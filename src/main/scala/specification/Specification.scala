@@ -1,10 +1,12 @@
 package specification
 
-import boogie._
-import ir._
+import boogie.*
+import ir.*
 import util.Logger
 
+
 case class Specification(
+    funcs: Set[FuncEntry],
     globals: Set[SpecGlobal],
     LPreds: Map[SpecGlobal, BExpr],
     relies: List[BExpr],
@@ -12,13 +14,18 @@ case class Specification(
     subroutines: List[SubroutineSpec],
     directFunctions: Set[FunctionOp]
 ) {
-  val guaranteeOldVars: List[SpecGlobalOrAccess] = guarantees.flatMap(g => g.oldSpecGlobals)
-
   val controls: Map[SpecGlobalOrAccess, Set[SpecGlobal]] = {
     val controlledBy = LPreds.map((k, v) => k -> v.specGlobals).collect { case (k, v) if v.nonEmpty => (k, v) }
-    controlledBy.toSet.flatMap((k, v) => v.map(_ -> k)).groupMap(_._1)(_._2)
+    controlledBy.toSet.flatMap((k, v) => v.map(_ -> k)).groupMap(_(0))(_(1))
   }
   val controlled: Set[SpecGlobal] = controls.values.flatten.toSet
+}
+
+
+trait SymbolTableEntry{
+  val name: String
+  val size: Int
+  val address: BigInt
 }
 
 case class SubroutineSpec(

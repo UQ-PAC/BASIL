@@ -18,9 +18,7 @@ def load(s: InterpreterState, global: SpecGlobal): Option[BitVecLiteral] = {
 
   State.evaluate(
     s,
-    Eval.evalBV(f)(
-      MemoryLoad(SharedMemory("mem", 64, 8), BitVecLiteral(global.address, 64), Endian.LittleEndian, global.size)
-    )
+    Eval.loadBV(f)("mem", Scalar(BitVecLiteral(global.address, 64)), Endian.LittleEndian, global.size)
   ) match {
     case Right(e) => Some(e)
     case Left(e) => {
@@ -236,7 +234,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     prog(
       proc(
         "begin",
-        block("entry", Assign(R8, Register("R31", 64)), Assign(R0, bv64(n)), directCall("fib"), goto("done")),
+        block("entry", LocalAssign(R8, Register("R31", 64)), LocalAssign(R0, bv64(n)), directCall("fib"), goto("done")),
         block("done", Assert(BinaryExpr(BVEQ, R0, bv64(fib(n)))), ret)
       ),
       proc(
@@ -248,22 +246,22 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
           "dofib",
           Assume(BinaryExpr(BoolAND, BinaryExpr(BVNEQ, R0, bv64(0)), BinaryExpr(BVNEQ, R0, bv64(1)))),
           // R8 stack pointer preserved across calls
-          Assign(R7, BinaryExpr(BVADD, R8, bv64(8))),
-          MemoryAssign(stack, R7, R8, Endian.LittleEndian, 64), // sp
-          Assign(R8, R7),
-          Assign(R8, BinaryExpr(BVADD, R8, bv64(8))), // sp + 8
-          MemoryAssign(stack, R8, R0, Endian.LittleEndian, 64), // [sp + 8] = arg0
-          Assign(R0, BinaryExpr(BVSUB, R0, bv64(1))),
+          LocalAssign(R7, BinaryExpr(BVADD, R8, bv64(8))),
+          MemoryStore(stack, R7, R8, Endian.LittleEndian, 64), // sp
+          LocalAssign(R8, R7),
+          LocalAssign(R8, BinaryExpr(BVADD, R8, bv64(8))), // sp + 8
+          MemoryStore(stack, R8, R0, Endian.LittleEndian, 64), // [sp + 8] = arg0
+          LocalAssign(R0, BinaryExpr(BVSUB, R0, bv64(1))),
           directCall("fib"),
-          Assign(R2, R8), // sp + 8
-          Assign(R8, BinaryExpr(BVADD, R8, bv64(8))), // sp + 16
-          MemoryAssign(stack, R8, R0, Endian.LittleEndian, 64), // [sp + 16] = r1
-          Assign(R0, MemoryLoad(stack, R2, Endian.LittleEndian, 64)), // [sp + 8]
-          Assign(R0, BinaryExpr(BVSUB, R0, bv64(2))),
+          LocalAssign(R2, R8), // sp + 8
+          LocalAssign(R8, BinaryExpr(BVADD, R8, bv64(8))), // sp + 16
+          MemoryStore(stack, R8, R0, Endian.LittleEndian, 64), // [sp + 16] = r1
+          MemoryLoad(R0, stack, R2, Endian.LittleEndian, 64), // [sp + 8]
+          LocalAssign(R0, BinaryExpr(BVSUB, R0, bv64(2))),
           directCall("fib"),
-          Assign(R2, MemoryLoad(stack, R8, Endian.LittleEndian, 64)), // [sp + 16] (r1)
-          Assign(R0, BinaryExpr(BVADD, R0, R2)),
-          Assign(R8, MemoryLoad(stack, BinaryExpr(BVSUB, R8, bv64(16)), Endian.LittleEndian, 64)),
+          MemoryLoad(R2, stack, R8, Endian.LittleEndian, 64), // [sp + 16] (r1)
+          LocalAssign(R0, BinaryExpr(BVADD, R0, R2)),
+          MemoryLoad(R8, stack, BinaryExpr(BVSUB, R8, bv64(16)), Endian.LittleEndian, 64),
           ret
         )
       )
@@ -338,7 +336,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
   test("Capture IllegalArg") {
 
     val tp = prog(
-      proc("begin", block("shouldfail", Assign(R0, ZeroExtend(-1, BitVecLiteral(0, 64))), ret))
+      proc("begin", block("shouldfail", LocalAssign(R0, ZeroExtend(-1, BitVecLiteral(0, 64))), ret))
     )
 
     val ir = interpret(tp)

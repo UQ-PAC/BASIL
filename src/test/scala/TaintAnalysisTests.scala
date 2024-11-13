@@ -7,12 +7,12 @@ import test_util.BASILTest
 
 class TaintAnalysisTests extends AnyFunSuite, BASILTest {
   def getTaintAnalysisResults(program: Program, taint: Map[CFGPosition, Set[Taintable]]): Map[CFGPosition, Set[Taintable]] = {
-    val constPropResults = ConstantPropagationSolver(program).analyze()
+    val constPropResults = InterProcConstantPropagation(program).analyze()
     TaintAnalysis(program, Map(), constPropResults, taint).analyze().map { (c, m) => (c, m.map { (v, _) => v }.toSet)}
   }
 
   def getVarDepResults(program: Program, procedure: Procedure): Map[CFGPosition, Map[Taintable, Set[Taintable]]] = {
-    val constPropResults = ConstantPropagationSolver(program).analyze()
+    val constPropResults = InterProcConstantPropagation(program).analyze()
     val variables = registers
     ProcVariableDependencyAnalysis(program, variables, Map(), constPropResults, Map(), procedure).analyze()
   }
@@ -31,7 +31,7 @@ class TaintAnalysisTests extends AnyFunSuite, BASILTest {
         ),
         proc("f",
           block("assign",
-            Assign(R0, bv64(2), None),
+            LocalAssign(R0, bv64(2), None),
             goto("returnBlock"),
           ),
           block("returnBlock",
@@ -65,7 +65,7 @@ class TaintAnalysisTests extends AnyFunSuite, BASILTest {
         ),
         proc("f",
           block("assign",
-            Assign(R0, BinaryExpr(BVADD, R0, R1), None),
+            LocalAssign(R0, BinaryExpr(BVADD, R0, R1), None),
             goto("returnBlock"),
           ),
           block("returnBlock",
@@ -102,11 +102,11 @@ class TaintAnalysisTests extends AnyFunSuite, BASILTest {
             goto("a", "b"),
           ),
           block("a",
-            Assign(R0, R1, None),
+            LocalAssign(R0, R1, None),
             goto("returnBlock"),
           ),
           block("b",
-            Assign(R0, R2, None),
+            LocalAssign(R0, R2, None),
             goto("returnBlock"),
           ),
           block("returnBlock",
@@ -143,12 +143,12 @@ class TaintAnalysisTests extends AnyFunSuite, BASILTest {
             goto("a", "b"),
           ),
           block("a",
-            Assign(R1, R1, None),
+            LocalAssign(R1, R1, None),
             directCall("g"),
             goto("returnBlock"),
           ),
           block("b",
-            Assign(R1, R2, None),
+            LocalAssign(R1, R2, None),
             directCall("g"),
             goto("returnBlock"),
           ),
@@ -158,7 +158,7 @@ class TaintAnalysisTests extends AnyFunSuite, BASILTest {
         ),
         proc("g",
           block("body",
-            Assign(R0, R1, None),
+            LocalAssign(R0, R1, None),
             goto("returnBlock"),
           ),
           block("returnBlock",
@@ -195,11 +195,11 @@ class TaintAnalysisTests extends AnyFunSuite, BASILTest {
             goto("a", "b"),
           ),
           block("a",
-            Assign(R0, BinaryExpr(BVADD, R0, R1), None),
+            LocalAssign(R0, BinaryExpr(BVADD, R0, R1), None),
             goto("branch"),
           ),
           block("b",
-            Assign(R0, R2, None),
+            LocalAssign(R0, R2, None),
             goto("returnBlock"),
           ),
           block("returnBlock",

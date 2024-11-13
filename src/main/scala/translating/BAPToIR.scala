@@ -10,12 +10,15 @@ import scala.collection.mutable
 import scala.collection.immutable
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.TreeMap
 import util.intrusive_list.*
 
 class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
 
   private val nameToProcedure: mutable.Map[String, Procedure] = mutable.Map()
   private val labelToBlock: mutable.Map[String, Block] = mutable.Map()
+
+  private var loadCounter: Int = 0
 
   def translate: Program = {
     var mainProcedure: Option[Procedure] = None
@@ -30,10 +33,10 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
         }
         labelToBlock.addOne(b.label, block)
       }
-      procedure.formalInParam = mutable.SortedSet.from(s.in.map(_.toIR))
-      procedure.formalOutParam = mutable.SortedSet.from(s.out.filterNot(_.name.endsWith("_result")).map(_.toIR))
-      procedure.inParamDefaultBinding = immutable.SortedMap.from(s.in.map(s => s.toIR -> s.paramRegisterRVal))
-      procedure.outParamDefaultBinding = immutable.SortedMap.from(s.out.filterNot(_.name.endsWith("_result")).map(s => s.toIR -> s.paramRegisterLVal))
+      procedure.formalInParam = mutable.SortedSet.from(s.in.map(translateParam))
+      procedure.formalOutParam = mutable.SortedSet.from(s.out.filterNot(_.name.endsWith("_result")).map(translateParam))
+      procedure.inParamDefaultBinding = immutable.SortedMap.from(s.in.map(s => translateParam(s)-> paramRegisterRVal(s)))
+      procedure.outParamDefaultBinding = immutable.SortedMap.from(s.out.filterNot(_.name.endsWith("_result")).map(s => translateParam(s) -> paramRegisterLVal(s)))
 
       if (s.address.get == mainAddress) {
         mainProcedure = Some(procedure)
@@ -47,7 +50,10 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       for (b <- s.blocks) {
         val block = labelToBlock(b.label)
         for (st <- b.statements) {
-          block.statements.append(translate(st))
+          val statements = translateStatement(st)
+          for (s <- statements) {
+            block.statements.append(s)
+          }
         }
         val (call, jump, newBlocks) = translate(b.jumps, block)
         procedure.addBlocks(newBlocks)
@@ -63,10 +69,15 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
 
     }
 
-    val memorySections: ArrayBuffer[MemorySection] = ArrayBuffer()
+    val memorySections: mutable.TreeMap[BigInt, MemorySection] = mutable.TreeMap()
     for (m <- program.memorySections) {
-      val bytes = m.bytes.map(_.toIR)
-      memorySections.append(MemorySection(m.name, m.address, m.size, bytes))
+      val bytes = if (m.name == ".bss" && m.bytes.isEmpty) {
+        for (_ <- 0 until m.size) yield BitVecLiteral(0, 8)
+      } else {
+        m.bytes.map(translateLiteral)
+      }
+      val readOnly = m.name == ".rodata" || m.name == ".got" // crude heuristic
+      memorySections.addOne(m.address, MemorySection(m.name, m.address, m.size, bytes, readOnly, None))
     }
 
     class FixCallParams(subroutines: immutable.Map[String, BAPSubroutine]) extends CILVisitor {
@@ -85,20 +96,197 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       }
     }
 
-    var prog = Program(procedures, mainProcedure.get, memorySections, ArrayBuffer())
+    var prog = Program(procedures, mainProcedure.get, memorySections)
     visit_prog(FixCallParams(program.subroutines.map(s => s.name -> s).toMap), prog)
+    prog
   }
 
-  private def translate(s: BAPStatement) = s match {
+  private def translateStatement(s: BAPStatement): Seq[Statement] = s match {
     case b: BAPMemAssign =>
-      val mem = b.lhs.toIRMemory
-      if (mem != b.rhs.memory.toIRMemory) {
+      val mem = translateMemory(b.lhs)
+      if (mem != translateMemory(b.rhs.memory)) {
         throw Exception(s"$b has conflicting lhs ${b.lhs} and rhs ${b.rhs.memory}")
       }
-      MemoryAssign(mem, b.rhs.index.toIR, b.rhs.value.toIR, b.rhs.endian, b.rhs.size, Some(b.line))
+      Seq(MemoryStore(mem, translateExprOnly(b.rhs.index), translateExprOnly(b.rhs.value), b.rhs.endian, b.rhs.size, Some(b.line)))
     case b: BAPLocalAssign =>
-      Assign(b.lhs.toIR, b.rhs.toIR, Some(b.line))
+      val lhs = translateVar(b.lhs)
+      val (rhs, load) = translateExpr(b.rhs)
+      if (load.isDefined) {
+        val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, Some(b.line + "$0"))
+        val assign = LocalAssign(lhs, rhs, Some(b.line + "$1"))
+        Seq(loadWithLabel, assign)
+      } else {
+        val assign = LocalAssign(lhs, rhs, Some(b.line))
+        Seq(assign)
+      }
   }
+
+  private def translateExpr(e: BAPExpr): (Expr, Option[MemoryLoad]) = e match {
+    case b @ BAPConcat(left, right) =>
+      val (arg0, load0) = translateExpr(left)
+      val (arg1, load1) = translateExpr(right)
+      (load0, load1) match {
+        case (Some(load), None) => (BinaryExpr(BVCONCAT, arg0, arg1), Some(load))
+        case (None, Some(load)) => (BinaryExpr(BVCONCAT, arg0, arg1), Some(load))
+        case (None, None) => (BinaryExpr(BVCONCAT, arg0, arg1), None)
+        case (Some(_), Some(_)) => throw Exception(s"$b contains multiple loads")
+      }
+    case BAPSignedExtend(width, body) =>
+      if (width > body.size) {
+        val (irBody, load) = translateExpr(body)
+        val se = SignExtend(width - body.size, irBody)
+        (se, load)
+      } else {
+        translateExpr(BAPExtract(width - 1, 0, body))
+      }
+    case BAPUnsignedExtend(width, body) =>
+      if (width > body.size) {
+        val (irBody, load) = translateExpr(body)
+        val ze = ZeroExtend(width - body.size, irBody)
+        (ze, load)
+      } else {
+        translateExpr(BAPExtract(width - 1, 0, body))
+      }
+    case b @ BAPExtract(high, low, body) =>
+      val bodySize = body.size
+      val (irBody, load) = translateExpr(body)
+      val extract = if (b.size > bodySize) {
+        if (low == 0) {
+          ZeroExtend(b.size - bodySize, irBody)
+        } else {
+          Extract(high + 1, low, ZeroExtend(b.size - bodySize, irBody))
+        }
+      } else {
+        Extract(high + 1, low, irBody)
+      }
+      (extract, load)
+    case literal: BAPLiteral => (translateLiteral(literal), None)
+    case BAPUnOp(operator, exp) => operator match {
+      case NOT => (UnaryExpr(BVNOT, translateExprOnly(exp)), None)
+      case NEG => (UnaryExpr(BVNEG, translateExprOnly(exp)), None)
+    }
+    case BAPBinOp(operator, lhs, rhs) => operator match {
+      case PLUS => (BinaryExpr(BVADD, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      case MINUS => (BinaryExpr(BVSUB, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      case TIMES => (BinaryExpr(BVMUL, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      case DIVIDE => (BinaryExpr(BVUDIV, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      case SDIVIDE => (BinaryExpr(BVSDIV, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      // counterintuitive but correct according to BAP source
+      case MOD => (BinaryExpr(BVSREM, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      // counterintuitive but correct according to BAP source
+      case SMOD => (BinaryExpr(BVUREM, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      case LSHIFT => // BAP says caring about this case is necessary?
+        if (lhs.size == rhs.size) {
+          (BinaryExpr(BVSHL, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+        } else {
+          (BinaryExpr(BVSHL, translateExprOnly(lhs), ZeroExtend(lhs.size - rhs.size, translateExprOnly(rhs))), None)
+        }
+      case RSHIFT =>
+        if (lhs.size == rhs.size) {
+          (BinaryExpr(BVLSHR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+        } else {
+          (BinaryExpr(BVLSHR, translateExprOnly(lhs), ZeroExtend(lhs.size - rhs.size, translateExprOnly(rhs))), None)
+        }
+      case ARSHIFT =>
+        if (lhs.size == rhs.size) {
+          (BinaryExpr(BVASHR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+        } else {
+          (BinaryExpr(BVASHR, translateExprOnly(lhs), ZeroExtend(lhs.size - rhs.size, translateExprOnly(rhs))), None)
+        }
+      case AND => (BinaryExpr(BVAND, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      case OR => (BinaryExpr(BVOR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      case XOR => (BinaryExpr(BVXOR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      case EQ => (BinaryExpr(BVCOMP, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      case NEQ => (UnaryExpr(BVNOT, BinaryExpr(BVCOMP, translateExprOnly(lhs), translateExprOnly(rhs))), None)
+      case LT => (BinaryExpr(BVULT, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      case LE => (BinaryExpr(BVULE, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      case SLT => (BinaryExpr(BVSLT, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      case SLE => (BinaryExpr(BVSLE, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+    }
+    case b: BAPVar => (translateVar(b), None)
+    case BAPMemAccess(memory, index, endian, size) =>
+      val temp = LocalVar("load" + loadCounter, BitVecType(size))
+      loadCounter += 1
+      val load = MemoryLoad(temp, translateMemory(memory), translateExprOnly(index), endian, size, None)
+      (temp, Some(load))
+  }
+
+  private def translateExprOnly(e: BAPExpr) = {
+    val (expr, load) = translateExpr(e)
+    if (load.isDefined) {
+      throw Exception(s"unexpected load in $e")
+    }
+    expr
+  }
+
+  private def paramRegisterLVal(param: BAPParameter): Variable = translateVar(param.value)
+  private def toIROutParam(param: BAPParameter) =  {
+    paramRegisterLVal(param) match {
+      case r: Register => {
+        if (r.size == param.size) then {
+          translateParam(param)
+        } else {
+          LocalVar(param.name, BitVecType(r.size))
+        }
+      }
+      case _ => throw Exception(s"subroutine parameter $this refers to non-register variable ${param.value}")
+    }
+
+  }
+  
+  private def paramRegisterRVal(p: BAPParameter): Expr = {
+    paramRegisterLVal(p) match {
+      case r: Register => {
+        if (r.size == p.size) then {
+          r
+        } else if (r.size > p.size){
+          Extract(p.size, 0, r)
+        } else {
+          ZeroExtend(p.size - r.size, r)
+        }
+      }
+      case _ => throw Exception(s"subroutine parameter $this refers to non-register variable ${p.value}")
+    }
+  }
+  def paramVariableRVal(p: BAPParameter): Expr = {
+    paramRegisterLVal(p) match {
+      case r: Register => {
+        if (r.size == p.size) then {
+          translateParam(p)
+        } else {
+          ZeroExtend(r.size - p.size, translateParam(p))
+        }
+      }
+      case _ => throw Exception(s"subroutine parameter $this refers to non-register variable ${p.value}")
+    }
+  }
+
+  def toAssignOut(p: BAPParameter) : LocalAssign = {
+    LocalAssign(translateParam(p), paramRegisterRVal(p))
+  }
+
+  def toAssignIn(p: BAPParameter) : LocalAssign = {
+    LocalAssign(paramRegisterLVal(p), paramVariableRVal(p))
+  }
+
+  def translateParam(p: BAPParameter): LocalVar = LocalVar(p.name, BitVecType(p.size))
+
+  private def translateVar(variable: BAPVar): Variable = variable match {
+    case BAPRegister(name, size) => Register(name, size)
+    case BAPLocalVar(name, size) => LocalVar(name, BitVecType(size))
+  }
+
+  private def translateMemory(memory: BAPMemory): Memory = {
+    SharedMemory(memory.name, memory.addressSize, memory.valueSize)
+  }
+
+
+
+
+  private def translateLiteral(literal: BAPLiteral) = {
+    BitVecLiteral(literal.value, literal.size)
+  }
+
 
   /**
     * Translates a list of jumps from BAP into a single Jump at the IR level by moving any conditions on jumps to
@@ -124,7 +312,9 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
                   // condition is true and previous conditions existing means this condition
                   // is actually that all previous conditions are false
                   val conditionsIR = conditions.map(c => convertConditionBool(c, true))
-                  val condition = conditionsIR.tail.foldLeft(conditionsIR.head)((ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands))
+                  val condition = conditionsIR.tail.foldLeft(conditionsIR.head) {
+                    (ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands)
+                  }
                   val newBlock = newBlockCondition(block, target, condition)
                   newBlocks.append(newBlock)
                   targets.append(newBlock)
@@ -139,7 +329,9 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
                   // if this is not the first condition, then we need to need to add
                   // that all previous conditions are false
                   val conditionsIR = conditions.map(c => convertConditionBool(c, true))
-                  conditionsIR.tail.foldLeft(currentCondition)((ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands))
+                  conditionsIR.tail.foldLeft(currentCondition) {
+                    (ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands)
+                  }
                 }
                 val newBlock = newBlockCondition(block, target, condition)
                 newBlocks.append(newBlock)
@@ -154,11 +346,11 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       jumps.head match {
         case b: BAPDirectCall =>
           val call = Some(DirectCall(nameToProcedure(b.target), Some(b.line)))
-          val ft = (b.returnTarget.map(t => labelToBlock(t))).map(x => GoTo(Set(x))).getOrElse(Unreachable())
+          val ft = b.returnTarget.map(t => labelToBlock(t)).map(x => GoTo(Set(x))).getOrElse(Unreachable())
           (call, ft, ArrayBuffer())
         case b: BAPIndirectCall =>
-          val call = IndirectCall(b.target.toIR, Some(b.line))
-          val ft = (b.returnTarget.map(t => labelToBlock(t))).map(x => GoTo(Set(x))).getOrElse(Unreachable())
+          val call = IndirectCall(translateVar(b.target), Some(b.line))
+          val ft = b.returnTarget.map(t => labelToBlock(t)).map(x => GoTo(Set(x))).getOrElse(Unreachable())
           (Some(call), ft, ArrayBuffer())
         case b: BAPGoTo =>
           val target = labelToBlock(b.target)
@@ -185,7 +377,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     * if necessary.
     * */
   private def convertConditionBool(expr: BAPExpr, negative: Boolean): Expr = {
-    val e = expr.toIR
+    val e = translateExprOnly(expr)
     e.getType match {
       case BitVecType(s) =>
         if (negative) {

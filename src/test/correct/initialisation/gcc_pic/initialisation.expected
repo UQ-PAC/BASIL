@@ -1,4 +1,8 @@
+var {:extern} Gamma_R0: bool;
+var {:extern} Gamma_R1: bool;
 var {:extern} Gamma_mem: [bv64]bool;
+var {:extern} R0: bv64;
+var {:extern} R1: bv64;
 var {:extern} mem: [bv64]bv8;
 const {:extern} $a_addr: bv64;
 axiom ($a_addr == 69664bv64);
@@ -8,26 +12,12 @@ const {:extern} $y_addr: bv64;
 axiom ($y_addr == 69652bv64);
 const {:extern} $z_addr: bv64;
 axiom ($z_addr == 69656bv64);
-function {:extern} L(memory: [bv64]bv8, index: bv64) returns (bool) {
+function {:extern} L(mem$in: [bv64]bv8, index: bv64) returns (bool) {
   false
 }
 
 function {:extern} {:bvbuiltin "bvadd"} bvadd32(bv32, bv32) returns (bv32);
 function {:extern} {:bvbuiltin "bvadd"} bvadd64(bv64, bv64) returns (bv64);
-function {:extern} {:bvbuiltin "bvlshr"} bvlshr32(bv32, bv32) returns (bv32);
-function {:extern} {:bvbuiltin "bvlshr"} bvlshr64(bv64, bv64) returns (bv64);
-function {:extern} {:bvbuiltin "bvmul"} bvmul64(bv64, bv64) returns (bv64);
-function {:extern} {:bvbuiltin "bvsub"} bvsub64(bv64, bv64) returns (bv64);
-function {:extern} {:bvbuiltin "bvule"} bvule64(bv64, bv64) returns (bool);
-function {:extern} {:bvbuiltin "bvult"} bvult64(bv64, bv64) returns (bool);
-function {:inline} byte_extract32_64(value: bv32, offset: bv64) returns (bv8) {
-  bvlshr32(value,bvmul64(offset,8bv64)[32:0])[8:0]
-}
-
-function {:inline} byte_extract64_64(value: bv64, offset: bv64) returns (bv8) {
-  bvlshr64(value,bvmul64(offset,8bv64))[8:0]
-}
-
 function {:extern} gamma_load32(gammaMap: [bv64]bool, index: bv64) returns (bool) {
   (gammaMap[bvadd64(index, 3bv64)] && (gammaMap[bvadd64(index, 2bv64)] && (gammaMap[bvadd64(index, 1bv64)] && gammaMap[index])))
 }
@@ -41,19 +31,15 @@ function {:extern} gamma_load8(gammaMap: [bv64]bool, index: bv64) returns (bool)
 }
 
 function {:extern} gamma_store32(gammaMap: [bv64]bool, index: bv64, value: bool) returns ([bv64]bool) {
-  (lambda i: bv64 :: ((if in_bounds64_le(index, 4bv64, i) then value else gammaMap[i])))
+  gammaMap[index := value][bvadd64(index, 1bv64) := value][bvadd64(index, 2bv64) := value][bvadd64(index, 3bv64) := value]
 }
 
 function {:extern} gamma_store64(gammaMap: [bv64]bool, index: bv64, value: bool) returns ([bv64]bool) {
-  (lambda i: bv64 :: ((if in_bounds64_le(index, 8bv64, i) then value else gammaMap[i])))
+  gammaMap[index := value][bvadd64(index, 1bv64) := value][bvadd64(index, 2bv64) := value][bvadd64(index, 3bv64) := value][bvadd64(index, 4bv64) := value][bvadd64(index, 5bv64) := value][bvadd64(index, 6bv64) := value][bvadd64(index, 7bv64) := value]
 }
 
 function {:extern} gamma_store8(gammaMap: [bv64]bool, index: bv64, value: bool) returns ([bv64]bool) {
   gammaMap[index := value]
-}
-
-function {:inline} in_bounds64_le(base: bv64, len: bv64, i: bv64) returns (bool) {
-  (if bvule64(base, bvadd64(base, len)) then (bvule64(base, i) && bvult64(i, bvadd64(base, len))) else (bvule64(base, i) || bvult64(i, bvadd64(base, len))))
 }
 
 function {:extern} memory_load32_le(memory: [bv64]bv8, index: bv64) returns (bv32) {
@@ -69,40 +55,37 @@ function {:extern} memory_load8_le(memory: [bv64]bv8, index: bv64) returns (bv8)
 }
 
 function {:extern} memory_store32_le(memory: [bv64]bv8, index: bv64, value: bv32) returns ([bv64]bv8) {
-  (lambda i: bv64 :: ((if in_bounds64_le(index, 4bv64, i) then byte_extract32_64(value, bvsub64(i, index)) else memory[i])))
+  memory[index := value[8:0]][bvadd64(index, 1bv64) := value[16:8]][bvadd64(index, 2bv64) := value[24:16]][bvadd64(index, 3bv64) := value[32:24]]
 }
 
 function {:extern} memory_store64_le(memory: [bv64]bv8, index: bv64, value: bv64) returns ([bv64]bv8) {
-  (lambda i: bv64 :: ((if in_bounds64_le(index, 8bv64, i) then byte_extract64_64(value, bvsub64(i, index)) else memory[i])))
+  memory[index := value[8:0]][bvadd64(index, 1bv64) := value[16:8]][bvadd64(index, 2bv64) := value[24:16]][bvadd64(index, 3bv64) := value[32:24]][bvadd64(index, 4bv64) := value[40:32]][bvadd64(index, 5bv64) := value[48:40]][bvadd64(index, 6bv64) := value[56:48]][bvadd64(index, 7bv64) := value[64:56]]
 }
 
 function {:extern} memory_store8_le(memory: [bv64]bv8, index: bv64, value: bv8) returns ([bv64]bv8) {
-  memory[index := value]
+  memory[index := value[8:0]]
 }
 
 function {:extern} {:bvbuiltin "zero_extend 32"} zero_extend32_32(bv32) returns (bv64);
 function {:extern} {:bvbuiltin "zero_extend 56"} zero_extend56_8(bv8) returns (bv64);
 procedure {:extern} rely();
   modifies Gamma_mem, mem;
-  ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
-  free ensures (memory_load8_le(mem, 2084bv64) == 1bv8);
-  free ensures (memory_load8_le(mem, 2085bv64) == 0bv8);
-  free ensures (memory_load8_le(mem, 2086bv64) == 2bv8);
-  free ensures (memory_load8_le(mem, 2087bv64) == 0bv8);
-  free ensures (memory_load64_le(mem, 69608bv64) == 69652bv64);
-  free ensures (memory_load64_le(mem, 69576bv64) == 69656bv64);
-  free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
-  free ensures (memory_load64_le(mem, 69616bv64) == 1940bv64);
-  free ensures (memory_load64_le(mem, 69584bv64) == 69648bv64);
-  free ensures (memory_load64_le(mem, 69600bv64) == 69664bv64);
+  ensures (mem == old(mem));
+  free ensures (memory_load32_le(mem, 2084bv64) == 131073bv32);
   free ensures (memory_load64_le(mem, 68984bv64) == 1936bv64);
   free ensures (memory_load64_le(mem, 68992bv64) == 1856bv64);
+  free ensures (memory_load64_le(mem, 69576bv64) == 69656bv64);
+  free ensures (memory_load64_le(mem, 69584bv64) == 69648bv64);
+  free ensures (memory_load64_le(mem, 69600bv64) == 69664bv64);
+  free ensures (memory_load64_le(mem, 69608bv64) == 69652bv64);
+  free ensures (memory_load64_le(mem, 69616bv64) == 1940bv64);
+  free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
 
 procedure {:extern} rely_transitive();
   modifies Gamma_mem, mem;
-  ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
+  ensures (mem == old(mem));
 
 implementation {:extern} rely_transitive()
 {
@@ -115,120 +98,96 @@ procedure {:extern} rely_reflexive();
 procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
 
-procedure main(R0_in: bv64, Gamma_R0_in: bool, R1_in: bv64, Gamma_R1_in: bool) returns (R0_out: bv64, Gamma_R0_out: bool, R1_out: bv64, Gamma_R1_out: bool);
-  modifies Gamma_mem, mem;
+procedure main();
+  modifies Gamma_R0, Gamma_R1, Gamma_mem, R0, R1, mem;
   free requires (memory_load64_le(mem, 69632bv64) == 0bv64);
   free requires (memory_load64_le(mem, 69640bv64) == 69640bv64);
   free requires (memory_load64_le(mem, 69648bv64) == 416611827717bv64);
   free requires (memory_load64_le(mem, 69656bv64) == 68719476735bv64);
   free requires (memory_load64_le(mem, 69664bv64) == 8589934593bv64);
-  free requires (memory_load8_le(mem, 2084bv64) == 1bv8);
-  free requires (memory_load8_le(mem, 2085bv64) == 0bv8);
-  free requires (memory_load8_le(mem, 2086bv64) == 2bv8);
-  free requires (memory_load8_le(mem, 2087bv64) == 0bv8);
-  free requires (memory_load64_le(mem, 69608bv64) == 69652bv64);
-  free requires (memory_load64_le(mem, 69576bv64) == 69656bv64);
-  free requires (memory_load64_le(mem, 69640bv64) == 69640bv64);
-  free requires (memory_load64_le(mem, 69616bv64) == 1940bv64);
-  free requires (memory_load64_le(mem, 69584bv64) == 69648bv64);
-  free requires (memory_load64_le(mem, 69600bv64) == 69664bv64);
+  free requires (memory_load32_le(mem, 2084bv64) == 131073bv32);
   free requires (memory_load64_le(mem, 68984bv64) == 1936bv64);
   free requires (memory_load64_le(mem, 68992bv64) == 1856bv64);
+  free requires (memory_load64_le(mem, 69576bv64) == 69656bv64);
+  free requires (memory_load64_le(mem, 69584bv64) == 69648bv64);
+  free requires (memory_load64_le(mem, 69600bv64) == 69664bv64);
+  free requires (memory_load64_le(mem, 69608bv64) == 69652bv64);
+  free requires (memory_load64_le(mem, 69616bv64) == 1940bv64);
+  free requires (memory_load64_le(mem, 69640bv64) == 69640bv64);
   ensures (memory_load32_le(mem, $x_addr) == 6bv32);
   ensures (memory_load32_le(mem, bvadd64($a_addr, 4bv64)) == 4bv32);
   ensures (memory_load32_le(mem, bvadd64($a_addr, 0bv64)) == 1bv32);
-  free ensures (memory_load8_le(mem, 2084bv64) == 1bv8);
-  free ensures (memory_load8_le(mem, 2085bv64) == 0bv8);
-  free ensures (memory_load8_le(mem, 2086bv64) == 2bv8);
-  free ensures (memory_load8_le(mem, 2087bv64) == 0bv8);
-  free ensures (memory_load64_le(mem, 69608bv64) == 69652bv64);
-  free ensures (memory_load64_le(mem, 69576bv64) == 69656bv64);
-  free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
-  free ensures (memory_load64_le(mem, 69616bv64) == 1940bv64);
-  free ensures (memory_load64_le(mem, 69584bv64) == 69648bv64);
-  free ensures (memory_load64_le(mem, 69600bv64) == 69664bv64);
+  free ensures (memory_load32_le(mem, 2084bv64) == 131073bv32);
   free ensures (memory_load64_le(mem, 68984bv64) == 1936bv64);
   free ensures (memory_load64_le(mem, 68992bv64) == 1856bv64);
+  free ensures (memory_load64_le(mem, 69576bv64) == 69656bv64);
+  free ensures (memory_load64_le(mem, 69584bv64) == 69648bv64);
+  free ensures (memory_load64_le(mem, 69600bv64) == 69664bv64);
+  free ensures (memory_load64_le(mem, 69608bv64) == 69652bv64);
+  free ensures (memory_load64_le(mem, 69616bv64) == 1940bv64);
+  free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
 
-implementation main(R0_in: bv64, Gamma_R0_in: bool, R1_in: bv64, Gamma_R1_in: bool) returns (R0_out: bv64, Gamma_R0_out: bool, R1_out: bv64, Gamma_R1_out: bool)
+implementation main()
 {
-  var Gamma_R0_11: bool;
-  var Gamma_R0_13: bool;
-  var Gamma_R0_14: bool;
-  var Gamma_R0_16: bool;
-  var Gamma_R0_18: bool;
-  var Gamma_R0_19: bool;
-  var Gamma_R0_20: bool;
-  var Gamma_R0_22: bool;
-  var Gamma_R0_3: bool;
-  var Gamma_R0_4: bool;
-  var Gamma_R0_6: bool;
-  var Gamma_R0_8: bool;
-  var Gamma_R0_9: bool;
-  var Gamma_R1_2: bool;
-  var Gamma_R1_4: bool;
-  var Gamma_R1_5: bool;
-  var R0_11: bv64;
-  var R0_13: bv64;
-  var R0_14: bv32;
-  var R0_16: bv64;
-  var R0_18: bv64;
-  var R0_19: bv64;
-  var R0_20: bv64;
-  var R0_22: bv64;
-  var R0_3: bv64;
-  var R0_4: bv32;
-  var R0_6: bv64;
-  var R0_8: bv64;
-  var R0_9: bv64;
-  var R1_2: bv32;
-  var R1_4: bv32;
-  var R1_5: bv64;
   lmain:
+    assume {:captureState "lmain"} true;
+    R0, Gamma_R0 := 65536bv64, true;
     call rely();
-    R0_3, Gamma_R0_3 := memory_load64_le(mem, 69584bv64), (gamma_load64(Gamma_mem, 69584bv64) || L(mem, 69584bv64));
+    R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 4048bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4048bv64)) || L(mem, bvadd64(R0, 4048bv64)));
     call rely();
-    R0_4, Gamma_R0_4 := memory_load32_le(mem, R0_3), (gamma_load32(Gamma_mem, R0_3) || L(mem, R0_3));
-    R1_2, Gamma_R1_2 := bvadd32(R0_4, 1bv32), Gamma_R0_4;
+    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, R0)), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
+    R1, Gamma_R1 := zero_extend32_32(bvadd32(R0[32:0], 1bv32)), Gamma_R0;
+    R0, Gamma_R0 := 65536bv64, true;
     call rely();
-    R0_6, Gamma_R0_6 := memory_load64_le(mem, 69584bv64), (gamma_load64(Gamma_mem, 69584bv64) || L(mem, 69584bv64));
+    R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 4048bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4048bv64)) || L(mem, bvadd64(R0, 4048bv64)));
     call rely();
-    assert (L(mem, R0_6) ==> Gamma_R1_2);
-    mem, Gamma_mem := memory_store32_le(mem, R0_6, R1_2), gamma_store32(Gamma_mem, R0_6, Gamma_R1_2);
+    assert (L(mem, R0) ==> Gamma_R1);
+    mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
+    assume {:captureState "%00000351"} true;
+    R0, Gamma_R0 := 65536bv64, true;
     call rely();
-    R0_8, Gamma_R0_8 := memory_load64_le(mem, 69576bv64), (gamma_load64(Gamma_mem, 69576bv64) || L(mem, 69576bv64));
+    R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 4040bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4040bv64)) || L(mem, bvadd64(R0, 4040bv64)));
     call rely();
-    R0_9, Gamma_R0_9 := memory_load64_le(mem, R0_8), (gamma_load64(Gamma_mem, R0_8) || L(mem, R0_8));
+    R0, Gamma_R0 := memory_load64_le(mem, R0), (gamma_load64(Gamma_mem, R0) || L(mem, R0));
+    R1, Gamma_R1 := bvadd64(R0, 18446744073709551615bv64), Gamma_R0;
+    R0, Gamma_R0 := 65536bv64, true;
     call rely();
-    R0_11, Gamma_R0_11 := memory_load64_le(mem, 69576bv64), (gamma_load64(Gamma_mem, 69576bv64) || L(mem, 69576bv64));
+    R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 4040bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4040bv64)) || L(mem, bvadd64(R0, 4040bv64)));
     call rely();
-    assert (L(mem, R0_11) ==> Gamma_R0_9);
-    mem, Gamma_mem := memory_store64_le(mem, R0_11, bvadd64(R0_9, 18446744073709551615bv64)), gamma_store64(Gamma_mem, R0_11, Gamma_R0_9);
+    assert (L(mem, R0) ==> Gamma_R1);
+    mem, Gamma_mem := memory_store64_le(mem, R0, R1), gamma_store64(Gamma_mem, R0, Gamma_R1);
+    assume {:captureState "%0000037e"} true;
+    R0, Gamma_R0 := 65536bv64, true;
     call rely();
-    R0_13, Gamma_R0_13 := memory_load64_le(mem, 69600bv64), (gamma_load64(Gamma_mem, 69600bv64) || L(mem, 69600bv64));
+    R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 4064bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4064bv64)) || L(mem, bvadd64(R0, 4064bv64)));
     call rely();
-    R0_14, Gamma_R0_14 := memory_load32_le(mem, R0_13), (gamma_load32(Gamma_mem, R0_13) || L(mem, R0_13));
-    R1_4, Gamma_R1_4 := bvadd32(R0_14, 3bv32), Gamma_R0_14;
+    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, R0)), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
+    R1, Gamma_R1 := zero_extend32_32(bvadd32(R0[32:0], 3bv32)), Gamma_R0;
+    R0, Gamma_R0 := 65536bv64, true;
     call rely();
-    R0_16, Gamma_R0_16 := memory_load64_le(mem, 69600bv64), (gamma_load64(Gamma_mem, 69600bv64) || L(mem, 69600bv64));
+    R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 4064bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4064bv64)) || L(mem, bvadd64(R0, 4064bv64)));
     call rely();
-    assert (L(mem, bvadd64(R0_16, 4bv64)) ==> Gamma_R1_4);
-    mem, Gamma_mem := memory_store32_le(mem, bvadd64(R0_16, 4bv64), R1_4), gamma_store32(Gamma_mem, bvadd64(R0_16, 4bv64), Gamma_R1_4);
+    assert (L(mem, bvadd64(R0, 4bv64)) ==> Gamma_R1);
+    mem, Gamma_mem := memory_store32_le(mem, bvadd64(R0, 4bv64), R1[32:0]), gamma_store32(Gamma_mem, bvadd64(R0, 4bv64), Gamma_R1);
+    assume {:captureState "%000003ab"} true;
+    R0, Gamma_R0 := 65536bv64, true;
     call rely();
-    R0_18, Gamma_R0_18 := memory_load64_le(mem, 69608bv64), (gamma_load64(Gamma_mem, 69608bv64) || L(mem, 69608bv64));
+    R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 4072bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4072bv64)) || L(mem, bvadd64(R0, 4072bv64)));
     call rely();
-    R0_19, Gamma_R0_19 := zero_extend56_8(memory_load8_le(mem, R0_18)), (gamma_load8(Gamma_mem, R0_18) || L(mem, R0_18));
-    R0_20, Gamma_R0_20 := zero_extend32_32(bvadd32(R0_19[32:0], 1bv32)), Gamma_R0_19;
-    R1_5, Gamma_R1_5 := zero_extend56_8(R0_20[8:0]), Gamma_R0_20;
+    R0, Gamma_R0 := zero_extend56_8(memory_load8_le(mem, R0)), (gamma_load8(Gamma_mem, R0) || L(mem, R0));
+    R0, Gamma_R0 := zero_extend32_32(bvadd32(R0[32:0], 1bv32)), Gamma_R0;
+    R1, Gamma_R1 := zero_extend32_32((0bv24 ++ R0[8:0])), Gamma_R0;
+    R0, Gamma_R0 := 65536bv64, true;
     call rely();
-    R0_22, Gamma_R0_22 := memory_load64_le(mem, 69608bv64), (gamma_load64(Gamma_mem, 69608bv64) || L(mem, 69608bv64));
+    R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 4072bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4072bv64)) || L(mem, bvadd64(R0, 4072bv64)));
     call rely();
-    assert (L(mem, R0_22) ==> Gamma_R1_5);
-    mem, Gamma_mem := memory_store8_le(mem, R0_22, R1_5[8:0]), gamma_store8(Gamma_mem, R0_22, Gamma_R1_5);
+    assert (L(mem, R0) ==> Gamma_R1);
+    mem, Gamma_mem := memory_store8_le(mem, R0, R1[8:0]), gamma_store8(Gamma_mem, R0, Gamma_R1);
+    assume {:captureState "%000003de"} true;
+    R0, Gamma_R0 := 0bv64, true;
     goto main_basil_return;
   main_basil_return:
-    R0_out, R1_out := 0bv64, R1_5;
-    Gamma_R0_out, Gamma_R1_out := true, Gamma_R1_5;
+    assume {:captureState "main_basil_return"} true;
     return;
 }
 

@@ -9,14 +9,15 @@ import analysis._
 
 val phiAssignLabel = Some("phi")
 
-/** This transforms the program by adding no-op copies and renaming local variable indices to establish the property that
+/** This transforms the program by adding no-op copies and renaming local variable indices to establish the property
+  * that
   *
   * \forall variables v, forall uses of v : u, No subset of definitions of v defines the use u.
   */
 
 class OnePassDSA(
-    /** Check our (faster) live var result against the TIP sovler solution 
-     */
+    /** Check our (faster) live var result against the TIP sovler solution
+      */
 ) {
 
   val liveVarsDom = transforms.IntraLiveVarsDomain()
@@ -44,7 +45,7 @@ class OnePassDSA(
     }
   }
 
-  def appendAssign(b: Block, s: Assign) = {
+  def appendAssign(b: Block, s: LocalAssign) = {
     // maintain call end of lock invariant
     if (b.statements.size > 0 && b.statements.last.isInstanceOf[Call]) {
       b.statements.insertBefore(b.statements.last, s)
@@ -73,14 +74,8 @@ class OnePassDSA(
     for (s <- block.statements) {
       visit_stmt(StmtRenamer(Map(), renames.toMap), s)
       s match {
-        case a @ Assign(lhs: LocalVar, _, _) => {
-          count(lhs) = count(lhs) + 1
-          renameLHS(a, lhs, count(lhs))
-          renames = renames + (lhs -> count(lhs))
-
-        }
-        case d: DirectCall => {
-          val vars = d.outParams.map(_._2).toList
+        case d: Assign => {
+          val vars = d.assignees
           for (lhs <- vars) {
             count(lhs) = count(lhs) + 1
             renameLHS(d, lhs, count(lhs))
@@ -141,7 +136,7 @@ class OnePassDSA(
             // if there is no renaming such that all the incoming renames agree
             // then we create a new copy
             case h :: tl =>
-              tl.foldLeft(Some(h): Option[Int])((acc : Option[Int], rn: Int) =>
+              tl.foldLeft(Some(h): Option[Int])((acc: Option[Int], rn: Int) =>
                 acc match {
                   case Some(v) if v == rn => Some(v)
                   case _                  => None
@@ -161,7 +156,7 @@ class OnePassDSA(
             assert(state(b).filled)
             state(nb).renamesBefore.addAll(state(b).renamesAfter)
 
-            val assign = Assign(v, v, Some("phiback"))
+            val assign = LocalAssign(v, v, Some("phiback"))
             state(nb).renamesAfter(v) = count(v)
             appendAssign(nb, assign)
             renameLHS(assign, v, state(nb).renamesAfter(v))
@@ -216,7 +211,7 @@ class OnePassDSA(
             state(nb).renamesAfter(v) = count(v)
           }
           if (state(nb).renamesBefore(v) != state(nb).renamesAfter(v)) {
-            val assign = Assign(v, v, phiAssignLabel)
+            val assign = LocalAssign(v, v, phiAssignLabel)
             appendAssign(nb, assign)
             renameLHS(assign, v, state(nb).renamesAfter(v))
             renameRHS(assign, v, state(nb).renamesBefore(v))
@@ -238,19 +233,19 @@ class OnePassDSA(
       block: Block
   ) = {
 
-  /** VisitBlock:
-    *
-    *   1. for all complete incoming
-    *      - if there is an incoming rename that is not equal across the predecessors
-    *      - add back phi block to each incoming edge
-    *      - create a fresh copy of each non-uniform renamed variable
-    *      - add copies to each phi block unify the incoming rename with the nominated new rename 2. add local value
-    *        numbering to this block 3. if all predecessors are filled, mark this complete, otherwise mark this
-    *        filled. 4. for all successors
-    *   - if marked filled, add phi block to unify our outgoing with its incoming
-    *   - if > 1 total predecessors for each unmarked , add phi block to nominate a new copy 5. for all successors, if
-    *     all predecessors are now filled, mark complete
-    */
+    /** VisitBlock:
+      *
+      *   1. for all complete incoming
+      *      - if there is an incoming rename that is not equal across the predecessors
+      *      - add back phi block to each incoming edge
+      *      - create a fresh copy of each non-uniform renamed variable
+      *      - add copies to each phi block unify the incoming rename with the nominated new rename 2. add local value
+      *        numbering to this block 3. if all predecessors are filled, mark this complete, otherwise mark this
+      *        filled. 4. for all successors
+      *   - if marked filled, add phi block to unify our outgoing with its incoming
+      *   - if > 1 total predecessors for each unmarked , add phi block to nominate a new copy 5. for all successors, if
+      *     all predecessors are now filled, mark complete
+      */
 
     def state(b: Block) = withDefault(_st)(b)
 
@@ -293,7 +288,6 @@ class OnePassDSA(
     for (b <- p.blocks.filterNot(liveAfterIn.contains)) {
       liveAfter(b) = liveVarsDom.bot
     }
-
 
     val worklist = mutable.PriorityQueue[Block]()(Ordering.by(b => b.rpoOrder))
     worklist.addAll(p.blocks)
@@ -345,10 +339,10 @@ def rdDSAProperty(p: Procedure): Boolean = {
    * DSA Property: Every use of a variable v has every definition of v as a reaching definition
    *  / no strict subset of defintions of v defines any use of v, forall v.
    */
-  val defs: Map[Variable, Set[Assign | DirectCall]] = p
+  val defs: Map[Variable, Set[Assign]] = p
     .flatMap {
-      case a: Assign     => Seq((a.lhs, (a: Assign | DirectCall)))
-      case a: DirectCall => a.outParams.map(_._2).map((l: Variable) => (l, (a: Assign | DirectCall))).toSeq
+      case a: SingleAssign => Seq((a.lhs, (a: Assign)))
+      case a: DirectCall => a.outParams.map(_._2).map((l: Variable) => (l, (a: Assign))).toSeq
       case _             => Seq()
     }
     .groupBy(_._1)
@@ -359,8 +353,8 @@ def rdDSAProperty(p: Procedure): Boolean = {
   Logger.debug(s"Reaching defs ${p.name} DONE")
 
   class CheckDSAProperty(
-      defs: Map[Variable, Set[Assign | DirectCall]],
-      reaching: Map[Command, Map[Variable, Set[Assign | DirectCall]]]
+      defs: Map[Variable, Set[Assign]],
+      reaching: Map[Command, Map[Variable, Set[Assign]]]
   ) extends CILVisitor {
     var passed = true
     var stmt: Command = null
@@ -412,7 +406,9 @@ object DSAPropCheck {
 
   def getUses(s: CFGPosition): Set[Variable] = {
     s match {
-      case a: Assign       => a.rhs.variables
+      case a: LocalAssign  => a.rhs.variables
+      case a: MemoryStore  => a.index.variables ++ a.value.variables
+      case a: MemoryLoad   => a.index.variables
       case a: DirectCall   => a.actualParams.flatMap(_._2.variables).toSet
       case a: Return       => a.outParams.flatMap(_._2.variables).toSet
       case a: IndirectCall => Set(a.target)
@@ -424,9 +420,8 @@ object DSAPropCheck {
 
   def getDefinitions(s: CFGPosition): Set[Variable] = {
     s match {
-      case a: Assign     => Set(a.lhs)
-      case a: DirectCall => a.outParams.map(_._2).toSet
-      case _             => Set()
+      case a: Assign      => a.assignees
+      case _              => Set()
     }
   }
 

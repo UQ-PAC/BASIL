@@ -1,96 +1,141 @@
 package ir.transforms
 
-import scala.collection.mutable.ListBuffer
-import scala.collection.mutable.ArrayBuffer
-import analysis.solvers.*
-import analysis.*
-import bap.*
-import ir.*
-import translating.*
-import util.Logger
-import util.intrusive_list.IntrusiveList
 import scala.collection.mutable
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+
+import analysis.{AddressValue, DataRegion, Lift, LiftedElement, LiteralValue, MemoryModelMap, MemoryRegion, RegisterWrapperEqualSets, StackRegion, Value, getUse}
+import ir.*
+import util.Logger
 import cilvisitor.*
 
-def resolveIndirectCallsUsingPointsTo(
-    pointsTos: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
-    regionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
-    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-    IRProgram: Program
-): Boolean = {
-  var modified: Boolean = false
-  val worklist = ListBuffer[CFGPosition]()
 
-  worklist.addAll(IRProgram)
+class SteensgaardIndirectCallResolution(
+  override val program: Program,
+  val pointsTos: Map[RegisterWrapperEqualSets | MemoryRegion, Set[RegisterWrapperEqualSets | MemoryRegion]],
+  val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
+) extends IndirectCallResolution {
 
-  val visited = mutable.Set[CFGPosition]()
-  while (worklist.nonEmpty) {
-    val node = worklist.remove(0)
-    if (!visited.contains(node)) {
-      // add to worklist before we delete the node and can no longer find its successors
-      InterProcIRCursor.succ(node).foreach(node => worklist.addOne(node))
-      process(node)
-      visited.add(node)
-    }
-  }
-
-  def searchRegion(region: MemoryRegion): mutable.Set[String] = {
-    val result = mutable.Set[String]()
+  private def searchRegion(region: MemoryRegion): Set[String] = {
     region match {
       case stackRegion: StackRegion =>
-        if (regionContents.contains(stackRegion)) {
-          for (c <- regionContents(stackRegion)) {
-            c match {
-              case bitVecLiteral: BitVecLiteral => Logger.debug("hi: " + bitVecLiteral) //???
-              case memoryRegion: MemoryRegion =>
-                result.addAll(searchRegion(memoryRegion))
-            }
+        if (pointsTos.contains(stackRegion)) {
+          pointsTos(stackRegion).flatMap {
+            case registerWrapperEqualSets: RegisterWrapperEqualSets =>
+              pointsTos(registerWrapperEqualSets).flatMap {
+                case memoryRegion: MemoryRegion =>
+                  searchRegion(memoryRegion)
+                case registerWrapperEqualSets: RegisterWrapperEqualSets =>
+                  throw Exception(s"possibly recursive points-to relation? should I handle this? $registerWrapperEqualSets")
+              }
+            case memoryRegion: MemoryRegion =>
+              //searchRegion(memoryRegion)
+              Set(memoryRegion.regionIdentifier) // TODO: fix me
           }
-        }
-        result
-      case dataRegion: DataRegion =>
-        if (!regionContents.contains(dataRegion) || regionContents(dataRegion).isEmpty) {
-          result.add(dataRegion.regionIdentifier)
         } else {
-          result.add(dataRegion.regionIdentifier) // TODO: may need to investigate if we should add the parent region
-          for (c <- regionContents(dataRegion)) {
-            c match {
-              case bitVecLiteral: BitVecLiteral => Logger.debug("hi: " + bitVecLiteral) //???
-              case memoryRegion: MemoryRegion =>
-                result.addAll(searchRegion(memoryRegion))
-            }
+          Set()
+        }
+      case dataRegion: DataRegion =>
+        if (!pointsTos.contains(dataRegion) || pointsTos(dataRegion).isEmpty) {
+          Set(dataRegion.regionIdentifier)
+        } else {
+          val names: Set[String] = pointsTos(dataRegion).flatMap {
+            case registerWrapperEqualSets: RegisterWrapperEqualSets =>
+              pointsTos(registerWrapperEqualSets).flatMap {
+                case memoryRegion: MemoryRegion =>
+                  searchRegion(memoryRegion)
+                case registerWrapperEqualSets: RegisterWrapperEqualSets =>
+                  throw Exception(s"possibly recursive points-to relation? should I handle this? $registerWrapperEqualSets")
+              }
+            case memoryRegion: MemoryRegion =>
+              //searchRegion(memoryRegion))
+              Set(memoryRegion.regionIdentifier) // TODO: fix me
           }
+          names + dataRegion.regionIdentifier // TODO: may need to investigate if we should add the parent region
         }
-        result
     }
   }
 
-  def addFakeProcedure(name: String): Procedure = {
-    val newProcedure = Procedure(name)
-    IRProgram.procedures += newProcedure
-    newProcedure
-  }
-
-  def resolveAddresses(variable: Variable, i: IndirectCall): mutable.Set[String] = {
-    val names = mutable.Set[String]()
-    val variableWrapper = RegisterVariableWrapper(variable, getUse(variable, i, reachingDefs))
+  override def resolveAddresses(variable: Variable, i: IndirectCall): Set[String] = {
+    val variableWrapper = RegisterWrapperEqualSets(variable, getUse(variable, i, reachingDefs))
     pointsTos.get(variableWrapper) match {
-      case Some(value) =>
-        value.map {
-          case v: RegisterVariableWrapper => names.addAll(resolveAddresses(v.variable, i))
-          case m: MemoryRegion            => names.addAll(searchRegion(m))
+      case Some(values) =>
+        values.flatMap {
+          case v: RegisterWrapperEqualSets => resolveAddresses(v.variable, i)
+          case m: MemoryRegion            => searchRegion(m)
         }
-        names
-      case None => names
+      case None => Set()
     }
   }
 
-  def process(n: CFGPosition): Unit = n match {
-    case indirectCall: IndirectCall if indirectCall.target != Register("R30", 64) =>
-      if (!indirectCall.hasParent) {
-        // skip if we have already processesd this call
-        return
+}
+
+class VSAIndirectCallResolution(
+  override val program: Program,
+  val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
+  val mmm: MemoryModelMap
+) extends IndirectCallResolution {
+
+  private def searchRegion(memoryRegion: MemoryRegion, n: CFGPosition): Set[String] = {
+    val names = vsaResult.get(n) match {
+      case Some(Lift(el)) => el.get(memoryRegion) match {
+        case Some(values) =>
+          values.flatMap {
+            case addressValue: AddressValue => searchRegion(addressValue.region, n)
+            case _ => Set()
+          }
+        case _ => Set()
       }
+      case _ => Set()
+    }
+    memoryRegion match {
+      case _: StackRegion =>
+        names
+      case dataRegion: DataRegion =>
+        names ++ mmm.relfContent.getOrElse(dataRegion, Set())
+      case _ =>
+        Set()
+    }
+  }
+
+  override def resolveAddresses(variable: Variable, i: IndirectCall): Set[String] = {
+    vsaResult.get(i) match {
+      case Some(Lift(el)) => el.get(variable) match {
+        case Some(values) =>
+          values.flatMap {
+            case addressValue: AddressValue => searchRegion(addressValue.region, i)
+            case _: LiteralValue => Set()
+          }
+        case _ => Set()
+      }
+      case _ => Set()
+    }
+  }
+}
+
+trait IndirectCallResolution {
+  val program: Program
+
+  def resolveIndirectCalls(): Boolean = {
+    var modified = false
+    val worklist = ListBuffer[CFGPosition]()
+    worklist.addAll(program)
+
+    val visited = mutable.Set[CFGPosition]()
+    while (worklist.nonEmpty) {
+      val node = worklist.remove(0)
+      if (!visited.contains(node)) {
+        // add to worklist before we delete the node and can no longer find its successors
+        InterProcIRCursor.succ(node).foreach(node => worklist.addOne(node))
+        modified = process(node) || modified
+        visited.add(node)
+      }
+    }
+    modified
+  }
+
+  // returns whether or not the program was modified
+  def process(n: CFGPosition): Boolean = n match {
+    case indirectCall: IndirectCall if indirectCall.target != Register("R30", 64) && indirectCall.hasParent =>
       // we need the single-call-at-end-of-block invariant
       assert(indirectCall.parent.statements.lastOption.contains(indirectCall))
 
@@ -98,25 +143,22 @@ def resolveIndirectCallsUsingPointsTo(
       val procedure = block.parent
 
       val targetNames = resolveAddresses(indirectCall.target, indirectCall)
-      Logger.debug(s"Points-To approximated call ${indirectCall.target} with $targetNames")
-      Logger.debug(IRProgram.procedures)
-      val targets: mutable.Set[Procedure] =
-        targetNames.map(name => IRProgram.procedures.find(_.name == name).getOrElse(addFakeProcedure(name)))
+      Logger.debug(s"approximated call ${indirectCall.target} with $targetNames")
+      Logger.debug(program.procedures)
+      val targets: Set[Procedure] =
+        targetNames.map(name => program.procedures.find(_.name == name).getOrElse(addFakeProcedure(name)))
 
-      if (targets.size > 1) {
+      if (targets.nonEmpty) {
         Logger.debug(s"Resolved indirect call $indirectCall")
       }
 
       if (targets.size == 1) {
-        modified = true
-
         val newCall = targets.head.makeCall(indirectCall.label)
         block.statements.replace(indirectCall, newCall)
+        true
       } else if (targets.size > 1) {
 
         val oft = indirectCall.parent.jump
-
-        modified = true
         val newBlocks = ArrayBuffer[Block]()
         for (t <- targets) {
           Logger.debug(targets)
@@ -131,9 +173,9 @@ def resolveIndirectCallsUsingPointsTo(
 
           /* copy the goto node resulting */
           val fallthrough = oft match {
-            case g: GoTo        => GoTo(g.targets, g.label)
-            case h: Unreachable => Unreachable()
-            case r: Return      => Return()
+            case g: GoTo => GoTo(g.targets, g.label)
+            case _: Unreachable => Unreachable()
+            case _: Return => Return()
           }
           newBlocks.append(Block(newLabel, None, ArrayBuffer(assume, directCall), fallthrough))
         }
@@ -141,9 +183,20 @@ def resolveIndirectCallsUsingPointsTo(
         procedure.addBlocks(newBlocks)
         val newCall = GoTo(newBlocks, indirectCall.label)
         block.replaceJump(newCall)
+        true
+      } else {
+        false
       }
     case _ =>
+      false
   }
 
-  modified
+  def addFakeProcedure(name: String): Procedure = {
+    val newProcedure = Procedure(name)
+    program.procedures += newProcedure
+    newProcedure
+  }
+
+  def resolveAddresses(variable: Variable, i: IndirectCall): Set[String]
+
 }

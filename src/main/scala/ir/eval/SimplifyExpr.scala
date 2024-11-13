@@ -1110,7 +1110,7 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
     case UnaryExpr(BoolNOT, UnaryExpr(BoolNOT, body)) => logSimp(e, body)
 
     // syntactic equality
-    case BinaryExpr(BVEQ, a, b) if a.loads.isEmpty && b.loads.isEmpty && a == b => logSimp(e, TrueLiteral)
+    case BinaryExpr(BVEQ, a, b) if a == b => logSimp(e, TrueLiteral)
 
     case BinaryExpr(BVADD, BinaryExpr(BVADD, y, UnaryExpr(BVNOT, x)), BitVecLiteral(1, _))
         if !(y.isInstanceOf[BitVecLiteral]) =>

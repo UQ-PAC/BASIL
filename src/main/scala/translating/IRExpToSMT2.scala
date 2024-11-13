@@ -11,8 +11,9 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
 
   def vstmt(s: Statement): Repr[Statement] = {
     s match {
-      case a: Assign       => vassign(vlvar(a.lhs), vexpr(a.rhs))
-      case m: MemoryAssign => vstore(m.mem.name, vexpr(m.index), vexpr(m.value), m.endian, m.size)
+      case a: LocalAssign       => vassign(vlvar(a.lhs), vexpr(a.rhs))
+      case m @ MemoryLoad(lhs, mem, index, endian, size, _) => vload(vlvar(lhs), mem.name, vexpr(index), endian, size)
+      case m: MemoryStore  => vstore(m.mem.name, vexpr(m.index), vexpr(m.value), m.endian, m.size)
       case c: DirectCall =>
         vcall(
           c.outParams.toList.map((l, r) => (vlvar(l), vexpr(r))),
@@ -38,7 +39,6 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
   def vexpr(e: Expr): Repr[Expr] = {
     e match {
       case n: Literal                               => vliteral(n)
-      case m @ MemoryLoad(mem, index, endian, size) => vload(m)
       case Extract(ed, start, arg)                  => vextract(ed, start, vexpr(arg))
       case Repeat(repeats, arg)                     => vrepeat(repeats, vexpr(arg))
       case ZeroExtend(bits, arg)                    => vzeroextend(bits, vexpr(arg))
@@ -74,8 +74,9 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
       returnBlock: Option[Repr[Block]]
   ): Repr[Procedure]
 
-  def vassign(lhs: Repr[Variable], rhs: Repr[Expr]): Repr[Assign]
-  def vstore(mem: String, index: Repr[Expr], value: Repr[Expr], endian: Endian, size: Int): Repr[MemoryAssign]
+  def vassign(lhs: Repr[Variable], rhs: Repr[Expr]): Repr[LocalAssign]
+  def vload(lhs: Repr[Variable], mem: String, index: Repr[Expr], endian: Endian, size: Int): Repr[MemoryLoad]
+  def vstore(mem: String, index: Repr[Expr], value: Repr[Expr], endian: Endian, size: Int): Repr[MemoryStore]
   def vcall(
       outParams: List[(Repr[Variable], Repr[Expr])],
       procname: String,
@@ -118,7 +119,6 @@ trait BasilIRExp[Repr[+_]] {
   def vuninterp_function(name: String, args: Seq[Repr[Expr]]): Repr[Expr]
 
   def vrvar(e: Variable): Repr[Variable]
-  def vload(arg: MemoryLoad): Repr[Expr]
 }
 
 trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
@@ -130,7 +130,6 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
   def vexpr(e: Expr): Repr[Expr] = {
     e match {
       case n: Literal => vliteral(n)
-      case m @ MemoryLoad(mem, index, endian, size) => vload(m)
       case Extract(ed, start, arg)                  => vextract(ed, start, vexpr(arg))
       case Repeat(repeats, arg) => {
         vexpr((0 until (repeats - 1)).foldLeft(arg)((acc, n) => BinaryExpr(BVCONCAT, acc, arg)))
@@ -156,7 +155,6 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
 enum Sexp[+T] {
   case Symb(v: String)
   case Slist(v: List[Sexp[T]])
-
 }
 
 object Sexp {
@@ -171,6 +169,8 @@ def sym[T](l: String): Sexp[T] = Sexp.Symb[T](l)
 def list[T](l: Sexp[T]*): Sexp[T] = Sexp.Slist(l.toList)
 
 object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
+  def vload(lhs: Sexp[Variable], mem: String, index: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryLoad] = ??? 
+  def vstore(mem: String, index: Sexp[Expr], value: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryStore] = ???
 
   def vprog(mainProc: String, procedures: List[Sexp[Procedure]]) : Sexp[Program] = ???
   def vrepeat(reps: Int, value: Sexp[Expr]): Sexp[Expr] = ???
@@ -276,8 +276,6 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   }
 
   override def vrvar(e: Variable): Sexp[Variable] = sym(fixVname(e.name))
-  override def vload(l: MemoryLoad): Sexp[Expr] =
-    list(sym("memoryload"), sym(l.mem.name), vexpr(l.index), endianToBool(l.endian), int2smt(l.size))
 
   def basilTypeToSMTType(v: IRType): Sexp[Expr] = {
     v match {
@@ -336,23 +334,6 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
           val decl = list(sym("declare-const"), sym(fixVname(v.name)), basilTypeToSMTType(v.getType))
           decled = decled + decl
           SkipChildren()
-        }
-        case l: MemoryLoad => {
-          val decl = list(
-            sym("declare-fun"),
-            sym("memoryload"),
-            list(
-              basilTypeToSMTType(l.mem.getType),
-              basilTypeToSMTType(BitVecType(l.mem.addressSize)),
-              basilTypeToSMTType(BoolType),
-              basilTypeToSMTType(IntType)
-            ),
-            basilTypeToSMTType(BitVecType(l.size))
-          )
-          val mem = list(sym("declare-const"), sym(l.mem.name), basilTypeToSMTType(l.mem.getType))
-          decled = decled + mem
-          decled = decled + decl
-          DoChildren()
         }
         case _ => DoChildren()
       }

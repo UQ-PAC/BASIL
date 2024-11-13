@@ -88,7 +88,7 @@ class UnionFindSolver[A] {
   /** Produces a string representation of the solution.
     */
   override def toString: String =
-    solution().map(p => s"${p._1} = ${p._2}").mkString("\n")
+    solution().map((k, v) => s"$k = $v").mkString("\n")
 }
 
 /** Exception thrown in case of unification failure.

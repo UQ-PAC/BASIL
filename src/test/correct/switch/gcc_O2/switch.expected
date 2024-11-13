@@ -3,22 +3,19 @@ var {:extern} mem: [bv64]bv8;
 const {:extern} $_IO_stdin_used_addr: bv64;
 axiom ($_IO_stdin_used_addr == 1896bv64);
 function {:extern} {:bvbuiltin "bvadd"} bvadd64(bv64, bv64) returns (bv64);
+function {:extern} memory_load32_le(memory: [bv64]bv8, index: bv64) returns (bv32) {
+  (memory[bvadd64(index, 3bv64)] ++ (memory[bvadd64(index, 2bv64)] ++ (memory[bvadd64(index, 1bv64)] ++ memory[index])))
+}
+
 function {:extern} memory_load64_le(memory: [bv64]bv8, index: bv64) returns (bv64) {
   (memory[bvadd64(index, 7bv64)] ++ (memory[bvadd64(index, 6bv64)] ++ (memory[bvadd64(index, 5bv64)] ++ (memory[bvadd64(index, 4bv64)] ++ (memory[bvadd64(index, 3bv64)] ++ (memory[bvadd64(index, 2bv64)] ++ (memory[bvadd64(index, 1bv64)] ++ memory[index])))))))
 }
 
-function {:extern} memory_load8_le(memory: [bv64]bv8, index: bv64) returns (bv8) {
-  memory[index]
-}
-
 procedure {:extern} rely();
   modifies Gamma_mem, mem;
-  ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
-  free ensures (memory_load8_le(mem, 1896bv64) == 1bv8);
-  free ensures (memory_load8_le(mem, 1897bv64) == 0bv8);
-  free ensures (memory_load8_le(mem, 1898bv64) == 2bv8);
-  free ensures (memory_load8_le(mem, 1899bv64) == 0bv8);
+  ensures (mem == old(mem));
+  free ensures (memory_load32_le(mem, 1896bv64) == 131073bv32);
   free ensures (memory_load64_le(mem, 69016bv64) == 1872bv64);
   free ensures (memory_load64_le(mem, 69024bv64) == 1792bv64);
   free ensures (memory_load64_le(mem, 69616bv64) == 1536bv64);
@@ -26,8 +23,8 @@ procedure {:extern} rely();
 
 procedure {:extern} rely_transitive();
   modifies Gamma_mem, mem;
-  ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
+  ensures (mem == old(mem));
 
 implementation {:extern} rely_transitive()
 {
@@ -40,33 +37,27 @@ procedure {:extern} rely_reflexive();
 procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
 
-procedure main(R0_in: bv64, Gamma_R0_in: bool, R10_in: bv64, Gamma_R10_in: bool, R11_in: bv64, Gamma_R11_in: bool, R12_in: bv64, Gamma_R12_in: bool, R13_in: bv64, Gamma_R13_in: bool, R14_in: bv64, Gamma_R14_in: bool, R15_in: bv64, Gamma_R15_in: bool, R16_in: bv64, Gamma_R16_in: bool, R17_in: bv64, Gamma_R17_in: bool, R18_in: bv64, Gamma_R18_in: bool, R19_in: bv64, Gamma_R19_in: bool, R1_in: bv64, Gamma_R1_in: bool, R20_in: bv64, Gamma_R20_in: bool, R21_in: bv64, Gamma_R21_in: bool, R22_in: bv64, Gamma_R22_in: bool, R23_in: bv64, Gamma_R23_in: bool, R24_in: bv64, Gamma_R24_in: bool, R25_in: bv64, Gamma_R25_in: bool, R26_in: bv64, Gamma_R26_in: bool, R27_in: bv64, Gamma_R27_in: bool, R28_in: bv64, Gamma_R28_in: bool, R29_in: bv64, Gamma_R29_in: bool, R2_in: bv64, Gamma_R2_in: bool, R30_in: bv64, Gamma_R30_in: bool, R31_in: bv64, Gamma_R31_in: bool, R3_in: bv64, Gamma_R3_in: bool, R4_in: bv64, Gamma_R4_in: bool, R5_in: bv64, Gamma_R5_in: bool, R6_in: bv64, Gamma_R6_in: bool, R7_in: bv64, Gamma_R7_in: bool, R8_in: bv64, Gamma_R8_in: bool, R9_in: bv64, Gamma_R9_in: bool) returns (R0_out: bv64, Gamma_R0_out: bool, R10_out: bv64, Gamma_R10_out: bool, R11_out: bv64, Gamma_R11_out: bool, R12_out: bv64, Gamma_R12_out: bool, R13_out: bv64, Gamma_R13_out: bool, R14_out: bv64, Gamma_R14_out: bool, R15_out: bv64, Gamma_R15_out: bool, R16_out: bv64, Gamma_R16_out: bool, R17_out: bv64, Gamma_R17_out: bool, R18_out: bv64, Gamma_R18_out: bool, R19_out: bv64, Gamma_R19_out: bool, R1_out: bv64, Gamma_R1_out: bool, R20_out: bv64, Gamma_R20_out: bool, R21_out: bv64, Gamma_R21_out: bool, R22_out: bv64, Gamma_R22_out: bool, R23_out: bv64, Gamma_R23_out: bool, R24_out: bv64, Gamma_R24_out: bool, R25_out: bv64, Gamma_R25_out: bool, R26_out: bv64, Gamma_R26_out: bool, R27_out: bv64, Gamma_R27_out: bool, R28_out: bv64, Gamma_R28_out: bool, R29_out: bv64, Gamma_R29_out: bool, R2_out: bv64, Gamma_R2_out: bool, R30_out: bv64, Gamma_R30_out: bool, R31_out: bv64, Gamma_R31_out: bool, R3_out: bv64, Gamma_R3_out: bool, R4_out: bv64, Gamma_R4_out: bool, R5_out: bv64, Gamma_R5_out: bool, R6_out: bv64, Gamma_R6_out: bool, R7_out: bv64, Gamma_R7_out: bool, R8_out: bv64, Gamma_R8_out: bool, R9_out: bv64, Gamma_R9_out: bool);
+procedure main();
   free requires (memory_load64_le(mem, 69632bv64) == 0bv64);
   free requires (memory_load64_le(mem, 69640bv64) == 69640bv64);
-  free requires (memory_load8_le(mem, 1896bv64) == 1bv8);
-  free requires (memory_load8_le(mem, 1897bv64) == 0bv8);
-  free requires (memory_load8_le(mem, 1898bv64) == 2bv8);
-  free requires (memory_load8_le(mem, 1899bv64) == 0bv8);
+  free requires (memory_load32_le(mem, 1896bv64) == 131073bv32);
   free requires (memory_load64_le(mem, 69016bv64) == 1872bv64);
   free requires (memory_load64_le(mem, 69024bv64) == 1792bv64);
   free requires (memory_load64_le(mem, 69616bv64) == 1536bv64);
   free requires (memory_load64_le(mem, 69640bv64) == 69640bv64);
-  free ensures (memory_load8_le(mem, 1896bv64) == 1bv8);
-  free ensures (memory_load8_le(mem, 1897bv64) == 0bv8);
-  free ensures (memory_load8_le(mem, 1898bv64) == 2bv8);
-  free ensures (memory_load8_le(mem, 1899bv64) == 0bv8);
+  free ensures (memory_load32_le(mem, 1896bv64) == 131073bv32);
   free ensures (memory_load64_le(mem, 69016bv64) == 1872bv64);
   free ensures (memory_load64_le(mem, 69024bv64) == 1792bv64);
   free ensures (memory_load64_le(mem, 69616bv64) == 1536bv64);
   free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
 
-implementation main(R0_in: bv64, Gamma_R0_in: bool, R10_in: bv64, Gamma_R10_in: bool, R11_in: bv64, Gamma_R11_in: bool, R12_in: bv64, Gamma_R12_in: bool, R13_in: bv64, Gamma_R13_in: bool, R14_in: bv64, Gamma_R14_in: bool, R15_in: bv64, Gamma_R15_in: bool, R16_in: bv64, Gamma_R16_in: bool, R17_in: bv64, Gamma_R17_in: bool, R18_in: bv64, Gamma_R18_in: bool, R19_in: bv64, Gamma_R19_in: bool, R1_in: bv64, Gamma_R1_in: bool, R20_in: bv64, Gamma_R20_in: bool, R21_in: bv64, Gamma_R21_in: bool, R22_in: bv64, Gamma_R22_in: bool, R23_in: bv64, Gamma_R23_in: bool, R24_in: bv64, Gamma_R24_in: bool, R25_in: bv64, Gamma_R25_in: bool, R26_in: bv64, Gamma_R26_in: bool, R27_in: bv64, Gamma_R27_in: bool, R28_in: bv64, Gamma_R28_in: bool, R29_in: bv64, Gamma_R29_in: bool, R2_in: bv64, Gamma_R2_in: bool, R30_in: bv64, Gamma_R30_in: bool, R31_in: bv64, Gamma_R31_in: bool, R3_in: bv64, Gamma_R3_in: bool, R4_in: bv64, Gamma_R4_in: bool, R5_in: bv64, Gamma_R5_in: bool, R6_in: bv64, Gamma_R6_in: bool, R7_in: bv64, Gamma_R7_in: bool, R8_in: bv64, Gamma_R8_in: bool, R9_in: bv64, Gamma_R9_in: bool) returns (R0_out: bv64, Gamma_R0_out: bool, R10_out: bv64, Gamma_R10_out: bool, R11_out: bv64, Gamma_R11_out: bool, R12_out: bv64, Gamma_R12_out: bool, R13_out: bv64, Gamma_R13_out: bool, R14_out: bv64, Gamma_R14_out: bool, R15_out: bv64, Gamma_R15_out: bool, R16_out: bv64, Gamma_R16_out: bool, R17_out: bv64, Gamma_R17_out: bool, R18_out: bv64, Gamma_R18_out: bool, R19_out: bv64, Gamma_R19_out: bool, R1_out: bv64, Gamma_R1_out: bool, R20_out: bv64, Gamma_R20_out: bool, R21_out: bv64, Gamma_R21_out: bool, R22_out: bv64, Gamma_R22_out: bool, R23_out: bv64, Gamma_R23_out: bool, R24_out: bv64, Gamma_R24_out: bool, R25_out: bv64, Gamma_R25_out: bool, R26_out: bv64, Gamma_R26_out: bool, R27_out: bv64, Gamma_R27_out: bool, R28_out: bv64, Gamma_R28_out: bool, R29_out: bv64, Gamma_R29_out: bool, R2_out: bv64, Gamma_R2_out: bool, R30_out: bv64, Gamma_R30_out: bool, R31_out: bv64, Gamma_R31_out: bool, R3_out: bv64, Gamma_R3_out: bool, R4_out: bv64, Gamma_R4_out: bool, R5_out: bv64, Gamma_R5_out: bool, R6_out: bv64, Gamma_R6_out: bool, R7_out: bv64, Gamma_R7_out: bool, R8_out: bv64, Gamma_R8_out: bool, R9_out: bv64, Gamma_R9_out: bool)
+implementation main()
 {
   lmain:
+    assume {:captureState "lmain"} true;
     goto main_basil_return;
   main_basil_return:
-    R0_out, R10_out, R11_out, R12_out, R13_out, R14_out, R15_out, R16_out, R17_out, R18_out, R19_out, R1_out, R20_out, R21_out, R22_out, R23_out, R24_out, R25_out, R26_out, R27_out, R28_out, R29_out, R2_out, R30_out, R31_out, R3_out, R4_out, R5_out, R6_out, R7_out, R8_out, R9_out := R0_in, R10_in, R11_in, R12_in, R13_in, R14_in, R15_in, R16_in, R17_in, R18_in, R19_in, R1_in, R20_in, R21_in, R22_in, R23_in, R24_in, R25_in, R26_in, R27_in, R28_in, R29_in, R2_in, R30_in, R31_in, R3_in, R4_in, R5_in, R6_in, R7_in, R8_in, R9_in;
-    Gamma_R0_out, Gamma_R10_out, Gamma_R11_out, Gamma_R12_out, Gamma_R13_out, Gamma_R14_out, Gamma_R15_out, Gamma_R16_out, Gamma_R17_out, Gamma_R18_out, Gamma_R19_out, Gamma_R1_out, Gamma_R20_out, Gamma_R21_out, Gamma_R22_out, Gamma_R23_out, Gamma_R24_out, Gamma_R25_out, Gamma_R26_out, Gamma_R27_out, Gamma_R28_out, Gamma_R29_out, Gamma_R2_out, Gamma_R30_out, Gamma_R31_out, Gamma_R3_out, Gamma_R4_out, Gamma_R5_out, Gamma_R6_out, Gamma_R7_out, Gamma_R8_out, Gamma_R9_out := Gamma_R0_in, Gamma_R10_in, Gamma_R11_in, Gamma_R12_in, Gamma_R13_in, Gamma_R14_in, Gamma_R15_in, Gamma_R16_in, Gamma_R17_in, Gamma_R18_in, Gamma_R19_in, Gamma_R1_in, Gamma_R20_in, Gamma_R21_in, Gamma_R22_in, Gamma_R23_in, Gamma_R24_in, Gamma_R25_in, Gamma_R26_in, Gamma_R27_in, Gamma_R28_in, Gamma_R29_in, Gamma_R2_in, Gamma_R30_in, Gamma_R31_in, Gamma_R3_in, Gamma_R4_in, Gamma_R5_in, Gamma_R6_in, Gamma_R7_in, Gamma_R8_in, Gamma_R9_in;
+    assume {:captureState "main_basil_return"} true;
     return;
 }
 

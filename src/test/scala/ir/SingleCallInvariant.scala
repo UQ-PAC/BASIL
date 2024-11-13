@@ -10,13 +10,13 @@ class InvariantTest extends AnyFunSuite {
     var program: Program = prog(
       proc("main",
         block("first_call",
-          Assign(R0, bv64(10)),
-          Assign(R1, bv64(10)),
+          LocalAssign(R0, bv64(10)),
+          LocalAssign(R1, bv64(10)),
           directCall("callee1"),
           ret 
         ),
         block("second_call",
-          Assign(R0, bv64(10)),
+          LocalAssign(R0, bv64(10)),
           directCall("callee2"),
           ret
         ),
@@ -35,14 +35,14 @@ class InvariantTest extends AnyFunSuite {
     var program: Program = prog(
       proc("main",
         block("first_call",
-          Assign(R0, bv64(10)),
+          LocalAssign(R0, bv64(10)),
           directCall("callee2"),
-          Assign(R1, bv64(10)),
+          LocalAssign(R1, bv64(10)),
           directCall("callee1"),
           ret 
         ),
         block("second_call",
-          Assign(R0, bv64(10)),
+          LocalAssign(R0, bv64(10)),
           ret
         ),
         block("returnBlock",
@@ -60,13 +60,13 @@ class InvariantTest extends AnyFunSuite {
     var program: Program = prog(
       proc("main",
         block("first_call",
-          Assign(R0, bv64(10)),
-          Assign(R1, bv64(10)),
+          LocalAssign(R0, bv64(10)),
+          LocalAssign(R1, bv64(10)),
           ret 
         ),
         block("second_call",
           directCall("callee2"),
-          Assign(R0, bv64(10)),
+          LocalAssign(R0, bv64(10)),
           ret
         ),
         block("returnBlock",

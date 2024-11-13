@@ -65,23 +65,23 @@ def basicReachingDefs(p: Procedure): Map[Command, Map[Variable, Set[Assign | Dir
   merged
 }
 
-case class DefUse(defined: Map[Variable, Assign | DirectCall])
+case class DefUse(defined: Map[Variable, Assign])
 
 // map v -> definitions reached here
 class DefUseDomain(liveBefore: Map[Block, Set[Variable]])
-    extends AbstractDomain[Map[Variable, Set[Assign | DirectCall]]] {
-  // TODO: cull values using liveness
+    extends AbstractDomain[Map[Variable, Set[Assign]]] {
 
-  override def transfer(s: Map[Variable, Set[Assign | DirectCall]], b: Command) = {
+  override def transfer(s: Map[Variable, Set[Assign]], b: Command) = {
     b match {
-      case a: Assign     => s.updated(a.lhs, Set(a))
-      case d: DirectCall => d.outParams.map(_._2).foldLeft(s)((s, r) => s.updated(r, Set(d)))
-      case _             => s
+      case a: LocalAssign => s.updated(a.lhs, Set(a))
+      case a: MemoryLoad  => s.updated(a.lhs, Set(a))
+      case d: DirectCall  => d.outParams.map(_._2).foldLeft(s)((s, r) => s.updated(r, Set(d)))
+      case _              => s
     }
   }
   override def top = ???
-  def bot = Map[Variable, Set[Assign | DirectCall]]()
-  def join(l: Map[Variable, Set[Assign | DirectCall]], r: Map[Variable, Set[Assign | DirectCall]], pos: Block) = {
+  def bot = Map[Variable, Set[Assign]]()
+  def join(l: Map[Variable, Set[Assign]], r: Map[Variable, Set[Assign]], pos: Block) = {
     l.keySet
       .union(r.keySet)
       .filter(k => liveBefore(pos).contains(k))
@@ -98,8 +98,9 @@ class IntraLiveVarsDomain extends PowerSetDomain[Variable] {
 
   def transfer(s: Set[Variable], a: Command): Set[Variable] = {
     a match {
-      case a: Assign       => (s - a.lhs) ++ a.rhs.variables
-      case m: MemoryAssign => s ++ m.index.variables ++ m.value.variables
+      case a: LocalAssign  => (s - a.lhs) ++ a.rhs.variables
+      case a: MemoryLoad   => (s - a.lhs) ++ a.index.variables
+      case m: MemoryStore  => s ++ m.index.variables ++ m.value.variables
       case a: Assume       => s ++ a.body.variables
       case a: Assert       => s ++ a.body.variables
       case i: IndirectCall => s + i.target
@@ -107,6 +108,7 @@ class IntraLiveVarsDomain extends PowerSetDomain[Variable] {
       case g: GoTo         => s
       case r: Return       => s ++ r.outParams.flatMap(_._2.variables)
       case r: Unreachable  => s
+      case n: NOP          => s
     }
   }
 }
@@ -123,10 +125,13 @@ def removeSlices(p: Procedure): Unit = {
     * We check this flow-insensitively and recover precision using DSA form.
     */
   val assignments: Map[LocalVar, Iterable[Assign]] = p
-    .collect { case a: Assign =>
-      a
+    .collect { 
+      case a: SingleAssign => Seq(a.lhs -> a)
+      case a: DirectCall => a.assignees.map(e => e -> a)
     }
-    .groupBy(_.lhs)
+    .flatten
+    .groupBy(_._1)
+    .map((k,v) => (k, v.map(_._2).toSet))
     .collect { case (k: LocalVar, v) =>
       (k, v)
     }
@@ -144,20 +149,24 @@ def removeSlices(p: Procedure): Unit = {
   // unify variable uses across direct assignments
   val ufsolver = analysis.solvers.UnionFindSolver[LVTerm]()
   val unioned = assignments.foreach {
-    case (lv, Assign(lhs: LocalVar, rhs: LocalVar, _)) => ufsolver.unify(LVTerm(lhs), LVTerm(rhs))
-    case _                                             => ()
+    case (lv, LocalAssign(lhs: LocalVar, rhs: LocalVar, _)) => ufsolver.unify(LVTerm(lhs), LVTerm(rhs))
+    case _                                                  => ()
   }
   val unifiedAssignments = ufsolver
     .unifications()
-    .map { case (v: LVTerm, rvs) =>
-      v.v -> (rvs.map { case LVTerm(rv) =>
-        rv
-      }).toSet
+    .map { 
+      case (v @ LVTerm(_), rvs) =>
+        v.v -> (rvs.map { 
+          case LVTerm(rv) =>
+          rv
+          case _ => ??? /* unreachable */
+        }).toSet
+      case _ => ??? /* unreachable */
     }
     .map((repr: LocalVar, elems: Set[LocalVar]) =>
       repr -> elems.flatMap(assignments(_).filter(_ match {
         // filter out the direct assignments we used to build the unif class
-        case Assign(lhs: LocalVar, rhs: LocalVar, _) if elems.contains(lhs) && elems.contains(rhs) => false
+        case LocalAssign(lhs: LocalVar, rhs: LocalVar, _) if elems.contains(lhs) && elems.contains(rhs) => false
         case _                                                                                     => true
       }))
     )
@@ -165,10 +174,12 @@ def removeSlices(p: Procedure): Unit = {
   val varHighZeroBits: Map[LocalVar, HighZeroBits] = assignments.map((v, assigns) =>
     // note: this overapproximates on x := y when x and y may both be smaller than their declared size
     val allRHSExtended = assigns.foldLeft(HighZeroBits.Bot: HighZeroBits)((e, assign) =>
-      (e, assign.rhs) match {
-        case (HighZeroBits.Bot, ZeroExtend(i, lhs))                   => HighZeroBits.Bits(i)
-        case (b @ HighZeroBits.Bits(ei), ZeroExtend(i, _)) if i == ei => b
-        case (b @ HighZeroBits.Bits(ei), ZeroExtend(i, _)) if i != ei => HighZeroBits.False
+      (e, assign) match {
+        case (HighZeroBits.Bot, LocalAssign(_, ZeroExtend(i, lhs), _))                   => HighZeroBits.Bits(i)
+        case (b @ HighZeroBits.Bits(ei), LocalAssign(_, ZeroExtend(i, _), _)) if i == ei => b
+        case (b @ HighZeroBits.Bits(ei), LocalAssign(_, ZeroExtend(i, _), _)) if i != ei => HighZeroBits.False
+        case (b @ HighZeroBits.Bits(ei), m: MemoryLoad)               => HighZeroBits.False
+        case (b @ HighZeroBits.Bits(ei), m: DirectCall)               => HighZeroBits.False
         case (HighZeroBits.False, _)                                  => HighZeroBits.False
         case (_, other)                                               => HighZeroBits.False
       }
@@ -180,6 +191,7 @@ def removeSlices(p: Procedure): Unit = {
       // map all lhs to the result for their representative
       val rep = ufsolver.find(LVTerm(lhs)) match {
         case LVTerm(r) => r
+        case _ => ??? /* unreachable */
       }
       lhs -> varHighZeroBits.get(rep)
     })
@@ -222,7 +234,7 @@ def removeSlices(p: Procedure): Unit = {
     }
     override def vstmt(s: Statement) = {
       s match {
-        case a @ Assign(lhs: LocalVar, ZeroExtend(sz, rhs), _)
+        case a @ LocalAssign(lhs: LocalVar, ZeroExtend(sz, rhs), _)
             if size(lhs).isDefined && varHighZeroBits.contains(lhs) => {
           assert(varHighZeroBits(lhs) == sz)
           a.lhs = LocalVar(lhs.name, BitVecType(size(lhs).get - varHighZeroBits(lhs)))
@@ -262,13 +274,19 @@ def getRedundantAssignments(procedure: Procedure): Set[Assign] = {
 
   for (c <- procedure) {
     c match {
-      case a: Assign => {
+      case a: LocalAssign => {
         assignedNotRead(a.lhs) = joinVS(assignedNotRead(a.lhs), VS.Assigned(Set(a)))
         a.rhs.variables.foreach(v => {
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(a)))
         })
       }
-      case m: MemoryAssign => {
+      case a: MemoryLoad => {
+        assignedNotRead(a.lhs) = joinVS(assignedNotRead(a.lhs), VS.Assigned(Set(a)))
+        a.index.variables.foreach(v => {
+          assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(a)))
+        })
+      }
+      case m: MemoryStore => {
         m.index.variables.foreach(v => {
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(m)))
         })
@@ -326,7 +344,7 @@ def getRedundantAssignments(procedure: Procedure): Set[Assign] = {
 class CleanupAssignments() extends CILVisitor {
   var redundantAssignments = Set[Assign]()
 
-  def isRedundant(a: Assign) = {
+  def isRedundant(a: LocalAssign) = {
     a.lhs == a.rhs || redundantAssignments.contains(a)
   }
 
@@ -336,7 +354,7 @@ class CleanupAssignments() extends CILVisitor {
   }
 
   override def vstmt(s: Statement) = s match {
-    case a: Assign if isRedundant(a) => ChangeTo(List())
+    case a: LocalAssign if isRedundant(a) => ChangeTo(List())
     case _                           => SkipChildren()
   }
 
@@ -493,19 +511,18 @@ def doCopyPropTransform(p: Program) = {
 
 }
 
-
-def reversePostOrder(p: Procedure) : Unit = {
+def reversePostOrder(p: Procedure): Unit = {
   /* Procedures may contain disconnected sets of blocks so we arbitrarily order these with respect to eachother. */
   for (b <- p.blocks) {
     b.rpoOrder = -1
   }
   var left = p.entryBlock.map(reversePostOrder(_)).getOrElse(0) + 1
   for (b <- p.blocks.filter(_.rpoOrder == -1)) {
-     left = reversePostOrder(b, true, left) + 1
+    left = reversePostOrder(b, true, left) + 1
   }
 }
 
-def reversePostOrder(startBlock: Block, fixup: Boolean = false, begin : Int = 0): Int = {
+def reversePostOrder(startBlock: Block, fixup: Boolean = false, begin: Int = 0): Int = {
   var count = begin
   val seen = mutable.HashSet[Block]()
   val vcs = mutable.HashMap[Block, Int]()
@@ -578,7 +595,6 @@ object CopyProp {
     val (beforeLive, afterLive) = getLiveVars(p)
     val dom = DefUseDomain(beforeLive)
     val solver = worklistSolver(dom)
-    // type rtype = Map[Block, Map[Variable, Set[Assign | DirectCall]]]
     val (beforeRes, afterRes) = solver.solveProc(p)
 
   }
@@ -612,15 +628,15 @@ object CopyProp {
 
     def transfer(s: Statement) = {
       s match {
-        case a: Assign if a.rhs.loads.size > 0 => clobberFull(state, a.lhs)
-        case a: Assign if !state.contains(a.lhs) && flagDeps.contains(a.lhs) => {
+        case a: MemoryLoad => clobberFull(state, a.lhs)
+        case a: LocalAssign if !state.contains(a.lhs) && flagDeps.contains(a.lhs) => {
           val r = canPropTo(state, a.rhs, true).get
           state(a.lhs) = PropState(r, mutable.Set.from(r.variables), false, 0, true)
         }
-        case a: Assign if state.contains(a.lhs) && state(a.lhs).clobbered => {
+        case a: LocalAssign if state.contains(a.lhs) && state(a.lhs).clobbered => {
           ()
         }
-        case a: Assign
+        case a: LocalAssign
             if state.contains(a.lhs) && (a.rhs != state(a.lhs).e) && (canPropTo(state, a.rhs, true) != canPropTo(
               state,
               state(a.lhs).e,
@@ -628,7 +644,7 @@ object CopyProp {
             )) => {
           clobberFull(state, a.lhs)
         }
-        case a: Assign if state.contains(a.lhs) => {
+        case a: LocalAssign if state.contains(a.lhs) => {
           state(a.lhs) = state(a.lhs).copy(e = canPropTo(state, a.rhs, true).get)
         }
         case i: IndirectCall => {
@@ -661,12 +677,6 @@ object CopyProp {
     }
   }
 
-  def clobberDeps(c: mutable.HashMap[Variable, PropState], l: Variable): Unit = {
-    val toclobber = c.filter(_.isInstanceOf[CopyProp.Prop]).filter(_.asInstanceOf[CopyProp.Prop].deps.contains(l))
-    for ((v, e) <- toclobber) {
-      c(v).clobbered = true
-    }
-  }
 
   def isTrivial(e: Expr): Boolean = e match {
     case l: Literal                              => true
@@ -727,43 +737,38 @@ object CopyProp {
     def transfer(c: mutable.HashMap[Variable, PropState], s: Statement): Unit = {
       // val callClobbers = ((0 to 7) ++ (19 to 30)).map("R" + _).map(c => Register(c, 64))
       s match {
-        case Assign(l, r, lb) => {
-          if (r.loads.size > 0) {
-            // c.copy(state = c.state + (l -> CopyProp.Clobbered))
-            clobberFull(c, l)
-          } else {
+        case l: MemoryLoad =>
+          clobberFull(c, l.lhs)
+        case LocalAssign(l, r, lb) => {
+          val isFlag = isFlagVar(l) || r.variables.exists(isFlagVar)
+          val isFlagDep = isFlag || c.get(l).map(v => v.isFlagDep).getOrElse(false)
 
-            val isFlag = isFlagVar(l) || r.variables.exists(isFlagVar)
-            val isFlagDep = isFlag || c.get(l).map(v => v.isFlagDep).getOrElse(false)
-
+          c.get(l).foreach(v => v.isFlagDep = v.isFlagDep || isFlagDep)
+          for (l <- r.variables) {
             c.get(l).foreach(v => v.isFlagDep = v.isFlagDep || isFlagDep)
-            for (l <- r.variables) {
-              c.get(l).foreach(v => v.isFlagDep = v.isFlagDep || isFlagDep)
+          }
+
+          var prop = canPropTo(c, r, isFlagDep)
+          val existing = c.get(l)
+
+          (prop, existing) match {
+            case (Some(evaled), None) => {
+              c(l) = PropState(evaled, mutable.Set.from(evaled.variables), false, 0, isFlagDep)
             }
-
-            var prop = canPropTo(c, r, isFlagDep)
-            val existing = c.get(l)
-
-            (prop, existing) match {
-              case (Some(evaled), None) => {
-                c(l) = PropState(evaled, mutable.Set.from(evaled.variables), false, 0, isFlagDep)
-              }
-              case (_, Some(ps)) if ps.clobbered => {
-                ()
-              }
-              case (Some(evaled), Some(ps))
-                  if ps.e == r || ps.e == evaled || (canPropTo(c, ps.e, isFlagDep).contains(evaled)) => {
-                c(l) = c(l).copy(e = evaled)
-              }
-              case (Some(evaled), Some(ps)) => {
-                clobberFull(c, l)
-              }
-              case _ => {
-                // ps.e != evaled and have prop
-                clobberFull(c, l)
-              }
+            case (_, Some(ps)) if ps.clobbered => {
+              ()
             }
-
+            case (Some(evaled), Some(ps))
+                if ps.e == r || ps.e == evaled || (canPropTo(c, ps.e, isFlagDep).contains(evaled)) => {
+              c(l) = c(l).copy(e = evaled)
+            }
+            case (Some(evaled), Some(ps)) => {
+              clobberFull(c, l)
+            }
+            case _ => {
+              // ps.e != evaled and have prop
+              clobberFull(c, l)
+            }
           }
         }
         case x: DirectCall => {
@@ -809,77 +814,6 @@ object CopyProp {
 
 }
 
-class ConstCopyProp() extends AbstractDomain[CCP] {
-  private final val callClobbers = ((0 to 7) ++ (19 to 30)).map("R" + _).map(c => Register(c, 64))
-
-  def top: CCP = CCP(Map().withDefaultValue(CopyProp.Clobbered))
-  def bot: CCP = CCP(Map().withDefaultValue(CopyProp.Bot))
-
-  override def join(l: CCP, r: CCP, pos: Block): CCP = {
-    // val ks = l.state.keySet.intersect(r.state.keySet)
-    val ks = l.state.keySet ++ (r.state.keySet)
-
-    val merged = ks.map(v =>
-      (v ->
-        ((l.state.get(v).getOrElse(CopyProp.Clobbered), r.state.get(v).getOrElse(CopyProp.Clobbered)) match {
-          case (l, CopyProp.Bot)                                                            => l
-          case (CopyProp.Bot, r)                                                            => r
-          case (c @ CopyProp.Clobbered, _)                                                  => c
-          case (_, c @ CopyProp.Clobbered)                                                  => c
-          case (p1 @ CopyProp.Prop(e1, deps1), p2 @ CopyProp.Prop(e2, deps2)) if (p1 == p2) => p1
-          case (_, _)                                                                       => CopyProp.Clobbered
-        }))
-    )
-    CCP(merged.toMap)
-  }
-
-  override def transfer(c: CCP, s: Command): CCP = {
-    s match {
-      case Assign(l, r, lb) => {
-        if (r.loads.size > 0) {
-          CCP.clobberFull(c, l)
-        } else {
-          val evaled = ir.eval.partialEvalExpr(
-            Substitute(
-              v => {
-                c.state.get(v) match {
-                  case Some(CopyProp.Prop(c, deps)) if deps.isEmpty => Some(c)
-                  case _                                            => None
-                }
-              },
-              false
-            )(r).getOrElse(r),
-            e => None
-          )
-          val rhsDeps = evaled.variables.toSet
-          val existing = c.state.get(l).getOrElse(CopyProp.Bot)
-
-          existing match {
-            case CopyProp.Bot => {
-              c.copy(state = c.state + (l -> CopyProp.Prop(evaled, rhsDeps))) // not seen yet
-            }
-            case CopyProp.Prop(e, _) => {
-              val p = CCP.clobber(c, l)
-              p.copy(state = p.state + (l -> CopyProp.Prop(evaled, rhsDeps))) // not seen yet
-            }
-            case _ => {
-              CCP.clobberFull(c, l)
-            }
-          }
-        }
-      }
-      case x: DirectCall => {
-        val lhs = x.outParams.map(_._2)
-        lhs.foldLeft(c)(CCP.clobberFull)
-      }
-      case x: IndirectCall => {
-        val toClob = callClobbers
-        toClob.foldLeft(c)(CCP.clobberFull)
-      }
-      case _ => c
-    }
-  }
-}
 
 class ExprComplexity extends CILVisitor {
   // count the nodes in the expression AST
@@ -902,15 +836,15 @@ class ExprComplexity extends CILVisitor {
   }
 }
 
-/**
- * Use this as a partially applied function. 
- * Substitute(Map.from(substs).get, recurse = false)
- *
- * @res: defines the substitutions to make
- * @recurse: continue substituting with `res` into each substituted expression
- * @complexityThreshold: Stop substituting after the AST node count has increased by this much
- *
- */
+/** Use this as a partially applied function. Substitute(Map.from(substs).get, recurse = false)
+  *
+  * @res:
+  *   defines the substitutions to make
+  * @recurse:
+  *   continue substituting with `res` into each substituted expression
+  * @complexityThreshold:
+  *   Stop substituting after the AST node count has increased by this much
+  */
 class Substitute(
     val res: Variable => Option[Expr],
     val recurse: Boolean = true,
@@ -957,7 +891,6 @@ class Substitute(
 class Simplify(
     val res: Variable => Option[Expr],
     val initialBlock: Block = null,
-    val absdom: Option[ConstCopyProp] = None /* flow sensitive */
 ) extends CILVisitor {
 
   var madeAnyChange = false

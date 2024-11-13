@@ -75,12 +75,19 @@ case class BProcedure(
     procList ++ implList ++ List("")
   }
   override def toString: String = toBoogie.mkString("\n")
-  def functionOps: Set[FunctionOp] =
-    body.flatMap(c => c.functionOps).toSet ++ ensures.flatMap(c => c.functionOps).toSet ++ requires
-      .flatMap(c => c.functionOps)
-      .toSet ++ freeEnsures.flatMap(c => c.functionOps).toSet ++ freeRequires.flatMap(c => c.functionOps).toSet
+  def functionOps: Set[FunctionOp] = {
+    val bodyOps = body.flatMap(_.functionOps)
+    val ensuresOps = ensures.flatMap(_.functionOps) ++ freeEnsures.flatMap(_.functionOps)
+    val requiresOps = requires.flatMap(_.functionOps) ++ freeRequires.flatMap(_.functionOps)
+    (bodyOps ++ ensuresOps ++ requiresOps).toSet
+  }
 
-  def globals: Set[BVar] = body.flatMap(c => c.globals).toSet ++ modifies
+  def globals: Set[BVar] = {
+    val bodyGlobals = body.flatMap(_.globals)
+    val ensuresGlobals = ensures.flatMap(_.globals) ++ freeEnsures.flatMap(_.globals)
+    val requiresGlobals = requires.flatMap(_.globals) ++ freeRequires.flatMap(_.globals)
+    (bodyGlobals ++ ensuresGlobals ++ requiresGlobals).toSet ++ modifies
+  }
 }
 
 case class BAxiom(body: BExpr, override val attributes: List[BAttribute] = List()) extends BDeclaration {

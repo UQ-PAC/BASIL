@@ -33,7 +33,7 @@ class ConstPropInterpreterValidate extends AnyFunSuite {
     ictx = IRTransform.doCleanup(ictx)
     val analysisres = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), ictx)
 
-    val breaks : List[BreakPoint] = analysisres.constPropResult.collect {
+    val breaks : List[BreakPoint] = analysisres.intraProcConstProp.collect {
       // convert analysis result to a list of breakpoints, each which evaluates an expression describing 
       // the invariant inferred by the analysis (the assignment of registers) at a corresponding program point
 

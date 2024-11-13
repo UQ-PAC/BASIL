@@ -7,7 +7,7 @@ import com.grammatech.gtirb.proto.CFG.Edge
 import com.grammatech.gtirb.proto.CFG.EdgeLabel
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Symbol.Symbol
-import Parsers.SemanticsParser.*
+import Parsers.ASLpParser.*
 import gtirb.*
 import ir.*
 
@@ -158,7 +158,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
     // maybe good to sort blocks by address around here?
 
-    val semanticsLoader = SemanticsLoader(parserMap)
+    val semanticsLoader = GTIRBLoader(parserMap)
 
     for ((functionUUID, blockUUIDs) <- functionBlocks) {
       val procedure = uuidToProcedure(functionUUID)
@@ -202,29 +202,35 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
     val sections = mods.flatMap(_.sections)
 
-    val initialMemory: ArrayBuffer[MemorySection] = ArrayBuffer()
-    sections.map {elem =>
-      val bytestoInt = elem.byteIntervals.head.contents.toByteArray.map(byte => BigInt(byte))
-      val bytes = bytestoInt.map {byte =>
-        if (byte < 0) {
-          BitVecLiteral(byte + (BigInt(1) << 8), 8)
-        } else {
-          BitVecLiteral(byte, 8)
-        }
+    val initialMemory: mutable.TreeMap[BigInt, MemorySection] = mutable.TreeMap()
+    sections.map { elem =>
+      val bytesToInt = elem.byteIntervals.head.contents.toByteArray.map(byte => BigInt(byte))
+      val size = elem.byteIntervals.head.size.toInt
+      val bytes = if (elem.name == ".bss" && bytesToInt.isEmpty) {
+        for (_ <- 0 until size) yield BitVecLiteral(0, 8)
+      } else {
+        bytesToInt.map { byte =>
+          if (byte < 0) {
+            BitVecLiteral(byte + (BigInt(1) << 8), 8)
+          } else {
+            BitVecLiteral(byte, 8)
+          }
+        }.toSeq
       }
-      val section = MemorySection(elem.name, elem.byteIntervals.head.address.toInt, elem.byteIntervals.head.size.toInt, bytes.toSeq)
-      initialMemory += section
+      val readOnly = elem.name == ".rodata" || elem.name == ".got" // crude heuristic for now
+      val address = BigInt(elem.byteIntervals.head.address)
+      val section = MemorySection(elem.name, address, size, bytes, readOnly, None)
+      initialMemory += (address -> section)
     }
 
-    val readOnlyMemory: ArrayBuffer[MemorySection] = ArrayBuffer()
     val intialProc: Procedure = procedures.find(_.address.get == mainAddress).get
 
-    Program(procedures, intialProc, initialMemory, readOnlyMemory)
+    Program(procedures, intialProc, initialMemory)
   }
 
   private def removePCAssign(block: Block): Option[String] = {
     block.statements.last match {
-      case last @ Assign(lhs: Register, _, _) if lhs.name == "_PC" =>
+      case last @ LocalAssign(lhs: Register, _, _) if lhs.name == "_PC" =>
         val label = last.label
         block.statements.remove(last)
         label
@@ -234,7 +240,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
   private def getPCTarget(block: Block): Register = {
     block.statements.last match {
-      case Assign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
+      case LocalAssign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
       case _ => throw Exception(s"expected block ${block.label} to have a program counter assignment at its end")
     }
   }
@@ -371,8 +377,8 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
       // need to copy jump as it can't have multiple parents
       val jumpCopy = currentBlock.jump match {
         case GoTo(targets, label) => GoTo(targets, label)
-        case h: Unreachable => Unreachable()
-        case r: Return => Return()
+        case Unreachable(label) => Unreachable(label)
+        case Return(label, args) => Return(label, args)
         case _ => throw Exception("this shouldn't be reachable")
       }
       trueBlock.replaceJump(currentBlock.jump)
@@ -395,7 +401,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           if (proxySymbols.isEmpty) {
             // indirect call with no further information
             val target = block.statements.last match {
-              case Assign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
+              case LocalAssign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
               case _ => throw Exception(s"no assignment to program counter found before indirect call in block ${block.label}")
             }
             val label = block.statements.last.label
@@ -650,5 +656,5 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     val assume = Assume(condition, checkSecurity = true)
     Block(newLabel, None, ArrayBuffer(assume), GoTo(ArrayBuffer(target)))
   }
-
 }
+

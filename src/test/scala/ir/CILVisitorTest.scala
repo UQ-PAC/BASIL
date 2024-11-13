@@ -44,7 +44,7 @@ class AddGammas extends CILVisitor {
 
   override def vstmt(s: Statement) = {
     s match {
-      case a: Assign => ChangeTo(List(a, Assign(gamma_v(a.lhs), gamma_e(a.rhs))))
+      case a: LocalAssign => ChangeTo(List(a, LocalAssign(gamma_v(a.lhs), gamma_e(a.rhs))))
       case _         => SkipChildren()
     }
 
@@ -86,10 +86,10 @@ class CILVisitorTest extends AnyFunSuite {
     val program: Program = prog(
       proc(
         "main",
-        block("0x0", Assign(getRegister("R6"), getRegister("R31")), goto("0x1")),
+        block("0x0", LocalAssign(getRegister("R6"), getRegister("R31")), goto("0x1")),
         block(
           "0x1",
-          MemoryAssign(mem, BinaryExpr(BVADD, getRegister("R6"), bv64(4)), bv64(10), Endian.LittleEndian, 64),
+          MemoryStore(mem, BinaryExpr(BVADD, getRegister("R6"), bv64(4)), bv64(10), Endian.LittleEndian, 64),
           goto("returntarget")
         ),
         block("returntarget", ret)
@@ -134,10 +134,10 @@ class CILVisitorTest extends AnyFunSuite {
     val program: Program = prog(
       proc(
         "main",
-        block("0x0", Assign(getRegister("R6"), getRegister("R31")), goto("0x1")),
+        block("0x0", LocalAssign(getRegister("R6"), getRegister("R31")), goto("0x1")),
         block(
           "0x1",
-          MemoryAssign(mem, BinaryExpr(BVADD, getRegister("R6"), bv64(4)), bv64(10), Endian.LittleEndian, 64),
+          MemoryStore(mem, BinaryExpr(BVADD, getRegister("R6"), bv64(4)), bv64(10), Endian.LittleEndian, 64),
           goto("returntarget")
         ),
         block("returntarget", ret)

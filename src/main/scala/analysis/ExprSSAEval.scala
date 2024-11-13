@@ -25,8 +25,6 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
 }
 
 def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], n: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[BitVecLiteral] = {
-  Logger.debug(s"evaluateExpression: $exp")
-
   def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = {
     val res = for {
       x <- a
@@ -36,9 +34,7 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapper
   }
 
   def applySingle(op: BitVecLiteral => BitVecLiteral, a: Set[BitVecLiteral]): Set[BitVecLiteral] = {
-    val res = for {
-      x <- a
-    } yield op(x)
+    val res = for (x <- a) yield op(x)
     res
   }
 
@@ -105,21 +101,27 @@ def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition,
   out.getOrElse(variable, Set())
 }
 
-def unwrapExpr(expr: Expr): Set[Expr] = {
-  var buffers: Set[Expr] = Set()
+def unwrapExprToVar(expr: Expr): Option[Variable] = {
   expr match {
-    case e: Extract => buffers ++= unwrapExpr(e.body)
-    case e: SignExtend => buffers ++= unwrapExpr(e.body)
-    case e: ZeroExtend => buffers ++= unwrapExpr(e.body)
-    case repeat: Repeat => buffers ++= unwrapExpr(repeat.body)
-    case unaryExpr: UnaryExpr => buffers ++= unwrapExpr(unaryExpr.arg)
-    case binaryExpr: BinaryExpr =>
-      buffers ++= unwrapExpr(binaryExpr.arg1)
-      buffers ++= unwrapExpr(binaryExpr.arg2)
-    case memoryLoad: MemoryLoad =>
-      buffers += memoryLoad
-      buffers ++= unwrapExpr(memoryLoad.index)
+    case variable: Variable =>
+      Some(variable)
+    case e: Extract => unwrapExprToVar(e.body)
+    case e: SignExtend => unwrapExprToVar(e.body)
+    case e: ZeroExtend => unwrapExprToVar(e.body)
+    case repeat: Repeat => unwrapExprToVar(repeat.body)
+    case unaryExpr: UnaryExpr => unwrapExprToVar(unaryExpr.arg)
+    case binaryExpr: BinaryExpr => // TODO: incorrect
+      unwrapExprToVar(binaryExpr.arg1)
+      unwrapExprToVar(binaryExpr.arg2)
     case _ =>
+      None
   }
-  buffers
+}
+
+def bitVectorOpToBigIntOp(op: BinOp, lhs: BigInt, rhs: BigInt): BigInt = {
+  op match {
+    case BVADD => lhs + rhs
+    case BVSUB => lhs - rhs
+    case _ => throw RuntimeException("Binary operation support not implemented: " + op)
+  }
 }

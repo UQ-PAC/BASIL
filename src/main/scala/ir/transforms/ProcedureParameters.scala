@@ -78,7 +78,7 @@ def clearParams(p: Program) = {
 def collectVariables(p: Procedure): (Set[Variable], Set[Variable]) = {
   val lvars = p.blocks.toSet.flatMap(_.statements.flatMap(s => {
     s match {
-      case Assign(l, _, _)        => Set(l)
+      case LocalAssign(l, _, _)        => Set(l)
       case DirectCall(t, o, _, _) => o.toSet.map(_._2)
       case _                      => Set()
     }
@@ -90,10 +90,11 @@ def collectVariables(p: Procedure): (Set[Variable], Set[Variable]) = {
     .flatten
   val rvars = p.blocks.toSet.flatMap(_.statements.flatMap(s => {
     s match {
-      case Assign(l, r, _)                => r.variables
+      case LocalAssign(l, r, _)                => r.variables
       case Assume(l, _, _, _)             => l.variables
       case Assert(l, _, _)                => l.variables
-      case MemoryAssign(m, i, v, _, _, _) => i.variables ++ v.variables
+      case MemoryStore(m, i, v, _, _, _) => i.variables ++ v.variables
+      case MemoryLoad(lhs, m, index, endian, size, label) => index.variables ++ Seq(lhs)
       case IndirectCall(l, _)             => Set(l)
       case DirectCall(t, o, l, _)         => l.toSet.flatMap(_._2.variables)
       case _                              => Set()
@@ -194,14 +195,18 @@ object ReadWriteAnalysis {
   def processProc(state: st, p: Procedure): RW = {
     p.foldLeft(state(p))((ir, s) => {
       s match {
-        case s: Assign => {
+        case s: LocalAssign => {
           ir.map(addWrites(Seq(s.lhs)))
             .map(addReads(s.rhs.variables))
+        }
+        case s: MemoryLoad => {
+          ir.map(addWrites(Seq(s.lhs)))
+            .map(addReads(s.index.variables))
         }
         case s: Return => {
           ir.map(addReads(s.outParams.flatMap(_._2.variables)))
         }
-        case s: MemoryAssign => {
+        case s: MemoryStore => {
           ir.map(addReads(s.index.variables ++ s.value.variables))
         }
         case s: DirectCall => {
@@ -306,7 +311,7 @@ class SetActualParams(
 
   override def vproc(p: Procedure) = {
     val incoming =
-      p.formalInParam.toList.flatMap(param => inBinding.get(p).flatMap(_.get(param)).map(p => Assign(p, param)).toList)
+      p.formalInParam.toList.flatMap(param => inBinding.get(p).flatMap(_.get(param)).map(p => LocalAssign(p, param)).toList)
     p.entryBlock.foreach(b => b.statements.prependAll(incoming))
     DoChildren()
   }
@@ -365,8 +370,8 @@ def specToProcForm(
   def toNameMapping(v: Map[LocalVar, Variable]): Map[String, String] = {
     v.map(v => (v._2.name, v._1.name)) ++ v.map(v => ("Gamma_" + v._2.name, "Gamma_" + v._1.name))
   }
-  val varToInVar: Map[String, Map[String, String]] = mappingInparam.map(p => (p._1.name -> toNameMapping(p._2)))
-  val varToOutVar: Map[String, Map[String, String]] = mappingOutparam.map(p => (p._1.name -> toNameMapping(p._2)))
+  val varToInVar: Map[String, Map[String, String]] = mappingInparam.map(p => (p._1.procName -> toNameMapping(p._2)))
+  val varToOutVar: Map[String, Map[String, String]] = mappingOutparam.map(p => (p._1.procName -> toNameMapping(p._2)))
 
   def convVarToOld(varInPre: Map[String, String], varInPost: Map[String, String], isPost: Boolean = false)(
       b: BExpr

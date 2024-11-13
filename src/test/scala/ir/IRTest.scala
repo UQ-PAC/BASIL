@@ -95,13 +95,13 @@ class IRTest extends AnyFunSuite {
     val p = prog(
       proc("main",
         block("l_main",
-          Assign(R0, bv64(10)),
-          Assign(R1, bv64(10)),
+          LocalAssign(R0, bv64(10)),
+          LocalAssign(R1, bv64(10)),
           goto("newblock")
         ),
         block("l_main_1",
-          Assign(R0, bv64(22)),
-          directCall("p2"), 
+          LocalAssign(R0, bv64(22)),
+          directCall("p2"),
           goto("returntarget")
         ),
         block("returntarget",
@@ -109,7 +109,7 @@ class IRTest extends AnyFunSuite {
         )
       ),
       proc("p2",
-        block("l_p2", Assign(R0, bv64(10)), goto("l_p2_1")),
+        block("l_p2", LocalAssign(R0, bv64(10)), goto("l_p2_1")),
         block("l_p2_1", ret)
       )
     )
@@ -153,15 +153,15 @@ class IRTest extends AnyFunSuite {
     )
 
     val b2 = block("newblock2",
-      Assign(R0, bv64(22)),
-      Assign(R0, bv64(22)),
-      Assign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
       goto("lmain2")
     ).resolve(p)
     val b1 = block("newblock1",
-      Assign(R0, bv64(22)),
-      Assign(R0, bv64(22)),
-      Assign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
       goto("lmain2")
     ).resolve(p)
 
@@ -190,16 +190,16 @@ class IRTest extends AnyFunSuite {
     )
 
     val b1 = block("newblock2",
-      Assign(R0, bv64(22)),
-      Assign(R0, bv64(22)),
-      Assign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
       directCall("main"),
       unreachable 
     ).resolve(p)
     val b2 = block("newblock1",
-      Assign(R0, bv64(22)),
-      Assign(R0, bv64(22)),
-      Assign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
       ret
     ).resolve(p)
 
@@ -217,7 +217,7 @@ class IRTest extends AnyFunSuite {
 
     assert(called.incomingCalls().isEmpty)
     val b3 = block("newblock3",
-      Assign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
       directCall("called"),
       unreachable
     ).resolve(p)
@@ -253,8 +253,8 @@ class IRTest extends AnyFunSuite {
     val p = prog(
         proc("main",
           block("l_main",
-            Assign(R0, bv64(10)),
-            Assign(R1, bv64(10)),
+            LocalAssign(R0, bv64(10)),
+            LocalAssign(R1, bv64(10)),
             goto("returntarget")
           ),
           block("returntarget",
@@ -284,13 +284,13 @@ class IRTest extends AnyFunSuite {
     val p = prog(
       proc("p1",
         block("b1",
-          Assign(R0, bv64(10)),
+          LocalAssign(R0, bv64(10)),
           ret
         )
       ),
       proc("main",
         block("l_main",
-          Assign(R0, bv64(10)),
+          LocalAssign(R0, bv64(10)),
           directCall("p1"), goto("returntarget")
         ),
         block("returntarget",

@@ -67,11 +67,15 @@ class BasilIRPrettyPrinter() extends BasilIR[BST] {
     BST(s"proc $name(${inParams.mkString(", ")}) -> (${outParams.mkString(", ")}) {\n$entry${middleBlocks.mkString("\n")}$ret\n}")
   }
 
-  override def vassign(lhs: BST[Variable], rhs: BST[Expr]): BST[Assign] = BST(s"${lhs} := ${rhs}")
+  override def vassign(lhs: BST[Variable], rhs: BST[Expr]): BST[LocalAssign] = BST(s"${lhs} := ${rhs}")
 
-  override def vstore(mem: String, index: BST[Expr], value: BST[Expr], endian: Endian, size: Int): BST[MemoryAssign] = {
+  override def vstore(mem: String, index: BST[Expr], value: BST[Expr], endian: Endian, size: Int): BST[MemoryStore] = {
     val le = if endian == Endian.LittleEndian then "le" else "be"
     BST(s"store_$le(${mem}, ${index}, ${value}, ${size})")
+  }
+  def vload(lhs: BST[Variable], mem: String, index: BST[Expr], endian: Endian, size: Int): BST[MemoryLoad] = {
+    val le = if endian == Endian.LittleEndian then "le" else "be"
+    BST(s"$lhs := load_$le(${mem}, ${index}, ${size})")
   }
 
   override def vcall(
@@ -96,6 +100,7 @@ class BasilIRPrettyPrinter() extends BasilIR[BST] {
     case BitVecType(sz) => s"bv$sz"
     case IntType => "nat"
     case BoolType => "bool"
+    case _ => ???
   }
 
   override def vrvar(e: Variable): BST[Variable] = vlvar(e) 
@@ -121,16 +126,10 @@ class BasilIRPrettyPrinter() extends BasilIR[BST] {
     BST(s"$opn($arg)")
   }
 
-
   override def vboollit(b: Boolean) = BST(b.toString)
   override def vintlit(i: BigInt) = BST("0x%x".format(i))
   override def vbvlit(i: BitVecLiteral) = BST("0x%x".format(i.value) + s"bv${i.size}")
   override def vuninterp_function(name: String, args: Seq[BST[Expr]]): BST[Expr] = BST(s"$name(${args.mkString(", ")})")
-
-  override def vload(arg: MemoryLoad): BST[Expr] = {
-    val le = if Endian == Endian.LittleEndian then "le" else "be"
-    BST(s"load_${le}(${arg.mem.name}, ${vexpr(arg.index)}, ${arg.size})")
-  }
 
 
 }

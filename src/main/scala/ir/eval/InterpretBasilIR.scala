@@ -304,14 +304,22 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
 
   def interpretStatement[S, T <: Effects[S, InterpreterError]](f: T)(s: Statement): State[S, Unit, InterpreterError] = {
     s match {
-      case assign: Assign => {
+      case assign: LocalAssign => {
         for {
           rhs <- Eval.evalBV(f)(assign.rhs)
           st <- f.storeVar(assign.lhs.name, assign.lhs.toBoogie.scope, Scalar(rhs))
           n <- f.setNext(Run(s.successor))
         } yield (st)
       }
-      case assign: MemoryAssign =>
+      case assign: MemoryLoad => {
+        for {
+          index <- Eval.evalBV(f)(assign.index)
+          loaded <- Eval.loadBV(f)(assign.mem.name, Scalar(index), assign.endian, assign.size)
+          st <- f.storeVar(assign.lhs.name, assign.lhs.toBoogie.scope, Scalar(loaded))
+          n <- f.setNext(Run(s.successor))
+        } yield (st)
+      }
+      case assign: MemoryStore =>
         for {
           index: BitVecLiteral <- Eval.evalBV(f)(assign.index)
           value: BitVecLiteral <- Eval.evalBV(f)(assign.value)
@@ -460,7 +468,7 @@ object InterpFuns {
   }
 
   def initialiseProgram[S, T <: Effects[S, InterpreterError]](f: T)(p: Program): State[S, Unit, InterpreterError] = {
-    def initMemory(mem: String, mems: ArrayBuffer[MemorySection]) = {
+    def initMemory(mem: String, mems: Iterable[MemorySection]) = {
       for {
         m <- State.sequence(
           State.pure(()),
@@ -493,10 +501,8 @@ object InterpFuns {
           )
       )
       _ <- State.pure(Logger.debug("INITIALISE MEMORY SECTIONS"))
-      mem <- initMemory("mem", p.initialMemory)
-      mem <- initMemory("stack", p.initialMemory)
-      mem <- initMemory("mem", p.readOnlyMemory)
-      mem <- initMemory("stack", p.readOnlyMemory)
+      mem <- initMemory("mem", p.initialMemory.values)
+      mem <- initMemory("stack", p.initialMemory.values)
       mainfun = {
         p.mainProcedure
       }

@@ -57,7 +57,9 @@ object Main {
       @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (requires --analyse flag)")
       simplify: Flag,
       @arg(name = "validate-simplify", doc = "Emit SMT2 check for algebraic simplification translation validation to 'rewrites.smt2'")
-      validateSimplify: Flag
+      validateSimplify: Flag,
+      @arg(name = "memory-regions", doc = "Performs static analysis to separate memory into discrete regions in Boogie output (requires --analyse flag)")
+      memoryRegions: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -92,7 +94,7 @@ object Main {
       runInterpret = conf.interpret.value,
       simplify = conf.simplify.value,
       validateSimp = conf.validateSimplify.value,
-      staticAnalysis = if conf.analyse.value then Some(StaticAnalysisConfig(conf.dumpIL, conf.analysisResults, conf.analysisResultsDot, conf.threadSplit.value, conf.summariseProcedures.value)) else None,
+      staticAnalysis = if conf.analyse.value then Some(StaticAnalysisConfig(conf.dumpIL, conf.analysisResults, conf.analysisResultsDot, conf.threadSplit.value, conf.summariseProcedures.value, conf.memoryRegions.value)) else None,
       boogieTranslation = BoogieGeneratorConfig(if conf.lambdaStores.value then BoogieMemoryAccessMode.LambdaStoreSelect else BoogieMemoryAccessMode.SuccessiveStoreSelect,
         true, rely, conf.threadSplit.value),
       outputPrefix = conf.outFileName,

@@ -4,6 +4,7 @@ import Parsers.SpecificationsParser._
 import boogie._
 import specification._
 import ir._
+import util.Logger
 
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
@@ -43,7 +44,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
       case Some(_) => visitDirectFunctions(ctx.directFunctions)
       case None    => Set()
     }
-    Specification(globals, lPreds, relies, guarantees, subroutines, directFunctions)
+    Specification(Set(), globals, lPreds, relies, guarantees, subroutines, directFunctions)
   }
 
   def visitDirectFunctions(ctx: DirectFunctionsContext): Set[FunctionOp] = {
@@ -276,8 +277,8 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   def visitBoogieTypeName(ctx: BoogieTypeNameContext): BType = {
     ctx match {
       case b: BvBTypeContext => BitVecBType(Integer.parseInt(b.BVSIZE.getText.stripPrefix("bv")))
-      case c: IntBTypeContext => IntBType
-      case c: BoolBTypeContext => BoolBType
+      case _: IntBTypeContext => IntBType
+      case _: BoolBTypeContext => BoolBType
       case m: MapBTypeContext => MapBType(visitBoogieTypeName(m.keyT), visitBoogieTypeName(m.valT))
     }
   }
@@ -317,38 +318,38 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   }
 
   def visitId(ctx: IdContext, nameToGlobals: Map[String, SpecGlobal], params: Map[String, Expr] = Map()): BExpr = {
-    val id = ctx.getText
-    id match {
+    ctx.getText match {
       case id if id.startsWith("Gamma_R") => {
         BVariable(id, BoolBType, Scope.Global)
       }
       case id if (id.startsWith("Gamma_")) => {
-      val gamma_id = id.stripPrefix("Gamma_")
-      params.get(gamma_id) match {
-        case Some(p: LocalVar) => p.toGamma
-        case Some(p: Expr) => p.toGamma
-        case None =>
-          nameToGlobals.get(gamma_id) match {
-            case Some(g: SpecGlobal) => SpecGamma(g)
-            case None                => throw new Exception(s"unresolvable reference to '$id' in specification")
-          }
+        val gamma_id = id.stripPrefix("Gamma_")
+        params.get(gamma_id) match {
+          case Some(p: LocalVar) => p.toGamma
+          case Some(p: Expr) => p.gammas.map(_.toGamma).head
+          case None =>
+            nameToGlobals.get(gamma_id) match {
+              case Some(g: SpecGlobal) => SpecGamma(g)
+              case None                => throw new Exception(s"unresolvable reference to '$id' in specification")
+            }
         }
       }
-      case id if id.startsWith("R") => {
+      case id if id.startsWith("R") =>
         BVariable(id, BitVecBType(64), Scope.Global)
-      }
-      case id =>  {
+      case id =>
         params.get(id) match {
           case Some(p: LocalVar) => p.toBoogie
           case Some(p: Expr) => p.toBoogie
           case None =>
             nameToGlobals.get(ctx.getText) match {
               case Some(g: SpecGlobal) => g
-              case None                => throw new Exception(s"unresolvable reference to '$id' in specification")
+              case None                => {
+                Logger.error(s"$params \n\n $nameToGlobals")
+                throw new Exception(s"unresolvable reference to '$id' in specification")
+              }
             }
         }
-      }
-      }
+    }
   }
 
   def visitMulDivModOp(ctx: MulDivModOpContext): BVBinOp = ctx.getText match {
@@ -374,13 +375,13 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
 
   def visitSubroutine(ctx: SubroutineContext, nameToGlobals: Map[String, SpecGlobal]): SubroutineSpec = {
     val name = ctx.id.getText
-    val irProc = program.procedures.collectFirst { case p if p.name == name => p }
+    val irProc = program.procedures.collectFirst { case p if p.procName == name => p }
 
     val params: Map[String, Expr] = irProc match {
       case None => Map()
       case Some(p) =>
         val r = p.inParamDefaultBinding.map(p => p._1.name -> p._2).toMap ++ p.outParamDefaultBinding.map(p => p._1.name -> p._2).toMap 
-        + (p.name + "_result" -> (Extract(32,0,Register("R0", 64)))) 
+        + (p.procName + "_result" -> (Extract(32,0,Register("R0", 64)))) 
         r
     }
 

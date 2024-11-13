@@ -271,11 +271,6 @@ def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S,
       for {
         v: Option[Literal] <- l.getVariable(variable)
       } yield (v.getOrElse(variable))
-    case ml: MemoryLoad =>
-      for {
-        addr <- eval(ml.index)
-        mem <- l.loadMemory(ml.mem, addr, ml.endian, ml.size)
-      } yield (mem.getOrElse(ml))
     case b: BitVecLiteral => State.pure(b)
     case b: IntLiteral    => State.pure(b)
     case b: BoolLit       => State.pure(b)
