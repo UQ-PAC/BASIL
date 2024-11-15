@@ -89,8 +89,8 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     assert(dsg.find(dsg.globalMapping(AddressRange(1876, 1876)).node.cells(0)).offset.equals(0))
     assert(dsg.find(dsg.globalMapping(AddressRange(1896, 1896)).node.cells(0)).offset.equals(8))
 
-    assert(dsg.adjust(dsg.SSAVar("%00000429", "R8")).equals(dsg.find(dsg.globalMapping(AddressRange(1876, 1876)).node.cells(0))))
-    assert(dsg.adjust(dsg.SSAVar("%00000438", "R8")).equals(dsg.find(dsg.globalMapping(AddressRange(1896, 1896)).node.cells(0))))
+    assert(dsg.adjust(dsg.SSAVar("%00000429$1", "R8")).equals(dsg.find(dsg.globalMapping(AddressRange(1876, 1876)).node.cells(0))))
+    assert(dsg.adjust(dsg.SSAVar("%00000438$1", "R8")).equals(dsg.find(dsg.globalMapping(AddressRange(1896, 1896)).node.cells(0))))
 
 
 

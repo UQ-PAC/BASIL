@@ -682,7 +682,7 @@ class Graph(val proc: Procedure,
   }
 
   def SSAVar(posLabel:String, varName: String): Slice = {
-    assert(posLabel.matches("%[0-9]{8}"))
+    assert(posLabel.matches("%[0-9]{8}?\\$\\d"))
 
     val res = varToCell.keys.filter(pos => pos.toShortString.startsWith(posLabel))
     assert(res.size == 1)
