@@ -34,7 +34,7 @@ trait RNAAnalysis(program: Program) {
       case assert: Assert =>
         m.union(assert.body.variables.filter(!ignoreRegions.contains(_)))
       case memoryAssign: MemoryAssign =>
-        m.union(memoryAssign.index.variables.filter(!ignoreRegions.contains(_)))
+        m.union((memoryAssign.index.variables ++ memoryAssign.value.variables).filter(!ignoreRegions.contains(_)))
       case indirectCall: IndirectCall =>
         if (ignoreRegions.contains(indirectCall.target)) return m
         m + indirectCall.target
@@ -60,7 +60,7 @@ trait RNAAnalysis(program: Program) {
 }
 
 class RNAAnalysisSolver(
-    program: Program,
+    program: Program
 ) extends RNAAnalysis(program)
     with IRIntraproceduralBackwardDependencies
     with Analysis[Map[CFGPosition, Set[Variable]]]

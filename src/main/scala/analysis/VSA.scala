@@ -21,9 +21,7 @@ case class LiteralValue(expr: BitVecLiteral) extends Value {
   override def toString: String = "Literal(" + expr + ")"
 }
 
-trait ValueSetAnalysis(program: Program,
-                       mmm: MemoryModelMap,
-                       constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) {
+trait ValueSetAnalysis(program: Program, mmm: MemoryModelMap) {
 
   val powersetLattice: PowersetLattice[Value] = PowersetLattice()
 
@@ -126,9 +124,8 @@ trait ValueSetAnalysis(program: Program,
 
 class ValueSetAnalysisSolver(
     program: Program,
-    mmm: MemoryModelMap,
-    constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-) extends ValueSetAnalysis(program, mmm, constantProp)
+    mmm: MemoryModelMap
+) extends ValueSetAnalysis(program, mmm)
     with IRIntraproceduralForwardDependencies
     with Analysis[Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]]
     with WorklistFixpointSolverWithReachability[CFGPosition, Map[Variable | MemoryRegion, Set[Value]], MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]] {

@@ -219,21 +219,12 @@ trait MemoryRegionAnalysis(val program: Program,
         s
       }
     case memAssign: MemoryAssign =>
-      val result = eval(memAssign.index, s, memAssign, memAssign.size)
-//          if (result.size > 1) {
-//            //throw new Exception(s"Memory load resulted in multiple regions ${result} for mem load $memoryLoad")
-//            addMergableRegions(result)
-//          }
-      result
+      eval(memAssign.index, s, memAssign, memAssign.size)
     case assign: Assign =>
       stackDetection(assign)
       val unwrapped = unwrapExpr(assign.rhs)
       if (unwrapped.isDefined) {
         eval(unwrapped.get.index, s, assign, unwrapped.get.size)
-        //            if (result.size > 1) {
-        //              //throw new Exception(s"Memory load resulted in multiple regions ${result} for mem load $memoryLoad")
-        //              addMergableRegions(result)
-        //            }
       } else {
         Set()
       }

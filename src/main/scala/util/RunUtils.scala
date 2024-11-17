@@ -407,6 +407,16 @@ object StaticAnalysis {
       )
 
       writeToFile(
+        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> ANRResult(b).toString).toMap),
+        s"${s}_ANR$iteration.dot"
+      )
+
+      writeToFile(
+        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> RNAResult(b).toString).toMap),
+        s"${s}_RNA$iteration.dot"
+      )
+
+      writeToFile(
         toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> mraResult(b).toString).toMap),
         s"${s}_MRA$iteration.dot"
       )
@@ -427,7 +437,7 @@ object StaticAnalysis {
     val steensgaardResults = steensgaardSolver.pointsTo()
 
     Logger.debug("[!] Running VSA")
-    val vsaSolver = ValueSetAnalysisSolver(IRProgram, mmm, constPropResult)
+    val vsaSolver = ValueSetAnalysisSolver(IRProgram, mmm)
     val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
 
     config.analysisDotPath.foreach(s => {
@@ -573,7 +583,7 @@ object RunUtils {
     var iteration = 1
     var modified: Boolean = true
     val analysisResult = mutable.ArrayBuffer[StaticAnalysisContext]()
-    while (modified || (analysisResult.size < 2)) {
+    while (modified) {
       Logger.debug("[!] Running Static Analysis")
       val result = StaticAnalysis.analyse(ctx, config, iteration, analysisResult.lastOption)
       analysisResult.append(result)

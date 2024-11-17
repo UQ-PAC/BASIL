@@ -2,6 +2,8 @@ package analysis
 import ir.*
 import util.Logger
 
+import scala.annotation.tailrec
+
 /** Evaluate an expression in a hope of finding a global variable.
   *
   * @param exp
@@ -153,6 +155,13 @@ def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition,
   out.getOrElse(variable, Set())
 }
 
+/** Extracts a MemoryLoad from Expr. Assumes that a statement contains only one memory load.
+  *
+  * @param stmt
+  *   The statement to extract the memory load from
+  * @return
+  *   The memory load if found, None otherwise
+ */
 def unwrapExpr(expr: Expr): Option[MemoryLoad] = {
   expr match {
     case e: Extract => unwrapExpr(e.body)
@@ -160,8 +169,12 @@ def unwrapExpr(expr: Expr): Option[MemoryLoad] = {
     case e: ZeroExtend => unwrapExpr(e.body)
     case repeat: Repeat => unwrapExpr(repeat.body)
     case unaryExpr: UnaryExpr => unwrapExpr(unaryExpr.arg)
-    case binaryExpr: BinaryExpr => // TODO: incorrect
-      unwrapExpr(binaryExpr.arg1)
+    case binaryExpr: BinaryExpr =>
+      // assume one memory load
+      val lhs = unwrapExpr(binaryExpr.arg1)
+      if (lhs.isDefined) {
+        return lhs
+      }
       unwrapExpr(binaryExpr.arg2)
     case memoryLoad: MemoryLoad =>
       Some(memoryLoad)
@@ -170,6 +183,14 @@ def unwrapExpr(expr: Expr): Option[MemoryLoad] = {
   }
 }
 
+/** Extracts the variable from an expression (only one variable is expected otherwise None ie. in Binary Expression).
+  *
+  * @param expr
+  *   The expression to extract the variable from
+  * @return
+  *   The variable if found, None otherwise
+ */
+@tailrec
 def unwrapExprToVar(expr: Expr): Option[Variable] = {
   expr match {
     case variable: Variable =>
@@ -179,9 +200,8 @@ def unwrapExprToVar(expr: Expr): Option[Variable] = {
     case e: ZeroExtend => unwrapExprToVar(e.body)
     case repeat: Repeat => unwrapExprToVar(repeat.body)
     case unaryExpr: UnaryExpr => unwrapExprToVar(unaryExpr.arg)
-    case binaryExpr: BinaryExpr => // TODO: incorrect
-      unwrapExprToVar(binaryExpr.arg1)
-      unwrapExprToVar(binaryExpr.arg2)
+    case binaryExpr: BinaryExpr => // TODO: handle multiple variables
+      None
     case memoryLoad: MemoryLoad => unwrapExprToVar(memoryLoad.index)
     case _ =>
       None

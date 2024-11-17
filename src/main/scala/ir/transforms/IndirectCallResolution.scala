@@ -82,6 +82,7 @@ class VSAIndirectCallResolution(
             case addressValue: AddressValue =>
               addressValue.region match {
                 case dataRegion: DataRegion => mmm.relfContent.getOrElse(dataRegion, Set())
+                case _ => Set()
               }
             case _: LiteralValue => Set()
           }

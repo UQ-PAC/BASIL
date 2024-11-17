@@ -33,7 +33,7 @@ trait ANRAnalysis(program: Program) {
       case assert: Assert =>
         m.diff(assert.body.variables)
       case memoryAssign: MemoryAssign =>
-        m.diff(memoryAssign.index.variables)
+        m.diff(memoryAssign.index.variables ++ memoryAssign.value.variables)
       case indirectCall: IndirectCall =>
         m - indirectCall.target
       case assign: Assign =>

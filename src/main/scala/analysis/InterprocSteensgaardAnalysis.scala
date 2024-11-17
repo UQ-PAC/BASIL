@@ -93,7 +93,7 @@ class InterprocSteensgaardAnalysis(
           val X2_star = mmm.nodeToRegion(node)
           val alpha = FreshVariable()
           X2_star.foreach { x =>
-            unify(PointerRef(alpha), ExpressionVariable(x))
+            unify(PointerRef(alpha), MemoryVariable(x))
           }
           unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getDefinition(X1, assign, reachingDefs))), alpha)
         }
@@ -109,10 +109,10 @@ class InterprocSteensgaardAnalysis(
           val alpha = FreshVariable()
           val pointerRef = PointerRef(alpha)
           X1_star.foreach { x =>
-            unify(ExpressionVariable(x), pointerRef)
+            unify(MemoryVariable(x), pointerRef)
           }
           X2_regions.foreach { x =>
-            unify(ExpressionVariable(x), alpha)
+            unify(MemoryVariable(x), alpha)
           }
         }
       case _ => // do nothing TODO: Maybe LocalVar too?
@@ -167,9 +167,9 @@ case class IdentifierVariable(id: RegisterWrapperEqualSets) extends StTerm with 
 
 /** A term variable that represents an expression in the program.
  */
-case class ExpressionVariable(expr: MemoryRegion | Expr) extends StTerm with Var[StTerm] {
+case class MemoryVariable(mem: MemoryRegion) extends StTerm with Var[StTerm] {
 
-  override def toString: String = s"$expr"
+  override def toString: String = s"$mem"
 }
 
 /** A fresh term variable.
