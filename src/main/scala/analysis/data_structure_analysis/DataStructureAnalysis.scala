@@ -124,17 +124,30 @@ class DataStructureAnalysis(program: Program,
           calleeGraph.globalMapping.foreach {
             case (range: AddressRange, Field(node: Node, offset: BigInt)) =>
               val field = calleeGraph.find(node)
-              buGraph.mergeCells(
+              val res = buGraph.mergeCells(
                 buGraph.globalMapping(range).node.getCell(buGraph.globalMapping(range).offset),
                 field.node.getCell(field.offset + offset)
               )
+
+              val size = res.node.get.getSize - res.offset
+              buGraph.getStackOffsets(res).foldLeft(res) {
+                (cell, offset) =>
+                  buGraph.mergeCells(cell, buGraph.getStack(offset, size.toInt))
+              }
           }
 
           if (buGraph.varToCell.contains(callee)) {
             buGraph.varToCell(callee).keys.foreach { variable =>
               if (!ignoreRegisters.contains(variable)) {
                 val formal = buGraph.varToCell(callee)(variable)
-                buGraph.mergeCells(buGraph.adjust(formal), buGraph.adjust(callSite.paramCells(variable)))
+                val res = buGraph.mergeCells(buGraph.adjust(formal), buGraph.adjust(callSite.paramCells(variable)))
+
+                val size = res.node.get.getSize - res.offset
+                buGraph.getStackOffsets(res).foldLeft(res) {
+                  (cell, offset) =>
+                    buGraph.mergeCells(cell, buGraph.getStack(offset, size.toInt))
+                }
+
               }
             }
           }
@@ -142,8 +155,14 @@ class DataStructureAnalysis(program: Program,
           writesTo(callee).foreach { reg =>
             val returnCells = buGraph.getCells(IRWalk.lastInProc(callee).get, reg)
             //              assert(returnCells.nonEmpty)
-            returnCells.foldLeft(buGraph.adjust(callSite.returnCells(reg))) { (c, ret) =>
+            val res = returnCells.foldLeft(buGraph.adjust(callSite.returnCells(reg))) { (c, ret) =>
               buGraph.mergeCells(c, buGraph.adjust(ret))
+            }
+
+            val size = res.node.get.getSize - res.offset
+            buGraph.getStackOffsets(res).foldLeft(res) {
+              (cell, offset) =>
+                buGraph.mergeCells(cell, buGraph.getStack(offset, size.toInt))
             }
           }
         }
@@ -187,25 +206,44 @@ class DataStructureAnalysis(program: Program,
         callersGraph.globalMapping.foreach { case (range: AddressRange, Field(oldNode, internal)) =>
           //              val node = callersGraph
           val field = callersGraph.find(oldNode)
-          calleesGraph.mergeCells(
+          val res = calleesGraph.mergeCells(
             calleesGraph.globalMapping(range).node.getCell(calleesGraph.globalMapping(range).offset),
             field.node.getCell(field.offset + internal)
           )
+
+          val size = res.node.get.getSize - res.offset
+          calleesGraph.getStackOffsets(res).foldLeft(res) {
+            (cell, offset) =>
+              calleesGraph.mergeCells(cell, calleesGraph.getStack(offset, size.toInt))
+          }
         }
 
         callSite.paramCells.keySet.foreach { variable =>
           val paramCells = calleesGraph.getCells(callSite.call, variable) // wrong param offset
-          paramCells.foldLeft(calleesGraph.adjust(calleesGraph.formals(variable))) {
+          val res = paramCells.foldLeft(calleesGraph.adjust(calleesGraph.formals(variable))) {
             (cell, slice) => calleesGraph.mergeCells(calleesGraph.adjust(slice), cell)
           }
+
+          val size = res.node.get.getSize - res.offset
+          calleesGraph.getStackOffsets(res).foldLeft(res) {
+            (cell, offset) =>
+              calleesGraph.mergeCells(cell, calleesGraph.getStack(offset, size.toInt))
+          }
+
         }
 
         if (calleesGraph.varToCell.contains(callSite.call)) {
           calleesGraph.varToCell(callSite.call).foreach { (variable, oldSlice) =>
             val slice = callersGraph.find(oldSlice)
             val returnCells = calleesGraph.getCells(IRWalk.lastInProc(callee).get, variable)
-            returnCells.foldLeft(calleesGraph.adjust(slice)) {
+            val res = returnCells.foldLeft(calleesGraph.adjust(slice)) {
               (c, retCell) => calleesGraph.mergeCells(c, calleesGraph.adjust(retCell))
+            }
+
+            val size = res.node.get.getSize - res.offset
+            calleesGraph.getStackOffsets(res).foldLeft(res) {
+              (cell, offset) =>
+                calleesGraph.mergeCells(cell, calleesGraph.getStack(offset, size.toInt))
             }
           }
         }

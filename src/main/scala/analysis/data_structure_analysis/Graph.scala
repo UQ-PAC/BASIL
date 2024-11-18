@@ -125,6 +125,68 @@ class Graph(val proc: Procedure,
     nextValidOffset = offset + byteSize
   }
 
+
+  /**
+   * Takes a cell and returns all corresponding stack offsets to it if any
+   */
+  def getStackOffsets(cell: Cell): Set[BigInt] = {
+    stackMapping.foldLeft(Set[BigInt]()) {
+      (s, f) =>
+        f match
+          case (offset: BigInt, node: Node) =>
+            s ++ node.cells.foldLeft(Set[BigInt]()) {
+              (se, g) =>
+                g match
+                  case (internal: BigInt, stackCell: Cell) =>
+                    if cell == find(stackCell) then
+                      se + (offset + internal)
+                    else
+                      se
+            }
+    }
+  }
+
+  def getStack(offset: BigInt, size: Int): Cell = {
+    var last: BigInt = 0
+    var headNodeOffset: BigInt = -1
+
+    val head: Cell =
+      if stackMapping.contains(offset) then
+        headNodeOffset = 0
+        stackMapping(offset).cells(0)
+      else
+        breakable {
+          stackMapping.keys.toSeq.sorted.foreach(
+            elementOffset =>
+              if offset < elementOffset then
+                break
+              else
+                last = elementOffset
+          )
+        }
+        val diff = offset - last
+        headNodeOffset = offset
+        assert(stackMapping.contains(last))
+        stackMapping(last).getCell(diff)
+
+    // DSA grows cell size with size
+    // selfCollapse at the end to merge all the overlapping accessed size
+    // However, the above approach prevents distinct multi loads
+    // find(head).growSize(size)
+    val headOffset = last + head.offset
+    stackMapping.keys.toSeq.filter(off => off > headOffset && off < headOffset + size).sorted.foreach {
+      off =>
+        val stackDiff = off - headOffset
+        val updatedHead = find(head)
+        val newHeadOffset = updatedHead.offset
+        val headNode = updatedHead.node.get
+        mergeCells(headNode.addCell(newHeadOffset + stackDiff, 0), find(stackMapping(off).cells(0)))
+    }
+    // selfCollapse(head.node.get)
+    head
+  }
+
+
   private val swappedOffsets = globalOffsets.map(_.swap)
 
   // creates the globals from the symbol tables

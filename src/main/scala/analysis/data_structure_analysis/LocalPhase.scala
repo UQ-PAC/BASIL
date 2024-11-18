@@ -50,46 +50,7 @@ class LocalPhase(proc: Procedure,
   }
 
 
-  private def getStack(offset: BigInt, size: Int): Cell = {
-    var last: BigInt = 0
-    var headNodeOffset: BigInt = -1
-
-    val head: Cell =
-      if graph.stackMapping.contains(offset) then
-        headNodeOffset = 0
-        graph.stackMapping(offset).cells(0)
-      else
-        breakable {
-          graph.stackMapping.keys.toSeq.sorted.foreach(
-            elementOffset =>
-              if offset < elementOffset then
-                break
-              else
-                last = elementOffset
-          )
-        }
-        val diff = offset - last
-        headNodeOffset = offset
-        assert(graph.stackMapping.contains(last))
-        graph.stackMapping(last).getCell(diff)
-
-    // DSA grows cell size with size
-    // selfCollapse at the end to merge all the overlapping accessed size
-    // However, the above approach prevents distinct multi loads
-    // graph.find(head).growSize(size)
-    val headOffset = last + head.offset
-    graph.stackMapping.keys.toSeq.filter(off => off > headOffset && off < headOffset + size).sorted.foreach {
-      off =>
-        val stackDiff = off - headOffset
-        val updatedHead = graph.find(head)
-        val newHeadOffset = updatedHead.offset
-        val headNode = updatedHead.node.get
-        graph.mergeCells(headNode.addCell(newHeadOffset + stackDiff, 0), graph.find(graph.stackMapping(off).cells(0)))
-    }
-    // graph.selfCollapse(head.node.get)
-    head
-  }
-
+  
 
   /**
    * if an expr is the address of a stack location return its corresponding cell
@@ -102,18 +63,18 @@ class LocalPhase(proc: Procedure,
         evaluateExpression(arg2, constProp(pos)) match
           case Some(v) =>
             val stackRegions = varToSym(pos)(arg1).filter(s => s.symbolicBase.isInstanceOf[StackLocation])
-            val res = stackRegions.tail.foldLeft(getStack(v.value + stackRegions.head.offset, size)) {
+            val res = stackRegions.tail.foldLeft(graph.getStack(v.value + stackRegions.head.offset, size)) {
               (res, sym) =>
-                graph.mergeCells(res, getStack(v.value + sym.offset, size))
+                graph.mergeCells(res, graph.getStack(v.value + sym.offset, size))
             }
             Some(res)
           case None => None
       case arg: Variable if varToSym.contains(pos) && varToSym(pos).contains(arg) &&
         varToSym(pos)(arg).exists(s => s.symbolicBase.isInstanceOf[StackLocation]) =>
         val stackRegions = varToSym(pos)(arg).filter(s => s.symbolicBase.isInstanceOf[StackLocation])
-        val res = stackRegions.tail.foldLeft(getStack(stackRegions.head.offset, size)) {
+        val res = stackRegions.tail.foldLeft(graph.getStack(stackRegions.head.offset, size)) {
           (res, sym) =>
-            graph.mergeCells(res, getStack(sym.offset, size))
+            graph.mergeCells(res, graph.getStack(sym.offset, size))
         }
         Some(res)
       case _ => None

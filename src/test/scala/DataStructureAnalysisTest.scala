@@ -99,6 +99,63 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
   }
 
+
+  test("stack interproc overlapping callee") {
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "src/test/dsa/stack_interproc_overlapping/stack_interproc_overlapping.adt",
+          relfFile = "src/test/dsa/stack_interproc_overlapping/stack_interproc_overlapping.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+
+    // the dsg of the main procedure after the all phases
+    val program = results.ir.program
+
+    // Local Callee
+    val dsgCallee = results.analysis.get.localDSA(program.nameToProcedure("set_fields"))
+    // dsg.formals(R29) is the slice representing formal R29
+
+    val stack8Pointee = dsgCallee.adjust(dsgCallee.find(dsgCallee.stackMapping(8).cells(0)).getPointee)
+    val R0formal = dsgCallee.adjust(dsgCallee.formals(R0))
+    val paramNode = R0formal.node.get
+
+    assert(stack8Pointee.equals(R0formal))
+    assert(paramNode.cells.size == 2)
+    assert(R0formal.largestAccessedSize == 8)
+    assert(paramNode.cells(0) == R0formal)
+    assert(paramNode.cells(16).largestAccessedSize == 8)
+
+
+
+    // Local Caller
+    val dsgCaller = results.analysis.get.localDSA(program.mainProcedure)
+    val stack0 = dsgCaller.find(dsgCaller.stackMapping(0).cells(0))
+    // val stack8 = dsgCaller.find(dsgCaller.stackMapping(8).cells(0))
+    val stack16 = dsgCaller.find(dsgCaller.stackMapping(16).cells(0))
+
+    assert(stack0.node.get != stack16.node.get)
+
+
+    // topdown Caller
+    val dsg = results.analysis.get.topDownDSA(program.mainProcedure)
+    val stack0Final = dsg.find(dsg.stackMapping(0).cells(0))
+    val stack0FinalNode = stack0Final.node.get
+    // val stack8 = dsgCaller.find(dsgCaller.stackMapping(8).cells(0))
+    val stack16Final = dsg.find(dsg.stackMapping(16).cells(0))
+
+//    assert(stack0Final.largestAccessedSize == 24)
+    assert(stack0Final.node.get == stack16Final.node.get)
+
+
+  }
+
   // Local DSA tests
   /*
   TODO - rewrite this test with a new input that is more suitable than the removed example
