@@ -136,22 +136,24 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
     // Local Caller
     val dsgCaller = results.analysis.get.localDSA(program.mainProcedure)
-    val stack0 = dsgCaller.find(dsgCaller.stackMapping(0).cells(0))
-    // val stack8 = dsgCaller.find(dsgCaller.stackMapping(8).cells(0))
-    val stack16 = dsgCaller.find(dsgCaller.stackMapping(16).cells(0))
+    val stack32 = dsgCaller.find(dsgCaller.stackMapping(32).cells(0))
+    val stack48 = dsgCaller.find(dsgCaller.stackMapping(48).cells(0))
 
-    assert(stack0.node.get != stack16.node.get)
+    assert(stack32.node.get != stack48.node.get)
 
 
     // topdown Caller
-    val dsg = results.analysis.get.topDownDSA(program.mainProcedure)
-    val stack0Final = dsg.find(dsg.stackMapping(0).cells(0))
-    val stack0FinalNode = stack0Final.node.get
-    // val stack8 = dsgCaller.find(dsgCaller.stackMapping(8).cells(0))
-    val stack16Final = dsg.find(dsg.stackMapping(16).cells(0))
+    val dsg = results.analysis.get.bottomUpDSA(program.mainProcedure)
+    val stack32Final = dsg.find(dsg.stackMapping(32).cells(0))
+    val stack32FinalNode = stack32Final.node.get
+    val stack48Final = dsg.find(dsg.stackMapping(48).cells(0))
 
 //    assert(stack0Final.largestAccessedSize == 24)
-    assert(stack0Final.node.get == stack16Final.node.get)
+    assert(stack32Final.node.get == stack48Final.node.get)
+    assert(dsg.find(stack32Final.node.get.cells(0)) == stack32Final)
+    assert(dsg.find(stack32Final.node.get.cells(16)) == stack48Final)
+
+
 
 
   }

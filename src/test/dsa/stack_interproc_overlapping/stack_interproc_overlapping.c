@@ -14,6 +14,8 @@ void __attribute__ ((noinline)) set_fields(str *ext) {
 
 int main()
 {
+    str push; // to get variable stack isnt the first thing on the stack
+    push.a = 4;
     str stack;
     stack.a = 3;
     stack.c = 10;

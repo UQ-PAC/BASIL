@@ -152,7 +152,7 @@ class Graph(val proc: Procedure,
 
     val head: Cell =
       if stackMapping.contains(offset) then
-        headNodeOffset = 0
+        headNodeOffset = offset
         stackMapping(offset).cells(0)
       else
         breakable {
@@ -165,7 +165,7 @@ class Graph(val proc: Procedure,
           )
         }
         val diff = offset - last
-        headNodeOffset = offset
+        headNodeOffset = last
         assert(stackMapping.contains(last))
         stackMapping(last).getCell(diff)
 
@@ -173,7 +173,7 @@ class Graph(val proc: Procedure,
     // selfCollapse at the end to merge all the overlapping accessed size
     // However, the above approach prevents distinct multi loads
     // find(head).growSize(size)
-    val headOffset = last + head.offset
+    val headOffset = headNodeOffset + head.offset
     stackMapping.keys.toSeq.filter(off => off > headOffset && off < headOffset + size).sorted.foreach {
       off =>
         val stackDiff = off - headOffset
