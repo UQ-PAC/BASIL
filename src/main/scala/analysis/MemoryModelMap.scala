@@ -33,6 +33,7 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt], val externalFunctio
   private val cfgPositionToDataRegion: mutable.Map[CFGPosition, Set[DataRegion]] = mutable.Map()
   private val heapCalls: mutable.Map[DirectCall, HeapRegion] = mutable.Map()
   private var relocatedAddressesMap: Map[BigInt, DataRegion] = Map()
+  val contextMapVSA: mutable.Map[Procedure, mutable.Map[DirectCall, Map[Variable | MemoryRegion, Set[Value]]]] = mutable.Map()
 
   private val stackAllocationSites: mutable.Map[CFGPosition, Set[StackRegion]] = mutable.Map()
 
@@ -140,6 +141,35 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt], val externalFunctio
     relocatedAddressesMap.foreach((offset, region) => {
       relfContent(region) = relfContent.getOrElse(region, mutable.Set()) += region.regionIdentifier
     })
+  }
+
+  /** Post load VSA relations
+   * Creates context for every function and creates VSA contexts for every call site
+   * Filters non parameter variables from the context
+   * Does not take in account return values
+   */
+  def postLoadVSARelations(vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
+                           ANRResult: Map[CFGPosition, Set[Variable]],
+                           RNAResult: Map[CFGPosition, Set[Variable]]): Unit = {
+    // 1. Construct context for every function ie. Map[Procedure, Map[Variable | MemoryRegion, Set[Value]]]]
+    // 2. For every directCall to that function, get VSA result and merge in context
+    // 3. Filter non parameter variables from the context
+
+    contextMapVSA.clear()
+    for (n <- vsaResult.keys) {
+      n match
+        case directCall: DirectCall =>
+          val parameters = ANRResult(n).intersect(RNAResult(directCall.target))
+          val proc = directCall.target
+          val vsa = vsaResult.get(n) match {
+            case Some(Lift(el)) =>
+              // filter out non parameter variables, keep regions and parameters
+              el.filter((k, _) => k.isInstanceOf[MemoryRegion] || parameters.contains(k.asInstanceOf[Variable]))
+            case _ => Map()
+          }
+          contextMapVSA(proc) = contextMapVSA.getOrElse(proc, mutable.Map()) += (directCall -> vsa)
+        case _ =>
+    }
   }
 
   def relocatedDataRegion(value: BigInt): Option[DataRegion] = {

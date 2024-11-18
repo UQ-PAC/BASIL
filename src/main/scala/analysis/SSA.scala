@@ -1,0 +1,85 @@
+package analysis
+
+import ir.*
+import analysis.solvers.SimpleWorklistFixpointSolver
+
+type TupleElement =
+  TupleLattice[MapLattice[Variable, FlatElement[Int], FlatLatticeWithDefault[Int]], MapLattice[Variable, FlatElement[Int], FlatLatticeWithDefault[Int]], Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]]]
+
+private var ssaCount: Int = 0
+
+private def nextSSACount() = {
+  ssaCount += 1
+  ssaCount
+}
+
+trait SSA(program: Program, writesTo: Map[Procedure, Set[Register]]) {
+
+  private val tupleLattice: TupleLattice[MapLattice[Variable, FlatElement[Int], FlatLatticeWithDefault[Int]], MapLattice[Variable, FlatElement[Int], FlatLatticeWithDefault[Int]], Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]]] =
+    TupleLattice(
+      MapLattice[Variable, FlatElement[Int], FlatLatticeWithDefault[Int]](FlatLatticeWithDefault[Int](nextSSACount)),
+      MapLattice[Variable, FlatElement[Int], FlatLatticeWithDefault[Int]](FlatLatticeWithDefault[Int](nextSSACount))
+    )
+
+  val lattice: MapLattice[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]]), TupleElement] = MapLattice(
+    tupleLattice
+  )
+
+  val domain: Set[CFGPosition] = Set.empty ++ program
+
+  def transfer(n: CFGPosition, s: (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])): (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]]) =
+    localTransfer(n, s)
+
+  def localTransfer(
+      n: CFGPosition,
+      s: (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])
+  ): (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]]) = n match {
+    case cmd: Command =>
+      eval(cmd, s)
+    case _ => s
+  }
+
+  private def transformUses(vars: Set[Variable], s: (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])): (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]]) = {
+    vars.foldLeft((s(0), Map.empty[Variable, FlatElement[Int]])) {
+      case ((state, acc), v) =>
+        (state, acc + (v -> state(v)))
+    }
+  }
+
+  def eval(cmd: Command, s: (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])):
+    (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]]) = cmd match {
+    case assign: Assign =>
+      val rhs = assign.rhs.variables
+      val lhs = assign.lhs
+      val rhsUseDefs: Map[Variable, FlatElement[Int]] = rhs.foldLeft(Map.empty[Variable, FlatElement[Int]]) {
+        case (acc, v) =>
+          acc + (v -> s(0)(v))
+      }
+      (s(0) + (lhs -> FlatEl(nextSSACount())), rhsUseDefs)
+    case assert: Assert =>
+      transformUses(assert.body.variables, s)
+    case memoryAssign: MemoryAssign =>
+      transformUses(memoryAssign.index.variables ++ memoryAssign.value.variables, s)
+    case assume: Assume =>
+      transformUses(assume.body.variables, s)
+    case indirectCall: IndirectCall =>
+      transformUses(indirectCall.target.variables, s)
+    case directCall: DirectCall =>
+      writesTo.get(directCall.target) match {
+        case Some(registers) =>
+          val result: Map[Variable, FlatElement[Int]] = registers.foldLeft(Map[Variable, FlatElement[Int]]()) {
+            (m, register) =>
+              m + (register -> FlatEl(nextSSACount()))
+          }
+          (s(0) ++ result, s(1))
+        case None =>
+          s
+      }
+    case _ => s
+  }
+}
+
+class IntraprocSSASolver(program: Program, writesTo: Map[Procedure, Set[Register]])
+  extends SSA(program, writesTo: Map[Procedure, Set[Register]])
+    with IRIntraproceduralForwardDependencies
+    with SimpleWorklistFixpointSolver[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]]), TupleElement]

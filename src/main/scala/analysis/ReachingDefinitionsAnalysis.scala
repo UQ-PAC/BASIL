@@ -69,3 +69,8 @@ class InterprocReachingDefinitionsAnalysisSolver(program: Program)
   extends ReachingDefinitionsAnalysis(program)
     with SimpleWorklistFixpointSolver[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]), TupleElement]
     with IRInterproceduralForwardDependencies
+
+class IntraprocReachingDefinitionsAnalysisSolver(program: Program)
+  extends ReachingDefinitionsAnalysis(program)
+    with SimpleWorklistFixpointSolver[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]), TupleElement]
+    with IRIntraproceduralForwardDependencies

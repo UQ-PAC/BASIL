@@ -123,6 +123,24 @@ class FlatLattice[X] extends Lattice[FlatElement[X]] {
   }
 }
 
+/** The flat lattice made of element of `X` with a default value generator `f`. Top is greater than every other element,
+ */
+class FlatLatticeWithDefault[X](val f: () => X) extends Lattice[FlatElement[X]] {
+
+  val bottom: FlatElement[X] = FlatEl(f())
+
+  override val top: FlatElement[X] = Top
+
+  def lub(x: FlatElement[X], y: FlatElement[X]): FlatElement[X] = (x, y) match {
+    case (a, Bottom) => a
+    case (Bottom, b) => b
+    case (a, b) if a == b => a
+    case (Top, _) => FlatEl(f())
+    case (_, Top) => FlatEl(f())
+    case _ => FlatEl(f())
+  }
+}
+
 class TupleLattice[L1 <: Lattice[T1], L2 <: Lattice[T2], T1, T2](val lattice1: L1, val lattice2: L2) extends Lattice[(T1, T2)] {
   override val bottom: (T1, T2) = (lattice1.bottom, lattice2.bottom)
 
