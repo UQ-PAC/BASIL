@@ -93,7 +93,7 @@ trait GlobalRegionAnalysis(val program: Program,
         case _: UninterpretedFunction => Set.empty
         case variable: Variable =>
           val uses = getUse(variable, n, reachingDefs)
-          uses.flatMap(i => getVSAHints(variable, i))
+          return uses.flatMap(i => getVSAHints(variable, i))
         case _ => Set()
       }
     }

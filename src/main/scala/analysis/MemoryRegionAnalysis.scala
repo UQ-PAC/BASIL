@@ -195,7 +195,7 @@ trait MemoryRegionAnalysis(val program: Program,
     if (possibleVar.isDefined) {
       val variable = possibleVar.get
       val uses = getUse(variable, n, reachingDefs)
-      uses.flatMap(i => getVSAHints(variable, i))
+      return uses.flatMap(i => getVSAHints(variable, i))
     }
     Set()
   }
@@ -247,7 +247,12 @@ trait MemoryRegionAnalysis(val program: Program,
     case assign: Assign =>
       val unwrapped = unwrapExpr(assign.rhs)
       if (unwrapped.isDefined) {
-        ((eval(unwrapped.get.index, s._1._1, s._1._2, assign, unwrapped.get.size), spList), Set.empty)
+        val isHeap = checkForHeap(unwrapped.get.index, n)
+        if (isHeap.nonEmpty) {
+          ((Set.empty, spList), s._2 ++ isHeap)
+        } else {
+          ((eval(unwrapped.get.index, s._1._1, s._1._2, assign, unwrapped.get.size), spList), Set.empty)
+        }
       } else {
         // this is a constant, but we need to check if it is a data region
         ((Set.empty, spList), s._2)
