@@ -54,7 +54,7 @@ case class IRContext(
 case class StaticAnalysisContext(
     constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
     IRconstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    memoryRegionResult: Map[CFGPosition, (Set[StackRegion], Set[HeapRegion])],
+    memoryRegionResult: Map[CFGPosition, ((Set[StackRegion], Set[Variable]), Set[HeapRegion])],
     vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
     interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]],
     paramResults: Map[Procedure, Set[Variable]],

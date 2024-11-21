@@ -183,7 +183,7 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt], val externalFunctio
 
   def convertMemoryRegions(stackRegionsPerProcedure: mutable.Map[Procedure, mutable.Set[StackRegion]],
                            heapRegions: mutable.Map[DirectCall, HeapRegion],
-                           allocationSites: Map[CFGPosition, (Set[StackRegion], Set[HeapRegion])],
+                           allocationSites: Map[CFGPosition, ((Set[StackRegion], Set[Variable]), Set[HeapRegion])],
                            procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]],
                            graRegions: mutable.HashMap[BigInt, DataRegion],
                            graResults: Map[CFGPosition, Set[DataRegion]]): Unit = {
@@ -207,7 +207,7 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt], val externalFunctio
       }
     }
 
-    val stackOnes = allocationSites.map((n, stacks) => (n, stacks._1))
+    val stackOnes = allocationSites.map((n, stacks) => (n, stacks._1._1))
     val heapOnes = allocationSites.map((n, heaps) => (n, heaps._2))
 
     cfgPositionToDataRegion ++= graResults
