@@ -92,18 +92,23 @@ trait GlobalRegionAnalysis(val program: Program,
         case _: MemoryLoad => ???
         case _: UninterpretedFunction => Set.empty
         case variable: Variable =>
-          val collage: Set[DataRegion] = vsaResult.get(n) match {
-            case Some(Lift(el)) =>
-              el.getOrElse(variable, Set()).flatMap {
-                case AddressValue(dataRegion2: DataRegion) => Some(dataRegion2)
-                case _ => Set()
-              }
-            case _ => Set()
-          }
-          return collage
+          val uses = getUse(variable, n, reachingDefs)
+          uses.flatMap(i => getVSAHints(variable, i))
         case _ => Set()
       }
     }
+  }
+
+  def getVSAHints(variable: Variable, n: CFGPosition): Set[DataRegion] = {
+    val collage: Set[DataRegion] = vsaResult.get(n) match {
+      case Some(Lift(el)) =>
+        el.getOrElse(variable, Set()).flatMap {
+          case AddressValue(dataRegion2: DataRegion) => Some(dataRegion2)
+          case _ => Set()
+        }
+      case _ => Set()
+    }
+    collage
   }
 
   /**

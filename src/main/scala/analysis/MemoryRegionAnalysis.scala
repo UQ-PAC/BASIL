@@ -67,7 +67,8 @@ trait MemoryRegionAnalysis(val program: Program,
     n match {
       case assign: Assign =>
         // check if any of rhs variables is a stack pointer
-        val isSP = assign.rhs.variables.exists(v => spList.contains(v))
+        val sp = unwrapExprToVar(assign.rhs)
+        val isSP = sp.isDefined && spList.contains(sp.get)
         if (isSP) {
           // add lhs to spList
           return spList + assign.lhs
@@ -189,21 +190,26 @@ trait MemoryRegionAnalysis(val program: Program,
     }
   }
 
-  def checkForHeap(expr: Expr, n: CFGPosition): Set[HeapRegion] = {
+  def checkForHeap(expr: Expr, n: CFGPosition): Set[HeapRegion] = { // may need to go to definitions (uses instead of n)
     val possibleVar = unwrapExprToVar(expr)
     if (possibleVar.isDefined) {
       val variable = possibleVar.get
-      val collage: Set[HeapRegion] = vsaResult.get(n) match {
-        case Some(Lift(el)) =>
-          el.getOrElse(variable, Set()).flatMap {
-            case AddressValue(heapRegion2: HeapRegion) => Some(heapRegion2)
-            case _ => Set()
-          }
-        case _ => Set()
-      }
-      return collage
+      val uses = getUse(variable, n, reachingDefs)
+      uses.flatMap(i => getVSAHints(variable, i))
     }
     Set()
+  }
+
+  def getVSAHints(variable: Variable, n: CFGPosition): Set[HeapRegion] = {
+    val collage: Set[HeapRegion] = vsaResult.get(n) match {
+      case Some(Lift(el)) =>
+        el.getOrElse(variable, Set()).flatMap {
+          case AddressValue(heapRegion2: HeapRegion) => Some(heapRegion2)
+          case _ => Set()
+        }
+      case _ => Set()
+    }
+    collage
   }
 
   /** Transfer function for state lattice elements.
@@ -229,7 +235,7 @@ trait MemoryRegionAnalysis(val program: Program,
             ((Set.empty, spList), s._2 + newHeapRegion)
         }
       } else {
-        s
+        ((Set.empty, spList), s._2)
       }
     case memAssign: MemoryAssign =>
       val isHeap = checkForHeap(memAssign.index, n)
@@ -244,9 +250,9 @@ trait MemoryRegionAnalysis(val program: Program,
         ((eval(unwrapped.get.index, s._1._1, s._1._2, assign, unwrapped.get.size), spList), Set.empty)
       } else {
         // this is a constant, but we need to check if it is a data region
-        s
+        ((Set.empty, spList), s._2)
       }
-    case _ => s
+    case _ => ((Set.empty, spList), s._2)
   }
 
   def transfer(n: CFGPosition, s: ((Set[StackRegion], Set[Variable]), Set[HeapRegion])): ((Set[StackRegion], Set[Variable]), Set[HeapRegion]) = localTransfer(n, s)
