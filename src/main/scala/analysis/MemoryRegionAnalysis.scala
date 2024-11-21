@@ -18,7 +18,8 @@ trait MemoryRegionAnalysis(val program: Program,
                            val RNAResult: Map[CFGPosition, Set[Variable]],
                            val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
                            val graResult: Map[CFGPosition, Set[DataRegion]],
-                           val mmm: MemoryModelMap) {
+                           val mmm: MemoryModelMap,
+                           val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]) {
 
   private var mallocCount: BigInt = 0
   private var stackCount: Int = 0
@@ -76,9 +77,12 @@ trait MemoryRegionAnalysis(val program: Program,
     }
   }
 
-  val regionLattice: PowersetLattice[StackRegion] = PowersetLattice()
+  val stackLattice: PowersetLattice[StackRegion] = PowersetLattice()
+  val heapLattice: PowersetLattice[HeapRegion] = PowersetLattice()
 
-  val lattice: MapLattice[CFGPosition, Set[StackRegion], PowersetLattice[StackRegion]] = MapLattice(regionLattice)
+  val tupleLattice: TupleLattice[stackLattice.type, heapLattice.type, Set[StackRegion], Set[HeapRegion]] = TupleLattice(stackLattice, heapLattice)
+
+  val lattice: MapLattice[CFGPosition, (Set[StackRegion], Set[HeapRegion]), tupleLattice.type] = MapLattice(tupleLattice)
 
   val first: Set[CFGPosition] = Set.empty + program.mainProcedure
 
@@ -99,7 +103,7 @@ trait MemoryRegionAnalysis(val program: Program,
   }
 
   def reducibleToRegion(binExpr: BinaryExpr, n: Command, subAccess: BigInt): Set[StackRegion] = {
-    val reducedRegions = binExpr.arg1 match {
+    val reducedRegions: Set[StackRegion] = binExpr.arg1 match {
       case variable: Variable if !spList.contains(variable) =>
         evaluateExpression(binExpr.arg2, constantProp(n)) match {
           case Some(b: BitVecLiteral) =>
@@ -178,27 +182,27 @@ trait MemoryRegionAnalysis(val program: Program,
     }
   }
 
+  def checkForHeap(expr: Expr, n: CFGPosition): Set[HeapRegion] = {
+    val possibleVar = unwrapExprToVar(expr)
+    if (possibleVar.isDefined) {
+      val variable = possibleVar.get
+      val collage: Set[HeapRegion] = vsaResult.get(n) match {
+        case Some(Lift(el)) =>
+          el.getOrElse(variable, Set()).flatMap {
+            case AddressValue(heapRegion2: HeapRegion) => Some(heapRegion2)
+            case _ => Set()
+          }
+        case _ => Set()
+      }
+      return collage
+    }
+    Set()
+  }
+
   /** Transfer function for state lattice elements.
    */
-  def localTransfer(n: CFGPosition, s: Set[StackRegion]): Set[StackRegion] = n match {
+  def localTransfer(n: CFGPosition, s: (Set[StackRegion], Set[HeapRegion])): (Set[StackRegion], Set[HeapRegion]) = n match {
     case directCall: DirectCall =>
-      // TODO: Re-enable when ReachingDef has interprocedural option
-      // val ANR = ANRResult(directCall)
-      // val RNA = RNAResult(program.procedures.filter(fn => fn == directCall.target).head)
-      //      val parameters = RNA.intersect(ANR)
-//          val ctx = regionAccesses(cmd)
-//          for (elem <- parameters) {
-//            if (ctx.contains(RegisterVariableWrapper(elem, getUse(elem, cmd.data, reachingDefs)))) {
-//              ctx(RegisterVariableWrapper(elem, getUse(elem, cmd.data, reachingDefs))) match {
-//                case FlatEl(al) =>
-//                  val regions = eval(al, s, cmd)
-//                  //val targetMap = stackMap(directCall.target)
-//                  //cfg.funEntries.filter(fn => fn.data == directCall.target).head
-//                  procedureToSharedRegions.getOrElseUpdate(directCall.target, mutable.Set.empty).addAll(regions)
-//                  registerToRegions.getOrElseUpdate(RegisterVariableWrapper(elem, getUse(elem, cmd.data, reachingDefs)), mutable.Set.empty).addAll(regions)
-//              }
-//            }
-//          }
       if (directCall.target.name == "malloc") {
         evaluateExpression(mallocVariable, constantProp(n)) match {
           case Some(b: BitVecLiteral) =>
@@ -206,32 +210,38 @@ trait MemoryRegionAnalysis(val program: Program,
             val (name, start) = nextMallocCount(negB)
             val newHeapRegion = HeapRegion(name, start, negB, IRWalk.procedure(n))
             addReturnHeap(directCall, newHeapRegion)
-            s
+            (Set.empty, s._2 + newHeapRegion)
           case None =>
             // Assume heap region size is at least 1 TODO: must approximate size of heap
             val negB = 1
             val (name, start) = nextMallocCount(negB)
             val newHeapRegion = HeapRegion(name, start, negB, IRWalk.procedure(n))
             addReturnHeap(directCall, newHeapRegion)
-            s
+            (Set.empty, s._2 + newHeapRegion)
         }
       } else {
         s
       }
     case memAssign: MemoryAssign =>
-      eval(memAssign.index, s, memAssign, memAssign.size)
+      val isHeap = checkForHeap(memAssign.index, n)
+      if (isHeap.nonEmpty) {
+          (Set.empty, s._2 ++ isHeap)
+      } else {
+        (eval(memAssign.index, s._1, memAssign, memAssign.size), Set.empty)
+      }
     case assign: Assign =>
       stackDetection(assign)
       val unwrapped = unwrapExpr(assign.rhs)
       if (unwrapped.isDefined) {
-        eval(unwrapped.get.index, s, assign, unwrapped.get.size)
+        (eval(unwrapped.get.index, s._1, assign, unwrapped.get.size), Set.empty)
       } else {
-        Set()
+        // this is a constant, but we need to check if it is a data region
+        s
       }
     case _ => s
   }
 
-  def transfer(n: CFGPosition, s: Set[StackRegion]): Set[StackRegion] = localTransfer(n, s)
+  def transfer(n: CFGPosition, s: (Set[StackRegion], Set[HeapRegion])): (Set[StackRegion], Set[HeapRegion]) = localTransfer(n, s)
 }
 
 class MemoryRegionAnalysisSolver(
@@ -245,8 +255,9 @@ class MemoryRegionAnalysisSolver(
     RNAResult: Map[CFGPosition, Set[Variable]],
     reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
     graResult: Map[CFGPosition, Set[DataRegion]],
-    mmm: MemoryModelMap
-  ) extends MemoryRegionAnalysis(program, domain, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, reachingDefs, graResult, mmm)
+    mmm: MemoryModelMap,
+    vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
+  ) extends MemoryRegionAnalysis(program, domain, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, reachingDefs, graResult, mmm, vsaResult)
   with IRIntraproceduralForwardDependencies
-  with Analysis[Map[CFGPosition, Set[StackRegion]]]
-  with SimpleWorklistFixpointSolver[CFGPosition, Set[StackRegion], PowersetLattice[StackRegion]]
+  with Analysis[Map[CFGPosition, (Set[StackRegion], Set[HeapRegion])]]
+  with SimpleWorklistFixpointSolver[CFGPosition, (Set[StackRegion], Set[HeapRegion]), TupleLattice[PowersetLattice[StackRegion], PowersetLattice[HeapRegion], Set[StackRegion], Set[HeapRegion]]]

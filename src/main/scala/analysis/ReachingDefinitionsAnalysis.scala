@@ -3,7 +3,7 @@ package analysis
 import ir.*
 import analysis.solvers.SimpleWorklistFixpointSolver
 
-type TupleElement =
+type ReachingDefTuple =
   TupleLattice[MapLattice[Variable, Set[Assign], PowersetLattice[Assign]], MapLattice[Variable, Set[Assign], PowersetLattice[Assign]], Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]]
 
 trait ReachingDefinitionsAnalysis(program: Program) {
@@ -15,7 +15,7 @@ trait ReachingDefinitionsAnalysis(program: Program) {
       MapLattice[Variable, Set[Assign], PowersetLattice[Assign]](PowersetLattice[Assign]())
     )
 
-  val lattice: MapLattice[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]), TupleElement] = MapLattice(
+  val lattice: MapLattice[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]), ReachingDefTuple] = MapLattice(
     tupleLattice
   )
 
@@ -67,10 +67,10 @@ trait ReachingDefinitionsAnalysis(program: Program) {
 
 class InterprocReachingDefinitionsAnalysisSolver(program: Program)
   extends ReachingDefinitionsAnalysis(program)
-    with SimpleWorklistFixpointSolver[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]), TupleElement]
+    with SimpleWorklistFixpointSolver[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]), ReachingDefTuple]
     with IRInterproceduralForwardDependencies
 
 class IntraprocReachingDefinitionsAnalysisSolver(program: Program)
   extends ReachingDefinitionsAnalysis(program)
-    with SimpleWorklistFixpointSolver[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]), TupleElement]
+    with SimpleWorklistFixpointSolver[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]), ReachingDefTuple]
     with IRIntraproceduralForwardDependencies

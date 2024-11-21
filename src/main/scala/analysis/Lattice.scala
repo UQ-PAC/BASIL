@@ -141,7 +141,7 @@ class FlatLatticeWithDefault[X](val f: () => X) extends Lattice[FlatElement[X]] 
   }
 }
 
-class TupleLattice[L1 <: Lattice[T1], L2 <: Lattice[T2], T1, T2](val lattice1: L1, val lattice2: L2) extends Lattice[(T1, T2)] {
+class TupleLattice[+L1 <: Lattice[T1], +L2 <: Lattice[T2], T1, T2](val lattice1: L1, val lattice2: L2) extends Lattice[(T1, T2)] {
   override val bottom: (T1, T2) = (lattice1.bottom, lattice2.bottom)
 
   override def lub(x: (T1, T2), y: (T1, T2)): (T1, T2) = {

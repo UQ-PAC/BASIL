@@ -34,8 +34,10 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt], val externalFunctio
   private val heapCalls: mutable.Map[DirectCall, HeapRegion] = mutable.Map()
   private var relocatedAddressesMap: Map[BigInt, DataRegion] = Map()
   val contextMapVSA: mutable.Map[Procedure, mutable.Map[DirectCall, Map[Variable | MemoryRegion, Set[Value]]]] = mutable.Map()
+  val callSiteSummaries: mutable.Map[DirectCall, Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]]] = mutable.Map()
 
   private val stackAllocationSites: mutable.Map[CFGPosition, Set[StackRegion]] = mutable.Map()
+  private val heapAllocationSites: mutable.Map[CFGPosition, Set[HeapRegion]] = mutable.Map()
 
   private val uf = UnionFind()
   val relfContent: mutable.Map[DataRegion, mutable.Set[String]] = mutable.Map()
@@ -155,7 +157,6 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt], val externalFunctio
     // 2. For every directCall to that function, get VSA result and merge in context
     // 3. Filter non parameter variables from the context
 
-    contextMapVSA.clear()
     for (n <- vsaResult.keys) {
       n match
         case directCall: DirectCall =>
@@ -172,13 +173,17 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt], val externalFunctio
     }
   }
 
+  def setCallSiteSummaries(callSiteSummary: mutable.Map[DirectCall, Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]]]) = {
+    callSiteSummaries ++= callSiteSummary
+  }
+
   def relocatedDataRegion(value: BigInt): Option[DataRegion] = {
     relocatedAddressesMap.get(value)
   }
 
   def convertMemoryRegions(stackRegionsPerProcedure: mutable.Map[Procedure, mutable.Set[StackRegion]],
                            heapRegions: mutable.Map[DirectCall, HeapRegion],
-                           allocationSites: Map[CFGPosition, Set[StackRegion]],
+                           allocationSites: Map[CFGPosition, (Set[StackRegion], Set[HeapRegion])],
                            procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]],
                            graRegions: mutable.HashMap[BigInt, DataRegion],
                            graResults: Map[CFGPosition, Set[DataRegion]]): Unit = {
@@ -202,8 +207,12 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt], val externalFunctio
       }
     }
 
+    val stackOnes = allocationSites.map((n, stacks) => (n, stacks._1))
+    val heapOnes = allocationSites.map((n, heaps) => (n, heaps._2))
+
     cfgPositionToDataRegion ++= graResults
-    stackAllocationSites ++= allocationSites
+    stackAllocationSites ++= stackOnes
+    heapAllocationSites ++= heapOnes
     stackRegionsPerProcedure.keys.foreach { proc =>
       if (procedureToSharedRegions.contains(proc)) {
         val sharedRegions = procedureToSharedRegions(proc)
@@ -406,10 +415,14 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt], val externalFunctio
     stackAllocationSites.getOrElse(allocationSite, Set.empty).map(returnRegion)
   }
 
+  def getHeap(allocationSite: CFGPosition): Set[HeapRegion] = {
+    heapAllocationSites.getOrElse(allocationSite, Set.empty).map(returnRegion)
+  }
+
   def getLocalStacks: mutable.Map[String, List[StackRegion]] = localStacks
 
-  def getData(cfgPosition: CFGPosition): Set[DataRegion] = {
-    cfgPositionToDataRegion.getOrElse(cfgPosition, Set.empty).map(returnRegion)
+  def getData(allocationSite: CFGPosition): Set[DataRegion] = {
+    cfgPositionToDataRegion.getOrElse(allocationSite, Set.empty).map(returnRegion)
   }
 
   def getDataRegions: Set[DataRegion] = {
@@ -421,7 +434,7 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt], val externalFunctio
       case directCall: DirectCall =>
         Set(getHeap(directCall))
       case _ =>
-        getStack(n) ++ getData(n)
+        getStack(n) ++ getData(n) ++ getHeap(n)
     }
   }
 

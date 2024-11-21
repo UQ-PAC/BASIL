@@ -112,7 +112,7 @@ class RegionInjector(program: Program, mmm: MemoryModelMap) {
   }
 
   private def statementToRegions(n: Statement): Set[MemoryRegion] = {
-    mmm.getStack(n) ++ mmm.getData(n)
+    mmm.nodeToRegion(n)
   }
 
   def visitExpr(expr: Expr, cmd: Statement): Unit = {

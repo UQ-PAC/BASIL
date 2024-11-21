@@ -54,7 +54,7 @@ case class IRContext(
 case class StaticAnalysisContext(
     constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
     IRconstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    memoryRegionResult: Map[CFGPosition, Set[StackRegion]],
+    memoryRegionResult: Map[CFGPosition, (Set[StackRegion], Set[HeapRegion])],
     vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
     interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]],
     paramResults: Map[Procedure, Set[Variable]],
@@ -382,7 +382,7 @@ object StaticAnalysis {
     Logger.debug("[!] Running Writes To")
     val writesTo = WriteToAnalysis(ctx.program).analyze()
 
-    val SSASolver = IntraprocSSASolver(IRProgram, writesTo)
+    val SSASolver = IntraprocSSASolver(IRProgram, writesTo, RNAResult)
     val SSAResults = SSASolver.analyze()
 
     config.analysisDotPath.foreach(s => {
@@ -406,7 +406,7 @@ object StaticAnalysis {
     val graResult = graSolver.analyze()
 
     Logger.debug("[!] Running MRA")
-    val mraSolver = MemoryRegionAnalysisSolver(IRProgram, domain.toSet, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, reachingDefinitionsAnalysisResults, graResult, mmm)
+    val mraSolver = MemoryRegionAnalysisSolver(IRProgram, domain.toSet, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, reachingDefinitionsAnalysisResults, graResult, mmm, previousVSAResults)
     val mraResult = mraSolver.analyze()
 
     config.analysisDotPath.foreach(s => {
@@ -446,11 +446,6 @@ object StaticAnalysis {
     mmm.convertMemoryRegions(mraSolver.procedureToStackRegions, mraSolver.procedureToHeapRegions, mraResult, mraSolver.procedureToSharedRegions, graSolver.getDataMap, graResult)
     mmm.logRegions()
 
-    Logger.debug("[!] Running Steensgaard")
-    val steensgaardSolver = InterprocSteensgaardAnalysis(interDomain.toSet, mmm, SSAResults, previousVSAResults)
-    steensgaardSolver.analyze()
-    val steensgaardResults = steensgaardSolver.pointsTo()
-
     Logger.debug("[!] Running VSA")
     val vsaSolver = ValueSetAnalysisSolver(IRProgram, mmm)
     val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
@@ -464,6 +459,13 @@ object StaticAnalysis {
       )
     })
 
+    Logger.debug("[!] Running Steensgaard")
+    val steensgaardSolver = InterprocSteensgaardAnalysis(interDomain.toSet, mmm, SSAResults, previousVSAResults)
+    steensgaardSolver.analyze()
+    val steensgaardResults = steensgaardSolver.pointsTo()
+
+    mmm.setCallSiteSummaries(steensgaardSolver.callSiteSummary)
+
     Logger.debug("[!] Injecting regions")
     val regionInjector = if (config.memoryRegions) {
       val injector = RegionInjector(IRProgram, mmm)
@@ -472,6 +474,11 @@ object StaticAnalysis {
     } else {
       None
     }
+    config.analysisDotPath.foreach(s => {
+    writeToFile(
+      toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> "").toMap),
+      s"${s}_InjectedRegions$iteration.dot"
+    )})
 
     val paramResults: Map[Procedure, Set[Variable]] = ParamAnalysis(IRProgram).analyze()
     val interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = InterLiveVarsAnalysis(IRProgram).analyze()

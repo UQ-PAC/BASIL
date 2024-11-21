@@ -4,22 +4,11 @@ import analysis.solvers.{Cons, Term, UnionFindSolver, Var}
 import ir.*
 import util.Logger
 
-/** Wrapper for variables so we can have Steensgaard-specific equals method indirectly
- * Relies on the SSA sets intersection being non-empty
- * */
-case class RegisterVariableWrapper(variable: Variable, assigns: Set[Assign]) {
-  override def equals(obj: Any): Boolean = {
-    obj match {
-      case RegisterVariableWrapper(other, otherAssigns) =>
-        variable == other && assigns.intersect(otherAssigns).nonEmpty
-      case _ =>
-        false
-    }
-  }
-}
+import scala.collection.immutable.{AbstractMap, SeqMap, SortedMap}
+import scala.collection.mutable
 
 /** Wrapper for variables so we can have ConstantPropegation-specific equals method indirectly
- * Relies on SSA sets being exactly the same
+ * Relies on SSA integers being exactly the same
  * */
 case class RegisterWrapperEqualSets(variable: Variable, ssa: FlatElement[Int])
 
@@ -33,6 +22,7 @@ class InterprocSteensgaardAnalysis(
       vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]) extends Analysis[Any] {
 
   val solver: UnionFindSolver[StTerm] = UnionFindSolver()
+  val callSiteSummary: mutable.Map[DirectCall, Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]]] = mutable.Map()
 
   private val mallocVariable = Register("R0", 64)
 
@@ -64,6 +54,31 @@ class InterprocSteensgaardAnalysis(
     domain.foreach { p =>
       visit(p, ())
     }
+
+    // for every direct call in mmm.contextMapVSA the ctx is unified with the call site summary
+    mmm.contextMapVSA.foreach { case (procedure, ctx) =>
+      ctx.foreach(
+        (directCall, v) => {
+          val solverCopy = solver.deepCopy()
+          v.foreach(
+            (k1, v1) => {
+              k1 match
+                case variable: Variable =>
+                  val defs = getSSADefinition(variable, directCall.target, reachingDefs)
+                  v1.foreach {
+                    case AddressValue(region) =>
+                      solverCopy.unify(IdentifierVariable(RegisterWrapperEqualSets(variable, defs)), PointerRef(AllocVariable(region)))
+                    case LiteralValue(expr) => ???
+                    case _ => ???
+                  }
+                case _=> // do nothing
+            }
+          )
+          callSiteSummary.put(directCall, pointsTo(solverCopy))
+        }
+      )
+    }
+    print("Done")
   }
 
   /** Generates the constraints for the given sub-AST.
@@ -121,9 +136,9 @@ class InterprocSteensgaardAnalysis(
 
   /** @inheritdoc
    */
-  def pointsTo(): Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]] = {
-    val solution = solver.solution()
-    val unifications = solver.unifications()
+  def pointsTo(eqSolver: UnionFindSolver[StTerm] = solver): Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]] = {
+    val solution = eqSolver.solution()
+    val unifications = eqSolver.unifications()
     Logger.debug(s"Solution: \n${solution.mkString(",\n")}\n")
     Logger.debug(s"Sets: \n${unifications.values.map { s => s"{ ${s.mkString(",")} }"}.mkString(", ")}")
 

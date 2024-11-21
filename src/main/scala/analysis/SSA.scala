@@ -3,7 +3,7 @@ package analysis
 import ir.*
 import analysis.solvers.SimpleWorklistFixpointSolver
 
-type TupleElement =
+type SSATuple =
   TupleLattice[MapLattice[Variable, FlatElement[Int], FlatLatticeWithDefault[Int]], MapLattice[Variable, FlatElement[Int], FlatLatticeWithDefault[Int]], Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]]]
 
 private var ssaCount: Int = 0
@@ -13,7 +13,7 @@ private def nextSSACount() = {
   ssaCount
 }
 
-trait SSA(program: Program, writesTo: Map[Procedure, Set[Register]]) {
+trait SSA(program: Program, writesTo: Map[Procedure, Set[Register]], RNAResult: Map[CFGPosition, Set[Variable]]) {
 
   private val tupleLattice: TupleLattice[MapLattice[Variable, FlatElement[Int], FlatLatticeWithDefault[Int]], MapLattice[Variable, FlatElement[Int], FlatLatticeWithDefault[Int]], Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]]] =
     TupleLattice(
@@ -21,7 +21,7 @@ trait SSA(program: Program, writesTo: Map[Procedure, Set[Register]]) {
       MapLattice[Variable, FlatElement[Int], FlatLatticeWithDefault[Int]](FlatLatticeWithDefault[Int](nextSSACount))
     )
 
-  val lattice: MapLattice[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]]), TupleElement] = MapLattice(
+  val lattice: MapLattice[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]]), SSATuple] = MapLattice(
     tupleLattice
   )
 
@@ -36,6 +36,11 @@ trait SSA(program: Program, writesTo: Map[Procedure, Set[Register]]) {
   ): (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]]) = n match {
     case cmd: Command =>
       eval(cmd, s)
+    case procedure: Procedure =>
+      // get params from RNA
+      // for every param assign a fresh SSA variable
+      val params = RNAResult(procedure).map(v => (v, FlatEl(nextSSACount()))) // TODO: more advanced handling of params required
+      (params.toMap, Map.empty)
     case _ => s
   }
 
@@ -79,7 +84,7 @@ trait SSA(program: Program, writesTo: Map[Procedure, Set[Register]]) {
   }
 }
 
-class IntraprocSSASolver(program: Program, writesTo: Map[Procedure, Set[Register]])
-  extends SSA(program, writesTo: Map[Procedure, Set[Register]])
+class IntraprocSSASolver(program: Program, writesTo: Map[Procedure, Set[Register]], RNAResult: Map[CFGPosition, Set[Variable]])
+  extends SSA(program, writesTo, RNAResult)
     with IRIntraproceduralForwardDependencies
-    with SimpleWorklistFixpointSolver[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]]), TupleElement]
+    with SimpleWorklistFixpointSolver[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]]), SSATuple]
