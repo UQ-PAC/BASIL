@@ -213,6 +213,16 @@ class AnalysisSystemTestsGTIRB extends SystemTests {
   runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = false, expectVerify = false))
 }
 
+class MemoryRegionSystemTestsBAP extends SystemTests {
+  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = true)), useBAPFrontend = true, expectVerify = true))
+  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = true)), useBAPFrontend = true, expectVerify = false))
+}
+
+class MemoryRegionSystemTestsGTIRB extends SystemTests {
+  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = true)), useBAPFrontend = false, expectVerify = true))
+  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = true)), useBAPFrontend = false, expectVerify = false))
+}
+
 class ProcedureSummaryTests extends SystemTests {
   // TODO currently procedure_summary3 verifies despite incorrect procedure summary analysis
   // this is due to BASIL's currently limited handling of non-returning calls
