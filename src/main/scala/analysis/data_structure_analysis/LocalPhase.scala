@@ -157,7 +157,7 @@ class LocalPhase(proc: Procedure,
       }
     val resultOffset = result.offset
     graph.selfCollapse(result.node.get)
-    result.node.get.getCell(result.offset)
+    graph.handleOverlapping(result.node.get.getCell(result.offset))
 
   /**
    * handles unsupported pointer arithmetic by collapsing all the nodes invloved
@@ -194,8 +194,9 @@ class LocalPhase(proc: Procedure,
     val pointers = pointer.node.get.cells.filter((offset, _) => offset >= startPointerOffset && offset < startPointerOffset + size).toSeq.sortBy((offset, cell) => offset)
     for (((offset, cell), i) <- pointers.zipWithIndex) {
       val lhs = lhsNode.addCell(offset - diff, 0) // todo check if 0 is the right size
-      graph.mergeCells(lhs, graph.adjust(graph.find(cell).getPointee))
-      graph.find(cell).growSize(if i < pointers.size - 1 then  (pointers(i+1)._1 - offset - diff).toInt else (size - (offset - diff)).toInt)
+      graph.find(cell).growSize(if i < pointers.size - 1 then (pointers(i + 1)._1 - offset - diff).toInt else (size - (offset - diff)).toInt)
+      val res = graph.mergeCells(lhs, graph.adjust(graph.find(cell).getPointee))
+       graph.handleOverlapping(res)
     }
   }
 

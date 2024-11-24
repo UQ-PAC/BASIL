@@ -567,7 +567,7 @@ class Graph(val proc: Procedure,
     * @param cell2
     * @return the resulting cell in the unified node
     */
-  def mergeCells(c1: Cell, c2: Cell, count: Int = 0): Cell = {
+  def mergeCells(c1: Cell, c2: Cell): Cell = {
     var cell1 = c1
     var cell2 = c2
     if c1.node.isDefined then
@@ -642,12 +642,12 @@ class Graph(val proc: Procedure,
         resultNode.children(k) = node2.children(k) + delta
       }
       resultNode.children += (node2 -> delta)
-      if node2.flags.global then // node 2 may have been adjusted depending on cell1 and cell2 offsets
-        globalMapping.foreach { // update global mapping if node 2 was global
-          case (range: AddressRange, Field(node, offset)) =>
-            if node.equals(node2) then
-              globalMapping.update(range, Field(node, offset + delta))
-        }
+//      if node2.flags.global then // node 2 may have been adjusted depending on cell1 and cell2 offsets
+//        globalMapping.foreach { // update global mapping if node 2 was global
+//          case (range: AddressRange, Field(node, offset)) =>
+//            if node.equals(node2) then
+//              globalMapping.update(range, Field(node, offset + delta))
+//        }
 
       // compute the cells present in the resulting unified node
       // a mapping from offsets to the set of old cells which are merged to form a cell in the new unified node
@@ -689,7 +689,7 @@ class Graph(val proc: Procedure,
         } else if (outgoing.size > 1) {
           val result = outgoing.tail.foldLeft(adjust(outgoing.head)) {
             (result, pointee) =>
-              mergeCells(result, adjust(pointee), count+1)
+              mergeCells(result, adjust(pointee))
           }
           collapsedCell.pointee = Some(deadjust(result))
         }
@@ -725,7 +725,7 @@ class Graph(val proc: Procedure,
   }
 
   def handleOverlapping(cell: Cell): Cell = {
-    var size =  cell.node.get.getSize - cell.offset // if it's stack the size is rest of the node
+    val size =  cell.node.get.getSize - cell.offset // if it's stack the size is rest of the node
     val result =
       if cell.node.get.flags.stack then
         getStackOffsets(cell).foldLeft(cell) {
@@ -736,7 +736,7 @@ class Graph(val proc: Procedure,
         cell
 
 
-    size = result.largestAccessedSize
+//    size = result.largestAccessedSize
     if result.node.get.flags.global then
       getGlobalAddresses(result).foldLeft(result) {
         (res, offset) =>
@@ -867,12 +867,13 @@ class Graph(val proc: Procedure,
 
     globalMapping.foreach { case (range: AddressRange, Field(node, offset)) =>
       assert(newGraph.globalMapping.contains(range))
-      val field = find(node)
-      nodes.add(field.node)
-      if !idToNode.contains(field.node.id) then
-        val newNode = node.cloneSelf(newGraph)
-        idToNode.update(field.node.id, newNode)
-      newGraph.globalMapping.update(range, Field(idToNode(field.node.id), field.offset))
+      val cell: Cell = find(node.getCell(offset))
+      val finalNode: Node = cell.node.get
+      nodes.add(finalNode)
+      if !idToNode.contains(finalNode.id) then
+        val newNode = finalNode.cloneSelf(newGraph)
+        idToNode.update(finalNode.id, newNode)
+      newGraph.globalMapping.update(range, Field(idToNode(finalNode.id), cell.offset + (node.getCell(offset).offset - offset)))
     }
 
     val queue = mutable.Queue[Node]()
