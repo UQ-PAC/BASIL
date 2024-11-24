@@ -100,7 +100,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   }
 
 
-  test("stack interproc overlapping callee") {
+  test("stack interproc overlapping") {
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
@@ -153,10 +153,42 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     assert(dsg.find(stack32Final.node.get.cells(0)) == stack32Final)
     assert(dsg.find(stack32Final.node.get.cells(16)) == stack48Final)
 
+  }
+
+  test("global interproc overlapping") {
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "src/test/dsa/global_interproc_overlapping/global_interproc_overlapping.adt",
+          relfFile = "src/test/dsa/global_interproc_overlapping/global_interproc_overlapping.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+
+    // the dsg of the main procedure after the local phase
+    val program = results.ir.program
 
 
+    // Local Caller
+    val dsgCaller = results.analysis.get.localDSA(program.mainProcedure)
+    assert(dsgCaller.find(dsgCaller.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells.size == 1)
+    assert(dsgCaller.find(dsgCaller.globalMapping(AddressRange(131096, 131096 + 24)).node.cells(0)).largestAccessedSize == 8)
+
+
+//    // topdown Caller
+    val dsg = results.analysis.get.bottomUpDSA(program.mainProcedure)
+    assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells.size == 3)
+    assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells(0).largestAccessedSize == 8)
+    assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells(8).largestAccessedSize == 8)
+    assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells(16).largestAccessedSize == 8)
 
   }
+
 
   // Local DSA tests
   /*

@@ -128,12 +128,7 @@ class DataStructureAnalysis(program: Program,
                 buGraph.globalMapping(range).node.getCell(buGraph.globalMapping(range).offset),
                 field.node.getCell(field.offset + offset)
               )
-
-              val size = res.node.get.getSize - res.offset
-              buGraph.getStackOffsets(res).foldLeft(res) {
-                (cell, offset) =>
-                  buGraph.mergeCells(cell, buGraph.getStack(offset, size.toInt))
-              }
+              buGraph.handleOverlapping(res)
           }
 
           if (buGraph.varToCell.contains(callee)) {
@@ -141,13 +136,7 @@ class DataStructureAnalysis(program: Program,
               if (!ignoreRegisters.contains(variable)) {
                 val formal = buGraph.varToCell(callee)(variable)
                 val res = buGraph.mergeCells(buGraph.adjust(formal), buGraph.adjust(callSite.paramCells(variable)))
-
-                val size = res.node.get.getSize - res.offset
-                buGraph.getStackOffsets(res).foldLeft(res) {
-                  (cell, offset) =>
-                    buGraph.mergeCells(cell, buGraph.getStack(offset, size.toInt))
-                }
-
+                buGraph.handleOverlapping(res)
               }
             }
           }
@@ -158,12 +147,7 @@ class DataStructureAnalysis(program: Program,
             val res = returnCells.foldLeft(buGraph.adjust(callSite.returnCells(reg))) { (c, ret) =>
               buGraph.mergeCells(c, buGraph.adjust(ret))
             }
-
-            val size = res.node.get.getSize - res.offset
-            buGraph.getStackOffsets(res).foldLeft(res) {
-              (cell, offset) =>
-                buGraph.mergeCells(cell, buGraph.getStack(offset, size.toInt))
-            }
+            buGraph.handleOverlapping(res)
           }
         }
         buGraph.collectNodes()
@@ -200,7 +184,7 @@ class DataStructureAnalysis(program: Program,
 
         callSite.returnCells.values.foreach { slice =>
           val node = callersGraph.find(slice).node
-          node.cloneNode(callersGraph, callersGraph)
+          node.cloneNode(callersGraph, calleesGraph)
         }
 
         callersGraph.globalMapping.foreach { case (range: AddressRange, Field(oldNode, internal)) =>
@@ -210,12 +194,7 @@ class DataStructureAnalysis(program: Program,
             calleesGraph.globalMapping(range).node.getCell(calleesGraph.globalMapping(range).offset),
             field.node.getCell(field.offset + internal)
           )
-
-          val size = res.node.get.getSize - res.offset
-          calleesGraph.getStackOffsets(res).foldLeft(res) {
-            (cell, offset) =>
-              calleesGraph.mergeCells(cell, calleesGraph.getStack(offset, size.toInt))
-          }
+          calleesGraph.handleOverlapping(res)
         }
 
         callSite.paramCells.keySet.foreach { variable =>
@@ -223,12 +202,7 @@ class DataStructureAnalysis(program: Program,
           val res = paramCells.foldLeft(calleesGraph.adjust(calleesGraph.formals(variable))) {
             (cell, slice) => calleesGraph.mergeCells(calleesGraph.adjust(slice), cell)
           }
-
-          val size = res.node.get.getSize - res.offset
-          calleesGraph.getStackOffsets(res).foldLeft(res) {
-            (cell, offset) =>
-              calleesGraph.mergeCells(cell, calleesGraph.getStack(offset, size.toInt))
-          }
+          calleesGraph.handleOverlapping(res)
 
         }
 
@@ -240,11 +214,7 @@ class DataStructureAnalysis(program: Program,
               (c, retCell) => calleesGraph.mergeCells(c, calleesGraph.adjust(retCell))
             }
 
-            val size = res.node.get.getSize - res.offset
-            calleesGraph.getStackOffsets(res).foldLeft(res) {
-              (cell, offset) =>
-                calleesGraph.mergeCells(cell, calleesGraph.getStack(offset, size.toInt))
-            }
+            calleesGraph.handleOverlapping(res)
           }
         }
       }

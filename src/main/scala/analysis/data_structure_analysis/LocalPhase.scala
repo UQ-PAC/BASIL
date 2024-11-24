@@ -50,7 +50,18 @@ class LocalPhase(proc: Procedure,
   }
 
 
-  
+  /**
+   * if an expr is the address of a global location return its corresponding cell
+   *
+   * @param pos IL position where the expression is used
+   */
+  def isGlobal(expr: Expr, pos: CFGPosition, size: Int = 0): Option[Cell] = {
+    val value = evaluateExpression(expr, constProp(pos))
+    if value.isDefined then
+      graph.getGlobal(value.get.value, size)
+    else
+      None
+  }
 
   /**
    * if an expr is the address of a stack location return its corresponding cell
@@ -88,45 +99,6 @@ class LocalPhase(proc: Procedure,
   }
 
   val graph: Graph = Graph(proc, constProp, varToSym, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params)
-
-  /**
-   * if an expr is the address of a global location return its corresponding cell
-   * @param pos IL position where the expression is used
-   */
-  def getGlobal(expr: Expr, pos: CFGPosition, size: Int = 0): Option[Cell] = {
-    val value = evaluateExpression(expr, constProp(pos))
-    if value.isDefined then
-        getGlobal(value.get.value, size)
-    else
-      None
-  }
-
-  def getGlobal(address: BigInt, size: Int): Option[Cell] = {
-    val globals = graph.getGlobal(address, size)
-    if globals.nonEmpty then
-      val head = globals.head
-      val DSAGlobal(range: AddressRange, Field(node, internal)) = head
-      val headOffset: BigInt = if address > range.start then address - range.start + internal else internal
-      val headNode = node
-      val headCell: Cell = node.addCell(headOffset, 0) // DSA has the size of the added cell should as size with
-      // selfCollapse at the end to merge all the overlapping accessed size
-      // However, the above approach prevent distinct multi loads
-      // graph.selfCollapse(headNode)
-      val tail = globals.tail
-      tail.foreach {
-        g =>
-          val DSAGlobal(range: AddressRange, Field(node, internal)) = g
-          val offset: BigInt = if address > range.start then address - range.start + internal else internal
-          node.addCell(offset, 0)
-          graph.selfCollapse(node)
-          assert(range.start >= address)
-          graph.mergeCells(graph.find(headNode.addCell(range.start - address, 0)), graph.find(node.getCell(offset)))
-      }
-      graph.selfCollapse(graph.find(headCell).node.get)
-      Some(graph.find(headCell))
-    else
-      None
-  }
 
   /**
    * Handles unification for instructions of the form R_x = R_y [+ offset] where R_y is a pointer and [+ offset] is optional
@@ -220,9 +192,10 @@ class LocalPhase(proc: Procedure,
 
 
     val pointers = pointer.node.get.cells.filter((offset, _) => offset >= startPointerOffset && offset < startPointerOffset + size).toSeq.sortBy((offset, cell) => offset)
-    for ((offset, cell) <- pointers) {
+    for (((offset, cell), i) <- pointers.zipWithIndex) {
       val lhs = lhsNode.addCell(offset - diff, 0) // todo check if 0 is the right size
       graph.mergeCells(lhs, graph.adjust(graph.find(cell).getPointee))
+      graph.find(cell).growSize(if i < pointers.size - 1 then  (pointers(i+1)._1 - offset - diff).toInt else (size - (offset - diff)).toInt)
     }
   }
 
@@ -255,7 +228,7 @@ class LocalPhase(proc: Procedure,
       case LocalAssign(variable, rhs, _) =>
         val expr: Expr = unwrapPaddingAndSlicing(rhs)
         val lhsCell = graph.adjust(graph.varToCell(n)(variable))
-        val global = getGlobal(rhs, n)
+        val global = isGlobal(rhs, n)
         val stack = isStack(rhs, n)
         if global.isDefined then // Rx = global address
           graph.mergeCells(lhsCell, global.get)
@@ -287,7 +260,7 @@ class LocalPhase(proc: Procedure,
         assert(size % 8 == 0)
         val byteSize = size / 8
         lhsCell.node.get.flags.read = true
-        val global = getGlobal(indexUnwrapped, n, byteSize)
+        val global = isGlobal(indexUnwrapped, n, byteSize)
         val stack = isStack(indexUnwrapped, n, byteSize)
         if global.isDefined then
           multiAccess(lhsCell, graph.find(global.get), byteSize)
@@ -319,7 +292,7 @@ class LocalPhase(proc: Procedure,
             reachingDefs(n)(value).foreach(visit)
             assert(size % 8 == 0)
             val byteSize = size / 8
-            val global = getGlobal(index, n)
+            val global = isGlobal(index, n)
             val stack = isStack(index, n)
 
             val valueCells = graph.getCells(n, value)

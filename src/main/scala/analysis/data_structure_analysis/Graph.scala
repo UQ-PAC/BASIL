@@ -129,7 +129,7 @@ class Graph(val proc: Procedure,
   /**
    * Takes a cell and returns all corresponding stack offsets to it if any
    */
-  def getStackOffsets(cell: Cell): Set[BigInt] = {
+  def getStackOffsets(cell: Cell): Set[BigInt] = { // TODO replace with tracking through merges
     stackMapping.foldLeft(Set[BigInt]()) {
       (s, f) =>
         f match
@@ -199,7 +199,7 @@ class Graph(val proc: Procedure,
           func.allocationRegions.add(DataLocation(name, address, size / 8))
           func.flags.global = true
           func.flags.incomplete = true
-          globalMapping.update(AddressRange(address, (address + size) / 8), Field(func, 0))
+//          globalMapping.update(AddressRange(address, address + (size / 8)), Field(func, 0))
 
           val pointer = Node(Some(this), 0)
           pointer.allocationRegions.add(DataLocation(s"$name's pointer@$address", address, 0)) // todo check that size 0 is correct
@@ -271,7 +271,7 @@ class Graph(val proc: Procedure,
   }
 
   // determine if an address is a global and return the corresponding global(s) if it is.
-  def getGlobal(address: BigInt, size: Int): Seq[DSAGlobal] =
+  private def getGlobals(address: BigInt, size: Int): Seq[DSAGlobal] =
     var global: Seq[DSAGlobal] = Seq.empty
     for ((range, field) <- globalMapping) {
       if (address < range.end && range.start < address + size) ||
@@ -281,6 +281,47 @@ class Graph(val proc: Procedure,
 
     }
     global.sortBy(f => f.addressRange.start)
+
+
+
+  def getGlobal(address: BigInt, size: Int): Option[Cell] = {
+    val globals = getGlobals(address, size)
+    if globals.nonEmpty then
+      val head = globals.head
+      val DSAGlobal(range: AddressRange, Field(node, internal)) = head
+      val headOffset: BigInt = if address > range.start then address - range.start + internal else internal
+      val headNode = node
+      val headCell: Cell = node.addCell(headOffset, 0) // DSA has the size of the added cell should as size with
+      // selfCollapse at the end to merge all the overlapping accessed size
+      // However, the above approach prevent distinct multi loads
+      // graph.selfCollapse(headNode)
+      val tail = globals.tail
+      tail.foreach {
+        g =>
+          val DSAGlobal(range: AddressRange, Field(node, internal)) = g
+          val offset: BigInt = if address > range.start then address - range.start + internal else internal
+          node.addCell(offset, 0)
+          selfCollapse(node)
+          assert(range.start >= address)
+          mergeCells(find(headNode.addCell(range.start - address, 0)), find(node.getCell(offset)))
+      }
+      selfCollapse(find(headCell).node.get)
+      Some(find(headCell))
+    else
+      None
+  }
+
+  def getGlobalAddresses(cell: Cell): Set[BigInt] = {
+    globalMapping.foldLeft(Set[BigInt]()) {
+      (s, g) =>
+        g match
+          case (range: AddressRange, field: Field) =>
+            if cell == find(field.node.getCell(field.offset)) then
+              s + range.start
+            else
+              s
+    }
+  }
 
   def getCells(pos: CFGPosition, arg: Variable): Set[Slice] = {
     if (reachingDefs(pos).contains(arg)) {
@@ -526,7 +567,7 @@ class Graph(val proc: Procedure,
     * @param cell2
     * @return the resulting cell in the unified node
     */
-  def mergeCells(c1: Cell, c2: Cell): Cell = {
+  def mergeCells(c1: Cell, c2: Cell, count: Int = 0): Cell = {
     var cell1 = c1
     var cell2 = c2
     if c1.node.isDefined then
@@ -648,7 +689,7 @@ class Graph(val proc: Procedure,
         } else if (outgoing.size > 1) {
           val result = outgoing.tail.foldLeft(adjust(outgoing.head)) {
             (result, pointee) =>
-              mergeCells(result, adjust(pointee))
+              mergeCells(result, adjust(pointee), count+1)
           }
           collapsedCell.pointee = Some(deadjust(result))
         }
@@ -681,6 +722,28 @@ class Graph(val proc: Procedure,
     val newCell = node.getCell(offset)
     assert(offset >= newCell.offset)
     Slice(newCell, offset - newCell.offset)
+  }
+
+  def handleOverlapping(cell: Cell): Cell = {
+    var size =  cell.node.get.getSize - cell.offset // if it's stack the size is rest of the node
+    val result =
+      if cell.node.get.flags.stack then
+        getStackOffsets(cell).foldLeft(cell) {
+          (res, offset) =>
+            mergeCells(res, getStack(offset, size.toInt))
+        }
+      else
+        cell
+
+
+    size = result.largestAccessedSize
+    if result.node.get.flags.global then
+      getGlobalAddresses(result).foldLeft(result) {
+        (res, offset) =>
+          mergeCells(res, getGlobal(offset, size.toInt).get)
+      }
+    else
+      result
   }
 
   private def isFormal(pos: CFGPosition, variable: Variable): Boolean = !reachingDefs(pos).contains(variable)
