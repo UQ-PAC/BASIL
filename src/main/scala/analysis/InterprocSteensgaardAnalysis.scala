@@ -78,7 +78,7 @@ class InterprocSteensgaardAnalysis(
         }
       )
     }
-    print("Done")
+    Logger.debug("Done")
   }
 
   /** Generates the constraints for the given sub-AST.

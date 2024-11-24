@@ -68,7 +68,8 @@ trait MemoryRegionAnalysis(val program: Program,
       case assign: Assign =>
         // check if any of rhs variables is a stack pointer
         val sp = unwrapExprToVar(assign.rhs)
-        val isSP = sp.isDefined && spList.contains(sp.get)
+        val isMemLoad = unwrapExpr(assign.rhs).isDefined
+        val isSP = sp.isDefined && spList.contains(sp.get) && !isMemLoad
         if (isSP) {
           // add lhs to spList
           return spList + assign.lhs
@@ -80,7 +81,8 @@ trait MemoryRegionAnalysis(val program: Program,
   }
 
   private def isAStackPointer(expr: Expr, spList: Set[Variable]): Boolean = {
-    expr.variables.exists(v => spList.contains(v))
+    val isMemLoad = unwrapExpr(expr).isDefined
+    expr.variables.exists(v => spList.contains(v)) && !isMemLoad
   }
 
   val stackLattice: PowersetLattice[StackRegion] = PowersetLattice()
@@ -242,7 +244,7 @@ trait MemoryRegionAnalysis(val program: Program,
       if (isHeap.nonEmpty) {
           ((Set.empty, spList), s._2 ++ isHeap)
       } else {
-        ((eval(memAssign.index, s._1._1, s._1._2, memAssign, memAssign.size), spList), Set.empty)
+        ((eval(memAssign.index, s._1._1, spList, memAssign, memAssign.size), spList), Set.empty)
       }
     case assign: Assign =>
       val unwrapped = unwrapExpr(assign.rhs)
@@ -251,7 +253,7 @@ trait MemoryRegionAnalysis(val program: Program,
         if (isHeap.nonEmpty) {
           ((Set.empty, spList), s._2 ++ isHeap)
         } else {
-          ((eval(unwrapped.get.index, s._1._1, s._1._2, assign, unwrapped.get.size), spList), Set.empty)
+          ((eval(unwrapped.get.index, s._1._1, spList, assign, unwrapped.get.size), spList), Set.empty)
         }
       } else {
         // this is a constant, but we need to check if it is a data region
