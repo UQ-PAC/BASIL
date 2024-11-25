@@ -45,6 +45,134 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     )
   }
 
+  test("overlapping access") {
+    val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable")
+
+
+    // the dsg of the main procedure after the local phase
+    val program = results.ir.program
+    val dsg = results.analysis.get.localDSA(program.mainProcedure)
+
+
+    // dsg.formals(R29) is the slice representing formal R29
+    val R29formal = dsg.adjust(dsg.formals(R29))
+
+
+    // cells representing the stack at various offsets
+    val stack64 = dsg.find(dsg.stackMapping(64).cells(0)) // R31 + 0x40
+    val stack72 = dsg.find(dsg.stackMapping(72).cells(0)) //  R31 + 0x40 + 8
+    val stack16 = dsg.find(dsg.stackMapping(16).cells(0)) //  R31 + 40
+    val stack32 = dsg.find(dsg.stackMapping(32).cells(0)) //  R31 + 32
+    val stack24 = dsg.find(dsg.stackMapping(16).cells(8)) //  R31 + 24 and Malloc
+
+    assert(dsg.adjust(stack64.getPointee).equals(R29formal)) // R31 points to the frame pointer
+    assert(dsg.adjust(stack72.getPointee).equals(dsg.adjust(dsg.formals(R30)))) // R31 + 8 points to the link register
+
+    // overlapping access
+    assert(dsg.adjust(stack16.getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0))))
+    assert(dsg.adjust(stack24.getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
+
+    assert(!dsg.find(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).equals(dsg.find(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
+    assert(dsg.find(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).node.get.equals(dsg.find(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0)).node.get))
+
+    assert(dsg.find(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).offset.equals(0))
+    assert(dsg.find(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0)).offset.equals(8))
+
+    assert(dsg.adjust(dsg.SSAVar("%00000429$1", "R8")).equals(dsg.find(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0))))
+    assert(dsg.adjust(dsg.SSAVar("%00000438$1", "R8")).equals(dsg.find(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
+
+
+
+    assert(dsg.adjust(stack32.getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1916, 1916 + 20)).node.cells(0))))
+
+  }
+
+
+  test("stack interproc overlapping") {
+    val results = runTest("src/test/dsa/stack_interproc_overlapping/stack_interproc_overlapping")
+
+    // the dsg of the main procedure after the all phases
+    val program = results.ir.program
+
+    // Local Callee
+    val dsgCallee = results.analysis.get.localDSA(program.nameToProcedure("set_fields"))
+    // dsg.formals(R29) is the slice representing formal R29
+
+    val stack8Pointee = dsgCallee.adjust(dsgCallee.find(dsgCallee.stackMapping(8).cells(0)).getPointee)
+    val R0formal = dsgCallee.adjust(dsgCallee.formals(R0))
+    val paramNode = R0formal.node.get
+
+    assert(stack8Pointee.equals(R0formal))
+    assert(paramNode.cells.size == 2)
+    assert(R0formal.largestAccessedSize == 8)
+    assert(paramNode.cells(0) == R0formal)
+    assert(paramNode.cells(16).largestAccessedSize == 8)
+
+
+
+    // Local Caller
+    val dsgCaller = results.analysis.get.localDSA(program.mainProcedure)
+    val stack32 = dsgCaller.find(dsgCaller.stackMapping(32).cells(0))
+    val stack48 = dsgCaller.find(dsgCaller.stackMapping(48).cells(0))
+
+    assert(stack32.node.get != stack48.node.get)
+
+
+    // topdown Caller
+    val dsg = results.analysis.get.bottomUpDSA(program.mainProcedure)
+    val stack32Final = dsg.find(dsg.stackMapping(32).cells(0))
+    val stack32FinalNode = stack32Final.node.get
+    val stack48Final = dsg.find(dsg.stackMapping(48).cells(0))
+
+//    assert(stack0Final.largestAccessedSize == 24)
+    assert(stack32Final.node.get == stack48Final.node.get)
+    assert(dsg.find(stack32Final.node.get.cells(0)) == stack32Final)
+    assert(dsg.find(stack32Final.node.get.cells(16)) == stack48Final)
+
+  }
+
+  test("global interproc overlapping") {
+    val results = runTest("src/test/dsa/global_interproc_overlapping/global_interproc_overlapping")
+
+    // the dsg of the main procedure after the local phase
+    val program = results.ir.program
+
+
+    // Local Caller
+    val dsgCaller = results.analysis.get.localDSA(program.mainProcedure)
+    assert(dsgCaller.find(dsgCaller.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells.size == 1)
+    assert(dsgCaller.find(dsgCaller.globalMapping(AddressRange(131096, 131096 + 24)).node.cells(0)).largestAccessedSize == 8)
+
+
+//    // topdown Caller
+    val dsg = results.analysis.get.topDownDSA(program.mainProcedure)
+    assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells.size == 3)
+    assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells(0).largestAccessedSize == 8)
+    assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells(8).largestAccessedSize == 8)
+    assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells(16).largestAccessedSize == 8)
+
+  }
+
+
+  test("indirect overlapping") {
+    val results = runTest("src/test/dsa/indirect_overlapping/indirect_overlapping")
+
+    val program = results.ir.program
+    val dsg = results.analysis.get.localDSA(program.mainProcedure)
+
+    val stack16 = dsg.find(dsg.stackMapping(16).cells(0))
+    val stack32 = dsg.find(dsg.stackMapping(32).cells(0))
+    assert(!dsg.stackMapping.keys.toSet.contains(24))
+
+    val node = stack16.node.get
+    assert(node.cells.size == 3)
+    assert(node.cells(0).largestAccessedSize == 8)
+    assert(node.cells(8).largestAccessedSize == 8)
+    assert(node.cells(16).largestAccessedSize == 8)
+    assert(node.cells(16) == stack32)
+  }
+
+
   // Local DSA tests
   /*
   TODO - rewrite this test with a new input that is more suitable than the removed example
