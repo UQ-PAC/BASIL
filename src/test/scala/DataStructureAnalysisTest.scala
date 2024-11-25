@@ -46,19 +46,8 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   }
 
   test("overlapping access") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "src/test/indirect_calls/jumptable/clang/jumptable.adt",
-          relfFile = "src/test/indirect_calls/jumptable/clang/jumptable.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
+    val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable")
+
 
     // the dsg of the main procedure after the local phase
     val program = results.ir.program
@@ -100,19 +89,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
 
   test("stack interproc overlapping") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "src/test/dsa/stack_interproc_overlapping/stack_interproc_overlapping.adt",
-          relfFile = "src/test/dsa/stack_interproc_overlapping/stack_interproc_overlapping.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
+    val results = runTest("src/test/dsa/stack_interproc_overlapping/stack_interproc_overlapping")
 
     // the dsg of the main procedure after the all phases
     val program = results.ir.program
@@ -155,19 +132,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   }
 
   test("global interproc overlapping") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "src/test/dsa/global_interproc_overlapping/global_interproc_overlapping.adt",
-          relfFile = "src/test/dsa/global_interproc_overlapping/global_interproc_overlapping.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
+    val results = runTest("src/test/dsa/global_interproc_overlapping/global_interproc_overlapping")
 
     // the dsg of the main procedure after the local phase
     val program = results.ir.program
@@ -190,19 +155,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
 
   test("indirect overlapping") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "src/test/dsa/indirect_overlapping/indirect_overlapping.adt",
-          relfFile = "src/test/dsa/indirect_overlapping/indirect_overlapping.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
+    val results = runTest("src/test/dsa/indirect_overlapping/indirect_overlapping")
 
     val program = results.ir.program
     val dsg = results.analysis.get.localDSA(program.mainProcedure)

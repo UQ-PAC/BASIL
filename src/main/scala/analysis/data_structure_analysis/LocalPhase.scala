@@ -181,19 +181,27 @@ class LocalPhase(proc: Procedure,
   }
 
 
-
+  /**
+   * Performs  overlapping access to the pointer cell while preserving size each dereferenced cell as separate
+   * (not collapsing them together)
+   * @param lhsOrValue either lhs in a load or value in a store
+   * @param pointer the cell which is being dereferenced
+   * @param size size of the dereference
+   */
   def multiAccess(lhsOrValue: Cell, pointer: Cell, size: Int): Unit = {
     // TODO there should be another check here to see we cover the bytesize
     // otherwise can fall back on expanding
 
     val diff = pointer.offset - lhsOrValue.offset
-    val startPointerOffset = pointer.offset
+    val startPointerOffset = pointer.offset // starting offset for the dereference
     val lhsNode = lhsOrValue.node.get
 
 
+    // collect all cells that are being dereferenced
     val pointers = pointer.node.get.cells.filter((offset, _) => offset >= startPointerOffset && offset < startPointerOffset + size).toSeq.sortBy((offset, cell) => offset)
-    for (((offset, cell), i) <- pointers.zipWithIndex) {
+    for (((offset, cell), i) <- pointers.zipWithIndex) { // iterate and merge each pointee at correct offset it lhs/value cell
       val lhs = lhsNode.addCell(offset - diff, 0) // todo check if 0 is the right size
+      // update the access size of the pointer
       graph.find(cell).growSize(if i < pointers.size - 1 then (pointers(i + 1)._1 - offset - diff).toInt else (size - (offset - diff)).toInt)
       val res = graph.mergeCells(lhs, graph.adjust(graph.find(cell).getPointee))
        graph.handleOverlapping(res)

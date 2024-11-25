@@ -25,7 +25,7 @@ case class HeapLocation(override val regionIdentifier: String, proc: Procedure, 
   override def toString: String = s"Heap($regionIdentifier, $size)"
 }
 
-case class DataLocation(override val regionIdentifier: String, start: BigInt, size: BigInt) extends MemoryLocation {
+case class DataPointer(override val regionIdentifier: String, start: BigInt, size: BigInt) extends MemoryLocation {
   override def toString: String = s"Data($regionIdentifier, $start, $size)"
 }
 

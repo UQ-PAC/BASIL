@@ -192,30 +192,27 @@ class Graph(val proc: Procedure,
   // creates the globals from the symbol tables
   val globalMapping = mutable.Map[AddressRange, Field]()
   globals.foreach {
-    global =>
-      global match
-        case FuncEntry(name, size, address) =>
-          val func = Node(Some(this), size)
-          func.allocationRegions.add(Function(name))
-          func.flags.global = true
-          func.flags.incomplete = true
-          func.flags.function = true
-//          globalMapping.update(AddressRange(address, address + (size / 8)), Field(func, 0))
+    case FuncEntry(name, size, address) =>
+      val func = Node(Some(this), size)
+      func.allocationRegions.add(Function(name))
+      func.flags.global = true
+      func.flags.incomplete = true
+      func.flags.function = true
+      //          globalMapping.update(AddressRange(address, address + (size / 8)), Field(func, 0))
 
-          val pointer = Node(Some(this), size)
-          pointer.allocationRegions.add(DataLocation(name, address, size / 8)) // todo check that size 0 is correct
-          pointer.flags.global = true
-          pointer.flags.incomplete = true
-          pointer.cells(0).pointee = Some(Slice(func.cells(0), 0))
-          globalMapping.update(AddressRange(address, address + (size / 8)), Field(pointer, 0))
-        case SpecGlobal(name, size, arraySize, address) =>
-          val node = Node(Some(this), size)
-          node.allocationRegions.add(DataLocation(name, address, size / 8))
-          node.flags.global = true
-          node.flags.incomplete = true
-          globalMapping.update(AddressRange(address, address + size / 8), Field(node, 0))
-        case _ => ???
-
+      val pointer = Node(Some(this), size)
+      pointer.allocationRegions.add(DataPointer(name, address, size / 8)) // todo check that size 0 is correct
+      pointer.flags.global = true
+      pointer.flags.incomplete = true
+      pointer.cells(0).pointee = Some(Slice(func.cells(0), 0))
+      globalMapping.update(AddressRange(address, address + (size / 8)), Field(pointer, 0))
+    case SpecGlobal(name, size, arraySize, address) =>
+      val node = Node(Some(this), size)
+      node.allocationRegions.add(DataPointer(name, address, size / 8))
+      node.flags.global = true
+      node.flags.incomplete = true
+      globalMapping.update(AddressRange(address, address + size / 8), Field(node, 0))
+    case _ => ???
   }
 
   // creates a global for each relocation entry in the symbol table
@@ -238,7 +235,7 @@ class Graph(val proc: Procedure,
 
           case None =>
             val node = Node(Some(this))
-            node.allocationRegions.add(DataLocation(s"Relocated_$relocatedAddress", relocatedAddress, 8))
+            node.allocationRegions.add(DataPointer(s"Relocated_$relocatedAddress", relocatedAddress, 8))
             node.flags.global = true
             node.flags.incomplete = true
             globalMapping.update(AddressRange(relocatedAddress, relocatedAddress + 8), Field(node, 0))
@@ -252,7 +249,7 @@ class Graph(val proc: Procedure,
 
   externalFunctions.foreach { external =>
     val node = Node(Some(this))
-    node.allocationRegions.add(DataLocation(external.name, external.offset, 0))
+    node.allocationRegions.add(DataPointer(external.name, external.offset, 0))
     node.flags.global = true
     node.flags.incomplete = true
     globalMapping.update(AddressRange(external.offset, external.offset), Field(node, 0))
