@@ -196,17 +196,18 @@ class Graph(val proc: Procedure,
       global match
         case FuncEntry(name, size, address) =>
           val func = Node(Some(this), size)
-          func.allocationRegions.add(DataLocation(name, address, size / 8))
+          func.allocationRegions.add(Function(name))
           func.flags.global = true
           func.flags.incomplete = true
+          func.flags.function = true
 //          globalMapping.update(AddressRange(address, address + (size / 8)), Field(func, 0))
 
-          val pointer = Node(Some(this), 0)
-          pointer.allocationRegions.add(DataLocation(s"$name's pointer@$address", address, 0)) // todo check that size 0 is correct
+          val pointer = Node(Some(this), size)
+          pointer.allocationRegions.add(DataLocation(name, address, size / 8)) // todo check that size 0 is correct
           pointer.flags.global = true
           pointer.flags.incomplete = true
           pointer.cells(0).pointee = Some(Slice(func.cells(0), 0))
-          globalMapping.update(AddressRange(address, address), Field(pointer, 0))
+          globalMapping.update(AddressRange(address, address + (size / 8)), Field(pointer, 0))
         case SpecGlobal(name, size, arraySize, address) =>
           val node = Node(Some(this), size)
           node.allocationRegions.add(DataLocation(name, address, size / 8))

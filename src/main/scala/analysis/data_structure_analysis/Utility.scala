@@ -21,6 +21,7 @@ object NodeCounter {
 
 class Flags() {
   var collapsed = false
+  var function = false
   var stack = false
   var heap = false
   var global = false
@@ -40,6 +41,7 @@ class Flags() {
     modified = other.modified || modified
     incomplete = other.incomplete || incomplete
     foreign = other.foreign && foreign
+    function = function || other.function
 }
 
 /**
