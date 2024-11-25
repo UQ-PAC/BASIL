@@ -183,7 +183,7 @@ class Graph(val proc: Procedure,
         mergeCells(headNode.addCell(newHeadOffset + stackDiff, 0), find(stackMapping(off).cells(0)))
     }
     // selfCollapse(head.node.get)
-    head
+    find(head)
   }
 
 
@@ -730,7 +730,8 @@ class Graph(val proc: Procedure,
       if cell.node.get.flags.stack then
         getStackOffsets(cell).foldLeft(cell) {
           (res, offset) =>
-            mergeCells(res, getStack(offset, size.toInt))
+            val stack = getStack(offset, size.toInt)
+            mergeCells(res, stack)
         }
       else
         cell

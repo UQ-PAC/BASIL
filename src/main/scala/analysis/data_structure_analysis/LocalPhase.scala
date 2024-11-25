@@ -346,6 +346,10 @@ class LocalPhase(proc: Procedure,
     //
     //      )
     //    )
+
+    for ((offset, node) <- graph.stackMapping) {
+      graph.handleOverlapping(graph.find(node.cells(0)))
+    }
     graph
   }
 }

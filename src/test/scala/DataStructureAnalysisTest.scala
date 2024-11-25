@@ -96,7 +96,6 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
     assert(dsg.adjust(stack32.getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1916, 1916)).node.cells(0))))
 
-
   }
 
 
@@ -181,12 +180,43 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
 
 //    // topdown Caller
-    val dsg = results.analysis.get.bottomUpDSA(program.mainProcedure)
+    val dsg = results.analysis.get.topDownDSA(program.mainProcedure)
     assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells.size == 3)
     assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells(0).largestAccessedSize == 8)
     assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells(8).largestAccessedSize == 8)
     assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells(16).largestAccessedSize == 8)
 
+  }
+
+
+  test("indirect overlapping") {
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "src/test/dsa/indirect_overlapping/indirect_overlapping.adt",
+          relfFile = "src/test/dsa/indirect_overlapping/indirect_overlapping.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+
+    val program = results.ir.program
+    val dsg = results.analysis.get.localDSA(program.mainProcedure)
+
+    val stack16 = dsg.find(dsg.stackMapping(16).cells(0))
+    val stack32 = dsg.find(dsg.stackMapping(32).cells(0))
+    assert(!dsg.stackMapping.keys.toSet.contains(24))
+
+    val node = stack16.node.get
+    assert(node.cells.size == 3)
+    assert(node.cells(0).largestAccessedSize == 8)
+    assert(node.cells(8).largestAccessedSize == 8)
+    assert(node.cells(16).largestAccessedSize == 8)
+    assert(node.cells(16) == stack32)
   }
 
 
