@@ -66,25 +66,25 @@ trait GlobalRegionAnalysis(val program: Program,
     tableAddress
   }
 
-  def tryCoerceIntoData(exp: Expr, n: Command, subAccess: BigInt): Set[DataRegion] = {
+  def tryCoerceIntoData(exp: Expr, n: Command, subAccess: BigInt, noLoad: Boolean = false): Set[DataRegion] = {
     val eval = evaluateExpression(exp, constantProp(n))
     if (eval.isDefined) {
       val index = eval.get.value
       Set(dataPoolMaster(index, subAccess))
     } else {
       exp match {
-        case literal: BitVecLiteral => tryCoerceIntoData(literal, n, subAccess)
-        case Extract(_, _, body) => tryCoerceIntoData(body, n, subAccess)
-        case Repeat(_, body) => tryCoerceIntoData(body, n, subAccess)
-        case ZeroExtend(_, body) => tryCoerceIntoData(body, n, subAccess)
-        case SignExtend(_, body) => tryCoerceIntoData(body, n, subAccess)
-        case UnaryExpr(_, arg) => tryCoerceIntoData(arg, n, subAccess)
+        case literal: BitVecLiteral => tryCoerceIntoData(literal, n, subAccess, noLoad)
+        case Extract(_, _, body) => tryCoerceIntoData(body, n, subAccess, noLoad)
+        case Repeat(_, body) => tryCoerceIntoData(body, n, subAccess, noLoad)
+        case ZeroExtend(_, body) => tryCoerceIntoData(body, n, subAccess, noLoad)
+        case SignExtend(_, body) => tryCoerceIntoData(body, n, subAccess, noLoad)
+        case UnaryExpr(_, arg) => tryCoerceIntoData(arg, n, subAccess, noLoad)
         case BinaryExpr(op, arg1, arg2) =>
           val evalArg2 = evaluateExpression(arg2, constantProp(n))
           if (evalArg2.isDefined) {
-            tryCoerceIntoData(arg1, n, subAccess) flatMap { i =>
+            tryCoerceIntoData(arg1, n, subAccess, noLoad) flatMap { i =>
               val newExpr = BinaryExpr(op, BitVecLiteral(i.start, evalArg2.get.size), evalArg2.get)
-              tryCoerceIntoData(newExpr, n, subAccess)
+              tryCoerceIntoData(newExpr, n, subAccess, noLoad)
             }
           } else {
             Set()
@@ -92,6 +92,9 @@ trait GlobalRegionAnalysis(val program: Program,
         case _: MemoryLoad => ???
         case _: UninterpretedFunction => Set.empty
         case variable: Variable =>
+          if (noLoad) {
+            return Set()
+          }
           val uses = getUse(variable, n, reachingDefs)
           return uses.flatMap(i => getVSAHints(variable, i))
         case _ => Set()
@@ -164,7 +167,7 @@ trait GlobalRegionAnalysis(val program: Program,
           return checkIfDefined(regions, n)
         } else {
           // this is a constant but we need to check if it is a data region
-          return checkIfDefined(tryCoerceIntoData(assign.rhs, assign, 1), n)
+          return checkIfDefined(tryCoerceIntoData(assign.rhs, assign, 1, noLoad = true), n)
         }
       case _ =>
         Set()

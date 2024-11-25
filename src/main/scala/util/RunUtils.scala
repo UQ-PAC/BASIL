@@ -612,6 +612,7 @@ object RunUtils {
     while (modified) {
       Logger.debug("[!] Running Static Analysis")
       val result = StaticAnalysis.analyse(ctx, config, iteration, analysisResult.lastOption)
+      val previousResult = analysisResult.lastOption
       analysisResult.append(result)
       Logger.debug("[!] Replacing Indirect Calls")
 
@@ -623,7 +624,7 @@ object RunUtils {
       ).resolveIndirectCalls()
       */
 
-      if analysisResult.size < 2 then
+      if previousResult.isEmpty || result.vsaResult != previousResult.get.vsaResult then
         modified = true
       else
         modified = transforms.VSAIndirectCallResolution(
