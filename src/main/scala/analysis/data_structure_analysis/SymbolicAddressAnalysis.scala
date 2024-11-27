@@ -13,8 +13,12 @@ case class SymbolicAddress(accessor: Variable, symbolicBase: MemoryLocation, off
 
 trait MemoryLocation {
   val regionIdentifier: String
+}
 
-  override def toString: String = s"MemoryRegion($regionIdentifier)"
+
+trait GlobalLocation {
+  val start: BigInt
+  val size: BigInt
 }
 
 case class StackLocation(override val regionIdentifier: String, proc: Procedure, size: BigInt) extends MemoryLocation {
@@ -25,11 +29,15 @@ case class HeapLocation(override val regionIdentifier: String, proc: Procedure, 
   override def toString: String = s"Heap($regionIdentifier, $size)"
 }
 
-case class DataPointer(override val regionIdentifier: String, start: BigInt, size: BigInt) extends MemoryLocation {
+case class DataLocation(override val regionIdentifier: String, override val start: BigInt, override val size: BigInt)
+extends MemoryLocation, GlobalLocation {
   override def toString: String = s"Data($regionIdentifier, $start, $size)"
 }
 
-case class Function(override val regionIdentifier: String) extends  MemoryLocation
+case class Function(regionIdentifier: String, start: BigInt, size: BigInt) extends MemoryLocation, GlobalLocation{
+  override def toString: String = s"Func($regionIdentifier, $start, $size)"
+}
+
 
 case class UnknownLocation(override val regionIdentifier: String, proc: Procedure) extends MemoryLocation {
   override def toString: String = s"Unknown($regionIdentifier)"

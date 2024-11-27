@@ -193,22 +193,17 @@ class Graph(val proc: Procedure,
   val globalMapping = mutable.Map[AddressRange, Field]()
   globals.foreach {
     case FuncEntry(name, size, address) =>
-      val func = Node(Some(this), size)
-      func.allocationRegions.add(Function(name))
-      func.flags.global = true
-      func.flags.incomplete = true
-      func.flags.function = true
-      //          globalMapping.update(AddressRange(address, address + (size / 8)), Field(func, 0))
 
-      val pointer = Node(Some(this), size)
-      pointer.allocationRegions.add(DataPointer(name, address, size / 8)) // todo check that size 0 is correct
-      pointer.flags.global = true
-      pointer.flags.incomplete = true
-      pointer.cells(0).pointee = Some(Slice(func.cells(0), 0))
-      globalMapping.update(AddressRange(address, address + (size / 8)), Field(pointer, 0))
+      val function = Node(Some(this), size/8)
+      function.cells(0).growSize(size/8)
+      function.allocationRegions.add(Function(name, address, size / 8)) // todo check that size 0 is correct
+      function.flags.global = true
+      function.flags.incomplete = true
+      globalMapping.update(AddressRange(address, address + (size / 8)), Field(function, 0))
     case SpecGlobal(name, size, arraySize, address) =>
-      val node = Node(Some(this), size)
-      node.allocationRegions.add(DataPointer(name, address, size / 8))
+
+      val node = Node(Some(this), size/8)
+      node.allocationRegions.add(DataLocation(name, address, size / 8))
       node.flags.global = true
       node.flags.incomplete = true
       globalMapping.update(AddressRange(address, address + size / 8), Field(node, 0))
@@ -235,7 +230,7 @@ class Graph(val proc: Procedure,
 
           case None =>
             val node = Node(Some(this))
-            node.allocationRegions.add(DataPointer(s"Relocated_$relocatedAddress", relocatedAddress, 8))
+            node.allocationRegions.add(DataLocation(s"Relocated_$relocatedAddress", relocatedAddress, 8))
             node.flags.global = true
             node.flags.incomplete = true
             globalMapping.update(AddressRange(relocatedAddress, relocatedAddress + 8), Field(node, 0))
@@ -249,7 +244,7 @@ class Graph(val proc: Procedure,
 
   externalFunctions.foreach { external =>
     val node = Node(Some(this))
-    node.allocationRegions.add(DataPointer(external.name, external.offset, 0))
+    node.allocationRegions.add(DataLocation(external.name, external.offset, 0))
     node.flags.global = true
     node.flags.incomplete = true
     globalMapping.update(AddressRange(external.offset, external.offset), Field(node, 0))
