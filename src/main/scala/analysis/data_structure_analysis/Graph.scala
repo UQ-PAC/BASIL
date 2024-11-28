@@ -212,8 +212,11 @@ class Graph(val proc: Procedure,
     nodes.clear()
     pointsto.clear()
     nodes.addAll(formals.values.map(n => find(n.cell.node.get).node))
-    varToCell.values.foreach {
-      value => nodes.addAll(value.values.map(n => find(n.cell.node.get).node))
+    varToCell.values.foreach { value =>
+      nodes.addAll(value.values.map(n => find(n.cell.node.get).node))
+    }
+    accessIndexToSlice.values.foreach { slice =>
+      nodes.add(find(slice.cell.node.get).node)
     }
     nodes.addAll(stackMapping.values.map(n => find(n).node))
     nodes.addAll(globalMapping.values.map(n => find(n.node).node))
@@ -648,6 +651,24 @@ class Graph(val proc: Procedure,
     varToCell
   }
 
+  val accessIndexToSlice: mutable.Map[Statement, Slice] = accessIndexToSliceInit(proc)
+
+  private def accessIndexToSliceInit(proc: Procedure): mutable.Map[Statement, Slice] = {
+    val accessIndexToSlice = mutable.Map[Statement, Slice]()
+    val domain = computeDomain(IntraProcIRCursor, Set(proc))
+    domain.foreach {
+      case load: MemoryLoad =>
+        val node = Node(Some(this))
+        accessIndexToSlice(load) = Slice(node.cells(0), 0)
+      case store: MemoryStore =>
+        val node = Node(Some(this))
+        accessIndexToSlice(store) = Slice(node.cells(0), 0)
+      case _ =>
+    }
+    accessIndexToSlice
+  }
+
+
   def cloneSelf(): Graph = {
     val newGraph = Graph(proc, constProp, varToSym, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params)
     assert(formals.size == newGraph.formals.size)
@@ -679,6 +700,28 @@ class Graph(val proc: Procedure,
         }
         newGraph.varToCell(position).update(variable, Slice(idToNode(node.id).cells(slice.offset), slice.internalOffset))
       }
+    }
+
+    accessIndexToSlice.foreach {
+      case (store: MemoryStore, s: Slice) =>
+        val slice = find(s)
+        val node = slice.node
+        nodes.add(node)
+        if (!idToNode.contains(node.id)) {
+          val newNode = node.cloneSelf(newGraph)
+          idToNode.update(node.id, newNode)
+        }
+        newGraph.accessIndexToSlice(store) = Slice(idToNode(node.id).cells(slice.offset), slice.internalOffset)
+      case (load: MemoryLoad, s: Slice) =>
+        val slice = find(s)
+        val node = slice.node
+        nodes.add(node)
+        if (!idToNode.contains(node.id)) {
+          val newNode = node.cloneSelf(newGraph)
+          idToNode.update(node.id, newNode)
+        }
+        newGraph.accessIndexToSlice(load) = Slice(idToNode(node.id).cells(slice.offset), slice.internalOffset)
+      case _ =>
     }
 
     stackMapping.foreach { (offset, oldNode) =>
