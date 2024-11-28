@@ -114,7 +114,7 @@ class Graph(val proc: Procedure,
     val byteSize = stackAccesses(offset)
     if offset >= nextValidOffset then
       val node = Node(Some(this), byteSize)
-      node.allocationRegions.add(StackLocation(s"Stack_${proc}_$offset", proc, byteSize))
+      node.allocationRegions.add(StackLocation(s"Stack_${proc.name}_$offset", proc, byteSize))
       node.flags.stack = true
       node.addCell(0, byteSize)
       stackMapping.update(offset, node)
@@ -231,6 +231,7 @@ class Graph(val proc: Procedure,
 
   def toDot: String = {
     collectNodes()
+    val toRemove = Set('$', '#', '%')
 
     val structs = ArrayBuffer[DotStruct]()
     val arrows = ArrayBuffer[StructArrow]()
@@ -240,11 +241,8 @@ class Graph(val proc: Procedure,
     }
 
     formals.keys.foreach { variable =>
-      var varName = variable.name
-      if (varName.startsWith("#")) {
-        varName = s"LocalVar_${varName.drop(1)}"
-      }
-      structs.append(DotStruct(s"Formal_${varName}", s"Formal_${varName}", None))
+      val varName = variable.name.filterNot(toRemove)
+      structs.append(DotStruct(s"Formal_$varName", s"Formal_$varName", None))
     }
 
     pointsto.foreach { (cell, pointee) =>
@@ -255,23 +253,17 @@ class Graph(val proc: Procedure,
 
     formals.foreach { (variable, slice) =>
       val value = find(slice)
-      arrows.append(StructArrow(DotStructElement(s"Formal_${variable.name}", None), DotStructElement(value.node.id.toString, Some(value.cell.offset.toString)), value.internalOffset.toString))
+      arrows.append(StructArrow(DotStructElement(s"Formal_${variable.name.filterNot(toRemove)}", None), DotStructElement(value.node.id.toString, Some(value.cell.offset.toString)), value.internalOffset.toString))
     }
 
     varToCell.foreach { (pos, mapping) =>
-      var id = pos match {
+      var id = (pos match {
         case p: Procedure => p.name
         case b: Block => b.label
         case c: Command => c.label.getOrElse("")
-      }
-      if (id.startsWith("%")) {
-        id = id.drop(1)
-      }
+      }).filterNot(toRemove)
       mapping.foreach { (variable, slice) =>
-        var varName = variable.name
-        if (varName.startsWith("#")) {
-          varName = s"LocalVar_${varName.drop(1)}"
-        }
+        val varName = variable.name.filterNot(toRemove)
         structs.append(DotStruct(s"SSA_${id}_$varName", s"SSA_${pos}_$varName", None, false))
         val value = find(slice)
         arrows.append(StructArrow(DotStructElement(s"SSA_${id}_$varName", None), DotStructElement(value.node.id.toString, Some(value.cell.offset.toString)), value.internalOffset.toString))
