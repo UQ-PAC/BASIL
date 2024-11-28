@@ -51,7 +51,9 @@ object Main {
       @arg(name = "summarise-procedures", doc = "Generates summaries of procedures which are used in pre/post-conditions (requires --analyse flag)")
       summariseProcedures: Flag,
       @arg(name = "memory-regions", doc = "Performs static analysis to separate memory into discrete regions in Boogie output (requires --analyse flag)")
-      memoryRegions: Flag
+      memoryRegions: Flag,
+      @arg(name = "no-irreducible-loops", doc = "Disable producing irreducible loops when --analyse is passed (does nothing without --analyse)")
+      noIrreducibleLoops: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -84,7 +86,7 @@ object Main {
     val q = BASILConfig(
       loading = ILLoadingConfig(conf.inputFileName, conf.relfFileName, conf.specFileName, conf.dumpIL, conf.mainProcedureName, conf.procedureDepth),
       runInterpret = conf.interpret.value,
-      staticAnalysis = if conf.analyse.value then Some(StaticAnalysisConfig(conf.dumpIL, conf.analysisResults, conf.analysisResultsDot, conf.threadSplit.value, conf.summariseProcedures.value, conf.memoryRegions.value)) else None,
+      staticAnalysis = if conf.analyse.value then Some(StaticAnalysisConfig(conf.dumpIL, conf.analysisResults, conf.analysisResultsDot, conf.threadSplit.value, conf.summariseProcedures.value, conf.memoryRegions.value, !conf.noIrreducibleLoops.value)) else None,
       boogieTranslation = BoogieGeneratorConfig(if conf.lambdaStores.value then BoogieMemoryAccessMode.LambdaStoreSelect else BoogieMemoryAccessMode.SuccessiveStoreSelect,
         true, rely, conf.threadSplit.value),
       outputPrefix = conf.outFileName,
