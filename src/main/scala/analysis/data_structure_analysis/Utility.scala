@@ -34,6 +34,7 @@ class Flags() {
   var modified = false
   var incomplete = false
   var foreign = false
+  var merged = false
 
   def join(other: Flags): Unit =
     collapsed = collapsed || other.collapsed
@@ -45,6 +46,7 @@ class Flags() {
     modified = other.modified || modified
     incomplete = other.incomplete || incomplete
     foreign = other.foreign && foreign
+    merged = true
 }
 
 /**

@@ -283,6 +283,7 @@ class LocalPhase(proc: Procedure,
         val global = isGlobal(indexUnwrapped, n, byteSize)
         val stack = isStack(indexUnwrapped, n)
         val indexCell = graph.adjust(graph.accessIndexToSlice(load))
+        assert(!indexCell.node.get.flags.merged) // check index cell is a placeholder
         if global.isDefined then
           graph.mergeCells(graph.find(global.get), indexCell)
           graph.mergeCells(lhsCell, graph.adjust(graph.find(global.get).getPointee))
@@ -315,6 +316,7 @@ class LocalPhase(proc: Procedure,
         val global = isGlobal(index, n, byteSize)
         val stack = isStack(index, n)
         val indexCell = graph.adjust(graph.accessIndexToSlice(store))
+        assert(!indexCell.node.get.flags.merged) // check index cell is a placeholder
         val addressPointee: Cell = if (global.isDefined) {
           graph.mergeCells(graph.find(global.get), indexCell)
           graph.adjust(graph.find(global.get).getPointee)

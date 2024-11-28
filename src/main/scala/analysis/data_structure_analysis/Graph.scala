@@ -674,9 +674,10 @@ class Graph(val proc: Procedure,
     assert(formals.size == newGraph.formals.size)
     val nodes = mutable.Set[Node]()
     val idToNode: mutable.Map[Int, Node] = mutable.Map()
-    formals.foreach { (variable, slice) =>
+    formals.foreach { (variable, s) =>
       //        assert(newGraph.formals.contains(variable))
-      val node = find(slice).node
+      val slice = find(s)
+      val node = slice.node
       nodes.add(node)
       if !idToNode.contains(node.id) then
         val newNode = node.cloneSelf(newGraph)
