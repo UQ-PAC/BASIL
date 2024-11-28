@@ -1,6 +1,6 @@
 package analysis
 
-import analysis.BitVectorEval.isNegative
+import analysis.data_structure_analysis.{AddressRange, Cell, Graph, Slice}
 import ir.*
 import util.Logger
 
@@ -11,13 +11,31 @@ import scala.collection.mutable.ArrayBuffer
  * Replaces the region access with the calculated memory region.
  */
 
-class MergedRegion(var name: String, val subregions: mutable.Set[MemoryRegion])
+trait MergedRegion {
+  var name: String = ""
+}
 
-class RegionInjector(program: Program, mmm: MemoryModelMap) {
+class MergedRegionMRA(private val nameIn: String, val subregions: mutable.Set[MemoryRegion]) extends MergedRegion {
+  name = nameIn
+}
+
+class MergedRegionDSA(private val nameIn: String, val cell: Cell) extends MergedRegion {
+  name = nameIn
+}
+
+trait RegionInjector {
+  val program: Program
+  def getMergedRegion(address: BigInt, size: Int): Option[MergedRegion]
+  def injectRegions(): Unit
+
+  def sharedRegions(): Iterable[MergedRegion]
+}
+
+class RegionInjectorMRA(override val program: Program, mmm: MemoryModelMap) extends RegionInjector {
+  private val mergedRegions: mutable.Map[MemoryRegion, MergedRegionMRA] = mutable.Map()
   private val accessToRegion = mutable.Map[Statement, Set[MemoryRegion]]()
-  val mergedRegions: mutable.Map[MemoryRegion, MergedRegion] = mutable.Map()
 
-  def nodeVisitor(): Unit = {
+  def injectRegions(): Unit = {
     // visit reachable procedures
     val queue = mutable.Queue[Procedure]()
     val visited = mutable.Set[Procedure]()
@@ -54,7 +72,7 @@ class RegionInjector(program: Program, mmm: MemoryModelMap) {
     transformMemorySections(program)
   }
 
-  def mergeRegions(regions: Set[MemoryRegion]): Unit = {
+  private def mergeRegions(regions: Set[MemoryRegion]): Unit = {
     // TODO need to check that all regions are the same type
     val oldMergedRegions = regions.flatMap(r => mergedRegions.get(r))
     if (oldMergedRegions.nonEmpty) {
@@ -69,7 +87,7 @@ class RegionInjector(program: Program, mmm: MemoryModelMap) {
       }
     } else {
       // TODO give sensible deterministic name
-      val mergedRegion = MergedRegion(regions.head.regionIdentifier, mutable.Set())
+      val mergedRegion = MergedRegionMRA(regions.head.regionIdentifier, mutable.Set())
       mergedRegion.subregions.addAll(regions)
       for (m <- mergedRegion.subregions) {
         mergedRegions(m) = mergedRegion
@@ -77,7 +95,7 @@ class RegionInjector(program: Program, mmm: MemoryModelMap) {
     }
   }
 
-  def renameMemory(): Unit = {
+  private def renameMemory(): Unit = {
     for (access <- accessToRegion.keys) {
       // all regions associated with an access should have same merged region so no need to check others
       val regions = accessToRegion(access)
@@ -99,7 +117,7 @@ class RegionInjector(program: Program, mmm: MemoryModelMap) {
     }
   }
 
-  def replaceMemory(memory: Memory, region: MemoryRegion, mergedRegion: MergedRegion): Memory = {
+  private def replaceMemory(memory: Memory, region: MemoryRegion, mergedRegion: MergedRegion): Memory = {
     region match {
       case _: StackRegion =>
         StackMemory(mergedRegion.name, memory.addressSize, memory.valueSize)
@@ -114,13 +132,13 @@ class RegionInjector(program: Program, mmm: MemoryModelMap) {
     mmm.getStack(n) ++ mmm.getData(n)
   }
 
-  def visitStatement(n: Statement): Unit = n match {
+  private def visitStatement(n: Statement): Unit = n match {
     case m: MemoryStore =>
       val regions = statementToRegions(m)
       accessToRegion(m) = regions
     case m: MemoryLoad =>
-      val regions = statementToRegions(n)
-      accessToRegion(n) = regions
+      val regions = statementToRegions(m)
+      accessToRegion(m) = regions
     case _ => // ignore other kinds of nodes
   }
 
@@ -129,7 +147,7 @@ class RegionInjector(program: Program, mmm: MemoryModelMap) {
   // then do the renaming
   // then get regions per procedure, handle initial memory with those
 
-  def transformMemorySections(program: Program): Unit = {
+  private def transformMemorySections(program: Program): Unit = {
     val dataRegions = mergedRegions.keys.collect { case d: DataRegion => d }
 
     for (region <- dataRegions) {
@@ -145,7 +163,7 @@ class RegionInjector(program: Program, mmm: MemoryModelMap) {
     }
   }
 
-  def getMergedRegion(address: BigInt): Option[MergedRegion] = {
+  override def getMergedRegion(address: BigInt, size: Int): Option[MergedRegionMRA] = {
     val region = mmm.findDataObject(address)
     if (region.isDefined && mergedRegions.contains(region.get)) {
       Some(mergedRegions(region.get))
@@ -153,8 +171,134 @@ class RegionInjector(program: Program, mmm: MemoryModelMap) {
       None
     }
   }
+
+  override def sharedRegions(): Iterable[MergedRegion] = {
+    mergedRegions.collect {
+      case (_: DataRegion | _: HeapRegion, region: MergedRegion) => region
+    }
+  }
 }
 
-class RegionRenamer(memory: Memory) extends Visitor {
-  override def visitMemory(node: Memory): Memory = memory
+class RegionInjectorDSA(override val program: Program, DSATopDown: mutable.Map[Procedure, Graph]) extends RegionInjector {
+  private val mergedRegions: mutable.Map[Cell, MergedRegionDSA] = mutable.Map()
+
+  def injectRegions(): Unit = {
+    // visit reachable procedures
+    val queue = mutable.Queue[Procedure]()
+    val visited = mutable.Set[Procedure]()
+    queue.enqueue(program.mainProcedure)
+
+    while (queue.nonEmpty) {
+      val procedure = queue.dequeue()
+      for {
+        b <- procedure.blocks
+        s <- b.statements
+      } {
+        s match {
+          case store: MemoryStore =>
+            val dsg = DSATopDown(procedure)
+            val cell = dsg.find(dsg.accessIndexToSlice(store)).cell
+            val mergedRegion = if (mergedRegions.contains(cell)) {
+              mergedRegions(cell)
+            } else {
+              val region = createRegion(cell)
+              mergedRegions(cell) = region
+              region
+            }
+            val newMemory = replaceMemory(store.mem, mergedRegion)
+            store.mem = newMemory
+          case load: MemoryLoad =>
+            val dsg = DSATopDown(procedure)
+            val cell = dsg.find(dsg.accessIndexToSlice(load)).cell
+            val mergedRegion = if (mergedRegions.contains(cell)) {
+              mergedRegions(cell)
+            } else {
+              val region = createRegion(cell)
+              mergedRegions(cell) = region
+              region
+            }
+            val newMemory = replaceMemory(load.mem, mergedRegion)
+            load.mem = newMemory
+          case _ =>
+        }
+      }
+      visited.add(procedure)
+      for (call <- procedure.calls) {
+        if (!queue.contains(call) && !visited.contains(call)) {
+          queue.enqueue(call)
+        }
+      }
+    }
+    transformMemorySections(program)
+  }
+
+  private def createRegion(cell: Cell): MergedRegionDSA = {
+    val name = if (cell.node.isDefined) {
+      s"cell${cell.node.get.id}_${cell.offset}"
+    } else {
+      ???
+    }
+    MergedRegionDSA(name, cell)
+  }
+
+  private def replaceMemory(memory: Memory, mergedRegion: MergedRegionDSA): Memory = {
+    if (mergedRegion.cell.node.get.flags.stack) {
+      StackMemory(mergedRegion.name, memory.addressSize, memory.valueSize)
+    } else {
+      SharedMemory(mergedRegion.name, memory.addressSize, memory.valueSize)
+    }
+  }
+
+  private def transformMemorySections(program: Program): Unit = {
+    // if any addressRange entries point to a mergedRegion: grab the bytes
+
+    val dsg = DSATopDown(program.mainProcedure)
+
+    // need to check if nodes match too
+
+    dsg.globalMapping.foreach { (range, field) =>
+      val cell = dsg.find(field.node.cells(0))
+      if (mergedRegions.contains(cell)) {
+        program.initialMemoryLookup(range.start) match {
+          case Some(section) =>
+            val size = (range.end - range.start).toInt
+            val bytes = section.getBytes(range.start, size)
+            // should probably check that region is entirely contained within section but shouldn't happen in practice?
+            val newSection = MemorySection(mergedRegions(cell).name, range.start, size, bytes, section.readOnly, Some(mergedRegions(cell)))
+            program.usedMemory(range.start) = newSection
+          case None =>
+        }
+      }
+    }
+  }
+
+  override def getMergedRegion(address: BigInt, size: Int): Option[MergedRegionDSA] = {
+    val dsg = DSATopDown(program.mainProcedure)
+
+    val cells = dsg.globalMapping.keys.flatMap { range =>
+      if (address >= range.start && (address < range.end || (range.start == range.end && range.end == address))) {
+        val node = dsg.globalMapping(range).node
+        val offset = address - range.start
+        val cell = node.cells.get(offset)
+        cell.map(dsg.find)
+      } else {
+        None
+      }
+    }
+
+    if (cells.isEmpty || cells.size > 1) {
+      throw Exception("")
+    } else if (!mergedRegions.contains(cells.head)) {
+      val region = createRegion(cells.head)
+      mergedRegions(cells.head) = region
+      Some(region)
+    } else {
+      mergedRegions.get(cells.head)
+    }
+  }
+
+  override def sharedRegions(): Iterable[MergedRegion] = {
+    mergedRegions.values.filter(region => !region.cell.node.get.flags.stack)
+  }
+
 }

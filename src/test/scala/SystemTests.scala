@@ -1,5 +1,5 @@
 import org.scalatest.funsuite.AnyFunSuite
-import util.{LogLevel, Logger, PerformanceTimer, StaticAnalysisConfig}
+import util.{LogLevel, Logger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
 
 import Numeric.Implicits.*
 import java.io.{BufferedWriter, File, FileWriter}
@@ -212,6 +212,17 @@ class AnalysisSystemTestsGTIRB extends SystemTests {
   runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = false, expectVerify = true))
   runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = false, expectVerify = false))
 }
+
+class DSAMemoryRegionSystemTestsBAP extends SystemTests {
+  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)), useBAPFrontend = true, expectVerify = true))
+  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)), useBAPFrontend = true, expectVerify = false))
+}
+
+class DSAMemoryRegionSystemTestsGTIRB extends SystemTests {
+  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)), useBAPFrontend = false, expectVerify = true))
+  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)), useBAPFrontend = false, expectVerify = false))
+}
+
 
 class ProcedureSummaryTests extends SystemTests {
   // TODO currently procedure_summary3 verifies despite incorrect procedure summary analysis
