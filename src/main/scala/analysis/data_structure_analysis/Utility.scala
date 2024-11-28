@@ -14,9 +14,14 @@ import scala.util.control.Breaks.{break, breakable}
 object NodeCounter {
   private var counter: Int = 0
 
-  def getCounter: Int =
+  def getCounter: Int = {
     counter = counter + 1
     counter
+  }
+
+  def reset(): Unit = {
+    counter = 0
+  }
 }
 
 class Flags() {
