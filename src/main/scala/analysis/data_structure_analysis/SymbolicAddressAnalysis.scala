@@ -29,6 +29,10 @@ case class DataLocation(override val regionIdentifier: String, start: BigInt, si
   override def toString: String = s"Data($regionIdentifier, $start, $size)"
 }
 
+case class ExternalLocation(override val regionIdentifier: String) extends MemoryLocation {
+  override def toString: String = s"External($regionIdentifier)"
+}
+
 case class UnknownLocation(override val regionIdentifier: String, proc: Procedure) extends MemoryLocation {
   override def toString: String = s"Unknown($regionIdentifier)"
 }

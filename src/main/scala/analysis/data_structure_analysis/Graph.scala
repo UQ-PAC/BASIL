@@ -170,11 +170,17 @@ class Graph(val proc: Procedure,
   }
 
   externalFunctions.foreach { external =>
-    val node = Node(Some(this))
-    node.allocationRegions.add(DataLocation(external.name, external.offset, 0))
-    node.flags.global = true
-    node.flags.incomplete = true
-    globalMapping.update(AddressRange(external.offset, external.offset), Field(node, 0))
+    val relocationNode = Node(Some(this))
+    relocationNode.allocationRegions.add(DataLocation(s"${external.name}_relocation", external.offset, 8))
+    relocationNode.flags.global = true
+    relocationNode.flags.incomplete = true
+    globalMapping.update(AddressRange(external.offset, external.offset + 8), Field(relocationNode, 0))
+    relocationNode.addCell(0, 8)
+    val externalNode = Node(Some(this))
+    externalNode.allocationRegions.add(ExternalLocation(s"${external.name}"))
+    externalNode.flags.global = true
+    externalNode.flags.incomplete = true
+    relocationNode.cells(0).pointee = Some(Slice(externalNode.cells(0), 0))
   }
 
   // determine if an address is a global and return the corresponding global if it is.
