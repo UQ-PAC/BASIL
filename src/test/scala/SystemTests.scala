@@ -223,6 +223,14 @@ class DSAMemoryRegionSystemTestsGTIRB extends SystemTests {
   runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)), useBAPFrontend = false, expectVerify = false))
 }
 
+class MemoryRegionTestsDSA extends SystemTests {
+  // stack_pointer currently times out because Boogie is bad at handling abstract map accesses
+  runTests("memory_regions", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)), useBAPFrontend = true, expectVerify = true))
+}
+
+class MemoryRegionTestsNoRegion extends SystemTests {
+  runTests("memory_regions", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = true))
+}
 
 class ProcedureSummaryTests extends SystemTests {
   // TODO currently procedure_summary3 verifies despite incorrect procedure summary analysis
