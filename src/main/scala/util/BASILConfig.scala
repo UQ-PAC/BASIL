@@ -20,7 +20,8 @@ case class StaticAnalysisConfig(dumpILToPath: Option[String] = None,
                                 analysisDotPath: Option[String] = None,
                                 threadSplit: Boolean = false,
                                 summariseProcedures: Boolean = false,
-                                memoryRegions: Boolean = false)
+                                memoryRegions: Boolean = false,
+                                irreducibleLoops: Boolean = true)
 enum BoogieMemoryAccessMode:
   case SuccessiveStoreSelect, LambdaStoreSelect
 
