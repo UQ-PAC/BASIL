@@ -19,7 +19,7 @@ class MergedRegionMRA(private val nameIn: String, val subregions: mutable.Set[Me
   name = nameIn
 }
 
-class MergedRegionDSA(private val nameIn: String, val cell: Cell) extends MergedRegion {
+class MergedRegionDSA(private val nameIn: String, val cell: Cell, val stack: Boolean) extends MergedRegion {
   name = nameIn
 }
 
@@ -182,6 +182,9 @@ class RegionInjectorMRA(override val program: Program, mmm: MemoryModelMap) exte
 class RegionInjectorDSA(override val program: Program, DSATopDown: mutable.Map[Procedure, Graph]) extends RegionInjector {
   private val mergedRegions: mutable.Map[Cell, MergedRegionDSA] = mutable.Map()
 
+  private var sharedMemoryCounter = 0
+  private var stackCounter = 0
+
   def injectRegions(): Unit = {
     // visit reachable procedures
     val queue = mutable.Queue[Procedure]()
@@ -233,16 +236,19 @@ class RegionInjectorDSA(override val program: Program, DSATopDown: mutable.Map[P
   }
 
   private def createRegion(cell: Cell): MergedRegionDSA = {
-    val name = if (cell.node.isDefined) {
-      s"cell${cell.node.get.id}_${cell.offset}"
+    val stack = cell.node.get.flags.stack
+    val name = if (stack) {
+      stackCounter += 1
+      s"stack$$${stackCounter}"
     } else {
-      ???
+      sharedMemoryCounter += 1
+      s"mem$$${sharedMemoryCounter}"
     }
-    MergedRegionDSA(name, cell)
+    MergedRegionDSA(name, cell, stack)
   }
 
   private def replaceMemory(memory: Memory, mergedRegion: MergedRegionDSA): Memory = {
-    if (mergedRegion.cell.node.get.flags.stack) {
+    if (mergedRegion.stack) {
       StackMemory(mergedRegion.name, memory.addressSize, memory.valueSize)
     } else {
       SharedMemory(mergedRegion.name, memory.addressSize, memory.valueSize)
@@ -298,7 +304,7 @@ class RegionInjectorDSA(override val program: Program, DSATopDown: mutable.Map[P
   }
 
   override def sharedRegions(): Iterable[MergedRegion] = {
-    mergedRegions.values.filter(region => !region.cell.node.get.flags.stack)
+    mergedRegions.values.filter(region => !region.stack)
   }
 
 }
