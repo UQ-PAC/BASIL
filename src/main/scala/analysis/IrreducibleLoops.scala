@@ -75,7 +75,7 @@ object LoopDetector {
   }
 
   def identify_loops(entryBlock: Block): State = {
-    traverse_loops_dfs(State(), entryBlock, 1)._1
+    traverse_loops_dfs(State(), entryBlock, 1)
   }
 
   /*
@@ -83,11 +83,11 @@ object LoopDetector {
    */
   def identify_loops(cfg: Program): State = {
     cfg.procedures.toSet.map(_.entryBlock).flatten
-      .foldLeft(State())((st, eb) => (traverse_loops_dfs(st, eb, 1)._1))
+      .foldLeft(State())((st, eb) => traverse_loops_dfs(st, eb, 1))
   }
 
 
-  private def processVisitedNodeOutgoingEdge(istate: State, edge: LoopEdge, DFSPpos: Int): State = {
+  private def processVisitedNodeOutgoingEdge(istate: State, edge: LoopEdge): State = {
     var st = istate
     val from = edge.from
     if (st.nodeDFSPpos(edge.to) > 0) {
@@ -197,7 +197,7 @@ object LoopDetector {
    *          node into the target loop, making it irreducible, so we mark it as such.
    *
    */
-  private def traverse_loops_dfs(_istate: State, _b0: Block, _DFSPpos: Int): (State, Option[Block]) = {
+  private def traverse_loops_dfs(_istate: State, _b0: Block, _DFSPpos: Int): State = {
 
     /**
      * The recursion is flattened using a state machine operating over the stack of operations
@@ -258,7 +258,7 @@ object LoopDetector {
                 stack.push(sf.copy(istate = st, b0 = edge.to, pos = sf.pos + 1, action=Action.BeginProcessNode)) // process this successor 
               } else {
                 // (b-e) visited before: finish processing this edge
-                st = processVisitedNodeOutgoingEdge(st, edge, sf.pos)
+                st = processVisitedNodeOutgoingEdge(st, edge)
                 // continue iterating `processingEdges`
                 stack.push(sf.copy(istate = st, action = Action.ContinueDFS))
               }
@@ -284,7 +284,7 @@ object LoopDetector {
       }
     }
 
-    retval
+    retval._1
   }
 
   /** Sets the most inner loop header `h` for a given node `b`
