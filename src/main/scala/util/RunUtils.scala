@@ -640,7 +640,6 @@ object RunUtils {
     }
 
     if (q.loading.parameterForm) {
-
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
     } else {

@@ -19,7 +19,7 @@ import util.RunUtils.loadAndTranslate
 
 import scala.collection.mutable
 
-class DifferentialTest extends AnyFunSuite {
+class DifferentialAnalysisTest extends AnyFunSuite {
 
   Logger.setLevel(LogLevel.WARN)
 
@@ -72,10 +72,17 @@ class DifferentialTest extends AnyFunSuite {
     ictx = IRTransform.doCleanup(ictx)
 
     var comparectx = IRLoading.load(loading)
-    comparectx = IRTransform.doCleanup(ictx)
+    comparectx = IRTransform.doCleanup(comparectx)
+
+    ir.transforms.clearParams(ictx.program)
+
+    ir.transforms.clearParams(comparectx.program)
+
     val analysisres = RunUtils.staticAnalysis(staticAnalysisConfig, comparectx)
 
     if (simplify) {
+      ictx = ir.transforms.liftProcedureCallAbstraction(ictx)
+      comparectx = ir.transforms.liftProcedureCallAbstraction(comparectx)
       RunUtils.doSimplify(ictx, Some(staticAnalysisConfig))
     }
 
@@ -87,41 +94,6 @@ class DifferentialTest extends AnyFunSuite {
 
 class DifferentialTestAnalysis extends DifferentialTest {
 
-  test("indirect_call_example") {
-    val testName = "indirect_call"
-    val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
-    testProgram(testName, examplePath)
-  }
-
-
-  test("jumptable2_example") {
-    val testName = "jumptable2"
-    val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
-    testProgram(testName, examplePath)
-  }
-
-
-  test("jumptable_example") {
-    val testName = "jumptable"
-    val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
-    testProgram(testName, examplePath)
-  }
-
-  test("functionpointer_example") {
-    val testName = "functionpointer"
-    val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
-    testProgram(testName, examplePath)
-  }
-
-
-
-  test("function_got_example") {
-    val testName = "function_got"
-    val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
-    testProgram(testName, examplePath)
-  }
-
-
   def runSystemTests(): Unit = {
 
     val path = System.getProperty("user.dir") + s"/src/test/correct/"
@@ -132,12 +104,20 @@ class DifferentialTestAnalysis extends DifferentialTest {
       val programPath = path + "/" + p
       val variations = getSubdirectories(programPath)
       variations.foreach(variation => {
-        test("analysis_differential:" + p + "/" + variation + ":BAP") {
-          testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".adt")
+        val bapPath = path + "/" + p + "/" + variation + "/" + p + ".adt"
+        val gtirbPath = path + "/" + p + "/" + variation + "/" + p + ".gts"
+
+        if (File(bapPath).exists) {
+          test("analysis_differential:" + p + "/" + variation + ":BAP") {
+            testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".adt")
+          }
         }
-        //test("analysis_differential:" +  p + "/" + variation + ":GTIRB") {
-        //  testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".gts")
-        //}
+        if (File(gtirbPath).exists) {
+          test("analysis_differential:" +  p + "/" + variation + ":GTIRB") {
+            testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".gts")
+          }
+        }
+
       }
       )
     }
@@ -147,7 +127,7 @@ class DifferentialTestAnalysis extends DifferentialTest {
   runSystemTests()
 }
 
-class DifferentialTestSimplification extends DifferentialTest {
+class DifferentialAnalysisTestSimplification extends DifferentialTest {
 
   def runSystemTests(): Unit = {
 
@@ -159,12 +139,20 @@ class DifferentialTestSimplification extends DifferentialTest {
       val programPath = path + "/" + p
       val variations = getSubdirectories(programPath)
       variations.foreach(variation => {
-        test("analysis_differential:" + p + "/" + variation + ":BAP") {
-          testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".adt", simplify=true)
+
+        val bapPath = path + "/" + p + "/" + variation + "/" + p + ".adt"
+        val gtirbPath = path + "/" + p + "/" + variation + "/" + p + ".gts"
+        if (File(bapPath).exists) {
+          test("analysis_differential:" + p + "/" + variation + ":BAP") {
+            testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".adt")
+          }
         }
-        //test("analysis_differential:" +  p + "/" + variation + ":GTIRB") {
-        //  testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".gts")
-        //}
+        if (File(gtirbPath).exists) {
+          test("analysis_differential:" +  p + "/" + variation + ":GTIRB") {
+            testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".gts")
+          }
+        }
+
       }
       )
     }

@@ -18,6 +18,7 @@ sealed trait ExecutionContinuation
 case class Stopped() extends ExecutionContinuation /* normal program stop  */
 case class ErrorStop(error: InterpreterError) extends ExecutionContinuation /* program stop in error state */
 case class Run(next: Command) extends ExecutionContinuation /* continue by executing next command */
+case class ReturnTo(call: DirectCall) extends ExecutionContinuation /* continue by executing next command */
 case class Intrinsic(name: String) extends ExecutionContinuation /* a named intrinsic instruction */
 
 sealed trait InterpreterError
@@ -312,6 +313,7 @@ case class MemoryState(
 }
 
 object LibcIntrinsic {
+  // TODO: make parameter passing work
 
   /**
    * Part of the intrinsics implementation that lives above the Effects interface 

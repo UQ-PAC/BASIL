@@ -70,6 +70,16 @@ case object Eval {
     } yield (res)
   }
 
+  def evalLiteral[S, T <: Effects[S, InterpreterError]](f: T)(e: Expr): State[S, Literal, InterpreterError] = {
+    for {
+      res <- evalExpr(f)(e)
+      r <- State.pureE(res match {
+        case l: Literal => Right(l)
+        case _          => Left((Errored(s"Eval BV residual $e")))
+      })
+    } yield (r)
+  }
+
   def evalBV[S, T <: Effects[S, InterpreterError]](f: T)(e: Expr): State[S, BitVecLiteral, InterpreterError] = {
     for {
       res <- evalExpr(f)(e)
@@ -228,12 +238,11 @@ case object Eval {
 
   /** Helper functions * */
 
-  /**
-   * Load all memory cells from pointer until reaching cell containing 0.
-   * Ptr -> List[Bitvector]
-   */
-  def getNullTerminatedString[S, T <: Effects[S, InterpreterError]](f: T)
-    (rgn: String, src: BasilValue, acc: List[BitVecLiteral] = List()): State[S, List[BitVecLiteral], InterpreterError] =
+  /** Load all memory cells from pointer until reaching cell containing 0. Ptr -> List[Bitvector]
+    */
+  def getNullTerminatedString[S, T <: Effects[S, InterpreterError]](
+      f: T
+  )(rgn: String, src: BasilValue, acc: List[BitVecLiteral] = List()): State[S, List[BitVecLiteral], InterpreterError] =
     for {
       srv: BitVecLiteral <- src match {
         case Scalar(b: BitVecLiteral) => State.pure(b)
@@ -262,6 +271,7 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
       r: Boolean <- (next match {
         case Intrinsic(tgt)    => LibcIntrinsic.intrinsics(tgt)(f).map(_ => true)
         case Run(c: Statement) => interpretStatement(f)(c).map(_ => true)
+        case ReturnTo(c)       => interpretReturn(f)(c).map(_ => true)
         case Run(c: Jump)      => interpretJump(f)(c).map(_ => true)
         case Stopped()         => State.pure(false)
         case ErrorStop(e)      => State.pure(false)
@@ -297,16 +307,45 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
             case h :: tl  => State.setError(Errored(s"More than one jump guard satisfied $gt"))
           }
         } yield (res)
-      case r: Return      => f.doReturn()
+      case r: Return => {
+        // eval return values, return to caller, then bind return values to formal out params
+        for {
+          outs <- State.mapM(
+            ((bindout: (LocalVar, Expr)) => {
+              for {
+                rhs <- Eval.evalLiteral(f)(bindout._2)
+              } yield (bindout._1, rhs)
+            }),
+            r.outParams
+          )
+          _ <- f.doReturn()
+          _ <- State.sequence(State.pure(()), outs.map(m => f.storeVar(m._1.name, m._1.toBoogie.scope, Scalar(m._2))))
+        } yield ()
+      }
       case h: Unreachable => State.setError(EscapedControlFlow(h))
     }
+  }
+
+  def interpretReturn[S, T <: Effects[S, InterpreterError]](f: T)(s: DirectCall): State[S, Unit, InterpreterError] = {
+    for {
+      outs <- State.mapM(
+        ((bindout: (LocalVar, Variable)) => {
+          for {
+            rhs <- Eval.evalLiteral(f)(bindout._1)
+          } yield (bindout._2, rhs)
+        }),
+        s.outParams
+      )
+      c <- State.sequence(State.pure(()), outs.map(m => f.storeVar(m._1.name, m._1.toBoogie.scope, Scalar(m._2))))
+      _ <- f.setNext(Run(s.successor))
+    } yield (c)
   }
 
   def interpretStatement[S, T <: Effects[S, InterpreterError]](f: T)(s: Statement): State[S, Unit, InterpreterError] = {
     s match {
       case assign: LocalAssign => {
         for {
-          rhs <- Eval.evalBV(f)(assign.rhs)
+          rhs <- Eval.evalLiteral(f)(assign.rhs)
           st <- f.storeVar(assign.lhs.name, assign.lhs.toBoogie.scope, Scalar(rhs))
           n <- f.setNext(Run(s.successor))
         } yield (st)
@@ -347,14 +386,29 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
              })
         } yield (n)
       case dc: DirectCall => {
-        if (dc.target.entryBlock.isDefined) {
-          val block = dc.target.entryBlock.get
-          f.call(dc.target.name, Run(block.statements.headOption.getOrElse(block.jump)), Run(dc.successor))
-        } else if (LibcIntrinsic.intrinsics.contains(dc.target.name)) {
-          f.call(dc.target.name, Intrinsic(dc.target.name), Run(dc.successor))
-        } else {
-          State.setError(EscapedControlFlow(dc))
-        }
+        for {
+          actualParams <- State.mapM(
+            (p: (LocalVar, Expr)) =>
+              for {
+                v <- Eval.evalLiteral(f)(p._2)
+              } yield (p._1, v),
+            dc.actualParams
+          )
+          _ <- {
+            if (dc.target.entryBlock.isDefined) {
+              val block = dc.target.entryBlock.get
+              f.call(dc.target.name, Run(block.statements.headOption.getOrElse(block.jump)), ReturnTo(dc))
+            } else if (LibcIntrinsic.intrinsics.contains(dc.target.name)) {
+              f.call(dc.target.name, Intrinsic(dc.target.name), ReturnTo(dc))
+            } else {
+              State.setError(EscapedControlFlow(dc))
+            }
+          }
+          _ <- State.sequence(
+            State.pure(()),
+            actualParams.map(m => f.storeVar(m._1.name, m._1.toBoogie.scope, Scalar(m._2)))
+          )
+        } yield ()
       }
       case ic: IndirectCall => {
         if (ic.target == Register("R30", 64)) {
@@ -460,6 +514,9 @@ object InterpFuns {
       j <- s.storeVar("R31", Scope.Global, Scalar(SP))
       k <- s.storeVar("R29", Scope.Global, Scalar(FP))
       l <- s.storeVar("R30", Scope.Global, Scalar(LR))
+      j <- s.storeVar("R31_in", Scope.Global, Scalar(SP))
+      k <- s.storeVar("R29_in", Scope.Global, Scalar(FP))
+      l <- s.storeVar("R30_in", Scope.Global, Scalar(LR))
       l <- s.storeVar("R0", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       l <- s.storeVar("R1", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       _ <- s.storeVar("ghost-funtable", Scope.Global, BasilMapValue(Map.empty, MapType(BitVecType(64), BitVecType(64))))
@@ -503,10 +560,10 @@ object InterpFuns {
       _ <- State.pure(Logger.debug("INITIALISE MEMORY SECTIONS"))
       mem <- initMemory("mem", p.initialMemory.values)
       mem <- initMemory("stack", p.initialMemory.values)
-      mainfun = {
-        p.mainProcedure
-      }
+      mainfun = p.mainProcedure
+      r <- f.call("init_activation", Stopped(), Stopped()) // frame for main to return to
       r <- f.call(mainfun.name, Run(IRWalk.firstInBlock(mainfun.entryBlock.get)), Stopped())
+      l <- State.sequence(State.pure(()), mainfun.formalInParam.toList.map(i => f.storeVar(i.name, i.toBoogie.scope, Scalar(BitVecLiteral(0, size(i).get)))))
     } yield (r)
   }
 
