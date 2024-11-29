@@ -2,8 +2,8 @@ import analysis.data_structure_analysis.*
 import ir.*
 import org.scalatest.funsuite.AnyFunSuite
 import ir.dsl.*
-import specification.Specification
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, StaticAnalysisContext}
+import specification.{Specification, SpecGlobal}
+import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, StaticAnalysisContext, writeToFile}
 
 /**
  * This is the test suite for testing DSA functionality
@@ -659,4 +659,59 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     assert(dsg.find(dsg.stackMapping(24).cells(0)).getPointee.internalOffset == 0)
   }
 
+  test("overlapping accesses soundness") {
+    val mem = SharedMemory("mem", 64, 8)
+    val V0 = Register("V0", 128)
+    val xAddress = BitVecLiteral(2000, 64)
+    val yAddress = BitVecLiteral(3000, 64)
+    val xPointer = BitVecLiteral(1000, 64)
+    val yPointer = BitVecLiteral(1008, 64)
+    val globalOffsets = Map(xPointer.value -> xAddress.value, yPointer.value -> yAddress.value)
+    val x = SpecGlobal("x", 64, None, xAddress.value)
+    val y = SpecGlobal("y", 64, None, yAddress.value)
+    val globals = Set(x, y)
+
+    val load = MemoryLoad(V0, mem, xPointer, Endian.LittleEndian, 128, Some("001"))
+
+    val program = prog(
+      proc("main",
+        block("block",
+          load,
+          ret
+        )
+      )
+    )
+
+    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+
+    val spec = Specification(Set(), globals, Map(), List(), List(), List(), Set())
+    val context = IRContext(List(), Set(), globals, Set(), globalOffsets, spec, program)
+    val staticAnalysisResult = RunUtils.staticAnalysis(StaticAnalysisConfig(), context)
+
+    val dsg = staticAnalysisResult.topDownDSA(program.mainProcedure)
+
+    val V0pointee = dsg.adjust(dsg.varToCell(load)(V0))
+
+    val xPointerField = dsg.globalMapping(AddressRange(1000, 1008))
+    val yPointerField = dsg.globalMapping(AddressRange(1008, 1016))
+
+    val xPointerCell = xPointerField.node.cells(xPointerField.offset)
+    val yPointerCell = yPointerField.node.cells(yPointerField.offset)
+
+    // for this to be sound, the location 1000, the location 1008, and V0 should all point to a collapsed node which
+    // represents x and y
+
+    assert(xPointerCell.pointee.isDefined)
+    assert(dsg.adjust(xPointerCell.pointee.get).equals(V0pointee))
+
+    assert(yPointerCell.pointee.isDefined)
+    assert(dsg.adjust(yPointerCell.pointee.get).equals(V0pointee))
+
+    val node = V0pointee.node
+    assert(node.isDefined)
+    assert(node.get.collapsed)
+
+  }
 }
