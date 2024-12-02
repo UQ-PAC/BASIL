@@ -26,17 +26,18 @@ trait GlobalRegionAnalysis(val program: Program,
 
   private val dataMap: mutable.HashMap[BigInt, DataRegion] = mutable.HashMap()
 
-  private def dataPoolMaster(offset: BigInt, size: BigInt): DataRegion = {
+  private def dataPoolMaster(offset: BigInt, size: BigInt, convertSize: Boolean = true): DataRegion = {
     assert(size >= 0)
+    val givenSize: Int = if (convertSize) (size.toDouble / 8).ceil.toInt else size.toInt
     if (dataMap.contains(offset)) {
-      if (dataMap(offset).size < (size.toDouble / 8).ceil.toInt) {
-        dataMap(offset) = DataRegion(dataMap(offset).regionIdentifier, offset, (size.toDouble / 8).ceil.toInt)
+      if (dataMap(offset).size < givenSize) {
+        dataMap(offset) = DataRegion(dataMap(offset).regionIdentifier, offset, givenSize)
         dataMap(offset)
       } else {
         dataMap(offset)
       }
     } else {
-      dataMap(offset) = DataRegion(nextDataCount(), offset, (size.toDouble / 8).ceil.toInt)
+      dataMap(offset) = DataRegion(nextDataCount(), offset, givenSize)
       dataMap(offset)
     }
   }
@@ -96,17 +97,17 @@ trait GlobalRegionAnalysis(val program: Program,
             return Set()
           }
           val uses = getUse(variable, n, reachingDefs)
-          return uses.flatMap(i => getVSAHints(variable, i))
+          return uses.flatMap(i => getVSAHints(variable, subAccess, i))
         case _ => Set()
       }
     }
   }
 
-  def getVSAHints(variable: Variable, n: CFGPosition): Set[DataRegion] = {
+  def getVSAHints(variable: Variable, subAccess: BigInt, n: CFGPosition): Set[DataRegion] = {
     val collage: Set[DataRegion] = vsaResult.get(n) match {
       case Some(Lift(el)) =>
         el.getOrElse(variable, Set()).flatMap {
-          case AddressValue(dataRegion2: DataRegion) => Some(dataRegion2)
+          case AddressValue(dataRegion2: DataRegion) => Some(dataPoolMaster(dataRegion2.start, subAccess))
           case _ => Set()
         }
       case _ => Set()
@@ -135,11 +136,11 @@ trait GlobalRegionAnalysis(val program: Program,
       } else if (accesses.size == 1) {
         if (f.contains(accesses.head)) {
           // full access
-          dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(accesses.head.size))
+          dataPoolMaster(i.start, i.size, false)
           converted = converted ++ Set(dataMap(i.start))
         } else {
           // partial access (we cannot determine the size)
-          dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size)
+          dataPoolMaster(i.start, i.size, false)
           converted = converted ++ Set(dataMap(i.start))
         }
       } else {
@@ -147,7 +148,7 @@ trait GlobalRegionAnalysis(val program: Program,
   //        dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(highestRegion.end - i.start))
   //        dataMap(i.start)
         dataMap.remove(i.start)
-        accesses.foreach(a => dataMap(a.start) = dataPoolMaster(a.start, a.size))
+        accesses.foreach(a => dataPoolMaster(a.start, a.size, false))
         converted = converted ++ accesses.collect({ case a => dataMap(a.start) })
       }
     }
