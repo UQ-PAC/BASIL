@@ -267,7 +267,7 @@ class RegionInjectorDSA(override val program: Program, DSATopDown: mutable.Map[P
       if (mergedRegions.contains(cell)) {
         program.initialMemoryLookup(range.start) match {
           case Some(section) =>
-            val size = (range.end - range.start).toInt
+            val size = cell.largestAccessedSize
             val bytes = section.getBytes(range.start, size)
             // should probably check that region is entirely contained within section but shouldn't happen in practice?
             val newSection = MemorySection(mergedRegions(cell).name, range.start, size, bytes, section.readOnly, Some(mergedRegions(cell)))
