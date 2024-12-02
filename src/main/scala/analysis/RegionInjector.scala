@@ -263,7 +263,7 @@ class RegionInjectorDSA(override val program: Program, DSATopDown: mutable.Map[P
     // need to check if nodes match too
 
     dsg.globalMapping.foreach { (range, field) =>
-      val cell = dsg.find(field.node.cells(0))
+      val cell = dsg.find(field.node.getCell(field.offset))
       if (mergedRegions.contains(cell)) {
         program.initialMemoryLookup(range.start) match {
           case Some(section) =>
