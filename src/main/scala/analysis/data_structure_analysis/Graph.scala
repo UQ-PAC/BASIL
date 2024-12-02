@@ -116,7 +116,7 @@ class Graph(val proc: Procedure,
       val node = Node(Some(this), byteSize)
       node.allocationRegions.add(StackLocation(s"Stack_${proc}_$offset", proc, byteSize))
       node.flags.stack = true
-      node.addCell(0, 0)
+      node.addCell(0, byteSize)
       stackMapping.update(offset, node)
       lastOffset = offset
     else
