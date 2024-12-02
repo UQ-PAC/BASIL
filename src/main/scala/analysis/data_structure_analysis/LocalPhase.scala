@@ -195,23 +195,26 @@ class LocalPhase(proc: Procedure,
     val diff = pointer.offset - lhsOrValue.offset
     val startPointerOffset = pointer.offset // starting offset for the dereference
     val lhsNode = lhsOrValue.node.get
-//
-//
-//    // collect all cells that are being dereferenced
-//    val pointers = pointer.node.get.cells.filter((offset, _) => offset >= startPointerOffset && offset < startPointerOffset + size).toSeq.sortBy((offset, cell) => offset)
-//    for (((offset, cell), i) <- pointers.zipWithIndex) { // iterate and merge each pointee at correct offset it lhs/value cell
-//      val lhs = lhsNode.addCell(offset - diff, 0) // todo check if 0 is the right size
-//      // update the access size of the pointer
-//      graph.find(cell).growSize(if i < pointers.size - 1 then (pointers(i + 1)._1 - offset - diff).toInt else (size - (offset - diff)).toInt)
-//      val res = graph.mergeCells(lhs, graph.adjust(graph.find(cell).getPointee))
-//       graph.handleOverlapping(res)
-//    }
 
-    val collapse = pointer.node.get.cells.filter((offset, _) => offset >= startPointerOffset && offset < startPointerOffset + size).toSeq.sortBy((offset, cell) => offset).size != 1
-    pointer.growSize(size)
-    graph.selfCollapse(pointer.node.get)
-    if collapse then graph.collapseNode(graph.find(graph.find(pointer).getPointee.node).node)
-    graph.mergeCells(lhsOrValue, graph.adjust(graph.find(pointer).getPointee))
+    //
+//
+    // collect all cells that are being dereferenced
+    val pointers = pointer.node.get.cells.filter((offset, _) => offset >= startPointerOffset && offset < startPointerOffset + size).toSeq.sortBy((offset, cell) => offset)
+    if pointers.size > 1 then
+      graph.collapseNode(lhsNode)
+    for (((offset, cell), i) <- pointers.zipWithIndex) { // iterate and merge each pointee at correct offset it lhs/value cell
+      val lhs = lhsNode.addCell(offset - diff, 0) // todo check if 0 is the right size
+      // update the access size of the pointer
+      graph.find(cell).growSize(if i < pointers.size - 1 then (pointers(i + 1)._1 - offset - diff).toInt else (size - (offset - diff)).toInt)
+      val res = graph.mergeCells(lhs, graph.adjust(graph.find(cell).getPointee))
+       graph.handleOverlapping(res)
+    }
+
+//    val collapse = pointer.node.get.cells.filter((offset, _) => offset >= startPointerOffset && offset < startPointerOffset + size).toSeq.sortBy((offset, cell) => offset).size != 1
+//    pointer.growSize(size)
+//    graph.selfCollapse(pointer.node.get)
+//    if collapse then graph.collapseNode(graph.find(graph.find(pointer).getPointee.node).node)
+//    graph.mergeCells(lhsOrValue, graph.adjust(graph.find(pointer).getPointee))
   }
 
 

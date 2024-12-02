@@ -63,15 +63,14 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val stack72 = dsg.get(dsg.stackMapping(72).cells(0)) //  R31 + 0x40 + 8
     val stack16 = dsg.get(dsg.stackMapping(16).cells(0)) //  R31 + 40
     val stack32 = dsg.get(dsg.stackMapping(32).cells(0)) //  R31 + 32
-    val stack24 = dsg.get(dsg.stackMapping(16).addCell(8, 0)) //  R31 + 24 and Malloc merged together with R31 + 16
+    val stack24 = dsg.get(dsg.stackMapping(16).cells(8)) //  R31 + 24 and Malloc merged together with R31 + 16
 
     assert(dsg.adjust(stack64.getPointee).equals(R29formal)) // R31 points to the frame pointer
     assert(dsg.adjust(stack72.getPointee).equals(dsg.adjust(dsg.formals(R30)))) // R31 + 8 points to the link register
-
+    assert(stack24 != stack16)
     // overlapping access
     assert(dsg.adjust(stack16.getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0))))
     assert(dsg.adjust(stack24.getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
-    assert(stack24 == stack16)
 
 //    assert(!dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).equals(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
     assert(dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).equals(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
