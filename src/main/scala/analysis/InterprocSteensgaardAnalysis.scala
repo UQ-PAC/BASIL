@@ -2,7 +2,7 @@ package analysis
 
 import analysis.solvers.{Cons, Term, UnionFindSolver, Var}
 import ir.*
-import util.Logger
+import util.SteensLogger
 import scala.collection.mutable
 
 /** Wrapper for variables so we can have Steensgaard-specific equals method indirectly
@@ -142,7 +142,7 @@ class InterprocSteensgaardAnalysis(
   }
 
   private def unify(t1: Term[StTerm], t2: Term[StTerm]): Unit = {
-    //Logger.info(s"univfying constraint $t1 = $t2\n")
+    //SteensLogger.info(s"univfying constraint $t1 = $t2\n")
     solver.unify(t1, t2)
     // note that unification cannot fail, because there is only one kind of term constructor and no constants
   }
@@ -152,8 +152,8 @@ class InterprocSteensgaardAnalysis(
   def pointsTo(): Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]] = {
     val solution = solver.solution()
     val unifications = solver.unifications()
-    Logger.debug(s"Solution: \n${solution.mkString(",\n")}\n")
-    Logger.debug(s"Sets: \n${unifications.values.map { s => s"{ ${s.mkString(",")} }"}.mkString(", ")}")
+    SteensLogger.debug(s"Solution: \n${solution.mkString(",\n")}\n")
+    SteensLogger.debug(s"Sets: \n${unifications.values.map { s => s"{ ${s.mkString(",")} }"}.mkString(", ")}")
 
     val vars = solution.keys.collect { case id: IdentifierVariable => id }
     val emptyMap = Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]]()
@@ -164,7 +164,7 @@ class InterprocSteensgaardAnalysis(
       }.toSet
       a + (v.id -> pt)
     }
-    Logger.debug(s"\nPoints-to:\n${pointsto.map((k, v) => s"$k -> { ${v.mkString(",")} }").mkString("\n")}\n")
+    SteensLogger.debug(s"\nPoints-to:\n${pointsto.map((k, v) => s"$k -> { ${v.mkString(",")} }").mkString("\n")}\n")
     pointsto
   }
 }

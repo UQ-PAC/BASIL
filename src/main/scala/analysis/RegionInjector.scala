@@ -2,7 +2,6 @@ package analysis
 
 import ir.eval.BitVectorEval.isNegative
 import ir.*
-import util.Logger
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer

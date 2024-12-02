@@ -28,8 +28,10 @@ object Main {
       lambdaStores: Flag,
       @arg(name = "boogie-procedure-rg", doc = "Switch version of procedure rely/guarantee checks to emit. (function|ifblock)")
       procedureRG: Option[String],
-      @arg(name = "verbose", short = 'v', doc = "Show extra debugging logs.")
+      @arg(name = "verbose", short = 'v', doc = "Show extra debugging logs (the same as -vl log)")
       verbose: Flag,
+      @arg(name = "vl", doc = s"Show extra debugging logs for a specific logger (${Logger.allLoggers.map(_.name).mkString(", ")}).")
+      verboseLog: Seq[String] = Seq(),
       @arg(name = "analyse", doc = "Run static analysis pass.")
       analyse: Flag,
       @arg(name = "interpret", doc = "Run BASIL IL interpreter.")
@@ -79,7 +81,19 @@ object Main {
 
     Logger.setLevel(LogLevel.INFO)
     if (conf.verbose.value) {
-      Logger.setLevel(LogLevel.DEBUG)
+        Logger.setLevel(LogLevel.DEBUG, true)
+    }
+    for (v <- conf.verboseLog) {
+        Logger.findLoggerByName(v) match {
+            case None => throw Exception(s"Unknown logger: '${v}': allowed are ${Logger.allLoggers.map(_.name).mkString(", ")}")
+            case Some(v) => v.setLevel(LogLevel.DEBUG, true)
+        }
+    }
+
+    if (conf.analysisResults.isDefined || conf.analysisResultsDot.isDefined) {
+        DebugDumpIRLogger.setLevel(LogLevel.INFO)
+    } else {
+        DebugDumpIRLogger.setLevel(LogLevel.OFF)
     }
 
     val rely = conf.procedureRG match {

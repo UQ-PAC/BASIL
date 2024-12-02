@@ -1,7 +1,7 @@
 package ir.transforms
 import translating.serialiseIL
 
-import util.Logger
+import util.SimplifyLogger
 import ir.eval.AlgebraicSimplifications
 import ir.eval.AssumeConditionSimplifications
 import ir.eval.simplifyExprFixpoint
@@ -28,7 +28,7 @@ def difftestLiveVars(p: Procedure, compareResult: Map[CFGPosition, Set[Variable]
     val c = (compareResult(b) == s)
     passed = passed && c
     if (!c) {
-      Logger.error(
+      SimplifyLogger.error(
         s"LiveVars unequal ${b.label}: ${compareResult(b)} == $s (differing ${compareResult(b).diff(s)})"
       )
     }
@@ -365,7 +365,7 @@ def copypropTransform(p: Procedure) = {
   // val dom = ConstCopyProp()
   // val solver = worklistSolver(dom)
 
-  // Logger.info(s"${p.name} ExprComplexity ${ExprComplexity()(p)}")
+  // SimplifyLogger.info(s"${p.name} ExprComplexity ${ExprComplexity()(p)}")
   // val result = solver.solveProc(p, true).withDefaultValue(dom.bot)
   val result = CopyProp.DSACopyProp(p)
   val solve = t.checkPoint("Solve CopyProp")
@@ -381,20 +381,20 @@ def copypropTransform(p: Procedure) = {
   }
 
   val xf = t.checkPoint("transform")
-  // Logger.info(s"    ${p.name} after transform expr complexity ${ExprComplexity()(p)}")
+  // SimplifyLogger.info(s"    ${p.name} after transform expr complexity ${ExprComplexity()(p)}")
 
   visit_proc(CleanupAssignments(), p)
   t.checkPoint("redundant assignments")
-  // Logger.info(s"    ${p.name} after dead var cleanup expr complexity ${ExprComplexity()(p)}")
+  // SimplifyLogger.info(s"    ${p.name} after dead var cleanup expr complexity ${ExprComplexity()(p)}")
 
   AlgebraicSimplifications(p)
   AssumeConditionSimplifications(p)
 
   AlgebraicSimplifications(p)
-  // Logger.info(s"    ${p.name}  after simp expr complexity ${ExprComplexity()(p)}")
+  // SimplifyLogger.info(s"    ${p.name}  after simp expr complexity ${ExprComplexity()(p)}")
   val sipm = t.checkPoint("algebraic simp")
 
-  // Logger.info("[!] Simplify :: RemoveSlices")
+  // SimplifyLogger.info("[!] Simplify :: RemoveSlices")
   removeSlices(p)
   ir.eval.cleanupSimplify(p)
   AlgebraicSimplifications(p)
@@ -470,13 +470,13 @@ def doCopyPropTransform(p: Program) = {
 
   applyRPO(p)
 
-  Logger.info("[!] Simplify :: Expr/Copy-prop Transform")
+  SimplifyLogger.info("[!] Simplify :: Expr/Copy-prop Transform")
   val work = p.procedures
     .filter(_.blocks.size > 0)
     .map(p =>
       p -> //Future
         {
-          Logger
+          SimplifyLogger
             .debug(s"CopyProp Transform ${p.name} (${p.blocks.size} blocks, expr complexity ${ExprComplexity()(p)})")
           copypropTransform(p)
         }
@@ -488,16 +488,16 @@ def doCopyPropTransform(p: Program) = {
       job
     } catch {
       case e => {
-        Logger.error("Simplify :: CopyProp " + p.name + ": " + e.toString)
+        SimplifyLogger.error("Simplify :: CopyProp " + p.name + ": " + e.toString)
       }
     }
   })
 
-  Logger.info("[!] Simplify :: Dead variable elimination")
+  SimplifyLogger.info("[!] Simplify :: Dead variable elimination")
 
   // cleanup
   visit_prog(CleanupAssignments(), p)
-  Logger.info("[!] Simplify :: Merge empty blocks")
+  SimplifyLogger.info("[!] Simplify :: Merge empty blocks")
 
   removeEmptyBlocks(p)
   coalesceBlocks(p)
@@ -912,7 +912,7 @@ class Simplify(
       val bl = s"${block.parent.name}::${block.label}"
       if (!skipped.contains(bl)) {
         skipped = skipped + bl
-        Logger.warn(s"Some skipped substitution at $bl due to resulting expr size > ${threshold} threshold")
+        SimplifyLogger.warn(s"Some skipped substitution at $bl due to resulting expr size > ${threshold} threshold")
       }
     }
     ChangeDoChildrenPost(result, x => x)

@@ -7,7 +7,8 @@ import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import scala.collection.immutable
-import util.Logger
+import util.VSALogger
+
 
 /** ValueSets are PowerSet of possible values */
 trait Value
@@ -68,7 +69,7 @@ trait ValueSetAnalysis(program: Program,
                 case Some(v: Variable) =>
                   s + (localAssign.lhs -> s(v))
                 case None =>
-                  Logger.debug(s"Too Complex: ${localAssign.rhs}") // do nothing
+                  VSALogger.debug(s"Too Complex: ${localAssign.rhs}") // do nothing
                   s
               }
           }
@@ -84,7 +85,7 @@ trait ValueSetAnalysis(program: Program,
             case Some(v: Variable) =>
               s + (load.lhs -> s(v))
             case None =>
-              Logger.debug(s"Too Complex: ${load.index}") // do nothing
+              VSALogger.debug(s"Too Complex: ${load.index}") // do nothing
               s
           }
         }
@@ -105,7 +106,7 @@ trait ValueSetAnalysis(program: Program,
               case Some(v: Variable) =>
                 s ++ regions.map(r => r -> s(v))
               case None =>
-                Logger.debug(s"Too Complex: $store.value") // do nothing
+                VSALogger.debug(s"Too Complex: $store.value") // do nothing
                 s
             }
         }

@@ -6,6 +6,7 @@ import util.functional.*
 import util.functional.State.*
 import boogie.Scope
 import scala.collection.WithFilter
+import translating.PrettyPrinter.*
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -34,10 +35,7 @@ case class MemoryError(message: String = "") extends InterpreterError /* An erro
 /* Concrete value type of the interpreter. */
 sealed trait BasilValue(val irType: Option[IRType])
 case class Scalar(value: Literal) extends BasilValue(Some(value.getType)) {
-  override def toString = value match {
-    case b: BitVecLiteral => "0x%x:bv%d".format(b.value, b.size)
-    case c                => c.toString
-  }
+  override def toString = pp_expr(value)
 }
 
 /* Abstract callable function address */

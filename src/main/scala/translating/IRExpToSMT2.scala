@@ -53,7 +53,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
   def vblock(b: Block): Repr[Block] = vblock(b.label, b.statements.toList.map(vstmt), vjump(b.jump))
   def vproc(p: Procedure): Repr[Procedure] = vproc(
     p.name,
-    p.formalInParam.toList.map(vrvar),
+    p.formalInParam.toList.map(vlvar),
     p.formalOutParam.toList.map(vlvar),
     p.entryBlock.map(vblock),
     (p.blocks.toSet -- p.entryBlock.toSet -- p.returnBlock.toSet).toList.sortBy( x => -x.rpoOrder).map(vblock),

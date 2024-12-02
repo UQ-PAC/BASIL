@@ -19,7 +19,7 @@ import util.RunUtils.loadAndTranslate
 
 import scala.collection.mutable
 
-class DifferentialAnalysisTest extends AnyFunSuite {
+class DifferentialTest extends AnyFunSuite {
 
   Logger.setLevel(LogLevel.WARN)
 
@@ -92,7 +92,7 @@ class DifferentialAnalysisTest extends AnyFunSuite {
 }
 
 
-class DifferentialTestAnalysis extends DifferentialTest {
+class DifferentialAnalysisTest extends DifferentialTest {
 
   def runSystemTests(): Unit = {
 

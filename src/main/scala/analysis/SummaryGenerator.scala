@@ -3,7 +3,6 @@ package analysis
 import analysis.*
 import ir.*
 import boogie.*
-import util.Logger
 import boogie.SpecGlobal
 
 /**

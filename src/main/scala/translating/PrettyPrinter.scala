@@ -3,6 +3,19 @@ import ir.*
 import scala.collection.mutable
 
 
+object PrettyPrinter {
+  def pp_expr(e: Expr) = BasilIRPrettyPrinter()(e)
+  def pp_stmt(s: Statement) = BasilIRPrettyPrinter()(s)
+  def pp_cmd(c: Command) = c match {
+    case j: Jump => pp_jump(j)
+    case j: Statement => pp_stmt(j)
+  }
+  def pp_block(s: Block) = BasilIRPrettyPrinter()(s)
+  def pp_jump(s: Jump) = BasilIRPrettyPrinter()(s)
+  def pp_prog(s: Program) = BasilIRPrettyPrinter()(s)
+  def pp_proc(s: Procedure) = BasilIRPrettyPrinter()(s)
+}
+
 case class BST[+T](val v: String) {
   def ++(s: String) = BST(v ++ s)
   override def toString = v
@@ -37,7 +50,7 @@ class BasilIRPrettyPrinter() extends BasilIR[BST] {
   }
 
   override def vblock(label: String, statements: List[BST[Statement]], terminator: BST[Jump]): BST[Block] = {
-    BST(s"${blockIndent}block ${label} {\n"
+    BST(s"${blockIndent}block \"${label}\" {\n"
     ++ statements.map(statementIndent + _ + ";").mkString("\n") 
     ++ "\n" ++ statementIndent + terminator + ";\n"
     ++ blockIndent + "}")
@@ -86,13 +99,12 @@ class BasilIRPrettyPrinter() extends BasilIR[BST] {
     BST(s"(${outParams.map((l,r) => l).mkString(", ")}) := call $procname (${inparams.map((l,r) => r).mkString(", ")});")
   }
 
-
   override def vindirect(target: BST[Variable]): BST[IndirectCall] = BST(s"indirect_call(${target})")
   override def vassert(body: BST[Expr]): BST[Assert] = BST(s"assert($body)")
   override def vassume(body: BST[Expr]): BST[Assume] = BST(s"assume($body)")
   override def vnop(): BST[NOP] = BST("nop")
 
-  override def vgoto(t: List[String]): BST[GoTo] = BST(s"goto(${t.mkString(", ")})")
+  override def vgoto(t: List[String]): BST[GoTo] = BST(s"goto(${t.map('"' + _ + '"').mkString(", ")})")
   override def vunreachable(): BST[Unreachable] = BST("unreachable")
   override def vreturn(outs: List[(BST[Variable], BST[Expr])]) = BST(s"return (${outs.map((l, r) => r).mkString(", ")})")
 
@@ -103,17 +115,15 @@ class BasilIRPrettyPrinter() extends BasilIR[BST] {
     case _ => ???
   }
 
-  override def vrvar(e: Variable): BST[Variable] = vlvar(e) 
+  override def vrvar(e: Variable): BST[Variable] =  BST(e.name)
   override def vlvar(e: Variable): BST[Variable] = {
-    if (seenVars.contains(e)) {
-      BST(e.name)
-    } else {
-      seenVars.add(e)
-      BST(e.name + s": ${vtype(e.getType)}")
+    e match {
+      case l: LocalVar => BST("var " + e.name + s": ${vtype(e.getType)}")
+      case _ => BST(e.name)
     }
   }
 
-  override def vextract(ed: Int, start: Int, a: BST[Expr]): BST[Expr] = BST(s"${a}[$ed:$start]")
+  override def vextract(ed: Int, start: Int, a: BST[Expr]): BST[Expr] = BST(s"extract($ed, $start, ${a})")
   override def vzeroextend(bits: Int, b: BST[Expr]): BST[Expr]  = BST(s"zero_extend($bits, $b)")
   override def vsignextend(bits: Int, b: BST[Expr]): BST[Expr] = BST(s"sign_extend($bits, $b)")
   override def vrepeat(reps: Int, b: BST[Expr]) = BST(s"repeat($reps, $b)")
@@ -130,8 +140,6 @@ class BasilIRPrettyPrinter() extends BasilIR[BST] {
   override def vintlit(i: BigInt) = BST("0x%x".format(i))
   override def vbvlit(i: BitVecLiteral) = BST("0x%x".format(i.value) + s"bv${i.size}")
   override def vuninterp_function(name: String, args: Seq[BST[Expr]]): BST[Expr] = BST(s"$name(${args.mkString(", ")})")
-
-
 }
 
 
