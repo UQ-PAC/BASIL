@@ -59,33 +59,34 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
 
     // cells representing the stack at various offsets
-    val stack64 = dsg.find(dsg.stackMapping(64).cells(0)) // R31 + 0x40
-    val stack72 = dsg.find(dsg.stackMapping(72).cells(0)) //  R31 + 0x40 + 8
-    val stack16 = dsg.find(dsg.stackMapping(16).cells(0)) //  R31 + 40
-    val stack32 = dsg.find(dsg.stackMapping(32).cells(0)) //  R31 + 32
-    val stack24 = dsg.find(dsg.stackMapping(16).cells(8)) //  R31 + 24 and Malloc
+    val stack64 = dsg.get(dsg.stackMapping(64).cells(0)) // R31 + 0x40
+    val stack72 = dsg.get(dsg.stackMapping(72).cells(0)) //  R31 + 0x40 + 8
+    val stack16 = dsg.get(dsg.stackMapping(16).cells(0)) //  R31 + 40
+    val stack32 = dsg.get(dsg.stackMapping(32).cells(0)) //  R31 + 32
+    val stack24 = dsg.get(dsg.stackMapping(16).addCell(8, 0)) //  R31 + 24 and Malloc merged together with R31 + 16
 
     assert(dsg.adjust(stack64.getPointee).equals(R29formal)) // R31 points to the frame pointer
     assert(dsg.adjust(stack72.getPointee).equals(dsg.adjust(dsg.formals(R30)))) // R31 + 8 points to the link register
 
     // overlapping access
-    assert(dsg.adjust(stack16.getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0))))
-    assert(dsg.adjust(stack24.getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
+    assert(dsg.adjust(stack16.getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0))))
+    assert(dsg.adjust(stack24.getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
+    assert(stack24 == stack16)
 
-//    assert(!dsg.find(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).equals(dsg.find(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
-    assert(dsg.find(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).equals(dsg.find(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
-    assert(dsg.find(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).node.get.equals(dsg.find(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0)).node.get))
+//    assert(!dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).equals(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
+    assert(dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).equals(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
+    assert(dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).node.get.equals(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0)).node.get))
 
-    assert(dsg.find(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).offset.equals(0))
-    assert(dsg.find(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0)).offset.equals(0))
-//    assert(dsg.find(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0)).offset.equals(8))
+    assert(dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).offset.equals(0))
+    assert(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0)).offset.equals(0))
+//    assert(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0)).offset.equals(8))
 
-    assert(dsg.adjust(dsg.SSAVar("%00000429$1", "R8")).equals(dsg.find(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0))))
-    assert(dsg.adjust(dsg.SSAVar("%00000438$1", "R8")).equals(dsg.find(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
+    assert(dsg.adjust(dsg.SSAVar("%00000429$1", "R8")).equals(dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0))))
+    assert(dsg.adjust(dsg.SSAVar("%00000438$1", "R8")).equals(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
 
 
 
-    assert(dsg.adjust(stack32.getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1916, 1916 + 20)).node.cells(0))))
+    assert(dsg.adjust(stack32.getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(1916, 1916 + 20)).node.cells(0))))
 
   }
 
@@ -100,7 +101,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val dsgCallee = results.analysis.get.localDSA(program.nameToProcedure("set_fields"))
     // dsg.formals(R29) is the slice representing formal R29
 
-    val stack8Pointee = dsgCallee.adjust(dsgCallee.find(dsgCallee.stackMapping(8).cells(0)).getPointee)
+    val stack8Pointee = dsgCallee.adjust(dsgCallee.get(dsgCallee.stackMapping(8).cells(0)).getPointee)
     val R0formal = dsgCallee.adjust(dsgCallee.formals(R0))
     val paramNode = R0formal.node.get
 
@@ -114,22 +115,22 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
     // Local Caller
     val dsgCaller = results.analysis.get.localDSA(program.mainProcedure)
-    val stack32 = dsgCaller.find(dsgCaller.stackMapping(32).cells(0))
-    val stack48 = dsgCaller.find(dsgCaller.stackMapping(48).cells(0))
+    val stack32 = dsgCaller.get(dsgCaller.stackMapping(32).cells(0))
+    val stack48 = dsgCaller.get(dsgCaller.stackMapping(48).cells(0))
 
     assert(stack32.node.get != stack48.node.get)
 
 
     // topdown Caller
     val dsg = results.analysis.get.bottomUpDSA(program.mainProcedure)
-    val stack32Final = dsg.find(dsg.stackMapping(32).cells(0))
+    val stack32Final = dsg.get(dsg.stackMapping(32).cells(0))
     val stack32FinalNode = stack32Final.node.get
-    val stack48Final = dsg.find(dsg.stackMapping(48).cells(0))
+    val stack48Final = dsg.get(dsg.stackMapping(48).cells(0))
 
 //    assert(stack0Final.largestAccessedSize == 24)
     assert(stack32Final.node.get == stack48Final.node.get)
-    assert(dsg.find(stack32Final.node.get.cells(0)) == stack32Final)
-    assert(dsg.find(stack32Final.node.get.cells(16)) == stack48Final)
+    assert(dsg.get(stack32Final.node.get.cells(0)) == stack32Final)
+    assert(dsg.get(stack32Final.node.get.cells(16)) == stack48Final)
 
   }
 
@@ -143,7 +144,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     // Local Caller
     val dsgCaller = results.analysis.get.localDSA(program.mainProcedure)
     assert(dsgCaller.find(dsgCaller.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells.size == 1)
-    assert(dsgCaller.find(dsgCaller.globalMapping(AddressRange(131096, 131096 + 24)).node.cells(0)).largestAccessedSize == 8)
+    assert(dsgCaller.get(dsgCaller.globalMapping(AddressRange(131096, 131096 + 24)).node.cells(0)).largestAccessedSize == 8)
 
 
 //    // topdown Caller
@@ -162,8 +163,8 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val program = results.ir.program
     val dsg = results.analysis.get.localDSA(program.mainProcedure)
 
-    val stack16 = dsg.find(dsg.stackMapping(16).cells(0))
-    val stack32 = dsg.find(dsg.stackMapping(32).cells(0))
+    val stack16 = dsg.get(dsg.stackMapping(16).cells(0))
+    val stack32 = dsg.get(dsg.stackMapping(32).cells(0))
     assert(!dsg.stackMapping.keys.toSet.contains(24))
 
     val node = stack16.node.get
@@ -201,11 +202,11 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val R29formal = dsg.adjust(dsg.formals(R29))
 
     // cells representing the stack at various offsets
-    val stack0 = dsg.find(dsg.stackMapping(0).cells(0)) // R31
-    val stack8 = dsg.find(dsg.stackMapping(8).cells(0)) //  R31 + 8
-    val stack40 = dsg.find(dsg.stackMapping(40).cells(0))//  R31 + 40
-    val stack32 = dsg.find(dsg.stackMapping(32).cells(0)) //  R31 + 32
-    val stack24 = dsg.find(dsg.stackMapping(24).cells(0)) //  R31 + 24 and Malloc
+    val stack0 = dsg.get(dsg.stackMapping(0).cells(0)) // R31
+    val stack8 = dsg.get(dsg.stackMapping(8).cells(0)) //  R31 + 8
+    val stack40 = dsg.get(dsg.stackMapping(40).cells(0))//  R31 + 40
+    val stack32 = dsg.get(dsg.stackMapping(32).cells(0)) //  R31 + 32
+    val stack24 = dsg.get(dsg.stackMapping(24).cells(0)) //  R31 + 24 and Malloc
 
     assert(dsg.adjust(stack0.getPointee).equals(R29formal)) // R31 points to the frame pointer
     assert(dsg.adjust(stack8.getPointee).equals(dsg.adjust(dsg.formals(R30)))) // R31 + 8 points to the link register
@@ -230,7 +231,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     assert(dsg.adjust(stack24.getPointee).equals(stack24)) // 00000466, R31 + 32 and R31 + 24 pointees are merged
 
     // __stack_chk_guard's pointee is also pointed to by stack40
-    assert(dsg.find(dsg.adjust(stack40.getPointee)).equals(dsg.find(dsg.adjust(dsg.find(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69600)).node.cells(0).getPointee)).getPointee))))
+    assert(dsg.get(dsg.adjust(stack40.getPointee)).equals(dsg.get(dsg.adjust(dsg.get(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69600)).node.cells(0).getPointee)).getPointee))))
 
   }
   */
@@ -240,17 +241,17 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     // global mappings
 
     // jump_table relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69624 + 8)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69624 + 8)).node.cells(0).getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0))))
     // add_two relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1940, 1940 + 36)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0).getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(1940, 1940 + 36)).node.cells(0))))
     // add_six relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1976, 1976 + 36)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(8).getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(1976, 1976 + 36)).node.cells(0))))
     // sub_seven relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2012, 2012 + 36)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(16).getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(2012, 2012 + 36)).node.cells(0))))
     // main relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69608 + 8)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2048, 2048 + 76)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69608 + 8)).node.cells(0).getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(2048, 2048 + 76)).node.cells(0))))
     // x relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69592, 69592 + 8)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69592, 69592 + 8)).node.cells(0).getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0))))
   }
 
   test("local jumptable2 callees") {
@@ -269,7 +270,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
       // all three load value of x
       // the analysis doesn't know if x is a pointer or not therefore assumes it is for soundness
       // arbitrary pointer is used in arithmetic causing collapse
-      assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee).node.get.collapsed)
+      assert(dsg.adjust(dsg.get(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee).node.get.collapsed)
     }
   }
 
@@ -278,10 +279,10 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
     val program = results.ir.program
     val dsg = results.analysis.get.localDSA(program.mainProcedure)
-    val stack0 = dsg.find(dsg.stackMapping(0).cells(0))
-    val stack8 = dsg.find(dsg.stackMapping(8).cells(0))
-    val stack16 = dsg.find(dsg.stackMapping(16).cells(0))
-    val stack28 = dsg.find(dsg.stackMapping(28).cells(0))
+    val stack0 = dsg.get(dsg.stackMapping(0).cells(0))
+    val stack8 = dsg.get(dsg.stackMapping(8).cells(0))
+    val stack16 = dsg.get(dsg.stackMapping(16).cells(0))
+    val stack28 = dsg.get(dsg.stackMapping(28).cells(0))
     assert(dsg.adjust(stack0.getPointee).equals(dsg.adjust(dsg.formals(R29))))
     assert(dsg.adjust(stack8.getPointee).equals(dsg.adjust(dsg.formals(R30))))
     assert(dsg.adjust(stack16.getPointee).equals(dsg.adjust(dsg.formals(R1)))) // input args
@@ -291,7 +292,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     assertJumptable2Globals(dsg)
 
     // x should not be collapsed in the main function's local graph
-    assert(!dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee.node.collapsed)
+    assert(!dsg.get(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee.node.collapsed)
   }
 
   test("unsafe pointer arithmetic") {
@@ -301,13 +302,13 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val dsg = results.analysis.get.localDSA(program.mainProcedure)
 
     // stackX is the pointee of stack object at position X instead of the stack object itself
-    val stack0 = dsg.adjust(dsg.find(dsg.stackMapping(0).cells(0)).getPointee)
-    val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
-    val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)
-    val stack32 = dsg.adjust(dsg.find(dsg.stackMapping(32).cells(0)).getPointee)
-    val stack40 = dsg.adjust(dsg.find(dsg.stackMapping(40).cells(0)).getPointee)
-    val stack48 = dsg.adjust(dsg.find(dsg.stackMapping(48).cells(0)).getPointee)
-    val stack56 = dsg.adjust(dsg.find(dsg.stackMapping(56).cells(0)).getPointee)
+    val stack0 = dsg.adjust(dsg.get(dsg.stackMapping(0).cells(0)).getPointee)
+    val stack8 = dsg.adjust(dsg.get(dsg.stackMapping(8).cells(0)).getPointee)
+    val stack24 = dsg.adjust(dsg.get(dsg.stackMapping(24).cells(0)).getPointee)
+    val stack32 = dsg.adjust(dsg.get(dsg.stackMapping(32).cells(0)).getPointee)
+    val stack40 = dsg.adjust(dsg.get(dsg.stackMapping(40).cells(0)).getPointee)
+    val stack48 = dsg.adjust(dsg.get(dsg.stackMapping(48).cells(0)).getPointee)
+    val stack56 = dsg.adjust(dsg.get(dsg.stackMapping(56).cells(0)).getPointee)
 
     assert(stack0.equals(dsg.adjust(dsg.formals(R29))))
     assert(stack8.equals(dsg.adjust(dsg.formals(R30))))
@@ -319,8 +320,8 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     assert(stack24.node.get.allocationRegions.head.asInstanceOf[HeapLocation].size == 20)
 
     // stack24 and stack40 should be pointing to the same cell at different internal offsets
-    val unadjustedStack24Pointee = dsg.find(dsg.stackMapping(24).cells(0)).getPointee
-    val unadjustedStack40Pointee = dsg.find(dsg.stackMapping(40).cells(0)).getPointee
+    val unadjustedStack24Pointee = dsg.get(dsg.stackMapping(24).cells(0)).getPointee
+    val unadjustedStack40Pointee = dsg.get(dsg.stackMapping(40).cells(0)).getPointee
     assert(unadjustedStack24Pointee.cell.equals(unadjustedStack40Pointee.cell))
     assert(unadjustedStack40Pointee.internalOffset == 1) // result of unsafe pointer arithmetic
     assert(unadjustedStack24Pointee.internalOffset == 0)
@@ -339,11 +340,11 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
     val dsg = results.analysis.get.localDSA(program.mainProcedure)
-    val stack0 = dsg.adjust(dsg.find(dsg.stackMapping(0).cells(0)).getPointee)
-    val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
-    val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)
-    val stack32 = dsg.adjust(dsg.find(dsg.stackMapping(32).cells(0)).getPointee)
-    val stack40 = dsg.adjust(dsg.find(dsg.stackMapping(40).cells(0)).getPointee)
+    val stack0 = dsg.adjust(dsg.get(dsg.stackMapping(0).cells(0)).getPointee)
+    val stack8 = dsg.adjust(dsg.get(dsg.stackMapping(8).cells(0)).getPointee)
+    val stack24 = dsg.adjust(dsg.get(dsg.stackMapping(24).cells(0)).getPointee)
+    val stack32 = dsg.adjust(dsg.get(dsg.stackMapping(32).cells(0)).getPointee)
+    val stack40 = dsg.adjust(dsg.get(dsg.stackMapping(40).cells(0)).getPointee)
 
     assert(stack0.equals(dsg.adjust(dsg.formals(R29))))
     assert(stack8.equals(dsg.adjust(dsg.formals(R30))))
@@ -362,8 +363,8 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
     val dsg = results.analysis.get.localDSA(program.nameToProcedure("callee"))
-    val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
-    val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)
+    val stack8 = dsg.adjust(dsg.get(dsg.stackMapping(8).cells(0)).getPointee)
+    val stack24 = dsg.adjust(dsg.get(dsg.stackMapping(24).cells(0)).getPointee)
 
     // stack8 points to the formal argument object
     assert(stack8.equals(dsg.adjust(dsg.formals(R0))))
@@ -395,7 +396,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val dsg: Graph = results.localDSA(program.mainProcedure)
 
     // R6 and R7 address the same cell (overlapping cells in the same node that are merged)
-    assert(dsg.find(dsg.varToCell(locAssign1)(R6)).cell.equals(dsg.find(dsg.varToCell(locAssign2)(R7)).cell))
+    assert(dsg.get(dsg.varToCell(locAssign1)(R6)).equals(dsg.get(dsg.varToCell(locAssign2)(R7))))
 
     // outgoing edges of R6 and R7 are unified since the cells are merged
     // object of formals R1 and R2 are written to overlapping fields of the same node (R6, R7); causing them to be merged together
@@ -432,7 +433,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val results = runAnalysis(program)
     val dsg: Graph = results.localDSA(program.mainProcedure)
     // check that R5 points to separate cell at offset 13
-    assert(dsg.find(dsg.varToCell(locAssign3)(R5)).offset == 13)
+    assert(dsg.get(dsg.varToCell(locAssign3)(R5)).offset == 13)
   }
 
   test("offsetting from middle of cell to the same cell") {
@@ -458,14 +459,14 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
     val results = runAnalysis(program)
     val dsg: Graph = results.localDSA(program.mainProcedure)
-    assert(dsg.find(dsg.formals(R1)).equals(dsg.find(dsg.formals(R2))))
-    assert(dsg.find(dsg.varToCell(locAssign1)(R6)).cell.equals(dsg.find(dsg.varToCell(locAssign2)(R7)).cell))
-    assert(dsg.find(dsg.varToCell(locAssign1)(R6)).cell.equals(dsg.find(dsg.varToCell(locAssign3)(R5)).cell))
+    assert(dsg.get(dsg.formals(R1)).equals(dsg.get(dsg.formals(R2))))
+    assert(dsg.get(dsg.varToCell(locAssign1)(R6)).equals(dsg.get(dsg.varToCell(locAssign2)(R7))))
+    assert(dsg.get(dsg.varToCell(locAssign1)(R6)).equals(dsg.get(dsg.varToCell(locAssign3)(R5))))
     assert(dsg.find(dsg.varToCell(locAssign1)(R6)).internalOffset == 0)
     assert(dsg.find(dsg.varToCell(locAssign2)(R7)).internalOffset == 1)
     assert(dsg.find(dsg.varToCell(locAssign3)(R5)).internalOffset == 8)
-    assert(dsg.find(dsg.varToCell(locAssign1)(R6)).cell.pointee.isDefined)
-    assert(dsg.find(dsg.find(dsg.varToCell(locAssign1)(R6)).cell.getPointee).equals(dsg.find(dsg.formals(R1))))
+    assert(dsg.get(dsg.varToCell(locAssign1)(R6)).pointee.isDefined)
+    assert(dsg.get(dsg.get(dsg.varToCell(locAssign1)(R6)).getPointee).equals(dsg.get(dsg.formals(R1))))
   }
 
   test("internal offset transfer") {
@@ -492,7 +493,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val results = runAnalysis(program)
 
     val dsg: Graph = results.localDSA(program.mainProcedure)
-    assert(dsg.find(dsg.varToCell(locAssign2)(R7)).equals(dsg.find(dsg.varToCell(locAssign3)(R5))))
+    assert(dsg.get(dsg.varToCell(locAssign2)(R7)).equals(dsg.get(dsg.varToCell(locAssign3)(R5))))
   }
 
   // bottom up tests
@@ -514,7 +515,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
       // all three load value of x
       // the analysis doesn't know if x is a pointer or not therefore assumes it is for soundness
       // arbitrary pointer is used in arithmetic causing collapse
-      assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee).node.get.collapsed)
+      assert(dsg.adjust(dsg.get(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee).node.get.collapsed)
     }
   }
 
@@ -523,10 +524,10 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val program = results.ir.program
     val dsg = results.analysis.get.bottomUpDSA(program.mainProcedure)
 
-    val framePointer = dsg.find(dsg.stackMapping(0).cells(0))
-    val stack8 = dsg.find(dsg.stackMapping(8).cells(0))
-    val stack16 = dsg.find(dsg.stackMapping(16).cells(0))
-    val stack28 = dsg.find(dsg.stackMapping(28).cells(0))
+    val framePointer = dsg.get(dsg.stackMapping(0).cells(0))
+    val stack8 = dsg.get(dsg.stackMapping(8).cells(0))
+    val stack16 = dsg.get(dsg.stackMapping(16).cells(0))
+    val stack28 = dsg.get(dsg.stackMapping(28).cells(0))
     assert(dsg.adjust(framePointer.getPointee).equals(dsg.adjust(dsg.formals(R29))))
     assert(dsg.adjust(stack8.getPointee).equals(dsg.adjust(dsg.formals(R30))))
     assert(dsg.adjust(stack16.getPointee).equals(dsg.adjust(dsg.formals(R1))))
@@ -536,7 +537,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     assertJumptable2Globals(dsg)
 
     // bottom-up x now should be collapsed since it was collapsed in callees
-    assert(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee.node.collapsed)
+    assert(dsg.get(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee.node.collapsed)
   }
 
   ignore("bottom up interproc pointer arithmetic callee") {
@@ -544,8 +545,8 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
     val dsg = results.analysis.get.bottomUpDSA(program.nameToProcedure("callee"))
-    val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
-    val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)
+    val stack8 = dsg.adjust(dsg.get(dsg.stackMapping(8).cells(0)).getPointee)
+    val stack24 = dsg.adjust(dsg.get(dsg.stackMapping(24).cells(0)).getPointee)
 
     assert(stack8.equals(dsg.adjust(dsg.formals(R0))))
     assert(stack8.offset == 0)
@@ -557,11 +558,11 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val program = results.ir.program
     val dsg = results.analysis.get.bottomUpDSA(program.mainProcedure)
 
-    val stack0 = dsg.adjust(dsg.find(dsg.stackMapping(0).cells(0)).getPointee)
-    val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
-    val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)
-    val stack32 = dsg.adjust(dsg.find(dsg.stackMapping(32).cells(0)).getPointee)
-    val stack40 = dsg.adjust(dsg.find(dsg.stackMapping(40).cells(0)).getPointee)
+    val stack0 = dsg.adjust(dsg.get(dsg.stackMapping(0).cells(0)).getPointee)
+    val stack8 = dsg.adjust(dsg.get(dsg.stackMapping(8).cells(0)).getPointee)
+    val stack24 = dsg.adjust(dsg.get(dsg.stackMapping(24).cells(0)).getPointee)
+    val stack32 = dsg.adjust(dsg.get(dsg.stackMapping(32).cells(0)).getPointee)
+    val stack40 = dsg.adjust(dsg.get(dsg.stackMapping(40).cells(0)).getPointee)
 
     // same as the local graph with the difference that stack40 points to cell at
     // a different of the same node as pointees of stack32 and stack24
@@ -573,9 +574,9 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     assert(stack40.pointee.isDefined)
     assert(stack40.node.get.equals(stack24.node.get))
     assert(stack40.offset == 32)
-    assert(dsg.find(dsg.stackMapping(40).cells(0)).getPointee.internalOffset == 0)
-    assert(dsg.find(dsg.stackMapping(32).cells(0)).getPointee.internalOffset == 0)
-    assert(dsg.find(dsg.stackMapping(24).cells(0)).getPointee.internalOffset == 0)
+    assert(dsg.get(dsg.stackMapping(40).cells(0)).getPointee.internalOffset == 0)
+    assert(dsg.get(dsg.stackMapping(32).cells(0)).getPointee.internalOffset == 0)
+    assert(dsg.get(dsg.stackMapping(24).cells(0)).getPointee.internalOffset == 0)
   }
 
   // top down tests
@@ -586,10 +587,10 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val dsg = results.analysis.get.topDownDSA(program.mainProcedure)
 //    assert(dsg.pointTo.size == 13) // 13
 
-    val framePointer = dsg.find(dsg.stackMapping(0).cells(0))
-    val stack8 = dsg.find(dsg.stackMapping(8).cells(0))
-    val stack16 = dsg.find(dsg.stackMapping(16).cells(0))
-    val stack28 = dsg.find(dsg.stackMapping(28).cells(0))
+    val framePointer = dsg.get(dsg.stackMapping(0).cells(0))
+    val stack8 = dsg.get(dsg.stackMapping(8).cells(0))
+    val stack16 = dsg.get(dsg.stackMapping(16).cells(0))
+    val stack28 = dsg.get(dsg.stackMapping(28).cells(0))
     assert(dsg.adjust(framePointer.getPointee).equals(dsg.adjust(dsg.formals(R29))))
     assert(dsg.adjust(stack8.getPointee).equals(dsg.adjust(dsg.formals(R30))))
     assert(dsg.adjust(stack16.getPointee).equals(dsg.adjust(dsg.formals(R1))))
@@ -597,7 +598,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     assertJumptable2Globals(dsg)
 
     // bottom-up
-    assert(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee.node.collapsed)
+    assert(dsg.get(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee.node.collapsed)
 
   }
 
@@ -616,7 +617,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
       // all three load value of x
       // the analysis doesn't know if x is a pointer or not therefore assumes it is for soundness
       // arbitrary pointer is used in arithmetic causing collapse
-      assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69652)).node.cells(0)).getPointee).node.get.collapsed)
+      assert(dsg.adjust(dsg.get(dsg.globalMapping(AddressRange(69648, 69652)).node.cells(0)).getPointee).node.get.collapsed)
     }
   }
 
@@ -625,8 +626,8 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val program = results.ir.program
     val dsg = results.analysis.get.topDownDSA(program.nameToProcedure("callee"))
 
-    val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
-    val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)
+    val stack8 = dsg.adjust(dsg.get(dsg.stackMapping(8).cells(0)).getPointee)
+    val stack24 = dsg.adjust(dsg.get(dsg.stackMapping(24).cells(0)).getPointee)
 
     // callee should now have different offsets due to formal and actual input parameters being unified
     assert(stack8.equals(dsg.adjust(dsg.formals(R0))))
@@ -640,11 +641,11 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val program = results.ir.program
     val dsg = results.analysis.get.topDownDSA(program.mainProcedure)
 
-    val stack0 = dsg.adjust(dsg.find(dsg.stackMapping(0).cells(0)).getPointee)
-    val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
-    val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)
-    val stack32 = dsg.adjust(dsg.find(dsg.stackMapping(32).cells(0)).getPointee)
-    val stack40 = dsg.adjust(dsg.find(dsg.stackMapping(40).cells(0)).getPointee)
+    val stack0 = dsg.adjust(dsg.get(dsg.stackMapping(0).cells(0)).getPointee)
+    val stack8 = dsg.adjust(dsg.get(dsg.stackMapping(8).cells(0)).getPointee)
+    val stack24 = dsg.adjust(dsg.get(dsg.stackMapping(24).cells(0)).getPointee)
+    val stack32 = dsg.adjust(dsg.get(dsg.stackMapping(32).cells(0)).getPointee)
+    val stack40 = dsg.adjust(dsg.get(dsg.stackMapping(40).cells(0)).getPointee)
 
     assert(stack0.equals(dsg.adjust(dsg.formals(R29))))
     assert(stack8.equals(dsg.adjust(dsg.formals(R30))))
@@ -654,9 +655,9 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     assert(stack40.pointee.isDefined)
     assert(stack40.node.get.equals(stack24.node.get))
     assert(stack40.offset == 32)
-    assert(dsg.find(dsg.stackMapping(40).cells(0)).getPointee.internalOffset == 0)
-    assert(dsg.find(dsg.stackMapping(32).cells(0)).getPointee.internalOffset == 0)
-    assert(dsg.find(dsg.stackMapping(24).cells(0)).getPointee.internalOffset == 0)
+    assert(dsg.get(dsg.stackMapping(40).cells(0)).getPointee.internalOffset == 0)
+    assert(dsg.get(dsg.stackMapping(32).cells(0)).getPointee.internalOffset == 0)
+    assert(dsg.get(dsg.stackMapping(24).cells(0)).getPointee.internalOffset == 0)
   }
 
   test("overlapping accesses soundness") {
@@ -697,8 +698,8 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val xPointerField = dsg.globalMapping(AddressRange(1000, 1008))
     val yPointerField = dsg.globalMapping(AddressRange(1008, 1016))
 
-    val xPointerCell = xPointerField.node.cells(xPointerField.offset)
-    val yPointerCell = yPointerField.node.cells(yPointerField.offset)
+    val xPointerCell = xPointerField.node.getCell(xPointerField.offset)
+    val yPointerCell = yPointerField.node.getCell(yPointerField.offset)
 
     // for this to be sound, the location 1000, the location 1008, and V0 should all point to a collapsed node which
     // represents x and y

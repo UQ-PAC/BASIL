@@ -553,6 +553,18 @@ class Graph(val proc: Procedure,
   }
 
   def find(slice: Slice): Slice = deadjust(adjust(slice))
+  
+  def get(cell: Cell): Cell = {
+    val newCell = find(cell)
+    selfCollapse(newCell.node.get)
+    newCell.node.get.getCell(newCell.offset)
+  }
+
+  def get(slice: Slice): Cell = {
+    val newCell = adjust(find(slice))
+    selfCollapse(newCell.node.get)
+    newCell.node.get.getCell(newCell.offset)
+  }
 
   /**
     * merges two cells and unifies their nodes
@@ -867,7 +879,7 @@ class Graph(val proc: Procedure,
       if !idToNode.contains(finalNode.id) then
         val newNode = finalNode.cloneSelf(newGraph)
         idToNode.update(finalNode.id, newNode)
-      newGraph.globalMapping.update(range, Field(idToNode(finalNode.id), cell.offset + (node.getCell(offset).offset - offset)))
+      newGraph.globalMapping.update(range, Field(idToNode(finalNode.id), cell.offset + (offset - finalNode.getCell(offset).offset)))
     }
 
     val queue = mutable.Queue[Node]()
