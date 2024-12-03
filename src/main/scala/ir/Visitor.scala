@@ -409,7 +409,7 @@ class Renamer(reserved: Set[String]) extends Visitor {
 
 class ExternalRemover(external: Set[String]) extends Visitor {
   override def visitProcedure(node: Procedure): Procedure = {
-    if (external.contains(node.name)) {
+    if (external.contains(node.procName)) {
       // update the modifies set before removing the body
       node.modifies.addAll(node.blocks.flatMap(_.modifies))
       node.replaceBlocks(Seq())
