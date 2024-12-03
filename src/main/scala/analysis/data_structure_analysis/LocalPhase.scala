@@ -274,7 +274,7 @@ class LocalPhase(proc: Procedure,
             case _ =>
               unsupportedPointerArithmeticOperation(n, expr, lhsCell)
         
-      case MemoryLoad(lhs, _, index, _, size, _) => // Rx = Mem[Ry], merge Rx and pointee of Ry (E(Ry))
+      case load @ MemoryLoad(lhs, _, index, _, size, _) => // Rx = Mem[Ry], merge Rx and pointee of Ry (E(Ry))
         val indexUnwrapped = unwrapPaddingAndSlicing(index)
         val lhsCell = graph.adjust(graph.varToCell(n)(lhs))
         assert(size % 8 == 0)
@@ -282,9 +282,13 @@ class LocalPhase(proc: Procedure,
         lhsCell.node.get.flags.read = true
         val global = isGlobal(indexUnwrapped, n, byteSize)
         val stack = isStack(indexUnwrapped, n)
+        val indexCell = graph.adjust(graph.accessIndexToSlice(load))
+        assert(!indexCell.node.get.flags.merged) // check index cell is a placeholder
         if global.isDefined then
+          graph.mergeCells(graph.find(global.get), indexCell)
           graph.mergeCells(lhsCell, graph.adjust(graph.find(global.get).getPointee))
         else if stack.isDefined then
+          graph.mergeCells(graph.find(stack.get), indexCell)
           graph.mergeCells(lhsCell, graph.adjust(graph.find(stack.get).getPointee))
         else
           indexUnwrapped match
@@ -293,6 +297,7 @@ class LocalPhase(proc: Procedure,
                 case Some(v) =>
                   //                        assert(varToSym(n).contains(arg1))
                   val offset = v.value
+                  visitPointerArithmeticOperation(n, indexCell, arg1, byteSize, false, offset)
                   visitPointerArithmeticOperation(n, lhsCell, arg1, byteSize, true, offset)
                 case None =>
                   //                        assert(varToSym(n).contains(arg1))
@@ -301,43 +306,51 @@ class LocalPhase(proc: Procedure,
                   unsupportedPointerArithmeticOperation(n, indexUnwrapped, Node(Some(graph)).cells(0))
             case arg: Variable =>
               //                    assert(varToSym(n).contains(arg))
+              visitPointerArithmeticOperation(n, indexCell, arg, byteSize)
               visitPointerArithmeticOperation(n, lhsCell, arg, byteSize, true)
             case _ => ???
-      case MemoryStore(_, ind, expr, _, size, _) =>
+      case store @ MemoryStore(_, ind, expr, _, size, _) =>
+        val index: Expr = unwrapPaddingAndSlicing(ind)
+        assert(size % 8 == 0)
+        val byteSize = size / 8
+        val global = isGlobal(index, n, byteSize)
+        val stack = isStack(index, n)
+        val indexCell = graph.adjust(graph.accessIndexToSlice(store))
+        assert(!indexCell.node.get.flags.merged) // check index cell is a placeholder
+        val addressPointee: Cell = if (global.isDefined) {
+          graph.mergeCells(graph.find(global.get), indexCell)
+          graph.adjust(graph.find(global.get).getPointee)
+        } else if (stack.isDefined) {
+          graph.mergeCells(graph.find(stack.get), indexCell)
+          graph.adjust(graph.find(stack.get).getPointee)
+        } else {
+            index match {
+              case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) =>
+                evaluateExpression(arg2, constProp(n)) match {
+                  case Some(v) =>
+                    //                    assert(varToSym(n).contains(arg1))
+                    val offset = v.value
+                    visitPointerArithmeticOperation(n, indexCell, arg1, byteSize, false, offset)
+                    visitPointerArithmeticOperation(n, Node(Some(graph)).cells(0), arg1, byteSize, true, offset)
+                  case None =>
+                    //                    assert(varToSym(n).contains(arg1))
+                    // collapse the results
+                    // visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg1, byteSize, true, 0, true)
+                    unsupportedPointerArithmeticOperation(n, index, Node(Some(graph)).cells(0))
+                }
+              case arg: Variable =>
+                //                assert(varToSym(n).contains(arg))
+                visitPointerArithmeticOperation(n, indexCell, arg, byteSize, false)
+                visitPointerArithmeticOperation(n, Node(Some(graph)).cells(0), arg, byteSize, true)
+              case _ =>
+                ???
+            }
+        }
         val unwrapped = unwrapPaddingAndSlicing(expr)
         unwrapped match {
           // Mem[Ry] = Rx
           case value: Variable =>
-            val index: Expr = unwrapPaddingAndSlicing(ind)
             reachingDefs(n)(value).foreach(visit)
-            assert(size % 8 == 0)
-            val byteSize = size / 8
-            val global = isGlobal(index, n, byteSize)
-            val stack = isStack(index, n)
-            val addressPointee: Cell =
-              if global.isDefined then
-                graph.adjust(graph.find(global.get).getPointee)
-              else if stack.isDefined then
-                graph.adjust(graph.find(stack.get).getPointee)
-              else
-                index match
-                  case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) =>
-                    evaluateExpression(arg2, constProp(n)) match
-                      case Some(v) =>
-                        //                    assert(varToSym(n).contains(arg1))
-                        val offset = v.value
-                        visitPointerArithmeticOperation(n, Node(Some(graph)).cells(0), arg1, byteSize, true, offset)
-                      case None =>
-                        //                    assert(varToSym(n).contains(arg1))
-                        // collapse the results
-                        // visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg1, byteSize, true, 0, true)
-                        unsupportedPointerArithmeticOperation(n, index, Node(Some(graph)).cells(0))
-                  case arg: Variable =>
-                    //                assert(varToSym(n).contains(arg))
-                    visitPointerArithmeticOperation(n, Node(Some(graph)).cells(0), arg, byteSize, true)
-                  case _ =>
-                    ???
-
             addressPointee.node.get.flags.modified = true
             val valueCells = graph.getCells(n, value)
             val result = valueCells.foldLeft(addressPointee) { (c, slice) =>
