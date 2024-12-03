@@ -40,6 +40,7 @@ case class SpecGlobal(override val name: String, override val size: Int, arraySi
 
 case class SpecGamma(global: SpecGlobal) extends SpecVar {
   override val address = global.address
+  val size = global.size
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitSpecGamma(this)
 }
 

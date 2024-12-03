@@ -114,7 +114,7 @@ class Graph(val proc: Procedure,
     val byteSize = stackAccesses(offset)
     if offset >= nextValidOffset then
       val node = Node(Some(this), byteSize)
-      node.allocationRegions.add(StackLocation(s"Stack_${proc}_$offset", proc, byteSize))
+      node.allocationRegions.add(StackLocation(s"Stack_${proc.name}_$offset", proc, byteSize))
       node.flags.stack = true
       node.addCell(0, 0)
       stackMapping.update(offset, node)
@@ -243,11 +243,17 @@ class Graph(val proc: Procedure,
   }
 
   externalFunctions.foreach { external =>
-    val node = Node(Some(this))
-    node.allocationRegions.add(DataLocation(external.name, external.offset, 0))
-    node.flags.global = true
-    node.flags.incomplete = true
-    globalMapping.update(AddressRange(external.offset, external.offset), Field(node, 0))
+    val relocationNode = Node(Some(this))
+    relocationNode.allocationRegions.add(DataLocation(s"${external.name}_relocation", external.offset, 8))
+    relocationNode.flags.global = true
+    relocationNode.flags.incomplete = true
+    globalMapping.update(AddressRange(external.offset, external.offset + 8), Field(relocationNode, 0))
+    relocationNode.addCell(0, 8)
+    val externalNode = Node(Some(this))
+    externalNode.allocationRegions.add(ExternalLocation(s"${external.name}"))
+    externalNode.flags.global = true
+    externalNode.flags.incomplete = true
+    relocationNode.cells(0).pointee = Some(Slice(externalNode.cells(0), 0))
   }
 
   // determine if an address is a global and return the corresponding global if it is.
@@ -274,8 +280,6 @@ class Graph(val proc: Procedure,
 
     }
     global.sortBy(f => f.addressRange.start)
-
-
 
   def getGlobal(address: BigInt, size: Int): Option[Cell] = {
     val globals = getGlobals(address, size)
@@ -332,8 +336,11 @@ class Graph(val proc: Procedure,
     nodes.clear()
     pointsto.clear()
     nodes.addAll(formals.values.map(n => find(n.cell.node.get).node))
-    varToCell.values.foreach {
-      value => nodes.addAll(value.values.map(n => find(n.cell.node.get).node))
+    varToCell.values.foreach { value =>
+      nodes.addAll(value.values.map(n => find(n.cell.node.get).node))
+    }
+    accessIndexToSlice.values.foreach { slice =>
+      nodes.add(find(slice.cell.node.get).node)
     }
     nodes.addAll(stackMapping.values.map(n => find(n).node))
     nodes.addAll(globalMapping.values.map(n => find(n.node).node))
@@ -357,6 +364,7 @@ class Graph(val proc: Procedure,
 
   def toDot: String = {
     collectNodes()
+    val toRemove = Set('$', '#', '%')
 
     val structs = ArrayBuffer[DotStruct]()
     val arrows = ArrayBuffer[StructArrow]()
@@ -366,11 +374,8 @@ class Graph(val proc: Procedure,
     }
 
     formals.keys.foreach { variable =>
-      var varName = variable.name
-      if (varName.startsWith("#")) {
-        varName = s"LocalVar_${varName.drop(1)}"
-      }
-      structs.append(DotStruct(s"Formal_${varName}", s"Formal_${varName}", None))
+      val varName = variable.name.filterNot(toRemove)
+      structs.append(DotStruct(s"Formal_$varName", s"Formal_$varName", None))
     }
 
     pointsto.foreach { (cell, pointee) =>
@@ -381,23 +386,17 @@ class Graph(val proc: Procedure,
 
     formals.foreach { (variable, slice) =>
       val value = find(slice)
-      arrows.append(StructArrow(DotStructElement(s"Formal_${variable.name}", None), DotStructElement(value.node.id.toString, Some(value.cell.offset.toString)), value.internalOffset.toString))
+      arrows.append(StructArrow(DotStructElement(s"Formal_${variable.name.filterNot(toRemove)}", None), DotStructElement(value.node.id.toString, Some(value.cell.offset.toString)), value.internalOffset.toString))
     }
 
     varToCell.foreach { (pos, mapping) =>
-      var id = pos match {
+      var id = (pos match {
         case p: Procedure => p.name
         case b: Block => b.label
         case c: Command => c.label.getOrElse("")
-      }
-      if (id.startsWith("%")) {
-        id = id.drop(1)
-      }
+      }).filterNot(toRemove)
       mapping.foreach { (variable, slice) =>
-        var varName = variable.name
-        if (varName.startsWith("#")) {
-          varName = s"LocalVar_${varName.drop(1)}"
-        }
+        val varName = variable.name.filterNot(toRemove)
         structs.append(DotStruct(s"SSA_${id}_$varName", s"SSA_${pos}_$varName", None, false))
         val value = find(slice)
         arrows.append(StructArrow(DotStructElement(s"SSA_${id}_$varName", None), DotStructElement(value.node.id.toString, Some(value.cell.offset.toString)), value.internalOffset.toString))
@@ -553,7 +552,7 @@ class Graph(val proc: Procedure,
   }
 
   def find(slice: Slice): Slice = deadjust(adjust(slice))
-  
+
   def get(cell: Cell): Cell = {
     val newCell = find(cell)
     selfCollapse(newCell.node.get)
@@ -812,6 +811,23 @@ class Graph(val proc: Procedure,
     varToCell
   }
 
+  val accessIndexToSlice: mutable.Map[Statement, Slice] = accessIndexToSliceInit(proc)
+
+  private def accessIndexToSliceInit(proc: Procedure): mutable.Map[Statement, Slice] = {
+    val accessIndexToSlice = mutable.Map[Statement, Slice]()
+    val domain = computeDomain(IntraProcIRCursor, Set(proc))
+    domain.foreach {
+      case load: MemoryLoad =>
+        val node = Node(Some(this))
+        accessIndexToSlice(load) = Slice(node.cells(0), 0)
+      case store: MemoryStore =>
+        val node = Node(Some(this))
+        accessIndexToSlice(store) = Slice(node.cells(0), 0)
+      case _ =>
+    }
+    accessIndexToSlice
+  }
+
   def SSAVar(posLabel:String, varName: String): Slice = {
     assert(posLabel.matches("%[0-9]{8}?\\$\\d"))
 
@@ -827,15 +843,15 @@ class Graph(val proc: Procedure,
     map(variable)
   }
 
-
   def cloneSelf(): Graph = {
     val newGraph = Graph(proc, constProp, varToSym, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params)
     assert(formals.size == newGraph.formals.size)
     val nodes = mutable.Set[Node]()
     val idToNode: mutable.Map[Int, Node] = mutable.Map()
-    formals.foreach { (variable, slice) =>
+    formals.foreach { (variable, s) =>
       //        assert(newGraph.formals.contains(variable))
-      val node = find(slice).node
+      val slice = find(s)
+      val node = slice.node
       nodes.add(node)
       if !idToNode.contains(node.id) then
         val newNode = node.cloneSelf(newGraph)
@@ -859,6 +875,28 @@ class Graph(val proc: Procedure,
         }
         newGraph.varToCell(position).update(variable, Slice(idToNode(node.id).cells(slice.offset), slice.internalOffset))
       }
+    }
+
+    accessIndexToSlice.foreach {
+      case (store: MemoryStore, s: Slice) =>
+        val slice = find(s)
+        val node = slice.node
+        nodes.add(node)
+        if (!idToNode.contains(node.id)) {
+          val newNode = node.cloneSelf(newGraph)
+          idToNode.update(node.id, newNode)
+        }
+        newGraph.accessIndexToSlice(store) = Slice(idToNode(node.id).cells(slice.offset), slice.internalOffset)
+      case (load: MemoryLoad, s: Slice) =>
+        val slice = find(s)
+        val node = slice.node
+        nodes.add(node)
+        if (!idToNode.contains(node.id)) {
+          val newNode = node.cloneSelf(newGraph)
+          idToNode.update(node.id, newNode)
+        }
+        newGraph.accessIndexToSlice(load) = Slice(idToNode(node.id).cells(slice.offset), slice.internalOffset)
+      case _ =>
     }
 
     stackMapping.foreach { (offset, oldNode) =>
