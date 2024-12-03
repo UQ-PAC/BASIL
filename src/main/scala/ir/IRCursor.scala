@@ -247,26 +247,56 @@ def stronglyConnectedComponents[T <: CFGPosition, O <: T](walker: IRWalk[T, O], 
 
 def toDot(program: Program, labels: Map[CFGPosition, String] = Map.empty, inter: Boolean = false): String = {
   if (inter) {
-    val domain = computeDomain[CFGPosition, CFGPosition](InterProcIRCursor, program.procedures)
+    val domain = computeDomain[CFGPosition, CFGPosition](InterProcIRCursor, program.procedures).toSet
     toDot[CFGPosition](domain, InterProcIRCursor, labels)
   } else {
-    val domain = computeDomain[CFGPosition, CFGPosition](IntraProcIRCursor, program.procedures)
+    val domain = computeDomain[CFGPosition, CFGPosition](IntraProcIRCursor, program.procedures).toSet
     toDot[CFGPosition](domain, IntraProcIRCursor, labels)
   }
 }
 
+
 def dotCallGraph(program: Program, labels: Map[CFGPosition, String] = Map.empty): String = {
   val domain = computeDomain[Procedure, Procedure](CallGraph, program.procedures)
-  toDot[Procedure](domain, CallGraph, labels)
+  toDot[Procedure](domain.toSet, CallGraph, labels)
+}
+
+
+def dotBlockGraph(proc: Procedure) : String = {
+  dotBlockGraph(proc.collect {
+    case b: Block => b
+  })
+}
+
+def dotBlockGraph(prog: Program) : String = {
+  dotBlockGraph(prog.collect {
+    case b: Block => b
+  })
+}
+
+def dotBlockGraph(blocks: Iterable[Block]) : String = {
+    val printer = translating.BasilIRPrettyPrinter()
+    val labels : Map[CFGPosition, String] = (blocks.collect {
+      case b : Block => b -> {
+        (b.statements.toList.map(printer.apply(_) + ";")  ++ {
+          b.jump match {
+            case g: GoTo => List()
+            case o => List(printer(o) + ";")
+          }
+        }).map("  " + _).mkString("\n")
+      }
+    }).toMap
+
+    toDot[Block](blocks.toSet, IntraProcBlockIRCursor, labels)
 }
 
 def dotBlockGraph(program: Program, labels: Map[CFGPosition, String] = Map.empty): String = {
   val domain = computeDomain[CFGPosition, Block](IntraProcBlockIRCursor, program.procedures.flatMap(_.blocks).toSet)
-  toDot[Block](domain, IntraProcBlockIRCursor, labels)
+  toDot[Block](domain.toSet, IntraProcBlockIRCursor, labels)
 }
 
 def toDot[T <: CFGPosition](
-    domain: mutable.Set[T],
+    domain: Set[T],
     iterator: IRWalk[? >: T, ?],
     labels: Map[CFGPosition, String]
 ): String = {
@@ -292,7 +322,7 @@ def toDot[T <: CFGPosition](
       case s        => s.toString
     }
     if (labels.contains(node)) {
-      text = labels(node) ++ "\n" ++ text
+      text = text + "\n\n" + labels(node)
     }
     text
   }

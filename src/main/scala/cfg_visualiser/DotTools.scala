@@ -11,21 +11,34 @@ object IDGenerator {
   }
 }
 
-def wrap(input: String, width: Integer = 20): String =
+def wrap(_input: String, width: Integer = 20, first : Boolean = true): String =
+  var input = _input
+
+  def cannotSplit(c:Char) = {
+    c.isLetterOrDigit || ("_$".contains(c))
+  }
+
   if (input.length() <= width) {
-    input
+    input.replace("\n", "\\l") + "\\l"
+  } else if ({
+    val index = input.indexOf('\n')
+    index != -1 && index <= width
+    }) {
+    var splitPoint = input.indexOf('\n')
+    val (line, rest) = (input.substring(0, splitPoint).replace("\n", "\\l"), input.substring(splitPoint + 1))
+    (if (!first) then "    " else "") + line  + "\\l" + wrap(rest, width=width, true)
   } else {
     var splitPoint = width
-    while (input.charAt(splitPoint).isLetterOrDigit && splitPoint > width / 2) {
+    while (cannotSplit(input.charAt(splitPoint)) && splitPoint > width / 3) {
       // search backwards for a non alphanumeric charcter to split on
       splitPoint -= 1
     }
-    if (input.charAt(splitPoint).isLetterOrDigit) {
+    if (cannotSplit(input.charAt(splitPoint))) {
       // didn't find a character to split on
       splitPoint = width
     }
-    val line = input.substring(0, splitPoint)
-    line + "\\l" + wrap(input.substring(splitPoint), width)
+    val (line, rest) = (input.substring(0, splitPoint).replace("\n", "\\l"), input.substring(splitPoint))
+    (if (!first) then "    " else "") + line  + "\\l" + wrap(rest, width=width, false)
   }
 
 
@@ -51,7 +64,7 @@ class DotNode(val id: String, val label: String) extends DotElement {
   override def toString: String = toDotString
 
   def toDotString: String =
-    s"\"$id\"" + "[label=\"" + wrap(label, 80) + "\"]"
+    s"\"$id\"" + "[label=\"" + wrap(label, 100) + "\", shape=\"box\", fontname=\"Mono\", fontsize=\"5\"]"
 
 }
 
@@ -134,7 +147,8 @@ class DotGraph(val title: String, val nodes: Iterable[DotNode], val edges: Itera
 
   override def toString: String = toDotString
 
-  def toDotString: String = "digraph " + title + " {\n" + (nodes ++ edges).foldLeft("")((str, elm) => str + elm.toDotString + "\n") + "}"
+  val graph = "graph [ fontsize=18 ];" 
+  def toDotString: String = "digraph " + title + " {\n" + graph + "\n" + (nodes ++ edges).foldLeft("")((str, elm) => str + elm.toDotString + "\n") + "}"
 }
 
 

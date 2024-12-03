@@ -95,7 +95,9 @@ trait GlobalRegionAnalysis(val program: Program,
             if (i != n) {
               val regions: Set[DataRegion] = vsaResult.get(i) match {
                 case Some(Lift(el)) =>
-                  el.getOrElse(i.lhs, Set()).flatMap {
+                  // FIXME: not correct for directall
+                  assert(i.assignees.toSet.contains(variable))
+                  el.getOrElse(variable, Set()).flatMap {
                     case AddressValue(region) =>
                       el.getOrElse(region, Set()).flatMap {
                         case AddressValue(dataRegion: DataRegion) => Some(dataRegion)

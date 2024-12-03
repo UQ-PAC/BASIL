@@ -1,0 +1,145 @@
+package translating
+import ir.*
+import scala.collection.mutable
+
+
+object PrettyPrinter {
+  def pp_expr(e: Expr) = BasilIRPrettyPrinter()(e)
+  def pp_stmt(s: Statement) = BasilIRPrettyPrinter()(s)
+  def pp_cmd(c: Command) = c match {
+    case j: Jump => pp_jump(j)
+    case j: Statement => pp_stmt(j)
+  }
+  def pp_block(s: Block) = BasilIRPrettyPrinter()(s)
+  def pp_jump(s: Jump) = BasilIRPrettyPrinter()(s)
+  def pp_prog(s: Program) = BasilIRPrettyPrinter()(s)
+  def pp_proc(s: Procedure) = BasilIRPrettyPrinter()(s)
+}
+
+case class BST[+T](val v: String) {
+  def ++(s: String) = BST(v ++ s)
+  override def toString = v
+}
+
+class BasilIRPrettyPrinter() extends BasilIR[BST] {
+  val blockIndent = "  " 
+  val statementIndent = "    " 
+  val seenVars = mutable.HashSet[Variable]()
+
+  def apply(x: Block) : String = {
+    vblock(x).v
+  }
+  def apply(x: Procedure) : String = {
+    vproc(x).v
+  }
+  def apply(x: Statement) : String = {
+    vstmt(x).v
+  }
+  def apply(x: Jump) : String = {
+    vjump(x).v
+  }
+  def apply(x: Expr) : String = {
+    vexpr(x).v
+  }
+  def apply(x: Program) : String = {
+    vprog(x).v
+  }
+
+  def vprog(mainProc: String, procedures: List[BST[Procedure]]) : BST[Program] = {
+    BST(s"(main_procedure ${mainProc})\n" + procedures.mkString("\n\n"))
+  }
+
+  override def vblock(label: String, statements: List[BST[Statement]], terminator: BST[Jump]): BST[Block] = {
+    BST(s"${blockIndent}block \"${label}\" {\n"
+    ++ statements.map(statementIndent + _ + ";").mkString("\n") 
+    ++ "\n" ++ statementIndent + terminator + ";\n"
+    ++ blockIndent + "}")
+  }
+
+  override def vproc(p: Procedure) : BST[Procedure] = {
+    seenVars.clear()
+    super.vproc(p)
+  }
+
+  override def vproc(
+      name: String,
+      inParams: List[BST[Variable]],
+      outParams: List[BST[Variable]],
+      entryBlock: Option[BST[Block]],
+      middleBlocks: List[BST[Block]],
+      returnBlock: Option[BST[Block]]
+    ): BST[Procedure] = {
+
+    val entry = entryBlock.map(b => {
+      b.toString + "\n"
+    }).getOrElse("")
+    val ret = returnBlock.map(b => {
+      "\n" + b.toString
+    }).getOrElse("")
+
+    BST(s"proc $name(${inParams.mkString(", ")}) -> (${outParams.mkString(", ")}) {\n$entry${middleBlocks.mkString("\n")}$ret\n}")
+  }
+
+  override def vassign(lhs: BST[Variable], rhs: BST[Expr]): BST[LocalAssign] = BST(s"${lhs} := ${rhs}")
+
+  override def vstore(mem: String, index: BST[Expr], value: BST[Expr], endian: Endian, size: Int): BST[MemoryStore] = {
+    val le = if endian == Endian.LittleEndian then "le" else "be"
+    BST(s"store_$le(${mem}, ${index}, ${value}, ${size})")
+  }
+  def vload(lhs: BST[Variable], mem: String, index: BST[Expr], endian: Endian, size: Int): BST[MemoryLoad] = {
+    val le = if endian == Endian.LittleEndian then "le" else "be"
+    BST(s"$lhs := load_$le(${mem}, ${index}, ${size})")
+  }
+
+  override def vcall(
+      outParams: List[(BST[Variable], BST[Expr])],
+      procname: String,
+      inparams: List[(BST[Variable], BST[Expr])]
+  ): BST[DirectCall] = {
+    BST(s"(${outParams.map((l,r) => l).mkString(", ")}) := call $procname (${inparams.map((l,r) => r).mkString(", ")});")
+  }
+
+  override def vindirect(target: BST[Variable]): BST[IndirectCall] = BST(s"indirect_call(${target})")
+  override def vassert(body: BST[Expr]): BST[Assert] = BST(s"assert($body)")
+  override def vassume(body: BST[Expr]): BST[Assume] = BST(s"assume($body)")
+  override def vnop(): BST[NOP] = BST("nop")
+
+  override def vgoto(t: List[String]): BST[GoTo] = BST(s"goto(${t.map('"' + _ + '"').mkString(", ")})")
+  override def vunreachable(): BST[Unreachable] = BST("unreachable")
+  override def vreturn(outs: List[(BST[Variable], BST[Expr])]) = BST(s"return (${outs.map((l, r) => r).mkString(", ")})")
+
+  def vtype(t: IRType): String = t match {
+    case BitVecType(sz) => s"bv$sz"
+    case IntType => "nat"
+    case BoolType => "bool"
+    case _ => ???
+  }
+
+  override def vrvar(e: Variable): BST[Variable] =  BST(e.name)
+  override def vlvar(e: Variable): BST[Variable] = {
+    e match {
+      case l: LocalVar => BST("var " + e.name + s": ${vtype(e.getType)}")
+      case _ => BST(e.name)
+    }
+  }
+
+  override def vextract(ed: Int, start: Int, a: BST[Expr]): BST[Expr] = BST(s"extract($ed, $start, ${a})")
+  override def vzeroextend(bits: Int, b: BST[Expr]): BST[Expr]  = BST(s"zero_extend($bits, $b)")
+  override def vsignextend(bits: Int, b: BST[Expr]): BST[Expr] = BST(s"sign_extend($bits, $b)")
+  override def vrepeat(reps: Int, b: BST[Expr]) = BST(s"repeat($reps, $b)")
+  override def vbinary_expr(e: BinOp, l: BST[Expr], r: BST[Expr]): BST[Expr] = {
+    val opn = e.getClass.getSimpleName.toLowerCase.stripSuffix("$")
+    BST(s"$opn($l, $r)")
+  }
+  override def vunary_expr(e: UnOp, arg: BST[Expr]): BST[Expr] = {
+    val opn = e.getClass.getSimpleName.toLowerCase.stripSuffix("$")
+    BST(s"$opn($arg)")
+  }
+
+  override def vboollit(b: Boolean) = BST(b.toString)
+  override def vintlit(i: BigInt) = BST("0x%x".format(i))
+  override def vbvlit(i: BitVecLiteral) = BST("0x%x".format(i.value) + s"bv${i.size}")
+  override def vuninterp_function(name: String, args: Seq[BST[Expr]]): BST[Expr] = BST(s"$name(${args.mkString(", ")})")
+}
+
+

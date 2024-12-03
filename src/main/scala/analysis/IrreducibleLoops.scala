@@ -2,7 +2,7 @@ package analysis
 
 import ir.{CFGPosition, Command, IntraProcIRCursor, Program, Procedure, Block, GoTo, IRWalk}
 import util.intrusive_list.IntrusiveList
-import util.Logger
+import util.StaticAnalysisLogger
 
 import scala.collection.mutable
 
@@ -325,8 +325,8 @@ class LoopTransform(loops: Set[Loop]) {
             case _ =>
           }
         case _ =>
-          Logger.error("Unexpected loop originating node - 1")
-          Logger.error(origNode)
+          StaticAnalysisLogger.error("Unexpected loop originating node - 1")
+          StaticAnalysisLogger.error(origNode)
       }
     }
 
@@ -353,8 +353,8 @@ class LoopTransform(loops: Set[Loop]) {
             case _ =>
           }
         case _ =>
-          Logger.error("Unexpected loop originating node - 1")
-          Logger.error(origNode)
+          StaticAnalysisLogger.error("Unexpected loop originating node - 1")
+          StaticAnalysisLogger.error(origNode)
       }
     }
 

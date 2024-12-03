@@ -10,7 +10,11 @@ import ir.cilvisitor.*
 class FindVars extends CILVisitor {
   val vars = mutable.ArrayBuffer[Variable]()
 
-  override def vvar(v: Variable) = {
+  override def vrvar(v: Variable) = {
+    vars.append(v)
+    SkipChildren()
+  }
+  override def vlvar(v: Variable) = {
     vars.append(v)
     SkipChildren()
   }
@@ -95,7 +99,14 @@ class CILVisitorTest extends AnyFunSuite {
     class ExprTrace extends CILVisitor {
       val res = mutable.ArrayBuffer[String]()
 
-      override def vvar(e: Variable) = {
+      override def vlvar(e: Variable) = {
+        e match {
+          case Register(n, _) => res.append(n);
+          case _              => ??? // only reg in source program
+        }
+        DoChildren()
+      }
+      override def vrvar(e: Variable) = {
         e match {
           case Register(n, _) => res.append(n);
           case _              => ??? // only reg in source program
@@ -135,12 +146,19 @@ class CILVisitorTest extends AnyFunSuite {
     class VarTrace extends CILVisitor {
       val res = mutable.ArrayBuffer[String]()
 
-      override def vvar(e: Variable) = { res.append(e.name); SkipChildren() }
+      override def vrvar(e: Variable) = { res.append(e.name); SkipChildren() }
+      override def vlvar(e: Variable) = { res.append(e.name); SkipChildren() }
 
     }
 
     class RegReplace extends CILVisitor {
-      override def vvar(e: Variable) = {
+      override def vrvar(e: Variable) = {
+        e match {
+          case Register(n, _) => ChangeTo(LocalVar("l" + n, e.getType));
+          case _               => DoChildren()
+        }
+      }
+      override def vlvar(e: Variable) = {
         e match {
           case Register(n, _) => ChangeTo(LocalVar("l" + n, e.getType));
           case _               => DoChildren()
@@ -151,8 +169,15 @@ class CILVisitorTest extends AnyFunSuite {
 
     class RegReplacePost extends CILVisitor {
       val res = mutable.ArrayBuffer[String]()
+      override def vlvar(e: Variable) = {
+        e match {
+          case LocalVar(n, _) =>
+            ChangeDoChildrenPost(LocalVar("e" + n, e.getType), e => { res.append(e.name); e });
+          case _ => DoChildren()
+        }
+      }
 
-      override def vvar(e: Variable) = {
+      override def vrvar(e: Variable) = {
         e match {
           case LocalVar(n, _) =>
             ChangeDoChildrenPost(LocalVar("e" + n, e.getType), e => { res.append(e.name); e });

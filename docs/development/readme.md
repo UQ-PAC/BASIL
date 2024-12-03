@@ -5,6 +5,7 @@
 - [tool-installation](tool-installation.md) Guide to lifter, etc. tool installation
 - [scala](scala.md) Advice on Scala programming.
 - [cfg](cfg.md) Explanation of the old CFG datastructure 
+- [interpreter](interpreter.md) Explanation of IR interpreter
 
 
 ## Scala

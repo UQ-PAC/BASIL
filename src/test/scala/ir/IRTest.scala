@@ -131,13 +131,12 @@ class IRTest extends AnyFunSuite {
     val aftercallGotos = p.collect {
       case c: Command if isAfterCall(c) => c
     }.toSet
-    // assert(aftercallGotos == Set(blocks("l_main_1").fallthrough.get))
 
     assert(1 == aftercallGotos.count(b => IntraProcIRCursor.pred(b).contains(blocks("l_main_1").jump)))
     assert(1 == aftercallGotos.count(b => IntraProcIRCursor.succ(b).contains(blocks("l_main_1").jump match {
       case GoTo(targets, _) => targets.head
+      case _ => throw Exception("unreachable")
     })))
-
   }
 
   test("addblocks") {
@@ -195,7 +194,7 @@ class IRTest extends AnyFunSuite {
       LocalAssign(R0, bv64(22)),
       LocalAssign(R0, bv64(22)),
       directCall("main"),
-      unreachable
+      unreachable 
     ).resolve(p)
     val b2 = block("newblock1",
       LocalAssign(R0, bv64(22)),
@@ -304,6 +303,10 @@ class IRTest extends AnyFunSuite {
     transforms.addReturnBlocks(p)
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), p)
 
+    cilvisitor.visit_prog(transforms.ReplaceReturns(), p)
+    transforms.addReturnBlocks(p)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), p)
+
     val blocks = p.labelToBlock
     val procs = p.nameToProcedure
 
@@ -311,10 +314,10 @@ class IRTest extends AnyFunSuite {
     val prev = InterProcIRCursor.pred(blocks("returntarget"))
 
     assert(prev.size == 1 && prev.collect {
-      case c: GoTo => (c.parent == blocks("l_main"))
+      case c : GoTo => (c.parent == p.labelToBlock("l_main"))
     }.contains(true))
 
-    // assert(next == Set(procs("p1"), blocks("l_main").fallthrough.get))
+    // assert(next == Set(p.procs("p1"), p.labelToBlock("l_main").fallthrough.get))
 
     val prevB: Command = (blocks("l_main").statements.lastOption match
       case Some(c: IndirectCall) => c.returnTarget

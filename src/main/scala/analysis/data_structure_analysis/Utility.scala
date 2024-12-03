@@ -4,7 +4,8 @@ import analysis.solvers.{DSAUniTerm, DSAUnionFindSolver, UnionFindSolver, Var}
 import analysis.*
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.*
-import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
+import specification.{ExternalFunction, SymbolTableEntry}
+import boogie.SpecGlobal
 import util.Logger
 
 import scala.collection.mutable

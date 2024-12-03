@@ -137,7 +137,7 @@ trait SystemTests extends AnyFunSuite, BASILTest {
 
     Logger.info(s"$name/$variation$testSuffix")
     val timer = PerformanceTimer(s"test $name/$variation$testSuffix")
-    runBASIL(inputPath, RELFPath, Some(specPath), BPLPath, conf.staticAnalysisConfig)
+    runBASIL(inputPath, RELFPath, Some(specPath), BPLPath, conf.staticAnalysisConfig, conf.simplify)
     val translateTime = timer.checkPoint("translate-boogie")
     Logger.info(s"$name/$variation$testSuffix DONE")
 
@@ -202,6 +202,27 @@ class ExtraSpecTests extends SystemTests {
     summary("testresult-extraspec")
   }
 }
+
+
+class NoSimplifySystemTests extends SystemTests {
+  runTests("correct", TestConfig(simplify=false, useBAPFrontend = true, expectVerify = true, logResults = true))
+  runTests("incorrect", TestConfig(simplify=false, useBAPFrontend = true, expectVerify = false, logResults = true))
+  runTests("correct", TestConfig(simplify=false, useBAPFrontend = false, expectVerify = true, logResults = true))
+  runTests("incorrect", TestConfig(simplify=false, useBAPFrontend = false, expectVerify = false, logResults = true))
+  test("summary-nosimplify") {
+    summary("nosimplify")
+  }
+}
+class SimplifySystemTests extends SystemTests {
+  runTests("correct", TestConfig(simplify=true, useBAPFrontend = true, expectVerify = true, logResults = true))
+  runTests("incorrect", TestConfig(simplify=true, useBAPFrontend = true, expectVerify = false, logResults = true))
+  runTests("correct", TestConfig(simplify=true, useBAPFrontend = false, expectVerify = true, logResults = true))
+  runTests("incorrect", TestConfig(simplify=true, useBAPFrontend = false, expectVerify = false, logResults = true))
+  test("summary-simplify") {
+    summary("simplify")
+  }
+}
+
 
 class AnalysisSystemTestsBAP extends SystemTests {
   runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = true))

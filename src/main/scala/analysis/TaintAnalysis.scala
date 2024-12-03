@@ -3,7 +3,6 @@ package analysis
 import analysis.solvers.ForwardIDESolver
 import ir.*
 import boogie.*
-import util.Logger
 
 /**
  * A value which can propogate taint/be tainted.

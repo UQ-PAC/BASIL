@@ -236,7 +236,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
   private def visitExprOnly(ctx: ExprContext): Option[Expr] = {
     val (expr, load) = visitExpr(ctx)
     if (load.isDefined) {
-      throw Exception("")
+      throw Exception(s"found load $expr $load")
     } else {
       expr
     }
@@ -287,7 +287,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
           throw Exception(s"inconsistent size parameters in Mem.read.0: ${ctx.getText}")
         }
 
-        val temp = LocalVar("$load" + loadCounter, BitVecType(size.toInt))
+        val temp = LocalVar("load" + loadCounter, BitVecType(size.toInt))
         loadCounter += 1
 
         if (index.isDefined) {
@@ -299,39 +299,39 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
 
       case "cvt_bool_bv.0" =>
         checkArgs(function, 0, 1, typeArgs.size, args.size, ctx.getText)
-        val expr = visitExprOnly(args.head)
-        val result = expr.map {
-          case b: BinaryExpr if b.op == BVEQ => BinaryExpr(BVCOMP, b.arg1, b.arg2)
-          case FalseLiteral => BitVecLiteral(0, 1)
-          case TrueLiteral => BitVecLiteral(1, 1)
-          case _ => throw Exception(s"unhandled conversion from bool to bitvector: ${ctx.getText}")
-        }
-        (result, None)
+        val (expr, load) = visitExpr(args.head)
+        val result : Option[Expr] = expr.map {
+            case b: BinaryExpr if b.op == BVEQ => BinaryExpr(BVCOMP, b.arg1, b.arg2)
+            case FalseLiteral   => BitVecLiteral(0, 1)
+            case TrueLiteral => BitVecLiteral(1, 1)
+            case o => UnaryExpr(BoolToBV1, o)
+          }
+        (result, load)
 
       case "not_bool.0" => (resolveUnaryOp(BoolNOT, function, 0, typeArgs, args, ctx.getText), None)
-      case "eq_enum.0" => (resolveBinaryOp(BoolEQ, function, 0, typeArgs, args, ctx.getText), None)
-      case "or_bool.0" => (resolveBinaryOp(BoolOR, function, 0, typeArgs, args, ctx.getText), None)
-      case "and_bool.0" => (resolveBinaryOp(BoolAND, function, 0, typeArgs, args, ctx.getText), None)
+      case "eq_enum.0" => (resolveBinaryOp(BoolEQ, function, 0, typeArgs, args, ctx.getText))
+      case "or_bool.0" => (resolveBinaryOp(BoolOR, function, 0, typeArgs, args, ctx.getText))
+      case "and_bool.0" => (resolveBinaryOp(BoolAND, function, 0, typeArgs, args, ctx.getText))
+
+      case "or_bits.0" => (resolveBinaryOp(BVOR, function, 1, typeArgs, args, ctx.getText))
+      case "and_bits.0" => (resolveBinaryOp(BVAND, function, 1, typeArgs, args, ctx.getText))
+      case "eor_bits.0" => (resolveBinaryOp(BVXOR, function, 1, typeArgs, args, ctx.getText))
+      case "eq_bits.0" => (resolveBinaryOp(BVEQ, function, 1, typeArgs, args, ctx.getText))
+      case "add_bits.0" => (resolveBinaryOp(BVADD, function, 1, typeArgs, args, ctx.getText))
+      case "sub_bits.0" => (resolveBinaryOp(BVSUB, function, 1, typeArgs, args, ctx.getText))
+      case "mul_bits.0" => (resolveBinaryOp(BVMUL, function, 1, typeArgs, args, ctx.getText))
+      case "sdiv_bits.0" => (resolveBinaryOp(BVSDIV, function, 1, typeArgs, args, ctx.getText))
+      case "slt_bits.0" => (resolveBinaryOp(BVSLT, function, 1, typeArgs, args, ctx.getText))
+      case "sle_bits.0" => (resolveBinaryOp(BVSLE, function, 1, typeArgs, args, ctx.getText))
 
       case "not_bits.0" => (resolveUnaryOp(BVNOT, function, 1, typeArgs, args, ctx.getText), None)
-      case "or_bits.0" => (resolveBinaryOp(BVOR, function, 1, typeArgs, args, ctx.getText), None)
-      case "and_bits.0" => (resolveBinaryOp(BVAND, function, 1, typeArgs, args, ctx.getText), None)
-      case "eor_bits.0" => (resolveBinaryOp(BVXOR, function, 1, typeArgs, args, ctx.getText), None)
-      case "eq_bits.0" => (resolveBinaryOp(BVEQ, function, 1, typeArgs, args, ctx.getText), None)
-      case "add_bits.0" => (resolveBinaryOp(BVADD, function, 1, typeArgs, args, ctx.getText), None)
-      case "sub_bits.0" => (resolveBinaryOp(BVSUB, function, 1, typeArgs, args, ctx.getText), None)
-      case "mul_bits.0" => (resolveBinaryOp(BVMUL, function, 1, typeArgs, args, ctx.getText), None)
-      case "sdiv_bits.0" => (resolveBinaryOp(BVSDIV, function, 1, typeArgs, args, ctx.getText), None)
-
-      case "slt_bits.0" => (resolveBinaryOp(BVSLT, function, 1, typeArgs, args, ctx.getText), None)
-      case "sle_bits.0" => (resolveBinaryOp(BVSLE, function, 1, typeArgs, args, ctx.getText), None)
 
       case "lsl_bits.0" => (resolveBitShiftOp(BVSHL, function, typeArgs, args, ctx.getText), None)
       case "lsr_bits.0" => (resolveBitShiftOp(BVLSHR, function, typeArgs, args, ctx.getText), None)
       case "asr_bits.0" => (resolveBitShiftOp(BVASHR, function, typeArgs, args, ctx.getText), None)
 
       case "append_bits.0" =>
-        (resolveBinaryOp(BVCONCAT, function, 2, typeArgs, args, ctx.getText), None)
+        (resolveBinaryOp(BVCONCAT, function, 2, typeArgs, args, ctx.getText))
 
       case "replicate_bits.0" =>
         checkArgs(function, 2, 2, typeArgs.size, args.size, ctx.getText)
@@ -482,16 +482,18 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
                               typeArgs: mutable.Buffer[ExprContext],
                               args: mutable.Buffer[ExprContext],
                               token: String
-                             ): Option[BinaryExpr] = {
+                             ): (Option[BinaryExpr], Option[MemoryLoad]) = {
     checkArgs(function, typeArgsExpected, 2, typeArgs.size, args.size, token)
     // we don't currently check the size for BV ops which is the type arg
     // memory loads shouldn't appear inside binary operations?
-    val arg0 = visitExprOnly(args(0))
-    val arg1 = visitExprOnly(args(1))
+    val (arg0, l0) = visitExpr(args(0))
+    val (arg1, l1) = visitExpr(args(1))
+    val l = l0.orElse(l1)
+    assert(!(l0.isDefined && l1.isDefined), "Multiple loads in expression")
     if (arg0.isDefined && arg1.isDefined) {
-      Some(BinaryExpr(operator, arg0.get, arg1.get))
+      (Some(BinaryExpr(operator, arg0.get, arg1.get)), l)
     } else {
-      None
+      (None, l)
     }
   }
 

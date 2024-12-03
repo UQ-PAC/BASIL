@@ -624,10 +624,10 @@ class Graph(val proc: Procedure,
         }
         val node = Node(Some(this))
         varToCell(pos) = mutable.Map(lhs -> Slice(node.cells(0), 0))
-      case pos @ DirectCall(target, _) if target.name == "malloc" =>
+      case pos @ DirectCall(target, _, _, _) if target.name == "malloc" =>
         val node = Node(Some(this))
         varToCell(pos) = mutable.Map(mallocRegister -> Slice(node.cells(0), 0))
-      case pos @ DirectCall(target, _) if writesTo.contains(target) =>
+      case pos @ DirectCall(target, _, _, _) if writesTo.contains(target) =>
         val result = mutable.Map[Variable, Slice]()
         writesTo(target).foreach { variable =>
           val node = Node(Some(this))

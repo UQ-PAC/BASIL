@@ -1,8 +1,8 @@
 package analysis
 
 import ir._
-import analysis.BitVectorEval
-import util.Logger
+import ir.eval.BitVectorEval
+import util.StaticAnalysisLogger
 
 /** Basic lattice
   */
@@ -162,7 +162,7 @@ class ConstantPropagationLattice extends FlatLattice[BitVecLiteral] {
       case (Top, _) => Top
   } catch {
     case e: Exception =>
-      Logger.error(s"Failed on op $op with $a and $b")
+      StaticAnalysisLogger.error(s"Failed on op $op with $a and $b")
       throw e
   }
 

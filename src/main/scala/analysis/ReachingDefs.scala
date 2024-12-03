@@ -15,9 +15,9 @@ abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[Regis
         s + (loc.lhs -> Set(n))
       case load: MemoryLoad =>
         s + (load.lhs -> Set(n))
-      case DirectCall(target, _) if target.name == "malloc" =>
+      case DirectCall(target, _, _, _) if target.name == "malloc" =>
         s + (mallocRegister -> Set(n))
-      case DirectCall(target, _) if writesTo.contains(target) =>
+      case DirectCall(target, _, _, _) if writesTo.contains(target) =>
         val result: Map[Variable, Set[CFGPosition]] = writesTo(target).foldLeft(Map[Variable, Set[CFGPosition]]()) {
           (m, register) =>
             m + (register -> Set(n))

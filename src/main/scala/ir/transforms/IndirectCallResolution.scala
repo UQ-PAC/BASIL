@@ -1,11 +1,12 @@
 package ir.transforms
 
+import scala.collection.mutable
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+
 import analysis.{AddressValue, DataRegion, Lift, LiftedElement, LiteralValue, MemoryModelMap, MemoryRegion, RegisterWrapperEqualSets, StackRegion, Value, getUse}
 import ir.*
 import util.Logger
-
-import scala.collection.mutable
-import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import cilvisitor.*
 
 
 class SteensgaardIndirectCallResolution(
@@ -152,7 +153,7 @@ trait IndirectCallResolution {
       }
 
       if (targets.size == 1) {
-        val newCall = DirectCall(targets.head, indirectCall.label)
+        val newCall = targets.head.makeCall(indirectCall.label)
         block.statements.replace(indirectCall, newCall)
         true
       } else if (targets.size > 1) {
@@ -168,7 +169,7 @@ trait IndirectCallResolution {
           }
           val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(address, 64)))
           val newLabel: String = block.label + t.name
-          val directCall = DirectCall(t)
+          val directCall = t.makeCall()
 
           /* copy the goto node resulting */
           val fallthrough = oft match {
