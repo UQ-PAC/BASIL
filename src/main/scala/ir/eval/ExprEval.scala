@@ -151,7 +151,7 @@ trait Loader[S, E] {
 }
 
 def evaluateExpr(exp: Expr): Option[Literal] = {
-  val (e, _) = SimpExpr(fastPartialEvalExpr)(exp)
+  val (e, _) = simpFixedPoint(SimpExpr(fastPartialEvalExpr).apply)(exp)
   e match {
     case l: Literal => Some(l)
     case _          => None

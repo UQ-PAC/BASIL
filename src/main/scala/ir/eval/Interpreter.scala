@@ -325,6 +325,14 @@ object LibcIntrinsic {
     _ <- s.doReturn()
   } yield (())
 
+  def twoArg[S, E, T <: Effects[S, E]](name: String)(s: T): State[S, Unit, E] = for {
+    c1 <- s.loadVar("R0")
+    c2 <- s.loadVar("R1")
+    res <- s.callIntrinsic(name, List(c1, c2))
+    _ <- if res.isDefined then s.storeVar("R0", Scope.Global, res.get) else State.pure(())
+    _ <- s.doReturn()
+  } yield (())
+
   def calloc[S, T <: Effects[S, InterpreterError]](s: T): State[S, Unit, InterpreterError] = for {
     size <- s.loadVar("R0")
     res <- s.callIntrinsic("malloc", List(size))
@@ -340,9 +348,12 @@ object LibcIntrinsic {
   def intrinsics[S, T <: Effects[S, InterpreterError]] =
     Map[String, T => State[S, Unit, InterpreterError]](
       "putc" -> singleArg("putc"),
+      "putchar" -> singleArg("putc"),
       "puts" -> singleArg("puts"),
       "printf" -> singleArg("print"),
+      "write" -> twoArg("write"),
       "malloc" -> singleArg("malloc"),
+      "__libc_malloc_impl" -> singleArg("malloc"),
       "free" -> singleArg("free"),
       "#free" -> singleArg("free"),
       "calloc" -> calloc
@@ -390,6 +401,27 @@ object IntrinsicImpl {
       nfilecount <- State.pureE(BasilValue.unsafeAdd(filecount.head, 1))
       _ <- f.storeMem("ghost-file-bookkeeping", Map(Symbol("$$filecount") -> nfilecount))
     } yield (Some(filecount.head))
+  }
+
+
+  def write[S, T <: Effects[S, InterpreterError]](f: T)(fd: BasilValue, strptr: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
+    for {
+      str <- Eval.getNullTerminatedString(f)("mem", strptr)
+      // TODO: fd mapping in state
+      file = fd match {
+        case Scalar(BitVecLiteral(1, 64)) => "stdout"
+        case Scalar(BitVecLiteral(2, 64)) => "stderr"
+        case _ => "unknown"
+      }
+      baseptr: List[BasilValue] <- f.loadMem("ghost-file-bookkeeping", List(Symbol(s"${file}-ptr")))
+      offs: List[BasilValue] <- State.mapM(
+        ((i: Int) => State.pureE(BasilValue.unsafeAdd(baseptr.head, i))),
+        (0 until (str.size + 1))
+      )
+      _ <- f.storeMem(file, offs.zip(str.map(Scalar(_))).toMap)
+      naddr <- State.pureE(BasilValue.unsafeAdd(baseptr.head, str.size))
+      _ <- f.storeMem("ghost-file-bookkeeping", Map(Symbol(s"${file}-ptr") -> naddr))
+    } yield (None)
   }
 
   def print[S, T <: Effects[S, InterpreterError]](f: T)(strptr: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
@@ -450,6 +482,7 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
         } yield (Some(r))
       case "print" => IntrinsicImpl.print(this)(args.head)
       case "puts"  => IntrinsicImpl.print(this)(args.head) >> IntrinsicImpl.putc(this)(Scalar(BitVecLiteral('\n'.toInt, 64)))
+      case "write"  => IntrinsicImpl.write(this)(args(1), args(2))
       case _       => State.setError(Errored(s"Call undefined intrinsic $name"))
     }
   }

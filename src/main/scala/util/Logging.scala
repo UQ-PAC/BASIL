@@ -55,7 +55,7 @@ class GenericLogger(
     if (level.id < LogLevel.OFF.id) {
       val l = deriveLogger(file.getName(), file)
       l.print(content)
-      close()
+      l.close()
       children.remove(l)
     }
   }
@@ -159,7 +159,6 @@ val StaticAnalysisLogger  = Logger.deriveLogger("analysis", System.out)
 val SimplifyLogger = Logger.deriveLogger("simplify", System.out)
 val DebugDumpIRLogger = {
   val l = Logger.deriveLogger("debugdumpir")
-  l.setLevel(LogLevel.OFF)
   l
 }
 val VSALogger = StaticAnalysisLogger.deriveLogger("vsa")

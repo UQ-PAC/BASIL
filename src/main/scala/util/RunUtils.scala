@@ -322,15 +322,15 @@ object StaticAnalysis {
     StaticAnalysisLogger.debug("Subroutine Addresses:")
     StaticAnalysisLogger.debug(subroutines)
 
-    StaticAnalysisLogger.info("reducible loops")
+    StaticAnalysisLogger.debug("reducible loops")
     // reducible loops
     val detector = LoopDetector(IRProgram)
     val foundLoops = detector.identify_loops()
-    foundLoops.foreach(l => StaticAnalysisLogger.info(s"Loop found: ${l.name}"))
+    foundLoops.foreach(l => StaticAnalysisLogger.debug(s"Loop found: ${l.name}"))
 
     val transformer = LoopTransform(foundLoops)
     val newLoops = transformer.llvm_transform()
-    newLoops.foreach(l => StaticAnalysisLogger.info(s"Loop found: ${l.name}"))
+    newLoops.foreach(l => StaticAnalysisLogger.debug(s"Loop found: ${l.name}"))
 
     config.analysisDotPath.foreach { s =>
       DebugDumpIRLogger.writeToFile(File(s"${s}_graph-after-reduce-$iteration.dot"), dotBlockGraph(IRProgram, IRProgram.map(b => b -> b.toString).toMap))
@@ -342,16 +342,15 @@ object StaticAnalysis {
     val domain = computeDomain(IntraProcIRCursor, IRProgram.procedures)
     val interDomain = computeDomain(InterProcIRCursor, IRProgram.procedures)
 
-    StaticAnalysisLogger.info("[!] Running ANR")
+    StaticAnalysisLogger.debug("[!] Running ANR")
     val ANRSolver = ANRAnalysisSolver(IRProgram)
     val ANRResult = ANRSolver.analyze()
 
-
-    StaticAnalysisLogger.info("[!] Running RNA")
+    StaticAnalysisLogger.debug("[!] Running RNA")
     val RNASolver = RNAAnalysisSolver(IRProgram)
     val RNAResult = RNASolver.analyze()
 
-    StaticAnalysisLogger.info("[!] Running Inter-procedural Constant Propagation")
+    StaticAnalysisLogger.debug("[!] Running Inter-procedural Constant Propagation")
     val interProcConstProp = InterProcConstantPropagation(IRProgram)
     val interProcConstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] = interProcConstProp.analyze()
 
@@ -359,7 +358,7 @@ object StaticAnalysis {
       DebugDumpIRLogger.writeToFile(File(s"${s}OGconstprop$iteration.txt"), printAnalysisResults(IRProgram, interProcConstPropResult))
     }
 
-    StaticAnalysisLogger.info("[!] Variable dependency summaries")
+    StaticAnalysisLogger.debug("[!] Variable dependency summaries")
     val scc = stronglyConnectedComponents(CallGraph, List(IRProgram.mainProcedure))
     val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
     val varDepsSummaries = VariableDependencyAnalysis(IRProgram, ctx.specification.globals, specGlobalAddresses, interProcConstPropResult, scc).analyze()
@@ -395,11 +394,11 @@ object StaticAnalysis {
       Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]()
     }
 
-    StaticAnalysisLogger.info("[!] Running GRA")
+    StaticAnalysisLogger.debug("[!] Running GRA")
     val graSolver = GlobalRegionAnalysisSolver(IRProgram, domain.toSet, interProcConstPropResult, reachingDefinitionsAnalysisResults, mmm, previousVSAResults)
     val graResult = graSolver.analyze()
 
-    StaticAnalysisLogger.info("[!] Running MRA")
+    StaticAnalysisLogger.debug("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysisSolver(IRProgram, domain.toSet, globalAddresses, globalOffsets, mergedSubroutines, interProcConstPropResult, ANRResult, RNAResult, reachingDefinitionsAnalysisResults, graResult, mmm)
     val mraResult = mraSolver.analyze()
 
@@ -426,16 +425,16 @@ object StaticAnalysis {
       )
     }
 
-    StaticAnalysisLogger.info("[!] Running MMM")
+    StaticAnalysisLogger.debug("[!] Running MMM")
     mmm.convertMemoryRegions(mraSolver.procedureToStackRegions, mraSolver.procedureToHeapRegions, mraResult, mraSolver.procedureToSharedRegions, graSolver.getDataMap, graResult)
     mmm.logRegions()
 
-    StaticAnalysisLogger.info("[!] Running Steensgaard")
+    StaticAnalysisLogger.debug("[!] Running Steensgaard")
     val steensgaardSolver = InterprocSteensgaardAnalysis(interDomain.toSet, mmm, reachingDefinitionsAnalysisResults, previousVSAResults)
     steensgaardSolver.analyze()
     val steensgaardResults = steensgaardSolver.pointsTo()
 
-    StaticAnalysisLogger.info("[!] Running VSA")
+    StaticAnalysisLogger.debug("[!] Running VSA")
     val vsaSolver = ValueSetAnalysisSolver(IRProgram, mmm, interProcConstPropResult)
     val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
 
@@ -446,7 +445,7 @@ object StaticAnalysis {
       )
     }
 
-    StaticAnalysisLogger.info("[!] Injecting regions")
+    StaticAnalysisLogger.debug("[!] Injecting regions")
     val regionInjector = if (config.memoryRegions) {
       val injector = RegionInjector(IRProgram, mmm)
       injector.nodeVisitor()
@@ -664,8 +663,19 @@ object RunUtils {
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
 
     if (q.runInterpret) {
+      Logger.info("Start interpret")
       val fs = eval.interpretTrace(ctx)
-      Logger.info("Interpreter Trace:\n" + fs._2.t.mkString("\n"))
+
+      val stdout = fs._1.memoryState.getMem("stdout").toList.sortBy(_._1.value).map(_._2.value.toChar).mkString("")
+
+      Logger.info(s"Interpreter stdout:\n${stdout}")
+
+      q.loading.dumpIL.foreach(f => {
+        val tf = f"${f}-interpret-trace.txt"
+        writeToFile((fs._2.t.mkString("\n")), tf)
+        Logger.info(s"Finished interpret: trace written to $tf")
+      })
+
       val stopState = fs._1.nextCmd
       if (stopState != eval.Stopped()) {
         Logger.error(s"Interpreter exited with $stopState")
@@ -777,7 +787,7 @@ object RunUtils {
 }
 
 def writeToFile(content: String, fileName: String): Unit = {
-  Logger.info(s"Writing $fileName (${content.size} bytes)")
+  Logger.debug(s"Writing $fileName (${content.size} bytes)")
   val outFile = File(fileName)
   val pw = PrintWriter(outFile, "UTF-8")
   pw.write(content)

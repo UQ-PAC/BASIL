@@ -61,7 +61,7 @@ class DifferentialTest extends AnyFunSuite {
     assert(filterEvents(traceInit.t).mkString("\n") == filterEvents(traceRes.t).mkString("\n"))
   }
 
-  def testProgram(testName: String, examplePath: String, suffix: String =".adt", staticAnalysisConfig : StaticAnalysisConfig = StaticAnalysisConfig(None, None, None), simplify: Boolean = true) = {
+  def testProgram(testName: String, examplePath: String, suffix: String =".adt", staticAnalysisConfig : StaticAnalysisConfig = StaticAnalysisConfig(None, None, None), simplify: Boolean = false) = {
 
     val loading = ILLoadingConfig(inputFile = examplePath + testName + suffix,
       relfFile = examplePath + testName + ".relf",

@@ -1,4 +1,9 @@
 package util.functional
+import util.Logger
+import sourcecode.Line, sourcecode.FileName
+import java.io.*
+
+val monlog = Logger.deriveLogger("statemonad", PrintStream(File("monad")))
 
 /*
  * Flattened state monad with error. 
@@ -13,7 +18,8 @@ case class State[S, A, E](f: S => (S, Either[E, A])) {
   } yield (x)
 
 
-  def flatMap[B](f: A => State[S, B, E]): State[S, B, E] = State(s => {
+  def flatMap[B](f: A => State[S, B, E])(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): State[S, B, E] = State(s => {
+    monlog.debug(s"State.flatMap ${file.value}:${line.value}")
     val (s2, a) = this.f(s)
     val r  = a match {
       case Left(l) => (s2, Left(l))
@@ -55,13 +61,28 @@ object State {
     case Right(ns) => (ns, Right(()))
     case Left(e) => (s, Left(e))
   })
-  def execute[S, A, E](s: S, c: State[S,A, E]) : S = c.f(s)._1
+  def execute[S, A, E](s: S, c: State[S,A, E])(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name) : S = {
+    Logger.debug(s"state.execute")(line, file, name)
+    c.f(s) match {
+      case (s, Left(r)) => {
+        monlog.info(s"ERROR: $r")
+        s
+      }
+      case (s, _) => s
+    }
+  }
   def evaluate[S, A, E](s: S, c: State[S,A, E])  : Either[E,A] = c.f(s)._2
 
   def setError[S,A,E](e: E) : State[S,A,E] =  State(s => (s, Left(e)))
 
   def pure[S, A, E](a: A) : State[S, A, E] = State((s:S) => (s, Right(a)))
-  def pureE[S, A, E](a: Either[E, A]) : State[S, A, E] = State((s:S) => (s, a))
+  def pureE[S, A, E](a: Either[E, A])(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name) : State[S, A, E] = {
+    a match {
+      case Left(l) => monlog.info(s"pureE error $l")(line, file, name)
+      case _ => ()
+    }
+    State((s:S) => (s, a))
+  }
 
   def sequence[S, V, E](ident: State[S,V, E], xs: Iterable[State[S,V, E]]) : State[S, V, E] = {
     xs.foldRight(ident)((l,r) => for {
@@ -74,7 +95,8 @@ object State {
     xs.foldRight(pure(List[A]()))((b,acc) => acc.flatMap(c => m(b).map(v => if v then b::c else c)))
   }
 
-  def mapM[A, B, S, E](m : (A => State[S, B, E]), xs: Iterable[A]): State[S, List[B], E] = {
+  def mapM[A, B, S, E](m : (A => State[S, B, E]), xs: Iterable[A])(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): State[S, List[B], E] = {
+    monlog.debug(s"State.mapM (${xs.size} items) ${file.value}:${line.value}")
     xs.foldRight(pure(List[B]()))((b,acc) => acc.flatMap(c => m(b).map(v => v::c)))
   }
 
