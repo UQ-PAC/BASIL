@@ -7,20 +7,43 @@
 
 NAME=$(notdir $(shell pwd))
 GIT_ROOT?=$(realpath ../../../../)
+BUILD_DIR ?= $(shell realpath --relative-to $(GIT_ROOT) .)
+MAKE_DIR ?= $(GIT_ROOT)/src/test/make
 
-GCC ?= aarch64-linux-gnu-gcc
-CLANG ?= clang-15 -target $(TARGET)
-CC ?= $(GCC)
-#CFLAGS=-fno-pic -fno-plt
-TARGET=aarch64-linux-gnu
+DOCKER ?= docker
+DOCKER_IMAGE ?= localhost/basil-tools-docker:latest
+DOCKER_CONTAINER ?= basil-build-container
+DOCKER_CMD ?= $(realpath $(MAKE_DIR)/docker-helper.sh)
 
-BAP?=bap
-READELF ?= aarch64-linux-gnu-readelf
+ifeq ($(USE_DOCKER), 1)
+
+	GCC ?= $(DOCKER_CMD) aarch64-unknown-linux-gnu-gcc
+	CLANG ?= $(DOCKER_CMD) fjdiaosfjdasio
+	CC ?= $(GCC)
+
+  # these execute outside of docker
+	BAP ?= bap
+	READELF ?= $(DOCKER_CMD) aarch64-unknown-linux-gnu-readelf
+
+else
+
+	GCC ?= aarch64-linux-gnu-gcc
+	CLANG ?= clang-15 -target $(TARGET)
+	CC ?= $(GCC)
+	#CFLAGS=-fno-pic -fno-plt
+	TARGET=aarch64-linux-gnu
+
+	BAP?=bap
+	READELF ?= aarch64-linux-gnu-readelf
+
+endif
+
 BASIL=$(GIT_ROOT)/target/scala-3.3.1/wptool-boogie-assembly-0.0.1.jar
 
-C_SOURCE ?=$(realpath $(wildcard *.c))
-SPEC ?=$(realpath $(wildcard *.spec))
-EXTRA_SPEC ?=$(realpath $(wildcard *.bpl))
+# paths below are relative to lift.mk's compilation_variant directory
+C_SOURCE ?=$(addprefix ../,$(wildcard *.c))
+SPEC ?=$(addprefix ../,$(wildcard *.spec))
+EXTRA_SPEC ?=$(addprefix ../,$(wildcard *.bpl))
 BASIL_FLAGS ?= 
 #BOOGIE_FLAGS=/proverOpt:O:smt.array.extensional=false
 BOOGIE_FLAGS ?= /useArrayAxioms
@@ -30,12 +53,20 @@ LIFT_ARTEFACTS=$(NAME).adt $(NAME).bir $(NAME).relf $(NAME).gts
 ENABLED_COMPILERS ?= clang clang_O2 clang_pic gcc gcc_O2 gcc_pic
 
 TARGETS := all verify clean cleanall cleanlift cleanjson cleangts cleantest recompile json gts
-.PHONY : $(TARGETS) $(ENABLED_COMPILERS)
+.PHONY : $(TARGETS) $(ENABLED_COMPILERS) docker-start docker-stop
 
 $(TARGETS): $(ENABLED_COMPILERS)
 
 $(ENABLED_COMPILERS):
 	mkdir -p $@/
 	# - continue if fails
-	-$(MAKE) -C $(realpath $@) -f $(GIT_ROOT)/src/test/make/$@.mk $(MAKECMDGOALS)
+	$(MAKE) -C $(realpath $@) -f $(MAKE_DIR)/$@.mk $(MAKECMDGOALS)
+
+docker-start: docker-stop
+	bash -c '[[ $(GIT_ROOT)/./$(BUILD_DIR) -ef . ]] && [[ -x "$(DOCKER_CMD)" ]]'
+	docker run -v$(GIT_ROOT):/build --rm -td --user root --name $(DOCKER_CONTAINER) $(DOCKER_IMAGE)
+
+docker-stop:
+	docker rm -f -t 1 $(DOCKER_CONTAINER)
+
 
