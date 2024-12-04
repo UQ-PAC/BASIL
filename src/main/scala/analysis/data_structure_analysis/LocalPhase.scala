@@ -69,7 +69,7 @@ class LocalPhase(proc: Procedure,
    */
   private def isStack(expr: Expr, pos: CFGPosition, size : Int = 0): Option[Cell] = {
     expr match
-      case BinaryExpr(op, arg1: Variable, arg2) if varToSym.contains(pos) && varToSym(pos).contains(arg1) &&
+      case BinaryExpr(_, arg1: Variable, arg2) if varToSym.contains(pos) && varToSym(pos).contains(arg1) &&
         varToSym(pos)(arg1).exists(s => s.symbolicBase.isInstanceOf[StackLocation]) =>
         evaluateExpression(arg2, constProp(pos)) match
           case Some(v) =>
@@ -268,8 +268,8 @@ class LocalPhase(proc: Procedure,
              visitPointerArithmeticOperation(n, lhsCell, arg, 0)
             case _ =>
               unsupportedPointerArithmeticOperation(n, expr, lhsCell)
-
-      case MemoryLoad(lhs, _, index, _, size, _) => // Rx = Mem[Ry], merge Rx and pointee of Ry (E(Ry))
+        
+      case load @ MemoryLoad(lhs, _, index, _, size, _) => // Rx = Mem[Ry], merge Rx and pointee of Ry (E(Ry))
         val indexUnwrapped = unwrapPaddingAndSlicing(index)
         val lhsCell = graph.adjust(graph.varToCell(n)(lhs))
         assert(size % 8 == 0)
@@ -277,9 +277,13 @@ class LocalPhase(proc: Procedure,
         lhsCell.node.get.flags.read = true
         val global = isGlobal(indexUnwrapped, n, byteSize)
         val stack = isStack(indexUnwrapped, n, byteSize)
+        val indexCell = graph.adjust(graph.accessIndexToSlice(load))
+        assert(!indexCell.node.get.flags.merged) // check index cell is a placeholder
         if global.isDefined then
+          graph.mergeCells(graph.find(global.get), indexCell)
           multiAccess(lhsCell, graph.find(global.get), byteSize)
         else if stack.isDefined then
+          graph.mergeCells(graph.find(stack.get), indexCell)
           multiAccess(lhsCell, graph.find(stack.get), byteSize)
         else
           indexUnwrapped match
@@ -288,6 +292,7 @@ class LocalPhase(proc: Procedure,
                 case Some(v) =>
                   //                        assert(varToSym(n).contains(arg1))
                   val offset = v.value
+                  visitPointerArithmeticOperation(n, indexCell, arg1, byteSize, false, offset)
                   visitPointerArithmeticOperation(n, lhsCell, arg1, byteSize, true, offset)
                 case None =>
                   //                        assert(varToSym(n).contains(arg1))
@@ -296,9 +301,10 @@ class LocalPhase(proc: Procedure,
                   unsupportedPointerArithmeticOperation(n, indexUnwrapped, Node(Some(graph)).cells(0))
             case arg: Variable =>
               //                    assert(varToSym(n).contains(arg))
+              visitPointerArithmeticOperation(n, indexCell, arg, byteSize)
               visitPointerArithmeticOperation(n, lhsCell, arg, byteSize, true)
             case _ => ???
-      case MemoryStore(_, ind, expr, _, size, _) =>
+      case store @ MemoryStore(_, ind, expr, _, size, _) =>
         val unwrapped = unwrapPaddingAndSlicing(expr)
         unwrapped match {
           // Mem[Ry] = Rx
@@ -307,8 +313,10 @@ class LocalPhase(proc: Procedure,
             reachingDefs(n)(value).foreach(visit)
             assert(size % 8 == 0)
             val byteSize = size / 8
-            val global = isGlobal(index, n)
-            val stack = isStack(index, n)
+            val global = isGlobal(index, n, byteSize)
+            val stack = isStack(index, n, byteSize)
+            val indexCell = graph.adjust(graph.accessIndexToSlice(store))
+            assert(!indexCell.node.get.flags.merged)
 
             val valueCells = graph.getCells(n, value)
             val valueCell = valueCells.tail.foldLeft(graph.adjust(valueCells.head)) { (c, slice) =>
@@ -316,8 +324,10 @@ class LocalPhase(proc: Procedure,
             }
 
             if global.isDefined then
+              graph.mergeCells(graph.find(global.get), indexCell)
               multiAccess(valueCell, graph.find(global.get), byteSize)
             else if stack.isDefined then
+              graph.mergeCells(graph.find(global.get), indexCell)
               multiAccess(valueCell, graph.find(stack.get), byteSize)
             else
               val addressPointee: Cell =
@@ -327,6 +337,7 @@ class LocalPhase(proc: Procedure,
                       case Some(v) =>
                         //                    assert(varToSym(n).contains(arg1))
                         val offset = v.value
+                        visitPointerArithmeticOperation(n, indexCell, arg1, byteSize, false, offset)
                         visitPointerArithmeticOperation(n, Node(Some(graph)).cells(0), arg1, byteSize, true, offset)
                       case None =>
                         //                    assert(varToSym(n).contains(arg1))
@@ -335,6 +346,7 @@ class LocalPhase(proc: Procedure,
                         unsupportedPointerArithmeticOperation(n, index, Node(Some(graph)).cells(0))
                   case arg: Variable =>
                     //                assert(varToSym(n).contains(arg))
+                    visitPointerArithmeticOperation(n, indexCell, arg, byteSize)
                     visitPointerArithmeticOperation(n, Node(Some(graph)).cells(0), arg, byteSize, true)
                   case _ =>
                     ???

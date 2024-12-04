@@ -34,6 +34,10 @@ extends MemoryLocation, GlobalLocation {
   override def toString: String = s"Data($regionIdentifier, $start, $size)"
 }
 
+case class ExternalLocation(override val regionIdentifier: String) extends MemoryLocation {
+  override def toString: String = s"External($regionIdentifier)"
+}
+
 case class Function(regionIdentifier: String, start: BigInt, size: BigInt) extends MemoryLocation, GlobalLocation{
   override def toString: String = s"Func($regionIdentifier, $start, $size)"
 }

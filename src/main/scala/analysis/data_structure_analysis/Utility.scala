@@ -14,9 +14,14 @@ import scala.util.control.Breaks.{break, breakable}
 object NodeCounter {
   private var counter: Int = 0
 
-  def getCounter: Int =
+  def getCounter: Int = {
     counter = counter + 1
     counter
+  }
+
+  def reset(): Unit = {
+    counter = 0
+  }
 }
 
 class Flags() {
@@ -30,6 +35,7 @@ class Flags() {
   var modified = false
   var incomplete = false
   var foreign = false
+  var merged = false
 
   def join(other: Flags): Unit =
     collapsed = collapsed || other.collapsed
@@ -41,6 +47,7 @@ class Flags() {
     modified = other.modified || modified
     incomplete = other.incomplete || incomplete
     foreign = other.foreign && foreign
+    merged = true
     function = function || other.function
 }
 
@@ -65,11 +72,6 @@ class Node(val graph: Option[Graph], var size: BigInt = 0, val id: Int = NodeCou
     size = offset + cell.largestAccessedSize
     size
   }
-
-//  private def updateSize(newSize: BigInt): Unit = {
-//    if newSize > size then
-//      size = newSize
-//  }
 
   def getCell(offset: BigInt): Cell = {
     if (collapsed) {

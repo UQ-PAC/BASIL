@@ -58,7 +58,7 @@ class ResolveSpec(regionInjector: Option[RegionInjector]) extends SpecResolution
 
   override def visitSpecGlobal(node: SpecGlobal): BMemoryLoad = {
     val memory = if (regionInjector.isDefined) {
-      regionInjector.get.getMergedRegion(node.address) match {
+      regionInjector.get.getMergedRegion(node.address, node.size) match {
         case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
         case None => mem
       }
@@ -70,7 +70,7 @@ class ResolveSpec(regionInjector: Option[RegionInjector]) extends SpecResolution
 
   override def visitSpecGamma(node: SpecGamma): GammaLoad = {
     val gammaMemory = if (regionInjector.isDefined) {
-      regionInjector.get.getMergedRegion(node.address) match {
+      regionInjector.get.getMergedRegion(node.address, node.size) match {
         case Some(region) => BMapVar(s"Gamma_${region.name}", MapBType(BitVecBType(64), BoolBType), Scope.Global)
         case None => gammaMem
       }
@@ -82,7 +82,7 @@ class ResolveSpec(regionInjector: Option[RegionInjector]) extends SpecResolution
 
   override def visitArrayAccess(node: ArrayAccess): BMemoryLoad = {
     val memory = if (regionInjector.isDefined) {
-      regionInjector.get.getMergedRegion(node.address) match {
+      regionInjector.get.getMergedRegion(node.address, node.size) match {
         case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
         case None => mem
       }
@@ -112,7 +112,7 @@ class ResolveSpecL(regionInjector: Option[RegionInjector]) extends SpecResolutio
   private val mem_in = BMapVar("mem$in", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter)
   override def visitSpecGlobal(node: SpecGlobal): BMemoryLoad = {
     val memory = if (regionInjector.isDefined) {
-      regionInjector.get.getMergedRegion(node.address) match {
+      regionInjector.get.getMergedRegion(node.address, node.size) match {
         case Some(region) => BMapVar(s"${region.name}$$in", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter)
         case None => mem_in
       }
@@ -124,7 +124,7 @@ class ResolveSpecL(regionInjector: Option[RegionInjector]) extends SpecResolutio
 
   override def visitArrayAccess(node: ArrayAccess): BMemoryLoad = {
     val memory = if (regionInjector.isDefined) {
-      regionInjector.get.getMergedRegion(node.address) match {
+      regionInjector.get.getMergedRegion(node.address, node.size) match {
         case Some(region) => BMapVar(s"${region.name}$$in", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter)
         case None => mem_in
       }
