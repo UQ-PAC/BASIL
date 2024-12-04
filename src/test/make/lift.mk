@@ -48,7 +48,7 @@ $(NAME)_bap_result.txt: $(NAME)_bap.bpl $(EXTRA_SPEC)
 $(NAME)_gtirb_result.txt: $(NAME)_gtirb.bpl $(EXTRA_SPEC)
 	bash -c "time boogie $(NAME)_gtirb.bpl $(EXTRA_SPEC) $(BOOGIE_FLAGS) | tee $(NAME)_gtirb_result.txt"
 
-md5sum-check:
+md5sum-check: a.out $(LIFT_ARTEFACTS)
 ifeq ($(USE_DOCKER), 1)
 	$(DOCKER_CMD) hash > docker-hash-new
 	diff -u docker-hash-new docker-hash  # if this fails, make sure your docker image is up-to-date.
