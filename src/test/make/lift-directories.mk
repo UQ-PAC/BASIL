@@ -10,15 +10,12 @@ GIT_ROOT?=$(realpath ../../../../)
 BUILD_DIR ?= $(shell realpath --relative-to $(GIT_ROOT) .)
 MAKE_DIR ?= $(GIT_ROOT)/src/test/make
 
-DOCKER ?= docker
-DOCKER_IMAGE ?= localhost/basil-tools-docker:latest
-DOCKER_CONTAINER ?= basil-build-container
 DOCKER_CMD ?= $(realpath $(MAKE_DIR)/docker-helper.sh)
 
 ifeq ($(USE_DOCKER), 1)
 
 	GCC ?= $(DOCKER_CMD) aarch64-unknown-linux-gnu-gcc
-	CLANG ?= $(DOCKER_CMD) fjdiaosfjdasio
+	CLANG ?= $(DOCKER_CMD) clang
 	CC ?= $(GCC)
 
   # these execute outside of docker
@@ -64,9 +61,9 @@ $(ENABLED_COMPILERS):
 
 docker-start: docker-stop
 	bash -c '[[ $(GIT_ROOT)/./$(BUILD_DIR) -ef . ]] && [[ -x "$(DOCKER_CMD)" ]]'
-	docker run -v$(GIT_ROOT):/build --rm -td --user root --name $(DOCKER_CONTAINER) $(DOCKER_IMAGE)
+	$(DOCKER_CMD) start
 
 docker-stop:
-	docker rm -f -t 1 $(DOCKER_CONTAINER)
+	$(DOCKER_CMD) stop
 
 
