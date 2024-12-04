@@ -327,7 +327,7 @@ class LocalPhase(proc: Procedure,
               graph.mergeCells(graph.find(global.get), indexCell)
               multiAccess(valueCell, graph.find(global.get), byteSize)
             else if stack.isDefined then
-              graph.mergeCells(graph.find(global.get), indexCell)
+              graph.mergeCells(graph.find(stack.get), indexCell)
               multiAccess(valueCell, graph.find(stack.get), byteSize)
             else
               val addressPointee: Cell =
