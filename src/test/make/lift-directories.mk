@@ -19,7 +19,7 @@ ifeq ($(USE_DOCKER), 1)
 	CC ?= $(GCC)
 
   # these execute outside of docker
-	BAP ?= bap
+	BAP ?= $(DOCKER_CMD) bap
 	READELF ?= $(DOCKER_CMD) aarch64-unknown-linux-gnu-readelf
 
 else
@@ -49,7 +49,7 @@ LIFT_ARTEFACTS=$(NAME).adt $(NAME).bir $(NAME).relf $(NAME).gts
 
 ENABLED_COMPILERS ?= clang clang_O2 clang_pic gcc gcc_O2 gcc_pic
 
-TARGETS := all verify clean cleanall cleanlift cleanjson cleangts cleantest recompile json gts
+TARGETS := all verify md5sums-update clean cleanall cleanlift cleanjson cleangts cleantest recompile json gts
 .PHONY : $(TARGETS) $(ENABLED_COMPILERS) docker-start docker-stop
 
 $(TARGETS): $(ENABLED_COMPILERS)

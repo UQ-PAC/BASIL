@@ -1,6 +1,7 @@
-#!/bin/bash -u
+#!/bin/bash -ue
 
-: "$@" $GIT_ROOT
+root=$(git rev-parse --show-toplevel)
+: ${GIT_ROOT:=${root}}
 
 : ${DOCKER:=docker}
 : ${DOCKER_IMAGE:=localhost/basil-tools-docker:latest}
@@ -12,6 +13,9 @@ if [[ "$1" == start ]]; then
 elif [[ "$1" == stop ]]; then
   set -x
 	exec $DOCKER rm -f -t 1 $DOCKER_CONTAINER
+elif [[ "$1" == hash ]]; then
+  set -x
+  exec "$0" ls -1 /nix/store
 fi
 
 DIR=$(realpath --relative-to "$GIT_ROOT" .)
