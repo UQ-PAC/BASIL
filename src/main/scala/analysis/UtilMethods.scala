@@ -93,34 +93,6 @@ def getSSAUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPositi
   out(variable)
 }
 
-/** Extracts a MemoryLoad from Expr. Assumes that a statement contains only one memory load.
-  *
-  * @param stmt
-  *   The statement to extract the memory load from
-  * @return
-  *   The memory load if found, None otherwise
- */
-def unwrapExpr(expr: Expr): Option[MemoryLoad] = {
-  expr match {
-    case e: Extract => unwrapExpr(e.body)
-    case e: SignExtend => unwrapExpr(e.body)
-    case e: ZeroExtend => unwrapExpr(e.body)
-    case repeat: Repeat => unwrapExpr(repeat.body)
-    case unaryExpr: UnaryExpr => unwrapExpr(unaryExpr.arg)
-    case binaryExpr: BinaryExpr =>
-      // assume one memory load
-      val lhs = unwrapExpr(binaryExpr.arg1)
-      if (lhs.isDefined) {
-        return lhs
-      }
-      unwrapExpr(binaryExpr.arg2)
-    case memoryLoad: MemoryLoad =>
-      Some(memoryLoad)
-    case _ =>
-      None
-  }
-}
-
 /** Extracts the variable from an expression (only one variable is expected otherwise None ie. in Binary Expression).
   *
   * @param expr
@@ -140,7 +112,6 @@ def unwrapExprToVar(expr: Expr): Option[Variable] = {
     case unaryExpr: UnaryExpr => unwrapExprToVar(unaryExpr.arg)
     case binaryExpr: BinaryExpr => // TODO: handle multiple variables
       None
-    case memoryLoad: MemoryLoad => unwrapExprToVar(memoryLoad.index)
     case _ =>
       None
   }

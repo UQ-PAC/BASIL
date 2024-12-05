@@ -14,9 +14,14 @@ import scala.util.control.Breaks.{break, breakable}
 object NodeCounter {
   private var counter: Int = 0
 
-  def getCounter: Int =
+  def getCounter: Int = {
     counter = counter + 1
     counter
+  }
+
+  def reset(): Unit = {
+    counter = 0
+  }
 }
 
 class Flags() {
@@ -29,6 +34,7 @@ class Flags() {
   var modified = false
   var incomplete = false
   var foreign = false
+  var merged = false
 
   def join(other: Flags): Unit =
     collapsed = collapsed || other.collapsed
@@ -40,6 +46,7 @@ class Flags() {
     modified = other.modified || modified
     incomplete = other.incomplete || incomplete
     foreign = other.foreign && foreign
+    merged = true
 }
 
 /**
@@ -246,7 +253,6 @@ def unwrapPaddingAndSlicing(expr: Expr): Expr =
     case SignExtend(extension, body) => SignExtend(extension, unwrapPaddingAndSlicing(body))
     case UnaryExpr(op, arg) => UnaryExpr(op, arg)
     case BinaryExpr(op, arg1, arg2) => BinaryExpr(op, unwrapPaddingAndSlicing(arg1), unwrapPaddingAndSlicing(arg2))
-    case MemoryLoad(mem, index, endian, size) => MemoryLoad(mem, unwrapPaddingAndSlicing(index), endian, size)
     case variable: Variable => variable
     case Extract(_, _, body) /*if start == 0 && end == 32*/ => unwrapPaddingAndSlicing(body) // this may make it unsound
     case ZeroExtend(_, body) => unwrapPaddingAndSlicing(body)

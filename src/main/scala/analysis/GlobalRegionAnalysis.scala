@@ -5,12 +5,14 @@ import ir.*
 
 import scala.collection.mutable
 
-trait GlobalRegionAnalysis(val program: Program,
-                           val domain: Set[CFGPosition],
-                           val constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-                           val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-                           val mmm: MemoryModelMap,
-                           val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]) {
+trait GlobalRegionAnalysis(
+  val program: Program,
+  val domain: Set[CFGPosition],
+  val constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+  val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
+  val mmm: MemoryModelMap,
+  val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
+) {
 
   private var dataCount: Int = 0
   private def nextDataCount() = {
@@ -44,29 +46,6 @@ trait GlobalRegionAnalysis(val program: Program,
 
   def getDataMap: mutable.HashMap[BigInt, DataRegion] = dataMap
 
-  /**
-   * For DataRegions, the actual address used needs to be converted to the relocated address.
-   * This is because when regions are found, the relocated address is used and as such match
-   * the correct range.
-   *
-   * @param address: The starting DataRegion
-   * @return DataRegion: The relocated data region if any
-   */
-  def resolveGlobalOffsetSecondLast(address: DataRegion): DataRegion = {
-    var tableAddress = address
-    // addresses may be layered as in jumptable2 example for which recursive search is required
-    var exitLoop = false
-    while (mmm.relocatedDataRegion(tableAddress.start).isDefined && mmm.relocatedDataRegion(mmm.relocatedDataRegion(tableAddress.start).get.start).isDefined && !exitLoop) {
-      val newAddress = mmm.relocatedDataRegion(tableAddress.start).getOrElse(tableAddress)
-      if (newAddress == tableAddress) {
-        exitLoop = true
-      } else {
-        tableAddress = newAddress
-      }
-    }
-    tableAddress
-  }
-
   def tryCoerceIntoData(exp: Expr, n: Command, subAccess: BigInt, noLoad: Boolean = false): Set[DataRegion] = {
     val eval = evaluateExpression(exp, constantProp(n))
     if (eval.isDefined) {
@@ -90,14 +69,14 @@ trait GlobalRegionAnalysis(val program: Program,
           } else {
             Set()
           }
-        case _: MemoryLoad => ???
         case _: UninterpretedFunction => Set.empty
         case variable: Variable =>
           if (noLoad) {
-            return Set()
+            Set()
+          } else {
+            val uses = getUse(variable, n, reachingDefs)
+            uses.flatMap(i => getVSAHints(variable, subAccess, i))
           }
-          val uses = getUse(variable, n, reachingDefs)
-          return uses.flatMap(i => getVSAHints(variable, subAccess, i))
         case _ => Set()
       }
     }
@@ -149,7 +128,7 @@ trait GlobalRegionAnalysis(val program: Program,
   //        dataMap(i.start)
         dataMap.remove(i.start)
         accesses.foreach(a => dataPoolMaster(a.start, a.size, false))
-        converted = converted ++ accesses.collect({ case a => dataMap(a.start) })
+        converted = converted ++ accesses.map(a => dataMap(a.start))
       }
     }
     converted
@@ -157,25 +136,21 @@ trait GlobalRegionAnalysis(val program: Program,
 
   /** Transfer function for state lattice elements.
    */
-  def localTransfer(n: CFGPosition, s: Set[DataRegion]): Set[DataRegion] = {
+  def transfer(n: CFGPosition, s: Set[DataRegion]): Set[DataRegion] = {
     n match {
-      case memAssign: MemoryAssign =>
-        return checkIfDefined(tryCoerceIntoData(memAssign.index, memAssign, memAssign.size), n)
-      case assign: Assign =>
-        val unwrapped = unwrapExpr(assign.rhs)
-        if (unwrapped.isDefined) {
-          val regions: Set[DataRegion] = tryCoerceIntoData(unwrapped.get.index, assign, unwrapped.get.size)
-          return checkIfDefined(regions, n)
-        } else {
-          // this is a constant but we need to check if it is a data region
-          return checkIfDefined(tryCoerceIntoData(assign.rhs, assign, 1, noLoad = true), n)
-        }
+      case store: MemoryStore =>
+        checkIfDefined(tryCoerceIntoData(store.index, store, store.size), n)
+      case load: MemoryLoad =>
+        val regions: Set[DataRegion] = tryCoerceIntoData(load.index, load, load.size)
+        checkIfDefined(regions, n)
+      case assign: LocalAssign =>
+        // this is a constant but we need to check if it is a data region
+        checkIfDefined(tryCoerceIntoData(assign.rhs, assign, 1, noLoad = true), n)
       case _ =>
         Set()
     }
  }
 
-  def transfer(n: CFGPosition, s: Set[DataRegion]): Set[DataRegion] = localTransfer(n, s)
 }
 
 class GlobalRegionAnalysisSolver(

@@ -31,8 +31,8 @@ trait SSA(program: Program, writesTo: Map[Procedure, Set[Register]], RNAResult: 
     localTransfer(n, s)
 
   def localTransfer(
-      n: CFGPosition,
-      s: (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])
+    n: CFGPosition,
+    s: (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])
   ): (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]]) = n match {
     case cmd: Command =>
       eval(cmd, s)
@@ -53,18 +53,24 @@ trait SSA(program: Program, writesTo: Map[Procedure, Set[Register]], RNAResult: 
 
   def eval(cmd: Command, s: (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])):
     (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]]) = cmd match {
-    case assign: Assign =>
+    case assign: LocalAssign =>
       val rhs = assign.rhs.variables
       val lhs = assign.lhs
-      val rhsUseDefs: Map[Variable, FlatElement[Int]] = rhs.foldLeft(Map.empty[Variable, FlatElement[Int]]) {
-        case (acc, v) =>
-          acc + (v -> s(0)(v))
+      val rhsUseDefs = rhs.foldLeft(Map.empty[Variable, FlatElement[Int]]) { (acc, v) =>
+        acc + (v -> s(0)(v))
+      }
+      (s(0) + (lhs -> FlatEl(nextSSACount())), rhsUseDefs)
+    case load: MemoryLoad =>
+      val rhs = load.index.variables
+      val lhs = load.lhs
+      val rhsUseDefs = rhs.foldLeft(Map.empty[Variable, FlatElement[Int]]) { (acc, v) =>
+        acc + (v -> s(0)(v))
       }
       (s(0) + (lhs -> FlatEl(nextSSACount())), rhsUseDefs)
     case assert: Assert =>
       transformUses(assert.body.variables, s)
-    case memoryAssign: MemoryAssign =>
-      transformUses(memoryAssign.index.variables ++ memoryAssign.value.variables, s)
+    case store: MemoryStore =>
+      transformUses(store.index.variables ++ store.value.variables, s)
     case assume: Assume =>
       transformUses(assume.body.variables, s)
     case indirectCall: IndirectCall =>
@@ -72,9 +78,8 @@ trait SSA(program: Program, writesTo: Map[Procedure, Set[Register]], RNAResult: 
     case directCall: DirectCall =>
       writesTo.get(directCall.target) match {
         case Some(registers) =>
-          val result: Map[Variable, FlatElement[Int]] = registers.foldLeft(Map[Variable, FlatElement[Int]]()) {
-            (m, register) =>
-              m + (register -> FlatEl(nextSSACount()))
+          val result = registers.foldLeft(Map[Variable, FlatElement[Int]]()) { (m, register) =>
+            m + (register -> FlatEl(nextSSACount()))
           }
           (s(0) ++ result, s(1))
         case None =>

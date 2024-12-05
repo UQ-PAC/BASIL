@@ -24,7 +24,8 @@ abstract class IDESolver[E <: Procedure | Command, EE <: Procedure | Command, C 
   protected def isExit(exit: CFGPosition): Boolean
   protected def getAfterCalls(exit: EE): Set[R]
 
-  def phase2Init = valuelattice.top
+  def phase2Init: T = valuelattice.top
+  def start: CFGPosition = startNode
 
   /**
    * Phase 1 of the IDE algorithm.
@@ -32,10 +33,10 @@ abstract class IDESolver[E <: Procedure | Command, EE <: Procedure | Command, C 
    * The original version of the algorithm uses summary edges from call nodes to after-call nodes
    * instead of `callJumpCache` and `exitJumpCache`.
    */
-  private class Phase1(val program: Program) extends InitializingPushDownWorklistFixpointSolver[(CFGPosition, DL, DL), EdgeFunction[T], EdgeFunctionLattice[T, L]] {
+  private class Phase1 extends InitializingPushDownWorklistFixpointSolver[(CFGPosition, DL, DL), EdgeFunction[T], EdgeFunctionLattice[T, L]] {
 
     val lattice: MapLattice[(CFGPosition, DL, DL), EdgeFunction[T], EdgeFunctionLattice[T, L]] = MapLattice(edgelattice)
-    val first: Set[(CFGPosition, DL, DL)] = Set((startNode, Right(Lambda()), Right(Lambda())))
+    val first: Set[(CFGPosition, DL, DL)] = Set((start, Right(Lambda()), Right(Lambda())))
 
     /**
      * callJumpCache(funentry, d1, call)(d3) returns the composition of the edges (call.funentry, d3) -> (call, *) -> (funentry, d1).
@@ -76,7 +77,6 @@ abstract class IDESolver[E <: Procedure | Command, EE <: Procedure | Command, C 
         }
       }
     }
-
 
     def process(n: (CFGPosition, DL, DL)): Unit = {
       val (position, d1, d2) = n
@@ -142,14 +142,14 @@ abstract class IDESolver[E <: Procedure | Command, EE <: Procedure | Command, C 
    * Performs a forward dataflow analysis using the decomposed lattice and the micro-transformers.
    * The original RHS version of IDE uses jump functions for all nodes, not only at exits, but the analysis result and complexity is the same.
    */
-  private class Phase2(val program: Program, val phase1: Phase1) extends InitializingPushDownWorklistFixpointSolver[(CFGPosition, DL), T, L]:
+  private class Phase2(val phase1: Phase1) extends InitializingPushDownWorklistFixpointSolver[(CFGPosition, DL), T, L] {
     val lattice: MapLattice[(CFGPosition, DL), T, L] = MapLattice(valuelattice)
-    val first: Set[(CFGPosition, DL)] = Set((startNode, Right(Lambda())))
+    val first: Set[(CFGPosition, DL)] = Set((start, Right(Lambda())))
 
     /**
-     * Function summaries from phase 1.
-     * Built when first invoked.
-     */
+      * Function summaries from phase 1.
+      * Built when first invoked.
+      */
     lazy val summaries: mutable.Map[Procedure, mutable.Map[DL, mutable.Map[DL, EdgeFunction[T]]]] = phase1.summaries()
 
     def init: T = phase2Init
@@ -188,21 +188,23 @@ abstract class IDESolver[E <: Procedure | Command, EE <: Procedure | Command, C 
     val restructuredlattice: MapLattice[CFGPosition, Map[D, T], MapLattice[D, T, L]] = MapLattice(MapLattice(valuelattice))
 
     /**
-     * Restructures the analysis output to match `restructuredlattice`.
-     */
-    def restructure(y: lattice.Element): restructuredlattice.Element =
+      * Restructures the analysis output to match `restructuredlattice`.
+      */
+    def restructure(y: lattice.Element): restructuredlattice.Element = {
       y.foldLeft(Map[CFGPosition, Map[D, valuelattice.Element]]()) { case (acc, ((n, dl), e)) =>
         dl match {
           case Left(d) => acc + (n -> (acc.getOrElse(n, Map[D, valuelattice.Element]()) + (d -> e)))
           case _ => acc
         }
       }
+    }
+  }
 
   def analyze(): Map[CFGPosition, Map[D, T]] = {
     if (program.mainProcedure.blocks.nonEmpty && program.mainProcedure.returnBlock.isDefined && program.mainProcedure.entryBlock.isDefined) {
-      val phase1 = Phase1(program)
+      val phase1 = Phase1()
       phase1.analyze()
-      val phase2 = Phase2(program, phase1)
+      val phase2 = Phase2(phase1)
       phase2.restructure(phase2.analyze())
     } else {
       Logger.warn(s"Disabling IDE solver tests due to external main procedure: ${program.mainProcedure.name}")
@@ -224,7 +226,7 @@ abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program)
 
   protected def returnToCall(ret: Command): DirectCall = ret match {
     case ret: Statement => ret.parent.statements.getPrev(ret).asInstanceOf[DirectCall]
-    case r: Jump => ret.parent.statements.last.asInstanceOf[DirectCall]
+    case _: Jump => ret.parent.statements.last.asInstanceOf[DirectCall]
   }
 
   protected def getCallee(call: DirectCall): Procedure = {
@@ -232,16 +234,20 @@ abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program)
     call.target
   }
 
-  protected def isCall(call: CFGPosition): Boolean =
-    call match
-      case directCall: DirectCall if (!directCall.successor.isInstanceOf[Unreachable] && directCall.target.returnBlock.isDefined && directCall.target.entryBlock.isDefined) => true
+  protected def isCall(call: CFGPosition): Boolean = {
+    call match {
+      case directCall: DirectCall if !directCall.successor.isInstanceOf[Unreachable] && directCall.target.returnBlock.isDefined && directCall.target.entryBlock.isDefined => true
       case _ => false
+    }
+  }
 
-  protected def isExit(exit: CFGPosition): Boolean =
-    exit match
+  protected def isExit(exit: CFGPosition): Boolean = {
+    exit match {
       // only looking at functions with statements
-      case command: Return => true
+      case _: Return => true
       case _ => false
+    }
+  }
 
   protected def getAfterCalls(exit: Return): Set[Command] =
     InterProcIRCursor.succ(exit).filter(_.isInstanceOf[Command]).map(_.asInstanceOf[Command])
@@ -258,7 +264,7 @@ abstract class BackwardIDESolver[D, T, L <: Lattice[T]](program: Program)
 
   protected def callToReturn(call: Command): DirectCall =  {
     IRWalk.prevCommandInBlock(call) match {
-      case Some(x : DirectCall) => x
+      case Some(x: DirectCall) => x
       case p => throw Exception(s"Not a return/aftercall node $call  .... prev = $p")
     }
   }
@@ -271,22 +277,25 @@ abstract class BackwardIDESolver[D, T, L <: Lattice[T]](program: Program)
     procCalled.returnBlock.getOrElse(throw Exception(s"No return node for procedure ${procCalled}")).jump.asInstanceOf[Return]
   }
 
-  protected def isCall(call: CFGPosition): Boolean =
-    call match
-      case c: Unreachable => false /* don't process non-returning calls */
-      case c : Command => {
+  protected def isCall(call: CFGPosition): Boolean = {
+    call match {
+      case _: Unreachable => false /* don't process non-returning calls */
+      case c: Command =>
         val call = IRWalk.prevCommandInBlock(c)
         call match {
           case Some(d: DirectCall) if d.target.returnBlock.isDefined => true
           case _ => false
         }
-      }
       case _ => false
+    }
+  }
 
-  protected def isExit(exit: CFGPosition): Boolean =
-    exit match
+  protected def isExit(exit: CFGPosition): Boolean = {
+    exit match {
       case procedure: Procedure => procedure.blocks.nonEmpty
       case _ => false
+    }
+  }
 
   protected def getAfterCalls(exit: Procedure): Set[DirectCall] = exit.incomingCalls().toSet
 }

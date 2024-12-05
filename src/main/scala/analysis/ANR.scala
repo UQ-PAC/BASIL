@@ -7,7 +7,7 @@ import scala.collection.immutable
 
 /**
  * Calculates the set of variables that are not read after being written up to that point in the program.
- * Useful for detecting dead stores, constants and if what variables are passed as parameters in a function call.
+ * Useful for detecting dead stores, constants and which variables are passed as parameters in a function call.
  */
 trait ANRAnalysis(program: Program) {
 
@@ -26,35 +26,41 @@ trait ANRAnalysis(program: Program) {
   /** Default implementation of eval.
     */
   def eval(cmd: Command, s: Set[Variable]): Set[Variable] = {
-    var m = s
     cmd match {
       case assume: Assume =>
-        m.diff(assume.body.variables)
+        s.diff(assume.body.variables)
       case assert: Assert =>
-        m.diff(assert.body.variables)
-      case memoryAssign: MemoryAssign =>
-        m.diff(memoryAssign.index.variables ++ memoryAssign.value.variables)
+        s.diff(assert.body.variables)
+      case memoryStore: MemoryStore =>
+        s.diff(memoryStore.index.variables ++ memoryStore.value.variables)
       case indirectCall: IndirectCall =>
-        m - indirectCall.target
-      case assign: Assign =>
-        m = m.diff(assign.rhs.variables)
-        if ignoreRegions.contains(assign.lhs) then m else m + assign.lhs
+        s - indirectCall.target
+      case assign: LocalAssign =>
+        val m = s.diff(assign.rhs.variables)
+        if (ignoreRegions.contains(assign.lhs)) {
+          m
+        } else {
+          m + assign.lhs
+        }
+      case memoryLoad: MemoryLoad =>
+        val m = s.diff(memoryLoad.index.variables)
+        if (ignoreRegions.contains(memoryLoad.lhs)) {
+          m
+        } else {
+          m + memoryLoad.lhs
+        }
       case _ =>
-        m
+        s
     }
   }
 
   /** Transfer function for state lattice elements.
     */
-  def localTransfer(n: CFGPosition, s: Set[Variable]): Set[Variable] = n match {
+  def transfer(n: CFGPosition, s: Set[Variable]): Set[Variable] = n match {
     case cmd: Command =>
       eval(cmd, s)
     case _ => s // ignore other kinds of nodes
   }
-
-  /** Transfer function for state lattice elements.
-      */
-  def transfer(n: CFGPosition, s: Set[Variable]): Set[Variable] = localTransfer(n, s)
 }
 
 class ANRAnalysisSolver(program: Program) extends ANRAnalysis(program)

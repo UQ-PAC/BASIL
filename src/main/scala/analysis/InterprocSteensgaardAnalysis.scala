@@ -56,27 +56,25 @@ class InterprocSteensgaardAnalysis(
     }
 
     // for every direct call in mmm.contextMapVSA the ctx is unified with the call site summary
-    mmm.contextMapVSA.foreach { case (procedure, ctx) =>
-      ctx.foreach(
-        (directCall, v) => {
-          val solverCopy = solver.deepCopy()
-          v.foreach(
-            (k1, v1) => {
-              k1 match
-                case variable: Variable =>
-                  val defs = getSSADefinition(variable, directCall.target, reachingDefs)
-                  v1.foreach {
-                    case AddressValue(region) =>
-                      solverCopy.unify(IdentifierVariable(RegisterWrapperEqualSets(variable, defs)), PointerRef(AllocVariable(region)))
-                    case LiteralValue(expr) => ???
-                    case _ => ???
-                  }
-                case _=> // do nothing
+
+    for {
+      ctx <- mmm.contextMapVSA.values
+      (directCall, v) <- ctx
+    } {
+      val solverCopy = solver.deepCopy()
+      v.foreach { (k1, v1) =>
+        k1 match {
+          case variable: Variable =>
+            val defs = getSSADefinition(variable, directCall.target, reachingDefs)
+            v1.foreach {
+              case AddressValue(region) =>
+                solverCopy.unify(IdentifierVariable(RegisterWrapperEqualSets(variable, defs)), PointerRef(AllocVariable(region)))
+              case LiteralValue(_) => ???
+              case _ => ???
             }
-          )
-          callSiteSummary.put(directCall, pointsTo(solverCopy))
+          case _ => // do nothing
         }
-      )
+      }
     }
     Logger.debug("Done")
   }
@@ -94,7 +92,8 @@ class InterprocSteensgaardAnalysis(
         val alloc = mmm.nodeToRegion(directCall).head
         val defs = getSSADefinition(mallocVariable, directCall, reachingDefs)
         unify(IdentifierVariable(RegisterWrapperEqualSets(mallocVariable, defs)), PointerRef(AllocVariable(alloc)))
-      case assign: Assign =>
+      case assign: LocalAssign =>
+        // TODO: unsound
         val unwrapped = unwrapExprToVar(assign.rhs)
         if (unwrapped.isDefined) {
           // X1 = X2: [[X1]] = [[X2]]
@@ -109,20 +108,37 @@ class InterprocSteensgaardAnalysis(
             unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, assign, reachingDefs))), PointerRef(AllocVariable(x)))
           }
         }
-      case memoryAssign: MemoryAssign =>
+      case memoryStore: MemoryStore =>
         // *X1 = X2: [[X1]] = ↑a ^ [[X2]] = a where a is a fresh term variable
         val X1_star = mmm.nodeToRegion(node)
-        val unwrapped = unwrapExprToVar(memoryAssign.value)
+        // TODO: This is not sound
+        val unwrapped = unwrapExprToVar(memoryStore.value)
         if (unwrapped.isDefined) {
           val X2 = unwrapped.get
           val alpha = FreshVariable()
           X1_star.foreach { x =>
             unify(PointerRef(AllocVariable(x)), PointerRef(alpha))
           }
-          unify(IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, memoryAssign, reachingDefs))), alpha)
+          unify(IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, memoryStore, reachingDefs))), alpha)
 //            X1_star.foreach { x =>
 //              unify(PointerRef(AllocVariable(x)), IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, memoryAssign, reachingDefs))))
 //            }
+        }
+      case load: MemoryLoad =>
+        // TODO: unsound
+        val unwrapped = unwrapExprToVar(load.index)
+        if (unwrapped.isDefined) {
+          // X1 = X2: [[X1]] = [[X2]]
+          val X1 = load.lhs
+          val X2 = unwrapped.get
+          unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, load, reachingDefs))), IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, load, reachingDefs))))
+        } else {
+          // X1 = *X2: [[X2]] = ↑a ^ [[X1]] = a where a is a fresh term variable TODO: this rule has been adapted to match [[X1]] = ↑[[alloc_X2]]
+          val X1 = load.lhs
+          val X2_star = mmm.nodeToRegion(node)
+          X2_star.foreach { x =>
+            unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, load, reachingDefs))), PointerRef(AllocVariable(x)))
+          }
         }
       case _ => // do nothing
     }

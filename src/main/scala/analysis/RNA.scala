@@ -22,47 +22,44 @@ trait RNAAnalysis(program: Program) {
   private val linkRegister = Register("R30", 64)
   private val framePointer = Register("R29", 64)
 
-  private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer, stackPointer)
+  private val ignoreRegions: Set[Variable] = Set(linkRegister, framePointer, stackPointer)
 
-  /** Default implementation of eval.
-    */
   def eval(cmd: Command, s: Set[Variable]): Set[Variable] = {
-    var m = s
     cmd match {
       case assume: Assume =>
-        m.union(assume.body.variables.filter(!ignoreRegions.contains(_)))
+        s ++ (assume.body.variables -- ignoreRegions)
       case assert: Assert =>
-        m.union(assert.body.variables.filter(!ignoreRegions.contains(_)))
-      case memoryAssign: MemoryAssign =>
-        m.union((memoryAssign.index.variables ++ memoryAssign.value.variables).filter(!ignoreRegions.contains(_)))
+        s ++ (assert.body.variables -- ignoreRegions)
+      case memoryStore: MemoryStore =>
+        s ++ ((memoryStore.index.variables ++ memoryStore.value.variables) -- ignoreRegions)
       case indirectCall: IndirectCall =>
-        if (ignoreRegions.contains(indirectCall.target)) return m
-        m + indirectCall.target
-      case assign: Assign =>
-        m = m - assign.lhs
-        m.union(assign.rhs.variables.filter(!ignoreRegions.contains(_)))
+        if (ignoreRegions.contains(indirectCall.target)) {
+          s
+        } else {
+          s + indirectCall.target
+        }
+      case assign: LocalAssign =>
+        val m = s - assign.lhs
+        m ++ (assign.rhs.variables -- ignoreRegions)
+      case memoryLoad: MemoryLoad =>
+        val m = s - memoryLoad.lhs
+        m ++ (memoryLoad.index.variables -- ignoreRegions)
       case _ =>
-        m
+        s
     }
   }
 
   /** Transfer function for state lattice elements.
     */
-  def localTransfer(n: CFGPosition, s: Set[Variable]): Set[Variable] = n match {
+  def transfer(n: CFGPosition, s: Set[Variable]): Set[Variable] = n match {
     case cmd: Command =>
       eval(cmd, s)
     case _ => s // ignore other kinds of nodes
   }
 
-  /** Transfer function for state lattice elements.
-      */
-  def transfer(n: CFGPosition, s: Set[Variable]): Set[Variable] = localTransfer(n, s)
 }
 
-class RNAAnalysisSolver(
-    program: Program
-) extends RNAAnalysis(program)
+class RNAAnalysisSolver(program: Program) extends RNAAnalysis(program)
     with IRIntraproceduralBackwardDependencies
     with Analysis[Map[CFGPosition, Set[Variable]]]
-    with SimpleWorklistFixpointSolver[CFGPosition, Set[Variable], PowersetLattice[Variable]] {
-}
+    with SimpleWorklistFixpointSolver[CFGPosition, Set[Variable], PowersetLattice[Variable]]

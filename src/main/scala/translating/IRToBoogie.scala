@@ -40,11 +40,10 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
   private val LArgs = lArgs
 
   private val memoriesToGamma = if (regionInjector.isDefined) {
-    regionInjector.get.mergedRegions.collect {
-      case (_: DataRegion | _: HeapRegion, region: MergedRegion) =>
-        val memory = BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
-        val gamma = BMapVar(s"Gamma_${region.name}", MapBType(BitVecBType(64), BoolBType), Scope.Global)
-        memory -> gamma
+    regionInjector.get.sharedRegions().map { region =>
+      val memory = BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+      val gamma = BMapVar(s"Gamma_${region.name}", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+      memory -> gamma
     }.toMap
   } else {
     Map(mem -> Gamma_mem)
@@ -72,7 +71,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
   def lArgs: List[BMapVar] = {
     if (regionInjector.isDefined) {
       spec.LPreds.values.flatMap(_.specGlobals).toSet.map { g =>
-        regionInjector.get.getMergedRegion(g.address) match {
+        regionInjector.get.getMergedRegion(g.address, g.size) match {
           case Some(region) => BMapVar(s"${region.name}", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
           case None => mem
         }
@@ -733,15 +732,15 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
   def translate(s: Statement): List[BCmd] = s match {
     case d: Call => translate(d)
     case _: NOP => List.empty
-    case m: MemoryAssign =>
+    case m: MemoryStore =>
       val lhs = m.mem.toBoogie
       val rhs = BMemoryStore(m.mem.toBoogie, m.index.toBoogie, m.value.toBoogie, m.endian, m.size)
       val lhsGamma = m.mem.toGamma
       val rhsGamma = GammaStore(m.mem.toGamma, m.index.toBoogie, exprToGamma(m.value), m.size, m.size / m.mem.valueSize)
       val store = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
       val stateSplit = s match {
-        case MemoryAssign(_, _, _, _, _, Some(label)) => List(captureStateStatement(s"$label"))
-        case Assign(_, _, Some(label)) => List(captureStateStatement(s"$label"))
+        case MemoryStore(_, _, _, _, _, Some(label)) => List(captureStateStatement(s"$label"))
+        case LocalAssign(_, _, Some(label)) => List(captureStateStatement(s"$label"))
         case _ => List.empty
       }
       m.mem match {
@@ -759,7 +758,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
           }
           val oldAssigns = oldVars.toList.sorted.map { g =>
             val memory = if (regionInjector.isDefined) {
-              regionInjector.get.getMergedRegion(g.address) match {
+              regionInjector.get.getMergedRegion(g.address, g.size) match {
                 case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
                 case None => mem
               }
@@ -770,7 +769,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
           }
           val oldGammaAssigns = controlled.map { g =>
             val gamma = if (regionInjector.isDefined) {
-              regionInjector.get.getMergedRegion(g.address) match {
+              regionInjector.get.getMergedRegion(g.address, g.size) match {
                 case Some(region) =>
                   BMapVar(s"Gamma_${region.name}", MapBType(BitVecBType(64), BoolBType), Scope.Global)
                 case None =>
@@ -801,22 +800,29 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
           }
           (List(rely, gammaValueCheck) ++ oldAssigns ++ oldGammaAssigns :+ store) ++ secureUpdate ++ guaranteeChecks ++ stateSplit
       }
-    case l: Assign =>
+    case l: LocalAssign =>
       val lhs = l.lhs.toBoogie
       val rhs = l.rhs.toBoogie
       val lhsGamma = l.lhs.toGamma
       val rhsGamma = exprToGamma(l.rhs)
-      val assign = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
-      val loads = l.rhs.loads
-      if (loads.size > 1) {
-        throw Exception(s"$l contains multiple loads")
+      List(AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma)))
+    case m: MemoryLoad =>
+      val lhs = m.lhs.toBoogie
+      val lhsGamma = m.lhs.toGamma
+      val rhs = BMemoryLoad(m.mem.toBoogie, m.index.toBoogie, m.endian, m.size)
+      val rhsGamma = m.mem match {
+        case s: StackMemory =>
+          GammaLoad(s.toGamma, m.index.toBoogie, m.size, m.size / s.valueSize)
+        case s: SharedMemory =>
+          val boogieIndex = m.index.toBoogie
+          BinaryBExpr(BoolOR, GammaLoad(s.toGamma, boogieIndex, m.size, m.size / s.valueSize), L(LArgs, boogieIndex))
       }
-      // add rely call if assignment contains a non-stack load
-      loads.headOption match {
-        case Some(MemoryLoad(SharedMemory(_, _, _), _, _, _)) =>
+      val assign = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
+      // add rely call if is a non-stack load
+      m.mem match {
+        case _: SharedMemory =>
           List(BProcedureCall("rely"), assign)
         case _ =>
-          // load is a stack load or doesn't exist
           List(assign)
       }
     case a: Assert =>
@@ -828,7 +834,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
   }
 
   def exprToGamma(e: Expr): BExpr = {
-    val gammaVars: Set[BExpr] = e.gammas.map(_.toGamma) ++ e.loads.map(_.toGamma(LArgs))
+    val gammaVars: Set[BExpr] = e.gammas.map(_.toGamma)
     if (gammaVars.isEmpty) {
       TrueBLiteral
     } else if (gammaVars.size == 1) {

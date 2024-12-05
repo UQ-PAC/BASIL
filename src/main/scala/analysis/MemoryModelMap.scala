@@ -304,7 +304,7 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt], val externalFunctio
   def findDataObject(value: BigInt): Option[DataRegion] =
     dataMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => returnRegion(obj))
 
-  def findDataObjectWithSize(value: BigInt, size: BigInt): (Set[DataRegion], Set[DataRegion]) =
+  def findDataObjectWithSize(value: BigInt, size: BigInt): (Set[DataRegion], Set[DataRegion]) = {
     // get regions that are between value and value + size and put partial regions (if part of the regions is between value and value + size) in a separate set
     dataMap.foldLeft((Set.empty[DataRegion], Set.empty[DataRegion])) { case ((fullRegions, partialRegions), (range, region)) =>
       if (range.start >= value && range.end <= value + size - 1) {
@@ -315,6 +315,7 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt], val externalFunctio
         (fullRegions, partialRegions)
       }
     }
+  }
 
   override def toString: String =
     s"Stack: $stackMap\n Heap: $heapMap\n Data: $dataMap\n"

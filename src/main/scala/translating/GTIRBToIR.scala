@@ -7,7 +7,7 @@ import com.grammatech.gtirb.proto.CFG.Edge
 import com.grammatech.gtirb.proto.CFG.EdgeLabel
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Symbol.Symbol
-import Parsers.SemanticsParser.*
+import Parsers.ASLpParser.*
 import gtirb.*
 import ir.*
 
@@ -156,7 +156,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
     // maybe good to sort blocks by address around here?
 
-    val semanticsLoader = SemanticsLoader(parserMap)
+    val semanticsLoader = GTIRBLoader(parserMap)
 
     for ((functionUUID, blockUUIDs) <- functionBlocks) {
       val procedure = uuidToProcedure(functionUUID)
@@ -228,7 +228,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
   private def removePCAssign(block: Block): Option[String] = {
     block.statements.last match {
-      case last @ Assign(lhs: Register, _, _) if lhs.name == "_PC" =>
+      case last @ LocalAssign(lhs: Register, _, _) if lhs.name == "_PC" =>
         val label = last.label
         block.statements.remove(last)
         label
@@ -238,7 +238,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
   private def getPCTarget(block: Block): Register = {
     block.statements.last match {
-      case Assign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
+      case LocalAssign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
       case _ => throw Exception(s"expected block ${block.label} to have a program counter assignment at its end")
     }
   }
@@ -373,8 +373,8 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
       // need to copy jump as it can't have multiple parents
       val jumpCopy = currentBlock.jump match {
         case GoTo(targets, label) => GoTo(targets, label)
-        case h: Unreachable => Unreachable()
-        case r: Return => Return()
+        case Unreachable(label) => Unreachable(label)
+        case Return(label) => Return(label)
         case _ => throw Exception("this shouldn't be reachable")
       }
       trueBlock.replaceJump(currentBlock.jump)
@@ -397,7 +397,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           if (proxySymbols.isEmpty) {
             // indirect call with no further information
             val target = block.statements.last match {
-              case Assign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
+              case LocalAssign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
               case _ => throw Exception(s"no assignment to program counter found before indirect call in block ${block.label}")
             }
             val label = block.statements.last.label

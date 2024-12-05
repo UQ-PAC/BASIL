@@ -24,35 +24,31 @@ private trait RNATaintableAnalysis(
   private val linkRegister = Register("R30", 64)
   private val framePointer = Register("R29", 64)
 
-  private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer, stackPointer)
+  private val ignoreRegions: Set[Variable] = Set(linkRegister, framePointer, stackPointer)
 
   def eval(cmd: Command, s: Set[Taintable]): Set[Taintable] = {
-    var m = s
-    val exprs = cmd match {
+    cmd match {
       case assume: Assume =>
-        Set(assume.body)
+        s ++ assume.body.variables -- ignoreRegions
       case assert: Assert =>
-        Set(assert.body)
-      case memoryAssign: MemoryAssign =>
-        m = m -- getMemoryVariable(cmd, memoryAssign.mem, memoryAssign.index, memoryAssign.size, constProp, globals)
-        Set(memoryAssign.index, memoryAssign.value)
+        s ++ assert.body.variables -- ignoreRegions
+      case memoryStore: MemoryStore =>
+        val m = s -- getMemoryVariable(cmd, memoryStore.mem, memoryStore.index, memoryStore.size, constProp, globals)
+        m ++ memoryStore.index.variables ++ memoryStore.value.variables -- ignoreRegions
       case indirectCall: IndirectCall =>
-        if (ignoreRegions.contains(indirectCall.target)) return m
-        Set(indirectCall.target)
-      case assign: Assign =>
-        m = m - assign.lhs
-        Set(assign.rhs)
-      case _ => return m
-    }
-
-    exprs.foldLeft(m) {
-      (m, expr) => {
-        val vars = expr.variables.filter(!ignoreRegions.contains(_)).map { v => v: Taintable }
-        val memvars: Set[Taintable] = expr.loads.flatMap {
-          l => getMemoryVariable(cmd, l.mem, l.index, l.size, constProp, globals)
+        if (ignoreRegions.contains(indirectCall.target)) {
+          s
+        } else {
+          s + indirectCall.target -- ignoreRegions
         }
-        m.union(vars).union(memvars)
-      }
+      case assign: LocalAssign =>
+        val m = s - assign.lhs
+        m ++ assign.rhs.variables -- ignoreRegions
+      case memoryLoad: MemoryLoad =>
+        val m = s - memoryLoad.lhs
+        val memvar = getMemoryVariable(cmd, memoryLoad.mem, memoryLoad.index, memoryLoad.size, constProp, globals)
+        m ++ memvar ++ memoryLoad.index.variables -- ignoreRegions
+      case _ => s
     }
   }
 
@@ -96,10 +92,10 @@ class SummaryGenerator(
   private def toGamma(variable: Taintable): Option[BExpr] = {
     variable match {
       case variable: Register => Some(variable.toGamma)
-      case variable: LocalVar => None
+      case _: LocalVar => None
       case variable: GlobalVariable => Some(variable.toGamma)
       //case variable: LocalStackVariable => None
-      case variable: UnknownMemory => Some(FalseBLiteral)
+      case _: UnknownMemory => Some(FalseBLiteral)
     }
   }
 

@@ -1,4 +1,4 @@
-grammar Semantics;
+grammar ASLp;
 
 // See aslp/libASL/asl.ott for reference grammar Bap-ali-plugin/asli_lifer.ml may also be useful for
 // visitors

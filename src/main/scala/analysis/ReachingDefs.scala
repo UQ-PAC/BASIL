@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.solvers.SimplePushDownWorklistFixpointSolver
-import ir.{Assert, Assume, BitVecType, CFGPosition, Call, DirectCall, Expr, GoTo, IndirectCall, InterProcIRCursor, IntraProcIRCursor, Assign, MemoryAssign, NOP, Procedure, Program, Register, Variable, computeDomain}
+import ir.{LocalAssign, CFGPosition, DirectCall, IntraProcIRCursor, MemoryLoad, Procedure, Program, Register, Variable, computeDomain}
 
 abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[Register]]) extends Analysis[Map[CFGPosition, Map[Variable, Set[CFGPosition]]]] {
 
@@ -11,8 +11,10 @@ abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[Regis
 
   def transfer(n: CFGPosition, s: Map[Variable, Set[CFGPosition]]): Map[Variable, Set[CFGPosition]] = {
     n match {
-      case loc: Assign =>
+      case loc: LocalAssign =>
         s + (loc.lhs -> Set(n))
+      case load: MemoryLoad =>
+        s + (load.lhs -> Set(n))
       case DirectCall(target, _) if target.name == "malloc" =>
         s + (mallocRegister -> Set(n))
       case DirectCall(target, _) if writesTo.contains(target) =>
@@ -27,6 +29,6 @@ abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[Regis
 
 }
 
-class ReachingDefsAnalysis(program: Program, writesTo:  Map[Procedure, Set[Register]]) extends ReachingDefs(program, writesTo), IRIntraproceduralForwardDependencies,
+class ReachingDefsAnalysis(program: Program, writesTo: Map[Procedure, Set[Register]]) extends ReachingDefs(program, writesTo), IRIntraproceduralForwardDependencies,
   SimplePushDownWorklistFixpointSolver[CFGPosition, Map[Variable, Set[CFGPosition]], MapLattice[Variable, Set[CFGPosition], PowersetLattice[CFGPosition]]]
 
