@@ -3,7 +3,7 @@ package analysis.data_structure_analysis
 import analysis.data_structure_analysis.SymBase.{Global, Heap, Par, Stack, Unknown}
 import analysis.solvers.SimplePushDownWorklistFixpointSolver
 import analysis.{Analysis, FlatEl, FlatElement, IRIntraproceduralForwardDependencies, MapLattice, SetLatticeWithTop, evaluateExpression}
-import ir.{BinaryExpr, BitVecLiteral, CFGPosition, DirectCall, Expr, IntraProcIRCursor, LocalAssign, MemoryLoad, Procedure, Program, Register, Variable, computeDomain}
+import ir.{BinaryExpr, BitVecLiteral, CFGPosition, DirectCall, Expr, IntraProcIRCursor, LocalAssign, MemoryLoad, Procedure, Program, Register, Variable, computeDomain, toShortString}
 
 
 object Counter {
@@ -86,7 +86,7 @@ abstract class SV(program: Program,  constProp: Map[CFGPosition, Map[Variable, F
               s ++ svs(v).keys
           }
 
-           assert(!symSet.contains(Global))
+          assert(!symSet.contains(Global))
           symSet.foldLeft(Map[SymBase, FlatElement[Set[BitVecLiteral]]]()) {
             (m, base) =>
               m + (base -> offsetSetLattice.top)
