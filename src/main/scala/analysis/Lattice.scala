@@ -555,6 +555,17 @@ class PowersetLattice[A] extends Lattice[Set[A]] {
   def lub(x: Set[A], y: Set[A]): Set[A] = x.union(y)
 }
 
+class SetLatticeWithTop[A] extends FlatLattice[Set[A]] {
+  override val bottom: FlatElement[Set[A]] = FlatEl(Set.empty)
+  override def lub(x: FlatElement[Set[A]], y: FlatElement[Set[A]]): FlatElement[Set[A]] = (x, y) match {
+    case (Top, _) => Top
+    case (_, Top) => Top
+    case (e1: FlatEl[Set[A]], e2: FlatEl[Set[A]]) => FlatEl(e1.el.union(e2.el))
+    case _ => Top
+  }
+
+}
+
 // Single element lattice (using Option)
 class SingleElementLattice[T] extends Lattice[Option[T]] {
   val bottom: Option[T] = None
@@ -668,7 +679,10 @@ class TupleLattice[L1 <: Lattice[T1], L2 <: Lattice[T2], T1, T2](val lattice1: L
 class MapLattice[A, T, +L <: Lattice[T]](val sublattice: L) extends Lattice[Map[A, T]] {
   val bottom: Map[A, T] = Map().withDefaultValue(sublattice.bottom)
   def lub(x: Map[A, T], y: Map[A, T]): Map[A, T] =
-    x.keys.foldLeft(y)((m, a) => m + (a -> sublattice.lub(x(a), y(a)))).withDefaultValue(sublattice.bottom)
+    x.keys.foldLeft(y)((m, a) =>
+      if (a.isInstanceOf[SymBase.Unknown]) then
+        print("")
+      m + (a -> sublattice.lub(x(a), y(a)))).withDefaultValue(sublattice.bottom)
 }
 
 /** Constant propagation lattice.
