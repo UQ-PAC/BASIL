@@ -10,8 +10,6 @@ GIT_ROOT?=$(realpath ../../../../)
 BUILD_DIR ?= $(shell realpath --relative-to $(GIT_ROOT) .)
 MAKE_DIR ?= $(GIT_ROOT)/src/test/make
 
-DOCKER_FLAKE := $(shell cat $(MAKE_DIR)/docker-flake.txt)
-
 ifeq ($(USE_DOCKER), 1)
 	DOCKER_CMD ?= $(realpath $(MAKE_DIR)/docker-helper.sh)
 	ENSURE_DOCKER := true "docker is enabled" &&
@@ -20,7 +18,6 @@ ifeq ($(USE_DOCKER), 1)
 	CLANG ?= $(DOCKER_CMD) aarch64-unknown-linux-gnu-clang
 	CC ?= $(GCC)
 
-  # these execute outside of docker
 	BAP ?= $(DOCKER_CMD) bap
 	READELF ?= $(DOCKER_CMD) aarch64-unknown-linux-gnu-readelf
 
@@ -62,12 +59,5 @@ $(ENABLED_COMPILERS):
 	mkdir -p $@/
 	# - continue if fails
 	$(MAKE) -C $(realpath $@) -f $(MAKE_DIR)/$@.mk $(MAKECMDGOALS)
-
-docker-start: docker-stop
-	bash -c '[[ $(GIT_ROOT)/./$(BUILD_DIR) -ef . ]] && [[ -x "$(DOCKER_CMD)" ]]'
-	$(DOCKER_CMD) start
-
-docker-stop:
-	$(DOCKER_CMD) stop
 
 
