@@ -10,6 +10,8 @@ GIT_ROOT?=$(realpath ../../../../)
 BUILD_DIR ?= $(shell realpath --relative-to $(GIT_ROOT) .)
 MAKE_DIR ?= $(GIT_ROOT)/src/test/make
 
+DOCKER_FLAKE ?= $(shell cat $(MAKE_DIR)/docker-flake.txt)
+
 ifeq ($(USE_DOCKER), 1)
 	DOCKER_CMD ?= $(realpath $(MAKE_DIR)/docker-helper.sh)
 	ENSURE_DOCKER := true "docker is enabled" &&
