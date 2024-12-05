@@ -27,4 +27,4 @@ fi
 
 DIR=$(realpath --relative-to "$GIT_ROOT" .)
 set -x
-exec $DOCKER exec --user root -it -w "/build/$DIR" $DOCKER_CONTAINER /usr/bin/_exec "$@"
+exec $DOCKER exec --user root -w "/build/$DIR" $DOCKER_CONTAINER /usr/bin/_exec "$@"
