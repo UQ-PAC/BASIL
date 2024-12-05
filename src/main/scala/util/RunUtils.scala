@@ -466,21 +466,6 @@ object StaticAnalysis {
 
     mmm.setCallSiteSummaries(steensgaardSolver.callSiteSummary)
 
-    Logger.debug("[!] Injecting regions")
-    val regionInjector = if (config.memoryRegions == MemoryRegionsMode.MRA) {
-      val injector = RegionInjectorMRA(IRProgram, mmm)
-      injector.injectRegions()
-      Some(injector)
-    } else {
-      None
-    }
-    config.analysisDotPath.foreach { s =>
-      writeToFile(
-        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> "").toMap),
-        s"${s}_InjectedRegions$iteration.dot"
-      )
-    }
-
     val paramResults: Map[Procedure, Set[Variable]] = ParamAnalysis(IRProgram).analyze()
     val interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = InterLiveVarsAnalysis(IRProgram).analyze()
 
@@ -496,7 +481,7 @@ object StaticAnalysis {
       symbolicAddresses = Map.empty,
       reachingDefs = reachingDefinitionsAnalysisResults,
       varDepsSummaries = varDepsSummaries,
-      regionInjector = regionInjector,
+      regionInjector = None,
       localDSA = Map.empty,
       bottomUpDSA = Map.empty,
       topDownDSA = Map.empty,
@@ -625,7 +610,7 @@ object RunUtils {
       ).resolveIndirectCalls()
       */
 
-      if (config.memoryRegions == MemoryRegionsMode.MRA && *(previousResult.isEmpty ||result.vsaResult != previousResult.get.vsaResult)) {
+      if (config.memoryRegions == MemoryRegionsMode.MRA && (previousResult.isEmpty || result.vsaResult != previousResult.get.vsaResult)) {
         modified = true
       } else {
         modified = transforms.VSAIndirectCallResolution(
@@ -675,7 +660,12 @@ object RunUtils {
       writeToFile(dsa.topDown(ctx.program.mainProcedure).toDot, s"${s}_main_dsg.dot")
     }
 
-    val regionInjector = if (config.memoryRegions == MemoryRegionsMode.DSA) {
+    Logger.debug("[!] Injecting regions")
+    val regionInjector = if (config.memoryRegions == MemoryRegionsMode.MRA) {
+      val injector = RegionInjectorMRA(ctx.program, analysisResult.last.mmmResults)
+      injector.injectRegions()
+      Some(injector)
+    } else if (config.memoryRegions == MemoryRegionsMode.DSA) {
       val injector = RegionInjectorDSA(ctx.program, dsa.topDown)
       injector.injectRegions()
       Some(injector)
