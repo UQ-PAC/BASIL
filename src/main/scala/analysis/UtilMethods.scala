@@ -44,6 +44,18 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
           Some(result)
         case _ => None
       }
+
+    case unaryExpr: UnaryExpr =>
+      val arg = evaluateExpression(unaryExpr.arg,  constantPropResult)
+      if arg.nonEmpty then 
+        unaryExpr.op match {
+          case BVNEG => Some(BitVectorEval.smt_bvneg(arg.get))
+          case BVNOT => Some(BitVectorEval.smt_bvnot(arg.get))
+          case _ => None
+        }
+      else 
+        None
+
     case extend: ZeroExtend =>
       evaluateExpression(extend.body, constantPropResult) match {
         case Some(b: BitVecLiteral) => Some(BitVectorEval.smt_zero_extend(extend.extension, b))
