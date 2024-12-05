@@ -249,7 +249,7 @@ def inOutParams(
     p: Program,
     interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]]
 ): Map[Procedure, (Set[Variable], Set[Variable])] = {
-  val overapprox = (0 to 31).map(i => Register(s"R${i}", 64)).toSet[Variable]
+  val overapprox = ((0 to 31).toSet -- (19 to 28).toSet).map(i => Register(s"R${i}", 64)).toSet[Variable]
   // in: live at entry & in procedure read set
 
   val readWrites = ReadWriteAnalysis.readWriteSets(p: Program).collect {
