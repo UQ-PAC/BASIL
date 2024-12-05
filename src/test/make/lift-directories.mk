@@ -10,9 +10,11 @@ GIT_ROOT?=$(realpath ../../../../)
 BUILD_DIR ?= $(shell realpath --relative-to $(GIT_ROOT) .)
 MAKE_DIR ?= $(GIT_ROOT)/src/test/make
 
-DOCKER_CMD ?= $(realpath $(MAKE_DIR)/docker-helper.sh)
+DOCKER_FLAKE := $(shell cat $(MAKE_DIR)/docker-flake.txt)
 
 ifeq ($(USE_DOCKER), 1)
+	DOCKER_CMD ?= $(realpath $(MAKE_DIR)/docker-helper.sh)
+	ENSURE_DOCKER := true "docker is enabled" &&
 
 	GCC ?= $(DOCKER_CMD) aarch64-unknown-linux-gnu-gcc
 	CLANG ?= $(DOCKER_CMD) clang
@@ -23,6 +25,8 @@ ifeq ($(USE_DOCKER), 1)
 	READELF ?= $(DOCKER_CMD) aarch64-unknown-linux-gnu-readelf
 
 else
+	DOCKER_CMD ?=
+	ENSURE_DOCKER := echo "USE_DOCKER is required for this operation" && false &&
 
 	GCC ?= aarch64-linux-gnu-gcc
 	CLANG ?= clang-15 -target $(TARGET)

@@ -1,13 +1,27 @@
 
 # Run from the directory basil/src/test/*/test_case/compilation_variant/
 
+md5sum-check: a.out $(LIFT_ARTEFACTS)
+ifeq ($(USE_DOCKER), 1)
+	$(DOCKER_CMD) hash > docker-hash-new
+	diff -u docker-hash-new docker-hash  # if this fails, make sure your docker image is up-to-date.
+	rm docker-hash-new
+	md5sum -c md5sums  # using docker; checking compiler output hashes.
+else
+	-md5sum -c md5sums  # not using docker; ignoring check errors.
+endif
+
+md5sum-update: a.out $(LIFT_ARTEFACTS)
+	md5sum *.* > md5sums
+	$(ENSURE_DOCKER) $(DOCKER_CMD) hash > docker-hash
+
 $(LIFT_ARTEFACTS): a.out
 	$(READELF) -s -r -W a.out > $(NAME).relf
 	$(BAP) a.out -d adt:$(NAME).adt -d bir:$(NAME).bir
-	ddisasm a.out --ir $(NAME).temp.gtirb
-	proto-json.py --idem=proto -s8 $(NAME).temp.gtirb $(NAME).gtirb
+	$(DOCKER_CMD) ddisasm a.out --ir $(NAME).temp.gtirb
+	$(DOCKER_CMD) proto-json.py --idem=proto -s8 $(NAME).temp.gtirb $(NAME).gtirb
 	rm $(NAME).temp.gtirb
-	gtirb-semantics $(NAME).gtirb $(NAME).gts
+	$(DOCKER_CMD) gtirb-semantics $(NAME).gtirb $(NAME).gts
 
 ifdef $(SPEC)
 BASIL_SPECARG = --spec $(SPEC) 
@@ -34,33 +48,16 @@ verify: $(NAME)_bap.bpl $(NAME)_gtirb.bpl
 
 recompile: a.out
 
-gts: a.out
-	ddisasm a.out --ir $(NAME).gtirb
-	gtirb-semantics $(NAME).gtirb $(NAME).gts
-	rm -rf $(NAME).gtirb
+gts: $(NAME).gts
 
-json:
-	debug-gts.py $(NAME).gts > $(NAME).json
+json: $(NAME).gts
+	$(DOCKER_CMD) debug-gts.py $(NAME).gts > $(NAME).json
 
 $(NAME)_bap_result.txt: $(NAME)_bap.bpl $(EXTRA_SPEC)
 	bash -c "time boogie $(NAME)_bap.bpl $(EXTRA_SPEC) $(BOOGIE_FLAGS) | tee $(NAME)_bap_result.txt"
 
 $(NAME)_gtirb_result.txt: $(NAME)_gtirb.bpl $(EXTRA_SPEC)
 	bash -c "time boogie $(NAME)_gtirb.bpl $(EXTRA_SPEC) $(BOOGIE_FLAGS) | tee $(NAME)_gtirb_result.txt"
-
-md5sum-check: a.out $(LIFT_ARTEFACTS)
-ifeq ($(USE_DOCKER), 1)
-	$(DOCKER_CMD) hash > docker-hash-new
-	diff -u docker-hash-new docker-hash  # if this fails, make sure your docker image is up-to-date.
-	rm docker-hash-new
-	md5sum -c md5sums  # using docker; checking compiler output hashes.
-else
-	-md5sum -c md5sums  # not using docker; ignoring check errors.
-endif
-
-md5sum-update: a.out $(LIFT_ARTEFACTS)
-	md5sum *.* > md5sums
-	$(DOCKER_CMD) hash > docker-hash
 
 cleanall: clean cleanlift cleanbin cleantest cleanjson
 
