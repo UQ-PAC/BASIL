@@ -9,4 +9,4 @@ correct: $(realpath $(wildcard correct/*))
 incorrect: $(realpath $(wildcard incorrect/*))
 
 $(SUBTARGETS):
-	-$(MAKE) -C $@ -f $(realpath ./make/lift-directories.mk) $(MAKECMDGOALS)
+	$(MAKE) -C $@ -f $(realpath ./make/lift-directories.mk) $(MAKECMDGOALS)

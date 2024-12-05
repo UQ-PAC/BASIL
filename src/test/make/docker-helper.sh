@@ -1,7 +1,5 @@
 #!/bin/bash -ue
 
-: $DOCKER_FLAKE  # nix flake reference to basil-tools-docker package
-
 root=$(git rev-parse --show-toplevel)
 : ${GIT_ROOT:=${root}}
 

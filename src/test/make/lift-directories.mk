@@ -17,7 +17,7 @@ ifeq ($(USE_DOCKER), 1)
 	ENSURE_DOCKER := true "docker is enabled" &&
 
 	GCC ?= $(DOCKER_CMD) aarch64-unknown-linux-gnu-gcc
-	CLANG ?= $(DOCKER_CMD) clang
+	CLANG ?= $(DOCKER_CMD) aarch64-unknown-linux-gnu-clang
 	CC ?= $(GCC)
 
   # these execute outside of docker

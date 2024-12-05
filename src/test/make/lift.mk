@@ -12,7 +12,7 @@ else
 endif
 
 md5sum-update: a.out $(LIFT_ARTEFACTS)
-	md5sum *.* > md5sums
+	md5sum $^ > md5sums
 	$(ENSURE_DOCKER) $(DOCKER_CMD) hash > docker-hash
 
 $(LIFT_ARTEFACTS): a.out
