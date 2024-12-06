@@ -64,7 +64,7 @@ elif [[ "$1" == hash ]]; then
   # outputs information about the docker image's version to stdout.
   echo "$DOCKER_FLAKE"
   echo
-  exec "$DOCKER_CMD" ls -1 /nix/store
+  exec "$DOCKER_CMD" bash -c 'ls -1 /nix/store | sort -k1.33' # sort /nix/store contents by name, not hash
 
 elif [[ "$1" == env ]]; then
   # outputs commands to set the environment to stdout.
@@ -88,6 +88,7 @@ elif [[ "$1" == env ]]; then
   echoexport DOCKER "$DOCKER"
   echoexport DOCKER_USER "$DOCKER_USER"
   echoexport DOCKER_IMAGE "$DOCKER_IMAGE"
+  echoexport DOCKER_CMD "$DOCKER_CMD"
   echo 'echo;'
 	echoexport GCC "$DOCKER_CMD aarch64-unknown-linux-gnu-gcc"
 	echoexport CLANG "$DOCKER_CMD aarch64-unknown-linux-gnu-clang"

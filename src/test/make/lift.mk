@@ -4,7 +4,7 @@
 md5sum-check: a.out $(LIFT_ARTEFACTS)
 ifeq ($(USE_DOCKER), 1)
 	$(DOCKER_CMD) hash > docker-hash-new
-	diff -u docker-hash-new docker-hash  # if this fails, make sure your docker image is up-to-date.
+	diff --color -u docker-hash docker-hash-new  # if this fails, make sure your docker image is up-to-date.
 	rm docker-hash-new
 	md5sum -c md5sums  # using docker; checking compiler output hashes.
 else

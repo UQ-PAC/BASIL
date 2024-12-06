@@ -10,7 +10,7 @@ GIT_ROOT?=$(realpath ../../../../)
 BUILD_DIR ?= $(shell realpath --relative-to $(GIT_ROOT) .)
 MAKE_DIR ?= $(GIT_ROOT)/src/test/make
 
-ENSURE_DOCKER := [[ "$USE_DOCKER" == 1 ]] &&
+ENSURE_DOCKER := [[ "$(USE_DOCKER)" == 1 ]] &&
 
 GCC ?= aarch64-linux-gnu-gcc
 CLANG ?= clang-15 -target $(TARGET)
