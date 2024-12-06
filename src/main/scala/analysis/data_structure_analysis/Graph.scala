@@ -5,7 +5,7 @@ import analysis.solvers.DSAUnionFindSolver
 import analysis.evaluateExpression
 import cfg_visualiser.*
 import ir.*
-import specification.{ExternalFunction, SymbolTableEntry}
+import specification.{ExternalFunction, FuncEntry, SpecGlobal, SymbolTableEntry}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -116,7 +116,7 @@ class Graph(val proc: Procedure,
       val node = Node(Some(this), byteSize)
       node.allocationRegions.add(StackLocation(s"Stack_${proc.name}_$offset", proc, byteSize))
       node.flags.stack = true
-      node.addCell(0, byteSize)
+      node.addCell(0, 0)
       stackMapping.update(offset, node)
       lastOffset = offset
     else
@@ -125,16 +125,89 @@ class Graph(val proc: Procedure,
     nextValidOffset = offset + byteSize
   }
 
+
+  /**
+   * Takes a cell and returns all corresponding stack offsets to it if any
+   */
+  def getStackOffsets(cell: Cell): Set[BigInt] = { // TODO replace with tracking through merges
+    stackMapping.foldLeft(Set[BigInt]()) {
+      (s, f) =>
+        f match
+          case (offset: BigInt, node: Node) =>
+            s ++ node.cells.foldLeft(Set[BigInt]()) {
+              (se, g) =>
+                g match
+                  case (internal: BigInt, stackCell: Cell) =>
+                    if cell == find(stackCell) then
+                      se + (offset + internal)
+                    else
+                      se
+            }
+    }
+  }
+
+  def getStack(offset: BigInt, size: Int): Cell = {
+    var last: BigInt = 0
+    var headNodeOffset: BigInt = -1
+
+    val head: Cell =
+      if stackMapping.contains(offset) then
+        headNodeOffset = offset
+        stackMapping(offset).cells(0)
+      else
+        breakable {
+          stackMapping.keys.toSeq.sorted.foreach(
+            elementOffset =>
+              if offset < elementOffset then
+                break
+              else
+                last = elementOffset
+          )
+        }
+        val diff = offset - last
+        headNodeOffset = last
+        assert(stackMapping.contains(last))
+        stackMapping(last).getCell(diff)
+
+    // DSA grows cell size with size
+    // selfCollapse at the end to merge all the overlapping accessed size
+    // However, the above approach prevents distinct multi loads
+    // find(head).growSize(size)
+    val headOffset = headNodeOffset + head.offset
+    stackMapping.keys.toSeq.filter(off => off > headOffset && off < headOffset + size).sorted.foreach {
+      off =>
+        val stackDiff = off - headOffset
+        val updatedHead = find(head)
+        val newHeadOffset = updatedHead.offset
+        val headNode = updatedHead.node.get
+        mergeCells(headNode.addCell(newHeadOffset + stackDiff, 0), find(stackMapping(off).cells(0)))
+    }
+    // selfCollapse(head.node.get)
+    find(head)
+  }
+
+
   private val swappedOffsets = globalOffsets.map(_.swap)
 
   // creates the globals from the symbol tables
   val globalMapping = mutable.Map[AddressRange, Field]()
-  globals.foreach { global =>
-    val node = Node(Some(this), global.size)
-    node.allocationRegions.add(DataLocation(global.name, global.address, global.size / 8))
-    node.flags.global = true
-    node.flags.incomplete = true
-    globalMapping.update(AddressRange(global.address, global.address + global.size / 8), Field(node, 0))
+  globals.foreach {
+    case FuncEntry(name, size, address) =>
+
+      val function = Node(Some(this), size/8)
+      function.cells(0).growSize(size/8)
+      function.allocationRegions.add(Function(name, address, size / 8)) // todo check that size 0 is correct
+      function.flags.global = true
+      function.flags.incomplete = true
+      globalMapping.update(AddressRange(address, address + (size / 8)), Field(function, 0))
+    case SpecGlobal(name, size, arraySize, address) =>
+
+      val node = Node(Some(this), size/8)
+      node.allocationRegions.add(DataLocation(name, address, size / 8))
+      node.flags.global = true
+      node.flags.incomplete = true
+      globalMapping.update(AddressRange(address, address + size / 8), Field(node, 0))
+    case _ => ???
   }
 
   // creates a global for each relocation entry in the symbol table
@@ -194,6 +267,59 @@ class Graph(val proc: Procedure,
       }
     }
     global
+  }
+
+  // determine if an address is a global and return the corresponding global(s) if it is.
+  private def getGlobals(address: BigInt, size: Int): Seq[DSAGlobal] =
+    var global: Seq[DSAGlobal] = Seq.empty
+    for ((range, field) <- globalMapping) {
+      if (address < range.end && range.start < address + size) ||
+        (address + size > range.end && address < range.end) ||
+        (address >= range.start && (address < range.end || (range.start == range.end && range.end == address))) then
+        global = global ++ Seq(DSAGlobal(range, field))
+
+    }
+    global.sortBy(f => f.addressRange.start)
+
+
+
+  def getGlobal(address: BigInt, size: Int): Option[Cell] = {
+    val globals = getGlobals(address, size)
+    if globals.nonEmpty then
+      val head = globals.head
+      val DSAGlobal(range: AddressRange, Field(node, internal)) = head
+      val headOffset: BigInt = if address > range.start then address - range.start + internal else internal
+      val headNode = node
+      val headCell: Cell = node.addCell(headOffset, 0) // DSA has the size of the added cell should as size with
+      // selfCollapse at the end to merge all the overlapping accessed size
+      // However, the above approach prevent distinct multi loads
+      // graph.selfCollapse(headNode)
+      val tail = globals.tail
+      tail.foreach {
+        g =>
+          val DSAGlobal(range: AddressRange, Field(node, internal)) = g
+          val offset: BigInt = if address > range.start then address - range.start + internal else internal
+          node.addCell(offset, 0)
+          selfCollapse(node)
+          assert(range.start >= address)
+          mergeCells(find(headNode.addCell(range.start - address, 0)), find(node.getCell(offset)))
+      }
+      selfCollapse(find(headCell).node.get)
+      Some(find(headCell))
+    else
+      None
+  }
+
+  def getGlobalAddresses(cell: Cell): Set[BigInt] = {
+    globalMapping.foldLeft(Set[BigInt]()) {
+      (s, g) =>
+        g match
+          case (range: AddressRange, field: Field) =>
+            if cell == find(field.node.getCell(field.offset)) then
+              s + range.start
+            else
+              s
+    }
   }
 
   def getCells(pos: CFGPosition, arg: Variable): Set[Slice] = {
@@ -429,6 +555,18 @@ class Graph(val proc: Procedure,
 
   def find(slice: Slice): Slice = deadjust(adjust(slice))
 
+  def get(cell: Cell): Cell = {
+    val newCell = find(cell)
+    selfCollapse(newCell.node.get)
+    newCell.node.get.getCell(newCell.offset)
+  }
+
+  def get(slice: Slice): Cell = {
+    val newCell = adjust(find(slice))
+    selfCollapse(newCell.node.get)
+    newCell.node.get.getCell(newCell.offset)
+  }
+
   /**
     * merges two cells and unifies their nodes
     * @param cell1
@@ -510,12 +648,12 @@ class Graph(val proc: Procedure,
         resultNode.children(k) = node2.children(k) + delta
       }
       resultNode.children += (node2 -> delta)
-      if node2.flags.global then // node 2 may have been adjusted depending on cell1 and cell2 offsets
-        globalMapping.foreach { // update global mapping if node 2 was global
-          case (range: AddressRange, Field(node, offset)) =>
-            if node.equals(node2) then
-              globalMapping.update(range, Field(node, offset + delta))
-        }
+//      if node2.flags.global then // node 2 may have been adjusted depending on cell1 and cell2 offsets
+//        globalMapping.foreach { // update global mapping if node 2 was global
+//          case (range: AddressRange, Field(node, offset)) =>
+//            if node.equals(node2) then
+//              globalMapping.update(range, Field(node, offset + delta))
+//        }
 
       // compute the cells present in the resulting unified node
       // a mapping from offsets to the set of old cells which are merged to form a cell in the new unified node
@@ -543,7 +681,8 @@ class Graph(val proc: Procedure,
 
       resultCells.keys.foreach { offset =>
         val collapsedCell = resultNode.addCell(offset, resultLargestAccesses(offset))
-        val outgoing: Set[Slice] = cells.flatMap { (_, cell) =>
+        val cells = resultCells(offset)
+        val outgoing: Set[Slice] = cells.flatMap { cell =>
           if (cell.pointee.isDefined) {
             Some(cell.getPointee)
           } else {
@@ -589,6 +728,29 @@ class Graph(val proc: Procedure,
     val newCell = node.getCell(offset)
     assert(offset >= newCell.offset)
     Slice(newCell, offset - newCell.offset)
+  }
+
+  def handleOverlapping(cell: Cell): Cell = {
+    val size =  cell.node.get.getSize - cell.offset // if it's stack the size is rest of the node
+    val result =
+      if cell.node.get.flags.stack then
+        getStackOffsets(cell).foldLeft(cell) {
+          (res, offset) =>
+            val stack = getStack(offset, size.toInt)
+            mergeCells(res, stack)
+        }
+      else
+        cell
+
+
+//    size = result.largestAccessedSize
+    if result.node.get.flags.global then
+      getGlobalAddresses(result).foldLeft(result) {
+        (res, offset) =>
+          mergeCells(res, getGlobal(offset, size.toInt).get)
+      }
+    else
+      result
   }
 
   private def isFormal(pos: CFGPosition, variable: Variable): Boolean = !reachingDefs(pos).contains(variable)
@@ -650,6 +812,22 @@ class Graph(val proc: Procedure,
     }
     varToCell
   }
+
+  def SSAVar(posLabel:String, varName: String): Slice = {
+    assert(posLabel.matches("%[0-9]{8}?\\$\\d"))
+
+    val res = varToCell.keys.filter(pos => pos.toShortString.startsWith(posLabel))
+    assert(res.size == 1)
+    val key = res.head
+
+    val map = varToCell(key).toMap
+
+    val temp =  map.keys.filter(variable => variable.name == varName)
+    assert(temp.size == 1)
+    val variable = temp.head
+    map(variable)
+  }
+
 
   val accessIndexToSlice: mutable.Map[Statement, Slice] = accessIndexToSliceInit(proc)
 
@@ -737,12 +915,13 @@ class Graph(val proc: Procedure,
 
     globalMapping.foreach { case (range: AddressRange, Field(node, offset)) =>
       assert(newGraph.globalMapping.contains(range))
-      val field = find(node)
-      nodes.add(field.node)
-      if !idToNode.contains(field.node.id) then
-        val newNode = node.cloneSelf(newGraph)
-        idToNode.update(field.node.id, newNode)
-      newGraph.globalMapping.update(range, Field(idToNode(field.node.id), field.offset + offset))
+      val cell: Cell = find(node.getCell(offset))
+      val finalNode: Node = cell.node.get
+      nodes.add(finalNode)
+      if !idToNode.contains(finalNode.id) then
+        val newNode = finalNode.cloneSelf(newGraph)
+        idToNode.update(finalNode.id, newNode)
+      newGraph.globalMapping.update(range, Field(idToNode(finalNode.id), cell.offset + (offset - finalNode.getCell(offset).offset)))
     }
 
     val queue = mutable.Queue[Node]()
