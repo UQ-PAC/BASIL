@@ -1,5 +1,5 @@
-ed1eeda03ec3e829a2440e1f43349e3f  a.out
-a501e8efb4db60411faa6f8ad7bb0598  basic_lock_read.adt
-fdc4e01ca5ee721a9c620a29af8bfe2d  basic_lock_read.bir
+d932bd42428443afa673053edce64488  a.out
+923084f2e1922ef555ee9e986c43b7aa  basic_lock_read.adt
+b22b156beeccce60a7465182562ab3d9  basic_lock_read.bir
 2cd00936c00414fb06d2434d9ffea66f  basic_lock_read.relf
-8431f4b93f0ae7598fb5b806297eb33f  basic_lock_read.gts
+84326b1262240e0fcabc225691959c26  basic_lock_read.gts

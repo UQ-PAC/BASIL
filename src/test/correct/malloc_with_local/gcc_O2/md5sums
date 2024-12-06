@@ -1,5 +1,5 @@
-85f36290ddd1ae393820bc1abd8e6f43  a.out
-72321c6d54f2e8a59809f4ea2bd6c4ab  malloc_with_local.adt
-3ce8836451f3ddcc85905ad9c986b387  malloc_with_local.bir
+20f36895b1d4366a7d12d9244fc22a97  a.out
+714985b09a2cb25c24f19f5873224862  malloc_with_local.adt
+8d3c19178b52e11e32f1b4d71723e093  malloc_with_local.bir
 78d0501c4f8924d21777dee898bb67fa  malloc_with_local.relf
-f52bd0952aaa969238cdedd2743ea0cc  malloc_with_local.gts
+51eb5e0bda3e518655a8d517dcc0dc83  malloc_with_local.gts

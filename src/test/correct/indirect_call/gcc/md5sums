@@ -1,5 +1,5 @@
-f2e98bca77590a38cc43d536618c677e  a.out
-59e20abf4b7d123adf6c9bde226d4ff3  indirect_call.adt
-1cdeef4e2cdfa6051c829be3d3df570a  indirect_call.bir
+d32eadb7aa6c3a9eb372f7394b36d613  a.out
+9db60d1ecc9d45d44b2fd363b31c4f5d  indirect_call.adt
+9ef8af49383b2ed8cf2682bc6dc3d7a7  indirect_call.bir
 d354eb235aef65644d6bf84e0c82595e  indirect_call.relf
-154761f5e4240661d1fd7edcf2004bf5  indirect_call.gts
+5a3657436343ff9852d59901bd2baa8b  indirect_call.gts
