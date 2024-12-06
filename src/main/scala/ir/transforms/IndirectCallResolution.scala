@@ -1,6 +1,6 @@
 package ir.transforms
 
-import analysis.{AddressValue, DataRegion, Lift, LiftedElement, LiteralValue, MemoryModelMap, MemoryRegion, RegisterWrapperEqualSets, StackRegion, Value, getUse}
+import analysis.{AddressValue, DataRegion, FlatElement, Lift, LiftedElement, LiteralValue, MemoryModelMap, MemoryRegion, RegisterWrapperEqualSets, StackRegion, Value, getSSAUse}
 import ir.*
 import util.Logger
 
@@ -11,7 +11,7 @@ import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 class SteensgaardIndirectCallResolution(
   override val program: Program,
   val pointsTos: Map[RegisterWrapperEqualSets | MemoryRegion, Set[RegisterWrapperEqualSets | MemoryRegion]],
-  val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
+  val reachingDefs: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
 ) extends IndirectCallResolution {
 
   private def searchRegion(region: MemoryRegion): Set[String] = {
@@ -55,7 +55,7 @@ class SteensgaardIndirectCallResolution(
   }
 
   override def resolveAddresses(variable: Variable, i: IndirectCall): Set[String] = {
-    val variableWrapper = RegisterWrapperEqualSets(variable, getUse(variable, i, reachingDefs))
+    val variableWrapper = RegisterWrapperEqualSets(variable, getSSAUse(variable, i, reachingDefs))
     pointsTos.get(variableWrapper) match {
       case Some(values) =>
         values.flatMap {
@@ -74,34 +74,16 @@ class VSAIndirectCallResolution(
   val mmm: MemoryModelMap
 ) extends IndirectCallResolution {
 
-  private def searchRegion(memoryRegion: MemoryRegion, n: CFGPosition): Set[String] = {
-    val names = vsaResult.get(n) match {
-      case Some(Lift(el)) => el.get(memoryRegion) match {
-        case Some(values) =>
-          values.flatMap {
-            case addressValue: AddressValue => searchRegion(addressValue.region, n)
-            case _ => Set()
-          }
-        case _ => Set()
-      }
-      case _ => Set()
-    }
-    memoryRegion match {
-      case _: StackRegion =>
-        names
-      case dataRegion: DataRegion =>
-        names ++ mmm.relfContent.getOrElse(dataRegion, Set())
-      case _ =>
-        Set()
-    }
-  }
-
   override def resolveAddresses(variable: Variable, i: IndirectCall): Set[String] = {
     vsaResult.get(i) match {
       case Some(Lift(el)) => el.get(variable) match {
         case Some(values) =>
           values.flatMap {
-            case addressValue: AddressValue => searchRegion(addressValue.region, i)
+            case addressValue: AddressValue =>
+              addressValue.region match {
+                case dataRegion: DataRegion => mmm.relfContent.getOrElse(dataRegion, Set())
+                case _ => Set()
+              }
             case _: LiteralValue => Set()
           }
         case _ => Set()

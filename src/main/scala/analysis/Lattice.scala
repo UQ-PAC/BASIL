@@ -2,31 +2,32 @@ package analysis
 
 import ir._
 import analysis.BitVectorEval
+import math.pow
 import util.Logger
 
 /** Basic lattice
-  */
+ */
 trait Lattice[T]:
 
   type Element = T
   /** The bottom element of this lattice.
-    */
+   */
   val bottom: T
 
   /** The top element of this lattice. Default: not implemented.
-    */
+   */
   def top: T = ???
 
   /** The least upper bound of `x` and `y`.
-    */
+   */
   def lub(x: T, y: T): T
 
   /** Returns true whenever `x` <= `y`.
-    */
+   */
   def leq(x: T, y: T): Boolean = lub(x, y) == y // rarely used, but easy to implement :-)
 
 /** The powerset lattice of a set of elements of type `A` with subset ordering.
-  */
+ */
 class PowersetLattice[A] extends Lattice[Set[A]] {
   val bottom: Set[A] = Set.empty
   def lub(x: Set[A], y: Set[A]): Set[A] = x.union(y)
@@ -104,8 +105,8 @@ case object Top extends FlatElement[Nothing]
 case object Bottom extends FlatElement[Nothing]
 
 /** The flat lattice made of element of `X`. Top is greater than every other element, and Bottom is less than every
-  * other element. No additional ordering is defined.
-  */
+ * other element. No additional ordering is defined.
+ */
 class FlatLattice[X] extends Lattice[FlatElement[X]] {
 
   val bottom: FlatElement[X] = Bottom
@@ -122,7 +123,25 @@ class FlatLattice[X] extends Lattice[FlatElement[X]] {
   }
 }
 
-class TupleLattice[L1 <: Lattice[T1], L2 <: Lattice[T2], T1, T2](val lattice1: L1, val lattice2: L2) extends Lattice[(T1, T2)] {
+/** The flat lattice made of element of `X` with a default value generator `f`. Top is greater than every other element,
+ */
+class FlatLatticeWithDefault[X](val f: () => X) extends Lattice[FlatElement[X]] {
+
+  val bottom: FlatElement[X] = FlatEl(f())
+
+  override val top: FlatElement[X] = Top
+
+  def lub(x: FlatElement[X], y: FlatElement[X]): FlatElement[X] = (x, y) match {
+    case (a, Bottom) => a
+    case (Bottom, b) => b
+    case (a, b) if a == b => a
+    case (Top, _) => FlatEl(f())
+    case (_, Top) => FlatEl(f())
+    case _ => FlatEl(f())
+  }
+}
+
+class TupleLattice[+L1 <: Lattice[T1], +L2 <: Lattice[T2], T1, T2](val lattice1: L1, val lattice2: L2) extends Lattice[(T1, T2)] {
   override val bottom: (T1, T2) = (lattice1.bottom, lattice2.bottom)
 
   override def lub(x: (T1, T2), y: (T1, T2)): (T1, T2) = {
@@ -140,9 +159,8 @@ class TupleLattice[L1 <: Lattice[T1], L2 <: Lattice[T2], T1, T2](val lattice1: L
   override def top: (T1, T2) = (lattice1.top, lattice2.top)
 }
 
-
 /** A lattice of maps from a set of elements of type `A` to a lattice with element `L'. Bottom is the default value.
-  */
+ */
 class MapLattice[A, T, +L <: Lattice[T]](val sublattice: L) extends Lattice[Map[A, T]] {
   val bottom: Map[A, T] = Map().withDefaultValue(sublattice.bottom)
   def lub(x: Map[A, T], y: Map[A, T]): Map[A, T] =
@@ -150,8 +168,8 @@ class MapLattice[A, T, +L <: Lattice[T]](val sublattice: L) extends Lattice[Map[
 }
 
 /** Constant propagation lattice.
-  *
-  */
+ *
+ */
 class ConstantPropagationLattice extends FlatLattice[BitVecLiteral] {
   private def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = try {
     (a, b) match
