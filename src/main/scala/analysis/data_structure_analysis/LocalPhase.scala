@@ -188,7 +188,7 @@ class LocalPhase(proc: Procedure,
    * @param pointer the cell which is being dereferenced
    * @param size size of the dereference
    */
-  def multiAccess(lhsOrValue: Cell, pointer: Cell, size: Int): Unit = {
+  def multiAccess(lhsOrValue: Cell, pointer: Cell, size: Int): Cell = {
     // TODO there should be another check here to see we cover the bytesize
     // otherwise can fall back on expanding
 //
@@ -305,53 +305,54 @@ class LocalPhase(proc: Procedure,
               visitPointerArithmeticOperation(n, lhsCell, arg, byteSize, true)
             case _ => ???
       case store @ MemoryStore(_, ind, expr, _, size, _) =>
+        val index: Expr = unwrapPaddingAndSlicing(ind)
+        assert(size % 8 == 0)
+        val byteSize = size / 8
+        val global = isGlobal(index, n, byteSize)
+        val stack = isStack(index, n)
+        val indexCell = graph.adjust(graph.accessIndexToSlice(store))
+        assert(!indexCell.node.get.flags.merged) // check index cell is a placeholder
+        val addressPointee: Cell = if (global.isDefined) {
+          graph.mergeCells(graph.find(global.get), indexCell)
+        } else if (stack.isDefined) {
+          graph.mergeCells(graph.find(stack.get), indexCell)
+        } else {
+          index match {
+            case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) =>
+              evaluateExpression(arg2, constProp(n)) match {
+                case Some(v) =>
+                  //                    assert(varToSym(n).contains(arg1))
+                  val offset = v.value
+                  visitPointerArithmeticOperation(n, indexCell, arg1, byteSize, false, offset)
+                  visitPointerArithmeticOperation(n, Node(Some(graph)).cells(0), arg1, byteSize, true, offset)
+                case None =>
+                  //                    assert(varToSym(n).contains(arg1))
+                  // collapse the results
+                  // visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg1, byteSize, true, 0, true)
+                  unsupportedPointerArithmeticOperation(n, index, Node(Some(graph)).cells(0))
+              }
+            case arg: Variable =>
+              //                assert(varToSym(n).contains(arg))
+              visitPointerArithmeticOperation(n, indexCell, arg, byteSize, false)
+              visitPointerArithmeticOperation(n, Node(Some(graph)).cells(0), arg, byteSize, true)
+            case _ =>
+              ???
+          }
+        }
+
         val unwrapped = unwrapPaddingAndSlicing(expr)
         unwrapped match {
+
           // Mem[Ry] = Rx
           case value: Variable =>
-            val index: Expr = unwrapPaddingAndSlicing(ind)
             reachingDefs(n)(value).foreach(visit)
-            assert(size % 8 == 0)
-            val byteSize = size / 8
-            val global = isGlobal(index, n, byteSize)
-            val stack = isStack(index, n, byteSize)
-            val indexCell = graph.adjust(graph.accessIndexToSlice(store))
-            assert(!indexCell.node.get.flags.merged)
-
+            addressPointee.node.get.flags.modified = true
             val valueCells = graph.getCells(n, value)
-            val valueCell = valueCells.tail.foldLeft(graph.adjust(valueCells.head)) { (c, slice) =>
-              graph.mergeCells(graph.adjust(slice), c)
+            val result = valueCells.foldLeft(indexCell) { (c, slice) =>
+              // graph.mergeCells(graph.adjust(slice), c)
+              multiAccess(graph.adjust(slice), graph.find(indexCell), byteSize)
             }
 
-            if global.isDefined then
-              graph.mergeCells(graph.find(global.get), indexCell)
-              multiAccess(valueCell, graph.find(global.get), byteSize)
-            else if stack.isDefined then
-              graph.mergeCells(graph.find(stack.get), indexCell)
-              multiAccess(valueCell, graph.find(stack.get), byteSize)
-            else
-              val addressPointee: Cell =
-                index match
-                  case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) =>
-                    evaluateExpression(arg2, constProp(n)) match
-                      case Some(v) =>
-                        //                    assert(varToSym(n).contains(arg1))
-                        val offset = v.value
-                        visitPointerArithmeticOperation(n, indexCell, arg1, byteSize, false, offset)
-                        visitPointerArithmeticOperation(n, Node(Some(graph)).cells(0), arg1, byteSize, true, offset)
-                      case None =>
-                        //                    assert(varToSym(n).contains(arg1))
-                        // collapse the results
-                        // visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg1, byteSize, true, 0, true)
-                        unsupportedPointerArithmeticOperation(n, index, Node(Some(graph)).cells(0))
-                  case arg: Variable =>
-                    //                assert(varToSym(n).contains(arg))
-                    visitPointerArithmeticOperation(n, indexCell, arg, byteSize)
-                    visitPointerArithmeticOperation(n, Node(Some(graph)).cells(0), arg, byteSize, true)
-                  case _ =>
-                    ???
-
-              graph.mergeCells(valueCell, addressPointee)
           case _ => // if value is a literal ignore it
         }
       case _ =>
