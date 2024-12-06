@@ -8,7 +8,8 @@ ifeq ($(USE_DOCKER), 1)
 	rm docker-hash-new
 	md5sum -c md5sums  # using docker; checking compiler output hashes.
 else
-	-md5sum -c md5sums  # not using docker; ignoring check errors.
+	echo "not running within docker; skipping docker image validation."
+	md5sum -c md5sums
 endif
 
 md5sum-update: a.out $(LIFT_ARTEFACTS)

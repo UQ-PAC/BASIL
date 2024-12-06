@@ -10,7 +10,11 @@ GIT_ROOT?=$(realpath ../../../../)
 BUILD_DIR ?= $(shell realpath --relative-to $(GIT_ROOT) .)
 MAKE_DIR ?= $(GIT_ROOT)/src/test/make
 
-ENSURE_DOCKER := [[ "$(USE_DOCKER)" == 1 ]] &&
+ifeq ($(USE_DOCKER),1)
+	ENSURE_DOCKER := true "using docker" &&
+else
+	ENSURE_DOCKER := echo "this command should be run within docker" >&2 && false &&
+endif
 
 GCC ?= aarch64-linux-gnu-gcc
 CLANG ?= clang-15 -target $(TARGET)
