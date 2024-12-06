@@ -1,6 +1,14 @@
 
 # Run from the directory basil/src/test/*/test_case/compilation_variant/
 
+$(LIFT_ARTEFACTS): a.out
+	$(READELF) -s -r -W a.out > $(NAME).relf
+	$(BAP) a.out -d adt:$(NAME).adt -d bir:$(NAME).bir
+	$(DDISASM) a.out --ir $(NAME).temp.gtirb
+	$(PROTO_JSON) --idem=proto -s8 $(NAME).temp.gtirb $(NAME).gtirb
+	rm $(NAME).temp.gtirb
+	$(GTIRB_SEMANTICS) $(NAME).gtirb $(NAME).gts
+
 md5sum-check: a.out $(LIFT_ARTEFACTS)
 ifeq ($(USE_DOCKER), 1)
 	$(DOCKER_CMD) hash > docker-hash-new
@@ -16,13 +24,6 @@ md5sum-update: a.out $(LIFT_ARTEFACTS)
 	md5sum $^ > md5sums
 	$(ENSURE_DOCKER) $(DOCKER_CMD) hash > docker-hash
 
-$(LIFT_ARTEFACTS): a.out
-	$(READELF) -s -r -W a.out > $(NAME).relf
-	$(BAP) a.out -d adt:$(NAME).adt -d bir:$(NAME).bir
-	$(DDISASM) a.out --ir $(NAME).temp.gtirb
-	$(PROTO_JSON) --idem=proto -s8 $(NAME).temp.gtirb $(NAME).gtirb
-	rm $(NAME).temp.gtirb
-	$(GTIRB_SEMANTICS) $(NAME).gtirb $(NAME).gts
 
 ifdef $(SPEC)
 BASIL_SPECARG = --spec $(SPEC) 
