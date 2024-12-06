@@ -353,7 +353,7 @@ class LocalPhase(proc: Procedure,
               multiAccess(graph.adjust(slice), graph.find(indexCell), byteSize)
             }
 
-          case _ => // if value is a literal ignore it
+          case _ => addressPointee.growSize(byteSize) // if it is a literal ignore the merge
         }
       case _ =>
 
