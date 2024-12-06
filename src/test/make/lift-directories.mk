@@ -10,33 +10,16 @@ GIT_ROOT?=$(realpath ../../../../)
 BUILD_DIR ?= $(shell realpath --relative-to $(GIT_ROOT) .)
 MAKE_DIR ?= $(GIT_ROOT)/src/test/make
 
-DOCKER_FLAKE ?= $(shell cat $(MAKE_DIR)/docker-flake.txt)
+ENSURE_DOCKER := [[ "$USE_DOCKER" == 1 ]] &&
 
-ifeq ($(USE_DOCKER), 1)
-	DOCKER_CMD ?= $(realpath $(MAKE_DIR)/docker-helper.sh)
-	ENSURE_DOCKER := true "docker is enabled" &&
+GCC ?= aarch64-linux-gnu-gcc
+CLANG ?= clang-15 -target $(TARGET)
+CC ?= $(GCC)
+#CFLAGS=-fno-pic -fno-plt
+TARGET=aarch64-linux-gnu
 
-	GCC ?= $(DOCKER_CMD) aarch64-unknown-linux-gnu-gcc
-	CLANG ?= $(DOCKER_CMD) aarch64-unknown-linux-gnu-clang
-	CC ?= $(GCC)
-
-	BAP ?= $(DOCKER_CMD) bap
-	READELF ?= $(DOCKER_CMD) aarch64-unknown-linux-gnu-readelf
-
-else
-	DOCKER_CMD ?=
-	ENSURE_DOCKER := echo "USE_DOCKER is required for this operation" && false &&
-
-	GCC ?= aarch64-linux-gnu-gcc
-	CLANG ?= clang-15 -target $(TARGET)
-	CC ?= $(GCC)
-	#CFLAGS=-fno-pic -fno-plt
-	TARGET=aarch64-linux-gnu
-
-	BAP?=bap
-	READELF ?= aarch64-linux-gnu-readelf
-
-endif
+BAP?=bap
+READELF ?= aarch64-linux-gnu-readelf
 
 BASIL=$(GIT_ROOT)/target/scala-3.3.1/wptool-boogie-assembly-0.0.1.jar
 

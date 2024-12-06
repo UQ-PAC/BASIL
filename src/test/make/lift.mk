@@ -18,10 +18,10 @@ md5sum-update: a.out $(LIFT_ARTEFACTS)
 $(LIFT_ARTEFACTS): a.out
 	$(READELF) -s -r -W a.out > $(NAME).relf
 	$(BAP) a.out -d adt:$(NAME).adt -d bir:$(NAME).bir
-	$(DOCKER_CMD) ddisasm a.out --ir $(NAME).temp.gtirb
-	$(DOCKER_CMD) proto-json.py --idem=proto -s8 $(NAME).temp.gtirb $(NAME).gtirb
+	$(DDISASM) a.out --ir $(NAME).temp.gtirb
+	$(PROTO_JSON) --idem=proto -s8 $(NAME).temp.gtirb $(NAME).gtirb
 	rm $(NAME).temp.gtirb
-	$(DOCKER_CMD) gtirb-semantics $(NAME).gtirb $(NAME).gts
+	$(GTIRB_SEMANTICS) $(NAME).gtirb $(NAME).gts
 
 ifdef $(SPEC)
 BASIL_SPECARG = --spec $(SPEC) 
@@ -51,7 +51,7 @@ recompile: a.out
 gts: $(NAME).gts
 
 json: $(NAME).gts
-	$(DOCKER_CMD) debug-gts.py $(NAME).gts > $(NAME).json
+	$(DEBUG_GTS) $(NAME).gts > $(NAME).json
 
 $(NAME)_bap_result.txt: $(NAME)_bap.bpl $(EXTRA_SPEC)
 	bash -c "time boogie $(NAME)_bap.bpl $(EXTRA_SPEC) $(BOOGIE_FLAGS) | tee $(NAME)_bap_result.txt"

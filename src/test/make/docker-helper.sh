@@ -6,25 +6,109 @@ root=$(git rev-parse --show-toplevel)
 : ${DOCKER:=podman}
 : ${DOCKER_USER:=root}
 : ${DOCKER_IMAGE:=localhost/basil-tools-docker:latest}
-: ${DOCKER_CONTAINER:=basil-build-container}
 
-if [[ "$1" == build ]]; then
-  # safe to re-run. if docker image is already up-to-date, should be reasonably fast.
-  nix build "$DOCKER_FLAKE" --no-link
-  $(nix build "$DOCKER_FLAKE" --no-link --print-out-paths) | "$DOCKER" image load
+if [[ $# -lt 1 ]] || [[ "$1" == --help ]]; then
+  echo "usage: $(basename $0) (build | start | stop | hash | env [--unset] | COMMAND...)"
+  ! [[ $# -lt 1 ]]
   exit
-elif [[ "$1" == start ]]; then
-  set -x
-	exec $DOCKER run -v$GIT_ROOT:/build --rm -td --user $DOCKER_USER --name $DOCKER_CONTAINER $DOCKER_IMAGE
-elif [[ "$1" == stop ]]; then
-  set -x
-	exec $DOCKER rm -f -t 1 $DOCKER_CONTAINER
-elif [[ "$1" == hash ]]; then
-  echo "$DOCKER_FLAKE"
-  echo
-  exec "$0" ls -1 /nix/store
 fi
 
+DOCKER_CMD="$(realpath $0)"
+
+if ! [[ -v DOCKER_FLAKE ]] && [[ -r "$(dirname $DOCKER_CMD)/docker-flake.txt" ]]; then
+  DOCKER_FLAKE=$(cat $(dirname $DOCKER_CMD)/docker-flake.txt)
+fi
+
+: $DOCKER_FLAKE
+
+# create unique names depending on the flake reference, to ensure the correct container
+# is used.
+flake_hash=$(printf '%s' "$DOCKER_FLAKE" | grep --only-matching -E '[0-9a-fA-F]{40}' | head -c8)
+if [[ -z "$flake_hash" ]]; then
+  flake_hash=md5-$(printf '%s' "$DOCKER_FLAKE" | md5sum | cut -d' ' -f1 | head -c4)
+fi
+unique_image=$DOCKER_IMAGE-$flake_hash
+unique_container=container-$flake_hash
+
+# this allows the env subcommand to output syntax compatible with multiple shells
+shell=$(basename $SHELL)
+if [[ $shell == fish ]]; then
+  unset='set --erase'
+  unalias='functions --erase'
+else
+  unset=unset
+  unalias=unalias
+fi
+
+
+if [[ "$1" == build ]]; then
+  # downloads/builds the docker image for running tools.
+  # safe to re-run. if docker image is already up-to-date, should be reasonably fast.
+  nix build "$DOCKER_FLAKE" --no-link
+  set -x
+  $(nix build "$DOCKER_FLAKE" --no-link --print-out-paths) | "$DOCKER" image load
+  $DOCKER image tag $DOCKER_IMAGE $unique_image
+  exit
+
+elif [[ "$1" == start ]]; then
+  # starts an instance of the docker image.
+  set -x
+	exec $DOCKER run -v$GIT_ROOT:/build --rm -td --user $DOCKER_USER --name $unique_container $unique_image
+
+elif [[ "$1" == stop ]]; then
+  # starts the instance of the docker image.
+  set -x
+	exec $DOCKER rm -f -t 1 $unique_container
+
+elif [[ "$1" == hash ]]; then
+  # outputs information about the docker image's version to stdout.
+  echo "$DOCKER_FLAKE"
+  echo
+  exec "$DOCKER_CMD" ls -1 /nix/store
+
+elif [[ "$1" == env ]]; then
+  # outputs commands to set the environment to stdout.
+  # when passed to `eval`, these commands should prepare the shell for running
+  # basil tests through docker.
+
+  isunset=$([[ $# -ge 2 ]] && [[ "$2" == --unset ]] && echo true || echo false)
+
+  function echoexport() {
+    if $isunset; then
+      echo echo "$unset" "$1" ';'
+      echo "$unset" "$1" ';'
+      return
+    fi
+    printf 'echo "%s = %s";\n' "$1" "$2"
+    printf 'export %s="%s";\n' "$1" "$2"
+  }
+
+  echoexport USE_DOCKER "1"
+  echoexport DOCKER_FLAKE "$DOCKER_FLAKE"
+  echoexport DOCKER "$DOCKER"
+  echoexport DOCKER_USER "$DOCKER_USER"
+  echoexport DOCKER_IMAGE "$DOCKER_IMAGE"
+  echo 'echo;'
+	echoexport GCC "$DOCKER_CMD aarch64-unknown-linux-gnu-gcc"
+	echoexport CLANG "$DOCKER_CMD aarch64-unknown-linux-gnu-clang"
+	echoexport READELF "$DOCKER_CMD aarch64-unknown-linux-gnu-readelf"
+	echoexport BAP "$DOCKER_CMD bap"
+	echoexport DDISASM "$DOCKER_CMD ddisasm"
+	echoexport PROTO_JSON "$DOCKER_CMD proto-json.py"
+	echoexport DEBUG_GTS "$DOCKER_CMD debug-gts.py"
+	echoexport GTIRB_SEMANTICS "$DOCKER_CMD gtirb-semantics"
+  echo 'echo;'
+	if $isunset; then
+	  echo "echo $unalias docker-helper.sh;"
+	  echo "$unalias docker-helper.sh;"
+	else
+	  echo "echo alias docker-helper.sh = '$DOCKER_CMD';"
+	  echo "alias 'docker-helper.sh=$DOCKER_CMD';"
+	fi
+	exit
+fi
+
+# for other commands, execute within the container.
 DIR=$(realpath --relative-to "$GIT_ROOT" .)
 set -x
-exec $DOCKER exec --user root -w "/build/$DIR" $DOCKER_CONTAINER /usr/bin/_exec "$@"
+exec $DOCKER exec --user root -w "/build/$DIR" $unique_container /usr/bin/_exec "$@"
