@@ -6,7 +6,7 @@ ADTS=$(addsuffix .adt,$(SOURCENAMES))
 OUTS=$(addsuffix .out,$(SOURCENAMES))
 CHECKSUMS=$(addsuffix .checksum,$(SOURCENAMES))
 
-CSMITH_HEADER = "/usr/include/csmith/"
+CSMITH_HEADER ?= "/usr/include/csmith/"
 CC=clang -target aarch64-linux-gnu
 
 %.out : %.c

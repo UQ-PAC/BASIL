@@ -11,7 +11,7 @@ num_rand = 50
 # produces programs that we can't handle
 # cmd = ["csmith", "--seed", str(seed), "--max-block-size", str(max_blocksize), "--max-funcs", str(max_funcs), "--output", f"{fname}.c"]
 
-csmith_header = "/nix/store/6rawnpny818v7wki6zlr3i0f3phmysyb-csmith-2.3.0/include/csmith-2.3.0/"
+csmith_header = "/usr/include/csmith/"
 csmith_safe = "--no-arrays --no-bitfields --no-checksum --no-comma-operators --no-longlong --no-int8 --no-uint8 --no-float --no-math64 --no-inline-function --no-safe-math --no-packed-struct --no-pointers --no-structs --no-unions --no-volatile-pointers --no-const-pointers".split(" ")
 
 files = []
