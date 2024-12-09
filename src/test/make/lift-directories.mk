@@ -39,7 +39,7 @@ LIFT_ARTEFACTS=$(NAME).adt $(NAME).bir $(NAME).relf $(NAME).gts
 
 ENABLED_COMPILERS ?= clang clang_O2 clang_pic gcc gcc_O2 gcc_pic
 
-TARGETS := all verify md5sum-check md5sum-update clean cleanall cleanlift cleanjson cleangts cleantest recompile json gts
+TARGETS := all verify repro-check md5sum-check md5sum-update clean cleanall cleanlift cleanjson cleangts cleantest recompile json gts
 .PHONY : $(TARGETS) $(ENABLED_COMPILERS) docker-start docker-stop
 
 $(TARGETS): $(ENABLED_COMPILERS)

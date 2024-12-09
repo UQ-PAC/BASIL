@@ -1,13 +1,33 @@
 
 # Run from the directory basil/src/test/*/test_case/compilation_variant/
 
+LIFT_ARTEFACTS_REPRO := $(addprefix repro-, $(LIFT_ARTEFACTS))
+NAME_REPRO := $(addprefix repro-, $(NAME))
+
 $(LIFT_ARTEFACTS): a.out
 	$(READELF) -s -r -W a.out > $(NAME).relf
 	$(BAP) a.out -d adt:$(NAME).adt -d bir:$(NAME).bir
+	$(MAKE_DIR)/bap-normalise.py $(NAME).adt $(NAME).bir
 	$(DDISASM) a.out --ir $(NAME).temp.gtirb
 	$(PROTO_JSON) --idem=proto -s8 $(NAME).temp.gtirb $(NAME).gtirb
 	rm $(NAME).temp.gtirb
 	$(GTIRB_SEMANTICS) $(NAME).gtirb $(NAME).gts
+
+$(LIFT_ARTEFACTS_REPRO): $(LIFT_ARTEFACTS)
+	$(READELF) -s -r -W a.out > $(NAME_REPRO).relf
+	diff --color -u $(NAME).relf $(NAME_REPRO).relf
+	$(BAP) a.out -d adt:$(NAME_REPRO).adt -d bir:$(NAME_REPRO).bir
+	$(MAKE_DIR)/bap-normalise.py $(NAME_REPRO).adt $(NAME_REPRO).bir
+	diff --color -u $(NAME).adt $(NAME_REPRO).adt
+	diff --color -u $(NAME).bir $(NAME_REPRO).bir
+	$(DDISASM) a.out --ir $(NAME_REPRO).temp.gtirb
+	$(PROTO_JSON) --idem=proto -s8 $(NAME_REPRO).temp.gtirb $(NAME_REPRO).gtirb
+	diff --color -u $(NAME).gtirb $(NAME_REPRO).gtirb
+	rm $(NAME_REPRO).temp.gtirb
+	$(GTIRB_SEMANTICS) $(NAME_REPRO).gtirb $(NAME_REPRO).gts
+	diff --color -u $(NAME).gts $(NAME_REPRO).gts
+
+repro-check: $(LIFT_ARTEFACTS_REPRO)
 
 md5sum-check: a.out $(LIFT_ARTEFACTS)
 ifeq ($(USE_DOCKER), 1)
@@ -45,7 +65,7 @@ $(BASIL):
 a.out: $(C_SOURCE)
 	$(CC) $(CFLAGS) $(C_SOURCE)
 
-.PHONY=recompile verify md5sum-check md5sum-update clean cleanlift cleanall cleanbin cleantest cleangts json gts
+.PHONY=recompile verify repro-check md5sum-check md5sum-update clean cleanlift cleanall cleanbin cleantest cleangts json gts
 verify: $(NAME)_bap.bpl $(NAME)_gtirb.bpl
 
 recompile: a.out

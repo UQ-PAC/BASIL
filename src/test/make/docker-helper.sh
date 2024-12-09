@@ -53,7 +53,7 @@ if [[ "$1" == build ]]; then
 elif [[ "$1" == start ]]; then
   # starts an instance of the docker image.
   set -x
-	exec $DOCKER run -v$GIT_ROOT:/build --rm -td --user $DOCKER_USER --name $unique_container $unique_image
+	exec $DOCKER run -v"$GIT_ROOT:$GIT_ROOT" --rm -td --user $DOCKER_USER --name $unique_container $unique_image
 
 elif [[ "$1" == stop ]]; then
   # starts the instance of the docker image.
@@ -112,4 +112,4 @@ fi
 # for other commands, execute within the container.
 DIR=$(realpath --relative-to "$GIT_ROOT" .)
 set -x
-exec $DOCKER exec --user root -w "/build/$DIR" $unique_container /usr/bin/_exec "$@"
+exec $DOCKER exec --user root -w "$GIT_ROOT/$DIR" $unique_container /usr/bin/_exec "$@"
