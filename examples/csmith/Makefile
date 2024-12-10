@@ -6,11 +6,12 @@ ADTS=$(addsuffix .adt,$(SOURCENAMES))
 OUTS=$(addsuffix .out,$(SOURCENAMES))
 CHECKSUMS=$(addsuffix .checksum,$(SOURCENAMES))
 
-CSMITH_HEADER ?= "/usr/include/csmith/"
-CC=clang -target aarch64-linux-gnu
+CSMITH_INCLUDE ?= /usr/include/csmith
+CSMITH_HEADER = $(CSMITH_INCLUDE)
+CC ?=clang -target aarch64-linux-gnu
 
 %.out : %.c
-	$(CC) $< -w -I $(CSMITH_HEADER) -o $@
+	$(CC) $< -I$(CSMITH_HEADER) -w -o $@
 
 %.relf : %.out
 	readelf -s -r -w $< > $@
@@ -19,7 +20,7 @@ CC=clang -target aarch64-linux-gnu
 	bap $< -d adt:$@
 
 %.checksum : %.c
-	clang -w -I $(CSMITH_HEADER) $< -o $<.out && ./$<.out || true
+	$(CC) -w -I $(CSMITH_HEADER) $< -o $<.out && ./$<.out || true
 
 default : $(ADTS) $(RELFS)
 
