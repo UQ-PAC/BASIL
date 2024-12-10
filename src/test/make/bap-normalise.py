@@ -47,7 +47,7 @@ adt_file = sys.argv[1]
 bir_file = sys.argv[2]
 
 tid_re = re.compile(rb'''Tid\(([_\d]+), "%([\da-fA-F]{8})"\)''')
-bir_re = re.compile(rb'''(?:^([\da-fA-F]{8}): )|(?: %([\da-fA-F]{8}))''')
+bir_re = re.compile(rb'''(?:^([\da-fA-F]{8}):)|(?: %([\da-fA-F]{8}))''')
 
 with open(adt_file, 'rb') as f:
   adt = f.read()

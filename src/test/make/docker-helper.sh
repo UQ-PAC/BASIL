@@ -1,7 +1,11 @@
-#!/bin/bash -ue
+#!/usr/bin/env bash
+set -ue
 
-root=$(git rev-parse --show-toplevel)
-: ${GIT_ROOT:=${root}}
+if ! [[ -v GIT_ROOT ]] && command -v git &>/dev/null; then
+  GIT_ROOT=$(git rev-parse --show-toplevel)
+fi
+: ${GIT_ROOT}
+DIR=$(realpath --relative-to "$GIT_ROOT" .)
 
 : ${DOCKER:=podman}
 : ${DOCKER_USER:=root}
@@ -60,6 +64,11 @@ elif [[ "$1" == stop ]]; then
   set -x
 	exec $DOCKER rm -f -t 1 $unique_container
 
+elif [[ "$1" == shell ]]; then
+  # enters an interactive shell within the container.
+  set -x
+  exec $DOCKER exec -it --user $DOCKER_USER -w "$GIT_ROOT/$DIR" -eshell=1 $unique_container /usr/bin/_exec bash
+
 elif [[ "$1" == hash ]]; then
   # outputs information about the docker image's version to stdout.
   echo "$DOCKER_FLAKE"
@@ -89,13 +98,15 @@ elif [[ "$1" == env ]]; then
   echoexport DOCKER_USER "$DOCKER_USER"
   echoexport DOCKER_IMAGE "$DOCKER_IMAGE"
   echoexport DOCKER_CMD "$DOCKER_CMD"
+  echoexport GIT_ROOT "$GIT_ROOT"
   echo 'echo;'
 	echoexport GCC "$DOCKER_CMD aarch64-unknown-linux-gnu-gcc"
 	echoexport CLANG "$DOCKER_CMD aarch64-unknown-linux-gnu-clang"
 	echoexport READELF "$DOCKER_CMD aarch64-unknown-linux-gnu-readelf"
 	echoexport BAP "$DOCKER_CMD bap"
 	echoexport DDISASM "$DOCKER_CMD ddisasm"
-	echoexport PROTO_JSON "$DOCKER_CMD proto-json.py"
+	# echoexport PROTO_JSON "$DOCKER_CMD proto-json.py"
+	echoexport PROTO_JSON "/home/rina/progs/gtirb-semantics/scripts/proto-json.py"
 	echoexport DEBUG_GTS "$DOCKER_CMD debug-gts.py"
 	echoexport GTIRB_SEMANTICS "$DOCKER_CMD gtirb-semantics"
   echo 'echo;'
@@ -110,6 +121,10 @@ elif [[ "$1" == env ]]; then
 fi
 
 # for other commands, execute within the container.
-DIR=$(realpath --relative-to "$GIT_ROOT" .)
-set -x
-exec $DOCKER exec --user root -w "$GIT_ROOT/$DIR" $unique_container /usr/bin/_exec "$@"
+if [[ -v NIX_BUILD_TOP ]]; then
+  set -x
+  exec /usr/bin/_exec "$@"
+else
+  set -x
+  exec $DOCKER exec --user $DOCKER_USER -w "$GIT_ROOT/$DIR" $unique_container /usr/bin/_exec "$@"
+fi

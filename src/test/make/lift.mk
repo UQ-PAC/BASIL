@@ -9,8 +9,8 @@ $(LIFT_ARTEFACTS): a.out
 	$(BAP) a.out -d adt:$(NAME).adt -d bir:$(NAME).bir
 	$(MAKE_DIR)/bap-normalise.py $(NAME).adt $(NAME).bir
 	$(DDISASM) a.out --ir $(NAME).temp.gtirb
-	$(PROTO_JSON) --idem=proto -s8 $(NAME).temp.gtirb $(NAME).gtirb
-	rm $(NAME).temp.gtirb
+	$(PROTO_JSON) --idem=proto -s8 `realpath $(NAME).temp.gtirb` $(NAME).gtirb
+	@rm -v `realpath $(NAME).temp.gtirb`
 	$(GTIRB_SEMANTICS) $(NAME).gtirb $(NAME).gts
 
 $(LIFT_ARTEFACTS_REPRO): $(LIFT_ARTEFACTS)
