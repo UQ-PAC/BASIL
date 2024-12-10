@@ -11,6 +11,7 @@ import scala.concurrent.duration._
 import java.io.{BufferedWriter, File, FileWriter}
 import ExecutionContext.Implicits.global
 import ir.cilvisitor.*
+import scala.sys.process.*
 
 
 class TimeStaticAnalysis extends AnyFunSuite {
@@ -95,19 +96,25 @@ class TimeStaticAnalysis extends AnyFunSuite {
         StaticAnalysis.analyse(ctx, StaticAnalysisConfig(), 0).timer.checkPoints()
       }
     }
+    var stop = false
     val result : List[(String, List[(String, String, Long)])] = sortedcontexts.map(v => {
       val (testn,ctx) = v
       try {
-        Logger.warn(s"TESTING $testn")
-        val comp = complexity(testn)._2
-        Logger.warn(comp)
-        val r = Await.result(doAnalysis(ctx), 30000.millis)
-        Logger.warn("CHECKPOINTS:")
-        Logger.warn(r.map(c => s"${c._1},${c._2},${c._3}").mkString("\n"))
-        (testn, r)
+        if stop then {
+          (testn, List((s"Timeout triggered stop", "", 0 : Long)))
+        } else {
+          Logger.warn(s"TESTING $testn")
+          val comp = complexity(testn)._2
+          Logger.warn(comp)
+          val r = Await.result(doAnalysis(ctx), 30000.millis)
+          Logger.warn("CHECKPOINTS:")
+          Logger.warn(r.map(c => s"${c._1},${c._2},${c._3}").mkString("\n"))
+          (testn, r)
+        }
       } catch {
         case e : scala.concurrent.TimeoutException => {
           Logger.error(e)
+          stop = true
           (testn, List((s"$e", "", 0 : Long)))
         }
         case e => {
@@ -120,7 +127,7 @@ class TimeStaticAnalysis extends AnyFunSuite {
     val times = result.flatMap(x => x._2.map((checkpoint : (String,  String, Long)) =>  {
       val comp = complexity(x._1)._2
       (x._1, comp.statements,comp.blocks,comp.procedures,
-        (checkpoint._1 + "," + checkpoint._2).filter(c => c != '\n'),
+      checkpoint._1,
       checkpoint._3
       )
     })
@@ -129,19 +136,45 @@ class TimeStaticAnalysis extends AnyFunSuite {
     times
   }
   
+  def log(path: String, text: String) = {
+    val writer = BufferedWriter(FileWriter(path, false))
+    writer.write(text)
+    writer.flush()
+    writer.close()
+  }
 
   test("Getexamples") {
 
-    val r = examples()
+    val r = examples().sortBy(x => x._5)
+    val grouped = r.groupBy(x => x._5).filter(i => !i._1.contains("Timeout") && !i._1.contains("Exception"))
+
+    var plotfile = "set terminal 'svg'; set output 'analysisres.svg' ; set xlabel \"statement count\" ; set ylabel \"analysis time (ms)\""
+
+    var plotcmds = List[String]()
+
+    for ((n, vs) <- grouped) {
+      val table = (vs.sortBy(_._2).map(vs => {
+        val x = vs._2 // statements
+        val y = vs._6 // time
+        s"$x $y"
+      })).mkString("\n")
+      val pname = s"dat/${n}.dat"
+      log(pname, table)
+      val plotcmd = s"'${pname}' title \"${n}\" with lines" 
+      plotcmds = plotcmd::plotcmds
+    }
+    val pl = s"plot ${plotcmds.mkString(", ")}"
+    val gp = plotfile + "\n" + pl
+    println(gp)
+    log("dat/plot.gp", gp)
+    Seq("gnuplot", "dat/plot.gp").!!
+
+
     val csv = r.map(c => c.toList.mkString(",")).mkString("\n")
     info(csv)
 
     val header = "test filename,statements,blocks,procedures,interval name,interval call loc,timedelta (ms)\n"
     val text = header + csv
     val path = "analysis-times.csv"
-    val writer = BufferedWriter(FileWriter(path, false))
-    writer.write(text)
-    writer.flush()
-    writer.close()
   }
 }

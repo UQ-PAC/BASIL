@@ -456,6 +456,9 @@ object StaticAnalysis {
 
     val paramResults: Map[Procedure, Set[Variable]] = ParamAnalysis(IRProgram).analyze()
     val interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = InterLiveVarsAnalysis(IRProgram).analyze()
+    config.analysisResultsPath.foreach(s =>
+        writeToFile("name,location,time(ms)\n" + timer.checkPoints().map(c => s"${c._1},${c._2},${c._3}").mkString("\n"), s"${s}-analysis-runtime.csv")
+    )
 
     StaticAnalysisContext(
       intraProcConstProp = interProcConstPropResult,
