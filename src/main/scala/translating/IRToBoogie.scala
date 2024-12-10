@@ -40,11 +40,10 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
   private val LArgs = lArgs
 
   private val memoriesToGamma = if (regionInjector.isDefined) {
-    regionInjector.get.mergedRegions.collect {
-      case (_: DataRegion | _: HeapRegion, region: MergedRegion) =>
-        val memory = BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
-        val gamma = BMapVar(s"Gamma_${region.name}", MapBType(BitVecBType(64), BoolBType), Scope.Global)
-        memory -> gamma
+    regionInjector.get.sharedRegions().map { region =>
+      val memory = BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+      val gamma = BMapVar(s"Gamma_${region.name}", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+      memory -> gamma
     }.toMap
   } else {
     Map(mem -> Gamma_mem)
@@ -72,7 +71,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
   def lArgs: List[BMapVar] = {
     if (regionInjector.isDefined) {
       spec.LPreds.values.flatMap(_.specGlobals).toSet.map { g =>
-        regionInjector.get.getMergedRegion(g.address) match {
+        regionInjector.get.getMergedRegion(g.address, g.size) match {
           case Some(region) => BMapVar(s"${region.name}", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
           case None => mem
         }
@@ -779,7 +778,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
           }
           val oldAssigns = oldVars.toList.sorted.map { g =>
             val memory = if (regionInjector.isDefined) {
-              regionInjector.get.getMergedRegion(g.address) match {
+              regionInjector.get.getMergedRegion(g.address, g.size) match {
                 case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
                 case None => mem
               }
@@ -790,7 +789,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
           }
           val oldGammaAssigns = controlled.map { g =>
             val gamma = if (regionInjector.isDefined) {
-              regionInjector.get.getMergedRegion(g.address) match {
+              regionInjector.get.getMergedRegion(g.address, g.size) match {
                 case Some(region) =>
                   BMapVar(s"Gamma_${region.name}", MapBType(BitVecBType(64), BoolBType), Scope.Global)
                 case None =>
