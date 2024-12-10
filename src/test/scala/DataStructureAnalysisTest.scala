@@ -3,7 +3,7 @@ import ir.*
 import org.scalatest.funsuite.AnyFunSuite
 import ir.dsl.*
 import specification.{Specification, SpecGlobal}
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, StaticAnalysisContext, writeToFile}
+import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, StaticAnalysisContext, writeToFile, Logger, LogLevel}
 
 /**
  * This is the test suite for testing DSA functionality
@@ -20,6 +20,7 @@ import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, I
 class DataStructureAnalysisTest extends AnyFunSuite {
 
   def runAnalysis(program: Program): StaticAnalysisContext = {
+    Logger.setLevel(LogLevel.WARN)
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program)
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)

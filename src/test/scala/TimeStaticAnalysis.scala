@@ -13,7 +13,7 @@ import ExecutionContext.Implicits.global
 import ir.cilvisitor.*
 import scala.sys.process.*
 
-val ANALYSE_TIMEOUT: Duration = 60000.millis
+val ANALYSE_TIMEOUT: Duration = 240000.millis
 
 class TimeStaticAnalysis extends AnyFunSuite {
 
@@ -115,7 +115,7 @@ class TimeStaticAnalysis extends AnyFunSuite {
       }
     }
     // give up after \timeout_thresh consecutive timeouts
-    val timeout_thresh = 3
+    val timeout_thresh = 1
     var timeouts = 0
     val result: List[(String, ProgStats, List[(String, String, Long)])] = sorted
       .map(v => {

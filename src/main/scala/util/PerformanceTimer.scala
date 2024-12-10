@@ -18,7 +18,7 @@ case class PerformanceTimer(timerName: String = "") {
       val delta = elapsed()
       lastCheckpoint = System.currentTimeMillis()
       checkpoints.append((name, s"${file.value}:${line.value}", delta))
-      Logger.info(s"PerformanceTimer $timerName [$name]: ${delta}ms")
+      Logger.debug(s"PerformanceTimer $timerName [$name]: ${delta}ms")
       delta
   }
   private def elapsed() :  Long = {
