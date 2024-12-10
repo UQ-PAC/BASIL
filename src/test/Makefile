@@ -1,4 +1,4 @@
-TARGETSS := all verify repro-check md5sum-check md5sum-update clean cleanall cleanlift recompile json cleanjson cleangts gts
+TARGETSS := all verify repro-stash repro-check md5sum-check md5sum-update clean cleanall cleanlift recompile json cleanjson cleangts gts
 
 SUBTARGETS = $(wildcard correct/*/ incorrect/*/)
 .PHONY : $(TARGETSS) $(SUBTARGETS) correct incorrect

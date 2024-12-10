@@ -105,8 +105,8 @@ elif [[ "$1" == env ]]; then
 	echoexport READELF "$DOCKER_CMD aarch64-unknown-linux-gnu-readelf"
 	echoexport BAP "$DOCKER_CMD bap"
 	echoexport DDISASM "$DOCKER_CMD ddisasm"
-	# echoexport PROTO_JSON "$DOCKER_CMD proto-json.py"
-	echoexport PROTO_JSON "/home/rina/progs/gtirb-semantics/scripts/proto-json.py"
+	echoexport PROTO_JSON "$DOCKER_CMD proto-json.py"
+	# echoexport PROTO_JSON "/home/rina/progs/gtirb-semantics/scripts/proto-json.py"
 	echoexport DEBUG_GTS "$DOCKER_CMD debug-gts.py"
 	echoexport GTIRB_SEMANTICS "$DOCKER_CMD gtirb-semantics"
   echo 'echo;'
