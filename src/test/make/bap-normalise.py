@@ -72,7 +72,7 @@ def sub_adt(m: re.Match[bytes]) -> bytes:
   new = new_tids[tid]
   return f'Tid({new:_}, "%{new:08x}")'.encode('ascii')
 
-adt = re.sub(tid_re, sub_adt, adt)
+new_adt = re.sub(tid_re, sub_adt, adt)
 
 # .bir file
 
@@ -87,13 +87,16 @@ def sub_bir(m: re.Match[bytes]) -> bytes:
 with open(bir_file, 'rb') as f:
   bir = f.read()
 
-bir = re.sub(bir_re, sub_bir, bir)
+new_bir = re.sub(bir_re, sub_bir, bir)
 assert bir_seen <= set(new_tids)
+
+assert new_adt != adt
+assert new_bir != bir
 
 # writeback only if both are successful
 
 with open(bir_file, 'wb') as f:
-  f.write(bir)
+  f.write(new_bir)
 
 with open(adt_file, 'wb') as f:
-  f.write(adt)
+  f.write(new_adt)

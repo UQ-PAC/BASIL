@@ -6,8 +6,9 @@ all: $(LIFT_ARTEFACTS)
 $(NAME).relf: a.out
 	$(READELF) -s -r -W a.out > $(NAME).relf
 $(NAME).adt $(NAME).bir &: a.out
-	$(BAP) a.out -d adt:$(NAME).adt -d bir:$(NAME).bir
-	$(MAKE_DIR)/bap-normalise.py $(NAME).adt $(NAME).bir
+	$(BAP) a.out -d adt:temp.adt -d bir:temp.bir
+	$(MAKE_DIR)/bap-normalise.py temp.adt temp.bir
+	mv temp.adt $(NAME).adt && mv temp.bir $(NAME).bir
 
 $(NAME).gtirb: a.out
 	$(DDISASM) a.out --ir $(NAME).temp.gtirb
@@ -21,7 +22,7 @@ repro-stash: $(LIFT_ARTEFACTS)
 
 repro-check: $(LIFT_ARTEFACTS)
 	[ -d repro-stash ]  # repro-stash must be executed before repro-check
-	bash -x -c 'cd $(realpath .); for f in $(LIFT_ARTEFACTS); do diff --color -u repro-stash/$$f $$f; done'
+	bash -xeu -c 'cd $(realpath .); for f in $(LIFT_ARTEFACTS); do diff --color -u repro-stash/$$f $$f; done'
 
 md5sum-check: a.out $(LIFT_ARTEFACTS)
 ifeq ($(USE_DOCKER), 1)
