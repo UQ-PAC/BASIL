@@ -2,7 +2,7 @@ package analysis.solvers
 
 import analysis.{BackwardIDEAnalysis, Dependencies, EdgeFunction, EdgeFunctionLattice, ForwardIDEAnalysis, IDEAnalysis, IRInterproceduralBackwardDependencies, IRInterproceduralForwardDependencies, Lambda, Lattice, MapLattice}
 import ir.{CFGPosition, Command, DirectCall, GoTo, IRWalk, IndirectCall, Return, InterProcIRCursor, Procedure, Program, isAfterCall, Unreachable, Statement, Jump}
-import util.Logger
+import util.{Logger, PerformanceTimer}
 
 import scala.collection.immutable.Map
 import scala.collection.mutable
@@ -211,6 +211,18 @@ abstract class IDESolver[E <: Procedure | Command, EE <: Procedure | Command, C 
       Map()
     }
   }
+
+  def timeAnalyze(timer: PerformanceTimer): Map[CFGPosition, Map[D, T]] = {
+    timer.reset()
+    val phase1 = Phase1()
+    phase1.analyze()
+    timer.checkPoint(s"${this.getClass.getSimpleName} phase 1")
+    val phase2 = Phase2(phase1)
+    val r = phase2.restructure(phase2.analyze())
+    timer.checkPoint(s"${this.getClass.getSimpleName} phase 2")
+    r
+  }
+
 }
 
 
