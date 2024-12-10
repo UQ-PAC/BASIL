@@ -129,7 +129,7 @@ object Main {
     val boogieGeneratorConfig = BoogieGeneratorConfig(boogieMemoryAccessMode, true, rely, conf.threadSplit.value)
 
     val q = BASILConfig(
-      loading = ILLoadingConfig(conf.inputFileName, conf.relfFileName, conf.specFileName, conf.dumpIL, conf.mainProcedureName, conf.procedureDepth, conf.parameterForm.value || conf.simplify.value, conf.trimEarly.value),
+      loading = ILLoadingConfig(conf.inputFileName, conf.relfFileName, conf.specFileName, conf.dumpIL, conf.mainProcedureName, conf.procedureDepth, conf.parameterForm.value, conf.trimEarly.value),
       runInterpret = conf.interpret.value,
       simplify = conf.simplify.value,
       validateSimp = conf.validateSimplify.value,

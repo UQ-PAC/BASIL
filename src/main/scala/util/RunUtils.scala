@@ -646,10 +646,6 @@ object RunUtils {
     }
     assert(invariant.correctCalls(ctx.program))
 
-    ir.eval.SimplifyValidation.validate = conf.validateSimp
-    if (conf.simplify) {
-      doSimplify(ctx, conf.staticAnalysis)
-    }
 
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))
@@ -661,6 +657,17 @@ object RunUtils {
       conf => staticAnalysis(conf, ctx)
     }
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
+
+    ir.eval.SimplifyValidation.validate = conf.validateSimp
+    if (conf.simplify) {
+
+      if (!q.loading.parameterForm) {
+        ir.transforms.clearParams(ctx.program)
+        ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
+      }
+
+      doSimplify(ctx, conf.staticAnalysis)
+    }
 
     if (q.runInterpret) {
       Logger.info("Start interpret")
