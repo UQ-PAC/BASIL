@@ -2,7 +2,8 @@ import analysis.data_structure_analysis.*
 import ir.*
 import org.scalatest.funsuite.AnyFunSuite
 import ir.dsl.*
-import specification.{Specification, SpecGlobal}
+import specification.Specification
+import boogie.SpecGlobal
 import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, StaticAnalysisContext, writeToFile}
 
 /**

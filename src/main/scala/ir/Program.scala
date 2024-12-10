@@ -3,21 +3,68 @@ package ir
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
 import boogie.*
-import analysis.{BitVectorEval, MergedRegion}
+import analysis.{MergedRegion}
 import util.intrusive_list.*
 import translating.serialiseIL
+import eval.BitVectorEval
 
-class Program(var procedures: ArrayBuffer[Procedure],
+
+/**
+  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
+  * not guaranteed to be in any defined order. 
+  */
+class ILUnorderedIterator(private val begin: Iterable[CFGPosition]) extends Iterator[CFGPosition] {
+  private val stack = mutable.Stack[CFGPosition]()
+  stack.addAll(begin)
+
+  override def hasNext: Boolean = {
+    stack.nonEmpty
+  }
+
+  override def next(): CFGPosition = {
+    val n: CFGPosition = stack.pop()
+
+    stack.pushAll(n match {
+      case p: Procedure => p.blocks
+      case b: Block => Seq() ++ b.statements.toSeq ++ Seq(b.jump)
+      case s: Command => Seq()
+    })
+    n
+  }
+
+}
+
+class Program(val procedures: ArrayBuffer[Procedure],
               var mainProcedure: Procedure,
               val initialMemory: mutable.TreeMap[BigInt, MemorySection]) extends Iterable[CFGPosition] {
 
   val threads: ArrayBuffer[ProgramThread] = ArrayBuffer()
-
   val usedMemory: mutable.Map[BigInt, MemorySection] = mutable.TreeMap()
+
+  def removeProcedure(i: Int) : Unit = {
+    val p = procedures(i)
+    for (b <- p.blocks) {
+      b.deParent()
+    }
+    procedures.remove(i)
+  }
+
+  def removeProcedure(p: Procedure) : Unit = {
+    removeProcedure(procedures.indexOf(p))
+  }
+
+  def addProcedure(p: Procedure) = {
+    for (b <- p.blocks) {
+      b.setParent(p)
+    }
+    procedures += p
+  }
+
 
   override def toString(): String = {
     serialiseIL(this)
   }
+
 
   def setModifies(specModifies: Map[String, List[String]]): Unit = {
     val procToCalls: mutable.Map[Procedure, Set[Procedure]] = mutable.Map()
@@ -92,37 +139,13 @@ class Program(var procedures: ArrayBuffer[Procedure],
 
   }
 
-  /**
-   * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
-   * not guaranteed to be in any defined order. 
-   */
-  private class ILUnorderedIterator(private val begin: Program) extends Iterator[CFGPosition] {
-    private val stack = mutable.Stack[CFGPosition]()
-    stack.addAll(begin.procedures)
-
-    override def hasNext: Boolean = {
-      stack.nonEmpty
-    }
-
-    override def next(): CFGPosition = {
-      val n: CFGPosition = stack.pop()
-
-      stack.pushAll(n match {
-        case p: Procedure => p.blocks
-        case b: Block => Seq() ++ b.statements.toSeq ++ Seq(b.jump)
-        case s: Command => Seq()
-      })
-      n
-    }
-
-  }
 
   /**
    * Get an Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
    * not guaranteed to be in any defined order. 
    */
   def iterator: Iterator[CFGPosition] = {
-    ILUnorderedIterator(this)
+    ILUnorderedIterator(this.procedures)
   }
 
   private def memoryLookup(memory: mutable.TreeMap[BigInt, MemorySection], address: BigInt) = {
@@ -153,32 +176,57 @@ class Program(var procedures: ArrayBuffer[Procedure],
 class ProgramThread(val entry: Procedure,
                     val procedures: mutable.LinkedHashSet[Procedure],
                     val creationSite: Option[DirectCall]) {
-
 }
 
+/*
+ * R0 := call procname(R0, R1, R2)
+ *
+ * procname (R0a, R1a, R2a):  
+ *  ...
+ *  return (R0)
+ *
+*/
+
 class Procedure private (
-                  var name: String,
+                  var procName: String,
                   var address: Option[BigInt],
                   private var _entryBlock: Option[Block],
                   private var _returnBlock: Option[Block],
                   private val _blocks: mutable.LinkedHashSet[Block],
-                  var in: ArrayBuffer[Parameter],
-                  var out: ArrayBuffer[Parameter],
+                  var formalInParam: mutable.SortedSet[LocalVar],
+                  var formalOutParam: mutable.SortedSet[LocalVar],
+                  var inParamDefaultBinding: immutable.SortedMap[LocalVar, Expr],
+                  var outParamDefaultBinding: immutable.SortedMap[LocalVar, Variable],
                   var requires: List[BExpr],
                   var ensures: List[BExpr],
-                ) {
+                ) extends Iterable[CFGPosition] {
+
+  def name = procName + address.map("_" + _).getOrElse("") 
+
   private val _callers = mutable.HashSet[DirectCall]()
   _blocks.foreach(_.parent = this)
   // class invariant
   require(_returnBlock.forall(b => _blocks.contains(b)) && _entryBlock.forall(b => _blocks.contains(b)))
   require(_blocks.isEmpty == _entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
 
-  def this(name: String, address: Option[BigInt] = None , entryBlock: Option[Block] = None, returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer(), requires: IterableOnce[BExpr] = ArrayBuffer(), ensures: IterableOnce[BExpr] = ArrayBuffer()) = {
-    this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out), List.from(requires), List.from(ensures))
+  def this(name: String, address: Option[BigInt] = None , entryBlock: Option[Block] = None, 
+      returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), 
+      formalInParam: IterableOnce[LocalVar] = ArrayBuffer(), formalOutParam: IterableOnce[LocalVar] = ArrayBuffer(), 
+      inParamDefaultBinding: Map[LocalVar, Expr] = Map(), outParamDefaultBinding: Map[LocalVar, Variable] = Map(), 
+      requires: IterableOnce[BExpr] = ArrayBuffer(), ensures: IterableOnce[BExpr] = ArrayBuffer()) = {
+    this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), mutable.SortedSet.from(formalInParam), mutable.SortedSet.from(formalOutParam), 
+      immutable.SortedMap.from(inParamDefaultBinding), immutable.SortedMap.from(outParamDefaultBinding),
+      List.from(requires), List.from(ensures))
+  }
+
+  def makeCall(label: Option[String] = None) = DirectCall(this, label, outParamDefaultBinding, inParamDefaultBinding)
+
+  def iterator: Iterator[CFGPosition] = {
+    ILUnorderedIterator(Seq(this))
   }
 
   override def toString: String = {
-    s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${in.size} in and ${out.size} out parameters"
+    s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${formalInParam.size} in and ${formalOutParam.size} out parameters"
   }
 
   def calls: Set[Procedure] = blocks.iterator.flatMap(_.calls).toSet
@@ -263,11 +311,10 @@ class Procedure private (
    * @return the removed block
    */
   def removeBlocks(block: Block): Block = {
+    require(_blocks.contains(block)) 
     require(block.incomingJumps.isEmpty) // don't leave jumps dangling
-    if (_blocks.contains(block)) {
-      block.deParent()
-      _blocks.remove(block)
-    }
+    block.deParent()
+    _blocks.remove(block)
     if (_entryBlock.contains(block)) {
       _entryBlock = None
     }
@@ -332,11 +379,6 @@ class Procedure private (
   }
 }
 
-class Parameter(var name: String, var size: Int, var value: Register) {
-  def toBoogie: BVariable = BParam(name, BitVecBType(size))
-  def toGamma: BVariable = BParam(s"Gamma_$name", BoolBType)
-}
-
 class Block private (
  val label: String,
  val address: Option[BigInt],
@@ -358,6 +400,8 @@ class Block private (
   def isEntry: Boolean = parent.entryBlock.contains(this)
 
   def jump: Jump = _jump
+
+  var rpoOrder : Long = -1
 
   private def jump_=(j: Jump): Unit = {
     require(!j.hasParent)
@@ -445,11 +489,17 @@ class Block private (
 
   override def linkParent(p: Procedure): Unit = {
     // to connect call() links that reference jump.parent.parent
+    for (s <- statements) {
+      s.setParent(this)
+    }
     jump.setParent(this)
   }
 
   override def unlinkParent(): Unit = {
     // to disconnect call() links that reference jump.parent.parent
+    for (s <- statements) {
+      s.deParent()
+    }
     jump.deParent()
   }
 }

@@ -1,7 +1,5 @@
-package analysis
+package ir.eval 
 import ir.*
-import analysis.BitVectorEval.*
-
 import scala.annotation.tailrec
 import scala.math.pow
 
@@ -168,15 +166,15 @@ object BitVectorEval {
   /** (bvneq (_ BitVec m) (_ BitVec m))
     *   - not equal too
     */
-  def smt_bveq(s: BitVecLiteral, t: BitVecLiteral): BoolLit = {
-    bool2BoolLit(s == t)
+  def smt_bveq(s: BitVecLiteral, t: BitVecLiteral): Boolean = {
+    s == t
   }
 
   /** (bvneq (_ BitVec m) (_ BitVec m))
     *   - not equal too
     */
-  def smt_bvneq(s: BitVecLiteral, t: BitVecLiteral): BoolLit = {
-    bool2BoolLit(s != t)
+  def smt_bvneq(s: BitVecLiteral, t: BitVecLiteral): Boolean = {
+    s != t
   }
 
   /** (bvshl (_ BitVec m) (_ BitVec m) (_ BitVec m))
@@ -270,55 +268,55 @@ object BitVectorEval {
   /** (bvult (_ BitVec m) (_ BitVec m) Bool)
     *   - binary predicate for unsigned less-than
     */
-  def smt_bvult(s: BitVecLiteral, t: BitVecLiteral): BoolLit = {
-    bool2BoolLit(bv2nat(s) < bv2nat(t))
+  def smt_bvult(s: BitVecLiteral, t: BitVecLiteral): Boolean = {
+    bv2nat(s) < bv2nat(t)
   }
 
   /** (bvule (_ BitVec m) (_ BitVec m) Bool)
     *   - binary predicate for unsigned less than or equal
     */
-  def smt_bvule(s: BitVecLiteral, t: BitVecLiteral): BoolLit = {
-    bool2BoolLit(bv2nat(s) <= bv2nat(t))
+  def smt_bvule(s: BitVecLiteral, t: BitVecLiteral): Boolean = {
+    bv2nat(s) <= bv2nat(t)
   }
 
   /** (bvugt (_ BitVec m) (_ BitVec m) Bool)
     *   - binary predicate for unsigned greater than
     */
-  def smt_bvugt(s: BitVecLiteral, t: BitVecLiteral): BoolLit = {
+  def smt_bvugt(s: BitVecLiteral, t: BitVecLiteral): Boolean = {
     smt_bvult(t, s)
   }
 
   /** (bvuge (_ BitVec m) (_ BitVec m) Bool)
     *   - binary predicate for unsigned greater than or equal
     */
-  def smt_bvuge(s: BitVecLiteral, t: BitVecLiteral): BoolLit = smt_bvule(t, s)
+  def smt_bvuge(s: BitVecLiteral, t: BitVecLiteral): Boolean = smt_bvule(t, s)
 
   /** (bvslt (_ BitVec m) (_ BitVec m) Bool)
     *   - binary predicate for signed less than
     */
-  def smt_bvslt(s: BitVecLiteral, t: BitVecLiteral): BoolLit = {
+  def smt_bvslt(s: BitVecLiteral, t: BitVecLiteral): Boolean = {
     val sNeg = isNegative(s)
     val tNeg = isNegative(t)
-    bool2BoolLit((sNeg && !tNeg) || ((sNeg == tNeg) && (smt_bvult(s, t) == TrueLiteral)))
+    (sNeg && !tNeg) || ((sNeg == tNeg) && (smt_bvult(s, t)))
   }
 
   /** (bvsle (_ BitVec m) (_ BitVec m) Bool)
     *   - binary predicate for signed less than or equal
     */
-  def smt_bvsle(s: BitVecLiteral, t: BitVecLiteral): BoolLit =
+  def smt_bvsle(s: BitVecLiteral, t: BitVecLiteral): Boolean =
     val sNeg = isNegative(s)
     val tNeg = isNegative(t)
-    bool2BoolLit((sNeg && !tNeg) || ((sNeg == tNeg) && (smt_bvule(s, t) == TrueLiteral)))
+    (sNeg && !tNeg) || ((sNeg == tNeg) && (smt_bvule(s, t)))
 
   /** (bvsgt (_ BitVec m) (_ BitVec m) Bool)
     *   - binary predicate for signed greater than
     */
-  def smt_bvsgt(s: BitVecLiteral, t: BitVecLiteral): BoolLit = smt_bvslt(t, s)
+  def smt_bvsgt(s: BitVecLiteral, t: BitVecLiteral): Boolean = smt_bvslt(t, s)
 
   /** (bvsge (_ BitVec m) (_ BitVec m) Bool)
     *   - binary predicate for signed greater than or equal
     */
-  def smt_bvsge(s: BitVecLiteral, t: BitVecLiteral): BoolLit = smt_bvsle(t, s)
+  def smt_bvsge(s: BitVecLiteral, t: BitVecLiteral): Boolean = smt_bvsle(t, s)
 
   def smt_bvashr(s: BitVecLiteral, t: BitVecLiteral): BitVecLiteral =
     if (!isNegative(s)) {

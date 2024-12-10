@@ -1,6 +1,6 @@
 package analysis.data_structure_analysis
 
-import analysis.BitVectorEval.{bv2SignedInt, isNegative}
+import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
 import analysis.solvers.ForwardIDESolver
 import analysis.*
 import ir.*
@@ -148,7 +148,7 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
           case Left(value) if value.accessor == lhs => Map()
           case Left(_) => Map(d -> IdEdge())
           case Right(_) => Map(d -> IdEdge(), Left(SymbolicAddress(lhs, UnknownLocation(nextunknownCount, IRWalk.procedure(n)), 0)) -> ConstEdge(TwoElementTop))
-      case DirectCall(target, _) if target.name == "malloc" =>
+      case DirectCall(target, _, _, _) if target.name == "malloc" =>
         d match
           case Left(value) if value.accessor == mallocVariable => Map()
           case Left(_) => Map(d -> IdEdge())
@@ -157,7 +157,7 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
               case Some(value) => value.value
               case None => -1
             Map(d -> IdEdge(), Left(SymbolicAddress(mallocVariable, HeapLocation(nextMallocCount, IRWalk.procedure(n), size), 0)) -> ConstEdge(TwoElementTop))
-      case DirectCall(target, _) if target.returnBlock.isEmpty => // for when calls are non returning, kills the stack dataflow facts
+      case DirectCall(target, _, _, _) if target.returnBlock.isEmpty => // for when calls are non returning, kills the stack dataflow facts
         d match
           case Left(value) =>
             value.symbolicBase match

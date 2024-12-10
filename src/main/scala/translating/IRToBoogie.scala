@@ -3,7 +3,7 @@ import analysis.{RegionInjector, DataRegion, HeapRegion, MergedRegion}
 import ir.{BoolOR, *}
 import boogie.*
 import specification.*
-import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
+import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion, Logger}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -89,10 +89,10 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
 
     val procedures: ArrayBuffer[BProcedure] = thread match {
       case None =>
-        program.procedures.map(f => translateProcedure(f, readOnlyMemory, initialMemory))
+        program.procedures.map(f => translateProcedure(f, readOnlyMemory))
       case Some(t) =>
         val translatedProcedures: ArrayBuffer[BProcedure] = ArrayBuffer[BProcedure]()
-        t.procedures.foreach(p => translatedProcedures.addOne(translateProcedure(p, readOnlyMemory, initialMemory)))
+        t.procedures.foreach(p => translatedProcedures.addOne(translateProcedure(p, readOnlyMemory)))
         translatedProcedures
     }
 
@@ -125,7 +125,8 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     val functionsUsed2 = functionsUsed1.map(p => functionOpToDefinition(p))
     val functionsUsed3 = functionsUsed2.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
     val functionsUsed4 = functionsUsed3.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
-    val functionsUsed = (functionsUsed2 ++ functionsUsed3 ++ functionsUsed4).toList.sorted
+    val functionsUsed5 = functionsUsed4.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
+    val functionsUsed = (functionsUsed2 ++ functionsUsed3 ++ functionsUsed4 ++ functionsUsed5).toList.sorted
 
     val globalVars = procedures.flatMap(_.globals) ++ rgProcs.flatMap(_.globals)
     val globalDecls = globalVars.map(b => BVarDecl(b, List(externAttr))).distinct.sorted.toList
@@ -257,6 +258,12 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
 
   def functionOpToDefinition(f: FunctionOp): BFunction = {
     f match {
+      case b @ BoolToBV1Op(arg) =>  {
+        val invar = BParam("arg", BoolBType)
+        val outvar = BParam(BitVecBType(1))
+        val body = IfThenElse(invar, BitVecBLiteral(1,1), BitVecBLiteral(0, 1))
+        BFunction(b.fnName, List(invar), outvar, Some(body), List(externAttr))
+      }
       case b: BVFunctionOp => BFunction(b.name, b.in, b.out, None, List(externAttr, b.attribute))
       case m: MemoryLoadOp =>
         val memVar = BMapVar("memory", MapBType(BitVecBType(m.addressSize), BitVecBType(m.valueSize)), Scope.Parameter)
@@ -475,8 +482,8 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
   }
 
 
-  def translateProcedure(p: Procedure, readOnlyMemory: List[BExpr], initialMemory: List[BExpr]): BProcedure = {
-    val body = (p.entryBlock.view ++ p.blocks.filterNot(x => p.entryBlock.contains(x))).map(translateBlock).toList
+  def translateProcedure(p: Procedure, readOnlyMemory: List[BExpr]): BProcedure = {
+    val body = (p.entryBlock.view ++ ArrayBuffer.from(p.blocks).sortBy( x => -x.rpoOrder).filterNot(x => p.entryBlock.contains(x))).map(translateBlock).toList
 
     val modifies: Seq[BVar] = p.modifies.toSeq.flatMap {
         case m: Memory   => Seq(m.toBoogie, m.toGamma)
@@ -486,24 +493,27 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     val modifiedPreserve = modifies.collect { case m: BVar if modifiedCheck.contains(m) => m }
     val modifiedPreserveEnsures: List[BExpr] = modifiedPreserve.map(m => BinaryBExpr(BoolEQ, m, Old(m))).toList
 
-    val procRequires: List[BExpr] = p.requires ++ requires.getOrElse(p.name, List())
-    val procEnsures: List[BExpr] = p.ensures ++ ensures.getOrElse(p.name, List())
+    val procRequires: List[BExpr] = p.requires ++ requires.getOrElse(p.procName, List())
+    val procEnsures: List[BExpr] = p.ensures ++ ensures.getOrElse(p.procName, List())
 
-    val procRequiresDirect: List[String] = requiresDirect.getOrElse(p.name, List())
-    val procEnsuresDirect: List[String] = ensuresDirect.getOrElse(p.name, List())
+    val procRequiresDirect: List[String] = requiresDirect.getOrElse(p.procName, List())
+    val procEnsuresDirect: List[String] = ensuresDirect.getOrElse(p.procName, List())
 
     val freeRequires: List[BExpr] = if (p == program.mainProcedure) {
-      initialMemory ++ readOnlyMemory
+      memoryToCondition(program.initialMemory.values) ++ readOnlyMemory
     } else {
       readOnlyMemory
     }
 
     val freeEnsures = modifiedPreserveEnsures ++ readOnlyMemory
 
+    val inparams = p.formalInParam.toList.flatMap(para => Seq(para.toBoogie, para.toGamma))
+    val outparams = p.formalOutParam.toList.flatMap(para => Seq(para.toBoogie, para.toGamma))
+
     BProcedure(
       p.name,
-      List(),
-      List(),
+      inparams,
+      outparams,
       procEnsures,
       procRequires,
       procEnsuresDirect,
@@ -622,7 +632,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
 
   def translateBlock(b: Block): BBlock = {
     val captureState = captureStateStatement(s"${b.label}")
-    val cmds = List(captureState) ++ b.statements.flatMap(s => translate(s)) ++ translate(b.jump)
+    val cmds = List() ++ b.statements.flatMap(s => translate(s)) ++ translate(b.jump)
 
     BBlock(b.label, cmds)
   }
@@ -705,13 +715,22 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
       }
       val jump = GoToCmd(g.targets.map(_.label).toSeq)
       conditionAssert :+ jump
-    case _: Return => List(ReturnCmd)
+    case r: Return => {
+      val out = r.outParams.toList
+      if (out.nonEmpty) then List(
+        AssignCmd(out.map(_._1.toBoogie), out.map(_._2.toBoogie)),
+        AssignCmd(out.map(_._1.toGamma), out.map(c => exprToGamma(c._2))),
+        ReturnCmd) else List(ReturnCmd)
+    }
     case _: Unreachable => List(BAssume(FalseBLiteral))
   }
 
   def translate(j: Call): List[BCmd] = j match {
     case d: DirectCall =>
-      val call = BProcedureCall(d.target.name)
+      val call = BProcedureCall(d.target.name, 
+        d.outParams.toList.flatMap(c => Seq(c._2.toBoogie, c._2.gammas.head.toGamma)),
+        d.actualParams.toList.flatMap(c => Seq(c._2.toBoogie, exprToGamma(c._2)))
+      )
 
       (config.procedureRely match {
         case Some(ProcRelyVersion.Function) =>
@@ -738,11 +757,12 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
       val lhsGamma = m.mem.toGamma
       val rhsGamma = GammaStore(m.mem.toGamma, m.index.toBoogie, exprToGamma(m.value), m.size, m.size / m.mem.valueSize)
       val store = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
+      val stateSplit = List.empty /*s match {
       val stateSplit = s match {
         case MemoryStore(_, _, _, _, _, Some(label)) => List(captureStateStatement(s"$label"))
         case LocalAssign(_, _, Some(label)) => List(captureStateStatement(s"$label"))
         case _ => List.empty
-      }
+      } */
       m.mem match {
         case _: StackMemory =>
           List(store) ++ stateSplit

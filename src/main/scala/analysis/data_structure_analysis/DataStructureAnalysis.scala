@@ -2,7 +2,8 @@ package analysis.data_structure_analysis
 
 import analysis.*
 import ir.*
-import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
+import specification.{ExternalFunction, SymbolTableEntry}
+import boogie.SpecGlobal
 
 import scala.collection.mutable
 

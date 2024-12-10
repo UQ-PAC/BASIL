@@ -17,7 +17,9 @@ case class ILLoadingConfig(
   specFile: Option[String] = None,
   dumpIL: Option[String] = None,
   mainProcedureName: String = "main",
-  procedureTrimDepth: Int = Int.MaxValue
+  procedureTrimDepth: Int = Int.MaxValue,
+  parameterForm: Boolean = false,
+  trimEarly: Boolean = false,
 )
 
 case class StaticAnalysisConfig(
@@ -40,6 +42,8 @@ enum MemoryRegionsMode {
 case class BASILConfig(
   loading: ILLoadingConfig,
   runInterpret: Boolean = false,
+  simplify: Boolean = false,
+  validateSimp: Boolean = false,
   staticAnalysis: Option[StaticAnalysisConfig] = None,
   boogieTranslation: BoogieGeneratorConfig = BoogieGeneratorConfig(),
   outputPrefix: String

@@ -25,8 +25,9 @@ BlockID ::=&~ String \\
 \\
 Jump ::=&~ GoTo ~|~ Unreachable ~|~ Return \\
 GoTo ::=&~ \text{goto } BlockID* \\
+Return::=&! \text{return } (outparams)
 Call ::=&~ DirectCall ~|~ IndirectCall  \\
-DirectCall ::=&~ \text{call } ProcID \\
+DirectCall ::=&~ (outparams) := \text{ call } ProcID \; (inparams) \\
 IndirectCall ::=&~ \text{call } Expr \\
 \\
           &~ loads(e: Expr) = \{x |  x:MemoryLoad, x \in e \} \\
@@ -55,7 +56,16 @@ Endian ::=&~ BigEndian ~|~ LittleEndian \\
 - The `Unreachable` jump is used to signify the absence of successors, it has the semantics of `assume false`.
 - The `Return` jump passes control to the calling function, often this is over-approximated to all functions which call the statement's parent procedure.
 
+### Indirect Calls
+
+An indirect call is a dynamic jump, to either a procedure or a block.
+
 ## Translation Phases
+
+We have invariant checkers to validate the structure of the IR's bidirectional CFG is correct, see `src/main/scala/ir/invariant`. This includes:
+
+- blocks belong to exactly one procedure: `invariant/BlocksUniqueToProcedure.scala`
+- forwards block CFG links match backwards block CFG links: `invariant/CFGCorrect.scala`
 
 #### IR With Returns
 
@@ -73,9 +83,20 @@ This ensures that all returning, non-stub procedures have exactly one return sta
 
 #### Calls appear only as the last statement in a block 
 
+- Checked by `invariant/SingleCallBlockEnd.scala`
 - The structure of the IR allows a call may appear anywhere in the block but for all the analysis passes we hold the invariant that it 
   only appears as the last statement. This is checked with the function `singleCallBlockEnd(p: Program)`.
   And it means for any call statement `c` we may `assert(c.parent.statements.lastOption.contains(c))`.
+
+## IR With Parameters
+
+The higher level IR containing parameters is established by `ir.transforms.liftProcedureCallAbstraction(ctx)`.
+This makes registers local variables, which are passed into procedures through prameters, and then returned from 
+procedures. Calls to these procedure must provide as input parameters the local variables corresponding to the
+values passed, and assign the output parameters to local variables also. Note now we must consider indirect calls
+as possibly assigning to everything, even though this is not explicitly represented syntactically.
+
+- Actual parameters to calls and returns match formal parameters is checked by `invariant/CorrectCallParameters.scala`
 
 ## Interaction with BASIL IR
 
@@ -127,20 +148,27 @@ label, the dsl constructor will likely throw a match error.
 
 Some additional constants are defined for convenience, Eg. `R0 = Register(R0, 64)`, see [the source file](../src/main/scala/ir/dsl/DSL.scala) for the full list.
 
-### Static Analysis / Abstract Interpretation
 
+### Pretty printing
+
+The ir can be printed with the overloaded function below, which can take a procedure, block, or statement and returns a string.
+
+```scala
+translating.BasilIRPrettyPrinter()(b)
+```
+
+It is also possible to dump a `dot/graphviz` digraph containing just the blocks in the program
+using the functions:
+
+```scala
+ir.dotBlockGraph(prog: Program) : String
+ir.dotBlockGraph(proc: Procedure) : String
+```
+
+### Static Analysis / Abstract Interpretation / IR Rewriting and modification
+
+- See [development/simplification-solvers.md](development/simplification-solvers.md)
 - For static analysis the Il-CFG-Iterator is the current well-supported way to iterate the IR.
   This currently uses the TIP framework, so you do not need to interact with the IR visitor directly. 
   See [BasicIRConstProp.scala](../src/main/scala/analysis/BasicIRConstProp.scala) for an example on its useage.
 - This visits all procedures, blocks and statements in the IR program.
-
-### Modifying and Visiting the IR with Visitor Pattern
-
-[src/main/scala/ir/Visitor.scala](../src/main/scala/ir/Visitor.scala) defines visitors which can be used
-for extracting specific features from an IR program. This is useful if you want to modify all instances of a specific 
-IR construct.
-  
-### CFG 
-
-The cfg is a control-flow graph constructed from the IR, it wraps each statement in a `Node`.
-

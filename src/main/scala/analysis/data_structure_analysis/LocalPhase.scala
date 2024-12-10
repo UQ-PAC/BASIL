@@ -1,9 +1,10 @@
 package analysis.data_structure_analysis
 
-import analysis.BitVectorEval.{bv2SignedInt, isNegative}
+import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
 import analysis.*
 import ir.*
-import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
+import boogie.SpecGlobal
+import specification.{ExternalFunction, SymbolTableEntry}
 import util.writeToFile
 
 import java.math.BigInteger
@@ -221,7 +222,7 @@ class LocalPhase(proc: Procedure,
     else
       visited.add(n)
     n match
-      case DirectCall(target, _) if target.name == "malloc" => // R0 = Malloc()
+      case DirectCall(target, _, _, _) if target.name == "malloc" => // R0 = Malloc()
         val size: BigInt = evaluateExpression(mallocRegister, constProp(n)) match
           case Some(value) => value.value
           case None => 0

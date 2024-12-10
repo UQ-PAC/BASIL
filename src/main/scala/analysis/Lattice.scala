@@ -1,9 +1,9 @@
 package analysis
 
 import ir._
-import analysis.BitVectorEval
+import ir.eval.BitVectorEval
 import math.pow
-import util.Logger
+import util.StaticAnalysisLogger
 
 /** Basic lattice
  */
@@ -294,6 +294,7 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
     op match
       case bvOp: BVBinOp =>
         bvOp match
+          case BVSADDO => ???
           case BVAND => ???
           case BVOR => ???
           case BVADD => rhs match
@@ -349,6 +350,7 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
       case boolOp: BoolUnOp =>
         boolOp match
           case BoolNOT => ???
+          case BoolToBV1 => ???
       case intOp: IntUnOp =>
         applyOp(intOp.toBV, rhs)
       case _ => ???
@@ -684,7 +686,7 @@ class ConstantPropagationLattice extends FlatLattice[BitVecLiteral] {
       case (Top, _) => Top
   } catch {
     case e: Exception =>
-      Logger.error(s"Failed on op $op with $a and $b")
+      StaticAnalysisLogger.error(s"Failed on op $op with $a and $b")
       throw e
   }
 
