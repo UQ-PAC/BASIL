@@ -162,25 +162,67 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
       val procedure = uuidToProcedure(functionUUID)
       var blockCount = 0
       for (blockUUID <- blockUUIDs) {
-        val block = uuidToBlock(blockUUID)
+        var block = uuidToBlock(blockUUID)
 
-        val statements = semanticsLoader.visitBlock(blockUUID, blockCount, block.address)
-        blockCount += 1
-        block.statements.addAll(statements)
+        val _statements = semanticsLoader.visitBlock(blockUUID, blockCount, block.address)
+        val blockNonEmpty = _statements.nonEmpty
 
-        if (block.statements.isEmpty && !blockOutgoingEdges.contains(blockUUID)) {
+        for (s <- _statements) {
+          // add intrinsics
+          s match {
+            case d: DirectCall if !procedures.exists(d.target.name == _.name) => procedures += d.target
+            case _ => ()
+          }
+        }
+
+        val blocks = ArrayBuffer[List[Statement]]() 
+
+        while (_statements.nonEmpty) {
+          val blockStatements = _statements.takeWhile(s => !(s.isInstanceOf[Call]))
+          _statements.remove(0, blockStatements.size)
+
+          val maybeCall = _statements.headOption
+          if (maybeCall.isDefined) {
+            _statements.remove(0)
+          }
+
+          blocks.addOne(blockStatements.toList ++ maybeCall)
+        }
+
+        blocks.toList match {
+          case Nil => ()
+          case statements::Nil => {
+            blockCount += 1
+            block.statements.addAll(statements)
+          }
+          case statements::tl => {
+            blockCount += 1
+            block.statements.addAll(statements)
+
+            val labels = (1 to tl.size).map(i => block.label + "_" + i)
+            val newBlocks = labels.zip(tl).map((l, statements) => Block(l, statements=statements))
+
+            newBlocks.foldLeft(block)((l, r) =>  {
+              l.replaceJump(GoTo(r))
+              r
+            })
+
+            block.parent.addBlocks(newBlocks)
+
+            block = newBlocks.last
+          }
+        }
+
+        if (blockNonEmpty && !blockOutgoingEdges.contains(blockUUID)) {
           // remove blocks that are just nop padding
           // TODO cleanup blocks that are entirely nop but have fallthrough edges?
           Logger.debug(s"removing block ${block.label}")
           procedure.removeBlocks(block)
+        } else if (!blockOutgoingEdges.contains(blockUUID) || blockOutgoingEdges(blockUUID).isEmpty) {
+            block.replaceJump(Unreachable())
+            Logger.debug(s"block ${block.label} in subroutine ${procedure.name} has no outgoing edges")
         } else {
-          if (!blockOutgoingEdges.contains(blockUUID)) {
-            throw Exception (s"block ${block.label} in subroutine ${procedure.name} has no outgoing edges")
-          }
           val outgoingEdges = blockOutgoingEdges(blockUUID)
-          if (outgoingEdges.isEmpty) {
-            throw Exception(s"block ${block.label} in subroutine ${procedure.name} has no outgoing edges")
-          }
 
           val (calls, jump) = if (outgoingEdges.size == 1) {
             val edge = outgoingEdges.head
@@ -285,7 +327,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     val blockLabel = convertLabel(procedure, blockUUID, blockCount)
 
     val blockAddress = blockUUIDToAddress.get(blockUUID)
-    val block = Block(blockLabel, blockAddress)
+    val block = Block(blockLabel, blockAddress, jump=Unreachable())
     procedure.addBlocks(block)
     if (uuidToBlock.contains(blockUUID)) {
       // TODO this is a case that requires special consideration
