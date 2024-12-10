@@ -58,7 +58,10 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
         Seq()
       case a: AssertContext => visitAssert(a, label).toSeq
       case t: TCallContext => visitTCall(t, label).toSeq
-      case i: IfContext => visitIf(i, label).toSeq
+      case i: IfContext => {
+        val (tif, load) = visitIf(i, label)
+        Seq() ++ load ++ tif
+      }
       case t: ThrowContext => Seq(visitThrow(t, label))
     }
   }
@@ -80,6 +83,8 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
   private def visitTCall(ctx: TCallContext, label: Option[String] = None): Option[Statement] = {
     val function = visitIdent(ctx.ident)
 
+    val atomicStart = Procedure("intrinsic$AtomicStart")
+    val atomicEnd = Procedure("intrinsic$AtomicEnd")
     val typeArgs = Option(ctx.tes).toList.flatMap(_.expr.asScala)
     val args = Option(ctx.args).toList.flatMap(_.expr.asScala)
 
@@ -102,6 +107,8 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
         } else {
           None
         }
+      case "AtomicStart.0" => Some(DirectCall(atomicStart))
+      case "AtomicEnd.0" => Some(DirectCall(atomicEnd))
       case "unsupported_opcode.0" => {
         val op = args.headOption.flatMap(visitExprOnly) match {
           case Some(IntLiteral(s)) => Some("%08x".format(s))
@@ -127,8 +134,8 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
     case _ => throw Exception(s"expected ${ctx.getText} to be an integer literal")
   }
 
-  private def visitIf(ctx: IfContext, label: Option[String] = None): Option[TempIf] = {
-    val condition = visitExprOnly(ctx.cond)
+  private def visitIf(ctx: IfContext, label: Option[String] = None): (Option[TempIf], Option[MemoryLoad]) = {
+    val (condition, load) = visitExpr(ctx.cond)
     val thenStmts = ctx.thenStmts.stmt.asScala.flatMap(visitStmt(_, label))
 
     val elseStmts = Option(ctx.elseStmts) match {
@@ -137,9 +144,9 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
     }
 
     if (condition.isDefined) {
-      Some(TempIf(condition.get, thenStmts, elseStmts, label))
+      (Some(TempIf(condition.get, thenStmts, elseStmts, label)), load)
     } else {
-      None
+      (None, None)
     }
   }
 
@@ -222,21 +229,27 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
   }
 
   private def visitExpr(ctx: ExprContext): (Option[Expr], Option[MemoryLoad]) = {
-    ctx match {
-      case e: ExprVarContext => (visitExprVar(e), None)
-      case e: ExprTApplyContext => visitExprTApply(e)
-      case e: ExprSlicesContext => visitExprSlices(e)
-      case e: ExprFieldContext => (Some(visitExprField(e)), None)
-      case e: ExprArrayContext => (Some(visitExprArray(e)), None)
-      case e: ExprLitIntContext => (Some(IntLiteral(parseInt(e))), None)
-      case e: ExprLitBitsContext => (Some(visitExprLitBits(e)), None)
+    try {
+      ctx match {
+        case e: ExprVarContext => (visitExprVar(e), None)
+        case e: ExprTApplyContext => visitExprTApply(e)
+        case e: ExprSlicesContext => visitExprSlices(e)
+        case e: ExprFieldContext => (Some(visitExprField(e)), None)
+        case e: ExprArrayContext => (Some(visitExprArray(e)), None)
+        case e: ExprLitIntContext => (Some(IntLiteral(parseInt(e))), None)
+        case e: ExprLitBitsContext => (Some(visitExprLitBits(e)), None)
+      }
+    } catch {
+      case ex: Exception => 
+        Logger.error(s"Error in : $ctx :" + ex) 
+        throw ex
     }
   }
 
   private def visitExprOnly(ctx: ExprContext): Option[Expr] = {
     val (expr, load) = visitExpr(ctx)
     if (load.isDefined) {
-      throw Exception("")
+      throw Exception(s"Unexpected load $load ; $expr ")
     } else {
       expr
     }
@@ -309,29 +322,29 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
         (result, None)
 
       case "not_bool.0" => (resolveUnaryOp(BoolNOT, function, 0, typeArgs, args, ctx.getText), None)
-      case "eq_enum.0" => (resolveBinaryOp(BoolEQ, function, 0, typeArgs, args, ctx.getText), None)
-      case "or_bool.0" => (resolveBinaryOp(BoolOR, function, 0, typeArgs, args, ctx.getText), None)
-      case "and_bool.0" => (resolveBinaryOp(BoolAND, function, 0, typeArgs, args, ctx.getText), None)
+      case "eq_enum.0" => (resolveBinaryOp(BoolEQ, function, 0, typeArgs, args, ctx.getText))
+      case "or_bool.0" => (resolveBinaryOp(BoolOR, function, 0, typeArgs, args, ctx.getText))
+      case "and_bool.0" => (resolveBinaryOp(BoolAND, function, 0, typeArgs, args, ctx.getText))
 
       case "not_bits.0" => (resolveUnaryOp(BVNOT, function, 1, typeArgs, args, ctx.getText), None)
-      case "or_bits.0" => (resolveBinaryOp(BVOR, function, 1, typeArgs, args, ctx.getText), None)
-      case "and_bits.0" => (resolveBinaryOp(BVAND, function, 1, typeArgs, args, ctx.getText), None)
-      case "eor_bits.0" => (resolveBinaryOp(BVXOR, function, 1, typeArgs, args, ctx.getText), None)
-      case "eq_bits.0" => (resolveBinaryOp(BVEQ, function, 1, typeArgs, args, ctx.getText), None)
-      case "add_bits.0" => (resolveBinaryOp(BVADD, function, 1, typeArgs, args, ctx.getText), None)
-      case "sub_bits.0" => (resolveBinaryOp(BVSUB, function, 1, typeArgs, args, ctx.getText), None)
-      case "mul_bits.0" => (resolveBinaryOp(BVMUL, function, 1, typeArgs, args, ctx.getText), None)
-      case "sdiv_bits.0" => (resolveBinaryOp(BVSDIV, function, 1, typeArgs, args, ctx.getText), None)
+      case "or_bits.0" => (resolveBinaryOp(BVOR, function, 1, typeArgs, args, ctx.getText))
+      case "and_bits.0" => (resolveBinaryOp(BVAND, function, 1, typeArgs, args, ctx.getText))
+      case "eor_bits.0" => (resolveBinaryOp(BVXOR, function, 1, typeArgs, args, ctx.getText))
+      case "eq_bits.0" => (resolveBinaryOp(BVEQ, function, 1, typeArgs, args, ctx.getText))
+      case "add_bits.0" => (resolveBinaryOp(BVADD, function, 1, typeArgs, args, ctx.getText))
+      case "sub_bits.0" => (resolveBinaryOp(BVSUB, function, 1, typeArgs, args, ctx.getText))
+      case "mul_bits.0" => (resolveBinaryOp(BVMUL, function, 1, typeArgs, args, ctx.getText))
+      case "sdiv_bits.0" => (resolveBinaryOp(BVSDIV, function, 1, typeArgs, args, ctx.getText))
 
-      case "slt_bits.0" => (resolveBinaryOp(BVSLT, function, 1, typeArgs, args, ctx.getText), None)
-      case "sle_bits.0" => (resolveBinaryOp(BVSLE, function, 1, typeArgs, args, ctx.getText), None)
+      case "slt_bits.0" => (resolveBinaryOp(BVSLT, function, 1, typeArgs, args, ctx.getText))
+      case "sle_bits.0" => (resolveBinaryOp(BVSLE, function, 1, typeArgs, args, ctx.getText))
 
       case "lsl_bits.0" => (resolveBitShiftOp(BVSHL, function, typeArgs, args, ctx.getText), None)
       case "lsr_bits.0" => (resolveBitShiftOp(BVLSHR, function, typeArgs, args, ctx.getText), None)
       case "asr_bits.0" => (resolveBitShiftOp(BVASHR, function, typeArgs, args, ctx.getText), None)
 
       case "append_bits.0" =>
-        (resolveBinaryOp(BVCONCAT, function, 2, typeArgs, args, ctx.getText), None)
+        (resolveBinaryOp(BVCONCAT, function, 2, typeArgs, args, ctx.getText))
 
       case "replicate_bits.0" =>
         checkArgs(function, 2, 2, typeArgs.size, args.size, ctx.getText)
@@ -482,16 +495,18 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
                               typeArgs: mutable.Buffer[ExprContext],
                               args: mutable.Buffer[ExprContext],
                               token: String
-                             ): Option[BinaryExpr] = {
+                             ): (Option[BinaryExpr], Option[MemoryLoad]) = {
     checkArgs(function, typeArgsExpected, 2, typeArgs.size, args.size, token)
     // we don't currently check the size for BV ops which is the type arg
     // memory loads shouldn't appear inside binary operations?
-    val arg0 = visitExprOnly(args(0))
-    val arg1 = visitExprOnly(args(1))
+    val (arg0, l0) = visitExpr(args(0))
+    val (arg1, l1) = visitExpr(args(1))
+    assert(!(l0.isDefined && l1.isDefined), "Do not expect two loads in an expression")
+    val load = l0.orElse(l1)
     if (arg0.isDefined && arg1.isDefined) {
-      Some(BinaryExpr(operator, arg0.get, arg1.get))
+      (Some(BinaryExpr(operator, arg0.get, arg1.get)), load)
     } else {
-      None
+      (None, load)
     }
   }
 

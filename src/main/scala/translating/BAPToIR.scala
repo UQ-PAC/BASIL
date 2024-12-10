@@ -4,6 +4,7 @@ import bap.*
 import boogie.UnaryBExpr
 import ir.{UnaryExpr, BinaryExpr, *}
 import specification.*
+import util.Logger
 
 import scala.collection.mutable
 import scala.collection.mutable.Map
@@ -37,7 +38,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       for (p <- s.out) {
         procedure.out.append(translateParameter(p))
       }
-      if (s.address.get == mainAddress) {
+      if (s.address.contains(mainAddress)) {
         mainProcedure = Some(procedure)
       }
       procedures.append(procedure)
@@ -102,7 +103,18 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       }
   }
 
-  private def translateExpr(e: BAPExpr): (Expr, Option[MemoryLoad]) = e match {
+
+  private def translateExpr(e: BAPExpr): (Expr, Option[MemoryLoad]) = 
+    try {
+      _translateExpr(e)
+    } catch {
+      case exp: Exception => {
+        Logger.error(s"Error translating $e:\n\t" + e)
+        throw exp
+      }
+  }
+
+  private def _translateExpr(e: BAPExpr): (Expr, Option[MemoryLoad]) = e match {
     case b @ BAPConcat(left, right) =>
       val (arg0, load0) = translateExpr(left)
       val (arg1, load1) = translateExpr(right)
@@ -146,43 +158,49 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       case NOT => (UnaryExpr(BVNOT, translateExprOnly(exp)), None)
       case NEG => (UnaryExpr(BVNEG, translateExprOnly(exp)), None)
     }
-    case BAPBinOp(operator, lhs, rhs) => operator match {
-      case PLUS => (BinaryExpr(BVADD, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case MINUS => (BinaryExpr(BVSUB, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case TIMES => (BinaryExpr(BVMUL, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case DIVIDE => (BinaryExpr(BVUDIV, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case SDIVIDE => (BinaryExpr(BVSDIV, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+    case BAPBinOp(operator, lhs, rhs) => 
+      val (arg0, l1) = translateExpr(lhs)
+      val (arg1, l2) = translateExpr(rhs)
+      assert(!(l1.isDefined && l2.isDefined), "Don't expect two loads in an expression")
+      val load : Option[MemoryLoad] = l1.orElse(l2)
+
+      operator match {
+      case PLUS => (BinaryExpr(BVADD, arg0, arg1), load)
+      case MINUS => (BinaryExpr(BVSUB, arg0, arg1), load)
+      case TIMES => (BinaryExpr(BVMUL, arg0, arg1), load)
+      case DIVIDE => (BinaryExpr(BVUDIV, arg0, arg1), load)
+      case SDIVIDE => (BinaryExpr(BVSDIV, arg0, arg1), load)
       // counterintuitive but correct according to BAP source
-      case MOD => (BinaryExpr(BVSREM, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      case MOD => (BinaryExpr(BVSREM, arg0, arg1), load)
       // counterintuitive but correct according to BAP source
-      case SMOD => (BinaryExpr(BVUREM, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      case SMOD => (BinaryExpr(BVUREM, arg0, arg1), load)
       case LSHIFT => // BAP says caring about this case is necessary?
         if (lhs.size == rhs.size) {
-          (BinaryExpr(BVSHL, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+          (BinaryExpr(BVSHL, arg0, arg1), load)
         } else {
-          (BinaryExpr(BVSHL, translateExprOnly(lhs), ZeroExtend(lhs.size - rhs.size, translateExprOnly(rhs))), None)
+          (BinaryExpr(BVSHL, arg0, ZeroExtend(lhs.size - rhs.size, arg1)), load)
         }
       case RSHIFT =>
         if (lhs.size == rhs.size) {
-          (BinaryExpr(BVLSHR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+          (BinaryExpr(BVLSHR, arg0, arg1), load)
         } else {
-          (BinaryExpr(BVLSHR, translateExprOnly(lhs), ZeroExtend(lhs.size - rhs.size, translateExprOnly(rhs))), None)
+          (BinaryExpr(BVLSHR, arg0, ZeroExtend(lhs.size - rhs.size, arg1)), load)
         }
       case ARSHIFT =>
         if (lhs.size == rhs.size) {
-          (BinaryExpr(BVASHR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+          (BinaryExpr(BVASHR, arg0, arg1), load)
         } else {
-          (BinaryExpr(BVASHR, translateExprOnly(lhs), ZeroExtend(lhs.size - rhs.size, translateExprOnly(rhs))), None)
+          (BinaryExpr(BVASHR, arg0, ZeroExtend(lhs.size - rhs.size, arg1)), load)
         }
-      case AND => (BinaryExpr(BVAND, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case OR => (BinaryExpr(BVOR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case XOR => (BinaryExpr(BVXOR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case EQ => (BinaryExpr(BVCOMP, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case NEQ => (UnaryExpr(BVNOT, BinaryExpr(BVCOMP, translateExprOnly(lhs), translateExprOnly(rhs))), None)
-      case LT => (BinaryExpr(BVULT, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case LE => (BinaryExpr(BVULE, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case SLT => (BinaryExpr(BVSLT, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case SLE => (BinaryExpr(BVSLE, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      case AND => (BinaryExpr(BVAND, arg0, arg1), load)
+      case OR => (BinaryExpr(BVOR, arg0, arg1), load)
+      case XOR => (BinaryExpr(BVXOR, arg0, arg1), load)
+      case EQ => (BinaryExpr(BVCOMP, arg0, arg1), load)
+      case NEQ => (UnaryExpr(BVNOT, BinaryExpr(BVCOMP, arg0, arg1)), load)
+      case LT => (BinaryExpr(BVULT, arg0, arg1), load)
+      case LE => (BinaryExpr(BVULE, arg0, arg1), load)
+      case SLT => (BinaryExpr(BVSLT, arg0, arg1), load)
+      case SLE => (BinaryExpr(BVSLE, arg0, arg1), load)
     }
     case b: BAPVar => (translateVar(b), None)
     case BAPMemAccess(memory, index, endian, size) =>
@@ -245,29 +263,35 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
                 } else {
                   // condition is true and previous conditions existing means this condition
                   // is actually that all previous conditions are false
-                  val conditionsIR = conditions.map(c => convertConditionBool(c, true))
-                  val condition = conditionsIR.tail.foldLeft(conditionsIR.head) {
-                    (ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands)
+                  val conditionsIR = conditions.map(c => {
+                    val (e, l) = convertConditionBool(c, true)
+                    (e, l.toList)
+                  })
+                  val (condition,loads) = conditionsIR.tail.foldLeft(conditionsIR.head) {
+                    (ands, next) => (BinaryExpr(BoolAND, next(0), ands(0)), next(1) ++ ands(1))
                   }
-                  val newBlock = newBlockCondition(block, target, condition)
+                  val newBlock = newBlockCondition(block, target, loads, condition)
                   newBlocks.append(newBlock)
                   targets.append(newBlock)
                 }
               // non-true condition
               case _ =>
-                val currentCondition = convertConditionBool(b.condition, false)
-                val condition = if (conditions.isEmpty) {
+                val (currentCondition, currentL) = convertConditionBool(b.condition, false)
+                val (condition,load) = if (conditions.isEmpty) {
                   // if this is the first condition then it is the only relevant part of the condition
-                  currentCondition
+                  (currentCondition, currentL.toList)
                 } else {
                   // if this is not the first condition, then we need to need to add
                   // that all previous conditions are false
-                  val conditionsIR = conditions.map(c => convertConditionBool(c, true))
-                  conditionsIR.tail.foldLeft(currentCondition) {
-                    (ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands)
+                  val conditionsIR = conditions.map(c => {
+                    val (e,l) = convertConditionBool(c, true)
+                    (e, l.toList)
+                  })
+                  conditionsIR.tail.foldLeft((currentCondition, currentL.toList)) {
+                    (ands, next) => (BinaryExpr(BoolAND, next(0), ands(0)), next(1) ++ ands(1))
                   }
                 }
-                val newBlock = newBlockCondition(block, target, condition)
+                val newBlock = newBlockCondition(block, target, load, condition)
                 newBlocks.append(newBlock)
                 targets.append(newBlock)
                 conditions.append(b.condition)
@@ -294,8 +318,8 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
               (None, GoTo(ArrayBuffer(target), Some(b.line)), ArrayBuffer())
             // non-true condition
             case _ =>
-              val condition = convertConditionBool(b.condition, false)
-              val newBlock = newBlockCondition(block, target, condition)
+              val (condition,load) = convertConditionBool(b.condition, false)
+              val newBlock = newBlockCondition(block, target, load.toSeq, condition)
               (None, GoTo(ArrayBuffer(newBlock), Some(b.line)), ArrayBuffer(newBlock))
           }
       }
@@ -310,9 +334,9 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     * If the BAPExpr uses a comparator that returns a Boolean then no further conversion is performed except negation,
     * if necessary.
     * */
-  private def convertConditionBool(expr: BAPExpr, negative: Boolean): Expr = {
-    val e = translateExprOnly(expr)
-    e.getType match {
+  private def convertConditionBool(expr: BAPExpr, negative: Boolean): (Expr, Option[MemoryLoad]) = {
+    val (e,l) = translateExpr(expr)
+    val exp = e.getType match {
       case BitVecType(s) =>
         if (negative) {
           BinaryExpr(BVEQ, e, BitVecLiteral(0, s))
@@ -327,12 +351,13 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
         }
       case _ => ???
     }
+    (exp, l)
   }
 
-  private def newBlockCondition(block: Block, target: Block, condition: Expr): Block = {
+  private def newBlockCondition(block: Block, target: Block, condLoad: Seq[MemoryLoad], condition: Expr): Block = {
     val newLabel = s"${block.label}_goto_${target.label}"
     val assume = Assume(condition, checkSecurity = true)
-    Block(newLabel, None, ArrayBuffer(assume), GoTo(ArrayBuffer(target)))
+    Block(newLabel, None, condLoad.toSeq ++ Seq(assume), GoTo(ArrayBuffer(target)))
   }
 
 }
