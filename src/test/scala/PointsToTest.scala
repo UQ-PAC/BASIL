@@ -3,7 +3,7 @@ import ir.Endian.LittleEndian
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import specification.*
-import util.{RunUtils, StaticAnalysisConfig, StaticAnalysis, StaticAnalysisContext, IRContext}
+import util.{RunUtils, StaticAnalysisConfig, StaticAnalysis, StaticAnalysisContext, IRContext, MemoryRegionsMode}
 
 import java.io.IOException
 import java.nio.file.*
@@ -20,7 +20,9 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
                   globalOffsets: Map[BigInt, BigInt] = Map.empty): StaticAnalysisContext = {
 
     val ctx = IRContext(List.empty, externalFunctions, globals, funcEntries, globalOffsets, Specification(Set(), Set(), Map(), List(), List(), List(), Set()), program)
-    StaticAnalysis.analyse(ctx, StaticAnalysisConfig(), 1)
+    StaticAnalysis.analyse(ctx, StaticAnalysisConfig(
+        memoryRegions = MemoryRegionsMode.MRA,
+      ), 1)
   }
 
   /**

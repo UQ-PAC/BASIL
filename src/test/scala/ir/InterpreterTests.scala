@@ -12,7 +12,6 @@ import util.ILLoadingConfig
 class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
   var i: Interpreter = Interpreter()
-  Logger.setLevel(LogLevel.DEBUG)
 
   def getProgram(name: String): (Program, Set[SpecGlobal]) = {
 

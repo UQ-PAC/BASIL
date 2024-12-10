@@ -1,6 +1,6 @@
 import ir.{Block, Command, DirectCall, GoTo, Procedure, Program, Statement}
 import org.scalatest.funsuite.*
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, LogLevel, Logger, PerformanceTimer, RunUtils, StaticAnalysisConfig}
+import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, LogLevel, Logger, PerformanceTimer, RunUtils, StaticAnalysisConfig, MemoryRegionsMode}
 
 import scala.collection.mutable.ArrayBuffer
 import test_util.BASILTest
@@ -43,7 +43,9 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
     val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
 
     Logger.debug(s"$name/$variation$testSuffix")
-    val basilResult = runBASIL(inputPath, RELFPath, Some(specPath), BPLPath, Some(StaticAnalysisConfig()))
+    val basilResult = runBASIL(inputPath, RELFPath, Some(specPath), BPLPath, Some(StaticAnalysisConfig(
+        memoryRegions = MemoryRegionsMode.MRA,
+      )))
     Logger.debug(s"$name/$variation$testSuffix DONE")
 
     val boogieResult = runBoogie(directoryPath, BPLPath, conf.boogieFlags)
