@@ -68,6 +68,8 @@ Now, running make commands should use compilers from Docker.
 The log of make commands should mention docker or podman
 while executing.
 
+To build compiled and lifted files, use `make` as usual.
+
 To check the generated files against the stored hashes, use:
 ```bash
 make md5sum-check
@@ -86,8 +88,23 @@ Some notes:
 - The Docker image will take about 5GB of your disk space.
 - The Docker image is an x86_64-linux image. If you are on a different architecture,
   you should configure your Docker to use the x86_64 platform.
+- You can run a command within the Docker container with `docker-helper.sh <command>`.
+  Note that this will not work with commands needing user interaction (e.g. shells).
+- To enter a shell within the Docker container, use `docker-helper.sh shell`.
 
+#### Reproducibility
 
+The Docker container and commands run within it should be reproducible.
+If, for any reason, you find unexpected hash mismatches,
+you can inspect the file differences between two runs with these commands:
 
+```bash
+# after a failed `make md5sum-check`...
 
+make repro-stash  # makes a copy of generated files, then cleans the originals
+
+make repro-check  # re-generates files and diffs them to the stashed copy
+```
+
+Note, `make clean` will not remove the stashed copies, but `make cleanall` will.
 
