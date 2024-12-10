@@ -246,7 +246,7 @@ object IRTransform {
     val renamer = Renamer(boogieReserved)
     renamer.visitProgram(ctx.program)
 
-    assert(invariant.singleCallBlockEnd(ctx.program))
+    assert(invariant.singleCallBlockEnd(ctx.program), "Single call at block end")
   }
 
   def generateProcedureSummaries(
@@ -562,7 +562,7 @@ object RunUtils {
       val boogieTranslator = IRToBoogie(ctx.program, ctx.specification, None, q.outputPrefix, regionInjector, q.boogieTranslation)
       ArrayBuffer(boogieTranslator.translate)
     }
-    assert(invariant.singleCallBlockEnd(ctx.program))
+    assert(invariant.singleCallBlockEnd(ctx.program), "Single call at block end")
 
     BASILResult(ctx, analysis, boogiePrograms)
   }
@@ -643,7 +643,7 @@ object RunUtils {
       None
     }
 
-    assert(invariant.singleCallBlockEnd(ctx.program))
+    assert(invariant.singleCallBlockEnd(ctx.program), "Single call at block end")
     Logger.debug(s"[!] Finished indirect call resolution after $iteration iterations")
     analysisResult.last.copy(
       symbolicAddresses = symResults,

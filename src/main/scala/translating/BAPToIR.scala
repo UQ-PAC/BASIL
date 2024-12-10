@@ -4,6 +4,7 @@ import bap.*
 import boogie.UnaryBExpr
 import ir.{UnaryExpr, BinaryExpr, *}
 import specification.*
+import util.Logger
 
 import scala.collection.mutable
 import scala.collection.mutable.Map
@@ -37,7 +38,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       for (p <- s.out) {
         procedure.out.append(translateParameter(p))
       }
-      if (s.address.get == mainAddress) {
+      if (s.address.contains(mainAddress)) {
         mainProcedure = Some(procedure)
       }
       procedures.append(procedure)
@@ -102,7 +103,18 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       }
   }
 
-  private def translateExpr(e: BAPExpr): (Expr, Option[MemoryLoad]) = e match {
+
+  private def translateExpr(e: BAPExpr): (Expr, Option[MemoryLoad]) = 
+    try {
+      _translateExpr(e)
+    } catch {
+      case exp: Exception => {
+        Logger.error(s"Error translating $e:\n\t" + e)
+        throw exp
+      }
+  }
+
+  private def _translateExpr(e: BAPExpr): (Expr, Option[MemoryLoad]) = e match {
     case b @ BAPConcat(left, right) =>
       val (arg0, load0) = translateExpr(left)
       val (arg1, load1) = translateExpr(right)
@@ -146,43 +158,49 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       case NOT => (UnaryExpr(BVNOT, translateExprOnly(exp)), None)
       case NEG => (UnaryExpr(BVNEG, translateExprOnly(exp)), None)
     }
-    case BAPBinOp(operator, lhs, rhs) => operator match {
-      case PLUS => (BinaryExpr(BVADD, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case MINUS => (BinaryExpr(BVSUB, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case TIMES => (BinaryExpr(BVMUL, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case DIVIDE => (BinaryExpr(BVUDIV, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case SDIVIDE => (BinaryExpr(BVSDIV, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+    case BAPBinOp(operator, lhs, rhs) => 
+      val (tlhs, l1) = translateExpr(lhs)
+      val (trhs, l2) = translateExpr(rhs)
+      assert(!(l1.isDefined && l2.isDefined), "Don't expect two loads in an expression")
+      val load : Option[MemoryLoad] = l1.orElse(l2)
+
+      operator match {
+      case PLUS => (BinaryExpr(BVADD, tlhs, trhs), None)
+      case MINUS => (BinaryExpr(BVSUB, tlhs, trhs), None)
+      case TIMES => (BinaryExpr(BVMUL, tlhs, trhs), None)
+      case DIVIDE => (BinaryExpr(BVUDIV, tlhs, trhs), None)
+      case SDIVIDE => (BinaryExpr(BVSDIV, tlhs, trhs), None)
       // counterintuitive but correct according to BAP source
-      case MOD => (BinaryExpr(BVSREM, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      case MOD => (BinaryExpr(BVSREM, tlhs, trhs), None)
       // counterintuitive but correct according to BAP source
-      case SMOD => (BinaryExpr(BVUREM, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      case SMOD => (BinaryExpr(BVUREM, tlhs, trhs), None)
       case LSHIFT => // BAP says caring about this case is necessary?
         if (lhs.size == rhs.size) {
-          (BinaryExpr(BVSHL, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+          (BinaryExpr(BVSHL, tlhs, trhs), None)
         } else {
-          (BinaryExpr(BVSHL, translateExprOnly(lhs), ZeroExtend(lhs.size - rhs.size, translateExprOnly(rhs))), None)
+          (BinaryExpr(BVSHL, tlhs, ZeroExtend(lhs.size - rhs.size, trhs)), None)
         }
       case RSHIFT =>
         if (lhs.size == rhs.size) {
-          (BinaryExpr(BVLSHR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+          (BinaryExpr(BVLSHR, tlhs, trhs), None)
         } else {
-          (BinaryExpr(BVLSHR, translateExprOnly(lhs), ZeroExtend(lhs.size - rhs.size, translateExprOnly(rhs))), None)
+          (BinaryExpr(BVLSHR, tlhs, ZeroExtend(lhs.size - rhs.size, trhs)), None)
         }
       case ARSHIFT =>
         if (lhs.size == rhs.size) {
-          (BinaryExpr(BVASHR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+          (BinaryExpr(BVASHR, tlhs, trhs), None)
         } else {
-          (BinaryExpr(BVASHR, translateExprOnly(lhs), ZeroExtend(lhs.size - rhs.size, translateExprOnly(rhs))), None)
+          (BinaryExpr(BVASHR, tlhs, ZeroExtend(lhs.size - rhs.size, trhs)), None)
         }
-      case AND => (BinaryExpr(BVAND, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case OR => (BinaryExpr(BVOR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case XOR => (BinaryExpr(BVXOR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case EQ => (BinaryExpr(BVCOMP, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case NEQ => (UnaryExpr(BVNOT, BinaryExpr(BVCOMP, translateExprOnly(lhs), translateExprOnly(rhs))), None)
-      case LT => (BinaryExpr(BVULT, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case LE => (BinaryExpr(BVULE, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case SLT => (BinaryExpr(BVSLT, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case SLE => (BinaryExpr(BVSLE, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      case AND => (BinaryExpr(BVAND, tlhs, trhs), None)
+      case OR => (BinaryExpr(BVOR, tlhs, trhs), None)
+      case XOR => (BinaryExpr(BVXOR, tlhs, trhs), None)
+      case EQ => (BinaryExpr(BVCOMP, tlhs, trhs), None)
+      case NEQ => (UnaryExpr(BVNOT, BinaryExpr(BVCOMP, tlhs, trhs)), None)
+      case LT => (BinaryExpr(BVULT, tlhs, trhs), None)
+      case LE => (BinaryExpr(BVULE, tlhs, trhs), None)
+      case SLT => (BinaryExpr(BVSLT, tlhs, trhs), None)
+      case SLE => (BinaryExpr(BVSLE, tlhs, trhs), None)
     }
     case b: BAPVar => (translateVar(b), None)
     case BAPMemAccess(memory, index, endian, size) =>
