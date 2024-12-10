@@ -16,9 +16,9 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
       case m: MemoryStore  => vstore(m.mem.name, vexpr(m.index), vexpr(m.value), m.endian, m.size)
       case c: DirectCall =>
         vcall(
-          c.outParams.toList.map((l, r) => (vlvar(l), vexpr(r))),
+          c.outParams.toList.map((l, r) => (l, vexpr(r))),
           c.target.name,
-          c.actualParams.toList.map((l, r) => (vlvar(l), vexpr(r)))
+          c.actualParams.toList.map((l, r) => (l, vexpr(r)))
         )
       case i: IndirectCall => vindirect(vrvar(i.target))
       case a: Assert       => vassert(vexpr(a.body))
@@ -50,7 +50,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
     }
   }
 
-  def vblock(b: Block): Repr[Block] = vblock(b.label, b.statements.toList.map(vstmt), vjump(b.jump))
+  def vblock(b: Block): Repr[Block] = vblock(b.label, b.address, b.statements.toList.map(vstmt), vjump(b.jump))
   def vproc(p: Procedure): Repr[Procedure] = vproc(
     p.name,
     p.formalInParam.toList.map(vlvar),
@@ -60,7 +60,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
     p.returnBlock.map(vblock)
   )
 
-  def vblock(label: String, statements: List[Repr[Statement]], terminator: Repr[Jump]): Repr[Block]
+  def vblock(label: String, address:Option[BigInt], statements: List[Repr[Statement]], terminator: Repr[Jump]): Repr[Block]
 
   def vprog(p: Program) : Repr[Program] = vprog(p.mainProcedure.name, p.procedures.toList.map(vproc))
   def vprog(mainProc: String, procedures: List[Repr[Procedure]]) : Repr[Program]
@@ -78,9 +78,9 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
   def vload(lhs: Repr[Variable], mem: String, index: Repr[Expr], endian: Endian, size: Int): Repr[MemoryLoad]
   def vstore(mem: String, index: Repr[Expr], value: Repr[Expr], endian: Endian, size: Int): Repr[MemoryStore]
   def vcall(
-      outParams: List[(Repr[Variable], Repr[Expr])],
+      outParams: List[(Variable, Repr[Expr])],
       procname: String,
-      inparams: List[(Repr[Variable], Repr[Expr])]
+      inparams: List[(Variable, Repr[Expr])]
   ): Repr[DirectCall]
   def vindirect(target: Repr[Variable]): Repr[IndirectCall]
   def vassert(body: Repr[Expr]): Repr[Assert]

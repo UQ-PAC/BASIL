@@ -51,7 +51,7 @@ class GenericLogger(
 
   def setOutput(stream: PrintStream) = output = stream
 
-  def writeToFile(file: File, content: String) = {
+  def writeToFile(file: File, content: => String) = {
     if (level.id < LogLevel.OFF.id) {
       val l = deriveLogger(file.getName(), file)
       l.print(content)
@@ -154,11 +154,12 @@ class GenericLogger(
 // doesn't work with `mill run`
 def isAConsole = System.console() != null
 
-val Logger  = GenericLogger("log", LogLevel.INFO, System.out, isAConsole)
+val Logger  = GenericLogger("log", LogLevel.DEBUG, System.out, isAConsole)
 val StaticAnalysisLogger  = Logger.deriveLogger("analysis", System.out)
 val SimplifyLogger = Logger.deriveLogger("simplify", System.out)
 val DebugDumpIRLogger = {
   val l = Logger.deriveLogger("debugdumpir")
+  l.setLevel(LogLevel.OFF)
   l
 }
 val VSALogger = StaticAnalysisLogger.deriveLogger("vsa")
