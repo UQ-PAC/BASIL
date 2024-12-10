@@ -1,5 +1,5 @@
 import org.scalatest.funsuite.AnyFunSuite
-import util.{LogLevel, Logger, PerformanceTimer, StaticAnalysisConfig}
+import util.{LogLevel, Logger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
 
 import Numeric.Implicits.*
 import java.io.{BufferedWriter, File, FileWriter}
@@ -232,6 +232,25 @@ class AnalysisSystemTestsBAP extends SystemTests {
 class AnalysisSystemTestsGTIRB extends SystemTests {
   runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = false, expectVerify = true))
   runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = false, expectVerify = false))
+}
+
+class DSAMemoryRegionSystemTestsBAP extends SystemTests {
+  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)), useBAPFrontend = true, expectVerify = true))
+  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)), useBAPFrontend = true, expectVerify = false))
+}
+
+class DSAMemoryRegionSystemTestsGTIRB extends SystemTests {
+  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)), useBAPFrontend = false, expectVerify = true))
+  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)), useBAPFrontend = false, expectVerify = false))
+}
+
+class MemoryRegionTestsDSA extends SystemTests {
+  // stack_pointer currently times out because Boogie is bad at handling abstract map accesses
+  runTests("memory_regions", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)), useBAPFrontend = true, expectVerify = true))
+}
+
+class MemoryRegionTestsNoRegion extends SystemTests {
+  runTests("memory_regions", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = true))
 }
 
 class ProcedureSummaryTests extends SystemTests {

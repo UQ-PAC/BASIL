@@ -222,7 +222,7 @@ object IRTransform {
     * add in modifies from the spec.
     */
   def prepareForTranslation(config: BASILConfig, ctx: IRContext): Unit = {
-    if (!config.staticAnalysis.isDefined || !config.staticAnalysis.get.memoryRegions) {
+    if (!config.staticAnalysis.isDefined || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled)) {
       ctx.program.determineRelevantMemory(ctx.globalOffsets)
     }
 
@@ -235,7 +235,7 @@ object IRTransform {
     val dupProcNames = ctx.program.procedures.groupBy(_.name).filter((_, p) => p.size > 1).toList.flatMap(_(1))
     assert(dupProcNames.isEmpty)
 
-    if (!config.staticAnalysis.isDefined || !config.staticAnalysis.get.memoryRegions) {
+    if (!config.staticAnalysis.isDefined || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled)) {
       val stackIdentification = StackSubstituter()
       stackIdentification.visitProgram(ctx.program)
     }
@@ -446,9 +446,9 @@ object StaticAnalysis {
     }
 
     StaticAnalysisLogger.debug("[!] Injecting regions")
-    val regionInjector = if (config.memoryRegions) {
-      val injector = RegionInjector(IRProgram, mmm)
-      injector.nodeVisitor()
+    val regionInjector = if (config.memoryRegions == MemoryRegionsMode.MRA) {
+      val injector = RegionInjectorMRA(IRProgram, mmm)
+      injector.injectRegions()
       Some(injector)
     } else {
       None
@@ -646,10 +646,6 @@ object RunUtils {
     }
     assert(invariant.correctCalls(ctx.program))
 
-    ir.eval.SimplifyValidation.validate = conf.validateSimp
-    if (conf.simplify) {
-      doSimplify(ctx, conf.staticAnalysis)
-    }
 
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))
@@ -661,6 +657,17 @@ object RunUtils {
       conf => staticAnalysis(conf, ctx)
     }
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
+
+    ir.eval.SimplifyValidation.validate = conf.validateSimp
+    if (conf.simplify) {
+
+      if (!q.loading.parameterForm) {
+        ir.transforms.clearParams(ctx.program)
+        ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
+      }
+
+      doSimplify(ctx, conf.staticAnalysis)
+    }
 
     if (q.runInterpret) {
       Logger.info("Start interpret")
@@ -686,6 +693,9 @@ object RunUtils {
 
     IRTransform.prepareForTranslation(q, ctx)
 
+    q.loading.dumpIL.foreach(s => 
+      writeToFile(pp_prog(ctx.program), s"$s-output.il")
+    )
     Logger.info("[!] Translating to Boogie")
 
     val regionInjector = analysis.flatMap(a => a.regionInjector)
@@ -704,6 +714,7 @@ object RunUtils {
     }
     assert(invariant.singleCallBlockEnd(ctx.program))
 
+
     BASILResult(ctx, analysis, boogiePrograms)
   }
 
@@ -713,7 +724,7 @@ object RunUtils {
     var iteration = 1
     var modified: Boolean = true
     val analysisResult = mutable.ArrayBuffer[StaticAnalysisContext]()
-    while (modified || (analysisResult.size < 2 && config.memoryRegions)) {
+    while (modified || (analysisResult.size < 2 && config.memoryRegions == MemoryRegionsMode.MRA)) {
       StaticAnalysisLogger.info("[!] Running Static Analysis")
       val result = StaticAnalysis.analyse(ctx, config, iteration, analysisResult.lastOption)
       analysisResult.append(result)
@@ -775,13 +786,22 @@ object RunUtils {
       DebugDumpIRLogger.writeToFile(File(s"${s}_main_dsg.dot"), dsa.topDown(ctx.program.mainProcedure).toDot)
     }
 
+    val regionInjector = if (config.memoryRegions == MemoryRegionsMode.DSA) {
+      val injector = RegionInjectorDSA(ctx.program, dsa.topDown)
+      injector.injectRegions()
+      Some(injector)
+    } else {
+      None
+    }
+
     assert(invariant.singleCallBlockEnd(ctx.program))
     StaticAnalysisLogger.info(s"[!] Finished indirect call resolution after $iteration iterations")
     analysisResult.last.copy(
       symbolicAddresses = symResults,
       localDSA = dsa.local.toMap,
       bottomUpDSA = dsa.bottomUp.toMap,
-      topDownDSA = dsa.topDown.toMap
+      topDownDSA = dsa.topDown.toMap,
+      regionInjector = regionInjector
     )
   }
 }

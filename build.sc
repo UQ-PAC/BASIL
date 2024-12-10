@@ -22,7 +22,6 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
 
   def scalaPBVersion = "0.11.15"
 
-  def scalacOptions = Seq("-deprecation", "-unchecked", "-feature")
 
   def mainClass = Some("Main")
 
