@@ -72,7 +72,7 @@ trait GlobalRegionAnalysis(val program: Program,
       Set(dataPoolMaster(eval.get.value, subAccess))
     } else {
       exp match {
-        case literal: BitVecLiteral => tryCoerceIntoData(literal, n, subAccess)
+        // case literal: BitVecLiteral => tryCoerceIntoData(literal, n, subAccess)
         case Extract(_, _, body) => tryCoerceIntoData(body, n, subAccess)
         case Repeat(_, body) => tryCoerceIntoData(body, n, subAccess)
         case ZeroExtend(_, body) => tryCoerceIntoData(body, n, subAccess)
