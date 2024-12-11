@@ -18,7 +18,7 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{DataStructureAnalysis, SVA, Graph, SymbolicAddress, SymbolicAddressAnalysis}
+import analysis.data_structure_analysis.{ConstraintGen, CoolDSA, DataStructureAnalysis, Graph, SVA, SymbolicAddress, SymbolicAddressAnalysis}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
@@ -620,10 +620,13 @@ object RunUtils {
     }
 
 
-    Logger.debug("[!] Running SVA")
-    val sva = SVA(ctx.program, analysisResult.last.interProcConstProp).analyze()
-    val labels = sva.map { (k, v) => k -> v.toString }
-    writeToFile(toDot(ctx.program, labels), s"SVA.dot")
+    Logger.debug("[!] Running ConstGen")
+
+    val test = CoolDSA(ctx.program, analysisResult.last.intraProcConstProp)
+    test.analyze()
+//    val gen = ConstraintGen(ctx.program, analysisResult.last.intraProcConstProp).analyze()
+//    val labels = gen.map { (k, v) => k -> v.toString }
+//    writeToFile(toDot(ctx.program, labels), s"SVA.dot")
 
     Logger.debug("[!] Running Symbolic Access Analysis")
     val symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]] =
