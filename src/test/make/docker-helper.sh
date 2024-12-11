@@ -9,7 +9,7 @@ DIR=$(realpath --relative-to "$GIT_ROOT" .)
 
 : ${DOCKER:=podman}
 : ${DOCKER_USER:=root}
-: ${DOCKER_IMAGE:=localhost/basil-tools-docker:latest}
+: ${DOCKER_IMAGE:=ghcr.io/uq-pac/basil-tools-docker}
 
 if [[ $# -lt 1 ]] || [[ "$1" == --help ]]; then
   echo "usage: $(basename $0) (build | start | stop | hash | env [--unset] | COMMAND...)"
@@ -27,31 +27,52 @@ fi
 
 # create unique names depending on the flake reference, to ensure the correct container
 # is used.
-flake_hash=$(printf '%s' "$DOCKER_FLAKE" | grep --only-matching -E '[0-9a-fA-F]{40}' | head -c8)
-if [[ -z "$flake_hash" ]]; then
-  flake_hash=md5-$(printf '%s' "$DOCKER_FLAKE" | md5sum | cut -d' ' -f1 | head -c4)
-fi
-unique_image=$DOCKER_IMAGE-$flake_hash
-unique_container=container-$flake_hash
+# unique names depend only on DOCKER_FLAKE, allowing them to be computed without nix.
+commit=$(printf '%s' "$DOCKER_FLAKE" | grep --only-matching -E '[0-9a-fA-F]{40}' | head -c8)
+flake_hash=flake-$(printf '%s' "$DOCKER_FLAKE" | md5sum | cut -d' ' -f1 | head -c4)
+unique_image="$DOCKER_IMAGE:$flake_hash-$commit"
+unique_container=container-$flake_hash-$commit
 
 # this allows the env subcommand to output syntax compatible with multiple shells
 shell=$(basename $SHELL)
 if [[ $shell == fish ]]; then
   unset='set --erase'
   unalias='functions --erase'
+  eval='('
 else
   unset=unset
   unalias=unalias
+  eval='$('
 fi
 
 
-if [[ "$1" == build ]]; then
-  # downloads/builds the docker image for running tools.
+if [[ "$1" == pull ]]; then
+  # pulls the unique image from the registry
+  set -x
+  exec $DOCKER pull "$unique_image"
+
+elif [[ "$1" == push ]]; then
+  # pushes the unique image to the registry. image must already exist locally.
+  set -x
+  exec $DOCKER push "$unique_image"
+
+elif [[ "$1" == build ]]; then
+  # builds the docker image for running tools.
   # safe to re-run. if docker image is already up-to-date, should be reasonably fast.
   nix build "$DOCKER_FLAKE" --no-link
+  nix build "$DOCKER_FLAKE.conf" --no-link
+  conf=$(nix build "$DOCKER_FLAKE.conf" --no-link --print-out-paths)
+  tag=$(nix eval --expr "with builtins; (fromJSON (unsafeDiscardStringContext (readFile $conf))).repo_tag" --impure --raw)
+  if ! [[ "$tag" == "$DOCKER_IMAGE":* ]]; then
+    printf '%s %s %s.\n' \
+      "ERROR: docker image names do not match!" \
+      "nix flake will build '$tag', but" \
+      "DOCKER_IMAGE is '$DOCKER_IMAGE'" >&2
+    exit 1
+  fi
   set -x
   $(nix build "$DOCKER_FLAKE" --no-link --print-out-paths) | "$DOCKER" image load
-  $DOCKER image tag $DOCKER_IMAGE $unique_image
+  $DOCKER image tag "$tag" $unique_image
   exit
 
 elif [[ "$1" == start ]]; then
@@ -80,7 +101,14 @@ elif [[ "$1" == env ]]; then
   # when passed to `eval`, these commands should prepare the shell for running
   # basil tests through docker.
 
+  # if --unset is used, removes all definitions
   isunset=$([[ $# -ge 2 ]] && [[ "$2" == --unset ]] && echo true || echo false)
+  # if --reset is used, removes all definitions, then re-adds them based on defaults
+  isreset=$([[ $# -ge 2 ]] && [[ "$2" == --reset ]] && echo true || echo false)
+
+  if $isreset; then
+    isunset=true
+  fi
 
   function echoexport() {
     if $isunset; then
@@ -94,9 +122,9 @@ elif [[ "$1" == env ]]; then
 
   echoexport USE_DOCKER "1"
   echoexport DOCKER_FLAKE "$DOCKER_FLAKE"
+  echoexport DOCKER_IMAGE "$DOCKER_IMAGE"
   echoexport DOCKER "$DOCKER"
   echoexport DOCKER_USER "$DOCKER_USER"
-  echoexport DOCKER_IMAGE "$DOCKER_IMAGE"
   echoexport DOCKER_CMD "$DOCKER_CMD"
   echoexport GIT_ROOT "$GIT_ROOT"
   echo 'echo;'
@@ -116,6 +144,10 @@ elif [[ "$1" == env ]]; then
 	else
 	  echo "echo alias docker-helper.sh = '$DOCKER_CMD';"
 	  echo "alias 'docker-helper.sh=$DOCKER_CMD';"
+	fi
+
+	if $isreset; then
+	  echo "eval $eval$DOCKER_CMD env);"
 	fi
 	exit
 fi

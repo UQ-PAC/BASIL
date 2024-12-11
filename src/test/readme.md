@@ -54,9 +54,9 @@ This will load a number of environment variables into your shell which are
 recognised by the Makefiles and subsequent docker-helper.sh calls.
 To de-activate this environment, use the same command with `--unset` after "env".
 
-After setting up the environment, to build and install the Docker image, run:
+After setting up the environment, to pull the Docker image, run:
 ```bash
-docker-helper.sh build
+docker-helper.sh pull
 ```
 
 To start an instance of the Docker container,
@@ -83,11 +83,14 @@ The Docker image is pinned by make/docker-flake.txt.
 To update the Docker image, first make the desired changes
 to the pac-nix repository, then update this text file.
 After this, you will have to repeat the "env", "build", and "start" subcommands.
+To push a new image to the GHCR package, use the "push" subcommand.
 
 Some notes:
 - The Docker image will take about 5GB of your disk space.
-- The Docker image is an x86_64-linux image. If you are on a different architecture,
-  you should configure your Docker to use the x86_64 platform.
+- The Docker image is an x86_64-linux image and can only be built on this platform.
+  If you are on a different architecture,
+  you should configure your Docker to use the x86_64 platform and pull from the GHCR
+  instead of building manually.
 - You can run a command within the Docker container with `docker-helper.sh <command>`.
   Note that this will not work with commands needing user interaction (e.g. shells).
 - To enter a shell within the Docker container, use `docker-helper.sh shell`.
