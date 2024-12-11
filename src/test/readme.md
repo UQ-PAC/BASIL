@@ -4,32 +4,28 @@ See [docs/development/readme.md](../../docs/development/readme.md)
 
 ## Lifting SystemTest examples
 
-Lifting options specified in make/lift-directories.mk can be overriden using this file, for example to specify the lifting templates:
-
-```
-$ cat correct/test_name/config.mk
-ENABLED_COMPILERS = clang clang_pic gcc gcc_pic
-```
-
 To force recompile and lift all:
-
 ```
 make cleanall 
 make
 ```
 
 Lift one:
-
-```
-                                # relative to correct/secret_write
+```bash
 make -C correct/secret_write -f ../../make/lift-directories.mk
+                              # ^ relative to correct/secret_write
 ```
-
 or
-
 ```
 cd correct/secret_write
 make -f ../../make/lift-directories.mk
+```
+
+Lifting options specified in make/lift-directories.mk can be overriden using the config.mk file in each
+test directory. For example, to specify the enabled lifting templates (i.e., compilers and compiler flags):
+```
+$ cat correct/test_name/config.mk
+ENABLED_COMPILERS = clang clang_pic gcc gcc_pic
 ```
 
 ### Lifting reproducibly with Docker
@@ -137,13 +133,16 @@ Now, running make commands should use compilers from Docker.
 To process only one test case at a time, you can use the `-C`
 and `-f` flags as in the "Lift one" command above.
 
-#### Updating test cases
+#### Updating or adding test cases
 If you change the source code for a test or add a new test case,
 you will have to update its hashes as well. You can use these steps to do so.
 
 1. Make your changes in the `src/test/[in]correct/[TESTNAME]` directory.
-2. Make sure the Docker environment is active with the set up steps.
-3. Run `make` to compile and lift your new files.
+   A new test directory should have at least a C source file
+   and, optionally, a specification file.
+   The Makefiles should automatically detect new test cases.
+3. Make sure the Docker environment is active with the set up steps.
+4. Run `make` to compile and lift your new files.
    To lift only one test case, you can add `-C` and `-f` flags
    to your make invocation (see "Lift one" above).
 5. Run `make md5sum-update -j6` to generate new hashes.
