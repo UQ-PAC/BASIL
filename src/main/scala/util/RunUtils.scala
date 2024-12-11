@@ -217,7 +217,7 @@ object IRTransform {
     * add in modifies from the spec.
     */
   def prepareForTranslation(config: BASILConfig, ctx: IRContext): Unit = {
-    if (!config.staticAnalysis.isDefined || !config.staticAnalysis.get.memoryRegions) {
+    if (!config.staticAnalysis.isDefined || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled)) {
       ctx.program.determineRelevantMemory(ctx.globalOffsets)
     }
 
@@ -235,7 +235,7 @@ object IRTransform {
       p.name = p.name + "$" + p.address.map(_.toString).getOrElse(dupCounter.toString)
     }
 
-    if (!config.staticAnalysis.isDefined || !config.staticAnalysis.get.memoryRegions) {
+    if (!config.staticAnalysis.isDefined || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled)) {
       val stackIdentification = StackSubstituter()
       stackIdentification.visitProgram(ctx.program)
     }
@@ -440,9 +440,9 @@ object StaticAnalysis {
     }
 
     Logger.debug("[!] Injecting regions")
-    val regionInjector = if (config.memoryRegions) {
-      val injector = RegionInjector(IRProgram, mmm)
-      injector.nodeVisitor()
+    val regionInjector = if (config.memoryRegions == MemoryRegionsMode.MRA) {
+      val injector = RegionInjectorMRA(IRProgram, mmm)
+      injector.injectRegions()
       Some(injector)
     } else {
       None
@@ -575,7 +575,7 @@ object RunUtils {
     var iteration = 1
     var modified: Boolean = true
     val analysisResult = mutable.ArrayBuffer[StaticAnalysisContext]()
-    while (modified || (analysisResult.size < 2 && config.memoryRegions)) {
+    while (modified || (analysisResult.size < 2 && config.memoryRegions == MemoryRegionsMode.MRA)) {
       Logger.debug("[!] Running Static Analysis")
       val result = StaticAnalysis.analyse(ctx, config, iteration, analysisResult.lastOption)
       analysisResult.append(result)
@@ -637,13 +637,22 @@ object RunUtils {
       writeToFile(dsa.topDown(ctx.program.mainProcedure).toDot, s"${s}_main_dsg.dot")
     }
 
+    val regionInjector = if (config.memoryRegions == MemoryRegionsMode.DSA) {
+      val injector = RegionInjectorDSA(ctx.program, dsa.topDown)
+      injector.injectRegions()
+      Some(injector)
+    } else {
+      None
+    }
+
     assert(invariant.singleCallBlockEnd(ctx.program))
     Logger.debug(s"[!] Finished indirect call resolution after $iteration iterations")
     analysisResult.last.copy(
       symbolicAddresses = symResults,
       localDSA = dsa.local.toMap,
       bottomUpDSA = dsa.bottomUp.toMap,
-      topDownDSA = dsa.topDown.toMap
+      topDownDSA = dsa.topDown.toMap,
+      regionInjector = regionInjector
     )
   }
 }
