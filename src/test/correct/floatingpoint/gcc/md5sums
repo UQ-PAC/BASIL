@@ -1,5 +1,5 @@
-18f43420a19b932270e23e40ee82b110  a.out
-ce438aa5f287137bde6dbde35af2493a  floatingpoint.adt
-36490bc8da01c5face0b0bfdef63d919  floatingpoint.bir
-f74f55ef20dfba89b14953547250a1ea  floatingpoint.relf
-f4ee4aad2659fda9914b0c07f08095c7  floatingpoint.gts
+18f43420a19b932270e23e40ee82b110  correct/floatingpoint/gcc/a.out
+ce438aa5f287137bde6dbde35af2493a  correct/floatingpoint/gcc/floatingpoint.adt
+36490bc8da01c5face0b0bfdef63d919  correct/floatingpoint/gcc/floatingpoint.bir
+f74f55ef20dfba89b14953547250a1ea  correct/floatingpoint/gcc/floatingpoint.relf
+f4ee4aad2659fda9914b0c07f08095c7  correct/floatingpoint/gcc/floatingpoint.gts

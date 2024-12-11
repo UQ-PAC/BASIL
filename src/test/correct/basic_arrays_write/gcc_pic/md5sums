@@ -1,5 +1,5 @@
-fccaa0c11409db3426e45080debc65b1  a.out
-d424e2cf2b6b1d3fe3fc2a9fcebd2014  basic_arrays_write.adt
-6f67a738b4308916f4a6275f3b7f21d7  basic_arrays_write.bir
-24ea1ec0163b5f4b03d3125bdbbe9f0e  basic_arrays_write.relf
-e2e99e292618a840516414130cc2bac7  basic_arrays_write.gts
+fccaa0c11409db3426e45080debc65b1  correct/basic_arrays_write/gcc_pic/a.out
+d424e2cf2b6b1d3fe3fc2a9fcebd2014  correct/basic_arrays_write/gcc_pic/basic_arrays_write.adt
+6f67a738b4308916f4a6275f3b7f21d7  correct/basic_arrays_write/gcc_pic/basic_arrays_write.bir
+24ea1ec0163b5f4b03d3125bdbbe9f0e  correct/basic_arrays_write/gcc_pic/basic_arrays_write.relf
+e2e99e292618a840516414130cc2bac7  correct/basic_arrays_write/gcc_pic/basic_arrays_write.gts

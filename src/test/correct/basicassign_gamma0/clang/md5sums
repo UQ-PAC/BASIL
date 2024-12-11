@@ -1,5 +1,5 @@
-2534fef63b99890d79db3acf7bf27770  a.out
-c8862ee3da35f018ae5ff0f69c955dce  basicassign_gamma0.adt
-9fcceb954b995160de8bd450fdda598f  basicassign_gamma0.bir
-db7c093b0e2fc8c69d1332a2310f78ad  basicassign_gamma0.relf
-d483a7b40ea47b54324c46c0786ed98b  basicassign_gamma0.gts
+2534fef63b99890d79db3acf7bf27770  correct/basicassign_gamma0/clang/a.out
+c8862ee3da35f018ae5ff0f69c955dce  correct/basicassign_gamma0/clang/basicassign_gamma0.adt
+9fcceb954b995160de8bd450fdda598f  correct/basicassign_gamma0/clang/basicassign_gamma0.bir
+db7c093b0e2fc8c69d1332a2310f78ad  correct/basicassign_gamma0/clang/basicassign_gamma0.relf
+d483a7b40ea47b54324c46c0786ed98b  correct/basicassign_gamma0/clang/basicassign_gamma0.gts

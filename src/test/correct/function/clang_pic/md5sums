@@ -1,5 +1,5 @@
-cb261ee17167418380e7921fa6f34bfe  a.out
-06bff3e152ebbaf47f5bd87a2d52b5bc  function.adt
-09c882682a82ac65235ffc4828e0e78b  function.bir
-9d6d1f99ed7a0b3f44fa6b6a66afc5b9  function.relf
-9722723f50a8af98d988da79e37feedd  function.gts
+cb261ee17167418380e7921fa6f34bfe  correct/function/clang_pic/a.out
+06bff3e152ebbaf47f5bd87a2d52b5bc  correct/function/clang_pic/function.adt
+09c882682a82ac65235ffc4828e0e78b  correct/function/clang_pic/function.bir
+9d6d1f99ed7a0b3f44fa6b6a66afc5b9  correct/function/clang_pic/function.relf
+9722723f50a8af98d988da79e37feedd  correct/function/clang_pic/function.gts

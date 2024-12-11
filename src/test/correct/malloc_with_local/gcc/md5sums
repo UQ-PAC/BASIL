@@ -1,5 +1,5 @@
-20f36895b1d4366a7d12d9244fc22a97  a.out
-d0aed25786d379c315a2a6a447a5f27a  malloc_with_local.adt
-b89b2b726f2c69d4ee51e5383936e228  malloc_with_local.bir
-78d0501c4f8924d21777dee898bb67fa  malloc_with_local.relf
-51eb5e0bda3e518655a8d517dcc0dc83  malloc_with_local.gts
+20f36895b1d4366a7d12d9244fc22a97  correct/malloc_with_local/gcc/a.out
+d0aed25786d379c315a2a6a447a5f27a  correct/malloc_with_local/gcc/malloc_with_local.adt
+b89b2b726f2c69d4ee51e5383936e228  correct/malloc_with_local/gcc/malloc_with_local.bir
+78d0501c4f8924d21777dee898bb67fa  correct/malloc_with_local/gcc/malloc_with_local.relf
+51eb5e0bda3e518655a8d517dcc0dc83  correct/malloc_with_local/gcc/malloc_with_local.gts

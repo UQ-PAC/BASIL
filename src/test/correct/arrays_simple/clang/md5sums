@@ -1,5 +1,5 @@
-6f2b9b8e3bcd8e9f7c289d8f36c5ea8f  a.out
-2a87b20d2af4025ed1177f095db9881d  arrays_simple.adt
-30939558e42c1e037e6c60f4651dcff1  arrays_simple.bir
-5b0376f05080e6b3d38ed1027b257357  arrays_simple.relf
-cfa33440d154ba71aad0bae5303ee473  arrays_simple.gts
+6f2b9b8e3bcd8e9f7c289d8f36c5ea8f  correct/arrays_simple/clang/a.out
+2a87b20d2af4025ed1177f095db9881d  correct/arrays_simple/clang/arrays_simple.adt
+30939558e42c1e037e6c60f4651dcff1  correct/arrays_simple/clang/arrays_simple.bir
+5b0376f05080e6b3d38ed1027b257357  correct/arrays_simple/clang/arrays_simple.relf
+cfa33440d154ba71aad0bae5303ee473  correct/arrays_simple/clang/arrays_simple.gts

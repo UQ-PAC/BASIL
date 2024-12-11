@@ -1,5 +1,5 @@
-54c05c8addac4dd31429f8e7ced706f4  a.out
-c9c7ecca49444a4b6c42594252476612  basicassign_gamma0.adt
-8b7820cfc6fcbf427329a2e5235065b0  basicassign_gamma0.bir
-3db2749a62e1cf8ca09b82e14a319a09  basicassign_gamma0.relf
-34cafe3baba38981cf9694c5e4ffd6e1  basicassign_gamma0.gts
+54c05c8addac4dd31429f8e7ced706f4  correct/basicassign_gamma0/gcc_O2/a.out
+c9c7ecca49444a4b6c42594252476612  correct/basicassign_gamma0/gcc_O2/basicassign_gamma0.adt
+8b7820cfc6fcbf427329a2e5235065b0  correct/basicassign_gamma0/gcc_O2/basicassign_gamma0.bir
+3db2749a62e1cf8ca09b82e14a319a09  correct/basicassign_gamma0/gcc_O2/basicassign_gamma0.relf
+34cafe3baba38981cf9694c5e4ffd6e1  correct/basicassign_gamma0/gcc_O2/basicassign_gamma0.gts

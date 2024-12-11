@@ -1,5 +1,5 @@
-fc776e9901b42e2f477b36690bc6268d  a.out
-2637a8fa79bbe5b6a1027269f580b408  basicfree.adt
-fdcf1c9ca95edca7495d1b50e1f91c82  basicfree.bir
-ad5e1b20fdb8805883f75593cadeff57  basicfree.relf
-306fd069900267342d3b704b1fa019c2  basicfree.gts
+fc776e9901b42e2f477b36690bc6268d  correct/basicfree/clang/a.out
+2637a8fa79bbe5b6a1027269f580b408  correct/basicfree/clang/basicfree.adt
+fdcf1c9ca95edca7495d1b50e1f91c82  correct/basicfree/clang/basicfree.bir
+ad5e1b20fdb8805883f75593cadeff57  correct/basicfree/clang/basicfree.relf
+306fd069900267342d3b704b1fa019c2  correct/basicfree/clang/basicfree.gts

@@ -1,5 +1,5 @@
-c70abc14aea32f0df6d6fa33c1ea9a20  a.out
-9f2bb10aa643c20bf5aaa9ff570658e2  jumptable2.adt
-bf0d148e14afe7b73a3309325531939a  jumptable2.bir
-e7a22b080f5057367a16a093a8048788  jumptable2.relf
-055e49780aaa092785497385313f118c  jumptable2.gts
+c70abc14aea32f0df6d6fa33c1ea9a20  correct/jumptable2/clang_O2/a.out
+9f2bb10aa643c20bf5aaa9ff570658e2  correct/jumptable2/clang_O2/jumptable2.adt
+bf0d148e14afe7b73a3309325531939a  correct/jumptable2/clang_O2/jumptable2.bir
+e7a22b080f5057367a16a093a8048788  correct/jumptable2/clang_O2/jumptable2.relf
+055e49780aaa092785497385313f118c  correct/jumptable2/clang_O2/jumptable2.gts

@@ -1,5 +1,5 @@
-d8ab7c32f26bb0187667615fa88ffce3  a.out
-a6be53d5b4b5f6e84dcc9c7fc11cc5b5  basic_arrays_read.adt
-9ff9ca6d94ec4ba19f23ebfc2a84164b  basic_arrays_read.bir
-a11fe07eaf809076a843ef84e500d154  basic_arrays_read.relf
-c187e85f81a9e01637d43469f4437be4  basic_arrays_read.gts
+d8ab7c32f26bb0187667615fa88ffce3  correct/basic_arrays_read/gcc/a.out
+a6be53d5b4b5f6e84dcc9c7fc11cc5b5  correct/basic_arrays_read/gcc/basic_arrays_read.adt
+9ff9ca6d94ec4ba19f23ebfc2a84164b  correct/basic_arrays_read/gcc/basic_arrays_read.bir
+a11fe07eaf809076a843ef84e500d154  correct/basic_arrays_read/gcc/basic_arrays_read.relf
+c187e85f81a9e01637d43469f4437be4  correct/basic_arrays_read/gcc/basic_arrays_read.gts

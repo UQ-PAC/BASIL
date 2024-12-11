@@ -1,5 +1,5 @@
-0166137a5a5b9d81744f2b5d575f737d  a.out
-b536496514c9048788d6e838a440c7a9  basicassign3.adt
-35764fd1b1c331533ed8db5985311b23  basicassign3.bir
-e6747116d815cb7fd8e67278ac42577b  basicassign3.relf
-12d2518ad1cc3e7e97915bab99b6772a  basicassign3.gts
+0166137a5a5b9d81744f2b5d575f737d  incorrect/basicassign3/clang_O2/a.out
+b536496514c9048788d6e838a440c7a9  incorrect/basicassign3/clang_O2/basicassign3.adt
+35764fd1b1c331533ed8db5985311b23  incorrect/basicassign3/clang_O2/basicassign3.bir
+e6747116d815cb7fd8e67278ac42577b  incorrect/basicassign3/clang_O2/basicassign3.relf
+12d2518ad1cc3e7e97915bab99b6772a  incorrect/basicassign3/clang_O2/basicassign3.gts

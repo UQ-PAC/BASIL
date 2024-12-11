@@ -1,5 +1,5 @@
-a9b93e629e68e54e905b57e570207551  a.out
-997147f266db7359cbc2d6726145dd30  using_gamma_write_z.adt
-e9933ada5d6795d38594fc57ef100005  using_gamma_write_z.bir
-9faf759215ead982485f671e583d9888  using_gamma_write_z.relf
-031cbf2f8f532cd0a9e1274d636de49a  using_gamma_write_z.gts
+a9b93e629e68e54e905b57e570207551  correct/using_gamma_write_z/clang_pic/a.out
+997147f266db7359cbc2d6726145dd30  correct/using_gamma_write_z/clang_pic/using_gamma_write_z.adt
+e9933ada5d6795d38594fc57ef100005  correct/using_gamma_write_z/clang_pic/using_gamma_write_z.bir
+9faf759215ead982485f671e583d9888  correct/using_gamma_write_z/clang_pic/using_gamma_write_z.relf
+031cbf2f8f532cd0a9e1274d636de49a  correct/using_gamma_write_z/clang_pic/using_gamma_write_z.gts

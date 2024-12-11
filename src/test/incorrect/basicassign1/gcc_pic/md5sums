@@ -1,5 +1,5 @@
-1160bc65a4282e7def5af3c2c8f88380  a.out
-902592946b35d96c32e20287463ce1e3  basicassign1.adt
-89092683bc15a5e791c432189f91a658  basicassign1.bir
-28bb374c1c2e9b3593f1423f51aa2bb3  basicassign1.relf
-d0171a396cbad6dca8f23c5d1f3700c4  basicassign1.gts
+1160bc65a4282e7def5af3c2c8f88380  incorrect/basicassign1/gcc_pic/a.out
+902592946b35d96c32e20287463ce1e3  incorrect/basicassign1/gcc_pic/basicassign1.adt
+89092683bc15a5e791c432189f91a658  incorrect/basicassign1/gcc_pic/basicassign1.bir
+28bb374c1c2e9b3593f1423f51aa2bb3  incorrect/basicassign1/gcc_pic/basicassign1.relf
+d0171a396cbad6dca8f23c5d1f3700c4  incorrect/basicassign1/gcc_pic/basicassign1.gts

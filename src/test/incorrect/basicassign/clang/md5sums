@@ -1,5 +1,5 @@
-46c4a0ccd1f7f63e190234caceb7babc  a.out
-1655ac7e2f6720c3e6702b6ceb9d40df  basicassign.adt
-a209787e0c29389cbf94c5d6be8c6d43  basicassign.bir
-9912903bb469667d3f864650aa636c84  basicassign.relf
-2fa825f01133fdeba9a90ccdb6fb23d4  basicassign.gts
+46c4a0ccd1f7f63e190234caceb7babc  incorrect/basicassign/clang/a.out
+1655ac7e2f6720c3e6702b6ceb9d40df  incorrect/basicassign/clang/basicassign.adt
+a209787e0c29389cbf94c5d6be8c6d43  incorrect/basicassign/clang/basicassign.bir
+9912903bb469667d3f864650aa636c84  incorrect/basicassign/clang/basicassign.relf
+2fa825f01133fdeba9a90ccdb6fb23d4  incorrect/basicassign/clang/basicassign.gts

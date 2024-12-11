@@ -1,5 +1,5 @@
-ff093c007244c30079e763781915faf0  a.out
-01c3070737cb5af22db7a4f45b0a2a5d  basic_loop_assign.adt
-3ac648915aa2986d557f79268a7f7fa0  basic_loop_assign.bir
-ee26f1985317d0bcc02e43404a0c7f1e  basic_loop_assign.relf
-68d7b7120d77628741bca9b4c74267e8  basic_loop_assign.gts
+ff093c007244c30079e763781915faf0  correct/basic_loop_assign/gcc_pic/a.out
+01c3070737cb5af22db7a4f45b0a2a5d  correct/basic_loop_assign/gcc_pic/basic_loop_assign.adt
+3ac648915aa2986d557f79268a7f7fa0  correct/basic_loop_assign/gcc_pic/basic_loop_assign.bir
+ee26f1985317d0bcc02e43404a0c7f1e  correct/basic_loop_assign/gcc_pic/basic_loop_assign.relf
+68d7b7120d77628741bca9b4c74267e8  correct/basic_loop_assign/gcc_pic/basic_loop_assign.gts

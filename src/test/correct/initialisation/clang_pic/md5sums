@@ -1,5 +1,5 @@
-94b0b92f6d65f02eda4a0eab83446222  a.out
-65012300f1c50393fefa310d6c23ea33  initialisation.adt
-5f309fa7ee603e42045b29828969547e  initialisation.bir
-b397f8453ebeda56747330020248e9d2  initialisation.relf
-3266e0dee63c1a2b56cc874890eb0747  initialisation.gts
+94b0b92f6d65f02eda4a0eab83446222  correct/initialisation/clang_pic/a.out
+65012300f1c50393fefa310d6c23ea33  correct/initialisation/clang_pic/initialisation.adt
+5f309fa7ee603e42045b29828969547e  correct/initialisation/clang_pic/initialisation.bir
+b397f8453ebeda56747330020248e9d2  correct/initialisation/clang_pic/initialisation.relf
+3266e0dee63c1a2b56cc874890eb0747  correct/initialisation/clang_pic/initialisation.gts

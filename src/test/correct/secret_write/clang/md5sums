@@ -1,5 +1,5 @@
-1e97f247f02de7f066fb7bda9e7edb50  a.out
-f1dcd472ce1b98351b1c350fde41120d  secret_write.adt
-dc14463007f49f0436c76f14d05446c6  secret_write.bir
-d4390911c12a0bef77fd4f187ebf699a  secret_write.relf
-ec2adab05a32807d532be26399655e2c  secret_write.gts
+1e97f247f02de7f066fb7bda9e7edb50  correct/secret_write/clang/a.out
+f1dcd472ce1b98351b1c350fde41120d  correct/secret_write/clang/secret_write.adt
+dc14463007f49f0436c76f14d05446c6  correct/secret_write/clang/secret_write.bir
+d4390911c12a0bef77fd4f187ebf699a  correct/secret_write/clang/secret_write.relf
+ec2adab05a32807d532be26399655e2c  correct/secret_write/clang/secret_write.gts

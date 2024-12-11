@@ -1,5 +1,5 @@
-fcb52f2935a520d410ff96e7ac3397c2  a.out
-7f0da07ea943a3ae876a7d9340c39e38  basicassign2.adt
-84cb2eb9d06db0726ec668d96e1f222d  basicassign2.bir
-ead7e041f7bf162330a96d90ff5c267f  basicassign2.relf
-e8f6d42bfc4a56987e26747e6e68d85b  basicassign2.gts
+fcb52f2935a520d410ff96e7ac3397c2  incorrect/basicassign2/gcc/a.out
+7f0da07ea943a3ae876a7d9340c39e38  incorrect/basicassign2/gcc/basicassign2.adt
+84cb2eb9d06db0726ec668d96e1f222d  incorrect/basicassign2/gcc/basicassign2.bir
+ead7e041f7bf162330a96d90ff5c267f  incorrect/basicassign2/gcc/basicassign2.relf
+e8f6d42bfc4a56987e26747e6e68d85b  incorrect/basicassign2/gcc/basicassign2.gts

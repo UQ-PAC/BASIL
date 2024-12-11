@@ -1,5 +1,5 @@
-b884024f7b9d69b1b0208a3ffb1801f4  a.out
-68ee8e2a5b338768e36200c20f19c479  secret_write.adt
-4053d70f3af818f5594eeec21f14b77a  secret_write.bir
-a501b0f864e5f07ff15d25a2f73ae6fd  secret_write.relf
-84ebd6722b307f5e65bf3c0e29d99696  secret_write.gts
+b884024f7b9d69b1b0208a3ffb1801f4  correct/secret_write/gcc_pic/a.out
+68ee8e2a5b338768e36200c20f19c479  correct/secret_write/gcc_pic/secret_write.adt
+4053d70f3af818f5594eeec21f14b77a  correct/secret_write/gcc_pic/secret_write.bir
+a501b0f864e5f07ff15d25a2f73ae6fd  correct/secret_write/gcc_pic/secret_write.relf
+84ebd6722b307f5e65bf3c0e29d99696  correct/secret_write/gcc_pic/secret_write.gts

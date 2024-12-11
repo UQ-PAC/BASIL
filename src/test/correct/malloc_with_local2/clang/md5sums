@@ -1,5 +1,5 @@
-22bdcb356cecae4ebfef4bc39f3d7cdf  a.out
-241834b546fcee2e45c1d0d8f7343e05  malloc_with_local2.adt
-41252c8f4ae4fd9e20aa2303af3f648c  malloc_with_local2.bir
-dffb4e9586fdf9badafcefa45ab78735  malloc_with_local2.relf
-f4eef77d6220509ebd034b01f6f4c2a4  malloc_with_local2.gts
+22bdcb356cecae4ebfef4bc39f3d7cdf  correct/malloc_with_local2/clang/a.out
+241834b546fcee2e45c1d0d8f7343e05  correct/malloc_with_local2/clang/malloc_with_local2.adt
+41252c8f4ae4fd9e20aa2303af3f648c  correct/malloc_with_local2/clang/malloc_with_local2.bir
+dffb4e9586fdf9badafcefa45ab78735  correct/malloc_with_local2/clang/malloc_with_local2.relf
+f4eef77d6220509ebd034b01f6f4c2a4  correct/malloc_with_local2/clang/malloc_with_local2.gts

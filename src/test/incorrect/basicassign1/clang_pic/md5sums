@@ -1,5 +1,5 @@
-06baa42996c0d96d2447d3dbe02fdf1f  a.out
-fb5b16df5be7f58e5416ed91be33e0c7  basicassign1.adt
-9fcceb954b995160de8bd450fdda598f  basicassign1.bir
-86085afe0121fc2ed002298bd05f70d7  basicassign1.relf
-c488619df0041a999549dc940c97f00b  basicassign1.gts
+06baa42996c0d96d2447d3dbe02fdf1f  incorrect/basicassign1/clang_pic/a.out
+fb5b16df5be7f58e5416ed91be33e0c7  incorrect/basicassign1/clang_pic/basicassign1.adt
+9fcceb954b995160de8bd450fdda598f  incorrect/basicassign1/clang_pic/basicassign1.bir
+86085afe0121fc2ed002298bd05f70d7  incorrect/basicassign1/clang_pic/basicassign1.relf
+c488619df0041a999549dc940c97f00b  incorrect/basicassign1/clang_pic/basicassign1.gts

@@ -1,5 +1,5 @@
-d747ee1fb075facaa6073c40fa95c952  a.out
-916051698d7eb03427172db02e642610  nestedifglobal.adt
-c8c461e587191fcec2386b7d9e834e60  nestedifglobal.bir
-925af1f9e3910b0ae828c4f08df2fb05  nestedifglobal.relf
-c9bc706cae728ba9ae8ffddea2acbdc4  nestedifglobal.gts
+d747ee1fb075facaa6073c40fa95c952  incorrect/nestedifglobal/gcc_pic/a.out
+916051698d7eb03427172db02e642610  incorrect/nestedifglobal/gcc_pic/nestedifglobal.adt
+c8c461e587191fcec2386b7d9e834e60  incorrect/nestedifglobal/gcc_pic/nestedifglobal.bir
+925af1f9e3910b0ae828c4f08df2fb05  incorrect/nestedifglobal/gcc_pic/nestedifglobal.relf
+c9bc706cae728ba9ae8ffddea2acbdc4  incorrect/nestedifglobal/gcc_pic/nestedifglobal.gts

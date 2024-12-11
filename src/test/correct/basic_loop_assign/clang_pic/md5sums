@@ -1,5 +1,5 @@
-7ee5b31ef8a77d1c32cd12c1e36c8955  a.out
-a89d4550c7768532dcfbb3f1c3b4f241  basic_loop_assign.adt
-3809539cdd23fa39641992bafc21eafd  basic_loop_assign.bir
-80455fb962babdb62f45cabfa2928654  basic_loop_assign.relf
-c0a898daa3fb5972ad7966c486f63813  basic_loop_assign.gts
+7ee5b31ef8a77d1c32cd12c1e36c8955  correct/basic_loop_assign/clang_pic/a.out
+a89d4550c7768532dcfbb3f1c3b4f241  correct/basic_loop_assign/clang_pic/basic_loop_assign.adt
+3809539cdd23fa39641992bafc21eafd  correct/basic_loop_assign/clang_pic/basic_loop_assign.bir
+80455fb962babdb62f45cabfa2928654  correct/basic_loop_assign/clang_pic/basic_loop_assign.relf
+c0a898daa3fb5972ad7966c486f63813  correct/basic_loop_assign/clang_pic/basic_loop_assign.gts
