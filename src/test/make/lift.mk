@@ -24,21 +24,24 @@ repro-check: $(LIFT_ARTEFACTS)
 	[ -d repro-stash ]  # repro-stash must be executed before repro-check
 	bash -xeu -c 'cd $(realpath .); for f in $(LIFT_ARTEFACTS); do diff --color -u repro-stash/$$f $$f; done'
 
+BASE_DIR := $(GIT_ROOT)/src/test
+RELATIVE_DIR := $(shell realpath --relative-to $(BASE_DIR) .)
+
 md5sum-check: a.out $(LIFT_ARTEFACTS)
 ifeq ($(USE_DOCKER), 1)
 	$(DOCKER_CMD) hash > docker-hash-new
 	diff --color -u docker-hash docker-hash-new  # if this fails, make sure your docker image is up-to-date.
 	rm docker-hash-new
-	md5sum -c $(realpath md5sums)  # using docker; checking compiler output hashes.
+	cd $(BASE_DIR) && md5sum -c $(realpath md5sums)  # using docker; checking compiler output hashes.
 else
 	echo "not running within docker; skipping docker image validation."
-	md5sum -c $(realpath md5sums)
+	cd $(BASE_DIR) && md5sum -c $(realpath md5sums)
 endif
 
+# paths in md5sum are relative to src/test, to allow for collation into a big md5sums file
 md5sum-update: a.out $(LIFT_ARTEFACTS)
-	md5sum $^ > md5sums
+	cd $(BASE_DIR) && md5sum $(addprefix $(RELATIVE_DIR)/,$^) > $(RELATIVE_DIR)/md5sums  # $^ is all specified dependencies
 	$(ENSURE_DOCKER) $(DOCKER_CMD) hash > docker-hash
-
 
 ifdef $(SPEC)
 BASIL_SPECARG = --spec $(SPEC) 

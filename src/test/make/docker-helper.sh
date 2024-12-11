@@ -12,7 +12,7 @@ DIR=$(realpath --relative-to "$GIT_ROOT" .)
 : ${DOCKER_IMAGE:=ghcr.io/uq-pac/basil-tools-docker}
 
 if [[ $# -lt 1 ]] || [[ "$1" == --help ]]; then
-  echo "usage: $(basename $0) (build | start | stop | hash | env [--unset] | COMMAND...)"
+  echo "usage: $(basename $0) (pull | push | build | start | stop | shell | hash | env [--unset] | COMMAND...)"
   ! [[ $# -lt 1 ]]
   exit
 fi

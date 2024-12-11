@@ -10,3 +10,10 @@ incorrect: $(realpath $(wildcard incorrect/*))
 
 $(SUBTARGETS):
 	$(MAKE) -C $@ -f $(realpath ./make/lift-directories.mk) $(MAKECMDGOALS)
+
+# concats md5sums files in subdirectories into a compiled.md5sum.
+# check with `md5sum -c compiled.md5sum` in src/test.
+.PHONY: compiled.md5sum
+compiled.md5sum:
+	rm -fv compiled.md5sum
+	find correct incorrect -name 'md5sums' -exec bash -c 'cat "$$@" >> compiled.md5sum' '{}' +
