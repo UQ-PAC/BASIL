@@ -32,7 +32,7 @@ cd correct/secret_write
 make -f ../../make/lift-directories.mk
 ```
 
-### Lifting with Docker
+### Lifting reproducibly with Docker
 
 This tests in this repository are a number of source code files which must be
 compiled (through gcc and clang) and lifted (by BAP or ddisasm + ASLp)
@@ -52,6 +52,7 @@ eval $(make/docker-helper.sh env)
 ```
 This will load a number of environment variables into your shell which are
 recognised by the Makefiles and subsequent docker-helper.sh calls.
+This also adds a `docker-helper.sh` alias into the current shell session.
 To de-activate this environment, use the same command with `--unset` after "env".
 
 After setting up the environment, to pull the Docker image, run:
@@ -61,7 +62,7 @@ docker-helper.sh pull
 
 To start an instance of the Docker container,
 ```bash
-docker-helper.sh start  # stop with `docker-helper.sh stop`
+docker-helper.sh start  # or, stop with `docker-helper.sh stop`
 ```
 
 Now, running make commands should use compilers from Docker.
@@ -72,11 +73,11 @@ To build compiled and lifted files, use `make` as usual.
 
 To check the generated files against the stored hashes, use:
 ```bash
-make md5sum-check
+make md5sum-check -j4
 ```
-To update the hashes after generating new versiosn of the files, use:
+To update the hashes after generating new versions of the files, use:
 ```bash
-make md5sum-update
+make md5sum-update -j4
 ```
 
 The Docker image is pinned by make/docker-flake.txt.
@@ -95,7 +96,7 @@ Some notes:
   Note that this will not work with commands needing user interaction (e.g. shells).
 - To enter a shell within the Docker container, use `docker-helper.sh shell`.
 
-#### Reproducibility
+#### Troubleshooting
 
 The Docker container and commands run within it should be reproducible.
 If, for any reason, you find unexpected hash mismatches,
