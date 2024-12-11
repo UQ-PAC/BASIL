@@ -78,12 +78,12 @@ elif [[ "$1" == build ]]; then
 elif [[ "$1" == start ]]; then
   # starts an instance of the docker image.
   set -x
-	exec $DOCKER run -v"$GIT_ROOT:$GIT_ROOT" --rm -td --user $DOCKER_USER --name $unique_container $unique_image
+  exec $DOCKER run -v"$GIT_ROOT:$GIT_ROOT" --rm -td --user $DOCKER_USER --name $unique_container $unique_image
 
 elif [[ "$1" == stop ]]; then
   # starts the instance of the docker image.
   set -x
-	exec $DOCKER rm -f -t 1 $unique_container
+  exec $DOCKER rm -f -t 1 $unique_container
 
 elif [[ "$1" == shell ]]; then
   # enters an interactive shell within the container.
@@ -128,28 +128,28 @@ elif [[ "$1" == env ]]; then
   echoexport DOCKER_CMD "$DOCKER_CMD"
   echoexport GIT_ROOT "$GIT_ROOT"
   echo 'echo;'
-	echoexport GCC "$DOCKER_CMD aarch64-unknown-linux-gnu-gcc"
-	echoexport CLANG "$DOCKER_CMD aarch64-unknown-linux-gnu-clang"
-	echoexport READELF "$DOCKER_CMD aarch64-unknown-linux-gnu-readelf"
-	echoexport BAP "$DOCKER_CMD bap"
-	echoexport DDISASM "$DOCKER_CMD ddisasm"
-	echoexport PROTO_JSON "$DOCKER_CMD proto-json.py"
-	# echoexport PROTO_JSON "/home/rina/progs/gtirb-semantics/scripts/proto-json.py"
-	echoexport DEBUG_GTS "$DOCKER_CMD debug-gts.py"
-	echoexport GTIRB_SEMANTICS "$DOCKER_CMD gtirb-semantics"
+  echoexport GCC "$DOCKER_CMD aarch64-unknown-linux-gnu-gcc"
+  echoexport CLANG "$DOCKER_CMD aarch64-unknown-linux-gnu-clang"
+  echoexport READELF "$DOCKER_CMD aarch64-unknown-linux-gnu-readelf"
+  echoexport BAP "$DOCKER_CMD bap"
+  echoexport DDISASM "$DOCKER_CMD ddisasm"
+  echoexport PROTO_JSON "$DOCKER_CMD proto-json.py"
+  # echoexport PROTO_JSON "/home/rina/progs/gtirb-semantics/scripts/proto-json.py"
+  echoexport DEBUG_GTS "$DOCKER_CMD debug-gts.py"
+  echoexport GTIRB_SEMANTICS "$DOCKER_CMD gtirb-semantics"
   echo 'echo;'
-	if $isunset; then
-	  echo "echo $unalias docker-helper.sh;"
-	  echo "$unalias docker-helper.sh;"
-	else
-	  echo "echo alias docker-helper.sh = '$DOCKER_CMD';"
-	  echo "alias 'docker-helper.sh=$DOCKER_CMD';"
-	fi
+  if $isunset; then
+    echo "echo $unalias docker-helper.sh;"
+    echo "$unalias docker-helper.sh;"
+  else
+    echo "echo alias docker-helper.sh = '$DOCKER_CMD';"
+    echo "alias 'docker-helper.sh=$DOCKER_CMD';"
+  fi
 
-	if $isreset; then
-	  echo "eval $eval$DOCKER_CMD env);"
-	fi
-	exit
+  if $isreset; then
+    echo "eval $eval$DOCKER_CMD env);"
+  fi
+  exit
 fi
 
 # for other commands, execute within the container.
