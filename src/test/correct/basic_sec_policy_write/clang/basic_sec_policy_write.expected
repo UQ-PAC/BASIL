@@ -97,6 +97,8 @@ procedure main();
 
 implementation main()
 {
+  var $load$18: bv32;
+  var Gamma_$load$18: bool;
   var Gamma_x_old: bool;
   var z_old: bv32;
   lmain:
@@ -114,7 +116,8 @@ implementation main()
     assert ((bvadd64(R9, 52bv64) == $z_addr) ==> (L(mem, $x_addr) ==> Gamma_x_old));
     assert ((z_old != 0bv32) ==> (memory_load32_le(mem, $z_addr) != 0bv32));
     assume {:captureState "%00000300"} true;
-    R10, Gamma_R10 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 12bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
+    $load$18, Gamma_$load$18 := memory_load32_le(stack, bvadd64(R31, 12bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
+    R10, Gamma_R10 := zero_extend32_32($load$18), Gamma_$load$18;
     R8, Gamma_R8 := 69632bv64, true;
     call rely();
     assert (L(mem, bvadd64(R8, 56bv64)) ==> Gamma_R10);

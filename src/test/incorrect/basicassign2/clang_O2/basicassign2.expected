@@ -78,13 +78,16 @@ procedure main();
 
 implementation main()
 {
+  var $load$18: bv64;
+  var Gamma_$load$18: bool;
   lmain:
     assume {:captureState "lmain"} true;
     R8, Gamma_R8 := 69632bv64, true;
     R9, Gamma_R9 := 69632bv64, true;
     R0, Gamma_R0 := 0bv64, true;
     call rely();
-    R8, Gamma_R8 := memory_load64_le(mem, bvadd64(R8, 56bv64)), (gamma_load64(Gamma_mem, bvadd64(R8, 56bv64)) || L(mem, bvadd64(R8, 56bv64)));
+    $load$18, Gamma_$load$18 := memory_load64_le(mem, bvadd64(R8, 56bv64)), (gamma_load64(Gamma_mem, bvadd64(R8, 56bv64)) || L(mem, bvadd64(R8, 56bv64)));
+    R8, Gamma_R8 := $load$18, Gamma_$load$18;
     call rely();
     assert (L(mem, bvadd64(R9, 64bv64)) ==> Gamma_R8);
     mem, Gamma_mem := memory_store64_le(mem, bvadd64(R9, 64bv64), R8), gamma_store64(Gamma_mem, bvadd64(R9, 64bv64), Gamma_R8);

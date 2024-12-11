@@ -95,6 +95,20 @@ procedure main();
 
 implementation main()
 {
+  var $load$18: bv32;
+  var $load$19: bv32;
+  var $load$20: bv32;
+  var $load$21: bv32;
+  var $load$22: bv32;
+  var $load$23: bv32;
+  var $load$24: bv32;
+  var Gamma_$load$18: bool;
+  var Gamma_$load$19: bool;
+  var Gamma_$load$20: bool;
+  var Gamma_$load$21: bool;
+  var Gamma_$load$22: bool;
+  var Gamma_$load$23: bool;
+  var Gamma_$load$24: bool;
   lmain:
     assume {:captureState "lmain"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551584bv64), Gamma_R31;
@@ -108,13 +122,17 @@ implementation main()
     R0, Gamma_R0 := 3bv64, true;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 24bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 24bv64), Gamma_R0);
     assume {:captureState "%0000034c"} true;
-    R1, Gamma_R1 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 20bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 20bv64));
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 24bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 24bv64));
+    $load$18, Gamma_$load$18 := memory_load32_le(stack, bvadd64(R31, 20bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 20bv64));
+    R1, Gamma_R1 := zero_extend32_32($load$18), Gamma_$load$18;
+    $load$19, Gamma_$load$19 := memory_load32_le(stack, bvadd64(R31, 24bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 24bv64));
+    R0, Gamma_R0 := zero_extend32_32($load$19), Gamma_$load$19;
     R0, Gamma_R0 := zero_extend32_32(bvxor32(R1[32:0], R0[32:0])), (Gamma_R0 && Gamma_R1);
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 28bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 28bv64), Gamma_R0);
     assume {:captureState "%00000369"} true;
-    R1, Gamma_R1 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 20bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 20bv64));
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
+    $load$20, Gamma_$load$20 := memory_load32_le(stack, bvadd64(R31, 20bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 20bv64));
+    R1, Gamma_R1 := zero_extend32_32($load$20), Gamma_$load$20;
+    $load$21, Gamma_$load$21 := memory_load32_le(stack, bvadd64(R31, 28bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
+    R0, Gamma_R0 := zero_extend32_32($load$21), Gamma_$load$21;
     R0, Gamma_R0 := zero_extend32_32(bvor32(R1[32:0], R0[32:0])), (Gamma_R0 && Gamma_R1);
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 24bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 24bv64), Gamma_R0);
     assume {:captureState "%00000386"} true;
@@ -124,8 +142,10 @@ implementation main()
     R0, Gamma_R0 := 17bv64, true;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 24bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 24bv64), Gamma_R0);
     assume {:captureState "%000003a0"} true;
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 20bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 20bv64));
-    R1, Gamma_R1 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 24bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 24bv64));
+    $load$22, Gamma_$load$22 := memory_load32_le(stack, bvadd64(R31, 20bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 20bv64));
+    R0, Gamma_R0 := zero_extend32_32($load$22), Gamma_$load$22;
+    $load$23, Gamma_$load$23 := memory_load32_le(stack, bvadd64(R31, 24bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 24bv64));
+    R1, Gamma_R1 := zero_extend32_32($load$23), Gamma_$load$23;
     assert Gamma_R1;
     goto lmain_goto_l000003b3, lmain_goto_l000003b8;
   l000003b8:
@@ -138,7 +158,8 @@ implementation main()
     goto l000003bb;
   l000003bb:
     assume {:captureState "l000003bb"} true;
-    R1, Gamma_R1 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 24bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 24bv64));
+    $load$24, Gamma_$load$24 := memory_load32_le(stack, bvadd64(R31, 24bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 24bv64));
+    R1, Gamma_R1 := zero_extend32_32($load$24), Gamma_$load$24;
     R1, Gamma_R1 := zero_extend32_32(bvmul64(zero_extend32_32(R2[32:0]), zero_extend32_32(R1[32:0]))[32:0]), (Gamma_R1 && Gamma_R2);
     R0, Gamma_R0 := zero_extend32_32(bvadd32(bvadd32(R0[32:0], bvnot32(R1[32:0])), 1bv32)), (Gamma_R1 && Gamma_R0);
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 28bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 28bv64), Gamma_R0);

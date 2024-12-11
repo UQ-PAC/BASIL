@@ -126,11 +126,14 @@ procedure FUN_630();
 
 implementation FUN_630()
 {
+  var $load4: bv64;
+  var Gamma_$load4: bool;
   $FUN_630$__0__$Q70X6WVjRICVO79dZjxubQ:
     assume {:captureState "$FUN_630$__0__$Q70X6WVjRICVO79dZjxubQ"} true;
     R16, Gamma_R16 := 69632bv64, true;
     call rely();
-    R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 32bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 32bv64)) || L(mem, bvadd64(R16, 32bv64)));
+    $load4, Gamma_$load4 := memory_load64_le(mem, bvadd64(R16, 32bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 32bv64)) || L(mem, bvadd64(R16, 32bv64)));
+    R17, Gamma_R17 := $load4, Gamma_$load4;
     R16, Gamma_R16 := bvadd64(R16, 32bv64), Gamma_R16;
     call printf();
     assume false;
@@ -185,7 +188,11 @@ procedure main();
 
 implementation main()
 {
+  var $load15: bv64;
+  var $load16: bv64;
   var Cse0__5$3$0: bv64;
+  var Gamma_$load15: bool;
+  var Gamma_$load16: bool;
   var Gamma_Cse0__5$3$0: bool;
   $main$__0__$qsNWZvfmT3SqwMLjWcYSLA:
     assume {:captureState "$main$__0__$qsNWZvfmT3SqwMLjWcYSLA"} true;
@@ -221,8 +228,10 @@ implementation main()
   $main$__3__$f8mE4zYMSriGzPYQZgWMTA:
     assume {:captureState "$main$__3__$f8mE4zYMSriGzPYQZgWMTA"} true;
     R0, Gamma_R0 := 0bv64, true;
-    R29, Gamma_R29 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
-    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
+    $load15, Gamma_$load15 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
+    R29, Gamma_R29 := $load15, Gamma_$load15;
+    $load16, Gamma_$load16 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
+    R30, Gamma_R30 := $load16, Gamma_$load16;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
     goto main_basil_return;
   main_basil_return:

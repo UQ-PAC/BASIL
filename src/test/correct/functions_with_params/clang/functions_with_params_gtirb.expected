@@ -96,8 +96,14 @@ procedure main();
 
 implementation main()
 {
+  var $load1: bv64;
+  var $load2: bv64;
+  var $load3: bv32;
   var Cse0__5$0$2: bv64;
   var Cse0__5$1$1: bv64;
+  var Gamma_$load1: bool;
+  var Gamma_$load2: bool;
+  var Gamma_$load3: bool;
   var Gamma_Cse0__5$0$2: bool;
   var Gamma_Cse0__5$1$1: bool;
   $main$__0__$_kmZuIukTa2pHUJW~uCGfQ:
@@ -115,7 +121,8 @@ implementation main()
     R8, Gamma_R8 := 2bv64, true;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 8bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 8bv64), Gamma_R8);
     assume {:captureState "1836$0"} true;
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R29, 18446744073709551612bv64))), gamma_load32(Gamma_stack, bvadd64(R29, 18446744073709551612bv64));
+    $load3, Gamma_$load3 := memory_load32_le(stack, bvadd64(R29, 18446744073709551612bv64)), gamma_load32(Gamma_stack, bvadd64(R29, 18446744073709551612bv64));
+    R0, Gamma_R0 := zero_extend32_32($load3), Gamma_$load3;
     R30, Gamma_R30 := 1848bv64, true;
     call plus_one();
     goto $main$__1__$HspZq7YwQ4y0NoLabaih0w;
@@ -125,8 +132,10 @@ implementation main()
     assume {:captureState "1848$0"} true;
     R0, Gamma_R0 := 0bv64, true;
     Cse0__5$0$2, Gamma_Cse0__5$0$2 := bvadd64(R31, 16bv64), Gamma_R31;
-    R29, Gamma_R29 := memory_load64_le(stack, Cse0__5$0$2), gamma_load64(Gamma_stack, Cse0__5$0$2);
-    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(Cse0__5$0$2, 8bv64)), gamma_load64(Gamma_stack, bvadd64(Cse0__5$0$2, 8bv64));
+    $load1, Gamma_$load1 := memory_load64_le(stack, Cse0__5$0$2), gamma_load64(Gamma_stack, Cse0__5$0$2);
+    R29, Gamma_R29 := $load1, Gamma_$load1;
+    $load2, Gamma_$load2 := memory_load64_le(stack, bvadd64(Cse0__5$0$2, 8bv64)), gamma_load64(Gamma_stack, bvadd64(Cse0__5$0$2, 8bv64));
+    R30, Gamma_R30 := $load2, Gamma_$load2;
     R31, Gamma_R31 := bvadd64(R31, 32bv64), Gamma_R31;
     goto main_basil_return;
   main_basil_return:
@@ -151,12 +160,15 @@ procedure plus_one();
 
 implementation plus_one()
 {
+  var $load17: bv32;
+  var Gamma_$load17: bool;
   $plus_one$__0__$Pl39SFHHQI2EffBjodiSvA:
     assume {:captureState "$plus_one$__0__$Pl39SFHHQI2EffBjodiSvA"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 12bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 12bv64), Gamma_R0);
     assume {:captureState "1872$0"} true;
-    R8, Gamma_R8 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 12bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
+    $load17, Gamma_$load17 := memory_load32_le(stack, bvadd64(R31, 12bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
+    R8, Gamma_R8 := zero_extend32_32($load17), Gamma_$load17;
     R0, Gamma_R0 := zero_extend32_32(bvadd32(R8[32:0], 1bv32)), Gamma_R8;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
     goto plus_one_basil_return;
