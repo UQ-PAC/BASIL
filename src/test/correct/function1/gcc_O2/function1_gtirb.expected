@@ -119,7 +119,11 @@ procedure main();
 
 implementation main()
 {
+  var $load15: bv64;
+  var $load16: bv64;
   var Cse0__5$0$0: bv64;
+  var Gamma_$load15: bool;
+  var Gamma_$load16: bool;
   var Gamma_Cse0__5$0$0: bool;
   $main$__0__$SdgQNRc1S~eXoTDCYKgVbQ:
     assume {:captureState "$main$__0__$SdgQNRc1S~eXoTDCYKgVbQ"} true;
@@ -151,8 +155,10 @@ implementation main()
   $main$__1__$jvvJx~HNQlaw7eS3PvnGyQ:
     assume {:captureState "$main$__1__$jvvJx~HNQlaw7eS3PvnGyQ"} true;
     R0, Gamma_R0 := 0bv64, true;
-    R29, Gamma_R29 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
-    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
+    $load15, Gamma_$load15 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
+    R29, Gamma_R29 := $load15, Gamma_$load15;
+    $load16, Gamma_$load16 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
+    R30, Gamma_R30 := $load16, Gamma_$load16;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
     goto main_basil_return;
   main_basil_return:
@@ -183,11 +189,14 @@ procedure FUN_620();
 
 implementation FUN_620()
 {
+  var $load18: bv64;
+  var Gamma_$load18: bool;
   $FUN_620$__0__$FzaZGObNRFyyU87ZY5JbcQ:
     assume {:captureState "$FUN_620$__0__$FzaZGObNRFyyU87ZY5JbcQ"} true;
     R16, Gamma_R16 := 65536bv64, true;
     call rely();
-    R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 4024bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 4024bv64)) || L(mem, bvadd64(R16, 4024bv64)));
+    $load18, Gamma_$load18 := memory_load64_le(mem, bvadd64(R16, 4024bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 4024bv64)) || L(mem, bvadd64(R16, 4024bv64)));
+    R17, Gamma_R17 := $load18, Gamma_$load18;
     R16, Gamma_R16 := bvadd64(R16, 4024bv64), Gamma_R16;
     call __printf_chk();
     assume false;
