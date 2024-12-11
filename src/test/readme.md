@@ -1,6 +1,6 @@
 ## Writing and Running Tests
 
-See [../../docs/development/readme.md]
+See [docs/development/readme.md](../../docs/development/readme.md)
 
 ## Lifting SystemTest examples
 
@@ -37,56 +37,178 @@ make -f ../../make/lift-directories.mk
 This tests in this repository are a number of source code files which must be
 compiled (through gcc and clang) and lifted (by BAP or ddisasm + ASLp)
 before they can be processed.
-These compiled files can very between compilers, operating systems, and tool versions.
+These compiled files can vary between compilers, operating systems, and tool versions.
 When developing and testing BASIL, it is important that everyone has identical
 versions of these files to make sure results are consistent and comparable.
 
 We use a Docker image (built through Nix) as a static
-environment for compiling and lifting examples. The Docker image's contained programs
-and versions are recorded within this repository, as well as the hashes of generated
-files. This ensures everything stays reproducible.
+environment for compiling and lifting examples.
+The hashes of generated files, as well as the versions of programs within the Docker image, 
+are recorded within this repository.
+This ensures everything stays reproducible and that everybody has identical copies of
+the lifted test cases.
 
-To set up the Docker environment, run this command:
-```bash
-eval $(make/docker-helper.sh env)
-```
-This will load a number of environment variables into your shell which are
-recognised by the Makefiles and subsequent docker-helper.sh calls.
-This also adds a `docker-helper.sh` alias into the current shell session.
-To de-activate this environment, use the same command with `--unset` after "env".
+#### Setting up Docker
+1. Install Podman or Docker through your system's package manager.
+2. To set up environment variables, run this command:
+   ```bash
+   cd src/test
+   eval $(make/docker-helper.sh env)
+   ```
+   This will load a number of environment variables into your shell which are
+   recognised by the Makefiles and subsequent docker-helper.sh calls.
+   This also adds a `docker-helper.sh` alias into the current shell session.
+   To de-activate this environment, use the same command with `--unset` after "env".
 
-After setting up the environment, to pull the Docker image, run:
-```bash
-docker-helper.sh pull
-```
+3. After setting up the environment, to pull the Docker image [from GHCR](https://github.com/UQ-PAC/BASIL/pkgs/container/basil-tools-docker), run:
+   ```bash
+   docker-helper.sh pull
+   ```
+   (The tag of the image is of the form "flake-HASH-COMMIT"
+   where COMMIT is the pac-nix commit where it originates,
+   and HASH is a hash of the Nix flake path which produced it.)
 
-To start an instance of the Docker container,
-```bash
-docker-helper.sh start  # or, stop with `docker-helper.sh stop`
-```
+5. To start an instance of the Docker image,
+   ```bash
+   docker-helper.sh start
+   ```
+   To stop the instance, use the "stop" subcommand.
+
+6. The last two steps will have to be repeated if the Docker image changes.
+
+#### Building with Docker
 
 Now, running make commands should use compilers from Docker.
-The log of make commands should mention docker or podman
-while executing.
 
-To build compiled and lifted files, use `make` as usual.
+1. To compile and lift all the examples, use
+   ```bash
+   cd src/test
+   make -j6  # adjust job count as appropriate
+   ```
+   as usual.
+   The log of make commands should mention docker or podman
+   while executing. If you see errors about "no container",
+   make sure the container is started with the steps above.
 
-To check the generated files against the stored hashes, use:
-```bash
-make md5sum-check -j4
-```
-To update the hashes after generating new versions of the files, use:
-```bash
-make md5sum-update -j4
-```
+   Note that the default `make` rule does not perform any hash checking.
+   This is so you can use `make` to update the hashes if needed.
+
+3. Now, we check the produced files against the recorded hashes.
+   This makes sure that every file is exactly as expected.
+   ```bash
+   make md5sum-check -j6
+   ```
+   Alternatively, you can run `md5sum -c compiled.md5sums`
+   to check all files in one batch
+   (this will be faster, but the make command is more flexible).
+
+   If the command exits successfully, all the files are valid.
+   
+   If it exits with a non-zero code, there will be a message reporting which files have failed
+   (the error message may be obscured further up in the output,
+   reducing the job count can reduce the noise).
+   You should look for messages like these:
+   ```bash
+   correct/basic_function_call_caller/clang_O2/a.out: FAILED
+   md5sum: WARNING: 1 computed checksum did NOT match
+   ```
+   ```diff
+   diff --color -u docker-hash docker-hash-new  # if this fails, make sure your docker image is up-to-date.
+   --- docker-hash 2024-12-11 17:11:48.982896545 +1000
+   +++ docker-hash-new     2024-12-11 17:12:30.406249598 +1000
+   @@ -1,4 +1,4 @@
+   -github:katrinafyi/pac-nix/e6b7a676154f08c9d6027d83cd6c9e05fab44145#basil-tools-docker
+   +github:katrinafyi/pac-nix/6c430d76555d1723fe2293847653cae18b9af1c9#basil-tools-docker
+   ```
+   If you see a mismatch in a docker-hash file, your running Docker container does not match
+   the one used to generate the files. Make sure you have the right container by repeating
+   the "pull" and "start" subcommands of docker-helper.sh.
+
+   If the mismatch is in the md5sum of a compilation output, this likely means the
+   compiler is not being deterministic;
+   this is a bug and should be reported.
+   See the _Troubleshooting_ section below for steps to inspect differences between
+   compilation runs.
+
+5. If the md5sum-check succeeds, you are good to go!
+   You should repeat these steps if the files have been updated by someone else,
+   e.g., to use a more recent version of BAP or ASLp.
+
+To process only one test case at a time, you can use the `-C`
+and `-f` flags as in the "Lift one" command above.
+
+#### Updating test cases
+If you change the source code for a test or add a new test case,
+you will have to update its hashes as well. You can use these steps to do so.
+
+1. Make your changes in the `src/test/[in]correct/[TESTNAME]` directory.
+2. Make sure the Docker environment is active with the set up steps.
+3. Run `make` to compile and lift your new files.
+   To lift only one test case, you can add `-C` and `-f` flags
+   to your make invocation (see "Lift one" above).
+5. Run `make md5sum-update -j6` to generate new hashes.
+   Git can be used to compare the differences.
+6. In the src/tests directory, run `make compiled.md5sum` to update the combined md5sums file.
+7. Optionally, check your new hashes are valid with `make clean && make md5sum-check`.
+8. Commit and PR your changes.
+
+#### Updating the Docker image
 
 The Docker image is pinned by make/docker-flake.txt.
-To update the Docker image, first make the desired changes
-to the pac-nix repository, then update this text file.
-After this, you will have to repeat the "env", "build", and "start" subcommands.
-To push a new image to the GHCR package, use the "push" subcommand.
+This is a string which can be passed to `nix build` to produce the Docker image.
 
-Some notes:
+To update the Docker image, first make the desired changes
+to the pac-nix repository,
+then update this text file to point to the
+relevant commit in pac-nix.
+On a x86_64-linux machine, run:
+```bash
+eval $(make/docker-helper.sh env --reset)
+docker-helper.sh build
+docker-helper.sh start
+```
+(If needed, authenticate with Github by `gh auth login --scopes write:packages`.
+Then, get the token with `gh auth token`
+and use this, along with your Github username,
+in `docker login ghcr.io` [docs](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry))
+
+After this, run `make -j8` to re-compile all files using this new container, then `make md5sum-update -j8` to
+update hashes.
+Make sure the changes are as you expect (e.g., if you only updated ASLp, only the ASLp-related
+hashes should change).
+
+If this is all fine, push the new Docker to GHCR
+```
+docker-helper.sh push
+```
+then commit and push the updated hashes to basil.
+
+In the basil repository, it is a good idea to update the docker-flake.txt
+and the recorded hashes in the same commit.
+This makes sure that at every commit, the test cases can be correctly
+built with the corresponding docker-flake.txt.
+
+#### Troubleshooting
+
+The Docker container and commands run within it should be reproducible.
+If, for any reason, you find unexpected md5sum mismatches,
+this is a bug.
+To aid in debugging,
+you can inspect the file differences between two runs with these commands:
+```bash
+# after a failed `make md5sum-check`...
+
+make repro-stash  # makes a stash of the lifter/compiler outputs, then cleans the directories
+
+make repro-check  # re-generates files and diffs them to the stashed copy
+```
+If there is non-determinism, the repro-check may coincidentally succeed.
+You can use `make clean` to remove generated files but keep the stashed copy,
+then repeat repro-check as needed.
+Different levels of job count may also affect reproducibility.
+
+#### Additional notes
+
 - The Docker image will take about 5GB of your disk space.
 - The Docker image is an x86_64-linux image and can only be built on this platform.
   If you are on a different architecture,
@@ -94,21 +216,4 @@ Some notes:
   instead of building manually.
 - You can run a command within the Docker container with `docker-helper.sh <command>`.
   Note that this will not work with commands needing user interaction (e.g. shells).
-- To enter a shell within the Docker container, use `docker-helper.sh shell`.
-
-#### Troubleshooting
-
-The Docker container and commands run within it should be reproducible.
-If, for any reason, you find unexpected hash mismatches,
-you can inspect the file differences between two runs with these commands:
-
-```bash
-# after a failed `make md5sum-check`...
-
-make repro-stash  # makes a copy of generated files, then cleans the originals
-
-make repro-check  # re-generates files and diffs them to the stashed copy
-```
-
-Note, `make clean` will not remove the stashed copies, but `make cleanall` will.
-
+- To enter an interactive shell within the Docker container, use `docker-helper.sh shell`.
