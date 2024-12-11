@@ -37,7 +37,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       for (p <- s.out) {
         procedure.out.append(translateParameter(p))
       }
-      if (s.address.get == mainAddress) {
+      if (s.address.contains(mainAddress)) {
         mainProcedure = Some(procedure)
       }
       procedures.append(procedure)
