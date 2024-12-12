@@ -188,10 +188,13 @@ You can use these steps to do so.
 5. Run `make md5sum-update -j6` to generate new hashes.
    Git can be used to compare the differences.
 6. In the src/tests directory, run `make compiled.md5sum` to update the combined md5sums file.
-7. Create the tarball of generated files with `make compiled.tar.gz`.
-8. Upload compiled.tar.gz to a publicly-accessible file host and update the URL in compiled.url.txt.
-9. Optionally, check your new hashes are valid and reproducible with `make clean && make md5sum-check`.
-10. Optionally, check the uploaded tarball is valid with `make clean && make extract`.
+7. Create the tarball of generated files with `make compiled.tar.bz2`.
+8. Upload compiled.tar.gz to a publicly-accessible file host and update the URL in compiled.url.txt, e.g. by
+   ```bash
+   curl -Freqtype=fileupload -FfileToUpload=@compiled.tar.bz2 https://catbox.moe/user/api.php
+   ```
+9. Optionally, check your new hashes are valid and reproducible with `make clean -j4 && make md5sum-check -j4`.
+10. Optionally, check the uploaded tarball is valid with `make clean -j4 && make extract`.
 11. Commit and PR your changes.
 
 For consistency, you *must* use the Docker environment when
