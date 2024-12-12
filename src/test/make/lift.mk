@@ -34,9 +34,9 @@ RELATIVE_DIR := $(shell realpath --relative-to $(BASE_DIR) .)
 
 md5sum-check: a.out $(LIFT_ARTEFACTS)
 ifeq ($(USE_DOCKER), 1)
-	$(DOCKER_CMD) hash > docker-hash-new
-	diff --color -u docker-hash docker-hash-new  # if this fails, make sure your docker image is up-to-date.
-	rm docker-hash-new
+	# $(DOCKER_CMD) hash > docker-hash-new
+	# diff --color -u docker-hash docker-hash-new  # if this fails, make sure your docker image is up-to-date.
+	# rm docker-hash-new
 	cd $(BASE_DIR) && md5sum -c $(realpath md5sums)  # using docker; checking compiler output hashes.
 else
 	echo "not running within docker; skipping docker image validation."
@@ -46,7 +46,7 @@ endif
 # paths in md5sum are relative to src/test, to allow for collation into a big md5sums file
 md5sum-update: a.out $(LIFT_ARTEFACTS)
 	cd $(BASE_DIR) && md5sum $(addprefix $(RELATIVE_DIR)/,$^) > $(RELATIVE_DIR)/md5sums  # $^ is all specified dependencies
-	$(ENSURE_DOCKER) $(DOCKER_CMD) hash > docker-hash
+	# $(ENSURE_DOCKER) $(DOCKER_CMD) hash > docker-hash
 
 ifdef $(SPEC)
 BASIL_SPECARG = --spec $(SPEC) 

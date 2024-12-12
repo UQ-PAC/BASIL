@@ -27,8 +27,9 @@ $(SUBDIRS):
 compiled.md5sum:
 	find $(DIRS) -name 'md5sums' -exec cat '{}' + > compiled.md5sum
 
-compiled.tar.gz: compiled.md5sum
-	md5sum --quiet -c compiled.md5sum  # before compressing, make sure our files match expected hashes
+compiled.tar.gz docker-contents.txt &: compiled.md5sum
+	set -u; $$DOCKER_CMD hash > docker-contents.txt  # before compessing, make sure docker-contents.txt is up to date.
+	md5sum --quiet -c compiled.md5sum  # before compressing, make sure our files match expected hashes.
 	list=`mktemp`; cut -d" " -f3 compiled.md5sum > $$list && tar caf $@ -T $$list && rm $$list
 
 extract:
