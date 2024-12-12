@@ -115,6 +115,14 @@ See [src/test/readme.md](../src/test/readme.md) for details.
 
 The test suites use [ScalaTest](https://www.scalatest.org/).
 
+This tests are defined as C source files and must be compiled before use.
+Before running any tests, download the pre-compiled test case files with:
+```bash
+$ make -C src/test extract
+```
+For more details on this process, including adding and editing test cases,
+see [src/test/readme.md](../src/test/readme.md).
+
 To run the primary SystemTests suites (SystemTestsBAP and SystemTestsGTIRB) (which require Boogie):
 
 ```

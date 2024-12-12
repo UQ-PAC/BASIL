@@ -1,39 +1,46 @@
-## Writing and Running Tests
+# Writing and Running Tests
 
-See [docs/development/readme.md](../../docs/development/readme.md)
-
-## Lifting SystemTest examples
-
-To force recompile and lift all:
-```
-make cleanall 
-make
-```
-
-Lift one:
-```bash
-make -C correct/secret_write -f ../../make/lift-directories.mk
-                              # ^ relative to correct/secret_write
-```
-or
-```
-cd correct/secret_write
-make -f ../../make/lift-directories.mk
-```
-
-Lifting options specified in make/lift-directories.mk can be overriden using the config.mk file in each
-test directory. For example, to specify the enabled lifting templates (i.e., compilers and compiler flags):
-```
-$ cat correct/test_name/config.mk
-ENABLED_COMPILERS = clang clang_pic gcc gcc_pic
-```
-
-### Lifting reproducibly with Docker
+See [docs/development/readme.md](../../docs/development/readme.md) for context.
 
 This tests in this repository are a number of source code files which must be
 compiled (through gcc and clang) and lifted (by BAP or ddisasm + ASLp)
 before they can be processed.
-These compiled files can vary between compilers, operating systems, and tool versions.
+This lifting is done deterministically in a Docker container.
+
+The compiled binaries and lifter outputs are not kept inside this repository.
+To get started, you can download pre-compiled copies of these files:
+```bash
+cd src/test
+make extract
+```
+This should be enough to run the SystemTests through mill.
+
+For much more detail about the lifting process, including how to add or edit
+test cases, keep reading.
+
+## Introduction
+
+The directories in src/test are organised by category, then by test case.
+For example, `src/test/correct/arrays_simple` is a test case called "arrays_simple"
+in the "correct" category (meaning the output is expected to verify through Boogie).
+Within each test case folder,
+there is a single C source file with the name `[TESTCASE].c`, and
+there are subdirectories for each compiler template
+("clang", "gcc_O2", etc).
+
+The compiler subdirectories are where the compiler/lifter outputs will go.
+These are excluded from the Git repository and their expected hashes
+are recorded in the md5sums file.
+There is also a ".expected" file which records the Boogie code
+produced by BASIL.
+The presence or absence of this expected file tells the test infrastructure
+whether BASIL is expected to successfully process that test case.
+
+
+
+## Lifting reproducibly with Docker
+
+The compiled files can vary between compilers, operating systems, and tool versions.
 When developing and testing BASIL, it is important that everyone has identical
 versions of these files to make sure results are consistent and comparable.
 
@@ -44,7 +51,7 @@ are recorded within this repository.
 This ensures everything stays reproducible and that everybody has identical copies of
 the lifted test cases.
 
-#### Setting up Docker
+### Setting up Docker
 1. Install Podman or Docker through your system's package manager.
 2. To set up environment variables, run this command:
    ```bash
@@ -60,6 +67,11 @@ the lifted test cases.
    ```bash
    docker-helper.sh pull
    ```
+   The Docker image will take about 5GB of your disk space.
+   Note that it is an x86_64-linux image.
+   If you are on a different architecture,
+   you should configure your Docker to virtualise the x86_64 Linux platform.
+
    (The tag of the image is of the form "flake-HASH-COMMIT"
    where COMMIT is the pac-nix commit where it originates,
    and HASH is a hash of the Nix flake path which produced it.)
@@ -72,7 +84,7 @@ the lifted test cases.
 
 6. The last two steps will have to be repeated if the Docker image changes.
 
-#### Building with Docker
+### Building with Docker
 
 Now, running make commands should use compilers from Docker.
 
@@ -87,7 +99,8 @@ Now, running make commands should use compilers from Docker.
    make sure the container is started with the steps above.
 
    Note that the default `make` rule does not perform any hash checking.
-   This is so you can use `make` to update the hashes if needed.
+   This is so you can use `make` to compile the files,
+   and then re-generate the hashes if needed.
 
 3. Now, we check the produced files against the recorded hashes.
    This makes sure that every file is exactly as expected.
@@ -130,31 +143,65 @@ Now, running make commands should use compilers from Docker.
    You should repeat these steps if the files have been updated by someone else,
    e.g., to use a more recent version of BAP or ASLp.
 
-To process only one test case at a time, you can use the `-C`
-and `-f` flags as in the "Lift one" command above.
+#### Customising the lifting
 
-#### Updating or adding test cases
+Instead of `make` which performs all tests in src/test,
+you can restrict it to particular categories or test cases.
+
+To lift one category of tests, use, e.g.,
+```bash
+make DIRS=correct
+```
+To lift a single test case (and all its compiler templates), use
+```bash
+make SUBDIRS=correct/arrays_simple
+```
+To lift only some compiler templates, use
+```bash
+make SUBDIRS=correct/arrays_simple ENABLED_COMPILERS=gcc
+```
+Each of these commands can be suffixed with specific make targets (e.g. "clean", "cleanall").
+
+### Updating or adding test cases
 If you change the source code for a test or add a new test case,
-you will have to update its hashes as well. You can use these steps to do so.
+you will have to update its hashes as well.
+You can use these steps to do so.
 
 1. Make your changes in the `src/test/[in]correct/[TESTNAME]` directory.
    A new test directory should have at least a C source file
    and, optionally, a specification file.
    The Makefiles should automatically detect new test cases.
+
+   Lifting options specified in make/lift-directories.mk can be overriden using the config.mk file in each
+   test directory. For example, to specify the enabled lifting templates (i.e., compilers and compiler flags):
+   ```
+   $ cat correct/test_name/config.mk
+   ENABLED_COMPILERS = clang clang_pic gcc gcc_pic
+   ```
+
 3. Make sure the Docker environment is active with the set up steps.
 4. Run `make` to compile and lift your new files.
-   To lift only one test case, you can add `-C` and `-f` flags
-   to your make invocation (see "Lift one" above).
+   If you are only changing a subset of tests, you can limit this using the DIRS or SUBDIRS arguments
+   as shown above.
 5. Run `make md5sum-update -j6` to generate new hashes.
    Git can be used to compare the differences.
 6. In the src/tests directory, run `make compiled.md5sum` to update the combined md5sums file.
-7. Optionally, check your new hashes are valid with `make clean && make md5sum-check`.
-8. Commit and PR your changes.
+7. Create the tarball of generated files with `make compiled.tar.gz`.
+8. Upload compiled.tar.gz to a publicly-accessible file host and update the URL in compiled.url.txt.
+9. Optionally, check your new hashes are valid and reproducible with `make clean && make md5sum-check`.
+10. Optionally, check the uploaded tarball is valid with `make clean && make extract`.
+11. Commit and PR your changes.
 
-#### Updating the Docker image
+For consistency, you *must* use the Docker environment when
+making changes to the hash files with md5sum-update.
+The Makefile should make sure that Docker is active.
+Of course, do not update any computed md5sum files by hand.
+
+### Updating the Docker image
 
 The Docker image is pinned by make/docker-flake.txt.
 This is a string which can be passed to `nix build` to produce the Docker image.
+The Docker image is an x86_64-linux image and can only be built on this platform.
 
 To update the Docker image, first make the desired changes
 to the pac-nix repository,
@@ -171,8 +218,8 @@ Then, get the token with `gh auth token`
 and use this, along with your Github username,
 in `docker login ghcr.io` [docs](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry))
 
-After this, run `make -j8` to re-compile all files using this new container, then `make md5sum-update -j8` to
-update hashes.
+After this,
+follow the steps from "updating / adding test cases".
 Make sure the changes are as you expect (e.g., if you only updated ASLp, only the ASLp-related
 hashes should change).
 
@@ -187,7 +234,7 @@ and the recorded hashes in the same commit.
 This makes sure that at every commit, the test cases can be correctly
 built with the corresponding docker-flake.txt.
 
-#### Troubleshooting
+### Troubleshooting
 
 The Docker container and commands run within it should be reproducible.
 If, for any reason, you find unexpected md5sum mismatches,
@@ -206,13 +253,8 @@ You can use `make clean` to remove generated files but keep the stashed copy,
 then repeat repro-check as needed.
 Different levels of job count may also affect reproducibility.
 
-#### Additional notes
+### Additional notes
 
-- The Docker image will take about 5GB of your disk space.
-- The Docker image is an x86_64-linux image and can only be built on this platform.
-  If you are on a different architecture,
-  you should configure your Docker to use the x86_64 platform and pull from the GHCR
-  instead of building manually.
 - You can run a command within the Docker container with `docker-helper.sh <command>`.
   Note that this will not work with commands needing user interaction (e.g. shells).
 - To enter an interactive shell within the Docker container, use `docker-helper.sh shell`.

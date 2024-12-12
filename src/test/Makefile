@@ -1,14 +1,24 @@
 TARGETSS := all verify repro-stash repro-check md5sum-check md5sum-update clean cleanall cleanlift recompile json cleanjson cleangts gts
 
-SUBTARGETS = $(wildcard correct/*/ incorrect/*/)
-.PHONY : $(TARGETSS) $(SUBTARGETS) correct incorrect
+# subdirectories of src/test. to be entered by this makefile
+DIRS := correct incorrect analysis extraspec_correct extraspec_incorrect indirect_calls memory_regions procedure_summaries
+# dirs with irregular structure: dsa, irreducible_loops
+# non-test dirs: make, scale, unimplemented
 
-$(TARGETSS): $(SUBTARGETS)
+# in case the user specfies DIRS, make sure all dirs exist.
+$(foreach d, $(DIRS), \
+  $(if $(wildcard $(d)/.), \
+    , \
+    $(error user error: directory "$(d)" in DIRS variable does not exist)))
 
-correct: $(realpath $(wildcard correct/*))
-incorrect: $(realpath $(wildcard incorrect/*))
+SUBDIRS = $(wildcard $(addsuffix /*/,$(DIRS)))
+.PHONY : $(TARGETSS) $(SUBDIRS) $(DIRS)
 
-$(SUBTARGETS):
+# through some unpleasantness, this lets the user specify either DIRS or SUBDIRS
+# on the command line, and the make operation will be narrowed to that directory
+$(TARGETSS): $(SUBDIRS)
+
+$(SUBDIRS):
 	$(MAKE) -C $@ -f $(realpath ./make/lift-directories.mk) $(MAKECMDGOALS)
 
 # concats md5sums files in subdirectories into a compiled.md5sum.
