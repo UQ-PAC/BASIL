@@ -4,6 +4,7 @@ import analysis.*
 import ir.*
 import boogie.*
 import boogie.SpecGlobal
+import ir.transforms.{AbstractDomain, reversePostOrder, worklistSolver}
 
 /** A temporary copy of RNA analysis which works on Taintables.
   */
@@ -112,9 +113,55 @@ class SummaryGenerator(
     varDepsSummaries.getOrElse(procedure, Map())
   }
 
-  /** Generate requires clauses for a procedure. Currently this does nothing.
+  /**
+   * Gets the set of gammas stored in a VarGammaMap, if possible
+   */
+  private def relevantGammas(gammaMap: VarGammaMap, v: Taintable): Option[Set[Taintable]] = {
+    gammaMap(v) match {
+      case LatticeSet.Top() => None // We can't know all of the variables, so we soundly say nothing
+      case LatticeSet.Bottom() => Some(Set())
+      case LatticeSet.FiniteSet(s) => Some(s)
+      case LatticeSet.DiffSet(_) => None
+    }
+  }
+
+  /** Generate requires clauses for a procedure. Currently we can generate the requirement that the variables that
+    * influence the gamma of the first branch condition must be low.
     */
-  def generateRequires(procedure: Procedure): List[BExpr] = List()
+  def generateRequires(procedure: Procedure): List[BExpr] = {
+    if procedure.blocks.isEmpty then return List()
+
+    val initialState = VarGammaMap.BottomMap(variables.map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+    reversePostOrder(procedure)
+    val (_, mustGammaResults) = worklistSolver(MustGammaDomain(globals, constProp)).solveProc(procedure, false)
+    val (before, after) = worklistSolver(ReachabilityConditions()).solveProc(procedure, false)
+
+    procedure.blocks.flatMap(b => {
+      b.statements.flatMap(s => {
+        s match {
+          case a: Assume if a.checkSecurity && a.parent.prevBlocks.foldLeft(true)((p, b) => p && before(b)) => {
+            a.body.variables.foldLeft(Some(Set()): Option[Set[BExpr]]) {
+              (s, v) => {
+                relevantGammas(mustGammaResults(a.parent), v).flatMap(r => s.map(s => s ++ r.flatMap(toGamma)))
+              }
+            }.flatMap {
+              gammas => {
+                if (gammas.size > 1) {
+                  val andedGammas = gammas.tail.foldLeft(gammas.head)((ands: BExpr, next: BExpr) => BinaryBExpr(BoolAND, ands, next))
+                  Some(andedGammas)
+                } else if (gammas.size == 1) {
+                  Some(gammas.head)
+                } else {
+                  None
+                }
+              }
+            }
+          }
+          case _ => List()
+        }
+      })
+    }).toSet.toList
+  }
 
   /** Generate ensures clauses for a procedure. Currently, all generated ensures clauses are of the form (for example)
     * ensures Gamma_R2 || (Gamma_R2 == old(Gamma_y)) || (Gamma_R2 == old(Gamma_R1)) || (Gamma_R2 == old(Gamma_R2));
