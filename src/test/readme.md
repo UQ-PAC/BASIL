@@ -82,6 +82,11 @@ the lifted test cases.
    ```
    To stop the instance, use the "stop" subcommand.
 
+   Inside the Docker container, the Git repository root will be available at the same file path.
+   Files on your computer outside this directory will be unavailable unless manually mounted.
+
+   **If you are on MacOS**, see the section near bottom for important notes.
+
 6. The last two steps will have to be repeated if the Docker image changes.
 
 ### Building with Docker
@@ -209,7 +214,7 @@ This is a string which can be passed to `nix build` to produce the Docker image.
 The Docker image is an x86_64-linux image and can only be built on this platform.
 
 To update the Docker image, first make the desired changes
-to the pac-nix repository,
+to the [pac-nix](https://github.com/katrinafyi/pac-nix) repository,
 then update this text file to point to the
 relevant commit in pac-nix.
 On a x86_64-linux machine, run:
@@ -258,8 +263,52 @@ You can use `make clean` to remove generated files but keep the stashed copy,
 then repeat repro-check as needed.
 Different levels of job count may also affect reproducibility.
 
+### Support on MacOS
+
+Although the tooling is primarily developed on Linux,
+efforts are made to keep compatibility with MacOS.
+However, there are important to note if you are using a MacOS computer.
+If you find additional notes, please add them here.
+
+- You will need **GNU coreutils**. Install with `brew install coreutils`,
+  then update PATH to use these by default, e.g.,
+  `export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"`.
+- You will need **GNU make 4.3+**. Install with `brew install make`,
+  then use `gmake` in place of make in all commands.
+  If you do not have this, lifting may inexplicably fail
+  with "file not found" errors for intermediate files.
+- If you see error 137 while making, especially if this happens with high job
+  counts,
+  uou may need to increase the CPUs / memory allocated to your container runner.
+  For example with podman,
+  ```bash
+  podman machine stop
+  podman machine set --cpus 6 --memory 8192
+  podman machine start
+  ```
+- The Nix packages aslp, bap, ddisasm, and gtirb-semantics are available
+  for the MacOS platform.
+  For testing local examples, you can install these native programs then follow the
+  "ad-hoc lifting" section below.
+
 ### Additional notes
 
 - You can run a command within the Docker container with `docker-helper.sh <command>`.
   Note that this will not work with commands needing user interaction (e.g. shells).
 - To enter an interactive shell within the Docker container, use `docker-helper.sh shell`.
+
+## Lifting ad-hoc examples locally
+
+If you have some examples which you would like to compile with
+tools on your local machine, you can use the Makefiles without the Docker environment active
+(it can be deactivated with `eval $(docker-helper.sh env --unset)`).
+This is useful if Docker is especially slow on your computer,
+or if you want to test changes to a lifter.
+However, please make sure to use Docker when updating hashes in the repository.
+
+The Makefiles are configured to fall back to programs on your PATH.
+You can override these manually by setting some environment variables:
+GCC, CLANG, READELF, BAP, DDISASM, PROTO_JSON, DEBUG_GTS, GTIRB_SEMANTICS.
+
+
+
