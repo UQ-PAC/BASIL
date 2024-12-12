@@ -161,6 +161,8 @@ To lift only some compiler templates, use
 make SUBDIRS=correct/arrays_simple ENABLED_COMPILERS=gcc
 ```
 Each of these commands can be suffixed with specific make targets (e.g. "clean", "cleanall").
+Multiple terms can be given by quoting them, e.g. `make DIRS='correct incorrect'`
+(arguments will be shell-separated).
 
 ### Updating or adding test cases
 If you change the source code for a test or add a new test case,

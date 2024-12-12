@@ -25,8 +25,7 @@ $(SUBDIRS):
 # check with `md5sum -c compiled.md5sum` in src/test.
 .PHONY: compiled.md5sum extract
 compiled.md5sum:
-	rm -fv compiled.md5sum
-	find correct incorrect -name 'md5sums' -exec bash -c 'cat "$$@" >> compiled.md5sum' '{}' +
+	find $(DIRS) -name 'md5sums' -exec cat '{}' + > compiled.md5sum
 
 compiled.tar.gz: compiled.md5sum
 	md5sum --quiet -c compiled.md5sum  # before compressing, make sure our files match expected hashes

@@ -10,9 +10,14 @@ $(NAME).adt $(NAME).bir &: a.out
 	$(MAKE_DIR)/bap-normalise.py temp.adt temp.bir
 	mv temp.adt $(NAME).adt && mv temp.bir $(NAME).bir
 
+# if gtirb is missing but required by .gts, do not attempt to build it.
+# essentially, missing intermediate files (here, gtirb) will not trigger
+# a re-build so long as its products (here, gts) are up-to-date with respect
+# to inputs (here, a.out)
+.SECONDARY: $(NAME).gtirb
 $(NAME).gtirb: a.out
 	$(DDISASM) a.out --ir $(NAME).temp.gtirb
-	$(PROTO_JSON) --idem=proto -s8 $(NAME).temp.gtirb $(NAME).gtirb
+	$(PROTO_JSON) --idem=proto -s8 $(NAME).temp.gtirb $(NAME).gtirb  # normalises protobuffer encoding
 	rm $(NAME).temp.gtirb
 $(NAME).gts: $(NAME).gtirb
 	$(GTIRB_SEMANTICS) $(NAME).gtirb $(NAME).gts
