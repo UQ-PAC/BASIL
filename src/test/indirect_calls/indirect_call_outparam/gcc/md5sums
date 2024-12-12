@@ -1,0 +1,5 @@
+cdf5e2c89356a49ad124f0827f6c6a54  indirect_calls/indirect_call_outparam/gcc/a.out
+8dc00591a1675237e4e6a603028be6a6  indirect_calls/indirect_call_outparam/gcc/indirect_call_outparam.adt
+a9a9a504fa93bc40e7871788f3799b6d  indirect_calls/indirect_call_outparam/gcc/indirect_call_outparam.bir
+988af80e7f3388f209ab33839399e147  indirect_calls/indirect_call_outparam/gcc/indirect_call_outparam.relf
+fdcfb427b4909560c55e248edfa0a1e0  indirect_calls/indirect_call_outparam/gcc/indirect_call_outparam.gts

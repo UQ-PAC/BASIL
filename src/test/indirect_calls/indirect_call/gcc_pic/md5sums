@@ -1,0 +1,5 @@
+d32eadb7aa6c3a9eb372f7394b36d613  indirect_calls/indirect_call/gcc_pic/a.out
+d3919446c8b03a3bc958e38364339679  indirect_calls/indirect_call/gcc_pic/indirect_call.adt
+29e86df0382a2afc215e0b5cebcf07d9  indirect_calls/indirect_call/gcc_pic/indirect_call.bir
+d354eb235aef65644d6bf84e0c82595e  indirect_calls/indirect_call/gcc_pic/indirect_call.relf
+5a3657436343ff9852d59901bd2baa8b  indirect_calls/indirect_call/gcc_pic/indirect_call.gts

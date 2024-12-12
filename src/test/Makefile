@@ -1,9 +1,9 @@
 TARGETSS := all verify repro-stash repro-check md5sum-check md5sum-update clean cleanall cleanlift recompile json cleanjson cleangts gts
 
-# subdirectories of src/test. to be entered by this makefile
-DIRS := correct incorrect analysis extraspec_correct extraspec_incorrect indirect_calls memory_regions procedure_summaries
+# subdirectories of src/test. to be entered into by this makefile.
+DIRS := correct incorrect extraspec_correct extraspec_incorrect indirect_calls memory_regions procedure_summaries
 # dirs with irregular structure: dsa, irreducible_loops
-# non-test dirs: make, scale, unimplemented
+# non-test dirs: make, scala, unimplemented
 
 # in case the user specfies DIRS, make sure all dirs exist.
 $(foreach d, $(DIRS), \
@@ -30,7 +30,7 @@ compiled.md5sum:
 compiled.tar.gz docker-contents.txt &: compiled.md5sum
 	set -u; $$DOCKER_CMD hash > docker-contents.txt  # before compessing, make sure docker-contents.txt is up to date.
 	md5sum --quiet -c compiled.md5sum  # before compressing, make sure our files match expected hashes.
-	list=`mktemp`; cut -d" " -f3 compiled.md5sum > $$list && tar caf $@ -T $$list && rm $$list
+	list=`mktemp`; cut -d' ' -f3 compiled.md5sum > $$list && tar caf $@ -T $$list && rm $$list
 
 extract:
 	curl -z compiled.tar.gz "$$(cat compiled.url.txt)" -o compiled.tar.gz

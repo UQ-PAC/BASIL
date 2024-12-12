@@ -47,6 +47,6 @@ $(TARGETS): $(ENABLED_COMPILERS)
 $(ENABLED_COMPILERS):
 	mkdir -p $@/
 	# - continue if fails
-	$(MAKE) -C $(realpath $@) -f $(MAKE_DIR)/$@.mk $(MAKECMDGOALS)
+	$(MAKE) -C $(realpath .)/$@ -f $(MAKE_DIR)/$@.mk $(MAKECMDGOALS)
 
 
