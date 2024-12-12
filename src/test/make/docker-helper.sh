@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -ue
 
-if ! [[ -v GIT_ROOT ]] && command -v git &>/dev/null; then
+if [[ -z "${GIT_ROOT:-}" ]] && command -v git &>/dev/null; then
   GIT_ROOT=$(git rev-parse --show-toplevel)
 fi
 : ${GIT_ROOT}
 DIR=$(realpath --relative-to "$GIT_ROOT" .)
 
 : ${DOCKER:=podman}
-: ${DOCKER_PLATFORM:=--platform linux/amd64}
+: ${DOCKER_PLATFORM:=--platform linux\/amd64}
 : ${DOCKER_USER:=root}
 : ${DOCKER_IMAGE:=ghcr.io/uq-pac/basil-tools-docker}
 
@@ -20,7 +20,7 @@ fi
 
 DOCKER_CMD="$(realpath $0)"
 
-if ! [[ -v DOCKER_FLAKE ]] && [[ -r "$(dirname $DOCKER_CMD)/docker-flake.txt" ]]; then
+if [[ -z "${DOCKER_FLAKE:-}" ]] && [[ -r "$(dirname $DOCKER_CMD)/docker-flake.txt" ]]; then
   DOCKER_FLAKE=$(cat $(dirname $DOCKER_CMD)/docker-flake.txt)
 fi
 
@@ -154,11 +154,12 @@ elif [[ "$1" == env ]]; then
   exit
 fi
 
-# for other commands, execute within the container.
-if [[ -v NIX_BUILD_TOP ]]; then
+if [[ -n "${NIX_BUILD_TOP:-}" ]]; then
   set -x
+  # if already inside a Nix shell, simply execute
   exec /usr/bin/_exec "$@"
 else
   set -x
+  # for other commands, execute within the container.
   exec $DOCKER exec --user $DOCKER_USER -w "$GIT_ROOT/$DIR" $unique_container /usr/bin/_exec "$@"
 fi
