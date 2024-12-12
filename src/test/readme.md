@@ -107,6 +107,8 @@ Now, running make commands should use compilers from Docker.
    This is so you can use `make` to compile the files,
    and then re-generate the hashes if needed.
 
+   Again, **please see the MacOS notes** if relevant.
+
 3. Now, we check the produced files against the recorded hashes.
    This makes sure that every file is exactly as expected.
    ```bash
@@ -123,25 +125,14 @@ Now, running make commands should use compilers from Docker.
    reducing the job count can reduce the noise).
    You should look for messages like these:
    ```bash
-   correct/basic_function_call_caller/clang_O2/a.out: FAILED
+correct/basic_function_call_caller/clang_O2/a.out: FAILED
    md5sum: WARNING: 1 computed checksum did NOT match
    ```
-   ```diff
-   diff --color -u docker-hash docker-hash-new  # if this fails, make sure your docker image is up-to-date.
-   --- docker-hash 2024-12-11 17:11:48.982896545 +1000
-   +++ docker-hash-new     2024-12-11 17:12:30.406249598 +1000
-   @@ -1,4 +1,4 @@
-   -github:katrinafyi/pac-nix/e6b7a676154f08c9d6027d83cd6c9e05fab44145#basil-tools-docker
-   +github:katrinafyi/pac-nix/6c430d76555d1723fe2293847653cae18b9af1c9#basil-tools-docker
-   ```
-   If you see a mismatch in a docker-hash file, your running Docker container does not match
-   the one used to generate the files. Make sure you have the right container by repeating
-   the "pull" and "start" subcommands of docker-helper.sh.
 
    If the mismatch is in the md5sum of a compilation output, this likely means the
    compiler is not being deterministic;
    this is a bug and should be reported.
-   See the _Troubleshooting_ section below for steps to inspect differences between
+   See the _Troubleshooting_ section below for steps to debug the issue and inspect differences between
    compilation runs.
 
 5. If the md5sum-check succeeds, you are good to go!
@@ -174,10 +165,11 @@ If you change the source code for a test or add a new test case,
 you will have to update its hashes as well.
 You can use these steps to do so.
 
-1. Make your changes in the `src/test/[in]correct/[TESTNAME]` directory.
+1. Make your changes in the `src/test/[CATEGORY]/[TESTNAME]` directory.
    A new test directory should have at least a C source file
    and, optionally, a specification file.
-   The Makefiles should automatically detect new test cases.
+   The Makefiles should automatically detect new test cases. If adding a new category,
+   add this to the DIRS variable in the root Makefile.
 
    Lifting options specified in make/lift-directories.mk can be overriden using the config.mk file in each
    test directory. For example, to specify the enabled lifting templates (i.e., compilers and compiler flags):
@@ -238,6 +230,8 @@ If this is all fine, push the new Docker to GHCR
 docker-helper.sh push
 ```
 then commit and push the updated hashes to basil.
+Make sure to include the docker-contents.txt
+in your Git changes.
 
 In the basil repository, it is a good idea to update the docker-flake.txt
 and the recorded hashes in the same commit.
@@ -247,8 +241,20 @@ built with the corresponding docker-flake.txt.
 ### Troubleshooting
 
 The Docker container and commands run within it should be reproducible.
-If, for any reason, you find unexpected md5sum mismatches,
-this is a bug.
+If, for any reason, you find unexpected md5sum mismatches, follow these steps.
+
+First, try one more time to build the file.
+Use these commands:
+```bash
+make clean SUBDIRS=correct/testcase
+make md5sum-check SUBDIRS=correct/testcase
+```
+Files can be improperly generated in some cases, for example, if a lifter is terminated by Ctrl+C partway through executing.
+Of course, do not repeat this too many times
+as it may mask non-deterministic behaviour.
+
+If it continues to fail,
+this is likely a bug and should be reported.
 To aid in debugging,
 you can inspect the file differences between two runs with these commands:
 ```bash
@@ -279,7 +285,7 @@ If you find additional notes, please add them here.
   with "file not found" errors for intermediate files.
 - If you see error 137 while making, especially if this happens with high job
   counts,
-  uou may need to increase the CPUs / memory allocated to your container runner.
+  you may need to increase the CPUs / memory allocated to your container runner.
   For example with podman,
   ```bash
   podman machine stop
