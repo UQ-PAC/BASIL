@@ -8,6 +8,7 @@ fi
 DIR=$(realpath --relative-to "$GIT_ROOT" .)
 
 : ${DOCKER:=podman}
+: ${DOCKER_PLATFORM:=--platform linux/amd64}
 : ${DOCKER_USER:=root}
 : ${DOCKER_IMAGE:=ghcr.io/uq-pac/basil-tools-docker}
 
@@ -49,12 +50,12 @@ fi
 if [[ "$1" == pull ]]; then
   # pulls the unique image from the registry
   set -x
-  exec $DOCKER pull "$unique_image"
+  exec $DOCKER pull $DOCKER_PLATFORM "$unique_image"
 
 elif [[ "$1" == push ]]; then
   # pushes the unique image to the registry. image must already exist locally.
   set -x
-  exec $DOCKER push "$unique_image"
+  exec $DOCKER push $DOCKER_PLATFORM "$unique_image"
 
 elif [[ "$1" == build ]]; then
   # builds the docker image for running tools.
@@ -78,7 +79,7 @@ elif [[ "$1" == build ]]; then
 elif [[ "$1" == start ]]; then
   # starts an instance of the docker image.
   set -x
-  exec $DOCKER run -v"$GIT_ROOT:$GIT_ROOT" --rm -td --user $DOCKER_USER --name $unique_container $unique_image
+  exec $DOCKER run $DOCKER_PLATFORM -v"$GIT_ROOT:$GIT_ROOT" --rm -td --user $DOCKER_USER --name $unique_container $unique_image
 
 elif [[ "$1" == stop ]]; then
   # starts the instance of the docker image.
@@ -123,6 +124,7 @@ elif [[ "$1" == env ]]; then
   echoexport USE_DOCKER "1"
   echoexport DOCKER_FLAKE "$DOCKER_FLAKE"
   echoexport DOCKER_IMAGE "$DOCKER_IMAGE"
+  echoexport DOCKER_PLATFORM "$DOCKER_PLATFORM"
   echoexport DOCKER "$DOCKER"
   echoexport DOCKER_USER "$DOCKER_USER"
   echoexport DOCKER_CMD "$DOCKER_CMD"
