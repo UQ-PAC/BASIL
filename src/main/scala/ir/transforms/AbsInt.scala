@@ -60,8 +60,8 @@ def onePassForwardGlobalStateSolver[L, D <: AbstractDomain[L]](initial: Iterable
 
 class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
 
-  def solveProc(p: Procedure, backwards: Boolean = false) = {
-    solve(p.blocks, Set(), Set(), backwards)
+  def solveProc(p: Procedure, backwards: Boolean = false, initialState: L = domain.bot) = {
+    solve(p.blocks, Set(), Set(), backwards, initialState)
   }
 
   def solveProg(
@@ -102,7 +102,8 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
       initial: IterableOnce[Block],
       widenpoints: Set[Block], // set of loop heads
       narrowpoints: Set[Block], // set of conditions
-      backwards: Boolean = false
+      backwards: Boolean = false,
+      initialState: L = domain.bot,
   ): (Map[Block, L], Map[Block, L]) = {
     val savedAfter: mutable.HashMap[Block, L] = mutable.HashMap()
     val savedBefore: mutable.HashMap[Block, L] = mutable.HashMap()
@@ -115,6 +116,7 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
       }
     }
     worklist.addAll(initial)
+    val initialBlock = worklist.head
 
     def successors(b: Block) = if backwards then b.prevBlocks else b.nextBlocks
     def predecessors(b: Block) = if backwards then b.nextBlocks else b.prevBlocks
@@ -137,7 +139,7 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
       val prev = savedAfter.get(b)
       val x = {
         predecessors(b).toList.flatMap(b => savedAfter.get(b).toList) match {
-          case Nil      => domain.bot
+          case Nil      => if b == initialBlock then initialState else domain.bot
           case h :: Nil => h
           case h :: tl  => tl.foldLeft(h)((acc, nb) => domain.join(acc, nb, b))
         }
