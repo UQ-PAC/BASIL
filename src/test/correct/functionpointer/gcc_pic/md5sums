@@ -1,5 +1,5 @@
-c2de59342d273ff9734b56679df39835  correct/functionpointer/gcc_pic/a.out
-fa9bfc3d00151614219e03fc811dc6b8  correct/functionpointer/gcc_pic/functionpointer.adt
-5eaf24f33cbdf5831e8a6959fe6fd496  correct/functionpointer/gcc_pic/functionpointer.bir
-dab280a11ec76c76fe872e7f030726fd  correct/functionpointer/gcc_pic/functionpointer.relf
-eb5f9767a85f593fe27840f12d1a580d  correct/functionpointer/gcc_pic/functionpointer.gts
+adc85bb75e82a9893f72b5647efb7a00  correct/functionpointer/gcc_pic/a.out
+ff7a4bda2f7513120345d1bb44e3b96e  correct/functionpointer/gcc_pic/functionpointer.adt
+f76a336ae68154f638da7776ba34526a  correct/functionpointer/gcc_pic/functionpointer.bir
+6db1a3d861c32687205eeff92e4edd2b  correct/functionpointer/gcc_pic/functionpointer.relf
+46f0cbbf491599364d4a33d92381abcb  correct/functionpointer/gcc_pic/functionpointer.gts
