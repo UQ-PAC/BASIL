@@ -40,7 +40,7 @@ extract:
 	{ tail -n1 compiled.url.txt | sha1sum -c - ; } \
 		|| curl "$$(head -n1 compiled.url.txt)" -o $(TARBALL)
 	# check file type.
-	file $(TARBALL)
+	-file $(TARBALL)
 	# validate the hash, otherwise remove the incorrect file and abort.
 	{ tail -n1 compiled.url.txt | sha1sum -c - ; } || { rm -v $(TARBALL); exit 1; }
 	tar xf $(TARBALL) --keep-old-files --touch
