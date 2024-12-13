@@ -55,7 +55,7 @@ if [[ "$1" == pull ]]; then
 elif [[ "$1" == push ]]; then
   # pushes the unique image to the registry. image must already exist locally.
   set -x
-  exec $DOCKER push $DOCKER_PLATFORM "$unique_image"
+  exec $DOCKER push "$unique_image"
 
 elif [[ "$1" == build ]]; then
   # builds the docker image for running tools.
