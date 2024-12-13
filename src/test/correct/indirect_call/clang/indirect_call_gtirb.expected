@@ -137,11 +137,14 @@ procedure FUN_630();
 
 implementation FUN_630()
 {
+  var $load1: bv64;
+  var Gamma_$load1: bool;
   $FUN_630$__0__$49PTrR3fTD2lKP8wnhJ57g:
     assume {:captureState "$FUN_630$__0__$49PTrR3fTD2lKP8wnhJ57g"} true;
     R16, Gamma_R16 := 69632bv64, true;
     call rely();
-    R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 32bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 32bv64)) || L(mem, bvadd64(R16, 32bv64)));
+    $load1, Gamma_$load1 := memory_load64_le(mem, bvadd64(R16, 32bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 32bv64)) || L(mem, bvadd64(R16, 32bv64)));
+    R17, Gamma_R17 := $load1, Gamma_$load1;
     R16, Gamma_R16 := bvadd64(R16, 32bv64), Gamma_R16;
     call printf();
     assume false;
@@ -190,7 +193,11 @@ procedure greet();
 
 implementation greet()
 {
+  var $load2: bv64;
+  var $load3: bv64;
   var Cse0__5$0$0: bv64;
+  var Gamma_$load2: bool;
+  var Gamma_$load3: bool;
   var Gamma_Cse0__5$0$0: bool;
   $greet$__0__$Nd2KKa~UT46Es~75P1pNcg:
     assume {:captureState "$greet$__0__$Nd2KKa~UT46Es~75P1pNcg"} true;
@@ -208,8 +215,10 @@ implementation greet()
     goto $greet$__1__$wP8zXF~mT7CtEXlgRwnnfA;
   $greet$__1__$wP8zXF~mT7CtEXlgRwnnfA:
     assume {:captureState "$greet$__1__$wP8zXF~mT7CtEXlgRwnnfA"} true;
-    R29, Gamma_R29 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
-    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
+    $load2, Gamma_$load2 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
+    R29, Gamma_R29 := $load2, Gamma_$load2;
+    $load3, Gamma_$load3 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
+    R30, Gamma_R30 := $load3, Gamma_$load3;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
     goto greet_basil_return;
   greet_basil_return:
@@ -262,8 +271,16 @@ procedure main();
 
 implementation main()
 {
+  var $load21: bv32;
+  var $load22: bv64;
+  var $load23: bv64;
+  var $load24: bv64;
   var Cse0__5$0$1: bv64;
   var Cse0__5$1$1: bv64;
+  var Gamma_$load21: bool;
+  var Gamma_$load22: bool;
+  var Gamma_$load23: bool;
+  var Gamma_$load24: bool;
   var Gamma_Cse0__5$0$1: bool;
   var Gamma_Cse0__5$1$1: bool;
   $main$__0__$YfoEKj0KQgmJWDAtkqhLtQ:
@@ -291,16 +308,20 @@ implementation main()
     goto $main$__1__$2meKsDplTtaQ3v5DgFlGYQ;
   $main$__1__$2meKsDplTtaQ3v5DgFlGYQ:
     assume {:captureState "$main$__1__$2meKsDplTtaQ3v5DgFlGYQ"} true;
-    R8, Gamma_R8 := memory_load64_le(stack, bvadd64(R31, 16bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 16bv64));
+    $load24, Gamma_$load24 := memory_load64_le(stack, bvadd64(R31, 16bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 16bv64));
+    R8, Gamma_R8 := $load24, Gamma_$load24;
     R30, Gamma_R30 := 1960bv64, true;
     call greet();
     goto $main$__2__$ZjG4NofsQHGQIBdy45MZMg;
   $main$__2__$ZjG4NofsQHGQIBdy45MZMg:
     assume {:captureState "$main$__2__$ZjG4NofsQHGQIBdy45MZMg"} true;
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 12bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
+    $load21, Gamma_$load21 := memory_load32_le(stack, bvadd64(R31, 12bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
+    R0, Gamma_R0 := zero_extend32_32($load21), Gamma_$load21;
     Cse0__5$1$1, Gamma_Cse0__5$1$1 := bvadd64(R31, 32bv64), Gamma_R31;
-    R29, Gamma_R29 := memory_load64_le(stack, Cse0__5$1$1), gamma_load64(Gamma_stack, Cse0__5$1$1);
-    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(Cse0__5$1$1, 8bv64)), gamma_load64(Gamma_stack, bvadd64(Cse0__5$1$1, 8bv64));
+    $load22, Gamma_$load22 := memory_load64_le(stack, Cse0__5$1$1), gamma_load64(Gamma_stack, Cse0__5$1$1);
+    R29, Gamma_R29 := $load22, Gamma_$load22;
+    $load23, Gamma_$load23 := memory_load64_le(stack, bvadd64(Cse0__5$1$1, 8bv64)), gamma_load64(Gamma_stack, bvadd64(Cse0__5$1$1, 8bv64));
+    R30, Gamma_R30 := $load23, Gamma_$load23;
     R31, Gamma_R31 := bvadd64(R31, 48bv64), Gamma_R31;
     goto main_basil_return;
   main_basil_return:

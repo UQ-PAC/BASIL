@@ -87,11 +87,14 @@ procedure .L_610();
 
 implementation .L_610()
 {
+  var $load17: bv64;
+  var Gamma_$load17: bool;
   $.L_610$__0__$RiGyG5O~QPG2HCmgeNO63Q:
     assume {:captureState "$.L_610$__0__$RiGyG5O~QPG2HCmgeNO63Q"} true;
     R16, Gamma_R16 := 65536bv64, true;
     call rely();
-    R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 4024bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 4024bv64)) || L(mem, bvadd64(R16, 4024bv64)));
+    $load17, Gamma_$load17 := memory_load64_le(mem, bvadd64(R16, 4024bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 4024bv64)) || L(mem, bvadd64(R16, 4024bv64)));
+    R17, Gamma_R17 := $load17, Gamma_$load17;
     R16, Gamma_R16 := bvadd64(R16, 4024bv64), Gamma_R16;
     call fork();
     assume false;

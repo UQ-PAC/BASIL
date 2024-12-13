@@ -13,7 +13,6 @@ import scala.io.Source
 import scala.sys.process.*
 import test_util.BASILTest.writeToFile
 
-
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
   */
@@ -36,29 +35,22 @@ class IrreducibleLoop extends AnyFunSuite {
 
     val program: Program = load(ILLoadingConfig(ADTPath, RELFPath))
 
-    val detector = LoopDetector(program)
-    val foundLoops = detector.identify_loops()
+    val foundLoops = LoopDetector.identify_loops(program)
 
-    writeToFile(dotBlockGraph(program, program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${variationPath}_blockgraph-before-reduce.dot")
+    writeToFile(dotBlockGraph(program, program.collect { case b: Block => b -> b.toString }.toMap), s"${variationPath}_blockgraph-before-reduce.dot")
 
-    foundLoops.foreach(l => Logger.debug(s"found loops${System.lineSeparator()}$l"))
+    foundLoops.identifiedLoops.foreach(l => Logger.debug(s"found loops${System.lineSeparator()}$l"))
 
-    val loops_to_transform = detector.irreducible_loops()
-    assert(loops_to_transform.forall(foundLoops.contains))
+    val newLoops = foundLoops.reducibleTransformIR()
+    newLoops.identifiedLoops.foreach(l => Logger.debug(s"newloops${System.lineSeparator()}$l"))
 
-    val transformer = LoopTransform(foundLoops)
-    val newLoops = transformer.llvm_transform()
-    newLoops.foreach(l => Logger.debug(s"newloops${System.lineSeparator()}$l"))
+    writeToFile(dotBlockGraph(program, program.collect { case b: Block => b -> b.toString }.toMap), s"${variationPath}_blockgraph-after-reduce.dot")
+    val foundLoops2 = LoopDetector.identify_loops(program)
+    assert(foundLoops2.identifiedLoops.count(_.reducible) == foundLoops.identifiedLoops.size)
+    assert(foundLoops2.identifiedLoops.count(_.reducible) > foundLoops.identifiedLoops.count(_.reducible))
+    assert(foundLoops2.irreducibleLoops.isEmpty)
 
-    val newDetect = LoopDetector(program)
-
-    writeToFile(dotBlockGraph(program, program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${variationPath}_blockgraph-after-reduce.dot")
-    val foundLoops2 = newDetect.identify_loops()
-    assert(foundLoops2.count(_.reducible) == foundLoops.size)
-    assert(foundLoops2.count(_.reducible) > foundLoops.count(_.reducible))
-    assert(newDetect.irreducible_loops().isEmpty)
-
-    foundLoops2.foreach(l => Logger.debug(s"updated found loops${System.lineSeparator()}$l"))
+    foundLoops2.identifiedLoops.foreach(l => Logger.debug(s"updated found loops${System.lineSeparator()}$l"))
   }
 
   test("irreducible 1") {
@@ -68,7 +60,6 @@ class IrreducibleLoop extends AnyFunSuite {
   test("irreducible 2") {
     runTest(testPath + "/irreducible_loop_2", "irreducible2")
   }
-
 
   test("testverify fail irreducible_loop") {
     val path = testPath + "/irreducible_loop/irreducible"
@@ -98,6 +89,4 @@ class IrreducibleLoop extends AnyFunSuite {
     assert(boogieResult.contains("Boogie program verifier finished with 2 verified, 0 errors"))
     assert(!boogieResult.contains("found unreachable code"))
   }
-
-
 }

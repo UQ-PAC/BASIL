@@ -139,11 +139,14 @@ procedure FUN_680();
 
 implementation FUN_680()
 {
+  var $load0: bv64;
+  var Gamma_$load0: bool;
   $FUN_680$__0__$9vdUBrbQSwiaJeVuom5EvQ:
     assume {:captureState "$FUN_680$__0__$9vdUBrbQSwiaJeVuom5EvQ"} true;
     R16, Gamma_R16 := 69632bv64, true;
     call rely();
-    R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 16bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 16bv64)) || L(mem, bvadd64(R16, 16bv64)));
+    $load0, Gamma_$load0 := memory_load64_le(mem, bvadd64(R16, 16bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 16bv64)) || L(mem, bvadd64(R16, 16bv64)));
+    R17, Gamma_R17 := $load0, Gamma_$load0;
     R16, Gamma_R16 := bvadd64(R16, 16bv64), Gamma_R16;
     call malloc();
     assume false;
@@ -178,11 +181,14 @@ procedure FUN_6b0();
 
 implementation FUN_6b0()
 {
+  var $load1: bv64;
+  var Gamma_$load1: bool;
   $FUN_6b0$__0__$8CgJ347mTAagL8N803gTlQ:
     assume {:captureState "$FUN_6b0$__0__$8CgJ347mTAagL8N803gTlQ"} true;
     R16, Gamma_R16 := 69632bv64, true;
     call rely();
-    R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 40bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 40bv64)) || L(mem, bvadd64(R16, 40bv64)));
+    $load1, Gamma_$load1 := memory_load64_le(mem, bvadd64(R16, 40bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 40bv64)) || L(mem, bvadd64(R16, 40bv64)));
+    R17, Gamma_R17 := $load1, Gamma_$load1;
     R16, Gamma_R16 := bvadd64(R16, 40bv64), Gamma_R16;
     call #free();
     assume false;
@@ -217,11 +223,14 @@ procedure FUN_6c0();
 
 implementation FUN_6c0()
 {
+  var $load13: bv64;
+  var Gamma_$load13: bool;
   $FUN_6c0$__0__$4WlH9L7ETgacwvseUfY3jw:
     assume {:captureState "$FUN_6c0$__0__$4WlH9L7ETgacwvseUfY3jw"} true;
     R16, Gamma_R16 := 69632bv64, true;
     call rely();
-    R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 48bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 48bv64)) || L(mem, bvadd64(R16, 48bv64)));
+    $load13, Gamma_$load13 := memory_load64_le(mem, bvadd64(R16, 48bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 48bv64)) || L(mem, bvadd64(R16, 48bv64)));
+    R17, Gamma_R17 := $load13, Gamma_$load13;
     R16, Gamma_R16 := bvadd64(R16, 48bv64), Gamma_R16;
     call printf();
     assume false;
@@ -262,8 +271,32 @@ procedure main();
 
 implementation main()
 {
+  var $load16: bv64;
+  var $load17: bv32;
+  var $load18: bv32;
+  var $load19: bv64;
+  var $load20: bv64;
+  var $load21: bv64;
+  var $load22: bv32;
+  var $load23: bv64;
+  var $load24: bv64;
+  var $load25: bv64;
+  var $load26: bv8;
+  var $load27: bv64;
   var Cse0__5$2$1: bv64;
   var Cse0__5$3$1: bv64;
+  var Gamma_$load16: bool;
+  var Gamma_$load17: bool;
+  var Gamma_$load18: bool;
+  var Gamma_$load19: bool;
+  var Gamma_$load20: bool;
+  var Gamma_$load21: bool;
+  var Gamma_$load22: bool;
+  var Gamma_$load23: bool;
+  var Gamma_$load24: bool;
+  var Gamma_$load25: bool;
+  var Gamma_$load26: bool;
+  var Gamma_$load27: bool;
   var Gamma_Cse0__5$2$1: bool;
   var Gamma_Cse0__5$3$1: bool;
   $main$__0__$uE7qCv5XQSaoZC2XHmZwIA:
@@ -299,21 +332,25 @@ implementation main()
     R8, Gamma_R8 := 10bv64, true;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 4bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 4bv64), Gamma_R8);
     assume {:captureState "2120$0"} true;
-    R9, Gamma_R9 := memory_load64_le(stack, bvadd64(R31, 16bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 16bv64));
+    $load23, Gamma_$load23 := memory_load64_le(stack, bvadd64(R31, 16bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 16bv64));
+    R9, Gamma_R9 := $load23, Gamma_$load23;
     R8, Gamma_R8 := 65bv64, true;
     call rely();
     assert (L(mem, R9) ==> Gamma_R8);
     mem, Gamma_mem := memory_store8_le(mem, R9, R8[8:0]), gamma_store8(Gamma_mem, R9, Gamma_R8);
     assume {:captureState "2132$0"} true;
-    R9, Gamma_R9 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
+    $load24, Gamma_$load24 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
+    R9, Gamma_R9 := $load24, Gamma_$load24;
     R8, Gamma_R8 := 42bv64, true;
     call rely();
     assert (L(mem, R9) ==> Gamma_R8);
     mem, Gamma_mem := memory_store32_le(mem, R9, R8[32:0]), gamma_store32(Gamma_mem, R9, Gamma_R8);
     assume {:captureState "2144$0"} true;
-    R8, Gamma_R8 := memory_load64_le(stack, bvadd64(R31, 16bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 16bv64));
+    $load25, Gamma_$load25 := memory_load64_le(stack, bvadd64(R31, 16bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 16bv64));
+    R8, Gamma_R8 := $load25, Gamma_$load25;
     call rely();
-    R1, Gamma_R1 := zero_extend32_32(zero_extend24_8(memory_load8_le(mem, R8))), (gamma_load8(Gamma_mem, R8) || L(mem, R8));
+    $load26, Gamma_$load26 := memory_load8_le(mem, R8), (gamma_load8(Gamma_mem, R8) || L(mem, R8));
+    R1, Gamma_R1 := zero_extend32_32(zero_extend24_8($load26)), Gamma_$load26;
     R0, Gamma_R0 := 0bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 2260bv64), Gamma_R0;
     R30, Gamma_R30 := 2168bv64, true;
@@ -321,9 +358,11 @@ implementation main()
     goto $main$__3__$YiNkuzyxSAi8ch4~JRnQRw;
   $main$__3__$YiNkuzyxSAi8ch4~JRnQRw:
     assume {:captureState "$main$__3__$YiNkuzyxSAi8ch4~JRnQRw"} true;
-    R8, Gamma_R8 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
+    $load21, Gamma_$load21 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
+    R8, Gamma_R8 := $load21, Gamma_$load21;
     call rely();
-    R1, Gamma_R1 := zero_extend32_32(memory_load32_le(mem, R8)), (gamma_load32(Gamma_mem, R8) || L(mem, R8));
+    $load22, Gamma_$load22 := memory_load32_le(mem, R8), (gamma_load32(Gamma_mem, R8) || L(mem, R8));
+    R1, Gamma_R1 := zero_extend32_32($load22), Gamma_$load22;
     R0, Gamma_R0 := 0bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 2277bv64), Gamma_R0;
     R30, Gamma_R30 := 2188bv64, true;
@@ -331,7 +370,8 @@ implementation main()
     goto $main$__4__$sePoi2e_Tqq7bHfBWVfW5g;
   $main$__4__$sePoi2e_Tqq7bHfBWVfW5g:
     assume {:captureState "$main$__4__$sePoi2e_Tqq7bHfBWVfW5g"} true;
-    R1, Gamma_R1 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 4bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 4bv64));
+    $load17, Gamma_$load17 := memory_load32_le(stack, bvadd64(R31, 4bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 4bv64));
+    R1, Gamma_R1 := zero_extend32_32($load17), Gamma_$load17;
     R0, Gamma_R0 := 0bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 2293bv64), Gamma_R0;
     R30, Gamma_R30 := 2204bv64, true;
@@ -339,22 +379,27 @@ implementation main()
     goto $main$__5__$J4PaOyLLQDaFhYWMa4o2Xw;
   $main$__5__$J4PaOyLLQDaFhYWMa4o2Xw:
     assume {:captureState "$main$__5__$J4PaOyLLQDaFhYWMa4o2Xw"} true;
-    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 16bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 16bv64));
+    $load27, Gamma_$load27 := memory_load64_le(stack, bvadd64(R31, 16bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 16bv64));
+    R0, Gamma_R0 := $load27, Gamma_$load27;
     R30, Gamma_R30 := 2212bv64, true;
     call FUN_6b0();
     goto $main$__6__$r9k1rsQ0R9i49NDTDexoJg;
   $main$__6__$r9k1rsQ0R9i49NDTDexoJg:
     assume {:captureState "$main$__6__$r9k1rsQ0R9i49NDTDexoJg"} true;
-    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
+    $load16, Gamma_$load16 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
+    R0, Gamma_R0 := $load16, Gamma_$load16;
     R30, Gamma_R30 := 2220bv64, true;
     call FUN_6b0();
     goto $main$__7__$2lSrma4tR0KhXTbZ8h2uhw;
   $main$__7__$2lSrma4tR0KhXTbZ8h2uhw:
     assume {:captureState "$main$__7__$2lSrma4tR0KhXTbZ8h2uhw"} true;
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, R31)), gamma_load32(Gamma_stack, R31);
+    $load18, Gamma_$load18 := memory_load32_le(stack, R31), gamma_load32(Gamma_stack, R31);
+    R0, Gamma_R0 := zero_extend32_32($load18), Gamma_$load18;
     Cse0__5$2$1, Gamma_Cse0__5$2$1 := bvadd64(R31, 32bv64), Gamma_R31;
-    R29, Gamma_R29 := memory_load64_le(stack, Cse0__5$2$1), gamma_load64(Gamma_stack, Cse0__5$2$1);
-    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(Cse0__5$2$1, 8bv64)), gamma_load64(Gamma_stack, bvadd64(Cse0__5$2$1, 8bv64));
+    $load19, Gamma_$load19 := memory_load64_le(stack, Cse0__5$2$1), gamma_load64(Gamma_stack, Cse0__5$2$1);
+    R29, Gamma_R29 := $load19, Gamma_$load19;
+    $load20, Gamma_$load20 := memory_load64_le(stack, bvadd64(Cse0__5$2$1, 8bv64)), gamma_load64(Gamma_stack, bvadd64(Cse0__5$2$1, 8bv64));
+    R30, Gamma_R30 := $load20, Gamma_$load20;
     R31, Gamma_R31 := bvadd64(R31, 48bv64), Gamma_R31;
     goto main_basil_return;
   main_basil_return:

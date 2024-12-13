@@ -77,6 +77,8 @@ procedure main();
 
 implementation main()
 {
+  var $load8: bv32;
+  var Gamma_$load8: bool;
   $main$__0__$hLpmd_ERQq2v3Sj7g4WZPA:
     assume {:captureState "$main$__0__$hLpmd_ERQq2v3Sj7g4WZPA"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551584bv64), Gamma_R31;
@@ -86,7 +88,8 @@ implementation main()
     R8, Gamma_R8 := 7bv64, true;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 28bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 28bv64), Gamma_R8);
     assume {:captureState "1828$0"} true;
-    R8, Gamma_R8 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 20bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 20bv64));
+    $load8, Gamma_$load8 := memory_load32_le(stack, bvadd64(R31, 20bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 20bv64));
+    R8, Gamma_R8 := zero_extend32_32($load8), Gamma_$load8;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 8bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 8bv64), Gamma_R8);
     assume {:captureState "1836$0"} true;
     R0, Gamma_R0 := 0bv64, true;

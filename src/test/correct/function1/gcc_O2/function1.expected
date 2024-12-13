@@ -141,7 +141,11 @@ procedure main();
 implementation main()
 {
   var #1: bv64;
+  var $load$19: bv64;
+  var $load$20: bv64;
   var Gamma_#1: bool;
+  var Gamma_$load$19: bool;
+  var Gamma_$load$20: bool;
   lmain:
     assume {:captureState "lmain"} true;
     #1, Gamma_#1 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
@@ -172,8 +176,10 @@ implementation main()
   l0000021a:
     assume {:captureState "l0000021a"} true;
     R0, Gamma_R0 := 0bv64, true;
-    R29, Gamma_R29 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
-    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
+    $load$19, Gamma_$load$19 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
+    R29, Gamma_R29 := $load$19, Gamma_$load$19;
+    $load$20, Gamma_$load$20 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
+    R30, Gamma_R30 := $load$20, Gamma_$load$20;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
     goto main_basil_return;
   main_basil_return:

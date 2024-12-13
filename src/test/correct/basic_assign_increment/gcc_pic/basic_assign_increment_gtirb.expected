@@ -94,18 +94,27 @@ procedure main();
 
 implementation main()
 {
+  var $load20: bv64;
+  var $load21: bv32;
+  var $load22: bv64;
+  var Gamma_$load20: bool;
+  var Gamma_$load21: bool;
+  var Gamma_$load22: bool;
   var x_old: bv32;
   $main$__0__$x4rdl4IySJOtuvEUdyndvg:
     assume {:captureState "$main$__0__$x4rdl4IySJOtuvEUdyndvg"} true;
     R0, Gamma_R0 := 65536bv64, true;
     call rely();
-    R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 4064bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4064bv64)) || L(mem, bvadd64(R0, 4064bv64)));
+    $load20, Gamma_$load20 := memory_load64_le(mem, bvadd64(R0, 4064bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4064bv64)) || L(mem, bvadd64(R0, 4064bv64)));
+    R0, Gamma_R0 := $load20, Gamma_$load20;
     call rely();
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, R0)), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
+    $load21, Gamma_$load21 := memory_load32_le(mem, R0), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
+    R0, Gamma_R0 := zero_extend32_32($load21), Gamma_$load21;
     R1, Gamma_R1 := zero_extend32_32(bvadd32(R0[32:0], 1bv32)), Gamma_R0;
     R0, Gamma_R0 := 65536bv64, true;
     call rely();
-    R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 4064bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4064bv64)) || L(mem, bvadd64(R0, 4064bv64)));
+    $load22, Gamma_$load22 := memory_load64_le(mem, bvadd64(R0, 4064bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4064bv64)) || L(mem, bvadd64(R0, 4064bv64)));
+    R0, Gamma_R0 := $load22, Gamma_$load22;
     call rely();
     assert (L(mem, R0) ==> Gamma_R1);
     x_old := memory_load32_le(mem, $x_addr);
