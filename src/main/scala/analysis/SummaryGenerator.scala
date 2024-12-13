@@ -1,5 +1,7 @@
 package analysis
 
+import util.Logger
+
 import analysis.*
 import ir.*
 import boogie.*
@@ -139,27 +141,33 @@ class SummaryGenerator(
     procedure.blocks.flatMap(b => {
       b.statements.flatMap(s => {
         s match {
-          case a: Assume if a.checkSecurity && a.parent.prevBlocks.foldLeft(true)((p, b) => p && before(b)) => {
+          case a: Assume if a.checkSecurity => {
+            val condition = a.parent.prevBlocks.foldLeft(TrueBLiteral: BExpr)((p, b) => BinaryBExpr(BoolAND, p, before(b)))
             a.body.variables.foldLeft(Some(Set()): Option[Set[BExpr]]) {
               (s, v) => {
                 relevantGammas(mustGammaResults(a.parent), v).flatMap(r => s.map(s => s ++ r.flatMap(toGamma)))
               }
             }.flatMap {
               gammas => {
-                if (gammas.size > 1) {
-                  val andedGammas = gammas.tail.foldLeft(gammas.head)((ands: BExpr, next: BExpr) => BinaryBExpr(BoolAND, ands, next))
-                  Some(andedGammas)
+                (if (gammas.size > 1) {
+                  Some(gammas.tail.foldLeft(gammas.head)((ands: BExpr, next: BExpr) => BinaryBExpr(BoolAND, ands, next)))
                 } else if (gammas.size == 1) {
                   Some(gammas.head)
                 } else {
                   None
-                }
+                }).map(prop => BinaryBExpr(BoolIMPLIES, condition, prop))
               }
             }
           }
           case _ => List()
         }
       })
+    }).flatMap(p => {
+      Logger.debug("Simplified " + p.toString() + " into " + p.simplify().toString())
+      p.simplify() match {
+        case TrueBLiteral => None
+        case p => Some[BExpr](p)
+      }
     }).toSet.toList
   }
 

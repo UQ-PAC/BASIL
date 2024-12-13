@@ -22,7 +22,7 @@ class GammaDomainTests extends AnyFunSuite, BASILTest {
     after
   }
 
-  def getReachabilityConditions(procedure: Procedure): Map[Block, Boolean] = {
+  def getReachabilityConditions(procedure: Procedure): Map[Block, BExpr] = {
     reversePostOrder(procedure)
     val (before, after) = worklistSolver(ReachabilityConditions()).solveProc(procedure, false)
     before
@@ -54,7 +54,7 @@ class GammaDomainTests extends AnyFunSuite, BASILTest {
     val reachability = getReachabilityConditions(f)
 
     assert(gammaResults(f.labelToBlock("returnBlock"))(R0) == LatticeSet.Bottom())
-    assert(reachability(f.labelToBlock("returnBlock")) == true)
+    assert(reachability(f.labelToBlock("returnBlock")) == TrueBLiteral)
   }
 
   test("branching") {
@@ -90,7 +90,7 @@ class GammaDomainTests extends AnyFunSuite, BASILTest {
     val reachability = getReachabilityConditions(f)
 
     assert(gammaResults(f.labelToBlock("returnBlock"))(R0) == LatticeSet.FiniteSet(Set(R0)))
-    assert(reachability(f.labelToBlock("branch")) == true)
+    assert(reachability(f.labelToBlock("branch")) == TrueBLiteral)
   }
 
   test("loop") {
