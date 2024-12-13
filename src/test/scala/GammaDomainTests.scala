@@ -48,12 +48,12 @@ class GammaDomainTests extends AnyFunSuite, BASILTest {
         )
       )
     val f = program.nameToProcedure("f")
-    val initialState = VarGammaMap.BottomMap(registers.map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+    val initialState = LatticeMap.BottomMap(registers.map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
     val constPropResults = InterProcConstantPropagation(program).analyze()
     val gammaResults = getMustGammaDomainResults(f, initialState, constPropResults)
     val reachability = getReachabilityConditions(f)
 
-    assert(gammaResults(f.labelToBlock("returnBlock"))(R0) == LatticeSet.Bottom())
+    assert(latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0)(LatticeSetLattice()) == LatticeSet.Bottom())
     assert(reachability(f.labelToBlock("returnBlock")) == TrueBLiteral)
   }
 
@@ -84,12 +84,12 @@ class GammaDomainTests extends AnyFunSuite, BASILTest {
         ),
       )
     val f = program.nameToProcedure("f")
-    val initialState = VarGammaMap.BottomMap(registers.map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+    val initialState = LatticeMap.BottomMap(registers.map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
     val constPropResults = InterProcConstantPropagation(program).analyze()
     val gammaResults = getMustGammaDomainResults(f, initialState, constPropResults)
     val reachability = getReachabilityConditions(f)
 
-    assert(gammaResults(f.labelToBlock("returnBlock"))(R0) == LatticeSet.FiniteSet(Set(R0)))
+    assert(latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0)(LatticeSetLattice()) == LatticeSet.FiniteSet(Set(R0)))
     assert(reachability(f.labelToBlock("branch")) == TrueBLiteral)
   }
 
@@ -120,10 +120,10 @@ class GammaDomainTests extends AnyFunSuite, BASILTest {
         ),
       )
     val f = program.nameToProcedure("f")
-    val initialState = VarGammaMap.BottomMap(registers.map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+    val initialState = LatticeMap.BottomMap(registers.map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
     val constPropResults = InterProcConstantPropagation(program).analyze()
     val gammaResults = getMustGammaDomainResults(f, initialState, constPropResults)
 
-    assert(gammaResults(f.labelToBlock("returnBlock"))(R0) == LatticeSet.FiniteSet(Set(R2)))
+    assert(latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0)(LatticeSetLattice()) == LatticeSet.FiniteSet(Set(R2)))
   }
 }
