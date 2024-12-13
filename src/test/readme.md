@@ -127,7 +127,7 @@ Now, running make commands should use compilers from Docker.
    reducing the job count can reduce the noise).
    You should look for messages like these:
    ```bash
-correct/basic_function_call_caller/clang_O2/a.out: FAILED
+   correct/basic_function_call_caller/clang_O2/a.out: FAILED
    md5sum: WARNING: 1 computed checksum did NOT match
    ```
 
