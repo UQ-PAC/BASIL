@@ -4,7 +4,7 @@ import analysis.BitVectorEval.isNegative
 import analysis.data_structure_analysis.SymBase.{Global, Heap, Par, Ret, Stack, Unknown}
 import analysis.solvers.{SimplePushDownWorklistFixpointSolver, SimpleWorklistFixpointSolver}
 import analysis.{Analysis, FlatElement, IRIntraproceduralForwardDependencies, MapLattice, PowerSetLatticeWithTop, evaluateExpression}
-import ir.{BVADD, BVSUB, BinaryExpr, BitVecLiteral, CFGPosition, DirectCall, Expr, IntraProcIRCursor, LocalAssign, MemoryLoad, Procedure, Program, Register, Variable, computeDomain, toShortString}
+import ir.{BVADD, BVSUB, BinaryExpr, BitVecLiteral, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, LocalAssign, MemoryLoad, Procedure, Program, Register, Repeat, SignExtend, UnaryExpr, UninterpretedFunction, Variable, ZeroExtend, computeDomain, toShortString}
 
 import scala.Option
 
@@ -73,20 +73,24 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
     Map(base -> Some(Set(value))).withDefaultValue(offsetSetLattice.bottom)
   }
 
-  def exprToSymValMap(pos: CFGPosition, expr: Expr, svs: Map[Variable, Map[SymBase, Option[Set[BitVecLiteral]]]]): Map[SymBase, Option[Set[BitVecLiteral]]] = {
-
+  def exprToSymValMap(pos: CFGPosition, expression: Expr, svs: Map[Variable, Map[SymBase, Option[Set[BitVecLiteral]]]]): Map[SymBase, Option[Set[BitVecLiteral]]] = {
+    val expr = unwrapPaddingAndSlicing(expression)
     if evaluateExpression(expr, constProp(pos)).nonEmpty then
       val const = evaluateExpression(expr, constProp(pos)).get
       initDef(Global, const)
     else
       expr match
+        case ZeroExtend(_, body: Variable) =>
+          svs(body)
+        case Extract(31, 0, body: Variable) => // TODO UNSOUND assume 32 bit extract is maintaining value
+          svs(body)
         case BinaryExpr(op, arg1: Variable, arg2) if evaluateExpression(arg2, constProp(pos)).nonEmpty =>
           val test = svs(arg1)
           svs(arg1).map {
             case (base: SymBase, set: Some[Set[BitVecLiteral]]) =>
               val newSet = set.get.map {
                 case el =>
-                  val binOp = BinaryExpr(op,el, arg2)
+                  val binOp = BinaryExpr(op,el, BitVecLiteral(evaluateExpression(arg2, constProp(pos)).get.value, 64))
                   evaluateExpression(binOp, constProp(pos)).get
                 case p => p
               }
@@ -99,7 +103,6 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
             (s, v) =>
               s ++ svs(v).keys
           }
-
 
           if (symSet.size == 1 && symSet.contains(Global)) then // TODO this is a work aorund the constProp setting all registers to top after a call
             expr.variables.foldLeft(Map[SymBase, Option[Set[BitVecLiteral]]]()) {
@@ -128,7 +131,7 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
         evaluateExpression(rhs.arg2, constProp(alloc)).nonEmpty && isNegative(evaluateExpression(rhs.arg2, constProp(alloc)).get) => s // ignore stack allocations
       case pos @ LocalAssign(lhs: Variable, rhs, label) =>
         s + (lhs -> exprToSymValMap(pos, rhs, s)) // local
-      case MemoryLoad(lhs, _, index, _, _, _) =>
+      case MemoryLoad(lhs, _, index, _, _, _)  =>
         s + (lhs -> initDef(Unknown())) // load
       case DirectCall(target, _) if target.name == "malloc" => s + (mallocRegister -> initDef(Heap()))
       case DirectCall(target, _) => s ++ target.out.foldLeft(Map[Variable, Map[SymBase, Option[Set[BitVecLiteral]]]]()) {

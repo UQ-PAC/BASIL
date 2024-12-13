@@ -36,7 +36,7 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
   val sva = SVA(proc, constProp)
   var nodes: Set[CoolNode] = Set.empty
   var pointsTo: Set[(CoolCell, CoolCell)] = Set.empty
-  var exprToCell: Set[(Expr, CoolCell)] = Set.empty
+  var exprToCell: Set[(CFGPosition, Expr, CoolCell)] = Set.empty
   val constraints: Set[Constraint] = computeConstraints()
   var symBases: Map[SymBase, CoolNode] = constraints.flatMap(c => List(c.arg1.SSAVar, c.arg2.SSAVar)).foldLeft(Map[SymBase, CoolNode]()) {
     (m, symValSet) =>
@@ -72,8 +72,8 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
     arrows.append(StructArrow(DotStructElement(pointerID, Some(pointerOffset)), DotStructElement(pointee.node.id.toString, Some(pointee.offset.toString))))
   }
 
-  exprToCell.foreach { (expr, cell) =>
-      structs.append(DotStruct(expr.hashCode().toString , expr.toString, None, true))
+  exprToCell.foreach { (pos, expr, cell) =>
+      structs.append(DotStruct(expr.hashCode().toString , s"${pos.toShortString.take(12)}_${expr.toString}", None, true))
       arrows.append(StructArrow(DotStructElement(expr.hashCode().toString, None), DotStructElement(cell.node.id.toString, Some(cell.offset.toString)), ""))
   }
 
@@ -83,21 +83,25 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
   private def collect(): Unit = {
     var nodes: Set[CoolNode] = Set.empty
     var pointsTo: Set[(CoolCell, CoolCell)] = Set.empty
-    var exprToCell: Set[(Expr, CoolCell)] = Set.empty
+    var exprToCell: Set[(CFGPosition, Expr, CoolCell)] = Set.empty
     constraints.foreach {
-      case DereferenceConstraint(value, index, arg1, arg2, size) =>
+      case DereferenceConstraint(pos, value, index, arg1, arg2, size) =>
         val valueCells = getCells(arg1.SSAVar).map(find)
         assert(valueCells.size == 1)
         val valueCell = valueCells.head
 
-        exprToCell += (value, valueCell)
+
+        exprToCell += (pos, value, valueCell)
         nodes += valueCell.node
+        assert(arg1.SSAVar.keys.toSet.subsetOf(valueCell.node.symBases))
 
         val indexCells = getCells(arg2.SSAVar).map(find)
         assert(indexCells.size == 1)
         val indexCell = indexCells.head
 
-        exprToCell += (index, indexCell)
+        assert(arg2.SSAVar.keys.toSet.subsetOf(indexCell.node.symBases))
+
+        exprToCell += (pos, index, indexCell)
 
         assert(indexCell.hasPointee)
         assert(find(indexCell.getPointee) == valueCell)
@@ -136,9 +140,9 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
     var constraints: Set[Constraint] = Set.empty
     domain.foreach {
       case load@MemoryLoad(lhs, _, index, _, size, _) =>
-        constraints += DereferenceConstraint(lhs, index, EV(sva.exprToSymValSet(load, lhs)), EEV(sva.exprToSymValSet(load, index)), size / 8)
+        constraints += DereferenceConstraint(load, lhs, index, EV(sva.exprToSymValSet(load, lhs)), EEV(sva.exprToSymValSet(load, index)), size / 8)
       case store@MemoryStore(_, index, value, _, size, _) =>
-        constraints += DereferenceConstraint(value, index, EV(sva.exprToSymValSet(store, value)), EEV(sva.exprToSymValSet(store, index)), size / 8)
+        constraints += DereferenceConstraint(store, value, index, EV(sva.exprToSymValSet(store, value)), EEV(sva.exprToSymValSet(store, index)), size / 8)
       case _ =>
     }
     constraints
@@ -174,13 +178,12 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
   private def processConstraint(constraint: Constraint): Unit =
   {
     constraint match
-      case DereferenceConstraint(value, index, arg1: EV, arg2: EEV, size: Int) =>
+      case DereferenceConstraint(pos, value, index, arg1: EV, arg2: EEV, size: Int) =>
         val valueCell: CoolCell = mergeCells(getCells(arg1.SSAVar))
         val pointerCells = getCells(arg2.SSAVar)
         pointerCells.foreach(_.growSize(size))
         val pointeeCell = mergePointees(pointerCells)
-        val test = mergeCells(valueCell, pointeeCell)
-        test
+        mergeCells(valueCell, pointeeCell)
       case _ => ???
   }
 
@@ -501,6 +504,7 @@ class CoolDSA(program: Program, constProp: Map[CFGPosition, Map[Variable, FlatEl
     })
 
     writeToFile(result(Local).head._2.toDot, "cooldsa.dot")
+    println(result(Local).head._2.constraints)
 
 
     result(Local)
