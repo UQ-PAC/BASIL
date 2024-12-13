@@ -119,7 +119,7 @@ class SummaryGenerator(
    * Gets the set of gammas stored in a VarGammaMap, if possible
    */
   private def relevantGammas(gammaMap: VarGammaMap, v: Taintable): Option[Set[Taintable]] = {
-    gammaMap(v) match {
+    latticeMapApply(gammaMap, v)(LatticeSetLattice()) match {
       case LatticeSet.Top() => None // We can't know all of the variables, so we soundly say nothing
       case LatticeSet.Bottom() => Some(Set())
       case LatticeSet.FiniteSet(s) => Some(s)
@@ -133,7 +133,7 @@ class SummaryGenerator(
   def generateRequires(procedure: Procedure): List[BExpr] = {
     if procedure.blocks.isEmpty then return List()
 
-    val initialState = VarGammaMap.BottomMap(variables.map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+    val initialState = LatticeMap.BottomMap(variables.map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
     reversePostOrder(procedure)
     val (_, mustGammaResults) = worklistSolver(MustGammaDomain(globals, constProp)).solveProc(procedure, false)
     val (before, after) = worklistSolver(ReachabilityConditions()).solveProc(procedure, false)
