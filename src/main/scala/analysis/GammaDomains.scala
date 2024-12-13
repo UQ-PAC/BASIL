@@ -1,6 +1,7 @@
 package analysis
 
 import analysis.*
+import boogie.*
 import ir.*
 import ir.transforms.{AbstractDomain, worklistSolver}
 
@@ -297,12 +298,13 @@ class MustGammaDomain(
  * prior to a branch are definitely reachable, and (soundly) assume everything else might not be
  * reachable.
  */
-class ReachabilityConditions extends AbstractDomain[Boolean] {
+class ReachabilityConditions extends AbstractDomain[BExpr] {
   import VarGammaMap.{Top, Bottom, TopMap, BottomMap}
 
-  def join(a: Boolean, b: Boolean, pos: Block): Boolean = a && b
+  // As the expressions get more complex, it may be worth considering not simplifying at every join
+  def join(a: BExpr, b: BExpr, pos: Block): BExpr = BinaryBExpr(BoolAND, a, b).simplify()
 
-  def transfer(b: Boolean, c: Command): Boolean = {
+  def transfer(b: BExpr, c: Command): BExpr = {
     c match {
       case a: LocalAssign  => b
       case a: MemoryLoad   => b
@@ -311,13 +313,13 @@ class ReachabilityConditions extends AbstractDomain[Boolean] {
       case a: Assert       => b
       case i: IndirectCall => b
       case c: DirectCall   => b
-      case g: GoTo         => g.targets.size == 1 && b
+      case g: GoTo         => if g.targets.size == 1 then b else FalseBLiteral
       case r: Return       => b
       case r: Unreachable  => b
       case n: NOP          => b
     }
   }
 
-  def top: Boolean = true
-  def bot: Boolean = false
+  def top: BExpr = TrueBLiteral
+  def bot: BExpr = FalseBLiteral
 }
