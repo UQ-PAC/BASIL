@@ -1,1 +1,12 @@
 https://files.catbox.moe/7uooak.bz2
+
+# this file should have a URL as its first line
+# and a sha1sum as its last line. all other
+# lines are ignored.
+#
+# sha1sum is used here because md5 collisions can be computed,
+# and this file might be placed into a third-party server.
+# 
+# make sure to update both URL and sha1sum simultaneously.
+
+bad7c939de984f139ecae9df957fd3a092b73a45  compiled.tar.bz2

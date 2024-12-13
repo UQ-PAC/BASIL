@@ -12,4 +12,5 @@
 *.gts
 docker-hash-new
 !compiled.url.txt
-*.tar.gz
+*.gz
+*.bz2

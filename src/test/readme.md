@@ -14,6 +14,8 @@ cd src/test
 make extract
 ```
 This should be enough to run the SystemTests through mill.
+Note that `make extract` will not overwrite any existing output files.
+Use `make clean -j4` beforehand if needed.
 
 For much more detail about the lifting process, including how to add or edit
 test cases, keep reading.
@@ -186,18 +188,26 @@ You can use these steps to do so.
    Git can be used to compare the differences.
 6. In the src/tests directory, run `make compiled.md5sum` to update the combined md5sums file.
 7. Create the tarball of generated files with `make compiled.tar.bz2`.
-8. Upload compiled.tar.gz to a publicly-accessible file host and update the URL in compiled.url.txt, e.g. by
+   Take note of the md5sum line at the bottom.
+8. Upload compiled.tar.gz to a publicly-accessible file host and take note of the URL.
    ```bash
    curl -Freqtype=fileupload -FfileToUpload=@compiled.tar.bz2 https://catbox.moe/user/api.php
    ```
-9. Optionally, check your new hashes are valid and reproducible with `make clean -j4 && make md5sum-check -j4`.
-10. Optionally, check the uploaded tarball is valid with `make clean -j4 && make extract`.
-11. Commit and PR your changes.
+9. Update compiled.url.txt with the new URL and the new md5sum.
+10. Optionally, check your new hashes are valid and reproducible with `make clean -j4 && make md5sum-check -j4`.
+11. Optionally, check the uploaded tarball is valid with `make clean -j4 && make extract`.
+12. Commit and PR your changes.
 
 For consistency, you *must* use the Docker environment when
 making changes to the hash files with md5sum-update.
 The Makefile should make sure that Docker is active.
 Of course, do not update any computed md5sum files by hand.
+
+Note that if you do the steps of
+(1) make a tarball, (2) extract it, then (3) re-make the tarball, this
+_will_ change the md5sum of the tarball (but not its contents).
+Be careful when updating compiled.url.txt to make sure the uploaded tarball
+matches the md5sum.
 
 ### Updating the Docker image
 

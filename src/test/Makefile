@@ -32,11 +32,16 @@ $(TARBALL) docker-contents.txt &: compiled.md5sum
 	set -u; $$DOCKER_CMD hash > docker-contents.txt  # before compessing, make sure docker-contents.txt is up to date.
 	md5sum --quiet -c compiled.md5sum  # before compressing, make sure our files match expected hashes.
 	list=`mktemp`; cut -d' ' -f3 compiled.md5sum > $$list && tar caf $(TARBALL) -T $$list && rm $$list
-	md5sum $(TARBALL)
+	sha1sum $(TARBALL)
 
 .PHONY: extract
 extract:
-	curl -z $(TARBALL) "$$(cat compiled.url.txt)" -o $(TARBALL)
-	file $(TARBALL) && md5sum $(TARBALL)
+	# check existing file, otherwise download fresh copy.
+	{ tail -n1 compiled.url.txt | sha1sum -c - ; } \
+		|| curl "$$(head -n1 compiled.url.txt)" -o $(TARBALL)
+	# check file type.
+	file $(TARBALL)
+	# validate the hash, otherwise remove the incorrect file and abort.
+	{ tail -n1 compiled.url.txt | sha1sum -c - ; } || { rm -v $(TARBALL); exit 1; }
 	tar xf $(TARBALL) --keep-old-files
-	md5sum --quiet -c compiled.md5sum
+	md5sum --quiet -c compiled.md5sum  # check that extracted files match expected checksums
