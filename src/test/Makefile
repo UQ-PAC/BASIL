@@ -43,5 +43,5 @@ extract:
 	file $(TARBALL)
 	# validate the hash, otherwise remove the incorrect file and abort.
 	{ tail -n1 compiled.url.txt | sha1sum -c - ; } || { rm -v $(TARBALL); exit 1; }
-	tar xf $(TARBALL) --keep-old-files
+	tar xf $(TARBALL) --keep-old-files --touch
 	md5sum --quiet -c compiled.md5sum  # check that extracted files match expected checksums
