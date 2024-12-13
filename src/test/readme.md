@@ -190,11 +190,11 @@ You can use these steps to do so.
 5. Run `make md5sum-update -j6` to generate new hashes.
    Git can be used to compare the differences.
 6. In the src/tests directory, run `make compiled.md5sum` to update the combined md5sums file.
-7. Create the tarball of generated files with `make compiled.tar.bz2`.
+7. Create the tarball of generated files with `make compiled.tar.zst`.
    Take note of the md5sum line at the bottom.
-8. Upload compiled.tar.bz2 to a publicly-accessible file host and take note of the URL.
+8. Upload compiled.tar.zst to a publicly-accessible file host and take note of the URL.
    ```bash
-   curl -Freqtype=fileupload -FfileToUpload=@compiled.tar.bz2 https://catbox.moe/user/api.php
+   curl -Freqtype=fileupload -FfileToUpload=@compiled.tar.zst https://catbox.moe/user/api.php
    ```
 9. Update compiled.url.txt with the new URL and the new md5sum.
 10. Optional but recommended, check your new hashes are valid and reproducible with `make clean -j4 && make md5sum-check -j4`.
