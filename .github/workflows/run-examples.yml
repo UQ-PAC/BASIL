@@ -60,6 +60,7 @@ jobs:
         run: ./mill test.testOnly 'SystemTests*'
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: testresult-${{ github.run_number }}
           path: |
