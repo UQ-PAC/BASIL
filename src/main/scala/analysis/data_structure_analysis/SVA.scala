@@ -101,7 +101,7 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
           }
 
 
-          if (symSet.size == 1 && symSet.contains(Global)) then
+          if (symSet.size == 1 && symSet.contains(Global)) then // TODO this is a work aorund the constProp setting all registers to top after a call
             expr.variables.foldLeft(Map[SymBase, Option[Set[BitVecLiteral]]]()) {
               (m, v) =>
                 m ++ svs(v)
