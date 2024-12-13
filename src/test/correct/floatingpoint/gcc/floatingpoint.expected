@@ -44,9 +44,9 @@ procedure main();
 
 implementation main()
 {
-  $main$__0__$cegbDVc9S6m8Z0kHHU8BZQ:
-    assume {:captureState "$main$__0__$cegbDVc9S6m8Z0kHHU8BZQ"} true;
-    R0, Gamma_R0 := 0bv64, true;
+  lmain:
+    assume {:captureState "lmain"} true;
+    R0, Gamma_R0 := 2147483647bv64, true;
     goto main_basil_return;
   main_basil_return:
     assume {:captureState "main_basil_return"} true;
