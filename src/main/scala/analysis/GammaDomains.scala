@@ -72,19 +72,62 @@ enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
   case DiffSet[T1](s: Set[T1]) extends LatticeSet[T1]
 }
 
+class LatticeSetLattice[T] extends Lattice[LatticeSet[T]] {
+  import LatticeSet.{Top, Bottom, FiniteSet, DiffSet}
 
-/*
-/*
- * D: Domain
- * C: Codomain
+  type Element = LatticeSet[T];
+
+  def lub(a: LatticeSet[T], b: LatticeSet[T]): LatticeSet[T] = {
+    (a, b) match {
+      case (Top(), _) => Top()
+      case (Bottom(), b) => b
+      case (FiniteSet(a), FiniteSet(b)) => FiniteSet(a.union(b))
+      case (FiniteSet(a), DiffSet(b)) => DiffSet(b -- a)
+      case (DiffSet(a), DiffSet(b)) => DiffSet(a.intersect(b))
+      case (a, b) => lub(b, a)
+    }
+  }
+
+  override def glb(a: LatticeSet[T], b: LatticeSet[T]): LatticeSet[T] = {
+    (a, b) match {
+      case (Top(), b) => b
+      case (Bottom(), _) => Bottom()
+      case (FiniteSet(a), FiniteSet(b)) => FiniteSet(a.intersect(b))
+      case (FiniteSet(a), DiffSet(b)) => FiniteSet(a.filter(x => !b.contains(x)))
+      case (DiffSet(a), DiffSet(b)) => DiffSet(a.union(b))
+      case (a, b) => glb(b, a)
+    }
+  }
+
+  override def top: LatticeSet[T] = Top()
+  val bottom: LatticeSet[T] = Bottom()
+}
+
+/**
+ * A map lattice map which has an abstract Top and Bottom value, along with variants for maps that default to Top and Bottom.
  */
-enum LatticeMap[D, L <: InternalLattice[L]] extends InternalLattice[LatticeMap[D, L]] {
-  case Top[D1, L1 <: InternalLattice[L1]]() extends LatticeMap[D1, L1]
-  case Bottom[D1, L1 <: InternalLattice[L1]]() extends LatticeMap[D1, L1]
+enum LatticeMap[D, +L] /* extends (D => L) */ {
+  case Top[D1, +L1]() extends LatticeMap[D1, L1]
+  case Bottom[D1, +L1]() extends LatticeMap[D1, L1]
   // A Map which defaults to Top
-  case TopMap[D1, L1 <: InternalLattice[L1]](m: Map[D1, L1]) extends LatticeMap[D1, L1]
+  case TopMap[D1, +L1](m: Map[D1, L1]) extends LatticeMap[D1, L1]
   // A Map which defaults to Bottom
-  case BottomMap[D1, L1 <: InternalLattice[L1]](m: Map[D1, L1]) extends LatticeMap[D1, L1]
+  case BottomMap[D1, +L1](m: Map[D1, L1]) extends LatticeMap[D1, L1]
+
+  /*
+  override def toString(): String = this match {
+    case Top() => "Top"
+    case Bottom() => "Bottom"
+    case TopMap(m) => "TopMap("+m.toString()+")"
+    case BottomMap(m) => "BottomMap("+m.toString()+")"
+  }
+
+  def apply(v: D): L = this match {
+    case Top => LatticeSet.Top()
+    case Bottom => LatticeSet.Bottom()
+    case TopMap(m) => m.getOrElse(v, LatticeSet.Top())
+    case BottomMap(m) => m.getOrElse(v, LatticeSet.Bottom())
+  }
 
   def join(other: LatticeMap[D, L]): LatticeMap[D, L] = {
     (this, other) match {
@@ -134,9 +177,77 @@ enum LatticeMap[D, L <: InternalLattice[L]] extends InternalLattice[LatticeMap[D
 
   def top: LatticeMap[D, L] = Top()
   def bottom: LatticeMap[D, L] = Bottom()
+  */
 }
-*/
 
+// TODO there has to be a better interface than this :((
+def latticeMapApply[D, L, LA <: Lattice[L]](m: LatticeMap[D, L], d: D)(l: LA): L = {
+  import LatticeMap.{Top, Bottom, TopMap, BottomMap}
+
+  m match {
+    case Top() => l.top
+    case Bottom() => l.bottom
+    case TopMap(m) => m.getOrElse(d, l.top)
+    case BottomMap(m) => m.getOrElse(d, l.bottom)
+  }
+}
+
+class LatticeMapLattice[D, L, LA <: Lattice[L]](l: LA) extends Lattice[LatticeMap[D, L]] {
+  import LatticeMap.{Top, Bottom, TopMap, BottomMap}
+
+  type Element = LatticeMap[D, L];
+
+  def lub(a: LatticeMap[D, L], b: LatticeMap[D, L]): LatticeMap[D, L] = {
+    (a, b) match {
+      case (Top(), _) => Top()
+      case (Bottom(), _) => Bottom()
+      case (TopMap(a), TopMap(b)) => TopMap(
+        a.foldLeft(b)((m, p) => {
+          val (k, v) = p
+          m + (k -> l.lub(m.getOrElse(k, l.top), v))
+        }))
+      case (TopMap(a), BottomMap(b)) => TopMap(
+        b.foldLeft(a)((m, p) => {
+          val (k, v) = p
+          m + (k -> l.lub(m.getOrElse(k, l.top), v))
+        }))
+      case (BottomMap(a), BottomMap(b)) => BottomMap(
+        a.foldLeft(b)((m, p) => {
+          val (k, v) = p
+          m + (k -> l.lub(m.getOrElse(k, l.bottom), v))
+        }))
+      case (a, b) => this.lub(b, a)
+    }
+  }
+
+  override def glb(a: LatticeMap[D, L], b: LatticeMap[D, L]): LatticeMap[D, L] = {
+    (a, b) match {
+      case (Top(), b) => b
+      case (Bottom(), _) => Bottom()
+      case (TopMap(a), TopMap(b)) => TopMap(
+        a.foldLeft(b)((m, p) => {
+          val (k, v) = p
+          m + (k -> l.glb(m.getOrElse(k, l.top), v))
+        }))
+      case (TopMap(a), BottomMap(b)) => BottomMap(
+        a.foldLeft(b)((m, p) => {
+          val (k, v) = p
+          m + (k -> l.glb(m.getOrElse(k, l.bottom), v))
+        }))
+      case (BottomMap(a), BottomMap(b)) => BottomMap(
+        a.foldLeft(b)((m, p) => {
+          val (k, v) = p
+          m + (k -> l.glb(m.getOrElse(k, l.bottom), v))
+        }))
+      case (a, b) => this.glb(b, a)
+    }
+  }
+
+  override def top: LatticeMap[D, L] = Top()
+  val bottom: LatticeMap[D, L] = Bottom()
+}
+
+/*
 /**
  * A map lattice map which has an abstract Top and Bottom value, along with variants for maps that default to Top and Bottom.
  * Because of the way I designed this unfortunately I wasn't able to make it generic! :( Oh well
@@ -213,6 +324,9 @@ enum VarGammaMap extends InternalLattice[VarGammaMap] with (Taintable => Lattice
   def top: VarGammaMap = Top
   def bottom: VarGammaMap = Bottom
 }
+*/
+
+type VarGammaMap = LatticeMap[Taintable, LatticeSet[Taintable]]
 
 /**
  * An abstract domain that determines for each variable at each block, a set of variables
@@ -233,16 +347,19 @@ class MustGammaDomain(
   globals: Map[BigInt, String],
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
 ) extends AbstractDomain[VarGammaMap] {
-  import VarGammaMap.{Top, Bottom, TopMap, BottomMap}
+  import LatticeMap.{Top, Bottom, TopMap, BottomMap}
+
+  // It would be cool if scala could figure this type signature out by itself but oh well!
+  private val l = LatticeMapLattice[Taintable, LatticeSet[Taintable], LatticeSetLattice[Taintable]](LatticeSetLattice())
 
   // Meeting on places we would normally join is how we get our must analysis.
-  def join(a: VarGammaMap, b: VarGammaMap, pos: Block): VarGammaMap = a.meet(b)
+  def join(a: VarGammaMap, b: VarGammaMap, pos: Block): VarGammaMap = l.glb(a, b)
 
   def transfer(m: VarGammaMap, c: Command): VarGammaMap = {
     c match {
       case c: LocalAssign => m match {
-        case Top => Top
-        case Bottom => Bottom
+        case Top() => Top()
+        case Bottom() => Bottom()
         case TopMap(m) =>
           TopMap(m + (c.lhs -> c.rhs.variables.foldLeft(LatticeSet.Bottom())((s: LatticeSet[Taintable], v) => s.union(m.getOrElse(v, LatticeSet.Top())))))
         case BottomMap(m) =>
@@ -251,8 +368,8 @@ class MustGammaDomain(
       case c: MemoryLoad => {
         val v = getMemoryVariable(c, c.mem, c.index, c.size, constProp, globals).getOrElse(UnknownMemory())
         (m, v) match {
-          case (Top, _) => Top
-          case (Bottom, _) => Bottom
+          case (Top(), _) => Top()
+          case (Bottom(), _) => Bottom()
           // If we load unknown memory, make no statements about the gammas of the loaded-into variable.
           case (TopMap(m), UnknownMemory()) => TopMap(m + (c.lhs -> LatticeSet.Bottom()))
           case (BottomMap(m), UnknownMemory()) => BottomMap(m + (c.lhs -> LatticeSet.Bottom()))
@@ -268,8 +385,8 @@ class MustGammaDomain(
          // If we write to UnknownMemory, we won't ever use the results of what is stored there (since we bottom on read).
          // Hence we simply store no new information.
           case (m, UnknownMemory()) => m
-          case (Top, _) => Top
-          case (Bottom, _) => Bottom
+          case (Top(), _) => Top()
+          case (Bottom(), _) => Bottom()
           case (TopMap(m), v) =>
             TopMap(m + (v -> c.value.variables.union(c.index.variables).foldLeft(LatticeSet.Bottom())((s: LatticeSet[Taintable], v) => s.union(m.getOrElse(v, LatticeSet.Top())))))
           case (BottomMap(m), v) =>
@@ -278,8 +395,8 @@ class MustGammaDomain(
       }
       case c: Assume       => m
       case c: Assert       => m
-      case c: IndirectCall => Bottom
-      case c: DirectCall   => Bottom
+      case c: IndirectCall => Bottom()
+      case c: DirectCall   => Bottom()
       case c: GoTo         => m
       case c: Return       => m
       case c: Unreachable  => m
@@ -287,10 +404,10 @@ class MustGammaDomain(
     }
   }
 
-  def top: VarGammaMap = VarGammaMap.Bottom
+  def top: VarGammaMap = Bottom()
   // Since bottom is set to Top, it is important to ensure that when running this analysis, the entry point
   // to the procedure you are analysing has things mostly set to bottom. That way, Top does not propagate.
-  def bot: VarGammaMap = VarGammaMap.Top
+  def bot: VarGammaMap = Top()
 }
 
 /**
@@ -299,7 +416,7 @@ class MustGammaDomain(
  * reachable.
  */
 class ReachabilityConditions extends AbstractDomain[BExpr] {
-  import VarGammaMap.{Top, Bottom, TopMap, BottomMap}
+  import LatticeMap.{Top, Bottom, TopMap, BottomMap}
 
   // As the expressions get more complex, it may be worth considering not simplifying at every join
   def join(a: BExpr, b: BExpr, pos: Block): BExpr = BinaryBExpr(BoolAND, a, b).simplify()
