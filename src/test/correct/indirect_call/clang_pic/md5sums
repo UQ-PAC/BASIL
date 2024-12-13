@@ -1,5 +1,5 @@
-78daf5450443f94987ceebe481cf046f  correct/indirect_call/clang_pic/a.out
-11bc789fac8cd466099d7a71dbca2bdc  correct/indirect_call/clang_pic/indirect_call.adt
-2498b1ec0bd93394724d8e2e2d7e4dc9  correct/indirect_call/clang_pic/indirect_call.bir
-2e68f27f1e2c7fe49e18550a792951b0  correct/indirect_call/clang_pic/indirect_call.relf
-78a99b091f81ee226d8f96c36b0ac0e4  correct/indirect_call/clang_pic/indirect_call.gts
+8d9935869b1ed092b02abe7705ebcf21  correct/indirect_call/clang_pic/a.out
+09687a382887fee02d4ff4f88867d299  correct/indirect_call/clang_pic/indirect_call.adt
+fd637cd45d0255aa25bb50d87d7f04a5  correct/indirect_call/clang_pic/indirect_call.bir
+e8d85c551cf2db297609279374c5ffdc  correct/indirect_call/clang_pic/indirect_call.relf
+bf4e0973cfce72a447e320c5af3ca741  correct/indirect_call/clang_pic/indirect_call.gts

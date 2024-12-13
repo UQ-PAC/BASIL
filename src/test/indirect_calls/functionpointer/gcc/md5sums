@@ -1,5 +1,5 @@
-9fb88aadbe2682795e1c67cb279536b5  indirect_calls/functionpointer/gcc/a.out
-da6658f90591bcbffc8b685e2554cb67  indirect_calls/functionpointer/gcc/functionpointer.adt
-6a7fcf80c16431302a35c55a5997de44  indirect_calls/functionpointer/gcc/functionpointer.bir
-6b0ef0ef86e8ac497f10cfcd3b86739f  indirect_calls/functionpointer/gcc/functionpointer.relf
-a9a9c72885544bfe67dbf556495c4bb3  indirect_calls/functionpointer/gcc/functionpointer.gts
+d3fd0ce466066426ea63666074bcbcb0  indirect_calls/functionpointer/gcc/a.out
+2771c1e656764a391c502fc7cecf66cf  indirect_calls/functionpointer/gcc/functionpointer.adt
+5047df447e76c6edfafad8d27fda5f6e  indirect_calls/functionpointer/gcc/functionpointer.bir
+69789da9dd26fc97658df9db86b61750  indirect_calls/functionpointer/gcc/functionpointer.relf
+d681467cbbc950024ee015777e595e50  indirect_calls/functionpointer/gcc/functionpointer.gts

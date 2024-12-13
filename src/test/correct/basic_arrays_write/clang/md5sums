@@ -1,5 +1,5 @@
-820205018f899a3f5821ec5c4e53f2cd  correct/basic_arrays_write/clang/a.out
-e2666abd7fd69561f306481add60377b  correct/basic_arrays_write/clang/basic_arrays_write.adt
-fd1d538c76fde7dff3f6e99e56247208  correct/basic_arrays_write/clang/basic_arrays_write.bir
-75218880a15a4a42df835bd7d0d4533f  correct/basic_arrays_write/clang/basic_arrays_write.relf
-c67c9e87a76cf3348179e6ce371b1dfc  correct/basic_arrays_write/clang/basic_arrays_write.gts
+35148a8fa0ff88ec3ef1dd9b062ca4c0  correct/basic_arrays_write/clang/a.out
+6244bede5f856efe40cb0655e7458f98  correct/basic_arrays_write/clang/basic_arrays_write.adt
+85aeec3bf36b5b2e51239671b5b47761  correct/basic_arrays_write/clang/basic_arrays_write.bir
+5c913df36fab59e90886f43917725a1a  correct/basic_arrays_write/clang/basic_arrays_write.relf
+81d95a111294e53c72474cceab77a444  correct/basic_arrays_write/clang/basic_arrays_write.gts

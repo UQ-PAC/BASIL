@@ -1,5 +1,5 @@
-ea5694fe5e358fd33ec2b791bbc44b03  dsa/stack_reassignment/clang_O2/a.out
-76eef6fa7fe6c084c877256ab86c9395  dsa/stack_reassignment/clang_O2/stack_reassignment.adt
-c5babb338ac092a792edf530787b1a02  dsa/stack_reassignment/clang_O2/stack_reassignment.bir
-d4c4d3bfacc9fa236c32af92a79769e8  dsa/stack_reassignment/clang_O2/stack_reassignment.relf
-ea2ea343c2ba226fced36db39f8d9923  dsa/stack_reassignment/clang_O2/stack_reassignment.gts
+fcb0c72f1a7206e36f09f750a90265ea  dsa/stack_reassignment/clang_O2/a.out
+95e43527fe960facdadfbe64bb9ea00c  dsa/stack_reassignment/clang_O2/stack_reassignment.adt
+500bb475d9bcf0ddd3e7921db9f40112  dsa/stack_reassignment/clang_O2/stack_reassignment.bir
+3704e8fe99b205f5181d98124409dd5e  dsa/stack_reassignment/clang_O2/stack_reassignment.relf
+75094db15fcfccb0eccf3482d9288914  dsa/stack_reassignment/clang_O2/stack_reassignment.gts

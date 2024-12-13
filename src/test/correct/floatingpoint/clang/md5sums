@@ -1,5 +1,5 @@
-1643b945119fbe64f260fea3b0dea051  correct/floatingpoint/clang/a.out
-cbe427ceef10f418612eb6765fb7e99e  correct/floatingpoint/clang/floatingpoint.adt
-fdcf1c9ca95edca7495d1b50e1f91c82  correct/floatingpoint/clang/floatingpoint.bir
-2faea1ad46209c1058611f47b151af14  correct/floatingpoint/clang/floatingpoint.relf
-916bb3a4cdce1bf99b7123e520764538  correct/floatingpoint/clang/floatingpoint.gts
+62b1304a44dc795d785bfc06c4c4f02a  correct/floatingpoint/clang/a.out
+01754d21a8d2f0f3327ba22f9198c898  correct/floatingpoint/clang/floatingpoint.adt
+ac36ce7321cfff200b5ffd0378b931f6  correct/floatingpoint/clang/floatingpoint.bir
+ad44c14e900d2c1baf0dfa3e4d4a88d1  correct/floatingpoint/clang/floatingpoint.relf
+4f51f1b5561fab64fe6dfad2a29120cb  correct/floatingpoint/clang/floatingpoint.gts

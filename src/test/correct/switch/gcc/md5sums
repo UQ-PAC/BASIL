@@ -1,5 +1,5 @@
-3e911a26088b2406d19c3119af02e420  correct/switch/gcc/a.out
-1b94ab58c9c1e7d430737b40416bbe33  correct/switch/gcc/switch.adt
-a1ab8f6b2af13f27b351d1c700cb46a5  correct/switch/gcc/switch.bir
-81dc2190e38ce88feaee39410d880428  correct/switch/gcc/switch.relf
-a7b4dce06d18b5de7cf0c876bdabc471  correct/switch/gcc/switch.gts
+a4816538964c963924d3a8d3e989646e  correct/switch/gcc/a.out
+539358ee6d74e76a3b0f1e8c5ad9ec54  correct/switch/gcc/switch.adt
+514c92853c96322158eb9b82a95cb503  correct/switch/gcc/switch.bir
+792778f0dcf6354ff39cf8ee0a0f2bb0  correct/switch/gcc/switch.relf
+ac269ce33e9a701493405e639d2f5a4e  correct/switch/gcc/switch.gts

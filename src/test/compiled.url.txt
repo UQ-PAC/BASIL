@@ -1,4 +1,4 @@
-https://files.catbox.moe/9smv6v.bz2
+https://files.catbox.moe/u6jsqr.bz2
 
 # this file should have a URL as its first line
 # and a sha1sum as its last line. all other
@@ -9,4 +9,4 @@ https://files.catbox.moe/9smv6v.bz2
 # 
 # make sure to update both URL and sha1sum simultaneously.
 
-8340aec38bf0b3da6f138a1399c8cbccb5213a54  compiled.tar.bz2
+f25a11df61bb3e2c623faf1502c8016fd73b43c7  compiled.tar.bz2

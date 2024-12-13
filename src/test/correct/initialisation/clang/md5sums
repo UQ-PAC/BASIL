@@ -1,5 +1,5 @@
-94b0b92f6d65f02eda4a0eab83446222  correct/initialisation/clang/a.out
-65012300f1c50393fefa310d6c23ea33  correct/initialisation/clang/initialisation.adt
-5f309fa7ee603e42045b29828969547e  correct/initialisation/clang/initialisation.bir
-b397f8453ebeda56747330020248e9d2  correct/initialisation/clang/initialisation.relf
-3266e0dee63c1a2b56cc874890eb0747  correct/initialisation/clang/initialisation.gts
+600cc5e506c0095bcd43eb309936e2f2  correct/initialisation/clang/a.out
+4240c642e23de89e045db6110ed12760  correct/initialisation/clang/initialisation.adt
+9f66b60d904034e42da27c1526d927f1  correct/initialisation/clang/initialisation.bir
+5707d77a8a4a2cb93b84db10ae34be70  correct/initialisation/clang/initialisation.relf
+dae6545234fe04b9c90b4405ced8ffa3  correct/initialisation/clang/initialisation.gts

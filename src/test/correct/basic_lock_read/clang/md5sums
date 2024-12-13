@@ -1,5 +1,5 @@
-81b97c1383f35f83215711ee8b1f367b  correct/basic_lock_read/clang/a.out
-586b04c7abc288b0943680dc2ee70a0b  correct/basic_lock_read/clang/basic_lock_read.adt
-b450c982eea96bdbd32fbd2c9d2060d4  correct/basic_lock_read/clang/basic_lock_read.bir
-048d10f95a6a95b51cb924dc784d58b9  correct/basic_lock_read/clang/basic_lock_read.relf
-0f581ed47740d3d2f1c51bdb9d71cf84  correct/basic_lock_read/clang/basic_lock_read.gts
+eff9c5660921a7e283a9802696bc75d4  correct/basic_lock_read/clang/a.out
+e7978c2ad486c1e28895320bbebfd2ac  correct/basic_lock_read/clang/basic_lock_read.adt
+fafca6605cc3440d78a6216595711c1a  correct/basic_lock_read/clang/basic_lock_read.bir
+bd921fc290258748cdc1a8917f0194f2  correct/basic_lock_read/clang/basic_lock_read.relf
+9c18e1e209e5cc9d9c8dd36b670f7fb4  correct/basic_lock_read/clang/basic_lock_read.gts

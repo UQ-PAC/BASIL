@@ -1,5 +1,5 @@
-d7eece66b1dc16bc852eccfd25093d09  correct/function1/gcc/a.out
-eb8bf7f35b71d97587db815ef6f1e00e  correct/function1/gcc/function1.adt
-1a02177c6068ef77390798246142adca  correct/function1/gcc/function1.bir
-43d7487f8cce1bfee0e1bd53acdc3ce5  correct/function1/gcc/function1.relf
-68e5add65253592f2fbad4ccdfc04b3b  correct/function1/gcc/function1.gts
+1e5ecaff79cdccd3b0dd03cd96c4a2aa  correct/function1/gcc/a.out
+6c37f4e134cbd258092938cb4c8d6a61  correct/function1/gcc/function1.adt
+cf7f3cb81fcdfc17c0d3179c6884933f  correct/function1/gcc/function1.bir
+2196bbbbbdb5e03bbf7a0befc48119b5  correct/function1/gcc/function1.relf
+932cf839b4f8c5bb1f3dca3d4a1af4b5  correct/function1/gcc/function1.gts

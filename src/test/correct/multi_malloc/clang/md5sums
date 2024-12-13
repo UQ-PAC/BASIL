@@ -1,5 +1,5 @@
-67858081e6248f968d877127198d4b90  correct/multi_malloc/clang/a.out
-1ab6608760d1e63fe6c2a4ea732bf9b3  correct/multi_malloc/clang/multi_malloc.adt
-6a9a9937d117d9e2b487fc22ffc92f64  correct/multi_malloc/clang/multi_malloc.bir
-dd7fab3d12b5a68a357529138cc83db1  correct/multi_malloc/clang/multi_malloc.relf
-b8186e6d8a0354736b0b14ade6d08d1a  correct/multi_malloc/clang/multi_malloc.gts
+ab94c17de23868f6d5beae54dc3e0dfa  correct/multi_malloc/clang/a.out
+8378929ad97420a503c2c96b72b98a6f  correct/multi_malloc/clang/multi_malloc.adt
+56c5068212ed3f9d5823e2587f8c93d7  correct/multi_malloc/clang/multi_malloc.bir
+85f2f7e7340aa49d69850db163d48113  correct/multi_malloc/clang/multi_malloc.relf
+19fa112e82a93f0ee67913892a6b2d38  correct/multi_malloc/clang/multi_malloc.gts

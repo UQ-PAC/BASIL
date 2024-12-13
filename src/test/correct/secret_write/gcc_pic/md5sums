@@ -1,5 +1,5 @@
-b884024f7b9d69b1b0208a3ffb1801f4  correct/secret_write/gcc_pic/a.out
-68ee8e2a5b338768e36200c20f19c479  correct/secret_write/gcc_pic/secret_write.adt
-4053d70f3af818f5594eeec21f14b77a  correct/secret_write/gcc_pic/secret_write.bir
-a501b0f864e5f07ff15d25a2f73ae6fd  correct/secret_write/gcc_pic/secret_write.relf
-84ebd6722b307f5e65bf3c0e29d99696  correct/secret_write/gcc_pic/secret_write.gts
+1e6300671c938bdf0a3ee1978f8eea4a  correct/secret_write/gcc_pic/a.out
+6987226ccab1b4d9322bdcbdbe8523b4  correct/secret_write/gcc_pic/secret_write.adt
+c2b79ce85ec13c9cdb20f14221e91255  correct/secret_write/gcc_pic/secret_write.bir
+e6fc02142c15e1f8c5226bc52be3ab1f  correct/secret_write/gcc_pic/secret_write.relf
+a6840674a6c69a9e2a91e163c0256215  correct/secret_write/gcc_pic/secret_write.gts

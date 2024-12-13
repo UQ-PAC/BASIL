@@ -1,5 +1,5 @@
-a98d3b41c60b6dd7d2b663e32fce57bd  incorrect/iflocal/gcc/a.out
-49485ab5c520d1c6c06fa0146a2f8fb7  incorrect/iflocal/gcc/iflocal.adt
-eab665f760e1b7c8e2dc2d7743ab8f90  incorrect/iflocal/gcc/iflocal.bir
-9099026bf94921e9ee41065b2d5aa004  incorrect/iflocal/gcc/iflocal.relf
-ab4f46189c31cf40ec234f8fefe79afc  incorrect/iflocal/gcc/iflocal.gts
+2b31264c3dc627a6ab146dc0a44a0976  incorrect/iflocal/gcc/a.out
+276988393992adb65db9f08ca636f382  incorrect/iflocal/gcc/iflocal.adt
+00bed4f2484f8296fa0c419637aa2510  incorrect/iflocal/gcc/iflocal.bir
+9c90bc111cbba06570c030656817be47  incorrect/iflocal/gcc/iflocal.relf
+77da370c8d7b5bc3a01309ba67511f5b  incorrect/iflocal/gcc/iflocal.gts

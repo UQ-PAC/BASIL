@@ -1,5 +1,5 @@
-5dcd7c7711183ad60b7a5e8017b0e559  dsa/stack_reassignment/gcc/a.out
-cfe02055ed69da92e072c57208215714  dsa/stack_reassignment/gcc/stack_reassignment.adt
-c4239172b9d35409a4687fae00d5dadf  dsa/stack_reassignment/gcc/stack_reassignment.bir
-afa707afbafa7f977017fedb37c86c53  dsa/stack_reassignment/gcc/stack_reassignment.relf
-84c51e3117a853c27d269945ec0e3ac4  dsa/stack_reassignment/gcc/stack_reassignment.gts
+3111e40e54552982c89fba85824e7b30  dsa/stack_reassignment/gcc/a.out
+7aa5b65429c9c287853343bdbce867f1  dsa/stack_reassignment/gcc/stack_reassignment.adt
+10628282e59462969f7c9e1b770bf056  dsa/stack_reassignment/gcc/stack_reassignment.bir
+4c0ec0e0e27bd8a1be01ac353fb50b57  dsa/stack_reassignment/gcc/stack_reassignment.relf
+d461cf153950a67cb078c9c04ad0da39  dsa/stack_reassignment/gcc/stack_reassignment.gts

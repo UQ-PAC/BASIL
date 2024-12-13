@@ -1,5 +1,5 @@
-3b78bf89e47f86842000fa75b730ce70  correct/basic_lock_unlock/gcc_pic/a.out
-e5f1568bd984f6a61705683f5533268d  correct/basic_lock_unlock/gcc_pic/basic_lock_unlock.adt
-d939f718d58219801448abc6c8f1d9c6  correct/basic_lock_unlock/gcc_pic/basic_lock_unlock.bir
-d7330423246ece1a5a1500142cd0ea77  correct/basic_lock_unlock/gcc_pic/basic_lock_unlock.relf
-79edb594418218e43526d2c45071f6a0  correct/basic_lock_unlock/gcc_pic/basic_lock_unlock.gts
+174f0ae8fb968a377b12b892465fffb8  correct/basic_lock_unlock/gcc_pic/a.out
+cb62638a43e18e7a9c09dbd244eb51c9  correct/basic_lock_unlock/gcc_pic/basic_lock_unlock.adt
+f857006fadc0d45f83fa68cc60ca4cbe  correct/basic_lock_unlock/gcc_pic/basic_lock_unlock.bir
+245659e2d96115cfb1baa89816362eb9  correct/basic_lock_unlock/gcc_pic/basic_lock_unlock.relf
+3a10f63efdbbe4eebca390803b156b78  correct/basic_lock_unlock/gcc_pic/basic_lock_unlock.gts

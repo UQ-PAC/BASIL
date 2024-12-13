@@ -1,5 +1,5 @@
-7ee5b31ef8a77d1c32cd12c1e36c8955  correct/basic_loop_assign/clang/a.out
-a89d4550c7768532dcfbb3f1c3b4f241  correct/basic_loop_assign/clang/basic_loop_assign.adt
-3809539cdd23fa39641992bafc21eafd  correct/basic_loop_assign/clang/basic_loop_assign.bir
-80455fb962babdb62f45cabfa2928654  correct/basic_loop_assign/clang/basic_loop_assign.relf
-c0a898daa3fb5972ad7966c486f63813  correct/basic_loop_assign/clang/basic_loop_assign.gts
+f41165874a7edb34fbd714b6bd18976f  correct/basic_loop_assign/clang/a.out
+7dae43b38a4aa1ee5447301eb5489cd5  correct/basic_loop_assign/clang/basic_loop_assign.adt
+dc4c45cee30620c809c330f56a771ff7  correct/basic_loop_assign/clang/basic_loop_assign.bir
+810f86bda97b69c7cc3ad91404a3c8b6  correct/basic_loop_assign/clang/basic_loop_assign.relf
+9610037fe154b191ad038c885f3c95f7  correct/basic_loop_assign/clang/basic_loop_assign.gts

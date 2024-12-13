@@ -1,5 +1,5 @@
-1e97f247f02de7f066fb7bda9e7edb50  correct/secret_write/clang_pic/a.out
-f1dcd472ce1b98351b1c350fde41120d  correct/secret_write/clang_pic/secret_write.adt
-dc14463007f49f0436c76f14d05446c6  correct/secret_write/clang_pic/secret_write.bir
-d4390911c12a0bef77fd4f187ebf699a  correct/secret_write/clang_pic/secret_write.relf
-ec2adab05a32807d532be26399655e2c  correct/secret_write/clang_pic/secret_write.gts
+762ce33ba7078838c45003305b438fb8  correct/secret_write/clang_pic/a.out
+78f2392f81c79f9839af8a424c0d35cb  correct/secret_write/clang_pic/secret_write.adt
+c6132b0df38fa54eeca07dba7ba013a1  correct/secret_write/clang_pic/secret_write.bir
+60d9482acb0c88923bf03475862d5e32  correct/secret_write/clang_pic/secret_write.relf
+0d16d9448bc6b315217ce00cc50f9290  correct/secret_write/clang_pic/secret_write.gts

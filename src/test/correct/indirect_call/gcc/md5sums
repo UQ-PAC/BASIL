@@ -1,5 +1,5 @@
-d32eadb7aa6c3a9eb372f7394b36d613  correct/indirect_call/gcc/a.out
-d3919446c8b03a3bc958e38364339679  correct/indirect_call/gcc/indirect_call.adt
-29e86df0382a2afc215e0b5cebcf07d9  correct/indirect_call/gcc/indirect_call.bir
-d354eb235aef65644d6bf84e0c82595e  correct/indirect_call/gcc/indirect_call.relf
-5a3657436343ff9852d59901bd2baa8b  correct/indirect_call/gcc/indirect_call.gts
+4f6caa66e2e3e131aff7ac3e0c4e5d77  correct/indirect_call/gcc/a.out
+8296fd9bd387e05b9c52c50462cb6b97  correct/indirect_call/gcc/indirect_call.adt
+441e1c62e63abf6d347ac79e556247ca  correct/indirect_call/gcc/indirect_call.bir
+de98122db349f10a47de9c5e4777d8e7  correct/indirect_call/gcc/indirect_call.relf
+9b5530e8fd27e819ebfc9a844c58a4f5  correct/indirect_call/gcc/indirect_call.gts

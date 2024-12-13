@@ -1,5 +1,5 @@
-1e97f247f02de7f066fb7bda9e7edb50  correct/secret_write/clang/a.out
-f1dcd472ce1b98351b1c350fde41120d  correct/secret_write/clang/secret_write.adt
-dc14463007f49f0436c76f14d05446c6  correct/secret_write/clang/secret_write.bir
-d4390911c12a0bef77fd4f187ebf699a  correct/secret_write/clang/secret_write.relf
-ec2adab05a32807d532be26399655e2c  correct/secret_write/clang/secret_write.gts
+06d77e89285be373dfcfbbe88471154d  correct/secret_write/clang/a.out
+7929673541099e16996a516de1b4967f  correct/secret_write/clang/secret_write.adt
+86ca8f2dbf7dca24d24266c72cd78dcc  correct/secret_write/clang/secret_write.bir
+b465d09837c6d6e9ad4782f0505e6e88  correct/secret_write/clang/secret_write.relf
+be4639738b046bf98accc811c35e10b0  correct/secret_write/clang/secret_write.gts

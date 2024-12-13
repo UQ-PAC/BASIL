@@ -1,5 +1,5 @@
-12f18276c2672a98e207d05941a9d355  correct/jumptable2/gcc_pic/a.out
-77311a623d41ff561adc54b0fbc39c59  correct/jumptable2/gcc_pic/jumptable2.adt
-a1f4e6fdef42d884a2233cfbcc660994  correct/jumptable2/gcc_pic/jumptable2.bir
-43fabd7a9640b08efc02282b550d47a8  correct/jumptable2/gcc_pic/jumptable2.relf
-37d8d9372b27b9b301bfe0ad06877be0  correct/jumptable2/gcc_pic/jumptable2.gts
+e57106ae194fd3a30554321c7544e5f5  correct/jumptable2/gcc_pic/a.out
+0483214563858bb6e4a81df408928e43  correct/jumptable2/gcc_pic/jumptable2.adt
+33bda8d84df741e995a064b2d9f36f67  correct/jumptable2/gcc_pic/jumptable2.bir
+05c7b5ea8c79f07e324a5abfb5c99bb2  correct/jumptable2/gcc_pic/jumptable2.relf
+b08a70a03baa034f2838d14d75c3f884  correct/jumptable2/gcc_pic/jumptable2.gts

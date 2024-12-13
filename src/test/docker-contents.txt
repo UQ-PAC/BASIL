@@ -1,4 +1,4 @@
-github:katrinafyi/pac-nix/e6b7a676154f08c9d6027d83cd6c9e05fab44145#basil-tools-docker
+github:katrinafyi/pac-nix/ef9c23743bddd6cf8d6b656c460c572426b50c9a#basil-tools-docker
 
 f9varb8bf7b8mzxmg2ff2lrz1z936qdj-aarch64-unknown-linux-gnu-binutils-2.43.1
 h9l8ji7kddz1w42rpll086qxclcvcpm8-aarch64-unknown-linux-gnu-binutils-wrapper-2.43.1

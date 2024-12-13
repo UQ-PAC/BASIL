@@ -1,5 +1,5 @@
-fb2a08ac0ed09cf338c5a292f0d608f1  dsa/stackambiguity/gcc/a.out
-60401bc8b8121c8995312b0b8ce0ee3f  dsa/stackambiguity/gcc/stackambiguity.adt
-cdbbdda2f5fb9dc56b4ebd8d7a1536c8  dsa/stackambiguity/gcc/stackambiguity.bir
-2903f701a197d2af25881b36e1c7e53e  dsa/stackambiguity/gcc/stackambiguity.relf
-1617a7eb9f4131e3a073867f46657b09  dsa/stackambiguity/gcc/stackambiguity.gts
+4e80e3914cf9422c9054a580e8ed742f  dsa/stackambiguity/gcc/a.out
+42aec1361cf47b090a06d94526f7e695  dsa/stackambiguity/gcc/stackambiguity.adt
+af86033c50988fe6c3179439632c0e2b  dsa/stackambiguity/gcc/stackambiguity.bir
+a1122cfb975863c7e6ebecf1d233761b  dsa/stackambiguity/gcc/stackambiguity.relf
+31cebf6a602c3968acb41c638b1b88f5  dsa/stackambiguity/gcc/stackambiguity.gts

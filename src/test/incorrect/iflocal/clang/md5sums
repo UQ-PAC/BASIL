@@ -1,5 +1,5 @@
-d2c0d5abbf6fa8f129f4608dc62ba4f4  incorrect/iflocal/clang/a.out
-03c4ca146a43c531703b6219d6b5e589  incorrect/iflocal/clang/iflocal.adt
-56c356f9f7208ab9460a5a79e271c5b1  incorrect/iflocal/clang/iflocal.bir
-aa1574d8aea590697456f305608171ef  incorrect/iflocal/clang/iflocal.relf
-43cf6b91fd37082a028b63354a3cc879  incorrect/iflocal/clang/iflocal.gts
+0c7bc30b0e185267e83163b529e31988  incorrect/iflocal/clang/a.out
+9178cb941adbd2d284147bb255743454  incorrect/iflocal/clang/iflocal.adt
+fd29baf3e3ecb90a75b2edea174b51ca  incorrect/iflocal/clang/iflocal.bir
+24e0c409f8df2892e51ab4eb15236c10  incorrect/iflocal/clang/iflocal.relf
+35a3157b499e0b22db2d9294f249b839  incorrect/iflocal/clang/iflocal.gts

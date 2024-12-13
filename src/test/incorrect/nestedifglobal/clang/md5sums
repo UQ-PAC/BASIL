@@ -1,5 +1,5 @@
-f66f7552257f66a1cd47ff1ced32af6f  incorrect/nestedifglobal/clang/a.out
-3eb3998e3536273deb53da88051f55af  incorrect/nestedifglobal/clang/nestedifglobal.adt
-9985a8b9959dac3a90827a9fab71805b  incorrect/nestedifglobal/clang/nestedifglobal.bir
-2381b19c72d83498fdf4271a52ae6b96  incorrect/nestedifglobal/clang/nestedifglobal.relf
-5e0f24a742383f34224640d8a21fc383  incorrect/nestedifglobal/clang/nestedifglobal.gts
+b70ae01e1abc3fbde05b9e4da7d96e7d  incorrect/nestedifglobal/clang/a.out
+1a152a73fa0286a9b0e3759d5dca8903  incorrect/nestedifglobal/clang/nestedifglobal.adt
+dd2cab9fb7fa82f0e97b1bf7f3779016  incorrect/nestedifglobal/clang/nestedifglobal.bir
+7c377ac61437178fc09f43d94a2f1322  incorrect/nestedifglobal/clang/nestedifglobal.relf
+741fca1ec5b70e6fd7df473f1c1554ff  incorrect/nestedifglobal/clang/nestedifglobal.gts
