@@ -37,10 +37,10 @@ ifeq ($(USE_DOCKER), 1)
 	# $(DOCKER_CMD) hash > docker-hash-new
 	# diff --color -u docker-hash docker-hash-new  # if this fails, make sure your docker image is up-to-date.
 	# rm docker-hash-new
-	cd $(BASE_DIR) && md5sum -c $(realpath md5sums)  # using docker; checking compiler output hashes.
+	cd $(BASE_DIR) && md5sum -c $(realpath .)/md5sums  # using docker; checking compiler output hashes.
 else
 	echo "not running within docker; skipping docker image validation."
-	cd $(BASE_DIR) && md5sum -c $(realpath md5sums)
+	cd $(BASE_DIR) && md5sum -c $(realpath .)/md5sums
 endif
 
 # paths in md5sum are relative to src/test, to allow for collation into a big md5sums file
@@ -66,7 +66,7 @@ $(BASIL):
 # don't re-lift only if binary is missing 
 .SECONDARY: a.out
 a.out: $(C_SOURCE)
-	$(CC) $(CFLAGS) $(C_SOURCE)
+	$(CC) $(CFLAGS) '$(C_SOURCE)'
 
 .PHONY=all recompile verify repro-stash repro-check md5sum-check md5sum-update clean cleanlift cleanall cleanbin cleantest cleangts cleanrepro json gts
 verify: $(NAME)_bap.bpl $(NAME)_gtirb.bpl

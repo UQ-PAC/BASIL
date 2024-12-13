@@ -11,11 +11,12 @@ The compiled binaries and lifter outputs are not kept inside this repository.
 To get started, you can download pre-compiled copies of these files:
 ```bash
 cd src/test
+make clean -j4  # `make extract` will refuse to overwrite existing files
 make extract
 ```
 This should be enough to run the SystemTests through mill.
-Note that `make extract` will not overwrite any existing output files.
-Use `make clean -j4` beforehand if needed.
+Note that `make extract` will not overwrite any existing output files,
+so `make clean` is suggested beforehand.
 
 For much more detail about the lifting process, including how to add or edit
 test cases, keep reading.
@@ -116,7 +117,7 @@ Now, running make commands should use compilers from Docker.
    ```bash
    make md5sum-check -j6
    ```
-   Alternatively, you can run `md5sum -c compiled.md5sums`
+   Alternatively, you can run `md5sum -c compiled.md5sum`
    to check all files in one batch
    (this will be faster, but the make command is more flexible).
 
@@ -130,12 +131,14 @@ Now, running make commands should use compilers from Docker.
    correct/basic_function_call_caller/clang_O2/a.out: FAILED
    md5sum: WARNING: 1 computed checksum did NOT match
    ```
-
    If the mismatch is in the md5sum of a compilation output, this likely means the
    compiler is not being deterministic;
    this is a bug and should be reported.
    See the _Troubleshooting_ section below for steps to debug the issue and inspect differences between
    compilation runs.
+
+   If you see other errors, such as "file not found", it is possible that there
+   are test directories without md5sums, or some other invalid state.
 
 5. If the md5sum-check succeeds, you are good to go!
    You should repeat these steps if the files have been updated by someone else,
@@ -189,14 +192,24 @@ You can use these steps to do so.
 6. In the src/tests directory, run `make compiled.md5sum` to update the combined md5sums file.
 7. Create the tarball of generated files with `make compiled.tar.bz2`.
    Take note of the md5sum line at the bottom.
-8. Upload compiled.tar.gz to a publicly-accessible file host and take note of the URL.
+8. Upload compiled.tar.bz2 to a publicly-accessible file host and take note of the URL.
    ```bash
    curl -Freqtype=fileupload -FfileToUpload=@compiled.tar.bz2 https://catbox.moe/user/api.php
    ```
 9. Update compiled.url.txt with the new URL and the new md5sum.
-10. Optionally, check your new hashes are valid and reproducible with `make clean -j4 && make md5sum-check -j4`.
-11. Optionally, check the uploaded tarball is valid with `make clean -j4 && make extract`.
+10. Optional but recommended, check your new hashes are valid and reproducible with `make clean -j4 && make md5sum-check -j4`.
+11. Highly recommended, check the uploaded tarball is valid with
+   ```bash
+   make clean -j4 && make extract && GCC=/nowhere CLANG=/nowhere make md5sum-check -j6
+   ```
 12. Commit and PR your changes.
+
+
+**Be careful!** If you use `make extract` after editing test cases
+but before updating md5sums, the Makefile will assume the extracted
+files (from the old test cases) are still valid.
+Be sure to make your changes after extracting, or clean the folders
+of the edited test cases.
 
 For consistency, you *must* use the Docker environment when
 making changes to the hash files with md5sum-update.

@@ -27,7 +27,8 @@ READELF ?= aarch64-linux-gnu-readelf
 
 BASIL=$(GIT_ROOT)/target/scala-3.3.1/wptool-boogie-assembly-0.0.1.jar
 
-# paths below are relative to lift.mk's compilation_variant directory
+# paths below are relative to lift.mk's compilation_variant directory.
+# note, wildcard is relative to test_case directory.
 C_SOURCE ?=$(addprefix ../,$(wildcard *.c))
 SPEC ?=$(addprefix ../,$(wildcard *.spec))
 EXTRA_SPEC ?=$(addprefix ../,$(wildcard *.bpl))
@@ -44,9 +45,24 @@ TARGETS := all verify repro-stash repro-check md5sum-check md5sum-update clean c
 
 $(TARGETS): $(ENABLED_COMPILERS)
 
+# an empty test case directory may be present for a number of reasons (e.g. git branch switching).
+# ignore such directories to avoid more cryptic errors later.
+ifeq ($(C_SOURCE),)
+
+# more validity checks
+ifneq ($(SPEC)$(EXTRA_SPEC),)
+	$(error invalid test case: "$(realpath .)" has .bpl or .spec files but no C file)
+endif
+
+$(ENABLED_COMPILERS):
+	@echo 'note: skipping directory "$(realpath .)" with no C files...'
+
+else
+
 $(ENABLED_COMPILERS):
 	mkdir -p $@/
-	# - continue if fails
 	$(MAKE) -C $(realpath .)/$@ -f $(MAKE_DIR)/$@.mk $(MAKECMDGOALS)
+
+endif
 
 
