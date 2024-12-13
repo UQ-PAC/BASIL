@@ -1,0 +1,5 @@
+2b825b12ad7da85b8ec806f4ba7d3a13  dsa/stackambiguity/gcc_pic/a.out
+860f8ca52e608f6fbd115e625cacd086  dsa/stackambiguity/gcc_pic/stackambiguity.adt
+6ed2268a462bc23d95f5fa95b0f38c95  dsa/stackambiguity/gcc_pic/stackambiguity.bir
+2903f701a197d2af25881b36e1c7e53e  dsa/stackambiguity/gcc_pic/stackambiguity.relf
+dee395612a006606cb80e50028ec32ff  dsa/stackambiguity/gcc_pic/stackambiguity.gts

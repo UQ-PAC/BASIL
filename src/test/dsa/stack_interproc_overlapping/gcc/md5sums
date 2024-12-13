@@ -1,0 +1,5 @@
+85722902e9b87ed04320a2d81436f744  dsa/stack_interproc_overlapping/gcc/a.out
+64ac19057fec4a99b7e2b89fae6bc032  dsa/stack_interproc_overlapping/gcc/stack_interproc_overlapping.adt
+3cfb9a9b9b49a2c74e0e06a3ba2d9953  dsa/stack_interproc_overlapping/gcc/stack_interproc_overlapping.bir
+69aa18d3c401861b4787d1f1a699cfc9  dsa/stack_interproc_overlapping/gcc/stack_interproc_overlapping.relf
+7970a10b2ad5ea7a5b0b0365c8478712  dsa/stack_interproc_overlapping/gcc/stack_interproc_overlapping.gts

@@ -1,0 +1,5 @@
+5dcd7c7711183ad60b7a5e8017b0e559  dsa/stack_reassignment/gcc/a.out
+cfe02055ed69da92e072c57208215714  dsa/stack_reassignment/gcc/stack_reassignment.adt
+c4239172b9d35409a4687fae00d5dadf  dsa/stack_reassignment/gcc/stack_reassignment.bir
+afa707afbafa7f977017fedb37c86c53  dsa/stack_reassignment/gcc/stack_reassignment.relf
+84c51e3117a853c27d269945ec0e3ac4  dsa/stack_reassignment/gcc/stack_reassignment.gts

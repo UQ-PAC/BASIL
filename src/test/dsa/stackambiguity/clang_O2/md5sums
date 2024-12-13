@@ -1,0 +1,5 @@
+c5f4d50e3e76770d60b2d8eb386fe208  dsa/stackambiguity/clang_O2/a.out
+0fb4b3288d0c1ecf292938376238bcf4  dsa/stackambiguity/clang_O2/stackambiguity.adt
+a1ea71dcedf1659c7847876f9fe81bf2  dsa/stackambiguity/clang_O2/stackambiguity.bir
+a280105a2a91acce1af973c4fb91a12d  dsa/stackambiguity/clang_O2/stackambiguity.relf
+0d6c29ac76e4e98b27ce41e077298a29  dsa/stackambiguity/clang_O2/stackambiguity.gts
