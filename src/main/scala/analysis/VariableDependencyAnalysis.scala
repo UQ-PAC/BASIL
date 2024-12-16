@@ -27,12 +27,24 @@ trait ProcVariableDependencyAnalysisFunctions(
 
   private val reachable = procedure.reachableFrom
 
+  // TODO use in and out params of procedures correctly
+
   def edgesCallToEntry(call: DirectCall, entry: Procedure)(d: DL): Map[DL, EdgeFunction[Set[Taintable]]] = {
     if varDepsSummaries.contains(entry) then Map() else Map(d -> IdEdge())
   }
 
   def edgesExitToAfterCall(exit: Return, aftercall: Command)(d: DL): Map[DL, EdgeFunction[Set[Taintable]]] = {
-    if reachable.contains(aftercall.parent.parent) then Map(d -> IdEdge()) else Map()
+    if reachable.contains(aftercall.parent.parent) then {
+      d match {
+        case Left(v: LocalVar) => exit.outParams.foldLeft(Map(d -> IdEdge())) {
+          (m, p) => {
+            val (o, e) = p
+            if e.variables.contains(v) then m + (Left(o) -> IdEdge()) else m
+          }
+        }
+        case _ => Map(d -> IdEdge())
+      }
+    } else Map()
   }
 
   def edgesCallToAfterCall(call: DirectCall, aftercall: Command)(d: DL): Map[DL, EdgeFunction[Set[Taintable]]] = {
@@ -53,44 +65,39 @@ trait ProcVariableDependencyAnalysisFunctions(
   }
 
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[Set[Taintable]]] = {
-    if n == procedure then
-      d match {
-        // At the start of the procedure, no variables should depend on anything but themselves.
-        case Left(_) => Map()
-        case Right(_) =>
-          variables.foldLeft(Map(d -> IdEdge())) { (m: Map[DL, EdgeFunction[Set[Taintable]]], v) =>
-            m + (Left(v) -> ConstEdge(Set(v)))
-          }
-      }
-    else
-      n match {
-        case LocalAssign(assigned, expression, _) =>
-          val vars = expression.variables -- ignoredRegisters
-          d match {
-            case Left(v: Variable) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> IdEdge())
-            case Left(v: Variable) if v == assigned => Map()
-            case _ => Map(d -> IdEdge())
-          }
-        case MemoryStore(mem, index, expression, _, size, _) =>
-          val assigned: Taintable =
-            getMemoryVariable(n, mem, index, size, constProp, globals).getOrElse(UnknownMemory())
-          val vars = expression.variables -- ignoredRegisters
-          d match {
-            case Left(v: Variable) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> IdEdge())
-            case Left(v: GlobalVariable) if v == assigned => Map()
-            case _ => Map(d -> IdEdge())
-          }
-        case MemoryLoad(lhs, mem, index, _, size, _) =>
-          val memoryVariable: Taintable =
-            getMemoryVariable(n, mem, index, size, constProp, globals).getOrElse(UnknownMemory())
-          val vars: Set[Taintable] = Set(memoryVariable) ++ index.variables -- ignoredRegisters
-          d match {
-            case Left(v) if vars.contains(v) => Map(d -> IdEdge(), Left(lhs) -> IdEdge())
-            case Left(v) if v == lhs => Map()
-            case _ => Map(d -> IdEdge())
-          }
-        case _ => Map(d -> IdEdge())
-      }
+    if n == procedure then d match {
+      // At the start of the procedure, no variables should depend on anything but themselves.
+      case Left(_) => Map()
+      case Right(_) =>
+        (variables ++ procedure.formalInParam).foldLeft(Map(d -> IdEdge())) {
+          (m: Map[DL, EdgeFunction[Set[Taintable]]], v) => m + (Left(v) -> ConstEdge(Set(v)))
+        }
+    } else n match {
+      case LocalAssign(assigned, expression, _) =>
+        val vars = expression.variables -- ignoredRegisters
+        d match {
+          case Left(v: Variable) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> IdEdge())
+          case Left(v: Variable) if v == assigned => Map()
+          case _ => Map(d -> IdEdge())
+        }
+      case MemoryStore(mem, index, expression, _, size, _) =>
+        val assigned: Taintable = getMemoryVariable(n, mem, index, size, constProp, globals).getOrElse(UnknownMemory())
+        val vars = expression.variables -- ignoredRegisters
+        d match {
+          case Left(v: Variable) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> IdEdge())
+          case Left(v: GlobalVariable) if v == assigned => Map()
+          case _ => Map(d -> IdEdge())
+        }
+      case MemoryLoad(lhs, mem, index, _, size, _) =>
+        val memoryVariable: Taintable = getMemoryVariable(n, mem, index, size, constProp, globals).getOrElse(UnknownMemory())
+        val vars: Set[Taintable] = Set(memoryVariable) ++ index.variables -- ignoredRegisters
+        d match {
+          case Left(v) if vars.contains(v) => Map(d -> IdEdge(), Left(lhs) -> IdEdge())
+          case Left(v) if v == lhs => Map()
+          case _ => Map(d -> IdEdge())
+        }
+      case _ => Map(d -> IdEdge())
+    }
   }
 }
 
@@ -125,7 +132,7 @@ class VariableDependencyAnalysis(
     }
     .toSet ++ specGlobals.map { g =>
     analysis.GlobalVariable(dsl.mem, BitVecLiteral(g.address, 64), g.size, g.name)
-  }
+  }// ++ program.procedures.flatMap(p => p.formalInParam ++ p.formalOutParam).toSet
 
   def analyze(): Map[Procedure, Map[Taintable, Set[Taintable]]] = {
     var varDepsSummaries = Map[Procedure, Map[Taintable, Set[Taintable]]]()
@@ -133,14 +140,20 @@ class VariableDependencyAnalysis(
     scc.flatten.filter(_.blocks.nonEmpty).foreach { procedure =>
       {
         StaticAnalysisLogger.debug("Generating variable dependencies for " + procedure)
-        val varDepResults = ProcVariableDependencyAnalysis(
-          program,
-          varDepVariables,
-          globals,
-          constProp,
-          varDepsSummariesTransposed,
-          procedure
-        ).analyze()
+        var varDepResults = ProcVariableDependencyAnalysis(program, varDepVariables, globals, constProp, varDepsSummariesTransposed, procedure).analyze()
+        // Do one last step to taint output parameters because i can't get the IDE solver to do it :(
+        IRWalk.lastInProc(procedure) match {
+          case Some(ret: Return) => {
+            val finalResults = varDepResults(ret)
+            varDepResults += ret -> ret.outParams.foldLeft(varDepResults(ret)) {
+              (m, p) => {
+                val (o, e) = p
+                m + (o -> e.variables.foldLeft(Set[Taintable]())((s, v) => s.union(finalResults(v))))
+              }
+            }
+          }
+          case _ => {}
+        }
         val varDepMap = varDepResults.getOrElse(IRWalk.lastInProc(procedure).getOrElse(procedure), Map())
         varDepsSummaries += procedure -> varDepMap
         varDepsSummariesTransposed += procedure -> varDepMap.foldLeft(Map[Taintable, Set[Taintable]]()) { (m, p) =>
@@ -151,6 +164,7 @@ class VariableDependencyAnalysis(
             }
           }
         }
+        StaticAnalysisLogger.debug(varDepsSummariesTransposed(procedure))
       }
     }
     varDepsSummaries

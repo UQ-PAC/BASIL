@@ -632,8 +632,8 @@ object StaticAnalysis {
     val interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = InterLiveVarsAnalysis(IRProgram).analyze()
 
     StaticAnalysisContext(
-      intraProcConstProp = interProcConstPropResult,
-      interProcConstProp = intraProcConstPropResult,
+      intraProcConstProp = intraProcConstPropResult,
+      interProcConstProp = interProcConstPropResult,
       memoryRegionResult = mraResult,
       vsaResult = vsaResult,
       interLiveVarsResults = interLiveVarsResults,
@@ -956,6 +956,17 @@ object RunUtils {
         }
     }
 
+    if (conf.staticAnalysis.map(_.summariseProcedures).getOrElse(false)) {
+      StaticAnalysisLogger.debug("[!] Variable dependency summaries again :(((((((((")
+      val scc = stronglyConnectedComponents(CallGraph, List(ctx.program.mainProcedure))
+      val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
+      val varDepsSummaries = VariableDependencyAnalysis(ctx.program, ctx.specification.globals, specGlobalAddresses, analysis.get.interProcConstProp, scc).analyze()
+
+      StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
+      // We must have performed analysis, so we .get (thought it might have panicked ! !)
+      IRTransform.generateProcedureSummaries(ctx, ctx.program, analysis.get.intraProcConstProp, varDepsSummaries)
+    }
+
     if (q.runInterpret) {
       Logger.info("Start interpret")
 
@@ -1046,11 +1057,6 @@ object RunUtils {
       } else {
         modified =
           transforms.VSAIndirectCallResolution(ctx.program, result.vsaResult, result.mmmResults).resolveIndirectCalls()
-      }
-
-      StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
-      if (config.summariseProcedures) {
-        IRTransform.generateProcedureSummaries(ctx, ctx.program, result.intraProcConstProp, result.varDepsSummaries)
       }
 
       if (modified) {

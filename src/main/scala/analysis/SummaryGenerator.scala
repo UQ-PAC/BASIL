@@ -95,7 +95,7 @@ class SummaryGenerator(
   private def toGamma(variable: Taintable): Option[BExpr] = {
     variable match {
       case variable: Register => Some(variable.toGamma)
-      case _: LocalVar => None
+      case variable: LocalVar => Some(variable.toGamma)
       case variable: GlobalVariable => Some(variable.toGamma)
       // case variable: LocalStackVariable => None
       case _: UnknownMemory => Some(FalseBLiteral)
@@ -133,7 +133,7 @@ class SummaryGenerator(
   def generateRequires(procedure: Procedure): List[BExpr] = {
     if procedure.blocks.isEmpty then return List()
 
-    val initialState = LatticeMap.BottomMap(variables.map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+    val initialState = LatticeMap.BottomMap((variables ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
     reversePostOrder(procedure)
     val (_, mustGammaResults) = worklistSolver(MustGammaDomain(globals, constProp)).solveProc(procedure, false)
     val (before, after) = worklistSolver(ReachabilityConditions()).solveProc(procedure, false)
@@ -179,24 +179,28 @@ class SummaryGenerator(
     if procedure.blocks.isEmpty then return List()
 
     // We only need to make ensures clauses about the gammas of modified variables.
-    val relevantVars = variables.filter { v =>
+    val relevantVars = (variables ++ procedure.formalOutParam).filter { v =>
       v match {
         case v: Global => procedure.modifies.contains(v)
+        case v: LocalVar => procedure.formalOutParam.contains(v)
         case _ => true
       }
     }
 
     // TODO further explanation of this would help
     // Use rnaResults to find stack function arguments
-    val tainters = relevantVars.map { v =>
-      (v, Set())
-    }.toMap ++ getTainters(procedure, variables ++ rnaResults(IRWalk.firstInProc(procedure).get) + UnknownMemory())
-      .filter { (variable, taints) =>
-        relevantVars.contains(variable)
-      }
+    val tainters = relevantVars.map {
+      v => (v, Set())
+    }.toMap ++ getTainters(procedure, variables ++ procedure.formalInParam ++ rnaResults(IRWalk.firstInProc(procedure).get) + UnknownMemory()).filter { (variable, taints) =>
+      relevantVars.contains(variable)
+    }
 
-    tainters.toList.flatMap { (variable, taints) =>
-      {
+    Logger.debug("For " + procedure.toString)
+    Logger.debug(relevantVars)
+    Logger.debug(tainters)
+
+    tainters.toList.flatMap {
+      (variable, taints) => {
         // If our variable was tainted by memory that we know nothing about, it is sound to assume that we
         // know nothing about its gamma in the post state.
         if taints.contains(UnknownMemory()) then None
