@@ -6,9 +6,9 @@ import ir.{BitVecLiteral, CFGPosition, Expr, IntraProcIRCursor, MemoryLoad, Memo
 import scala.collection.mutable
 
 
-trait ConstraintArg(val SSAVar: Map[SymBase, Option[Set[BitVecLiteral]]])
-case class EEV(override val SSAVar: Map[SymBase, Option[Set[BitVecLiteral]]]) extends ConstraintArg(SSAVar)
-case class EV(override val SSAVar: Map[SymBase, Option[Set[BitVecLiteral]]]) extends ConstraintArg(SSAVar)
+trait ConstraintArg(val SSAVar: Map[SymBase, Option[Set[Int]]])
+case class EEV(override val SSAVar: Map[SymBase, Option[Set[Int]]]) extends ConstraintArg(SSAVar)
+case class EV(override val SSAVar: Map[SymBase, Option[Set[Int]]]) extends ConstraintArg(SSAVar)
 
 
 trait Constraint(val pos: CFGPosition, val expr1: Expr, val expr2: Expr, val arg1: ConstraintArg, val arg2: ConstraintArg, val size: Int = 0)

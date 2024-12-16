@@ -1,6 +1,6 @@
 package analysis.data_structure_analysis
 
-import analysis.BitVectorEval.isNegative
+import analysis.BitVectorEval.{bv2SignedInt, isNegative}
 import analysis.data_structure_analysis.SymBase.{Global, Heap, Par, Ret, Stack, Unknown}
 import analysis.solvers.{SimplePushDownWorklistFixpointSolver, SimpleWorklistFixpointSolver}
 import analysis.{Analysis, FlatElement, IRIntraproceduralForwardDependencies, MapLattice, PowerSetLatticeWithTop, evaluateExpression}
@@ -47,7 +47,7 @@ enum SymBase:
 
 
 abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends
-  Analysis[Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[BitVecLiteral]]]]]] {
+  Analysis[Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]]] {
 
   Counter.reset()
 
@@ -61,37 +61,39 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
 
   val domain: Set[CFGPosition] = computeDomain(IntraProcIRCursor, Set(proc)).toSet
 
-  val offsetSetLattice: PowerSetLatticeWithTop[BitVecLiteral] = PowerSetLatticeWithTop[BitVecLiteral]()
-  val symValMapLattice: MapLattice[SymBase, Option[Set[BitVecLiteral]], offsetSetLattice.type] =
-    MapLattice[SymBase, Option[Set[BitVecLiteral]], offsetSetLattice.type](offsetSetLattice)
-  val lattice: MapLattice[CFGPosition, Map[Variable, Map[SymBase, Option[Set[BitVecLiteral]]]],
-    MapLattice[Variable, Map[SymBase, Option[Set[BitVecLiteral]]],
+  val offsetSetLattice: PowerSetLatticeWithTop[Int] = PowerSetLatticeWithTop[Int]()
+  val symValMapLattice: MapLattice[SymBase, Option[Set[Int]], offsetSetLattice.type] =
+    MapLattice[SymBase, Option[Set[Int]], offsetSetLattice.type](offsetSetLattice)
+  val lattice: MapLattice[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]],
+    MapLattice[Variable, Map[SymBase, Option[Set[Int]]],
       symValMapLattice.type]] = MapLattice(MapLattice(symValMapLattice))
 
 
-  private def initDef(base: SymBase, value: BitVecLiteral = BitVecLiteral(0, 64)): Map[SymBase, Option[Set[BitVecLiteral]]] = {
+  private def initDef(base: SymBase, value: Int = 0): Map[SymBase, Option[Set[Int]]] = {
     Map(base -> Some(Set(value))).withDefaultValue(offsetSetLattice.bottom)
   }
 
-  def exprToSymValMap(pos: CFGPosition, expression: Expr, svs: Map[Variable, Map[SymBase, Option[Set[BitVecLiteral]]]]): Map[SymBase, Option[Set[BitVecLiteral]]] = {
-    val expr = unwrapPaddingAndSlicing(expression)
+
+
+  def exprToSymValMap(pos: CFGPosition, expr: Expr, svs: Map[Variable, Map[SymBase, Option[Set[Int]]]]): Map[SymBase, Option[Set[Int]]] = {
+    //val expr = unwrapPaddingAndSlicing(expression)
     if evaluateExpression(expr, constProp(pos)).nonEmpty then
-      val const = evaluateExpression(expr, constProp(pos)).get
+      val const = bv2SignedInt(evaluateExpression(expr, constProp(pos)).get).toInt
       initDef(Global, const)
     else
       expr match
-        case ZeroExtend(_, body: Variable) =>
-          svs(body)
-        case Extract(31, 0, body: Variable) => // TODO UNSOUND assume 32 bit extract is maintaining value
-          svs(body)
-        case BinaryExpr(op, arg1: Variable, arg2) if evaluateExpression(arg2, constProp(pos)).nonEmpty =>
-          val test = svs(arg1)
-          svs(arg1).map {
-            case (base: SymBase, set: Some[Set[BitVecLiteral]]) =>
+        case ZeroExtend(_, body) =>
+          exprToSymValMap(pos, body, svs)
+        case Extract(32, 0, body) => // TODO UNSOUND assume 32 bit extract is maintaining value
+          exprToSymValMap(pos, body, svs) //.map(f => (f._1, f._2.map(s => s.map(b => Int(b.value, 32)))))
+        case BinaryExpr(op, arg1, arg2) if evaluateExpression(arg2, constProp(pos)).nonEmpty =>
+          exprToSymValMap(pos, arg1, svs).map {
+            case (base: SymBase, set: Some[Set[Int]]) =>
               val newSet = set.get.map {
                 case el =>
-                  val binOp = BinaryExpr(op,el, BitVecLiteral(evaluateExpression(arg2, constProp(pos)).get.value, 64))
-                  evaluateExpression(binOp, constProp(pos)).get
+                  val operand = evaluateExpression(arg2, constProp(pos)).get
+                  val binOp = BinaryExpr(op, BitVecLiteral(el, operand.size), operand)
+                  bv2SignedInt(evaluateExpression(binOp, constProp(pos)).get).toInt
                 case p => p
               }
               base -> Some(newSet)
@@ -103,26 +105,25 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
             (s, v) =>
               s ++ svs(v).keys
           }
-
-          if (symSet.size == 1 && symSet.contains(Global)) then // TODO this is a work aorund the constProp setting all registers to top after a call
-            expr.variables.foldLeft(Map[SymBase, Option[Set[BitVecLiteral]]]()) {
+          if (symSet.size == 1 && symSet.contains(Global)) then // TODO this is a work around the constProp setting all registers to top after a call
+            expr.variables.foldLeft(Map[SymBase, Option[Set[Int]]]()) {
               (m, v) =>
                 m ++ svs(v)
             }
           else
             assert(!symSet.contains(Global))
-            symSet.foldLeft(Map[SymBase, Option[Set[BitVecLiteral]]]()) {
+            symSet.foldLeft(Map[SymBase, Option[Set[Int]]]()) {
               (m, base) =>
                 m + (base -> offsetSetLattice.top)
             }.withDefaultValue(offsetSetLattice.bottom)
   }
 
-  def transfer(n: CFGPosition, s: Map[Variable, Map[SymBase, Option[Set[BitVecLiteral]]]]): Map[Variable, Map[SymBase, Option[Set[BitVecLiteral]]]] = {
+  def transfer(n: CFGPosition, s: Map[Variable, Map[SymBase, Option[Set[Int]]]]): Map[Variable, Map[SymBase, Option[Set[Int]]]] = {
 
     n match
       case procedure: Procedure => // entry
         (s + (stackPointer -> initDef(Stack(procedure.name))) + (linkRegister -> initDef(Par("link"))) + (framePointer -> initDef(Par("frame")))) ++
-          procedure.in.foldLeft(Map[Variable, Map[SymBase, Option[Set[BitVecLiteral]]]]()) {
+          procedure.in.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
           (m, param) =>
            m + (param.value -> initDef(Par(param.name)))
         }
@@ -134,7 +135,7 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
       case MemoryLoad(lhs, _, index, _, _, _)  =>
         s + (lhs -> initDef(Unknown())) // load
       case DirectCall(target, _) if target.name == "malloc" => s + (mallocRegister -> initDef(Heap()))
-      case DirectCall(target, _) => s ++ target.out.foldLeft(Map[Variable, Map[SymBase, Option[Set[BitVecLiteral]]]]()) {
+      case DirectCall(target, _) => s ++ target.out.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
         (m, param) =>
           m + (param.value -> initDef(Ret(f"${target.name}_${param.name}", Counter.getRetCounter)))
       }
@@ -144,17 +145,17 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
 
 
 class SVAHelper(proc: Procedure, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends SV(proc, constProp), IRIntraproceduralForwardDependencies,
-  SimpleWorklistFixpointSolver[CFGPosition, Map[Variable, Map[SymBase, Option[Set[BitVecLiteral]]]],
-    MapLattice[Variable, Map[SymBase,  Option[Set[BitVecLiteral]]],
-      MapLattice[SymBase, Option[Set[BitVecLiteral]], PowerSetLatticeWithTop[BitVecLiteral]]]]
+  SimpleWorklistFixpointSolver[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]],
+    MapLattice[Variable, Map[SymBase,  Option[Set[Int]]],
+      MapLattice[SymBase, Option[Set[Int]], PowerSetLatticeWithTop[Int]]]]
 
 
-class SVA(proc: Procedure, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends Analysis[Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[BitVecLiteral]]]]]] {
+class SVA(proc: Procedure, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends Analysis[Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]]] {
 
   private val sva = SVAHelper(proc, constProp)
-  private val svaMap = sva.analyze()
-  override def analyze(): Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[BitVecLiteral]]]]] = svaMap
-  def exprToSymValSet(pos: CFGPosition, expr: Expr): Map[SymBase, Option[Set[BitVecLiteral]]] = {
+  val svaMap = sva.analyze()
+  override def analyze(): Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]] = svaMap
+  def exprToSymValSet(pos: CFGPosition, expr: Expr): Map[SymBase, Option[Set[Int]]] = {
     sva.exprToSymValMap(pos, expr, svaMap(pos))
   }
 }

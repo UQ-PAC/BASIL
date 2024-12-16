@@ -41,11 +41,11 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
   var symBases: Map[SymBase, CoolNode] = constraints.flatMap(c => List(c.arg1.SSAVar, c.arg2.SSAVar)).foldLeft(Map[SymBase, CoolNode]()) {
     (m, symValSet) =>
       var res = m
-      for ((base: SymBase, valSet: Option[Set[BitVecLiteral]]) <- symValSet) {
+      for ((base: SymBase, valSet: Option[Set[Int]]) <- symValSet) {
         val node = res.getOrElse(base, CoolNode(this, mutable.Set(base)))
         valSet match
           case Some(vs) =>
-            vs.foreach(f => node.addCell(f.value.toInt))
+            vs.foreach(f => node.addCell(f))
           case None =>
             node.collapse()
         res += (base -> node)
@@ -53,32 +53,43 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
       res
   }
 
- def toDot: String = {
-  collect()
-  val toRemove = Set('$', '#', '%')
 
-  val structs = ArrayBuffer[DotStruct]()
-  val arrows = ArrayBuffer[StructArrow]()
+  def toDot: String = {
 
-  nodes.foreach { n =>
-    structs.append(DotStruct(n.id.toString, n.toString, Some(n.cells.keys.map(o => o.toString)), true))
+    collect()
+    val toRemove = Set('$', '#', '%')
+
+    val structs = ArrayBuffer[DotStruct]()
+    val arrows = ArrayBuffer[StructArrow]()
+
+    nodes.foreach { n =>
+      structs.append(DotStruct(n.id.toString, n.toString, Some(n.cells.keys.toSeq.sorted.map(o => o.toString)), true))
+    }
+
+
+
+    pointsTo.foreach { (pointer, pointee) =>
+      val pointerID = pointer.node.id.toString
+      val pointerOffset = pointer.offset.toString
+      arrows.append(StructArrow(DotStructElement(pointerID, Some(pointerOffset)), DotStructElement(pointee.node.id.toString, Some(pointee.offset.toString))))
+    }
+
+    var seen : Set[Expr] = Set.empty
+    exprToCell.foreach { (pos, expr, cell) =>
+      var const = false
+      val id: String = expr match
+        case _: Literal | BinaryExpr(_, Register("R31", 64), _) | Register("R31", 64) =>
+          const = true
+          s"${expr.hashCode().toString}".replace("-", ".")
+        case _ => s"${pos.hashCode().toString}${expr.hashCode().toString}".replace("-", ".")
+      if !const || !seen.contains(expr) then
+        seen += expr
+        structs.append(DotStruct(id , s"${if !const then pos.toShortString.takeWhile(_ != ':') + "_" else ""}${expr.toString}", None, true))
+        arrows.append(StructArrow(DotStructElement(id, None), DotStructElement(cell.node.id.toString, Some(cell.offset.toString)), ""))
+    }
+
+    StructDotGraph(proc.name, structs, arrows).toDotString
   }
-
-
-
-  pointsTo.foreach { (pointer, pointee) =>
-    val pointerID = pointer.node.id.toString
-    val pointerOffset = pointer.offset.toString
-    arrows.append(StructArrow(DotStructElement(pointerID, Some(pointerOffset)), DotStructElement(pointee.node.id.toString, Some(pointee.offset.toString))))
-  }
-
-  exprToCell.foreach { (pos, expr, cell) =>
-      structs.append(DotStruct(expr.hashCode().toString , s"${pos.toShortString.take(12)}_${expr.toString}", None, true))
-      arrows.append(StructArrow(DotStructElement(expr.hashCode().toString, None), DotStructElement(cell.node.id.toString, Some(cell.offset.toString)), ""))
-  }
-
-  StructDotGraph(proc.name, structs, arrows).toDotString
-}
 
   private def collect(): Unit = {
     var nodes: Set[CoolNode] = Set.empty
@@ -148,22 +159,22 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
     constraints
   }
 
-  private def getCells(symValSet: Map[SymBase, Option[Set[BitVecLiteral]]]): Set[CoolCell] =
+  private def getCells(symValSet: Map[SymBase, Option[Set[Int]]]): Set[CoolCell] =
   {
     symValSet.foldLeft(Set[CoolCell]()) {
       (s, m) =>
         m match
-          case (base: SymBase, valSet: Option[Set[BitVecLiteral]]) =>
+          case (base: SymBase, valSet: Option[Set[Int]]) =>
             s ++ getCells(base, valSet)
     }
   }
 
-  private def getCells(base: SymBase, offset: Option[Set[BitVecLiteral]]): Set[CoolCell] =
+  private def getCells(base: SymBase, offset: Option[Set[Int]]): Set[CoolCell] =
   {
     val node = symBases(base)
     offset match
       case Some(value) =>
-        value.map(_.value.toInt).map(node.getCell)
+        value.map(node.getCell)
       case None =>
         assert(node.isCollapsed)
         Set(node.getCell(0))
@@ -288,8 +299,9 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
       resultCells.keys.foreach { offset =>
         val collapsedCell = resultNode.addCell(offset, resultLargestAccesses(offset))
         val cells = resultCells(offset)
-        val pointee = mergePointees(cells.toSet)
-        collapsedCell.setPointee(pointee)
+        if cells.filter(_.hasPointee).toSet.nonEmpty then
+          val pointee = mergePointees(cells.toSet)
+          collapsedCell.setPointee(pointee)
       }
 
       solver.unify(node1.term, resultNode.term, 0)
@@ -504,7 +516,7 @@ class CoolDSA(program: Program, constProp: Map[CFGPosition, Map[Variable, FlatEl
     })
 
     writeToFile(result(Local).head._2.toDot, "cooldsa.dot")
-    println(result(Local).head._2.constraints)
+    writeToFile(toDot(program, result(Local).head._2.sva.svaMap.map(f => (f._1, f._2.toString())).toMap), "sva.dot")
 
 
     result(Local)
