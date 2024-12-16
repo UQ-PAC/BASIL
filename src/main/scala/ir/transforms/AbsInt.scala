@@ -116,7 +116,7 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
       }
     }
     worklist.addAll(initial)
-    val initialBlock = worklist.head
+    val initialBlock = worklist.headOption
 
     def successors(b: Block) = if backwards then b.prevBlocks else b.nextBlocks
     def predecessors(b: Block) = if backwards then b.nextBlocks else b.prevBlocks
@@ -139,7 +139,7 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
       val prev = savedAfter.get(b)
       val x = {
         predecessors(b).toList.flatMap(b => savedAfter.get(b).toList) match {
-          case Nil      => if b == initialBlock then initialState else domain.bot
+          case Nil      => if Some(b) == initialBlock then initialState else domain.bot
           case h :: Nil => h
           case h :: tl  => tl.foldLeft(h)((acc, nb) => domain.join(acc, nb, b))
         }
