@@ -1,1 +1,3 @@
 ENABLED_COMPILERS = clang clang_pic gcc gcc_pic
+
+LIFT_ARTEFACTS := $(COMMON_ARTEFACTS) $(GTIRB_ARTEFACTS)

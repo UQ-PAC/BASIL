@@ -2,10 +2,17 @@
 
 # Run from the directory basil/src/test/*/test_case/
 
+NAME := $(notdir $(shell pwd))
+
+COMMON_ARTEFACTS := $(NAME).relf
+BAP_ARTEFACTS := $(NAME).adt $(NAME).bir
+GTIRB_ARTEFACTS := $(NAME).gts
+
 # - means continue if it doesnt exist
 -include ./config.mk
 
-NAME=$(notdir $(shell pwd))
+LIFT_ARTEFACTS ?= $(BAP_ARTEFACTS) $(COMMON_ARTEFACTS) $(GTIRB_ARTEFACTS)
+
 GIT_ROOT?=$(realpath ../../../../)
 BUILD_DIR ?= $(shell realpath --relative-to $(GIT_ROOT) .)
 MAKE_DIR ?= $(GIT_ROOT)/src/test/make
@@ -35,8 +42,6 @@ EXTRA_SPEC ?=$(addprefix ../,$(wildcard *.bpl))
 BASIL_FLAGS ?= 
 #BOOGIE_FLAGS=/proverOpt:O:smt.array.extensional=false
 BOOGIE_FLAGS ?= /useArrayAxioms
-
-LIFT_ARTEFACTS=$(NAME).adt $(NAME).bir $(NAME).relf $(NAME).gts
 
 ENABLED_COMPILERS ?= clang clang_O2 clang_pic gcc gcc_O2 gcc_pic
 

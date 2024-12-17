@@ -1,4 +1,4 @@
-https://files.catbox.moe/vy35tk.bz2
+https://files.catbox.moe/4ne2m1.zst
 
 # this file should have a URL as its first line
 # and a sha1sum as its last line. all other
@@ -9,4 +9,4 @@ https://files.catbox.moe/vy35tk.bz2
 # 
 # make sure to update both URL and sha1sum simultaneously.
 
-76172bd26b04f1ceb0aa1d5b698072aa97500c53  compiled.tar.bz2
+9bae8d55898d6715b27323de74954086de86d2cc  compiled.tar.zst

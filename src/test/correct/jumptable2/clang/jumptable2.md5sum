@@ -1,5 +1,3 @@
 350b8a7223a87ae1164255faac8bf989  correct/jumptable2/clang/a.out
-5b977e790eefd1668b82168d7f870662  correct/jumptable2/clang/jumptable2.adt
-e09195e63d04d5b609b2bd34c0d3795f  correct/jumptable2/clang/jumptable2.bir
 dfe5e4f47c5b4718a7023e51847e4977  correct/jumptable2/clang/jumptable2.relf
 a6c262573840e36b2559daa850c99bb6  correct/jumptable2/clang/jumptable2.gts

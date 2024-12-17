@@ -24,9 +24,9 @@ $(SUBDIRS):
 # check with `md5sum -c compiled.md5sum` in src/test.
 .PHONY: compiled.md5sum
 compiled.md5sum:
-	find $(DIRS) -name 'md5sums' -exec cat '{}' + > compiled.md5sum
+	find $(DIRS) -name '*.md5sum' -exec cat '{}' + | sort -k2 > compiled.md5sum
 
-TARBALL := compiled.tar.bz2
+TARBALL := compiled.tar.zst
 
 $(TARBALL) docker-contents.txt &: compiled.md5sum
 	set -u; $$DOCKER_CMD hash > docker-contents.txt  # before compessing, make sure docker-contents.txt is up to date.

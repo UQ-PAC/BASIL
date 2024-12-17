@@ -1,5 +1,3 @@
 37f77cb80e1cb81e2098a1873107989b  correct/jumptable2/gcc/a.out
-5eddd4883dc8e80e649b3b59e3ab70dc  correct/jumptable2/gcc/jumptable2.adt
-531fd7be86c58a8f8c392ac69982cf84  correct/jumptable2/gcc/jumptable2.bir
 73d67997598e19044edc3b878f89b471  correct/jumptable2/gcc/jumptable2.relf
 c972a9193d6ebb964fc959477cd6bacb  correct/jumptable2/gcc/jumptable2.gts
