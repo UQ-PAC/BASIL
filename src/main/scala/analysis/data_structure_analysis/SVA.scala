@@ -9,37 +9,14 @@ import ir.{BVADD, BVSUB, BinaryExpr, BitVecLiteral, CFGPosition, DirectCall, Exp
 import scala.Option
 
 
-object Counter {
-  private var unknownCounter: Int = 0
-  private var heapCounter: Int = 0
-  private var retCounter: Int = 0
 
-
-  def getHeapCounter: Int = {
-    heapCounter = heapCounter + 1
-    heapCounter
-  }
-
-  def getRetCounter: Int = {
-    retCounter = retCounter + 1
-    retCounter
-  }
-
-  def getUnknownCounter: Int = {
-    unknownCounter = unknownCounter + 1
-    unknownCounter
-  }
-
-  def reset() : Unit = {
-    unknownCounter = 0
-    heapCounter = 0
-  }
-
-}
+object HeapCounter extends Counter
+object UnknownCounter extends Counter
+object RetCounter extends  Counter
 
 enum SymBase:
-  case Heap(id: Int = Counter.getHeapCounter) extends SymBase
-  case Unknown(id: Int = Counter.getUnknownCounter) extends SymBase
+  case Heap(id: Int = HeapCounter.increment()) extends SymBase
+  case Unknown(id: Int = UnknownCounter.increment()) extends SymBase
   case Stack(name: String) extends SymBase
   case Par(name: String) extends SymBase
   case Ret(name: String, id: Int) extends SymBase
@@ -49,7 +26,9 @@ enum SymBase:
 abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends
   Analysis[Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]]] {
 
-  Counter.reset()
+  HeapCounter.reset()
+  UnknownCounter.reset()
+  RetCounter.reset()
 
   private val stackPointer = Register("R31", 64)
   private val linkRegister = Register("R30", 64)
@@ -68,12 +47,9 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
     MapLattice[Variable, Map[SymBase, Option[Set[Int]]],
       symValMapLattice.type]] = MapLattice(MapLattice(symValMapLattice))
 
-
   private def initDef(base: SymBase, value: Int = 0): Map[SymBase, Option[Set[Int]]] = {
     Map(base -> Some(Set(value))).withDefaultValue(offsetSetLattice.bottom)
   }
-
-
 
   def exprToSymValMap(pos: CFGPosition, expr: Expr, svs: Map[Variable, Map[SymBase, Option[Set[Int]]]]): Map[SymBase, Option[Set[Int]]] = {
     //val expr = unwrapPaddingAndSlicing(expression)
@@ -119,7 +95,6 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
   }
 
   def transfer(n: CFGPosition, s: Map[Variable, Map[SymBase, Option[Set[Int]]]]): Map[Variable, Map[SymBase, Option[Set[Int]]]] = {
-
     n match
       case procedure: Procedure => // entry
         (s + (stackPointer -> initDef(Stack(procedure.name))) + (linkRegister -> initDef(Par("link"))) + (framePointer -> initDef(Par("frame")))) ++
@@ -137,18 +112,16 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
       case DirectCall(target, _) if target.name == "malloc" => s + (mallocRegister -> initDef(Heap()))
       case DirectCall(target, _) => s ++ target.out.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
         (m, param) =>
-          m + (param.value -> initDef(Ret(f"${target.name}_${param.name}", Counter.getRetCounter)))
+          m + (param.value -> initDef(Ret(f"${target.name}_${param.name}", RetCounter.increment())))
       }
       case _ => s
   }
 }
 
-
 class SVAHelper(proc: Procedure, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends SV(proc, constProp), IRIntraproceduralForwardDependencies,
   SimpleWorklistFixpointSolver[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]],
     MapLattice[Variable, Map[SymBase,  Option[Set[Int]]],
       MapLattice[SymBase, Option[Set[Int]], PowerSetLatticeWithTop[Int]]]]
-
 
 class SVA(proc: Procedure, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends Analysis[Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]]] {
 

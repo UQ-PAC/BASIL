@@ -42,6 +42,7 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
     (m, symValSet) =>
       var res = m
       for ((base: SymBase, valSet: Option[Set[Int]]) <- symValSet) {
+
         val node = res.getOrElse(base, CoolNode(this, mutable.Set(base)))
         valSet match
           case Some(vs) =>
@@ -52,7 +53,6 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
       }
       res
   }
-
 
   def toDot: String = {
 
@@ -65,8 +65,6 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
     nodes.foreach { n =>
       structs.append(DotStruct(n.id.toString, n.toString, Some(n.cells.keys.toSeq.sorted.map(o => o.toString)), true))
     }
-
-
 
     pointsTo.foreach { (pointer, pointee) =>
       val pointerID = pointer.node.id.toString
@@ -95,8 +93,8 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
     var nodes: Set[CoolNode] = Set.empty
     var pointsTo: Set[(CoolCell, CoolCell)] = Set.empty
     var exprToCell: Set[(CFGPosition, Expr, CoolCell)] = Set.empty
-    constraints.foreach {
-      case DereferenceConstraint(pos, value, index, arg1, arg2, size) =>
+    constraints.toSeq.sortBy(f => f.id).foreach {
+      case Constraint(pos, value, index, arg1, arg2, size, id) =>
         val valueCells = getCells(arg1.SSAVar).map(find)
         assert(valueCells.size == 1)
         val valueCell = valueCells.head
@@ -115,7 +113,7 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
         exprToCell += (pos, index, indexCell)
 
         assert(indexCell.hasPointee)
-        assert(find(indexCell.getPointee) == valueCell)
+        assert(indexCell.getPointee == valueCell)
 
         pointsTo += (indexCell, valueCell)
         nodes += indexCell.node
@@ -151,9 +149,9 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
     var constraints: Set[Constraint] = Set.empty
     domain.foreach {
       case load@MemoryLoad(lhs, _, index, _, size, _) =>
-        constraints += DereferenceConstraint(load, lhs, index, EV(sva.exprToSymValSet(load, lhs)), EEV(sva.exprToSymValSet(load, index)), size / 8)
+        constraints += Constraint(load, lhs, index, EV(sva.exprToSymValSet(load, lhs)), EEV(sva.exprToSymValSet(load, index)), size / 8)
       case store@MemoryStore(_, index, value, _, size, _) =>
-        constraints += DereferenceConstraint(store, value, index, EV(sva.exprToSymValSet(store, value)), EEV(sva.exprToSymValSet(store, index)), size / 8)
+        constraints += Constraint(store, value, index, EV(sva.exprToSymValSet(store, value)), EEV(sva.exprToSymValSet(store, index)), size / 8)
       case _ =>
     }
     constraints
@@ -174,27 +172,29 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
     val node = symBases(base)
     offset match
       case Some(value) =>
-        value.map(node.getCell)
+        value.map(node.getCell).map(find)
       case None =>
         assert(node.isCollapsed)
-        Set(node.getCell(0))
+        Set(find(node.getCell(0)))
   }
 
   def localPhase(): CoolGraph =
     {
-      constraints.toSeq.sortBy(f => f.expr1.toString).foreach(processConstraint)
+      constraints.toSeq.sortBy(f => f.id).foreach(processConstraint) //  sorting only for debugging
       this
     }
 
   private def processConstraint(constraint: Constraint): Unit =
   {
     constraint match
-      case DereferenceConstraint(pos, value, index, arg1: EV, arg2: EEV, size: Int) =>
+      case Constraint(pos, value, index, arg1: EV, arg2: EEV, size: Int, id: Int) =>
         val valueCell: CoolCell = mergeCells(getCells(arg1.SSAVar))
-        val pointerCells = getCells(arg2.SSAVar)
-        pointerCells.foreach(_.growSize(size))
-        val pointeeCell = mergePointees(pointerCells)
-        mergeCells(valueCell, pointeeCell)
+        val pointerCell = mergeCells(getCells(arg2.SSAVar))
+        // pointerCells.foreach(_.growSize(size))
+        val pointeeCell = pointerCell.getPointee // mergePointees(pointerCells)
+        val res = mergeCells(valueCell, pointeeCell)
+        val test = symBases.map(f => (f._1, find(f._2)))
+        test
       case _ => ???
   }
 
@@ -238,10 +238,6 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
 
 
       node1.getCell(0).setPointee(node2.getCell(0).getPointee)
-//      if node1.getCell(0).hasPointee then
-//        node2.getCell(0).setPointee(node1.getCell(0).getPointee)
-//      else
-//        node1.getCell(0).setPointee(node2.getCell(0).getPointee)
 
       solver.unify(node1.term, node2.term, 0)
       node2.symBases.addAll(node1.symBases)
@@ -271,8 +267,6 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
       // create a new node to represent the unified node
       val resultNode = CoolNode(this, node2.symBases.union(node1.symBases))
       // add nodes flags and regions to the resulting node
-
-      // compute the cells present in the resulting unified node
       // a mapping from offsets to the set of old cells which are merged to form a cell in the new unified node
       // values in the mapping also include the largest access size so far computed for each resulting cell
       val resultCells = mutable.Map[Int, mutable.Set[CoolCell]]()
@@ -296,16 +290,30 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
         }
       }
 
-      resultCells.keys.foreach { offset =>
-        val collapsedCell = resultNode.addCell(offset, resultLargestAccesses(offset))
-        val cells = resultCells(offset)
-        if cells.filter(_.hasPointee).toSet.nonEmpty then
-          val pointee = mergePointees(cells.toSet)
-          collapsedCell.setPointee(pointee)
-      }
 
+      // do this prior to merging pointees in case a cell points to the resulting node
+      resultCells.keys.foreach( offset => resultNode.addCell(offset, resultLargestAccesses(offset)))
       solver.unify(node1.term, resultNode.term, 0)
       solver.unify(node2.term, resultNode.term, delta)
+
+
+
+      resultCells.keys.foreach { off =>
+        var field = find(resultNode)
+        val node = field.node
+        var offset = off + field.offset
+        var collapsedCell = node.getCell(offset)
+        val cells = resultCells(off)
+        if (cells.filter(_.hasPointee).toSet.nonEmpty) {
+          val pointee = mergePointees(cells.toSet)
+          field = find(resultNode) // the above merge affects the result node if it is pointed to by itself
+          offset = off + field.offset
+          collapsedCell = field.node.getCell(offset)
+          collapsedCell.setPointee(pointee)
+        }
+      }
+
+
       if cell1.offset >= cell2.offset then
         resultNode.getCell(cell1.offset)
       else
@@ -333,6 +341,7 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
 
 class CoolNode(val graph: CoolGraph, val symBases: mutable.Set[SymBase] = mutable.Set.empty, private var _size: Int = 0, val id: Int = CoolNodeCounter.getCounter) {
 
+  val t = 1
   val term: DSACoolUniTerm = DSACoolUniTerm(this)
   private var collapsed = false
 
@@ -423,7 +432,7 @@ class CoolNode(val graph: CoolGraph, val symBases: mutable.Set[SymBase] = mutabl
 
     val internalOffsetChange = cell2.offset - cell1.offset
     cells.remove(cell2.offset)
-    cell1.growSize((cell2.offset - cell1.offset).toInt + cell2.largestAccessedSize) // might cause another collapse
+    cell1.growSize((cell2.offset - cell1.offset) + cell2.largestAccessedSize) // might cause another collapse
     cell1
   }
 
@@ -472,11 +481,11 @@ class CoolCell(val node: CoolNode, val offset: Int, var largestAccessedSize: Int
     {
       if _pointee.isEmpty then
         _pointee = Some(cell)
-      else if graph.find(_pointee.get) == graph.find(this) then
+      else if graph.find(_pointee.get) == graph.find(this) then // if a cell points to itself break the link,
         _pointee = None
         _pointee = Some(graph.mergeCells(this, cell))
       else if graph.find(cell) != graph.find(_pointee.get) then
-        graph.mergeCells(cell, _pointee.get)
+        _pointee = Some(graph.mergeCells(cell, graph.find(_pointee.get)))
       graph.find(_pointee.get)
     }
 

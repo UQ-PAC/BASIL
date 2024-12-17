@@ -10,12 +10,27 @@ trait ConstraintArg(val SSAVar: Map[SymBase, Option[Set[Int]]])
 case class EEV(override val SSAVar: Map[SymBase, Option[Set[Int]]]) extends ConstraintArg(SSAVar)
 case class EV(override val SSAVar: Map[SymBase, Option[Set[Int]]]) extends ConstraintArg(SSAVar)
 
+class Counter(val init: Int = 0) {
+  private var counter = init
+  def increment(by: Int = 1): Int = {
+      counter += by
+      counter
+    }
+  
+  def decrement(by: Int = 1): Int = {
+    counter -= by
+    counter
+  }
+  
+  def get: Int = counter
+  
+  def reset(): Unit = counter = init
+}
 
-trait Constraint(val pos: CFGPosition, val expr1: Expr, val expr2: Expr, val arg1: ConstraintArg, val arg2: ConstraintArg, val size: Int = 0)
+object ConstraintCounter extends Counter
 
+case class Constraint(pos: CFGPosition, value: Expr, index: Expr, arg1: EV, arg2: EEV, size: Int, id: Int = ConstraintCounter.increment())
 
-case class DereferenceConstraint(override val pos: CFGPosition, value: Expr, index: Expr, override val arg1: EV, override val arg2: EEV, override val size: Int) extends Constraint(pos, value, index, arg1, arg2, size)
-//case class AssignmentConstraint(arg1: EV, arg2: EV) extends Constraint(arg1, arg2)
 
 class ConstraintGen(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends Analysis[Set[Constraint]] {
   
@@ -26,9 +41,9 @@ class ConstraintGen(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, 
     var constraints: Set[Constraint] = Set.empty
     domain.foreach {
       case load @ MemoryLoad(lhs, _, index, _, size, _) =>
-        constraints += DereferenceConstraint(load, lhs, index, EV(sva.exprToSymValSet(load, lhs)), EEV(sva.exprToSymValSet(load, index)), size/8)
+        constraints += Constraint(load, lhs, index, EV(sva.exprToSymValSet(load, lhs)), EEV(sva.exprToSymValSet(load, index)), size/8)
       case store @ MemoryStore(_, index, value, _, size, _) =>
-        constraints += DereferenceConstraint(store, value, index, EV(sva.exprToSymValSet(store, value)), EEV(sva.exprToSymValSet(store, index)), size/8)
+        constraints += Constraint(store, value, index, EV(sva.exprToSymValSet(store, value)), EEV(sva.exprToSymValSet(store, index)), size/8)
       case _ =>
     }
 
