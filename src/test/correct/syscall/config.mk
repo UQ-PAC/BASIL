@@ -1,1 +1,4 @@
 ENABLED_COMPILERS = clang clang_O2 gcc gcc_O2
+
+# disable BAP for clang_O2
+LIFT_ARTEFACTS_clang_O2 = $(COMMON_ARTEFACTS) $(GTIRB_ARTEFACTS)

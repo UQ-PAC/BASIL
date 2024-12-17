@@ -3,6 +3,16 @@
 
 MD5SUM_FILE := $(NAME).md5sum
 
+# compilation variant name. be careful of trailing whitespace!
+CONFIG := $(notdir $(realpath .))
+
+# override with config-specific lifter selection
+ifdef LIFT_ARTEFACTS_$(CONFIG)
+	LIFT_ARTEFACTS := $(LIFT_ARTEFACTS_$(CONFIG))
+endif
+
+# $(info $(realpath .) config=$(CONFIG) artefacts=$(LIFT_ARTEFACTS))
+
 all: $(LIFT_ARTEFACTS)
 
 $(NAME).relf: a.out

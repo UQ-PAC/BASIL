@@ -2,12 +2,18 @@
 
 # Run from the directory basil/src/test/*/test_case/
 
+# - lift-directories.mk: sets NAME
+#   - config.mk: sets ENABLED_COMPILERS
+#   - exec: gcc_pic.mk: sets CC / CFLAGS
+#     - lift.mk: sets CONFIG to compiler variant
+
 NAME := $(notdir $(shell pwd))
 
 COMMON_ARTEFACTS := $(NAME).relf
 BAP_ARTEFACTS := $(NAME).adt $(NAME).bir
 GTIRB_ARTEFACTS := $(NAME).gts
 
+ALL_ARTEFACTS := $(BAP_ARTEFACTS) $(COMMON_ARTEFACTS) $(GTIRB_ARTEFACTS)
 # - means continue if it doesnt exist
 -include ./config.mk
 
