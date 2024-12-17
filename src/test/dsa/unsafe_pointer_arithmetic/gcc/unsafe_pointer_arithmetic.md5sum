@@ -1,5 +1,0 @@
-0854ff8e69466a1e186e861fe19cf6d7  dsa/unsafe_pointer_arithmetic/gcc/a.out
-336471da789ff0e56056a0292d288c28  dsa/unsafe_pointer_arithmetic/gcc/unsafe_pointer_arithmetic.adt
-da3cce44f82325a1b54c428462bf9fdf  dsa/unsafe_pointer_arithmetic/gcc/unsafe_pointer_arithmetic.bir
-17a90118262f429ead93605de98ee780  dsa/unsafe_pointer_arithmetic/gcc/unsafe_pointer_arithmetic.relf
-17dbcad26ca94ac265191ce30c378e22  dsa/unsafe_pointer_arithmetic/gcc/unsafe_pointer_arithmetic.gts

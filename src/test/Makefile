@@ -1,7 +1,9 @@
 TARGETSS := all verify repro-stash repro-check md5sum-check md5sum-update clean cleanall cleanlift recompile json cleanjson cleangts gts
 
 # subdirectories of src/test. to be entered into by this makefile.
-DIRS := correct incorrect extraspec_correct extraspec_incorrect indirect_calls memory_regions procedure_summaries dsa irreducible_loops
+DIRS := correct incorrect extraspec_correct extraspec_incorrect indirect_calls memory_regions procedure_summaries
+# dirs with different directory structure: dsa, irreducible_loops
+
 # non-test dirs: make, scala, unimplemented
 
 # in case the user specfies DIRS, make sure all dirs exist.

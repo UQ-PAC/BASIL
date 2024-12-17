@@ -1,5 +1,0 @@
-80c2f8a6221980e18f58aa6ca2505bf4  dsa/unsafe_pointer_arithmetic/clang_pic/a.out
-efc6ad7922949ddc24a683d19f376b6d  dsa/unsafe_pointer_arithmetic/clang_pic/unsafe_pointer_arithmetic.adt
-00c3c035190a763de350b96ac346a20e  dsa/unsafe_pointer_arithmetic/clang_pic/unsafe_pointer_arithmetic.bir
-dd83768066c9dc9337511f30e3588fac  dsa/unsafe_pointer_arithmetic/clang_pic/unsafe_pointer_arithmetic.relf
-daf0bd12858c861accd8ce374bceb436  dsa/unsafe_pointer_arithmetic/clang_pic/unsafe_pointer_arithmetic.gts
