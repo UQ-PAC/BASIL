@@ -58,7 +58,7 @@ class Node(val graph: Option[Graph], var size: BigInt = 0, val id: Int = NodeCou
 
   val term: DSAUniTerm = DSAUniTerm(this)
   val children: mutable.Map[Node, BigInt] = mutable.Map()
-//  var collapsed = false
+//  var collapsed = falsesetpointee
   var flags: Flags = Flags()
   def collapsed: Boolean = flags.collapsed
 
