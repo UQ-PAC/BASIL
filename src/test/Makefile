@@ -24,7 +24,7 @@ $(SUBDIRS):
 # check with `md5sum -c compiled.md5sum` in src/test.
 .PHONY: compiled.md5sum
 compiled.md5sum:
-	find $(DIRS) -name 'md5sums' -exec cat '{}' + | sort -k2 > compiled.md5sum
+	find $(DIRS) -name '*.md5sum' -exec cat '{}' + | sort -k2 > compiled.md5sum
 
 TARBALL := compiled.tar.zst
 
