@@ -31,7 +31,7 @@ trait RNAAnalysis(program: Program) {
       case assert: Assert =>
         s ++ (assert.body.variables -- ignoreRegions)
       case memoryStore: MemoryStore =>
-        s ++ (memoryStore.index.variables -- ignoreRegions)
+        s ++ ((memoryStore.index.variables ++ memoryStore.value.variables) -- ignoreRegions)
       case indirectCall: IndirectCall =>
         if (ignoreRegions.contains(indirectCall.target)) {
           s
