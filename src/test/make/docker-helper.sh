@@ -21,7 +21,7 @@ fi
 DOCKER_CMD="$(realpath $0)"
 
 if [[ -z "${DOCKER_FLAKE:-}" ]] && [[ -r "$(dirname $DOCKER_CMD)/docker-flake.txt" ]]; then
-  DOCKER_FLAKE=$(cat $(dirname $DOCKER_CMD)/docker-flake.txt)
+  DOCKER_FLAKE="$(cat $(dirname $DOCKER_CMD)/docker-flake.txt)"
 fi
 
 : $DOCKER_FLAKE

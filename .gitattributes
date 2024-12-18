@@ -5,3 +5,6 @@ docker-hash linguist-generated
 *.adt linguist-generated
 *.bir linguist-generated
 *.relf linguist-generated
+
+src/test/compiled.url.txt text eol=lf
+src/test/make/docker-flake.txt text eol=lf
