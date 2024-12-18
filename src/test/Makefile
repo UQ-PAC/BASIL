@@ -38,6 +38,8 @@ $(TARBALL) docker-contents.txt &: compiled.md5sum
 
 .PHONY: extract
 extract:
+	# log URL and expected hash
+	{ head -n1 compiled.url.txt; tail -n1 compiled.url.txt; } | cat -v
 	# check existing file, otherwise download fresh copy.
 	{ tail -n1 compiled.url.txt | sha1sum -c - ; } \
 		|| curl "$$(head -n1 compiled.url.txt)" -o $(TARBALL)
