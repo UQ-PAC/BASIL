@@ -31,8 +31,13 @@ fi
 # unique names depend only on DOCKER_FLAKE, allowing them to be computed without nix.
 commit=$(printf '%s' "$DOCKER_FLAKE" | grep --only-matching -E '[0-9a-fA-F]{40}' | head -c8)
 flake_hash=flake-$(printf '%s' "$DOCKER_FLAKE" | md5sum | cut -d' ' -f1 | head -c4)
-unique_image="$DOCKER_IMAGE:$flake_hash-$commit"
-unique_container=container-$flake_hash-$commit
+
+if [[ -z "${DOCKER_TAG:-}" ]]; then
+  DOCKER_TAG="$flake_hash-$commit"
+fi
+
+unique_image="$DOCKER_IMAGE:$DOCKER_TAG"
+unique_container="container-$DOCKER_TAG"
 
 # this allows the env subcommand to output syntax compatible with multiple shells
 shell=$(basename $SHELL)
@@ -124,6 +129,7 @@ elif [[ "$1" == env ]]; then
   echoexport USE_DOCKER "1"
   echoexport DOCKER_FLAKE "$DOCKER_FLAKE"
   echoexport DOCKER_IMAGE "$DOCKER_IMAGE"
+  echoexport DOCKER_TAG "$DOCKER_TAG"
   echoexport DOCKER_PLATFORM "$DOCKER_PLATFORM"
   echoexport DOCKER "$DOCKER"
   echoexport DOCKER_USER "$DOCKER_USER"

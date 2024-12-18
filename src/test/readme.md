@@ -66,6 +66,9 @@ the lifted test cases.
    This also adds a `docker-helper.sh` alias into the current shell session.
    To de-activate this environment, use the same command with `--unset` after "env".
 
+   The environment can be configured by setting environment variables before running the "env"
+   subcommand. See the "Customising Docker behaviour" subsection below.
+
 3. After setting up the environment, to pull the Docker image [from GHCR](https://github.com/UQ-PAC/BASIL/pkgs/container/basil-tools-docker), run:
    ```bash
    docker-helper.sh pull
@@ -91,6 +94,43 @@ the lifted test cases.
    **If you are on MacOS**, see the section near bottom for important notes.
 
 6. The last two steps will have to be repeated if the Docker image changes.
+
+#### Customising Docker options
+
+Before running `docker-helper.sh env`, several environment variables can be set
+to influence its behaviour:
+
+- `DOCKER` is the name of the Docker program (default: podman).
+- `DOCKER_USER` is the name/ID of a user _inside_ the container, to be used
+  to run the lifter commands (default: root).
+- `DOCKER_FLAKE` is a Nix flake reference to a streamed Docker image builder (default: read from docker-flake.txt).
+- `DOCKER_IMAGE` is name of the image, including the registry URL (default: ghcr.io/uq-pac/basil-tools-docker)
+- `DOCKER_TAG` is the tag of the image (default: hashed from DOCKER_FLAKE).
+
+The values of these variables will be printed by `eval $(docker-helper.sh env)`.
+Note that if you want to change these variables, you should first deactivate the environment,
+make the changes, then re-activate.
+This will make sure dependent variables are updated correctly.
+```bash
+eval $(docker-helper.sh env --unset)
+# set variables here
+export DOCKER=docker
+# ... etc
+eval $(docker-helper.sh env)
+```
+
+To use traditional `docker` instead of `podman`:
+- By default, the container runner is `podman`. Podman is
+  an implementation of the Docker protocol which is rootless by default.
+  Containers are run as your usual user, without needing a separate system
+  service. Change `DOCKER` to "docker" to use the original Docker program.
+- If you are using the traditional `docker` program in a _non_ rootless setup,
+  you will have to set `DOCKER_USER` to `UID:GID` where UID/GID are is the user/group ID of
+  your _outside_ user (obtain with `id -u` and `id -g`).
+  This will make sure the produced files are editable by your ordinary user.
+
+To use a custom Docker image, change `DOCKER_IMAGE` and `DOCKER_TAG` as necessary.
+Note that changing these will likely break the "build" subcommand.
 
 ### Building with Docker
 
