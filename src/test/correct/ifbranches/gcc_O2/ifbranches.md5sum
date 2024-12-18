@@ -1,5 +1,5 @@
-70a316256f86d2ec0a4f84c5a861224a  correct/ifbranches/gcc_O2/a.out
-dbae6b833294182f7de248c53b98e90a  correct/ifbranches/gcc_O2/ifbranches.adt
-afada7da3dbd3772c0b802620eced52e  correct/ifbranches/gcc_O2/ifbranches.bir
-8f377704969f647a594d5f93f3639c4a  correct/ifbranches/gcc_O2/ifbranches.relf
-f5f48e953206287b9ff81e37062123be  correct/ifbranches/gcc_O2/ifbranches.gts
+3849a990f3c9648961180b866254306b  correct/ifbranches/gcc_O2/a.out
+40ebf06e9292bbdac636e9c9e524540f  correct/ifbranches/gcc_O2/ifbranches.adt
+315cf4fbb51821dbc5c8368e4aeefbcc  correct/ifbranches/gcc_O2/ifbranches.bir
+2e93984248bc0591fffd0d92e64ce453  correct/ifbranches/gcc_O2/ifbranches.relf
+aed7aa1c0cdf9378a21643fc4ea381ca  correct/ifbranches/gcc_O2/ifbranches.gts

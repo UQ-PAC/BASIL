@@ -1,5 +1,5 @@
-de69a197860c4969f949576bc3e5946d  correct/basic_assign_assign/gcc/a.out
-88675e867f944bd5bd6ae43ea1a55331  correct/basic_assign_assign/gcc/basic_assign_assign.adt
-c80a315af67522200ad1cbeb395447f7  correct/basic_assign_assign/gcc/basic_assign_assign.bir
-9c72476e4af4a7e167d6404f01fab943  correct/basic_assign_assign/gcc/basic_assign_assign.relf
-8a57e5008577d748b28df7dd8e065388  correct/basic_assign_assign/gcc/basic_assign_assign.gts
+6affb9b8370ef429adc6565514ac99a9  correct/basic_assign_assign/gcc/a.out
+79ec1f6e3e1ed52e65e51bd574966448  correct/basic_assign_assign/gcc/basic_assign_assign.adt
+19f4fa8cc3fc337efc972c3bf43830bc  correct/basic_assign_assign/gcc/basic_assign_assign.bir
+8f9485202dfce9cc140bf3b2aa21d91e  correct/basic_assign_assign/gcc/basic_assign_assign.relf
+1ee7f61a14b73d2c8ceeee8ca04faf49  correct/basic_assign_assign/gcc/basic_assign_assign.gts

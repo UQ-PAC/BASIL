@@ -1,5 +1,5 @@
-a14e010111de96f9957bb8dacc982c53  incorrect/nestedifglobal/gcc/a.out
-fe21ee48fb3eae894a985d987d58cc99  incorrect/nestedifglobal/gcc/nestedifglobal.adt
-2f02da498c71e7d1231fcb52fd19428d  incorrect/nestedifglobal/gcc/nestedifglobal.bir
-2f11c59414905f15fb2a39b6c33dcb96  incorrect/nestedifglobal/gcc/nestedifglobal.relf
-0a243bc1f807675c262ade67d774d7d5  incorrect/nestedifglobal/gcc/nestedifglobal.gts
+71653c09fd2ff87de63f4aa53b7f3e77  incorrect/nestedifglobal/gcc/a.out
+512a5c1a268dd1f0a721b495d30e2cf8  incorrect/nestedifglobal/gcc/nestedifglobal.adt
+81f09a192f18b4e4bbd1b62b91b7846b  incorrect/nestedifglobal/gcc/nestedifglobal.bir
+aa76e200281058eee95a425205a2c5ab  incorrect/nestedifglobal/gcc/nestedifglobal.relf
+3fca7c68a268d0fd9c059b18bc6833e9  incorrect/nestedifglobal/gcc/nestedifglobal.gts

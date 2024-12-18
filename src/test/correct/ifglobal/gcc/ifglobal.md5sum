@@ -1,5 +1,5 @@
-31f421c94eba09a79d74ac4e1b508688  correct/ifglobal/gcc/a.out
-9bd1d488d51ab156b162d5b58f50cf4e  correct/ifglobal/gcc/ifglobal.adt
-2582bf0f1f536cab071278186a821a3b  correct/ifglobal/gcc/ifglobal.bir
-594c287e240ca8a03df1051d3e591d58  correct/ifglobal/gcc/ifglobal.relf
-c7cb1c35476d5a58c2fc1883bdf14aa2  correct/ifglobal/gcc/ifglobal.gts
+6632a8b8212d0f10985b9a188d78d31c  correct/ifglobal/gcc/a.out
+482a8c1b9e2346fb5f55f288733b8fc8  correct/ifglobal/gcc/ifglobal.adt
+bef0954055c39e7b281859f34626cc87  correct/ifglobal/gcc/ifglobal.bir
+08c91ea9f258d3c5142e51e00aedfd50  correct/ifglobal/gcc/ifglobal.relf
+b5c946c2d2587bbfe91b7bb803790dbe  correct/ifglobal/gcc/ifglobal.gts

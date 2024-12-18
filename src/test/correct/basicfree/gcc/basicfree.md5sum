@@ -1,5 +1,5 @@
-43b116f82d403f4adb4c1dd11c08da40  correct/basicfree/gcc/a.out
-0a4ed1790c58a92a143cc00b9ee3acbd  correct/basicfree/gcc/basicfree.adt
-f01e81baa28a622356e88c03b5f4fdc1  correct/basicfree/gcc/basicfree.bir
-92853bc875d43005206db4aa266ec329  correct/basicfree/gcc/basicfree.relf
-286d9d6575f7882dc45fe84c27f29ec8  correct/basicfree/gcc/basicfree.gts
+0f6d5c55768eaeb744d8755434ed287b  correct/basicfree/gcc/a.out
+3c2cd15523050b33c01bd55622d44875  correct/basicfree/gcc/basicfree.adt
+d272407cd2715fe1455eeb9b25584196  correct/basicfree/gcc/basicfree.bir
+d378ea70913589738c5eee4b1519259b  correct/basicfree/gcc/basicfree.relf
+b328290d7e075b59e166d95b1fb8b82a  correct/basicfree/gcc/basicfree.gts

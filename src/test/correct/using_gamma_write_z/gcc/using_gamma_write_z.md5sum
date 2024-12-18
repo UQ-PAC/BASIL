@@ -1,5 +1,5 @@
-2d83ef8649c7727284ce763a7fbe66fb  correct/using_gamma_write_z/gcc/a.out
-059381fd0ee17eae1693316ca8bec236  correct/using_gamma_write_z/gcc/using_gamma_write_z.adt
-790b0c360d436338243d3a8dbbbbe832  correct/using_gamma_write_z/gcc/using_gamma_write_z.bir
-7fbf004033fbe3693cdae64537e33310  correct/using_gamma_write_z/gcc/using_gamma_write_z.relf
-6646ae0872b44693659613d83430fcc4  correct/using_gamma_write_z/gcc/using_gamma_write_z.gts
+16f972a1fa91fda23e9b9afbe874ec5e  correct/using_gamma_write_z/gcc/a.out
+f45aec651c2537ec6e3b4528d5c75422  correct/using_gamma_write_z/gcc/using_gamma_write_z.adt
+ca68082e4c68afa8cd0ad1de1044bb7b  correct/using_gamma_write_z/gcc/using_gamma_write_z.bir
+0649fedf9d92f7e861fedd1c73fa501d  correct/using_gamma_write_z/gcc/using_gamma_write_z.relf
+748330f7cae947d0229b5ef15f5a6ea6  correct/using_gamma_write_z/gcc/using_gamma_write_z.gts

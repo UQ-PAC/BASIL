@@ -1,5 +1,5 @@
-221adcea1cfaefef08b248d2480bbd36  correct/basic_lock_read/gcc_O2/a.out
-a94cf9f311982005f109674f03e850ec  correct/basic_lock_read/gcc_O2/basic_lock_read.adt
-f8e1669dd402dbe05aa88c13e2681d00  correct/basic_lock_read/gcc_O2/basic_lock_read.bir
-564ce5720fe9088018d8b4b8584317f9  correct/basic_lock_read/gcc_O2/basic_lock_read.relf
-86ceb67b8b7d3194d9b9987d76371273  correct/basic_lock_read/gcc_O2/basic_lock_read.gts
+21dbc0a2516a563093e9391cfd682ef3  correct/basic_lock_read/gcc_O2/a.out
+aadddbc532536e8f9db449ad646cc2f8  correct/basic_lock_read/gcc_O2/basic_lock_read.adt
+fe9ae317d56298a6123a7a13d60efe9d  correct/basic_lock_read/gcc_O2/basic_lock_read.bir
+cc4aee13c440f7d0b72e267ea1d5b099  correct/basic_lock_read/gcc_O2/basic_lock_read.relf
+81d9e03c0d046ee603772302f7601b3f  correct/basic_lock_read/gcc_O2/basic_lock_read.gts

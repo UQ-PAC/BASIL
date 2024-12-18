@@ -1,5 +1,5 @@
-df09c31c57cd105e80986d5efc74dd7f  correct/basic_arrays_write/gcc/a.out
-b4ef586f464697599cb41fc7a2e56565  correct/basic_arrays_write/gcc/basic_arrays_write.adt
-0e2d5c564e11bb4fb02e602215d385de  correct/basic_arrays_write/gcc/basic_arrays_write.bir
-9d6de7506544f50020a33e4bb44b5672  correct/basic_arrays_write/gcc/basic_arrays_write.relf
-2f3249bc92ba46d798496608e6fd71d4  correct/basic_arrays_write/gcc/basic_arrays_write.gts
+e46f7a250f53f86aadce7ac697bf5e34  correct/basic_arrays_write/gcc/a.out
+780ff0f2b7f024334ec31992e2b79061  correct/basic_arrays_write/gcc/basic_arrays_write.adt
+0fc4ed6f41a2ca6bcd96e6fc2014d1c2  correct/basic_arrays_write/gcc/basic_arrays_write.bir
+23478f8ea5af7e614f3e63b6937e2f0a  correct/basic_arrays_write/gcc/basic_arrays_write.relf
+f876f35f8826903281ff41935f685518  correct/basic_arrays_write/gcc/basic_arrays_write.gts

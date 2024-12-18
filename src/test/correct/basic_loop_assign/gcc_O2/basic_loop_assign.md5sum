@@ -1,5 +1,5 @@
-399226601e783f27c11558c7b61a5c8f  correct/basic_loop_assign/gcc_O2/a.out
-68c04a177214ec48cd162c46573a0957  correct/basic_loop_assign/gcc_O2/basic_loop_assign.adt
-887abf4bfbbd80f56517888f4419df5b  correct/basic_loop_assign/gcc_O2/basic_loop_assign.bir
-a81bcd2aee000c6fdec696f15c7650cb  correct/basic_loop_assign/gcc_O2/basic_loop_assign.relf
-a685680f407011d82271da58d45782a2  correct/basic_loop_assign/gcc_O2/basic_loop_assign.gts
+1a1705720627370be6caf2571048de4c  correct/basic_loop_assign/gcc_O2/a.out
+f3496a2984cc911134fc6c41ae4fd723  correct/basic_loop_assign/gcc_O2/basic_loop_assign.adt
+898c57621fa9dbef67f7abdcddcf23ea  correct/basic_loop_assign/gcc_O2/basic_loop_assign.bir
+829bfa9626b980300c292827c5f31591  correct/basic_loop_assign/gcc_O2/basic_loop_assign.relf
+e216c7c532a346c882a342b631284551  correct/basic_loop_assign/gcc_O2/basic_loop_assign.gts

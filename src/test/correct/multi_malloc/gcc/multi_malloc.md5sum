@@ -1,5 +1,5 @@
-5dec9255bc4d20255c18e4b49d75b5e8  correct/multi_malloc/gcc/a.out
-534f5859fb024c417ca99c797f1c228b  correct/multi_malloc/gcc/multi_malloc.adt
-85ec6e615e3f8c54e08ab90d82fee53e  correct/multi_malloc/gcc/multi_malloc.bir
-e7be0a0b4292a510712438c8e5618f20  correct/multi_malloc/gcc/multi_malloc.relf
-8c4396d70f686926fe069bc08e2bcd1d  correct/multi_malloc/gcc/multi_malloc.gts
+5509d967cece10e3f21460dee6a888a8  correct/multi_malloc/gcc/a.out
+ad39b42b3a605a885de72e0529b88661  correct/multi_malloc/gcc/multi_malloc.adt
+bbdcd24688e7abc856f4c11d07fe1b3f  correct/multi_malloc/gcc/multi_malloc.bir
+7f49405d085d39aeea13082b3d1a8d8a  correct/multi_malloc/gcc/multi_malloc.relf
+aebfff1a49e4b803c19944d096bd5671  correct/multi_malloc/gcc/multi_malloc.gts
