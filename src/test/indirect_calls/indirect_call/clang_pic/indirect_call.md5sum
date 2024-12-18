@@ -1,5 +1,4 @@
 8d9935869b1ed092b02abe7705ebcf21  indirect_calls/indirect_call/clang_pic/a.out
+e8d85c551cf2db297609279374c5ffdc  indirect_calls/indirect_call/clang_pic/indirect_call.relf
 09687a382887fee02d4ff4f88867d299  indirect_calls/indirect_call/clang_pic/indirect_call.adt
 fd637cd45d0255aa25bb50d87d7f04a5  indirect_calls/indirect_call/clang_pic/indirect_call.bir
-e8d85c551cf2db297609279374c5ffdc  indirect_calls/indirect_call/clang_pic/indirect_call.relf
-bf4e0973cfce72a447e320c5af3ca741  indirect_calls/indirect_call/clang_pic/indirect_call.gts

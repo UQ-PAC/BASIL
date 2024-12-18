@@ -1,5 +1,4 @@
 cb31ebc0dc521c69bdd8fe386aba0d9d  memory_regions/heap_pointer/clang/a.out
+4b8689ab2abe775bb8da022449bb2293  memory_regions/heap_pointer/clang/heap_pointer.relf
 137742190cf1df5316d013ca1b6360a0  memory_regions/heap_pointer/clang/heap_pointer.adt
 e9762fa2578100a5a2bc58aca1e2bdf1  memory_regions/heap_pointer/clang/heap_pointer.bir
-4b8689ab2abe775bb8da022449bb2293  memory_regions/heap_pointer/clang/heap_pointer.relf
-4480630734719dc6cd891d1f519145f1  memory_regions/heap_pointer/clang/heap_pointer.gts

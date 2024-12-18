@@ -1,5 +1,4 @@
 13f5b5c2194b1508f596231a15b072c7  memory_regions/stack_pointer/clang/a.out
+e98bee8600e7745f3e89d2ccc08c74f2  memory_regions/stack_pointer/clang/stack_pointer.relf
 072efa1a4c0737778daa835b3b46a93d  memory_regions/stack_pointer/clang/stack_pointer.adt
 4c11787ec9b42d2211d855a9d056d460  memory_regions/stack_pointer/clang/stack_pointer.bir
-e98bee8600e7745f3e89d2ccc08c74f2  memory_regions/stack_pointer/clang/stack_pointer.relf
-829de605c3a25ec471efd00fab8bf187  memory_regions/stack_pointer/clang/stack_pointer.gts

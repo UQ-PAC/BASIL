@@ -1,5 +1,4 @@
 bfeeef918a9e6e2343382262c6de1a28  memory_regions/heap_pointer/gcc/a.out
+6a25f0f1e7b6f4c4caab19d6b508fc5d  memory_regions/heap_pointer/gcc/heap_pointer.relf
 0939e2ca130dd6969d984975b6f00072  memory_regions/heap_pointer/gcc/heap_pointer.adt
 b5907db7d1a5da1316c3ee55826b8750  memory_regions/heap_pointer/gcc/heap_pointer.bir
-6a25f0f1e7b6f4c4caab19d6b508fc5d  memory_regions/heap_pointer/gcc/heap_pointer.relf
-bd4c68de82c2ac034a5c70fcaa708f70  memory_regions/heap_pointer/gcc/heap_pointer.gts

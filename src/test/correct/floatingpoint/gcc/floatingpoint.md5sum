@@ -1,5 +1,3 @@
 3b352d078981c0642c768c46bac49cfe  correct/floatingpoint/gcc/a.out
-68a718a2703c6410cf8dd849050b5140  correct/floatingpoint/gcc/floatingpoint.adt
-26463a9525b49f8a54bbc1ff09ff0951  correct/floatingpoint/gcc/floatingpoint.bir
 79f241581564a236eda1b69333386ea2  correct/floatingpoint/gcc/floatingpoint.relf
 be0bae5f9141230a9cbfacd0b58b9050  correct/floatingpoint/gcc/floatingpoint.gts

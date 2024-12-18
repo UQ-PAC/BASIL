@@ -1,5 +1,4 @@
 58b942874f21cf227476f49c7918c54e  memory_regions/stack_pointer/clang_pic/a.out
+af17093b1aa757415d035421bdb6b339  memory_regions/stack_pointer/clang_pic/stack_pointer.relf
 d2b41b87d845b86ca119f5dc6e395dee  memory_regions/stack_pointer/clang_pic/stack_pointer.adt
 884f62e2e2840877fe0a3dda231c8ae7  memory_regions/stack_pointer/clang_pic/stack_pointer.bir
-af17093b1aa757415d035421bdb6b339  memory_regions/stack_pointer/clang_pic/stack_pointer.relf
-b924e9257a2f1a5c3f72a6c9cec47ba3  memory_regions/stack_pointer/clang_pic/stack_pointer.gts
