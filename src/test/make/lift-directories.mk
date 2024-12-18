@@ -29,14 +29,19 @@ else
 	ENSURE_DOCKER := echo "this command should be run within docker" >&2 && false &&
 endif
 
+TARGET = aarch64-linux-gnu
 GCC ?= aarch64-linux-gnu-gcc
 CLANG ?= clang-15 -target $(TARGET)
 CC ?= $(GCC)
 #CFLAGS=-fno-pic -fno-plt
-TARGET=aarch64-linux-gnu
 
-BAP?=bap
+BAP ?= bap
 READELF ?= aarch64-linux-gnu-readelf
+
+DDISASM ?= ddisasm
+PROTO_JSON ?= proto-json.py
+DEBUG_GTS ?= debug-gts.py
+GTIRB_SEMANTICS ?= gtirb-semantics
 
 BASIL=$(GIT_ROOT)/target/scala-3.3.1/wptool-boogie-assembly-0.0.1.jar
 
