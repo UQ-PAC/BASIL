@@ -144,7 +144,7 @@ class VariableDependencyAnalysis(
         // Do one last step to taint output parameters because i can't get the IDE solver to do it :(
         IRWalk.lastInProc(procedure) match {
           case Some(ret: Return) => {
-            val finalResults = varDepResults(ret)
+            val finalResults = varDepResults.getOrElse(ret, Map())
             varDepResults += ret -> ret.outParams.foldLeft(varDepResults(ret)) {
               (m, p) => {
                 val (o, e) = p
