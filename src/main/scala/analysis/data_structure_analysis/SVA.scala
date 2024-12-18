@@ -1,9 +1,9 @@
 package analysis.data_structure_analysis
 
-import analysis.BitVectorEval.{bv2SignedInt, isNegative, signedInt2bv}
 import analysis.data_structure_analysis.SymBase.{Global, Heap, Par, Ret, Stack, Unknown}
 import analysis.solvers.{SimplePushDownWorklistFixpointSolver, SimpleWorklistFixpointSolver}
 import analysis.{Analysis, FlatElement, IRIntraproceduralForwardDependencies, MapLattice, PowerSetLatticeWithTop, evaluateExpression}
+import ir.eval.BitVectorEval.*
 import ir.{BVADD, BVSUB, BinaryExpr, BitVecLiteral, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, LocalAssign, MemoryLoad, Procedure, Program, Register, Repeat, SignExtend, UnaryExpr, UninterpretedFunction, Variable, ZeroExtend, computeDomain, toShortString}
 
 import scala.Option
@@ -98,9 +98,9 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
     n match
       case procedure: Procedure => // entry
         (s + (stackPointer -> initDef(Stack(procedure.name))) + (linkRegister -> initDef(Par("link"))) + (framePointer -> initDef(Par("frame")))) ++
-          procedure.in.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
+          procedure.formalInParam.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
           (m, param) =>
-           m + (param.value -> initDef(Par(param.name)))
+           m + (param -> initDef(Par(param.name)))
         }
 
       case alloc @ LocalAssign(lhs: Variable, rhs: BinaryExpr, _) if rhs.arg1 == stackPointer && rhs.op == BVADD &&
@@ -109,10 +109,10 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
         s + (lhs -> exprToSymValMap(pos, rhs, s)) // local
       case MemoryLoad(lhs, _, index, _, _, _)  =>
         s + (lhs -> initDef(Unknown())) // load
-      case DirectCall(target, _) if target.name == "malloc" => s + (mallocRegister -> initDef(Heap()))
-      case DirectCall(target, _) => s ++ target.out.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
+      case DirectCall(target, _, _ , _) if target.name == "malloc" => s + (mallocRegister -> initDef(Heap()))
+      case DirectCall(target, _, _ , _) => s ++ target.formalOutParam.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
         (m, param) =>
-          m + (param.value -> initDef(Ret(f"${target.name}_${param.name}", RetCounter.increment())))
+          m + (param -> initDef(Ret(f"${target.name}_${param.name}", RetCounter.increment())))
       }
       case _ => s
   }

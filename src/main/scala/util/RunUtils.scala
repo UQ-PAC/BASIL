@@ -669,6 +669,10 @@ object RunUtils {
       doSimplify(ctx, conf.staticAnalysis)
     }
 
+    val test = CoolDSA(ctx.program, analysis.get.intraProcConstProp)
+    test.analyze()
+    // TODO here
+
     if (q.runInterpret) {
       Logger.info("Start interpret")
       val fs = eval.interpretTrace(ctx)
@@ -770,8 +774,8 @@ object RunUtils {
 
 
 
-    val test = CoolDSA(ctx.program, analysisResult.last.intraProcConstProp)
-    test.analyze()
+//    val test = CoolDSA(ctx.program, analysisResult.last.intraProcConstProp)
+//    test.analyze()
 //    val gen = ConstraintGen(ctx.program, analysisResult.last.intraProcConstProp).analyze()
 //    val labels = gen.map { (k, v) => k -> v.toString }
 //    writeToFile(toDot(ctx.program, labels), s"SVA.dot")
