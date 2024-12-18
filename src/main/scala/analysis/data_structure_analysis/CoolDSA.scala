@@ -192,9 +192,7 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
         val pointerCell = mergeCells(getCells(arg2.SSAVar))
         // pointerCells.foreach(_.growSize(size))
         val pointeeCell = pointerCell.getPointee // mergePointees(pointerCells)
-        val res = mergeCells(valueCell, pointeeCell)
-        val test = symBases.map(f => (f._1, find(f._2)))
-        test
+        mergeCells(valueCell, pointeeCell)
       case _ => ???
   }
 
@@ -207,6 +205,7 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
 
   def mergeCells(cells: Set[CoolCell]): CoolCell =
   {
+    require(cells.nonEmpty)
     if cells.size > 1 then
       cells.tail.foldLeft(cells.head) {
         (res, cell) =>
