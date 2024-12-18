@@ -1,6 +1,6 @@
 package analysis.data_structure_analysis
 
-import analysis.BitVectorEval.{bv2SignedInt, isNegative}
+import analysis.BitVectorEval.{bv2SignedInt, isNegative, signedInt2bv}
 import analysis.data_structure_analysis.SymBase.{Global, Heap, Par, Ret, Stack, Unknown}
 import analysis.solvers.{SimplePushDownWorklistFixpointSolver, SimpleWorklistFixpointSolver}
 import analysis.{Analysis, FlatElement, IRIntraproceduralForwardDependencies, MapLattice, PowerSetLatticeWithTop, evaluateExpression}
@@ -68,7 +68,7 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
               val newSet = set.get.map {
                 case el =>
                   val operand = evaluateExpression(arg2, constProp(pos)).get
-                  val binOp = BinaryExpr(op, BitVecLiteral(el, operand.size), operand)
+                  val binOp = BinaryExpr(op, signedInt2bv(el, operand.size), operand)
                   bv2SignedInt(evaluateExpression(binOp, constProp(pos)).get).toInt
                 case p => p
               }
