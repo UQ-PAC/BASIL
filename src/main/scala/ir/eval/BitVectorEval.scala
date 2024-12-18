@@ -32,6 +32,12 @@ object BitVectorEval {
     else
       b.value
 
+  def signedInt2bv(b: BigInt, size: Int): BitVecLiteral =
+    require(b >= -BigInt(2).pow(size - 1) && b < BigInt(2).pow(size - 1))
+    val value: BigInt = if b < 0 then b + BigInt(2).pow(size) else b
+    BitVecLiteral(value, size)
+
+
 
   /** (bvadd (_ BitVec m) (_ BitVec m) (_ BitVec m))
     *   - addition modulo 2^m

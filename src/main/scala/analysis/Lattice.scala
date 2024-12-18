@@ -557,6 +557,14 @@ class PowersetLattice[A] extends Lattice[Set[A]] {
   def lub(x: Set[A], y: Set[A]): Set[A] = x.union(y)
 }
 
+class PowerSetLatticeWithTop[A] extends Lattice[Option[Set[A]]] {
+  override val bottom: Option[Set[A]] = Some(Set.empty)
+  override def top: Option[Set[A]] = None
+  def lub(x: Option[Set[A]], y: Option[Set[A]]): Option[Set[A]] = (x, y) match
+    case (s1: Some[Set[A]], s2 :Some[Set[A]]) => Some(s1.get.union(s2.get))
+    case _ => top
+}
+
 // Single element lattice (using Option)
 class SingleElementLattice[T] extends Lattice[Option[T]] {
   val bottom: Option[T] = None
@@ -670,7 +678,7 @@ class TupleLattice[L1 <: Lattice[T1], L2 <: Lattice[T2], T1, T2](val lattice1: L
 class MapLattice[A, T, +L <: Lattice[T]](val sublattice: L) extends Lattice[Map[A, T]] {
   val bottom: Map[A, T] = Map().withDefaultValue(sublattice.bottom)
   def lub(x: Map[A, T], y: Map[A, T]): Map[A, T] =
-    x.keys.foldLeft(y)((m, a) => m + (a -> sublattice.lub(x(a), y(a)))).withDefaultValue(sublattice.bottom)
+    x.keys.foldLeft(y)((m, a) =>  m + (a -> sublattice.lub(x(a), y(a)))).withDefaultValue(sublattice.bottom)
 }
 
 /** Constant propagation lattice.

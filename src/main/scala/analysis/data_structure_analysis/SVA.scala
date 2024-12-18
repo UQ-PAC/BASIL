@@ -1,0 +1,135 @@
+package analysis.data_structure_analysis
+
+import analysis.BitVectorEval.{bv2SignedInt, isNegative, signedInt2bv}
+import analysis.data_structure_analysis.SymBase.{Global, Heap, Par, Ret, Stack, Unknown}
+import analysis.solvers.{SimplePushDownWorklistFixpointSolver, SimpleWorklistFixpointSolver}
+import analysis.{Analysis, FlatElement, IRIntraproceduralForwardDependencies, MapLattice, PowerSetLatticeWithTop, evaluateExpression}
+import ir.{BVADD, BVSUB, BinaryExpr, BitVecLiteral, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, LocalAssign, MemoryLoad, Procedure, Program, Register, Repeat, SignExtend, UnaryExpr, UninterpretedFunction, Variable, ZeroExtend, computeDomain, toShortString}
+
+import scala.Option
+
+
+
+object HeapCounter extends Counter
+object UnknownCounter extends Counter
+object RetCounter extends  Counter
+
+enum SymBase:
+  case Heap(id: Int = HeapCounter.increment()) extends SymBase
+  case Unknown(id: Int = UnknownCounter.increment()) extends SymBase
+  case Stack(name: String) extends SymBase
+  case Par(name: String) extends SymBase
+  case Ret(name: String, id: Int) extends SymBase
+  case Global extends SymBase
+
+
+abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends
+  Analysis[Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]]] {
+
+  HeapCounter.reset()
+  UnknownCounter.reset()
+  RetCounter.reset()
+
+  private val stackPointer = Register("R31", 64)
+  private val linkRegister = Register("R30", 64)
+  private val framePointer = Register("R29", 64)
+
+  private val implicitFormals: Set[Variable] = Set(linkRegister, framePointer)
+
+  private val mallocRegister: Register = Register("R0", 64)
+
+  val domain: Set[CFGPosition] = computeDomain(IntraProcIRCursor, Set(proc)).toSet
+
+  val offsetSetLattice: PowerSetLatticeWithTop[Int] = PowerSetLatticeWithTop[Int]()
+  val symValMapLattice: MapLattice[SymBase, Option[Set[Int]], offsetSetLattice.type] =
+    MapLattice[SymBase, Option[Set[Int]], offsetSetLattice.type](offsetSetLattice)
+  val lattice: MapLattice[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]],
+    MapLattice[Variable, Map[SymBase, Option[Set[Int]]],
+      symValMapLattice.type]] = MapLattice(MapLattice(symValMapLattice))
+
+  private def initDef(base: SymBase, value: Int = 0): Map[SymBase, Option[Set[Int]]] = {
+    Map(base -> Some(Set(value))).withDefaultValue(offsetSetLattice.bottom)
+  }
+
+  def exprToSymValMap(pos: CFGPosition, expr: Expr, svs: Map[Variable, Map[SymBase, Option[Set[Int]]]]): Map[SymBase, Option[Set[Int]]] = {
+    //val expr = unwrapPaddingAndSlicing(expression)
+    if evaluateExpression(expr, constProp(pos)).nonEmpty then
+      val const = bv2SignedInt(evaluateExpression(expr, constProp(pos)).get).toInt
+      initDef(Global, const)
+    else
+      expr match
+        case ZeroExtend(_, body) =>
+          exprToSymValMap(pos, body, svs)
+        case Extract(32, 0, body) => // TODO UNSOUND assume 32 bit extract is maintaining value
+          exprToSymValMap(pos, body, svs) //.map(f => (f._1, f._2.map(s => s.map(b => Int(b.value, 32)))))
+        case BinaryExpr(op, arg1, arg2) if evaluateExpression(arg2, constProp(pos)).nonEmpty =>
+          exprToSymValMap(pos, arg1, svs).map {
+            case (base: SymBase, set: Some[Set[Int]]) =>
+              val newSet = set.get.map {
+                case el =>
+                  val operand = evaluateExpression(arg2, constProp(pos)).get
+                  val binOp = BinaryExpr(op, signedInt2bv(el, operand.size), operand)
+                  bv2SignedInt(evaluateExpression(binOp, constProp(pos)).get).toInt
+                case p => p
+              }
+              base -> Some(newSet)
+            case top => top
+          }.withDefaultValue(offsetSetLattice.bottom)
+        case variable: Variable => svs(variable)
+        case _ =>
+          val symSet = expr.variables.foldLeft(Set[SymBase]()) {
+            (s, v) =>
+              s ++ svs(v).keys
+          }
+          if (symSet.size == 1 && symSet.contains(Global)) then // TODO this is a work around the constProp setting all registers to top after a call
+            expr.variables.foldLeft(Map[SymBase, Option[Set[Int]]]()) {
+              (m, v) =>
+                m ++ svs(v)
+            }
+          else
+            assert(!symSet.contains(Global))
+            symSet.foldLeft(Map[SymBase, Option[Set[Int]]]()) {
+              (m, base) =>
+                m + (base -> offsetSetLattice.top)
+            }.withDefaultValue(offsetSetLattice.bottom)
+  }
+
+  def transfer(n: CFGPosition, s: Map[Variable, Map[SymBase, Option[Set[Int]]]]): Map[Variable, Map[SymBase, Option[Set[Int]]]] = {
+    n match
+      case procedure: Procedure => // entry
+        (s + (stackPointer -> initDef(Stack(procedure.name))) + (linkRegister -> initDef(Par("link"))) + (framePointer -> initDef(Par("frame")))) ++
+          procedure.in.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
+          (m, param) =>
+           m + (param.value -> initDef(Par(param.name)))
+        }
+
+      case alloc @ LocalAssign(lhs: Variable, rhs: BinaryExpr, _) if rhs.arg1 == stackPointer && rhs.op == BVADD &&
+        evaluateExpression(rhs.arg2, constProp(alloc)).nonEmpty && isNegative(evaluateExpression(rhs.arg2, constProp(alloc)).get) => s // ignore stack allocations
+      case pos @ LocalAssign(lhs: Variable, rhs, label) =>
+        s + (lhs -> exprToSymValMap(pos, rhs, s)) // local
+      case MemoryLoad(lhs, _, index, _, _, _)  =>
+        s + (lhs -> initDef(Unknown())) // load
+      case DirectCall(target, _) if target.name == "malloc" => s + (mallocRegister -> initDef(Heap()))
+      case DirectCall(target, _) => s ++ target.out.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
+        (m, param) =>
+          m + (param.value -> initDef(Ret(f"${target.name}_${param.name}", RetCounter.increment())))
+      }
+      case _ => s
+  }
+}
+
+class SVAHelper(proc: Procedure, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends SV(proc, constProp), IRIntraproceduralForwardDependencies,
+  SimpleWorklistFixpointSolver[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]],
+    MapLattice[Variable, Map[SymBase,  Option[Set[Int]]],
+      MapLattice[SymBase, Option[Set[Int]], PowerSetLatticeWithTop[Int]]]]
+
+class SVA(proc: Procedure, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends Analysis[Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]]] {
+
+  private val sva = SVAHelper(proc, constProp)
+  val svaMap = sva.analyze()
+  override def analyze(): Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]] = svaMap
+  def exprToSymValSet(pos: CFGPosition, expr: Expr): Map[SymBase, Option[Set[Int]]] = {
+    sva.exprToSymValMap(pos, expr, svaMap(pos))
+  }
+}
+

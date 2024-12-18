@@ -20,7 +20,7 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{DataStructureAnalysis, Graph, SymbolicAddress, SymbolicAddressAnalysis}
+import analysis.data_structure_analysis.{ConstraintGen, CoolDSA, DataStructureAnalysis, Graph, SVA, SymbolicAddress, SymbolicAddressAnalysis}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
@@ -549,7 +549,7 @@ object RunUtils {
     transforms.removeEmptyBlocks(ctx.program)
 
     DebugDumpIRLogger.writeToFile(File("blockgraph-before-dsa.dot"), dotBlockGraph(ctx.program.mainProcedure))
-    
+
     Logger.info(s"RPO ${timer.checkPoint("RPO")} ms ")
     Logger.info("[!] Simplify :: DynamicSingleAssignment")
     DebugDumpIRLogger.writeToFile(File("il-before-dsa.il"), serialiseIL(ctx.program))
@@ -558,7 +558,7 @@ object RunUtils {
     transforms.OnePassDSA().applyTransform(ctx.program)
     Logger.info(s"DSA ${timer.checkPoint("DSA ")} ms ")
 
-    DebugDumpIRLogger.writeToFile(File(s"blockgraph-after-dsa.dot"), 
+    DebugDumpIRLogger.writeToFile(File(s"blockgraph-after-dsa.dot"),
       dotBlockGraph(ctx.program, (ctx.program.collect {
       case b : Block => b -> pp_block(b)
     }).toMap))
@@ -693,7 +693,7 @@ object RunUtils {
 
     IRTransform.prepareForTranslation(q, ctx)
 
-    q.loading.dumpIL.foreach(s => 
+    q.loading.dumpIL.foreach(s =>
       writeToFile(pp_prog(ctx.program), s"$s-output.il")
     )
     Logger.info("[!] Translating to Boogie")
@@ -767,6 +767,14 @@ object RunUtils {
     config.analysisDotPath.foreach { s =>
       DebugDumpIRLogger.writeToFile(File(s"${s}_ct.dot"), toDot(ctx.program))
     }
+
+
+
+    val test = CoolDSA(ctx.program, analysisResult.last.intraProcConstProp)
+    test.analyze()
+//    val gen = ConstraintGen(ctx.program, analysisResult.last.intraProcConstProp).analyze()
+//    val labels = gen.map { (k, v) => k -> v.toString }
+//    writeToFile(toDot(ctx.program, labels), s"SVA.dot")
 
     StaticAnalysisLogger.info("[!] Running Symbolic Access Analysis")
     val symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]] =
