@@ -8,3 +8,8 @@ docker-hash linguist-generated
 
 src/test/compiled.url.txt text eol=lf
 src/test/make/docker-flake.txt text eol=lf
+
+Makefile text eol=lf
+*.sh text eol=lf
+*.mk text eol=lf
+*.md5sum text eol=lf

@@ -87,9 +87,10 @@ elif [[ "$1" == start ]]; then
   exec $DOCKER run $DOCKER_PLATFORM -v"$GIT_ROOT:$GIT_ROOT" --rm -td --user $DOCKER_USER --name $unique_container $unique_image
 
 elif [[ "$1" == stop ]]; then
-  # starts the instance of the docker image.
+  # stops the instance of the docker image.
   set -x
-  exec $DOCKER rm -f -t 1 $unique_container
+  exec $DOCKER stop -t 1 $unique_container
+  # since --rm is given to `docker run`, this will also remove the container.
 
 elif [[ "$1" == shell ]]; then
   # enters an interactive shell within the container.
