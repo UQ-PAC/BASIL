@@ -173,8 +173,6 @@ object IRLoading {
     val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, List[InsnSemantics]]])
 
     val parserMap : Map[String, List[InsnSemantics]] = semantics.flatten.toMap
-
-
     val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress)
     GTIRBConverter.createIR()
   }
