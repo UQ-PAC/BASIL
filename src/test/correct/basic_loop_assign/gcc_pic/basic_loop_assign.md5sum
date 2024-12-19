@@ -1,0 +1,5 @@
+a6177e7d0ca389e4dc3438858dbc5a09  correct/basic_loop_assign/gcc_pic/a.out
+3c6cf48e6befb73cb3d3c232407cc6bf  correct/basic_loop_assign/gcc_pic/basic_loop_assign.adt
+d5235491d028bc1196b12521216eb890  correct/basic_loop_assign/gcc_pic/basic_loop_assign.bir
+c673bb94a3029ce694bfe27ecdcae201  correct/basic_loop_assign/gcc_pic/basic_loop_assign.relf
+4ad24cc8bd114cd7280f63ed36258348  correct/basic_loop_assign/gcc_pic/basic_loop_assign.gts

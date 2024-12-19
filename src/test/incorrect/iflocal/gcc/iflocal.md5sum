@@ -1,0 +1,5 @@
+01f87689b86d3218ab57c41df1cef4e2  incorrect/iflocal/gcc/a.out
+a98d3bf35a7dca5ff1da578a9dca17ae  incorrect/iflocal/gcc/iflocal.adt
+ade26fcb1551d10cb73cd0d243636d77  incorrect/iflocal/gcc/iflocal.bir
+12cdb1a04b7792f9aaf9a8b69e92f960  incorrect/iflocal/gcc/iflocal.relf
+44ca047f482b6371206179d57ea226f1  incorrect/iflocal/gcc/iflocal.gts

@@ -1,0 +1,5 @@
+944bd0d04b7d267ebc7d922147176998  correct/malloc_with_local3/clang/a.out
+c6a21d709bbe09a48b568e7bf74d1f6b  correct/malloc_with_local3/clang/malloc_with_local3.adt
+c49bff38c6d17649bedb87560659e619  correct/malloc_with_local3/clang/malloc_with_local3.bir
+3db2783911f73797acf290eb6be7f8ef  correct/malloc_with_local3/clang/malloc_with_local3.relf
+e41949df307a8145555bd4ac4f68b95d  correct/malloc_with_local3/clang/malloc_with_local3.gts

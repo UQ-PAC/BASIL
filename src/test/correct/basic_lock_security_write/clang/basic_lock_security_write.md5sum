@@ -1,0 +1,5 @@
+5a2b6be5d9f616d54201fdcf7bb63bd8  correct/basic_lock_security_write/clang/a.out
+06fc02f98c0ec4a9c580a2e69252ab0b  correct/basic_lock_security_write/clang/basic_lock_security_write.adt
+6c16d3dd4f0bbb57e38b594151352689  correct/basic_lock_security_write/clang/basic_lock_security_write.bir
+fd1b5a112bc536f8be2a1d87a2690508  correct/basic_lock_security_write/clang/basic_lock_security_write.relf
+6c994ece5a92f2b2045d92f9a9bdec6a  correct/basic_lock_security_write/clang/basic_lock_security_write.gts

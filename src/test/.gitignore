@@ -3,3 +3,16 @@
 *.md
 *.md.part
 *.svg
+
+# files reproducibly generated
+*.relf
+*.adt
+*.bir
+*.gtirb
+*.gts
+docker-hash-new
+!compiled.url.txt
+*.gz
+*.bz2
+*.xz
+*.zst

@@ -1,0 +1,5 @@
+a445994c6ea6d02a534f3786856b7c2f  correct/basic_function_call_caller/gcc/a.out
+838466afb8939146142b5c59a85eff4d  correct/basic_function_call_caller/gcc/basic_function_call_caller.adt
+cf443e4b86456f74abcf2f9f92dbcdc7  correct/basic_function_call_caller/gcc/basic_function_call_caller.bir
+cdef4ffbb3e7cf32779d41e794b3280f  correct/basic_function_call_caller/gcc/basic_function_call_caller.relf
+c071c1f5c32ef5ed7b025817a88f0572  correct/basic_function_call_caller/gcc/basic_function_call_caller.gts

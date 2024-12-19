@@ -1,0 +1,5 @@
+eefb3e1fba7242c48420e0154c12acba  correct/initialisation/clang_pic/a.out
+48d6f8e3df0c6949b2e16de109ba533d  correct/initialisation/clang_pic/initialisation.adt
+d04ff64c47ddb82259ebd83b486bf18e  correct/initialisation/clang_pic/initialisation.bir
+5187ada39b5c829b2fdac94797769031  correct/initialisation/clang_pic/initialisation.relf
+e20002421033f067ec6e671e661d154c  correct/initialisation/clang_pic/initialisation.gts

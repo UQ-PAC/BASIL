@@ -1,0 +1,5 @@
+05e565efc44a5f7e10385b1d2188ec8a  correct/cjump/gcc_pic/a.out
+f54e98073b3fc4760a89e0219917e397  correct/cjump/gcc_pic/cjump.adt
+bf3ee8c42559dc9d7df92cf1b647c872  correct/cjump/gcc_pic/cjump.bir
+09543e2c6668be2d96ba76bd03c69dd6  correct/cjump/gcc_pic/cjump.relf
+1bbf00c4c5b884b4b8760edd0b5e34f3  correct/cjump/gcc_pic/cjump.gts

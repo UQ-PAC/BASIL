@@ -1,0 +1,5 @@
+5ea4ceab41f64287bc3e11e6b2f2abb2  correct/switch/gcc/a.out
+534569497b58df94a78f009785146310  correct/switch/gcc/switch.adt
+732b8ebe2617549ff518d46a00f2663d  correct/switch/gcc/switch.bir
+eeb128dc5144f3e7730ba01d11d174c9  correct/switch/gcc/switch.relf
+f4555bf4a764875b9192fed0143a02a6  correct/switch/gcc/switch.gts

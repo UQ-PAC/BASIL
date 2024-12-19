@@ -1,0 +1,5 @@
+be68a176ab4e599bb5b615c3411ff063  correct/functions_with_params/gcc/a.out
+9a59c2b9b8fe69ca92db08f65fd836ec  correct/functions_with_params/gcc/functions_with_params.adt
+d5bc1147ae2446145454f6f7bbdbfdc2  correct/functions_with_params/gcc/functions_with_params.bir
+d903484a2d6b298bc4b00a246612df76  correct/functions_with_params/gcc/functions_with_params.relf
+e7bf2b329c8a7d6de6da61a281b96449  correct/functions_with_params/gcc/functions_with_params.gts

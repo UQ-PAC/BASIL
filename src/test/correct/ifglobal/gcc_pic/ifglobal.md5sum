@@ -1,0 +1,5 @@
+842f64dbef5762f2935b2bd84ed3c06f  correct/ifglobal/gcc_pic/a.out
+ed4680b1fe5d1d91b41ec36f7e1b57e4  correct/ifglobal/gcc_pic/ifglobal.adt
+031c1165a6fbf5bceca0c3b973764172  correct/ifglobal/gcc_pic/ifglobal.bir
+d62c8a765845d84c644d4f556e9d4f33  correct/ifglobal/gcc_pic/ifglobal.relf
+23ef9b4a87928125fc20f3f204609ef0  correct/ifglobal/gcc_pic/ifglobal.gts

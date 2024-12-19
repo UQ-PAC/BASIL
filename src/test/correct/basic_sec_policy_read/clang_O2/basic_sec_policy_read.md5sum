@@ -1,0 +1,5 @@
+6b2cb75a0d7634efb610a43c878b555e  correct/basic_sec_policy_read/clang_O2/a.out
+99a77919c0cc112be94e2ff2c915e164  correct/basic_sec_policy_read/clang_O2/basic_sec_policy_read.adt
+e2b73cdb7c75a8a1bae69e4b29e2f6aa  correct/basic_sec_policy_read/clang_O2/basic_sec_policy_read.bir
+049a14e33d3c0b4d6b848c0c593728a9  correct/basic_sec_policy_read/clang_O2/basic_sec_policy_read.relf
+dea55c99afa3b1ed021f9a48f2baa9af  correct/basic_sec_policy_read/clang_O2/basic_sec_policy_read.gts

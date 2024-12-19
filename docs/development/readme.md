@@ -105,21 +105,23 @@ The [dsl](../basil-ir.md#constructing-programs-in-code) can be used to construct
 ### Integration tests
 
 These are the `SystemTests.scala` test case with the files present in `src/test/correct` for examples that should verify and `src/test/incorrect`
-for examples that should not verify. 
+for examples that should not verify.
 
-These are lifted via the Makefiles, to add another test simply add a directory, c source file, and optionally specification file and run 
-
-```sh
-cd src/test/
-make
-```
-
-The `config.mk` file in the test directory can be used to exclude unnecessary compilers, and change compilation flags. 
-Full details can be found [here](../src/test/readme.md).
+These are run via the Makefiles in src/test.
+A Docker image is used to compile and lift examples in a reproducible way.
+See [src/test/readme.md](../src/test/readme.md) for details.
 
 ### Running Tests
 
 The test suites use [ScalaTest](https://www.scalatest.org/).
+
+This tests are defined as C source files and must be compiled before use.
+Before running any tests, download the pre-compiled test case files with:
+```bash
+$ make -C src/test extract
+```
+For more details on this process, including adding and editing test cases,
+see [src/test/readme.md](../src/test/readme.md).
 
 To run the primary SystemTests suites (SystemTestsBAP and SystemTestsGTIRB) (which require Boogie):
 
