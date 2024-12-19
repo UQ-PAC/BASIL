@@ -463,6 +463,7 @@ case class BVFunctionOp(name: String, bvbuiltin: String, in: List[BVar], out: BV
 
 case class MemoryLoadOp(addressSize: Int, valueSize: Int, endian: Endian, bits: Int) extends FunctionOp {
   val accesses: Int = bits / valueSize
+  assert(accesses > 0)
 
   val fnName: String = endian match {
     case Endian.LittleEndian => s"memory_load${bits}_le"
@@ -558,6 +559,7 @@ case class BoolToBV1Op(arg: BExpr) extends FunctionOp {
 
 case class BMemoryLoad(memory: BMapVar, index: BExpr, endian: Endian, bits: Int) extends BExpr {
   override def toString: String = s"$fnName($memory, $index)"
+  assert(bits >= 8)
 
   val fnName: String = endian match {
     case Endian.LittleEndian => s"memory_load${bits}_le"

@@ -394,7 +394,7 @@ def copypropTransform(p: Procedure) = {
   // SimplifyLogger.info(s"    ${p.name}  after simp expr complexity ${ExprComplexity()(p)}")
   val sipm = t.checkPoint("algebraic simp")
 
-  SimplifyLogger.info("[!] Simplify :: RemoveSlices")
+  // SimplifyLogger.info("[!] Simplify :: RemoveSlices")
   removeSlices(p)
   ir.eval.cleanupSimplify(p)
   AlgebraicSimplifications(p)

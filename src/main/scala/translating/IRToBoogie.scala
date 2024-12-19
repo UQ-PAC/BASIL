@@ -282,8 +282,12 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
           case Endian.LittleEndian => accesses
         }
 
-        val body: BExpr = accessesEndian.tail.foldLeft(accessesEndian.head) { (concat: BExpr, next: MapAccess) =>
-          BinaryBExpr(BVCONCAT, next, concat)
+        val body: BExpr = accessesEndian.toList match {
+          case h::Nil => h
+          case h::tail =>  tail.foldLeft(h) {
+            (concat: BExpr, next: MapAccess) => BinaryBExpr(BVCONCAT, next, concat)
+          }
+          case Nil => throw Exception(s"Zero byte access: $f")
         }
 
         BFunction(m.fnName, in, out, Some(body), List(externAttr))
@@ -528,7 +532,8 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
   private def memoryToCondition(memorySections: Iterable[MemorySection]): List[BExpr] = {
 
     def coalesced: List[BExpr] = {
-      val sections = memorySections.flatMap { s =>
+      val sections = memorySections.filter(_.size >= 8)
+        .flatMap { s =>
         // Phrase the memory condition in terms of 64-bit operations, as long as the memory
         // section's size is a multiple of 64-bits and 64-bits (8 bytes) aligned
         // If the memory section is not aligned, the initial unaligned part of it will not be coalesced into a 64-bit
