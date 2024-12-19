@@ -350,126 +350,127 @@ object StaticAnalysis {
     val RNASolver = RNAAnalysisSolver(IRProgram)
     val RNAResult = RNASolver.analyze()
 
-    StaticAnalysisLogger.debug("[!] Running Inter-procedural Constant Propagation")
-    val interProcConstProp = InterProcConstantPropagation(IRProgram)
-    val interProcConstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] = interProcConstProp.analyze()
-
-    config.analysisResultsPath.foreach { s =>
-      DebugDumpIRLogger.writeToFile(File(s"${s}OGconstprop$iteration.txt"), printAnalysisResults(IRProgram, interProcConstPropResult))
-    }
-
-    StaticAnalysisLogger.debug("[!] Variable dependency summaries")
-    val scc = stronglyConnectedComponents(CallGraph, List(IRProgram.mainProcedure))
-    val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
-    val varDepsSummaries = VariableDependencyAnalysis(IRProgram, ctx.specification.globals, specGlobalAddresses, interProcConstPropResult, scc).analyze()
+    StaticAnalysisLogger.debug("[!] Running Intra-procedural Constant Propagation")
+//    val interProcConstProp = InterProcConstantPropagation(IRProgram)
+//    val interProcConstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] = interProcConstProp.analyze()
+//
+//    config.analysisResultsPath.foreach { s =>
+//      DebugDumpIRLogger.writeToFile(File(s"${s}OGconstprop$iteration.txt"), printAnalysisResults(IRProgram, interProcConstPropResult))
+//    }
+//
+//    StaticAnalysisLogger.debug("[!] Variable dependency summaries")
+//    val scc = stronglyConnectedComponents(CallGraph, List(IRProgram.mainProcedure))
+//    val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
+//    val varDepsSummaries = VariableDependencyAnalysis(IRProgram, ctx.specification.globals, specGlobalAddresses, interProcConstPropResult, scc).analyze()
 
     val intraProcConstProp = IntraProcConstantPropagation(IRProgram)
     val intraProcConstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] = intraProcConstProp.analyze()
-
-    config.analysisResultsPath.foreach { s =>
-      DebugDumpIRLogger.writeToFile(File(s"${s}_new_ir_constprop$iteration.txt"), printAnalysisResults(IRProgram, intraProcConstPropResult))
-    }
-
-    config.analysisDotPath.foreach { f =>
-      val dumpdomain = computeDomain[CFGPosition, CFGPosition](InterProcIRCursor, IRProgram.procedures)
-       DebugDumpIRLogger.writeToFile(File(s"${f}_new_ir_intercfg$iteration.dot"), toDot(dumpdomain.toSet, InterProcIRCursor, Map.empty))
-    }
-
-    val reachingDefinitionsAnalysisSolver = InterprocReachingDefinitionsAnalysisSolver(IRProgram)
-    val reachingDefinitionsAnalysisResults = reachingDefinitionsAnalysisSolver.analyze()
-
-    config.analysisDotPath.foreach { s =>
-      DebugDumpIRLogger.writeToFile(
-        File(s"${s}_reachingDefinitions$iteration.dot"),
-        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> reachingDefinitionsAnalysisResults(b).toString).toMap, true)
-      )
-    }
-
+//
+//    config.analysisResultsPath.foreach { s =>
+//      DebugDumpIRLogger.writeToFile(File(s"${s}_new_ir_constprop$iteration.txt"), printAnalysisResults(IRProgram, intraProcConstPropResult))
+//    }
+//
+//    config.analysisDotPath.foreach { f =>
+//      val dumpdomain = computeDomain[CFGPosition, CFGPosition](InterProcIRCursor, IRProgram.procedures)
+//       DebugDumpIRLogger.writeToFile(File(s"${f}_new_ir_intercfg$iteration.dot"), toDot(dumpdomain.toSet, InterProcIRCursor, Map.empty))
+//    }
+//
+//    val reachingDefinitionsAnalysisSolver = InterprocReachingDefinitionsAnalysisSolver(IRProgram)
+//    val reachingDefinitionsAnalysisResults = reachingDefinitionsAnalysisSolver.analyze()
+//
+//    config.analysisDotPath.foreach { s =>
+//      DebugDumpIRLogger.writeToFile(
+//        File(s"${s}_reachingDefinitions$iteration.dot"),
+//        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> reachingDefinitionsAnalysisResults(b).toString).toMap, true)
+//      )
+//    }
+//
+    StaticAnalysisLogger.debug("Done Constant Prop")
     val mmm = MemoryModelMap(globalOffsets)
-    mmm.preLoadGlobals(mergedSubroutines, globalAddresses, globalSizes)
-
-    val previousVSAResults = if (previousResults.isDefined) {
-      previousResults.get.vsaResult
-    } else {
-      Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]()
-    }
-
-    StaticAnalysisLogger.debug("[!] Running GRA")
-    val graSolver = GlobalRegionAnalysisSolver(IRProgram, domain.toSet, interProcConstPropResult, reachingDefinitionsAnalysisResults, mmm, previousVSAResults)
-    val graResult = graSolver.analyze()
-
-    StaticAnalysisLogger.debug("[!] Running MRA")
-    val mraSolver = MemoryRegionAnalysisSolver(IRProgram, domain.toSet, globalAddresses, globalOffsets, mergedSubroutines, interProcConstPropResult, ANRResult, RNAResult, reachingDefinitionsAnalysisResults, graResult, mmm)
-    val mraResult = mraSolver.analyze()
-
-    config.analysisDotPath.foreach { s =>
-      DebugDumpIRLogger.writeToFile(File(s"${s}_callgraph$iteration.dot"), dotCallGraph(IRProgram))
-      DebugDumpIRLogger.writeToFile(
-        File(s"${s}_blockgraph$iteration.dot"),
-        dotBlockGraph(IRProgram, IRProgram.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap)
-      )
-
-      DebugDumpIRLogger.writeToFile(
-        File(s"${s}_new_ir_constprop$iteration.dot"),
-        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> intraProcConstPropResult(b).toString).toMap)
-      )
-
-      DebugDumpIRLogger.writeToFile(
-        File(s"${s}_MRA$iteration.dot"),
-        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> mraResult(b).toString).toMap)
-      )
-
-      DebugDumpIRLogger.writeToFile(
-        File(s"${s}_GRA$iteration.dot"),
-        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> graResult(b).toString).toMap)
-      )
-    }
-
-    StaticAnalysisLogger.debug("[!] Running MMM")
-    mmm.convertMemoryRegions(mraSolver.procedureToStackRegions, mraSolver.procedureToHeapRegions, mraResult, mraSolver.procedureToSharedRegions, graSolver.getDataMap, graResult)
-    mmm.logRegions()
-
-    StaticAnalysisLogger.debug("[!] Running Steensgaard")
-    val steensgaardSolver = InterprocSteensgaardAnalysis(interDomain.toSet, mmm, reachingDefinitionsAnalysisResults, previousVSAResults)
-    steensgaardSolver.analyze()
-    val steensgaardResults = steensgaardSolver.pointsTo()
-
-    StaticAnalysisLogger.debug("[!] Running VSA")
-    val vsaSolver = ValueSetAnalysisSolver(IRProgram, mmm, interProcConstPropResult)
-    val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
-
-    config.analysisDotPath.foreach { s =>
-      DebugDumpIRLogger.writeToFile(
-        File(s"${s}_VSA$iteration.dot"),
-        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> vsaResult(b).toString).toMap)
-      )
-    }
-
-    StaticAnalysisLogger.debug("[!] Injecting regions")
-    val regionInjector = if (config.memoryRegions == MemoryRegionsMode.MRA) {
-      val injector = RegionInjectorMRA(IRProgram, mmm)
-      injector.injectRegions()
-      Some(injector)
-    } else {
-      None
-    }
+//    mmm.preLoadGlobals(mergedSubroutines, globalAddresses, globalSizes)
+//
+//    val previousVSAResults = if (previousResults.isDefined) {
+//      previousResults.get.vsaResult
+//    } else {
+//      Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]()
+//    }
+//
+//    StaticAnalysisLogger.debug("[!] Running GRA")
+//    val graSolver = GlobalRegionAnalysisSolver(IRProgram, domain.toSet, intraProcConstPropResult, reachingDefinitionsAnalysisResults, mmm, previousVSAResults)
+//    val graResult = graSolver.analyze()
+//
+//    StaticAnalysisLogger.debug("[!] Running MRA")
+//    val mraSolver = MemoryRegionAnalysisSolver(IRProgram, domain.toSet, globalAddresses, globalOffsets, mergedSubroutines, intraProcConstPropResult, ANRResult, RNAResult, reachingDefinitionsAnalysisResults, graResult, mmm)
+//    val mraResult = mraSolver.analyze()
+//
+//    config.analysisDotPath.foreach { s =>
+//      DebugDumpIRLogger.writeToFile(File(s"${s}_callgraph$iteration.dot"), dotCallGraph(IRProgram))
+//      DebugDumpIRLogger.writeToFile(
+//        File(s"${s}_blockgraph$iteration.dot"),
+//        dotBlockGraph(IRProgram, IRProgram.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap)
+//      )
+//
+//      DebugDumpIRLogger.writeToFile(
+//        File(s"${s}_new_ir_constprop$iteration.dot"),
+//        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> intraProcConstPropResult(b).toString).toMap)
+//      )
+//
+//      DebugDumpIRLogger.writeToFile(
+//        File(s"${s}_MRA$iteration.dot"),
+//        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> mraResult(b).toString).toMap)
+//      )
+//
+//      DebugDumpIRLogger.writeToFile(
+//        File(s"${s}_GRA$iteration.dot"),
+//        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> graResult(b).toString).toMap)
+//      )
+//    }
+//
+//    StaticAnalysisLogger.debug("[!] Running MMM")
+//    mmm.convertMemoryRegions(mraSolver.procedureToStackRegions, mraSolver.procedureToHeapRegions, mraResult, mraSolver.procedureToSharedRegions, graSolver.getDataMap, graResult)
+//    mmm.logRegions()
+//
+//    StaticAnalysisLogger.debug("[!] Running Steensgaard")
+//    val steensgaardSolver = InterprocSteensgaardAnalysis(interDomain.toSet, mmm, reachingDefinitionsAnalysisResults, previousVSAResults)
+//    steensgaardSolver.analyze()
+//    val steensgaardResults = steensgaardSolver.pointsTo()
+//
+//    StaticAnalysisLogger.debug("[!] Running VSA")
+//    val vsaSolver = ValueSetAnalysisSolver(IRProgram, mmm, intraProcConstPropResult)
+//    val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
+//
+//    config.analysisDotPath.foreach { s =>
+//      DebugDumpIRLogger.writeToFile(
+//        File(s"${s}_VSA$iteration.dot"),
+//        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> vsaResult(b).toString).toMap)
+//      )
+//    }
+//
+//    StaticAnalysisLogger.debug("[!] Injecting regions")
+//    val regionInjector = if (config.memoryRegions == MemoryRegionsMode.MRA) {
+//      val injector = RegionInjectorMRA(IRProgram, mmm)
+//      injector.injectRegions()
+//      Some(injector)
+//    } else {
+//      None
+//    }
 
     val paramResults: Map[Procedure, Set[Variable]] = ParamAnalysis(IRProgram).analyze()
     val interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = InterLiveVarsAnalysis(IRProgram).analyze()
 
     StaticAnalysisContext(
-      intraProcConstProp = interProcConstPropResult,
+      intraProcConstProp = intraProcConstPropResult,
       interProcConstProp = intraProcConstPropResult,
-      memoryRegionResult = mraResult,
-      vsaResult = vsaResult,
+      memoryRegionResult = Map.empty, // mraResult,
+      vsaResult = Map.empty, //vsaResult,
       interLiveVarsResults = interLiveVarsResults,
       paramResults = paramResults,
-      steensgaardResults = steensgaardResults,
+      steensgaardResults =  Map.empty, // steensgaardResults,
       mmmResults = mmm,
       symbolicAddresses = Map.empty,
-      reachingDefs = reachingDefinitionsAnalysisResults,
-      varDepsSummaries = varDepsSummaries,
-      regionInjector = regionInjector,
+      reachingDefs = Map.empty, //reachingDefinitionsAnalysisResults,
+      varDepsSummaries = Map.empty, //varDepsSummaries,
+      regionInjector = None,// regionInjector,
       localDSA = Map.empty,
       bottomUpDSA = Map.empty,
       topDownDSA = Map.empty,
@@ -765,12 +766,12 @@ object RunUtils {
       transforms.splitThreads(ctx.program, analysisResult.last.steensgaardResults, analysisResult.last.reachingDefs)
     }
 
-    StaticAnalysisLogger.info("[!] Running Writes To")
-    val writesTo = WriteToAnalysis(ctx.program).analyze()
-    val reachingDefs = ReachingDefsAnalysis(ctx.program, writesTo).analyze()
-    config.analysisDotPath.foreach { s =>
-      DebugDumpIRLogger.writeToFile(File(s"${s}_ct.dot"), toDot(ctx.program))
-    }
+//    StaticAnalysisLogger.info("[!] Running Writes To")
+//    val writesTo = WriteToAnalysis(ctx.program).analyze()
+//    val reachingDefs = ReachingDefsAnalysis(ctx.program, writesTo).analyze()
+//    config.analysisDotPath.foreach { s =>
+//      DebugDumpIRLogger.writeToFile(File(s"${s}_ct.dot"), toDot(ctx.program))
+//    }
 
 
 
@@ -780,40 +781,40 @@ object RunUtils {
 //    val labels = gen.map { (k, v) => k -> v.toString }
 //    writeToFile(toDot(ctx.program, labels), s"SVA.dot")
 
-    StaticAnalysisLogger.info("[!] Running Symbolic Access Analysis")
-    val symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]] =
-      SymbolicAddressAnalysis(ctx.program, analysisResult.last.interProcConstProp).analyze()
-    config.analysisDotPath.foreach { s =>
-      val labels = symResults.map { (k, v) => k -> v.toString }
-      DebugDumpIRLogger.writeToFile(File(s"${s}_saa.dot"), toDot(ctx.program, labels))
-    }
-
-    StaticAnalysisLogger.info("[!] Running DSA Analysis")
-    val symbolTableEntries: Set[SymbolTableEntry] = ctx.globals ++ ctx.funcEntries
-    val dsa = DataStructureAnalysis(ctx.program, symResults, analysisResult.last.interProcConstProp, symbolTableEntries, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, analysisResult.last.paramResults)
-    dsa.analyze()
-
-    config.analysisDotPath.foreach { s =>
-      dsa.topDown(ctx.program.mainProcedure).toDot
-      DebugDumpIRLogger.writeToFile(File(s"${s}_main_dsg.dot"), dsa.topDown(ctx.program.mainProcedure).toDot)
-    }
-
-    val regionInjector = if (config.memoryRegions == MemoryRegionsMode.DSA) {
-      val injector = RegionInjectorDSA(ctx.program, dsa.topDown)
-      injector.injectRegions()
-      Some(injector)
-    } else {
-      None
-    }
+//    StaticAnalysisLogger.info("[!] Running Symbolic Access Analysis")
+//    val symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]] =
+//      SymbolicAddressAnalysis(ctx.program, analysisResult.last.interProcConstProp).analyze()
+//    config.analysisDotPath.foreach { s =>
+//      val labels = symResults.map { (k, v) => k -> v.toString }
+//      DebugDumpIRLogger.writeToFile(File(s"${s}_saa.dot"), toDot(ctx.program, labels))
+//    }
+//
+//    StaticAnalysisLogger.info("[!] Running DSA Analysis")
+//    val symbolTableEntries: Set[SymbolTableEntry] = ctx.globals ++ ctx.funcEntries
+//    val dsa = DataStructureAnalysis(ctx.program, symResults, analysisResult.last.interProcConstProp, symbolTableEntries, ctx.globalOffsets, ctx.externalFunctions, Map.empty, Map.empty, analysisResult.last.paramResults)
+//    dsa.analyze()
+//
+//    config.analysisDotPath.foreach { s =>
+//      dsa.topDown(ctx.program.mainProcedure).toDot
+//      DebugDumpIRLogger.writeToFile(File(s"${s}_main_dsg.dot"), dsa.topDown(ctx.program.mainProcedure).toDot)
+//    }
+//
+//    val regionInjector = if (config.memoryRegions == MemoryRegionsMode.DSA) {
+//      val injector = RegionInjectorDSA(ctx.program, dsa.topDown)
+//      injector.injectRegions()
+//      Some(injector)
+//    } else {
+//      None
+//    }
 
     assert(invariant.singleCallBlockEnd(ctx.program))
     StaticAnalysisLogger.info(s"[!] Finished indirect call resolution after $iteration iterations")
     analysisResult.last.copy(
-      symbolicAddresses = symResults,
-      localDSA = dsa.local.toMap,
-      bottomUpDSA = dsa.bottomUp.toMap,
-      topDownDSA = dsa.topDown.toMap,
-      regionInjector = regionInjector
+      symbolicAddresses = Map.empty, // symResults,
+      localDSA = Map.empty,//  dsa.local.toMap,
+      bottomUpDSA = Map.empty, // dsa.bottomUp.toMap,
+      topDownDSA = Map.empty, //dsa.topDown.toMap,
+      regionInjector = None // regionInjector
     )
   }
 }

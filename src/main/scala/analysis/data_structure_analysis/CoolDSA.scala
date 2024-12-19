@@ -188,6 +188,8 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
   {
     constraint match
       case Constraint(pos, value, index, arg1: EV, arg2: EEV, size: Int, id: Int) =>
+//        if (getCells(arg1.SSAVar).isEmpty) then println(pos)
+//        if (getCells(arg2.SSAVar).isEmpty) then println(pos)
         val valueCell: CoolCell = mergeCells(getCells(arg1.SSAVar))
         val pointerCell = mergeCells(getCells(arg2.SSAVar))
         // pointerCells.foreach(_.growSize(size))

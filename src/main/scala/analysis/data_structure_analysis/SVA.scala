@@ -4,7 +4,7 @@ import analysis.data_structure_analysis.SymBase.{Global, Heap, Par, Ret, Stack, 
 import analysis.solvers.{SimplePushDownWorklistFixpointSolver, SimpleWorklistFixpointSolver}
 import analysis.{Analysis, FlatElement, IRIntraproceduralForwardDependencies, MapLattice, PowerSetLatticeWithTop, evaluateExpression}
 import ir.eval.BitVectorEval.*
-import ir.{BVADD, BVSUB, BinaryExpr, BitVecLiteral, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, LocalAssign, MemoryLoad, Procedure, Program, Register, Repeat, SignExtend, UnaryExpr, UninterpretedFunction, Variable, ZeroExtend, computeDomain, toShortString}
+import ir.{BVADD, BVSUB, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, LocalAssign, LocalVar, MemoryLoad, Procedure, Program, Register, Repeat, SignExtend, UnaryExpr, UninterpretedFunction, Variable, ZeroExtend, computeDomain, toShortString}
 
 import scala.Option
 
@@ -30,11 +30,11 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
   UnknownCounter.reset()
   RetCounter.reset()
 
-  private val stackPointer = Register("R31", 64)
-  private val linkRegister = Register("R30", 64)
-  private val framePointer = Register("R29", 64)
+  private val stackPointer = LocalVar("R31_in", BitVecType(64)) //Register("R31", 64)
+  private val linkRegister = LocalVar("R30_in", BitVecType(64)) //Register("R30", 64)
+  private val framePointer = LocalVar("R29_in", BitVecType(64)) //Register("R29", 64)
 
-  private val implicitFormals: Set[Variable] = Set(linkRegister, framePointer)
+  private val implicitFormals: Set[LocalVar] = Set(linkRegister, framePointer, framePointer)
 
   private val mallocRegister: Register = Register("R0", 64)
 
@@ -98,16 +98,16 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
     n match
       case procedure: Procedure => // entry
         (s + (stackPointer -> initDef(Stack(procedure.name))) + (linkRegister -> initDef(Par("link"))) + (framePointer -> initDef(Par("frame")))) ++
-          procedure.formalInParam.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
+          procedure.formalInParam.diff(implicitFormals).foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
           (m, param) =>
            m + (param -> initDef(Par(param.name)))
         }
 
-      case alloc @ LocalAssign(lhs: Variable, rhs: BinaryExpr, _) if rhs.arg1 == stackPointer && rhs.op == BVADD &&
+      case alloc @ LocalAssign(lhs: Variable, rhs: BinaryExpr, label) if rhs.arg1 == stackPointer && rhs.op == BVADD &&
         evaluateExpression(rhs.arg2, constProp(alloc)).nonEmpty && isNegative(evaluateExpression(rhs.arg2, constProp(alloc)).get) => s // ignore stack allocations
       case pos @ LocalAssign(lhs: Variable, rhs, label) =>
         s + (lhs -> exprToSymValMap(pos, rhs, s)) // local
-      case MemoryLoad(lhs, _, index, _, _, _)  =>
+      case MemoryLoad(lhs, _, index, _, _, label)  =>
         s + (lhs -> initDef(Unknown())) // load
       case DirectCall(target, _, _ , _) if target.name == "malloc" => s + (mallocRegister -> initDef(Heap()))
       case DirectCall(target, _, _ , _) => s ++ target.formalOutParam.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
