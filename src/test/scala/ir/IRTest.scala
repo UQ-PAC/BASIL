@@ -361,5 +361,33 @@ class IRTest extends AnyFunSuite {
     assert(block2.jump.asInstanceOf[GoTo].targets.isEmpty)
   }
 
+
+  test("proc iterator") {
+
+    val p = prog(
+      proc("main",
+        block("lmain", goto("lmain1")),
+        block("lmain1", goto("lmain", "lmainret", "lmain3")),
+        block("lmain3", goto("lmainret")),
+        block("lmainret", ret)
+      )
+    )
+
+    println(p)
+    val blockOrder = p.mainProcedure.preOrderIterator.collect {
+      case b: Block => b.label
+    }.toList
+
+    // assert(blockOrder == List("lmain", "lmain1", "lmainret", "lmain3"))
+
+    assert(blockOrder.head == "lmain")
+    assert(blockOrder.tail.head == "lmain1")
+    assert(blockOrder.tail.tail.take(2).toSet == Set("lmain3", "lmainret"))
+
+
+
+    
+  }
+
 }
 
