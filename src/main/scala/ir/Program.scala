@@ -9,8 +9,7 @@ import translating.serialiseIL
 
 
 /**
-  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
-  * not guaranteed to be in any defined order. 
+  * Iterator in pre-order of procedures, blocks, and commands. GoTos targets are traversed in an unspecified order.
   */
 private class ILForwardIterator(private val begin: IterableOnce[CFGPosition], val walk: IRWalk[CFGPosition, CFGPosition]) extends Iterator[CFGPosition] {
   val seen = mutable.Set[CFGPosition]()
