@@ -13,7 +13,7 @@ import scala.collection.mutable.ArrayBuffer
 import com.grammatech.gtirb.proto.Module.ByteOrder.LittleEndian
 import util.Logger
 
-class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
+class GTIRBLoader(parserMap: immutable.Map[String, List[Either[(String, String), List[StmtContext]]]]) {
 
   private val constMap = mutable.Map[String, IRType]()
   private val varMap = mutable.Map[String, IRType]()
@@ -30,20 +30,27 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
 
     val statements: ArrayBuffer[Statement] = ArrayBuffer()
 
-    for (instruction <- instructions) {
+    for (instsem <- instructions) {
       constMap.clear
       varMap.clear
 
-      for ((s, i) <- instruction.zipWithIndex) {
-        
-        val label = blockAddress.map {(a: BigInt) =>
-          val instructionAddress = a + (opcodeSize * instructionCount)
-          instructionAddress.toString + "$" + i
+      val s = instsem match {
+        case Left((op, err)) => {
+          statements.append(Assert(FalseLiteral, Some(s"Decode error: $op ${err.replace("\n", " :: ")}")))
+          instructionCount += 1
         }
+        case Right(instruction) => {
+          for ((s, i) <- instruction.zipWithIndex) {
+            val label = blockAddress.map {(a: BigInt) =>
+              val instructionAddress = a + (opcodeSize * instructionCount)
+              instructionAddress.toString + "$" + i
+            }
 
-        statements.appendAll(visitStmt(s, label))
+            statements.appendAll(visitStmt(s, label))
+          }
+          instructionCount += 1
+        }
       }
-      instructionCount += 1
     }
     statements
   }
@@ -301,7 +308,8 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
         checkArgs(function, 0, 1, typeArgs.size, args.size, ctx.getText)
         val expr = visitExprOnly(args.head)
         val result = expr.map {
-          case b: BinaryExpr if b.op == BVEQ => BinaryExpr(BVCOMP, b.arg1, b.arg2)
+          case BinaryExpr(BVEQ, l, r) => BinaryExpr(BVCOMP, l, r)
+          case UnaryExpr(BoolNOT, BinaryExpr(BVEQ, l, r)) => UnaryExpr(BVNOT, BinaryExpr(BVCOMP, l, r))
           case FalseLiteral => BitVecLiteral(0, 1)
           case TrueLiteral => BitVecLiteral(1, 1)
           case _ => throw Exception(s"unhandled conversion from bool to bitvector: ${ctx.getText}")
