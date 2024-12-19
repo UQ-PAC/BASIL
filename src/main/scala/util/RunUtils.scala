@@ -127,9 +127,29 @@ object IRLoading {
     val mods = ir.modules
     val cfg = ir.cfg.get
 
-    val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, Array[Array[String]]]])
+    enum InsnSemantics {
+      case Result(value: Array[String])
+      case Error(opcode: String, error: String)
+    }
 
-    def parse_insn(line: String): StmtContext = {
+    implicit object InsnSemanticsFormat extends JsonFormat[InsnSemantics] {
+      def write(m: InsnSemantics) =  ???
+      def read(json: JsValue) = json match {
+        case JsObject(fields) => {
+          val m : Map[String, JsValue] = fields.get("decode_error") match {
+            case Some(JsObject(m)) => m
+            case _ => deserializationError(s"Bad sem format $json")
+          }
+          InsnSemantics.Error(m("opcode").convertTo[String], m("error").convertTo[String])
+        }
+        case array @ JsArray(_) => InsnSemantics.Result(array.convertTo[Array[String]])
+        case s => deserializationError(s"Bad sem format $s")
+      }
+    }
+
+    val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, Array[InsnSemantics]]])
+
+    def parse_asl_stmt(line: String): StmtContext = {
       val lexer = ASLpLexer(CharStreams.fromString(line))
       val tokens = CommonTokenStream(lexer)
       val parser = ASLpParser(tokens)
@@ -150,16 +170,20 @@ object IRLoading {
               ${line.replace('\n', ' ')}
               ${" " * token.getStartIndex}^ here!
               """.stripIndent
-            case _ => ""
+            case o => o.toString
           }
           Logger.error(s"""Semantics parse error:\n  line: $line\n$extra""")
           throw e
       }
     }
 
-    val parserMap = semantics.map(_.map((k: String, v: Array[Array[String]]) => (k, v.map(_.map(parse_insn)))))
+    val parserMap : Map[String, List[Either[(String,String), List[StmtContext]]]] =
+      semantics.toList.map(_.map((k: String, v: Array[InsnSemantics]) => (k, v.toList.map {
+      case InsnSemantics.Result(s) => Right(s.toList.map(parse_asl_stmt))
+      case InsnSemantics.Error(op, err) => Left((op, err))
+      }))).flatten.toMap
 
-    val GTIRBConverter = GTIRBToIR(mods, parserMap.flatten.toMap, cfg, mainAddress)
+    val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress)
     GTIRBConverter.createIR()
   }
 
@@ -170,6 +194,7 @@ object IRLoading {
     val lexer = ReadELFLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(lexer)
     val parser = ReadELFParser(tokens)
+    parser.setErrorHandler(BailErrorStrategy())
     parser.setBuildParseTree(true)
     ReadELFLoader.visitSyms(parser.syms(), config)
   }
