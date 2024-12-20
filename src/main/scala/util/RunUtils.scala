@@ -241,10 +241,11 @@ object IRTransform {
     }
 
     Logger.debug("[!] Stripping unreachable")
-    val before = ctx.program.procedures.size
+    val before = ctx.program.procedures.map(_.name).toSeq
     transforms.stripUnreachableFunctions(ctx.program, config.loading.procedureTrimDepth)
+    val after = ctx.program.procedures.map(_.name).toSeq
     Logger.debug(
-      s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
+      s"[!] Removed ${before.size - after.size} unreachable functions (namely, ${before diff after})"
     )
     val dupProcNames = ctx.program.procedures.groupBy(_.name).filter((_, p) => p.size > 1).toList.flatMap(_(1))
 
