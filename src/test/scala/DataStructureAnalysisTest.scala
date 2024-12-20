@@ -3,7 +3,9 @@ import ir.*
 import org.scalatest.funsuite.AnyFunSuite
 import ir.dsl.*
 import specification.{Specification, SpecGlobal}
+import translating.{ELFSymbol}
 import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, StaticAnalysisContext, writeToFile}
+import util.{Logger, LogLevel}
 
 /**
  * This is the test suite for testing DSA functionality
@@ -30,6 +32,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   }
 
   def runTest(path: String): BASILResult = {
+    // Logger.setLevel(LogLevel.DEBUG);
     RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
@@ -45,14 +48,30 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     )
   }
 
+  def findProcedure(ctx: IRContext, functionName: String): Procedure = {
+    val allprocs = ctx.program.procedures;
+    val procs = allprocs.filter(_.name == functionName).toSeq;
+    assert(procs.length == 1, s": failed to find procedure '$functionName' (available: ${allprocs.map(_.name)})");
+    procs.head
+  }
+
+  def findGlobal(ctx: IRContext, name: String): SpecGlobal = {
+    val allglobs = ctx.globals;
+    val matching = allglobs.filter(_.name == name).toSeq;
+    assert(matching.length == 1, s": failed to find global '$name' (available: ${allglobs.map(_.name)})");
+    matching.head
+  }
+
   test("overlapping access") {
     val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable")
-
 
     // the dsg of the main procedure after the local phase
     val program = results.ir.program
     val dsg = results.analysis.get.localDSA(program.mainProcedure)
 
+    val addtwo_addr = findProcedure(results.ir, "add_two").address.get
+    val addsix_addr = findProcedure(results.ir, "add_six").address.get
+    val subseven_addr = findProcedure(results.ir, "sub_seven").address.get
 
     // dsg.formals(R29) is the slice representing formal R29
     val R29formal = dsg.adjust(dsg.formals(R29))
@@ -69,24 +88,22 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     assert(dsg.adjust(stack72.getPointee).equals(dsg.adjust(dsg.formals(R30)))) // R31 + 8 points to the link register
 
     // overlapping access
-    assert(dsg.adjust(stack16.getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0))))
-    assert(dsg.adjust(stack24.getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
+    assert(dsg.adjust(stack16.getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(addtwo_addr, addtwo_addr + 20)).node.cells(0))))
+    assert(dsg.adjust(stack24.getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(addsix_addr, addsix_addr + 20)).node.cells(0))))
     assert(stack24 == stack16)
 
-//    assert(!dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).equals(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
-    assert(dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).equals(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
-    assert(dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).node.get.equals(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0)).node.get))
+//    assert(!dsg.get(dsg.globalMapping(AddressRange(addtwo_addr, addtwo_addr + 20)).node.cells(0)).equals(dsg.get(dsg.globalMapping(AddressRange(addsix_addr, addsix_addr + 20)).node.cells(0))))
+    assert(dsg.get(dsg.globalMapping(AddressRange(addtwo_addr, addtwo_addr + 20)).node.cells(0)).equals(dsg.get(dsg.globalMapping(AddressRange(addsix_addr, addsix_addr + 20)).node.cells(0))))
+    assert(dsg.get(dsg.globalMapping(AddressRange(addtwo_addr, addtwo_addr + 20)).node.cells(0)).node.get.equals(dsg.get(dsg.globalMapping(AddressRange(addsix_addr, addsix_addr + 20)).node.cells(0)).node.get))
 
-    assert(dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).offset.equals(0))
-    assert(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0)).offset.equals(0))
-//    assert(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0)).offset.equals(8))
+    assert(dsg.get(dsg.globalMapping(AddressRange(addtwo_addr, addtwo_addr + 20)).node.cells(0)).offset.equals(0))
+    assert(dsg.get(dsg.globalMapping(AddressRange(addsix_addr, addsix_addr + 20)).node.cells(0)).offset.equals(0))
+//    assert(dsg.get(dsg.globalMapping(AddressRange(addsix_addr, addsix_addr + 20)).node.cells(0)).offset.equals(8))
 
-    assert(dsg.adjust(dsg.SSAVar("%00000429$1", "R8")).equals(dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0))))
-    assert(dsg.adjust(dsg.SSAVar("%00000438$1", "R8")).equals(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
+    assert(dsg.adjust(dsg.SSAVar("%00000429$1", "R8")).equals(dsg.get(dsg.globalMapping(AddressRange(addtwo_addr, addtwo_addr + 20)).node.cells(0))))
+    assert(dsg.adjust(dsg.SSAVar("%00000438$1", "R8")).equals(dsg.get(dsg.globalMapping(AddressRange(addsix_addr, addsix_addr + 20)).node.cells(0))))
 
-
-
-    assert(dsg.adjust(stack32.getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(1916, 1916 + 20)).node.cells(0))))
+    assert(dsg.adjust(stack32.getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(subseven_addr, subseven_addr + 20)).node.cells(0))))
 
   }
 
@@ -143,16 +160,17 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
     // Local Caller
     val dsgCaller = results.analysis.get.localDSA(program.mainProcedure)
-    assert(dsgCaller.find(dsgCaller.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells.size == 1)
-    assert(dsgCaller.get(dsgCaller.globalMapping(AddressRange(131096, 131096 + 24)).node.cells(0)).largestAccessedSize == 8)
+    val global = findGlobal(results.ir, "global").address
 
+    assert(dsgCaller.find(dsgCaller.globalMapping(AddressRange(global, global + 24)).node).node.cells.size == 1)
+    assert(dsgCaller.get(dsgCaller.globalMapping(AddressRange(global, global + 24)).node.cells(0)).largestAccessedSize == 8)
 
 //    // topdown Caller
     val dsg = results.analysis.get.topDownDSA(program.mainProcedure)
-    assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells.size == 3)
-    assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells(0).largestAccessedSize == 8)
-    assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells(8).largestAccessedSize == 8)
-    assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells(16).largestAccessedSize == 8)
+    assert(dsg.find(dsg.globalMapping(AddressRange(global, global + 24)).node).node.cells.size == 3)
+    assert(dsg.find(dsg.globalMapping(AddressRange(global, global + 24)).node).node.cells(0).largestAccessedSize == 8)
+    assert(dsg.find(dsg.globalMapping(AddressRange(global, global + 24)).node).node.cells(8).largestAccessedSize == 8)
+    assert(dsg.find(dsg.globalMapping(AddressRange(global, global + 24)).node).node.cells(16).largestAccessedSize == 8)
 
   }
 
