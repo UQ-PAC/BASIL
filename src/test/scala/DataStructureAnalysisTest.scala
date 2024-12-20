@@ -31,9 +31,14 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
   }
 
-  def runTest(path: String): BASILResult = {
+  type Addresses = Map[String, BigInt]
+
+  def runTest(path: String): (BASILResult, Addresses, Addresses) = {
     // Logger.setLevel(LogLevel.DEBUG);
-    RunUtils.loadAndTranslate(
+
+    var procs: Addresses = Map();
+    var globals: Addresses = Map();
+    val result = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
           inputFile = path + ".adt",
@@ -44,38 +49,29 @@ class DataStructureAnalysisTest extends AnyFunSuite {
         staticAnalysis = Some(StaticAnalysisConfig()),
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-      )
+      ),
+      postLoad = (ctx: IRContext) => {
+        procs = ctx.program.procedures.collect{ case p if p.address.nonEmpty => p.name -> p.address.head }.toMap
+        globals = ctx.globals.map(p => p.name -> p.address).toMap
+      }
     )
-  }
 
-  def findProcedure(ctx: IRContext, functionName: String): Procedure = {
-    val allprocs = ctx.program.procedures;
-    val procs = allprocs.filter(_.name == functionName).toSeq;
-    assert(procs.length == 1, s": failed to find procedure '$functionName' (available: ${allprocs.map(_.name)})");
-    procs.head
-  }
-
-  def findGlobal(ctx: IRContext, name: String): SpecGlobal = {
-    val allglobs = ctx.globals;
-    val matching = allglobs.filter(_.name == name).toSeq;
-    assert(matching.length == 1, s": failed to find global '$name' (available: ${allglobs.map(_.name)})");
-    matching.head
+    (result, procs, globals)
   }
 
   test("overlapping access") {
-    val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable")
+    val (results, procedures, globals) = runTest("src/test/indirect_calls/jumptable/clang/jumptable")
 
     // the dsg of the main procedure after the local phase
     val program = results.ir.program
     val dsg = results.analysis.get.localDSA(program.mainProcedure)
 
-    val addtwo_addr = findProcedure(results.ir, "add_two").address.get
-    val addsix_addr = findProcedure(results.ir, "add_six").address.get
-    val subseven_addr = findProcedure(results.ir, "sub_seven").address.get
+    val addtwo_addr = procedures("add_two");
+    val addsix_addr = procedures("add_six");
+    val subseven_addr = procedures("sub_seven");
 
     // dsg.formals(R29) is the slice representing formal R29
     val R29formal = dsg.adjust(dsg.formals(R29))
-
 
     // cells representing the stack at various offsets
     val stack64 = dsg.get(dsg.stackMapping(64).cells(0)) // R31 + 0x40
@@ -109,7 +105,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
 
   test("stack interproc overlapping") {
-    val results = runTest("src/test/dsa/stack_interproc_overlapping/stack_interproc_overlapping")
+    val (results, procedures, globals) = runTest("src/test/dsa/stack_interproc_overlapping/stack_interproc_overlapping")
 
     // the dsg of the main procedure after the all phases
     val program = results.ir.program
@@ -152,7 +148,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   }
 
   test("global interproc overlapping") {
-    val results = runTest("src/test/dsa/global_interproc_overlapping/global_interproc_overlapping")
+    val (results, procedures, globals) = runTest("src/test/dsa/global_interproc_overlapping/global_interproc_overlapping")
 
     // the dsg of the main procedure after the local phase
     val program = results.ir.program
@@ -160,7 +156,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
     // Local Caller
     val dsgCaller = results.analysis.get.localDSA(program.mainProcedure)
-    val global = findGlobal(results.ir, "global").address
+    val global = globals("global")
 
     assert(dsgCaller.find(dsgCaller.globalMapping(AddressRange(global, global + 24)).node).node.cells.size == 1)
     assert(dsgCaller.get(dsgCaller.globalMapping(AddressRange(global, global + 24)).node.cells(0)).largestAccessedSize == 8)
@@ -176,7 +172,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
 
   test("indirect overlapping") {
-    val results = runTest("src/test/dsa/indirect_overlapping/indirect_overlapping")
+    val (results, procedures, globals) = runTest("src/test/dsa/indirect_overlapping/indirect_overlapping")
 
     val program = results.ir.program
     val dsg = results.analysis.get.localDSA(program.mainProcedure)
@@ -198,7 +194,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   /*
   TODO - rewrite this test with a new input that is more suitable than the removed example
   test("basic pointer") {
-    val results = RunUtils.loadAndTranslate(
+    val (results, procedures, globals) = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
           inputFile = "examples/basicpointer/basicpointer.adt",
@@ -273,7 +269,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   }
 
   test("local jumptable2 callees") {
-    val results = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
+    val (results, procedures, globals) = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
 
     val program = results.ir.program
     // test that all three callees have the same local graph
@@ -293,7 +289,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   }
 
   test("local jumptable2 main") {
-    val results = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
+    val (results, procedures, globals) = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
 
     val program = results.ir.program
     val dsg = results.analysis.get.localDSA(program.mainProcedure)
@@ -314,7 +310,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   }
 
   test("unsafe pointer arithmetic") {
-    val results = runTest("src/test/dsa/unsafe_pointer_arithmetic/unsafe_pointer_arithmetic")
+    val (results, procedures, globals) = runTest("src/test/dsa/unsafe_pointer_arithmetic/unsafe_pointer_arithmetic")
 
     val program = results.ir.program
     val dsg = results.analysis.get.localDSA(program.mainProcedure)
@@ -355,7 +351,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   }
 
   test("interproc pointer arithmetic main") {
-    val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
+    val (results, procedures, globals) = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
     val dsg = results.analysis.get.localDSA(program.mainProcedure)
     val stack0 = dsg.adjust(dsg.get(dsg.stackMapping(0).cells(0)).getPointee)
@@ -378,7 +374,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   }
 
   test("interproc pointer arithmetic callee") {
-    val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
+    val (results, procedures, globals) = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
     val dsg = results.analysis.get.localDSA(program.nameToProcedure("callee"))
     val stack8 = dsg.adjust(dsg.get(dsg.stackMapping(8).cells(0)).getPointee)
@@ -519,7 +515,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     // this is the same as local graphs
     // nothing should be changed
     // TODO count point-to relations and ensure no more constraints are added in this phase
-    val results = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
+    val (results, procedures, globals) = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
 
     val program = results.ir.program
     // test that all three callees have the same local graph
@@ -538,7 +534,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   }
 
   test("bottom up jumptable2 main") {
-    val results = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
+    val (results, procedures, globals) = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
     val program = results.ir.program
     val dsg = results.analysis.get.bottomUpDSA(program.mainProcedure)
 
@@ -560,7 +556,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
   ignore("bottom up interproc pointer arithmetic callee") {
     // same as interproc pointer arithmetic callee's local graph (no changes should have been made)
-    val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
+    val (results, procedures, globals) = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
     val dsg = results.analysis.get.bottomUpDSA(program.nameToProcedure("callee"))
     val stack8 = dsg.adjust(dsg.get(dsg.stackMapping(8).cells(0)).getPointee)
@@ -572,7 +568,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   }
 
   test("bottom up interproc pointer arithmetic main") {
-    val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
+    val (results, procedures, globals) = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
     val dsg = results.analysis.get.bottomUpDSA(program.mainProcedure)
 
@@ -600,7 +596,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   // top down tests
   ignore("top down jumptable2 main") {
     // no changes should be made from previous phase
-    val results = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
+    val (results, procedures, globals) = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
     val program = results.ir.program
     val dsg = results.analysis.get.topDownDSA(program.mainProcedure)
 //    assert(dsg.pointTo.size == 13) // 13
@@ -621,7 +617,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   }
 
   ignore("top down jumptable2 callees") {
-    val results = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
+    val (results, procedures, globals) = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
 
     val program = results.ir.program
     // test that all three callees have the same local graph
@@ -640,7 +636,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   }
 
   test("top down interproc pointer arithmetic callee") {
-    val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
+    val (results, procedures, globals) = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
     val dsg = results.analysis.get.topDownDSA(program.nameToProcedure("callee"))
 
@@ -655,7 +651,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
   // top-down phase should be the same as bottom-up phase
   ignore("top down interproc pointer arithmetic main") {
-    val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
+    val (results, procedures, globals) = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
     val dsg = results.analysis.get.topDownDSA(program.mainProcedure)
 
