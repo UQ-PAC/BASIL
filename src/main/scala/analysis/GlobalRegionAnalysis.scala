@@ -50,7 +50,7 @@ trait GlobalRegionAnalysis(
     val eval = evaluateExpression(exp, constantProp(n))
     if (eval.isDefined) {
       val index = eval.get.value
-      Set(dataPoolMaster(index, subAccess))
+      Set(dataPoolMaster(index, subAccess, convertSize = !noLoad))
     } else {
       exp match {
         case literal: BitVecLiteral => tryCoerceIntoData(literal, n, subAccess, noLoad)
@@ -105,7 +105,7 @@ trait GlobalRegionAnalysis(
    * @param n CFGPosition
    * @return Set[DataRegion]
    */
-  def checkIfDefined(dataRegions: Set[DataRegion], n: CFGPosition): Set[DataRegion] = {
+  def checkIfDefined(dataRegions: Set[DataRegion], n: CFGPosition, strict: Boolean = false): Set[DataRegion] = {
     var converted: Set[DataRegion] = Set.empty
     dataRegions.foreach { i =>
       val (f, p) = mmm.findDataObjectWithSize(i.start, i.size)
@@ -115,13 +115,20 @@ trait GlobalRegionAnalysis(
       } else if (accesses.size == 1) {
         if (f.contains(accesses.head)) {
           // full access
-          dataPoolMaster(i.start, i.size, false)
-          converted = converted ++ Set(dataMap(i.start))
+          if (strict && i.size == 1) {
+            dataPoolMaster(i.start, accesses.head.size, false)
+          } else {
+            dataPoolMaster(i.start, i.size, false)
+          }
         } else {
           // partial access (we cannot determine the size)
-          dataPoolMaster(i.start, i.size, false)
-          converted = converted ++ Set(dataMap(i.start))
+          if (i.start == accesses.head.start && i.size == 1 && strict) {
+            dataPoolMaster(i.start, accesses.head.size, false)
+          } else {
+            dataPoolMaster(i.start, i.size, false)
+          }
         }
+        converted = converted ++ Set(dataMap(i.start))
       } else {
   //        val highestRegion = accesses.maxBy(_.start)
   //        dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(highestRegion.end - i.start))
@@ -145,7 +152,8 @@ trait GlobalRegionAnalysis(
         checkIfDefined(regions, n)
       case assign: LocalAssign =>
         // this is a constant but we need to check if it is a data region
-        checkIfDefined(tryCoerceIntoData(assign.rhs, assign, 1, noLoad = true), n)
+        // size assumption of 1 here is ok, because it will get approximated later with strict mode
+        checkIfDefined(tryCoerceIntoData(assign.rhs, assign, 1, noLoad = true), n, strict = true)
       case _ =>
         Set()
     }
