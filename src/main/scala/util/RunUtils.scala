@@ -530,9 +530,10 @@ object RunUtils {
     }
   }
 
-  def loadAndTranslate(q: BASILConfig): BASILResult = {
+  def loadAndTranslate(q: BASILConfig, postLoad: IRContext => Unit = s => ()): BASILResult = {
     Logger.debug("[!] Loading Program")
     val ctx = IRLoading.load(q.loading)
+    postLoad(ctx)  // allows extracting information from the original loaded program
 
     IRTransform.doCleanup(ctx)
 
