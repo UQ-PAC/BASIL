@@ -72,3 +72,15 @@ jobs:
           echo "$pasted" > $GITHUB_STEP_SUMMARY
         shell: "bash -xe {0}"
 
+  UnitTests:
+    runs-on: ubuntu-latest
+    container:
+      # Requires repo to have action access in package settings
+      image: ghcr.io/uq-pac/basil-dev:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.github_token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: ./mill test
