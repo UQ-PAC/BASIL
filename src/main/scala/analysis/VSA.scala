@@ -82,7 +82,7 @@ trait ValueSetAnalysis(program: Program, mmm: MemoryModelMap) {
           val unwrapValue = unwrapExprToVar(load.index)
           unwrapValue match {
             case Some(v: Variable) =>
-              s + (load.lhs -> s(v))
+              s + (load.lhs -> s(v).flatMap(r => findLoadedWithPreDefined(s, r.asInstanceOf[AddressValue].region)).map(r => AddressValue(r)))
             case None =>
               Logger.debug(s"Too Complex: $load") // do nothing
               s

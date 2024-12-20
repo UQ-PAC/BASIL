@@ -197,6 +197,7 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt], val externalFunctio
       val obj = findDataObject(dr.start)
       if (obj.isEmpty) {
         Logger.debug(s"Data region $dr not found in the new data map")
+        add(dr.start, dr)
       } else {
         val isRelocated = relocatedDataRegion(dr.start)
         if (isRelocated.isDefined) {
