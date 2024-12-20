@@ -23,7 +23,7 @@ enum SymBase:
   case Global extends SymBase
 
 
-abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends
+abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]], inParams: Map[Procedure, Set[Variable]], outParams: Map[Procedure, Set[Register]]) extends
   Analysis[Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]]] {
 
   HeapCounter.reset()
@@ -33,6 +33,10 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
   private val stackPointer = Register("R31", 64)
   private val linkRegister = Register("R30", 64)
   private val framePointer = Register("R29", 64)
+
+
+  private final val callerPreservedRegisters: Set[Variable] = Set("R0", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10",
+    "R11", "R12", "R13", "R14", "R15", "R16", "R17", "R18").map(n => Register(n, 64))
 
   private val implicitFormals: Set[Variable] = Set(linkRegister, framePointer)
 
@@ -98,34 +102,35 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
     n match
       case procedure: Procedure => // entry
         (s + (stackPointer -> initDef(Stack(procedure.name))) + (linkRegister -> initDef(Par("link"))) + (framePointer -> initDef(Par("frame")))) ++
-          procedure.in.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
+          inParams.getOrElse(procedure, callerPreservedRegisters).foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
           (m, param) =>
-           m + (param.value -> initDef(Par(param.name)))
+           m + (param -> initDef(Par(param.name)))
         }
 
       case alloc @ LocalAssign(lhs: Variable, rhs: BinaryExpr, _) if rhs.arg1 == stackPointer && rhs.op == BVADD &&
-        evaluateExpression(rhs.arg2, constProp(alloc)).nonEmpty && isNegative(evaluateExpression(rhs.arg2, constProp(alloc)).get) => s // ignore stack allocations
+        evaluateExpression(rhs.arg2, constProp(alloc)).nonEmpty && isNegative(evaluateExpression(rhs.arg2, constProp(alloc)).get) =>
+        s + (lhs -> s(stackPointer)) // ignore stack allocations
       case pos @ LocalAssign(lhs: Variable, rhs, label) =>
         s + (lhs -> exprToSymValMap(pos, rhs, s)) // local
       case MemoryLoad(lhs, _, index, _, _, _)  =>
         s + (lhs -> initDef(Unknown())) // load
       case DirectCall(target, _) if target.name == "malloc" => s + (mallocRegister -> initDef(Heap()))
-      case DirectCall(target, _) => s ++ target.out.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
+      case DirectCall(target, _) => s ++ outParams.getOrElse(target, callerPreservedRegisters).foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
         (m, param) =>
-          m + (param.value -> initDef(Ret(f"${target.name}_${param.name}", RetCounter.increment())))
+          m + (param -> initDef(Ret(f"${target.name}_${param.name}", RetCounter.increment())))
       }
       case _ => s
   }
 }
 
-class SVAHelper(proc: Procedure, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends SV(proc, constProp), IRIntraproceduralForwardDependencies,
+class SVAHelper(proc: Procedure, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]], inParams: Map[Procedure, Set[Variable]], outParams: Map[Procedure, Set[Register]]) extends SV(proc, constProp, inParams, outParams), IRIntraproceduralForwardDependencies,
   SimpleWorklistFixpointSolver[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]],
     MapLattice[Variable, Map[SymBase,  Option[Set[Int]]],
       MapLattice[SymBase, Option[Set[Int]], PowerSetLatticeWithTop[Int]]]]
 
-class SVA(proc: Procedure, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends Analysis[Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]]] {
+class SVA(proc: Procedure, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]], inParams: Map[Procedure, Set[Variable]], outParams: Map[Procedure, Set[Register]]) extends Analysis[Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]]] {
 
-  private val sva = SVAHelper(proc, constProp)
+  private val sva = SVAHelper(proc, constProp, inParams, outParams)
   val svaMap = sva.analyze()
   override def analyze(): Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]] = svaMap
   def exprToSymValSet(pos: CFGPosition, expr: Expr): Map[SymBase, Option[Set[Int]]] = {

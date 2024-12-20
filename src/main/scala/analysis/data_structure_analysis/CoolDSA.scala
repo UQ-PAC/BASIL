@@ -28,12 +28,13 @@ object CoolNodeCounter {
     }
 }
 
-class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]])
+class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]], inParams: Map[Procedure, Set[Variable]], outParams: Map[Procedure, Set[Register]])
 {
 
   val solver: CoolDSAUnionFindSolver = CoolDSAUnionFindSolver()
 
-  val sva = SVA(proc, constProp)
+
+  val sva = SVA(proc, constProp, inParams, outParams)
   var nodes: Set[CoolNode] = Set.empty
   var pointsTo: Set[(CoolCell, CoolCell)] = Set.empty
   var exprToCell: Set[(CFGPosition, Expr, CoolCell)] = Set.empty
@@ -192,7 +193,8 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
         val pointerCell = mergeCells(getCells(arg2.SSAVar))
         // pointerCells.foreach(_.growSize(size))
         val pointeeCell = pointerCell.getPointee // mergePointees(pointerCells)
-        mergeCells(valueCell, pointeeCell)
+        val test = mergeCells(valueCell, pointeeCell)
+        test
       case _ => ???
   }
 
@@ -261,8 +263,8 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
 
       val cells: Seq[(Int, CoolCell)] = (node1.cells.toSeq ++ node2CellsOffset).sortBy(_(0))
 
-      var lastOffset: Int = -1
-      var lastAccess: Int = -1
+      var lastOffset: Int = Int.MinValue // allow for negative offsets
+      var lastAccess: Int = 0 
       // create a new node to represent the unified node
       val resultNode = CoolNode(this, node2.symBases.union(node1.symBases))
       // add nodes flags and regions to the resulting node
@@ -338,11 +340,53 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
   }
 }
 
+
+class CoolFlags {
+  var collapsed = false
+  var stack = false
+  var heap = false
+  var global = false
+  var unknown =  false
+  var incomplete = false
+  var function = false
+  var merged = false
+  var read = false
+  var modified = false
+  var external = false
+
+
+  def join(other: CoolFlags): Unit = {
+    collapsed = collapsed || other.collapsed
+    stack = other.stack || stack
+    heap = other.heap || heap
+    global = other.global || global
+    unknown = other.unknown || unknown
+    read = other.read || read
+    modified = other.modified || modified
+    incomplete = other.incomplete || incomplete
+    external = other.external && external
+    merged = true
+    function = function || other.function
+  }
+}
+
 class CoolNode(val graph: CoolGraph, val symBases: mutable.Set[SymBase] = mutable.Set.empty, private var _size: Int = 0, val id: Int = CoolNodeCounter.getCounter) {
 
-  val t = 1
   val term: DSACoolUniTerm = DSACoolUniTerm(this)
-  private var collapsed = false
+  private val flags: CoolFlags = CoolFlags()
+  symBases.foreach {
+    case SymBase.Heap(id) =>
+      flags.heap = true
+    case SymBase.Unknown(id) =>
+      flags.incomplete = true
+      flags.unknown = true
+    case SymBase.Stack(name) => flags.stack = true
+    case SymBase.Par(name) => flags.incomplete = true
+    case SymBase.Ret(name, id) => flags.incomplete = true
+    case SymBase.Global => flags.global = true
+  }
+
+//  private var collapsed = false
 
   override def equals(obj: Any): Boolean =
     {
@@ -352,10 +396,26 @@ class CoolNode(val graph: CoolGraph, val symBases: mutable.Set[SymBase] = mutabl
     }
 
   override def toString: String = {
-    s"Node($id, $symBases${if collapsed then ", C" else ""})"
+    s"Node($id, $symBases${if flags.collapsed then ", C" else ""})"
   }
 
-  def isCollapsed: Boolean = collapsed
+
+  var selfMerged: Set[Set[Int]] = Set.empty
+
+
+  def valid: Boolean = {
+    var seen: Set[Int] = Set.empty
+    selfMerged.foreach(
+      s =>
+        s.foreach(getCell)
+        assert(s.intersect(seen).isEmpty)
+        seen ++= s
+    )
+
+    true
+  }
+
+  def isCollapsed: Boolean = flags.collapsed
 
   def collapse(): CoolNode =
   {
@@ -363,12 +423,12 @@ class CoolNode(val graph: CoolGraph, val symBases: mutable.Set[SymBase] = mutabl
     val field = graph.find(this)
     val node: CoolNode = field.node
 
-    if (!(node.collapsed)) {
+    if (!(node.flags.collapsed)) {
       val collapsedNode: CoolNode = CoolNode(graph, symBases)
       val collapsedCell = collapsedNode.cells(0)
 
-      node.collapsed = true
-      collapsedNode.collapsed = true
+      node.flags.collapsed = true
+      collapsedNode.flags.collapsed = true
 
       var pointToItself = false
       val cells = node.cells.values
@@ -388,7 +448,7 @@ class CoolNode(val graph: CoolGraph, val symBases: mutable.Set[SymBase] = mutabl
         cell = graph.mergeCells(cell, collapsedCell)
       }
 
-      collapsedCell.setPointee(collapsedCell)
+      collapsedCell.setPointee(cell)
       assert(collapsedNode.cells.size == 1)
 
       graph.solver.unify(node.term, collapsedNode.term, 0)
@@ -437,11 +497,11 @@ class CoolNode(val graph: CoolGraph, val symBases: mutable.Set[SymBase] = mutabl
 
 
   def getCell(offset: Int): CoolCell = {
-    if collapsed then cells(0) else cells(offset)
+    if flags.collapsed then cells(0) else cells(offset)
   }
 
   def addCell(offset: Int, accessSize: Int = 0): CoolCell = {
-    if collapsed then cells(0) else cells.getOrElseUpdate(offset, new CoolCell(this, offset, accessSize))
+    if flags.collapsed then cells(0) else cells.getOrElseUpdate(offset, new CoolCell(this, offset, accessSize))
   }
 
   def size(): Int = {
@@ -494,7 +554,7 @@ class CoolCell(val node: CoolNode, val offset: Int, var largestAccessedSize: Int
     }
 }
 
-class CoolDSA(program: Program, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends Analysis[Map[Procedure, CoolGraph]]
+class CoolDSA(program: Program, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]], inParams: Map[Procedure, Set[Variable]], outParams: Map[Procedure, Set[Register]]) extends Analysis[Map[Procedure, CoolGraph]]
 {
 
   val domain = computeDomain(program)
@@ -520,7 +580,7 @@ class CoolDSA(program: Program, constProp: Map[CFGPosition, Map[Variable, FlatEl
 
     val result: mutable.Map[DSAPhase, Map[Procedure, CoolGraph]] = mutable.Map.empty
     result.update(Local, domain.foldLeft(Map[Procedure, CoolGraph]()) {
-      (m, proc) => m + (proc -> CoolGraph(proc, Local, constProp).localPhase())
+      (m, proc) => m + (proc -> CoolGraph(proc, Local, constProp, inParams, outParams).localPhase())
     })
 
     writeToFile(result(Local).head._2.toDot, "cooldsa.dot")

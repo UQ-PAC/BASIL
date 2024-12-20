@@ -622,7 +622,8 @@ object RunUtils {
 
     Logger.debug("[!] Running ConstGen")
 
-    val test = CoolDSA(ctx.program, analysisResult.last.intraProcConstProp)
+
+    val test = CoolDSA(ctx.program, analysisResult.last.intraProcConstProp, analysisResult.last.paramResults, writesTo)
     test.analyze()
 //    val gen = ConstraintGen(ctx.program, analysisResult.last.intraProcConstProp).analyze()
 //    val labels = gen.map { (k, v) => k -> v.toString }
