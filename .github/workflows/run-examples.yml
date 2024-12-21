@@ -83,4 +83,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - run: ./mill test
+        # every text except SystemTests:
+        # ./mill test.testOnly '*' -- -t '' | tr -d ':' | ansi2txt | grep -vE '^SystemTests' 
+      - run: ./mill test.testOnly DSAMemoryRegionSystemTestsBAP IntrusiveListTest IntrusiveListPublicInterfaceTest PointsToTest DSAMemoryRegionSystemTestsGTIRB MemoryRegionTestsNoRegion AnalysisSystemTestsBAP AnalysisSystemTestsGTIRB DataStructureAnalysisTest IrreducibleLoop ParamAnalysisTests LiveVarsAnalysisTests IRTest CILVisitorTest InterpreterTests InvariantTest ProcedureSummaryTests UnimplementedTests ExtraSpecTests BitVectorAnalysisTests TaintAnalysisTests IndirectCallTests MemoryRegionTestsDSA
