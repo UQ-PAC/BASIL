@@ -30,9 +30,7 @@ object CoolNodeCounter {
 
 class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]], inParams: Map[Procedure, Set[Variable]], outParams: Map[Procedure, Set[Register]])
 {
-
   val solver: CoolDSAUnionFindSolver = CoolDSAUnionFindSolver()
-
 
   val sva = SVA(proc, constProp, inParams, outParams)
   var nodes: Set[CoolNode] = Set.empty
@@ -227,8 +225,9 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
     if cell1.equals(cell2) then // same cell no action required
       cell1
     else if cell1.node.equals(cell2.node) then // same node different cells causes collapse
-      val ne = cell1.node.collapse()
-      ne.getCell(0)
+      cell1.node.merge(cell1.offset, cell2.offset)
+//      val ne = cell1.node.collapse()
+//      ne.getCell(0)
     else if (cell1.node.isCollapsed || cell2.node.isCollapsed) then // a collapsed node
 
       var node1 = cell1.node
@@ -264,7 +263,7 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
       val cells: Seq[(Int, CoolCell)] = (node1.cells.toSeq ++ node2CellsOffset).sortBy(_(0))
 
       var lastOffset: Int = Int.MinValue // allow for negative offsets
-      var lastAccess: Int = 0 
+      var lastAccess: Int = 0
       // create a new node to represent the unified node
       val resultNode = CoolNode(this, node2.symBases.union(node1.symBases))
       // add nodes flags and regions to the resulting node
@@ -291,13 +290,19 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
         }
       }
 
-
       // do this prior to merging pointees in case a cell points to the resulting node
       resultCells.keys.foreach( offset => resultNode.addCell(offset, resultLargestAccesses(offset)))
+
+      val selfMerged = (node1.selfMerged ++ node2.selfMerged.map(f => f.map(_ + delta))).foldLeft(Set[Set[Int]]()) {
+        case (s, mergedOffsets) =>
+          val common = s.filter(f => f.intersect(mergedOffsets).nonEmpty)
+          (s -- common) + common.flatten
+      }
+
+      resultNode.selfMerged = selfMerged
+
       solver.unify(node1.term, resultNode.term, 0)
       solver.unify(node2.term, resultNode.term, delta)
-
-
 
       resultCells.keys.foreach { off =>
         var field = find(resultNode)
@@ -386,8 +391,6 @@ class CoolNode(val graph: CoolGraph, val symBases: mutable.Set[SymBase] = mutabl
     case SymBase.Global => flags.global = true
   }
 
-//  private var collapsed = false
-
   override def equals(obj: Any): Boolean =
     {
       obj match
@@ -402,6 +405,14 @@ class CoolNode(val graph: CoolGraph, val symBases: mutable.Set[SymBase] = mutabl
 
   var selfMerged: Set[Set[Int]] = Set.empty
 
+  private def getMerged(offset: Int): Set[Int] = {
+    val equiv = selfMerged.filter(_.contains(offset))
+    assert(equiv.size <= 1) // can only belong to at most one set of merged cells from this node
+    if equiv.size == 1 then
+      equiv.head
+    else
+      Set(offset)
+  }
 
   def valid: Boolean = {
     var seen: Set[Int] = Set.empty
@@ -413,6 +424,30 @@ class CoolNode(val graph: CoolGraph, val symBases: mutable.Set[SymBase] = mutabl
     )
 
     true
+  }
+
+  def merge(offset1: Int, offset2: Int): CoolCell = {
+    require(cells.contains(offset1) && cells.contains(offset2))
+    val cell1 = getCell(offset1)
+    val cell2 = getCell(offset2)
+
+    val cell1Mergees = getMerged(offset1)
+    val cell2Mergees = getMerged(offset2)
+
+    cell1Mergees.foreach(
+      f => getCell(f).growSize(cell2.largestAccessedSize)
+    )
+
+    cell2Mergees.foreach(
+      f => getCell(f).growSize(cell1.largestAccessedSize)
+    )
+
+    cell1.setPointee(cell2.getPointee) // merge their pointees
+
+    selfMerged = selfMerged.diff(Set(getMerged(offset1), getMerged(offset2))) + (getMerged(offset1) ++ getMerged(offset2))
+
+    selfCollapse()
+    cell1
   }
 
   def isCollapsed: Boolean = flags.collapsed
