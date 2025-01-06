@@ -45,100 +45,95 @@ object Main {
       case ChooseInput.Bap   => adt
 
     Logger.info(s"Loading $input $relf ${spec.getOrElse("")}")
-    val x = ILLoadingConfig(
-      input,
-      relf,
-      spec
-    )
+    val x = ILLoadingConfig(input, relf, spec)
     x
   }
 
   @main(name = "BASIL")
   case class Config(
-      @arg(
-        name = "load-directory-bap",
-        short = 'd',
-        doc = "Load relf, adt, and bir from directory (and spec from parent directory)"
-      )
-      bapInputDirName: Option[String],
-      @arg(
-        name = "load-directory-gtirb",
-        short = 'd',
-        doc = "Load relf, gts, and bir from directory (and spec from parent directory)"
-      )
-      gtirbInputDirName: Option[String],
-      @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file")
-      inputFileName: Option[String],
-      @arg(name = "relf", short = 'r', doc = "Name of the file containing the output of 'readelf -s -r -W'.")
-      relfFileName: Option[String],
-      @arg(name = "spec", short = 's', doc = "BASIL specification file.")
-      specFileName: Option[String],
-      @arg(name = "output", short = 'o', doc = "Boogie output destination file.")
-      outFileName: String = "basil-out.bpl",
-      @arg(name = "boogie-use-lambda-stores", doc = "Use lambda representation of store operations.")
-      lambdaStores: Flag,
-      @arg(
-        name = "boogie-procedure-rg",
-        doc = "Switch version of procedure rely/guarantee checks to emit. (function|ifblock)"
-      )
-      procedureRG: Option[String],
-      @arg(name = "verbose", short = 'v', doc = "Show extra debugging logs (the same as -vl log)")
-      verbose: Flag,
-      @arg(
-        name = "vl",
-        doc = s"Show extra debugging logs for a specific logger (${Logger.allLoggers.map(_.name).mkString(", ")})."
-      )
-      verboseLog: Seq[String] = Seq(),
-      @arg(name = "analyse", doc = "Run static analysis pass.")
-      analyse: Flag,
-      @arg(name = "interpret", doc = "Run BASIL IL interpreter.")
-      interpret: Flag,
-      @arg(name = "dump-il", doc = "Dump the Intermediate Language to text.")
-      dumpIL: Option[String],
-      @arg(name = "main-procedure-name", short = 'm', doc = "Name of the main procedure to begin analysis at.")
-      mainProcedureName: String = "main",
-      @arg(
-        name = "procedure-call-depth",
-        doc = "Cull procedures beyond this call depth from the main function (defaults to Int.MaxValue)"
-      )
-      procedureDepth: Int = Int.MaxValue,
-      @arg(name = "trim-early", doc = "Cull procedures BEFORE running analysis")
-      trimEarly: Flag,
-      @arg(name = "help", short = 'h', doc = "Show this help message.")
-      help: Flag,
-      @arg(name = "analysis-results", doc = "Log analysis results in files at specified path.")
-      analysisResults: Option[String],
-      @arg(name = "analysis-results-dot", doc = "Log analysis results in .dot form at specified path.")
-      analysisResultsDot: Option[String],
-      @arg(
-        name = "threads",
-        short = 't',
-        doc =
-          "Separates threads into multiple .bpl files with given output filename as prefix (requires --analyse flag)"
-      )
-      threadSplit: Flag,
-      @arg(name = "parameter-form", doc = "Lift registers to local variables passed by parameter")
-      parameterForm: Flag,
-      @arg(
-        name = "summarise-procedures",
-        doc = "Generates summaries of procedures which are used in pre/post-conditions (requires --analyse flag)"
-      )
-      summariseProcedures: Flag,
-      @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (requires --analyse flag)")
-      simplify: Flag,
-      @arg(
-        name = "validate-simplify",
-        doc = "Emit SMT2 check for algebraic simplification translation validation to 'rewrites.smt2'"
-      )
-      validateSimplify: Flag,
-      @arg(
-        name = "memory-regions",
-        doc =
-          "Performs static analysis to separate memory into discrete regions in Boogie output (requires --analyse flag) (mra|dsa)"
-      )
-      memoryRegions: Option[String],
-      @arg(name = "verify", doc = "Run boogie on the resulting file")
-      verify: Flag
+    @arg(
+      name = "load-directory-bap",
+      short = 'd',
+      doc = "Load relf, adt, and bir from directory (and spec from parent directory)"
+    )
+    bapInputDirName: Option[String],
+    @arg(
+      name = "load-directory-gtirb",
+      short = 'd',
+      doc = "Load relf, gts, and bir from directory (and spec from parent directory)"
+    )
+    gtirbInputDirName: Option[String],
+    @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file")
+    inputFileName: Option[String],
+    @arg(name = "relf", short = 'r', doc = "Name of the file containing the output of 'readelf -s -r -W'.")
+    relfFileName: Option[String],
+    @arg(name = "spec", short = 's', doc = "BASIL specification file.")
+    specFileName: Option[String],
+    @arg(name = "output", short = 'o', doc = "Boogie output destination file.")
+    outFileName: String = "basil-out.bpl",
+    @arg(name = "boogie-use-lambda-stores", doc = "Use lambda representation of store operations.")
+    lambdaStores: Flag,
+    @arg(
+      name = "boogie-procedure-rg",
+      doc = "Switch version of procedure rely/guarantee checks to emit. (function|ifblock)"
+    )
+    procedureRG: Option[String],
+    @arg(name = "verbose", short = 'v', doc = "Show extra debugging logs (the same as -vl log)")
+    verbose: Flag,
+    @arg(
+      name = "vl",
+      doc = s"Show extra debugging logs for a specific logger (${Logger.allLoggers.map(_.name).mkString(", ")})."
+    )
+    verboseLog: Seq[String] = Seq(),
+    @arg(name = "analyse", doc = "Run static analysis pass.")
+    analyse: Flag,
+    @arg(name = "interpret", doc = "Run BASIL IL interpreter.")
+    interpret: Flag,
+    @arg(name = "dump-il", doc = "Dump the Intermediate Language to text.")
+    dumpIL: Option[String],
+    @arg(name = "main-procedure-name", short = 'm', doc = "Name of the main procedure to begin analysis at.")
+    mainProcedureName: String = "main",
+    @arg(
+      name = "procedure-call-depth",
+      doc = "Cull procedures beyond this call depth from the main function (defaults to Int.MaxValue)"
+    )
+    procedureDepth: Int = Int.MaxValue,
+    @arg(name = "trim-early", doc = "Cull procedures BEFORE running analysis")
+    trimEarly: Flag,
+    @arg(name = "help", short = 'h', doc = "Show this help message.")
+    help: Flag,
+    @arg(name = "analysis-results", doc = "Log analysis results in files at specified path.")
+    analysisResults: Option[String],
+    @arg(name = "analysis-results-dot", doc = "Log analysis results in .dot form at specified path.")
+    analysisResultsDot: Option[String],
+    @arg(
+      name = "threads",
+      short = 't',
+      doc = "Separates threads into multiple .bpl files with given output filename as prefix (requires --analyse flag)"
+    )
+    threadSplit: Flag,
+    @arg(name = "parameter-form", doc = "Lift registers to local variables passed by parameter")
+    parameterForm: Flag,
+    @arg(
+      name = "summarise-procedures",
+      doc = "Generates summaries of procedures which are used in pre/post-conditions (requires --analyse flag)"
+    )
+    summariseProcedures: Flag,
+    @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (requires --analyse flag)")
+    simplify: Flag,
+    @arg(
+      name = "validate-simplify",
+      doc = "Emit SMT2 check for algebraic simplification translation validation to 'rewrites.smt2'"
+    )
+    validateSimplify: Flag,
+    @arg(
+      name = "memory-regions",
+      doc =
+        "Performs static analysis to separate memory into discrete regions in Boogie output (requires --analyse flag) (mra|dsa)"
+    )
+    memoryRegions: Option[String],
+    @arg(name = "verify", doc = "Run boogie on the resulting file")
+    verify: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -215,17 +210,12 @@ object Main {
     } else if (conf.gtirbInputDirName.isDefined) then {
       loadDirectory(ChooseInput.Gtirb, conf.gtirbInputDirName.get)
     } else if (conf.inputFileName.isDefined && conf.relfFileName.isDefined) then {
-      ILLoadingConfig(
-        conf.inputFileName.get,
-        conf.relfFileName.get,
-        conf.specFileName
-      )
+      ILLoadingConfig(conf.inputFileName.get, conf.relfFileName.get, conf.specFileName)
 
     } else {
       throw IllegalArgumentException(
-        "\nRequires --load-directory-bap OR --load-directory-gtirb OR --input and--relf\n\n" + parser.helpText(sorted =
-          false
-        )
+        "\nRequires --load-directory-bap OR --load-directory-gtirb OR --input and--relf\n\n" + parser
+          .helpText(sorted = false)
       )
     }
 
