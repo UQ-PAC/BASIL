@@ -53,13 +53,11 @@ object Main {
   case class Config(
     @arg(
       name = "load-directory-bap",
-      short = 'd',
       doc = "Load relf, adt, and bir from directory (and spec from parent directory)"
     )
     bapInputDirName: Option[String],
     @arg(
       name = "load-directory-gtirb",
-      short = 'd',
       doc = "Load relf, gts, and bir from directory (and spec from parent directory)"
     )
     gtirbInputDirName: Option[String],
