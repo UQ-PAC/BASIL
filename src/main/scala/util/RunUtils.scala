@@ -98,7 +98,7 @@ object IRLoading {
     } else if (q.inputFile.endsWith(".gts")) {
       loadGTIRB(q.inputFile, mainAddress)
     } else {
-      throw Exception(s"input file name ${q.inputFile} must be an .adt or .gst file")
+      throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
     }
 
     val specification = IRLoading.loadSpecification(q.specFile, program, globals)

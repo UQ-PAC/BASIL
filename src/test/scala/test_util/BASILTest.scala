@@ -33,7 +33,7 @@ trait BASILTest {
       ),
       simplify = simplify,
       staticAnalysis = staticAnalysisConf,
-      boogieTranslation = util.BoogieGeneratorConfig().copy(memoryFunctionType=util.BoogieMemoryAccessMode.LambdaStoreSelect),
+      boogieTranslation = util.BoogieGeneratorConfig().copy(memoryFunctionType=util.BoogieMemoryAccessMode.SuccessiveStoreSelect),
       outputPrefix = BPLPath,
     )
     val result = RunUtils.loadAndTranslate(config)
