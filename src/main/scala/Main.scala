@@ -244,7 +244,9 @@ object Main {
     RunUtils.run(q)
     if (conf.verify.value) {
       Logger.info("Running boogie")
+      val timer = PerformanceTimer("Verify", LogLevel.INFO)
       Seq("boogie", "/useArrayAxioms", q.outputPrefix).!
+      timer.checkPoint("Finish")
     }
   }
 

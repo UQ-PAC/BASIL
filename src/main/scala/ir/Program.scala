@@ -74,8 +74,8 @@ class Program(val procedures: ArrayBuffer[Procedure],
     }
 
     for (p <- procedures) {
-      if (specModifies.contains(p.name)) {
-        p.modifies.addAll(specModifies(p.name).map(nameToGlobal))
+      if (specModifies.contains(p.procName)) {
+        p.modifies.addAll(specModifies(p.procName).map(nameToGlobal))
       }
     }
 
