@@ -3,11 +3,22 @@ package ir.transforms
 import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 
-import analysis.{AddressValue, DataRegion, Lift, LiftedElement, LiteralValue, MemoryModelMap, MemoryRegion, RegisterWrapperEqualSets, StackRegion, Value, getUse}
+import analysis.{
+  AddressValue,
+  DataRegion,
+  Lift,
+  LiftedElement,
+  LiteralValue,
+  MemoryModelMap,
+  MemoryRegion,
+  RegisterWrapperEqualSets,
+  StackRegion,
+  Value,
+  getUse
+}
 import ir.*
 import util.Logger
 import cilvisitor.*
-
 
 class SteensgaardIndirectCallResolution(
   override val program: Program,
@@ -25,7 +36,9 @@ class SteensgaardIndirectCallResolution(
                 case memoryRegion: MemoryRegion =>
                   searchRegion(memoryRegion)
                 case registerWrapperEqualSets: RegisterWrapperEqualSets =>
-                  throw Exception(s"possibly recursive points-to relation? should I handle this? $registerWrapperEqualSets")
+                  throw Exception(
+                    s"possibly recursive points-to relation? should I handle this? $registerWrapperEqualSets"
+                  )
               }
             case memoryRegion: MemoryRegion =>
               //searchRegion(memoryRegion)
@@ -44,7 +57,9 @@ class SteensgaardIndirectCallResolution(
                 case memoryRegion: MemoryRegion =>
                   searchRegion(memoryRegion)
                 case registerWrapperEqualSets: RegisterWrapperEqualSets =>
-                  throw Exception(s"possibly recursive points-to relation? should I handle this? $registerWrapperEqualSets")
+                  throw Exception(
+                    s"possibly recursive points-to relation? should I handle this? $registerWrapperEqualSets"
+                  )
               }
             case memoryRegion: MemoryRegion =>
               //searchRegion(memoryRegion))
@@ -61,7 +76,7 @@ class SteensgaardIndirectCallResolution(
       case Some(values) =>
         values.flatMap {
           case v: RegisterWrapperEqualSets => resolveAddresses(v.variable, i)
-          case m: MemoryRegion            => searchRegion(m)
+          case m: MemoryRegion             => searchRegion(m)
         }
       case None => Set()
     }
@@ -77,14 +92,15 @@ class VSAIndirectCallResolution(
 
   private def searchRegion(memoryRegion: MemoryRegion, n: CFGPosition): Set[String] = {
     val names = vsaResult.get(n) match {
-      case Some(Lift(el)) => el.get(memoryRegion) match {
-        case Some(values) =>
-          values.flatMap {
-            case addressValue: AddressValue => searchRegion(addressValue.region, n)
-            case _ => Set()
-          }
-        case _ => Set()
-      }
+      case Some(Lift(el)) =>
+        el.get(memoryRegion) match {
+          case Some(values) =>
+            values.flatMap {
+              case addressValue: AddressValue => searchRegion(addressValue.region, n)
+              case _                          => Set()
+            }
+          case _ => Set()
+        }
       case _ => Set()
     }
     memoryRegion match {
@@ -99,14 +115,15 @@ class VSAIndirectCallResolution(
 
   override def resolveAddresses(variable: Variable, i: IndirectCall): Set[String] = {
     vsaResult.get(i) match {
-      case Some(Lift(el)) => el.get(variable) match {
-        case Some(values) =>
-          values.flatMap {
-            case addressValue: AddressValue => searchRegion(addressValue.region, i)
-            case _: LiteralValue => Set()
-          }
-        case _ => Set()
-      }
+      case Some(Lift(el)) =>
+        el.get(variable) match {
+          case Some(values) =>
+            values.flatMap {
+              case addressValue: AddressValue => searchRegion(addressValue.region, i)
+              case _: LiteralValue            => Set()
+            }
+          case _ => Set()
+        }
       case _ => Set()
     }
   }
@@ -173,9 +190,9 @@ trait IndirectCallResolution {
 
           /* copy the goto node resulting */
           val fallthrough = oft match {
-            case g: GoTo => GoTo(g.targets, g.label)
+            case g: GoTo        => GoTo(g.targets, g.label)
             case _: Unreachable => Unreachable()
-            case _: Return => Return()
+            case _: Return      => Return()
           }
           newBlocks.append(Block(newLabel, None, ArrayBuffer(assume, directCall), fallthrough))
         }

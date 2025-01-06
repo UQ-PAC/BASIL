@@ -5,12 +5,12 @@ import ir.*
 
 import scala.collection.mutable
 
+def splitThreads(
+  program: Program,
+  pointsTo: Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]],
+  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
+): Unit = {
 
-def splitThreads(program: Program,
-                 pointsTo: Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]],
-                 reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
-                ): Unit = {
-  
   // iterate over all commands - if call is to pthread_create, look up
   program.foreach {
     case d: DirectCall if d.target.name == "pthread_create" =>
@@ -31,7 +31,7 @@ def splitThreads(program: Program,
           case data: DataRegion =>
             val threadEntrance = program.procedures.find(_.name == data.regionIdentifier) match {
               case Some(proc) => proc
-              case None => throw Exception("could not find procedure with name " + data.regionIdentifier)
+              case None       => throw Exception("could not find procedure with name " + data.regionIdentifier)
             }
             val thread = ProgramThread(threadEntrance, mutable.LinkedHashSet(threadEntrance), Some(d))
             program.threads.addOne(thread)

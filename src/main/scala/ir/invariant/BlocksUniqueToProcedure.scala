@@ -30,19 +30,18 @@ private class BVis extends CILVisitor {
   override def vjump(j: Jump) = {
     j match {
       case g @ GoTo(targets, _) if !(targets.forall(t => t.parent == proc)) => gotoViolations.add(g)
-      case _ => ()
+      case _                                                                => ()
     }
 
     SkipChildren()
   }
 }
 
-
-def blockUniqueLabels(p: Program) : Boolean = {
+def blockUniqueLabels(p: Program): Boolean = {
   p.procedures.forall(blockUniqueLabels)
 }
 
-def blockUniqueLabels(p: Procedure) : Boolean = {
+def blockUniqueLabels(p: Procedure): Boolean = {
   val blockNames = mutable.Set[String]()
   var passed = true
 
@@ -56,8 +55,7 @@ def blockUniqueLabels(p: Procedure) : Boolean = {
   passed
 }
 
-
-def blocksUniqueToEachProcedure(p: Program) : Boolean = {
+def blocksUniqueToEachProcedure(p: Program): Boolean = {
   val v = BVis()
   visit_prog(v, p)
   for (g <- v.gotoViolations) {

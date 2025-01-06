@@ -30,7 +30,7 @@ def stripUnreachableFunctions(p: Program, depth: Int = Int.MaxValue): Unit = {
     }
   }
   assert(invariant.cfgCorrect(p))
-  val removed  = p.procedures.filterNot(f => reachableNames.keySet.contains(f)).toSet
+  val removed = p.procedures.filterNot(f => reachableNames.keySet.contains(f)).toSet
   // p.procedures = p.procedures.filter(f => reachableNames.keySet.contains(f.name))
   for (proc <- removed) {
     p.removeProcedure(proc)

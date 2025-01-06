@@ -97,9 +97,9 @@ def evalUnOp(op: UnOp, body: Literal): Expr = {
 }
 
 def evalIntExpr(
-    exp: Expr,
-    variableAssignment: Variable => Option[Literal],
-    memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((a, b, c, d) => None)
+  exp: Expr,
+  variableAssignment: Variable => Option[Literal],
+  memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((a, b, c, d) => None)
 ): Either[Expr, BigInt] = {
   partialEvalExpr(exp, variableAssignment, memory) match {
     case i: IntLiteral => Right(i.value)
@@ -108,9 +108,9 @@ def evalIntExpr(
 }
 
 def evalBVExpr(
-    exp: Expr,
-    variableAssignment: Variable => Option[Literal],
-    memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((a, b, c, d) => None)
+  exp: Expr,
+  variableAssignment: Variable => Option[Literal],
+  memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((a, b, c, d) => None)
 ): Either[Expr, BitVecLiteral] = {
   partialEvalExpr(exp, variableAssignment, memory) match {
     case b: BitVecLiteral => Right(b)
@@ -119,9 +119,9 @@ def evalBVExpr(
 }
 
 def evalLogExpr(
-    exp: Expr,
-    variableAssignment: Variable => Option[Literal],
-    memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((a, b, c, d) => None)
+  exp: Expr,
+  variableAssignment: Variable => Option[Literal],
+  memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((a, b, c, d) => None)
 ): Either[Expr, Boolean] = {
   partialEvalExpr(exp, variableAssignment, memory) match {
     case TrueLiteral  => Right(true)
@@ -131,9 +131,9 @@ def evalLogExpr(
 }
 
 def evalExpr(
-    exp: Expr,
-    variableAssignment: Variable => Option[Literal],
-    memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((d, a, b, c) => None)
+  exp: Expr,
+  variableAssignment: Variable => Option[Literal],
+  memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((d, a, b, c) => None)
 ): Option[Literal] = {
   partialEvalExpr match {
     case l: Literal => Some(l)
@@ -285,8 +285,8 @@ def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S,
 }
 
 class StatelessLoader[E](
-    getVar: Variable => Option[Literal],
-    loadMem: (Memory, Expr, Endian, Int) => Option[Literal] = ((a, b, c, d) => None)
+  getVar: Variable => Option[Literal],
+  loadMem: (Memory, Expr, Endian, Int) => Option[Literal] = ((a, b, c, d) => None)
 ) extends Loader[Unit, E] {
   def getVariable(v: Variable): State[Unit, Option[Literal], E] = State.pure(getVar(v))
   override def loadMemory(m: Memory, addr: Expr, endian: Endian, size: Int): State[Unit, Option[Literal], E] =
@@ -294,9 +294,9 @@ class StatelessLoader[E](
 }
 
 def partialEvalExpr(
-    exp: Expr,
-    variableAssignment: Variable => Option[Literal],
-    memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((a, b, c, d) => None)
+  exp: Expr,
+  variableAssignment: Variable => Option[Literal],
+  memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((a, b, c, d) => None)
 ): Expr = {
   val l = StatelessLoader[InterpreterError](variableAssignment, memory)
   State.evaluate((), statePartialEvalExpr(l)(exp)) match {

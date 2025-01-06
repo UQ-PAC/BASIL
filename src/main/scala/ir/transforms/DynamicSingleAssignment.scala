@@ -16,19 +16,19 @@ val phiAssignLabel = Some("phi")
   */
 
 class OnePassDSA(
-    /** Check our (faster) live var result against the TIP sovler solution
-      */
+  /** Check our (faster) live var result against the TIP sovler solution
+    */
 ) {
 
   val liveVarsDom = transforms.IntraLiveVarsDomain()
   val liveVarsSolver = transforms.worklistSolver(liveVarsDom)
 
   case class BlockState(
-      renamesBefore: mutable.Map[Variable, Int] = mutable.Map[Variable, Int](),
-      renamesAfter: mutable.Map[Variable, Int] = mutable.Map[Variable, Int](),
-      var filled: Boolean = false, /* have given local value numbering */
-      var completed: Boolean = false, /* have filled and processed all incoming */
-      var isPhi: Boolean = false /* begins filled */
+    renamesBefore: mutable.Map[Variable, Int] = mutable.Map[Variable, Int](),
+    renamesAfter: mutable.Map[Variable, Int] = mutable.Map[Variable, Int](),
+    var filled: Boolean = false, /* have given local value numbering */
+    var completed: Boolean = false, /* have filled and processed all incoming */
+    var isPhi: Boolean = false /* begins filled */
   )
 
   def renameLHS(c: Command, variable: Variable, index: Int) = {
@@ -63,9 +63,9 @@ class OnePassDSA(
   }
 
   def localProcessBlock(
-      state: mutable.Map[Block, BlockState],
-      count: mutable.Map[Variable, Int],
-      block: Block
+    state: mutable.Map[Block, BlockState],
+    count: mutable.Map[Variable, Int],
+    block: Block
   ): Unit = {
     def st(b: Block) = withDefault(state)(b)
 
@@ -114,10 +114,10 @@ class OnePassDSA(
   }
 
   def fixPredecessors(
-      _st: mutable.Map[Block, BlockState],
-      count: mutable.Map[Variable, Int],
-      liveBefore: mutable.Map[Block, Set[Variable]],
-      block: Block
+    _st: mutable.Map[Block, BlockState],
+    count: mutable.Map[Variable, Int],
+    liveBefore: mutable.Map[Block, Set[Variable]],
+    block: Block
   ) = {
     def state(b: Block) = withDefault(_st)(b)
 
@@ -182,11 +182,11 @@ class OnePassDSA(
   }
 
   def fixSuccessors(
-      _st: mutable.Map[Block, BlockState],
-      count: mutable.Map[Variable, Int],
-      liveBefore: mutable.Map[Block, Set[Variable]],
-      liveAfter: mutable.Map[Block, Set[Variable]],
-      block: Block
+    _st: mutable.Map[Block, BlockState],
+    count: mutable.Map[Variable, Int],
+    liveBefore: mutable.Map[Block, Set[Variable]],
+    liveAfter: mutable.Map[Block, Set[Variable]],
+    block: Block
   ) = {
     def state(b: Block) = withDefault(_st)(b)
 
@@ -226,11 +226,11 @@ class OnePassDSA(
   }
 
   def visitBlock(
-      _st: mutable.Map[Block, BlockState],
-      count: mutable.Map[Variable, Int],
-      liveBefore: mutable.Map[Block, Set[Variable]],
-      liveAfter: mutable.Map[Block, Set[Variable]],
-      block: Block
+    _st: mutable.Map[Block, BlockState],
+    count: mutable.Map[Variable, Int],
+    liveBefore: mutable.Map[Block, Set[Variable]],
+    liveAfter: mutable.Map[Block, Set[Variable]],
+    block: Block
   ) = {
 
     /** VisitBlock:
@@ -342,8 +342,8 @@ def rdDSAProperty(p: Procedure): Boolean = {
   val defs: Map[Variable, Set[Assign]] = p
     .flatMap {
       case a: SingleAssign => Seq((a.lhs, (a: Assign)))
-      case a: DirectCall => a.outParams.map(_._2).map((l: Variable) => (l, (a: Assign))).toSeq
-      case _             => Seq()
+      case a: DirectCall   => a.outParams.map(_._2).map((l: Variable) => (l, (a: Assign))).toSeq
+      case _               => Seq()
     }
     .groupBy(_._1)
     .map((v, vs) => (v, vs.map(_._2).toSet))
@@ -352,10 +352,8 @@ def rdDSAProperty(p: Procedure): Boolean = {
   val reachingDefs = basicReachingDefs(p)
   Logger.debug(s"Reaching defs ${p.name} DONE")
 
-  class CheckDSAProperty(
-      defs: Map[Variable, Set[Assign]],
-      reaching: Map[Command, Map[Variable, Set[Assign]]]
-  ) extends CILVisitor {
+  class CheckDSAProperty(defs: Map[Variable, Set[Assign]], reaching: Map[Command, Map[Variable, Set[Assign]]])
+      extends CILVisitor {
     var passed = true
     var stmt: Command = null
     val violations = mutable.HashSet[(Command, Variable)]()
@@ -420,8 +418,8 @@ object DSAPropCheck {
 
   def getDefinitions(s: CFGPosition): Set[Variable] = {
     s match {
-      case a: Assign      => a.assignees
-      case _              => Set()
+      case a: Assign => a.assignees
+      case _         => Set()
     }
   }
 

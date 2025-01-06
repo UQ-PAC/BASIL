@@ -12,10 +12,10 @@ enum LogLevel(val id: Int):
   case OFF extends LogLevel(4)
 
 class GenericLogger(
-    val name : String,
-    val defaultLevel: LogLevel = LogLevel.INFO,
-    var output: PrintStream = System.out,
-    var ANSIColour: Boolean = true
+  val name: String,
+  val defaultLevel: LogLevel = LogLevel.INFO,
+  var output: PrintStream = System.out,
+  var ANSIColour: Boolean = true
 ) {
 
   val children: HashSet[GenericLogger] = HashSet()
@@ -35,7 +35,6 @@ class GenericLogger(
 
   def disableColour(setChildren: Boolean = false) = setColour(false, setChildren)
   def enableColour(setChildren: Boolean = false): Unit = setColour(true, setChildren)
-
 
   def deriveLogger(sname: String, stream: PrintStream): GenericLogger = {
     val l = GenericLogger(name + "." + sname, level, stream, ANSIColour)
@@ -81,20 +80,23 @@ class GenericLogger(
   }
 
   private def writeLog(
-      logLevel: LogLevel,
-      arg: Any,
-      line: sourcecode.Line,
-      file: sourcecode.FileName,
-      name: sourcecode.Name
+    logLevel: LogLevel,
+    arg: Any,
+    line: sourcecode.Line,
+    file: sourcecode.FileName,
+    name: sourcecode.Name
   ): Unit = {
 
     if (level.id <= logLevel.id) {
-      val colour = if (!ANSIColour) then "" else logLevel match
-        case DEBUG => AnsiColor.RESET
-        case INFO  => AnsiColor.GREEN
-        case WARN  => AnsiColor.YELLOW
-        case ERROR => AnsiColor.RED
-        case OFF   => ???
+      val colour =
+        if (!ANSIColour) then ""
+        else
+          logLevel match
+            case DEBUG => AnsiColor.RESET
+            case INFO  => AnsiColor.GREEN
+            case WARN  => AnsiColor.YELLOW
+            case ERROR => AnsiColor.RED
+            case OFF   => ???
 
       val showPosition = (logLevel, level) match
         case (_, DEBUG) => true
@@ -139,14 +141,14 @@ class GenericLogger(
     }
   }
 
-  def findLoggerByName(s: String) : Option[GenericLogger] = allLoggers.find(_.name == s)
+  def findLoggerByName(s: String): Option[GenericLogger] = allLoggers.find(_.name == s)
 
   def allLoggers: Iterable[GenericLogger] = {
     (for {
       c <- children
       cc <- c.allLoggers
-    } yield (cc)) 
-    ++ Seq(this)
+    } yield (cc))
+      ++ Seq(this)
   }
 
 }
@@ -154,8 +156,8 @@ class GenericLogger(
 // doesn't work with `mill run`
 def isAConsole = System.console() != null
 
-val Logger  = GenericLogger("log", LogLevel.DEBUG, System.out, isAConsole)
-val StaticAnalysisLogger  = Logger.deriveLogger("analysis", System.out)
+val Logger = GenericLogger("log", LogLevel.DEBUG, System.out, isAConsole)
+val StaticAnalysisLogger = Logger.deriveLogger("analysis", System.out)
 val SimplifyLogger = Logger.deriveLogger("simplify", System.out)
 val DebugDumpIRLogger = {
   val l = Logger.deriveLogger("debugdumpir")
@@ -165,6 +167,3 @@ val DebugDumpIRLogger = {
 val VSALogger = StaticAnalysisLogger.deriveLogger("vsa")
 val MRALogger = StaticAnalysisLogger.deriveLogger("mra")
 val SteensLogger = StaticAnalysisLogger.deriveLogger("steensgaard")
-
-
-

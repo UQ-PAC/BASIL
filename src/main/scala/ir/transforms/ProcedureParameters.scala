@@ -8,32 +8,36 @@ import specification.Specification
 import analysis.{TwoElement, TwoElementTop, TwoElementBottom}
 import ir.CallGraph
 
-case class FunSig(inArgs: List[Register], outArgs: List[Register]) 
+case class FunSig(inArgs: List[Register], outArgs: List[Register])
 
 def R(n: Int) = {
   Register(s"R$n", 64)
 }
 
-val builtinSigs : Map[String, FunSig] = Map(
+val builtinSigs: Map[String, FunSig] = Map(
   "#free" -> FunSig(List(R(0)), List(R(0))),
   "malloc" -> FunSig(List(R(0)), List(R(0))),
   "strlen" -> FunSig(List(R(0)), List(R(0))),
   "strchr" -> FunSig(List(R(0), R(1)), List(R(0))),
   "strlcpy" -> FunSig(List(R(0), R(1), R(2)), List(R(0))),
   "strlcat" -> FunSig(List(R(0), R(1), R(2)), List(R(0)))
-  )
+)
 
-def fnsigToBinding(f: FunSig) = (f.inArgs.map(a => LocalVar(a.name + "_in", a.getType) -> LocalVar(a.name, a.getType)), 
-  f.outArgs.map(a => LocalVar(a.name + "_out", a.getType) -> LocalVar(a.name, a.getType)))
+def fnsigToBinding(f: FunSig) = (
+  f.inArgs.map(a => LocalVar(a.name + "_in", a.getType) -> LocalVar(a.name, a.getType)),
+  f.outArgs.map(a => LocalVar(a.name + "_out", a.getType) -> LocalVar(a.name, a.getType))
+)
 
 def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
 
-  val liveVars  =
-  if (ctx.program.mainProcedure.blocks.nonEmpty && ctx.program.mainProcedure.returnBlock.isDefined && ctx.program.mainProcedure.entryBlock.isDefined) {
-    analysis.InterLiveVarsAnalysis(ctx.program).analyze()
-  } else {
-    Map.empty
-  }
+  val liveVars =
+    if (
+      ctx.program.mainProcedure.blocks.nonEmpty && ctx.program.mainProcedure.returnBlock.isDefined && ctx.program.mainProcedure.entryBlock.isDefined
+    ) {
+      analysis.InterLiveVarsAnalysis(ctx.program).analyze()
+    } else {
+      Map.empty
+    }
 
   val params = inOutParams(ctx.program, liveVars)
 
@@ -78,7 +82,7 @@ def clearParams(p: Program) = {
 def collectVariables(p: Procedure): (Set[Variable], Set[Variable]) = {
   val lvars = p.blocks.toSet.flatMap(_.statements.flatMap(s => {
     s match {
-      case LocalAssign(l, _, _)        => Set(l)
+      case LocalAssign(l, _, _)   => Set(l)
       case DirectCall(t, o, _, _) => o.toSet.map(_._2)
       case _                      => Set()
     }
@@ -90,14 +94,14 @@ def collectVariables(p: Procedure): (Set[Variable], Set[Variable]) = {
     .flatten
   val rvars = p.blocks.toSet.flatMap(_.statements.flatMap(s => {
     s match {
-      case LocalAssign(l, r, _)                => r.variables
-      case Assume(l, _, _, _)             => l.variables
-      case Assert(l, _, _)                => l.variables
-      case MemoryStore(m, i, v, _, _, _) => i.variables ++ v.variables
+      case LocalAssign(l, r, _)                           => r.variables
+      case Assume(l, _, _, _)                             => l.variables
+      case Assert(l, _, _)                                => l.variables
+      case MemoryStore(m, i, v, _, _, _)                  => i.variables ++ v.variables
       case MemoryLoad(lhs, m, index, endian, size, label) => index.variables ++ Seq(lhs)
-      case IndirectCall(l, _)             => Set(l)
-      case DirectCall(t, o, l, _)         => l.toSet.flatMap(_._2.variables)
-      case _                              => Set()
+      case IndirectCall(l, _)                             => Set(l)
+      case DirectCall(t, o, l, _)                         => l.toSet.flatMap(_._2.variables)
+      case _                                              => Set()
     }
   }))
 
@@ -105,8 +109,8 @@ def collectVariables(p: Procedure): (Set[Variable], Set[Variable]) = {
 }
 
 class SetFormalParams(
-    val inoutparams: Map[Procedure, (Set[Variable], Set[Variable])],
-    val externalFunctions: Set[String]
+  val inoutparams: Map[Procedure, (Set[Variable], Set[Variable])],
+  val externalFunctions: Set[String]
 ) extends CILVisitor {
   // expects programs to be in single return form
 
@@ -122,8 +126,6 @@ class SetFormalParams(
 
   override def vproc(p: Procedure) = {
     if (externalFunctions.contains(p.name)) {
-
-
 
       p.formalInParam = mutable.SortedSet.from(externalIn.map(_._1))
       p.formalOutParam = mutable.SortedSet.from(externalOut.map(_._1))
@@ -246,8 +248,8 @@ object ReadWriteAnalysis {
 }
 
 def inOutParams(
-    p: Program,
-    interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]]
+  p: Program,
+  interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]]
 ): Map[Procedure, (Set[Variable], Set[Variable])] = {
   val overapprox = ((0 to 31).toSet -- (19 to 28).toSet).map(i => Register(s"R${i}", 64)).toSet[Variable]
   // in: live at entry & in procedure read set
@@ -261,7 +263,7 @@ def inOutParams(
     p -> p.returnBlock.getOrElse(p)
   }.toMap
 
-  val lives : Map[Procedure, (Set[Variable], Set[Variable])] = p.procedures
+  val lives: Map[Procedure, (Set[Variable], Set[Variable])] = p.procedures
     .map(p => {
       val in = (interLiveVarsResults.get(p))
       val out = (interLiveVarsResults.get(procEnd(p)))
@@ -295,9 +297,9 @@ def inOutParams(
 }
 
 class SetActualParams(
-    val inBinding: Map[Procedure, Map[LocalVar, Variable]],
-    val outBinding: Map[Procedure, Map[LocalVar, Variable]],
-    val externalFunctions: Set[String]
+  val inBinding: Map[Procedure, Map[LocalVar, Variable]],
+  val outBinding: Map[Procedure, Map[LocalVar, Variable]],
+  val externalFunctions: Set[String]
 ) extends CILVisitor {
   // expects programs to be in single return form
   var currStmt: Option[Statement] = None
@@ -311,7 +313,9 @@ class SetActualParams(
 
   override def vproc(p: Procedure) = {
     val incoming =
-      p.formalInParam.toList.flatMap(param => inBinding.get(p).flatMap(_.get(param)).map(p => LocalAssign(p, param)).toList)
+      p.formalInParam.toList.flatMap(param =>
+        inBinding.get(p).flatMap(_.get(param)).map(p => LocalAssign(p, param)).toList
+      )
     p.entryBlock.foreach(b => b.statements.prependAll(incoming))
     DoChildren()
   }
@@ -361,9 +365,9 @@ class SetActualParams(
 }
 
 def specToProcForm(
-    spec: Specification,
-    mappingInparam: Map[Procedure, Map[LocalVar, Variable]],
-    mappingOutparam: Map[Procedure, Map[LocalVar, Variable]]
+  spec: Specification,
+  mappingInparam: Map[Procedure, Map[LocalVar, Variable]],
+  mappingOutparam: Map[Procedure, Map[LocalVar, Variable]]
 ): Specification = {
   import boogie.*
 
@@ -374,7 +378,7 @@ def specToProcForm(
   val varToOutVar: Map[String, Map[String, String]] = mappingOutparam.map(p => (p._1.procName -> toNameMapping(p._2)))
 
   def convVarToOld(varInPre: Map[String, String], varInPost: Map[String, String], isPost: Boolean = false)(
-      b: BExpr
+    b: BExpr
   ): BExpr = {
     val varToOld = convVarToOld(varInPre, varInPost, isPost)
     b match {

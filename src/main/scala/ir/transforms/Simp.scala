@@ -68,8 +68,7 @@ def basicReachingDefs(p: Procedure): Map[Command, Map[Variable, Set[Assign | Dir
 case class DefUse(defined: Map[Variable, Assign])
 
 // map v -> definitions reached here
-class DefUseDomain(liveBefore: Map[Block, Set[Variable]])
-    extends AbstractDomain[Map[Variable, Set[Assign]]] {
+class DefUseDomain(liveBefore: Map[Block, Set[Variable]]) extends AbstractDomain[Map[Variable, Set[Assign]]] {
 
   override def transfer(s: Map[Variable, Set[Assign]], b: Command) = {
     b match {
@@ -117,6 +116,8 @@ def removeSlices(p: Program): Unit = {
   p.procedures.foreach(removeSlices)
 }
 
+case class LVTerm(v: LocalVar) extends analysis.solvers.Var[LVTerm]
+
 def removeSlices(p: Procedure): Unit = {
 
   /** if for each variable v there is some i:int such that (i) all its assignments have a ZeroExtend(i, x) and (ii) all
@@ -125,13 +126,13 @@ def removeSlices(p: Procedure): Unit = {
     * We check this flow-insensitively and recover precision using DSA form.
     */
   val assignments: Map[LocalVar, Iterable[Assign]] = p
-    .collect { 
+    .collect {
       case a: SingleAssign => Seq(a.lhs -> a)
-      case a: DirectCall => a.assignees.map(e => e -> a)
+      case a: DirectCall   => a.assignees.map(e => e -> a)
     }
     .flatten
     .groupBy(_._1)
-    .map((k,v) => (k, v.map(_._2).toSet))
+    .map((k, v) => (k, v.map(_._2).toSet))
     .collect { case (k: LocalVar, v) =>
       (k, v)
     }
@@ -145,7 +146,6 @@ def removeSlices(p: Procedure): Unit = {
       case _             => None
     }
   }
-  case class LVTerm(v: LocalVar) extends analysis.solvers.Var[LVTerm]
   // unify variable uses across direct assignments
   val ufsolver = analysis.solvers.UnionFindSolver[LVTerm]()
   val unioned = assignments.foreach {
@@ -154,11 +154,11 @@ def removeSlices(p: Procedure): Unit = {
   }
   val unifiedAssignments = ufsolver
     .unifications()
-    .map { 
+    .map {
       case (v @ LVTerm(_), rvs) =>
-        v.v -> (rvs.map { 
+        v.v -> (rvs.map {
           case LVTerm(rv) =>
-          rv
+            rv
           case _ => ??? /* unreachable */
         }).toSet
       case _ => ??? /* unreachable */
@@ -167,7 +167,7 @@ def removeSlices(p: Procedure): Unit = {
       repr -> elems.flatMap(assignments(_).filter(_ match {
         // filter out the direct assignments we used to build the unif class
         case LocalAssign(lhs: LocalVar, rhs: LocalVar, _) if elems.contains(lhs) && elems.contains(rhs) => false
-        case _                                                                                     => true
+        case _                                                                                          => true
       }))
     )
   // try and find a single extension size for all rhs of assignments to all variables in the assigned equality class
@@ -178,10 +178,10 @@ def removeSlices(p: Procedure): Unit = {
         case (HighZeroBits.Bot, LocalAssign(_, ZeroExtend(i, lhs), _))                   => HighZeroBits.Bits(i)
         case (b @ HighZeroBits.Bits(ei), LocalAssign(_, ZeroExtend(i, _), _)) if i == ei => b
         case (b @ HighZeroBits.Bits(ei), LocalAssign(_, ZeroExtend(i, _), _)) if i != ei => HighZeroBits.False
-        case (b @ HighZeroBits.Bits(ei), m: MemoryLoad)               => HighZeroBits.False
-        case (b @ HighZeroBits.Bits(ei), m: DirectCall)               => HighZeroBits.False
-        case (HighZeroBits.False, _)                                  => HighZeroBits.False
-        case (_, other)                                               => HighZeroBits.False
+        case (b @ HighZeroBits.Bits(ei), m: MemoryLoad)                                  => HighZeroBits.False
+        case (b @ HighZeroBits.Bits(ei), m: DirectCall)                                  => HighZeroBits.False
+        case (HighZeroBits.False, _)                                                     => HighZeroBits.False
+        case (_, other)                                                                  => HighZeroBits.False
       }
     )
     (v, allRHSExtended)
@@ -191,7 +191,7 @@ def removeSlices(p: Procedure): Unit = {
       // map all lhs to the result for their representative
       val rep = ufsolver.find(LVTerm(lhs)) match {
         case LVTerm(r) => r
-        case _ => ??? /* unreachable */
+        case _         => ??? /* unreachable */
       }
       lhs -> varHighZeroBits.get(rep)
     })
@@ -355,7 +355,7 @@ class CleanupAssignments() extends CILVisitor {
 
   override def vstmt(s: Statement) = s match {
     case a: LocalAssign if isRedundant(a) => ChangeTo(List())
-    case _                           => SkipChildren()
+    case _                                => SkipChildren()
   }
 
 }
@@ -558,9 +558,7 @@ enum CopyProp {
   case Clobbered
 }
 
-case class CCP(
-    val state: Map[Variable, CopyProp] = Map()
-)
+case class CCP(val state: Map[Variable, CopyProp] = Map())
 
 object CCP {
 
@@ -608,11 +606,11 @@ object CopyProp {
   }
 
   case class PropState(
-      var e: Expr,
-      val deps: mutable.Set[Variable],
-      var clobbered: Boolean,
-      var useCount: Int,
-      var isFlagDep: Boolean
+    var e: Expr,
+    val deps: mutable.Set[Variable],
+    var clobbered: Boolean,
+    var useCount: Int,
+    var isFlagDep: Boolean
   )
 
   def PropFlagCalculations(p: Procedure, initialState: Map[Variable, PropState]) = {
@@ -676,7 +674,6 @@ object CopyProp {
       c(l) = PropState(FalseLiteral, mutable.Set(), true, 0, false)
     }
   }
-
 
   def isTrivial(e: Expr): Boolean = e match {
     case l: Literal                              => true
@@ -814,7 +811,6 @@ object CopyProp {
 
 }
 
-
 class ExprComplexity extends CILVisitor {
   // count the nodes in the expression AST
   var count = 0
@@ -845,11 +841,8 @@ class ExprComplexity extends CILVisitor {
   * @complexityThreshold:
   *   Stop substituting after the AST node count has increased by this much
   */
-class Substitute(
-    val res: Variable => Option[Expr],
-    val recurse: Boolean = true,
-    val complexityThreshold: Int = 0
-) extends CILVisitor {
+class Substitute(val res: Variable => Option[Expr], val recurse: Boolean = true, val complexityThreshold: Int = 0)
+    extends CILVisitor {
   var madeAnyChange = false
   var complexity = 0
 
@@ -888,10 +881,7 @@ class Substitute(
 
 }
 
-class Simplify(
-    val res: Variable => Option[Expr],
-    val initialBlock: Block = null,
-) extends CILVisitor {
+class Simplify(val res: Variable => Option[Expr], val initialBlock: Block = null) extends CILVisitor {
 
   var madeAnyChange = false
   var block: Block = initialBlock

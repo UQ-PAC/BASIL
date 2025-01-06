@@ -9,10 +9,10 @@ enum SatResult {
   case Unknown(s: String)
 }
 
-
-def checkSATSMT2(smt: String, softTimeoutMillis: Option[Int] = None) : SatResult = {
-  val cmd = Seq("z3", "-smt2", "-in") ++ (if (softTimeoutMillis.isDefined) then Seq(s"-t:${softTimeoutMillis.get}") else Seq())
-  val output = (cmd  #< ByteArrayInputStream(smt.getBytes("UTF-8"))).!!
+def checkSATSMT2(smt: String, softTimeoutMillis: Option[Int] = None): SatResult = {
+  val cmd =
+    Seq("z3", "-smt2", "-in") ++ (if (softTimeoutMillis.isDefined) then Seq(s"-t:${softTimeoutMillis.get}") else Seq())
+  val output = (cmd #< ByteArrayInputStream(smt.getBytes("UTF-8"))).!!
   if (output == "sat\n") {
     SatResult.SAT
   } else if (output == "unsat\n") {

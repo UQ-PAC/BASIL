@@ -11,9 +11,9 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
 
   def vstmt(s: Statement): Repr[Statement] = {
     s match {
-      case a: LocalAssign       => vassign(vlvar(a.lhs), vexpr(a.rhs))
-      case m @ MemoryLoad(lhs, mem, index, endian, size, _) => vload(vlvar(lhs), mem.name, vexpr(index), endian, size)
-      case m: MemoryStore  => vstore(m.mem.name, vexpr(m.index), vexpr(m.value), m.endian, m.size)
+      case a: LocalAssign => vassign(vlvar(a.lhs), vexpr(a.rhs))
+      case m: MemoryLoad  => vload(vlvar(m.lhs), m.mem.name, vexpr(m.index), m.endian, m.size)
+      case m: MemoryStore => vstore(m.mem.name, vexpr(m.index), vexpr(m.value), m.endian, m.size)
       case c: DirectCall =>
         vcall(
           c.outParams.toList.map((l, r) => (l, vexpr(r))),
@@ -35,7 +35,6 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
     }
   }
 
-
   def vexpr(e: Expr): Repr[Expr] = {
     e match {
       case n: Literal                               => vliteral(n)
@@ -56,31 +55,36 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
     p.formalInParam.toList.map(vlvar),
     p.formalOutParam.toList.map(vlvar),
     p.entryBlock.map(vblock),
-    (p.blocks.toSet -- p.entryBlock.toSet -- p.returnBlock.toSet).toList.sortBy( x => -x.rpoOrder).map(vblock),
+    (p.blocks.toSet -- p.entryBlock.toSet -- p.returnBlock.toSet).toList.sortBy(x => -x.rpoOrder).map(vblock),
     p.returnBlock.map(vblock)
   )
 
-  def vblock(label: String, address:Option[BigInt], statements: List[Repr[Statement]], terminator: Repr[Jump]): Repr[Block]
+  def vblock(
+    label: String,
+    address: Option[BigInt],
+    statements: List[Repr[Statement]],
+    terminator: Repr[Jump]
+  ): Repr[Block]
 
-  def vprog(p: Program) : Repr[Program] = vprog(p.mainProcedure.name, p.procedures.toList.map(vproc))
-  def vprog(mainProc: String, procedures: List[Repr[Procedure]]) : Repr[Program]
+  def vprog(p: Program): Repr[Program] = vprog(p.mainProcedure.name, p.procedures.toList.map(vproc))
+  def vprog(mainProc: String, procedures: List[Repr[Procedure]]): Repr[Program]
 
   def vproc(
-      name: String,
-      inParams: List[Repr[Variable]],
-      outParams: List[Repr[Variable]],
-      entryBlock: Option[Repr[Block]],
-      middleBlocks: List[Repr[Block]],
-      returnBlock: Option[Repr[Block]]
+    name: String,
+    inParams: List[Repr[Variable]],
+    outParams: List[Repr[Variable]],
+    entryBlock: Option[Repr[Block]],
+    middleBlocks: List[Repr[Block]],
+    returnBlock: Option[Repr[Block]]
   ): Repr[Procedure]
 
   def vassign(lhs: Repr[Variable], rhs: Repr[Expr]): Repr[LocalAssign]
   def vload(lhs: Repr[Variable], mem: String, index: Repr[Expr], endian: Endian, size: Int): Repr[MemoryLoad]
   def vstore(mem: String, index: Repr[Expr], value: Repr[Expr], endian: Endian, size: Int): Repr[MemoryStore]
   def vcall(
-      outParams: List[(Variable, Repr[Expr])],
-      procname: String,
-      inparams: List[(Variable, Repr[Expr])]
+    outParams: List[(Variable, Repr[Expr])],
+    procname: String,
+    inparams: List[(Variable, Repr[Expr])]
   ): Repr[DirectCall]
   def vindirect(target: Repr[Variable]): Repr[IndirectCall]
   def vassert(body: Repr[Expr]): Repr[Assert]
@@ -102,7 +106,7 @@ trait BasilIRExp[Repr[+_]] {
   def vsignextend(bits: Int, b: Repr[Expr]): Repr[Expr]
   def vbinary_expr(e: BinOp, l: Repr[Expr], r: Repr[Expr]): Repr[Expr]
   def vunary_expr(e: UnOp, arg: Repr[Expr]): Repr[Expr]
-  def vliteral(l: Literal) : Repr[Literal] = {
+  def vliteral(l: Literal): Repr[Literal] = {
     l match {
       case TrueLiteral      => vboollit(true)
       case FalseLiteral     => vboollit(false)
@@ -126,11 +130,10 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
   /** Performs some simple reductions to fit basil IR into SMT2.
     */
 
-
   def vexpr(e: Expr): Repr[Expr] = {
     e match {
-      case n: Literal => vliteral(n)
-      case Extract(ed, start, arg)                  => vextract(ed, start, vexpr(arg))
+      case n: Literal              => vliteral(n)
+      case Extract(ed, start, arg) => vextract(ed, start, vexpr(arg))
       case Repeat(repeats, arg) => {
         vexpr((0 until (repeats - 1)).foldLeft(arg)((acc, n) => BinaryExpr(BVCONCAT, acc, arg)))
       }
@@ -169,10 +172,10 @@ def sym[T](l: String): Sexp[T] = Sexp.Symb[T](l)
 def list[T](l: Sexp[T]*): Sexp[T] = Sexp.Slist(l.toList)
 
 object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
-  def vload(lhs: Sexp[Variable], mem: String, index: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryLoad] = ??? 
+  def vload(lhs: Sexp[Variable], mem: String, index: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryLoad] = ???
   def vstore(mem: String, index: Sexp[Expr], value: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryStore] = ???
 
-  def vprog(mainProc: String, procedures: List[Sexp[Procedure]]) : Sexp[Program] = ???
+  def vprog(mainProc: String, procedures: List[Sexp[Procedure]]): Sexp[Program] = ???
   def vrepeat(reps: Int, value: Sexp[Expr]): Sexp[Expr] = ???
   def vzeroextend(bits: Int, b: Sexp[Expr]): Sexp[Expr] = ???
   def vsignextend(bits: Int, b: Sexp[Expr]): Sexp[Expr] = ???
@@ -180,22 +183,21 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   def vbvlit(b: BitVecLiteral): Sexp[BitVecLiteral] = ???
   def vintlit(b: BigInt): Sexp[IntLiteral] = ???
 
-  /**
-   * Immediately invoke z3 and block until it returns a result.
-   *
-   * Return Some(true) when proven, Some(false) when counterexample found, and None when unknown.
-   */
-  def proveExpr(e: Expr, softTimeoutMillis: Option[Int] = None) : Option[Boolean] = {
+  /** Immediately invoke z3 and block until it returns a result.
+    *
+    * Return Some(true) when proven, Some(false) when counterexample found, and None when unknown.
+    */
+  def proveExpr(e: Expr, softTimeoutMillis: Option[Int] = None): Option[Boolean] = {
     val query = exprUnsat(e, None, false)
     val res = util.z3.checkSATSMT2(query, softTimeoutMillis)
     res match {
-      case util.z3.SatResult.UNSAT => Some(true)
-      case util.z3.SatResult.SAT => Some(false)
+      case util.z3.SatResult.UNSAT      => Some(true)
+      case util.z3.SatResult.SAT        => Some(false)
       case util.z3.SatResult.Unknown(_) => None
     }
   }
 
-  def exprUnsat(e: Expr, name: Option[String] = None, getModel : Boolean = true): String = {
+  def exprUnsat(e: Expr, name: Option[String] = None, getModel: Boolean = true): String = {
     val assert = if (name.isDefined) {
       list(sym("assert"), list(sym("!"), BasilIRToSMT2.vexpr(e), sym(":named"), sym(name.get)))
     } else {
@@ -203,12 +205,10 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     }
 
     val terms = list(sym("push")) :: BasilIRToSMT2.extractDecls(e)
-      ++ List(
-        assert,
-        list(sym("set-option"), sym(":smt.timeout"), sym("1")),
-        list(sym("check-sat"))
-      ) 
-      ++ (if (getModel) then List(list(sym("echo"), sym("\"" + name.getOrElse("") + "  ::  " + e + "\"")), list(sym("get-model"))) else List())
+      ++ List(assert, list(sym("set-option"), sym(":smt.timeout"), sym("1")), list(sym("check-sat")))
+      ++ (if (getModel) then
+            List(list(sym("echo"), sym("\"" + name.getOrElse("") + "  ::  " + e + "\"")), list(sym("get-model")))
+          else List())
       ++ List(list(sym("pop")))
 
     (terms.map(Sexp.print)).mkString("\n")

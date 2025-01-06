@@ -30,10 +30,10 @@ case class StVarLoader[S, F <: Effects[S, InterpreterError]](f: F) extends Loade
   }
 
   override def loadMemory(
-      m: Memory,
-      addr: Expr,
-      endian: Endian,
-      size: Int
+    m: Memory,
+    addr: Expr,
+    endian: Endian,
+    size: Int
   ): State[S, Option[Literal], InterpreterError] = {
     for {
       r <- addr match {
@@ -134,7 +134,7 @@ case object Eval {
   /*--------------------------------------------------------------------------------*/
 
   def load[S, T <: Effects[S, InterpreterError]](
-      f: T
+    f: T
   )(vname: String, addr: Scalar, endian: Endian, count: Int): State[S, List[BasilValue], InterpreterError] = {
     for {
       _ <-
@@ -150,7 +150,7 @@ case object Eval {
 
   /** Load and concat bitvectors */
   def loadBV[S, T <: Effects[S, InterpreterError]](
-      f: T
+    f: T
   )(vname: String, addr: Scalar, endian: Endian, size: Int): State[S, BitVecLiteral, InterpreterError] = for {
     mem <- f.loadVar(vname)
     x <- mem match {
@@ -168,9 +168,7 @@ case object Eval {
           c match {
             case Scalar(bv @ BitVecLiteral(v, sz)) if sz == valsize => State.pure(bv)
             case c =>
-              State.setError(
-                TypeError(s"Loaded value of type ${c.irType} did not match expected type bv$valsize")
-              )
+              State.setError(TypeError(s"Loaded value of type ${c.irType} did not match expected type bv$valsize"))
           },
         res
       )
@@ -178,7 +176,7 @@ case object Eval {
   } yield (bvs.foldLeft(BitVecLiteral(0, 0))((acc, r) => eval.evalBVBinExpr(BVCONCAT, acc, r)))
 
   def loadSingle[S, T <: Effects[S, InterpreterError]](
-      f: T
+    f: T
   )(vname: String, addr: Scalar): State[S, BasilValue, InterpreterError] = {
     for {
       m <- load(f)(vname, addr, Endian.LittleEndian, 1)
@@ -190,15 +188,12 @@ case object Eval {
   /*--------------------------------------------------------------------------------*/
 
   /* Expand addr for number of values to store */
-  def store[S, T <: Effects[S, InterpreterError]](f: T)(
-      vname: String,
-      addr: BasilValue,
-      values: List[BasilValue],
-      endian: Endian
-  )(implicit
-      line: sourcecode.Line,
-      file: sourcecode.FileName,
-      name: sourcecode.Name
+  def store[S, T <: Effects[S, InterpreterError]](
+    f: T
+  )(vname: String, addr: BasilValue, values: List[BasilValue], endian: Endian)(implicit
+    line: sourcecode.Line,
+    file: sourcecode.FileName,
+    name: sourcecode.Name
   ): State[S, Unit, InterpreterError] =
     monlog.debug(s"store ${vname} ${values.size} bytes ${file.value}:${line.value}")
     for {
@@ -219,47 +214,48 @@ case object Eval {
     } yield (x)
 
   /** Extract bitvec to bytes and store bytes */
-  def storeBV[S, T <: Effects[S, InterpreterError]](f: T)(
-      vname: String,
-      addr: BasilValue,
-      value: BitVecLiteral,
-      endian: Endian
-  )(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): State[S, Unit, InterpreterError] = 
+  def storeBV[S, T <: Effects[S, InterpreterError]](
+    f: T
+  )(vname: String, addr: BasilValue, value: BitVecLiteral, endian: Endian)(implicit
+    line: sourcecode.Line,
+    file: sourcecode.FileName,
+    name: sourcecode.Name
+  ): State[S, Unit, InterpreterError] =
 
     monlog.debug(s"storeBV ${vname} ${size(value).get / 8} bytes")(line, file, name)
     for {
-    mem <- f.loadVar(vname)
-    mr <- mem match {
-      case m @ BasilMapValue(_, MapType(kt, BitVecType(size))) if Some(kt) == addr.irType => State.pure((m, size))
-      case v =>
-        State.setError(
-          TypeError(
-            s"Invalid map store operation to $vname : ${v.irType} (expect [${addr.irType}] <- ${value.getType})"
+      mem <- f.loadVar(vname)
+      mr <- mem match {
+        case m @ BasilMapValue(_, MapType(kt, BitVecType(size))) if Some(kt) == addr.irType => State.pure((m, size))
+        case v =>
+          State.setError(
+            TypeError(
+              s"Invalid map store operation to $vname : ${v.irType} (expect [${addr.irType}] <- ${value.getType})"
+            )
           )
-        )
-    }
-    (mapval, vsize) = mr
-    cells = value.size / vsize
-    _ = {
-      if (cells < 1) {
-        State.setError((MemoryError("Tried to execute fractional store")))
-      } else {
-        State.pure(())
       }
-    }
+      (mapval, vsize) = mr
+      cells = value.size / vsize
+      _ = {
+        if (cells < 1) {
+          State.setError((MemoryError("Tried to execute fractional store")))
+        } else {
+          State.pure(())
+        }
+      }
 
-    extractVals = (0 until cells).map(i => BitVectorEval.boogie_extract((i + 1) * vsize, i * vsize, value)).toList
-    vs = endian match {
-      case Endian.LittleEndian => extractVals.map(Scalar(_))
-      case Endian.BigEndian    => extractVals.reverse.map(Scalar(_))
-    }
+      extractVals = (0 until cells).map(i => BitVectorEval.boogie_extract((i + 1) * vsize, i * vsize, value)).toList
+      vs = endian match {
+        case Endian.LittleEndian => extractVals.map(Scalar(_))
+        case Endian.BigEndian    => extractVals.reverse.map(Scalar(_))
+      }
 
-    keys <- State.mapM((i: Int) => State.pureE(BasilValue.unsafeAdd(addr, i)), (0 until cells))
-    s <- f.storeMem(vname, keys.zip(vs).toMap)
-  } yield (s)
+      keys <- State.mapM((i: Int) => State.pureE(BasilValue.unsafeAdd(addr, i)), (0 until cells))
+      s <- f.storeMem(vname, keys.zip(vs).toMap)
+    } yield (s)
 
   def storeSingle[S, E, T <: Effects[S, E]](
-      f: T
+    f: T
   )(vname: String, addr: BasilValue, value: BasilValue): State[S, Unit, E] = {
     f.storeMem(vname, Map((addr -> value)))
   }
@@ -269,7 +265,7 @@ case object Eval {
   /** Load all memory cells from pointer until reaching cell containing 0. Ptr -> List[Bitvector]
     */
   def getNullTerminatedString[S, T <: Effects[S, InterpreterError]](
-      f: T
+    f: T
   )(rgn: String, src: BasilValue, acc: List[BitVecLiteral] = List()): State[S, List[BitVecLiteral], InterpreterError] =
     for {
       srv: BitVecLiteral <- src match {
@@ -510,12 +506,7 @@ object InterpFuns {
       .map((p) => {
         val (offset, fptr) = p
         Eval.storeSingle(s)("ghost-funtable", Scalar(fptr.addr), fptr)
-          >> (Eval.storeBV(s)(
-            "mem",
-            Scalar(BitVecLiteral(offset, 64)),
-            fptr.addr,
-            Endian.LittleEndian
-          ))
+          >> (Eval.storeBV(s)("mem", Scalar(BitVecLiteral(offset, 64)), fptr.addr, Endian.LittleEndian))
       })
 
     for {
@@ -547,7 +538,7 @@ object InterpFuns {
       l <- s.storeVar("R30_in", Scope.Global, Scalar(LR))
       l <- s.storeVar("R0", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       l <- s.storeVar("R1", Scope.Global, Scalar(BitVecLiteral(0, 64)))
-      /** callee saved **/
+      /** callee saved * */
       l <- s.storeVar("R19", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       l <- s.storeVar("R20", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       l <- s.storeVar("R21", Scope.Global, Scalar(BitVecLiteral(0, 64)))
@@ -558,32 +549,22 @@ object InterpFuns {
       l <- s.storeVar("R26", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       l <- s.storeVar("R27", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       l <- s.storeVar("R28", Scope.Global, Scalar(BitVecLiteral(0, 64)))
-      /** end callee saved **/
+      /** end callee saved * */
       _ <- s.storeVar("ghost-funtable", Scope.Global, BasilMapValue(Map.empty, MapType(BitVecType(64), BitVecType(64))))
       _ <- IntrinsicImpl.initFileGhostRegions(s)
     } yield (l)
   }
 
-  def initialiseProgram[S, T <: Effects[S, InterpreterError]](
-      f: T
-  )(is: S, p: Program): S = {
+  def initialiseProgram[S, T <: Effects[S, InterpreterError]](f: T)(is: S, p: Program): S = {
 
-    def initMemory(is: S, mem: String, mems: Iterable[MemorySection]) : S = {
+    def initMemory(is: S, mem: String, mems: Iterable[MemorySection]): S = {
       var s = is
       for (memory <- mems.filter(m => m.address != 0 && m.bytes.size != 0)) {
         val bytes = memory.bytes.toList.map(Scalar(_))
         val addrs = memory.address until memory.address + bytes.size
         for (store <- addrs.zip(bytes)) {
-          val (addr,value) = store
-          s = State.execute(
-            s,
-            Eval.store(f)(
-              mem,
-              Scalar(BitVecLiteral(addr, 64)),
-              List(value),
-              Endian.BigEndian
-            )
-          )
+          val (addr, value) = store
+          s = State.execute(s, Eval.store(f)(mem, Scalar(BitVecLiteral(addr, 64)), List(value), Endian.BigEndian))
         }
       }
       s
@@ -592,20 +573,22 @@ object InterpFuns {
     var s = State.execute(is, initialState(f))
 
     for (proc <- p.procedures.filter(p => p.blocks.nonEmpty && p.address.isDefined)) {
-            s = State.execute(s, Eval.storeSingle(f)(
-              "ghost-funtable",
-              Scalar(BitVecLiteral(proc.address.get, 64)),
-              FunPointer(BitVecLiteral(proc.address.get, 64), proc.name, Run(IRWalk.firstInBlock(proc.entryBlock.get)))
-            )
-          )
+      s = State.execute(
+        s,
+        Eval.storeSingle(f)(
+          "ghost-funtable",
+          Scalar(BitVecLiteral(proc.address.get, 64)),
+          FunPointer(BitVecLiteral(proc.address.get, 64), proc.name, Run(IRWalk.firstInBlock(proc.entryBlock.get)))
+        )
+      )
     }
 
     val mainfun = p.mainProcedure
-    s = State.execute(s, f.call("init_activation", Stopped(), Stopped())) 
+    s = State.execute(s, f.call("init_activation", Stopped(), Stopped()))
     s = initMemory(s, "mem", p.initialMemory.values)
     s = initMemory(s, "stack", p.initialMemory.values)
     s = State.execute(s, f.call(mainfun.name, Run(IRWalk.firstInBlock(mainfun.entryBlock.get)), Stopped()))
-      // l <- State.sequence(State.pure(()), mainfun.formalInParam.toList.map(i => f.storeVar(i.name, i.toBoogie.scope, Scalar(BitVecLiteral(0, size(i).get)))))
+    // l <- State.sequence(State.pure(()), mainfun.formalInParam.toList.map(i => f.storeVar(i.name, i.toBoogie.scope, Scalar(BitVecLiteral(0, size(i).get)))))
     s
   }
 
@@ -619,7 +602,8 @@ object InterpFuns {
         var s = is
         for (rgn <- Seq("mem", "stack")) {
           for (addr <- (first until last)) {
-            s = State.execute(s, 
+            s = State.execute(
+              s,
               Eval.storeBV(f)(rgn, Scalar(BitVecLiteral(addr, 64)), BitVecLiteral(0, 8), Endian.LittleEndian)
             )
           }
@@ -629,15 +613,14 @@ object InterpFuns {
 
     } yield (st)
 
-
     bss match {
-      case None       => Logger.error("No BSS initialised"); is 
+      case None       => Logger.error("No BSS initialised"); is
       case Some(init) => init
     }
   }
 
   def initProgState[S, T <: Effects[S, InterpreterError]](f: T)(p: IRContext, is: S): S = {
-    var ist = initialiseProgram(f)(is, p.program) 
+    var ist = initialiseProgram(f)(is, p.program)
     ist = initBSS(f)(ist, p)
     ist = State.execute(ist, InterpFuns.initRelocTable(f)(p))
     val st = State.putS(ist)

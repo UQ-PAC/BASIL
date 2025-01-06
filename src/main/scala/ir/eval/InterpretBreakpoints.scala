@@ -19,10 +19,10 @@ enum BreakPointLoc:
   case CMDCond(c: Command, condition: Expr)
 
 case class BreakPointAction(
-    saveState: Boolean = true,
-    stop: Boolean = false,
-    evalExprs: List[(String, Expr)] = List(),
-    log: Boolean = false
+  saveState: Boolean = true,
+  stop: Boolean = false,
+  evalExprs: List[(String, Expr)] = List(),
+  log: Boolean = false
 )
 
 case class BreakPoint(name: String = "", location: BreakPointLoc, action: BreakPointAction)
@@ -42,11 +42,8 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](f: I, break
     )
   }
 
-  override def getNext: State[
-    (T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])]),
-    ExecutionContinuation,
-    InterpreterError
-  ] = {
+  override def getNext
+    : State[(T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])]), ExecutionContinuation, InterpreterError] = {
     for {
       v: ExecutionContinuation <- doLeft(f.getNext)
       n <- v match {
@@ -103,10 +100,10 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](f: I, break
 }
 
 def interpretWithBreakPoints[I](
-    p: IRContext,
-    breakpoints: List[BreakPoint],
-    innerInterpreter: Effects[I, InterpreterError],
-    innerInitialState: I
+  p: IRContext,
+  breakpoints: List[BreakPoint],
+  innerInterpreter: Effects[I, InterpreterError],
+  innerInitialState: I
 ): (I, List[(BreakPoint, Option[I], List[(String, Expr, Expr)])]) = {
   val interp = LayerInterpreter(innerInterpreter, RememberBreakpoints(innerInterpreter, breakpoints))
   val res = InterpFuns.interpretProg(interp)(p, (innerInitialState, List()))
@@ -114,10 +111,10 @@ def interpretWithBreakPoints[I](
 }
 
 def interpretWithBreakPoints[I](
-    p: Program,
-    breakpoints: List[BreakPoint],
-    innerInterpreter: Effects[I, InterpreterError],
-    innerInitialState: I
+  p: Program,
+  breakpoints: List[BreakPoint],
+  innerInterpreter: Effects[I, InterpreterError],
+  innerInitialState: I
 ): (I, List[(BreakPoint, Option[I], List[(String, Expr, Expr)])]) = {
   val interp = LayerInterpreter(innerInterpreter, RememberBreakpoints(innerInterpreter, breakpoints))
   val res = InterpFuns.interpretProg(interp)(p, (innerInitialState, List()))
@@ -127,7 +124,6 @@ def interpretWithBreakPoints[I](
 def interpretBreakPoints(p: IRContext, breakpoints: List[BreakPoint]) = {
   interpretWithBreakPoints(p, breakpoints, NormalInterpreter, InterpreterState())
 }
-
 
 def interpretBreakPoints(p: Program, breakpoints: List[BreakPoint]) = {
   interpretWithBreakPoints(p, breakpoints, NormalInterpreter, InterpreterState())

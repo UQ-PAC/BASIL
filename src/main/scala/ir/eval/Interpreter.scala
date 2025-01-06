@@ -154,13 +154,13 @@ type StackFrameID = String
 val globalFrame: StackFrameID = "GLOBAL"
 
 case class MemoryState(
-    /* We have a very permissive value reprsentation and store all dynamic state in `stackFrames`.
-     * - activations is the call stack, the top of which indicates the current stackFrame.
-     * - activationCount: (procedurename -> int) is used to create uniquely-named stackframes.
-     */
-    val stackFrames: Map[StackFrameID, Map[String, BasilValue]] = Map((globalFrame -> Map.empty)),
-    val activations: List[StackFrameID] = List.empty,
-    val activationCount: Map[String, Int] = Map.empty.withDefault(_ => 0)
+  /* We have a very permissive value reprsentation and store all dynamic state in `stackFrames`.
+   * - activations is the call stack, the top of which indicates the current stackFrame.
+   * - activationCount: (procedurename -> int) is used to create uniquely-named stackframes.
+   */
+  val stackFrames: Map[StackFrameID, Map[String, BasilValue]] = Map((globalFrame -> Map.empty)),
+  val activations: List[StackFrameID] = List.empty,
+  val activationCount: Map[String, Int] = Map.empty.withDefault(_ => 0)
 ) {
 
   /** Debug return useful values * */
@@ -313,10 +313,9 @@ case class MemoryState(
 object LibcIntrinsic {
   // TODO: make parameter passing work
 
-  /**
-   * Part of the intrinsics implementation that lives above the Effects interface 
-   * (i.e. we are defining the observable part of the intrinsics behaviour)
-   */
+  /** Part of the intrinsics implementation that lives above the Effects interface (i.e. we are defining the observable
+    * part of the intrinsics behaviour)
+    */
 
   def singleArg[S, E, T <: Effects[S, E]](name: String)(s: T): State[S, Unit, E] = for {
     c <- s.loadVar("R0")
@@ -364,19 +363,21 @@ object LibcIntrinsic {
 object IntrinsicImpl {
 
   /** state initialisation for file modelling */
-  def initFileGhostRegions[S, E, T <: Effects[S, E]](f: T): State[S, Unit, E]  = for {
-      _ <- f.storeVar("ghost-file-bookkeeping", Scope.Global, GenMapValue(Map.empty))
-      _ <- f.storeVar("ghost-fd-mapping", Scope.Global, GenMapValue(Map.empty))
-      _ <- f.storeMem("ghost-file-bookkeeping", Map(Symbol("$$filecount") -> Scalar(BitVecLiteral(0, 64))))
-      _ <- f.callIntrinsic("fopen", List(Symbol("stderr")))
-      _ <- f.callIntrinsic("fopen", List(Symbol("stdout")))
+  def initFileGhostRegions[S, E, T <: Effects[S, E]](f: T): State[S, Unit, E] = for {
+    _ <- f.storeVar("ghost-file-bookkeeping", Scope.Global, GenMapValue(Map.empty))
+    _ <- f.storeVar("ghost-fd-mapping", Scope.Global, GenMapValue(Map.empty))
+    _ <- f.storeMem("ghost-file-bookkeeping", Map(Symbol("$$filecount") -> Scalar(BitVecLiteral(0, 64))))
+    _ <- f.callIntrinsic("fopen", List(Symbol("stderr")))
+    _ <- f.callIntrinsic("fopen", List(Symbol("stdout")))
   } yield (())
 
-  /** Intrinsics defined over arbitrary effects 
-   *
-   * We call these from Effects[T, E] rather than the Interpreter so their implementation does not appear in the trace.
-   */
-  def putc[S, T <: Effects[S, InterpreterError]](f: T)(arg: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
+  /** Intrinsics defined over arbitrary effects
+    *
+    * We call these from Effects[T, E] rather than the Interpreter so their implementation does not appear in the trace.
+    */
+  def putc[S, T <: Effects[S, InterpreterError]](
+    f: T
+  )(arg: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
     for {
       addr <- f.loadMem("ghost-file-bookkeeping", List(Symbol("stdout-ptr")))
       byte <- State.pureE(BasilValue.toBV(arg))
@@ -387,7 +388,9 @@ object IntrinsicImpl {
     } yield (None)
   }
 
-  def fopen[S, T <: Effects[S, InterpreterError]](f: T)(file: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
+  def fopen[S, T <: Effects[S, InterpreterError]](
+    f: T
+  )(file: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
     for {
       fname <- file match {
         case Symbol(name) => State.pure(name)
@@ -403,15 +406,16 @@ object IntrinsicImpl {
     } yield (Some(filecount.head))
   }
 
-
-  def write[S, T <: Effects[S, InterpreterError]](f: T)(fd: BasilValue, strptr: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
+  def write[S, T <: Effects[S, InterpreterError]](
+    f: T
+  )(fd: BasilValue, strptr: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
     for {
       str <- Eval.getNullTerminatedString(f)("mem", strptr)
       // TODO: fd mapping in state
       file = fd match {
         case Scalar(BitVecLiteral(1, 64)) => "stdout"
         case Scalar(BitVecLiteral(2, 64)) => "stderr"
-        case _ => "unknown"
+        case _                            => "unknown"
       }
       baseptr: List[BasilValue] <- f.loadMem("ghost-file-bookkeeping", List(Symbol(s"${file}-ptr")))
       offs: List[BasilValue] <- State.mapM(
@@ -424,7 +428,9 @@ object IntrinsicImpl {
     } yield (None)
   }
 
-  def print[S, T <: Effects[S, InterpreterError]](f: T)(strptr: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
+  def print[S, T <: Effects[S, InterpreterError]](
+    f: T
+  )(strptr: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
     for {
       str <- Eval.getNullTerminatedString(f)("mem", strptr)
       baseptr: List[BasilValue] <- f.loadMem("ghost-file-bookkeeping", List(Symbol("stdout-ptr")))
@@ -438,7 +444,9 @@ object IntrinsicImpl {
     } yield (None)
   }
 
-  def malloc[S, T <: Effects[S, InterpreterError]](f: T)(size: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
+  def malloc[S, T <: Effects[S, InterpreterError]](
+    f: T
+  )(size: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
     for {
       size <- (size match {
         case (x @ Scalar(_: BitVecLiteral)) => State.pure(x)
@@ -455,19 +463,18 @@ object IntrinsicImpl {
 }
 
 case class InterpreterState(
-    val nextCmd: ExecutionContinuation = Stopped(),
-    val callStack: List[ExecutionContinuation] = List.empty,
-    val memoryState: MemoryState = MemoryState()
+  val nextCmd: ExecutionContinuation = Stopped(),
+  val callStack: List[ExecutionContinuation] = List.empty,
+  val memoryState: MemoryState = MemoryState()
 )
 
 /** Implementation of Effects for InterpreterState concrete state representation.
   */
 object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
 
-
   def callIntrinsic(
-      name: String,
-      args: List[BasilValue]
+    name: String,
+    args: List[BasilValue]
   ): State[InterpreterState, Option[BasilValue], InterpreterError] = {
     name match {
       case "free"   => State.pure(None)
@@ -481,8 +488,9 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
           _ <- storeVar("R0", Scope.Global, r)
         } yield (Some(r))
       case "print" => IntrinsicImpl.print(this)(args.head)
-      case "puts"  => IntrinsicImpl.print(this)(args.head) >> IntrinsicImpl.putc(this)(Scalar(BitVecLiteral('\n'.toInt, 64)))
-      case "write"  => IntrinsicImpl.write(this)(args(1), args(2))
+      case "puts" =>
+        IntrinsicImpl.print(this)(args.head) >> IntrinsicImpl.putc(this)(Scalar(BitVecLiteral('\n'.toInt, 64)))
+      case "write" => IntrinsicImpl.write(this)(args(1), args(2))
       case _       => State.setError(Errored(s"Call undefined intrinsic $name"))
     }
   }

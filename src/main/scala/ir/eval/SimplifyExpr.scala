@@ -79,10 +79,7 @@ def simpFixedPoint(s: Expr => (Expr, Boolean))(e: Expr): (Expr, Boolean) = {
 def simplifyExprVis = SimpExpr(simpFixedPoint(sequenceSimp(simplifyExpr, SimpExpr(fastPartialEvalExpr).apply)))
 def simplifyCondVis = SimpExpr(
   simpFixedPoint(
-    sequenceSimp(
-      simpFixedPoint(SimpExpr(simpFixedPoint(simplifyCmpInequalities)).apply),
-      simplifyExprVis.apply,
-    )
+    sequenceSimp(simpFixedPoint(SimpExpr(simpFixedPoint(simplifyCmpInequalities)).apply), simplifyExprVis.apply)
   )
 )
 def simplifyExprFixpoint = simplifyExprVis.apply
@@ -153,9 +150,9 @@ object SimplifyValidation {
 }
 
 def logSimp(e: Expr, ne: Expr, actual: Boolean = true)(implicit
-    line: sourcecode.Line,
-    file: sourcecode.FileName,
-    name: sourcecode.Name
+  line: sourcecode.Line,
+  file: sourcecode.FileName,
+  name: sourcecode.Name
 ): Expr = {
   if (!actual) {
     return ne
@@ -179,7 +176,6 @@ def logSimp(e: Expr, ne: Expr, actual: Boolean = true)(implicit
   }
   ne
 }
-
 
 class VarNameNormalise() extends CILVisitor {
   var count = 1
@@ -232,10 +228,13 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
     case BinaryExpr(BVEQ, UnaryExpr(BoolToBV1, body), BitVecLiteral(1, 1))  => logSimp(e, body)
     case BinaryExpr(BVEQ, UnaryExpr(BoolToBV1, l), UnaryExpr(BoolToBV1, r)) => logSimp(e, BinaryExpr(BoolEQ, (l), (r)))
 
-    case BinaryExpr(BVADD, l @ UnaryExpr(BVNEG, x), r) if !r.isInstanceOf[Literal] && !{r match {
-      case UnaryExpr(BVNEG, _) => true
-      case _ => false
-    }} => BinaryExpr(BVADD, r, l)
+    case BinaryExpr(BVADD, l @ UnaryExpr(BVNEG, x), r) if !r.isInstanceOf[Literal] && ! {
+          r match {
+            case UnaryExpr(BVNEG, _) => true
+            case _                   => false
+          }
+        } =>
+      BinaryExpr(BVADD, r, l)
 
     case BinaryExpr(BoolAND, l @ BinaryExpr(BVEQ, _, _), r @ BinaryExpr(relop, _, _))
         if ineqToStrict.contains(relop) || strictIneq.contains(relop) => {
@@ -246,44 +245,23 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
       BinaryExpr(BoolAND, r, l)
     }
 
-    /* intro bool2bv */
-    case BinaryExpr(
-          BVCOMP,
-          l,
-          r
-        ) => {
+    case BinaryExpr(BVCOMP, l, r) => {
       logSimp(e, bool2bv1(BinaryExpr(BVEQ, l, r)))
     }
     /* push bool2bv upwards */
-    case BinaryExpr(
-          bop,
-          BitVecLiteral(x, 1),
-          UnaryExpr(BoolToBV1, r)
-        ) if bvLogOpToBoolOp.contains(bop) => {
+    case BinaryExpr(bop, BitVecLiteral(x, 1), UnaryExpr(BoolToBV1, r)) if bvLogOpToBoolOp.contains(bop) => {
       val l = if x == 1 then TrueLiteral else FalseLiteral
       logSimp(e, bool2bv1(BinaryExpr(bvLogOpToBoolOp(bop), (l), (r))))
     }
 
-    case BinaryExpr(
-          bop,
-          UnaryExpr(BoolToBV1, l),
-          BitVecLiteral(x, 1)
-        ) if bvLogOpToBoolOp.contains(bop) => {
+    case BinaryExpr(bop, UnaryExpr(BoolToBV1, l), BitVecLiteral(x, 1)) if bvLogOpToBoolOp.contains(bop) => {
       val r = if x == 1 then TrueLiteral else FalseLiteral
       logSimp(e, bool2bv1(BinaryExpr(bvLogOpToBoolOp(bop), (l), (r))))
     }
-    case BinaryExpr(
-          bop,
-          UnaryExpr(BoolToBV1, l),
-          UnaryExpr(BoolToBV1, r)
-        ) if bvLogOpToBoolOp.contains(bop) => {
+    case BinaryExpr(bop, UnaryExpr(BoolToBV1, l), UnaryExpr(BoolToBV1, r)) if bvLogOpToBoolOp.contains(bop) => {
       logSimp(e, bool2bv1(BinaryExpr(bvLogOpToBoolOp(bop), (l), (r))))
     }
-    case BinaryExpr(
-          bop,
-          UnaryExpr(BoolToBV1, l),
-          UnaryExpr(BoolToBV1, r)
-        ) if bvLogOpToBoolOp.contains(bop) => {
+    case BinaryExpr(bop, UnaryExpr(BoolToBV1, l), UnaryExpr(BoolToBV1, r)) if bvLogOpToBoolOp.contains(bop) => {
       logSimp(e, bool2bv1(BinaryExpr(bvLogOpToBoolOp(bop), (l), (r))))
     }
 
@@ -553,11 +531,7 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
       logSimp(e, BinaryExpr(BVSGE, x1, UnaryExpr(BVNEG, BinaryExpr(BVADD, y1, z1))))
     }
 
-    case BinaryExpr(
-          BVEQ,
-          ZeroExtend(exts, orig @ BinaryExpr(o1, x1, y1)),
-          compar @ BinaryExpr(o2, x2, y2)
-        )
+    case BinaryExpr(BVEQ, ZeroExtend(exts, orig @ BinaryExpr(o1, x1, y1)), compar @ BinaryExpr(o2, x2, y2))
         if size(x1).get > 1 && (o1 == o2) && o1 == BVADD
           && simplifyCond(x2) == simplifyCond(ZeroExtend(exts, x1))
           && simplifyCond(y2) == simplifyCond(ZeroExtend(exts, y1)) => {
@@ -607,9 +581,7 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
         )
         if exts == ext2 && size(x1).get >= 8 && (o1 == o2) && o2 == o4 && o1 == BVADD
           && simplifyCond(BinaryExpr(o1, ZeroExtend(exts, x1), ZeroExtend(exts, z1)))
-          == simplifyCond(
-            BinaryExpr(BVADD, ZeroExtend(exts, x2), (BinaryExpr(BVADD, ZeroExtend(exts, y2), z2)))
-          ) => {
+          == simplifyCond(BinaryExpr(BVADD, ZeroExtend(exts, x2), (BinaryExpr(BVADD, ZeroExtend(exts, y2), z2)))) => {
       // C not Set
       logSimp(e, UnaryExpr(BoolNOT, BinaryExpr(BVUGT, x1, UnaryExpr(BVNOT, z1))))
     }
@@ -663,9 +635,8 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
           l @ BinaryExpr(BoolAND, _, BinaryExpr(op, lhs, rhs: BitVecLiteral)),
           UnaryExpr(BoolNOT, BinaryExpr(BVEQ, lhs2, rhs2: BitVecLiteral))
         )
-        if (ineqToStrict.contains(op) || strictIneq.contains(op)) && simplifyCond(
-          BinaryExpr(ineqToStrict.get(op).getOrElse(op), rhs, rhs2)
-        ) == TrueLiteral
+        if (ineqToStrict.contains(op) || strictIneq
+          .contains(op)) && simplifyCond(BinaryExpr(ineqToStrict.get(op).getOrElse(op), rhs, rhs2)) == TrueLiteral
           && lhs == lhs2 => {
       logSimp(e, l)
     }
@@ -696,9 +667,7 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
     // x >= 0 && x != 0 ===> x > 0
     case BinaryExpr(BoolAND, BinaryExpr(op, lhs, BitVecLiteral(0, sz)), UnaryExpr(BoolNOT, rhs))
         if ineqToStrict.contains(op) &&
-          size(lhs).isDefined && (simplifyCond(
-            BinaryExpr(BVEQ, lhs, BitVecLiteral(0, size(lhs).get))
-          ) == rhs) => {
+          size(lhs).isDefined && (simplifyCond(BinaryExpr(BVEQ, lhs, BitVecLiteral(0, size(lhs).get))) == rhs) => {
       logSimp(e, BinaryExpr(ineqToStrict(op), lhs, BitVecLiteral(0, size(lhs).get)))
     }
     case BinaryExpr(BoolAND, BinaryExpr(op, lhs, rhs), UnaryExpr(BoolNOT, BinaryExpr(BVEQ, lhs2, rhs2)))
@@ -748,25 +717,25 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
     case BinaryExpr(BoolOR, BinaryExpr(BVULT, x, y), BinaryExpr(BVUGE, x1, y1)) if x1 == x && y1 == y => TrueLiteral
     case BinaryExpr(BoolOR, BinaryExpr(BVULE, x, y), BinaryExpr(BVUGT, x1, y1)) if x1 == x && y1 == y => TrueLiteral
 
-   // case orig @ BinaryExpr(
-   //       BoolAND,
-   //       BinaryExpr(BoolAND, a, b),
-   //       BinaryExpr(BoolOR, c, d)
-   //     )  if {
-   //       //val simpeda = BinaryExpr(BoolAND, BinaryExpr(BoolOR, a, c), BinaryExpr(BoolOR, a, d))
-   //       //val simpedb = BinaryExpr(BoolAND, BinaryExpr(BoolOR, b, c), BinaryExpr(BoolOR, b, d))
-   //       //val s = BinaryExpr(BoolAND, simpeda, simpedb)
-   //       //val r = simplifyCond(s)
-   //       true
-   //     } => {
-   //       trace = true
-   //       val simpeda = (BinaryExpr(BoolAND, (BinaryExpr(BoolAND, c, a)), (BinaryExpr(BoolAND, c, b))))
-   //       val simpedb = (BinaryExpr(BoolAND, (BinaryExpr(BoolAND, d, a)), (BinaryExpr(BoolAND, d, b))))
-   //       val s = simplifyCond(BinaryExpr(BoolOR, simpeda, simpedb))
-   //       val nr =  logSimp(e, s)
-   //       trace = false
-   //       nr
-   //     }
+    // case orig @ BinaryExpr(
+    //       BoolAND,
+    //       BinaryExpr(BoolAND, a, b),
+    //       BinaryExpr(BoolOR, c, d)
+    //     )  if {
+    //       //val simpeda = BinaryExpr(BoolAND, BinaryExpr(BoolOR, a, c), BinaryExpr(BoolOR, a, d))
+    //       //val simpedb = BinaryExpr(BoolAND, BinaryExpr(BoolOR, b, c), BinaryExpr(BoolOR, b, d))
+    //       //val s = BinaryExpr(BoolAND, simpeda, simpedb)
+    //       //val r = simplifyCond(s)
+    //       true
+    //     } => {
+    //       trace = true
+    //       val simpeda = (BinaryExpr(BoolAND, (BinaryExpr(BoolAND, c, a)), (BinaryExpr(BoolAND, c, b))))
+    //       val simpedb = (BinaryExpr(BoolAND, (BinaryExpr(BoolAND, d, a)), (BinaryExpr(BoolAND, d, b))))
+    //       val s = simplifyCond(BinaryExpr(BoolOR, simpeda, simpedb))
+    //       val nr =  logSimp(e, s)
+    //       trace = false
+    //       nr
+    //     }
 
     case BinaryExpr(
           BoolOR,
@@ -782,16 +751,8 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
               case _                                                              => false
             }
           } => {
-      logSimp(
-        e,
-        BinaryExpr(
-          BoolAND,
-          simplifyCond(BinaryExpr(BoolOR, l, d)),
-          simplifyCond(BinaryExpr(BoolOR, r, d))
-        )
-      )
+      logSimp(e, BinaryExpr(BoolAND, simplifyCond(BinaryExpr(BoolOR, l, d)), simplifyCond(BinaryExpr(BoolOR, r, d))))
     }
-
 
     case BinaryExpr(
           BoolAND,
@@ -874,26 +835,11 @@ def isIneq(b: BinOp) = {
   ineqToStrict.contains(b) || strictIneq.contains(b)
 }
 
-val ineqToStrict = Map[BinOp, BinOp](
-  BVSGE -> BVSGT,
-  BVUGE -> BVUGT,
-  BVSLE -> BVSLT,
-  BVULE -> BVULT
-)
+val ineqToStrict = Map[BinOp, BinOp](BVSGE -> BVSGT, BVUGE -> BVUGT, BVSLE -> BVSLT, BVULE -> BVULT)
 
-val strictToNonStrict = Map[BinOp, BinOp](
-  BVSGT -> BVSGE,
-  BVUGT -> BVUGE,
-  BVSLT -> BVSLE,
-  BVULT -> BVULE
-)
+val strictToNonStrict = Map[BinOp, BinOp](BVSGT -> BVSGE, BVUGT -> BVUGE, BVSLT -> BVSLE, BVULT -> BVULE)
 
-val strictIneq = Set[BinOp](
-  BVSGT,
-  BVUGT,
-  BVSLT,
-  BVULT
-)
+val strictIneq = Set[BinOp](BVSGT, BVUGT, BVSLT, BVULT)
 
 def cleanupExtends(e: Expr): (Expr, Boolean) = {
   // this 'de-canonicalises' to some extent, but makes the resulting program simpler, so we perform as a post pass
@@ -1132,9 +1078,6 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
     case UnaryExpr(BoolNOT, BinaryExpr(BoolOR, a, b)) =>
       logSimp(e, BinaryExpr(BoolAND, UnaryExpr(BoolNOT, a), UnaryExpr(BoolNOT, b)))
 
-    // inequality negation
-    case BinaryExpr(BVCOMP, body @ BinaryExpr(BVCOMP, _, _), BitVecLiteral(0, 1)) =>
-      logSimp(e, UnaryExpr(BVNOT, (body)))
     case UnaryExpr(BoolNOT, BinaryExpr(BVSLT, lhs, rhs)) => logSimp(e, BinaryExpr(BVSGE, lhs, rhs))
     case UnaryExpr(BoolNOT, BinaryExpr(BVSGT, lhs, rhs)) => logSimp(e, BinaryExpr(BVSLE, lhs, rhs))
     case UnaryExpr(BoolNOT, BinaryExpr(BVULT, lhs, rhs)) => logSimp(e, BinaryExpr(BVUGE, lhs, rhs))
@@ -1143,7 +1086,6 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
     case UnaryExpr(BoolNOT, BinaryExpr(BVSGE, lhs, rhs)) => logSimp(e, BinaryExpr(BVSLT, lhs, rhs))
     case UnaryExpr(BoolNOT, BinaryExpr(BVULE, lhs, rhs)) => logSimp(e, BinaryExpr(BVUGT, lhs, rhs))
     case UnaryExpr(BoolNOT, BinaryExpr(BVUGE, lhs, rhs)) => logSimp(e, BinaryExpr(BVULT, lhs, rhs))
-
 
     case r => {
       didAnything = false

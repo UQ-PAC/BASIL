@@ -83,8 +83,7 @@ case class ProductInterpreter[L, T, E](inner: Effects[L, E], before: Effects[T, 
   } yield (f)
 }
 
-case class LayerInterpreter[L, T, E](inner: Effects[L, E], before: Effects[(L, T), E])
-    extends Effects[(L, T), E] {
+case class LayerInterpreter[L, T, E](inner: Effects[L, E], before: Effects[(L, T), E]) extends Effects[(L, T), E] {
 
   def loadVar(v: String) = for {
     n <- (before.loadVar(v))
