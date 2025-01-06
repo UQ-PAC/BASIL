@@ -253,15 +253,15 @@ class BasilIRPrettyPrinter() extends BasilIR[PPProg] {
     val name = p.name
     val inParams = p.formalInParam.toList.map(vparam)
     val outParams = p.formalOutParam.toList.map(vparam)
-    val entryBlock = p.entryBlock.map(vblock)
+    val entryBlock = p.entryBlock
     val middleBlocks =
-      (p.blocks.toSet -- p.entryBlock.toSet -- p.returnBlock.toSet).toList.sortBy(x => -x.rpoOrder).map(vblock)
+      (p.entryBlock.toList ++ (p.blocks.toSet -- p.entryBlock.toSet -- p.returnBlock.toSet).toList.sortBy(x => -x.rpoOrder)
+      ++ p.returnBlock).map(vblock)
     val returnBlock = p.returnBlock.map(vblock)
 
     val localDecls = decls.toList.sorted
 
-    val iblocks = entryBlock.map(b => (s"  entry = ${indent(b.toString)}")).toList
-      ++ returnBlock.map(b => (s"  exit = ${indent(b.toString)}")).toList
+    val iblocks = p.entryBlock.map(b => (s"  entry_block = " + '"' + b.label + '"')).toList
 
     val addr = p.address.map(l => vaddress(l).toString).map("  address = " + _).toList
 
