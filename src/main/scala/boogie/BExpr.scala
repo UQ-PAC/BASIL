@@ -288,7 +288,7 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
           } else {
             throw new Exception(s"bitvector size mismatch: $arg1, $arg2")
           }
-        case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE | BVSADDO =>
+        case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
           if (bv1.size == bv2.size) {
             BoolBType
           } else {

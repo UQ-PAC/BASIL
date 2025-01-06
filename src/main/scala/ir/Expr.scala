@@ -190,7 +190,7 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
           } else {
             throw new Exception("bitvector size mismatch")
           }
-        case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE | BVSADDO =>
+        case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
           if (bv1.size == bv2.size) {
             BoolType
           } else {
@@ -252,7 +252,6 @@ sealed trait BVBinOp(op: String) extends BinOp {
   def opName = op
 }
 
-case object BVSADDO extends BVBinOp("saddo")
 case object BVAND extends BVBinOp("and")
 case object BVOR extends BVBinOp("or")
 case object BVADD extends BVBinOp("add")

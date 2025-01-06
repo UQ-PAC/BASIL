@@ -294,7 +294,6 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
     op match
       case bvOp: BVBinOp =>
         bvOp match
-          case BVSADDO => ???
           case BVAND => ???
           case BVOR => ???
           case BVADD => rhs match
