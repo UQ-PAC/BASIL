@@ -94,16 +94,25 @@ procedure main();
 
 implementation main()
 {
+  var $load16: bv64;
+  var $load17: bv32;
+  var $load18: bv64;
+  var Gamma_$load16: bool;
+  var Gamma_$load17: bool;
+  var Gamma_$load18: bool;
   $main$__0__$F4R_psC2T4y6sYXDzaadXQ:
     assume {:captureState "$main$__0__$F4R_psC2T4y6sYXDzaadXQ"} true;
     R8, Gamma_R8 := 65536bv64, true;
     call rely();
-    R8, Gamma_R8 := memory_load64_le(mem, bvadd64(R8, 4048bv64)), (gamma_load64(Gamma_mem, bvadd64(R8, 4048bv64)) || L(mem, bvadd64(R8, 4048bv64)));
+    $load16, Gamma_$load16 := memory_load64_le(mem, bvadd64(R8, 4048bv64)), (gamma_load64(Gamma_mem, bvadd64(R8, 4048bv64)) || L(mem, bvadd64(R8, 4048bv64)));
+    R8, Gamma_R8 := $load16, Gamma_$load16;
     call rely();
-    R8, Gamma_R8 := zero_extend32_32(memory_load32_le(mem, R8)), (gamma_load32(Gamma_mem, R8) || L(mem, R8));
+    $load17, Gamma_$load17 := memory_load32_le(mem, R8), (gamma_load32(Gamma_mem, R8) || L(mem, R8));
+    R8, Gamma_R8 := zero_extend32_32($load17), Gamma_$load17;
     R9, Gamma_R9 := 65536bv64, true;
     call rely();
-    R9, Gamma_R9 := memory_load64_le(mem, bvadd64(R9, 4032bv64)), (gamma_load64(Gamma_mem, bvadd64(R9, 4032bv64)) || L(mem, bvadd64(R9, 4032bv64)));
+    $load18, Gamma_$load18 := memory_load64_le(mem, bvadd64(R9, 4032bv64)), (gamma_load64(Gamma_mem, bvadd64(R9, 4032bv64)) || L(mem, bvadd64(R9, 4032bv64)));
+    R9, Gamma_R9 := $load18, Gamma_$load18;
     call rely();
     assert (L(mem, R9) ==> Gamma_R8);
     mem, Gamma_mem := memory_store32_le(mem, R9, R8[32:0]), gamma_store32(Gamma_mem, R9, Gamma_R8);

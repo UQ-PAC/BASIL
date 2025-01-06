@@ -38,7 +38,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       procedure.inParamDefaultBinding = immutable.SortedMap.from(s.in.map(s => translateParam(s)-> paramRegisterRVal(s)))
       procedure.outParamDefaultBinding = immutable.SortedMap.from(s.out.filterNot(_.name.endsWith("_result")).map(s => translateParam(s) -> paramRegisterLVal(s)))
 
-      if (s.address.get == mainAddress) {
+      if (s.address.contains(mainAddress)) {
         mainProcedure = Some(procedure)
       }
       procedures.append(procedure)

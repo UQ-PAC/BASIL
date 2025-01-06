@@ -117,12 +117,21 @@ procedure main();
 
 implementation main()
 {
+  var $load1: bv32;
+  var $load2: bv64;
+  var $load3: bv32;
+  var $load4: bv8;
+  var Gamma_$load1: bool;
+  var Gamma_$load2: bool;
+  var Gamma_$load3: bool;
+  var Gamma_$load4: bool;
   $main$__0__$ulEp46faSbyYIP08N0ny3w:
     assume {:captureState "$main$__0__$ulEp46faSbyYIP08N0ny3w"} true;
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 16bv64), Gamma_R0;
     call rely();
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, R0)), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
+    $load1, Gamma_$load1 := memory_load32_le(mem, R0), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
+    R0, Gamma_R0 := zero_extend32_32($load1), Gamma_$load1;
     R1, Gamma_R1 := zero_extend32_32(bvadd32(R0[32:0], 1bv32)), Gamma_R0;
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 16bv64), Gamma_R0;
@@ -133,7 +142,8 @@ implementation main()
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 24bv64), Gamma_R0;
     call rely();
-    R0, Gamma_R0 := memory_load64_le(mem, R0), (gamma_load64(Gamma_mem, R0) || L(mem, R0));
+    $load2, Gamma_$load2 := memory_load64_le(mem, R0), (gamma_load64(Gamma_mem, R0) || L(mem, R0));
+    R0, Gamma_R0 := $load2, Gamma_$load2;
     R1, Gamma_R1 := bvadd64(R0, 18446744073709551615bv64), Gamma_R0;
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 24bv64), Gamma_R0;
@@ -144,7 +154,8 @@ implementation main()
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 32bv64), Gamma_R0;
     call rely();
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, R0)), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
+    $load3, Gamma_$load3 := memory_load32_le(mem, R0), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
+    R0, Gamma_R0 := zero_extend32_32($load3), Gamma_$load3;
     R1, Gamma_R1 := zero_extend32_32(bvadd32(R0[32:0], 3bv32)), Gamma_R0;
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 32bv64), Gamma_R0;
@@ -155,7 +166,8 @@ implementation main()
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 20bv64), Gamma_R0;
     call rely();
-    R0, Gamma_R0 := zero_extend32_32(zero_extend24_8(memory_load8_le(mem, R0))), (gamma_load8(Gamma_mem, R0) || L(mem, R0));
+    $load4, Gamma_$load4 := memory_load8_le(mem, R0), (gamma_load8(Gamma_mem, R0) || L(mem, R0));
+    R0, Gamma_R0 := zero_extend32_32(zero_extend24_8($load4)), Gamma_$load4;
     R0, Gamma_R0 := zero_extend32_32(bvadd32(R0[32:0], 1bv32)), Gamma_R0;
     R1, Gamma_R1 := zero_extend32_32((0bv24 ++ R0[8:0])), Gamma_R0;
     R0, Gamma_R0 := 69632bv64, true;

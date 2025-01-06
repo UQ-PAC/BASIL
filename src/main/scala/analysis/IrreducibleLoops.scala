@@ -1,18 +1,14 @@
 package analysis
 
-import ir.{CFGPosition, Command, IntraProcIRCursor, Program, Procedure, Block, GoTo, IRWalk}
+import scala.annotation.tailrec
+import ir.{Block, Command, IntraProcIRCursor, Program, Procedure, GoTo, IRWalk}
+import ir.{LocalAssign, Assume, IntLiteral, IntType, IntEQ, BoolOR, LocalVar, BinaryExpr}
 import util.intrusive_list.IntrusiveList
 import util.StaticAnalysisLogger
 
 import scala.collection.mutable
 
-private def label(p: CFGPosition) = {
-  p match {
-    case b: Block => "block." + b.label
-    case p: Procedure => "proc." + p.name
-    case c: Command => "cmd." + c.hashCode().toString
-  }
-}
+private def label(p: Block) = "block." + p.label
 
 /*
  * Loop Identification
@@ -23,19 +19,19 @@ private def label(p: CFGPosition) = {
 /* A connection between to IL nodes, purely for the representation of loops in
  *
  */
-case class LoopEdge(from: CFGPosition, to: CFGPosition) {
+case class LoopEdge(from: Block, to: Block) {
   override def toString: String = s"(${label(from)}, ${label(to)})"
 }
 
 /* A loop is a subgraph <G_l, E_l> of a CFG <G, E>
  *
  */
-class Loop(val header: CFGPosition) {
+class Loop(val header: Block) {
   val reentries: mutable.Set[LoopEdge] = mutable.Set() // Edges to loop from outside that are not to the header
   val backEdges: mutable.Set[LoopEdge] = mutable.Set() // Edges from inside loop to the header
   val entryEdges: mutable.Set[LoopEdge] = mutable.Set() // Edges into the header node
 
-  val nodes: mutable.Set[CFGPosition] = mutable.Set() // G_l
+  val nodes: mutable.Set[Block] = mutable.Set() // G_l
   val edges: mutable.Set[LoopEdge] = mutable.Set() // G_e
   var reducible: Boolean = true // Assume reducible by default
 
@@ -55,45 +51,136 @@ class Loop(val header: CFGPosition) {
 /* Loop detection and classification with respect to being reducible or irreducible. Implements the algorithm
  *  described by Wei in `A New Algorithm for Identifying Loops in Decompilation` (LNCS 4632 pp 170-183)
  */
-class LoopDetector(cfg: Program) {
-  // Header -> Loop
-  private val loops: mutable.HashMap[CFGPosition, Loop] = mutable.HashMap()
-  private val headers: mutable.Set[CFGPosition] = mutable.Set()
+object LoopDetector {
 
-  // Algorithm helpers
-  private val visitedNodes: mutable.Set[CFGPosition] = mutable.Set()
-  private val nodeDFSPpos: mutable.HashMap[CFGPosition, Int] = mutable.HashMap()
-  private val iloopHeaders: mutable.HashMap[CFGPosition, CFGPosition] = mutable.HashMap()
-  private val edgeStack: mutable.Stack[LoopEdge] = mutable.Stack()
+  case class State(
+    // Header -> Loop
+    loops: Map[Block, Loop] = Map(),
+    headers: Set[Block] = Set(),
 
-  /*
-   * Returns the set of irreducible loops in the program.
-   *
-   */
-  def irreducible_loops(): Set[Loop] = {
-    val irreducibleLoops: Set[Loop] = loops.values.filter(l => !l.reducible).toSet
-    irreducibleLoops
+    // Algorithm helpers
+    visitedNodes: Set[Block] = Set(),
+    nodeDFSPpos: Map[Block, Int] = Map(),
+    iloopHeaders: Map[Block, Block] = Map(),
+    edgeStack: List[LoopEdge] = List()
+  ) {
+    def irreducibleLoops: Set[Loop] = loops.values.filter(l => !l.reducible).toSet
 
-    /*
-    TODO is this supposed to be anything?
-    if (irreducibleLoops.isEmpty) {
-      irreducibleLoops
-    } else {
-      val wantedLoops: mutable.Set[Loop] = mutable.Set[Loop]()
-      val irrHeaders: Set[CFGPosition] = irreducibleLoops.map(l => l.header)
+    def identifiedLoops: Iterable[Loop] = loops.values
 
-      irreducibleLoops
+    def reducibleTransformIR(): State = {
+      this.copy(loops = LoopTransform.llvm_transform(loops.values).map(l => l.header -> l).toMap)
     }
-    */
+  }
+
+  def identify_loops(entryBlock: Block): State = {
+    traverse_loops_dfs(State(), entryBlock, 1)
   }
 
   /*
-   * Returns the set of loops in the program.
+   * Returns the set of loops for each procedure in the program.
    */
-  def identify_loops(): Set[Loop] = {
-    val funcEntries = cfg.procedures
-    funcEntries.foreach { funcEntry => traverse_loops_dfs(funcEntry, 1) }
-    loops.values.toSet
+  def identify_loops(cfg: Program): State = {
+    cfg.procedures.toSet.flatMap(_.entryBlock)
+      .foldLeft(State())((st, eb) => traverse_loops_dfs(st, eb, 1))
+  }
+
+
+  private def processVisitedNodeOutgoingEdge(istate: State, edge: LoopEdge): State = {
+    var st = istate
+    val from = edge.from
+    if (st.nodeDFSPpos(edge.to) > 0) {
+      // Case (b)
+      // b is in DFSP(edge.from)
+      st = st.copy(headers = st.headers + edge.to)
+
+      val newLoop = st.loops.getOrElse(edge.to, Loop(edge.to))
+      st.edgeStack.reverse.slice(st.nodeDFSPpos(edge.to) - 1, st.nodeDFSPpos(edge.from)).foreach { pEdge =>
+        newLoop.addEdge(pEdge)
+      }
+      newLoop.backEdges += edge
+
+      // Add loop entry edge
+      edge.to.prevBlocks.foreach { predNode =>
+        val predEdge = LoopEdge(predNode, edge.to)
+        if (st.nodeDFSPpos.contains(predNode)) {
+          if (st.nodeDFSPpos(predNode) > 0 && predEdge != edge) {
+            newLoop.entryEdges += predEdge
+          }
+        }
+      }
+
+      if (!st.loops.contains(edge.to)) {
+        st = st.copy(loops = st.loops.updated(edge.to, newLoop))
+      }
+
+      st = tag_lhead(st, edge.from, edge.to)
+    } else if (!st.iloopHeaders.contains(edge.to)) {
+      // Case (c) - do nothing
+      // edge.to is not part of this path, and it's not a header, so we can ignore it.
+      // (in effect we add it to our path later, but we do that when we discover a new header
+      //  by looking through the instruction call stack)
+    } else {
+      var h: Block = st.iloopHeaders(edge.to)
+      if (st.nodeDFSPpos(h) > 0) {
+        // Case (d)
+        // h is in DFSP(edge.from)
+        val loop = st.loops(h)
+
+        // Add current path to the existing loop (a new path in the loop is discovered)
+        // This can happen for example in the case that there is a branch in a loop, or a `continue` stmt, etc
+        st.edgeStack.reverse.slice(st.nodeDFSPpos(h) - 1, st.nodeDFSPpos(edge.from)).foreach(loop.addEdge)
+        edge.to.nextBlocks.filter(n => n == h).foreach { n =>
+          val outEdge = LoopEdge(edge.to, n)
+          loop.addEdge(outEdge)
+        }
+
+        st = tag_lhead(st, edge.from, h)
+      } else {
+        // Case (e)
+        // reentry (irreducible!)
+        val loop = st.loops(h)
+        loop.reducible = false
+        loop.reentries += edge
+
+        // Make outer loops irreducible if the originating node of the re-entry edge is not within those loops
+        edge.to.nextBlocks.foreach { nextNode =>
+          val nextEdge = LoopEdge(edge.to, nextNode)
+          var ih = nextNode
+
+          while (st.iloopHeaders.contains(ih)) {
+            ih = st.iloopHeaders(ih)
+            val thisLoop = st.loops(ih)
+            if (st.iloopHeaders.contains(from)) {
+              if (st.iloopHeaders(from) != ih) {
+                thisLoop.reducible = false
+                thisLoop.reentries += edge
+              }
+            } else {
+              // `from` must be outside the loop
+              thisLoop.reducible = false
+              thisLoop.reentries += edge
+            }
+          }
+        }
+
+        var break = false
+        while (st.iloopHeaders.contains(h) && !break) {
+          h = st.iloopHeaders(h)
+          if (st.nodeDFSPpos(h) > 0) {
+            st = tag_lhead(st, edge.from, h)
+            break = true
+          }
+        }
+      }
+    }
+
+    // Here the most recent edge will be originating from `edge.from`
+    st = st.copy(edgeStack = st.edgeStack match {
+      case h :: tl => tl
+      case Nil => Nil
+    })
+    st
   }
 
   /*
@@ -110,151 +197,129 @@ class LoopDetector(cfg: Program) {
    *          node into the target loop, making it irreducible, so we mark it as such.
    *
    */
-  private def traverse_loops_dfs(b0: CFGPosition, DFSPpos: Int): Option[CFGPosition] = {
+  private def traverse_loops_dfs(_istate: State, _b0: Block, _DFSPpos: Int): State = {
 
-    visitedNodes += b0
-    nodeDFSPpos(b0) = DFSPpos
-
-    // Process all outgoing edges from the current node
-    // IntraProcIRCursor.succ(b0).toList.sortBy(n => n.to.ed).foreach{ toNode =>
-    //  The above makes the iteration of loops deterministic. The algorithm (and transform) should be agnostic of how loops are identified
-    //      (in the sense its application should completely resolve any irreducibility), though by the nature of irreducible loops they can be
-    //      characterised in different ways
-    IntraProcIRCursor.succ(b0).foreach { toNode =>
-      val edge = LoopEdge(b0, toNode)
-      edgeStack.push(edge)
-      val from = edge.from
-      val b = edge.to
-
-      if (!visitedNodes.contains(b)) {
-        // Case (a)
-        val nh: Option[CFGPosition] = traverse_loops_dfs(b, DFSPpos + 1)
-        nh.foreach(b => tag_lhead(b0, b))
-      } else {
-        if (nodeDFSPpos(b) > 0) {
-          // Case (b)
-          // b is in DFSP(b0)
-          headers += b
-
-          val newLoop = if (loops.contains(b)) loops(b) else Loop(b)
-          edgeStack.reverse.slice(nodeDFSPpos(b) - 1, nodeDFSPpos(b0)).foreach { pEdge => newLoop.addEdge(pEdge) }
-          newLoop.backEdges += edge
-
-          // Add loop entry edge
-          IntraProcIRCursor.pred(b).foreach { predNode =>
-            val predEdge = LoopEdge(predNode, b)
-            if (nodeDFSPpos.contains(predNode)) {
-              if (nodeDFSPpos(predNode) > 0 && predEdge != edge) {
-                newLoop.entryEdges += predEdge
-              }
-            }
-          }
-
-          if (!loops.contains(b)) {
-            loops(b) = newLoop
-          }
-
-          tag_lhead(b0, b)
-        } else if (!iloopHeaders.contains(b)) {
-          // Case (c) - do nothing
-          // b is not part of this path, and it's not a header, so we can ignore it.
-          // (in effect we add it to our path later, but we do that when we discover a new header
-          //  by looking through the instruction call stack)
-        } else {
-          var h: CFGPosition = iloopHeaders(b)
-          if (nodeDFSPpos(h) > 0) {
-            // Case (d)
-            // h is in DFSP(b0)
-            val loop = loops(h)
-
-            // Add current path to the existing loop (a new path in the loop is discovered)
-            // This can happen for example in the case that there is a branch in a loop, or a `continue` stmt, etc
-            edgeStack.reverse.slice(nodeDFSPpos(h) - 1, nodeDFSPpos(b0)).foreach {
-              pEdge => loop.addEdge(pEdge)
-            }
-            IntraProcIRCursor.succ(b).filter(n => n == h).foreach { n =>
-              val outEdge = LoopEdge(b, n)
-              loop.addEdge(outEdge)
-            }
-
-            tag_lhead(b0, h)
-          } else {
-            // Case (e)
-            // reentry (irreducible!)
-            val loop = loops(h)
-            loop.reducible = false
-            loop.reentries += edge
-
-            // Make outer loops irreducible if the originating node of the re-entry edge is not within those loops
-            IntraProcIRCursor.succ(b).foreach { nextNode =>
-              val nextEdge = LoopEdge(b, nextNode)
-              var ih = nextNode
-
-              while (iloopHeaders.contains(ih)) {
-                ih = iloopHeaders(ih)
-                val thisLoop = loops(ih)
-                if (iloopHeaders.contains(from)) {
-                  if (iloopHeaders(from) != ih) {
-                    thisLoop.reducible = false
-                    thisLoop.reentries += edge
-                  }
-                } else {
-                  // `from` must be outside the loop
-                  thisLoop.reducible = false
-                  thisLoop.reentries += edge
-                }
-              }
-            }
-
-            var break = false
-            while (iloopHeaders.contains(h) && !break) {
-              h = iloopHeaders(h)
-              if (nodeDFSPpos(h) > 0) {
-                tag_lhead(b0, h)
-                break = true
-              }
-            }
-          }
-        }
-      }
-      edgeStack.pop() // Here the most recent edge will be originating from `b0`
+    /**
+     * The recursion is flattened using a state machine operating over the stack of operations
+     * to perform
+     *
+     *      +--> BeginProcessNode <--+     Start DFS on node: push ContinueDFS with node's successors
+     *      |           |            |
+     *      |           |       succ not visited 
+     *      |           |    (push self & successor)
+     *      |           v            |
+     *      |       ContinueDFS -----+     if not previously visited, traverse to successors (a),
+     *      |           |            |     otherwise process this edge (b-e) then continue procesing edges.
+     *      |      succ visited      |
+     *  siblings        |       no successors           (siblings = processingEdges) 
+     *      |           V            |
+     *      +---- ProcesVisitedNode  |      we have returned after processing successor edges
+     *                  |            |
+     *              no siblings      |
+     *                  |            |
+     *                  v            |
+     *          FinishProcessNode <--+     all outgoing edges have been processed, finish this node
+     *
+     *
+     */
+    enum Action {
+      case BeginProcessNode
+      case ContinueDFS
+      case ProcessVisitedNode
+      case FinishProcessNode
     }
-    nodeDFSPpos(b0) = 0
-    iloopHeaders.get(b0)
+
+    case class LocalState(istate: State, b0: Block, pos: Int, action: Action, processingEdges: List[LoopEdge])
+    val stack = mutable.Stack[LocalState]()
+    stack.push(LocalState(_istate, _b0, _DFSPpos, Action.BeginProcessNode, List()))
+
+    var retval: (State, Option[Block]) = (_istate, None)
+
+    while (stack.nonEmpty) {
+      var sf = stack.pop()
+      var st = sf.istate
+
+      sf.action match {
+        case Action.BeginProcessNode =>
+          st = st.copy(visitedNodes = st.visitedNodes + sf.b0)
+          st = st.copy(nodeDFSPpos = st.nodeDFSPpos.updated(sf.b0, sf.pos))
+          val edgesToProcess = sf.b0.nextBlocks.map(toNode => LoopEdge(sf.b0, toNode)).toList
+          sf = sf.copy(istate = st, processingEdges = edgesToProcess, action = Action.ContinueDFS)
+          stack.push(sf)
+
+        case Action.ContinueDFS =>
+          sf.processingEdges match {
+            case edge::tl =>
+              sf = sf.copy(processingEdges = tl)
+
+              if (!st.visitedNodes.contains(edge.to)) {
+                // (a) not visited before: BeginProcessNode on this successor
+                st = st.copy(edgeStack = edge::st.edgeStack)
+                stack.push(sf.copy(action = Action.ProcessVisitedNode)) // continue after processing this successor
+                stack.push(sf.copy(istate = st, b0 = edge.to, pos = sf.pos + 1, action = Action.BeginProcessNode)) // process this successor
+              } else {
+                // (b-e) visited before: finish processing this edge
+                st = processVisitedNodeOutgoingEdge(st, edge)
+                // continue iterating `processingEdges`
+                stack.push(sf.copy(istate = st, action = Action.ContinueDFS))
+              }
+            case Nil =>
+              // loop over
+              sf = sf.copy(action = Action.FinishProcessNode)
+              stack.push(sf)
+          }
+
+        case Action.ProcessVisitedNode =>
+          val (nst, newhead) = retval
+          st = nst
+          st = newhead.foldLeft(st)((st, b) => tag_lhead(st, sf.b0, b))
+          sf = sf.copy(action=Action.ContinueDFS, istate = st) // continue iteration
+          stack.push(sf)
+
+        case Action.FinishProcessNode =>
+          st = st.copy(nodeDFSPpos = st.nodeDFSPpos.updated(sf.b0, 0))
+          retval = (st, st.iloopHeaders.get(sf.b0))
+
+      }
+    }
+
+    retval(0)
   }
 
   /** Sets the most inner loop header `h` for a given node `b`
     *
     */
-  private def tag_lhead(b: CFGPosition, h: CFGPosition): Unit = {
-    var cur1: CFGPosition = b
-    var cur2: CFGPosition = h
+  private def tag_lhead(istate: State, b: Block, h: Block): State = {
+    var cur1: Block = b
+    var cur2: Block = h
+    var st = istate
 
     if (cur1 == cur2) {
-      return // We don't consider self-loops to be loops for our purposes
+      return st // We don't consider self-loops to be loops for our purposes
     }
 
-    var hasLoopHeader: Boolean = iloopHeaders.contains(cur1)
+    var hasLoopHeader: Boolean = st.iloopHeaders.contains(cur1)
     while (hasLoopHeader) {
-      val ih = iloopHeaders(cur1)
+      val ih = st.iloopHeaders(cur1)
       if (ih == cur2) {
-        return
+        return st
       }
-      if (nodeDFSPpos(ih) < nodeDFSPpos(cur2)) {
-        iloopHeaders(cur1) = cur2
+      if (st.nodeDFSPpos(ih) < st.nodeDFSPpos(cur2)) {
+        st = st.copy(iloopHeaders = st.iloopHeaders.updated(cur1, cur2))
         cur1 = cur2
         cur2 = ih
       } else {
         cur1 = ih
       }
-      hasLoopHeader = iloopHeaders.contains(cur1)
+      hasLoopHeader = st.iloopHeaders.contains(cur1)
     }
-    iloopHeaders(cur1) = cur2
+    st = st.copy(iloopHeaders = st.iloopHeaders.updated(cur1, cur2))
+    st
   }
 }
 
 
-class LoopTransform(loops: Set[Loop]) {
+object LoopTransform {
 
   /* For every irreducible loop, transform it into a reducible one. The algorithm
    *  for doing this is "inspired" (read: copied) from LLVM, the source for which
@@ -262,15 +327,14 @@ class LoopTransform(loops: Set[Loop]) {
    *
    * Returns: Set of loops which were previously irreducible, but are no longer
    */
-  def llvm_transform(): Set[Loop] = {
-    val newLoops: mutable.Set[Loop] = mutable.Set()
-    var i: Int = 0 // Exclusively for tracking
-    loops.filter(l => !l.reducible).foreach { l =>
-      newLoops += llvm_transform_loop(l, i)
-      i = i + 1
+  def llvm_transform(loops: Iterable[Loop]): Iterable[Loop] = {
+    loops.map { l =>
+      if (!l.reducible) {
+        llvm_transform_loop(l)
+      } else {
+        l
+      }
     }
-
-    newLoops.toSet
   }
 
   /* Performs the LLVM transform for an individual loop. The algorithm is as follows:
@@ -283,79 +347,62 @@ class LoopTransform(loops: Set[Loop]) {
    *
    * Returns: A new reducible loop which is semantically equivalent to the input irreducible loop
    */
-  private def llvm_transform_loop(loop: Loop, i: Int): Loop = {
+  private def llvm_transform_loop(loop: Loop): Loop = {
     val entryEdges: Set[LoopEdge] = loop.entryEdges.union(loop.reentries).union(loop.backEdges).toSet
 
     val P_e: Set[LoopEdge] = entryEdges // N entry edges
     val P_b: Set[LoopEdge] = entryEdges.flatMap { e =>
-      val predNodes = IntraProcIRCursor.pred(e.to)
+      val predNodes = e.to.prevBlocks 
       predNodes.map(a => LoopEdge(a, e.to))
     } -- P_e // N back edges
     val body: Set[LoopEdge] = loop.edges.toSet -- P_b // Regular control flow in the loop
 
+    // Add bookeeping to preserve control flow precision across the introduced N block
+    // WARNING: We are not careful to avoid repeatedly adding these statements to the IR, so
+    // re-running this transform following a transform producing irreducible control flow over the
+    // same entry blocks will produce invalid/unreachable code
+    val entrys = P_e.map(_.from)
+    val entryids = entrys.zip(0 until entrys.size).toMap
+
+    for ((block, id) <- entryids) {
+      block.statements.prepend(LocalAssign(LocalVar("FromEntryIdx", IntType), IntLiteral(BigInt(id))))
+    }
+
+    P_e.groupBy(_.to).map { (destBlock,origins) =>
+      val idexs = origins.map { b =>
+        BinaryExpr(IntEQ, LocalVar("FromEntryIdx", IntType), IntLiteral(BigInt(entryids(b.from))))
+      }
+      idexs.toList match {
+        case Nil => ()
+        case h::tl =>
+          val cond = tl.foldLeft(h)((l, r) => BinaryExpr(BoolOR, l, r))
+          destBlock.statements.prepend(Assume(cond))
+      }
+    }
 
     // 3. Create block `N` and redirect every edge from set `P` to `H` via `N`
     val conns = P_e.map(e => e.to).union(P_b.map(e => e.to)).collect { case blk: Block => blk }
     val NGoTo = GoTo(conns)
 
-    val N = Block(s"${IRWalk.procedure(loop.header).name}_N_$i", jump = NGoTo)
+    val N = Block(s"${loop.header.label}_loop_N", jump = NGoTo)
     IRWalk.procedure(loop.header).addBlocks(N)
 
     val newLoop = Loop(N)
     newLoop.edges ++= body
 
     P_e.foreach { originalEdge =>
-      val origNode = originalEdge.from
-      val origDest = originalEdge.to
-
-      origNode match {
-        case origBlock: Block =>
-          origBlock.replaceJump(GoTo(List(N)))
-          newLoop.addEdge(LoopEdge(origBlock, N))
-          newLoop.addEdge(LoopEdge(N, origDest))
-
-        case goto: GoTo =>
-          origDest match {
-            case origDest: Block =>
-              goto.removeTarget(origDest)
-              goto.addTarget(N)
-
-              newLoop.addEdge(LoopEdge(goto, N))
-              newLoop.addEdge(LoopEdge(N, origDest))
-            case _ =>
-          }
-        case _ =>
-          StaticAnalysisLogger.error("Unexpected loop originating node - 1")
-          StaticAnalysisLogger.error(origNode)
-      }
+      originalEdge.from.replaceJump(GoTo(List(N)))
+      newLoop.addEdge(LoopEdge(originalEdge.from, N))
+      newLoop.addEdge(LoopEdge(N, originalEdge.to))
     }
 
     P_b.foreach { originalEdge =>
-      val origNode = originalEdge.from
-      val origDest = originalEdge.to
+      originalEdge.from.replaceJump(GoTo(List(N)))
+      val toEdge = LoopEdge(originalEdge.from, N)
 
-      origNode match {
-        case origBlock: Block =>
-          origBlock.replaceJump(GoTo(List(N)))
-          val toEdge = LoopEdge(origBlock, N)
-
-          newLoop.addEdge(toEdge)
-          newLoop.addEdge(LoopEdge(N, origDest))
-          newLoop.backEdges += toEdge
-        case goto: GoTo =>
-          origDest match {
-            case origDest: Block =>
-              goto.removeTarget(origDest)
-              goto.addTarget(N)
-
-              newLoop.addEdge(LoopEdge(goto, N))
-              newLoop.addEdge(LoopEdge(N, origDest))
-            case _ =>
-          }
-        case _ =>
-          StaticAnalysisLogger.error("Unexpected loop originating node - 1")
-          StaticAnalysisLogger.error(origNode)
-      }
+      newLoop.addEdge(toEdge)
+      newLoop.addEdge(LoopEdge(N, originalEdge.to))
+      newLoop.backEdges += toEdge
     }
 
     newLoop

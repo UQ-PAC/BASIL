@@ -84,13 +84,16 @@ procedure main();
 
 implementation main()
 {
+  var $load18: bv32;
+  var Gamma_$load18: bool;
   $main$__0__$ZeApiS~BRSG296M3kaSCnQ:
     assume {:captureState "$main$__0__$ZeApiS~BRSG296M3kaSCnQ"} true;
     R1, Gamma_R1 := 69632bv64, true;
     R2, Gamma_R2 := bvadd64(R1, 20bv64), Gamma_R1;
     R0, Gamma_R0 := 0bv64, true;
     call rely();
-    R2, Gamma_R2 := zero_extend32_32(memory_load32_le(mem, bvadd64(R2, 4bv64))), (gamma_load32(Gamma_mem, bvadd64(R2, 4bv64)) || L(mem, bvadd64(R2, 4bv64)));
+    $load18, Gamma_$load18 := memory_load32_le(mem, bvadd64(R2, 4bv64)), (gamma_load32(Gamma_mem, bvadd64(R2, 4bv64)) || L(mem, bvadd64(R2, 4bv64)));
+    R2, Gamma_R2 := zero_extend32_32($load18), Gamma_$load18;
     call rely();
     assert (L(mem, bvadd64(R1, 20bv64)) ==> Gamma_R2);
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R1, 20bv64), R2[32:0]), gamma_store32(Gamma_mem, bvadd64(R1, 20bv64), Gamma_R2);

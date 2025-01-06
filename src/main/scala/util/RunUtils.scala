@@ -324,17 +324,17 @@ object StaticAnalysis {
 
     StaticAnalysisLogger.debug("reducible loops")
     // reducible loops
-    val detector = LoopDetector(IRProgram)
-    val foundLoops = detector.identify_loops()
-    foundLoops.foreach(l => StaticAnalysisLogger.debug(s"Loop found: ${l.name}"))
+    if (config.irreducibleLoops) {
+      val foundLoops = LoopDetector.identify_loops(IRProgram)
+      foundLoops.irreducibleLoops.foreach(l => StaticAnalysisLogger.debug(s"Irreducible loop found: ${l.name}"))
 
-    val transformer = LoopTransform(foundLoops)
-    val newLoops = transformer.llvm_transform()
-    newLoops.foreach(l => StaticAnalysisLogger.debug(s"Loop found: ${l.name}"))
+      val newLoops = foundLoops.reducibleTransformIR().identifiedLoops
+      newLoops.foreach(l => StaticAnalysisLogger.debug(s"Loop found: ${l.name}"))
 
-    config.analysisDotPath.foreach { s =>
-      DebugDumpIRLogger.writeToFile(File(s"${s}_graph-after-reduce-$iteration.dot"), dotBlockGraph(IRProgram, IRProgram.map(b => b -> b.toString).toMap))
-      DebugDumpIRLogger.writeToFile(File(s"${s}_blockgraph-after-reduce-$iteration.dot"), dotBlockGraph(IRProgram, IRProgram.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap))
+      config.analysisDotPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_graph-after-loop-reduce-$iteration.dot"), dotBlockGraph(IRProgram, IRProgram.map(b => b -> b.toString).toMap))
+        DebugDumpIRLogger.writeToFile(File(s"${s}_blockgraph-after-loop-reduce-$iteration.dot"), dotBlockGraph(IRProgram, IRProgram.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap))
+      }
     }
 
     val mergedSubroutines = subroutines ++ externalAddresses

@@ -10,6 +10,10 @@ import collection.mutable
   To support the state-free IL iteration in CFG order all Commands must be classes with a unique object ref.
 */
 
+/** A Statement or Jump.
+  *
+  * Note that some commands have optional labels.  For example, jump destinations.
+  */
 sealed trait Command extends HasParent[Block] {
   val label: Option[String]
 
@@ -85,9 +89,13 @@ class Assert(var body: Expr, var comment: Option[String] = None, override val la
 object Assert:
   def unapply(a: Assert): Option[(Expr, Option[String], Option[String])] = Some(a.body, a.comment, a.label)
 
-  /**
-   * checkSecurity is true if this is a branch condition that we want to assert has a security level of low before branching
-   * */
+/** Assumptions express control flow restrictions and other properties that can be assumed to be true.
+  * 
+  * For example, an `if (C) S else T` statement in C will eventually be translated to IR with a non-deterministic
+  * goto to two blocks, one with `assume C; S` and the other with `assume not(C); T`.
+  *
+  * checkSecurity is true if this is a branch condition that we want to assert has a security level of low before branching
+  */
 class Assume(var body: Expr, var comment: Option[String] = None, override val label: Option[String] = None, var checkSecurity: Boolean = false) extends Statement {
 
   override def toString: String = s"${labelStr}assume $body" + comment.map(" //" + _)

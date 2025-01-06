@@ -117,8 +117,14 @@ procedure main();
 
 implementation main()
 {
+  var $load4: bv32;
+  var $load5: bv64;
+  var $load6: bv64;
   var Cse0__5$0$1: bv64;
   var Cse0__5$1$6: bv64;
+  var Gamma_$load4: bool;
+  var Gamma_$load5: bool;
+  var Gamma_$load6: bool;
   var Gamma_Cse0__5$0$1: bool;
   var Gamma_Cse0__5$1$6: bool;
   var Gamma_y_old: bool;
@@ -149,7 +155,8 @@ implementation main()
     assert ((x_old == 0bv32) ==> (memory_load32_le(mem, $x_addr) == 0bv32));
     assert (Gamma_y_old ==> ((memory_load32_le(mem, $x_addr) == 0bv32) || gamma_load32(Gamma_mem, $y_addr)));
     assume {:captureState "1844$0"} true;
-    R8, Gamma_R8 := zero_extend32_32(memory_load32_le(stack, bvadd64(R29, 18446744073709551612bv64))), gamma_load32(Gamma_stack, bvadd64(R29, 18446744073709551612bv64));
+    $load4, Gamma_$load4 := memory_load32_le(stack, bvadd64(R29, 18446744073709551612bv64)), gamma_load32(Gamma_stack, bvadd64(R29, 18446744073709551612bv64));
+    R8, Gamma_R8 := zero_extend32_32($load4), Gamma_$load4;
     R9, Gamma_R9 := 69632bv64, true;
     call rely();
     assert (L(mem, bvadd64(R9, 56bv64)) ==> Gamma_R8);
@@ -162,8 +169,10 @@ implementation main()
     assume {:captureState "1856$0"} true;
     R0, Gamma_R0 := 0bv64, true;
     Cse0__5$1$6, Gamma_Cse0__5$1$6 := bvadd64(R31, 16bv64), Gamma_R31;
-    R29, Gamma_R29 := memory_load64_le(stack, Cse0__5$1$6), gamma_load64(Gamma_stack, Cse0__5$1$6);
-    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(Cse0__5$1$6, 8bv64)), gamma_load64(Gamma_stack, bvadd64(Cse0__5$1$6, 8bv64));
+    $load5, Gamma_$load5 := memory_load64_le(stack, Cse0__5$1$6), gamma_load64(Gamma_stack, Cse0__5$1$6);
+    R29, Gamma_R29 := $load5, Gamma_$load5;
+    $load6, Gamma_$load6 := memory_load64_le(stack, bvadd64(Cse0__5$1$6, 8bv64)), gamma_load64(Gamma_stack, bvadd64(Cse0__5$1$6, 8bv64));
+    R30, Gamma_R30 := $load6, Gamma_$load6;
     R31, Gamma_R31 := bvadd64(R31, 32bv64), Gamma_R31;
     goto main_basil_return;
   main_basil_return:
