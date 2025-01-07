@@ -1,6 +1,6 @@
 package analysis.data_structure_analysis
 
-import analysis.{Analysis, FlatElement}
+import analysis.{Analysis, FlatElement, Loop}
 import ir.{BitVecLiteral, CFGPosition, Expr, IntraProcIRCursor, MemoryLoad, MemoryStore, Procedure, Program, Variable, computeDomain}
 
 import scala.collection.mutable
@@ -29,13 +29,17 @@ class Counter(val init: Int = 0) {
 
 object ConstraintCounter extends Counter
 
-case class Constraint(pos: CFGPosition, value: Expr, index: Expr, arg1: EV, arg2: EEV, size: Int, id: Int = ConstraintCounter.increment())
+case class Constraint(pos: CFGPosition, value: Expr, index: Expr, arg1: EV, arg2: EEV, size: Int, id: Int = ConstraintCounter.increment()) {
 
+  override def toString: String = {
+    s"Constraint: $id\n$pos\nEV:$arg1\nEEV:$arg2"
+  }
+}
 
-class ConstraintGen(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends Analysis[Set[Constraint]] {
+class ConstraintGen(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]], loops: Set[Loop]) extends Analysis[Set[Constraint]] {
   
   val domain: Set[CFGPosition] = computeDomain(IntraProcIRCursor, Set(proc)).toSet
-  val sva = SVA(proc, constProp)
+  val sva = SVA(proc, constProp, loops)
 
   override def analyze(): Set[Constraint] = {
     var constraints: Set[Constraint] = Set.empty

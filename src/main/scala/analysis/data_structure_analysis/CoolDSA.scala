@@ -2,7 +2,7 @@ package analysis.data_structure_analysis
 
 import analysis.data_structure_analysis.DSAPhase.Local
 import analysis.solvers.{CoolDSAUnionFindSolver, DSACoolUniTerm, DSAUnionFindSolver}
-import analysis.{Analysis, FlatElement}
+import analysis.{Analysis, FlatElement, Loop}
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.*
 import util.writeToFile
@@ -28,12 +28,12 @@ object CoolNodeCounter {
     }
 }
 
-class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]])
+class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]], loops: Set[Loop])
 {
 
   val solver: CoolDSAUnionFindSolver = CoolDSAUnionFindSolver()
 
-  val sva = SVA(proc, constProp)
+  val sva = SVA(proc, constProp, loops)
   var nodes: Set[CoolNode] = Set.empty
   var pointsTo: Set[(CoolCell, CoolCell)] = Set.empty
   var exprToCell: Set[(CFGPosition, Expr, CoolCell)] = Set.empty
@@ -496,7 +496,7 @@ class CoolCell(val node: CoolNode, val offset: Int, var largestAccessedSize: Int
     }
 }
 
-class CoolDSA(program: Program, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends Analysis[Map[Procedure, CoolGraph]]
+class CoolDSA(program: Program, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]], loops: Set[Loop]) extends Analysis[Map[Procedure, CoolGraph]]
 {
 
   val domain = computeDomain(program)
@@ -522,7 +522,7 @@ class CoolDSA(program: Program, constProp: Map[CFGPosition, Map[Variable, FlatEl
 
     val result: mutable.Map[DSAPhase, Map[Procedure, CoolGraph]] = mutable.Map.empty
     result.update(Local, domain.foldLeft(Map[Procedure, CoolGraph]()) {
-      (m, proc) => m + (proc -> CoolGraph(proc, Local, constProp).localPhase())
+      (m, proc) => m + (proc -> CoolGraph(proc, Local, constProp, loops).localPhase())
     })
 
     writeToFile(result(Local).head._2.toDot, "cooldsa.dot")

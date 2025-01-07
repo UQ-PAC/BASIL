@@ -20,12 +20,12 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{ConstraintGen, CoolDSA, DataStructureAnalysis, Graph, SVA, SymbolicAddress, SymbolicAddressAnalysis}
+import analysis.data_structure_analysis.{Constraint, ConstraintGen, CoolDSA, DataStructureAnalysis, Graph, SVA, SymbolicAddress, SymbolicAddressAnalysis}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
 import translating.*
-import util.{Logger, DebugDumpIRLogger, SimplifyLogger}
+import util.{DebugDumpIRLogger, Logger, SimplifyLogger}
 
 import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
@@ -68,7 +68,8 @@ case class StaticAnalysisContext(
   symbolicAddresses: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
   localDSA: Map[Procedure, Graph],
   bottomUpDSA: Map[Procedure, Graph],
-  topDownDSA: Map[Procedure, Graph]
+  topDownDSA: Map[Procedure, Graph],
+  loops: Set[Loop],
 )
 
 /** Results of the main program execution.
@@ -474,6 +475,7 @@ object StaticAnalysis {
       localDSA = Map.empty,
       bottomUpDSA = Map.empty,
       topDownDSA = Map.empty,
+      loops = foundLoops ++ newLoops
     )
   }
 
@@ -670,7 +672,22 @@ object RunUtils {
       doSimplify(ctx, conf.staticAnalysis)
     }
 
-    val test = CoolDSA(ctx.program, analysis.get.intraProcConstProp)
+
+    Logger.debug("Got to constraint builder")
+    val constraints: String = ctx.program.procedures.foldLeft(Set[Constraint]()) {
+      (s, proc) =>
+        Logger.debug(s"Generating constraints for ${proc.name}")
+        val temp = ConstraintGen(proc, analysis.get.intraProcConstProp, analysis.get.loops).analyze()
+        writeToFile(temp.mkString("\n"), s"${proc.name}_constraints.txt")
+        s ++ temp
+    }.map(_.toString).mkString("\n")
+
+    writeToFile(constraints, "constraints.txt" )
+
+
+    Logger.debug("Done Constraints")
+
+    val test = CoolDSA(ctx.program, analysis.get.intraProcConstProp, analysis.get.loops)
     test.analyze()
     // TODO here
 

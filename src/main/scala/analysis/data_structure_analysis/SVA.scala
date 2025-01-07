@@ -2,33 +2,26 @@ package analysis.data_structure_analysis
 
 import analysis.data_structure_analysis.SymBase.{Global, Heap, Par, Ret, Stack, Unknown}
 import analysis.solvers.{SimplePushDownWorklistFixpointSolver, SimpleWorklistFixpointSolver}
-import analysis.{Analysis, FlatElement, IRIntraproceduralForwardDependencies, MapLattice, PowerSetLatticeWithTop, evaluateExpression}
+import analysis.{Analysis, FlatElement, IRIntraproceduralForwardDependencies, Loop, MapLattice, PowerSetLatticeWithTop, evaluateExpression}
 import ir.eval.BitVectorEval.*
-import ir.{BVADD, BVSUB, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, LocalAssign, LocalVar, MemoryLoad, Procedure, Program, Register, Repeat, SignExtend, UnaryExpr, UninterpretedFunction, Variable, ZeroExtend, computeDomain, toShortString}
+import ir.{BVADD, BVSUB, BinaryExpr, BitVecLiteral, BitVecType, Block, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, LocalAssign, LocalVar, MemoryLoad, Procedure, Program, Register, Repeat, SignExtend, UnaryExpr, UninterpretedFunction, Variable, ZeroExtend, computeDomain, toShortString}
 
 import scala.Option
 
 
 
-object HeapCounter extends Counter
-object UnknownCounter extends Counter
-object RetCounter extends  Counter
 
 enum SymBase:
-  case Heap(id: Int = HeapCounter.increment()) extends SymBase
-  case Unknown(id: Int = UnknownCounter.increment()) extends SymBase
+  case Heap(name: String) extends SymBase
+  case Unknown(name: String) extends SymBase
   case Stack(name: String) extends SymBase
   case Par(name: String) extends SymBase
-  case Ret(name: String, id: Int) extends SymBase
+  case Ret(name: String) extends SymBase
   case Global extends SymBase
 
 
-abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends
+abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]], loops: Set[Loop]) extends
   Analysis[Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]]] {
-
-  HeapCounter.reset()
-  UnknownCounter.reset()
-  RetCounter.reset()
 
   private val stackPointer = LocalVar("R31_in", BitVecType(64)) //Register("R31", 64)
   private val linkRegister = LocalVar("R30_in", BitVecType(64)) //Register("R30", 64)
@@ -39,6 +32,12 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
   private val mallocRegister: Register = Register("R0", 64)
 
   val domain: Set[CFGPosition] = computeDomain(IntraProcIRCursor, Set(proc)).toSet
+
+  // Map from a loop header to the last known state of the SV at the header
+  var loopHeaderToPrev: Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]] = Map.empty
+
+  // Map from a loop header to the number of times the header is seen
+  var loopHeaderCount: Map[CFGPosition, Int] = Map.empty.withDefaultValue(0)
 
   val offsetSetLattice: PowerSetLatticeWithTop[Int] = PowerSetLatticeWithTop[Int]()
   val symValMapLattice: MapLattice[SymBase, Option[Set[Int]], offsetSetLattice.type] =
@@ -94,38 +93,85 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
             }.withDefaultValue(offsetSetLattice.bottom)
   }
 
-  def transfer(n: CFGPosition, s: Map[Variable, Map[SymBase, Option[Set[Int]]]]): Map[Variable, Map[SymBase, Option[Set[Int]]]] = {
-    n match
-      case procedure: Procedure => // entry
-        (s + (stackPointer -> initDef(Stack(procedure.name))) + (linkRegister -> initDef(Par("link"))) + (framePointer -> initDef(Par("frame")))) ++
-          procedure.formalInParam.diff(implicitFormals).foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
-          (m, param) =>
-           m + (param -> initDef(Par(param.name)))
-        }
-
-      case alloc @ LocalAssign(lhs: Variable, rhs: BinaryExpr, label) if rhs.arg1 == stackPointer && rhs.op == BVADD &&
-        evaluateExpression(rhs.arg2, constProp(alloc)).nonEmpty && isNegative(evaluateExpression(rhs.arg2, constProp(alloc)).get) => s // ignore stack allocations
-      case pos @ LocalAssign(lhs: Variable, rhs, label) =>
-        s + (lhs -> exprToSymValMap(pos, rhs, s)) // local
-      case MemoryLoad(lhs, _, index, _, _, label)  =>
-        s + (lhs -> initDef(Unknown())) // load
-      case DirectCall(target, _, _ , _) if target.name == "malloc" => s + (mallocRegister -> initDef(Heap()))
-      case DirectCall(target, _, _ , _) => s ++ target.formalOutParam.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
-        (m, param) =>
-          m + (param -> initDef(Ret(f"${target.name}_${param.name}", RetCounter.increment())))
+  // It widens the SymValSets at loop headers to avoid positive loop cycles
+  // it only looks at the number of times loop header has been seen and if it exceeds cut off
+  // it sets the symbases changed since last seen to top
+  def widenOnLoopHeader(n: CFGPosition, s: Map[Variable, Map[SymBase, Option[Set[Int]]]], cutOff: Int = 10): Map[Variable, Map[SymBase, Option[Set[Int]]]] = {
+    if loopHeaderToPrev.contains(n) && loopHeaderToPrev(n) != s && loopHeaderCount(n) >= cutOff then
+      loopHeaderCount += n -> (loopHeaderCount(n) + 1)
+      val oldSVs = loopHeaderToPrev(n)
+      val newSV = s.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
+        (newS, sv) =>
+          val variable = sv._1
+          val symBases = sv._2
+          if oldSVs.contains(variable) && oldSVs(variable) != symBases then
+            val update = variable -> symBases.foldLeft(Map[SymBase, Option[Set[Int]]]()) {
+              (updatedSV, currentSV) =>
+                val base = currentSV._1
+                val valueSet = currentSV._2
+                if valueSet.isEmpty || (!oldSVs(variable).contains(base)) then
+                  updatedSV + currentSV
+                else
+                  val oldValueSet = oldSVs(variable)(base).get // shouldn't be TOP (None), since no narrowing is implemented
+                  if oldValueSet.diff(valueSet.get).nonEmpty then
+                    updatedSV + currentSV + (base -> offsetSetLattice.top)
+                  else
+                    updatedSV + currentSV
+            }
+            newS + sv + update
+          else
+            newS + sv
       }
-      case _ => s
+      loopHeaderToPrev += n -> newSV
+      newSV
+    else
+      loopHeaderCount += n -> (loopHeaderCount(n) + 1)
+      loopHeaderToPrev += n -> s
+      s
+  }
+
+  def labelToPC(label: Option[String]): String = {
+    assert(label.nonEmpty)
+    label.get.takeWhile(_ != ':')
+  }
+
+  def transfer(n: CFGPosition, s: Map[Variable, Map[SymBase, Option[Set[Int]]]]): Map[Variable, Map[SymBase, Option[Set[Int]]]] = {
+//    if loops.exists(_.header == n) then
+//      assert(n.isInstanceOf[Block])
+//      widenOnLoopHeader(n, s)
+//
+//    else
+      n match
+        case procedure: Procedure => // entry
+          (s + (stackPointer -> initDef(Stack(procedure.name))) + (linkRegister -> initDef(Par("link"))) + (framePointer -> initDef(Par("frame")))) ++
+            procedure.formalInParam.diff(implicitFormals).foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
+            (m, param) =>
+             m + (param -> initDef(Par(param.name)))
+          }
+
+        case alloc @ LocalAssign(lhs: Variable, rhs: BinaryExpr, label) if rhs.arg1 == stackPointer && rhs.op == BVADD &&
+          evaluateExpression(rhs.arg2, constProp(alloc)).nonEmpty && isNegative(evaluateExpression(rhs.arg2, constProp(alloc)).get) => s // ignore stack allocations
+        case pos @ LocalAssign(lhs: Variable, rhs, label) =>
+          s + (lhs -> exprToSymValMap(pos, rhs, s)) // local
+        case MemoryLoad(lhs, _, index, _, _, label)  =>
+          s + (lhs -> initDef(Unknown(s"Unknown_${proc.name}_${labelToPC(label)}"))) // load
+        case DirectCall(target, _, _ , label) if target.name == "malloc" => s + (mallocRegister -> initDef(Heap(f"Heap_${proc.name}_${labelToPC(label)}")))
+        case DirectCall(target, _, _ , label) => s ++ target.formalOutParam.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
+          (m, param) =>
+            m + (param -> initDef(Ret(f"${proc.name}_${target.name}_${param.name}_${labelToPC(label)}")))
+        }
+        case _ => s
   }
 }
 
-class SVAHelper(proc: Procedure, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends SV(proc, constProp), IRIntraproceduralForwardDependencies,
+class SVAHelper(proc: Procedure, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]], loops: Set[Loop]) extends SV(proc, constProp, loops), IRIntraproceduralForwardDependencies,
   SimpleWorklistFixpointSolver[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]],
     MapLattice[Variable, Map[SymBase,  Option[Set[Int]]],
       MapLattice[SymBase, Option[Set[Int]], PowerSetLatticeWithTop[Int]]]]
 
-class SVA(proc: Procedure, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends Analysis[Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]]] {
+class SVA(proc: Procedure, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]], loops: Set[Loop]) extends Analysis[Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]]] {
 
-  private val sva = SVAHelper(proc, constProp)
+  private val sva = SVAHelper(proc, constProp, loops)
   val svaMap = sva.analyze()
   override def analyze(): Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]] = svaMap
   def exprToSymValSet(pos: CFGPosition, expr: Expr): Map[SymBase, Option[Set[Int]]] = {
