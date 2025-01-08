@@ -39,6 +39,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
           specFile = None,
           dumpIL = None,
         ),
+        simplify = true,
         staticAnalysis = Some(StaticAnalysisConfig()),
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",

@@ -10,7 +10,7 @@ trait ConstraintArg(val SSAVar: Map[SymBase, Option[Set[Int]]])
 case class EEV(override val SSAVar: Map[SymBase, Option[Set[Int]]]) extends ConstraintArg(SSAVar)
 case class EV(override val SSAVar: Map[SymBase, Option[Set[Int]]]) extends ConstraintArg(SSAVar)
 
-class Counter(val init: Int = 0) {
+trait Counter(val init: Int = 0) {
   private var counter = init
   def increment(by: Int = 1): Int = {
       counter += by

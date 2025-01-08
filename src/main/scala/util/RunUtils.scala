@@ -20,7 +20,7 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{Constraint, ConstraintGen, CoolDSA, DataStructureAnalysis, Graph, SVA, SymbolicAddress, SymbolicAddressAnalysis}
+import analysis.data_structure_analysis.{Constraint, ConstraintGen, CoolDSA, DataStructureAnalysis, Graph, SVA, SymbolicAddress, SymbolicAddressAnalysis, WinterDSA}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
@@ -687,8 +687,10 @@ object RunUtils {
 
     Logger.debug("Done Constraints")
 
-    val test = CoolDSA(ctx.program, analysis.get.intraProcConstProp, analysis.get.loops)
-    test.analyze()
+    val test = WinterDSA(ctx.program, analysis.get.intraProcConstProp, analysis.get.loops).analyze()
+
+//    val test = CoolDSA(ctx.program, analysis.get.intraProcConstProp, analysis.get.loops)
+//    test.analyze()
     // TODO here
 
     if (q.runInterpret) {

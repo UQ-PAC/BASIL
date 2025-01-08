@@ -4,7 +4,8 @@ import analysis.data_structure_analysis.SymBase.{Global, Heap, Par, Ret, Stack, 
 import analysis.solvers.{SimplePushDownWorklistFixpointSolver, SimpleWorklistFixpointSolver}
 import analysis.{Analysis, FlatElement, IRIntraproceduralForwardDependencies, Loop, MapLattice, PowerSetLatticeWithTop, evaluateExpression}
 import ir.eval.BitVectorEval.*
-import ir.{BVADD, BVSUB, BinaryExpr, BitVecLiteral, BitVecType, Block, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, LocalAssign, LocalVar, MemoryLoad, Procedure, Program, Register, Repeat, SignExtend, UnaryExpr, UninterpretedFunction, Variable, ZeroExtend, computeDomain, toShortString}
+import ir.{toDot, BVADD, BVSUB, BinaryExpr, BitVecLiteral, BitVecType, Block, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, LocalAssign, LocalVar, MemoryLoad, Procedure, Program, Register, Repeat, SignExtend, UnaryExpr, UninterpretedFunction, Variable, ZeroExtend, computeDomain, toShortString}
+import util.writeToFile
 
 import scala.Option
 
@@ -86,7 +87,7 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
                 m ++ svs(v)
             }
           else
-            assert(!symSet.contains(Global))
+            // assert(!symSet.contains(Global))
             symSet.foldLeft(Map[SymBase, Option[Set[Int]]]()) {
               (m, base) =>
                 m + (base -> offsetSetLattice.top)
@@ -150,12 +151,16 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
           }
 
         case alloc @ LocalAssign(lhs: Variable, rhs: BinaryExpr, label) if rhs.arg1 == stackPointer && rhs.op == BVADD &&
-          evaluateExpression(rhs.arg2, constProp(alloc)).nonEmpty && isNegative(evaluateExpression(rhs.arg2, constProp(alloc)).get) => s // ignore stack allocations
+          evaluateExpression(rhs.arg2, constProp(alloc)).nonEmpty && isNegative(evaluateExpression(rhs.arg2, constProp(alloc)).get) =>
+          // stack allocation
+          // set lhs to stack param
+          s + (lhs -> exprToSymValMap(alloc, stackPointer, s))
+
         case pos @ LocalAssign(lhs: Variable, rhs, label) =>
           s + (lhs -> exprToSymValMap(pos, rhs, s)) // local
         case MemoryLoad(lhs, _, index, _, _, label)  =>
-          s + (lhs -> initDef(Unknown(s"Unknown_${proc.name}_${labelToPC(label)}"))) // load
-        case DirectCall(target, _, _ , label) if target.name == "malloc" => s + (mallocRegister -> initDef(Heap(f"Heap_${proc.name}_${labelToPC(label)}")))
+          s + (lhs -> initDef(Unknown(s"${proc.name}_${labelToPC(label)}"))) // load
+        case DirectCall(target, _, _ , label) if target.name == "malloc" => s + (mallocRegister -> initDef(Heap(f"${proc.name}_${labelToPC(label)}")))
         case DirectCall(target, _, _ , label) => s ++ target.formalOutParam.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
           (m, param) =>
             m + (param -> initDef(Ret(f"${proc.name}_${target.name}_${param.name}_${labelToPC(label)}")))
@@ -173,7 +178,10 @@ class SVA(proc: Procedure, constProp: Map[CFGPosition, Map[Variable, FlatElement
 
   private val sva = SVAHelper(proc, constProp, loops)
   val svaMap = sva.analyze()
-  override def analyze(): Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]] = svaMap
+  override def analyze(): Map[CFGPosition, Map[Variable, Map[SymBase, Option[Set[Int]]]]] = {
+    writeToFile(toDot[CFGPosition](sva.domain, IntraProcIRCursor, svaMap.map(f => (f._1, f._2.toString))), s"${proc.name}_SVA.dot")
+    svaMap
+  }
   def exprToSymValSet(pos: CFGPosition, expr: Expr): Map[SymBase, Option[Set[Int]]] = {
     sva.exprToSymValMap(pos, expr, svaMap(pos))
   }

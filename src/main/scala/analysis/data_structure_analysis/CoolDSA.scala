@@ -34,6 +34,7 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
   val solver: CoolDSAUnionFindSolver = CoolDSAUnionFindSolver()
 
   val sva = SVA(proc, constProp, loops)
+  sva.analyze()
   var nodes: Set[CoolNode] = Set.empty
   var pointsTo: Set[(CoolCell, CoolCell)] = Set.empty
   var exprToCell: Set[(CFGPosition, Expr, CoolCell)] = Set.empty
@@ -519,6 +520,8 @@ class CoolDSA(program: Program, constProp: Map[CFGPosition, Map[Variable, FlatEl
 
   override def analyze(): Map[Procedure, CoolGraph] =
   {
+
+
 
     val result: mutable.Map[DSAPhase, Map[Procedure, CoolGraph]] = mutable.Map.empty
     result.update(Local, domain.foldLeft(Map[Procedure, CoolGraph]()) {
