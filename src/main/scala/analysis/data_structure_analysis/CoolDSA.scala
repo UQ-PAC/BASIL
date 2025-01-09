@@ -33,6 +33,7 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
   val solver: CoolDSAUnionFindSolver = CoolDSAUnionFindSolver()
 
   val sva = SVA(proc, constProp, inParams, outParams)
+  sva.analyze()
   var nodes: Set[CoolNode] = Set.empty
   var pointsTo: Set[(CoolCell, CoolCell)] = Set.empty
   var exprToCell: Set[(CFGPosition, Expr, CoolCell)] = Set.empty
@@ -389,7 +390,7 @@ class CoolNode(val graph: CoolGraph, val symBases: mutable.Set[SymBase] = mutabl
       flags.unknown = true
     case SymBase.Stack(name) => flags.stack = true
     case SymBase.Par(name) => flags.incomplete = true
-    case SymBase.Ret(name, id) => flags.incomplete = true
+    case SymBase.Ret(name) => flags.incomplete = true
     case SymBase.Global => flags.global = true
   }
 

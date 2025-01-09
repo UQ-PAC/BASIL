@@ -29,7 +29,11 @@ class Counter(val init: Int = 0) {
 
 object ConstraintCounter extends Counter
 
-case class Constraint(pos: CFGPosition, value: Expr, index: Expr, arg1: EV, arg2: EEV, size: Int, id: Int = ConstraintCounter.increment())
+case class Constraint(pos: CFGPosition, value: Expr, index: Expr, arg1: EV, arg2: EEV, size: Int, id: Int = ConstraintCounter.increment()) {
+  override def toString: String = {
+    s"Constraint: $id\n$pos\nEV:$arg1\nEEV:$arg2"
+  }
+}
 
 
 /*class ConstraintGen(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends Analysis[Set[Constraint]] {
