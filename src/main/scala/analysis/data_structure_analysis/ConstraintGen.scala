@@ -32,7 +32,7 @@ object ConstraintCounter extends Counter
 case class Constraint(pos: CFGPosition, value: Expr, index: Expr, arg1: EV, arg2: EEV, size: Int, id: Int = ConstraintCounter.increment())
 
 
-class ConstraintGen(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends Analysis[Set[Constraint]] {
+/*class ConstraintGen(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends Analysis[Set[Constraint]] {
   
   val domain: Set[CFGPosition] = computeDomain(IntraProcIRCursor, Set(proc)).toSet
   val sva = SVA(proc, constProp)
@@ -49,5 +49,5 @@ class ConstraintGen(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, 
 
     constraints
   }
-}
+}*/
 

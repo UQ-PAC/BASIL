@@ -18,7 +18,7 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{ConstraintGen, CoolDSA, DataStructureAnalysis, Graph, SVA, SymbolicAddress, SymbolicAddressAnalysis}
+import analysis.data_structure_analysis.{CoolDSA, DataStructureAnalysis, Graph, SVA, SymbolicAddress, SymbolicAddressAnalysis}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}

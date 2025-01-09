@@ -166,7 +166,7 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
     }
   }
 
-  private def getCells(base: SymBase, offset: Option[Set[Int]]): Set[CoolCell] =
+  def getCells(base: SymBase, offset: Option[Set[Int]]): Set[CoolCell] =
   {
     val node = symBases(base)
     offset match
@@ -225,7 +225,8 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
     if cell1.equals(cell2) then // same cell no action required
       cell1
     else if cell1.node.equals(cell2.node) then // same node different cells causes collapse
-      cell1.node.merge(cell1.offset, cell2.offset)
+      val test = cell1.node.merge(cell1, cell2)
+      test
 //      val ne = cell1.node.collapse()
 //      ne.getCell(0)
     else if (cell1.node.isCollapsed || cell2.node.isCollapsed) then // a collapsed node
@@ -296,10 +297,11 @@ class CoolGraph(val proc: Procedure, val phase: DSAPhase = Local, constProp: Map
       val selfMerged = (node1.selfMerged ++ node2.selfMerged.map(f => f.map(_ + delta))).foldLeft(Set[Set[Int]]()) {
         case (s, mergedOffsets) =>
           val common = s.filter(f => f.intersect(mergedOffsets).nonEmpty)
-          (s -- common) + common.flatten
+          if common.isEmpty then s + mergedOffsets else (s -- common) + common.flatten
       }
 
       resultNode.selfMerged = selfMerged
+      assert(resultNode.valid)
 
       solver.unify(node1.term, resultNode.term, 0)
       solver.unify(node2.term, resultNode.term, delta)
@@ -398,6 +400,8 @@ class CoolNode(val graph: CoolGraph, val symBases: mutable.Set[SymBase] = mutabl
         case _ => false
     }
 
+  override def hashCode(): Int = id
+
   override def toString: String = {
     s"Node($id, $symBases${if flags.collapsed then ", C" else ""})"
   }
@@ -405,6 +409,7 @@ class CoolNode(val graph: CoolGraph, val symBases: mutable.Set[SymBase] = mutabl
 
   var selfMerged: Set[Set[Int]] = Set.empty
 
+  // get the set of offsets merged with this cell
   private def getMerged(offset: Int): Set[Int] = {
     val equiv = selfMerged.filter(_.contains(offset))
     assert(equiv.size <= 1) // can only belong to at most one set of merged cells from this node
@@ -426,10 +431,11 @@ class CoolNode(val graph: CoolGraph, val symBases: mutable.Set[SymBase] = mutabl
     true
   }
 
-  def merge(offset1: Int, offset2: Int): CoolCell = {
-    require(cells.contains(offset1) && cells.contains(offset2))
-    val cell1 = getCell(offset1)
-    val cell2 = getCell(offset2)
+  def merge(cell1: CoolCell, cell2: CoolCell) = {
+    require(cell1.node == this && cell2.node == this)
+
+    val offset1 = cell1.offset
+    val offset2 = cell2.offset
 
     val cell1Mergees = getMerged(offset1)
     val cell2Mergees = getMerged(offset2)
@@ -448,6 +454,14 @@ class CoolNode(val graph: CoolGraph, val symBases: mutable.Set[SymBase] = mutabl
 
     selfCollapse()
     cell1
+  }
+
+  def merge(offset1: Int, offset2: Int): CoolCell = {
+    require(cells.contains(offset1) && cells.contains(offset2))
+    val cell1 = getCell(offset1)
+    val cell2 = getCell(offset2)
+
+    merge(cell1, cell2)
   }
 
   def isCollapsed: Boolean = flags.collapsed
@@ -512,6 +526,11 @@ class CoolNode(val graph: CoolGraph, val symBases: mutable.Set[SymBase] = mutabl
         lastAccess = cells(offset).largestAccessedSize
       }
     }
+
+    // update self merged to remove cells that are removed
+    selfMerged = selfMerged.map(_.removedAll(removed))
+
+    // update the cells
     removed.foreach(cells.remove)
   }
 
@@ -554,7 +573,9 @@ class CoolCell(val node: CoolNode, val offset: Int, var largestAccessedSize: Int
 
   override def equals(obj: Any): Boolean =  {
     obj match
-      case cell: CoolCell => node.equals(cell.node) && offset == cell.offset
+      case cell: CoolCell => node.equals(cell.node) &&
+        // have the same offset or be merged together
+        (offset == cell.offset || node.selfMerged.exists(s => s.contains(offset) && s.contains(cell.offset)))
       case _ => false
   }
 
