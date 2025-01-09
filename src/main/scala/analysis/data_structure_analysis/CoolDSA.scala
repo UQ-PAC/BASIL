@@ -512,8 +512,8 @@ class CoolNode(val graph: CoolGraph, val symBases: mutable.Set[SymBase] = mutabl
    * The node DOESN'T lose field sensitivity after this
    */
   def selfCollapse(): Unit = {
-    var lastOffset: Int = -1
-    var lastAccess: Int = -1
+    var lastOffset: Int = Int.MinValue
+    var lastAccess: Int = 0
     val removed = mutable.Set[Int]()
     val sortedOffsets = cells.keys.toSeq.sorted
     sortedOffsets.foreach { offset =>
