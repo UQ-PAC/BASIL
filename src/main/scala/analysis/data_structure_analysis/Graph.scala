@@ -753,10 +753,16 @@ class Graph(val proc: Procedure,
       result
   }
 
-  private def isFormal(pos: CFGPosition, variable: Variable): Boolean = !reachingDefs(pos).contains(variable)
+  private def isFormal(pos: CFGPosition, variable: Variable): Boolean = variable.name != "R31" && !reachingDefs(pos).contains(variable)
 
   // formal arguments to this function
-  val formals: mutable.Map[Variable, Slice] = mutable.Map()
+  val formals: mutable.Map[Variable, Slice] = (params(proc).union(Set(Register("R30", 64), Register("R29", 64)))).foldLeft(mutable.Map[Variable, Slice]()) {
+    (m, param) =>
+      val node: Node = Node(Some(this))
+      node.flags.incomplete = true
+      nodes.add(node)
+      m + (param -> Slice(node.cells(0), 0))
+  }
 
   // mapping from each SSA variable (position, variable) to a slice
   val varToCell: mutable.Map[CFGPosition, mutable.Map[Variable, Slice]] = varToCellInit(proc)
@@ -768,10 +774,7 @@ class Graph(val proc: Procedure,
       case pos @ LocalAssign(variable, value, _) =>
         value.variables.foreach { v =>
           if (isFormal(pos, v)) {
-            val node = Node(Some(this))
-            node.flags.incomplete = true
-            nodes.add(node)
-            formals.update(v, Slice(node.cells(0), 0))
+            assert(formals.contains(v))
           }
         }
         val node = Node(Some(this))
@@ -779,10 +782,7 @@ class Graph(val proc: Procedure,
       case pos @ MemoryLoad(lhs, _, index, _, _, _) =>
         index.variables.foreach { v =>
           if (isFormal(pos, v)) {
-            val node = Node(Some(this))
-            node.flags.incomplete = true
-            nodes.add(node)
-            formals.update(v, Slice(node.cells(0), 0))
+            assert(formals.contains(v))
           }
         }
         val node = Node(Some(this))
@@ -801,13 +801,21 @@ class Graph(val proc: Procedure,
         unwrapPaddingAndSlicing(expr) match {
           case value: Variable =>
             if (isFormal(pos, value)) {
-              val node = Node(Some(this))
-              node.flags.incomplete = true
-              nodes.add(node)
-              formals.update(value, Slice(node.cells(0), 0))
+              assert(formals.contains(value))
             }
           case _ =>
         }
+      case indirectCall: IndirectCall =>
+        if isFormal(indirectCall, indirectCall.target) then
+          assert(formals.contains(indirectCall.target))
+      case assume: Assume =>
+        assume.body.variables.foreach(
+          v =>
+            if (isFormal(assume, v)) {
+              assert(formals.contains(v))
+            }
+        )
+
       case _ =>
     }
     varToCell
