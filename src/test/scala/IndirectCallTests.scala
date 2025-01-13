@@ -34,37 +34,14 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
 
   case class IndirectCallResult(resolution: IndirectCallResolution, success: Boolean, message: Option[String])
 
+  def getIndirectCalls(p: Program) : Seq[IndirectCall] = {
+    p.mainProcedure.preOrderIterator.collect { case c: IndirectCall => c }.toSeq
+  }
 
-  def reallyRunBASIL(inputPath: String, RELFPath: String, specPath: Option[String], BPLPath: String, staticAnalysisConf: Option[StaticAnalysisConfig]): (BASILResult, Seq[String]) = {
-    val specFile = if (specPath.isDefined && File(specPath.get).exists) {
-      specPath
-    } else {
-      None
-    }
-    val config = BASILConfig(
-      loading = ILLoadingConfig(
-        inputFile = inputPath,
-        relfFile = RELFPath,
-        specFile = specFile
-      ),
-      staticAnalysis = staticAnalysisConf,
-      outputPrefix = BPLPath
-    )
-
-    val ctx = util.IRLoading.load(config.loading)
-    util.IRTransform.doCleanup(ctx)
-    val icallblock = callBlock(ctx.program)
-    val analysis = Some(RunUtils.staticAnalysis(config.staticAnalysis.get, ctx))
-    util.IRTransform.prepareForTranslation(config, ctx)
-
-    val boogiePrograms =  {
-      val boogieTranslator = translating.IRToBoogie(ctx.program, ctx.specification, None, config.outputPrefix, None, config.boogieTranslation)
-      ArrayBuffer(boogieTranslator.translate)
-    }
-
-    val result = BASILResult(ctx, analysis, boogiePrograms)
-
-    (result, icallblock)
+  def runBASILWithIndirectCalls(inputPath: String, RELFPath: String, specPath: Option[String], BPLPath: String, staticAnalysisConf: Option[StaticAnalysisConfig]) = {
+    var indircalls = Seq[IndirectCall]()
+    val basilresult = runBASIL(inputPath, RELFPath, specPath, BPLPath, staticAnalysisConf, postLoad = ctx => { indircalls = getIndirectCalls(ctx.program); })
+    (basilresult, indircalls.map(_.label.get))
   }
 
   def runTest(name: String, variation: String, conf: TestConfig, resolvedCalls: Seq[IndirectCallResolution]): Unit = {
@@ -78,7 +55,7 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
     val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
 
     Logger.debug(s"$name/$variation$testSuffix")
-    val (basilResult,indirectCallBlock) = reallyRunBASIL(inputPath, RELFPath, Some(specPath), BPLPath, Some(StaticAnalysisConfig()))
+    val (basilResult,indirectCallBlock) = runBASILWithIndirectCalls(inputPath, RELFPath, Some(specPath), BPLPath, Some(StaticAnalysisConfig()))
     Logger.debug(s"$name/$variation$testSuffix DONE")
 
     val boogieResult = runBoogie(directoryPath, BPLPath, conf.boogieFlags)
@@ -235,17 +212,6 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
   
   private val BAPConfig = TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = true)
   private val GTIRBConfig = TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = false, expectVerify = true)
-
-  def callBlock(p: Program) : Seq[String] = {
-
-
-    val x = mutable.Set[Block]()
-
-    val labels = p.mainProcedure.preOrderIterator.collect { 
-      case c: IndirectCall => c.label.get
-    }
-    labels.toSeq
-  }
 
   test("functionpointer/clang:BAP") {
     val resolvedCalls = Seq(IndirectCallResolution("%0000045d", "main", Set("set_six", "set_two", "set_seven"), Set()))
