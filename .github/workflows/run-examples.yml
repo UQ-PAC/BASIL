@@ -75,14 +75,46 @@ jobs:
   UnitTests:
     runs-on: ubuntu-latest
     container:
-      # Requires repo to have action access in package settings
       image: ghcr.io/uq-pac/basil-dev:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.github_token }}
+
     steps:
       - uses: actions/checkout@v4
+      - run: ./mill compile
 
         # every text except SystemTests:
         # ./mill test.testOnly '*' -- -t '' | tr -d ':' | ansi2txt | grep -vE '^SystemTests' 
-      - run: ./mill test.testOnly DSAMemoryRegionSystemTestsBAP IntrusiveListTest IntrusiveListPublicInterfaceTest PointsToTest DSAMemoryRegionSystemTestsGTIRB MemoryRegionTestsNoRegion AnalysisSystemTestsBAP AnalysisSystemTestsGTIRB DataStructureAnalysisTest IrreducibleLoop ParamAnalysisTests LiveVarsAnalysisTests IRTest CILVisitorTest InterpreterTests InvariantTest ProcedureSummaryTests UnimplementedTests ExtraSpecTests BitVectorAnalysisTests TaintAnalysisTests IndirectCallTests MemoryRegionTestsDSA
+        # also omitting: MemoryRegionTestsDSA MemoryRegionTestsNoRegion UnimplementedTests ExtraSpecTests IndirectCallTests PointsToTest BitVectorAnalysisTests IntrusiveListPublicInterfaceTest
+
+      - run: ./mill test.testOnly DSAMemoryRegionSystemTestsBAP
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly IntrusiveListTest 
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly SAMemoryRegionSystemTestsGTIRB
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly AnalysisSystemTestsBAP
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly AnalysisSystemTestsGTIRB
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly DataStructureAnalysisTest
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly IrreducibleLoop
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly ParamAnalysisTests
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly LiveVarsAnalysisTests
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly ir.IRTest
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly CILVisitorTest
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly InterpreterTests
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly InvariantTest
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly ProcedureSummaryTests
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly TaintAnalysisTests
+        if: ${{ ! cancelled() }}
