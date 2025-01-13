@@ -56,7 +56,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     // the dsg of the main procedure after the local phase
     val program = results.ir.program
     val dsg = results.analysis.get.localDSA(program.mainProcedure)
-    
+
     val addtwo_range = dsg.getGlobal("add_two").get // procedures("add_two");
     val addsix_range = dsg.getGlobal("add_six").get // procedures("add_six");
     val subseven_range = dsg.getGlobal("sub_seven").get //procedures("sub_seven");

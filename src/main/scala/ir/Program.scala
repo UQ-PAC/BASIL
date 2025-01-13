@@ -33,8 +33,8 @@ private class ILForwardIterator(private val begin: IterableOnce[CFGPosition], va
 }
 
 /**
-  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
-  * not guaranteed to be in any defined order. 
+  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are
+  * not guaranteed to be in any defined order.
   */
 private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extends Iterator[CFGPosition] {
   private val stack = mutable.Stack[CFGPosition]()
