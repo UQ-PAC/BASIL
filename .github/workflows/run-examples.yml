@@ -82,21 +82,18 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - run: ./mill compile
+      - run: ./mill test.compile
 
-        # every text except SystemTests:
-        # ./mill test.testOnly '*' -- -t '' | tr -d ':' | ansi2txt | grep -vE '^SystemTests' 
-        # also omitting: MemoryRegionTestsDSA MemoryRegionTestsNoRegion UnimplementedTests ExtraSpecTests IndirectCallTests PointsToTest BitVectorAnalysisTests IntrusiveListPublicInterfaceTest
+        # every test with package prefix:
+        # sbt "show test:definedTests"
 
-      - run: ./mill test.testOnly DSAMemoryRegionSystemTestsBAP
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly IntrusiveListTest 
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly SAMemoryRegionSystemTestsGTIRB
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly AnalysisSystemTestsBAP
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly AnalysisSystemTestsGTIRB
+        # omitting because failing or incorrect:
+        # MemoryRegionTestsDSA MemoryRegionTestsNoRegion UnimplementedTests ExtraSpecTests IndirectCallTests PointsToTest
+
+        # omitting because run elsewhere:
+        # BitVectorAnalysisTests IntrusiveListPublicInterfaceTest
+
+      - run: ./mill test.testOnly util.intrusive_list.IntrusiveListTest 
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly DataStructureAnalysisTest
         if: ${{ ! cancelled() }}
@@ -108,13 +105,23 @@ jobs:
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly ir.IRTest
         if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly CILVisitorTest
+      - run: ./mill test.testOnly ir.CILVisitorTest
         if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly InterpreterTests
+      - run: ./mill test.testOnly ir.InterpreterTests
         if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly InvariantTest
+      - run: ./mill test.testOnly ir.InvariantTest
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly ProcedureSummaryTests
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly TaintAnalysisTests
+        if: ${{ ! cancelled() }}
+
+        # slower tests run at end
+      - run: ./mill test.testOnly DSAMemoryRegionSystemTestsBAP
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly DSAMemoryRegionSystemTestsGTIRB
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly AnalysisSystemTestsBAP
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly AnalysisSystemTestsGTIRB
         if: ${{ ! cancelled() }}
