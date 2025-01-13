@@ -480,25 +480,27 @@ class CoolNode(val graph: CoolGraph, val symBases: mutable.Set[SymBase] = mutabl
       node.flags.collapsed = true
       collapsedNode.flags.collapsed = true
 
-      var pointToItself = false
-      val cells = node.cells.values
-      var cell = cells.tail.foldLeft(cells.head.getPointee) { (c, cell) =>
-        if (cell.hasPointee && cell.getPointee == graph.find(cell)) {
-          pointToItself = true // This is necessary to stop infinite recursion of cells pointing to themselves
-          c
-        } else if (cell.hasPointee) {
-          val pointee  = cell.getPointee
-          graph.mergeCells(c, pointee)
-        } else {
-          c
+      if node.cells.values.exists(_.hasPointee) then
+        var pointToItself = false
+        val cells = node.cells.values
+        var cell = cells.tail.foldLeft(cells.head.getPointee) { (c, cell) =>
+          if (cell.hasPointee && cell.getPointee == graph.find(cell)) {
+            pointToItself = true // This is necessary to stop infinite recursion of cells pointing to themselves
+            c
+          } else if (cell.hasPointee) {
+            val pointee  = cell.getPointee
+            graph.mergeCells(c, pointee)
+          } else {
+            c
+          }
         }
-      }
 
-      if (pointToItself) {
-        cell = graph.mergeCells(cell, collapsedCell)
-      }
+        if (pointToItself) {
+          cell = graph.mergeCells(cell, collapsedCell)
+        }
 
-      collapsedCell.setPointee(cell)
+        collapsedCell.setPointee(cell)
+
       assert(collapsedNode.cells.size == 1)
 
       graph.solver.unify(node.term, collapsedNode.term, 0)
@@ -596,7 +598,7 @@ class CoolCell(val node: CoolNode, val offset: Int, var largestAccessedSize: Int
   def setPointee(cell: CoolCell): CoolCell =
     {
       if _pointee.isEmpty then
-        _pointee = Some(cell)
+        _pointee = Some(graph.find(cell))
       else if graph.find(_pointee.get) == graph.find(this) then // if a cell points to itself break the link,
         _pointee = None
         _pointee = Some(graph.mergeCells(this, cell))
