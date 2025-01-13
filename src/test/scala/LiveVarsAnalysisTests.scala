@@ -323,10 +323,12 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.labelToBlock
 
+    val lmain = blocks("lmain")
+    val laftercall = lmain.singleSuccessor.head
     // checks function call blocks
-    assert(analysisResults(blocks("lmain")) == Map(R29 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(analysisResults(lmain) == Map(R29 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
     assert(analysisResults(blocks("lget_two")) == Map(R31 -> TwoElementTop))
-    assert(analysisResults(blocks("l00000946")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block
+    assert(analysisResults(laftercall) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block
   }
 
   test("basic_function_call_caller") {
@@ -334,10 +336,12 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.labelToBlock
 
+    val lmain = blocks("lmain")
+    val laftercall = lmain.singleSuccessor.head
     // main has parameter, callee (zero) has return and no parameter
-    assert(analysisResults(blocks("lmain")) == Map(R0 -> TwoElementTop, R29 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(analysisResults(lmain) == Map(R0 -> TwoElementTop, R29 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
     assert(analysisResults(blocks("lzero")) == Map(R31 -> TwoElementTop))
-    assert(analysisResults(blocks("l00000323")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block
+    assert(analysisResults(laftercall) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block
     assert(analysisResults(blocks("zero_basil_return")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop))
   }
 
@@ -346,10 +350,13 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.labelToBlock
 
+    val lmain = blocks("lmain")
+    val l_get_two_aftercall = lmain.singleSuccessor.head
+    val l_printf_aftercall = l_get_two_aftercall.singleSuccessor.head
     // main has no parameters, get_two has three and a return
-    assert(analysisResults(blocks("lmain")) == Map(R29 -> TwoElementTop, R31 -> TwoElementTop, R30 -> TwoElementTop))
-    assert(analysisResults(blocks("l000003ec")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // get_two aftercall
-    assert(analysisResults(blocks("l00000430")) == Map(R31 -> TwoElementTop)) // printf aftercall
+    assert(analysisResults(lmain) == Map(R29 -> TwoElementTop, R31 -> TwoElementTop, R30 -> TwoElementTop))
+    assert(analysisResults(l_get_two_aftercall) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // get_two aftercall
+    assert(analysisResults(l_printf_aftercall) == Map(R31 -> TwoElementTop)) // printf aftercall
     assert(analysisResults(blocks("lget_two")) == Map(R0 -> TwoElementTop, R1 -> TwoElementTop, R2 -> TwoElementTop, R31 -> TwoElementTop))
     assert(analysisResults(blocks("get_two_basil_return")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop))
   }
@@ -359,12 +366,18 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.labelToBlock
 
+    val gotoBlocks = blocks.filterKeys(_.startsWith("lmain_goto_")).toMap
+    assert(gotoBlocks.size == 2)
+
+    val blockAfterBranch = gotoBlocks.values.map(_.singleSuccessor.head.singleSuccessor.head).toSet
+    assert(blockAfterBranch.size == 1)
+
     // block after branch
-    assert(analysisResults(blocks("l00000342")) == Map(R31 -> TwoElementTop))
+    assert(analysisResults(blockAfterBranch.head) == Map(R31 -> TwoElementTop))
     // branch blocks
-    assert(analysisResults(blocks("lmain_goto_l00000330")) == Map(Register("ZF", 1) -> TwoElementTop,
-      R31 -> TwoElementTop))
-    assert(analysisResults(blocks("lmain_goto_l00000369")) == Map(Register("ZF", 1) -> TwoElementTop,
-      R31 -> TwoElementTop))
+    for ((_,b) <- gotoBlocks) {
+      assert(analysisResults(b) == Map(Register("ZF", 1) -> TwoElementTop,
+        R31 -> TwoElementTop))
+    }
   }
 }
