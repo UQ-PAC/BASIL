@@ -87,8 +87,22 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     assert(dsg.get(dsg.globalMapping(addsix_range).node.cells(0)).offset.equals(0))
 //    assert(dsg.get(dsg.globalMapping(addsix_range).node.cells(0)).offset.equals(8))
 
-    assert(dsg.adjust(dsg.SSAVar("%00000429$1", "R8")).equals(dsg.get(dsg.globalMapping(addtwo_range).node.cells(0))))
-    assert(dsg.adjust(dsg.SSAVar("%00000438$1", "R8")).equals(dsg.get(dsg.globalMapping(addsix_range).node.cells(0))))
+    // locate all memory loads with R31 within their index expression, where
+    // the loaded value is immediately assigned into a register.
+    // the returned list is the label and destination register of the local assignment.
+    val loadsWithStackOffset = program
+      .mainProcedure
+      .preOrderIterator
+      .sliding(2).map(_.toSeq)
+      .collect {
+        case Seq(
+          MemoryLoad(memresult, _, memexpr, _, _, _),
+          LocalAssign(Register(assignedreg, _), assignedval, Some(assignlabel)))
+        if memexpr.variables.contains(R31) && memresult == assignedval
+        => (assignlabel, assignedreg)
+      }.toSeq
+    assert(dsg.adjust(dsg.SSAVar.tupled(loadsWithStackOffset(0))).equals(dsg.get(dsg.globalMapping(addtwo_range).node.cells(0))))
+    assert(dsg.adjust(dsg.SSAVar.tupled(loadsWithStackOffset(1))).equals(dsg.get(dsg.globalMapping(addsix_range).node.cells(0))))
 
     assert(dsg.adjust(stack32.getPointee).equals(dsg.get(dsg.globalMapping(subseven_range).node.cells(0))))
 
