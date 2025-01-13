@@ -846,13 +846,13 @@ class Graph(val proc: Procedure,
     assert(posLabel.matches("%[0-9]{8}?\\$\\d"))
 
     val res = varToCell.keys.filter(pos => pos.toShortString.startsWith(posLabel))
-    assert(res.size == 1)
+    assert(res.size == 1, s"failed to get SSAVar from posLabel '$posLabel'. matched: ${res}")
     val key = res.head
 
     val map = varToCell(key).toMap
 
     val temp =  map.keys.filter(variable => variable.name == varName)
-    assert(temp.size == 1)
+    assert(temp.size == 1, s"failed to get SSAVar with variable '$varName'. matched: ${temp}")
     val variable = temp.head
     map(variable)
   }
