@@ -2,7 +2,7 @@ package test_util
 
 import org.scalatest.funsuite.AnyFunSuite
 import ir.{Block, Procedure, Program}
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, Logger, RunUtils, StaticAnalysisConfig}
+import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, Logger, RunUtils, StaticAnalysisConfig, IRContext}
 
 import scala.sys.process.*
 import scala.io.Source
@@ -17,7 +17,7 @@ case class TestConfig(boogieFlags: Seq[String] = Seq("/timeLimit:10", "/useArray
                      )
 
 trait BASILTest {
-  def runBASIL(inputPath: String, RELFPath: String, specPath: Option[String], BPLPath: String, staticAnalysisConf: Option[StaticAnalysisConfig]): BASILResult = {
+  def runBASIL(inputPath: String, RELFPath: String, specPath: Option[String], BPLPath: String, staticAnalysisConf: Option[StaticAnalysisConfig], postLoad: IRContext => Unit = s => ()): BASILResult = {
     val specFile = if (specPath.isDefined && File(specPath.get).exists) {
       specPath
     } else {
@@ -32,7 +32,7 @@ trait BASILTest {
       staticAnalysis = staticAnalysisConf,
       outputPrefix = BPLPath
     )
-    val result = RunUtils.loadAndTranslate(config)
+    val result = RunUtils.loadAndTranslate(config, postLoad = postLoad)
     RunUtils.writeOutput(result)
     result
   }
