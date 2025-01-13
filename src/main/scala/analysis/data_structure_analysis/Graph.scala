@@ -756,7 +756,7 @@ class Graph(val proc: Procedure,
   private def isFormal(pos: CFGPosition, variable: Variable): Boolean = variable.name != "R31" && !reachingDefs(pos).contains(variable)
 
   // formal arguments to this function
-  val formals: mutable.Map[Variable, Slice] = (params(proc).union(Set(Register("R30", 64), Register("R29", 64)))).foldLeft(mutable.Map[Variable, Slice]()) {
+  val formals: mutable.Map[Variable, Slice] = (params.getOrElse(proc, Set.empty).union(Set(Register("R30", 64), Register("R29", 64)))).foldLeft(mutable.Map[Variable, Slice]()) {
     (m, param) =>
       val node: Node = Node(Some(this))
       node.flags.incomplete = true
