@@ -674,15 +674,25 @@ object RunUtils {
 
 
     Logger.debug("Got to constraint builder")
+    var procToConstraints: Map[Procedure, Set[Constraint]] = Map.empty
     val constraints: String = ctx.program.procedures.foldLeft(Set[Constraint]()) {
       (s, proc) =>
         Logger.debug(s"Generating constraints for ${proc.name}")
         val temp = ConstraintGen(proc, analysis.get.intraProcConstProp, analysis.get.loops).analyze()
+        procToConstraints += (proc -> temp)
         writeToFile(temp.mkString("\n"), s"${proc.name}_constraints.txt")
         s ++ temp
     }.map(_.toString).mkString("\n")
 
-    writeToFile(constraints, "constraints.txt" )
+    val prettyConstraints: String = procToConstraints.foldLeft("") {
+      (s, pair) =>
+        val (proc, constraints) = pair
+        val prettyProc = proc.toString + "\n" + constraints.map(_.toString).mkString("\n") + (if constraints.isEmpty then "\n" else "\n\n")
+        s + prettyProc
+    }
+
+   writeToFile(prettyConstraints, "prettyConstraints.txt")
+//    writeToFile(constraints, "constraints.txt" )
 
 
     Logger.debug("Done Constraints")

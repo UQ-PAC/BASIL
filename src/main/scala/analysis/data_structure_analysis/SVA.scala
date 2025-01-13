@@ -9,9 +9,6 @@ import util.writeToFile
 
 import scala.Option
 
-
-
-
 enum SymBase:
   case Heap(name: String) extends SymBase
   case Unknown(name: String) extends SymBase
@@ -155,7 +152,6 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
           // stack allocation
           // set lhs to stack param
           s + (lhs -> exprToSymValMap(alloc, stackPointer, s))
-
         case pos @ LocalAssign(lhs: Variable, rhs, label) =>
           s + (lhs -> exprToSymValMap(pos, rhs, s)) // local
         case MemoryLoad(lhs, _, index, _, _, label)  =>
