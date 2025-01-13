@@ -189,6 +189,35 @@ class Graph(val proc: Procedure,
 
   private val swappedOffsets = globalOffsets.map(_.swap)
 
+  /**
+   * Converts a global name to an Address range
+   * @param name the name of the global region used as a reference
+   * @param size size of the Address region to be returned if 0 the size is instead one specified by SpecGlobals
+   * @param relocated value determines the level of relocation, if 0 return address range begining at start of
+   *                  global region name. otherwise attempt to find a global address pointing to x through
+   *                  "relocated" number of indirections
+   * @return
+   */
+  def getGlobal(name : String, size: Int = 0, relocated: Int = 0): Option[AddressRange] = {
+    val matchedName = globals.filter(_.name == name)
+    assert(matchedName.size <= 1)
+    if matchedName.isEmpty then
+      None
+    else
+      val global = matchedName.head
+      if relocated == 0 then
+        Some(AddressRange(global.address, global.address + (if size == 0 then global.size / 8 else size)))
+      else
+        var i = relocated
+        var address = global.address
+        while i > 0 do
+          address = swappedOffsets.getOrElse(address, -1)
+          i -= 1
+        if address == -1 then
+          None
+        else
+          Some(AddressRange(address, address + size))
+  }
   // creates the globals from the symbol tables
   val globalMapping = mutable.Map[AddressRange, Field]()
   globals.foreach {
