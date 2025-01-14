@@ -2,6 +2,7 @@ package analysis.data_structure_analysis
 
 import analysis.{Analysis, FlatElement, Loop}
 import ir.{BitVecLiteral, CFGPosition, Expr, IntraProcIRCursor, MemoryLoad, MemoryStore, Procedure, Program, Variable, computeDomain}
+import util.writeToFile
 
 import scala.collection.mutable
 
@@ -40,6 +41,7 @@ class ConstraintGen(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, 
   
   val domain: Set[CFGPosition] = computeDomain(IntraProcIRCursor, Set(proc)).toSet
   val sva = SVA(proc, constProp, loops)
+  sva.analyze()
 
   override def analyze(): Set[Constraint] = {
     var constraints: Set[Constraint] = Set.empty

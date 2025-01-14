@@ -675,13 +675,21 @@ object RunUtils {
 
     Logger.debug("Got to constraint builder")
     var procToConstraints: Map[Procedure, Set[Constraint]] = Map.empty
+    val skipList = Set("direct_request", "forward_request", "main_")
     val constraints: String = ctx.program.procedures.foldLeft(Set[Constraint]()) {
       (s, proc) =>
-        Logger.debug(s"Generating constraints for ${proc.name}")
-        val temp = ConstraintGen(proc, analysis.get.intraProcConstProp, analysis.get.loops).analyze()
-        procToConstraints += (proc -> temp)
-        writeToFile(temp.mkString("\n"), s"${proc.name}_constraints.txt")
-        s ++ temp
+        if skipList.exists(skipValue => proc.name.startsWith(skipValue)) then
+          s
+        else
+          Logger.debug(s"Generating constraints for ${proc.name}")
+          val temp = ConstraintGen(proc, analysis.get.intraProcConstProp, analysis.get.loops).analyze()
+          procToConstraints += (proc -> temp)
+          val content = proc.formalInParam.toString() + "\n" + temp.mkString("\n")
+          if content.isEmpty then
+            Logger.debug(s"Skipped writing due no constraints")
+          else
+            writeToFile(content, s"${proc.name}_constraints.txt")
+          s ++ temp
     }.map(_.toString).mkString("\n")
 
     val prettyConstraints: String = procToConstraints.foldLeft("") {

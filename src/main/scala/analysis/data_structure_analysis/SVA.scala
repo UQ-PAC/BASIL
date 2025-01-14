@@ -60,7 +60,7 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
         case Extract(32, 0, body) => // TODO UNSOUND assume 32 bit extract is maintaining value
           exprToSymValMap(pos, body, svs) //.map(f => (f._1, f._2.map(s => s.map(b => Int(b.value, 32)))))
         case BinaryExpr(op, arg1, arg2) if evaluateExpression(arg2, constProp(pos)).nonEmpty =>
-          exprToSymValMap(pos, arg1, svs).map {
+          exprToSymValMap(pos, arg1, svs).map { // get the arg1 symValSet and transform it with offset arg2
             case (base: SymBase, set: Some[Set[Int]]) =>
               val newSet = set.get.map {
                 case el =>
@@ -115,7 +115,7 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
                     updatedSV + currentSV + (base -> offsetSetLattice.top)
                   else
                     updatedSV + currentSV
-            }
+            }.withDefaultValue(offsetSetLattice.bottom)
             newS + sv + update
           else
             newS + sv
@@ -157,7 +157,7 @@ abstract class SV(proc: Procedure,  constProp: Map[CFGPosition, Map[Variable, Fl
         case MemoryLoad(lhs, _, index, _, _, label)  =>
           s + (lhs -> initDef(Unknown(s"${proc.name}_${labelToPC(label)}"))) // load
         case DirectCall(target, _, _ , label) if target.name == "malloc" => s + (mallocRegister -> initDef(Heap(f"${proc.name}_${labelToPC(label)}")))
-        case DirectCall(target, _, _ , label) => s ++ target.formalOutParam.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
+        case DirectCall(target, outParamas, _ , label) => s ++ outParamas.keys.foldLeft(Map[Variable, Map[SymBase, Option[Set[Int]]]]()) {
           (m, param) =>
             m + (param -> initDef(Ret(f"${proc.name}_${target.name}_${param.name}_${labelToPC(label)}")))
         }
