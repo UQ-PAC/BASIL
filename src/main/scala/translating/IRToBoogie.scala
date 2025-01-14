@@ -757,7 +757,6 @@ class IRToBoogie(
 
         val inv = BinaryBExpr(BoolOR, Rc, Gf)
         val conseq = BinaryBExpr(BoolIMPLIES, Rc, Rf)
-
         val procInv = BProcedure(
           targetName + "$InlineInv",
           List(),

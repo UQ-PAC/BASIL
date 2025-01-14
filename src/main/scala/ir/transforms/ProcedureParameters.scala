@@ -7,6 +7,7 @@ import collection.immutable.SortedMap
 import specification.Specification
 import analysis.{TwoElement, TwoElementTop, TwoElementBottom}
 import ir.CallGraph
+import util.Logger
 
 case class FunSig(inArgs: List[Register], outArgs: List[Register])
 
@@ -30,14 +31,18 @@ def fnsigToBinding(f: FunSig) = (
 
 def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
 
-  val liveVars =
-    if (
-      ctx.program.mainProcedure.blocks.nonEmpty && ctx.program.mainProcedure.returnBlock.isDefined && ctx.program.mainProcedure.entryBlock.isDefined
-    ) {
-      analysis.InterLiveVarsAnalysis(ctx.program).analyze()
-    } else {
-      Map.empty
-    }
+  val mainNonEmpty = ctx.program.mainProcedure.blocks.nonEmpty
+  val mainHasReturn = ctx.program.mainProcedure.returnBlock.isDefined
+  val mainHasEntry = ctx.program.mainProcedure.entryBlock.isDefined
+
+  val liveVars = if (mainNonEmpty && mainHasEntry && mainHasReturn) {
+    analysis.InterLiveVarsAnalysis(ctx.program).analyze()
+  } else {
+    Logger.error(s"Empty live vars $mainNonEmpty $mainHasReturn $mainHasEntry")
+    Map.empty
+  }
+
+  transforms.applyRPO(ctx.program)
 
   val params = inOutParams(ctx.program, liveVars)
 
@@ -337,8 +342,8 @@ class SetActualParams(
       //   }
       // }
       case d: DirectCall => {
-        d.actualParams = SortedMap.from(d.target.inParamDefaultBinding)
-        d.outParams = SortedMap.from(d.target.outParamDefaultBinding)
+        d.actualParams = SortedMap.from(inBinding(d.target))
+        d.outParams = SortedMap.from(outBinding(d.target))
       }
       case _ => ()
     }

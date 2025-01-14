@@ -205,6 +205,13 @@ object IRTransform {
       }
     }
 
+    transforms.applyRPO(ctx.program)
+    val nonReturning = transforms.findNonReturningFunctionsSaturating(ctx.program)
+    ctx.program.mainProcedure.foreach(s => s match {
+      case d : DirectCall if nonReturning.nonreturning.contains(d.target) => d.parent.replaceJump(Return())
+      case _ => ()
+    })
+
     cilvisitor.visit_prog(transforms.ReplaceReturns(), ctx.program)
     transforms.addReturnBlocks(ctx.program)
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
@@ -550,7 +557,6 @@ object RunUtils {
 
     DebugDumpIRLogger.writeToFile(File("blockgraph-before-dsa.dot"), dotBlockGraph(ctx.program.mainProcedure))
     
-    Logger.info(s"RPO ${timer.checkPoint("RPO")} ms ")
     Logger.info("[!] Simplify :: DynamicSingleAssignment")
     DebugDumpIRLogger.writeToFile(File("il-before-dsa.il"), serialiseIL(ctx.program))
 
@@ -587,7 +593,7 @@ object RunUtils {
     // assert(ctx.program.procedures.forall(transforms.rdDSAProperty))
 
     assert(invariant.blockUniqueLabels(ctx.program))
-    Logger.info(s"CopyProp ${timer.checkPoint("CopyProp")} ms ")
+    Logger.info(s"CopyProp ${timer.checkPoint("Simplify")} ms ")
     DebugDumpIRLogger.writeToFile(File("il-after-copyprop.il"), pp_prog(ctx.program))
 
 

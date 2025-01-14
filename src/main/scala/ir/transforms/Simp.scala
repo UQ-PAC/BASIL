@@ -878,7 +878,65 @@ class Substitute(val res: Variable => Option[Expr], val recurse: Boolean = true,
       None
     }
   }
+}
 
+enum PathExit:
+  case Maybe
+  case Return
+  case NoReturn
+  case Bot
+
+class ProcExitsDomain(is_nonreturning: String => Boolean) extends AbstractDomain[PathExit] {
+  /* backwards analysis to identify non-returning function */
+
+  override def transfer(s: PathExit, b: Command) = {
+    b match {
+      case d: DirectCall if is_nonreturning(d.target.name) => PathExit.NoReturn
+      case r: Return                                       => PathExit.Maybe
+      case _                                               => s
+    }
+  }
+  override def top = PathExit.Maybe
+  def bot = PathExit.Bot
+  def join(l: PathExit, r: PathExit, pos: Block) = (l, r) match {
+    case (PathExit.Return, PathExit.Return)     => PathExit.Return
+    case (PathExit.NoReturn, PathExit.NoReturn) => PathExit.NoReturn
+    case (PathExit.Return, PathExit.NoReturn)   => PathExit.Maybe
+    case (PathExit.NoReturn, PathExit.Return)   => PathExit.Maybe
+    case (PathExit.Maybe, x)                    => PathExit.Maybe
+    case (x, PathExit.Maybe)                    => PathExit.Maybe
+    case (PathExit.Bot, x)                      => x
+    case (x, PathExit.Bot)                      => x
+  }
+}
+
+case class ProcReturnInfo(returning: Set[Procedure], nonreturning: Set[Procedure])
+
+def findNonReturningFunctionsSaturating(p: Program) = {
+  var returning = Set[String]()
+  var old_nonreturning = Set[String]()
+
+  val exit = p.procedures.find(p => p.procName == "exit").map(_.name)
+  var nonreturning = exit.toSet ++ Set("exit")
+
+  while (nonreturning != old_nonreturning) {
+    old_nonreturning = nonreturning
+
+    for (p <- p.procedures.filterNot(p => nonreturning.contains(p.name) || returning.contains(p.name))) {
+      val solver = worklistSolver(ProcExitsDomain(s => nonreturning.contains(s)))
+      val (beforeBlocks, afterBlocks) = solver.solveProc(p, true)
+      p.entryBlock.flatMap(beforeBlocks.get) match {
+        case Some(PathExit.NoReturn) => nonreturning = nonreturning + p.name
+        case Some(PathExit.Return)   => returning = returning + p.name
+        case _                       => ()
+      }
+    }
+  }
+
+  ProcReturnInfo(
+    returning.flatMap(pn => p.procedures.find(_.name == pn).toSet),
+    nonreturning.flatMap(pn => p.procedures.find(_.name == pn).toSet)
+  )
 }
 
 class Simplify(val res: Variable => Option[Expr], val initialBlock: Block = null) extends CILVisitor {
