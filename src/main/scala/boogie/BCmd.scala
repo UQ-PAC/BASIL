@@ -44,7 +44,7 @@ case class BAssume(body: BExpr, comment: Option[String] = None, override val att
 case class BProcedureCall(name: String, lhss: Seq[BVar] = Seq(), params: Seq[BExpr] = Seq(), comment: Option[String] = None) extends BCmd {
   override def toString: String = {
     if (lhss.isEmpty) {
-      s"call $attrString$name();"
+      s"call $attrString$name(${params.mkString(", ")});"
     } else {
       s"call $attrString${lhss.mkString(", ")} := $name(${params.mkString(", ")});"
     }
