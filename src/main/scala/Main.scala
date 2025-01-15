@@ -23,30 +23,37 @@ object Main {
 
   def loadDirectory(i: ChooseInput = ChooseInput.Gtirb, d: String): ILLoadingConfig = {
     val p = d.split("/")
-    val name = p.dropRight(1).last
+    val tryName = Seq(p.last, p.dropRight(1).last)
 
-    val trySpec = Seq((p ++ Seq(s"$name.spec")).mkString("/"), (p.dropRight(1) ++ Seq(s"$name.spec")).mkString("/"))
-    val adt = (p ++ Seq(s"$name.adt")).mkString("/")
-    val relf = (p ++ Seq(s"$name.relf")).mkString("/")
-    val gtirb = (p ++ Seq(s"$name.gts")).mkString("/")
+    tryName.flatMap(name =>  {
+      val trySpec = Seq((p ++ Seq(s"$name.spec")).mkString("/"), (p.dropRight(1) ++ Seq(s"$name.spec")).mkString("/"))
+      val adt = (p ++ Seq(s"$name.adt")).mkString("/")
+      val relf = (p ++ Seq(s"$name.relf")).mkString("/")
+      val gtirb = (p ++ Seq(s"$name.gts")).mkString("/")
 
-    val spec = trySpec
-      .flatMap(s => {
-        if (File(s).exists) {
-          Seq(s)
+
+      val spec = trySpec
+        .flatMap(s => {
+          if (File(s).exists) {
+            Seq(s)
+          } else {
+            Seq()
+          }
+        })
+        .headOption
+
+      val input = i match
+        case ChooseInput.Gtirb => gtirb
+        case ChooseInput.Bap   => adt
+
+        if (File(input).exists() && File(relf).exists()) {
+          Logger.info(s"Found $input $relf ${spec.getOrElse("")}")
+          Seq(ILLoadingConfig(input, relf, spec))
         } else {
           Seq()
         }
-      })
-      .headOption
+    }).head
 
-    val input = i match
-      case ChooseInput.Gtirb => gtirb
-      case ChooseInput.Bap   => adt
-
-    Logger.info(s"Loading $input $relf ${spec.getOrElse("")}")
-    val x = ILLoadingConfig(input, relf, spec)
-    x
   }
 
   @main(name = "BASIL")

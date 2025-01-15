@@ -59,27 +59,45 @@ Other flags are listed below:
 
 ```
 BASIL
-  --analyse                       Run static analysis pass.
-  --analysis-results <str>        Log analysis results in files at specified path.
-  --analysis-results-dot <str>    Log analysis results in .dot form at specified path.
-  --boogie-procedure-rg <str>     Switch version of procedure rely/guarantee checks to emit.
-                                  (function|ifblock)
-  --boogie-use-lambda-stores      Use lambda representation of store operations.
-  --dump-il <str>                 Dump the Intermediate Language to text.
-  -h --help                       Show this help message.
+  --load-directory-bap <str>      Load relf, adt, and bir from directory (and spec from parent
+                                  directory)
+  --load-directory-gtirb <str>    Load relf, gts, and bir from directory (and spec from parent
+                                  directory)
   -i --input <str>                BAP .adt file or GTIRB/ASLi .gts file
-  --interpret                     Run BASIL IL interpreter.
-  -m --main-procedure-name <str>  Name of the main procedure to begin analysis at.
-  -o --output <str>               Boogie output destination file.
-  --procedure-call-depth <int>    Cull procedures beyond this call depth from the main function
-                                  (defaults to Int.MaxValue)
   -r --relf <str>                 Name of the file containing the output of 'readelf -s -r -W'.
   -s --spec <str>                 BASIL specification file.
-  --summarise-procedures          Generates summaries of procedures which are used in
-                                  pre/post-conditions (requires --analyse flag)
+  -o --output <str>               Boogie output destination file.
+  --boogie-use-lambda-stores      Use lambda representation of store operations.
+  --boogie-procedure-rg <str>     Switch version of procedure rely/guarantee checks to emit.
+                                  (function|ifblock)
+  -v --verbose                    Show extra debugging logs (the same as -vl log)
+  --vl <str>                      Show extra debugging logs for a specific logger (log.debugdumpir,
+                                  log.analysis.vsa, log.simplify, log, log.analysis,
+                                  log.analysis.steensgaard, log.analysis.mra).
+  --analyse                       Run static analysis pass.
+  --interpret                     Run BASIL IL interpreter.
+  --dump-il <str>                 Dump the Intermediate Language to text.
+  -m --main-procedure-name <str>  Name of the main procedure to begin analysis at.
+  --procedure-call-depth <int>    Cull procedures beyond this call depth from the main function
+                                  (defaults to Int.MaxValue)
+  --trim-early                    Cull procedures BEFORE running analysis
+  -h --help                       Show this help message.
+  --analysis-results <str>        Log analysis results in files at specified path.
+  --analysis-results-dot <str>    Log analysis results in .dot form at specified path.
   -t --threads                    Separates threads into multiple .bpl files with given output
                                   filename as prefix (requires --analyse flag)
-  -v --verbose                    Show extra debugging logs.
+  --parameter-form                Lift registers to local variables passed by parameter
+  --summarise-procedures          Generates summaries of procedures which are used in
+                                  pre/post-conditions (requires --analyse flag)
+  --simplify                      Partial evaluate / simplify BASIL IR before output (requires
+                                  --analyse flag)
+  --validate-simplify             Emit SMT2 check for algebraic simplification translation
+                                  validation to 'rewrites.smt2'
+  --verify                        Run boogie on the resulting file
+  --memory-regions <str>          Performs static analysis to separate memory into discrete regions
+                                  in Boogie output (requires --analyse flag) (mra|dsa)
+  --no-irreducible-loops          Disable producing irreducible loops when --analyse is passed (does
+                                  nothing without --analyse)
 ```
 
 For more information see [docs/usage](docs/usage.md).
