@@ -20,6 +20,7 @@ trait AbstractDomain[L] {
   def widen(a: L, b: L, pos: Block): L = join(a, b, pos) /* not used */
   def narrow(a: L, b: L): L = a
   def transfer(a: L, b: Command): L
+  def init(b: Block): L = bot
 
   def isFixed(prev: L, next: L) : Boolean = (prev == next)
 
@@ -137,7 +138,7 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
       val prev = savedAfter.get(b)
       val x = {
         predecessors(b).toList.flatMap(b => savedAfter.get(b).toList) match {
-          case Nil      => domain.bot
+          case Nil      => domain.init(b)
           case h :: Nil => h
           case h :: tl  => tl.foldLeft(h)((acc, nb) => domain.join(acc, nb, b))
         }
