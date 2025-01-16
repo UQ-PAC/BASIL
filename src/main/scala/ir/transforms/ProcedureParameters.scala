@@ -423,10 +423,16 @@ def specToProcForm(
   }
 
   val ns = spec.copy(subroutines = spec.subroutines.map(s => {
-    s.copy(
-      requires = s.requires.map(convVarToOld(varToInVar(s.name), varToOutVar(s.name), false)),
-      ensures = s.ensures.map(convVarToOld(varToInVar(s.name), varToOutVar(s.name), true))
-    )
+    if (s.requires.nonEmpty || s.ensures.nonEmpty) {
+      val in = varToInVar(s.name)
+      val out = varToOutVar(s.name)
+      s.copy(
+        requires = s.requires.map(convVarToOld(in, out, false)),
+        ensures = s.ensures.map(convVarToOld(in, out, true))
+      )
+    } else {
+      s
+    }
   }))
   ns
 }
