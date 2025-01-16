@@ -20,9 +20,7 @@ case class LiteralValue(expr: BitVecLiteral) extends Value {
   override def toString: String = "Literal(" + expr + ")"
 }
 
-trait ValueSetAnalysis(program: Program,
-                       mmm: MemoryModelMap,
-                       constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) {
+trait ValueSetAnalysis(program: Program, mmm: MemoryModelMap) {
 
   val powersetLattice: PowersetLattice[Value] = PowersetLattice()
 
@@ -36,8 +34,21 @@ trait ValueSetAnalysis(program: Program,
 
   private val mallocVariable = Register("R0", 64)
 
-  def canCoerceIntoDataRegion(bitVecLiteral: BitVecLiteral, size: Int): Option[DataRegion] = {
-    mmm.findDataObject(bitVecLiteral.value)
+  def findLoadedWithPreDefined(s: Map[Variable | MemoryRegion, Set[Value]], region: MemoryRegion): Set[MemoryRegion] = {
+    // check if relocated
+    region match {
+      case dataRegion: DataRegion =>
+        val relocated = mmm.relocatedDataRegion(dataRegion.start)
+        if (relocated.isDefined) {
+          return Set(relocated.get)
+        }
+        if (mmm.externalFunctions.contains(dataRegion.start)) {
+          return Set(dataRegion) // TODO: works for syscall:clang_O2 load of external function but it is a memLoad so it should be getting what is loaded?
+        }
+      case _ =>
+    }
+    // get only the address values
+    s(region).collect { case a: AddressValue => a.region }
   }
 
   /** Default implementation of eval.
@@ -49,65 +60,43 @@ trait ValueSetAnalysis(program: Program,
         // malloc variable
         s + (mallocVariable -> regions.map(r => AddressValue(r)))
       case localAssign: LocalAssign =>
-        val regions = mmm.nodeToRegion(cmd)
+        val regions = mmm.nodeToRegion(localAssign)
         if (regions.nonEmpty) {
           s + (localAssign.lhs -> regions.map(r => AddressValue(r)))
         } else {
-          evaluateExpression(localAssign.rhs, constantProp(cmd)) match {
-            case Some(bitVecLiteral: BitVecLiteral) =>
-              val possibleData = canCoerceIntoDataRegion(bitVecLiteral, 1)
-              if (possibleData.isDefined) {
-                s + (localAssign.lhs -> Set(AddressValue(possibleData.get)))
-              } else {
-                s + (localAssign.lhs -> Set(LiteralValue(bitVecLiteral)))
-              }
+          val unwrapValue = unwrapExprToVar(localAssign.rhs)
+          unwrapValue match {
+            case Some(v: Variable) =>
+              s + (localAssign.lhs -> s(v))
             case None =>
-              // TODO this is not at all sound
-              val unwrapValue = unwrapExprToVar(localAssign.rhs)
-              unwrapValue match {
-                case Some(v: Variable) =>
-                  s + (localAssign.lhs -> s(v))
-                case None =>
-                  Logger.debug(s"Too Complex: ${localAssign.rhs}") // do nothing
-                  s
-              }
+              Logger.debug(s"Too Complex: $localAssign") // do nothing
+              s
           }
         }
       case load: MemoryLoad =>
-        val regions = mmm.nodeToRegion(cmd)
+        val regions = mmm.nodeToRegion(load)
         if (regions.nonEmpty) {
-          s + (load.lhs -> regions.map(r => AddressValue(r)))
+          s + (load.lhs -> regions.flatMap(r => findLoadedWithPreDefined(s, r)).map(r => AddressValue(r)))
         } else {
-          // TODO this is blatantly incorrect but maintaining current functionality to start
+          // TODO: obviously unsound
           val unwrapValue = unwrapExprToVar(load.index)
           unwrapValue match {
             case Some(v: Variable) =>
-              s + (load.lhs -> s(v))
+              s + (load.lhs -> s(v).flatMap(r => findLoadedWithPreDefined(s, r.asInstanceOf[AddressValue].region)).map(r => AddressValue(r)))
             case None =>
-              Logger.debug(s"Too Complex: ${load.index}") // do nothing
+              Logger.debug(s"Too Complex: $load") // do nothing
               s
           }
         }
       case store: MemoryStore =>
-        val regions = mmm.nodeToRegion(cmd)
-        evaluateExpression(store.value, constantProp(cmd)) match {
-          case Some(bitVecLiteral: BitVecLiteral) =>
-            val possibleData = canCoerceIntoDataRegion(bitVecLiteral, store.size)
-            if (possibleData.isDefined) {
-              s ++ regions.map(r => r -> Set(AddressValue(possibleData.get)))
-            } else {
-              s ++ regions.map(r => r -> Set(LiteralValue(bitVecLiteral)))
-            }
+        val regions = mmm.nodeToRegion(store)
+        val unwrapValue = unwrapExprToVar(store.value)
+        unwrapValue match {
+          case Some(v: Variable) =>
+            s ++ regions.map(r => r -> s(v))
           case None =>
-            // TODO: unsound
-            val unwrapValue = unwrapExprToVar(store.value)
-            unwrapValue match {
-              case Some(v: Variable) =>
-                s ++ regions.map(r => r -> s(v))
-              case None =>
-                Logger.debug(s"Too Complex: $store.value") // do nothing
-                s
-            }
+            Logger.debug(s"Too Complex: $store") // do nothing
+            s
         }
       case _ =>
         s
@@ -134,9 +123,8 @@ trait ValueSetAnalysis(program: Program,
 
 class ValueSetAnalysisSolver(
     program: Program,
-    mmm: MemoryModelMap,
-    constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-) extends ValueSetAnalysis(program, mmm, constantProp)
+    mmm: MemoryModelMap
+) extends ValueSetAnalysis(program, mmm)
     with IRIntraproceduralForwardDependencies
     with Analysis[Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]]
     with WorklistFixpointSolverWithReachability[CFGPosition, Map[Variable | MemoryRegion, Set[Value]], MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]] {

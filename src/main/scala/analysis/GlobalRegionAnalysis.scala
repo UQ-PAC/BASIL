@@ -6,22 +6,24 @@ import ir.*
 import scala.collection.mutable
 
 /** Identifies global data regions.
-  *
-  * This is iterated until results reach a fixpoint.
-  *
-  * @param program
-  * @param domain reachable parts of the program
-  * @param constantProp
-  * @param reachingDefs maps each CFG node to two maps: variable definitions and variables uses.
-  * @param mmm preloaded globals from symbol table.
-  * @param vsaResult extra information from VSA results of previous passes.
-  */
-trait GlobalRegionAnalysis(val program: Program,
-                           val domain: Set[CFGPosition],
-                           val constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-                           val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-                           val mmm: MemoryModelMap,
-                           val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]) {
+ *
+ * This is iterated until results reach a fixpoint.
+ *
+ * @param program
+ * @param domain reachable parts of the program
+ * @param constantProp constant propagation results
+ * @param reachingDefs maps each CFG node to two maps: variable definitions and variables uses.
+ * @param mmm preloaded globals from symbol table.
+ * @param vsaResult extra information from VSA results of previous passes.
+ */
+trait GlobalRegionAnalysis(
+  val program: Program,
+  val domain: Set[CFGPosition],
+  val constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+  val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
+  val mmm: MemoryModelMap,
+  val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
+) {
 
   private var dataCount: Int = 0
   private def nextDataCount() = {
@@ -37,114 +39,70 @@ trait GlobalRegionAnalysis(val program: Program,
 
   private val dataMap: mutable.HashMap[BigInt, DataRegion] = mutable.HashMap()
 
-  private def dataPoolMaster(offset: BigInt, size: BigInt): DataRegion = {
+  private def dataPoolMaster(offset: BigInt, size: BigInt, convertSize: Boolean = true): DataRegion = {
     assert(size >= 0)
+    val givenSize: Int = if (convertSize) (size.toDouble / 8).ceil.toInt else size.toInt
     if (dataMap.contains(offset)) {
-      if (dataMap(offset).size < (size.toDouble / 8).ceil.toInt) {
-        dataMap(offset) = DataRegion(dataMap(offset).regionIdentifier, offset, (size.toDouble / 8).ceil.toInt)
+      if (dataMap(offset).size < givenSize) {
+        dataMap(offset) = DataRegion(dataMap(offset).regionIdentifier, offset, givenSize)
         dataMap(offset)
       } else {
         dataMap(offset)
       }
     } else {
-      dataMap(offset) = DataRegion(nextDataCount(), offset, (size.toDouble / 8).ceil.toInt)
+      dataMap(offset) = DataRegion(nextDataCount(), offset, givenSize)
       dataMap(offset)
     }
   }
 
   def getDataMap: mutable.HashMap[BigInt, DataRegion] = dataMap
 
-  /**
-   * For DataRegions, the actual address used needs to be converted to the relocated address.
-   * This is because when regions are found, the relocated address is used and as such match
-   * the correct range.
-   *
-   * @param address: The starting DataRegion
-   * @return DataRegion: The relocated data region if any
-   */
-  def resolveGlobalOffsetSecondLast(address: DataRegion): DataRegion = {
-    var tableAddress = address
-    // addresses may be layered as in jumptable2 example for which recursive search is required
-    var exitLoop = false
-    while (mmm.relocatedDataRegion(tableAddress.start).isDefined && mmm.relocatedDataRegion(mmm.relocatedDataRegion(tableAddress.start).get.start).isDefined && !exitLoop) {
-      val newAddress = mmm.relocatedDataRegion(tableAddress.start).getOrElse(tableAddress)
-      if (newAddress == tableAddress) {
-        exitLoop = true
-      } else {
-        tableAddress = newAddress
-      }
-    }
-    tableAddress
-  }
-
-  def tryCoerceIntoData(exp: Expr, n: Command, subAccess: BigInt, loadOp: Boolean = false): Set[DataRegion] = {
+  def tryCoerceIntoData(exp: Expr, n: Command, subAccess: BigInt, noLoad: Boolean = false): Set[DataRegion] = {
     val eval = evaluateExpression(exp, constantProp(n))
     if (eval.isDefined) {
-      Set(dataPoolMaster(eval.get.value, subAccess))
+      val index = eval.get.value
+      Set(dataPoolMaster(index, subAccess, convertSize = !noLoad))
     } else {
       exp match {
-        case literal: BitVecLiteral => tryCoerceIntoData(literal, n, subAccess)
-        case Extract(_, _, body) => tryCoerceIntoData(body, n, subAccess)
-        case Repeat(_, body) => tryCoerceIntoData(body, n, subAccess)
-        case ZeroExtend(_, body) => tryCoerceIntoData(body, n, subAccess)
-        case SignExtend(_, body) => tryCoerceIntoData(body, n, subAccess)
-        case UnaryExpr(_, arg) => tryCoerceIntoData(arg, n, subAccess)
+        case literal: BitVecLiteral => tryCoerceIntoData(literal, n, subAccess, noLoad)
+        case Extract(_, _, body) => tryCoerceIntoData(body, n, subAccess, noLoad)
+        case Repeat(_, body) => tryCoerceIntoData(body, n, subAccess, noLoad)
+        case ZeroExtend(_, body) => tryCoerceIntoData(body, n, subAccess, noLoad)
+        case SignExtend(_, body) => tryCoerceIntoData(body, n, subAccess, noLoad)
+        case UnaryExpr(_, arg) => tryCoerceIntoData(arg, n, subAccess, noLoad)
         case BinaryExpr(op, arg1, arg2) =>
           val evalArg2 = evaluateExpression(arg2, constantProp(n))
           if (evalArg2.isDefined) {
-            tryCoerceIntoData(arg1, n, subAccess, true) flatMap { i =>
+            tryCoerceIntoData(arg1, n, subAccess, noLoad) flatMap { i =>
               val newExpr = BinaryExpr(op, BitVecLiteral(i.start, evalArg2.get.size), evalArg2.get)
-              tryCoerceIntoData(newExpr, n, subAccess)
+              tryCoerceIntoData(newExpr, n, subAccess, noLoad)
             }
           } else {
             Set()
           }
         case _: UninterpretedFunction => Set.empty
         case variable: Variable =>
-          val ctx = getUse(variable, n, reachingDefs)
-          val collage = ctx.flatMap { i =>
-            if (i != n) {
-              val regions: Set[DataRegion] = vsaResult.get(i) match {
-                case Some(Lift(el)) =>
-                  el.getOrElse(i.lhs, Set()).flatMap {
-                    case AddressValue(region) =>
-                      el.getOrElse(region, Set()).flatMap {
-                        case AddressValue(dataRegion: DataRegion) => Some(dataRegion)
-                        case _ => None
-                      }
-                    case _ => Set()
-                  }
-                case _ => Set()
-              }
-              if (regions.isEmpty) {
-                localTransfer(i, Set())
-              } else {
-                regions
-              }
-            } else {
-              Set()
-            }
-          }
-          collage.map { i =>
-            if (!loadOp) {
-              mmm.relocatedDataRegion(i.start).getOrElse(i)
-            } else {
-              resolveGlobalOffsetSecondLast(i)
-            }
+          if (noLoad) {
+            Set()
+          } else {
+            val uses = getUse(variable, n, reachingDefs)
+            uses.flatMap(i => getVSAHints(variable, subAccess, i))
           }
         case _ => Set()
       }
     }
   }
 
-  def evalMemLoadToGlobal(index: Expr, size: BigInt, n: Command, loadOp: Boolean = false): Set[DataRegion] = {
-    val indexValue = evaluateExpression(index, constantProp(n))
-    if (indexValue.isDefined) {
-      val indexValueBigInt = indexValue.get.value
-      Set(dataPoolMaster(indexValueBigInt, size))
-    } else {
-      tryCoerceIntoData(index, n, size)
+  def getVSAHints(variable: Variable, subAccess: BigInt, n: CFGPosition): Set[DataRegion] = {
+    val collage: Set[DataRegion] = vsaResult.get(n) match {
+      case Some(Lift(el)) =>
+        el.getOrElse(variable, Set()).flatMap {
+          case AddressValue(dataRegion2: DataRegion) => Some(dataPoolMaster(dataRegion2.start, subAccess))
+          case _ => Set()
+        }
+      case _ => Set()
     }
+    collage
   }
 
   /**
@@ -158,50 +116,71 @@ trait GlobalRegionAnalysis(val program: Program,
    * @param n CFGPosition
    * @return Set[DataRegion]
    */
-  def checkIfDefined(dataRegions: Set[DataRegion], n: CFGPosition): Set[DataRegion] = {
-    dataRegions.map { i =>
+  def checkIfDefined(dataRegions: Set[DataRegion], n: CFGPosition, strict: Boolean = false): Set[DataRegion] = {
+    var converted: Set[DataRegion] = Set.empty
+    dataRegions.foreach { i =>
       val (f, p) = mmm.findDataObjectWithSize(i.start, i.size)
       val accesses = f.union(p)
       if (accesses.isEmpty) {
         i
       } else if (accesses.size == 1) {
-        dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(accesses.head.size))
-        dataMap(i.start)
+        if (f.contains(accesses.head)) {
+          // full access
+          if (strict && i.size == 1) {
+            dataPoolMaster(i.start, accesses.head.size, false)
+          } else {
+            dataPoolMaster(i.start, i.size, false)
+          }
+        } else {
+          // partial access (we cannot determine the size)
+          if (i.start == accesses.head.start && i.size == 1 && strict) {
+            dataPoolMaster(i.start, accesses.head.size, false)
+          } else {
+            dataPoolMaster(i.start, i.size, false)
+          }
+        }
+        converted = converted ++ Set(dataMap(i.start))
       } else {
-        val highestRegion = accesses.maxBy(_.start)
-        dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(highestRegion.end - i.start))
-        dataMap(i.start)
+  //        val highestRegion = accesses.maxBy(_.start)
+  //        dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(highestRegion.end - i.start))
+  //        dataMap(i.start)
+        dataMap.remove(i.start)
+        accesses.foreach(a => dataPoolMaster(a.start, a.size, false))
+        converted = converted ++ accesses.map(a => dataMap(a.start))
       }
     }
+    converted
   }
 
   /** Transfer function for state lattice elements.
    */
-  def localTransfer(n: CFGPosition, s: Set[DataRegion]): Set[DataRegion] = {
+  def transfer(n: CFGPosition, s: Set[DataRegion]): Set[DataRegion] = {
     n match {
       case store: MemoryStore =>
-        checkIfDefined(evalMemLoadToGlobal(store.index, store.size, store), n)
+        checkIfDefined(tryCoerceIntoData(store.index, store, store.size), n)
       case load: MemoryLoad =>
-        checkIfDefined(evalMemLoadToGlobal(load.index, load.size, load, loadOp = true), n)
+        val regions: Set[DataRegion] = tryCoerceIntoData(load.index, load, load.size)
+        checkIfDefined(regions, n)
       case assign: LocalAssign =>
         // this is a constant but we need to check if it is a data region
-        checkIfDefined(evalMemLoadToGlobal(assign.rhs, 1, assign), n)
+        // TODO aefault value of 1 here causes problems as 1 is both used as a default and is also
+        //  a valid size for 1-byte accesses
+        checkIfDefined(tryCoerceIntoData(assign.rhs, assign, 1, noLoad = true), n, strict = true)
       case _ =>
         Set()
     }
  }
 
-  def transfer(n: CFGPosition, s: Set[DataRegion]): Set[DataRegion] = localTransfer(n, s)
 }
 
 class GlobalRegionAnalysisSolver(
-                                  program: Program,
-                                  domain: Set[CFGPosition],
-                                  constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-                                  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-                                  mmm: MemoryModelMap,
-                                  vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
-  ) extends GlobalRegionAnalysis(program, domain, constantProp, reachingDefs, mmm, vsaResult)
+  program: Program,
+  domain: Set[CFGPosition],
+  constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
+  mmm: MemoryModelMap,
+  vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
+) extends GlobalRegionAnalysis(program, domain, constantProp, reachingDefs, mmm, vsaResult)
   with IRIntraproceduralForwardDependencies
   with Analysis[Map[CFGPosition, Set[DataRegion]]]
   with SimpleWorklistFixpointSolver[CFGPosition, Set[DataRegion], PowersetLattice[DataRegion]]
