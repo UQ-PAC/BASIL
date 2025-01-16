@@ -85,7 +85,6 @@ case class DSAContext(
   */
 case class BASILResult(ir: IRContext, analysis: Option[StaticAnalysisContext], dsa: Option[DSAContext], boogie: ArrayBuffer[BProgram])
 
-
 /** Tools for loading the IR program into an IRContext.
   */
 object IRLoading {
@@ -595,6 +594,7 @@ object StaticAnalysis {
   }
 
 }
+
 object RunUtils {
 
   def run(q: BASILConfig): Unit = {
@@ -642,7 +642,7 @@ object RunUtils {
 
     transforms.removeEmptyBlocks(program)
 
-    AnalysisResultDotLogger.writeToFile(File(s"blockgraph-after-dsa.dot"), 
+    AnalysisResultDotLogger.writeToFile(File(s"blockgraph-after-dsa.dot"),
       dotBlockGraph(program, (program.collect {
       case b : Block => b -> pp_block(b)
     }).toMap))
