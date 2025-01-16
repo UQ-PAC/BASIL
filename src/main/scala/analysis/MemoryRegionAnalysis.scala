@@ -8,6 +8,19 @@ import util.Logger
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
+/** Identifies stack and heap regions.
+ *
+ * This is iterated until results reach a fixpoint.
+ * Subsequent runs may refine the definition of global data regions as well.
+ *
+ * @param program
+ * @param domain reachable parts of the program
+ * @param constantProp constant propagation results
+ * @param reachingDefs maps each CFG node to two maps: variable definitions and variables uses.
+ * @param graResult results from global region analysis.
+ * @param mmm preloaded globals from symbol table.
+ * @param vsaResult extra information from VSA results of previous passes.
+ */
 trait MemoryRegionAnalysis(
   val program: Program,
   val domain: Set[CFGPosition],

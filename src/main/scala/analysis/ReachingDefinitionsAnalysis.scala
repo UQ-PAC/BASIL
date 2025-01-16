@@ -6,6 +6,7 @@ import analysis.solvers.SimpleWorklistFixpointSolver
 type ReachingDefTuple =
   TupleLattice[MapLattice[Variable, Set[Assign], PowersetLattice[Assign]], MapLattice[Variable, Set[Assign], PowersetLattice[Assign]], Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]]
 
+/** Calculates def-use chains for the program. */
 trait ReachingDefinitionsAnalysis(program: Program) {
 
   private val tupleLattice: TupleLattice[MapLattice[Variable, Set[Assign], PowersetLattice[Assign]], MapLattice[Variable, Set[Assign], PowersetLattice[
