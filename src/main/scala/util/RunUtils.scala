@@ -603,7 +603,7 @@ object RunUtils {
       Logger.info("DSA Check (after transform)")
       val x = ctx.program.procedures.forall(transforms.rdDSAProperty)
       assert(x)
-      Logger.info("passed")
+      Logger.info("DSA Check succeeded")
     }
 
     // run this after cond recovery because sign bit calculations often need high bits

@@ -7,29 +7,76 @@ binaries that have been lifted to intermediate formats. Supported input formats 
 
 ### Example
 
+Example of a direct translation:
+
 ```sh
-$ ./mill run --input src/test/correct/secret_write/clang/secret_write.adt --relf src/test/correct/secret_write/clang/secret_write.relf --spec src/test/correct/secret_write/secret_write.spec --output boogie_out.bpl
+$ mill run --load-directory-bap src/test/correct/secret_write/gcc -o test.bpl --verify 
+[70/70] run 
+[INFO]   Found src/test/correct/secret_write/gcc/secret_write.adt src/test/correct/secret_write/gcc/secret_write.relf src/test/correct/secret_write/secret_write.spec
 [INFO]   [!] Loading Program
 [INFO]   [!] Removing external function calls
 [INFO]   [!] Stripping unreachable
 [INFO]   [!] Removed 11 functions (1 remaining)
 [INFO]   [!] Translating to Boogie
-[INFO]   [!] Writing file...
-$ tail boogie_out.bpl 
-    mem, Gamma_mem := memory_store32_le(mem, bvadd64(R9, 52bv64), R8[32:0]), gamma_store32(Gamma_mem, bvadd64(R9, 52bv64), Gamma_R8);
-    assert ((bvadd64(R9, 52bv64) == $z_addr) ==> (L(mem, $x_addr) ==> Gamma_x_old));
-    assert bvsge32(memory_load32_le(mem, $z_addr), z_old);
-    assume {:captureState "%0000033f"} true;
-    goto main_basil_return;
-  main_basil_return:
-    assume {:captureState "main_basil_return"} true;
-    return;
-}
-
-$ boogie boogie_out.bpl 
+[INFO]   Writing output
+[INFO]   Running boogie
 
 Boogie program verifier finished with 4 verified, 0 errors
+[INFO]   PerformanceTimer Verify [Finish]: 816ms
+$ tail test.bpl 
+    assert ((R0 == $z_addr) ==> (L(mem, $x_addr) ==> Gamma_x_old));
+    assert bvsge32(memory_load32_le(mem, $z_addr), z_old);
+    assume {:captureState "%000003b7"} true;
+    R0, Gamma_R0 := 0bv64, true;
+    goto main_1812_basil_return;
+  main_1812_basil_return:
+    assume {:captureState "main_1812_basil_return"} true;
+    return;
+}
 ```
+
+Example using analysis:
+
+- Infer separate stack/memory variables (--analyse)
+- Resolve indirect calls (--memory-regions dsa)
+- Simplify code: (--simplify)
+  - Fold constant expressions
+  - Simplify branch flag calculations to (in)equality conditions
+  - Remove dead code
+
+```
+$ mill run --load-directory-gtirb src/test/correct/functionpointer/clang --simplify --analyse --memory-regions mra --verify
+[INFO]   Found src/test/correct/functionpointer/clang/functionpointer.gts src/test/correct/functionpointer/clang/functionpointer.relf src/test/correct/functionpointer/functionpointer.spec
+[INFO]   [!] Loading Program
+[INFO]   [!] Removing external function calls
+[INFO]   [!] Running Static Analysis
+[INFO]   [!] Replacing Indirect Calls
+[INFO]   [!] Generating Procedure Summaries
+[INFO]   [!] Running Static Analysis
+[INFO]   [!] Replacing Indirect Calls
+[INFO]   [!] Generating Procedure Summaries
+[INFO]   [!] Running Writes To
+[INFO]   [!] Running Symbolic Access Analysis
+[INFO]   [!] Running DSA Analysis
+[INFO]   [!] Finished indirect call resolution after 1 iterations
+[INFO]   [!] Running Simplify
+[INFO]   [!] Simplify :: DynamicSingleAssignment
+[INFO]   DSA 29 ms 
+[INFO]   [!] Simplify :: Expr/Copy-prop Transform
+[INFO]   [!] Simplify :: Dead variable elimination
+[INFO]   [!] Simplify :: Merge empty blocks
+[INFO]   CopyProp 72 ms 
+[INFO]   [!] Simplify :: finished
+[INFO]   [!] Stripping unreachable
+[INFO]   [!] Removed 17 functions (4 remaining)
+[INFO]   [!] Translating to Boogie
+[INFO]   Writing output
+[INFO]   Running boogie
+
+Boogie program verifier finished with 5 verified, 0 errors
+[INFO]   PerformanceTimer Verify [Finish]: 622ms
+```
+
 
 ---
 
@@ -89,10 +136,10 @@ BASIL
   --parameter-form                Lift registers to local variables passed by parameter
   --summarise-procedures          Generates summaries of procedures which are used in
                                   pre/post-conditions (requires --analyse flag)
-  --simplify                      Partial evaluate / simplify BASIL IR before output (requires
-                                  --analyse flag)
-  --validate-simplify             Emit SMT2 check for algebraic simplification translation
-                                  validation to 'rewrites.smt2'
+  --simplify                      Partial evaluate / simplify BASIL IR before output (implies
+                                  --parameter-form)
+  --validate-simplify             Emit SMT2 check for validation of simplification expression
+                                  rewrites 'rewrites.smt2'
   --verify                        Run boogie on the resulting file
   --memory-regions <str>          Performs static analysis to separate memory into discrete regions
                                   in Boogie output (requires --analyse flag) (mra|dsa)

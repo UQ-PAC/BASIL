@@ -124,11 +124,11 @@ object Main {
       doc = "Generates summaries of procedures which are used in pre/post-conditions (requires --analyse flag)"
     )
     summariseProcedures: Flag,
-    @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (requires --analyse flag)")
+    @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (implies --parameter-form)")
     simplify: Flag,
     @arg(
       name = "validate-simplify",
-      doc = "Emit SMT2 check for algebraic simplification translation validation to 'rewrites.smt2'"
+      doc = "Emit SMT2 check for validation of simplification expression rewrites 'rewrites.smt2'"
     )
     validateSimplify: Flag,
     @arg(name = "verify", doc = "Run boogie on the resulting file")
