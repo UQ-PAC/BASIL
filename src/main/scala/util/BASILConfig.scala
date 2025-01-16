@@ -27,6 +27,7 @@ case class StaticAnalysisConfig(
   threadSplit: Boolean = false,
   summariseProcedures: Boolean = false,
   memoryRegions: MemoryRegionsMode = MemoryRegionsMode.Disabled,
+  irreducibleLoops: Boolean = true
 )
 
 enum BoogieMemoryAccessMode {
@@ -44,4 +45,3 @@ case class BASILConfig(
   boogieTranslation: BoogieGeneratorConfig = BoogieGeneratorConfig(),
   outputPrefix: String
 )
-

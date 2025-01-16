@@ -82,18 +82,24 @@ procedure main();
 
 implementation main()
 {
+  var $load19: bv32;
+  var $load20: bv32;
+  var Gamma_$load19: bool;
+  var Gamma_$load20: bool;
   $main$__0__$dHiJQHnYTpm65oMaN9oFgA:
     assume {:captureState "$main$__0__$dHiJQHnYTpm65oMaN9oFgA"} true;
     R0, Gamma_R0 := 69632bv64, true;
     R1, Gamma_R1 := bvadd64(R0, 20bv64), Gamma_R0;
     call rely();
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, bvadd64(R0, 20bv64))), (gamma_load32(Gamma_mem, bvadd64(R0, 20bv64)) || L(mem, bvadd64(R0, 20bv64)));
+    $load19, Gamma_$load19 := memory_load32_le(mem, bvadd64(R0, 20bv64)), (gamma_load32(Gamma_mem, bvadd64(R0, 20bv64)) || L(mem, bvadd64(R0, 20bv64)));
+    R0, Gamma_R0 := zero_extend32_32($load19), Gamma_$load19;
     assert Gamma_R0;
     goto $main$__0__$dHiJQHnYTpm65oMaN9oFgA_goto_$main$__2__$5XEKQ4igS9uTmAyY~2l26Q, $main$__0__$dHiJQHnYTpm65oMaN9oFgA_goto_$main$__1__$_i5~WMZiQtmSmwJkk1py6w;
   $main$__1__$_i5~WMZiQtmSmwJkk1py6w:
     assume {:captureState "$main$__1__$_i5~WMZiQtmSmwJkk1py6w"} true;
     call rely();
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, bvadd64(R1, 4bv64))), (gamma_load32(Gamma_mem, bvadd64(R1, 4bv64)) || L(mem, bvadd64(R1, 4bv64)));
+    $load20, Gamma_$load20 := memory_load32_le(mem, bvadd64(R1, 4bv64)), (gamma_load32(Gamma_mem, bvadd64(R1, 4bv64)) || L(mem, bvadd64(R1, 4bv64)));
+    R0, Gamma_R0 := zero_extend32_32($load20), Gamma_$load20;
     goto $main$__2__$5XEKQ4igS9uTmAyY~2l26Q;
   $main$__2__$5XEKQ4igS9uTmAyY~2l26Q:
     assume {:captureState "$main$__2__$5XEKQ4igS9uTmAyY~2l26Q"} true;

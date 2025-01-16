@@ -83,13 +83,16 @@ procedure main();
 
 implementation main()
 {
+  var $load$18: bv8;
+  var Gamma_$load$18: bool;
   lmain:
     assume {:captureState "lmain"} true;
     R1, Gamma_R1 := 69632bv64, true;
     R2, Gamma_R2 := bvadd64(R1, 17bv64), Gamma_R1;
     R0, Gamma_R0 := 0bv64, true;
     call rely();
-    R2, Gamma_R2 := zero_extend56_8(memory_load8_le(mem, bvadd64(R2, 1bv64))), (gamma_load8(Gamma_mem, bvadd64(R2, 1bv64)) || L(mem, bvadd64(R2, 1bv64)));
+    $load$18, Gamma_$load$18 := memory_load8_le(mem, bvadd64(R2, 1bv64)), (gamma_load8(Gamma_mem, bvadd64(R2, 1bv64)) || L(mem, bvadd64(R2, 1bv64)));
+    R2, Gamma_R2 := zero_extend56_8($load$18), Gamma_$load$18;
     call rely();
     assert (L(mem, bvadd64(R1, 17bv64)) ==> Gamma_R2);
     mem, Gamma_mem := memory_store8_le(mem, bvadd64(R1, 17bv64), R2[8:0]), gamma_store8(Gamma_mem, bvadd64(R1, 17bv64), Gamma_R2);

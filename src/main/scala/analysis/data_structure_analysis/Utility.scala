@@ -26,6 +26,7 @@ object NodeCounter {
 
 class Flags() {
   var collapsed = false
+  var function = false
   var stack = false
   var heap = false
   var global = false
@@ -47,6 +48,7 @@ class Flags() {
     incomplete = other.incomplete || incomplete
     foreign = other.foreign && foreign
     merged = true
+    function = function || other.function
 }
 
 /**
@@ -65,9 +67,10 @@ class Node(val graph: Option[Graph], var size: BigInt = 0, val id: Int = NodeCou
   val cells: mutable.Map[BigInt, Cell] = mutable.Map()
   this.addCell(0, 0)
 
-  private def updateSize(newSize: BigInt): Unit = {
-    if newSize > size then
-      size = newSize
+  def getSize: BigInt = {
+    val (offset, cell) = cells.toSeq.maxBy((offset, cell) => offset)
+    size = offset + cell.largestAccessedSize
+    size
   }
 
   def getCell(offset: BigInt): Cell = {
@@ -93,7 +96,7 @@ class Node(val graph: Option[Graph], var size: BigInt = 0, val id: Int = NodeCou
 
 
   def addCell(offset: BigInt, size: Int): Cell = {
-    this.updateSize(offset + size)
+//    this.updateSize(offset + size)
     if collapsed then
       cells(0)
     else if !cells.contains(offset) then

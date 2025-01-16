@@ -77,11 +77,14 @@ procedure main();
 
 implementation main()
 {
+  var $load10: bv32;
+  var Gamma_$load10: bool;
   $main$__0__$8o8s0gkLQHmltXj4DgySqA:
     assume {:captureState "$main$__0__$8o8s0gkLQHmltXj4DgySqA"} true;
     R8, Gamma_R8 := 69632bv64, true;
     call rely();
-    R9, Gamma_R9 := zero_extend32_32(memory_load32_le(mem, bvadd64(R8, 52bv64))), (gamma_load32(Gamma_mem, bvadd64(R8, 52bv64)) || L(mem, bvadd64(R8, 52bv64)));
+    $load10, Gamma_$load10 := memory_load32_le(mem, bvadd64(R8, 52bv64)), (gamma_load32(Gamma_mem, bvadd64(R8, 52bv64)) || L(mem, bvadd64(R8, 52bv64)));
+    R9, Gamma_R9 := zero_extend32_32($load10), Gamma_$load10;
     assert Gamma_R9;
     goto $main$__0__$8o8s0gkLQHmltXj4DgySqA_goto_$main$__2__$J_ed8O5fQyujpIXPBE06ZA, $main$__0__$8o8s0gkLQHmltXj4DgySqA_goto_$main$__1__$PgxZhKszSIyzQiwC3MZUTg;
   $main$__1__$PgxZhKszSIyzQiwC3MZUTg:

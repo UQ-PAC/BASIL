@@ -93,6 +93,8 @@ procedure main();
 
 implementation main()
 {
+  var $load12: bv32;
+  var Gamma_$load12: bool;
   var arr$0_old: bv32;
   $main$__0__$pfAb81AKR8CuFLyGhCrxEg:
     assume {:captureState "$main$__0__$pfAb81AKR8CuFLyGhCrxEg"} true;
@@ -101,7 +103,8 @@ implementation main()
     R9, Gamma_R9 := bvadd64(R9, 52bv64), Gamma_R9;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 12bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 12bv64), Gamma_R0);
     assume {:captureState "1824$0"} true;
-    R8, Gamma_R8 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 12bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
+    $load12, Gamma_$load12 := memory_load32_le(stack, bvadd64(R31, 12bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
+    R8, Gamma_R8 := zero_extend32_32($load12), Gamma_$load12;
     call rely();
     assert (L(mem, bvadd64(R9, 4bv64)) ==> Gamma_R8);
     arr$0_old := memory_load32_le(mem, bvadd64($arr_addr, 0bv64));

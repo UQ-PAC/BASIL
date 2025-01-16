@@ -90,6 +90,8 @@ procedure main();
 
 implementation main()
 {
+  var $load$18: bv32;
+  var Gamma_$load$18: bool;
   lmain:
     assume {:captureState "lmain"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
@@ -101,7 +103,8 @@ implementation main()
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R8, 52bv64), 0bv32), gamma_store32(Gamma_mem, bvadd64(R8, 52bv64), true);
     assume {:captureState "%000002dd"} true;
     call rely();
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, bvadd64(R8, 52bv64))), (gamma_load32(Gamma_mem, bvadd64(R8, 52bv64)) || L(mem, bvadd64(R8, 52bv64)));
+    $load$18, Gamma_$load$18 := memory_load32_le(mem, bvadd64(R8, 52bv64)), (gamma_load32(Gamma_mem, bvadd64(R8, 52bv64)) || L(mem, bvadd64(R8, 52bv64)));
+    R0, Gamma_R0 := zero_extend32_32($load$18), Gamma_$load$18;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
     goto main_basil_return;
   main_basil_return:

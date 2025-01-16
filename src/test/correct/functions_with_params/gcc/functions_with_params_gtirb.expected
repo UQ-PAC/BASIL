@@ -90,12 +90,15 @@ procedure plus_one();
 
 implementation plus_one()
 {
+  var $load0: bv32;
+  var Gamma_$load0: bool;
   $plus_one$__0__$aniLEBpwTwWecL~mJKhdww:
     assume {:captureState "$plus_one$__0__$aniLEBpwTwWecL~mJKhdww"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 12bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 12bv64), Gamma_R0);
     assume {:captureState "1864$0"} true;
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 12bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
+    $load0, Gamma_$load0 := memory_load32_le(stack, bvadd64(R31, 12bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
+    R0, Gamma_R0 := zero_extend32_32($load0), Gamma_$load0;
     R0, Gamma_R0 := zero_extend32_32(bvadd32(R0[32:0], 1bv32)), Gamma_R0;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
     goto plus_one_basil_return;
@@ -125,7 +128,13 @@ procedure main();
 
 implementation main()
 {
+  var $load20: bv32;
+  var $load21: bv64;
+  var $load22: bv64;
   var Cse0__5$0$0: bv64;
+  var Gamma_$load20: bool;
+  var Gamma_$load21: bool;
+  var Gamma_$load22: bool;
   var Gamma_Cse0__5$0$0: bool;
   $main$__0__$yXI5g~EeQ_GieNYkY~buoQ:
     assume {:captureState "$main$__0__$yXI5g~EeQ_GieNYkY~buoQ"} true;
@@ -142,7 +151,8 @@ implementation main()
     R0, Gamma_R0 := 2bv64, true;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 28bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 28bv64), Gamma_R0);
     assume {:captureState "1832$0"} true;
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 24bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 24bv64));
+    $load20, Gamma_$load20 := memory_load32_le(stack, bvadd64(R31, 24bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 24bv64));
+    R0, Gamma_R0 := zero_extend32_32($load20), Gamma_$load20;
     R30, Gamma_R30 := 1844bv64, true;
     call plus_one();
     goto $main$__1__$4Vr1A4uzTlqLZDSUKeLWQA;
@@ -151,8 +161,10 @@ implementation main()
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 24bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 24bv64), Gamma_R0);
     assume {:captureState "1844$0"} true;
     R0, Gamma_R0 := 0bv64, true;
-    R29, Gamma_R29 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
-    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
+    $load21, Gamma_$load21 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
+    R29, Gamma_R29 := $load21, Gamma_$load21;
+    $load22, Gamma_$load22 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
+    R30, Gamma_R30 := $load22, Gamma_$load22;
     R31, Gamma_R31 := bvadd64(R31, 32bv64), Gamma_R31;
     goto main_basil_return;
   main_basil_return:

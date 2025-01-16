@@ -85,7 +85,9 @@ procedure main();
 
 implementation main()
 {
+  var $load16: bv32;
   var Cse0__5$1$4: bv64;
+  var Gamma_$load16: bool;
   var Gamma_Cse0__5$1$4: bool;
   $main$__0__$10UzS393SWKTYt~mTNe_uw:
     assume {:captureState "$main$__0__$10UzS393SWKTYt~mTNe_uw"} true;
@@ -93,7 +95,8 @@ implementation main()
     R1, Gamma_R1 := bvadd64(R2, 20bv64), Gamma_R2;
     R0, Gamma_R0 := 0bv64, true;
     call rely();
-    R2, Gamma_R2 := zero_extend32_32(memory_load32_le(mem, bvadd64(R2, 20bv64))), (gamma_load32(Gamma_mem, bvadd64(R2, 20bv64)) || L(mem, bvadd64(R2, 20bv64)));
+    $load16, Gamma_$load16 := memory_load32_le(mem, bvadd64(R2, 20bv64)), (gamma_load32(Gamma_mem, bvadd64(R2, 20bv64)) || L(mem, bvadd64(R2, 20bv64)));
+    R2, Gamma_R2 := zero_extend32_32($load16), Gamma_$load16;
     Cse0__5$1$4, Gamma_Cse0__5$1$4 := bvadd64(R1, 4bv64), Gamma_R1;
     call rely();
     assert (L(mem, Cse0__5$1$4) ==> Gamma_R2);

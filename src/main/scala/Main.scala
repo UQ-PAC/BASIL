@@ -51,7 +51,9 @@ object Main {
     @arg(name = "summarise-procedures", doc = "Generates summaries of procedures which are used in pre/post-conditions (requires --analyse flag)")
     summariseProcedures: Flag,
     @arg(name = "memory-regions", doc = "Performs static analysis to separate memory into discrete regions in Boogie output (requires --analyse flag) (mra|dsa)")
-    memoryRegions: Option[String]
+    memoryRegions: Option[String],
+    @arg(name = "no-irreducible-loops", doc = "Disable producing irreducible loops when --analyse is passed (does nothing without --analyse)")
+    noIrreducibleLoops: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -93,7 +95,8 @@ object Main {
         conf.analysisResultsDot,
         conf.threadSplit.value,
         conf.summariseProcedures.value,
-        memoryRegionsMode
+        memoryRegionsMode,
+        !conf.noIrreducibleLoops.value
       ))
     } else {
       None

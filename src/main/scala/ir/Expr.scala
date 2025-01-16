@@ -6,7 +6,9 @@ import scala.collection.mutable
 sealed trait Expr {
   def toBoogie: BExpr
   def getType: IRType
-  def gammas: Set[Variable] = Set() // variables not including those inside a load's index
+  /** variables that occur in the expression NOT including those inside a load's index */
+  def gammas: Set[Variable] = Set()
+  /** all variables that occur in the expression */
   def variables: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Expr = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
@@ -41,10 +43,13 @@ case class IntLiteral(value: BigInt) extends Literal {
   override def toString: String = value.toString
 }
 
-/**
+/** Extracts a subsequence of bits (end..start) from body.
+  *
   * @param end : high bit exclusive
   * @param start : low bit inclusive
   * @param body
+  *
+  * Requires end > start
   */
 case class Extract(end: Int, start: Int, body: Expr) extends Expr {
   override def toBoogie: BExpr = BVExtract(end, start, body.toBoogie)
@@ -55,6 +60,10 @@ case class Extract(end: Int, start: Int, body: Expr) extends Expr {
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitExtract(this)
 }
 
+/** Gives repeats copies of body, concatenated.
+  *
+  * Requires repeats > 0.
+  */
 case class Repeat(repeats: Int, body: Expr) extends Expr {
   override def toBoogie: BExpr = BVRepeat(repeats, body.toBoogie)
   override def gammas: Set[Variable] = body.gammas
@@ -68,6 +77,7 @@ case class Repeat(repeats: Int, body: Expr) extends Expr {
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitRepeat(this)
 }
 
+/** Zero-extends by extension extra bits. */
 case class ZeroExtend(extension: Int, body: Expr) extends Expr {
   override def toBoogie: BExpr = BVZeroExtend(extension, body.toBoogie)
   override def gammas: Set[Variable] = body.gammas
@@ -81,6 +91,7 @@ case class ZeroExtend(extension: Int, body: Expr) extends Expr {
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitZeroExtend(this)
 }
 
+/** Sign-extends by extension extra bits. */
 case class SignExtend(extension: Int, body: Expr) extends Expr {
   override def toBoogie: BExpr = BVSignExtend(extension, body.toBoogie)
   override def gammas: Set[Variable] = body.gammas
@@ -292,11 +303,13 @@ case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IR
   override def variables: Set[Variable] = params.flatMap(_.variables).toSet
 }
 
-// Means something has a global scope from the perspective of the IR and Boogie
-// Not the same as global in the sense of shared memory between threads
+/** Something that has a global scope from the perspective of the IR and Boogie.
+  *
+  * Not the same as global in the sense of shared memory between threads.
+  */
 sealed trait Global
 
-// A variable that is accessible without a memory load/store
+/** A variable that is accessible without a memory load/store. */
 sealed trait Variable extends Expr {
   val name: String
   val irType: IRType
@@ -313,8 +326,11 @@ sealed trait Variable extends Expr {
     throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
-// Variable with global scope (in a 'accessible from any procedure' sense), not related to the concurrent shared memory sense
-// These are all hardware registers
+/** Hardware registers.
+  *
+  * These are variables with global scope (in a 'accessible from any procedure' sense),
+  * not related to the concurrent shared memory sense.
+  */
 case class Register(override val name: String, size: Int) extends Variable with Global {
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Global)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Global)
@@ -323,7 +339,7 @@ case class Register(override val name: String, size: Int) extends Variable with 
   override val irType: BitVecType = BitVecType(size)
 }
 
-// Variable with scope local to the procedure, typically a temporary variable created in the lifting process
+/** Variable with scope local to the procedure, typically a temporary variable created in the lifting process. */
 case class LocalVar(override val name: String, override val irType: IRType) extends Variable {
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
@@ -331,7 +347,7 @@ case class LocalVar(override val name: String, override val irType: IRType) exte
   override def acceptVisit(visitor: Visitor): Variable = visitor.visitLocalVar(this)
 }
 
-// A memory section
+/** Any memory variable. */
 sealed trait Memory extends Global {
   val name: String
   val addressSize: Int
@@ -345,12 +361,12 @@ sealed trait Memory extends Global {
     throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
-// A stack section of memory, which is local to a thread
+/** A stack area of memory, which is local to a thread. */
 case class StackMemory(override val name: String, override val addressSize: Int, override val valueSize: Int) extends Memory {
   override def acceptVisit(visitor: Visitor): Memory = visitor.visitStackMemory(this)
 }
 
-// A non-stack region of memory, which is shared between threads
+/** A non-stack region of memory, which may be shared between threads. */
 case class SharedMemory(override val name: String, override val addressSize: Int, override val valueSize: Int) extends Memory {
   override def acceptVisit(visitor: Visitor): Memory = visitor.visitSharedMemory(this)
 }

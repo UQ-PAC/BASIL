@@ -89,13 +89,16 @@ procedure main();
 
 implementation main()
 {
+  var $load$18: bv32;
+  var Gamma_$load$18: bool;
   var z_old: bv32;
   lmain:
     assume {:captureState "lmain"} true;
     R0, Gamma_R0 := 69632bv64, true;
     R1, Gamma_R1 := bvadd64(R0, 20bv64), Gamma_R0;
     call rely();
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, bvadd64(R0, 20bv64))), (gamma_load32(Gamma_mem, bvadd64(R0, 20bv64)) || L(mem, bvadd64(R0, 20bv64)));
+    $load$18, Gamma_$load$18 := memory_load32_le(mem, bvadd64(R0, 20bv64)), (gamma_load32(Gamma_mem, bvadd64(R0, 20bv64)) || L(mem, bvadd64(R0, 20bv64)));
+    R0, Gamma_R0 := zero_extend32_32($load$18), Gamma_$load$18;
     assert Gamma_R0;
     goto lmain_goto_l000001bd, lmain_goto_l0000039c;
   l0000039c:
