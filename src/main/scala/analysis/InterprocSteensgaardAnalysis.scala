@@ -16,10 +16,10 @@ case class RegisterWrapperEqualSets(variable: Variable, ssa: FlatElement[Int])
  * expression node in the AST. It is implemented using [[analysis.solvers.UnionFindSolver]].
  */
 class InterprocSteensgaardAnalysis(
-      domain: Set[CFGPosition],
-      mmm: MemoryModelMap,
-      reachingDefs: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])],
-      vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]) extends Analysis[Any] {
+  domain: Set[CFGPosition],
+  mmm: MemoryModelMap,
+  reachingDefs: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])],
+) extends Analysis[Any] {
 
   val solver: UnionFindSolver[StTerm] = UnionFindSolver()
   val callSiteSummary: mutable.Map[DirectCall, Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]]] = mutable.Map()
@@ -52,7 +52,7 @@ class InterprocSteensgaardAnalysis(
   def analyze(): Unit = {
     // generate the constraints by traversing the AST and solve them on-the-fly
     domain.foreach { p =>
-      visit(p, ())
+      visit(p)
     }
 
     // for every direct call in mmm.contextMapVSA the ctx is unified with the call site summary
@@ -85,65 +85,61 @@ class InterprocSteensgaardAnalysis(
    * @param arg
    *   unused for this visitor
    */
-  def visit(node: CFGPosition, arg: Unit): Unit = {
+  def visit(node: CFGPosition): Unit = {
     node match {
-      case cmd: Command =>
-        cmd match {
-          case directCall: DirectCall if directCall.target.name == "malloc" =>
-            // X = alloc P:  [[X]] = ↑[[alloc-i]]
-            val alloc = mmm.nodeToRegion(directCall).head
-            val defs = getSSADefinition(mallocVariable, directCall, reachingDefs)
-            unify(IdentifierVariable(RegisterWrapperEqualSets(mallocVariable, defs)), PointerRef(AllocVariable(alloc)))
-          case assign: LocalAssign =>
-            // TODO: unsound
-            val unwrapped = unwrapExprToVar(assign.rhs)
-            if (unwrapped.isDefined) {
-              // X1 = X2: [[X1]] = [[X2]]
-              val X1 = assign.lhs
-              val X2 = unwrapped.get
-              unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, assign, reachingDefs))), IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, assign, reachingDefs))))
-            } else {
-              // X1 = *X2: [[X2]] = ↑a ^ [[X1]] = a where a is a fresh term variable TODO: this rule has been adapted to match [[X1]] = ↑[[alloc_X2]]
-              val X1 = assign.lhs
-              val X2_star = mmm.nodeToRegion(node)
-              X2_star.foreach { x =>
-                unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, assign, reachingDefs))), PointerRef(AllocVariable(x)))
-              }
-            }
-          case memoryStore: MemoryStore =>
-            // *X1 = X2: [[X1]] = ↑a ^ [[X2]] = a where a is a fresh term variable
-            val X1_star = mmm.nodeToRegion(node)
-            // TODO: This is not sound
-            val unwrapped = unwrapExprToVar(memoryStore.value)
-            if (unwrapped.isDefined) {
-              val X2 = unwrapped.get
-              val alpha = FreshVariable()
-              X1_star.foreach { x =>
-                //unify(PointerRef(AllocVariable(x)), PointerRef(alpha))
-                unify(IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, memoryStore, reachingDefs))), PointerRef(AllocVariable(x)))
-              }
-              //unify(IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, memoryStore, reachingDefs))), alpha)
-              //            X1_star.foreach { x =>
-              //              unify(PointerRef(AllocVariable(x)), IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, memoryAssign, reachingDefs))))
-              //            }
-            }
-          case load: MemoryLoad =>
-            // TODO: unsound
-            val unwrapped = unwrapExprToVar(load.index)
-            if (unwrapped.isDefined) {
-              // X1 = X2: [[X1]] = [[X2]]
-              val X1 = load.lhs
-              val X2 = unwrapped.get
-              unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, load, reachingDefs))), IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, load, reachingDefs))))
-            } else {
-              // X1 = *X2: [[X2]] = ↑a ^ [[X1]] = a where a is a fresh term variable TODO: this rule has been adapted to match [[X1]] = ↑[[alloc_X2]]
-              val X1 = load.lhs
-              val X2_star = mmm.nodeToRegion(node)
-              X2_star.foreach { x =>
-                unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, load, reachingDefs))), PointerRef(AllocVariable(x)))
-              }
-            }
-          case _ => // do nothing
+      case directCall: DirectCall if directCall.target.name == "malloc" =>
+        // X = alloc P:  [[X]] = ↑[[alloc-i]]
+        val alloc = mmm.nodeToRegion(directCall).head
+        val defs = getSSADefinition(mallocVariable, directCall, reachingDefs)
+        unify(IdentifierVariable(RegisterWrapperEqualSets(mallocVariable, defs)), PointerRef(AllocVariable(alloc)))
+      case assign: LocalAssign =>
+        // TODO: unsound
+        val unwrapped = unwrapExprToVar(assign.rhs)
+        if (unwrapped.isDefined) {
+          // X1 = X2: [[X1]] = [[X2]]
+          val X1 = assign.lhs
+          val X2 = unwrapped.get
+          unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, assign, reachingDefs))), IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, assign, reachingDefs))))
+        } else {
+          // X1 = *X2: [[X2]] = ↑a ^ [[X1]] = a where a is a fresh term variable TODO: this rule has been adapted to match [[X1]] = ↑[[alloc_X2]]
+          val X1 = assign.lhs
+          val X2_star = mmm.nodeToRegion(node)
+          X2_star.foreach { x =>
+            unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, assign, reachingDefs))), PointerRef(AllocVariable(x)))
+          }
+        }
+      case memoryStore: MemoryStore =>
+        // *X1 = X2: [[X1]] = ↑a ^ [[X2]] = a where a is a fresh term variable
+        val X1_star = mmm.nodeToRegion(node)
+        // TODO: This is not sound
+        val unwrapped = unwrapExprToVar(memoryStore.value)
+        if (unwrapped.isDefined) {
+          val X2 = unwrapped.get
+          val alpha = FreshVariable()
+          X1_star.foreach { x =>
+            //unify(PointerRef(AllocVariable(x)), PointerRef(alpha))
+            unify(IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, memoryStore, reachingDefs))), PointerRef(AllocVariable(x)))
+          }
+          //unify(IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, memoryStore, reachingDefs))), alpha)
+          //            X1_star.foreach { x =>
+          //              unify(PointerRef(AllocVariable(x)), IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, memoryAssign, reachingDefs))))
+          //            }
+        }
+      case load: MemoryLoad =>
+        // TODO: unsound
+        val unwrapped = unwrapExprToVar(load.index)
+        if (unwrapped.isDefined) {
+          // X1 = X2: [[X1]] = [[X2]]
+          val X1 = load.lhs
+          val X2 = unwrapped.get
+          unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, load, reachingDefs))), IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, load, reachingDefs))))
+        } else {
+          // X1 = *X2: [[X2]] = ↑a ^ [[X1]] = a where a is a fresh term variable TODO: this rule has been adapted to match [[X1]] = ↑[[alloc_X2]]
+          val X1 = load.lhs
+          val X2_star = mmm.nodeToRegion(node)
+          X2_star.foreach { x =>
+            unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, load, reachingDefs))), PointerRef(AllocVariable(x)))
+          }
         }
       case _ => // do nothing
     }

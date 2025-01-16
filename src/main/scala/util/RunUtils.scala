@@ -408,7 +408,7 @@ object StaticAnalysis {
     val graResult = graSolver.analyze()
 
     Logger.debug("[!] Running MRA")
-    val mraSolver = MemoryRegionAnalysisSolver(IRProgram, domain.toSet, globalAddresses, globalOffsets, mergedSubroutines, interProcConstPropResult, ANRResult, RNAResult, reachingDefinitionsAnalysisResults, graResult, mmm, previousVSAResults)
+    val mraSolver = MemoryRegionAnalysisSolver(IRProgram, domain.toSet, interProcConstPropResult, reachingDefinitionsAnalysisResults, graResult, mmm, previousVSAResults)
     val mraResult = mraSolver.analyze()
 
     config.analysisDotPath.foreach { s =>
@@ -462,7 +462,7 @@ object StaticAnalysis {
     }
 
     Logger.debug("[!] Running Steensgaard")
-    val steensgaardSolver = InterprocSteensgaardAnalysis(interDomain.toSet, mmm, SSAResults, previousVSAResults)
+    val steensgaardSolver = InterprocSteensgaardAnalysis(interDomain.toSet, mmm, SSAResults)
     steensgaardSolver.analyze()
     val steensgaardResults = steensgaardSolver.pointsTo()
 

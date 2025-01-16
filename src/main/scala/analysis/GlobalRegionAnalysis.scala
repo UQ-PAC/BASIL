@@ -152,7 +152,8 @@ trait GlobalRegionAnalysis(
         checkIfDefined(regions, n)
       case assign: LocalAssign =>
         // this is a constant but we need to check if it is a data region
-        // size assumption of 1 here is ok, because it will get approximated later with strict mode
+        // TODO aefault value of 1 here causes problems as 1 is both used as a default and is also
+        //  a valid size for 1-byte accesses
         checkIfDefined(tryCoerceIntoData(assign.rhs, assign, 1, noLoad = true), n, strict = true)
       case _ =>
         Set()
@@ -162,13 +163,13 @@ trait GlobalRegionAnalysis(
 }
 
 class GlobalRegionAnalysisSolver(
-    program: Program,
-    domain: Set[CFGPosition],
-    constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-    mmm: MemoryModelMap,
-    vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
-  ) extends GlobalRegionAnalysis(program, domain, constantProp, reachingDefs, mmm, vsaResult)
+  program: Program,
+  domain: Set[CFGPosition],
+  constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
+  mmm: MemoryModelMap,
+  vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
+) extends GlobalRegionAnalysis(program, domain, constantProp, reachingDefs, mmm, vsaResult)
   with IRIntraproceduralForwardDependencies
   with Analysis[Map[CFGPosition, Set[DataRegion]]]
   with SimpleWorklistFixpointSolver[CFGPosition, Set[DataRegion], PowersetLattice[DataRegion]]

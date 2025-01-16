@@ -11,12 +11,7 @@ import scala.collection.mutable.ListBuffer
 trait MemoryRegionAnalysis(
   val program: Program,
   val domain: Set[CFGPosition],
-  val globals: Map[BigInt, String],
-  val globalOffsets: Map[BigInt, BigInt],
-  val subroutines: Map[BigInt, String],
   val constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-  val ANRResult: Map[CFGPosition, Set[Variable]],
-  val RNAResult: Map[CFGPosition, Set[Variable]],
   val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
   val graResult: Map[CFGPosition, Set[DataRegion]],
   val mmm: MemoryModelMap,
@@ -265,19 +260,14 @@ trait MemoryRegionAnalysis(
 }
 
 class MemoryRegionAnalysisSolver(
-    program: Program,
-    domain: Set[CFGPosition],
-    globals: Map[BigInt, String],
-    globalOffsets: Map[BigInt, BigInt],
-    subroutines: Map[BigInt, String],
-    constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    ANRResult: Map[CFGPosition, Set[Variable]],
-    RNAResult: Map[CFGPosition, Set[Variable]],
-    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-    graResult: Map[CFGPosition, Set[DataRegion]],
-    mmm: MemoryModelMap,
-    vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
-  ) extends MemoryRegionAnalysis(program, domain, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, reachingDefs, graResult, mmm, vsaResult)
+  program: Program,
+  domain: Set[CFGPosition],
+  constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
+  graResult: Map[CFGPosition, Set[DataRegion]],
+  mmm: MemoryModelMap,
+  vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
+) extends MemoryRegionAnalysis(program, domain, constantProp, reachingDefs, graResult, mmm, vsaResult)
   with IRIntraproceduralForwardDependencies
   with Analysis[Map[CFGPosition, ((Set[StackRegion], Set[Variable]), Set[HeapRegion])]]
   with SimpleWorklistFixpointSolver[CFGPosition, ((Set[StackRegion], Set[Variable]), Set[HeapRegion]), TupleLattice[TupleLattice[PowersetLattice[StackRegion], PowersetLattice[Variable], Set[StackRegion], Set[Variable]], PowersetLattice[HeapRegion], (Set[StackRegion], Set[Variable]), Set[HeapRegion]]]
