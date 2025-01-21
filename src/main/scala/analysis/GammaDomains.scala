@@ -127,3 +127,45 @@ class ReachabilityConditions extends PredicateEncodingDomain[Predicate] {
 
   def toPred(x: Predicate): Predicate = x
 }
+
+/**
+ * Effectively a weakest precondition.
+ * This analysis should be run backwards.
+ */
+class PredicateDomain extends PredicateEncodingDomain[Predicate] {
+  import Predicate.*
+
+  def join(a: Predicate, b: Predicate, pos: Block): Predicate = Bop(BoolOR, a, b).simplify
+
+  private def lowExpr(e: Expr): Predicate = GammaCmp(BoolIMPLIES, GammaTerm.Lit(TrueLiteral), e.variables.foldLeft(GammaTerm.Lit(TrueLiteral)) {
+    (p, v) => GammaTerm.Bop(BoolAND, p, GammaTerm.Var(v))
+  })
+
+  def transfer(b: Predicate, c: Command): Predicate = {
+    c match {
+      case a: LocalAssign  => b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get).replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get)
+      case a: MemoryLoad   => top
+      case m: MemoryStore  => top
+      case a: Assume       => {
+        if (a.checkSecurity) {
+          Bop(BoolAND, Bop(BoolAND, b, exprToPredicate(a.body).get), lowExpr(a.body))
+        } else {
+          Bop(BoolAND, b, exprToPredicate(a.body).get)
+        }
+      }
+      case a: Assert       => Bop(BoolAND, b, exprToPredicate(a.body).get)
+      case i: IndirectCall => top
+      case c: DirectCall   => top
+      case g: GoTo         => b
+      case r: Return       => b
+      case r: Unreachable  => b
+      case n: NOP          => b
+    }
+  }
+
+  def top: Predicate = Lit(TrueLiteral)
+  def bot: Predicate = Lit(FalseLiteral)
+
+  def toPred(x: Predicate): Predicate = x
+  override def fromPred(p: Predicate): Predicate = p
+}
