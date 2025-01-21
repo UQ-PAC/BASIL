@@ -134,12 +134,15 @@ class SummaryGenerator(
     if procedure.blocks.isEmpty then return List()
 
     val mustGammaDomain = MustGammaDomain(globals, constProp)
+    val predDomain = PredicateDomain()
     val initialState = LatticeMap.TopMap((variables ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
     reversePostOrder(procedure)
     val (_, mustGammaResults) = worklistSolver(MustGammaDomain(globals, constProp)).solveProc(procedure, false)
     val (before, after) = worklistSolver(ReachabilityConditions()).solveProc(procedure, false)
+    val (predDomainResults, _) = worklistSolver(predDomain).solveProc(procedure, true)
+    Logger.debug(predDomainResults.map((a, b) => (a, eval.simplifyExprFixpoint(b.simplify.toBasil.get)._1.toBoogie)))
 
-    procedure.blocks.flatMap(b => {
+    val mustGammasWithConditions = procedure.blocks.flatMap(b => {
       b.statements.flatMap(s => {
         s match {
           case a: Assume if a.checkSecurity => {
@@ -171,6 +174,10 @@ class SummaryGenerator(
         case p => Some[BExpr](p)
       }
     }).toSet.toList
+
+    val wpThing = procedure.entryBlock.flatMap(b => predDomainResults.get(b).map(p => p.toBoogie)).toList
+
+    mustGammasWithConditions ++ wpThing
   }
 
   /** Generate ensures clauses for a procedure. Currently, all generated ensures clauses are of the form (for example)

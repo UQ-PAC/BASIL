@@ -18,6 +18,8 @@ enum BVTerm {
   case ZeroExtend(extension: Int, body: BVTerm)
   case SignExtend(extension: Int, body: BVTerm)
 
+  override def toString(): String = this.toBoogie.toString()
+
   def toBoogie: BExpr = this match {
     case Lit(x) => x.toBoogie
     case Var(v) => v.toBoogie
@@ -28,6 +30,18 @@ enum BVTerm {
     case Repeat(repeats, body) => BVRepeat(repeats, body.toBoogie)
     case ZeroExtend(extension, body) => BVZeroExtend(extension, body.toBoogie)
     case SignExtend(extension, body) => BVSignExtend(extension, body.toBoogie)
+  }
+
+  def toBasil: Option[Expr] = this match {
+    case Lit(x) => Some(x)
+    case Var(v) => Some(v)
+    case OldVar(v) => None
+    case Uop(op, x) => x.toBasil.map(x => UnaryExpr(op, x))
+    case Bop(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
+    case Extract(end, start, body) => body.toBasil.map(x => ir.Extract(end, start, x))
+    case Repeat(repeats, body) => body.toBasil.map(x => ir.Repeat(repeats, x))
+    case ZeroExtend(extension, body) => body.toBasil.map(x => ir.ZeroExtend(extension, x))
+    case SignExtend(extension, body) => body.toBasil.map(x => ir.SignExtend(extension, x))
   }
 
   def simplify: BVTerm =
@@ -41,6 +55,19 @@ enum BVTerm {
       //case SignExtend(extension, body) => SignExtend(extension, body.simplify)
       case _ => this
     }
+
+  def replace(prev: BVTerm, cur: BVTerm): BVTerm = this match {
+    case x if x == prev => cur
+    case Lit(x) => this
+    case Var(v) => this
+    case OldVar(v) => this
+    case Uop(op, x) => Uop(op, x.replace(prev, cur))
+    case Bop(op, x, y) => Bop(op, x.replace(prev, cur), y.replace(prev, cur))
+    case Extract(end, start, body) => Extract(end, start, body.replace(prev, cur))
+    case Repeat(repeats, body) => Repeat(repeats, body.replace(prev, cur))
+    case ZeroExtend(extension, body) => ZeroExtend(extension, body.replace(prev, cur))
+    case SignExtend(extension, body) => SignExtend(extension, body.replace(prev, cur))
+  }
 }
 
 enum GammaTerm {
@@ -50,12 +77,22 @@ enum GammaTerm {
   case Uop(op: BoolUnOp, x: GammaTerm)
   case Bop(op: BoolBinOp, x: GammaTerm, y: GammaTerm)
 
+  override def toString(): String = this.toBoogie.toString()
+
   def toBoogie: BExpr = this match {
     case Lit(x) => x.toBoogie
     case Var(v) => v.toGamma
     case OldVar(v) => Old(v.toGamma)
     case Uop(op, x) => UnaryBExpr(op, x.toBoogie)
     case Bop(op, x, y) => BinaryBExpr(op, x.toBoogie, y.toBoogie)
+  }
+
+  def toBasil: Option[Expr] = this match {
+    case Lit(x) => Some(x)
+    case Var(v) => Some(LocalVar(s"Gamma_${v.name}", BoolType))
+    case OldVar(v) => None
+    case Uop(op, x) => x.toBasil.map(x => UnaryExpr(op, x))
+    case Bop(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
   }
 
   def vars: Set[Variable] = this match {
@@ -93,6 +130,15 @@ enum GammaTerm {
         }
       case _ => this
     }
+
+  def replace(prev: GammaTerm, cur: GammaTerm): GammaTerm = this match {
+    case x if x == prev => cur
+    case Lit(x) => this
+    case Var(v) => this
+    case OldVar(v) => this
+    case Uop(op, x) => Uop(op, x.replace(prev, cur))
+    case Bop(op, x, y) => Bop(op, x.replace(prev, cur), y.replace(prev, cur))
+  }
 }
 
 enum Predicate {
@@ -102,14 +148,20 @@ enum Predicate {
   case BVCmp(op: BVCmpOp, x: BVTerm, y: BVTerm)
   case GammaCmp(op: BoolCmpOp, x: GammaTerm, y: GammaTerm)
 
-  assert(this.simplify == this.simplify.simplify)
-
   def toBoogie: BExpr = this match {
     case Lit(x) => x.toBoogie
     case Uop(op, x) => UnaryBExpr(op, x.toBoogie)
     case Bop(op, x, y) => BinaryBExpr(op, x.toBoogie, y.toBoogie)
     case BVCmp(op, x, y) => BinaryBExpr(op, x.toBoogie, y.toBoogie)
     case GammaCmp(op, x, y) => BinaryBExpr(op, x.toBoogie, y.toBoogie)
+  }
+
+  def toBasil: Option[Expr] = this match {
+    case Lit(x) => Some(x)
+    case Uop(op, x) => x.toBasil.map(x => UnaryExpr(op, x))
+    case Bop(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
+    case BVCmp(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
+    case GammaCmp(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
   }
 
   override def toString(): String = this.toBoogie.toString
@@ -156,6 +208,22 @@ enum Predicate {
       case Bop(BoolAND, a, b) => a.split ++ b.split
       case _ => List(this)
     }
+
+  def replace(prev: BVTerm, cur: BVTerm): Predicate = this match {
+    case Lit(x) => this
+    case Uop(op, x) => Uop(op, x.replace(prev, cur))
+    case Bop(op, x, y) => Bop(op, x.replace(prev, cur), y.replace(prev, cur))
+    case BVCmp(op, x, y) => BVCmp(op, x.replace(prev, cur), y.replace(prev, cur))
+    case GammaCmp(op, x, y) => this
+  }
+
+  def replace(prev: GammaTerm, cur: GammaTerm): Predicate = this match {
+    case Lit(x) => this
+    case Uop(op, x) => Uop(op, x.replace(prev, cur))
+    case Bop(op, x, y) => Bop(op, x.replace(prev, cur), y.replace(prev, cur))
+    case BVCmp(op, x, y) => this
+    case GammaCmp(op, x, y) => GammaCmp(op, x.replace(prev, cur), y.replace(prev, cur))
+  }
 }
 
 def exprToBVTerm(e: Expr): Option[BVTerm] = e match {
@@ -167,6 +235,21 @@ def exprToBVTerm(e: Expr): Option[BVTerm] = e match {
   case Repeat(repeats, body) => exprToBVTerm(body).map(x => BVTerm.Repeat(repeats, x))
   case ZeroExtend(extension, body) => exprToBVTerm(body).map(x => BVTerm.ZeroExtend(extension, x))
   case SignExtend(extension, body) => exprToBVTerm(body).map(x => BVTerm.SignExtend(extension, x))
+  case _ => None
+}
+
+/**
+ * Get the gamma of a bitvector expression, i.e. the join of all of the gammas of the variables in the expression
+ */
+def exprToGammaTerm(e: Expr): Option[GammaTerm] = e match {
+  case b: BitVecLiteral => Some(GammaTerm.Lit(TrueLiteral))
+  case v: Variable => Some(GammaTerm.Var(v))
+  case UnaryExpr(op: BVUnOp, arg) => exprToGammaTerm(arg)
+  case BinaryExpr(op: BVBinOp, arg1, arg2) => exprToGammaTerm(arg1).flatMap(x => exprToGammaTerm(arg2).map(y => GammaTerm.Bop(BoolAND, x, y)))
+  case Extract(end, start, body) => exprToGammaTerm(body)
+  case Repeat(repeats, body) => exprToGammaTerm(body)
+  case ZeroExtend(extension, body) => exprToGammaTerm(body)
+  case SignExtend(extension, body) => exprToGammaTerm(body)
   case _ => None
 }
 

@@ -288,7 +288,7 @@ case object BVSLE extends BVBinOp("sle") with BVCmpOp
 case object BVSGT extends BVBinOp("sgt") with BVCmpOp
 case object BVSGE extends BVBinOp("sge") with BVCmpOp
 case object BVEQ extends BVBinOp("==") with BVCmpOp
-case object BVNEQ extends BVBinOp("!=")
+case object BVNEQ extends BVBinOp("!=") with BVCmpOp
 case object BVCONCAT extends BVBinOp("++")
 
 sealed trait IntBinOp(op: String) extends BinOp {
