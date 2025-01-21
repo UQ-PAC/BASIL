@@ -4,9 +4,6 @@ import ir.*
 import boogie.*
 import ir.transforms.AbstractDomain
 
-// TODO
-// to avoid duplicating simplify calls (it should be idempotent) we could perhaps annotate terms which have already been simplified.
-
 enum BVTerm {
   case Lit(x: BitVecLiteral)
   case Var(v: Variable)
@@ -17,6 +14,8 @@ enum BVTerm {
   case Repeat(repeats: Int, body: BVTerm)
   case ZeroExtend(extension: Int, body: BVTerm)
   case SignExtend(extension: Int, body: BVTerm)
+
+  private var simplified: Boolean = false
 
   override def toString(): String = this.toBoogie.toString()
 
@@ -44,8 +43,9 @@ enum BVTerm {
     case SignExtend(extension, body) => body.toBasil.map(x => ir.SignExtend(extension, x))
   }
 
-  def simplify: BVTerm =
-    this match {
+  def simplify: BVTerm = {
+    if this.simplified then return this
+    val ret = this match {
       // TODO const prop
       //case Uop(op, x) => Uop(op, x.simplify)
       //case Bop(op, x, y) => Bop(op, x.simplify, y.simplify)
@@ -55,6 +55,9 @@ enum BVTerm {
       //case SignExtend(extension, body) => SignExtend(extension, body.simplify)
       case _ => this
     }
+    ret.simplified = true
+    ret
+  }
 
   def replace(prev: BVTerm, cur: BVTerm): BVTerm = this match {
     case x if x == prev => cur
@@ -76,6 +79,9 @@ enum GammaTerm {
   case OldVar(v: Variable)
   case Uop(op: BoolUnOp, x: GammaTerm)
   case Bop(op: BoolBinOp, x: GammaTerm, y: GammaTerm)
+  case Join(s: Set[GammaTerm])
+
+  private var simplified: Boolean = false
 
   override def toString(): String = this.toBoogie.toString()
 
@@ -85,6 +91,9 @@ enum GammaTerm {
     case OldVar(v) => Old(v.toGamma)
     case Uop(op, x) => UnaryBExpr(op, x.toBoogie)
     case Bop(op, x, y) => BinaryBExpr(op, x.toBoogie, y.toBoogie)
+    case Join(s) => s.foldLeft(TrueBLiteral: BExpr) {
+      (p, g) => BinaryBExpr(BoolAND, p, g.toBoogie)
+    }
   }
 
   def toBasil: Option[Expr] = this match {
@@ -93,6 +102,9 @@ enum GammaTerm {
     case OldVar(v) => None
     case Uop(op, x) => x.toBasil.map(x => UnaryExpr(op, x))
     case Bop(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
+    case Join(s) => s.foldLeft(Some(TrueLiteral): Option[Expr]) {
+      (p, g) => g.toBasil.flatMap(g => p.map(p => BinaryExpr(BoolAND, p, g)))
+    }
   }
 
   def vars: Set[Variable] = this match {
@@ -101,17 +113,22 @@ enum GammaTerm {
     case OldVar(v) => Set(v)
     case Uop(_, x) => x.vars
     case Bop(_, x, y) => x.vars ++ y.vars
+    case Join(s) => s.foldLeft(Set()) { (s, g) => s ++ g.vars }
   }
 
-  def simplify: GammaTerm =
-    this match {
+  def simplify: GammaTerm = {
+    if this.simplified then return this
+    val ret = this match {
       case Bop(BoolAND, a, b) =>
         (a.simplify, b.simplify) match {
           case (Lit(TrueLiteral), b) => b
           case (a, Lit(TrueLiteral)) => a
           case (Lit(FalseLiteral), _) => Lit(FalseLiteral)
           case (_, Lit(FalseLiteral)) => Lit(FalseLiteral)
-          case (a, b) => Bop(BoolAND, a, b)
+          case (Join(a), Join(b)) => Join(a ++ b)
+          case (Join(a), b) => Join(a + b)
+          case (a, Join(b)) => Join(b + a)
+          case (a, b) => Join(Set(a, b))
         }
       case Bop(BoolOR, a, b) =>
         (a.simplify, b.simplify) match {
@@ -128,8 +145,26 @@ enum GammaTerm {
           case (_, Lit(TrueLiteral)) => Lit(TrueLiteral)
           case (a, b) => Bop(BoolIMPLIES, a, b)
         }
+      case Join(s) => {
+        val set = s.map(g => g.simplify)
+        if set.size == 1 then s.head else {
+          Join(set.foldLeft(Set()) {
+            (s, g) => g match {
+              case Join(s2) => s ++ s2
+              case g => s + g
+            }
+          })
+        }
+      }
       case _ => this
     }
+    ret match {
+      case Join(s) => println(s)
+      case _ => {}
+    }
+    ret.simplified = true
+    ret
+  }
 
   def replace(prev: GammaTerm, cur: GammaTerm): GammaTerm = this match {
     case x if x == prev => cur
@@ -138,6 +173,7 @@ enum GammaTerm {
     case OldVar(v) => this
     case Uop(op, x) => Uop(op, x.replace(prev, cur))
     case Bop(op, x, y) => Bop(op, x.replace(prev, cur), y.replace(prev, cur))
+    case Join(s) => Join(s.map(g => g.replace(prev, cur)))
   }
 }
 
@@ -147,6 +183,8 @@ enum Predicate {
   case Bop(op: BoolBinOp, x: Predicate, y: Predicate)
   case BVCmp(op: BVCmpOp, x: BVTerm, y: BVTerm)
   case GammaCmp(op: BoolCmpOp, x: GammaTerm, y: GammaTerm)
+
+  private var simplified: Boolean = false
 
   def toBoogie: BExpr = this match {
     case Lit(x) => x.toBoogie
@@ -166,8 +204,9 @@ enum Predicate {
 
   override def toString(): String = this.toBoogie.toString
 
-  def simplify: Predicate =
-    this match {
+  def simplify: Predicate = {
+    if this.simplified then return this
+    val ret = this match {
       case Bop(BoolAND, a, b) =>
         (a.simplify, b.simplify) match {
           case (Lit(TrueLiteral), b) => b
@@ -202,6 +241,9 @@ enum Predicate {
         }
       case _ => this
     }
+    ret.simplified = true
+    ret
+  }
 
   def split: List[Predicate] =
     this match {

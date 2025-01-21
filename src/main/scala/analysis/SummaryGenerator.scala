@@ -175,7 +175,7 @@ class SummaryGenerator(
       }
     }).toSet.toList
 
-    val wpThing = procedure.entryBlock.flatMap(b => predDomainResults.get(b).map(p => p.toBoogie)).toList
+    val wpThing = procedure.entryBlock.flatMap(b => predDomainResults.get(b).flatMap(p => p.toBasil).map(p => eval.simplifyExprFixpoint(p)._1.toBoogie)).toList
 
     mustGammasWithConditions ++ wpThing
   }
