@@ -137,23 +137,21 @@ class PredicateDomain extends PredicateEncodingDomain[Predicate] {
 
   def join(a: Predicate, b: Predicate, pos: Block): Predicate = Bop(BoolOR, a, b).simplify
 
-  private def lowExpr(e: Expr): Predicate = GammaCmp(BoolIMPLIES, GammaTerm.Lit(TrueLiteral), e.variables.foldLeft(GammaTerm.Lit(TrueLiteral)) {
-    (p, v) => GammaTerm.Bop(BoolAND, p, GammaTerm.Var(v))
-  })
+  private def lowExpr(e: Expr): Predicate = GammaCmp(BoolIMPLIES, GammaTerm.Lit(TrueLiteral), GammaTerm.Join(e.variables.map(v => GammaTerm.Var(v))))
 
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
-      case a: LocalAssign  => b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get).replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get)
+      case a: LocalAssign  => b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get).replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get).simplify
       case a: MemoryLoad   => top
       case m: MemoryStore  => top
       case a: Assume       => {
         if (a.checkSecurity) {
-          Bop(BoolAND, Bop(BoolAND, b, exprToPredicate(a.body).get), lowExpr(a.body))
+          Bop(BoolAND, Bop(BoolAND, b, exprToPredicate(a.body).get), lowExpr(a.body)).simplify
         } else {
-          Bop(BoolAND, b, exprToPredicate(a.body).get)
+          Bop(BoolAND, b, exprToPredicate(a.body).get).simplify
         }
       }
-      case a: Assert       => Bop(BoolAND, b, exprToPredicate(a.body).get)
+      case a: Assert       => Bop(BoolAND, b, exprToPredicate(a.body).get).simplify
       case i: IndirectCall => top
       case c: DirectCall   => top
       case g: GoTo         => b
