@@ -5,6 +5,30 @@ import ir.*
 import boogie.*
 
 /**
+ * SOUNDNESS
+ *
+ * The GlobalVariable type unsoundly represents global variables, in the case that there is a misaligned memory operation.
+ * Consider the following example c program (assuming a long is 8 bytes and an int is 4 bytes).
+ * ```c
+ * long x;
+ * long y;
+ *
+ * void f(int a) {
+ *     *((int*)(&x) + 1) = a;
+ * }
+ *
+ * int main(int argc, char **argv) {
+ *     f(y);
+ *     return 0;
+ * }
+ * ```
+ * Here, the global variable x should be tainted by the input parameter a in f. With the current implementation however,
+ * this isn't the case, since we taint based on base addresses. To solve this we can work on individual bytes of memory,
+ * but this would be extremely expensive. It would be ideal to instead taint memory regions acquired from MRA or DSA.
+ * For use in summary generation however, this requires a sensible way to express the gamma of a memory region.
+ */
+
+/**
  * A value which can propogate taint/be tainted.
  */
 type Taintable = Variable | GlobalVariable /*| LocalStackVariable*/ | UnknownMemory
