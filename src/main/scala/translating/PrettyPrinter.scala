@@ -15,8 +15,12 @@ object PrettyPrinter {
   def pp_jump(s: Jump) = BasilIRPrettyPrinter()(s)
   def pp_prog(s: Program) = BasilIRPrettyPrinter()(s)
   def pp_proc(s: Procedure) = BasilIRPrettyPrinter()(s)
-}
 
+  def pp_prog_with_analysis_results[T](before: Map[Block, T], after: Map[Block, T], p: Program, resultPrinter: T => String = ((x : T) => x.toString)) = {
+    BasilIRPrettyPrinter(with_analysis_results_begin=block => before.get(block).map(resultPrinter), block => after.get(block).map(resultPrinter))(p)
+  }
+
+}
 
 def indent(s: String, indent: String = "  "): String = {
   s.flatMap(c =>
@@ -34,14 +38,11 @@ case class BST[T <: Expr | Command](v: String) extends PPProg[T] {
 }
 
 case class Prog(mainProc: String, globalDecls: List[String], procedures: List[Proc]) extends PPProg[Program] {
-  override def toString = globalDecls.map(_ + ";").mkString("\n") + "\n\n" + procedures.map(_.toString + ";\n").mkString("")
+  override def toString =
+    globalDecls.map(_ + ";").mkString("\n") + "\n\n" + procedures.map(_.toString + ";\n").mkString("")
 }
 
-case class Proc(
-    signature: String,
-    localDecls: List[String],
-    blocks: String
-) extends PPProg[Procedure] {
+case class Proc(signature: String, localDecls: List[String], blocks: String) extends PPProg[Procedure] {
   override def toString = {
     if (blocks.size > 0) {
       signature + "\n{" + "\n" + blocks + "\n}"
@@ -51,13 +52,15 @@ case class Proc(
   }
 }
 
-case class PBlock(label: String, address: Option[String], commands: List[String]) extends PPProg[Block] {
+case class PBlock(label: String, address: Option[String], commands: List[String], entryComment: Option[String]= None, exitComment: Option[String]=None) extends PPProg[Block] {
   override def toString = {
     val indent = "  "
     val addr = address.map(" " + _).getOrElse("")
-    s"block ${label}${addr} [\n"
+    val comment = entryComment.map(c => c + "\n").getOrElse("") 
+    val excomment = exitComment.map(c => "\n" + c).getOrElse("")
+    s"block ${label}${addr} [\n${comment}"
       ++ commands.map("  " + _).mkString(";\n")
-      ++ "\n]"
+      ++ s"${excomment}\n]"
   }
 }
 
@@ -66,7 +69,8 @@ case class PBlock(label: String, address: Option[String], commands: List[String]
 //   override def toString = v
 // }
 
-class BasilIRPrettyPrinter() extends BasilIR[PPProg] {
+class BasilIRPrettyPrinter(with_analysis_results_begin: Block => Option[String] = _ => None, 
+  with_analysis_results_end: Block => Option[String] = _ => None) extends BasilIR[PPProg] {
   val blockIndent = "  "
   val statementIndent = "    "
   val seenVars = mutable.HashSet[Variable]()
@@ -139,8 +143,8 @@ class BasilIRPrettyPrinter() extends BasilIR[PPProg] {
       memoryRegions(p).toList.sortBy(_.name).map(memdecl) ++
         globals(p).toList.sorted.map(vardecl)
         ++ List("\nlet entry_procedure = " + p.mainProcedure.name)
-        // ++ List(initialMemory(p.initialMemory.values))
-        ,
+      // ++ List(initialMemory(p.initialMemory.values))
+      ,
       p.procedures.toList.map(vproc).collect {
         case p: Proc => p
         case _       => ???
@@ -153,14 +157,24 @@ class BasilIRPrettyPrinter() extends BasilIR[PPProg] {
     assert(false)
   }
 
+  override def vblock(b: Block): PPProg[Block] = {
+    val label = b.label 
+    val address = b.address 
+    val statements =  b.statements.toList.map(vstmt)
+    val terminator = vjump(b.jump)
+    val entryComent = with_analysis_results_begin(b).map(c => s"${blockIndent}// ${c}")
+    val exitComment = with_analysis_results_end(b).map(c => s"${blockIndent}// ${c}")
+    val addr = address.map(a => s"{address = ${vaddress(a)}}")
+    PBlock(label, addr, statements.map(_.toString) ++ Seq(terminator.toString), entryComent, exitComment)
+  }
+
   override def vblock(
       label: String,
       address: Option[BigInt],
       statements: List[PPProg[Statement]],
       terminator: PPProg[Jump]
   ): PPProg[Block] = {
-    val addr = address.map(a => s"{address = ${vaddress(a)}}")
-    PBlock(label, addr, statements.map(_.toString) ++ Seq(terminator.toString))
+    assert(false)
   }
 
   def vardecl(v: Variable): String = {
@@ -241,22 +255,23 @@ class BasilIRPrettyPrinter() extends BasilIR[PPProg] {
 
   def vaddress(a: BigInt) = vintlit(a)
 
-  def vparam(l: Variable) : String = {
-    s"${l.name}:${vtype{l.getType}}"
+  def vparam(l: Variable): String = {
+    s"${l.name}:${vtype { l.getType }}"
   }
 
   override def vproc(p: Procedure): PPProg[Procedure] = {
     seenVars.clear()
     val decls = locals(p).map(vardecl)
 
-
     val name = p.name
     val inParams = p.formalInParam.toList.map(vparam)
     val outParams = p.formalOutParam.toList.map(vparam)
     val entryBlock = p.entryBlock
     val middleBlocks =
-      (p.entryBlock.toList ++ (p.blocks.toSet -- p.entryBlock.toSet -- p.returnBlock.toSet).toList.sortBy(x => -x.rpoOrder)
-      ++ p.returnBlock).map(vblock)
+      (p.entryBlock.toList ++ (p.blocks.toSet -- p.entryBlock.toSet -- p.returnBlock.toSet).toList.sortBy(x =>
+        -x.rpoOrder
+      )
+        ++ p.returnBlock).map(vblock)
     val returnBlock = p.returnBlock.map(vblock)
 
     val localDecls = decls.toList.sorted
@@ -275,30 +290,26 @@ class BasilIRPrettyPrinter() extends BasilIR[PPProg] {
 
     val blocks = (pname ++ addr ++ iblocks ++ mblocks.toList).map(_ + ";").mkString("\n")
 
-    Proc(
-      s"proc $name(${inParams.mkString(", ")}) -> (${outParams.mkString(", ")})",
-      localDecls,
-      blocks
-    )
+    Proc(s"proc $name(${inParams.mkString(", ")}) -> (${outParams.mkString(", ")})", localDecls, blocks)
   }
 
   def vproc(
-      name: String,
-      inParams: List[PPProg[Variable]],
-      outParams: List[PPProg[Variable]],
-      entryBlock: Option[PPProg[Block]],
-      middleBlocks: List[PPProg[Block]],
-      returnBlock: Option[PPProg[Block]]
+    name: String,
+    inParams: List[PPProg[Variable]],
+    outParams: List[PPProg[Variable]],
+    entryBlock: Option[PPProg[Block]],
+    middleBlocks: List[PPProg[Block]],
+    returnBlock: Option[PPProg[Block]]
   ): PPProg[Procedure] = ???
 
   override def vassign(lhs: PPProg[Variable], rhs: PPProg[Expr]): PPProg[LocalAssign] = BST(s"${lhs} := ${rhs}")
 
   override def vstore(
-      mem: String,
-      index: PPProg[Expr],
-      value: PPProg[Expr],
-      endian: Endian,
-      size: Int
+    mem: String,
+    index: PPProg[Expr],
+    value: PPProg[Expr],
+    endian: Endian,
+    size: Int
   ): BST[MemoryStore] = {
     val le = if endian == Endian.LittleEndian then "le" else "be"
     BST(s"store $le ${mem} ${index} ${value} ${size}")
@@ -310,11 +321,10 @@ class BasilIRPrettyPrinter() extends BasilIR[PPProg] {
   }
 
   override def vcall(
-      outParams: List[(Variable, PPProg[Expr])],
-      procname: String,
-      inparams: List[(Variable, PPProg[Expr])]
+    outParams: List[(Variable, PPProg[Expr])],
+    procname: String,
+    inparams: List[(Variable, PPProg[Expr])]
   ): PPProg[DirectCall] = {
-
 
     val op = {
       if (outParams.forall(_._1.isInstanceOf[LocalVar])) {

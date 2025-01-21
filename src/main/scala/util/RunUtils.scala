@@ -206,7 +206,7 @@ object IRTransform {
     }
 
     transforms.applyRPO(ctx.program)
-    val nonReturning = transforms.findNonReturningFunctionsSaturating(ctx.program)
+    val nonReturning = transforms.findDefinitelyExits(ctx.program)
     ctx.program.mainProcedure.foreach(s => s match {
       case d : DirectCall if nonReturning.nonreturning.contains(d.target) => d.parent.replaceJump(Return())
       case _ => ()
@@ -337,6 +337,8 @@ object StaticAnalysis {
 
       val newLoops = foundLoops.reducibleTransformIR().identifiedLoops
       newLoops.foreach(l => StaticAnalysisLogger.debug(s"Loop found: ${l.name}"))
+
+      foundLoops.updateIrWithLoops()
 
       config.analysisDotPath.foreach { s =>
         DebugDumpIRLogger.writeToFile(File(s"${s}_graph-after-loop-reduce-$iteration.dot"), dotBlockGraph(IRProgram, IRProgram.map(b => b -> b.toString).toMap))
@@ -545,11 +547,20 @@ object RunUtils {
 
   def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]) : Unit = {
 
+
     // writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
     Logger.info("[!] Running Simplify")
     val timer = PerformanceTimer("Simplify")
 
     transforms.applyRPO(ctx.program)
+
+    // example of printing a simple analysis
+    val liveVarsDom = transforms.IntraLiveVarsDomain()
+    val liveVarsSolver = transforms.worklistSolver(liveVarsDom)
+    val (beforeLive, afterLive) = liveVarsSolver.solveProgIntraProc(ctx.program, backwards = true)
+
+    writeToFile(pp_prog_with_analysis_results(beforeLive, afterLive, ctx.program, x => s"Live vars: ${x.map(_.name).toList.sorted.mkString(", ")}"), s"live-vars.il")
+
 
     transforms.removeEmptyBlocks(ctx.program)
     transforms.coalesceBlocks(ctx.program)

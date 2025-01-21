@@ -589,13 +589,6 @@ object CCP {
 
 object CopyProp {
 
-  def forwardFlagCalc(p: Procedure) = {
-    val (beforeLive, afterLive) = getLiveVars(p)
-    val dom = DefUseDomain(beforeLive)
-    val solver = worklistSolver(dom)
-    val (beforeRes, afterRes) = solver.solveProc(p)
-
-  }
 
   def isFlagVar(l: Variable) = {
     val flagNames = Set("ZF", "VF", "CF", "NF")
@@ -886,6 +879,18 @@ enum PathExit:
   case NoReturn
   case Bot
 
+object PathExit:
+  def join(l: PathExit, r: PathExit) = (l, r) match {
+    case (PathExit.Return, PathExit.Return)     => PathExit.Return
+    case (PathExit.NoReturn, PathExit.NoReturn) => PathExit.NoReturn
+    case (PathExit.Return, PathExit.NoReturn)   => PathExit.Maybe
+    case (PathExit.NoReturn, PathExit.Return)   => PathExit.Maybe
+    case (PathExit.Maybe, x)                    => PathExit.Maybe
+    case (x, PathExit.Maybe)                    => PathExit.Maybe
+    case (PathExit.Bot, x)                      => x
+    case (x, PathExit.Bot)                      => x
+  }
+
 class ProcExitsDomain(is_nonreturning: String => Boolean) extends AbstractDomain[PathExit] {
   /* backwards analysis to identify non-returning function */
 
@@ -898,45 +903,58 @@ class ProcExitsDomain(is_nonreturning: String => Boolean) extends AbstractDomain
   }
   override def top = PathExit.Maybe
   def bot = PathExit.Bot
-  def join(l: PathExit, r: PathExit, pos: Block) = (l, r) match {
-    case (PathExit.Return, PathExit.Return)     => PathExit.Return
-    case (PathExit.NoReturn, PathExit.NoReturn) => PathExit.NoReturn
-    case (PathExit.Return, PathExit.NoReturn)   => PathExit.Maybe
-    case (PathExit.NoReturn, PathExit.Return)   => PathExit.Maybe
-    case (PathExit.Maybe, x)                    => PathExit.Maybe
-    case (x, PathExit.Maybe)                    => PathExit.Maybe
-    case (PathExit.Bot, x)                      => x
-    case (x, PathExit.Bot)                      => x
+  def join(l: PathExit, r: PathExit, pos: Block) = PathExit.join(l,r)
+}
+
+case class ProcReturnInfo(returning: Set[Procedure], nonreturning: Set[Procedure]) {
+  override def toString = s"returning : ${returning.map(_.name).toList.sorted}\nnonretruning: ${nonreturning.map(_.name).toList.sorted}"
+}
+
+class DefinitelyExits(knownExit: Set[Procedure]) extends ProcedureSummaryGenerator[PathExit, PathExit] {
+  def top: ir.transforms.PathExit = ???
+  def bot: ir.transforms.PathExit = PathExit.Bot
+  override def init (p: Procedure) = if p.procName == "exit" then PathExit.NoReturn else PathExit.Bot
+  def join(l: PathExit, r: PathExit, p: Procedure) = PathExit.join(l,r)
+
+  def transfer
+  (a: ir.transforms.PathExit, b: ir.Procedure):
+    ir.transforms.PathExit = ???
+  
+  def localTransferCall
+  (l: ir.transforms.PathExit, summaryForTarget: ir.transforms.PathExit, p: ir.DirectCall)
+    : ir.transforms.PathExit = (l, summaryForTarget) match {
+      case (PathExit.Return, PathExit.Return)  => PathExit.Return
+      case (_, PathExit.NoReturn) => PathExit.NoReturn
+      case (o, _)  => o
+  }
+
+  def updateSummary
+  (prevSummary: ir.transforms.PathExit, p: ir.Procedure,
+    resBefore: Map[ir.Block, ir.transforms.PathExit], resAfter:
+    Map[ir.Block, ir.transforms.PathExit]): ir.transforms.PathExit = {
+      p.entryBlock.flatMap(resBefore.get) match {
+        case Some(PathExit.NoReturn) => PathExit.NoReturn
+        case Some(PathExit.Return)   => PathExit.Return
+        case Some(PathExit.Maybe)    => PathExit.Maybe
+        case  _                      => prevSummary
+    }
   }
 }
 
-case class ProcReturnInfo(returning: Set[Procedure], nonreturning: Set[Procedure])
-
-def findNonReturningFunctionsSaturating(p: Program) = {
-  var returning = Set[String]()
-  var old_nonreturning = Set[String]()
-
-  val exit = p.procedures.find(p => p.procName == "exit").map(_.name)
-  var nonreturning = exit.toSet ++ Set("exit")
-
-  while (nonreturning != old_nonreturning) {
-    old_nonreturning = nonreturning
-
-    for (p <- p.procedures.filterNot(p => nonreturning.contains(p.name) || returning.contains(p.name))) {
-      val solver = worklistSolver(ProcExitsDomain(s => nonreturning.contains(s)))
-      val (beforeBlocks, afterBlocks) = solver.solveProc(p, true)
-      p.entryBlock.flatMap(beforeBlocks.get) match {
-        case Some(PathExit.NoReturn) => nonreturning = nonreturning + p.name
-        case Some(PathExit.Return)   => returning = returning + p.name
-        case _                       => ()
-      }
-    }
-  }
-
-  ProcReturnInfo(
-    returning.flatMap(pn => p.procedures.find(_.name == pn).toSet),
-    nonreturning.flatMap(pn => p.procedures.find(_.name == pn).toSet)
+def findDefinitelyExits(p: Program) = {
+  val exit = p.procedures.filter(p => p.procName == "exit").toSet
+  val dom = DefinitelyExits(exit)
+  val ldom = ProcExitsDomain(x => false)
+  val solve = interprocSummaryFixpointSolver(ldom, dom)
+  val res = solve.solveProgInterProc(p, true)
+  ProcReturnInfo(res.collect {
+    case (p, PathExit.Return) => p
+  }.toSet, 
+  res.collect {
+    case (p, PathExit.NoReturn) => p
+  }.toSet
   )
+
 }
 
 class Simplify(val res: Variable => Option[Expr], val initialBlock: Block = null) extends CILVisitor {

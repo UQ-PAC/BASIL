@@ -15,25 +15,30 @@ import scala.util.{Failure, Success}
 import ExecutionContext.Implicits.global
 
 
-trait AbstractDomain[L] {
-  def join(a: L, b: L, pos: Block): L
-  def widen(a: L, b: L, pos: Block): L = join(a, b, pos) /* not used */
+
+trait GenericAbstractDomain[Location, Code, L] {
+  def join(a: L, b: L, pos: Location): L
+  def widen(a: L, b: L, pos: Location): L = join(a, b, pos) /* not used */
   def narrow(a: L, b: L): L = a
-  def transfer(a: L, b: Command): L
-  def init(b: Block): L = bot
+  def transfer(a: L, b: Code): L
+  def init(b: Location): L = bot
 
-  def isFixed(prev: L, next: L) : Boolean = (prev == next)
+  def isFixed(prev: L, next: L): Boolean = (prev == next)
 
+  def top: L
+  def bot: L
+}
+
+
+trait AbstractDomain[L] extends GenericAbstractDomain[Block, Command, L] {
   def transferBlockFwd(a: L, b: Block): L = {
     transfer(b.statements.foldLeft(a)(transfer), b.jump)
   }
   def transferBlockBwd(a: L, b: Block): L = {
     b.statements.toList.reverse.foldLeft(transfer(a, b.jump))(transfer)
   }
-
-  def top: L
-  def bot: L
 }
+
 
 trait PowerSetDomain[T] extends AbstractDomain[Set[T]] {
   def bot = Set()
@@ -41,69 +46,70 @@ trait PowerSetDomain[T] extends AbstractDomain[Set[T]] {
   def join(a: Set[T], b: Set[T], pos: Block) = a.union(b)
 }
 
-
 def onePassForwardGlobalStateSolver[L, D <: AbstractDomain[L]](initial: Iterable[Block], domain: D) = {
-    val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
-    worklist.addAll(initial)
-    var state = domain.bot
+  val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
+  worklist.addAll(initial)
+  var state = domain.bot
 
-    while (worklist.nonEmpty) {
-      val b: Block = worklist.dequeue
-      val p = state
+  while (worklist.nonEmpty) {
+    val b: Block = worklist.dequeue
+    val p = state
 
-      for (l <- b.statements) {
-        state = domain.transfer(state, l)
-      }
-      state = domain.transfer(state, b.jump)
+    for (l <- b.statements) {
+      state = domain.transfer(state, l)
     }
-
+    state = domain.transfer(state, b.jump)
+  }
 }
+
+
+trait ProcAbstractDomain[L] extends GenericAbstractDomain[Procedure, Procedure, L]
+
+class DomainWithFunctionSummaries[L, Summary](d: AbstractDomain[L], 
+  procSummary: Procedure => Summary,
+  transferCallSummary: (L, Summary, DirectCall) => L
+  ) extends AbstractDomain[L]  {
+    def join(a: L, b: L, pos: Block): L = d.join(a,b,pos)
+    override def widen(a: L, b: L, pos: Block): L = d.widen(a,b, pos)
+    override def narrow(a: L, b: L): L = d.narrow(a, b)
+    override def init(b: Block): L = d.init(b)
+    override def isFixed(prev: L, next: L): Boolean = d.isFixed(prev, next)
+    def top: L = d.top
+    def bot: L = d.bot
+
+    def transfer(a: L, b: Command): L = b match {
+      case call: DirectCall => {
+        transferCallSummary(a, procSummary(call.target), call)
+      }
+      case o => d.transfer(a, b)
+    }
+}
+
+trait ProcedureSummaryGenerator[L, LocalDomain] extends GenericAbstractDomain[Procedure, Procedure, L] {
+  def localTransferCall(l: LocalDomain, summaryForTarget: L, p: DirectCall) : LocalDomain
+  def updateSummary(prevSummary: L, p: Procedure,  resBefore: Map[Block, LocalDomain], resAfter: Map[Block, LocalDomain]) : L
+}
+
+
 
 class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
 
-  def solveProc(p: Procedure, backwards: Boolean = false) = {
-    solve(p.blocks, Set(), Set(), backwards)
+  def solveProc(p: Procedure, backwards: Boolean = false) : (Map[Block, L], Map[Block, L]) = {
+    solve(p.blocks, backwards)
   }
 
-  def solveProg(
-      p: Program,
-      widenpoints: Set[Block], // set of loop heads
-      narrowpoints: Set[Block] // set of conditions
-  ): Map[Procedure, Map[Block, L]] = {
-    val initDom = p.procedures.map(p => (p, p.blocks))
-
-    val work = initDom.map(d => {
-      (
-        d._1,
-        Future {
-          val t = util.PerformanceTimer(s"solve ${d._1.name}")
-          Logger.info(s"begin ${t.timerName}")
-          val r = solve(d._2, Set(), Set())
-          t.checkPoint("finished")
-          r
-        }
-      )
-    })
-    work
-      .map((prog, x) =>
-        try {
-          (prog, Await.result(x, 10000.millis)._2)
-        } catch {
-          case t: Exception => {
-            Logger.error(s"${prog.name} : $t")
-            (prog, Map())
-          }
-        }
-      )
-      .toMap
-    // Await.result(Future.sequence(work), Duration.Inf).toMap
+  def solveProgIntraProc(p: Program, backwards: Boolean = false): (Map[Block, L], Map[Block, L]) = {
+    def foldfun(acc: (Map[Block, L], Map[Block, L]), l: (Map[Block, L], Map[Block, L])) = {
+        val (accl, accr) = acc
+        val (vl, vr) = l
+        ((accl ++ vl), (accr ++ vr))
+    }
+    p.procedures.map(p => solve(p.blocks, backwards)).foldLeft(Map[Block, L](), Map[Block, L]())(foldfun)
   }
 
   def solve(
-      initial: IterableOnce[Block],
-      widenpoints: Set[Block], // set of loop heads
-      narrowpoints: Set[Block], // set of conditions
-      backwards: Boolean = false
+    initial: IterableOnce[Block],
+    backwards: Boolean = false
   ): (Map[Block, L], Map[Block, L]) = {
     val savedAfter: mutable.HashMap[Block, L] = mutable.HashMap()
     val savedBefore: mutable.HashMap[Block, L] = mutable.HashMap()
@@ -170,5 +176,36 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
       }
     }
     if backwards then (savedAfter.toMap, savedBefore.toMap) else (savedBefore.toMap, savedAfter.toMap)
+  }
+}
+
+
+
+class interprocSummaryFixpointSolver[SummaryAbsVal, LocalAbsVal, 
+  A <: AbstractDomain[LocalAbsVal]](localDomain : A, 
+    sg: ProcedureSummaryGenerator[SummaryAbsVal, LocalAbsVal]) {
+
+  def transferProcedure(a: SummaryAbsVal, b: Procedure, getSummary: Procedure => SummaryAbsVal, backwards: Boolean): SummaryAbsVal = {
+    val domain = DomainWithFunctionSummaries(localDomain, getSummary, sg.localTransferCall)
+    val solver = worklistSolver(domain)
+    val (beforeRes, afterRes) = solver.solveProc(b, backwards)
+    sg.updateSummary(a, b, beforeRes, afterRes)
+  }
+
+  def solveProgInterProc(p: Program, backwards : Boolean = false) = {
+    var old_summaries = Map[Procedure, SummaryAbsVal]()
+    var summaries = Map[Procedure, SummaryAbsVal]()
+    var first = true
+    while (first || summaries != old_summaries) {
+      first = false
+      old_summaries = summaries
+
+      for (p <- p.procedures) {
+        def getSummary(p: Procedure) = old_summaries.get(p).getOrElse(sg.init(p))
+        val r = transferProcedure(getSummary(p), p, getSummary, backwards)
+        summaries = summaries.updated(p, r)
+      }
+    }
+    summaries
   }
 }
