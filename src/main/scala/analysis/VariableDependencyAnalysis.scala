@@ -148,7 +148,7 @@ class VariableDependencyAnalysis(
             varDepResults += ret -> ret.outParams.foldLeft(varDepResults(ret)) {
               (m, p) => {
                 val (o, e) = p
-                m + (o -> e.variables.foldLeft(Set[Taintable]())((s, v) => s.union(finalResults(v))))
+                m + (o -> e.variables.foldLeft(Set[Taintable]())((s, v) => s.union(finalResults.getOrElse(v, Set()))))
               }
             }
           }
