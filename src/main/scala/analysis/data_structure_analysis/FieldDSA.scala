@@ -11,6 +11,28 @@ enum DSAPhase {
   case Local, BU, TD
 }
 
+
+trait DSA {
+
+}
+
+trait DSAGraph(val proc: Procedure, val phase: DSAPhase) {
+  val sva: Map[LocalVar, SymValueSet] = getSymbolicValues(proc)
+  val constraints: Set[Constraint] = generateConstraints(proc)
+  val nodes: Map[SymBase, DSANode]
+  def exprToSymVal(expr: Expr): SymValueSet = SymbolicValueDomain.exprToSymValSet(expr, sva)
+  def constraintArgToCells(constraintArg: ConstraintArg): Seq[DSACell]
+  def symValToCells(symVal: SymValueSet): Seq[DSACell]
+  
+}
+trait DSANode {
+
+}
+
+trait DSACell {
+
+}
+
 trait Counter(val init: Int = 0) {
   private var counter = init
   def increment(by: Int = 1): Int = {
@@ -32,36 +54,34 @@ object SuperCellCounter extends Counter
 
 case class FieldTerm(v: SuperCell) extends analysis.solvers.Var[FieldTerm]
 
-class FieldGraph(val proc: Procedure, val phase: DSAPhase) {
-  val sva: Map[LocalVar, SymValueSet] = getSymbolicValues(proc)
-  val constraints: Set[Constraint] = generateConstraints(proc)
-  def exprToSymVal(expr: Expr): SymValueSet = SymbolicValueDomain.exprToSymValSet(expr, sva)
+class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph(proc, phase) {
+
   val solver: UnionFindSolver[FieldTerm] = UnionFindSolver[FieldTerm]()
-  var nodes: Map[SymBase, FieldNode] = buildNodes
+  override val nodes: Map[SymBase, FieldNode] = buildNodes
 
   def localPhase(): Unit = {
     constraints.foreach(processConstraint)
   }
 
-  def symValToCells(symVal: SymValueSet): Set[FieldCell] = {
+  def symValToCells(symVal: SymValueSet): Seq[FieldCell] = {
     val pairs = symVal.map
-    pairs.foldLeft(Set[FieldCell]()) {
-      case (resultSet, (base: SymBase, offsets: SymOffsets)) =>
+    pairs.foldLeft(Seq[FieldCell]()) {
+      case (results, (base: SymBase, offsets: SymOffsets)) =>
         val node = nodes(base)
         if offsets.isTop then
           node.collapse()
-          resultSet + node.get(0)
+          results.appended(node.get(0))
         else
-          resultSet ++ offsets.getOffsets.map(node.get)
-    }
+          results ++ offsets.getOffsets.map(node.get)
+    }.sorted
   }
 
-  def constraintArgToCells(constraintArg: ConstraintArg): Set[SuperCell] = {
+  def constraintArgToCells(constraintArg: ConstraintArg): Seq[ConstraintCell] = {
     val exprCells = symValToCells(exprToSymVal(constraintArg.value))
     if constraintArg.contents then
-      exprCells.map(_.content).map(_.sc)
+      exprCells.map(_.content)
     else
-      exprCells.map(_.sc)
+      exprCells
   }
 
   // takes a map from symbolic bases to nodes and updates it based on symVal
@@ -114,7 +134,7 @@ class FieldGraph(val proc: Procedure, val phase: DSAPhase) {
     find(cell.sc)
   }
 
-  def mergeCells[T <: ConstraintCell](cells: Set[T]): SuperCell = {
+  def mergeCells[T <: ConstraintCell](cells: Iterable[T]): SuperCell = {
     require(cells.nonEmpty, "can't merge no cells")
     mergeCells(cells.map(_.sc))
   }
@@ -140,7 +160,7 @@ class FieldGraph(val proc: Procedure, val phase: DSAPhase) {
       newCell1
   }
 
-  private def mergeCells(cells: Set[SuperCell])(implicit i1: DummyImplicit): SuperCell = {
+  private def mergeCells(cells: Iterable[SuperCell])(implicit i1: DummyImplicit): SuperCell = {
     require(cells.nonEmpty, "can't merge no cells")
     if cells.size > 1 then
       cells.tail.foldLeft(cells.head) {
@@ -182,7 +202,7 @@ class FieldGraph(val proc: Procedure, val phase: DSAPhase) {
 }
 
 
-class FieldNode(val graph: FieldGraph, val base: SymBase, val size: Option[Int]) {
+class FieldNode(val graph: FieldGraph, val base: SymBase, val size: Option[Int]) extends DSANode {
 
   var cells: Set[FieldCell] = Set.empty
   private var collapsed: Option[FieldCell] = None
@@ -265,13 +285,18 @@ object Interval {
   def join(interval1: Interval, interval2: Interval): Interval = interval1.join(interval2)
 }
 
-sealed trait ConstraintCell {
+sealed trait ConstraintCell extends DSACell {
   val sc = SuperCell(Set(this))
 }
 
 case class FieldCell(node: FieldNode, interval: Interval) extends ConstraintCell  {
   val content: ContentCell = ContentCell(this)
   override def toString: String = s"Cell($node, $interval)"
+}
+
+object FieldCell {
+  implicit def orderingByInterval[A <: FieldCell]: Ordering[A] =
+    Ordering.by(e => (e.interval.start, e.interval.end))
 }
 
 case class ContentCell(cell: FieldCell) extends ConstraintCell {
