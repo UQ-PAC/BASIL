@@ -119,7 +119,7 @@ class SummaryGenerator(
    * Gets the set of gammas stored in a VarGammaMap, if possible
    */
   private def relevantGammas(gammaMap: VarGammaMap, v: Taintable): Option[Set[Taintable]] = {
-    latticeMapApply(gammaMap, v)(LatticeSetLattice()) match {
+    gammaMap(v) match {
       case LatticeSet.Top() => None // We can't know all of the variables, so we soundly say nothing
       case LatticeSet.Bottom() => Some(Set())
       case LatticeSet.FiniteSet(s) => Some(s)
@@ -133,7 +133,8 @@ class SummaryGenerator(
   def generateRequires(procedure: Procedure): List[BExpr] = {
     if procedure.blocks.isEmpty then return List()
 
-    val initialState = LatticeMap.BottomMap((variables ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+    val mustGammaDomain = MustGammaDomain(globals, constProp)
+    val initialState = LatticeMap.TopMap((variables ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
     reversePostOrder(procedure)
     val (_, mustGammaResults) = worklistSolver(MustGammaDomain(globals, constProp)).solveProc(procedure, false)
     val (before, after) = worklistSolver(ReachabilityConditions()).solveProc(procedure, false)
@@ -142,7 +143,8 @@ class SummaryGenerator(
       b.statements.flatMap(s => {
         s match {
           case a: Assume if a.checkSecurity => {
-            val condition = a.parent.prevBlocks.foldLeft(TrueBLiteral: BExpr)((p, b) => BinaryBExpr(BoolAND, p, before(b)))
+            val condition = a.parent.prevBlocks.foldLeft(TrueBLiteral: BExpr)((p, b) =>
+                BinaryBExpr(BoolAND, p, ReachabilityConditions().toPred(before(b)).toBoogie.simplify))
             a.body.variables.foldLeft(Some(Set()): Option[Set[BExpr]]) {
               (s, v) => {
                 relevantGammas(mustGammaResults(a.parent), v).flatMap(r => s.map(s => s ++ r.flatMap(toGamma)))
@@ -163,8 +165,8 @@ class SummaryGenerator(
         }
       })
     }).flatMap(p => {
-      Logger.debug("Simplified " + p.toString() + " into " + p.simplify().toString())
-      p.simplify() match {
+      Logger.debug("Simplified " + p.toString() + " into " + p.simplify.toString())
+      p.simplify match {
         case TrueBLiteral => None
         case p => Some[BExpr](p)
       }

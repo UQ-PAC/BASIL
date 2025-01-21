@@ -245,17 +245,21 @@ sealed trait BoolBinOp(op: String) extends BinOp {
   def opName = op
 }
 
-case object BoolEQ extends BoolBinOp("==")
+sealed trait BoolCmpOp extends BinOp
+
+case object BoolEQ extends BoolBinOp("==") with BoolCmpOp
 case object BoolNEQ extends BoolBinOp("!=")
 case object BoolAND extends BoolBinOp("&&")
 case object BoolOR extends BoolBinOp("||")
-case object BoolIMPLIES extends BoolBinOp("==>")
+case object BoolIMPLIES extends BoolBinOp("==>") with BoolCmpOp
 case object BoolEQUIV extends BoolBinOp("<==>")
 
 sealed trait BVBinOp(op: String) extends BinOp {
   override def toString: String = op
   def opName = op
 }
+
+sealed trait BVCmpOp extends BinOp
 
 case object BVAND extends BVBinOp("and")
 case object BVOR extends BVBinOp("or")
@@ -265,7 +269,7 @@ case object BVUDIV extends BVBinOp("udiv")
 case object BVUREM extends BVBinOp("urem")
 case object BVSHL extends BVBinOp("shl")
 case object BVLSHR extends BVBinOp("lshr")
-case object BVULT extends BVBinOp("ult")
+case object BVULT extends BVBinOp("ult") with BVCmpOp
 case object BVNAND extends BVBinOp("nand")
 case object BVNOR extends BVBinOp("nor")
 case object BVXOR extends BVBinOp("xor")
@@ -276,14 +280,14 @@ case object BVSDIV extends BVBinOp("sdiv")
 case object BVSREM extends BVBinOp("srem")
 case object BVSMOD extends BVBinOp("smod")
 case object BVASHR extends BVBinOp("ashr")
-case object BVULE extends BVBinOp("ule")
-case object BVUGT extends BVBinOp("ugt")
-case object BVUGE extends BVBinOp("uge")
-case object BVSLT extends BVBinOp("slt")
-case object BVSLE extends BVBinOp("sle")
-case object BVSGT extends BVBinOp("sgt")
-case object BVSGE extends BVBinOp("sge")
-case object BVEQ extends BVBinOp("==")
+case object BVULE extends BVBinOp("ule") with BVCmpOp
+case object BVUGT extends BVBinOp("ugt") with BVCmpOp
+case object BVUGE extends BVBinOp("uge") with BVCmpOp
+case object BVSLT extends BVBinOp("slt") with BVCmpOp
+case object BVSLE extends BVBinOp("sle") with BVCmpOp
+case object BVSGT extends BVBinOp("sgt") with BVCmpOp
+case object BVSGE extends BVBinOp("sge") with BVCmpOp
+case object BVEQ extends BVBinOp("==") with BVCmpOp
 case object BVNEQ extends BVBinOp("!=")
 case object BVCONCAT extends BVBinOp("++")
 
