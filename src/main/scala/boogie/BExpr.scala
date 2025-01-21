@@ -17,10 +17,10 @@ sealed trait BExpr {
   def serialiseBoogie(w: Writer): Unit = w.append(toString)
   def acceptVisit(visitor: BVisitor): BExpr = this
 
-  def simplify(): BExpr =
+  def simplify: BExpr =
     this match {
       case BinaryBExpr(BoolAND, a, b) =>
-        (a.simplify(), b.simplify()) match {
+        (a.simplify, b.simplify) match {
           case (TrueBLiteral, b) => b
           case (a, TrueBLiteral) => a
           case (FalseBLiteral, _) => FalseBLiteral
@@ -28,7 +28,7 @@ sealed trait BExpr {
           case (a, b) => BinaryBExpr(BoolAND, a, b)
         }
       case BinaryBExpr(BoolOR, a, b) =>
-        (a.simplify(), b.simplify()) match {
+        (a.simplify, b.simplify) match {
           case (TrueBLiteral, _) => TrueBLiteral
           case (_, TrueBLiteral) => TrueBLiteral
           case (FalseBLiteral, b) => b
@@ -36,9 +36,10 @@ sealed trait BExpr {
           case (a, b) => BinaryBExpr(BoolOR, a, b)
         }
       case BinaryBExpr(BoolIMPLIES, a, b) =>
-        (a.simplify(), b.simplify()) match {
+        (a.simplify, b.simplify) match {
           case (TrueBLiteral, b) => b
           case (FalseBLiteral, _) => TrueBLiteral
+          case (_, TrueBLiteral) => TrueBLiteral
           case (a, b) => BinaryBExpr(BoolIMPLIES, a, b)
         }
       case _ => this
