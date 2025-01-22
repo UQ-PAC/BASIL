@@ -52,6 +52,7 @@ class GenericLogger(
 
   def writeToFile(file: File, content: => String) = {
     if (level.id < LogLevel.OFF.id) {
+      this.debug(s"Writing $file")
       val l = deriveLogger(file.getName(), file)
       l.print(content)
       l.close()
@@ -132,13 +133,15 @@ class GenericLogger(
     writeLog(LogLevel.INFO, arg, line, file, name)
   }
 
-  def setLevel(logLevel: LogLevel, setChildren: Boolean = true): Unit = {
+  def setLevel(logLevel: LogLevel, setChildren: Boolean = true) : GenericLogger = {
+    println(s"Set level $name $logLevel")
     level = logLevel
     if (setChildren) {
       for (c <- children) {
         c.setLevel(logLevel, setChildren)
       }
     }
+    this
   }
 
   def findLoggerByName(s: String): Option[GenericLogger] = allLoggers.find(_.name == s)
@@ -159,11 +162,8 @@ def isAConsole = System.console() != null
 val Logger = GenericLogger("log", LogLevel.DEBUG, System.out, isAConsole)
 val StaticAnalysisLogger = Logger.deriveLogger("analysis", System.out)
 val SimplifyLogger = Logger.deriveLogger("simplify", System.out)
-val DebugDumpIRLogger = {
-  val l = Logger.deriveLogger("debugdumpir")
-  l.setLevel(LogLevel.OFF)
-  l
-}
+val DebugDumpIRLogger = Logger.deriveLogger("debugdumpir").setLevel(LogLevel.OFF)
+val AnalysisResultDotLogger = Logger.deriveLogger("analysis-results-dot").setLevel(LogLevel.OFF)
 val VSALogger = StaticAnalysisLogger.deriveLogger("vsa")
 val MRALogger = StaticAnalysisLogger.deriveLogger("mra")
 val SteensLogger = StaticAnalysisLogger.deriveLogger("steensgaard")

@@ -3,7 +3,7 @@ package ir
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
 import boogie.*
-import analysis.{MergedRegion}
+import analysis.{MergedRegion, Loop}
 import util.intrusive_list.*
 import translating.serialiseIL
 import eval.BitVectorEval
@@ -398,6 +398,10 @@ class Block private (
 
   def isReturn: Boolean = parent.returnBlock.contains(this)
   def isEntry: Boolean = parent.entryBlock.contains(this)
+
+  var inLoop: Set[Loop] = Set()
+  def isLoopHeader () = inLoop.exists(x => x.header == this)
+  def isLoopParticipant () = inLoop.nonEmpty
 
   def jump: Jump = _jump
 

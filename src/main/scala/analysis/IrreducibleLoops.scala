@@ -71,6 +71,15 @@ object LoopDetector {
     def reducibleTransformIR(): State = {
       this.copy(loops = LoopTransform.llvm_transform(loops.values).map(l => l.header -> l).toMap)
     }
+
+    def updateIrWithLoops() = {
+      for ((hd, l) <- loops) {
+        hd.inLoop = Set(l)
+        for (participant <- l.nodes) {
+          participant.inLoop = participant.inLoop + l
+        }
+      }
+    }
   }
 
   def identify_loops(entryBlock: Block): State = {
