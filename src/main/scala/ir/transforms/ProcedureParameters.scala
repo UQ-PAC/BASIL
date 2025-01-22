@@ -15,19 +15,43 @@ def R(n: Int) = {
   Register(s"R$n", 64)
 }
 
+
 val builtinSigs: Map[String, FunSig] = Map(
-  "#free" -> FunSig(List(R(0)), List(R(0))),
+  "free" -> FunSig(List(R(0)), List()),
+  "#free" -> FunSig(List(R(0)), List()),
   "malloc" -> FunSig(List(R(0)), List(R(0))),
+  "calloc" -> FunSig(List(R(0), R(1)), List(R(0))),
+  "realloc" -> FunSig(List(R(0), R(1)), List(R(0))),
+  "reallocarray" -> FunSig(List(R(0), R(1), R(2)), List(R(0))),
   "strlen" -> FunSig(List(R(0)), List(R(0))),
   "strchr" -> FunSig(List(R(0), R(1)), List(R(0))),
   "strlcpy" -> FunSig(List(R(0), R(1), R(2)), List(R(0))),
-  "strlcat" -> FunSig(List(R(0), R(1), R(2)), List(R(0)))
+  "strlcat" -> FunSig(List(R(0), R(1), R(2)), List(R(0))),
+  "__stack_chk_fail_16432" -> FunSig(List(), List()),
+  "__syslog_chk" -> FunSig(List(R(0)), List()),
+  "assert" -> FunSig(List(R(0)), List()),
 )
+
+
 
 def fnsigToBinding(f: FunSig) = (
   f.inArgs.map(a => LocalVar(a.name + "_in", a.getType) -> LocalVar(a.name, a.getType)),
   f.outArgs.map(a => LocalVar(a.name + "_out", a.getType) -> LocalVar(a.name, a.getType))
 )
+
+def externalIn(name: String): Map[LocalVar, Variable] = {
+  (builtinSigs.get(name)).map(fnsigToBinding).map(_._1) match  {
+    case Some(x) => x.toMap
+    case None => ((0 to 30).toSet -- (19 to 28).toSet).map(i => LocalVar(s"R${i}_in", BitVecType(64)) -> LocalVar(s"R$i", BitVecType(64))).toMap
+  }
+}
+def externalOut(name: String): Map[LocalVar, Variable] = {
+  (builtinSigs.get(name)).map(fnsigToBinding).map(_._2) match  {
+    case Some(x) => x.toMap
+    case None => ((0 to 30).toSet -- (19 to 28).toSet).map(i => LocalVar(s"R${i}_out", BitVecType(64)) -> LocalVar(s"R$i", BitVecType(64))).toMap
+  }
+}
+
 
 def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
 
@@ -122,22 +146,15 @@ class SetFormalParams(
   var mappingOutparam = Map[Procedure, Map[LocalVar, Variable]]()
   var mappingInparam = Map[Procedure, Map[LocalVar, Variable]]()
 
-  def externalIn: Map[LocalVar, Variable] = {
-    (0 to 31).map(i => LocalVar(s"R${i}_in", BitVecType(64)) -> LocalVar(s"R$i", BitVecType(64))).toMap
-  }
-  def externalOut: Map[LocalVar, Variable] = {
-    (0 to 31).map(i => LocalVar(s"R${i}_out", BitVecType(64)) -> LocalVar(s"R$i", BitVecType(64))).toMap
-  }
 
   override def vproc(p: Procedure) = {
     if (externalFunctions.contains(p.name)) {
-
-      p.formalInParam = mutable.SortedSet.from(externalIn.map(_._1))
-      p.formalOutParam = mutable.SortedSet.from(externalOut.map(_._1))
-      p.inParamDefaultBinding = immutable.SortedMap.from(externalIn)
-      p.outParamDefaultBinding = immutable.SortedMap.from(externalOut)
-      mappingInparam = mappingInparam.updated(p, externalIn)
-      mappingOutparam = mappingOutparam.updated(p, externalOut)
+      p.formalInParam = mutable.SortedSet.from(externalIn(p.procName).map(_._1))
+      p.formalOutParam = mutable.SortedSet.from(externalOut(p.procName).map(_._1))
+      p.inParamDefaultBinding = immutable.SortedMap.from(externalIn(p.procName))
+      p.outParamDefaultBinding = immutable.SortedMap.from(externalOut(p.procName))
+      mappingInparam = mappingInparam.updated(p, externalIn(p.procName))
+      mappingOutparam = mappingOutparam.updated(p, externalOut(p.procName))
       SkipChildren()
     } else {
       val (lvars, rvars) = collectVariables(p)
@@ -258,7 +275,7 @@ def inOutParams(
   p: Program,
   interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]]
 ): Map[Procedure, (Set[Variable], Set[Variable])] = {
-  val overapprox = ((0 to 31).toSet -- (19 to 28).toSet).map(i => Register(s"R${i}", 64)).toSet[Variable]
+  val overapprox = ((0 to 30).toSet -- (19 to 28).toSet).map(i => Register(s"R${i}", 64)).toSet[Variable]
   // in: live at entry & in procedure read set
 
   val readWrites = ReadWriteAnalysis.readWriteSets(p: Program).collect {
@@ -310,13 +327,6 @@ class SetActualParams(
 ) extends CILVisitor {
   // expects programs to be in single return form
   var currStmt: Option[Statement] = None
-
-  def externalIn: Map[LocalVar, Variable] = {
-    (0 to 31).map(i => LocalVar(s"R${i}_in", BitVecType(64)) -> LocalVar(s"R$i", BitVecType(64))).toMap
-  }
-  def externalOut: Map[LocalVar, Variable] = {
-    (0 to 31).map(i => LocalVar(s"R${i}_out", BitVecType(64)) -> LocalVar(s"R$i", BitVecType(64))).toMap
-  }
 
   override def vproc(p: Procedure) = {
     val incoming =
