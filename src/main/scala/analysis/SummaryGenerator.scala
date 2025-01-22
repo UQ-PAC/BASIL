@@ -176,7 +176,10 @@ class SummaryGenerator(
       }
     }).toSet.toList
 
-    val wpThing = procedure.entryBlock.flatMap(b => predDomainResults.get(b).flatMap(p => p.toBasil).map(p => eval.simplifyExprFixpoint(p)._1.toBoogie)).toList
+    val wpThing = procedure.entryBlock.flatMap(b => predDomainResults.get(b).flatMap(p =>
+        p.toBasil).map(p =>
+          eval.simplifyCondFixpoint(p)._1.toBoogie
+        )).toList
 
     mustGammasWithConditions ++ wpThing
   }
@@ -200,9 +203,9 @@ class SummaryGenerator(
 
     // TODO further explanation of this would help
     // Use rnaResults to find stack function arguments
-    val tainters = relevantVars.map {
+    val tainters = /*relevantVars.map {
       v => (v, Set())
-    }.toMap ++ getTainters(procedure, variables ++ procedure.formalInParam ++ rnaResults(IRWalk.firstInProc(procedure).get) + UnknownMemory()).filter { (variable, taints) =>
+    }.toMap ++*/ getTainters(procedure, variables ++ procedure.formalInParam ++ rnaResults(IRWalk.firstInProc(procedure).get) + UnknownMemory()).filter { (variable, taints) =>
       relevantVars.contains(variable)
     }
 
