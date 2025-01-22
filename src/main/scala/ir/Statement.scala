@@ -29,6 +29,7 @@ sealed trait Statement extends Command, IntrusiveListElement[Statement] {
   def acceptVisit(visitor: Visitor): Statement = throw new Exception(
     "visitor " + visitor + " unimplemented for: " + this
   )
+  def predecessor : Option[Command] = parent.statements.prevOption(this)
   def successor: Command = parent.statements.nextOption(this).getOrElse(parent.jump)
 }
 

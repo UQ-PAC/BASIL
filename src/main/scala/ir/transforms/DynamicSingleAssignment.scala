@@ -191,8 +191,10 @@ class OnePassDSA(
     def state(b: Block) = withDefault(_st)(b)
 
     val next = block.nextBlocks.toList
-    val anyNextFilled = next.exists(state(_).filled)
+    // any next not completed
     val anyNextPrevNotFilled = next.exists(_.prevBlocks.exists(b => !state(b).filled))
+    val incompleteSuccessor = next.exists(b => !(state(b).completed))
+    assert(anyNextPrevNotFilled == incompleteSuccessor)
     for (b <- next) {
       val definedVars = state(block).renamesAfter.keySet.intersect(liveAfter(block))
 
@@ -219,8 +221,30 @@ class OnePassDSA(
         }
         state(nb).filled = true
         state(nb).isPhi = true
-        liveBefore(nb) = liveBefore(b)
+        liveBefore(nb) = liveAfter(block)
         liveAfter(nb) = liveBefore(b)
+      } else if (definedVars.size > 0 && !incompleteSuccessor) {
+        val renamesOut = state(block).renamesAfter
+        val toCorrect = state(b).renamesBefore.filter(rn => renamesOut.get(rn._1).map(_ != rn._2).getOrElse(false))
+        if (toCorrect.nonEmpty) {
+
+          val nb = createBlockBetween(block, b, "_phi_forward_")
+          nb.rpoOrder = -1
+          state(nb).renamesBefore.addAll(state(block).renamesAfter)
+          state(nb).renamesAfter.addAll(state(b).renamesBefore)
+
+          for ((v, rn) <- toCorrect) {
+            val assign = LocalAssign(v, v, phiAssignLabel)
+            appendAssign(nb, assign)
+            renameLHS(assign, v, state(nb).renamesAfter(v))
+            renameRHS(assign, v, state(nb).renamesBefore(v))
+          }
+          state(nb).filled = true
+          state(nb).isPhi = true
+          liveBefore(nb) = liveAfter(block)
+          liveAfter(nb) = liveBefore(b)
+        }
+
       }
     }
   }

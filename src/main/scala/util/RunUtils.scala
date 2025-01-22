@@ -8,6 +8,7 @@ import spray.json.*
 import ir.eval
 import gtirb.*
 import translating.PrettyPrinter.*
+import ir.dsl.*
 
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
@@ -74,6 +75,7 @@ case class StaticAnalysisContext(
 /** Results of the main program execution.
   */
 case class BASILResult(ir: IRContext, analysis: Option[StaticAnalysisContext], boogie: ArrayBuffer[BProgram])
+
 
 /** Tools for loading the IR program into an IRContext.
   */
@@ -545,83 +547,86 @@ object RunUtils {
     }
   }
 
-  def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]) : Unit = {
+  def doSimplify(program: Program, config: Option[StaticAnalysisConfig]) : Unit = {
 
 
-    // writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
+    // writeToFile(dotBlockGraph(program, program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
     Logger.info("[!] Running Simplify")
     val timer = PerformanceTimer("Simplify")
 
-    transforms.applyRPO(ctx.program)
+    transforms.applyRPO(program)
 
     // example of printing a simple analysis
     val liveVarsDom = transforms.IntraLiveVarsDomain()
     val liveVarsSolver = transforms.worklistSolver(liveVarsDom)
-    val (beforeLive, afterLive) = liveVarsSolver.solveProgIntraProc(ctx.program, backwards = true)
+    val (beforeLive, afterLive) = liveVarsSolver.solveProgIntraProc(program, backwards = true)
     DebugDumpIRLogger.writeToFile(File(s"live-vars.il"), 
-      pp_prog_with_analysis_results(beforeLive, afterLive, ctx.program, x => s"Live vars: ${x.map(_.name).toList.sorted.mkString(", ")}"))
+      pp_prog_with_analysis_results(beforeLive, afterLive, program, x => s"Live vars: ${x.map(_.name).toList.sorted.mkString(", ")}"))
 
-    transforms.removeEmptyBlocks(ctx.program)
-    transforms.coalesceBlocks(ctx.program)
-    transforms.removeEmptyBlocks(ctx.program)
+    transforms.removeEmptyBlocks(program)
+    transforms.coalesceBlocks(program)
+    transforms.removeEmptyBlocks(program)
 
-    DebugDumpIRLogger.writeToFile(File("blockgraph-before-dsa.dot"), dotBlockGraph(ctx.program.mainProcedure))
+    DebugDumpIRLogger.writeToFile(File("blockgraph-before-dsa.dot"), dotBlockGraph(program.mainProcedure))
     
     Logger.info("[!] Simplify :: DynamicSingleAssignment")
-    DebugDumpIRLogger.writeToFile(File("il-before-dsa.il"), serialiseIL(ctx.program))
+    DebugDumpIRLogger.writeToFile(File("il-before-dsa.il"), pp_prog(program))
 
-    // transforms.DynamicSingleAssignment.applyTransform(ctx.program, liveVars)
-    transforms.OnePassDSA().applyTransform(ctx.program)
+    // transforms.DynamicSingleAssignment.applyTransform(program, liveVars)
+    transforms.OnePassDSA().applyTransform(program)
     Logger.info(s"DSA ${timer.checkPoint("DSA ")} ms ")
 
+    transforms.removeEmptyBlocks(program)
+
     AnalysisResultDotLogger.writeToFile(File(s"blockgraph-after-dsa.dot"), 
-      dotBlockGraph(ctx.program, (ctx.program.collect {
+      dotBlockGraph(program, (program.collect {
       case b : Block => b -> pp_block(b)
     }).toMap))
 
     if (ir.eval.SimplifyValidation.validate) {
       // Logger.info("Live vars difftest")
-      // val tipLiveVars : Map[CFGPosition, Set[Variable]] = analysis.IntraLiveVarsAnalysis(ctx.program).analyze()
-      // assert(ctx.program.procedures.forall(transforms.difftestLiveVars(_, tipLiveVars)))
+      // val tipLiveVars : Map[CFGPosition, Set[Variable]] = analysis.IntraLiveVarsAnalysis(program).analyze()
+      // assert(program.procedures.forall(transforms.difftestLiveVars(_, tipLiveVars)))
 
       Logger.info("DSA Check")
-      val x = ctx.program.procedures.forall(transforms.rdDSAProperty)
+      val x = program.procedures.forall(transforms.rdDSAProperty)
       assert(x)
       Logger.info("DSA Check passed")
     }
-    assert(invariant.singleCallBlockEnd(ctx.program))
-    assert(invariant.cfgCorrect(ctx.program))
-    assert(invariant.blocksUniqueToEachProcedure(ctx.program))
+    assert(invariant.singleCallBlockEnd(program))
+    assert(invariant.cfgCorrect(program))
+    assert(invariant.blocksUniqueToEachProcedure(program))
 
-    DebugDumpIRLogger.writeToFile(File("il-before-copyprop.il"), pp_prog(ctx.program))
+    DebugDumpIRLogger.writeToFile(File("il-before-copyprop.il"), pp_prog(program))
 
     // brute force run the analysis twice because it cleans up more stuff
-    //assert(ctx.program.procedures.forall(transforms.rdDSAProperty))
-    transforms.doCopyPropTransform(ctx.program)
-    AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(ctx.program.mainProcedure))
+    //assert(program.procedures.forall(transforms.rdDSAProperty))
+    AnalysisResultDotLogger.writeToFile(File("blockgraph-before-copyprop.dot"), dotBlockGraph(program.mainProcedure))
+    transforms.doCopyPropTransform(program)
+    AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
 
-    // assert(ctx.program.procedures.forall(transforms.rdDSAProperty))
+    // assert(program.procedures.forall(transforms.rdDSAProperty))
 
-    assert(invariant.blockUniqueLabels(ctx.program))
+    assert(invariant.blockUniqueLabels(program))
     Logger.info(s"CopyProp ${timer.checkPoint("Simplify")} ms ")
-    DebugDumpIRLogger.writeToFile(File("il-after-copyprop.il"), pp_prog(ctx.program))
+    DebugDumpIRLogger.writeToFile(File("il-after-copyprop.il"), pp_prog(program))
 
 
-    // val x = ctx.program.procedures.forall(transforms.rdDSAProperty)
+    // val x = program.procedures.forall(transforms.rdDSAProperty)
     //assert(x)
     if (ir.eval.SimplifyValidation.validate) {
       Logger.info("DSA Check (after transform)")
-      val x = ctx.program.procedures.forall(transforms.rdDSAProperty)
+      val x = program.procedures.forall(transforms.rdDSAProperty)
       assert(x)
       Logger.info("DSA Check succeeded")
     }
 
     // run this after cond recovery because sign bit calculations often need high bits
     // which go away in high level conss
-    DebugDumpIRLogger.writeToFile(File("il-after-slices.il"), pp_prog(ctx.program))
+    DebugDumpIRLogger.writeToFile(File("il-after-slices.il"), pp_prog(program))
 
     // re-apply dsa
-    // transforms.OnePassDSA().applyTransform(ctx.program)
+    // transforms.OnePassDSA().applyTransform(program)
 
 
     if (ir.eval.SimplifyValidation.validate) {
@@ -682,7 +687,7 @@ object RunUtils {
         ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
       }
 
-      doSimplify(ctx, conf.staticAnalysis)
+      doSimplify(ctx.program, conf.staticAnalysis)
     }
 
     if (q.runInterpret) {
