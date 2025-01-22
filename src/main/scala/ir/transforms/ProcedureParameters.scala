@@ -176,6 +176,8 @@ object ReadWriteAnalysis {
   case class RWSet(reads: Set[Variable], writes: Set[Variable]) extends RW
   case object Top extends RW
 
+  def onlyGlobal(r: RWSet) = r.copy(reads = r.reads.filterNot(_.isInstanceOf[LocalVar]), writes = r.writes.filterNot(_.isInstanceOf[LocalVar]))
+
   type st = Map[Procedure, RW]
 
   def addReads(r: Iterable[Variable])(i: RW) = {
@@ -261,7 +263,7 @@ def inOutParams(
 
   val readWrites = ReadWriteAnalysis.readWriteSets(p: Program).collect {
     case (p, None)    => (p, ReadWriteAnalysis.RWSet(overapprox, overapprox))
-    case (p, Some(x)) => (p, x)
+    case (p, Some(x)) => (p, ReadWriteAnalysis.onlyGlobal(x))
   }
 
   val procEnd = p.procedures.map { case p =>
@@ -353,7 +355,7 @@ class SetActualParams(
   override def vjump(j: Jump) = {
     j match {
       case r: Return => {
-        r.outParams = SortedMap.from(r.parent.parent.outParamDefaultBinding)
+        r.outParams = SortedMap.from(outBinding(r.parent.parent))
         DoChildren()
       }
       case _ => DoChildren()

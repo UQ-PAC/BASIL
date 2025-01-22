@@ -4,7 +4,7 @@ import util.Logger
 import ir.cilvisitor.*
 import ir.*
 
-class ReplaceReturns extends CILVisitor {
+class ReplaceReturns(assertR30Addr : Boolean = true) extends CILVisitor {
 
   /** Assumes IR with 1 call per block which appears as the last statement.
     */
@@ -15,13 +15,17 @@ class ReplaceReturns extends CILVisitor {
         if (j.parent.jump.isInstanceOf[Unreachable | Return]) {
           j.parent.replaceJump(Return())
           val R30Begin = LocalVar("R30_begin", BitVecType(64))
-          ChangeTo(List(Assert(BinaryExpr(BVEQ, r30, R30Begin))))
+          if (assertR30Addr) {
+            ChangeTo(List(Assert(BinaryExpr(BVEQ, r30, R30Begin), Some("is returning to caller-set R30"))))
+          } else {
+            ChangeTo(List())
+          }
         } else {
           SkipChildren()
         }
       }
       case d : DirectCall  => {
-        (d.predecessor, d.successor) match {
+        (d.predecessor, d.parent.jump) match {
           case (Some(l : LocalAssign), _) if l.lhs.name == "R30" => SkipChildren()
           case (Some(_), _: Unreachable) if d.target == d.parent.parent => {
             // recursive tailcall
@@ -32,14 +36,13 @@ class ReplaceReturns extends CILVisitor {
               d
             ))
           }
-          case (Some(_), _: Unreachable) => {
+          case (_, _: Unreachable) => {
             val R30Begin = LocalVar("R30_begin", BitVecType(64))
             d.parent.replaceJump(Return())
             ChangeTo(List(
               Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin)),
               d
             ))
-            SkipChildren()
           }
           case _ => SkipChildren()
         }

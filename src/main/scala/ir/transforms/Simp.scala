@@ -360,6 +360,7 @@ class CleanupAssignments() extends CILVisitor {
 
 }
 
+
 def copypropTransform(p: Procedure) = {
   val t = util.PerformanceTimer(s"simplify ${p.name} (${p.blocks.size} blocks)")
   // val dom = ConstCopyProp()
@@ -380,6 +381,7 @@ def copypropTransform(p: Procedure) = {
     visit_proc(condVis, p)
 
   }
+  // visit_proc(CopyProp.BlockyProp(), p)
 
   val xf = t.checkPoint("transform")
   // SimplifyLogger.info(s"    ${p.name} after transform expr complexity ${ExprComplexity()(p)}")
@@ -589,6 +591,65 @@ object CCP {
 }
 
 object CopyProp {
+
+  class BlockyProp() extends CILVisitor {
+    /* Flow-sensitive intra-block copyprop */
+
+    var st = Map[Variable, Expr]()
+
+    def subst(e: Expr) : Expr = {
+      simplifyExprFixpoint(Substitute(
+        v =>  st.get(v).filter(isTrivial),
+        true
+      )(e).getOrElse(e))(0)
+    }
+
+    override def vblock(b: Block) = {
+      st = Map()
+      DoChildren()
+    }
+
+    override def vstmt(s: Statement) = {
+      s match {
+        case l : LocalAssign => {
+          val nrhs = subst(l.rhs)
+          st = st.removedAll(st.keys)
+          st = st.updated(l.lhs, nrhs)
+          l.rhs = nrhs 
+          SkipChildren()
+        }
+        case x : Assert => {
+          x.body = subst(x.body)
+          SkipChildren()
+        }
+        case x : Assume => {
+          x.body = subst(x.body)
+          SkipChildren()
+        }
+        case x: DirectCall => {
+          x.actualParams = x.actualParams.map((l,r) => (l, subst(r)))
+          val lhs = x.outParams.map(_._2)
+          st = st.removedAll(lhs)
+          SkipChildren()
+        }
+        case d : MemoryLoad => {
+          d.index = subst(d.index)
+          st = st.removed(d.lhs)
+          SkipChildren()
+        }
+        case d : MemoryStore => {
+          d.index = subst(d.index)
+          d.value = subst(d.value)
+          SkipChildren()
+        } 
+        case x: IndirectCall => {
+          st = Map()
+          SkipChildren()
+        }
+        case _ : NOP => SkipChildren()
+      }
+    }
+  }
 
 
   def isFlagVar(l: Variable) = {

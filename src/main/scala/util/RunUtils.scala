@@ -589,17 +589,17 @@ object RunUtils {
       val x = program.procedures.forall(transforms.rdDSAProperty)
       assert(x)
       Logger.info("DSA Check passed")
+      assert(invariant.singleCallBlockEnd(program))
+      assert(invariant.cfgCorrect(program))
+      assert(invariant.blocksUniqueToEachProcedure(program))
     }
-    assert(invariant.singleCallBlockEnd(program))
-    assert(invariant.cfgCorrect(program))
-    assert(invariant.blocksUniqueToEachProcedure(program))
 
     DebugDumpIRLogger.writeToFile(File("il-before-copyprop.il"), pp_prog(program))
 
     // brute force run the analysis twice because it cleans up more stuff
     //assert(program.procedures.forall(transforms.rdDSAProperty))
     AnalysisResultDotLogger.writeToFile(File("blockgraph-before-copyprop.dot"), dotBlockGraph(program.mainProcedure))
-    transforms.doCopyPropTransform(program)
+    Logger.info("Copyprop Start")
     transforms.doCopyPropTransform(program)
     AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
 

@@ -321,16 +321,16 @@ class BasilIRPrettyPrinter(with_analysis_results_begin: Block => Option[String] 
   }
 
   override def vcall(
-    outParams: List[(Variable, PPProg[Expr])],
+    outParams: List[(Variable, Variable)],
     procname: String,
     inparams: List[(Variable, PPProg[Expr])]
   ): PPProg[DirectCall] = {
 
     val op = {
-      if (outParams.forall(_._1.isInstanceOf[LocalVar])) {
-        "var (" + outParams.map((l, r) => vparam(l)).mkString(", ") + ")"
+      if (outParams.forall(_._2.isInstanceOf[LocalVar])) {
+        "var (" + outParams.map((l, r) => vparam(r)).mkString(", ") + ")"
       } else {
-        "(" + outParams.map((l, r) => vlvar(l)).mkString(", ") + ")"
+        "(" + outParams.map((l, r) => vlvar(r)).mkString(", ") + ")"
       }
     }
 
