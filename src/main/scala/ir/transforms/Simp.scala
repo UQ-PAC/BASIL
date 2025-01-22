@@ -622,7 +622,7 @@ object CopyProp {
       s match {
         case a: MemoryLoad => clobberFull(state, a.lhs)
         case a: LocalAssign if !state.contains(a.lhs) && flagDeps.contains(a.lhs) => {
-          val r = canPropTo(state, a.rhs, true).get
+          val (r,deps) = canPropTo(state, a.rhs, true).get
           state(a.lhs) = PropState(r, mutable.Set.from(r.variables), false, 0, true)
         }
         case a: LocalAssign if state.contains(a.lhs) && state(a.lhs).clobbered => {
@@ -637,7 +637,9 @@ object CopyProp {
           clobberFull(state, a.lhs)
         }
         case a: LocalAssign if state.contains(a.lhs) => {
-          state(a.lhs) = state(a.lhs).copy(e = canPropTo(state, a.rhs, true).get)
+          val (ne, deps) = canPropTo(state, a.rhs, true).get
+          state(a.lhs).e = ne
+          state(a.lhs).deps.addAll(deps)
         }
         case i: IndirectCall => {
           poisoned = true
@@ -662,6 +664,15 @@ object CopyProp {
   }
 
   def clobberFull(c: mutable.HashMap[Variable, PropState], l: Variable): Unit = {
+    clobberOne(c, l)
+    for (v <- c.keys) {
+      if (c(v).deps.contains(l)) {
+        clobberOne(c, v)
+      }
+    }
+  }
+
+  def clobberOne(c: mutable.HashMap[Variable, PropState], l: Variable): Unit = {
     if (c.contains(l) && !c(l).clobbered) {
       c(l).clobbered = true
     } else if (!c.contains(l)) {
@@ -680,43 +691,37 @@ object CopyProp {
     case _                                       => false
   }
 
-  def canPropTo(s: mutable.HashMap[Variable, PropState], e: Expr, isFlag: Boolean = false): Option[Expr] = {
+  def canPropTo(s: mutable.HashMap[Variable, PropState], e: Expr, isFlag: Boolean = false): Option[(Expr, Set[Variable])] = {
 
     def proped(e: Expr) = {
-      //val ne =
-      //  if e.variables.size > 1 && !isFlag then Some(e)
-      //  else
-      //    Substitute(
-      //      v => {
-      //        s.get(v) match {
-      //          case Some(vs) if !vs.clobbered => Some(vs.e)
-      //          case _                         => None
-      //        }
-      //      },
-      //      true
-      //    )(e)
-      val ne = Some(e)
+      var deps = Set[Variable]() ++ e.variables
+      val ne =
+        if e.variables.size > 1 && !isFlag then Some(e)
+        else
+          Substitute(
+            v => {
+              s.get(v) match {
+                case Some(vs) if !vs.clobbered => {
+                  deps = deps ++ vs.deps + v
+                  Some(vs.e)
+                }
+                case _                         => None
+              }
+            },
+            true
+          )(e)
 
       // partial eval after prop
-      simplifyExprFixpoint(ne.getOrElse(e))._1
+      (simplifyExprFixpoint(ne.getOrElse(e))._1, deps)
     }
 
-    def propfp(e: Expr) = {
-      var o = e
-      var p = proped(e)
 
-      while (o != p) {
-        o = p
-        p = proped(o)
-      }
-      p
-    }
-
-    proped(e) match {
-      case l: Literal                                 => Some(l)
-      case l: Variable                                => Some(l)
-      case e @ BinaryExpr(o, v: Variable, c: Literal) => Some(e)
-      case e: Expr if isFlag || e.variables.size <= 1 => Some(e)
+    val (p, deps) = proped(e)
+    p match {
+      case l: Literal                                 => Some(l, deps)
+      case l: Variable                                => Some(l, deps)
+      case e @ BinaryExpr(o, v: Variable, c: Literal) => Some(e, deps)
+      case e: Expr if isFlag || e.variables.size <= 1 => Some(e, deps)
       case e                                          => None
     }
   }
@@ -745,20 +750,15 @@ object CopyProp {
           val existing = c.get(l)
 
           (prop, existing) match {
-            case (Some(evaled), None) => {
-              c(l) = PropState(evaled, mutable.Set.from(evaled.variables), false, 0, isFlagDep)
+            case (Some(evaled, deps), None) => {
+              c(l) = PropState(evaled, mutable.Set.from(deps), false, 0, isFlagDep)
             }
             case (_, Some(ps)) if ps.clobbered => {
-              clobberFull(c, l)
+              ()
             }
-            case (Some(evaled), Some(ps))
-                if (canPropTo(c, ps.e, isFlagDep).contains(evaled)) => {
-              if (c(l).e != evaled) {
-                c(l) = c(l).copy(e = evaled)
-              }
-            }
-            case (Some(evaled), Some(ps)) => {
-              clobberFull(c, l)
+            case (Some(evaled, deps), Some(ps))  if ps.e == r || ps.e == evaled || (canPropTo(c, ps.e, isFlagDep).contains(evaled)) => {
+                c(l).e = evaled
+                c(l).deps.addAll(deps)
             }
             case _ => {
               // ps.e != evaled and have prop
