@@ -173,10 +173,11 @@ object Main {
       }
     }
 
-    if (conf.analysisResults.isDefined || conf.analysisResultsDot.isDefined) {
+    if (conf.analysisResults.isDefined || conf.dumpIL.isDefined) {
       DebugDumpIRLogger.setLevel(LogLevel.INFO)
-    } else {
-      DebugDumpIRLogger.setLevel(LogLevel.OFF)
+    }
+    if (conf.analysisResultsDot.isDefined) {
+      AnalysisResultDotLogger.setLevel(LogLevel.INFO)
     }
 
     val rely = conf.procedureRG match {

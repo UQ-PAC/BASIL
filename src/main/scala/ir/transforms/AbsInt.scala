@@ -85,7 +85,7 @@ class DomainWithFunctionSummaries[L, Summary](d: AbstractDomain[L],
     }
 }
 
-trait ProcedureSummaryGenerator[L, LocalDomain] extends GenericAbstractDomain[Procedure, Procedure, L] {
+trait ProcedureSummaryGenerator[L, LocalDomain] extends ProcAbstractDomain[L] {
   def localTransferCall(l: LocalDomain, summaryForTarget: L, p: DirectCall) : LocalDomain
   def updateSummary(prevSummary: L, p: Procedure,  resBefore: Map[Block, LocalDomain], resAfter: Map[Block, LocalDomain]) : L
 }
