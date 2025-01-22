@@ -72,7 +72,6 @@ case class StaticAnalysisContext(
   steensgaardResults: Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]],
   mmmResults: MemoryModelMap,
   reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-  varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
   regionInjector: Option[RegionInjector],
   symbolicAddresses: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
   localDSA: Map[Procedure, Graph],
@@ -472,17 +471,6 @@ object StaticAnalysis {
       )
     }
 
-    StaticAnalysisLogger.debug("[!] Variable dependency summaries")
-    val scc = stronglyConnectedComponents(CallGraph, List(IRProgram.mainProcedure))
-    val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
-    val varDepsSummaries = VariableDependencyAnalysis(
-      IRProgram,
-      ctx.specification.globals,
-      specGlobalAddresses,
-      interProcConstPropResult,
-      scc
-    ).analyze()
-
     val intraProcConstProp = IntraProcConstantPropagation(IRProgram)
     val intraProcConstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] =
       intraProcConstProp.analyze()
@@ -642,7 +630,6 @@ object StaticAnalysis {
       mmmResults = mmm,
       symbolicAddresses = Map.empty,
       reachingDefs = reachingDefinitionsAnalysisResults,
-      varDepsSummaries = varDepsSummaries,
       regionInjector = None,
       localDSA = Map.empty,
       bottomUpDSA = Map.empty,
@@ -957,7 +944,7 @@ object RunUtils {
     }
 
     if (conf.staticAnalysis.map(_.summariseProcedures).getOrElse(false)) {
-      StaticAnalysisLogger.debug("[!] Variable dependency summaries again :(((((((((")
+      StaticAnalysisLogger.debug("[!] Variable dependency summaries")
       val scc = stronglyConnectedComponents(CallGraph, List(ctx.program.mainProcedure))
       val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
       val varDepsSummaries = VariableDependencyAnalysis(ctx.program, ctx.specification.globals, specGlobalAddresses, analysis.get.interProcConstProp, scc).analyze()

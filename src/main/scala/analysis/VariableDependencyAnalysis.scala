@@ -141,15 +141,20 @@ class VariableDependencyAnalysis(
       {
         StaticAnalysisLogger.debug("Generating variable dependencies for " + procedure)
         var varDepResults = ProcVariableDependencyAnalysis(program, varDepVariables, globals, constProp, varDepsSummariesTransposed, procedure).analyze()
+        StaticAnalysisLogger.debug(varDepResults)
         // Do one last step to taint output parameters because i can't get the IDE solver to do it :(
         IRWalk.lastInProc(procedure) match {
           case Some(ret: Return) => {
-            val finalResults = varDepResults.getOrElse(ret, Map())
-            varDepResults += ret -> ret.outParams.foldLeft(varDepResults.getOrElse(ret, Map())) {
-              (m, p) => {
-                val (o, e) = p
-                m + (o -> e.variables.foldLeft(Set[Taintable]())((s, v) => s.union(finalResults.getOrElse(v, Set()))))
+            varDepResults.get(ret) match {
+              case Some(finalResults) => {
+                varDepResults += ret -> ret.outParams.foldLeft(finalResults) {
+                  (m, p) => {
+                    val (o, e) = p
+                    m + (o -> e.variables.foldLeft(Set[Taintable]())((s, v) => s.union(finalResults.getOrElse(v, Set()))))
+                  }
+                }
               }
+              case _ => {}
             }
           }
           case _ => {}
