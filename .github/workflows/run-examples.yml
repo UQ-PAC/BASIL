@@ -8,7 +8,7 @@ on:
       - main
   workflow_dispatch:
 jobs:
-  CompileAndTest:
+  Compile:
     runs-on: ubuntu-latest
     container:
       # Requires repo to have action access in package settings
@@ -20,16 +20,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Compile BASIL 
+      - name: Compile BASIL Mill
         run: ./mill compile
 
-      - name: Bitvec Tests
-        run: ./mill test.testOnly BitVectorAnalysisTests
 
-      - name: IntrusiveListTest
-        run: ./mill test.testOnly '*IntrusiveListPublicInterfaceTest'
-
-  SystemTests:
+  StandardSystemTests:
     runs-on: ubuntu-latest
     container:
       # Requires repo to have action access in package settings
@@ -90,9 +85,10 @@ jobs:
         # omitting because failing or incorrect:
         # MemoryRegionTestsDSA MemoryRegionTestsNoRegion UnimplementedTests ExtraSpecTests IndirectCallTests PointsToTest
 
-        # omitting because run elsewhere:
-        # BitVectorAnalysisTests IntrusiveListPublicInterfaceTest
-
+      - run: ./mill test.testOnly BitVectorAnalysisTests
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly '*IntrusiveListPublicInterfaceTest'
+        if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly util.intrusive_list.IntrusiveListTest 
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly DataStructureAnalysisTest
@@ -116,7 +112,20 @@ jobs:
       - run: ./mill test.testOnly TaintAnalysisTests
         if: ${{ ! cancelled() }}
 
-        # slower tests run at end
+  AnalysisSystemTests:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/uq-pac/basil-dev:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.github_token }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./mill test.compile
+
+      - run: echo "All systemtest suites:" & ./mill test.testOnly '*SystemTests*' -- -z 'xxxx'
+
       - run: ./mill test.testOnly DSAMemoryRegionSystemTestsBAP
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly DSAMemoryRegionSystemTestsGTIRB
