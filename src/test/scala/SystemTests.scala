@@ -20,6 +20,8 @@ trait SystemTests extends AnyFunSuite, BASILTest {
     val toCsv = s"$name,$passed,$verified,$shouldVerify,$hasExpected,$timedOut,$matchesExpected,$translateTime,$verifyTime"
   }
 
+  Logger.setLevel(LogLevel.WARN)
+
   object TestResult {
     val csvHeader = "testCase,passed,verified,shouldVerify,hasExpected,timedOut,matchesExpected,translateTime,verifyTime"
   }

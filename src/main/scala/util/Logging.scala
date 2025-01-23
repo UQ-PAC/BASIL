@@ -134,7 +134,6 @@ class GenericLogger(
   }
 
   def setLevel(logLevel: LogLevel, setChildren: Boolean = true) : GenericLogger = {
-    println(s"Set level $name $logLevel")
     level = logLevel
     if (setChildren) {
       for (c <- children) {

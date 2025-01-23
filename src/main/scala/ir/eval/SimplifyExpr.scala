@@ -82,8 +82,8 @@ def simplifyCondVis = SimpExpr(
     sequenceSimp(simpFixedPoint(SimpExpr(simpFixedPoint(simplifyCmpInequalities)).apply), simplifyExprVis.apply)
   )
 )
-def simplifyExprFixpoint = simplifyExprVis.apply
-def simplifyCondFixpoint = simplifyCondVis.apply
+def simplifyExprFixpoint = simpFixedPoint(simplifyExprVis.apply)
+def simplifyCondFixpoint = simpFixedPoint(simplifyCondVis.apply)
 
 object AssumeConditionSimplifications extends CILVisitor {
   override def vstmt(s: Statement) = s match {

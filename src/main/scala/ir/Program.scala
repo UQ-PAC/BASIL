@@ -221,6 +221,8 @@ class Procedure private (
 
   def makeCall(label: Option[String] = None) = DirectCall(this, label, outParamDefaultBinding, inParamDefaultBinding)
 
+  var isExternal : Option[Boolean] = None
+
   def iterator: Iterator[CFGPosition] = {
     ILUnorderedIterator(Seq(this))
   }

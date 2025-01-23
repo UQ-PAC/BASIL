@@ -20,6 +20,10 @@ object PrettyPrinter {
     BasilIRPrettyPrinter(with_analysis_results_begin=block => before.get(block).map(resultPrinter), block => after.get(block).map(resultPrinter))(p)
   }
 
+  def pp_block_with_analysis_results[T](before: Map[Block, T], after: Map[Block, T], p: Block, resultPrinter: T => String = ((x : T) => x.toString)) = {
+    BasilIRPrettyPrinter(with_analysis_results_begin=block => before.get(block).map(resultPrinter), block => after.get(block).map(resultPrinter))(p)
+  }
+
 }
 
 def indent(s: String, indent: String = "  "): String = {
@@ -321,16 +325,16 @@ class BasilIRPrettyPrinter(with_analysis_results_begin: Block => Option[String] 
   }
 
   override def vcall(
-    outParams: List[(Variable, PPProg[Expr])],
+    outParams: List[(Variable, Variable)],
     procname: String,
     inparams: List[(Variable, PPProg[Expr])]
   ): PPProg[DirectCall] = {
 
     val op = {
-      if (outParams.forall(_._1.isInstanceOf[LocalVar])) {
-        "var (" + outParams.map((l, r) => vparam(l)).mkString(", ") + ")"
+      if (outParams.forall(_._2.isInstanceOf[LocalVar])) {
+        "var (" + outParams.map((l, r) => vparam(r)).mkString(", ") + ")"
       } else {
-        "(" + outParams.map((l, r) => vlvar(l)).mkString(", ") + ")"
+        "(" + outParams.map((l, r) => vlvar(r)).mkString(", ") + ")"
       }
     }
 
