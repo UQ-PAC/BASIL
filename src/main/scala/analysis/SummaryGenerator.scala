@@ -1,6 +1,6 @@
 package analysis
 
-import util.Logger
+import util.ProcedureSummariesLogger as Logger
 
 import analysis.*
 import ir.*
@@ -133,11 +133,11 @@ class SummaryGenerator(
   def generateRequires(procedure: Procedure): List[BExpr] = {
     if procedure.blocks.isEmpty then return List()
 
-    val mustGammaDomain = MustGammaDomain(globals, constProp)
-    val predDomain = PredicateDomain()
     val initialState = LatticeMap.TopMap((variables ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+    val mustGammaDomain = MustGammaDomain(globals, constProp, initialState)
+    val predDomain = PredicateDomain()
     reversePostOrder(procedure)
-    val (_, mustGammaResults) = worklistSolver(MustGammaDomain(globals, constProp)).solveProc(procedure, false)
+    val (_, mustGammaResults) = worklistSolver(MustGammaDomain(globals, constProp, initialState)).solveProc(procedure, false)
     val (before, after) = worklistSolver(ReachabilityConditions()).solveProc(procedure, false)
     val (predDomainResults, _) = worklistSolver(predDomain).solveProc(procedure, true)
     Logger.debug(predDomainResults.map((a, b) => (a, eval.simplifyExprFixpoint(b.simplify.toBasil.get)._1.toBoogie)))
@@ -211,7 +211,7 @@ class SummaryGenerator(
     Logger.debug(relevantVars)
     Logger.debug(tainters)
 
-    tainters.toList.flatMap {
+    val taintPreds = tainters.toList.flatMap {
       (variable, taints) => {
         // If our variable was tainted by memory that we know nothing about, it is sound to assume that we
         // know nothing about its gamma in the post state.
@@ -249,5 +249,12 @@ class SummaryGenerator(
           }
       }
     }
+
+    val intervalDomain = DoubleIntervalDomain()
+    val (before, after) = worklistSolver(intervalDomain).solveProc(procedure)
+
+    Logger.debug(after)
+
+    taintPreds
   }
 }

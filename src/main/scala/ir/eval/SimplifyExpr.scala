@@ -1216,13 +1216,11 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
     case BinaryExpr(BoolIMPLIES, x, FalseLiteral) => logSimp(e, UnaryExpr(BoolNOT, x))
     case BinaryExpr(BoolIMPLIES, x, y) if x == y => logSimp(e, TrueLiteral)
 
-    case BinaryExpr(BoolOR, UnaryExpr(BoolNOT, a), b) => logSimp(e, BinaryExpr(BoolIMPLIES, a, b))
-    case BinaryExpr(BoolOR, a, UnaryExpr(BoolNOT, b)) => logSimp(e, BinaryExpr(BoolIMPLIES, b, a))
-
     // double negation
     case UnaryExpr(BVNOT, UnaryExpr(BVNOT, body)) => logSimp(e, body)
     case UnaryExpr(BVNEG, UnaryExpr(BVNEG, body)) => logSimp(e, body)
     case UnaryExpr(BoolNOT, UnaryExpr(BoolNOT, body)) => logSimp(e, body)
+    case BinaryExpr(BoolIMPLIES, UnaryExpr(BoolNOT, a), b) => logSimp(e, BinaryExpr(BoolOR, a, b))
 
     // syntactic equality
     case BinaryExpr(BVEQ, a, b) if a == b => logSimp(e, TrueLiteral)
@@ -1276,6 +1274,9 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
       logSimp(e, BinaryExpr(BoolAND, BinaryExpr(BoolOR, b, c), a))
     case BinaryExpr(BoolOR, BinaryExpr(BoolAND, a, b), BinaryExpr(BoolAND, c, d)) if b == d =>
       logSimp(e, BinaryExpr(BoolAND, BinaryExpr(BoolOR, a, c), b))
+
+    //case BinaryExpr(BoolOR, UnaryExpr(BoolNOT, a), b) => logSimp(e, BinaryExpr(BoolIMPLIES, a, b))
+    //case BinaryExpr(BoolOR, a, UnaryExpr(BoolNOT, b)) => logSimp(e, BinaryExpr(BoolIMPLIES, b, a))
 
     case r => {
       didAnything = false

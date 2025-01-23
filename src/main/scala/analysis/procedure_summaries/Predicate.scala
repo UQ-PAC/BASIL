@@ -78,7 +78,6 @@ enum GammaTerm {
   case Var(v: Variable)
   case OldVar(v: Variable)
   case Uop(op: BoolUnOp, x: GammaTerm)
-  case Bop(op: BoolBinOp, x: GammaTerm, y: GammaTerm)
   case Join(s: Set[GammaTerm])
 
   private var simplified: Boolean = false
@@ -90,7 +89,6 @@ enum GammaTerm {
     case Var(v) => v.toGamma
     case OldVar(v) => Old(v.toGamma)
     case Uop(op, x) => UnaryBExpr(op, x.toBoogie)
-    case Bop(op, x, y) => BinaryBExpr(op, x.toBoogie, y.toBoogie)
     case Join(s) => s.foldLeft(TrueBLiteral: BExpr) {
       (p, g) => BinaryBExpr(BoolAND, p, g.toBoogie)
     }
@@ -101,7 +99,6 @@ enum GammaTerm {
     case Var(v) => Some(LocalVar(s"Gamma_${v.name}", BoolType))
     case OldVar(v) => None
     case Uop(op, x) => x.toBasil.map(x => UnaryExpr(op, x))
-    case Bop(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
     case Join(s) => s.foldLeft(Some(TrueLiteral): Option[Expr]) {
       (p, g) => g.toBasil.flatMap(g => p.map(p => BinaryExpr(BoolAND, p, g)))
     }
@@ -112,39 +109,12 @@ enum GammaTerm {
     case Var(v) => Set(v)
     case OldVar(v) => Set(v)
     case Uop(_, x) => x.vars
-    case Bop(_, x, y) => x.vars ++ y.vars
     case Join(s) => s.foldLeft(Set()) { (s, g) => s ++ g.vars }
   }
 
   def simplify: GammaTerm = {
     if this.simplified then return this
     val ret = this match {
-      case Bop(BoolAND, a, b) =>
-        (a.simplify, b.simplify) match {
-          case (Lit(TrueLiteral), b) => b
-          case (a, Lit(TrueLiteral)) => a
-          case (Lit(FalseLiteral), _) => Lit(FalseLiteral)
-          case (_, Lit(FalseLiteral)) => Lit(FalseLiteral)
-          case (Join(a), Join(b)) => Join(a ++ b)
-          case (Join(a), b) => Join(a + b)
-          case (a, Join(b)) => Join(b + a)
-          case (a, b) => Join(Set(a, b))
-        }
-      case Bop(BoolOR, a, b) =>
-        (a.simplify, b.simplify) match {
-          case (Lit(TrueLiteral), _) => Lit(TrueLiteral)
-          case (_, Lit(TrueLiteral)) => Lit(TrueLiteral)
-          case (Lit(FalseLiteral), b) => b
-          case (a, Lit(FalseLiteral)) => a
-          case (a, b) => Bop(BoolOR, a, b)
-        }
-      case Bop(BoolIMPLIES, a, b) =>
-        (a.simplify, b.simplify) match {
-          case (Lit(TrueLiteral), b) => b
-          case (Lit(FalseLiteral), _) => Lit(TrueLiteral)
-          case (_, Lit(TrueLiteral)) => Lit(TrueLiteral)
-          case (a, b) => Bop(BoolIMPLIES, a, b)
-        }
       case Join(s) => {
         val set = s.map(g => g.simplify)
         if set.size == 1 then s.head else {
@@ -158,10 +128,6 @@ enum GammaTerm {
       }
       case _ => this
     }
-    ret match {
-      case Join(s) => println(s)
-      case _ => {}
-    }
     ret.simplified = true
     ret
   }
@@ -172,7 +138,6 @@ enum GammaTerm {
     case Var(v) => this
     case OldVar(v) => this
     case Uop(op, x) => Uop(op, x.replace(prev, cur))
-    case Bop(op, x, y) => Bop(op, x.replace(prev, cur), y.replace(prev, cur))
     case Join(s) => Join(s.map(g => g.replace(prev, cur)))
   }
 }
@@ -287,7 +252,7 @@ def exprToGammaTerm(e: Expr): Option[GammaTerm] = e match {
   case b: BitVecLiteral => Some(GammaTerm.Lit(TrueLiteral))
   case v: Variable => Some(GammaTerm.Var(v))
   case UnaryExpr(op: BVUnOp, arg) => exprToGammaTerm(arg)
-  case BinaryExpr(op: BVBinOp, arg1, arg2) => exprToGammaTerm(arg1).flatMap(x => exprToGammaTerm(arg2).map(y => GammaTerm.Bop(BoolAND, x, y)))
+  case BinaryExpr(op: BVBinOp, arg1, arg2) => exprToGammaTerm(arg1).flatMap(x => exprToGammaTerm(arg2).map(y => GammaTerm.Join(Set(x, y))))
   case Extract(end, start, body) => exprToGammaTerm(body)
   case Repeat(repeats, body) => exprToGammaTerm(body)
   case ZeroExtend(extension, body) => exprToGammaTerm(body)

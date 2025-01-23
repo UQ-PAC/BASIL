@@ -1,6 +1,5 @@
 package analysis
 
-import analysis.*
 import boogie.*
 import ir.*
 import ir.transforms.{AbstractDomain, worklistSolver}
@@ -8,6 +7,69 @@ import ir.transforms.{AbstractDomain, worklistSolver}
 type VarGammaMap = LatticeMap[Taintable, LatticeSet[Taintable]]
 
 implicit val taintableLatticeSetTerm: LatticeSet[Taintable] = LatticeSet.Bottom()
+
+/**
+ */
+class MayGammaDomain(
+  initialState: VarGammaMap,
+) extends MapDomain[Taintable, LatticeSet[Taintable]] {
+  import LatticeMap.{Top, Bottom, TopMap, BottomMap}
+
+  private val ls = LatticeSetLattice[Taintable]()
+  private val l = LatticeMapLattice[Taintable, LatticeSet[Taintable], LatticeSetLattice[Taintable]](ls)
+
+  def joinTerm(a: LatticeSet[Taintable], b: LatticeSet[Taintable], pos: Block): LatticeSet[Taintable] = a.union(b)
+
+  def transfer(m: VarGammaMap, c: Command): VarGammaMap = {
+    c match {
+      case c: LocalAssign  => m + (c.lhs -> c.rhs.variables.foldLeft(LatticeSet.Bottom())((s, v) => s.union(m(v))))
+      case c: MemoryLoad   => m + (c.lhs -> ls.top)
+      case c: MemoryStore  => m
+      case c: Assume       => m
+      case c: Assert       => m
+      case c: IndirectCall => l.top
+      case c: DirectCall   => l.top
+      case c: GoTo         => m
+      case c: Return       => m
+      case c: Unreachable  => m
+      case c: NOP          => m
+    }
+  }
+
+  override def init(b: Block): LatticeMap[Taintable, LatticeSet[Taintable]] = {
+    if Some(b) == b.parent.entryBlock then initialState else bot
+  }
+
+  def topTerm: LatticeSet[Taintable] = ls.top
+  def botTerm: LatticeSet[Taintable] = ls.bottom
+
+  def toPred(x: VarGammaMap): Predicate = x match {
+    case Top() => Predicate.Lit(TrueLiteral)
+    case TopMap(m) => m.foldLeft(Predicate.Lit(TrueLiteral)) {
+      (p, z) => {
+        val (v, s) = z
+        (v, s) match {
+          case (v: Variable, LatticeSet.FiniteSet(s)) => {
+            val g = s.foldLeft(Some(GammaTerm.Lit(TrueLiteral))) {
+              (q: Option[GammaTerm], t) => (q, t) match {
+                case (Some(q), v: Variable) => Some(GammaTerm.Join(Set(q, GammaTerm.OldVar(v))))
+                case _ => None
+              }
+            }
+            g match {
+              case Some(g) => Predicate.Bop(BoolAND, p, Predicate.GammaCmp(BoolIMPLIES, GammaTerm.Var(v), g))
+              case None => p
+            }
+          }
+          case _ => p
+        }
+      }
+    }.simplify
+    // There won't be any state where a variable is affected by every variable.
+    case Bottom() => Predicate.Lit(FalseLiteral)
+    case BottomMap(m) => Predicate.Lit(FalseLiteral)
+  }
+}
 
 /**
  * An abstract domain that determines for each variable, a set of variables whose gammas (at
@@ -27,7 +89,8 @@ implicit val taintableLatticeSetTerm: LatticeSet[Taintable] = LatticeSet.Bottom(
 class MustGammaDomain(
   globals: Map[BigInt, String],
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-) extends MapDomain[Taintable, LatticeSet[Taintable]] {
+  initialState: VarGammaMap,
+) extends PredMapDomain[Taintable, LatticeSet[Taintable]] {
   import LatticeMap.{Top, Bottom, TopMap, BottomMap}
 
   private val ls = LatticeSetLattice[Taintable]()
@@ -42,7 +105,7 @@ class MustGammaDomain(
       case c: MemoryLoad => {
         val v = getMemoryVariable(c, c.mem, c.index, c.size, constProp, globals).getOrElse(UnknownMemory())
         v match {
-          case UnknownMemory() => m + (c.lhs -> ls.bottom)
+          case UnknownMemory() => m + (c.lhs -> topTerm)
           case v => m + (c.lhs -> c.index.variables.foldLeft(m(v))((s, v) => s.union(m(v))))
         }
       }
@@ -50,7 +113,7 @@ class MustGammaDomain(
         val v = getMemoryVariable(c, c.mem, c.index, c.size, constProp, globals).getOrElse(UnknownMemory())
         v match {
           case UnknownMemory() => m
-          case v => m + (v -> c.value.variables.union(c.index.variables).foldLeft(ls.bottom)((s, v) => s.union(m(v))))
+          case v => m + (v -> c.value.variables.union(c.index.variables).foldLeft(topTerm)((s, v) => s.union(m(v))))
         }
       }
       case c: Assume       => m
@@ -69,6 +132,24 @@ class MustGammaDomain(
   // to the procedure you are analysing has things mostly set to Bottom. That way, Top does not propagate.
   def botTerm: LatticeSet[Taintable] = ls.top
 
+  def termToPred(v: Taintable, s: LatticeSet[Taintable]): Predicate =
+    (v, s) match {
+      case (v: Variable, LatticeSet.FiniteSet(s)) => {
+        val g = s.foldLeft(Some(GammaTerm.Lit(TrueLiteral))) {
+          (q: Option[GammaTerm], t) => (q, t) match {
+            case (Some(q), v: Variable) => Some(GammaTerm.Join(Set(q, GammaTerm.OldVar(v))))
+            case _ => None
+          }
+        }
+        g match {
+          case Some(g) => Predicate.GammaCmp(BoolIMPLIES, GammaTerm.Var(v), g)
+          case None => Predicate.Lit(TrueLiteral)
+        }
+      }
+      case _ => Predicate.Lit(TrueLiteral)
+    }
+
+  /*
   def toPred(x: VarGammaMap): Predicate = x match {
     case Top() => Predicate.Lit(TrueLiteral)
     case TopMap(m) => m.foldLeft(Predicate.Lit(TrueLiteral)) {
@@ -78,7 +159,7 @@ class MustGammaDomain(
           case (v: Variable, LatticeSet.FiniteSet(s)) => {
             val g = s.foldLeft(Some(GammaTerm.Lit(TrueLiteral))) {
               (q: Option[GammaTerm], t) => (q, t) match {
-                case (Some(q), v: Variable) => Some(GammaTerm.Bop(BoolAND, q, GammaTerm.OldVar(v)))
+                case (Some(q), v: Variable) => Some(GammaTerm.Join(Set(q, GammaTerm.OldVar(v))))
                 case _ => None
               }
             }
@@ -95,6 +176,7 @@ class MustGammaDomain(
     case Bottom() => Predicate.Lit(FalseLiteral)
     case BottomMap(m) => Predicate.Lit(FalseLiteral)
   }
+  */
 }
 
 /**
