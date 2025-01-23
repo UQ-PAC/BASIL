@@ -182,7 +182,7 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
           if (bv1.size == bv2.size) {
             bv1
           } else {
-            throw new Exception("bitvector size mismatch")
+            throw new Exception(s"bitvector size mismatch $bv1 $bv2")
           }
         case BVCOMP =>
           if (bv1.size == bv2.size) {

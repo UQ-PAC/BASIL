@@ -148,7 +148,7 @@ class Program(val procedures: ArrayBuffer[Procedure],
     ILUnorderedIterator(this.procedures)
   }
 
-  private def memoryLookup(memory: mutable.TreeMap[BigInt, MemorySection], address: BigInt) = {
+  def memoryLookup(memory: mutable.TreeMap[BigInt, MemorySection], address: BigInt) = {
     memory.maxBefore(address + 1) match {
       case Some(_, section) =>
         if (section.address + section.size > address) {
@@ -523,6 +523,10 @@ object Block {
   * @param bytes sequence of bytes represented by BitVecLiterals of size 8
   */
 case class MemorySection(name: String, address: BigInt, size: Int, bytes: Seq[BitVecLiteral], readOnly: Boolean, region: Option[MergedRegion] = None) {
+
+  def canGetBytes(addr: BigInt, num: Int) : Boolean = {
+    (addr >= address) && (addr + num < (address + size))
+  }
 
   def getBytes(addr: BigInt, num: Int): Seq[BitVecLiteral] = {
     val startIndex = (addr - address).toInt
