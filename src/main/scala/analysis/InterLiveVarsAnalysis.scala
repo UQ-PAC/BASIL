@@ -20,7 +20,12 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement
   import edgelattice.{IdEdge, ConstEdge}
 
   def edgesCallToEntry(call: Command, entry: Return)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
-    Map(d -> IdEdge())
+    d match {
+      case Left(l) => Map() // maps all variables before the call to bottom
+      case Right(_) => entry.outParams.flatMap(_._2.variables).foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
+              (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
+      }
+    }
   }
 
   def edgesExitToAfterCall(exit: Procedure, aftercall: DirectCall)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
