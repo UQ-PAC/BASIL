@@ -220,6 +220,9 @@ object IRTransform {
 
     val externalRemover = ExternalRemover(externalNamesLibRemoved.toSet)
     externalRemover.visitProgram(ctx.program)
+    for (p <- ctx.program.procedures) {
+      p.isExternal = Some(ctx.externalFunctions.find(e => e.name == p.procName || p.address.contains(e.offset)).isDefined)
+    }
 
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))

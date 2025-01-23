@@ -173,7 +173,7 @@ object Main {
       }
     }
 
-    if (conf.analysisResults.isDefined || conf.dumpIL.isDefined) {
+    if (conf.analysisResults.isDefined) {
       DebugDumpIRLogger.setLevel(LogLevel.INFO)
     }
     if (conf.analysisResultsDot.isDefined) {

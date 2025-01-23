@@ -27,9 +27,12 @@ val builtinSigs: Map[String, FunSig] = Map(
   "strchr" -> FunSig(List(R(0), R(1)), List(R(0))),
   "strlcpy" -> FunSig(List(R(0), R(1), R(2)), List(R(0))),
   "strlcat" -> FunSig(List(R(0), R(1), R(2)), List(R(0))),
-  "__stack_chk_fail_16432" -> FunSig(List(), List()),
-  "__syslog_chk" -> FunSig(List(R(0)), List()),
+  "strdup" -> FunSig(List(R(0)), List(R(0))),
+  "strndup" -> FunSig(List(R(0), R(1)), List(R(0))),
   "assert" -> FunSig(List(R(0)), List()),
+  "__stack_chk_fail_16432" -> FunSig(List(), List()),
+  "__printf_chk" -> FunSig(List(R(0), R(1)), List(R(0))),
+  "__syslog_chk" -> FunSig(List(R(0)), List()),
 )
 
 
@@ -52,6 +55,48 @@ def externalOut(name: String): Map[LocalVar, Variable] = {
   }
 }
 
+def externalCallReads(name: String) = {
+  externalIn(name).map(_._2).map { case (l: LocalVar) => Register(l.name, 64)
+    case r : Register => r
+  }
+}
+
+def externalCallWrites(name: String) = {
+  externalIn(name).map(_._2).map { case (l: LocalVar) => Register(l.name, 64)
+    case r : Register => r
+  }
+}
+
+
+object DefinedOnAllPaths {
+
+  class DefinitelyDefined extends AbstractDomain[Set[Variable]] {
+
+    def bot = Set() 
+    def top = ???
+
+    def join(a: Set[Variable], b: Set[Variable], c: Block) = {
+      a.intersect(b)
+    }
+
+    override def init(b: Block): Set[Variable] = if (b.parent.entryBlock.contains(b)) then b.parent.formalInParam.toSet else bot
+
+    def transfer(st: Set[Variable], c: Command) = c match {
+      case a : Assign => st ++ a.assignees
+      case _ => st
+    }
+  }
+
+  def proc(p: Procedure) = {
+    p.returnBlock.toSet.flatMap(rb => {
+      val s = transforms.worklistSolver(DefinitelyDefined())
+      val (beforeblock,afterblock) = s.solveProc(p, false)
+      afterblock(rb)
+    })
+  }
+
+}
+
 
 def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
 
@@ -65,6 +110,13 @@ def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
     Logger.error(s"Empty live vars $mainNonEmpty $mainHasReturn $mainHasEntry")
     Map.empty
   }
+  println(liveVars)
+  util.writeToFile(translating.PrettyPrinter.pp_prog_with_analysis_results(liveVars.collect {case (b: Block, r) => (b,r)}, Map(), ctx.program, x => x.toString), "live.il")
+
+
+  util.writeToFile(
+    dotBlockGraph(ctx.program, (liveVars.collect {case (b: Block, r) => (b,r)}).map((b, l) => (b, translating.PrettyPrinter.pp_block_with_analysis_results(Map((b, l)), Map(), b, _.collect {case (l, TwoElementTop) => l}.toString ))))
+  , "livegraph.dot")
 
   transforms.applyRPO(ctx.program)
 
@@ -167,7 +219,6 @@ class SetFormalParams(
         p.inParamDefaultBinding = immutable.SortedMap.from(inparams)
       }
 
-      // outparams is everything touched
       val outparams = inoutparams(p)._2.map(v => LocalVar(v.name + "_out", v.getType) -> LocalVar(v.name, v.getType))
       p.formalOutParam = mutable.SortedSet.from(outparams.map(_._1))
       mappingOutparam = mappingOutparam.updated(p, outparams.toMap)
@@ -307,7 +358,7 @@ def inOutParams(
     case (proc, rws) if p.mainProcedure == proc => {
       // no callers of main procedure so keep the whole read/write set
       // of registers
-      proc -> ((lives(proc)._1.intersect(rws.reads)), (overapprox.intersect(rws.writes)))
+      proc -> ((lives(proc)._1.intersect(rws.reads)), (overapprox.intersect(DefinedOnAllPaths.proc(proc))))
     }
     case (proc, rws) => {
       val liveStart = lives(proc)._1

@@ -721,7 +721,8 @@ object CopyProp {
         transfer(l)
       }
     }
-    if (poisoned) then mutable.HashMap() else state
+    if (poisoned) then mutable.HashMap() else 
+    state
   }
 
   def clobberFull(c: mutable.HashMap[Variable, PropState], l: Variable): Unit = {
