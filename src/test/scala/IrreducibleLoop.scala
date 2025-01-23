@@ -1,6 +1,6 @@
 
 import org.scalatest.funsuite.AnyFunSuite
-import util.{Logger, PerformanceTimer, ILLoadingConfig, RunUtils, IRLoading, Logger, LogLevel}
+import util.{Logger, PerformanceTimer, ILLoadingConfig, RunUtils, IRLoading, LogLevel}
 import translating.BAPToIR
 import analysis.LoopDetector
 import analysis.LoopTransform
