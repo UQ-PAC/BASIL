@@ -7,70 +7,6 @@ import ir.{Expr, InterProcIRCursor, LocalVar, Procedure, Program, computeDomain}
 
 import scala.collection.mutable.ArrayBuffer
 
-enum DSAPhase {
-  case Local, BU, TD
-}
-
-trait DSA {}
-
-trait DSAGraph[Merged, Cell <: DSACell, Node <: DSANode](val proc: Procedure, val phase: DSAPhase) {
-  val sva: SymbolicValues = getSymbolicValues(proc)
-  val constraints: Set[Constraint] = generateConstraints(proc)
-  val nodes: Map[SymBase, Node]
-  def exprToSymVal(expr: Expr): SymValueSet = sva.exprToSymValSet(expr)
-  def constraintArgToCells(constraintArg: ConstraintArg): Set[Cell]
-  def symValToCells(symVal: SymValueSet): Seq[Cell]
-  protected def processConstraint(constraint: Constraint): Unit
-
-  // takes a map from symbolic bases to nodes and updates it based on symVal
-  protected def symValToNodes(symVal: SymValueSet, current: Map[SymBase, Node]): Map[SymBase, Node]
-
-  // takes a map from symbolic bases to nodes and updates it based on constraint
-  protected def binaryConstraintToNodes(constraint: BinaryConstraint, nodes: Map[SymBase, Node]): Map[SymBase, Node] = {
-    val arg1 = exprToSymVal(constraint.arg1.value)
-    val arg2 = exprToSymVal(constraint.arg2.value)
-    val res = symValToNodes(arg1, nodes)
-    symValToNodes(arg2, res)
-  }
-
-  def buildNodes: Map[SymBase, Node] = {
-    constraints.foldLeft(Map[SymBase, Node]()) {
-      case (resultMap, constraint) => constraint match
-        case constraint: BinaryConstraint => binaryConstraintToNodes(constraint, resultMap)
-        case dcc @ DirectCallConstraint(call) =>
-          (dcc.inConstraints ++ dcc.outConstraints).foldLeft(resultMap){case (updated, constraint) => binaryConstraintToNodes(constraint, updated)}
-        case _ => resultMap
-    }
-  }
-
-
-  def mergeCells(cell1: Cell, cell2: Cell): Merged
-  def mergeCells[T <: Cell](cells: Iterable[T]): Merged
-}
-trait DSANode {
-
-}
-
-trait DSACell {
-
-}
-
-trait Counter(val init: Int = 0) {
-  private var counter = init
-  def increment(by: Int = 1): Int = {
-    counter += by
-    counter
-  }
-
-  def decrement(by: Int = 1): Int = {
-    counter -= by
-    counter
-  }
-
-  def get: Int = counter
-
-  def reset(): Unit = counter = init
-}
 
 object SuperCellCounter extends Counter
 
@@ -206,101 +142,56 @@ class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SuperCell, C
 }
 
 
-class FieldNode(val graph: FieldGraph, val base: SymBase, val size: Option[Int]) extends DSANode {
+class FieldNode(val parent: FieldGraph, val base: SymBase, val size: Option[Int]) extends DSANode[SuperCell, FieldCell, ConstraintCell, FieldNode] {
 
-  var cells: Set[FieldCell] = Set.empty
-  private var collapsed: Option[FieldCell] = None
+  var _cells: Seq[FieldCell] = Seq.empty
+  override def cells: Seq[FieldCell] = _cells
+  private var _collapsed: Option[FieldCell] = None
+  override def collapsed: Option[FieldCell] = _collapsed
+  def graph = parent
   add(0)
 
-  def nonOverlappingProperty: Boolean = {
-    if cells.size <= 1 then true
-    else
-      val intervals = cells.map(_.interval)
-      val overlapping = false
-      intervals.exists(interval1 =>
-        intervals.exists(interval2 => interval1 != interval2 && interval1.isOverlapping(interval2)))
-  }
-
-  def add(interval: Interval): FieldCell = {
-    val overlapping: Set[FieldCell] = cells.filter(_.interval.isOverlapping(interval))
-    cells = cells -- overlapping
+  override def add(interval: Interval): FieldCell = {
+    val overlapping: Seq[FieldCell] = cells.filter(_.interval.isOverlapping(interval))
+    _cells = cells.diff(overlapping)
 
     val newCell = if overlapping.isEmpty then
       FieldCell(this, interval)
     else
       val unifiedInterval = overlapping.map(_.interval).reduce(Interval.join)
       val res = FieldCell(this, unifiedInterval)
-      graph.mergeCells(overlapping + res)
+      graph.mergeCells(overlapping.appended(res))
       res
 
-    cells += newCell
+    _cells = cells.appended(newCell)
     newCell
 
   }
 
-  def add(offset: Int): FieldCell = {
-    if !isCollapsed then
-      add(Interval(offset, offset))
-    else
-      collapsed.get
-  }
 
-  def get(offset: Int): FieldCell = {
-    val exactMatch = cells.filter(_.interval.contains(offset))
-    assert(exactMatch.size == 1, "Expected  exactly one interval to contain the offset")
-    exactMatch.head
-  }
-
-  def get(interval: Interval): FieldCell = {
-    val exactMatches = cells.filter(_.interval.isOverlapping(interval))
-    assert(exactMatches.size == 1, "Expected exactly one overlapping interval")
-    assert(exactMatches.head.interval == interval, "")
-    exactMatches.head
-  }
-
-  def collapse(): FieldCell = {
+  override def collapse(): FieldCell = {
     if !isCollapsed then
       val collapsedCell = FieldCell(this, Interval(0,0))
-      graph.mergeCells(cells + collapsedCell)
-      collapsed = Some(collapsedCell)
+      graph.mergeCells(cells.appended(collapsedCell))
+      _collapsed = Some(collapsedCell)
     collapsed.get
   }
-
-  def isCollapsed: Boolean = collapsed.nonEmpty
-  def growCell(interval: Interval): FieldCell = {
-    add(interval)
-  }
-}
-
-case class Interval(start: Int, end: Int) {
-  require(start <= end)
-
-  def size: Int = end - start
-  def isEmpty: Boolean = this.size == 0
-  def contains(offset: Int): Boolean = start <= offset && end > offset
-  def isOverlapping(other: Interval): Boolean = !(start > other.end || other.start > end)
-  def join(other: Interval): Interval = {
-    require(isOverlapping(other), "Expected overlapping Interval for a join")
-    Interval(math.min(start, other.start), math.max(end, other.end))
-  }
-}
-
-object Interval {
-  def join(interval1: Interval, interval2: Interval): Interval = interval1.join(interval2)
 }
 
 sealed trait ConstraintCell extends DSACell {
   val sc = SuperCell(Set(this))
 }
 
-case class FieldCell(node: FieldNode, interval: Interval) extends ConstraintCell  {
+trait NodeCell(val interval: Interval) extends ConstraintCell
+
+case class FieldCell(node: FieldNode, override val interval: Interval) extends NodeCell(interval)  {
   val content: ContentCell = ContentCell(this)
   override def toString: String = s"Cell($node, $interval)"
 }
 
 object FieldCell {
   implicit def orderingByInterval[A <: FieldCell]: Ordering[A] =
-    Ordering.by(e => (e.interval.start, e.interval.end))
+    Ordering.by(fc => fc.interval)
 }
 
 case class ContentCell(cell: FieldCell) extends ConstraintCell {
@@ -316,12 +207,9 @@ case class SuperCell(members: Set[ConstraintCell], id: Int = SuperCellCounter.in
   override def toString: String = s"SuperCell($id, $members)"
 }
 
-
 class FieldDSA(program: Program) {
   val domain: Set[Procedure] = computeDomain(InterProcIRCursor, Set(program.mainProcedure))
     .collect {case proc: Procedure => proc}.toSet
-
-
 }
 
 object FieldDSA {
