@@ -110,14 +110,6 @@ def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
     Logger.error(s"Empty live vars $mainNonEmpty $mainHasReturn $mainHasEntry")
     Map.empty
   }
-  println(liveVars)
-  util.writeToFile(translating.PrettyPrinter.pp_prog_with_analysis_results(liveVars.collect {case (b: Block, r) => (b,r)}, Map(), ctx.program, x => x.toString), "live.il")
-
-
-  util.writeToFile(
-    dotBlockGraph(ctx.program, (liveVars.collect {case (b: Block, r) => (b,r)}).map((b, l) => (b, translating.PrettyPrinter.pp_block_with_analysis_results(Map((b, l)), Map(), b, _.collect {case (l, TwoElementTop) => l}.toString ))))
-  , "livegraph.dot")
-
   transforms.applyRPO(ctx.program)
 
   val params = inOutParams(ctx.program, liveVars)
