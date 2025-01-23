@@ -52,9 +52,19 @@ class DisjunctiveCompletion[L](d: AbstractDomain[L]) extends AbstractDomain[Set[
   def bot: Set[L] = Set(d.bot)
 }
 
-/** Obtain an exact join by encoding sets of abstract states, taking set unions. If the set's size exceeds the bound,
-  * join all elements into a single term using the underlying domain's join operator.
-  */
+class PredDisjunctiveCompletion[L](d: PredicateEncodingDomain[L]) extends DisjunctiveCompletion[L](d) with PredicateEncodingDomain[Set[L]] {
+  def toPred(x: Set[L]): Predicate = x.foldLeft(Predicate.Lit(FalseLiteral)) { (p, l) => Predicate.Bop(BoolOR, p, d.toPred(l)) }.simplify
+
+  override def fromPred(p: Predicate): Set[L] = p match {
+    case Predicate.Bop(BoolOR, a, b) => fromPred(a).union(fromPred(b))
+    case _ => Set(d.fromPred(p))
+  }
+}
+
+/**
+ * Obtain an exact join by encoding sets of abstract states, taking set unions.
+ * If the set's size exceeds the bound, join all elements into a single term using the underlying domain's join operator.
+ */
 class BoundedDisjunctiveCompletion[L](d: AbstractDomain[L], bound: Int) extends AbstractDomain[Set[L]] {
   assert(bound > 0)
 

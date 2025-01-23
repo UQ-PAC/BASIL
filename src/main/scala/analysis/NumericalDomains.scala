@@ -8,7 +8,7 @@ private def sInf(size: Int): BigInt = BigInt(2).pow(size-1)-1
 // Signed negative infinity
 private def sNInf(size: Int): BigInt = -BigInt(2).pow(size-1)
 // Unsigned infinity
-private def uInf(size: Int): BigInt = BigInt(2).pow(size-1)
+private def uInf(size: Int): BigInt = BigInt(2).pow(size)-1
 // Unsigned "negative infinity"
 private def uNInf(size: Int): BigInt = 0
 
@@ -16,7 +16,7 @@ def signedInt2bv(bitSize: Int, n: BigInt): BitVecLiteral =
   require(bitSize > 0, "length of bitvector must be positive")
   require(sNInf(bitSize) <= n && n <= sInf(bitSize), "input must be within bounds")
 
-  if n < 0 then smt_bvneg(BitVecLiteral(-n % BigInt(2).pow(bitSize), bitSize)) else BitVecLiteral(n % BigInt(2).pow(bitSize), bitSize)
+  if n < 0 then smt_bvneg(BitVecLiteral((-n) % BigInt(2).pow(bitSize), bitSize)) else BitVecLiteral(n % BigInt(2).pow(bitSize), bitSize)
 
 enum Interval extends InternalLattice[Interval] {
   case Top
@@ -57,7 +57,7 @@ enum Interval extends InternalLattice[Interval] {
 
 private implicit val intervalTerm: Interval = Interval.Bottom
 
-class IntervalDomain(inf: Int => BigInt, negInf: Int => BigInt, bvto: BitVecLiteral => BigInt, tobv: (Int, BigInt) => BitVecLiteral)
+class IntervalDomain(signed: Boolean, inf: Int => BigInt, negInf: Int => BigInt, bvto: BitVecLiteral => BigInt, tobv: (Int, BigInt) => BitVecLiteral)
   extends PredMapDomain[Variable, Interval] {
   import Interval.*
   import ir.eval.BitVectorEval.*
@@ -82,7 +82,7 @@ class IntervalDomain(inf: Int => BigInt, negInf: Int => BigInt, bvto: BitVecLite
       case c: IndirectCall => top
       case c: DirectCall   => top
       case c: GoTo         => b
-      case c: Return       => b
+      case c: Return       => b ++ c.outParams.map((l, e) => l -> eval(e, b))
       case c: Unreachable  => b
       case c: NOP          => b
     }
@@ -101,10 +101,14 @@ class IntervalDomain(inf: Int => BigInt, negInf: Int => BigInt, bvto: BitVecLite
   def termToPred(v: Variable, l: Interval): Predicate = l match {
     case Top => Predicate.Lit(TrueLiteral)
     case Bottom => Predicate.Lit(TrueLiteral)
-    case ConcreteInterval(lower, upper, width) =>
+    case ConcreteInterval(lower, upper, width) if signed =>
       Predicate.Bop(BoolAND,
         Predicate.BVCmp(BVSLE, BVTerm.Lit(tobv(width, lower)), BVTerm.Var(v)),
-        Predicate.BVCmp(BVSGE, BVTerm.Var(v), BVTerm.Lit(tobv(width, upper))))
+        Predicate.BVCmp(BVSLE, BVTerm.Var(v), BVTerm.Lit(tobv(width, upper))))
+    case ConcreteInterval(lower, upper, width) /* if !signed */ =>
+      Predicate.Bop(BoolAND,
+        Predicate.BVCmp(BVULE, BVTerm.Lit(tobv(width, lower)), BVTerm.Var(v)),
+        Predicate.BVCmp(BVULE, BVTerm.Var(v), BVTerm.Lit(tobv(width, upper))))
   }
 
   def eval(e: Expr, m: LatticeMap[Variable, Interval]): Interval = {
@@ -150,15 +154,25 @@ class IntervalDomain(inf: Int => BigInt, negInf: Int => BigInt, bvto: BitVecLite
       case BVCmp(BVEQ, BVTerm.Lit(x), BVTerm.Var(v)) => top + (v -> ConcreteInterval(bvto(x), bvto(x), x.size))
       case BVCmp(BVEQ, BVTerm.Var(v), BVTerm.Lit(x)) => top + (v -> ConcreteInterval(bvto(x), bvto(x), x.size))
 
-      case BVCmp(BVSLE, BVTerm.Lit(x), BVTerm.Var(v)) => top + (v -> ConcreteInterval(bvto(x), inf(x.size), x.size))
-      case BVCmp(BVSGE, BVTerm.Lit(x), BVTerm.Var(v)) => top + (v -> ConcreteInterval(negInf(x.size), bvto(x), x.size))
-      case BVCmp(BVSLE, BVTerm.Var(v), BVTerm.Lit(x)) => top + (v -> ConcreteInterval(negInf(x.size), bvto(x), x.size))
-      case BVCmp(BVSGE, BVTerm.Var(v), BVTerm.Lit(x)) => top + (v -> ConcreteInterval(bvto(x), inf(x.size), x.size))
+      case BVCmp(BVSLE, BVTerm.Lit(x), BVTerm.Var(v)) if signed => top + (v -> ConcreteInterval(bvto(x), inf(x.size), x.size))
+      case BVCmp(BVSGE, BVTerm.Lit(x), BVTerm.Var(v)) if signed => top + (v -> ConcreteInterval(negInf(x.size), bvto(x), x.size))
+      case BVCmp(BVSLE, BVTerm.Var(v), BVTerm.Lit(x)) if signed => top + (v -> ConcreteInterval(negInf(x.size), bvto(x), x.size))
+      case BVCmp(BVSGE, BVTerm.Var(v), BVTerm.Lit(x)) if signed => top + (v -> ConcreteInterval(bvto(x), inf(x.size), x.size))
 
-      case BVCmp(BVSLT, BVTerm.Lit(x), BVTerm.Var(v)) if inf(x.size) >= bvto(x) => top + (v -> ConcreteInterval(bvto(x) + 1, inf(x.size), x.size))
-      case BVCmp(BVSGT, BVTerm.Lit(x), BVTerm.Var(v)) if negInf(x.size) <= bvto(x) => top + (v -> ConcreteInterval(negInf(x.size), bvto(x) - 1, x.size))
-      case BVCmp(BVSLT, BVTerm.Var(v), BVTerm.Lit(x)) if negInf(x.size) <= bvto(x) => top + (v -> ConcreteInterval(negInf(x.size), bvto(x) - 1, x.size))
-      case BVCmp(BVSGT, BVTerm.Var(v), BVTerm.Lit(x)) if inf(x.size) >= bvto(x) => top + (v -> ConcreteInterval(bvto(x) + 1, inf(x.size), x.size))
+      case BVCmp(BVSLT, BVTerm.Lit(x), BVTerm.Var(v)) if signed && inf(x.size) >= bvto(x) => top + (v -> ConcreteInterval(bvto(x) + 1, inf(x.size), x.size))
+      case BVCmp(BVSGT, BVTerm.Lit(x), BVTerm.Var(v)) if signed && negInf(x.size) <= bvto(x) => top + (v -> ConcreteInterval(negInf(x.size), bvto(x) - 1, x.size))
+      case BVCmp(BVSLT, BVTerm.Var(v), BVTerm.Lit(x)) if signed && negInf(x.size) <= bvto(x) => top + (v -> ConcreteInterval(negInf(x.size), bvto(x) - 1, x.size))
+      case BVCmp(BVSGT, BVTerm.Var(v), BVTerm.Lit(x)) if signed && inf(x.size) >= bvto(x) => top + (v -> ConcreteInterval(bvto(x) + 1, inf(x.size), x.size))
+
+      case BVCmp(BVULE, BVTerm.Lit(x), BVTerm.Var(v)) if !signed => top + (v -> ConcreteInterval(bvto(x), inf(x.size), x.size))
+      case BVCmp(BVUGE, BVTerm.Lit(x), BVTerm.Var(v)) if !signed => top + (v -> ConcreteInterval(negInf(x.size), bvto(x), x.size))
+      case BVCmp(BVULE, BVTerm.Var(v), BVTerm.Lit(x)) if !signed => top + (v -> ConcreteInterval(negInf(x.size), bvto(x), x.size))
+      case BVCmp(BVUGE, BVTerm.Var(v), BVTerm.Lit(x)) if !signed => top + (v -> ConcreteInterval(bvto(x), inf(x.size), x.size))
+
+      case BVCmp(BVULT, BVTerm.Lit(x), BVTerm.Var(v)) if !signed && inf(x.size) >= bvto(x) => top + (v -> ConcreteInterval(bvto(x) + 1, inf(x.size), x.size))
+      case BVCmp(BVUGT, BVTerm.Lit(x), BVTerm.Var(v)) if !signed && negInf(x.size) <= bvto(x) => top + (v -> ConcreteInterval(negInf(x.size), bvto(x) - 1, x.size))
+      case BVCmp(BVULT, BVTerm.Var(v), BVTerm.Lit(x)) if !signed && negInf(x.size) <= bvto(x) => top + (v -> ConcreteInterval(negInf(x.size), bvto(x) - 1, x.size))
+      case BVCmp(BVUGT, BVTerm.Var(v), BVTerm.Lit(x)) if !signed && inf(x.size) >= bvto(x) => top + (v -> ConcreteInterval(bvto(x) + 1, inf(x.size), x.size))
 
       case BVCmp(op, x, y) => top
       case Bop(op, x, y) => top
@@ -169,7 +183,7 @@ class IntervalDomain(inf: Int => BigInt, negInf: Int => BigInt, bvto: BitVecLite
   }
 }
 
-class SignedIntervalDomain extends IntervalDomain(sInf, sNInf, bv2SignedInt, signedInt2bv)
-class UnsignedIntervalDomain extends IntervalDomain(uInf, uNInf, bv2nat, nat2bv)
+class SignedIntervalDomain extends IntervalDomain(true, sInf, sNInf, bv2SignedInt, signedInt2bv)
+class UnsignedIntervalDomain extends IntervalDomain(false, uInf, uNInf, bv2nat, nat2bv)
 
 class DoubleIntervalDomain extends PredProductDomain(SignedIntervalDomain(), UnsignedIntervalDomain())

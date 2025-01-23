@@ -178,6 +178,7 @@ enum Predicate {
           case (a, Lit(TrueLiteral)) => a
           case (Lit(FalseLiteral), _) => Lit(FalseLiteral)
           case (_, Lit(FalseLiteral)) => Lit(FalseLiteral)
+          case (a, b) if a == b => a
           case (a, b) => Bop(BoolAND, a, b)
         }
       case Bop(BoolOR, a, b) =>
@@ -186,6 +187,7 @@ enum Predicate {
           case (_, Lit(TrueLiteral)) => Lit(TrueLiteral)
           case (Lit(FalseLiteral), b) => b
           case (a, Lit(FalseLiteral)) => a
+          case (a, b) if a == b => a
           case (a, b) => Bop(BoolOR, a, b)
         }
       case Bop(BoolIMPLIES, a, b) =>
@@ -193,6 +195,7 @@ enum Predicate {
           case (Lit(TrueLiteral), b) => b
           case (Lit(FalseLiteral), _) => Lit(TrueLiteral)
           case (_, Lit(TrueLiteral)) => Lit(TrueLiteral)
+          case (a, b) if a == b => a
           case (a, b) => Bop(BoolIMPLIES, a, b)
         }
       case BVCmp(op, a, b) =>

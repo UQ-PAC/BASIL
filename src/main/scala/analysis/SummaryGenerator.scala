@@ -127,9 +127,50 @@ class SummaryGenerator(
     }
   }
 
-  /** Generate requires clauses for a procedure. Currently we can generate the requirement that the variables that
-    * influence the gamma of the first branch condition must be low.
-    */
+  def varsAllIn(b: BVTerm, vars: Set[Variable]): Boolean = {
+    import BVTerm.*
+    b match {
+      case Lit(x) => true
+      case Var(v) => vars.contains(v)
+      case OldVar(v) => true
+      case Uop(op, x) => varsAllIn(x, vars)
+      case Bop(op, x, y) => varsAllIn(x, vars) && varsAllIn(y, vars)
+      case Repeat(repeats, body) => varsAllIn(body, vars)
+      case Extract(end, start, body) => varsAllIn(body, vars)
+      case ZeroExtend(extension, body) => varsAllIn(body, vars)
+      case SignExtend(extension, body) => varsAllIn(body, vars)
+    }
+  }
+
+  def varsAllIn(g: GammaTerm, vars: Set[Variable]): Boolean = {
+    import GammaTerm.*
+    g match {
+      case Lit(x) => true
+      case Var(v) => vars.contains(v)
+      case OldVar(v) => true
+      case Uop(op, x) => varsAllIn(x, vars)
+      case Join(s) => s.forall(varsAllIn(_, vars))
+    }
+  }
+
+  /**
+   * Removes all parts of the predicate containing variables not in vars (replacing the subexpression with default).
+   */
+  private def filterPred(p: Predicate, vars: Set[Variable], default: Predicate): Predicate = {
+    import Predicate.*
+    p match {
+      case Lit(x) => p
+      case Uop(op, x) => Uop(op, filterPred(x, vars, default))
+      case Bop(op, x, y) => Bop(op, filterPred(x, vars, default), filterPred(y, vars, default))
+      case BVCmp(op, x, y) => if varsAllIn(x, vars) && varsAllIn(y, vars) then p else default
+      case GammaCmp(op, x, y) => if varsAllIn(x, vars) && varsAllIn(y, vars) then p else default
+    }
+  }
+
+  /**
+   * Generate requires clauses for a procedure. Currently we can generate the requirement that the variables that
+   * influence the gamma of the first branch condition must be low.
+   */
   def generateRequires(procedure: Procedure): List[BExpr] = {
     if procedure.blocks.isEmpty then return List()
 
@@ -250,11 +291,24 @@ class SummaryGenerator(
       }
     }
 
-    val intervalDomain = DoubleIntervalDomain()
-    val (before, after) = worklistSolver(intervalDomain).solveProc(procedure)
+    val returnBlock = IRWalk.lastInProc(procedure).map(_.parent)
+
+    val initialState = LatticeMap.TopMap((variables.filter(a => false) ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+
+    val predDomain = PredDisjunctiveCompletion(PredProductDomain(DoubleIntervalDomain(), MayGammaDomain(initialState)))
+    //val predDomain = PredDisjunctiveCompletion(SignedIntervalDomain())
+    //val predDomain = PredDisjunctiveCompletion(UnsignedIntervalDomain())
+    //val predDomain = PredDisjunctiveCompletion(DoubleIntervalDomain())
+    //val predDomain = PredDisjunctiveCompletion(MayGammaDomain(initialState))
+    val (before, after) = worklistSolver(predDomain).solveProc(procedure)
+    val outVars: Set[Variable] = procedure.formalOutParam.toSet ++ procedure.formalInParam
 
     Logger.debug(after)
+    Logger.debug(after.map((b, l) => (b, predDomain.toPred(l))))
+    Logger.debug(after.map((b, l) => (b, filterPred(predDomain.toPred(l), outVars, Predicate.Lit(TrueLiteral)))))
 
-    taintPreds
+    val absIntPreds = returnBlock.map(b => after.get(b).map(l => filterPred(predDomain.toPred(l), outVars, Predicate.Lit(TrueLiteral)).split.map(_.simplify.toBoogie.simplify))).flatten.toList.flatten
+
+    taintPreds ++ absIntPreds
   }
 }
