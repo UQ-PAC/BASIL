@@ -85,6 +85,8 @@ jobs:
         # omitting because failing or incorrect:
         # MemoryRegionTestsDSA MemoryRegionTestsNoRegion UnimplementedTests ExtraSpecTests IndirectCallTests PointsToTest
 
+      - run: ./mill test.testOnly IrreducibleLoop
+        if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly BitVectorAnalysisTests
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly '*IntrusiveListPublicInterfaceTest'
@@ -92,8 +94,6 @@ jobs:
       - run: ./mill test.testOnly util.intrusive_list.IntrusiveListTest 
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly DataStructureAnalysisTest
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly IrreducibleLoop
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly ParamAnalysisTests
         if: ${{ ! cancelled() }}

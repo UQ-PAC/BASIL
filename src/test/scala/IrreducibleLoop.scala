@@ -1,6 +1,6 @@
 
 import org.scalatest.funsuite.AnyFunSuite
-import util.{Logger, PerformanceTimer, ILLoadingConfig, RunUtils, IRLoading}
+import util.{Logger, PerformanceTimer, ILLoadingConfig, RunUtils, IRLoading, Logger, LogLevel}
 import translating.BAPToIR
 import analysis.LoopDetector
 import analysis.LoopTransform
@@ -18,6 +18,7 @@ import test_util.BASILTest.writeToFile
   */
 class IrreducibleLoop extends AnyFunSuite {
   val testPath = "./src/test/irreducible_loops"
+  Logger.setLevel(LogLevel.DEBUG)
 
   def load(conf: ILLoadingConfig) : Program = {
     val bapProgram = IRLoading.loadBAP(conf.inputFile)
@@ -68,10 +69,8 @@ class IrreducibleLoop extends AnyFunSuite {
 
     Main.main(args)
 
-    val boogieResult = Seq("boogie", "/useArrayAxioms", outPath).!!
-
+    val boogieResult = Seq("boogie", "/useArrayAxioms", "/timeLimit:10", outPath).!!
     Logger.debug("Boogie result: " + boogieResult)
-
     assert(boogieResult.contains("Irreducible flow graphs are unsupported."))
   }
 
@@ -80,13 +79,24 @@ class IrreducibleLoop extends AnyFunSuite {
     val outPath = s"$path.bpl"
     val args = Array("-o", s"$outPath", "-i", s"$path.adt", "-r", s"$path.relf", "-s", s"$path.spec", "--analyse")
 
-    Main.main(args)
+    try {
+      Logger.debug("main")
+      Main.main(args)
+      Logger.debug("end main")
 
-    val boogieResult = Seq("boogie", "/smoke", "/useArrayAxioms", outPath).!!
+      Logger.debug("boogie")
+      val boogieResult = Seq("boogie", "/smoke", "/timeLimit:10", "/useArrayAxioms", outPath).!!
+      Logger.debug("endboogie")
 
-    Logger.debug("Boogie result: " + boogieResult)
+      Logger.debug("Boogie result: " + boogieResult)
 
-    assert(boogieResult.contains("Boogie program verifier finished with 2 verified, 0 errors"))
-    assert(!boogieResult.contains("found unreachable code"))
+      assert(boogieResult.contains("Boogie program verifier finished with 2 verified, 0 errors"))
+      assert(!boogieResult.contains("found unreachable code"))
+    } catch {
+      case e => {
+        Logger.error(e.getStackTrace.reverse.map(_.toString).mkString("\n    "))
+        assert(false)
+      }
+    }
   }
 }
