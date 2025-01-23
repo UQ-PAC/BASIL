@@ -38,7 +38,7 @@ private class ILForwardIterator(private val begin: IterableOnce[CFGPosition], va
   */
 private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extends Iterator[CFGPosition] {
   private val stack = mutable.Stack[CFGPosition]()
-  stack.pushAll(begin)
+  stack.addAll(begin)
 
   override def hasNext: Boolean = {
     stack.nonEmpty
