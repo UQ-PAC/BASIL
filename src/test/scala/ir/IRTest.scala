@@ -133,9 +133,10 @@ class IRTest extends AnyFunSuite {
     }.toSet
     // assert(aftercallGotos == Set(blocks("l_main_1").fallthrough.get))
 
-    assert(1 == aftercallGotos.count(b => IntraProcIRCursor.pred(b).contains(blocks("l_main_1").jump)))
+    assert(1 == aftercallGotos.count(b => IntraProcIRCursor.pred(b).contains(blocks("l_main_1").statements.last)))
     assert(1 == aftercallGotos.count(b => IntraProcIRCursor.succ(b).contains(blocks("l_main_1").jump match {
       case GoTo(targets, _) => targets.head
+      case _ => ???
     })))
 
   }
@@ -208,6 +209,8 @@ class IRTest extends AnyFunSuite {
     val called = p.procedures.find(_.name == "called").get
     called.addBlocks(b1)
     called.addBlocks(b2)
+    // no longer implicitly set entryblock to the first block
+    called.entryBlock = b1
 
     assert(called.blocks.size == 2)
     assert(called.entryBlock.contains(b1))
@@ -373,7 +376,6 @@ class IRTest extends AnyFunSuite {
       )
     )
 
-    println(p)
     val blockOrder = p.mainProcedure.preOrderIterator.collect {
       case b: Block => b.label
     }.toList
