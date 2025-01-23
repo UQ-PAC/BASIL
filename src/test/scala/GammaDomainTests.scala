@@ -18,7 +18,7 @@ class GammaDomainTests extends AnyFunSuite, BASILTest {
     constPropResults: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
   ): Map[Block, VarGammaMap] = {
     reversePostOrder(procedure)
-    val (before, after) = worklistSolver(MustGammaDomain(Map(), constPropResults)).solveProc(procedure, false)
+    val (before, after) = worklistSolver(MustGammaDomain(Map(), constPropResults, initialState)).solveProc(procedure, false)
     after
   }
 
@@ -90,7 +90,7 @@ class GammaDomainTests extends AnyFunSuite, BASILTest {
     val reachability = getReachabilityConditions(f)
 
     assert(latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0, LatticeSetLattice()) == LatticeSet.FiniteSet(Set(R0)))
-    assert(MustGammaDomain(Map(), constPropResults).toPred(gammaResults(f.labelToBlock("returnBlock"))).split.contains(
+    assert(MustGammaDomain(Map(), constPropResults, initialState).toPred(gammaResults(f.labelToBlock("returnBlock"))).split.contains(
       Predicate.GammaCmp(BoolIMPLIES, GammaTerm.Var(R0), GammaTerm.OldVar(R0))))
     assert(reachability(f.labelToBlock("branch")) == Predicate.Lit(TrueLiteral))
   }
@@ -127,7 +127,7 @@ class GammaDomainTests extends AnyFunSuite, BASILTest {
     val gammaResults = getMustGammaDomainResults(f, initialState, constPropResults)
 
     assert(latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0, LatticeSetLattice()) == LatticeSet.FiniteSet(Set(R2)))
-    assert(MustGammaDomain(Map(), constPropResults).toPred(gammaResults(f.labelToBlock("returnBlock"))).split.contains(
+    assert(MustGammaDomain(Map(), constPropResults, initialState).toPred(gammaResults(f.labelToBlock("returnBlock"))).split.contains(
       Predicate.GammaCmp(BoolIMPLIES, GammaTerm.Var(R0), GammaTerm.OldVar(R2))))
   }
 }

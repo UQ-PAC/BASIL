@@ -23,6 +23,14 @@ class ProductDomain[L1, L2](d1: AbstractDomain[L1], d2: AbstractDomain[L2]) exte
   def bot: (L1, L2) = (d1.bot, d2.bot)
 }
 
+class PredProductDomain[L1, L2](d1: PredicateEncodingDomain[L1], d2: PredicateEncodingDomain[L2])
+  extends ProductDomain[L1, L2](d1, d2) with PredicateEncodingDomain[(L1, L2)] {
+
+  def toPred(x: (L1, L2)): Predicate = Predicate.Bop(BoolAND, d1.toPred(x._1), d2.toPred(x._2))
+
+  override def fromPred(p: Predicate): (L1, L2) = (d1.fromPred(p), d2.fromPred(p))
+}
+
 /**
  * This domain stores as abstract values, sets of abstract values in the provided abstract domain.
  * A set of values represents the disjunction of the values in the set. For example, if S = {a, b, c},
