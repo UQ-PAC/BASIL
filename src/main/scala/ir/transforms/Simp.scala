@@ -541,6 +541,8 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
   removeEmptyBlocks(p)
   coalesceBlocks(p)
   removeEmptyBlocks(p)
+  visit_prog(CopyProp.BlockyProp(), p)
+  visit_prog(CleanupAssignments(), p)
 
 }
 
@@ -994,7 +996,7 @@ object CopyProp {
 
     val trivialOnly = false
 
-    state
+    if (!poisoned) state else mutable.HashMap()
   }
 
   def toResult(s: mutable.Map[Variable, PropState], trivialOnly: Boolean = true)(v: Variable): Option[Expr] = {

@@ -955,6 +955,10 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
           BitVecLiteral(1, 1)
         ) =>
       logSimp(e, BinaryExpr(BVEQ, (body), BitVecLiteral(0, 1)))
+    case BinaryExpr(BVEQ, ZeroExtend(hi, Extract(ehi, 0, expr)), BitVecLiteral(0, _)) => {
+      val x = BinaryExpr(BVEQ, Extract(ehi, 0, expr), BitVecLiteral(0, ehi))
+      logSimp(e, x)
+    }
 
     case BinaryExpr(BVEQ, BinaryExpr(BVCOMP, e1: Expr, e2: Expr), BitVecLiteral(0, 1)) =>
       logSimp(e, UnaryExpr(BoolNOT, BinaryExpr(BVEQ, (e1), (e2))))
