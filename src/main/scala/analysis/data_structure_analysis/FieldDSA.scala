@@ -119,7 +119,7 @@ class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SuperCell, F
 }
 
 
-class FieldNode(val graph: FieldGraph, val base: SymBase, size: Option[Int]) extends DSANode[FieldCell, ConstraintCell](size) {
+class FieldNode(val graph: FieldGraph, val base: SymBase, size: Option[Int]) extends DSANode[FieldCell](size) {
 //  override def graph: DSAGraph[SuperCell, FieldCell, ConstraintCell, FieldNode] = parent
   override def init(interval: Interval): FieldCell = FieldCell(this, interval)
 }

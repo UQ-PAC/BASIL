@@ -103,7 +103,7 @@ class SetGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SetCell, SetCe
   }
 }
 
-class SetNode(val graph: SetGraph, val bases: mutable.Set[SymBase], size: Option[Int] = None, val id: Int = SetNodeCounter.increment()) extends DSANode[SetCell, SetCell](size) {
+class SetNode(val graph: SetGraph, val bases: mutable.Set[SymBase], size: Option[Int] = None, val id: Int = SetNodeCounter.increment()) extends DSANode[SetCell](size) {
 
   val term: NodeTerm = NodeTerm(this)
   override def hashCode(): Int = id
