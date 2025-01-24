@@ -855,10 +855,12 @@ object CopyProp {
     val state = mutable.HashMap[Variable, PropState]()
     var poisoned = false // we have an indirect call
 
+    val doLoadReasoning = false
+
     def transfer(c: mutable.HashMap[Variable, PropState], s: Statement): Unit = {
       // val callClobbers = ((0 to 7) ++ (19 to 30)).map("R" + _).map(c => Register(c, 64))
       s match {
-        case l : MemoryStore => {
+        case l : MemoryStore if doLoadReasoning => {
           val mvar = varForMem(l.mem)
           val existing = c.get(mvar).isDefined
 
@@ -888,7 +890,7 @@ object CopyProp {
             }
           }
         }
-        case l: MemoryLoad => {
+        case l: MemoryLoad if doLoadReasoning => {
           val loadprop = canPropTo(c, l.index)
           val loaded = for {
             (addr, deps) <-  loadprop
@@ -911,6 +913,12 @@ object CopyProp {
             clobberFull(c, l.lhs)
           }
           }
+        }
+        case l : MemoryStore  => {
+          ()
+        }
+        case l: MemoryLoad => {
+            clobberFull(c, l.lhs)
         }
         case LocalAssign(l, r, lb) => {
           val isFlag = isFlagVar(l) || r.variables.exists(isFlagVar)
@@ -957,6 +965,9 @@ object CopyProp {
         case x: IndirectCall => {
           // need a reaching-defs to get inout args (just assume register name matches?)
           // this reduce we have to clobber with the indirect call this round
+          if (!doLoadReasoning) {
+              poisoned = true
+          }
           val r = for {
             (addr, deps) <- canPropTo(c, x.target)
             addr <- addr match {
