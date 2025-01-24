@@ -27,7 +27,8 @@ case class StaticAnalysisConfig(
   threadSplit: Boolean = false,
   summariseProcedures: Boolean = false,
   memoryRegions: MemoryRegionsMode = MemoryRegionsMode.Disabled,
-  irreducibleLoops: Boolean = true
+  irreducibleLoops: Boolean = true,
+  indirectCalls: Boolean = false,
 )
 
 enum BoogieMemoryAccessMode {

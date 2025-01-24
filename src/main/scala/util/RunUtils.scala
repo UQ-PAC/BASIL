@@ -58,8 +58,8 @@ case class StaticAnalysisContext(
   vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
   interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]],
   paramResults: Map[Procedure, Set[Variable]],
-  steensgaardResults: Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]],
-  mmmResults: MemoryModelMap,
+  steensgaardResults: () => Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]],
+  mmmResults: () => MemoryModelMap,
   reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
   varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
   regionInjector: Option[RegionInjector],
@@ -68,7 +68,7 @@ case class StaticAnalysisContext(
   bottomUpDSA: Map[Procedure, Graph],
   topDownDSA: Map[Procedure, Graph],
   writesToResult: Map[Procedure, Set[Register]],
-  ssaResults: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
+  ssaResults: () => Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
 )
 
 /** Results of the main program execution.
@@ -385,14 +385,18 @@ object StaticAnalysis {
     val writesTo = WriteToAnalysis(ctx.program).analyze()
 
     val SSASolver = IntraprocSSASolver(IRProgram, writesTo, RNAResult)
-    val SSAResults = SSASolver.analyze()
+    lazy val SSAResults = {
+      Logger.debug("[!] Running SSA")
+      val r = SSASolver.analyze()
+      config.analysisDotPath.foreach(s => {
+        writeToFile(
+          toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> r(b).toString).toMap, true),
+          s"${s}_SSA$iteration.dot"
+        )
+      })
+      r
+    }
 
-    config.analysisDotPath.foreach(s => {
-      writeToFile(
-        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> SSAResults(b).toString).toMap, true),
-        s"${s}_SSA$iteration.dot"
-      )
-    })
 
     val mmm = MemoryModelMap(globalOffsets, mergedSubroutines, globalAddresses, globalSizes)
     mmm.preLoadGlobals()
@@ -461,12 +465,20 @@ object StaticAnalysis {
       )
     }
 
-    Logger.debug("[!] Running Steensgaard")
-    val steensgaardSolver = InterprocSteensgaardAnalysis(interDomain.toSet, mmm, SSAResults)
-    steensgaardSolver.analyze()
-    val steensgaardResults = steensgaardSolver.pointsTo()
+    lazy val steensgaardSolver = {
+      Logger.debug("[!] Running Steensgaard")
+      val s = InterprocSteensgaardAnalysis(interDomain.toSet, mmm, SSAResults)
+      s.analyze()
+      s
+    }
+    lazy val steensgaardResults = {
+      steensgaardSolver.pointsTo()
+    }
 
-    mmm.setCallSiteSummaries(steensgaardSolver.callSiteSummary)
+    lazy val mmmres = {
+      mmm.setCallSiteSummaries(steensgaardSolver.callSiteSummary)
+      mmm
+    }
 
     val paramResults: Map[Procedure, Set[Variable]] = ParamAnalysis(IRProgram).analyze()
     val interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = InterLiveVarsAnalysis(IRProgram).analyze()
@@ -478,8 +490,8 @@ object StaticAnalysis {
       vsaResult = vsaResult,
       interLiveVarsResults = interLiveVarsResults,
       paramResults = paramResults,
-      steensgaardResults = steensgaardResults,
-      mmmResults = mmm,
+      steensgaardResults = () => steensgaardResults,
+      mmmResults = () => mmmres,
       symbolicAddresses = Map.empty,
       reachingDefs = reachingDefinitionsAnalysisResults,
       varDepsSummaries = varDepsSummaries,
@@ -488,7 +500,7 @@ object StaticAnalysis {
       bottomUpDSA = Map.empty,
       topDownDSA = Map.empty,
       writesToResult = writesTo,
-      ssaResults = SSAResults
+      ssaResults = () => SSAResults
     )
   }
 
@@ -614,12 +626,14 @@ object RunUtils {
 
       if (config.memoryRegions == MemoryRegionsMode.MRA && (previousResult.isEmpty || result.vsaResult != previousResult.get.vsaResult)) {
         modified = true
-      } else {
+      } else if (config.indirectCalls) {
         modified = transforms.VSAIndirectCallResolution(
           ctx.program,
           result.vsaResult,
-          result.mmmResults
+          result.mmmResults()
         ).resolveIndirectCalls()
+      } else {
+        modified = false
       }
 
       Logger.debug("[!] Generating Procedure Summaries")
@@ -636,7 +650,7 @@ object RunUtils {
     // should later move this to be inside while (modified) loop and have splitting threads cause further iterations
 
     if (config.threadSplit) {
-      transforms.splitThreads(ctx.program, analysisResult.last.steensgaardResults, analysisResult.last.ssaResults)
+      transforms.splitThreads(ctx.program, analysisResult.last.steensgaardResults(), analysisResult.last.ssaResults())
     }
 
     val reachingDefs = ReachingDefsAnalysis(ctx.program, analysisResult.last.writesToResult).analyze()
@@ -664,7 +678,7 @@ object RunUtils {
 
     Logger.debug("[!] Injecting regions")
     val regionInjector = if (config.memoryRegions == MemoryRegionsMode.MRA) {
-      val injector = RegionInjectorMRA(ctx.program, analysisResult.last.mmmResults)
+      val injector = RegionInjectorMRA(ctx.program, analysisResult.last.mmmResults())
       injector.injectRegions()
       Some(injector)
     } else if (config.memoryRegions == MemoryRegionsMode.DSA) {

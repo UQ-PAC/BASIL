@@ -53,7 +53,9 @@ object Main {
     @arg(name = "memory-regions", doc = "Performs static analysis to separate memory into discrete regions in Boogie output (requires --analyse flag) (mra|dsa) (dsa is recommended over mra)")
     memoryRegions: Option[String],
     @arg(name = "no-irreducible-loops", doc = "Disable producing irreducible loops when --analyse is passed (does nothing without --analyse)")
-    noIrreducibleLoops: Flag
+    noIrreducibleLoops: Flag,
+    @arg(name = "resolve-indirect-calls", doc = "Enable indirect call resolution (does not currently support code containing loops).")
+    resolveCalls: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -96,7 +98,8 @@ object Main {
         conf.threadSplit.value,
         conf.summariseProcedures.value,
         memoryRegionsMode,
-        !conf.noIrreducibleLoops.value
+        !conf.noIrreducibleLoops.value,
+        conf.resolveCalls.value
       ))
     } else {
       None
