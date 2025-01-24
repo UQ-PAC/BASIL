@@ -116,15 +116,13 @@ enum GammaTerm {
     if this.simplified then return this
     val ret = this match {
       case Join(s) => {
-        val set = s.map(g => g.simplify)
-        if set.size == 1 then s.head else {
-          Join(set.foldLeft(Set()) {
-            (s, g) => g match {
-              case Join(s2) => s ++ s2
-              case g => s + g
-            }
-          })
-        }
+        val set = s.map(g => g.simplify).foldLeft(Set[GammaTerm]()) {
+          (s, g) => g match {
+            case Join(s2) => s ++ s2
+            case g => s + g
+          }
+        } - Lit(TrueLiteral)
+        if set.size == 0 then Lit(TrueLiteral) else if set.size == 1 then set.head else Join(set)
       }
       case _ => this
     }
