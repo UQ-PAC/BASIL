@@ -60,7 +60,7 @@ trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[Variable, Lat
           }
         }
         g match {
-          case Some(g) => Predicate.GammaCmp(BoolIMPLIES, g, GammaTerm.Var(v))
+          case Some(g) => Predicate.GammaCmp(BoolIMPLIES, g, GammaTerm.Var(v)).simplify
           case None => Predicate.Lit(TrueLiteral)
         }
       }

@@ -190,7 +190,7 @@ class SummaryGenerator(
         s match {
           case a: Assume if a.checkSecurity => {
             val condition = a.parent.prevBlocks.foldLeft(TrueBLiteral: BExpr)((p, b) =>
-                BinaryBExpr(BoolAND, p, ReachabilityConditions().toPred(before(b)).toBoogie.simplify))
+                BinaryBExpr(BoolAND, p, ReachabilityConditions().toPred(before(b)).toBoogie.simplify)).simplify
             a.body.variables.foldLeft(Some(Set()): Option[Set[BExpr]]) {
               (s, v) => {
                 relevantGammas(mustGammaResults(a.parent), v).flatMap(r => s.map(s => s ++ r.flatMap(toGamma)))

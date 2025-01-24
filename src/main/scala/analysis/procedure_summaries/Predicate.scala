@@ -89,9 +89,12 @@ enum GammaTerm {
     case Var(v) => v.toGamma
     case OldVar(v) => Old(v.toGamma)
     case Uop(op, x) => UnaryBExpr(op, x.toBoogie)
-    case Join(s) => s.foldLeft(TrueBLiteral: BExpr) {
-      (p, g) => BinaryBExpr(BoolAND, p, g.toBoogie)
-    }
+    case Join(s) =>
+      if s.size == 0 then TrueBLiteral
+      else if s.size == 1 then s.head.toBoogie
+      else s.foldLeft(s.head.toBoogie) {
+        (p, g) => BinaryBExpr(BoolAND, p, g.toBoogie)
+      }
   }
 
   def toBasil: Option[Expr] = this match {
@@ -99,9 +102,12 @@ enum GammaTerm {
     case Var(v) => Some(LocalVar(s"Gamma_${v.name}", BoolType))
     case OldVar(v) => None
     case Uop(op, x) => x.toBasil.map(x => UnaryExpr(op, x))
-    case Join(s) => s.foldLeft(Some(TrueLiteral): Option[Expr]) {
-      (p, g) => g.toBasil.flatMap(g => p.map(p => BinaryExpr(BoolAND, p, g)))
-    }
+    case Join(s) => 
+      if s.size == 0 then Some(TrueLiteral)
+      else if s.size == 1 then s.head.toBasil
+      else s.foldLeft(s.head.toBasil) {
+        (p, g) => g.toBasil.flatMap(g => p.map(p => BinaryExpr(BoolAND, p, g)))
+      }
   }
 
   def vars: Set[Variable] = this match {
