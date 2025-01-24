@@ -118,7 +118,7 @@ class SummaryGenerator(
   /**
    * Gets the set of gammas stored in a VarGammaMap, if possible
    */
-  private def relevantGammas(gammaMap: VarGammaMap, v: Taintable): Option[Set[Taintable]] = {
+  private def relevantGammas(gammaMap: VarGammaMap, v: Variable): Option[Set[Variable]] = {
     gammaMap(v) match {
       case LatticeSet.Top() => None // We can't know all of the variables, so we soundly say nothing
       case LatticeSet.Bottom() => Some(Set())
@@ -174,11 +174,13 @@ class SummaryGenerator(
   def generateRequires(procedure: Procedure): List[BExpr] = {
     if procedure.blocks.isEmpty then return List()
 
-    val initialState = LatticeMap.TopMap((variables ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
-    val mustGammaDomain = MustGammaDomain(globals, constProp, initialState)
     val predDomain = PredicateDomain()
+    val initialState = LatticeMap.TopMap((variables.collect(_ match {
+      case v: Variable => v
+    }) ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+    val mustGammaDomain = MustGammaDomain(initialState)
     reversePostOrder(procedure)
-    val (_, mustGammaResults) = worklistSolver(MustGammaDomain(globals, constProp, initialState)).solveProc(procedure, false)
+    val (_, mustGammaResults) = worklistSolver(mustGammaDomain).solveProc(procedure, false)
     val (before, after) = worklistSolver(ReachabilityConditions()).solveProc(procedure, false)
     val (predDomainResults, _) = worklistSolver(predDomain).solveProc(procedure, true)
     Logger.debug(predDomainResults.map((a, b) => (a, eval.simplifyExprFixpoint(b.simplify.toBasil.get)._1.toBoogie)))
@@ -293,7 +295,7 @@ class SummaryGenerator(
 
     val returnBlock = IRWalk.lastInProc(procedure).map(_.parent)
 
-    val initialState = LatticeMap.TopMap((variables.filter(a => false) ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+    val initialState = LatticeMap.TopMap((procedure.formalInParam.toSet: Set[Variable]).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
 
     val predDomain = PredDisjunctiveCompletion(PredProductDomain(DoubleIntervalDomain(), MayGammaDomain(initialState)))
     //val predDomain = PredDisjunctiveCompletion(SignedIntervalDomain())

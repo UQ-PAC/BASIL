@@ -9,16 +9,15 @@ import test_util.BASILTest
 // TODO more tests + system tests
 
 class GammaDomainTests extends AnyFunSuite, BASILTest {
-  private val registers = 0.to(28).map { n => Register(s"R$n", 64): Taintable }.toSet
+  private val registers = 0.to(28).map { n => Register(s"R$n", 64): Variable }.toSet
   private val baseRegisterMap = registers.map { r => (r, Set(r)) }.toMap
 
   def getMustGammaDomainResults(
     procedure: Procedure,
     initialState: VarGammaMap,
-    constPropResults: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
   ): Map[Block, VarGammaMap] = {
     reversePostOrder(procedure)
-    val (before, after) = worklistSolver(MustGammaDomain(Map(), constPropResults, initialState)).solveProc(procedure, false)
+    val (before, after) = worklistSolver(MustGammaDomain(initialState)).solveProc(procedure, false)
     after
   }
 
@@ -50,7 +49,7 @@ class GammaDomainTests extends AnyFunSuite, BASILTest {
     val f = program.nameToProcedure("f")
     val initialState = LatticeMap.TopMap(registers.map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
     val constPropResults = InterProcConstantPropagation(program).analyze()
-    val gammaResults = getMustGammaDomainResults(f, initialState, constPropResults)
+    val gammaResults = getMustGammaDomainResults(f, initialState)
     val reachability = getReachabilityConditions(f)
 
     assert(latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0, LatticeSetLattice()) == LatticeSet.Bottom())
@@ -86,12 +85,12 @@ class GammaDomainTests extends AnyFunSuite, BASILTest {
     val f = program.nameToProcedure("f")
     val initialState = LatticeMap.TopMap(registers.map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
     val constPropResults = InterProcConstantPropagation(program).analyze()
-    val gammaResults = getMustGammaDomainResults(f, initialState, constPropResults)
+    val gammaResults = getMustGammaDomainResults(f, initialState)
     val reachability = getReachabilityConditions(f)
 
     assert(latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0, LatticeSetLattice()) == LatticeSet.FiniteSet(Set(R0)))
-    assert(MustGammaDomain(Map(), constPropResults, initialState).toPred(gammaResults(f.labelToBlock("returnBlock"))).split.contains(
-      Predicate.GammaCmp(BoolIMPLIES, GammaTerm.Var(R0), GammaTerm.OldVar(R0))))
+    assert(MustGammaDomain(initialState).toPred(gammaResults(f.labelToBlock("returnBlock"))).split.contains(
+      Predicate.GammaCmp(BoolIMPLIES, GammaTerm.OldVar(R0), GammaTerm.Var(R0))))
     assert(reachability(f.labelToBlock("branch")) == Predicate.Lit(TrueLiteral))
   }
 
@@ -124,10 +123,10 @@ class GammaDomainTests extends AnyFunSuite, BASILTest {
     val f = program.nameToProcedure("f")
     val initialState = LatticeMap.TopMap(registers.map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
     val constPropResults = InterProcConstantPropagation(program).analyze()
-    val gammaResults = getMustGammaDomainResults(f, initialState, constPropResults)
+    val gammaResults = getMustGammaDomainResults(f, initialState)
 
     assert(latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0, LatticeSetLattice()) == LatticeSet.FiniteSet(Set(R2)))
-    assert(MustGammaDomain(Map(), constPropResults, initialState).toPred(gammaResults(f.labelToBlock("returnBlock"))).split.contains(
-      Predicate.GammaCmp(BoolIMPLIES, GammaTerm.Var(R0), GammaTerm.OldVar(R2))))
+    assert(MustGammaDomain(initialState).toPred(gammaResults(f.labelToBlock("returnBlock"))).simplify.split.contains(
+      Predicate.GammaCmp(BoolIMPLIES, GammaTerm.OldVar(R2), GammaTerm.Var(R0))))
   }
 }
