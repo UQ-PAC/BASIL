@@ -28,6 +28,7 @@ case class Interval(start: Int, end: Int) {
   require(start <= end)
 
   def size: Int = end - start
+  def move(func: Int => Int): Interval = Interval(func(start), func(end))
   def isEmpty: Boolean = this.size == 0
   def contains(offset: Int): Boolean = start <= offset && end > offset
   def isOverlapping(other: Interval): Boolean = !(start > other.end || other.start > end)
@@ -52,7 +53,7 @@ trait DSAGraph[Merged, Cell <: NodeCell & CCell, CCell <: DSACell, Node <: DSANo
   val nodes: Map[SymBase, Node] = buildNodes
   def exprToSymVal(expr: Expr): SymValueSet = sva.exprToSymValSet(expr)
   def init(symBase: SymBase, size: Option[Int]): Node
-  def constraintArgToCells(constraintArg: ConstraintArg): Set[CCell] 
+  def constraintArgToCells(constraintArg: ConstraintArg): Set[CCell]
 
   def symValToCells(symVal: SymValueSet): Set[Cell] = {
     val pairs = symVal.state
