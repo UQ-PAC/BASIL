@@ -102,20 +102,19 @@ trait DSAGraph[Merged, Cell <: NodeCell & CCell, CCell <: DSACell, Node <: DSANo
   }
 
   def mergeCells(cell1: CCell, cell2: CCell): Merged
-  def mergeCells[T <: CCell](cells: Iterable[T]): Merged
+  def mergeCells[T <: Cell](cells: Iterable[T]): Merged
   def find(cell: CCell): Merged
 }
 
-trait DSANode[Cell <: NodeCell & CCell, CCell <: DSACell](val size: Option[Int]) {
+trait DSANode[Cell <: NodeCell & DSACell](val size: Option[Int]) {
 
   def init(interval: Interval): Cell
-  def graph: DSAGraph[_, Cell, CCell, _]
+  def graph: DSAGraph[_, Cell, _, _]
   var _cells: Seq[Cell] = Seq.empty
   def cells: Seq[Cell] = _cells
   protected var _collapsed: Option[Cell] = None
   def collapsed: Option[Cell] = _collapsed
 
-  add(0) // init cell 0
   def nonOverlappingProperty: Boolean = {
     if cells.size <= 1 then true
     else
@@ -153,7 +152,7 @@ trait DSANode[Cell <: NodeCell & CCell, CCell <: DSACell](val size: Option[Int])
     add(interval)
   }
 
-    def add(interval: Interval): Cell = {
+  def add(interval: Interval): Cell = {
     if !isCollapsed then
       val overlapping: Seq[Cell] = cells.filter(_.interval.isOverlapping(interval))
       _cells = cells.diff(overlapping)
