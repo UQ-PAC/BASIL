@@ -4,7 +4,7 @@ import analysis.data_structure_analysis.Node
 import scala.collection.mutable
 
 class DSAUnionFindSolver extends UnionFindSolver[UniTerm] {
-  private val parent = mutable.Map[DSAUniTerm, DSAUniTerm]()
+  private val parento = mutable.Map[DSAUniTerm, DSAUniTerm]()
   private val offsets = mutable.Map[DSAUniTerm, BigInt]()
 
   override def unify(t1: Term[UniTerm], t2: Term[UniTerm]): Unit =
@@ -30,12 +30,12 @@ class DSAUnionFindSolver extends UnionFindSolver[UniTerm] {
 
   def findWithOffset(t: DSAUniTerm): (DSAUniTerm, BigInt) = {
     mkSet(t)
-    if (parent(t) != t)
-      val (par, offset) = findWithOffset(parent(t))
+    if (parento(t) != t)
+      val (par, offset) = findWithOffset(parento(t))
       parent += t -> par
       offsets += t -> (offsets(t) + offset)
 
-    (parent(t), offsets(t))
+    (parento(t), offsets(t))
   }
 
   /** Creates an equivalence class for the term `t`, if it does not exists already.
