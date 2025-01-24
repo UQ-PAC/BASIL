@@ -549,10 +549,11 @@ object RunUtils {
     }
   }
 
-  def doSimplify(program: Program, config: Option[StaticAnalysisConfig]) : Unit = {
+  def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]) : Unit = {
     // writeToFile(dotBlockGraph(program, program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
     Logger.info("[!] Running Simplify")
     val timer = PerformanceTimer("Simplify")
+    val program = ctx.program
 
     transforms.applyRPO(program)
 
@@ -603,7 +604,7 @@ object RunUtils {
     //assert(program.procedures.forall(transforms.rdDSAProperty))
     AnalysisResultDotLogger.writeToFile(File("blockgraph-before-copyprop.dot"), dotBlockGraph(program.mainProcedure))
     Logger.info("Copyprop Start")
-    transforms.doCopyPropTransform(program)
+    transforms.doCopyPropTransform(program, ctx.globalOffsets)
     AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
 
     // assert(program.procedures.forall(transforms.rdDSAProperty))
@@ -639,7 +640,6 @@ object RunUtils {
 
     Logger.info("[!] Simplify :: finished")
   }
-  def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]) : Unit = doSimplify(ctx.program, config)
 
   def loadAndTranslate(conf: BASILConfig): BASILResult = {
     Logger.info("[!] Loading Program")
@@ -689,7 +689,7 @@ object RunUtils {
         ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
       }
 
-      doSimplify(ctx.program, conf.staticAnalysis)
+      doSimplify(ctx, conf.staticAnalysis)
     }
 
     if (q.runInterpret) {

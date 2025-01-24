@@ -1,6 +1,8 @@
 package ir.transforms
 import translating.serialiseIL
+import translating.PrettyPrinter.*
 
+import boogie.FuncEntry
 import util.SimplifyLogger
 import ir.eval.AlgebraicSimplifications
 import ir.eval.AssumeConditionSimplifications
@@ -361,14 +363,14 @@ class CleanupAssignments() extends CILVisitor {
 }
 
 
-def copypropTransform(p: Procedure) = {
+def copypropTransform(p: Procedure, procFrames: Map[Procedure, Set[Memory]], funcEntries: Map[BigInt, Procedure], constRead: (BigInt, Int) => Option[BitVecLiteral]) = {
   val t = util.PerformanceTimer(s"simplify ${p.name} (${p.blocks.size} blocks)")
   // val dom = ConstCopyProp()
   // val solver = worklistSolver(dom)
 
   // SimplifyLogger.info(s"${p.name} ExprComplexity ${ExprComplexity()(p)}")
   // val result = solver.solveProc(p, true).withDefaultValue(dom.bot)
-  val result = CopyProp.DSACopyProp(p)
+  val result = CopyProp.DSACopyProp(p, procFrames, funcEntries, constRead)
   val solve = t.checkPoint("Solve CopyProp")
 
   if (result.nonEmpty) {
@@ -381,7 +383,7 @@ def copypropTransform(p: Procedure) = {
     visit_proc(condVis, p)
 
   }
-  // visit_proc(CopyProp.BlockyProp(), p)
+  visit_proc(CopyProp.BlockyProp(), p)
 
   val xf = t.checkPoint("transform")
   // SimplifyLogger.info(s"    ${p.name} after transform expr complexity ${ExprComplexity()(p)}")
@@ -469,9 +471,37 @@ def coalesceBlocks(p: Program) = {
   didAny
 }
 
-def doCopyPropTransform(p: Program) = {
+def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
 
   applyRPO(p)
+
+  def isExternal(p: Procedure) = p.isExternal.contains(true) || p.blocks.isEmpty
+  // assume some functions modify nothing 
+  def noModifies(p: Procedure) = 
+    p.procName match {
+    case "strlen" | "assert" | "printf"  | "__stack_chk_fail" | "__printf_chk" | "__syslog_chk" => true
+    case _ => false
+  }
+
+  val procFrames = p.procedures.filterNot(p => (isExternal(p) && !(noModifies(p))))
+    .map(p => (p, getProcFrame.apply(p))).toMap
+
+  val addrToProc = p.procedures.toSeq.flatMap(p => p.address.map(addr => addr -> p).toSeq).toMap
+
+  def read(addr: BigInt, size: Int) : Option[BitVecLiteral] = {
+    val rodata = p.initialMemory.filter((_, s) => s.readOnly)
+    rodata.maxBefore(addr + 1) match {
+      case None => None
+      case (Some((k, s))) if s.canGetBytes(addr, size / 8) => {
+        SimplifyLogger.debug(s"got [$addr..${addr + size}] from ${s.name} [${s.address}..${s.address + s.size}]")
+        Some(s.getBytes(addr, size / 8).reverse.foldLeft(BitVecLiteral(0,0))((acc, r) => ir.eval.BitVectorEval.smt_concat(acc, r)))
+      }
+      case (Some((k,s))) => {
+        SimplifyLogger.debug(s"Cannot get [$addr..${addr + size}] from ${s.name} [${s.address}..${s.address + s.size}]")
+        None
+      }
+    }
+  }
 
   SimplifyLogger.info("[!] Simplify :: Expr/Copy-prop Transform")
   val work = p.procedures
@@ -481,7 +511,7 @@ def doCopyPropTransform(p: Program) = {
         {
           SimplifyLogger
             .debug(s"CopyProp Transform ${p.name} (${p.blocks.size} blocks, expr complexity ${ExprComplexity()(p)})")
-          copypropTransform(p)
+          copypropTransform(p, procFrames, addrToProc, read)
         }
     )
 
@@ -511,6 +541,8 @@ def doCopyPropTransform(p: Program) = {
   removeEmptyBlocks(p)
   coalesceBlocks(p)
   removeEmptyBlocks(p)
+  visit_prog(CopyProp.BlockyProp(), p)
+  visit_prog(CleanupAssignments(), p)
 
 }
 
@@ -562,6 +594,26 @@ enum CopyProp {
 }
 
 case class CCP(val state: Map[Variable, CopyProp] = Map())
+
+
+object getProcFrame {
+  class GetProcFrame extends CILVisitor  {
+    var modifies = Set[Memory]()
+
+    override def vstmt(e: Statement) = e match {
+      case s : MemoryStore => modifies = modifies + s.mem; SkipChildren()
+      case _ => SkipChildren()
+    }
+
+  }
+
+  def apply(p: Procedure): Set[Memory] = {
+    val v = GetProcFrame()
+    visit_proc(v, p)
+    v.modifies
+  }
+}
+
 
 object CCP {
 
@@ -788,17 +840,86 @@ object CopyProp {
     }
   }
 
-  def DSACopyProp(p: Procedure) = {
+  def varForMem(m: Memory) = Register("symbolic_memory_var" + m.name, 1)
+  def isMemVar(v: Variable) = v.name.startsWith("symbolic_memory_var")
+  def varForLoadStore(m: Memory, addr: Expr , sz: Int) = {
+    Register(m.name + "_symbolic_store_" + translating.PrettyPrinter.pp_expr(addr), sz)
+  }
 
+  def clobberAllMemory(c: mutable.HashMap[Variable, PropState]) = {
+    c.keys.filter(isMemVar).foreach(v => clobberFull(c, v))
+  }
+
+  def DSACopyProp(p: Procedure, procFrames: Map[Procedure, Set[Memory]], funcEntries: Map[BigInt, Procedure], constRead: (BigInt, Int) => Option[BitVecLiteral]) = {
     val updated = false
     val state = mutable.HashMap[Variable, PropState]()
     var poisoned = false // we have an indirect call
 
+    val doLoadReasoning = false
+
     def transfer(c: mutable.HashMap[Variable, PropState], s: Statement): Unit = {
       // val callClobbers = ((0 to 7) ++ (19 to 30)).map("R" + _).map(c => Register(c, 64))
       s match {
-        case l: MemoryLoad =>
-          clobberFull(c, l.lhs)
+        case l : MemoryStore if doLoadReasoning => {
+          val mvar = varForMem(l.mem)
+          val existing = c.get(mvar).isDefined
+
+          if (existing) {
+            clobberFull(c, varForMem(l.mem))
+          } else {
+            c(mvar) = PropState(FalseLiteral, mutable.Set.empty, false, 0, false)
+
+            val store = canPropTo(c, l.index) 
+            
+            store match {
+              case (Some((addr),deps)) => {
+                val storeVar = varForLoadStore(l.mem, addr, l.size)
+                if (c.get(storeVar).isDefined) {
+                  clobberFull(c, storeVar)
+                } else {
+                  val value = canPropTo(c, l.value) 
+                  value match {
+                    case Some(value, deps) => {
+                      c(storeVar) = PropState(value, mutable.Set.from(deps + mvar), false, 0, false)
+                    }
+                    case _ =>  clobberFull(c, storeVar)
+                  }
+                }
+              }
+              case _ => ()
+            }
+          }
+        }
+        case l: MemoryLoad if doLoadReasoning => {
+          val loadprop = canPropTo(c, l.index)
+          val loaded = for {
+            (addr, deps) <-  loadprop
+            loadvar = varForLoadStore(l.mem, addr, l.size)
+            loadval = canPropTo(c, loadvar).filterNot((v, _) => v == loadvar)
+            (value, ndeps) <- loadval.orElse(addr match {
+              case b : BitVecLiteral => {
+                val r = constRead(b.value, l.size)
+                r.map(v => (v, Set[Variable]()))
+              }
+              case r => {
+                None
+              }
+            })
+          } yield (value, deps ++ ndeps)
+          loaded match {
+            case (Some(value, deps)) => 
+              c(l.lhs) = PropState(value, mutable.Set.from(deps), false, 0, false)
+          case _ => {
+            clobberFull(c, l.lhs)
+          }
+          }
+        }
+        case l : MemoryStore  => {
+          ()
+        }
+        case l: MemoryLoad => {
+            clobberFull(c, l.lhs)
+        }
         case LocalAssign(l, r, lb) => {
           val isFlag = isFlagVar(l) || r.variables.exists(isFlagVar)
           val isFlagDep = isFlag || c.get(l).map(v => v.isFlagDep).getOrElse(false)
@@ -829,17 +950,45 @@ object CopyProp {
           }
         }
         case x: DirectCall => {
+          procFrames.get(x.target) match {
+            case Some(f) => for (mem <- f) {
+              clobberFull(c, varForMem(mem))
+            }
+            case _ => clobberAllMemory(c)
+          }
+
           val lhs = x.outParams.map(_._2)
           for (l <- lhs) {
             clobberFull(c, l)
           }
         }
         case x: IndirectCall => {
-          // not really correct
-          poisoned = true
-          for ((i, v) <- c) {
-            v.clobbered = true
+          // need a reaching-defs to get inout args (just assume register name matches?)
+          // this reduce we have to clobber with the indirect call this round
+          if (!doLoadReasoning) {
+              poisoned = true
           }
+          val r = for {
+            (addr, deps) <- canPropTo(c, x.target)
+            addr <- addr match {
+              case b : BitVecLiteral => Some(b.value)
+              case _ => None
+            }
+            proc <- funcEntries.get(addr)
+          } yield (proc, deps)
+
+          r match {
+            case Some(target, deps) => {
+              SimplifyLogger.info("Resolved indirect call")
+            }
+            case None => {
+              for ((i, v) <- c) {
+                v.clobbered = true
+              }
+              poisoned = true
+            }
+          }
+
         }
         case _ => ()
       }
@@ -858,7 +1007,7 @@ object CopyProp {
 
     val trivialOnly = false
 
-    if poisoned then mutable.HashMap() else state
+    if (!poisoned) state else mutable.HashMap()
   }
 
   def toResult(s: mutable.Map[Variable, PropState], trivialOnly: Boolean = true)(v: Variable): Option[Expr] = {

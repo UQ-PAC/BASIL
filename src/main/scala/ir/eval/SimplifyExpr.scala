@@ -888,6 +888,8 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
     case Extract(ed, bg, ZeroExtend(x, expr)) if (bg < size(expr).get) && (ed < size(expr).get) => Extract(ed, bg, expr)
     case Extract(ed, bg, SignExtend(x, expr)) if (bg < size(expr).get) && (ed < size(expr).get) => Extract(ed, bg, expr)
 
+    case ZeroExtend(ed, Extract(hi, 0, e)) if size(e).get == hi + ed => BinaryExpr(BVAND, e, BinaryExpr(BVCONCAT, BitVecLiteral(0, ed), BitVecLiteral(BigInt(2).pow(hi)-1, hi)))
+
     case BinaryExpr(BVSHL, body, BitVecLiteral(n, _)) if size(body).get <= n => BitVecLiteral(0, size(body).get)
 
     // simplify convoluted bit test
@@ -953,6 +955,10 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
           BitVecLiteral(1, 1)
         ) =>
       logSimp(e, BinaryExpr(BVEQ, (body), BitVecLiteral(0, 1)))
+    case BinaryExpr(BVEQ, ZeroExtend(hi, Extract(ehi, 0, expr)), BitVecLiteral(0, _)) => {
+      val x = BinaryExpr(BVEQ, Extract(ehi, 0, expr), BitVecLiteral(0, ehi))
+      logSimp(e, x)
+    }
 
     case BinaryExpr(BVEQ, BinaryExpr(BVCOMP, e1: Expr, e2: Expr), BitVecLiteral(0, 1)) =>
       logSimp(e, UnaryExpr(BoolNOT, BinaryExpr(BVEQ, (e1), (e2))))

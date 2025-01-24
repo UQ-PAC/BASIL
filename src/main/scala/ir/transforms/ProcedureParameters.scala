@@ -30,7 +30,7 @@ val builtinSigs: Map[String, FunSig] = Map(
   "strdup" -> FunSig(List(R(0)), List(R(0))),
   "strndup" -> FunSig(List(R(0), R(1)), List(R(0))),
   "assert" -> FunSig(List(R(0)), List()),
-  "__stack_chk_fail_16432" -> FunSig(List(), List()),
+  "__stack_chk_fail" -> FunSig(List(), List()),
   "__printf_chk" -> FunSig(List(R(0), R(1)), List(R(0))),
   "__syslog_chk" -> FunSig(List(R(0)), List()),
 )

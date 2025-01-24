@@ -24,6 +24,19 @@ class ReplaceReturns(assertR30Addr : Boolean = true) extends CILVisitor {
           SkipChildren()
         }
       }
+      case i : IndirectCall => {
+        (i.predecessor, i.parent.jump) match {
+          case (Some(l : LocalAssign), _) if l.lhs.name == "R30" => SkipChildren()
+          case (_, _) => {
+            val R30Begin = LocalVar("R30_begin", BitVecType(64))
+            i.parent.replaceJump(Return())
+            ChangeTo(List(
+              Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin)),
+              i
+            ))
+          }
+        }
+      }
       case d : DirectCall  => {
         (d.predecessor, d.parent.jump) match {
           case (Some(l : LocalAssign), _) if l.lhs.name == "R30" => SkipChildren()
@@ -36,7 +49,7 @@ class ReplaceReturns(assertR30Addr : Boolean = true) extends CILVisitor {
               d
             ))
           }
-          case (_, _: Unreachable) => {
+          case (_, _) => {
             val R30Begin = LocalVar("R30_begin", BitVecType(64))
             d.parent.replaceJump(Return())
             ChangeTo(List(
