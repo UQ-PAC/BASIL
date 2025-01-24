@@ -46,13 +46,13 @@ object Interval {
 
 trait DSA {}
 
-trait DSAGraph[Merged, Cell <: DSACell, Node <: DSANode[Merged, _, Cell, Node]](val proc: Procedure, val phase: DSAPhase) {
+trait DSAGraph[Merged, Cell <: NodeCell & CCell, CCell <: DSACell, Node <: DSANode[Cell, CCell]](val proc: Procedure, val phase: DSAPhase) {
   val sva: SymbolicValues = getSymbolicValues(proc)
   val constraints: Set[Constraint] = generateConstraints(proc)
   val nodes: Map[SymBase, Node]
   def exprToSymVal(expr: Expr): SymValueSet = sva.exprToSymValSet(expr)
-  def constraintArgToCells(constraintArg: ConstraintArg): Set[Cell]
-  def symValToCells(symVal: SymValueSet): Seq[Cell]
+  def constraintArgToCells(constraintArg: ConstraintArg): Set[CCell]
+  def symValToCells(symVal: SymValueSet): Set[Cell]
   protected def processConstraint(constraint: Constraint): Unit
 
   // takes a map from symbolic bases to nodes and updates it based on symVal
@@ -76,13 +76,21 @@ trait DSAGraph[Merged, Cell <: DSACell, Node <: DSANode[Merged, _, Cell, Node]](
     }
   }
 
-  def mergeCells(cell1: Cell, cell2: Cell): Merged
-  def mergeCells[T <: Cell](cells: Iterable[T]): Merged
-  def find(cell: Cell): Merged
+  def mergeCells(cell1: CCell, cell2: CCell): Merged
+  def mergeCells[T <: CCell](cells: Iterable[T]): Merged
+  def find(cell: CCell): Merged
 }
 
-trait DSANode[Merged, CCell <: NodeCell, Cell <: DSACell, Node <: DSANode[Merged, CCell, Cell, Node]]() {
+trait DSANode[Cell <: NodeCell & CCell, CCell <: DSACell](val size: Option[Int]) {
 
+  def init(interval: Interval): Cell
+  def graph: DSAGraph[_, Cell, CCell, _]
+  var _cells: Seq[Cell] = Seq.empty
+  def cells: Seq[Cell] = _cells
+  protected var _collapsed: Option[Cell] = None
+  def collapsed: Option[Cell] = _collapsed
+
+  add(0) // init cell 0
   def nonOverlappingProperty: Boolean = {
     if cells.size <= 1 then true
     else
@@ -91,35 +99,60 @@ trait DSANode[Merged, CCell <: NodeCell, Cell <: DSACell, Node <: DSANode[Merged
       intervals.exists(interval1 =>
         intervals.exists(interval2 => interval1 != interval2 && interval1.isOverlapping(interval2)))
   }
-  
-  def collapsed: Option[CCell]
-  def cells: Seq[CCell]
-  def graph: DSAGraph[Merged, Cell, Node]
+
+
   def isCollapsed: Boolean = collapsed.nonEmpty
-  def collapse(): CCell
-  def add(offset: Int): CCell = {
+  def add(offset: Int): Cell = {
     if !isCollapsed then
       add(Interval(offset, offset))
     else
       collapsed.get
   }
-  def add(interval: Interval): CCell 
-  
-  def get(offset: Int): CCell = {
-    val exactMatch = cells.filter(_.interval.contains(offset))
-    assert(exactMatch.size == 1, "Expected  exactly one interval to contain the offset")
-    exactMatch.head
+
+  def get(offset: Int): Cell = {
+    if isCollapsed then collapsed.get else
+      val exactMatch = cells.filter(_.interval.contains(offset))
+      assert(exactMatch.size == 1, "Expected  exactly one interval to contain the offset")
+      exactMatch.head
   }
 
-  def get(interval: Interval): CCell = {
-    val exactMatches = cells.filter(_.interval.isOverlapping(interval))
-    assert(exactMatches.size == 1, "Expected exactly one overlapping interval")
-    assert(exactMatches.head.interval == interval, "")
-    exactMatches.head
+  def get(interval: Interval): Cell = {
+    if isCollapsed then collapsed.get else
+      val exactMatches = cells.filter(_.interval.isOverlapping(interval))
+      assert(exactMatches.size == 1, "Expected exactly one overlapping interval")
+      assert(exactMatches.head.interval == interval, "")
+      exactMatches.head
   }
 
-  def growCell(interval: Interval): CCell = {
+  def growCell(interval: Interval): Cell = {
     add(interval)
+  }
+
+    def add(interval: Interval): Cell = {
+    if !isCollapsed then
+      val overlapping: Seq[Cell] = cells.filter(_.interval.isOverlapping(interval))
+      _cells = cells.diff(overlapping)
+
+      val newCell = if overlapping.isEmpty then
+        init(interval)
+      else
+        val unifiedInterval = overlapping.map(_.interval).reduce(Interval.join)
+        val res = init(unifiedInterval)
+        graph.mergeCells(overlapping.appended(res))
+        res
+
+      _cells = cells.appended(newCell).sorted
+      newCell
+    else
+      collapsed.get
+  }
+
+  def collapse(): Cell = {
+    if !isCollapsed then
+      val collapsedCell = init(Interval(0, 0))
+      graph.mergeCells(cells.appended(collapsedCell))
+      _collapsed = Some(collapsedCell)
+    collapsed.get
   }
 
 }
