@@ -13,25 +13,14 @@ object SuperCellCounter extends Counter
 case class FieldTerm(v: SuperCell) extends analysis.solvers.Var[FieldTerm]
 
 class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SuperCell, FieldCell, ConstraintCell, FieldNode](proc, phase) {
-
+  
+  override def init(symBase: SymBase, size: Option[Int]): FieldNode = FieldNode(this, symBase, size)
+  
   val solver: UnionFindSolver[FieldTerm] = UnionFindSolver[FieldTerm]()
   override val nodes: Map[SymBase, FieldNode] = buildNodes
 
   def localPhase(): Unit = {
     constraints.foreach(processConstraint)
-  }
-
-  def symValToCells(symVal: SymValueSet): Set[FieldCell] = {
-    val pairs = symVal.state
-    pairs.foldLeft(Set[FieldCell]()) {
-      case (results, (base: SymBase, offsets: SymOffsets)) =>
-        val node = nodes(base)
-        if offsets.isTop then
-          node.collapse()
-          results + node.get(0)
-        else
-          results ++ offsets.getOffsets.map(node.get)
-    }
   }
 
   override def constraintArgToCells(constraintArg: ConstraintArg): Set[ConstraintCell] = {
@@ -40,18 +29,6 @@ class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SuperCell, F
       exprCells.map(_.content).toSet
     else
       exprCells.toSet
-  }
-
-  // takes a map from symbolic bases to nodes and updates it based on symVal
-  override def symValToNodes(symVal: SymValueSet, current: Map[SymBase, FieldNode]): Map[SymBase, FieldNode]  = {
-    symVal.state.foldLeft(current) {
-      case (result, (base, symOffsets)) =>
-        val node = result.getOrElse(base, FieldNode(this, base, None))
-        if symOffsets.isTop then node.collapse()
-        else
-          symOffsets.getOffsets.map(node.add)
-        result + (base -> node)
-    }
   }
 
   override def processConstraint(constraint: Constraint): Unit =
@@ -118,7 +95,7 @@ class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SuperCell, F
     var seenCells: Set[Int] = Set.empty
     var pointTos: Set[(Int, Int)] = Set.empty
 
-    val cells = nodes.values.flatMap(_.cells)
+    val cells = nodes.values.flatMap(f => f.cells)
     val superCells = cells.flatMap(f => Set(f.sc, f.content.sc)).map(find)
 
     superCells.foreach(

@@ -49,16 +49,40 @@ trait DSA {}
 trait DSAGraph[Merged, Cell <: NodeCell & CCell, CCell <: DSACell, Node <: DSANode[Cell, CCell]](val proc: Procedure, val phase: DSAPhase) {
   val sva: SymbolicValues = getSymbolicValues(proc)
   val constraints: Set[Constraint] = generateConstraints(proc)
-  val nodes: Map[SymBase, Node]
+  val nodes: Map[SymBase, Node] = buildNodes
   def exprToSymVal(expr: Expr): SymValueSet = sva.exprToSymValSet(expr)
-  def constraintArgToCells(constraintArg: ConstraintArg): Set[CCell]
-  def symValToCells(symVal: SymValueSet): Set[Cell]
+  def init(symBase: SymBase, size: Option[Int]): Node
+  def constraintArgToCells(constraintArg: ConstraintArg): Set[CCell] 
+
+  def symValToCells(symVal: SymValueSet): Set[Cell] = {
+    val pairs = symVal.state
+    pairs.foldLeft(Set[Cell]()) {
+      case (results, (base: SymBase, offsets: SymOffsets)) =>
+        val node = nodes(base)
+        if offsets.isTop then
+          node.collapse()
+          results + node.get(0) // any offset returns the collapsed node
+        else
+          results ++ offsets.getOffsets.map(node.get)
+    }
+  }
+
   protected def processConstraint(constraint: Constraint): Unit
 
   // takes a map from symbolic bases to nodes and updates it based on symVal
-  protected def symValToNodes(symVal: SymValueSet, current: Map[SymBase, Node]): Map[SymBase, Node]
+  protected def symValToNodes(symVal: SymValueSet, current: Map[SymBase, Node]): Map[SymBase, Node] = {
+    symVal.state.foldLeft(current) {
+      case (result, (base, symOffsets)) =>
+        val node = result.getOrElse(base, init(base, None))
+        if symOffsets.isTop then node.collapse()
+        else
+          symOffsets.getOffsets.map(node.add)
+        result + (base -> node)
+    }
+  }
 
-  // takes a map from symbolic bases to nodes and updates it based on constraint
+
+    // takes a map from symbolic bases to nodes and updates it based on constraint
   protected def binaryConstraintToNodes(constraint: BinaryConstraint, nodes: Map[SymBase, Node]): Map[SymBase, Node] = {
     val arg1 = exprToSymVal(constraint.arg1.value)
     val arg2 = exprToSymVal(constraint.arg2.value)
