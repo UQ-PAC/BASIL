@@ -12,7 +12,7 @@ object SuperCellCounter extends Counter
 
 case class FieldTerm(v: SuperCell) extends analysis.solvers.Var[FieldTerm]
 
-class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SuperCell, ConstraintCell, FieldNode](proc, phase) {
+class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SuperCell, FieldCell, ConstraintCell, FieldNode](proc, phase) {
 
   val solver: UnionFindSolver[FieldTerm] = UnionFindSolver[FieldTerm]()
   override val nodes: Map[SymBase, FieldNode] = buildNodes
@@ -21,14 +21,14 @@ class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SuperCell, C
     constraints.foreach(processConstraint)
   }
 
-  def symValToCells(symVal: SymValueSet): Seq[FieldCell] = {
+  def symValToCells(symVal: SymValueSet): Set[FieldCell] = {
     val pairs = symVal.state
-    pairs.foldLeft(Seq[FieldCell]()) {
+    pairs.foldLeft(Set[FieldCell]()) {
       case (results, (base: SymBase, offsets: SymOffsets)) =>
         val node = nodes(base)
         if offsets.isTop then
           node.collapse()
-          results.appended(node.get(0))
+          results + node.get(0)
         else
           results ++ offsets.getOffsets.map(node.get)
     }
@@ -142,57 +142,27 @@ class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SuperCell, C
 }
 
 
-class FieldNode(val parent: FieldGraph, val base: SymBase, val size: Option[Int]) extends DSANode[SuperCell, FieldCell, ConstraintCell, FieldNode] {
-
-  var _cells: Seq[FieldCell] = Seq.empty
-  override def cells: Seq[FieldCell] = _cells
-  private var _collapsed: Option[FieldCell] = None
-  override def collapsed: Option[FieldCell] = _collapsed
-  def graph = parent
-  add(0)
-
-  override def add(interval: Interval): FieldCell = {
-    val overlapping: Seq[FieldCell] = cells.filter(_.interval.isOverlapping(interval))
-    _cells = cells.diff(overlapping)
-
-    val newCell = if overlapping.isEmpty then
-      FieldCell(this, interval)
-    else
-      val unifiedInterval = overlapping.map(_.interval).reduce(Interval.join)
-      val res = FieldCell(this, unifiedInterval)
-      graph.mergeCells(overlapping.appended(res))
-      res
-
-    _cells = cells.appended(newCell)
-    newCell
-
-  }
-
-
-  override def collapse(): FieldCell = {
-    if !isCollapsed then
-      val collapsedCell = FieldCell(this, Interval(0,0))
-      graph.mergeCells(cells.appended(collapsedCell))
-      _collapsed = Some(collapsedCell)
-    collapsed.get
-  }
+class FieldNode(val graph: FieldGraph, val base: SymBase, size: Option[Int]) extends DSANode[FieldCell, ConstraintCell](size) {
+//  override def graph: DSAGraph[SuperCell, FieldCell, ConstraintCell, FieldNode] = parent
+  override def init(interval: Interval): FieldCell = FieldCell(this, interval)
 }
 
 sealed trait ConstraintCell extends DSACell {
   val sc = SuperCell(Set(this))
 }
 
-trait NodeCell(val interval: Interval) extends ConstraintCell
+trait NodeCell(val interval: Interval) extends DSACell, ConstraintCell
+
+object NodeCell {
+  implicit def orderingByInterval[T <: NodeCell]: Ordering[T] =
+    Ordering.by(sc => sc.interval)
+}
 
 case class FieldCell(node: FieldNode, override val interval: Interval) extends NodeCell(interval)  {
   val content: ContentCell = ContentCell(this)
   override def toString: String = s"Cell($node, $interval)"
 }
 
-object FieldCell {
-  implicit def orderingByInterval[A <: FieldCell]: Ordering[A] =
-    Ordering.by(fc => fc.interval)
-}
 
 case class ContentCell(cell: FieldCell) extends ConstraintCell {
   override def toString: String = s"[|${cell.toString}|]"
