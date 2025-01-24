@@ -109,9 +109,10 @@ class SummaryGenerator(
     }
   }
 
-  /** Get a map of variables to variables which have tainted it in the procedure.
-    */
-  private def getTainters(procedure: Procedure, variables: Set[Taintable]): Map[Taintable, Set[Taintable]] = {
+  /**
+   * Get a map of variables to variables which have tainted it in the procedure.
+   */
+  private def getTainters(procedure: Procedure): Map[Taintable, Set[Taintable]] = {
     varDepsSummaries.getOrElse(procedure, Map())
   }
 
@@ -246,13 +247,14 @@ class SummaryGenerator(
     // Use rnaResults to find stack function arguments
     val tainters = /*relevantVars.map {
       v => (v, Set())
-    }.toMap ++*/ getTainters(procedure, variables ++ procedure.formalInParam ++ rnaResults(IRWalk.firstInProc(procedure).get) + UnknownMemory()).filter { (variable, taints) =>
+    }.toMap ++*/ getTainters(procedure).filter { (variable, taints) =>
       relevantVars.contains(variable)
     }
 
     Logger.debug("For " + procedure.toString)
     Logger.debug(relevantVars)
     Logger.debug(tainters)
+    Logger.debug(getTainters(procedure))
 
     val taintPreds = tainters.toList.flatMap {
       (variable, taints) => {
@@ -304,10 +306,6 @@ class SummaryGenerator(
     //val predDomain = PredDisjunctiveCompletion(MayGammaDomain(initialState))
     val (before, after) = worklistSolver(predDomain).solveProc(procedure)
     val outVars: Set[Variable] = procedure.formalOutParam.toSet ++ procedure.formalInParam
-
-    Logger.debug(after)
-    Logger.debug(after.map((b, l) => (b, predDomain.toPred(l))))
-    Logger.debug(after.map((b, l) => (b, filterPred(predDomain.toPred(l), outVars, Predicate.Lit(TrueLiteral)))))
 
     val absIntPreds = returnBlock.map(b => after.get(b).map(l => filterPred(predDomain.toPred(l), outVars, Predicate.Lit(TrueLiteral)).split.map(_.simplify.toBoogie.simplify))).flatten.toList.flatten
 

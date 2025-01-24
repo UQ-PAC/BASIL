@@ -96,6 +96,16 @@ trait ProcVariableDependencyAnalysisFunctions(
           case Left(v) if v == lhs => Map()
           case _ => Map(d -> IdEdge())
         }
+      case Return(_, out) =>
+        out.toMap.flatMap {
+          (assigned, expression) => {
+            val vars = expression.variables -- ignoredRegisters
+            d match {
+              case Left(v: Variable) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> IdEdge())
+              case _ => Map(d -> IdEdge())
+            }
+          }
+        }
       case _ => Map(d -> IdEdge())
     }
   }
@@ -140,25 +150,9 @@ class VariableDependencyAnalysis(
     scc.flatten.filter(_.blocks.nonEmpty).foreach { procedure =>
       {
         StaticAnalysisLogger.debug("Generating variable dependencies for " + procedure)
-        var varDepResults = ProcVariableDependencyAnalysis(program, varDepVariables, globals, constProp, varDepsSummariesTransposed, procedure).analyze()
+        var varDepResults = ProcVariableDependencyAnalysis(program, varDepVariables ++ procedure.formalInParam ++ procedure.formalOutParam,
+          globals, constProp, varDepsSummariesTransposed, procedure).analyze()
         StaticAnalysisLogger.debug(varDepResults)
-        // Do one last step to taint output parameters because i can't get the IDE solver to do it :(
-        IRWalk.lastInProc(procedure) match {
-          case Some(ret: Return) => {
-            varDepResults.get(ret) match {
-              case Some(finalResults) => {
-                varDepResults += ret -> ret.outParams.foldLeft(finalResults) {
-                  (m, p) => {
-                    val (o, e) = p
-                    m + (o -> e.variables.foldLeft(Set[Taintable]())((s, v) => s.union(finalResults.getOrElse(v, Set()))))
-                  }
-                }
-              }
-              case _ => {}
-            }
-          }
-          case _ => {}
-        }
         val varDepMap = varDepResults.getOrElse(IRWalk.lastInProc(procedure).getOrElse(procedure), Map())
         varDepsSummaries += procedure -> varDepMap
         varDepsSummariesTransposed += procedure -> varDepMap.foldLeft(Map[Taintable, Set[Taintable]]()) { (m, p) =>
