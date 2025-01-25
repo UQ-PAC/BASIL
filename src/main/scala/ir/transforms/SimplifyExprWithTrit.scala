@@ -1,4 +1,5 @@
-package ir
+package ir.transforms
+import ir.*
 
 // A = definite 1 bits, B = unknown bits
 // A[i] = 1, B[i] = 0 -> Bit i is definitely 1
@@ -16,8 +17,18 @@ package ir
 
 // Bitwise AND:
 // Ay[i] = Ax[i] & Az[i]    ->    Ay[i] = 0000
-// By[i] = (Bx[i] || Bz[i]) & ~(Ay[i])  ->  By[i] = 1101
-// y = {T, T, 0, T}
+// By[i] = (Bx[i] | Bz[i]) & (Ax[i] | Az[i])   ->   By[i] = 1100
+// y = {T, T, 0, 0}
+
+// Bitwise OR:
+// Ay[i] = Ax[i] | Az[i]    ->    Ay[i] = 1110
+// By[i] = (Bx[i] | Bz[i]) & ~(Ax[i] | Az[i])   ->   By[i] = 0001
+// y = {1, 1, 1, T}
+
+// Bitwise XOR:
+// Ay[i] = (Ax[i] ^ Az[i]) & ~(Bx[i] | Bz[i])   ->    Ay[i] = 0010
+// By[i] = (Bx[i] | Bz[i])    ->    By[i] = 1101
+// y = {T, T, 1, T}
 
 // Represents a single bit in a bitvector
 case class Trit(a: Int, b: Int) {
@@ -33,21 +44,21 @@ case class Trit(a: Int, b: Int) {
     // Bitwise AND
     def TAND(that: Trit): Trit = {
         val newA = this.a & that.a
-        val newB = (this.b | that.b) & ~(newA)
+        val newB = (this.b | that.b) & (this.a | that.a)
         Trit(newA, newB)
     }
 
     // Bitwise OR
     def TOR(that: Trit): Trit = {
         val newA = this.a | that.a
-        val newB = (this.b | that.b) & ~(newA)
+        val newB = (this.b | that.b) & ~(this.a | that.a)
         Trit(newA, newB)
     }
 
     // Bitwise XOR
     def TXOR(that: Trit): Trit = {
-        val newA = this.a ^ that.a
-        val newB = (this.b | that.b) & ~(newA)
+        val newA = (this.a ^ that.a) & ~(this.b | that.b)
+        val newB = (this.b | that.b)
         Trit(newA, newB)
     }
 }
@@ -69,7 +80,7 @@ case class TritVector(trits: Vector[Trit]) {
 
 // Check AbstractDomain signature
 class TritSimplificationDomain extends AbstractDomain[Map[Variable, Expr]] {
-    def toTritVector(b: BitVecLiteral): TritVector = {
+    def toTritVector(bv: BitVecLiteral): TritVector = {
         val trits = (0 until bv.length).map { i =>
             val bit = (bv.value >> i) & 1
             if (bit == 1) {
@@ -96,7 +107,7 @@ class TritSimplificationDomain extends AbstractDomain[Map[Variable, Expr]] {
     }
 
     // BitVecLiteral does not store Top element so parameter type should change
-    override def transfer(s: Map[Variable, BitVecLiteral], b: Command): Map[Variable, TritVector] = {
+    override def transfer(s: Map[Variable, TritVector], b: Command): Map[Variable, TritVector] = {
         b match {
             case a: LocalAssign if a.rhs.isInstanceOf[BinaryExpr] => 
                 if (a.rhs.arg1.isInstanceOf[BitVecLiteral] && a.rhs.arg2.isInstanceOf[BitVecLiteral]) {
