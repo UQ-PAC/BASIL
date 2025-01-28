@@ -13,14 +13,11 @@ import ir.transforms.{AbstractDomain, reversePostOrder, worklistSolver}
  * This helps because the verifier cannot make any assumptions about procedures with no summaries.
  */
 class SummaryGenerator(
-    program: Program,
-    varDepsSummaries: Map[Procedure, Map[Variable, LatticeSet[Variable]]],
+  program: Program,
+  varDepsSummaries: Map[Procedure, Map[Variable, LatticeSet[Variable]]],
+  simplified: Boolean = false,
 ) {
-  // registers R19 to R29 and R31 must be preserved by a procedure call, so we only need summaries for R0-R18 and R30
-  // TODO support R30? the analysis currently ignores it?
-  val variables: Set[Variable] = 0.to(18).map { n =>
-    Register(s"R$n", 64)
-  }.toSet
+  val relevantGlobals: Set[Variable] = if simplified then Set() else 0.to(31).map { n => Register(s"R$n", 64) }.toSet
 
   /**
    * Get a map of variables to variables which have tainted it in the procedure.
@@ -95,7 +92,7 @@ class SummaryGenerator(
     if procedure.blocks.isEmpty then return List()
 
     val predDomain = PredicateDomain()
-    val initialState = LatticeMap.TopMap((variables.collect(_ match {
+    val initialState = LatticeMap.TopMap((relevantGlobals.collect(_ match {
       case v: Variable => v
     }) ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
     val mustGammaDomain = MustGammaDomain(initialState)
@@ -153,8 +150,9 @@ class SummaryGenerator(
   def generateEnsures(procedure: Procedure): List[BExpr] = {
     if procedure.blocks.isEmpty then return List()
 
+    val inVars = relevantGlobals ++ procedure.formalInParam
     // We only need to make ensures clauses about the gammas of modified globals our output variables.
-    val relevantVars = (variables ++ procedure.formalOutParam).filter { v =>
+    val outVars = (relevantGlobals ++ procedure.formalOutParam).filter { v =>
       v match {
         case v: Global => procedure.modifies.contains(v)
         case v: LocalVar => procedure.formalOutParam.contains(v)
@@ -165,14 +163,14 @@ class SummaryGenerator(
     // Use rnaResults to find stack function arguments
     // TODO COMMENTS I think the reason I added this relevantVars.map thing is to make variables that aren't
     // tainted by anything report their gammas as low.
-    val tainters = relevantVars.map {
+    val tainters = outVars.map {
       v => (v, Set())
     }.toMap ++ getTainters(procedure).filter { (variable, taints) =>
-      relevantVars.contains(variable)
+      outVars.contains(variable)
     }
 
     Logger.debug("For " + procedure.toString)
-    Logger.debug(relevantVars)
+    Logger.debug(outVars)
     Logger.debug(tainters)
     Logger.debug(getTainters(procedure))
     Logger.debug(varDepsSummaries.get(procedure))
@@ -211,14 +209,9 @@ class SummaryGenerator(
     val initialState = LatticeMap.TopMap((procedure.formalInParam.toSet: Set[Variable]).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
 
     val predDomain = PredDisjunctiveCompletion(PredProductDomain(DoubleIntervalDomain(), MayGammaDomain(initialState)))
-    //val predDomain = PredDisjunctiveCompletion(SignedIntervalDomain())
-    //val predDomain = PredDisjunctiveCompletion(UnsignedIntervalDomain())
-    //val predDomain = PredDisjunctiveCompletion(DoubleIntervalDomain())
-    //val predDomain = PredDisjunctiveCompletion(MayGammaDomain(initialState))
     val (before, after) = worklistSolver(predDomain).solveProc(procedure)
-    val outVars: Set[Variable] = procedure.formalOutParam.toSet ++ procedure.formalInParam
 
-    val absIntPreds = returnBlock.map(b => after.get(b).map(l => filterPred(predDomain.toPred(l), outVars, Predicate.Lit(TrueLiteral)).split.map(_.simplify.toBoogie.simplify))).flatten.toList.flatten
+    val absIntPreds = returnBlock.map(b => after.get(b).map(l => filterPred(predDomain.toPred(l), outVars ++ inVars, Predicate.Lit(TrueLiteral)).split.map(_.simplify.toBoogie.simplify))).flatten.toList.flatten
 
     taintPreds ++ absIntPreds
   }

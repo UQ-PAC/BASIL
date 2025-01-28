@@ -351,13 +351,14 @@ object IRTransform {
     ctx: IRContext,
     IRProgram: Program,
     varDepsSummaries: Map[Procedure, Map[Variable, LatticeSet[Variable]]],
+    simplified: Boolean = false,
   ): Boolean = {
     var modified = false
     // Need to know modifies clauses to generate summaries, but this is probably out of place
     val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
     ctx.program.setModifies(specModifies)
 
-    val summaryGenerator = SummaryGenerator(IRProgram, varDepsSummaries)
+    val summaryGenerator = SummaryGenerator(IRProgram, varDepsSummaries, simplified)
     IRProgram.procedures.filter {
       p => p != IRProgram.mainProcedure
     }.foreach {
@@ -940,10 +941,10 @@ object RunUtils {
     if (conf.summariseProcedures) {
       StaticAnalysisLogger.debug("[!] Variable dependency summaries")
       val scc = stronglyConnectedComponents(CallGraph, List(ctx.program.mainProcedure))
-      val varDepsSummaries = VariableDependencyAnalysis(ctx.program, scc).analyze()
+      val varDepsSummaries = VariableDependencyAnalysis(ctx.program, scc, conf.simplify).analyze()
 
       StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
-      IRTransform.generateProcedureSummaries(ctx, ctx.program, varDepsSummaries)
+      IRTransform.generateProcedureSummaries(ctx, ctx.program, varDepsSummaries, conf.simplify)
     }
 
     if (q.runInterpret) {

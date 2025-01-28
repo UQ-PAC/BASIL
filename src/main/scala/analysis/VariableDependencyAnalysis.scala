@@ -7,7 +7,7 @@ import util.StaticAnalysisLogger
 import scala.collection.mutable
 
 trait ProcVariableDependencyAnalysisFunctions(
-  variables: Set[Variable],
+  relevantGlobals: Set[Variable],
   varDepsSummaries: Map[Procedure, Map[Variable, LatticeSet[Variable]]],
   procedure: Procedure,
 ) extends ForwardIDEAnalysis[Variable, LatticeSet[Variable], LatticeSetLattice[Variable]] {
@@ -16,15 +16,7 @@ trait ProcVariableDependencyAnalysisFunctions(
   import edgelattice.{IdEdge, ConstEdge, JoinEdge}
   import LatticeSet.*
 
-  private val stackPointer = Register("R31", 64)
-  private val linkRegister = Register("R30", 64)
-  private val framePointer = Register("R29", 64)
-
-  private val ignoredRegisters = Set(stackPointer, linkRegister, framePointer)
-
   private val reachable = procedure.reachableFrom
-
-  // TODO use in and out params of procedures correctly
 
   def edgesCallToEntry(call: DirectCall, entry: Procedure)(d: DL): Map[DL, EdgeFunction[LatticeSet[Variable]]] = {
     if varDepsSummaries.contains(entry) then Map() else Map(d -> IdEdge())
@@ -66,12 +58,12 @@ trait ProcVariableDependencyAnalysisFunctions(
       // At the start of the procedure, no variables should depend on anything but themselves.
       case Left(_) => Map()
       case Right(_) =>
-        (variables ++ procedure.formalInParam).foldLeft(Map(d -> IdEdge())) {
+        (relevantGlobals ++ procedure.formalInParam).foldLeft(Map(d -> IdEdge())) {
           (m: Map[DL, EdgeFunction[LatticeSet[Variable]]], v) => m + (Left(v) -> ConstEdge(FiniteSet(Set(v))))
         }
     } else n match {
       case LocalAssign(assigned, expression, _) =>
-        val vars = expression.variables -- ignoredRegisters
+        val vars = expression.variables
         d match {
           case Left(v) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> IdEdge())
           case Left(v) if v == assigned => Map()
@@ -89,7 +81,7 @@ trait ProcVariableDependencyAnalysisFunctions(
       case Return(_, out) =>
         out.toMap.flatMap {
           (assigned, expression) => {
-            val vars = expression.variables -- ignoredRegisters
+            val vars = expression.variables
             d match {
               case Left(v: Variable) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> IdEdge())
               case _ => Map(d -> IdEdge())
@@ -106,11 +98,11 @@ trait ProcVariableDependencyAnalysisFunctions(
   */
 class ProcVariableDependencyAnalysis(
   program: Program,
-  variables: Set[Variable],
+  relevantGlobals: Set[Variable],
   varDepsSummaries: Map[Procedure, Map[Variable, LatticeSet[Variable]]],
   procedure: Procedure,
 ) extends ForwardIDESolver[Variable, LatticeSet[Variable], LatticeSetLattice[Variable]](program),
-    ProcVariableDependencyAnalysisFunctions(variables, varDepsSummaries, procedure)
+    ProcVariableDependencyAnalysisFunctions(relevantGlobals, varDepsSummaries, procedure)
 {
   override def start: CFGPosition = procedure
 }
@@ -118,8 +110,9 @@ class ProcVariableDependencyAnalysis(
 class VariableDependencyAnalysis(
   program: Program,
   scc: mutable.ListBuffer[mutable.Set[Procedure]],
+  simplified: Boolean = false,
 ) {
-  val varDepVariables: Set[Variable] = 0.to(28).map { n =>
+  val relevantGlobals: Set[Variable] = if simplified then Set() else 0.to(31).map { n =>
     Register(s"R$n", 64)
   }.toSet
 
@@ -128,7 +121,7 @@ class VariableDependencyAnalysis(
     scc.flatten.filter(_.blocks.nonEmpty).foreach {
       procedure => {
         StaticAnalysisLogger.debug("Generating variable dependencies for " + procedure)
-        var varDepResults = ProcVariableDependencyAnalysis(program, varDepVariables,
+        var varDepResults = ProcVariableDependencyAnalysis(program, relevantGlobals,
           varDepsSummaries, procedure).analyze()
         StaticAnalysisLogger.debug(varDepResults)
         val varDepMap = IRWalk.lastInProc(procedure).flatMap(varDepResults.get(_)).getOrElse(Map())
