@@ -3,7 +3,7 @@ package analysis.data_structure_analysis
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
 import ir.Procedure
 
-import scala.collection.mutable
+import scala.collection.{SortedSet, mutable}
 
 object SetNodeCounter extends Counter
 class SetDSA
@@ -64,34 +64,57 @@ class SetGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SetCell, SetCe
       val nodeToBeMoved = toBeMoved.node
 
       val stableCells = stableNode.cells
-      val stableSelfMerges = stableNode.selfMerged.map(f => f.map(g => g.interval))
       val movedCells = nodeToBeMoved.cells.map(_.move(i => i + delta))
-      val movedSelfMerged = nodeToBeMoved.selfMerged.map(f => f.map(g => g.interval.move(i => i + delta)))
-      val oldSelfMerged = stableSelfMerges ++ movedSelfMerged
-
-//      val selfMerged = oldSelfMerged
-//        .foldLeft(Set[Set[Interval]]()) {
-//          case (s, equiv) =>
-//            val common = s.filter(eq => eq.exists(interval => equiv.exists(interval2 => interval.isOverlapping(interval2))))
-//            
-//        }
-
-
       val allCells = (stableCells ++ movedCells).sorted
       val resultNode = SetNode(this, stableNode.bases.union(nodeToBeMoved.bases))
       val queue: mutable.Queue[SetCell] = mutable.Queue(allCells:_*)
+      val newToOlds: mutable.Map[SetCell, Set[SetCell]] = mutable.Map.empty
       while queue.nonEmpty do
         val cell = queue.dequeue()
         val (overlapping, rest) = queue.toSet.partition(cell2 => cell.interval.isOverlapping(cell2.interval))
         queue.dequeueAll(overlapping.contains)
         val unifiedInterval = overlapping.map(_.interval).reduce(Interval.join)
         val newCell = SetCell(resultNode, unifiedInterval)
+        newToOlds.update(newCell, overlapping)
         resultNode.add(newCell)
 
+      // compute and set selfMerged of the resultNode
+      val stableSelfMerges = stableNode.selfMerged.map(f => f.map(g => g.interval))
+      val movedSelfMerged = nodeToBeMoved.selfMerged.map(f => f.map(g => g.interval.move(i => i + delta)))
+      val oldSelfMerged = stableSelfMerges ++ movedSelfMerged
+
+      val eqClassQueue = mutable.Queue().enqueueAll(oldSelfMerged)
+      var newEqIntervals: Set[Set[Interval]] = Set.empty
+      while eqClassQueue.nonEmpty do
+        val eqClass = eqClassQueue.dequeue()
+        val intervals: Set[Interval] = eqClass.foldLeft(Set[Interval]()) {
+          (s, interval) =>
+            val overlapping = oldSelfMerged.filter(eq => eq.exists(i => i.isOverlapping(interval)))
+            eqClassQueue.removeAll(overlapping.contains)
+            s ++ overlapping.flatten
+        }
+        newEqIntervals += intervals
+
+      resultNode.selfMerged = newEqIntervals.foldLeft(Set[Set[SetCell]]()) {
+        case (s, intervals) =>
+          s + intervals.map(resultNode.get)
+      }
+
+      // unify old and new nodes
+      solver.unify(stableNode.term, resultNode.term, 0)
+      solver.unify(nodeToBeMoved.term, resultNode.term, delta)
+
+      //set pointees
+      resultNode.cells.foreach(
+        newCell =>
+          val pointees = newToOlds
+            .getOrElse(newCell, Set.empty)
+            .collect {case cell: SetCell if cell.hasPointee => cell.getPointee}
+          pointees.map(newCell.setPointee)
+      )
 
 
-      ???
-
+      resultNode.get(stableCell.interval)
   }
 
   override def mergeCells[T <: SetCell](cells: Iterable[T]): SetCell = ???

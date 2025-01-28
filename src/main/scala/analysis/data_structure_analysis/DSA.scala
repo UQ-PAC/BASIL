@@ -112,7 +112,7 @@ trait DSANode[Cell <: NodeCell & DSACell](val size: Option[Int]) {
 
   def init(interval: Interval): Cell
   def graph: DSAGraph[_, Cell, _, _]
-  var _cells: Seq[Cell] = Seq.empty
+  protected var _cells: Seq[Cell] = Seq.empty
   def cells: Seq[Cell] = _cells
   protected var _collapsed: Option[Cell] = None
   def collapsed: Option[Cell] = _collapsed
