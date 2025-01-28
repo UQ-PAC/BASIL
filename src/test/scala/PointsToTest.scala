@@ -47,10 +47,10 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
     val results = runAnalyses(program)
-    results.mmmResults.pushContext("main")
-    assert(results.mmmResults.findStackObject(BigInt(4)).isDefined)
-    assert(results.mmmResults.findStackObject(BigInt(4)).get.start == BigInt(4))
-    assert(results.mmmResults.findStackObject(BigInt(4)).get.regionIdentifier == "stack_1")
+    results.mmmResults().pushContext("main")
+    assert(results.mmmResults().findStackObject(BigInt(4)).isDefined)
+    assert(results.mmmResults().findStackObject(BigInt(4)).get.start == BigInt(4))
+    assert(results.mmmResults().findStackObject(BigInt(4)).get.regionIdentifier == "stack_1")
   }
 
   /**
@@ -76,16 +76,16 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
     val results = runAnalyses(program)
-    results.mmmResults.pushContext("main")
-    assert(results.mmmResults.findStackObject(BigInt(4)).isDefined)
-    assert(results.mmmResults.findStackObject(BigInt(5)).isDefined)
-    assert(results.mmmResults.findStackObject(BigInt(6)).isDefined)
-    assert(results.mmmResults.findStackObject(BigInt(10)).isDefined)
+    results.mmmResults().pushContext("main")
+    assert(results.mmmResults().findStackObject(BigInt(4)).isDefined)
+    assert(results.mmmResults().findStackObject(BigInt(5)).isDefined)
+    assert(results.mmmResults().findStackObject(BigInt(6)).isDefined)
+    assert(results.mmmResults().findStackObject(BigInt(10)).isDefined)
 
-    assert(results.mmmResults.findStackObject(BigInt(4)).get.start == BigInt(4))
-    assert(results.mmmResults.findStackObject(BigInt(5)).get.start == BigInt(4))
-    assert(results.mmmResults.findStackObject(BigInt(6)).get.start == BigInt(6))
-    assert(results.mmmResults.findStackObject(BigInt(10)).get.start == BigInt(6))
+    assert(results.mmmResults().findStackObject(BigInt(4)).get.start == BigInt(4))
+    assert(results.mmmResults().findStackObject(BigInt(5)).get.start == BigInt(4))
+    assert(results.mmmResults().findStackObject(BigInt(6)).get.start == BigInt(6))
+    assert(results.mmmResults().findStackObject(BigInt(10)).get.start == BigInt(6))
   }
 
 //  /**
@@ -115,17 +115,17 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
 //    )
 //
 //    runSteensgaardAnalysis(program)
-//    results.mmmResults.pushContext("main")
-//    assert(results.mmmResults.findStackObject(BigInt(4)).isDefined) // Explicit memStore
-//    assert(results.mmmResults.findStackObject(BigInt(6)).isDefined) // Explicit memLoad
-//    assert(results.mmmResults.findStackObject(BigInt(10)).isDefined) // Implicit memLoad
-//    assert(results.mmmResults.findStackObject(BigInt(20)).isDefined) // Implicit memStore
+//    results.mmmResults().pushContext("main")
+//    assert(results.mmmResults().findStackObject(BigInt(4)).isDefined) // Explicit memStore
+//    assert(results.mmmResults().findStackObject(BigInt(6)).isDefined) // Explicit memLoad
+//    assert(results.mmmResults().findStackObject(BigInt(10)).isDefined) // Implicit memLoad
+//    assert(results.mmmResults().findStackObject(BigInt(20)).isDefined) // Implicit memStore
 //
 //
-//    assert(results.mmmResults.findStackObject(BigInt(4)).get.start == bv64(4))
-//    assert(results.mmmResults.findStackObject(BigInt(6)).get.start == bv64(6))
-//    assert(results.mmmResults.findStackObject(BigInt(10)).get.start == bv64(10))
-//    assert(results.mmmResults.findStackObject(BigInt(20)).get.start == bv64(20))
+//    assert(results.mmmResults().findStackObject(BigInt(4)).get.start == bv64(4))
+//    assert(results.mmmResults().findStackObject(BigInt(6)).get.start == bv64(6))
+//    assert(results.mmmResults().findStackObject(BigInt(10)).get.start == bv64(10))
+//    assert(results.mmmResults().findStackObject(BigInt(20)).get.start == bv64(20))
 //  }
 
   /**
@@ -162,19 +162,19 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
     val results = runAnalyses(program)
-    results.mmmResults.pushContext("main")
-    assert(results.mmmResults.findStackObject(BigInt(6)).isDefined)
+    results.mmmResults().pushContext("main")
+    assert(results.mmmResults().findStackObject(BigInt(6)).isDefined)
 
-    assert(results.mmmResults.findStackObject(BigInt(6)).get.start == BigInt(6))
+    assert(results.mmmResults().findStackObject(BigInt(6)).get.start == BigInt(6))
 
     /* ------------------------------------------------------------------------- */
 
-    results.mmmResults.pushContext("p2")
-    assert(results.mmmResults.findSharedStackObject(BigInt(6)).nonEmpty)
-    assert(results.mmmResults.findSharedStackObject(BigInt(10)).nonEmpty)
+    results.mmmResults().pushContext("p2")
+    assert(results.mmmResults().findSharedStackObject(BigInt(6)).nonEmpty)
+    assert(results.mmmResults().findSharedStackObject(BigInt(10)).nonEmpty)
 
-    assert(results.mmmResults.findSharedStackObject(BigInt(6)).head.start == BigInt(6))
-    assert(results.mmmResults.findSharedStackObject(BigInt(10)).head.start == BigInt(10))
+    assert(results.mmmResults().findSharedStackObject(BigInt(6)).head.start == BigInt(6))
+    assert(results.mmmResults().findSharedStackObject(BigInt(10)).head.start == BigInt(10))
   }
 
   /**
@@ -221,24 +221,24 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
     val results = runAnalyses(program)
-    results.mmmResults.pushContext("main")
-    assert(results.mmmResults.findStackObject(BigInt(6)).isDefined)
+    results.mmmResults().pushContext("main")
+    assert(results.mmmResults().findStackObject(BigInt(6)).isDefined)
 
-    assert(results.mmmResults.findStackObject(BigInt(6)).get.start == BigInt(6))
+    assert(results.mmmResults().findStackObject(BigInt(6)).get.start == BigInt(6))
 
     /* ------------------------------------------------------------------------- */
 
-    results.mmmResults.pushContext("p2")
-    assert(results.mmmResults.findSharedStackObject(BigInt(6)).nonEmpty)
-    assert(results.mmmResults.findSharedStackObject(BigInt(10)).nonEmpty)
+    results.mmmResults().pushContext("p2")
+    assert(results.mmmResults().findSharedStackObject(BigInt(6)).nonEmpty)
+    assert(results.mmmResults().findSharedStackObject(BigInt(10)).nonEmpty)
 
-    assert(results.mmmResults.findSharedStackObject(BigInt(6)).size == 2)
-    assert(results.mmmResults.findSharedStackObject(BigInt(10)).size == 2)
+    assert(results.mmmResults().findSharedStackObject(BigInt(6)).size == 2)
+    assert(results.mmmResults().findSharedStackObject(BigInt(10)).size == 2)
 
-    assert(results.mmmResults.findSharedStackObject(BigInt(6)).exists(_.parent.name == "main"))
-    assert(results.mmmResults.findSharedStackObject(BigInt(6)).exists(_.parent.name == "foo"))
-    assert(results.mmmResults.findSharedStackObject(BigInt(10)).exists(_.parent.name == "main"))
-    assert(results.mmmResults.findSharedStackObject(BigInt(10)).exists(_.parent.name == "foo"))
+    assert(results.mmmResults().findSharedStackObject(BigInt(6)).exists(_.parent.name == "main"))
+    assert(results.mmmResults().findSharedStackObject(BigInt(6)).exists(_.parent.name == "foo"))
+    assert(results.mmmResults().findSharedStackObject(BigInt(10)).exists(_.parent.name == "main"))
+    assert(results.mmmResults().findSharedStackObject(BigInt(10)).exists(_.parent.name == "foo"))
   }
 
 //  /**
