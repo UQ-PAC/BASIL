@@ -937,9 +937,7 @@ object RunUtils {
         }
     }
 
-    // TODO move procedure summaries outside the static analysis flag
-    //if (conf.staticAnalysis.map(_.summariseProcedures).getOrElse(false)) {
-    if (true) {
+    if (conf.summariseProcedures) {
       StaticAnalysisLogger.debug("[!] Variable dependency summaries")
       val scc = stronglyConnectedComponents(CallGraph, List(ctx.program.mainProcedure))
       val varDepsSummaries = VariableDependencyAnalysis(ctx.program, scc).analyze()

@@ -28,7 +28,6 @@ case class StaticAnalysisConfig(
   analysisResultsPath: Option[String] = None,
   analysisDotPath: Option[String] = None,
   threadSplit: Boolean = false,
-  summariseProcedures: Boolean = false,
   memoryRegions: MemoryRegionsMode = MemoryRegionsMode.Disabled,
   irreducibleLoops: Boolean = true
 )
@@ -55,6 +54,7 @@ case class BASILConfig(
   validateSimp: Boolean = false,
   dsaConfig: Option[DSAConfig] = None,
   memoryTransform: Boolean = false,
+  summariseProcedures: Boolean = false,
   staticAnalysis: Option[StaticAnalysisConfig] = None,
   boogieTranslation: BoogieGeneratorConfig = BoogieGeneratorConfig(),
   outputPrefix: String
