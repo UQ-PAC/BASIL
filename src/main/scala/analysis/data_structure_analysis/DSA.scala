@@ -30,6 +30,7 @@ enum DSAPhase {
 case class Interval(start: Int, end: Int) {
   require(start <= end)
 
+  override def toString: String = s"$start-$end"
   def size: Int = end - start
   def move(func: Int => Int): Interval = Interval(func(start), func(end))
   def isEmpty: Boolean = this.size == 0
