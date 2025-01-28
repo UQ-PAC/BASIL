@@ -33,8 +33,9 @@ case class Interval(start: Int, end: Int) {
   def size: Int = end - start
   def move(func: Int => Int): Interval = Interval(func(start), func(end))
   def isEmpty: Boolean = this.size == 0
-  def contains(offset: Int): Boolean = start <= offset && end > offset
-  def contains(interval: Interval): Boolean = start <= interval.start && end >= interval.end
+  def contains(offset: Int): Boolean = start <= offset && end >= offset
+  def contains(interval: Interval): Boolean =
+    start <= interval.start && end >= interval.end
   def isOverlapping(other: Interval): Boolean = !(start > other.end || other.start > end)
   def join(other: Interval): Interval = {
     require(isOverlapping(other), "Expected overlapping Interval for a join")
@@ -49,13 +50,17 @@ object Interval {
     Ordering.by(i => (i.start, i.end))
 }
 
-trait DSAGraph[Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Node <: DSANode[Cell]](val proc: Procedure, val phase: DSAPhase) {
+trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Node <: DSANode[Cell]](val proc: Procedure, val phase: DSAPhase, val solver: Solver) {
   val sva: SymbolicValues = getSymbolicValues(proc)
   val constraints: Set[Constraint] = generateConstraints(proc)
   val nodes: Map[SymBase, Node] = buildNodes
   def exprToSymVal(expr: Expr): SymValueSet = sva.exprToSymValSet(expr)
   def init(symBase: SymBase, size: Option[Int]): Node
   def constraintArgToCells(constraintArg: ConstraintArg): Set[CCell]
+
+  def localPhase(): Unit = {
+    constraints.foreach(processConstraint)
+  }
 
   def symValToCells(symVal: SymValueSet): Set[Cell] = {
     val pairs = symVal.state
@@ -104,14 +109,14 @@ trait DSAGraph[Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Node <: DSA
   }
 
   def mergeCells(cell1: CCell, cell2: CCell): Merged
-  def mergeCells[T <: Cell](cells: Iterable[T]): Merged
+  def mergeCells(cells: Iterable[Cell]): Merged
   def find(cell: CCell): Merged
 }
 
 trait DSANode[Cell <: NodeCell & DSACell](val size: Option[Int]) {
 
   def init(interval: Interval): Cell
-  def graph: DSAGraph[_, Cell, _, _]
+  def graph: DSAGraph[_, _, Cell, _, _]
   protected var _cells: Seq[Cell] = Seq.empty
   def cells: Seq[Cell] = _cells
   protected var _collapsed: Option[Cell] = None
@@ -144,7 +149,7 @@ trait DSANode[Cell <: NodeCell & DSACell](val size: Option[Int]) {
 
   def get(interval: Interval): Cell = {
     if isCollapsed then collapsed.get else
-      val exactMatches = cells.filter(_.interval.isOverlapping(interval))
+      val exactMatches = cells.filter(_.interval.contains(interval))
       assert(exactMatches.size == 1, "Expected exactly one overlapping interval")
       assert(exactMatches.head.interval == interval, "")
       exactMatches.head
@@ -157,7 +162,7 @@ trait DSANode[Cell <: NodeCell & DSACell](val size: Option[Int]) {
   def add(interval: Interval): Cell = {
     if !isCollapsed then
       val overlapping: Seq[Cell] = cells.filter(_.interval.isOverlapping(interval))
-      _cells = cells.diff(overlapping)
+//      _cells = cells.diff(overlapping)
 
       val newCell = if overlapping.isEmpty then
         init(interval)
@@ -167,7 +172,7 @@ trait DSANode[Cell <: NodeCell & DSACell](val size: Option[Int]) {
         graph.mergeCells(overlapping.appended(res))
         res
 
-      _cells = cells.appended(newCell).sorted
+      _cells = cells.diff(overlapping).appended(newCell).sorted
       newCell
     else
       collapsed.get
@@ -175,7 +180,8 @@ trait DSANode[Cell <: NodeCell & DSACell](val size: Option[Int]) {
 
   def collapse(): Cell = {
     if !isCollapsed then
-      val collapsedCell = init(Interval(0, 0))
+
+      val collapsedCell = add(Interval(0, 0))
       graph.mergeCells(cells.appended(collapsedCell))
       _collapsed = Some(collapsedCell)
     collapsed.get

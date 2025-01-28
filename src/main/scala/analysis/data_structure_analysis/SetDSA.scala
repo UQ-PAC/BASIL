@@ -1,7 +1,9 @@
 package analysis.data_structure_analysis
 
+import analysis.data_structure_analysis.DSAPhase.Local
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
 import ir.Procedure
+import util.DSALogger
 
 import scala.collection.{SortedSet, mutable}
 
@@ -10,11 +12,7 @@ class SetDSA
 
 case class NodeTerm(v: SetNode) extends analysis.solvers.Var[NodeTerm]
 
-class SetGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SetCell, SetCell, SetCell, SetNode](proc, phase){
-
-
-  val solver: OffsetUnionFindSolver[NodeTerm] = OffsetUnionFindSolver()
-
+class SetGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[OffsetUnionFindSolver[NodeTerm], SetCell, SetCell, SetCell, SetNode](proc, phase, OffsetUnionFindSolver[NodeTerm]()){
 
   override def init(symBase: SymBase, size: Option[Int]): SetNode = SetNode(this, mutable.Set(symBase), size)
   override def constraintArgToCells(constraintArg: ConstraintArg): Set[SetCell] = {
@@ -29,9 +27,10 @@ class SetGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SetCell, SetCe
   {
     constraint match
       case cons: BinaryConstraint =>
-        val first = mergeCells(constraintArgToCells(cons.arg1))
-        val sec = mergeCells(constraintArgToCells(cons.arg2))
-        mergeCells(first, sec)
+        val first = if constraintArgToCells(cons.arg1).nonEmpty then Some(mergeCells(constraintArgToCells(cons.arg1))) else None
+        val sec = if constraintArgToCells(cons.arg2).nonEmpty then Some(mergeCells(constraintArgToCells(cons.arg2))) else None
+        if first.nonEmpty && sec.nonEmpty then mergeCells(first.get, sec.get) else
+          DSALogger.warn(s"$cons had an empty argument")
       case dcc: DirectCallConstraint =>
         (dcc.inConstraints ++ dcc.outConstraints).foreach(processConstraint)
       case idcc: IndirectCallConstraint => // ignore
@@ -49,13 +48,15 @@ class SetGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SetCell, SetCe
       cell1 = cell1.node.collapse()
       cell2 = cell2.node.collapse()
 
-      cell1.setPointee(cell2.getPointee)
+//      cell1.node.collapsed.get.setPointee(cell2.node.collapsed.get.getPointee)
+      if cell2.node.collapsed.get.hasPointee then
+        cell1.node.collapsed.get.setPointee(cell2.node.collapsed.get.getPointee)
 
       solver.unify(cell1.node.term, cell2.node.term, 0)
       cell1.node.bases.addAll(cell2.node.bases)
       cell2.node.bases.addAll(cell2.node.bases)
 
-      cell1
+      cell1.node.collapsed.get
     else
       val (stableCell, toBeMoved) = if cell1.interval.start > cell2.interval.start then (cell2, cell1) else (cell1, cell2)
       val delta = toBeMoved.interval.start - toBeMoved.interval.end
@@ -73,7 +74,7 @@ class SetGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SetCell, SetCe
         val cell = queue.dequeue()
         val (overlapping, rest) = queue.toSet.partition(cell2 => cell.interval.isOverlapping(cell2.interval))
         queue.dequeueAll(overlapping.contains)
-        val unifiedInterval = overlapping.map(_.interval).reduce(Interval.join)
+        val unifiedInterval = if overlapping.isEmpty then cell.interval else overlapping.map(_.interval).reduce(Interval.join)
         val newCell = SetCell(resultNode, unifiedInterval)
         newToOlds.update(newCell, overlapping)
         resultNode.add(newCell)
@@ -110,14 +111,23 @@ class SetGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SetCell, SetCe
           val pointees = newToOlds
             .getOrElse(newCell, Set.empty)
             .collect {case cell: SetCell if cell.hasPointee => cell.getPointee}
-          pointees.map(newCell.setPointee)
+          if pointees.nonEmpty then
+            val mergedPointees = mergeCells(pointees)
+            newCell.setPointee(mergedPointees)
       )
 
 
       resultNode.get(stableCell.interval)
   }
 
-  override def mergeCells[T <: SetCell](cells: Iterable[T]): SetCell = ???
+  override def mergeCells(cells: Iterable[SetCell]): SetCell = {
+    require(cells.nonEmpty, "can't merge empty set of cells")
+    cells.tail.foldLeft(cells.head) {
+      (result, cell) =>
+        mergeCells(result, cell)
+    }
+  }
+
   override def find(cell: SetCell): SetCell = {
     val node = cell.node
     val (term, offset) = solver.findWithOffset(node.term)
@@ -168,7 +178,6 @@ class SetNode(val graph: SetGraph, val bases: mutable.Set[SymBase], size: Option
       val cell = queue.dequeue()  // cell will be in overlapping by default
       val (overlapping, rest) = cells.partition(cell2 => cell.interval.isOverlapping(cell2.interval))
       queue.dequeueAll(overlapping.contains)
-      _cells = rest
       val unifiedInterval = overlapping.map(_.interval).reduce(Interval.join)
       val newCell = init(unifiedInterval)
       graph.mergeCells(overlapping.appended(newCell))
@@ -204,7 +213,7 @@ case class SetCell(node: SetNode, override val interval: Interval) extends NodeC
 
   def getPointee: SetCell =
     {
-      if _pointee.isEmpty then _pointee = Some(SetNode(graph, mutable.Set.empty).get(0))
+      if _pointee.isEmpty then _pointee = Some(SetNode(graph, mutable.Set.empty).add(0))
       graph.find(_pointee.get)
     }
 
@@ -220,6 +229,14 @@ case class SetCell(node: SetNode, override val interval: Interval) extends NodeC
       _pointee = Some(graph.mergeCells(cell, graph.find(_pointee.get)))
 
     graph.find(_pointee.get)
+  }
+}
+
+object SetDSA {
+  def getLocal(proc: Procedure): SetGraph = {
+    val graph = SetGraph(proc, Local)
+    graph.localPhase()
+    graph
   }
 }
 
