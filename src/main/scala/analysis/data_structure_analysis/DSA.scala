@@ -1,6 +1,9 @@
 package analysis.data_structure_analysis
 
+import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver, UnionFindSolver}
 import ir.{Expr, Procedure}
+
+import scala.collection.{SortedSet, mutable}
 
 trait Counter(val init: Int = 0) {
   private var counter = init
@@ -20,7 +23,7 @@ trait Counter(val init: Int = 0) {
 }
 
 enum DSAPhase {
-  case Local, BU, TD
+  case Pre, Local, BU, TD
 }
 
 
@@ -31,6 +34,7 @@ case class Interval(start: Int, end: Int) {
   def move(func: Int => Int): Interval = Interval(func(start), func(end))
   def isEmpty: Boolean = this.size == 0
   def contains(offset: Int): Boolean = start <= offset && end > offset
+  def contains(interval: Interval): Boolean = start <= interval.start && end >= interval.end
   def isOverlapping(other: Interval): Boolean = !(start > other.end || other.start > end)
   def join(other: Interval): Interval = {
     require(isOverlapping(other), "Expected overlapping Interval for a join")
@@ -45,9 +49,7 @@ object Interval {
     Ordering.by(i => (i.start, i.end))
 }
 
-trait DSA {}
-
-trait DSAGraph[Merged, Cell <: NodeCell & CCell, CCell <: DSACell, Node <: DSANode[Cell, CCell]](val proc: Procedure, val phase: DSAPhase) {
+trait DSAGraph[Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Node <: DSANode[Cell]](val proc: Procedure, val phase: DSAPhase) {
   val sva: SymbolicValues = getSymbolicValues(proc)
   val constraints: Set[Constraint] = generateConstraints(proc)
   val nodes: Map[SymBase, Node] = buildNodes
@@ -180,5 +182,6 @@ trait DSANode[Cell <: NodeCell & DSACell](val size: Option[Int]) {
   }
 
 }
+
 
 trait DSACell
