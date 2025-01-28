@@ -117,10 +117,9 @@ def unwrapExprToVar(expr: Expr): Option[Variable] = {
   }
 }
 
-def bitVectorOpToBigIntOp(op: BinOp, lhs: BigInt, rhs: BigInt): BigInt = {
+def bitVectorOpToBigIntOp(op: BinOp, lhs: BigInt, rhs: BigInt): BigInt =
   op match {
     case BVADD => lhs + rhs
     case BVSUB => lhs - rhs
     case _ => throw RuntimeException("Binary operation support not implemented: " + op)
   }
-}
