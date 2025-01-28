@@ -182,6 +182,10 @@ enum Predicate {
           case (a, Lit(TrueLiteral)) => a
           case (Lit(FalseLiteral), _) => Lit(FalseLiteral)
           case (_, Lit(FalseLiteral)) => Lit(FalseLiteral)
+          case (BVCmp(BVSLE, a, b), BVCmp(BVSLE, c, d)) if a == d && b == c => BVCmp(BVEQ, a, b)
+          case (BVCmp(BVULE, a, b), BVCmp(BVULE, c, d)) if a == d && b == c => BVCmp(BVEQ, a, b)
+          case (BVCmp(BVSGE, a, b), BVCmp(BVSGE, c, d)) if a == d && b == c => BVCmp(BVEQ, a, b)
+          case (BVCmp(BVUGE, a, b), BVCmp(BVUGE, c, d)) if a == d && b == c => BVCmp(BVEQ, a, b)
           case (a, b) if a == b => a
           case (a, b) => Bop(BoolAND, a, b)
         }
