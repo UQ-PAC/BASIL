@@ -75,15 +75,14 @@ case class StaticAnalysisContext(
   ssaResults: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
 )
 
-
 case class DSAContext(
- sva: Map[Procedure, SymbolicValues],
- constraints: Map[Procedure, Set[Constraint]],
+  sva: Map[Procedure, SymbolicValues],
+  constraints: Map[Procedure, Set[Constraint]],
 )
 
 /** Results of the main program execution.
   */
-case class BASILResult(ir: IRContext, analysis: Option[StaticAnalysisContext], dsa: Option[DSAContext], boogie: ArrayBuffer[BProgram])
+case class BASILResult(ir: IRContext, analysis: Option[StaticAnalysisContext], dsa: DSAContext, boogie: ArrayBuffer[BProgram])
 
 /** Tools for loading the IR program into an IRContext.
   */
@@ -769,8 +768,8 @@ object RunUtils {
 
       doSimplify(ctx, conf.staticAnalysis)
     }
-    
-    
+
+
     // SVA
     var dsaContext: Option[DSAContext] = None
     if conf.dsaConfig.nonEmpty then
@@ -786,13 +785,15 @@ object RunUtils {
           val constraints = generateConstraints(proc)
           sva += (proc -> SVAResults)
           cons += (proc -> constraints)
-
-      )
+          writeToFile(SVAResults.pretty, s"cntlm_${proc.name}.SVA")
+          writeToFile(constraints.map(c => c.toString).toSeq.sorted.mkString("\n"), s"cntlm_${proc.name}.ConsExpr")
+          writeToFile(constraints.map(c => c.eval(Expr => SVAResults.exprToSymValSet(Expr))).toSeq.sorted.mkString("\n"), s"cntlm_${proc.name}.Cons")
+    )
 
       DSALogger.info("Finished local phase")
 
       dsaContext = Some(DSAContext(sva, cons))
-      
+
 
     if (q.runInterpret) {
       Logger.info("Start interpret")

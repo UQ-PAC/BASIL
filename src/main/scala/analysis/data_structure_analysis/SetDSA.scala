@@ -2,9 +2,11 @@ package analysis.data_structure_analysis
 
 import analysis.data_structure_analysis.DSAPhase.Local
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
+import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.Procedure
 import util.DSALogger
 
+import scala.collection.mutable.ArrayBuffer
 import scala.collection.{SortedSet, mutable}
 
 object SetNodeCounter extends Counter
@@ -13,6 +15,69 @@ class SetDSA
 case class NodeTerm(v: SetNode) extends analysis.solvers.Var[NodeTerm]
 
 class SetGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[OffsetUnionFindSolver[NodeTerm], SetCell, SetCell, SetCell, SetNode](proc, phase, OffsetUnionFindSolver[NodeTerm]()){
+
+
+  def toDot: String = {
+
+    val (nodes, pointsTo) = collect()
+    val toRemove = Set('$', '#', '%')
+
+    val structs = ArrayBuffer[DotStruct]()
+    val arrows = ArrayBuffer[StructArrow]()
+
+    nodes.foreach { n =>
+      structs.append(DotStruct(n.id.toString, n.toString, Some(n.cells.map(o => o.interval.toString)), true))
+    }
+
+    pointsTo.foreach { (pointer, pointee) =>
+      val pointerID = pointer.node.id.toString
+      val pointerOffset = pointer.interval.toString
+      arrows.append(StructArrow(DotStructElement(pointerID, Some(pointerOffset)), DotStructElement(pointee.node.id.toString, Some(pointee.interval.toString))))
+    }
+
+//    var seen : Set[Expr] = Set.empty
+//    exprToCell.foreach { (pos, expr, cell) =>
+//      var const = false
+//      val id: String = expr match
+//        case _: Literal | BinaryExpr(_, Register("R31", 64), _) | Register("R31", 64) =>
+//          const = true
+//          s"${expr.hashCode().toString}".replace("-", ".")
+//        case _ => s"${pos.hashCode().toString}${expr.hashCode().toString}".replace("-", ".")
+//      if !const || !seen.contains(expr) then
+//        seen += expr
+//        structs.append(DotStruct(id , s"${if !const then pos.toShortString.takeWhile(_ != ':') + "_" else ""}${expr.toString}", None, true))
+//        arrows.append(StructArrow(DotStructElement(id, None), DotStructElement(cell.node.id.toString, Some(cell.offset.toString)), ""))
+//    }
+
+    StructDotGraph(proc.name, structs, arrows).toDotString
+  }
+
+  private def collect(): (Set[SetNode], Set[(SetCell, SetCell)]) = {
+    var nodes: Set[SetNode] = Set.empty
+    var pointsTo: Set[(SetCell, SetCell)] = Set.empty
+    constraints.foreach {
+      case constraint: BinaryConstraint =>
+        val valueCells = constraintArgToCells(constraint.arg2).map(find)
+        assert(valueCells.size <= 1)
+        var valueCell: Option[SetCell] = None
+        if valueCells.size == 1 then
+          valueCell = Some(valueCells.head)
+          nodes += valueCell.get.node
+
+        val indexCells = constraintArgToCells(constraint.arg1).map(find)
+        assert(indexCells.size <= 1)
+        var indexCell: Option[SetCell] = None
+        if indexCells.size == 1 then
+          indexCell = Some(indexCells.head)
+          nodes += indexCell.get.node
+
+        if indexCell.nonEmpty && valueCells.nonEmpty then
+          pointsTo += (indexCell.get, valueCell.get)
+      case _ =>
+    }
+
+    (nodes, pointsTo)
+  }
 
   override def init(symBase: SymBase, size: Option[Int]): SetNode = SetNode(this, mutable.Set(symBase), size)
   override def constraintArgToCells(constraintArg: ConstraintArg): Set[SetCell] = {
@@ -27,6 +92,8 @@ class SetGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[OffsetUnionFin
   {
     constraint match
       case cons: BinaryConstraint =>
+        if cons.isInstanceOf[MemoryReadConstraint] && cons.asInstanceOf[MemoryReadConstraint].pos.label.get.startsWith("%0000429") then
+          print("")
         val first = if constraintArgToCells(cons.arg1).nonEmpty then Some(mergeCells(constraintArgToCells(cons.arg1))) else None
         val sec = if constraintArgToCells(cons.arg2).nonEmpty then Some(mergeCells(constraintArgToCells(cons.arg2))) else None
         if first.nonEmpty && sec.nonEmpty then mergeCells(first.get, sec.get) else
