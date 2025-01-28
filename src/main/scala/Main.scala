@@ -198,7 +198,6 @@ object Main {
           conf.analysisResults,
           conf.analysisResultsDot,
           conf.threadSplit.value,
-          conf.summariseProcedures.value,
           memoryRegionsMode,
           !conf.noIrreducibleLoops.value
         )
@@ -253,6 +252,7 @@ object Main {
       runInterpret = conf.interpret.value,
       simplify = conf.simplify.value,
       validateSimp = conf.validateSimplify.value,
+      summariseProcedures = conf.summariseProcedures.value,
       staticAnalysis = staticAnalysis,
       boogieTranslation = boogieGeneratorConfig,
       outputPrefix = conf.outFileName,
