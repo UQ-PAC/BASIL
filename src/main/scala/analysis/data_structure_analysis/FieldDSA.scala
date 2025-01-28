@@ -35,9 +35,11 @@ class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SuperCell, F
   {
     constraint match
       case cons: BinaryConstraint =>
-        val first = mergeCells(constraintArgToCells(cons.arg1))
-        val sec = mergeCells(constraintArgToCells(cons.arg2))
-        mergeCells(first, sec)
+        mergeCells(
+          constraintArgToCells(cons.arg1)
+            ++
+          constraintArgToCells(cons.arg2)
+        )
       case dcc: DirectCallConstraint =>
         (dcc.inConstraints ++ dcc.outConstraints).foreach(processConstraint)
       case idcc: IndirectCallConstraint => // ignore
