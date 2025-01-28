@@ -89,7 +89,7 @@ class IntervalDomain(signed: Boolean, inf: Int => BigInt, negInf: Int => BigInt,
   }
 
   override def init(b: Block): LatticeMap[Variable, Interval] =
-    if Some(b) == b.parent.entryBlock then 
+    if Some(b) == b.parent.entryBlock then
       b.parent.formalInParam.foldLeft(bot) {
         (m, v) => m + (v -> Top)
       }

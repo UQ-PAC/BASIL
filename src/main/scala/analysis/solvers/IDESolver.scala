@@ -218,6 +218,10 @@ abstract class IDESolver[
         }
       } else if (isExit(position)) { // at exit node
         // ignore, return flow is handled at the call nodes
+        // temporary fix, propagate results into the out params of a return
+        edgesOther(position)(d).foreach { (d2, e) =>
+          propagate(e(xnd), (position, d2))
+        }
       } else {
         edgesOther(position)(d).foreach { (d2, e) =>
           outdep(position).foreach(m => propagate(e(xnd), (m, d2)))
