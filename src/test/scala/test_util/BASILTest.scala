@@ -15,10 +15,11 @@ case class TestConfig(boogieFlags: Seq[String] = Seq("/timeLimit:10", "/useArray
                       checkExpected: Boolean = false,
                       logResults: Boolean = false,
                       simplify: Boolean = false,
+                      summariseProcedures: Boolean = false,
                      )
 
 trait BASILTest {
-  def runBASIL(inputPath: String, RELFPath: String, specPath: Option[String], BPLPath: String, staticAnalysisConf: Option[StaticAnalysisConfig], simplify: Boolean=false): BASILResult = {
+  def runBASIL(inputPath: String, RELFPath: String, specPath: Option[String], BPLPath: String, staticAnalysisConf: Option[StaticAnalysisConfig], simplify: Boolean = false, summariseProcedures: Boolean = false): BASILResult = {
     val specFile = if (specPath.isDefined && File(specPath.get).exists) {
       specPath
     } else {
@@ -32,6 +33,7 @@ trait BASILTest {
         parameterForm = false,
       ),
       simplify = simplify,
+      summariseProcedures = summariseProcedures,
       staticAnalysis = staticAnalysisConf,
       boogieTranslation = util.BoogieGeneratorConfig().copy(memoryFunctionType=util.BoogieMemoryAccessMode.SuccessiveStoreSelect),
       outputPrefix = BPLPath,
