@@ -102,7 +102,7 @@ enum GammaTerm {
     case Var(v) => Some(LocalVar(s"Gamma_${v.name}", BoolType))
     case OldVar(v) => None
     case Uop(op, x) => x.toBasil.map(x => UnaryExpr(op, x))
-    case Join(s) => 
+    case Join(s) =>
       if s.size == 0 then Some(TrueLiteral)
       else if s.size == 1 then s.head.toBasil
       else s.foldLeft(s.head.toBasil) {

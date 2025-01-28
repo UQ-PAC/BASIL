@@ -300,16 +300,14 @@ object IRTransform {
   def generateProcedureSummaries(
     ctx: IRContext,
     IRProgram: Program,
-    constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
+    varDepsSummaries: Map[Procedure, Map[Variable, LatticeSet[Variable]]],
   ): Boolean = {
     var modified = false
     // Need to know modifies clauses to generate summaries, but this is probably out of place
     val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
     ctx.program.setModifies(specModifies)
 
-    val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
-    val summaryGenerator = SummaryGenerator(IRProgram, ctx.specification.globals, specGlobalAddresses, constPropResult, varDepsSummaries)
+    val summaryGenerator = SummaryGenerator(IRProgram, varDepsSummaries)
     IRProgram.procedures.filter {
       p => p != IRProgram.mainProcedure
     }.foreach {
@@ -780,15 +778,15 @@ object RunUtils {
       dsaContext = Some(DSAContext(sva, cons))
       
 
-    if (conf.staticAnalysis.map(_.summariseProcedures).getOrElse(false)) {
+    // TODO move procedure summaries outside the static analysis flag
+    //if (conf.staticAnalysis.map(_.summariseProcedures).getOrElse(false)) {
+    if (true) {
       StaticAnalysisLogger.debug("[!] Variable dependency summaries")
       val scc = stronglyConnectedComponents(CallGraph, List(ctx.program.mainProcedure))
-      val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
-      val varDepsSummaries = VariableDependencyAnalysis(ctx.program, ctx.specification.globals, specGlobalAddresses, analysis.get.interProcConstProp, scc).analyze()
+      val varDepsSummaries = VariableDependencyAnalysis(ctx.program, scc).analyze()
 
       StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
-      // We must have performed analysis, so we .get (thought it might have panicked ! !)
-      IRTransform.generateProcedureSummaries(ctx, ctx.program, analysis.get.intraProcConstProp, varDepsSummaries)
+      IRTransform.generateProcedureSummaries(ctx, ctx.program, varDepsSummaries)
     }
 
     if (q.runInterpret) {
