@@ -12,16 +12,12 @@ object SuperCellCounter extends Counter
 
 case class FieldTerm(v: SuperCell) extends analysis.solvers.Var[FieldTerm]
 
-class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SuperCell, FieldCell, ConstraintCell, FieldNode](proc, phase) {
+class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[UnionFindSolver[FieldTerm], SuperCell, FieldCell, ConstraintCell, FieldNode](proc, phase, UnionFindSolver[FieldTerm]()) {
   
   override def init(symBase: SymBase, size: Option[Int]): FieldNode = FieldNode(this, symBase, size)
-  
-  val solver: UnionFindSolver[FieldTerm] = UnionFindSolver[FieldTerm]()
   override val nodes: Map[SymBase, FieldNode] = buildNodes
 
-  def localPhase(): Unit = {
-    constraints.foreach(processConstraint)
-  }
+
 
   override def constraintArgToCells(constraintArg: ConstraintArg): Set[ConstraintCell] = {
     val exprCells = symValToCells(exprToSymVal(constraintArg.value))
@@ -53,10 +49,16 @@ class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SuperCell, F
     find(cell.sc)
   }
 
-  override def mergeCells[T <: ConstraintCell](cells: Iterable[T]): SuperCell = {
+  def mergeCells(cells: Iterable[ConstraintCell]) (implicit i1: DummyImplicit): SuperCell = {
     require(cells.nonEmpty, "can't merge no cells")
     mergeCells(cells.map(_.sc))
   }
+
+  override def mergeCells(cells: Iterable[FieldCell]): SuperCell = {
+    require(cells.nonEmpty, "can't merge no cells")
+    mergeCells(cells.map(_.sc))
+  }
+
 
   override def mergeCells(cell1: ConstraintCell, cell2: ConstraintCell): SuperCell = {
     mergeCells(cell1.sc, cell2.sc)
@@ -79,7 +81,7 @@ class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[SuperCell, F
       newCell1
   }
 
-  private def mergeCells(cells: Iterable[SuperCell])(implicit i1: DummyImplicit): SuperCell = {
+  private def mergeCells(cells: Iterable[SuperCell])(implicit i1: DummyImplicit, i2: DummyImplicit): SuperCell = {
     require(cells.nonEmpty, "can't merge no cells")
     if cells.size > 1 then
       cells.tail.foldLeft(cells.head) {
