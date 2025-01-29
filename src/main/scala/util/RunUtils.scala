@@ -196,7 +196,7 @@ object IRTransform {
 
   /** Initial cleanup before analysis.
     */
-  def doCleanup(ctx: IRContext): IRContext = {
+  def doCleanup(ctx: IRContext, doSimplify : Boolean = false): IRContext = {
     Logger.info("[!] Removing external function calls")
     // Remove external function references (e.g. @printf)
     val externalNames = ctx.externalFunctions.map(e => e.name)
@@ -216,7 +216,7 @@ object IRTransform {
       case _ => ()
     })
 
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), ctx.program)
+    cilvisitor.visit_prog(transforms.ReplaceReturns(doSimplify), ctx.program)
     transforms.addReturnBlocks(ctx.program)
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
 
@@ -673,7 +673,7 @@ object RunUtils {
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
 
-    ctx = IRTransform.doCleanup(ctx)
+    ctx = IRTransform.doCleanup(ctx, conf.simplify)
 
     if (q.loading.trimEarly) {
       val before = ctx.program.procedures.size

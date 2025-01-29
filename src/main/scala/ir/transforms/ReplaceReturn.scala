@@ -4,7 +4,7 @@ import util.Logger
 import ir.cilvisitor.*
 import ir.*
 
-class ReplaceReturns(assertR30Addr : Boolean = true) extends CILVisitor {
+class ReplaceReturns(assertR30Addr: Boolean = true) extends CILVisitor {
 
   /** Assumes IR with 1 call per block which appears as the last statement.
     */
@@ -24,42 +24,51 @@ class ReplaceReturns(assertR30Addr : Boolean = true) extends CILVisitor {
           SkipChildren()
         }
       }
-      case i : IndirectCall => {
+      case i: IndirectCall => {
         (i.predecessor, i.parent.jump) match {
-          case (Some(l : LocalAssign), _) if l.lhs.name == "R30" => SkipChildren()
+          case (Some(l: LocalAssign), _) if l.lhs.name == "R30" => SkipChildren()
           case (_, _) => {
             val R30Begin = LocalVar("R30_begin", BitVecType(64))
             i.parent.replaceJump(Return())
-            ChangeTo(List(
-              Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin)),
-              i
-            ))
+            if (assertR30Addr) {
+              ChangeTo(List(Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin)), i))
+            } else {
+              SkipChildren()
+            }
           }
         }
       }
-      case d : DirectCall  => {
+      case d: DirectCall => {
         (d.predecessor, d.parent.jump) match {
-          case (Some(l : LocalAssign), _) if l.lhs.name == "R30" => SkipChildren()
+          case (Some(l: LocalAssign), _) if l.lhs.name == "R30" => SkipChildren()
           case (Some(_), _: Unreachable) if d.target == d.parent.parent => {
             // recursive tailcall
             val R30Begin = LocalVar("R30_begin", BitVecType(64))
             d.parent.replaceJump(GoTo((d.parent.parent.entryBlock.get)))
-            ChangeTo(List(
-              Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin)),
-              d
-            ))
+            if (assertR30Addr) {
+              ChangeTo(List(Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin)), d))
+            } else {
+              SkipChildren()
+            }
           }
-          case (_, _) => {
+          case (_, _: Unreachable) => {
+            // FIXME: Have coalesce blocks pull unreachable on empty block to end of prev block when possible.
+            // Currently we miss causes because of the pattern:
+            //  block:
+            //    indirect call R17
+            //    goto nblock
+            //  nblock:
+            //    unreachable 
             val R30Begin = LocalVar("R30_begin", BitVecType(64))
             d.parent.replaceJump(Return())
-            ChangeTo(List(
-              Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin)),
-              d
-            ))
+            if (assertR30Addr) {
+              ChangeTo(List(Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin)), d))
+            } else {
+              SkipChildren()
+            }
           }
           case _ => SkipChildren()
         }
-
 
       }
       case _ => SkipChildren()
