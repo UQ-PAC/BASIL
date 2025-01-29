@@ -22,7 +22,7 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{Constraint, DataStructureAnalysis, FieldDSA, Graph, SadDSA, SetDSA, SymValueSet, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValueDomain, SymbolicValues, generateConstraints, getSymbolicValues}
+import analysis.data_structure_analysis.{Constraint, DataStructureAnalysis, FieldDSA, FieldGraph, Graph, SadDSA, SadGraph, SetDSA, SetGraph, SymValueSet, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValueDomain, SymbolicValues, generateConstraints, getSymbolicValues}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
@@ -78,11 +78,14 @@ case class StaticAnalysisContext(
 case class DSAContext(
   sva: Map[Procedure, SymbolicValues],
   constraints: Map[Procedure, Set[Constraint]],
+  setDSA: Map[Procedure, SetGraph],
+  fieldDSA: Map[Procedure, FieldGraph],
+  sadDSA: Map[Procedure, SadGraph]
 )
 
 /** Results of the main program execution.
   */
-case class BASILResult(ir: IRContext, analysis: Option[StaticAnalysisContext], dsa: DSAContext, boogie: ArrayBuffer[BProgram])
+case class BASILResult(ir: IRContext, analysis: Option[StaticAnalysisContext], dsa: Option[DSAContext], boogie: ArrayBuffer[BProgram])
 
 /** Tools for loading the IR program into an IRContext.
   */
@@ -769,30 +772,39 @@ object RunUtils {
       doSimplify(ctx, conf.staticAnalysis)
     }
 
-    // todo make args
-    val main = ctx.program.mainProcedure
-    var sva: Map[Procedure, SymbolicValues] = Map.empty
-    var cons: Map[Procedure, Set[Constraint]] = Map.empty
-    ctx.program.procedures.foreach(
-      proc =>
-//        if proc.name.startsWith("forward_request") then
-//          val setGraph = SetDSA.getLocal(proc)
-          val sadGraph = SadDSA.getLocal(proc)
-//          val fieldGraph = FieldDSA.getLocal(proc)
-          val SVAResults = sadGraph.sva
-          val constraints = sadGraph.constraints
-          sva += (proc -> SVAResults)
-          cons += (proc -> constraints)
-          writeToFile(setGraph.toDot, s"cntlm_${proc.name}.DSA")
-          writeToFile(SVAResults.pretty, s"cntlm_${proc.name}.SVA")
-          writeToFile(constraints.map(c => c.toString).toSeq.sorted.mkString("\n"), s"cntlm_${proc.name}.ConsExpr")
-          writeToFile(constraints.map(c => c.eval(Expr => SVAResults.exprToSymValSet(Expr))).toSeq.sorted.mkString("\n"), s"cntlm_${proc.name}.Cons")
-    )
+    var dsaContext: Option[DSAContext] = None
+    if conf.dsaConfig.nonEmpty then
+      val config = conf.dsaConfig.get
 
-      DSALogger.info("Finished local phase")
+      // todo make args
+      val main = ctx.program.mainProcedure
+      var sva: Map[Procedure, SymbolicValues] = Map.empty
+      var cons: Map[Procedure, Set[Constraint]] = Map.empty
+      var setDSA: Map[Procedure, SetGraph] = Map.empty
+      var fieldDSA: Map[Procedure, FieldGraph] = Map.empty
+      var sadDSA: Map[Procedure, SadGraph] = Map.empty
+      ctx.program.procedures.foreach(
+        proc =>
+  //        if proc.name.startsWith("forward_request") then
+            val SVAResults = getSymbolicValues(proc)
+            val constraints = generateConstraints(proc)
+            sva += (proc -> SVAResults)
+            cons += (proc -> constraints)
+            if config.analyses.contains(DSAAnalysis.Set) then
+              val setGraph = SetDSA.getLocal(proc, Some(SVAResults), Some(constraints))
+              writeToFile(setGraph.toDot, s"cntlm_${proc.name}.SetDSA")
+              setDSA += (proc -> setGraph)
+            if config.analyses.contains(DSAAnalysis.Sad) then
+              val sadGraph = SadDSA.getLocal(proc, Some(SVAResults), Some(constraints))
+              writeToFile(sadGraph.toDot, s"cntlm_${proc.name}.SadDSA")
+              sadDSA += (proc -> sadGraph)
 
-      dsaContext = Some(DSAContext(sva, cons))
+            writeToFile(SVAResults.pretty, s"cntlm_${proc.name}.SVA")
+            writeToFile(constraints.map(c => c.toString).toSeq.sorted.mkString("\n"), s"cntlm_${proc.name}.ConsExpr")
+            writeToFile(constraints.map(c => c.eval(Expr => SVAResults.exprToSymValSet(Expr))).toSeq.sorted.mkString("\n"), s"cntlm_${proc.name}.Cons")
+      )
 
+      dsaContext = Some(DSAContext(sva, cons, setDSA, fieldDSA, sadDSA))
 
     if (q.runInterpret) {
       Logger.info("Start interpret")
@@ -839,8 +851,7 @@ object RunUtils {
     }
     assert(invariant.singleCallBlockEnd(ctx.program))
 
-
-    BASILResult(ctx, analysis, dsaContext, boogiePrograms)
+    BASILResult(ctx, analysis, dsaContext ,boogiePrograms)
   }
 
   /** Use static analysis to resolve indirect calls and replace them in the IR until fixed point.

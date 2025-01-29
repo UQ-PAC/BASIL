@@ -13,7 +13,10 @@ object SetNodeCounter extends Counter
 class SetDSA
 
 
-class SetGraph(proc: Procedure, phase: DSAPhase) extends SadGraph(proc, phase) {
+class SetGraph(proc: Procedure, phase: DSAPhase,
+               symValues: Option[SymbolicValues] = None,
+               cons: Option[Set[Constraint]] = None)
+  extends SadGraph(proc, phase, symValues, cons) {
 
   override def mergeCells(c1: SadCell, c2: SadCell): SadCell = {
     val cell1 = find(c1)
@@ -32,8 +35,11 @@ class SetGraph(proc: Procedure, phase: DSAPhase) extends SadGraph(proc, phase) {
 }
 
 object SetDSA {
-  def getLocal(proc: Procedure): SetGraph = {
-    val graph = SetGraph(proc, Local)
+
+  def getLocal(proc: Procedure, symValues: Option[SymbolicValues] = None,
+               cons: Option[Set[Constraint]] = None,
+              ): SetGraph = {
+    val graph = SetGraph(proc, Local, symValues, cons)
     graph.localPhase()
     graph
   }

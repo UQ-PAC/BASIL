@@ -14,7 +14,13 @@ class SadDSA
 
 case class NodeTerm(v: SadNode) extends analysis.solvers.Var[NodeTerm]
 
-class SadGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[OffsetUnionFindSolver[NodeTerm], SadCell, SadCell, SadCell, SadNode](proc, phase, OffsetUnionFindSolver[NodeTerm]()){
+class SadGraph(proc: Procedure, phase: DSAPhase,
+               symValues: Option[SymbolicValues] = None,
+               cons: Option[Set[Constraint]] = None)
+  extends
+    DSAGraph[OffsetUnionFindSolver[NodeTerm], SadCell, SadCell, SadCell, SadNode]
+      (proc, phase, OffsetUnionFindSolver[NodeTerm](), symValues, cons)
+{
 
   var last: Option[(SadCell, SadCell)] = None
   var secondLast: Option[(SadCell, SadCell)] = None
@@ -365,8 +371,10 @@ case class SadCell(node: SadNode, override val interval: Interval) extends NodeC
 }
 
 object SadDSA {
-  def getLocal(proc: Procedure): SadGraph = {
-    val graph = SadGraph(proc, Local)
+  def getLocal(proc: Procedure, symValues: Option[SymbolicValues] = None,
+               cons: Option[Set[Constraint]] = None,
+              ): SadGraph = {
+    val graph = SadGraph(proc, Local, symValues, cons)
     graph.localPhase()
     graph
   }
