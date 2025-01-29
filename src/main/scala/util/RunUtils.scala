@@ -163,7 +163,7 @@ object IRLoading {
       }
     }
 
-    val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, List[InsnSemantics]]])
+    val semantics: Seq[Map[String, List[InsnSemantics]]] = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, List[InsnSemantics]]])
 
 
     val parserMap : Map[String, Array[InsnSemantics]] = semantics.flatten.toMap
