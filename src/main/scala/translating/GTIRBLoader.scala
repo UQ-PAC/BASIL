@@ -13,7 +13,12 @@ import scala.collection.mutable.ArrayBuffer
 import com.grammatech.gtirb.proto.Module.ByteOrder.LittleEndian
 import util.Logger
 
-class GTIRBLoader(parserMap: immutable.Map[String, List[Either[(String, String), List[StmtContext]]]]) {
+enum InsnSemantics {
+  case Result(value: Array[StmtContext])
+  case Error(opcode: String, error: String)
+}
+
+class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
 
   private val constMap = mutable.Map[String, IRType]()
   private val varMap = mutable.Map[String, IRType]()
@@ -35,18 +40,27 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[Either[(String, String),
       varMap.clear
 
       val s = instsem match {
-        case Left((op, err)) => {
+        case InsnSemantics.Error(op, err) => {
           statements.append(Assert(FalseLiteral, Some(s"Decode error: $op ${err.replace("\n", " :: ")}")))
           instructionCount += 1
         }
-        case Right(instruction) => {
+        case InsnSemantics.Result(instruction) => {
           for ((s, i) <- instruction.zipWithIndex) {
             val label = blockAddress.map {(a: BigInt) =>
               val instructionAddress = a + (opcodeSize * instructionCount)
               instructionAddress.toString + "$" + i
             }
 
-            statements.appendAll(visitStmt(s, label))
+            statements.appendAll(
+              try {
+                visitStmt(s, label)
+              } catch {
+                case e => {
+                  Logger.error(s"Failed to load insn: $e\n${e.getStackTrace.mkString("\n")}")
+                  Seq(Assert(FalseLiteral, Some(" Failed to load instruction")))
+                }
+              }
+            )
           }
           instructionCount += 1
         }
