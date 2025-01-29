@@ -864,15 +864,11 @@ object RunUtils {
       ).resolveIndirectCalls()
       */
 
-      if (config.memoryRegions == MemoryRegionsMode.MRA && (previousResult.isEmpty || result.vsaResult != previousResult.get.vsaResult)) {
-        modified = true
-      } else {
-        modified = transforms.VSAIndirectCallResolution(
-          ctx.program,
-          result.vsaResult,
-          result.mmmResults
-        ).resolveIndirectCalls()
-      }
+      modified = transforms.VSAIndirectCallResolution(
+        ctx.program,
+        result.vsaResult,
+        result.mmmResults
+      ).resolveIndirectCalls()
 
       StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
       if (config.summariseProcedures) {
