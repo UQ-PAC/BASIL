@@ -133,14 +133,15 @@ class SummaryGenerator(
         case TrueBLiteral => None
         case p => Some[BExpr](p)
       }
-    }).toSet.toList
+    }).toList
 
     val wpThing = procedure.entryBlock.flatMap(b => predDomainResults.get(b).flatMap(p =>
         p.toBasil).map(p =>
           eval.simplifyCondFixpoint(p)._1.toBoogie
-        )).toList
+        ))
 
-    mustGammasWithConditions ++ wpThing
+    // wpThing should always out at least what mustGammasWithConditions outputs
+    (mustGammasWithConditions ++ wpThing).filter(_ != TrueBLiteral).distinct
   }
 
   /** Generate ensures clauses for a procedure. Currently, all generated ensures clauses are of the form (for example)
@@ -213,6 +214,7 @@ class SummaryGenerator(
 
     val absIntPreds = returnBlock.map(b => after.get(b).map(l => filterPred(predDomain.toPred(l), outVars ++ inVars, Predicate.Lit(TrueLiteral)).split.map(_.simplify.toBoogie.simplify))).flatten.toList.flatten
 
-    taintPreds ++ absIntPreds
+    // Filter out True
+    (taintPreds ++ absIntPreds).filter(_ != TrueBLiteral).distinct
   }
 }

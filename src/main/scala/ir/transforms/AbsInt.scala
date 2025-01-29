@@ -1,7 +1,7 @@
 package ir.transforms
 import translating.serialiseIL
 
-import util.Logger
+import util.StaticAnalysisLogger as Logger
 import ir.eval.AlgebraicSimplifications
 import ir.eval.AssumeConditionSimplifications
 import ir.eval.simplifyExprFixpoint

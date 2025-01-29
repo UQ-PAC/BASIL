@@ -1,5 +1,6 @@
 package analysis
 
+import util.StaticAnalysisLogger
 import ir.*
 import boogie.*
 import ir.transforms.AbstractDomain
@@ -186,6 +187,11 @@ enum Predicate {
           case (BVCmp(BVULE, a, b), BVCmp(BVULE, c, d)) if a == d && b == c => BVCmp(BVEQ, a, b)
           case (BVCmp(BVSGE, a, b), BVCmp(BVSGE, c, d)) if a == d && b == c => BVCmp(BVEQ, a, b)
           case (BVCmp(BVUGE, a, b), BVCmp(BVUGE, c, d)) if a == d && b == c => BVCmp(BVEQ, a, b)
+          case (BVCmp(BVSLE, a, b), BVCmp(BVSGE, c, d)) if a == c && b == d => BVCmp(BVEQ, a, b)
+          case (BVCmp(BVULE, a, b), BVCmp(BVUGE, c, d)) if a == c && b == d => BVCmp(BVEQ, a, b)
+          case (BVCmp(BVSGE, a, b), BVCmp(BVSLE, c, d)) if a == c && b == d => BVCmp(BVEQ, a, b)
+          case (BVCmp(BVUGE, a, b), BVCmp(BVULE, c, d)) if a == c && b == d => BVCmp(BVEQ, a, b)
+          case (GammaCmp(BoolIMPLIES, a, b), GammaCmp(BoolIMPLIES, c, d)) if a == d && b == c => GammaCmp(BoolEQ, a, b)
           case (a, b) if a == b => a
           case (a, b) => Bop(BoolAND, a, b)
         }
@@ -213,10 +219,12 @@ enum Predicate {
       case GammaCmp(op, a, b) =>
         (op, a.simplify, b.simplify) match {
           case (BoolIMPLIES, a, b) if a == b => Lit(TrueLiteral)
+          case (BoolEQ, a, b) if a == b => Lit(TrueLiteral)
           case (op, a, b) => GammaCmp(op, a, b)
         }
       case _ => this
     }
+    StaticAnalysisLogger.debug(s"simplified $this into $ret")
     ret.simplified = true
     ret
   }
