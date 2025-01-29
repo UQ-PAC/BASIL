@@ -89,6 +89,12 @@ class UnionFindSolver[A] {
     */
   override def toString: String =
     solution().map((k, v) => s"$k = $v").mkString("\n")
+
+  def deepCopy(): UnionFindSolver[A] = {
+    val newSolver = new UnionFindSolver[A]()
+    newSolver.parent ++= parent
+    newSolver
+  }
 }
 
 /** Exception thrown in case of unification failure.

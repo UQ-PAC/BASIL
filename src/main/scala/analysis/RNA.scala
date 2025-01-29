@@ -31,7 +31,7 @@ trait RNAAnalysis(program: Program, ignoreStackPtrs: Boolean = true) {
       case assert: Assert =>
         s ++ (assert.body.variables -- ignoreRegions)
       case memoryStore: MemoryStore =>
-        s ++ (memoryStore.index.variables -- ignoreRegions)
+        s ++ ((memoryStore.index.variables ++ memoryStore.value.variables) -- ignoreRegions)
       case call: DirectCall=>
         (s ++ call.actualParams.flatMap(_._2.variables).toSet.filterNot(ignoreRegions.contains(_)))
           .diff(call.outParams.map(_._2).toSet)

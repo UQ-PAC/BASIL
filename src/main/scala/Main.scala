@@ -133,11 +133,7 @@ object Main {
     validateSimplify: Flag,
     @arg(name = "verify", doc = "Run boogie on the resulting file")
     verify: Flag,
-    @arg(
-      name = "memory-regions",
-      doc =
-        "Performs static analysis to separate memory into discrete regions in Boogie output (requires --analyse flag) (mra|dsa)"
-    )
+    @arg(name = "memory-regions", doc = "Performs static analysis to separate memory into discrete regions in Boogie output (requires --analyse flag) (mra|dsa) (dsa is recommended over mra)")
     memoryRegions: Option[String],
     @arg(
       name = "no-irreducible-loops",
@@ -161,7 +157,7 @@ object Main {
       println(parser.helpText(sorted = false))
     }
 
-    Logger.setLevel(LogLevel.INFO)
+    Logger.setLevel(LogLevel.INFO, false)
     if (conf.verbose.value) {
       Logger.setLevel(LogLevel.DEBUG, true)
     }

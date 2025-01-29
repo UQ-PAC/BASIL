@@ -3,70 +3,79 @@ package analysis
 import analysis.solvers.{Cons, Term, UnionFindSolver, Var}
 import ir.*
 import util.SteensLogger
+import scala.collection.immutable.{AbstractMap, SeqMap, SortedMap}
 import scala.collection.mutable
 
-/** Wrapper for variables so we can have Steensgaard-specific equals method indirectly
- * Relies on the SSA sets intersection being non-empty
- * */
-case class RegisterVariableWrapper(variable: Variable, assigns: Set[Assign]) {
-  override def equals(obj: Any): Boolean = {
-    obj match {
-      case RegisterVariableWrapper(other, otherAssigns) =>
-        variable == other && assigns.intersect(otherAssigns).nonEmpty
-      case _ =>
-        false
-    }
-  }
-}
-
 /** Wrapper for variables so we can have ConstantPropegation-specific equals method indirectly
- * Relies on SSA sets being exactly the same
+ * Relies on SSA integers being exactly the same
  * */
-case class RegisterWrapperEqualSets(variable: Variable, assigns: Set[Assign])
+case class RegisterWrapperEqualSets(variable: Variable, ssa: FlatElement[Int])
 
 /** Steensgaard-style pointer analysis. The analysis associates an [[StTerm]] with each variable declaration and
  * expression node in the AST. It is implemented using [[analysis.solvers.UnionFindSolver]].
  */
 class InterprocSteensgaardAnalysis(
-                                    domain: Set[CFGPosition],
-                                    mmm: MemoryModelMap,
-                                    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-                                    vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]) extends Analysis[Any] {
+  domain: Set[CFGPosition],
+  mmm: MemoryModelMap,
+  reachingDefs: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])],
+) extends Analysis[Any] {
 
   val solver: UnionFindSolver[StTerm] = UnionFindSolver()
+  val callSiteSummary: mutable.Map[DirectCall, Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]]] = mutable.Map()
 
   private val mallocVariable = Register("R0", 64)
 
-  def vsaApproximation(variable: Variable, n: CFGPosition): Set[MemoryRegion] = {
-    val ctx = getUse(variable, n, reachingDefs)
-    ctx.flatMap { i =>
-      if (i != n) {
-        vsaResult.get(i) match {
-          case Some(Lift(el)) => 
-            assert(i.assignees.contains(variable))
-            el.get(variable) match {
-            case Some(values) => values.flatMap {
-              case addressValue: AddressValue =>
-                Some(addressValue.region)
-              case _: LiteralValue => None
-            }
-            case None => Set()
-          }
-          case _ => Set()
-        }
-      } else {
-        Set()
-      }
-    }
-  }
+//  def vsaApproximation(variable: Variable, n: CFGPosition): Set[MemoryRegion] = {
+//    val ctx = getSSAUse(variable, n, reachingDefs)
+//    ctx.flatMap { i =>
+//      if (i != n) {
+//        vsaResult.get(i) match {
+//          case Some(Lift(el)) => el.get(i.lhs) match {
+//            case Some(values) => values.flatMap {
+//              case addressValue: AddressValue =>
+//                Some(addressValue.region)
+//              case _: LiteralValue => None
+//            }
+//            case None => Set()
+//          }
+//          case _ => Set()
+//        }
+//      } else {
+//        Set()
+//      }
+//    }
+//  }
 
   /** @inheritdoc
    */
   def analyze(): Unit = {
     // generate the constraints by traversing the AST and solve them on-the-fly
     domain.foreach { p =>
-      visit(p, ())
+      visit(p)
     }
+
+    // for every direct call in mmm.contextMapVSA the ctx is unified with the call site summary
+
+    for {
+      ctx <- mmm.contextMapVSA.values
+      (directCall, v) <- ctx
+    } {
+      val solverCopy = solver.deepCopy()
+      v.foreach { (k1, v1) =>
+        k1 match {
+          case variable: Variable =>
+            val defs = getSSADefinition(variable, directCall.target, reachingDefs)
+            v1.foreach {
+              case AddressValue(region) =>
+                solverCopy.unify(IdentifierVariable(RegisterWrapperEqualSets(variable, defs)), PointerRef(AllocVariable(region)))
+              case LiteralValue(_) => ???
+              case _ => ???
+            }
+          case _ => // do nothing
+        }
+      }
+    }
+    SteensLogger.debug("Done")
   }
 
   /** Generates the constraints for the given sub-AST.
@@ -75,12 +84,12 @@ class InterprocSteensgaardAnalysis(
    * @param arg
    *   unused for this visitor
    */
-  def visit(node: CFGPosition, arg: Unit): Unit = {
+  def visit(node: CFGPosition): Unit = {
     node match {
       case directCall: DirectCall if directCall.target.name == "malloc" =>
         // X = alloc P:  [[X]] = ↑[[alloc-i]]
         val alloc = mmm.nodeToRegion(directCall).head
-        val defs = getDefinition(mallocVariable, directCall, reachingDefs)
+        val defs = getSSADefinition(mallocVariable, directCall, reachingDefs)
         unify(IdentifierVariable(RegisterWrapperEqualSets(mallocVariable, defs)), PointerRef(AllocVariable(alloc)))
       case assign: LocalAssign =>
         // TODO: unsound
@@ -89,16 +98,14 @@ class InterprocSteensgaardAnalysis(
           // X1 = X2: [[X1]] = [[X2]]
           val X1 = assign.lhs
           val X2 = unwrapped.get
-          unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getDefinition(X1, assign, reachingDefs))), IdentifierVariable(RegisterWrapperEqualSets(X2, getUse(X2, assign, reachingDefs))))
+          unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, assign, reachingDefs))), IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, assign, reachingDefs))))
         } else {
-          // X1 = *X2: [[X2]] = ↑a ^ [[X1]] = a where a is a fresh term variable
+          // X1 = *X2: [[X2]] = ↑a ^ [[X1]] = a where a is a fresh term variable TODO: this rule has been adapted to match [[X1]] = ↑[[alloc_X2]]
           val X1 = assign.lhs
           val X2_star = mmm.nodeToRegion(node)
-          val alpha = FreshVariable()
           X2_star.foreach { x =>
-            unify(PointerRef(alpha), ExpressionVariable(x))
+            unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, assign, reachingDefs))), PointerRef(AllocVariable(x)))
           }
-          unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getDefinition(X1, assign, reachingDefs))), alpha)
         }
       case memoryStore: MemoryStore =>
         // *X1 = X2: [[X1]] = ↑a ^ [[X2]] = a where a is a fresh term variable
@@ -107,37 +114,33 @@ class InterprocSteensgaardAnalysis(
         val unwrapped = unwrapExprToVar(memoryStore.value)
         if (unwrapped.isDefined) {
           val X2 = unwrapped.get
-          val X2_regions: Set[MemoryRegion] = vsaApproximation(X2, node)
-
           val alpha = FreshVariable()
-          val pointerRef = PointerRef(alpha)
           X1_star.foreach { x =>
-            unify(ExpressionVariable(x), pointerRef)
+            //unify(PointerRef(AllocVariable(x)), PointerRef(alpha))
+            unify(IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, memoryStore, reachingDefs))), PointerRef(AllocVariable(x)))
           }
-          X2_regions.foreach { x =>
-            unify(ExpressionVariable(x), alpha)
-          }
+          //unify(IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, memoryStore, reachingDefs))), alpha)
+          //            X1_star.foreach { x =>
+          //              unify(PointerRef(AllocVariable(x)), IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, memoryAssign, reachingDefs))))
+          //            }
         }
-      case memoryLoad: MemoryLoad =>
+      case load: MemoryLoad =>
         // TODO: unsound
-        val unwrapped = unwrapExprToVar(memoryLoad.index)
+        val unwrapped = unwrapExprToVar(load.index)
         if (unwrapped.isDefined) {
           // X1 = X2: [[X1]] = [[X2]]
-          val X1 = memoryLoad.lhs
+          val X1 = load.lhs
           val X2 = unwrapped.get
-          unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getDefinition(X1, memoryLoad, reachingDefs))), IdentifierVariable(RegisterWrapperEqualSets(X2, getUse(X2, memoryLoad, reachingDefs))))
+          unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, load, reachingDefs))), IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, load, reachingDefs))))
         } else {
-          // X1 = *X2: [[X2]] = ↑a ^ [[X1]] = a where a is a fresh term variable
-          val X1 = memoryLoad.lhs
+          // X1 = *X2: [[X2]] = ↑a ^ [[X1]] = a where a is a fresh term variable TODO: this rule has been adapted to match [[X1]] = ↑[[alloc_X2]]
+          val X1 = load.lhs
           val X2_star = mmm.nodeToRegion(node)
-          val alpha = FreshVariable()
           X2_star.foreach { x =>
-            unify(PointerRef(alpha), ExpressionVariable(x))
+            unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, load, reachingDefs))), PointerRef(AllocVariable(x)))
           }
-          unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getDefinition(X1, memoryLoad, reachingDefs))), alpha)
         }
-
-      case _ => // do nothing TODO: Maybe LocalVar too?
+      case _ => // do nothing
     }
   }
 
@@ -149,9 +152,9 @@ class InterprocSteensgaardAnalysis(
 
   /** @inheritdoc
    */
-  def pointsTo(): Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]] = {
-    val solution = solver.solution()
-    val unifications = solver.unifications()
+  def pointsTo(eqSolver: UnionFindSolver[StTerm] = solver): Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]] = {
+    val solution = eqSolver.solution()
+    val unifications = eqSolver.unifications()
     SteensLogger.debug(s"Solution: \n${solution.mkString(",\n")}\n")
     SteensLogger.debug(s"Sets: \n${unifications.values.map { s => s"{ ${s.mkString(",")} }"}.mkString(", ")}")
 
@@ -185,13 +188,6 @@ case class AllocVariable(alloc: MemoryRegion) extends StTerm with Var[StTerm] {
 case class IdentifierVariable(id: RegisterWrapperEqualSets) extends StTerm with Var[StTerm] {
 
   override def toString: String = s"$id"
-}
-
-/** A term variable that represents an expression in the program.
- */
-case class ExpressionVariable(expr: MemoryRegion | Expr) extends StTerm with Var[StTerm] {
-
-  override def toString: String = s"$expr"
 }
 
 /** A fresh term variable.

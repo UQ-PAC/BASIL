@@ -128,7 +128,7 @@ class RegionInjectorMRA(override val program: Program, mmm: MemoryModelMap) exte
   }
 
   private def statementToRegions(n: Statement): Set[MemoryRegion] = {
-    mmm.getStack(n) ++ mmm.getData(n)
+    mmm.nodeToRegion(n)
   }
 
   private def visitStatement(n: Statement): Unit = n match {
@@ -164,10 +164,18 @@ class RegionInjectorMRA(override val program: Program, mmm: MemoryModelMap) exte
 
   override def getMergedRegion(address: BigInt, size: Int): Option[MergedRegionMRA] = {
     val region = mmm.findDataObject(address)
-    if (region.isDefined && mergedRegions.contains(region.get)) {
-      Some(mergedRegions(region.get))
+    if (region.isDefined) {
+      if (mergedRegions.contains(region.get)) {
+        Some(mergedRegions(region.get))
+      } else if (region.get.size >= (size / 8)) {
+        val newRegion = MergedRegionMRA(region.get.regionIdentifier, mutable.Set(region.get))
+        mergedRegions(region.get) = newRegion
+        Some(newRegion)
+      } else {
+        throw Exception(s"MMM returned region for $address with size ${region.get.size} bytes which does not match requested size ${size / 8} bytes")
+      }
     } else {
-      None
+      throw Exception(s"failed to find region with address $address of size ${size / 8} bytes")
     }
   }
 
@@ -292,7 +300,7 @@ class RegionInjectorDSA(override val program: Program, DSATopDown: mutable.Map[P
     }
 
     if (cells.isEmpty || cells.size > 1) {
-      throw Exception("")
+      throw Exception(s"failed to find region with address $address of size ${size / 8} bytes")
     } else if (!mergedRegions.contains(cells.head)) {
       val region = createRegion(cells.head)
       mergedRegions(cells.head) = region
