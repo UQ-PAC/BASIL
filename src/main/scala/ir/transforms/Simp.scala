@@ -471,6 +471,92 @@ def coalesceBlocks(p: Program) = {
   didAny
 }
 
+def removeDeadInParams(p: Program) : Boolean = {
+  var modified = false
+  assert(invariant.correctCalls(p))
+
+  for (block <- p.procedures.flatMap(_.entryBlock)) {
+    val proc = block.parent
+
+    val (liveBefore,_) = getLiveVars(proc)
+    val live = liveBefore(block)
+    val unused = proc.formalInParam.filterNot(live.contains(_))
+
+    for (unusedFormalInParam <- unused) {
+      modified = true
+      proc.formalInParam.remove(unusedFormalInParam)
+
+      for (call <- proc.incomingCalls()) {
+        call.actualParams = call.actualParams.removed(unusedFormalInParam)
+      }
+    }
+  }
+
+  if (modified) assert(invariant.correctCalls(p))
+  modified
+}
+
+/*
+ * Inline procedure output parameters where the procedure returns a constant or the same out param as the in param.
+ */
+def removeInvariantOutParameters(p: Program): Boolean = {
+  assert(invariant.correctCalls(p))
+  assert(invariant.singleCallBlockEnd(p))
+  var modified = false
+
+  val returns = p.procedures.flatMap(_.returnBlock).map(_.jump).collect { case r: Return => r }
+  for (ret <- returns) {
+    val proc = ret.parent.parent
+    val inParams = proc.formalInParam.toSet
+
+    val invariantParams = ret.outParams.collect {
+      // we are returning a constant and can inline
+      case (formalOut, binding: Literal) => (formalOut, binding)
+      // we are returning the input parameter with the same name as the output parameter so can inline at callsite
+      case (formalOut, binding: LocalVar) if inParams.contains(binding) => (formalOut, binding)
+    }
+
+    // remove invariant params from outparam signature, and outparam list of return, and out param list of all calls,
+    // and add assignment after the call of bound actual param to bound outparam
+    for ((invariantOutFormal, binding) <- invariantParams) {
+      modified = true
+      proc.formalOutParam.remove(invariantOutFormal)
+      ret.outParams = ret.outParams.removed(invariantOutFormal)
+
+      val calls = proc.incomingCalls()
+
+      for (call <- calls) {
+        val lhs = call.outParams(invariantOutFormal)
+        val rhs = binding 
+        call.outParams = call.outParams.removed(invariantOutFormal)
+
+        // insert assignment of to successor to maintain singleCallBlockEnd invariant
+        call.parent.jump match {
+          case r : Return => {
+            // substitute directly into return
+            r.outParams = r.outParams.map((f, a) => (f, Substitute(v => if (v == lhs) then Some(rhs) else None)(a).getOrElse(a)))
+          }
+          case r: Unreachable => ()
+          case g: GoTo => {
+            // add assignment
+            for (t <- g.targets) {
+              t.statements.prepend(LocalAssign(lhs, rhs))
+            }
+          }
+        }
+
+        call.parent.statements.insertBefore(call, LocalAssign(lhs, rhs))
+      }
+    }
+  }
+
+  if (modified) {
+    assert(invariant.correctCalls(p))
+    assert(invariant.singleCallBlockEnd(p))
+  }
+  modified
+}
+
 def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
 
   applyRPO(p)
@@ -546,6 +632,20 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
 
 }
 
+def copyPropParamFixedPoint(p: Program, rela: Map[BigInt, BigInt]): Int = {
+  doCopyPropTransform(p, rela)
+  var changed = removeInvariantOutParameters(p)
+  var iterations = 1
+  if (changed) {
+    SimplifyLogger.info(s"Simplify:: Copyprop iteration $iterations")
+    doCopyPropTransform(p, rela)
+    changed = removeInvariantOutParameters(p)
+    changed = changed | removeDeadInParams(p)
+    iterations += 1
+  }
+  iterations
+}
+
 def reversePostOrder(p: Procedure): Unit = {
   /* Procedures may contain disconnected sets of blocks so we arbitrarily order these with respect to eachother. */
   for (b <- p.blocks) {
@@ -613,7 +713,6 @@ object getProcFrame {
     v.modifies
   }
 }
-
 
 object CCP {
 

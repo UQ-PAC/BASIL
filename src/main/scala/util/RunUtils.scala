@@ -626,7 +626,7 @@ object RunUtils {
     //assert(program.procedures.forall(transforms.rdDSAProperty))
     AnalysisResultDotLogger.writeToFile(File("blockgraph-before-copyprop.dot"), dotBlockGraph(program.mainProcedure))
     Logger.info("Copyprop Start")
-    transforms.doCopyPropTransform(program, ctx.globalOffsets)
+    transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
     AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
 
     // assert(program.procedures.forall(transforms.rdDSAProperty))
