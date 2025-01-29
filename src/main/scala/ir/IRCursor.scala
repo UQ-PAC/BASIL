@@ -97,7 +97,7 @@ trait IntraProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
       case proc: Procedure => proc.entryBlock.toSet
       case b: Block        => b.statements.headOption.orElse(Some(b.jump)).toSet
       case n: GoTo         => n.targets.asInstanceOf[Set[CFGPosition]]
-      case h: Unreachable         => Set()
+      case h: Unreachable  => Set()
       case h: Return       => Set()
       case c: Statement    => IRWalk.nextCommandInBlock(c).toSet
     }

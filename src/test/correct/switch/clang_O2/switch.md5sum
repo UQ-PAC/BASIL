@@ -1,0 +1,5 @@
+240e6d95f621ee91fe3731b174d0460c  correct/switch/clang_O2/a.out
+27a141bc127cfc284fd62a50edd2b871  correct/switch/clang_O2/switch.adt
+deb655d87967357a586ec65c298b0a3c  correct/switch/clang_O2/switch.bir
+add95b2d3c8dc1cc867d98d7dff7ff61  correct/switch/clang_O2/switch.relf
+5a58c73c41f6f2f487170e4bcaad4291  correct/switch/clang_O2/switch.gts

@@ -1,0 +1,5 @@
+2eb990b06304b345a513e539431492e3  correct/basic_arrays_read/clang_pic/a.out
+cd7dcaae1cf09f26f078fcdaa06151d5  correct/basic_arrays_read/clang_pic/basic_arrays_read.adt
+211cfab398428218dba94a08e28beb65  correct/basic_arrays_read/clang_pic/basic_arrays_read.bir
+e58a679556ec698407b60ad49f21810a  correct/basic_arrays_read/clang_pic/basic_arrays_read.relf
+bcf31c83ba6022b9612ac81271a86896  correct/basic_arrays_read/clang_pic/basic_arrays_read.gts

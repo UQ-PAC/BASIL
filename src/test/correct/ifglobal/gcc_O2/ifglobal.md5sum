@@ -1,0 +1,5 @@
+a7ed42132b91adfacdbdd894d2706086  correct/ifglobal/gcc_O2/a.out
+219a2c22d71834b4f365b05afa2335f4  correct/ifglobal/gcc_O2/ifglobal.adt
+e57b7fd51160df3f581cf1d1bedd36b5  correct/ifglobal/gcc_O2/ifglobal.bir
+2e56bd92d1e64bd0ef06b1c857162297  correct/ifglobal/gcc_O2/ifglobal.relf
+764cb8066f6aba56c00531f9ec4b5857  correct/ifglobal/gcc_O2/ifglobal.gts

@@ -1,0 +1,5 @@
+915d92a9810bc6893656f9af2d4bbabf  correct/initialisation/gcc_pic/a.out
+e5303a2f699be9371c4883ab96cec21d  correct/initialisation/gcc_pic/initialisation.adt
+e40efe06bb66bb999f7c079edb8d8122  correct/initialisation/gcc_pic/initialisation.bir
+8389fc6ef2d773f91fdf9cf510ca3c5f  correct/initialisation/gcc_pic/initialisation.relf
+4007260caacde4d306b19d9e86dd6d7a  correct/initialisation/gcc_pic/initialisation.gts

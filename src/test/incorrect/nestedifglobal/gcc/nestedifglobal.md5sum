@@ -1,0 +1,5 @@
+71653c09fd2ff87de63f4aa53b7f3e77  incorrect/nestedifglobal/gcc/a.out
+512a5c1a268dd1f0a721b495d30e2cf8  incorrect/nestedifglobal/gcc/nestedifglobal.adt
+81f09a192f18b4e4bbd1b62b91b7846b  incorrect/nestedifglobal/gcc/nestedifglobal.bir
+aa76e200281058eee95a425205a2c5ab  incorrect/nestedifglobal/gcc/nestedifglobal.relf
+3fca7c68a268d0fd9c059b18bc6833e9  incorrect/nestedifglobal/gcc/nestedifglobal.gts

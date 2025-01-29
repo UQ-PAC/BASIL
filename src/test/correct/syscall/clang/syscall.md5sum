@@ -1,0 +1,5 @@
+17d72c6a7a72b8018879e5c445636de4  correct/syscall/clang/a.out
+ce1cc85de1f94735a4484434eb043d48  correct/syscall/clang/syscall.adt
+0540de487f7e016d2374770ce4849067  correct/syscall/clang/syscall.bir
+3c057bf2d2b9bd847c65a878a292f0cd  correct/syscall/clang/syscall.relf
+fc2931f275382868541e86c63f26e612  correct/syscall/clang/syscall.gts
