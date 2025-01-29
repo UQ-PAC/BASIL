@@ -51,9 +51,16 @@ object Interval {
     Ordering.by(i => (i.start, i.end))
 }
 
-trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Node <: DSANode[Cell]](val proc: Procedure, val phase: DSAPhase, val solver: Solver) {
-  val sva: SymbolicValues = getSymbolicValues(proc)
-  val constraints: Set[Constraint] = generateConstraints(proc)
+trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Node <: DSANode[Cell]]
+  (val proc: Procedure, 
+   val phase: DSAPhase,
+   val solver: Solver,
+   val symValues: Option[SymbolicValues] = None,
+   val cons: Option[Set[Constraint]] = None,
+  ) 
+{
+  val sva: SymbolicValues = symValues.getOrElse(getSymbolicValues(proc))
+  val constraints: Set[Constraint] = cons.getOrElse(generateConstraints(proc))
   val nodes: Map[SymBase, Node] = buildNodes
   def exprToSymVal(expr: Expr): SymValueSet = sva.exprToSymValSet(expr)
   def init(symBase: SymBase, size: Option[Int]): Node
