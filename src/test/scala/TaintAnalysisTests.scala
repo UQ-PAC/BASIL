@@ -17,7 +17,7 @@ class TaintAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest
     ProcVariableDependencyAnalysis(program, variables, Map(), procedure).analyze()
   }
 
-  private val registers = 0.to(28).map { n => Register(s"R$n", 64): Variable }.toSet
+  private val registers = 0.to(31).map { n => Register(s"R$n", 64): Variable }.toSet
   private val baseRegisterMap = registers.map { r => (r -> FiniteSet(Set(r))) }.toMap
 
   test("constantLiteral") {
