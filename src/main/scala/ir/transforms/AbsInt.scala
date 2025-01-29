@@ -1,7 +1,7 @@
 package ir.transforms
 import translating.serialiseIL
 
-import util.Logger
+import util.StaticAnalysisLogger as Logger
 import ir.eval.AlgebraicSimplifications
 import ir.eval.AssumeConditionSimplifications
 import ir.eval.simplifyExprFixpoint
@@ -168,7 +168,7 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
       saveCount(lastBlock) = saveCount.get(lastBlock).getOrElse(0) + 1
       if (!prev.contains(nx)) then {
         if (saveCount(lastBlock) >= 50) {
-          Logger.warn(s"Large join count on block ${lastBlock.label}, no fix point? (-v for mor info)")
+          Logger.warn(s"Large join count on block ${lastBlock.label}, no fix point? (-v for more info)")
           Logger.debug(lastBlock.label + "    ==> " + x)
           Logger.debug(lastBlock.label + "    <== " + nx)
         }

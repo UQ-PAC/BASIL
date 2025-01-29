@@ -98,7 +98,7 @@ class MustGammaDomain(initialState: VarGammaMap) extends GammaDomain(initialStat
  */
 class ReachabilityConditions extends PredicateEncodingDomain[Predicate] {
   // As the expressions get more complex, it may be worth considering not simplifying at every join
-  def join(a: Predicate, b: Predicate, pos: Block): Predicate = Predicate.Bop(BoolAND, a, b)
+  def join(a: Predicate, b: Predicate, pos: Block): Predicate = Predicate.Bop(BoolAND, a, b).simplify
 
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
