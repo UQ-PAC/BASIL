@@ -120,28 +120,6 @@ object IRLoading {
     val mods = ir.modules
     val cfg = ir.cfg.get
 
-    enum InsnSemantics {
-      case Result(value: Array[String])
-      case Error(opcode: String, error: String)
-    }
-
-    implicit object InsnSemanticsFormat extends JsonFormat[InsnSemantics] {
-      def write(m: InsnSemantics) =  ???
-      def read(json: JsValue) = json match {
-        case JsObject(fields) => {
-          val m : Map[String, JsValue] = fields.get("decode_error") match {
-            case Some(JsObject(m)) => m
-            case _ => deserializationError(s"Bad sem format $json")
-          }
-          InsnSemantics.Error(m("opcode").convertTo[String], m("error").convertTo[String])
-        }
-        case array @ JsArray(_) => InsnSemantics.Result(array.convertTo[Array[String]])
-        case s => deserializationError(s"Bad sem format $s")
-      }
-    }
-
-    val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, Array[InsnSemantics]]])
-
     def parse_asl_stmt(line: String): StmtContext = {
       val lexer = ASLpLexer(CharStreams.fromString(line))
       val tokens = CommonTokenStream(lexer)
@@ -170,11 +148,25 @@ object IRLoading {
       }
     }
 
-    val parserMap : Map[String, List[Either[(String,String), List[StmtContext]]]] =
-      semantics.toList.map(_.map((k: String, v: Array[InsnSemantics]) => (k, v.toList.map {
-      case InsnSemantics.Result(s) => Right(s.toList.map(parse_asl_stmt))
-      case InsnSemantics.Error(op, err) => Left((op, err))
-      }))).flatten.toMap
+    implicit object InsnSemanticsFormat extends JsonFormat[InsnSemantics] {
+      def write(m: InsnSemantics) =  ???
+      def read(json: JsValue) = json match {
+        case JsObject(fields) => {
+          val m : Map[String, JsValue] = fields.get("decode_error") match {
+            case Some(JsObject(m)) => m
+            case _ => deserializationError(s"Bad sem format $json")
+          }
+          InsnSemantics.Error(m("opcode").convertTo[String], m("error").convertTo[String])
+        }
+        case array @ JsArray(_) => InsnSemantics.Result(array.convertTo[Array[String]].map(parse_asl_stmt))
+        case s => deserializationError(s"Bad sem format $s")
+      }
+    }
+
+    val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, List[InsnSemantics]]])
+
+    val parserMap : Map[String, List[InsnSemantics]] = semantics.flatten.toMap
+
 
     val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress)
     GTIRBConverter.createIR()
