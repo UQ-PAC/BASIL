@@ -158,11 +158,11 @@ class GenericLogger(
 // doesn't work with `mill run`
 def isAConsole = System.console() != null
 
-val Logger = GenericLogger("log", LogLevel.DEBUG, System.out, isAConsole)
+val Logger = GenericLogger("log", LogLevel.DEBUG, System.out, isAConsole).setLevel(LogLevel.INFO, true)
 val StaticAnalysisLogger = Logger.deriveLogger("analysis", System.out)
 val SimplifyLogger = Logger.deriveLogger("simplify", System.out)
 val DebugDumpIRLogger = Logger.deriveLogger("debugdumpir").setLevel(LogLevel.OFF)
 val AnalysisResultDotLogger = Logger.deriveLogger("analysis-results-dot").setLevel(LogLevel.OFF)
 val VSALogger = StaticAnalysisLogger.deriveLogger("vsa")
-val MRALogger = StaticAnalysisLogger.deriveLogger("mra")
+val MRALogger = StaticAnalysisLogger.deriveLogger("mra").setLevel(LogLevel.INFO)
 val SteensLogger = StaticAnalysisLogger.deriveLogger("steensgaard")

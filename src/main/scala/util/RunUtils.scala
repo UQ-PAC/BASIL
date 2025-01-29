@@ -825,6 +825,7 @@ object RunUtils {
     }
 
     StaticAnalysisLogger.info("[!] Running DSA Analysis")
+    writeToFile(pp_prog(ctx.program), "testo1.il" )
     val symbolTableEntries: Set[SymbolTableEntry] = ctx.globals ++ ctx.funcEntries
     val dsa = DataStructureAnalysis(ctx.program, symResults, analysisResult.last.interProcConstProp, symbolTableEntries, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, analysisResult.last.writesToResult, analysisResult.last.paramResults)
     dsa.analyze()

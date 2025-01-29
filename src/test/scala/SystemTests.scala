@@ -225,6 +225,17 @@ class SimplifySystemTests extends SystemTests {
   }
 }
 
+class SimplifyMemorySystemTests extends SystemTests {
+  Logger.setLevel(LogLevel.DEBUG)
+  val staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA))
+  runTests("correct", TestConfig(simplify=true, useBAPFrontend = true, expectVerify = true, logResults = true, staticAnalysisConfig = staticAnalysisConfig))
+  runTests("incorrect", TestConfig(simplify=true, useBAPFrontend = true, expectVerify = false, logResults = true, staticAnalysisConfig = staticAnalysisConfig))
+  runTests("correct", TestConfig(simplify=true, useBAPFrontend = false, expectVerify = true, logResults = true, staticAnalysisConfig = staticAnalysisConfig))
+  runTests("incorrect", TestConfig(simplify=true, useBAPFrontend = false, expectVerify = false, logResults = true, staticAnalysisConfig = staticAnalysisConfig))
+  test("summary-simplify-mem") {
+    summary("simplify-mem")
+  }
+}
 
 class AnalysisSystemTestsBAP extends SystemTests {
   runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = true))

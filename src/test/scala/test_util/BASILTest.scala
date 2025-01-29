@@ -29,7 +29,7 @@ trait BASILTest {
         inputFile = inputPath,
         relfFile = RELFPath,
         specFile = specFile,
-        parameterForm = simplify,
+        parameterForm = false,
       ),
       simplify = simplify,
       staticAnalysis = staticAnalysisConf,
