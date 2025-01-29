@@ -22,12 +22,12 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{Constraint, DataStructureAnalysis, getSymbolicValues, generateConstraints, Graph, SymbolicAddress, SymbolicValues, SymbolicAddressAnalysis}
+import analysis.data_structure_analysis.{Constraint, DataStructureAnalysis, FieldDSA, Graph, SadDSA, SetDSA, SymValueSet, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValueDomain, SymbolicValues, generateConstraints, getSymbolicValues}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
 import translating.*
-import util.{Logger, DebugDumpIRLogger, SimplifyLogger}
+import util.{DebugDumpIRLogger, Logger, SimplifyLogger}
 
 import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
@@ -769,22 +769,21 @@ object RunUtils {
       doSimplify(ctx, conf.staticAnalysis)
     }
 
-
-    // SVA
-    var dsaContext: Option[DSAContext] = None
-    if conf.dsaConfig.nonEmpty then
-      val config = conf.dsaConfig.get
-
-      val main = ctx.program.mainProcedure
-      var sva: Map[Procedure, SymbolicValues] = Map.empty
-      var cons: Map[Procedure, Set[Constraint]] = Map.empty
-
-      ctx.program.procedures.foreach(
-        proc =>
-          val SVAResults = getSymbolicValues(proc)
-          val constraints = generateConstraints(proc)
+    // todo make args
+    val main = ctx.program.mainProcedure
+    var sva: Map[Procedure, SymbolicValues] = Map.empty
+    var cons: Map[Procedure, Set[Constraint]] = Map.empty
+    ctx.program.procedures.foreach(
+      proc =>
+//        if proc.name.startsWith("forward_request") then
+//          val setGraph = SetDSA.getLocal(proc)
+          val sadGraph = SadDSA.getLocal(proc)
+//          val fieldGraph = FieldDSA.getLocal(proc)
+          val SVAResults = sadGraph.sva
+          val constraints = sadGraph.constraints
           sva += (proc -> SVAResults)
           cons += (proc -> constraints)
+          writeToFile(setGraph.toDot, s"cntlm_${proc.name}.DSA")
           writeToFile(SVAResults.pretty, s"cntlm_${proc.name}.SVA")
           writeToFile(constraints.map(c => c.toString).toSeq.sorted.mkString("\n"), s"cntlm_${proc.name}.ConsExpr")
           writeToFile(constraints.map(c => c.eval(Expr => SVAResults.exprToSymValSet(Expr))).toSeq.sorted.mkString("\n"), s"cntlm_${proc.name}.Cons")
