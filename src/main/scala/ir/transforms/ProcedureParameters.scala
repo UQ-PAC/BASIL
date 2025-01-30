@@ -33,6 +33,7 @@ val builtinSigs: Map[String, FunSig] = Map(
   "__stack_chk_fail" -> FunSig(List(), List()),
   "__printf_chk" -> FunSig(List(R(0), R(1)), List(R(0))),
   "__syslog_chk" -> FunSig(List(R(0)), List()),
+  "indirect_call_launchpad" -> indirectCallFunsig,
 )
 
 
@@ -192,7 +193,8 @@ class SetFormalParams(
 
 
   override def vproc(p: Procedure) = {
-    if (externalFunctions.contains(p.name)) {
+    if (externalFunctions.contains(p.name) || p.isExternal.contains(true)) {
+      println(p.name)
       p.formalInParam = mutable.SortedSet.from(externalIn(p.procName).map(_._1))
       p.formalOutParam = mutable.SortedSet.from(externalOut(p.procName).map(_._1))
       p.inParamDefaultBinding = immutable.SortedMap.from(externalIn(p.procName))

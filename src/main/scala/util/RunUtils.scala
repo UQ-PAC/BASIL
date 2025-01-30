@@ -583,6 +583,7 @@ object RunUtils {
     val timer = PerformanceTimer("Simplify")
     val program = ctx.program
 
+    DebugDumpIRLogger.writeToFile(File("il-before-simp.il"), pp_prog(program))
     transforms.applyRPO(program)
 
     // example of printing a simple analysis
@@ -689,7 +690,7 @@ object RunUtils {
       )
     }
 
-    if (q.loading.parameterForm) {
+    if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
     } else {
@@ -712,10 +713,11 @@ object RunUtils {
     ir.eval.SimplifyValidation.validate = conf.validateSimp
     if (conf.simplify) {
 
-      if (!q.loading.parameterForm) {
-        ir.transforms.clearParams(ctx.program)
-        ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
-      }
+      ir.transforms.clearParams(ctx.program)
+      ir.transforms.liftIndirectCall(ctx.program)
+      DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
+      ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
+      DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
 
       doSimplify(ctx, conf.staticAnalysis)
     }

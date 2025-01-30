@@ -479,7 +479,7 @@ def removeDeadInParams(p: Program): Boolean = {
   var modified = false
   assert(invariant.correctCalls(p))
 
-  for (block <- p.procedures.flatMap(_.entryBlock)) {
+  for (block <- p.procedures.filterNot(_.isExternal.contains(true)).flatMap(_.entryBlock)) {
     val proc = block.parent
 
     val (liveBefore, _) = getLiveVars(proc)
@@ -1106,12 +1106,14 @@ object CopyProp {
           }
         }
         case x: DirectCall => {
-          procFrames.get(x.target) match {
-            case Some(f) =>
-              for (mem <- f) {
-                clobberFull(c, varForMem(mem))
-              }
-            case _ => clobberAllMemory(c)
+          if x.target.isExternal.contains(true) then clobberAllMemory(c) else {
+            procFrames.get(x.target) match {
+              case Some(f) =>
+                for (mem <- f) {
+                  clobberFull(c, varForMem(mem))
+                }
+              case _ => clobberAllMemory(c)
+            }
           }
 
           val lhs = x.outParams.map(_._2)
