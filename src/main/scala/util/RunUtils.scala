@@ -410,8 +410,8 @@ object StaticAnalysis {
     Logger.debug("[!] Running Writes To")
     val writesTo = WriteToAnalysis(ctx.program).analyze()
 
-    val SSASolver = IntraprocSSASolver(IRProgram, writesTo, RNAResult)
-    val SSAResults = SSASolver.analyze()
+    Logger.debug("[!] Running commondef variable renaming (Intra SSA)")
+    val SSAResults = getCommonDefinitionVariableRenaming(IRProgram, writesTo)
 
     config.analysisDotPath.foreach(s => {
       writeToFile(
