@@ -34,6 +34,7 @@ case class Interval(start: Int, end: Int) {
   def size: Int = end - start
   def move(func: Int => Int): Interval = Interval(func(start), func(end))
   def isEmpty: Boolean = this.size == 0
+  def growTo(size: Int): Interval = Interval(start, math.max(end, start + size))
   def contains(offset: Int): Boolean = start <= offset && end >= offset
   def contains(interval: Interval): Boolean =
     start <= interval.start && end >= interval.end
@@ -64,7 +65,7 @@ trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Nod
   val nodes: Map[SymBase, Node] = buildNodes
   def exprToSymVal(expr: Expr): SymValueSet = sva.exprToSymValSet(expr)
   def init(symBase: SymBase, size: Option[Int]): Node
-  def constraintArgToCells(constraintArg: ConstraintArg): Set[CCell]
+  def constraintArgToCells(constraintArg: ConstraintArg, ignoreContents: Boolean = false): Set[CCell]
 
   def localPhase(): Unit = {
     constraints.foreach(processConstraint)
@@ -174,9 +175,9 @@ trait DSANode[Cell <: NodeCell & DSACell](val size: Option[Int]) {
       val newCell = if overlapping.isEmpty then
         init(interval)
       else
-        val unifiedInterval = overlapping.map(_.interval).reduce(Interval.join)
+        val unifiedInterval = overlapping.map(_.interval).fold(interval)(Interval.join)
         val res = init(unifiedInterval)
-        graph.mergeCells(overlapping.appended(res))
+        graph.mergeCells(overlapping)
         res
 
       _cells = cells.diff(overlapping).appended(newCell).sorted
