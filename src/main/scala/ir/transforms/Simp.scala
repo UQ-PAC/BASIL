@@ -683,11 +683,13 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
 }
 
 def copyPropParamFixedPoint(p: Program, rela: Map[BigInt, BigInt]): Int = {
+  SimplifyLogger.info(s"Simplify:: Copyprop iteration 0")
   doCopyPropTransform(p, rela)
   var inlinedOutParams : Map[Procedure, Set[Variable]] = removeInvariantOutParameters(p)
   var changed = inlinedOutParams.nonEmpty
   var iterations = 1
-  if (changed) {
+  while (changed) {
+    changed = false
     SimplifyLogger.info(s"Simplify:: Copyprop iteration $iterations")
     doCopyPropTransform(p, rela)
     val extraInlined = removeInvariantOutParameters(p, inlinedOutParams)
