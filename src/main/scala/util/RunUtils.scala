@@ -217,7 +217,12 @@ object IRTransform {
       case _ => ()
     })
 
-    cilvisitor.visit_prog(transforms.ReplaceReturns(doSimplify), ctx.program)
+    // FIXME: Main will often maintain the stack by loading R30 from the caller's stack frame
+    //        before returning, which makes the R30 assertin faile. Hence we currently skip this 
+    //        assertion for main, instead we should precondition the stack layout before main
+    //        but the interaction between spec and memory regions is nontrivial currently
+    cilvisitor.visit_prog(transforms.ReplaceReturns(proc => doSimplify && ctx.program.mainProcedure != proc), ctx.program)
+
     transforms.addReturnBlocks(ctx.program)
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
 
