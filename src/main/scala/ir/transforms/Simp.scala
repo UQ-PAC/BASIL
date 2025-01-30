@@ -502,29 +502,42 @@ def removeDeadInParams(p: Program): Boolean = {
 
 /*
  * Inline procedure output parameters where the procedure returns a constant or the same out param as the in param.
+ *
+ * Returns additional set newly inlined variables.
  */
-def removeInvariantOutParameters(p: Program): Boolean = {
+def removeInvariantOutParameters(p: Program, alreadyInlined : Map[Procedure, Set[Variable]] = Map()): Map[Procedure, Set[Variable]] = {
   assert(invariant.correctCalls(p))
   assert(invariant.singleCallBlockEnd(p))
   var modified = false
+  var inlined = Map[Procedure, Set[Variable]]()
 
   val returns = p.procedures.flatMap(_.returnBlock).map(_.jump).collect { case r: Return => r }
   for (ret <- returns) {
     val proc = ret.parent.parent
     val inParams = proc.formalInParam.toSet
 
+    val doneAlready = alreadyInlined.getOrElse(proc, Set())
+    var doneNow = Set[Variable]()
+    var toRename = Map[LocalVar, LocalVar]()
+
     val invariantParams = ret.outParams.collect {
       // we are returning a constant and can inline
       case (formalOut, binding: Literal) => (formalOut, binding)
       // we are returning the input parameter with the same name as the output parameter so can inline at callsite
-      case (formalOut, binding: LocalVar) if inParams.contains(binding) => (formalOut, binding)
+      case (formalOut, binding: Expr) if binding.variables.forall {
+        case l : LocalVar => inParams.contains(l)
+        case _ => false
+      } => (formalOut, binding)
     }
 
     // remove invariant params from outparam signature, and outparam list of return, and out param list of all calls,
     // and add assignment after the call of bound actual param to bound outparam
-    for ((invariantOutFormal, binding) <- invariantParams) {
+    for ((invariantOutFormal, binding) <- invariantParams.filterNot((k,v) => doneAlready.contains(k))) {
+      doneNow = doneNow + invariantOutFormal
+
       modified = true
       // TODO: uncomment and take dependency from specification into account when removing outparams
+      //
       // proc.formalOutParam.remove(invariantOutFormal)
       // ret.outParams = ret.outParams.removed(invariantOutFormal)
 
@@ -532,10 +545,19 @@ def removeInvariantOutParameters(p: Program): Boolean = {
 
       for (call <- calls) {
         val lhs = call.outParams(invariantOutFormal)
-        val rhs = binding
-        
+        // substitute the call in params for
+        val rhs = Substitute(((v : Variable) => v match {
+          case l: LocalVar => call.actualParams.get(l)
+          case _ => None
+        }), false)(binding).getOrElse(binding)
+
+        val renameRHS = match rhs with {
+          case l: LocalVar if l.index != 0 => {}
+        }
+
         // TODO: uncomment and take dependency from specification into account when removing outparams
-        //call.outParams = call.outParams.removed(invariantOutFormal)
+        //
+        // call.outParams = call.outParams.removed(invariantOutFormal)
 
         // insert assignment of to successor to maintain singleCallBlockEnd invariant
         call.parent.jump match {
@@ -552,17 +574,18 @@ def removeInvariantOutParameters(p: Program): Boolean = {
             }
           }
         }
-
-        call.parent.statements.insertBefore(call, LocalAssign(lhs, rhs))
       }
     }
+
+    if (doneNow.nonEmpty) inlined = inlined.updated(proc, doneNow)
   }
 
-  if (modified) {
+  if (inlined.nonEmpty) {
     assert(invariant.correctCalls(p))
     assert(invariant.singleCallBlockEnd(p))
   }
-  modified
+
+  inlined
 }
 
 def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
@@ -648,13 +671,15 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
 
 def copyPropParamFixedPoint(p: Program, rela: Map[BigInt, BigInt]): Int = {
   doCopyPropTransform(p, rela)
-  var changed = removeInvariantOutParameters(p)
+  var inlinedOutParams : Map[Procedure, Set[Variable]] = removeInvariantOutParameters(p)
+  var changed = inlinedOutParams.nonEmpty
   var iterations = 1
   if (changed) {
     SimplifyLogger.info(s"Simplify:: Copyprop iteration $iterations")
     doCopyPropTransform(p, rela)
-    changed = removeInvariantOutParameters(p)
-    changed = changed | removeDeadInParams(p)
+    val extraInlined = removeInvariantOutParameters(p, inlinedOutParams)
+    inlinedOutParams = extraInlined.foldLeft(inlinedOutParams)((acc, v) => acc + (v._1 -> (acc.getOrElse(v._1, Set[Variable]()) ++ v._2)))
+    changed = changed || extraInlined.nonEmpty || removeDeadInParams(p)
     iterations += 1
   }
   iterations
