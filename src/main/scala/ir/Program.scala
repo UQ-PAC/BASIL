@@ -7,6 +7,56 @@ import analysis.{BitVectorEval, MergedRegion}
 import util.intrusive_list.*
 import translating.serialiseIL
 
+
+/**
+  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
+  * not guaranteed to be in any defined order. 
+  */
+private class ILForwardIterator(private val begin: IterableOnce[CFGPosition], val walk: IRWalk[CFGPosition, CFGPosition]) extends Iterator[CFGPosition] {
+  val seen = mutable.Set[CFGPosition]()
+  private val stack = mutable.Stack[CFGPosition]()
+  stack.pushAll(begin)
+  seen.addAll(begin)
+
+  override def hasNext: Boolean = {
+    stack.nonEmpty
+  }
+
+  override def next(): CFGPosition = {
+    val n: CFGPosition = stack.pop()
+    seen.add(n)
+
+    val next = walk.succ(n).filterNot(seen.contains(_))
+    seen.addAll(next)
+    stack.pushAll(next)
+    n
+  }
+}
+
+/**
+  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
+  * not guaranteed to be in any defined order. 
+  */
+private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extends Iterator[CFGPosition] {
+  private val stack = mutable.Stack[CFGPosition]()
+  stack.pushAll(begin)
+
+  override def hasNext: Boolean = {
+    stack.nonEmpty
+  }
+
+  override def next(): CFGPosition = {
+    val n: CFGPosition = stack.pop()
+
+    stack.pushAll(n match {
+      case p: Procedure => p.blocks
+      case b: Block => Seq() ++ b.statements.toSeq ++ Seq(b.jump)
+      case s: Command => Seq()
+    })
+    n
+  }
+}
+
 class Program(var procedures: ArrayBuffer[Procedure],
               var mainProcedure: Procedure,
               val initialMemory: mutable.TreeMap[BigInt, MemorySection]) extends Iterable[CFGPosition] {
@@ -93,36 +143,15 @@ class Program(var procedures: ArrayBuffer[Procedure],
   }
 
   /**
-   * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
-   * not guaranteed to be in any defined order. 
-   */
-  private class ILUnorderedIterator(private val begin: Program) extends Iterator[CFGPosition] {
-    private val stack = mutable.Stack[CFGPosition]()
-    stack.addAll(begin.procedures)
-
-    override def hasNext: Boolean = {
-      stack.nonEmpty
-    }
-
-    override def next(): CFGPosition = {
-      val n: CFGPosition = stack.pop()
-
-      stack.pushAll(n match {
-        case p: Procedure => p.blocks
-        case b: Block => Seq() ++ b.statements.toSeq ++ Seq(b.jump)
-        case s: Command => Seq()
-      })
-      n
-    }
-
-  }
-
-  /**
    * Get an Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
    * not guaranteed to be in any defined order. 
    */
   def iterator: Iterator[CFGPosition] = {
-    ILUnorderedIterator(this)
+    ILLexicalIterator(this.procedures)
+  }
+
+  def preOrderIterator: Iterator[CFGPosition] = {
+    ILForwardIterator(this.procedures, IntraProcIRCursor)
   }
 
   private def memoryLookup(memory: mutable.TreeMap[BigInt, MemorySection], address: BigInt) = {
@@ -166,7 +195,7 @@ class Procedure private (
                   var out: ArrayBuffer[Parameter],
                   var requires: List[BExpr],
                   var ensures: List[BExpr],
-                ) {
+                ) extends Iterable[CFGPosition] {
   private val _callers = mutable.HashSet[DirectCall]()
   _blocks.foreach(_.parent = this)
   // class invariant
@@ -175,6 +204,21 @@ class Procedure private (
 
   def this(name: String, address: Option[BigInt] = None , entryBlock: Option[Block] = None, returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer(), requires: IterableOnce[BExpr] = ArrayBuffer(), ensures: IterableOnce[BExpr] = ArrayBuffer()) = {
     this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out), List.from(requires), List.from(ensures))
+  }
+
+  /**
+   * Get an Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
+   * not guaranteed to be in any defined order. 
+   */
+  def iterator: Iterator[CFGPosition] = {
+    ILLexicalIterator(Seq(this))
+  }
+
+  /**
+   * Iterate in cfg pre order.
+   */
+  def preOrderIterator: Iterator[CFGPosition] = {
+    ILForwardIterator(Seq(this), IntraProcIRCursor)
   }
 
   override def toString: String = {
