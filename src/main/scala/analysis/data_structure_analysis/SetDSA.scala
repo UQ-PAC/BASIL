@@ -32,6 +32,10 @@ class SetGraph(proc: Procedure, phase: DSAPhase,
       mergeCellsHelper(cell1, cell2)
 
   }
+
+  override def collect(): (Set[SadNode], Set[(SadCell, SadCell)]) = {
+    (Set.empty, Set.empty)
+  }
 }
 
 object SetDSA {
