@@ -782,10 +782,10 @@ object RunUtils {
     if (conf.summariseProcedures) {
       StaticAnalysisLogger.debug("[!] Variable dependency summaries")
       val scc = stronglyConnectedComponents(CallGraph, List(ctx.program.mainProcedure))
-      val varDepsSummaries = VariableDependencyAnalysis(ctx.program, scc, conf.simplify).analyze()
+      val varDepsSummaries = VariableDependencyAnalysis(ctx.program, scc, q.loading.parameterForm || conf.simplify).analyze()
 
       StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
-      IRTransform.generateProcedureSummaries(ctx, ctx.program, varDepsSummaries, conf.simplify)
+      IRTransform.generateProcedureSummaries(ctx, ctx.program, varDepsSummaries, q.loading.parameterForm || conf.simplify)
     }
 
     if (q.runInterpret) {
