@@ -1,7 +1,7 @@
 package analysis.data_structure_analysis
 
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver, UnionFindSolver}
-import ir.{Expr, Procedure}
+import ir.{Expr, Procedure, Program}
 
 import scala.collection.{SortedSet, mutable}
 
@@ -197,5 +197,19 @@ trait DSANode[Cell <: NodeCell & DSACell](val size: Option[Int]) {
 
 }
 
+def computeDSADomain(program: Program): Set[Procedure] = {
+  var domain: Set[Procedure] = Set(program.mainProcedure)
+  val stack: mutable.Stack[Procedure] = mutable.Stack()
+  stack.pushAll(program.mainProcedure.calls)
+
+  // calculate the procedures used in the program
+  while (stack.nonEmpty) {
+    val current = stack.pop()
+    domain += current
+    stack.pushAll(current.calls.diff(domain))
+  }
+
+  domain
+}
 
 trait DSACell
