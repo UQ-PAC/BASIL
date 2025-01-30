@@ -147,6 +147,39 @@ trait SystemTests extends AnyFunSuite, BASILTest {
     val verifyTime = timer.checkPoint("verify")
     val (boogieFailureMsg, verified, timedOut) = checkVerify(boogieResult, resultPath, conf.expectVerify)
 
+
+    def parseError(e: String, context: Int =3) = {
+      val lines = e.split('\n')
+      for (l <- lines) {
+        if (l.endsWith(": Error: this assertion could not be proved") || l.contains("this is the postcondition that could not be proved"))  {
+          val b = l.trim()
+          val parts = b.split("\\(").map(_.split("\\)")).flatten.map(_.split(",")).flatten
+          val fname = parts(0)
+          val line = Integer(parts(1))
+          val col = parts(2)
+
+          val lines = util.readFormFile(fname).toArray
+
+          val lineOffset = line - 1
+
+          val beginLine = Integer.max(0, lineOffset - context)
+          val endLine = Integer.min(lines.length, lineOffset + context)
+
+          val errorLines = (beginLine to endLine).map(x => {
+            val carat = if x == lineOffset then " > " else "   "
+            s"$carat ${x + 1} | ${lines(x)}"
+          })
+
+          info(s"Failing assertion $fname:$line")
+          info(errorLines.mkString("\n").trim)
+
+
+        }
+      }
+    }
+
+    if (conf.expectVerify) parseError(boogieResult)
+
     val (hasExpected, matchesExpected) = if (conf.checkExpected) {
       checkExpected(expectedOutPath, BPLPath)
     } else {

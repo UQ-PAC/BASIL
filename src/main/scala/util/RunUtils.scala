@@ -1,6 +1,7 @@
 package util
 
 import java.io.{BufferedWriter, File, FileInputStream, FileWriter, IOException, PrintWriter}
+import java.nio.file.{Files, Path, Paths}
 import com.grammatech.gtirb.proto.IR.IR
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Section.Section
@@ -858,6 +859,11 @@ object RunUtils {
       regionInjector = regionInjector
     )
   }
+}
+
+
+def readFormFile(fileName: String) : Iterable[String] = {
+  Files.readAllLines(Paths.get(fileName)).asScala
 }
 
 def writeToFile(content: String, fileName: String): Unit = {
