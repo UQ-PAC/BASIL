@@ -518,7 +518,7 @@ def removeInvariantOutParameters(p: Program, alreadyInlined : Map[Procedure, Set
 
     val doneAlready = alreadyInlined.getOrElse(proc, Set())
     var doneNow = Set[Variable]()
-    var toRename = Map[LocalVar, LocalVar]()
+    var toRename = Map[Variable, LocalVar]()
 
     val invariantParams = ret.outParams.collect {
       // we are returning a constant and can inline
@@ -544,16 +544,27 @@ def removeInvariantOutParameters(p: Program, alreadyInlined : Map[Procedure, Set
       val calls = proc.incomingCalls()
 
       for (call <- calls) {
-        val lhs = call.outParams(invariantOutFormal)
         // substitute the call in params for
         val rhs = Substitute(((v : Variable) => v match {
           case l: LocalVar => call.actualParams.get(l)
           case _ => None
         }), false)(binding).getOrElse(binding)
 
-        val renameRHS = match rhs with {
-          case l: LocalVar if l.index != 0 => {}
+        // rename lhs to fresh ssa variable
+        
+        val lhs = call.outParams(invariantOutFormal)
+
+        // if we are in dsa form, replace the return outparam with a new local so the 
+        // inlining does not break ssa form
+        val callLHS = lhs match {
+          case l: LocalVar if (l.index != 0) => {
+            val newName = proc.getFreshSSAVar(l.varName + "_retval_inlined" , l.getType)
+            toRename = toRename + (l -> newName)
+            newName
+          }
+          case o => o
         }
+        call.outParams = call.outParams + (invariantOutFormal -> callLHS)
 
         // TODO: uncomment and take dependency from specification into account when removing outparams
         //
@@ -577,7 +588,9 @@ def removeInvariantOutParameters(p: Program, alreadyInlined : Map[Procedure, Set
       }
     }
 
-    if (doneNow.nonEmpty) inlined = inlined.updated(proc, doneNow)
+    if (doneNow.nonEmpty) {
+      inlined = inlined.updated(proc, doneNow)
+    }
   }
 
   if (inlined.nonEmpty) {

@@ -329,6 +329,12 @@ class OnePassDSA(
 
     // fix up rpo index of added phi blocks
     reversePostOrder(p)
+
+    val maxIndex = (Seq(0) ++ freeVarsPos(p).collect  {
+      case l: LocalVar if l.index != 0 => l.index
+    }).max
+    p.ssaCount = maxIndex + 1
+
   }
 
 }

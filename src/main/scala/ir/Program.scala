@@ -417,6 +417,17 @@ class Procedure private (
     }
     reachable.toSet
   }
+
+  /**
+   * SSA Form
+   */
+
+  var ssaCount = 0
+  def getFreshSSAVar(name: String, ty: IRType) = {
+    ssaCount += 1
+    LocalVar(name, ty, ssaCount)
+  }
+
 }
 
 class Block private (
