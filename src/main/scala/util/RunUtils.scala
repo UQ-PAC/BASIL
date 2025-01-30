@@ -386,19 +386,6 @@ object StaticAnalysis {
 
     Logger.debug("[!] Running commondef variable renaming (Intra SSA)")
     val SSAResults = getCommonDefinitionVariableRenaming(IRProgram, writesTo)
-    // val SSASolver = IntraprocSSASolver(IRProgram, writesTo, RNAResult)
-    // val SSAResults = SSASolver.analyze()
-
-
-    // config.analysisDotPath.foreach(s => {
-    //   writeToFile(
-    //     toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> xSSA(b).toString).toMap, true),
-    //     s"${s}_xSSA$iteration.dot"
-    //   )
-    // })
-
-    // Logger.debug("[!] Running Intra SSA")
-
 
     config.analysisDotPath.foreach(s => {
       writeToFile(

@@ -1,5 +1,7 @@
 package analysis
 
+import analysis.solvers.Var
+import analysis.solvers.UnionFindSolver
 import ir.*
 import util.Logger
 
@@ -38,22 +40,22 @@ def getCommonDefinitionVariableRenaming(p: Program, writesTo: Map[Procedure, Set
   val RNASolver = RNAAnalysisSolver(p, false)
   val RNAResult: Map[CFGPosition, Set[Variable]] = RNASolver.analyze()
 
-  val init = (Map[CFGPosition, Map[Variable, Int]](), Map[Variable, Int]())
-
   // hack to get unreachable nodes in the visit order
   val unreachable = p.toSet.diff(p.preOrderIterator.toSet)
   val order = p.preOrderIterator.toList
-  val toVisit = (p.procedures.toList ++ order ++ unreachable)
+  val toVisit = p.procedures.toList ++ order ++ unreachable
+
+  val init = (Map[CFGPosition, Map[Variable, Int]](), Map[Variable, Int]())
 
   // pass 1; assign indexes to each definition
-  val definitionToIndex : Map[CFGPosition, Map[Variable, Int]]= toVisit.foldLeft(init)((acc: (Map[CFGPosition, Map[Variable, Int]], Map[Variable, Int]) , s: CFGPosition) => {
+  val (definitionToIndex: Map[CFGPosition, Map[Variable, Int]], _) = toVisit.foldLeft(init) { (acc: (Map[CFGPosition, Map[Variable, Int]], Map[Variable, Int]), s: CFGPosition) =>
 
     val (st, x) = acc
     val nx = s match {
       case a: Assign => x.updated(a.lhs, nextSSACount())
-      case p : Procedure =>
+      case p: Procedure =>
         val params = RNAResult(p).map(v => (v, nextSSACount())).toMap
-        Logger.debug(s"${p.name} ${params}")
+        Logger.debug(s"${p.name} $params")
         x ++ params
       case d: DirectCall => writesTo.get(d.target) match {
         case Some(registers) =>
@@ -67,33 +69,34 @@ def getCommonDefinitionVariableRenaming(p: Program, writesTo: Map[Procedure, Set
       case _: GoTo | _: MemoryStore | _: Assume | _: Assert | _: Block | _: NOP | _: IndirectCall | _: Unreachable | _: Return => x
     }
     (st.updated(s, nx), nx)
-  })._1
+  }
 
   // pass 2: unify indexes over their uses using reaching definitions (intraprocedurally so as to not unify across calls)
   val reachingDefinitionsAnalysisSolver = IntraprocReachingDefinitionsAnalysisSolver(p)
   val reachingDefs = reachingDefinitionsAnalysisSolver.analyze()
-  case class SSAVar(v: Int) extends analysis.solvers.Var[SSAVar]
-  val ufsolver = analysis.solvers.UnionFindSolver[SSAVar]()
 
+  case class SSAVar(v: Int) extends Var[SSAVar]
 
-  def unifyUsesOf(v: Variable, atPos: CFGPosition) : Unit = {
+  val ufSolver = UnionFindSolver[SSAVar]()
+
+  def unifyUsesOf(v: Variable, atPos: CFGPosition): Unit = {
     val d = getUse(v, atPos, reachingDefs)
     val vars = d.map(definitionToIndex(_)(v))
     for (v1 <- vars) {
       for (v2 <- vars) {
         if (v1 != v2) {
-          ufsolver.unify(SSAVar(v1), SSAVar(v2))
+          ufSolver.unify(SSAVar(v1), SSAVar(v2))
         }
       }
     }
   }
 
-  def unifyVarsUses(vs: Iterable[Variable], loc: CFGPosition) : Unit = {
+  def unifyVarsUses(vs: Iterable[Variable], loc: CFGPosition): Unit = {
     vs.foreach(unifyUsesOf(_, loc))
   }
 
-  toVisit.foreach((s: CFGPosition) => s match {
-    case a: LocalAssign => unifyVarsUses(a.rhs.variables, s)
+  toVisit.foreach {
+    case a: LocalAssign => unifyVarsUses(a.rhs.variables, a)
     case l: MemoryLoad => unifyVarsUses(l.index.variables, l)
     case a: MemoryStore => unifyVarsUses(a.index.variables ++ a.value.variables, a)
     case a: Assert => unifyVarsUses(a.body.variables, a)
@@ -103,29 +106,30 @@ def getCommonDefinitionVariableRenaming(p: Program, writesTo: Map[Procedure, Set
     case a: DirectCall => () /* actual params */
     case _: Return => () /* return params */
     case _: Block | _: Unreachable |  _:GoTo | _: NOP => ()
-  })
+  }
 
   // extract result
   // Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
   //      loc ->        (defining (var -> index)            reaching (var -> index))
 
-  def getUseInd(v: Variable, pos: CFGPosition) : Int = {
-    val d = getUse(v, pos, reachingDefs).headOption.getOrElse({Logger.debug(s"${IRWalk.blockBegin(pos)}"); IRWalk.procedure(pos)})
+  def getUseInd(v: Variable, pos: CFGPosition): Int = {
+    val d = getUse(v, pos, reachingDefs).headOption.getOrElse {
+      Logger.debug(s"${IRWalk.blockBegin(pos)}")
+      IRWalk.procedure(pos)
+    }
     val ind = definitionToIndex(d)(v)
-    ufsolver.find(SSAVar(ind)).asInstanceOf[SSAVar].v
+    ufSolver.find(SSAVar(ind)).asInstanceOf[SSAVar].v
   }
 
-  val defuse = definitionToIndex.map((pos, defs) => {
-    (pos: CFGPosition) -> {
-      val definitions = defs.map((v, ind) => v -> FlatEl(ufsolver.find(SSAVar(ind)).asInstanceOf[SSAVar].v)).toMap
-      val uses = pos match {
-        case c: Command =>
-          freeVarsPos(pos).map(v => v -> FlatEl(getUseInd(v, pos))).toMap
-        case _ => Map()
-      }
-      (definitions, uses)
+  val defUse = definitionToIndex.map { (pos, defs) =>
+    val definitions = defs.map((v, ind) => v -> FlatEl(ufSolver.find(SSAVar(ind)).asInstanceOf[SSAVar].v)).toMap
+    val uses = pos match {
+      case _: Command =>
+        freeVarsPos(pos).map(v => v -> FlatEl(getUseInd(v, pos))).toMap
+      case _ => Map()
     }
-  })
+    pos -> (definitions, uses)
+  }
 
-  defuse
+  defUse
 }

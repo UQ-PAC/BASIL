@@ -325,20 +325,20 @@ def toDot[T <: CFGPosition](
 }
 
 
-def freeVarsPos(s: CFGPosition) : Set[Variable] = s match {
-    case a: LocalAssign => a.rhs.variables
-    case l: MemoryLoad => l.index.variables
-    case a: MemoryStore => a.index.variables ++ a.value.variables
-    case a: Assert => a.body.variables
-    case a: Assume => a.body.variables
-    case a: IndirectCall => a.target.variables
-    case p: Procedure => p.flatMap (x => x match {
-      case c: Command => freeVarsPos(c)
-      case _ => Set()
-    }).toSet
-    case p: Block => p.statements.flatMap(freeVarsPos).toSet
-    case _: DirectCall  /* actual params */
-      | _: Return  /* return params */
-      | _: Unreachable |  _:GoTo | _: NOP => Set[Variable]()
+def freeVarsPos(s: CFGPosition): Set[Variable] = s match {
+  case a: LocalAssign => a.rhs.variables
+  case l: MemoryLoad => l.index.variables
+  case a: MemoryStore => a.index.variables ++ a.value.variables
+  case a: Assert => a.body.variables
+  case a: Assume => a.body.variables
+  case a: IndirectCall => a.target.variables
+  case p: Procedure => p.flatMap {
+    case c: Command => freeVarsPos(c)
+    case _ => Set()
+  }.toSet
+  case p: Block => p.statements.flatMap(freeVarsPos).toSet
+  case _: DirectCall  /* actual params */
+    | _: Return  /* return params */
+    | _: Unreachable |  _: GoTo | _: NOP => Set[Variable]()
 }
 
