@@ -13,34 +13,28 @@ implicit val variableLatticeSetTerm: LatticeSet[Variable] = LatticeSet.Bottom()
  * the start of a procedure) are "affected" this variable's gamma. This is paramaterised by
  * whether we join or meet at branches to change whether this is a may or must analysis.
  *
- * This is not perfectly precise. For example, if (given three variables x, y, z) the only
- * two possible states for gammas was
- * [x -> Gamma_old(y), y -> Gamma_old(z), z -> Gamma_old(z)]
- * and
- * [x -> Gamma_old(x), y -> Gamma_old(y), z -> Gamma_old(z)]
- * we would store
- * [x -> Set(), y -> Set(), z -> Set(z)]
- * which loses information. It would be more precise to store a set of maps as opposed to a
- * map to sets, however this would be significantly more expensive. Hopefully this loss of
- * precision isn't very significant!
+ * At every program point, every variable's gamma is equal to the join of a set of input
+ * variables (or memory values at procedure entry). Hence, there is a set S of these old
+ * variables and memory locations that we can aim to compute. A may analysis of this domain
+ * will overapproximate S, and a must analysis will underapproximate S.
+ *
+ * We have Gamma_x = Join(S), so if Join(S_o) is an overapproximation and Join(S_u) is an
+ * underapproximation, we have the invariants that Gamma_x <= Join(S_o) and Join(S_u) <= Gamma_x.
  */
 trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[Variable, LatticeSet[Variable]] {
   import LatticeMap.{Top, Bottom, TopMap, BottomMap}
 
-  val ls = LatticeSetLattice[Variable]()
-  val l = LatticeMapLattice[Variable, LatticeSet[Variable], LatticeSetLattice[Variable]](ls)
-
   def transfer(m: VarGammaMap, c: Command): VarGammaMap = {
     c match {
-      case c: LocalAssign  => m + (c.lhs -> c.rhs.variables.foldLeft(ls.bottom)((s, v) => s.union(m(v))))
-      case c: MemoryLoad   => m + (c.lhs -> ls.top)
+      case c: LocalAssign  => m + (c.lhs -> c.rhs.variables.foldLeft(LatticeSet.Bottom[Variable]())((s, v) => s.union(m(v))))
+      case c: MemoryLoad   => m + (c.lhs -> topTerm)
       case c: MemoryStore  => m
       case c: Assume       => m
       case c: Assert       => m
-      case c: IndirectCall => l.top
-      case c: DirectCall   => l.top
+      case c: IndirectCall => top
+      case c: DirectCall   => top
       case c: GoTo         => m
-      case c: Return       => m ++ c.outParams.map((l, e) => l -> e.variables.foldLeft(ls.bottom)((s, v) => s.union(m(v)))).toMap
+      case c: Return       => m ++ c.outParams.map((l, e) => l -> e.variables.foldLeft(LatticeSet.Bottom[Variable]())((s, v) => s.union(m(v)))).toMap
       case c: Unreachable  => m
       case c: NOP          => m
     }
@@ -74,8 +68,8 @@ trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[Variable, Lat
 class MayGammaDomain(initialState: VarGammaMap) extends GammaDomain(initialState) {
   def joinTerm(a: LatticeSet[Variable], b: LatticeSet[Variable], pos: Block): LatticeSet[Variable] = a.union(b)
 
-  def topTerm: LatticeSet[Variable] = ls.top
-  def botTerm: LatticeSet[Variable] = ls.bottom
+  def topTerm: LatticeSet[Variable] = LatticeSet.Top()
+  def botTerm: LatticeSet[Variable] = LatticeSet.Bottom()
 }
 
 /**
@@ -85,10 +79,10 @@ class MustGammaDomain(initialState: VarGammaMap) extends GammaDomain(initialStat
   // Meeting on places we would normally join is how we get our must analysis.
   def joinTerm(a: LatticeSet[Variable], b: LatticeSet[Variable], pos: Block): LatticeSet[Variable] = a.intersect(b)
 
-  def topTerm: LatticeSet[Variable] = ls.bottom
+  def topTerm: LatticeSet[Variable] = LatticeSet.Bottom()
   // Since bottom is set to Top, it is important to ensure that when running this analysis, the entry point
   // to the procedure you are analysing has things mostly set to Bottom. That way, Top does not propagate.
-  def botTerm: LatticeSet[Variable] = ls.top
+  def botTerm: LatticeSet[Variable] = LatticeSet.Top()
 }
 
 /**

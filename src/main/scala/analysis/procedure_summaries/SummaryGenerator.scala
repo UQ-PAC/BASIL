@@ -8,6 +8,9 @@ import boogie.*
 import boogie.SpecGlobal
 import ir.transforms.{AbstractDomain, reversePostOrder, worklistSolver}
 
+// TODO annotated preconditions and postconditions
+// TODO don't convert to boogie until translating, so that we can use conditions in analyses
+
 /**
  * Generates summaries (requires and ensures clauses) for procedures that necessarily must hold (assuming a correct implementation).
  * This helps because the verifier cannot make any assumptions about procedures with no summaries.
@@ -15,14 +18,11 @@ import ir.transforms.{AbstractDomain, reversePostOrder, worklistSolver}
 class SummaryGenerator(
   program: Program,
   varDepsSummaries: Map[Procedure, Map[Variable, LatticeSet[Variable]]],
-  simplified: Boolean = false,
+  parameterForm: Boolean = false,
 ) {
-  val relevantGlobals: Set[Variable] = if simplified then Set() else 0.to(31).map { n => Register(s"R$n", 64) }.toSet
+  val relevantGlobals: Set[Variable] = if parameterForm then Set() else 0.to(31).map { n => Register(s"R$n", 64) }.toSet
 
-  /**
-   * Get a map of variables to variables which have tainted it in the procedure.
-   */
-  private def getTainters(procedure: Procedure): Map[Variable, Set[Variable]] = {
+  private def getDependencies(procedure: Procedure): Map[Variable, Set[Variable]] = {
     varDepsSummaries.getOrElse(procedure, Map()).flatMap {
       (v, ls) => ls match {
         case LatticeSet.FiniteSet(s) => Some((v, s))
@@ -32,18 +32,10 @@ class SummaryGenerator(
     }
   }
 
+  // TODO move these to the predicate file
   /**
-   * Gets the set of gammas stored in a VarGammaMap, if possible
+   * Determines whether the term contains only variables in vars
    */
-  private def relevantGammas(gammaMap: VarGammaMap, v: Variable): Option[Set[Variable]] = {
-    gammaMap(v) match {
-      case LatticeSet.Top() => None // We can't know all of the variables, so we soundly say nothing
-      case LatticeSet.Bottom() => Some(Set())
-      case LatticeSet.FiniteSet(s) => Some(s)
-      case LatticeSet.DiffSet(_) => None
-    }
-  }
-
   def varsAllIn(b: BVTerm, vars: Set[Variable]): Boolean = {
     import BVTerm.*
     b match {
@@ -59,6 +51,9 @@ class SummaryGenerator(
     }
   }
 
+  /**
+   * Determines whether the term contains only variables in vars
+   */
   def varsAllIn(g: GammaTerm, vars: Set[Variable]): Boolean = {
     import GammaTerm.*
     g match {
@@ -85,74 +80,84 @@ class SummaryGenerator(
   }
 
   /**
-   * Generate requires clauses for a procedure. Currently we can generate the requirement that the variables that
-   * influence the gamma of the first branch condition must be low.
+   * Generate requires clauses for a procedure.
    */
   def generateRequires(procedure: Procedure): List[BExpr] = {
     if procedure.blocks.isEmpty then return List()
 
-    val predDomain = PredicateDomain()
+    /* Gamma domain with reachability conditions
+     *
+     * Computes requires conditions for branch conditions to have low gammas.
+     * At each branch condition, we compute a necessary gamma dependency for the
+     * condition to be low, and a reachability predicate for the branch condition
+     * (think nested in statements).
+     */
     val initialState = LatticeMap.TopMap((relevantGlobals.collect(_ match {
       case v: Variable => v
     }) ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
     val mustGammaDomain = MustGammaDomain(initialState)
+    val reachabilityDomain = ReachabilityConditions()
     reversePostOrder(procedure)
     val (_, mustGammaResults) = worklistSolver(mustGammaDomain).solveProc(procedure, false)
-    val (before, after) = worklistSolver(ReachabilityConditions()).solveProc(procedure, false)
-    val (predDomainResults, _) = worklistSolver(predDomain).solveProc(procedure, true)
-    Logger.debug(predDomainResults.map((a, b) => (a, eval.simplifyExprFixpoint(b.simplify.toBasil.get)._1.toBoogie)))
+    val (before, after) = worklistSolver(reachabilityDomain).solveProc(procedure, false)
 
     val mustGammasWithConditions = procedure.blocks.flatMap(b => {
       b.statements.flatMap(s => {
         s match {
           case a: Assume if a.checkSecurity => {
-            val condition = a.parent.prevBlocks.foldLeft(TrueBLiteral: BExpr)((p, b) =>
-                BinaryBExpr(BoolAND, p, ReachabilityConditions().toPred(before(b)).toBoogie.simplify)).simplify
-            a.body.variables.foldLeft(Some(Set()): Option[Set[BExpr]]) {
-              (s, v) => {
-                relevantGammas(mustGammaResults(a.parent), v).flatMap(r => s.map(s => s ++ r.map(_.toGamma)))
-              }
-            }.flatMap {
+            val condition = reachabilityDomain.toPred(before(a.parent))
+
+            /* Compute a set of variables that this branch condition definitely depends on.
+             * The MustGammaDomain gives as an invariant that Gamma_x => Join(S_u) for each
+             * variable x in the branch condition. We require that the branch condition is
+             * low, so Low => Join(S_u). Since S_u is a set of input variables, we require
+             * at procedure entry that those variables are low.
+             */
+            a.body.variables.foldLeft(Some(Set()): Option[Set[GammaTerm]]) {
+              (curSet, v) => for {
+                s <- curSet
+                r <- mustGammaResults(a.parent)(v).tryToSet
+              } yield (s ++ r.map(GammaTerm.Var(_)))
+            }.map {
               gammas => {
-                (if (gammas.size > 1) {
-                  Some(gammas.tail.foldLeft(gammas.head)((ands: BExpr, next: BExpr) => BinaryBExpr(BoolAND, ands, next)))
-                } else if (gammas.size == 1) {
-                  Some(gammas.head)
-                } else {
-                  None
-                }).map(prop => BinaryBExpr(BoolIMPLIES, condition, prop))
+                Predicate.Bop(
+                  BoolIMPLIES,
+                  condition,
+                  Predicate.GammaCmp(BoolIMPLIES, GammaTerm.Lit(TrueLiteral), GammaTerm.Join(gammas))
+                ).simplify.toBoogie.simplify
               }
             }
           }
-          case _ => List()
+          case _ => None
         }
       })
-    }).flatMap(p => {
-      Logger.debug("Simplified " + p.toString() + " into " + p.simplify.toString())
-      p.simplify match {
-        case TrueBLiteral => None
-        case p => Some[BExpr](p)
-      }
-    }).toList
+    }).map(_.simplify).toList
+
+    // Predicate domain / mini wp
+    val predDomain = PredicateDomain()
+    val (predDomainResults, _) = worklistSolver(predDomain).solveProc(procedure, true)
 
     val wpThing = procedure.entryBlock.flatMap(b => predDomainResults.get(b).flatMap(p =>
         p.toBasil).map(p =>
           eval.simplifyCondFixpoint(p)._1.toBoogie
         ))
 
-    // wpThing should always out at least what mustGammasWithConditions outputs
     (mustGammasWithConditions ++ wpThing).filter(_ != TrueBLiteral).distinct
   }
 
-  /** Generate ensures clauses for a procedure. Currently, all generated ensures clauses are of the form (for example)
-    * ensures Gamma_R2 || (Gamma_R2 == old(Gamma_y)) || (Gamma_R2 == old(Gamma_R1)) || (Gamma_R2 == old(Gamma_R2));
-    * whenever this can be done soundly.
-    */
+  /**
+   * Generate ensures clauses for a procedure.
+   */
   def generateEnsures(procedure: Procedure): List[BExpr] = {
     if procedure.blocks.isEmpty then return List()
 
+    /* Forwards variable dependency
+     *
+     * Interprocedurally computes an overapproximation of, for each output variable,
+     * the set of input variables whose join of gammas is the gamma of the output.
+     * Since this is an overapproximation, we have that Gamma_out <= Join(S_o)
+     */
     val inVars = relevantGlobals ++ procedure.formalInParam
-    // We only need to make ensures clauses about the gammas of modified globals our output variables.
     val outVars = (relevantGlobals ++ procedure.formalOutParam).filter { v =>
       v match {
         case v: Global => procedure.modifies.contains(v)
@@ -160,61 +165,36 @@ class SummaryGenerator(
       }
     }
 
-    // TODO further explanation of this would help
-    // Use rnaResults to find stack function arguments
-    // TODO COMMENTS I think the reason I added this relevantVars.map thing is to make variables that aren't
-    // tainted by anything report their gammas as low.
-    val tainters = outVars.map {
-      v => (v, Set())
-    }.toMap ++ getTainters(procedure).filter { (variable, taints) =>
+    val dependencyMap = getDependencies(procedure).filter { (variable, _) =>
       outVars.contains(variable)
     }
 
-    Logger.debug("For " + procedure.toString)
-    Logger.debug(outVars)
-    Logger.debug(tainters)
-    Logger.debug(getTainters(procedure))
-    Logger.debug(varDepsSummaries.get(procedure))
-
-    val taintPreds = tainters.toList.flatMap {
-      (variable, taints) => {
-        val varGamma = variable.toGamma
-        if taints.isEmpty then {
-          // If the variable is tainted by nothing, it must have been set to some constant value, meaning
-          // its gamma is low. Note that if a variable was unchanged, it would be tainted by itself.
-          Some(varGamma)
-        } else {
-          // Else, we must consider the variables which have tainted this variable. We can soundly assert
-          // that this variable's gamma must be equal to one of its tainter's gammas, or it is set to
-          // low.
-          //
-          // In a correct procedure, we never have L(x) = true and Gamma_x = false, so we can safely
-          // assume L(x) || Gamma_x == Gamma_x. This means that the gamma of any expression is equal
-          // to the conjunction of the gammas of the variables and the loads in the expression.
-          val equations = taints.map { tainter =>
-            BinaryBExpr(BoolEQ, varGamma, Old(tainter.toGamma))
-          }
-
-          if equations.nonEmpty then {
-            Some(equations.foldLeft(varGamma: BExpr) { (expr, eq) =>
-              BinaryBExpr(BoolOR, expr, eq)
-            })
-          } else {
-            None
-          }
+    val dependencyPreds = dependencyMap.toList.map {
+      (variable, dependencies) => {
+        Predicate.GammaCmp(BoolIMPLIES, GammaTerm.Join(dependencies.map(GammaTerm.OldVar(_))), GammaTerm.Var(variable))
+          .simplify.toBoogie.simplify
       }
     }
 
+    /* Abstract interpretation predicates
+     *
+     * If a forwards abstract domain that is a may analysis can encode its state as a
+     * predicate, it can be used to generate ensures clauses (by ensuring the state's
+     * predicate at the end of the procedure).
+     */
     val returnBlock = IRWalk.lastInProc(procedure).map(_.parent)
 
-    val initialState = LatticeMap.TopMap((procedure.formalInParam.toSet: Set[Variable]).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
-
-    val predDomain = PredDisjunctiveCompletion(PredProductDomain(DoubleIntervalDomain(), MayGammaDomain(initialState)))
+    /* By computing the disjunctive completion of a product domain of a numerical and
+     * gamma domain, we get some path sensitivity for gamma dependency. If the verifier
+     * knows that a numerical invariant is not held, it can know that one of the disjuncts
+     * will not hold.
+     */
+    val initialGammaDeps = LatticeMap.TopMap((procedure.formalInParam.toSet: Set[Variable]).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+    val predDomain = PredDisjunctiveCompletion(PredProductDomain(DoubleIntervalDomain(), MayGammaDomain(initialGammaDeps)))
     val (before, after) = worklistSolver(predDomain).solveProc(procedure)
 
     val absIntPreds = returnBlock.map(b => after.get(b).map(l => filterPred(predDomain.toPred(l), outVars ++ inVars, Predicate.Lit(TrueLiteral)).split.map(_.simplify.toBoogie.simplify))).flatten.toList.flatten
 
-    // Filter out True
-    (taintPreds ++ absIntPreds).filter(_ != TrueBLiteral).distinct
+    (dependencyPreds ++ absIntPreds).filter(_ != TrueBLiteral).distinct
   }
 }

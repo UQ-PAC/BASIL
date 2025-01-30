@@ -93,7 +93,7 @@ enum GammaTerm {
     case Join(s) =>
       if s.size == 0 then TrueBLiteral
       else if s.size == 1 then s.head.toBoogie
-      else s.foldLeft(s.head.toBoogie) {
+      else s.tail.foldLeft(s.head.toBoogie) {
         (p, g) => BinaryBExpr(BoolAND, p, g.toBoogie)
       }
   }
@@ -106,7 +106,7 @@ enum GammaTerm {
     case Join(s) =>
       if s.size == 0 then Some(TrueLiteral)
       else if s.size == 1 then s.head.toBasil
-      else s.foldLeft(s.head.toBasil) {
+      else s.tail.foldLeft(s.head.toBasil) {
         (p, g) => g.toBasil.flatMap(g => p.map(p => BinaryExpr(BoolAND, p, g)))
       }
   }

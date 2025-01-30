@@ -27,14 +27,8 @@ trait TaintAnalysisFunctions(
     (n match {
       case LocalAssign(variable, expression, _) =>
         d match {
-          case Left(v: Variable) =>
-            if (expression.variables.contains(v)) {
-              Map(d -> IdEdge(), Left(variable) -> IdEdge())
-            } else if (v == variable) {
-              Map()
-            } else {
-              Map(d -> IdEdge())
-            }
+          case Left(v) if expression.variables.contains(v) => Map(d -> IdEdge(), Left(variable) -> IdEdge())
+          case Left(v) if v == variable => Map()
           case _ => Map(d -> IdEdge())
         }
       // TODO taint regions
@@ -45,16 +39,10 @@ trait TaintAnalysisFunctions(
       case Return(_, out) => out.toMap.flatMap {
         (variable, expression) => {
           d match {
-            case Left(v: Variable) =>
-              if (expression.variables.contains(v)) {
-                Map(d -> IdEdge(), Left(variable) -> IdEdge())
-              } else if (v == variable) {
-                Map()
-              } else {
-                Map(d -> IdEdge())
-              }
+            case Left(v) if expression.variables.contains(v) => Map(d -> IdEdge(), Left(variable) -> IdEdge())
+            case Left(v) if v == variable => Map()
             case _ => Map(d -> IdEdge())
-          }
+            }
           }
         }
       case _ => Map(d -> IdEdge())

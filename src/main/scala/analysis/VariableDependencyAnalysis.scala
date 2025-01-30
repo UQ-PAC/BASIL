@@ -45,7 +45,7 @@ trait ProcVariableDependencyAnalysisFunctions(
         // This could possibly be improved by transposing the summary maps, but there is some difficulty with how
         // this works with Top elements.
         varDepsSummaries.get(call.target).map {
-          m => m.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]]()) {
+          _.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]]()) {
             case (m, (v2, s)) => if s.contains(v) then m + (Left(v2) -> IdEdge()) else m
           }
           .getOrElse(Map())
@@ -67,12 +67,14 @@ trait ProcVariableDependencyAnalysisFunctions(
         d match {
           case Left(v) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> IdEdge())
           case Left(v) if v == assigned => Map()
-          case _ => Map(d -> IdEdge())
+          // This needs to be FiniteSet(Set()) and not Bottom() since Bottom() means something
+          // special to the IDE solver
+          case _ => Map(d -> IdEdge(), Left(assigned) -> ConstEdge(FiniteSet(Set())))
         }
       case MemoryLoad(lhs, mem, index, _, size, _) => d match {
         case Left(_) => Map(d -> IdEdge())
-        // Sound approximation of memory loading
-        // This could be more made precise by having dependencies on individual memory regions
+        // An approximation of memory loading is just that the read values could have been anything at all
+        // This could perhaps be more made precise by having dependencies on individual memory regions
         case Right(_) => Map(d -> IdEdge(), Left(lhs) -> ConstEdge(Top()))
       }
       // TODO
@@ -93,9 +95,20 @@ trait ProcVariableDependencyAnalysisFunctions(
   }
 }
 
-/** Calculates the set of "input variables" that a variable has been affected by at each CFG node, starting at the given
-  * procedure.
-  */
+/**
+ * Computes (for a given procedure, and interprocedurally), for each variable, the set of variables whose value
+ * has been in an expression affecting the current assigned value of this variable. Equivalently, it gives a
+ * set of variables such that the gamma of this variable is less than the join of the set.
+ *
+ * `relevantGlobals` is the set of global variables are read in the procedure without being assigned.
+ * Effectively, they are input variables, though they are not in the formalInParam of the procedure.
+ * If procedures have not been rewritten to parameter form, this could be the set of registers.
+ *
+ * For interprocedurality, `varDepsSummaries` can contain a summary of the result of an analysis for some given
+ * procedures. This means that we can avoid inspecting the contents of the procedure to compute our result.
+ * Note that this analysis is still interprocedural without this map containing any values, the summaries
+ * are only an optimisation.
+ */
 class ProcVariableDependencyAnalysis(
   program: Program,
   relevantGlobals: Set[Variable],
@@ -107,27 +120,34 @@ class ProcVariableDependencyAnalysis(
   override def start: CFGPosition = procedure
 }
 
+/**
+ * Computes the results of a `ProcVariableDependencyAnalysis` on each procedure in the given program. For
+ * performance, scc must be the set of strongly connected components of the call graph of the program in
+ * a reverse topological order (see `stronglyConnectedComponents` in '../IRCursor.scala'). The ordering
+ * allows a significantly faster interprocedural analysis to be performed, by computing summaries of
+ * procedures before they are called.
+ */
 class VariableDependencyAnalysis(
   program: Program,
-  scc: mutable.ListBuffer[mutable.Set[Procedure]],
-  simplified: Boolean = false,
+  scc: List[Set[Procedure]],
+  parameterForm: Boolean = false,
 ) {
-  val relevantGlobals: Set[Variable] = if simplified then Set() else 0.to(31).map { n =>
+  val relevantGlobals: Set[Variable] = if parameterForm then Set() else 0.to(31).map { n =>
     Register(s"R$n", 64)
   }.toSet
 
   def analyze(): Map[Procedure, Map[Variable, LatticeSet[Variable]]] = {
-    var varDepsSummaries = Map[Procedure, Map[Variable, LatticeSet[Variable]]]()
-    scc.flatten.filter(_.blocks.nonEmpty).foreach {
-      procedure => {
+    scc.flatten.filter(_.blocks.nonEmpty).foldLeft(Map[Procedure, Map[Variable, LatticeSet[Variable]]]()) {
+      (varDepsSummaries, procedure) => {
         StaticAnalysisLogger.debug("Generating variable dependencies for " + procedure)
         var varDepResults = ProcVariableDependencyAnalysis(program, relevantGlobals,
           varDepsSummaries, procedure).analyze()
         StaticAnalysisLogger.debug(varDepResults)
         val varDepMap = IRWalk.lastInProc(procedure).flatMap(varDepResults.get(_)).getOrElse(Map())
-        varDepsSummaries += procedure -> varDepMap
+        StaticAnalysisLogger.debug(IRWalk.lastInProc(procedure))
+        StaticAnalysisLogger.debug(varDepMap)
+        varDepsSummaries + (procedure -> varDepMap)
       }
     }
-    varDepsSummaries
   }
 }
