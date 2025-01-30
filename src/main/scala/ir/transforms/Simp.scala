@@ -524,15 +524,18 @@ def removeInvariantOutParameters(p: Program): Boolean = {
     // and add assignment after the call of bound actual param to bound outparam
     for ((invariantOutFormal, binding) <- invariantParams) {
       modified = true
-      proc.formalOutParam.remove(invariantOutFormal)
-      ret.outParams = ret.outParams.removed(invariantOutFormal)
+      // TODO: uncomment and take dependency from specification into account when removing outparams
+      // proc.formalOutParam.remove(invariantOutFormal)
+      // ret.outParams = ret.outParams.removed(invariantOutFormal)
 
       val calls = proc.incomingCalls()
 
       for (call <- calls) {
         val lhs = call.outParams(invariantOutFormal)
         val rhs = binding
-        call.outParams = call.outParams.removed(invariantOutFormal)
+        
+        // TODO: uncomment and take dependency from specification into account when removing outparams
+        //call.outParams = call.outParams.removed(invariantOutFormal)
 
         // insert assignment of to successor to maintain singleCallBlockEnd invariant
         call.parent.jump match {
