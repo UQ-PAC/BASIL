@@ -194,7 +194,6 @@ class SetFormalParams(
 
   override def vproc(p: Procedure) = {
     if (externalFunctions.contains(p.name) || p.isExternal.contains(true)) {
-      println(p.name)
       p.formalInParam = mutable.SortedSet.from(externalIn(p.procName).map(_._1))
       p.formalOutParam = mutable.SortedSet.from(externalOut(p.procName).map(_._1))
       p.inParamDefaultBinding = immutable.SortedMap.from(externalIn(p.procName))

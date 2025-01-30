@@ -21,8 +21,8 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
           c.actualParams.toList.map((l, r) => (l, vexpr(r)))
         )
       case i: IndirectCall => vindirect(vrvar(i.target))
-      case a: Assert       => vassert(vexpr(a.body))
-      case a: Assume       => vassume(vexpr(a.body))
+      case a: Assert       => vassert(a)
+      case a: Assume       => vassume(a)
       case n: NOP          => vnop()
     }
   }
@@ -87,8 +87,8 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
     inparams: List[(Variable, Repr[Expr])]
   ): Repr[DirectCall]
   def vindirect(target: Repr[Variable]): Repr[IndirectCall]
-  def vassert(body: Repr[Expr]): Repr[Assert]
-  def vassume(body: Repr[Expr]): Repr[Assume]
+  def vassert(body: Assert): Repr[Assert]
+  def vassume(body: Assume): Repr[Assume]
   def vnop(): Repr[NOP]
 
   def vgoto(t: List[String]): Repr[GoTo]
