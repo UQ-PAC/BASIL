@@ -35,7 +35,7 @@ private def nextSSACount() = {
  * Pass 2: Use reaching definitions results to unify definition indexes under their set of uses
  *
  */
-def getCommonDefinitionVariableRenaming(p: Program, writesTo: Map[Procedure, Set[Register]]) : Map[CFGPosition, (Map[Variable, FlatEl[Int]], Map[Variable, FlatEl[Int]])] = {
+def getCommonDefinitionVariableRenaming(p: Program, writesTo: Map[Procedure, Set[Register]]): Map[CFGPosition, (Map[Variable, FlatEl[Int]], Map[Variable, FlatEl[Int]])] = {
 
   val RNASolver = RNAAnalysisSolver(p, false)
   val RNAResult: Map[CFGPosition, Set[Variable]] = RNASolver.analyze()
@@ -105,7 +105,7 @@ def getCommonDefinitionVariableRenaming(p: Program, writesTo: Map[Procedure, Set
     case b: Procedure => () /* formal params */
     case a: DirectCall => () /* actual params */
     case _: Return => () /* return params */
-    case _: Block | _: Unreachable |  _:GoTo | _: NOP => ()
+    case _: Block | _: Unreachable | _: GoTo | _: NOP => ()
   }
 
   // extract result
