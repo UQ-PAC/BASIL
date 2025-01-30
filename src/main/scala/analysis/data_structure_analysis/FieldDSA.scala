@@ -19,9 +19,9 @@ class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[UnionFindSol
 
 
 
-  override def constraintArgToCells(constraintArg: ConstraintArg): Set[ConstraintCell] = {
+  override def constraintArgToCells(constraintArg: ConstraintArg, ignoreContents: Boolean = false): Set[ConstraintCell] = {
     val exprCells = symValToCells(exprToSymVal(constraintArg.value))
-    if constraintArg.contents then
+    if constraintArg.contents && !ignoreContents then
       exprCells.map(_.content).toSet
     else
       exprCells.toSet

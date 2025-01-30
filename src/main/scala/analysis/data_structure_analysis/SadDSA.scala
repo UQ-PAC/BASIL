@@ -22,6 +22,30 @@ class SadGraph(proc: Procedure, phase: DSAPhase,
       (proc, phase, OffsetUnionFindSolver[NodeTerm](), symValues, cons)
 {
 
+  def localCorrectness(): Unit = {
+
+    constraints.foreach {
+      case constraint: MemoryAccessConstraint[_]  =>
+        val valueCells = constraintArgToCells(constraint.arg2).map(find)
+        assert(valueCells.size <= 1, s"value cells should be unified instead got $valueCells")
+        var valueCell: Option[SadCell] = None
+        if valueCells.size == 1 then
+          valueCell = Some(valueCells.head)
+
+        val indexCells = constraintArgToCells(constraint.arg1).map(find)
+        var indexCell: Option[SadCell] = None
+        if indexCells.nonEmpty then
+          if indexCells.nonEmpty && valueCells.nonEmpty then
+            indexCells.foreach(
+              indexCell =>
+                assert(
+                  indexCell.hasPointee && indexCell.getPointee == valueCell.get,
+                  s"$constraint, $indexCell doesn't point to ${valueCell.get} instead ${indexCell.getPointee}"
+                )
+            )
+    }
+  }
+
   var last: Option[(SadCell, SadCell)] = None
   var secondLast: Option[(SadCell, SadCell)] = None
 //  SadNodeCounter.reset()
@@ -45,7 +69,7 @@ class SadGraph(proc: Procedure, phase: DSAPhase,
     StructDotGraph(proc.name, structs, arrows).toDotString
   }
 
-  private def collect(): (Set[SadNode], Set[(SadCell, SadCell)]) = {
+  protected def collect(): (Set[SadNode], Set[(SadCell, SadCell)]) = {
     var nodes: Set[SadNode] = Set.empty
     var pointsTo: Set[(SadCell, SadCell)] = Set.empty
     constraints.foreach {
@@ -74,9 +98,9 @@ class SadGraph(proc: Procedure, phase: DSAPhase,
   }
 
   override def init(symBase: SymBase, size: Option[Int]): SadNode = SadNode(this, mutable.Set(symBase), size)
-  override def constraintArgToCells(constraintArg: ConstraintArg): Set[SadCell] = {
-    val exprCells = symValToCells(exprToSymVal(constraintArg.value).remove(NonPointer))
-    if constraintArg.contents then
+  override def constraintArgToCells(constraintArg: ConstraintArg, ignoreContents: Boolean = false): Set[SadCell] = {
+    val exprCells = symValToCells(exprToSymVal(constraintArg.value).removeNonAddress(i => i >= 11000))
+    if constraintArg.contents && !ignoreContents then
       exprCells.map(_.getPointee)
     else
       exprCells
@@ -85,16 +109,24 @@ class SadGraph(proc: Procedure, phase: DSAPhase,
   override def processConstraint(constraint: Constraint): Unit =
   {
     constraint match
-      case cons: BinaryConstraint =>
-        if cons.isInstanceOf[MemoryReadConstraint] && cons.asInstanceOf[MemoryReadConstraint].pos.label.get.startsWith("%00019517") then
-          print("")
-        val first = if constraintArgToCells(cons.arg1).nonEmpty then Some(mergeCells(constraintArgToCells(cons.arg1))) else None
+      case cons: MemoryAccessConstraint[_] =>
+        val first = if constraintArgToCells(cons.arg1).nonEmpty then
+          constraintArgToCells(cons.arg1, ignoreContents = true)
+            .map(findExact)
+            .foreach {
+              case (node, interval) => node.add(interval.growTo(cons.size))
+            }
+          Some(mergeCells(constraintArgToCells(cons.arg1)))
+        else None
         val sec = if constraintArgToCells(cons.arg2).nonEmpty then Some(mergeCells(constraintArgToCells(cons.arg2))) else None
-        if first.nonEmpty && sec.nonEmpty then mergeCells(first.get, sec.get) else
+        if first.nonEmpty && sec.nonEmpty then
+          mergeCells(first.get, sec.get)
+          assert(first.map(find) == sec.map(find))
+        else
           DSALogger.warn(s"$cons had an empty argument")
-      case dcc: DirectCallConstraint =>
-        (dcc.inConstraints ++ dcc.outConstraints).foreach(processConstraint)
-      case idcc: IndirectCallConstraint => // ignore
+
+        val test = 1
+      case  _ =>// ignore
   }
 
   protected def collapseAndMerge(c1: SadCell, c2:SadCell): SadCell = {
@@ -205,12 +237,15 @@ class SadGraph(proc: Procedure, phase: DSAPhase,
     }
   }
 
+  def findExact(cell: SadCell): (SadNode, Interval) = {
+    val node = cell.node
+    val (newNode, offset) = findNode(node)
+    (newNode, cell.interval.move(i => i + offset))
+  }
 
   override def find(cell: SadCell): SadCell = {
-    val node = cell.node
-    val (term, offset) = solver.findWithOffset(node.term)
-    val newNode = term.asInstanceOf[NodeTerm].v
-    newNode.get(cell.interval.move(i => i + offset))
+    val (newNode, newInterval) = findExact(cell)
+    newNode.get(newInterval)
   }
 
   def findNode(node: SadNode): (SadNode, Int) = {
