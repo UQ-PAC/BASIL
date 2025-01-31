@@ -44,7 +44,7 @@ trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[Variable, Lat
     if Some(b) == b.parent.entryBlock then initialState else bot
   }
 
-  def termToPred(v: Variable, s: LatticeSet[Variable]): Predicate =
+  def termToPred(m: LatticeMap[Variable, LatticeSet[Variable]], v: Variable, s: LatticeSet[Variable]): Predicate =
     (v, s) match {
       case (v: Variable, LatticeSet.FiniteSet(s)) => {
         val g = s.foldLeft(Some(GammaTerm.Lit(TrueLiteral))) {
@@ -65,7 +65,7 @@ trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[Variable, Lat
 /**
  * A may gamma domain. See `GammaDomain`. This is a forwards analysis.
  */
-class MayGammaDomain(initialState: VarGammaMap) extends GammaDomain(initialState) {
+class MayGammaDomain(initialState: VarGammaMap) extends GammaDomain(initialState) with MayPredMapDomain[Variable, LatticeSet[Variable]] {
   def joinTerm(a: LatticeSet[Variable], b: LatticeSet[Variable], pos: Block): LatticeSet[Variable] = a.union(b)
 
   def topTerm: LatticeSet[Variable] = LatticeSet.Top()
@@ -75,7 +75,7 @@ class MayGammaDomain(initialState: VarGammaMap) extends GammaDomain(initialState
 /**
  * A must gamma domain. See `GammaDomain`. This is a forwards analysis.
  */
-class MustGammaDomain(initialState: VarGammaMap) extends GammaDomain(initialState) {
+class MustGammaDomain(initialState: VarGammaMap) extends GammaDomain(initialState) with MustPredMapDomain[Variable, LatticeSet[Variable]]{
   // Meeting on places we would normally join is how we get our must analysis.
   def joinTerm(a: LatticeSet[Variable], b: LatticeSet[Variable], pos: Block): LatticeSet[Variable] = a.intersect(b)
 
