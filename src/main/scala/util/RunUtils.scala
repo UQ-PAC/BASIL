@@ -583,15 +583,13 @@ object RunUtils {
     val timer = PerformanceTimer("Simplify")
     val program = ctx.program
 
+    transforms.liftLinuxAssertFail(ctx)
+    transforms.liftSVComp(ctx.program)
+
     DebugDumpIRLogger.writeToFile(File("il-before-simp.il"), pp_prog(program))
     transforms.applyRPO(program)
 
     // example of printing a simple analysis
-    val liveVarsDom = transforms.IntraLiveVarsDomain()
-    val liveVarsSolver = transforms.worklistSolver(liveVarsDom)
-    val (beforeLive, afterLive) = liveVarsSolver.solveProgIntraProc(program, backwards = true)
-    DebugDumpIRLogger.writeToFile(File(s"live-vars.il"), 
-      pp_prog_with_analysis_results(beforeLive, afterLive, program, x => s"Live vars: ${x.map(_.name).toList.sorted.mkString(", ")}"))
 
     transforms.removeEmptyBlocks(program)
     transforms.coalesceBlocks(program)
@@ -716,7 +714,10 @@ object RunUtils {
     if (conf.simplify) {
 
       ir.transforms.clearParams(ctx.program)
+
       ir.transforms.liftIndirectCall(ctx.program)
+      transforms.liftSVCompNonDetEarlyIR(ctx.program)
+
       DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
       DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
