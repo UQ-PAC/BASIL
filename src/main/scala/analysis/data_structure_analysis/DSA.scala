@@ -52,6 +52,34 @@ object Interval {
     Ordering.by(i => (i.start, i.end))
 }
 
+class DSFlag {
+  var collapsed = false
+  var function = false
+  var stack = false
+  var heap = false
+  var global = false
+  var unknown = false
+  var read = false
+  var modified = false
+  var incomplete = false
+  var foreign = false
+  var merged = false
+
+  def join(other: DSFlag): Unit =
+    collapsed = collapsed || other.collapsed
+    stack = other.stack || stack
+    heap = other.heap || heap
+    global = other.global || global
+    unknown = other.unknown || unknown
+    read = other.read || read
+    modified = other.modified || modified
+    incomplete = other.incomplete || incomplete
+    foreign = other.foreign && foreign
+    merged = true
+    function = function || other.function
+}
+
+
 trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Node <: DSANode[Cell]]
   (val proc: Procedure, 
    val phase: DSAPhase,
@@ -90,9 +118,17 @@ trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Nod
     symVal.state.foldLeft(current) {
       case (result, (base, symOffsets)) =>
         val node = result.getOrElse(base, init(base, None))
+        base match
+          case Heap(call) => node.flags.heap = true
+          case Stack(proc) => node.flags.stack = true
+          case Global => node.flags.stack = true
+          case NonPointer =>
+            throw new Exception("Attempted to create a node from an Non-pointer symbolic base")
+          case unknown: (Ret | Loaded | Par) =>
+            node.flags.unknown = true
+            node.flags.incomplete = true
         if symOffsets.isTop then node.collapse()
-        else
-          symOffsets.getOffsets.map(node.add)
+        else symOffsets.getOffsets.map(node.add)
         result + (base -> node)
     }
   }
@@ -100,8 +136,8 @@ trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Nod
 
     // takes a map from symbolic bases to nodes and updates it based on constraint
   protected def binaryConstraintToNodes(constraint: BinaryConstraint, nodes: Map[SymBase, Node]): Map[SymBase, Node] = {
-    val arg1 = exprToSymVal(constraint.arg1.value)
-    val arg2 = exprToSymVal(constraint.arg2.value)
+    val arg1 = exprToSymVal(constraint.arg1.value).removeNonAddress(i => i >= 11000)
+    val arg2 = exprToSymVal(constraint.arg2.value).removeNonAddress(i => i >= 11000)
     val res = symValToNodes(arg1, nodes)
     symValToNodes(arg2, res)
   }
@@ -123,6 +159,7 @@ trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Nod
 
 trait DSANode[Cell <: NodeCell & DSACell](val size: Option[Int]) {
 
+  val flags: DSFlag = DSFlag()
   def init(interval: Interval): Cell
   def graph: DSAGraph[_, _, Cell, _, _]
   protected var _cells: Seq[Cell] = Seq.empty
