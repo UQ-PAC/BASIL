@@ -22,7 +22,7 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{Constraint, DataStructureAnalysis, FieldDSA, FieldGraph, Graph, SadDSA, SadGraph, SetDSA, SetGraph, SymValueSet, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValueDomain, SymbolicValues, generateConstraints, getSymbolicValues}
+import analysis.data_structure_analysis.{computeDSADomain, Constraint, DataStructureAnalysis, FieldDSA, FieldGraph, Graph, SadDSA, SadGraph, SetDSA, SetGraph, SymValueSet, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValueDomain, SymbolicValues, generateConstraints, getSymbolicValues}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
@@ -783,9 +783,9 @@ object RunUtils {
       var setDSA: Map[Procedure, SetGraph] = Map.empty
       var fieldDSA: Map[Procedure, FieldGraph] = Map.empty
       var sadDSA: Map[Procedure, SadGraph] = Map.empty
-      ctx.program.procedures.foreach(
+      computeDSADomain(ctx.program).foreach(
         proc =>
-  //        if proc.name.startsWith("forward_request") then
+//          if proc.name.startsWith("md5_process_block") then
             val SVAResults = getSymbolicValues(proc)
             val constraints = generateConstraints(proc)
             sva += (proc -> SVAResults)

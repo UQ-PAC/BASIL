@@ -28,17 +28,17 @@ enum DSAPhase {
 
 
 case class Interval(start: Int, end: Int) {
-  require(start <= end)
+  require(start < end)
 
-  override def toString: String = s"$start-$end" 
+  override def toString: String = s"$start-${end-1}"
   def size: Int = end - start
   def move(func: Int => Int): Interval = Interval(func(start), func(end))
   def isEmpty: Boolean = this.size == 0
   def growTo(size: Int): Interval = Interval(start, math.max(end, start + size))
-  def contains(offset: Int): Boolean = start <= offset && end >= offset
+  def contains(offset: Int): Boolean = start <= offset && end > offset
   def contains(interval: Interval): Boolean =
     start <= interval.start && end >= interval.end
-  def isOverlapping(other: Interval): Boolean = !(start > other.end || other.start > end)
+  def isOverlapping(other: Interval): Boolean = !(start >= other.end || other.start >= end)
   def join(other: Interval): Interval = {
     require(isOverlapping(other), "Expected overlapping Interval for a join")
     Interval(math.min(start, other.start), math.max(end, other.end))
@@ -68,7 +68,7 @@ trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Nod
   def constraintArgToCells(constraintArg: ConstraintArg, ignoreContents: Boolean = false): Set[CCell]
 
   def localPhase(): Unit = {
-    constraints.foreach(processConstraint)
+    constraints.toSeq.sortBy(f => f.label).foreach(processConstraint)
   }
 
   def symValToCells(symVal: SymValueSet): Set[Cell] = {
@@ -142,50 +142,25 @@ trait DSANode[Cell <: NodeCell & DSACell](val size: Option[Int]) {
 
   def isCollapsed: Boolean = collapsed.nonEmpty
   def add(offset: Int): Cell = {
-    if !isCollapsed then
-      add(Interval(offset, offset))
-    else
-      collapsed.get
+      add(Interval(offset, offset + 1))
   }
 
   def get(offset: Int): Cell = {
-    if isCollapsed then collapsed.get else
-      val exactMatch = cells.filter(_.interval.contains(offset))
-      assert(exactMatch.size == 1, "Expected  exactly one interval to contain the offset")
-      exactMatch.head
+    get(Interval(offset, offset+1))
   }
 
-  def get(interval: Interval): Cell = {
+  def get(interval: Interval): Cell /*= {
     if isCollapsed then collapsed.get else
       val exactMatches = cells.filter(_.interval.contains(interval))
       assert(exactMatches.size == 1, "Expected exactly one overlapping interval")
-      assert(exactMatches.head.interval == interval, "")
       exactMatches.head
-  }
+  }*/
 
   def growCell(interval: Interval): Cell = {
     add(interval)
   }
 
-  def add(interval: Interval): Cell = {
-    if !isCollapsed then
-      val overlapping: Seq[Cell] = cells.filter(_.interval.isOverlapping(interval))
-//      _cells = cells.diff(overlapping)
-
-      val newCell = if overlapping.isEmpty then
-        init(interval)
-      else
-        val unifiedInterval = overlapping.map(_.interval).fold(interval)(Interval.join)
-        val res = init(unifiedInterval)
-        graph.mergeCells(overlapping)
-        res
-
-      _cells = cells.diff(overlapping).appended(newCell).sorted
-      newCell
-    else
-      collapsed.get
-  }
-
+  def add(interval: Interval): Cell
   def collapse(): Cell = {
     if !isCollapsed then
 
