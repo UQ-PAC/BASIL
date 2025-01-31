@@ -74,6 +74,8 @@ class SummaryGenerator(
       case Lit(x) => p
       case Uop(op, x) => Uop(op, filterPred(x, vars, default))
       case Bop(op, x, y) => Bop(op, filterPred(x, vars, default), filterPred(y, vars, default))
+      case Conj(s) => Conj(s.map(filterPred(_, vars, default)))
+      case Disj(s) => Disj(s.map(filterPred(_, vars, default)))
       case BVCmp(op, x, y) => if varsAllIn(x, vars) && varsAllIn(y, vars) then p else default
       case GammaCmp(op, x, y) => if varsAllIn(x, vars) && varsAllIn(y, vars) then p else default
     }
@@ -92,6 +94,7 @@ class SummaryGenerator(
      * condition to be low, and a reachability predicate for the branch condition
      * (think nested in statements).
      */
+    Logger.debug(s"Generating gamma with reachability preconditions for $procedure")
     val initialGammaDeps = LatticeMap.BottomMap((relevantGlobals.collect(_ match {
       case v: Variable => v
     }) ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
@@ -134,12 +137,25 @@ class SummaryGenerator(
     }).map(_.simplify).toList
 
     // Predicate domain / mini wp
+    Logger.debug(s"Generating mini wp preconditions for $procedure")
     val predDomain = PredicateDomain()
     val (predDomainResults, _) = worklistSolver(predDomain).solveProc(procedure, true)
 
     val wpThing = procedure.entryBlock.flatMap(b => predDomainResults.get(b).flatMap(p =>
+        Logger.debug(p)
+        Logger.debug(p.simplify)
         p.toBasil).map(p =>
-          eval.simplifyCondFixpoint(p)._1.toBoogie
+          Logger.debug(p)
+          /*try {
+            eval.simplifyCondFixpoint(p)._1.toBoogie
+          } catch {
+            case e =>
+              println(e)
+              println(eval.SimplifyValidation.debugTrace.take(10))
+              println(eval.SimplifyValidation.debugTrace.takeRight(10))
+              assert(false)
+          }*/
+          p.toBoogie
         ))
 
     (mustGammasWithConditions ++ wpThing).filter(_ != TrueBLiteral).distinct
@@ -157,6 +173,7 @@ class SummaryGenerator(
      * the set of input variables whose join of gammas is the gamma of the output.
      * Since this is an overapproximation, we have that Gamma_out <= Join(S_o)
      */
+    Logger.debug(s"Generating forwards dependency gamma postconditions for $procedure")
     val inVars = relevantGlobals ++ procedure.formalInParam
     val outVars = (relevantGlobals ++ procedure.formalOutParam).filter { v =>
       v match {
@@ -182,6 +199,7 @@ class SummaryGenerator(
      * predicate, it can be used to generate ensures clauses (by ensuring the state's
      * predicate at the end of the procedure).
      */
+    Logger.debug(s"Generating forward abstract interpretation postconditions for $procedure")
     val returnBlock = IRWalk.lastInProc(procedure).map(_.parent)
 
     /* By computing the disjunctive completion of a product domain of a numerical and

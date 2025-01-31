@@ -150,6 +150,14 @@ class IntervalDomain(signed: Boolean, inf: Int => BigInt, negInf: Int => BigInt,
     p match {
       case Bop(BoolAND, x, y) => fromPred(x).meet(fromPred(y))
       case Bop(BoolOR, x, y) => fromPred(x).join(fromPred(y))
+      case Conj(s) =>
+        if s.size == 0 then top
+        else if s.size == 1 then fromPred(s.head)
+        else s.tail.foldLeft(fromPred(s.head)) { (i, p) => i.meet(fromPred(p)) }
+      case Disj(s) =>
+        if s.size == 0 then bot
+        else if s.size == 1 then fromPred(s.head)
+        else s.tail.foldLeft(fromPred(s.head)) { (i, p) => i.join(fromPred(p)) }
 
       case BVCmp(BVEQ, BVTerm.Lit(x), BVTerm.Var(v)) => top + (v -> ConcreteInterval(bvto(x), bvto(x), x.size))
       case BVCmp(BVEQ, BVTerm.Var(v), BVTerm.Lit(x)) => top + (v -> ConcreteInterval(bvto(x), bvto(x), x.size))
@@ -176,7 +184,8 @@ class IntervalDomain(signed: Boolean, inf: Int => BigInt, negInf: Int => BigInt,
 
       case BVCmp(op, x, y) => top
       case Bop(op, x, y) => top
-      case Lit(_) => top
+      case Lit(TrueLiteral) => top
+      case Lit(FalseLiteral) => bot
       case Uop(op, x) => top
       case GammaCmp(_, _, _) => top
     }

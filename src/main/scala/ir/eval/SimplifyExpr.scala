@@ -277,6 +277,9 @@ def logSimp(e: Expr, ne: Expr, actual: Boolean = true)(implicit
     return ne
   }
 
+  e.getType
+  ne.getType
+
   if (SimplifyValidation.debugTrace.length > 50) {
     SimplifyValidation.debugTrace.drop(SimplifyValidation.debugTrace.length - 50)
   }
