@@ -636,6 +636,8 @@ object RunUtils {
     transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
     AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
 
+    transforms.liftLinuxAssertFail(ctx)
+
     // assert(program.procedures.forall(transforms.rdDSAProperty))
 
     assert(invariant.blockUniqueLabels(program))

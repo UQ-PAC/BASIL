@@ -350,11 +350,11 @@ class BasilIRPrettyPrinter(with_analysis_results_begin: Block => Option[String] 
   override def vindirect(target: PPProg[Variable]): PPProg[IndirectCall] = BST(s"indirect call ${target} ")
   override def vassert(body: Assert): PPProg[Assert] = {
     val comment = body.comment.map(c => s" // $c").getOrElse("")
-    BST(s"assert ${vexpr(body.body)}$comment")
+    BST(s"assert ${vexpr(body.body)};$comment")
   }
   override def vassume(body: Assume): PPProg[Assume] = {
     val comment = body.comment.map(c => s" // $c").getOrElse("")
-    BST(s"assume ${vexpr(body.body)}$comment")
+    BST(s"assume ${vexpr(body.body)};$comment")
   }
   override def vnop(): PPProg[NOP] = BST("nop")
 
