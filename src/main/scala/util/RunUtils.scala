@@ -785,7 +785,7 @@ object RunUtils {
       var sadDSA: Map[Procedure, SadGraph] = Map.empty
       computeDSADomain(ctx.program).foreach(
         proc =>
-//          if proc.name.startsWith("md5_process_block") then
+//          if proc.name.startsWith("memxor") then
             val SVAResults = getSymbolicValues(proc)
             val constraints = generateConstraints(proc)
             sva += (proc -> SVAResults)
