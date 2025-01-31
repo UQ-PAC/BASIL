@@ -79,6 +79,19 @@ enum BVTerm {
     case ZeroExtend(extension, body) => ZeroExtend(extension, body.replace(prev, cur))
     case SignExtend(extension, body) => SignExtend(extension, body.replace(prev, cur))
   }
+
+  /**
+   * Determines whether the provided term is a subexpression of this expression
+   */
+  def contains(term: BVTerm): Boolean = if this == term then true else this match {
+    case Uop(op, x) => x.contains(term)
+    case Bop(op, x, y) => x.contains(term) || y.contains(term)
+    case Extract(end, start, body) => body.contains(term)
+    case Repeat(repeats, body) => body.contains(term)
+    case ZeroExtend(extension, body) => body.contains(term)
+    case SignExtend(extension, body) => body.contains(term)
+    case _ => false
+  }
 }
 
 /**
@@ -151,6 +164,17 @@ enum GammaTerm {
     case Uop(op, x) => Uop(op, x.replace(prev, cur))
     case Join(s) => Join(s.map(g => g.replace(prev, cur)))
   }
+
+  /**
+   * Determines whether the provided term is a subexpression of this expression
+   */
+  def contains(term: GammaTerm): Boolean = if this == term then true else this match {
+    case Lit(x) => false
+    case Var(v) => false
+    case OldVar(v) => false
+    case Uop(op, x) => x.contains(term)
+    case Join(s) => s.exists(_.contains(term))
+  }
 }
 
 /**
@@ -222,6 +246,14 @@ enum Predicate {
           case (a, b) if a == b => a
           case (a, b) => Bop(BoolIMPLIES, a, b)
         }
+      case Bop(op, a, b) => Bop(op, a.simplify, b.simplify)
+      case Uop(BoolNOT, a) =>
+        a.simplify match {
+          case Lit(TrueLiteral) => Lit(FalseLiteral)
+          case Lit(FalseLiteral) => Lit(TrueLiteral)
+          case a => Uop(BoolNOT, a)
+        }
+      case Uop(op, a) => Uop(op, a.simplify)
       case BVCmp(op, a, b) =>
         (op, a.simplify, b.simplify) match {
           case (op, a, b) => BVCmp(op, a, b)
@@ -268,6 +300,28 @@ enum Predicate {
     case Bop(op, x, y) => Bop(op, x.replace(prev, cur), y.replace(prev, cur))
     case BVCmp(op, x, y) => this
     case GammaCmp(op, x, y) => GammaCmp(op, x.replace(prev, cur), y.replace(prev, cur))
+  }
+
+  /**
+   * Remove atomic expressions containing `term` (replacing with True if needed)
+   */
+  def remove(term: BVTerm): Predicate = this match {
+    case Lit(x) => this
+    case Uop(op, x) => Uop(op, x.remove(term))
+    case Bop(op, x, y) => Bop(op, x.remove(term), y.remove(term))
+    case BVCmp(op, x, y) => if x.contains(term) || y.contains(term) then Lit(TrueLiteral) else this
+    case GammaCmp(op, x, y) => this
+  }
+
+  /**
+   * Remove atomic expressions containing `term` (replacing with True if needed)
+   */
+  def remove(term: GammaTerm): Predicate = this match {
+    case Lit(x) => this
+    case Uop(op, x) => Uop(op, x.remove(term))
+    case Bop(op, x, y) => Bop(op, x.remove(term), y.remove(term))
+    case BVCmp(op, x, y) => this
+    case GammaCmp(op, x, y) => if x.contains(term) || y.contains(term) then Lit(TrueLiteral) else this
   }
 }
 
