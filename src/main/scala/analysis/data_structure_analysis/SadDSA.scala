@@ -23,7 +23,6 @@ class SadGraph(proc: Procedure, phase: DSAPhase,
 {
 
   def localCorrectness(): Unit = {
-
     constraints.toSeq.sortBy(f => f.label).foreach {
       case constraint: MemoryAccessConstraint[_]  =>
         val valueCells = constraintArgToCells(constraint.arg2).map(find)
