@@ -130,8 +130,8 @@ class PredicateDomain extends PredicateEncodingDomain[Predicate] {
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
       case a: LocalAssign  => b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get).replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get).simplify
-      case a: MemoryLoad   => top
-      case m: MemoryStore  => top
+      case a: MemoryLoad   => b.remove(BVTerm.Var(a.lhs)).remove(GammaTerm.Var(a.lhs))
+      case m: MemoryStore  => b
       case a: Assume       => {
         if (a.checkSecurity) {
           Bop(BoolAND, Bop(BoolAND, b, exprToPredicate(a.body).get), lowExpr(a.body)).simplify
