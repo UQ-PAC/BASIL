@@ -299,27 +299,69 @@ trait MapDomain[D, L] extends AbstractDomain[LatticeMap[D, L]] {
   def top: LatticeMap[D, L] = Top()
 }
 
+/**
+ * A map domain that encodes predicates per term of a map.
+ *
+ * If you want to implement this trait, instead implement either `MayPredMapDomain` or `MustPredMapDomain`
+ */
 trait PredMapDomain[D, L] extends MapDomain[D, L] with PredicateEncodingDomain[LatticeMap[D, L]] {
-  import LatticeMap.{Top, Bottom, TopMap, BottomMap}
+  /**
+   * Encode the information the abstract value `l` represents, as a predicate, when `l` is the result
+   * of applying `d` to `m`.
+   */
+  def termToPred(m: LatticeMap[D, L], d: D, l: L): Predicate
+}
 
-  def termToPred(d: D, l: L): Predicate
+/**
+ * A map domain encoding predicates that is a may analysis.
+ *
+ * As described in `PredicateEncodingDomain`, a may analysis must overapproximate its encoded predicate,
+ * where a concretised predicate should give a superset of the concretisation of the lattice element that
+ * encoded the predicate.
+ *
+ * Extending this trait gives a sound implementation of the toPred method over a map using termToPred
+ * for a may analysis, namely by mapping top to true, bottom and a map defaulting to bottom to false,
+ * and mapping a top defaulting map to a conjunction of each individual predicate of the non default
+ * elements. An analysis implementing this trait should thus have the initial state be a top defaulting
+ * map.
+ */
+trait MayPredMapDomain[D, L] extends PredMapDomain[D, L] with MayAnalysis {
+  import LatticeMap.{Top, Bottom, TopMap, BottomMap}
 
   def toPred(x: LatticeMap[D, L]): Predicate = x match {
     case Top() => Predicate.Lit(TrueLiteral)
     case TopMap(m) => m.foldLeft(Predicate.Lit(TrueLiteral)) {
       (p, z) => {
         val (d, l) = z
-        termToPred(d, l) match {
+        termToPred(x, d, l) match {
           case Predicate.Lit(TrueLiteral) => p
           case q => Predicate.Bop(BoolAND, p, q)
         }
       }
     }.simplify
-    case Bottom() => Predicate.Lit(FalseLiteral) // ? this should be True on may analyses
+    case Bottom() => Predicate.Lit(FalseLiteral)
+    case BottomMap(m) => Predicate.Lit(FalseLiteral)
+  }
+}
+
+/**
+ * A map domain encoding predicates that is a must analysis.
+ *
+ * See `MayPredMapDomain` for a description, but replace superset with subset, and bottom with top.
+ * Importantly, note that an analysis implementing this trait should have the initial state be a
+ * bottom defaulting map.
+ */
+trait MustPredMapDomain[D, L] extends PredMapDomain[D, L] with MustAnalysis {
+  import LatticeMap.{Top, Bottom, TopMap, BottomMap}
+
+  def toPred(x: LatticeMap[D, L]): Predicate = x match {
+    case Top() => Predicate.Lit(FalseLiteral)
+    case TopMap(m) => Predicate.Lit(FalseLiteral)
+    case Bottom() => Predicate.Lit(TrueLiteral)
     case BottomMap(m) => m.foldLeft(Predicate.Lit(TrueLiteral)) {
       (p, z) => {
         val (d, l) = z
-        termToPred(d, l) match {
+        termToPred(x, d, l) match {
           case Predicate.Lit(TrueLiteral) => p
           case q => Predicate.Bop(BoolAND, p, q)
         }
@@ -327,4 +369,3 @@ trait PredMapDomain[D, L] extends MapDomain[D, L] with PredicateEncodingDomain[L
     }.simplify
   }
 }
-

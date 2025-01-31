@@ -58,7 +58,7 @@ enum Interval extends InternalLattice[Interval] {
 private implicit val intervalTerm: Interval = Interval.Bottom
 
 class IntervalDomain(signed: Boolean, inf: Int => BigInt, negInf: Int => BigInt, bvto: BitVecLiteral => BigInt, tobv: (Int, BigInt) => BitVecLiteral)
-  extends PredMapDomain[Variable, Interval] {
+  extends MayPredMapDomain[Variable, Interval] {
   import Interval.*
   import ir.eval.BitVectorEval.*
 
@@ -90,7 +90,7 @@ class IntervalDomain(signed: Boolean, inf: Int => BigInt, negInf: Int => BigInt,
 
   override def init(b: Block): LatticeMap[Variable, Interval] =
     if Some(b) == b.parent.entryBlock then
-      b.parent.formalInParam.foldLeft(bot) {
+      b.parent.formalInParam.foldLeft(top) {
         (m, v) => m + (v -> Top)
       }
     else bot
@@ -98,7 +98,7 @@ class IntervalDomain(signed: Boolean, inf: Int => BigInt, negInf: Int => BigInt,
   def topTerm: Interval = Top
   def botTerm: Interval = Bottom
 
-  def termToPred(v: Variable, l: Interval): Predicate = l match {
+  def termToPred(m: LatticeMap[Variable, Interval], v: Variable, l: Interval): Predicate = l match {
     case Top => Predicate.Lit(TrueLiteral)
     case Bottom => Predicate.Lit(TrueLiteral)
     case ConcreteInterval(lower, upper, width) if signed =>

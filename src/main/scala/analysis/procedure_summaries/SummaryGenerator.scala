@@ -92,10 +92,10 @@ class SummaryGenerator(
      * condition to be low, and a reachability predicate for the branch condition
      * (think nested in statements).
      */
-    val initialState = LatticeMap.TopMap((relevantGlobals.collect(_ match {
+    val initialGammaDeps = LatticeMap.BottomMap((relevantGlobals.collect(_ match {
       case v: Variable => v
     }) ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
-    val mustGammaDomain = MustGammaDomain(initialState)
+    val mustGammaDomain = MustGammaDomain(initialGammaDeps)
     val reachabilityDomain = ReachabilityConditions()
     reversePostOrder(procedure)
     val (_, mustGammaResults) = worklistSolver(mustGammaDomain).solveProc(procedure, false)
