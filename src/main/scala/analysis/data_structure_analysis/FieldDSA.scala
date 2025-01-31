@@ -126,6 +126,33 @@ class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[UnionFindSol
 class FieldNode(val graph: FieldGraph, val base: SymBase, size: Option[Int]) extends DSANode[FieldCell](size) {
 //  override def graph: DSAGraph[SuperCell, FieldCell, ConstraintCell, FieldNode] = parent
   override def init(interval: Interval): FieldCell = FieldCell(this, interval)
+
+  override def add(interval: Interval): FieldCell = {
+    if !isCollapsed then
+      val overlapping: Seq[FieldCell] = cells.filter(_.interval.isOverlapping(interval))
+//      _cells = cells.diff(overlapping)
+
+      val newCell = if overlapping.isEmpty then
+        init(interval)
+      else
+        val unifiedInterval = overlapping.map(_.interval).fold(interval)(Interval.join)
+        val res = init(unifiedInterval)
+        graph.mergeCells(overlapping.appended(res))
+        res
+
+      _cells = cells.diff(overlapping).appended(newCell).sorted
+      newCell
+    else
+      collapsed.get
+  }
+
+
+  override def get(interval: Interval): FieldCell = {
+    if isCollapsed then collapsed.get else
+      val exactMatches = cells.filter(_.interval.contains(interval))
+      assert(exactMatches.size == 1, "Expected exactly one overlapping interval")
+      exactMatches.head
+  }
 }
 
 sealed trait ConstraintCell extends DSACell {
