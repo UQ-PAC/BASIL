@@ -5,6 +5,8 @@ import ir.*
 import boogie.*
 import ir.transforms.AbstractDomain
 
+/**
+ */
 enum BVTerm {
   case Lit(x: BitVecLiteral)
   case Var(v: Variable)
@@ -44,6 +46,8 @@ enum BVTerm {
     case SignExtend(extension, body) => body.toBasil.map(x => ir.SignExtend(extension, x))
   }
 
+  /**
+   */
   def simplify: BVTerm = {
     if this.simplified then return this
     val ret = this match {
@@ -60,6 +64,9 @@ enum BVTerm {
     ret
   }
 
+  /**
+   * Replace all instances of the term `prev` with the new term `cur`.
+   */
   def replace(prev: BVTerm, cur: BVTerm): BVTerm = this match {
     case x if x == prev => cur
     case Lit(x) => this
@@ -74,6 +81,8 @@ enum BVTerm {
   }
 }
 
+/**
+ */
 enum GammaTerm {
   case Lit(x: BoolLit)
   case Var(v: Variable)
@@ -111,14 +120,8 @@ enum GammaTerm {
       }
   }
 
-  def vars: Set[Variable] = this match {
-    case Lit(_) => Set()
-    case Var(v) => Set(v)
-    case OldVar(v) => Set(v)
-    case Uop(_, x) => x.vars
-    case Join(s) => s.foldLeft(Set()) { (s, g) => s ++ g.vars }
-  }
-
+  /**
+   */
   def simplify: GammaTerm = {
     if this.simplified then return this
     val ret = this match {
@@ -137,6 +140,9 @@ enum GammaTerm {
     ret
   }
 
+  /**
+   * Replace all instances of the term `prev` with the new term `cur`.
+   */
   def replace(prev: GammaTerm, cur: GammaTerm): GammaTerm = this match {
     case x if x == prev => cur
     case Lit(x) => this
@@ -147,6 +153,8 @@ enum GammaTerm {
   }
 }
 
+/**
+ */
 enum Predicate {
   case Lit(x: BoolLit)
   case Uop(op: BoolUnOp, x: Predicate)
@@ -174,6 +182,8 @@ enum Predicate {
 
   override def toString(): String = this.toBoogie.toString
 
+  /**
+   */
   def simplify: Predicate = {
     if this.simplified then return this
     val ret = this match {
@@ -224,17 +234,23 @@ enum Predicate {
         }
       case _ => this
     }
-    StaticAnalysisLogger.debug(s"simplified $this into $ret")
     ret.simplified = true
     ret
   }
 
+  /**
+   * Convert a conjunction of predicates into the set of predicates in the conjunction.
+   * All predicates are at least conjunctions of one term.
+   */
   def split: List[Predicate] =
     this match {
       case Bop(BoolAND, a, b) => a.split ++ b.split
       case _ => List(this)
     }
 
+  /**
+   * Replace all instances of the term `prev` with the new term `cur`.
+   */
   def replace(prev: BVTerm, cur: BVTerm): Predicate = this match {
     case Lit(x) => this
     case Uop(op, x) => Uop(op, x.replace(prev, cur))
@@ -243,6 +259,9 @@ enum Predicate {
     case GammaCmp(op, x, y) => this
   }
 
+  /**
+   * Replace all instances of the term `prev` with the new term `cur`.
+   */
   def replace(prev: GammaTerm, cur: GammaTerm): Predicate = this match {
     case Lit(x) => this
     case Uop(op, x) => Uop(op, x.replace(prev, cur))
@@ -252,6 +271,9 @@ enum Predicate {
   }
 }
 
+/**
+ * Try to convert a BASIL expression into a BVTerm.
+ */
 def exprToBVTerm(e: Expr): Option[BVTerm] = e match {
   case b: BitVecLiteral => Some(BVTerm.Lit(b))
   case v: Variable => Some(BVTerm.Var(v))
@@ -279,6 +301,9 @@ def exprToGammaTerm(e: Expr): Option[GammaTerm] = e match {
   case _ => None
 }
 
+/**
+ * Try to convert a BASIL expression into a predicate.
+ */
 def exprToPredicate(e: Expr): Option[Predicate] = e match {
   case b: BoolLit => Some(Predicate.Lit(b))
   case UnaryExpr(op: BoolUnOp, arg) => exprToPredicate(arg).map(p => Predicate.Uop(op, p))
@@ -300,7 +325,13 @@ def exprToPredicate(e: Expr): Option[Predicate] = e match {
  * Intuitively, the predicate should be an approximation of the abstract state, cannot soundly be more precise than the domain itself.
  */
 trait PredicateEncodingDomain[L] extends AbstractDomain[L] {
+  /**
+   * Convert an abstract value to a predicate encoding its meaning.
+   */
   def toPred(x: L): Predicate
 
+  /**
+   * Extract an abstract value from a predicate.
+   */
   def fromPred(p: Predicate): L = top
 }

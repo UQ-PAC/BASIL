@@ -24,6 +24,9 @@ class ProductDomain[L1, L2](d1: AbstractDomain[L1], d2: AbstractDomain[L2]) exte
   def bot: (L1, L2) = (d1.bot, d2.bot)
 }
 
+/**
+ * Encodes the conjunction of two domain predicates.
+ */
 class PredProductDomain[L1, L2](d1: PredicateEncodingDomain[L1], d2: PredicateEncodingDomain[L2])
   extends ProductDomain[L1, L2](d1, d2) with PredicateEncodingDomain[(L1, L2)] {
 
@@ -52,6 +55,9 @@ class DisjunctiveCompletion[L](d: AbstractDomain[L]) extends AbstractDomain[Set[
   def bot: Set[L] = Set(d.bot)
 }
 
+/**
+ * Encodes a disjunctive completion as the disjunction of a set of predicates.
+ */
 class PredDisjunctiveCompletion[L](d: PredicateEncodingDomain[L]) extends DisjunctiveCompletion[L](d) with PredicateEncodingDomain[Set[L]] {
   def toPred(x: Set[L]): Predicate = x.foldLeft(Predicate.Lit(FalseLiteral)) { (p, l) => Predicate.Bop(BoolOR, p, d.toPred(l)) }.simplify
 
