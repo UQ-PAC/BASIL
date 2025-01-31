@@ -188,12 +188,14 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
           if (bv1.size == bv2.size) {
             BitVecType(1)
           } else {
+            println(this)
             throw new Exception("bitvector size mismatch")
           }
         case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
           if (bv1.size == bv2.size) {
             BoolType
           } else {
+            println(this)
             throw new Exception("bitvector size mismatch")
           }
         case BVEQ | BVNEQ =>

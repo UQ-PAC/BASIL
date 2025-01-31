@@ -5,6 +5,8 @@ import ir.*
 import boogie.*
 import ir.transforms.AbstractDomain
 
+// TODO DAG predicates (don't represent the same expression twice)
+
 /**
  */
 enum BVTerm {
@@ -115,9 +117,7 @@ enum GammaTerm {
     case Join(s) =>
       if s.size == 0 then TrueBLiteral
       else if s.size == 1 then s.head.toBoogie
-      else s.tail.foldLeft(s.head.toBoogie) {
-        (p, g) => BinaryBExpr(BoolAND, p, g.toBoogie)
-      }
+      else s.tail.foldLeft(s.head.toBoogie) { (p, g) => BinaryBExpr(BoolAND, p, g.toBoogie) }
   }
 
   def toBasil: Option[Expr] = this match {
@@ -128,9 +128,7 @@ enum GammaTerm {
     case Join(s) =>
       if s.size == 0 then Some(TrueLiteral)
       else if s.size == 1 then s.head.toBasil
-      else s.tail.foldLeft(s.head.toBasil) {
-        (p, g) => g.toBasil.flatMap(g => p.map(p => BinaryExpr(BoolAND, p, g)))
-      }
+      else s.tail.foldLeft(s.head.toBasil) { (p, g) => g.toBasil.flatMap(g => p.map(p => BinaryExpr(BoolAND, p, g))) }
   }
 
   /**
@@ -183,6 +181,8 @@ enum Predicate {
   case Lit(x: BoolLit)
   case Uop(op: BoolUnOp, x: Predicate)
   case Bop(op: BoolBinOp, x: Predicate, y: Predicate)
+  case Conj(s: Set[Predicate])
+  case Disj(s: Set[Predicate])
   case BVCmp(op: BVCmpOp, x: BVTerm, y: BVTerm)
   case GammaCmp(op: BoolCmpOp, x: GammaTerm, y: GammaTerm)
 
@@ -192,6 +192,14 @@ enum Predicate {
     case Lit(x) => x.toBoogie
     case Uop(op, x) => UnaryBExpr(op, x.toBoogie)
     case Bop(op, x, y) => BinaryBExpr(op, x.toBoogie, y.toBoogie)
+    case Conj(s) =>
+      if s.size == 0 then TrueBLiteral
+      else if s.size == 1 then s.head.toBoogie
+      else s.tail.foldLeft(s.head.toBoogie) { (p, q) => BinaryBExpr(BoolAND, p, q.toBoogie) }
+    case Disj(s) =>
+      if s.size == 0 then FalseBLiteral
+      else if s.size == 1 then s.head.toBoogie
+      else s.tail.foldLeft(s.head.toBoogie) { (p, q) => BinaryBExpr(BoolOR, p, q.toBoogie) }
     case BVCmp(op, x, y) => BinaryBExpr(op, x.toBoogie, y.toBoogie)
     case GammaCmp(op, x, y) => BinaryBExpr(op, x.toBoogie, y.toBoogie)
   }
@@ -200,11 +208,19 @@ enum Predicate {
     case Lit(x) => Some(x)
     case Uop(op, x) => x.toBasil.map(x => UnaryExpr(op, x))
     case Bop(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
+    case Conj(s) =>
+      if s.size == 0 then Some(TrueLiteral)
+      else if s.size == 1 then s.head.toBasil
+      else s.tail.foldLeft(s.head.toBasil) { (p, q) => p.flatMap { p => q.toBasil.map { q => BinaryExpr(BoolAND, p, q) } } }
+    case Disj(s) =>
+      if s.size == 0 then Some(FalseLiteral)
+      else if s.size == 1 then s.head.toBasil
+      else s.tail.foldLeft(s.head.toBasil) { (p, q) => p.flatMap { p => q.toBasil.map { q => BinaryExpr(BoolOR, p, q) } } }
     case BVCmp(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
     case GammaCmp(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
   }
 
-  override def toString(): String = this.toBoogie.toString
+  //override def toString(): String = this.toBoogie.toString
 
   /**
    */
@@ -213,30 +229,17 @@ enum Predicate {
     val ret = this match {
       case Bop(BoolAND, a, b) =>
         (a.simplify, b.simplify) match {
-          case (Lit(TrueLiteral), b) => b
-          case (a, Lit(TrueLiteral)) => a
-          case (Lit(FalseLiteral), _) => Lit(FalseLiteral)
-          case (_, Lit(FalseLiteral)) => Lit(FalseLiteral)
-          case (BVCmp(BVSLE, a, b), BVCmp(BVSLE, c, d)) if a == d && b == c => BVCmp(BVEQ, a, b)
-          case (BVCmp(BVULE, a, b), BVCmp(BVULE, c, d)) if a == d && b == c => BVCmp(BVEQ, a, b)
-          case (BVCmp(BVSGE, a, b), BVCmp(BVSGE, c, d)) if a == d && b == c => BVCmp(BVEQ, a, b)
-          case (BVCmp(BVUGE, a, b), BVCmp(BVUGE, c, d)) if a == d && b == c => BVCmp(BVEQ, a, b)
-          case (BVCmp(BVSLE, a, b), BVCmp(BVSGE, c, d)) if a == c && b == d => BVCmp(BVEQ, a, b)
-          case (BVCmp(BVULE, a, b), BVCmp(BVUGE, c, d)) if a == c && b == d => BVCmp(BVEQ, a, b)
-          case (BVCmp(BVSGE, a, b), BVCmp(BVSLE, c, d)) if a == c && b == d => BVCmp(BVEQ, a, b)
-          case (BVCmp(BVUGE, a, b), BVCmp(BVULE, c, d)) if a == c && b == d => BVCmp(BVEQ, a, b)
-          case (GammaCmp(BoolIMPLIES, a, b), GammaCmp(BoolIMPLIES, c, d)) if a == d && b == c => GammaCmp(BoolEQ, a, b)
-          case (a, b) if a == b => a
-          case (a, b) => Bop(BoolAND, a, b)
+          case (Conj(a), Conj(b)) => Conj(a ++ b)
+          case (Conj(a), b) => Conj(a + b)
+          case (a, Conj(b)) => Conj(b + a)
+          case (a, b) => Conj(Set(a, b))
         }
       case Bop(BoolOR, a, b) =>
         (a.simplify, b.simplify) match {
-          case (Lit(TrueLiteral), _) => Lit(TrueLiteral)
-          case (_, Lit(TrueLiteral)) => Lit(TrueLiteral)
-          case (Lit(FalseLiteral), b) => b
-          case (a, Lit(FalseLiteral)) => a
-          case (a, b) if a == b => a
-          case (a, b) => Bop(BoolOR, a, b)
+          case (Disj(a), Disj(b)) => Disj(a ++ b)
+          case (Disj(a), b) => Disj(a + b)
+          case (a, Disj(b)) => Disj(b + a)
+          case (a, b) => Disj(Set(a, b))
         }
       case Bop(BoolIMPLIES, a, b) =>
         (a.simplify, b.simplify) match {
@@ -254,6 +257,75 @@ enum Predicate {
           case a => Uop(BoolNOT, a)
         }
       case Uop(op, a) => Uop(op, a.simplify)
+      case Conj(s) => {
+        var cur = s.map(_.simplify)
+        var changed = true
+        while (changed) {
+          changed = false
+
+          // Merge internal disjuncts
+          var disj = Set[Predicate]()
+          for x <- cur do {
+            x match {
+              case d @ Disj(s) =>
+                cur -= d
+                disj = disj ++ s
+              case _ => {}
+            }
+          }
+          if disj.size == 1 then cur += disj.head
+          else if disj.size > 1 then cur += Disj(disj)
+
+          for x <- cur if !changed do {
+            val cur1 = x match {
+              case Lit(FalseLiteral) => Set(Lit(FalseLiteral))
+              case p @ Conj(s2) => cur - p ++ s2
+              case p @ BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSLE, b, a)) => cur - p - BVCmp(BVSLE, b, a) + BVCmp(BVEQ, a, b)
+              case p @ BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSGE, a, b)) => cur - p - BVCmp(BVSGE, a, b) + BVCmp(BVEQ, a, b)
+              case p @ BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVULE, b, a)) => cur - p - BVCmp(BVULE, b, a) + BVCmp(BVEQ, a, b)
+              case p @ BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVUGE, a, b)) => cur - p - BVCmp(BVUGE, a, b) + BVCmp(BVEQ, a, b)
+              case p @ GammaCmp(BoolIMPLIES, a, b) if cur.contains(GammaCmp(BoolIMPLIES, b, a)) => cur - p - GammaCmp(BoolIMPLIES, b, a) + GammaCmp(BoolEQ, a, b)
+              case _ => cur
+            }
+            changed = cur != cur1
+            cur = cur1
+          }
+          cur -= Lit(TrueLiteral)
+        }
+        if cur.size == 1 then cur.head else Conj(cur)
+      }
+      case Disj(s) => {
+        var cur = s.map(_.simplify)
+        var changed = true
+        while (changed) {
+          changed = false
+
+          // Merge internal conjuncts
+          var conj = Set[Predicate]()
+          for x <- cur do {
+            x match {
+              case d @ Conj(s) =>
+                cur -= d
+                conj = conj ++ s
+              case _ => {}
+            }
+          }
+          if conj.size == 1 then cur += conj.head
+          else if conj.size > 1 then cur += Conj(conj)
+
+          for x <- cur if !changed do {
+            val cur1 = x match {
+              case p @ Disj(s2) => cur - p ++ s2
+              case Lit(TrueLiteral) => Set(Lit(TrueLiteral))
+              case _ => cur
+            }
+            changed = cur != cur1
+            cur = cur1
+          }
+          cur -= Lit(FalseLiteral)
+        }
+        if cur.size == 1 then cur.head else Disj(cur)
+      }
       case BVCmp(op, a, b) =>
         (op, a.simplify, b.simplify) match {
           case (op, a, b) => BVCmp(op, a, b)
@@ -287,6 +359,8 @@ enum Predicate {
     case Lit(x) => this
     case Uop(op, x) => Uop(op, x.replace(prev, cur))
     case Bop(op, x, y) => Bop(op, x.replace(prev, cur), y.replace(prev, cur))
+    case Conj(s) => Conj(s.map(_.replace(prev, cur)))
+    case Disj(s) => Disj(s.map(_.replace(prev, cur)))
     case BVCmp(op, x, y) => BVCmp(op, x.replace(prev, cur), y.replace(prev, cur))
     case GammaCmp(op, x, y) => this
   }
@@ -298,6 +372,8 @@ enum Predicate {
     case Lit(x) => this
     case Uop(op, x) => Uop(op, x.replace(prev, cur))
     case Bop(op, x, y) => Bop(op, x.replace(prev, cur), y.replace(prev, cur))
+    case Conj(s) => Conj(s.map(_.replace(prev, cur)))
+    case Disj(s) => Disj(s.map(_.replace(prev, cur)))
     case BVCmp(op, x, y) => this
     case GammaCmp(op, x, y) => GammaCmp(op, x.replace(prev, cur), y.replace(prev, cur))
   }
@@ -309,6 +385,8 @@ enum Predicate {
     case Lit(x) => this
     case Uop(op, x) => Uop(op, x.remove(term))
     case Bop(op, x, y) => Bop(op, x.remove(term), y.remove(term))
+    case Conj(s) => Conj(s.map(_.remove(term)))
+    case Disj(s) => Disj(s.map(_.remove(term)))
     case BVCmp(op, x, y) => if x.contains(term) || y.contains(term) then Lit(TrueLiteral) else this
     case GammaCmp(op, x, y) => this
   }
@@ -320,6 +398,8 @@ enum Predicate {
     case Lit(x) => this
     case Uop(op, x) => Uop(op, x.remove(term))
     case Bop(op, x, y) => Bop(op, x.remove(term), y.remove(term))
+    case Conj(s) => Conj(s.map(_.remove(term)))
+    case Disj(s) => Disj(s.map(_.remove(term)))
     case BVCmp(op, x, y) => this
     case GammaCmp(op, x, y) => if x.contains(term) || y.contains(term) then Lit(TrueLiteral) else this
   }
