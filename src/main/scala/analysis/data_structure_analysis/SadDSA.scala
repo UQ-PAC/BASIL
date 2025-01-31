@@ -199,6 +199,8 @@ class SadGraph(proc: Procedure, phase: DSAPhase,
     cell2.node.bases.addAll(cell1.node.bases)
     cell2.node.children.addAll(cell1.node.children)
     cell1.node.children.addAll(cell1.node.children)
+    cell1.node.flags.join(cell2.node.flags)
+    cell2.node.flags.join(cell1.node.flags)
 
     cell1.node.collapsed.get
   }
@@ -215,6 +217,8 @@ class SadGraph(proc: Procedure, phase: DSAPhase,
       val allCells = (stableCells ++ movedCells).sorted
       val resultNode = SadNode(this, stableNode.bases.union(nodeToBeMoved.bases))
       resultNode.children.addAll(stableNode.children ++ nodeToBeMoved.children + stableNode.id + nodeToBeMoved.id)
+      resultNode.flags.join(stableNode.flags)
+      resultNode.flags.join(nodeToBeMoved.flags)
       val queue: mutable.Queue[SadCell] = mutable.Queue(allCells:_*)
       val newToOlds: mutable.Map[SadCell, Set[SadCell]] = mutable.Map.empty
       while queue.nonEmpty do
@@ -382,13 +386,15 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase], size: Option
       val collapseNode: SadNode = SadNode(graph, bases, size)
       val collapsedCell: SadCell = collapseNode.add(0)
       collapseNode._collapsed = Some(collapsedCell)
-//      graph.solver.unify(node.term, collapseNode.term, 0)
+      // delay unification
+      // treat collapsed node completely distinct to current node
       if  node.cells.exists(_.hasPointee) then
         var pointToItself = false
         val cells = node.cells
         val pointee = cells.foldLeft(collapsedCell.getPointee) {
           (c, current) =>
             val cell = graph.find(current)
+            // since unification delayed check pointee against old version as well
             if (cell.hasPointee && (cell.getPointee.node == node || cell.getPointee.node == this)) {
               pointToItself = true
               c
@@ -410,6 +416,7 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase], size: Option
 
         assert(collapseNode.cells.size == 1)
 
+      // unify collapsed node and current node
       graph.solver.unify(node.term, collapseNode.term, 0)
       graph.find(collapsedCell)
 
