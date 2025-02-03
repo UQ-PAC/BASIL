@@ -123,7 +123,11 @@ class ReachabilityConditions extends PredicateEncodingDomain[Predicate] {
 class PredicateDomain extends PredicateEncodingDomain[Predicate] {
   import Predicate.*
 
-  def join(a: Predicate, b: Predicate, pos: Block): Predicate = Bop(BoolOR, a, b).simplify
+  private var atTop = Set[Block]()
+
+  def join(a: Predicate, b: Predicate, pos: Block): Predicate =
+    if a.size + b.size > 100 then atTop += pos
+    if atTop.contains(pos) then top else Bop(BoolOR, a, b).simplify
 
   private def lowExpr(e: Expr): Predicate = GammaCmp(BoolIMPLIES, GammaTerm.Lit(TrueLiteral), GammaTerm.Join(e.variables.map(v => GammaTerm.Var(v))))
 

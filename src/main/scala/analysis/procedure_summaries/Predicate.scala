@@ -224,7 +224,17 @@ enum Predicate {
     case GammaCmp(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
   }
 
-  //override def toString(): String = this.toBoogie.toString
+  override def toString(): String = this.toBoogie.toString
+
+  def size: Int = this match {
+    case Lit(x) => 1
+    case Not(x) => x.size + 1
+    case Bop(op, x, y) => x.size + y.size + 1
+    case Conj(s) => s.map(_.size).sum + 1
+    case Disj(s) => s.map(_.size).sum + 1
+    case BVCmp(op, x, y) => 1
+    case GammaCmp(op, x, y) => 1
+  }
 
   /**
    * Convert a conjunction of predicates into the set of predicates in the conjunction.
