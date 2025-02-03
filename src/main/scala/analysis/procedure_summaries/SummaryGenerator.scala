@@ -17,10 +17,15 @@ import ir.transforms.{AbstractDomain, reversePostOrder, worklistSolver}
  */
 class SummaryGenerator(
   program: Program,
-  varDepsSummaries: Map[Procedure, Map[Variable, LatticeSet[Variable]]],
   parameterForm: Boolean = false,
 ) {
   val relevantGlobals: Set[Variable] = if parameterForm then Set() else 0.to(31).map { n => Register(s"R$n", 64) }.toSet
+
+  val varDepsSummaries = {
+      util.StaticAnalysisLogger.debug("[!] Variable dependency summaries")
+      val scc = stronglyConnectedComponents(CallGraph, List(program.mainProcedure))
+      VariableDependencyAnalysis(program, scc, parameterForm).analyze()
+  }
 
   private def getDependencies(procedure: Procedure): Map[Variable, Set[Variable]] = {
     varDepsSummaries.getOrElse(procedure, Map()).flatMap {
