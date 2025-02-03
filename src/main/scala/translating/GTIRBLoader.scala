@@ -39,9 +39,11 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
       constMap.clear
       varMap.clear
 
-      val s = instsem match {
+      instsem match {
         case InsnSemantics.Error(op, err) => {
-          statements.append(Assert(FalseLiteral, Some(s"Decode error: $op ${err.replace("\n", " :: ")}")))
+          val message = s"$op ${err.replace("\n", " :: ")}"
+          Logger.warn(s"Program contains lifter unsupported opcode: $message")
+          statements.append(Assert(FalseLiteral, Some(s"Lifter error: $message")))
           instructionCount += 1
         }
         case InsnSemantics.Result(instruction) => {
@@ -492,7 +494,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         // AArch64.MemTag.read, AArch64.MemTag.set - allocation tag operations, can't model as uninterpreted functions
         // and will require some research into their semantics
         // AtomicStart, AtomicEnd - can't model as uninterpreted functions, requires modelling atomic section
-        Logger.debug(s"unidentified call to $function: ${ctx.getText}")
+        Logger.error(s"unidentified call to $function: ${ctx.getText}")
         (None, None)
     }
 
