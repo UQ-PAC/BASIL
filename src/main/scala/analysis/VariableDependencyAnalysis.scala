@@ -44,8 +44,14 @@ trait ProcVariableDependencyAnalysisFunctions(
         // We iterate over the summary map many times, once for each d: DL
         // This could possibly be improved by transposing the summary maps, but there is some difficulty with how
         // this works with Top elements.
-        varDepsSummaries.get(call.target).map {
-          _.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]]()) {
+        varDepsSummaries.get(call.target).map { m =>
+          // Should this map be initialised to contain d -> IdEdge()?
+          // If d is unchanged, there should be an IdEdge to after the function call.
+          // If d is changed, then there shouldn't be one
+          // I'm not very confident in this :(
+          // also TODO handle modified globals
+          val init: Map[DL, EdgeFunction[LatticeSet[Variable]]] = if m.contains(v) then Map() else Map(d -> IdEdge())
+          m.foldLeft(init) {
             case (m, (v2, s)) => if s.contains(v) then m + (Left(v2) -> IdEdge()) else m
           }
           .getOrElse(Map())
@@ -53,11 +59,15 @@ trait ProcVariableDependencyAnalysisFunctions(
     }
   }
 
+  println(procedure)
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[LatticeSet[Variable]]] = {
     if n == procedure then d match {
       // At the start of the procedure, no variables should depend on anything but themselves.
       case Left(_) => Map()
       case Right(_) =>
+        println(procedure.formalInParam)
+        println(varDepsSummaries)
+
         (relevantGlobals ++ procedure.formalInParam).foldLeft(Map(d -> IdEdge())) {
           (m: Map[DL, EdgeFunction[LatticeSet[Variable]]], v) => m + (Left(v) -> ConstEdge(FiniteSet(Set(v))))
         }
@@ -69,7 +79,9 @@ trait ProcVariableDependencyAnalysisFunctions(
           case Left(v) if v == assigned => Map()
           // This needs to be FiniteSet(Set()) and not Bottom() since Bottom() means something
           // special to the IDE solver
-          case _ => Map(d -> IdEdge(), Left(assigned) -> ConstEdge(FiniteSet(Set())))
+          case Left(_) => Map(d -> IdEdge())
+          case Right(_) =>
+            Map(d -> IdEdge(), Left(assigned) -> ConstEdge(FiniteSet(Set())))
         }
       case MemoryLoad(lhs, mem, index, _, size, _) => d match {
         case Left(_) => Map(d -> IdEdge())
@@ -85,8 +97,10 @@ trait ProcVariableDependencyAnalysisFunctions(
           (assigned, expression) => {
             val vars = expression.variables
             d match {
-              case Left(v: Variable) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> IdEdge())
-              case _ => Map(d -> IdEdge())
+              case Left(v) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> IdEdge())
+              case Left(_) => Map(d -> IdEdge())
+              case Right(_) =>
+                Map(d -> IdEdge(), Left(assigned) -> ConstEdge(FiniteSet(Set())))
             }
           }
         }
@@ -135,6 +149,8 @@ class VariableDependencyAnalysis(
   val relevantGlobals: Set[Variable] = if parameterForm then Set() else 0.to(31).map { n =>
     Register(s"R$n", 64)
   }.toSet
+
+  println(scc)
 
   def analyze(): Map[Procedure, Map[Variable, LatticeSet[Variable]]] = {
     scc.flatten.filter(_.blocks.nonEmpty).foldLeft(Map[Procedure, Map[Variable, LatticeSet[Variable]]]()) {

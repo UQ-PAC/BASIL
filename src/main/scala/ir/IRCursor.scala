@@ -241,6 +241,8 @@ def stronglyConnectedComponents[T <: CFGPosition, O <: T](walker: IRWalk[T, O], 
       out += component
     }
   }
+  println(out)
+  assert(stack.size == 0)
 
   out.map(_.toSet).toList
 }
