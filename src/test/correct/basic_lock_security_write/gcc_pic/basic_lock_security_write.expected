@@ -117,8 +117,8 @@ implementation main()
   var Gamma_x_old: bool;
   var x_old: bv32;
   var z_old: bv32;
-  lmain:
-    assume {:captureState "lmain"} true;
+  $main:
+    assume {:captureState "$main"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 12bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 12bv64), Gamma_R0);
     assume {:captureState "%00000302"} true;

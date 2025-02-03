@@ -134,8 +134,8 @@ implementation get_two()
   var Gamma_$load$18: bool;
   var Gamma_$load$19: bool;
   var Gamma_$load$20: bool;
-  lget_two:
-    assume {:captureState "lget_two"} true;
+  $get_two:
+    assume {:captureState "$get_two"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
     stack, Gamma_stack := memory_store8_le(stack, bvadd64(R31, 15bv64), R0[8:0]), gamma_store8(Gamma_stack, bvadd64(R31, 15bv64), Gamma_R0);
     assume {:captureState "%00000336"} true;
@@ -188,8 +188,8 @@ implementation main()
   var Gamma_$load$21: bool;
   var Gamma_$load$22: bool;
   var Gamma_$load$23: bool;
-  lmain:
-    assume {:captureState "lmain"} true;
+  $main:
+    assume {:captureState "$main"} true;
     #4, Gamma_#4 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
     stack, Gamma_stack := memory_store64_le(stack, #4, R29), gamma_store64(Gamma_stack, #4, Gamma_R29);
     assume {:captureState "%00000386"} true;
@@ -210,9 +210,9 @@ implementation main()
     R2, Gamma_R2 := (R2[64:48] ++ (2bv16 ++ R2[32:0])), Gamma_R2;
     R30, Gamma_R30 := 1968bv64, true;
     call get_two();
-    goto l000003ce;
-  l000003ce:
-    assume {:captureState "l000003ce"} true;
+    goto $000003ce;
+  $000003ce:
+    assume {:captureState "$000003ce"} true;
     R8, Gamma_R8 := 69632bv64, true;
     call rely();
     assert (L(mem, bvadd64(R8, 64bv64)) ==> Gamma_R0);
@@ -225,9 +225,9 @@ implementation main()
     R0, Gamma_R0 := bvadd64(R0, 2028bv64), Gamma_R0;
     R30, Gamma_R30 := 1992bv64, true;
     call printf();
-    goto l000003f5;
-  l000003f5:
-    assume {:captureState "l000003f5"} true;
+    goto $000003f5;
+  $000003f5:
+    assume {:captureState "$000003f5"} true;
     R0, Gamma_R0 := 0bv64, true;
     $load$22, Gamma_$load$22 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
     R29, Gamma_R29 := $load$22, Gamma_$load$22;

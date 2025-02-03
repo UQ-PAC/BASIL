@@ -76,8 +76,8 @@ implementation main()
 {
   var #4: bv32;
   var Gamma_#4: bool;
-  lmain:
-    assume {:captureState "lmain"} true;
+  $main:
+    assume {:captureState "$main"} true;
     R8, Gamma_R8 := 2bv64, true;
     #4, Gamma_#4 := bvadd32(R0[32:0], 4294967295bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#4, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 0bv33))), (Gamma_R0 && Gamma_#4);
@@ -85,26 +85,26 @@ implementation main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#4, 1bv32), 0bv32), Gamma_#4;
     NF, Gamma_NF := bvadd32(#4, 1bv32)[32:31], Gamma_#4;
     assert Gamma_ZF;
-    goto lmain_goto_l000002db, lmain_goto_l000002df;
-  l000002df:
-    assume {:captureState "l000002df"} true;
+    goto $main_goto_$000002db, $main_goto_$000002df;
+  $000002df:
+    assume {:captureState "$000002df"} true;
     R0, Gamma_R0 := zero_extend32_32(bvadd32(R8[32:0], 1bv32)), Gamma_R8;
-    goto l000002e2;
-  l000002db:
-    assume {:captureState "l000002db"} true;
+    goto $000002e2;
+  $000002db:
+    assume {:captureState "$000002db"} true;
     R0, Gamma_R0 := zero_extend32_32(R8[32:0]), Gamma_R8;
-    goto l000002e2;
-  l000002e2:
-    assume {:captureState "l000002e2"} true;
+    goto $000002e2;
+  $000002e2:
+    assume {:captureState "$000002e2"} true;
     goto main_basil_return;
-  lmain_goto_l000002db:
-    assume {:captureState "lmain_goto_l000002db"} true;
+  $main_goto_$000002db:
+    assume {:captureState "$main_goto_$000002db"} true;
     assume (bvcomp1(ZF, 1bv1) != 0bv1);
-    goto l000002db;
-  lmain_goto_l000002df:
-    assume {:captureState "lmain_goto_l000002df"} true;
+    goto $000002db;
+  $main_goto_$000002df:
+    assume {:captureState "$main_goto_$000002df"} true;
     assume (bvcomp1(ZF, 1bv1) == 0bv1);
-    goto l000002df;
+    goto $000002df;
   main_basil_return:
     assume {:captureState "main_basil_return"} true;
     return;

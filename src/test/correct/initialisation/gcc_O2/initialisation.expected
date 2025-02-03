@@ -136,8 +136,8 @@ implementation main()
   var Gamma_$load$19: bool;
   var Gamma_$load$20: bool;
   var Gamma_$load$21: bool;
-  lmain:
-    assume {:captureState "lmain"} true;
+  $main:
+    assume {:captureState "$main"} true;
     R5, Gamma_R5 := 69632bv64, true;
     R1, Gamma_R1 := bvadd64(R5, 16bv64), Gamma_R5;
     R0, Gamma_R0 := 0bv64, true;

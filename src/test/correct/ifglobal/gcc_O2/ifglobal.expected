@@ -79,34 +79,34 @@ implementation main()
 {
   var $load$18: bv32;
   var Gamma_$load$18: bool;
-  lmain:
-    assume {:captureState "lmain"} true;
+  $main:
+    assume {:captureState "$main"} true;
     R0, Gamma_R0 := 69632bv64, true;
     call rely();
     $load$18, Gamma_$load$18 := memory_load32_le(mem, bvadd64(R0, 20bv64)), (gamma_load32(Gamma_mem, bvadd64(R0, 20bv64)) || L(mem, bvadd64(R0, 20bv64)));
     R1, Gamma_R1 := zero_extend32_32($load$18), Gamma_$load$18;
     assert Gamma_R1;
-    goto lmain_goto_l000001b7, lmain_goto_l00000396;
-  l00000396:
-    assume {:captureState "l00000396"} true;
+    goto $main_goto_$000001b7, $main_goto_$00000396;
+  $00000396:
+    assume {:captureState "$00000396"} true;
     R1, Gamma_R1 := 1bv64, true;
     call rely();
     assert (L(mem, bvadd64(R0, 20bv64)) ==> Gamma_R1);
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R0, 20bv64), R1[32:0]), gamma_store32(Gamma_mem, bvadd64(R0, 20bv64), Gamma_R1);
     assume {:captureState "%000003a1"} true;
-    goto l000001b7;
-  l000001b7:
-    assume {:captureState "l000001b7"} true;
+    goto $000001b7;
+  $000001b7:
+    assume {:captureState "$000001b7"} true;
     R0, Gamma_R0 := 0bv64, true;
     goto main_basil_return;
-  lmain_goto_l000001b7:
-    assume {:captureState "lmain_goto_l000001b7"} true;
+  $main_goto_$000001b7:
+    assume {:captureState "$main_goto_$000001b7"} true;
     assume (bvnot1(bvcomp32(R1[32:0], 0bv32)) != 0bv1);
-    goto l000001b7;
-  lmain_goto_l00000396:
-    assume {:captureState "lmain_goto_l00000396"} true;
+    goto $000001b7;
+  $main_goto_$00000396:
+    assume {:captureState "$main_goto_$00000396"} true;
     assume (bvnot1(bvcomp32(R1[32:0], 0bv32)) == 0bv1);
-    goto l00000396;
+    goto $00000396;
   main_basil_return:
     assume {:captureState "main_basil_return"} true;
     return;

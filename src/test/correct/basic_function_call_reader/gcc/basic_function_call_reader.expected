@@ -118,8 +118,8 @@ implementation main()
   var Gamma_$load$18: bool;
   var Gamma_$load$19: bool;
   var Gamma_$load$20: bool;
-  lmain:
-    assume {:captureState "lmain"} true;
+  $main:
+    assume {:captureState "$main"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 24bv64), Gamma_R0;
@@ -139,28 +139,28 @@ implementation main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#4, 1bv32), 0bv32), Gamma_#4;
     NF, Gamma_NF := bvadd32(#4, 1bv32)[32:31], Gamma_#4;
     assert Gamma_ZF;
-    goto lmain_goto_l00000332, lmain_goto_l00000349;
-  l00000332:
-    assume {:captureState "l00000332"} true;
+    goto $main_goto_$00000332, $main_goto_$00000349;
+  $00000332:
+    assume {:captureState "$00000332"} true;
     $load$20, Gamma_$load$20 := memory_load32_le(stack, bvadd64(R31, 12bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
     R0, Gamma_R0 := zero_extend32_32($load$20), Gamma_$load$20;
-    goto l0000033e;
-  l00000349:
-    assume {:captureState "l00000349"} true;
+    goto $0000033e;
+  $00000349:
+    assume {:captureState "$00000349"} true;
     R0, Gamma_R0 := 0bv64, true;
-    goto l0000033e;
-  l0000033e:
-    assume {:captureState "l0000033e"} true;
+    goto $0000033e;
+  $0000033e:
+    assume {:captureState "$0000033e"} true;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
     goto main_basil_return;
-  lmain_goto_l00000332:
-    assume {:captureState "lmain_goto_l00000332"} true;
+  $main_goto_$00000332:
+    assume {:captureState "$main_goto_$00000332"} true;
     assume (bvnot1(bvcomp1(ZF, 1bv1)) != 0bv1);
-    goto l00000332;
-  lmain_goto_l00000349:
-    assume {:captureState "lmain_goto_l00000349"} true;
+    goto $00000332;
+  $main_goto_$00000349:
+    assume {:captureState "$main_goto_$00000349"} true;
     assume (bvnot1(bvcomp1(ZF, 1bv1)) == 0bv1);
-    goto l00000349;
+    goto $00000349;
   main_basil_return:
     assume {:captureState "main_basil_return"} true;
     return;
