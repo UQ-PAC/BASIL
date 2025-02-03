@@ -142,10 +142,7 @@ class VariableDependencyAnalysis(
         StaticAnalysisLogger.debug("Generating variable dependencies for " + procedure)
         var varDepResults = ProcVariableDependencyAnalysis(program, relevantGlobals,
           varDepsSummaries, procedure).analyze()
-        StaticAnalysisLogger.debug(varDepResults)
         val varDepMap = IRWalk.lastInProc(procedure).flatMap(varDepResults.get(_)).getOrElse(Map())
-        StaticAnalysisLogger.debug(IRWalk.lastInProc(procedure))
-        StaticAnalysisLogger.debug(varDepMap)
         varDepsSummaries + (procedure -> varDepMap)
       }
     }
