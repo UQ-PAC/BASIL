@@ -378,6 +378,7 @@ enum Predicate {
     case GammaCmp(op, x, y) => GammaCmp(op, x.replace(prev, cur), y.replace(prev, cur))
   }
 
+  // TODO actually remove only atomic preds
   /**
    * Remove atomic expressions containing `term` (replacing with True if needed)
    */
