@@ -330,7 +330,7 @@ trait MayPredMapDomain[D, L] extends PredMapDomain[D, L] with MayAnalysis {
 
   def toPred(x: LatticeMap[D, L]): Predicate = x match {
     case Top() => Predicate.Lit(TrueLiteral)
-    case TopMap(m) => m.foldLeft(Predicate.Lit(TrueLiteral)) {
+    case TopMap(m) => m.foldLeft(Predicate.True) {
       (p, z) => {
         val (d, l) = z
         termToPred(x, d, l) match {
@@ -358,7 +358,7 @@ trait MustPredMapDomain[D, L] extends PredMapDomain[D, L] with MustAnalysis {
     case Top() => Predicate.Lit(FalseLiteral)
     case TopMap(m) => Predicate.Lit(FalseLiteral)
     case Bottom() => Predicate.Lit(TrueLiteral)
-    case BottomMap(m) => m.foldLeft(Predicate.Lit(TrueLiteral)) {
+    case BottomMap(m) => m.foldLeft(Predicate.True) {
       (p, z) => {
         val (d, l) = z
         termToPred(x, d, l) match {

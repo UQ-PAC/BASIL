@@ -59,7 +59,7 @@ class DisjunctiveCompletion[L](d: AbstractDomain[L]) extends AbstractDomain[Set[
  * Encodes a disjunctive completion as the disjunction of a set of predicates.
  */
 class PredDisjunctiveCompletion[L](d: PredicateEncodingDomain[L]) extends DisjunctiveCompletion[L](d) with PredicateEncodingDomain[Set[L]] {
-  def toPred(x: Set[L]): Predicate = x.foldLeft(Predicate.Lit(FalseLiteral)) { (p, l) => Predicate.Bop(BoolOR, p, d.toPred(l)) }.simplify
+  def toPred(x: Set[L]): Predicate = x.foldLeft(Predicate.False) { (p, l) => Predicate.Bop(BoolOR, p, d.toPred(l)) }.simplify
 
   override def fromPred(p: Predicate): Set[L] = p match {
     case Predicate.Bop(BoolOR, a, b) => fromPred(a).union(fromPred(b))

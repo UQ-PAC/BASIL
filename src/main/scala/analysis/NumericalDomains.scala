@@ -186,7 +186,7 @@ class IntervalDomain(signed: Boolean, inf: Int => BigInt, negInf: Int => BigInt,
       case Bop(op, x, y) => top
       case Lit(TrueLiteral) => top
       case Lit(FalseLiteral) => bot
-      case Uop(op, x) => top
+      case Not(x) => top
       case GammaCmp(_, _, _) => top
     }
   }
