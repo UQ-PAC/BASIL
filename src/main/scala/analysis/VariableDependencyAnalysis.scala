@@ -59,15 +59,11 @@ trait ProcVariableDependencyAnalysisFunctions(
     }
   }
 
-  println(procedure)
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[LatticeSet[Variable]]] = {
     if n == procedure then d match {
       // At the start of the procedure, no variables should depend on anything but themselves.
       case Left(_) => Map()
       case Right(_) =>
-        println(procedure.formalInParam)
-        println(varDepsSummaries)
-
         (relevantGlobals ++ procedure.formalInParam).foldLeft(Map(d -> IdEdge())) {
           (m: Map[DL, EdgeFunction[LatticeSet[Variable]]], v) => m + (Left(v) -> ConstEdge(FiniteSet(Set(v))))
         }
@@ -149,8 +145,6 @@ class VariableDependencyAnalysis(
   val relevantGlobals: Set[Variable] = if parameterForm then Set() else 0.to(31).map { n =>
     Register(s"R$n", 64)
   }.toSet
-
-  println(scc)
 
   def analyze(): Map[Procedure, Map[Variable, LatticeSet[Variable]]] = {
     scc.flatten.filter(_.blocks.nonEmpty).foldLeft(Map[Procedure, Map[Variable, LatticeSet[Variable]]]()) {
