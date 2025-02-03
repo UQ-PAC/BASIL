@@ -113,7 +113,9 @@ object IRLoading {
 
     parser.setBuildParseTree(true)
 
-    BAPLoader.visitProject(parser.project())
+    val bapLoader = BAPLoader()
+
+    bapLoader.visitProject(parser.project())
   }
 
   def loadGTIRB(fileName: String, mainAddress: BigInt): Program = {
