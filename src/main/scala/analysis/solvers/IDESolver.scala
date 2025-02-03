@@ -150,6 +150,8 @@ abstract class IDESolver[
     }
 
     def summaries(): mutable.Map[Procedure, mutable.Map[DL, mutable.Map[DL, EdgeFunction[T]]]] = {
+      this.analyze()
+
       val res = mutable.Map[Procedure, mutable.Map[DL, mutable.Map[DL, EdgeFunction[T]]]]()
       x.foreach { case ((n, d1, d2), e) =>
         if (isExit(n)) {
@@ -250,7 +252,6 @@ abstract class IDESolver[
       program.mainProcedure.blocks.nonEmpty && program.mainProcedure.returnBlock.isDefined && program.mainProcedure.entryBlock.isDefined
     ) {
       val phase1 = Phase1()
-      phase1.analyze()
       val phase2 = Phase2(phase1)
       phase2.restructure(phase2.analyze())
     } else {
