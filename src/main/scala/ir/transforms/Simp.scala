@@ -571,6 +571,7 @@ def removeInvariantOutParameters(p: Program, alreadyInlined : Map[Procedure, Set
         // call.outParams = call.outParams.removed(invariantOutFormal)
 
         // insert assignment of to successor to maintain singleCallBlockEnd invariant
+        // TODO: this would really be simpler if we just broke the singleCallBlockEnd invariant
         call.parent.jump match {
           case r: Return => {
             // substitute directly into return
@@ -579,10 +580,17 @@ def removeInvariantOutParameters(p: Program, alreadyInlined : Map[Procedure, Set
           }
           case r: Unreachable => ()
           case g: GoTo => {
-            // add assignment
-            for (t <- g.targets) {
-              t.statements.prepend(LocalAssign(lhs, rhs))
+
+            val tgts = g.targets.toSet
+            val label = g.parent.label + "_retval_inline"
+            val b = if (g.targets.size == 1 && g.targets.forall(_.label == label)) then g.targets.head else {
+              val b = Block(label)
+              g.parent.parent.addBlocks(b)
+              g.parent.replaceJump(GoTo(b))
+              b.replaceJump(GoTo(tgts))
             }
+
+            b.statements.prepend(LocalAssign(lhs, rhs, Some("inlineret")))
           }
         }
       }
@@ -596,9 +604,19 @@ def removeInvariantOutParameters(p: Program, alreadyInlined : Map[Procedure, Set
   if (inlined.nonEmpty) {
     assert(invariant.correctCalls(p))
     assert(invariant.singleCallBlockEnd(p))
+    applyRPO(p) /* Because we added blocks */
   }
 
   inlined
+}
+
+def cleanupBlocks(p: Program) = {
+  var merged = true
+  while (merged) {
+    SimplifyLogger.debug("[!] Simplify :: Merge empty blocks")
+    merged = coalesceBlocks(p)
+    removeEmptyBlocks(p)
+  }
 }
 
 def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
@@ -666,17 +684,10 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
 
   // cleanup
   visit_prog(CleanupAssignments(), p)
-  SimplifyLogger.info("[!] Simplify :: Merge empty blocks")
 
-  removeEmptyBlocks(p)
-  coalesceBlocks(p)
-  removeEmptyBlocks(p)
-  coalesceBlocks(p)
-  removeEmptyBlocks(p)
-  coalesceBlocks(p)
-  removeEmptyBlocks(p)
-  coalesceBlocks(p)
-  removeEmptyBlocks(p)
+  SimplifyLogger.info("[!] Simplify :: Merge empty blocks")
+  cleanupBlocks(p)
+
   visit_prog(CopyProp.BlockyProp(), p)
   visit_prog(CleanupAssignments(), p)
 
@@ -688,14 +699,19 @@ def copyPropParamFixedPoint(p: Program, rela: Map[BigInt, BigInt]): Int = {
   var inlinedOutParams : Map[Procedure, Set[Variable]] = removeInvariantOutParameters(p)
   var changed = inlinedOutParams.nonEmpty
   var iterations = 1
-  while (changed && iterations < 2) {
+  val maxIterations = 2
+  while (changed && iterations < maxIterations) {
     changed = false
     SimplifyLogger.info(s"Simplify:: Copyprop iteration $iterations")
     doCopyPropTransform(p, rela)
     val extraInlined = removeInvariantOutParameters(p, inlinedOutParams)
     inlinedOutParams = extraInlined.foldLeft(inlinedOutParams)((acc, v) => acc + (v._1 -> (acc.getOrElse(v._1, Set[Variable]()) ++ v._2)))
     changed = changed || extraInlined.nonEmpty || removeDeadInParams(p)
+    cleanupBlocks(p)
     iterations += 1
+  }
+  if (changed && iterations == maxIterations) {
+    Logger.info(s"Stopped at copyprop iteration bound: $maxIterations")
   }
   iterations
 }
@@ -714,7 +730,6 @@ def reversePostOrder(p: Procedure): Unit = {
 def reversePostOrder(startBlock: Block, fixup: Boolean = false, begin: Int = 0): Int = {
   var count = begin
   val seen = mutable.HashSet[Block]()
-  val vcs = mutable.HashMap[Block, Int]()
 
   def walk(b: Block): Unit = {
     seen += b
@@ -1332,7 +1347,6 @@ def findDefinitelyExits(p: Program) = {
       p
     }.toSet
   )
-
 }
 
 class Simplify(val res: Variable => Option[Expr], val initialBlock: Block = null) extends CILVisitor {

@@ -84,6 +84,36 @@ class Program(var procedures: ArrayBuffer[Procedure],
     procedures += p
   }
 
+  def sortProceduresRPO() = {
+
+    var count = 0
+    val seen = mutable.HashSet[Procedure]()
+    val ordering = mutable.HashMap[Procedure, Int]()
+
+    def walk(p: Procedure) : Unit = {
+      seen += p
+      for (n <- p.calls) {
+        if (!seen.contains(n)) {
+          walk(n)
+        }
+      }
+      ordering(p) = count
+      count += 1
+    }
+
+    walk(mainProcedure)
+
+    var wl = procedures.toSet.diff(seen)
+
+    while (wl.nonEmpty) {
+      // add the rest of the procedures
+      val n = wl.find(p => p.incomingCalls().isEmpty).getOrElse(wl.head)
+      walk(n)
+      wl = procedures.toSet.diff(seen)
+    }
+
+    procedures.sortInPlaceBy(ordering)
+  }
 
   override def toString(): String = {
     serialiseIL(this)
@@ -557,6 +587,35 @@ class Block private (
     }
     jump.deParent()
   }
+
+  def createBlockBetween(b2: Block, label: String = "_goto_"): Block = {
+    require(nextBlocks.toSet.contains(b2))
+    val b1 = this
+    val nb = Block(b1.label + label + b2.label)
+    b1.parent.addBlocks(nb)
+    b1.jump match {
+      case g: GoTo => {
+        g.addTarget(nb)
+        g.removeTarget(b2)
+      }
+      case _ => ???
+    }
+    nb.replaceJump(GoTo(b2))
+    nb
+  }
+
+  def createBlockOnEdgeWith(b2: Block, label: String = "_goto_") : Block = {
+    require((nextBlocks ++ prevBlocks).find(_ == b2).isDefined)
+    if (nextBlocks.find(_ == b2).isDefined) {
+      createBlockBetween(b2, label)
+    } else if (prevBlocks.find(_ == b2).isDefined) {
+      b2.createBlockBetween(this, "_goto_")
+    } else {
+      throw IllegalArgumentException(s"This block does not have edge with ${b2.label}")
+    }
+  }
+
+
 }
 
 object Block {

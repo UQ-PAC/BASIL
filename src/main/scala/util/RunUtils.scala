@@ -583,6 +583,8 @@ object RunUtils {
     val timer = PerformanceTimer("Simplify")
     val program = ctx.program
 
+    ctx.program.sortProceduresRPO()
+
     transforms.liftLinuxAssertFail(ctx)
     transforms.liftSVComp(ctx.program)
 
@@ -610,6 +612,7 @@ object RunUtils {
       dotBlockGraph(program, (program.collect {
       case b : Block => b -> pp_block(b)
     }).toMap))
+    DebugDumpIRLogger.writeToFile(File("il-after-dsa.il"), pp_prog(program))
 
     if (ir.eval.SimplifyValidation.validate) {
       // Logger.info("Live vars difftest")
@@ -634,6 +637,9 @@ object RunUtils {
     transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
     AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
 
+    for (p <- ctx.program.procedures) {
+      DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
+    }
     transforms.liftLinuxAssertFail(ctx)
 
     // assert(program.procedures.forall(transforms.rdDSAProperty))
@@ -658,7 +664,6 @@ object RunUtils {
 
     // re-apply dsa
     // transforms.OnePassDSA().applyTransform(program)
-
 
     if (ir.eval.SimplifyValidation.validate) {
       Logger.info("[!] Simplify :: Writing simplification validation")
