@@ -175,22 +175,26 @@ enum GammaTerm {
   }
 }
 
+sealed trait Atomic
+
 /**
  */
 enum Predicate {
-  case Lit(x: BoolLit)
-  case Uop(op: BoolUnOp, x: Predicate)
+  import Predicate.*
+
+  case Lit(x: BoolLit) extends Predicate with Atomic
+  case Not(p: Atomic & Predicate)
   case Bop(op: BoolBinOp, x: Predicate, y: Predicate)
   case Conj(s: Set[Predicate])
   case Disj(s: Set[Predicate])
-  case BVCmp(op: BVCmpOp, x: BVTerm, y: BVTerm)
-  case GammaCmp(op: BoolCmpOp, x: GammaTerm, y: GammaTerm)
+  case BVCmp(op: BVCmpOp, x: BVTerm, y: BVTerm) extends Predicate with Atomic
+  case GammaCmp(op: BoolCmpOp, x: GammaTerm, y: GammaTerm) extends Predicate with Atomic
 
   private var simplified: Boolean = false
 
   def toBoogie: BExpr = this match {
     case Lit(x) => x.toBoogie
-    case Uop(op, x) => UnaryBExpr(op, x.toBoogie)
+    case Not(x) => UnaryBExpr(BoolNOT, x.toBoogie)
     case Bop(op, x, y) => BinaryBExpr(op, x.toBoogie, y.toBoogie)
     case Conj(s) =>
       if s.size == 0 then TrueBLiteral
@@ -206,7 +210,7 @@ enum Predicate {
 
   def toBasil: Option[Expr] = this match {
     case Lit(x) => Some(x)
-    case Uop(op, x) => x.toBasil.map(x => UnaryExpr(op, x))
+    case Not(x) => x.toBasil.map(x => UnaryExpr(BoolNOT, x))
     case Bop(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
     case Conj(s) =>
       if s.size == 0 then Some(TrueLiteral)
@@ -221,6 +225,69 @@ enum Predicate {
   }
 
   //override def toString(): String = this.toBoogie.toString
+
+  /**
+   * Convert a conjunction of predicates into the set of predicates in the conjunction.
+   * All predicates are at least conjunctions of one term.
+   */
+  def split: List[Predicate] =
+    this match {
+      case Bop(BoolAND, a, b) => a.split ++ b.split
+      case _ => List(this)
+    }
+
+  /**
+   * Replace all instances of the term `prev` with the new term `cur`.
+   */
+  def replace(prev: BVTerm, cur: BVTerm): Predicate = this match {
+    case Lit(x) => this
+    case Not(x) => not(x.replace(prev, cur))
+    case Bop(op, x, y) => Bop(op, x.replace(prev, cur), y.replace(prev, cur))
+    case Conj(s) => Conj(s.map(_.replace(prev, cur)))
+    case Disj(s) => Disj(s.map(_.replace(prev, cur)))
+    case BVCmp(op, x, y) => BVCmp(op, x.replace(prev, cur), y.replace(prev, cur))
+    case GammaCmp(op, x, y) => this
+  }
+
+  /**
+   * Replace all instances of the term `prev` with the new term `cur`.
+   */
+  def replace(prev: GammaTerm, cur: GammaTerm): Predicate = this match {
+    case Lit(x) => this
+    case Not(x) => not(x.replace(prev, cur))
+    case Bop(op, x, y) => Bop(op, x.replace(prev, cur), y.replace(prev, cur))
+    case Conj(s) => Conj(s.map(_.replace(prev, cur)))
+    case Disj(s) => Disj(s.map(_.replace(prev, cur)))
+    case BVCmp(op, x, y) => this
+    case GammaCmp(op, x, y) => GammaCmp(op, x.replace(prev, cur), y.replace(prev, cur))
+  }
+
+  // TODO actually remove only atomic preds
+  /**
+   * Remove atomic expressions containing `term` (replacing with True if needed)
+   */
+  def remove(term: BVTerm): Predicate = this match {
+    case Lit(x) => this
+    case Not(x) => not(x.remove(term))
+    case Bop(op, x, y) => Bop(op, x.remove(term), y.remove(term))
+    case Conj(s) => Conj(s.map(_.remove(term)))
+    case Disj(s) => Disj(s.map(_.remove(term)))
+    case BVCmp(op, x, y) => if x.contains(term) || y.contains(term) then Lit(TrueLiteral) else this
+    case GammaCmp(op, x, y) => this
+  }
+
+  /**
+   * Remove atomic expressions containing `term` (replacing with True if needed)
+   */
+  def remove(term: GammaTerm): Predicate = this match {
+    case Lit(x) => this
+    case Not(x) => not(x.remove(term))
+    case Bop(op, x, y) => Bop(op, x.remove(term), y.remove(term))
+    case Conj(s) => Conj(s.map(_.remove(term)))
+    case Disj(s) => Disj(s.map(_.remove(term)))
+    case BVCmp(op, x, y) => this
+    case GammaCmp(op, x, y) => if x.contains(term) || y.contains(term) then Lit(TrueLiteral) else this
+  }
 
   /**
    */
@@ -250,13 +317,12 @@ enum Predicate {
           case (a, b) => Bop(BoolIMPLIES, a, b)
         }
       case Bop(op, a, b) => Bop(op, a.simplify, b.simplify)
-      case Uop(BoolNOT, a) =>
+      case Not(a) =>
         a.simplify match {
           case Lit(TrueLiteral) => Lit(FalseLiteral)
           case Lit(FalseLiteral) => Lit(TrueLiteral)
-          case a => Uop(BoolNOT, a)
+          case a => not(a)
         }
-      case Uop(op, a) => Uop(op, a.simplify)
       case Conj(s) => {
         var cur = s.map(_.simplify)
         var changed = true
@@ -341,68 +407,30 @@ enum Predicate {
     ret.simplified = true
     ret
   }
+}
+
+object Predicate {
+  val True: Predicate = Predicate.Lit(TrueLiteral)
+  val False: Predicate = Predicate.Lit(FalseLiteral)
 
   /**
-   * Convert a conjunction of predicates into the set of predicates in the conjunction.
-   * All predicates are at least conjunctions of one term.
+   * Applies De Morgan's law to express the negation of a predicate such that negations are only on atomic predicates.
    */
-  def split: List[Predicate] =
-    this match {
-      case Bop(BoolAND, a, b) => a.split ++ b.split
-      case _ => List(this)
+  def not(p: Predicate): Predicate = {
+    p match {
+      case Bop(op, x, y) => op match {
+        case BoolAND => Bop(BoolOR, not(x), not(y))
+        case BoolOR => Bop(BoolAND, not(x), not(y))
+        case BoolIMPLIES => Bop(BoolAND, x, not(y))
+        case BoolEQ => Bop(BoolNEQ, x, y)
+        case BoolNEQ => Bop(BoolEQ, x, y)
+        case BoolEQUIV => Bop(BoolNEQ, x, y)
+      }
+      case Conj(s) => Disj(s.map(not(_)))
+      case Disj(s) => Conj(s.map(not(_)))
+      case Not(a) => a
+      case a: Atomic => Not(a)
     }
-
-  /**
-   * Replace all instances of the term `prev` with the new term `cur`.
-   */
-  def replace(prev: BVTerm, cur: BVTerm): Predicate = this match {
-    case Lit(x) => this
-    case Uop(op, x) => Uop(op, x.replace(prev, cur))
-    case Bop(op, x, y) => Bop(op, x.replace(prev, cur), y.replace(prev, cur))
-    case Conj(s) => Conj(s.map(_.replace(prev, cur)))
-    case Disj(s) => Disj(s.map(_.replace(prev, cur)))
-    case BVCmp(op, x, y) => BVCmp(op, x.replace(prev, cur), y.replace(prev, cur))
-    case GammaCmp(op, x, y) => this
-  }
-
-  /**
-   * Replace all instances of the term `prev` with the new term `cur`.
-   */
-  def replace(prev: GammaTerm, cur: GammaTerm): Predicate = this match {
-    case Lit(x) => this
-    case Uop(op, x) => Uop(op, x.replace(prev, cur))
-    case Bop(op, x, y) => Bop(op, x.replace(prev, cur), y.replace(prev, cur))
-    case Conj(s) => Conj(s.map(_.replace(prev, cur)))
-    case Disj(s) => Disj(s.map(_.replace(prev, cur)))
-    case BVCmp(op, x, y) => this
-    case GammaCmp(op, x, y) => GammaCmp(op, x.replace(prev, cur), y.replace(prev, cur))
-  }
-
-  // TODO actually remove only atomic preds
-  /**
-   * Remove atomic expressions containing `term` (replacing with True if needed)
-   */
-  def remove(term: BVTerm): Predicate = this match {
-    case Lit(x) => this
-    case Uop(op, x) => Uop(op, x.remove(term))
-    case Bop(op, x, y) => Bop(op, x.remove(term), y.remove(term))
-    case Conj(s) => Conj(s.map(_.remove(term)))
-    case Disj(s) => Disj(s.map(_.remove(term)))
-    case BVCmp(op, x, y) => if x.contains(term) || y.contains(term) then Lit(TrueLiteral) else this
-    case GammaCmp(op, x, y) => this
-  }
-
-  /**
-   * Remove atomic expressions containing `term` (replacing with True if needed)
-   */
-  def remove(term: GammaTerm): Predicate = this match {
-    case Lit(x) => this
-    case Uop(op, x) => Uop(op, x.remove(term))
-    case Bop(op, x, y) => Bop(op, x.remove(term), y.remove(term))
-    case Conj(s) => Conj(s.map(_.remove(term)))
-    case Disj(s) => Disj(s.map(_.remove(term)))
-    case BVCmp(op, x, y) => this
-    case GammaCmp(op, x, y) => if x.contains(term) || y.contains(term) then Lit(TrueLiteral) else this
   }
 }
 
@@ -441,7 +469,7 @@ def exprToGammaTerm(e: Expr): Option[GammaTerm] = e match {
  */
 def exprToPredicate(e: Expr): Option[Predicate] = e match {
   case b: BoolLit => Some(Predicate.Lit(b))
-  case UnaryExpr(op: BoolUnOp, arg) => exprToPredicate(arg).map(p => Predicate.Uop(op, p))
+  case UnaryExpr(BoolNOT, arg) => exprToPredicate(arg).map(p => Predicate.not(p))
   case BinaryExpr(op: BoolBinOp, arg1, arg2) => exprToPredicate(arg1).flatMap(p => exprToPredicate(arg2).map(q => Predicate.Bop(op, p, q)))
   case BinaryExpr(op: BVCmpOp, arg1, arg2) => exprToBVTerm(arg1).flatMap(p => exprToBVTerm(arg2).map(q => Predicate.BVCmp(op, p, q)))
   case _ => None

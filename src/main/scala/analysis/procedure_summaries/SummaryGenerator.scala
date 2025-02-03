@@ -72,7 +72,7 @@ class SummaryGenerator(
     import Predicate.*
     p match {
       case Lit(x) => p
-      case Uop(op, x) => Uop(op, filterPred(x, vars, default))
+      case Not(x) => not(filterPred(x, vars, default))
       case Bop(op, x, y) => Bop(op, filterPred(x, vars, default), filterPred(y, vars, default))
       case Conj(s) => Conj(s.map(filterPred(_, vars, default)))
       case Disj(s) => Disj(s.map(filterPred(_, vars, default)))
