@@ -386,21 +386,21 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
         ) if x == x2 && z.value == y.value + 1 => {
       logSimp(e, BinaryExpr(BVUGT, x, z))
     }
-    case e @ BinaryExpr(
+    case BinaryExpr(
           BoolAND,
           BinaryExpr(BVULT, x, y: BitVecLiteral),
           UnaryExpr(BoolNOT, (BinaryExpr(BVEQ, x2, z: BitVecLiteral)))
         ) if x == x2 && z.value == y.value - 1 => {
       logSimp(e, BinaryExpr(BVULT, x, z))
     }
-    case e @ BinaryExpr(
+    case BinaryExpr(
           BoolAND,
           BinaryExpr(BVUGE, x, y: BitVecLiteral),
           UnaryExpr(BoolNOT, (BinaryExpr(BVEQ, x2, z: BitVecLiteral)))
         ) if x == x2 && z.value == y.value + 1 => {
       logSimp(e, BinaryExpr(BVUGT, x, z))
     }
-    case e @ BinaryExpr(
+    case  BinaryExpr(
           BoolAND,
           BinaryExpr(BVULE, x, y: BitVecLiteral),
           UnaryExpr(BoolNOT, (BinaryExpr(BVEQ, x2, z: BitVecLiteral)))
