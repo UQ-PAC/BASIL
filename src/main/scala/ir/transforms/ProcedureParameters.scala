@@ -284,7 +284,7 @@ object ReadWriteAnalysis {
     }
   }
 
-  def processProc(state: Procedure => RW, p: Procedure): RW = {
+  def processProc(state: st, p: Procedure): RW = {
     p.foldLeft(state(p))((ir, s) => {
       s match {
         case s: LocalAssign => {

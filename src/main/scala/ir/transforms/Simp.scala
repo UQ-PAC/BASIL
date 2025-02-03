@@ -631,10 +631,7 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
       case _                                                                                     => false
     }
 
-  val procFrames = p.procedures
-    .filterNot(p => (isExternal(p) && !(noModifies(p))))
-    .map(p => (p, getProcFrame.apply(p)))
-    .toMap
+  val procFrames = getProcFrame.solveInterproc(p)
 
   val addrToProc = p.procedures.toSeq.flatMap(p => p.address.map(addr => addr -> p).toSeq).toMap
 
@@ -651,7 +648,7 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
         )
       }
       case (Some((k, s))) => {
-        SimplifyLogger.debug(s"Cannot get [$addr..${addr + size}] from ${s.name} [${s.address}..${s.address + s.size}]")
+        // SimplifyLogger.debug(s"Cannot get [$addr..${addr + size}] from ${s.name} [${s.address}..${s.address + s.size}]")
         None
       }
     }
@@ -765,21 +762,30 @@ enum CopyProp {
 case class CCP(val state: Map[Variable, CopyProp] = Map())
 
 object getProcFrame {
-  class GetProcFrame extends CILVisitor {
+  class GetProcFrame(frames: Procedure => Set[Memory]) extends CILVisitor {
     var modifies = Set[Memory]()
 
     override def vstmt(e: Statement) = e match {
       case s: MemoryStore => modifies = modifies + s.mem; SkipChildren()
+      case d: DirectCall => modifies = modifies ++ frames(d.target); SkipChildren()
       case _              => SkipChildren()
     }
 
   }
 
-  def apply(p: Procedure): Set[Memory] = {
-    val v = GetProcFrame()
+
+  def solveProc(st: Procedure => Set[Memory],s: Set[Memory], p: Procedure): Set[Memory] = {
+    val v = GetProcFrame(st)
     visit_proc(v, p)
-    v.modifies
+    s ++ v.modifies
   }
+
+  def solveInterproc(p: Program) = {
+    val solver = BottomUpCallgraphWorklistSolver[Set[Memory]](solveProc, _ => Set[Memory]())
+    solver.solve(p)
+
+  }
+
 }
 
 object CCP {
