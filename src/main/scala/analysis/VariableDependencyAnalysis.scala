@@ -6,6 +6,31 @@ import util.StaticAnalysisLogger
 
 import scala.collection.mutable
 
+private def getLiveVars(p: Procedure): Map[CFGPosition, Set[Variable]] = {
+  val liveVarsDom = transforms.IntraLiveVarsDomain()
+  val (before, after) = transforms.getLiveVars(p)
+  /* Stolen from Simp.scala
+   * This should probably be made into a generic function
+   */
+  after
+    .flatMap((block, sts) => {
+      val b = Seq(IRWalk.firstInBlock(block) -> sts)
+      val stmts =
+        if (block.statements.nonEmpty) then
+          (block.statements.toList: List[Command]).zip(block.statements.toList.tail ++ List(block.jump))
+        else List()
+      val transferred = stmts
+        .foldLeft((sts, List[(CFGPosition, Set[Variable])]()))((st, s) => {
+          // map successor to transferred predecessor
+          val x = liveVarsDom.transfer(st._1, s._1)
+          (x, (s._2 -> x) :: st._2)
+        })
+        ._2
+        .toMap
+      b ++ transferred
+    })
+}
+
 trait ProcVariableDependencyAnalysisFunctions(
   relevantGlobals: Set[Variable],
   varDepsSummaries: Map[Procedure, Map[Variable, LatticeSet[Variable]]],
@@ -17,6 +42,7 @@ trait ProcVariableDependencyAnalysisFunctions(
   import LatticeSet.*
 
   private val reachable = procedure.reachableFrom
+  private val liveVars = getLiveVars(procedure)
 
   def edgesCallToEntry(call: DirectCall, entry: Procedure)(d: DL): Map[DL, EdgeFunction[LatticeSet[Variable]]] = {
     if varDepsSummaries.contains(entry) then Map() else Map(d -> IdEdge())
@@ -75,6 +101,7 @@ trait ProcVariableDependencyAnalysisFunctions(
           case Left(v) if v == assigned => Map()
           // This needs to be FiniteSet(Set()) and not Bottom() since Bottom() means something
           // special to the IDE solver
+          case Left(v) if !liveVars.get(n).exists(_.contains(v)) => Map()
           case Left(_) => Map(d -> IdEdge())
           case Right(_) =>
             Map(d -> IdEdge(), Left(assigned) -> ConstEdge(FiniteSet(Set())))
