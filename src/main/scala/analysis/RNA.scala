@@ -10,7 +10,7 @@ import scala.collection.immutable
  * This helps to identify the set of variables that are read from memory before they have been initialised.
  * This could be used on callee side to identify what parameters where passed to the function.
  */
-trait RNAAnalysis(program: Program, ignoreStackPtrs: Boolean = true) {
+trait RNAAnalysis(program: Program, ignoreStack: Boolean = true) {
 
   val powersetLattice: PowersetLattice[Variable] = PowersetLattice()
 
@@ -22,7 +22,7 @@ trait RNAAnalysis(program: Program, ignoreStackPtrs: Boolean = true) {
   private val linkRegister = Register("R30", 64)
   private val framePointer = Register("R29", 64)
 
-  private val ignoreRegions: Set[Variable] = Set(linkRegister, framePointer, stackPointer)
+  private val ignoreRegions: Set[Variable] = if ignoreStack then Set(linkRegister, framePointer, stackPointer) else Set()
 
   def eval(cmd: Command, s: Set[Variable]): Set[Variable] = {
     cmd match {
@@ -62,7 +62,7 @@ trait RNAAnalysis(program: Program, ignoreStackPtrs: Boolean = true) {
 
 }
 
-class RNAAnalysisSolver(program: Program) extends RNAAnalysis(program)
+class RNAAnalysisSolver(program: Program, ignoreStack: Boolean = true) extends RNAAnalysis(program, ignoreStack)
     with IRIntraproceduralBackwardDependencies
     with Analysis[Map[CFGPosition, Set[Variable]]]
     with SimpleWorklistFixpointSolver[CFGPosition, Set[Variable], PowersetLattice[Variable]]

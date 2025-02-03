@@ -99,18 +99,7 @@ class OnePassDSA(
   }
 
   def createBlockBetween(b1: Block, b2: Block, label: String = "_phi_"): Block = {
-    require(b1.nextBlocks.toSet.contains(b2))
-    val nb = Block(b1.label + label + b2.label)
-    b1.parent.addBlocks(nb)
-    b1.jump match {
-      case g: GoTo => {
-        g.addTarget(nb)
-        g.removeTarget(b2)
-      }
-      case _ => ???
-    }
-    nb.replaceJump(GoTo(b2))
-    nb
+    b1.createBlockBetween(b2, label)
   }
 
   def fixPredecessors(
@@ -198,7 +187,7 @@ class OnePassDSA(
     for (b <- next) {
       val definedVars = state(block).renamesAfter.keySet.intersect(liveAfter(block))
 
-      if (definedVars.size > 0 && (anyNextPrevNotFilled)) {
+      if (definedVars.size > 0) {
         val nb = createBlockBetween(block, b, "_phi_")
 
         state(nb).renamesBefore.addAll(state(block).renamesAfter)
@@ -223,29 +212,7 @@ class OnePassDSA(
         state(nb).isPhi = true
         liveBefore(nb) = liveAfter(block)
         liveAfter(nb) = liveBefore(b)
-      } else if (definedVars.size > 0 && !incompleteSuccessor) {
-        val renamesOut = state(block).renamesAfter
-        val toCorrect = state(b).renamesBefore.filter(rn => renamesOut.get(rn._1).map(_ != rn._2).getOrElse(false))
-        if (toCorrect.nonEmpty) {
-
-          val nb = createBlockBetween(block, b, "_phi_forward_")
-          nb.rpoOrder = -1
-          state(nb).renamesBefore.addAll(state(block).renamesAfter)
-          state(nb).renamesAfter.addAll(state(b).renamesBefore)
-
-          for ((v, rn) <- toCorrect) {
-            val assign = LocalAssign(v, v, phiAssignLabel)
-            appendAssign(nb, assign)
-            renameLHS(assign, v, state(nb).renamesAfter(v))
-            renameRHS(assign, v, state(nb).renamesBefore(v))
-          }
-          state(nb).filled = true
-          state(nb).isPhi = true
-          liveBefore(nb) = liveAfter(block)
-          liveAfter(nb) = liveBefore(b)
-        }
-
-      }
+      } 
     }
   }
 
@@ -329,6 +296,12 @@ class OnePassDSA(
 
     // fix up rpo index of added phi blocks
     reversePostOrder(p)
+
+    val maxIndex = (Seq(0) ++ freeVarsPos(p).collect  {
+      case l: LocalVar if l.index != 0 => l.index
+    }).max
+    p.ssaCount = maxIndex + 1
+
   }
 
 }

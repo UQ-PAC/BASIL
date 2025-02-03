@@ -362,8 +362,12 @@ class CleanupAssignments() extends CILVisitor {
 
 }
 
-
-def copypropTransform(p: Procedure, procFrames: Map[Procedure, Set[Memory]], funcEntries: Map[BigInt, Procedure], constRead: (BigInt, Int) => Option[BitVecLiteral]) = {
+def copypropTransform(
+  p: Procedure,
+  procFrames: Map[Procedure, Set[Memory]],
+  funcEntries: Map[BigInt, Procedure],
+  constRead: (BigInt, Int) => Option[BitVecLiteral]
+) = {
   val t = util.PerformanceTimer(s"simplify ${p.name} (${p.blocks.size} blocks)")
   // val dom = ConstCopyProp()
   // val solver = worklistSolver(dom)
@@ -471,33 +475,180 @@ def coalesceBlocks(p: Program) = {
   didAny
 }
 
+def removeDeadInParams(p: Program): Boolean = {
+  var modified = false
+  assert(invariant.correctCalls(p))
+
+  for (block <- p.procedures.filterNot(_.isExternal.contains(true)).flatMap(_.entryBlock)) {
+    val proc = block.parent
+
+    val (liveBefore, _) = getLiveVars(proc)
+    val live = liveBefore(block)
+    val unused = proc.formalInParam.filterNot(live.contains(_))
+
+    for (unusedFormalInParam <- unused) {
+      modified = true
+      proc.formalInParam.remove(unusedFormalInParam)
+
+      for (call <- proc.incomingCalls()) {
+        call.actualParams = call.actualParams.removed(unusedFormalInParam)
+      }
+    }
+  }
+
+  if (modified) assert(invariant.correctCalls(p))
+  modified
+}
+
+/*
+ * Inline procedure output parameters where the procedure returns a constant or the same out param as the in param.
+ *
+ * Returns additional set newly inlined variables.
+ */
+def removeInvariantOutParameters(p: Program, alreadyInlined : Map[Procedure, Set[Variable]] = Map()): Map[Procedure, Set[Variable]] = {
+  assert(invariant.correctCalls(p))
+  assert(invariant.singleCallBlockEnd(p))
+  var modified = false
+  var inlined = Map[Procedure, Set[Variable]]()
+
+  val returns = p.procedures.flatMap(_.returnBlock).map(_.jump).collect { case r: Return => r }
+  for (ret <- returns) {
+    val proc = ret.parent.parent
+    val inParams = proc.formalInParam.toSet
+
+    val doneAlready = alreadyInlined.getOrElse(proc, Set())
+    var doneNow = Set[Variable]()
+    var toRename = Map[Variable, LocalVar]()
+
+    val invariantParams = ret.outParams.collect {
+      // we are returning a constant and can inline
+      case (formalOut, binding: Literal) => (formalOut, binding)
+      // we are returning the input parameter with the same name as the output parameter so can inline at callsite
+      case (formalOut, binding: Expr) if binding.variables.forall {
+        case l : LocalVar => inParams.contains(l)
+        case _ => false
+      } => (formalOut, binding)
+    }
+
+    // remove invariant params from outparam signature, and outparam list of return, and out param list of all calls,
+    // and add assignment after the call of bound actual param to bound outparam
+    for ((invariantOutFormal, binding) <- invariantParams.filterNot((k,v) => doneAlready.contains(k))) {
+      doneNow = doneNow + invariantOutFormal
+
+      modified = true
+      // TODO: uncomment and take dependency from specification into account when removing outparams
+      //
+      // proc.formalOutParam.remove(invariantOutFormal)
+      // ret.outParams = ret.outParams.removed(invariantOutFormal)
+
+      val calls = proc.incomingCalls()
+
+      for (call <- calls) {
+        // substitute the call in params for
+        val rhs = Substitute(((v : Variable) => v match {
+          case l: LocalVar => call.actualParams.get(l)
+          case _ => None
+        }), false)(binding).getOrElse(binding)
+
+        // rename lhs to fresh ssa variable
+        
+        val lhs = call.outParams(invariantOutFormal)
+
+        // if we are in dsa form, replace the return outparam with a new local so the 
+        // inlining does not break ssa form
+        val callLHS = lhs match {
+          case l: LocalVar if (l.index != 0) => {
+            val newName = proc.getFreshSSAVar(l.varName + "_retval_inlined" , l.getType)
+            toRename = toRename + (l -> newName)
+            newName
+          }
+          case o => o
+        }
+        call.outParams = call.outParams + (invariantOutFormal -> callLHS)
+
+        // TODO: uncomment and take dependency from specification into account when removing outparams
+        //
+        // call.outParams = call.outParams.removed(invariantOutFormal)
+
+        // insert assignment of to successor to maintain singleCallBlockEnd invariant
+        // TODO: this would really be simpler if we just broke the singleCallBlockEnd invariant
+        call.parent.jump match {
+          case r: Return => {
+            // substitute directly into return
+            r.outParams =
+              r.outParams.map((f, a) => (f, Substitute(v => if (v == lhs) then Some(rhs) else None)(a).getOrElse(a)))
+          }
+          case r: Unreachable => ()
+          case g: GoTo => {
+
+            val tgts = g.targets.toSet
+            val label = g.parent.label + "_retval_inline"
+            val b = if (g.targets.size == 1 && g.targets.forall(_.label == label)) then g.targets.head else {
+              val b = Block(label)
+              g.parent.parent.addBlocks(b)
+              g.parent.replaceJump(GoTo(b))
+              b.replaceJump(GoTo(tgts))
+            }
+
+            b.statements.prepend(LocalAssign(lhs, rhs, Some("inlineret")))
+          }
+        }
+      }
+    }
+
+    if (doneNow.nonEmpty) {
+      inlined = inlined.updated(proc, doneNow)
+    }
+  }
+
+  if (inlined.nonEmpty) {
+    assert(invariant.correctCalls(p))
+    assert(invariant.singleCallBlockEnd(p))
+    applyRPO(p) /* Because we added blocks */
+  }
+
+  inlined
+}
+
+def cleanupBlocks(p: Program) = {
+  var merged = true
+  while (merged) {
+    SimplifyLogger.debug("[!] Simplify :: Merge empty blocks")
+    merged = coalesceBlocks(p)
+    removeEmptyBlocks(p)
+  }
+}
+
 def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
 
   applyRPO(p)
 
   def isExternal(p: Procedure) = p.isExternal.contains(true) || p.blocks.isEmpty
-  // assume some functions modify nothing 
-  def noModifies(p: Procedure) = 
+  // assume some functions modify nothing
+  def noModifies(p: Procedure) =
     p.procName match {
-    case "strlen" | "assert" | "printf"  | "__stack_chk_fail" | "__printf_chk" | "__syslog_chk" => true
-    case _ => false
-  }
+      case "strlen" | "assert" | "printf" | "__stack_chk_fail" | "__printf_chk" | "__syslog_chk" => true
+      case _                                                                                     => false
+    }
 
-  val procFrames = p.procedures.filterNot(p => (isExternal(p) && !(noModifies(p))))
-    .map(p => (p, getProcFrame.apply(p))).toMap
+  val procFrames = getProcFrame.solveInterproc(p)
 
   val addrToProc = p.procedures.toSeq.flatMap(p => p.address.map(addr => addr -> p).toSeq).toMap
 
-  def read(addr: BigInt, size: Int) : Option[BitVecLiteral] = {
+  def read(addr: BigInt, size: Int): Option[BitVecLiteral] = {
     val rodata = p.initialMemory.filter((_, s) => s.readOnly)
     rodata.maxBefore(addr + 1) match {
       case None => None
       case (Some((k, s))) if s.canGetBytes(addr, size / 8) => {
         SimplifyLogger.debug(s"got [$addr..${addr + size}] from ${s.name} [${s.address}..${s.address + s.size}]")
-        Some(s.getBytes(addr, size / 8).reverse.foldLeft(BitVecLiteral(0,0))((acc, r) => ir.eval.BitVectorEval.smt_concat(acc, r)))
+        Some(
+          s.getBytes(addr, size / 8)
+            .reverse
+            .foldLeft(BitVecLiteral(0, 0))((acc, r) => ir.eval.BitVectorEval.smt_concat(acc, r))
+        )
       }
-      case (Some((k,s))) => {
-        SimplifyLogger.debug(s"Cannot get [$addr..${addr + size}] from ${s.name} [${s.address}..${s.address + s.size}]")
+      case (Some((k, s))) => {
+        // SimplifyLogger.debug(s"Cannot get [$addr..${addr + size}] from ${s.name} [${s.address}..${s.address + s.size}]")
         None
       }
     }
@@ -529,21 +680,37 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
   SimplifyLogger.info("[!] Simplify :: Dead variable elimination")
 
   // cleanup
-   visit_prog(CleanupAssignments(), p)
-  SimplifyLogger.info("[!] Simplify :: Merge empty blocks")
+  visit_prog(CleanupAssignments(), p)
 
-  removeEmptyBlocks(p)
-  coalesceBlocks(p)
-  removeEmptyBlocks(p)
-  coalesceBlocks(p)
-  removeEmptyBlocks(p)
-  coalesceBlocks(p)
-  removeEmptyBlocks(p)
-  coalesceBlocks(p)
-  removeEmptyBlocks(p)
+  SimplifyLogger.info("[!] Simplify :: Merge empty blocks")
+  cleanupBlocks(p)
+
   visit_prog(CopyProp.BlockyProp(), p)
   visit_prog(CleanupAssignments(), p)
 
+}
+
+def copyPropParamFixedPoint(p: Program, rela: Map[BigInt, BigInt]): Int = {
+  SimplifyLogger.info(s"Simplify:: Copyprop iteration 0")
+  doCopyPropTransform(p, rela)
+  var inlinedOutParams : Map[Procedure, Set[Variable]] = removeInvariantOutParameters(p)
+  var changed = inlinedOutParams.nonEmpty
+  var iterations = 1
+  val maxIterations = 2
+  while (changed && iterations < maxIterations) {
+    changed = false
+    SimplifyLogger.info(s"Simplify:: Copyprop iteration $iterations")
+    doCopyPropTransform(p, rela)
+    val extraInlined = removeInvariantOutParameters(p, inlinedOutParams)
+    inlinedOutParams = extraInlined.foldLeft(inlinedOutParams)((acc, v) => acc + (v._1 -> (acc.getOrElse(v._1, Set[Variable]()) ++ v._2)))
+    changed = changed || extraInlined.nonEmpty || removeDeadInParams(p)
+    cleanupBlocks(p)
+    iterations += 1
+  }
+  if (changed && iterations == maxIterations) {
+    Logger.info(s"Stopped at copyprop iteration bound: $maxIterations")
+  }
+  iterations
 }
 
 def reversePostOrder(p: Procedure): Unit = {
@@ -560,7 +727,6 @@ def reversePostOrder(p: Procedure): Unit = {
 def reversePostOrder(startBlock: Block, fixup: Boolean = false, begin: Int = 0): Int = {
   var count = begin
   val seen = mutable.HashSet[Block]()
-  val vcs = mutable.HashMap[Block, Int]()
 
   def walk(b: Block): Unit = {
     seen += b
@@ -595,25 +761,32 @@ enum CopyProp {
 
 case class CCP(val state: Map[Variable, CopyProp] = Map())
 
-
 object getProcFrame {
-  class GetProcFrame extends CILVisitor  {
+  class GetProcFrame(frames: Procedure => Set[Memory]) extends CILVisitor {
     var modifies = Set[Memory]()
 
     override def vstmt(e: Statement) = e match {
-      case s : MemoryStore => modifies = modifies + s.mem; SkipChildren()
-      case _ => SkipChildren()
+      case s: MemoryStore => modifies = modifies + s.mem; SkipChildren()
+      case d: DirectCall => modifies = modifies ++ frames(d.target); SkipChildren()
+      case _              => SkipChildren()
     }
 
   }
 
-  def apply(p: Procedure): Set[Memory] = {
-    val v = GetProcFrame()
-    visit_proc(v, p)
-    v.modifies
-  }
-}
 
+  def solveProc(st: Procedure => Set[Memory],s: Set[Memory], p: Procedure): Set[Memory] = {
+    val v = GetProcFrame(st)
+    visit_proc(v, p)
+    s ++ v.modifies
+  }
+
+  def solveInterproc(p: Program) = {
+    val solver = BottomUpCallgraphWorklistSolver[Set[Memory]](solveProc, _ => Set[Memory]())
+    solver.solve(p)
+
+  }
+
+}
 
 object CCP {
 
@@ -649,11 +822,8 @@ object CopyProp {
 
     var st = Map[Variable, Expr]()
 
-    def subst(e: Expr) : Expr = {
-      simplifyExprFixpoint(Substitute(
-        v =>  st.get(v).filter(isTrivial),
-        true
-      )(e).getOrElse(e))(0)
+    def subst(e: Expr): Expr = {
+      simplifyExprFixpoint(Substitute(v => st.get(v).filter(isTrivial), true)(e).getOrElse(e))(0)
     }
 
     override def vblock(b: Block) = {
@@ -663,46 +833,45 @@ object CopyProp {
 
     override def vstmt(s: Statement) = {
       s match {
-        case l : LocalAssign => {
+        case l: LocalAssign => {
           val nrhs = subst(l.rhs)
           st = st.removedAll(st.keys)
           st = st.updated(l.lhs, nrhs)
-          l.rhs = nrhs 
+          l.rhs = nrhs
           SkipChildren()
         }
-        case x : Assert => {
+        case x: Assert => {
           x.body = subst(x.body)
           SkipChildren()
         }
-        case x : Assume => {
+        case x: Assume => {
           x.body = subst(x.body)
           SkipChildren()
         }
         case x: DirectCall => {
-          x.actualParams = x.actualParams.map((l,r) => (l, subst(r)))
+          x.actualParams = x.actualParams.map((l, r) => (l, subst(r)))
           val lhs = x.outParams.map(_._2)
           st = st.removedAll(lhs)
           SkipChildren()
         }
-        case d : MemoryLoad => {
+        case d: MemoryLoad => {
           d.index = subst(d.index)
           st = st.removed(d.lhs)
           SkipChildren()
         }
-        case d : MemoryStore => {
+        case d: MemoryStore => {
           d.index = subst(d.index)
           d.value = subst(d.value)
           SkipChildren()
-        } 
+        }
         case x: IndirectCall => {
           st = Map()
           SkipChildren()
         }
-        case _ : NOP => SkipChildren()
+        case _: NOP => SkipChildren()
       }
     }
   }
-
 
   def isFlagVar(l: Variable) = {
     val flagNames = Set("ZF", "VF", "CF", "NF")
@@ -735,7 +904,7 @@ object CopyProp {
       s match {
         case a: MemoryLoad => clobberFull(state, a.lhs)
         case a: LocalAssign if !state.contains(a.lhs) && flagDeps.contains(a.lhs) => {
-          val (r,deps) = canPropTo(state, a.rhs, true).get
+          val (r, deps) = canPropTo(state, a.rhs, true).get
           state(a.lhs) = PropState(r, mutable.Set.from(r.variables), false, 0, true)
         }
         case a: LocalAssign if state.contains(a.lhs) && state(a.lhs).clobbered => {
@@ -773,8 +942,7 @@ object CopyProp {
         transfer(l)
       }
     }
-    if (poisoned) then mutable.HashMap() else 
-    state
+    if (poisoned) then mutable.HashMap() else state
   }
 
   def clobberFull(c: mutable.HashMap[Variable, PropState], l: Variable): Unit = {
@@ -805,7 +973,11 @@ object CopyProp {
     case _                                       => false
   }
 
-  def canPropTo(s: mutable.HashMap[Variable, PropState], e: Expr, isFlag: Boolean = false): Option[(Expr, Set[Variable])] = {
+  def canPropTo(
+    s: mutable.HashMap[Variable, PropState],
+    e: Expr,
+    isFlag: Boolean = false
+  ): Option[(Expr, Set[Variable])] = {
 
     def proped(e: Expr) = {
       var deps = Set[Variable]() ++ e.variables
@@ -819,7 +991,7 @@ object CopyProp {
                   deps = deps ++ vs.deps + v
                   Some(vs.e)
                 }
-                case _                         => None
+                case _ => None
               }
             },
             true
@@ -828,7 +1000,6 @@ object CopyProp {
       // partial eval after prop
       (simplifyExprFixpoint(ne.getOrElse(e))._1, deps)
     }
-
 
     val (p, deps) = proped(e)
     p match {
@@ -842,7 +1013,7 @@ object CopyProp {
 
   def varForMem(m: Memory) = Register("symbolic_memory_var" + m.name, 1)
   def isMemVar(v: Variable) = v.name.startsWith("symbolic_memory_var")
-  def varForLoadStore(m: Memory, addr: Expr , sz: Int) = {
+  def varForLoadStore(m: Memory, addr: Expr, sz: Int) = {
     Register(m.name + "_symbolic_store_" + translating.PrettyPrinter.pp_expr(addr), sz)
   }
 
@@ -850,17 +1021,22 @@ object CopyProp {
     c.keys.filter(isMemVar).foreach(v => clobberFull(c, v))
   }
 
-  def DSACopyProp(p: Procedure, procFrames: Map[Procedure, Set[Memory]], funcEntries: Map[BigInt, Procedure], constRead: (BigInt, Int) => Option[BitVecLiteral]) = {
+  def DSACopyProp(
+    p: Procedure,
+    procFrames: Map[Procedure, Set[Memory]],
+    funcEntries: Map[BigInt, Procedure],
+    constRead: (BigInt, Int) => Option[BitVecLiteral]
+  ) = {
     val updated = false
     val state = mutable.HashMap[Variable, PropState]()
     var poisoned = false // we have an indirect call
 
-    val doLoadReasoning = false
+    val doLoadReasoning = true
 
     def transfer(c: mutable.HashMap[Variable, PropState], s: Statement): Unit = {
       // val callClobbers = ((0 to 7) ++ (19 to 30)).map("R" + _).map(c => Register(c, 64))
       s match {
-        case l : MemoryStore if doLoadReasoning => {
+        case l: MemoryStore if doLoadReasoning => {
           val mvar = varForMem(l.mem)
           val existing = c.get(mvar).isDefined
 
@@ -869,20 +1045,20 @@ object CopyProp {
           } else {
             c(mvar) = PropState(FalseLiteral, mutable.Set.empty, false, 0, false)
 
-            val store = canPropTo(c, l.index) 
-            
+            val store = canPropTo(c, l.index)
+
             store match {
-              case (Some((addr),deps)) => {
+              case (Some((addr), deps)) => {
                 val storeVar = varForLoadStore(l.mem, addr, l.size)
                 if (c.get(storeVar).isDefined) {
                   clobberFull(c, storeVar)
                 } else {
-                  val value = canPropTo(c, l.value) 
+                  val value = canPropTo(c, l.value)
                   value match {
                     case Some(value, deps) => {
                       c(storeVar) = PropState(value, mutable.Set.from(deps + mvar), false, 0, false)
                     }
-                    case _ =>  clobberFull(c, storeVar)
+                    case _ => clobberFull(c, storeVar)
                   }
                 }
               }
@@ -893,11 +1069,11 @@ object CopyProp {
         case l: MemoryLoad if doLoadReasoning => {
           val loadprop = canPropTo(c, l.index)
           val loaded = for {
-            (addr, deps) <-  loadprop
+            (addr, deps) <- loadprop
             loadvar = varForLoadStore(l.mem, addr, l.size)
             loadval = canPropTo(c, loadvar).filterNot((v, _) => v == loadvar)
             (value, ndeps) <- loadval.orElse(addr match {
-              case b : BitVecLiteral => {
+              case b: BitVecLiteral => {
                 val r = constRead(b.value, l.size)
                 r.map(v => (v, Set[Variable]()))
               }
@@ -907,18 +1083,18 @@ object CopyProp {
             })
           } yield (value, deps ++ ndeps)
           loaded match {
-            case (Some(value, deps)) => 
+            case (Some(value, deps)) =>
               c(l.lhs) = PropState(value, mutable.Set.from(deps), false, 0, false)
-          case _ => {
-            clobberFull(c, l.lhs)
-          }
+            case _ => {
+              clobberFull(c, l.lhs)
+            }
           }
         }
-        case l : MemoryStore  => {
+        case l: MemoryStore => {
           ()
         }
         case l: MemoryLoad => {
-            clobberFull(c, l.lhs)
+          clobberFull(c, l.lhs)
         }
         case LocalAssign(l, r, lb) => {
           val isFlag = isFlagVar(l) || r.variables.exists(isFlagVar)
@@ -939,9 +1115,10 @@ object CopyProp {
             case (_, Some(ps)) if ps.clobbered => {
               ()
             }
-            case (Some(evaled, deps), Some(ps))  if ps.e == r || ps.e == evaled || (canPropTo(c, ps.e, isFlagDep).contains(evaled)) => {
-                c(l).e = evaled
-                c(l).deps.addAll(deps)
+            case (Some(evaled, deps), Some(ps))
+                if ps.e == r || ps.e == evaled || (canPropTo(c, ps.e, isFlagDep).contains(evaled)) => {
+              c(l).e = evaled
+              c(l).deps.addAll(deps)
             }
             case _ => {
               // ps.e != evaled and have prop
@@ -950,11 +1127,14 @@ object CopyProp {
           }
         }
         case x: DirectCall => {
-          procFrames.get(x.target) match {
-            case Some(f) => for (mem <- f) {
-              clobberFull(c, varForMem(mem))
+          if x.target.isExternal.contains(true) then clobberAllMemory(c) else {
+            procFrames.get(x.target) match {
+              case Some(f) =>
+                for (mem <- f) {
+                  clobberFull(c, varForMem(mem))
+                }
+              case _ => clobberAllMemory(c)
             }
-            case _ => clobberAllMemory(c)
           }
 
           val lhs = x.outParams.map(_._2)
@@ -966,13 +1146,13 @@ object CopyProp {
           // need a reaching-defs to get inout args (just assume register name matches?)
           // this reduce we have to clobber with the indirect call this round
           if (!doLoadReasoning) {
-              poisoned = true
+            poisoned = true
           }
           val r = for {
             (addr, deps) <- canPropTo(c, x.target)
             addr <- addr match {
-              case b : BitVecLiteral => Some(b.value)
-              case _ => None
+              case b: BitVecLiteral => Some(b.value)
+              case _                => None
             }
             proc <- funcEntries.get(addr)
           } yield (proc, deps)
@@ -1012,7 +1192,7 @@ object CopyProp {
 
   def toResult(s: mutable.Map[Variable, PropState], trivialOnly: Boolean = true)(v: Variable): Option[Expr] = {
     s.get(v) match {
-      case Some(c) if !c.clobbered && (!trivialOnly || isTrivial(c.e))  => Some(c.e)
+      case Some(c) if !c.clobbered && (!trivialOnly || isTrivial(c.e)) => Some(c.e)
       case _                                                           => None
     }
   }
@@ -1118,40 +1298,43 @@ class ProcExitsDomain(is_nonreturning: String => Boolean) extends AbstractDomain
   }
   override def top = PathExit.Maybe
   def bot = PathExit.Bot
-  def join(l: PathExit, r: PathExit, pos: Block) = PathExit.join(l,r)
+  def join(l: PathExit, r: PathExit, pos: Block) = PathExit.join(l, r)
 }
 
 case class ProcReturnInfo(returning: Set[Procedure], nonreturning: Set[Procedure]) {
-  override def toString = s"returning : ${returning.map(_.name).toList.sorted}\nnonretruning: ${nonreturning.map(_.name).toList.sorted}"
+  override def toString =
+    s"returning : ${returning.map(_.name).toList.sorted}\nnonretruning: ${nonreturning.map(_.name).toList.sorted}"
 }
 
 class DefinitelyExits(knownExit: Set[Procedure]) extends ProcedureSummaryGenerator[PathExit, PathExit] {
   def top: ir.transforms.PathExit = ???
   def bot: ir.transforms.PathExit = PathExit.Bot
-  override def init (p: Procedure) = if p.procName == "exit" then PathExit.NoReturn else PathExit.Bot
-  def join(l: PathExit, r: PathExit, p: Procedure) = PathExit.join(l,r)
+  override def init(p: Procedure) = if p.procName == "exit" then PathExit.NoReturn else PathExit.Bot
+  def join(l: PathExit, r: PathExit, p: Procedure) = PathExit.join(l, r)
 
-  def transfer
-  (a: ir.transforms.PathExit, b: ir.Procedure):
-    ir.transforms.PathExit = ???
-  
-  def localTransferCall
-  (l: ir.transforms.PathExit, summaryForTarget: ir.transforms.PathExit, p: ir.DirectCall)
-    : ir.transforms.PathExit = (l, summaryForTarget) match {
-      case (PathExit.Return, PathExit.Return)  => PathExit.Return
-      case (_, PathExit.NoReturn) => PathExit.NoReturn
-      case (o, _)  => o
+  def transfer(a: ir.transforms.PathExit, b: ir.Procedure): ir.transforms.PathExit = ???
+
+  def localTransferCall(
+    l: ir.transforms.PathExit,
+    summaryForTarget: ir.transforms.PathExit,
+    p: ir.DirectCall
+  ): ir.transforms.PathExit = (l, summaryForTarget) match {
+    case (PathExit.Return, PathExit.Return) => PathExit.Return
+    case (_, PathExit.NoReturn)             => PathExit.NoReturn
+    case (o, _)                             => o
   }
 
-  def updateSummary
-  (prevSummary: ir.transforms.PathExit, p: ir.Procedure,
-    resBefore: Map[ir.Block, ir.transforms.PathExit], resAfter:
-    Map[ir.Block, ir.transforms.PathExit]): ir.transforms.PathExit = {
-      p.entryBlock.flatMap(resBefore.get) match {
-        case Some(PathExit.NoReturn) => PathExit.NoReturn
-        case Some(PathExit.Return)   => PathExit.Return
-        case Some(PathExit.Maybe)    => PathExit.Maybe
-        case  _                      => prevSummary
+  def updateSummary(
+    prevSummary: ir.transforms.PathExit,
+    p: ir.Procedure,
+    resBefore: Map[ir.Block, ir.transforms.PathExit],
+    resAfter: Map[ir.Block, ir.transforms.PathExit]
+  ): ir.transforms.PathExit = {
+    p.entryBlock.flatMap(resBefore.get) match {
+      case Some(PathExit.NoReturn) => PathExit.NoReturn
+      case Some(PathExit.Return)   => PathExit.Return
+      case Some(PathExit.Maybe)    => PathExit.Maybe
+      case _                       => prevSummary
     }
   }
 }
@@ -1162,14 +1345,14 @@ def findDefinitelyExits(p: Program) = {
   val ldom = ProcExitsDomain(x => false)
   val solve = interprocSummaryFixpointSolver(ldom, dom)
   val res = solve.solveProgInterProc(p, true)
-  ProcReturnInfo(res.collect {
-    case (p, PathExit.Return) => p
-  }.toSet, 
-  res.collect {
-    case (p, PathExit.NoReturn) => p
-  }.toSet
+  ProcReturnInfo(
+    res.collect { case (p, PathExit.Return) =>
+      p
+    }.toSet,
+    res.collect { case (p, PathExit.NoReturn) =>
+      p
+    }.toSet
   )
-
 }
 
 class Simplify(val res: Variable => Option[Expr], val initialBlock: Block = null) extends CILVisitor {
@@ -1204,4 +1387,3 @@ class Simplify(val res: Variable => Option[Expr], val initialBlock: Block = null
     DoChildren()
   }
 }
-

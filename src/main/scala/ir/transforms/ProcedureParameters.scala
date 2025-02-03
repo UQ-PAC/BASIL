@@ -1,13 +1,15 @@
 package ir.transforms
 import ir.cilvisitor.*
+import java.io.File
 import ir.*
+import translating.PrettyPrinter
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{mutable, immutable}
 import collection.immutable.SortedMap
 import specification.Specification
 import analysis.{TwoElement, TwoElementTop, TwoElementBottom}
 import ir.CallGraph
-import util.Logger
+import util.{Logger, DebugDumpIRLogger}
 
 case class FunSig(inArgs: List[Register], outArgs: List[Register])
 
@@ -26,13 +28,21 @@ val builtinSigs: Map[String, FunSig] = Map(
   "strlen" -> FunSig(List(R(0)), List(R(0))),
   "strchr" -> FunSig(List(R(0), R(1)), List(R(0))),
   "strlcpy" -> FunSig(List(R(0), R(1), R(2)), List(R(0))),
+  "memset" -> FunSig(List(R(0), R(1), R(2)), List(R(0))),
   "strlcat" -> FunSig(List(R(0), R(1), R(2)), List(R(0))),
   "strdup" -> FunSig(List(R(0)), List(R(0))),
   "strndup" -> FunSig(List(R(0), R(1)), List(R(0))),
   "assert" -> FunSig(List(R(0)), List()),
+  "exit" -> FunSig(List(R(0)), List()),
+  // https://refspecs.linuxfoundation.org/LSB_1.3.0/gLSB/gLSB/baselib---assert-fail-1.html
+  "__assert_fail" -> FunSig(List(R(0), R(1), R(2), R(3)), List()),
   "__stack_chk_fail" -> FunSig(List(), List()),
   "__printf_chk" -> FunSig(List(R(0), R(1)), List(R(0))),
   "__syslog_chk" -> FunSig(List(R(0)), List()),
+  "indirect_call_launchpad" -> indirectCallFunsig,
+  "__VERIFIER_assert" -> FunSig(List(R(0)), List()),
+  "__VERIFIER_assume" -> FunSig(List(R(0)), List()),
+  "__VERIFIER_error" -> FunSig(List(), List()),
 )
 
 
@@ -111,6 +121,19 @@ def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
     Map.empty
   }
   transforms.applyRPO(ctx.program)
+
+  val liveLab = () => liveVars.collect {
+    case (b: Block, r) => b -> {
+        r.toList.collect {
+        (v, TwoElementTop) => v
+      }
+    }
+  }.toMap
+
+  DebugDumpIRLogger.writeToFile(File(s"live-vars.il"), 
+    PrettyPrinter.pp_prog_with_analysis_results(liveLab(), Map(), 
+      ctx.program, x => s"Live vars: ${x.map(_.name).toList.sorted.mkString(", ")}"))
+
 
   val params = inOutParams(ctx.program, liveVars)
 
@@ -192,7 +215,7 @@ class SetFormalParams(
 
 
   override def vproc(p: Procedure) = {
-    if (externalFunctions.contains(p.name)) {
+    if (externalFunctions.contains(p.name) || p.isExternal.contains(true)) {
       p.formalInParam = mutable.SortedSet.from(externalIn(p.procName).map(_._1))
       p.formalOutParam = mutable.SortedSet.from(externalOut(p.procName).map(_._1))
       p.inParamDefaultBinding = immutable.SortedMap.from(externalIn(p.procName))
@@ -278,6 +301,10 @@ object ReadWriteAnalysis {
         case s: MemoryStore => {
           ir.map(addReads(s.index.variables ++ s.value.variables))
         }
+        case s: DirectCall if (s.target.isExternal.contains(true)) => {
+          ir.map(addReads(externalCallReads(s.target.procName)))
+            .map(addWrites(externalCallWrites(s.target.procName)))
+        }
         case s: DirectCall => {
           ir.map(x => join(x, state(s.target)))
             .map(addReads(s.actualParams.flatMap(_._2.variables)))
@@ -350,13 +377,13 @@ def inOutParams(
     case (proc, rws) if p.mainProcedure == proc => {
       // no callers of main procedure so keep the whole read/write set
       // of registers
-      proc -> ((lives(proc)._1.intersect(rws.reads)), (overapprox.intersect(DefinedOnAllPaths.proc(proc))))
+      proc -> ((lives(proc)._1), (overapprox.intersect(DefinedOnAllPaths.proc(proc))))
     }
     case (proc, rws) => {
       val liveStart = lives(proc)._1
       val liveEnd = lives(proc)._2
 
-      proc -> (liveStart.intersect(rws.reads), liveEnd.intersect(rws.writes))
+      proc -> (liveStart, liveEnd.intersect(rws.writes))
     }
   }.toMap
 

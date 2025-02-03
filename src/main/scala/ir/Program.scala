@@ -13,9 +13,34 @@ import eval.BitVectorEval
   * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
   * not guaranteed to be in any defined order. 
   */
-class ILUnorderedIterator(private val begin: Iterable[CFGPosition]) extends Iterator[CFGPosition] {
+private class ILForwardIterator(private val begin: IterableOnce[CFGPosition], val walk: IRWalk[CFGPosition, CFGPosition]) extends Iterator[CFGPosition] {
+  val seen = mutable.Set[CFGPosition]()
   private val stack = mutable.Stack[CFGPosition]()
-  stack.addAll(begin)
+  stack.pushAll(begin)
+  seen.addAll(begin)
+
+  override def hasNext: Boolean = {
+    stack.nonEmpty
+  }
+
+  override def next(): CFGPosition = {
+    val n: CFGPosition = stack.pop()
+    seen.add(n)
+
+    val next = walk.succ(n).filterNot(seen.contains(_))
+    seen.addAll(next)
+    stack.pushAll(next)
+    n
+  }
+}
+
+/**
+  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
+  * not guaranteed to be in any defined order. 
+  */
+private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extends Iterator[CFGPosition] {
+  private val stack = mutable.Stack[CFGPosition]()
+  stack.pushAll(begin)
 
   override def hasNext: Boolean = {
     stack.nonEmpty
@@ -31,10 +56,9 @@ class ILUnorderedIterator(private val begin: Iterable[CFGPosition]) extends Iter
     })
     n
   }
-
 }
 
-class Program(val procedures: ArrayBuffer[Procedure],
+class Program(var procedures: ArrayBuffer[Procedure],
               var mainProcedure: Procedure,
               val initialMemory: mutable.TreeMap[BigInt, MemorySection]) extends Iterable[CFGPosition] {
 
@@ -60,6 +84,36 @@ class Program(val procedures: ArrayBuffer[Procedure],
     procedures += p
   }
 
+  def sortProceduresRPO() = {
+
+    var count = 0
+    val seen = mutable.HashSet[Procedure]()
+    val ordering = mutable.HashMap[Procedure, Int]()
+
+    def walk(p: Procedure) : Unit = {
+      seen += p
+      for (n <- p.calls) {
+        if (!seen.contains(n)) {
+          walk(n)
+        }
+      }
+      ordering(p) = count
+      count += 1
+    }
+
+    walk(mainProcedure)
+
+    var wl = procedures.toSet.diff(seen)
+
+    while (wl.nonEmpty) {
+      // add the rest of the procedures
+      val n = wl.find(p => p.incomingCalls().isEmpty).getOrElse(wl.head)
+      walk(n)
+      wl = procedures.toSet.diff(seen)
+    }
+
+    procedures.sortInPlaceBy(ordering)
+  }
 
   override def toString(): String = {
     serialiseIL(this)
@@ -139,13 +193,16 @@ class Program(val procedures: ArrayBuffer[Procedure],
 
   }
 
-
   /**
    * Get an Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
    * not guaranteed to be in any defined order. 
    */
   def iterator: Iterator[CFGPosition] = {
-    ILUnorderedIterator(this.procedures)
+    ILLexicalIterator(this.procedures)
+  }
+
+  def preOrderIterator: Iterator[CFGPosition] = {
+    ILForwardIterator(this.procedures, IntraProcIRCursor)
   }
 
   def memoryLookup(memory: mutable.TreeMap[BigInt, MemorySection], address: BigInt) = {
@@ -223,8 +280,19 @@ class Procedure private (
 
   var isExternal : Option[Boolean] = None
 
+  /**
+   * Get an Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
+   * not guaranteed to be in any defined order. 
+   */
   def iterator: Iterator[CFGPosition] = {
-    ILUnorderedIterator(Seq(this))
+    ILLexicalIterator(Seq(this))
+  }
+
+  /**
+   * Iterate in cfg pre order.
+   */
+  def preOrderIterator: Iterator[CFGPosition] = {
+    ILForwardIterator(Seq(this), IntraProcIRCursor)
   }
 
   override def toString: String = {
@@ -379,6 +447,17 @@ class Procedure private (
     }
     reachable.toSet
   }
+
+  /**
+   * SSA Form
+   */
+
+  var ssaCount = 0
+  def getFreshSSAVar(name: String, ty: IRType) = {
+    ssaCount += 1
+    LocalVar(name, ty, ssaCount)
+  }
+
 }
 
 class Block private (
@@ -508,6 +587,35 @@ class Block private (
     }
     jump.deParent()
   }
+
+  def createBlockBetween(b2: Block, label: String = "_goto_"): Block = {
+    require(nextBlocks.toSet.contains(b2))
+    val b1 = this
+    val nb = Block(b1.label + label + b2.label)
+    b1.parent.addBlocks(nb)
+    b1.jump match {
+      case g: GoTo => {
+        g.addTarget(nb)
+        g.removeTarget(b2)
+      }
+      case _ => ???
+    }
+    nb.replaceJump(GoTo(b2))
+    nb
+  }
+
+  def createBlockOnEdgeWith(b2: Block, label: String = "_goto_") : Block = {
+    require((nextBlocks ++ prevBlocks).find(_ == b2).isDefined)
+    if (nextBlocks.find(_ == b2).isDefined) {
+      createBlockBetween(b2, label)
+    } else if (prevBlocks.find(_ == b2).isDefined) {
+      b2.createBlockBetween(this, "_goto_")
+    } else {
+      throw IllegalArgumentException(s"This block does not have edge with ${b2.label}")
+    }
+  }
+
+
 }
 
 object Block {

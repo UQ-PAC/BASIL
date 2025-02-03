@@ -459,8 +459,7 @@ object InterpFuns {
 
     val p = ctx.program
 
-    val base = ctx.symbols.find(_.name == "__end__").get
-    var addr = base.value
+    var addr = ctx.symbols.find(_.name == "__end__").map(_.value).getOrElse(BigInt(123456))
     var done = false
     var x = List[(String, FunPointer)]()
 

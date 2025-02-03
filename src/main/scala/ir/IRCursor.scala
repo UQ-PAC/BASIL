@@ -97,7 +97,7 @@ trait IntraProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
       case proc: Procedure => proc.entryBlock.toSet
       case b: Block        => b.statements.headOption.orElse(Some(b.jump)).toSet
       case n: GoTo         => n.targets.asInstanceOf[Set[CFGPosition]]
-      case h: Unreachable         => Set()
+      case h: Unreachable  => Set()
       case h: Return       => Set()
       case c: Statement    => IRWalk.nextCommandInBlock(c).toSet
     }
@@ -353,3 +353,22 @@ def toDot[T <: CFGPosition](
   val allNodes = dotNodes.values.toList.sortBy(n => n.id)
   new DotGraph("CursorCFG", allNodes, dotArrows).toDotString
 }
+
+
+def freeVarsPos(s: CFGPosition): Set[Variable] = s match {
+  case a: LocalAssign => a.rhs.variables
+  case l: MemoryLoad => l.index.variables
+  case a: MemoryStore => a.index.variables ++ a.value.variables
+  case a: Assert => a.body.variables
+  case a: Assume => a.body.variables
+  case a: IndirectCall => a.target.variables
+  case p: Procedure => p.flatMap {
+    case c: Command => freeVarsPos(c)
+    case _ => Set()
+  }.toSet
+  case p: Block => p.statements.flatMap(freeVarsPos).toSet
+  case p: DirectCall  => p.actualParams.flatMap(_._2.variables).toSet
+  case p: Return  => p.outParams.flatMap(_._2.variables).toSet
+  case  _: Unreachable |  _: GoTo | _: NOP => Set[Variable]()
+}
+

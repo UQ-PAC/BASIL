@@ -4,11 +4,13 @@ import util.Logger
 import ir.cilvisitor.*
 import ir.*
 
-class ReplaceReturns(assertR30Addr: Boolean = true) extends CILVisitor {
+class ReplaceReturns(insertR30InvariantAssertion: Procedure => Boolean = (_ => true)) extends CILVisitor {
 
   /** Assumes IR with 1 call per block which appears as the last statement.
     */
   override def vstmt(j: Statement): VisitAction[List[Statement]] = {
+    val assertR30Addr = insertR30InvariantAssertion(j.parent.parent)
+
     j match {
       case IndirectCall(r30 @ Register("R30", rt), _) => {
         assert(j.parent.statements.lastOption.contains(j))

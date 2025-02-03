@@ -209,3 +209,32 @@ class interprocSummaryFixpointSolver[SummaryAbsVal, LocalAbsVal,
     summaries
   }
 }
+
+class BottomUpCallgraphWorklistSolver[L](transferProcedure: (Procedure => L, L, Procedure) => L, init: Procedure => L)  {
+
+  def solve(p: Program) = {
+    var old_summaries = Map[Procedure, L]()
+    var summaries = Map[Procedure, L]()
+
+    p.sortProceduresRPO()
+    val indexed = p.procedures.zipWithIndex
+    val indexMap = indexed.toMap
+    val worklist = mutable.PriorityQueue[(Procedure, Int)]()(Ordering.by(_._2))
+    worklist.addAll(indexed)
+
+    while (worklist.nonEmpty) {
+      val (p,_) = worklist.dequeue
+      old_summaries = summaries
+
+      def getSummary(p: Procedure) = old_summaries.get(p).getOrElse(init(p))
+      val s = getSummary(p)
+      val r = transferProcedure(getSummary, s, p)
+      if (r != s) {
+        summaries = summaries.updated(p, r)
+        worklist.addAll(p.incomingCalls().map(p => (p.target, indexMap(p.target))))
+        worklist.addAll(p.calls.map(p => (p, indexMap(p))))
+      }
+    }
+    summaries
+  }
+}

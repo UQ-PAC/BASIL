@@ -1,6 +1,7 @@
 package util
 
 import java.io.{BufferedWriter, File, FileInputStream, FileWriter, IOException, PrintWriter}
+import java.nio.file.{Files, Path, Paths}
 import com.grammatech.gtirb.proto.IR.IR
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Section.Section
@@ -216,7 +217,12 @@ object IRTransform {
       case _ => ()
     })
 
-    cilvisitor.visit_prog(transforms.ReplaceReturns(doSimplify), ctx.program)
+    // FIXME: Main will often maintain the stack by loading R30 from the caller's stack frame
+    //        before returning, which makes the R30 assertin faile. Hence we currently skip this 
+    //        assertion for main, instead we should precondition the stack layout before main
+    //        but the interaction between spec and memory regions is nontrivial currently
+    cilvisitor.visit_prog(transforms.ReplaceReturns(proc => doSimplify && ctx.program.mainProcedure != proc), ctx.program)
+
     transforms.addReturnBlocks(ctx.program)
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
 
@@ -404,8 +410,8 @@ object StaticAnalysis {
     Logger.debug("[!] Running Writes To")
     val writesTo = WriteToAnalysis(ctx.program).analyze()
 
-    val SSASolver = IntraprocSSASolver(IRProgram, writesTo, RNAResult)
-    val SSAResults = SSASolver.analyze()
+    Logger.debug("[!] Running commondef variable renaming (Intra SSA)")
+    val SSAResults = getCommonDefinitionVariableRenaming(IRProgram, writesTo)
 
     config.analysisDotPath.foreach(s => {
       writeToFile(
@@ -577,14 +583,15 @@ object RunUtils {
     val timer = PerformanceTimer("Simplify")
     val program = ctx.program
 
+    ctx.program.sortProceduresRPO()
+
+    transforms.liftLinuxAssertFail(ctx)
+    transforms.liftSVComp(ctx.program)
+
+    DebugDumpIRLogger.writeToFile(File("il-before-simp.il"), pp_prog(program))
     transforms.applyRPO(program)
 
     // example of printing a simple analysis
-    val liveVarsDom = transforms.IntraLiveVarsDomain()
-    val liveVarsSolver = transforms.worklistSolver(liveVarsDom)
-    val (beforeLive, afterLive) = liveVarsSolver.solveProgIntraProc(program, backwards = true)
-    DebugDumpIRLogger.writeToFile(File(s"live-vars.il"), 
-      pp_prog_with_analysis_results(beforeLive, afterLive, program, x => s"Live vars: ${x.map(_.name).toList.sorted.mkString(", ")}"))
 
     transforms.removeEmptyBlocks(program)
     transforms.coalesceBlocks(program)
@@ -605,6 +612,7 @@ object RunUtils {
       dotBlockGraph(program, (program.collect {
       case b : Block => b -> pp_block(b)
     }).toMap))
+    DebugDumpIRLogger.writeToFile(File("il-after-dsa.il"), pp_prog(program))
 
     if (ir.eval.SimplifyValidation.validate) {
       // Logger.info("Live vars difftest")
@@ -626,8 +634,13 @@ object RunUtils {
     //assert(program.procedures.forall(transforms.rdDSAProperty))
     AnalysisResultDotLogger.writeToFile(File("blockgraph-before-copyprop.dot"), dotBlockGraph(program.mainProcedure))
     Logger.info("Copyprop Start")
-    transforms.doCopyPropTransform(program, ctx.globalOffsets)
+    transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
     AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
+
+    for (p <- ctx.program.procedures) {
+      DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
+    }
+    transforms.liftLinuxAssertFail(ctx)
 
     // assert(program.procedures.forall(transforms.rdDSAProperty))
 
@@ -651,7 +664,6 @@ object RunUtils {
 
     // re-apply dsa
     // transforms.OnePassDSA().applyTransform(program)
-
 
     if (ir.eval.SimplifyValidation.validate) {
       Logger.info("[!] Simplify :: Writing simplification validation")
@@ -683,7 +695,7 @@ object RunUtils {
       )
     }
 
-    if (q.loading.parameterForm) {
+    if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
     } else {
@@ -706,10 +718,14 @@ object RunUtils {
     ir.eval.SimplifyValidation.validate = conf.validateSimp
     if (conf.simplify) {
 
-      if (!q.loading.parameterForm) {
-        ir.transforms.clearParams(ctx.program)
-        ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
-      }
+      ir.transforms.clearParams(ctx.program)
+
+      ir.transforms.liftIndirectCall(ctx.program)
+      transforms.liftSVCompNonDetEarlyIR(ctx.program)
+
+      DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
+      ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
+      DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
 
       doSimplify(ctx, conf.staticAnalysis)
     }
@@ -825,6 +841,7 @@ object RunUtils {
     }
 
     StaticAnalysisLogger.info("[!] Running DSA Analysis")
+    writeToFile(pp_prog(ctx.program), "testo1.il" )
     val symbolTableEntries: Set[SymbolTableEntry] = ctx.globals ++ ctx.funcEntries
     val dsa = DataStructureAnalysis(ctx.program, symResults, analysisResult.last.interProcConstProp, symbolTableEntries, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, analysisResult.last.writesToResult, analysisResult.last.paramResults)
     dsa.analyze()
@@ -857,6 +874,11 @@ object RunUtils {
       regionInjector = regionInjector
     )
   }
+}
+
+
+def readFormFile(fileName: String) : Iterable[String] = {
+  Files.readAllLines(Paths.get(fileName)).asScala
 }
 
 def writeToFile(content: String, fileName: String): Unit = {
