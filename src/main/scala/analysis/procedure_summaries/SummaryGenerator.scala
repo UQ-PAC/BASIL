@@ -142,20 +142,8 @@ class SummaryGenerator(
     val (predDomainResults, _) = worklistSolver(predDomain).solveProc(procedure, true)
 
     val wpThing = procedure.entryBlock.flatMap(b => predDomainResults.get(b).flatMap(p =>
-        Logger.debug(p)
-        Logger.debug(p.simplify)
         p.toBasil).map(p =>
-          Logger.debug(p)
-          /*try {
-            eval.simplifyCondFixpoint(p)._1.toBoogie
-          } catch {
-            case e =>
-              println(e)
-              println(eval.SimplifyValidation.debugTrace.take(10))
-              println(eval.SimplifyValidation.debugTrace.takeRight(10))
-              assert(false)
-          }*/
-          p.toBoogie
+          eval.simplifyCondFixpoint(p)._1.toBoogie
         ))
 
     (mustGammasWithConditions ++ wpThing).filter(_ != TrueBLiteral).distinct
