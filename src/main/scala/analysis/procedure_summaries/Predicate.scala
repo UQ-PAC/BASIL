@@ -183,7 +183,7 @@ enum Predicate {
   import Predicate.*
 
   case Lit(x: BoolLit) extends Predicate with Atomic
-  case Not(p: Atomic & Predicate)
+  case Not(p: Atomic & Predicate) extends Predicate with Atomic
   case Bop(op: BoolBinOp, x: Predicate, y: Predicate)
   case Conj(s: Set[Predicate])
   case Disj(s: Set[Predicate])
@@ -233,8 +233,35 @@ enum Predicate {
   def split: List[Predicate] =
     this match {
       case Bop(BoolAND, a, b) => a.split ++ b.split
+      case Conj(s) => s.toList
       case _ => List(this)
     }
+
+  /**
+   * Determins whether the term appears in this predicate.
+   */
+  def contains(b: BVTerm): Boolean = this match {
+    case Lit(x) => false
+    case Not(x) => x.contains(b)
+    case Bop(op, x, y) => x.contains(b)
+    case Conj(s) => s.exists(_.contains(b))
+    case Disj(s) => s.exists(_.contains(b))
+    case BVCmp(op, x, y) => x.contains(b) || y.contains(b)
+    case GammaCmp(op, x, y) => false
+  }
+
+  /**
+   * Determins whether the term appears in this predicate.
+   */
+  def contains(b: GammaTerm): Boolean = this match {
+    case Lit(x) => false
+    case Not(x) => x.contains(b)
+    case Bop(op, x, y) => x.contains(b)
+    case Conj(s) => s.exists(_.contains(b))
+    case Disj(s) => s.exists(_.contains(b))
+    case BVCmp(op, x, y) => false
+    case GammaCmp(op, x, y) => x.contains(b) || y.contains(b)
+  }
 
   /**
    * Replace all instances of the term `prev` with the new term `cur`.
@@ -267,26 +294,20 @@ enum Predicate {
    * Remove atomic expressions containing `term` (replacing with True if needed)
    */
   def remove(term: BVTerm): Predicate = this match {
-    case Lit(x) => this
-    case Not(x) => not(x.remove(term))
+    case a: Atomic => if a.contains(term) then True else this
     case Bop(op, x, y) => Bop(op, x.remove(term), y.remove(term))
     case Conj(s) => Conj(s.map(_.remove(term)))
     case Disj(s) => Disj(s.map(_.remove(term)))
-    case BVCmp(op, x, y) => if x.contains(term) || y.contains(term) then Lit(TrueLiteral) else this
-    case GammaCmp(op, x, y) => this
   }
 
   /**
    * Remove atomic expressions containing `term` (replacing with True if needed)
    */
   def remove(term: GammaTerm): Predicate = this match {
-    case Lit(x) => this
-    case Not(x) => not(x.remove(term))
+    case a: Atomic => if a.contains(term) then True else this
     case Bop(op, x, y) => Bop(op, x.remove(term), y.remove(term))
     case Conj(s) => Conj(s.map(_.remove(term)))
     case Disj(s) => Disj(s.map(_.remove(term)))
-    case BVCmp(op, x, y) => this
-    case GammaCmp(op, x, y) => if x.contains(term) || y.contains(term) then Lit(TrueLiteral) else this
   }
 
   /**
@@ -296,17 +317,17 @@ enum Predicate {
     val ret = this match {
       case Bop(BoolAND, a, b) =>
         (a.simplify, b.simplify) match {
-          case (Conj(a), Conj(b)) => Conj(a ++ b)
-          case (Conj(a), b) => Conj(a + b)
-          case (a, Conj(b)) => Conj(b + a)
-          case (a, b) => Conj(Set(a, b))
+          case (Conj(a), Conj(b)) => Conj(a ++ b).simplify
+          case (Conj(a), b) => Conj(a + b).simplify
+          case (a, Conj(b)) => Conj(b + a).simplify
+          case (a, b) => Conj(Set(a, b)).simplify
         }
       case Bop(BoolOR, a, b) =>
         (a.simplify, b.simplify) match {
-          case (Disj(a), Disj(b)) => Disj(a ++ b)
-          case (Disj(a), b) => Disj(a + b)
-          case (a, Disj(b)) => Disj(b + a)
-          case (a, b) => Disj(Set(a, b))
+          case (Disj(a), Disj(b)) => Disj(a ++ b).simplify
+          case (Disj(a), b) => Disj(a + b).simplify
+          case (a, Disj(b)) => Disj(b + a).simplify
+          case (a, b) => Disj(Set(a, b)).simplify
         }
       case Bop(BoolIMPLIES, a, b) =>
         (a.simplify, b.simplify) match {
@@ -329,34 +350,21 @@ enum Predicate {
         while (changed) {
           changed = false
 
-          // Merge internal disjuncts
-          var disj = Set[Predicate]()
-          for x <- cur do {
-            x match {
-              case d @ Disj(s) =>
-                cur -= d
-                disj = disj ++ s
-              case _ => {}
-            }
-          }
-          if disj.size == 1 then cur += disj.head
-          else if disj.size > 1 then cur += Disj(disj)
-
-          for x <- cur if !changed do {
-            val cur1 = x match {
+          for p <- cur if !changed do {
+            val cur1 = p match {
+              case Lit(TrueLiteral) => cur - p
               case Lit(FalseLiteral) => Set(Lit(FalseLiteral))
-              case p @ Conj(s2) => cur - p ++ s2
-              case p @ BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSLE, b, a)) => cur - p - BVCmp(BVSLE, b, a) + BVCmp(BVEQ, a, b)
-              case p @ BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSGE, a, b)) => cur - p - BVCmp(BVSGE, a, b) + BVCmp(BVEQ, a, b)
-              case p @ BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVULE, b, a)) => cur - p - BVCmp(BVULE, b, a) + BVCmp(BVEQ, a, b)
-              case p @ BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVUGE, a, b)) => cur - p - BVCmp(BVUGE, a, b) + BVCmp(BVEQ, a, b)
-              case p @ GammaCmp(BoolIMPLIES, a, b) if cur.contains(GammaCmp(BoolIMPLIES, b, a)) => cur - p - GammaCmp(BoolIMPLIES, b, a) + GammaCmp(BoolEQ, a, b)
+              case Conj(s2) => cur - p ++ s2
+              case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSLE, b, a)) => cur - p - BVCmp(BVSLE, b, a) + BVCmp(BVEQ, a, b)
+              case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSGE, a, b)) => cur - p - BVCmp(BVSGE, a, b) + BVCmp(BVEQ, a, b)
+              case BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVULE, b, a)) => cur - p - BVCmp(BVULE, b, a) + BVCmp(BVEQ, a, b)
+              case BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVUGE, a, b)) => cur - p - BVCmp(BVUGE, a, b) + BVCmp(BVEQ, a, b)
+              case GammaCmp(BoolIMPLIES, a, b) if cur.contains(GammaCmp(BoolIMPLIES, b, a)) => cur - p - GammaCmp(BoolIMPLIES, b, a) + GammaCmp(BoolEQ, a, b)
               case _ => cur
             }
             changed = cur != cur1
             cur = cur1
           }
-          cur -= Lit(TrueLiteral)
         }
         if cur.size == 1 then cur.head else Conj(cur)
       }
@@ -366,29 +374,16 @@ enum Predicate {
         while (changed) {
           changed = false
 
-          // Merge internal conjuncts
-          var conj = Set[Predicate]()
-          for x <- cur do {
-            x match {
-              case d @ Conj(s) =>
-                cur -= d
-                conj = conj ++ s
-              case _ => {}
-            }
-          }
-          if conj.size == 1 then cur += conj.head
-          else if conj.size > 1 then cur += Conj(conj)
-
-          for x <- cur if !changed do {
-            val cur1 = x match {
-              case p @ Disj(s2) => cur - p ++ s2
+          for p <- cur if !changed do {
+            val cur1 = p match {
+              case Disj(s2) => cur - p ++ s2
               case Lit(TrueLiteral) => Set(Lit(TrueLiteral))
+              case Lit(FalseLiteral) => cur - p
               case _ => cur
             }
             changed = cur != cur1
             cur = cur1
           }
-          cur -= Lit(FalseLiteral)
         }
         if cur.size == 1 then cur.head else Disj(cur)
       }
