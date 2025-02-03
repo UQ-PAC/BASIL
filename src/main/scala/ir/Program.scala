@@ -58,6 +58,7 @@ private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extend
   }
 }
 
+
 class Program(var procedures: ArrayBuffer[Procedure],
               var mainProcedure: Procedure,
               val initialMemory: mutable.TreeMap[BigInt, MemorySection]) extends Iterable[CFGPosition] {

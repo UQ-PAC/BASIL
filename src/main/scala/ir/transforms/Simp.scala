@@ -708,7 +708,7 @@ def copyPropParamFixedPoint(p: Program, rela: Map[BigInt, BigInt]): Int = {
     iterations += 1
   }
   if (changed && iterations == maxIterations) {
-    Logger.info(s"Stopped at copyprop iteration bound: $maxIterations")
+    SimplifyLogger.info(s"Stopped at copyprop iteration bound: $maxIterations")
   }
   iterations
 }
