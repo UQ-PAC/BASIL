@@ -90,7 +90,7 @@ trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Nod
 {
   val sva: SymbolicValues = symValues.getOrElse(getSymbolicValues(proc))
   val constraints: Set[Constraint] = cons.getOrElse(generateConstraints(proc))
-  val nodes: Map[SymBase, Node] = buildNodes
+  var nodes: Map[SymBase, Node] = buildNodes
   def exprToSymVal(expr: Expr): SymValueSet = sva.exprToSymValSet(expr)
   def init(symBase: SymBase, size: Option[Int]): Node
   def constraintArgToCells(constraintArg: ConstraintArg, ignoreContents: Boolean = false): Set[CCell]
@@ -98,6 +98,8 @@ trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Nod
   def localPhase(): Unit = {
     constraints.toSeq.sortBy(f => f.label).foreach(processConstraint)
   }
+  
+//  def clone[T <: DSAGraph[Solver, Merged, Cell, CCell, Node]]: T 
 
   def symValToCells(symVal: SymValueSet): Set[Cell] = {
     val pairs = symVal.state

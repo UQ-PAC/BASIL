@@ -15,7 +15,7 @@ case class FieldTerm(v: SuperCell) extends analysis.solvers.Var[FieldTerm]
 class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[UnionFindSolver[FieldTerm], SuperCell, FieldCell, ConstraintCell, FieldNode](proc, phase, UnionFindSolver[FieldTerm]()) {
   
   override def init(symBase: SymBase, size: Option[Int]): FieldNode = FieldNode(this, symBase, size)
-  override val nodes: Map[SymBase, FieldNode] = buildNodes
+//  var nodes: Map[SymBase, FieldNode] = buildNodes
 
 
 
