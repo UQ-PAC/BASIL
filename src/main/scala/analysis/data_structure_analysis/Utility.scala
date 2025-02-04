@@ -30,6 +30,9 @@ class Flags() {
   var function = false
   var stack = false
   var heap = false
+  var loaded = false
+  var par = false
+  var ret = false
   var global = false
   var unknown = false
   var read = false

@@ -3,7 +3,7 @@ package analysis.data_structure_analysis
 import analysis.data_structure_analysis.DSAPhase.{BU, Local}
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
-import ir.Procedure
+import ir.{Expr, Procedure}
 import util.SadDSALogger as Logger
 
 import scala.collection.mutable.ArrayBuffer
@@ -14,12 +14,12 @@ class SadDSA
 
 case class NodeTerm(v: SadNode) extends analysis.solvers.Var[NodeTerm]
 
-class SadGraph(proc: Procedure, phase: DSAPhase,
+class SadGraph(proc: Procedure, ph: DSAPhase,
                symValues: Option[SymbolicValues] = None,
                cons: Option[Set[Constraint]] = None)
   extends
     DSAGraph[OffsetUnionFindSolver[NodeTerm], SadCell, SadCell, SadCell, SadNode]
-      (proc, phase, OffsetUnionFindSolver[NodeTerm](), symValues, cons)
+      (proc, ph, OffsetUnionFindSolver[NodeTerm](), symValues, cons)
 {
 
 //  def BUPhase(locals: Map[Procedure, SadGraph]): Unit = {
@@ -67,39 +67,13 @@ class SadGraph(proc: Procedure, phase: DSAPhase,
         val oldCopy = node.clone(copy)
         assert(!oldToNew.contains(node))
         oldToNew.update(node, oldCopy)
-        val curCopy =
-          if !oldToNew.contains(current) then
-            val v = current.clone(copy)
-            oldToNew.update(current, v)
-            v
-          else copy.findNode(oldToNew(current))._1
+        val curCopy = current.clone(copy, true, oldToNew)
         queue.enqueue(current)
         copy.solver.unify(curCopy.term, oldCopy.term, offset)
     }
 
 
     copy.nodes = this.nodes.view.mapValues(oldToNew.apply).toMap
-
-    while queue.nonEmpty do
-      val old = queue.dequeue()
-      assert(oldToNew.contains(old))
-      val (newNode, off) = copy.findNode(oldToNew(old))
-      assert(off == 0)
-      old.cells.foreach {
-        case cell: SadCell if cell.hasPointee =>
-          val pointee = cell.getPointee
-          val pointeeNode = pointee.node
-          queue.enqueue(pointeeNode)
-          val clonedNode =
-            if !oldToNew.contains(pointeeNode) then
-              val v = pointeeNode.clone(copy)
-              oldToNew.update(pointeeNode, v)
-              v
-            else copy.findNode(oldToNew(pointeeNode))._1
-          newNode.get(cell.interval).setPointee(clonedNode.get(pointee.interval))
-        case _ =>
-      }
-
     copy.localCorrectness()
     copy
   }
@@ -374,16 +348,47 @@ class SadGraph(proc: Procedure, phase: DSAPhase,
 
 class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase], size: Option[Int] = None, val id: Int = SadNodeCounter.increment()) extends DSANode[SadCell](size) {
 
-  def clone(newGraph: SadGraph): SadNode  = {
-    val (node, _) = graph.findNode(this)
-    val newNode = newGraph.init(node.bases, node.size)
-    node.cells.foreach(
-      cell =>
-        newNode.add(cell.interval)
-    )
-    
+  def clone(newGraph: SadGraph, recurse: Boolean = false,
+            oldToNew: mutable.Map[SadNode, SadNode] = mutable.Map()): SadNode  = {
+    //    val (node, _) = graph.findNode(this)
+    val node = this
+    val newNode =
+      if !oldToNew.contains(node) then
+        val v = newGraph.init(node.bases, node.size)
+        node.cells.foreach(
+          cell =>
+            v.add(cell.interval)
+        )
+        oldToNew.update(node, v)
+        v
+      else newGraph.findNode(oldToNew(node))._1
+
+
+    if recurse then
+      val queue = mutable.Queue[SadNode](node)
+      while queue.nonEmpty do
+        val old = queue.dequeue()
+        assert(oldToNew.contains(old))
+        val (newNode, off) = newGraph.findNode(oldToNew(old))
+        assert(off == 0)
+        old.cells.foreach {
+          case cell: SadCell if cell.hasPointee =>
+            val pointee = cell.getPointee
+            val pointeeNode = pointee.node
+            queue.enqueue(pointeeNode)
+            val clonedNode =
+              if !oldToNew.contains(pointeeNode) then
+                val v = pointeeNode.clone(newGraph)
+                oldToNew.update(pointeeNode, v)
+                v
+              else newGraph.findNode(oldToNew(pointeeNode))._1
+            newNode.get(cell.interval).setPointee(clonedNode.get(pointee.interval))
+          case _ =>
+        }
+
     newNode
   }
+
   val term: NodeTerm = NodeTerm(this)
   val children = mutable.Set[Int]()
   override def hashCode(): Int = id
