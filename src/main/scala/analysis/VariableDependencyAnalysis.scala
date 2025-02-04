@@ -14,14 +14,13 @@ private def getLiveVars(p: Procedure): Map[CFGPosition, Set[Variable]] = {
    */
   after
     .flatMap((block, sts) => {
-      val b = Seq(IRWalk.firstInBlock(block) -> sts)
+      val b = Seq(IRWalk.lastInBlock(block) -> sts)
       val stmts =
         if (block.statements.nonEmpty) then
-          (block.statements.toList: List[Command]).zip(block.statements.toList.tail ++ List(block.jump))
+          (List(block.jump) ++ block.statements.toList.reverse.tail).zip(block.statements.toList.reverse)
         else List()
       val transferred = stmts
-        .foldLeft((sts, List[(CFGPosition, Set[Variable])]()))((st, s) => {
-          // map successor to transferred predecessor
+        .foldLeft((sts, List[(CFGPosition, Set[Variable])](block -> sts)))((st, s) => {
           val x = liveVarsDom.transfer(st._1, s._1)
           (x, (s._2 -> x) :: st._2)
         })
@@ -99,10 +98,10 @@ trait ProcVariableDependencyAnalysisFunctions(
         d match {
           case Left(v) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> IdEdge())
           case Left(v) if v == assigned => Map()
+          case Left(v) if liveVars.get(n).exists(!_.contains(v)) => Map()
+          case Left(_) => Map(d -> IdEdge())
           // This needs to be FiniteSet(Set()) and not Bottom() since Bottom() means something
           // special to the IDE solver
-          case Left(v) if !liveVars.get(n).exists(_.contains(v)) => Map()
-          case Left(_) => Map(d -> IdEdge())
           case Right(_) =>
             Map(d -> IdEdge(), Left(assigned) -> ConstEdge(FiniteSet(Set())))
         }
