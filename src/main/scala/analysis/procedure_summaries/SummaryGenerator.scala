@@ -201,7 +201,7 @@ class SummaryGenerator(
      * will not hold.
      */
     val initialGammaDeps = LatticeMap.TopMap((procedure.formalInParam.toSet: Set[Variable]).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
-    val predDomain = PredDisjunctiveCompletion(PredProductDomain(DoubleIntervalDomain(procedure), MayGammaDomain(initialGammaDeps)))
+    val predDomain = PredBoundedDisjunctiveCompletion(PredProductDomain(DoubleIntervalDomain(procedure), MayGammaDomain(initialGammaDeps)), 50)
     val (before, after) = worklistSolver(predDomain).solveProc(procedure)
 
     val absIntPreds = returnBlock.map(b => after.get(b).map(l => filterPred(predDomain.toPred(l), outVars ++ inVars, Predicate.Lit(TrueLiteral)).split.map(_.simplify.toBoogie.simplify))).flatten.toList.flatten
