@@ -110,8 +110,8 @@ class ReachabilityConditions extends PredicateEncodingDomain[Predicate] {
     }
   }
 
-  def top: Predicate = Predicate.Lit(TrueLiteral)
-  def bot: Predicate = Predicate.Lit(FalseLiteral)
+  def top: Predicate = Predicate.Lit(FalseLiteral)
+  def bot: Predicate = Predicate.Lit(TrueLiteral)
 
   def toPred(x: Predicate): Predicate = x
 }
@@ -152,6 +152,8 @@ class PredicateDomain extends PredicateEncodingDomain[Predicate] {
       case n: NOP          => b
     }
   }
+
+  override def init(b: Block): Predicate = top
 
   def top: Predicate = Lit(TrueLiteral)
   def bot: Predicate = Lit(FalseLiteral)
