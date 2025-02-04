@@ -82,7 +82,7 @@ class DSFlag {
 
 trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Node <: DSANode[Cell]]
   (val proc: Procedure, 
-   val phase: DSAPhase,
+   var phase: DSAPhase,
    val solver: Solver,
    val symValues: Option[SymbolicValues] = None,
    val cons: Option[Set[Constraint]] = None,
