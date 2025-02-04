@@ -88,3 +88,15 @@ class BoundedDisjunctiveCompletion[L](d: AbstractDomain[L], bound: Int) extends 
   def top: Set[L] = Set(d.top)
   def bot: Set[L] = Set(d.bot)
 }
+
+/**
+ * Encodes a bounded disjunctive completion as the disjunction of a set of predicates.
+ */
+class PredBoundedDisjunctiveCompletion[L](d: PredicateEncodingDomain[L], bound: Int) extends BoundedDisjunctiveCompletion[L](d, bound) with PredicateEncodingDomain[Set[L]] {
+  def toPred(x: Set[L]): Predicate = x.foldLeft(Predicate.False) { (p, l) => Predicate.Bop(BoolOR, p, d.toPred(l)) }.simplify
+
+  override def fromPred(p: Predicate): Set[L] = p match {
+    case Predicate.Bop(BoolOR, a, b) => fromPred(a).union(fromPred(b))
+    case _ => Set(d.fromPred(p))
+  }
+}
