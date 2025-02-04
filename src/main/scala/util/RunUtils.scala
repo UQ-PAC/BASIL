@@ -809,6 +809,7 @@ object RunUtils {
       sadDSA.values.foreach(_.localCorrectness())
       sadDSABU = sadDSA.view.mapValues(_.clone).toMap
       sadDSABU.values.foreach(_.localCorrectness())
+      sadDSABU.values.foreach(f => f.BUPhase(sadDSA))
 
     if (q.runInterpret) {
       Logger.info("Start interpret")

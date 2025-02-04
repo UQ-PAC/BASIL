@@ -22,13 +22,36 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
       (proc, ph, OffsetUnionFindSolver[NodeTerm](), symValues, cons)
 {
 
-//  def BUPhase(locals: Map[Procedure, SadGraph]): Unit = {
-//    this.phase = BU
-//    constraints.foreach {
-//
-//    }
-//  }
-//
+  def BUPhase(locals: Map[Procedure, SadGraph]): Unit = {
+    phase = BU
+    constraints.foreach {
+      case dcc: DirectCallConstraint =>
+        val oldToNew = mutable.Map[SadNode, SadNode]()
+        dcc.inParams.foreach {
+          case (formal, actual) =>
+            val formals = locals(dcc.target)
+            .exprToCells(formal)
+            .map(
+              cell =>
+                cell
+                  .node
+                  .clone(this, true, oldToNew)
+                  .get(cell.interval)
+            )
+            val actuals = exprToCells(actual)
+            mergeCells(formals ++ actuals)
+        }
+        dcc.outParmas
+      case icc: IndirectCallConstraint =>
+      case _ =>
+    }
+  }
+
+
+  def exprToCells(expr: Expr): Set[SadCell] = {
+    symValToCells(exprToSymVal(expr))
+  }
+
   def localCorrectness(): Unit = {
     constraints.toSeq.sortBy(f => f.label).foreach {
       case constraint: MemoryAccessConstraint[_]  =>
