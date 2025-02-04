@@ -806,7 +806,9 @@ object RunUtils {
       )
 
       dsaContext = Some(DSAContext(sva, cons, setDSA, fieldDSA, sadDSA))
+      sadDSA.values.foreach(_.localCorrectness())
       sadDSABU = sadDSA.view.mapValues(_.clone).toMap
+      sadDSABU.values.foreach(_.localCorrectness())
 
     if (q.runInterpret) {
       Logger.info("Start interpret")

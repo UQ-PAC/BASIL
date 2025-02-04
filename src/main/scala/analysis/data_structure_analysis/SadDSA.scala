@@ -1,6 +1,6 @@
 package analysis.data_structure_analysis
 
-import analysis.data_structure_analysis.DSAPhase.Local
+import analysis.data_structure_analysis.DSAPhase.{BU, Local}
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.Procedure
@@ -22,6 +22,13 @@ class SadGraph(proc: Procedure, phase: DSAPhase,
       (proc, phase, OffsetUnionFindSolver[NodeTerm](), symValues, cons)
 {
 
+//  def BUPhase(locals: Map[Procedure, SadGraph]): Unit = {
+//    this.phase = BU
+//    constraints.foreach {
+//
+//    }
+//  }
+//
   def localCorrectness(): Unit = {
     constraints.toSeq.sortBy(f => f.label).foreach {
       case constraint: MemoryAccessConstraint[_]  =>
@@ -39,7 +46,7 @@ class SadGraph(proc: Procedure, phase: DSAPhase,
               indexCell =>
                 assert(
                   indexCell.hasPointee && indexCell.getPointee == valueCell.get,
-                  s"$constraint, $indexCell doesn't point to ${valueCell.get} instead ${indexCell.hasPointee}"
+                  s"$constraint, $indexCell doesn't point to ${valueCell.get} instead ${indexCell.getPointee}"
                 )
             )
 
@@ -58,21 +65,26 @@ class SadGraph(proc: Procedure, phase: DSAPhase,
         val (current, offset) = this.findNode(node)
         queue.enqueue(current)
         val oldCopy = node.clone(copy)
+        assert(!oldToNew.contains(node))
         oldToNew.update(node, oldCopy)
         val curCopy =
           if !oldToNew.contains(current) then
             val v = current.clone(copy)
             oldToNew.update(current, v)
             v
-          else oldToNew(current)
+          else copy.findNode(oldToNew(current))._1
         queue.enqueue(current)
         copy.solver.unify(curCopy.term, oldCopy.term, offset)
     }
 
+
+    copy.nodes = this.nodes.view.mapValues(oldToNew.apply).toMap
+
     while queue.nonEmpty do
       val old = queue.dequeue()
       assert(oldToNew.contains(old))
-      val newNode = oldToNew(old)
+      val (newNode, off) = copy.findNode(oldToNew(old))
+      assert(off == 0)
       old.cells.foreach {
         case cell: SadCell if cell.hasPointee =>
           val pointee = cell.getPointee
@@ -83,10 +95,12 @@ class SadGraph(proc: Procedure, phase: DSAPhase,
               val v = pointeeNode.clone(copy)
               oldToNew.update(pointeeNode, v)
               v
-            else oldToNew(pointeeNode)
+            else copy.findNode(oldToNew(pointeeNode))._1
           newNode.get(cell.interval).setPointee(clonedNode.get(pointee.interval))
         case _ =>
       }
+
+    copy.localCorrectness()
     copy
   }
   def toDot: String = {
@@ -457,7 +471,6 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase], size: Option
             }
         }
 
-//        collapsedCell.setPointee(pointee)
         assert(collapsedCell.hasPointee)
         assert(collapsedCell.getPointee == graph.find(pointee))
 
