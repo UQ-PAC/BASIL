@@ -22,7 +22,7 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{computeDSADomain, Constraint, DataStructureAnalysis, FieldDSA, FieldGraph, Graph, SadDSA, SadGraph, SetDSA, SetGraph, SymValueSet, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValueDomain, SymbolicValues, generateConstraints, getSymbolicValues}
+import analysis.data_structure_analysis.{estimateStackSizes, getStackSize, computeDSADomain, Constraint, DataStructureAnalysis, FieldDSA, FieldGraph, Graph, SadDSA, SadGraph, SetDSA, SetGraph, SymValueSet, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValueDomain, SymbolicValues, generateConstraints, getSymbolicValues}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
@@ -253,7 +253,7 @@ object IRTransform {
 
 
     // FIXME: Main will often maintain the stack by loading R30 from the caller's stack frame
-    //        before returning, which makes the R30 assertin faile. Hence we currently skip this 
+    //        before returning, which makes the R30 assertin faile. Hence we currently skip this
     //        assertion for main, instead we should precondition the stack layout before main
     //        but the interaction between spec and memory regions is nontrivial currently
     cilvisitor.visit_prog(transforms.ReplaceReturns(proc => doSimplify && ctx.program.mainProcedure != proc), ctx.program)
@@ -783,6 +783,7 @@ object RunUtils {
       var setDSA: Map[Procedure, SetGraph] = Map.empty
       var fieldDSA: Map[Procedure, FieldGraph] = Map.empty
       var sadDSA: Map[Procedure, SadGraph] = Map.empty
+      var sadDSABU: Map[Procedure, SadGraph] = Map.empty
       computeDSADomain(ctx.program).foreach(
         proc =>
 //          if proc.name.startsWith("memxor") then
@@ -805,6 +806,7 @@ object RunUtils {
       )
 
       dsaContext = Some(DSAContext(sva, cons, setDSA, fieldDSA, sadDSA))
+      sadDSABU = sadDSA.view.mapValues(_.clone).toMap
 
     if (q.runInterpret) {
       Logger.info("Start interpret")

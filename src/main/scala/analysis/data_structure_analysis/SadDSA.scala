@@ -49,6 +49,46 @@ class SadGraph(proc: Procedure, phase: DSAPhase,
 
   var last: Option[(SadCell, SadCell)] = None
   var secondLast: Option[(SadCell, SadCell)] = None
+  override def clone: SadGraph = {
+    val oldToNew: mutable.Map[SadNode, SadNode] = mutable.Map()
+    val copy = SadGraph(proc, phase, Some(sva), Some(constraints))
+    val queue = mutable.Queue[SadNode]()
+    this.nodes.foreach { // in addition to current nodes
+      case (base, node) => // clone old nodes in base to node map to carry offset info
+        val (current, offset) = this.findNode(node)
+        queue.enqueue(current)
+        val oldCopy = node.clone(copy)
+        oldToNew.update(node, oldCopy)
+        val curCopy =
+          if !oldToNew.contains(current) then
+            val v = current.clone(copy)
+            oldToNew.update(current, v)
+            v
+          else oldToNew(current)
+        queue.enqueue(current)
+        copy.solver.unify(curCopy.term, oldCopy.term, offset)
+    }
+
+    while queue.nonEmpty do
+      val old = queue.dequeue()
+      assert(oldToNew.contains(old))
+      val newNode = oldToNew(old)
+      old.cells.foreach {
+        case cell: SadCell if cell.hasPointee =>
+          val pointee = cell.getPointee
+          val pointeeNode = pointee.node
+          queue.enqueue(pointeeNode)
+          val clonedNode =
+            if !oldToNew.contains(pointeeNode) then
+              val v = pointeeNode.clone(copy)
+              oldToNew.update(pointeeNode, v)
+              v
+            else oldToNew(pointeeNode)
+          newNode.get(cell.interval).setPointee(clonedNode.get(pointee.interval))
+        case _ =>
+      }
+    copy
+  }
   def toDot: String = {
 
     val (nodes, pointsTo) = collect()
@@ -98,6 +138,7 @@ class SadGraph(proc: Procedure, phase: DSAPhase,
   }
 
   override def init(symBase: SymBase, size: Option[Int]): SadNode = SadNode(this, mutable.Set(symBase), size)
+  def init(symBases: mutable.Set[SymBase], size: Option[Int]): SadNode = SadNode(this, symBases, size)
   override def constraintArgToCells(constraintArg: ConstraintArg, ignoreContents: Boolean = false): Set[SadCell] = {
     val cells = symValToCells(exprToSymVal(constraintArg.value).removeNonAddress(i => i >= 11000))
     val exprCells = cells.map(find)
@@ -314,10 +355,21 @@ class SadGraph(proc: Procedure, phase: DSAPhase,
     val (term, offset) = solver.findWithOffset(node.term)
     (term.asInstanceOf[NodeTerm].v, offset)
   }
+
 }
 
 class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase], size: Option[Int] = None, val id: Int = SadNodeCounter.increment()) extends DSANode[SadCell](size) {
 
+  def clone(newGraph: SadGraph): SadNode  = {
+    val (node, _) = graph.findNode(this)
+    val newNode = newGraph.init(node.bases, node.size)
+    node.cells.foreach(
+      cell =>
+        newNode.add(cell.interval)
+    )
+    
+    newNode
+  }
   val term: NodeTerm = NodeTerm(this)
   val children = mutable.Set[Int]()
   override def hashCode(): Int = id
