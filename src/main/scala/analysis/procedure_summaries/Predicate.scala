@@ -243,6 +243,31 @@ enum Predicate {
     }
 
   /**
+   * Flatten nested conjunctions or disjunctions
+   */
+  def flatten: Predicate = this match {
+    case a: Atomic => this
+    case Conj(s) => {
+      val c = s.map(_.flatten).foldLeft(Set[Predicate]()) {
+        case (s, Conj(s2)) => s ++ s2
+        case (s, p) => s + p
+      }
+      if c.size == 0 then True
+      else if c.size == 1 then c.head
+      else Conj(c)
+    }
+    case Disj(s) => {
+      val d = s.map(_.flatten).foldLeft(Set[Predicate]()) {
+        case (s, Disj(s2)) => s ++ s2
+        case (s, p) => s + p
+      }
+      if d.size == 0 then True
+      else if d.size == 1 then d.head
+      else Disj(d)
+    }
+  }
+
+  /**
    * Determins whether the term appears in this predicate.
    */
   def contains(b: BVTerm): Boolean = this match {
@@ -308,6 +333,79 @@ enum Predicate {
     case Conj(s) => Conj(s.map(_.remove(term)))
     case Disj(s) => Disj(s.map(_.remove(term)))
   }
+
+  /**
+   * Determines whether this predicate is in disjunctive normal form
+   */
+  def inDnf: Boolean = this match {
+    case a: Atomic => true
+    case Conj(s) => {
+      if s.size == 1 then s.head.inDnf
+      else s.forall(_.isInstanceOf[Atomic])
+    }
+    case Disj(s) => {
+      if s.size == 1 then s.head.inDnf
+      else s.forall(x => x match {
+        case a: Atomic => true
+        case Conj(s) => s.forall(_.isInstanceOf[Atomic])
+        case Disj(s) => x.inDnf
+      })
+    }
+  }
+
+  /**
+   * Determines whether this predicate is in conjunctive normal form
+   */
+  def inCnf: Boolean = this match {
+    case a: Atomic => true
+    case Disj(s) => {
+      if s.size == 1 then s.head.inCnf
+      else s.forall(_.isInstanceOf[Atomic])
+    }
+    case Conj(s) => {
+      if s.size == 1 then s.head.inCnf
+      else s.forall(x => x match {
+        case a: Atomic => true
+        case Disj(s) => s.forall(_.isInstanceOf[Atomic])
+        case Conj(s) => x.inCnf
+      })
+    }
+  }
+
+  /**
+   * Put this predicate in disjunctive normal form
+   */
+  def dnf: Predicate =
+    val ret = this match {
+      case a: Atomic => this
+      case Conj(s) => {
+        val dnfed = s.map(_.dnf)
+        if dnfed.size == 0 then True
+        else if dnfed.size == 1 then dnfed.head
+        else {
+          val init = dnfed.head match {
+            case a: Atomic => Set(a)
+            case c @ Conj(_) => Set(c)
+            case Disj(s) => s
+          }
+          Disj(dnfed.tail.foldLeft(init) {
+            case (s, a: Atomic) => s.map(and(_, a))
+            case (s, c @ Conj(s2)) => s.map(and(_, c))
+            case (s, Disj(s2)) if s2.size == 0 => s
+            case (s, Disj(s2)) => s.flatMap { p => s2.map(and(p, _)) }
+          })
+        }
+      }
+      case Disj(s) => Disj(s.map(_.dnf)).flatten
+    }
+    assert(ret.inDnf)
+    ret
+
+  def cnf: Predicate =
+    val ret = not(not(this).dnf)
+    println(ret)
+    assert(ret.inCnf)
+    ret
 
   /**
    */
@@ -396,9 +494,9 @@ object Predicate {
     }
   }
 
-  def and(ps: Predicate*): Predicate = Conj(ps.toSet)
+  def and(ps: Predicate*): Predicate = Conj(ps.toSet).flatten
 
-  def or(ps: Predicate*): Predicate = Disj(ps.toSet)
+  def or(ps: Predicate*): Predicate = Disj(ps.toSet).flatten
 
   def bop(op: BoolBinOp, a: Predicate, b: Predicate): Predicate =
     op match {
