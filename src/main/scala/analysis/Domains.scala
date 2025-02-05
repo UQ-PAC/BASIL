@@ -45,11 +45,11 @@ class DisjunctiveCompletion[L](d: AbstractDomain[L]) extends AbstractDomain[Set[
 class BoundedDisjunctiveCompletion[L](d: AbstractDomain[L], bound: Int) extends AbstractDomain[Set[L]] {
   assert(bound > 0)
 
+  def bound(a: Set[L], pos: Block): Set[L] =
+    if a.size > bound then Set(a.foldLeft(d.bot) { (a, b) => d.join(a, b, pos) }) else a
+
   def join(a: Set[L], b: Set[L], pos: Block): Set[L] = 
-    val ret = if a.contains(d.top) || b.contains(d.top) then top else a.union(b)
-    if ret.size > bound
-    then Set(ret.foldLeft(d.bot) { (a, b) => d.join(a, b, pos) })
-    else ret
+    bound(if a.contains(d.top) || b.contains(d.top) then top else a.union(b), pos)
 
   override def widen(a: Set[L], b: Set[L], pos: Block): Set[L] = ???
   override def narrow(a: Set[L], b: Set[L]): Set[L] = ???
