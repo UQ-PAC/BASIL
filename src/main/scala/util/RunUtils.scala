@@ -741,7 +741,7 @@ object RunUtils {
       .foreach {
         case (proc, size) => proc.stackSize = Some(size)
       }
-      
+
 //      .map {
 //      (proc, graph) => (proc.name, graph)
 //    }
@@ -825,14 +825,14 @@ object RunUtils {
       dsaContext = Some(DSAContext(sva, cons, setDSA, fieldDSA, sadDSA))
       sadDSA.values.foreach(_.localCorrectness())
       DSALogger.info("performed correctness check")
-//      sadDSABU = /*sadDSA.view.mapValues(_.clone).toMap*/
-//        sadDSA.map {
-//          case (proc, graph) =>
-//            DSALogger.info(s"cloning ${proc.name}")
-//            (proc, graph.clone)
-//        }
-//
-//      sadDSABU.values.foreach(_.localCorrectness())
+      sadDSABU = /*sadDSA.view.mapValues(_.clone).toMap*/
+        sadDSA.map {
+          case (proc, graph) =>
+            DSALogger.info(s"cloning ${proc.name}")
+            (proc, graph.clone)
+        }
+
+      sadDSABU.values.foreach(_.localCorrectness())
       DSALogger.info("performed cloning")
 //      sadDSABU.values.foreach(f => f.BUPhase(sadDSA))
 
