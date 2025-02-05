@@ -234,38 +234,23 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
 
     Logger.debug(s"Cell2 after collapse $cell2")
     if cell2.hasPointee then Logger.debug(s"Collapsed Cell2 has pointee ${cell2.getPointee}")
-    if last.nonEmpty && secondLast.nonEmpty && Some(cell1, cell2) == last && last == secondLast then
-      print("")
-
-
-    last = Some(cell1, cell2)
-    secondLast = last
-
 
     mergePointees(cell1, cell2)
-//    cell1.node.collapsed.get.setPointee(cell2.node.collapsed.get.getPointee)
-//    if cell2.node.collapsed.get.hasPointee then
-//      cell1.node.collapsed.get.setPointee(cell2.node.collapsed.get.getPointee)
     cell1 = find(cell1)
     cell2 = find(cell2)
-    val newNode = SadNode(this, cell1.node.bases ++ cell2.node.bases, None).collapse().node
 
-    newNode.children.addAll(cell1.node.children)
-    newNode.children.addAll(cell1.node.children)
-    newNode.flags.join(cell2.node.flags)
-    newNode.flags.join(cell1.node.flags)
-    if cell1.hasPointee then newNode.collapsed.get.setPointee(cell1.getPointee)
+    cell2.node.children.addAll(cell1.node.children)
+    cell1.node.children.addAll(cell2.node.children)
+    cell1.node.flags.join(cell2.node.flags)
+    cell2.node.flags.join(cell1.node.flags)
 
-    solver.unify(cell1.node.term, newNode.term, 0)
-    solver.unify(cell2.node.term, newNode.term, 0)
+    solver.unify(cell1.node.term, cell2.node.term, 0)
 
     cell1 = find(cell1)
     cell2 = find(cell2)
 
     assert(cell1 == cell2)
-    assert(cell1 == newNode.collapsed.get)
-
-    newNode.collapsed.get
+    cell1
   }
 
   protected def mergeCellsHelper(cell1: SadCell, cell2: SadCell): SadCell = {
@@ -404,19 +389,19 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase], size: Option
         val old = queue.dequeue()
         assert(oldToNew.contains(old))
         val (newNode, off) = newGraph.findNode(oldToNew(old))
-        assert(off == 0)
+//        assert(off == 0)
         old.cells.foreach {
           case cell: SadCell if cell.hasPointee =>
             val pointee = cell.getPointee
             val pointeeNode = pointee.node
             queue.enqueue(pointeeNode)
-            val clonedNode =
+            val (clonedNode, clonedOff) =
               if !oldToNew.contains(pointeeNode) then
                 val v = pointeeNode.clone(newGraph)
                 oldToNew.update(pointeeNode, v)
-                v
-              else newGraph.findNode(oldToNew(pointeeNode))._1
-            newNode.get(cell.interval).setPointee(clonedNode.get(pointee.interval))
+                (v, 0)
+              else newGraph.findNode(oldToNew(pointeeNode))
+            newNode.get(cell.interval.move(i => i + off)).setPointee(clonedNode.get(pointee.interval.move(i => i + clonedOff)))
           case _ =>
         }
 
