@@ -24,7 +24,11 @@ class ProductDomain[L1, L2](d1: AbstractDomain[L1], d2: AbstractDomain[L2]) exte
 }
 
 /**
- * Obtain an exact join by encoding sets of abstract states, taking set unions.
+ * This domain stores as abstract values, sets of abstract values in the provided abstract domain.
+ * A set of values represents the disjunction of the values in the set. For example, if S = {a, b, c},
+ * then a state s is represented by S if and only if s is represented by either a, b or c (inclusive).
+ * Doing this allows us to replace the join operator with a set union of abstract states, making the
+ * join exact.
  */
 class DisjunctiveCompletion[L](d: AbstractDomain[L]) extends AbstractDomain[Set[L]] {
   def join(a: Set[L], b: Set[L], pos: Block): Set[L] = if a.contains(d.top) || b.contains(d.top) then top else a.union(b)
@@ -40,7 +44,7 @@ class DisjunctiveCompletion[L](d: AbstractDomain[L]) extends AbstractDomain[Set[
 
 /**
  * Obtain an exact join by encoding sets of abstract states, taking set unions.
- * If the set's size exceeds the bound, join all elements into a single term.
+ * If the set's size exceeds the bound, join all elements into a single term using the underlying domain's join operator.
  */
 class BoundedDisjunctiveCompletion[L](d: AbstractDomain[L], bound: Int) extends AbstractDomain[Set[L]] {
   assert(bound > 0)
