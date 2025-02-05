@@ -786,7 +786,7 @@ object RunUtils {
       var sadDSABU: Map[Procedure, SadGraph] = Map.empty
       computeDSADomain(ctx.program).foreach(
         proc =>
-//          if proc.name.startsWith("memxor") then
+//          if proc.name.startsWith("main") then
             val SVAResults = getSymbolicValues(proc)
             val constraints = generateConstraints(proc)
             sva += (proc -> SVAResults)
@@ -805,11 +805,15 @@ object RunUtils {
             writeToFile(constraints.map(c => c.eval(Expr => SVAResults.exprToSymValSet(Expr))).toSeq.sorted.mkString("\n"), s"cntlm_${proc.name}.Cons")
       )
 
+      DSALogger.info("Finished local phase")
+
       dsaContext = Some(DSAContext(sva, cons, setDSA, fieldDSA, sadDSA))
       sadDSA.values.foreach(_.localCorrectness())
+      DSALogger.info("performed correctness check")
       sadDSABU = sadDSA.view.mapValues(_.clone).toMap
       sadDSABU.values.foreach(_.localCorrectness())
-      sadDSABU.values.foreach(f => f.BUPhase(sadDSA))
+      DSALogger.info("performed cloning")
+//      sadDSABU.values.foreach(f => f.BUPhase(sadDSA))
 
     if (q.runInterpret) {
       Logger.info("Start interpret")

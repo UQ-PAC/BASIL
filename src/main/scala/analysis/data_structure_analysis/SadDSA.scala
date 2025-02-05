@@ -25,7 +25,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
   def BUPhase(locals: Map[Procedure, SadGraph]): Unit = {
     phase = BU
     constraints.foreach {
-      case dcc: DirectCallConstraint =>
+      case dcc: DirectCallConstraint if locals.contains(dcc.target) =>
         val oldToNew = mutable.Map[SadNode, SadNode]()
         dcc.inParams.foreach {
           case (formal, actual) =>
@@ -226,11 +226,12 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
   }
 
   protected def collapseAndMerge(c1: SadCell, c2:SadCell): SadCell = {
-    val cell1 = c1.node.collapse()
+    var cell1 = c1.node.collapse()
     Logger.debug(s"Cell1 after collapse $cell1")
     if cell1.hasPointee then Logger.debug(s"Collapsed Cell1 has pointee ${cell1.getPointee}")
 
-    val cell2 = c2.node.collapse()
+    var cell2 = c2.node.collapse()
+
     Logger.debug(s"Cell2 after collapse $cell2")
     if cell2.hasPointee then Logger.debug(s"Collapsed Cell2 has pointee ${cell2.getPointee}")
     if last.nonEmpty && secondLast.nonEmpty && Some(cell1, cell2) == last && last == secondLast then
@@ -245,16 +246,26 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
 //    cell1.node.collapsed.get.setPointee(cell2.node.collapsed.get.getPointee)
 //    if cell2.node.collapsed.get.hasPointee then
 //      cell1.node.collapsed.get.setPointee(cell2.node.collapsed.get.getPointee)
+    cell1 = find(cell1)
+    cell2 = find(cell2)
+    val newNode = SadNode(this, cell1.node.bases ++ cell2.node.bases, None).collapse().node
 
-    solver.unify(cell1.node.term, cell2.node.term, 0)
-    cell1.node.bases.addAll(cell2.node.bases)
-    cell2.node.bases.addAll(cell1.node.bases)
-    cell2.node.children.addAll(cell1.node.children)
-    cell1.node.children.addAll(cell1.node.children)
-    cell1.node.flags.join(cell2.node.flags)
-    cell2.node.flags.join(cell1.node.flags)
+    newNode.children.addAll(cell1.node.children)
+    newNode.children.addAll(cell1.node.children)
+    newNode.flags.join(cell2.node.flags)
+    newNode.flags.join(cell1.node.flags)
+    if cell1.hasPointee then newNode.collapsed.get.setPointee(cell1.getPointee)
 
-    cell1.node.collapsed.get
+    solver.unify(cell1.node.term, newNode.term, 0)
+    solver.unify(cell2.node.term, newNode.term, 0)
+
+    cell1 = find(cell1)
+    cell2 = find(cell2)
+
+    assert(cell1 == cell2)
+    assert(cell1 == newNode.collapsed.get)
+
+    newNode.collapsed.get
   }
 
   protected def mergeCellsHelper(cell1: SadCell, cell2: SadCell): SadCell = {
@@ -478,6 +489,7 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase], size: Option
 
     if (!(node.isCollapsed)) {
       val collapseNode: SadNode = SadNode(graph, bases, size)
+      collapseNode.children.addAll(this.children)
       val collapsedCell: SadCell = collapseNode.add(0)
       collapseNode._collapsed = Some(collapsedCell)
       // delay unification
@@ -594,10 +606,15 @@ case class SadCell(node: SadNode, override val interval: Interval) extends NodeC
       _pointee = Some(graph.find(cell))
     else if graph.find(_pointee.get) == graph.find(this) then // if a cell points to itself break the link,
       _pointee = None
-      _pointee = Some(graph.mergeCells(this, cell))
+      val pointee = graph.mergeCells(this, cell)
+      graph.find(this)._pointee = Some(pointee)
+      _pointee = Some(pointee)
+//      pointee.setPointee(pointee)
+//      _pointee = Some(pointee)
     else if graph.find(cell) != graph.find(_pointee.get) then
       _pointee = Some(graph.mergeCells(cell, graph.find(_pointee.get)))
 
+//    graph.find(this)._pointee.get
     graph.find(_pointee.get)
   }
 }
