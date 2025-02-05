@@ -308,7 +308,7 @@ class BottomUpCallgraphWorklistSolver[L](transferProcedure: (Procedure => L, L, 
     p.sortProceduresRPO()
     val indexed = p.procedures.zipWithIndex
     val indexMap = indexed.toMap
-    val worklist = mutable.PriorityQueue[(Procedure, Int)]()(Ordering.by(_._2))
+    val worklist = mutable.PriorityQueue[(Procedure, Int)]()(Ordering.by(-_._2))
     worklist.addAll(indexed)
 
     while (worklist.nonEmpty) {

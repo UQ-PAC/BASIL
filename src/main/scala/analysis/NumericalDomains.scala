@@ -201,3 +201,13 @@ class SignedIntervalDomain(procedure: Procedure) extends IntervalDomain(procedur
 class UnsignedIntervalDomain(procedure: Procedure) extends IntervalDomain(procedure, false, uInf, uNInf, bv2nat, nat2bv)
 
 class DoubleIntervalDomain(procedure: Procedure) extends PredProductDomain(SignedIntervalDomain(procedure), UnsignedIntervalDomain(procedure))
+
+class TopDomain extends PredicateEncodingDomain[Unit] {
+  def join(a: Unit, b: Unit, pos: Block): Unit = {}
+  def transfer(a: Unit, b: Command): Unit = {}
+
+  def top: Unit = {}
+  def bot: Unit = {}
+
+  def toPred(x: Unit): Predicate = Predicate.True
+}
