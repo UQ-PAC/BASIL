@@ -182,7 +182,7 @@ private def latticeMapJoin[D, L](
 
   (a, b) match {
     case (Top(), _) => Top()
-    case (Bottom(), _) => Bottom()
+    case (Bottom(), b) => b
     case (TopMap(a), TopMap(b)) => TopMap(
       a.foldLeft(b)((m, p) => {
         val (k, v) = p
