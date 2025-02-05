@@ -30,7 +30,7 @@ class ProductDomain[L1, L2](d1: AbstractDomain[L1], d2: AbstractDomain[L2]) exte
 class PredProductDomain[L1, L2](d1: PredicateEncodingDomain[L1], d2: PredicateEncodingDomain[L2])
   extends ProductDomain[L1, L2](d1, d2) with PredicateEncodingDomain[(L1, L2)] {
 
-  def toPred(x: (L1, L2)): Predicate = Predicate.Bop(BoolAND, d1.toPred(x._1), d2.toPred(x._2))
+  def toPred(x: (L1, L2)): Predicate = Predicate.and(d1.toPred(x._1), d2.toPred(x._2))
 
   override def fromPred(p: Predicate): (L1, L2) = (d1.fromPred(p), d2.fromPred(p))
 }
@@ -59,10 +59,10 @@ class DisjunctiveCompletion[L](d: AbstractDomain[L]) extends AbstractDomain[Set[
  * Encodes a disjunctive completion as the disjunction of a set of predicates.
  */
 class PredDisjunctiveCompletion[L](d: PredicateEncodingDomain[L]) extends DisjunctiveCompletion[L](d) with PredicateEncodingDomain[Set[L]] {
-  def toPred(x: Set[L]): Predicate = x.foldLeft(Predicate.False) { (p, l) => Predicate.Bop(BoolOR, p, d.toPred(l)) }.simplify
+  def toPred(x: Set[L]): Predicate = x.foldLeft(Predicate.False) { (p, l) => Predicate.or(p, d.toPred(l)) }.simplify
 
   override def fromPred(p: Predicate): Set[L] = p match {
-    case Predicate.Bop(BoolOR, a, b) => fromPred(a).union(fromPred(b))
+    case Predicate.Disj(s) => s.map(d.fromPred(_))
     case _ => Set(d.fromPred(p))
   }
 }
@@ -93,10 +93,11 @@ class BoundedDisjunctiveCompletion[L](d: AbstractDomain[L], bound: Int) extends 
  * Encodes a bounded disjunctive completion as the disjunction of a set of predicates.
  */
 class PredBoundedDisjunctiveCompletion[L](d: PredicateEncodingDomain[L], bound: Int) extends BoundedDisjunctiveCompletion[L](d, bound) with PredicateEncodingDomain[Set[L]] {
-  def toPred(x: Set[L]): Predicate = x.foldLeft(Predicate.False) { (p, l) => Predicate.Bop(BoolOR, p, d.toPred(l)) }.simplify
+  def toPred(x: Set[L]): Predicate = x.foldLeft(Predicate.False) { (p, l) => Predicate.or(p, d.toPred(l)) }.simplify
 
   override def fromPred(p: Predicate): Set[L] = p match {
-    case Predicate.Bop(BoolOR, a, b) => fromPred(a).union(fromPred(b))
+    // TODO we can't bound since bounding performs a join, and joining requires a block position, and we want to call fromPred from assume and assert commands
+    case Predicate.Disj(s) => s.map(d.fromPred(_))
     case _ => Set(d.fromPred(p))
   }
 }

@@ -92,7 +92,7 @@ class MustGammaDomain(initialState: VarGammaMap) extends GammaDomain(initialStat
  */
 class ReachabilityConditions extends PredicateEncodingDomain[Predicate] {
   // As the expressions get more complex, it may be worth considering not simplifying at every join
-  def join(a: Predicate, b: Predicate, pos: Block): Predicate = Predicate.Bop(BoolAND, a, b).simplify
+  def join(a: Predicate, b: Predicate, pos: Block): Predicate = Predicate.and(a, b).simplify
 
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
@@ -127,7 +127,7 @@ class PredicateDomain extends PredicateEncodingDomain[Predicate] {
 
   def join(a: Predicate, b: Predicate, pos: Block): Predicate =
     if a.size + b.size > 100 then atTop += pos
-    if atTop.contains(pos) then top else Bop(BoolOR, a, b).simplify
+    if atTop.contains(pos) then top else or(a, b).simplify
 
   private def lowExpr(e: Expr): Predicate = GammaCmp(BoolIMPLIES, GammaTerm.Lit(TrueLiteral), GammaTerm.Join(e.variables.map(v => GammaTerm.Var(v))))
 
@@ -138,12 +138,12 @@ class PredicateDomain extends PredicateEncodingDomain[Predicate] {
       case m: MemoryStore  => b
       case a: Assume       => {
         if (a.checkSecurity) {
-          Bop(BoolAND, Bop(BoolAND, b, exprToPredicate(a.body).get), lowExpr(a.body)).simplify
+          and(b, exprToPredicate(a.body).get, lowExpr(a.body)).simplify
         } else {
-          Bop(BoolAND, b, exprToPredicate(a.body).get).simplify
+          and(b, exprToPredicate(a.body).get).simplify
         }
       }
-      case a: Assert       => Bop(BoolAND, b, exprToPredicate(a.body).get).simplify
+      case a: Assert       => and(b, exprToPredicate(a.body).get).simplify
       case i: IndirectCall => top
       case c: DirectCall   => top
       case g: GoTo         => b

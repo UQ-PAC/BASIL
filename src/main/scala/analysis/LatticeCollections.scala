@@ -335,7 +335,7 @@ trait MayPredMapDomain[D, L] extends PredMapDomain[D, L] with MayAnalysis {
         val (d, l) = z
         termToPred(x, d, l) match {
           case Predicate.Lit(TrueLiteral) => p
-          case q => Predicate.Bop(BoolAND, p, q)
+          case q => Predicate.and(p, q)
         }
       }
     }.simplify
@@ -363,7 +363,7 @@ trait MustPredMapDomain[D, L] extends PredMapDomain[D, L] with MustAnalysis {
         val (d, l) = z
         termToPred(x, d, l) match {
           case Predicate.Lit(TrueLiteral) => p
-          case q => Predicate.Bop(BoolAND, p, q)
+          case q => Predicate.and(p, q)
         }
       }
     }.simplify
