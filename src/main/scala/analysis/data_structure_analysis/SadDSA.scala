@@ -92,14 +92,14 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
         oldToNew.update(node, oldCopy)
         val curCopy = current.clone(copy, true, oldToNew)
         queue.enqueue(current)
-        copy.solver.unify(curCopy.term, oldCopy.term, offset)
+        copy.solver.unify(oldCopy.term, curCopy.term, offset)
     }
-
 
     copy.nodes = this.nodes.view.mapValues(oldToNew.apply).toMap
     copy.localCorrectness()
     copy
   }
+
   def toDot: String = {
 
     val (nodes, pointsTo) = collect()
@@ -394,7 +394,7 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase], size: Option
           case cell: SadCell if cell.hasPointee =>
             val pointee = cell.getPointee
             val pointeeNode = pointee.node
-            queue.enqueue(pointeeNode)
+            if !oldToNew.contains(pointeeNode) then queue.enqueue(pointeeNode)
             val (clonedNode, clonedOff) =
               if !oldToNew.contains(pointeeNode) then
                 val v = pointeeNode.clone(newGraph)
@@ -402,6 +402,7 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase], size: Option
                 (v, 0)
               else newGraph.findNode(oldToNew(pointeeNode))
             newNode.get(cell.interval.move(i => i + off)).setPointee(clonedNode.get(pointee.interval.move(i => i + clonedOff)))
+            assert(newNode.get(cell.interval.move(i => i + off)).getPointee == graph.find(clonedNode.get(pointee.interval.move(i => i + clonedOff))))
           case _ =>
         }
 
