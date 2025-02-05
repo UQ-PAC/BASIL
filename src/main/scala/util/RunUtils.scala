@@ -737,6 +737,15 @@ object RunUtils {
       )
     }
 
+    val estimates = estimateStackSizes(ctx.program)
+      .foreach {
+        case (proc, size) => proc.stackSize = Some(size)
+      }
+      
+//      .map {
+//      (proc, graph) => (proc.name, graph)
+//    }
+
     if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
@@ -776,6 +785,12 @@ object RunUtils {
     if conf.dsaConfig.nonEmpty then
       val config = conf.dsaConfig.get
 
+//      ctx.program.procedures.foreach (
+//        proc =>
+//          proc.stackSize  = estimates.collectFirst {
+//            case (name: String, size: Int) if proc.name.startsWith(name) => size
+//          }
+//      )
       // todo make args
       val main = ctx.program.mainProcedure
       var sva: Map[Procedure, SymbolicValues] = Map.empty
@@ -786,7 +801,7 @@ object RunUtils {
       var sadDSABU: Map[Procedure, SadGraph] = Map.empty
       computeDSADomain(ctx.program).foreach(
         proc =>
-//          if proc.name.startsWith("main") then
+//          if proc.name.startsWith("tunnel_4") then
             val SVAResults = getSymbolicValues(proc)
             val constraints = generateConstraints(proc)
             sva += (proc -> SVAResults)
@@ -810,8 +825,14 @@ object RunUtils {
       dsaContext = Some(DSAContext(sva, cons, setDSA, fieldDSA, sadDSA))
       sadDSA.values.foreach(_.localCorrectness())
       DSALogger.info("performed correctness check")
-      sadDSABU = sadDSA.view.mapValues(_.clone).toMap
-      sadDSABU.values.foreach(_.localCorrectness())
+//      sadDSABU = /*sadDSA.view.mapValues(_.clone).toMap*/
+//        sadDSA.map {
+//          case (proc, graph) =>
+//            DSALogger.info(s"cloning ${proc.name}")
+//            (proc, graph.clone)
+//        }
+//
+//      sadDSABU.values.foreach(_.localCorrectness())
       DSALogger.info("performed cloning")
 //      sadDSABU.values.foreach(f => f.BUPhase(sadDSA))
 
