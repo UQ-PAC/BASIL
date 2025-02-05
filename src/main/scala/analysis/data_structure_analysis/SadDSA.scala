@@ -378,9 +378,17 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase], size: Option
           cell =>
             v.add(cell.interval)
         )
+        if node.isCollapsed then
+          v._collapsed = Some(v.get(0))
         oldToNew.update(node, v)
         v
-      else newGraph.findNode(oldToNew(node))._1
+      else
+        val (newNode, offset) = newGraph.findNode(oldToNew(node))
+        node.cells.foreach(
+          cell =>
+            newNode.add(cell.interval.move(i => i + offset))
+        )
+        newNode
 
 
     if recurse then
@@ -405,6 +413,8 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase], size: Option
             assert(newNode.get(cell.interval.move(i => i + off)).getPointee == graph.find(clonedNode.get(pointee.interval.move(i => i + clonedOff))))
           case _ =>
         }
+        if old.isCollapsed then
+          newNode._collapsed = Some(newNode.get(0))
 
     newNode
   }
