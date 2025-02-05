@@ -104,8 +104,8 @@ class IntervalDomain(procedure: Procedure, signed: Boolean, inf: Int => BigInt, 
   def botTerm: Interval = Bottom
 
   def termToPred(m: LatticeMap[Variable, Interval], v: Variable, l: Interval): Predicate = l match {
-    case Top => Predicate.Lit(TrueLiteral)
-    case Bottom => Predicate.Lit(TrueLiteral)
+    case Top => Predicate.True
+    case Bottom => Predicate.True // sound?
     case ConcreteInterval(lower, upper, width) if signed =>
       Predicate.and(
         Predicate.BVCmp(BVSLE, BVTerm.Lit(tobv(width, lower)), BVTerm.Var(v)),

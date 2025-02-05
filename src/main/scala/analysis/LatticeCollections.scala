@@ -329,18 +329,18 @@ trait MayPredMapDomain[D, L] extends PredMapDomain[D, L] with MayAnalysis {
   import LatticeMap.{Top, Bottom, TopMap, BottomMap}
 
   def toPred(x: LatticeMap[D, L]): Predicate = x match {
-    case Top() => Predicate.Lit(TrueLiteral)
+    case Top() => Predicate.True
     case TopMap(m) => m.foldLeft(Predicate.True) {
       (p, z) => {
         val (d, l) = z
         termToPred(x, d, l) match {
-          case Predicate.Lit(TrueLiteral) => p
+          case Predicate.True => p
           case q => Predicate.and(p, q)
         }
       }
     }.simplify
-    case Bottom() => Predicate.Lit(FalseLiteral)
-    case BottomMap(m) => Predicate.Lit(FalseLiteral)
+    case Bottom() => Predicate.False
+    case BottomMap(m) => Predicate.False
   }
 }
 
@@ -355,14 +355,14 @@ trait MustPredMapDomain[D, L] extends PredMapDomain[D, L] with MustAnalysis {
   import LatticeMap.{Top, Bottom, TopMap, BottomMap}
 
   def toPred(x: LatticeMap[D, L]): Predicate = x match {
-    case Top() => Predicate.Lit(FalseLiteral)
-    case TopMap(m) => Predicate.Lit(FalseLiteral)
-    case Bottom() => Predicate.Lit(TrueLiteral)
+    case Top() => Predicate.False
+    case TopMap(m) => Predicate.False
+    case Bottom() => Predicate.True
     case BottomMap(m) => m.foldLeft(Predicate.True) {
       (p, z) => {
         val (d, l) = z
         termToPred(x, d, l) match {
-          case Predicate.Lit(TrueLiteral) => p
+          case Predicate.True => p
           case q => Predicate.and(p, q)
         }
       }

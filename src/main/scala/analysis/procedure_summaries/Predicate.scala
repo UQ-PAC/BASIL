@@ -99,6 +99,8 @@ enum BVTerm {
 /**
  */
 enum GammaTerm {
+  import GammaTerm.*
+
   case Lit(x: BoolLit)
   case Var(v: Variable)
   case OldVar(v: Variable)
@@ -142,8 +144,8 @@ enum GammaTerm {
             case Join(s2) => s ++ s2
             case g => s + g
           }
-        } - Lit(TrueLiteral)
-        if set.size == 0 then Lit(TrueLiteral) else if set.size == 1 then set.head else Join(set)
+        } - Low
+        if set.size == 0 then Low else if set.size == 1 then set.head else Join(set)
       }
       case _ => this
     }
@@ -173,6 +175,13 @@ enum GammaTerm {
     case Uop(op, x) => x.contains(term)
     case Join(s) => s.exists(_.contains(term))
   }
+}
+
+object GammaTerm {
+  import GammaTerm.*
+
+  val Low = Lit(TrueLiteral)
+  val High = Lit(FalseLiteral)
 }
 
 sealed trait Atomic
@@ -414,8 +423,8 @@ enum Predicate {
     val ret = this match {
       case Not(a) =>
         a.simplify match {
-          case Lit(TrueLiteral) => Lit(FalseLiteral)
-          case Lit(FalseLiteral) => Lit(TrueLiteral)
+          case Lit(TrueLiteral) => False
+          case Lit(FalseLiteral) => True
           case a => not(a)
         }
       case Conj(s) => {
@@ -451,7 +460,7 @@ enum Predicate {
           for p <- cur if !changed do {
             val cur1 = p match {
               case Disj(s2) => cur - p ++ s2
-              case Lit(TrueLiteral) => Set(Lit(TrueLiteral))
+              case Lit(TrueLiteral) => Set(True)
               case Lit(FalseLiteral) => cur - p
               case _ => cur
             }
@@ -467,8 +476,8 @@ enum Predicate {
         }
       case GammaCmp(op, a, b) =>
         (op, a.simplify, b.simplify) match {
-          case (BoolIMPLIES, a, b) if a == b => Lit(TrueLiteral)
-          case (BoolEQ, a, b) if a == b => Lit(TrueLiteral)
+          case (BoolIMPLIES, a, b) if a == b => True
+          case (BoolEQ, a, b) if a == b => True
           case (op, a, b) => GammaCmp(op, a, b)
         }
       case _ => this
@@ -498,7 +507,7 @@ object Predicate {
 
   def or(ps: Predicate*): Predicate = Disj(ps.toSet).flatten
 
-  def bop(op: BoolBinOp, a: Predicate, b: Predicate): Predicate =
+  def bop(op: BoolBinOp, a: Predicate, b: Predicate): Predicate = {
     op match {
       case BoolEQ => or(and(not(a), not(b)), and(a, b))
       case BoolNEQ => or(and(not(a), b), and(a, not(b)))
@@ -507,6 +516,11 @@ object Predicate {
       case BoolIMPLIES => or(not(a), b)
       case BoolEQUIV => bop(BoolEQ, a, b)
     }
+  }
+
+  def gammaLeq(a: GammaTerm, b: GammaTerm) = GammaCmp(BoolIMPLIES, b, a)
+  def gammaGeq(a: GammaTerm, b: GammaTerm) = GammaCmp(BoolIMPLIES, a, b)
+  def gammaEq(a: GammaTerm, b: GammaTerm) = GammaCmp(BoolEQ, a, b)
 }
 
 /**
@@ -528,7 +542,7 @@ def exprToBVTerm(e: Expr): Option[BVTerm] = e match {
  * Get the gamma of a bitvector expression, i.e. the join of all of the gammas of the variables in the expression
  */
 def exprToGammaTerm(e: Expr): Option[GammaTerm] = e match {
-  case b: BitVecLiteral => Some(GammaTerm.Lit(TrueLiteral))
+  case b: BitVecLiteral => Some(GammaTerm.Low)
   case v: Variable => Some(GammaTerm.Var(v))
   case UnaryExpr(op: BVUnOp, arg) => exprToGammaTerm(arg)
   case BinaryExpr(op: BVBinOp, arg1, arg2) => exprToGammaTerm(arg1).flatMap(x => exprToGammaTerm(arg2).map(y => GammaTerm.Join(Set(x, y))))
