@@ -107,11 +107,11 @@ class IntervalDomain(procedure: Procedure, signed: Boolean, inf: Int => BigInt, 
     case Top => Predicate.Lit(TrueLiteral)
     case Bottom => Predicate.Lit(TrueLiteral)
     case ConcreteInterval(lower, upper, width) if signed =>
-      Predicate.Bop(BoolAND,
+      Predicate.and(
         Predicate.BVCmp(BVSLE, BVTerm.Lit(tobv(width, lower)), BVTerm.Var(v)),
         Predicate.BVCmp(BVSLE, BVTerm.Var(v), BVTerm.Lit(tobv(width, upper))))
     case ConcreteInterval(lower, upper, width) /* if !signed */ =>
-      Predicate.Bop(BoolAND,
+      Predicate.and(
         Predicate.BVCmp(BVULE, BVTerm.Lit(tobv(width, lower)), BVTerm.Var(v)),
         Predicate.BVCmp(BVULE, BVTerm.Var(v), BVTerm.Lit(tobv(width, upper))))
   }
@@ -153,8 +153,6 @@ class IntervalDomain(procedure: Procedure, signed: Boolean, inf: Int => BigInt, 
   override def fromPred(p: Predicate): LatticeMap[Variable, Interval] = {
     import Predicate.*
     p match {
-      case Bop(BoolAND, x, y) => fromPred(x).meet(fromPred(y))
-      case Bop(BoolOR, x, y) => fromPred(x).join(fromPred(y))
       case Conj(s) =>
         if s.size == 0 then top
         else if s.size == 1 then fromPred(s.head)
@@ -188,7 +186,6 @@ class IntervalDomain(procedure: Procedure, signed: Boolean, inf: Int => BigInt, 
       case BVCmp(BVUGT, BVTerm.Var(v), BVTerm.Lit(x)) if !signed && inf(x.size) >= bvto(x) => top + (v -> ConcreteInterval(bvto(x) + 1, inf(x.size), x.size))
 
       case BVCmp(op, x, y) => top
-      case Bop(op, x, y) => top
       case Lit(TrueLiteral) => top
       case Lit(FalseLiteral) => bot
       case Not(x) => top

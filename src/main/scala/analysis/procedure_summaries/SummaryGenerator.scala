@@ -73,7 +73,6 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
     p match {
       case Lit(x) => p
       case Not(x) => not(filterPred(x, vars, default))
-      case Bop(op, x, y) => Bop(op, filterPred(x, vars, default), filterPred(y, vars, default))
       case Conj(s) => Conj(s.map(filterPred(_, vars, default)))
       case Disj(s) => Disj(s.map(filterPred(_, vars, default)))
       case BVCmp(op, x, y) => if varsAllIn(x, vars) && varsAllIn(y, vars) then p else default
@@ -121,7 +120,7 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
               } yield (s ++ r.map(GammaTerm.Var(_)))
             }.map {
               gammas => {
-                Predicate.Bop(
+                Predicate.bop(
                   BoolIMPLIES,
                   condition,
                   Predicate.GammaCmp(BoolIMPLIES, GammaTerm.Lit(TrueLiteral), GammaTerm.Join(gammas))
@@ -184,7 +183,7 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
      * will not hold.
      */
     val initialMayGammaDeps = LatticeMap.TopMap((relevantGlobals ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
-    val predAbsIntDomain = PredBoundedDisjunctiveCompletion(PredProductDomain(DoubleIntervalDomain(procedure), MayGammaDomain(initialMayGammaDeps)), 1)
+    val predAbsIntDomain = PredBoundedDisjunctiveCompletion(PredProductDomain(DoubleIntervalDomain(procedure), MayGammaDomain(initialMayGammaDeps)), 10)
     val (beforeAbsInt, afterAbsInt) = worklistSolver(predAbsIntDomain).solveProc(procedure)
 
     val absIntPreds = returnBlock.map(b => afterAbsInt.get(b).map(l => filterPred(predAbsIntDomain.toPred(l), outVars ++ inVars, Predicate.Lit(TrueLiteral)).split.map(_.simplify))).flatten.toList.flatten
