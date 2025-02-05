@@ -135,7 +135,7 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
 
     // Predicate domain / mini wp
     Logger.debug(s"Generating mini wp preconditions for $procedure")
-    val wpDomain = PredicateDomain()
+    val wpDomain = PredicateDomain(map)
     val (wpDomainResults, _) = worklistSolver(wpDomain).solveProc(procedure, true)
 
     val wpThing = procedure.entryBlock.flatMap(b => wpDomainResults.get(b))

@@ -9,7 +9,7 @@ import scala.collection.mutable
 private def getLiveVars(p: Procedure): Map[CFGPosition, Set[Variable]] = {
   val liveVarsDom = transforms.IntraLiveVarsDomain()
   val (before, after) = transforms.getLiveVars(p)
-  /* Stolen from Simp.scala
+  /* Taken from Simp.scala
    * This should probably be made into a generic function
    */
   after
@@ -17,7 +17,7 @@ private def getLiveVars(p: Procedure): Map[CFGPosition, Set[Variable]] = {
       val b = Seq(IRWalk.lastInBlock(block) -> sts)
       val stmts =
         if (block.statements.nonEmpty) then
-          (List(block.jump) ++ block.statements.toList.reverse.tail).zip(block.statements.toList.reverse)
+          (List(block.jump) ++ block.statements.toList.tail.reverse).zip(block.statements.toList.reverse)
         else List()
       val transferred = stmts
         .foldLeft((sts, List[(CFGPosition, Set[Variable])](block -> sts)))((st, s) => {
