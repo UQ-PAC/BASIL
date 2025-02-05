@@ -261,6 +261,8 @@ class Procedure private (
 
   def name = procName + address.map("_" + _).getOrElse("")
 
+  var stackSize: Option[Int] = None
+
   private val _callers = mutable.HashSet[DirectCall]()
   _blocks.foreach(_.parent = this)
   // class invariant
