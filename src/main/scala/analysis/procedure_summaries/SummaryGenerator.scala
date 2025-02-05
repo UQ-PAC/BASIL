@@ -6,19 +6,14 @@ import analysis.*
 import ir.*
 import boogie.*
 import boogie.SpecGlobal
-import ir.transforms.{AbstractDomain, reversePostOrder, worklistSolver}
+import ir.transforms.{AbstractDomain, BottomUpCallgraphWorklistSolver, ProcAbstractDomain, reversePostOrder, worklistSolver}
 
 // TODO annotated preconditions and postconditions
 // TODO don't convert to boogie until translating, so that we can use conditions in analyses
 
-/**
- * Generates summaries (requires and ensures clauses) for procedures that necessarily must hold (assuming a correct implementation).
- * This helps because the verifier cannot make any assumptions about procedures with no summaries.
- */
-class SummaryGenerator(
-  program: Program,
-  parameterForm: Boolean = false,
-) {
+class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false) {
+  import Predicate.*
+
   val relevantGlobals: Set[Variable] = if parameterForm then Set() else 0.to(31).map { n => Register(s"R$n", 64) }.toSet
 
   val varDepsSummaries = {
@@ -86,11 +81,11 @@ class SummaryGenerator(
     }
   }
 
-  /**
-   * Generate requires clauses for a procedure.
-   */
-  def generateRequires(procedure: Procedure): List[BExpr] = {
-    if procedure.blocks.isEmpty then return List()
+
+  def transfer(map: Procedure => (List[Predicate], List[Predicate]), p: (List[Predicate], List[Predicate]), procedure: Procedure): (List[Predicate], List[Predicate]) = {
+    if procedure.blocks.isEmpty then return (List(), List())
+
+    val (curRequires, curEnsures) = p
 
     /* Gamma domain with reachability conditions
      *
@@ -100,20 +95,18 @@ class SummaryGenerator(
      * (think nested in statements).
      */
     Logger.debug(s"Generating gamma with reachability preconditions for $procedure")
-    val initialGammaDeps = LatticeMap.BottomMap((relevantGlobals.collect(_ match {
-      case v: Variable => v
-    }) ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
-    val mustGammaDomain = MustGammaDomain(initialGammaDeps)
+    val initialMustGammaDeps = LatticeMap.BottomMap((relevantGlobals ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+    val mustGammaDomain = MustGammaDomain(initialMustGammaDeps)
     val reachabilityDomain = ReachabilityConditions()
     reversePostOrder(procedure)
     val (_, mustGammaResults) = worklistSolver(mustGammaDomain).solveProc(procedure, false)
-    val (before, after) = worklistSolver(reachabilityDomain).solveProc(procedure, false)
+    val (beforeReachability, afterReachability) = worklistSolver(reachabilityDomain).solveProc(procedure, false)
 
     val mustGammasWithConditions = procedure.blocks.flatMap(b => {
       b.statements.flatMap(s => {
         s match {
           case a: Assume if a.checkSecurity => {
-            val condition = reachabilityDomain.toPred(before(a.parent))
+            val condition = reachabilityDomain.toPred(beforeReachability(a.parent))
 
             /* Compute a set of variables that this branch condition definitely depends on.
              * The MustGammaDomain gives as an invariant that Gamma_x => Join(S_u) for each
@@ -132,7 +125,7 @@ class SummaryGenerator(
                   BoolIMPLIES,
                   condition,
                   Predicate.GammaCmp(BoolIMPLIES, GammaTerm.Lit(TrueLiteral), GammaTerm.Join(gammas))
-                ).simplify.toBoogie.simplify
+                ).simplify
               }
             }
           }
@@ -143,22 +136,12 @@ class SummaryGenerator(
 
     // Predicate domain / mini wp
     Logger.debug(s"Generating mini wp preconditions for $procedure")
-    val predDomain = PredicateDomain()
-    val (predDomainResults, _) = worklistSolver(predDomain).solveProc(procedure, true)
+    val wpDomain = PredicateDomain()
+    val (wpDomainResults, _) = worklistSolver(wpDomain).solveProc(procedure, true)
 
-    val wpThing = procedure.entryBlock.flatMap(b => predDomainResults.get(b).flatMap(p =>
-        p.toBasil).map(p =>
-          eval.simplifyCondFixpoint(p)._1.toBoogie
-        ))
+    val wpThing = procedure.entryBlock.flatMap(b => wpDomainResults.get(b))
 
-    (mustGammasWithConditions ++ wpThing).filter(_ != TrueBLiteral).distinct
-  }
-
-  /**
-   * Generate ensures clauses for a procedure.
-   */
-  def generateEnsures(procedure: Procedure): List[BExpr] = {
-    if procedure.blocks.isEmpty then return List()
+    val requires = (curRequires ++ mustGammasWithConditions ++ wpThing).filter(_ != TrueBLiteral).distinct
 
     /* Forwards variable dependency
      *
@@ -182,7 +165,7 @@ class SummaryGenerator(
     val dependencyPreds = dependencyMap.toList.map {
       (variable, dependencies) => {
         Predicate.GammaCmp(BoolIMPLIES, GammaTerm.Join(dependencies.map(GammaTerm.OldVar(_))), GammaTerm.Var(variable))
-          .simplify.toBoogie.simplify
+          .simplify
       }
     }
 
@@ -200,12 +183,42 @@ class SummaryGenerator(
      * knows that a numerical invariant is not held, it can know that one of the disjuncts
      * will not hold.
      */
-    val initialGammaDeps = LatticeMap.TopMap((procedure.formalInParam.toSet: Set[Variable]).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
-    val predDomain = PredBoundedDisjunctiveCompletion(PredProductDomain(DoubleIntervalDomain(procedure), MayGammaDomain(initialGammaDeps)), 50)
-    val (before, after) = worklistSolver(predDomain).solveProc(procedure)
+    val initialMayGammaDeps = LatticeMap.TopMap((relevantGlobals ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+    val predAbsIntDomain = PredBoundedDisjunctiveCompletion(PredProductDomain(DoubleIntervalDomain(procedure), MayGammaDomain(initialMayGammaDeps)), 1)
+    val (beforeAbsInt, afterAbsInt) = worklistSolver(predAbsIntDomain).solveProc(procedure)
 
-    val absIntPreds = returnBlock.map(b => after.get(b).map(l => filterPred(predDomain.toPred(l), outVars ++ inVars, Predicate.Lit(TrueLiteral)).split.map(_.simplify.toBoogie.simplify))).flatten.toList.flatten
+    val absIntPreds = returnBlock.map(b => afterAbsInt.get(b).map(l => filterPred(predAbsIntDomain.toPred(l), outVars ++ inVars, Predicate.Lit(TrueLiteral)).split.map(_.simplify))).flatten.toList.flatten
 
-    (dependencyPreds ++ absIntPreds).filter(_ != TrueBLiteral).distinct
+    val ensures = (curEnsures ++ dependencyPreds ++ absIntPreds).filter(_ != True).distinct
+
+    (requires, ensures)
+  }
+
+  def init(p: Procedure): (List[Predicate], List[Predicate]) = (List(), List())
+}
+
+/**
+ * Generates summaries (requires and ensures clauses) for procedures that necessarily must hold (assuming a correct implementation).
+ * This helps because the verifier cannot make any assumptions about procedures with no summaries.
+ */
+class SummaryGenerator(
+  program: Program,
+  parameterForm: Boolean = false,
+) {
+  val interprocGenerator = InterprocSummaryGenerator(program, parameterForm)
+  val interprocResults: Map[Procedure, (List[Predicate], List[Predicate])] = BottomUpCallgraphWorklistSolver(interprocGenerator.transfer, interprocGenerator.init).solve(program)
+
+  /**
+   * Generate requires clauses for a procedure.
+   */
+  def generateRequires(procedure: Procedure): List[BExpr] = {
+    interprocResults.getOrElse(procedure, (List(), List()))._1.map(_.toBoogie.simplify).filter(_ != TrueBLiteral)
+  }
+
+  /**
+   * Generate ensures clauses for a procedure.
+   */
+  def generateEnsures(procedure: Procedure): List[BExpr] = {
+    interprocResults.getOrElse(procedure, (List(), List()))._2.map(_.toBoogie.simplify).filter(_ != TrueBLiteral)
   }
 }
