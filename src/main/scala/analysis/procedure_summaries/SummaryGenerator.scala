@@ -123,7 +123,7 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
                 Predicate.bop(
                   BoolIMPLIES,
                   condition,
-                  Predicate.GammaCmp(BoolIMPLIES, GammaTerm.Lit(TrueLiteral), GammaTerm.Join(gammas))
+                  Predicate.gammaLeq(GammaTerm.Join(gammas), GammaTerm.Low)
                 ).simplify
               }
             }
@@ -163,7 +163,7 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
 
     val dependencyPreds = dependencyMap.toList.map {
       (variable, dependencies) => {
-        Predicate.GammaCmp(BoolIMPLIES, GammaTerm.Join(dependencies.map(GammaTerm.OldVar(_))), GammaTerm.Var(variable))
+        Predicate.gammaLeq(GammaTerm.Var(variable), GammaTerm.Join(dependencies.map(GammaTerm.OldVar(_))))
           .simplify
       }
     }
@@ -186,7 +186,7 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
     val predAbsIntDomain = PredBoundedDisjunctiveCompletion(PredProductDomain(DoubleIntervalDomain(procedure), MayGammaDomain(initialMayGammaDeps)), 10)
     val (beforeAbsInt, afterAbsInt) = worklistSolver(predAbsIntDomain).solveProc(procedure)
 
-    val absIntPreds = returnBlock.map(b => afterAbsInt.get(b).map(l => filterPred(predAbsIntDomain.toPred(l), outVars ++ inVars, Predicate.Lit(TrueLiteral)).split.map(_.simplify))).flatten.toList.flatten
+    val absIntPreds = returnBlock.map(b => afterAbsInt.get(b).map(l => filterPred(predAbsIntDomain.toPred(l), outVars ++ inVars, Predicate.True).split.map(_.simplify))).flatten.toList.flatten
 
     val ensures = (curEnsures ++ dependencyPreds ++ absIntPreds).filter(_ != True).distinct
 

@@ -47,18 +47,19 @@ trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[Variable, Lat
   def termToPred(m: LatticeMap[Variable, LatticeSet[Variable]], v: Variable, s: LatticeSet[Variable]): Predicate =
     (v, s) match {
       case (v: Variable, LatticeSet.FiniteSet(s)) => {
-        val g = s.foldLeft(Some(GammaTerm.Lit(TrueLiteral))) {
+        val g = s.foldLeft(Some(GammaTerm.Low)) {
           (q: Option[GammaTerm], t) => (q, t) match {
             case (Some(q), v: Variable) => Some(GammaTerm.Join(Set(q, GammaTerm.OldVar(v))))
             case _ => None
           }
         }
         g match {
-          case Some(g) => Predicate.GammaCmp(BoolIMPLIES, g, GammaTerm.Var(v)).simplify
-          case None => Predicate.Lit(TrueLiteral)
+          // TODO is this right? it should depend on whether this is a may or must analysis.
+          case Some(g) => Predicate.gammaGeq(g, GammaTerm.Var(v)).simplify
+          case None => Predicate.True
         }
       }
-      case _ => Predicate.Lit(TrueLiteral)
+      case _ => Predicate.True
     }
 }
 
@@ -103,15 +104,15 @@ class ReachabilityConditions extends PredicateEncodingDomain[Predicate] {
       case a: Assert       => b
       case i: IndirectCall => b
       case c: DirectCall   => b
-      case g: GoTo         => if g.targets.size == 1 then b else Predicate.Lit(FalseLiteral)
+      case g: GoTo         => if g.targets.size == 1 then b else Predicate.False
       case r: Return       => b
       case r: Unreachable  => b
       case n: NOP          => b
     }
   }
 
-  def top: Predicate = Predicate.Lit(FalseLiteral)
-  def bot: Predicate = Predicate.Lit(TrueLiteral)
+  def top: Predicate = Predicate.False
+  def bot: Predicate = Predicate.True
 
   def toPred(x: Predicate): Predicate = x
 }
@@ -129,7 +130,7 @@ class PredicateDomain extends PredicateEncodingDomain[Predicate] {
     if a.size + b.size > 100 then atTop += pos
     if atTop.contains(pos) then top else or(a, b).simplify
 
-  private def lowExpr(e: Expr): Predicate = GammaCmp(BoolIMPLIES, GammaTerm.Lit(TrueLiteral), GammaTerm.Join(e.variables.map(v => GammaTerm.Var(v))))
+  private def lowExpr(e: Expr): Predicate = gammaLeq(GammaTerm.Join(e.variables.map(v => GammaTerm.Var(v))), GammaTerm.Low)
 
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
@@ -155,8 +156,8 @@ class PredicateDomain extends PredicateEncodingDomain[Predicate] {
 
   override def init(b: Block): Predicate = top
 
-  def top: Predicate = Lit(TrueLiteral)
-  def bot: Predicate = Lit(FalseLiteral)
+  def top: Predicate = True
+  def bot: Predicate = False
 
   def toPred(x: Predicate): Predicate = x
   override def fromPred(p: Predicate): Predicate = p

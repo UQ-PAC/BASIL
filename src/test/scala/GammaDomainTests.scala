@@ -53,7 +53,7 @@ class GammaDomainTests extends AnyFunSuite, BASILTest {
     val reachability = getReachabilityConditions(f)
 
     assert(latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0, LatticeSetLattice()) == LatticeSet.Bottom())
-    assert(reachability(f.labelToBlock("returnBlock")) == Predicate.Lit(TrueLiteral))
+    assert(reachability(f.labelToBlock("returnBlock")) == Predicate.True)
   }
 
   test("branching") {
@@ -89,9 +89,10 @@ class GammaDomainTests extends AnyFunSuite, BASILTest {
     val reachability = getReachabilityConditions(f)
 
     assert(latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0, LatticeSetLattice()) == LatticeSet.FiniteSet(Set(R0)))
+    // TODO is this right?!
     assert(MustGammaDomain(initialState).toPred(gammaResults(f.labelToBlock("returnBlock"))).split.contains(
-      Predicate.GammaCmp(BoolIMPLIES, GammaTerm.OldVar(R0), GammaTerm.Var(R0))))
-    assert(reachability(f.labelToBlock("branch")) == Predicate.Lit(TrueLiteral))
+      Predicate.gammaLeq(GammaTerm.Var(R0), GammaTerm.OldVar(R0))))
+    assert(reachability(f.labelToBlock("branch")) == Predicate.True)
   }
 
   test("loop") {
@@ -127,6 +128,6 @@ class GammaDomainTests extends AnyFunSuite, BASILTest {
 
     assert(latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0, LatticeSetLattice()) == LatticeSet.FiniteSet(Set(R2)))
     assert(MustGammaDomain(initialState).toPred(gammaResults(f.labelToBlock("returnBlock"))).simplify.split.contains(
-      Predicate.GammaCmp(BoolIMPLIES, GammaTerm.OldVar(R2), GammaTerm.Var(R0))))
+      Predicate.gammaLeq(GammaTerm.Var(R0), GammaTerm.OldVar(R2))))
   }
 }
