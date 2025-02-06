@@ -30,7 +30,7 @@ trait CompatibleLattice[S] extends Lattice[S] {
   * L: A lattice type, defined over element type S.
   * stateTransfer: A transfer function for lattice elements of type S.
   */
-abstract class InterferenceDomain[T, S](stateLattice: CompatibleLattice[S], stateTransfer: S => Command => S) {
+abstract class InterferenceDomain[T, S](val stateLattice: CompatibleLattice[S], val stateTransfer: (S, Command) => S) {
   def bot: T
   def derive(s: S, c: Command): T
   def apply(t: T, s: S): S
@@ -45,7 +45,7 @@ abstract class InterferenceDomain[T, S](stateLattice: CompatibleLattice[S], stat
   * This is implemented with a map [v_i -> P_i] from variables to the conditions under which they may be written to in the program.
   * Variables that are never written to are omitted from the map, rather than being mapped to bot.
   */
-class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransfer: S => Command => S) extends InterferenceDomain[Map[Variable, S], S](stateLattice, stateTransfer) {
+class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransfer: (S, Command) => S) extends InterferenceDomain[Map[Variable, S], S](stateLattice, stateTransfer) {
   // an empty map means no variables have been written to
   def bot: Map[Variable, S] = Map.empty[Variable, S]
   
@@ -102,14 +102,14 @@ class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransf
   }
 }
 
-class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S]/*, stateDom: AbstractDomain[S] */) extends AbstractDomain[(T, S)](rely: T) {
-  def join(a: (T, S), b: (T, S), pos: Block): (T, S) = (intDom.join(a._1, b._1), stateLattice.join(a._2, b._2))
+class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S])(rely: T) extends AbstractDomain[(T, S)] {
+  def join(a: (T, S), b: (T, S), pos: Block): (T, S) = (intDom.join(a._1, b._1), intDom.stateLattice.lub(a._2, b._2))
   
   def transfer(a: (T, S), b: Command): (T, S) = {
     // stabilise the pre-state under the rely
     var pre_state = intDom.apply(rely, a._2)
     // derive post-state from the stabilised pre-state
-    var post_state = stateTransfer(pre_state, b)
+    var post_state = intDom.stateTransfer(pre_state, b)
     // derive the new guarantee
     var guar = intDom.join(a._1, intDom.derive(pre_state, b))
     // return results
@@ -118,5 +118,5 @@ class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S]/*, stateD
   
   def top: (T, S) = ???
   
-  def bot: (T, S) = (intDom.bot, stateDom.bot)
+  def bot: (T, S) = (intDom.bot, intDom.stateLattice.bottom)
 }
