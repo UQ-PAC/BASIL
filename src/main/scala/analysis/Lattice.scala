@@ -22,6 +22,10 @@ trait Lattice[T]:
    */
   def lub(x: T, y: T): T
 
+  /** The greatest lower bound of `x` and `y`
+   */
+  def glb(x: T, y: T): T = ???
+
   /** Returns true whenever `x` <= `y`.
    */
   def leq(x: T, y: T): Boolean = lub(x, y) == y // rarely used, but easy to implement :-)
