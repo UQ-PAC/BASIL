@@ -10,7 +10,7 @@ import scala.collection.{SortedMap, mutable}
 
 
 def getSymbolicValues(p: Procedure): SymbolicValues = {
-  Logger.debug(s"Running Symbolic Value Analysis for ${p.name}")
+  Logger.info(s"Generating Symbolic Values for ${p.name}")
   val symValDomain = SymbolicValueDomain()
   val symValSolver = worklistSolver[SymbolicValues, symValDomain.type](symValDomain)
   symValSolver.solveProc(p)._2
