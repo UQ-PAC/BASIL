@@ -803,7 +803,7 @@ object RunUtils {
               val setGraph = SetDSA.getLocal(proc, Some(SVAResults), Some(constraints))
               writeToFile(setGraph.toDot, s"cntlm_${proc.name}.SetDSA")
               setDSA += (proc -> setGraph)
-            if config.analyses.contains(DSAAnalysis.Sad) then
+            if config.analyses.contains(DSAAnalysis.Norm) then
               val sadGraph = SadDSA.getLocal(proc, Some(SVAResults), Some(constraints))
               writeToFile(sadGraph.toDot, s"cntlm_${proc.name}.SadDSA")
               sadDSA += (proc -> sadGraph)
