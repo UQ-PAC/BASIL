@@ -33,7 +33,7 @@ case class StaticAnalysisConfig(
 )
 
 enum DSAAnalysis {
-  case Sad, Set, Field
+  case Plain, Set, Field
 }
 
 case class DSAConfig(analyses: Set[DSAAnalysis])

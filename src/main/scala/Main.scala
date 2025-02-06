@@ -140,7 +140,7 @@ object Main {
      doc = "Disable producing irreducible loops when --analyse is passed (does nothing without --analyse)"
     )
     noIrreducibleLoops: Flag,
-    @arg(name = "dsa", doc = "Perform Data Structure Analysis if no version is specified perform constraint generation (requires --simplify flag) (none|sad|field|set|all)")
+    @arg(name = "dsa", doc = "Perform Data Structure Analysis if no version is specified perform constraint generation (requires --simplify flag) (none|plain|field|set|all)")
     dsaType: Option[String],
   )
 
@@ -211,11 +211,11 @@ object Main {
       conf.dsaType match
         case Some("set") => Some(DSAConfig(immutable.Set(DSAAnalysis.Set)))
         case Some("field") => Some(DSAConfig(immutable.Set(DSAAnalysis.Field)))
-        case Some("sad") => Some(DSAConfig(immutable.Set(DSAAnalysis.Sad)))
-        case Some("all") =>  Some(DSAConfig(immutable.Set(DSAAnalysis.Set, DSAAnalysis.Field, DSAAnalysis.Sad)))
+        case Some("plain") => Some(DSAConfig(immutable.Set(DSAAnalysis.Plain)))
+        case Some("all") =>  Some(DSAConfig(immutable.Set(DSAAnalysis.Set, DSAAnalysis.Field, DSAAnalysis.Plain)))
         case Some("none") => Some(DSAConfig(immutable.Set.empty))
         case None => None
-        case Some(_) => throw new IllegalArgumentException("Illegal option to dsa, allowed are: (none|set|field|sad|all)")
+        case Some(_) => throw new IllegalArgumentException("Illegal option to dsa, allowed are: (none|set|field|plain|all)")
     } else {
       None
     }
