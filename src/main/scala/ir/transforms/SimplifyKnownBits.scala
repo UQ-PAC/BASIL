@@ -574,11 +574,11 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
         }
     }
 
-    // Joins the same variables and merges shared TNum values, otherwise replaces with Top
+    // Joins the same variables and merges TNum values using bitwise OR
     // e.g. Join: x = 0011, x = 1111
     // x = 0011 => value = 0011, mask = 0000
     // x = 1111 => value = 1111, mask = 0000
-    // Joined x = TT11 => value = 0011, mask = 1100
+    // Joined x = 1111 => value = 1111, mask = 0000
     override def join(left: Map[Variable, TNum], right: Map[Variable, TNum], pos: Block): Map[Variable, TNum] = {
         (left.keySet ++ right.keySet).map { key =>
             val leftTNum = left.getOrElse(key, TNum(BigInt(0), BigInt(-1)))
@@ -590,11 +590,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
             } else if (!left.contains(key) && right.contains(key)) {
                 key -> rightTNum
             } else {
-                // Change to bitwise OR
-                val newValue = (leftTNum.value & ~leftTNum.mask) & (rightTNum.value & ~rightTNum.mask)
-                val newMask = leftTNum.mask | rightTNum.mask | (leftTNum.value ^ rightTNum.value)
-                
-                key -> TNum(newValue, newMask)
+                key -> leftTNum.TOR(rightTNum)
             }
         }.toMap
     }
