@@ -1,5 +1,5 @@
 import org.scalatest.funsuite.AnyFunSuite
-import util.{LogLevel, Logger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
+import util.{LogLevel, Logger, DebugDumpIRLogger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
 
 import Numeric.Implicits.*
 import java.io.{BufferedWriter, File, FileWriter}
@@ -21,6 +21,7 @@ trait SystemTests extends AnyFunSuite, BASILTest {
   }
 
   Logger.setLevel(LogLevel.WARN)
+  DebugDumpIRLogger.setLevel(LogLevel.OFF)
 
   object TestResult {
     val csvHeader = "testCase,passed,verified,shouldVerify,hasExpected,timedOut,matchesExpected,translateTime,verifyTime"

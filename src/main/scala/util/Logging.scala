@@ -24,6 +24,8 @@ class GenericLogger(
 
   private var level: LogLevel = defaultLevel
 
+  def getLevel() = level
+
   private def setColour(value: Boolean, setChildren: Boolean = false): Unit = {
     ANSIColour = value
     if (setChildren) {

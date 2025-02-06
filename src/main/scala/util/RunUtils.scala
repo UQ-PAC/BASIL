@@ -654,8 +654,12 @@ object RunUtils {
     transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
     AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
 
-    for (p <- ctx.program.procedures) {
-      DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
+    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
+      val dir = File("./graphs/")
+      if (!dir.exists()) then dir.mkdirs()
+      for (p <- ctx.program.procedures) {
+        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
+      }
     }
     transforms.liftLinuxAssertFail(ctx)
 
