@@ -101,3 +101,22 @@ class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransf
     new_t
   }
 }
+
+class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S]/*, stateDom: AbstractDomain[S] */) extends AbstractDomain[(T, S)](rely: T) {
+  def join(a: (T, S), b: (T, S), pos: Block): (T, S) = (intDom.join(a._1, b._1), stateLattice.join(a._2, b._2))
+  
+  def transfer(a: (T, S), b: Command): (T, S) = {
+    // stabilise the pre-state under the rely
+    var pre_state = intDom.apply(rely, a._2)
+    // derive post-state from the stabilised pre-state
+    var post_state = stateTransfer(pre_state, b)
+    // derive the new guarantee
+    var guar = intDom.join(a._1, intDom.derive(pre_state, b))
+    // return results
+    (guar, post_state)
+  }
+  
+  def top: (T, S) = ???
+  
+  def bot: (T, S) = (intDom.bot, stateDom.bot)
+}
