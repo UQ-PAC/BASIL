@@ -90,7 +90,7 @@ class CILVisitorImpl(val v: CILVisitor) {
       }
       case Repeat(repeats, arg) => {
         val narg = visit_expr(arg)
-        if (narg ne arg) Repeat(repeats, arg) else n
+        if (narg ne arg) Repeat(repeats, narg) else n
       }
       case ZeroExtend(bits, arg) => {
         val narg = visit_expr(arg)
@@ -132,8 +132,8 @@ class CILVisitorImpl(val v: CILVisitor) {
         i.target = visit_rvar(i.target)
         i
       case m: MemoryStore =>
-        m.value = visit_expr(m.value)
         m.index = visit_expr(m.index)
+        m.value = visit_expr(m.value)
         m.mem = visit_mem(m.mem)
         m
       case m: MemoryLoad =>
