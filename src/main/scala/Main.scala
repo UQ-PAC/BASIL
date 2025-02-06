@@ -4,15 +4,15 @@ import bap.*
 import boogie.*
 import translating.*
 import util.RunUtils
-import scala.sys.process.*
 
+import scala.sys.process.*
 import java.io.File
 import scala.collection.mutable.{ArrayBuffer, Set}
 import scala.collection.{immutable, mutable}
 import scala.language.postfixOps
 import scala.sys.process.*
 import util.*
-import mainargs.{main, arg, ParserForClass, Flag}
+import mainargs.{Flag, ParserForClass, arg, main}
 
 object Main {
 
@@ -59,13 +59,13 @@ object Main {
   @main(name = "BASIL")
   case class Config(
     @arg(
-      name = "load-directory-bap",
-      doc = "Load relf, adt, and bir from directory (and spec from parent directory)"
+     name = "load-directory-bap",
+     doc = "Load relf, adt, and bir from directory (and spec from parent directory)"
     )
     bapInputDirName: Option[String],
     @arg(
-      name = "load-directory-gtirb",
-      doc = "Load relf, gts, and bir from directory (and spec from parent directory)"
+     name = "load-directory-gtirb",
+     doc = "Load relf, gts, and bir from directory (and spec from parent directory)"
     )
     gtirbInputDirName: Option[String],
     @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file")
@@ -79,15 +79,15 @@ object Main {
     @arg(name = "boogie-use-lambda-stores", doc = "Use lambda representation of store operations.")
     lambdaStores: Flag,
     @arg(
-      name = "boogie-procedure-rg",
-      doc = "Switch version of procedure rely/guarantee checks to emit. (function|ifblock)"
+     name = "boogie-procedure-rg",
+     doc = "Switch version of procedure rely/guarantee checks to emit. (function|ifblock)"
     )
     procedureRG: Option[String],
     @arg(name = "verbose", short = 'v', doc = "Show extra debugging logs (the same as -vl log)")
     verbose: Flag,
     @arg(
-      name = "vl",
-      doc = s"Show extra debugging logs for a specific logger (${Logger.allLoggers.map(_.name).mkString(", ")})."
+     name = "vl",
+     doc = s"Show extra debugging logs for a specific logger (${Logger.allLoggers.map(_.name).mkString(", ")})."
     )
     verboseLog: Seq[String] = Seq(),
     @arg(name = "analyse", doc = "Run static analysis pass.")
@@ -99,8 +99,8 @@ object Main {
     @arg(name = "main-procedure-name", short = 'm', doc = "Name of the main procedure to begin analysis at.")
     mainProcedureName: String = "main",
     @arg(
-      name = "procedure-call-depth",
-      doc = "Cull procedures beyond this call depth from the main function (defaults to Int.MaxValue)"
+     name = "procedure-call-depth",
+     doc = "Cull procedures beyond this call depth from the main function (defaults to Int.MaxValue)"
     )
     procedureDepth: Int = Int.MaxValue,
     @arg(name = "trim-early", doc = "Cull procedures BEFORE running analysis")
@@ -112,23 +112,23 @@ object Main {
     @arg(name = "analysis-results-dot", doc = "Log analysis results in .dot form at specified path.")
     analysisResultsDot: Option[String],
     @arg(
-      name = "threads",
-      short = 't',
-      doc = "Separates threads into multiple .bpl files with given output filename as prefix (requires --analyse flag)"
+     name = "threads",
+     short = 't',
+     doc = "Separates threads into multiple .bpl files with given output filename as prefix (requires --analyse flag)"
     )
     threadSplit: Flag,
     @arg(name = "parameter-form", doc = "Lift registers to local variables passed by parameter")
     parameterForm: Flag,
     @arg(
-      name = "summarise-procedures",
-      doc = "Generates summaries of procedures which are used in pre/post-conditions (requires --analyse flag)"
+     name = "summarise-procedures",
+     doc = "Generates summaries of procedures which are used in pre/post-conditions (requires --analyse flag)"
     )
     summariseProcedures: Flag,
     @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (implies --parameter-form)")
     simplify: Flag,
     @arg(
-      name = "validate-simplify",
-      doc = "Emit SMT2 check for validation of simplification expression rewrites 'rewrites.smt2'"
+     name = "validate-simplify",
+     doc = "Emit SMT2 check for validation of simplification expression rewrites 'rewrites.smt2'"
     )
     validateSimplify: Flag,
     @arg(name = "verify", doc = "Run boogie on the resulting file")
@@ -136,10 +136,12 @@ object Main {
     @arg(name = "memory-regions", doc = "Performs static analysis to separate memory into discrete regions in Boogie output (requires --analyse flag) (mra|dsa) (dsa is recommended over mra)")
     memoryRegions: Option[String],
     @arg(
-      name = "no-irreducible-loops",
-      doc = "Disable producing irreducible loops when --analyse is passed (does nothing without --analyse)"
+     name = "no-irreducible-loops",
+     doc = "Disable producing irreducible loops when --analyse is passed (does nothing without --analyse)"
     )
-    noIrreducibleLoops: Flag
+    noIrreducibleLoops: Flag,
+    @arg(name = "dsa", doc = "Perform Data Structure Analysis if no version is specified perform constraint generation (requires --simplify flag) (none|sad|field|set|all)")
+    dsaType: Option[String],
   )
 
   def main(args: Array[String]): Unit = {
@@ -205,6 +207,19 @@ object Main {
       None
     }
 
+    val dsa: Option[DSAConfig] =  if (conf.simplify.value) {
+      conf.dsaType match
+        case Some("set") => Some(DSAConfig(immutable.Set(DSAAnalysis.Set)))
+        case Some("field") => Some(DSAConfig(immutable.Set(DSAAnalysis.Field)))
+        case Some("sad") => Some(DSAConfig(immutable.Set(DSAAnalysis.Sad)))
+        case Some("all") =>  Some(DSAConfig(immutable.Set(DSAAnalysis.Set, DSAAnalysis.Field, DSAAnalysis.Sad)))
+        case Some("none") => Some(DSAConfig(immutable.Set.empty))
+        case None => None
+        case Some(_) => throw new IllegalArgumentException("Illegal option to dsa, allowed are: (none|set|field|sad|all)")
+    } else {
+      None
+    }
+
     val boogieMemoryAccessMode = if (conf.lambdaStores.value) {
       BoogieMemoryAccessMode.LambdaStoreSelect
     } else {
@@ -240,7 +255,8 @@ object Main {
       validateSimp = conf.validateSimplify.value,
       staticAnalysis = staticAnalysis,
       boogieTranslation = boogieGeneratorConfig,
-      outputPrefix = conf.outFileName
+      outputPrefix = conf.outFileName,
+      dsaConfig = dsa,
     )
 
     RunUtils.run(q)
