@@ -785,13 +785,6 @@ object RunUtils {
     if conf.dsaConfig.nonEmpty then
       val config = conf.dsaConfig.get
 
-//      ctx.program.procedures.foreach (
-//        proc =>
-//          proc.stackSize  = estimates.collectFirst {
-//            case (name: String, size: Int) if proc.name.startsWith(name) => size
-//          }
-//      )
-      // todo make args
       val main = ctx.program.mainProcedure
       var sva: Map[Procedure, SymbolicValues] = Map.empty
       var cons: Map[Procedure, Set[Constraint]] = Map.empty
@@ -801,7 +794,7 @@ object RunUtils {
       var sadDSABU: Map[Procedure, SadGraph] = Map.empty
       computeDSADomain(ctx.program).foreach(
         proc =>
-//          if proc.name.startsWith("tunnel_4") then
+//          if proc.name.startsWith("des_key_schedule") then
             val SVAResults = getSymbolicValues(proc)
             val constraints = generateConstraints(proc)
             sva += (proc -> SVAResults)
@@ -825,16 +818,23 @@ object RunUtils {
       dsaContext = Some(DSAContext(sva, cons, setDSA, fieldDSA, sadDSA))
       sadDSA.values.foreach(_.localCorrectness())
       DSALogger.info("performed correctness check")
-      sadDSABU = /*sadDSA.view.mapValues(_.clone).toMap*/
-        sadDSA.map {
-          case (proc, graph) =>
-            DSALogger.info(s"cloning ${proc.name}")
-            (proc, graph.clone)
-        }
+      sadDSABU = sadDSA.view.mapValues(_.clone).toMap
 
       sadDSABU.values.foreach(_.localCorrectness())
       DSALogger.info("performed cloning")
-//      sadDSABU.values.foreach(f => f.BUPhase(sadDSA))
+
+      val visited: mutable.Set[Procedure] = mutable.Set.empty
+      val queue = mutable.Queue[Procedure]().enqueueAll(sadDSABU.keys)
+
+      while queue.nonEmpty do
+        val proc = queue.dequeue()
+        if !proc.calls.forall(visited.contains) then
+          queue.enqueue(proc)
+        else
+          sadDSABU(proc).BUPhase(sadDSABU)
+          visited += proc
+
+      sadDSABU.values.foreach(_.localCorrectness())
 
     if (q.runInterpret) {
       Logger.info("Start interpret")
