@@ -229,6 +229,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
       case c: TypeConstructorContext => visitIdent(c.str).match {
         case "FPRounding" => BitVecType(3)
         case "integer" => BitVecType(64)
+        case "boolean" => BoolType
         case _ => throw Exception(s"unknown type ${ctx.getText}")
       }
       case _ => throw Exception(s"unknown type ${ctx.getText}")
