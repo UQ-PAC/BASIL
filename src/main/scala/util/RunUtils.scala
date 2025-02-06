@@ -22,7 +22,7 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{DataStructureAnalysis, Graph, SymValueSet, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValueDomain, SymbolicValues, getSymbolicValues}
+import analysis.data_structure_analysis.{Constraint, DataStructureAnalysis, generateConstraints, Graph, SymValueSet, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValueDomain, SymbolicValues, getSymbolicValues}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
@@ -77,7 +77,7 @@ case class StaticAnalysisContext(
 
 case class DSAContext(
  sva: Map[Procedure, SymbolicValues],
-// constraints: Map[Procedure, Set[Constraint]],
+ constraints: Map[Procedure, Set[Constraint]],
 )
 
 /** Results of the main program execution.
@@ -742,19 +742,20 @@ object RunUtils {
 
       val main = ctx.program.mainProcedure
       var sva: Map[Procedure, SymbolicValues] = Map.empty
+      var cons: Map[Procedure, Set[Constraint]] = Map.empty
 
       ctx.program.procedures.foreach(
         proc =>
           val SVAResults = getSymbolicValues(proc)
-//          val constraints = generateConstraints(proc)
+          val constraints = generateConstraints(proc)
           sva += (proc -> SVAResults)
-//          cons += (proc -> constraints)
+          cons += (proc -> constraints)
 
       )
 
       DSALogger.info("Finished local phase")
 
-      dsaContext = Some(DSAContext(sva))
+      dsaContext = Some(DSAContext(sva, cons))
 
 
     if (q.runInterpret) {
