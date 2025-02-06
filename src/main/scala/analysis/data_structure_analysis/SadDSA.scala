@@ -3,7 +3,7 @@ package analysis.data_structure_analysis
 import analysis.data_structure_analysis.DSAPhase.{BU, Local}
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
-import ir.{Expr, Procedure}
+import ir.{BitVecType, Expr, LocalVar, Procedure}
 import util.SadDSALogger as Logger
 
 import scala.collection.mutable.ArrayBuffer
@@ -25,7 +25,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
   def BUPhase(locals: Map[Procedure, SadGraph]): Unit = {
     phase = BU
     constraints.foreach {
-      case dcc: DirectCallConstraint if locals.contains(dcc.target) =>
+      case dcc: DirectCallConstraint if locals.contains(dcc.target) && !dcc.target.isExternal.getOrElse(false) =>
         val oldToNew = mutable.Map[SadNode, SadNode]()
         dcc.inParams.foreach {
           case (formal, actual) =>
@@ -33,15 +33,31 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
             .exprToCells(formal)
             .map(
               cell =>
-                cell
+                val (node, offset) = findNode(cell
                   .node
-                  .clone(this, true, oldToNew)
-                  .get(cell.interval)
+                  .clone(this, true, oldToNew))
+                node
+                  .get(cell.interval.move(i => i + offset))
             )
             val actuals = exprToCells(actual)
-            mergeCells(formals ++ actuals)
+            if (formals ++ actuals).nonEmpty then  mergeCells(formals ++ actuals)
         }
-        dcc.outParmas
+
+        dcc.outParmas.foreach {
+          case (out, actual) =>
+            val actuals = locals(dcc.target)
+            .exprToCells(actual)
+            .map(
+              cell =>
+                val (node, offset) = findNode(cell
+                  .node
+                  .clone(this, true, oldToNew))
+                node
+                  .get(cell.interval.move(i => i + offset))
+            )
+            val outs = exprToCells(out)
+            if (actuals ++ outs).nonEmpty then mergeCells(actuals ++ outs)
+        }
       case icc: IndirectCallConstraint =>
       case _ =>
     }
@@ -90,12 +106,14 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
         val oldCopy = node.clone(copy)
         assert(!oldToNew.contains(node))
         oldToNew.update(node, oldCopy)
+        println(s"adding current node with offset: $offset")
         val curCopy = current.clone(copy, true, oldToNew)
         queue.enqueue(current)
         copy.solver.unify(oldCopy.term, curCopy.term, offset)
     }
 
     copy.nodes = this.nodes.view.mapValues(oldToNew.apply).toMap
+    assert(copy.nodes.keys == this.nodes.keys)
     copy.localCorrectness()
     copy
   }
@@ -271,9 +289,24 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
       val newToOlds: mutable.Map[SadCell, Set[SadCell]] = mutable.Map.empty
       while queue.nonEmpty do
         val cell = queue.dequeue()
-        val (overlapping, rest) = queue.toSet.partition(cell2 => cell.interval.isOverlapping(cell2.interval))
-        queue.dequeueAll(overlapping.contains)
-        val unifiedInterval = if overlapping.isEmpty then cell.interval else overlapping.map(_.interval).reduce(Interval.join)
+        var unifiedInterval = cell.interval
+        var overlapping: Set[SadCell] = Set.empty
+        while (
+          {
+            val old = unifiedInterval
+            overlapping ++= queue.toSet.filter(cell2 => unifiedInterval.isOverlapping(cell2.interval))
+            queue.dequeueAll(overlapping.contains)
+            unifiedInterval = if overlapping.isEmpty then cell.interval else overlapping.map(_.interval).reduce(Interval.join)
+            unifiedInterval != old
+          }
+        ) {}
+
+//        overlapping += (queue.toSet.filter(cell2 => cell.interval.isOverlapping(cell2.interval))
+//          println(overlapping)
+//          queue.dequeueAll(overlapping.contains)
+//          unifiedInterval = if overlapping.isEmpty then cell.interval else overlapping.map(_.interval).reduce(Interval.join)
+
+
         val newCell = SadCell(resultNode, unifiedInterval)
         newToOlds.update(newCell, overlapping + cell)
         resultNode.add(newCell)
@@ -452,6 +485,7 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase], size: Option
   def add(cell: SadCell): Unit = {
     require(cell.node == this, "added cell must have a reference to this node")
     _cells = _cells.appended(cell).sorted
+    assert(nonOverlappingProperty)
   }
 
   private def selfCollapse(): Unit = {
@@ -542,9 +576,11 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase], size: Option
 
   }
 
+
   override def add(interval: Interval): SadCell = {
     val (newNode, offset) = graph.findNode(this)
     if this != newNode then
+//      println(offset)
       newNode.add(interval.move(i => i + offset))
     else if !isCollapsed then
       val overlapping: Seq[SadCell] = cells.filter(_.interval.isOverlapping(interval))
@@ -560,6 +596,7 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase], size: Option
         res
 
       _cells = cells.diff(overlapping).appended(newCell).sorted
+      assert(nonOverlappingProperty)
       newCell
     else
       collapsed.get
@@ -568,10 +605,16 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase], size: Option
 
   def get(interval: Interval): SadCell = {
     val (newNode, offset) = graph.findNode(this)
+//    println(s"in get with $offset")
     if newNode != this then
       newNode.get(interval.move(i => i + offset))
     else if isCollapsed then collapsed.get else
       val exactMatches = cells.filter(_.interval.contains(interval))
+//      println(cells)
+//      println(interval)
+      if exactMatches.size != 1 then
+        println(s"id: $id")
+        println(exactMatches.size)
       assert(exactMatches.size == 1, "Expected exactly one overlapping interval")
       exactMatches.head
   }

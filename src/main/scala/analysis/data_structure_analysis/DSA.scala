@@ -26,7 +26,6 @@ enum DSAPhase {
   case Pre, Local, BU, TD
 }
 
-
 case class Interval(start: Int, end: Int) {
   require(start < end)
 
@@ -40,7 +39,7 @@ case class Interval(start: Int, end: Int) {
     start <= interval.start && end >= interval.end
   def isOverlapping(other: Interval): Boolean = !(start >= other.end || other.start >= end)
   def join(other: Interval): Interval = {
-    require(isOverlapping(other), "Expected overlapping Interval for a join")
+    //require(isOverlapping(other), "Expected overlapping Interval for a join")
     Interval(math.min(start, other.start), math.max(end, other.end))
   }
 }
@@ -109,7 +108,7 @@ trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Nod
         if offsets.isTop then
           results + node.collapse()
         else
-          results ++ offsets.getOffsets.map(node.get)
+          results ++ offsets.getOffsets.map(node.add)
     }
   }
 
@@ -145,7 +144,12 @@ trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Nod
   }
 
   def buildNodes: Map[SymBase, Node] = {
-    constraints.foldLeft(Map[SymBase, Node]()) {
+    val init = sva.state.foldLeft(Map[SymBase, Node]()) {
+      case (m, (variable, valueSet)) =>
+        symValToNodes(valueSet.removeNonAddress(i => i >= 11000), m)
+    }
+
+    constraints.foldLeft(init) {
       case (resultMap, constraint) => constraint match
         case constraint: BinaryConstraint => binaryConstraintToNodes(constraint, resultMap)
         case dcc @ DirectCallConstraint(call) =>
@@ -172,9 +176,8 @@ trait DSANode[Cell <: NodeCell & DSACell](val size: Option[Int]) {
   def nonOverlappingProperty: Boolean = {
     if cells.size <= 1 then true
     else
-      val intervals = cells.map(_.interval)
-      val overlapping = false
-      intervals.exists(interval1 =>
+      val intervals = cells.map(_.interval).sorted
+      !intervals.exists(interval1 =>
         intervals.exists(interval2 => interval1 != interval2 && interval1.isOverlapping(interval2)))
   }
 
