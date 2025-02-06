@@ -279,6 +279,8 @@ class Procedure private (
 
   def makeCall(label: Option[String] = None) = DirectCall(this, label, outParamDefaultBinding, inParamDefaultBinding)
 
+  
+  var stackSize: Option[Int] = None
   var isExternal : Option[Boolean] = None
 
   /**
