@@ -102,7 +102,7 @@ class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransf
   }
 }
 
-class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S])(rely: T) extends AbstractDomain[(T, S)] {
+class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T) extends AbstractDomain[(T, S)] {
   def join(a: (T, S), b: (T, S), pos: Block): (T, S) = (intDom.join(a._1, b._1), intDom.stateLattice.lub(a._2, b._2))
   
   def transfer(a: (T, S), b: Command): (T, S) = {
@@ -119,4 +119,37 @@ class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S])(rely: T)
   def top: (T, S) = ???
   
   def bot: (T, S) = (intDom.bot, intDom.stateLattice.bottom)
+}
+
+class RelyGuaranteeGenerator[T, S](intDom: InterferenceDomain[T, S], threads: List[Procedure]) {
+  var old_guars, new_guars = threads.map(_ -> intDom.bot).toMap
+  var fixpoint_reached = false
+  val max_iterations = 50
+  var iterations = 0
+  while (!fixpoint_reached && iterations < max_iterations) {
+    for (p <- threads) {
+      // construct rely for p
+      var rely = intDom.bot
+      for (other_p <- threads) {
+        if (p != other_p) {
+          rely = intDom.join(rely, new_guars(other_p))
+        }
+      }
+      // generate new guar for p
+      val productDom = InterferenceProductDomain[T, S](intDom, rely)
+      val solver = transforms.worklistSolver(productDom)
+      val (_, block_postconditions) = solver.solveProc(p)
+      val guar = block_postconditions(???)._1
+      new_guars = new_guars + (p -> guar)
+    }
+    // check if fixpoint is reached
+    fixpoint_reached = true
+    for (p <- threads) {
+      if (old_guars(p) != new_guars(p)) {
+        fixpoint_reached = false
+      }
+    }
+    iterations = iterations + 1
+    old_guars = new_guars
+  }
 }
