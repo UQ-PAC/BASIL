@@ -98,7 +98,7 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement
         val reads = ir.transforms.externalCallReads(c.target.procName).toSet[Variable]
         d match {
           case Left(value) =>
-            if reads.contains(value) then
+            if writes.contains(value) then
               Map()
             else
               Map(d -> IdEdge())
@@ -113,7 +113,7 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement
         val reads = c.actualParams.flatMap(_._2.variables).toSet
         d match {
           case Left(value) =>
-            if reads.contains(value) then
+            if writes.contains(value) then
               Map()
             else
               Map(d -> IdEdge())
