@@ -177,21 +177,20 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, List[InsnSem
           procedure.removeBlocks(block)
         } else {
           if (!blockOutgoingEdges.contains(blockUUID)) {
-            throw Exception (s"block ${block.label} in subroutine ${procedure.name} has no outgoing edges")
-          }
-          val outgoingEdges = blockOutgoingEdges(blockUUID)
-          if (outgoingEdges.isEmpty) {
-            throw Exception(s"block ${block.label} in subroutine ${procedure.name} has no outgoing edges")
-          }
-
-          val (calls, jump) = if (outgoingEdges.size == 1) {
-            val edge = outgoingEdges.head
-            handleSingleEdge(block, edge, procedure, procedures)
+            Logger.warn(s"block ${block.label} in subroutine ${procedure.name} no outgoing edges")
+          } else if (blockOutgoingEdges(blockUUID).isEmpty) {
+            Logger.warn(s"block ${block.label} in subroutine ${procedure.name} has no outgoing edges")
           } else {
-            handleMultipleEdges(block, outgoingEdges, procedure)
+            val outgoingEdges = blockOutgoingEdges(blockUUID)
+            val (calls, jump) = if (outgoingEdges.size == 1) {
+              val edge = outgoingEdges.head
+              handleSingleEdge(block, edge, procedure, procedures)
+            } else {
+              handleMultipleEdges(block, outgoingEdges, procedure)
+            }
+            calls.foreach(c => block.statements.append(c))
+            block.replaceJump(jump)
           }
-          calls.foreach(c => block.statements.append(c))
-          block.replaceJump(jump)
 
           if (block.statements.nonEmpty) {
             cleanUpIfPCAssign(block, procedure)

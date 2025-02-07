@@ -127,7 +127,7 @@ object IRLoading {
     val mods = ir.modules
     val cfg = ir.cfg.get
 
-    def parse_asl_stmt(line: String): StmtContext = {
+    def parse_asl_stmt(line: String): Option[StmtContext] = {
       val lexer = ASLpLexer(CharStreams.fromString(line))
       val tokens = CommonTokenStream(lexer)
       val parser = ASLpParser(tokens)
@@ -135,7 +135,7 @@ object IRLoading {
       parser.setBuildParseTree(true)
 
       try {
-        parser.stmt()
+        Some(parser.stmt())
       } catch {
         case e: org.antlr.v4.runtime.misc.ParseCancellationException =>
           val extra = e.getCause match {
@@ -151,7 +151,8 @@ object IRLoading {
             case o => o.toString
           }
           Logger.error(s"""Semantics parse error:\n  line: $line\n$extra""")
-          throw e
+          Logger.error(e.getStackTrace.mkString("\n"))
+          None
       }
     }
 
@@ -165,7 +166,14 @@ object IRLoading {
           }
           InsnSemantics.Error(m("opcode").convertTo[String], m("error").convertTo[String])
         }
-        case array @ JsArray(_) => InsnSemantics.Result(array.convertTo[Array[String]].map(parse_asl_stmt))
+        case array @ JsArray(_) => {
+          val xs = array.convertTo[Array[String]].map(parse_asl_stmt)
+          if (xs.exists(_.isEmpty))  {
+            InsnSemantics.Error("?", "parseError")
+          } else {
+            InsnSemantics.Result(xs.map(_.get))
+          }
+        }
         case s => deserializationError(s"Bad sem format $s")
       }
     }
@@ -173,8 +181,6 @@ object IRLoading {
     val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, List[InsnSemantics]]])
 
     val parserMap : Map[String, List[InsnSemantics]] = semantics.flatten.toMap
-
-
     val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress)
     GTIRBConverter.createIR()
   }
