@@ -402,7 +402,36 @@ def inOutParams(
     }
   }.toMap
 
-  inout.withDefaultValue((overapprox, overapprox))
+
+  // callgraph fixed point :(
+
+  var newParams = inout
+  var oldParams = Map[Procedure, (Set[Variable], Set[Variable])]()
+
+  while (newParams != oldParams) {
+    oldParams = newParams
+
+    for (proc <- p.procedures.filter(newParams.contains)) {
+      val origIn = oldParams(proc)._1
+      val origOut = oldParams(proc)._2
+
+      val modifiedFromCall = proc.calls.flatMap(p => oldParams.get(p).toSet.flatMap(_._2)).filterNot(_.isInstanceOf[LocalVar])
+
+      // TODO: needs to be more precise by actually checking the use reaches the procedure entry
+      val liveFromCall = proc.calls.flatMap(p => oldParams.get(p).toSet.flatMap(_._1)).filterNot(_.isInstanceOf[LocalVar])
+
+      val writes = readWrites(proc).writes ++ modifiedFromCall
+
+      val newOut = origOut ++ lives(proc)._2.intersect(writes)
+      val liveFromReturn = newOut
+      val newIn = origIn ++ ((liveFromReturn ++ liveFromCall)-- (notLive(proc)))
+      newParams = newParams.updated(proc, (newIn, newOut))
+    }
+
+  }
+
+
+  newParams.withDefaultValue((overapprox, overapprox))
 }
 
 class SetActualParams(
