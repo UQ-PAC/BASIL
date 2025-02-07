@@ -139,7 +139,9 @@ object Main {
       name = "no-irreducible-loops",
       doc = "Disable producing irreducible loops when --analyse is passed (does nothing without --analyse)"
     )
-    noIrreducibleLoops: Flag
+    noIrreducibleLoops: Flag,
+    @arg(name = "dsa", doc = "Perform Data Structure Analysis if no version is specified perform constraint generation (requires --simplify flag) (none|norm|field|set|all)")
+    dsaType: Option[String],
   )
 
   def main(args: Array[String]): Unit = {
@@ -205,6 +207,19 @@ object Main {
       None
     }
 
+    val dsa: Option[DSAConfig] =  if (conf.simplify.value) {
+      conf.dsaType match
+        case Some("set") => Some(DSAConfig(immutable.Set(DSAAnalysis.Set)))
+        case Some("field") => Some(DSAConfig(immutable.Set(DSAAnalysis.Field)))
+        case Some("norm") => Some(DSAConfig(immutable.Set(DSAAnalysis.Norm)))
+        case Some("all") =>  Some(DSAConfig(immutable.Set(DSAAnalysis.Set, DSAAnalysis.Field, DSAAnalysis.Norm)))
+        case Some("none") => Some(DSAConfig(immutable.Set.empty))
+        case None => None
+        case Some(_) => throw new IllegalArgumentException("Illegal option to dsa, allowed are: (none|set|field|norm|all)")
+    } else {
+      None
+    }
+
     val boogieMemoryAccessMode = if (conf.lambdaStores.value) {
       BoogieMemoryAccessMode.LambdaStoreSelect
     } else {
@@ -240,7 +255,8 @@ object Main {
       validateSimp = conf.validateSimplify.value,
       staticAnalysis = staticAnalysis,
       boogieTranslation = boogieGeneratorConfig,
-      outputPrefix = conf.outFileName
+      outputPrefix = conf.outFileName,
+      dsaConfig = dsa
     )
 
     RunUtils.run(q)

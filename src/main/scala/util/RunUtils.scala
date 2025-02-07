@@ -22,7 +22,7 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{DataStructureAnalysis, Graph, SymbolicAddress, SymbolicAddressAnalysis}
+import analysis.data_structure_analysis.{Constraint, DataStructureAnalysis, getSymbolicValues, generateConstraints, Graph, SymbolicAddress, SymbolicValues, SymbolicAddressAnalysis}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
@@ -75,9 +75,15 @@ case class StaticAnalysisContext(
   ssaResults: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
 )
 
+
+case class DSAContext(
+ sva: Map[Procedure, SymbolicValues],
+ constraints: Map[Procedure, Set[Constraint]],
+)
+
 /** Results of the main program execution.
   */
-case class BASILResult(ir: IRContext, analysis: Option[StaticAnalysisContext], boogie: ArrayBuffer[BProgram])
+case class BASILResult(ir: IRContext, analysis: Option[StaticAnalysisContext], dsa: Option[DSAContext], boogie: ArrayBuffer[BProgram])
 
 
 /** Tools for loading the IR program into an IRContext.
@@ -706,7 +712,7 @@ object RunUtils {
     Logger.info("[!] Loading Program")
     var q = conf
 
-    var ctx = IRLoading.load(q.loading)
+    var ctx = q.context.getOrElse(IRLoading.load(q.loading))
 
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))
@@ -756,6 +762,30 @@ object RunUtils {
 
       doSimplify(ctx, conf.staticAnalysis)
     }
+    
+    
+    // SVA
+    var dsaContext: Option[DSAContext] = None
+    if conf.dsaConfig.nonEmpty then
+      val config = conf.dsaConfig.get
+
+      val main = ctx.program.mainProcedure
+      var sva: Map[Procedure, SymbolicValues] = Map.empty
+      var cons: Map[Procedure, Set[Constraint]] = Map.empty
+
+      ctx.program.procedures.foreach(
+        proc =>
+          val SVAResults = getSymbolicValues(proc)
+          val constraints = generateConstraints(proc)
+          sva += (proc -> SVAResults)
+          cons += (proc -> constraints)
+
+      )
+
+      DSALogger.info("Finished local phase")
+
+      dsaContext = Some(DSAContext(sva, cons))
+      
 
     if (q.runInterpret) {
       Logger.info("Start interpret")
@@ -803,7 +833,7 @@ object RunUtils {
     assert(invariant.singleCallBlockEnd(ctx.program))
 
 
-    BASILResult(ctx, analysis, boogiePrograms)
+    BASILResult(ctx, analysis, dsaContext, boogiePrograms)
   }
 
   /** Use static analysis to resolve indirect calls and replace them in the IR until fixed point.

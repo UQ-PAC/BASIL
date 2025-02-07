@@ -1,0 +1,381 @@
+import analysis.data_structure_analysis.*
+import boogie.SpecGlobal
+import ir.Endian.LittleEndian
+import ir.dsl.*
+import ir.*
+import org.scalatest.funsuite.AnyFunSuite
+import specification.Specification
+import util.*
+
+import scala.collection.immutable.{AbstractSeq, LinearSeq}
+
+class SVATest extends AnyFunSuite {
+
+  def runAnalysis(program: Program): StaticAnalysisContext = {
+    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+
+    val emptySpec = Specification(Set(), Set(), Map(), List(), List(), List(), Set())
+    val emptyContext = IRContext(List(), Set(), Set(), Set(), Map(), emptySpec, program)
+    RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
+  }
+
+  def runTest(path: String): BASILResult = {
+    RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = path + ".adt",
+          relfFile = path + ".relf",
+        ),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(DSAConfig(Set.empty))
+      )
+    )
+  }
+
+  def runTest(context: IRContext): BASILResult = {
+    RunUtils.loadAndTranslate(
+      BASILConfig(
+        context = Some(context),
+        loading = ILLoadingConfig(
+          inputFile = "",
+          relfFile = "",
+        ),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(DSAConfig(Set.empty))
+      )
+    )
+  }
+
+  def programToContext(program: Program, globals: Set[SpecGlobal] = Set.empty, globalOffsets: Map[BigInt, BigInt] = Map.empty): IRContext = {
+    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+
+    val spec = Specification(Set(), globals, Map(), List(), List(), List(), Set())
+    IRContext(List(), Set(), globals, Set(), globalOffsets, spec, program)
+  }
+
+  test("malloc") {
+    val mem = SharedMemory("mem", 64, 8)
+    val R0 = Register("R0", 64)
+    val R1 = Register("R1", 64)
+    val globalOffsets: Map[BigInt, BigInt] = Map.empty
+    val globals: Set[SpecGlobal] = Set.empty
+
+    val load = MemoryLoad(R0, mem, R0, Endian.LittleEndian, 64, Some("001"))
+//    val assign = LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("assign"))
+//    val use = MemoryStore(mem, R0, R1, Endian.LittleEndian, 64, Some("use"))
+    val use = LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(10, 64)), Some("use"))
+    val use1 = LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(10, 64)), Some("use1"))
+
+    val program = prog(
+      proc("main",
+        block("call",
+          directCall("malloc"),
+          goto("block1", "block2")
+        ),
+        block("block1",
+          use,
+          goto("return")
+        ),
+        block("block2",
+          use1,
+          goto("return")
+        ),
+        block("return",
+          ret
+        )
+      ),
+
+      proc("malloc", // fake malloc
+        block("malloc_b",
+          load,
+          ret
+        )
+      ),
+    )
+
+    val context = programToContext(program, globals, globalOffsets)
+    val results = runTest(context)
+    val mainProc = results.ir.program.mainProcedure
+    val sva = results.dsa.get.sva(mainProc)
+    println(sva)
+    val r0SVA = sva.getSorted("R0")
+//    val r1SVA = sva.getSorted("R1")
+
+    val inParam = r0SVA.firstKey // TODO look into why there is an inParam
+    assert(r0SVA(inParam) == SymValueSet(Par(mainProc, inParam)), "input param not set correctly")
+
+//    val mallocCall: DirectCall = computeDomain(IntraProcIRCursor, Set(mainProc))
+//      .collectFirst {
+//        case call: DirectCall if call.target.name.startsWith("malloc") => call
+//      }.get // this doesn't work because the call is changed somewhere after the analysis
+//
+//    val mallocSB: SymBase = Heap(mallocCall)
+
+
+    val mallocValSet = r0SVA.collectFirst {
+      case (variable: LocalVar, valueSet: SymValueSet)
+        if valueSet.state.keys.exists(_.isInstanceOf[Heap]) && valueSet.size == 1 => valueSet
+    }.get // expect exactly 1 value set matching the case
+    assert(mallocValSet.state.head._2.getOffsets == Set(0), "incorrect offset for malloc symbolic value")
+
+    val outPram = r0SVA.lastKey
+    assert(r0SVA(outPram) == mallocValSet.apply(i => i + 10), "should be malloc symValueSet oplus 10")
+  }
+
+  test("call") {
+    val mem = SharedMemory("mem", 64, 8)
+    val regName = "R0"
+    val R0 = Register(regName, 64)
+    val globalOffsets: Map[BigInt, BigInt] = Map.empty
+    val globals: Set[SpecGlobal] = Set.empty
+
+    val init = LocalAssign(R0, BitVecLiteral(20, 64))
+    val load = MemoryLoad(R0, mem, R0, Endian.LittleEndian, 64, Some("001"))
+    val assign = LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(10, 64)), Some("assign"))
+
+    val program = prog(
+      proc("main",
+        block("call",
+          init,
+          directCall("callee"),
+          goto("block")
+        ),
+        block("block",
+          assign,
+          ret
+        )
+      ),
+
+      proc("callee", // fake malloc
+        block("callee_b",
+          load,
+          ret
+        )
+      ),
+    )
+
+    val context = programToContext(program, globals, globalOffsets)
+    val main = program.mainProcedure
+    val sva = runTest(context).dsa.get.sva(main)
+    val r0SVA = sva.getSorted(regName)
+
+    val returnedValSet = r0SVA.collectFirst {
+      case (variable: LocalVar, valueSet: SymValueSet)
+        if valueSet.state.keys.exists(_.isInstanceOf[Ret]) && valueSet.size == 1 => valueSet
+    }.get // expect exactly 1 value set matching the case
+    assert(returnedValSet.state.head._2.getOffsets == Set(0), "incorrect offset for returned symbolic value")
+
+    val outPram = r0SVA.lastKey
+    assert(r0SVA(outPram) == returnedValSet.apply(i => i + 10), "should be malloc symValueSet oplus 10")
+  }
+
+  test("proc entry") {
+    val R0 = Register("R0", 64)
+    val R1 = Register("R1", 64)
+    val R2 = Register("R2", 64)
+    val R3 = Register("R3", 64)
+    val bv64 = BitVecType(64)
+    val globalOffsets: Map[BigInt, BigInt] = Map.empty
+    val globals: Set[SpecGlobal] = Set.empty
+
+    val assign1 = LocalAssign(R2, R0, Some("01"))
+    val assign2 = LocalAssign(R3, R1, Some("02"))
+//    val assign3 = LocalAssign(R0, BinaryExpr(BVADD, R2, BitVecLiteral(10, 64)), Some("assign"))
+
+    val program = prog(
+      proc("main",
+        block("block",
+          assign1,
+          assign2,
+          ret
+        )
+      ),
+    )
+
+    val context = programToContext(program, globals, globalOffsets)
+    val main = program.mainProcedure
+    val sva = runTest(context).dsa.get.sva(main)
+
+    val R0in = LocalVar("R0_in", bv64)
+    val R1in = LocalVar("R1_in", bv64)
+
+    val R2out = LocalVar("R2_out", bv64)
+    val R3out = LocalVar("R3_out", bv64)
+
+    assert(main.formalInParam.contains(R0in), "Expected R0 as an input parameter")
+    assert(main.formalInParam.contains(R1in), "Expected R1 as an input parameter")
+
+    assert(sva(R0in) == SymValueSet(Par(main, R0in)), "Incorrect SymbolicValueSet for R0_in")
+    assert(sva(R1in) == SymValueSet(Par(main, R1in)), "Incorrect SymbolicValueSet for R1_in")
+
+    assert(sva(R0in) == sva(R2out), "Expected input param to propagate to output")
+    assert(sva(R1in) == sva(R3out), "Expected input param to propagate to output")
+
+  }
+
+  test("reassignment") {
+    val R0 = Register("R0", 64)
+    val R1 = Register("R1", 64)
+    val bv64 = BitVecType(64)
+    val globalOffsets: Map[BigInt, BigInt] = Map.empty
+    val globals: Set[SpecGlobal] = Set.empty
+
+    val assign1 = LocalAssign(R1, R0, Some("01"))
+    val assign2 = LocalAssign(R0, BinaryExpr(BVADD, R1, BitVecLiteral(10, 64)), Some("assign"))
+
+    val program = prog(
+      proc("main",
+        block("block",
+          assign1,
+          assign2,
+          ret
+        )
+      ),
+    )
+
+    val context = programToContext(program, globals, globalOffsets)
+    val main = program.mainProcedure
+    val sva = runTest(context).dsa.get.sva(main)
+
+    val R0in = LocalVar("R0_in", bv64)
+
+    val R0out = LocalVar("R0_out", bv64)
+    val R1out = LocalVar("R1_out", bv64)
+
+    assert(main.formalInParam.contains(R0in), "Expected R0 as an input parameter")
+
+    assert(sva(R0in) == SymValueSet(Par(main, R0in)), "Incorrect SymbolicValueSet for R0_in")
+
+    assert(sva(R0in) == sva(R1out), "Expected input param to propagate to output")
+    assert(sva(R0out) == sva(R0in).apply(i => i + 10), "Expected updated input param to propagate to output")
+  }
+
+  test("branch") {
+    val R0 = Register("R0", 64)
+    val bv64 = BitVecType(64)
+    val globalOffsets: Map[BigInt, BigInt] = Map.empty
+    val globals: Set[SpecGlobal] = Set.empty
+
+    val assign1 = LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(10, 64)), Some("01"))
+    val assign2 = LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(45, 64)), Some("02"))
+    val assign3 = LocalAssign(R0, R0, Some("03"))
+
+    val program = prog(
+      proc("main",
+        block("split",
+          goto(List("return", "branch1", "branch2"))
+        ),
+        block("branch1",
+          assign1,
+          goto("return")
+        ),
+        block("branch2",
+          assign2,
+          goto("return")
+        ),
+        block("return",
+          assign3, // needed so that dead code won't kill the branch assignments
+          ret
+        )
+      ),
+    )
+    val R0in = LocalVar("R0_in", bv64)
+
+    val context = programToContext(program, globals, globalOffsets)
+    val main = program.mainProcedure
+    val sva = runTest(context).dsa.get.sva(main)
+
+    val (_, lastValSet) = sva.getSorted("R0").last
+
+    assert(sva(R0in) == SymValueSet(Par(main, R0in)), "Incorrect SymbolicValueSet for R0_in")
+    assert(lastValSet == sva(R0in).join(sva(R0in).apply(i => i + 10).join(sva(R0in).apply(i => i + 45))), "Incorrect set of offsets")
+  }
+
+  test("loop") {
+    val R0 = Register("R0", 64)
+    val bv64 = BitVecType(64)
+    val globalOffsets: Map[BigInt, BigInt] = Map.empty
+    val globals: Set[SpecGlobal] = Set.empty
+
+    val assign1 = LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(10, 64)), Some("01"))
+    val assign2 = LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(45, 64)), Some("assign"))
+
+    val program = prog(
+      proc("main",
+        block("intro",
+          goto("head")
+        ),
+        block("head",
+          goto("body", "return")
+        ),
+        block("body",
+          assign1,
+          goto(List("head", "return"))
+        ),
+        block("return",
+          ret
+        )
+      ),
+    )
+
+    val R0in = LocalVar("R0_in", bv64)
+
+    val context = programToContext(program, globals, globalOffsets)
+    val main = context.program.mainProcedure
+    val sva = runTest(context).dsa.get.sva(main)
+    val R0last = sva.getSorted("R0").lastKey
+
+    assert(sva(R0in) == SymValueSet(Par(main, R0in)), "Incorrect SymbolicValueSet for R0_in")
+    assert(sva(R0last) == sva(R0in).toTop, "Incorrect set of offsets")
+  }
+
+  test("load") {
+    val mem = SharedMemory("mem", 64, 8)
+    val regName = "R0"
+    val R0 = Register(regName, 64)
+    val xAddress = BitVecLiteral(2000, 64)
+    val xPointer = BitVecLiteral(1000, 64)
+    val globalOffsets = Map(xPointer.value -> xAddress.value)
+    val x = SpecGlobal("x", 64, None, xAddress.value)
+    val globals = Set(x)
+
+    val load = MemoryLoad(R0, mem, xPointer, Endian.LittleEndian, 64, Some("001"))
+    val assign = LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(10, 64)))
+
+    val program = prog(
+      proc("main",
+        block("block",
+          load,
+          assign,
+          ret
+        )
+      )
+    )
+
+    val context = programToContext(program, globals, globalOffsets)
+
+    val procedure: Procedure = program.mainProcedure
+    val sva = runTest(context).dsa.get.sva(procedure)
+
+    val r0SVA = sva.getSorted(regName)
+
+    val loadValSet = r0SVA.collectFirst {
+      case (variable: LocalVar, valueSet: SymValueSet)
+        if valueSet.contains(Loaded(load)) && valueSet.size == 1 => valueSet
+    }.get // expect exactly 1 value set matching the case
+    assert(loadValSet.get(Loaded(load)).getOffsets == Set(0), "incorrect offset for loaded symbolic value")
+
+    val outPram = r0SVA.lastKey
+    assert(r0SVA(outPram) == loadValSet.apply(i => i + 10), "should be load symValueSet oplus 10")
+  }
+}
