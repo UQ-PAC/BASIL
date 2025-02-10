@@ -183,7 +183,7 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
      * will not hold.
      */
     val initialMayGammaDeps = LatticeMap.TopMap((relevantGlobals ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
-    val predAbsIntDomain = PredBoundedDisjunctiveCompletion(PredProductDomain(DoubleIntervalDomain(procedure), MayGammaDomain(initialMayGammaDeps)), 10)
+    val predAbsIntDomain = PredBoundedDisjunctiveCompletion(PredProductDomain(DoubleIntervalDomain(Some(procedure)), MayGammaDomain(initialMayGammaDeps)), 10)
     val (beforeAbsInt, afterAbsInt) = worklistSolver(predAbsIntDomain).solveProc(procedure)
 
     val absIntPreds = returnBlock.map(b => afterAbsInt.get(b).map(l => filterPred(predAbsIntDomain.toPred(l), outVars ++ inVars, Predicate.True).split.map(_.simplify))).flatten.toList.flatten
