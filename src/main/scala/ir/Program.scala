@@ -9,7 +9,8 @@ import translating.serialiseIL
 
 
 /**
-  * Iterator in pre-order of procedures, blocks, and commands. GoTos targets are traversed in an unspecified order.
+  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
+  * not guaranteed to be in any defined order. 
   */
 private class ILForwardIterator(private val begin: IterableOnce[CFGPosition], val walk: IRWalk[CFGPosition, CFGPosition]) extends Iterator[CFGPosition] {
   val seen = mutable.Set[CFGPosition]()
@@ -33,12 +34,12 @@ private class ILForwardIterator(private val begin: IterableOnce[CFGPosition], va
 }
 
 /**
-  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are
-  * not guaranteed to be in any defined order.
+  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
+  * not guaranteed to be in any defined order. 
   */
 private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extends Iterator[CFGPosition] {
   private val stack = mutable.Stack[CFGPosition]()
-  stack.addAll(begin)
+  stack.pushAll(begin)
 
   override def hasNext: Boolean = {
     stack.nonEmpty
