@@ -168,3 +168,8 @@ val AnalysisResultDotLogger = Logger.deriveLogger("analysis-results-dot").setLev
 val VSALogger = StaticAnalysisLogger.deriveLogger("vsa")
 val MRALogger = StaticAnalysisLogger.deriveLogger("mra").setLevel(LogLevel.INFO)
 val SteensLogger = StaticAnalysisLogger.deriveLogger("steensgaard")
+// DSA Loggers
+val DSALogger = Logger.deriveLogger("DSA", System.out).setLevel(LogLevel.OFF)
+val ConstGenLogger = DSALogger.deriveLogger("Constraint Gen", System.out).setLevel(LogLevel.INFO)
+val SVALogger = DSALogger.deriveLogger("VSA", System.out)
+val SadDSALogger = DSALogger.deriveLogger("SadDSA", System.out)
