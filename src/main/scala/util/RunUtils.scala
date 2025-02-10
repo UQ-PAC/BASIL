@@ -518,6 +518,29 @@ object StaticAnalysis {
     )
   }
 
+  def generate_rg_conditions(procs: List[Procedure]): Unit = {
+    type StateElement = Map[Variable, FlatElement[BitVecLiteral]]
+    val stateLattice = ConstantPropagationLattice()
+    // extracting this (what should be static) function from IntraProcConstantPropagation requires instantiating it with a Program
+    // in future, we expect this function to be defined in an AbstractDomain for constant propagation
+    // val stateTransfer: (CFGPosition, StateElement) => StateElement = (n, s) => n match {
+    //   case la: LocalAssign =>
+    //     s + (la.lhs -> ConstantPropagation.eval(la.rhs, s))
+    //   case l: MemoryLoad =>
+    //     s + (l.lhs -> stateLattice.top)
+    //   case _: Call => s.map { (k, v) =>
+    //     if (Set("R0", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15", "R16", "R17", "R18", "R30").map(n => Register(n, 64)).contains(k)) {
+    //       (k, stateLattice.top)
+    //     } else {
+    //       (k, v)
+    //     }
+    //   }
+    //   case _ => s
+    // }
+    // val intDom = ConditionalWritesDomain[StateElement](stateLattice, stateTransfer)
+    // val rg_generator = RelyGuaranteeGenerator(intDom, procs)
+  }
+
   def printAnalysisResults(prog: Program, result: Map[CFGPosition, _]): String = {
     val results = mutable.ArrayBuffer[String]()
     val toVisit = mutable.Stack[CFGPosition]()
@@ -558,8 +581,8 @@ object StaticAnalysis {
     }
     results.mkString(System.lineSeparator())
   }
-
 }
+
 object RunUtils {
 
   def run(q: BASILConfig): Unit = {

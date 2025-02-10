@@ -30,12 +30,14 @@ trait CompatibleLattice[S] extends Lattice[S] {
   * L: A lattice type, defined over element type S.
   * stateTransfer: A transfer function for lattice elements of type S.
   */
-abstract class InterferenceDomain[T, S](val stateLattice: CompatibleLattice[S], val stateTransfer: (S, Command) => S) {
+abstract class InterferenceDomain[T, S](val stateLattice: CompatibleLattice[S], val stateTransfer: (Command, S) => S) {
   def bot: T
-  def derive(s: S, c: Command): T
+  // until the memory region analysis is complete, we test our static analysis by generating RG conditions for local variables
+  def derive(s: S, c: LocalAssign): T
   def apply(t: T, s: S): S
   def join(t1: T, t2: T): T
   def close(t: T): T
+  def toString(t: T): String
 }
 
 /**
@@ -45,15 +47,12 @@ abstract class InterferenceDomain[T, S](val stateLattice: CompatibleLattice[S], 
   * This is implemented with a map [v_i -> P_i] from variables to the conditions under which they may be written to in the program.
   * Variables that are never written to are omitted from the map, rather than being mapped to bot.
   */
-class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransfer: (S, Command) => S) extends InterferenceDomain[Map[Variable, S], S](stateLattice, stateTransfer) {
+class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransfer: (Command, S) => S) extends InterferenceDomain[Map[Variable, S], S](stateLattice, stateTransfer) {
   // an empty map means no variables have been written to
   def bot: Map[Variable, S] = Map.empty[Variable, S]
   
   // for assignments, simply return a mapping from the assigned variable to the given state
-  def derive(s: S, c: Command): Map[Variable, S] = c match {
-    case LocalAssign(lhs, _, _) => Map(lhs -> s)
-    case _ => Map.empty[Variable, S]
-  }
+  def derive(s: S, c: LocalAssign): Map[Variable, S] = Map(c.lhs -> s)
   
   // weaken s by eliminating each variable v that maps to a condition that overlaps with s
   def apply(t: Map[Variable, S], s: S): S = {
@@ -100,6 +99,21 @@ class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransf
     }
     new_t
   }
+
+  def toString(t: Map[Variable, S]): String = {
+    if (t.isEmpty) {
+      return "forall v in Vars :: v' == v"
+    }
+    val sb = new StringBuilder
+    val vars = t.keys.toList
+    for (v <- vars) {
+      sb.append(s"(~(${t(v)}) ==> ${v}' == ${v})\n&& ")
+    }
+    sb.append("forall v in Vars - {")
+    sb.append(vars.map(_.toString).mkString(", "))
+    sb.append("} :: v' == v")
+    sb.toString()
+  }
 }
 
 class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T) extends AbstractDomain[(T, S)] {
@@ -107,11 +121,16 @@ class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T)
   
   def transfer(a: (T, S), b: Command): (T, S) = {
     // stabilise the pre-state under the rely
-    var pre_state = intDom.apply(rely, a._2)
+    val pre_state = intDom.apply(rely, a._2)
     // derive post-state from the stabilised pre-state
-    var post_state = intDom.stateTransfer(pre_state, b)
-    // derive the new guarantee
-    var guar = intDom.join(a._1, intDom.derive(pre_state, b))
+    val post_state = intDom.stateTransfer(b, pre_state)
+    // derive the possible state transitions resulting from this statement
+    val transitions = b match {
+      case a: LocalAssign => intDom.derive(pre_state, a)
+      case _ => intDom.bot
+    }
+    // update the guarantee by joining these transitions
+    val guar = intDom.join(a._1, transitions)
     // return results
     (guar, post_state)
   }
@@ -122,34 +141,47 @@ class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T)
 }
 
 class RelyGuaranteeGenerator[T, S](intDom: InterferenceDomain[T, S], threads: List[Procedure]) {
-  var old_guars, new_guars = threads.map(_ -> intDom.bot).toMap
-  var fixpoint_reached = false
-  val max_iterations = 50
-  var iterations = 0
-  while (!fixpoint_reached && iterations < max_iterations) {
+  def generate(): Map[Procedure, (T, T)] = {
+    var old_guars, new_guars = threads.map(_ -> intDom.bot).toMap
+    var fixpoint_reached = false
+    val max_iterations = 50
+    var iterations = 0
+    while (!fixpoint_reached && iterations < max_iterations) {
+      for (p <- threads) {
+        // construct rely for p
+        var rely = intDom.bot
+        for (other_p <- threads) {
+          if (p != other_p) {
+            rely = intDom.join(rely, new_guars(other_p))
+          }
+        }
+        // generate new guar for p
+        val productDom = InterferenceProductDomain[T, S](intDom, rely)
+        val solver = transforms.worklistSolver(productDom)
+        val (_, block_postconditions) = solver.solveProc(p)
+        val guar = block_postconditions(???)._1
+        new_guars = new_guars + (p -> guar)
+      }
+      // check if fixpoint is reached
+      fixpoint_reached = true
+      for (p <- threads) {
+        if (old_guars(p) != new_guars(p)) {
+          fixpoint_reached = false
+        }
+      }
+      iterations = iterations + 1
+      old_guars = new_guars
+    }
+    var rg_conditions = Map.empty[Procedure, (T, T)]
     for (p <- threads) {
-      // construct rely for p
       var rely = intDom.bot
       for (other_p <- threads) {
         if (p != other_p) {
           rely = intDom.join(rely, new_guars(other_p))
         }
       }
-      // generate new guar for p
-      val productDom = InterferenceProductDomain[T, S](intDom, rely)
-      val solver = transforms.worklistSolver(productDom)
-      val (_, block_postconditions) = solver.solveProc(p)
-      val guar = block_postconditions(???)._1
-      new_guars = new_guars + (p -> guar)
+      rg_conditions = rg_conditions + (p -> (rely, new_guars(p)))
     }
-    // check if fixpoint is reached
-    fixpoint_reached = true
-    for (p <- threads) {
-      if (old_guars(p) != new_guars(p)) {
-        fixpoint_reached = false
-      }
-    }
-    iterations = iterations + 1
-    old_guars = new_guars
+    rg_conditions
   }
 }
