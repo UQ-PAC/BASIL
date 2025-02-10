@@ -108,7 +108,7 @@ trait ProcVariableDependencyAnalysisFunctions(
 
         // TODO handle modified global variables
         case Left(v) => {
-          val init: Map[DL, EdgeFunction[LatticeSet[Variable]]] = if call.outParams.exists(_._1 == v) then Map() else Map(d -> IdEdge())
+          val init: Map[DL, EdgeFunction[LatticeSet[Variable]]] = if call.outParams.exists(_._2 == v) then Map() else Map(d -> IdEdge())
           call.actualParams.foldLeft(init) {
             case (m, (inVar, expr)) => if !expr.variables.contains(v) then m else {
               summary.foldLeft(m) {
@@ -128,7 +128,14 @@ trait ProcVariableDependencyAnalysisFunctions(
             case (m, (outVar, expr)) => m + (Left(outVar) -> ConstEdge(FiniteSet(Set())))
           }
           summary.foldLeft(initialise) {
-            case (m, (endVar, deps)) => if deps.topped then m + (Left(endVar) -> ConstEdge(Top())) else m
+            case (m, (endVar, deps)) => endVar match {
+              case endVar: LocalVar if call.target.formalOutParam.contains(endVar) => deps match {
+                case Top() | DiffSet(_) => m + (Left(call.outParams(endVar)) -> ConstEdge(Top()))
+                case FiniteSet(s) if s == Set() => m + (Left(call.outParams(endVar)) -> ConstEdge(FiniteSet(Set())))
+                case _ => m
+              }
+              case _ => m
+            }
           }
       }
       case None => d match {
@@ -173,11 +180,11 @@ trait ProcVariableDependencyAnalysisFunctions(
         case Left(_) => Map(d -> ConstEdge(Top()))
         case Right(_) => Map(d -> IdEdge())
       }
-      case DirectCall(target, _, out, _)  => {
+      case call: DirectCall  => {
         d match {
-          case Left(v: LocalVar) if out.keySet.contains(v) => Map()
+          case Left(v: LocalVar) if call.outParams.exists(_._2 == v) => Map()
           case Left(v) => Map(d -> IdEdge())
-          case Right(_) => out.keySet.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
+          case Right(_) => call.outParams.toList.map(_._2).foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
             (m, v) => m + (Left(v) -> ConstEdge(Top()))
           }
         }
