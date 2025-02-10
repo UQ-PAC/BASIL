@@ -34,6 +34,7 @@ trait ProcVariableDependencyAnalysisFunctions(
   relevantGlobals: Set[Variable],
   varDepsSummaries: Map[Procedure, Map[Variable, LatticeSet[Variable]]],
   procedure: Procedure,
+  parameterForm: Boolean,
 ) extends ForwardIDEAnalysis[Variable, LatticeSet[Variable], LatticeSetLattice[Variable]] {
   val valuelattice = LatticeSetLattice()
   val edgelattice = EdgeFunctionLattice(valuelattice)
@@ -44,13 +45,22 @@ trait ProcVariableDependencyAnalysisFunctions(
   private val liveVars = getLiveVars(procedure)
 
   def edgesCallToEntry(call: DirectCall, entry: Procedure)(d: DL): Map[DL, EdgeFunction[LatticeSet[Variable]]] = {
-    if varDepsSummaries.contains(entry) then Map() else Map(d -> IdEdge())
+    if varDepsSummaries.contains(entry) then Map()
+    else if !parameterForm then Map(d -> IdEdge())
+    else d match {
+      case Left(v) => call.actualParams.toList.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]]()) {
+        case (m, (inVar, expr)) => if expr.variables.contains(v) then m + (Left(inVar) -> IdEdge()) else m
+      }
+      case Right(_) => call.actualParams.toList.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
+        case (m, (inVar, _)) => m + (Left(inVar) -> ConstEdge(FiniteSet(Set())))
+      }
+    }
   }
 
   def edgesExitToAfterCall(exit: Return, aftercall: Command)(d: DL): Map[DL, EdgeFunction[LatticeSet[Variable]]] = {
     // TODO is this reachability actually needed/helpful?
     if reachable.contains(aftercall.parent.parent) then {
-      d match {
+      if !parameterForm then d match {
         case Left(v: LocalVar) => exit.outParams.foldLeft(Map(d -> IdEdge())) {
           case (m, (o, e)) => {
             if e.variables.contains(v) then m + (Left(o) -> IdEdge()) else m
@@ -58,29 +68,69 @@ trait ProcVariableDependencyAnalysisFunctions(
         }
         case _ => Map(d -> IdEdge())
       }
+      else {
+        val call: DirectCall = aftercall match {
+          case aftercall: Statement => aftercall.parent.statements.getPrev(aftercall).asInstanceOf[DirectCall]
+          case _: Jump => aftercall.parent.statements.last.asInstanceOf[DirectCall]
+        }
+
+        d match {
+          case Left(v) =>
+            exit.outParams.toList.flatMap((retVar, expr) => {
+              if expr.variables.contains(v)
+              then call.outParams.toList.filter(_._1 == retVar).map((_, outVar) => Left(outVar) -> IdEdge())
+              else List()
+            }).toMap
+          case Right(_) => call.outParams.toList.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
+            case (m, (outVar, expr)) => m + (Left(outVar) -> ConstEdge(FiniteSet(Set())))
+          }
+        }
+      }
     } else Map()
   }
 
   def edgesCallToAfterCall(call: DirectCall, aftercall: Command)(d: DL): Map[DL, EdgeFunction[LatticeSet[Variable]]] = {
-    d match {
-      case Left(v) =>
+    if !parameterForm then d match {
+      case Left(v) => varDepsSummaries.get(call.target).map(summary => {
+        summary.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]]()) {
+          case (m, (outVar, deps)) => if deps.contains(v) then m + (Left(outVar) -> IdEdge()) else m
+        }
+      }).getOrElse(Map())
+      case Right(_) => Map(d -> IdEdge())
+    }
+    else varDepsSummaries.get(call.target) match {
+      case Some(summary) => d match {
         // PERFORMANCE:
         // There is a lot of wasted work done here
         // We iterate over the summary map many times, once for each d: DL
         // This could possibly be improved by transposing the summary maps, but there is some difficulty with how
         // this works with Top elements.
-        varDepsSummaries.get(call.target).map { m =>
-          // Should this map be initialised to contain d -> IdEdge()?
-          // If d is unchanged, there should be an IdEdge to after the function call.
-          // If d is changed, then there shouldn't be one
-          // I'm not very confident in this :(
-          // also TODO handle modified globals
-          val init: Map[DL, EdgeFunction[LatticeSet[Variable]]] = if m.contains(v) then Map() else Map(d -> IdEdge())
-          m.foldLeft(init) {
-            case (m, (v2, s)) => if s.contains(v) then m + (Left(v2) -> IdEdge()) else m
+
+        // TODO handle modified global variables
+        case Left(v) => {
+          val init: Map[DL, EdgeFunction[LatticeSet[Variable]]] = if call.outParams.exists(_._1 == v) then Map() else Map(d -> IdEdge())
+          call.actualParams.foldLeft(init) {
+            case (m, (inVar, expr)) => if !expr.variables.contains(v) then m else {
+              summary.foldLeft(m) {
+                case (m, (endVar, deps)) => endVar match {
+                  case endVar: LocalVar if call.target.formalOutParam.contains(endVar) => if deps.contains(inVar) then m + (Left(call.outParams(endVar)) -> IdEdge()) else m
+                  case _ => m
+                }
+              }
+            }
           }
-          .getOrElse(Map())
-      case Right(_) => Map(d -> IdEdge())
+        }
+        case Right(_) => call.outParams.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
+          case (m, (outVar, expr)) => m + (Left(outVar) -> ConstEdge(FiniteSet(Set())))
+        }
+      }
+      case None => d match {
+        case Left(v: LocalVar) if call.outParams.exists(_._1 == v) => Map()
+        case Left(v) => Map(d -> IdEdge())
+        case Right(_) => call.outParams.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
+          case (m, (outVar, expr)) => m + (Left(outVar) -> ConstEdge(FiniteSet(Set())))
+        }
+      }
     }
   }
 
@@ -106,10 +156,24 @@ trait ProcVariableDependencyAnalysisFunctions(
             Map(d -> IdEdge(), Left(assigned) -> ConstEdge(FiniteSet(Set())))
         }
       case MemoryLoad(lhs, mem, index, _, size, _) => d match {
+        case Left(v) if v == lhs => Map()
         case Left(_) => Map(d -> IdEdge())
         // An approximation of memory loading is just that the read values could have been anything at all
         // This could perhaps be more made precise by having dependencies on individual memory regions
         case Right(_) => Map(d -> IdEdge(), Left(lhs) -> ConstEdge(Top()))
+      }
+      case IndirectCall(_, _) => d match {
+        case Left(_) => Map(d -> ConstEdge(Top()))
+        case Right(_) => Map(d -> IdEdge())
+      }
+      case DirectCall(target, _, out, _)  => {
+        d match {
+          case Left(v: LocalVar) if out.keySet.contains(v) => Map()
+          case Left(v) => Map(d -> IdEdge())
+          case Right(_) => out.keySet.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
+            (m, v) => m + (Left(v) -> ConstEdge(Top()))
+          }
+        }
       }
       // TODO
       // this may be out of place, as this is an exit node
@@ -150,8 +214,9 @@ class ProcVariableDependencyAnalysis(
   relevantGlobals: Set[Variable],
   varDepsSummaries: Map[Procedure, Map[Variable, LatticeSet[Variable]]],
   procedure: Procedure,
+  parameterForm: Boolean = false,
 ) extends ForwardIDESolver[Variable, LatticeSet[Variable], LatticeSetLattice[Variable]](program),
-    ProcVariableDependencyAnalysisFunctions(relevantGlobals, varDepsSummaries, procedure)
+    ProcVariableDependencyAnalysisFunctions(relevantGlobals, varDepsSummaries, procedure, parameterForm)
 {
   override def start: CFGPosition = procedure
 }
@@ -177,7 +242,7 @@ class VariableDependencyAnalysis(
       (varDepsSummaries, procedure) => {
         StaticAnalysisLogger.debug("Generating variable dependencies for " + procedure)
         var varDepResults = ProcVariableDependencyAnalysis(program, relevantGlobals,
-          varDepsSummaries, procedure).analyze()
+          varDepsSummaries, procedure, parameterForm).analyze()
         val varDepMap = IRWalk.lastInProc(procedure).flatMap(varDepResults.get(_)).getOrElse(Map())
         varDepsSummaries + (procedure -> varDepMap)
       }
