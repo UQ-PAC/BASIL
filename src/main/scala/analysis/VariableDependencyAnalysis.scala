@@ -113,16 +113,23 @@ trait ProcVariableDependencyAnalysisFunctions(
             case (m, (inVar, expr)) => if !expr.variables.contains(v) then m else {
               summary.foldLeft(m) {
                 case (m, (endVar, deps)) => endVar match {
-                  case endVar: LocalVar if call.target.formalOutParam.contains(endVar) => if deps.contains(inVar) then m + (Left(call.outParams(endVar)) -> IdEdge()) else m
+                  case endVar: LocalVar if call.target.formalOutParam.contains(endVar) => {
+                    if deps.contains(inVar) then m + (Left(call.outParams(endVar)) -> IdEdge())
+                    else m
+                  }
                   case _ => m
                 }
               }
             }
           }
         }
-        case Right(_) => call.outParams.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
-          case (m, (outVar, expr)) => m + (Left(outVar) -> ConstEdge(FiniteSet(Set())))
-        }
+        case Right(_) =>
+          val initialise = call.outParams.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
+            case (m, (outVar, expr)) => m + (Left(outVar) -> ConstEdge(FiniteSet(Set())))
+          }
+          summary.foldLeft(initialise) {
+            case (m, (endVar, deps)) => if deps.topped then m + (Left(endVar) -> ConstEdge(Top())) else m
+          }
       }
       case None => d match {
         case Left(v: LocalVar) if call.outParams.exists(_._1 == v) => Map()

@@ -94,6 +94,14 @@ enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
       case DiffSet(_) => None
     }
   }
+
+  /**
+   * Returns whether this set is Top or Top minus some elements
+   */
+  def topped: Boolean = this match {
+    case Top() | DiffSet(_) => true
+    case _ => false
+  }
 }
 
 class LatticeSetLattice[T] extends Lattice[LatticeSet[T]] {
