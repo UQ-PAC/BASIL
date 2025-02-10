@@ -217,7 +217,7 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
       savedAfter(lastBlock) = nx
       saveCount(lastBlock) = saveCount.get(lastBlock).getOrElse(0) + 1
       if (!prev.contains(nx)) then {
-        if (saveCount(lastBlock) >= 50) {
+        if (saveCount(lastBlock) >= 100) {
           Logger.warn(s"Large join count on block ${lastBlock.label}, no fix point? (-v for mor info)")
           Logger.debug(lastBlock.label + "    ==> " + x)
           Logger.debug(lastBlock.label + "    <== " + nx)

@@ -133,6 +133,9 @@ def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
     }
   }.toMap
 
+  DebugDumpIRLogger.writeToFile(File(s"live-vars.il"), 
+    PrettyPrinter.pp_prog_with_analysis_results(liveLab(), Map(), 
+      ctx.program, x => s"Live vars: ${x.map(_.name).toList.sorted.mkString(", ")}"))
   
 
   val params = inOutParams(ctx.program, liveVars)
@@ -146,6 +149,9 @@ def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
   visit_prog(formalParams, ctx.program)
   val actualParams = SetActualParams(formalParams.mappingInparam, formalParams.mappingOutparam, external)
   visit_prog(actualParams, ctx.program)
+
+  
+  while (removeDeadInParams(ctx.program)) {}
 
   ctx.copy(specification = specToProcForm(ctx.specification, formalParams.mappingInparam, formalParams.mappingOutparam))
 }
@@ -403,7 +409,22 @@ def inOutParams(
   }.toMap
 
 
-  // callgraph fixed point :(
+  // callgraph fixed point
+
+  val defUseDom = DefUseEntryDomain()
+  val defUseSolver = worklistSolver(defUseDom)
+
+
+  val defUses = lives.keySet.map(k => k -> defUseSolver.solveProc(k)).toMap
+
+  def reachesEntry(v: Variable, s: Statement) = {
+    val stmts = s.parent.statements.takeWhile(_ != s)
+    val r = for {
+      init <- defUses(s.parent.parent)._1.get(s.parent)
+      r <- stmts.foldLeft(init)(defUseDom.transfer).get(v)
+    } yield (r.contains(Def.Entry))
+    r.getOrElse(true)
+  }
 
   var newParams = inout
   var oldParams = Map[Procedure, (Set[Variable], Set[Variable])]()
@@ -415,6 +436,10 @@ def inOutParams(
       val origIn = oldParams(proc)._1
       val origOut = oldParams(proc)._2
 
+      val calls = proc.collect {
+        case c : DirectCall => c
+      }
+
       val modifiedFromCall = proc.calls.flatMap(p => oldParams.get(p).toSet.flatMap(_._2)).filterNot(_.isInstanceOf[LocalVar])
 
       // TODO: needs to be more precise by actually checking the use reaches the procedure entry
@@ -422,9 +447,13 @@ def inOutParams(
 
       val writes = readWrites(proc).writes ++ modifiedFromCall
 
-      val newOut = origOut ++ lives(proc)._2.intersect(writes)
+      val newOut = origOut ++ (if (proc == p.mainProcedure) then Seq() else lives(proc)._2.intersect(writes))
       val liveFromReturn = newOut
-      val newIn = origIn ++ ((liveFromReturn ++ liveFromCall)-- (notLive(proc)))
+
+      // filtering by reaching entry does not seem to have much effect
+      val extraLive = (liveFromReturn ++ liveFromCall).filter(v => calls.exists(c => reachesEntry(v, c)))
+      val newIn = origIn ++ (extraLive -- (notLive(proc)))
+
       newParams = newParams.updated(proc, (newIn, newOut))
     }
 

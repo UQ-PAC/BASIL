@@ -42,8 +42,11 @@ class ReplaceReturns(insertR30InvariantAssertion: Procedure => Boolean = (_ => t
       }
       case d: DirectCall => {
         (d.predecessor, d.parent.jump) match {
-          case (Some(l: LocalAssign), _) if l.lhs.name == "R30" => SkipChildren()
-          case (Some(_), _: Unreachable) if d.target == d.parent.parent => {
+          // d.parent.jump == d.successor,  from singleprocend invariant
+          // case (Some(l: LocalAssign), _) if l.lhs.name == "R30" && l.rhs.isInstanceOf[BitVecLiteral] => SkipChildren() 
+            // ^ we can resolve the exact return target if we are assigning a constant
+            // If we can't find one 
+          case (_, _: Unreachable) if d.target == d.parent.parent => {
             // recursive tailcall
             val R30Begin = LocalVar("R30_begin", BitVecType(64))
             d.parent.replaceJump(GoTo((d.parent.parent.entryBlock.get)))
@@ -54,13 +57,6 @@ class ReplaceReturns(insertR30InvariantAssertion: Procedure => Boolean = (_ => t
             }
           }
           case (_, _: Unreachable) => {
-            // FIXME: Have coalesce blocks pull unreachable on empty block to end of prev block when possible.
-            // Currently we miss causes because of the pattern:
-            //  block:
-            //    indirect call R17
-            //    goto nblock
-            //  nblock:
-            //    unreachable 
             val R30Begin = LocalVar("R30_begin", BitVecType(64))
             d.parent.replaceJump(Return())
             if (assertR30Addr) {

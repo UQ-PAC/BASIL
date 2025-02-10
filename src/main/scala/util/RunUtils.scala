@@ -239,12 +239,17 @@ object IRTransform {
       }
     }
 
+    // useful for ReplaceReturns
+    // (pushes single block with `Unreachable` into its predecessor)
+    while (transforms.coalesceBlocks(ctx.program)) {}
+
     transforms.applyRPO(ctx.program)
     val nonReturning = transforms.findDefinitelyExits(ctx.program)
     ctx.program.mainProcedure.foreach(s => s match {
       case d : DirectCall if nonReturning.nonreturning.contains(d.target) => d.parent.replaceJump(Return())
       case _ => ()
     })
+
 
     // FIXME: Main will often maintain the stack by loading R30 from the caller's stack frame
     //        before returning, which makes the R30 assertin faile. Hence we currently skip this 
@@ -254,6 +259,14 @@ object IRTransform {
 
     transforms.addReturnBlocks(ctx.program)
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
+
+    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
+      val dir = File("./graphs/")
+      if (!dir.exists()) then dir.mkdirs()
+      for (p <- ctx.program.procedures) {
+        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
+      }
+    }
 
     val externalRemover = ExternalRemover(externalNamesLibRemoved.toSet)
     externalRemover.visitProgram(ctx.program)
@@ -634,13 +647,8 @@ object RunUtils {
     // transforms.DynamicSingleAssignment.applyTransform(program, liveVars)
     transforms.OnePassDSA().applyTransform(program)
     Logger.info(s"DSA ${timer.checkPoint("DSA ")} ms ")
-    assert(invariant.allVariablesAssignedIndex(program))
-    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
-      val dir = File("./graphs/")
-      if (!dir.exists()) then dir.mkdirs()
-      for (p <- ctx.program.procedures) {
-        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
-      }
+    if (ir.eval.SimplifyValidation.validate) {
+      assert(invariant.allVariablesAssignedIndex(program))
     }
 
     transforms.removeEmptyBlocks(program)

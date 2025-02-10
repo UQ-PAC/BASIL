@@ -72,8 +72,6 @@ def basicReachingDefs(p: Procedure): Map[Command, Map[Variable, Set[Assign | Dir
   merged
 }
 
-case class DefUse(defined: Map[Variable, Assign])
-
 // map v -> definitions reached here
 class DefUseDomain(liveBefore: Map[Block, Set[Variable]]) extends AbstractDomain[Map[Variable, Set[Assign]]] {
 
@@ -96,7 +94,37 @@ class DefUseDomain(liveBefore: Map[Block, Set[Variable]]) extends AbstractDomain
       })
       .toMap
   }
+}
 
+
+enum Def {
+  case Def(a: Assign)
+  case Entry
+}
+
+// map v -> definitions reached here
+class DefUseEntryDomain() extends AbstractDomain[Map[Variable, Set[Def]]] {
+
+  override def transfer(s: Map[Variable, Set[Def]], b: Command) = {
+    b match {
+      case a: LocalAssign => s.updated(a.lhs, Set(Def.Def(a)))
+      case a: MemoryLoad  => s.updated(a.lhs, Set(Def.Def(a)))
+      case d: DirectCall  => d.outParams.map(_._2).foldLeft(s)((s, r) => s.updated(r, Set(Def.Def(d))))
+      case _              => s
+    }
+  }
+  override def top = ???
+  def bot = Map[Variable, Set[Def]]()
+  def init = Map[Variable, Set[Def]]().withDefaultValue(Def.Entry)
+
+  def join(l: Map[Variable, Set[Def]], r: Map[Variable, Set[Def]], pos: Block) = {
+    l.keySet
+      .union(r.keySet)
+      .map(k => {
+        k -> (l.get(k).getOrElse(Set(Def.Entry)) ++ r.get(k).getOrElse(Set(Def.Entry)))
+      })
+      .toMap
+  }
 }
 
 class IntraLiveVarsDomain extends PowerSetDomain[Variable] {
@@ -443,7 +471,7 @@ def removeEmptyBlocks(p: Program) = {
   }
 }
 
-def coalesceBlocks(p: Program) = {
+def coalesceBlocks(p: Program) : Boolean = {
   var didAny = false
   for (proc <- p.procedures) {
     val blocks = proc.blocks.toList
@@ -474,7 +502,12 @@ def coalesceBlocks(p: Program) = {
         val stmts = b.statements.map(b.statements.remove).toList
         nextBlock.statements.prependAll(stmts)
         // leave empty block b and cleanup with removeEmptyBlocks
-      }
+      } else if (
+        b.jump.isInstanceOf[Unreachable] && b.statements.isEmpty && b.prevBlocks.size == 1
+        ) {
+          b.prevBlocks.head.replaceJump(Unreachable())
+          b.parent.removeBlocks(b)
+        }
     }
   }
   didAny
@@ -708,7 +741,9 @@ def copyPropParamFixedPoint(p: Program, rela: Map[BigInt, BigInt]): Int = {
     doCopyPropTransform(p, rela)
     val extraInlined = removeInvariantOutParameters(p, inlinedOutParams)
     inlinedOutParams = extraInlined.foldLeft(inlinedOutParams)((acc, v) => acc + (v._1 -> (acc.getOrElse(v._1, Set[Variable]()) ++ v._2)))
-    changed = changed || extraInlined.nonEmpty || removeDeadInParams(p)
+    var deadIn = removeDeadInParams(p)
+    while (removeDeadInParams(p))
+    changed = changed || extraInlined.nonEmpty || deadIn 
     cleanupBlocks(p)
     iterations += 1
   }
