@@ -57,17 +57,17 @@ enum Interval extends InternalLattice[Interval] {
 
 private implicit val intervalTerm: Interval = Interval.Bottom
 
-class IntervalDomain(procedure: Procedure, signed: Boolean, inf: Int => BigInt, negInf: Int => BigInt, bvto: BitVecLiteral => BigInt, tobv: (Int, BigInt) => BitVecLiteral)
+class IntervalDomain(procedure: Option[Procedure] = None, signed: Boolean, inf: Int => BigInt, negInf: Int => BigInt, bvto: BitVecLiteral => BigInt, tobv: (Int, BigInt) => BitVecLiteral)
   extends MayPredMapDomain[Variable, Interval] {
   import Interval.*
   import ir.eval.BitVectorEval.*
 
-  private val (liveBefore, liveAfter) = transforms.getLiveVars(procedure)
+  private val (liveBefore, liveAfter) = procedure.map(transforms.getLiveVars(_)).unzip
 
   def joinTerm(a: Interval, b: Interval, pos: Block): Interval = a.join(b)
 
   override def join(a: LatticeMap[Variable, Interval], b: LatticeMap[Variable, Interval], pos: Block): LatticeMap[Variable, Interval] =
-    super.join(a, b, pos).filter((v, i) => liveBefore(pos).contains(v))
+    super.join(a, b, pos).filter((v, i) => liveBefore.exists(_(pos).contains(v)))
 
   override def widenTerm(a: Interval, b: Interval, pos: Block): Interval =
     (a, b) match {
@@ -194,10 +194,12 @@ class IntervalDomain(procedure: Procedure, signed: Boolean, inf: Int => BigInt, 
   }
 }
 
-class SignedIntervalDomain(procedure: Procedure) extends IntervalDomain(procedure, true, sInf, sNInf, bv2SignedInt, signedInt2bv)
-class UnsignedIntervalDomain(procedure: Procedure) extends IntervalDomain(procedure, false, uInf, uNInf, bv2nat, nat2bv)
+// The optional procedure is used to filter dead variables, it is not needed and is a performance optimisation.
 
-class DoubleIntervalDomain(procedure: Procedure) extends PredProductDomain(SignedIntervalDomain(procedure), UnsignedIntervalDomain(procedure))
+class SignedIntervalDomain(procedure: Option[Procedure] = None) extends IntervalDomain(procedure, true, sInf, sNInf, bv2SignedInt, signedInt2bv)
+class UnsignedIntervalDomain(procedure: Option[Procedure] = None) extends IntervalDomain(procedure, false, uInf, uNInf, bv2nat, nat2bv)
+
+class DoubleIntervalDomain(procedure: Option[Procedure] = None) extends PredProductDomain(SignedIntervalDomain(procedure), UnsignedIntervalDomain(procedure))
 
 class TopDomain extends PredicateEncodingDomain[Unit] {
   def join(a: Unit, b: Unit, pos: Block): Unit = {}
