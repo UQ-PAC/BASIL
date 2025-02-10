@@ -13,7 +13,7 @@ import ir.{Assert, LocalAssign, Assume, CFGPosition, Command, DirectCall, Indire
  * Tip SPA IDE Slides include a short and clear explanation of microfunctions
  * https://cs.au.dk/~amoeller/spa/8-distributive.pdf
  */
-trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement, TwoElementLattice] {
+trait LiveVarsAnalysisFunctions(inline: Boolean = false) extends BackwardIDEAnalysis[Variable, TwoElement, TwoElementLattice] {
 
   val valuelattice: TwoElementLattice = TwoElementLattice()
   val edgelattice: EdgeFunctionLattice[TwoElement, TwoElementLattice] = EdgeFunctionLattice(valuelattice)
@@ -21,9 +21,10 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement
 
   def edgesCallToEntry(call: Command, entry: Return)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     d match {
-      case Left(l) => {
+      case Left(l) if inline => {
         Map(d -> IdEdge())
       }
+      case Left(l) => Map()
       case Right(_) => entry.outParams.flatMap(_._2.variables).foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
               (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
       }
@@ -134,6 +135,7 @@ class InterLiveVarsAnalysis(program: Program)
   extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program), LiveVarsAnalysisFunctions
 
 
-
+class InlineInterLiveVarsAnalysis(program: Program)
+  extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program), LiveVarsAnalysisFunctions(true)
 
 

@@ -10,6 +10,7 @@ import specification.Specification
 import analysis.{TwoElement, TwoElementTop, TwoElementBottom}
 import ir.CallGraph
 import util.{Logger, DebugDumpIRLogger}
+import analysis.{LatticeMap, MapDomain, InternalLattice}
 
 case class FunSig(inArgs: List[Register], outArgs: List[Register])
 
@@ -111,6 +112,7 @@ object DefinedOnAllPaths {
   }
 }
 
+
 def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
 
   val mainNonEmpty = ctx.program.mainProcedure.blocks.nonEmpty
@@ -118,7 +120,7 @@ def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
   val mainHasEntry = ctx.program.mainProcedure.entryBlock.isDefined
 
   val liveVars = if (mainNonEmpty && mainHasEntry && mainHasReturn) {
-    analysis.InterLiveVarsAnalysis(ctx.program).analyze()
+    analysis.InlineInterLiveVarsAnalysis(ctx.program).analyze()
   } else {
     Logger.error(s"Empty live vars $mainNonEmpty $mainHasReturn $mainHasEntry")
     Map.empty
@@ -127,15 +129,21 @@ def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
 
   val liveLab = () => liveVars.collect {
     case (b: Block, r) => b -> {
-        r.toList.collect {
-        (v, TwoElementTop) => v
+      val live = r.toList.collect {
+        case (v, TwoElementTop) => v
       }
+      val dead = r.toList.collect {
+        case (v, TwoElementBottom) => v
+      }
+      val livel = live.map(_.name).toList.sorted.mkString(", ")
+      // val deadl = dead.map(_.name).toList.sorted.mkString(", ")
+      s"Live: $livel"
     }
   }.toMap
 
   DebugDumpIRLogger.writeToFile(File(s"live-vars.il"), 
     PrettyPrinter.pp_prog_with_analysis_results(liveLab(), Map(), 
-      ctx.program, x => s"Live vars: ${x.map(_.name).toList.sorted.mkString(", ")}"))
+      ctx.program, x => x))
   
 
   val params = inOutParams(ctx.program, liveVars)
@@ -354,7 +362,7 @@ def inOutParams(
   val overapprox = ((0 to 31).toSet -- (19 to 28).toSet).map(i => Register(s"R${i}", 64)).toSet[Variable]
   // in: live at entry & in procedure read set
 
-  val readWrites = ReadWriteAnalysis.readWriteSets(p: Program).collect {
+  var readWrites = ReadWriteAnalysis.readWriteSets(p: Program).collect {
     case (p, None)    => (p, ReadWriteAnalysis.RWSet(overapprox, overapprox))
     case (p, Some(x)) => (p, ReadWriteAnalysis.onlyGlobal(x))
   }
@@ -366,7 +374,6 @@ def inOutParams(
   val lives: Map[Procedure, (Set[Variable], Set[Variable])] = p.procedures
     .map(p => {
       val in = (interLiveVarsResults.get(p))
-      val out = (interLiveVarsResults.get(procEnd(p)))
 
       def toLiveSet(p: Option[Map[Variable, TwoElement]]): Set[Variable] = {
         p.map(p => {
@@ -375,19 +382,14 @@ def inOutParams(
           }.toSet
         }).getOrElse(overapprox)
       }
-      p -> (toLiveSet(in), toLiveSet(out))
+
+      // live after any call to procedure
+      val out = p.incomingCalls().map(_.successor).map(v => toLiveSet(interLiveVarsResults.get(v))).toSet.flatten
+
+      p -> (toLiveSet(in), out)
     })
     .toMap
 
-  val notLive = p.procedures.map(proc =>
-      proc -> interLiveVarsResults
-      .get(proc).toSet
-      .flatMap(r =>
-        r.collect { case (v, TwoElementBottom) =>
-          v
-        }
-      )
-  ).toMap.withDefaultValue(Set())
 
   val inout = readWrites.collect {
     case (proc, rws) if p.mainProcedure == proc => {
@@ -395,7 +397,7 @@ def inOutParams(
       // of registers
     
       val outParams = (overapprox.intersect(DefinedOnAllPaths.proc(proc)))
-      val inParams =  lives(proc)._1 ++ (outParams -- notLive(proc))
+      val inParams =  lives(proc)._1
       proc -> (inParams, outParams)
     }
     case (proc, rws) => {
@@ -403,7 +405,7 @@ def inOutParams(
       val liveEnd = lives(proc)._2
 
       val outParams = liveEnd.intersect(rws.writes)
-      val inParams = liveStart ++ (outParams -- notLive(proc))
+      val inParams = liveStart
       proc -> (inParams, outParams)
     }
   }.toMap
@@ -413,11 +415,9 @@ def inOutParams(
 
   val defUseDom = DefUseEntryDomain()
   val defUseSolver = worklistSolver(defUseDom)
-
-
   val defUses = lives.keySet.map(k => k -> defUseSolver.solveProc(k)).toMap
 
-  def reachesEntry(v: Variable, s: Statement) = {
+  def reachesEntry(v: Variable, s: Command) = {
     val stmts = s.parent.statements.takeWhile(_ != s)
     val r = for {
       init <- defUses(s.parent.parent)._1.get(s.parent)
@@ -442,22 +442,34 @@ def inOutParams(
 
       val modifiedFromCall = proc.calls.flatMap(p => oldParams.get(p).toSet.flatMap(_._2)).filterNot(_.isInstanceOf[LocalVar])
 
-      // TODO: needs to be more precise by actually checking the use reaches the procedure entry
-      val liveFromCall = proc.calls.flatMap(p => oldParams.get(p).toSet.flatMap(_._1)).filterNot(_.isInstanceOf[LocalVar])
+      val liveFromCall = {
+        (for {
+          c <- calls
+          res <- oldParams.get(c.target)
+          globs = res._1.filterNot(_.isInstanceOf[LocalVar])
+          vars = globs.filter(x => reachesEntry(x, c))
+        } yield (vars)).toSet.flatten
+      }
 
-      val writes = readWrites(proc).writes ++ modifiedFromCall
+      readWrites = readWrites.updated(proc, readWrites(proc).copy(writes = readWrites(proc).writes ++ modifiedFromCall))
+      val writes = readWrites(proc).writes
 
       val newOut = origOut ++ (if (proc == p.mainProcedure) then Seq() else lives(proc)._2.intersect(writes))
-      val liveFromReturn = newOut
+      val liveFromReturn = newOut.filter(reachesEntry(_, proc.returnBlock.get.jump))
 
       // filtering by reaching entry does not seem to have much effect
-      val extraLive = (liveFromReturn ++ liveFromCall).filter(v => calls.exists(c => reachesEntry(v, c)))
-      val newIn = origIn ++ (extraLive -- (notLive(proc)))
+      val extraLive = (liveFromReturn ++ liveFromCall)
+      val newIn = origIn ++ extraLive
 
       newParams = newParams.updated(proc, (newIn, newOut))
     }
 
   }
+
+  // val counts = newParams.toList.map(p => (p._1, p._2._1.size, p._2._2.size))
+  // for ((p, i, o) <- counts.sortBy(_._1.name)) {
+  //   Logger.info(s"${p.name} in $i out $o")
+  // }
 
 
   newParams.withDefaultValue((overapprox, overapprox))
