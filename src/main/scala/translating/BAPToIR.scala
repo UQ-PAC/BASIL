@@ -25,7 +25,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       val procedure = Procedure(s.name, s.address)
       for (b <- s.blocks) {
         val block = Block(b.label, b.address)
-        procedure.addBlocks(block)
+        procedure.addBlock(block)
         if (b.address.isDefined && b.address.isDefined && b.address.get == procedure.address.get) {
           procedure.entryBlock = block
         }

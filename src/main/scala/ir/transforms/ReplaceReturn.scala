@@ -35,7 +35,7 @@ def addReturnBlocks(p: Program, toAll: Boolean = false) = {
       p.returnBlock = (Block(label=p.name + "_basil_return",jump=Return()))
       p.entryBlock = (Block(label=p.name + "_basil_entry",jump=GoTo(p.returnBlock.get)))
     } else if (p.returnBlock.isEmpty && (toAll || containsReturn)) {
-      p.returnBlock = p.addBlocks(Block(label=p.name + "_basil_return",jump=Return()))
+      p.returnBlock = p.addBlock(Block(label=p.name + "_basil_return",jump=Return()))
     }
   })
 }

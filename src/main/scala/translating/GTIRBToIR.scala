@@ -35,10 +35,16 @@ import util.Logger
   * @param elseStmts: else statements
   *
   */
-class TempIf(val cond: Expr,
-             val thenStmts: mutable.Buffer[Statement],
-             val elseStmts: mutable.Buffer[Statement],
-             override val label: Option[String] = None) extends Assert(cond)
+class TempIf(
+  val cond: Expr,
+  val thenStmts: mutable.Buffer[Statement],
+  val elseStmts: mutable.Buffer[Statement],
+  override val label: Option[String] = None
+) extends NOP(label)
+
+class AtomicStart(override val label: Option[String] = None) extends NOP(label)
+
+class AtomicEnd(override val label: Option[String] = None) extends NOP(label)
 
 /**
   * GTIRBToIR class. Forms an IR as close as possible to the one produced by BAP by using GTIRB instead
@@ -192,7 +198,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, List[InsnSem
           block.replaceJump(jump)
 
           if (block.statements.nonEmpty) {
-            cleanUpIfPCAssign(block, procedure)
+            cleanUpTemporary(block, procedure)
           }
         }
       }
@@ -286,7 +292,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, List[InsnSem
 
     val blockAddress = blockUUIDToAddress.get(blockUUID)
     val block = Block(blockLabel, blockAddress)
-    procedure.addBlocks(block)
+    procedure.addBlock(block)
     if (uuidToBlock.contains(blockUUID)) {
       // TODO this is a case that requires special consideration
       throw Exception(s"block ${byteStringToString(blockUUID)} is in multiple functions")
@@ -303,15 +309,20 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, List[InsnSem
     "$" + procedure.name + "$__" + blockCount + "__$" + byteStringToString(label).replace("=", "").replace("-", "~").replace("/", "\'")
   }
 
-  // handles stray assignments to the program counter (which are indirect calls that DDisasm failed to identify)
-  // also handles if statements that are not related to conditional edges in the GTIRB CFG
-  // both must be transformed to ensure correct control flow in the IR
-  private def cleanUpIfPCAssign(block: Block, procedure: Procedure): Unit = {
+  /**
+   * cleans up temporary artefacts of the lifting process
+   * handles if statements that are not related to conditional edges in the GTIRB CFG
+   * they must be transformed to ensure correct control flow in the IR
+   */
+  private def cleanUpTemporary(block: Block, procedure: Procedure): Unit = {
     var newBlockCount = 0
     var currentBlock = block
     var currentStatement = currentBlock.statements.head
     var breakLoop = false
     val queue = mutable.Queue[Block]()
+    var atomicSectionStart: Option[Block] = None
+    val atomicSectionContents: mutable.Set[Block] = mutable.Set()
+
     while (!breakLoop) {
       currentStatement match {
         // if statement not related to conditional edges - requires creating new blocks for the if statement contents
@@ -323,15 +334,84 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, List[InsnSem
 
           if (queue.nonEmpty) {
             currentBlock = queue.dequeue()
+            if (atomicSectionStart.nonEmpty) {
+              atomicSectionContents.add(currentBlock)
+            }
             currentStatement = currentBlock.statements.head
           } else {
             breakLoop = true
           }
+
+        case a: AtomicStart =>
+          if (atomicSectionStart.nonEmpty) {
+            // this should not happen and if there is ever any combination of instructions that causes it to happen
+            // it probably produces undefined behaviour
+            throw Exception("nested atomic sections")
+          }
+
+          // split off new block at this point
+          val afterStatements = currentBlock.statements.splitOn(a)
+          val newBlock = Block(block.label + "$__" + newBlockCount, None, afterStatements)
+          newBlockCount += 1
+          newBlock.replaceJump(currentBlock.jump)
+          currentBlock.replaceJump(GoTo(Seq(newBlock)))
+
+          currentBlock.statements.remove(a)
+          currentBlock.statements.append(Assert(TrueLiteral, Some("next block is atomic start")))
+
+          atomicSectionStart = Some(newBlock)
+          atomicSectionContents.add(newBlock)
+
+          queue.enqueue(newBlock)
+          procedure.addBlock(newBlock)
+
+          if (queue.nonEmpty) {
+            currentBlock = queue.dequeue()
+            currentStatement = currentBlock.statements.head
+          } else {
+            breakLoop = true
+          }
+
+        case a: AtomicEnd =>
+          if (atomicSectionStart.isEmpty) {
+            // this should not happen and if there is ever any combination of instructions that causes it to happen
+            // it probably produces undefined behaviour on the actual hardware
+            throw Exception("nested atomic sections")
+          }
+          // split off new block
+
+          val afterStatements = currentBlock.statements.splitOn(a)
+          val newBlock = Block(block.label + "$__" + newBlockCount, None, afterStatements)
+          newBlockCount += 1
+          newBlock.replaceJump(currentBlock.jump)
+          currentBlock.replaceJump(GoTo(Seq(newBlock)))
+
+          currentBlock.statements.remove(a)
+          currentBlock.statements.append(Assert(TrueLiteral, Some("this block is atomic end")))
+
+          queue.enqueue(newBlock)
+          procedure.addBlock(newBlock)
+
+          val atomicSection = AtomicSection(atomicSectionStart.get, currentBlock, atomicSectionContents.clone())
+          atomicSectionContents.foreach(_.atomicSection = Some(atomicSection))
+          atomicSectionStart = None
+          atomicSectionContents.clear()
+
+          if (queue.nonEmpty) {
+            currentBlock = queue.dequeue()
+            currentStatement = currentBlock.statements.head
+          } else {
+            breakLoop = true
+          }
+
         case _ =>
           if (currentBlock.statements.hasNext(currentStatement)) {
             currentStatement = currentBlock.statements.getNext(currentStatement)
           } else if (queue.nonEmpty) {
             currentBlock = queue.dequeue()
+            if (atomicSectionStart.nonEmpty) {
+              atomicSectionContents.add(currentBlock)
+            }
             currentStatement = currentBlock.statements.head
           } else {
             breakLoop = true

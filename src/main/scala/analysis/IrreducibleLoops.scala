@@ -385,7 +385,7 @@ object LoopTransform {
     val NGoTo = GoTo(conns)
 
     val N = Block(s"${loop.header.label}_loop_N", jump = NGoTo)
-    IRWalk.procedure(loop.header).addBlocks(N)
+    IRWalk.procedure(loop.header).addBlock(N)
 
     val newLoop = Loop(N)
     newLoop.edges ++= body

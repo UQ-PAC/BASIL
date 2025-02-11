@@ -9,8 +9,8 @@ import translating.serialiseIL
 
 
 /**
-  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
-  * not guaranteed to be in any defined order. 
+  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are
+  * not guaranteed to be in any defined order.
   */
 private class ILForwardIterator(private val begin: IterableOnce[CFGPosition], val walk: IRWalk[CFGPosition, CFGPosition]) extends Iterator[CFGPosition] {
   val seen = mutable.Set[CFGPosition]()
@@ -34,8 +34,8 @@ private class ILForwardIterator(private val begin: IterableOnce[CFGPosition], va
 }
 
 /**
-  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
-  * not guaranteed to be in any defined order. 
+  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are
+  * not guaranteed to be in any defined order.
   */
 private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extends Iterator[CFGPosition] {
   private val stack = mutable.Stack[CFGPosition]()
@@ -57,9 +57,11 @@ private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extend
   }
 }
 
-class Program(var procedures: ArrayBuffer[Procedure],
-              var mainProcedure: Procedure,
-              val initialMemory: mutable.TreeMap[BigInt, MemorySection]) extends Iterable[CFGPosition] {
+class Program(
+  var procedures: ArrayBuffer[Procedure],
+  var mainProcedure: Procedure,
+  val initialMemory: mutable.TreeMap[BigInt, MemorySection]
+) extends Iterable[CFGPosition] {
 
   val threads: ArrayBuffer[ProgramThread] = ArrayBuffer()
 
@@ -179,36 +181,46 @@ class Program(var procedures: ArrayBuffer[Procedure],
 
 
 // if creationSite == None then it is the initial thread
-class ProgramThread(val entry: Procedure,
-                    val procedures: mutable.LinkedHashSet[Procedure],
-                    val creationSite: Option[DirectCall]) {
-
-}
+class ProgramThread(
+  val entry: Procedure,
+  val procedures: mutable.LinkedHashSet[Procedure],
+  val creationSite: Option[DirectCall]
+)
 
 class Procedure private (
-                  var name: String,
-                  var address: Option[BigInt],
-                  private var _entryBlock: Option[Block],
-                  private var _returnBlock: Option[Block],
-                  private val _blocks: mutable.LinkedHashSet[Block],
-                  var in: ArrayBuffer[Parameter],
-                  var out: ArrayBuffer[Parameter],
-                  var requires: List[BExpr],
-                  var ensures: List[BExpr],
-                ) extends Iterable[CFGPosition] {
+  var name: String,
+  var address: Option[BigInt],
+  private var _entryBlock: Option[Block],
+  private var _returnBlock: Option[Block],
+  private val _blocks: mutable.LinkedHashSet[Block],
+  var in: ArrayBuffer[Parameter],
+  var out: ArrayBuffer[Parameter],
+  var requires: List[BExpr],
+  var ensures: List[BExpr],
+) extends Iterable[CFGPosition] {
   private val _callers = mutable.HashSet[DirectCall]()
   _blocks.foreach(_.parent = this)
   // class invariant
   require(_returnBlock.forall(b => _blocks.contains(b)) && _entryBlock.forall(b => _blocks.contains(b)))
   require(_blocks.isEmpty == _entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
 
-  def this(name: String, address: Option[BigInt] = None , entryBlock: Option[Block] = None, returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer(), requires: IterableOnce[BExpr] = ArrayBuffer(), ensures: IterableOnce[BExpr] = ArrayBuffer()) = {
+  def this(
+    name: String,
+    address: Option[BigInt] = None,
+    entryBlock: Option[Block] = None,
+    returnBlock: Option[Block] = None,
+    blocks: Iterable[Block] = ArrayBuffer(),
+    in: IterableOnce[Parameter] = ArrayBuffer(),
+    out: IterableOnce[Parameter] = ArrayBuffer(),
+    requires: IterableOnce[BExpr] = ArrayBuffer(),
+    ensures: IterableOnce[BExpr] = ArrayBuffer()
+  ) = {
     this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out), List.from(requires), List.from(ensures))
   }
 
   /**
-   * Get an Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
-   * not guaranteed to be in any defined order. 
+   * Get an Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are
+   * not guaranteed to be in any defined order.
    */
   def iterator: Iterator[CFGPosition] = {
     ILLexicalIterator(Seq(this))
@@ -246,7 +258,7 @@ class Procedure private (
   def returnBlock_=(value: Block): Unit = {
     if (!returnBlock.contains(value)) {
       _returnBlock.foreach(removeBlocks)
-      _returnBlock = Some(addBlocks(value))
+      _returnBlock = Some(addBlock(value))
     }
   }
 
@@ -255,11 +267,11 @@ class Procedure private (
   def entryBlock_=(value: Block): Unit = {
     if (!entryBlock.contains(value)) {
       _entryBlock.foreach(removeBlocks)
-      _entryBlock = Some(addBlocks(value))
+      _entryBlock = Some(addBlock(value))
     }
   }
 
-  def addBlocks(block: Block): Block = {
+  def addBlock(block: Block): Block = {
     if (!_blocks.contains(block)) {
       block.parent = this
       _blocks.add(block)
@@ -269,7 +281,7 @@ class Procedure private (
 
   def addBlocks(blocks: Iterable[Block]): Unit = {
     for (elem <- blocks) {
-      addBlocks(elem)
+      addBlock(elem)
     }
   }
 
@@ -280,7 +292,7 @@ class Procedure private (
       val isReturn: Boolean = returnBlock.contains(oldBlock)
       val incoming = oldBlock.incomingJumps
       removeBlocksDisconnect(oldBlock)
-      addBlocks(block)
+      addBlock(block)
       for (elem <- incoming) {
         elem.addTarget(block)
       }
@@ -388,6 +400,7 @@ class Block private (
  private var _jump: Jump,
  private val _incomingJumps: mutable.HashSet[GoTo],
 ) extends HasParent[Procedure] {
+  var atomicSection: Option[AtomicSection] = None
   _jump.setParent(this)
   statements.foreach(_.setParent(this))
 
@@ -522,5 +535,26 @@ case class MemorySection(name: String, address: BigInt, size: Int, bytes: Seq[Bi
       bytes(index)
     }
   }
+
+}
+
+class AtomicSection(start: Block, end: Block, blocks: mutable.Set[Block]) {
+  def isStart(b: Block): Boolean = {
+    if (start == b) {
+      true
+    } else {
+      false
+    }
+  }
+
+  def isEnd(b: Block): Boolean = {
+    if (end == b) {
+      true
+    } else {
+      false
+    }
+  }
+
+  def getBlocks: mutable.Set[Block] = blocks
 
 }

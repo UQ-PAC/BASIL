@@ -206,8 +206,8 @@ class IRTest extends AnyFunSuite {
 
     assert(p.mainProcedure eq p.procedures.find(_.name == "main").get)
     val called = p.procedures.find(_.name == "called").get
-    called.addBlocks(b1)
-    called.addBlocks(b2)
+    called.addBlock(b1)
+    called.addBlock(b2)
 
     assert(called.blocks.size == 2)
     assert(called.entryBlock.contains(b1))
@@ -240,7 +240,7 @@ class IRTest extends AnyFunSuite {
     p.mainProcedure.replaceBlock(b3, b3)
     assert(called.incomingCalls().toSet == Set(b3.statements.last))
     assert(olds == blocks.size)
-    p.mainProcedure.addBlocks(block("test", ret).resolve(p))
+    p.mainProcedure.addBlock(block("test", ret).resolve(p))
     blocks = p.labelToBlock
     assert(olds != blocks.size)
 

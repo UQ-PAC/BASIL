@@ -125,21 +125,37 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         } else {
           None
         }
-      case "unsupported_opcode.0" => {
+
+      case "AtomicStart.0" =>
+        checkArgs(function, 0, 0, typeArgs.size, args.size, ctx.getText)
+        Some(AtomicStart(label))
+
+      case "AtomicEnd.0" =>
+        checkArgs(function, 0, 0, typeArgs.size, args.size, ctx.getText)
+        Some(AtomicEnd(label))
+
+      case "unsupported_opcode.0" =>
         val op = args.headOption.flatMap(visitExprOnly) match {
           case Some(IntLiteral(s)) => Some("%08x".format(s))
           case c => c.map(_.toString)
         }
         val comment = " unsupported opcode" + op.map(": " + _).getOrElse("")
         Some(Assert(FalseLiteral, Some(comment)))
-      }
+
       case _ =>
         Logger.error(s"Unidentified function call $function: ${ctx.getText}")
         Some(Assert(FalseLiteral, Some( " unsupported: " + ctx.getText)))
     }
   }
 
-  private def checkArgs(name: String, typeArgsExpected: Int, argsExpected: Int, typeArgsCount: Int, argsCount: Int, token: String): Unit = {
+  private def checkArgs(
+    name: String,
+    typeArgsExpected: Int,
+    argsExpected: Int,
+    typeArgsCount: Int,
+    argsCount: Int,
+    token: String
+  ): Unit = {
     if (typeArgsExpected != typeArgsCount || argsExpected != argsCount) {
       throw Exception(s"Unexpected argument counts for $name - expected $typeArgsExpected type argument(s) and $argsExpected argument(s), got $typeArgsCount type arguments and $argsCount arguments: $token")
     }
@@ -500,13 +516,14 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
 
   }
 
-  private def resolveBinaryOp(operator: BinOp,
-                              function: String,
-                              typeArgsExpected: Int,
-                              typeArgs: mutable.Buffer[ExprContext],
-                              args: mutable.Buffer[ExprContext],
-                              token: String
-                             ): Option[BinaryExpr] = {
+  private def resolveBinaryOp(
+    operator: BinOp,
+    function: String,
+    typeArgsExpected: Int,
+    typeArgs: mutable.Buffer[ExprContext],
+    args: mutable.Buffer[ExprContext],
+    token: String
+  ): Option[BinaryExpr] = {
     checkArgs(function, typeArgsExpected, 2, typeArgs.size, args.size, token)
     // we don't currently check the size for BV ops which is the type arg
     // memory loads shouldn't appear inside binary operations?
@@ -519,13 +536,14 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
     }
   }
 
-  private def resolveUnaryOp(operator: UnOp,
-                             function: String,
-                             typeArgsExpected: Int,
-                             typeArgs: mutable.Buffer[ExprContext],
-                             args: mutable.Buffer[ExprContext],
-                             token: String
-                            ): Option[UnaryExpr] = {
+  private def resolveUnaryOp(
+    operator: UnOp,
+    function: String,
+    typeArgsExpected: Int,
+    typeArgs: mutable.Buffer[ExprContext],
+    args: mutable.Buffer[ExprContext],
+    token: String
+  ): Option[UnaryExpr] = {
     checkArgs(function, typeArgsExpected, 1, typeArgs.size, args.size, token)
     // we don't currently check the size for BV ops which is the type arg
     // memory loads shouldn't appear inside unary operations?
@@ -537,12 +555,13 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
     }
   }
 
-  private def resolveBitShiftOp(operator: BinOp,
-                                function: String,
-                                typeArgs: mutable.Buffer[ExprContext],
-                                args: mutable.Buffer[ExprContext],
-                                token: String
-                               ): Option[BinaryExpr] = {
+  private def resolveBitShiftOp(
+    operator: BinOp,
+    function: String,
+    typeArgs: mutable.Buffer[ExprContext],
+    args: mutable.Buffer[ExprContext],
+    token: String
+  ): Option[BinaryExpr] = {
     checkArgs(function, 2, 2, typeArgs.size, args.size, token)
     val size0 = parseInt(typeArgs(0))
     val size1 = parseInt(typeArgs(1))

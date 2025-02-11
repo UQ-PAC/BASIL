@@ -151,8 +151,8 @@ object IRLoading {
     }
 
     implicit object InsnSemanticsFormat extends JsonFormat[InsnSemantics] {
-      def write(m: InsnSemantics) =  ???
-      def read(json: JsValue) = json match {
+      def write(m: InsnSemantics): JsValue =  ???
+      def read(json: JsValue): InsnSemantics = json match {
         case JsObject(fields) => {
           val m : Map[String, JsValue] = fields.get("decode_error") match {
             case Some(JsObject(m)) => m
@@ -167,16 +167,15 @@ object IRLoading {
 
     val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, List[InsnSemantics]]])
 
-    val parserMap : Map[String, List[InsnSemantics]] = semantics.flatten.toMap
-
+    val parserMap: Map[String, List[InsnSemantics]] = semantics.flatten.toMap
 
     val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress)
     GTIRBConverter.createIR()
   }
 
   def loadReadELF(
-      fileName: String,
-      config: ILLoadingConfig
+    fileName: String,
+    config: ILLoadingConfig
   ): (List[ELFSymbol], Set[ExternalFunction], Set[SpecGlobal],  Set[FuncEntry], Map[BigInt, BigInt], BigInt) = {
     val lexer = ReadELFLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(lexer)
