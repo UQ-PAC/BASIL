@@ -112,7 +112,6 @@ object DefinedOnAllPaths {
   }
 }
 
-
 def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
 
   val mainNonEmpty = ctx.program.mainProcedure.blocks.nonEmpty
@@ -390,6 +389,7 @@ def inOutParams(
     })
     .toMap
 
+  val alwaysReturnParams = (0 to 7).map(i => Register(s"R$i", 64))
 
   val inout = readWrites.collect {
     case (proc, rws) if p.mainProcedure == proc => {
@@ -402,7 +402,7 @@ def inOutParams(
     }
     case (proc, rws) => {
       val liveStart = lives(proc)._1
-      val liveEnd = lives(proc)._2
+      val liveEnd = lives(proc)._2 ++ alwaysReturnParams
 
       val outParams = liveEnd.intersect(rws.writes)
       val inParams = liveStart
@@ -424,6 +424,7 @@ def inOutParams(
       r <- stmts.foldLeft(init)(defUseDom.transfer).get(v)
     } yield (r.contains(Def.Entry))
     r.getOrElse(true)
+    true
   }
 
   var newParams = inout

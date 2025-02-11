@@ -570,14 +570,20 @@ def removeInvariantOutParameters(p: Program, alreadyInlined : Map[Procedure, Set
 
     // remove invariant params from outparam signature, and outparam list of return, and out param list of all calls,
     // and add assignment after the call of bound actual param to bound outparam
+    // TODO: dependency from specification into account when removing outparams
+    val overApproxSpecDependency = ((0 to 7).map(n => LocalVar(s"R${n}_in", BitVecType(64))) ++ (0 to 7).map(n => LocalVar(s"R${n}_out", BitVecType(64)))).toSet
+
     for ((invariantOutFormal, binding) <- invariantParams.filterNot((k,v) => doneAlready.contains(k))) {
       doneNow = doneNow + invariantOutFormal
 
       modified = true
-      // TODO: uncomment and take dependency from specification into account when removing outparams
-      //
-      // proc.formalOutParam.remove(invariantOutFormal)
-      // ret.outParams = ret.outParams.removed(invariantOutFormal)
+
+      val remove = !overApproxSpecDependency.contains(invariantOutFormal)
+
+      if (remove) {
+        proc.formalOutParam.remove(invariantOutFormal)
+        ret.outParams = ret.outParams.removed(invariantOutFormal)
+      }
 
       val calls = proc.incomingCalls()
 
@@ -604,9 +610,9 @@ def removeInvariantOutParameters(p: Program, alreadyInlined : Map[Procedure, Set
         }
         call.outParams = call.outParams + (invariantOutFormal -> callLHS)
 
-        // TODO: uncomment and take dependency from specification into account when removing outparams
-        //
-        // call.outParams = call.outParams.removed(invariantOutFormal)
+        if (remove) {
+          call.outParams = call.outParams.removed(invariantOutFormal)
+        }
 
         // insert assignment of to successor to maintain singleCallBlockEnd invariant
         // TODO: this would really be simpler if we just broke the singleCallBlockEnd invariant

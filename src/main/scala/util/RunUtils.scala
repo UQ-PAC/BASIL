@@ -639,14 +639,6 @@ object RunUtils {
 
     // transforms.DynamicSingleAssignment.applyTransform(program, liveVars)
     transforms.OnePassDSA().applyTransform(program)
-    (invariant.allVariablesAssignedIndex(program))
-    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
-      val dir = File("./graphs/")
-      if (!dir.exists()) then dir.mkdirs()
-      for (p <- ctx.program.procedures) {
-        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
-      }
-    }
 
     transforms.removeEmptyBlocks(program)
 
@@ -657,6 +649,8 @@ object RunUtils {
     DebugDumpIRLogger.writeToFile(File("il-after-dsa.il"), pp_prog(program))
 
     if (ir.eval.SimplifyValidation.validate) {
+      Logger.info("DSA no uninitialised")
+      assert(invariant.allVariablesAssignedIndex(program))
       // Logger.info("Live vars difftest")
       // val tipLiveVars : Map[CFGPosition, Set[Variable]] = analysis.IntraLiveVarsAnalysis(program).analyze()
       // assert(program.procedures.forall(transforms.difftestLiveVars(_, tipLiveVars)))
@@ -709,6 +703,13 @@ object RunUtils {
       val w = BufferedWriter(FileWriter("rewrites.smt2"))
       ir.eval.SimplifyValidation.makeValidation(w)
       w.close()
+    }
+    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
+      val dir = File("./graphs/")
+      if (!dir.exists()) then dir.mkdirs()
+      for (p <- ctx.program.procedures) {
+        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
+      }
     }
 
     Logger.info("[!] Simplify :: finished")

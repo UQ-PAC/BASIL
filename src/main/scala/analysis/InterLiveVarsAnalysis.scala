@@ -13,7 +13,7 @@ import ir.{Assert, LocalAssign, Assume, CFGPosition, Command, DirectCall, Indire
  * Tip SPA IDE Slides include a short and clear explanation of microfunctions
  * https://cs.au.dk/~amoeller/spa/8-distributive.pdf
  */
-trait LiveVarsAnalysisFunctions(inline: Boolean = false) extends BackwardIDEAnalysis[Variable, TwoElement, TwoElementLattice] {
+trait LiveVarsAnalysisFunctions(inline: Boolean) extends BackwardIDEAnalysis[Variable, TwoElement, TwoElementLattice] {
 
   val valuelattice: TwoElementLattice = TwoElementLattice()
   val edgelattice: EdgeFunctionLattice[TwoElement, TwoElementLattice] = EdgeFunctionLattice(valuelattice)
@@ -132,7 +132,7 @@ trait LiveVarsAnalysisFunctions(inline: Boolean = false) extends BackwardIDEAnal
 }
 
 class InterLiveVarsAnalysis(program: Program)
-  extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program), LiveVarsAnalysisFunctions
+  extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program), LiveVarsAnalysisFunctions(false)
 
 
 class InlineInterLiveVarsAnalysis(program: Program)
