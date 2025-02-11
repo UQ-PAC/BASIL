@@ -201,6 +201,8 @@ class UnsignedIntervalDomain(procedure: Option[Procedure] = None) extends Interv
 
 class DoubleIntervalDomain(procedure: Option[Procedure] = None) extends PredProductDomain(SignedIntervalDomain(procedure), UnsignedIntervalDomain(procedure))
 
+class IntervalLattice extends InternalLatticeLattice[Interval](Interval.Bottom)
+
 class TopDomain extends PredicateEncodingDomain[Unit] {
   def join(a: Unit, b: Unit, pos: Block): Unit = {}
   def transfer(a: Unit, b: Command): Unit = {}

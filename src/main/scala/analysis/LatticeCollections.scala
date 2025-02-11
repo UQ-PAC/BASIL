@@ -13,9 +13,23 @@ trait InternalLattice[T <: InternalLattice[T]] {
   def bottom: T
 }
 
-/** An element of a powerset lattice. This type represents Top and Bottom and finite sets, and is closed under unions,
-  * intersections, and set difference.
-  */
+/**
+ * A Lattice over a type that implements the InternalLattice trait.
+ *
+ * The `term` parameter can be any term of the type L, it just needs to exist to be able to call the top and bottom methods.
+ */
+class InternalLatticeLattice[L <: InternalLattice[L]](term: L) extends Lattice[L] {
+  def lub(x: L, y: L): L = x.join(y)
+  override def glb(x: L, y: L): L = x.meet(y)
+
+  val bottom: L = term.bottom
+  override def top: L = term.top
+}
+
+/**
+ * An element of a powerset lattice. This type represents Top and Bottom and finite sets, and is closed under
+ * unions, intersections, and set difference.
+ */
 enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
   /* The set of all terms of type T */
   case Top[T1]() extends LatticeSet[T1]
