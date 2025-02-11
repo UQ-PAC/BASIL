@@ -1204,6 +1204,9 @@ object CopyProp {
 
 }
 
+/**
+ * Use this to count the number of subexpressions in a basil-ir expression
+ */
 class ExprComplexity extends CILVisitor {
   // count the nodes in the expression AST
   var count = 0
@@ -1225,14 +1228,12 @@ class ExprComplexity extends CILVisitor {
   }
 }
 
-/** Use this as a partially applied function. Substitute(Map.from(substs).get, recurse = false)
+/** 
+ *  Use this as a partially applied function. Substitute(Map.from(substs).get, recurse = false)
   *
-  * @res:
-  *   defines the substitutions to make
-  * @recurse:
-  *   continue substituting with `res` into each substituted expression
-  * @complexityThreshold:
-  *   Stop substituting after the AST node count has increased by this much
+  * @param res defines the substitutions to make
+  * @param recurse continue substituting with `res` into each substituted expression
+  * @param complexityThreshold Stop substituting after the AST node count has increased by this much
   */
 class Substitute(val res: Variable => Option[Expr], val recurse: Boolean = true, val complexityThreshold: Int = 0)
     extends CILVisitor {
