@@ -42,10 +42,6 @@ class TempIf(
   override val label: Option[String] = None
 ) extends NOP(label)
 
-class AtomicStart(override val label: Option[String] = None) extends NOP(label)
-
-class AtomicEnd(override val label: Option[String] = None) extends NOP(label)
-
 /**
   * GTIRBToIR class. Forms an IR as close as possible to the one produced by BAP by using GTIRB instead
   *
@@ -378,8 +374,8 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, List[InsnSem
             // it probably produces undefined behaviour on the actual hardware
             throw Exception("nested atomic sections")
           }
-          // split off new block
 
+          // split off new block
           val afterStatements = currentBlock.statements.splitOn(a)
           val newBlock = Block(block.label + "$__" + newBlockCount, None, afterStatements)
           newBlockCount += 1

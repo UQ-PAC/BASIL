@@ -34,7 +34,11 @@ sealed trait Assign extends Statement {
   var lhs: Variable
 }
 
-class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[String] = None) extends Assign {
+class LocalAssign(
+  var lhs: Variable,
+  var rhs: Expr,
+  override val label: Option[String] = None
+) extends Assign {
   override def modifies: Set[Global] = lhs match {
     case r: Register => Set(r)
     case _           => Set()
@@ -46,7 +50,14 @@ class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[S
 object LocalAssign:
   def unapply(l: LocalAssign): Option[(Variable, Expr, Option[String])] = Some(l.lhs, l.rhs, l.label)
 
-class MemoryStore(var mem: Memory, var index: Expr, var value: Expr, var endian: Endian, var size: Int, override val label: Option[String] = None) extends Statement {
+class MemoryStore(
+  var mem: Memory,
+  var index: Expr,
+  var value: Expr,
+  var endian: Endian,
+  var size: Int,
+  override val label: Option[String] = None
+) extends Statement {
   override def modifies: Set[Global] = Set(mem)
   override def toString: String = s"$labelStr$mem[$index] := MemoryStore($value, $endian, $size)"
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitMemoryStore(this)
@@ -56,7 +67,14 @@ object MemoryStore {
   def unapply(m: MemoryStore): Option[(Memory, Expr, Expr, Endian, Int, Option[String])] = Some(m.mem, m.index, m.value, m.endian, m.size, m.label)
 }
 
-class MemoryLoad(var lhs: Variable, var mem: Memory, var index: Expr, var endian: Endian, var size: Int, override val label: Option[String] = None) extends Assign {
+class MemoryLoad(
+  var lhs: Variable,
+  var mem: Memory,
+  var index: Expr,
+  var endian: Endian,
+  var size: Int,
+  override val label: Option[String] = None
+) extends Assign {
   override def modifies: Set[Global] = lhs match {
     case r: Register => Set(r)
     case _ => Set()
@@ -74,7 +92,19 @@ class NOP(override val label: Option[String] = None) extends Statement {
   override def acceptVisit(visitor: Visitor): Statement = this
 }
 
-class Assert(var body: Expr, var comment: Option[String] = None, override val label: Option[String] = None) extends Statement {
+class AtomicStart(override val label: Option[String] = None) extends NOP(label) {
+  override def toString: String = s"AtomicStart $labelStr"
+}
+
+class AtomicEnd(override val label: Option[String] = None) extends NOP(label) {
+  override def toString: String = s"AtomicEnd $labelStr"
+}
+
+class Assert(
+  var body: Expr,
+  var comment: Option[String] = None,
+  override val label: Option[String] = None
+) extends Statement {
   override def toString: String = s"${labelStr}assert $body" + comment.map(" //" + _)
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssert(this)
 }
@@ -89,7 +119,12 @@ object Assert:
   *
   * checkSecurity is true if this is a branch condition that we want to assert has a security level of low before branching
   */
-class Assume(var body: Expr, var comment: Option[String] = None, override val label: Option[String] = None, var checkSecurity: Boolean = false) extends Statement {
+class Assume(
+  var body: Expr,
+  var comment: Option[String] = None,
+  override val label: Option[String] = None,
+  var checkSecurity: Boolean = false
+) extends Statement {
 
   override def toString: String = s"${labelStr}assume $body" + comment.map(" //" + _)
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssume(this)
@@ -121,7 +156,10 @@ object Return {
   def unapply(r: Return): Option[Option[String]] = Some(r.label)
 }
 
-class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override val label: Option[String]) extends Jump {
+class GoTo private (
+  private val _targets: mutable.LinkedHashSet[Block],
+  override val label: Option[String]
+) extends Jump {
 
   def this(targets: Iterable[Block], label: Option[String] = None) = this(mutable.LinkedHashSet.from(targets), label)
 
@@ -173,9 +211,10 @@ sealed trait Call extends Statement {
   }
 }
 
-class DirectCall(val target: Procedure,
-                 override val label: Option[String] = None
-                ) extends Call {
+class DirectCall(
+  val target: Procedure,
+  override val label: Option[String] = None
+) extends Call {
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals
     case None => Set()
@@ -199,9 +238,10 @@ class DirectCall(val target: Procedure,
 object DirectCall:
   def unapply(i: DirectCall): Option[(Procedure, Option[String])] = Some(i.target, i.label)
 
-class IndirectCall(var target: Variable,
-                   override val label: Option[String] = None
-                  ) extends Call {
+class IndirectCall(
+  var target: Variable,
+  override val label: Option[String] = None
+) extends Call {
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals + target
     case None => Set(target)

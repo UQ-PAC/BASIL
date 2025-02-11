@@ -523,7 +523,14 @@ object Block {
   * @param size number of bytes
   * @param bytes sequence of bytes represented by BitVecLiterals of size 8
   */
-case class MemorySection(name: String, address: BigInt, size: Int, bytes: Seq[BitVecLiteral], readOnly: Boolean, region: Option[MergedRegion] = None) {
+case class MemorySection(
+  name: String,
+  address: BigInt,
+  size: Int,
+  bytes: Seq[BitVecLiteral],
+  readOnly: Boolean,
+  region: Option[MergedRegion] = None
+) {
 
   def getBytes(addr: BigInt, num: Int): Seq[BitVecLiteral] = {
     val startIndex = (addr - address).toInt
@@ -556,5 +563,4 @@ class AtomicSection(start: Block, end: Block, blocks: mutable.Set[Block]) {
   }
 
   def getBlocks: mutable.Set[Block] = blocks
-
 }
