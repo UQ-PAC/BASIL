@@ -586,7 +586,7 @@ object InterpFuns {
     s = State.execute(s, f.call("init_activation", Stopped(), Stopped()))
     s = initMemory(s, "mem", p.initialMemory.values)
     s = initMemory(s, "stack", p.initialMemory.values)
-    s = State.execute(s, f.call(mainfun.name, Run(IRWalk.firstInBlock(mainfun.entryBlock.get)), Stopped()))
+    mainfun.entryBlock.foreach(startBlock => s = State.execute(s, f.call(mainfun.name, Run(IRWalk.firstInBlock(startBlock)), Stopped())))
     // l <- State.sequence(State.pure(()), mainfun.formalInParam.toList.map(i => f.storeVar(i.name, i.toBoogie.scope, Scalar(BitVecLiteral(0, size(i).get)))))
     s
   }

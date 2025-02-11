@@ -49,7 +49,7 @@ class TempIf(val cond: Expr,
   * @param mainAddress: The address of the main function
   *
   */
-class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[StmtContext]]], cfg: CFG, mainAddress: BigInt) {
+class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, List[InsnSemantics]], cfg: CFG, mainAddress: BigInt) {
   private val functionNames = MapDecoder.decode_uuid(mods.map(_.auxData("functionNames").data))
   private val functionEntries = MapDecoder.decode_set(mods.map(_.auxData("functionEntries").data))
   private val functionBlocks = MapDecoder.decode_set(mods.map(_.auxData("functionBlocks").data))
@@ -177,21 +177,20 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           procedure.removeBlocks(block)
         } else {
           if (!blockOutgoingEdges.contains(blockUUID)) {
-            throw Exception (s"block ${block.label} in subroutine ${procedure.name} has no outgoing edges")
-          }
-          val outgoingEdges = blockOutgoingEdges(blockUUID)
-          if (outgoingEdges.isEmpty) {
-            throw Exception(s"block ${block.label} in subroutine ${procedure.name} has no outgoing edges")
-          }
-
-          val (calls, jump) = if (outgoingEdges.size == 1) {
-            val edge = outgoingEdges.head
-            handleSingleEdge(block, edge, procedure, procedures)
+            Logger.warn(s"block ${block.label} in subroutine ${procedure.name} no outgoing edges")
+          } else if (blockOutgoingEdges(blockUUID).isEmpty) {
+            Logger.warn(s"block ${block.label} in subroutine ${procedure.name} has no outgoing edges")
           } else {
-            handleMultipleEdges(block, outgoingEdges, procedure)
+            val outgoingEdges = blockOutgoingEdges(blockUUID)
+            val (calls, jump) = if (outgoingEdges.size == 1) {
+              val edge = outgoingEdges.head
+              handleSingleEdge(block, edge, procedure, procedures)
+            } else {
+              handleMultipleEdges(block, outgoingEdges, procedure)
+            }
+            calls.foreach(c => block.statements.append(c))
+            block.replaceJump(jump)
           }
-          calls.foreach(c => block.statements.append(c))
-          block.replaceJump(jump)
 
           if (block.statements.nonEmpty) {
             cleanUpIfPCAssign(block, procedure)

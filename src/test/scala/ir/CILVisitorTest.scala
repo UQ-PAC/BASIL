@@ -197,8 +197,32 @@ class CILVisitorTest extends AnyFunSuite {
 
     val v3 = RegReplacePost()
     visit_proc(v3, program.procedures.head)
-    assert(v3.res.toList == List("elR31", "elR6", "elR6"))
+    assert(v3.res.toList == List("elR31_0", "elR6_0", "elR6_0"))
 
   }
+
+  test ("changedochildrenposttest") {
+
+    val expr = BinaryExpr(BVADD, BitVecLiteral(BigInt(12), 32), (BinaryExpr(BVADD, BitVecLiteral(BigInt(100), 32), BitVecLiteral(BigInt(120), 32))))
+    class vis extends CILVisitor {
+
+      override def vexpr(e: Expr) = {
+        ChangeDoChildrenPost(e match {
+          case BitVecLiteral(100, 32) => BitVecLiteral(111, 32)
+          case _ => e
+          }, x => x match {
+            case BitVecLiteral(111,32) =>  LocalVar("beans", BitVecType(32))
+            case _ => x
+          })
+        }
+      }
+
+      val cexpr = BinaryExpr(BVADD, BitVecLiteral(BigInt(12), 32), (BinaryExpr(BVADD, LocalVar("beans", BitVecType(32)), BitVecLiteral(BigInt(120), 32))))
+
+      val ne = visit_expr(vis(), expr)
+      assert(ne == cexpr)
+
+    }
+
 
 }

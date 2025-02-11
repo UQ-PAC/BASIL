@@ -11,6 +11,13 @@ object IDGenerator {
   }
 }
 
+
+def escape(s: String) =  {
+  val n = s.replace("\"", "\\\"")
+  n
+}
+
+
 def wrap(_input: String, width: Integer = 20, first : Boolean = true): String =
   var input = _input
 
@@ -61,10 +68,12 @@ class DotNode(val id: String, val label: String) extends DotElement {
 
   def equals(other: DotNode): Boolean = toDotString.equals(other.toDotString)
 
-  override def toString: String = toDotString
 
   def toDotString: String =
-    s"\"$id\"" + "[label=\"" + wrap(label, 100) + "\", shape=\"box\", fontname=\"Mono\", fontsize=\"5\"]"
+    s"\"$id\"" + "[label=\"" + escape(wrap(label, 100)) + "\", shape=\"box\", fontname=\"Mono\", fontsize=\"5\"]"
+
+
+  override def toString: String = toDotString
 
 }
 
@@ -81,8 +90,9 @@ class DotNode(val id: String, val label: String) extends DotElement {
 
   def equals(other: DotArrow): Boolean = toDotString.equals(other.toDotString)
 
+
   def toDotString: String =
-    s"\"${fromNode.id}\" $arrow \"${toNode.id}\"[label=\"$label\", style=\"$style\", color=\"$colour\"]"
+    s"\"${fromNode.id}\" $arrow \"${toNode.id}\"[label=\"${escape(label)}\", style=\"$style\", color=\"$colour\"]"
 }
 
 /** Represents a directed edge between two regular cfg nodes in a Graphviz dot file.
@@ -161,7 +171,7 @@ class DotStruct(val id: String, val details: String, val fields: Option[Iterable
   override def toString: String = toDotString
 
   override def toDotString: String =
-    s"$id " + "[label=" + label + "]"
+    s"$id " + "[label=" + escape(label) + "]"
 }
 
 class DotStructElement(val id: String, val field: Option[String]) extends DotElement {
@@ -183,7 +193,7 @@ case class StructArrow(
   def equals(other: DotArrow): Boolean = toDotString.equals(other.toDotString)
 
   def toDotString: String =
-    s"${from.toString} $arrow ${to.toString} [label=\"$label\", style=\"$style\", color=\"$colour\"]"
+    s"${from.toString} $arrow ${to.toString} [label=\"${escape(label)}\", style=\"$style\", color=\"$colour\"]"
 }
 
 

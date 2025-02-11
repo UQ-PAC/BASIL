@@ -13,7 +13,12 @@ import scala.collection.mutable.ArrayBuffer
 import com.grammatech.gtirb.proto.Module.ByteOrder.LittleEndian
 import util.Logger
 
-class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
+enum InsnSemantics {
+  case Result(value: Array[StmtContext])
+  case Error(opcode: String, error: String)
+}
+
+class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
 
   private val constMap = mutable.Map[String, IRType]()
   private val varMap = mutable.Map[String, IRType]()
@@ -30,20 +35,29 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
 
     val statements: ArrayBuffer[Statement] = ArrayBuffer()
 
-    for (instruction <- instructions) {
+    for (instsem <- instructions) {
       constMap.clear
       varMap.clear
 
-      for ((s, i) <- instruction.zipWithIndex) {
-        
-        val label = blockAddress.map {(a: BigInt) =>
-          val instructionAddress = a + (opcodeSize * instructionCount)
-          instructionAddress.toString + "$" + i
+      instsem match {
+        case InsnSemantics.Error(op, err) => {
+          val message = s"$op ${err.replace("\n", " :: ")}"
+          Logger.warn(s"Program contains lifter unsupported opcode: $message")
+          statements.append(Assert(FalseLiteral, Some(s"Lifter error: $message")))
+          instructionCount += 1
         }
+        case InsnSemantics.Result(instruction) => {
+          for ((s, i) <- instruction.zipWithIndex) {
+            val label = blockAddress.map {(a: BigInt) =>
+              val instructionAddress = a + (opcodeSize * instructionCount)
+              instructionAddress.toString + "$" + i
+            }
 
-        statements.appendAll(visitStmt(s, label))
+            statements.appendAll(visitStmt(s, label))
+          }
+          instructionCount += 1
+        }
       }
-      instructionCount += 1
     }
     statements
   }
@@ -215,6 +229,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
       case c: TypeConstructorContext => visitIdent(c.str).match {
         case "FPRounding" => BitVecType(3)
         case "integer" => BitVecType(64)
+        case "boolean" => BoolType
         case _ => throw Exception(s"unknown type ${ctx.getText}")
       }
       case _ => throw Exception(s"unknown type ${ctx.getText}")
@@ -307,6 +322,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
             case o => UnaryExpr(BoolToBV1, o)
           }
         (result, load)
+
 
       case "not_bool.0" => (resolveUnaryOp(BoolNOT, function, 0, typeArgs, args, ctx.getText), None)
       case "eq_enum.0" => (resolveBinaryOp(BoolEQ, function, 0, typeArgs, args, ctx.getText))
@@ -470,7 +486,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
         // AArch64.MemTag.read, AArch64.MemTag.set - allocation tag operations, can't model as uninterpreted functions
         // and will require some research into their semantics
         // AtomicStart, AtomicEnd - can't model as uninterpreted functions, requires modelling atomic section
-        Logger.debug(s"unidentified call to $function: ${ctx.getText}")
+        Logger.error(s"unidentified call to $function: ${ctx.getText}")
         (None, None)
     }
 

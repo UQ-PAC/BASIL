@@ -15,18 +15,31 @@ var trace = false
 class SimpExpr(simplifier: Expr => (Expr, Boolean)) extends CILVisitor {
   var changedAnything = false
   var count = 0
-  override def vexpr(e: Expr) =
-    val (ne, changed) = simplifier(e)
+
+  def simplify(e: Expr) = {
+    val (n, changed) = simplifier(e)
+
     changedAnything = changedAnything || changed
+
+    if (changed) logSimp(e, n)
+    (n, changed)
+  }
+
+  override def vexpr(e: Expr) = {
+    val e1 = e
+    val cbefore = changedAnything
+    val (ne, changed) = simplify(e)
     ChangeDoChildrenPost(
       ne,
-      (e: Expr) => {
-        val one = e
-        val (ne, c) = simplifier(e)
-        changedAnything = changedAnything || c
-        ne
+      (oe: Expr) => {
+        val (ne2, c) = simplify(oe)
+        if (!cbefore && changedAnything && (oe == e1)) {
+          throw Exception(s"Intermediate changes but $e1 -> $oe -> $ne2")
+        }
+        ne2
       }
     )
+  }
 
   def apply(e: Expr) = {
     val ns = SimpExpr(simplifier)
@@ -38,18 +51,17 @@ class SimpExpr(simplifier: Expr => (Expr, Boolean)) extends CILVisitor {
 def sequenceSimp(a: Expr => (Expr, Boolean), b: Expr => (Expr, Boolean))(e: Expr): (Expr, Boolean) = {
   val (ne1, changed1) = a(e)
   if (ne1 == e && changed1) {
-    Logger.error(s" ${SimplifyValidation.debugTrace.last}")
-    throw Exception(s"No simp $e \n  -> $ne1")
+    val change = s" ${SimplifyValidation.debugTrace.last}"
+    throw Exception(s"Simplifier $change returned 'changed' for identical expression $e \n  -> $ne1")
   }
   val (ne2, changed2) = b(ne1)
   if (ne2 == ne1 && changed2) {
-    // throw Exception("No simp")
-    Logger.error(s" ${SimplifyValidation.debugTrace.last}")
-    throw Exception(s"No simp $ne1 \n  -> $ne2")
+    val change = SimplifyValidation.debugTrace.takeRight(5).map("  " + _ ).mkString("\n")
+    throw Exception(s"$change\nSimplifier returned 'changed' for identical expression $ne1 \n  -> $ne2")
   }
   if (ne2 == e && (changed1 || changed2)) {
-    Logger.error(s" ${SimplifyValidation.debugTrace.last}")
-    throw Exception(s"No simp $e \n  -> $ne1\n  -> $ne2")
+    val change = SimplifyValidation.debugTrace.takeRight(5).map("  " + _ ).mkString("\n")
+    throw Exception(s"$change\nSimplifier returned 'changed' for identical expression $e \n  -> $ne1\n  -> $ne2")
   }
   (ne2, changed1 || changed2)
 }
@@ -234,15 +246,15 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
             case _                   => false
           }
         } =>
-      BinaryExpr(BVADD, r, l)
+      logSimp(e, BinaryExpr(BVADD, r, l))
 
     case BinaryExpr(BoolAND, l @ BinaryExpr(BVEQ, _, _), r @ BinaryExpr(relop, _, _))
         if ineqToStrict.contains(relop) || strictIneq.contains(relop) => {
-      BinaryExpr(BoolAND, r, l)
+      logSimp(e, BinaryExpr(BoolAND, r, l))
     }
     case BinaryExpr(BoolAND, l @ UnaryExpr(BoolNOT, BinaryExpr(BVEQ, _, _)), r @ BinaryExpr(relop, _, _))
         if ineqToStrict.contains(relop) || strictIneq.contains(relop) => {
-      BinaryExpr(BoolAND, r, l)
+      logSimp(e, BinaryExpr(BoolAND, r, l))
     }
 
     case BinaryExpr(BVCOMP, l, r) => {
@@ -636,7 +648,7 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
           UnaryExpr(BoolNOT, BinaryExpr(BVEQ, lhs2, rhs2: BitVecLiteral))
         )
         if (ineqToStrict.contains(op) || strictIneq
-          .contains(op)) && simplifyCond(BinaryExpr(ineqToStrict.get(op).getOrElse(op), rhs, rhs2)) == TrueLiteral
+          .contains(op)) && rhs.getType == rhs2.getType && simplifyCond(BinaryExpr(ineqToStrict.get(op).getOrElse(op), rhs, rhs2)) == TrueLiteral
           && lhs == lhs2 => {
       logSimp(e, l)
     }
@@ -847,27 +859,27 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
   var changedAnything = true
 
   val res = e match {
-    case Extract(ed, 0, body) if size(body).get == ed                                    => (body)
-    case ZeroExtend(0, body)                                                             => (body)
-    case SignExtend(0, body)                                                             => (body)
-    case BinaryExpr(BVADD, body, BitVecLiteral(0, _))                                    => (body)
-    case BinaryExpr(BVMUL, body, BitVecLiteral(1, _))                                    => (body)
-    case Repeat(1, body)                                                                 => (body)
-    case Extract(ed, 0, ZeroExtend(extension, body)) if (body.getType == BitVecType(ed)) => (body)
-    case Extract(ed, 0, SignExtend(extension, body)) if (body.getType == BitVecType(ed)) => (body)
+    case Extract(ed, 0, body) if size(body).get == ed                                    => logSimp(e, body)
+    case ZeroExtend(0, body)                                                             => logSimp(e, body)
+    case SignExtend(0, body)                                                             => logSimp(e, body)
+    case BinaryExpr(BVADD, body, BitVecLiteral(0, _))                                    => logSimp(e, body)
+    case BinaryExpr(BVMUL, body, BitVecLiteral(1, _))                                    => logSimp(e, body)
+    case Repeat(1, body)                                                                 => logSimp(e, body)
+    case Extract(ed, 0, ZeroExtend(extension, body)) if (body.getType == BitVecType(ed)) => logSimp(e, body)
+    case Extract(ed, 0, SignExtend(extension, body)) if (body.getType == BitVecType(ed)) => logSimp(e, body)
     case Extract(ed, 0, ZeroExtend(exts, body)) if exts + size(body).get >= ed && ed > size(body).get =>
-      ZeroExtend(ed - size(body).get, body)
+      logSimp(e, ZeroExtend(ed - size(body).get, body))
 
     case BinaryExpr(BVEQ, ZeroExtend(x, body), y: BitVecLiteral) if y.value <= BigInt(2).pow(size(body).get) - 1 =>
-      BinaryExpr(BVEQ, body, BitVecLiteral(y.value, size(body).get))
+      logSimp(e, BinaryExpr(BVEQ, body, BitVecLiteral(y.value, size(body).get)))
 
     case BinaryExpr(BVEQ, ZeroExtend(sz, expr), BitVecLiteral(0, sz2)) =>
-      BinaryExpr(BVEQ, expr, BitVecLiteral(0, size(expr).get))
+      logSimp(e, BinaryExpr(BVEQ, expr, BitVecLiteral(0, size(expr).get)))
 
     // compose slices
-    case Extract(ed1, be1, Extract(ed2, be2, body)) => Extract(ed1 + be2, be1 + be2, (body))
-    case SignExtend(sz1, SignExtend(sz2, exp))      => SignExtend(sz1 + sz2, exp)
-    case ZeroExtend(sz1, ZeroExtend(sz2, exp))      => ZeroExtend(sz1 + sz2, exp)
+    case Extract(ed1, be1, Extract(ed2, be2, body)) => logSimp(e, Extract(ed1 + be2, be1 + be2, (body)))
+    case SignExtend(sz1, SignExtend(sz2, exp))      => logSimp(e, SignExtend(sz1 + sz2, exp))
+    case ZeroExtend(sz1, ZeroExtend(sz2, exp))      => logSimp(e, ZeroExtend(sz1 + sz2, exp))
 
     // make subs more readable
     //case BinaryExpr(BVADD, x, b: BitVecLiteral) if eval.BitVectorEval.isNegative(b) => {
@@ -878,24 +890,24 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
     case BinaryExpr(BVCONCAT, Extract(hi1, lo1, x1), ZeroExtend(ext, Extract(hi2, 0, x2))) if lo1 == ext + hi2 => {
       val b = "1" * (hi1 - lo1) ++ ("0" * ext) ++ "1" * hi2
       val n = BinaryExpr(BVAND, Extract(hi1, 0, x2), BitVecLiteral(BigInt(b, 2), hi1))
-      n
+      logSimp(e, n)
     }
 
     // redundant extends
     // extract extended zero part
-    case Extract(ed, bg, ZeroExtend(x, expr)) if (bg > size(expr).get) => BitVecLiteral(0, ed - bg)
+    case Extract(ed, bg, ZeroExtend(x, expr)) if (bg > size(expr).get) => logSimp(e, BitVecLiteral(0, ed - bg))
     // extract below extend
-    case Extract(ed, bg, ZeroExtend(x, expr)) if (bg < size(expr).get) && (ed < size(expr).get) => Extract(ed, bg, expr)
-    case Extract(ed, bg, SignExtend(x, expr)) if (bg < size(expr).get) && (ed < size(expr).get) => Extract(ed, bg, expr)
+    case Extract(ed, bg, ZeroExtend(x, expr)) if (bg < size(expr).get) && (ed < size(expr).get) => logSimp(e, Extract(ed, bg, expr))
+    case Extract(ed, bg, SignExtend(x, expr)) if (bg < size(expr).get) && (ed < size(expr).get) => logSimp(e, Extract(ed, bg, expr))
 
-    case ZeroExtend(ed, Extract(hi, 0, e)) if size(e).get == hi + ed => BinaryExpr(BVAND, e, BinaryExpr(BVCONCAT, BitVecLiteral(0, ed), BitVecLiteral(BigInt(2).pow(hi)-1, hi)))
+    case ZeroExtend(ed, Extract(hi, 0, e)) if size(e).get == hi + ed => logSimp(e, BinaryExpr(BVAND, e, BinaryExpr(BVCONCAT, BitVecLiteral(0, ed), BitVecLiteral(BigInt(2).pow(hi)-1, hi))))
 
-    case BinaryExpr(BVSHL, body, BitVecLiteral(n, _)) if size(body).get <= n => BitVecLiteral(0, size(body).get)
+    case BinaryExpr(BVSHL, body, BitVecLiteral(n, _)) if size(body).get <= n => logSimp(e, BitVecLiteral(0, size(body).get))
 
     // simplify convoluted bit test
     case BinaryExpr(BVEQ, BinaryExpr(BVSHL, ZeroExtend(n1, body), BitVecLiteral(n, _)), BitVecLiteral(0, _))
         if n1 == n => {
-      BinaryExpr(BVEQ, body, BitVecLiteral(0, size(body).get))
+      logSimp(e, BinaryExpr(BVEQ, body, BitVecLiteral(0, size(body).get)))
     }
     //     assume (!(bvshl8(zero_extend6_2(R3_19[8:6]), 6bv8) == 128bv8));
     case BinaryExpr(
@@ -903,16 +915,16 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
           BinaryExpr(BVSHL, ZeroExtend(n1, body @ Extract(hi, lo, v)), BitVecLiteral(n, _)),
           c @ BitVecLiteral(cval, _)
         ) if lo == n && cval >= BigInt(2).pow(lo + n.toInt) => {
-      BinaryExpr(BVEQ, body, Extract(hi + n.toInt, lo + n.toInt, c))
+      logSimp(e, BinaryExpr(BVEQ, body, Extract(hi + n.toInt, lo + n.toInt, c)))
     }
     case BinaryExpr(BVEQ, BinaryExpr(BVSHL, b, BitVecLiteral(n, _)), c @ BitVecLiteral(0, _)) => {
       // b low bits are all zero due to shift
-      BinaryExpr(BVEQ, b, BitVecLiteral(0, size(b).get))
+      logSimp(e, BinaryExpr(BVEQ, b, BitVecLiteral(0, size(b).get)))
     }
     case BinaryExpr(BVEQ, BinaryExpr(BVSHL, b, BitVecLiteral(n, _)), c @ BitVecLiteral(cval, _))
         if cval != 0 && cval < BigInt(2).pow(n.toInt) => {
       // low bits are all zero due to shift, and cval low bits are not zero
-      FalseLiteral
+      logSimp(e, FalseLiteral)
     }
     case BinaryExpr(
           BVEQ,
@@ -920,7 +932,7 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
           c @ BitVecLiteral(cval, _)
         ) if lo == n && cval >= BigInt(2).pow(n.toInt) => {
       // extract the part of cval we are testing and remove the shift on the lhs operand
-      BinaryExpr(BVEQ, body, Extract((hi - lo) + n.toInt, n.toInt, c))
+      logSimp(e, BinaryExpr(BVEQ, body, Extract((hi - lo) + n.toInt, n.toInt, c)))
     }
 
     // bvnot to bvneg
@@ -997,10 +1009,13 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
 
     case BinaryExpr(BVADD, ed @ SignExtend(sz, UnaryExpr(BVNOT, x)), bo @ BitVecLiteral(bv, sz2))
         if size(ed).contains(sz2) && !BitVectorEval.isNegative(bo) =>
-      logSimp(e, BinaryExpr(BVADD, UnaryExpr(BVNEG, SignExtend(sz, x)), BitVecLiteral(bv - 1, sz2)), actual = false)
+      didAnything = false
+      logSimp(e, BinaryExpr(BVADD, UnaryExpr(BVNEG, SignExtend(sz, x)), BitVecLiteral(bv - 1, sz2)), 
+        actual = false)
 
     case BinaryExpr(BVADD, BinaryExpr(BVADD, y, ed @ UnaryExpr(BVNOT, x)), bo @ BitVecLiteral(off, sz2))
         if size(ed).contains(sz2) && !(y.isInstanceOf[BitVecLiteral]) && !BitVectorEval.isNegative(bo) =>
+      didAnything = false
       logSimp(
         e,
         BinaryExpr(BVADD, BinaryExpr(BVADD, y, UnaryExpr(BVNEG, x)), BitVecLiteral(off - 1, sz2)),
@@ -1009,6 +1024,7 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
 
     case BinaryExpr(BVADD, BinaryExpr(BVADD, y, ed @ SignExtend(sz, UnaryExpr(BVNOT, x))), BitVecLiteral(off, sz2))
         if size(ed).contains(sz2) && !(y.isInstanceOf[BitVecLiteral]) =>
+      didAnything = false
       logSimp(
         e,
         BinaryExpr(BVADD, BinaryExpr(BVADD, y, UnaryExpr(BVNEG, SignExtend(sz, x))), BitVecLiteral(off - 1, sz2)),
@@ -1019,7 +1035,7 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
     //case BinaryExpr(BVADD, BitVecLiteral(1, _), UnaryExpr(BVNEG, x)) => logSimp(e, UnaryExpr(BVNOT, x))
     // case BinaryExpr(BVADD, UnaryExpr(BVNEG, x), BitVecLiteral(c, sz)) => logSimp(e, BinaryExpr(UnaryExpr(BVNOT, x), ))
 
-    case BinaryExpr(BVADD, UnaryExpr(BVNOT, x), BitVecLiteral(1, _)) => UnaryExpr(BVNEG, x)
+    case BinaryExpr(BVADD, UnaryExpr(BVNOT, x), BitVecLiteral(1, _)) => logSimp(e, UnaryExpr(BVNEG, x))
 
     //case BinaryExpr(BVEQ, BinaryExpr(BVADD, x, y: BitVecLiteral), BitVecLiteral(0, _))
     //    if (eval.BitVectorEval.isNegative(y)) =>

@@ -32,6 +32,13 @@ case class StaticAnalysisConfig(
   irreducibleLoops: Boolean = true
 )
 
+
+enum DSAAnalysis {
+  case Norm, Set, Field
+}
+
+case class DSAConfig(analyses: Set[DSAAnalysis])
+
 enum BoogieMemoryAccessMode {
   case SuccessiveStoreSelect, LambdaStoreSelect
 }
@@ -41,10 +48,12 @@ enum MemoryRegionsMode {
 }
 
 case class BASILConfig(
+  context: Option[IRContext] = None,
   loading: ILLoadingConfig,
   runInterpret: Boolean = false,
   simplify: Boolean = false,
   validateSimp: Boolean = false,
+  dsaConfig: Option[DSAConfig] = None,
   staticAnalysis: Option[StaticAnalysisConfig] = None,
   boogieTranslation: BoogieGeneratorConfig = BoogieGeneratorConfig(),
   outputPrefix: String

@@ -22,7 +22,7 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{DataStructureAnalysis, Graph, SymbolicAddress, SymbolicAddressAnalysis}
+import analysis.data_structure_analysis.{Constraint, DataStructureAnalysis, getSymbolicValues, generateConstraints, Graph, SymbolicAddress, SymbolicValues, SymbolicAddressAnalysis}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
@@ -75,9 +75,15 @@ case class StaticAnalysisContext(
   ssaResults: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
 )
 
+
+case class DSAContext(
+ sva: Map[Procedure, SymbolicValues],
+ constraints: Map[Procedure, Set[Constraint]],
+)
+
 /** Results of the main program execution.
   */
-case class BASILResult(ir: IRContext, analysis: Option[StaticAnalysisContext], boogie: ArrayBuffer[BProgram])
+case class BASILResult(ir: IRContext, analysis: Option[StaticAnalysisContext], dsa: Option[DSAContext], boogie: ArrayBuffer[BProgram])
 
 
 /** Tools for loading the IR program into an IRContext.
@@ -127,9 +133,7 @@ object IRLoading {
     val mods = ir.modules
     val cfg = ir.cfg.get
 
-    val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, Array[Array[String]]]])
-
-    def parse_insn(line: String): StmtContext = {
+    def parse_asl_stmt(line: String): Option[StmtContext] = {
       val lexer = ASLpLexer(CharStreams.fromString(line))
       val tokens = CommonTokenStream(lexer)
       val parser = ASLpParser(tokens)
@@ -137,7 +141,7 @@ object IRLoading {
       parser.setBuildParseTree(true)
 
       try {
-        parser.stmt()
+        Some(parser.stmt())
       } catch {
         case e: org.antlr.v4.runtime.misc.ParseCancellationException =>
           val extra = e.getCause match {
@@ -150,16 +154,40 @@ object IRLoading {
               ${line.replace('\n', ' ')}
               ${" " * token.getStartIndex}^ here!
               """.stripIndent
-            case _ => ""
+            case o => o.toString
           }
           Logger.error(s"""Semantics parse error:\n  line: $line\n$extra""")
-          throw e
+          Logger.error(e.getStackTrace.mkString("\n"))
+          None
       }
     }
 
-    val parserMap = semantics.map(_.map((k: String, v: Array[Array[String]]) => (k, v.map(_.map(parse_insn)))))
+    implicit object InsnSemanticsFormat extends JsonFormat[InsnSemantics] {
+      def write(m: InsnSemantics) =  ???
+      def read(json: JsValue) = json match {
+        case JsObject(fields) => {
+          val m : Map[String, JsValue] = fields.get("decode_error") match {
+            case Some(JsObject(m)) => m
+            case _ => deserializationError(s"Bad sem format $json")
+          }
+          InsnSemantics.Error(m("opcode").convertTo[String], m("error").convertTo[String])
+        }
+        case array @ JsArray(_) => {
+          val xs = array.convertTo[Array[String]].map(parse_asl_stmt)
+          if (xs.exists(_.isEmpty))  {
+            InsnSemantics.Error("?", "parseError")
+          } else {
+            InsnSemantics.Result(xs.map(_.get))
+          }
+        }
+        case s => deserializationError(s"Bad sem format $s")
+      }
+    }
 
-    val GTIRBConverter = GTIRBToIR(mods, parserMap.flatten.toMap, cfg, mainAddress)
+    val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, List[InsnSemantics]]])
+
+    val parserMap : Map[String, List[InsnSemantics]] = semantics.flatten.toMap
+    val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress)
     GTIRBConverter.createIR()
   }
 
@@ -170,6 +198,7 @@ object IRLoading {
     val lexer = ReadELFLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(lexer)
     val parser = ReadELFParser(tokens)
+    parser.setErrorHandler(BailErrorStrategy())
     parser.setBuildParseTree(true)
     ReadELFLoader.visitSyms(parser.syms(), config)
   }
@@ -668,8 +697,12 @@ object RunUtils {
     transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
     AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
 
-    for (p <- ctx.program.procedures) {
-      DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
+    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
+      val dir = File("./graphs/")
+      if (!dir.exists()) then dir.mkdirs()
+      for (p <- ctx.program.procedures) {
+        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
+      }
     }
     transforms.liftLinuxAssertFail(ctx)
 
@@ -710,7 +743,7 @@ object RunUtils {
     Logger.info("[!] Loading Program")
     var q = conf
 
-    var ctx = IRLoading.load(q.loading)
+    var ctx = q.context.getOrElse(IRLoading.load(q.loading))
 
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))
@@ -760,6 +793,30 @@ object RunUtils {
 
       doSimplify(ctx, conf.staticAnalysis)
     }
+    
+    
+    // SVA
+    var dsaContext: Option[DSAContext] = None
+    if conf.dsaConfig.nonEmpty then
+      val config = conf.dsaConfig.get
+
+      val main = ctx.program.mainProcedure
+      var sva: Map[Procedure, SymbolicValues] = Map.empty
+      var cons: Map[Procedure, Set[Constraint]] = Map.empty
+
+      ctx.program.procedures.foreach(
+        proc =>
+          val SVAResults = getSymbolicValues(proc)
+          val constraints = generateConstraints(proc)
+          sva += (proc -> SVAResults)
+          cons += (proc -> constraints)
+
+      )
+
+      DSALogger.info("Finished local phase")
+
+      dsaContext = Some(DSAContext(sva, cons))
+      
 
     if (q.runInterpret) {
       Logger.info("Start interpret")
@@ -807,7 +864,7 @@ object RunUtils {
     assert(invariant.singleCallBlockEnd(ctx.program))
 
 
-    BASILResult(ctx, analysis, boogiePrograms)
+    BASILResult(ctx, analysis, dsaContext, boogiePrograms)
   }
 
   /** Use static analysis to resolve indirect calls and replace them in the IR until fixed point.
