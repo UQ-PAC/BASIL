@@ -57,17 +57,12 @@ enum Interval extends InternalLattice[Interval] {
 
 private implicit val intervalTerm: Interval = Interval.Bottom
 
-class IntervalDomain(procedure: Procedure, signed: Boolean, inf: Int => BigInt, negInf: Int => BigInt, bvto: BitVecLiteral => BigInt, tobv: (Int, BigInt) => BitVecLiteral)
+class IntervalDomain(signed: Boolean, inf: Int => BigInt, negInf: Int => BigInt, bvto: BitVecLiteral => BigInt, tobv: (Int, BigInt) => BitVecLiteral)
   extends MapDomain[Variable, Interval] {
   import Interval.*
   import ir.eval.BitVectorEval.*
 
-  private val (liveBefore, liveAfter) = transforms.getLiveVars(procedure)
-
   def joinTerm(a: Interval, b: Interval, pos: Block): Interval = a.join(b)
-
-  override def join(a: LatticeMap[Variable, Interval], b: LatticeMap[Variable, Interval], pos: Block): LatticeMap[Variable, Interval] =
-    super.join(a, b, pos).filter((v, i) => liveBefore(pos).contains(v))
 
   override def widenTerm(a: Interval, b: Interval, pos: Block): Interval =
     (a, b) match {
@@ -138,7 +133,7 @@ class IntervalDomain(procedure: Procedure, signed: Boolean, inf: Int => BigInt, 
   }
 }
 
-class SignedIntervalDomain(procedure: Procedure) extends IntervalDomain(procedure, true, sInf, sNInf, bv2SignedInt, signedInt2bv)
-class UnsignedIntervalDomain(procedure: Procedure) extends IntervalDomain(procedure, false, uInf, uNInf, bv2nat, nat2bv)
+class SignedIntervalDomain extends IntervalDomain(true, sInf, sNInf, bv2SignedInt, signedInt2bv)
+class UnsignedIntervalDomain extends IntervalDomain(false, uInf, uNInf, bv2nat, nat2bv)
 
-class DoubleIntervalDomain(procedure: Procedure) extends ProductDomain(SignedIntervalDomain(procedure), UnsignedIntervalDomain(procedure))
+class DoubleIntervalDomain extends ProductDomain(SignedIntervalDomain(), UnsignedIntervalDomain())
