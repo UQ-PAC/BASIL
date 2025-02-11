@@ -16,6 +16,11 @@ import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
 import ExecutionContext.Implicits.global
 
+
+/**
+ * Simplification pass, see also: docs/development/simplification-solvers.md
+ */
+
 def getLiveVars(p: Procedure): (Map[Block, Set[Variable]], Map[Block, Set[Variable]]) = {
   val liveVarsDom = IntraLiveVarsDomain()
   val liveVarsSolver = worklistSolver(liveVarsDom)
