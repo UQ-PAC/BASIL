@@ -520,7 +520,7 @@ object StaticAnalysis {
 
   def generate_rg_conditions(procs: List[Procedure]): Unit = {
     val stateTransfer = SignedIntervalDomain().transfer
-    val stateLattice = LatticeMap//[Variable, Interval]
+    val stateLattice = CompatibleLatticeMap[Variable, Interval, LA <: Lattice[L]](l: LA)
     type StateElement = Map[Variable, Interval]
     val intDom = ConditionalWritesDomain[StateElement](stateLattice, stateTransfer)
     val rg_generator = RelyGuaranteeGenerator(intDom, procs)

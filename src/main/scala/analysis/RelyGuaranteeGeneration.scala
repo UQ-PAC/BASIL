@@ -13,6 +13,12 @@ trait CompatibleLattice[S] extends Lattice[S] {
   def glb(s1: S, s2: S): S
 }
 
+class CompatibleLatticeMap[D, L, LA <: Lattice[L]](l: LA) extends LatticeMapLattice[D, L, LA](l: LA) with CompatibleLattice[LatticeMap[D, L]] {
+  def drop(v: Variable, s: LatticeMap[D, L]): LatticeMap[D, L] = {
+    s.filter((d: D, _: L) => d != v)
+  }
+}
+
 /**
   * An interference domain is similar to an abstract domain, except that it
   * represents sets of state transitions rather than sets of states. These
