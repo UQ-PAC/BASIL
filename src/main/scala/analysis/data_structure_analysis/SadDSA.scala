@@ -23,9 +23,11 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
 {
 
   def BUPhase(locals: Map[Procedure, SadGraph]): Unit = {
+
+    val skip = List("unicode", "so_recvln")
     phase = BU
     constraints.toSeq.sortBy(c => c.label).foreach {
-      case dcc: DirectCallConstraint if locals.contains(dcc.target) && !dcc.target.isExternal.getOrElse(false) =>
+      case dcc: DirectCallConstraint if locals.contains(dcc.target) && skip.forall(f => dcc.target.name.startsWith(f)) &&  !dcc.target.isExternal.getOrElse(false) =>
 //        if dcc.target.name.startsWith("so_recvln")
         println(s"cloning ${dcc.target.name} into ${proc.name}")
         val oldToNew = mutable.Map[SadNode, SadNode]()
