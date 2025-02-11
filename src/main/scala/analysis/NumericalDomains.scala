@@ -57,12 +57,17 @@ enum Interval extends InternalLattice[Interval] {
 
 private implicit val intervalTerm: Interval = Interval.Bottom
 
-class IntervalDomain(signed: Boolean, inf: Int => BigInt, negInf: Int => BigInt, bvto: BitVecLiteral => BigInt, tobv: (Int, BigInt) => BitVecLiteral)
-  extends MapDomain[Variable, Interval] {
+class IntervalDomain(procedure: Option[Procedure] = None, signed: Boolean, inf: Int => BigInt, negInf: Int => BigInt, bvto: BitVecLiteral => BigInt, tobv: (Int, BigInt) => BitVecLiteral)
+  extends MayPredMapDomain[Variable, Interval] {
   import Interval.*
   import ir.eval.BitVectorEval.*
 
+  private val (liveBefore, liveAfter) = procedure.map(transforms.getLiveVars(_)).unzip
+
   def joinTerm(a: Interval, b: Interval, pos: Block): Interval = a.join(b)
+
+  override def join(a: LatticeMap[Variable, Interval], b: LatticeMap[Variable, Interval], pos: Block): LatticeMap[Variable, Interval] =
+    super.join(a, b, pos).filter((v, i) => liveBefore.exists(_(pos).contains(v)))
 
   override def widenTerm(a: Interval, b: Interval, pos: Block): Interval =
     (a, b) match {
@@ -133,7 +138,21 @@ class IntervalDomain(signed: Boolean, inf: Int => BigInt, negInf: Int => BigInt,
   }
 }
 
-class SignedIntervalDomain extends IntervalDomain(true, sInf, sNInf, bv2SignedInt, signedInt2bv)
-class UnsignedIntervalDomain extends IntervalDomain(false, uInf, uNInf, bv2nat, nat2bv)
+// The optional procedure is used to filter dead variables, it is not needed and is a performance optimisation.
 
-class DoubleIntervalDomain extends ProductDomain(SignedIntervalDomain(), UnsignedIntervalDomain())
+class SignedIntervalDomain(procedure: Option[Procedure] = None) extends IntervalDomain(procedure, true, sInf, sNInf, bv2SignedInt, signedInt2bv)
+class UnsignedIntervalDomain(procedure: Option[Procedure] = None) extends IntervalDomain(procedure, false, uInf, uNInf, bv2nat, nat2bv)
+
+class DoubleIntervalDomain(procedure: Option[Procedure] = None) extends PredProductDomain(SignedIntervalDomain(procedure), UnsignedIntervalDomain(procedure))
+
+class IntervalLattice extends InternalLatticeLattice[Interval](Interval.Bottom)
+
+class TopDomain extends PredicateEncodingDomain[Unit] {
+  def join(a: Unit, b: Unit, pos: Block): Unit = {}
+  def transfer(a: Unit, b: Command): Unit = {}
+
+  def top: Unit = {}
+  def bot: Unit = {}
+
+  def toPred(x: Unit): Predicate = Predicate.True
+}

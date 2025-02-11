@@ -200,7 +200,7 @@ def computeDomain[T <: CFGPosition, O <: T](walker: IRWalk[T, O], initial: Itera
 /** Compute the set of strongly connected subcomponents (flattened) in a topological sort order using
  *  Tarjan's strongly connected components algorithm
  */
-def stronglyConnectedComponents[T <: CFGPosition, O <: T](walker: IRWalk[T, O], initial: IterableOnce[O]): mutable.ListBuffer[mutable.Set[O]] = {
+def stronglyConnectedComponents[T <: CFGPosition, O <: T](walker: IRWalk[T, O], initial: IterableOnce[O]): List[Set[O]] = {
   var index = 0;
   var stack = mutable.Stack[O]()
   var vIndex = mutable.Map[O, Int]()
@@ -225,7 +225,7 @@ def stronglyConnectedComponents[T <: CFGPosition, O <: T](walker: IRWalk[T, O], 
       if (!vIndex.contains(next)) {
         strongconnect(next)
         vLowLink(cur) = vLowLink(cur).min(vLowLink(next))
-      } else {
+      } else if (vOnStack(next)) {
         vLowLink(cur) = vLowLink(cur).min(vIndex(next))
       }
     }
@@ -241,8 +241,9 @@ def stronglyConnectedComponents[T <: CFGPosition, O <: T](walker: IRWalk[T, O], 
       out += component
     }
   }
+  assert(stack.size == 0)
 
-  out
+  out.map(_.toSet).toList
 }
 
 def toDot(program: Program, labels: Map[CFGPosition, String] = Map.empty, inter: Boolean = false): String = {
