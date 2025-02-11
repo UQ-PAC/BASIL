@@ -21,9 +21,9 @@ val R31: Register = Register("R31", 64)
 
 def exprEq(l: Expr, r: Expr) : Expr = (l, r) match {
   case (l, r) if l.getType != r.getType => FalseLiteral
-  case (l, r) if l.getType == BoolType => BinaryExpr(BoolEQ, l, r) 
-  case (l, r) if l.getType.isInstanceOf[BitVecType] => BinaryExpr(BVEQ, l, r) 
-  case (l, r) if l.getType == IntType => BinaryExpr(IntEQ, l, r) 
+  case (l, r) if l.getType == BoolType => BinaryExpr(BoolEQ, l, r)
+  case (l, r) if l.getType.isInstanceOf[BitVecType] => BinaryExpr(BVEQ, l, r)
+  case (l, r) if l.getType == IntType => BinaryExpr(IntEQ, l, r)
   case _ => FalseLiteral
 }
 
@@ -129,7 +129,9 @@ case class EventuallyBlock(label: String, sl: Seq[EventuallyStatement], j: Event
   }
 }
 
-def block(label: String, sl: (Statement | EventuallyStatement | EventuallyJump)*): EventuallyBlock = {
+type DSLStatement = (AtomicStatement | EventuallyStatement | EventuallyJump)
+
+def block(label: String, sl: DSLStatement*): EventuallyBlock = {
   val statements : Seq[EventuallyStatement] = sl.flatMap {
     case s: Statement => Some(ResolvableStatement(s))
     case o: EventuallyStatement => Some(o)
@@ -196,4 +198,26 @@ def prog(procedures: EventuallyProcedure*): Program = {
   p
 }
 
+object Exporter {
+  def statementToDSL(s: Statement): DSLStatement = s match
+    case s: SingleAssign => s
+    case s: MemoryStore => s
+    // case s: MemoryLoad => s // subtype of Assign
+    case s: NOP => s
+    case s: Assert => s
+    case s: Assume => s
+    case IndirectCall(target, _) => indirectCall(target)
+    case DirectCall(proc, _, _, _) => directCall(proc.name)
+
+  def dslStatementToScala(s: DSLStatement): String = s match
+    case LocalAssign(a,b,c) => s"LocalAssign($a, $b, $c)"
+    case MemoryStore(a,b,c,d,e,f) => s"MemoryStore($a, $b, $c, $d, $e, $f)"
+    // case s: MemoryLoad => s // subtype of Assign
+    case s: NOP => "NOP"
+}
+
+
+extension (s: Statement)
+  def toDSL() = Exporter.statementToDSL(s)
+  def toScala() = Exporter.dslStatementToScala(s.toDSL())
 
