@@ -832,7 +832,7 @@ object RunUtils {
       val visited: mutable.Set[Procedure] = mutable.Set.empty
       val queue = mutable.Queue[Procedure]().enqueueAll(sadDSABU.keys.toSeq.sortBy(p => p.name))
 
-      val skip = Seq("croak", "myexit", "headers_recv")
+      val skip = Seq("croak", "myexit")
       while queue.nonEmpty do
         val proc = queue.dequeue()
         if skip.exists(name => proc.name.startsWith(name)) then
