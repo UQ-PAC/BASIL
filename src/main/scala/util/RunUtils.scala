@@ -519,6 +519,14 @@ object StaticAnalysis {
   }
 
   def generate_rg_conditions(procs: List[Procedure]): Unit = {
+    val stateTransfer = SignedIntervalDomain().transfer
+    val stateLattice = LatticeMap//[Variable, Interval]
+    type StateElement = Map[Variable, Interval]
+    val intDom = ConditionalWritesDomain[StateElement](stateLattice, stateTransfer)
+    val rg_generator = RelyGuaranteeGenerator(intDom, procs)
+
+
+
     type StateElement = Map[Variable, FlatElement[BitVecLiteral]]
     val stateLattice = ConstantPropagationLattice()
     // extracting this (what should be static) function from IntraProcConstantPropagation requires instantiating it with a Program

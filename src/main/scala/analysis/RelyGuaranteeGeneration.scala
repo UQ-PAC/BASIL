@@ -14,15 +14,24 @@ trait CompatibleLattice[S] extends Lattice[S] {
 }
 
 /**
-  * Whereas an abstract domain is used for deriving sets of states in the form
-  * of some lattice, an interference domain is used for deriving sets of state
-  * _transitions_, also in the form of some lattice. As sets of state
-  * transitions, they can represent both rely and guarantee conditions.
+  * An interference domain is similar to an abstract domain, except that it
+  * represents sets of state transitions rather than sets of states. These
+  * state transitions can represent both rely and guarantee conditions. Similar
+  * to a transfer function, the interference domain is equipped with a "derive"
+  * function which effectively generates a sound guarantee condition of a
+  * given assignment with respect to a given pre-state. It is also equipped with
+  * an "apply" function that weakens a given state by accounting for the
+  * interference captured by a rely condition (i.e. an element of this domain).
   * 
-  * Interference domains are parameterised by some abstract domain A, and
-  * provide functionality for deriving themselves (i.e. as guarantees) from
-  * elements of A, as well as stabilising elements of A
-  * under themselves (i.e. as rely conditions).
+  * Of course, we also need some way to represent these aforementioned
+  * "pre-states" and "states". For this, we parameterise our interference
+  * domain with an abstract domain, which we call a "state domain". The ability
+  * to mix-and-match different interference and state domains is one of the
+  * strengths of this analysis.
+  * 
+  * Some interference domains require that the parameterised state domain
+  * defines some extra functions. Hence, we require that state domains extend
+  * the CompatibleLattice trait.
   * 
   * Type parameters:
   * T: The type of lattice element representing a set of state transitions.
@@ -30,7 +39,7 @@ trait CompatibleLattice[S] extends Lattice[S] {
   * L: A lattice type, defined over element type S.
   * stateTransfer: A transfer function for lattice elements of type S.
   */
-abstract class InterferenceDomain[T, S](val stateLattice: CompatibleLattice[S], val stateTransfer: (Command, S) => S) {
+abstract class InterferenceDomain[T, S](val stateLattice: CompatibleLattice[S], val stateTransfer: (S, Command) => S) {
   def bot: T
   // until the memory region analysis is complete, we test our static analysis by generating RG conditions for local variables
   def derive(s: S, c: LocalAssign): T
@@ -47,7 +56,7 @@ abstract class InterferenceDomain[T, S](val stateLattice: CompatibleLattice[S], 
   * This is implemented with a map [v_i -> P_i] from variables to the conditions under which they may be written to in the program.
   * Variables that are never written to are omitted from the map, rather than being mapped to bot.
   */
-class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransfer: (Command, S) => S) extends InterferenceDomain[Map[Variable, S], S](stateLattice, stateTransfer) {
+class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransfer: (S, Command) => S) extends InterferenceDomain[Map[Variable, S], S](stateLattice, stateTransfer) {
   // an empty map means no variables have been written to
   def bot: Map[Variable, S] = Map.empty[Variable, S]
   
@@ -116,14 +125,27 @@ class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransf
   }
 }
 
+/**
+  * To generate guarantee conditions, we need to:
+  * 1. Generate the set of reachable states using the state domain.
+  * 2. Generate the set of reachable state transitions by applying the "derive"
+  *    function to these reachable states.
+  * In our analysis, these two steps are implemented simultaneously using the
+  * InterferenceProductDomain to track both the reachable states and reachable
+  * state transitions at a particular program point.
+  */
 class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T) extends AbstractDomain[(T, S)] {
+  def top: (T, S) = ???
+  
+  def bot: (T, S) = (intDom.bot, intDom.stateLattice.bottom)
+
   def join(a: (T, S), b: (T, S), pos: Block): (T, S) = (intDom.join(a._1, b._1), intDom.stateLattice.lub(a._2, b._2))
   
   def transfer(a: (T, S), b: Command): (T, S) = {
     // stabilise the pre-state under the rely
     val pre_state = intDom.apply(rely, a._2)
     // derive post-state from the stabilised pre-state
-    val post_state = intDom.stateTransfer(b, pre_state)
+    val post_state = intDom.stateTransfer(pre_state, b)
     // derive the possible state transitions resulting from this statement
     val transitions = b match {
       case a: LocalAssign => intDom.derive(pre_state, a)
@@ -134,12 +156,19 @@ class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T)
     // return results
     (guar, post_state)
   }
-  
-  def top: (T, S) = ???
-  
-  def bot: (T, S) = (intDom.bot, intDom.stateLattice.bottom)
 }
 
+/**
+  * This class contains the function for generating rely-guarantee conditions
+  * for a given concurrent program using the given interference and state
+  * domains. Currently, a thread is a represented as a Procedure, and only
+  * intraprocedural analysis is supported.
+  * 
+  * Todo:
+  * IntervalDomain takes a procedure as a parameter. Do we construct a list of
+  * IntervalDomains, or are we supposed to only construct those domains here in
+  * this procedure? Can we construct 
+  */
 class RelyGuaranteeGenerator[T, S](intDom: InterferenceDomain[T, S], threads: List[Procedure]) {
   def generate(): Map[Procedure, (T, T)] = {
     var old_guars, new_guars = threads.map(_ -> intDom.bot).toMap
