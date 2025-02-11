@@ -7,12 +7,45 @@ import scala.collection.mutable
 import java.io.{BufferedWriter}
 import ir.cilvisitor.*
 
-val assocOps: Set[BinOp] =
-  Set(BVADD, BVMUL, BVOR, BVAND, BVEQ, BoolAND, BoolEQ, BoolOR, BoolEQUIV, BoolEQ, IntADD, IntMUL, IntEQ)
+/********************************************************************************** 
+ *  Combination of Simplifiers
+ **********************************************************************************/
 
-var trace = false
 
-class SimpExpr(simplifier: Expr => (Expr, Boolean)) extends CILVisitor {
+/**
+ *
+ * Expr => (Expr, Boolean)
+ *
+ *  Expression simplification functions have this signature, taking an expression and returning 
+ *  an updated expression and a boolean indicating whether a simplification rule was applied.
+ *
+ *  def simplifier(expr: Expr) : (Expr, Boolean) 
+ *
+ *
+ * This is so that a fixed-point can be computed without performing a structural equality 
+ * test at every step.
+ *
+ */
+@FunctionalInterface
+trait Simplifier {
+ /** 
+  *  Apply this simplification.
+  *
+  *   @ensures return._2 ==> (return._1 != expr)
+  */
+  def apply(expr: Expr): (Expr, Boolean) 
+}
+
+/**
+ * Perform a simplification down the expression tree and then up the expression tree.
+ *
+ * @param simplifier: simplification function which returns an updated expression and whether it was changed
+ *
+ * @throws Exception when simplifier returns true indicating that the expression was changed but it 
+ *  returned the same output as input, or a cycle is detected through repeated applications of the simplification.
+ *
+ */
+class SimpExpr(simplifier: Simplifier) extends CILVisitor with Simplifier {
   var changedAnything = false
   var count = 0
 
@@ -41,6 +74,12 @@ class SimpExpr(simplifier: Expr => (Expr, Boolean)) extends CILVisitor {
     )
   }
 
+  /**
+   * Apply this simplification to an expression.
+   *
+   * @return the updated expression and whether it was changed.
+   *
+   */
   def apply(e: Expr) = {
     val ns = SimpExpr(simplifier)
     val ne = visit_expr(ns, e)
@@ -48,7 +87,14 @@ class SimpExpr(simplifier: Expr => (Expr, Boolean)) extends CILVisitor {
   }
 }
 
-def sequenceSimp(a: Expr => (Expr, Boolean), b: Expr => (Expr, Boolean))(e: Expr): (Expr, Boolean) = {
+/**
+ * Apply two simplification functions in sequence. 
+ *
+ * @implements Simplifier
+ * @ensures return._2  ==> return._1 != e
+ *
+ */
+def sequenceSimp(a: Simplifier, b: Simplifier)(e: Expr): (Expr, Boolean) = {
   val (ne1, changed1) = a(e)
   if (ne1 == e && changed1) {
     val change = s" ${SimplifyValidation.debugTrace.last}"
@@ -66,7 +112,14 @@ def sequenceSimp(a: Expr => (Expr, Boolean), b: Expr => (Expr, Boolean))(e: Expr
   (ne2, changed1 || changed2)
 }
 
-def simpFixedPoint(s: Expr => (Expr, Boolean))(e: Expr): (Expr, Boolean) = {
+/**
+ * Apply a simplifier to a fixed point
+ *
+ * @implements Simplifier
+ * @ensures return._2  ==> return._1 != e
+ *
+ */
+def simpFixedPoint(s: Simplifier)(e: Expr): (Expr, Boolean) = {
   var expr = e
   var changed = true
   var changedAny = false
@@ -88,15 +141,39 @@ def simpFixedPoint(s: Expr => (Expr, Boolean))(e: Expr): (Expr, Boolean) = {
   (expr, changedAny)
 }
 
-def simplifyExprVis = SimpExpr(simpFixedPoint(sequenceSimp(simplifyExpr, SimpExpr(fastPartialEvalExpr).apply)))
-def simplifyCondVis = SimpExpr(
-  simpFixedPoint(
-    sequenceSimp(simpFixedPoint(SimpExpr(simpFixedPoint(simplifyCmpInequalities)).apply), simplifyExprVis.apply)
-  )
-)
-def simplifyExprFixpoint = simpFixedPoint(simplifyExprVis.apply)
-def simplifyCondFixpoint = simpFixedPoint(simplifyCondVis.apply)
 
+/********************************************************************************** 
+ *  Expression simplifier functions
+ **********************************************************************************/
+
+
+/**
+ * Perform general-purpose expression simplifications and partial evaluation to remove redundant operations.
+ * - Normalises predicate calculations to boolean form rather than bitvector form. 
+ * - Normalises BinaryExpr(BVNEQ, a, b) to unaryExpr(BoolNOT, BinaryExpr(BVEQ, a, b))
+ * - Normalises BinaryExpr(BVSUB, a, b) to BinaryExpr(BVADD, a, UnaryExpr(BVNEG, b))
+ *
+ * @see [[simplifyExpr]]
+ */
+def simplifyExprFixpoint : Simplifier = simpFixedPoint(SimpExpr(simpFixedPoint(sequenceSimp(simplifyExpr, SimpExpr(fastPartialEvalExpr)))))
+
+/**
+ * Perform (expensive) simplification of inequalities and attempt to lift flag calculations to inequalities.
+ *
+ * Sequences [[simplifyCmpInequalities]] with [[simplifyExprFixpoint]] since we expect the normal
+ * form to apply for these rules to work.
+ *
+ */
+def simplifyCondFixpoint : Simplifier = simpFixedPoint(SimpExpr(simpFixedPoint(
+    sequenceSimp(simpFixedPoint(SimpExpr(simpFixedPoint(simplifyCmpInequalities))), simplifyExprFixpoint)
+  )))
+
+/**
+ * Apply [[simplifyCondFixpoint]] to every Assert or Assume condition in a procedure.
+ *
+ * These are the only places we expect to see predicate expressions once we have applied
+ * flag copy-prop.
+ */
 object AssumeConditionSimplifications extends CILVisitor {
   override def vstmt(s: Statement) = s match {
     case a: Assert => {
@@ -118,15 +195,54 @@ object AssumeConditionSimplifications extends CILVisitor {
   }
 }
 
-def AlgebraicSimplifications(p: Procedure) = {
-  visit_proc(simplifyExprVis, p)
-  ()
+/**
+ * Apply the [[simplifyExprFixpoint]] to every expression in a procedure.
+ */
+object AlgebraicSimplifications extends CILVisitor {
+  override def vexpr(e: Expr) = {
+    ChangeTo(simplifyExprFixpoint(e)._1)
+  }
+
+  def apply(p: Procedure)  = {
+    visit_proc(AlgebraicSimplifications, p)
+  }
 }
 
-def cleanupSimplify(p: Procedure) = {
-  visit_proc(SimpExpr(simpFixedPoint(cleanupExtends)), p)
+/**
+ * CleanupExtends simplifier. This tries to minimise redundant bitvector operations using local
+ * syntactically known bits.
+ *
+ * Do not perform this before assume condition simplification as the flag calculation detection
+ * is sensitive to the structure of bitvector operations emitted by the lifter.
+ */
+object cleanupSimplify extends CILVisitor {
+
+  override def vexpr(e: Expr) = {
+    ChangeTo(simpFixedPoint(SimpExpr(cleanupExtends))(e)._1)
+  }
+
+
+  def apply(p: Procedure)  = {
+    visit_proc(AlgebraicSimplifications, p)
+  }
+
 }
 
+
+/********************************************************************************** 
+ *  Simplification logging and validation                                         *
+ **********************************************************************************/
+
+
+/**
+ * Global logging of simplifications.
+ *
+ *  - stores a bounded history of simplifications applied for debugging (debugTrace)
+ *  - if `validate` has been set; stores a set of all unique normalised simplifications 
+ *    applied for the life of the program. The normalisation only extends to variable names,
+ *    so we still get many duplicates.
+ *
+ */
 object SimplifyValidation {
   var traceLog = mutable.LinkedHashSet[(Expr, Expr, String)]()
   var validate: Boolean = false
@@ -189,6 +305,10 @@ def logSimp(e: Expr, ne: Expr, actual: Boolean = true)(implicit
   ne
 }
 
+/**
+ * Normalises variable names to a counted sequence in the order of traversal.
+ * Only used to deduplicate log entries.
+ */
 class VarNameNormalise() extends CILVisitor {
   var count = 1
   val assigned = mutable.Map[Variable, Variable]()
@@ -227,6 +347,17 @@ def bvLogOpToBoolOp = Map[BinOp, BinOp](
   BVOR -> BoolOR
 )
 
+/********************************************************************************** 
+ *  Expression simplifier implementations
+ **********************************************************************************/
+
+
+/**
+ * Simplifier which reduces branch conditions on assembly flags to inequality expression.
+ * Assuming normal form provided by simplifyExprFixpoint.
+ *
+ * @see [[Simplifier]]
+ */
 def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
 
   var didAnything = true
@@ -853,8 +984,12 @@ val strictToNonStrict = Map[BinOp, BinOp](BVSGT -> BVSGE, BVUGT -> BVUGE, BVSLT 
 
 val strictIneq = Set[BinOp](BVSGT, BVUGT, BVSLT, BVULT)
 
+/**
+ * Simplify bitvector extract and extending expressions based on bits we locally know based on the expression.
+ *
+ * This 'de-canonicalises' to some extent, but makes the resulting program simpler, so we perform as a post pass
+ */
 def cleanupExtends(e: Expr): (Expr, Boolean) = {
-  // this 'de-canonicalises' to some extent, but makes the resulting program simpler, so we perform as a post pass
 
   var changedAnything = true
 
@@ -947,7 +1082,20 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
   (res, changedAnything)
 }
 
+/**
+ * Simplifier implementing basic canonicalisation and simplifications of experssions without changing them too much.
+ *
+ * - Normalises predicate calculations to boolean form rather than bitvector form. 
+ * - Normalises BinaryExpr(BVNEQ, a, b) to unaryExpr(BoolNOT, BinaryExpr(BVEQ, a, b))
+ * - Normalises BinaryExpr(BVSUB, a, b) to BinaryExpr(BVADD, a, UnaryExpr(BVNEG, b))
+ * - Removes redundant expressions
+ *
+ */
 def simplifyExpr(e: Expr): (Expr, Boolean) = {
+
+  val assocOps: Set[BinOp] =
+    Set(BVADD, BVMUL, BVOR, BVAND, BVEQ, BoolAND, BoolEQ, BoolOR, BoolEQUIV, BoolEQ, IntADD, IntMUL, IntEQ)
+
   // println((0 until indent).map(" ").mkString("") + e)
 
   /** Apply the rewrite rules once. Note some rules expect a canonical form produced by other rules, and hence this is
