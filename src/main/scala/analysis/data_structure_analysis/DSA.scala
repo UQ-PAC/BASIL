@@ -214,10 +214,10 @@ trait DSANode[Cell <: NodeCell & DSACell](val size: Option[Int]) {
 
 }
 
-def computeDSADomain(program: Program): Set[Procedure] = {
-  var domain: Set[Procedure] = Set(program.mainProcedure)
+def computeDSADomain(proc: Procedure): Set[Procedure] = {
+  var domain: Set[Procedure] = Set(proc)
   val stack: mutable.Stack[Procedure] = mutable.Stack()
-  stack.pushAll(program.mainProcedure.calls)
+  stack.pushAll(proc.calls)
 
   // calculate the procedures used in the program
   while (stack.nonEmpty) {
