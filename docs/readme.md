@@ -108,6 +108,10 @@ it additionally inserts assertions and specifications to make Boogie check infor
 3. Analysis
     - Static analysis over the [BASIL IR](basil-ir.md) collects information used for translation.
     - The goal is to lift the program constructs present to constructs that afford more local reasoning.
+    - Simplifications (see [simplification-solvers](development/simplification-solvers))
+      - Parameter form
+      - Dynamic Single Assignment
+      - Simplifications (copyprop & branch condition simplifications)
 4. Translation & Verification condition generation 
     - Verification conditions implementing the $wp_{if}^{\cal R G}$ logic, based on the function and rely/guarantee specifications 
     from the `.spec` file are added to the program when it is translated to the **Boogie IR**.
