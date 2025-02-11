@@ -780,10 +780,15 @@ object RunUtils {
 
       doSimplify(ctx, conf.staticAnalysis)
     }
+    val scc = stronglyConnectedComponents(CallGraph, List(ctx.program.mainProcedure))
+//    assert(scc.exists(s => s.size > 1))
+//    println(scc)
+
+
 
     var dsaContext: Option[DSAContext] = None
-    if conf.dsaConfig.nonEmpty then
-      val config = conf.dsaConfig.get
+    if true then //conf.dsaConfig.nonEmpty then
+//      val config = conf.dsaConfig.get
 
       val main = ctx.program.mainProcedure
       var sva: Map[Procedure, SymbolicValues] = Map.empty
@@ -792,18 +797,19 @@ object RunUtils {
       var fieldDSA: Map[Procedure, FieldGraph] = Map.empty
       var sadDSA: Map[Procedure, SadGraph] = Map.empty
       var sadDSABU: Map[Procedure, SadGraph] = Map.empty
-      computeDSADomain(ctx.program).foreach(
+      computeDSADomain(ctx.program.mainProcedure).foreach(
+//      computeDSADomain(ctx.program.procedures.collectFirst{case p if p.name.startsWith("headers_recv") => p}.get).foreach(
         proc =>
 //          if proc.name.startsWith("des_key_schedule") then
             val SVAResults = getSymbolicValues(proc)
             val constraints = generateConstraints(proc)
             sva += (proc -> SVAResults)
             cons += (proc -> constraints)
-            if config.analyses.contains(DSAAnalysis.Set) then
+           /* if config.analyses.contains(DSAAnalysis.Set) then
               val setGraph = SetDSA.getLocal(proc, Some(SVAResults), Some(constraints))
               writeToFile(setGraph.toDot, s"cntlm_${proc.name}.SetDSA")
-              setDSA += (proc -> setGraph)
-            if config.analyses.contains(DSAAnalysis.Norm) then
+              setDSA += (proc -> setGraph)*/
+//            if config.analyses.contains(DSAAnalysis.Norm) then
               val sadGraph = SadDSA.getLocal(proc, Some(SVAResults), Some(constraints))
               writeToFile(sadGraph.toDot, s"cntlm_${proc.name}.SadDSA")
               sadDSA += (proc -> sadGraph)
@@ -824,15 +830,23 @@ object RunUtils {
       DSALogger.info("performed cloning")
 
       val visited: mutable.Set[Procedure] = mutable.Set.empty
-      val queue = mutable.Queue[Procedure]().enqueueAll(sadDSABU.keys)
+      val queue = mutable.Queue[Procedure]().enqueueAll(sadDSABU.keys.toSeq.sortBy(p => p.name))
 
+      val skip = Seq("croak", "myexit", "headers_recv")
       while queue.nonEmpty do
         val proc = queue.dequeue()
-        if !proc.calls.forall(visited.contains) then
+        if skip.exists(name => proc.name.startsWith(name)) then
+          DSALogger.info(s"skipped ${proc.name} due to recursion")
+          visited += proc
+        else if !proc.calls.filter(proc => !proc.isExternal.getOrElse(false)).forall(visited.contains) then
+          DSALogger.info(s"procedure ${proc.name} was readded")
           queue.enqueue(proc)
         else
+          println(s"did BU for ${proc.name}")
+          DSALogger.info(s"performing BU for ${proc.name}")
           sadDSABU(proc).BUPhase(sadDSABU)
           visited += proc
+
 
       sadDSABU.values.foreach(_.localCorrectness())
 

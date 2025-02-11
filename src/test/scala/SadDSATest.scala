@@ -5,7 +5,6 @@ import ir.dsl.{block, proc, prog, ret}
 import ir.{BitVecLiteral, Endian, MemoryLoad, Register, SharedMemory}
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
-import util.DSAAnalysis.Sad
 import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, DSAAnalysis, DSAConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, StaticAnalysisContext}
 
 
@@ -31,7 +30,7 @@ class SadDSATest extends AnyFunSuite {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Sad)))
+        dsaConfig = Some(DSAConfig(Set.empty))
       )
     )
   }
@@ -48,7 +47,7 @@ class SadDSATest extends AnyFunSuite {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Sad)))
+        dsaConfig = Some(DSAConfig(Set.empty))
       )
     )
   }
