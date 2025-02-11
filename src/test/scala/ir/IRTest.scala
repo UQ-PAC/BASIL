@@ -66,7 +66,7 @@ class IRTest extends AnyFunSuite {
     assert(IntraProcIRCursor.pred(blocks("lmain1")) == Set(blocks("lmain").jump))
     assert(IntraProcIRCursor.pred(blocks("lmain2")) == Set(blocks("lmain1").jump))
 
-    blocks("lmain").replaceJump(goto("lmain2").resolve(p))
+    blocks("lmain").replaceJump(goto("lmain2").resolve(p, null))
 
     assert(IntraProcIRCursor.succ(blocks("lmain").jump) == Set(blocks("lmain2")))
     // lmain1 is unreachable but still jumps to lmain2
@@ -132,7 +132,7 @@ class IRTest extends AnyFunSuite {
       case c: Command if isAfterCall(c) => c
     }.toSet
 
-    assert(1 == aftercallGotos.count(b => IntraProcIRCursor.pred(b).contains(blocks("l_main_1").jump)))
+    assert(1 == aftercallGotos.count(b => IntraProcIRCursor.pred(b).contains(blocks("l_main_1").statements.last)))
     assert(1 == aftercallGotos.count(b => IntraProcIRCursor.succ(b).contains(blocks("l_main_1").jump match {
       case GoTo(targets, _) => targets.head
       case _ => throw Exception("unreachable")
@@ -152,18 +152,20 @@ class IRTest extends AnyFunSuite {
       )
     )
 
+    val pp = p.procedures.head
+
     val b2 = block("newblock2",
       LocalAssign(R0, bv64(22)),
       LocalAssign(R0, bv64(22)),
       LocalAssign(R0, bv64(22)),
       goto("lmain2")
-    ).resolve(p)
+    ).resolve(p, pp)
     val b1 = block("newblock1",
       LocalAssign(R0, bv64(22)),
       LocalAssign(R0, bv64(22)),
       LocalAssign(R0, bv64(22)),
       goto("lmain2")
-    ).resolve(p)
+    ).resolve(p, pp)
 
     p.procedures.head.addBlocks(Seq(b1, b2))
 
@@ -188,6 +190,7 @@ class IRTest extends AnyFunSuite {
       ),
       proc("called")
     )
+    val called = p.procedures.find(_.name == "called").get
 
     val b1 = block("newblock2",
       LocalAssign(R0, bv64(22)),
@@ -195,18 +198,19 @@ class IRTest extends AnyFunSuite {
       LocalAssign(R0, bv64(22)),
       directCall("main"),
       unreachable 
-    ).resolve(p)
+    ).resolve(p, called)
     val b2 = block("newblock1",
       LocalAssign(R0, bv64(22)),
       LocalAssign(R0, bv64(22)),
       LocalAssign(R0, bv64(22)),
       ret
-    ).resolve(p)
+    ).resolve(p, called)
 
     assert(p.mainProcedure eq p.procedures.find(_.name == "main").get)
-    val called = p.procedures.find(_.name == "called").get
+
     called.addBlocks(b1)
     called.addBlocks(b2)
+    called.entryBlock = b1
 
     assert(called.blocks.size == 2)
     assert(called.entryBlock.contains(b1))
@@ -220,7 +224,7 @@ class IRTest extends AnyFunSuite {
       LocalAssign(R0, bv64(22)),
       directCall("called"),
       unreachable
-    ).resolve(p)
+    ).resolve(p, called)
 
     blocks = p.labelToBlock
 
@@ -239,11 +243,11 @@ class IRTest extends AnyFunSuite {
     p.mainProcedure.replaceBlock(b3, b3)
     assert(called.incomingCalls().toSet == Set(b3.statements.last))
     assert(olds == blocks.size)
-    p.mainProcedure.addBlocks(block("test", ret).resolve(p))
+    p.mainProcedure.addBlocks(block("test", ret).resolve(p, p.mainProcedure))
     blocks = p.labelToBlock
     assert(olds != blocks.size)
 
-    p.mainProcedure.replaceBlocks(Set(block("test", ret).resolve(p)))
+    p.mainProcedure.replaceBlocks(Set(block("test", ret).resolve(p, p.mainProcedure)))
     blocks = p.labelToBlock
     assert(blocks.count(_(1).parent.name == "main") == 1)
 
@@ -268,7 +272,7 @@ class IRTest extends AnyFunSuite {
 
     assert(blocks.size > 1)
     assert(procs("main").entryBlock.isDefined)
-    procs("main").returnBlock = block("retb", ret).resolve(p)
+    procs("main").returnBlock = block("retb", ret).resolve(p, procs("main"))
     assert(procs("main").returnBlock.isDefined)
     procs("main").clearBlocks()
 
@@ -363,6 +367,40 @@ class IRTest extends AnyFunSuite {
     assert(block2.jump.isInstanceOf[GoTo])
     assert(block2.jump.asInstanceOf[GoTo].targets.isEmpty)
   }
+
+  test("dsl params") {
+
+    val p = prog(
+      proc("p1", Seq(("R0_in" -> BitVecType(64))), Seq(("R0_out", BitVecType(64))),
+        block("b1",
+          ret("R0_out" -> LocalVar("R0_in", BitVecType(64)))
+        )
+      ),
+      proc("main", Seq(), Seq(("R0_out") -> BitVecType(64)),
+        block("l_main",
+          indirectCall(R1), goto("returntarget")
+        ),
+        block("block2",
+          directCall(Seq(("R0_out" -> R0)), "p1", "R0_in" -> BitVecLiteral(150, 64)), goto("returntarget")
+        ),
+        block("returntarget",
+          ret("R0_out" -> BitVecLiteral(1, 64))
+        )
+      ),
+    )
+
+    val p1 = p.procedures.find(_.procName == "p1").get
+    val main = p.procedures.find(_.procName == "main").get
+
+    assert(p1.formalInParam == SortedSet(LocalVar("R0_in", BitVecType(64))))
+    assert(p1.formalOutParam == SortedSet(LocalVar("R0_out", BitVecType(64))))
+    assert(main.formalInParam.isEmpty)
+    assert(main.formalOutParam == SortedSet(LocalVar("R0_out", BitVecType(64))))
+
+
+  }
+
+
 
 }
 
