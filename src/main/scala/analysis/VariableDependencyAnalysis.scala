@@ -30,6 +30,8 @@ private def getLiveVars(p: Procedure): Map[CFGPosition, Set[Variable]] = {
     })
 }
 
+// TODO this seems to break on mutually recursive procedures that may not terminate
+
 trait ProcVariableDependencyAnalysisFunctions(
   relevantGlobals: Set[Variable],
   varDepsSummaries: Map[Procedure, Map[Variable, LatticeSet[Variable]]],
@@ -78,12 +80,11 @@ trait ProcVariableDependencyAnalysisFunctions(
           case Left(v) =>
             exit.outParams.toList.flatMap((retVar, expr) => {
               if expr.variables.contains(v)
-              then call.outParams.toList.filter(_._1 == retVar).map((_, outVar) => Left(outVar) -> IdEdge())
-              else List()
+                then
+                  List(Left(call.outParams(retVar)) -> IdEdge())
+                else List()
             }).toMap
-          case Right(_) => call.outParams.toList.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
-            case (m, (outVar, expr)) => m + (Left(outVar) -> ConstEdge(FiniteSet(Set())))
-          }
+          case Right(_) => Map(d -> IdEdge())
         }
       }
     } else Map()
@@ -108,7 +109,9 @@ trait ProcVariableDependencyAnalysisFunctions(
 
         // TODO handle modified global variables
         case Left(v) => {
+          // If the variable is assigned to in this call, reassign its value, else keep it.
           val init: Map[DL, EdgeFunction[LatticeSet[Variable]]] = if call.outParams.exists(_._2 == v) then Map() else Map(d -> IdEdge())
+
           call.actualParams.foldLeft(init) {
             case (m, (inVar, expr)) => if !expr.variables.contains(v) then m else {
               summary.foldLeft(m) {
@@ -125,9 +128,9 @@ trait ProcVariableDependencyAnalysisFunctions(
         }
         case Right(_) =>
           val initialise = call.outParams.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
-            case (m, (outVar, expr)) => m + (Left(outVar) -> ConstEdge(FiniteSet(Set())))
+            case (m, (formalVar, resultVar)) => m + (Left(resultVar) -> ConstEdge(FiniteSet(Set())))
           }
-          summary.foldLeft(initialise) {
+          val ret = summary.foldLeft(initialise) {
             case (m, (endVar, deps)) => endVar match {
               case endVar: LocalVar if call.target.formalOutParam.contains(endVar) => deps match {
                 case Top() | DiffSet(_) => m + (Left(call.outParams(endVar)) -> ConstEdge(Top()))
@@ -137,12 +140,13 @@ trait ProcVariableDependencyAnalysisFunctions(
               case _ => m
             }
           }
+          ret
       }
       case None => d match {
-        case Left(v: LocalVar) if call.outParams.exists(_._1 == v) => Map()
+        case Left(v) if call.outParams.exists(_._2 == v) => Map()
         case Left(v) => Map(d -> IdEdge())
         case Right(_) => call.outParams.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
-          case (m, (outVar, expr)) => m + (Left(outVar) -> ConstEdge(FiniteSet(Set())))
+          case (m, (outVar, resultVar)) => m + (Left(resultVar) -> ConstEdge(FiniteSet(Set())))
         }
       }
     }
@@ -184,7 +188,7 @@ trait ProcVariableDependencyAnalysisFunctions(
         d match {
           case Left(v: LocalVar) if call.outParams.exists(_._2 == v) => Map()
           case Left(v) => Map(d -> IdEdge())
-          case Right(_) => call.outParams.toList.map(_._2).foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
+          case Right(_) => call.outParams.map(_._2).foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
             (m, v) => m + (Left(v) -> ConstEdge(Top()))
           }
         }
