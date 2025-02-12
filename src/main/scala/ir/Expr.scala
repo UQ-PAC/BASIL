@@ -375,7 +375,7 @@ case class LocalVar(varName: String, override val irType: IRType, val index: Int
 }
 
 object LocalVar {
-  def unapply(l: LocalVar): Option[(String, IRType)] = Some((s"${l.name}_${l.index}", l.irType))
+  def unapply(l: LocalVar): Option[(String, IRType, Int)] = Some((l.name, l.irType, l.index))
 
 }
 
