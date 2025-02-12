@@ -56,8 +56,7 @@ class IntervalLatticeExtension(l: IntervalLattice) extends LatticeMapLattice[Var
   */
 abstract class InterferenceDomain[T, S](val stateLattice: CompatibleLattice[S], val stateTransfer: (S, Command) => S) {
   def bot: T
-  // until the memory region analysis is complete, we test our static analysis by generating RG conditions for local variables
-  def derive(s: S, c: LocalAssign): T
+  def derive(s: S, c: Command): T
   def apply(t: T, s: S): S
   def join(t1: T, t2: T): T
   def close(t: T): T
@@ -76,12 +75,12 @@ class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransf
   def bot: Map[Variable, S] = Map.empty[Variable, S]
   
   // for assignments, simply return a mapping from the assigned variable to the given state
-  def derive(s: S, c: LocalAssign): Map[Variable, S] = {
-    if (s == stateLattice.bottom) {
-      return Map.empty
+  def derive(s: S, c: Command): Map[Variable, S] = 
+    if (s == stateLattice.bottom) Map.empty
+    else c match {
+      case a: Assign => a.assignees.map(v => v -> s).toMap
+      case _ => bot
     }
-    return Map(c.lhs -> s)
-  }
   
   // weaken s by eliminating each variable v that maps to a condition that overlaps with s
   def apply(t: Map[Variable, S], s: S): S = {
@@ -169,18 +168,18 @@ class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T)
   def join(a: (T, S), b: (T, S), pos: Block): (T, S) = (intDom.join(a._1, b._1), intDom.stateLattice.lub(a._2, b._2))
   
   def transfer(a: (T, S), b: Command): (T, S) = {
+    println("pre-state: " + intDom.stateLattice.toPredString(a._2) + "\n")
+    println("command: " + b + "\n")
     // stabilise the pre-state under the rely
     val pre_state = intDom.apply(rely, a._2)
     // derive post-state from the stabilised pre-state
     val post_state = intDom.stateTransfer(pre_state, b)
     // derive the possible state transitions resulting from this statement
-    val transitions = b match {
-      case a: LocalAssign => intDom.derive(pre_state, a)
-      case _ => intDom.bot
-    }
+    val transitions = intDom.derive(pre_state, b)
     // update the guarantee by joining these transitions
     val guar = intDom.join(a._1, transitions)
     // return results
+    println("post-state: " + intDom.stateLattice.toPredString(post_state) + "\n\n")
     (guar, post_state)
   }
 }
