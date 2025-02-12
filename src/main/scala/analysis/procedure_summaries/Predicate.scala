@@ -575,6 +575,7 @@ enum Predicate {
           case (op, BVTerm.Lit(a), BVTerm.Lit(b)) => if evalBVLogBinExpr(op, a, b) then True else False
           case (BVEQ, a, b) if a == b => True
           case (BVEQ, a, Uop(BVNEG, b)) => BVCmp(BVEQ, Bop(BVADD, a, b), BVTerm.Lit(BitVecLiteral(0, a.size))).simplify
+          case (BVEQ, l: BVTerm.Lit, v: Var) => BVCmp(BVEQ, v, l) // Canonical form-ish (to remove duplicate terms
           case (op, a, b) => BVCmp(op, a, b)
         }
       case GammaCmp(op, a, b) =>
