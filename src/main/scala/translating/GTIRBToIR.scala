@@ -303,7 +303,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, List[InsnSem
 
   // makes label boogie friendly
   private def convertLabel(procedure: Procedure, label: ByteString, blockCount: Int): String = {
-    "$" + procedure.name + "$__" + blockCount + "__$" + byteStringToString(label).replace("=", "").replace("-", "~").replace("/", "\'")
+    procedure.name + "__" + blockCount + "__" + byteStringToString(label).replace("=", "").replace("-", "__").replace("/", "__")
   }
 
   // handles stray assignments to the program counter (which are indirect calls that DDisasm failed to identify)
@@ -582,7 +582,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, List[InsnSem
       val resolvedCall = DirectCall(target)
 
       val assume = Assume(BinaryExpr(BVEQ, targetRegister, BitVecLiteral(target.address.get, 64)))
-      val label = block.label + "$" + target.name
+      val label = block.label + "_" + target.name
       newBlocks.append(Block(label, None, ArrayBuffer(assume, resolvedCall), GoTo(returnTarget)))
     }
     removePCAssign(block)

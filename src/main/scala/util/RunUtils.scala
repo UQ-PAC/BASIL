@@ -239,12 +239,17 @@ object IRTransform {
       }
     }
 
+    // useful for ReplaceReturns
+    // (pushes single block with `Unreachable` into its predecessor)
+    while (transforms.coalesceBlocks(ctx.program)) {}
+
     transforms.applyRPO(ctx.program)
     val nonReturning = transforms.findDefinitelyExits(ctx.program)
     ctx.program.mainProcedure.foreach(s => s match {
       case d : DirectCall if nonReturning.nonreturning.contains(d.target) => d.parent.replaceJump(Return())
       case _ => ()
     })
+
 
     // FIXME: Main will often maintain the stack by loading R30 from the caller's stack frame
     //        before returning, which makes the R30 assertin faile. Hence we currently skip this 
@@ -254,6 +259,7 @@ object IRTransform {
 
     transforms.addReturnBlocks(ctx.program)
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
+
 
     val externalRemover = ExternalRemover(externalNamesLibRemoved.toSet)
     externalRemover.visitProgram(ctx.program)
@@ -423,7 +429,7 @@ object StaticAnalysis {
 
     config.analysisDotPath.foreach { f =>
       val dumpdomain = computeDomain[CFGPosition, CFGPosition](InterProcIRCursor, IRProgram.procedures)
-       AnalysisResultDotLogger.writeToFile(File(s"${f}_new_ir_intercfg$iteration.dot"), toDot(dumpdomain.toSet, InterProcIRCursor, Map.empty))
+       AnalysisResultDotLogger.writeToFile(File(s"${f}_new_ir_intercfg$iteration.dot"), toDot(dumpdomain.toSet, InterProcIRCursor, Map.empty, Set()))
     }
 
     val reachingDefinitionsAnalysisSolver = InterprocReachingDefinitionsAnalysisSolver(IRProgram)
@@ -633,7 +639,6 @@ object RunUtils {
 
     // transforms.DynamicSingleAssignment.applyTransform(program, liveVars)
     transforms.OnePassDSA().applyTransform(program)
-    Logger.info(s"DSA ${timer.checkPoint("DSA ")} ms ")
 
     transforms.removeEmptyBlocks(program)
 
@@ -644,6 +649,8 @@ object RunUtils {
     DebugDumpIRLogger.writeToFile(File("il-after-dsa.il"), pp_prog(program))
 
     if (ir.eval.SimplifyValidation.validate) {
+      Logger.info("DSA no uninitialised")
+      assert(invariant.allVariablesAssignedIndex(program))
       // Logger.info("Live vars difftest")
       // val tipLiveVars : Map[CFGPosition, Set[Variable]] = analysis.IntraLiveVarsAnalysis(program).analyze()
       // assert(program.procedures.forall(transforms.difftestLiveVars(_, tipLiveVars)))
@@ -666,13 +673,6 @@ object RunUtils {
     transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
     AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
 
-    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
-      val dir = File("./graphs/")
-      if (!dir.exists()) then dir.mkdirs()
-      for (p <- ctx.program.procedures) {
-        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
-      }
-    }
     transforms.liftLinuxAssertFail(ctx)
 
     // assert(program.procedures.forall(transforms.rdDSAProperty))
@@ -703,6 +703,13 @@ object RunUtils {
       val w = BufferedWriter(FileWriter("rewrites.smt2"))
       ir.eval.SimplifyValidation.makeValidation(w)
       w.close()
+    }
+    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
+      val dir = File("./graphs/")
+      if (!dir.exists()) then dir.mkdirs()
+      for (p <- ctx.program.procedures) {
+        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
+      }
     }
 
     Logger.info("[!] Simplify :: finished")

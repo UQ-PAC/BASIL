@@ -60,7 +60,7 @@ abstract class DotElement {
 
 /** Represents a node in a Graphviz dot file.
   */
-class DotNode(val id: String, val label: String) extends DotElement {
+class DotNode(val id: String, val label: String, highlight: Boolean = false) extends DotElement {
 
   def this(label: String) = this("n" + IDGenerator.getNewId, label)
 
@@ -69,11 +69,10 @@ class DotNode(val id: String, val label: String) extends DotElement {
   def equals(other: DotNode): Boolean = toDotString.equals(other.toDotString)
 
 
+  def hl = if (highlight) then "style=filled, fillcolor=\"orangered\", " else ""
+
   def toDotString: String =
-    s"\"$id\"" + "[label=\"" + escape(wrap(label, 100)) + "\", shape=\"box\", fontname=\"Mono\", fontsize=\"5\"]"
-
-
-  override def toString: String = toDotString
+    s"\"$id\"" + s"[${hl}label=\"" + escape(wrap(label, 100)) + "\", shape=\"box\", fontname=\"Mono\", fontsize=\"5\"]"
 
 }
 
