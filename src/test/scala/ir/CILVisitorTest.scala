@@ -171,7 +171,7 @@ class CILVisitorTest extends AnyFunSuite {
       val res = mutable.ArrayBuffer[String]()
       override def vlvar(e: Variable) = {
         e match {
-          case LocalVar(n, _) =>
+          case LocalVar(n, _, _) =>
             ChangeDoChildrenPost(LocalVar("e" + n, e.getType), e => { res.append(e.name); e });
           case _ => DoChildren()
         }
@@ -179,7 +179,7 @@ class CILVisitorTest extends AnyFunSuite {
 
       override def vrvar(e: Variable) = {
         e match {
-          case LocalVar(n, _) =>
+          case LocalVar(n, _, _) =>
             ChangeDoChildrenPost(LocalVar("e" + n, e.getType), e => { res.append(e.name); e });
           case _ => DoChildren()
         }
