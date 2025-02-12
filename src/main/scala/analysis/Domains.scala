@@ -102,7 +102,6 @@ class BoundedDisjunctiveCompletion[L](d: AbstractDomain[L], bound: Int) extends 
     }, pos)
 
   override def widen(a: Set[L], b: Set[L], pos: Block): Set[L] =
-    println("Widened!")
     for {
       a2 <- collapse(a, pos)
       b2 <- collapse(b, pos)
