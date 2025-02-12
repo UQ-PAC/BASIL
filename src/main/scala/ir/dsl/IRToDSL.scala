@@ -162,29 +162,41 @@ given ToScala[IRType] with
 given ToScala[Return] with
   def toScala(x: Return): String = "ret"
 given ToScala[DirectCall] with
-  def toScala(x: DirectCall): String = s"directCall(\"${x.target.procName}\")"
+  def toScala(x: DirectCall): String =
+    val str = summon[ToScala[String]]
+    s"directCall(${str.toScala(x.target.procName)}\")"
 given ToScala[IndirectCall] with
   def toScala(x: IndirectCall): String =
     val v = summon[ToScala[Variable]]
+    val str = summon[ToScala[String]]
     s"indirectCall(${v.toScala(x.target)})"
 given ToScala[GoTo] with
-  def toScala(x: GoTo): String = s"goto(${x.targets.map(x => StringEscape.quote(x.label)).mkString(", ")})"
+  val str = summon[ToScala[String]]
+  def toScala(x: GoTo): String = s"goto(${x.targets.map(x => str.toScala(x.label)).mkString(", ")})"
 
 given ToScala[Block] with
   def toScala(x: Block): String =
     val s = summon[ToScala[Statement]]
+    val str = summon[ToScala[String]]
     val commands = x.statements ++ Seq(x.jump)
-    s"block(${StringEscape.quote(x.label)},\n    " + (commands.map(s.toScala).mkString(",\n    ")) + "\n  )"
+    s"block(${str.toScala(x.label)},\n      " + (commands.map(s.toScala).mkString(",\n      ")) + "\n    )"
 
 given ToScala[Procedure] with
   def toScala(x: Procedure): String =
     val b = summon[ToScala[Block]]
-    s"proc(${StringEscape.quote(x.procName)},\n  " + (x.blocks.map(b.toScala).mkString(",\n  ")) + "\n)"
+    val str = summon[ToScala[String]]
+    s"proc(${str.toScala(x.procName)},\n    " + (x.blocks.map(b.toScala).mkString(",\n    ")) + "\n  )"
+
+given ToScala[Program] with
+  def toScala(x: Program): String =
+    val p = summon[ToScala[Procedure]]
+    val str = summon[ToScala[String]]
+    s"prog(\n  " + (x.procedures.map(p.toScala).mkString(",\n  ")) + "\n)"
 
 given ToScala[String] with
   def toScala(x: String): String = StringEscape.quote(x)
 given ToScala[Endian] with
-  def toScala(x: Endian): String = x.toString()
+  def toScala(x: Endian): String = "Endian." + x.toString()
 given ToScala[Int] with
   def toScala(x: Int): String = x.toString()
 given ToScala[Boolean] with
@@ -251,3 +263,5 @@ extension (x: Statement)
   def toScala: String = summon[ToScala[Statement]].toScala(x)
 extension (x: Procedure)
   def toScala: String = summon[ToScala[Procedure]].toScala(x)
+extension (x: Program)
+  def toScala: String = summon[ToScala[Program]].toScala(x)
