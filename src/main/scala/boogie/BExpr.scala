@@ -19,6 +19,8 @@ sealed trait BExpr {
   def serialiseBoogie(w: Writer): Unit = w.append(toString)
   def acceptVisit(visitor: BVisitor): BExpr = this
 
+  var label: Option[String] = None
+
   def simplify: BExpr =
     this match {
       case BinaryBExpr(BoolAND, a, b) =>

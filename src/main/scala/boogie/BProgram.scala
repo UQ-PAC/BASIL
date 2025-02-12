@@ -53,8 +53,8 @@ case class BProcedure(
     } else {
       List()
     }
-    val requiresStrs = requires.map(r => s"  requires $r;") ++ requiresDirect.map(r => s"  requires $r;")
-    val ensuresStrs = ensures.map(e => s"  ensures $e;") ++ ensuresDirect.map(e => s"  ensures $e;")
+    val requiresStrs = requires.map(r => s"  requires ${r};${r.label.map(l => s" // ${l.toString}").getOrElse("")}") ++ requiresDirect.map(r => s"  requires $r;")
+    val ensuresStrs = ensures.map(e => s"  ensures ${e};${e.label.map(l => s" // ${l.toString}").getOrElse("")}") ++ ensuresDirect.map(e => s"  ensures $e;")
     val freeRequiresStrs = freeRequires.map(r => s"  free requires $r;")
     val freeEnsuresStrs = freeEnsures.map(e => s"  free ensures $e;")
     val locals: Set[BVar] = (body.flatMap(l => l.locals).toSet) -- (in.toSet ++ out.toSet)
