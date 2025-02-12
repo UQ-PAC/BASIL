@@ -53,7 +53,16 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
               instructionAddress.toString + "_" + i
             }
 
-            statements.appendAll(visitStmt(s, label))
+            statements.appendAll(
+              try {
+                visitStmt(s, label)
+              } catch {
+                case e => {
+                  Logger.error(s"Failed to load insn: $e\n${e.getStackTrace.mkString("\n")}")
+                  Seq(Assert(FalseLiteral, Some(" Failed to load instruction")))
+                }
+              }
+            )
           }
           instructionCount += 1
         }
@@ -322,7 +331,6 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
             case o => UnaryExpr(BoolToBV1, o)
           }
         (result, load)
-
 
       case "not_bool.0" => (resolveUnaryOp(BoolNOT, function, 0, typeArgs, args, ctx.getText), None)
       case "eq_enum.0" => (resolveBinaryOp(BoolEQ, function, 0, typeArgs, args, ctx.getText))
