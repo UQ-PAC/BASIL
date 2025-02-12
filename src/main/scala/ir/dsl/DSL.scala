@@ -1,4 +1,5 @@
 package ir.dsl
+
 import ir.*
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -17,14 +18,12 @@ val R29: Register = Register("R29", 64)
 val R30: Register = Register("R30", 64)
 val R31: Register = Register("R31", 64)
 
-
-
-def exprEq(l: Expr, r: Expr) : Expr = (l, r) match {
-  case (l, r) if l.getType != r.getType => FalseLiteral
-  case (l, r) if l.getType == BoolType => BinaryExpr(BoolEQ, l, r)
+def exprEq(l: Expr, r: Expr): Expr = (l, r) match {
+  case (l, r) if l.getType != r.getType             => FalseLiteral
+  case (l, r) if l.getType == BoolType              => BinaryExpr(BoolEQ, l, r)
   case (l, r) if l.getType.isInstanceOf[BitVecType] => BinaryExpr(BVEQ, l, r)
-  case (l, r) if l.getType == IntType => BinaryExpr(IntEQ, l, r)
-  case _ => FalseLiteral
+  case (l, r) if l.getType == IntType               => BinaryExpr(IntEQ, l, r)
+  case _                                            => FalseLiteral
 }
 
 def bv32(i: Int): BitVecLiteral = BitVecLiteral(i, 32)
@@ -52,11 +51,11 @@ trait EventuallyStatement {
 }
 
 case class ResolvableStatement(s: Statement) extends EventuallyStatement {
-  override def resolve(p: Program) : Statement = s
+  override def resolve(p: Program): Statement = s
 }
 
 trait EventuallyJump {
-  def resolve(p: Program, proc: Procedure): Jump
+  def resolve(p: Program): Jump
 }
 
 case class EventuallyIndirectCall(target: Variable) extends EventuallyStatement {
@@ -65,33 +64,27 @@ case class EventuallyIndirectCall(target: Variable) extends EventuallyStatement 
   }
 }
 
-case class EventuallyCall(target: DelayNameResolve, lhs: Iterable[(String, Variable)], actualParams: Iterable[(String, Expr)]) extends EventuallyStatement {
+case class EventuallyCall(target: DelayNameResolve) extends EventuallyStatement {
   override def resolve(p: Program): Statement = {
     val t = target.resolveProc(p) match {
       case Some(x) => x
-      case None => throw Exception("can't resolve proc " + p)
+      case None    => throw Exception("can't resolve proc " + p)
     }
-    val actual = SortedMap.from(actualParams.map((name, value) => t.formalInParam.find(_.name == name).get -> value))
-    val callLhs = SortedMap.from(lhs.map((name, value) => t.formalOutParam.find(_.name == name).get -> value))
-    DirectCall(t, None, callLhs, actual)
+    DirectCall(t)
   }
 }
 
-
 case class EventuallyGoto(targets: List[DelayNameResolve]) extends EventuallyJump {
-  override def resolve(p: Program, proc: Procedure): GoTo = {
+  override def resolve(p: Program): GoTo = {
     val tgs = targets.flatMap(tn => tn.resolveBlock(p))
     GoTo(tgs)
   }
 }
-case class EventuallyReturn(params: Iterable[(String, Expr)]) extends EventuallyJump {
-  override def resolve(p: Program, proc: Procedure) = {
-    val r = SortedMap.from(params.map((n,v) => proc.formalOutParam.find(_.name == n).get -> v))
-    Return(None, r)
-  }
+case class EventuallyReturn() extends EventuallyJump {
+  override def resolve(p: Program) = Return()
 }
-case class EventuallyUnreachable() extends EventuallyJump  {
-  override def resolve(p: Program, proc: Procedure) = Unreachable()
+case class EventuallyUnreachable() extends EventuallyJump {
+  override def resolve(p: Program) = Unreachable()
 }
 
 def goto(): EventuallyGoto = EventuallyGoto(List.empty)
@@ -100,31 +93,25 @@ def goto(targets: String*): EventuallyGoto = {
   EventuallyGoto(targets.map(p => DelayNameResolve(p)).toList)
 }
 
-def ret: EventuallyReturn = EventuallyReturn(Seq())
-def ret(params: (String, Expr)*): EventuallyReturn = EventuallyReturn(params)
-
-def unreachable: EventuallyUnreachable= EventuallyUnreachable()
+def ret: EventuallyReturn = EventuallyReturn()
+def unreachable: EventuallyUnreachable = EventuallyUnreachable()
 
 def goto(targets: List[String]): EventuallyGoto = {
   EventuallyGoto(targets.map(p => DelayNameResolve(p)))
 }
 
-def directCall(tgt: String): EventuallyCall = EventuallyCall(DelayNameResolve(tgt), Map(), Map())
-
-def directCall(lhs: Iterable[(String, Variable)], tgt: String, actualParams: (String, Expr)*): EventuallyCall 
-  = EventuallyCall(DelayNameResolve(tgt), lhs, actualParams)
+def directCall(tgt: String): EventuallyCall = EventuallyCall(DelayNameResolve(tgt))
 
 def indirectCall(tgt: Variable): EventuallyIndirectCall = EventuallyIndirectCall(tgt)
 // def directcall(tgt: String) = EventuallyCall(DelayNameResolve(tgt), None)
 
-
 case class EventuallyBlock(label: String, sl: Seq[EventuallyStatement], j: EventuallyJump) {
   val tempBlock: Block = Block(label, None, List(), GoTo(List.empty))
 
-  def resolve(prog: Program, proc: Procedure): Block = {
+  def resolve(prog: Program): Block = {
     val resolved = sl.map(_.resolve(prog))
     tempBlock.statements.addAll(resolved)
-    tempBlock.replaceJump(j.resolve(prog, proc))
+    tempBlock.replaceJump(j.resolve(prog))
     tempBlock
   }
 }
@@ -132,59 +119,37 @@ case class EventuallyBlock(label: String, sl: Seq[EventuallyStatement], j: Event
 type DSLStatement = (AtomicStatement | EventuallyStatement | EventuallyJump)
 
 def block(label: String, sl: DSLStatement*): EventuallyBlock = {
-  val statements : Seq[EventuallyStatement] = sl.flatMap {
-    case s: Statement => Some(ResolvableStatement(s))
+  val statements: Seq[EventuallyStatement] = sl.flatMap {
+    case s: Statement           => Some(ResolvableStatement(s))
     case o: EventuallyStatement => Some(o)
-    case g: EventuallyJump => None
+    case g: EventuallyJump      => None
   }
-  val jump = sl.collectFirst {
-    case j: EventuallyJump => j
+  val jump = sl.collectFirst { case j: EventuallyJump =>
+    j
   }
   EventuallyBlock(label, statements, jump.get)
 }
 
-case class EventuallyProcedure(label: String, in: Map[String, IRType] = Map(), out: Map[String, IRType] = Map(),  blocks: Seq[EventuallyBlock]) {
+case class EventuallyProcedure(label: String, blocks: Seq[EventuallyBlock]) {
   val _blocks: Seq[Block] = blocks.map(_.tempBlock)
-  val tempProc: Procedure = Procedure(label, None, _blocks.headOption, None, _blocks, in.map((n, t) =>  LocalVar(n, t)), out.map((n, t) =>  LocalVar(n, t)))
+  val tempProc: Procedure = Procedure(label, None, _blocks.headOption, None, _blocks)
   val jumps: Map[Block, EventuallyJump] = blocks.map(b => b.tempBlock -> b.j).toMap
 
   def resolve(prog: Program): Procedure = {
-    val resolvedBlocks = blocks.map(b => b.resolve(prog, tempProc))
-    jumps.map((b, j) => b.replaceJump(j.resolve(prog, tempProc)))
-    resolvedBlocks.headOption.foreach(b => 
-      tempProc.entryBlock = b
-    )
+    blocks.foreach(b => b.resolve(prog))
+    jumps.map((b, j) => b.replaceJump(j.resolve(prog)))
     tempProc
-  }
-
-  def toProg() = {
-    val p = prog(this)
-    this.resolve(p)
-    p
-  }
-
-  def addToProg(p: Program) = {
-    p.addProcedure(tempProc)
-    val proc = resolve(p)
-    proc
   }
 
 }
 
 def proc(label: String, blocks: EventuallyBlock*): EventuallyProcedure = {
-  EventuallyProcedure(label, Map(), Map(), blocks)
+  EventuallyProcedure(label, blocks)
 }
-
-def proc(label: String, in: Iterable[(String, IRType)], out: Iterable[(String, IRType)], blocks: EventuallyBlock*): EventuallyProcedure = {
-  EventuallyProcedure(label, in.toMap, out.toMap, blocks)
-}
-
-
 
 def mem: SharedMemory = SharedMemory("mem", 64, 8)
 
 def stack: SharedMemory = SharedMemory("stack", 64, 8)
-
 
 def prog(procedures: EventuallyProcedure*): Program = {
   require(procedures.nonEmpty)
@@ -193,31 +158,5 @@ def prog(procedures: EventuallyProcedure*): Program = {
   val p = Program(ArrayBuffer.from(procedures.map(_.tempProc)), procedures.map(_.tempProc).head, initialMemory)
 
   procedures.foreach(_.resolve(p))
-  assert(ir.invariant.correctCalls(p))
-  assert(ir.invariant.cfgCorrect(p))
   p
 }
-
-object Exporter {
-  def statementToDSL(s: Statement): DSLStatement = s match
-    case s: SingleAssign => s
-    case s: MemoryStore => s
-    // case s: MemoryLoad => s // subtype of Assign
-    case s: NOP => s
-    case s: Assert => s
-    case s: Assume => s
-    case IndirectCall(target, _) => indirectCall(target)
-    case DirectCall(proc, _, _, _) => directCall(proc.name)
-
-  def dslStatementToScala(s: DSLStatement): String = s match
-    case LocalAssign(a,b,c) => s"LocalAssign($a, $b, $c)"
-    case MemoryStore(a,b,c,d,e,f) => s"MemoryStore($a, $b, $c, $d, $e, $f)"
-    // case s: MemoryLoad => s // subtype of Assign
-    case s: NOP => "NOP"
-}
-
-
-extension (s: Statement)
-  def toDSL() = Exporter.statementToDSL(s)
-  def toScala() = Exporter.dslStatementToScala(s.toDSL())
-
