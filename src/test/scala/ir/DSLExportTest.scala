@@ -3,6 +3,7 @@ package ir
 import org.scalatest.funsuite.AnyFunSuite
 import util.Logger
 import ir.dsl.*
+import ir.dsl.{given}
 import ir.*
 
 import scala.runtime.stdLibPatches.Predef.assert
@@ -71,6 +72,7 @@ class DSLExportTest extends AnyFunSuite {
 
   test("test basil ir to dsl") {
     assert(cleanOutput(expected) == cleanOutput(program.toScala))
+    println(program.toScala)
   }
 
 }

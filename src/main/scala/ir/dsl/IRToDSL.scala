@@ -8,36 +8,36 @@ import collection.mutable
 import collection.mutable.{LinkedHashSet}
 
 trait ToScala[-T]:
-  def toScala(x: T): String
+  def convertToScala(x: T): String = x.toScala
+  extension (x: T)
+    def toScala: String
 
-
-
-// generated from ./expr.json
+    // generated from ./expr.json
 given ToScala[Expr] with
-  def toScala(x: Expr): String = x match {
+  extension (x: Expr) def toScala: String = x match {
     case x: Literal => x match {
       case x: BoolLit => x match {
         case x: TrueLiteral.type => s"TrueLiteral"
         case x: FalseLiteral.type => s"FalseLiteral"
       }
-      case x: BitVecLiteral => s"BitVecLiteral(${summon[ToScala[BigInt]].toScala(x.value)}, ${summon[ToScala[Int]].toScala(x.size)})"
-      case x: IntLiteral => s"IntLiteral(${summon[ToScala[BigInt]].toScala(x.value)})"
+      case x: BitVecLiteral => s"BitVecLiteral(${x.value.toScala}, ${x.size.toScala})"
+      case x: IntLiteral => s"IntLiteral(${x.value.toScala})"
     }
-    case x: Extract => s"Extract(${summon[ToScala[Int]].toScala(x.end)}, ${summon[ToScala[Int]].toScala(x.start)}, ${summon[ToScala[Expr]].toScala(x.body)})"
-    case x: Repeat => s"Repeat(${summon[ToScala[Int]].toScala(x.repeats)}, ${summon[ToScala[Expr]].toScala(x.body)})"
-    case x: ZeroExtend => s"ZeroExtend(${summon[ToScala[Int]].toScala(x.extension)}, ${summon[ToScala[Expr]].toScala(x.body)})"
-    case x: SignExtend => s"SignExtend(${summon[ToScala[Int]].toScala(x.extension)}, ${summon[ToScala[Expr]].toScala(x.body)})"
-    case x: UnaryExpr => s"UnaryExpr(${summon[ToScala[UnOp]].toScala(x.op)}, ${summon[ToScala[Expr]].toScala(x.arg)})"
-    case x: BinaryExpr => s"BinaryExpr(${summon[ToScala[BinOp]].toScala(x.op)}, ${summon[ToScala[Expr]].toScala(x.arg1)}, ${summon[ToScala[Expr]].toScala(x.arg2)})"
-    case x: UninterpretedFunction => s"UninterpretedFunction(${summon[ToScala[String]].toScala(x.name)}, ${summon[ToScala[Seq[Expr]]].toScala(x.params)}, ${summon[ToScala[IRType]].toScala(x.returnType)})"
+    case x: Extract => s"Extract(${x.end.toScala}, ${x.start.toScala}, ${x.body.toScala})"
+    case x: Repeat => s"Repeat(${x.repeats.toScala}, ${x.body.toScala})"
+    case x: ZeroExtend => s"ZeroExtend(${x.extension.toScala}, ${x.body.toScala})"
+    case x: SignExtend => s"SignExtend(${x.extension.toScala}, ${x.body.toScala})"
+    case x: UnaryExpr => s"UnaryExpr(${x.op.toScala}, ${x.arg.toScala})"
+    case x: BinaryExpr => s"BinaryExpr(${x.op.toScala}, ${x.arg1.toScala}, ${x.arg2.toScala})"
+    case x: UninterpretedFunction => s"UninterpretedFunction(${x.name.toScala}, ${x.params.toScala}, ${x.returnType.toScala})"
     case x: Variable => x match {
-      case x: Register => s"Register(${summon[ToScala[String]].toScala(x.name)}, ${summon[ToScala[Int]].toScala(x.size)})"
-      case x: LocalVar => s"LocalVar(${summon[ToScala[String]].toScala(x.varName)}, ${summon[ToScala[IRType]].toScala(x.irType)}, ${summon[ToScala[Int]].toScala(x.index)})"
+      case x: Register => s"Register(${x.name.toScala}, ${x.size.toScala})"
+      case x: LocalVar => s"LocalVar(${x.varName.toScala}, ${x.irType.toScala}, ${x.index.toScala})"
     }
   }
 
 given ToScala[UnOp] with
-  def toScala(x: UnOp): String = x match {
+  extension (x: UnOp) def toScala: String = x match {
     case x: BoolUnOp => x match {
       case x: BoolNOT.type => s"BoolNOT"
       case x: BoolToBV1.type => s"BoolToBV1"
@@ -52,7 +52,7 @@ given ToScala[UnOp] with
   }
 
 given ToScala[BinOp] with
-  def toScala(x: BinOp): String = x match {
+  extension (x: BinOp) def toScala: String = x match {
     case x: BoolBinOp => x match {
       case x: BoolEQ.type => s"BoolEQ"
       case x: BoolNEQ.type => s"BoolNEQ"
@@ -108,123 +108,116 @@ given ToScala[BinOp] with
   }
 
 given ToScala[Global] with
-  def toScala(x: Global): String = x match {
-    case x: Register => s"Register(${summon[ToScala[String]].toScala(x.name)}, ${summon[ToScala[Int]].toScala(x.size)})"
+  extension (x: Global) def toScala: String = x match {
+    case x: Register => s"Register(${x.name.toScala}, ${x.size.toScala})"
     case x: Memory => x match {
-      case x: StackMemory => s"StackMemory(${summon[ToScala[String]].toScala(x.name)}, ${summon[ToScala[Int]].toScala(x.addressSize)}, ${summon[ToScala[Int]].toScala(x.valueSize)})"
-      case x: SharedMemory => s"SharedMemory(${summon[ToScala[String]].toScala(x.name)}, ${summon[ToScala[Int]].toScala(x.addressSize)}, ${summon[ToScala[Int]].toScala(x.valueSize)})"
+      case x: StackMemory => s"StackMemory(${x.name.toScala}, ${x.addressSize.toScala}, ${x.valueSize.toScala})"
+      case x: SharedMemory => s"SharedMemory(${x.name.toScala}, ${x.addressSize.toScala}, ${x.valueSize.toScala})"
     }
   }
 
-// end generated
+
+// end generated from ./expr.json
 
 // generated from ./statements.json
 given ToScala[Command] with
-  def toScala(x: Command): String = x match {
+  extension (x: Command) def toScala: String = x match {
     case x: Statement => x match {
       case x: Assign => x match {
         case x: SingleAssign => x match {
-          case x: LocalAssign => s"LocalAssign(${summon[ToScala[Variable]].toScala(x.lhs)}, ${summon[ToScala[Expr]].toScala(x.rhs)}, ${summon[ToScala[Option[String]]].toScala(x.label)})"
-          case x: MemoryLoad => s"MemoryLoad(${summon[ToScala[Variable]].toScala(x.lhs)}, ${summon[ToScala[Memory]].toScala(x.mem)}, ${summon[ToScala[Expr]].toScala(x.index)}, ${summon[ToScala[Endian]].toScala(x.endian)}, ${summon[ToScala[Int]].toScala(x.size)}, ${summon[ToScala[Option[String]]].toScala(x.label)})"
+          case x: LocalAssign => s"LocalAssign(${x.lhs.toScala}, ${x.rhs.toScala}, ${x.label.toScala})"
+          case x: MemoryLoad => s"MemoryLoad(${x.lhs.toScala}, ${x.mem.toScala}, ${x.index.toScala}, ${x.endian.toScala}, ${x.size.toScala}, ${x.label.toScala})"
         }
-        case x: DirectCall => summon[ToScala[DirectCall]].toScala(x)
+        case x: DirectCall => x.toScala
       }
-      case x: MemoryStore => s"MemoryStore(${summon[ToScala[Memory]].toScala(x.mem)}, ${summon[ToScala[Expr]].toScala(x.index)}, ${summon[ToScala[Expr]].toScala(x.value)}, ${summon[ToScala[Endian]].toScala(x.endian)}, ${summon[ToScala[Int]].toScala(x.size)}, ${summon[ToScala[Option[String]]].toScala(x.label)})"
-      case x: NOP => s"NOP(${summon[ToScala[Option[String]]].toScala(x.label)})"
-      case x: Assert => s"Assert(${summon[ToScala[Expr]].toScala(x.body)}, ${summon[ToScala[Option[String]]].toScala(x.comment)}, ${summon[ToScala[Option[String]]].toScala(x.label)})"
-      case x: Assume => s"Assume(${summon[ToScala[Expr]].toScala(x.body)}, ${summon[ToScala[Option[String]]].toScala(x.comment)}, ${summon[ToScala[Option[String]]].toScala(x.label)}, ${summon[ToScala[Boolean]].toScala(x.checkSecurity)})"
+      case x: MemoryStore => s"MemoryStore(${x.mem.toScala}, ${x.index.toScala}, ${x.value.toScala}, ${x.endian.toScala}, ${x.size.toScala}, ${x.label.toScala})"
+      case x: NOP => s"NOP(${x.label.toScala})"
+      case x: Assert => s"Assert(${x.body.toScala}, ${x.comment.toScala}, ${x.label.toScala})"
+      case x: Assume => s"Assume(${x.body.toScala}, ${x.comment.toScala}, ${x.label.toScala}, ${x.checkSecurity.toScala})"
       case x: Call => x match {
-        case x: DirectCall => summon[ToScala[DirectCall]].toScala(x)
-        case x: IndirectCall => summon[ToScala[IndirectCall]].toScala(x)
+        case x: DirectCall => x.toScala
+        case x: IndirectCall => x.toScala
       }
     }
     case x: Jump => x match {
-      case x: Unreachable => s"Unreachable(${summon[ToScala[Option[String]]].toScala(x.label)})"
-      case x: Return => summon[ToScala[Return]].toScala(x)
-      case x: GoTo => summon[ToScala[GoTo]].toScala(x)
+      case x: Unreachable => s"Unreachable(${x.label.toScala})"
+      case x: Return => x.toScala
+      case x: GoTo => x.toScala
     }
   }
 
-// end generated
 
-// generated from irtype.json
+// end generated from ./statements.json
+
+// generated from ./irtype.json
 given ToScala[IRType] with
-  def toScala(x: IRType): String = x match {
+  extension (x: IRType) def toScala: String = x match {
     case x: BoolType.type => s"BoolType"
     case x: IntType.type => s"IntType"
-    case x: BitVecType => s"BitVecType(${summon[ToScala[Int]].toScala(x.size)})"
-    case x: MapType => s"MapType(${summon[ToScala[IRType]].toScala(x.param)}, ${summon[ToScala[IRType]].toScala(x.result)})"
+    case x: BitVecType => s"BitVecType(${x.size.toScala})"
+    case x: MapType => s"MapType(${x.param.toScala}, ${x.result.toScala})"
   }
 
-// end generated
 
+// end generated from ./irtype.json
 
 given ToScala[Return] with
-  def toScala(x: Return): String = "ret"
+  extension (x: Return) def toScala: String = "ret"
 given ToScala[DirectCall] with
-  def toScala(x: DirectCall): String =
+  extension (x: DirectCall) def toScala: String =
     val str = summon[ToScala[String]]
-    s"directCall(${str.toScala(x.target.procName)}\")"
+    s"directCall(${x.target.procName.toScala}\")"
 given ToScala[IndirectCall] with
-  def toScala(x: IndirectCall): String =
-    val v = summon[ToScala[Variable]]
-    val str = summon[ToScala[String]]
-    s"indirectCall(${v.toScala(x.target)})"
+  extension (x: IndirectCall) def toScala: String =
+    s"indirectCall(${x.target.toScala})"
 given ToScala[GoTo] with
-  val str = summon[ToScala[String]]
-  def toScala(x: GoTo): String = s"goto(${x.targets.map(x => str.toScala(x.label)).mkString(", ")})"
+  extension (x: GoTo) def toScala: String = s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})"
 
 given ToScala[Block] with
-  def toScala(x: Block): String =
-    val s = summon[ToScala[Statement]]
-    val str = summon[ToScala[String]]
+  extension (x: Block) def toScala: String =
     val commands = x.statements ++ Seq(x.jump)
-    s"block(${str.toScala(x.label)},\n      " + (commands.map(s.toScala).mkString(",\n      ")) + "\n    )"
+    s"block(${x.label.toScala},\n      " + (commands.map(_.toScala).mkString(",\n      ")) + "\n    )"
 
 given ToScala[Procedure] with
-  def toScala(x: Procedure): String =
-    val b = summon[ToScala[Block]]
-    val str = summon[ToScala[String]]
-    s"proc(${str.toScala(x.procName)},\n    " + (x.blocks.map(b.toScala).mkString(",\n    ")) + "\n  )"
+  extension (x: Procedure) def toScala: String =
+    s"proc(${x.procName.toScala},\n    " + (x.blocks.map(_.toScala).mkString(",\n    ")) + "\n  )"
 
 given ToScala[Program] with
-  def toScala(x: Program): String =
-    val p = summon[ToScala[Procedure]]
-    val str = summon[ToScala[String]]
-    s"prog(\n  " + (x.procedures.map(p.toScala).mkString(",\n  ")) + "\n)"
+  extension (x: Program) def toScala: String =
+    s"prog(\n  " + (x.procedures.map(_.toScala).mkString(",\n  ")) + "\n)"
 
 given ToScala[String] with
-  def toScala(x: String): String = StringEscape.quote(x)
+  extension (x: String) def toScala: String = StringEscape.quote(x)
 given ToScala[Endian] with
-  def toScala(x: Endian): String = "Endian." + x.toString()
+  extension (x: Endian) def toScala: String = "Endian." + x.toString()
 given ToScala[Int] with
-  def toScala(x: Int): String = x.toString()
+  extension (x: Int) def toScala: String = x.toString()
 given ToScala[Boolean] with
-  def toScala(x: Boolean): String = x.toString()
+  extension (x: Boolean) def toScala: String = x.toString()
 given ToScala[BigInt] with
-  def toScala(x: BigInt): String = s"BigInt(\"$x\")"
+  extension (x: BigInt) def toScala: String = s"BigInt(\"$x\")"
 
 
-given [T](using t: ToScala[T]): ToScala[Seq[T]] with
-  def toScala(x: Seq[T]): String = x match
+given [T](using ToScala[T]): ToScala[Seq[T]] with
+  extension (x: Seq[T]) def toScala: String = x match
     case Seq() => "Seq()"
-    case Seq(x) => s"Seq(${t.toScala(x)})"
-    case _ => s"Seq(${x.map(t.toScala).mkString(", ")})"
+    case Seq(x) => s"Seq(${x.toScala})"
+    case _ => s"Seq(${x.map(_.toScala).mkString(", ")})"
 
-given [T](using t: ToScala[T]): ToScala[LinkedHashSet[T]] with
-  def toScala(x: LinkedHashSet[T]): String = x match
+given [T](using ToScala[T]): ToScala[LinkedHashSet[T]] with
+  extension (x: LinkedHashSet[T]) def toScala: String = x match
     case Seq() => "LinkedHashSet()"
-    case _ => s"LinkedHashSet(${x.map(t.toScala).mkString(", ")})"
+    case _ => s"LinkedHashSet(${x.map(_.toScala).mkString(", ")})"
 
 
-given [T](using t: ToScala[T]): ToScala[Option[T]] with
-  def toScala(x: Option[T]): String = x match
+given [T](using ToScala[T]): ToScala[Option[T]] with
+  extension (x: Option[T]) def toScala: String = x match
     case None => "None"
-    case Some(x) => s"Some(${t.toScala(x)})"
+    case Some(x) => s"Some(${x.toScala})"
 
-given [K,V](using k: ToScala[K])(using v: ToScala[V]): ToScala[SortedMap[K,V]] with
-  def toScala(x: SortedMap[K,V]): String =
-    val entries = x.map((a,b) => s"${k.toScala(a)} -> ${v.toScala(b)}").mkString(", ")
+given [K,V](using ToScala[K])(using ToScala[V]): ToScala[SortedMap[K,V]] with
+  extension (x: SortedMap[K,V]) def toScala: String =
+    val entries = x.map((a,b) => s"${a.toScala} -> ${b.toScala}").mkString(", ")
     s"SortedMap($entries)"
 
 object StringEscape {
@@ -258,10 +251,3 @@ object Exporter {
     case IndirectCall(target, _)   => indirectCall(target)
     case DirectCall(proc, _, _, _) => directCall(proc.name)
 }
-
-extension (x: Statement)
-  def toScala: String = summon[ToScala[Statement]].toScala(x)
-extension (x: Procedure)
-  def toScala: String = summon[ToScala[Procedure]].toScala(x)
-extension (x: Program)
-  def toScala: String = summon[ToScala[Program]].toScala(x)

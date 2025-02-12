@@ -90,11 +90,11 @@ def make_repr_match_case(d: Hierarchy | Decl):
   # print(d.args)
   if isinstance(d, Decl):
     if d.valname in BANNED:
-      yield f'summon[ToScala[{d.tyname}]].toScala(x)\n'
+      yield f'x.toScala\n'
       return
 
     if d.args is not None:
-      argstr = '(' + ', '.join(f'${{summon[ToScala[{ty}]].toScala(x.{arg})}}' for arg,ty in d.args) + ')'
+      argstr = '(' + ', '.join(f'${{x.{arg}.toScala}}' for arg,_ in d.args) + ')'
     else:
       argstr = ''
     yield f's"{d.valname}{argstr}"\n'
@@ -111,11 +111,9 @@ def make_repr_match_case(d: Hierarchy | Decl):
 def make_repr_given(h: Hierarchy):
   for k, x in h.items():
     yield f'given ToScala[{k}] with\n'
-    yield f'  def toScala(x: {k}): String = '
+    yield f'  extension (x: {k}) def toScala(): String = '
     yield from indent(make_repr_match_case(x))
     yield '\n'
-
-  yield '// end generated'
 
 
 def main(argv: list[str]):
@@ -124,6 +122,7 @@ def main(argv: list[str]):
     with open(f) as fp:
       d = toplevel_definitions(json.load(fp))
       print(*make_repr_given(d), sep='')
+    print('// end generated from', f)
     print()
 
 
