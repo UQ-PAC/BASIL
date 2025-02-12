@@ -37,7 +37,7 @@ class TaintAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(IRWalk.lastInProc(f).get).contains(baseRegisterMap - R0))
+    assert(varDepResults(IRWalk.lastInProc(f).get)(R0) == FiniteSet(Set()))
   }
 
   test("arguments") {
@@ -57,11 +57,11 @@ class TaintAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest
     val taint: Map[CFGPosition, Set[Variable]] = Map(f -> Set(R0))
     val taintAnalysisResults = getTaintAnalysisResults(program, taint)
 
-    assert(taintAnalysisResults.get(IRWalk.lastInProc(f).get).contains(Set(R0)))
+    assert(taintAnalysisResults(IRWalk.lastInProc(f).get) == Set(R0))
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(IRWalk.lastInProc(f).get).contains(baseRegisterMap + (R0 -> FiniteSet(Set(R0, R1)))))
+    assert(varDepResults(IRWalk.lastInProc(f).get)(R0) == FiniteSet(Set(R0, R1)))
   }
 
   test("branching") {
@@ -83,25 +83,50 @@ class TaintAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest
     val taint: Map[CFGPosition, Set[Variable]] = Map(f -> Set(R1))
     val taintAnalysisResults = getTaintAnalysisResults(program, taint)
 
-    assert(taintAnalysisResults.get(IRWalk.lastInProc(f).get).contains(Set(R0, R1)))
+    assert(taintAnalysisResults(IRWalk.lastInProc(f).get) == Set(R0, R1))
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(IRWalk.lastInProc(f).get) == Some(baseRegisterMap + (R0 -> FiniteSet(Set(R1, R2)))))
+    assert(varDepResults(IRWalk.lastInProc(f).get)(R0) == FiniteSet(Set(R1, R2)))
   }
 
   test("interproc") {
     val program = prog(
-      proc("main", block("main", directCall("f"), goto("mainRet")), block("mainRet", ret)),
-      proc(
-        "f",
-        block("branch", goto("a", "b")),
-        block("a", LocalAssign(R1, R1, None), directCall("g"), goto("fReturnBlock")),
-        block("b", LocalAssign(R1, R2, None), directCall("g"), goto("fReturnBlock")),
-        block("fReturnBlock", ret)
-      ),
-      proc("g", block("body", LocalAssign(R0, R1, None), goto("gReturnBlock")), block("gReturnBlock", ret))
-    )
+        proc("main",
+          block("main",
+            directCall("f"),
+            goto("mainRet")
+          ),
+          block("mainRet", ret)
+        ),
+        proc("f",
+          block("branch",
+            goto("a", "b"),
+          ),
+          block("a",
+            LocalAssign(R1, R1, None),
+            directCall("g"),
+            goto("fReturnBlock"),
+          ),
+          block("b",
+            LocalAssign(R1, R2, None),
+            directCall("g"),
+            goto("fReturnBlock"),
+          ),
+          block("fReturnBlock",
+            ret
+          ),
+        ),
+        proc("g",
+          block("body",
+            LocalAssign(R0, R1, None),
+            goto("gReturnBlock"),
+          ),
+          block("gReturnBlock",
+            ret
+          ),
+        ),
+      )
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
@@ -110,11 +135,12 @@ class TaintAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest
     val taint: Map[CFGPosition, Set[Variable]] = Map(f -> Set(R1))
     val taintAnalysisResults = getTaintAnalysisResults(program, taint)
 
-    assert(taintAnalysisResults.get(IRWalk.lastInProc(f).get).contains(Set(R0, R1)))
+    assert(taintAnalysisResults(IRWalk.lastInProc(f).get) == Set(R0, R1))
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(IRWalk.lastInProc(f).get).contains(baseRegisterMap + (R0 -> FiniteSet(Set(R1, R2))) + (R1 -> FiniteSet(Set(R1, R2)))))
+    assert(varDepResults(IRWalk.lastInProc(f).get)(R0) == FiniteSet(Set(R1, R2)))
+    assert(varDepResults(IRWalk.lastInProc(f).get)(R1) == FiniteSet(Set(R1, R2)))
   }
 
   test("loop") {
@@ -136,10 +162,10 @@ class TaintAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest
     val taint: Map[CFGPosition, Set[Variable]] = Map(f -> Set(R1))
     val taintAnalysisResults = getTaintAnalysisResults(program, taint)
 
-    assert(taintAnalysisResults.get(IRWalk.lastInProc(f).get).contains(Set(R1)))
+    assert(taintAnalysisResults(IRWalk.lastInProc(f).get) == Set(R1))
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(IRWalk.lastInProc(f).get).contains(baseRegisterMap + (R0 -> FiniteSet(Set(R2)))))
+    assert(varDepResults(IRWalk.lastInProc(f).get)(R0) == FiniteSet(Set(R2)))
   }
 }
