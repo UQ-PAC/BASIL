@@ -7,167 +7,163 @@ import collection.immutable.{SortedMap}
 import collection.mutable
 import collection.mutable.{LinkedHashSet}
 
-trait ToScala[T]:
+trait ToScala[-T]:
   def toScala(x: T): String
 
+
+
 // generated from ./expr.json
-given ToScala[TrueLiteral.type] with
-  def toScala(x: TrueLiteral.type) = s"TrueLiteral"
-given ToScala[FalseLiteral.type] with
-  def toScala(x: FalseLiteral.type) = s"FalseLiteral"
-given ToScala[BitVecLiteral] with
-  def toScala(x: BitVecLiteral) = s"BitVecLiteral(${summon[ToScala[BigInt]].toScala(x.value)}, ${summon[ToScala[Int]].toScala(x.size)})"
-given ToScala[IntLiteral] with
-  def toScala(x: IntLiteral) = s"IntLiteral(${summon[ToScala[BigInt]].toScala(x.value)})"
-given ToScala[Extract] with
-  def toScala(x: Extract) = s"Extract(${summon[ToScala[Int]].toScala(x.end)}, ${summon[ToScala[Int]].toScala(x.start)}, ${summon[ToScala[Expr]].toScala(x.body)})"
-given ToScala[Repeat] with
-  def toScala(x: Repeat) = s"Repeat(${summon[ToScala[Int]].toScala(x.repeats)}, ${summon[ToScala[Expr]].toScala(x.body)})"
-given ToScala[ZeroExtend] with
-  def toScala(x: ZeroExtend) = s"ZeroExtend(${summon[ToScala[Int]].toScala(x.extension)}, ${summon[ToScala[Expr]].toScala(x.body)})"
-given ToScala[SignExtend] with
-  def toScala(x: SignExtend) = s"SignExtend(${summon[ToScala[Int]].toScala(x.extension)}, ${summon[ToScala[Expr]].toScala(x.body)})"
-given ToScala[UnaryExpr] with
-  def toScala(x: UnaryExpr) = s"UnaryExpr(${summon[ToScala[UnOp]].toScala(x.op)}, ${summon[ToScala[Expr]].toScala(x.arg)})"
-given ToScala[BoolNOT.type] with
-  def toScala(x: BoolNOT.type) = s"BoolNOT"
-given ToScala[BoolToBV1.type] with
-  def toScala(x: BoolToBV1.type) = s"BoolToBV1"
-given ToScala[IntNEG.type] with
-  def toScala(x: IntNEG.type) = s"IntNEG"
-given ToScala[BVNOT.type] with
-  def toScala(x: BVNOT.type) = s"BVNOT"
-given ToScala[BVNEG.type] with
-  def toScala(x: BVNEG.type) = s"BVNEG"
-given ToScala[BinaryExpr] with
-  def toScala(x: BinaryExpr) = s"BinaryExpr(${summon[ToScala[BinOp]].toScala(x.op)}, ${summon[ToScala[Expr]].toScala(x.arg1)}, ${summon[ToScala[Expr]].toScala(x.arg2)})"
-given ToScala[BoolEQ.type] with
-  def toScala(x: BoolEQ.type) = s"BoolEQ"
-given ToScala[BoolNEQ.type] with
-  def toScala(x: BoolNEQ.type) = s"BoolNEQ"
-given ToScala[BoolAND.type] with
-  def toScala(x: BoolAND.type) = s"BoolAND"
-given ToScala[BoolOR.type] with
-  def toScala(x: BoolOR.type) = s"BoolOR"
-given ToScala[BoolIMPLIES.type] with
-  def toScala(x: BoolIMPLIES.type) = s"BoolIMPLIES"
-given ToScala[BoolEQUIV.type] with
-  def toScala(x: BoolEQUIV.type) = s"BoolEQUIV"
-given ToScala[BVAND.type] with
-  def toScala(x: BVAND.type) = s"BVAND"
-given ToScala[BVOR.type] with
-  def toScala(x: BVOR.type) = s"BVOR"
-given ToScala[BVADD.type] with
-  def toScala(x: BVADD.type) = s"BVADD"
-given ToScala[BVMUL.type] with
-  def toScala(x: BVMUL.type) = s"BVMUL"
-given ToScala[BVUDIV.type] with
-  def toScala(x: BVUDIV.type) = s"BVUDIV"
-given ToScala[BVUREM.type] with
-  def toScala(x: BVUREM.type) = s"BVUREM"
-given ToScala[BVSHL.type] with
-  def toScala(x: BVSHL.type) = s"BVSHL"
-given ToScala[BVLSHR.type] with
-  def toScala(x: BVLSHR.type) = s"BVLSHR"
-given ToScala[BVULT.type] with
-  def toScala(x: BVULT.type) = s"BVULT"
-given ToScala[BVNAND.type] with
-  def toScala(x: BVNAND.type) = s"BVNAND"
-given ToScala[BVNOR.type] with
-  def toScala(x: BVNOR.type) = s"BVNOR"
-given ToScala[BVXOR.type] with
-  def toScala(x: BVXOR.type) = s"BVXOR"
-given ToScala[BVXNOR.type] with
-  def toScala(x: BVXNOR.type) = s"BVXNOR"
-given ToScala[BVCOMP.type] with
-  def toScala(x: BVCOMP.type) = s"BVCOMP"
-given ToScala[BVSUB.type] with
-  def toScala(x: BVSUB.type) = s"BVSUB"
-given ToScala[BVSDIV.type] with
-  def toScala(x: BVSDIV.type) = s"BVSDIV"
-given ToScala[BVSREM.type] with
-  def toScala(x: BVSREM.type) = s"BVSREM"
-given ToScala[BVSMOD.type] with
-  def toScala(x: BVSMOD.type) = s"BVSMOD"
-given ToScala[BVASHR.type] with
-  def toScala(x: BVASHR.type) = s"BVASHR"
-given ToScala[BVULE.type] with
-  def toScala(x: BVULE.type) = s"BVULE"
-given ToScala[BVUGT.type] with
-  def toScala(x: BVUGT.type) = s"BVUGT"
-given ToScala[BVUGE.type] with
-  def toScala(x: BVUGE.type) = s"BVUGE"
-given ToScala[BVSLT.type] with
-  def toScala(x: BVSLT.type) = s"BVSLT"
-given ToScala[BVSLE.type] with
-  def toScala(x: BVSLE.type) = s"BVSLE"
-given ToScala[BVSGT.type] with
-  def toScala(x: BVSGT.type) = s"BVSGT"
-given ToScala[BVSGE.type] with
-  def toScala(x: BVSGE.type) = s"BVSGE"
-given ToScala[BVEQ.type] with
-  def toScala(x: BVEQ.type) = s"BVEQ"
-given ToScala[BVNEQ.type] with
-  def toScala(x: BVNEQ.type) = s"BVNEQ"
-given ToScala[BVCONCAT.type] with
-  def toScala(x: BVCONCAT.type) = s"BVCONCAT"
-given ToScala[IntADD.type] with
-  def toScala(x: IntADD.type) = s"IntADD"
-given ToScala[IntMUL.type] with
-  def toScala(x: IntMUL.type) = s"IntMUL"
-given ToScala[IntSUB.type] with
-  def toScala(x: IntSUB.type) = s"IntSUB"
-given ToScala[IntDIV.type] with
-  def toScala(x: IntDIV.type) = s"IntDIV"
-given ToScala[IntMOD.type] with
-  def toScala(x: IntMOD.type) = s"IntMOD"
-given ToScala[IntEQ.type] with
-  def toScala(x: IntEQ.type) = s"IntEQ"
-given ToScala[IntNEQ.type] with
-  def toScala(x: IntNEQ.type) = s"IntNEQ"
-given ToScala[IntLT.type] with
-  def toScala(x: IntLT.type) = s"IntLT"
-given ToScala[IntLE.type] with
-  def toScala(x: IntLE.type) = s"IntLE"
-given ToScala[IntGT.type] with
-  def toScala(x: IntGT.type) = s"IntGT"
-given ToScala[IntGE.type] with
-  def toScala(x: IntGE.type) = s"IntGE"
-given ToScala[UninterpretedFunction] with
-  def toScala(x: UninterpretedFunction) = s"UninterpretedFunction(${summon[ToScala[String]].toScala(x.name)}, ${summon[ToScala[Seq[Expr]]].toScala(x.params)}, ${summon[ToScala[IRType]].toScala(x.returnType)})"
-given ToScala[Register] with
-  def toScala(x: Register) = s"Register(${summon[ToScala[String]].toScala(x.name)}, ${summon[ToScala[Int]].toScala(x.size)})"
-given ToScala[LocalVar] with
-  def toScala(x: LocalVar) = s"LocalVar(${summon[ToScala[String]].toScala(x.varName)}, ${summon[ToScala[IRType]].toScala(x.irType)}, ${summon[ToScala[Int]].toScala(x.index)})"
-given ToScala[StackMemory] with
-  def toScala(x: StackMemory) = s"StackMemory(${summon[ToScala[String]].toScala(x.name)}, ${summon[ToScala[Int]].toScala(x.addressSize)}, ${summon[ToScala[Int]].toScala(x.valueSize)})"
-given ToScala[SharedMemory] with
-  def toScala(x: SharedMemory) = s"SharedMemory(${summon[ToScala[String]].toScala(x.name)}, ${summon[ToScala[Int]].toScala(x.addressSize)}, ${summon[ToScala[Int]].toScala(x.valueSize)})"
+given ToScala[Expr] with
+  def toScala(x: Expr): String = x match {
+    case x: Literal => x match {
+      case x: BoolLit => x match {
+        case x: TrueLiteral.type => s"TrueLiteral"
+        case x: FalseLiteral.type => s"FalseLiteral"
+      }
+      case x: BitVecLiteral => s"BitVecLiteral(${summon[ToScala[BigInt]].toScala(x.value)}, ${summon[ToScala[Int]].toScala(x.size)})"
+      case x: IntLiteral => s"IntLiteral(${summon[ToScala[BigInt]].toScala(x.value)})"
+    }
+    case x: Extract => s"Extract(${summon[ToScala[Int]].toScala(x.end)}, ${summon[ToScala[Int]].toScala(x.start)}, ${summon[ToScala[Expr]].toScala(x.body)})"
+    case x: Repeat => s"Repeat(${summon[ToScala[Int]].toScala(x.repeats)}, ${summon[ToScala[Expr]].toScala(x.body)})"
+    case x: ZeroExtend => s"ZeroExtend(${summon[ToScala[Int]].toScala(x.extension)}, ${summon[ToScala[Expr]].toScala(x.body)})"
+    case x: SignExtend => s"SignExtend(${summon[ToScala[Int]].toScala(x.extension)}, ${summon[ToScala[Expr]].toScala(x.body)})"
+    case x: UnaryExpr => s"UnaryExpr(${summon[ToScala[UnOp]].toScala(x.op)}, ${summon[ToScala[Expr]].toScala(x.arg)})"
+    case x: BinaryExpr => s"BinaryExpr(${summon[ToScala[BinOp]].toScala(x.op)}, ${summon[ToScala[Expr]].toScala(x.arg1)}, ${summon[ToScala[Expr]].toScala(x.arg2)})"
+    case x: UninterpretedFunction => s"UninterpretedFunction(${summon[ToScala[String]].toScala(x.name)}, ${summon[ToScala[Seq[Expr]]].toScala(x.params)}, ${summon[ToScala[IRType]].toScala(x.returnType)})"
+    case x: Variable => x match {
+      case x: Register => s"Register(${summon[ToScala[String]].toScala(x.name)}, ${summon[ToScala[Int]].toScala(x.size)})"
+      case x: LocalVar => s"LocalVar(${summon[ToScala[String]].toScala(x.varName)}, ${summon[ToScala[IRType]].toScala(x.irType)}, ${summon[ToScala[Int]].toScala(x.index)})"
+    }
+  }
 
-// generated from statements.json
-given ToScala[LocalAssign] with
-  def toScala(x: LocalAssign) = s"LocalAssign(${summon[ToScala[Variable]].toScala(x.lhs)}, ${summon[ToScala[Expr]].toScala(x.rhs)}, ${summon[ToScala[Option[String]]].toScala(x.label)})"
-given ToScala[MemoryStore] with
-  def toScala(x: MemoryStore) = s"MemoryStore(${summon[ToScala[Memory]].toScala(x.mem)}, ${summon[ToScala[Expr]].toScala(x.index)}, ${summon[ToScala[Expr]].toScala(x.value)}, ${summon[ToScala[Endian]].toScala(x.endian)}, ${summon[ToScala[Int]].toScala(x.size)}, ${summon[ToScala[Option[String]]].toScala(x.label)})"
-given ToScala[MemoryLoad] with
-  def toScala(x: MemoryLoad) = s"MemoryLoad(${summon[ToScala[Variable]].toScala(x.lhs)}, ${summon[ToScala[Memory]].toScala(x.mem)}, ${summon[ToScala[Expr]].toScala(x.index)}, ${summon[ToScala[Endian]].toScala(x.endian)}, ${summon[ToScala[Int]].toScala(x.size)}, ${summon[ToScala[Option[String]]].toScala(x.label)})"
-given ToScala[NOP] with
-  def toScala(x: NOP) = s"NOP(${summon[ToScala[Option[String]]].toScala(x.label)})"
-given ToScala[Assert] with
-  def toScala(x: Assert) = s"Assert(${summon[ToScala[Expr]].toScala(x.body)}, ${summon[ToScala[Option[String]]].toScala(x.comment)}, ${summon[ToScala[Option[String]]].toScala(x.label)})"
-given ToScala[Assume] with
-  def toScala(x: Assume) = s"Assume(${summon[ToScala[Expr]].toScala(x.body)}, ${summon[ToScala[Option[String]]].toScala(x.comment)}, ${summon[ToScala[Option[String]]].toScala(x.label)}, ${summon[ToScala[Boolean]].toScala(x.checkSecurity)})"
-given ToScala[Unreachable] with
-  def toScala(x: Unreachable) = s"Unreachable(${summon[ToScala[Option[String]]].toScala(x.label)})"
+given ToScala[UnOp] with
+  def toScala(x: UnOp): String = x match {
+    case x: BoolUnOp => x match {
+      case x: BoolNOT.type => s"BoolNOT"
+      case x: BoolToBV1.type => s"BoolToBV1"
+    }
+    case x: IntUnOp => x match {
+      case x: IntNEG.type => s"IntNEG"
+    }
+    case x: BVUnOp => x match {
+      case x: BVNOT.type => s"BVNOT"
+      case x: BVNEG.type => s"BVNEG"
+    }
+  }
+
+given ToScala[BinOp] with
+  def toScala(x: BinOp): String = x match {
+    case x: BoolBinOp => x match {
+      case x: BoolEQ.type => s"BoolEQ"
+      case x: BoolNEQ.type => s"BoolNEQ"
+      case x: BoolAND.type => s"BoolAND"
+      case x: BoolOR.type => s"BoolOR"
+      case x: BoolIMPLIES.type => s"BoolIMPLIES"
+      case x: BoolEQUIV.type => s"BoolEQUIV"
+    }
+    case x: BVBinOp => x match {
+      case x: BVAND.type => s"BVAND"
+      case x: BVOR.type => s"BVOR"
+      case x: BVADD.type => s"BVADD"
+      case x: BVMUL.type => s"BVMUL"
+      case x: BVUDIV.type => s"BVUDIV"
+      case x: BVUREM.type => s"BVUREM"
+      case x: BVSHL.type => s"BVSHL"
+      case x: BVLSHR.type => s"BVLSHR"
+      case x: BVULT.type => s"BVULT"
+      case x: BVNAND.type => s"BVNAND"
+      case x: BVNOR.type => s"BVNOR"
+      case x: BVXOR.type => s"BVXOR"
+      case x: BVXNOR.type => s"BVXNOR"
+      case x: BVCOMP.type => s"BVCOMP"
+      case x: BVSUB.type => s"BVSUB"
+      case x: BVSDIV.type => s"BVSDIV"
+      case x: BVSREM.type => s"BVSREM"
+      case x: BVSMOD.type => s"BVSMOD"
+      case x: BVASHR.type => s"BVASHR"
+      case x: BVULE.type => s"BVULE"
+      case x: BVUGT.type => s"BVUGT"
+      case x: BVUGE.type => s"BVUGE"
+      case x: BVSLT.type => s"BVSLT"
+      case x: BVSLE.type => s"BVSLE"
+      case x: BVSGT.type => s"BVSGT"
+      case x: BVSGE.type => s"BVSGE"
+      case x: BVEQ.type => s"BVEQ"
+      case x: BVNEQ.type => s"BVNEQ"
+      case x: BVCONCAT.type => s"BVCONCAT"
+    }
+    case x: IntBinOp => x match {
+      case x: IntADD.type => s"IntADD"
+      case x: IntMUL.type => s"IntMUL"
+      case x: IntSUB.type => s"IntSUB"
+      case x: IntDIV.type => s"IntDIV"
+      case x: IntMOD.type => s"IntMOD"
+      case x: IntEQ.type => s"IntEQ"
+      case x: IntNEQ.type => s"IntNEQ"
+      case x: IntLT.type => s"IntLT"
+      case x: IntLE.type => s"IntLE"
+      case x: IntGT.type => s"IntGT"
+      case x: IntGE.type => s"IntGE"
+    }
+  }
+
+given ToScala[Global] with
+  def toScala(x: Global): String = x match {
+    case x: Register => s"Register(${summon[ToScala[String]].toScala(x.name)}, ${summon[ToScala[Int]].toScala(x.size)})"
+    case x: Memory => x match {
+      case x: StackMemory => s"StackMemory(${summon[ToScala[String]].toScala(x.name)}, ${summon[ToScala[Int]].toScala(x.addressSize)}, ${summon[ToScala[Int]].toScala(x.valueSize)})"
+      case x: SharedMemory => s"SharedMemory(${summon[ToScala[String]].toScala(x.name)}, ${summon[ToScala[Int]].toScala(x.addressSize)}, ${summon[ToScala[Int]].toScala(x.valueSize)})"
+    }
+  }
+
+// end generated
+
+// generated from ./statements.json
+given ToScala[Command] with
+  def toScala(x: Command): String = x match {
+    case x: Statement => x match {
+      case x: Assign => x match {
+        case x: SingleAssign => x match {
+          case x: LocalAssign => s"LocalAssign(${summon[ToScala[Variable]].toScala(x.lhs)}, ${summon[ToScala[Expr]].toScala(x.rhs)}, ${summon[ToScala[Option[String]]].toScala(x.label)})"
+          case x: MemoryLoad => s"MemoryLoad(${summon[ToScala[Variable]].toScala(x.lhs)}, ${summon[ToScala[Memory]].toScala(x.mem)}, ${summon[ToScala[Expr]].toScala(x.index)}, ${summon[ToScala[Endian]].toScala(x.endian)}, ${summon[ToScala[Int]].toScala(x.size)}, ${summon[ToScala[Option[String]]].toScala(x.label)})"
+        }
+        case x: DirectCall => summon[ToScala[DirectCall]].toScala(x)
+      }
+      case x: MemoryStore => s"MemoryStore(${summon[ToScala[Memory]].toScala(x.mem)}, ${summon[ToScala[Expr]].toScala(x.index)}, ${summon[ToScala[Expr]].toScala(x.value)}, ${summon[ToScala[Endian]].toScala(x.endian)}, ${summon[ToScala[Int]].toScala(x.size)}, ${summon[ToScala[Option[String]]].toScala(x.label)})"
+      case x: NOP => s"NOP(${summon[ToScala[Option[String]]].toScala(x.label)})"
+      case x: Assert => s"Assert(${summon[ToScala[Expr]].toScala(x.body)}, ${summon[ToScala[Option[String]]].toScala(x.comment)}, ${summon[ToScala[Option[String]]].toScala(x.label)})"
+      case x: Assume => s"Assume(${summon[ToScala[Expr]].toScala(x.body)}, ${summon[ToScala[Option[String]]].toScala(x.comment)}, ${summon[ToScala[Option[String]]].toScala(x.label)}, ${summon[ToScala[Boolean]].toScala(x.checkSecurity)})"
+      case x: Call => x match {
+        case x: DirectCall => summon[ToScala[DirectCall]].toScala(x)
+        case x: IndirectCall => summon[ToScala[IndirectCall]].toScala(x)
+      }
+    }
+    case x: Jump => x match {
+      case x: Unreachable => s"Unreachable(${summon[ToScala[Option[String]]].toScala(x.label)})"
+      case x: Return => summon[ToScala[Return]].toScala(x)
+      case x: GoTo => summon[ToScala[GoTo]].toScala(x)
+    }
+  }
+
+// end generated
+
 given ToScala[Return] with
-  def toScala(x: Return) = s"Return(${summon[ToScala[Option[String]]].toScala(x.label)}, ${summon[ToScala[SortedMap[LocalVar, Expr]]].toScala(x.outParams)})"
-given ToScala[GoTo] with
-  def toScala(x: GoTo) = s"GoTo(${summon[ToScala[mutable.LinkedHashSet[Block]]].toScala(x._targets)}, ${summon[ToScala[Option[String]]].toScala(x.label)})"
+  def toScala(x: Return): String = "ret"
 given ToScala[DirectCall] with
-  def toScala(x: DirectCall) = s"DirectCall(${summon[ToScala[Procedure]].toScala(x.target)}, ${summon[ToScala[Option[String]]].toScala(x.label)}, ${summon[ToScala[SortedMap[LocalVar, Variable]]].toScala(x.outParams)}, ${summon[ToScala[SortedMap[LocalVar, Expr]]].toScala(x.actualParams)})"
-given ToScala[IndirectCall] with
-  def toScala(x: IndirectCall) = s"IndirectCall(${summon[ToScala[Variable]].toScala(x.target)}, ${summon[ToScala[Option[String]]].toScala(x.label)})"
+  def toScala(x: DirectCall): String = s"directCall(\"${x.target.procName}\")"
+given ToScala[GoTo] with
+  def toScala(x: GoTo): String = s"goto(${x.targets.map(x => StringEscape.quote(x.label)).mkString(", ")})"
 
+given ToScala[Block] with
+  def toScala(x: Block): String =
+    val s = summon[ToScala[Statement]]
+    val commands = x.statements ++ Seq(x.jump)
+    s"block(${StringEscape.quote(x.label)},\n    " + (commands.map(s.toScala).mkString(",\n    ")) + ")"
+
+given ToScala[Procedure] with
+  def toScala(x: Procedure): String =
+    val b = summon[ToScala[Block]]
+    s"proc(${StringEscape.quote(x.procName)},\n  " + (x.blocks.map(b.toScala).mkString(",\n  ")) + ")"
 
 given ToScala[String] with
   def toScala(x: String): String = StringEscape.quote(x)
@@ -178,25 +174,10 @@ given ToScala[Int] with
 given ToScala[Boolean] with
   def toScala(x: Boolean): String = x.toString()
 given ToScala[BigInt] with
-  def toScala(x: BigInt): String = s"BigInt($x)"
-given ToScala[Expr] with
-  def toScala(x: Expr): String = x match
-    case _: (Register | TrueLiteral.type | FalseLiteral.type | BitVecLiteral | IntLiteral | Extract | Repeat | ZeroExtend | SignExtend | UnaryExpr | BinaryExpr | LocalVar | UninterpretedFunction)
-    => toScala(x)
-given ToScala[Memory] with
-  def toScala(x: Memory): String = x match
-    case _: (StackMemory | SharedMemory) => toScala(x)
-
-given ToScala[Variable] with
-  def toScala(x: Variable): String = x match
-    case _: (Register | LocalVar) => toScala(x)
+  def toScala(x: BigInt): String = s"BigInt(\"$x\")"
 
 given ToScala[IRType] with
   def toScala(x: IRType): String = ???
-given ToScala[BinOp] with
-  def toScala(x: BinOp): String = ???
-given ToScala[UnOp] with
-  def toScala(x: UnOp): String = ???
 
 given [T](using t: ToScala[T]): ToScala[Seq[T]] with
   def toScala(x: Seq[T]): String = x match
@@ -251,3 +232,8 @@ object Exporter {
     case IndirectCall(target, _)   => indirectCall(target)
     case DirectCall(proc, _, _, _) => directCall(proc.name)
 }
+
+extension (x: Statement)
+  def toScala: String = summon[ToScala[Statement]].toScala(x)
+extension (x: Procedure)
+  def toScala: String = summon[ToScala[Procedure]].toScala(x)

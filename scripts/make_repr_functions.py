@@ -4,7 +4,8 @@
 import sys
 import json
 import dataclasses
-from pathlib import Path
+from collections import defaultdict
+from pprint import pprint
 
 @dataclasses.dataclass
 class Decl:
@@ -12,6 +13,14 @@ class Decl:
   valname: str
   args: None | list[tuple[str, str]]  # list of (name, type)
   extends: list[str] = dataclasses.field(default_factory=list)
+  istop: bool = False
+
+Hierarchy = dict[str, 'Hierarchy | Decl']
+
+BANNED = ['DirectCall', 'IndirectCall', 'GoTo', 'Return']
+
+def new_hierarchy() -> Hierarchy:
+  return defaultdict(new_hierarchy)
 
 def name(x) -> str:
   assert x['type'] == 'Term.Name'
@@ -28,43 +37,93 @@ def typestring(x) -> str:
 
 
 def toplevel_definitions(d: dict):
+  h = new_hierarchy()
+  traits: dict[str, Hierarchy] = {}
+
   assert len(d['stats']) == 1 and d['stats'][0]['type'] == 'Pkg'
   pkg = d['stats'][0]['stats']
   for defn in pkg:
     ty = defn['type']
     mods = [x['type'] for x in defn.get('mods', [])]
     name = defn.get('name', {}).get('value', None)
-    # print(mods)
+    try:
+      extends = [typestring(x['tpe']) for x in defn['templ']['inits']]
+    except KeyError:
+      extends = []
+    # print(name, extends)
     # print(defn)
-    if ty == 'Defn.Object' and 'Mod.Case' in mods:
-      yield Decl(name + '.type', name, None)
+    decl = None
+    if ty == 'Defn.Trait':
+      assert name
+      traits[name] = traits.get(name, new_hierarchy())
+      decl = traits[name]
+    elif ty == 'Defn.Object' and 'Mod.Case' in mods:
+      decl = Decl(name + '.type', name, None)
     elif ty == 'Defn.Class':
       params = [y['name']['value'] for x in defn['ctor']['paramClauses'] for y in x['values']]
       paramtypes = [typestring(y['decltpe']) for x in defn['ctor']['paramClauses'] for y in x['values']]
       if 'Mod.Case' in mods:
-        yield Decl(name, name, list(zip(params, paramtypes)))
+        decl = Decl(name, name, list(zip(params, paramtypes)))
       else:
-        yield Decl(name, name, list(zip(params, paramtypes)))
+        decl = Decl(name, name, list(zip(params, paramtypes)))
 
+    if decl is not None:
+      extends = [e for e in extends if e in traits]
+      for e in extends:
+        traits[e][name] = decl
+      if not extends:
+        h[name] = decl
 
-def make_repr(d: Decl, fn: str = 'toScala') -> str:
+  return h
+
+def indent(generator):
+  indentnext = False
+  for l in generator:
+    if indentnext:
+      yield '  '
+      indentnext = False
+    yield l
+    if l.endswith('\n'):
+      indentnext = True
+
+def make_repr_match_case(d: Hierarchy | Decl):
   # print(d.args)
-  var = 'x'
-  if d.args is not None:
-    argstr = '(' + ', '.join(f'${{summon[ToScala[{ty}]].{fn}({var}.{arg})}}' for arg,ty in d.args) + ')'
-  else:
-    argstr = ''
-  return (
-    f'given ToScala[{d.tyname}] with\n'
-    f'  def {fn}({var}: {d.tyname}) = s"{d.valname}{argstr}"'
-  )
+  if isinstance(d, Decl):
+    if d.valname in BANNED:
+      yield f'summon[ToScala[{d.tyname}]].toScala(x)\n'
+      return
+
+    if d.args is not None:
+      argstr = '(' + ', '.join(f'${{summon[ToScala[{ty}]].toScala(x.{arg})}}' for arg,ty in d.args) + ')'
+    else:
+      argstr = ''
+    yield f's"{d.valname}{argstr}"\n'
+    return
+
+  yield 'x match {\n'
+
+  for k, x in d.items():
+    k = x.tyname if isinstance(x, Decl) else k
+    yield f'  case x: {k} => '
+    yield from indent(make_repr_match_case(x))
+  yield '}\n'
+
+def make_repr_given(h: Hierarchy):
+  for k, x in h.items():
+    yield f'given ToScala[{k}] with\n'
+    yield f'  def toScala(x: {k}): String = '
+    yield from indent(make_repr_match_case(x))
+    yield '\n'
+
+  yield '// end generated'
+
 
 def main(argv: list[str]):
-  for f in sys.argv[1:]:
+  for f in argv[1:]:
     print('// generated from', f)
     with open(f) as fp:
-      for d in toplevel_definitions(json.load(fp)):
-        print(make_repr(d))
+      d = toplevel_definitions(json.load(fp))
+      print(*make_repr_given(d), sep='')
     print()
 
 

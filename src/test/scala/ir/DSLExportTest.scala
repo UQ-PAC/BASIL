@@ -39,8 +39,10 @@ class DSLExportTest extends AnyFunSuite {
   )
 
   test("asd") {
-    println(toScala(LocalAssign(R0, bv64(1), None)))
-    println(toScala(Assert(TrueLiteral, Some("asd"))))
+    println((LocalAssign(R0, bv64(1), None)).toScala)
+    println((Assert(TrueLiteral, Some("asd"))).toScala)
+    println( program.procedures(0) .toScala)
+    println((Assert(TrueLiteral, Some("asd"))).toScala)
     assert(false)
   }
 
