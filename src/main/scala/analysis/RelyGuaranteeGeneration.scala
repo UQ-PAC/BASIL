@@ -160,9 +160,11 @@ class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransf
   * state transitions at a particular program point.
   */
 class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T) extends AbstractDomain[(T, S)] {
+  override def init(b: Block): (T, S) = bot
+
   def top: (T, S) = ???
   
-  def bot: (T, S) = (intDom.bot, intDom.stateLattice.bottom)
+  def bot: (T, S) = (intDom.bot, intDom.stateLattice.top)
 
   def join(a: (T, S), b: (T, S), pos: Block): (T, S) = (intDom.join(a._1, b._1), intDom.stateLattice.lub(a._2, b._2))
   

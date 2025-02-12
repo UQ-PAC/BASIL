@@ -124,6 +124,11 @@ object Main {
       doc = "Generates summaries of procedures which are used in pre/post-conditions (requires --analyse flag)"
     )
     summariseProcedures: Flag,
+    @arg(
+      name = "generate-rely-guarantees",
+      doc = "Generates rely-guarantee conditions for each procedure that contains a return node."
+    )
+    generateRelyGuarantees: Flag,
     @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (implies --parameter-form)")
     simplify: Flag,
     @arg(
@@ -255,6 +260,7 @@ object Main {
       simplify = conf.simplify.value,
       validateSimp = conf.validateSimplify.value,
       summariseProcedures = conf.summariseProcedures.value,
+      generateRelyGuarantees = conf.generateRelyGuarantees.value,
       staticAnalysis = staticAnalysis,
       boogieTranslation = boogieGeneratorConfig,
       outputPrefix = conf.outFileName,

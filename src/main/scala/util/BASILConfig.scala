@@ -54,6 +54,7 @@ case class BASILConfig(
   validateSimp: Boolean = false,
   dsaConfig: Option[DSAConfig] = None,
   summariseProcedures: Boolean = false,
+  generateRelyGuarantees: Boolean = false,
   staticAnalysis: Option[StaticAnalysisConfig] = None,
   boogieTranslation: BoogieGeneratorConfig = BoogieGeneratorConfig(),
   outputPrefix: String
