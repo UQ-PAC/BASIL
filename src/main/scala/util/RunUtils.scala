@@ -518,6 +518,9 @@ object StaticAnalysis {
     val paramResults: Map[Procedure, Set[Variable]] = ParamAnalysis(IRProgram).analyze()
     val interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = InterLiveVarsAnalysis(IRProgram).analyze()
 
+    StaticAnalysisLogger.debug("[!] Generating Rely-Guarantee Conditions")
+    generate_rg_conditions(ctx.program.procedures.toList.filter(p => p.returnBlock != None))
+
     StaticAnalysisContext(
       intraProcConstProp = intraProcConstPropResult,
       interProcConstProp = interProcConstPropResult,
@@ -539,34 +542,20 @@ object StaticAnalysis {
   }
 
   def generate_rg_conditions(procs: List[Procedure]): Unit = {
+    type StateLatticeElement = LatticeMap[Variable, Interval]
+    type InterferenceLatticeElement = Map[Variable, StateLatticeElement]
+    val stateLattice = IntervalLatticeExtension(IntervalLattice())
     val stateTransfer = SignedIntervalDomain().transfer
-    val stateLattice = CompatibleLatticeMap[Variable, Interval, LA <: Lattice[L]](l: LA)
-    type StateElement = Map[Variable, Interval]
-    val intDom = ConditionalWritesDomain[StateElement](stateLattice, stateTransfer)
-    val rg_generator = RelyGuaranteeGenerator(intDom, procs)
-
-
-
-    type StateElement = Map[Variable, FlatElement[BitVecLiteral]]
-    val stateLattice = ConstantPropagationLattice()
-    // extracting this (what should be static) function from IntraProcConstantPropagation requires instantiating it with a Program
-    // in future, we expect this function to be defined in an AbstractDomain for constant propagation
-    // val stateTransfer: (CFGPosition, StateElement) => StateElement = (n, s) => n match {
-    //   case la: LocalAssign =>
-    //     s + (la.lhs -> ConstantPropagation.eval(la.rhs, s))
-    //   case l: MemoryLoad =>
-    //     s + (l.lhs -> stateLattice.top)
-    //   case _: Call => s.map { (k, v) =>
-    //     if (Set("R0", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15", "R16", "R17", "R18", "R30").map(n => Register(n, 64)).contains(k)) {
-    //       (k, stateLattice.top)
-    //     } else {
-    //       (k, v)
-    //     }
-    //   }
-    //   case _ => s
-    // }
-    // val intDom = ConditionalWritesDomain[StateElement](stateLattice, stateTransfer)
-    // val rg_generator = RelyGuaranteeGenerator(intDom, procs)
+    val intDom = ConditionalWritesDomain[StateLatticeElement](stateLattice, stateTransfer)
+    val rg_generator = RelyGuaranteeGenerator[InterferenceLatticeElement, StateLatticeElement](intDom, procs)
+    val rely_guarantees: Map[Procedure, (InterferenceLatticeElement, InterferenceLatticeElement)] = rg_generator.generate()
+    for ((p, (rely, guar)) <- rely_guarantees) {
+      println(p.procName + "\n")
+      println("Rely:")
+      println(intDom.toString(rely) + "\n")
+      println("Guarantee:")
+      println(intDom.toString(guar) + "\n")
+    }
   }
 
   def printAnalysisResults(prog: Program, result: Map[CFGPosition, _]): String = {

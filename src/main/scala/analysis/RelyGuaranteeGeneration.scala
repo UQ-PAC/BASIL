@@ -11,12 +11,21 @@ trait CompatibleLattice[S] extends Lattice[S] {
   def drop(v: Variable, s: S): S
   // greatest lower bound, i.e. meet
   def glb(s1: S, s2: S): S
+  // display this set of states as a boogie predicate
+  def toPredString(s: S): String
 }
 
-class CompatibleLatticeMap[D, L, LA <: Lattice[L]](l: LA) extends LatticeMapLattice[D, L, LA](l: LA) with CompatibleLattice[LatticeMap[D, L]] {
-  def drop(v: Variable, s: LatticeMap[D, L]): LatticeMap[D, L] = {
-    s.filter((d: D, _: L) => d != v)
-  }
+// class CompatibleLatticeMapLattice[D, L, LA <: Lattice[L]](l: LA) extends LatticeMapLattice[D, L, LA](l: LA) with CompatibleLattice[LatticeMap[D, L]] {
+//   def drop(v: Variable, s: LatticeMap[D, L]): LatticeMap[D, L] = {
+//     s.filter((d: D, _: L) => d != v)
+//   }
+// }
+
+class IntervalLatticeExtension(l: IntervalLattice) extends LatticeMapLattice[Variable, Interval, IntervalLattice](l) with CompatibleLattice[LatticeMap[Variable, Interval]] {
+  def drop(v: Variable, s: LatticeMap[Variable, Interval]): LatticeMap[Variable, Interval] =
+    s + (v -> Interval.Top)
+
+  def toPredString(s: LatticeMap[Variable, Interval]): String = SignedIntervalDomain().toPred(s).toString()
 }
 
 /**
@@ -67,7 +76,12 @@ class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransf
   def bot: Map[Variable, S] = Map.empty[Variable, S]
   
   // for assignments, simply return a mapping from the assigned variable to the given state
-  def derive(s: S, c: LocalAssign): Map[Variable, S] = Map(c.lhs -> s)
+  def derive(s: S, c: LocalAssign): Map[Variable, S] = {
+    if (s == stateLattice.bottom) {
+      return Map.empty
+    }
+    return Map(c.lhs -> s)
+  }
   
   // weaken s by eliminating each variable v that maps to a condition that overlaps with s
   def apply(t: Map[Variable, S], s: S): S = {
@@ -103,7 +117,12 @@ class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransf
         for ((v2, cond2) <- old_t) {
           val drop_v2 = stateLattice.drop(v2, old_t(v1))
           val to_join = stateLattice.glb(old_t(v2), drop_v2)
-          new_t = new_t + (v1 -> stateLattice.lub(new_t(v1), to_join))
+          val new_cond = stateLattice.lub(new_t(v1), to_join)
+          if (new_cond == stateLattice.bottom) {
+            new_t = new_t.removed(v1)
+          } else {
+            new_t = new_t + (v1 -> new_cond)
+          }
         }
       }
       count = count + 1
@@ -122,10 +141,10 @@ class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransf
     val sb = new StringBuilder
     val vars = t.keys.toList
     for (v <- vars) {
-      sb.append(s"(~(${t(v)}) ==> ${v}' == ${v})\n&& ")
+      sb.append(s"(~(${stateLattice.toPredString(t(v))}) ==> ${v.name}' == ${v.name})\n&& ")
     }
     sb.append("forall v in Vars - {")
-    sb.append(vars.map(_.toString).mkString(", "))
+    sb.append(vars.map(_.name).mkString(", "))
     sb.append("} :: v' == v")
     sb.toString()
   }
@@ -169,11 +188,6 @@ class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T)
   * for a given concurrent program using the given interference and state
   * domains. Currently, a thread is a represented as a Procedure, and only
   * intraprocedural analysis is supported.
-  * 
-  * Todo:
-  * IntervalDomain takes a procedure as a parameter. Do we construct a list of
-  * IntervalDomains, or are we supposed to only construct those domains here in
-  * this procedure? Can we construct 
   */
 class RelyGuaranteeGenerator[T, S](intDom: InterferenceDomain[T, S], threads: List[Procedure]) {
   def generate(): Map[Procedure, (T, T)] = {
@@ -194,7 +208,7 @@ class RelyGuaranteeGenerator[T, S](intDom: InterferenceDomain[T, S], threads: Li
         val productDom = InterferenceProductDomain[T, S](intDom, rely)
         val solver = transforms.worklistSolver(productDom)
         val (_, block_postconditions) = solver.solveProc(p)
-        val guar = block_postconditions(???)._1
+        val guar = block_postconditions(p.returnBlock.get)._1
         new_guars = new_guars + (p -> guar)
       }
       // check if fixpoint is reached
