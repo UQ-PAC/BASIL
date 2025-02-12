@@ -31,7 +31,7 @@ trait SystemTests extends AnyFunSuite, BASILTest {
 
   private val testPath = "./src/test/"
 
-  def runTests(folder: String, conf: TestConfig): Unit = {
+  def runTests(folder: String, conf: TestConfig, name: String = ""): Unit = {
     val path = testPath + folder
     val programs = getSubdirectories(path)
 
@@ -44,7 +44,7 @@ trait SystemTests extends AnyFunSuite, BASILTest {
         val variationPath = programPath + "/" + t + "/" + p
         val inputPath = if conf.useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
         if (File(inputPath).exists) {
-          test(folder + "/" + p + "/" + t + testSuffix) {
+          test(name + folder + "/" + p + "/" + t + testSuffix) {
             runTest(path, p, t, conf)
           }
         }
@@ -144,55 +144,56 @@ trait SystemTests extends AnyFunSuite, BASILTest {
     val translateTime = timer.checkPoint("translate-boogie")
     Logger.info(s"$name/$variation$testSuffix DONE")
 
-    val boogieResult = runBoogie(directoryPath, BPLPath, conf.boogieFlags)
-    val verifyTime = timer.checkPoint("verify")
-    val (boogieFailureMsg, verified, timedOut) = checkVerify(boogieResult, resultPath, conf.expectVerify)
+    if (conf.checkVerify) {
+      val boogieResult = runBoogie(directoryPath, BPLPath, conf.boogieFlags)
+      val verifyTime = timer.checkPoint("verify")
+      val (boogieFailureMsg, verified, timedOut) = checkVerify(boogieResult, resultPath, conf.expectVerify)
+
+      def parseError(e: String, context: Int =3) = {
+        val lines = e.split('\n')
+        for (l <- lines) {
+          if (l.endsWith(": Error: this assertion could not be proved") || l.contains("this is the postcondition that could not be proved"))  {
+            val b = l.trim()
+            val parts = b.split("\\(").map(_.split("\\)")).flatten.map(_.split(",")).flatten
+            val fname = parts(0)
+            val line = Integer(parts(1))
+            val col = parts(2)
+
+            val lines = util.readFormFile(fname).toArray
+
+            val lineOffset = line - 1
+
+            val beginLine = Integer.max(0, lineOffset - context)
+            val endLine = Integer.min(lines.length, lineOffset + context)
+
+            val errorLines = (beginLine to endLine).map(x => {
+              val carat = if x == lineOffset then " > " else "   "
+              s"$carat ${x + 1} | ${lines(x)}"
+            })
+
+            info(s"Failing assertion $fname:$line")
+            info(errorLines.mkString("\n").trim)
 
 
-    def parseError(e: String, context: Int =3) = {
-      val lines = e.split('\n')
-      for (l <- lines) {
-        if (l.endsWith(": Error: this assertion could not be proved") || l.contains("this is the postcondition that could not be proved"))  {
-          val b = l.trim()
-          val parts = b.split("\\(").map(_.split("\\)")).flatten.map(_.split(",")).flatten
-          val fname = parts(0)
-          val line = Integer(parts(1))
-          val col = parts(2)
-
-          val lines = util.readFormFile(fname).toArray
-
-          val lineOffset = line - 1
-
-          val beginLine = Integer.max(0, lineOffset - context)
-          val endLine = Integer.min(lines.length, lineOffset + context)
-
-          val errorLines = (beginLine to endLine).map(x => {
-            val carat = if x == lineOffset then " > " else "   "
-            s"$carat ${x + 1} | ${lines(x)}"
-          })
-
-          info(s"Failing assertion $fname:$line")
-          info(errorLines.mkString("\n").trim)
-
-
+          }
         }
       }
-    }
 
-    if (conf.expectVerify) parseError(boogieResult)
+      if (conf.expectVerify) parseError(boogieResult)
 
-    val (hasExpected, matchesExpected) = if (conf.checkExpected) {
-      checkExpected(expectedOutPath, BPLPath)
-    } else {
-      (false, false)
-    }
+      val (hasExpected, matchesExpected) = if (conf.checkExpected) {
+        checkExpected(expectedOutPath, BPLPath)
+      } else {
+        (false, false)
+      }
 
-    val passed = boogieFailureMsg.isEmpty
-    if (conf.logResults) {
-      val result = TestResult(s"$name/$variation$testSuffix", passed, verified, conf.expectVerify, hasExpected, timedOut, matchesExpected, translateTime, verifyTime)
-      testResults.append(result)
+      val passed = boogieFailureMsg.isEmpty
+      if (conf.logResults) {
+        val result = TestResult(s"$name/$variation$testSuffix", passed, verified, conf.expectVerify, hasExpected, timedOut, matchesExpected, translateTime, verifyTime)
+        testResults.append(result)
+      }
+      if (!passed) fail(boogieFailureMsg.get)
     }
-    if (!passed) fail(boogieFailureMsg.get)
   }
 
   def checkExpected(expectedOutPath: String, BPLPath: String): (Boolean, Boolean) = {
@@ -259,8 +260,35 @@ class SimplifySystemTests extends SystemTests {
   }
 }
 
+class AnalysisRegressionTests extends SystemTests {
+  val staticAnalysisConfig = Some(StaticAnalysisConfig())
+  runTests("csmith", TestConfig(simplify=false, useBAPFrontend = true, expectVerify = true, logResults = true, staticAnalysisConfig = staticAnalysisConfig, checkVerify=false), "analyse")
+  runTests("csmith", TestConfig(simplify=false, useBAPFrontend = false, expectVerify = true, logResults = true, staticAnalysisConfig = staticAnalysisConfig, checkVerify=false), "analyse")
+  runTests("csmith", TestConfig(simplify=true, useBAPFrontend = true, expectVerify = true, logResults = true, staticAnalysisConfig = staticAnalysisConfig, checkVerify=false), "anlayse-simplify")
+  runTests("csmith", TestConfig(simplify=true, useBAPFrontend = false, expectVerify = true, logResults = true, staticAnalysisConfig = staticAnalysisConfig, checkVerify=false), "analyse-simplify")
+}
+
+
+class AnalysisRegressionTestsSimplifierOnly extends SystemTests {
+  val staticAnalysisConfig = Some(StaticAnalysisConfig())
+  runTests("csmith", TestConfig(simplify=true, useBAPFrontend = true, expectVerify = true, logResults = true, staticAnalysisConfig = None, checkVerify=false), "simplify")
+  runTests("csmith", TestConfig(simplify=true, useBAPFrontend = false, expectVerify = true, logResults = true, staticAnalysisConfig = None, checkVerify=false), "simplify")
+}
+
+
+class AnalysisRegressionTestsLoopy extends SystemTests {
+  val staticAnalysisConfig = Some(StaticAnalysisConfig())
+  runTests("loopy", TestConfig(simplify=true, useBAPFrontend = true, expectVerify = true, logResults = true, staticAnalysisConfig = None, checkVerify=false), "simplify")
+  runTests("loopy", TestConfig(simplify=true, useBAPFrontend = false, expectVerify = true, logResults = true, staticAnalysisConfig = None, checkVerify=false), "simplify")
+  runTests("loopy", TestConfig(simplify=false, useBAPFrontend = true, expectVerify = true, logResults = true, staticAnalysisConfig = staticAnalysisConfig, checkVerify=false), "analyse")
+  runTests("loopy", TestConfig(simplify=false, useBAPFrontend = false, expectVerify = true, logResults = true, staticAnalysisConfig = staticAnalysisConfig, checkVerify=false), "analyse")
+  runTests("loopy", TestConfig(simplify=true, useBAPFrontend = true, expectVerify = true, logResults = true, staticAnalysisConfig = staticAnalysisConfig, checkVerify=false), "anlayse-simplify")
+  runTests("loopy", TestConfig(simplify=true, useBAPFrontend = false, expectVerify = true, logResults = true, staticAnalysisConfig = staticAnalysisConfig, checkVerify=false), "analyse-simplify")
+}
+
+
+
 class SimplifyMemorySystemTests extends SystemTests {
-  Logger.setLevel(LogLevel.DEBUG)
   val staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA))
   runTests("correct", TestConfig(simplify=true, useBAPFrontend = true, expectVerify = true, logResults = true, staticAnalysisConfig = staticAnalysisConfig))
   runTests("incorrect", TestConfig(simplify=true, useBAPFrontend = true, expectVerify = false, logResults = true, staticAnalysisConfig = staticAnalysisConfig))

@@ -12,6 +12,7 @@ case class TestConfig(boogieFlags: Seq[String] = Seq("/timeLimit:10", "/useArray
                       staticAnalysisConfig: Option[StaticAnalysisConfig] = None,
                       useBAPFrontend: Boolean,
                       expectVerify: Boolean,
+                      checkVerify: Boolean = true,
                       checkExpected: Boolean = false,
                       logResults: Boolean = false,
                       simplify: Boolean = false,

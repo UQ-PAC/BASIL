@@ -1,12 +1,19 @@
 TARGETSS := all verify clean cleanall cleanlift recompile json cleanjson cleangts gts
 
-SUBTARGETS = $(wildcard correct/*/ incorrect/*/)
-.PHONY : $(TARGETSS) $(SUBTARGETS) correct incorrect
+DIRS := correct incorrect analysis-regression 
 
-$(TARGETSS): $(SUBTARGETS)
 
-correct: $(realpath $(wildcard correct/*))
-incorrect: $(realpath $(wildcard incorrect/*))
+$(foreach d, $(DIRS), \
+  $(if $(wildcard $(d)/.), \
+    , \
+    $(error user error: directory "$(d)" in DIRS variable does not exist)))
 
-$(SUBTARGETS):
-	-$(MAKE) -C $@ -f $(realpath ./make/lift-directories.mk) $(MAKECMDGOALS)
+
+SUBDIRS = $(wildcard $(addsuffix /*/,$(DIRS)))
+.PHONY : $(TARGETSS) $(SUBDIRS) $(DIRS)
+
+$(TARGETSS): $(SUBDIRS)
+
+$(SUBDIRS):
+	$(MAKE) -C $@ -f $(realpath ./make/lift-directories.mk) $(MAKECMDGOALS)
+
