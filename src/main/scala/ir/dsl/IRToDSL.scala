@@ -147,10 +147,26 @@ given ToScala[Command] with
 
 // end generated
 
+// generated from irtype.json
+given ToScala[IRType] with
+  def toScala(x: IRType): String = x match {
+    case x: BoolType.type => s"BoolType"
+    case x: IntType.type => s"IntType"
+    case x: BitVecType => s"BitVecType(${summon[ToScala[Int]].toScala(x.size)})"
+    case x: MapType => s"MapType(${summon[ToScala[IRType]].toScala(x.param)}, ${summon[ToScala[IRType]].toScala(x.result)})"
+  }
+
+// end generated
+
+
 given ToScala[Return] with
   def toScala(x: Return): String = "ret"
 given ToScala[DirectCall] with
   def toScala(x: DirectCall): String = s"directCall(\"${x.target.procName}\")"
+given ToScala[IndirectCall] with
+  def toScala(x: IndirectCall): String =
+    val v = summon[ToScala[Variable]]
+    s"indirectCall(${v.toScala(x.target)})"
 given ToScala[GoTo] with
   def toScala(x: GoTo): String = s"goto(${x.targets.map(x => StringEscape.quote(x.label)).mkString(", ")})"
 
@@ -158,12 +174,12 @@ given ToScala[Block] with
   def toScala(x: Block): String =
     val s = summon[ToScala[Statement]]
     val commands = x.statements ++ Seq(x.jump)
-    s"block(${StringEscape.quote(x.label)},\n    " + (commands.map(s.toScala).mkString(",\n    ")) + ")"
+    s"block(${StringEscape.quote(x.label)},\n    " + (commands.map(s.toScala).mkString(",\n    ")) + "\n  )"
 
 given ToScala[Procedure] with
   def toScala(x: Procedure): String =
     val b = summon[ToScala[Block]]
-    s"proc(${StringEscape.quote(x.procName)},\n  " + (x.blocks.map(b.toScala).mkString(",\n  ")) + ")"
+    s"proc(${StringEscape.quote(x.procName)},\n  " + (x.blocks.map(b.toScala).mkString(",\n  ")) + "\n)"
 
 given ToScala[String] with
   def toScala(x: String): String = StringEscape.quote(x)
@@ -176,8 +192,6 @@ given ToScala[Boolean] with
 given ToScala[BigInt] with
   def toScala(x: BigInt): String = s"BigInt(\"$x\")"
 
-given ToScala[IRType] with
-  def toScala(x: IRType): String = ???
 
 given [T](using t: ToScala[T]): ToScala[Seq[T]] with
   def toScala(x: Seq[T]): String = x match
