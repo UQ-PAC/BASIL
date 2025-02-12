@@ -80,6 +80,7 @@ class BoundedDisjunctiveCompletion[L](d: AbstractDomain[L], bound: Int) extends 
   def join(a: Set[L], b: Set[L], pos: Block): Set[L] =
     bound(if a.contains(d.top) || b.contains(d.top) then top else a.union(b), pos)
 
+  // TODO Widening!
   override def widen(a: Set[L], b: Set[L], pos: Block): Set[L] = ???
   override def narrow(a: Set[L], b: Set[L]): Set[L] = ???
   def transfer(a: Set[L], b: Command): Set[L] = a.map(l => d.transfer(l, b))

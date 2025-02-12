@@ -49,17 +49,44 @@ enum BVTerm {
   }
 
   /**
+   * Return the number of bits in this bitvector
+   */
+  def size: Int = this match {
+    case Lit(x) => x.size
+    case Var(v) => ir.size(v).get
+    case OldVar(v) => ir.size(v).get
+    case Uop(op, x) => x.size
+    case Bop(op, x, y) =>
+      assert(x.size == y.size)
+      x.size
+    case Extract(end, start, body) => end - start
+    case Repeat(repeats, body) => body.size * repeats
+    case ZeroExtend(extension, body) => body.size + extension
+    case SignExtend(extension, body) => body.size + extension
+  }
+
+  /**
    */
   def simplify: BVTerm = {
+    import eval.BitVectorEval.*
     if this.simplified then return this
     val ret = this match {
       // TODO const prop
-      //case Uop(op, x) => Uop(op, x.simplify)
-      //case Bop(op, x, y) => Bop(op, x.simplify, y.simplify)
-      //case Extract(end, start, body) => Extract(end, start, body.simplify)
-      //case Repeat(repeats, body) => Repeat(repeats, body.simplify)
-      //case ZeroExtend(extension, body) => ZeroExtend(extension, body.simplify)
-      //case SignExtend(extension, body) => SignExtend(extension, body.simplify)
+      case Uop(op, x) => (op, x.simplify) match {
+        case (BVNEG, Lit(x)) => Lit(smt_bvneg(x))
+        case (BVNOT, Lit(x)) => Lit(smt_bvnot(x))
+        case (op, x) => Uop(op, x)
+      }
+      case Bop(op, x, y) => (op, x.simplify, y.simplify) match {
+        case (BVADD, x, Lit(BitVecLiteral(0, _))) => x
+        case (BVADD, Lit(BitVecLiteral(0, _)), y) => y
+        case (op, Lit(a), Lit(b)) => Lit(eval.evalBVBinExpr(op, a, b))
+        case (op, x, y) => Bop(op, x, y)
+      }
+      case Extract(end, start, body) => Extract(end, start, body.simplify)
+      case Repeat(repeats, body) => Repeat(repeats, body.simplify)
+      case ZeroExtend(extension, body) => ZeroExtend(extension, body.simplify)
+      case SignExtend(extension, body) => SignExtend(extension, body.simplify)
       case _ => this
     }
     ret.simplified = true
@@ -433,16 +460,40 @@ enum Predicate {
         while (changed) {
           changed = false
 
+          // There's some nondeterminism here because we may iterate over hashsets
+
+          var disjs = Set[Disj]()
+
+          for p <- cur if disjs.size < 2 do {
+            p match {
+              case p: Disj => disjs = disjs + p
+              case _ => {}
+            }
+          }
+          if disjs.size >= 2 then {
+            assert(disjs.size == 2)
+
+            val l = disjs.toList
+            val a = l(0).s
+            val b = l(1).s
+
+            if a.intersect(b).nonEmpty then cur = cur - Disj(a) - Disj(b) + or(Disj(a.intersect(b)), and(Disj(a.diff(b)), Disj(b.diff(a)))).simplify
+          }
+
           for p <- cur if !changed do {
             val cur1 = p match {
               case Lit(TrueLiteral) => cur - p
               case Lit(FalseLiteral) => Set(Lit(FalseLiteral))
               case Conj(s2) => cur - p ++ s2
-              case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSLE, b, a)) => cur - p - BVCmp(BVSLE, b, a) + BVCmp(BVEQ, a, b)
-              case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSGE, a, b)) => cur - p - BVCmp(BVSGE, a, b) + BVCmp(BVEQ, a, b)
-              case BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVULE, b, a)) => cur - p - BVCmp(BVULE, b, a) + BVCmp(BVEQ, a, b)
-              case BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVUGE, a, b)) => cur - p - BVCmp(BVUGE, a, b) + BVCmp(BVEQ, a, b)
-              case GammaCmp(BoolIMPLIES, a, b) if cur.contains(GammaCmp(BoolIMPLIES, b, a)) => cur - p - GammaCmp(BoolIMPLIES, b, a) + GammaCmp(BoolEQ, a, b)
+              case Not(p) if cur.contains(p) => cur - p - Not(p) + False
+              case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSLE, b, a)) => cur - p - BVCmp(BVSLE, b, a) + BVCmp(BVEQ, a, b).simplify
+              case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSGE, a, b)) => cur - p - BVCmp(BVSGE, a, b) + BVCmp(BVEQ, a, b).simplify
+              case BVCmp(BVSGE, a, b) if cur.contains(BVCmp(BVSGE, b, a)) => cur - p - BVCmp(BVSGE, b, a) + BVCmp(BVEQ, a, b).simplify
+              case BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVULE, b, a)) => cur - p - BVCmp(BVULE, b, a) + BVCmp(BVEQ, a, b).simplify
+              case BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVUGE, a, b)) => cur - p - BVCmp(BVUGE, a, b) + BVCmp(BVEQ, a, b).simplify
+              case BVCmp(BVUGE, a, b) if cur.contains(BVCmp(BVUGE, b, a)) => cur - p - BVCmp(BVUGE, b, a) + BVCmp(BVEQ, a, b).simplify
+              case GammaCmp(BoolIMPLIES, a, b) if cur.contains(GammaCmp(BoolIMPLIES, b, a)) => cur - p - GammaCmp(BoolIMPLIES, b, a) + GammaCmp(BoolEQ, a, b).simplify
+              case Disj(s2) if s.intersect(s2).nonEmpty => cur - p
               case _ => cur
             }
             changed = cur != cur1
@@ -457,11 +508,58 @@ enum Predicate {
         while (changed) {
           changed = false
 
+          // There's some nondeterminism here because we may iterate over hashsets
+
+          var conjs = Set[Conj]()
+
+          for p <- cur if conjs.size < 2 do {
+            p match {
+              case p: Conj => conjs = conjs + p
+              case _ => {}
+            }
+          }
+          if conjs.size >= 2 then {
+            assert(conjs.size == 2)
+
+            val l = conjs.toList
+            val a = l(0).s
+            val b = l(1).s
+
+            if a.intersect(b).nonEmpty then cur = cur - Conj(a) - Conj(b) + and(Conj(a.intersect(b)), or(Conj(a.diff(b)), Conj(b.diff(a)))).simplify
+          }
+
           for p <- cur if !changed do {
             val cur1 = p match {
               case Disj(s2) => cur - p ++ s2
               case Lit(TrueLiteral) => Set(True)
               case Lit(FalseLiteral) => cur - p
+              case Not(p) if cur.contains(p) => cur - p - Not(p) + True
+              case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSLE, b, a)) => cur - p - BVCmp(BVSLE, b, a) + True
+              case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSGE, a, b)) => cur - p - BVCmp(BVSGE, a, b) + True
+              case BVCmp(BVSGE, a, b) if cur.contains(BVCmp(BVSGE, b, a)) => cur - p - BVCmp(BVSGE, b, a) + True
+              case BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVULE, b, a)) => cur - p - BVCmp(BVULE, b, a) + True
+              case BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVUGE, a, b)) => cur - p - BVCmp(BVUGE, a, b) + True
+              case BVCmp(BVUGE, a, b) if cur.contains(BVCmp(BVUGE, b, a)) => cur - p - BVCmp(BVUGE, b, a) + True
+
+              case BVCmp(BVSLT, a, b) if cur.contains(BVCmp(BVSLE, b, a)) => cur - p - BVCmp(BVSLE, b, a) + True
+              case BVCmp(BVSLT, a, b) if cur.contains(BVCmp(BVSGE, a, b)) => cur - p - BVCmp(BVSGE, a, b) + True
+              case BVCmp(BVSGT, a, b) if cur.contains(BVCmp(BVSGE, b, a)) => cur - p - BVCmp(BVSGE, b, a) + True
+              case BVCmp(BVSGT, a, b) if cur.contains(BVCmp(BVSLE, a, b)) => cur - p - BVCmp(BVSLE, a, b) + True
+              case BVCmp(BVULT, a, b) if cur.contains(BVCmp(BVULE, b, a)) => cur - p - BVCmp(BVULE, b, a) + True
+              case BVCmp(BVULT, a, b) if cur.contains(BVCmp(BVUGE, a, b)) => cur - p - BVCmp(BVUGE, a, b) + True
+              case BVCmp(BVUGT, a, b) if cur.contains(BVCmp(BVUGE, b, a)) => cur - p - BVCmp(BVUGE, b, a) + True
+              case BVCmp(BVUGT, a, b) if cur.contains(BVCmp(BVULE, a, b)) => cur - p - BVCmp(BVULE, a, b) + True
+
+              case BVCmp(BVSLT, a, b) if cur.contains(BVCmp(BVEQ, a, b)) => cur - p - BVCmp(BVEQ, a, b) + BVCmp(BVSLE, a, b).simplify
+              case BVCmp(BVSLT, a, b) if cur.contains(BVCmp(BVEQ, b, a)) => cur - p - BVCmp(BVEQ, b, a) + BVCmp(BVSLE, a, b).simplify
+              case BVCmp(BVSGT, a, b) if cur.contains(BVCmp(BVEQ, a, b)) => cur - p - BVCmp(BVEQ, a, b) + BVCmp(BVSGE, a, b).simplify
+              case BVCmp(BVSGT, a, b) if cur.contains(BVCmp(BVEQ, b, a)) => cur - p - BVCmp(BVEQ, b, a) + BVCmp(BVSGE, a, b).simplify
+              case BVCmp(BVULT, a, b) if cur.contains(BVCmp(BVEQ, a, b)) => cur - p - BVCmp(BVEQ, a, b) + BVCmp(BVULE, a, b).simplify
+              case BVCmp(BVULT, a, b) if cur.contains(BVCmp(BVEQ, b, a)) => cur - p - BVCmp(BVEQ, b, a) + BVCmp(BVULE, a, b).simplify
+              case BVCmp(BVUGT, a, b) if cur.contains(BVCmp(BVEQ, a, b)) => cur - p - BVCmp(BVEQ, a, b) + BVCmp(BVUGE, a, b).simplify
+              case BVCmp(BVUGT, a, b) if cur.contains(BVCmp(BVEQ, b, a)) => cur - p - BVCmp(BVEQ, b, a) + BVCmp(BVUGE, a, b).simplify
+
+              case Conj(s2) if s.intersect(s2).nonEmpty => cur - p
               case _ => cur
             }
             changed = cur != cur1
@@ -471,7 +569,12 @@ enum Predicate {
         if cur.size == 1 then cur.head else Disj(cur)
       }
       case BVCmp(op, a, b) =>
+        import eval.evalBVLogBinExpr
+        import BVTerm.*
         (op, a.simplify, b.simplify) match {
+          case (op, BVTerm.Lit(a), BVTerm.Lit(b)) => if evalBVLogBinExpr(op, a, b) then True else False
+          case (BVEQ, a, b) if a == b => True
+          case (BVEQ, a, Uop(BVNEG, b)) => BVCmp(BVEQ, Bop(BVADD, a, b), BVTerm.Lit(BitVecLiteral(0, a.size))).simplify
           case (op, a, b) => BVCmp(op, a, b)
         }
       case GammaCmp(op, a, b) =>

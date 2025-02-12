@@ -138,9 +138,11 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
     val wpDomain = PredicateDomain(map)
     val (wpDomainResults, _) = worklistSolver(wpDomain).solveProc(procedure, true)
 
-    val wpThing = procedure.entryBlock.flatMap(b => wpDomainResults.get(b))
+    val wp = procedure.entryBlock.flatMap(b => wpDomainResults.get(b)).toList.flatMap(p =>
+        p.simplify.split
+      )
 
-    val requires = (curRequires ++ mustGammasWithConditions ++ wpThing).filter(_ != TrueBLiteral).distinct
+    val requires = (curRequires ++ mustGammasWithConditions ++ wp).filter(_ != TrueBLiteral).distinct
 
     /* Forwards variable dependency
      *
