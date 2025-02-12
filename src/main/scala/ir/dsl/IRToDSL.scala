@@ -8,11 +8,10 @@ import collection.mutable
 import collection.mutable.{LinkedHashSet}
 
 trait ToScala[-T]:
-  def convertToScala(x: T): String = x.toScala
-  extension (x: T)
-    def toScala: String
+  extension (x: T) def toScala: String
 
-    // generated from ./expr.json
+
+// generated from ./expr.json
 given ToScala[Expr] with
   extension (x: Expr) def toScala: String = x match {
     case x: Literal => x match {
@@ -128,21 +127,21 @@ given ToScala[Command] with
           case x: LocalAssign => s"LocalAssign(${x.lhs.toScala}, ${x.rhs.toScala}, ${x.label.toScala})"
           case x: MemoryLoad => s"MemoryLoad(${x.lhs.toScala}, ${x.mem.toScala}, ${x.index.toScala}, ${x.endian.toScala}, ${x.size.toScala}, ${x.label.toScala})"
         }
-        case x: DirectCall => x.toScala
+        case x: DirectCall => summon[ToScala[DirectCall]].toScala(x)
       }
       case x: MemoryStore => s"MemoryStore(${x.mem.toScala}, ${x.index.toScala}, ${x.value.toScala}, ${x.endian.toScala}, ${x.size.toScala}, ${x.label.toScala})"
       case x: NOP => s"NOP(${x.label.toScala})"
       case x: Assert => s"Assert(${x.body.toScala}, ${x.comment.toScala}, ${x.label.toScala})"
       case x: Assume => s"Assume(${x.body.toScala}, ${x.comment.toScala}, ${x.label.toScala}, ${x.checkSecurity.toScala})"
       case x: Call => x match {
-        case x: DirectCall => x.toScala
-        case x: IndirectCall => x.toScala
+        case x: DirectCall => summon[ToScala[DirectCall]].toScala(x)
+        case x: IndirectCall => summon[ToScala[IndirectCall]].toScala(x)
       }
     }
     case x: Jump => x match {
       case x: Unreachable => s"Unreachable(${x.label.toScala})"
-      case x: Return => x.toScala
-      case x: GoTo => x.toScala
+      case x: Return => summon[ToScala[Return]].toScala(x)
+      case x: GoTo => summon[ToScala[GoTo]].toScala(x)
     }
   }
 
@@ -161,15 +160,13 @@ given ToScala[IRType] with
 
 // end generated from ./irtype.json
 
+
 given ToScala[Return] with
   extension (x: Return) def toScala: String = "ret"
 given ToScala[DirectCall] with
-  extension (x: DirectCall) def toScala: String =
-    val str = summon[ToScala[String]]
-    s"directCall(${x.target.procName.toScala}\")"
+  extension (x: DirectCall) def toScala: String = s"directCall(${x.target.procName.toScala})"
 given ToScala[IndirectCall] with
-  extension (x: IndirectCall) def toScala: String =
-    s"indirectCall(${x.target.toScala})"
+  extension (x: IndirectCall) def toScala: String = s"indirectCall(${x.target.toScala})"
 given ToScala[GoTo] with
   extension (x: GoTo) def toScala: String = s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})"
 
@@ -195,7 +192,7 @@ given ToScala[Int] with
 given ToScala[Boolean] with
   extension (x: Boolean) def toScala: String = x.toString()
 given ToScala[BigInt] with
-  extension (x: BigInt) def toScala: String = s"BigInt(\"$x\")"
+  extension (x: BigInt) def toScala: String = s"BigInt(${x.toString.toScala})"
 
 
 given [T](using ToScala[T]): ToScala[Seq[T]] with
@@ -205,9 +202,8 @@ given [T](using ToScala[T]): ToScala[Seq[T]] with
     case _ => s"Seq(${x.map(_.toScala).mkString(", ")})"
 
 given [T](using ToScala[T]): ToScala[LinkedHashSet[T]] with
-  extension (x: LinkedHashSet[T]) def toScala: String = x match
-    case Seq() => "LinkedHashSet()"
-    case _ => s"LinkedHashSet(${x.map(_.toScala).mkString(", ")})"
+  extension (x: LinkedHashSet[T]) def toScala: String =
+    s"LinkedHashSet(${x.map(_.toScala).mkString(", ")})"
 
 
 given [T](using ToScala[T]): ToScala[Option[T]] with

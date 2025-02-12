@@ -44,11 +44,11 @@ class DSLExportTest extends AnyFunSuite {
         block("first_call",
           LocalAssign(Register("R0", 64), BitVecLiteral(BigInt("1"), 64), None),
           LocalAssign(Register("R1", 64), BitVecLiteral(BigInt("1"), 64), None),
-          directCall("callee1""),
+          directCall("callee1"),
           goto("second_call")
         ),
         block("second_call",
-          directCall("callee2""),
+          directCall("callee2"),
           goto("returnBlock")
         ),
         block("returnBlock",

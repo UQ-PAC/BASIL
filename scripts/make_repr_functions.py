@@ -90,7 +90,7 @@ def make_repr_match_case(d: Hierarchy | Decl):
   # print(d.args)
   if isinstance(d, Decl):
     if d.valname in BANNED:
-      yield f'x.toScala\n'
+      yield f'summon[ToScala[{d.tyname}]].toScala(x)\n'
       return
 
     if d.args is not None:
@@ -111,7 +111,7 @@ def make_repr_match_case(d: Hierarchy | Decl):
 def make_repr_given(h: Hierarchy):
   for k, x in h.items():
     yield f'given ToScala[{k}] with\n'
-    yield f'  extension (x: {k}) def toScala(): String = '
+    yield f'  extension (x: {k}) def toScala: String = '
     yield from indent(make_repr_match_case(x))
     yield '\n'
 
