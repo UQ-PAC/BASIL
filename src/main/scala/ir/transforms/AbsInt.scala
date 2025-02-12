@@ -14,8 +14,19 @@ import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
 import ExecutionContext.Implicits.global
 
+/**********************************************************************************
+ * Block-level abstract interpreter framework.
+ *********************************************************************************/
 
 
+/**
+ * The abstract domain used for an analysis. 
+ *
+ * @tparam Location: a code location (e.g. [[Block]])
+ * @tparam Code : A program command transfer is defined for (e.g. [[Command]])
+ * @tparam L : The lattice value type for the analysis
+ *
+ */
 trait GenericAbstractDomain[Location, Code, L] {
   def join(a: L, b: L, pos: Location): L
   def widen(a: L, b: L, pos: Location): L = join(a, b, pos) /* not used */
@@ -30,6 +41,9 @@ trait GenericAbstractDomain[Location, Code, L] {
 }
 
 
+/**
+ * An abstract domain for a block-level analysis. Use with [[worklistSolver]].
+ */
 trait AbstractDomain[L] extends GenericAbstractDomain[Block, Command, L] {
   def transferBlockFwd(a: L, b: Block): L = {
     transfer(b.statements.foldLeft(a)(transfer), b.jump)
@@ -46,6 +60,20 @@ trait PowerSetDomain[T] extends AbstractDomain[Set[T]] {
   def join(a: Set[T], b: Set[T], pos: Block) = a.union(b)
 }
 
+/**
+ * A solver which solve for a single global lattice value across a procedrure. 
+ * This traverses blocks in reverse-post-order.
+ *
+ * This expects blocks [[rpoOrder()]] to have been run on the blocks in the procedure.
+ *
+ * E.g. used for flow-insensitive analyses. 
+ *
+ * @tparam L : the lattice value type
+ * @tparam D : The analysis abstract domain defining operations over L
+ *
+ * @param initial: the initial set of blocks to add to the worklist
+ * @param domain: the instance of D providing an implementation of the abstract domain
+ */
 def onePassForwardGlobalStateSolver[L, D <: AbstractDomain[L]](initial: Iterable[Block], domain: D) = {
   val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
   worklist.addAll(initial)
@@ -91,13 +119,35 @@ trait ProcedureSummaryGenerator[L, LocalDomain] extends ProcAbstractDomain[L] {
 }
 
 
-
+/**
+ * Intraprocedural worklist solver.
+ *
+ * Traverses blocks in reverse-post-order so requires [[rpoOrder()]] to have been run on the procedure.
+ *
+ * @tparam L: the lattice value type
+ * @tparam A: The abstract domain defining the analysis using lattice value [[L]]
+ * @param domain: The abstract domain implementing the analysis
+ *
+ */
 class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
 
+  /**
+   * Perform the analysis on a procedure and return the resulting lattice values for each block.
+   *
+   * @param p the procedure to analyse
+   * @param backwards should the analysis be run backwards
+   * @returns (block -> lattice value at start of block, block -> lattice value at end of block)
+   */
   def solveProc(p: Procedure, backwards: Boolean = false) : (Map[Block, L], Map[Block, L]) = {
     solve(p.blocks, backwards)
   }
 
+  /**
+   * Apply the [[solveProc]] to every procedure in the program and flatten the result into one map.
+   *
+   * @param p the procedure to analyse
+   * @returns (block -> lattice value at start of block, block -> lattice value at end of block)
+   */
   def solveProgIntraProc(p: Program, backwards: Boolean = false): (Map[Block, L], Map[Block, L]) = {
     def foldfun(acc: (Map[Block, L], Map[Block, L]), l: (Map[Block, L], Map[Block, L])) = {
         val (accl, accr) = acc
@@ -181,6 +231,24 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
 
 
 
+/**
+ * Perform an interprocedural analysis by running an intraprocedural analysis on each procedure,
+ * computing a summary based on the result, and computing the fixed point of summaries over 
+ * the call graph.
+ *
+ * Recommended to call [[Procedure.sortProceduresRPO]] before using this so that we traverse
+ * the call graph in reverse-post-order.
+ *
+ * @tparam SummaryAbsVal The lattice value type representing summaries of a procedure
+ * @tparam LocalAbsVal The lattice value type for the intraprocedural analysis of each block
+ * @tparam A The abstract domain type implemmenting the intraprocedural analysis of each procedure
+ * @param localDomain The abstract domain implementing the intraprocedural analysis of procedures
+ * @param sg The ProcedureSummaryGenerator defining the analysis of a procedure using summaries.
+ *
+ *  This internally creates a new abstract domain that overrides transfer of [[DirectCall]] in [[localDomain]]
+ *  with the transfer function defined in [[sg]] which utilises procedure summaries.
+ *
+ */
 class interprocSummaryFixpointSolver[SummaryAbsVal, LocalAbsVal, 
   A <: AbstractDomain[LocalAbsVal]](localDomain : A, 
     sg: ProcedureSummaryGenerator[SummaryAbsVal, LocalAbsVal]) {
@@ -210,6 +278,14 @@ class interprocSummaryFixpointSolver[SummaryAbsVal, LocalAbsVal,
   }
 }
 
+/**
+ * Worklist solver which performs a fixed point over the call graph. 
+ *
+ * @tparam L the lattice value type
+ * @param transferProcedure defines the analysis of a single procedure (akin to a transfer function)
+ * @param init function defining the initial lattice value for a procedure
+ * 
+ */
 class BottomUpCallgraphWorklistSolver[L](transferProcedure: (Procedure => L, L, Procedure) => L, init: Procedure => L)  {
 
   def solve(p: Program) = {
