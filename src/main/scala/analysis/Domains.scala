@@ -35,6 +35,7 @@ class PredProductDomain[L1, L2](d1: PredicateEncodingDomain[L1], d2: PredicateEn
   override def fromPred(p: Predicate): (L1, L2) = (d1.fromPred(p), d2.fromPred(p))
 }
 
+import collection.mutable
 /**
  * This domain stores as abstract values, sets of abstract values in the provided abstract domain.
  * A set of values represents the disjunction of the values in the set. For example, if S = {a, b, c},
@@ -43,10 +44,22 @@ class PredProductDomain[L1, L2](d1: PredicateEncodingDomain[L1], d2: PredicateEn
  * join exact.
  */
 class DisjunctiveCompletion[L](d: AbstractDomain[L]) extends AbstractDomain[Set[L]] {
-  def join(a: Set[L], b: Set[L], pos: Block): Set[L] =
-    if a.contains(d.top) || b.contains(d.top) then top else a.union(b)
+  def collapse(a: Set[L], pos: Block): Set[L] = Set(a.foldLeft(d.bot) { (a, b) => d.join(a, b, pos) })
 
-  override def widen(a: Set[L], b: Set[L], pos: Block): Set[L] = ???
+  private var joinCount: mutable.HashMap[Block, Int] = mutable.HashMap()
+
+  def join(a: Set[L], b: Set[L], pos: Block): Set[L] =
+    joinCount += pos -> (joinCount.getOrElse(pos, 0) + 1)
+    if a.contains(d.top) || b.contains(d.top) then top else {
+      // TODO this is manual widening, maybe widening should be added to the solver instead
+      if pos.isLoopHeader() || joinCount(pos) > 20 then widen(a, b, pos) else a.union(b)
+    }
+
+  override def widen(a: Set[L], b: Set[L], pos: Block): Set[L] =
+    for {
+      a2 <- collapse(a, pos)
+      b2 <- collapse(b, pos)
+    } yield d.widen(a2, b2, pos)
   override def narrow(a: Set[L], b: Set[L]): Set[L] = ???
   def transfer(a: Set[L], b: Command): Set[L] = a.map(l => d.transfer(l, b))
   override def init(b: Block): Set[L] = Set(d.init(b))
@@ -74,14 +87,27 @@ class PredDisjunctiveCompletion[L](d: PredicateEncodingDomain[L]) extends Disjun
 class BoundedDisjunctiveCompletion[L](d: AbstractDomain[L], bound: Int) extends AbstractDomain[Set[L]] {
   assert(bound > 0)
 
+  def collapse(a: Set[L], pos: Block): Set[L] = Set(a.foldLeft(d.bot) { (a, b) => d.join(a, b, pos) })
+
   def bound(a: Set[L], pos: Block): Set[L] =
-    if a.size > bound then Set(a.foldLeft(d.bot) { (a, b) => d.join(a, b, pos) }) else a
+    if a.size > bound then collapse(a, pos) else a
 
-  def join(a: Set[L], b: Set[L], pos: Block): Set[L] =
-    bound(if a.contains(d.top) || b.contains(d.top) then top else a.union(b), pos)
+  private var joinCount: mutable.Map[Block, Int] = mutable.Map()
 
-  // TODO Widening!
-  override def widen(a: Set[L], b: Set[L], pos: Block): Set[L] = ???
+  def join(a: Set[L], b: Set[L], pos: Block): Set[L] = 
+    joinCount += pos -> (joinCount.getOrElse(pos, 0) + 1)
+    bound(if a.contains(d.top) || b.contains(d.top) then top else {
+      // TODO this is manual widening, maybe widening should be added to the solver instead
+      if pos.isLoopHeader() || joinCount(pos) > 20 then widen(a, b, pos) else a.union(b)
+    }, pos)
+
+  override def widen(a: Set[L], b: Set[L], pos: Block): Set[L] =
+    println("Widened!")
+    for {
+      a2 <- collapse(a, pos)
+      b2 <- collapse(b, pos)
+    } yield d.widen(a2, b2, pos)
+
   override def narrow(a: Set[L], b: Set[L]): Set[L] = ???
   def transfer(a: Set[L], b: Command): Set[L] = a.map(l => d.transfer(l, b))
   override def init(b: Block): Set[L] = Set(d.init(b))

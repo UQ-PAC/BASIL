@@ -207,21 +207,18 @@ private def latticeMapJoin[D, L](
   (a, b) match {
     case (Top(), _) => Top()
     case (Bottom(), b) => b
-    case (TopMap(a), TopMap(b)) =>
-      TopMap(a.foldLeft(b)((m, p) => {
-        val (k, v) = p
-        m + (k -> join(m.getOrElse(k, top), v))
-      }))
-    case (TopMap(a), BottomMap(b)) =>
-      TopMap(b.foldLeft(a)((m, p) => {
-        val (k, v) = p
-        m + (k -> join(m.getOrElse(k, top), v))
-      }))
-    case (BottomMap(a), BottomMap(b)) =>
-      BottomMap(a.foldLeft(b)((m, p) => {
-        val (k, v) = p
-        m + (k -> join(m.getOrElse(k, bottom), v))
-      }))
+    case (TopMap(a), TopMap(b)) => TopMap(
+      a.foldLeft(b) {
+        case (m, (k, v)) => m + (k -> join(m.getOrElse(k, top), v))
+      })
+    case (TopMap(a), BottomMap(b)) => TopMap(
+      b.foldLeft(a) {
+        case (m, (k, v)) => m + (k -> join(m.getOrElse(k, top), v))
+      })
+    case (BottomMap(a), BottomMap(b)) => BottomMap(
+      a.foldLeft(b) {
+        case (m, (k, v)) => m + (k -> join(m.getOrElse(k, bottom), v))
+      })
     case (a, b) => latticeMapJoin(b, a, join, top, bottom)
   }
 }
@@ -238,21 +235,18 @@ private def latticeMapMeet[D, L](
   (a, b) match {
     case (Top(), b) => b
     case (Bottom(), _) => Bottom()
-    case (TopMap(a), TopMap(b)) =>
-      TopMap(a.foldLeft(b)((m, p) => {
-        val (k, v) = p
-        m + (k -> meet(m.getOrElse(k, top), v))
-      }))
-    case (TopMap(a), BottomMap(b)) =>
-      BottomMap(a.foldLeft(b)((m, p) => {
-        val (k, v) = p
-        m + (k -> meet(m.getOrElse(k, bottom), v))
-      }))
-    case (BottomMap(a), BottomMap(b)) =>
-      BottomMap(a.foldLeft(b)((m, p) => {
-        val (k, v) = p
-        m + (k -> meet(m.getOrElse(k, bottom), v))
-      }))
+    case (TopMap(a), TopMap(b)) => TopMap(
+      a.foldLeft(b) {
+        case (m, (k, v)) => m + (k -> meet(m.getOrElse(k, top), v))
+      })
+    case (TopMap(a), BottomMap(b)) => BottomMap(
+      a.foldLeft(b) {
+        case (m, (k, v)) => m + (k -> meet(m.getOrElse(k, bottom), v))
+      })
+    case (BottomMap(a), BottomMap(b)) => BottomMap(
+      a.foldLeft(b) {
+        case (m, (k, v)) => m + (k -> meet(m.getOrElse(k, bottom), v))
+      })
     case (a, b) => latticeMapMeet(b, a, meet, top, bottom)
   }
 }
@@ -305,16 +299,20 @@ trait MapDomain[D, L] extends AbstractDomain[LatticeMap[D, L]] {
     (a, b) match {
       case (Bottom(), b) => b
       case (a, Bottom()) => a
-      // TODO
-      case (BottomMap(a), BottomMap(b)) => ???
-      case (BottomMap(a), TopMap(b)) => ???
-      case (BottomMap(a), Top()) => ???
-      case (TopMap(a), BottomMap(b)) => ???
-      case (TopMap(a), TopMap(b)) => ???
-      case (TopMap(a), Top()) => ???
-      case (Top(), BottomMap(b)) => ???
-      case (Top(), TopMap(b)) => ???
-      case (Top(), Top()) => ???
+      case (Top(), _) => Top()
+      case (_, Top()) => Top()
+      case (BottomMap(a), BottomMap(b)) => BottomMap(a.foldLeft(b) {
+        case (m, (b, v)) => m + (b -> widenTerm(m.getOrElse(b, botTerm), v, pos))
+      })
+      case (BottomMap(a), TopMap(b)) => TopMap(a.foldLeft(b) {
+        case (m, (b, v)) => m + (b -> widenTerm(m.getOrElse(b, botTerm), v, pos))
+      })
+      case (TopMap(a), BottomMap(b)) => TopMap(b.foldLeft(a) {
+        case (m, (a, v)) => m + (a -> widenTerm(v, m.getOrElse(a, botTerm), pos))
+      })
+      case (TopMap(a), TopMap(b)) => TopMap(a.foldLeft(b) {
+        case (m, (b, v)) => m + (b -> widenTerm(m.getOrElse(b, botTerm), v, pos))
+      })
     }
 
   def bot: LatticeMap[D, L] = Bottom()
