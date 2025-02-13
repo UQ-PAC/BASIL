@@ -1,6 +1,6 @@
 import analysis.{InterLiveVarsAnalysis, TwoElementTop}
 import ir.dsl.*
-import ir.{BitVecLiteral, BitVecType, dsl, LocalAssign, LocalVar, Program, Register, Statement, Variable, transforms, cilvisitor, Procedure, AtomicStatement}
+import ir.{BitVecLiteral, BitVecType, dsl, LocalAssign, LocalVar, Program, Register, Statement, Variable, transforms, cilvisitor, Procedure}
 import util.{Logger, LogLevel}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest
@@ -18,7 +18,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     runBASIL(inputFile, relfFile, None, outputFile, staticAnalysisConfig)
   }
 
-  def createSimpleProc(name: String, statements: Seq[AtomicStatement]): EventuallyProcedure = {
+  def createSimpleProc(name: String, statements: Seq[Statement]): EventuallyProcedure = {
     proc(name,
       block("l" + name,
         statements.:+(goto(name + "_return")): _*

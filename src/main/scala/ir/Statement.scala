@@ -91,7 +91,7 @@ object Assert:
   def unapply(a: Assert): Option[(Expr, Option[String], Option[String])] = Some(a.body, a.comment, a.label)
 
 /** Assumptions express control flow restrictions and other properties that can be assumed to be true.
-  *
+  * 
   * For example, an `if (C) S else T` statement in C will eventually be translated to IR with a non-deterministic
   * goto to two blocks, one with `assume C; S` and the other with `assume not(C); T`.
   *
@@ -117,7 +117,7 @@ class Unreachable(override val label: Option[String] = None) extends Jump {
   override def acceptVisit(visitor: Visitor): Jump = this
 }
 
-class Return(override val label: Option[String] = None, var outParams : SortedMap[LocalVar, Expr] = SortedMap()) extends Jump {
+class Return(override val label: Option[String] = None, var outParams : SortedMap[LocalVar, Expr] = SortedMap()) extends Jump { 
   override def acceptVisit(visitor: Visitor): Jump = this
   override def toString = s"Return(${outParams.mkString(",")})"
 }
@@ -226,5 +226,3 @@ class IndirectCall(var target: Variable,
 
 object IndirectCall:
   def unapply(i: IndirectCall): Option[(Variable, Option[String])] = Some(i.target, i.label)
-
-type AtomicStatement = SingleAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume
