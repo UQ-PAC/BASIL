@@ -10,6 +10,7 @@ import test_util.BASILTest
 import test_util.BASILTest.*
 import test_util.Histogram
 import test_util.TestConfig
+import util.z3.*
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
@@ -44,7 +45,7 @@ trait SystemTests extends AnyFunSuite, BASILTest {
         val variationPath = programPath + "/" + t + "/" + p
         val inputPath = if conf.useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
         if (File(inputPath).exists) {
-          test(name + folder + "/" + p + "/" + t + testSuffix) {
+          test(name + " " + folder + "/" + p + "/" + t + testSuffix) {
             runTest(path, p, t, conf)
           }
         }
@@ -138,11 +139,27 @@ trait SystemTests extends AnyFunSuite, BASILTest {
     val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
     val expectedOutPath = if conf.useBAPFrontend then variationPath + ".expected" else variationPath + "_gtirb.expected"
 
+    if (conf.simplify) {
+      ir.eval.SimplifyValidation.validate = true
+      ir.eval.SimplifyValidation.clearLog()
+    }
+
     Logger.info(s"$name/$variation$testSuffix")
     val timer = PerformanceTimer(s"test $name/$variation$testSuffix")
     runBASIL(inputPath, RELFPath, Some(specPath), BPLPath, conf.staticAnalysisConfig, conf.simplify)
     val translateTime = timer.checkPoint("translate-boogie")
     Logger.info(s"$name/$variation$testSuffix DONE")
+
+    if (conf.verifySimplify) {
+      val q = ir.eval.SimplifyValidation.getSatQueries()
+      val res = util.z3.checkSatExprBatch(q, softTimeoutMillis=Some(10000))
+      assert((res.collect {
+        case (comment, SatResult.SAT) => {
+          info("unsound simplification found")
+          comment.foreach(info(_))
+        }
+      }).isEmpty)
+    }
 
     if (conf.checkVerify) {
       val boogieResult = runBoogie(directoryPath, BPLPath, conf.boogieFlags)
@@ -251,10 +268,10 @@ class NoSimplifySystemTests extends SystemTests {
   }
 }
 class SimplifySystemTests extends SystemTests {
-  runTests("correct", TestConfig(simplify=true, useBAPFrontend = true, expectVerify = true, logResults = true))
-  runTests("incorrect", TestConfig(simplify=true, useBAPFrontend = true, expectVerify = false, logResults = true))
-  runTests("correct", TestConfig(simplify=true, useBAPFrontend = false, expectVerify = true, logResults = true))
-  runTests("incorrect", TestConfig(simplify=true, useBAPFrontend = false, expectVerify = false, logResults = true))
+  runTests("correct", TestConfig(simplify=true, useBAPFrontend = true, expectVerify = true, logResults = true, verifySimplify=true))
+  runTests("incorrect", TestConfig(simplify=true, useBAPFrontend = true, expectVerify = false, logResults = true, verifySimplify=true))
+  runTests("correct", TestConfig(simplify=true, useBAPFrontend = false, expectVerify = true, logResults = true, verifySimplify=true))
+  runTests("incorrect", TestConfig(simplify=true, useBAPFrontend = false, expectVerify = false, logResults = true, verifySimplify=true))
   test("summary-simplify") {
     summary("simplify")
   }

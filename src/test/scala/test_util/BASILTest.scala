@@ -16,6 +16,7 @@ case class TestConfig(boogieFlags: Seq[String] = Seq("/timeLimit:10", "/useArray
                       checkExpected: Boolean = false,
                       logResults: Boolean = false,
                       simplify: Boolean = false,
+                      verifySimplify: Boolean = false,
                      )
 
 trait BASILTest {
@@ -33,6 +34,7 @@ trait BASILTest {
         parameterForm = false,
       ),
       simplify = simplify,
+      validateSimp= simplify,
       staticAnalysis = staticAnalysisConf,
       boogieTranslation = util.BoogieGeneratorConfig().copy(memoryFunctionType=util.BoogieMemoryAccessMode.SuccessiveStoreSelect),
       outputPrefix = BPLPath,
