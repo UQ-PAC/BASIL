@@ -1,14 +1,21 @@
 package ir.dsl
 
 import ir.*
+import util.{Twine, indent, indentNested, intersperse}
 import translating.{BasilIR, BasilIRExp}
 
 import collection.immutable.{SortedMap}
+import collection.immutable.{LazyList}
 import collection.mutable
 import collection.mutable.{LinkedHashSet}
 
 trait ToScala[-T]:
   extension (x: T) def toScala: String
+
+trait ToScalaLines[-T] extends ToScala[T]:
+  extension (x: T)
+    override def toScala: String = x.toScalaLines.mkString
+    def toScalaLines: Twine
 
 
 // generated from ./expr.json
@@ -170,18 +177,32 @@ given ToScala[IndirectCall] with
 given ToScala[GoTo] with
   extension (x: GoTo) def toScala: String = s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})"
 
-given ToScala[Block] with
-  extension (x: Block) def toScala: String =
-    val commands = x.statements ++ Seq(x.jump)
-    s"block(${x.label.toScala},\n      " + (commands.map(_.toScala).mkString(",\n      ")) + "\n    )"
+given ToScalaLines[Block] with
+  extension (x: Block) def toScalaLines: Twine =
+    val commands = x.statements ++: LazyList(x.jump)
+    indentNested(
+      s"block(${x.label.toScala}",
+      commands.map(x => LazyList(x.toScala)),
+      ")",
+      hasPreceding = true
+    )
 
-given ToScala[Procedure] with
-  extension (x: Procedure) def toScala: String =
-    s"proc(${x.procName.toScala},\n    " + (x.blocks.map(_.toScala).mkString(",\n    ")) + "\n  )"
+given ToScalaLines[Procedure] with
+  extension (x: Procedure) def toScalaLines: Twine =
+    indentNested(
+      s"proc(${x.procName.toScala}",
+      x.blocks.to(LazyList).map(_.toScalaLines),
+      ")",
+      hasPreceding = true
+    )
 
-given ToScala[Program] with
-  extension (x: Program) def toScala: String =
-    s"prog(\n  " + (x.procedures.map(_.toScala).mkString(",\n  ")) + "\n)"
+given ToScalaLines[Program] with
+  extension (x: Program) def toScalaLines: Twine =
+    indentNested(
+      "prog(",
+      x.procedures.to(LazyList).map(_.toScalaLines),
+      ")"
+    )
 
 given ToScala[String] with
   extension (x: String) def toScala: String = StringEscape.quote(x)

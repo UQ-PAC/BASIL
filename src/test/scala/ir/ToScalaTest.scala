@@ -8,7 +8,7 @@ import ir.*
 
 import scala.runtime.stdLibPatches.Predef.assert
 
-class DSLExportTest extends AnyFunSuite {
+class ToScalaTest extends AnyFunSuite {
 
   val program: Program = prog(
     proc("main",
@@ -35,44 +35,48 @@ class DSLExportTest extends AnyFunSuite {
       block("returnBlock",
         ret
       ),
-    )
+    ),
+    proc("empty procedure")
   )
 
   val expected = """
-    prog(
-      proc("main",
-        block("first_call",
-          LocalAssign(Register("R0", 64), BitVecLiteral(BigInt("1"), 64), None),
-          LocalAssign(Register("R1", 64), BitVecLiteral(BigInt("1"), 64), None),
-          directCall("callee1"),
-          goto("second_call")
-        ),
-        block("second_call",
-          directCall("callee2"),
-          goto("returnBlock")
-        ),
-        block("returnBlock",
-          ret
-        )
-      ),
-      proc("callee1",
-        block("returnBlock",
-          ret
-        )
-      ),
-      proc("callee2",
-        block("returnBlock",
-          ret
-        )
-      )
+prog(
+  proc("main",
+    block("first_call",
+      LocalAssign(Register("R0", 64), BitVecLiteral(BigInt("1"), 64), None),
+      LocalAssign(Register("R1", 64), BitVecLiteral(BigInt("1"), 64), None),
+      directCall("callee1"),
+      goto("second_call")
+    ),
+    block("second_call",
+      directCall("callee2"),
+      goto("returnBlock")
+    ),
+    block("returnBlock",
+      ret
     )
+  ),
+  proc("callee1",
+    block("returnBlock",
+      ret
+    )
+  ),
+  proc("callee2",
+    block("returnBlock",
+      ret
+    )
+  ),
+  proc("empty procedure")
+)
   """
 
-  def cleanOutput(s: String): String = s.replaceAll(" ", "").replaceAll("\n", "").trim
+  def cleanOutput(s: String): String = s.trim
 
   test("test basil ir to dsl") {
+    if (cleanOutput(expected) != cleanOutput(program.toScala)) {
+      println("current program.toScala output:")
+      println(program.toScala)
+    }
     assert(cleanOutput(expected) == cleanOutput(program.toScala))
-    println(program.toScala)
   }
-
 }
