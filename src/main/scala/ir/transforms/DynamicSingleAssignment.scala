@@ -112,7 +112,7 @@ class OnePassDSA(
 
     val preds = block.prevBlocks.toList
     val toJoin = preds.filter(state(_).filled)
-    assert(!(toJoin.isEmpty && preds.nonEmpty), s"should always have at least one processed predecessor ${preds}")
+    assert(!(!(preds == List(block)) && toJoin.isEmpty && preds.nonEmpty), s"should always have at least one processed predecessor ${preds}")
 
     {
       val definedVars = toJoin.flatMap(state(_).renamesAfter.keySet).toSet.intersect(liveBefore(block))

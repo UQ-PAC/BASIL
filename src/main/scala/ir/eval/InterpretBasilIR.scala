@@ -343,7 +343,7 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
             r.outParams
           )
           _ <- f.doReturn()
-          _ <- State.sequence(State.pure(()), outs.map(m => f.storeVar(m._1.name, m._1.toBoogie.scope, Scalar(m._2))))
+          _ <- State.sequence(State.pure(()), outs.map(m => f.storeVar(m._1.name, Scope.Local, Scalar(m._2))))
         } yield ()
       }
       case h: Unreachable => State.setError(EscapedControlFlow(h))
@@ -351,18 +351,40 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
   }
 
   def interpretReturn[S, T <: Effects[S, InterpreterError]](f: T)(s: DirectCall): State[S, Unit, InterpreterError] = {
-    for {
-      outs <- State.mapM(
-        ((bindout: (LocalVar, Variable)) => {
-          for {
-            rhs <- Eval.evalLiteral(f)(bindout._1)
-          } yield (bindout._2, rhs)
-        }),
-        s.outParams
-      )
-      c <- State.sequence(State.pure(()), outs.map(m => f.storeVar(m._1.name, m._1.toBoogie.scope, Scalar(m._2))))
-      _ <- f.setNext(Run(s.successor))
-    } yield (c)
+
+    if (LibcIntrinsic.intrinsics.contains(s.target.procName)) {
+      for {
+        outs <- State.mapM(
+          ((bindout: (LocalVar, Variable)) => {
+            for {
+              rhs <- if (LibcIntrinsic.intrinsicOuts(s.target.procName).contains(bindout._1.name.stripSuffix("_out"))) {
+                Eval.evalLiteral(f)(bindout._1.copy(varName = bindout._1.name.stripSuffix("_out")))
+              } else {
+                State.pure(InterpFuns.zero(bindout._1))
+              }
+            } yield (bindout._2, rhs)
+          }),
+          s.outParams
+        )
+        c <- State.sequence(State.pure(()), outs.map(m => f.storeVar(m._1.name, m._1.toBoogie.scope, Scalar(m._2))))
+        _ <- f.setNext(Run(s.successor))
+      } yield (c)
+    }
+    else {
+      for {
+        outs <- State.mapM(
+          ((bindout: (LocalVar, Variable)) => {
+            for {
+              rhs <- Eval.evalLiteral(f)(bindout._1)
+            } yield (bindout._2, rhs)
+          }),
+          s.outParams
+        )
+        c <- State.sequence(State.pure(()), outs.map(m => f.storeVar(m._1.name, m._1.toBoogie.scope, Scalar(m._2))))
+        _ <- f.setNext(Run(s.successor))
+      } yield (c)
+    }
+
   }
 
   def interpretStatement[S, T <: Effects[S, InterpreterError]](f: T)(s: Statement): State[S, Unit, InterpreterError] = {
@@ -428,10 +450,12 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
               State.setError(EscapedControlFlow(dc))
             }
           }
-          _ <- State.sequence(
-            State.pure(()),
-            actualParams.map(m => f.storeVar(m._1.name, m._1.toBoogie.scope, Scalar(m._2)))
-          )
+          _ <- 
+            if (LibcIntrinsic.intrinsics.contains(dc.target.procName)) {
+              State.sequence(State.pure(()), actualParams.map(m => f.storeVar(m._1.name.stripSuffix("_in"), Scope.Local, Scalar(m._2))))
+            } else {
+              State.sequence(State.pure(()), actualParams.map(m => f.storeVar(m._1.name, Scope.Local, Scalar(m._2))))
+            }
         } yield ()
       }
       case ic: IndirectCall => {
@@ -454,6 +478,14 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
 }
 
 object InterpFuns {
+
+
+  def zero(v: Variable) = v.getType match {
+      case BitVecType(n) => BitVecLiteral(0, n)
+      case BoolType      => TrueLiteral
+      case IntType       => IntLiteral(0)
+      case _             => ???
+    }
 
   def initRelocTable[S, T <: Effects[S, InterpreterError]](s: T)(ctx: IRContext): State[S, Unit, InterpreterError] = {
 
@@ -529,6 +561,10 @@ object InterpFuns {
       h <- State.pure(Logger.debug("DEFINE MEMORY REGIONS"))
       h <- s.storeVar("mem", Scope.Global, BasilMapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
       i <- s.storeVar("stack", Scope.Global, BasilMapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
+      h <- State.pure(Logger.debug("DEFINE GHOST REGIONS"))
+      _ <- s.storeVar("ghost-funtable", Scope.Global, BasilMapValue(Map.empty, MapType(BitVecType(64), BitVecType(64))))
+      _ <- IntrinsicImpl.initFileGhostRegions(s)
+      h <- State.pure(Logger.debug("DEFINE INITIAL REGISTERS"))
       j <- s.storeVar("R31", Scope.Global, Scalar(SP))
       k <- s.storeVar("R29", Scope.Global, Scalar(FP))
       l <- s.storeVar("R30", Scope.Global, Scalar(LR))
@@ -549,8 +585,6 @@ object InterpFuns {
       l <- s.storeVar("R27", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       l <- s.storeVar("R28", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       /** end callee saved * */
-      _ <- s.storeVar("ghost-funtable", Scope.Global, BasilMapValue(Map.empty, MapType(BitVecType(64), BitVecType(64))))
-      _ <- IntrinsicImpl.initFileGhostRegions(s)
     } yield (l)
   }
 
@@ -586,7 +620,35 @@ object InterpFuns {
     s = State.execute(s, f.call("init_activation", Stopped(), Stopped()))
     s = initMemory(s, "mem", p.initialMemory.values)
     s = initMemory(s, "stack", p.initialMemory.values)
-    mainfun.entryBlock.foreach(startBlock => s = State.execute(s, f.call(mainfun.name, Run(IRWalk.firstInBlock(startBlock)), Stopped())))
+
+    //  j <- s.storeVar("R31", Scope.Global, Scalar(SP))
+    //  k <- s.storeVar("R29", Scope.Global, Scalar(FP))
+    //  l <- s.storeVar("R30", Scope.Global, Scalar(LR))
+
+    val SP: BitVecLiteral = BitVecLiteral(0x78000000, 64)
+    val FP: BitVecLiteral = SP
+    val LR: BitVecLiteral = BitVecLiteral(BigInt("78000000", 16), 64)
+
+    val init = mainfun.formalInParam.toSeq.map(v => {
+      val value = v.name match {
+        case n if n.startsWith("R31") => SP
+        case n if n.startsWith("R29") => FP
+        case n if n.startsWith("R30") => LR
+        case _ => zero(v)
+      }
+
+      f.storeVar(v.name, Scope.Local, Scalar(value))
+    })
+
+    mainfun.entryBlock.foreach(startBlock => {
+      val call = f.call(mainfun.name, Run(IRWalk.firstInBlock(startBlock)), Stopped())
+      val run = if (init.length > 0) then {
+        State.sequence(State.pure(()), Seq(call) ++ init)
+      } else {
+        call
+      }
+      s = State.execute(s, run)
+    })
     // l <- State.sequence(State.pure(()), mainfun.formalInParam.toList.map(i => f.storeVar(i.name, i.toBoogie.scope, Scalar(BitVecLiteral(0, size(i).get)))))
     s
   }

@@ -811,6 +811,7 @@ object RunUtils {
       val stopState = fs._1.nextCmd
       if (stopState != eval.Stopped()) {
         Logger.error(s"Interpreter exited with $stopState")
+        Logger.error(s"StackTrace: \n    ${fs._1.callStack.mkString("\n    ")}")
       } else {
         Logger.info("Interpreter stopped normally.")
       }

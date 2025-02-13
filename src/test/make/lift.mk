@@ -1,11 +1,17 @@
 
 # Run from the directory basil/src/test/*/test_case/compilation_variant/
+#
+#
+
+GTIRB_SEM ?= gtirb_semantics
+DDISASM ?= ddisasm 
+
 
 $(LIFT_ARTEFACTS): a.out
 	$(READELF) -s -r -W a.out > $(NAME).relf
 	$(BAP) a.out -d adt:$(NAME).adt -d bir:$(NAME).bir
-	ddisasm a.out --ir $(NAME).gtirb
-	gtirb-semantics $(NAME).gtirb $(NAME).gts
+	$(DDISASM) a.out --ir $(NAME).gtirb
+	$(GTIRB_SEM) $(NAME).gtirb $(NAME).gts
 
 ifdef $(SPEC) 
 BASIL_SPECARG = --spec $(SPEC) 
