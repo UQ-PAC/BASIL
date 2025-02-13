@@ -344,6 +344,19 @@ object LibcIntrinsic {
     _ <- s.doReturn()
   } yield (())
 
+  def intrinsicOuts = Map(
+    "putc" -> Seq(),
+    "putchar" -> Seq(),
+    "puts" -> Seq(),
+    "printf" -> Seq(),
+    "write" -> Seq(),
+    "malloc" -> Seq("R0"),
+    "__libc_malloc_impl" -> Seq("R0"),
+    "free" ->  Seq(),
+    "#free" -> Seq(),
+    "calloc" -> Seq("R0"),
+  )
+
   def intrinsics[S, T <: Effects[S, InterpreterError]] =
     Map[String, T => State[S, Unit, InterpreterError]](
       "putc" -> singleArg("putc"),

@@ -3,7 +3,7 @@ import util.Logger
 import sourcecode.Line, sourcecode.FileName
 import java.io.*
 
-val monlog = Logger.deriveLogger("statemonad")
+val monlog = Logger.deriveLogger("statemonad", PrintStream(File("monad")))
 
 /*
  * Flattened state monad with error.
