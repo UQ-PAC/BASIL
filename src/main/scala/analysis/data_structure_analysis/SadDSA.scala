@@ -1,10 +1,10 @@
 package analysis.data_structure_analysis
 
-import analysis.data_structure_analysis.DSAPhase.{BU, Local}
+import analysis.data_structure_analysis.DSAPhase.{BU, Local, TD}
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.{BitVecType, Expr, LocalVar, Procedure}
-import util.SadDSALogger as Logger
+import util.{DSALogger, SadDSALogger as Logger}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{SortedSet, mutable}
@@ -22,16 +22,60 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
       (proc, ph, OffsetUnionFindSolver[NodeTerm](), symValues, cons)
 {
 
+  def TDPhase(bus: Map[Procedure, SadGraph]): Unit = {
+    phase = TD
+    val skip = List()
+    constraints.toSeq.sortBy(c => c.label).foreach {
+      case dcc: DirectCallConstraint if bus.contains(dcc.target) && skip.forall(f => dcc.target.name.startsWith(f)) && !dcc.target.isExternal.getOrElse(false) =>
+        val oldToNew = mutable.Map[SadNode, SadNode]()
+        val callee = bus(dcc.call.target)
+        DSALogger.warn(s"cloning ${this.proc.name} into ${callee.proc.name}")
+        dcc.inParams.foreach {
+          case (formal, actual) =>
+            val formals = callee.exprToCells(formal).map(find)
+            val actuals = exprToCells(actual).map(find).map (
+              cell =>
+                val (node, offset) =
+                  findNode(
+                    cell.node.clone(callee, true, oldToNew)
+                  )
+                node.get(cell.interval.move(i => i + offset))
+            )
+            localCorrectness()
+            if (actuals ++ formals).nonEmpty then mergeCells(actuals ++ formals)
+            localCorrectness()
+        }
+        
+
+        dcc.outParmas.foreach {
+          case (out, actual) =>
+            val actuals = callee.exprToCells(out).map(find)
+            val outs: Set[SadCell] = exprToCells(actual).map(find).map(
+              cell =>
+                val (node, offset) =
+                  findNode(
+                    cell.node.clone(callee, true, oldToNew)
+                  )
+                node.get(cell.interval.move(i => i + offset))
+            )
+            localCorrectness()
+            if (outs ++ actuals).nonEmpty then mergeCells(outs ++ actuals)
+            localCorrectness()
+        }
+      case _ =>
+    }
+
+  }
   def BUPhase(locals: Map[Procedure, SadGraph]): Unit = {
 
     val skip = List("unicode", "so_recvln")
     phase = BU
-    constraints.toSeq.sortBy(c => c.label).foreach {
+    constraints.toSeq/*.sortBy(c => c.label)*/.foreach {
       case dcc: DirectCallConstraint if locals.contains(dcc.target) && skip.forall(f => dcc.target.name.startsWith(f)) &&  !dcc.target.isExternal.getOrElse(false) =>
 //        if dcc.target.name.startsWith("so_recvln")
-        println(s"cloning ${dcc.target.name} into ${proc.name}")
+//        println(s"cloning ${dcc.target.name} into ${proc.name}")
         val oldToNew = mutable.Map[SadNode, SadNode]()
-        println("doing in params")
+//        println("doing in params")
         dcc.inParams.toSeq.sortBy(f => f._1.name).foreach {
           case (formal, actual) =>
             val formals = locals(dcc.target)
@@ -82,7 +126,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
         }
 
         Logger.debug("doing out params")
-        dcc.outParmas.toSeq.sortBy(f => f._1.name).foreach {
+        dcc.outParmas./*toSeq.sortBy(f => f._1.name).*/foreach {
           case (out, actual) =>
             localCorrectness()
             val actuals = locals(dcc.target)
@@ -528,14 +572,18 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
     assert(result == find(cell2))
 //    Logger.debug(result)
     if cell1.node.cells.filter(_.hasPointee).nonEmpty then
-      Logger.debug(result.node)
-      Logger.debug(result.node.cells.map(_.interval))
-      Logger.debug(cell1.interval)
-      Logger.debug(cell2.interval)
+//      Logger.debug(result.node)
+//      Logger.debug(result.node.cells.map(_.interval))
+//      Logger.debug(cell1.interval)
+//      Logger.debug(cell2.interval)
       cell1.node.cells.filter(_.hasPointee).foreach(
         f =>
-//          Logger.debug(f)
-          assert(f.getPointee == find(f).getPointee)
+          if find(f.getPointee)  != find(f).getPointee then
+            DSALogger.warn(f)
+            DSALogger.warn(f.getPointee)
+            DSALogger.warn(find(f))
+            DSALogger.warn(find(f).getPointee)
+          assert(find(f.getPointee) == find(f).getPointee)
           assert(find(f).node == result.node)
       )
     if cell2.node.cells.filter(_.hasPointee).nonEmpty then
@@ -565,11 +613,16 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
 
   override def find(cell: SadCell): SadCell = {
     val (newNode, newInterval) = findExact(cell)
-    newNode.get(newInterval)
+    val res = newNode.get(newInterval)
+//    if (findNode(res.node) != res.node) then
+//      println(s"got here wrong ${findNode(res.node)} vs  ${res.node}")
+    assert(findNode(res.node)._1 == res.node)
+    res
   }
 
   def findNode(node: SadNode): (SadNode, Int) = {
     val (term, offset) = solver.findWithOffset(node.term)
+    assert(solver.findWithOffset(term)._1 == term)
     (term.asInstanceOf[NodeTerm].v, offset)
   }
 
@@ -620,8 +673,16 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase]= mutable.Set.
 //                pointeeNode.cells.map(_.interval).forall(i => v.cells.exists(c => c.interval == i))
 //                oldToNew.update(pointeeNode, v)
               else newGraph.findNode(oldToNew(pointeeNode))
-            newNode.get(cell.interval.move(i => i + off)).setPointee(clonedNode.get(pointee.interval.move(i => i + clonedOff)))
-            assert(newNode.get(cell.interval.move(i => i + off)).getPointee == graph.find(clonedNode.get(pointee.interval.move(i => i + clonedOff))))
+
+            val pointer = newNode.get(cell.interval.move(i => i + off))
+            DSALogger.warn(s"pointer has pointee: ${pointer.hasPointee}")
+            assert(pointer == newGraph.find(pointer))
+            if pointer.hasPointee then DSALogger.warn(s"pointer has pointee: ${pointer.getPointee}")
+            val clonedPointee = clonedNode.get(pointee.interval.move(i => i + clonedOff))
+            DSALogger.warn(s"new pointee: ${clonedPointee}")
+            DSALogger.warn(s"new pointee: ${newGraph.find(clonedPointee)}")
+            pointer.setPointee(clonedNode.get(pointee.interval.move(i => i + clonedOff)))
+            assert(newNode.get(cell.interval.move(i => i + off)).getPointee == newGraph.find(clonedNode.get(pointee.interval.move(i => i + clonedOff))))
           case _ =>
         }
 //        if old.isCollapsed then
@@ -843,18 +904,36 @@ case class SadCell(node: SadNode, override val interval: Interval) extends NodeC
   }*/
 
   def setPointee(cell: SadCell): SadCell = {
+//    DSALogger.warn(s"Setting the pointee for ${this}")
     if _pointee.isEmpty then
+//      DSALogger.warn("empty")
       _pointee = Some(graph.find(cell))
     else if graph.find(_pointee.get) == graph.find(this) then // if a cell points to itself break the link,
       _pointee = None
+      graph.find(this)._pointee = None
       val pointee = graph.mergeCells(this, cell)
+//      DSALogger.warn("Doing a delayed merge")
       graph.find(this)._pointee = Some(pointee)
       _pointee = Some(pointee)
+      assert(graph.find(this).node == pointee.node)
 //      pointee.setPointee(pointee)
 //      _pointee = Some(pointee)
+//    else if graph.find(this) == graph.find(cell) then
+//      DSALogger.warn("Doing a merge with itself")
+//      val oldPointee = graph.find(_pointee.get)
+//      _pointee = None
+//      graph.find(this)._pointee = None
+//      val pointee = graph.mergeCells(cell, oldPointee)
+//      DSALogger.warn("Doing a delayed merge")
+//      graph.find(this)._pointee = Some(pointee)
+//      _pointee = Some(pointee)
+//      assert(graph.find(this).node == pointee.node)
+
     else if graph.find(cell) != graph.find(_pointee.get) then
+//      DSALogger.warn("doing a normal merge")
       _pointee = Some(graph.mergeCells(cell, graph.find(_pointee.get)))
       graph.find(this)._pointee = _pointee
+
 
 //    graph.find(this)._pointee.get
     graph.find(_pointee.get)
