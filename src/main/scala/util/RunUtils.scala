@@ -832,11 +832,11 @@ object RunUtils {
       val visited: mutable.Set[Procedure] = mutable.Set.empty
       val queue = mutable.Queue[Procedure]().enqueueAll(sadDSABU.keys.toSeq.sortBy(p => p.name))
 
-      val skip = Seq("croak", "myexit")
+      var skip = Seq("croak", "myexit")
       while queue.nonEmpty do
         val proc = queue.dequeue()
         if skip.exists(name => proc.name.startsWith(name)) then
-          DSALogger.info(s"skipped ${proc.name} due to recursion")
+          DSALogger.info(s"skipped ${proc.name} due to scc")
           visited += proc
         else if !proc.calls.filter(proc => !proc.isExternal.getOrElse(false)).forall(visited.contains) then
           DSALogger.info(s"procedure ${proc.name} was readded")
@@ -849,6 +849,25 @@ object RunUtils {
 
 
       sadDSABU.values.foreach(_.localCorrectness())
+      val sadDSATD = sadDSABU.view.mapValues(_.clone).toMap
+      sadDSATD.values.foreach(_.localCorrectness())
+
+      DSALogger.info("finished BU phase")
+      visited.clear()
+      skip = Seq.empty
+      queue.enqueueAll(sadDSATD.keys.toSeq.sortBy(p => p.name))
+      while queue.nonEmpty do
+        val proc = queue.dequeue()
+        if skip.exists(name => proc.name.startsWith(name)) then
+          DSALogger.info(s"skipped ${proc.name} due to scc")
+          visited += proc
+        else if !proc.calls.filter(proc => !proc.isExternal.getOrElse(false)).forall(visited.contains) then
+          DSALogger.info(s"procedure ${proc.name} was readded")
+          queue.enqueue(proc)
+        else
+          DSALogger.info(s"performing TD for ${proc.name}")
+          sadDSATD(proc).TDPhase(sadDSATD)
+          visited += proc
 
     if (q.runInterpret) {
       Logger.info("Start interpret")

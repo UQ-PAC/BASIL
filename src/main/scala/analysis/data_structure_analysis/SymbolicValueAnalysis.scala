@@ -248,7 +248,8 @@ case class SymbolicValues(state: Map[LocalVar, SymValueSet]) {
           .collect {case locVar: LocalVar if state.contains(locVar) => state(locVar)}
           .foldLeft(SymValueSet.empty)((result, operand) => result.join(operand))
           .toTop
-      case _ =>
+      case e @ _ =>
+        println(e)
         ???
   }
   
