@@ -676,10 +676,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
       }
     }
 
-    val secureUpdate = translateSecureUpdate(sharedStores)
-    val guaranteeChecks = translateGuaranteeChecks(sharedStores)
-
-    secureUpdate ++ guaranteeChecks
+    translateGuaranteeChecks(sharedStores)
   }
 
   private val libRGFunsContradictionProof: Map[String, Seq[BProcedure]] = {
@@ -803,14 +800,14 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
           List(store) ++ stateSplit
         case memory: SharedMemory =>
           val gammaValueCheck = BAssert(BinaryBExpr(BoolIMPLIES, L(LArgs, rhs.index), exprToGamma(m.value)))
+          val secureUpdate = translateSecureUpdate(List(m))
           if (!atomic) {
             val rely = BProcedureCall("rely")
             val oldAssigns = translateOldAssigns(Set(memory))
-            val secureUpdate = translateSecureUpdate(List(m))
             val guaranteeChecks = translateGuaranteeChecks(List(m))
             List(rely) ++ oldAssigns ++ List(gammaValueCheck, store) ++ secureUpdate ++ guaranteeChecks ++ stateSplit
           } else {
-            List(gammaValueCheck, store) ++ stateSplit
+            List(gammaValueCheck, store) ++ secureUpdate ++ stateSplit
           }
       }
     case l: LocalAssign =>
