@@ -325,7 +325,7 @@ object IRTransform {
     modified
   }
 
-  def generate_rg_conditions(procs: List[Procedure]): Unit = {
+  def generateRelyGuaranteeConditions(procs: List[Procedure]): Unit = {
     /* Todo: For the moment we are printing these to stdout, but in future we'd
     like to add them to the IR. */
     type StateLatticeElement = LatticeMap[Variable, Interval]
@@ -333,9 +333,9 @@ object IRTransform {
     val stateLattice = IntervalLatticeExtension(IntervalLattice())
     val stateTransfer = SignedIntervalDomain().transfer
     val intDom = ConditionalWritesDomain[StateLatticeElement](stateLattice, stateTransfer)
-    val rg_generator = RelyGuaranteeGenerator[InterferenceLatticeElement, StateLatticeElement](intDom, procs)
-    val rely_guarantees: Map[Procedure, (InterferenceLatticeElement, InterferenceLatticeElement)] = rg_generator.generate()
-    for ((p, (rely, guar)) <- rely_guarantees) {
+    val generator = RelyGuaranteeGenerator[InterferenceLatticeElement, StateLatticeElement](intDom, procs)
+    val relyGuarantees: Map[Procedure, (InterferenceLatticeElement, InterferenceLatticeElement)] = generator.generate()
+    for ((p, (rely, guar)) <- relyGuarantees) {
       println("--- " + p.procName + " " + "-" * 50 + "\n")
       println("Rely:")
       println(intDom.toString(rely) + "\n")
@@ -827,7 +827,7 @@ object RunUtils {
 
     if (conf.generateRelyGuarantees) {
       StaticAnalysisLogger.info("[!] Generating Rely-Guarantee Conditions")
-      IRTransform.generate_rg_conditions(ctx.program.procedures.toList.filter(p => p.returnBlock != None))
+      IRTransform.generateRelyGuaranteeConditions(ctx.program.procedures.toList.filter(p => p.returnBlock != None))
     }
 
     q.loading.dumpIL.foreach(s => 

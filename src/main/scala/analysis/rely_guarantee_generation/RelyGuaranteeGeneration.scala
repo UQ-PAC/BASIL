@@ -2,59 +2,33 @@ package analysis
 
 import ir.*
 import ir.transforms.AbstractDomain
+import analysis.*
 
-/**
-  * State lattices must define these functions to be used in interference domains.
-  */
-trait CompatibleLattice[S] extends Lattice[S] {
-  // weakens s by eliminating v
-  def drop(v: Variable, s: S): S
-  // greatest lower bound, i.e. meet
-  def glb(s1: S, s2: S): S
-  // display this set of states as a boogie predicate
-  def toPredString(s: S): String
-}
-
-// class CompatibleLatticeMapLattice[D, L, LA <: Lattice[L]](l: LA) extends LatticeMapLattice[D, L, LA](l: LA) with CompatibleLattice[LatticeMap[D, L]] {
-//   def drop(v: Variable, s: LatticeMap[D, L]): LatticeMap[D, L] = {
-//     s.filter((d: D, _: L) => d != v)
-//   }
-// }
-
-class IntervalLatticeExtension(l: IntervalLattice) extends LatticeMapLattice[Variable, Interval, IntervalLattice](l) with CompatibleLattice[LatticeMap[Variable, Interval]] {
-  def drop(v: Variable, s: LatticeMap[Variable, Interval]): LatticeMap[Variable, Interval] =
-    s + (v -> Interval.Top)
-
-  def toPredString(s: LatticeMap[Variable, Interval]): String = SignedIntervalDomain().toPred(s).toString()
-}
-
-/**
-  * An interference domain is similar to an abstract domain, except that it
-  * represents sets of state transitions rather than sets of states. These
-  * state transitions can represent both rely and guarantee conditions. Similar
-  * to a transfer function, the interference domain is equipped with a "derive"
-  * function which effectively generates a sound guarantee condition of a
-  * given assignment with respect to a given pre-state. It is also equipped with
-  * an "apply" function that weakens a given state by accounting for the
-  * interference captured by a rely condition (i.e. an element of this domain).
+/** An interference domain is similar to an abstract domain, except that it
+  * represents sets of state transitions rather than sets of states. These sets
+  * of state transitions can represent both rely and guarantee conditions.
+  * Similar to a transfer function, interference domains are equipped with a
+  * "derive" function which effectively generates a sound guarantee condition of
+  * a given assignment with respect to a given pre-state. They are also equipped
+  * with an "apply" function that weakens a given state by accounting for the
+  * interference captured by a rely condition.
   * 
   * Of course, we also need some way to represent these aforementioned
-  * "pre-states" and "states". For this, we parameterise our interference
-  * domain with an abstract domain, which we call a "state domain". The ability
-  * to mix-and-match different interference and state domains is one of the
-  * strengths of this analysis.
-  * 
-  * Some interference domains require that the parameterised state domain
-  * defines some extra functions. Hence, we require that state domains extend
-  * the CompatibleLattice trait.
+  * "states". For this, interference domains are parameterised with an abstract
+  * domain, which we call a "state domain". This gives us the ability to
+  * mix-and-match different interference and state domains.
   * 
   * Type parameters:
   * T: The type of lattice element representing a set of state transitions.
   * S: The type of lattice element representing a set of states.
-  * L: A lattice type, defined over element type S.
-  * stateTransfer: A transfer function for lattice elements of type S.
+  * 
+  * @param stateLattice: A lattice providing operations over S.
+  * @param stateTransfer: A transfer function for deriving reachable states.
   */
-abstract class InterferenceDomain[T, S](val stateLattice: CompatibleLattice[S], val stateTransfer: (S, Command) => S) {
+abstract class InterferenceDomain[T, S](
+  val stateLattice: InterferenceCompatibleLattice[S],
+  val stateTransfer: (S, Command) => S
+) {
   def bot: T
   def derive(s: S, c: Command): T
   def apply(t: T, s: S): S
@@ -63,18 +37,24 @@ abstract class InterferenceDomain[T, S](val stateLattice: CompatibleLattice[S], 
   def toString(t: T): String
 }
 
-/**
-  * Represents guarantee conditions of the form:
-  * (!P1 ==> v1' == v1) && (!P2 ==> v2' == v2) && ...
+/** The conditional-writes domain is an interference domain that represents
+  * guarantee conditions of the form:
+  * (!P_1 ==> v_1' == v_1) && (!P_2 ==> v_2' == v_2) && ...
   * 
-  * This is implemented with a map [v_i -> P_i] from variables to the conditions under which they may be written to in the program.
-  * Variables that are never written to are omitted from the map, rather than being mapped to bot.
+  * This is implemented with a map [v_i -> P_i] from variables to an
+  * overapproximation of the set of states under which they may be written to in
+  * the thread. Variables that are never written to are omitted from the map,
+  * rather than being mapped to bot.
   */
-class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransfer: (S, Command) => S) extends InterferenceDomain[Map[Variable, S], S](stateLattice, stateTransfer) {
+case class ConditionalWritesDomain[S](
+  override val stateLattice: InterferenceCompatibleLattice[S], 
+  override val stateTransfer: (S, Command) => S
+) extends InterferenceDomain[Map[Variable, S], S](stateLattice, stateTransfer) {
+  
   // an empty map means no variables have been written to
   def bot: Map[Variable, S] = Map.empty[Variable, S]
   
-  // for assignments, simply return a mapping from the assigned variable to the given state
+  // simply map all assigned variables to the precondition
   def derive(s: S, c: Command): Map[Variable, S] = 
     if (s == stateLattice.bottom) Map.empty
     else c match {
@@ -82,7 +62,9 @@ class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransf
       case _ => bot
     }
   
-  // weaken s by eliminating each variable v that maps to a condition that overlaps with s
+  /* If a variable v maps to a set of states that intersects s, then there
+  exists a state satisfying s under which v can be written. Thus, we stabilise s
+  by eliminating v. */
   def apply(t: Map[Variable, S], s: S): S = {
     var new_s = s
     t.foreach {
@@ -93,7 +75,7 @@ class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransf
     new_s
   }
 
-  // the join of two conditional-writes elements is just their component-wise join
+  // the join of two elements is just the component-wise join over the map
   def join(t1: Map[Variable, S], t2: Map[Variable, S]): Map[Variable, S] = {
     var new_t = t1
     t2.foreach {
@@ -105,8 +87,9 @@ class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransf
     new_t
   }
 
+  // the transitive closure algorithm is best described in the white-paper
   def close(t: Map[Variable, S]): Map[Variable, S] = {
-    // iterate 50 times to find a transitive closure, then give up and set to top
+    // iterate 50 times to find a closure, then give up and go to top
     val max_iterations = 50
     var count = 0
     var old_t, new_t = t
@@ -140,7 +123,8 @@ class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransf
     val sb = new StringBuilder
     val vars = t.keys.toList
     for (v <- vars) {
-      sb.append(s"(~(${stateLattice.toPredString(t(v))}) ==> ${v.name}' == ${v.name})\n&& ")
+      val condStr = stateLattice.toPredString(t(v))
+      sb.append(s"(~(${condStr}) ==> ${v.name}' == ${v.name})\n&& ")
     }
     sb.append("forall v in Vars - {")
     sb.append(vars.map(_.name).mkString(", "))
@@ -149,24 +133,36 @@ class ConditionalWritesDomain[S](stateLattice: CompatibleLattice[S], stateTransf
   }
 }
 
-/**
-  * To generate guarantee conditions, we need to:
+/** To generate guarantee conditions, we need to:
   * 1. Generate the set of reachable states using the state domain.
   * 2. Generate the set of reachable state transitions by applying the "derive"
   *    function to these reachable states.
   * In our analysis, these two steps are implemented simultaneously using the
   * InterferenceProductDomain to track both the reachable states and reachable
   * state transitions at a particular program point.
+  * 
+  * @param intDom: Instance of the interference domain, to provide operations.
+  * @param rely: The rely condition under which we stabilise generated states.
   */
-class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T) extends AbstractDomain[(T, S)] {
+class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T)
+    extends AbstractDomain[(T, S)] {
+
+  /* We initialise the interference domain to bottom, meaning we have
+  encountered no reachable state transitions. However, we initialise the state
+  domain to top, meaning the program may exist in any state at this position. */
   override def init(b: Block): (T, S) = (intDom.bot, intDom.stateLattice.top)
 
+  // this is undefined because top is undefined for InterferenceDomains
   def top: (T, S) = ???
   
+  // this is a bit of a sketchy definition
   def bot: (T, S) = (intDom.bot, intDom.stateLattice.bottom)
 
-  def join(a: (T, S), b: (T, S), pos: Block): (T, S) = (intDom.join(a._1, b._1), intDom.stateLattice.lub(a._2, b._2))
+  // simply the component-wise join
+  def join(a: (T, S), b: (T, S), pos: Block): (T, S) =
+    (intDom.join(a._1, b._1), intDom.stateLattice.lub(a._2, b._2))
   
+  // updates and stabilises the state while collecting reachable transitions
   def transfer(a: (T, S), b: Command): (T, S) = {
     // stabilise the pre-state under the rely
     val pre_state = intDom.apply(rely, a._2)
@@ -181,13 +177,15 @@ class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T)
   }
 }
 
-/**
-  * This class contains the function for generating rely-guarantee conditions
+/** This class contains the function for generating rely-guarantee conditions
   * for a given concurrent program using the given interference and state
   * domains. Currently, a thread is a represented as a Procedure, and only
   * intraprocedural analysis is supported.
   */
-class RelyGuaranteeGenerator[T, S](intDom: InterferenceDomain[T, S], threads: List[Procedure]) {
+class RelyGuaranteeGenerator[T, S](
+  intDom: InterferenceDomain[T, S], 
+  threads: List[Procedure]
+) {
   def generate(): Map[Procedure, (T, T)] = {
     var old_guars, new_guars = threads.map(_ -> intDom.bot).toMap
     var fixpoint_reached = false
