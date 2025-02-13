@@ -168,8 +168,6 @@ class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T)
   def join(a: (T, S), b: (T, S), pos: Block): (T, S) = (intDom.join(a._1, b._1), intDom.stateLattice.lub(a._2, b._2))
   
   def transfer(a: (T, S), b: Command): (T, S) = {
-    println("pre-state: " + intDom.stateLattice.toPredString(a._2) + "\n")
-    println("command: " + b + "\n")
     // stabilise the pre-state under the rely
     val pre_state = intDom.apply(rely, a._2)
     // derive post-state from the stabilised pre-state
@@ -179,7 +177,6 @@ class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T)
     // update the guarantee by joining these transitions
     val guar = intDom.join(a._1, transitions)
     // return results
-    println("post-state: " + intDom.stateLattice.toPredString(post_state) + "\n\n")
     (guar, post_state)
   }
 }
