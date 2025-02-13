@@ -1,5 +1,10 @@
 package ir
 
+
+
+import org.scalatest.concurrent.TimeLimits.failAfter
+import org.scalatest.concurrent.{Signaler, TimeLimitedTests, ThreadSignaler}
+import org.scalatest.time.{Span, Seconds}
 import org.scalatest.funsuite.AnyFunSuite
 import util.Logger
 import ir.dsl.*
@@ -8,7 +13,7 @@ import ir.*
 
 import scala.runtime.stdLibPatches.Predef.assert
 
-class ToScalaTest extends AnyFunSuite {
+class ToScalaTest extends AnyFunSuite with TimeLimitedTests {
 
   val program: Program = prog(
     proc("main",
@@ -69,6 +74,9 @@ prog(
   proc("empty procedure")
 )
   """
+
+  override def timeLimit = Span(2, Seconds)
+  override val defaultTestSignaler = ThreadSignaler
 
   def cleanOutput(s: String): String = s.trim
 

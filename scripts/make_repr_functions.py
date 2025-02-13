@@ -90,7 +90,8 @@ def make_repr_match_case(d: Hierarchy | Decl):
   # print(d.args)
   if isinstance(d, Decl):
     if d.valname in BANNED:
-      yield f'summon[ToScala[{d.tyname}]].toScala(x)\n'
+      summon = f'summon[ToScala[{d.tyname}]].toScala(x)'
+      yield 'if (Thread.interrupted()) { Thread.currentThread().interrupt(); "<interrupted>" } else ' + summon
       return
 
     if d.args is not None:
