@@ -28,9 +28,9 @@ import scala.collection.mutable.ArrayBuffer
   * @tparam T
   */
 final class IntrusiveList[T <: IntrusiveListElement[T]] private (
-    var numElems: Int,
-    var firstElem: Option[T],
-    var lastElem: Option[T]
+  var numElems: Int,
+  var firstElem: Option[T],
+  var lastElem: Option[T]
 ) extends mutable.Iterable[T],
       mutable.Growable[T]:
   /* Method called on the element whenever it is inserted to this list. */
@@ -53,21 +53,19 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     this
   }
 
-  /**
-   * Remove all elements, O(n).
-   */
+  /** Remove all elements, O(n).
+    */
   override def clear(): Unit = {
     while (size > 0) {
       this.remove(lastElem.get)
     }
   }
 
-  /**
-   * Add all elements from the iterator.
-   * The elements must already be in any other IntrusiveList.
-   * @param xs Elements to add from.
-   * @return
-   */
+  /** Add all elements from the iterator. The elements must already be in any other IntrusiveList.
+    * @param xs
+    *   Elements to add from.
+    * @return
+    */
   override def addAll(xs: IterableOnce[T]): IntrusiveList.this.type = {
     xs.iterator.foreach(append)
     this
@@ -114,15 +112,16 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
    */
   def reverseIterator: Iterator[T] = IntrusiveListIterator(lastElem, false)
 
-
-  /**
-   * Return an iterator beginning at a specific element in the list. O(1)
-   * It is safe to modify or remove elements returned by the iterator.
-   * @param elem The elemenet to begin at
-   * @param forward Iterate forwards (defualt) or backwards.
-   * @return The iterator
-   */
-  def iteratorFrom(elem: T, forward : Boolean = true): Iterator[T] = {
+  /** Return an iterator beginning at a specific element in the list. O(1) It is safe to modify or remove elements
+    * returned by the iterator.
+    * @param elem
+    *   The elemenet to begin at
+    * @param forward
+    *   Iterate forwards (defualt) or backwards.
+    * @return
+    *   The iterator
+    */
+  def iteratorFrom(elem: T, forward: Boolean = true): Iterator[T] = {
     assert(elem.first() == firstElem.get)
     IntrusiveListIterator(Some(elem), forward)
   }
@@ -131,22 +130,18 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
 
   override def size: Int = numElems
 
-  /**
-   * Unsafely return the first element of the list.
-   */
+  /** Unsafely return the first element of the list.
+    */
   override def head: T = firstElem.get
 
   override def headOption: Option[T] = firstElem
 
-  /**
-   * Unsafely return the first element of the list.
-   */
+  /** Unsafely return the first element of the list.
+    */
   def begin: T = firstElem.get
 
-  /**
-   * Check whether the list contains the given element (by reference) by linear scan.
-   * O(n)
-   */
+  /** Check whether the list contains the given element (by reference) by linear scan. O(n)
+    */
   private def containsRef(elem: T): Boolean = {
     if (size == 0) {
       false
@@ -155,10 +150,8 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     }
   }
 
-  /**
-   * Check whether the list contains the given element (by value) by linear scan.
-   * O(n)
-   */
+  /** Check whether the list contains the given element (by value) by linear scan. O(n)
+    */
   def contains(elem: T): Boolean = {
     if (size == 0) {
       false
@@ -167,17 +160,16 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     }
   }
 
-  /**
-   * Unsafely return the last element of the list.
-   */
+  /** Unsafely return the last element of the list.
+    */
   def back: T = lastElem.get
 
-  /**
-   * Add an element to the beginning of the list.
-   * The element must not be a member of any other IntrusiveList.
-   * @param newElem The element to add
-   * @return The element
-   */
+  /** Add an element to the beginning of the list. The element must not be a member of any other IntrusiveList.
+    * @param newElem
+    *   The element to add
+    * @return
+    *   The element
+    */
   def prepend(newElem: T): T = {
     assert(newElem.unitary)
     assert(!containsRef(newElem))
@@ -192,13 +184,23 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     newElem
   }
 
-  /**
-   * Add an element to the end of the list.
-   * The element must not be a member of any other IntrusiveList.
-   *
-   * @param newElem The element to add
-   * @return The element
-   */
+  def prependAll(elems: Iterable[T]) = {
+    // first == None ==> empty list
+    insertAllBefore(firstElem, elems)
+  }
+
+  def appendAll(elems: Iterable[T]) = {
+    // last == None ==> empty list
+    insertAllAfter(lastElem, elems)
+  }
+
+  /** Add an element to the end of the list. The element must not be a member of any other IntrusiveList.
+    *
+    * @param newElem
+    *   The element to add
+    * @return
+    *   The element
+    */
   def append(newElem: T): T = {
     assert(newElem.unitary)
     assert(!containsRef(newElem))
@@ -213,12 +215,14 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     newElem
   }
 
-  /**
-   * Replace an element with another, at the same position in the list.
-   * @param elem The element to remove.
-   * @param withElem The element to add, must not be a member of any other IntrusiveList.
-   * @return The added element
-   */
+  /** Replace an element with another, at the same position in the list.
+    * @param elem
+    *   The element to remove.
+    * @param withElem
+    *   The element to add, must not be a member of any other IntrusiveList.
+    * @return
+    *   The added element
+    */
   def replace(elem: T, withElem: T): T = {
     assert(containsRef(elem))
     if (elem ne withElem) {
@@ -232,13 +236,14 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     }
   }
 
-  /**
-   * Removes all elements after the provided element n and returns an ArrayBuffer containing the removed elements,
-   * maintaining the ordering.
-   *
-   * @param n The element to split on, remains in the first list.
-   * @return An ArrayBuffer containing all elements after n.
-   */
+  /** Removes all elements after the provided element n and returns an ArrayBuffer containing the removed elements,
+    * maintaining the ordering.
+    *
+    * @param n
+    *   The element to split on, remains in the first list.
+    * @return
+    *   An ArrayBuffer containing all elements after n.
+    */
   def splitOn(n: T): ArrayBuffer[T] = {
     require(!lastElem.contains(n))
     require(containsRef(n))
@@ -257,13 +262,13 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     newlist
   }
 
-
-  /**
-   * Remove an element from the list.
-   *
-   * @param intrusiveListElement the element to remove
-   * @return The removed element
-   */
+  /** Remove an element from the list.
+    *
+    * @param intrusiveListElement
+    *   the element to remove
+    * @return
+    *   The removed element
+    */
   def remove(intrusiveListElement: T): T = {
     assert(size >= 0)
     assert(containsRef(intrusiveListElement))
@@ -278,12 +283,14 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     intrusiveListElement.remove()
   }
 
-  /**
-   * Insert an element after another element in the list.
-   * @param intrusiveListElement The element in the list to insert after.
-   * @param newElem The element to insert. Must not be a member of any other intrusive list.
-   * @return the inserted element
-   */
+  /** Insert an element after another element in the list.
+    * @param intrusiveListElement
+    *   The element in the list to insert after.
+    * @param newElem
+    *   The element to insert. Must not be a member of any other intrusive list.
+    * @return
+    *   the inserted element
+    */
   def insertAfter(intrusiveListElement: T, newElem: T): T = {
     assert(size >= 1)
     assert(containsRef(intrusiveListElement))
@@ -298,18 +305,19 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     intrusiveListElement.insertAfter(newElem)
   }
 
-
-  /**
-   * Insert an element after another element in the list.
-   * @param intrusiveListElement The element in the list to insert after, or None to indicate the beginning.
-   * @param newElems The elements to insert. Must not be members of any other intrusive list(s).
-   * @return the last inserted element, or the reference element
-   */
+  /** Insert an element after another element in the list.
+    * @param intrusiveListElement
+    *   The element in the list to insert after, or None to indicate the beginning.
+    * @param newElems
+    *   The elements to insert. Must not be members of any other intrusive list(s).
+    * @return
+    *   the last inserted element, or the reference element
+    */
   def insertAllAfter(intrusiveListElement: Option[T], newElems: Iterable[T]): Option[T] = {
     intrusiveListElement match {
-      case None => 
+      case None =>
         newElems.toList.reverse.map(prepend).headOption.orElse(intrusiveListElement)
-      case Some(n) => 
+      case Some(n) =>
         var p = n
         for (i <- newElems) {
           p = insertAfter(p, i)
@@ -318,18 +326,19 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     }
   }
 
-
-  /**
-   * Insert an element before another element in the list.
-   * @param intrusiveListElement The element in the list to insert before, or None to indicate the end of the list.
-   * @param newElems The elements to insert. Must not be members of any other intrusive list(s).
-   * @return the last inserted element, or the reference element
-   */
+  /** Insert an element before another element in the list.
+    * @param intrusiveListElement
+    *   The element in the list to insert before, or None to indicate the end of the list.
+    * @param newElems
+    *   The elements to insert. Must not be members of any other intrusive list(s).
+    * @return
+    *   the last inserted element, or the reference element
+    */
   def insertAllBefore(intrusiveListElement: Option[T], newElems: Iterable[T]): Option[T] = {
     intrusiveListElement match {
-      case None => 
+      case None =>
         newElems.map(append).lastOption.orElse(intrusiveListElement)
-      case Some(n) => 
+      case Some(n) =>
         var p = n
         for (i <- newElems.toList.reverse) {
           p = insertBefore(p, i)
@@ -338,14 +347,15 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     }
   }
 
-
-  /**
-   * Insert an element before another element in the list.
-   *
-   * @param intrusiveListElement The element in the list to insert before.
-   * @param newElem              The element to insert. Must not be a member of any other intrusive list.
-   * @return the inserted element
-   */
+  /** Insert an element before another element in the list.
+    *
+    * @param intrusiveListElement
+    *   The element in the list to insert before.
+    * @param newElem
+    *   The element to insert. Must not be a member of any other intrusive list.
+    * @return
+    *   the inserted element
+    */
   def insertBefore(intrusiveListElement: T, newElem: T): T = {
     assert(size >= 1)
     assert(containsRef(intrusiveListElement))
@@ -359,31 +369,26 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     intrusiveListElement.insertBefore(newElem)
   }
 
-
-  /**
-   * Unsafely return the element after a given element.
-   */
+  /** Unsafely return the element after a given element.
+    */
   def getNext(elem: T): T = {
     elem.getNext
   }
 
-  /**
-   * Return whether \elem has a successor.
-   */
+  /** Return whether \elem has a successor.
+    */
   def hasNext(elem: T): Boolean = {
     elem.hasNext
   }
 
-  /**
-   * Return whether \elem has a predecessor.
-   */
+  /** Return whether \elem has a predecessor.
+    */
   def hasPrev(elem: T): Boolean = {
     elem.hasPrev
   }
 
-  /**
-   * Unsafely return the element after the provided element.
-   */
+  /** Unsafely return the element after the provided element.
+    */
   def getPrev(elem: T): T = {
     elem.getPrev
   }
@@ -400,12 +405,11 @@ object IntrusiveList {
   def empty[T <: IntrusiveListElement[T]]: IntrusiveList[T] = IntrusiveList[T]()
 }
 
-/**
- * Internal implementation of the intrusive list.
- * This stores the inter-element links, but is only accessed by the containing IntrusiveList implementation, so that
- * the size, beginning and end are cached.
- * @tparam T The elements own type.
- */
+/** Internal implementation of the intrusive list. This stores the inter-element links, but is only accessed by the
+  * containing IntrusiveList implementation, so that the size, beginning and end are cached.
+  * @tparam T
+  *   The elements own type.
+  */
 trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
   private[intrusive_list] var next: Option[T] = None
   private[intrusive_list] var prev: Option[T] = None
@@ -449,18 +453,16 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
     this.asInstanceOf[T]
   }
 
-  /**
-   * @return Some(next) where next is the next element in the list this belongs to.
-   *         None when this is the last element.
-   */
+  /** @return
+    *   Some(next) where next is the next element in the list this belongs to. None when this is the last element.
+    */
   def succ(): Option[this.type] = {
     next.map(_.asInstanceOf[this.type])
   }
 
-  /**
-   * @return Some(prev) where prev is the previous element in the list this belongs to.
-   *         None when this is the first element.
-   */
+  /** @return
+    *   Some(prev) where prev is the previous element in the list this belongs to. None when this is the first element.
+    */
   def pred(): Option[this.type] = {
     prev.map(_.asInstanceOf[this.type])
   }

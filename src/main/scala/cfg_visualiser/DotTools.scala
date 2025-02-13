@@ -11,21 +11,41 @@ object IDGenerator {
   }
 }
 
-def wrap(input: String, width: Integer = 20): String =
+
+def escape(s: String) =  {
+  val n = s.replace("\"", "\\\"")
+  n
+}
+
+
+def wrap(_input: String, width: Integer = 20, first : Boolean = true): String =
+  var input = _input
+
+  def cannotSplit(c:Char) = {
+    c.isLetterOrDigit || ("_$".contains(c))
+  }
+
   if (input.length() <= width) {
-    input
+    input.replace("\n", "\\l") + "\\l"
+  } else if ({
+    val index = input.indexOf('\n')
+    index != -1 && index <= width
+    }) {
+    var splitPoint = input.indexOf('\n')
+    val (line, rest) = (input.substring(0, splitPoint).replace("\n", "\\l"), input.substring(splitPoint + 1))
+    (if (!first) then "    " else "") + line  + "\\l" + wrap(rest, width=width, true)
   } else {
     var splitPoint = width
-    while (input.charAt(splitPoint).isLetterOrDigit && splitPoint > width / 2) {
+    while (cannotSplit(input.charAt(splitPoint)) && splitPoint > width / 3) {
       // search backwards for a non alphanumeric charcter to split on
       splitPoint -= 1
     }
-    if (input.charAt(splitPoint).isLetterOrDigit) {
+    if (cannotSplit(input.charAt(splitPoint))) {
       // didn't find a character to split on
       splitPoint = width
     }
-    val line = input.substring(0, splitPoint)
-    line + "\\l" + wrap(input.substring(splitPoint), width)
+    val (line, rest) = (input.substring(0, splitPoint).replace("\n", "\\l"), input.substring(splitPoint))
+    (if (!first) then "    " else "") + line  + "\\l" + wrap(rest, width=width, false)
   }
 
 
@@ -40,7 +60,7 @@ abstract class DotElement {
 
 /** Represents a node in a Graphviz dot file.
   */
-class DotNode(val id: String, val label: String) extends DotElement {
+class DotNode(val id: String, val label: String, highlight: Boolean = false) extends DotElement {
 
   def this(label: String) = this("n" + IDGenerator.getNewId, label)
 
@@ -48,10 +68,11 @@ class DotNode(val id: String, val label: String) extends DotElement {
 
   def equals(other: DotNode): Boolean = toDotString.equals(other.toDotString)
 
-  override def toString: String = toDotString
+
+  def hl = if (highlight) then "style=filled, fillcolor=\"orangered\", " else ""
 
   def toDotString: String =
-    s"\"$id\"" + "[label=\"" + wrap(label, 80) + "\"]"
+    s"\"$id\"" + s"[${hl}label=\"" + escape(wrap(label, 100)) + "\", shape=\"box\", fontname=\"Mono\", fontsize=\"5\"]"
 
 }
 
@@ -68,8 +89,9 @@ class DotNode(val id: String, val label: String) extends DotElement {
 
   def equals(other: DotArrow): Boolean = toDotString.equals(other.toDotString)
 
+
   def toDotString: String =
-    s"\"${fromNode.id}\" $arrow \"${toNode.id}\"[label=\"$label\", style=\"$style\", color=\"$colour\"]"
+    s"\"${fromNode.id}\" $arrow \"${toNode.id}\"[label=\"${escape(label)}\", style=\"$style\", color=\"$colour\"]"
 }
 
 /** Represents a directed edge between two regular cfg nodes in a Graphviz dot file.
@@ -134,7 +156,8 @@ class DotGraph(val title: String, val nodes: Iterable[DotNode], val edges: Itera
 
   override def toString: String = toDotString
 
-  def toDotString: String = "digraph " + title + " {\n" + (nodes ++ edges).foldLeft("")((str, elm) => str + elm.toDotString + "\n") + "}"
+  val graph = "graph [ fontsize=18 ];" 
+  def toDotString: String = "digraph " + title + " {\n" + graph + "\n" + (nodes ++ edges).foldLeft("")((str, elm) => str + elm.toDotString + "\n") + "}"
 }
 
 
@@ -147,7 +170,7 @@ class DotStruct(val id: String, val details: String, val fields: Option[Iterable
   override def toString: String = toDotString
 
   override def toDotString: String =
-    s"$id " + "[label=" + label + "]"
+    s"$id " + "[label=" + escape(label) + "]"
 }
 
 class DotStructElement(val id: String, val field: Option[String]) extends DotElement {
@@ -169,7 +192,7 @@ case class StructArrow(
   def equals(other: DotArrow): Boolean = toDotString.equals(other.toDotString)
 
   def toDotString: String =
-    s"${from.toString} $arrow ${to.toString} [label=\"$label\", style=\"$style\", color=\"$colour\"]"
+    s"${from.toString} $arrow ${to.toString} [label=\"${escape(label)}\", style=\"$style\", color=\"$colour\"]"
 }
 
 

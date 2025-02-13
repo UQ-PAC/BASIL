@@ -66,6 +66,10 @@ trait ReachingDefinitionsAnalysis(program: Program) {
       transformUses(assume.body.variables, s)
     case indirectCall: IndirectCall =>
       transformUses(indirectCall.target.variables, s)
+    case r: DirectCall => 
+      transformUses(r.actualParams.toSet.flatMap(_._2.variables), s)
+    case r: Return => 
+      transformUses(r.outParams.toSet.flatMap(_._2.variables), s)
     case _ => s
   }
 }

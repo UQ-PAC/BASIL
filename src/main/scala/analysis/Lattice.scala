@@ -1,9 +1,9 @@
 package analysis
 
 import ir._
-import analysis.BitVectorEval
+import ir.eval.BitVectorEval
 import math.pow
-import util.Logger
+import util.StaticAnalysisLogger
 
 /** Basic lattice
  */
@@ -21,6 +21,10 @@ trait Lattice[T]:
   /** The least upper bound of `x` and `y`.
    */
   def lub(x: T, y: T): T
+
+  /** The greatest lower bound of `x` and `y`
+   */
+  def glb(x: T, y: T): T = ???
 
   /** Returns true whenever `x` <= `y`.
    */
@@ -349,6 +353,7 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
       case boolOp: BoolUnOp =>
         boolOp match
           case BoolNOT => ???
+          case BoolToBV1 => ???
       case intOp: IntUnOp =>
         applyOp(intOp.toBV, rhs)
       case _ => ???
@@ -702,7 +707,7 @@ class ConstantPropagationLattice extends FlatLattice[BitVecLiteral] {
       case (Top, _) => Top
   } catch {
     case e: Exception =>
-      Logger.error(s"Failed on op $op with $a and $b")
+      StaticAnalysisLogger.error(s"Failed on op $op with $a and $b")
       throw e
   }
 

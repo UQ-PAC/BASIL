@@ -10,7 +10,11 @@ import ir.cilvisitor.*
 class FindVars extends CILVisitor {
   val vars = mutable.ArrayBuffer[Variable]()
 
-  override def vvar(v: Variable) = {
+  override def vrvar(v: Variable) = {
+    vars.append(v)
+    SkipChildren()
+  }
+  override def vlvar(v: Variable) = {
     vars.append(v)
     SkipChildren()
   }
@@ -95,7 +99,14 @@ class CILVisitorTest extends AnyFunSuite {
     class ExprTrace extends CILVisitor {
       val res = mutable.ArrayBuffer[String]()
 
-      override def vvar(e: Variable) = {
+      override def vlvar(e: Variable) = {
+        e match {
+          case Register(n, _) => res.append(n);
+          case _              => ??? // only reg in source program
+        }
+        DoChildren()
+      }
+      override def vrvar(e: Variable) = {
         e match {
           case Register(n, _) => res.append(n);
           case _              => ??? // only reg in source program
@@ -135,12 +146,19 @@ class CILVisitorTest extends AnyFunSuite {
     class VarTrace extends CILVisitor {
       val res = mutable.ArrayBuffer[String]()
 
-      override def vvar(e: Variable) = { res.append(e.name); SkipChildren() }
+      override def vrvar(e: Variable) = { res.append(e.name); SkipChildren() }
+      override def vlvar(e: Variable) = { res.append(e.name); SkipChildren() }
 
     }
 
     class RegReplace extends CILVisitor {
-      override def vvar(e: Variable) = {
+      override def vrvar(e: Variable) = {
+        e match {
+          case Register(n, _) => ChangeTo(LocalVar("l" + n, e.getType));
+          case _               => DoChildren()
+        }
+      }
+      override def vlvar(e: Variable) = {
         e match {
           case Register(n, _) => ChangeTo(LocalVar("l" + n, e.getType));
           case _               => DoChildren()
@@ -151,10 +169,17 @@ class CILVisitorTest extends AnyFunSuite {
 
     class RegReplacePost extends CILVisitor {
       val res = mutable.ArrayBuffer[String]()
-
-      override def vvar(e: Variable) = {
+      override def vlvar(e: Variable) = {
         e match {
-          case LocalVar(n, _) =>
+          case LocalVar(n, _, _) =>
+            ChangeDoChildrenPost(LocalVar("e" + n, e.getType), e => { res.append(e.name); e });
+          case _ => DoChildren()
+        }
+      }
+
+      override def vrvar(e: Variable) = {
+        e match {
+          case LocalVar(n, _, _) =>
             ChangeDoChildrenPost(LocalVar("e" + n, e.getType), e => { res.append(e.name); e });
           case _ => DoChildren()
         }
@@ -172,8 +197,32 @@ class CILVisitorTest extends AnyFunSuite {
 
     val v3 = RegReplacePost()
     visit_proc(v3, program.procedures.head)
-    assert(v3.res.toList == List("elR31", "elR6", "elR6"))
+    assert(v3.res.toList == List("elR31_0", "elR6_0", "elR6_0"))
 
   }
+
+  test ("changedochildrenposttest") {
+
+    val expr = BinaryExpr(BVADD, BitVecLiteral(BigInt(12), 32), (BinaryExpr(BVADD, BitVecLiteral(BigInt(100), 32), BitVecLiteral(BigInt(120), 32))))
+    class vis extends CILVisitor {
+
+      override def vexpr(e: Expr) = {
+        ChangeDoChildrenPost(e match {
+          case BitVecLiteral(100, 32) => BitVecLiteral(111, 32)
+          case _ => e
+          }, x => x match {
+            case BitVecLiteral(111,32) =>  LocalVar("beans", BitVecType(32))
+            case _ => x
+          })
+        }
+      }
+
+      val cexpr = BinaryExpr(BVADD, BitVecLiteral(BigInt(12), 32), (BinaryExpr(BVADD, LocalVar("beans", BitVecType(32)), BitVecLiteral(BigInt(120), 32))))
+
+      val ne = visit_expr(vis(), expr)
+      assert(ne == cexpr)
+
+    }
+
 
 }

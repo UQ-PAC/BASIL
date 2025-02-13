@@ -41,6 +41,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Simplify System Tests
+        run: ./mill test.testOnly 'SimplifySystemTests*'
+
       - name: System Tests
         run: ./mill test.testOnly 'SystemTests*'
       - uses: actions/upload-artifact@v4

@@ -4,8 +4,10 @@ import bap.*
 import boogie.UnaryBExpr
 import ir.{UnaryExpr, BinaryExpr, *}
 import specification.*
+import ir.cilvisitor.*
 
 import scala.collection.mutable
+import scala.collection.immutable
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.TreeMap
@@ -31,12 +33,11 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
         }
         labelToBlock.addOne(b.label, block)
       }
-      for (p <- s.in) {
-        procedure.in.append(translateParameter(p))
-      }
-      for (p <- s.out) {
-        procedure.out.append(translateParameter(p))
-      }
+      procedure.formalInParam = mutable.SortedSet.from(s.in.map(translateParam))
+      procedure.formalOutParam = mutable.SortedSet.from(s.out.filterNot(_.name.endsWith("_result")).map(translateParam))
+      procedure.inParamDefaultBinding = immutable.SortedMap.from(s.in.map(s => translateParam(s)-> paramRegisterRVal(s)))
+      procedure.outParamDefaultBinding = immutable.SortedMap.from(s.out.filterNot(_.name.endsWith("_result")).map(s => translateParam(s) -> paramRegisterLVal(s)))
+
       if (s.address.contains(mainAddress)) {
         mainProcedure = Some(procedure)
       }
@@ -79,7 +80,25 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       memorySections.addOne(m.address, MemorySection(m.name, m.address, m.size, bytes, readOnly, None))
     }
 
-    Program(procedures, mainProcedure.get, memorySections)
+    class FixCallParams(subroutines: immutable.Map[String, BAPSubroutine]) extends CILVisitor {
+      override def vstmt(st: Statement) = st match {
+        case d: DirectCall => {
+          if (subroutines.contains(d.target.name)) {
+            val s = subroutines(d.target.name)
+            ChangeTo(List(DirectCall(d.target, d.label, 
+              d.target.outParamDefaultBinding,
+              d.target.inParamDefaultBinding)))
+          }  else {
+            SkipChildren()
+          }
+        }
+        case _ => SkipChildren()
+      }
+    }
+
+    var prog = Program(procedures, mainProcedure.get, memorySections)
+    visit_prog(FixCallParams(program.subroutines.map(s => s.name -> s).toMap), prog)
+    prog
   }
 
   private def translateStatement(s: BAPStatement): Seq[Statement] = s match {
@@ -186,7 +205,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     }
     case b: BAPVar => (translateVar(b), None)
     case BAPMemAccess(memory, index, endian, size) =>
-      val temp = LocalVar("$load$" + loadCounter, BitVecType(size))
+      val temp = LocalVar("load" + loadCounter, BitVecType(size))
       loadCounter += 1
       val load = MemoryLoad(temp, translateMemory(memory), translateExprOnly(index), endian, size, None)
       (temp, Some(load))
@@ -200,6 +219,58 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     expr
   }
 
+  private def paramRegisterLVal(param: BAPParameter): Variable = translateVar(param.value)
+  private def toIROutParam(param: BAPParameter) =  {
+    paramRegisterLVal(param) match {
+      case r: Register => {
+        if (r.size == param.size) then {
+          translateParam(param)
+        } else {
+          LocalVar(param.name, BitVecType(r.size))
+        }
+      }
+      case _ => throw Exception(s"subroutine parameter $this refers to non-register variable ${param.value}")
+    }
+
+  }
+  
+  private def paramRegisterRVal(p: BAPParameter): Expr = {
+    paramRegisterLVal(p) match {
+      case r: Register => {
+        if (r.size == p.size) then {
+          r
+        } else if (r.size > p.size){
+          Extract(p.size, 0, r)
+        } else {
+          ZeroExtend(p.size - r.size, r)
+        }
+      }
+      case _ => throw Exception(s"subroutine parameter $this refers to non-register variable ${p.value}")
+    }
+  }
+  def paramVariableRVal(p: BAPParameter): Expr = {
+    paramRegisterLVal(p) match {
+      case r: Register => {
+        if (r.size == p.size) then {
+          translateParam(p)
+        } else {
+          ZeroExtend(r.size - p.size, translateParam(p))
+        }
+      }
+      case _ => throw Exception(s"subroutine parameter $this refers to non-register variable ${p.value}")
+    }
+  }
+
+  def toAssignOut(p: BAPParameter) : LocalAssign = {
+    LocalAssign(translateParam(p), paramRegisterRVal(p))
+  }
+
+  def toAssignIn(p: BAPParameter) : LocalAssign = {
+    LocalAssign(paramRegisterLVal(p), paramVariableRVal(p))
+  }
+
+  def translateParam(p: BAPParameter): LocalVar = LocalVar(p.name, BitVecType(p.size))
+
   private def translateVar(variable: BAPVar): Variable = variable match {
     case BAPRegister(name, size) => Register(name, size)
     case BAPLocalVar(name, size) => LocalVar(name, BitVecType(size))
@@ -209,13 +280,8 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     SharedMemory(memory.name, memory.addressSize, memory.valueSize)
   }
 
-  private def translateParameter(parameter: BAPParameter): Parameter = {
-    val register = translateExprOnly(parameter.value)
-    register match {
-      case r: Register => Parameter(parameter.name, parameter.size, r)
-      case _ => throw Exception(s"subroutine parameter $this refers to non-register variable ${parameter.value}")
-    }
-  }
+
+
 
   private def translateLiteral(literal: BAPLiteral) = {
     BitVecLiteral(literal.value, literal.size)
@@ -279,7 +345,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     } else {
       jumps.head match {
         case b: BAPDirectCall =>
-          val call = Some(DirectCall(nameToProcedure(b.target),Some(b.line)))
+          val call = Some(DirectCall(nameToProcedure(b.target), Some(b.line)))
           val ft = b.returnTarget.map(t => labelToBlock(t)).map(x => GoTo(Set(x))).getOrElse(Unreachable())
           (call, ft, ArrayBuffer())
         case b: BAPIndirectCall =>

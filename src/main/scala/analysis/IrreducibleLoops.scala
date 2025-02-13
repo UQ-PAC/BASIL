@@ -4,7 +4,7 @@ import scala.annotation.tailrec
 import ir.{Block, Command, IntraProcIRCursor, Program, Procedure, GoTo, IRWalk}
 import ir.{LocalAssign, Assume, IntLiteral, IntType, IntEQ, BoolOR, LocalVar, BinaryExpr}
 import util.intrusive_list.IntrusiveList
-import util.Logger
+import util.StaticAnalysisLogger
 
 import scala.collection.mutable
 
@@ -70,6 +70,15 @@ object LoopDetector {
 
     def reducibleTransformIR(): State = {
       this.copy(loops = LoopTransform.llvm_transform(loops.values).map(l => l.header -> l).toMap)
+    }
+
+    def updateIrWithLoops() = {
+      for ((hd, l) <- loops) {
+        hd.inLoop = Set(l)
+        for (participant <- l.nodes) {
+          participant.inLoop = participant.inLoop + l
+        }
+      }
     }
   }
 

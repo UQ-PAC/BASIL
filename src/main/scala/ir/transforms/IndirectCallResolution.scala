@@ -7,6 +7,22 @@ import util.Logger
 import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 
+import analysis.{
+  AddressValue,
+  DataRegion,
+  Lift,
+  LiftedElement,
+  LiteralValue,
+  MemoryModelMap,
+  MemoryRegion,
+  RegisterWrapperEqualSets,
+  StackRegion,
+  Value,
+  getUse
+}
+import ir.*
+import util.Logger
+import cilvisitor.*
 
 class SteensgaardIndirectCallResolution(
   override val program: Program,
@@ -24,7 +40,9 @@ class SteensgaardIndirectCallResolution(
                 case memoryRegion: MemoryRegion =>
                   searchRegion(memoryRegion)
                 case registerWrapperEqualSets: RegisterWrapperEqualSets =>
-                  throw Exception(s"possibly recursive points-to relation? should I handle this? $registerWrapperEqualSets")
+                  throw Exception(
+                    s"possibly recursive points-to relation? should I handle this? $registerWrapperEqualSets"
+                  )
               }
             case memoryRegion: MemoryRegion =>
               //searchRegion(memoryRegion)
@@ -43,7 +61,9 @@ class SteensgaardIndirectCallResolution(
                 case memoryRegion: MemoryRegion =>
                   searchRegion(memoryRegion)
                 case registerWrapperEqualSets: RegisterWrapperEqualSets =>
-                  throw Exception(s"possibly recursive points-to relation? should I handle this? $registerWrapperEqualSets")
+                  throw Exception(
+                    s"possibly recursive points-to relation? should I handle this? $registerWrapperEqualSets"
+                  )
               }
             case memoryRegion: MemoryRegion =>
               //searchRegion(memoryRegion))
@@ -60,7 +80,7 @@ class SteensgaardIndirectCallResolution(
       case Some(values) =>
         values.flatMap {
           case v: RegisterWrapperEqualSets => resolveAddresses(v.variable, i)
-          case m: MemoryRegion            => searchRegion(m)
+          case m: MemoryRegion             => searchRegion(m)
         }
       case None => Set()
     }
@@ -134,7 +154,7 @@ trait IndirectCallResolution {
       }
 
       if (targets.size == 1) {
-        val newCall = DirectCall(targets.head, indirectCall.label)
+        val newCall = targets.head.makeCall(indirectCall.label)
         block.statements.replace(indirectCall, newCall)
         true
       } else if (targets.size > 1) {
@@ -150,13 +170,13 @@ trait IndirectCallResolution {
           }
           val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(address, 64)))
           val newLabel: String = block.label + t.name
-          val directCall = DirectCall(t)
+          val directCall = t.makeCall()
 
           /* copy the goto node resulting */
           val fallthrough = oft match {
-            case g: GoTo => GoTo(g.targets, g.label)
+            case g: GoTo        => GoTo(g.targets, g.label)
             case _: Unreachable => Unreachable()
-            case _: Return => Return()
+            case _: Return      => Return()
           }
           newBlocks.append(Block(newLabel, None, ArrayBuffer(assume, directCall), fallthrough))
         }

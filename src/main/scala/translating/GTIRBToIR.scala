@@ -131,17 +131,19 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, List[InsnSem
 
   // TODO this is a hack to imitate BAP so that the existing specifications relying on this will work
   // we cannot and should not rely on this at all
-  private def createArguments(name: String): (ArrayBuffer[Parameter], ArrayBuffer[Parameter]) = {
-    val args = ArrayBuffer.newBuilder[Parameter]
+  private def createArguments(name: String): (Map[LocalVar, Expr], ArrayBuffer[LocalVar]) = {
     var regNum = 0
 
-    val in = if (name == "main") {
-      ArrayBuffer(Parameter("main_argc", 32, Register("R0", 64)), Parameter("main_argv", 64, Register("R1", 64)))
+    val in : Map[LocalVar, Expr] = if (name == "main") {
+      Map(
+        (LocalVar("main_argc", BitVecType(32)) -> Extract(32,0, Register("R0", (64)))),
+        (LocalVar("main_argv", BitVecType(32)) -> Extract(32,0, Register("R1", (64)))),
+      )
     } else {
-      ArrayBuffer()
+      Map()
     }
 
-    val out = ArrayBuffer(Parameter(name + "_result", 32, Register("R0", 64)))
+    val out = ArrayBuffer[LocalVar]()
 
     (in, out)
   }
@@ -175,21 +177,20 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, List[InsnSem
           procedure.removeBlocks(block)
         } else {
           if (!blockOutgoingEdges.contains(blockUUID)) {
-            throw Exception (s"block ${block.label} in subroutine ${procedure.name} has no outgoing edges")
-          }
-          val outgoingEdges = blockOutgoingEdges(blockUUID)
-          if (outgoingEdges.isEmpty) {
-            throw Exception(s"block ${block.label} in subroutine ${procedure.name} has no outgoing edges")
-          }
-
-          val (calls, jump) = if (outgoingEdges.size == 1) {
-            val edge = outgoingEdges.head
-            handleSingleEdge(block, edge, procedure, procedures)
+            Logger.warn(s"block ${block.label} in subroutine ${procedure.name} no outgoing edges")
+          } else if (blockOutgoingEdges(blockUUID).isEmpty) {
+            Logger.warn(s"block ${block.label} in subroutine ${procedure.name} has no outgoing edges")
           } else {
-            handleMultipleEdges(block, outgoingEdges, procedure)
+            val outgoingEdges = blockOutgoingEdges(blockUUID)
+            val (calls, jump) = if (outgoingEdges.size == 1) {
+              val edge = outgoingEdges.head
+              handleSingleEdge(block, edge, procedure, procedures)
+            } else {
+              handleMultipleEdges(block, outgoingEdges, procedure)
+            }
+            calls.foreach(c => block.statements.append(c))
+            block.replaceJump(jump)
           }
-          calls.foreach(c => block.statements.append(c))
-          block.replaceJump(jump)
 
           if (block.statements.nonEmpty) {
             cleanUpIfPCAssign(block, procedure)
@@ -264,7 +265,8 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, List[InsnSem
 
     val (in, out) = createArguments(name)
 
-    val procedure = Procedure(name, address, in = in, out = out)
+    val procedure = Procedure(name, address, formalInParam = in.map(_._1), formalOutParam = out, inParamDefaultBinding=in.toMap)
+    procedure.inParamDefaultBinding = immutable.SortedMap.from(in.map((l,r) => l -> LocalVar(l.name, BitVecType(64))))
     uuidToProcedure += (functionUUID -> procedure)
     entranceUUIDtoProcedure += (entranceUUID -> procedure)
 
@@ -278,6 +280,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, List[InsnSem
       createBlock(blockUUID, procedure, entranceUUID, blockCount)
       blockCount += 1
     }
+
     procedure
   }
 
@@ -300,7 +303,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, List[InsnSem
 
   // makes label boogie friendly
   private def convertLabel(procedure: Procedure, label: ByteString, blockCount: Int): String = {
-    "$" + procedure.name + "$__" + blockCount + "__$" + byteStringToString(label).replace("=", "").replace("-", "~").replace("/", "\'")
+    procedure.name + "__" + blockCount + "__" + byteStringToString(label).replace("=", "").replace("-", "__").replace("/", "__")
   }
 
   // handles stray assignments to the program counter (which are indirect calls that DDisasm failed to identify)
@@ -374,7 +377,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, List[InsnSem
       val jumpCopy = currentBlock.jump match {
         case GoTo(targets, label) => GoTo(targets, label)
         case Unreachable(label) => Unreachable(label)
-        case Return(label) => Return(label)
+        case Return(label, args) => Return(label, args)
         case _ => throw Exception("this shouldn't be reachable")
       }
       trueBlock.replaceJump(currentBlock.jump)
@@ -579,7 +582,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, List[InsnSem
       val resolvedCall = DirectCall(target)
 
       val assume = Assume(BinaryExpr(BVEQ, targetRegister, BitVecLiteral(target.address.get, 64)))
-      val label = block.label + "$" + target.name
+      val label = block.label + "_" + target.name
       newBlocks.append(Block(label, None, ArrayBuffer(assume, resolvedCall), GoTo(returnTarget)))
     }
     removePCAssign(block)
@@ -652,5 +655,5 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, List[InsnSem
     val assume = Assume(condition, checkSecurity = true)
     Block(newLabel, None, ArrayBuffer(assume), GoTo(ArrayBuffer(target)))
   }
-
 }
+

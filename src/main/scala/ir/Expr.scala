@@ -1,5 +1,4 @@
 package ir
-
 import boogie._
 import scala.collection.mutable
 
@@ -11,27 +10,41 @@ sealed trait Expr {
   /** all variables that occur in the expression */
   def variables: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Expr = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
+
+  lazy val variablesCached = variables
+}
+
+def size(e: Expr) = {
+  e.getType match {
+    case BitVecType(s) => Some(s)
+    case _             => None
+  }
 }
 
 sealed trait Literal extends Expr {
   override def acceptVisit(visitor: Visitor): Literal = visitor.visitLiteral(this)
 }
 
-sealed trait BoolLit extends Literal
+sealed trait BoolLit extends Literal {
+  def value: Boolean
+}
 
 case object TrueLiteral extends BoolLit {
   override def toBoogie: BoolBLiteral = TrueBLiteral
   override def getType: IRType = BoolType
   override def toString: String = "true"
+  override def value = true
 }
 
 case object FalseLiteral extends BoolLit {
   override def toBoogie: BoolBLiteral = FalseBLiteral
   override def getType: IRType = BoolType
   override def toString: String = "false"
+  override def value = false
 }
 
 case class BitVecLiteral(value: BigInt, size: Int) extends Literal {
+  assert(size >= 0)
   override def toBoogie: BitVecBLiteral = BitVecBLiteral(value, size)
   override def getType: IRType = BitVecType(size)
   override def toString: String = s"${value}bv$size"
@@ -110,6 +123,7 @@ case class UnaryExpr(op: UnOp, arg: Expr) extends Expr {
   override def gammas: Set[Variable] = arg.gammas
   override def variables: Set[Variable] = arg.variables
   override def getType: IRType = (op, arg.getType) match {
+    case (BoolToBV1, BoolType)       => BitVecType(1)
     case (_: BoolUnOp, BoolType)     => BoolType
     case (_: BVUnOp, bv: BitVecType) => bv
     case (_: IntUnOp, IntType)       => IntType
@@ -137,6 +151,7 @@ sealed trait BoolUnOp(op: String) extends UnOp {
 }
 
 case object BoolNOT extends BoolUnOp("!")
+case object BoolToBV1 extends BoolUnOp("bool2bv1")
 
 sealed trait IntUnOp(op: String) extends UnOp {
   override def toString: String = op
@@ -144,7 +159,6 @@ sealed trait IntUnOp(op: String) extends UnOp {
 }
 
 case object IntNEG extends IntUnOp("-")
-
 
 sealed trait BVUnOp(op: String) extends UnOp {
   override def toString: String = op
@@ -168,7 +182,7 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
           if (bv1.size == bv2.size) {
             bv1
           } else {
-            throw new Exception("bitvector size mismatch")
+            throw new Exception(s"bitvector size mismatch $bv1 $bv2")
           }
         case BVCOMP =>
           if (bv1.size == bv2.size) {
@@ -191,7 +205,9 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
         case IntEQ | IntNEQ | IntLT | IntLE | IntGT | IntGE => BoolType
       }
     case _ =>
-      throw new Exception("type mismatch, operator " + op + " type doesn't match args: (" + arg1 + ", " + arg2 + ")")
+      throw new Exception(
+        "type mismatch, operator " + op.getClass.getSimpleName + s" type doesn't match args: (" + arg1 + ", " + arg2 + ")"
+      )
   }
 
   private def inSize = arg1.getType match {
@@ -215,10 +231,13 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
 
 }
 
-trait BinOp
+trait BinOp {
+  def opName: String
+}
 
 sealed trait BoolBinOp(op: String) extends BinOp {
   override def toString: String = op
+  def opName = op
 }
 
 case object BoolEQ extends BoolBinOp("==")
@@ -230,6 +249,7 @@ case object BoolEQUIV extends BoolBinOp("<==>")
 
 sealed trait BVBinOp(op: String) extends BinOp {
   override def toString: String = op
+  def opName = op
 }
 
 case object BVAND extends BVBinOp("and")
@@ -264,6 +284,7 @@ case object BVCONCAT extends BVBinOp("++")
 
 sealed trait IntBinOp(op: String) extends BinOp {
   override def toString: String = op
+  def opName = op
   def toBV: BVBinOp = this match {
     case IntADD => BVADD
     case IntMUL => BVMUL
@@ -301,6 +322,7 @@ case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IR
   override def toBoogie: BFunctionCall = BFunctionCall(name, params.map(_.toBoogie).toList, returnType.toBoogie, true)
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitUninterpretedFunction(this)
   override def variables: Set[Variable] = params.flatMap(_.variables).toSet
+  override def toString = s"$name(${params.mkString(", ")})"
 }
 
 /** Something that has a global scope from the perspective of the IR and Boogie.
@@ -326,6 +348,10 @@ sealed trait Variable extends Expr {
     throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
+object Variable {
+  implicit def ordering[V <: Variable]: Ordering[V] = Ordering.by(_.name)
+}
+
 /** Hardware registers.
   *
   * These are variables with global scope (in a 'accessible from any procedure' sense),
@@ -340,14 +366,20 @@ case class Register(override val name: String, size: Int) extends Variable with 
 }
 
 /** Variable with scope local to the procedure, typically a temporary variable created in the lifting process. */
-case class LocalVar(override val name: String, override val irType: IRType) extends Variable {
+case class LocalVar(varName: String, override val irType: IRType, val index: Int = 0) extends Variable {
+  override val name = varName + (if (index > 0) then s"_$index" else "")
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
-  override def toString: String = s"LocalVar($name, $irType)"
+  override def toString: String = s"LocalVar(${name}, $irType)"
   override def acceptVisit(visitor: Visitor): Variable = visitor.visitLocalVar(this)
 }
 
-/** Any memory variable. */
+object LocalVar {
+  def unapply(l: LocalVar): Option[(String, IRType, Int)] = Some((l.name, l.irType, l.index))
+
+}
+
+/** A global memory section (subject to shared-memory concurrent accesses from multiple threads). */
 sealed trait Memory extends Global {
   val name: String
   val addressSize: Int

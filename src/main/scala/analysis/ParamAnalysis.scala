@@ -1,6 +1,6 @@
 package analysis
 
-import ir.{BitVecType, Procedure, Program, Register, Variable}
+import ir.{BitVecType, Procedure, Program, Register, Variable, Block, Return, Unreachable, GoTo}
 
 /**
  * This analysis uses the interprocedural and intraprocedural live variable analyses to
@@ -52,7 +52,18 @@ class ParamAnalysis(val program: Program) extends Analysis[Any] {
         val params = interLivenessResults(proc).keys.toSet.diff(ignoreRegisters).intersect(intraLivenessResults(proc).union(calleeParams))
         val nonParams = interLivenessResults(proc).keys.toSet.diff(ignoreRegisters).diff(intraLivenessResults(proc).union(calleeParams))
         nonParams.foreach(
-          v => assert(interLivenessResults(exit).keys.toSet.contains(v))
+          v => {
+            if (interLivenessResults.contains(exit)) {
+              assert(interLivenessResults(exit).keys.toSet.contains(v))
+            } else {
+              // exit should be the nominated main procedure
+              exit match {
+                case _: Unreachable => ()
+                case r: Return =>  assert(r.parent.statements.isEmpty && r.outParams.isEmpty && r.parent.parent.incomingCalls().isEmpty)
+                case g: GoTo => assert(false)
+              }
+            }
+          }
         )
 
         results += (proc -> params)

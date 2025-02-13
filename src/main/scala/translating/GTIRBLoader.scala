@@ -50,7 +50,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
           for ((s, i) <- instruction.zipWithIndex) {
             val label = blockAddress.map {(a: BigInt) =>
               val instructionAddress = a + (opcodeSize * instructionCount)
-              instructionAddress.toString + "$" + i
+              instructionAddress.toString + "_" + i
             }
 
             statements.appendAll(
@@ -180,8 +180,8 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
     val (expr, load) = visitExpr(ctx.expr)
     if (expr.isDefined) {
       if (load.isDefined) {
-        val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0"))
-        val assign = LocalAssign(LocalVar(name, ty), expr.get, label.map(_ + "$1"))
+        val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "_0"))
+        val assign = LocalAssign(LocalVar(name, ty), expr.get, label.map(_ + "_1"))
         Seq(loadWithLabel, assign)
       } else {
         val assign = LocalAssign(LocalVar(name, ty), expr.get, label)
@@ -197,8 +197,8 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
     val (rhs, load) = visitExpr(ctx.expr)
     if (lhs.isDefined && rhs.isDefined) {
       if (load.isDefined) {
-        val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0"))
-        val assign = LocalAssign(lhs.get, rhs.get, label.map(_ + "$1"))
+        val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "_0"))
+        val assign = LocalAssign(lhs.get, rhs.get, label.map(_ + "_1"))
         Seq(loadWithLabel, assign)
       } else {
         val assign = LocalAssign(lhs.get, rhs.get, label)
@@ -217,10 +217,10 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
     if (expr.isDefined) {
       if (load.isDefined) {
         val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0"))
-        val assign = LocalAssign(LocalVar(name + "$" + blockCount + "$" + instructionCount, ty), expr.get, label.map(_ + "$1"))
+        val assign = LocalAssign(LocalVar(name + "_" + blockCount + "_" + instructionCount, ty), expr.get, label.map(_ + "$1"))
         Seq(loadWithLabel, assign)
       } else {
-        val assign = LocalAssign(LocalVar(name + "$" + blockCount + "$" + instructionCount, ty), expr.get, label)
+        val assign = LocalAssign(LocalVar(name + "_" + blockCount + "_" + instructionCount, ty), expr.get, label)
         Seq(assign)
       }
     } else {
@@ -238,6 +238,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
       case c: TypeConstructorContext => visitIdent(c.str).match {
         case "FPRounding" => BitVecType(3)
         case "integer" => BitVecType(64)
+        case "boolean" => BoolType
         case _ => throw Exception(s"unknown type ${ctx.getText}")
       }
       case _ => throw Exception(s"unknown type ${ctx.getText}")
@@ -259,7 +260,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
   private def visitExprOnly(ctx: ExprContext): Option[Expr] = {
     val (expr, load) = visitExpr(ctx)
     if (load.isDefined) {
-      throw Exception("")
+      throw Exception(s"found load $expr $load")
     } else {
       expr
     }
@@ -268,7 +269,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
   private def visitExprVar(ctx: ExprVarContext): Option[Expr] = {
     val name = visitIdent(ctx.ident)
     name match {
-      case n if constMap.contains(n) => Some(LocalVar(n + "$" + blockCount + "$" + instructionCount, constMap(n)))
+      case n if constMap.contains(n) => Some(LocalVar(n + "_" + blockCount + "_" + instructionCount, constMap(n)))
       case v if varMap.contains(v) => Some(LocalVar(v, varMap(v)))
       case "SP_EL0" => Some(Register("R31", 64))
       case "_PC" => Some(Register("_PC", 64))
@@ -310,7 +311,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
           throw Exception(s"inconsistent size parameters in Mem.read.0: ${ctx.getText}")
         }
 
-        val temp = LocalVar("$load" + loadCounter, BitVecType(size.toInt))
+        val temp = LocalVar("load" + loadCounter, BitVecType(size.toInt))
         loadCounter += 1
 
         if (index.isDefined) {
@@ -322,40 +323,39 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
 
       case "cvt_bool_bv.0" =>
         checkArgs(function, 0, 1, typeArgs.size, args.size, ctx.getText)
-        val expr = visitExprOnly(args.head)
-        val result = expr.map {
-          case BinaryExpr(BVEQ, l, r) => BinaryExpr(BVCOMP, l, r)
-          case UnaryExpr(BoolNOT, BinaryExpr(BVEQ, l, r)) => UnaryExpr(BVNOT, BinaryExpr(BVCOMP, l, r))
-          case FalseLiteral => BitVecLiteral(0, 1)
-          case TrueLiteral => BitVecLiteral(1, 1)
-          case _ => throw Exception(s"unhandled conversion from bool to bitvector: ${ctx.getText}")
-        }
-        (result, None)
+        val (expr, load) = visitExpr(args.head)
+        val result : Option[Expr] = expr.map {
+            case b: BinaryExpr if b.op == BVEQ => BinaryExpr(BVCOMP, b.arg1, b.arg2)
+            case FalseLiteral   => BitVecLiteral(0, 1)
+            case TrueLiteral => BitVecLiteral(1, 1)
+            case o => UnaryExpr(BoolToBV1, o)
+          }
+        (result, load)
 
       case "not_bool.0" => (resolveUnaryOp(BoolNOT, function, 0, typeArgs, args, ctx.getText), None)
-      case "eq_enum.0" => (resolveBinaryOp(BoolEQ, function, 0, typeArgs, args, ctx.getText), None)
-      case "or_bool.0" => (resolveBinaryOp(BoolOR, function, 0, typeArgs, args, ctx.getText), None)
-      case "and_bool.0" => (resolveBinaryOp(BoolAND, function, 0, typeArgs, args, ctx.getText), None)
+      case "eq_enum.0" => (resolveBinaryOp(BoolEQ, function, 0, typeArgs, args, ctx.getText))
+      case "or_bool.0" => (resolveBinaryOp(BoolOR, function, 0, typeArgs, args, ctx.getText))
+      case "and_bool.0" => (resolveBinaryOp(BoolAND, function, 0, typeArgs, args, ctx.getText))
+
+      case "or_bits.0" => (resolveBinaryOp(BVOR, function, 1, typeArgs, args, ctx.getText))
+      case "and_bits.0" => (resolveBinaryOp(BVAND, function, 1, typeArgs, args, ctx.getText))
+      case "eor_bits.0" => (resolveBinaryOp(BVXOR, function, 1, typeArgs, args, ctx.getText))
+      case "eq_bits.0" => (resolveBinaryOp(BVEQ, function, 1, typeArgs, args, ctx.getText))
+      case "add_bits.0" => (resolveBinaryOp(BVADD, function, 1, typeArgs, args, ctx.getText))
+      case "sub_bits.0" => (resolveBinaryOp(BVSUB, function, 1, typeArgs, args, ctx.getText))
+      case "mul_bits.0" => (resolveBinaryOp(BVMUL, function, 1, typeArgs, args, ctx.getText))
+      case "sdiv_bits.0" => (resolveBinaryOp(BVSDIV, function, 1, typeArgs, args, ctx.getText))
+      case "slt_bits.0" => (resolveBinaryOp(BVSLT, function, 1, typeArgs, args, ctx.getText))
+      case "sle_bits.0" => (resolveBinaryOp(BVSLE, function, 1, typeArgs, args, ctx.getText))
 
       case "not_bits.0" => (resolveUnaryOp(BVNOT, function, 1, typeArgs, args, ctx.getText), None)
-      case "or_bits.0" => (resolveBinaryOp(BVOR, function, 1, typeArgs, args, ctx.getText), None)
-      case "and_bits.0" => (resolveBinaryOp(BVAND, function, 1, typeArgs, args, ctx.getText), None)
-      case "eor_bits.0" => (resolveBinaryOp(BVXOR, function, 1, typeArgs, args, ctx.getText), None)
-      case "eq_bits.0" => (resolveBinaryOp(BVEQ, function, 1, typeArgs, args, ctx.getText), None)
-      case "add_bits.0" => (resolveBinaryOp(BVADD, function, 1, typeArgs, args, ctx.getText), None)
-      case "sub_bits.0" => (resolveBinaryOp(BVSUB, function, 1, typeArgs, args, ctx.getText), None)
-      case "mul_bits.0" => (resolveBinaryOp(BVMUL, function, 1, typeArgs, args, ctx.getText), None)
-      case "sdiv_bits.0" => (resolveBinaryOp(BVSDIV, function, 1, typeArgs, args, ctx.getText), None)
-
-      case "slt_bits.0" => (resolveBinaryOp(BVSLT, function, 1, typeArgs, args, ctx.getText), None)
-      case "sle_bits.0" => (resolveBinaryOp(BVSLE, function, 1, typeArgs, args, ctx.getText), None)
 
       case "lsl_bits.0" => (resolveBitShiftOp(BVSHL, function, typeArgs, args, ctx.getText), None)
       case "lsr_bits.0" => (resolveBitShiftOp(BVLSHR, function, typeArgs, args, ctx.getText), None)
       case "asr_bits.0" => (resolveBitShiftOp(BVASHR, function, typeArgs, args, ctx.getText), None)
 
       case "append_bits.0" =>
-        (resolveBinaryOp(BVCONCAT, function, 2, typeArgs, args, ctx.getText), None)
+        (resolveBinaryOp(BVCONCAT, function, 2, typeArgs, args, ctx.getText))
 
       case "replicate_bits.0" =>
         checkArgs(function, 2, 2, typeArgs.size, args.size, ctx.getText)
@@ -409,14 +409,14 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0))
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + size, argsIR, BoolType)), None)
+        (Some(UninterpretedFunction(name + "_" + size, argsIR, BoolType)), None)
 
       case "FPAdd.0" | "FPMul.0" | "FPDiv.0" | "FPMulX.0" | "FPMax.0" | "FPMin.0" | "FPMaxNum.0" | "FPMinNum.0" | "FPSub.0" =>
         checkArgs(function, 1, 3, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0)).toInt
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size))), None)
+        (Some(UninterpretedFunction(name + "_" + size, argsIR, BitVecType(size))), None)
 
       case "FPMulAddH.0" | "FPMulAdd.0" |
            "FPRoundInt.0" |
@@ -425,7 +425,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0)).toInt
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size))), None)
+        (Some(UninterpretedFunction(name + "_" + size, argsIR, BitVecType(size))), None)
 
       case "FPRecpX.0" | "FPSqrt.0" | "FPRecipEstimate.0" |
            "FPRSqrtStepFused.0" | "FPRecipStepFused.0" =>
@@ -433,14 +433,14 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0)).toInt
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size))), None)
+        (Some(UninterpretedFunction(name + "_" + size, argsIR, BitVecType(size))), None)
 
       case "FPCompare.0" =>
         checkArgs(function, 1, 4, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0))
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(4))), None)
+        (Some(UninterpretedFunction(name + "_" + size, argsIR, BitVecType(4))), None)
 
       case "FPConvert.0" =>
         checkArgs(function, 2, 3, typeArgs.size, args.size, ctx.getText)
@@ -448,7 +448,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val outSize = parseInt(typeArgs(0)).toInt
         val inSize = parseInt(typeArgs(1))
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize))), None)
+        (Some(UninterpretedFunction(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "FPToFixed.0" =>
         checkArgs(function, 2, 5, typeArgs.size, args.size, ctx.getText)
@@ -457,7 +457,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val inSize = parseInt(typeArgs(1))
         // need to specifically handle the integer parameter
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize))), None)
+        (Some(UninterpretedFunction(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "FixedToFP.0" =>
         checkArgs(function, 2, 5, typeArgs.size, args.size, ctx.getText)
@@ -466,7 +466,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val outSize = parseInt(typeArgs(1)).toInt
         // need to specifically handle the integer parameter
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize))), None)
+        (Some(UninterpretedFunction(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "FPConvertBF.0" =>
         checkArgs(function, 0, 3, typeArgs.size, args.size, ctx.getText)
@@ -480,7 +480,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val inSize = parseInt(typeArgs(0))
         val outSize = parseInt(typeArgs(1)).toInt
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize))), None)
+        (Some(UninterpretedFunction(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "BFAdd.0" | "BFMul.0" =>
         checkArgs(function, 0, 2, typeArgs.size, args.size, ctx.getText)
@@ -506,16 +506,18 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
                               typeArgs: mutable.Buffer[ExprContext],
                               args: mutable.Buffer[ExprContext],
                               token: String
-                             ): Option[BinaryExpr] = {
+                             ): (Option[BinaryExpr], Option[MemoryLoad]) = {
     checkArgs(function, typeArgsExpected, 2, typeArgs.size, args.size, token)
     // we don't currently check the size for BV ops which is the type arg
     // memory loads shouldn't appear inside binary operations?
-    val arg0 = visitExprOnly(args(0))
-    val arg1 = visitExprOnly(args(1))
+    val (arg0, l0) = visitExpr(args(0))
+    val (arg1, l1) = visitExpr(args(1))
+    val l = l0.orElse(l1)
+    assert(!(l0.isDefined && l1.isDefined), "Multiple loads in expression")
     if (arg0.isDefined && arg1.isDefined) {
-      Some(BinaryExpr(operator, arg0.get, arg1.get))
+      (Some(BinaryExpr(operator, arg0.get, arg1.get)), l)
     } else {
-      None
+      (None, l)
     }
   }
 
@@ -623,7 +625,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
   private def visitLExprVar(ctx: LExprVarContext): Option[Variable] = {
     val name = visitIdent(ctx.ident)
     name match {
-      case n if constMap.contains(n) => Some(LocalVar(n + "$" + blockCount + "$" + instructionCount, constMap(n)))
+      case n if constMap.contains(n) => Some(LocalVar(n + "_" + blockCount + "_" + instructionCount, constMap(n)))
       case v if varMap.contains(v) => Some(LocalVar(v, varMap(v)))
       case "SP_EL0" => Some(Register("R31", 64))
       case "_PC" => Some(Register("_PC", 64))

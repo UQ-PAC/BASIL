@@ -13,14 +13,22 @@ import ir.{Assert, LocalAssign, Assume, CFGPosition, Command, DirectCall, Indire
  * Tip SPA IDE Slides include a short and clear explanation of microfunctions
  * https://cs.au.dk/~amoeller/spa/8-distributive.pdf
  */
-trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement, TwoElementLattice] {
+trait LiveVarsAnalysisFunctions(inline: Boolean) extends BackwardIDEAnalysis[Variable, TwoElement, TwoElementLattice] {
 
   val valuelattice: TwoElementLattice = TwoElementLattice()
   val edgelattice: EdgeFunctionLattice[TwoElement, TwoElementLattice] = EdgeFunctionLattice(valuelattice)
   import edgelattice.{IdEdge, ConstEdge}
 
   def edgesCallToEntry(call: Command, entry: Return)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
-    Map(d -> IdEdge())
+    d match {
+      case Left(l) if inline => {
+        Map(d -> IdEdge())
+      }
+      case Left(l) => Map()
+      case Right(_) => entry.outParams.flatMap(_._2.variables).foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
+              (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
+      }
+    }
   }
 
   def edgesExitToAfterCall(exit: Procedure, aftercall: DirectCall)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
@@ -88,15 +96,46 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement
           case Left(value) => if value != variable then Map(d -> IdEdge()) else Map()
           case Right(_) => Map(d -> IdEdge(), Left(variable) -> ConstEdge(TwoElementTop))
         }
+      case c: DirectCall if (c.target.isExternal.contains(true) || c.target.blocks.isEmpty) => {
+        val writes = ir.transforms.externalCallWrites(c.target.procName).toSet[Variable]
+        val reads = ir.transforms.externalCallReads(c.target.procName).toSet[Variable]
+        d match {
+          case Left(value) =>
+            if writes.contains(value) then
+              Map()
+            else
+              Map(d -> IdEdge())
+          case Right(_) =>
+            reads.foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
+              (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
+            }
+        }
+      } 
+      case c: DirectCall  => {
+        val writes = c.outParams.map(_._2).toSet
+        val reads = c.actualParams.flatMap(_._2.variables).toSet
+        d match {
+          case Left(value) =>
+            if writes.contains(value) then
+              Map()
+            else
+              Map(d -> IdEdge())
+          case Right(_) =>
+            reads.foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
+              (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
+            }
+        }
+      }
       case _ => Map(d -> IdEdge())
     }
   }
 }
 
 class InterLiveVarsAnalysis(program: Program)
-  extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program), LiveVarsAnalysisFunctions
+  extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program), LiveVarsAnalysisFunctions(false)
 
 
-
+class InlineInterLiveVarsAnalysis(program: Program)
+  extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program), LiveVarsAnalysisFunctions(true)
 
 

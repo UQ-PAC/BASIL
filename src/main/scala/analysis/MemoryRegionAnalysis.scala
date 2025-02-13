@@ -1,9 +1,9 @@
 package analysis
 
-import analysis.BitVectorEval.bv2SignedInt
+import ir.eval.BitVectorEval.bv2SignedInt
 import analysis.solvers.SimpleWorklistFixpointSolver
 import ir.*
-import util.Logger
+import util.MRALogger
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -195,7 +195,7 @@ trait MemoryRegionAnalysis(
           Set.empty
         // we cannot evaluate this to a concrete value, we need VSA for this
         case _ =>
-          Logger.debug(s"type: ${exp.getClass} $exp\n")
+          MRALogger.debug(s"type: ${exp.getClass} $exp\n")
           throw new Exception("Unknown type")
       }
     }

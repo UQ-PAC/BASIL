@@ -32,6 +32,9 @@ trait RNAAnalysis(program: Program, ignoreStack: Boolean = true) {
         s ++ (assert.body.variables -- ignoreRegions)
       case memoryStore: MemoryStore =>
         s ++ ((memoryStore.index.variables ++ memoryStore.value.variables) -- ignoreRegions)
+      case call: DirectCall=>
+        (s ++ call.actualParams.flatMap(_._2.variables).toSet.filterNot(ignoreRegions.contains(_)))
+          .diff(call.outParams.map(_._2).toSet)
       case indirectCall: IndirectCall =>
         if (ignoreRegions.contains(indirectCall.target)) {
           s
