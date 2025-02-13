@@ -1,7 +1,7 @@
 package ir.dsl
 
 import ir.*
-import util.{Twine, indent, indentNested, intersperse}
+import util.{Twine, StringEscape, indent, indentNested, intersperse}
 import translating.{BasilIR, BasilIRExp}
 
 import collection.immutable.{SortedMap}
@@ -9,13 +9,36 @@ import collection.immutable.{LazyList}
 import collection.mutable
 import collection.mutable.{LinkedHashSet}
 
+/**
+ * Trait supporting the conversion of objects to stringified Scala source code, suitable
+ * for use verbatim in a .scala file. (In some cases, additional imports may be needed.)
+ *
+ * For example, the following Scala expressions evaluate to true:
+ *
+ *     "hi".toScala == "\"hi\""
+ *     TrueLiteral.toScala == "TrueLiteral"
+ *     123.toScala == "123"
+ *     BigInt(123).toScala == "BigInt(\"123\")"
+ *
+ * The main function provided is a .toScala extension method which returns a String.
+ *
+ * When defining ToScala[A], if the Scala source code will span multiple lines,
+ * then `toScalaLines` should be implemented instead. This allows for more efficient
+ * manipulation and indentation. See the definition of `Twine` for more details.
+ *
+ * In such cases, `toScalaLines` should be overriden and `toScalaUsingToScalaLines`
+ * should be used to define `toScala`.
+ *
+ */
 trait ToScala[-T]:
-  extension (x: T) def toScala: String
+  protected def toScalaUsingToScalaLines(x: T): String = x.toScalaLines.mkString
 
-trait ToScalaLines[-T] extends ToScala[T]:
   extension (x: T)
-    override def toScala: String = x.toScalaLines.mkString
-    def toScalaLines: Twine
+    def toScala: String
+
+    // NOTE: default implementation does not check for newlines within the toScala output!
+    // embedded newlines are not permitted by the Twine conventions.
+    def toScalaLines: Twine = LazyList(x.toScala)
 
 
 // generated from ./expr.json
@@ -43,7 +66,7 @@ given ToScala[Expr] with
   }
 
 given ToScala[UnOp] with
-  extension (x: UnOp) def toScala: String = x match {
+  extension (x: UnOp) override def toScala: String = x match {
     case x: BoolUnOp => x match {
       case x: BoolNOT.type => s"BoolNOT"
       case x: BoolToBV1.type => s"BoolToBV1"
@@ -58,7 +81,7 @@ given ToScala[UnOp] with
   }
 
 given ToScala[BinOp] with
-  extension (x: BinOp) def toScala: String = x match {
+  extension (x: BinOp) override def toScala: String = x match {
     case x: BoolBinOp => x match {
       case x: BoolEQ.type => s"BoolEQ"
       case x: BoolNEQ.type => s"BoolNEQ"
@@ -114,7 +137,7 @@ given ToScala[BinOp] with
   }
 
 given ToScala[Global] with
-  extension (x: Global) def toScala: String = x match {
+  extension (x: Global) override def toScala: String = x match {
     case x: Register => s"Register(${x.name.toScala}, ${x.size.toScala})"
     case x: Memory => x match {
       case x: StackMemory => s"StackMemory(${x.name.toScala}, ${x.addressSize.toScala}, ${x.valueSize.toScala})"
@@ -122,12 +145,11 @@ given ToScala[Global] with
     }
   }
 
-
 // end generated from ./expr.json
 
 // generated from ./statements.json
 given ToScala[Command] with
-  extension (x: Command) def toScala: String = x match {
+  extension (x: Command) override def toScala: String = x match {
     case x: Statement => x match {
       case x: Assign => x match {
         case x: SingleAssign => x match {
@@ -152,119 +174,91 @@ given ToScala[Command] with
     }
   }
 
-
 // end generated from ./statements.json
 
 // generated from ./irtype.json
 given ToScala[IRType] with
-  extension (x: IRType) def toScala: String = x match {
+  extension (x: IRType) override def toScala: String = x match {
     case x: BoolType.type => s"BoolType"
     case x: IntType.type => s"IntType"
     case x: BitVecType => s"BitVecType(${x.size.toScala})"
     case x: MapType => s"MapType(${x.param.toScala}, ${x.result.toScala})"
   }
 
-
 // end generated from ./irtype.json
 
 
 given ToScala[Return] with
-  extension (x: Return) def toScala: String = "ret"
+  extension (x: Return) override def toScala: String = "ret"
 given ToScala[DirectCall] with
-  extension (x: DirectCall) def toScala: String = s"directCall(${x.target.procName.toScala})"
+  extension (x: DirectCall) override def toScala: String = s"directCall(${x.target.procName.toScala})"
 given ToScala[IndirectCall] with
-  extension (x: IndirectCall) def toScala: String = s"indirectCall(${x.target.toScala})"
+  extension (x: IndirectCall) override def toScala: String = s"indirectCall(${x.target.toScala})"
 given ToScala[GoTo] with
-  extension (x: GoTo) def toScala: String = s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})"
+  extension (x: GoTo) override def toScala: String = s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})"
 
-given ToScalaLines[Block] with
-  extension (x: Block) def toScalaLines: Twine =
-    val commands = x.statements ++: LazyList(x.jump)
-    indentNested(
-      s"block(${x.label.toScala}",
-      commands.map(x => LazyList(x.toScala)),
-      ")",
-      hasPreceding = true
-    )
+given ToScala[Block] with
+  extension (x: Block)
+    def toScala = toScalaUsingToScalaLines(x)
+    override def toScalaLines: Twine =
+      val commands = x.statements ++ LazyList(x.jump)
+      indentNested(
+        s"block(${x.label.toScala}",
+        commands.to(LazyList).map(_.toScalaLines),
+        ")",
+        headSep = true
+      )
 
-given ToScalaLines[Procedure] with
-  extension (x: Procedure) def toScalaLines: Twine =
-    indentNested(
-      s"proc(${x.procName.toScala}",
-      x.blocks.to(LazyList).map(_.toScalaLines),
-      ")",
-      hasPreceding = true
-    )
+given ToScala[Procedure] with
+  extension (x: Procedure)
+    def toScala = toScalaUsingToScalaLines(x)
+    override def toScalaLines: Twine =
+      indentNested(
+        s"proc(${x.procName.toScala}",
+        x.blocks.to(LazyList).map(_.toScalaLines),
+        ")",
+        headSep = true
+      )
 
-given ToScalaLines[Program] with
-  extension (x: Program) def toScalaLines: Twine =
-    indentNested(
-      "prog(",
-      x.procedures.to(LazyList).map(_.toScalaLines),
-      ")"
-    )
+given ToScala[Program] with
+  extension (x: Program)
+    def toScala = toScalaUsingToScalaLines(x)
+    override def toScalaLines: Twine =
+      indentNested(
+        "prog(",
+        x.procedures.to(LazyList).map(_.toScalaLines),
+        ")"
+      )
 
 given ToScala[String] with
-  extension (x: String) def toScala: String = StringEscape.quote(x)
+  extension (x: String) override def toScala: String = StringEscape.quote(x)
 given ToScala[Endian] with
-  extension (x: Endian) def toScala: String = "Endian." + x.toString()
+  extension (x: Endian) override def toScala: String = "Endian." + x.toString()
 given ToScala[Int] with
-  extension (x: Int) def toScala: String = x.toString()
+  extension (x: Int) override def toScala: String = x.toString()
 given ToScala[Boolean] with
-  extension (x: Boolean) def toScala: String = x.toString()
+  extension (x: Boolean) override def toScala: String = x.toString()
 given ToScala[BigInt] with
-  extension (x: BigInt) def toScala: String = s"BigInt(${x.toString.toScala})"
+  extension (x: BigInt) override def toScala: String = s"BigInt(${x.toString.toScala})"
 
 
 given [T](using ToScala[T]): ToScala[Seq[T]] with
-  extension (x: Seq[T]) def toScala: String = x match
+  extension (x: Seq[T]) override def toScala: String = x match
     case Seq() => "Seq()"
     case Seq(x) => s"Seq(${x.toScala})"
     case _ => s"Seq(${x.map(_.toScala).mkString(", ")})"
 
 given [T](using ToScala[T]): ToScala[LinkedHashSet[T]] with
-  extension (x: LinkedHashSet[T]) def toScala: String =
+  extension (x: LinkedHashSet[T]) override def toScala: String =
     s"LinkedHashSet(${x.map(_.toScala).mkString(", ")})"
 
 
 given [T](using ToScala[T]): ToScala[Option[T]] with
-  extension (x: Option[T]) def toScala: String = x match
+  extension (x: Option[T]) override def toScala: String = x match
     case None => "None"
     case Some(x) => s"Some(${x.toScala})"
 
 given [K,V](using ToScala[K])(using ToScala[V]): ToScala[SortedMap[K,V]] with
-  extension (x: SortedMap[K,V]) def toScala: String =
+  extension (x: SortedMap[K,V]) override def toScala: String =
     val entries = x.map((a,b) => s"${a.toScala} -> ${b.toScala}").mkString(", ")
     s"SortedMap($entries)"
-
-object StringEscape {
-
-  def quote (s: String): String = "\"" + escape(s) + "\""
-  def escape(s: String): String = s.flatMap(escapedChar)
-
-  def escapedChar(ch: Char): String = ch match {
-    case '\b' => "\\b"
-    case '\t' => "\\t"
-    case '\n' => "\\n"
-    case '\f' => "\\f"
-    case '\r' => "\\r"
-    case '"'  => "\\\""
-    case '\'' => "\\\'"
-    case '\\' => "\\\\"
-    case _    => if (ch.isControl) "\\0" + Integer.toOctalString(ch.toInt)
-                 else              String.valueOf(ch)
-  }
-
-}
-
-object Exporter {
-  def statementToDSL(s: Statement): DSLStatement = s match
-    case s: SingleAssign => s
-    case s: MemoryStore  => s
-    // case s: MemoryLoad => s // subtype of Assign
-    case s: NOP                    => s
-    case s: Assert                 => s
-    case s: Assume                 => s
-    case IndirectCall(target, _)   => indirectCall(target)
-    case DirectCall(proc, _, _, _) => directCall(proc.name)
-}

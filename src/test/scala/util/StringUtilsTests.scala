@@ -1,4 +1,4 @@
-import util.{Twine, indent}
+import util.{Twine, indent, indentNested}
 
 import org.scalatest.funsuite.AnyFunSuite
 
@@ -27,6 +27,48 @@ class StringUtilsTest extends AnyFunSuite {
     assert((indented diff list).distinct == LazyList("  "), "the new strings in the output should only be indentation")
 
     // all the strings in the input also occur in the output, with reference equality.
-    assert(list.forall(x => indented.exists(_ eq x)), "every input string should be contained in the output (by reference)")
+    assert(
+      list.forall(x => indented.exists(_ eq x)),
+      "every input string should be contained in the output (by reference)"
+    )
+  }
+
+  test("indentnested") {
+
+    assert(indentNested("head(", List("a", "b", "c").map(LazyList(_)), ")tail").mkString == """
+head(
+  a,
+  b,
+  c
+)tail""".trim)
+
+    assert(
+      indentNested("<head>", List("a", "b", "c").map(LazyList(_)), "<tail>", sep = "<sep>", newline = "<nl>").mkString
+        ==
+          "<head><nl>a<sep><nl>b<sep><nl>c<nl><tail>",
+      "usual case"
+    )
+
+    assert(
+      indentNested("<head>", List(), "<tail>", sep = "<sep>", newline = "<nl>").mkString
+        ==
+          "<head><tail>",
+      "empty elems should insert no newlines"
+    )
+
+    assert(
+      indentNested(
+        "<head>",
+        List("a", "b", "c").map(LazyList(_)),
+        "<tail>",
+        sep = "<sep>",
+        newline = "<nl>",
+        headSep = true
+      ).mkString
+        ==
+          "<head><sep><nl>a<sep><nl>b<sep><nl>c<nl><tail>",
+      "usual case with headSep"
+    )
+
   }
 }

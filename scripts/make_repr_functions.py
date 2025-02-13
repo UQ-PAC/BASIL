@@ -121,7 +121,7 @@ def main(argv: list[str]):
     print('// generated from', f)
     with open(f) as fp:
       d = toplevel_definitions(json.load(fp))
-      print(*make_repr_given(d), sep='')
+      print(*make_repr_given(d), sep='', end='')
     print('// end generated from', f)
     print()
 
