@@ -54,7 +54,9 @@ class ParamAnalysis(val program: Program) extends Analysis[Any] {
         nonParams.foreach(
           v => {
             if (interLivenessResults.contains(exit)) {
-              assert(interLivenessResults(exit).keys.toSet.contains(v))
+              // main is going to have no outparams
+              // otherwise all the nonparams should be live at exit
+              assert((program.mainProcedure == proc) || interLivenessResults(exit).keys.toSet.contains(v))
             } else {
               // exit should be the nominated main procedure
               exit match {
