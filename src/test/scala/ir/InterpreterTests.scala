@@ -35,11 +35,11 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
   Logger.setLevel(LogLevel.WARN)
 
-  def getProgram(name: String): IRContext = {
+  def getProgram(name: String, path: String): IRContext = {
     val compiler = "gcc"
     val loading = ILLoadingConfig(
-      inputFile = s"src/test/correct/$name/$compiler/$name.adt",
-      relfFile = s"src/test/correct/$name/$compiler/$name.relf",
+      inputFile = s"$path/$name/$compiler/$name.adt",
+      relfFile = s"$path/$name/$compiler/$name.relf",
       specFile = None,
       dumpIL = None
     )
@@ -59,8 +59,8 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     ctx
   }
 
-  def testInterpret(name: String, expected: Map[String, Int]): Unit = {
-    val ctx = getProgram(name)
+  def testInterpret(name: String, expected: Map[String, Int], path: String ="src/test/correct"): Unit = {
+    val ctx = getProgram(name, path)
     val fstate = interpret(ctx)
     val regs = fstate.memoryState.getGlobalVals
     val globals = ctx.globals
@@ -178,8 +178,9 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
   }
 
   test("indirect_call") {
+    // moved indirectcall to separate folder
     val expected = Map[String, Int]()
-    testInterpret("indirect_call", expected)
+    testInterpret("indirect_call", expected, "src/test/indirect_calls")
   }
 
   test("ifglobal") {

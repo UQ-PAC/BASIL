@@ -197,7 +197,7 @@ class CILVisitorTest extends AnyFunSuite {
 
     val v3 = RegReplacePost()
     visit_proc(v3, program.procedures.head)
-    assert(v3.res.toList == List("elR31_0", "elR6_0", "elR6_0"))
+    assert(v3.res.toList == List("elR31", "elR6", "elR6"))
 
   }
 

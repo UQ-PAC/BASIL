@@ -622,7 +622,7 @@ class IRToBoogie(
 
     def coalesced: List[BExpr] = {
       val sections = memorySections
-        .filter(_.size >= 8)
+        .filter(_.size > 0)
         .flatMap { s =>
           // Phrase the memory condition in terms of 64-bit operations, as long as the memory
           // section's size is a multiple of 64-bits and 64-bits (8 bytes) aligned

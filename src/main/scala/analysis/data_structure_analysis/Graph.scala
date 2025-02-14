@@ -115,7 +115,7 @@ class Graph(val proc: Procedure,
     val byteSize = stackAccesses(offset)
     if offset >= nextValidOffset then
       val node = Node(Some(this), byteSize)
-      node.allocationRegions.add(StackLocation(s"Stack_${proc.name}_$offset", proc, byteSize))
+      node.allocationRegions.add(StackLocation(s"Stack_${proc.procName}_$offset", proc, byteSize))
       node.flags.stack = true
       node.addCell(0, 0)
       stackMapping.update(offset, node)
@@ -423,7 +423,7 @@ class Graph(val proc: Procedure,
 
     varToCell.foreach { (pos, mapping) =>
       var id = (pos match {
-        case p: Procedure => p.name
+        case p: Procedure => p.procName
         case b: Block => b.label
         case c: Command => c.label.getOrElse("")
       }).filterNot(toRemove)
@@ -453,7 +453,7 @@ class Graph(val proc: Procedure,
       arrows.append(StructArrow(DotStructElement(s"Stack_$offset", None), DotStructElement(node.id.toString, Some(cellOffset.toString)), internalOffset.toString))
     }
 
-    StructDotGraph(proc.name, structs, arrows).toDotString
+    StructDotGraph(proc.procName, structs, arrows).toDotString
   }
 
 
@@ -817,7 +817,7 @@ class Graph(val proc: Procedure,
         }
         val node = Node(Some(this))
         varToCell(pos) = mutable.Map(lhs -> Slice(node.cells(0), 0))
-      case pos @ DirectCall(target, _, _, _) if target.name == "malloc" =>
+      case pos @ DirectCall(target, _, _, _) if target.procName == "malloc" =>
         val node = Node(Some(this))
         varToCell(pos) = mutable.Map(mallocRegister -> Slice(node.cells(0), 0))
       case pos @ DirectCall(target, _, _, _) if writesTo.contains(target) =>

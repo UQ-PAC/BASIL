@@ -589,6 +589,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val program = results.ir.program
     val dsg = results.analysis.get.bottomUpDSA(program.mainProcedure)
 
+    info(dsg.stackMapping.keySet.mkString(", "))
     val stack0 = dsg.adjust(dsg.get(dsg.stackMapping(0).cells(0)).getPointee)
     val stack8 = dsg.adjust(dsg.get(dsg.stackMapping(8).cells(0)).getPointee)
     val stack24 = dsg.adjust(dsg.get(dsg.stackMapping(24).cells(0)).getPointee)
