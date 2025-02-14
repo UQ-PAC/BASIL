@@ -204,6 +204,9 @@ prog(
     val stmt = MemoryStore(StackMemory("stack", 64, 8), BinaryExpr(BVADD, Register("R31", 64), BitVecLiteral(BigInt("15"), 64)), Extract(8, 0, Register("R0", 64)), Endian.LittleEndian, 8, Some("%0000034e"))
 
     checkOutput(expected, stmt.toScala)
+
+    println(ir.dsl.x)
+
   }
 
 }
