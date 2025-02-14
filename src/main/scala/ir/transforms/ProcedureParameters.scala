@@ -119,7 +119,7 @@ def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
   val mainHasEntry = ctx.program.mainProcedure.entryBlock.isDefined
 
   val liveVars = if (mainNonEmpty && mainHasEntry && mainHasReturn) {
-    analysis.InlineInterLiveVarsAnalysis(ctx.program).analyze()
+    analysis.InterLiveVarsAnalysis(ctx.program).analyze()
   } else {
     Logger.error(s"Empty live vars $mainNonEmpty $mainHasReturn $mainHasEntry")
     Map.empty

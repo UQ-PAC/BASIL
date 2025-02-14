@@ -1,10 +1,11 @@
 import analysis.{InterLiveVarsAnalysis, TwoElementTop}
 import ir.dsl.*
-import ir.{BitVecLiteral, BitVecType, dsl, LocalAssign, LocalVar, Program, Register, Statement, Variable, transforms, cilvisitor, Procedure}
+import ir.{BitVecLiteral, Block, BitVecType, dsl, LocalAssign, LocalVar, Program, Register, Statement, Variable, transforms, cilvisitor, Procedure}
 import util.{Logger, LogLevel}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest
 import util.{BASILResult, StaticAnalysisConfig}
+import translating.PrettyPrinter.*
 
 
 class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
@@ -336,6 +337,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     val result: BASILResult = runExample("basic_function_call_caller")
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.labelToBlock
+    info("bean1")
+    info(analysisResults.keySet.collect {
+      case b : Block => b.label
+    }.mkString("; "))
+    info("bean2")
 
     val lmain = blocks("lmain")
     val laftercall = lmain.singleSuccessor.head
@@ -343,7 +349,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     assert(analysisResults(lmain) == Map(R0 -> TwoElementTop, R29 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
     assert(analysisResults(blocks("lzero")) == Map(R31 -> TwoElementTop))
     assert(analysisResults(laftercall) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block
-    assert(analysisResults(blocks("zero_basil_return")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(analysisResults(blocks("lzero").parent.returnBlock.get) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop))
   }
 
   test("function1") {
@@ -355,11 +361,17 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     val l_get_two_aftercall = lmain.singleSuccessor.head
     val l_printf_aftercall = l_get_two_aftercall.singleSuccessor.head
     // main has no parameters, get_two has three and a return
-    assert(analysisResults(lmain) == Map(R29 -> TwoElementTop, R31 -> TwoElementTop, R30 -> TwoElementTop))
-    assert(analysisResults(l_get_two_aftercall) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // get_two aftercall
+    // We have substantially overapproximated due to printf's set overapproximating
+    val main = Map(Register("R16", 64) -> TwoElementTop, Register("R8", 64) -> TwoElementTop, Register("R14", 64) -> TwoElementTop, Register("R5", 64) -> TwoElementTop, 
+        Register("R15", 64) -> TwoElementTop, Register("R18", 64) -> TwoElementTop, Register("R17", 64) -> TwoElementTop, Register("R29", 64) -> TwoElementTop, 
+        Register("R31", 64) -> TwoElementTop, Register("R7", 64) -> TwoElementTop, Register("R9", 64) -> TwoElementTop, Register("R12", 64) -> TwoElementTop, 
+        Register("R4", 64) -> TwoElementTop, Register("R10", 64) -> TwoElementTop, Register("R3", 64) -> TwoElementTop, 
+        Register("R11", 64) -> TwoElementTop, Register("R13", 64) -> TwoElementTop, Register("R6", 64) -> TwoElementTop)
+    assert(analysisResults(lmain) == main ++ Map(Register("R30", 64) -> TwoElementTop))
+    assert(analysisResults(l_get_two_aftercall) == main ++ Map(Register("R0", 64) -> TwoElementTop, Register("R2", 64) -> TwoElementTop) ) // get_two aftercall
     assert(analysisResults(l_printf_aftercall) == Map(R31 -> TwoElementTop)) // printf aftercall
-    assert(analysisResults(blocks("lget_two")) == Map(R0 -> TwoElementTop, R1 -> TwoElementTop, R2 -> TwoElementTop, R31 -> TwoElementTop))
-    assert(analysisResults(blocks("get_two_basil_return")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(analysisResults(blocks("lget_two")) == main ++ Map(R0 -> TwoElementTop, R1 -> TwoElementTop, R2 -> TwoElementTop) )
+    assert(analysisResults(blocks("lget_two").parent.returnBlock.get) == main ++ Map(R0 -> TwoElementTop, R2 -> TwoElementTop, R31 -> TwoElementTop))
   }
 
   test("ifbranches") {

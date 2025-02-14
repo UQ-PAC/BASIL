@@ -131,11 +131,8 @@ trait LiveVarsAnalysisFunctions(inline: Boolean) extends BackwardIDEAnalysis[Var
   }
 }
 
+
 class InterLiveVarsAnalysis(program: Program)
-  extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program), LiveVarsAnalysisFunctions(false)
-
-
-class InlineInterLiveVarsAnalysis(program: Program)
   extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program), LiveVarsAnalysisFunctions(true)
 
 

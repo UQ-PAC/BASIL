@@ -257,7 +257,7 @@ object IRTransform {
     //        but the interaction between spec and memory regions is nontrivial currently
     cilvisitor.visit_prog(transforms.ReplaceReturns(proc => doSimplify && ctx.program.mainProcedure != proc), ctx.program)
 
-    transforms.addReturnBlocks(ctx.program)
+    transforms.addReturnBlocks(ctx.program, insertR30InvariantAssertion = _ => doSimplify)
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
 
 
