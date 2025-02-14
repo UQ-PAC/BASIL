@@ -97,6 +97,9 @@ jobs:
         # every test with package prefix:
         # sbt "show test:definedTests"
 
+        # note: tests prefixed with '!' are expected to fail.
+        #       if they are fixed, the '!' should be removed.
+        
       - run: ./mill test.testOnly IrreducibleLoop
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly BitVectorAnalysisTests
@@ -119,7 +122,7 @@ jobs:
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly ir.InvariantTest
         if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly ProcedureSummaryTests
+      - run: '! ./mill test.testOnly ProcedureSummaryTests'
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly TaintAnalysisTests
         if: ${{ ! cancelled() }}

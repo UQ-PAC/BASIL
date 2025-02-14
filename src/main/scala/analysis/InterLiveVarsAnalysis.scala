@@ -13,8 +13,7 @@ import ir.{Assert, LocalAssign, Assume, CFGPosition, Command, DirectCall, Indire
  * Tip SPA IDE Slides include a short and clear explanation of microfunctions
  * https://cs.au.dk/~amoeller/spa/8-distributive.pdf
  */
-trait LiveVarsAnalysisFunctions(inline: Boolean) extends BackwardIDEAnalysis[Variable, TwoElement, TwoElementLattice] {
-
+trait LiveVarsAnalysisFunctions(inline: Boolean, addExternals : Boolean = true) extends BackwardIDEAnalysis[Variable, TwoElement, TwoElementLattice] {
   val valuelattice: TwoElementLattice = TwoElementLattice()
   val edgelattice: EdgeFunctionLattice[TwoElement, TwoElementLattice] = EdgeFunctionLattice(valuelattice)
   import edgelattice.{IdEdge, ConstEdge}
@@ -96,7 +95,7 @@ trait LiveVarsAnalysisFunctions(inline: Boolean) extends BackwardIDEAnalysis[Var
           case Left(value) => if value != variable then Map(d -> IdEdge()) else Map()
           case Right(_) => Map(d -> IdEdge(), Left(variable) -> ConstEdge(TwoElementTop))
         }
-      case c: DirectCall if (c.target.isExternal.contains(true) || c.target.blocks.isEmpty) => {
+      case c: DirectCall if addExternals && (c.target.isExternal.contains(true) || c.target.blocks.isEmpty) => {
         val writes = ir.transforms.externalCallWrites(c.target.procName).toSet[Variable]
         val reads = ir.transforms.externalCallReads(c.target.procName).toSet[Variable]
         d match {
@@ -132,7 +131,8 @@ trait LiveVarsAnalysisFunctions(inline: Boolean) extends BackwardIDEAnalysis[Var
 }
 
 
-class InterLiveVarsAnalysis(program: Program)
-  extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program), LiveVarsAnalysisFunctions(true)
+class InterLiveVarsAnalysis(program: Program, ignoreExternals : Boolean = false)
+  extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program), LiveVarsAnalysisFunctions(true, !ignoreExternals)
+
 
 

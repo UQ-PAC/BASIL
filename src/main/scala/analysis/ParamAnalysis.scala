@@ -1,4 +1,5 @@
 package analysis
+import translating.PrettyPrinter.*
 
 import ir.{BitVecType, Procedure, Program, Register, Variable, Block, Return, Unreachable, GoTo}
 
@@ -9,7 +10,7 @@ import ir.{BitVecType, Procedure, Program, Register, Variable, Block, Return, Un
  */
 class ParamAnalysis(val program: Program) extends Analysis[Any] {
   private val intraLivenessResults = IntraLiveVarsAnalysis(program).analyze()
-  private val interLivenessResults = InterLiveVarsAnalysis(program).analyze()
+  private val interLivenessResults = InterLiveVarsAnalysis(program, true).analyze()
   private var completeProcs: Set[Procedure] = Set()
   private var visitedProcs: Set[Procedure] = Set()
   private var results : Map[Procedure, Set[Variable]] = Map()
@@ -54,9 +55,7 @@ class ParamAnalysis(val program: Program) extends Analysis[Any] {
         nonParams.foreach(
           v => {
             if (interLivenessResults.contains(exit)) {
-              // main is going to have no outparams
-              // otherwise all the nonparams should be live at exit
-              assert((program.mainProcedure == proc) || interLivenessResults(exit).keys.toSet.contains(v))
+              assert(interLivenessResults(exit).keys.toSet.contains(v))
             } else {
               // exit should be the nominated main procedure
               exit match {
