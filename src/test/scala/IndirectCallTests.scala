@@ -184,7 +184,7 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
             if (targets.size == resolution.procTargets.size) {
               val targetNames = targets.flatMap {
                 _.statements.lastElem match {
-                  case Some(DirectCall(target, _)) => Some(target.name)
+                  case Some(DirectCall(target, _, _, _)) => Some(target.name)
                   case _ => None
                 }
               }

@@ -1,5 +1,5 @@
 import org.scalatest.funsuite.AnyFunSuite
-import util.{LogLevel, Logger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
+import util.{LogLevel, Logger, DebugDumpIRLogger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
 
 import Numeric.Implicits.*
 import java.io.{BufferedWriter, File, FileWriter}
@@ -19,6 +19,9 @@ trait SystemTests extends AnyFunSuite, BASILTest {
   case class TestResult(name: String, passed: Boolean, verified: Boolean, shouldVerify: Boolean, hasExpected: Boolean, timedOut: Boolean, matchesExpected: Boolean, translateTime: Long, verifyTime: Long) {
     val toCsv = s"$name,$passed,$verified,$shouldVerify,$hasExpected,$timedOut,$matchesExpected,$translateTime,$verifyTime"
   }
+
+  Logger.setLevel(LogLevel.WARN)
+  DebugDumpIRLogger.setLevel(LogLevel.OFF)
 
   object TestResult {
     val csvHeader = "testCase,passed,verified,shouldVerify,hasExpected,timedOut,matchesExpected,translateTime,verifyTime"
@@ -137,13 +140,46 @@ trait SystemTests extends AnyFunSuite, BASILTest {
 
     Logger.info(s"$name/$variation$testSuffix")
     val timer = PerformanceTimer(s"test $name/$variation$testSuffix")
-    runBASIL(inputPath, RELFPath, Some(specPath), BPLPath, conf.staticAnalysisConfig)
+    runBASIL(inputPath, RELFPath, Some(specPath), BPLPath, conf.staticAnalysisConfig, conf.simplify)
     val translateTime = timer.checkPoint("translate-boogie")
     Logger.info(s"$name/$variation$testSuffix DONE")
 
     val boogieResult = runBoogie(directoryPath, BPLPath, conf.boogieFlags)
     val verifyTime = timer.checkPoint("verify")
     val (boogieFailureMsg, verified, timedOut) = checkVerify(boogieResult, resultPath, conf.expectVerify)
+
+
+    def parseError(e: String, context: Int =3) = {
+      val lines = e.split('\n')
+      for (l <- lines) {
+        if (l.endsWith(": Error: this assertion could not be proved") || l.contains("this is the postcondition that could not be proved"))  {
+          val b = l.trim()
+          val parts = b.split("\\(").map(_.split("\\)")).flatten.map(_.split(",")).flatten
+          val fname = parts(0)
+          val line = Integer(parts(1))
+          val col = parts(2)
+
+          val lines = util.readFormFile(fname).toArray
+
+          val lineOffset = line - 1
+
+          val beginLine = Integer.max(0, lineOffset - context)
+          val endLine = Integer.min(lines.length, lineOffset + context)
+
+          val errorLines = (beginLine to endLine).map(x => {
+            val carat = if x == lineOffset then " > " else "   "
+            s"$carat ${x + 1} | ${lines(x)}"
+          })
+
+          info(s"Failing assertion $fname:$line")
+          info(errorLines.mkString("\n").trim)
+
+
+        }
+      }
+    }
+
+    if (conf.expectVerify) parseError(boogieResult)
 
     val (hasExpected, matchesExpected) = if (conf.checkExpected) {
       checkExpected(expectedOutPath, BPLPath)
@@ -200,6 +236,38 @@ class ExtraSpecTests extends SystemTests {
   runTests("extraspec_incorrect", TestConfig(boogieFlags = boogieFlags, useBAPFrontend = false, expectVerify = false, checkExpected = true, logResults = true))
   test("summary-extraspec") {
     summary("testresult-extraspec")
+  }
+}
+
+
+class NoSimplifySystemTests extends SystemTests {
+  runTests("correct", TestConfig(simplify=false, useBAPFrontend = true, expectVerify = true, logResults = true))
+  runTests("incorrect", TestConfig(simplify=false, useBAPFrontend = true, expectVerify = false, logResults = true))
+  runTests("correct", TestConfig(simplify=false, useBAPFrontend = false, expectVerify = true, logResults = true))
+  runTests("incorrect", TestConfig(simplify=false, useBAPFrontend = false, expectVerify = false, logResults = true))
+  test("summary-nosimplify") {
+    summary("nosimplify")
+  }
+}
+class SimplifySystemTests extends SystemTests {
+  runTests("correct", TestConfig(simplify=true, useBAPFrontend = true, expectVerify = true, logResults = true))
+  runTests("incorrect", TestConfig(simplify=true, useBAPFrontend = true, expectVerify = false, logResults = true))
+  runTests("correct", TestConfig(simplify=true, useBAPFrontend = false, expectVerify = true, logResults = true))
+  runTests("incorrect", TestConfig(simplify=true, useBAPFrontend = false, expectVerify = false, logResults = true))
+  test("summary-simplify") {
+    summary("simplify")
+  }
+}
+
+class SimplifyMemorySystemTests extends SystemTests {
+  Logger.setLevel(LogLevel.DEBUG)
+  val staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA))
+  runTests("correct", TestConfig(simplify=true, useBAPFrontend = true, expectVerify = true, logResults = true, staticAnalysisConfig = staticAnalysisConfig))
+  runTests("incorrect", TestConfig(simplify=true, useBAPFrontend = true, expectVerify = false, logResults = true, staticAnalysisConfig = staticAnalysisConfig))
+  runTests("correct", TestConfig(simplify=true, useBAPFrontend = false, expectVerify = true, logResults = true, staticAnalysisConfig = staticAnalysisConfig))
+  runTests("incorrect", TestConfig(simplify=true, useBAPFrontend = false, expectVerify = false, logResults = true, staticAnalysisConfig = staticAnalysisConfig))
+  test("summary-simplify-mem") {
+    summary("simplify-mem")
   }
 }
 

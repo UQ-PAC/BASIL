@@ -2,7 +2,7 @@ package analysis
 
 import analysis.*
 import ir.*
-import util.Logger
+import util.MRALogger
 
 import scala.collection.immutable.TreeMap
 import scala.collection.mutable
@@ -238,7 +238,8 @@ class MemoryModelMap(
     for (dr <- oldRegions) {
       val obj = findDataObject(dr.start)
       if (obj.isEmpty) {
-        Logger.debug(s"Data region $dr not found in the new data map")
+        MRALogger.debug(s"Data region $dr not found in the new data map")
+        MRALogger.debug(s"Data region $dr not found in the new data map")
         add(dr.start, dr)
       } else {
         val isRelocated = relocatedDataRegion(dr.start)
@@ -370,34 +371,34 @@ class MemoryModelMap(
           case _: HeapRegion => "  "
           case _: DataRegion => "  "
       }
-      Logger.debug(s"$spacing$range -> $region")
+      MRALogger.debug(s"$spacing$range -> $region")
       region match
         case region1: DataRegion if relfContent.contains(region1) => for value <- relfContent(region1) do
-          Logger.debug(s"$spacing    $value")
+          MRALogger.debug(s"$spacing    $value")
         case _ =>
     }
-    Logger.debug("Stack:")
+    MRALogger.debug("Stack:")
     for name <- localStacks.keys do
       popContext()
       pushContext(name)
-      Logger.debug(s"  Function: $name")
-      if stackMap.nonEmpty then Logger.debug(s"    Local:")
+      MRALogger.debug(s"  Function: $name")
+      if stackMap.nonEmpty then MRALogger.debug(s"    Local:")
       // must sort by ranges
       for ((range, region) <- stackMap) {
         logRegion(range, region)
       }
-      if sharedStackMap.nonEmpty then Logger.debug(s"    Shared:")
+      if sharedStackMap.nonEmpty then MRALogger.debug(s"    Shared:")
       for ((parent, treeMap) <- sharedStackMap) {
-        Logger.debug(s"        Parent: ${parent.name}")
+        MRALogger.debug(s"        Parent: ${parent.name}")
         for ((range, region) <- treeMap) {
           logRegion(range, region, true)
         }
       }
-    Logger.debug("Stack Union-Find Roots:")
+    MRALogger.debug("Stack Union-Find Roots:")
     for name <- localStacks.keys do
       popContext()
       pushContext(name)
-      Logger.debug(s"  Function: $name")
+      MRALogger.debug(s"  Function: $name")
       var parentCount = 0
       // get root regions
       for ((range, region) <- stackMap) {
@@ -406,17 +407,17 @@ class MemoryModelMap(
           logRegion(range, root)
           parentCount += 1
       }
-      if parentCount == 0 then Logger.debug("    No root regions") else Logger.debug(s"    Parents: $parentCount/${stackMap.size}")
-    Logger.debug("Shared Stacks:")
+      if parentCount == 0 then MRALogger.debug("    No root regions") else MRALogger.debug(s"    Parents: $parentCount/${stackMap.size}")
+    MRALogger.debug("Shared Stacks:")
     for (name, sharedStacks) <- sharedStacks do
-      Logger.debug(s"  Function: $name")
+      MRALogger.debug(s"  Function: $name")
       for region <- sharedStacks do
-        Logger.debug(s"    $region")
-    Logger.debug("Heap:")
+        MRALogger.debug(s"    $region")
+    MRALogger.debug("Heap:")
     for ((range, region) <- heapMap) {
       logRegion(range, region)
     }
-    Logger.debug("Data:")
+    MRALogger.debug("Data:")
     for ((range, region) <- dataMap) {
       logRegion(range, region)
     }

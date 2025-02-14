@@ -1,6 +1,8 @@
 package ir
+import util.Logger
 import util.intrusive_list.IntrusiveListElement
 import boogie.{BMapVar, GammaStore}
+import collection.immutable.SortedMap
 
 import collection.mutable
 
@@ -27,14 +29,20 @@ sealed trait Statement extends Command, IntrusiveListElement[Statement] {
   def acceptVisit(visitor: Visitor): Statement = throw new Exception(
     "visitor " + visitor + " unimplemented for: " + this
   )
+  def predecessor : Option[Command] = parent.statements.prevOption(this)
   def successor: Command = parent.statements.nextOption(this).getOrElse(parent.jump)
 }
 
 sealed trait Assign extends Statement {
-  var lhs: Variable
+  def assignees: Set[Variable]
 }
 
-class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[String] = None) extends Assign {
+sealed trait SingleAssign extends Assign {
+  def lhs: Variable
+  override def assignees = Set(lhs)
+}
+
+class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[String] = None) extends SingleAssign {
   override def modifies: Set[Global] = lhs match {
     case r: Register => Set(r)
     case _           => Set()
@@ -56,7 +64,7 @@ object MemoryStore {
   def unapply(m: MemoryStore): Option[(Memory, Expr, Expr, Endian, Int, Option[String])] = Some(m.mem, m.index, m.value, m.endian, m.size, m.label)
 }
 
-class MemoryLoad(var lhs: Variable, var mem: Memory, var index: Expr, var endian: Endian, var size: Int, override val label: Option[String] = None) extends Assign {
+class MemoryLoad(var lhs: Variable, var mem: Memory, var index: Expr, var endian: Endian, var size: Int, override val label: Option[String] = None) extends SingleAssign {
   override def modifies: Set[Global] = lhs match {
     case r: Register => Set(r)
     case _ => Set()
@@ -109,16 +117,18 @@ class Unreachable(override val label: Option[String] = None) extends Jump {
   override def acceptVisit(visitor: Visitor): Jump = this
 }
 
+class Return(override val label: Option[String] = None, var outParams : SortedMap[LocalVar, Expr] = SortedMap()) extends Jump { 
+  override def acceptVisit(visitor: Visitor): Jump = this
+  override def toString = s"Return(${outParams.mkString(",")})"
+}
+
+
 object Unreachable {
   def unapply(u: Unreachable): Option[Option[String]] = Some(u.label)
 }
 
-class Return(override val label: Option[String] = None) extends Jump {
-  override def acceptVisit(visitor: Visitor): Jump = this
-}
-
 object Return {
-  def unapply(r: Return): Option[Option[String]] = Some(r.label)
+  def unapply(r: Return): Option[(Option[String], SortedMap[LocalVar, Expr])] = Some((r.label, r.outParams))
 }
 
 class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override val label: Option[String]) extends Jump {
@@ -174,15 +184,19 @@ sealed trait Call extends Statement {
 }
 
 class DirectCall(val target: Procedure,
-                 override val label: Option[String] = None
-                ) extends Call {
+                 override val label: Option[String] = None,
+                 var outParams: SortedMap[LocalVar, Variable] = SortedMap(), // out := formal
+                 var actualParams: SortedMap[LocalVar, Expr] = SortedMap(), // formal := actual
+                ) extends Call with Assign {
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals
     case None => Set()
   } */
   def calls: Set[Procedure] = Set(target)
-  override def toString: String = s"${labelStr}DirectCall(${target.name})"
+  override def toString: String = s"${labelStr}${outParams.map(_._2.name).mkString(",")} := DirectCall(${target.name})(${actualParams.map(_._2).mkString(",")})"
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitDirectCall(this)
+
+  def assignees = outParams.map(_._2).toSet
 
   override def linkParent(p: Block): Unit = {
     super.linkParent(p)
@@ -197,7 +211,7 @@ class DirectCall(val target: Procedure,
 }
 
 object DirectCall:
-  def unapply(i: DirectCall): Option[(Procedure, Option[String])] = Some(i.target, i.label)
+  def unapply(i: DirectCall): Option[(Procedure, Map[LocalVar, Variable], Map[LocalVar, Expr], Option[String])] = Some(i.target, i.outParams, i.actualParams, i.label)
 
 class IndirectCall(var target: Variable,
                    override val label: Option[String] = None
