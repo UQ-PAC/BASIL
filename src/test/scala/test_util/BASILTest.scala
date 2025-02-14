@@ -14,7 +14,7 @@ case class TestConfig(boogieFlags: Seq[String] = Seq("/timeLimit:10", "/useArray
                       expectVerify: Boolean,
                       checkExpected: Boolean = false,
                       logResults: Boolean = false,
-                      simplify: Boolean = false,
+                      simplify: Boolean = true,
                      )
 
 trait BASILTest {
