@@ -91,14 +91,14 @@ case class TNum(value: BigInt, mask: BigInt) {
         val v = this.value * that.value
         var mu = TNum(BigInt(0), BigInt(0))
 
-        while (a.value | a.mask) {
-            if (a.value & BigInt(1)) {
+        while ((a.value | a.mask) != 0) {
+            if ((a.value & BigInt(1)) != 0) {
                 mu = mu.TADD(TNum(BigInt(0), b.mask))
-            } else if (a.mask & BigInt(1)) {
+            } else if ((a.mask & BigInt(1)) != 0) {
                 mu = mu.TADD(TNum(BigInt(0), b.value | b.mask))
             }
-            a = a.TLSHR(1)
-            b = b.TSHL(1)
+            a = a.TLSHR(TNum(BigInt(1), BigInt(0)))
+            b = b.TSHL(TNum(BigInt(1), BigInt(0)))
         }
         TNum(v, BigInt(0)).TADD(mu)
     }
@@ -121,45 +121,94 @@ case class TNum(value: BigInt, mask: BigInt) {
 
     // Shift Left
     def TSHL(that: TNum): TNum = {
-        val shiftL = that.value & ~that.mask
-        val shiftH = that.value | that.mask
+        // Lower and upper bounds of shift value
+        val thatLB = (that.value & ~that.mask).toInt
+        val thatUB = (that.value | that.mask).toInt
 
-        val vL = this.value << shiftL
-        val vH = this.value << shiftH
+        val bitWidth = (this.value | this.mask).bitLength
 
-        val newValue = vL & vH
-        val newMask = (this.mask << shiftL) | (this.mask << shiftH) | (vL ^ vH)
+        // Value and mask accumulator begins with lower bound
+        var accValue = this.value << thatLB
+        var accMask = this.mask << thatLB
 
-        TNum(newValue, newMask)
+        // Iterate through each shift value
+        for (i <- thatLB to Math.min(thatUB, bitWidth - 1)) {
+            // Check if the shift is possible
+            if ((i & ~that.mask) == that.value) {
+                accMask |= (this.mask << i) | ((this.value << i) ^ accValue)
+                accValue &= (this.value << i)
+            }
+        }
+
+        if (thatUB >= bitWidth) {
+            accMask |= accValue
+            accValue = 0
+        }
+
+        TNum(accValue, accMask)
     }
 
     // Logical Shift Right
     def TLSHR(that: TNum): TNum = {
-        val shiftL = that.value & ~that.mask
-        val shiftH = that.value | that.mask
+        // Handle logical shift right since >> is arithmetic shift right
+        def logicalShiftRight(n: BigInt, shift: Int): BigInt = {
+            return (n >> shift) & ~(BigInt(-1) << (n.bitLength - shift))
+        }
 
-        // '>>' used for arithmetic shift, not logical
-        val vL = this.value.shiftRight(shiftL)
-        val vH = this.value.shiftRight(shiftH)
+        // Lower and upper bounds of shift value
+        val thatLB = (that.value & ~that.mask).toInt
+        val thatUB = (that.value | that.mask).toInt
 
-        val newValue = vL & vH
-        val newMask = (this.mask >> shiftL) | (this.mask >> shiftH) | (vL ^ vH)
+        val bitWidth = (this.value | this.mask).bitLength
 
-        TNum(newValue, newMask)
+        // Value and mask accumulator begins with lower bound
+        var accValue = logicalShiftRight(this.value, thatLB)
+        var accMask = logicalShiftRight(this.mask, thatLB)
+
+        // Iterate through each shift value
+        for (i <- thatLB to Math.min(thatUB, bitWidth - 1)) {
+            // Check if the shift is possible
+            if ((i & ~that.mask) == that.value) {
+                accMask |= logicalShiftRight(this.mask, i) | (logicalShiftRight(this.value, i) ^ accValue)
+                accValue &= logicalShiftRight(this.value, i)
+            }
+        }
+
+        if (thatUB >= bitWidth) {
+            accMask |= accValue
+            accValue = 0
+        }
+
+        TNum(accValue, accMask)
     }
 
     // Arithmetic Shift Right
     def TASHR(that: TNum): TNum = {
-        val shiftL = that.value & ~that.mask
-        val shiftH = that.value | that.mask
+        // Lower and upper bounds of shift value
+        val thatLB = (that.value & ~that.mask).toInt
+        val thatUB = (that.value | that.mask).toInt
 
-        val vL = this.value >> shiftL
-        val vH = this.value >> shiftH
+        val bitWidth = (this.value | this.mask).bitLength
 
-        val newValue = vL & vH
-        val newMask = (this.mask >> shiftL) | (this.mask >> shiftH) | (vL ^ vH)
+        // Value and mask accumulator begins with lower bound
+        var accValue = this.value >> thatLB
+        var accMask = this.mask >> thatLB
 
-        TNum(newValue, newMask)
+        // Iterate through each shift value
+        for (i <- thatLB to Math.min(thatUB, bitWidth - 1)) {
+            // Check if the shift is possible
+            if ((i & ~that.mask) == that.value) {
+                accMask |= (this.mask >> i) | ((this.value >> i) ^ accValue)
+                accValue &= (this.value >> i)
+            }
+        }
+
+        if (thatUB >= bitWidth) {
+            accMask |= (this.mask >> bitWidth) | ((this.value >> bitWidth) ^ accValue)
+            accValue &= (this.value >> bitWidth)
+        }
+
+        TNum(accValue, accMask)
     }
 
     // Unsigned Division
@@ -435,7 +484,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
             TNum(bv.value & mask, BigInt(0))
 
         case iv: IntLiteral =>
-            val mask = (BigInt(1) << iv.size) - 1
+            val mask = (BigInt(1) << iv.value.bitLength) - 1
             TNum(iv.value & mask, BigInt(0))
     }
 
@@ -596,6 +645,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
     }
 }
 
+// TODO
 // call applyTransform method in RunUtils
 // transforms.SimplifyExprWithTNum().applyTransform(ctx.program)
 class SimplifyKnownBits() {
@@ -607,7 +657,8 @@ class SimplifyKnownBits() {
         }
     }
 
-    def applyTransform(p: Procedure): Unit = {
-        val (beforeIn, afterIn) = solver.solveProc(p, backwards = true)
+    def applyTransform(procedure: Procedure): Unit = {
+        val (beforeIn, afterIn) = solver.solveProc(procedure, backwards = false)
+        writeToFile(translating.PrettyPrinter.pp_proc_with_analysis_results(beforeIn, afterIn, procedure, x => s"Live vars: ${x.map(_.name).toList.sorted.mkString(", ")}"), "live-vars.il")
     }
 }
