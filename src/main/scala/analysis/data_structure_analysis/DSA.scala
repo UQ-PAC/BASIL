@@ -100,17 +100,21 @@ trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Nod
   
 //  def clone[T <: DSAGraph[Solver, Merged, Cell, CCell, Node]]: T 
 
+/*
   def symValToCells(symVal: SymValueSet): Set[Cell] = {
     val pairs = symVal.state
     pairs.foldLeft(Set[Cell]()) {
       case (results, (base: SymBase, offsets: SymOffsets)) =>
-        val node = nodes(base)
+        val node = find(nodes(base))
         if offsets.isTop then
           results + node.collapse()
         else
-          results ++ offsets.getOffsets.map(node.add)
+          results ++ offsets.getOffsets.map(node.get)
     }
   }
+*/
+
+  def find(node: Node): Node
 
   protected def processConstraint(constraint: Constraint): Unit
 
@@ -118,7 +122,7 @@ trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Nod
   protected def symValToNodes(symVal: SymValueSet, current: Map[SymBase, Node]): Map[SymBase, Node] = {
     symVal.state.foldLeft(current) {
       case (result, (base, symOffsets)) =>
-        val node = result.getOrElse(base, init(base, None))
+        val node = find(result.getOrElse(base, init(base, None)))
         base match
           case Heap(call) => node.flags.heap = true
           case Stack(proc) => node.flags.stack = true
