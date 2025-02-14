@@ -341,7 +341,6 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
           case BoolEQUIV => ???
       case intOp: IntBinOp =>
         applyOp(intOp.toBV, lhs, rhs)
-      case _ => ???
   }
 
   def applyOp(op: UnOp, rhs: ValueSet[T]): ValueSet[T] = {
@@ -356,7 +355,6 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
           case BoolToBV1 => ???
       case intOp: IntUnOp =>
         applyOp(intOp.toBV, rhs)
-      case _ => ???
   }
 
   def add(x: ValueSet[T], y: ValueSet[T]): ValueSet[T] = {
