@@ -257,7 +257,7 @@ object IRTransform {
     //        but the interaction between spec and memory regions is nontrivial currently
     cilvisitor.visit_prog(transforms.ReplaceReturns(proc => doSimplify && ctx.program.mainProcedure != proc), ctx.program)
 
-    transforms.addReturnBlocks(ctx.program)
+    transforms.addReturnBlocks(ctx.program, insertR30InvariantAssertion = _ => doSimplify)
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
 
 
@@ -612,6 +612,7 @@ object RunUtils {
     }
   }
 
+
   def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]) : Unit = {
     // writeToFile(dotBlockGraph(program, program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
     Logger.info("[!] Running Simplify")
@@ -715,11 +716,11 @@ object RunUtils {
     Logger.info("[!] Simplify :: finished")
   }
 
-  def loadAndTranslate(conf: BASILConfig): BASILResult = {
+  def loadAndTranslate(conf: BASILConfig, postLoad: IRContext => Unit = s => ()): BASILResult = {
     Logger.info("[!] Loading Program")
-    var q = conf
-
+    val q = conf
     var ctx = q.context.getOrElse(IRLoading.load(q.loading))
+    postLoad(ctx)  // allows extracting information from the original loaded program
 
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))

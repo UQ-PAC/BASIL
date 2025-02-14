@@ -221,7 +221,7 @@ class Program(var procedures: ArrayBuffer[Procedure],
   def initialMemoryLookup(address: BigInt): Option[MemorySection] = memoryLookup(initialMemory, address)
 
   def nameToProcedure: Map[String, Procedure] = {
-    procedures.view.map(p => p.name -> p).toMap
+    procedures.view.map(p => p.procName -> p).toMap
   }
 
   def labelToBlock: Map[String, Block] = {

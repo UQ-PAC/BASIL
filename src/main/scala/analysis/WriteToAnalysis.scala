@@ -30,7 +30,7 @@ class WriteToAnalysis(program: Program) extends Analysis[Map[Procedure, Set[Regi
             writtenTo.add(variable)
           case MemoryLoad(lhs: Register, _, _, _, _, _) if paramRegisters.contains(lhs) =>
             writtenTo.add(lhs)
-          case DirectCall(target, _, _, _) if target.name == "malloc" =>
+          case DirectCall(target, _, _, _) if target.procName == "malloc" =>
             writtenTo.add(mallocRegister)
           case d: DirectCall if program.procedures.contains(d.target) =>
             writtenTo.addAll(getWritesTos(d.target))

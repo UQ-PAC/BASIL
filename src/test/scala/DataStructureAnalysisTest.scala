@@ -2,9 +2,12 @@ import analysis.data_structure_analysis.*
 import ir.*
 import org.scalatest.funsuite.AnyFunSuite
 import ir.dsl.*
-import specification.Specification
+import specification.{Specification, SymbolTableEntry}
+import translating.ELFSymbol
 import boogie.SpecGlobal
 import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, StaticAnalysisContext, writeToFile}
+import util.{LogLevel, Logger}
+import translating.PrettyPrinter.*
 
 /**
  * This is the test suite for testing DSA functionality
@@ -30,8 +33,10 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
   }
 
+
   def runTest(path: String): BASILResult = {
-    RunUtils.loadAndTranslate(
+
+    val result = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
           inputFile = path + ".adt",
@@ -42,22 +47,24 @@ class DataStructureAnalysisTest extends AnyFunSuite {
         staticAnalysis = Some(StaticAnalysisConfig()),
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-      )
+      ),
     )
+    result
   }
 
   test("overlapping access") {
     val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable")
 
-
     // the dsg of the main procedure after the local phase
     val program = results.ir.program
     val dsg = results.analysis.get.localDSA(program.mainProcedure)
 
+    val addtwo_range = dsg.getGlobal("add_two").get // procedures("add_two");
+    val addsix_range = dsg.getGlobal("add_six").get // procedures("add_six");
+    val subseven_range = dsg.getGlobal("sub_seven").get //procedures("sub_seven");
 
     // dsg.formals(R29) is the slice representing formal R29
     val R29formal = dsg.adjust(dsg.formals(R29))
-
 
     // cells representing the stack at various offsets
     val stack64 = dsg.get(dsg.stackMapping(64).cells(0)) // R31 + 0x40
@@ -70,24 +77,36 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     assert(dsg.adjust(stack72.getPointee).equals(dsg.adjust(dsg.formals(R30)))) // R31 + 8 points to the link register
 
     // overlapping access
-    assert(dsg.adjust(stack16.getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0))))
-    assert(dsg.adjust(stack24.getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
+    assert(dsg.adjust(stack16.getPointee).equals(dsg.get(dsg.globalMapping(addtwo_range).node.cells(0))))
+    assert(dsg.adjust(stack24.getPointee).equals(dsg.get(dsg.globalMapping(addsix_range).node.cells(0))))
     assert(stack24 == stack16)
 
-//    assert(!dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).equals(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
-    assert(dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).equals(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
-    assert(dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).node.get.equals(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0)).node.get))
+//    assert(!dsg.get(dsg.globalMapping(addtwo_range).node.cells(0)).equals(dsg.get(dsg.globalMapping(addsix_range).node.cells(0))))
+    assert(dsg.get(dsg.globalMapping(addtwo_range).node.cells(0)).equals(dsg.get(dsg.globalMapping(addsix_range).node.cells(0))))
+    assert(dsg.get(dsg.globalMapping(addtwo_range).node.cells(0)).node.get.equals(dsg.get(dsg.globalMapping(addsix_range).node.cells(0)).node.get))
 
-    assert(dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0)).offset.equals(0))
-    assert(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0)).offset.equals(0))
-//    assert(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0)).offset.equals(8))
+    assert(dsg.get(dsg.globalMapping(addtwo_range).node.cells(0)).offset.equals(0))
+    assert(dsg.get(dsg.globalMapping(addsix_range).node.cells(0)).offset.equals(0))
+//    assert(dsg.get(dsg.globalMapping(addsix_range).node.cells(0)).offset.equals(8))
 
-    assert(dsg.adjust(dsg.SSAVar("%00000429$1", "R8")).equals(dsg.get(dsg.globalMapping(AddressRange(1876, 1876 + 20)).node.cells(0))))
-    assert(dsg.adjust(dsg.SSAVar("%00000438$1", "R8")).equals(dsg.get(dsg.globalMapping(AddressRange(1896, 1896 + 20)).node.cells(0))))
+    // locate all memory loads with R31 within their index expression, where
+    // the loaded value is immediately assigned into a register.
+    // the returned list is the label and destination register of the local assignment.
+    val loadsWithStackOffset = program
+      .mainProcedure
+      .preOrderIterator
+      .sliding(2).map(_.toSeq)
+      .collect {
+        case Seq(
+          MemoryLoad(memresult, _, memexpr, _, _, _),
+          LocalAssign(Register(assignedreg, _), assignedval, Some(assignlabel)))
+        if memexpr.variables.contains(R31) && memresult == assignedval
+        => (assignlabel, assignedreg)
+      }.toSeq
+    assert(dsg.adjust(dsg.SSAVar.tupled(loadsWithStackOffset(0))).equals(dsg.get(dsg.globalMapping(addtwo_range).node.cells(0))))
+    assert(dsg.adjust(dsg.SSAVar.tupled(loadsWithStackOffset(1))).equals(dsg.get(dsg.globalMapping(addsix_range).node.cells(0))))
 
-
-
-    assert(dsg.adjust(stack32.getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(1916, 1916 + 20)).node.cells(0))))
+    assert(dsg.adjust(stack32.getPointee).equals(dsg.get(dsg.globalMapping(subseven_range).node.cells(0))))
 
   }
 
@@ -111,8 +130,6 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     assert(R0formal.largestAccessedSize == 8)
     assert(paramNode.cells(0) == R0formal)
     assert(paramNode.cells(16).largestAccessedSize == 8)
-
-
 
     // Local Caller
     val dsgCaller = results.analysis.get.localDSA(program.mainProcedure)
@@ -141,19 +158,19 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     // the dsg of the main procedure after the local phase
     val program = results.ir.program
 
-
     // Local Caller
     val dsgCaller = results.analysis.get.localDSA(program.mainProcedure)
-    assert(dsgCaller.find(dsgCaller.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells.size == 1)
-    assert(dsgCaller.get(dsgCaller.globalMapping(AddressRange(131096, 131096 + 24)).node.cells(0)).largestAccessedSize == 8)
+    val global = dsgCaller.getGlobal("global").get
 
+    assert(dsgCaller.find(dsgCaller.globalMapping(global).node).node.cells.size == 1)
+    assert(dsgCaller.get(dsgCaller.globalMapping(global).node.cells(0)).largestAccessedSize == 8)
 
 //    // topdown Caller
     val dsg = results.analysis.get.topDownDSA(program.mainProcedure)
-    assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells.size == 3)
-    assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells(0).largestAccessedSize == 8)
-    assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells(8).largestAccessedSize == 8)
-    assert(dsg.find(dsg.globalMapping(AddressRange(131096, 131096 + 24)).node).node.cells(16).largestAccessedSize == 8)
+    assert(dsg.find(dsg.globalMapping(global).node).node.cells.size == 3)
+    assert(dsg.find(dsg.globalMapping(global).node).node.cells(0).largestAccessedSize == 8)
+    assert(dsg.find(dsg.globalMapping(global).node).node.cells(8).largestAccessedSize == 8)
+    assert(dsg.find(dsg.globalMapping(global).node).node.cells(16).largestAccessedSize == 8)
 
   }
 
@@ -240,19 +257,29 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   // this function asserts universal properties about global objects in Jumptable2  example
   def assertJumptable2Globals(dsg: Graph): Unit = {
     // global mappings
+    val addsix = dsg.getGlobal("add_six").get
+    val addtwo = dsg.getGlobal("add_two").get
+    val subseven = dsg.getGlobal("sub_seven").get
+    val main = dsg.getGlobal("main").get
+
+    val x = dsg.getGlobal("x").get
+    val x_relocated = dsg.getGlobal("x", 8, 1).get // all relocations are pointing to an address, therefore size 8
+    val main_relocated = dsg.getGlobal("main", 8, 1).get
+    val jumptable = dsg.getGlobal("add_two", 24, 1).get // jumptable points to add_two and has size 24
+    val jumptable_relocated = dsg.getGlobal("add_two", 8, 2).get
 
     // jump_table relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69624 + 8)).node.cells(0).getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(jumptable_relocated).node.cells(0).getPointee).equals(dsg.get(dsg.globalMapping(jumptable).node.cells(0))))
     // add_two relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0).getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(1940, 1940 + 36)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(jumptable).node.cells(0).getPointee).equals(dsg.get(dsg.globalMapping(addtwo).node.cells(0))))
     // add_six relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(8).getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(1976, 1976 + 36)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(jumptable).node.cells(8).getPointee).equals(dsg.get(dsg.globalMapping(addsix).node.cells(0))))
     // sub_seven relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(16).getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(2012, 2012 + 36)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(jumptable).node.cells(16).getPointee).equals(dsg.get(dsg.globalMapping(subseven).node.cells(0))))
     // main relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69608 + 8)).node.cells(0).getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(2048, 2048 + 76)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(main_relocated).node.cells(0).getPointee).equals(dsg.get(dsg.globalMapping(main).node.cells(0))))
     // x relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69592, 69592 + 8)).node.cells(0).getPointee).equals(dsg.get(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(x_relocated).node.cells(0).getPointee).equals(dsg.get(dsg.globalMapping(x).node.cells(0))))
   }
 
   test("local jumptable2 callees") {
@@ -265,13 +292,14 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
     callees.foreach { callee =>
       val dsg = results.analysis.get.localDSA(procs(callee))
+      val x = dsg.getGlobal("x").get
       assert(dsg.stackMapping.isEmpty) // stack is not used in either callee
       assertJumptable2Globals(dsg) // globals should be the same everywhere unused in callees
       // x should point to a collapsed object, in all 3 functions
       // all three load value of x
       // the analysis doesn't know if x is a pointer or not therefore assumes it is for soundness
       // arbitrary pointer is used in arithmetic causing collapse
-      assert(dsg.adjust(dsg.get(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee).node.get.collapsed)
+      assert(dsg.adjust(dsg.get(dsg.globalMapping(x).node.cells(0)).getPointee).node.get.collapsed)
     }
   }
 
@@ -280,6 +308,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
     val program = results.ir.program
     val dsg = results.analysis.get.localDSA(program.mainProcedure)
+    val x = dsg.getGlobal("x").get
     val stack0 = dsg.get(dsg.stackMapping(0).cells(0))
     val stack8 = dsg.get(dsg.stackMapping(8).cells(0))
     val stack16 = dsg.get(dsg.stackMapping(16).cells(0))
@@ -293,7 +322,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     assertJumptable2Globals(dsg)
 
     // x should not be collapsed in the main function's local graph
-    assert(!dsg.get(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee.node.collapsed)
+    assert(!dsg.get(dsg.globalMapping(x).node.cells(0)).getPointee.node.collapsed)
   }
 
   test("unsafe pointer arithmetic") {
@@ -510,13 +539,14 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val procs = program.nameToProcedure
     callees.foreach { callee =>
       val dsg = results.analysis.get.bottomUpDSA(procs(callee))
+      val x = dsg.getGlobal("x").get
       assert(dsg.stackMapping.isEmpty) // stack is not used in either callee
       assertJumptable2Globals(dsg) // globals should be the same everywhere unused in callees
       // x should point to a collapsed object, in all 3 functions
       // all three load value of x
       // the analysis doesn't know if x is a pointer or not therefore assumes it is for soundness
       // arbitrary pointer is used in arithmetic causing collapse
-      assert(dsg.adjust(dsg.get(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee).node.get.collapsed)
+      assert(dsg.adjust(dsg.get(dsg.globalMapping(x).node.cells(0)).getPointee).node.get.collapsed)
     }
   }
 
@@ -525,6 +555,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val program = results.ir.program
     val dsg = results.analysis.get.bottomUpDSA(program.mainProcedure)
 
+    val x = dsg.getGlobal("x").get
     val framePointer = dsg.get(dsg.stackMapping(0).cells(0))
     val stack8 = dsg.get(dsg.stackMapping(8).cells(0))
     val stack16 = dsg.get(dsg.stackMapping(16).cells(0))
@@ -538,7 +569,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     assertJumptable2Globals(dsg)
 
     // bottom-up x now should be collapsed since it was collapsed in callees
-    assert(dsg.get(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee.node.collapsed)
+    assert(dsg.get(dsg.globalMapping(x).node.cells(0)).getPointee.node.collapsed)
   }
 
   ignore("bottom up interproc pointer arithmetic callee") {
@@ -587,6 +618,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val program = results.ir.program
     val dsg = results.analysis.get.topDownDSA(program.mainProcedure)
 //    assert(dsg.pointTo.size == 13) // 13
+    val x = dsg.getGlobal("x").get
 
     val framePointer = dsg.get(dsg.stackMapping(0).cells(0))
     val stack8 = dsg.get(dsg.stackMapping(8).cells(0))
@@ -599,7 +631,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     assertJumptable2Globals(dsg)
 
     // bottom-up
-    assert(dsg.get(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee.node.collapsed)
+    assert(dsg.get(dsg.globalMapping(x).node.cells(0)).getPointee.node.collapsed)
 
   }
 
@@ -612,13 +644,14 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val procs = program.nameToProcedure
     callees.foreach { callee =>
       val dsg = results.analysis.get.topDownDSA(procs(callee))
+      val x = dsg.getGlobal("x").get
       assert(dsg.stackMapping.isEmpty) // stack is not used in either callee
       assertJumptable2Globals(dsg) // globals should be the same everywhere unused in callees
       // x should point to a collapsed object, in all 3 functions
       // all three load value of x
       // the analysis doesn't know if x is a pointer or not therefore assumes it is for soundness
       // arbitrary pointer is used in arithmetic causing collapse
-      assert(dsg.adjust(dsg.get(dsg.globalMapping(AddressRange(69648, 69652)).node.cells(0)).getPointee).node.get.collapsed)
+      assert(dsg.adjust(dsg.get(dsg.globalMapping(x).node.cells(0)).getPointee).node.get.collapsed)
     }
   }
 

@@ -56,7 +56,7 @@ trait ValueSetAnalysis(program: Program, mmm: MemoryModelMap) {
     */
   def eval(cmd: Command, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = {
     cmd match {
-      case directCall: DirectCall if directCall.target.name == "malloc" =>
+      case directCall: DirectCall if directCall.target.procName == "malloc" =>
         val regions = mmm.nodeToRegion(cmd)
         // malloc variable
         s + (mallocVariable -> regions.map(r => AddressValue(r)))

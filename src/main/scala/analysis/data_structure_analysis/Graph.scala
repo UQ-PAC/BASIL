@@ -190,6 +190,35 @@ class Graph(val proc: Procedure,
 
   private val swappedOffsets = globalOffsets.map(_.swap)
 
+  /**
+   * Converts a global name to an Address range
+   * @param name the name of the global region used as a reference
+   * @param size size of the Address region to be returned if 0 the size is instead one specified by SpecGlobals
+   * @param relocated value determines the level of relocation, if 0 return address range begining at start of
+   *                  global region name. otherwise attempt to find a global address pointing to x through
+   *                  "relocated" number of indirections
+   * @return
+   */
+  def getGlobal(name : String, size: Int = 0, relocated: Int = 0): Option[AddressRange] = {
+    val matchedName = globals.filter(_.name == name)
+    assert(matchedName.size <= 1)
+    if matchedName.isEmpty then
+      None
+    else
+      val global = matchedName.head
+      if relocated == 0 then
+        Some(AddressRange(global.address, global.address + (if size == 0 then global.size / 8 else size)))
+      else
+        var i = relocated
+        var address = global.address
+        while i > 0 do
+          address = swappedOffsets.getOrElse(address, -1)
+          i -= 1
+        if address == -1 then
+          None
+        else
+          Some(AddressRange(address, address + size))
+  }
   // creates the globals from the symbol tables
   val globalMapping = mutable.Map[AddressRange, Field]()
   globals.foreach {
@@ -424,7 +453,7 @@ class Graph(val proc: Procedure,
       arrows.append(StructArrow(DotStructElement(s"Stack_$offset", None), DotStructElement(node.id.toString, Some(cellOffset.toString)), internalOffset.toString))
     }
 
-    StructDotGraph(proc.name, structs, arrows).toDotString
+    StructDotGraph(proc.procName, structs, arrows).toDotString
   }
 
 
@@ -788,7 +817,7 @@ class Graph(val proc: Procedure,
         }
         val node = Node(Some(this))
         varToCell(pos) = mutable.Map(lhs -> Slice(node.cells(0), 0))
-      case pos @ DirectCall(target, _, _, _) if target.name == "malloc" =>
+      case pos @ DirectCall(target, _, _, _) if target.procName == "malloc" =>
         val node = Node(Some(this))
         varToCell(pos) = mutable.Map(mallocRegister -> Slice(node.cells(0), 0))
       case pos @ DirectCall(target, _, _, _) if writesTo.contains(target) =>
@@ -815,16 +844,16 @@ class Graph(val proc: Procedure,
   }
 
   def SSAVar(posLabel:String, varName: String): Slice = {
-    assert(posLabel.matches("%[0-9]{8}?\\$\\d"))
+    assert(posLabel.matches("%[0-9a-f]{8}?\\$\\d"), s"posLabel not matching BAP format '$posLabel'")
 
     val res = varToCell.keys.filter(pos => pos.toShortString.startsWith(posLabel))
-    assert(res.size == 1)
+    assert(res.size == 1, s"failed to get SSAVar for '$posLabel' and '$varName'. matched label: ${res}")
     val key = res.head
 
     val map = varToCell(key).toMap
 
     val temp =  map.keys.filter(variable => variable.name == varName)
-    assert(temp.size == 1)
+    assert(temp.size == 1, s"failed to get SSAVar for '$posLabel' and '$varName'. matched name: ${temp}")
     val variable = temp.head
     map(variable)
   }

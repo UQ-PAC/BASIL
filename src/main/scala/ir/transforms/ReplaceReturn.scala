@@ -76,7 +76,7 @@ class ReplaceReturns(insertR30InvariantAssertion: Procedure => Boolean = (_ => t
   override def vjump(j: Jump) = SkipChildren()
 }
 
-def addReturnBlocks(p: Program, toAll: Boolean = false) = {
+def addReturnBlocks(p: Program, toAll: Boolean = false, insertR30InvariantAssertion: Procedure => Boolean = _ => false) = {
   p.procedures.foreach(p => {
     val containsReturn = p.blocks.map(_.jump).find(_.isInstanceOf[Return]).isDefined
     if (toAll && p.blocks.isEmpty && p.entryBlock.isEmpty && p.returnBlock.isEmpty) {
@@ -85,9 +85,11 @@ def addReturnBlocks(p: Program, toAll: Boolean = false) = {
     } else if (p.returnBlock.isEmpty && (toAll || containsReturn)) {
       p.returnBlock = p.addBlocks(Block(label = p.name + "_basil_return", jump = Return()))
     }
-    for (eb <- p.entryBlock) {
-      val R30Begin = LocalVar("R30_begin", BitVecType(64))
-      p.entryBlock.get.statements.prepend(LocalAssign(R30Begin, Register("R30", 64)))
+    if (insertR30InvariantAssertion(p)) {
+      for (eb <- p.entryBlock) {
+        val R30Begin = LocalVar("R30_begin", BitVecType(64))
+        p.entryBlock.get.statements.prepend(LocalAssign(R30Begin, Register("R30", 64)))
+      }
     }
   })
 }

@@ -246,10 +246,10 @@ class RegionInjectorDSA(override val program: Program, DSATopDown: mutable.Map[P
     val stack = cell.node.get.flags.stack
     val name = if (stack) {
       stackCounter += 1
-      s"stack$$${stackCounter}"
+      s"stack_${stackCounter}"
     } else {
       sharedMemoryCounter += 1
-      s"mem$$${sharedMemoryCounter}"
+      s"mem_${sharedMemoryCounter}"
     }
     MergedRegionDSA(name, cell, stack)
   }
