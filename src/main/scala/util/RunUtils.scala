@@ -10,6 +10,7 @@ import ir.eval
 import gtirb.*
 import translating.PrettyPrinter.*
 import ir.dsl.*
+import ir.dsl.given
 
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
@@ -820,7 +821,7 @@ object RunUtils {
 
     q.loading.dumpIL.foreach(s =>
       writeToFile(pp_prog(ctx.program), s"$s-output.il")
-      import ir.dsl.ToScalaWithSplitting.given
+      // import ir.dsl.ToScalaWithSplitting.given
       writeToFile(ctx.program.toScala, s"$s-output.scala")
     )
     Logger.info("[!] Translating to Boogie")

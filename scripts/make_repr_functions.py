@@ -10,6 +10,10 @@ from collections import defaultdict
 from pprint import pprint
 
 """
+Generates ToScala instances for hierarchies of case classes.
+See ToScala.scala for the definition of the trait and ToScalaGenerated.scala
+for more information about the generated code.
+
 usage:
 
   make_repr_functions.py <SCALA_TEMPLATE> [JSON_FILES...]

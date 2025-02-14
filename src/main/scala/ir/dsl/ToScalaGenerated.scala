@@ -3,7 +3,7 @@ package ir.dsl
 import ir.*
 
 /**
- * This file contains generated code to implement ToScala for the various type
+ * The end of this file contains generated code to implement ToScala for the various type
  * hierarchies defined by BASIL.
  */
 
@@ -16,7 +16,7 @@ import ir.*
  * that the code maintains the general contract of the ToScala trait.
  *
  * That is, the returned string must be valid Scala code to construct the given
- * object. The ensure_constructible functions are defined to match the produced
+ * object. The `ensure_constructible` functions are defined to match the produced
  * string. Successful compilation of the ensure_constructible functions ensures
  * that the produced strings are valid Scala code.
  *
@@ -52,15 +52,21 @@ import ir.*
  */
 
 
-// Declares the following types as having manually-defined ToScala instances.
-// These types interact with control-flow, and the naive auto-generated code would
-// be large and possibly cyclic.
-//
-// NOTE: It is important that these handwritten given instances live in the same
-// file as the auto-generated ones. These instances must be locatable by summon[],
-// ot herwise the generated code will self-recurse, leading to non-termination.
+/**
+ * Manually-defined ToScala instances
+ * ----------------------------------
+ *
+ * Externals: DirectCall, IndirectCall, GoTo, Return
+ *
+ * The "Externals" line above tells the generator the following types as having
+ * manually-defined ToScala instances. These types interact with control-flow,
+ * and the naive auto-generated code would be large and possibly cyclic.
+ */
 
-// Externals: DirectCall, IndirectCall, GoTo, Return
+
+// NOTE: It is important that these handwritten given instances live in the same
+// file as the generated code. These instances must be locatable by summon[],
+// otherwise the generated code will self-recurse, leading to non-termination.
 
 given ToScala[Return] with
   extension (x: Return) override def toScala: String = "ret"

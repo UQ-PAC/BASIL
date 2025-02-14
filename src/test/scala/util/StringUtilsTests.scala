@@ -1,4 +1,4 @@
-import util.{Twine, indent, indentNested}
+import util.{Twine, indent, indentNested, StringEscape}
 
 import org.scalatest.funsuite.AnyFunSuite
 
@@ -69,6 +69,15 @@ head(
           "<head><sep><nl>a<sep><nl>b<sep><nl>c<nl><tail>",
       "usual case with headSep"
     )
+  }
 
+  test("escape for variable name") {
+    assert(StringEscape.escapeForVariableName("$") == "Dollar")
+    assert(StringEscape.escapeForVariableName("$::") == "DollarColonColon")
+    assert(StringEscape.escapeForVariableName("a.b") == "aDotb")
+    assert(StringEscape.escapeForVariableName("`%#*()!") == "U0060PercentHashTimesU0028U0029Bang");
+    assert(StringEscape.escapeForVariableName("=~") == "EqTilde");
+    assert(StringEscape.escapeForVariableName("a_b-") == "a_bMinus");
+    assert(StringEscape.escapeForVariableName("0a_b") == "0a_b");
   }
 }

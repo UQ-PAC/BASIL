@@ -5,6 +5,9 @@ import scala.collection.{IterableOps, Factory}
 import scala.collection.{ AbstractIterator, AbstractView, BuildFrom }
 import scala.collection.generic.IsSeq
 
+import scala.util.matching.Regex
+import scala.reflect.NameTransformer
+
 /**
  * A `Twine` is a lazy list of strings. This allows efficient concatenation and indentation
  * without allocating and copying strings.
@@ -19,26 +22,31 @@ import scala.collection.generic.IsSeq
 type Twine = LazyList[String]
 
 /**
+ * Converts the given string to a Twine, splitting at newlines as needed.
+ */
+def stringToTwine(x: String): Twine =
+  x.split("\n", -1).intersperse("\n").to(LazyList)
+
+/**
  * Indents the given iterable of strings, using the given prefix.
  *
  * The iterable does not need to be a `Twine`, but it is assumed to conform
  * to the `Twine` conventions. In particular, newlines must occur as the last character
  * in a string.
  *
- * This function has the desirable properties of being (1) efficient and (2) compositional.
+ * This function has the desirable properties of being both (1) efficient and (2) compositional.
  * (1) means that strings are never copied or appended to each other. Only lists are
- * manipulated, and even then, they are lazy and generated on-demand. (2) means that it is
+ * manipulated and, even then, they are lazy and generated on-demand. (2) means that it is
  * easy to indent multiple times by calling this function multiple times. This is in comparison
  * to, for example, a method which requires an indent level parameter to be passed to
  * recursive subcalls.
  */
 def indent(ss: Iterable[String], prefix: String = "  "): Twine =
-  ss.take(1).to(LazyList) ++
-    ss.sliding(2).map(_.toSeq).flatMap {
-      case Seq(_) => LazyList()
-      case Seq(prev,s) => if (prev.endsWith("\n")) LazyList(prefix, s) else LazyList(s)
-      case x => throw new AssertionError(s"sliding(2) returned unexpected length: ${x.length}")
-    }
+  (Iterable("") ++ ss).sliding(2).to(LazyList).flatMap(x => x.toSeq match {
+    case Seq(_) => Seq.empty
+    case Seq(prev, s) => if (prev.endsWith("\n")) Seq(prefix, s) else Seq(s)
+    case x => throw new AssertionError(s"sliding(2) returned unexpected length: ${x.length}")
+  })
 
 /**
  * Indents a nested structure, placing the indented `elems` between `head` and `tail`,
@@ -73,21 +81,26 @@ def indentNested(head: String, elems: Iterable[Twine], tail: String, newline: St
   // if `headSep` is given, `sep` is prefixed to the first element as well.
   val offset = if (headSep) 1 else 0
   def makeElem(x: Iterable[String], i: Int): Iterable[String] =
-    val s = (if (offset + i > 0) Iterable(sep) else Iterable.empty)
+    val s = (if (offset + i > 0) stringToTwine(sep) else Iterable.empty)
     s ++ Iterable(newline) ++ x
 
-  val indented = indent(elems.zipWithIndex.flatMap(makeElem.tupled))
+  val body = indent(elems.zipWithIndex.flatMap(makeElem.tupled))
 
-  val body = if (indented.isEmpty) indented else (indented :+ newline)
+  if (body.isEmpty)
+    LazyList(head, tail)
+  else
+    head #:: body #::: (newline #:: LazyList(tail))
 
-  head +: body :+ tail
-
-
-// from https://stackoverflow.com/a/40073137, itself from the scala.runtime source.
 object StringEscape {
+  /**
+   * Quotes the given string, returning a string of a string literal.
+   * When evaluated by Scala, the literal would return the original string.
+   */
   def quote (s: String): String = "\"" + escape(s) + "\""
   def escape(s: String): String = s.flatMap(escapedChar)
 
+  // from https://stackoverflow.com/a/40073137, itself from the scala.runtime source.
+  // https://github.com/scala/scala/blob/bada209e96c659d74e20e6ec48ad6888ee19f4c3/src/reflect/scala/reflect/internal/Constants.scala#L270
   def escapedChar(ch: Char): String = ch match {
     case '\b' => "\\b"
     case '\t' => "\\t"
@@ -98,9 +111,32 @@ object StringEscape {
     case '\'' => "\\\'"
     case '\\' => "\\\\"
     case _    => if (ch.isControl) "\\0" + Integer.toOctalString(ch.toInt)
-                  else              String.valueOf(ch)
+                 else              String.valueOf(ch)
   }
+
+  /**
+   * Escapes the given string for use as a variable identifier.
+   * The returned string should only have letters, characters, and underscore.
+   *
+   * Note: the returned string might still start with a digit and as such, could
+   * be unsuitable for some uses.
+   *
+   * Examples:
+   *
+   *     StringEscape.escapeForVariableName("$::") == "DollarColonColon"
+   *     StringEscape.escapeForVariableName("0a_b") == "0a_b"
+   *
+   */
+  def escapeForVariableName(s: String) = {
+    // https://www.scala-lang.org/api/2.13.3/scala/reflect/NameTransformer$.html
+    val transformed = NameTransformer.encode(s.replaceAll("\\$", "Dollar").replaceAll("\\.", "Dot"))
+    dollarRe.replaceAllIn(transformed, m => m.group(1).toUpperCase)
+  }
+
+  private val dollarRe = new Regex("""\$([a-z])""")
+
 }
+
 
 // copied, with apologies, from: https://docs.scala-lang.org/overviews/core/custom-collection-operations.html
 extension [Repr](coll: Repr)(using seq: IsSeq[Repr])
