@@ -377,6 +377,18 @@ given ToScala[BinOp] with
     }
   }
 
+given ToScala[Endian] with
+  extension (x: Endian) def toScala: String = x match {
+    case x: Endian.LittleEndian.type => {
+      def ensure_constructible(): Endian.LittleEndian.type = Endian.LittleEndian
+      s"Endian.LittleEndian"
+    }
+    case x: Endian.BigEndian.type => {
+      def ensure_constructible(): Endian.BigEndian.type = Endian.BigEndian
+      s"Endian.BigEndian"
+    }
+  }
+
 given ToScala[Global] with
   extension (x: Global) def toScala: String = x match {
     case x: Register => {

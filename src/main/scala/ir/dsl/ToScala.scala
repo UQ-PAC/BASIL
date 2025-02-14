@@ -270,8 +270,6 @@ class ToScalaWithSplitting {
 
 given ToScala[String] with
   extension (x: String) override def toScala: String = StringEscape.quote(x)
-given ToScala[Endian] with
-  extension (x: Endian) override def toScala: String = "Endian." + x.toString()
 given ToScala[Int] with
   extension (x: Int) override def toScala: String = x.toString()
 given ToScala[Boolean] with

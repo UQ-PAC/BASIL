@@ -6,6 +6,7 @@ import json
 import shlex
 import tempfile
 import dataclasses
+from typing import Iterator
 from collections import defaultdict
 from pprint import pprint
 
@@ -45,53 +46,70 @@ def typestring(x) -> str:
     return typestring(x['tpe']) + '[' + ', '.join(typestring(x) for x in x['argClause']['values']) + ']'
   assert False, "unsupported type type: " + str(x)
 
+def termname(x) -> str:
+  if 'name' in x:
+    assert x['name']['type'] in ('Term.Name', 'Type.Name'), f'{x} is not a term name??'
+  return x.get('name', {}).get('value', None)
+
+def handle_definition(defn: dict) -> Iterator[tuple[str, Hierarchy | Decl, list[str]]]:
+  ty = defn['type']
+  mods = [x['type'] for x in defn.get('mods', [])]
+  name = termname(defn)
+
+  try:
+    extends = [typestring(x['tpe']) for x in defn['templ']['inits']]
+  except KeyError:
+    extends = []
+
+  if ty == 'Defn.Trait':
+    assert name
+    yield name, new_hierarchy(), extends
+
+  elif ty == 'Defn.Object' and 'Mod.Case' in mods:
+    d = Decl(name + '.type', name, None)
+    yield d.tyname, d, extends
+
+  elif ty == 'Defn.Class':
+    paramclauses = [y for x in defn['ctor']['paramClauses'] for y in x['values']]
+    params = [termname(y) for y in paramclauses]
+    paramtypes = [typestring(y['decltpe']) for y in paramclauses]
+    hasprivate = any('Mod.Private' == m['type'] for x in paramclauses for m in x['mods'])
+
+    if 'Mod.Case' in mods:
+      yield name, Decl(name, name, list(zip(params, paramtypes)), hasprivate), extends
+    else:
+      yield name, Decl(name, name, list(zip(params, paramtypes)), hasprivate), extends
+
+  elif ty == 'Defn.Enum':
+    assert not extends, "enum that inherits from somethign??!"
+    yield name, new_hierarchy(), extends
+    enumname = name
+
+    cases = [termname(x) for x in defn['templ']['stats']]
+    for case in cases:
+      casename = f'{name}.{case}'
+      yield casename, Decl(casename + '.type', casename, None), [enumname]
+
 
 def toplevel_definitions(d: dict):
   h = new_hierarchy()
-  traits: dict[str, Hierarchy | Decl] = {}
+  root = '<root>'
+  traits: dict[str, Hierarchy | Decl] = {root: h}
 
   assert len(d['stats']) == 1 and d['stats'][0]['type'] == 'Pkg'
   pkg = d['stats'][0]['stats']
   for defn in pkg:
-    ty = defn['type']
-    mods = [x['type'] for x in defn.get('mods', [])]
-    name = defn.get('name', {}).get('value', None)
-    try:
-      extends = [typestring(x['tpe']) for x in defn['templ']['inits']]
-    except KeyError:
-      extends = []
-    # print(name, extends)
-    # print(defn)
-    decl = None
-    if ty == 'Defn.Trait':
-      assert name
-      traits[name] = traits.get(name, new_hierarchy())
-      decl = traits[name]
-    elif ty == 'Defn.Object' and 'Mod.Case' in mods:
-      decl = Decl(name + '.type', name, None)
-    elif ty == 'Defn.Class':
-      paramclauses = [y for x in defn['ctor']['paramClauses'] for y in x['values']]
-      params = [y['name']['value'] for y in paramclauses]
-      paramtypes = [typestring(y['decltpe']) for y in paramclauses]
-      hasprivate = any('Mod.Private' == m['type'] for x in paramclauses for m in x['mods'])
-      if 'Mod.Case' in mods:
-        decl = Decl(name, name, list(zip(params, paramtypes)), hasprivate)
-      else:
-        decl = Decl(name, name, list(zip(params, paramtypes)), hasprivate)
+    for name, decl, extends in handle_definition(defn):
 
-    if decl and isinstance(decl, Decl):
-      traits[decl.tyname] = decl
+      assert name not in traits, f"repeated definition name?? {name}"
+      traits[name] = decl
 
-    if decl is not None:
       extends = [e for e in extends if e in traits]
-      for e in extends:
+      for e in extends or [root]:
         t = traits[e]
         assert isinstance(t, dict), "extending a concrete class??"
         t[name] = decl
-      if not extends:
-        h[name] = decl
 
-  # pprint(traits)
   return h, traits
 
 def indent(generator):
