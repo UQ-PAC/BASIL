@@ -252,7 +252,7 @@ object IRTransform {
 
 
     // FIXME: Main will often maintain the stack by loading R30 from the caller's stack frame
-    //        before returning, which makes the R30 assertin faile. Hence we currently skip this 
+    //        before returning, which makes the R30 assertin faile. Hence we currently skip this
     //        assertion for main, instead we should precondition the stack layout before main
     //        but the interaction between spec and memory regions is nontrivial currently
     cilvisitor.visit_prog(transforms.ReplaceReturns(proc => doSimplify && ctx.program.mainProcedure != proc), ctx.program)
@@ -633,7 +633,7 @@ object RunUtils {
     transforms.removeEmptyBlocks(program)
 
     DebugDumpIRLogger.writeToFile(File("blockgraph-before-dsa.dot"), dotBlockGraph(program.mainProcedure))
-    
+
     Logger.info("[!] Simplify :: DynamicSingleAssignment")
     DebugDumpIRLogger.writeToFile(File("il-before-dsa.il"), pp_prog(program))
 
@@ -642,7 +642,7 @@ object RunUtils {
 
     transforms.removeEmptyBlocks(program)
 
-    AnalysisResultDotLogger.writeToFile(File(s"blockgraph-after-dsa.dot"), 
+    AnalysisResultDotLogger.writeToFile(File(s"blockgraph-after-dsa.dot"),
       dotBlockGraph(program, (program.collect {
       case b : Block => b -> pp_block(b)
     }).toMap))
@@ -769,8 +769,8 @@ object RunUtils {
 
       doSimplify(ctx, conf.staticAnalysis)
     }
-    
-    
+
+
     // SVA
     var dsaContext: Option[DSAContext] = None
     if conf.dsaConfig.nonEmpty then
@@ -792,7 +792,7 @@ object RunUtils {
       DSALogger.info("Finished local phase")
 
       dsaContext = Some(DSAContext(sva, cons))
-      
+
 
     if (q.runInterpret) {
       Logger.info("Start interpret")
@@ -818,8 +818,10 @@ object RunUtils {
 
     IRTransform.prepareForTranslation(q, ctx)
 
-    q.loading.dumpIL.foreach(s => 
+    q.loading.dumpIL.foreach(s =>
       writeToFile(pp_prog(ctx.program), s"$s-output.il")
+      import ir.dsl.ToScalaWithSplitting.given
+      writeToFile(ctx.program.toScala, s"$s-output.scala")
     )
     Logger.info("[!] Translating to Boogie")
 

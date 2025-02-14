@@ -84,6 +84,9 @@ prog(
   // become recursive. make sure that all instances are provided and correctly scoped,
   // especially where multiple instances might be applicable.
   test("test basil ir to dsl") {
+    // println(f)
+
+    import ir.dsl.ToScalaWithSplitting.given
 
     if (cleanOutput(expected) != cleanOutput(program.toScala)) {
       println("current program.toScala output:")

@@ -41,7 +41,7 @@ trait ToScala[-T]:
     def toScalaLines: Twine = LazyList(x.toScala)
 
 
-inline given ToScala[Block] with
+given blockToScalaDefault: ToScala[Block] with
   extension (x: Block)
     def toScala = toScalaUsingToScalaLines(x)
     override def toScalaLines: Twine =
@@ -53,62 +53,28 @@ inline given ToScala[Block] with
         headSep = true
       )
 
-object Internal {
+given procedureToScalaDefault(using _blockToScala: ToScala[Block]): ToScala[Procedure] with
+  extension (x: Procedure)
+    def toScala = toScalaUsingToScalaLines(x)
+    override def toScalaLines: Twine =
+      indentNested(
+        s"proc(${x.procName.toScala}",
+        x.blocks.to(LazyList).map(_blockToScala.toScalaLines),
+        ")",
+        headSep = true
+      )
 
-  def procedureToScalaLinesWith(b: Block => Twine)(x: Procedure): Twine =
-    indentNested(
-      s"proc(${x.procName.toScala}",
-      x.blocks.to(LazyList).map(b),
-      ")",
-      headSep = true
-    )
+given programToScalaDefault(using _procToScala: ToScala[Procedure]): ToScala[Program] with
+  extension (x: Program)
+    def toScala = toScalaUsingToScalaLines(x)
+    override def toScalaLines: Twine =
+      indentNested(
+        "prog(",
+        x.procedures.to(LazyList).map(_procToScala.toScalaLines),
+        ")"
+      )
 
-  def programToScalaLinesWith(p: Procedure => Twine)(x: Program): Twine =
-    indentNested(
-      "prog(",
-      x.procedures.to(LazyList).map(p),
-      ")"
-    )
 
-}
-
-class ToScalaWithSplitting {
-  import ToScalaWithSplitting.*
-
-  private var _decls: Map[String, Twine] = ListMap()
-
-  def decls = _decls
-
-  private def blockToScalaLines(x: Block): Twine =
-    val name = blockName(x)
-    _decls += name -> x.toScalaLines
-    LazyList(name)
-
-  protected def toScalaWithDecls[T](f: T => Twine)(name: String, x: T): Twine =
-
-    // XXX: must be evaluated separately from the += operation!!
-    // otherwise, new decls from blocks are overwritten
-    val entry = (name -> f(x).force)
-
-    _decls += entry
-
-    // NOTE: scala compiler will error on duplicated names
-    indentNested(
-      "{",
-      declsToScala(_decls) ++ Iterable(LazyList(name)),
-      "}",
-      sep = "\n"
-    )
-
-  protected def baseProcedureToScalaLines = Internal.procedureToScalaLinesWith(blockToScalaLines)
-  protected def baseProgramToScalaLines = Internal.programToScalaLinesWith(baseProcedureToScalaLines)
-
-  def toScalaLines(x: Procedure): Twine =
-    toScalaWithDecls(baseProcedureToScalaLines)(x.name, x)
-
-  def toScalaLines(x: Program): Twine =
-    toScalaWithDecls(baseProgramToScalaLines)("program", x)
-}
 
 object ToScalaWithSplitting {
 
@@ -129,17 +95,48 @@ object ToScalaWithSplitting {
 
 }
 
-given ToScala[Procedure] with
-  extension (x: Procedure)
-    def toScala = toScalaUsingToScalaLines(x)
-    override def toScalaLines: Twine =
-      Internal.procedureToScalaLinesWith(_.toScalaLines)(x)
+class ToScalaWithSplitting {
+  import ToScalaWithSplitting.*
 
-given ToScala[Program] with
-  extension (x: Program)
-    def toScala = toScalaUsingToScalaLines(x)
-    override def toScalaLines: Twine =
-      Internal.programToScalaLinesWith(_.toScalaLines)(x)
+  private var _decls: Map[String, Twine] = ListMap()
+
+  def decls = _decls
+
+  protected given blockToScalaWithSplitting: ToScala[Block] with
+    extension (x: Block)
+      def toScala = toScalaUsingToScalaLines(x)
+      override def toScalaLines =
+        val name = blockName(x)
+        _decls += name -> blockToScalaDefault.toScalaLines(x)
+        LazyList(name)
+
+  protected def toScalaWithDecls[T](f: T => Twine)(name: String, x: T): Twine =
+    assert(decls.isEmpty, "repeated use of the same ToScalaWithSplitting instance is not allowed")
+
+    // XXX: must be evaluated separately from the += operation !!
+    // otherwise, new decls from blocks will be overwritten
+    val entry = (name -> f(x).force)
+
+    _decls += entry
+
+    // NOTE: scala compiler will error on duplicated names
+    indentNested(
+      "{",
+      declsToScala(_decls) ++ Iterable(LazyList(name)),
+      "}",
+      sep = "\n"
+    )
+
+  protected val procedureToScalaWithSplitting: ToScala[Procedure] = procedureToScalaDefault(using blockToScalaWithSplitting)
+  protected val programToScalaWithSplitting: ToScala[Program] = programToScalaDefault(using procedureToScalaWithSplitting)
+
+  def toScalaLines(x: Procedure): Twine =
+    toScalaWithDecls(procedureToScalaWithSplitting.toScalaLines)(x.name, x)
+
+  def toScalaLines(x: Program): Twine =
+    toScalaWithDecls(programToScalaWithSplitting.toScalaLines)("program", x)
+}
+
 
 given ToScala[String] with
   extension (x: String) override def toScala: String = StringEscape.quote(x)
