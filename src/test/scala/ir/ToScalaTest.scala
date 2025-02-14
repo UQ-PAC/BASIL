@@ -80,7 +80,11 @@ prog(
 
   def cleanOutput(s: String): String = s.trim
 
+  // NOTE: if this test TIMES OUT, it is likely that the ToScala instances have
+  // become recursive. make sure that all instances are provided and correctly scoped,
+  // especially where multiple instances might be applicable.
   test("test basil ir to dsl") {
+
     if (cleanOutput(expected) != cleanOutput(program.toScala)) {
       println("current program.toScala output:")
       println(program.toScala)
