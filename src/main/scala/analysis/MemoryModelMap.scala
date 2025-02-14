@@ -443,7 +443,7 @@ class MemoryModelMap(
   }
 
   def getHeap(directCall: DirectCall): HeapRegion = {
-    require(directCall.target.name == "malloc", "Should be a malloc call")
+    require(directCall.target.procName == "malloc", "Should be a malloc call")
     heapCalls(directCall)
   }
 

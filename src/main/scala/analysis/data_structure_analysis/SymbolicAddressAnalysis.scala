@@ -148,7 +148,7 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
           case Left(value) if value.accessor == lhs => Map()
           case Left(_) => Map(d -> IdEdge())
           case Right(_) => Map(d -> IdEdge(), Left(SymbolicAddress(lhs, UnknownLocation(nextunknownCount, IRWalk.procedure(n)), 0)) -> ConstEdge(TwoElementTop))
-      case DirectCall(target, _, _, _) if target.name == "malloc" =>
+      case DirectCall(target, _, _, _) if target.procName == "malloc" =>
         d match
           case Left(value) if value.accessor == mallocVariable => Map()
           case Left(_) => Map(d -> IdEdge())

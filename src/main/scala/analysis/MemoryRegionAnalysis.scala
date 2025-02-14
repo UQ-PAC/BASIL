@@ -230,7 +230,7 @@ trait MemoryRegionAnalysis(
     val stackPointerVariables = stackDetection(n, s(0)(1))
     n match {
       case directCall: DirectCall =>
-        if (directCall.target.name == "malloc") {
+        if (directCall.target.procName == "malloc") {
           evaluateExpression(mallocVariable, constantProp(n)) match {
             case Some(b: BitVecLiteral) =>
               val negB = bv2SignedInt(b)
