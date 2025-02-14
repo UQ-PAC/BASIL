@@ -12,7 +12,7 @@ object SuperCellCounter extends Counter
 
 case class FieldTerm(v: SuperCell) extends analysis.solvers.Var[FieldTerm]
 
-class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[UnionFindSolver[FieldTerm], SuperCell, FieldCell, ConstraintCell, FieldNode](proc, phase, UnionFindSolver[FieldTerm]()) {
+abstract class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[UnionFindSolver[FieldTerm], SuperCell, FieldCell, ConstraintCell, FieldNode](proc, phase, UnionFindSolver[FieldTerm]()) {
   
   override def init(symBase: SymBase, size: Option[Int]): FieldNode = FieldNode(this, symBase, size)
 //  var nodes: Map[SymBase, FieldNode] = buildNodes
@@ -20,7 +20,8 @@ class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[UnionFindSol
 
 
   override def constraintArgToCells(constraintArg: ConstraintArg, ignoreContents: Boolean = false): Set[ConstraintCell] = {
-    val exprCells = symValToCells(exprToSymVal(constraintArg.value))
+    ???
+    val exprCells = Set[FieldCell]()//symValToCells(exprToSymVal(constraintArg.value))
     if constraintArg.contents && !ignoreContents then
       exprCells.map(_.content).toSet
     else
@@ -192,7 +193,7 @@ class FieldDSA(program: Program) {
 
 object FieldDSA {
   def getLocal(proc: Procedure): FieldGraph = {
-    val graph = FieldGraph(proc, Local)
+    val graph: FieldGraph = ??? // FieldGraph(proc, Local)
     graph.localPhase()
     graph
   }
