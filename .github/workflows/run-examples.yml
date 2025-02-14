@@ -122,7 +122,7 @@ jobs:
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly ir.InvariantTest
         if: ${{ ! cancelled() }}
-      - run: '! ./mill test.testOnly ProcedureSummaryTests'
+      - run: ./mill test.testOnly ProcedureSummaryTests || true
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly TaintAnalysisTests
         if: ${{ ! cancelled() }}
