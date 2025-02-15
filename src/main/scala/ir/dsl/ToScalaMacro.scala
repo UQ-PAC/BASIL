@@ -30,32 +30,50 @@ inline def deriveOrSummon[T, Elem]: Boop[Elem] =
 inline def deriveRec[T, Elem]: Boop[Elem] =
   inline erasedValue[T] match
     case _: Elem => error("infinite recursive derivation")
-    case _       => Boop.derived[Elem](using summonInline[Mirror.Of[Elem]]) // recursive derivation
+    case _       => Boop.derived[Elem] // recursive derivation
+
+inline def elemTypes[Elems <: Tuple](using quotes: Quotes): List[quotes.reflect.TypeRepr] =
+  import quotes.reflect.*
+  inline erasedValue[Elems] match
+    case _: (elem *: elems) => TypeRepr.of[elem] :: elemTypes[elems]
+    case _: EmptyTuple => Nil
+
+def boopOfSum[T](s: Mirror.SumOf[T], elems: => List[Boop[?]]): Boop[T] =
+  new Boop[T]:
+    def boop(x: T): String =
+      val idx = s.ordinal(x)
+      elems(s.ordinal(x)).asInstanceOf[Boop[T]].boop(x)
+
+inline def boopOfProduct[T](s: Mirror.ProductOf[T], elems: => List[Boop[?]]): Boop[T] =
+  val tys = elemTypes[s.MirroredElemTypes]
+  new Boop[T]:
+    def boop(x: T): String =
+
+      "boop of product"
+
 
 trait Boop[A]:
-  def boop: Int
-
-
-case class Entity(id: Int, value: String) derives Boop
+  def boop(x: A): String
 
 // https://docs.scala-lang.org/scala3/reference/contextual/derivation-macro.html
 
 object Boop {
-  inline def derived[T](using m: Mirror.Of[T]): Boop[T] =
-    // lazy val elemInstances = summonInstances[T, m.MirroredElemTypes] // (1)
-    inline m match                                                   // (2)
-      case s: Mirror.SumOf[T]     =>
-        new Boop[T]:
-          def boop = 2
-      case p: Mirror.ProductOf[T] =>
-        new Boop[T]:
-          def boop =
-            println(m.toString)
-            10
 
+  inline def derived[T]: Boop[T] = ${ derivedMacro[T] }
+
+  inline def derivedMirror[T](m: Mirror.Of[T], instances: List[Boop[?]]): Boop[T] =
+    inline m match                                                   // (2)
+      case s: Mirror.SumOf[T]     => boopOfSum(s, elemInstances)
+      case p: Mirror.ProductOf[T] => boopOfProduct(p, elemInstances)
+
+
+  def derivedMacro[T: Type](using Quotes): Expr[Boop[T]] =
+    import quotes.reflect.*
+
+    val expr: Expr[Mirror.Of[T]] = Expr.summon[Mirror.Of[T]].get
+    expr match
+      case '{ $m: Mirror.Of[T] } => '{ derivedMirror[T]($m) }
+
+    //
 }
 
-given Boop[None.type] = Boop.derived
-given Boop[Option[Boolean]] = Boop.derived
-given Boop[ir.Endian] = Boop.derived
-val x = summon[Boop[Entity]].boop
