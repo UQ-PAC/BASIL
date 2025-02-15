@@ -205,19 +205,10 @@ prog(
 
     checkOutput(expected, stmt.toScala)
 
-    println(x)
-
+    ir.dsl.go
   }
 
 }
 
 
 
-
-case class Entity(id: Int, value: String) derives Boop
-
-given Boop[Int] = ???
-given Boop[String] = ???
-given Boop[None.type] = Boop.derived
-given Boop[ir.Endian] = Boop.derived
-val x = summon[Boop[Entity]].boop(Entity(1, "a"))

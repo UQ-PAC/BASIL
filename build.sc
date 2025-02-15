@@ -11,6 +11,8 @@ import contrib.scalapblib._
 object basil extends RootModule with ScalaModule with antlr.AntlrModule with ScalaPBModule{
   def scalaVersion = "3.3.4"
 
+  def scalacOptions: T[Seq[String]] = Seq("-Xprint:typer")
+
   val javaTests = ivy"com.novocode:junit-interface:0.11"
   val scalaTests = ivy"org.scalatest::scalatest:3.2.10"
   val scalactic = ivy"org.scalactic::scalactic:3.2.10"
@@ -18,7 +20,7 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
   val sourceCode = ivy"com.lihaoyi::sourcecode:0.3.0"
   val mainArgs = ivy"com.lihaoyi::mainargs:0.5.1"
   val sprayJson = ivy"io.spray::spray-json:1.3.6"
-  val scalapb = ivy"com.thesamet.scalapb::scalapb-runtime:0.11.15" 
+  val scalapb = ivy"com.thesamet.scalapb::scalapb-runtime:0.11.15"
 
   def scalaPBVersion = "0.11.15"
 
