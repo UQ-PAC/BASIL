@@ -31,7 +31,39 @@ import ir.*
 
 sealed trait TNum
 
-case class TNumBool(boolean: Int) extends TNum
+case class TNumBool(boolean: Int) extends TNum {
+    def TEQ(that: TNumBool): TNumBool = {
+        if (this.boolean == that.boolean) TNumBool(1) else TNumBool(0)
+    }
+
+    def TNEQ(that: TNumBool): TNumBool = {
+        if (this.boolean != that.boolean) TNumBool(1) else TNumBool(0)
+    }
+
+    def TAND(that: TNumBool): TNumBool = {
+        if (this.boolean != 0 && that.boolean != 0) TNumBool(1) else TNumBool(0)
+    }
+
+    def TOR(that: TNumBool): TNumBool = {
+        if (this.boolean != 0 || that.boolean != 0) TNumBool(1) else TNumBool(0)
+    }
+
+    def TIMPLIES(that: TNumBool): TNumBool = {
+        if ((1 - this.boolean) != 0 || that.boolean != 0) TNumBool(1) else TNumBool(0)
+    }
+
+    def TEQUIV(that: TNumBool): TNumBool = {
+        if (this.boolean == that.boolean) TNumBool(1) else TNumBool(0)
+    }
+
+    def TNOT(): TNumBool = {
+        TNumBool(1 - this.boolean)
+    }
+
+    def TToBV1(): TNumValue = {
+        TNumValue(BigInt(this.boolean), BigInt(0))
+    }
+}
 
 case class TNumValue(value: BigInt, mask: BigInt) extends TNum {
     // Bitwise AND
@@ -538,7 +570,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
     override def bot: Map[Variable, TNum] = Map.empty
 
     // Converts a bitvector or integer literal to a TNum
-    def toTNum(literal: BitVecLiteral | IntLiteral): TNumValue = literal match {
+    def toTNumValue(literal: BitVecLiteral | IntLiteral): TNumValue = literal match {
         case bv: BitVecLiteral =>
             val mask = (BigInt(1) << bv.size) - 1
             TNumValue(bv.value & mask, BigInt(0))
@@ -549,7 +581,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
     }
 
     // Evaluates binary operation and returns either a TNumValue or TNumBool
-    def evaluateBinOp(op: BVBinOp, tn1: TNumValue, tn2: TNumValue): TNum = {
+    def evaluateValueBinOp(op: BVBinOp | IntBinOp, tn1: TNumValue, tn2: TNumValue): TNum = {
         op match {
             case BVAND => tn1.TAND(tn2)
             case BVOR => tn1.TOR(tn2)
@@ -580,31 +612,71 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
             case BVEQ => tn1.TEQ(tn2)
             case BVNEQ => tn1.TNEQ(tn2)
             case BVCONCAT => tn1.TCONCAT(tn2)
+            case IntADD => tn1.TADD(tn2)
+            case IntMUL => tn1.TMUL(tn2)
+            case IntSUB => tn1.TSUB(tn2)
+            case IntDIV => tn1.TSDIV(tn2)
+            case IntMOD => tn1.TSMOD(tn2)
+            case IntEQ  => tn1.TEQ(tn2)
+            case IntNEQ => tn1.TNEQ(tn2)
+            case IntLT  => tn1.TSLT(tn2)
+            case IntLE  => tn1.TSLE(tn2)
+            case IntGT  => tn1.TSGT(tn2)
+            case IntGE  => tn1.TSGE(tn2)
             case _ => TNumValue(BigInt(0), BigInt(-1))
         }
     }
 
+    def evaluateBoolBinOp(op: BoolBinOp, tn1: TNumBool, tn2: TNumBool): TNumBool = {
+        op match {
+            case BoolEQ => tn1.TEQ(tn2)
+            case BoolNEQ => tn1.TNEQ(tn2)
+            case BoolAND => tn1.TAND(tn2)
+            case BoolOR => tn1.TOR(tn2)
+            case BoolIMPLIES => tn1.TIMPLIES(tn2)
+            case BoolEQUIV => tn1.TEQUIV(tn2)
+            case _ => TNumBool(0)
+        }
+    }
+
     // Evaluates unary operations
-    def evaluateUnOp(op: BVUnOp, tn: TNumValue): TNumValue = {
+    def evaluateValueUnOp(op: BVUnOp | IntUnOp, tn: TNumValue): TNumValue = {
         op match {
             case BVNOT => tn.TNOT()
             case BVNEG => tn.TNEG()
+            case IntNEG => tn.TNEG()
             case _ => TNumValue(BigInt(0), BigInt(-1))
+        }
+    }
+
+    def evaluateBoolUnOp(op: BoolUnOp, tn: TNumBool): TNum = {
+        op match {
+            case BoolNOT => tn.TNOT()
+            case BoolToBV1 => tn.TToBV1()
+            case _ => TNumBool(0)
         }
     }
 
     // Recursively evaluates nested or non-nested expression
     def evaluateExprToTNum(s: Map[Variable, TNum], expr: Expr): TNum = expr match {
-        case b: BitVecLiteral => toTNum(b)
+        case b: BitVecLiteral => toTNumValue(b)
 
-        case i: IntLiteral => toTNum(i)
+        case i: IntLiteral => toTNumValue(i)
+
+        case TrueLiteral => TNumBool(1)
+
+        case FalseLiteral => TNumBool(0)
 
         case v: Variable => s.getOrElse(v, TNumValue(BigInt(0), BigInt(-1)))
+
+        case UnaryExpr(op: BVUnOp, arg: Expr) =>
+            val argTNum = evaluateExprToTNum(s, arg)
+            evaluateValueUnOp(op, argTNum)
 
         case BinaryExpr(op: BVBinOp, arg1: Expr, arg2: Expr) => 
             val arg1TNum = evaluateExprToTNum(s, arg1)
             val arg2TNum = evaluateExprToTNum(s, arg2)
-            evaluateBinOp(op, arg1TNum, arg2TNum)
+            evaluateValueBinOp(op, arg1TNum, arg2TNum)
 
         case Extract(endIndex: Int, startIndex: Int, body: Expr) => 
             val bodyTNum = evaluateExprToTNum(s, body)
@@ -657,10 +729,6 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
                     }
             }
             TNumValue(extendedValue, extendedMask)
-            
-        case UnaryExpr(op: BVUnOp, arg: Expr) =>
-            val argTNum = evaluateExprToTNum(s, arg)
-            evaluateUnOp(op, argTNum)
 
         case _ => TNumValue(BigInt(0), BigInt(-1))
     }
