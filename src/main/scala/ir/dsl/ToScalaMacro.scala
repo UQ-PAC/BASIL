@@ -1,53 +1,48 @@
 package ir.dsl
 
-import scala.quoted.*
 import scala.deriving.*
 import scala.compiletime.*
 
 import scala.collection.mutable.AbstractIterable
 
-inline def boop[A] = ${ boopImpl[A]() }
 
-def generateForCase[A: Type](using Quotes)(e: Expr[A]): Expr[String] =
-  ???
-
-def boopImpl[A: Type](using Quotes)(): Expr[Int] =
-  import quotes.reflect.*
-  val ty = TypeRepr.of[A].typeSymbol
-  report.errorAndAbort(s"hi $ty ${ty.isClassDef}")
-
-  ???
-
-inline def isElemOf[T, Tys <: Tuple]: Boolean =
-  inline erasedValue[Tys] match
-    case _: (elem *: elems) =>
-      inline (erasedValue[T], erasedValue[elem]) match
-        case _: (elem, T) => true
-        case _ => isElemOf[T, elems]
-    case _: EmptyTuple => false
-
-inline def summonIfNotExcluded[T, t, Excl](custom: => Excl => String): Boop[?] =
-  inline erasedValue[t] match
-    case _: Excl => Boop.BoopImpl(custom)
-    case _ => deriveOrSummon[T, t]
-
-inline def summonInstances[T, Elems <: Tuple, Excl <: T](custom: => Excl => String): List[Boop[?]] =
+inline def summonInstances[T, Elems <: Tuple, Excl <: T]: List[Boop[?]] =
   inline erasedValue[Elems] match
     case _: (t1 *: t2 *: t3 *: t4 *: rest) =>
-      summonIfNotExcluded[T, t1, Excl](custom)
-      :: summonIfNotExcluded[T, t2, Excl](custom)
-      :: summonIfNotExcluded[T, t3, Excl](custom)
-      :: summonIfNotExcluded[T, t4, Excl](custom)
-      :: summonInstances[T, rest, Excl](custom)
+      summonOrCustom[T, t1, Excl]
+      :: summonOrCustom[T, t2, Excl]
+      :: summonOrCustom[T, t3, Excl]
+      :: summonOrCustom[T, t4, Excl]
+      :: summonInstances[T, rest, Excl]
+    case _: (t1 *: t2 *: rest) =>
+      summonOrCustom[T, t1, Excl]
+      :: summonOrCustom[T, t2, Excl]
+      :: summonInstances[T, rest, Excl]
     case _: (t *: rest) =>
-      summonIfNotExcluded[T, t, Excl](custom) :: summonInstances[T, rest, Excl](custom)
+      summonOrCustom[T, t, Excl] :: summonInstances[T, rest, Excl]
     case _: EmptyTuple => Nil
 
-inline def deriveOrSummon[T, Elem]: Boop[Elem] =
+inline def summonOrCustom[T, t, Excl]: Boop[?] =
+  inline erasedValue[t] match
+    case _: Excl => Boop.BoopImpl(summonInline[Excl => String])
+    case _ => deriveOrSummon[T, t, Excl]
+
+
+inline def deriveOrSummon[T, Elem, Excl]: Boop[Elem] =
   inline (erasedValue[Elem], erasedValue[T]) match
+    // Elem <: T and T <: Elem means T == Elem
     case _: (T, Elem) => error("infinite recursive derivation\nadjio")
-    case _: (T, _) => Boop.derived[Elem](using summonInline[Mirror.Of[Elem]]) // recursive derivation
-    case _    => summonInline[Boop[Elem]]
+
+    // Elem <: T means the element is a subtype and we should recurse
+    case _: (T, _) =>
+      Boop.deriveWithExclusions(using summonInline[Mirror.Of[Elem]])(summonInline[Excl => String]) // recursive derivation
+
+    // otherwise, including T <: Elem, we summon.
+    case _ => summonInline[Boop[Elem]]
+    //   summonFrom {
+    //   case b: Boop[Elem] => b
+    //   case _ => error("No given instance of type ${Elem} was found")
+    // }
 
 
 inline def boopOfSum[T](m: Mirror.SumOf[T], instances: => List[Boop[?]], x: T): String =
@@ -90,9 +85,9 @@ object Boop {
     deriveWithExclusions[T, Nothing](absurd)
 
   inline def deriveWithExclusions[T, Excl <: T](using m: Mirror.Of[T])(custom: => Excl => String) =
-    lazy val lazyCustom = custom
-    lazy val elemInstances = summonInstances[T, m.MirroredElemTypes, Excl](lazyCustom) // if you see an error here, are you missing a given instance?
-    println("hi 5 " + constValue[m.MirroredLabel])
+    given (Excl => String) = custom
+    lazy val elemInstances = summonInstances[T, m.MirroredElemTypes, Excl] // if you see an error here, are you missing a given instance?
+    println("hi 7 " + constValue[m.MirroredLabel])
     BoopImpl((x: T) =>
       inline m match
         case s: Mirror.SumOf[T] => boopOfSum(s, elemInstances, x)
@@ -122,51 +117,55 @@ case class X3() extends X
 // case object Leaf extends ASD;
 //
 
-sealed trait ASD derives Boop
-case class A() extends ASD
-case class A1() extends ASD
-case class A2() extends ASD
-case class A3() extends ASD
-case class A4() extends ASD
-case class A5() extends ASD
-case class A6() extends ASD
-case class A7() extends ASD
-case class A8() extends ASD
-case class A9() extends ASD
-case class A10() extends ASD
-case class A11() extends ASD
-case class A12() extends ASD
-case class A13() extends ASD
-case class A14() extends ASD
-case class A15() extends ASD
-case class A16() extends ASD
-case class A17() extends ASD
-case class A18() extends ASD
-case class A19() extends ASD
-case class A20() extends ASD
-case class A21() extends ASD
-case class A22() extends ASD
-case class A23() extends ASD
-case class A24() extends ASD
-case class A25() extends ASD
-case class A26() extends ASD
-case class A27() extends ASD
+// sealed trait ASD derives Boop
+// case class A() extends ASD
+// case class A1() extends ASD
+// case class A2() extends ASD
+// case class A3() extends ASD
+// case class A4() extends ASD
+// case class A5() extends ASD
+// case class A6() extends ASD
+// case class A7() extends ASD
+// case class A8() extends ASD
+// case class A9() extends ASD
+// case class A10() extends ASD
+// case class A11() extends ASD
+// case class A12() extends ASD
+// case class A13() extends ASD
+// case class A14() extends ASD
+// case class A15() extends ASD
+// case class A16() extends ASD
+// case class A17() extends ASD
+// case class A18() extends ASD
+// case class A19() extends ASD
+// case class A20() extends ASD
+// case class A21() extends ASD
+// case class A22() extends ASD
+// case class A23() extends ASD
+// case class A24() extends ASD
+// case class A25() extends ASD
+// case class A26() extends ASD
+// case class A27() extends ASD
 
-sealed trait ASDjis
-case class II(a: ASD) extends ASDjis
+// sealed trait ASDjis
+// case class II(a: ASD) extends ASDjis
 
-given Boop[EAAA] = Boop.deriveWithExclusions[EAAA, EAAA.A.type](x => "custom" + x.toString)
+sealed trait L derives Boop
+case object N extends L
+case class C(x: Int, l: L, d: Double) extends L
+
+// given Boop[Double] with
+//   extension (x: Double) def boop = "doule"
+
+given Boop[EAAA] = Boop.deriveWithExclusions[EAAA, EAAA.A.type]((x: EAAA.A.type) => "custom" + x.toString)
 
 def go =
-  println(isElemOf[Int, (String, String)])
-  println(isElemOf[Nothing, (String, String)])
-  println(isElemOf[String, (String, String)])
   println(classOf[X2])
   println(s"= ${EAAA.A.boop}")
-  println(s"= ${X1.boop}")
+  println(s"= ${X1.boop} ")
   println(s"= ${X2a(29).boop}")
   println(s"= ${X2(10, 20, X1).boop}")
   println(s"= ${X3().boop} ")
-  // println(s"= ${II(A9()).boop} ")
+  println(s"= ${C(100, N, 10.0).boop} ")
   // println(s"= ${(null.asInstanceOf[A]).boop} ")
 
