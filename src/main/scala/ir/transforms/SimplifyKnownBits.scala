@@ -32,34 +32,42 @@ import ir.*
 sealed trait TNum
 
 case class TNumBool(boolean: Int) extends TNum {
+    // Equals
     def TEQ(that: TNumBool): TNumBool = {
         if (this.boolean == that.boolean) TNumBool(1) else TNumBool(0)
     }
 
+    // Not Equals
     def TNEQ(that: TNumBool): TNumBool = {
         if (this.boolean != that.boolean) TNumBool(1) else TNumBool(0)
     }
 
+    // AND
     def TAND(that: TNumBool): TNumBool = {
         if (this.boolean != 0 && that.boolean != 0) TNumBool(1) else TNumBool(0)
     }
 
+    // OR
     def TOR(that: TNumBool): TNumBool = {
         if (this.boolean != 0 || that.boolean != 0) TNumBool(1) else TNumBool(0)
     }
 
+    // Implies
     def TIMPLIES(that: TNumBool): TNumBool = {
         if ((1 - this.boolean) != 0 || that.boolean != 0) TNumBool(1) else TNumBool(0)
     }
 
+    // Equivalent
     def TEQUIV(that: TNumBool): TNumBool = {
         if (this.boolean == that.boolean) TNumBool(1) else TNumBool(0)
     }
 
+    // NOT
     def TNOT(): TNumBool = {
         TNumBool(1 - this.boolean)
     }
 
+    // Convert to equivalent bitvector (TNumValue)
     def TToBV1(): TNumValue = {
         TNumValue(BigInt(this.boolean), BigInt(0))
     }
@@ -425,20 +433,12 @@ case class TNumValue(value: BigInt, mask: BigInt) extends TNum {
 
     // Equality (TNum cannot have Top elements when checking for equality)
     def TEQ(that: TNumValue): TNumBool = {
-        if ((this.mask == 0 && that.mask == 0) && (this.value == that.value)) {
-            TNumBool(1)
-        } else {
-            TNumBool(0)
-        }
+        if ((this.mask == 0 && that.mask == 0) && (this.value == that.value)) TNumBool(1) else TNumBool(0)
     }
 
     // Not Equal (If a Top element exists, we assume not equal since Top could be 1 or 0)
     def TNEQ(that: TNumValue): TNumBool = {
-        if ((this.mask != 0 || that.mask != 0) || (this.value != that.value)) {
-            TNumBool(1)
-        } else {
-            TNumBool(0)
-        }
+        if ((this.mask != 0 || that.mask != 0) || (this.value != that.value)) TNumBool(1) else TNumBool(0)
     }
 
     // Get smallest possible unsigned value of the TNum (e.g. Min value of TT0 is 000)
@@ -466,11 +466,7 @@ case class TNumValue(value: BigInt, mask: BigInt) extends TNum {
         val thisUnsignedMaxValue = this.getUnsignedMaxValue()
         val thatUnsignedMinValue = that.getUnsignedMinValue()
 
-        if (thisUnsignedMaxValue < thatUnsignedMinValue) {
-            TNumBool(1)
-        } else {
-            TNumBool(0)
-        }
+        if (thisUnsignedMaxValue < thatUnsignedMinValue) TNumBool(1) else TNumBool(0)
     }
 
     // Signed Less Than
@@ -478,11 +474,7 @@ case class TNumValue(value: BigInt, mask: BigInt) extends TNum {
         val thisSignedMaxValue = this.getSignedMaxValue()
         val thatSignedMinValue = that.getSignedMinValue()
 
-        if (thisSignedMaxValue < thatSignedMinValue) {
-            TNumBool(1)
-        } else {
-            TNumBool(0)
-        }
+        if (thisSignedMaxValue < thatSignedMinValue) TNumBool(1) else TNumBool(0)
     }
 
     // Unsigned Less Than or Equal
@@ -490,11 +482,7 @@ case class TNumValue(value: BigInt, mask: BigInt) extends TNum {
         val thisUnsignedMaxValue = this.getUnsignedMaxValue()
         val thatUnsignedMinValue = that.getUnsignedMinValue()
 
-        if (thisUnsignedMaxValue <= thatUnsignedMinValue) {
-            TNumBool(1)
-        } else {
-            TNumBool(0)
-        }
+        if (thisUnsignedMaxValue <= thatUnsignedMinValue) TNumBool(1) else TNumBool(0)
     }
 
     // Signed Less Than or Equal
@@ -502,11 +490,7 @@ case class TNumValue(value: BigInt, mask: BigInt) extends TNum {
         val thisSignedMaxValue = this.getSignedMaxValue()
         val thatSignedMinValue = that.getSignedMinValue()
         
-        if (thisSignedMaxValue <= thatSignedMinValue) {
-            TNumBool(1)
-        } else {
-            TNumBool(0)
-        }
+        if (thisSignedMaxValue <= thatSignedMinValue) TNumBool(1) else TNumBool(0)
     }  
 
     // Unsigned Greater Than
@@ -514,11 +498,7 @@ case class TNumValue(value: BigInt, mask: BigInt) extends TNum {
         val thisUnsignedMinValue = this.getUnsignedMinValue()
         val thatUnsignedMaxValue = that.getUnsignedMaxValue()
 
-        if (thisUnsignedMinValue > thatUnsignedMaxValue) {
-            TNumBool(1)
-        } else {
-            TNumBool(0)
-        }
+        if (thisUnsignedMinValue > thatUnsignedMaxValue) TNumBool(1) else TNumBool(0)
     }
 
     // Signed Greater Than
@@ -526,11 +506,7 @@ case class TNumValue(value: BigInt, mask: BigInt) extends TNum {
         val thisSignedMinValue = this.getSignedMinValue()
         val thatSignedMaxValue = that.getSignedMaxValue()
 
-        if (thisSignedMinValue > thatSignedMaxValue) {
-            TNumBool(1)
-        } else {
-            TNumBool(0)
-        }
+        if (thisSignedMinValue > thatSignedMaxValue) TNumBool(1) else TNumBool(0)
     }
 
     // Unsigned Greater Than or Equal
@@ -538,11 +514,7 @@ case class TNumValue(value: BigInt, mask: BigInt) extends TNum {
         val thisUnsignedMinValue = this.getUnsignedMinValue()
         val thatUnsignedMaxValue = that.getUnsignedMaxValue()
         
-        if (thisUnsignedMinValue >= thatUnsignedMaxValue) {
-            TNumBool(1)
-        } else {
-            TNumBool(0)
-        }
+        if (thisUnsignedMinValue >= thatUnsignedMaxValue) TNumBool(1) else TNumBool(0)
     }
 
     // Signed Greater Than or Equal
@@ -550,11 +522,7 @@ case class TNumValue(value: BigInt, mask: BigInt) extends TNum {
         val thisSignedMinValue = this.getSignedMinValue()
         val thatSignedMaxValue = that.getSignedMaxValue()
         
-        if (thisSignedMinValue >= thatSignedMaxValue) {
-            TNumBool(1)
-        } else {
-            TNumBool(0)
-        }
+        if (thisSignedMinValue >= thatSignedMaxValue) TNumBool(1) else TNumBool(0)
     }
 
     // Concatenation
@@ -669,66 +637,92 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
 
         case v: Variable => s.getOrElse(v, TNumValue(BigInt(0), BigInt(-1)))
 
-        case UnaryExpr(op: BVUnOp, arg: Expr) =>
+        case UnaryExpr(op: UnOp, arg: Expr) =>
             val argTNum = evaluateExprToTNum(s, arg)
-            evaluateValueUnOp(op, argTNum)
+
+            (op, argTNum) match {
+                case (opVal: BVUnOp, tnum: TNumValue) => evaluateValueUnOp(opVal, tnum)
+                case (opVal: IntUnOp, tnum: TNumValue) => evaluateValueUnOp(opVal, tnum)
+                case (opVal: BoolUnOp, tnum: TNumBool) => evaluateBoolUnOp(opVal, tnum)
+            }
 
         case BinaryExpr(op: BVBinOp, arg1: Expr, arg2: Expr) => 
             val arg1TNum = evaluateExprToTNum(s, arg1)
             val arg2TNum = evaluateExprToTNum(s, arg2)
-            evaluateValueBinOp(op, arg1TNum, arg2TNum)
+
+            (op, arg1TNum, arg2TNum) match {
+                case (opVal: BVBinOp, tnum1: TNumValue, tnum2: TNumValue) => evaluateValueBinOp(opVal, tnum1, tnum2)
+                case (opVal: IntBinOp, tnum1: TNumValue, tnum2: TNumValue) => evaluateValueBinOp(opVal, tnum1, tnum2)
+                case (opVal: BoolBinOp, tnum1: TNumBool, tnum2: TNumBool) => evaluateBoolBinOp(opVal, tnum1, tnum2)
+            }
 
         case Extract(endIndex: Int, startIndex: Int, body: Expr) => 
             val bodyTNum = evaluateExprToTNum(s, body)
-            val bodyTNumValueExtract = (bodyTNum.value >> startIndex) & ((BigInt(1) << (endIndex - startIndex)) - 1)
-            val bodyTNumMaskExtract = (bodyTNum.mask >> startIndex) & ((BigInt(1) << (endIndex - startIndex)) - 1)
-            TNumValue(bodyTNumValueExtract, bodyTNumMaskExtract)
 
+            bodyTNum match {
+                case tnum: TNumValue =>
+                    val bodyTNumValueExtract = (tnum.value >> startIndex) & ((BigInt(1) << (endIndex - startIndex)) - 1)
+                    val bodyTNumMaskExtract = (tnum.mask >> startIndex) & ((BigInt(1) << (endIndex - startIndex)) - 1)
+                    TNumValue(bodyTNumValueExtract, bodyTNumMaskExtract)
+            }
+            
         case Repeat(repeats: Int, body: Expr) =>
             val bodyTNum = evaluateExprToTNum(s, body)
-            val repeatedValue = (0 until repeats).foldLeft(BigInt(0)) { (acc, _) => (acc << bodyTNum.value.bitLength) | bodyTNum.value }
-            val repeatedMask = (0 until repeats).foldLeft(BigInt(0)) { (acc, _) => (acc << bodyTNum.mask.bitLength) | bodyTNum.mask }
-            TNumValue(repeatedValue, repeatedMask)
+
+            bodyTNum match {
+                case tnum: TNumValue =>
+                    val repeatedValue = (0 until repeats).foldLeft(BigInt(0)) { (acc, _) => (acc << tnum.value.bitLength) | tnum.value }
+                    val repeatedMask = (0 until repeats).foldLeft(BigInt(0)) { (acc, _) => (acc << tnum.mask.bitLength) | tnum.mask }
+                    TNumValue(repeatedValue, repeatedMask)
+            }
 
         case ZeroExtend(extension: Int, body: Expr) =>
             val bodyTNum = evaluateExprToTNum(s, body)
-            val newLength = bodyTNum.value.bitLength + extension
-            val zeroExtendedValue = bodyTNum.value & ((BigInt(1) << newLength) - 1)
-            val zeroExtendedMask = bodyTNum.mask & ((BigInt(1) << newLength) - 1)
-            TNumValue(zeroExtendedValue, zeroExtendedMask)
 
+            bodyTNum match {
+                case tnum: TNumValue =>
+                    val newLength = tnum.value.bitLength + extension
+                    val zeroExtendedValue = tnum.value & ((BigInt(1) << newLength) - 1)
+                    val zeroExtendedMask = tnum.mask & ((BigInt(1) << newLength) - 1)
+                    TNumValue(zeroExtendedValue, zeroExtendedMask)
+            }
+            
         case SignExtend(extension: Int, body: Expr) =>
             val bodyTNum = evaluateExprToTNum(s, body)
-            val valueMsb = (bodyTNum.value >> (bodyTNum.value.bitLength - 1)) & 1
-            val maskMsb = (bodyTNum.mask >> (bodyTNum.mask.bitLength - 1)) & 1
 
-            val (extendedValue, extendedMask) = (valueMsb, maskMsb) match {
-                case (0, 0) =>
-                    // If MSB of value is 0 and MSB of mask is 0, extend value and mask with 0
-                    (bodyTNum.value, bodyTNum.mask)
-                case (1, 0) =>
-                    // If MSB of value is 1 and MSB of mask is 0, extend value with 1 and mask with 0
-                    val extendedPart = (BigInt(1) << extension) - 1
-                    (bodyTNum.value | (extendedPart << bodyTNum.value.bitLength), bodyTNum.mask)
-                case (0, 1) =>
-                    // If MSB of value is 0 and MSB of mask is 1, extend value with 0 and mask with 1
-                    val extendedPartMask = (BigInt(1) << extension) - 1
-                    (bodyTNum.value, bodyTNum.mask | (extendedPartMask << bodyTNum.mask.bitLength))
-                case (1, 1) =>
-                    // If MSB 0 in value or mask has been removed due to BigInt type 
-                    // (e.g. value = 001 = BigInt(1) != MSB 0, mask = 100), compare their bit lengths 
-                    // since (value, mask) can never be (1, 1) and have the same length
-                    if (bodyTNum.value.bitLength > bodyTNum.mask.bitLength) {
-                        // If value has more bits, extend value with 1 and mask with 0
-                        val extendedPartValue = (BigInt(1) << extension) - 1
-                        (bodyTNum.value | (extendedPartValue << bodyTNum.value.bitLength), bodyTNum.mask)
-                    } else if (bodyTNum.value.bitLength < bodyTNum.mask.bitLength) {
-                        // If value has less bits, extend value with 0 and mask with 1
-                        val extendedPartMask = (BigInt(1) << extension) - 1
-                        (bodyTNum.value, bodyTNum.mask | (extendedPartMask << bodyTNum.mask.bitLength))
+            bodyTNum match {
+                case tnum: TNumValue =>
+                    val valueMsb = (tnum.value >> (tnum.value.bitLength - 1)) & 1
+                    val maskMsb = (tnum.mask >> (tnum.mask.bitLength - 1)) & 1
+
+                    val (extendedValue, extendedMask) = (valueMsb, maskMsb) match {
+                        case (0, 0) =>
+                            // If MSB of value is 0 and MSB of mask is 0, extend value and mask with 0
+                            (tnum.value, tnum.mask)
+                        case (1, 0) =>
+                            // If MSB of value is 1 and MSB of mask is 0, extend value with 1 and mask with 0
+                            val extendedPart = (BigInt(1) << extension) - 1
+                            (tnum.value | (extendedPart << tnum.value.bitLength), tnum.mask)
+                        case (0, 1) =>
+                            // If MSB of value is 0 and MSB of mask is 1, extend value with 0 and mask with 1
+                            val extendedPartMask = (BigInt(1) << extension) - 1
+                            (tnum.value, tnum.mask | (extendedPartMask << tnum.mask.bitLength))
+                        case (1, 1) =>
+                            // If MSB 0 in value or mask has been removed due to BigInt type 
+                            // (e.g. value = 001 = BigInt(1) != MSB 0, mask = 100), compare their bit lengths 
+                            // since (value, mask) can never be (1, 1) and have the same length
+                            if (tnum.value.bitLength > tnum.mask.bitLength) {
+                                // If value has more bits, extend value with 1 and mask with 0
+                                val extendedPartValue = (BigInt(1) << extension) - 1
+                                (tnum.value | (extendedPartValue << tnum.value.bitLength), tnum.mask)
+                            } else if (tnum.value.bitLength < tnum.mask.bitLength) {
+                                // If value has less bits, extend value with 0 and mask with 1
+                                val extendedPartMask = (BigInt(1) << extension) - 1
+                                (tnum.value, tnum.mask | (extendedPartMask << tnum.mask.bitLength))
+                            }
                     }
+                    TNumValue(extendedValue, extendedMask)
             }
-            TNumValue(extendedValue, extendedMask)
 
         case _ => TNumValue(BigInt(0), BigInt(-1))
     }
@@ -738,13 +732,13 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
         b match {
             // Assign variable to variable (e.g. x = y)
             case LocalAssign(lhs: Variable, rhs: Expr) =>
-                s.updated(lhs, evaluateExprToTNum(rhs))
+                s.updated(lhs, evaluateExprToTNum(s, rhs))
 
             // Load from memory and store in variable
             case MemoryLoad(lhs: Variable, mem: Memory, index: Expr, endian: Endian, size: Int) 
                 if !s.contains(lhs) =>
                     // Overapproxiate memory values with Top
-                    s.updated(lhs, TNum(BigInt(0), BigInt(-1)))
+                    s.updated(lhs, TNumValue(BigInt(0), BigInt(-1)))
 
             // Default case    
             case _ => s 
@@ -761,21 +755,24 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
             val leftTNum = left.getOrElse(key, TNumValue(BigInt(0), BigInt(-1)))
             val rightTNum = right.getOrElse(key, TNumValue(BigInt(0), BigInt(-1)))
 
-            // Only merge the TNum of variables that appear in both program states
             if (left.contains(key) && !right.contains(key)) {
+                // Only left map contains key
                 key -> leftTNum
             } else if (!left.contains(key) && right.contains(key)) {
+                // Only right map contains key
                 key -> rightTNum
             } else {
-                key -> leftTNum.TOR(rightTNum)
+                // Merge the TNum of variables that appear in both program states but need to be compatible
+                (leftTNum, rightTNum) match {
+                    case (left: TNumValue, right: TNumValue) => key -> left.TOR(right)
+                    case (left: TNumBool, right: TNumBool) => key -> left.TOR(right)
+                    case _ => key -> TNumValue(BigInt(0), BigInt(-1))
+                }
             }
         }.toMap
     }
 }
 
-// TODO
-// call applyTransform method in RunUtils
-// transforms.SimplifyExprWithTNum().applyTransform(ctx.program)
 class SimplifyKnownBits() {
     val solver = transforms.worklistSolver(TNumDomain())
 
