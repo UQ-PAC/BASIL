@@ -26,13 +26,21 @@ inline def isElemOf[T, Tys <: Tuple]: Boolean =
         case _ => isElemOf[T, elems]
     case _: EmptyTuple => false
 
+inline def summonIfNotExcluded[T, t, Excl](custom: => Excl => String): Boop[?] =
+  inline erasedValue[t] match
+    case _: Excl => Boop.BoopImpl(custom)
+    case _ => deriveOrSummon[T, t]
+
 inline def summonInstances[T, Elems <: Tuple, Excl <: T](custom: => Excl => String): List[Boop[?]] =
   inline erasedValue[Elems] match
+    case _: (t1 *: t2 *: t3 *: t4 *: rest) =>
+      summonIfNotExcluded[T, t1, Excl](custom)
+      :: summonIfNotExcluded[T, t2, Excl](custom)
+      :: summonIfNotExcluded[T, t3, Excl](custom)
+      :: summonIfNotExcluded[T, t4, Excl](custom)
+      :: summonInstances[T, rest, Excl](custom)
     case _: (t *: rest) =>
-      val boop = inline erasedValue[t] match
-        case _: Excl => Boop.BoopImpl(custom)
-        case _ => deriveOrSummon[T, t]
-      boop :: summonInstances[T, rest, Excl](custom)
+      summonIfNotExcluded[T, t, Excl](custom) :: summonInstances[T, rest, Excl](custom)
     case _: EmptyTuple => Nil
 
 inline def deriveOrSummon[T, Elem]: Boop[Elem] =
@@ -103,7 +111,7 @@ given Boop[Int] with
 
 sealed trait Y derives Boop
 
-sealed trait X extends Y
+sealed trait X extends Y derives Boop
 case object X1 extends X
 case class X2(x: Int, y: Int, rec: X) extends X
 case class X2a(x: Int) extends X
@@ -143,7 +151,9 @@ case class A24() extends ASD
 case class A25() extends ASD
 case class A26() extends ASD
 case class A27() extends ASD
-case class A28() extends ASD
+
+sealed trait ASDjis
+case class II(a: ASD) extends ASDjis
 
 given Boop[EAAA] = Boop.deriveWithExclusions[EAAA, EAAA.A.type](x => "custom" + x.toString)
 
@@ -157,5 +167,6 @@ def go =
   println(s"= ${X2a(29).boop}")
   println(s"= ${X2(10, 20, X1).boop}")
   println(s"= ${X3().boop} ")
-  println(s"= ${(null.asInstanceOf[A]).boop} ")
+  // println(s"= ${II(A9()).boop} ")
+  // println(s"= ${(null.asInstanceOf[A]).boop} ")
 
