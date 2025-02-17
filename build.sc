@@ -11,7 +11,7 @@ import contrib.scalapblib._
 object basil extends RootModule with ScalaModule with antlr.AntlrModule with ScalaPBModule{
   def scalaVersion = "3.3.4"
 
-  def scalacOptions: T[Seq[String]] = Seq("-Xprint:typer,explicitouter,erasure,lambdalift")
+  // def scalacOptions: T[Seq[String]] = Seq("-Xprint:typer,erasure")
 
   val javaTests = ivy"com.novocode:junit-interface:0.11"
   val scalaTests = ivy"org.scalatest::scalatest:3.2.10"

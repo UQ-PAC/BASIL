@@ -12,18 +12,18 @@ import scala.compiletime.{summonInline, erasedValue, constValue, error}
  * It can be used in these ways:
  *
  *     // to derive for instances of a sealed trait
- *     sealed trait Trait derives Boop
+ *     sealed trait Trait derives ToScala
  *
  *     // to manually derive for a given type (the above syntax desugars to this)
- *     given Boop[TheType] = Boop.derived
+ *     given ToScala[TheType] = ToScala.derived
  *
  *     // to override the ToScala implementation for particular cases
  *     enum EAAA {
  *       case A
  *       case B
  *     }
- *     given Boop[EAAA] =
- *       Boop.deriveWithExclusions[EAAA, EAAA.A.type](
+ *     given ToScala[EAAA] =
+ *       ToScala.deriveWithExclusions[EAAA, EAAA.A.type](
  *         (x: EAAA.A.type) => s"custom implementation for EAAA.A")
  */
 
@@ -184,125 +184,117 @@ import scala.compiletime.{summonInline, erasedValue, constValue, error}
  */
 
 
-/**
- * Support functions
- * -----------------
- *
- * The following functions are used to recursively obtain type-class instances
- * for the tuple of types in MirroredElemTypes.
- *
- * Aside from summonOrCustom, these are largely copied from:
- * https://docs.scala-lang.org/scala3/reference/contextual/derivation.html#how-to-write-a-type-class-derived-method-using-low-level-mechanisms-1
- */
-
-/**
- * Summon Boop instances for each type in the Elems tuple of types. Also handles exclusions.
- */
-inline def summonInstances[T, Elems <: Tuple, Excl <: T](using m: Mirror.Of[T]): List[Boop[?]] =
-
-  // NOTE: this is an unrolled recursion to avoid the "Maximal number of successive inlines (32) exceeded" error
-  inline erasedValue[Elems] match
-    case _: (t1 *: t2 *: t3 *: t4 *: rest) =>
-      summonOrCustom[T, t1, Excl] // first field / case
-      :: summonOrCustom[T, t2, Excl] // second field / case
-      :: summonOrCustom[T, t3, Excl] // third field / case
-      :: summonOrCustom[T, t4, Excl] // fourth field / case
-      :: summonInstances[T, rest, Excl] // + 4
-    case _: (t1 *: t2 *: t3 *: EmptyTuple) =>
-      summonOrCustom[T, t1, Excl] // first field / case
-      :: summonOrCustom[T, t2, Excl] // second field / case
-      :: summonOrCustom[T, t3, Excl] // third field / case
-      :: List()
-    case _: (t1 *: t2 *: EmptyTuple) =>
-      summonOrCustom[T, t1, Excl] // first field / case
-      :: summonOrCustom[T, t2, Excl] // second field / case
-      :: List()
-    case _: (t *: EmptyTuple) =>
-      summonOrCustom[T, t, Excl] // first field / case
-      :: List()
-    case _: EmptyTuple => Nil
-
-/**
- * Summon Boop for the given type or apply a custom exclusion.
- */
-inline def summonOrCustom[T, t, Excl](using m: Mirror.Of[T]): Boop[?] =
-  inline erasedValue[t] match
-    case _: Excl => summonInline[Boop.BoopImpl[Excl]]
-    case _ => deriveOrSummon[T, t, Excl]
-
-/**
- * Obtain a Boop for the given type, either by summoning an existing instance
- * or deriving a new instance.
- *
- * Detects infinite self-recursion.
- * Recursively derives subtypes (i.e. cases) of sum types.
- * Otherwise, summons an external Boop instance for the given type.
- */
-inline def deriveOrSummon[T, Elem, Excl](using m: Mirror.Of[T]): Boop[Elem] =
-  inline (erasedValue[Elem], erasedValue[T]) match
-    // Elem <: T and T <: Elem means T == Elem
-    case _: (T, Elem) => error("Infinite recursive derivation. The type " + constValue[m.MirroredLabel] + " appears in its own constructor.")
-
-    // Elem <: T means the element is a subtype and we should recurse
-    case _: (T, _) =>
-      Boop.deriveWithExclusions(using summonInline[Mirror.Of[Elem]])(summonInline[Boop.BoopImpl[Excl]].boop) // recursively derive sum case
-
-    // otherwise, including the case where the Elem is a supertype of T, we summon.
-    case _ => summonInline[Boop[Elem]] // summon externally-defined instance
-
-
-/**
- * Implementation for sums and products
- * ------------------------------------
- *
- * Every mirror represents either a sum or a product type (itself containing more
- * sum or product types). As such, we only need to implement derivation for these two cases.
- */
-
-/**
- * Implements Boop for the given value of a sum type.
- *
- * This is done by obtaining Boop instances for each case and invoking the appropriate
- * instance based on the value.
- */
-inline def boopOfSum[T](m: Mirror.SumOf[T], instances: => List[Boop[?]], x: T): String =
-  val idx = m.ordinal(x)
-
-  val name = constValue[m.MirroredLabel]
-  val prefix = inline erasedValue[m.MirroredMonoType] match
-    case _: scala.reflect.Enum => name + "."
-    case _ => ""
-
-  prefix + instances(idx).asInstanceOf[Boop[T]].boop(x)
-
-/**
- * Implements Boop instance for the given value of a product type.
- *
- * This is done by obtaining Boop instances for the fields, then joining their
- * results.
- */
-inline def boopOfProduct[T](m: Mirror.ProductOf[T], instances: => List[Boop[?]], x: T): String =
-  val name = constValue[m.MirroredLabel]
-  val args = inline m match
-    case _: Mirror.Singleton => ""
-    case _ =>
-      val elems = x.asInstanceOf[Product].productIterator
-      val args = (instances zip elems).map((f, x) => f.asInstanceOf[Boop[Any]].boop(x))
-      args.mkString("(", ", ", ")")
-
-  name + args
-
-
-trait Boop[-A]:
-  extension (x: A) def boop: String
-
-object Boop {
+object ToScalaDeriving {
 
   /**
-   * Helper class for wrapping a lambda function into a Boop instance.
+   * Support functions
+   * -----------------
+   *
+   * The following functions are used to recursively obtain type-class instances
+   * for the tuple of types in MirroredElemTypes.
+   *
+   * Aside from summonOrCustom, these are largely copied from:
+   * https://docs.scala-lang.org/scala3/reference/contextual/derivation.html#how-to-write-a-type-class-derived-method-using-low-level-mechanisms-1
    */
-  class BoopImpl[T](f: T => String) extends Boop[T] {
-    extension (x: T) def boop: String = f(x)
+
+  /**
+   * Summon ToScala instances for each type in the Elems tuple of types. Also handles exclusions.
+   */
+  inline def summonInstances[T, Elems <: Tuple, Excl <: T](using m: Mirror.Of[T]): List[ToScala[?]] =
+
+    // NOTE: this is an unrolled recursion to avoid the "Maximal number of successive inlines (32) exceeded" error
+    inline erasedValue[Elems] match
+      case _: (t1 *: t2 *: t3 *: t4 *: rest) =>
+        summonOrCustom[T, t1, Excl] // first field / case
+        :: summonOrCustom[T, t2, Excl] // second field / case
+        :: summonOrCustom[T, t3, Excl] // third field / case
+        :: summonOrCustom[T, t4, Excl] // fourth field / case
+        :: summonInstances[T, rest, Excl] // + 4
+      case _: (t1 *: t2 *: t3 *: EmptyTuple) =>
+        summonOrCustom[T, t1, Excl] // first field / case
+        :: summonOrCustom[T, t2, Excl] // second field / case
+        :: summonOrCustom[T, t3, Excl] // third field / case
+        :: List()
+      case _: (t1 *: t2 *: EmptyTuple) =>
+        summonOrCustom[T, t1, Excl] // first field / case
+        :: summonOrCustom[T, t2, Excl] // second field / case
+        :: List()
+      case _: (t *: EmptyTuple) =>
+        summonOrCustom[T, t, Excl] // first field / case
+        :: List()
+      case _: EmptyTuple => Nil
+
+  /**
+   * Summon ToScala for the given type or apply a custom exclusion.
+   */
+  inline def summonOrCustom[T, t, Excl](using m: Mirror.Of[T]): ToScala[?] =
+    inline erasedValue[t] match
+      case _: Excl => summonInline[Make[Excl]]
+      case _ => deriveOrSummon[T, t, Excl]
+
+  /**
+   * Obtain a ToScala for the given type, either by summoning an existing instance
+   * or deriving a new instance.
+   *
+   * Detects infinite self-recursion.
+   * Recursively derives subtypes (i.e. cases) of sum types.
+   * Otherwise, summons an external ToScala instance for the given type.
+   */
+  inline def deriveOrSummon[T, Elem, Excl](using m: Mirror.Of[T]): ToScala[Elem] =
+    inline (erasedValue[Elem], erasedValue[T]) match
+      // Elem <: T and T <: Elem means T == Elem
+      case _: (T, Elem) => error("Infinite recursive derivation. The type " + constValue[m.MirroredLabel] + " appears in its own constructor.")
+
+      // Elem <: T means the element is a subtype and we should recurse
+      case _: (T, _) =>
+        ToScala.deriveWithExclusions(using summonInline[Mirror.Of[Elem]])(summonInline[Make[Excl]].toScala) // recursively derive sum case
+
+      // otherwise, including the case where the Elem is a supertype of T, we summon.
+      case _ => summonInline[ToScala[Elem]] // summon externally-defined instance
+
+
+  /**
+   * Implementation for sums and products
+   * ------------------------------------
+   *
+   * Every mirror represents either a sum or a product type (itself containing more
+   * sum or product types). As such, we only need to implement derivation for these two cases.
+   */
+
+  /**
+   * Implements ToScala for the given value of a sum type.
+   *
+   * This is done by obtaining ToScala instances for each case and invoking the appropriate
+   * instance based on the value.
+   */
+  inline def toScalaOfSum[T](instances: => List[ToScala[?]], name: String, idx: Int, x: T): String =
+    val prefix = inline x match
+      case _: scala.reflect.Enum => name + "."
+      case _ => ""
+
+    prefix + instances(idx).asInstanceOf[ToScala[T]].toScala(x)
+
+  /**
+   * Implements ToScala instance for the given value of a product type.
+   *
+   * This is done by obtaining ToScala instances for the fields, then joining their
+   * results.
+   */
+  inline def toScalaOfProduct[T](instances: => List[ToScala[?]], name: String, inline isSingleton: Boolean, x: T): String =
+    val args = inline isSingleton match
+      case true => ""
+      case false =>
+        val elems = x.asInstanceOf[Product].productIterator
+        val args = (instances zip elems).map((f, x) => f.asInstanceOf[ToScala[Any]].toScala(x))
+        args.mkString("(", ", ", ")")
+
+    name + args
+
+  /**
+   * Helper class for wrapping a lambda function into a ToScala instance.
+   */
+  class Make[T](f: T => String) extends ToScala[T] {
+    extension (x: T) def toScala: String = f(x)
   }
 
   /**
@@ -311,25 +303,32 @@ object Boop {
   def absurd[T](x: Nothing): T = x
 
   /**
-   * Entry point for derivation. Used by Scala's "deriving Boop" syntax.
+   * Entry point for derivation. Used by Scala's "deriving ToScala" syntax.
    */
-  inline def derived[T](using m: Mirror.Of[T]): Boop[T] =
+  inline def derived[T](using m: Mirror.Of[T]): ToScala[T] =
     deriveWithExclusions[T, Nothing](absurd) // derive with defaults (no exclusions)
 
   /**
-   * Alternative entry point for deriving Boop. Allows for specifying
+   * Alternative entry point for deriving ToScala. Allows for specifying
    * a custom implementation for a certain subset of cases.
    */
-  inline def deriveWithExclusions[T, Excl <: T](using m: Mirror.Of[T])(custom: => Excl => String) =
-    given Boop.BoopImpl[Excl] = BoopImpl(custom)
+  inline def deriveWithExclusions[T, Excl <: T](using m: Mirror.Of[T])(custom: => Excl => String) = {
+
+    import ToScalaDeriving.{summonInstances, toScalaOfSum, toScalaOfProduct}
+
+    given Make[Excl] = Make(custom)
+
     lazy val elemInstances = inline m match
       case _: Mirror.SumOf[T] => summonInstances[T, m.MirroredElemTypes, Excl] // obtain given instances for sum cases
       case _: Mirror.ProductOf[T] => summonInstances[T, m.MirroredElemTypes, Excl] // obtain given instances for product fields
 
-    BoopImpl((x: T) =>
+    inline val name = constValue[m.MirroredLabel]
+    Make((x: T) =>
       inline m match
-        case s: Mirror.SumOf[T] => boopOfSum(s, elemInstances, x)
-        case p: Mirror.ProductOf[T] => boopOfProduct[T](p, elemInstances, x)
+        case s: Mirror.SumOf[T] => toScalaOfSum(elemInstances, name, s.ordinal(x), x)
+        case p: Mirror.Singleton => toScalaOfProduct(elemInstances, name, true, x)
+        case p: Mirror.ProductOf[T] => toScalaOfProduct(elemInstances, name, false, x)
     )
-}
+  }
 
+}

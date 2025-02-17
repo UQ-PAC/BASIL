@@ -213,7 +213,7 @@ enum EAAA {
   case A
   case B
 }
-given Boop[EAAA] = Boop.deriveWithExclusions[EAAA, EAAA.A.type]((x: EAAA.A.type) => "custom" + x.toString)
+given ToScala[EAAA] = ToScala.deriveWithExclusions[EAAA, EAAA.A.type]((x: EAAA.A.type) => "custom" + x.toString)
       """)
 
     // exclusion type should be a subtype of base type
@@ -222,16 +222,16 @@ enum EAAA {
   case A
   case B
 }
-given Boop[EAAA] = Boop.deriveWithExclusions[EAAA, Any]((x: Any) => ???)
+given ToScala[EAAA] = ToScala.deriveWithExclusions[EAAA, Any]((x: Any) => ???)
       """)
 
     // recursive
     assertCompiles("""
-given Boop[Int] = Boop.BoopImpl(_.toString)
+given ToScala[Int] = ToScala.Make(_.toString)
 
-sealed trait Y derives Boop
+sealed trait Y derives ToScala
 
-sealed trait X extends Y derives Boop
+sealed trait X extends Y derives ToScala
 case object X1 extends X
 case class X2(x: Int, y: Int, rec: X) extends X
 case class X2a(x: Int) extends X
@@ -240,36 +240,36 @@ case class X3() extends X
 
     // missing instance for Double
     assertTypeError("""
-given Boop[Int] with
-  extension (x: Int) def boop = x.toString
+given ToScala[Int] with
+  extension (x: Int) def toScala = x.toString
 
-sealed trait L derives Boop
+sealed trait L derives ToScala
 case object N extends L
 case class C(x: Int, l: L, d: Double) extends L
       """)
 
     // as above but with Double present
     assertCompiles("""
-given Boop[Int] with
-  extension (x: Int) def boop = x.toString
-given Boop[Double] with
-  extension (x: Double) def boop = x.toString
+given ToScala[Int] with
+  extension (x: Int) def toScala = x.toString
+given ToScala[Double] with
+  extension (x: Double) def toScala = x.toString
 
-sealed trait L derives Boop
+sealed trait L derives ToScala
 case object N extends L
 case class C(x: Int, l: L, d: Double) extends L
       """)
 
     // type that appears in its own constructor
     assertTypeError("""
-sealed trait T derives Boop
+sealed trait T derives ToScala
 case class A(a: A) extends T
       """)
 
 
     // large number of cases
     assertCompiles("""
-sealed trait ASD derives Boop
+sealed trait ASD derives ToScala
 case class A() extends ASD
 case class A1() extends ASD
 case class A2() extends ASD
@@ -320,13 +320,13 @@ case class A39() extends ASD
       case A
       case B
     }
-    given Boop[EAAA] = Boop.deriveWithExclusions[EAAA, EAAA.A.type]((x: EAAA.A.type) => s"custom$x")
+    given ToScala[EAAA] = ToScala.deriveWithExclusions[EAAA, EAAA.A.type]((x: EAAA.A.type) => s"custom$x")
 
-    sealed trait L derives Boop
+    sealed trait L derives ToScala
     case class N() extends L
     case class C(t: L) extends L
 
-    enum Color(val rgb: Int) derives Boop {
+    enum Color(val rgb: Int) derives ToScala {
       case Red   extends Color(0xFF0000)
       case Green extends Color(0x00FF00)
       case Blue  extends Color(0x0000FF)
@@ -335,11 +335,11 @@ case class A39() extends ASD
 
   test("toscala macro result") {
     import TestData.*
-    assertResult("EAAA.B") { EAAA.B.boop }
-    assertResult("EAAA.customA") { EAAA.A.boop }
-    assertResult("N()") { N().boop }
-    assertResult("C(C(N()))") { C(C(N())).boop }
-    assertResult("Color.Red") { Color.Red.boop }
+    assertResult("EAAA.B") { EAAA.B.toScala }
+    assertResult("EAAA.customA") { EAAA.A.toScala }
+    assertResult("N()") { N().toScala }
+    assertResult("C(C(N()))") { C(C(N())).toScala }
+    assertResult("Color.Red") { Color.Red.toScala }
   }
 
 }

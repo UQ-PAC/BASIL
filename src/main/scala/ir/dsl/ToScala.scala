@@ -42,6 +42,12 @@ trait ToScalaLines[-T] extends ToScala[T]:
     override def toScala = x.toScalaLines.mkString
 
 
+object ToScala {
+  def apply[T](using inst: ToScala[T]) = inst
+
+  export ToScalaDeriving.*
+}
+
 /**
  * Base functions
  * --------------

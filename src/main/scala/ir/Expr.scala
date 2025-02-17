@@ -144,7 +144,7 @@ case class UnaryExpr(op: UnOp, arg: Expr) extends Expr {
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitUnaryExpr(this)
 }
 
-trait UnOp
+sealed trait UnOp
 
 sealed trait BoolUnOp(op: String) extends UnOp {
   override def toString: String = op
@@ -231,7 +231,7 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
 
 }
 
-trait BinOp {
+sealed trait BinOp {
   def opName: String
 }
 
