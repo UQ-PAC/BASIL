@@ -204,11 +204,144 @@ prog(
     val stmt = MemoryStore(StackMemory("stack", 64, 8), BinaryExpr(BVADD, Register("R31", 64), BitVecLiteral(BigInt("15"), 64)), Extract(8, 0, Register("R0", 64)), Endian.LittleEndian, 8, Some("%0000034e"))
 
     checkOutput(expected, stmt.toScala)
+  }
 
-    ir.dsl.go
+  test("toscala macro compilation") {
+    // derive with exclusions
+    assertCompiles("""
+enum EAAA {
+  case A
+  case B
+}
+given Boop[EAAA] = Boop.deriveWithExclusions[EAAA, EAAA.A.type]((x: EAAA.A.type) => "custom" + x.toString)
+      """)
+
+    // exclusion type should be a subtype of base type
+    assertTypeError("""
+enum EAAA {
+  case A
+  case B
+}
+given Boop[EAAA] = Boop.deriveWithExclusions[EAAA, Any]((x: Any) => ???)
+      """)
+
+    // recursive
+    assertCompiles("""
+given Boop[Int] = Boop.BoopImpl(_.toString)
+
+sealed trait Y derives Boop
+
+sealed trait X extends Y derives Boop
+case object X1 extends X
+case class X2(x: Int, y: Int, rec: X) extends X
+case class X2a(x: Int) extends X
+case class X3() extends X
+""")
+
+    // missing instance for Double
+    assertTypeError("""
+given Boop[Int] with
+  extension (x: Int) def boop = x.toString
+
+sealed trait L derives Boop
+case object N extends L
+case class C(x: Int, l: L, d: Double) extends L
+      """)
+
+    // as above but with Double present
+    assertCompiles("""
+given Boop[Int] with
+  extension (x: Int) def boop = x.toString
+given Boop[Double] with
+  extension (x: Double) def boop = x.toString
+
+sealed trait L derives Boop
+case object N extends L
+case class C(x: Int, l: L, d: Double) extends L
+      """)
+
+    // type that appears in its own constructor
+    assertTypeError("""
+sealed trait T derives Boop
+case class A(a: A) extends T
+      """)
+
+
+    // large number of cases
+    assertCompiles("""
+sealed trait ASD derives Boop
+case class A() extends ASD
+case class A1() extends ASD
+case class A2() extends ASD
+case class A3() extends ASD
+case class A4() extends ASD
+case class A5() extends ASD
+case class A6() extends ASD
+case class A7() extends ASD
+case class A8() extends ASD
+case class A9() extends ASD
+case class A10() extends ASD
+case class A11() extends ASD
+case class A12() extends ASD
+case class A13() extends ASD
+case class A14() extends ASD
+case class A15() extends ASD
+case class A16() extends ASD
+case class A17() extends ASD
+case class A18() extends ASD
+case class A19() extends ASD
+case class A20() extends ASD
+case class A21() extends ASD
+case class A22() extends ASD
+case class A23() extends ASD
+case class A24() extends ASD
+case class A25() extends ASD
+case class A26() extends ASD
+case class A27() extends ASD
+case class A28() extends ASD
+case class A29() extends ASD
+case class A30() extends ASD
+case class A31() extends ASD
+case class A32() extends ASD
+case class A33() extends ASD
+case class A34() extends ASD
+case class A35() extends ASD
+case class A36() extends ASD
+case class A37() extends ASD
+case class A38() extends ASD
+case class A39() extends ASD
+""")
+
+  }
+
+  object TestData {
+
+    enum EAAA {
+      case A
+      case B
+    }
+    given Boop[EAAA] = Boop.deriveWithExclusions[EAAA, EAAA.A.type]((x: EAAA.A.type) => s"custom$x")
+
+    sealed trait L derives Boop
+    case class N() extends L
+    case class C(t: L) extends L
+
+    enum Color(val rgb: Int) derives Boop {
+      case Red   extends Color(0xFF0000)
+      case Green extends Color(0x00FF00)
+      case Blue  extends Color(0x0000FF)
+    }
+  }
+
+  test("toscala macro result") {
+    import TestData.*
+    assertResult("EAAA.B") { EAAA.B.boop }
+    assertResult("EAAA.customA") { EAAA.A.boop }
+    assertResult("N()") { N().boop }
+    assertResult("C(C(N()))") { C(C(N())).boop }
+    assertResult("Color.Red") { Color.Red.boop }
   }
 
 }
-
 
 
