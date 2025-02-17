@@ -653,7 +653,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
 
     val sharedStores = a.getBlocks.flatMap { b =>
       b.statements.collect {
-        case store@MemoryStore(_: SharedMemory, _, _, _, _, _) => store
+        case store @ MemoryStore(_: SharedMemory, _, _, _, _, _) => store
       }
     }
 
@@ -664,7 +664,11 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     }
 
     val sharedMemories = sharedStores.map(_.mem).toSet
-    val oldAssigns = translateOldAssigns(sharedMemories)
+    val oldAssigns = if (sharedMemories.nonEmpty) {
+      translateOldAssigns(sharedMemories)
+    } else {
+      List()
+    }
 
     rely ++ oldAssigns
   }
@@ -847,6 +851,11 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
       List(BAssume(body, a.comment))
   }
 
+  /**
+   *
+   * @param memories must be non-empty
+   * @return
+   */
   private def translateOldAssigns(memories: Set[Memory]): List[AssignCmd] = {
     val lhss: Set[BVar] = memories.map(_.toBoogie)
     val oldVars = guarantees.keys.view.toSet.flatMap { g =>
