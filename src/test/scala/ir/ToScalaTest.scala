@@ -199,11 +199,85 @@ prog(
     checkOutput(expected, singleStatement.toScala)
   }
 
-  test("toscala statements") {
+  test("toscala of statements") {
     val expected = """MemoryStore(StackMemory("stack", 64, 8), BinaryExpr(BVADD, Register("R31", 64), BitVecLiteral(BigInt("15"), 64)), Extract(8, 0, Register("R0", 64)), Endian.LittleEndian, 8, Some("%0000034e"))"""
     val stmt = MemoryStore(StackMemory("stack", 64, 8), BinaryExpr(BVADD, Register("R31", 64), BitVecLiteral(BigInt("15"), 64)), Extract(8, 0, Register("R0", 64)), Endian.LittleEndian, 8, Some("%0000034e"))
 
     checkOutput(expected, stmt.toScala)
+  }
+
+  test("proc params") {
+    val p = prog(
+      proc("printf",
+        Seq(
+          "R9_in" -> BitVecType(64),
+          "R0_in" -> BitVecType(64),
+        ),
+        Seq(
+          "R9_out" -> BitVecType(64),
+          "R0_out" -> BitVecType(64),
+        )
+      )
+    )
+
+    val expected = """
+prog(
+  proc("printf",
+    Seq(
+      "R0_in" -> BitVecType(64),
+      "R9_in" -> BitVecType(64)
+    ),
+    Seq(
+      "R0_out" -> BitVecType(64),
+      "R9_out" -> BitVecType(64)
+    )
+  )
+)
+    """
+
+    checkOutput(expected, p.toScala)
+  }
+
+  test("return params") {
+    val p = prog(
+      proc("proc",
+        Seq(),
+        Seq(
+          "R0_out" -> BitVecType(64),
+          "R1_out" -> BitVecType(64),
+          "R31_out" -> BitVecType(64)
+        ),
+        block("get_two_1876_basil_return",
+          ret(
+            "R0_out" -> LocalVar("R0", BitVecType(64), 0),
+            "R1_out" -> LocalVar("R1", BitVecType(64), 0),
+            "R31_out" -> LocalVar("R31", BitVecType(64), 0)
+          )
+        )
+      )
+    )
+
+    val expected = """
+prog(
+  proc("proc",
+    Seq(),
+    Seq(
+      "R0_out" -> BitVecType(64),
+      "R1_out" -> BitVecType(64),
+      "R31_out" -> BitVecType(64)
+    ),
+    block("get_two_1876_basil_return",
+      ret(
+        "R0_out" -> LocalVar("R0", BitVecType(64), 0),
+        "R1_out" -> LocalVar("R1", BitVecType(64), 0),
+        "R31_out" -> LocalVar("R31", BitVecType(64), 0)
+      )
+    )
+  )
+)
+    """
+
+    checkOutput(expected, p.toScala)
   }
 
 }

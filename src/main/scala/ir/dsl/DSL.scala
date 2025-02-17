@@ -21,9 +21,9 @@ val R31: Register = Register("R31", 64)
 
 def exprEq(l: Expr, r: Expr) : Expr = (l, r) match {
   case (l, r) if l.getType != r.getType => FalseLiteral
-  case (l, r) if l.getType == BoolType => BinaryExpr(BoolEQ, l, r) 
-  case (l, r) if l.getType.isInstanceOf[BitVecType] => BinaryExpr(BVEQ, l, r) 
-  case (l, r) if l.getType == IntType => BinaryExpr(IntEQ, l, r) 
+  case (l, r) if l.getType == BoolType => BinaryExpr(BoolEQ, l, r)
+  case (l, r) if l.getType.isInstanceOf[BitVecType] => BinaryExpr(BVEQ, l, r)
+  case (l, r) if l.getType == IntType => BinaryExpr(IntEQ, l, r)
   case _ => FalseLiteral
 }
 
@@ -111,7 +111,7 @@ def goto(targets: List[String]): EventuallyGoto = {
 
 def directCall(tgt: String): EventuallyCall = EventuallyCall(DelayNameResolve(tgt), Map(), Map())
 
-def directCall(lhs: Iterable[(String, Variable)], tgt: String, actualParams: (String, Expr)*): EventuallyCall 
+def directCall(lhs: Iterable[(String, Variable)], tgt: String, actualParams: (String, Expr)*): EventuallyCall
   = EventuallyCall(DelayNameResolve(tgt), lhs, actualParams)
 
 def indirectCall(tgt: Variable): EventuallyIndirectCall = EventuallyIndirectCall(tgt)
@@ -149,7 +149,7 @@ case class EventuallyProcedure(label: String, in: Map[String, IRType] = Map(), o
   def resolve(prog: Program): Procedure = {
     val resolvedBlocks = blocks.map(b => b.resolve(prog, tempProc))
     jumps.map((b, j) => b.replaceJump(j.resolve(prog, tempProc)))
-    resolvedBlocks.headOption.foreach(b => 
+    resolvedBlocks.headOption.foreach(b =>
       tempProc.entryBlock = b
     )
     tempProc

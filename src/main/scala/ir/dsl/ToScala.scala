@@ -36,11 +36,12 @@ trait ToScala[-T]:
  *
  * This will automatically provide a `toScala` implementation in terms of `toScalaLines`.
  */
-trait ToScalaLines[-T] extends ToScala[T]:
+trait ToScalaLines[-T]:
   extension (x: T)
     def toScalaLines: Twine
-    override def toScala = x.toScalaLines.mkString
 
+given [T](using ToScalaLines[T]): ToScala[T] with
+  extension (x: T) override def toScala = x.toScalaLines.mkString
 
 /**
  * Base functions
@@ -53,7 +54,10 @@ trait ToScalaLines[-T] extends ToScala[T]:
  */
 
 def commandListToScala(x: Iterable[Command]): Iterable[Twine] =
-  x.map(_.toScala).map(LazyList(_))
+  x.map {
+    case x: Return => LazyList(x.toScala)
+    case x => LazyList(x.toScala)
+  }.to(LazyList)
 
 def blockToScalaWith(commandListToScala: Iterable[Command] => Iterable[Twine])(x: Block): Twine =
   // XXX: using a Seq here allows the size to be known, avoiding excessive splitting.
@@ -66,9 +70,22 @@ def blockToScalaWith(commandListToScala: Iterable[Command] => Iterable[Twine])(x
   )
 
 def procedureToScalaWith(blockToScala: Block => Twine)(x: Procedure): Twine =
+  def extractParam(x: LocalVar) = x match
+    case LocalVar(nm, ty, _) => (x.name, ty)
+  def formalParamsToScala(x: mutable.SortedSet[LocalVar]) =
+    x.iterator.map(extractParam).toSeq.toScalaLines
+
+  val params = if (x.formalInParam.isEmpty && x.formalOutParam.isEmpty) {
+    LazyList.empty
+  } else {
+    LazyList(
+      formalParamsToScala(x.formalInParam),
+      formalParamsToScala(x.formalOutParam))
+  }
+
   indentNested(
     s"proc(${x.procName.toScala}",
-    x.blocks.to(LazyList).map(blockToScala),
+    params #::: x.blocks.to(LazyList).map(blockToScala),
     ")",
     headSep = true
   )
@@ -278,16 +295,13 @@ given ToScala[BigInt] with
   extension (x: BigInt) override def toScala: String = s"BigInt(${x.toString.toScala})"
 
 
-given [T](using ToScala[T]): ToScala[Seq[T]] with
-  extension (x: Seq[T]) override def toScala: String = x match
-    case Seq() => "Seq()"
-    case Seq(x) => s"Seq(${x.toScala})"
-    case _ => s"Seq(${x.map(_.toScala).mkString(", ")})"
-
-given [T](using ToScala[T]): ToScala[LinkedHashSet[T]] with
-  extension (x: LinkedHashSet[T]) override def toScala: String =
-    s"LinkedHashSet(${x.map(_.toScala).mkString(", ")})"
-
+given [T](using ToScala[T]): ToScalaLines[Seq[T]] with
+  extension (x: Seq[T]) override def toScalaLines =
+    indentNested(
+      "Seq(",
+      x.map(_.toScala).map(LazyList(_)),
+      ")"
+    )
 
 given [T](using ToScala[T]): ToScala[Option[T]] with
   extension (x: Option[T]) override def toScala: String = x match
@@ -298,3 +312,8 @@ given [K,V](using ToScala[K])(using ToScala[V]): ToScala[SortedMap[K,V]] with
   extension (x: SortedMap[K,V]) override def toScala: String =
     val entries = x.map((a,b) => s"${a.toScala} -> ${b.toScala}").mkString(", ")
     s"SortedMap($entries)"
+
+given [K,V](using ToScala[K])(using ToScala[V]): ToScala[(K, V)] with
+  extension (x: (K, V)) override def toScala: String =
+    val (a, b) = x
+    s"${a.toScala} -> ${b.toScala}"

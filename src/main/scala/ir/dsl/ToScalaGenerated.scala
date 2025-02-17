@@ -1,6 +1,7 @@
 package ir.dsl
 
 import ir.*
+import util.{indentNested}
 
 /**
  * The end of this file contains generated code to implement ToScala for the various type
@@ -68,8 +69,19 @@ import ir.*
 // file as the generated code. These instances must be locatable by summon[],
 // otherwise the generated code will self-recurse, leading to non-termination.
 
-given ToScala[Return] with
-  extension (x: Return) override def toScala: String = "ret"
+given ToScalaLines[Return] with
+  extension (x: Return)
+    override def toScalaLines =
+      def outParamToScala(x: (LocalVar, Expr)) = (x(0).name, x(1))
+
+      if (x.outParams.isEmpty) {
+        LazyList("ret")
+      } else {
+        indentNested(
+          "ret(",
+          x.outParams.map(outParamToScala).map(_.toScala).map(LazyList(_)),
+          ")")
+      }
 
 given ToScala[DirectCall] with
   extension (x: DirectCall) override def toScala: String = s"directCall(${x.target.procName.toScala})"
