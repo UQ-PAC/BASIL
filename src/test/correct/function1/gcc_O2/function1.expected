@@ -146,8 +146,8 @@ implementation main()
   var Gamma_#1: bool;
   var Gamma_$load$19: bool;
   var Gamma_$load$20: bool;
-  lmain:
-    assume {:captureState "lmain"} true;
+  $main:
+    assume {:captureState "$main"} true;
     #1, Gamma_#1 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
     stack, Gamma_stack := memory_store64_le(stack, #1, R29), gamma_store64(Gamma_stack, #1, Gamma_R29);
     assume {:captureState "%000001ca"} true;
@@ -172,9 +172,9 @@ implementation main()
     assume {:captureState "%00000210"} true;
     R30, Gamma_R30 := 1712bv64, true;
     call __printf_chk();
-    goto l0000021a;
-  l0000021a:
-    assume {:captureState "l0000021a"} true;
+    goto $0000021a;
+  $0000021a:
+    assume {:captureState "$0000021a"} true;
     R0, Gamma_R0 := 0bv64, true;
     $load$19, Gamma_$load$19 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
     R29, Gamma_R29 := $load$19, Gamma_$load$19;

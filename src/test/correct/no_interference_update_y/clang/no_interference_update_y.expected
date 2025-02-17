@@ -85,8 +85,8 @@ procedure main();
 implementation main()
 {
   var x_old: bv32;
-  lmain:
-    assume {:captureState "lmain"} true;
+  $main:
+    assume {:captureState "$main"} true;
     R9, Gamma_R9 := 69632bv64, true;
     R8, Gamma_R8 := 1bv64, true;
     call rely();

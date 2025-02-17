@@ -113,8 +113,8 @@ implementation main()
   var Gamma_$load$21: bool;
   var Gamma_$load$22: bool;
   var Gamma_$load$23: bool;
-  lmain:
-    assume {:captureState "lmain"} true;
+  $main:
+    assume {:captureState "$main"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
     R8, Gamma_R8 := 65536bv64, true;
     call rely();

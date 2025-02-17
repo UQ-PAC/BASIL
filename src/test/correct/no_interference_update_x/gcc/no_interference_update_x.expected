@@ -83,8 +83,8 @@ procedure main();
 implementation main()
 {
   var y_old: bv32;
-  lmain:
-    assume {:captureState "lmain"} true;
+  $main:
+    assume {:captureState "$main"} true;
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 20bv64), Gamma_R0;
     R1, Gamma_R1 := 1bv64, true;

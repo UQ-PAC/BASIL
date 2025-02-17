@@ -53,8 +53,8 @@ procedure main();
 
 implementation main()
 {
-  lmain:
-    assume {:captureState "lmain"} true;
+  $main:
+    assume {:captureState "$main"} true;
     goto main_basil_return;
   main_basil_return:
     assume {:captureState "main_basil_return"} true;

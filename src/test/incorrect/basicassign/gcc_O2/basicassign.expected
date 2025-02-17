@@ -89,8 +89,8 @@ implementation main()
   var $load$18: bv32;
   var Gamma_#1: bool;
   var Gamma_$load$18: bool;
-  lmain:
-    assume {:captureState "lmain"} true;
+  $main:
+    assume {:captureState "$main"} true;
     R2, Gamma_R2 := 69632bv64, true;
     R1, Gamma_R1 := bvadd64(R2, 20bv64), Gamma_R2;
     R0, Gamma_R0 := 0bv64, true;

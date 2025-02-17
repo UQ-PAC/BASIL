@@ -120,8 +120,8 @@ implementation main()
   var Gamma_$load$19: bool;
   var Gamma_$load$20: bool;
   var Gamma_$load$21: bool;
-  lmain:
-    assume {:captureState "lmain"} true;
+  $main:
+    assume {:captureState "$main"} true;
     #4, Gamma_#4 := bvadd64(R31, 18446744073709551568bv64), Gamma_R31;
     stack, Gamma_stack := memory_store64_le(stack, #4, R29), gamma_store64(Gamma_stack, #4, Gamma_R29);
     assume {:captureState "%000002d8"} true;
@@ -135,9 +135,9 @@ implementation main()
     assume {:captureState "%000002f8"} true;
     R30, Gamma_R30 := 1896bv64, true;
     call fork();
-    goto l00000302;
-  l00000302:
-    assume {:captureState "l00000302"} true;
+    goto $00000302;
+  $00000302:
+    assume {:captureState "$00000302"} true;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 44bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 44bv64), Gamma_R0);
     assume {:captureState "%00000308"} true;
     $load$19, Gamma_$load$19 := memory_load32_le(stack, bvadd64(R31, 44bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 44bv64));

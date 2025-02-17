@@ -97,8 +97,8 @@ procedure get_two();
 
 implementation get_two()
 {
-  lget_two:
-    assume {:captureState "lget_two"} true;
+  $get_two:
+    assume {:captureState "$get_two"} true;
     R0, Gamma_R0 := 2bv64, true;
     goto get_two_basil_return;
   get_two_basil_return:
@@ -135,8 +135,8 @@ implementation main()
   var Gamma_#4: bool;
   var Gamma_$load$18: bool;
   var Gamma_$load$19: bool;
-  lmain:
-    assume {:captureState "lmain"} true;
+  $main:
+    assume {:captureState "$main"} true;
     #4, Gamma_#4 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
     stack, Gamma_stack := memory_store64_le(stack, #4, R29), gamma_store64(Gamma_stack, #4, Gamma_R29);
     assume {:captureState "%000008db"} true;
@@ -152,9 +152,9 @@ implementation main()
     assume {:captureState "%000008fd"} true;
     R30, Gamma_R30 := 1836bv64, true;
     call get_two();
-    goto l00000910;
-  l00000910:
-    assume {:captureState "l00000910"} true;
+    goto $00000910;
+  $00000910:
+    assume {:captureState "$00000910"} true;
     R8, Gamma_R8 := 69632bv64, true;
     call rely();
     assert (L(mem, bvadd64(R8, 56bv64)) ==> Gamma_R0);

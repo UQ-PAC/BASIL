@@ -102,8 +102,8 @@ implementation main()
   var Gamma_$load$18: bool;
   var Gamma_$load$19: bool;
   var Gamma_$load$20: bool;
-  lmain:
-    assume {:captureState "lmain"} true;
+  $main:
+    assume {:captureState "$main"} true;
     #4, Gamma_#4 := bvadd64(R31, 18446744073709551584bv64), Gamma_R31;
     stack, Gamma_stack := memory_store64_le(stack, #4, R29), gamma_store64(Gamma_stack, #4, Gamma_R29);
     assume {:captureState "%000002fc"} true;
@@ -121,9 +121,9 @@ implementation main()
     R0, Gamma_R0 := zero_extend32_32($load$18), Gamma_$load$18;
     R30, Gamma_R30 := 1844bv64, true;
     call plus_one();
-    goto l0000035c;
-  l0000035c:
-    assume {:captureState "l0000035c"} true;
+    goto $0000035c;
+  $0000035c:
+    assume {:captureState "$0000035c"} true;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 24bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 24bv64), Gamma_R0);
     assume {:captureState "%00000362"} true;
     R0, Gamma_R0 := 0bv64, true;
@@ -157,8 +157,8 @@ implementation plus_one()
 {
   var $load$21: bv32;
   var Gamma_$load$21: bool;
-  lplus_one:
-    assume {:captureState "lplus_one"} true;
+  $plus_one:
+    assume {:captureState "$plus_one"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 12bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 12bv64), Gamma_R0);
     assume {:captureState "%00000342"} true;

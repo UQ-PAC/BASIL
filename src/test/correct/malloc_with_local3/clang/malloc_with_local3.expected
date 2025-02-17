@@ -231,8 +231,8 @@ implementation main()
   var Gamma_$load$28: bool;
   var Gamma_$load$29: bool;
   var Gamma_$load$30: bool;
-  lmain:
-    assume {:captureState "lmain"} true;
+  $main:
+    assume {:captureState "$main"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551536bv64), Gamma_R31;
     #4, Gamma_#4 := bvadd64(R31, 64bv64), Gamma_R31;
     stack, Gamma_stack := memory_store64_le(stack, #4, R29), gamma_store64(Gamma_stack, #4, Gamma_R29);
@@ -248,9 +248,9 @@ implementation main()
     R0, Gamma_R0 := 1bv64, true;
     R30, Gamma_R30 := 2100bv64, true;
     call malloc();
-    goto l000003e9;
-  l000003e9:
-    assume {:captureState "l000003e9"} true;
+    goto $000003e9;
+  $000003e9:
+    assume {:captureState "$000003e9"} true;
     stack, Gamma_stack := memory_store64_le(stack, bvadd64(R29, 18446744073709551600bv64), R0), gamma_store64(Gamma_stack, bvadd64(R29, 18446744073709551600bv64), Gamma_R0);
     assume {:captureState "%000003ef"} true;
     R8, Gamma_R8 := 11bv64, true;
@@ -261,9 +261,9 @@ implementation main()
     assume {:captureState "%00000409"} true;
     R30, Gamma_R30 := 2124bv64, true;
     call malloc();
-    goto l00000412;
-  l00000412:
-    assume {:captureState "l00000412"} true;
+    goto $00000412;
+  $00000412:
+    assume {:captureState "$00000412"} true;
     R8, Gamma_R8 := R0, Gamma_R0;
     $load$19, Gamma_$load$19 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
     R0, Gamma_R0 := $load$19, Gamma_$load$19;
@@ -274,9 +274,9 @@ implementation main()
     assume {:captureState "%00000432"} true;
     R30, Gamma_R30 := 2148bv64, true;
     call malloc();
-    goto l0000043b;
-  l0000043b:
-    assume {:captureState "l0000043b"} true;
+    goto $0000043b;
+  $0000043b:
+    assume {:captureState "$0000043b"} true;
     stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 16bv64), R0), gamma_store64(Gamma_stack, bvadd64(R31, 16bv64), Gamma_R0);
     assume {:captureState "%00000441"} true;
     R8, Gamma_R8 := 9bv64, true;
@@ -300,9 +300,9 @@ implementation main()
     R0, Gamma_R0 := $load$22, Gamma_$load$22;
     R30, Gamma_R30 := 2192bv64, true;
     call printCharValue();
-    goto l00000504;
-  l00000504:
-    assume {:captureState "l00000504"} true;
+    goto $00000504;
+  $00000504:
+    assume {:captureState "$00000504"} true;
     $load$23, Gamma_$load$23 := memory_load64_le(stack, bvadd64(R31, 32bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 32bv64));
     R8, Gamma_R8 := $load$23, Gamma_$load$23;
     call rely();
@@ -312,32 +312,32 @@ implementation main()
     R0, Gamma_R0 := bvadd64(R0, 2348bv64), Gamma_R0;
     R30, Gamma_R30 := 2212bv64, true;
     call printf();
-    goto l00000524;
-  l00000524:
-    assume {:captureState "l00000524"} true;
+    goto $00000524;
+  $00000524:
+    assume {:captureState "$00000524"} true;
     $load$25, Gamma_$load$25 := memory_load32_le(stack, bvadd64(R31, 28bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     R1, Gamma_R1 := zero_extend32_32($load$25), Gamma_$load$25;
     R0, Gamma_R0 := 0bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 2364bv64), Gamma_R0;
     R30, Gamma_R30 := 2228bv64, true;
     call printf();
-    goto l0000053d;
-  l0000053d:
-    assume {:captureState "l0000053d"} true;
+    goto $0000053d;
+  $0000053d:
+    assume {:captureState "$0000053d"} true;
     $load$26, Gamma_$load$26 := memory_load64_le(stack, bvadd64(R29, 18446744073709551600bv64)), gamma_load64(Gamma_stack, bvadd64(R29, 18446744073709551600bv64));
     R0, Gamma_R0 := $load$26, Gamma_$load$26;
     R30, Gamma_R30 := 2236bv64, true;
     call #free();
-    goto l0000054c;
-  l0000054c:
-    assume {:captureState "l0000054c"} true;
+    goto $0000054c;
+  $0000054c:
+    assume {:captureState "$0000054c"} true;
     $load$27, Gamma_$load$27 := memory_load64_le(stack, bvadd64(R31, 32bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 32bv64));
     R0, Gamma_R0 := $load$27, Gamma_$load$27;
     R30, Gamma_R30 := 2244bv64, true;
     call #free();
-    goto l0000055a;
-  l0000055a:
-    assume {:captureState "l0000055a"} true;
+    goto $0000055a;
+  $0000055a:
+    assume {:captureState "$0000055a"} true;
     $load$28, Gamma_$load$28 := memory_load32_le(stack, bvadd64(R31, 8bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 8bv64));
     R0, Gamma_R0 := zero_extend32_32($load$28), Gamma_$load$28;
     #7, Gamma_#7 := bvadd64(R31, 64bv64), Gamma_R31;
@@ -452,8 +452,8 @@ implementation printCharValue()
   var Gamma_$load$35: bool;
   var Gamma_$load$36: bool;
   var Gamma_$load$37: bool;
-  lprintCharValue:
-    assume {:captureState "lprintCharValue"} true;
+  $printCharValue:
+    assume {:captureState "$printCharValue"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551584bv64), Gamma_R31;
     #5, Gamma_#5 := bvadd64(R31, 16bv64), Gamma_R31;
     stack, Gamma_stack := memory_store64_le(stack, #5, R29), gamma_store64(Gamma_stack, #5, Gamma_R29);
@@ -482,9 +482,9 @@ implementation printCharValue()
     R0, Gamma_R0 := bvadd64(R0, 2391bv64), Gamma_R0;
     R30, Gamma_R30 := 2312bv64, true;
     call printf();
-    goto l000004e9;
-  l000004e9:
-    assume {:captureState "l000004e9"} true;
+    goto $000004e9;
+  $000004e9:
+    assume {:captureState "$000004e9"} true;
     #6, Gamma_#6 := bvadd64(R31, 16bv64), Gamma_R31;
     $load$36, Gamma_$load$36 := memory_load64_le(stack, #6), gamma_load64(Gamma_stack, #6);
     R29, Gamma_R29 := $load$36, Gamma_$load$36;

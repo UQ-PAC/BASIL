@@ -116,8 +116,8 @@ implementation main()
   var Gamma_$load$19: bool;
   var Gamma_$load$20: bool;
   var z_old: bv32;
-  lmain:
-    assume {:captureState "lmain"} true;
+  $main:
+    assume {:captureState "$main"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 12bv64), 0bv32), gamma_store32(Gamma_stack, bvadd64(R31, 12bv64), true);
     assume {:captureState "%000002f9"} true;
@@ -132,9 +132,9 @@ implementation main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#4, 1bv32), 0bv32), Gamma_#4;
     NF, Gamma_NF := bvadd32(#4, 1bv32)[32:31], Gamma_#4;
     assert Gamma_ZF;
-    goto lmain_goto_l00000327, lmain_goto_l0000033e;
-  l0000033e:
-    assume {:captureState "l0000033e"} true;
+    goto $main_goto_$00000327, $main_goto_$0000033e;
+  $0000033e:
+    assume {:captureState "$0000033e"} true;
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 20bv64), Gamma_R0;
     call rely();
@@ -150,21 +150,21 @@ implementation main()
     R0, Gamma_R0 := zero_extend32_32($load$19), Gamma_$load$19;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 12bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 12bv64), Gamma_R0);
     assume {:captureState "%00000368"} true;
-    goto l00000327;
-  l00000327:
-    assume {:captureState "l00000327"} true;
+    goto $00000327;
+  $00000327:
+    assume {:captureState "$00000327"} true;
     $load$20, Gamma_$load$20 := memory_load32_le(stack, bvadd64(R31, 12bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
     R0, Gamma_R0 := zero_extend32_32($load$20), Gamma_$load$20;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
     goto main_basil_return;
-  lmain_goto_l00000327:
-    assume {:captureState "lmain_goto_l00000327"} true;
+  $main_goto_$00000327:
+    assume {:captureState "$main_goto_$00000327"} true;
     assume (bvnot1(bvcomp1(ZF, 1bv1)) != 0bv1);
-    goto l00000327;
-  lmain_goto_l0000033e:
-    assume {:captureState "lmain_goto_l0000033e"} true;
+    goto $00000327;
+  $main_goto_$0000033e:
+    assume {:captureState "$main_goto_$0000033e"} true;
     assume (bvnot1(bvcomp1(ZF, 1bv1)) == 0bv1);
-    goto l0000033e;
+    goto $0000033e;
   main_basil_return:
     assume {:captureState "main_basil_return"} true;
     return;

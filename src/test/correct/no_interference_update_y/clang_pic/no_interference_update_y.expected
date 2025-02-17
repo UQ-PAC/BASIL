@@ -94,8 +94,8 @@ implementation main()
   var $load$18: bv64;
   var Gamma_$load$18: bool;
   var x_old: bv32;
-  lmain:
-    assume {:captureState "lmain"} true;
+  $main:
+    assume {:captureState "$main"} true;
     R9, Gamma_R9 := 65536bv64, true;
     call rely();
     $load$18, Gamma_$load$18 := memory_load64_le(mem, bvadd64(R9, 4048bv64)), (gamma_load64(Gamma_mem, bvadd64(R9, 4048bv64)) || L(mem, bvadd64(R9, 4048bv64)));

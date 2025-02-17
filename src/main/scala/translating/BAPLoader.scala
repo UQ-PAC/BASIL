@@ -1,13 +1,16 @@
 package translating
 
-import Parsers.BAP_ADTParser._
-import bap._
+import Parsers.BAP_ADTParser.*
+import bap.*
 import ir.Endian
 
 import scala.annotation.tailrec
-import scala.jdk.CollectionConverters._
+import scala.collection.mutable
+import scala.jdk.CollectionConverters.*
 
-object BAPLoader {
+class BAPLoader {
+
+  private val tidToLabel = mutable.Map[String, String]()
 
   def visitProject(ctx: ProjectContext): BAPProgram = {
     val memorySections = visitSections(ctx.sections)
@@ -31,7 +34,7 @@ object BAPLoader {
   def visitProgram(ctx: ProgramContext): List[BAPSubroutine] = ctx.subs.sub.asScala.map(visitSub).toList
 
   @tailrec
-  def visitExp(ctx: ExpContext): BAPExpr = ctx match {
+  final def visitExp(ctx: ExpContext): BAPExpr = ctx match {
     case e: ExpParenContext  => visitExp(e.exp)
     case e: LoadContext      => visitLoad(e)
     case e: BinOpContext     => visitBinOp(e)
@@ -109,8 +112,8 @@ object BAPLoader {
 
   def visitIndirectCall(ctx: IndirectCallContext): BAPIndirectCall = {
     val returnTarget = Option(ctx.returnTarget) match {
-      case Some(r: DirectContext) => Some(parseLabel(r.tid.name))
-      case None                   => None
+      case Some(r: DirectContext) => Some(visitTid(r.tid))
+      case None => None
     }
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
@@ -120,7 +123,7 @@ object BAPLoader {
 
   def visitDirectCall(ctx: DirectCallContext): BAPDirectCall = {
     val returnTarget = Option(ctx.returnTarget) match {
-      case Some(r: DirectContext) => Some(parseLabel(r.tid.name))
+      case Some(r: DirectContext) => Some(visitTid(r.tid))
       case None                   => None
     }
     val line = visitQuoteString(ctx.tid.name)
@@ -146,7 +149,7 @@ object BAPLoader {
   def visitGotoJmp(ctx: GotoJmpContext): BAPGoTo = {
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
-    BAPGoTo(parseLabel(ctx.target.tid.name), visitExp(ctx.cond), line, insn)
+    BAPGoTo(visitTid(ctx.target.tid), visitExp(ctx.cond), line, insn)
   }
 
   def visitArg(ctx: ArgContext): (Option[BAPParameter], Option[BAPParameter]) = {
@@ -208,7 +211,7 @@ object BAPLoader {
     }
      */
 
-    val label = parseLabel(ctx.tid.name)
+    val label = visitTid(ctx.tid)
     val address = parseFromAttrs(ctx.attrs, "address") match {
       case Some(x: String) => Some(BigInt(x.stripPrefix("0x"), 16))
       case None            => None
@@ -241,12 +244,32 @@ object BAPLoader {
     BAPMemAssign(visitMemVar(ctx.lhs), visitStore(ctx.rhs), line, insn, addr)
   }
 
+  def visitTid(ctx: TidContext): String = {
+    val tid = ctx.id.getText
+    if (tidToLabel.contains(tid)) {
+      tidToLabel(tid)
+    } else {
+      // check for conflicts
+      val label = parseLabel(ctx.name)
+      var newLabel = label
+      var i = 1
+      val labels = tidToLabel.values.toSet
+      while (labels.contains(newLabel)) {
+        newLabel = s"$label$$$i"
+        i = i + 1
+      }
+      tidToLabel(tid) = newLabel
+      newLabel
+    }
+  }
+
   def visitQuoteString(ctx: QuoteStringContext): String = ctx.getText.stripPrefix("\"").stripSuffix("\"")
 
   def parseAllowed(s: String): String = s.map(c => if allowedChars.contains(c) then c else '$')
 
-  def parseLabel(ctx: QuoteStringContext): String =
-    "l" + parseAllowed(visitQuoteString(ctx).stripPrefix("@").stripPrefix("%"))
+  def parseLabel(ctx: QuoteStringContext): String = {
+    "$" + parseAllowed(visitQuoteString(ctx).stripPrefix("@").stripPrefix("%"))
+  }
 
   def parseFromAttrs(ctx: AttrsContext, field: String): Option[String] = {
     ctx.attr.asScala.map(visitAttr).collectFirst {
