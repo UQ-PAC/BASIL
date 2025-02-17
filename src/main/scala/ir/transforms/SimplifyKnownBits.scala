@@ -1,5 +1,6 @@
 package ir.transforms
 import ir.*
+import util.writeToFile
 
 // A = definite 1 bits, B = unknown bits
 // A_[i] = 1, B_[i] = 0 -> Bit i of TNum _ is definitely 1
