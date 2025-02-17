@@ -784,6 +784,6 @@ class SimplifyKnownBits() {
 
     def applyTransform(procedure: Procedure): Unit = {
         val (beforeIn, afterIn) = solver.solveProc(procedure, backwards = false)
-        writeToFile(translating.PrettyPrinter.pp_proc_with_analysis_results(beforeIn, afterIn, procedure, x => s"Live vars: ${x.map(_.name).toList.sorted.mkString(", ")}"), "live-vars.il")
+        util.writeToFile(translating.PrettyPrinter.pp_proc_with_analysis_results(beforeIn, afterIn, procedure, x => x.toString), "known_bits.il")
     }
 }

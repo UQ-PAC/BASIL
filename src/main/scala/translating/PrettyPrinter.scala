@@ -20,6 +20,10 @@ object PrettyPrinter {
     BasilIRPrettyPrinter(with_analysis_results_begin=block => before.get(block).map(resultPrinter), block => after.get(block).map(resultPrinter))(p)
   }
 
+  def pp_proc_with_analysis_results[T](before: Map[Block, T], after: Map[Block, T], p: Procedure, resultPrinter: T => String = ((x : T) => x.toString)) = {
+    BasilIRPrettyPrinter(with_analysis_results_begin=block => before.get(block).map(resultPrinter), block => after.get(block).map(resultPrinter))(p)
+  }
+
   def pp_block_with_analysis_results[T](before: Map[Block, T], after: Map[Block, T], p: Block, resultPrinter: T => String = ((x : T) => x.toString)) = {
     BasilIRPrettyPrinter(with_analysis_results_begin=block => before.get(block).map(resultPrinter), block => after.get(block).map(resultPrinter))(p)
   }
