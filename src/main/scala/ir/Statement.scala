@@ -52,7 +52,7 @@ class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[S
 }
 
 object LocalAssign:
-  def unapply(l: LocalAssign): Option[(Variable, Expr, Option[String])] = Some(l.lhs, l.rhs, l.label)
+  def unapply(l: LocalAssign): Some[(Variable, Expr, Option[String])] = Some(l.lhs, l.rhs, l.label)
 
 class MemoryStore(var mem: Memory, var index: Expr, var value: Expr, var endian: Endian, var size: Int, override val label: Option[String] = None) extends Statement {
   override def modifies: Set[Global] = Set(mem)
@@ -61,7 +61,7 @@ class MemoryStore(var mem: Memory, var index: Expr, var value: Expr, var endian:
 }
 
 object MemoryStore {
-  def unapply(m: MemoryStore): Option[(Memory, Expr, Expr, Endian, Int, Option[String])] = Some(m.mem, m.index, m.value, m.endian, m.size, m.label)
+  def unapply(m: MemoryStore): Some[(Memory, Expr, Expr, Endian, Int, Option[String])] = Some(m.mem, m.index, m.value, m.endian, m.size, m.label)
 }
 
 class MemoryLoad(var lhs: Variable, var mem: Memory, var index: Expr, var endian: Endian, var size: Int, override val label: Option[String] = None) extends SingleAssign {
@@ -74,7 +74,7 @@ class MemoryLoad(var lhs: Variable, var mem: Memory, var index: Expr, var endian
 }
 
 object MemoryLoad {
-  def unapply(m: MemoryLoad): Option[(Variable, Memory, Expr, Endian, Int, Option[String])] = Some(m.lhs, m.mem, m.index, m.endian, m.size, m.label)
+  def unapply(m: MemoryLoad): Some[(Variable, Memory, Expr, Endian, Int, Option[String])] = Some(m.lhs, m.mem, m.index, m.endian, m.size, m.label)
 }
 
 class NOP(override val label: Option[String] = None) extends Statement {
@@ -88,10 +88,10 @@ class Assert(var body: Expr, var comment: Option[String] = None, override val la
 }
 
 object Assert:
-  def unapply(a: Assert): Option[(Expr, Option[String], Option[String])] = Some(a.body, a.comment, a.label)
+  def unapply(a: Assert): Some[(Expr, Option[String], Option[String])] = Some(a.body, a.comment, a.label)
 
 /** Assumptions express control flow restrictions and other properties that can be assumed to be true.
-  * 
+  *
   * For example, an `if (C) S else T` statement in C will eventually be translated to IR with a non-deterministic
   * goto to two blocks, one with `assume C; S` and the other with `assume not(C); T`.
   *
@@ -104,7 +104,7 @@ class Assume(var body: Expr, var comment: Option[String] = None, override val la
 }
 
 object Assume:
-  def unapply(a: Assume): Option[(Expr, Option[String], Option[String], Boolean)] = Some(a.body, a.comment, a.label, a.checkSecurity)
+  def unapply(a: Assume): Some[(Expr, Option[String], Option[String], Boolean)] = Some(a.body, a.comment, a.label, a.checkSecurity)
 
 sealed trait Jump extends Command {
   def modifies: Set[Global] = Set()
@@ -117,18 +117,18 @@ class Unreachable(override val label: Option[String] = None) extends Jump {
   override def acceptVisit(visitor: Visitor): Jump = this
 }
 
-class Return(override val label: Option[String] = None, var outParams : SortedMap[LocalVar, Expr] = SortedMap()) extends Jump { 
+class Return(override val label: Option[String] = None, var outParams : SortedMap[LocalVar, Expr] = SortedMap()) extends Jump {
   override def acceptVisit(visitor: Visitor): Jump = this
   override def toString = s"Return(${outParams.mkString(",")})"
 }
 
 
 object Unreachable {
-  def unapply(u: Unreachable): Option[Option[String]] = Some(u.label)
+  def unapply(u: Unreachable): Some[Option[String]] = Some(u.label)
 }
 
 object Return {
-  def unapply(r: Return): Option[(Option[String], SortedMap[LocalVar, Expr])] = Some((r.label, r.outParams))
+  def unapply(r: Return): Some[(Option[String], SortedMap[LocalVar, Expr])] = Some((r.label, r.outParams))
 }
 
 class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override val label: Option[String]) extends Jump {
@@ -173,7 +173,7 @@ class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override
 }
 
 object GoTo:
-  def unapply(g: GoTo): Option[(Set[Block], Option[String])] = Some(g.targets, g.label)
+  def unapply(g: GoTo): Some[(Set[Block], Option[String])] = Some(g.targets, g.label)
 
 
 sealed trait Call extends Statement {
@@ -211,7 +211,7 @@ class DirectCall(val target: Procedure,
 }
 
 object DirectCall:
-  def unapply(i: DirectCall): Option[(Procedure, Map[LocalVar, Variable], Map[LocalVar, Expr], Option[String])] = Some(i.target, i.outParams, i.actualParams, i.label)
+  def unapply(i: DirectCall): Some[(Procedure, Map[LocalVar, Variable], Map[LocalVar, Expr], Option[String])] = Some(i.target, i.outParams, i.actualParams, i.label)
 
 class IndirectCall(var target: Variable,
                    override val label: Option[String] = None
@@ -225,4 +225,4 @@ class IndirectCall(var target: Variable,
 }
 
 object IndirectCall:
-  def unapply(i: IndirectCall): Option[(Variable, Option[String])] = Some(i.target, i.label)
+  def unapply(i: IndirectCall): Some[(Variable, Option[String])] = Some(i.target, i.label)
