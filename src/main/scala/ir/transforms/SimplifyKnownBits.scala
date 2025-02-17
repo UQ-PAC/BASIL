@@ -731,11 +731,11 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
     override def transfer(s: Map[Variable, TNum], b: Command): Map[Variable, TNum] = {
         b match {
             // Assign variable to variable (e.g. x = y)
-            case LocalAssign(lhs: Variable, rhs: Expr) =>
+            case LocalAssign(lhs: Variable, rhs: Expr, _) =>
                 s.updated(lhs, evaluateExprToTNum(s, rhs))
 
             // Load from memory and store in variable
-            case MemoryLoad(lhs: Variable, mem: Memory, index: Expr, endian: Endian, size: Int) 
+            case MemoryLoad(lhs: Variable, mem: Memory, index: Expr, endian: Endian, size: Int, _) 
                 if !s.contains(lhs) =>
                     // Overapproxiate memory values with Top
                     s.updated(lhs, TNumValue(BigInt(0), BigInt(-1)))
