@@ -732,11 +732,11 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
     override def transfer(s: Map[Variable, TNum], b: Command): Map[Variable, TNum] = {
         b match {
             // Assign variable to variable (e.g. x = y)
-            case LocalAssign(lhs: Variable, rhs: Expr) =>
+            case LocalAssign(lhs: Variable, rhs: Expr, _) =>
                 s.updated(lhs, evaluateExprToTNum(s, rhs))
 
             // Load from memory and store in variable
-            case MemoryLoad(lhs: Variable, mem: Memory, index: Expr, endian: Endian, size: Int) 
+            case MemoryLoad(lhs: Variable, mem: Memory, index: Expr, endian: Endian, size: Int, _) 
                 if !s.contains(lhs) =>
                     // Overapproxiate memory values with Top
                     s.updated(lhs, TNumValue(BigInt(0), BigInt(-1)))
@@ -785,6 +785,6 @@ class SimplifyKnownBits() {
 
     def applyTransform(procedure: Procedure): Unit = {
         val (beforeIn, afterIn) = solver.solveProc(procedure, backwards = false)
-        writeToFile(translating.PrettyPrinter.pp_proc_with_analysis_results(beforeIn, afterIn, procedure, x => s"Live vars: ${x.map(_.name).toList.sorted.mkString(", ")}"), "live-vars.il")
+        util.writeToFile(translating.PrettyPrinter.pp_proc_with_analysis_results(beforeIn, afterIn, procedure, x => x.toString), "known_bits.il")
     }
 }
