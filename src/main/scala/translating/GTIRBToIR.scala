@@ -378,7 +378,6 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, List[InsnSem
         case GoTo(targets, label) => GoTo(targets, label)
         case Unreachable(label) => Unreachable(label)
         case Return(label, args) => Return(label, args)
-        case _ => throw Exception("this shouldn't be reachable")
       }
       trueBlock.replaceJump(currentBlock.jump)
       falseBlock.replaceJump(jumpCopy)
