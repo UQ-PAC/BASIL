@@ -134,10 +134,10 @@ def make_repr_match_case(d: Hierarchy | Decl, externals):
       valstr = ''
 
     if d.valname in externals:
-      summon = f'summon[ToScala[{d.tyname}]].toScala(x)'
-      expr = 'if (Thread.interrupted()) { Thread.currentThread().interrupt(); "<interrupted>" } else ' + summon + '\n'
+      summon = f'summon[ToScalaLines[{d.tyname}]].toScalaLines(x)'
+      expr = 'if (Thread.interrupted()) { Thread.currentThread().interrupt(); LazyList("<interrupted>") } else ' + summon + '\n'
     else:
-      expr = f's"{d.valname}{argstr}"\n'
+      expr = f'LazyList(s"{d.valname}{argstr}")\n'
 
     valcheck = [f'def ensure_constructible(): {d.tyname} = {d.valname}{valstr}\n']
     if d.hasprivate:
@@ -158,8 +158,8 @@ def make_repr_match_case(d: Hierarchy | Decl, externals):
 
 def make_repr_given(h: Hierarchy, externals):
   for k, x in h.items():
-    yield f'given ToScala[{k}] with\n'
-    yield f'  extension (x: {k}) def toScala: String = '
+    yield f'given ToScalaLines[{k}] with\n'
+    yield f'  extension (x: {k}) def toScalaLines: Twine = '
     yield from indent(make_repr_match_case(x, externals))
     yield '\n'
 

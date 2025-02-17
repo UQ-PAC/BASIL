@@ -54,10 +54,7 @@ given [T](using ToScalaLines[T]): ToScala[T] with
  */
 
 def commandListToScala(x: Iterable[Command]): Iterable[Twine] =
-  x.map {
-    case x: Return => LazyList(x.toScala)
-    case x => LazyList(x.toScala)
-  }.to(LazyList)
+  x.map(_.toScalaLines).to(LazyList)
 
 def blockToScalaWith(commandListToScala: Iterable[Command] => Iterable[Twine])(x: Block): Twine =
   // XXX: using a Seq here allows the size to be known, avoiding excessive splitting.
