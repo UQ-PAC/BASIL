@@ -300,7 +300,7 @@ given [T](using ToScala[T]): ToScala[Option[T]] with
     case None => "None"
     case Some(x) => s"Some(${x.toScala})"
 
-given [K,V](using ToScala[K])(using ToScala[V]): ToScala[SortedMap[K,V]] with
-  extension (x: SortedMap[K,V]) override def toScala: String =
+given [K,V](using ToScala[K])(using ToScala[V]): ToScala[Map[K,V]] with
+  extension (x: Map[K,V]) override def toScala: String =
     val entries = x.map((a,b) => s"${a.toScala} -> ${b.toScala}").mkString(", ")
-    s"SortedMap($entries)"
+    s"Map($entries)"

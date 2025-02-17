@@ -81,6 +81,9 @@ class NOP(override val label: Option[String] = None) extends Statement {
   override def toString: String = s"NOP $labelStr"
   override def acceptVisit(visitor: Visitor): Statement = this
 }
+object NOP {
+  def unapply(x: NOP) = Some(x.label)
+}
 
 class Assert(var body: Expr, var comment: Option[String] = None, override val label: Option[String] = None) extends Statement {
   override def toString: String = s"${labelStr}assert $body" + comment.map(" //" + _)
@@ -91,7 +94,7 @@ object Assert:
   def unapply(a: Assert): Option[(Expr, Option[String], Option[String])] = Some(a.body, a.comment, a.label)
 
 /** Assumptions express control flow restrictions and other properties that can be assumed to be true.
-  * 
+  *
   * For example, an `if (C) S else T` statement in C will eventually be translated to IR with a non-deterministic
   * goto to two blocks, one with `assume C; S` and the other with `assume not(C); T`.
   *
@@ -117,7 +120,7 @@ class Unreachable(override val label: Option[String] = None) extends Jump {
   override def acceptVisit(visitor: Visitor): Jump = this
 }
 
-class Return(override val label: Option[String] = None, var outParams : SortedMap[LocalVar, Expr] = SortedMap()) extends Jump { 
+class Return(override val label: Option[String] = None, var outParams : SortedMap[LocalVar, Expr] = SortedMap()) extends Jump {
   override def acceptVisit(visitor: Visitor): Jump = this
   override def toString = s"Return(${outParams.mkString(",")})"
 }

@@ -200,7 +200,7 @@ object ToScalaDeriving {
   /**
    * Summon ToScala instances for each type in the Elems tuple of types. Also handles exclusions.
    */
-  inline def summonInstances[T, Elems <: Tuple, Excl <: T](using m: Mirror.Of[T]): List[ToScala[?]] =
+  inline def summonInstances[T, Elems <: Tuple, Excl](using m: Mirror.Of[T]): List[ToScala[?]] =
 
     // NOTE: this is an unrolled recursion to avoid the "Maximal number of successive inlines (32) exceeded" error
     inline erasedValue[Elems] match
@@ -247,7 +247,8 @@ object ToScalaDeriving {
 
       // Elem <: T means the element is a subtype and we should recurse
       case _: (T, _) =>
-        ToScala.deriveWithExclusions(using summonInline[Mirror.Of[Elem]])(summonInline[Make[Excl]].toScala) // recursively derive sum case
+        // XXX: this seems to cause BIG problems when annotating with [Elem, Elem & Excl]
+        deriveWithExclusionsPrivate(using summonInline[Mirror.Of[Elem]])(summonInline[Make[Excl]].toScala) // recursively derive sum case
 
       // otherwise, including the case where the Elem is a supertype of T, we summon.
       case _ => summonInline[ToScala[Elem]] // summon externally-defined instance
@@ -312,7 +313,11 @@ object ToScalaDeriving {
    * Alternative entry point for deriving ToScala. Allows for specifying
    * a custom implementation for a certain subset of cases.
    */
-  inline def deriveWithExclusions[T, Excl <: T](using m: Mirror.Of[T])(custom: => Excl => String) = {
+  inline def deriveWithExclusions[T, Excl <: T](using m: Mirror.Of[T])(custom: => Excl => String): ToScala[T] =
+    deriveWithExclusionsPrivate[T, Excl](using m)(custom)
+
+
+  private inline def deriveWithExclusionsPrivate[T, Excl](using m: Mirror.Of[T])(custom: => Excl => String): ToScala[T] = {
 
     import ToScalaDeriving.{summonInstances, toScalaOfSum, toScalaOfProduct}
 
@@ -323,11 +328,11 @@ object ToScalaDeriving {
       case _: Mirror.ProductOf[T] => summonInstances[T, m.MirroredElemTypes, Excl] // obtain given instances for product fields
 
     inline val name = constValue[m.MirroredLabel]
-    Make((x: T) =>
+    Make[T]((x: T) =>
       inline m match
-        case s: Mirror.SumOf[T] => toScalaOfSum(elemInstances, name, s.ordinal(x), x)
-        case p: Mirror.Singleton => toScalaOfProduct(elemInstances, name, true, x)
-        case p: Mirror.ProductOf[T] => toScalaOfProduct(elemInstances, name, false, x)
+        case s: Mirror.SumOf[T] => toScalaOfSum[T](elemInstances, name, s.ordinal(x), x)
+        case p: Mirror.Singleton => toScalaOfProduct[T](elemInstances, name, true, x)
+        case p: Mirror.ProductOf[T] => toScalaOfProduct[T](elemInstances, name, false, x)
     )
   }
 

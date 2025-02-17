@@ -68,12 +68,6 @@ import ir.*
 // file as the generated code. These instances must be locatable by summon[],
 // otherwise the generated code will self-recurse, leading to non-termination.
 
-given ToScala[Return] = ToScala.Make(_ => "ret")
-given ToScala[DirectCall] = ToScala.Make(x => s"directCall(${x.target.procName.toScala})")
-given ToScala[IndirectCall] = ToScala.Make(x => s"indirectCall(${x.target.toScala})")
-given ToScala[GoTo] = ToScala.Make(x => s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})")
-
-
 /**
  * Automatically-derived instances
  * -------------------------------
@@ -91,88 +85,75 @@ given ToScala[Global] = ToScala.derived
 given ToScala[IRType] = ToScala.derived
 
 
-// NOTE: Unfortunately, for the Command trait, this is not possible because the classes are not case classes.
+// NOTE: Unfortunately, for the Command trait, this is not straightforward because the classes are not case classes.
 
-// given ToScala[Command] = ToScala.deriveWithExclusions[Command, Return | DirectCall | IndirectCall | GoTo] {
-//   case x: Return => "ret"
-//   case x: DirectCall => s"directCall(${x.target.procName.toScala})"
-//   case x: IndirectCall => s"indirectCall(${x.target.toScala})"
-//   case x: GoTo => s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})"
-// }
+/**
+ * A hierarchy mirroring BASIL IR statements but it's case classes so we can use automatic deriving.
+ */
+private object Case {
+
+  import collection.immutable.{Map,SortedMap}
+  import collection.mutable
+
+  sealed trait Command
+
+  sealed trait Statement extends Command
+  sealed trait Assign extends Statement
+  sealed trait SingleAssign extends Assign
+  sealed trait Jump extends Command
+  sealed trait Call extends Statement
+
+  case class LocalAssign(lhs: Variable, rhs: Expr, label: Option[String] = None) extends SingleAssign
+  case class MemoryStore(mem: Memory, index: Expr, value: Expr, endian: Endian, size: Int, label: Option[String] = None) extends Statement
+  case class MemoryLoad(lhs: Variable, mem: Memory, index: Expr, endian: Endian, size: Int, label: Option[String] = None) extends SingleAssign
+  case class NOP(label: Option[String] = None) extends Statement
+  case class Assert(body: Expr, comment: Option[String] = None, label: Option[String] = None) extends Statement
+  case class Assume(body: Expr, comment: Option[String] = None, label: Option[String] = None, checkSecurity: Boolean = false) extends Statement
+  case class Unreachable(label: Option[String] = None) extends Jump
+  case class Return(label: Option[String] = None, outParams : Map[LocalVar, Expr] = SortedMap()) extends Jump
+  case class GoTo (targets: Set[Block], label: Option[String]) extends Jump
+  case class DirectCall(target: Procedure, label: Option[String] = None, outParams: Map[LocalVar, Variable] = SortedMap(), actualParams: Map[LocalVar, Expr] = SortedMap()) extends Call with Assign
+  case class IndirectCall(target: Variable, label: Option[String] = None) extends Call
+
+  given Conversion[ir.LocalAssign, LocalAssign] = { case ir.LocalAssign(a,b,c) => LocalAssign(a,b,c) }
+  given Conversion[ir.MemoryStore, MemoryStore] = { case ir.MemoryStore(a,b,c,d,e,f) => MemoryStore(a,b,c,d,e,f) }
+  given Conversion[ir.MemoryLoad, MemoryLoad] = { case ir.MemoryLoad(a,b,c,d,e,f) => MemoryLoad(a,b,c,d,e,f) }
+  given Conversion[ir.NOP, NOP] = { case ir.NOP(a) => NOP(a) }
+  given Conversion[ir.Assert, Assert] = { case ir.Assert(a,b,c) => Assert(a,b,c) }
+  given Conversion[ir.Assume, Assume] = { case ir.Assume(a,b,c,d) => Assume(a,b,c,d) }
+  given Conversion[ir.Unreachable, Unreachable] = { case ir.Unreachable(a) => Unreachable(a) }
+  given Conversion[ir.Return, Return] = { case ir.Return(a,b) => Return(a,b) }
+  given Conversion[ir.GoTo , GoTo] = { case ir.GoTo(a,b) => GoTo(a,b) }
+  // XXX: order changed in DirectCall params
+  given Conversion[ir.DirectCall, DirectCall] = { case ir.DirectCall(a,b,c,d) => DirectCall(a,d,b,c) }
+  given Conversion[ir.IndirectCall, IndirectCall] = { case ir.IndirectCall(a,b) => IndirectCall(a,b) }
+
+  given Conversion[ir.Command, Command] = {
+    case x: ir.LocalAssign => x
+    case x: ir.MemoryStore => x
+    case x: ir.MemoryLoad => x
+    case x: ir.NOP => x
+    case x: ir.Assert => x
+    case x: ir.Assume => x
+    case x: ir.Unreachable => x
+    case x: ir.Return => x
+    case x: ir.GoTo  => x
+    case x: ir.DirectCall => x
+    case x: ir.IndirectCall => x
+  }
+
+  given ToScala[Command] = ToScala.deriveWithExclusions[Command, Return | DirectCall | IndirectCall | GoTo] {
+    case x: Return => "ret"
+    case x: DirectCall => s"directCall(${x.target.procName.toScala})"
+    case x: IndirectCall => s"indirectCall(${x.target.toScala})"
+    case x: GoTo => s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})"
+  }
+
+}
+
+given ToScala[ir.Command] = ToScala.Make(x => (x : Case.Command).toScala)
 
 
 // WARNING: Everything below the next line will be overwritten by the generator!
 // ------------------------ >8 ------------------------
 
-// format: off
-
-// command:
-// scripts/make_repr_functions.py src/main/scala/ir/dsl/ToScalaGenerated.scala ./statements.json
-
-// generated from ./statements.json
-given ToScala[Command] with
-  extension (x: Command) def toScala: String = x match {
-    case x: Statement => x match {
-      case x: Assign => x match {
-        case x: SingleAssign => x match {
-          case x: LocalAssign => {
-            def ensure_constructible(): LocalAssign = LocalAssign(x.lhs, x.rhs, x.label)
-            s"LocalAssign(${x.lhs.toScala}, ${x.rhs.toScala}, ${x.label.toScala})"
-          }
-          case x: MemoryLoad => {
-            def ensure_constructible(): MemoryLoad = MemoryLoad(x.lhs, x.mem, x.index, x.endian, x.size, x.label)
-            s"MemoryLoad(${x.lhs.toScala}, ${x.mem.toScala}, ${x.index.toScala}, ${x.endian.toScala}, ${x.size.toScala}, ${x.label.toScala})"
-          }
-        }
-        case x: DirectCall => {
-          def ensure_constructible(): DirectCall = DirectCall(x.target, x.label, x.outParams, x.actualParams)
-          if (Thread.interrupted()) { Thread.currentThread().interrupt(); "<interrupted>" } else summon[ToScala[DirectCall]].toScala(x)
-        }
-      }
-      case x: MemoryStore => {
-        def ensure_constructible(): MemoryStore = MemoryStore(x.mem, x.index, x.value, x.endian, x.size, x.label)
-        s"MemoryStore(${x.mem.toScala}, ${x.index.toScala}, ${x.value.toScala}, ${x.endian.toScala}, ${x.size.toScala}, ${x.label.toScala})"
-      }
-      case x: NOP => {
-        def ensure_constructible(): NOP = NOP(x.label)
-        s"NOP(${x.label.toScala})"
-      }
-      case x: Assert => {
-        def ensure_constructible(): Assert = Assert(x.body, x.comment, x.label)
-        s"Assert(${x.body.toScala}, ${x.comment.toScala}, ${x.label.toScala})"
-      }
-      case x: Assume => {
-        def ensure_constructible(): Assume = Assume(x.body, x.comment, x.label, x.checkSecurity)
-        s"Assume(${x.body.toScala}, ${x.comment.toScala}, ${x.label.toScala}, ${x.checkSecurity.toScala})"
-      }
-      case x: Call => x match {
-        case x: DirectCall => {
-          def ensure_constructible(): DirectCall = DirectCall(x.target, x.label, x.outParams, x.actualParams)
-          if (Thread.interrupted()) { Thread.currentThread().interrupt(); "<interrupted>" } else summon[ToScala[DirectCall]].toScala(x)
-        }
-        case x: IndirectCall => {
-          def ensure_constructible(): IndirectCall = IndirectCall(x.target, x.label)
-          if (Thread.interrupted()) { Thread.currentThread().interrupt(); "<interrupted>" } else summon[ToScala[IndirectCall]].toScala(x)
-        }
-      }
-    }
-    case x: Jump => x match {
-      case x: Unreachable => {
-        def ensure_constructible(): Unreachable = Unreachable(x.label)
-        s"Unreachable(${x.label.toScala})"
-      }
-      case x: Return => {
-        def ensure_constructible(): Return = Return(x.label, x.outParams)
-        if (Thread.interrupted()) { Thread.currentThread().interrupt(); "<interrupted>" } else summon[ToScala[Return]].toScala(x)
-      }
-      case x: GoTo => {
-        // unable to validate constructor with private field:
-        // def ensure_constructible(): GoTo = GoTo(x._targets, x.label)
-        if (Thread.interrupted()) { Thread.currentThread().interrupt(); "<interrupted>" } else summon[ToScala[GoTo]].toScala(x)
-      }
-    }
-  }
-
-// end generated from ./statements.json
-
-// format: on
