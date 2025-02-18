@@ -1,6 +1,6 @@
 package ir.dsl
 
-import util.{Twine}
+import util.{Twine, intersperse}
 import scala.deriving.{Mirror}
 import scala.compiletime.{summonInline, erasedValue, constValue, error}
 
@@ -184,7 +184,6 @@ import scala.compiletime.{summonInline, erasedValue, constValue, error}
  *
  */
 
-
 object ToScalaDeriving {
 
   /**
@@ -201,28 +200,30 @@ object ToScalaDeriving {
   /**
    * Summon ToScala instances for each type in the Elems tuple of types. Also handles exclusions.
    */
-  inline def summonInstances[T, Elems <: Tuple, Excl](using m: Mirror.Of[T])(custom: => ToScala[Excl]): List[ToScala[?]] =
+  inline def summonInstances[T, Elems <: Tuple, Excl](using
+    m: Mirror.Of[T]
+  )(custom: => ToScala[Excl]): List[ToScala[?]] =
 
     // NOTE: this is an unrolled recursion to avoid the "Maximal number of successive inlines (32) exceeded" error
     inline erasedValue[Elems] match
       case _: (t1 *: t2 *: t3 *: t4 *: rest) =>
         summonOrCustom[T, t1, Excl](custom) // first field / case
-        :: summonOrCustom[T, t2, Excl](custom) // second field / case
-        :: summonOrCustom[T, t3, Excl](custom) // third field / case
-        :: summonOrCustom[T, t4, Excl](custom) // fourth field / case
-        :: summonInstances[T, rest, Excl](custom) // + 4
+          :: summonOrCustom[T, t2, Excl](custom) // second field / case
+          :: summonOrCustom[T, t3, Excl](custom) // third field / case
+          :: summonOrCustom[T, t4, Excl](custom) // fourth field / case
+          :: summonInstances[T, rest, Excl](custom) // + 4
       case _: (t1 *: t2 *: t3 *: EmptyTuple) =>
         summonOrCustom[T, t1, Excl](custom) // first field / case
-        :: summonOrCustom[T, t2, Excl](custom) // second field / case
-        :: summonOrCustom[T, t3, Excl](custom) // third field / case
-        :: List()
+          :: summonOrCustom[T, t2, Excl](custom) // second field / case
+          :: summonOrCustom[T, t3, Excl](custom) // third field / case
+          :: List()
       case _: (t1 *: t2 *: EmptyTuple) =>
         summonOrCustom[T, t1, Excl](custom) // first field / case
-        :: summonOrCustom[T, t2, Excl](custom) // second field / case
-        :: List()
+          :: summonOrCustom[T, t2, Excl](custom) // second field / case
+          :: List()
       case _: (t *: EmptyTuple) =>
         summonOrCustom[T, t, Excl](custom) // first field / case
-        :: List()
+          :: List()
       case _: EmptyTuple => Nil
 
   /**
@@ -244,7 +245,10 @@ object ToScalaDeriving {
   inline def deriveOrSummon[T, Elem, Excl](using m: Mirror.Of[T])(custom: => ToScala[Excl]): ToScala[Elem] =
     inline (erasedValue[Elem], erasedValue[T]) match
       // Elem <: T and T <: Elem means T == Elem
-      case _: (T, Elem) => error("Infinite recursive derivation. The type " + constValue[m.MirroredLabel] + " appears in its own constructor.")
+      case _: (T, Elem) =>
+        error(
+          "Infinite recursive derivation. The type " + constValue[m.MirroredLabel] + " appears in its own constructor."
+        )
 
       // Elem <: T means the element is a subtype and we should recurse
       case _: (T, _) =>
@@ -253,7 +257,6 @@ object ToScalaDeriving {
 
       // otherwise, including the case where the Elem is a supertype of T, we summon.
       case _ => summonInline[ToScala[Elem]] // summon externally-defined instance
-
 
   /**
    * Implementation for sums and products
@@ -274,7 +277,7 @@ object ToScalaDeriving {
       case _: scala.reflect.Enum => name + "."
       case _ => ""
 
-    LazyList(prefix, instances(idx).asInstanceOf[ToScala[T]].toScala(x))
+    prefix #:: instances(idx).asInstanceOf[ToScala[T]].toScalaLines(x)
 
   /**
    * Implements ToScala instance for the given value of a product type.
@@ -282,15 +285,22 @@ object ToScalaDeriving {
    * This is done by obtaining ToScala instances for the fields, then joining their
    * results.
    */
-  inline def toScalaOfProduct[T](instances: => List[ToScala[?]], name: String, inline isSingleton: Boolean, x: T): Twine =
+  inline def toScalaOfProduct[T](
+    instances: => List[ToScala[?]],
+    name: String,
+    inline isSingleton: Boolean,
+    x: T
+  ): Twine =
     val args = inline isSingleton match
-      case true => ""
+      case true => LazyList()
       case false =>
         val elems = x.asInstanceOf[Product].productIterator
-        val args = (instances zip elems).map((f, x) => f.asInstanceOf[ToScala[Any]].toScala(x))
-        args.mkString("(", ", ", ")")
+        val args = (instances.iterator zip elems)
+          .map((f, x) => f.asInstanceOf[ToScala[Any]].toScalaLines(x))
+          .to(LazyList)
+        "(" #:: (args.intersperse(LazyList(", ")).flatten ++: LazyList(")"))
 
-    LazyList(name, args)
+    name #:: args
 
   /**
    * Helper class for wrapping a lambda function into a ToScala instance,
@@ -326,14 +336,17 @@ object ToScalaDeriving {
   inline def deriveWithExclusions[T, Excl <: T](using m: Mirror.Of[T])(custom: => ToScala[Excl]): ToScala[T] =
     deriveWithExclusionsPrivate[T, Excl](using m)(custom)
 
-
-  private inline def deriveWithExclusionsPrivate[T, Excl](using m: Mirror.Of[T])(custom: => ToScala[Excl]): ToScala[T] = {
+  private inline def deriveWithExclusionsPrivate[T, Excl](using
+    m: Mirror.Of[T]
+  )(custom: => ToScala[Excl]): ToScala[T] = {
 
     import ToScalaDeriving.{summonInstances, toScalaOfSum, toScalaOfProduct}
 
     lazy val elemInstances = inline m match
-      case _: Mirror.SumOf[T] => summonInstances[T, m.MirroredElemTypes, Excl](custom) // obtain given instances for sum cases
-      case _: Mirror.ProductOf[T] => summonInstances[T, m.MirroredElemTypes, Excl](custom) // obtain given instances for product fields
+      case _: Mirror.SumOf[T] =>
+        summonInstances[T, m.MirroredElemTypes, Excl](custom) // obtain given instances for sum cases
+      case _: Mirror.ProductOf[T] =>
+        summonInstances[T, m.MirroredElemTypes, Excl](custom) // obtain given instances for product fields
 
     inline val name = constValue[m.MirroredLabel]
     Make[T]((x: T) =>
