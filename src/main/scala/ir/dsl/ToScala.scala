@@ -85,11 +85,6 @@ given [T](using ToScala[T]): ToScalaString[Option[T]] with
       case None => "None"
       case Some(x) => s"Some(${x.toScala})"
 
-given [K,V](using ToScala[K])(using ToScala[V]): ToScala[Map[K,V]] with
-  extension (x: Map[K,V]) override def toScala: String =
-    val entries = x.map(_.toScala).mkString(", ")
-    s"Map($entries)"
-
 given [K, V](using ToScala[K])(using ToScala[V]): ToScalaString[(K, V)] with
   extension (x: (K, V))
     def toScala: String =

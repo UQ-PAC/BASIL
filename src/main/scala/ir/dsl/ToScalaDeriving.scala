@@ -1,5 +1,6 @@
 package ir.dsl
 
+import util.{Twine}
 import scala.deriving.{Mirror}
 import scala.compiletime.{summonInline, erasedValue, constValue, error}
 
@@ -248,7 +249,7 @@ object ToScalaDeriving {
       // Elem <: T means the element is a subtype and we should recurse
       case _: (T, _) =>
         // XXX: this seems to cause BIG problems when annotating with [Elem, Elem & Excl]
-        deriveWithExclusionsPrivate(using summonInline[Mirror.Of[Elem]])(summonInline[Make[Excl]].toScala) // recursively derive sum case
+        deriveWithExclusionsPrivate(using summonInline[Mirror.Of[Elem]])(summonInline[Make[Excl]].toScalaLines) // recursively derive sum case
 
       // otherwise, including the case where the Elem is a supertype of T, we summon.
       case _ => summonInline[ToScala[Elem]] // summon externally-defined instance
@@ -268,12 +269,12 @@ object ToScalaDeriving {
    * This is done by obtaining ToScala instances for each case and invoking the appropriate
    * instance based on the value.
    */
-  inline def toScalaOfSum[T](instances: => List[ToScala[?]], name: String, idx: Int, x: T): String =
+  inline def toScalaOfSum[T](instances: => List[ToScala[?]], name: String, idx: Int, x: T): Twine =
     val prefix = inline x match
       case _: scala.reflect.Enum => name + "."
       case _ => ""
 
-    prefix + instances(idx).asInstanceOf[ToScala[T]].toScala(x)
+    LazyList(prefix, instances(idx).asInstanceOf[ToScala[T]].toScala(x))
 
   /**
    * Implements ToScala instance for the given value of a product type.
@@ -281,7 +282,7 @@ object ToScalaDeriving {
    * This is done by obtaining ToScala instances for the fields, then joining their
    * results.
    */
-  inline def toScalaOfProduct[T](instances: => List[ToScala[?]], name: String, inline isSingleton: Boolean, x: T): String =
+  inline def toScalaOfProduct[T](instances: => List[ToScala[?]], name: String, inline isSingleton: Boolean, x: T): Twine =
     val args = inline isSingleton match
       case true => ""
       case false =>
@@ -289,13 +290,22 @@ object ToScalaDeriving {
         val args = (instances zip elems).map((f, x) => f.asInstanceOf[ToScala[Any]].toScala(x))
         args.mkString("(", ", ", ")")
 
-    name + args
+    LazyList(name, args)
 
   /**
-   * Helper class for wrapping a lambda function into a ToScala instance.
+   * Helper class for wrapping a lambda function into a ToScala instance,
+   * given a lambda returning a Twine.
    */
-  class Make[T](f: T => String) extends ToScala[T] {
-    extension (x: T) def toScala: String = f(x)
+  class Make[T](f: T => Twine) extends ToScalaLines[T] {
+    extension (x: T) def toScalaLines: Twine = f(x)
+  }
+
+  /**
+   * Helper class for wrapping a lambda function into a ToScala instance,
+   * given a lambda returning a String.
+   */
+  class MakeString[T](f: T => String) extends ToScalaString[T] {
+    extension (x: T) def toScala = f(x)
   }
 
   /**
@@ -313,11 +323,11 @@ object ToScalaDeriving {
    * Alternative entry point for deriving ToScala. Allows for specifying
    * a custom implementation for a certain subset of cases.
    */
-  inline def deriveWithExclusions[T, Excl <: T](using m: Mirror.Of[T])(custom: => Excl => String): ToScala[T] =
+  inline def deriveWithExclusions[T, Excl <: T](using m: Mirror.Of[T])(custom: => Excl => Twine): ToScala[T] =
     deriveWithExclusionsPrivate[T, Excl](using m)(custom)
 
 
-  private inline def deriveWithExclusionsPrivate[T, Excl](using m: Mirror.Of[T])(custom: => Excl => String): ToScala[T] = {
+  private inline def deriveWithExclusionsPrivate[T, Excl](using m: Mirror.Of[T])(custom: => Excl => Twine): ToScala[T] = {
 
     import ToScalaDeriving.{summonInstances, toScalaOfSum, toScalaOfProduct}
 

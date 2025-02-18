@@ -200,6 +200,73 @@ prog(
     checkOutput(expected, stmt.toScala)
   }
 
+  test("proc params") {
+    val p = prog(
+      proc(
+        "printf",
+        Seq("R9_in" -> BitVecType(64), "R0_in" -> BitVecType(64)),
+        Seq("R9_out" -> BitVecType(64), "R0_out" -> BitVecType(64))
+      )
+    )
+
+    val expected = """
+prog(
+  proc("printf",
+    Seq(
+      "R0_in" -> BitVecType(64),
+      "R9_in" -> BitVecType(64)
+    ),
+    Seq(
+      "R0_out" -> BitVecType(64),
+      "R9_out" -> BitVecType(64)
+    )
+  )
+)
+    """
+
+    checkOutput(expected, p.toScala)
+  }
+
+  test("return params") {
+    val p = prog(
+      proc(
+        "proc",
+        Seq(),
+        Seq("R0_out" -> BitVecType(64), "R1_out" -> BitVecType(64), "R31_out" -> BitVecType(64)),
+        block(
+          "get_two_1876_basil_return",
+          ret(
+            "R0_out" -> LocalVar("R0", BitVecType(64), 0),
+            "R1_out" -> LocalVar("R1", BitVecType(64), 0),
+            "R31_out" -> LocalVar("R31", BitVecType(64), 0)
+          )
+        )
+      )
+    )
+
+    val expected = """
+prog(
+  proc("proc",
+    Seq(),
+    Seq(
+      "R0_out" -> BitVecType(64),
+      "R1_out" -> BitVecType(64),
+      "R31_out" -> BitVecType(64)
+    ),
+    block("get_two_1876_basil_return",
+      ret(
+        "R0_out" -> LocalVar("R0", BitVecType(64), 0),
+        "R1_out" -> LocalVar("R1", BitVecType(64), 0),
+        "R31_out" -> LocalVar("R31", BitVecType(64), 0)
+      )
+    )
+  )
+)
+    """
+
+    checkOutput(expected, p.toScala)
+  }
+
   test("toscala macro compilation") {
     // derive with exclusions
     assertCompiles("""
@@ -207,7 +274,7 @@ enum EAAA {
   case A
   case B
 }
-given ToScala[EAAA] = ToScala.deriveWithExclusions[EAAA, EAAA.A.type]((x: EAAA.A.type) => "custom" + x.toString)
+given ToScala[EAAA] = ToScala.deriveWithExclusions[EAAA, EAAA.A.type]((x: EAAA.A.type) => LazyList("custom", x.toString))
       """)
 
     // exclusion type should be a subtype of base type
@@ -221,7 +288,7 @@ given ToScala[EAAA] = ToScala.deriveWithExclusions[EAAA, Any]((x: Any) => ???)
 
     // recursive
     assertCompiles("""
-given ToScala[Int] = ToScala.Make(_.toString)
+given ToScala[Int] = ToScala.MakeString(_.toString)
 
 sealed trait Y derives ToScala
 
@@ -234,8 +301,7 @@ case class X3() extends X
 
     // missing instance for Double
     assertTypeError("""
-given ToScala[Int] with
-  extension (x: Int) def toScala = x.toString
+given ToScala[Int] = ToScala.MakeString(_.toString)
 
 sealed trait L derives ToScala
 case object N extends L
@@ -244,10 +310,8 @@ case class C(x: Int, l: L, d: Double) extends L
 
     // as above but with Double present
     assertCompiles("""
-given ToScala[Int] with
-  extension (x: Int) def toScala = x.toString
-given ToScala[Double] with
-  extension (x: Double) def toScala = x.toString
+given ToScala[Int] = ToScala.MakeString(_.toString)
+given ToScala[Double] = ToScala.MakeString(_.toString)
 
 sealed trait L derives ToScala
 case object N extends L
@@ -313,7 +377,8 @@ case class A39() extends ASD
       case A
       case B
     }
-    given ToScala[EAAA] = ToScala.deriveWithExclusions[EAAA, EAAA.A.type]((x: EAAA.A.type) => s"custom$x")
+    given ToScala[EAAA] =
+      ToScala.deriveWithExclusions[EAAA, EAAA.A.type]((x: EAAA.A.type) => LazyList("custom", x.toString))
 
     sealed trait L derives ToScala
     case class N() extends L

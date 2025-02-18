@@ -141,12 +141,19 @@ private object Case {
   }
 
   given ToScala[Command] = ToScala.deriveWithExclusions[Command, Return | DirectCall | IndirectCall | GoTo] {
-    case x: Return => "ret"
-    case x: DirectCall => s"directCall(${x.target.procName.toScala})"
-    case x: IndirectCall => s"indirectCall(${x.target.toScala})"
-    case x: GoTo => s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})"
+    case x: Return => {
+      if (x.outParams.isEmpty) {
+        LazyList("ret")
+      } else {
+        def outParamToScala(x: (LocalVar, Expr)) = (x(0).name, x(1)).toScalaLines
+        indentNested("ret(", x.outParams.map(outParamToScala), ")")
+      }
+    }
+    case x: DirectCall => LazyList(s"directCall(${x.target.procName.toScala})")
+    case x: IndirectCall => LazyList(s"indirectCall(${x.target.toScala})")
+    case x: GoTo => LazyList(s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})")
   }
 
 }
 
-given ToScala[ir.Command] = ToScala.Make(x => (x : Case.Command).toScala)
+given ToScala[ir.Command] = ToScala.Make(x => (x : Case.Command).toScalaLines)
