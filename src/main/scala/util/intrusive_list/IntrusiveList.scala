@@ -485,14 +485,14 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
   private[intrusive_list] final def last(): T = {
     next match {
       case Some(n) => n.last()
-      case None    => this.asInstanceOf[T]
+      case None => this.asInstanceOf[T]
     }
   }
 
   private[intrusive_list] final def first(): T = {
     prev match {
       case Some(n) => n.first()
-      case None    => this.asInstanceOf[T]
+      case None => this.asInstanceOf[T]
     }
   }
 

@@ -3,9 +3,8 @@ package analysis
 import ir.*
 import ir.transforms.AbstractDomain
 
-/**
- * Lattice structure internal to a type.
- */
+/** Lattice structure internal to a type.
+  */
 trait InternalLattice[T <: InternalLattice[T]] {
   def join(other: T): T
   def meet(other: T): T
@@ -14,10 +13,9 @@ trait InternalLattice[T <: InternalLattice[T]] {
   def bottom: T
 }
 
-/**
- * An element of a powerset lattice. This type represents Top and Bottom and finite sets, and is closed under
- * unions, intersections, and set difference.
- */
+/** An element of a powerset lattice. This type represents Top and Bottom and finite sets, and is closed under unions,
+  * intersections, and set difference.
+  */
 enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
   /* The set of all terms of type T */
   case Top[T1]() extends LatticeSet[T1]
@@ -78,17 +76,16 @@ enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
   def -(v: T): LatticeSet[T] = this.diff(FiniteSet(Set(v)))
   def union(other: LatticeSet[T]): LatticeSet[T] = this.join(other)
   def intersect(other: LatticeSet[T]): LatticeSet[T] = this.meet(other)
-  def ++ (other: LatticeSet[T]): LatticeSet[T] = this.union(other)
-  def ++ (other: Iterable[T]): LatticeSet[T] = this.union(FiniteSet(other.toSet))
-  def -- (other: LatticeSet[T]): LatticeSet[T] = this.diff(other)
-  def -- (other: Iterable[T]): LatticeSet[T] = this.diff(FiniteSet(other.toSet))
+  def ++(other: LatticeSet[T]): LatticeSet[T] = this.union(other)
+  def ++(other: Iterable[T]): LatticeSet[T] = this.union(FiniteSet(other.toSet))
+  def --(other: LatticeSet[T]): LatticeSet[T] = this.diff(other)
+  def --(other: Iterable[T]): LatticeSet[T] = this.diff(FiniteSet(other.toSet))
 
   def top: LatticeSet[T] = Top()
   def bottom: LatticeSet[T] = Bottom()
 
-  /**
-   * Try to convert to a finitely represented set. Returns None if this set is infinite
-   */
+  /** Try to convert to a finitely represented set. Returns None if this set is infinite
+    */
   def tryToSet: Option[Set[T]] = {
     this match {
       case Top() => None
@@ -112,11 +109,9 @@ class LatticeSetLattice[T] extends Lattice[LatticeSet[T]] {
   val bottom: LatticeSet[T] = Bottom()
 }
 
-/**
- * A map which defaults to either the top or bottom element of a lattice.
- * This is more efficient to use in static analyses as it is common to default
- * most values in a map to either top or bottom.
- */
+/** A map which defaults to either the top or bottom element of a lattice. This is more efficient to use in static
+  * analyses as it is common to default most values in a map to either top or bottom.
+  */
 enum LatticeMap[D, L] {
   /* PERFORMANCE:
    * Something like an AVL tree could be more efficient, see section 4.1.4 of Antoine Miné's abstract interpretation tutorial.
@@ -131,9 +126,8 @@ enum LatticeMap[D, L] {
   /* A Map which defaults to bottom and is else specified by the internal map */
   case BottomMap[D1, L1](m: Map[D1, L1]) extends LatticeMap[D1, L1]
 
-  /**
-   * Update this map so that `from` now maps to `to`
-   */
+  /** Update this map so that `from` now maps to `to`
+    */
   def update(from: D, to: L): LatticeMap[D, L] = this match {
     case Top() => TopMap(Map(from -> to))
     case Bottom() => BottomMap(Map(from -> to))
@@ -141,9 +135,8 @@ enum LatticeMap[D, L] {
     case BottomMap(m) => BottomMap(m + (from -> to))
   }
 
-  /**
-   * Keeps all key value pairs satisfying the predicate, sending the rest to default
-   */
+  /** Keeps all key value pairs satisfying the predicate, sending the rest to default
+    */
   def filter(pred: ((D, L)) => Boolean): LatticeMap[D, L] = this match {
     case Top() => Top()
     case Bottom() => Bottom()
@@ -158,13 +151,11 @@ enum LatticeMap[D, L] {
     case BottomMap(m) => m
   }
 
+  def +(kv: (D, L)): LatticeMap[D, L] = update(kv._1, kv._2)
+  def ++(kv: Map[D, L]): LatticeMap[D, L] = kv.foldLeft(this) { (m, kv) => m + kv }
 
-  def + (kv: (D, L)): LatticeMap[D, L] = update(kv._1, kv._2)
-  def ++ (kv: Map[D, L]): LatticeMap[D, L] = kv.foldLeft(this) { (m, kv) => m + kv }
-
-  /**
-   * Evaluate the function at `v`, accounting for defaulting behaviour.
-   */
+  /** Evaluate the function at `v`, accounting for defaulting behaviour.
+    */
   def apply[L1 <: InternalLattice[L1]](v: D)(implicit s: L <:< L1, l: L1): L1 = this match {
     case Top() => l.top
     case Bottom() => l.bottom
@@ -183,26 +174,29 @@ enum LatticeMap[D, L] {
 }
 
 private def latticeMapJoin[D, L](
-  a: LatticeMap[D, L], b: LatticeMap[D, L],
-  join: ((L, L) => L), top: => L, bottom: => L
+  a: LatticeMap[D, L],
+  b: LatticeMap[D, L],
+  join: ((L, L) => L),
+  top: => L,
+  bottom: => L
 ): LatticeMap[D, L] = {
   import LatticeMap.{Top, Bottom, TopMap, BottomMap}
 
   (a, b) match {
     case (Top(), _) => Top()
     case (Bottom(), b) => b
-    case (TopMap(a), TopMap(b)) => TopMap(
-      a.foldLeft(b)((m, p) => {
+    case (TopMap(a), TopMap(b)) =>
+      TopMap(a.foldLeft(b)((m, p) => {
         val (k, v) = p
         m + (k -> join(m.getOrElse(k, top), v))
       }))
-    case (TopMap(a), BottomMap(b)) => TopMap(
-      b.foldLeft(a)((m, p) => {
+    case (TopMap(a), BottomMap(b)) =>
+      TopMap(b.foldLeft(a)((m, p) => {
         val (k, v) = p
         m + (k -> join(m.getOrElse(k, top), v))
       }))
-    case (BottomMap(a), BottomMap(b)) => BottomMap(
-      a.foldLeft(b)((m, p) => {
+    case (BottomMap(a), BottomMap(b)) =>
+      BottomMap(a.foldLeft(b)((m, p) => {
         val (k, v) = p
         m + (k -> join(m.getOrElse(k, bottom), v))
       }))
@@ -211,26 +205,29 @@ private def latticeMapJoin[D, L](
 }
 
 private def latticeMapMeet[D, L](
-  a: LatticeMap[D, L], b: LatticeMap[D, L],
-  meet: ((L, L) => L), top: => L, bottom: => L
+  a: LatticeMap[D, L],
+  b: LatticeMap[D, L],
+  meet: ((L, L) => L),
+  top: => L,
+  bottom: => L
 ): LatticeMap[D, L] = {
   import LatticeMap.{Top, Bottom, TopMap, BottomMap}
 
   (a, b) match {
     case (Top(), b) => b
     case (Bottom(), _) => Bottom()
-    case (TopMap(a), TopMap(b)) => TopMap(
-      a.foldLeft(b)((m, p) => {
+    case (TopMap(a), TopMap(b)) =>
+      TopMap(a.foldLeft(b)((m, p) => {
         val (k, v) = p
         m + (k -> meet(m.getOrElse(k, top), v))
       }))
-    case (TopMap(a), BottomMap(b)) => BottomMap(
-      a.foldLeft(b)((m, p) => {
+    case (TopMap(a), BottomMap(b)) =>
+      BottomMap(a.foldLeft(b)((m, p) => {
         val (k, v) = p
         m + (k -> meet(m.getOrElse(k, bottom), v))
       }))
-    case (BottomMap(a), BottomMap(b)) => BottomMap(
-      a.foldLeft(b)((m, p) => {
+    case (BottomMap(a), BottomMap(b)) =>
+      BottomMap(a.foldLeft(b)((m, p) => {
         val (k, v) = p
         m + (k -> meet(m.getOrElse(k, bottom), v))
       }))
@@ -238,10 +235,8 @@ private def latticeMapMeet[D, L](
   }
 }
 
-/**
- * Evaluate the map m at value d, defaulting based on the top and bottom
- * values in the lattice l.
- */
+/** Evaluate the map m at value d, defaulting based on the top and bottom values in the lattice l.
+  */
 def latticeMapApply[D, L, LA <: Lattice[L]](m: LatticeMap[D, L], d: D, l: LA): L = {
   import LatticeMap.{Top, Bottom, TopMap, BottomMap}
 
@@ -268,10 +263,9 @@ class LatticeMapLattice[D, L, LA <: Lattice[L]](l: LA) extends Lattice[LatticeMa
   val bottom: LatticeMap[D, L] = Bottom()
 }
 
-/**
- * A domain which has terms as maps. Implementing a MapDomain involves only defining operations
- * element wise on the codomain of the map (along with the transfer function).
- */
+/** A domain which has terms as maps. Implementing a MapDomain involves only defining operations element wise on the
+  * codomain of the map (along with the transfer function).
+  */
 trait MapDomain[D, L] extends AbstractDomain[LatticeMap[D, L]] {
   import LatticeMap.{Top, Bottom, TopMap, BottomMap}
 

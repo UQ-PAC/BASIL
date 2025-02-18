@@ -32,15 +32,15 @@ object BAPLoader {
 
   @tailrec
   def visitExp(ctx: ExpContext): BAPExpr = ctx match {
-    case e: ExpParenContext  => visitExp(e.exp)
-    case e: LoadContext      => visitLoad(e)
-    case e: BinOpContext     => visitBinOp(e)
-    case e: UOpContext       => visitUOp(e)
+    case e: ExpParenContext => visitExp(e.exp)
+    case e: LoadContext => visitLoad(e)
+    case e: BinOpContext => visitBinOp(e)
+    case e: UOpContext => visitUOp(e)
     case e: ExpImmVarContext => visitImmVar(e.immVar)
-    case e: ExpIntContext    => visitExpInt(e)
-    case e: ExpCastContext   => visitCast(e.cast)
-    case e: ExtractContext   => visitExtract(e)
-    case e: ConcatContext    => visitConcat(e)
+    case e: ExpIntContext => visitExpInt(e)
+    case e: ExpCastContext => visitCast(e.cast)
+    case e: ExtractContext => visitExtract(e)
+    case e: ConcatContext => visitConcat(e)
   }
 
   def visitLoad(ctx: LoadContext): BAPMemAccess = {
@@ -67,9 +67,10 @@ object BAPLoader {
 
   def visitImmVar(ctx: ImmVarContext): BAPVar = {
     val name = parseAllowed(visitQuoteString(ctx.name))
-    if (((name.startsWith("R") || name.startsWith("V"))
-      && (name.length == 2 || name.length == 3)
-      && name.substring(1).forall(_.isDigit)) ||
+    if (
+      ((name.startsWith("R") || name.startsWith("V"))
+        && (name.length == 2 || name.length == 3)
+        && name.substring(1).forall(_.isDigit)) ||
       (name == "NF" || name == "ZF" || name == "CF" || name == "VF")
     ) {
       BAPRegister(name, parseInt(ctx.size))
@@ -88,9 +89,9 @@ object BAPLoader {
 
   def visitCast(ctx: CastContext): BAPExpr = ctx.CAST.getText match {
     case "UNSIGNED" => BAPUnsignedExtend(parseInt(ctx.size), visitExp(ctx.exp))
-    case "SIGNED"   => BAPSignedExtend(parseInt(ctx.size), visitExp(ctx.exp))
-    case "LOW"      => BAPLowCast(parseInt(ctx.size), visitExp(ctx.exp))
-    case "HIGH"     => BAPHighCast(parseInt(ctx.size), visitExp(ctx.exp))
+    case "SIGNED" => BAPSignedExtend(parseInt(ctx.size), visitExp(ctx.exp))
+    case "LOW" => BAPLowCast(parseInt(ctx.size), visitExp(ctx.exp))
+    case "HIGH" => BAPHighCast(parseInt(ctx.size), visitExp(ctx.exp))
   }
 
   def visitExtract(ctx: ExtractContext): BAPExtract = {
@@ -103,14 +104,14 @@ object BAPLoader {
 
   def visitJmp(ctx: JmpContext): BAPJump = ctx match {
     case i: IndirectCallContext => visitIndirectCall(i)
-    case d: DirectCallContext   => visitDirectCall(d)
-    case g: GotoJmpContext      => visitGotoJmp(g)
+    case d: DirectCallContext => visitDirectCall(d)
+    case g: GotoJmpContext => visitGotoJmp(g)
   }
 
   def visitIndirectCall(ctx: IndirectCallContext): BAPIndirectCall = {
     val returnTarget = Option(ctx.returnTarget) match {
       case Some(r: DirectContext) => Some(parseLabel(r.tid.name))
-      case None                   => None
+      case None => None
     }
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
@@ -121,17 +122,12 @@ object BAPLoader {
   def visitDirectCall(ctx: DirectCallContext): BAPDirectCall = {
     val returnTarget = Option(ctx.returnTarget) match {
       case Some(r: DirectContext) => Some(parseLabel(r.tid.name))
-      case None                   => None
+      case None => None
     }
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
     checkCondition(ctx.cond, ctx)
-    BAPDirectCall(
-      parseAllowed(visitQuoteString(ctx.callee.tid.name).stripPrefix("@")),
-      returnTarget,
-      line,
-      insn
-    )
+    BAPDirectCall(parseAllowed(visitQuoteString(ctx.callee.tid.name).stripPrefix("@")), returnTarget, line, insn)
   }
 
   def checkCondition(condition: ExpContext, ctx: JmpContext): Unit = {
@@ -139,7 +135,9 @@ object BAPLoader {
     if (conditionParsed != BAPLiteral(1, 1)) {
       // If this is thrown then we have will have to actually support BAP giving calls (as opposed to gotos).
       // This is not something that it seems like the ARM64 instruction set should produce.
-      throw BAPCallConditionParsingException(s"Error parsing BAP at \"${ctx.getText}\": call contains non-true condition: \"${condition.getText}\", parsed as $conditionParsed")
+      throw BAPCallConditionParsingException(
+        s"Error parsing BAP at \"${ctx.getText}\": call contains non-true condition: \"${condition.getText}\", parsed as $conditionParsed"
+      )
     }
   }
 
@@ -156,11 +154,11 @@ object BAPLoader {
       case c: CastOptContext =>
         c.cast.exp match {
           case e: ExpImmVarContext => visitImmVar(e.immVar)
-          case _                   => return (None, None)
+          case _ => return (None, None)
         }
     }
     ctx.intent.getText match {
-      case "In()"  => (Some(BAPParameter(lhs.name, lhs.size, rhs)), None)
+      case "In()" => (Some(BAPParameter(lhs.name, lhs.size, rhs)), None)
       case "Out()" => (None, Some(BAPParameter(lhs.name, lhs.size, rhs)))
       case "Both()" =>
         (Some(BAPParameter(lhs.name, lhs.size, rhs)), Some(BAPParameter(lhs.name + "_out", lhs.size, rhs)))
@@ -175,7 +173,7 @@ object BAPLoader {
 
     val address = parseFromAttrs(ctx.attrs, "address") match {
       case Some(x: String) => Some(BigInt(x.stripPrefix("0x"), 16))
-      case None            => None
+      case None => None
     }
 
     BAPSubroutine(
@@ -211,7 +209,7 @@ object BAPLoader {
     val label = parseLabel(ctx.tid.name)
     val address = parseFromAttrs(ctx.attrs, "address") match {
       case Some(x: String) => Some(BigInt(x.stripPrefix("0x"), 16))
-      case None            => None
+      case None => None
     }
 
     BAPBlock(label, address, statements, jumps)
@@ -219,7 +217,7 @@ object BAPLoader {
 
   def visitEndian(ctx: EndianContext): Endian = ctx.ENDIAN.getText match {
     case "LittleEndian" => Endian.LittleEndian
-    case "BigEndian"    => Endian.BigEndian
+    case "BigEndian" => Endian.BigEndian
   }
 
   def visitAssign(ctx: AssignContext): BAPStatement = ctx match {

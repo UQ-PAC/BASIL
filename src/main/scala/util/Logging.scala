@@ -96,18 +96,18 @@ class GenericLogger(
         else
           logLevel match
             case DEBUG => AnsiColor.RESET
-            case INFO  => AnsiColor.GREEN
-            case WARN  => AnsiColor.YELLOW
+            case INFO => AnsiColor.GREEN
+            case WARN => AnsiColor.YELLOW
             case ERROR => AnsiColor.RED
-            case OFF   => ???
+            case OFF => ???
 
       val showPosition = (logLevel, level) match
         case (_, DEBUG) => true
         case (ERROR, _) => true
-        case (WARN, _)  => true
-        case (INFO, _)  => false
+        case (WARN, _) => true
+        case (INFO, _) => false
         case (DEBUG, _) => false
-        case (OFF, _)   => ???
+        case (OFF, _) => ???
 
       val position = if showPosition then s" [${name.value}@${file.value}:${line.value}]" else ""
 
@@ -135,7 +135,7 @@ class GenericLogger(
     writeLog(LogLevel.INFO, arg, line, file, name)
   }
 
-  def setLevel(logLevel: LogLevel, setChildren: Boolean = true) : GenericLogger = {
+  def setLevel(logLevel: LogLevel, setChildren: Boolean = true): GenericLogger = {
     level = logLevel
     if (setChildren) {
       for (c <- children) {

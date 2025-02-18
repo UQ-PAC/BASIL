@@ -1,9 +1,10 @@
 package ir.dsl
 
 import ir.*
+import util.{Twine, indentNested}
 
 /**
- * The end of this file contains generated code to implement ToScala for the various type
+ * The end of this file contains generated code to implement ToScalaLines for the various type
  * hierarchies defined by BASIL.
  */
 
@@ -13,7 +14,7 @@ import ir.*
  *
  * If you are here to manually fix a compilation error, please make sure that
  * you understand the context and carefully apply a specific fix. Make sure
- * that the code maintains the general contract of the ToScala trait.
+ * that the code maintains the general contract of the ToScalaLines trait.
  *
  * That is, the returned string must be valid Scala code to construct the given
  * object. The `ensure_constructible` functions are defined to match the produced
@@ -23,7 +24,6 @@ import ir.*
  * When making manual changes, be sure to change the string literal and the
  * ensure_constrictible functions in the same way.
  */
-
 
 /**
  * Running the auto-generator
@@ -45,24 +45,22 @@ import ir.*
  * 7. Run the Python command listed below the scissors line.
  * 8. Make sure that the code compiles and passes tests:
  *
- *     ./mill test.testOnly 'ir.ToScalaTest'
+ *     ./mill test.testOnly 'ir.ToScalaLinesTest'
  *
  * 9. Upload the changes.
  *
  */
 
-
 /**
- * Manually-defined ToScala instances
+ * Manually-defined ToScalaLines instances
  * ----------------------------------
  *
  * Externals: DirectCall, IndirectCall, GoTo, Return
  *
  * The "Externals" line above tells the generator the following types as having
- * manually-defined ToScala instances. These types interact with control-flow,
+ * manually-defined ToScalaLines instances. These types interact with control-flow,
  * and the naive auto-generated code would be large and possibly cyclic.
  */
-
 
 // NOTE: It is important that these handwritten given instances live in the same
 // file as the generated code. These instances must be locatable by summon[],
@@ -152,8 +150,3 @@ private object Case {
 }
 
 given ToScala[ir.Command] = ToScala.Make(x => (x : Case.Command).toScala)
-
-
-// WARNING: Everything below the next line will be overwritten by the generator!
-// ------------------------ >8 ------------------------
-

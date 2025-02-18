@@ -30,7 +30,7 @@ private class BVis extends CILVisitor {
   override def vjump(j: Jump) = {
     j match {
       case g @ GoTo(targets, _) if !(targets.forall(t => t.parent == proc)) => gotoViolations.add(g)
-      case _                                                                => ()
+      case _ => ()
     }
 
     SkipChildren()

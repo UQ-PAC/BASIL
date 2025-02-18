@@ -6,9 +6,7 @@ import os.Path
 import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
 import contrib.scalapblib._
 
-
-
-object basil extends RootModule with ScalaModule with antlr.AntlrModule with ScalaPBModule{
+object basil extends RootModule with ScalaModule with antlr.AntlrModule with ScalaPBModule {
   def scalaVersion = "3.3.4"
 
   // def scalacOptions: T[Seq[String]] = Seq("-Xprint:typer")
@@ -24,14 +22,12 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
 
   def scalaPBVersion = "0.11.15"
 
-
   def mainClass = Some("Main")
 
-  override def scalaPBSources = T.sources {Seq(PathRef(this.millSourcePath / "main" / "protobuf"))}
+  override def scalaPBSources = T.sources { Seq(PathRef(this.millSourcePath / "main" / "protobuf")) }
   def millSourcePath = super.millSourcePath / "src"
   def ivyDeps = Agg(scalactic, antlrRuntime, sourceCode, mainArgs, sprayJson, scalapb)
-  def sources = T.sources {Seq(PathRef(this.millSourcePath / "main" / "scala" ))}
-
+  def sources = T.sources { Seq(PathRef(this.millSourcePath / "main" / "scala")) }
 
   override def antlrPackage: Option[String] = Some("Parsers")
   override def antlrGenerateVisitor = true
@@ -39,15 +35,13 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
     Seq(PathRef(millSourcePath / "main" / "antlr4"))
   }
 
-  object test extends ScalaTests with TestModule.ScalaTest  {
+  object test extends ScalaTests with TestModule.ScalaTest {
     def ivyDeps = Agg(scalaTests, javaTests)
-    def sources = T.sources {Seq(PathRef(this.millSourcePath / "scala" ))}
+    def sources = T.sources { Seq(PathRef(this.millSourcePath / "scala")) }
   }
 
-
-  /**
-   * Updates the expected
-   */
+  /** Updates the expected
+    */
 
   def updateExpectedBAP() = T.command {
     val correctPath = test.millSourcePath / "correct"

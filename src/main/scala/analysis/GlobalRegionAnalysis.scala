@@ -6,16 +6,21 @@ import ir.*
 import scala.collection.mutable
 
 /** Identifies global data regions.
- *
- * This is iterated until results reach a fixpoint.
- *
- * @param program
- * @param domain reachable parts of the program
- * @param constantProp constant propagation results
- * @param reachingDefs maps each CFG node to two maps: variable definitions and variables uses.
- * @param mmm preloaded globals from symbol table.
- * @param vsaResult extra information from VSA results of previous passes.
- */
+  *
+  * This is iterated until results reach a fixpoint.
+  *
+  * @param program
+  * @param domain
+  *   reachable parts of the program
+  * @param constantProp
+  *   constant propagation results
+  * @param reachingDefs
+  *   maps each CFG node to two maps: variable definitions and variables uses.
+  * @param mmm
+  *   preloaded globals from symbol table.
+  * @param vsaResult
+  *   extra information from VSA results of previous passes.
+  */
 trait GlobalRegionAnalysis(
   val program: Program,
   val domain: Set[CFGPosition],
@@ -105,17 +110,16 @@ trait GlobalRegionAnalysis(
     collage
   }
 
-  /**
-   * Check if the data region is defined.
-   * Finds full and partial matches
-   * Full matches sizes are altered to match the size of the data region
-   * Partial matches are not altered
-   * Otherwise the data region is returned
-   *
-   * @param dataRegions Set[DataRegion]
-   * @param n CFGPosition
-   * @return Set[DataRegion]
-   */
+  /** Check if the data region is defined. Finds full and partial matches Full matches sizes are altered to match the
+    * size of the data region Partial matches are not altered Otherwise the data region is returned
+    *
+    * @param dataRegions
+    *   Set[DataRegion]
+    * @param n
+    *   CFGPosition
+    * @return
+    *   Set[DataRegion]
+    */
   def checkIfDefined(dataRegions: Set[DataRegion], n: CFGPosition, strict: Boolean = false): Set[DataRegion] = {
     var converted: Set[DataRegion] = Set.empty
     dataRegions.foreach { i =>
@@ -141,9 +145,9 @@ trait GlobalRegionAnalysis(
         }
         converted = converted ++ Set(dataMap(i.start))
       } else {
-  //        val highestRegion = accesses.maxBy(_.start)
-  //        dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(highestRegion.end - i.start))
-  //        dataMap(i.start)
+        //        val highestRegion = accesses.maxBy(_.start)
+        //        dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(highestRegion.end - i.start))
+        //        dataMap(i.start)
         dataMap.remove(i.start)
         accesses.foreach(a => dataPoolMaster(a.start, a.size, false))
         converted = converted ++ accesses.map(a => dataMap(a.start))
@@ -153,7 +157,7 @@ trait GlobalRegionAnalysis(
   }
 
   /** Transfer function for state lattice elements.
-   */
+    */
   def transfer(n: CFGPosition, s: Set[DataRegion]): Set[DataRegion] = {
     n match {
       case store: MemoryStore =>
@@ -169,7 +173,7 @@ trait GlobalRegionAnalysis(
       case _ =>
         Set()
     }
- }
+  }
 
 }
 
@@ -181,6 +185,6 @@ class GlobalRegionAnalysisSolver(
   mmm: MemoryModelMap,
   vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
 ) extends GlobalRegionAnalysis(program, domain, constantProp, reachingDefs, mmm, vsaResult)
-  with IRIntraproceduralForwardDependencies
-  with Analysis[Map[CFGPosition, Set[DataRegion]]]
-  with SimpleWorklistFixpointSolver[CFGPosition, Set[DataRegion], PowersetLattice[DataRegion]]
+    with IRIntraproceduralForwardDependencies
+    with Analysis[Map[CFGPosition, Set[DataRegion]]]
+    with SimpleWorklistFixpointSolver[CFGPosition, Set[DataRegion], PowersetLattice[DataRegion]]

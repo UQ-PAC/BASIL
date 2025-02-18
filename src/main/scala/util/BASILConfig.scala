@@ -19,7 +19,7 @@ case class ILLoadingConfig(
   mainProcedureName: String = "main",
   procedureTrimDepth: Int = Int.MaxValue,
   parameterForm: Boolean = false,
-  trimEarly: Boolean = false,
+  trimEarly: Boolean = false
 )
 
 case class StaticAnalysisConfig(
@@ -31,7 +31,6 @@ case class StaticAnalysisConfig(
   memoryRegions: MemoryRegionsMode = MemoryRegionsMode.Disabled,
   irreducibleLoops: Boolean = true
 )
-
 
 enum DSAAnalysis {
   case Norm, Set, Field

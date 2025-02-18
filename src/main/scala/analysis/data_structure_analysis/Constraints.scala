@@ -1,6 +1,20 @@
 package analysis.data_structure_analysis
 
-import ir.{CFGPosition, Call, DirectCall, Expr, IndirectCall, IntraProcIRCursor, LocalVar, MemoryLoad, MemoryStore, Procedure, Statement, Variable, computeDomain}
+import ir.{
+  CFGPosition,
+  Call,
+  DirectCall,
+  Expr,
+  IndirectCall,
+  IntraProcIRCursor,
+  LocalVar,
+  MemoryLoad,
+  MemoryStore,
+  Procedure,
+  Statement,
+  Variable,
+  computeDomain
+}
 import util.ConstGenLogger
 
 sealed trait Constraint {
@@ -26,18 +40,19 @@ sealed trait BinaryConstraint extends Constraint {
 
   private def name = this.getClass.getSimpleName
   override def toString: String = eval()
-  override def eval(evaluator: Expr => Any = identity): String = s"(${arg1.eval(evaluator)} <==> ${arg2.eval(evaluator)}"
+  override def eval(evaluator: Expr => Any = identity): String =
+    s"(${arg1.eval(evaluator)} <==> ${arg2.eval(evaluator)}"
 }
 
 case class AssignmentConstraint(pos: CFGPosition, ar1: Expr, ar2: Expr) extends BinaryConstraint {
   override def source: CFGPosition = pos
   override val label: String = labelToPC(Some(pos.toString))
   override val arg1: ConstraintArg = ConstraintArg(ar1)
-  override val arg2: ConstraintArg =  ConstraintArg(ar2)
+  override val arg2: ConstraintArg = ConstraintArg(ar2)
 }
 
 sealed trait MemoryAccessConstraint[T <: MemoryStore | MemoryLoad](pos: T, index: Expr, value: Expr, val size: Int)
-  extends BinaryConstraint {
+    extends BinaryConstraint {
   val label: String = labelToPC(pos.label)
   override def source: T = pos
 
@@ -51,20 +66,21 @@ sealed trait MemoryAccessConstraint[T <: MemoryStore | MemoryLoad](pos: T, index
 }
 
 case class MemoryReadConstraint(pos: MemoryLoad)
-  extends MemoryAccessConstraint[MemoryLoad](pos, pos.index, pos.lhs, pos.size/8)
+    extends MemoryAccessConstraint[MemoryLoad](pos, pos.index, pos.lhs, pos.size / 8)
 
 case class MemoryWriteConstraint(pos: MemoryStore)
-  extends MemoryAccessConstraint[MemoryStore](pos, pos.index, pos.value, pos.size/8)
+    extends MemoryAccessConstraint[MemoryStore](pos, pos.index, pos.value, pos.size / 8)
 
-sealed trait CallConstraint[T <: Call, V <: Procedure | Variable](call: T)
-  extends Constraint {
+sealed trait CallConstraint[T <: Call, V <: Procedure | Variable](call: T) extends Constraint {
   val label: String = labelToPC(call.label)
   def caller: Procedure = call.parent.parent
   def target: V
   val inParams: Map[LocalVar, Expr]
   val outParmas: Map[LocalVar, LocalVar]
-  def inConstraints: Set[AssignmentConstraint] = inParams.map(pair => AssignmentConstraint(call, pair._1, pair._2)).toSet
-  def outConstraints: Set[AssignmentConstraint] = outParmas.map(pair => AssignmentConstraint(call, pair._1, pair._2)).toSet
+  def inConstraints: Set[AssignmentConstraint] =
+    inParams.map(pair => AssignmentConstraint(call, pair._1, pair._2)).toSet
+  def outConstraints: Set[AssignmentConstraint] =
+    outParmas.map(pair => AssignmentConstraint(call, pair._1, pair._2)).toSet
   override def source: T = call
   override def toString: String = eval()
 
@@ -74,17 +90,14 @@ sealed trait CallConstraint[T <: Call, V <: Procedure | Variable](call: T)
   }
 }
 
-case class DirectCallConstraint(call: DirectCall)
-  extends CallConstraint[DirectCall, Procedure] (call) {
+case class DirectCallConstraint(call: DirectCall) extends CallConstraint[DirectCall, Procedure](call) {
   override def target: Procedure = call.target
 
   override val inParams: Map[LocalVar, Expr] = call.actualParams
   override val outParmas: Map[LocalVar, LocalVar] = call.outParams.view.mapValues(_.asInstanceOf[LocalVar]).toMap
 }
 
-case class IndirectCallConstraint(call: IndirectCall)
-  extends CallConstraint[IndirectCall, Variable](call)
-{
+case class IndirectCallConstraint(call: IndirectCall) extends CallConstraint[IndirectCall, Variable](call) {
 
   override def target: Variable = call.target
 
@@ -92,7 +105,7 @@ case class IndirectCallConstraint(call: IndirectCall)
   override val outParmas: Map[LocalVar, LocalVar] = Map.empty
 }
 
-def generateConstraints(proc: Procedure): Set[Constraint]  = {
+def generateConstraints(proc: Procedure): Set[Constraint] = {
   ConstGenLogger.info(s"Generating Constraints for ${proc.name}")
   val domain = computeDomain(IntraProcIRCursor, Set(proc))
   var constraints: Set[Constraint] = Set.empty

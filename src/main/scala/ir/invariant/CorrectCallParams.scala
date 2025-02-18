@@ -33,7 +33,7 @@ def correctCalls(p: Program): Boolean = {
           case (k, v) if k.getType != v.getType => s"$v := $k"
         }
         Logger.error(s"Call $c doesn't typecheck${if inp.nonEmpty then " in : " else ""}${inp
-          .mkString(" ")}${if out.nonEmpty then " out : " else ""}${out.mkString(" ")}")
+            .mkString(" ")}${if out.nonEmpty then " out : " else ""}${out.mkString(" ")}")
       }
 
       r

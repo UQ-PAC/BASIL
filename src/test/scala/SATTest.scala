@@ -6,8 +6,6 @@ import test_util.BASILTest
 import util.*
 import translating.BasilIRToSMT2
 
-
-
 class SATTest extends AnyFunSuite {
   test(" basic taut ") {
     // Logger.setLevel(LogLevel.DEBUG)

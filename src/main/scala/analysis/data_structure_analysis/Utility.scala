@@ -52,9 +52,8 @@ class Flags() {
     function = function || other.function
 }
 
-/**
- * a Data structure Node
- */
+/** a Data structure Node
+  */
 class Node(val graph: Option[Graph], var size: BigInt = 0, val id: Int = NodeCounter.getCounter) {
 
   val term: DSAUniTerm = DSAUniTerm(this)
@@ -95,11 +94,9 @@ class Node(val graph: Option[Graph], var size: BigInt = 0, val id: Int = NodeCou
     }
   }
 
-
   def addCell(offset: BigInt, size: Int): Cell = {
 //    this.updateSize(offset + size)
-    if collapsed then
-      cells(0)
+    if collapsed then cells(0)
     else if !cells.contains(offset) then
       val cell = Cell(Some(this), offset)
       cells.update(offset, cell)
@@ -168,11 +165,12 @@ class Node(val graph: Option[Graph], var size: BigInt = 0, val id: Int = NodeCou
 
 }
 
-/**
- * a cell in DSA
- * @param node the node this cell belongs to
- * @param offset the offset of the cell
- */
+/** a cell in DSA
+  * @param node
+  *   the node this cell belongs to
+  * @param offset
+  *   the offset of the cell
+  */
 class Cell(val node: Option[Node], val offset: BigInt) {
   var largestAccessedSize: Int = 0
 
@@ -206,34 +204,33 @@ class Cell(val node: Option[Node], val offset: BigInt) {
   override def toString: String = s"Cell(${if node.isDefined then node.get.toString else "NONE"}, $offset)"
 }
 
-
-/**
- * a slice made from a cell and an internal offset
- */
+/** a slice made from a cell and an internal offset
+  */
 case class Slice(cell: Cell, internalOffset: BigInt) {
   def node: Node = cell.node.get
   def offset: BigInt = cell.offset
 }
 
-/**
- * represents a direct call in DSA
- * @param call instance of the call
- * @param graph caller's DSG
- */
+/** represents a direct call in DSA
+  * @param call
+  *   instance of the call
+  * @param graph
+  *   caller's DSG
+  */
 class CallSite(val call: DirectCall, val graph: Graph) {
   val proc: Procedure = call.target
-  val paramCells: mutable.Map[Variable, Slice] = graph.params(proc).foldLeft(mutable.Map[Variable, Slice]()) {
-    (m, reg) =>
+  val paramCells: mutable.Map[Variable, Slice] =
+    graph.params(proc).foldLeft(mutable.Map[Variable, Slice]()) { (m, reg) =>
       val node = Node(Some(graph))
       node.flags.incomplete = true
       m += (reg -> Slice(node.cells(0), 0))
-  }
-  val returnCells: mutable.Map[Variable, Slice] = graph.writesTo(proc).foldLeft(mutable.Map[Variable, Slice]()) {
-    (m, reg) =>
+    }
+  val returnCells: mutable.Map[Variable, Slice] =
+    graph.writesTo(proc).foldLeft(mutable.Map[Variable, Slice]()) { (m, reg) =>
       val node = Node(Some(graph))
       node.flags.incomplete = true
       m += (reg -> Slice(node.cells(0), 0))
-  }
+    }
 }
 
 case class DSAGlobal(addressRange: AddressRange, field: Field) {

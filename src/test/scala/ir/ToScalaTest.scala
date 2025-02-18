@@ -1,7 +1,5 @@
 package ir
 
-
-
 import org.scalatest.concurrent.TimeLimits.failAfter
 import org.scalatest.concurrent.{Signaler, TimeLimitedTests, ThreadSignaler}
 import org.scalatest.time.{Span, Seconds}
@@ -27,31 +25,20 @@ class ToScalaTest extends AnyFunSuite with TimeLimitedTests with BeforeAndAfterE
   }
 
   val program: Program = prog(
-    proc("main",
-      block("first_call",
+    proc(
+      "main",
+      block(
+        "first_call",
         LocalAssign(R0, bv64(1), None),
         LocalAssign(R1, bv64(1), None),
         directCall("callee1"),
         goto("second_call")
       ),
-      block("second_call",
-        directCall("callee2"),
-        goto("returnBlock")
-      ),
-      block("returnBlock",
-        ret
-      ),
+      block("second_call", directCall("callee2"), goto("returnBlock")),
+      block("returnBlock", ret)
     ),
-    proc("callee1",
-      block("returnBlock",
-        ret
-      ),
-    ),
-    proc("callee2",
-      block("returnBlock",
-        ret
-      ),
-    ),
+    proc("callee1", block("returnBlock", ret)),
+    proc("callee2", block("returnBlock", ret)),
     proc("empty procedure")
   )
 
@@ -158,7 +145,6 @@ prog(
     checkOutput(expectedWithSplitting, program.toScala)
   }
 
-
   test("procedures with no body should not be split") {
     import ir.dsl.ToScalaWithSplitting.given
 
@@ -200,8 +186,16 @@ prog(
   }
 
   test("toscala statements") {
-    val expected = """MemoryStore(StackMemory("stack", 64, 8), BinaryExpr(BVADD, Register("R31", 64), BitVecLiteral(BigInt("15"), 64)), Extract(8, 0, Register("R0", 64)), Endian.LittleEndian, 8, Some("%0000034e"))"""
-    val stmt = MemoryStore(StackMemory("stack", 64, 8), BinaryExpr(BVADD, Register("R31", 64), BitVecLiteral(BigInt("15"), 64)), Extract(8, 0, Register("R0", 64)), Endian.LittleEndian, 8, Some("%0000034e"))
+    val expected =
+      """MemoryStore(StackMemory("stack", 64, 8), BinaryExpr(BVADD, Register("R31", 64), BitVecLiteral(BigInt("15"), 64)), Extract(8, 0, Register("R0", 64)), Endian.LittleEndian, 8, Some("%0000034e"))"""
+    val stmt = MemoryStore(
+      StackMemory("stack", 64, 8),
+      BinaryExpr(BVADD, Register("R31", 64), BitVecLiteral(BigInt("15"), 64)),
+      Extract(8, 0, Register("R0", 64)),
+      Endian.LittleEndian,
+      8,
+      Some("%0000034e")
+    )
 
     checkOutput(expected, stmt.toScala)
   }
@@ -266,7 +260,6 @@ sealed trait T derives ToScala
 case class A(a: A) extends T
       """)
 
-
     // large number of cases
     assertCompiles("""
 sealed trait ASD derives ToScala
@@ -327,9 +320,9 @@ case class A39() extends ASD
     case class C(t: L) extends L
 
     enum Color(val rgb: Int) derives ToScala {
-      case Red   extends Color(0xFF0000)
-      case Green extends Color(0x00FF00)
-      case Blue  extends Color(0x0000FF)
+      case Red extends Color(0xff0000)
+      case Green extends Color(0x00ff00)
+      case Blue extends Color(0x0000ff)
     }
   }
 
@@ -343,5 +336,3 @@ case class A39() extends ASD
   }
 
 }
-
-
