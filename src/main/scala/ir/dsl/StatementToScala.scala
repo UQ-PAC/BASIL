@@ -88,7 +88,7 @@ given ToScala[IRType] = ToScala.derived
 /**
  * A hierarchy mirroring BASIL IR statements but it's case classes so we can use automatic deriving.
  */
-private object Case {
+private object CaseIR {
 
   import collection.immutable.{Map,SortedMap}
   import collection.mutable
@@ -113,31 +113,20 @@ private object Case {
   case class DirectCall(target: Procedure, label: Option[String] = None, outParams: Map[LocalVar, Variable] = SortedMap(), actualParams: Map[LocalVar, Expr] = SortedMap()) extends Call with Assign
   case class IndirectCall(target: Variable, label: Option[String] = None) extends Call
 
-  given Conversion[ir.LocalAssign, LocalAssign] = { case ir.LocalAssign(a,b,c) => LocalAssign(a,b,c) }
-  given Conversion[ir.MemoryStore, MemoryStore] = { case ir.MemoryStore(a,b,c,d,e,f) => MemoryStore(a,b,c,d,e,f) }
-  given Conversion[ir.MemoryLoad, MemoryLoad] = { case ir.MemoryLoad(a,b,c,d,e,f) => MemoryLoad(a,b,c,d,e,f) }
-  given Conversion[ir.NOP, NOP] = { case ir.NOP(a) => NOP(a) }
-  given Conversion[ir.Assert, Assert] = { case ir.Assert(a,b,c) => Assert(a,b,c) }
-  given Conversion[ir.Assume, Assume] = { case ir.Assume(a,b,c,d) => Assume(a,b,c,d) }
-  given Conversion[ir.Unreachable, Unreachable] = { case ir.Unreachable(a) => Unreachable(a) }
-  given Conversion[ir.Return, Return] = { case ir.Return(a,b) => Return(a,b) }
-  given Conversion[ir.GoTo , GoTo] = { case ir.GoTo(a,b) => GoTo(a,b) }
-  // XXX: order changed in DirectCall params
-  given Conversion[ir.DirectCall, DirectCall] = { case ir.DirectCall(a,b,c,d) => DirectCall(a,d,b,c) }
-  given Conversion[ir.IndirectCall, IndirectCall] = { case ir.IndirectCall(a,b) => IndirectCall(a,b) }
 
-  given Conversion[ir.Command, Command] = {
-    case x: ir.LocalAssign => x
-    case x: ir.MemoryStore => x
-    case x: ir.MemoryLoad => x
-    case x: ir.NOP => x
-    case x: ir.Assert => x
-    case x: ir.Assume => x
-    case x: ir.Unreachable => x
-    case x: ir.Return => x
-    case x: ir.GoTo  => x
-    case x: ir.DirectCall => x
-    case x: ir.IndirectCall => x
+  def fromBasilIR(x: ir.Command): Command = x match {
+    case ir.LocalAssign(a,b,c) => LocalAssign(a,b,c)
+    case ir.MemoryStore(a,b,c,d,e,f) => MemoryStore(a,b,c,d,e,f)
+    case ir.MemoryLoad(a,b,c,d,e,f) => MemoryLoad(a,b,c,d,e,f)
+    case ir.NOP(a) => NOP(a)
+    case ir.Assert(a,b,c) => Assert(a,b,c)
+    case ir.Assume(a,b,c,d) => Assume(a,b,c,d)
+    case ir.Unreachable(a) => Unreachable(a)
+    case ir.Return(a,b) => Return(a,b)
+    case ir.GoTo(a,b) => GoTo(a,b)
+    // XXX: order changed in DirectCall params
+    case ir.DirectCall(a,b,c,d) => DirectCall(a,d,b,c)
+    case ir.IndirectCall(a,b) => IndirectCall(a,b)
   }
 
 
@@ -161,4 +150,5 @@ private object Case {
 
 }
 
-given ToScala[ir.Command] = ToScala.Make(x => (x : Case.Command).toScalaLines)
+given ToScala[ir.Command] = ToScala.Make(x => CaseIR.fromBasilIR(x).toScalaLines)
+
