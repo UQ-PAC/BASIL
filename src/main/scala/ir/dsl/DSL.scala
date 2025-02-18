@@ -4,6 +4,13 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.immutable.*
 
+// TODO: naming?
+type NonControlFlowStatement =
+  LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume
+
+type ControlFlowStatement =
+  Unreachable | Return | GoTo | DirectCall | IndirectCall
+
 val R0: Register = Register("R0", 64)
 val R1: Register = Register("R1", 64)
 val R2: Register = Register("R2", 64)
@@ -49,7 +56,7 @@ trait EventuallyStatement {
   def resolve(p: Program): Statement
 }
 
-case class ResolvableStatement(s: Statement) extends EventuallyStatement {
+case class ResolvableStatement(s: NonControlFlowStatement) extends EventuallyStatement {
   override def resolve(p: Program): Statement = s
 }
 
@@ -129,16 +136,15 @@ case class EventuallyBlock(label: String, sl: Seq[EventuallyStatement], j: Event
   }
 }
 
-def block(label: String, sl: (Statement | EventuallyStatement | EventuallyJump)*): EventuallyBlock = {
+def block(label: String, sl: (NonControlFlowStatement | EventuallyStatement | EventuallyJump)*): EventuallyBlock = {
   val statements: Seq[EventuallyStatement] = sl.flatMap {
-    case s: Statement => Some(ResolvableStatement(s))
+    case s: NonControlFlowStatement => Some(ResolvableStatement(s))
     case o: EventuallyStatement => Some(o)
     case g: EventuallyJump => None
   }
-  val jump = sl.collectFirst { case j: EventuallyJump =>
-    j
-  }
-  EventuallyBlock(label, statements, jump.get)
+  val jump = sl.collect { case j: EventuallyJump => j }
+  require(jump.length == 1, s"DSL block '$label' must contain exactly one jump statement")
+  EventuallyBlock(label, statements, jump.head)
 }
 
 case class EventuallyProcedure(
