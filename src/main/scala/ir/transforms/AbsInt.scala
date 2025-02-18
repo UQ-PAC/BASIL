@@ -192,7 +192,10 @@ class interprocSummaryFixpointSolver[SummaryAbsVal, LocalAbsVal,
     sg.updateSummary(a, b, beforeRes, afterRes)
   }
 
-  def solveProgInterProc(p: Program, backwards : Boolean = false) = {
+  def solveProgInterProc(p: Program, backwards : Boolean = false) =
+    solveProcsInterProc(p.procedures.toSet, backwards)
+
+  def solveProcsInterProc(procs: Set[Procedure], backwards: Boolean = false): Map[Procedure, SummaryAbsVal] = {
     var old_summaries = Map[Procedure, SummaryAbsVal]()
     var summaries = Map[Procedure, SummaryAbsVal]()
     var first = true
@@ -200,7 +203,7 @@ class interprocSummaryFixpointSolver[SummaryAbsVal, LocalAbsVal,
       first = false
       old_summaries = summaries
 
-      for (p <- p.procedures) {
+      for (p <- procs) {
         def getSummary(p: Procedure) = old_summaries.get(p).getOrElse(sg.init(p))
         val r = transferProcedure(getSummary(p), p, getSummary, backwards)
         summaries = summaries.updated(p, r)

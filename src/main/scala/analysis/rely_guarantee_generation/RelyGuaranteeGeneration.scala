@@ -1,8 +1,17 @@
+/** Todo:
+  * - Use function summaries developed by Ben to get more precise results for
+  *   get_two.
+  * - Use Ben's disjunctive completion domain to get accurate results for a
+  *   bigger example.
+  * - Enquire about going to top for mem calls - this seems stifling.
+  */
+
 package analysis
 
 import ir.*
-import ir.transforms.AbstractDomain
+import ir.transforms.*
 import analysis.*
+import scala.collection.mutable.Queue
 
 /** An interference domain is similar to an abstract domain, except that it
   * represents sets of state transitions rather than sets of states. These sets
@@ -147,6 +156,8 @@ case class ConditionalWritesDomain[S](
 class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T)
     extends AbstractDomain[(T, S)] {
 
+  
+
   /* We initialise the interference domain to bottom, meaning we have
   encountered no reachable state transitions. However, we initialise the state
   domain to top, meaning the program may exist in any state at this position. */
@@ -159,7 +170,10 @@ class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T)
   def bot: (T, S) = (intDom.bot, intDom.stateLattice.bottom)
 
   // simply the component-wise join
-  def join(a: (T, S), b: (T, S), pos: Block): (T, S) =
+  def join(a: (T, S), b: (T, S), pos: Block): (T, S) = pureJoin(a, b)
+
+  // join without the position argument
+  def pureJoin(a: (T, S), b: (T, S)): (T, S) =
     (intDom.join(a._1, b._1), intDom.stateLattice.lub(a._2, b._2))
   
   // updates and stabilises the state while collecting reachable transitions
@@ -182,11 +196,26 @@ class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T)
   * domains. Currently, a thread is a represented as a Procedure, and only
   * intraprocedural analysis is supported.
   */
-class RelyGuaranteeGenerator[T, S](
-  intDom: InterferenceDomain[T, S], 
-  threads: List[Procedure]
-) {
-  def generate(): Map[Procedure, (T, T)] = {
+class RelyGuaranteeGenerator[T, S](intDom: InterferenceDomain[T, S]) {
+
+  private def getReachableProcedures(proc: Procedure): Set[Procedure] = {
+    var reachable = Set[Procedure]()
+    var toAdd = Queue[Procedure](proc)
+    while (!toAdd.isEmpty) {
+      val p = toAdd.dequeue
+      reachable = reachable + p
+      for (callee <- p.calls) {
+        if (!reachable.contains(callee)) {
+          toAdd.enqueue(callee)
+        }
+      }
+    }
+    reachable
+  }
+
+  def generate(threads: List[Procedure]): Map[Procedure, (T, T)] = {
+    val reachableProcedures: Map[Procedure, Set[Procedure]] =
+      threads.map(p => p -> getReachableProcedures(p)).toMap
     var old_guars, new_guars = threads.map(_ -> intDom.bot).toMap
     var fixpoint_reached = false
     val max_iterations = 50
@@ -201,10 +230,10 @@ class RelyGuaranteeGenerator[T, S](
           }
         }
         // generate new guar for p
-        val productDom = InterferenceProductDomain[T, S](intDom, rely)
-        val solver = transforms.worklistSolver(productDom)
-        val (_, block_postconditions) = solver.solveProc(p)
-        val guar = block_postconditions(p.returnBlock.get)._1
+        val localDom = InterferenceProductDomain[T, S](intDom, rely)
+        val summaryGenerator = GuarGenSummaryGenerator[T, S](localDom)
+        val solver = interprocSummaryFixpointSolver(localDom, summaryGenerator)
+        val (guar, _) = solver.solveProcsInterProc(reachableProcedures(p))(p)
         new_guars = new_guars + (p -> guar)
       }
       // check if fixpoint is reached
@@ -229,4 +258,26 @@ class RelyGuaranteeGenerator[T, S](
     }
     rg_conditions
   }
+}
+
+class GuarGenSummaryGenerator[T, S](dom: InterferenceProductDomain[T, S])
+    extends ProcedureSummaryGenerator[(T, S), (T, S)] {
+
+  def bot: (T, S) = dom.bot
+
+  def top: (T, S) = ???
+
+  def join(a: (T, S), b: (T, S), pos: Procedure): (T, S) = dom.pureJoin(a, b)
+
+  def transfer(a: (T, S), b: Procedure): (T, S) = ???
+
+  def localTransferCall(localState: (T, S), summaryForTarget: (T, S),
+      call: DirectCall) : (T, S) =
+    // the postcondition of a procedure call is simply the procedure's summary
+    summaryForTarget
+
+  def updateSummary(prevSummary: (T, S), p: Procedure,
+      resBefore: Map[Block, (T, S)], resAfter: Map[Block, (T, S)]) : (T, S) =
+    // we want to expand the previous postcondition by joining this one
+    dom.pureJoin(prevSummary, resAfter(p.returnBlock.get))
 }
