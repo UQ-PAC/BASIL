@@ -4,67 +4,13 @@ import ir.*
 import util.{Twine, indentNested}
 
 /**
- * The end of this file contains generated code to implement ToScalaLines for the various type
- * hierarchies defined by BASIL.
+ * ToScala for Statement and Expr
+ * ==============================
+ * This file contains code to implement ToScala for the various type
+ * hierarchies defined by BASIL. Most of these are implemented using the automatic
+ * deriving mechanism, but Basil IR Commands have to be translated to a case class
+ * version before using the automatic deriving.
  */
-
-/**
- * XXX: ATTENTION: auto-generated code!
- * ====================================
- *
- * If you are here to manually fix a compilation error, please make sure that
- * you understand the context and carefully apply a specific fix. Make sure
- * that the code maintains the general contract of the ToScalaLines trait.
- *
- * That is, the returned string must be valid Scala code to construct the given
- * object. The `ensure_constructible` functions are defined to match the produced
- * string. Successful compilation of the ensure_constructible functions ensures
- * that the produced strings are valid Scala code.
- *
- * When making manual changes, be sure to change the string literal and the
- * ensure_constrictible functions in the same way.
- */
-
-/**
- * Running the auto-generator
- * --------------------------
- *
- * For large changes, it may be more convenient to re-run the auto-generator
- * instead of manually changing the code.
- *
- * 1. Look below the scissors line (containing "- >8 -") to find the "command:" line.
- *    Take note of which JSON files are mentioned.
- * 2. For each JSON file, find its corresponding Scala file (e.g. statements.json comes
- *    from Statement.scala).
- * 3. Go to https://astexplorer.net/#/gist/eb0f2062180067b412017010df04eace/latest and
- *    make sure that the scalameta setting is set to "Scala 3".
- * 4. Paste the contents of the Scala file into the left side.
- * 5. Copy the JSON from the right-hand side into a new JSON file.
- * 6. Repeat this for the rest of the required JSON files.
- *
- * 7. Run the Python command listed below the scissors line.
- * 8. Make sure that the code compiles and passes tests:
- *
- *     ./mill test.testOnly 'ir.ToScalaLinesTest'
- *
- * 9. Upload the changes.
- *
- */
-
-/**
- * Manually-defined ToScalaLines instances
- * ----------------------------------
- *
- * Externals: DirectCall, IndirectCall, GoTo, Return
- *
- * The "Externals" line above tells the generator the following types as having
- * manually-defined ToScalaLines instances. These types interact with control-flow,
- * and the naive auto-generated code would be large and possibly cyclic.
- */
-
-// NOTE: It is important that these handwritten given instances live in the same
-// file as the generated code. These instances must be locatable by summon[],
-// otherwise the generated code will self-recurse, leading to non-termination.
 
 /**
  * Automatically-derived instances
@@ -95,7 +41,7 @@ private object CaseIR {
   // format: off
 
   // NOTE: format off because this is easier to scan and manipulate (e.g. with vim)
-  // it keeps the structure of one line per case
+  // when we have the structure of one line per case
 
   sealed trait Command
 
@@ -134,6 +80,14 @@ private object CaseIR {
 
   // format: on
 
+  /**
+   * Manually-defined ToScala instances
+   * ----------------------------------
+   *
+   * These types interact with control-flow, and the naive auto-generated
+   * code would be large and possibly cyclic.
+   */
+
   type Excluded = Return | DirectCall | IndirectCall | GoTo
 
   private lazy val toScalaOfExcluded = ToScala.Make[Excluded] {
@@ -154,4 +108,9 @@ private object CaseIR {
 
 }
 
+/**
+ * ToScala[Command] is implemented in terms of the automatiicaly-derived
+ * ToScala[CaseIR.Command], with certain exclusions for control-flow-affecting
+ * commands.
+ */
 given ToScala[ir.Command] = ToScala.Make(x => CaseIR.fromBasilIR(x).toScalaLines)
