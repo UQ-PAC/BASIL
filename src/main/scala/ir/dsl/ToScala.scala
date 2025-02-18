@@ -69,24 +69,24 @@ given ToScalaString[BigInt] with
   extension (x: BigInt) def toScala: String = s"BigInt(${x.toString.toScala})"
 
 given [T](using ToScala[T]): ToScalaLines[Seq[T]] with
-  extension (x: Seq[T]) def toScalaLines =
-    indentNested(
-      "Seq(",
-      x.map(_.toScala).map(LazyList(_)),
-      ")"
-    )
+  extension (x: Seq[T])
+    def toScalaLines =
+      indentNested("Seq(", x.map(_.toScala).map(LazyList(_)), ")")
 
 given [T](using ToScala[T]): ToScalaString[Option[T]] with
-  extension (x: Option[T]) def toScala: String = x match
-    case None => "None"
-    case Some(x) => s"Some(${x.toScala})"
+  extension (x: Option[T])
+    def toScala: String = x match
+      case None => "None"
+      case Some(x) => s"Some(${x.toScala})"
 
-given [K,V](using ToScala[K])(using ToScala[V]): ToScalaString[SortedMap[K,V]] with
-  extension (x: SortedMap[K,V]) def toScala: String =
-    val entries = x.map((a,b) => s"${a.toScala} -> ${b.toScala}").mkString(", ")
-    s"SortedMap($entries)"
+given [K, V](using ToScala[K])(using ToScala[V]): ToScalaString[SortedMap[K, V]] with
+  extension (x: SortedMap[K, V])
+    def toScala: String =
+      val entries = x.map((a, b) => s"${a.toScala} -> ${b.toScala}").mkString(", ")
+      s"SortedMap($entries)"
 
-given [K,V](using ToScala[K])(using ToScala[V]): ToScalaString[(K, V)] with
-  extension (x: (K, V)) def toScala: String =
-    val (a, b) = x
-    s"${a.toScala} -> ${b.toScala}"
+given [K, V](using ToScala[K])(using ToScala[V]): ToScalaString[(K, V)] with
+  extension (x: (K, V))
+    def toScala: String =
+      val (a, b) = x
+      s"${a.toScala} -> ${b.toScala}"

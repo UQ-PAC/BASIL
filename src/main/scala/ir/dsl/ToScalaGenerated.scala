@@ -25,7 +25,6 @@ import util.{Twine, indentNested}
  * ensure_constrictible functions in the same way.
  */
 
-
 /**
  * Running the auto-generator
  * --------------------------
@@ -52,7 +51,6 @@ import util.{Twine, indentNested}
  *
  */
 
-
 /**
  * Manually-defined ToScalaLines instances
  * ----------------------------------
@@ -63,7 +61,6 @@ import util.{Twine, indentNested}
  * manually-defined ToScalaLines instances. These types interact with control-flow,
  * and the naive auto-generated code would be large and possibly cyclic.
  */
-
 
 // NOTE: It is important that these handwritten given instances live in the same
 // file as the generated code. These instances must be locatable by summon[],
@@ -77,24 +74,23 @@ given ToScalaLines[Return] with
       if (x.outParams.isEmpty) {
         LazyList("ret")
       } else {
-        indentNested(
-          "ret(",
-          x.outParams.map(outParamToScalaLines).map(_.toScala).map(LazyList(_)),
-          ")")
+        indentNested("ret(", x.outParams.map(outParamToScalaLines).map(_.toScala).map(LazyList(_)), ")")
       }
 
 given ToScalaLines[DirectCall] with
-  extension (x: DirectCall) def toScalaLines =
-    LazyList(s"directCall(${x.target.procName.toScala})")
+  extension (x: DirectCall)
+    def toScalaLines =
+      LazyList(s"directCall(${x.target.procName.toScala})")
 
 given ToScalaLines[IndirectCall] with
-  extension (x: IndirectCall) def toScalaLines =
-    LazyList(s"indirectCall(${x.target.toScala})")
+  extension (x: IndirectCall)
+    def toScalaLines =
+      LazyList(s"indirectCall(${x.target.toScala})")
 
 given ToScalaLines[GoTo] with
-  extension (x: GoTo) def toScalaLines =
-    LazyList(s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})")
-
+  extension (x: GoTo)
+    def toScalaLines =
+      LazyList(s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})")
 
 // WARNING: Everything below the next line will be overwritten by the generator!
 // ------------------------ >8 ------------------------

@@ -2,7 +2,7 @@ package util
 
 import scala.collection.immutable.{LazyList, Seq}
 import scala.collection.{IterableOps, Factory}
-import scala.collection.{ AbstractIterator, AbstractView, BuildFrom }
+import scala.collection.{AbstractIterator, AbstractView, BuildFrom}
 import scala.collection.generic.IsSeq
 
 import scala.util.matching.Regex
@@ -42,11 +42,16 @@ def stringToTwine(x: String): Twine =
  * recursive subcalls.
  */
 def indent(ss: Iterable[String], prefix: String = "  "): Twine =
-  (Iterable("") ++ ss).sliding(2).to(LazyList).flatMap(x => x.toSeq match {
-    case Seq(_) => Seq.empty
-    case Seq(prev, s) => if (prev.endsWith("\n")) Seq(prefix, s) else Seq(s)
-    case x => throw new AssertionError(s"sliding(2) returned unexpected length: ${x.length}")
-  })
+  (Iterable("") ++ ss)
+    .sliding(2)
+    .to(LazyList)
+    .flatMap(x =>
+      x.toSeq match {
+        case Seq(_) => Seq.empty
+        case Seq(prev, s) => if (prev.endsWith("\n")) Seq(prefix, s) else Seq(s)
+        case x => throw new AssertionError(s"sliding(2) returned unexpected length: ${x.length}")
+      }
+    )
 
 /**
  * Indents a nested structure, placing the indented `elems` between `head` and `tail`,
@@ -74,7 +79,14 @@ def indent(ss: Iterable[String], prefix: String = "  "): Twine =
  *
  *     head tail
  */
-def indentNested(head: String, elems: Iterable[Twine], tail: String, newline: String = "\n", sep: String = ",", headSep: Boolean = false): Twine =
+def indentNested(
+  head: String,
+  elems: Iterable[Twine],
+  tail: String,
+  newline: String = "\n",
+  sep: String = ",",
+  headSep: Boolean = false
+): Twine =
 
   // this implements the described functionality by preceding all elements with \n,
   // then preceding all elements aside from the first with `sep`.
@@ -92,11 +104,12 @@ def indentNested(head: String, elems: Iterable[Twine], tail: String, newline: St
     head #:: body #::: (newline #:: LazyList(tail))
 
 object StringEscape {
+
   /**
    * Quotes the given string, returning a string of a string literal.
    * When evaluated by Scala, the literal would return the original string.
    */
-  def quote (s: String): String = "\"" + escape(s) + "\""
+  def quote(s: String): String = "\"" + escape(s) + "\""
   def escape(s: String): String = s.flatMap(escapedChar)
 
   // from https://stackoverflow.com/a/40073137, itself from the scala.runtime source.
@@ -107,11 +120,12 @@ object StringEscape {
     case '\n' => "\\n"
     case '\f' => "\\f"
     case '\r' => "\\r"
-    case '"'  => "\\\""
+    case '"' => "\\\""
     case '\'' => "\\\'"
     case '\\' => "\\\\"
-    case _    => if (ch.isControl) "\\0" + Integer.toOctalString(ch.toInt)
-                 else              String.valueOf(ch)
+    case _ =>
+      if (ch.isControl) "\\0" + Integer.toOctalString(ch.toInt)
+      else String.valueOf(ch)
   }
 
   /**
@@ -137,7 +151,6 @@ object StringEscape {
 
 }
 
-
 // copied, with apologies, from: https://docs.scala-lang.org/overviews/core/custom-collection-operations.html
 extension [Repr](coll: Repr)(using seq: IsSeq[Repr])
 
@@ -150,13 +163,14 @@ extension [Repr](coll: Repr)(using seq: IsSeq[Repr])
    */
   def intersperse[B >: seq.A, That](sep: B)(using bf: BuildFrom[Repr, B, That]): That =
     val seqOps = seq(coll)
-    bf.fromSpecific(coll)(new AbstractView[B]:
-      def iterator = new AbstractIterator[B]:
-        val it = seqOps.iterator
-        var intersperseNext = false
-        def hasNext = intersperseNext || it.hasNext
-        def next() =
-          val elem = if intersperseNext then sep else it.next()
-          intersperseNext = !intersperseNext && it.hasNext
-          elem
+    bf.fromSpecific(coll)(
+      new AbstractView[B]:
+        def iterator = new AbstractIterator[B]:
+          val it = seqOps.iterator
+          var intersperseNext = false
+          def hasNext = intersperseNext || it.hasNext
+          def next() =
+            val elem = if intersperseNext then sep else it.next()
+            intersperseNext = !intersperseNext && it.hasNext
+            elem
     )

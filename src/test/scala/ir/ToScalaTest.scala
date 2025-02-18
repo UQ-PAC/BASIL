@@ -1,7 +1,5 @@
 package ir
 
-
-
 import org.scalatest.concurrent.TimeLimits.failAfter
 import org.scalatest.concurrent.{Signaler, TimeLimitedTests, ThreadSignaler}
 import org.scalatest.time.{Span, Seconds}
@@ -27,31 +25,20 @@ class ToScalaTest extends AnyFunSuite with TimeLimitedTests with BeforeAndAfterE
   }
 
   val program: Program = prog(
-    proc("main",
-      block("first_call",
+    proc(
+      "main",
+      block(
+        "first_call",
         LocalAssign(R0, bv64(1), None),
         LocalAssign(R1, bv64(1), None),
         directCall("callee1"),
         goto("second_call")
       ),
-      block("second_call",
-        directCall("callee2"),
-        goto("returnBlock")
-      ),
-      block("returnBlock",
-        ret
-      ),
+      block("second_call", directCall("callee2"), goto("returnBlock")),
+      block("returnBlock", ret)
     ),
-    proc("callee1",
-      block("returnBlock",
-        ret
-      ),
-    ),
-    proc("callee2",
-      block("returnBlock",
-        ret
-      ),
-    ),
+    proc("callee1", block("returnBlock", ret)),
+    proc("callee2", block("returnBlock", ret)),
     proc("empty procedure")
   )
 
@@ -158,7 +145,6 @@ prog(
     checkOutput(expectedWithSplitting, program.toScala)
   }
 
-
   test("procedures with no body should not be split") {
     import ir.dsl.ToScalaWithSplitting.given
 
@@ -200,23 +186,26 @@ prog(
   }
 
   test("toscala of statements") {
-    val expected = """MemoryStore(StackMemory("stack", 64, 8), BinaryExpr(BVADD, Register("R31", 64), BitVecLiteral(BigInt("15"), 64)), Extract(8, 0, Register("R0", 64)), Endian.LittleEndian, 8, Some("%0000034e"))"""
-    val stmt = MemoryStore(StackMemory("stack", 64, 8), BinaryExpr(BVADD, Register("R31", 64), BitVecLiteral(BigInt("15"), 64)), Extract(8, 0, Register("R0", 64)), Endian.LittleEndian, 8, Some("%0000034e"))
+    val expected =
+      """MemoryStore(StackMemory("stack", 64, 8), BinaryExpr(BVADD, Register("R31", 64), BitVecLiteral(BigInt("15"), 64)), Extract(8, 0, Register("R0", 64)), Endian.LittleEndian, 8, Some("%0000034e"))"""
+    val stmt = MemoryStore(
+      StackMemory("stack", 64, 8),
+      BinaryExpr(BVADD, Register("R31", 64), BitVecLiteral(BigInt("15"), 64)),
+      Extract(8, 0, Register("R0", 64)),
+      Endian.LittleEndian,
+      8,
+      Some("%0000034e")
+    )
 
     checkOutput(expected, stmt.toScala)
   }
 
   test("proc params") {
     val p = prog(
-      proc("printf",
-        Seq(
-          "R9_in" -> BitVecType(64),
-          "R0_in" -> BitVecType(64),
-        ),
-        Seq(
-          "R9_out" -> BitVecType(64),
-          "R0_out" -> BitVecType(64),
-        )
+      proc(
+        "printf",
+        Seq("R9_in" -> BitVecType(64), "R0_in" -> BitVecType(64)),
+        Seq("R9_out" -> BitVecType(64), "R0_out" -> BitVecType(64))
       )
     )
 
@@ -240,14 +229,12 @@ prog(
 
   test("return params") {
     val p = prog(
-      proc("proc",
+      proc(
+        "proc",
         Seq(),
-        Seq(
-          "R0_out" -> BitVecType(64),
-          "R1_out" -> BitVecType(64),
-          "R31_out" -> BitVecType(64)
-        ),
-        block("get_two_1876_basil_return",
+        Seq("R0_out" -> BitVecType(64), "R1_out" -> BitVecType(64), "R31_out" -> BitVecType(64)),
+        block(
+          "get_two_1876_basil_return",
           ret(
             "R0_out" -> LocalVar("R0", BitVecType(64), 0),
             "R1_out" -> LocalVar("R1", BitVecType(64), 0),

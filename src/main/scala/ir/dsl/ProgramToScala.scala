@@ -14,7 +14,6 @@ import collection.mutable.{LinkedHashSet}
  * ===================================================
  */
 
-
 /**
  * Base functions
  * --------------
@@ -31,12 +30,7 @@ def commandListToScala(x: Iterable[Command]): Iterable[Twine] =
 def blockToScalaWith(commandListToScala: Iterable[Command] => Iterable[Twine])(x: Block): Twine =
   // XXX: using a Seq here allows the size to be known, avoiding excessive splitting.
   val commands = x.statements ++ Seq(x.jump)
-  indentNested(
-    s"block(${x.label.toScala}",
-    commandListToScala(commands),
-    ")",
-    headSep = true
-  )
+  indentNested(s"block(${x.label.toScala}", commandListToScala(commands), ")", headSep = true)
 
 def procedureToScalaWith(blockToScala: Block => Twine)(x: Procedure): Twine =
   def extractParam(x: LocalVar) = x match
@@ -47,24 +41,13 @@ def procedureToScalaWith(blockToScala: Block => Twine)(x: Procedure): Twine =
   val params = if (x.formalInParam.isEmpty && x.formalOutParam.isEmpty) {
     LazyList.empty
   } else {
-    LazyList(
-      formalParamsToScala(x.formalInParam),
-      formalParamsToScala(x.formalOutParam))
+    LazyList(formalParamsToScala(x.formalInParam), formalParamsToScala(x.formalOutParam))
   }
 
-  indentNested(
-    s"proc(${x.procName.toScala}",
-    params #::: x.blocks.to(LazyList).map(blockToScala),
-    ")",
-    headSep = true
-  )
+  indentNested(s"proc(${x.procName.toScala}", params #::: x.blocks.to(LazyList).map(blockToScala), ")", headSep = true)
 
 def programToScalaWith(procedureToScala: Procedure => Twine)(x: Program): Twine =
-  indentNested(
-    "prog(",
-    x.procedures.to(LazyList).map(procedureToScala),
-    ")"
-  )
+  indentNested("prog(", x.procedures.to(LazyList).map(procedureToScala), ")")
 
 /**
  * ToScala instances
@@ -74,16 +57,13 @@ def programToScalaWith(procedureToScala: Procedure => Twine)(x: Program): Twine 
  */
 
 given ToScalaLines[Block] with
-  extension (x: Block)
-    def toScalaLines: Twine = blockToScalaWith(commandListToScala)(x)
+  extension (x: Block) def toScalaLines: Twine = blockToScalaWith(commandListToScala)(x)
 
 given ToScalaLines[Procedure] with
-  extension (x: Procedure)
-    def toScalaLines: Twine = procedureToScalaWith(_.toScalaLines)(x)
+  extension (x: Procedure) def toScalaLines: Twine = procedureToScalaWith(_.toScalaLines)(x)
 
 given ToScalaLines[Program] with
-  extension (x: Program)
-    def toScalaLines: Twine = programToScalaWith(_.toScalaLines)(x)
+  extension (x: Program) def toScalaLines: Twine = programToScalaWith(_.toScalaLines)(x)
 
 /**
  * ToScala with splitting
@@ -120,15 +100,12 @@ given ToScalaLines[Program] with
 object ToScalaWithSplitting {
 
   given ToScalaLines[Program] with
-    extension (x: Program)
-      def toScalaLines = ToScalaWithSplitting().toScalaLines(x)
+    extension (x: Program) def toScalaLines = ToScalaWithSplitting().toScalaLines(x)
 
   given ToScalaLines[Procedure] with
-    extension (x: Procedure)
-      def toScalaLines = ToScalaWithSplitting().toScalaLines(x)
+    extension (x: Procedure) def toScalaLines = ToScalaWithSplitting().toScalaLines(x)
 
 }
-
 
 /**
  * Implementation of ToScalaWithSplitting. This is automatically instantiated
@@ -175,22 +152,12 @@ class ToScalaWithSplitting {
       commandListToScala(cmds)
     } else {
       val chunks = cmds.grouped(10).toList
-      val chunkNames = chunks.map(
-        chunk => {
-          val name = nextChunk
-          addDecl(name, indentNested(
-            "Vector(",
-            commandListToScala(chunk),
-            ")"
-          ))
-          name
-        }
-      )
-      Iterable(indentNested(
-        "Vector(",
-        chunkNames.map(LazyList(_)),
-        ").flatten : _*",
-      ))
+      val chunkNames = chunks.map(chunk => {
+        val name = nextChunk
+        addDecl(name, indentNested("Vector(", commandListToScala(chunk), ")"))
+        name
+      })
+      Iterable(indentNested("Vector(", chunkNames.map(LazyList(_)), ").flatten : _*"))
     }
 
   /**
@@ -229,16 +196,10 @@ class ToScalaWithSplitting {
     addDecl(name, f(x).force)
 
     // NOTE: scala compiler will error on duplicated names
-    indentNested(
-      "{",
-      declsToScala(decls) ++ Iterable(LazyList(name)),
-      "}",
-      sep = "\n"
-    )
+    indentNested("{", declsToScala(decls) ++ Iterable(LazyList(name)), "}", sep = "\n")
 
   def declsToScala(decls: Map[String, Twine]): Iterable[Twine] =
-    decls.map((k,v) => s"def $k = " +: v)
-
+    decls.map((k, v) => s"def $k = " +: v)
 
   protected def programSplitting = programToScalaWith(procedureSplitting)
 
@@ -248,4 +209,3 @@ class ToScalaWithSplitting {
   def toScalaLines(x: Program): Twine =
     toScalaAndDeclsWith(programSplitting)("program", x)
 }
-
