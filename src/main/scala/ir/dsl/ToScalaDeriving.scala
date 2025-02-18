@@ -328,7 +328,7 @@ object ToScalaDeriving {
    * Entry point for derivation. Used by Scala's "deriving ToScala" syntax.
    */
   inline def derived[T](using m: Mirror.Of[T]): ToScala[T] =
-    deriveWithExclusions(summon[ToScala[Nothing]]) // derive with defaults (no exclusions)
+    deriveWithExclusions(Make[Nothing](absurd)) // derive with defaults (no exclusions)
 
   /**
    * Alternative entry point for deriving ToScala. Allows for specifying
