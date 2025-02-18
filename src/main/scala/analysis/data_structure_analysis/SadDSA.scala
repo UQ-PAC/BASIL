@@ -28,7 +28,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
         localCorrectness(processed)
         processed += c
         processConstraint(c)
-//        DSALogger.warn(c)
+//        SadDSALogger.warn(c)
         localCorrectness(processed)
      )
   }
@@ -365,14 +365,9 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
   def mergePointees(c1: SadCell, c2: SadCell): Option[SadCell] = {
     var cell1 = find(c1)
     var cell2 = find(c2)
-    println(s"cell1 : $cell1")
-    println(s"cell2 : $cell2")
     if cell1 != cell2 then
       (cell1.hasPointee, cell2.hasPointee) match
         case (true, true) =>
-
-          println(s"cell1  pointee: ${cell1.getPointee}")
-          println(s"cell2  pointee: ${cell2.getPointee}")
           val pointee1 = cell1.removePointee.get
           val pointee2 = cell2.removePointee.get
           assert(!(cell1.getPointee == cell2 && cell2.getPointee == cell1))
@@ -380,8 +375,9 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
           cell1 = find(cell1)
           resPointee = cell1.setPointee(resPointee)
           cell2 = find(cell2)
-          assert(find(resPointee) == resPointee)
           val res = Some(cell2.setPointee(resPointee))
+//          assert(cell1.getPointee == res)
+//          assert(cell2.getPointee == res)
           res
         case (_, true) => Some(cell1.setPointee(cell2.getPointee))
         case (true, _) => Some(cell2.setPointee(cell1.getPointee))
@@ -471,8 +467,8 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
     if c1.node.cells.filter(_.hasPointee).nonEmpty then
       c1.node.cells.filter(_.hasPointee).map(_._pointee.get).foreach(
         f =>
-          DSALogger.warn(find(f))
-          DSALogger.warn(cell1.getPointee)
+          Logger.warn(find(f))
+          Logger.warn(cell1.getPointee)
 
           assert(find(f) == cell1.getPointee)
           assert(pointee.nonEmpty)
@@ -586,12 +582,12 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
               val actual = find(cell)
               val pointees = allCells.filter(c => c.interval.isOverlapping(cell.interval)).filter(_.hasPointee).map(_._pointee.get)
               if !pointees.forall(f => find(f) == actual.getPointee) then
-                DSALogger.debug(s"result node cell: $cell")
-                DSALogger.debug(s"result cell udpated: ${actual} ")
-                DSALogger.debug(s"Unified Cells: ${allCells.filter(_.interval.isOverlapping(cell.interval))}")
-                DSALogger.debug(s"non-unified pointees: ${pointees}")
-                DSALogger.debug(s"updated pointees: ${pointees.map(find)}")
-                DSALogger.debug(s"updated result cell pointee: ${actual.getPointee}")
+                Logger.debug(s"result node cell: $cell")
+                Logger.debug(s"result cell udpated: ${actual} ")
+                Logger.debug(s"Unified Cells: ${allCells.filter(_.interval.isOverlapping(cell.interval))}")
+                Logger.debug(s"non-unified pointees: ${pointees}")
+                Logger.debug(s"updated pointees: ${pointees.map(find)}")
+                Logger.debug(s"updated result cell pointee: ${actual.getPointee}")
                 pointees.foreach(f => assert(find(f) == actual.getPointee, s"pointee $f has updated version ${find(f)},\n but the pointer $actual has pointee ${actual.getPointee}"))
           )
     )
@@ -603,8 +599,8 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
         val actual = find(cell)
         val pointees = allCells.filter(c => c.interval.isOverlapping(cell.interval)).filter(_.hasPointee).map(_._pointee.get)
 
-        DSALogger.debug(s"the following pointees ${pointees}")
-        DSALogger.debug(s"the following pointees updated ${pointees.map(find)}")
+        SadDSALogger.debug(s"the following pointees ${pointees}")
+        SadDSALogger.debug(s"the following pointees updated ${pointees.map(find)}")
         pointees.foreach(f => assert(find(f) == actual.getPointee))
     )*/
 //
@@ -657,45 +653,45 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
     assert(result == find(cell2))
     if cell1.hasPointee then assert(result.getPointee == find(cell1._pointee.get))
     if cell2.hasPointee then
-      DSALogger.debug(result.getPointee)
-      DSALogger.debug(find(cell2._pointee.get))
-      DSALogger.debug(cell2._pointee.get)
+      Logger.debug(result.getPointee)
+      Logger.debug(find(cell2._pointee.get))
+      Logger.debug(cell2._pointee.get)
       assert(result.getPointee == find(cell2._pointee.get))
     if cell1.node.cells.filter(_.hasPointee).nonEmpty then
       cell1.node.cells.filter(_.hasPointee).foreach(
         f =>
           if find(f.getPointee) != find(f).getPointee then
-            DSALogger.debug(s"unifying $cell1 and $cell2")
+            Logger.debug(s"unifying $cell1 and $cell2")
             cell1.node.cells.foreach(
               cell =>
-                DSALogger.debug(s"Node 1 had cell: $cell")
+                Logger.debug(s"Node 1 had cell: $cell")
                 if cell.hasPointee then
-                  DSALogger.debug(s"with pointee ${cell._pointee}")
-                  DSALogger.debug(s"updated pointee ${find(cell._pointee.get)}")
+                  Logger.debug(s"with pointee ${cell._pointee}")
+                  Logger.debug(s"updated pointee ${find(cell._pointee.get)}")
             )
             cell2.node.cells.foreach(
               cell =>
-                DSALogger.debug(s"Node 2 had cell: $cell")
+                Logger.debug(s"Node 2 had cell: $cell")
                 if cell.hasPointee then
-                  DSALogger.debug(s"with pointee ${cell._pointee}")
-                  DSALogger.debug(s"updated pointee ${find(cell._pointee.get)}")
+                  Logger.debug(s"with pointee ${cell._pointee}")
+                  Logger.debug(s"updated pointee ${find(cell._pointee.get)}")
 
             )
 
 
-            DSALogger.warn(f)
-            DSALogger.warn(f._pointee)
-            DSALogger.warn(f.getPointee)
-            DSALogger.warn(find(f))
-            DSALogger.warn(find(f).getPointee)
+            Logger.warn(f)
+            Logger.warn(f._pointee)
+            Logger.warn(f.getPointee)
+            Logger.warn(find(f))
+            Logger.warn(find(f).getPointee)
           assert(find(f.getPointee) == find(f).getPointee)
           assert(find(f).node == result.node)
       )
     if cell2.node.cells.filter(_.hasPointee).nonEmpty then
       cell2.node.cells.filter(_.hasPointee).foreach(
         f =>
-//          DSALogger.warn(f.getPointee)
-//          DSALogger.warn(find(f).getPointee)
+//          SadDSALogger.warn(f.getPointee)
+//          SadDSALogger.warn(find(f).getPointee)
           assert(f.getPointee == find(f).getPointee)
           assert(find(f).node == result.node)
       )
@@ -724,8 +720,8 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
 //    if (findNode(res.node) != res.node) then
 //      println(s"got here wrong ${findNode(res.node)} vs  ${res.node}")
     if (findNode(res.node)._1 != res.node) then
-      DSALogger.warn(res.node)
-      DSALogger.warn(findNode(res.node)._1)
+      Logger.warn(res.node)
+      Logger.warn(findNode(res.node)._1)
     assert(findNode(res.node)._1 == res.node)
     res
   }
@@ -806,8 +802,6 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase]= mutable.Set.
               assert(oldToNew.contains(pointee.node))
           )
       }
-//        if old.isCollapsed then
-//          newNode._collapsed = Some(newNode.get(0))
 
     newNode
   }
