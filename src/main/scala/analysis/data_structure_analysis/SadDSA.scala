@@ -28,7 +28,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
         localCorrectness(processed)
         processed += c
         processConstraint(c)
-        DSALogger.warn(c)
+//        DSALogger.warn(c)
         localCorrectness(processed)
      )
   }
@@ -60,7 +60,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
             val actuals = exprToCells(actual).map(find).map (
               cell =>
                 val (node, offset) =
-                  findNode(
+                  callee.findNode(
                     cell.node.clone(callee, true, oldToNew)
                   )
                 assert(node.graph == callee)
@@ -68,7 +68,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
                 node.get(cell.interval.move(i => i + offset))
             )
             localCorrectness()
-            if (actuals ++ formals).nonEmpty then mergeCells(actuals ++ formals)
+            if (actuals ++ formals).nonEmpty then callee.mergeCells(actuals ++ formals)
             localCorrectness()
         }
         
@@ -80,13 +80,13 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
             val outs: Set[SadCell] = exprToCells(actual).map(find).map(
               cell =>
                 val (node, offset) =
-                  findNode(
+                  callee.findNode(
                     cell.node.clone(callee, true, oldToNew)
                   )
                 node.get(cell.interval.move(i => i + offset))
             )
             localCorrectness()
-            if (outs ++ actuals).nonEmpty then mergeCells(outs ++ actuals)
+            if (outs ++ actuals).nonEmpty then callee.mergeCells(outs ++ actuals)
             localCorrectness()
         }
 
@@ -97,15 +97,15 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
   }
   def BUPhase(locals: Map[Procedure, SadGraph]): Unit = {
 
-    val skip = List() //List("so_recvln") // List("unicode", "so_recvln")
+    val skip = List() // List("so_recvln") // List("unicode", "so_recvln")
     phase = BU
-    constraints.toSeq/*.sortBy(c => c.label)*/.foreach {
+    constraints.toSeq.sortBy(c => c.label).foreach {
       case dcc: DirectCallConstraint if locals.contains(dcc.target) && skip.forall(f => dcc.target.name.startsWith(f)) &&  !dcc.target.isExternal.getOrElse(false) =>
 //        if dcc.target.name.startsWith("so_recvln")
 //        println(s"cloning ${dcc.target.name} into ${proc.name}")
         val oldToNew = mutable.Map[SadNode, SadNode]()
 //        println("doing in params")
-        dcc.inParams.toSeq.sortBy(f => f._1.name).foreach {
+        dcc.inParams/*.filterNot(f => f._1.name.startsWith("R31"))*/.toSeq.sortBy(f => f._1.name).foreach {
           case (formal, actual) =>
             val formals = locals(dcc.target)
             .exprToCells(formal)
@@ -115,6 +115,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
                 val (node, offset) = findNode(cell
                   .node
                   .clone(this, true, oldToNew))
+                println(offset)
                 node
                   .get(cell.interval.move(i => i + offset))
             )
@@ -131,12 +132,12 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
 //              val res = mergeCells(formals ++ actuals)
               (formals ++ actuals).reduce(
                 (a, b) =>
-                  Logger.warn(s"Got to merging ${find(a)}")
-                  Logger.warn(s"with ${find(b)}")
+                  Logger.debug(s"Got to merging ${find(a)}")
+                  Logger.debug(s"with ${find(b)}")
                   val res = mergeCells(a, b)
                   assert(res.getPointee == find(a).getPointee)
                   assert(res.getPointee == find(b).getPointee)
-                  Logger.debug(s"merging cells $a and $b ")
+//                  Logger.debug(s"merging cells $a and $b ")
                   localCorrectness()
                   res
               )
@@ -155,7 +156,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
         }
 
         Logger.debug("doing out params")
-        dcc.outParmas./*toSeq.sortBy(f => f._1.name).*/foreach {
+        dcc.outParmas/*.filterNot(f => f._1.name.startsWith("R31"))*/.toSeq.sortBy(f => f._1.name).foreach {
           case (out, actual) =>
             localCorrectness()
             val actuals = locals(dcc.target)
@@ -213,8 +214,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
                 assert(indexCell.node.isUptoDate)
                 assert(indexCell.getPointee.node.isUptoDate)
                 assert(valueCell.get.node.isUptoDate)
-                if !(indexCell.hasPointee && indexCell.getPointee == valueCell.get) then
-                  print("")
+
                 assert(
                   indexCell.hasPointee && indexCell.getPointee == valueCell.get,
                   s"$constraint, $indexCell doesn't point to ${valueCell.get} instead ${indexCell.getPointee}"
@@ -240,7 +240,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
 //        oldToNew.update(node, oldCopy)
         val curCopy = current.clone(copy, true, oldToNew)
         queue.enqueue(current)
-        copy.solver.unify(oldCopy.term, curCopy.term, offset)
+        copy.unify(oldCopy, curCopy, offset)
     }
 
     copy.nodes = this.nodes.view.mapValues(oldToNew.apply).toMap
@@ -363,16 +363,32 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
 
 
   def mergePointees(c1: SadCell, c2: SadCell): Option[SadCell] = {
-    val cell1 = find(c1)
-    val cell2 = find(c2)
+    var cell1 = find(c1)
+    var cell2 = find(c2)
+    println(s"cell1 : $cell1")
+    println(s"cell2 : $cell2")
+    if cell1 != cell2 then
+      (cell1.hasPointee, cell2.hasPointee) match
+        case (true, true) =>
 
-    (cell1.hasPointee, cell2.hasPointee) match
-      case (true, true) =>
-        assert(!(cell1.getPointee == cell2 && cell2.getPointee == cell1))
-        Some(mergeCells(cell1.getPointee, cell2.getPointee))
-      case (_, true) => Some(cell1.setPointee(cell2.getPointee))
-      case (true, _) => Some(cell2.setPointee(cell1.getPointee))
-      case (_, _) => None // Logger.warn(s"neither $cell1, or $cell2 had a pointee")
+          println(s"cell1  pointee: ${cell1.getPointee}")
+          println(s"cell2  pointee: ${cell2.getPointee}")
+          val pointee1 = cell1.removePointee.get
+          val pointee2 = cell2.removePointee.get
+          assert(!(cell1.getPointee == cell2 && cell2.getPointee == cell1))
+          var resPointee = mergeCells(pointee1, pointee2)
+          cell1 = find(cell1)
+          resPointee = cell1.setPointee(resPointee)
+          cell2 = find(cell2)
+          assert(find(resPointee) == resPointee)
+          val res = Some(cell2.setPointee(resPointee))
+          res
+        case (_, true) => Some(cell1.setPointee(cell2.getPointee))
+        case (true, _) => Some(cell2.setPointee(cell1.getPointee))
+        case (_, _) => None // Logger.warn(s"neither $cell1, or $cell2 had a pointee")
+    else
+      Some(cell1.getPointee)
+
   }
 
   protected def collapseAndMerge(c1: SadCell, c2:SadCell): SadCell = {
@@ -403,7 +419,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
           assert(cell2.hasPointee)
 //          Logger.debug(f.getPointee)
 //          Logger.debug(cell2.getPointee)
-          assert(find(f.getPointee) == cell2.getPointee)
+          assert(f.getPointee == cell2.getPointee)
       )
 
     cell1 = find(cell1) // collapsing cell2 may affect cell1
@@ -441,6 +457,10 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
 
     if cell1.hasPointee && cell1.getPointee == cell2 && cell2.hasPointee && cell2.getPointee == cell1 then
       println("Possible source of error")
+//      println(cell1)
+//      println(cell1.getPointee)
+//      println(cell2)
+//      println(cell2.getPointee)
 
 
     val pointee: Option[SadCell] = mergePointees(cell1, cell2)
@@ -449,7 +469,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
 
     assert(find(c1) == cell1)
     if c1.node.cells.filter(_.hasPointee).nonEmpty then
-      c1.node.cells.filter(_.hasPointee).map(_.getPointee).foreach(
+      c1.node.cells.filter(_.hasPointee).map(_._pointee.get).foreach(
         f =>
           DSALogger.warn(find(f))
           DSALogger.warn(cell1.getPointee)
@@ -459,7 +479,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
       )
     assert(find(c2) == cell2)
     if c2.node.cells.filter(_.hasPointee).nonEmpty then
-      c2.node.cells.filter(_.hasPointee).map(_.getPointee).foreach(
+      c2.node.cells.filter(_.hasPointee).map(_._pointee.get).foreach(
         f =>
           assert(find(f) == cell2.getPointee)
           assert(pointee.nonEmpty)
@@ -467,18 +487,14 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
 
 
     if c1.hasPointee || c2.hasPointee then assert(pointee.nonEmpty)
-    if pointee.nonEmpty then
-      DSALogger.warn("we are here")
-      DSALogger.warn(pointee.get)
-      DSALogger.warn(find(pointee.get))
     if pointee.nonEmpty then collapsedCell.setPointee(find(pointee.get))
 //    cell2.node.children.addAll(cell1.node.children)
 //    cell1.node.children.addAll(cell2.node.children)
 //    cell1.node.flags.join(cell2.node.flags)
 //    cell2.node.flags.join(cell1.node.flags)
 
-    solver.unify(cell1.node.term, collapsedNode.term, 0)
-    solver.unify(cell2.node.term, collapsedNode.term, 0)
+    unify(cell1.node, collapsedNode)
+    unify(cell2.node, collapsedNode)
 
     cell1 = find(cell1)
     cell2 = find(cell2)
@@ -504,108 +520,112 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
     assert(cell1.node.isUptoDate)
     assert(cell2.node.isUptoDate)
     val (stableCell, toBeMoved) = if cell1.interval.start > cell2.interval.start then (cell1, cell2) else (cell2, cell1)
-      val delta = stableCell.interval.start - toBeMoved.interval.start
+    val delta = stableCell.interval.start - toBeMoved.interval.start
 
-      val stableNode = stableCell.node
-      val nodeToBeMoved = toBeMoved.node
+    val stableNode = stableCell.node
+    val nodeToBeMoved = toBeMoved.node
+    assert(stableCell.interval.isOverlapping(toBeMoved.move(i => i + delta).interval))
 
-      val stableCells = stableNode.cells
-      val movedCells = nodeToBeMoved.cells.map(_.move(i => i + delta))
-      val allCells = (stableCells ++ movedCells).sorted
-      val resultNode = SadNode(this, stableNode.bases.union(nodeToBeMoved.bases))
-      Logger.debug(s"created resultnode with id ${resultNode.id}")
-      resultNode.children.addAll(stableNode.children ++ nodeToBeMoved.children + stableNode.id + nodeToBeMoved.id)
-      resultNode.flags.join(stableNode.flags)
-      resultNode.flags.join(nodeToBeMoved.flags)
-      val queue: mutable.Queue[SadCell] = mutable.Queue(allCells:_*)
+    val stableCells = stableNode.cells
+    val movedCells = nodeToBeMoved.cells.map(_.move(i => i + delta))
+    val allCells = (stableCells ++ movedCells).sorted
+    val resultNode = SadNode(this, stableNode.bases.union(nodeToBeMoved.bases))
+    Logger.debug(s"created resultnode with id ${resultNode.id}")
+    resultNode.children.addAll(stableNode.children ++ nodeToBeMoved.children + stableNode.id + nodeToBeMoved.id)
+    resultNode.flags.join(stableNode.flags)
+    resultNode.flags.join(nodeToBeMoved.flags)
+    val queue: mutable.Queue[SadCell] = mutable.Queue(allCells:_*)
 //      val newToOlds: mutable.Map[SadCell, Set[SadCell]] = mutable.Map.empty
-      allCells.foreach(
-        c =>
-          resultNode.add(c.interval)
-      )
-/*      while queue.nonEmpty do
-        val cell = queue.dequeue()
-        var unifiedInterval = cell.interval
-        var overlapping: Set[SadCell] = Set.empty
-        while (
-          {
-            val old = unifiedInterval
-            overlapping ++= queue.toSet.filter(cell2 => unifiedInterval.isOverlapping(cell2.interval))
-            queue.dequeueAll(overlapping.contains)
-            unifiedInterval = if overlapping.isEmpty then cell.interval else overlapping.map(_.interval).reduce(Interval.join)
-            unifiedInterval != old
-          }
-        ) {}
+    allCells.foreach(
+      c =>
+        resultNode.add(c.interval)
+    )
+/*
+    // compute and set selfMerged of the resultNode
+    val stableSelfMerges = stableNode.selfMerged.map(f => f.map(g => g.interval))
+    val movedSelfMerged = nodeToBeMoved.selfMerged.map(f => f.map(g => g.interval.move(i => i + delta)))
+    val oldSelfMerged = stableSelfMerges ++ movedSelfMerged
 
-//        overlapping += (queue.toSet.filter(cell2 => cell.interval.isOverlapping(cell2.interval))
-//          queue.dequeueAll(overlapping.contains)
-//          unifiedInterval = if overlapping.isEmpty then cell.interval else overlapping.map(_.interval).reduce(Interval.join)
-
-
-        val newCell = SadCell(resultNode, unifiedInterval)
-        newToOlds.update(newCell, overlapping + cell)
-        resultNode.add(newCell)*/
-
-      // compute and set selfMerged of the resultNode
-      val stableSelfMerges = stableNode.selfMerged.map(f => f.map(g => g.interval))
-      val movedSelfMerged = nodeToBeMoved.selfMerged.map(f => f.map(g => g.interval.move(i => i + delta)))
-      val oldSelfMerged = stableSelfMerges ++ movedSelfMerged
-
-      val eqClassQueue = mutable.Queue().enqueueAll(oldSelfMerged)
-      var newEqIntervals: Set[Set[Interval]] = Set.empty
-      while eqClassQueue.nonEmpty do
-        val eqClass = eqClassQueue.dequeue()
-        val intervals: Set[Interval] = eqClass.foldLeft(Set[Interval]()) {
-          (s, interval) =>
-            val overlapping = oldSelfMerged.filter(eq => eq.exists(i => i.isOverlapping(interval)))
-            eqClassQueue.removeAll(overlapping.contains)
-            s ++ overlapping.flatten
-        }
-        newEqIntervals += intervals
-
-      resultNode.selfMerged = newEqIntervals.foldLeft(Set[Set[SadCell]]()) {
-        case (s, intervals) =>
-          s + intervals.map(resultNode.get)
+    val eqClassQueue = mutable.Queue().enqueueAll(oldSelfMerged)
+    var newEqIntervals: Set[Set[Interval]] = Set.empty
+    while eqClassQueue.nonEmpty do
+      val eqClass = eqClassQueue.dequeue()
+      val intervals: Set[Interval] = eqClass.foldLeft(Set[Interval]()) {
+        (s, interval) =>
+          val overlapping = oldSelfMerged.filter(eq => eq.exists(i => i.isOverlapping(interval)))
+          eqClassQueue.removeAll(overlapping.contains)
+          s ++ overlapping.flatten
       }
+      newEqIntervals += intervals
 
-      // unify old and new nodes
-      Logger.debug(s"unified result Node ${resultNode.id} with ${stableNode.id}")
-      solver.unify(stableNode.term, resultNode.term, 0)
-      solver.unify(nodeToBeMoved.term, resultNode.term, delta)
-      Logger.debug(s"unified result Node ${resultNode.id} with ${nodeToBeMoved.id}")
+    resultNode.selfMerged = newEqIntervals.foldLeft(Set[Set[SadCell]]()) {
+      case (s, intervals) =>
+        s + intervals.map(resultNode.get)
+    }*/
 
-      //set pointees
-      val pointeeResult = mutable.Map[SadCell, SadCell]()
-      resultNode.cells.foreach(
-        cell =>
-          var newCell = find(cell)
-          val pointees = allCells.filter(_.interval.isOverlapping(cell.interval)) //newToOlds
-            .collect {case cell: SadCell if cell.hasPointee => cell.getPointee}
-          if pointees.nonEmpty then
-            val mergedPointees = mergeCells(pointees)
-            newCell = find(newCell) // above merge may change the cell if the node points to itself
-            pointeeResult.update(cell, mergedPointees)
-            newCell.setPointee(mergedPointees)
-      )
+    // unify old and new nodes
+    unify(stableNode, resultNode)
+    unify(nodeToBeMoved, resultNode, delta)
+
+    assert(resultNode.cells.exists(c => c.interval.isOverlapping(stableCell.interval) && c.interval.isOverlapping(toBeMoved.move(i => i + delta).interval)))
+    //set pointees
+    val pointeeResult = mutable.Map[SadCell, SadCell]()
+    resultNode.cells.foreach(
+      cell =>
+        var newCell = find(cell)
+        val pointees = allCells.filter(_.interval.isOverlapping(cell.interval)) //newToOlds
+          .collect {case cell: SadCell if cell.hasPointee => cell.getPointee}
+        if pointees.nonEmpty then
+          val mergedPointees = mergeCells(pointees)
+          newCell = find(newCell) // above merge may change the cell if the node points to itself
+          pointeeResult.update(cell, mergedPointees)
+          pointees.foreach(f => assert(find(f) == mergedPointees))
+          newCell.setPointee(mergedPointees)
+          pointeeResult.keys.foreach(
+            cell =>
+              val actual = find(cell)
+              val pointees = allCells.filter(c => c.interval.isOverlapping(cell.interval)).filter(_.hasPointee).map(_._pointee.get)
+              if !pointees.forall(f => find(f) == actual.getPointee) then
+                DSALogger.debug(s"result node cell: $cell")
+                DSALogger.debug(s"result cell udpated: ${actual} ")
+                DSALogger.debug(s"Unified Cells: ${allCells.filter(_.interval.isOverlapping(cell.interval))}")
+                DSALogger.debug(s"non-unified pointees: ${pointees}")
+                DSALogger.debug(s"updated pointees: ${pointees.map(find)}")
+                DSALogger.debug(s"updated result cell pointee: ${actual.getPointee}")
+                pointees.foreach(f => assert(find(f) == actual.getPointee, s"pointee $f has updated version ${find(f)},\n but the pointer $actual has pointee ${actual.getPointee}"))
+          )
+    )
+
+    /*resultNode.cells.foreach(
+      cell =>
+//          if cell.interval.isOverlapping(stableCell.interval) then
+//            assert(cell.interval.isOverlapping(toBeMoved))
+        val actual = find(cell)
+        val pointees = allCells.filter(c => c.interval.isOverlapping(cell.interval)).filter(_.hasPointee).map(_._pointee.get)
+
+        DSALogger.debug(s"the following pointees ${pointees}")
+        DSALogger.debug(s"the following pointees updated ${pointees.map(find)}")
+        pointees.foreach(f => assert(find(f) == actual.getPointee))
+    )*/
 //
 //      resultNode.cells.filter(pointeeResult.contains).foreach(
 //        f =>
-//          f.setPointee(pointeeResult(f))
-//          find(f).setPointee(pointeeResult(f))
+////          f.setPointee(pointeeResult(f))
+//          find(f).setPointee(find(pointeeResult(f)))
 //      )
 
-      find(resultNode.get(stableCell.interval))
+    find(resultNode.get(stableCell.interval))
   }
 
   override def mergeCells(c1: SadCell, c2: SadCell): SadCell = {
     require(c1.node.graph == c2.node.graph)
     val cell1 = find(c1)
     val cell2 = find(c2)
-    Logger.debug(cell1)
-    if cell1.hasPointee then Logger.debug(cell1.getPointee)
+    Logger.debug(s"merging $cell1")
+    if cell1.hasPointee then Logger.debug(s"and pointee ${cell1.getPointee}")
 
-    Logger.debug(cell2)
-    if cell2.hasPointee then Logger.debug(cell2.getPointee)
+    Logger.debug(s"with $cell2")
+    if cell2.hasPointee then Logger.debug(s"pointee ${cell2.getPointee}")
 
 
 //    Logger.debug(s"Cell1 of Merge $cell1")
@@ -616,29 +636,55 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
       Logger.debug(s"merged $cell1 with itself")
       cell1
     else if cell1.node.equals(cell2.node) then
-      Logger.debug(s"merged $cell1 and $cell2")
-      cell1.node.collapse()
+      Logger.debug(s"collapsed $cell1 and $cell2")
+      val res = cell1.node.collapse()
+      Logger.debug(s"collapsed $cell1 and $cell2")
+      res
     else if cell1.node.isCollapsed || cell2.node.isCollapsed then
       Logger.debug(s"merge and collapse $cell1 and $cell2")
-      collapseAndMerge(cell1, cell2)
+      val res = collapseAndMerge(cell1, cell2)
+      Logger.debug(s"merge and collapse $cell1 and $cell2")
+      res
     else
       Logger.debug(s"merged $cell1 and $cell2")
-      mergeCellsHelper(cell1, cell2)
+      val res = mergeCellsHelper(cell1, cell2)
+      Logger.debug(s"merged $cell1 and $cell2")
+      res
 
 
     Logger.debug(s"Got result: $result")
     assert(result == find(cell1))
     assert(result == find(cell2))
-//    Logger.debug(result)
+    if cell1.hasPointee then assert(result.getPointee == find(cell1._pointee.get))
+    if cell2.hasPointee then
+      DSALogger.debug(result.getPointee)
+      DSALogger.debug(find(cell2._pointee.get))
+      DSALogger.debug(cell2._pointee.get)
+      assert(result.getPointee == find(cell2._pointee.get))
     if cell1.node.cells.filter(_.hasPointee).nonEmpty then
-//      Logger.debug(result.node)
-//      Logger.debug(result.node.cells.map(_.interval))
-//      Logger.debug(cell1.interval)
-//      Logger.debug(cell2.interval)
       cell1.node.cells.filter(_.hasPointee).foreach(
         f =>
-          if find(f.getPointee)  != find(f).getPointee then
+          if find(f.getPointee) != find(f).getPointee then
+            DSALogger.debug(s"unifying $cell1 and $cell2")
+            cell1.node.cells.foreach(
+              cell =>
+                DSALogger.debug(s"Node 1 had cell: $cell")
+                if cell.hasPointee then
+                  DSALogger.debug(s"with pointee ${cell._pointee}")
+                  DSALogger.debug(s"updated pointee ${find(cell._pointee.get)}")
+            )
+            cell2.node.cells.foreach(
+              cell =>
+                DSALogger.debug(s"Node 2 had cell: $cell")
+                if cell.hasPointee then
+                  DSALogger.debug(s"with pointee ${cell._pointee}")
+                  DSALogger.debug(s"updated pointee ${find(cell._pointee.get)}")
+
+            )
+
+
             DSALogger.warn(f)
+            DSALogger.warn(f._pointee)
             DSALogger.warn(f.getPointee)
             DSALogger.warn(find(f))
             DSALogger.warn(find(f).getPointee)
@@ -648,9 +694,9 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
     if cell2.node.cells.filter(_.hasPointee).nonEmpty then
       cell2.node.cells.filter(_.hasPointee).foreach(
         f =>
-          DSALogger.warn(f.getPointee)
-          DSALogger.warn(find(f).getPointee)
-//          assert(f.getPointee == find(f).getPointee)
+//          DSALogger.warn(f.getPointee)
+//          DSALogger.warn(find(f).getPointee)
+          assert(f.getPointee == find(f).getPointee)
           assert(find(f).node == result.node)
       )
 
@@ -693,14 +739,23 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
   override def find(node: SadNode): SadNode = {
     findNode(node)._1
   }
+
+  def unify(a: SadNode, b: SadNode, offset: Int = 0): Unit = {
+    Logger.debug(s"unifying ${b.id} with ${a.id} at offset ${offset}")
+    solver.unify(a.term, b.term, offset)
+  }
 }
 
 class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase]= mutable.Set.empty, size: Option[Int] = None, val id: Int = SadNodeCounter.increment()) extends DSANode[SadCell](size) {
 
   Logger.debug(s"created node with id $id")
+
+  // clones a this node into newGraph
+  //
   def clone(newGraph: SadGraph, recurse: Boolean = false,
             oldToNew: mutable.Map[SadNode, SadNode] = mutable.Map()): SadNode  = {
     //    val (node, _) = graph.findNode(this)
+    if recurse then assert(isUptoDate)
     val node = this
     val newNode =
       if !oldToNew.contains(node) then
@@ -715,10 +770,6 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase]= mutable.Set.
         v
       else
         val (newNode, offset) = newGraph.findNode(oldToNew(node))
-//        node.cells.foreach(
-//          cell =>
-//            newNode.add(cell.interval.move(i => i + offset))
-//        )
         newNode
 
 
@@ -728,27 +779,21 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase]= mutable.Set.
         val old = queue.dequeue()
         assert(oldToNew.contains(old))
         val (newNode, off) = newGraph.findNode(oldToNew(old))
-//        assert(off == 0)
         old.cells.foreach {
           case cell: SadCell if cell.hasPointee =>
             val pointee = cell.getPointee
             assert(pointee == graph.find(cell).getPointee)
             val pointeeNode = pointee.node
+            assert(pointeeNode.isUptoDate)
             if !oldToNew.contains(pointeeNode) then queue.enqueue(pointeeNode)
             val (clonedNode, clonedOff) =
               if !oldToNew.contains(pointeeNode) then
                 newGraph.findNode(pointeeNode.clone(newGraph, false, oldToNew))
-//                pointeeNode.cells.map(_.interval).forall(i => v.cells.exists(c => c.interval == i))
-//                oldToNew.update(pointeeNode, v)
               else newGraph.findNode(oldToNew(pointeeNode))
 
             val pointer = newNode.get(cell.interval.move(i => i + off))
-            DSALogger.warn(s"pointer has pointee: ${pointer.hasPointee}")
             assert(pointer == newGraph.find(pointer))
-            if pointer.hasPointee then DSALogger.warn(s"pointer has pointee: ${pointer.getPointee}")
             val clonedPointee = clonedNode.get(pointee.interval.move(i => i + clonedOff))
-            DSALogger.warn(s"new pointee: ${clonedPointee}")
-            DSALogger.warn(s"new pointee: ${newGraph.find(clonedPointee)}")
             pointer.setPointee(clonedNode.get(pointee.interval.move(i => i + clonedOff)))
             assert(newNode.get(cell.interval.move(i => i + off)).getPointee == newGraph.find(clonedNode.get(pointee.interval.move(i => i + clonedOff))))
           case _ =>
@@ -838,6 +883,7 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase]= mutable.Set.
     assert(isUptoDate)
     val node = this
     if (!(node.isCollapsed)) {
+      val oldPointees = cells.filter(_.hasPointee).map(_.getPointee)
       val collapseNode: SadNode = SadNode(graph, bases, size)
       collapseNode.children.addAll(this.children)
       var collapsedCell: SadCell = collapseNode.add(0)
@@ -845,34 +891,27 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase]= mutable.Set.
       // delay unification
       // treat collapsed node completely distinct to current node
       if  node.cells.exists(_.hasPointee) then
-        var pointToItself = false
-        val cells = node.cells
-        var pointee = cells.filter(_.hasPointee).map(_.getPointee).foldLeft(SadNode(graph).add(0)) {
-          (c, current) =>
-            val cell = graph.find(current)
-            // since unification delayed check pointee against old version as well
-            if ((cell.node == node || cell.node == this)) {
-              pointToItself = true
-              c
-            } else {
-              graph.mergeCells(c, cell)
-            }
-        }
+        val pointToItself = node.cells.filter(_.hasPointee).map(_.getPointee).exists(c => c.node == node)
+        var pointees = node.cells.filter(_.hasPointee).map(_.getPointee).filter(_.node != node)
+        if pointToItself then pointees.map(f => graph.find(f).node.collapse())
+        pointees = pointees.map(graph.find)
+        var pointee = if pointees.nonEmpty then graph.mergeCells(pointees) else collapsedCell
 
         if (pointToItself) {
           assert(!collapsedCell.hasPointee)
-//          println(pointee.node.id)
           val oldPointee = pointee.node
-          Logger.debug(oldPointee.id)
-          Logger.debug(collapsedCell.node.id)
+//          Logger.debug(oldPointee.id)
+//          Logger.debug(collapsedCell.node.id)
+//          Logger.debug(collapsedCell)
+//          graph.mergePointees(pointee, collapsedCell)
+          assert(collapseNode.isUptoDate)
+          assert(pointee.node.isCollapsed)
+//          pointee = pointee.node.collapse()
           pointee = graph.mergeCells(pointee, collapsedCell)
           Logger.debug(pointee)
-//          graph.solver.unify(collapsedCell.node.term, pointee.node.term, 0)
-//          graph.solver.unify(oldPointee.term, pointee.node.term, 0)
           collapsedCell = pointee
         }
 
-//        graph.solver.unify(node.term, collapsedCell.node.term, 0)
         if !pointToItself then assert(!collapsedCell.hasPointee)
         if pointToItself then println("pointing to itself") else println("not pointing to itself")
         collapsedCell.setPointee(pointee)
@@ -880,23 +919,26 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase]= mutable.Set.
         if pointToItself then assert(collapsedCell.getPointee == collapsedCell)
         assert(collapsedCell.hasPointee)
         assert(collapsedCell.getPointee == graph.find(pointee))
-//        println(collapsedCell.node.cells)
         assert(collapsedCell.node.cells.size == 1)
 
       // unify collapsed node and current node
-      graph.solver.unify(node.term, collapsedCell.node.term, 0)
+      graph.unify(node, collapsedCell.node)
       cells.foreach(f =>
-        Logger.debug(graph.find(f))
-        Logger.debug(collapsedCell)
+//        Logger.debug(graph.find(f))
+//        Logger.debug(collapsedCell)
         assert(graph.find(f) == collapsedCell)
       )
       if node.cells.exists(_.hasPointee) then assert(graph.find(collapsedCell).hasPointee)
-      cells.filter(_.hasPointee).map(_.getPointee).foreach(
-        f => assert(graph.find(collapsedCell).getPointee == f)
-      )
-      node.cells.filter(_.hasPointee).map(_.getPointee).foreach(
-        f => assert(graph.find(collapsedCell).getPointee == f)
-      )
+
+      if (!oldPointees.map(graph.find).forall(f => f == graph.find(collapsedCell).getPointee)) then
+        print("")
+      assert(oldPointees.map(graph.find).forall(f => f == graph.find(collapsedCell).getPointee))
+//      cells.filter(_.hasPointee).map(_.getPointee).foreach(
+//        f => assert(graph.find(collapsedCell).getPointee == f)
+//      )
+//      node.cells.filter(_.hasPointee).map(_.getPointee).foreach(
+//        f => assert(graph.find(collapsedCell).getPointee == f)
+//      )
       graph.find(collapsedCell)
 
 
@@ -940,7 +982,7 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase]= mutable.Set.
 }
 
 case class SadCell(node: SadNode, override val interval: Interval) extends NodeCell(interval) {
-  private var _pointee: Option[SadCell] = None
+  var _pointee: Option[SadCell] = None
   private val graph: SadGraph = node.graph
 
   override def toString: String = s"Cell($node, $interval)"
@@ -949,6 +991,12 @@ case class SadCell(node: SadNode, override val interval: Interval) extends NodeC
     val newCell = SadCell(node, interval.move(f))
     newCell._pointee = _pointee
     newCell
+  }
+
+  def removePointee: Option[SadCell] = {
+    val temp = _pointee.map(graph.find)
+    _pointee = None
+    temp
   }
 
   def getPointee: SadCell =
@@ -965,13 +1013,19 @@ case class SadCell(node: SadNode, override val interval: Interval) extends NodeC
     assert(cell.node.isUptoDate)
     if _pointee.isEmpty then
       _pointee = Some(cell)
-    else if graph.find(_pointee.get) == graph.find(this) then // if a cell points to itself break the link,
-      _pointee = None
-      val pointee = graph.mergeCells(this, cell)
-      _pointee = Some(pointee)
-      assert(graph.find(this).node == pointee.node)
-    else if graph.find(cell) != graph.find(_pointee.get) then
-      _pointee = Some(graph.mergeCells(cell, graph.find(_pointee.get)))
+    else  // if a cell points to itself break the link,
+      graph.mergePointees(this.getPointee, cell)
+      // TODO possibly update
+      this._pointee = Some(graph.mergeCells(cell, graph.find(this).getPointee))
+      graph.find(this)._pointee = this._pointee
+//      _pointee = None
+//      val pointee = graph.mergeCells(this, cell)
+//      _pointee = Some(pointee)
+//      pointee
+
+//      assert(graph.find(this).node == pointee.node)
+//    else if cell != graph.find(_pointee.get) then
+//      _pointee = Some(graph.mergeCells(cell, graph.find(_pointee.get)))
     _pointee.get
   }
 }
