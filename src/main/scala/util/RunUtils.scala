@@ -798,7 +798,7 @@ object RunUtils {
       var sadDSA: Map[Procedure, SadGraph] = Map.empty
       var sadDSABU: Map[Procedure, SadGraph] = Map.empty
       computeDSADomain(ctx.program.mainProcedure).toSeq.sortBy(_.name).foreach(
-//      computeDSADomain(ctx.program.procedures.collectFirst{case p if p.name.startsWith("headers_recv") => p}.get).foreach(
+//      computeDSADomain(ctx.program.procedures.collectFirst{case p if p.name.startsWith("config_close") => p}.get).foreach(
         proc =>
 //          if proc.name.startsWith("des_key_schedule") then
             val SVAResults = getSymbolicValues(proc)
@@ -861,7 +861,7 @@ object RunUtils {
         if skip.exists(name => proc.name.startsWith(name)) then
           DSALogger.info(s"skipped ${proc.name} due to scc")
           visited += proc
-        else if !proc.calls.filter(proc => !proc.isExternal.getOrElse(false)).forall(visited.contains) then
+        else if !proc.callers().filter(f => sadDSATD.keySet.contains(f)).forall(f => visited.contains(f)) then
           DSALogger.info(s"procedure ${proc.name} was readded")
           queue.enqueue(proc)
         else
@@ -913,7 +913,7 @@ object RunUtils {
       ArrayBuffer(boogieTranslator.translate)
     }
     assert(invariant.singleCallBlockEnd(ctx.program))
-
+//
     BASILResult(ctx, analysis, dsaContext ,boogiePrograms)
   }
 
