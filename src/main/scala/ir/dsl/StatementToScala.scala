@@ -82,7 +82,6 @@ given ToScala[Endian] = ToScala.derived
 given ToScala[Global] = ToScala.derived
 given ToScala[IRType] = ToScala.derived
 
-
 // NOTE: Unfortunately, for the Command trait, this is not straightforward because the classes are not case classes.
 
 /**
@@ -90,8 +89,13 @@ given ToScala[IRType] = ToScala.derived
  */
 private object CaseIR {
 
-  import collection.immutable.{Map,SortedMap}
+  import collection.immutable.{Map, SortedMap}
   import collection.mutable
+
+  // format: off
+
+  // NOTE: format off because this is easier to scan and manipulate (e.g. with vim)
+  // it keeps the structure of one line per case
 
   sealed trait Command
 
@@ -113,7 +117,6 @@ private object CaseIR {
   case class DirectCall(target: Procedure, label: Option[String] = None, outParams: Map[LocalVar, Variable] = SortedMap(), actualParams: Map[LocalVar, Expr] = SortedMap()) extends Call with Assign
   case class IndirectCall(target: Variable, label: Option[String] = None) extends Call
 
-
   def fromBasilIR(x: ir.Command): Command = x match {
     case ir.LocalAssign(a,b,c) => LocalAssign(a,b,c)
     case ir.MemoryStore(a,b,c,d,e,f) => MemoryStore(a,b,c,d,e,f)
@@ -129,6 +132,7 @@ private object CaseIR {
     case ir.IndirectCall(a,b) => IndirectCall(a,b)
   }
 
+  // format: on
 
   type Excluded = Return | DirectCall | IndirectCall | GoTo
 
@@ -151,4 +155,3 @@ private object CaseIR {
 }
 
 given ToScala[ir.Command] = ToScala.Make(x => CaseIR.fromBasilIR(x).toScalaLines)
-
