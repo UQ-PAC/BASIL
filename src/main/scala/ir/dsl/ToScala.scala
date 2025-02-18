@@ -43,12 +43,6 @@ trait ToScalaLines[-T] extends ToScala[T]:
     def toScalaLines: Twine
     final override def toScala = x.toScalaLines.mkString
 
-object ToScala {
-  def apply[T](using inst: ToScala[T]) = inst
-
-  export ToScalaDeriving.*
-}
-
 /**
  * Implements ToScala in terms of toScala, for classes whose ToScala output always fits within
  * one line.
@@ -57,6 +51,16 @@ trait ToScalaString[-T] extends ToScala[T]:
   extension (x: T)
     def toScala: String
     final override def toScalaLines: Twine = LazyList(x.toScala)
+
+/**
+ * Companion object for ToScala, defining functions and classes to help with
+ * constructing and deriving instances. The apply method can also be used to
+ * summon an instance.
+ */
+object ToScala {
+  export ToScalaDeriving.{Make, MakeString, derived, deriveWithExclusions}
+  def apply[T](using inst: ToScala[T]) = inst
+}
 
 /**
  * Additional ToScala instances
