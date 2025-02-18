@@ -4,7 +4,7 @@ import ir.*
 import util.{Twine, indentNested}
 
 /**
- * The end of this file contains generated code to implement ToScala for the various type
+ * The end of this file contains generated code to implement ToScalaLines for the various type
  * hierarchies defined by BASIL.
  */
 
@@ -14,7 +14,7 @@ import util.{Twine, indentNested}
  *
  * If you are here to manually fix a compilation error, please make sure that
  * you understand the context and carefully apply a specific fix. Make sure
- * that the code maintains the general contract of the ToScala trait.
+ * that the code maintains the general contract of the ToScalaLines trait.
  *
  * That is, the returned string must be valid Scala code to construct the given
  * object. The `ensure_constructible` functions are defined to match the produced
@@ -46,7 +46,7 @@ import util.{Twine, indentNested}
  * 7. Run the Python command listed below the scissors line.
  * 8. Make sure that the code compiles and passes tests:
  *
- *     ./mill test.testOnly 'ir.ToScalaTest'
+ *     ./mill test.testOnly 'ir.ToScalaLinesTest'
  *
  * 9. Upload the changes.
  *
@@ -54,13 +54,13 @@ import util.{Twine, indentNested}
 
 
 /**
- * Manually-defined ToScala instances
+ * Manually-defined ToScalaLines instances
  * ----------------------------------
  *
  * Externals: DirectCall, IndirectCall, GoTo, Return
  *
  * The "Externals" line above tells the generator the following types as having
- * manually-defined ToScala instances. These types interact with control-flow,
+ * manually-defined ToScalaLines instances. These types interact with control-flow,
  * and the naive auto-generated code would be large and possibly cyclic.
  */
 
@@ -71,28 +71,28 @@ import util.{Twine, indentNested}
 
 given ToScalaLines[Return] with
   extension (x: Return)
-    override def toScalaLines =
-      def outParamToScala(x: (LocalVar, Expr)) = (x(0).name, x(1))
+    def toScalaLines =
+      def outParamToScalaLines(x: (LocalVar, Expr)) = (x(0).name, x(1))
 
       if (x.outParams.isEmpty) {
         LazyList("ret")
       } else {
         indentNested(
           "ret(",
-          x.outParams.map(outParamToScala).map(_.toScala).map(LazyList(_)),
+          x.outParams.map(outParamToScalaLines).map(_.toScala).map(LazyList(_)),
           ")")
       }
 
 given ToScalaLines[DirectCall] with
-  extension (x: DirectCall) override def toScalaLines =
+  extension (x: DirectCall) def toScalaLines =
     LazyList(s"directCall(${x.target.procName.toScala})")
 
 given ToScalaLines[IndirectCall] with
-  extension (x: IndirectCall) override def toScalaLines =
+  extension (x: IndirectCall) def toScalaLines =
     LazyList(s"indirectCall(${x.target.toScala})")
 
 given ToScalaLines[GoTo] with
-  extension (x: GoTo) override def toScalaLines =
+  extension (x: GoTo) def toScalaLines =
     LazyList(s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})")
 
 
