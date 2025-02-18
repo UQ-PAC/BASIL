@@ -8,7 +8,7 @@ object PrettyPrinter {
   def pp_expr(e: Expr) = BasilIRPrettyPrinter()(e)
   def pp_stmt(s: Statement) = BasilIRPrettyPrinter()(s)
   def pp_cmd(c: Command) = c match {
-    case j: Jump      => pp_jump(j)
+    case j: Jump => pp_jump(j)
     case j: Statement => pp_stmt(j)
   }
   def pp_block(s: Block) = BasilIRPrettyPrinter()(s)
@@ -16,12 +16,28 @@ object PrettyPrinter {
   def pp_prog(s: Program) = BasilIRPrettyPrinter()(s)
   def pp_proc(s: Procedure) = BasilIRPrettyPrinter()(s)
 
-  def pp_prog_with_analysis_results[T](before: Map[Block, T], after: Map[Block, T], p: Program, resultPrinter: T => String = ((x : T) => x.toString)) = {
-    BasilIRPrettyPrinter(with_analysis_results_begin=block => before.get(block).map(resultPrinter), block => after.get(block).map(resultPrinter))(p)
+  def pp_prog_with_analysis_results[T](
+    before: Map[Block, T],
+    after: Map[Block, T],
+    p: Program,
+    resultPrinter: T => String = ((x: T) => x.toString)
+  ) = {
+    BasilIRPrettyPrinter(
+      with_analysis_results_begin = block => before.get(block).map(resultPrinter),
+      block => after.get(block).map(resultPrinter)
+    )(p)
   }
 
-  def pp_block_with_analysis_results[T](before: Map[Block, T], after: Map[Block, T], p: Block, resultPrinter: T => String = ((x : T) => x.toString)) = {
-    BasilIRPrettyPrinter(with_analysis_results_begin=block => before.get(block).map(resultPrinter), block => after.get(block).map(resultPrinter))(p)
+  def pp_block_with_analysis_results[T](
+    before: Map[Block, T],
+    after: Map[Block, T],
+    p: Block,
+    resultPrinter: T => String = ((x: T) => x.toString)
+  ) = {
+    BasilIRPrettyPrinter(
+      with_analysis_results_begin = block => before.get(block).map(resultPrinter),
+      block => after.get(block).map(resultPrinter)
+    )(p)
   }
 
 }
@@ -30,7 +46,7 @@ def indent(s: String, indent: String = "  "): String = {
   s.flatMap(c =>
     c match {
       case '\n' => s"\n$indent"
-      case c    => "" + c
+      case c => "" + c
     }
   )
 }
@@ -56,11 +72,17 @@ case class Proc(signature: String, localDecls: List[String], blocks: String) ext
   }
 }
 
-case class PBlock(label: String, address: Option[String], commands: List[String], entryComment: Option[String]= None, exitComment: Option[String]=None) extends PPProg[Block] {
+case class PBlock(
+  label: String,
+  address: Option[String],
+  commands: List[String],
+  entryComment: Option[String] = None,
+  exitComment: Option[String] = None
+) extends PPProg[Block] {
   override def toString = {
     val indent = "  "
     val addr = address.map(" " + _).getOrElse("")
-    val comment = entryComment.map(c => c + "\n").getOrElse("") 
+    val comment = entryComment.map(c => c + "\n").getOrElse("")
     val excomment = exitComment.map(c => "\n" + c).getOrElse("")
     s"block ${label}${addr} [\n${comment}"
       ++ commands.map("  " + _).mkString(";\n")
@@ -73,8 +95,10 @@ case class PBlock(label: String, address: Option[String], commands: List[String]
 //   override def toString = v
 // }
 
-class BasilIRPrettyPrinter(with_analysis_results_begin: Block => Option[String] = _ => None, 
-  with_analysis_results_end: Block => Option[String] = _ => None) extends BasilIR[PPProg] {
+class BasilIRPrettyPrinter(
+  with_analysis_results_begin: Block => Option[String] = _ => None,
+  with_analysis_results_end: Block => Option[String] = _ => None
+) extends BasilIR[PPProg] {
   val blockIndent = "  "
   val statementIndent = "    "
   val seenVars = mutable.HashSet[Variable]()
@@ -103,9 +127,9 @@ class BasilIRPrettyPrinter(with_analysis_results_begin: Block => Option[String] 
 
     override def vlvar(v: Variable) = {
       v match {
-        case v: Global if global      => vars.add(v)
+        case v: Global if global => vars.add(v)
         case v: LocalVar if (!global) => vars.add(v)
-        case _                        => ()
+        case _ => ()
       }
 
       SkipChildren()
@@ -113,9 +137,9 @@ class BasilIRPrettyPrinter(with_analysis_results_begin: Block => Option[String] 
 
     override def vrvar(v: Variable) = {
       v match {
-        case v: Global if global      => vars.add(v)
+        case v: Global if global => vars.add(v)
         case v: LocalVar if (!global) => vars.add(v)
-        case _                        => ()
+        case _ => ()
       }
 
       SkipChildren()
@@ -136,7 +160,7 @@ class BasilIRPrettyPrinter(with_analysis_results_begin: Block => Option[String] 
 
   def memoryRegions(prog: Program): Set[Memory] = {
     prog.collect {
-      case m: MemoryLoad  => m.mem
+      case m: MemoryLoad => m.mem
       case m: MemoryStore => m.mem
     }.toSet
   }
@@ -151,7 +175,7 @@ class BasilIRPrettyPrinter(with_analysis_results_begin: Block => Option[String] 
       ,
       p.procedures.toList.map(vproc).collect {
         case p: Proc => p
-        case _       => ???
+        case _ => ???
       }
     )
   }
@@ -162,9 +186,9 @@ class BasilIRPrettyPrinter(with_analysis_results_begin: Block => Option[String] 
   }
 
   override def vblock(b: Block): PPProg[Block] = {
-    val label = b.label 
-    val address = b.address 
-    val statements =  b.statements.toList.map(vstmt)
+    val label = b.label
+    val address = b.address
+    val statements = b.statements.toList.map(vstmt)
     val terminator = vjump(b.jump)
     val entryComent = with_analysis_results_begin(b).map(c => s"${blockIndent}// ${c}")
     val exitComment = with_analysis_results_end(b).map(c => s"${blockIndent}// ${c}")
@@ -173,10 +197,10 @@ class BasilIRPrettyPrinter(with_analysis_results_begin: Block => Option[String] 
   }
 
   override def vblock(
-      label: String,
-      address: Option[BigInt],
-      statements: List[PPProg[Statement]],
-      terminator: PPProg[Jump]
+    label: String,
+    address: Option[BigInt],
+    statements: List[PPProg[Statement]],
+    terminator: PPProg[Jump]
   ): PPProg[Block] = {
     assert(false)
   }
@@ -366,16 +390,16 @@ class BasilIRPrettyPrinter(with_analysis_results_begin: Block => Option[String] 
 
   def vtype(t: IRType): String = t match {
     case BitVecType(sz) => s"bv$sz"
-    case IntType        => "nat"
-    case BoolType       => "bool"
-    case m: MapType     => s"map ${vtype(m.result)}[${vtype(m.param)}]"
+    case IntType => "nat"
+    case BoolType => "bool"
+    case m: MapType => s"map ${vtype(m.result)}[${vtype(m.param)}]"
   }
 
   override def vrvar(e: Variable): PPProg[Variable] = BST(s"${e.name}:${vtype(e.getType)}")
   override def vlvar(e: Variable): PPProg[Variable] = {
     e match {
       case l: LocalVar => BST("var " + e.name + s": ${vtype(e.getType)}")
-      case l           => BST(e.name + s": ${vtype(e.getType)}")
+      case l => BST(e.name + s": ${vtype(e.getType)}")
     }
   }
 

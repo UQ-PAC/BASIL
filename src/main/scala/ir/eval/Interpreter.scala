@@ -67,29 +67,29 @@ case object BasilValue {
   def size(v: IRType): Int = {
     v match {
       case BitVecType(sz) => sz
-      case _              => 1
+      case _ => 1
     }
   }
 
   def toBV[S, E](l: BasilValue): Either[InterpreterError, BitVecLiteral] = {
     l match {
       case Scalar(b1: BitVecLiteral) => Right(b1)
-      case _                         => Left((TypeError(s"Not a bitvector add $l")))
+      case _ => Left((TypeError(s"Not a bitvector add $l")))
     }
   }
 
   def unsafeAdd[S, E](l: BasilValue, vr: Int): Either[InterpreterError, BasilValue] = {
     l match {
-      case _ if vr == 0              => Right(l)
-      case Scalar(IntLiteral(vl))    => Right(Scalar(IntLiteral(vl + vr)))
+      case _ if vr == 0 => Right(l)
+      case Scalar(IntLiteral(vl)) => Right(Scalar(IntLiteral(vl + vr)))
       case Scalar(b1: BitVecLiteral) => Right(Scalar(eval.evalBVBinExpr(BVADD, b1, BitVecLiteral(vr, b1.size))))
-      case _                         => Left((TypeError(s"Operation add $vr undefined on $l")))
+      case _ => Left((TypeError(s"Operation add $vr undefined on $l")))
     }
   }
 
   def add[S, E](l: BasilValue, r: BasilValue): Either[InterpreterError, BasilValue] = {
     (l, r) match {
-      case (Scalar(IntLiteral(vl)), Scalar(IntLiteral(vr)))       => Right(Scalar(IntLiteral(vl + vr)))
+      case (Scalar(IntLiteral(vl)), Scalar(IntLiteral(vr))) => Right(Scalar(IntLiteral(vl + vr)))
       case (Scalar(b1: BitVecLiteral), Scalar(b2: BitVecLiteral)) => Right(Scalar(eval.evalBVBinExpr(BVADD, b1, b2)))
       case _ => Left((TypeError(s"Operation add undefined  $l + $r")))
     }
@@ -195,9 +195,9 @@ case class MemoryState(
 
   def popStackFrame(): Either[InterpreterError, MemoryState] = {
     val hv = activations match {
-      case Nil                          => Left((Errored("No stack frame to pop")))
+      case Nil => Left((Errored("No stack frame to pop")))
       case h :: Nil if h == globalFrame => Left((Errored("tried to pop global scope")))
-      case h :: tl                      => Right((h, tl))
+      case h :: tl => Right((h, tl))
     }
     hv.map((hv) => {
       val (frame, remactivs) = hv
@@ -226,7 +226,7 @@ case class MemoryState(
   def defVar(name: String, s: Scope, value: BasilValue): MemoryState = {
     val frame = s match {
       case Scope.Global => globalFrame
-      case _            => activations.head
+      case _ => activations.head
     }
     setVar(frame, name, value)
   }
@@ -237,7 +237,7 @@ case class MemoryState(
     searchScopes.foldRight(None: Option[(StackFrameID, BasilValue)])((r, acc) =>
       acc match {
         case None => stackFrames(r).get(name).map(v => (r, v))
-        case s    => s
+        case s => s
       }
     )
   }
@@ -260,7 +260,7 @@ case class MemoryState(
       case Right(dv: BasilValue) if Some(v.getType) != dv.irType =>
         Left(Errored(s"Type mismatch on variable definition and load: defined ${dv.irType}, variable ${v.getType}"))
       case Right(o) => Right(o)
-      case o        => o
+      case o => o
     }
   }
 
@@ -269,7 +269,7 @@ case class MemoryState(
     v <- findVar(vname)
     mapv: MapValue <- v._2 match {
       case m: MapValue => Right(m)
-      case m           => Left((TypeError(s"Load from nonmap ${m.irType}")))
+      case m => Left((TypeError(s"Load from nonmap ${m.irType}")))
     }
     rs: List[Option[BasilValue]] = addr.map(k => mapv.value.get(k))
     xs <-
@@ -338,7 +338,7 @@ object LibcIntrinsic {
     ptr = res.get
     isize <- size match {
       case Scalar(b: BitVecLiteral) => State.pure(b.value * 8)
-      case _                        => State.setError(Errored("programmer error"))
+      case _ => State.setError(Errored("programmer error"))
     }
     cl <- Eval.storeBV(s)("mem", ptr, BitVecLiteral(0, isize.toInt), Endian.LittleEndian)
     _ <- s.doReturn()
@@ -394,7 +394,7 @@ object IntrinsicImpl {
     for {
       fname <- file match {
         case Symbol(name) => State.pure(name)
-        case _            => State.setError(Errored("Intrinsic fopen open not given filename"))
+        case _ => State.setError(Errored("Intrinsic fopen open not given filename"))
       }
       _ <- f.storeVar(fname, Scope.Global, BasilMapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
       filecount <- f.loadMem("ghost-file-bookkeeping", List(Symbol("$$filecount")))
@@ -415,7 +415,7 @@ object IntrinsicImpl {
       file = fd match {
         case Scalar(BitVecLiteral(1, 64)) => "stdout"
         case Scalar(BitVecLiteral(2, 64)) => "stderr"
-        case _                            => "unknown"
+        case _ => "unknown"
       }
       baseptr: List[BasilValue] <- f.loadMem("ghost-file-bookkeeping", List(Symbol(s"${file}-ptr")))
       offs: List[BasilValue] <- State.mapM(
@@ -450,8 +450,8 @@ object IntrinsicImpl {
     for {
       size <- (size match {
         case (x @ Scalar(_: BitVecLiteral)) => State.pure(x)
-        case (Scalar(x: IntLiteral))        => State.pure(Scalar(BitVecLiteral(x.value, 64)))
-        case _                              => State.setError(Errored("illegal prim arg"))
+        case (Scalar(x: IntLiteral)) => State.pure(Scalar(BitVecLiteral(x.value, 64)))
+        case _ => State.setError(Errored("illegal prim arg"))
       })
       x <- f.loadVar("ghost_malloc_top")
       x_gap <- State.pureE(BasilValue.unsafeAdd(x, 128)) // put a gap around allocations to catch buffer overflows
@@ -477,10 +477,10 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
     args: List[BasilValue]
   ): State[InterpreterState, Option[BasilValue], InterpreterError] = {
     name match {
-      case "free"   => State.pure(None)
+      case "free" => State.pure(None)
       case "malloc" => IntrinsicImpl.malloc(this)(args.head)
-      case "fopen"  => IntrinsicImpl.fopen(this)(args.head)
-      case "putc"   => IntrinsicImpl.putc(this)(args.head)
+      case "fopen" => IntrinsicImpl.fopen(this)(args.head)
+      case "putc" => IntrinsicImpl.putc(this)(args.head)
       case "strlen" =>
         for {
           str <- Eval.getNullTerminatedString(this)("mem", args.head)
@@ -491,7 +491,7 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
       case "puts" =>
         IntrinsicImpl.print(this)(args.head) >> IntrinsicImpl.putc(this)(Scalar(BitVecLiteral('\n'.toInt, 64)))
       case "write" => IntrinsicImpl.write(this)(args(1), args(2))
-      case _       => State.setError(Errored(s"Call undefined intrinsic $name"))
+      case _ => State.setError(Errored(s"Call undefined intrinsic $name"))
     }
   }
 
@@ -510,7 +510,7 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
     } yield {
       res match {
         case ((f: FunPointer) :: Nil) => Some(f)
-        case _                        => None
+        case _ => None
       }
     }
 
@@ -518,8 +518,8 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
     val ks = update.toList.sortWith((x, y) => {
       def conv(v: BasilValue): BigInt = v match {
         case (Scalar(b: BitVecLiteral)) => b.value
-        case (Scalar(b: IntLiteral))    => b.value
-        case _                          => BigInt(0)
+        case (Scalar(b: IntLiteral)) => b.value
+        case _ => BigInt(0)
       }
       conv(x._1) <= conv(y._1)
     })
@@ -528,8 +528,8 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
       v match {
         case (Scalar(bv: BitVecLiteral), Scalar(bv2: BitVecLiteral)) => {
           acc match {
-            case None                                  => None
-            case Some(None, l)                         => Some(Some(bv.value), bv2 :: l)
+            case None => None
+            case Some(None, l) => Some(Some(bv.value), bv2 :: l)
             case Some(Some(v), l) if bv.value == v + 1 => Some(Some(bv.value), bv2 :: l)
             case Some(Some(v), l) => {
               None

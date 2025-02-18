@@ -86,7 +86,7 @@ class IRToBoogie(
         .map { g =>
           regionInjector.get.getMergedRegion(g.address, g.size) match {
             case Some(region) => BMapVar(s"${region.name}", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
-            case None         => mem
+            case None => mem
           }
         }
         .toList
@@ -131,7 +131,7 @@ class IRToBoogie(
           List()
         }
       case Some(ProcRelyVersion.IfCommandContradiction) => libRGFunsContradictionProof.values.flatten
-      case None                                         => Nil
+      case None => Nil
     }
 
     val functionsUsed1 = procedures.flatMap(p => p.functionOps).toSet ++
@@ -356,7 +356,7 @@ class IRToBoogie(
           }
         }
         val accessesEndian = m.endian match {
-          case Endian.BigEndian    => accesses.reverse
+          case Endian.BigEndian => accesses.reverse
           case Endian.LittleEndian => accesses
         }
 
@@ -408,7 +408,7 @@ class IRToBoogie(
               BVExtract((i + 1) * m.valueSize, i * m.valueSize, valueVar)
             }
             val valuesEndian = m.endian match {
-              case Endian.BigEndian    => values.reverse
+              case Endian.BigEndian => values.reverse
               case Endian.LittleEndian => values
             }
             val indiceValues = for (i <- 0 until m.accesses) yield {
@@ -528,11 +528,11 @@ class IRToBoogie(
         val out = BParam(BoolBType)
         val begin = b.endian match {
           case Endian.LittleEndian => baseVar
-          case Endian.BigEndian    => BinaryBExpr(BVSUB, baseVar, lenVar)
+          case Endian.BigEndian => BinaryBExpr(BVSUB, baseVar, lenVar)
         }
         val end = b.endian match {
           case Endian.LittleEndian => BinaryBExpr(BVADD, baseVar, lenVar)
-          case Endian.BigEndian    => baseVar
+          case Endian.BigEndian => baseVar
         }
 
         val above = BinaryBExpr(BVULE, begin, iVar)
@@ -555,7 +555,7 @@ class IRToBoogie(
       proceduresUpdated = proceduresUpdated.map { procedure =>
         val cmds: List[BCmd] = procedure.body.flatten {
           case b: BBlock => b.body
-          case c: BCmd   => Seq(c)
+          case c: BCmd => Seq(c)
         }
         val callModifies = cmds.collect { case c: BProcedureCall => nameToProcedure(c.name) }.flatMap(_.modifies)
         val modifiesUpdate = procedure.modifies ++ callModifies
@@ -577,7 +577,7 @@ class IRToBoogie(
 
     val modifies: Seq[BVar] = p.modifies.toSeq
       .flatMap {
-        case m: Memory   => Seq(m.toBoogie, m.toGamma)
+        case m: Memory => Seq(m.toBoogie, m.toGamma)
         case r: Register => Seq(r.toBoogie, r.toGamma)
       }
       .distinct
@@ -633,7 +633,7 @@ class IRToBoogie(
 
           val memory = s.region match {
             case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
-            case None         => mem
+            case None => mem
           }
 
           if (s.bytes.size <= 8) {
@@ -707,7 +707,7 @@ class IRToBoogie(
       val sections = memorySections.flatMap { s =>
         val memory = s.region match {
           case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
-          case None         => mem
+          case None => mem
         }
         for (b <- s.bytes.indices) yield {
           BinaryBExpr(
@@ -901,14 +901,14 @@ class IRToBoogie(
             List()
           }
         case Some(ProcRelyVersion.IfCommandContradiction) => relyfun(d.target.name).toList
-        case None                                         => List()
+        case None => List()
       }) ++ List(call)
     case i: IndirectCall => List(Comment(s"UNRESOLVED: call ${i.target.name}"), BAssert(FalseBLiteral))
   }
 
   def translate(s: Statement): List[BCmd] = s match {
     case d: Call => translate(d)
-    case _: NOP  => List.empty
+    case _: NOP => List.empty
     case m: MemoryStore =>
       val lhs = m.mem.toBoogie
       val rhs = BMemoryStore(m.mem.toBoogie, m.index.toBoogie, m.value.toBoogie, m.endian, m.size)
@@ -917,8 +917,8 @@ class IRToBoogie(
       val store = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
       val stateSplit = s match {
         case MemoryStore(_, _, _, _, _, Some(label)) => List(captureStateStatement(s"$label"))
-        case LocalAssign(_, _, Some(label))          => List(captureStateStatement(s"$label"))
-        case _                                       => List.empty
+        case LocalAssign(_, _, Some(label)) => List(captureStateStatement(s"$label"))
+        case _ => List.empty
       }
       m.mem match {
         case _: StackMemory =>
@@ -937,7 +937,7 @@ class IRToBoogie(
             val memory = if (regionInjector.isDefined) {
               regionInjector.get.getMergedRegion(g.address, g.size) match {
                 case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
-                case None         => mem
+                case None => mem
               }
             } else {
               mem

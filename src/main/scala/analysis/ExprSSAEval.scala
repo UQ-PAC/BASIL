@@ -14,10 +14,13 @@ import scala.annotation.tailrec
   * @return:
   *   The evaluated expression (e.g. 0x69632)
   */
-def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[BitVecLiteral]]): Option[BitVecLiteral] = {
+def evaluateExpression(
+  exp: Expr,
+  constantPropResult: Map[Variable, FlatElement[BitVecLiteral]]
+): Option[BitVecLiteral] = {
   def value(v: Variable) = constantPropResult(v) match {
-        case FlatEl(value) => Some(value)
-        case _             => None
+    case FlatEl(value) => Some(value)
+    case _ => None
   }
 
   ir.eval.evalBVExpr(exp, value) match {
@@ -26,22 +29,38 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
   }
 }
 
-def getDefinition(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[Assign] = {
+def getDefinition(
+  variable: Variable,
+  node: CFGPosition,
+  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
+): Set[Assign] = {
   val (in, _) = reachingDefs(node)
   in.getOrElse(variable, Set())
 }
 
-def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[Assign] = {
+def getUse(
+  variable: Variable,
+  node: CFGPosition,
+  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
+): Set[Assign] = {
   val (_, out) = reachingDefs(node)
   out.getOrElse(variable, Set())
 }
 
-def getSSADefinition(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]): FlatElement[Int] = {
+def getSSADefinition(
+  variable: Variable,
+  node: CFGPosition,
+  reachingDefs: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
+): FlatElement[Int] = {
   val (in, _) = reachingDefs(node)
   in(variable)
 }
 
-def getSSAUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]): FlatElement[Int] = {
+def getSSAUse(
+  variable: Variable,
+  node: CFGPosition,
+  reachingDefs: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
+): FlatElement[Int] = {
   val (_, out) = reachingDefs(node)
   out(variable)
 }
@@ -52,7 +71,7 @@ def getSSAUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPositi
   *   The expression to extract the variable from
   * @return
   *   The variable if found, None otherwise
- */
+  */
 @tailrec
 def unwrapExprToVar(expr: Expr): Option[Variable] = {
   expr match {

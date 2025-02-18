@@ -72,14 +72,14 @@ def externalOut(name: String): Map[LocalVar, Variable] = {
 def externalCallReads(name: String) = {
   externalIn(name).map(_._2).map {
     case (l: LocalVar) => Register(l.name, 64)
-    case r: Register   => r
+    case r: Register => r
   }
 }
 
 def externalCallWrites(name: String) = {
   externalIn(name).map(_._2).map {
     case (l: LocalVar) => Register(l.name, 64)
-    case r: Register   => r
+    case r: Register => r
   }
 }
 
@@ -99,7 +99,7 @@ object DefinedOnAllPaths {
 
     def transfer(st: Set[Variable], c: Command) = c match {
       case a: Assign => st ++ a.assignees
-      case _         => st
+      case _ => st
     }
   }
 
@@ -126,24 +126,25 @@ def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
   }
   transforms.applyRPO(ctx.program)
 
-  val liveLab = () => liveVars.collect {
-    case (b: Block, r) => b -> {
-      val live = r.toList.collect {
-        case (v, TwoElementTop) => v
+  val liveLab = () =>
+    liveVars.collect { case (b: Block, r) =>
+      b -> {
+        val live = r.toList.collect { case (v, TwoElementTop) =>
+          v
+        }
+        val dead = r.toList.collect { case (v, TwoElementBottom) =>
+          v
+        }
+        val livel = live.map(_.name).toList.sorted.mkString(", ")
+        // val deadl = dead.map(_.name).toList.sorted.mkString(", ")
+        s"Live: $livel"
       }
-      val dead = r.toList.collect {
-        case (v, TwoElementBottom) => v
-      }
-      val livel = live.map(_.name).toList.sorted.mkString(", ")
-      // val deadl = dead.map(_.name).toList.sorted.mkString(", ")
-      s"Live: $livel"
-    }
-  }.toMap
+    }.toMap
 
-  DebugDumpIRLogger.writeToFile(File(s"live-vars.il"), 
-    PrettyPrinter.pp_prog_with_analysis_results(liveLab(), Map(), 
-      ctx.program, x => x))
-  
+  DebugDumpIRLogger.writeToFile(
+    File(s"live-vars.il"),
+    PrettyPrinter.pp_prog_with_analysis_results(liveLab(), Map(), ctx.program, x => x)
+  )
 
   val params = inOutParams(ctx.program, liveVars)
 
@@ -157,7 +158,6 @@ def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
   val actualParams = SetActualParams(formalParams.mappingInparam, formalParams.mappingOutparam, external)
   visit_prog(actualParams, ctx.program)
 
-  
   while (removeDeadInParams(ctx.program)) {}
 
   ctx.copy(specification = specToProcForm(ctx.specification, formalParams.mappingInparam, formalParams.mappingOutparam))
@@ -191,9 +191,9 @@ def clearParams(p: Program) = {
 def collectVariables(p: Procedure): (Set[Variable], Set[Variable]) = {
   val lvars = p.blocks.toSet.flatMap(_.statements.flatMap(s => {
     s match {
-      case LocalAssign(l, _, _)   => Set(l)
+      case LocalAssign(l, _, _) => Set(l)
       case DirectCall(t, o, _, _) => o.toSet.map(_._2)
-      case _                      => Set()
+      case _ => Set()
     }
   })) ++ p.blocks
     .map(_.jump)
@@ -203,14 +203,14 @@ def collectVariables(p: Procedure): (Set[Variable], Set[Variable]) = {
     .flatten
   val rvars = p.blocks.toSet.flatMap(_.statements.flatMap(s => {
     s match {
-      case LocalAssign(l, r, _)                           => r.variables
-      case Assume(l, _, _, _)                             => l.variables
-      case Assert(l, _, _)                                => l.variables
-      case MemoryStore(m, i, v, _, _, _)                  => i.variables ++ v.variables
+      case LocalAssign(l, r, _) => r.variables
+      case Assume(l, _, _, _) => l.variables
+      case Assert(l, _, _) => l.variables
+      case MemoryStore(m, i, v, _, _, _) => i.variables ++ v.variables
       case MemoryLoad(lhs, m, index, endian, size, label) => index.variables ++ Seq(lhs)
-      case IndirectCall(l, _)                             => Set(l)
-      case DirectCall(t, o, l, _)                         => l.toSet.flatMap(_._2.variables)
-      case _                                              => Set()
+      case IndirectCall(l, _) => Set(l)
+      case DirectCall(t, o, l, _) => l.toSet.flatMap(_._2.variables)
+      case _ => Set()
     }
   }))
 
@@ -260,7 +260,7 @@ object ReadWriteAnalysis {
   sealed trait RW {
     def getRWSet: Option[RWSet] = {
       this match {
-        case Top      => None
+        case Top => None
         case r: RWSet => Some(r)
       }
     }
@@ -278,21 +278,21 @@ object ReadWriteAnalysis {
 
   def addReads(r: Iterable[Variable])(i: RW) = {
     i match {
-      case Top      => Top
+      case Top => Top
       case i: RWSet => i.copy(reads = i.reads ++ r)
     }
   }
   def addWrites(w: Iterable[Variable])(i: RW) = {
     i match {
-      case Top      => Top
+      case Top => Top
       case i: RWSet => i.copy(writes = i.writes ++ w)
     }
   }
 
   def join(a: RW, b: RW): RW = {
     (a, b) match {
-      case (Top, _)             => Top
-      case (_, Top)             => Top
+      case (Top, _) => Top
+      case (_, Top) => Top
       case (a: RWSet, b: RWSet) => RWSet(a.reads ++ b.reads, a.writes ++ b.writes)
     }
   }
@@ -324,13 +324,13 @@ object ReadWriteAnalysis {
             .map(addWrites(s.outParams.flatMap(_._2.variables)))
         }
         case s: IndirectCall => Top
-        case s: Assert       => ir.map(addReads(s.body.variables))
-        case s: Assume       => ir.map(addReads(s.body.variables))
-        case p: Procedure    => ir
-        case b: Block        => ir
-        case b: NOP          => ir
-        case b: Unreachable  => ir
-        case b: GoTo         => ir
+        case s: Assert => ir.map(addReads(s.body.variables))
+        case s: Assume => ir.map(addReads(s.body.variables))
+        case p: Procedure => ir
+        case b: Block => ir
+        case b: NOP => ir
+        case b: Unreachable => ir
+        case b: GoTo => ir
       }
     })
   }
@@ -362,7 +362,7 @@ def inOutParams(
   // in: live at entry & in procedure read set
 
   var readWrites = ReadWriteAnalysis.readWriteSets(p: Program).collect {
-    case (p, None)    => (p, ReadWriteAnalysis.RWSet(overapprox, overapprox))
+    case (p, None) => (p, ReadWriteAnalysis.RWSet(overapprox, overapprox))
     case (p, Some(x)) => (p, ReadWriteAnalysis.onlyGlobal(x))
   }
 
@@ -395,9 +395,9 @@ def inOutParams(
     case (proc, rws) if p.mainProcedure == proc => {
       // no callers of main procedure so keep the whole read/write set
       // of registers
-    
+
       val outParams = (overapprox.intersect(DefinedOnAllPaths.proc(proc)))
-      val inParams =  lives(proc)._1
+      val inParams = lives(proc)._1
       proc -> (inParams, outParams)
     }
     case (proc, rws) => {
@@ -409,7 +409,6 @@ def inOutParams(
       proc -> (inParams, outParams)
     }
   }.toMap
-
 
   // callgraph fixed point
 
@@ -437,11 +436,12 @@ def inOutParams(
       val origIn = oldParams(proc)._1
       val origOut = oldParams(proc)._2
 
-      val calls = proc.collect {
-        case c : DirectCall => c
+      val calls = proc.collect { case c: DirectCall =>
+        c
       }
 
-      val modifiedFromCall = proc.calls.flatMap(p => oldParams.get(p).toSet.flatMap(_._2)).filterNot(_.isInstanceOf[LocalVar])
+      val modifiedFromCall =
+        proc.calls.flatMap(p => oldParams.get(p).toSet.flatMap(_._2)).filterNot(_.isInstanceOf[LocalVar])
 
       val liveFromCall = {
         (for {
@@ -471,7 +471,6 @@ def inOutParams(
   // for ((p, i, o) <- counts.sortBy(_._1.name)) {
   //   Logger.info(s"${p.name} in $i out $o")
   // }
-
 
   newParams.withDefaultValue((overapprox, overapprox))
 }
@@ -557,17 +556,17 @@ def specToProcForm(
     b match {
       case b: BVariable if isPost && varInPost.contains(b.name) => BVariable(varInPost(b.name), b.getType, b.scope)
       case b: BVariable if !isPost && varInPre.contains(b.name) => BVariable(varInPre(b.name), b.getType, b.scope)
-      case b: BVar                                              => b
+      case b: BVar => b
       // case b : _ => varToOld(b)
-      case b: BLiteral       => b
-      case b: BVExtract      => b.copy(body = varToOld(b.body))
-      case b: BVRepeat       => b.copy(body = varToOld(b.body))
-      case b: BVZeroExtend   => b.copy(body = varToOld(b.body))
-      case b: BVSignExtend   => b.copy(body = varToOld(b.body))
-      case b: BFunctionCall  => b.copy(args = b.args.map(varToOld))
-      case b: UnaryBExpr     => b.copy(arg = varToOld(b.arg))
-      case b: BinaryBExpr    => b.copy(arg1 = varToOld(b.arg1), arg2 = varToOld(b.arg2))
-      case b: IfThenElse     => IfThenElse(varToOld(b.guard), varToOld(b.thenExpr), varToOld(b.elseExpr))
+      case b: BLiteral => b
+      case b: BVExtract => b.copy(body = varToOld(b.body))
+      case b: BVRepeat => b.copy(body = varToOld(b.body))
+      case b: BVZeroExtend => b.copy(body = varToOld(b.body))
+      case b: BVSignExtend => b.copy(body = varToOld(b.body))
+      case b: BFunctionCall => b.copy(args = b.args.map(varToOld))
+      case b: UnaryBExpr => b.copy(arg = varToOld(b.arg))
+      case b: BinaryBExpr => b.copy(arg1 = varToOld(b.arg1), arg2 = varToOld(b.arg2))
+      case b: IfThenElse => IfThenElse(varToOld(b.guard), varToOld(b.thenExpr), varToOld(b.elseExpr))
       case b: QuantifierExpr => b
       case b: Old => {
         if (isPost) {
@@ -576,17 +575,17 @@ def specToProcForm(
           throw Exception("Illegal nested or non-relation Old()")
         }
       }
-      case b: MapAccess    => b.copy(index = varToOld(b.index))
-      case b: MapUpdate    => b.copy(index = varToOld(b.index), value = varToOld(b.value))
+      case b: MapAccess => b.copy(index = varToOld(b.index))
+      case b: MapUpdate => b.copy(index = varToOld(b.index), value = varToOld(b.value))
       case b: BByteExtract => b.copy(value = varToOld(b.value), offset = varToOld(b.offset))
-      case b: BInBounds    => b.copy(base = varToOld(b.base), len = varToOld(b.len), i = varToOld(b.i))
-      case b: BMemoryLoad  => b.copy(index = varToOld(b.index))
+      case b: BInBounds => b.copy(base = varToOld(b.base), len = varToOld(b.len), i = varToOld(b.i))
+      case b: BMemoryLoad => b.copy(index = varToOld(b.index))
       case b: BMemoryStore => b.copy(index = varToOld(b.index), value = varToOld(b.value))
-      case b: BDirectExpr  => b
-      case b: GammaLoad    => b.copy(index = varToOld(b.index))
-      case b: GammaStore   => b.copy(index = varToOld(b.index), value = varToOld(b.value))
-      case b: L            => b.copy(index = varToOld(b.index))
-      case b: SpecVar      => b
+      case b: BDirectExpr => b
+      case b: GammaLoad => b.copy(index = varToOld(b.index))
+      case b: GammaStore => b.copy(index = varToOld(b.index), value = varToOld(b.value))
+      case b: L => b.copy(index = varToOld(b.index))
+      case b: SpecVar => b
     }
   }
 

@@ -34,9 +34,9 @@ def gamma_v(l: Variable) = LocalVar("Gamma_" + l.name, BoolType)
 
 def gamma_e(e: Expr): Expr = {
   globals(e) match {
-    case Nil       => TrueLiteral
+    case Nil => TrueLiteral
     case hd :: Nil => hd
-    case hd :: tl  => tl.foldLeft(hd: Expr)((l, r) => BinaryExpr(BoolAND, l, gamma_v(r)))
+    case hd :: tl => tl.foldLeft(hd: Expr)((l, r) => BinaryExpr(BoolAND, l, gamma_v(r)))
   }
 }
 
@@ -45,7 +45,7 @@ class AddGammas extends CILVisitor {
   override def vstmt(s: Statement) = {
     s match {
       case a: LocalAssign => ChangeTo(List(a, LocalAssign(gamma_v(a.lhs), gamma_e(a.rhs))))
-      case _         => SkipChildren()
+      case _ => SkipChildren()
     }
 
   }
@@ -55,9 +55,7 @@ class CILVisitorTest extends AnyFunSuite {
 
   def getRegister(name: String) = Register(name, 64)
   test("trace prog") {
-    val p = prog(
-      proc("main", block("lmain", goto("lmain1")), block("lmain1", goto("lmain2")), block("lmain2", ret))
-    )
+    val p = prog(proc("main", block("lmain", goto("lmain1")), block("lmain1", goto("lmain2")), block("lmain2", ret)))
 
     class BlockTrace extends CILVisitor {
       val res = mutable.ArrayBuffer[String]()
@@ -69,9 +67,9 @@ class CILVisitorTest extends AnyFunSuite {
 
       override def vjump(b: Jump) = {
         b match {
-          case g: GoTo         => res.addAll(g.targets.map(t => s"gt_${t.label}").toList)
+          case g: GoTo => res.addAll(g.targets.map(t => s"gt_${t.label}").toList)
           case _: Return => res.append("return")
-          case _: Unreachable   => res.append("direct")
+          case _: Unreachable => res.append("direct")
         }
         DoChildren()
       }
@@ -102,14 +100,14 @@ class CILVisitorTest extends AnyFunSuite {
       override def vlvar(e: Variable) = {
         e match {
           case Register(n, _) => res.append(n);
-          case _              => ??? // only reg in source program
+          case _ => ??? // only reg in source program
         }
         DoChildren()
       }
       override def vrvar(e: Variable) = {
         e match {
           case Register(n, _) => res.append(n);
-          case _              => ??? // only reg in source program
+          case _ => ??? // only reg in source program
         }
         DoChildren()
       }
@@ -117,8 +115,8 @@ class CILVisitorTest extends AnyFunSuite {
       override def vexpr(e: Expr) = {
         e match {
           case BinaryExpr(op, _, _) => res.append(op.toString)
-          case n: Literal           => res.append(n.toString)
-          case _                    => ()
+          case n: Literal => res.append(n.toString)
+          case _ => ()
         }
         DoChildren()
       }
@@ -155,13 +153,13 @@ class CILVisitorTest extends AnyFunSuite {
       override def vrvar(e: Variable) = {
         e match {
           case Register(n, _) => ChangeTo(LocalVar("l" + n, e.getType));
-          case _               => DoChildren()
+          case _ => DoChildren()
         }
       }
       override def vlvar(e: Variable) = {
         e match {
           case Register(n, _) => ChangeTo(LocalVar("l" + n, e.getType));
-          case _               => DoChildren()
+          case _ => DoChildren()
         }
       }
 
@@ -201,28 +199,39 @@ class CILVisitorTest extends AnyFunSuite {
 
   }
 
-  test ("changedochildrenposttest") {
+  test("changedochildrenposttest") {
 
-    val expr = BinaryExpr(BVADD, BitVecLiteral(BigInt(12), 32), (BinaryExpr(BVADD, BitVecLiteral(BigInt(100), 32), BitVecLiteral(BigInt(120), 32))))
+    val expr = BinaryExpr(
+      BVADD,
+      BitVecLiteral(BigInt(12), 32),
+      (BinaryExpr(BVADD, BitVecLiteral(BigInt(100), 32), BitVecLiteral(BigInt(120), 32)))
+    )
     class vis extends CILVisitor {
 
       override def vexpr(e: Expr) = {
-        ChangeDoChildrenPost(e match {
-          case BitVecLiteral(100, 32) => BitVecLiteral(111, 32)
-          case _ => e
-          }, x => x match {
-            case BitVecLiteral(111,32) =>  LocalVar("beans", BitVecType(32))
-            case _ => x
-          })
-        }
+        ChangeDoChildrenPost(
+          e match {
+            case BitVecLiteral(100, 32) => BitVecLiteral(111, 32)
+            case _ => e
+          },
+          x =>
+            x match {
+              case BitVecLiteral(111, 32) => LocalVar("beans", BitVecType(32))
+              case _ => x
+            }
+        )
       }
-
-      val cexpr = BinaryExpr(BVADD, BitVecLiteral(BigInt(12), 32), (BinaryExpr(BVADD, LocalVar("beans", BitVecType(32)), BitVecLiteral(BigInt(120), 32))))
-
-      val ne = visit_expr(vis(), expr)
-      assert(ne == cexpr)
-
     }
 
+    val cexpr = BinaryExpr(
+      BVADD,
+      BitVecLiteral(BigInt(12), 32),
+      (BinaryExpr(BVADD, LocalVar("beans", BitVecType(32)), BitVecLiteral(BigInt(120), 32)))
+    )
+
+    val ne = visit_expr(vis(), expr)
+    assert(ne == cexpr)
+
+  }
 
 }
