@@ -68,6 +68,13 @@ class IRToDSLTest extends AnyFunSuite {
   }
 }
 
+class A extends Iterable[A] {
+  var n = 0
+  def iterator =
+    n = n + 1
+    if n < 1000 then List(this, this).iterator else Iterator()
+  override def toString = "A.toString"
+}
 
 class BadTest extends AnyFunSuite {
 
@@ -76,8 +83,9 @@ class BadTest extends AnyFunSuite {
   )
 
   test("assert failrue") {
-    println(p)
-    assert(p != p)(Prettifier.basic, org.scalactic.source.Position.here)
+    println(p.getClass().getMethods.map(m => m.getName -> m.getDeclaringClass).toSeq)
+    println(classOf[A].getMethods.map(m => m.getName -> m.getDeclaringClass).toSeq)
+    assert(A() == A())
   }
 }
 
