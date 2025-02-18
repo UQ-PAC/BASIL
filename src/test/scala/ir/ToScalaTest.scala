@@ -274,7 +274,7 @@ enum EAAA {
   case A
   case B
 }
-given ToScala[EAAA] = ToScala.deriveWithExclusions[EAAA, EAAA.A.type]((x: EAAA.A.type) => LazyList("custom", x.toString))
+given ToScala[EAAA] = ToScala.deriveWithExclusions[EAAA, EAAA.A.type](ToScala.Make(x => LazyList("custom", x.toString)))
       """)
 
     // exclusion type should be a subtype of base type
@@ -283,7 +283,7 @@ enum EAAA {
   case A
   case B
 }
-given ToScala[EAAA] = ToScala.deriveWithExclusions[EAAA, Any]((x: Any) => ???)
+given ToScala[EAAA] = ToScala.deriveWithExclusions[EAAA, Any](???)
       """)
 
     // recursive
@@ -378,7 +378,7 @@ case class A39() extends ASD
       case B
     }
     given ToScala[EAAA] =
-      ToScala.deriveWithExclusions[EAAA, EAAA.A.type]((x: EAAA.A.type) => LazyList("custom", x.toString))
+      ToScala.deriveWithExclusions[EAAA, EAAA.A.type](ToScala.Make(x => LazyList("custom", x.toString)))
 
     sealed trait L derives ToScala
     case class N() extends L

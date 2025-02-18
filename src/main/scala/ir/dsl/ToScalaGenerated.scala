@@ -140,7 +140,10 @@ private object Case {
     case x: ir.IndirectCall => x
   }
 
-  given ToScala[Command] = ToScala.deriveWithExclusions[Command, Return | DirectCall | IndirectCall | GoTo] {
+
+  type Excluded = Return | DirectCall | IndirectCall | GoTo
+
+  private lazy val toScalaOfExcluded = ToScala.Make[Excluded] {
     case x: Return => {
       if (x.outParams.isEmpty) {
         LazyList("ret")
@@ -153,6 +156,8 @@ private object Case {
     case x: IndirectCall => LazyList(s"indirectCall(${x.target.toScala})")
     case x: GoTo => LazyList(s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})")
   }
+
+  given ToScala[Command] = ToScala.deriveWithExclusions[Command, Excluded](toScalaOfExcluded)
 
 }
 
