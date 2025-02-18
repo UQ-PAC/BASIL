@@ -43,6 +43,12 @@ trait ToScalaLines[-T] extends ToScala[T]:
     def toScalaLines: Twine
     final override def toScala = x.toScalaLines.mkString
 
+object ToScala {
+  def apply[T](using inst: ToScala[T]) = inst
+
+  export ToScalaDeriving.*
+}
+
 /**
  * Implements ToScala in terms of toScala, for classes whose ToScala output always fits within
  * one line.
@@ -78,12 +84,6 @@ given [T](using ToScala[T]): ToScalaString[Option[T]] with
     def toScala: String = x match
       case None => "None"
       case Some(x) => s"Some(${x.toScala})"
-
-given [K, V](using ToScala[K])(using ToScala[V]): ToScalaString[SortedMap[K, V]] with
-  extension (x: SortedMap[K, V])
-    def toScala: String =
-      val entries = x.map((a, b) => s"${a.toScala} -> ${b.toScala}").mkString(", ")
-      s"SortedMap($entries)"
 
 given [K, V](using ToScala[K])(using ToScala[V]): ToScalaString[(K, V)] with
   extension (x: (K, V))
