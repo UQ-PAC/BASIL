@@ -8,6 +8,8 @@ import translating.serialiseIL
 import ir.dsl.*
 import ir.*
 
+import org.scalactic.Prettifier
+
 class IRToDSLTest extends AnyFunSuite {
 
   val mainproc = proc(
@@ -74,7 +76,8 @@ class BadTest extends AnyFunSuite {
   )
 
   test("assert failrue") {
-    assert(p != p)
+    println(p)
+    assert(p != p)(Prettifier.basic, org.scalactic.source.Position.here)
   }
 }
 
