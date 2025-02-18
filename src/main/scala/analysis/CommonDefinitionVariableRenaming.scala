@@ -12,10 +12,9 @@ private def nextSSACount() = {
   ssaCount
 }
 
-
 /*
  *
- * This analysis attempts to create a variable renaming <name, integer> such that for a given (rhs) variable, all 
+ * This analysis attempts to create a variable renaming <name, integer> such that for a given (rhs) variable, all
  * variables with the same renaming have at least one reaching definition in common.
  *
  * This should mean that sequences of assignments such as:
@@ -35,7 +34,10 @@ private def nextSSACount() = {
  * Pass 2: Use reaching definitions results to unify definition indexes under their set of uses
  *
  */
-def getCommonDefinitionVariableRenaming(p: Program, writesTo: Map[Procedure, Set[Register]]): Map[CFGPosition, (Map[Variable, FlatEl[Int]], Map[Variable, FlatEl[Int]])] = {
+def getCommonDefinitionVariableRenaming(
+  p: Program,
+  writesTo: Map[Procedure, Set[Register]]
+): Map[CFGPosition, (Map[Variable, FlatEl[Int]], Map[Variable, FlatEl[Int]])] = {
 
   val RNASolver = RNAAnalysisSolver(p, false)
   val RNAResult: Map[CFGPosition, Set[Variable]] = RNASolver.analyze()
@@ -48,27 +50,31 @@ def getCommonDefinitionVariableRenaming(p: Program, writesTo: Map[Procedure, Set
   val init = (Map[CFGPosition, Map[Variable, Int]](), Map[Variable, Int]())
 
   // pass 1; assign indexes to each definition
-  val (definitionToIndex: Map[CFGPosition, Map[Variable, Int]], _) = toVisit.foldLeft(init) { (acc: (Map[CFGPosition, Map[Variable, Int]], Map[Variable, Int]), s: CFGPosition) =>
+  val (definitionToIndex: Map[CFGPosition, Map[Variable, Int]], _) = toVisit.foldLeft(init) {
+    (acc: (Map[CFGPosition, Map[Variable, Int]], Map[Variable, Int]), s: CFGPosition) =>
 
-    val (st, x) = acc
-    val nx = s match {
-      case a: SingleAssign => x.updated(a.lhs, nextSSACount())
-      case p: Procedure =>
-        val params = RNAResult(p).map(v => (v, nextSSACount())).toMap
-        Logger.debug(s"${p.name} $params")
-        x ++ params
-      case d: DirectCall => writesTo.get(d.target) match {
-        case Some(registers) =>
-          val result = registers.foldLeft(Map[Variable, Int]()) { (m, register) =>
-            m + (register -> nextSSACount())
+      val (st, x) = acc
+      val nx = s match {
+        case a: SingleAssign => x.updated(a.lhs, nextSSACount())
+        case p: Procedure =>
+          val params = RNAResult(p).map(v => (v, nextSSACount())).toMap
+          Logger.debug(s"${p.name} $params")
+          x ++ params
+        case d: DirectCall =>
+          writesTo.get(d.target) match {
+            case Some(registers) =>
+              val result = registers.foldLeft(Map[Variable, Int]()) { (m, register) =>
+                m + (register -> nextSSACount())
+              }
+              x ++ result
+            case None =>
+              x
           }
-          x ++ result
-        case None =>
+        case _: GoTo | _: MemoryStore | _: Assume | _: Assert | _: Block | _: NOP | _: IndirectCall | _: Unreachable |
+            _: Return =>
           x
-        }
-      case _: GoTo | _: MemoryStore | _: Assume | _: Assert | _: Block | _: NOP | _: IndirectCall | _: Unreachable | _: Return => x
-    }
-    (st.updated(s, nx), nx)
+      }
+      (st.updated(s, nx), nx)
   }
 
   // pass 2: unify indexes over their uses using reaching definitions (intraprocedurally so as to not unify across calls)

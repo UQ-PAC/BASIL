@@ -25,7 +25,7 @@ case class StVarLoader[S, F <: Effects[S, InterpreterError]](f: F) extends Loade
       v <- f.loadVar(v.name)
     } yield ((v match {
       case Scalar(l) => Some(l)
-      case _         => None
+      case _ => None
     }))
   }
 
@@ -43,11 +43,11 @@ case class StVarLoader[S, F <: Effects[S, InterpreterError]](f: F) extends Loade
             .map((v: BasilValue) =>
               v match {
                 case Scalar(l) => Some(l)
-                case _         => None
+                case _ => None
               }
             )
         case l: Literal => Eval.loadBV(f)(m.name, Scalar(l), endian, size).map(Some(_))
-        case _          => get((s: S) => None)
+        case _ => get((s: S) => None)
       }
     } yield (r)
   }
@@ -94,7 +94,7 @@ case object Eval {
       res <- evalExpr(f)(e)
       r <- State.pureE(res match {
         case l: Literal => Right(l)
-        case _          => Left((Errored(s"Eval BV residual $e")))
+        case _ => Left((Errored(s"Eval BV residual $e")))
       })
     } yield (r)
   }
@@ -104,7 +104,7 @@ case object Eval {
       res <- evalExpr(f)(e)
       r <- State.pureE(res match {
         case l: BitVecLiteral => Right(l)
-        case _                => Left((Errored(s"Eval BV residual $e")))
+        case _ => Left((Errored(s"Eval BV residual $e")))
       })
     } yield (r)
   }
@@ -114,7 +114,7 @@ case object Eval {
       res <- evalExpr(f)(e)
       r <- State.pureE(res match {
         case l: IntLiteral => Right(l.value)
-        case _             => Left((Errored(s"Eval Int residual $e")))
+        case _ => Left((Errored(s"Eval Int residual $e")))
       })
     } yield (r)
   }
@@ -124,7 +124,7 @@ case object Eval {
       res <- evalExpr(f)(e)
       r <- State.pureE(res match {
         case l: BoolLit => Right(l == TrueLiteral)
-        case _          => Left((Errored(s"Eval Bool residual $e")))
+        case _ => Left((Errored(s"Eval Bool residual $e")))
       })
     } yield (r)
   }
@@ -143,7 +143,7 @@ case object Eval {
       values <- f.loadMem(vname, keys.toList)
       vals = endian match {
         case Endian.LittleEndian => values.reverse
-        case Endian.BigEndian    => values
+        case Endian.BigEndian => values
       }
     } yield (vals.toList)
   }
@@ -208,7 +208,7 @@ case object Eval {
       keys <- State.mapM((i: Int) => State.pureE(BasilValue.unsafeAdd(addr, i)), (0 until values.size))
       vals = endian match {
         case Endian.LittleEndian => values.reverse
-        case Endian.BigEndian    => values
+        case Endian.BigEndian => values
       }
       x <- f.storeMem(vname, keys.zip(vals).toMap)
     } yield (x)
@@ -247,7 +247,7 @@ case object Eval {
       extractVals = (0 until cells).map(i => BitVectorEval.boogie_extract((i + 1) * vsize, i * vsize, value)).toList
       vs = endian match {
         case Endian.LittleEndian => extractVals.map(Scalar(_))
-        case Endian.BigEndian    => extractVals.reverse.map(Scalar(_))
+        case Endian.BigEndian => extractVals.reverse.map(Scalar(_))
       }
 
       keys <- State.mapM((i: Int) => State.pureE(BasilValue.unsafeAdd(addr, i)), (0 until cells))
@@ -270,7 +270,7 @@ case object Eval {
     for {
       srv: BitVecLiteral <- src match {
         case Scalar(b: BitVecLiteral) => State.pure(b)
-        case _                        => State.setError(Errored(s"Not pointer : $src"))
+        case _ => State.setError(Errored(s"Not pointer : $src"))
       }
       c <- f.loadMem(rgn, List(src))
       res <- c.head match {
@@ -293,12 +293,12 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
       next <- f.getNext
       _ <- State.pure(Logger.debug(s"$next"))
       r: Boolean <- (next match {
-        case Intrinsic(tgt)    => LibcIntrinsic.intrinsics(tgt)(f).map(_ => true)
+        case Intrinsic(tgt) => LibcIntrinsic.intrinsics(tgt)(f).map(_ => true)
         case Run(c: Statement) => interpretStatement(f)(c).map(_ => true)
-        case ReturnTo(c)       => interpretReturn(f)(c).map(_ => true)
-        case Run(c: Jump)      => interpretJump(f)(c).map(_ => true)
-        case Stopped()         => State.pure(false)
-        case ErrorStop(e)      => State.pure(false)
+        case ReturnTo(c) => interpretReturn(f)(c).map(_ => true)
+        case Run(c: Jump) => interpretJump(f)(c).map(_ => true)
+        case Stopped() => State.pure(false)
+        case ErrorStop(e) => State.pure(false)
       })
     } yield (r)
 
@@ -326,9 +326,9 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
           chosen: List[Assume] <- filterM((a: Assume) => Eval.evalBool(f)(a.body), assumes)
 
           res <- chosen match {
-            case Nil      => State.setError(Errored(s"No jump target satisfied $gt"))
+            case Nil => State.setError(Errored(s"No jump target satisfied $gt"))
             case h :: Nil => f.setNext(Run(h))
-            case h :: tl  => State.setError(Errored(s"More than one jump guard satisfied $gt"))
+            case h :: tl => State.setError(Errored(s"More than one jump guard satisfied $gt"))
           }
         } yield (res)
       case r: Return => {
@@ -443,7 +443,7 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
             fp <- f.evalAddrToProc(addr.value.toInt)
             _ <- fp match {
               case Some(fp) => f.call(fp.name, fp.call, Run(ic.successor))
-              case none     => State.setError(EscapedControlFlow(ic))
+              case none => State.setError(EscapedControlFlow(ic))
             }
           } yield ()
         }
@@ -537,6 +537,7 @@ object InterpFuns {
       l <- s.storeVar("R30_in", Scope.Global, Scalar(LR))
       l <- s.storeVar("R0", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       l <- s.storeVar("R1", Scope.Global, Scalar(BitVecLiteral(0, 64)))
+
       /** callee saved * */
       l <- s.storeVar("R19", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       l <- s.storeVar("R20", Scope.Global, Scalar(BitVecLiteral(0, 64)))
@@ -548,6 +549,7 @@ object InterpFuns {
       l <- s.storeVar("R26", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       l <- s.storeVar("R27", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       l <- s.storeVar("R28", Scope.Global, Scalar(BitVecLiteral(0, 64)))
+
       /** end callee saved * */
       _ <- s.storeVar("ghost-funtable", Scope.Global, BasilMapValue(Map.empty, MapType(BitVecType(64), BitVecType(64))))
       _ <- IntrinsicImpl.initFileGhostRegions(s)
@@ -586,7 +588,9 @@ object InterpFuns {
     s = State.execute(s, f.call("init_activation", Stopped(), Stopped()))
     s = initMemory(s, "mem", p.initialMemory.values)
     s = initMemory(s, "stack", p.initialMemory.values)
-    mainfun.entryBlock.foreach(startBlock => s = State.execute(s, f.call(mainfun.name, Run(IRWalk.firstInBlock(startBlock)), Stopped())))
+    mainfun.entryBlock.foreach(startBlock =>
+      s = State.execute(s, f.call(mainfun.name, Run(IRWalk.firstInBlock(startBlock)), Stopped()))
+    )
     // l <- State.sequence(State.pure(()), mainfun.formalInParam.toList.map(i => f.storeVar(i.name, i.toBoogie.scope, Scalar(BitVecLiteral(0, size(i).get)))))
     s
   }
@@ -613,7 +617,7 @@ object InterpFuns {
     } yield (st)
 
     bss match {
-      case None       => Logger.error("No BSS initialised"); is
+      case None => Logger.error("No BSS initialised"); is
       case Some(init) => init
     }
   }
@@ -626,7 +630,7 @@ object InterpFuns {
     val (fs, v) = st.f(is)
     v match {
       case Right(r) => fs
-      case Left(e)  => throw Exception(s"Init failed $e")
+      case Left(e) => throw Exception(s"Init failed $e")
     }
   }
 

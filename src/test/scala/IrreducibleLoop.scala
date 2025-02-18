@@ -1,4 +1,3 @@
-
 import org.scalatest.funsuite.AnyFunSuite
 import util.{Logger, PerformanceTimer, ILLoadingConfig, RunUtils, IRLoading, LogLevel}
 import translating.BAPToIR
@@ -20,7 +19,7 @@ class IrreducibleLoop extends AnyFunSuite {
   val testPath = "./src/test/irreducible_loops"
   Logger.setLevel(LogLevel.ERROR)
 
-  def load(conf: ILLoadingConfig) : Program = {
+  def load(conf: ILLoadingConfig): Program = {
     val bapProgram = IRLoading.loadBAP(conf.inputFile)
     val (_, _, _, _, _, mainAddress) = IRLoading.loadReadELF(conf.relfFile, conf)
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
@@ -41,7 +40,6 @@ class IrreducibleLoop extends AnyFunSuite {
     assert(!boogieResult.contains("found unreachable code"))
   }
 
-
   def runTest(path: String, name: String): Unit = {
     val variationPath = path + "/" + name
     val ADTPath = variationPath + ".adt"
@@ -52,14 +50,20 @@ class IrreducibleLoop extends AnyFunSuite {
 
     val foundLoops = LoopDetector.identify_loops(program)
 
-    writeToFile(dotBlockGraph(program, program.collect { case b: Block => b -> b.toString }.toMap), s"${variationPath}_blockgraph-before-reduce.dot")
+    writeToFile(
+      dotBlockGraph(program, program.collect { case b: Block => b -> b.toString }.toMap),
+      s"${variationPath}_blockgraph-before-reduce.dot"
+    )
 
     foundLoops.identifiedLoops.foreach(l => Logger.debug(s"found loops${System.lineSeparator()}$l"))
 
     val newLoops = foundLoops.reducibleTransformIR()
     newLoops.identifiedLoops.foreach(l => Logger.debug(s"newloops${System.lineSeparator()}$l"))
 
-    writeToFile(dotBlockGraph(program, program.collect { case b: Block => b -> b.toString }.toMap), s"${variationPath}_blockgraph-after-reduce.dot")
+    writeToFile(
+      dotBlockGraph(program, program.collect { case b: Block => b -> b.toString }.toMap),
+      s"${variationPath}_blockgraph-after-reduce.dot"
+    )
     val foundLoops2 = LoopDetector.identify_loops(program)
     assert(foundLoops2.identifiedLoops.count(_.reducible) == foundLoops.identifiedLoops.size)
     assert(foundLoops2.identifiedLoops.count(_.reducible) > foundLoops.identifiedLoops.count(_.reducible))

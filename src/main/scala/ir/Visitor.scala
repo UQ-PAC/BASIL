@@ -30,7 +30,6 @@ abstract class Visitor {
     node
   }
 
-
   def visitAssume(node: Assume): Statement = {
     node.body = visitExpr(node.body)
     node
@@ -229,7 +228,6 @@ abstract class ReadOnlyVisitor extends Visitor {
     node
   }
 
-
   override def visitProgram(node: Program): Program = {
     for (i <- node.procedures) {
       visitProcedure(i)
@@ -246,12 +244,9 @@ abstract class ReadOnlyVisitor extends Visitor {
 
 }
 
-/**
-  * Visits all reachable blocks in a procedure, depth-first, in the order they are reachable from the start of the
-  * procedure.
-  * Does not jump to other procedures.
-  * Only modifies statements and jumps.
-  * */
+/** Visits all reachable blocks in a procedure, depth-first, in the order they are reachable from the start of the
+  * procedure. Does not jump to other procedures. Only modifies statements and jumps.
+  */
 abstract class IntraproceduralControlFlowVisitor extends Visitor {
   private val visitedBlocks: mutable.Set[Block] = mutable.Set()
 
@@ -303,18 +298,18 @@ class StackSubstituter extends IntraproceduralControlFlowVisitor {
   }
 
   def isStackPtr(v: Variable) = {
-      (v match {
-            case l: LocalVar if l.varName == "R31" => true
-            case r: Variable if r.name == "R31" => true
-            case _ => false
-      }) || stackRefs.contains(v)
+    (v match {
+      case l: LocalVar if l.varName == "R31" => true
+      case r: Variable if r.name == "R31" => true
+      case _ => false
+    }) || stackRefs.contains(v)
   }
 
   override def visitMemoryLoad(node: MemoryLoad): MemoryLoad = {
     // replace mem with stack in load if index contains stack references
     if (node.index.variables.exists(isStackPtr)) {
       node.mem = stackMemory
-    } 
+    }
 
     if (stackRefs.contains(node.lhs) && node.lhs != stackPointer) {
       stackRefs.remove(node.lhs)
@@ -348,18 +343,17 @@ class StackSubstituter extends IntraproceduralControlFlowVisitor {
 class Substituter(variables: Map[Variable, Variable] = Map(), memories: Map[Memory, Memory] = Map()) extends Visitor {
   override def visitVariable(node: Variable): Variable = variables.get(node) match {
     case Some(v: Variable) => v
-    case None              => node
+    case None => node
   }
 
   override def visitMemory(node: Memory): Memory = memories.get(node) match {
     case Some(m: Memory) => m
-    case None            => node
+    case None => node
   }
 }
 
-/**
-  * Prevents strings in 'reserved' from being used as the name of anything by adding a '#' to the start.
-  * Useful for avoiding Boogie's reserved keywords.
+/** Prevents strings in 'reserved' from being used as the name of anything by adding a '#' to the start. Useful for
+  * avoiding Boogie's reserved keywords.
   */
 class Renamer(reserved: Set[String]) extends Visitor {
   override def visitProgram(node: Program): Program = {
@@ -419,7 +413,7 @@ class ExternalRemover(external: Set[String]) extends Visitor {
 }
 
 /** Gives variables that are not contained within a MemoryStore or the rhs of a MemoryLoad
-  * */
+  */
 class VariablesWithoutStoresLoads extends ReadOnlyVisitor {
   val variables: mutable.Set[Variable] = mutable.Set()
 

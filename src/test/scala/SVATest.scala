@@ -24,10 +24,7 @@ class SVATest extends AnyFunSuite {
   def runTest(path: String): BASILResult = {
     RunUtils.loadAndTranslate(
       BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = path + ".adt",
-          relfFile = path + ".relf",
-        ),
+        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf"),
         simplify = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
@@ -41,10 +38,7 @@ class SVATest extends AnyFunSuite {
     RunUtils.loadAndTranslate(
       BASILConfig(
         context = Some(context),
-        loading = ILLoadingConfig(
-          inputFile = "",
-          relfFile = "",
-        ),
+        loading = ILLoadingConfig(inputFile = "", relfFile = ""),
         simplify = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
@@ -54,7 +48,11 @@ class SVATest extends AnyFunSuite {
     )
   }
 
-  def programToContext(program: Program, globals: Set[SpecGlobal] = Set.empty, globalOffsets: Map[BigInt, BigInt] = Map.empty): IRContext = {
+  def programToContext(
+    program: Program,
+    globals: Set[SpecGlobal] = Set.empty,
+    globalOffsets: Map[BigInt, BigInt] = Map.empty
+  ): IRContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program)
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
@@ -77,30 +75,17 @@ class SVATest extends AnyFunSuite {
     val use1 = LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(10, 64)), Some("use1"))
 
     val program = prog(
-      proc("main",
-        block("call",
-          directCall("malloc"),
-          goto("block1", "block2")
-        ),
-        block("block1",
-          use,
-          goto("return")
-        ),
-        block("block2",
-          use1,
-          goto("return")
-        ),
-        block("return",
-          ret
-        )
+      proc(
+        "main",
+        block("call", directCall("malloc"), goto("block1", "block2")),
+        block("block1", use, goto("return")),
+        block("block2", use1, goto("return")),
+        block("return", ret)
       ),
-
-      proc("malloc", // fake malloc
-        block("malloc_b",
-          load,
-          ret
-        )
-      ),
+      proc(
+        "malloc", // fake malloc
+        block("malloc_b", load, ret)
+      )
     )
 
     val context = programToContext(program, globals, globalOffsets)
@@ -121,10 +106,10 @@ class SVATest extends AnyFunSuite {
 //
 //    val mallocSB: SymBase = Heap(mallocCall)
 
-
     val mallocValSet = r0SVA.collectFirst {
       case (variable: LocalVar, valueSet: SymValueSet)
-        if valueSet.state.keys.exists(_.isInstanceOf[Heap]) && valueSet.size == 1 => valueSet
+          if valueSet.state.keys.exists(_.isInstanceOf[Heap]) && valueSet.size == 1 =>
+        valueSet
     }.get // expect exactly 1 value set matching the case
     assert(mallocValSet.state.head._2.getOffsets == Set(0), "incorrect offset for malloc symbolic value")
 
@@ -144,24 +129,11 @@ class SVATest extends AnyFunSuite {
     val assign = LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(10, 64)), Some("assign"))
 
     val program = prog(
-      proc("main",
-        block("call",
-          init,
-          directCall("callee"),
-          goto("block")
-        ),
-        block("block",
-          assign,
-          ret
-        )
-      ),
-
-      proc("callee", // fake malloc
-        block("callee_b",
-          load,
-          ret
-        )
-      ),
+      proc("main", block("call", init, directCall("callee"), goto("block")), block("block", assign, ret)),
+      proc(
+        "callee", // fake malloc
+        block("callee_b", load, ret)
+      )
     )
 
     val context = programToContext(program, globals, globalOffsets)
@@ -171,7 +143,8 @@ class SVATest extends AnyFunSuite {
 
     val returnedValSet = r0SVA.collectFirst {
       case (variable: LocalVar, valueSet: SymValueSet)
-        if valueSet.state.keys.exists(_.isInstanceOf[Ret]) && valueSet.size == 1 => valueSet
+          if valueSet.state.keys.exists(_.isInstanceOf[Ret]) && valueSet.size == 1 =>
+        valueSet
     }.get // expect exactly 1 value set matching the case
     assert(returnedValSet.state.head._2.getOffsets == Set(0), "incorrect offset for returned symbolic value")
 
@@ -192,15 +165,7 @@ class SVATest extends AnyFunSuite {
     val assign2 = LocalAssign(R3, R1, Some("02"))
 //    val assign3 = LocalAssign(R0, BinaryExpr(BVADD, R2, BitVecLiteral(10, 64)), Some("assign"))
 
-    val program = prog(
-      proc("main",
-        block("block",
-          assign1,
-          assign2,
-          ret
-        )
-      ),
-    )
+    val program = prog(proc("main", block("block", assign1, assign2, ret)))
 
     val context = programToContext(program, globals, globalOffsets)
     val main = program.mainProcedure
@@ -233,15 +198,7 @@ class SVATest extends AnyFunSuite {
     val assign1 = LocalAssign(R1, R0, Some("01"))
     val assign2 = LocalAssign(R0, BinaryExpr(BVADD, R1, BitVecLiteral(10, 64)), Some("assign"))
 
-    val program = prog(
-      proc("main",
-        block("block",
-          assign1,
-          assign2,
-          ret
-        )
-      ),
-    )
+    val program = prog(proc("main", block("block", assign1, assign2, ret)))
 
     val context = programToContext(program, globals, globalOffsets)
     val main = program.mainProcedure
@@ -271,23 +228,17 @@ class SVATest extends AnyFunSuite {
     val assign3 = LocalAssign(R0, R0, Some("03"))
 
     val program = prog(
-      proc("main",
-        block("split",
-          goto(List("return", "branch1", "branch2"))
-        ),
-        block("branch1",
-          assign1,
-          goto("return")
-        ),
-        block("branch2",
-          assign2,
-          goto("return")
-        ),
-        block("return",
+      proc(
+        "main",
+        block("split", goto(List("return", "branch1", "branch2"))),
+        block("branch1", assign1, goto("return")),
+        block("branch2", assign2, goto("return")),
+        block(
+          "return",
           assign3, // needed so that dead code won't kill the branch assignments
           ret
         )
-      ),
+      )
     )
     val R0in = LocalVar("R0_in", bv64)
 
@@ -298,7 +249,10 @@ class SVATest extends AnyFunSuite {
     val (_, lastValSet) = sva.getSorted("R0").last
 
     assert(sva(R0in) == SymValueSet(Par(main, R0in)), "Incorrect SymbolicValueSet for R0_in")
-    assert(lastValSet == sva(R0in).join(sva(R0in).apply(i => i + 10).join(sva(R0in).apply(i => i + 45))), "Incorrect set of offsets")
+    assert(
+      lastValSet == sva(R0in).join(sva(R0in).apply(i => i + 10).join(sva(R0in).apply(i => i + 45))),
+      "Incorrect set of offsets"
+    )
   }
 
   test("loop") {
@@ -311,21 +265,13 @@ class SVATest extends AnyFunSuite {
     val assign2 = LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(45, 64)), Some("assign"))
 
     val program = prog(
-      proc("main",
-        block("intro",
-          goto("head")
-        ),
-        block("head",
-          goto("body", "return")
-        ),
-        block("body",
-          assign1,
-          goto(List("head", "return"))
-        ),
-        block("return",
-          ret
-        )
-      ),
+      proc(
+        "main",
+        block("intro", goto("head")),
+        block("head", goto("body", "return")),
+        block("body", assign1, goto(List("head", "return"))),
+        block("return", ret)
+      )
     )
 
     val R0in = LocalVar("R0_in", bv64)
@@ -352,15 +298,7 @@ class SVATest extends AnyFunSuite {
     val load = MemoryLoad(R0, mem, xPointer, Endian.LittleEndian, 64, Some("001"))
     val assign = LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(10, 64)))
 
-    val program = prog(
-      proc("main",
-        block("block",
-          load,
-          assign,
-          ret
-        )
-      )
-    )
+    val program = prog(proc("main", block("block", load, assign, ret)))
 
     val context = programToContext(program, globals, globalOffsets)
 
@@ -370,8 +308,8 @@ class SVATest extends AnyFunSuite {
     val r0SVA = sva.getSorted(regName)
 
     val loadValSet = r0SVA.collectFirst {
-      case (variable: LocalVar, valueSet: SymValueSet)
-        if valueSet.contains(Loaded(load)) && valueSet.size == 1 => valueSet
+      case (variable: LocalVar, valueSet: SymValueSet) if valueSet.contains(Loaded(load)) && valueSet.size == 1 =>
+        valueSet
     }.get // expect exactly 1 value set matching the case
     assert(loadValSet.get(Loaded(load)).getOffsets == Set(0), "incorrect offset for loaded symbolic value")
 

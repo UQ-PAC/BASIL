@@ -14,7 +14,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
   def blockIdentifier(block: Block): String = {
     val i = block.address match {
       case Some(addr) => f"$addr:${block.label}"
-      case None       => f"?:${block.label}"
+      case None => f"?:${block.label}"
     }
     s"\"$i\""
   }
@@ -22,7 +22,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
   def procedureIdentifier(proc: Procedure): String = {
     val i = proc.address match {
       case Some(addr) => f"$addr:${proc.name}"
-      case None       => f"?:${proc.name}"
+      case None => f"?:${proc.name}"
     }
     s"\"$i\""
   }
@@ -54,7 +54,6 @@ private class ILSerialiser extends ReadOnlyVisitor {
     node
   }
 
-
   override def visitAssume(node: Assume): Statement = {
     program ++= "Assume("
     visitExpr(node.body)
@@ -82,7 +81,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
 
   override def visitJump(node: Jump): Jump = {
     node match {
-      case j: GoTo => program ++= s"goTo(${j.targets.map(_.label).mkString(", ")})" 
+      case j: GoTo => program ++= s"goTo(${j.targets.map(_.label).mkString(", ")})"
       case h: Unreachable => program ++= "halt"
       case h: Return => program ++= s"return (${h.outParams.map(_._2).mkString(", ")})"
     }

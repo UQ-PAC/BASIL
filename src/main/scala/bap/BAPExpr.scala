@@ -83,7 +83,7 @@ object BAPUnOperator {
 case class BAPBinOp(operator: BAPBinOperator, lhs: BAPExpr, rhs: BAPExpr) extends BAPExpr {
   override val size: Int = operator match {
     case EQ | NEQ | LT | LE | SLT | SLE => 1
-    case _                              => lhs.size
+    case _ => lhs.size
   }
 }
 
@@ -93,25 +93,25 @@ sealed trait BAPBinOperator(op: String) {
 
 object BAPBinOperator {
   def apply(op: String): BAPBinOperator = op match {
-    case "PLUS"    => PLUS
-    case "MINUS"   => MINUS
-    case "TIMES"   => TIMES
-    case "DIVIDE"  => DIVIDE
+    case "PLUS" => PLUS
+    case "MINUS" => MINUS
+    case "TIMES" => TIMES
+    case "DIVIDE" => DIVIDE
     case "SDIVIDE" => SDIVIDE
-    case "MOD"     => MOD
-    case "SMOD"    => SMOD
-    case "LSHIFT"  => LSHIFT
-    case "RSHIFT"  => RSHIFT
+    case "MOD" => MOD
+    case "SMOD" => SMOD
+    case "LSHIFT" => LSHIFT
+    case "RSHIFT" => RSHIFT
     case "ARSHIFT" => ARSHIFT
-    case "AND"     => AND
-    case "OR"      => OR
-    case "XOR"     => XOR
-    case "EQ"      => EQ
-    case "NEQ"     => NEQ
-    case "LT"      => LT
-    case "LE"      => LE
-    case "SLT"     => SLT
-    case "SLE"     => SLE
+    case "AND" => AND
+    case "OR" => OR
+    case "XOR" => XOR
+    case "EQ" => EQ
+    case "NEQ" => NEQ
+    case "LT" => LT
+    case "LE" => LE
+    case "SLT" => SLT
+    case "SLE" => SLE
   }
 }
 

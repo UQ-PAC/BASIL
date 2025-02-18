@@ -1,4 +1,4 @@
-package ir.eval 
+package ir.eval
 import ir.*
 import scala.annotation.tailrec
 import scala.math.pow
@@ -23,15 +23,11 @@ object BitVectorEval {
     */
   def bv2nat(b: BitVecLiteral): BigInt = b.value
 
-  /**
-   * Converts a bitvector value to its corresponding signed integer
-   */
+  /** Converts a bitvector value to its corresponding signed integer
+    */
   def bv2SignedInt(b: BitVecLiteral): BigInt =
-    if isNegative(b) then
-      b.value - BigInt(2).pow(b.size)
-    else
-      b.value
-
+    if isNegative(b) then b.value - BigInt(2).pow(b.size)
+    else b.value
 
   /** (bvadd (_ BitVec m) (_ BitVec m) (_ BitVec m))
     *   - addition modulo 2^m

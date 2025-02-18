@@ -35,8 +35,11 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       }
       procedure.formalInParam = mutable.SortedSet.from(s.in.map(translateParam))
       procedure.formalOutParam = mutable.SortedSet.from(s.out.filterNot(_.name.endsWith("_result")).map(translateParam))
-      procedure.inParamDefaultBinding = immutable.SortedMap.from(s.in.map(s => translateParam(s)-> paramRegisterRVal(s)))
-      procedure.outParamDefaultBinding = immutable.SortedMap.from(s.out.filterNot(_.name.endsWith("_result")).map(s => translateParam(s) -> paramRegisterLVal(s)))
+      procedure.inParamDefaultBinding =
+        immutable.SortedMap.from(s.in.map(s => translateParam(s) -> paramRegisterRVal(s)))
+      procedure.outParamDefaultBinding = immutable.SortedMap.from(
+        s.out.filterNot(_.name.endsWith("_result")).map(s => translateParam(s) -> paramRegisterLVal(s))
+      )
 
       if (s.address.contains(mainAddress)) {
         mainProcedure = Some(procedure)
@@ -85,10 +88,10 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
         case d: DirectCall => {
           if (subroutines.contains(d.target.name)) {
             val s = subroutines(d.target.name)
-            ChangeTo(List(DirectCall(d.target, d.label, 
-              d.target.outParamDefaultBinding,
-              d.target.inParamDefaultBinding)))
-          }  else {
+            ChangeTo(
+              List(DirectCall(d.target, d.label, d.target.outParamDefaultBinding, d.target.inParamDefaultBinding))
+            )
+          } else {
             SkipChildren()
           }
         }
@@ -107,12 +110,22 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       if (mem != translateMemory(b.rhs.memory)) {
         throw Exception(s"$b has conflicting lhs ${b.lhs} and rhs ${b.rhs.memory}")
       }
-      Seq(MemoryStore(mem, translateExprOnly(b.rhs.index), translateExprOnly(b.rhs.value), b.rhs.endian, b.rhs.size, Some(b.line)))
+      Seq(
+        MemoryStore(
+          mem,
+          translateExprOnly(b.rhs.index),
+          translateExprOnly(b.rhs.value),
+          b.rhs.endian,
+          b.rhs.size,
+          Some(b.line)
+        )
+      )
     case b: BAPLocalAssign =>
       val lhs = translateVar(b.lhs)
       val (rhs, load) = translateExpr(b.rhs)
       if (load.isDefined) {
-        val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, Some(b.line + "$0"))
+        val loadWithLabel =
+          MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, Some(b.line + "$0"))
         val assign = LocalAssign(lhs, rhs, Some(b.line + "$1"))
         Seq(loadWithLabel, assign)
       } else {
@@ -161,48 +174,50 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       }
       (extract, load)
     case literal: BAPLiteral => (translateLiteral(literal), None)
-    case BAPUnOp(operator, exp) => operator match {
-      case NOT => (UnaryExpr(BVNOT, translateExprOnly(exp)), None)
-      case NEG => (UnaryExpr(BVNEG, translateExprOnly(exp)), None)
-    }
-    case BAPBinOp(operator, lhs, rhs) => operator match {
-      case PLUS => (BinaryExpr(BVADD, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case MINUS => (BinaryExpr(BVSUB, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case TIMES => (BinaryExpr(BVMUL, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case DIVIDE => (BinaryExpr(BVUDIV, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case SDIVIDE => (BinaryExpr(BVSDIV, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      // counterintuitive but correct according to BAP source
-      case MOD => (BinaryExpr(BVSREM, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      // counterintuitive but correct according to BAP source
-      case SMOD => (BinaryExpr(BVUREM, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case LSHIFT => // BAP says caring about this case is necessary?
-        if (lhs.size == rhs.size) {
-          (BinaryExpr(BVSHL, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-        } else {
-          (BinaryExpr(BVSHL, translateExprOnly(lhs), ZeroExtend(lhs.size - rhs.size, translateExprOnly(rhs))), None)
-        }
-      case RSHIFT =>
-        if (lhs.size == rhs.size) {
-          (BinaryExpr(BVLSHR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-        } else {
-          (BinaryExpr(BVLSHR, translateExprOnly(lhs), ZeroExtend(lhs.size - rhs.size, translateExprOnly(rhs))), None)
-        }
-      case ARSHIFT =>
-        if (lhs.size == rhs.size) {
-          (BinaryExpr(BVASHR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-        } else {
-          (BinaryExpr(BVASHR, translateExprOnly(lhs), ZeroExtend(lhs.size - rhs.size, translateExprOnly(rhs))), None)
-        }
-      case AND => (BinaryExpr(BVAND, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case OR => (BinaryExpr(BVOR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case XOR => (BinaryExpr(BVXOR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case EQ => (BinaryExpr(BVCOMP, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case NEQ => (UnaryExpr(BVNOT, BinaryExpr(BVCOMP, translateExprOnly(lhs), translateExprOnly(rhs))), None)
-      case LT => (BinaryExpr(BVULT, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case LE => (BinaryExpr(BVULE, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case SLT => (BinaryExpr(BVSLT, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case SLE => (BinaryExpr(BVSLE, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-    }
+    case BAPUnOp(operator, exp) =>
+      operator match {
+        case NOT => (UnaryExpr(BVNOT, translateExprOnly(exp)), None)
+        case NEG => (UnaryExpr(BVNEG, translateExprOnly(exp)), None)
+      }
+    case BAPBinOp(operator, lhs, rhs) =>
+      operator match {
+        case PLUS => (BinaryExpr(BVADD, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+        case MINUS => (BinaryExpr(BVSUB, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+        case TIMES => (BinaryExpr(BVMUL, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+        case DIVIDE => (BinaryExpr(BVUDIV, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+        case SDIVIDE => (BinaryExpr(BVSDIV, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+        // counterintuitive but correct according to BAP source
+        case MOD => (BinaryExpr(BVSREM, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+        // counterintuitive but correct according to BAP source
+        case SMOD => (BinaryExpr(BVUREM, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+        case LSHIFT => // BAP says caring about this case is necessary?
+          if (lhs.size == rhs.size) {
+            (BinaryExpr(BVSHL, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+          } else {
+            (BinaryExpr(BVSHL, translateExprOnly(lhs), ZeroExtend(lhs.size - rhs.size, translateExprOnly(rhs))), None)
+          }
+        case RSHIFT =>
+          if (lhs.size == rhs.size) {
+            (BinaryExpr(BVLSHR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+          } else {
+            (BinaryExpr(BVLSHR, translateExprOnly(lhs), ZeroExtend(lhs.size - rhs.size, translateExprOnly(rhs))), None)
+          }
+        case ARSHIFT =>
+          if (lhs.size == rhs.size) {
+            (BinaryExpr(BVASHR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+          } else {
+            (BinaryExpr(BVASHR, translateExprOnly(lhs), ZeroExtend(lhs.size - rhs.size, translateExprOnly(rhs))), None)
+          }
+        case AND => (BinaryExpr(BVAND, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+        case OR => (BinaryExpr(BVOR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+        case XOR => (BinaryExpr(BVXOR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+        case EQ => (BinaryExpr(BVCOMP, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+        case NEQ => (UnaryExpr(BVNOT, BinaryExpr(BVCOMP, translateExprOnly(lhs), translateExprOnly(rhs))), None)
+        case LT => (BinaryExpr(BVULT, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+        case LE => (BinaryExpr(BVULE, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+        case SLT => (BinaryExpr(BVSLT, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+        case SLE => (BinaryExpr(BVSLE, translateExprOnly(lhs), translateExprOnly(rhs)), None)
+      }
     case b: BAPVar => (translateVar(b), None)
     case BAPMemAccess(memory, index, endian, size) =>
       val temp = LocalVar("load" + loadCounter, BitVecType(size))
@@ -220,7 +235,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
   }
 
   private def paramRegisterLVal(param: BAPParameter): Variable = translateVar(param.value)
-  private def toIROutParam(param: BAPParameter) =  {
+  private def toIROutParam(param: BAPParameter) = {
     paramRegisterLVal(param) match {
       case r: Register => {
         if (r.size == param.size) then {
@@ -233,13 +248,13 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     }
 
   }
-  
+
   private def paramRegisterRVal(p: BAPParameter): Expr = {
     paramRegisterLVal(p) match {
       case r: Register => {
         if (r.size == p.size) then {
           r
-        } else if (r.size > p.size){
+        } else if (r.size > p.size) {
           Extract(p.size, 0, r)
         } else {
           ZeroExtend(p.size - r.size, r)
@@ -261,11 +276,11 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     }
   }
 
-  def toAssignOut(p: BAPParameter) : LocalAssign = {
+  def toAssignOut(p: BAPParameter): LocalAssign = {
     LocalAssign(translateParam(p), paramRegisterRVal(p))
   }
 
-  def toAssignIn(p: BAPParameter) : LocalAssign = {
+  def toAssignIn(p: BAPParameter): LocalAssign = {
     LocalAssign(paramRegisterLVal(p), paramVariableRVal(p))
   }
 
@@ -280,18 +295,13 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     SharedMemory(memory.name, memory.addressSize, memory.valueSize)
   }
 
-
-
-
   private def translateLiteral(literal: BAPLiteral) = {
     BitVecLiteral(literal.value, literal.size)
   }
 
-
-  /**
-    * Translates a list of jumps from BAP into a single Jump at the IR level by moving any conditions on jumps to
-    * Assume statements in new blocks
-    * */
+  /** Translates a list of jumps from BAP into a single Jump at the IR level by moving any conditions on jumps to Assume
+    * statements in new blocks
+    */
   private def translate(jumps: List[BAPJump], block: Block): (Option[Call], Jump, ArrayBuffer[Block]) = {
     if (jumps.size > 1) {
       val targets = ArrayBuffer[Block]()
@@ -312,8 +322,8 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
                   // condition is true and previous conditions existing means this condition
                   // is actually that all previous conditions are false
                   val conditionsIR = conditions.map(c => convertConditionBool(c, true))
-                  val condition = conditionsIR.tail.foldLeft(conditionsIR.head) {
-                    (ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands)
+                  val condition = conditionsIR.tail.foldLeft(conditionsIR.head) { (ands: Expr, next: Expr) =>
+                    BinaryExpr(BoolAND, next, ands)
                   }
                   val newBlock = newBlockCondition(block, target, condition)
                   newBlocks.append(newBlock)
@@ -329,8 +339,8 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
                   // if this is not the first condition, then we need to need to add
                   // that all previous conditions are false
                   val conditionsIR = conditions.map(c => convertConditionBool(c, true))
-                  conditionsIR.tail.foldLeft(currentCondition) {
-                    (ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands)
+                  conditionsIR.tail.foldLeft(currentCondition) { (ands: Expr, next: Expr) =>
+                    BinaryExpr(BoolAND, next, ands)
                   }
                 }
                 val newBlock = newBlockCondition(block, target, condition)
@@ -368,14 +378,13 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     }
   }
 
-  /**
-    * Converts a BAPExpr condition that returns a bitvector of size 1 to an Expr condition that returns a Boolean
+  /** Converts a BAPExpr condition that returns a bitvector of size 1 to an Expr condition that returns a Boolean
     *
     * If negative is true then the negation of the condition is returned
     *
     * If the BAPExpr uses a comparator that returns a Boolean then no further conversion is performed except negation,
     * if necessary.
-    * */
+    */
   private def convertConditionBool(expr: BAPExpr, negative: Boolean): Expr = {
     val e = translateExprOnly(expr)
     e.getType match {

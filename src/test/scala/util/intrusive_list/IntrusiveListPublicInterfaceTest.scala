@@ -5,7 +5,7 @@ import scala.collection.mutable
 class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
   class Elem(val t: Int) extends IntrusiveListElement[Elem]
 
-  def getSequentialList(elems: Int = 15) : IntrusiveList[Elem] = {
+  def getSequentialList(elems: Int = 15): IntrusiveList[Elem] = {
     val x = IntrusiveList[Elem]()
 
     for (i <- 0 until elems) {
@@ -152,11 +152,11 @@ class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
 
   test("splitat") {
     val l = IntrusiveList[Elem]()
-    
+
     l.addOne(Elem(1))
 
     val e = Elem(15)
-    val toAdd = List(e,Elem(16),Elem(17))
+    val toAdd = List(e, Elem(16), Elem(17))
 
     l.addAll(toAdd)
     assert(l.size == 4)
@@ -171,10 +171,9 @@ class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
     assert(l2.exists(_.t == 17))
   }
 
-
   test("addAll") {
     val l = getSequentialList(3)
-    val toAdd = List(Elem(3),Elem(4),Elem(5))
+    val toAdd = List(Elem(3), Elem(4), Elem(5))
     l.addAll(toAdd)
 
     for (i <- 0 until 6) {
@@ -217,7 +216,6 @@ class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
 
   }
 
-
   test("insertAllBefore") {
     val x = IntrusiveList[Elem]()
 
@@ -233,11 +231,11 @@ class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
 
     val r = x.insertAllBefore(Some(first), toInsert)
     assert(r.get eq n)
-    assert(x.toList.map(_.t) == List(9,11, 12, 255, 10, 13))
+    assert(x.toList.map(_.t) == List(9, 11, 12, 255, 10, 13))
 
     val l = Range(1, 4).map(x => Elem(x))
     val rr = x.insertAllBefore(None, l)
-    assert(x.toList.map(_.t) == List(9, 11, 12, 255,10, 13, 1, 2, 3))
+    assert(x.toList.map(_.t) == List(9, 11, 12, 255, 10, 13, 1, 2, 3))
   }
 
 }

@@ -66,7 +66,7 @@ class ParamAnalysisTests extends AnyFunSuite, BASILTest {
     assert(analysisResults(procs("main")) == Set.empty)
     assert(analysisResults(procs("plus_one")) == Set(R0))
   }
-  
+
   ignore("initialisation") {
     val result: BASILResult = runExample("initialisation")
     val analysisResults = result.analysis.get.paramResults

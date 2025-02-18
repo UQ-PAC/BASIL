@@ -12,12 +12,12 @@ trait TestUtil {
   val incorrectPath = "./src/test/incorrect/"
   val incorrectPrograms: Array[String] = getSubdirectories(incorrectPath)
   extension (p: Program) {
-    def procs: Map[String, Procedure] = p.collect {
-      case b: Procedure => b.name -> b
+    def procs: Map[String, Procedure] = p.collect { case b: Procedure =>
+      b.name -> b
     }.toMap
 
-    def blocks: Map[String, Block] = p.collect {
-      case b: Block => b.label -> b
+    def blocks: Map[String, Block] = p.collect { case b: Block =>
+      b.label -> b
     }.toMap
   }
 
@@ -36,17 +36,16 @@ trait TestUtil {
         ),
         staticAnalysis = Some(StaticAnalysisConfig(None)),
         boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
+        outputPrefix = "boogie_out"
       )
     )
   }
 }
 
-
 /** @param directoryName
-  * of the parent directory
+  *   of the parent directory
   * @return
-  * the names all subdirectories of the given parent directory
+  *   the names all subdirectories of the given parent directory
   */
 def getSubdirectories(directoryName: String): Array[String] = {
   Option(File(directoryName).listFiles(_.isDirectory)) match {
@@ -61,4 +60,3 @@ def log(text: String, path: String): Unit = {
   writer.flush()
   writer.close()
 }
-

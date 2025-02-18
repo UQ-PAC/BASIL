@@ -34,18 +34,18 @@ trait CILVisitor:
 
 def doVisitList[T](v: CILVisitor, a: VisitAction[List[T]], n: T, continue: T => T): List[T] = {
   a match {
-    case SkipChildren()             => List(n)
-    case ChangeTo(z)                => z
-    case DoChildren()               => List(continue(n))
+    case SkipChildren() => List(n)
+    case ChangeTo(z) => z
+    case DoChildren() => List(continue(n))
     case ChangeDoChildrenPost(x, f) => f(x.map(continue(_)))
   }
 }
 
 def doVisit[T](v: CILVisitor, a: VisitAction[T], n: T, continue: T => T): T = {
   a match {
-    case SkipChildren()             => n
-    case DoChildren()               => continue(n)
-    case ChangeTo(z)                => z
+    case SkipChildren() => n
+    case DoChildren() => continue(n)
+    case ChangeTo(z) => z
     case ChangeDoChildrenPost(x, f) => f(continue(x))
   }
 }
@@ -79,9 +79,7 @@ class CILVisitorImpl(val v: CILVisitor) {
     doVisit(v, v.vjump(j), j, continue)
   }
 
-
-
-   def visit_expr(n: Expr): Expr = {
+  def visit_expr(n: Expr): Expr = {
     def continue(n: Expr): Expr = n match {
       case n: Literal => n
       case Extract(end, start, arg) => {
@@ -114,7 +112,7 @@ class CILVisitorImpl(val v: CILVisitor) {
         val nparams = params.map(visit_expr)
         val updated = (params.zip(nparams).map((a, b) => a ne b)).contains(true)
         if (updated) UninterpretedFunction(name, nparams, rt) else n
-      } 
+      }
     }
     doVisit(v, v.vexpr(n), n, continue)
   }
@@ -192,16 +190,16 @@ class CILVisitorImpl(val v: CILVisitor) {
     def continue(p: Program) = {
       for (i <- (0 until p.procedures.size)) {
         visit_proc(p.procedures(i)) match {
-          case h::Nil if p.procedures(i) eq h => {}
-          case h::Nil if !(p.procedures(i) eq h) => {
+          case h :: Nil if p.procedures(i) eq h => {}
+          case h :: Nil if !(p.procedures(i) eq h) => {
             // TODO: need some better approximation of knowing whether this procedure requires relinking?
             p.removeProcedure(i)
             p.addProcedure(h)
           }
           case Nil => p.removeProcedure(i)
-          case h::tl => {
+          case h :: tl => {
             p.removeProcedure(i)
-            for (x <- h::tl) {
+            for (x <- h :: tl) {
               p.addProcedure(x)
             }
           }
