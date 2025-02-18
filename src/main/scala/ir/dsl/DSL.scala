@@ -197,18 +197,23 @@ def mem: SharedMemory = SharedMemory("mem", 64, 8)
 
 def stack: SharedMemory = SharedMemory("stack", 64, 8)
 
-case class EventuallyProgram(procedures: EventuallyProcedure*) {
-  require(procedures.nonEmpty)
+case class EventuallyProgram(mainProcedure: EventuallyProcedure, otherProcedures: EventuallyProcedure*) {
 
   def resolve: Program = {
     val initialMemory = mutable.TreeMap[BigInt, MemorySection]()
-    val p = Program(ArrayBuffer.from(procedures.map(_.tempProc)), procedures.map(_.tempProc).head, initialMemory)
 
-    procedures.foreach(_.resolve(p))
+    val allProcedures = mainProcedure +: otherProcedures
+    val tempProcs = allProcedures.map(_.tempProc)
+    val procs = ArrayBuffer.from(tempProcs)
+
+    val p = Program(procs, procs.head, initialMemory)
+
+    allProcedures.foreach(_.resolve(p))
     assert(ir.invariant.correctCalls(p))
     assert(ir.invariant.cfgCorrect(p))
     p
   }
 }
 
-def prog(procedures: EventuallyProcedure*) = EventuallyProgram(procedures: _*).resolve
+def prog(mainProc: EventuallyProcedure, procedures: EventuallyProcedure*) =
+  EventuallyProgram(mainProc, procedures: _*).resolve
