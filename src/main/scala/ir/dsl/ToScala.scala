@@ -65,6 +65,8 @@ trait ToScalaString[-T] extends ToScala[T]:
  * collection types.
  */
 
+given ToScalaString[Nothing] with
+  extension (x: Nothing) def toScala: String = x
 given ToScalaString[String] with
   extension (x: String) def toScala: String = StringEscape.quote(x)
 given ToScalaString[Int] with

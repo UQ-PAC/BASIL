@@ -200,7 +200,7 @@ object ToScalaDeriving {
   /**
    * Summon ToScala instances for each type in the Elems tuple of types. Also handles exclusions.
    */
-  inline def summonInstances[T, Elems <: Tuple, Excl](using
+  inline def summonInstances[T, Elems <: Tuple, Excl <: T](using
     m: Mirror.Of[T]
   )(custom: => ToScala[Excl]): List[ToScala[?]] =
 
@@ -229,7 +229,7 @@ object ToScalaDeriving {
   /**
    * Summon ToScala for the given type or apply a custom exclusion.
    */
-  inline def summonOrCustom[T, t, Excl](using m: Mirror.Of[T])(custom: => ToScala[Excl]): ToScala[?] =
+  inline def summonOrCustom[T, t, Excl <: T](using m: Mirror.Of[T])(custom: => ToScala[Excl]): ToScala[?] =
     inline erasedValue[t] match
       case _: Excl => custom
       case _ => deriveOrSummon[T, t, Excl](custom)
@@ -242,7 +242,7 @@ object ToScalaDeriving {
    * Recursively derives subtypes (i.e. cases) of sum types.
    * Otherwise, summons an external ToScala instance for the given type.
    */
-  inline def deriveOrSummon[T, Elem, Excl](using m: Mirror.Of[T])(custom: => ToScala[Excl]): ToScala[Elem] =
+  inline def deriveOrSummon[T, Elem, Excl <: T](using m: Mirror.Of[T])(custom: => ToScala[Excl]): ToScala[Elem] =
     inline (erasedValue[Elem], erasedValue[T]) match
       // Elem <: T and T <: Elem means T == Elem
       case _: (T, Elem) =>
@@ -252,8 +252,9 @@ object ToScalaDeriving {
 
       // Elem <: T means the element is a subtype and we should recurse
       case _: (T, _) =>
-        // XXX: this seems to cause BIG problems when annotating with [Elem, Elem & Excl]
-        deriveWithExclusionsPrivate(using summonInline[Mirror.Of[Elem]])(custom) // recursively derive sum case
+        deriveWithExclusions[Elem, Elem & Excl](using summonInline[Mirror.Of[Elem]])(
+          custom
+        ) // recursively derive sum case
 
       // otherwise, including the case where the Elem is a supertype of T, we summon.
       case _ => summonInline[ToScala[Elem]] // summon externally-defined instance
@@ -327,20 +328,13 @@ object ToScalaDeriving {
    * Entry point for derivation. Used by Scala's "deriving ToScala" syntax.
    */
   inline def derived[T](using m: Mirror.Of[T]): ToScala[T] =
-    deriveWithExclusions[T, Nothing](Make(absurd)) // derive with defaults (no exclusions)
+    deriveWithExclusions(summon[ToScala[Nothing]]) // derive with defaults (no exclusions)
 
   /**
    * Alternative entry point for deriving ToScala. Allows for specifying
    * a custom implementation for a certain subset of cases.
    */
-  inline def deriveWithExclusions[T, Excl <: T](using m: Mirror.Of[T])(custom: => ToScala[Excl]): ToScala[T] =
-    deriveWithExclusionsPrivate[T, Excl](using m)(custom)
-
-  private inline def deriveWithExclusionsPrivate[T, Excl](using
-    m: Mirror.Of[T]
-  )(custom: => ToScala[Excl]): ToScala[T] = {
-
-    import ToScalaDeriving.{summonInstances, toScalaOfSum, toScalaOfProduct}
+  inline def deriveWithExclusions[T, Excl <: T](using m: Mirror.Of[T])(custom: => ToScala[Excl]): ToScala[T] = {
 
     lazy val elemInstances = inline m match
       case _: Mirror.SumOf[T] =>
