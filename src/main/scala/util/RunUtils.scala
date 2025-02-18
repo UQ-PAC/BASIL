@@ -797,7 +797,7 @@ object RunUtils {
       var fieldDSA: Map[Procedure, FieldGraph] = Map.empty
       var sadDSA: Map[Procedure, SadGraph] = Map.empty
       var sadDSABU: Map[Procedure, SadGraph] = Map.empty
-      computeDSADomain(ctx.program.mainProcedure).foreach(
+      computeDSADomain(ctx.program.mainProcedure).toSeq.sortBy(_.name).foreach(
 //      computeDSADomain(ctx.program.procedures.collectFirst{case p if p.name.startsWith("headers_recv") => p}.get).foreach(
         proc =>
 //          if proc.name.startsWith("des_key_schedule") then
@@ -854,7 +854,7 @@ object RunUtils {
 
       DSALogger.info("finished BU phase")
       visited.clear()
-      skip = Seq.empty
+      skip = Seq("croak", "myexit") // Seq.empty
       queue.enqueueAll(sadDSATD.keys.toSeq.sortBy(p => p.name))
       while queue.nonEmpty do
         val proc = queue.dequeue()
