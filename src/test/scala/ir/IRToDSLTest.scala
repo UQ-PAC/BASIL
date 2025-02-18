@@ -65,3 +65,16 @@ class IRToDSLTest extends AnyFunSuite {
     // println(p)
   }
 }
+
+
+class BadTest extends AnyFunSuite {
+
+  val p = prog(
+    proc("p1", block("b1", ret)),
+  )
+
+  test("assert failrue") {
+    assert(p != p)
+  }
+}
+
