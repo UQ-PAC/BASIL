@@ -8,8 +8,7 @@ import scala.collection.immutable.*
 type NonControlFlowStatement =
   LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume
 
-type ControlFlowStatement =
-  Unreachable | Return | GoTo | DirectCall | IndirectCall
+type ControlFlowStatement = DirectCall | IndirectCall
 
 val R0: Register = Register("R0", 64)
 val R1: Register = Register("R1", 64)
@@ -117,7 +116,7 @@ def goto(targets: List[String]): EventuallyGoto = {
   EventuallyGoto(targets.map(p => DelayNameResolve(p)))
 }
 
-def directCall(tgt: String): EventuallyCall = EventuallyCall(DelayNameResolve(tgt), Map(), Map())
+def directCall(tgt: String): EventuallyCall = EventuallyCall(DelayNameResolve(tgt), List(), List())
 
 def directCall(lhs: Iterable[(String, Variable)], tgt: String, actualParams: (String, Expr)*): EventuallyCall =
   EventuallyCall(DelayNameResolve(tgt), lhs, actualParams)

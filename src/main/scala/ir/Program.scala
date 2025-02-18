@@ -118,7 +118,8 @@ class Program(
   }
 
   override def toString(): String = {
-    serialiseIL(this)
+    // serialiseIL(this)
+    translating.PrettyPrinter.pp_prog(this)
   }
 
   def setModifies(specModifies: Map[String, List[String]]): Unit = {
