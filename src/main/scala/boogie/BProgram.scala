@@ -23,18 +23,18 @@ trait BDeclaration extends HasAttributes {
 }
 
 case class BProcedure(
-    name: String,
-    in: List[BVar] = Nil,
-    out: List[BVar] = Nil,
-    ensures: List[BExpr] = Nil,
-    requires: List[BExpr] = Nil,
-    ensuresDirect: List[String] = Nil,
-    requiresDirect: List[String] = Nil,
-    freeEnsures: List[BExpr] = Nil,
-    freeRequires: List[BExpr] = Nil,
-    modifies: Set[BVar] = Set(),
-    body: List[BCmdOrBlock] = Nil,
-    override val attributes: List[BAttribute] = List()
+  name: String,
+  in: List[BVar] = Nil,
+  out: List[BVar] = Nil,
+  ensures: List[BExpr] = Nil,
+  requires: List[BExpr] = Nil,
+  ensuresDirect: List[String] = Nil,
+  requiresDirect: List[String] = Nil,
+  freeEnsures: List[BExpr] = Nil,
+  freeRequires: List[BExpr] = Nil,
+  modifies: Set[BVar] = Set(),
+  body: List[BCmdOrBlock] = Nil,
+  override val attributes: List[BAttribute] = List()
 ) extends BDeclaration
     with Ordered[BProcedure] {
   override def compare(that: BProcedure): Int = name.compare(that.name)
@@ -55,7 +55,7 @@ case class BProcedure(
     val ensuresStrs = ensures.map(e => s"  ensures $e;") ++ ensuresDirect.map(e => s"  ensures $e;")
     val freeRequiresStrs = freeRequires.map(r => s"  free requires $r;")
     val freeEnsuresStrs = freeEnsures.map(e => s"  free ensures $e;")
-    val locals : Set[BVar] = (body.flatMap(l => l.locals).toSet) --  (in.toSet ++ out.toSet)
+    val locals: Set[BVar] = (body.flatMap(l => l.locals).toSet) -- (in.toSet ++ out.toSet)
     val localDefs = locals.toList.sorted.map(l => "  " + BVarDecl(l).toString)
     val bodyStr = if (body.nonEmpty) {
       List("{") ++ localDefs ++ body.flatMap(x => x.toBoogie).map(s => "  " + s) ++ List("}")
@@ -94,9 +94,13 @@ case class BAxiom(body: BExpr, override val attributes: List[BAttribute] = List(
   override def toString: String = s"axiom $attrString$body;"
 }
 
-case class BFunction(name: String, in: List[BVar], out: BVar, body: Option[BExpr],
-                     override val attributes: List[BAttribute] = List())
-    extends BDeclaration
+case class BFunction(
+  name: String,
+  in: List[BVar],
+  out: BVar,
+  body: Option[BExpr],
+  override val attributes: List[BAttribute] = List()
+) extends BDeclaration
     with Ordered[BFunction] {
   override def compare(that: BFunction): Int = name.compare(that.name)
   override def toBoogie: List[String] = {
@@ -112,18 +116,20 @@ case class BFunction(name: String, in: List[BVar], out: BVar, body: Option[BExpr
         b.serialiseBoogie(s)
         s.append(System.lineSeparator())
         s.append("}" + System.lineSeparator())
-      case None    => s.append(";")
+      case None => s.append(";")
     }
     List(s.toString)
   }
   override def toString: String = toBoogie.mkString("\n")
   def functionOps: Set[FunctionOp] = body match {
     case Some(b) => b.functionOps
-    case None    => Set()
+    case None => Set()
   }
 }
 
-case class BVarDecl(variable: BVar, override val attributes: List[BAttribute] = List()) extends BDeclaration with Ordered[BVarDecl] {
+case class BVarDecl(variable: BVar, override val attributes: List[BAttribute] = List())
+    extends BDeclaration
+    with Ordered[BVarDecl] {
   def compare(that: BVarDecl): Int = variable.compare(that.variable)
   override def toString: String = if (variable.scope == Scope.Const) {
     s"const $attrString$variable: ${variable.getType};"

@@ -9,7 +9,6 @@ import scala.collection.mutable
 import scala.collection.immutable
 import util.VSALogger
 
-
 /** ValueSets are PowerSet of possible values */
 trait Value
 
@@ -29,7 +28,11 @@ trait ValueSetAnalysis(program: Program, mmm: MemoryModelMap) {
 
   val liftedLattice: LiftLattice[Map[Variable | MemoryRegion, Set[Value]], mapLattice.type] = LiftLattice(mapLattice)
 
-  val lattice: MapLattice[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]], LiftLattice[Map[Variable | MemoryRegion, Set[Value]], mapLattice.type]] = MapLattice(liftedLattice)
+  val lattice: MapLattice[
+    CFGPosition,
+    LiftedElement[Map[Variable | MemoryRegion, Set[Value]]],
+    LiftLattice[Map[Variable | MemoryRegion, Set[Value]], mapLattice.type]
+  ] = MapLattice(liftedLattice)
 
   val first: Set[CFGPosition] = Set(program.mainProcedure)
 
@@ -44,7 +47,9 @@ trait ValueSetAnalysis(program: Program, mmm: MemoryModelMap) {
           return Set(relocated.get)
         }
         if (mmm.externalFunctions.contains(dataRegion.start)) {
-          return Set(dataRegion) // TODO: works for syscall:clang_O2 load of external function but it is a memLoad so it should be getting what is loaded?
+          return Set(
+            dataRegion
+          ) // TODO: works for syscall:clang_O2 load of external function but it is a memLoad so it should be getting what is loaded?
         }
       case _ =>
     }
@@ -56,7 +61,7 @@ trait ValueSetAnalysis(program: Program, mmm: MemoryModelMap) {
     */
   def eval(cmd: Command, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = {
     cmd match {
-      case directCall: DirectCall if directCall.target.name == "malloc" =>
+      case directCall: DirectCall if directCall.target.procName == "malloc" =>
         val regions = mmm.nodeToRegion(cmd)
         // malloc variable
         s + (mallocVariable -> regions.map(r => AddressValue(r)))
@@ -83,7 +88,9 @@ trait ValueSetAnalysis(program: Program, mmm: MemoryModelMap) {
           val unwrapValue = unwrapExprToVar(load.index)
           unwrapValue match {
             case Some(v: Variable) =>
-              s + (load.lhs -> s(v).flatMap(r => findLoadedWithPreDefined(s, r.asInstanceOf[AddressValue].region)).map(r => AddressValue(r)))
+              s + (load.lhs -> s(v)
+                .flatMap(r => findLoadedWithPreDefined(s, r.asInstanceOf[AddressValue].region))
+                .map(r => AddressValue(r)))
             case None =>
               VSALogger.debug(s"Too Complex: $load") // do nothing
               s
@@ -106,7 +113,10 @@ trait ValueSetAnalysis(program: Program, mmm: MemoryModelMap) {
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
-  def transferUnlifted(n: CFGPosition, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = {
+  def transferUnlifted(
+    n: CFGPosition,
+    s: Map[Variable | MemoryRegion, Set[Value]]
+  ): Map[Variable | MemoryRegion, Set[Value]] = {
     n match {
       case p: Procedure =>
         mmm.pushContext(p.name)
@@ -122,15 +132,20 @@ trait ValueSetAnalysis(program: Program, mmm: MemoryModelMap) {
   }
 }
 
-class ValueSetAnalysisSolver(
-    program: Program,
-    mmm: MemoryModelMap
-) extends ValueSetAnalysis(program, mmm)
+class ValueSetAnalysisSolver(program: Program, mmm: MemoryModelMap)
+    extends ValueSetAnalysis(program, mmm)
     with IRIntraproceduralForwardDependencies
     with Analysis[Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]]
-    with WorklistFixpointSolverWithReachability[CFGPosition, Map[Variable | MemoryRegion, Set[Value]], MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]] {
+    with WorklistFixpointSolverWithReachability[
+      CFGPosition,
+      Map[Variable | MemoryRegion, Set[Value]],
+      MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]
+    ] {
 
-  override def funsub(n: CFGPosition, x: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]): LiftedElement[Map[Variable | MemoryRegion, Set[Value]]] = {
+  override def funsub(
+    n: CFGPosition,
+    x: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
+  ): LiftedElement[Map[Variable | MemoryRegion, Set[Value]]] = {
     n match {
       // function entry nodes are always reachable as this is intraprocedural
       case _: Procedure => liftedLattice.lift(mapLattice.bottom)

@@ -26,11 +26,11 @@ def cfgCorrect(p: Program | Procedure) = {
       val c = forwards && backwards
       if (!forwards) {
         Logger.error(s"Forwards block cfg does not match : ${b.nextBlocks.toSet
-          .map(_.label)} == ${forwardsIntraMap.get(b).getOrElse(Set()).map(_.label)}")
+            .map(_.label)} == ${forwardsIntraMap.get(b).getOrElse(Set()).map(_.label)}")
       }
       if (!backwards) {
         Logger.error(s"Backward block cfg does not match : ${b.prevBlocks.toSet
-          .map(_.label)} == ${revForwardsIntra.get(b).getOrElse(Set()).map(_.label)}")
+            .map(_.label)} == ${revForwardsIntra.get(b).getOrElse(Set()).map(_.label)}")
       }
       c
     }

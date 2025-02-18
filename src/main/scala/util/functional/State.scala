@@ -23,7 +23,7 @@ case class State[S, A, E](f: S => (S, Either[E, A])) {
     monlog.debug(s"State.flatMap ${file.value}:${line.value}")
     val (s2, a) = this.f(s)
     val r = a match {
-      case Left(l)  => (s2, Left(l))
+      case Left(l) => (s2, Left(l))
       case Right(a) => f(a).f(s2)
     }
     r
@@ -33,7 +33,7 @@ case class State[S, A, E](f: S => (S, Either[E, A])) {
     State(s => {
       val (s2, a) = this.f(s)
       a match {
-        case Left(l)  => (s2, Left(l))
+        case Left(l) => (s2, Left(l))
         case Right(a) => (s2, Right(f(a)))
       }
     })
@@ -43,7 +43,7 @@ case class State[S, A, E](f: S => (S, Either[E, A])) {
     State(s => {
       val (s2, a) = this.f(s)
       a match {
-        case Left(l)  => f(l).f(s2)
+        case Left(l) => f(l).f(s2)
         case Right(_) => (s2, a)
       }
     })
@@ -59,7 +59,7 @@ object State {
   def modifyE[S, E](f: S => Either[E, S]): State[S, Unit, E] = State(s =>
     f(s) match {
       case Right(ns) => (ns, Right(()))
-      case Left(e)   => (s, Left(e))
+      case Left(e) => (s, Left(e))
     }
   )
   def execute[S, A, E](s: S, c: State[S, A, E])(implicit
@@ -86,7 +86,7 @@ object State {
   )(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): State[S, A, E] = {
     a match {
       case Left(l) => monlog.info(s"pureE error $l")(line, file, name)
-      case _       => ()
+      case _ => ()
     }
     State((s: S) => (s, a))
   }

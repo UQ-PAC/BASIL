@@ -68,7 +68,7 @@ podman-compose run compiler-explorer
 OR
 
 ```
-podman run -p 10240:10240 ghcr.io/uq-pac/basil-compiler-explorer:latest
+podman run --rm -p 10240:10240 ghcr.io/uq-pac/basil-compiler-explorer:latest
 ```
 
 ##### Development/Testing Container
@@ -77,7 +77,7 @@ This mounts the current directory as the working directory of the container.
 
 ```
 podman pull ghcr.io/uq-pac/basil-dev /bin/bash
-podman run -v .:/host -w /host -it ghcr.io/uq-pac/basil-dev /bin/bash
+podman run --privileged --rm -v .:/host -w /host -it ghcr.io/uq-pac/basil-dev /bin/bash
 ```
 
 

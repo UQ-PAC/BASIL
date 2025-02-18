@@ -13,10 +13,10 @@ case class PerformanceTimer(timerName: String = "", logLevel: LogLevel = LogLeve
     checkpoints.put(name, delta)
     logLevel match {
       case LogLevel.DEBUG => Logger.debug(s"PerformanceTimer $timerName [$name]: ${delta}ms")
-      case LogLevel.INFO  => Logger.info(s"PerformanceTimer $timerName [$name]: ${delta}ms")
-      case LogLevel.WARN  => Logger.warn(s"PerformanceTimer $timerName [$name]: ${delta}ms")
+      case LogLevel.INFO => Logger.info(s"PerformanceTimer $timerName [$name]: ${delta}ms")
+      case LogLevel.WARN => Logger.warn(s"PerformanceTimer $timerName [$name]: ${delta}ms")
       case LogLevel.ERROR => Logger.error(s"PerformanceTimer $timerName [$name]: ${delta}ms")
-      case _              => ???
+      case _ => ???
     }
     delta
   }

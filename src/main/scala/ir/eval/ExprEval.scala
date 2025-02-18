@@ -15,24 +15,24 @@ import ir._
 
 def evalBVBinExpr(b: BVBinOp, l: BitVecLiteral, r: BitVecLiteral): BitVecLiteral = {
   b match {
-    case BVADD    => BitVectorEval.smt_bvadd(l, r)
-    case BVSUB    => BitVectorEval.smt_bvsub(l, r)
-    case BVMUL    => BitVectorEval.smt_bvmul(l, r)
-    case BVUDIV   => BitVectorEval.smt_bvudiv(l, r)
-    case BVSDIV   => BitVectorEval.smt_bvsdiv(l, r)
-    case BVSREM   => BitVectorEval.smt_bvsrem(l, r)
-    case BVUREM   => BitVectorEval.smt_bvurem(l, r)
-    case BVSMOD   => BitVectorEval.smt_bvsmod(l, r)
-    case BVAND    => BitVectorEval.smt_bvand(l, r)
-    case BVOR     => BitVectorEval.smt_bvxor(l, r)
-    case BVXOR    => BitVectorEval.smt_bvxor(l, r)
-    case BVNAND   => BitVectorEval.smt_bvnand(l, r)
-    case BVNOR    => BitVectorEval.smt_bvnor(l, r)
-    case BVXNOR   => BitVectorEval.smt_bvxnor(l, r)
-    case BVSHL    => BitVectorEval.smt_bvshl(l, r)
-    case BVLSHR   => BitVectorEval.smt_bvlshr(l, r)
-    case BVASHR   => BitVectorEval.smt_bvashr(l, r)
-    case BVCOMP   => BitVectorEval.smt_bvcomp(l, r)
+    case BVADD => BitVectorEval.smt_bvadd(l, r)
+    case BVSUB => BitVectorEval.smt_bvsub(l, r)
+    case BVMUL => BitVectorEval.smt_bvmul(l, r)
+    case BVUDIV => BitVectorEval.smt_bvudiv(l, r)
+    case BVSDIV => BitVectorEval.smt_bvsdiv(l, r)
+    case BVSREM => BitVectorEval.smt_bvsrem(l, r)
+    case BVUREM => BitVectorEval.smt_bvurem(l, r)
+    case BVSMOD => BitVectorEval.smt_bvsmod(l, r)
+    case BVAND => BitVectorEval.smt_bvand(l, r)
+    case BVOR => BitVectorEval.smt_bvxor(l, r)
+    case BVXOR => BitVectorEval.smt_bvxor(l, r)
+    case BVNAND => BitVectorEval.smt_bvnand(l, r)
+    case BVNOR => BitVectorEval.smt_bvnor(l, r)
+    case BVXNOR => BitVectorEval.smt_bvxnor(l, r)
+    case BVSHL => BitVectorEval.smt_bvshl(l, r)
+    case BVLSHR => BitVectorEval.smt_bvlshr(l, r)
+    case BVASHR => BitVectorEval.smt_bvashr(l, r)
+    case BVCOMP => BitVectorEval.smt_bvcomp(l, r)
     case BVCONCAT => BitVectorEval.smt_concat(l, r)
     case BVULE | BVULT | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE | BVEQ | BVNEQ =>
       throw IllegalArgumentException("Did not expect logical op")
@@ -48,7 +48,7 @@ def evalBVLogBinExpr(b: BVBinOp, l: BitVecLiteral, r: BitVecLiteral): Boolean = 
   case BVSLE => BitVectorEval.smt_bvsle(l, r)
   case BVSGT => BitVectorEval.smt_bvsgt(l, r)
   case BVSGE => BitVectorEval.smt_bvsge(l, r)
-  case BVEQ  => BitVectorEval.smt_bveq(l, r)
+  case BVEQ => BitVectorEval.smt_bveq(l, r)
   case BVNEQ => BitVectorEval.smt_bvneq(l, r)
   case BVADD | BVSUB | BVMUL | BVUDIV | BVSDIV | BVSREM | BVUREM | BVSMOD | BVAND | BVOR | BVXOR | BVNAND | BVNOR |
       BVXNOR | BVSHL | BVLSHR | BVASHR | BVCOMP | BVCONCAT =>
@@ -56,30 +56,30 @@ def evalBVLogBinExpr(b: BVBinOp, l: BitVecLiteral, r: BitVecLiteral): Boolean = 
 }
 
 def evalIntLogBinExpr(b: IntBinOp, l: BigInt, r: BigInt): Boolean = b match {
-  case IntEQ                                      => l == r
-  case IntNEQ                                     => l != r
-  case IntLT                                      => l < r
-  case IntLE                                      => l <= r
-  case IntGT                                      => l > r
-  case IntGE                                      => l >= r
+  case IntEQ => l == r
+  case IntNEQ => l != r
+  case IntLT => l < r
+  case IntLE => l <= r
+  case IntGT => l > r
+  case IntGE => l >= r
   case IntADD | IntSUB | IntMUL | IntDIV | IntMOD => throw IllegalArgumentException("Did not expect non-logical op")
 }
 
 def evalIntBinExpr(b: IntBinOp, l: BigInt, r: BigInt): BigInt = b match {
-  case IntADD                                         => l + r
-  case IntSUB                                         => l - r
-  case IntMUL                                         => l * r
-  case IntDIV                                         => l / r
-  case IntMOD                                         => l % r
+  case IntADD => l + r
+  case IntSUB => l - r
+  case IntMUL => l * r
+  case IntDIV => l / r
+  case IntMOD => l % r
   case IntEQ | IntNEQ | IntLT | IntLE | IntGT | IntGE => throw IllegalArgumentException("Did not expect logical op")
 }
 
 def evalBoolLogBinExpr(b: BoolBinOp, l: Boolean, r: Boolean): Boolean = b match {
-  case BoolEQ      => l == r
-  case BoolEQUIV   => l == r
-  case BoolNEQ     => l != r
-  case BoolAND     => l && r
-  case BoolOR      => l || r
+  case BoolEQ => l == r
+  case BoolEQUIV => l == r
+  case BoolNEQ => l != r
+  case BoolAND => l && r
+  case BoolOR => l || r
   case BoolIMPLIES => l || (!r)
 }
 
@@ -87,12 +87,12 @@ def evalUnOp(op: UnOp, body: Literal): Expr = {
   (body, op) match {
     case (b: BitVecLiteral, BVNOT) => BitVectorEval.smt_bvnot(b)
     case (b: BitVecLiteral, BVNEG) => BitVectorEval.smt_bvneg(b)
-    case (i: IntLiteral, IntNEG)   => IntLiteral(-i.value)
-    case (FalseLiteral, BoolNOT)   => TrueLiteral
-    case (TrueLiteral, BoolNOT)    => FalseLiteral
-    case (TrueLiteral, BoolToBV1)  => BitVecLiteral(1, 1)
+    case (i: IntLiteral, IntNEG) => IntLiteral(-i.value)
+    case (FalseLiteral, BoolNOT) => TrueLiteral
+    case (TrueLiteral, BoolNOT) => FalseLiteral
+    case (TrueLiteral, BoolToBV1) => BitVecLiteral(1, 1)
     case (FalseLiteral, BoolToBV1) => BitVecLiteral(0, 1)
-    case (_, _)                    => throw Exception(s"Unreachable ${(body, op)}")
+    case (_, _) => throw Exception(s"Unreachable ${(body, op)}")
   }
 }
 
@@ -103,7 +103,7 @@ def evalIntExpr(
 ): Either[Expr, BigInt] = {
   partialEvalExpr(exp, variableAssignment, memory) match {
     case i: IntLiteral => Right(i.value)
-    case o             => Left(o)
+    case o => Left(o)
   }
 }
 
@@ -114,7 +114,7 @@ def evalBVExpr(
 ): Either[Expr, BitVecLiteral] = {
   partialEvalExpr(exp, variableAssignment, memory) match {
     case b: BitVecLiteral => Right(b)
-    case o                => Left(o)
+    case o => Left(o)
   }
 }
 
@@ -124,9 +124,9 @@ def evalLogExpr(
   memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((a, b, c, d) => None)
 ): Either[Expr, Boolean] = {
   partialEvalExpr(exp, variableAssignment, memory) match {
-    case TrueLiteral  => Right(true)
+    case TrueLiteral => Right(true)
     case FalseLiteral => Right(false)
-    case o            => Left(o)
+    case o => Left(o)
   }
 }
 
@@ -137,7 +137,7 @@ def evalExpr(
 ): Option[Literal] = {
   partialEvalExpr match {
     case l: Literal => Some(l)
-    case _          => None
+    case _ => None
   }
 }
 
@@ -154,7 +154,7 @@ def evaluateExpr(exp: Expr): Option[Literal] = {
   val (e, _) = simpFixedPoint(SimpExpr(fastPartialEvalExpr).apply)(exp)
   e match {
     case l: Literal => Some(l)
-    case _          => None
+    case _ => None
   }
 }
 
@@ -203,7 +203,7 @@ def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S,
         body <- eval(unOp.arg)
       } yield (body match {
         case l: Literal => evalUnOp(unOp.op, l)
-        case o          => UnaryExpr(unOp.op, body)
+        case o => UnaryExpr(unOp.op, body)
       })
     case binOp: BinaryExpr =>
       for {
@@ -214,22 +214,22 @@ def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S,
         case b: BitVecType => {
           (binOp.op, lhs, rhs) match {
             case (o: BVBinOp, l: BitVecLiteral, r: BitVecLiteral) => evalBVBinExpr(o, l, r)
-            case _                                                => BinaryExpr(binOp.op, lhs, rhs)
+            case _ => BinaryExpr(binOp.op, lhs, rhs)
           }
         }
         case BoolType => {
           def bool2lit(b: Boolean) = if b then TrueLiteral else FalseLiteral
           (binOp.op, lhs, rhs) match {
             case (o: BVBinOp, l: BitVecLiteral, r: BitVecLiteral) => bool2lit(evalBVLogBinExpr(o, l, r))
-            case (o: IntBinOp, l: IntLiteral, r: IntLiteral)      => bool2lit(evalIntLogBinExpr(o, l.value, r.value))
-            case (o: BoolBinOp, l: BoolLit, r: BoolLit)           => bool2lit(evalBoolLogBinExpr(o, l.value, r.value))
-            case _                                                => BinaryExpr(binOp.op, lhs, rhs)
+            case (o: IntBinOp, l: IntLiteral, r: IntLiteral) => bool2lit(evalIntLogBinExpr(o, l.value, r.value))
+            case (o: BoolBinOp, l: BoolLit, r: BoolLit) => bool2lit(evalBoolLogBinExpr(o, l.value, r.value))
+            case _ => BinaryExpr(binOp.op, lhs, rhs)
           }
         }
         case IntType => {
           (binOp.op, lhs, rhs) match {
             case (o: IntBinOp, l: IntLiteral, r: IntLiteral) => IntLiteral(evalIntBinExpr(o, l.value, r.value))
-            case _                                           => BinaryExpr(binOp.op, lhs, rhs)
+            case _ => BinaryExpr(binOp.op, lhs, rhs)
           }
         }
       })
@@ -238,21 +238,21 @@ def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S,
         body <- eval(extend.body)
       } yield (body match {
         case b: BitVecLiteral => BitVectorEval.smt_zero_extend(extend.extension, b)
-        case o                => extend.copy(body = o)
+        case o => extend.copy(body = o)
       })
     case extend: SignExtend =>
       for {
         body <- eval(extend.body)
       } yield (body match {
         case b: BitVecLiteral => BitVectorEval.smt_sign_extend(extend.extension, b)
-        case o                => extend.copy(body = o)
+        case o => extend.copy(body = o)
       })
     case e: Extract =>
       for {
         body <- eval(e.body)
       } yield (body match {
         case b: BitVecLiteral => BitVectorEval.boogie_extract(e.end, e.start, b)
-        case o                => e.copy(body = o)
+        case o => e.copy(body = o)
       })
     case r: Repeat =>
       for {
@@ -272,8 +272,8 @@ def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S,
         v: Option[Literal] <- l.getVariable(variable)
       } yield (v.getOrElse(variable))
     case b: BitVecLiteral => State.pure(b)
-    case b: IntLiteral    => State.pure(b)
-    case b: BoolLit       => State.pure(b)
+    case b: IntLiteral => State.pure(b)
+    case b: BoolLit => State.pure(b)
   }
   State.protect(
     () => ns,
@@ -301,6 +301,6 @@ def partialEvalExpr(
   val l = StatelessLoader[InterpreterError](variableAssignment, memory)
   State.evaluate((), statePartialEvalExpr(l)(exp)) match {
     case Right(e) => e
-    case Left(e)  => throw Exception(s"Unable to evaluate expr  $exp :" + e.toString)
+    case Left(e) => throw Exception(s"Unable to evaluate expr  $exp :" + e.toString)
   }
 }

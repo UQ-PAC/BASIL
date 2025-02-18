@@ -35,11 +35,11 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
   Logger.setLevel(LogLevel.WARN)
 
-  def getProgram(name: String): IRContext = {
+  def getProgram(name: String, path: String): IRContext = {
     val compiler = "gcc"
     val loading = ILLoadingConfig(
-      inputFile = s"src/test/correct/$name/$compiler/$name.adt",
-      relfFile = s"src/test/correct/$name/$compiler/$name.relf",
+      inputFile = s"$path/$name/$compiler/$name.adt",
+      relfFile = s"$path/$name/$compiler/$name.relf",
       specFile = None,
       dumpIL = None
     )
@@ -52,15 +52,15 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     // var IRProgram = IRTranslator.translate
     // IRProgram = ExternalRemover(externalFunctions.map(e => e.name)).visitProgram(IRProgram)
     // IRProgram = Renamer(Set("free")).visitProgram(IRProgram)
-    //IRProgram.stripUnreachableFunctions()
+    // IRProgram.stripUnreachableFunctions()
     // val stackIdentification = StackSubstituter()
     // stackIdentification.visitProgram(IRProgram)
     ctx.program.setModifies(Map())
     ctx
   }
 
-  def testInterpret(name: String, expected: Map[String, Int]): Unit = {
-    val ctx = getProgram(name)
+  def testInterpret(name: String, expected: Map[String, Int], path: String = "src/test/correct"): Unit = {
+    val ctx = getProgram(name, path)
     val fstate = interpret(ctx)
     val regs = fstate.memoryState.getGlobalVals
     val globals = ctx.globals
@@ -131,32 +131,22 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
   }
 
   test("basic_arrays_read") {
-    val expected = Map(
-      "arr" -> 0
-    )
+    val expected = Map("arr" -> 0)
     testInterpret("basic_arrays_read", expected)
   }
 
   test("basic_assign_assign") {
-    val expected = Map(
-      "x" -> 5
-    )
+    val expected = Map("x" -> 5)
     testInterpret("basic_assign_assign", expected)
   }
 
   test("basic_assign_increment") {
-    val expected = Map(
-      "x" -> 1
-    )
+    val expected = Map("x" -> 1)
     testInterpret("basic_assign_increment", expected)
   }
 
-
   test("function") {
-    val expected = Map(
-      "x" -> 1,
-      "y" -> 2
-    )
+    val expected = Map("x" -> 1, "y" -> 2)
     testInterpret("function", expected)
   }
 
@@ -169,56 +159,41 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
   }
 
   test("secret_write") {
-    val expected = Map(
-      "z" -> 2,
-      "x" -> 0,
-      "secret" -> 0
-    )
+    val expected = Map("z" -> 2, "x" -> 0, "secret" -> 0)
     testInterpret("secret_write", expected)
   }
 
   test("indirect_call") {
+    // moved indirectcall to separate folder
     val expected = Map[String, Int]()
-    testInterpret("indirect_call", expected)
+    testInterpret("indirect_call", expected, "src/test/indirect_calls")
   }
 
   test("ifglobal") {
-    val expected = Map(
-      "x" -> 1
-    )
+    val expected = Map("x" -> 1)
     testInterpret("ifglobal", expected)
   }
 
   test("cjump") {
-    val expected = Map(
-      "x" -> 1,
-      "y" -> 3
-    )
+    val expected = Map("x" -> 1, "y" -> 3)
     testInterpret("cjump", expected)
   }
 
   test("initialisation") {
 
     // Logger.setLevel(LogLevel.WARN)
-    val expected = Map(
-      "x" -> 6,
-      "y" -> ('b'.toInt)
-    )
+    val expected = Map("x" -> 6, "y" -> ('b'.toInt))
 
     testInterpret("initialisation", expected)
   }
 
   test("no_interference_update_x") {
-    val expected = Map(
-      "x" -> 1
-    )
+    val expected = Map("x" -> 1)
     testInterpret("no_interference_update_x", expected)
   }
 
   test("no_interference_update_y") {
-    val expected = Map(
-      "y" -> 1
-    )
+    val expected = Map("y" -> 1)
     testInterpret("no_interference_update_y", expected)
   }
 
@@ -301,7 +276,11 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
     }
 
-    info(("fibonacci runtime table:\nFibNumber,ScalaRunTime,interpreterRunTime,instructionCycleCount" :: (res.map(x => s"${x._1},${x._2},${x._3},${x._4}"))).mkString("\n"))
+    info(
+      ("fibonacci runtime table:\nFibNumber,ScalaRunTime,interpreterRunTime,instructionCycleCount" :: (res.map(x =>
+        s"${x._1},${x._2},${x._3},${x._4}"
+      ))).mkString("\n")
+    )
 
   }
 
@@ -327,7 +306,11 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       BreakPointLoc.CMDCond(watch, BinaryExpr(BVEQ, BitVecLiteral(5, 64), Register("R0", 64))),
       BreakPointAction(true, true, List(("R0", Register("R0", 64))), true)
     )
-    val bp2 = BreakPoint("Fibentry",  BreakPointLoc.CMD(watch), BreakPointAction(true, true , List(("R0", Register("R0", 64))), true))
+    val bp2 = BreakPoint(
+      "Fibentry",
+      BreakPointLoc.CMD(watch),
+      BreakPointAction(true, true, List(("R0", Register("R0", 64))), true)
+    )
     val res = interpretWithBreakPoints(fib, List(bp), NormalInterpreter, InterpreterState())
     assert(res._1.nextCmd.isInstanceOf[ErrorStop])
     assert(res._2.nonEmpty)
@@ -335,9 +318,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
   test("Capture IllegalArg") {
 
-    val tp = prog(
-      proc("begin", block("shouldfail", LocalAssign(R0, ZeroExtend(-1, BitVecLiteral(0, 64))), ret))
-    )
+    val tp = prog(proc("begin", block("shouldfail", LocalAssign(R0, ZeroExtend(-1, BitVecLiteral(0, 64))), ret)))
 
     val ir = interpret(tp)
     assert(ir.nextCmd.isInstanceOf[ErrorStop])

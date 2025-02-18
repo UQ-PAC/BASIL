@@ -8,9 +8,8 @@ import util.ILLoadingConfig
 
 import scala.jdk.CollectionConverters.*
 
-/**
- * https://refspecs.linuxfoundation.org/elf/elf.pdf
- */
+/** https://refspecs.linuxfoundation.org/elf/elf.pdf
+  */
 
 enum ELFSymType:
   case NOTYPE /* absolute symbol or similar */
@@ -20,11 +19,10 @@ enum ELFSymType:
   case FUNC /* code function */
   case TLS /* ??? */
 
-
 enum ELFBind:
-  case LOCAL  /* local to the translation unit */
+  case LOCAL /* local to the translation unit */
   case GLOBAL /* global to the program */
-  case WEAK  /* multiple versions of symbol may be exposed to the linker, and the last definition is used. */
+  case WEAK /* multiple versions of symbol may be exposed to the linker, and the last definition is used. */
 
 enum ELFVis:
   case HIDDEN
@@ -36,28 +34,42 @@ enum ELFNDX:
   case UND /* Undefined */
   case ABS /* Absolute, unaffected by relocation */
 
-case class ELFSymbol(num: Int,  /* symbol number */
+case class ELFSymbol(
+  num: Int, /* symbol number */
   value: BigInt, /* symbol address */
-  size: Int,  /* symbol size (bytes) */
+  size: Int, /* symbol size (bytes) */
   etype: ELFSymType,
   bind: ELFBind,
   vis: ELFVis,
   ndx: ELFNDX, /* The section containing the symbol */
-  name: String)
+  name: String
+)
 
 object ReadELFLoader {
-  def visitSyms(ctx: SymsContext, config: ILLoadingConfig): (List[ELFSymbol], Set[ExternalFunction], Set[SpecGlobal], Set[FuncEntry], Map[BigInt, BigInt], BigInt) = {
-    val externalFunctions = ctx.relocationTable.asScala.filter(_.relocationTableHeader != null).flatMap(r => visitRelocationTableExtFunc(r)).toSet
-    val relocationOffsets = ctx.relocationTable.asScala.filter(_.relocationTableHeader != null).flatMap(r => visitRelocationTableOffsets(r)).toMap
+  def visitSyms(
+    ctx: SymsContext,
+    config: ILLoadingConfig
+  ): (List[ELFSymbol], Set[ExternalFunction], Set[SpecGlobal], Set[FuncEntry], Map[BigInt, BigInt], BigInt) = {
+    val externalFunctions = ctx.relocationTable.asScala
+      .filter(_.relocationTableHeader != null)
+      .flatMap(r => visitRelocationTableExtFunc(r))
+      .toSet
+    val relocationOffsets = ctx.relocationTable.asScala
+      .filter(_.relocationTableHeader != null)
+      .flatMap(r => visitRelocationTableOffsets(r))
+      .toMap
     val mainAddress = ctx.symbolTable.asScala.flatMap(s => getFunctionAddress(s, config.mainProcedureName))
 
     val symbolTable = ctx.symbolTable.asScala.flatMap(s => visitSymbolTable(s)).toList
     val globalVariables = symbolTable.collect {
-      case ELFSymbol(_, value, size, ELFSymType.OBJECT, ELFBind.GLOBAL, ELFVis.DEFAULT, ndx, name) if ndx != ELFNDX.UND => SpecGlobal(name, size * 8, None, value)
+      case ELFSymbol(_, value, size, ELFSymType.OBJECT, ELFBind.GLOBAL, ELFVis.DEFAULT, ndx, name)
+          if ndx != ELFNDX.UND =>
+        SpecGlobal(name, size * 8, None, value)
     }.toSet
 
     val functionEntries = symbolTable.collect {
-      case ELFSymbol(_, value, size, ELFSymType.FUNC, ELFBind.GLOBAL, ELFVis.DEFAULT, ndx, name) if ndx != ELFNDX.UND => FuncEntry(name, size * 8, value)
+      case ELFSymbol(_, value, size, ELFSymType.FUNC, ELFBind.GLOBAL, ELFVis.DEFAULT, ndx, name) if ndx != ELFNDX.UND =>
+        FuncEntry(name, size * 8, value)
     }.toSet
 
     if (mainAddress.isEmpty) {

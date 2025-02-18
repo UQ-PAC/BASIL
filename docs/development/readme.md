@@ -126,31 +126,31 @@ The test suites use [ScalaTest](https://www.scalatest.org/).
 To run the primary SystemTests suites (SystemTestsBAP and SystemTestsGTIRB) (which require Boogie):
 
 ```
-$ mill.test.testOnly 'SystemTests*'
+$ ./mill test.testOnly 'SystemTests*'
 ```
 
 To run a single test from a test suite, it can be selected using globbing on the full test class name with the `testOnly` task:
 
 ```
-$ mill test.testOnly 'SystemTestsBAP' -- -z basic_arrays_read/gcc:BAP
+$ ./mill test.testOnly 'SystemTestsBAP' -- -z basic_arrays_read/gcc:BAP
 ```
 
 To update the expected BASIL output files from the SystemTests results run:
 
 ```
-$ mill updateExpected
+$ ./mill updateExpected
 ```
 
 To run another test suite, just use the name of the class containing the test suite (in this case LiveVarsAnalysisTests):
 
 ```
-$ mill.test.testOnly 'LiveVarsAnalysisTests'
+$ ./mill test.testOnly 'LiveVarsAnalysisTests'
 ```
 
 To list all test suites:
 
 ```
-$ mill.test.testOnly * -- -t ''
+$ ./mill test.testOnly '*' -- -t ''
 ```
 
 ## Performance profiling

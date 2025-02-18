@@ -43,9 +43,9 @@ class ReplaceReturns(insertR30InvariantAssertion: Procedure => Boolean = (_ => t
       case d: DirectCall => {
         (d.predecessor, d.parent.jump) match {
           // d.parent.jump == d.successor,  from singleprocend invariant
-          // case (Some(l: LocalAssign), _) if l.lhs.name == "R30" && l.rhs.isInstanceOf[BitVecLiteral] => SkipChildren() 
-            // ^ we can resolve the exact return target if we are assigning a constant
-            // If we can't find one 
+          // case (Some(l: LocalAssign), _) if l.lhs.name == "R30" && l.rhs.isInstanceOf[BitVecLiteral] => SkipChildren()
+          // ^ we can resolve the exact return target if we are assigning a constant
+          // If we can't find one
           case (_, _: Unreachable) if d.target == d.parent.parent => {
             // recursive tailcall
             val R30Begin = LocalVar("R30_begin", BitVecType(64))
@@ -76,7 +76,11 @@ class ReplaceReturns(insertR30InvariantAssertion: Procedure => Boolean = (_ => t
   override def vjump(j: Jump) = SkipChildren()
 }
 
-def addReturnBlocks(p: Program, toAll: Boolean = false) = {
+def addReturnBlocks(
+  p: Program,
+  toAll: Boolean = false,
+  insertR30InvariantAssertion: Procedure => Boolean = _ => false
+) = {
   p.procedures.foreach(p => {
     val containsReturn = p.blocks.map(_.jump).find(_.isInstanceOf[Return]).isDefined
     if (toAll && p.blocks.isEmpty && p.entryBlock.isEmpty && p.returnBlock.isEmpty) {
@@ -85,9 +89,11 @@ def addReturnBlocks(p: Program, toAll: Boolean = false) = {
     } else if (p.returnBlock.isEmpty && (toAll || containsReturn)) {
       p.returnBlock = p.addBlocks(Block(label = p.name + "_basil_return", jump = Return()))
     }
-    for (eb <- p.entryBlock) {
-      val R30Begin = LocalVar("R30_begin", BitVecType(64))
-      p.entryBlock.get.statements.prepend(LocalAssign(R30Begin, Register("R30", 64)))
+    if (insertR30InvariantAssertion(p)) {
+      for (eb <- p.entryBlock) {
+        val R30Begin = LocalVar("R30_begin", BitVecType(64))
+        p.entryBlock.get.statements.prepend(LocalAssign(R30Begin, Register("R30", 64)))
+      }
     }
   })
 }

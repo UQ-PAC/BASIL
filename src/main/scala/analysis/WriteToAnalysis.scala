@@ -16,12 +16,11 @@ class WriteToAnalysis(program: Program) extends Analysis[Map[Procedure, Set[Regi
     Register("R4", 64),
     Register("R5", 64),
     Register("R6", 64),
-    Register("R7", 64),
+    Register("R7", 64)
   )
 
   def getWritesTos(proc: Procedure): Set[Register] = {
-    if writesTo.contains(proc) then
-      writesTo(proc)
+    if writesTo.contains(proc) then writesTo(proc)
     else
       val writtenTo: mutable.Set[Register] = mutable.Set()
       proc.blocks.foreach { block =>
@@ -30,13 +29,13 @@ class WriteToAnalysis(program: Program) extends Analysis[Map[Procedure, Set[Regi
             writtenTo.add(variable)
           case MemoryLoad(lhs: Register, _, _, _, _, _) if paramRegisters.contains(lhs) =>
             writtenTo.add(lhs)
-          case DirectCall(target, _, _, _) if target.name == "malloc" =>
+          case DirectCall(target, _, _, _) if target.procName == "malloc" =>
             writtenTo.add(mallocRegister)
           case d: DirectCall if program.procedures.contains(d.target) =>
             writtenTo.addAll(getWritesTos(d.target))
           case _ =>
         }
-    }
+      }
 
       writesTo.update(proc, writtenTo.toSet)
       writesTo(proc)
