@@ -90,8 +90,12 @@ class IRToDSLTest extends AnyFunSuite {
   test("function parameters proc to dsl") {
     val dslprog = IRToDSLTestData.function1
     val irprog = dslprog.resolve
-    assertResultWithToString(dslprog.mainProcedure) {
-      IRToDSL.convertProcedure(irprog.mainProcedure)
+
+    // for each procedure, check that the conversion is correct,
+    // i.e., is structurally equal to the original dsl procedure
+    (dslprog.allProcedures zip irprog.procedures).foreach {
+      case (dslproc, proc) =>
+        assertResultWithToString(dslproc) { IRToDSL.convertProcedure(proc) }
     }
   }
 }
