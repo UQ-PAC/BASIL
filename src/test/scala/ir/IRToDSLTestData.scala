@@ -5,6 +5,8 @@ import ir.dsl.*
 
 // ./mill run --load-directory-bap src/test/correct/function1/gcc --parameter-form --dump-il function1
 
+// format: off
+
 object IRToDSLTestData {
 
   lazy val function1 = EventuallyProgram(

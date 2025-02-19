@@ -17,6 +17,7 @@ class IRToDSLTest extends AnyFunSuite {
     "main",
     block("l_main",
       LocalAssign(R0, bv64(10)),
+      LocalAssign(R1, bv64(10)),
       directCall("p1"),
       indirectCall(R0),
       goto("returntarget")
@@ -87,7 +88,7 @@ class IRToDSLTest extends AnyFunSuite {
     }
   }
 
-  test("function parameters proc to dsl") {
+  test("function1 procs to dsl (with params)") {
     val dslprog = IRToDSLTestData.function1
     val irprog = dslprog.resolve
 
@@ -98,6 +99,14 @@ class IRToDSLTest extends AnyFunSuite {
         assertResultWithToString(dslproc) { IRToDSL.convertProcedure(proc) }
     }
   }
+
+  test("function1 prog to dsl (with params)") {
+    val p = IRToDSLTestData.function1.resolve
+    assertResultWithToString(p) {
+      IRToDSL.convertProgram(p).resolve
+    }
+  }
+
 }
 
 

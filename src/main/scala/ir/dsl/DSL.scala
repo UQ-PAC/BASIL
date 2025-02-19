@@ -4,11 +4,59 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.immutable.*
 
+/**
+ * IR construction DSL
+ * ===================
+ * This file defines helper methods to properly construct a Basil IR
+ * from within Scala.
+ *
+ * To construct the DSL, you should build up the structure
+ * of program, procedure, blocks, and statements. Non control-flow
+ * statements can be used literally. Statements which might jump
+ * should be constructed by special functions, and destinations should
+ * be specified as block label strings.
+ *
+ * The prog() function will return a Basil IR program.
+ *
+ * Note that in the prog() function, the main procedure should be
+ * given as the first argument.
+ *
+ *     prog(
+ *       proc("main",
+ *         block("l_main",
+ *           LocalAssign(R0, bv64(10)),
+ *           LocalAssign(R1, bv64(10)),
+ *           directCall("p1"),
+ *           indirectCall(R0),
+ *           goto("returntarget")
+ *         ),
+ *         block("returntarget", ret)
+ *       ),
+ *       proc("p1",
+ *         block("b1",
+ *           LocalAssign(R0, bv64(10)),
+ *           ret
+ *         )
+ *       )
+ *     )
+ *
+ */
+
+/**
+ * Implementation of DSL
+ * ---------------------
+ * The constructor functions proc(), block(), goto(), etc
+ * return special classes with names beginning with Eventually.
+ * The top-level prog() function will then resolve these objects
+ * and build the Basil IR with the correct links.
+ */
+
+
 // TODO: naming?
-type NonControlFlowStatement =
+type NonCallStatement =
   LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume
 
-type ControlFlowStatement = DirectCall | IndirectCall
+type CallStatement = DirectCall | IndirectCall
 
 val R0: Register = Register("R0", 64)
 val R1: Register = Register("R1", 64)
@@ -55,8 +103,8 @@ trait EventuallyStatement {
   def resolve(p: Program): Statement
 }
 
-case class ResolvableStatement(s: NonControlFlowStatement) extends EventuallyStatement {
-  override def resolve(p: Program): Statement = s
+case class ResolvableStatement(s: NonCallStatement) extends EventuallyStatement {
+  override def resolve(p: Program): Statement = IRToDSL.cloneStatement(s)
 }
 
 trait EventuallyJump {
@@ -122,21 +170,48 @@ def directCall(tgt: String): EventuallyCall = directCall(Nil, tgt)
 
 def indirectCall(tgt: Variable): EventuallyIndirectCall = EventuallyIndirectCall(tgt)
 
+/**
+ * Implementation of blocks and procedures
+ * ---------------------------------------
+ * Resolving EventuallyBlock and EventuallyProcedure is somewhat involved.
+ * This is done by a `makeResolver` function which returns a tuple of
+ * the temporary Basil IR structure (block or proc) and a continuation function.
+ *
+ * The temporary structure is provided so it can be linked into its parent.
+ * Then, the continuation should be called to resolve references within
+ * the temporary structure. This should only be called after the temp
+ * object has been added, as it relies on its presence for detection of
+ * labels (e.g., in the case of a recursive method). After the continuation
+ * has been called, the temporary object is fully constructed and can be used.
+ *
+ */
 
 case class EventuallyBlock(label: String, sl: Seq[EventuallyStatement], j: EventuallyJump) {
-  val tempBlock: Block = Block(label, None, List(), GoTo(List.empty))
+
+  def makeResolver: (Block, (Program, Procedure) => Unit) = {
+    val tempBlock: Block = Block(label, None, List(), GoTo(List.empty))
+
+    def cont(prog: Program, proc: Procedure): Block = {
+      assert(tempBlock.statements.isEmpty)
+      val resolved = sl.map(_.resolve(prog))
+      assert(tempBlock.statements.isEmpty)
+      tempBlock.statements.addAll(resolved)
+      tempBlock.replaceJump(j.resolve(prog, proc))
+    }
+
+    (tempBlock, cont)
+  }
 
   def resolve(prog: Program, proc: Procedure): Block = {
-    val resolved = sl.map(_.resolve(prog))
-    tempBlock.statements.addAll(resolved)
-    tempBlock.replaceJump(j.resolve(prog, proc))
-    tempBlock
+    val (b, resolve) = makeResolver
+    resolve(prog, proc)
+    b
   }
 }
 
-def block(label: String, sl: (NonControlFlowStatement | EventuallyStatement | EventuallyJump)*): EventuallyBlock = {
+def block(label: String, sl: (NonCallStatement | EventuallyStatement | EventuallyJump)*): EventuallyBlock = {
   val statements: Seq[EventuallyStatement] = sl.flatMap {
-    case s: NonControlFlowStatement => Some(ResolvableStatement(s))
+    case s: NonCallStatement => Some(ResolvableStatement(s))
     case o: EventuallyStatement => Some(o)
     case g: EventuallyJump => None
   }
@@ -151,34 +226,45 @@ case class EventuallyProcedure(
   out: Map[String, IRType] = Map(),
   blocks: Seq[EventuallyBlock]
 ) {
-  val _blocks: Seq[Block] = blocks.map(_.tempBlock)
-  val tempProc: Procedure = Procedure(
-    label,
-    None,
-    _blocks.headOption,
-    None,
-    _blocks,
-    in.map((n, t) => LocalVar(n, t)),
-    out.map((n, t) => LocalVar(n, t))
-  )
-  val jumps: Map[Block, EventuallyJump] = blocks.map(b => b.tempBlock -> b.j).toMap
 
-  def resolve(prog: Program): Procedure = {
-    val resolvedBlocks = blocks.map(b => b.resolve(prog, tempProc))
-    jumps.map((b, j) => b.replaceJump(j.resolve(prog, tempProc)))
-    resolvedBlocks.headOption.foreach(b => tempProc.entryBlock = b)
-    tempProc
+  def makeResolver: (Procedure, Program => Unit) = {
+
+    val (tempBlocks, resolvers) = blocks.map(_.makeResolver).unzip
+
+    val tempProc: Procedure = Procedure(
+      label,
+      None,
+      tempBlocks.headOption,
+      None,
+      tempBlocks,
+      in.map((n, t) => LocalVar(n, t)),
+      out.map((n, t) => LocalVar(n, t))
+    )
+
+    val jumps: Iterable[(Block, EventuallyJump)] =
+      (tempBlocks zip blocks).map((temp, b) => temp -> b.j)
+
+    def cont(prog: Program) = {
+      resolvers.foreach(_(prog, tempProc))
+      jumps.foreach((b, j) => b.replaceJump(j.resolve(prog, tempProc)))
+      tempBlocks.headOption.foreach(b => tempProc.entryBlock = b)
+    }
+
+    (tempProc, cont)
   }
 
-  def toProg() = {
-    val p = prog(this)
-    this.resolve(p)
+  def resolve(prog: Program): Procedure = {
+    val (p, resolver) = makeResolver
+    resolver(prog)
     p
   }
 
-  def addToProg(p: Program) = {
-    p.addProcedure(tempProc)
-    val proc = resolve(p)
+  def toProg() = prog(this)
+
+  def addToProg(p: Program): Procedure = {
+    val (proc, resolver) = makeResolver
+    p.addProcedure(proc)
+    resolver(p)
     proc
   }
 
@@ -207,12 +293,12 @@ case class EventuallyProgram(mainProcedure: EventuallyProcedure, otherProcedures
   def resolve: Program = {
     val initialMemory = mutable.TreeMap[BigInt, MemorySection]()
 
-    val tempProcs = allProcedures.map(_.tempProc)
+    val (tempProcs,resolvers) = allProcedures.map(_.makeResolver).unzip
     val procs = ArrayBuffer.from(tempProcs)
 
     val p = Program(procs, procs.head, initialMemory)
 
-    allProcedures.foreach(_.resolve(p))
+    resolvers.foreach(_(p))
     assert(ir.invariant.correctCalls(p))
     assert(ir.invariant.cfgCorrect(p))
     p

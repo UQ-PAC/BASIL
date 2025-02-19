@@ -23,7 +23,7 @@ object IRToDSL {
     case GoTo(targs, label) => goto(targs.map(_.label).toArray : _*)
   }
 
-  def cloneStatement(x: NonControlFlowStatement): NonControlFlowStatement = x match {
+  def cloneStatement(x: NonCallStatement): NonCallStatement = x match {
     case LocalAssign(a,b,c) => LocalAssign(a,b,c)
     case MemoryStore(a,b,c,d,e,f) => MemoryStore(a,b,c,d,e,f)
     case MemoryLoad(a,b,c,d,e,f) => MemoryLoad(a,b,c,d,e,f)
@@ -32,10 +32,10 @@ object IRToDSL {
     case Assume(a,b,c,d) => Assume(a,b,c,d)
   }
 
-  def convertNonControlStatement(x: NonControlFlowStatement): EventuallyStatement =
-    ResolvableStatement(cloneStatement(x))
+  def convertNonControlStatement(x: NonCallStatement): EventuallyStatement =
+    ResolvableStatement(x)
 
-  def convertControlStatement(x: ControlFlowStatement): EventuallyStatement = x match {
+  def convertControlStatement(x: CallStatement): EventuallyStatement = x match {
     case DirectCall(targ, outs, actuals, label) =>
       // XXX: be aware of ordering, .map() on a SortedMap may return a HashMap.
       directCall(
@@ -48,14 +48,14 @@ object IRToDSL {
 
   def convertCommand(x: Command) = x match {
     case x: Jump => convertJump(x)
-    case x: NonControlFlowStatement => convertNonControlStatement(x)
-    case x: ControlFlowStatement => convertControlStatement(x)
+    case x: NonCallStatement => convertNonControlStatement(x)
+    case x: CallStatement => convertControlStatement(x)
   }
 
   def convertBlock(x: Block) =
     block(
       x.label,
-      (x.statements ++ Iterator(x.jump)).map(convertCommand).toArray : _*
+      (x.statements ++ Iterable(x.jump)).map(convertCommand).toArray : _*
     )
 
   def convertProcedure(x: Procedure) =
