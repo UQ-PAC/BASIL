@@ -36,11 +36,13 @@ object IRToDSL {
     ResolvableStatement(cloneStatement(x))
 
   def convertControlStatement(x: ControlFlowStatement): EventuallyStatement = x match {
-    case DirectCall(targ, outs, actuals, label) => directCall(
-      outs.map(keyToString).toArray,
-      targ.name,
-      actuals.map(keyToString).toArray : _*
-    )
+    case DirectCall(targ, outs, actuals, label) =>
+      // XXX: be aware of ordering, .map() on a SortedMap may return a HashMap.
+      directCall(
+        outs.toArray.map(keyToString),
+        targ.name,
+        actuals.toArray.map(keyToString) : _*
+      )
     case IndirectCall(targ, label) => indirectCall(targ)
   }
 

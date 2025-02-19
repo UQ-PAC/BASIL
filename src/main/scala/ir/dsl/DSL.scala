@@ -185,7 +185,7 @@ case class EventuallyProcedure(
 }
 
 def proc(label: String, blocks: EventuallyBlock*): EventuallyProcedure = {
-  EventuallyProcedure(label, Map(), Map(), blocks)
+  EventuallyProcedure(label, SortedMap(), SortedMap(), blocks)
 }
 
 def proc(
@@ -194,7 +194,7 @@ def proc(
   out: Iterable[(String, IRType)],
   blocks: EventuallyBlock*
 ): EventuallyProcedure = {
-  EventuallyProcedure(label, in.toMap, out.toMap, blocks)
+  EventuallyProcedure(label, in.to(SortedMap), out.to(SortedMap), blocks)
 }
 
 def mem: SharedMemory = SharedMemory("mem", 64, 8)
