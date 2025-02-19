@@ -1087,7 +1087,9 @@ object CopyProp {
     val state = mutable.HashMap[Variable, PropState]()
     var poisoned = false // we have an indirect call
 
-    val doLoadReasoning = true
+    // This is obviously invalid to do flow-insensitively as we don't have
+    // a DSA form on memory imposing the order of loads/stores
+    val doLoadReasoning = false
 
     def transfer(c: mutable.HashMap[Variable, PropState], s: Statement): Unit = {
       // val callClobbers = ((0 to 7) ++ (19 to 30)).map("R" + _).map(c => Register(c, 64))
