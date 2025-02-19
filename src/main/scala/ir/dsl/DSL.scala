@@ -202,11 +202,11 @@ def mem: SharedMemory = SharedMemory("mem", 64, 8)
 def stack: SharedMemory = SharedMemory("stack", 64, 8)
 
 case class EventuallyProgram(mainProcedure: EventuallyProcedure, otherProcedures: EventuallyProcedure*) {
+  val allProcedures = mainProcedure +: otherProcedures
 
   def resolve: Program = {
     val initialMemory = mutable.TreeMap[BigInt, MemorySection]()
 
-    val allProcedures = mainProcedure +: otherProcedures
     val tempProcs = allProcedures.map(_.tempProc)
     val procs = ArrayBuffer.from(tempProcs)
 

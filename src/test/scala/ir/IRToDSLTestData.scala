@@ -3,11 +3,12 @@ package ir
 import ir.*
 import ir.dsl.*
 
+// ./mill run --load-directory-bap src/test/correct/function1/gcc --parameter-form --dump-il function1
+
 object IRToDSLTestData {
 
-  lazy val function1 = prog(
-    proc(
-      "get_two",
+  lazy val function1 = EventuallyProgram(
+    proc("get_two_1876",
       Seq(
         "R0_in" -> BitVecType(64),
         "R10_in" -> BitVecType(64),
@@ -22,7 +23,6 @@ object IRToDSLTestData {
         "R1_in" -> BitVecType(64),
         "R29_in" -> BitVecType(64),
         "R2_in" -> BitVecType(64),
-        "R30_in" -> BitVecType(64),
         "R31_in" -> BitVecType(64),
         "R3_in" -> BitVecType(64),
         "R4_in" -> BitVecType(64),
@@ -32,9 +32,12 @@ object IRToDSLTestData {
         "R8_in" -> BitVecType(64),
         "R9_in" -> BitVecType(64)
       ),
-      Seq("R0_out" -> BitVecType(64), "R1_out" -> BitVecType(64), "R31_out" -> BitVecType(64)),
-      block(
-        "lget_two",
+      Seq(
+        "R0_out" -> BitVecType(64),
+        "R1_out" -> BitVecType(64),
+        "R31_out" -> BitVecType(64)
+      ),
+      block("lget_two",
         LocalAssign(LocalVar("R0", BitVecType(64), 0), LocalVar("R0_in", BitVecType(64), 0), None),
         LocalAssign(LocalVar("R10", BitVecType(64), 0), LocalVar("R10_in", BitVecType(64), 0), None),
         LocalAssign(LocalVar("R11", BitVecType(64), 0), LocalVar("R11_in", BitVecType(64), 0), None),
@@ -48,7 +51,6 @@ object IRToDSLTestData {
         LocalAssign(LocalVar("R1", BitVecType(64), 0), LocalVar("R1_in", BitVecType(64), 0), None),
         LocalAssign(LocalVar("R29", BitVecType(64), 0), LocalVar("R29_in", BitVecType(64), 0), None),
         LocalAssign(LocalVar("R2", BitVecType(64), 0), LocalVar("R2_in", BitVecType(64), 0), None),
-        LocalAssign(LocalVar("R30", BitVecType(64), 0), LocalVar("R30_in", BitVecType(64), 0), None),
         LocalAssign(LocalVar("R31", BitVecType(64), 0), LocalVar("R31_in", BitVecType(64), 0), None),
         LocalAssign(LocalVar("R3", BitVecType(64), 0), LocalVar("R3_in", BitVecType(64), 0), None),
         LocalAssign(LocalVar("R4", BitVecType(64), 0), LocalVar("R4_in", BitVecType(64), 0), None),
@@ -57,109 +59,23 @@ object IRToDSLTestData {
         LocalAssign(LocalVar("R7", BitVecType(64), 0), LocalVar("R7_in", BitVecType(64), 0), None),
         LocalAssign(LocalVar("R8", BitVecType(64), 0), LocalVar("R8_in", BitVecType(64), 0), None),
         LocalAssign(LocalVar("R9", BitVecType(64), 0), LocalVar("R9_in", BitVecType(64), 0), None),
-        LocalAssign(LocalVar("R30_begin", BitVecType(64), 0), LocalVar("R30", BitVecType(64), 0), None),
-        LocalAssign(
-          LocalVar("R31", BitVecType(64), 0),
-          BinaryExpr(BVADD, LocalVar("R31", BitVecType(64), 0), BitVecLiteral(BigInt("18446744073709551600"), 64)),
-          Some("%00000346")
-        ),
-        MemoryStore(
-          StackMemory("stack", 64, 8),
-          BinaryExpr(BVADD, LocalVar("R31", BitVecType(64), 0), BitVecLiteral(BigInt("15"), 64)),
-          Extract(8, 0, LocalVar("R0", BitVecType(64), 0)),
-          Endian.LittleEndian,
-          8,
-          Some("%0000034e")
-        ),
-        MemoryStore(
-          StackMemory("stack", 64, 8),
-          BinaryExpr(BVADD, LocalVar("R31", BitVecType(64), 0), BitVecLiteral(BigInt("8"), 64)),
-          Extract(32, 0, LocalVar("R1", BitVecType(64), 0)),
-          Endian.LittleEndian,
-          32,
-          Some("%00000356")
-        ),
-        MemoryStore(
-          StackMemory("stack", 64, 8),
-          LocalVar("R31", BitVecType(64), 0),
-          LocalVar("R2", BitVecType(64), 0),
-          Endian.LittleEndian,
-          64,
-          Some("%0000035e")
-        ),
-        MemoryLoad(
-          LocalVar("load18", BitVecType(8), 0),
-          StackMemory("stack", 64, 8),
-          BinaryExpr(BVADD, LocalVar("R31", BitVecType(64), 0), BitVecLiteral(BigInt("15"), 64)),
-          Endian.LittleEndian,
-          8,
-          Some("%00000365$0")
-        ),
-        LocalAssign(
-          LocalVar("R1", BitVecType(64), 0),
-          ZeroExtend(56, LocalVar("load18", BitVecType(8), 0)),
-          Some("%00000365$1")
-        ),
-        MemoryLoad(
-          LocalVar("load19", BitVecType(32), 0),
-          StackMemory("stack", 64, 8),
-          BinaryExpr(BVADD, LocalVar("R31", BitVecType(64), 0), BitVecLiteral(BigInt("8"), 64)),
-          Endian.LittleEndian,
-          32,
-          Some("%0000036c$0")
-        ),
-        LocalAssign(
-          LocalVar("R0", BitVecType(64), 0),
-          ZeroExtend(32, LocalVar("load19", BitVecType(32), 0)),
-          Some("%0000036c$1")
-        ),
-        LocalAssign(
-          LocalVar("R0", BitVecType(64), 0),
-          ZeroExtend(
-            32,
-            BinaryExpr(
-              BVADD,
-              Extract(32, 0, LocalVar("R1", BitVecType(64), 0)),
-              Extract(32, 0, LocalVar("R0", BitVecType(64), 0))
-            )
-          ),
-          Some("%00000373")
-        ),
-        LocalAssign(
-          LocalVar("R1", BitVecType(64), 0),
-          ZeroExtend(32, Extract(32, 0, LocalVar("R0", BitVecType(64), 0))),
-          Some("%00000379")
-        ),
-        MemoryLoad(
-          LocalVar("load20", BitVecType(64), 0),
-          StackMemory("stack", 64, 8),
-          LocalVar("R31", BitVecType(64), 0),
-          Endian.LittleEndian,
-          64,
-          Some("%00000380$0")
-        ),
+        LocalAssign(LocalVar("R31", BitVecType(64), 0), BinaryExpr(BVADD, LocalVar("R31", BitVecType(64), 0), BitVecLiteral(BigInt("18446744073709551600"), 64)), Some("%00000346")),
+        MemoryStore(StackMemory("stack", 64, 8), BinaryExpr(BVADD, LocalVar("R31", BitVecType(64), 0), BitVecLiteral(BigInt("15"), 64)), Extract(8, 0, LocalVar("R0", BitVecType(64), 0)), Endian.LittleEndian, 8, Some("%0000034e")),
+        MemoryStore(StackMemory("stack", 64, 8), BinaryExpr(BVADD, LocalVar("R31", BitVecType(64), 0), BitVecLiteral(BigInt("8"), 64)), Extract(32, 0, LocalVar("R1", BitVecType(64), 0)), Endian.LittleEndian, 32, Some("%00000356")),
+        MemoryStore(StackMemory("stack", 64, 8), LocalVar("R31", BitVecType(64), 0), LocalVar("R2", BitVecType(64), 0), Endian.LittleEndian, 64, Some("%0000035e")),
+        MemoryLoad(LocalVar("load18", BitVecType(8), 0), StackMemory("stack", 64, 8), BinaryExpr(BVADD, LocalVar("R31", BitVecType(64), 0), BitVecLiteral(BigInt("15"), 64)), Endian.LittleEndian, 8, Some("%00000365$0")),
+        LocalAssign(LocalVar("R1", BitVecType(64), 0), ZeroExtend(56, LocalVar("load18", BitVecType(8), 0)), Some("%00000365$1")),
+        MemoryLoad(LocalVar("load19", BitVecType(32), 0), StackMemory("stack", 64, 8), BinaryExpr(BVADD, LocalVar("R31", BitVecType(64), 0), BitVecLiteral(BigInt("8"), 64)), Endian.LittleEndian, 32, Some("%0000036c$0")),
+        LocalAssign(LocalVar("R0", BitVecType(64), 0), ZeroExtend(32, LocalVar("load19", BitVecType(32), 0)), Some("%0000036c$1")),
+        LocalAssign(LocalVar("R0", BitVecType(64), 0), ZeroExtend(32, BinaryExpr(BVADD, Extract(32, 0, LocalVar("R1", BitVecType(64), 0)), Extract(32, 0, LocalVar("R0", BitVecType(64), 0)))), Some("%00000373")),
+        LocalAssign(LocalVar("R1", BitVecType(64), 0), ZeroExtend(32, Extract(32, 0, LocalVar("R0", BitVecType(64), 0))), Some("%00000379")),
+        MemoryLoad(LocalVar("load20", BitVecType(64), 0), StackMemory("stack", 64, 8), LocalVar("R31", BitVecType(64), 0), Endian.LittleEndian, 64, Some("%00000380$0")),
         LocalAssign(LocalVar("R0", BitVecType(64), 0), LocalVar("load20", BitVecType(64), 0), Some("%00000380$1")),
-        LocalAssign(
-          LocalVar("R0", BitVecType(64), 0),
-          ZeroExtend(
-            32,
-            BinaryExpr(
-              BVADD,
-              Extract(32, 0, LocalVar("R1", BitVecType(64), 0)),
-              Extract(32, 0, LocalVar("R0", BitVecType(64), 0))
-            )
-          ),
-          Some("%00000387")
-        ),
-        LocalAssign(
-          LocalVar("R31", BitVecType(64), 0),
-          BinaryExpr(BVADD, LocalVar("R31", BitVecType(64), 0), BitVecLiteral(BigInt("16"), 64)),
-          Some("%0000038d")
-        ),
+        LocalAssign(LocalVar("R0", BitVecType(64), 0), ZeroExtend(32, BinaryExpr(BVADD, Extract(32, 0, LocalVar("R1", BitVecType(64), 0)), Extract(32, 0, LocalVar("R0", BitVecType(64), 0)))), Some("%00000387")),
+        LocalAssign(LocalVar("R31", BitVecType(64), 0), BinaryExpr(BVADD, LocalVar("R31", BitVecType(64), 0), BitVecLiteral(BigInt("16"), 64)), Some("%0000038d")),
         goto("get_two_1876_basil_return")
       ),
-      block(
-        "get_two_1876_basil_return",
+      block("get_two_1876_basil_return",
         ret(
           "R0_out" -> LocalVar("R0", BitVecType(64), 0),
           "R1_out" -> LocalVar("R1", BitVecType(64), 0),
@@ -167,8 +83,7 @@ object IRToDSLTestData {
         )
       )
     ),
-    proc(
-      "main",
+    proc("main_1924",
       Seq(
         "R0_in" -> BitVecType(64),
         "R10_in" -> BitVecType(64),
@@ -201,8 +116,7 @@ object IRToDSLTestData {
         "R30_out" -> BitVecType(64),
         "R31_out" -> BitVecType(64)
       ),
-      block(
-        "lmain",
+      block("lmain",
         LocalAssign(LocalVar("R0", BitVecType(64), 0), LocalVar("R0_in", BitVecType(64), 0), None),
         LocalAssign(LocalVar("R10", BitVecType(64), 0), LocalVar("R10_in", BitVecType(64), 0), None),
         LocalAssign(LocalVar("R11", BitVecType(64), 0), LocalVar("R11_in", BitVecType(64), 0), None),
@@ -225,155 +139,124 @@ object IRToDSLTestData {
         LocalAssign(LocalVar("R7", BitVecType(64), 0), LocalVar("R7_in", BitVecType(64), 0), None),
         LocalAssign(LocalVar("R8", BitVecType(64), 0), LocalVar("R8_in", BitVecType(64), 0), None),
         LocalAssign(LocalVar("R9", BitVecType(64), 0), LocalVar("R9_in", BitVecType(64), 0), None),
-        LocalAssign(LocalVar("R30_begin", BitVecType(64), 0), LocalVar("R30", BitVecType(64), 0), None),
-        LocalAssign(
-          LocalVar("#4", BitVecType(64), 0),
-          BinaryExpr(BVADD, LocalVar("R31", BitVecType(64), 0), BitVecLiteral(BigInt("18446744073709551600"), 64)),
-          Some("%00000398")
-        ),
-        MemoryStore(
-          StackMemory("stack", 64, 8),
-          LocalVar("#4", BitVecType(64), 0),
-          LocalVar("R29", BitVecType(64), 0),
-          Endian.LittleEndian,
-          64,
-          Some("%0000039e")
-        ),
-        MemoryStore(
-          StackMemory("stack", 64, 8),
-          BinaryExpr(BVADD, LocalVar("#4", BitVecType(64), 0), BitVecLiteral(BigInt("8"), 64)),
-          LocalVar("R30", BitVecType(64), 0),
-          Endian.LittleEndian,
-          64,
-          Some("%000003a4")
-        ),
+        LocalAssign(LocalVar("#4", BitVecType(64), 0), BinaryExpr(BVADD, LocalVar("R31", BitVecType(64), 0), BitVecLiteral(BigInt("18446744073709551600"), 64)), Some("%00000398")),
+        MemoryStore(StackMemory("stack", 64, 8), LocalVar("#4", BitVecType(64), 0), LocalVar("R29", BitVecType(64), 0), Endian.LittleEndian, 64, Some("%0000039e")),
+        MemoryStore(StackMemory("stack", 64, 8), BinaryExpr(BVADD, LocalVar("#4", BitVecType(64), 0), BitVecLiteral(BigInt("8"), 64)), LocalVar("R30", BitVecType(64), 0), Endian.LittleEndian, 64, Some("%000003a4")),
         LocalAssign(LocalVar("R31", BitVecType(64), 0), LocalVar("#4", BitVecType(64), 0), Some("%000003a8")),
         LocalAssign(LocalVar("R29", BitVecType(64), 0), LocalVar("R31", BitVecType(64), 0), Some("%000003ae")),
         LocalAssign(LocalVar("R0", BitVecType(64), 0), BitVecLiteral(BigInt("69632"), 64), Some("%000003b3")),
-        LocalAssign(
-          LocalVar("R0", BitVecType(64), 0),
-          BinaryExpr(BVADD, LocalVar("R0", BitVecType(64), 0), BitVecLiteral(BigInt("20"), 64)),
-          Some("%000003b9")
-        ),
+        LocalAssign(LocalVar("R0", BitVecType(64), 0), BinaryExpr(BVADD, LocalVar("R0", BitVecType(64), 0), BitVecLiteral(BigInt("20"), 64)), Some("%000003b9")),
         LocalAssign(LocalVar("R1", BitVecType(64), 0), BitVecLiteral(BigInt("1"), 64), Some("%000003be")),
-        MemoryStore(
-          SharedMemory("mem", 64, 8),
-          LocalVar("R0", BitVecType(64), 0),
-          Extract(32, 0, LocalVar("R1", BitVecType(64), 0)),
-          Endian.LittleEndian,
-          32,
-          Some("%000003c6")
-        ),
+        MemoryStore(SharedMemory("mem", 64, 8), LocalVar("R0", BitVecType(64), 0), Extract(32, 0, LocalVar("R1", BitVecType(64), 0)), Endian.LittleEndian, 32, Some("%000003c6")),
         LocalAssign(LocalVar("R2", BitVecType(64), 0), BitVecLiteral(BigInt("58368"), 64), Some("%000003cb")),
-        LocalAssign(
-          LocalVar("R2", BitVecType(64), 0),
-          BinaryExpr(
-            BVCONCAT,
-            Extract(64, 32, LocalVar("R2", BitVecType(64), 0)),
-            BinaryExpr(BVCONCAT, BitVecLiteral(BigInt("21515"), 16), Extract(16, 0, LocalVar("R2", BitVecType(64), 0)))
-          ),
-          Some("%000003d2")
-        ),
-        LocalAssign(
-          LocalVar("R2", BitVecType(64), 0),
-          BinaryExpr(
-            BVCONCAT,
-            Extract(64, 48, LocalVar("R2", BitVecType(64), 0)),
-            BinaryExpr(BVCONCAT, BitVecLiteral(BigInt("2"), 16), Extract(32, 0, LocalVar("R2", BitVecType(64), 0)))
-          ),
-          Some("%000003d9")
-        ),
+        LocalAssign(LocalVar("R2", BitVecType(64), 0), BinaryExpr(BVCONCAT, Extract(64, 32, LocalVar("R2", BitVecType(64), 0)), BinaryExpr(BVCONCAT, BitVecLiteral(BigInt("21515"), 16), Extract(16, 0, LocalVar("R2", BitVecType(64), 0)))), Some("%000003d2")),
+        LocalAssign(LocalVar("R2", BitVecType(64), 0), BinaryExpr(BVCONCAT, Extract(64, 48, LocalVar("R2", BitVecType(64), 0)), BinaryExpr(BVCONCAT, BitVecLiteral(BigInt("2"), 16), Extract(32, 0, LocalVar("R2", BitVecType(64), 0)))), Some("%000003d9")),
         LocalAssign(LocalVar("R1", BitVecType(64), 0), BitVecLiteral(BigInt("10"), 64), Some("%000003de")),
         LocalAssign(LocalVar("R0", BitVecType(64), 0), BitVecLiteral(BigInt("97"), 64), Some("%000003e3")),
         LocalAssign(LocalVar("R30", BitVecType(64), 0), BitVecLiteral(BigInt("1972"), 64), Some("%000003e8")),
-        directCall("get_two"),
+        directCall(
+          Seq(
+            "R0_out" -> LocalVar("R0", BitVecType(64), 0),
+            "R1_out" -> LocalVar("R1", BitVecType(64), 0),
+            "R31_out" -> LocalVar("R31", BitVecType(64), 0)
+          ),
+          "get_two_1876",
+          "R0_in" -> LocalVar("R0", BitVecType(64), 0),
+          "R10_in" -> LocalVar("R10", BitVecType(64), 0),
+          "R11_in" -> LocalVar("R11", BitVecType(64), 0),
+          "R12_in" -> LocalVar("R12", BitVecType(64), 0),
+          "R13_in" -> LocalVar("R13", BitVecType(64), 0),
+          "R14_in" -> LocalVar("R14", BitVecType(64), 0),
+          "R15_in" -> LocalVar("R15", BitVecType(64), 0),
+          "R16_in" -> LocalVar("R16", BitVecType(64), 0),
+          "R17_in" -> LocalVar("R17", BitVecType(64), 0),
+          "R18_in" -> LocalVar("R18", BitVecType(64), 0),
+          "R1_in" -> LocalVar("R1", BitVecType(64), 0),
+          "R29_in" -> LocalVar("R29", BitVecType(64), 0),
+          "R2_in" -> LocalVar("R2", BitVecType(64), 0),
+          "R31_in" -> LocalVar("R31", BitVecType(64), 0),
+          "R3_in" -> LocalVar("R3", BitVecType(64), 0),
+          "R4_in" -> LocalVar("R4", BitVecType(64), 0),
+          "R5_in" -> LocalVar("R5", BitVecType(64), 0),
+          "R6_in" -> LocalVar("R6", BitVecType(64), 0),
+          "R7_in" -> LocalVar("R7", BitVecType(64), 0),
+          "R8_in" -> LocalVar("R8", BitVecType(64), 0),
+          "R9_in" -> LocalVar("R9", BitVecType(64), 0)
+        ),
         goto("l000003ec")
       ),
-      block(
-        "l000003ec",
-        LocalAssign(
-          LocalVar("R1", BitVecType(64), 0),
-          ZeroExtend(32, Extract(32, 0, LocalVar("R0", BitVecType(64), 0))),
-          Some("%000003f0")
-        ),
+      block("l000003ec",
+        LocalAssign(LocalVar("R1", BitVecType(64), 0), ZeroExtend(32, Extract(32, 0, LocalVar("R0", BitVecType(64), 0))), Some("%000003f0")),
         LocalAssign(LocalVar("R0", BitVecType(64), 0), BitVecLiteral(BigInt("69632"), 64), Some("%000003f5")),
-        LocalAssign(
-          LocalVar("R0", BitVecType(64), 0),
-          BinaryExpr(BVADD, LocalVar("R0", BitVecType(64), 0), BitVecLiteral(BigInt("24"), 64)),
-          Some("%000003fb")
-        ),
-        MemoryStore(
-          SharedMemory("mem", 64, 8),
-          LocalVar("R0", BitVecType(64), 0),
-          Extract(32, 0, LocalVar("R1", BitVecType(64), 0)),
-          Endian.LittleEndian,
-          32,
-          Some("%00000403")
-        ),
+        LocalAssign(LocalVar("R0", BitVecType(64), 0), BinaryExpr(BVADD, LocalVar("R0", BitVecType(64), 0), BitVecLiteral(BigInt("24"), 64)), Some("%000003fb")),
+        MemoryStore(SharedMemory("mem", 64, 8), LocalVar("R0", BitVecType(64), 0), Extract(32, 0, LocalVar("R1", BitVecType(64), 0)), Endian.LittleEndian, 32, Some("%00000403")),
         LocalAssign(LocalVar("R0", BitVecType(64), 0), BitVecLiteral(BigInt("69632"), 64), Some("%00000408")),
-        LocalAssign(
-          LocalVar("R0", BitVecType(64), 0),
-          BinaryExpr(BVADD, LocalVar("R0", BitVecType(64), 0), BitVecLiteral(BigInt("24"), 64)),
-          Some("%0000040e")
-        ),
-        MemoryLoad(
-          LocalVar("load21", BitVecType(32), 0),
-          SharedMemory("mem", 64, 8),
-          LocalVar("R0", BitVecType(64), 0),
-          Endian.LittleEndian,
-          32,
-          Some("%00000415$0")
-        ),
-        LocalAssign(
-          LocalVar("R0", BitVecType(64), 0),
-          ZeroExtend(32, LocalVar("load21", BitVecType(32), 0)),
-          Some("%00000415$1")
-        ),
-        LocalAssign(
-          LocalVar("R1", BitVecType(64), 0),
-          ZeroExtend(32, Extract(32, 0, LocalVar("R0", BitVecType(64), 0))),
-          Some("%0000041b")
-        ),
+        LocalAssign(LocalVar("R0", BitVecType(64), 0), BinaryExpr(BVADD, LocalVar("R0", BitVecType(64), 0), BitVecLiteral(BigInt("24"), 64)), Some("%0000040e")),
+        MemoryLoad(LocalVar("load21", BitVecType(32), 0), SharedMemory("mem", 64, 8), LocalVar("R0", BitVecType(64), 0), Endian.LittleEndian, 32, Some("%00000415$0")),
+        LocalAssign(LocalVar("R0", BitVecType(64), 0), ZeroExtend(32, LocalVar("load21", BitVecType(32), 0)), Some("%00000415$1")),
+        LocalAssign(LocalVar("R1", BitVecType(64), 0), ZeroExtend(32, Extract(32, 0, LocalVar("R0", BitVecType(64), 0))), Some("%0000041b")),
         LocalAssign(LocalVar("R0", BitVecType(64), 0), BitVecLiteral(BigInt("0"), 64), Some("%00000420")),
-        LocalAssign(
-          LocalVar("R0", BitVecType(64), 0),
-          BinaryExpr(BVADD, LocalVar("R0", BitVecType(64), 0), BitVecLiteral(BigInt("2056"), 64)),
-          Some("%00000426")
-        ),
+        LocalAssign(LocalVar("R0", BitVecType(64), 0), BinaryExpr(BVADD, LocalVar("R0", BitVecType(64), 0), BitVecLiteral(BigInt("2056"), 64)), Some("%00000426")),
         LocalAssign(LocalVar("R30", BitVecType(64), 0), BitVecLiteral(BigInt("2016"), 64), Some("%0000042b")),
-        directCall("printf"),
+        directCall(
+          Seq(
+            "R0_out" -> LocalVar("R0", BitVecType(64), 0),
+            "R10_out" -> LocalVar("R10", BitVecType(64), 0),
+            "R11_out" -> LocalVar("R11", BitVecType(64), 0),
+            "R12_out" -> LocalVar("R12", BitVecType(64), 0),
+            "R13_out" -> LocalVar("R13", BitVecType(64), 0),
+            "R14_out" -> LocalVar("R14", BitVecType(64), 0),
+            "R15_out" -> LocalVar("R15", BitVecType(64), 0),
+            "R16_out" -> LocalVar("R16", BitVecType(64), 0),
+            "R17_out" -> LocalVar("R17", BitVecType(64), 0),
+            "R18_out" -> LocalVar("R18", BitVecType(64), 0),
+            "R1_out" -> LocalVar("R1", BitVecType(64), 0),
+            "R29_out" -> LocalVar("R29", BitVecType(64), 0),
+            "R2_out" -> LocalVar("R2", BitVecType(64), 0),
+            "R30_out" -> LocalVar("R30", BitVecType(64), 0),
+            "R3_out" -> LocalVar("R3", BitVecType(64), 0),
+            "R4_out" -> LocalVar("R4", BitVecType(64), 0),
+            "R5_out" -> LocalVar("R5", BitVecType(64), 0),
+            "R6_out" -> LocalVar("R6", BitVecType(64), 0),
+            "R7_out" -> LocalVar("R7", BitVecType(64), 0),
+            "R8_out" -> LocalVar("R8", BitVecType(64), 0),
+            "R9_out" -> LocalVar("R9", BitVecType(64), 0)
+          ),
+          "printf_1584",
+          "R0_in" -> LocalVar("R0", BitVecType(64), 0),
+          "R10_in" -> LocalVar("R10", BitVecType(64), 0),
+          "R11_in" -> LocalVar("R11", BitVecType(64), 0),
+          "R12_in" -> LocalVar("R12", BitVecType(64), 0),
+          "R13_in" -> LocalVar("R13", BitVecType(64), 0),
+          "R14_in" -> LocalVar("R14", BitVecType(64), 0),
+          "R15_in" -> LocalVar("R15", BitVecType(64), 0),
+          "R16_in" -> LocalVar("R16", BitVecType(64), 0),
+          "R17_in" -> LocalVar("R17", BitVecType(64), 0),
+          "R18_in" -> LocalVar("R18", BitVecType(64), 0),
+          "R1_in" -> LocalVar("R1", BitVecType(64), 0),
+          "R29_in" -> LocalVar("R29", BitVecType(64), 0),
+          "R2_in" -> LocalVar("R2", BitVecType(64), 0),
+          "R30_in" -> LocalVar("R30", BitVecType(64), 0),
+          "R3_in" -> LocalVar("R3", BitVecType(64), 0),
+          "R4_in" -> LocalVar("R4", BitVecType(64), 0),
+          "R5_in" -> LocalVar("R5", BitVecType(64), 0),
+          "R6_in" -> LocalVar("R6", BitVecType(64), 0),
+          "R7_in" -> LocalVar("R7", BitVecType(64), 0),
+          "R8_in" -> LocalVar("R8", BitVecType(64), 0),
+          "R9_in" -> LocalVar("R9", BitVecType(64), 0)
+        ),
         goto("l00000430")
       ),
-      block(
-        "l00000430",
+      block("l00000430",
         LocalAssign(LocalVar("R0", BitVecType(64), 0), BitVecLiteral(BigInt("0"), 64), Some("%00000433")),
-        MemoryLoad(
-          LocalVar("load22", BitVecType(64), 0),
-          StackMemory("stack", 64, 8),
-          LocalVar("R31", BitVecType(64), 0),
-          Endian.LittleEndian,
-          64,
-          Some("%0000043a$0")
-        ),
+        MemoryLoad(LocalVar("load22", BitVecType(64), 0), StackMemory("stack", 64, 8), LocalVar("R31", BitVecType(64), 0), Endian.LittleEndian, 64, Some("%0000043a$0")),
         LocalAssign(LocalVar("R29", BitVecType(64), 0), LocalVar("load22", BitVecType(64), 0), Some("%0000043a$1")),
-        MemoryLoad(
-          LocalVar("load23", BitVecType(64), 0),
-          StackMemory("stack", 64, 8),
-          BinaryExpr(BVADD, LocalVar("R31", BitVecType(64), 0), BitVecLiteral(BigInt("8"), 64)),
-          Endian.LittleEndian,
-          64,
-          Some("%0000043f$0")
-        ),
+        MemoryLoad(LocalVar("load23", BitVecType(64), 0), StackMemory("stack", 64, 8), BinaryExpr(BVADD, LocalVar("R31", BitVecType(64), 0), BitVecLiteral(BigInt("8"), 64)), Endian.LittleEndian, 64, Some("%0000043f$0")),
         LocalAssign(LocalVar("R30", BitVecType(64), 0), LocalVar("load23", BitVecType(64), 0), Some("%0000043f$1")),
-        LocalAssign(
-          LocalVar("R31", BitVecType(64), 0),
-          BinaryExpr(BVADD, LocalVar("R31", BitVecType(64), 0), BitVecLiteral(BigInt("16"), 64)),
-          Some("%00000443")
-        ),
+        LocalAssign(LocalVar("R31", BitVecType(64), 0), BinaryExpr(BVADD, LocalVar("R31", BitVecType(64), 0), BitVecLiteral(BigInt("16"), 64)), Some("%00000443")),
         goto("main_1924_basil_return")
       ),
-      block(
-        "main_1924_basil_return",
+      block("main_1924_basil_return",
         ret(
           "R0_out" -> LocalVar("R0", BitVecType(64), 0),
           "R1_out" -> LocalVar("R1", BitVecType(64), 0),
@@ -384,8 +267,7 @@ object IRToDSLTestData {
         )
       )
     ),
-    proc(
-      "printf",
+    proc("printf_1584",
       Seq(
         "R0_in" -> BitVecType(64),
         "R10_in" -> BitVecType(64),

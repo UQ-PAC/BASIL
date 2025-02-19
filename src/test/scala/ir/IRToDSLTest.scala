@@ -35,7 +35,7 @@ class IRToDSLTest extends AnyFunSuite {
    *
    * Used as a quick fix to get structural equality.
    */
-  inline def assertResultWithToString(expected: Any)(actual: Any) = {
+  inline def assertResultWithToString[T](expected: T)(actual: T) = {
     assertResult(expected.toString)(actual.toString)
   }
 
@@ -88,12 +88,10 @@ class IRToDSLTest extends AnyFunSuite {
   }
 
   test("function parameters proc to dsl") {
-    val p = IRToDSLTestData.function1
-    val procedure = p.nameToProcedure("main")
-    assertResultWithToString(mainproc) {
-      IRToDSL.convertProcedure(procedure)
+    val dslprog = IRToDSLTestData.function1
+    assertResultWithToString(dslprog.mainProcedure) {
+      IRToDSL.convertProcedure(dslprog.resolve.mainProcedure)
     }
-
   }
 }
 
