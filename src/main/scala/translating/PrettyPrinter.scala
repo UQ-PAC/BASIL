@@ -193,8 +193,7 @@ class BasilIRPrettyPrinter(
     val entryComent = with_analysis_results_begin(b).map(c => s"${blockIndent}// ${c}")
     val exitComment = with_analysis_results_end(b).map(c => s"${blockIndent}// ${c}")
     val addr = address.map(a => s"{address = ${vaddress(a)}}")
-    PBlock(label, addr,
-      List("blockxx"), entryComent, exitComment)
+    PBlock(label, addr, statements.map(_.toString) ++ Seq(terminator.toString), entryComent, exitComment)
   }
 
   override def vblock(
@@ -319,7 +318,7 @@ class BasilIRPrettyPrinter(
 
     val blocks = (pname ++ addr ++ iblocks ++ mblocks.toList).map(_ + ";").mkString("\n")
 
-    Proc(s"proc $name -> XXX", localDecls, blocks)
+    Proc(s"proc $name(${inParams.mkString(", ")}) -> (${outParams.mkString(", ")})", localDecls, blocks)
   }
 
   def vproc(
@@ -386,7 +385,7 @@ class BasilIRPrettyPrinter(
   override def vgoto(t: List[String]): PPProg[GoTo] = BST[GoTo](s"goto(${t.mkString(", ")})")
   override def vunreachable(): PPProg[Unreachable] = BST[Unreachable]("unreachable")
   override def vreturn(outs: List[(PPProg[Variable], PPProg[Expr])]) = BST(
-    s"return (xxx)"
+    s"return (${outs.map((l, r) => r).mkString(", ")})"
   )
 
   def vtype(t: IRType): String = t match {

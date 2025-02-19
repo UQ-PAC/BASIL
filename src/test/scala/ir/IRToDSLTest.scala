@@ -9,6 +9,7 @@ import ir.dsl.*
 import ir.*
 
 import org.scalactic.Prettifier
+import org.scalactic._
 
 class IRToDSLTest extends AnyFunSuite {
 
@@ -28,9 +29,27 @@ class IRToDSLTest extends AnyFunSuite {
     proc("p1", block("b1", LocalAssign(R0, bv64(10)), ret)),
   )
 
+  /**
+   * Compares expected and actual by first converting both to their
+   * string representations.
+   *
+   * Used as a quick fix to get structural equality.
+   */
+  inline def assertResultWithToString(expected: Any)(actual: Any) = {
+    assertResult(expected.toString)(actual.toString)
+  }
+
+  /**
+   * XXX: The assertions use /structural/ equality on the DSL's "Eventually"
+   * classes. These succeed only when the precise types of all arguments are
+   * equal (e.g., List vs Array). We have unified the types so the DSL
+   * DSL construction and the Basil IR to DSL conversion use the same types,
+   * but this is something to be aware of. In particular, the compiler may
+   * change the type for varargs to something other than Array.
+   */
   test("commands to dsl") {
     val lassign = LocalAssign(R0, bv64(10))
-    assertResult(ResolvableStatement(lassign)) {
+    assertResultWithToString(ResolvableStatement(lassign)) {
       IRToDSL.convertCommand(lassign)
     }
 
@@ -57,35 +76,17 @@ class IRToDSLTest extends AnyFunSuite {
 
   test("proc to dsl") {
     val procedure = p.nameToProcedure("main")
-    assertResult(mainproc) {
+    assertResultWithToString(mainproc) {
       IRToDSL.convertProcedure(procedure)
     }
   }
 
   test("prog to dsl") {
-    assert(p != p)
-    // println(p)
+    assertResultWithToString(p) {
+      IRToDSL.convertProgram(p).resolve
+    }
   }
 }
 
-class A extends Iterable[A] {
-  var n = 0
-  def iterator =
-    n = n + 1
-    if n < 1000 then List(this, this).iterator else Iterator()
-  override def toString = "A.toString"
-}
 
-class BadTest extends AnyFunSuite {
-
-  val p = prog(
-    proc("p1", block("b1", ret)),
-  )
-
-  test("assert failrue") {
-    println(p.getClass().getMethods.map(m => m.getName -> m.getDeclaringClass).toSeq)
-    println(classOf[A].getMethods.map(m => m.getName -> m.getDeclaringClass).toSeq)
-    assert(A() == A())
-  }
-}
 

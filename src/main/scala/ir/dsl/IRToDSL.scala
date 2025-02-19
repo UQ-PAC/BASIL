@@ -19,8 +19,8 @@ object IRToDSL {
 
   def convertJump(x: Jump): EventuallyJump = x match {
     case Unreachable(label) => unreachable
-    case Return(label, out) => ret(out.map(keyToString).toSeq : _*)
-    case GoTo(targs, label) => goto(targs.map(_.label).toSeq : _*)
+    case Return(label, out) => ret(out.map(keyToString).toArray : _*)
+    case GoTo(targs, label) => goto(targs.map(_.label).toArray : _*)
   }
 
   def cloneStatement(x: NonControlFlowStatement): NonControlFlowStatement = x match {
@@ -37,9 +37,9 @@ object IRToDSL {
 
   def convertControlStatement(x: ControlFlowStatement): EventuallyStatement = x match {
     case DirectCall(targ, outs, actuals, label) => directCall(
-      outs.map(keyToString).toSeq,
+      outs.map(keyToString).toArray,
       targ.name,
-      actuals.map(keyToString).toSeq : _*
+      actuals.map(keyToString).toArray : _*
     )
     case IndirectCall(targ, label) => indirectCall(targ)
   }
@@ -53,7 +53,7 @@ object IRToDSL {
   def convertBlock(x: Block) =
     block(
       x.label,
-      (x.statements ++ Iterator(x.jump)).map(convertCommand).toSeq : _*
+      (x.statements ++ Iterator(x.jump)).map(convertCommand).toArray : _*
     )
 
   def convertProcedure(x: Procedure) =
@@ -61,11 +61,11 @@ object IRToDSL {
       x.name,
       x.formalInParam.toSeq.map(localVarToTuple),
       x.formalOutParam.toSeq.map(localVarToTuple),
-      x.blocks.map(convertBlock).toSeq : _*
+      x.blocks.map(convertBlock).toArray : _*
     )
 
   def convertProgram(x: Program) =
     val others = x.procedures.filter(_ != x.mainProcedure).map(convertProcedure)
-    prog(convertProcedure(x.mainProcedure), others.toSeq : _*)
+    EventuallyProgram(convertProcedure(x.mainProcedure), others.toArray : _*)
 
 }

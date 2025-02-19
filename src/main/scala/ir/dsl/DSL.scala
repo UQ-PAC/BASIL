@@ -101,28 +101,27 @@ case class EventuallyUnreachable() extends EventuallyJump {
   override def resolve(p: Program, proc: Procedure) = Unreachable()
 }
 
-def goto(): EventuallyGoto = EventuallyGoto(List.empty)
-
-def goto(targets: String*): EventuallyGoto = {
-  EventuallyGoto(targets.map(p => DelayNameResolve(p)).toList)
-}
-
-def ret: EventuallyReturn = EventuallyReturn(Seq())
-def ret(params: (String, Expr)*): EventuallyReturn = EventuallyReturn(params)
-
-def unreachable: EventuallyUnreachable = EventuallyUnreachable()
 
 def goto(targets: List[String]): EventuallyGoto = {
   EventuallyGoto(targets.map(p => DelayNameResolve(p)))
 }
 
-def directCall(tgt: String): EventuallyCall = EventuallyCall(DelayNameResolve(tgt), List(), List())
+def goto(): EventuallyGoto = goto(Nil)
+def goto(targets: String*): EventuallyGoto = goto(targets.toList)
+
+def ret: EventuallyReturn = ret()
+def ret(params: (String, Expr)*): EventuallyReturn = EventuallyReturn(params)
+
+def unreachable: EventuallyUnreachable = EventuallyUnreachable()
+
 
 def directCall(lhs: Iterable[(String, Variable)], tgt: String, actualParams: (String, Expr)*): EventuallyCall =
-  EventuallyCall(DelayNameResolve(tgt), lhs, actualParams)
+  EventuallyCall(DelayNameResolve(tgt), lhs.toArray, actualParams)
+
+def directCall(tgt: String): EventuallyCall = directCall(Nil, tgt)
 
 def indirectCall(tgt: Variable): EventuallyIndirectCall = EventuallyIndirectCall(tgt)
-// def directcall(tgt: String) = EventuallyCall(DelayNameResolve(tgt), None)
+
 
 case class EventuallyBlock(label: String, sl: Seq[EventuallyStatement], j: EventuallyJump) {
   val tempBlock: Block = Block(label, None, List(), GoTo(List.empty))
