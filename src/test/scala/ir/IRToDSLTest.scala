@@ -15,7 +15,8 @@ class IRToDSLTest extends AnyFunSuite {
 
   val mainproc = proc(
     "main",
-    block("l_main",
+    block(
+      "l_main",
       LocalAssign(R0, bv64(10)),
       LocalAssign(R1, bv64(10)),
       directCall("p1"),
@@ -25,10 +26,7 @@ class IRToDSLTest extends AnyFunSuite {
     block("returntarget", ret)
   )
 
-  val p = prog(
-    mainproc,
-    proc("p1", block("b1", LocalAssign(R0, bv64(10)), ret)),
-  )
+  val p = prog(mainproc, proc("p1", block("b1", LocalAssign(R0, bv64(10)), ret)))
 
   /**
    * Compares expected and actual by first converting both to their
@@ -94,9 +92,8 @@ class IRToDSLTest extends AnyFunSuite {
 
     // for each procedure, check that the conversion is correct,
     // i.e., is structurally equal to the original dsl procedure
-    (dslprog.allProcedures zip irprog.procedures).foreach {
-      case (dslproc, proc) =>
-        assertResultWithToString(dslproc) { IRToDSL.convertProcedure(proc) }
+    (dslprog.allProcedures zip irprog.procedures).foreach { case (dslproc, proc) =>
+      assertResultWithToString(dslproc) { IRToDSL.convertProcedure(proc) }
     }
   }
 
@@ -108,6 +105,3 @@ class IRToDSLTest extends AnyFunSuite {
   }
 
 }
-
-
-

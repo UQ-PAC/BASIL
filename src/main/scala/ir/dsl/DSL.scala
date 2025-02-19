@@ -51,7 +51,6 @@ import scala.collection.immutable.*
  * and build the Basil IR with the correct links.
  */
 
-
 // TODO: naming?
 type NonCallStatement =
   LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume
@@ -149,7 +148,6 @@ case class EventuallyUnreachable() extends EventuallyJump {
   override def resolve(p: Program, proc: Procedure) = Unreachable()
 }
 
-
 def goto(targets: List[String]): EventuallyGoto = {
   EventuallyGoto(targets.map(p => DelayNameResolve(p)))
 }
@@ -161,7 +159,6 @@ def ret: EventuallyReturn = ret()
 def ret(params: (String, Expr)*): EventuallyReturn = EventuallyReturn(params)
 
 def unreachable: EventuallyUnreachable = EventuallyUnreachable()
-
 
 def directCall(lhs: Iterable[(String, Variable)], tgt: String, actualParams: (String, Expr)*): EventuallyCall =
   EventuallyCall(DelayNameResolve(tgt), lhs.toArray, actualParams)
@@ -293,7 +290,7 @@ case class EventuallyProgram(mainProcedure: EventuallyProcedure, otherProcedures
   def resolve: Program = {
     val initialMemory = mutable.TreeMap[BigInt, MemorySection]()
 
-    val (tempProcs,resolvers) = allProcedures.map(_.makeResolver).unzip
+    val (tempProcs, resolvers) = allProcedures.map(_.makeResolver).unzip
     val procs = ArrayBuffer.from(tempProcs)
 
     val p = Program(procs, procs.head, initialMemory)
