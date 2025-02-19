@@ -109,8 +109,8 @@ private object CaseIR {
         indentNested(
           s"directCall(",
           outs.toSeq.toScalaLines
-          #:: tgt.name.toScalaLines
-          #:: actuals.to(LazyList).map(_.toScalaLines),
+            #:: tgt.name.toScalaLines
+            #:: actuals.to(LazyList).map(_.toScalaLines),
           ")"
         )
       }

@@ -243,10 +243,7 @@ prog(
           )
         )
       ),
-      proc("printf",
-        Seq("in" -> BitVecType(64)),
-        Seq("out" -> BitVecType(64)),
-      ),
+      proc("printf", Seq("in" -> BitVecType(64)), Seq("out" -> BitVecType(64)))
     )
 
     val expected = """
@@ -422,10 +419,7 @@ case class A39() extends ASD
 
   test("prog toscala should always put main first") {
 
-    val p = prog(
-      proc("main"),
-      proc("notmain"),
-    )
+    val p = prog(proc("main"), proc("notmain"))
 
     // move the main procedure after notmain in the procedures array
     val main = p.procedures(0)
@@ -435,8 +429,10 @@ case class A39() extends ASD
     val s = p.toScala
     assert(s.contains("\"main\""))
     assert(s.contains("\"notmain\""))
-    assert(s.indexOfSlice("\"main\"") < s.indexOfSlice("\"notmain\""),
-      "main procedure should be the first argument to a prog() call")
+    assert(
+      s.indexOfSlice("\"main\"") < s.indexOfSlice("\"notmain\""),
+      "main procedure should be the first argument to a prog() call"
+    )
   }
 
 }
