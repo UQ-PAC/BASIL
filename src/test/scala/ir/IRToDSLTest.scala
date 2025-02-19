@@ -86,6 +86,15 @@ class IRToDSLTest extends AnyFunSuite {
       IRToDSL.convertProgram(p).resolve
     }
   }
+
+  test("function parameters proc to dsl") {
+    val p = IRToDSLTestData.function1
+    val procedure = p.nameToProcedure("main")
+    assertResultWithToString(mainproc) {
+      IRToDSL.convertProcedure(procedure)
+    }
+
+  }
 }
 
 
