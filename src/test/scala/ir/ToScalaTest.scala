@@ -420,4 +420,23 @@ case class A39() extends ASD
     assertResult("Color.Red") { Color.Red.toScala }
   }
 
+  test("prog toscala should always put main first") {
+
+    val p = prog(
+      proc("main"),
+      proc("notmain"),
+    )
+
+    // move the main procedure after notmain in the procedures array
+    val main = p.procedures(0)
+    p.procedures(0) = p.procedures(1)
+    p.procedures(1) = main
+
+    val s = p.toScala
+    assert(s.contains("\"main\""))
+    assert(s.contains("\"notmain\""))
+    assert(s.indexOfSlice("\"main\"") < s.indexOfSlice("\"notmain\""),
+      "main procedure should be the first argument to a prog() call")
+  }
+
 }

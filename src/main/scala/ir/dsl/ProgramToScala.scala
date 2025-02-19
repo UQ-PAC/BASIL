@@ -47,7 +47,13 @@ def procedureToScalaWith(blockToScala: Block => Twine)(x: Procedure): Twine =
   indentNested(s"proc(${x.name.toScala}", params #::: x.blocks.to(LazyList).map(blockToScala), ")", headSep = true)
 
 def programToScalaWith(procedureToScala: Procedure => Twine)(x: Program): Twine =
-  indentNested("prog(", x.procedures.to(LazyList).map(procedureToScala), ")")
+  val main = x.mainProcedure
+  val others = x.procedures.to(LazyList).filter(_ ne main)
+  indentNested(
+    "prog(",
+    (main #:: others).map(procedureToScala),
+    ")"
+  )
 
 /**
  * ToScala instances
