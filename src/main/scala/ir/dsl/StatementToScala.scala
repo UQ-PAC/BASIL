@@ -91,15 +91,29 @@ private object CaseIR {
   type Excluded = Return | DirectCall | IndirectCall | GoTo
 
   private lazy val toScalaOfExcluded = ToScala.Make[Excluded] {
-    case x: Return => {
-      if (x.outParams.isEmpty) {
+    case Return(label, outs) => {
+      if (outs.isEmpty) {
         LazyList("ret")
       } else {
-        def outParamToScala(x: (LocalVar, Expr)) = (x(0).name, x(1)).toScalaLines
-        indentNested("ret(", x.outParams.map(outParamToScala), ")")
+        given ToScala[LocalVar] = ToScala.MakeString(_.name.toScala)
+
+        indentNested("ret(", outs.map(_.toScalaLines), ")")
       }
     }
-    case x: DirectCall => LazyList(s"directCall(${x.target.procName.toScala})")
+    case DirectCall(tgt, label, outs, actuals) =>
+      if (outs.isEmpty && actuals.isEmpty) {
+        LazyList(s"directCall(${tgt.procName.toScala})")
+      } else {
+        given ToScala[LocalVar] = ToScala.MakeString(_.name.toScala)
+
+        indentNested(
+          s"directCall(",
+          outs.toSeq.toScalaLines
+          #:: tgt.name.toScalaLines
+          #:: actuals.to(LazyList).map(_.toScalaLines),
+          ")"
+        )
+      }
     case x: IndirectCall => LazyList(s"indirectCall(${x.target.toScala})")
     case x: GoTo => LazyList(s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})")
   }
