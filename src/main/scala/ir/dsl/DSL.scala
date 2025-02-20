@@ -350,7 +350,11 @@ case class EventuallyProgram(
 def prog(mainProc: EventuallyProcedure, procedures: EventuallyProcedure*): Program =
   prog(Seq(), mainProc, procedures: _*)
 
-def prog(initialMemory: Iterable[MemorySection], mainProc: EventuallyProcedure, procedures: EventuallyProcedure*): Program =
+def prog(
+  initialMemory: Iterable[MemorySection],
+  mainProc: EventuallyProcedure,
+  procedures: EventuallyProcedure*
+): Program =
   progUnresolved(initialMemory, mainProc, procedures: _*).resolve
 
 def progUnresolved(mainProc: EventuallyProcedure, procedures: EventuallyProcedure*): EventuallyProgram =
@@ -362,4 +366,3 @@ def progUnresolved(
   procedures: EventuallyProcedure*
 ): EventuallyProgram =
   EventuallyProgram(mainProc, procedures, initialMemory)
-
