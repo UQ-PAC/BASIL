@@ -297,7 +297,7 @@ enum Predicate {
         case (s, Disj(s2)) => s ++ s2
         case (s, p) => s + p
       }
-      if d.size == 0 then True
+      if d.size == 0 then False
       else if d.size == 1 then d.head
       else Disj(d)
     }
@@ -477,15 +477,18 @@ enum Predicate {
             val a = l(0).s
             val b = l(1).s
 
-            if a.intersect(b).nonEmpty then cur = cur - Disj(a) - Disj(b) + or(Disj(a.intersect(b)), and(Disj(a.diff(b)), Disj(b.diff(a)))).simplify
+            if a.intersect(b).nonEmpty then
+              val cur1 = cur - Disj(a) - Disj(b) + or(Disj(a.intersect(b)), and(Disj(a.diff(b)), Disj(b.diff(a)))).simplify
+              changed = cur != cur1
+              cur = cur1
           }
 
           for p <- cur if !changed do {
             val cur1 = p match {
               case Lit(TrueLiteral) => cur - p
-              case Lit(FalseLiteral) => Set(Lit(FalseLiteral))
+              case Lit(FalseLiteral) => Set(False)
               case Conj(s2) => cur - p ++ s2
-              case Not(p) if cur.contains(p) => cur - p - Not(p) + False
+              case Not(p) if cur.contains(p) => Set(False)
               case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSLE, b, a)) => cur - p - BVCmp(BVSLE, b, a) + BVCmp(BVEQ, a, b).simplify
               case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSGE, a, b)) => cur - p - BVCmp(BVSGE, a, b) + BVCmp(BVEQ, a, b).simplify
               case BVCmp(BVSGE, a, b) if cur.contains(BVCmp(BVSGE, b, a)) => cur - p - BVCmp(BVSGE, b, a) + BVCmp(BVEQ, a, b).simplify
@@ -500,7 +503,8 @@ enum Predicate {
             cur = cur1
           }
         }
-        if cur.size == 1 then cur.head else Conj(cur)
+        if cur.size == 0 then True
+        else if cur.size == 1 then cur.head else Conj(cur)
       }
       case Disj(s) => {
         var cur = s.map(_.simplify)
@@ -525,7 +529,10 @@ enum Predicate {
             val a = l(0).s
             val b = l(1).s
 
-            if a.intersect(b).nonEmpty then cur = cur - Conj(a) - Conj(b) + and(Conj(a.intersect(b)), or(Conj(a.diff(b)), Conj(b.diff(a)))).simplify
+            if a.intersect(b).nonEmpty then
+              val cur1 = cur - Conj(a) - Conj(b) + and(Conj(a.intersect(b)), or(Conj(a.diff(b)), Conj(b.diff(a)))).simplify
+              changed = cur != cur1
+              cur = cur1
           }
 
           for p <- cur if !changed do {
@@ -533,7 +540,8 @@ enum Predicate {
               case Disj(s2) => cur - p ++ s2
               case Lit(TrueLiteral) => Set(True)
               case Lit(FalseLiteral) => cur - p
-              case Not(p) if cur.contains(p) => cur - p - Not(p) + True
+              case Not(p) if cur.contains(p) => Set(True)
+
               case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSLE, b, a)) => cur - p - BVCmp(BVSLE, b, a) + True
               case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSGE, a, b)) => cur - p - BVCmp(BVSGE, a, b) + True
               case BVCmp(BVSGE, a, b) if cur.contains(BVCmp(BVSGE, b, a)) => cur - p - BVCmp(BVSGE, b, a) + True
@@ -566,7 +574,8 @@ enum Predicate {
             cur = cur1
           }
         }
-        if cur.size == 1 then cur.head else Disj(cur)
+        if cur.size == 0 then False
+        else if cur.size == 1 then cur.head else Disj(cur)
       }
       case BVCmp(op, a, b) =>
         import eval.evalBVLogBinExpr
@@ -621,6 +630,8 @@ object Predicate {
       case BoolEQUIV => bop(BoolEQ, a, b)
     }
   }
+
+  def implies(a: Predicate, b: Predicate): Predicate = bop(BoolIMPLIES, a, b)
 
   def gammaLeq(a: GammaTerm, b: GammaTerm) = GammaCmp(BoolIMPLIES, b, a)
   def gammaGeq(a: GammaTerm, b: GammaTerm) = GammaCmp(BoolIMPLIES, a, b)
