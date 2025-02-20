@@ -890,7 +890,7 @@ class SadNode(val graph: SadGraph, val bases: mutable.Set[SymBase]= mutable.Set.
         val pointee = if pointees.nonEmpty then  Some(graph.mergeCells(pointees)) else None
         _cells = cells.diff(overlapping).appended(res).sorted
         if pointees.nonEmpty then res.setPointee(pointee.get)
-        res
+        init(interval)
 
       assert(nonOverlappingProperty)
       newCell
