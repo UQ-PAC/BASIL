@@ -225,7 +225,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
 
   // find the corresponding cells for a expr from this graph's procedure
   def exprToCells(expr: Expr): Set[SadCell] = {
-    symValToCells(exprToSymVal(expr).removeNonAddress(i => i > 11000))
+    symValToCells(exprToSymVal(expr).removeNonAddress(i => i > 1000))
   }
 
   // check that local constraints hold after processing
@@ -331,7 +331,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
   override def init(symBase: SymBase, size: Option[Int]): SadNode = SadNode(this, mutable.Map(symBase -> 0), size)
   def init(symBases: mutable.Map[SymBase, Int], size: Option[Int]): SadNode = SadNode(this, symBases, size)
   override def constraintArgToCells(constraintArg: ConstraintArg, ignoreContents: Boolean = false): Set[SadCell] = {
-    val cells = symValToCells(exprToSymVal(constraintArg.value).removeNonAddress(i => i >= 11000))
+    val cells = symValToCells(exprToSymVal(constraintArg.value).removeNonAddress(i => i >= 1000))
     val exprCells = cells.map(find)
 
 
