@@ -131,7 +131,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
             localCorrectness()
         }
         
-        dcc.outParmas.foreach {
+        dcc.outParams.foreach {
           case (out, actual) =>
             DSALogger.warn(s"cloning $actual into $out")
             val actuals = callee.exprToCells(out).map(find)
@@ -198,7 +198,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
         }
 
         Logger.debug("doing out params")
-        dcc.outParmas/*.filterNot(f => f._1.name.startsWith("R31"))*/.toSeq.sortBy(f => f._1.name).foreach {
+        dcc.outParams/*.filterNot(f => f._1.name.startsWith("R31"))*/.toSeq.sortBy(f => f._1.name).foreach {
           case (out, actual) =>
             localCorrectness()
             val actuals = locals(dcc.target)
