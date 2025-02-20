@@ -8,6 +8,8 @@ import translating.serialiseIL
 import ir.dsl.*
 import ir.*
 
+object Load extends test_util.TestUtil
+
 class IRTest extends AnyFunSuite {
 
   test("blockintralinks") {
@@ -357,4 +359,14 @@ class IRTest extends AnyFunSuite {
     assert(main.formalOutParam == SortedSet(LocalVar("R0_out", BitVecType(64))))
 
   }
+
+  test("dsl procedure with self-recursive call") {
+    // this should be correctly resolved
+    val emptyprog = prog(proc("main"))
+    val recursiveproc = proc("p2", block("b1", LocalAssign(R0, bv64(10)), directCall("p2"), goto("b1")))
+
+    assert(prog(recursiveproc) != null)
+    assert(recursiveproc.addToProg(emptyprog) != null)
+  }
+
 }

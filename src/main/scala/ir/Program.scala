@@ -118,7 +118,8 @@ class Program(
   }
 
   override def toString(): String = {
-    serialiseIL(this)
+    // serialiseIL(this)
+    translating.PrettyPrinter.pp_prog(this)
   }
 
   def setModifies(specModifies: Map[String, List[String]]): Unit = {
@@ -250,7 +251,7 @@ class Procedure private (
   var address: Option[BigInt],
   private var _entryBlock: Option[Block],
   private var _returnBlock: Option[Block],
-  private val _blocks: mutable.LinkedHashSet[Block],
+  private val _blocks: mutable.ArrayBuffer[Block],
   var formalInParam: mutable.SortedSet[LocalVar],
   var formalOutParam: mutable.SortedSet[LocalVar],
   var inParamDefaultBinding: immutable.SortedMap[LocalVar, Expr],
@@ -285,7 +286,7 @@ class Procedure private (
       address,
       entryBlock,
       returnBlock,
-      mutable.LinkedHashSet.from(blocks),
+      mutable.ArrayBuffer.from(blocks),
       mutable.SortedSet.from(formalInParam),
       mutable.SortedSet.from(formalOutParam),
       immutable.SortedMap.from(inParamDefaultBinding),
@@ -314,7 +315,8 @@ class Procedure private (
   }
 
   override def toString: String = {
-    s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${formalInParam.size} in and ${formalOutParam.size} out parameters"
+    // s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${formalInParam.size} in and ${formalOutParam.size} out parameters"
+    translating.PrettyPrinter.pp_proc(this)
   }
 
   def calls: Set[Procedure] = blocks.iterator.flatMap(_.calls).toSet
@@ -322,7 +324,14 @@ class Procedure private (
   /** Block iteration order is defined such that that the entryBlock is first, and no order is defined beyond that. Both
     * entry block and return block are elements of _blocks.
     */
-  def blocks: Iterator[Block] = _blocks.iterator
+  def blocks: Iterator[Block] = entryBlock.iterator ++ (_blocks.iterator.filterNot(entryBlock.contains))
+
+  def reverseiterator: Iterator[Block] = _blocks.reverseIterator
+
+  def sortBlocksRPO() : Unit = {
+    transforms.reversePostOrder(this)
+    _blocks.sortInPlaceBy(x => - x.rpoOrder)
+  }
 
   def addCaller(c: DirectCall): Unit = {
     _callers.add(c)
@@ -353,7 +362,7 @@ class Procedure private (
   def addBlocks(block: Block): Block = {
     if (!_blocks.contains(block)) {
       block.parent = this
-      _blocks.add(block)
+      _blocks.append(block)
     }
     block
   }
@@ -403,7 +412,7 @@ class Procedure private (
     require(_blocks.contains(block))
     require(block.incomingJumps.isEmpty) // don't leave jumps dangling
     block.deParent()
-    _blocks.remove(block)
+    _blocks.remove(_blocks.indexOf(block))
     if (_entryBlock.contains(block)) {
       _entryBlock = None
     }
