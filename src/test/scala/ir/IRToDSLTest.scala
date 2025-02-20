@@ -24,7 +24,7 @@ class IRToDSLTest extends AnyFunSuite {
       goto("returntarget")
     ),
     block("returntarget", ret)
-  )
+  ).cloneable
 
   val p = prog(mainproc, proc("p1", block("b1", LocalAssign(R0, bv64(10)), ret)))
 
@@ -48,7 +48,7 @@ class IRToDSLTest extends AnyFunSuite {
    */
   test("commands to dsl") {
     val lassign = LocalAssign(R0, bv64(10))
-    assertResultWithToString(ResolvableStatement(lassign)) {
+    assertResultWithToString(CloneableStatement(lassign)) {
       IRToDSL.convertCommand(lassign)
     }
 

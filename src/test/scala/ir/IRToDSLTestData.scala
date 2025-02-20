@@ -9,7 +9,7 @@ import ir.dsl.*
 
 object IRToDSLTestData {
 
-  lazy val function1 = EventuallyProgram(
+  lazy val function1 = progUnresolved(
     proc("main_1924",
       Seq(
         "R0_in" -> BitVecType(64),
@@ -317,6 +317,6 @@ object IRToDSLTestData {
         "R9_out" -> BitVecType(64)
       )
     )
-  )
+  ).cloneable
 
 }
