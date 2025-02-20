@@ -93,7 +93,7 @@ class SadDSATest extends AnyFunSuite {
     val basilResult = runTest(context)
     val main = basilResult.ir.program.mainProcedure
 
-    val localGraph = SadDSA.getLocal(main)
+    val localGraph = SadDSA.getLocal(main, context)
 
     val test = 1
   }

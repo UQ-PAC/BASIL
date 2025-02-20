@@ -4,6 +4,7 @@ import analysis.data_structure_analysis.DSAPhase.Local
 import analysis.solvers.UnionFindSolver
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.{Expr, InterProcIRCursor, LocalVar, Procedure, Program, computeDomain}
+import util.IRContext
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -12,8 +13,8 @@ object SuperCellCounter extends Counter
 
 case class FieldTerm(v: SuperCell) extends analysis.solvers.Var[FieldTerm]
 
-abstract class FieldGraph(proc: Procedure, phase: DSAPhase) extends DSAGraph[UnionFindSolver[FieldTerm], SuperCell, FieldCell, ConstraintCell, FieldNode](proc, phase, UnionFindSolver[FieldTerm]()) {
-  
+abstract class FieldGraph(proc: Procedure, phase: DSAPhase, context: IRContext) extends DSAGraph[UnionFindSolver[FieldTerm], SuperCell, FieldCell, ConstraintCell, FieldNode](proc, phase, context, UnionFindSolver[FieldTerm]()) {
+
   override def init(symBase: SymBase, size: Option[Int]): FieldNode = FieldNode(this, symBase, size)
 //  var nodes: Map[SymBase, FieldNode] = buildNodes
 

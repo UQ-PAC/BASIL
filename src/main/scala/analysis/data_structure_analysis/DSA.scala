@@ -2,6 +2,8 @@ package analysis.data_structure_analysis
 
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver, UnionFindSolver}
 import ir.{Expr, Procedure, Program}
+import specification.{ExternalFunction, SymbolTableEntry}
+import util.IRContext
 
 import scala.collection.{SortedSet, mutable}
 
@@ -82,6 +84,7 @@ class DSFlag {
 trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Node <: DSANode[Cell]]
   (val proc: Procedure, 
    var phase: DSAPhase,
+   val irContex: IRContext,
    val solver: Solver,
    val symValues: Option[SymbolicValues] = None,
    val cons: Option[Set[Constraint]] = None,
@@ -93,6 +96,10 @@ trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Nod
   def exprToSymVal(expr: Expr): SymValueSet = sva.exprToSymValSet(expr)
   def init(symBase: SymBase, size: Option[Int]): Node
   def constraintArgToCells(constraintArg: ConstraintArg, ignoreContents: Boolean = false): Set[CCell]
+
+  def globalNode(globals: Set[SymbolTableEntry],
+                 globalOffsets: Map[BigInt, BigInt],
+                 externalFunctions: Set[ExternalFunction]): Node
 
   def localPhase(): Unit = {
     constraints.toSeq.sortBy(f => f.label).foreach(processConstraint)
@@ -148,7 +155,8 @@ trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Nod
   }
 
   def buildNodes: Map[SymBase, Node] = {
-    val init = sva.state.foldLeft(Map[SymBase, Node]()) {
+    val global = globalNode(irContex.globals ++ irContex.funcEntries, irContex.globalOffsets, irContex.externalFunctions)
+    val init = sva.state.foldLeft(Map[SymBase, Node](Global -> global)) {
       case (m, (variable, valueSet)) =>
         symValToNodes(valueSet.removeNonAddress(i => i >= 11000), m)
     }

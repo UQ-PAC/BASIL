@@ -4,7 +4,7 @@ import analysis.data_structure_analysis.DSAPhase.Local
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.Procedure
-import util.DSALogger
+import util.{DSALogger, IRContext}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{SortedSet, mutable}
@@ -14,9 +14,10 @@ class SetDSA
 
 
 class SetGraph(proc: Procedure, phase: DSAPhase,
+               context: IRContext,
                symValues: Option[SymbolicValues] = None,
                cons: Option[Set[Constraint]] = None)
-  extends SadGraph(proc, phase, symValues, cons) {
+  extends SadGraph(proc, phase, context, symValues, cons) {
 
   override def mergeCells(c1: SadCell, c2: SadCell): SadCell = {
     val cell1 = find(c1)
@@ -48,10 +49,12 @@ class SetGraph(proc: Procedure, phase: DSAPhase,
 
 object SetDSA {
 
-  def getLocal(proc: Procedure, symValues: Option[SymbolicValues] = None,
+  def getLocal(proc: Procedure,
+               context: IRContext,
+               symValues: Option[SymbolicValues] = None,
                cons: Option[Set[Constraint]] = None,
               ): SetGraph = {
-    val graph = SetGraph(proc, Local, symValues, cons)
+    val graph = SetGraph(proc, Local, context, symValues, cons)
     graph.localPhase()
     graph
   }
