@@ -1,16 +1,16 @@
 package util.intrusive_list
 
-import org.scalatest.funsuite.AnyFunSuite
+import munit.FunSuite
 
-class IntrusiveListTest extends AnyFunSuite {
+class IntrusiveListTest extends FunSuite {
   case class Elem(t: Float) extends IntrusiveListElement[Elem]
 
   test("basic") {
     val x = IntrusiveList[Elem]()
     val toInsert = Elem(10)
-    val f: IntrusiveListElement[Elem] = x.append(toInsert)
-    assert(x.size == 1)
-    assert(f.last() == f)
+    val f = x.append(toInsert)
+    assertEquals(x.size , 1)
+    assertEquals(f.last() , f)
     assert(f eq toInsert)
   }
 

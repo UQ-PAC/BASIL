@@ -1,4 +1,4 @@
-import org.scalatest.funsuite.AnyFunSuite
+import munit.FunSuite
 import util.{Logger, PerformanceTimer, ILLoadingConfig, RunUtils, IRLoading, LogLevel}
 import translating.BAPToIR
 import analysis.LoopDetector
@@ -15,7 +15,7 @@ import test_util.BASILTest.writeToFile
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
   */
-class IrreducibleLoop extends AnyFunSuite {
+class IrreducibleLoop extends FunSuite {
   val testPath = "./src/test/irreducible_loops"
   Logger.setLevel(LogLevel.ERROR)
 

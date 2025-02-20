@@ -1,6 +1,5 @@
 package test_util
 
-import org.scalatest.funsuite.AnyFunSuite
 import ir.{Block, Procedure, Program}
 import util.{
   BASILConfig,

@@ -3,13 +3,13 @@ import boogie.SpecGlobal
 import ir.Endian.LittleEndian
 import ir.dsl.*
 import ir.*
-import org.scalatest.funsuite.AnyFunSuite
+import munit.FunSuite
 import specification.Specification
 import util.*
 
 import scala.collection.immutable.{AbstractSeq, LinearSeq}
 
-class SVATest extends AnyFunSuite {
+class SVATest extends FunSuite {
 
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)

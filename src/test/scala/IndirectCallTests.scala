@@ -1,6 +1,6 @@
 import ir.{Block, Command, DirectCall, GoTo, Procedure, Program, Statement}
 import ir.*
-import org.scalatest.funsuite.*
+import munit.FunSuite
 import util.{
   BASILConfig,
   BASILResult,
@@ -20,7 +20,7 @@ import test_util.TestConfig
 
 import java.io.{BufferedWriter, File, FileWriter}
 
-class IndirectCallTests extends AnyFunSuite, BASILTest {
+class IndirectCallTests extends FunSuite, BASILTest {
 
   /** @param label - the label of the IndirectCall to be resolved
     * @param labelProcedure - the name of the procedure containing the IndirectCall to be resolved

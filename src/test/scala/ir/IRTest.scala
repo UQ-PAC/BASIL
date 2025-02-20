@@ -2,13 +2,13 @@ package ir
 
 import scala.collection.mutable
 import scala.collection.immutable.*
-import org.scalatest.funsuite.AnyFunSuite
+import munit.FunSuite
 import util.intrusive_list.*
 import translating.serialiseIL
 import ir.dsl.*
 import ir.*
 
-class IRTest extends AnyFunSuite {
+class IRTest extends FunSuite {
 
   test("blockintralinks") {
     val p = prog(proc("main", block("lmain", goto("lmain1")), block("lmain1", goto("lmain2")), block("lmain2", ret)))

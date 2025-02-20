@@ -16,12 +16,12 @@ import ir.{
   Procedure
 }
 import util.{Logger, LogLevel}
-import org.scalatest.funsuite.AnyFunSuite
+import munit.FunSuite
 import test_util.BASILTest
 import util.{BASILResult, StaticAnalysisConfig}
 import translating.PrettyPrinter.*
 
-class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
+class LiveVarsAnalysisTests extends FunSuite, BASILTest {
   Logger.setLevel(LogLevel.ERROR)
   private val correctPath = "./src/test/correct/"
   def runExample(name: String): BASILResult = {
@@ -245,7 +245,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     simpleBranch()
   }
 
-  ignore("recursionInfinite") {
+  test("recursionInfinite".ignore) {
     recursionInfinite()
   }
 
@@ -279,15 +279,13 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     val result: BASILResult = runExample("basic_function_call_caller")
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.labelToBlock
-    info("bean1")
-    info(
+    println(
       analysisResults.keySet
         .collect { case b: Block =>
           b.label
         }
         .mkString("; ")
     )
-    info("bean2")
 
     val lmain = blocks("lmain")
     val laftercall = lmain.singleSuccessor.head

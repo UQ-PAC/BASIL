@@ -3,8 +3,7 @@ import ir.eval.*
 import analysis.*
 import java.io.{BufferedWriter, File, FileWriter}
 import ir.Endian.LittleEndian
-import org.scalatest.*
-import org.scalatest.funsuite.*
+import munit.FunSuite
 import specification.*
 import util.{
   BASILConfig,
@@ -31,7 +30,7 @@ import util.RunUtils.loadAndTranslate
 
 import scala.collection.mutable
 
-class ConstPropInterpreterValidate extends AnyFunSuite {
+class ConstPropInterpreterValidate extends FunSuite {
 
   Logger.setLevel(LogLevel.ERROR)
 

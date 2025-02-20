@@ -5,8 +5,7 @@ import util.functional._
 import ir.eval._
 import boogie.Scope
 import ir.dsl._
-import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.BeforeAndAfter
+import munit.FunSuite
 import boogie.SpecGlobal
 import translating.BAPToIR
 import util.{LogLevel, Logger}
@@ -31,9 +30,8 @@ def mems[E, T <: Effects[T, E]](m: MemoryState): Map[BigInt, BitVecLiteral] = {
   m.getMem("mem").map((k, v) => k.value -> v)
 }
 
-class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
+class InterpreterTests extends FunSuite {
 
-  Logger.setLevel(LogLevel.WARN)
 
   def getProgram(name: String, path: String): IRContext = {
     val compiler = "gcc"
@@ -60,6 +58,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
   }
 
   def testInterpret(name: String, expected: Map[String, Int], path: String = "src/test/correct"): Unit = {
+    Logger.setLevel(LogLevel.ERROR, true)
     val ctx = getProgram(name, path)
     val fstate = interpret(ctx)
     val regs = fstate.memoryState.getGlobalVals
@@ -276,7 +275,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
     }
 
-    info(
+    println(
       ("fibonacci runtime table:\nFibNumber,ScalaRunTime,interpreterRunTime,instructionCycleCount" :: (res.map(x =>
         s"${x._1},${x._2},${x._3},${x._4}"
       ))).mkString("\n")

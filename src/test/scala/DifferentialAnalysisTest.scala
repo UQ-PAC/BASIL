@@ -2,8 +2,7 @@ import ir.*
 import ir.eval._
 import java.io.{BufferedWriter, File, FileWriter}
 import ir.Endian.LittleEndian
-import org.scalatest.*
-import org.scalatest.funsuite.*
+import munit.FunSuite
 import specification.*
 import util.{
   BASILConfig,
@@ -30,7 +29,7 @@ import util.RunUtils.loadAndTranslate
 
 import scala.collection.mutable
 
-class DifferentialTest extends AnyFunSuite {
+class DifferentialTest extends FunSuite {
 
   Logger.setLevel(LogLevel.WARN)
 
@@ -62,7 +61,7 @@ class DifferentialTest extends AnyFunSuite {
     val initstdout =
       initialRes.memoryState.getMem("stdout").toList.sortBy(_._1.value).map(_._2.value.toChar).mkString("")
     val comparstdout = result.memoryState.getMem("stdout").toList.sortBy(_._1.value).map(_._2.value.toChar).mkString("")
-    info("STDOUT: \"" + initstdout + "\"")
+    Logger.info("STDOUT: \"" + initstdout + "\"")
     // Logger.info(initialRes.memoryState.getMem("stderr").toList.sortBy(_._1.value).map(_._2).mkString(""))
     assert(initstdout == comparstdout)
     assert(initialRes.nextCmd == Stopped())

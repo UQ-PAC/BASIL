@@ -1,6 +1,6 @@
 import analysis.data_structure_analysis.*
 import ir.*
-import org.scalatest.funsuite.AnyFunSuite
+import munit.FunSuite
 import ir.dsl.*
 import specification.{Specification, SymbolTableEntry}
 import translating.ELFSymbol
@@ -27,7 +27,7 @@ import translating.PrettyPrinter.*
   * BASILRESULT.analysis.get.bu is the set of graphs from the end of the bottom-up phase BASILRESULT.analysis.get.td is
   * the set of graphs from the end of the top-down phase
   */
-class DataStructureAnalysisTest extends AnyFunSuite {
+class DataStructureAnalysisTest extends FunSuite {
 
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
@@ -572,7 +572,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   }
 
   // bottom up tests
-  ignore("bottom up jumptable2 callees") {
+  test("bottom up jumptable2 callees".ignore) {
     // this is the same as local graphs
     // nothing should be changed
     // TODO count point-to relations and ensure no more constraints are added in this phase
@@ -617,7 +617,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     assert(dsg.get(dsg.globalMapping(x).node.cells(0)).getPointee.node.collapsed)
   }
 
-  ignore("bottom up interproc pointer arithmetic callee") {
+  test("bottom up interproc pointer arithmetic callee".ignore) {
     // same as interproc pointer arithmetic callee's local graph (no changes should have been made)
     val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
@@ -657,7 +657,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   }
 
   // top down tests
-  ignore("top down jumptable2 main") {
+  test("top down jumptable2 main".ignore) {
     // no changes should be made from previous phase
     val results = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
     val program = results.ir.program
@@ -680,7 +680,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
   }
 
-  ignore("top down jumptable2 callees") {
+  test("top down jumptable2 callees".ignore) {
     val results = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
 
     val program = results.ir.program
@@ -715,7 +715,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   }
 
   // top-down phase should be the same as bottom-up phase
-  ignore("top down interproc pointer arithmetic main") {
+  test("top down interproc pointer arithmetic main".ignore) {
     val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
     val dsg = results.analysis.get.topDownDSA(program.mainProcedure)

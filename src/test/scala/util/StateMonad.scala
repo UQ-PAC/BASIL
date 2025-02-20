@@ -3,8 +3,7 @@ import util.functional._
 
 import ir.eval._
 import ir.dsl._
-import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.BeforeAndAfter
+import munit.FunSuite
 import translating.BAPToIR
 import util.{LogLevel, Logger}
 import util.IRLoading.{loadBAP, loadReadELF}
@@ -12,7 +11,7 @@ import util.ILLoadingConfig
 
 def add: State[Int, Unit, Unit] = State(s => (s + 1, Right(())))
 
-class StateMonadTest extends AnyFunSuite {
+class StateMonadTest extends FunSuite {
 
   test("forcompre") {
     val s = for {

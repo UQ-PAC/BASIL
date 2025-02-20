@@ -11,6 +11,7 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
 
   val javaTests = ivy"com.novocode:junit-interface:0.11"
   val scalaTests = ivy"org.scalatest::scalatest:3.2.10"
+  val munit = ivy"org.scalameta::munit::1.0.4"
   val scalactic = ivy"org.scalactic::scalactic:3.2.10"
   val antlrRuntime = ivy"org.antlr:antlr4-runtime:4.9"
   val sourceCode = ivy"com.lihaoyi::sourcecode:0.3.0"
@@ -33,9 +34,9 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
     Seq(PathRef(millSourcePath / "main" / "antlr4"))
   }
 
-  object test extends ScalaTests with TestModule.ScalaTest {
-    def ivyDeps = Agg(scalaTests, javaTests)
-    def sources = T.sources { Seq(PathRef(this.millSourcePath / "scala")) }
+  object test extends ScalaTests with TestModule.Munit {
+    def ivyDeps = Agg(munit)
+    def sources = T.sources { Seq(PathRef(this.millSourcePath / "scala" )) }
   }
 
   /** Updates the expected

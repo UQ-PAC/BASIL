@@ -1,10 +1,10 @@
 import analysis.ParamAnalysis
 import ir.dsl.{R0, R1, R2}
-import org.scalatest.funsuite.AnyFunSuite
+import munit.FunSuite
 import test_util.BASILTest
 import util.{BASILResult, StaticAnalysisConfig, Logger, LogLevel}
 
-class ParamAnalysisTests extends AnyFunSuite, BASILTest {
+class ParamAnalysisTests extends FunSuite, BASILTest {
   private val correctPath = "./src/test/correct/"
 
   def runExample(name: String): BASILResult = {
@@ -67,7 +67,7 @@ class ParamAnalysisTests extends AnyFunSuite, BASILTest {
     assert(analysisResults(procs("plus_one")) == Set(R0))
   }
 
-  ignore("initialisation") {
+  test("initialisation".ignore) {
     val result: BASILResult = runExample("initialisation")
     val analysisResults = result.analysis.get.paramResults
     val procs = result.ir.program.nameToProcedure

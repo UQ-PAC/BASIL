@@ -2,10 +2,10 @@ import analysis.*
 import boogie.*
 import ir.*
 import ir.dsl.*
-import org.scalatest.funsuite.AnyFunSuite
+import munit.FunSuite
 import test_util.BASILTest
 
-class TaintAnalysisTests extends AnyFunSuite, BASILTest {
+class TaintAnalysisTests extends FunSuite, BASILTest {
   def getTaintAnalysisResults(
     program: Program,
     taint: Map[CFGPosition, Set[Taintable]]

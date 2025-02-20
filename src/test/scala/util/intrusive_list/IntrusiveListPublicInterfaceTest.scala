@@ -1,8 +1,8 @@
 package util.intrusive_list
-import org.scalatest.funsuite.AnyFunSuite
+import munit.FunSuite
 import scala.collection.mutable
 
-class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
+class IntrusiveListPublicInterfaceTest extends FunSuite {
   class Elem(val t: Int) extends IntrusiveListElement[Elem]
 
   def getSequentialList(elems: Int = 15): IntrusiveList[Elem] = {

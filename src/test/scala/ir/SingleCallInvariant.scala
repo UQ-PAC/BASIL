@@ -2,8 +2,8 @@ package ir
 
 import ir.dsl._
 
-import org.scalatest.funsuite.AnyFunSuite
-class InvariantTest extends AnyFunSuite {
+import munit.FunSuite
+class InvariantTest extends FunSuite {
 
   test("sat singleCallBlockEnd case") {
     var program: Program = prog(

@@ -1,7 +1,6 @@
 import ir.*
 import ir.Endian.LittleEndian
-import org.scalatest.*
-import org.scalatest.funsuite.*
+import munit.FunSuite
 import specification.*
 import boogie.*
 import util.{RunUtils, StaticAnalysisConfig, StaticAnalysis, StaticAnalysisContext, IRContext}
@@ -12,7 +11,7 @@ import java.nio.file.attribute.BasicFileAttributes
 
 import ir.dsl.*
 
-class PointsToTest extends AnyFunSuite with OneInstancePerTest {
+class PointsToTest extends FunSuite {
 
   def runAnalyses(
     program: Program,

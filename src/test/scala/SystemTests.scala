@@ -1,4 +1,4 @@
-import org.scalatest.funsuite.AnyFunSuite
+import munit.FunSuite
 import util.{LogLevel, Logger, DebugDumpIRLogger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
 
 import Numeric.Implicits.*
@@ -15,7 +15,7 @@ import test_util.TestConfig
   * directory structure and file-name patterns.
   */
 
-trait SystemTests extends AnyFunSuite, BASILTest {
+trait SystemTests extends FunSuite, BASILTest {
   case class TestResult(
     name: String,
     passed: Boolean,
@@ -43,7 +43,7 @@ trait SystemTests extends AnyFunSuite, BASILTest {
 
   private val testPath = "./src/test/"
 
-  def runTests(folder: String, conf: TestConfig): Unit = {
+  def runTests(folder: String, conf: TestConfig)(implicit loc: munit.Location): Unit = {
     val path = testPath + folder
     val programs = getSubdirectories(path)
 
@@ -84,13 +84,13 @@ trait SystemTests extends AnyFunSuite, BASILTest {
     val meanVerifyTime = mean(verifTimes)
     val stdDevVerifyTime = stdDev(verifTimes)
 
-    info(
+    println(
       s"Test summary: $numSuccess succeeded, $numFail failed: $numVerified verified, $numCounterexample did not verify (including $numTimeout timeouts)."
     )
     if (verifying.nonEmpty)
-      info(s"Average time to verify: ${verifying.sum / verifying.size}")
+      println(s"Average time to verify: ${verifying.sum / verifying.size}")
     if (counterExamples.nonEmpty)
-      info(s"Average time to counterexample: ${counterExamples.sum / counterExamples.size}")
+      println(s"Average time to counterexample: ${counterExamples.sum / counterExamples.size}")
 
     val summaryMap = ListMap(
       "passedCount" -> numSuccess,
@@ -153,11 +153,11 @@ trait SystemTests extends AnyFunSuite, BASILTest {
     val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
     val expectedOutPath = if conf.useBAPFrontend then variationPath + ".expected" else variationPath + "_gtirb.expected"
 
-    Logger.info(s"$name/$variation$testSuffix")
+    // println(s"$name/$variation$testSuffix")
     val timer = PerformanceTimer(s"test $name/$variation$testSuffix")
     runBASIL(inputPath, RELFPath, Some(specPath), BPLPath, conf.staticAnalysisConfig, conf.simplify)
     val translateTime = timer.checkPoint("translate-boogie")
-    Logger.info(s"$name/$variation$testSuffix DONE")
+    // Logger.info(s"$name/$variation$testSuffix DONE")
 
     val boogieResult = runBoogie(directoryPath, BPLPath, conf.boogieFlags)
     val verifyTime = timer.checkPoint("verify")
@@ -189,8 +189,8 @@ trait SystemTests extends AnyFunSuite, BASILTest {
             s"$carat ${x + 1} | ${lines(x)}"
           })
 
-          info(s"Failing assertion $fname:$line")
-          info(errorLines.mkString("\n").trim)
+          println(s"Failing assertion $fname:$line")
+          println(errorLines.mkString("\n").trim)
 
         }
       }
@@ -228,10 +228,10 @@ trait SystemTests extends AnyFunSuite, BASILTest {
     if (hasExpected) {
       if (!BASILTest.compareFiles(expectedOutPath, BPLPath)) {
         matchesExpected = false
-        info("Warning: Boogie file differs from expected")
+        println("Warning: Boogie file differs from expected")
       }
     } else {
-      info("Note: this test has not previously succeeded")
+      println("Note: this test has not previously succeeded")
     }
     (hasExpected, matchesExpected)
   }
@@ -242,7 +242,7 @@ class SystemTestsBAP extends SystemTests {
   runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true))
   runTests(
     "incorrect",
-    TestConfig(useBAPFrontend = true, expectVerify = false, checkExpected = true, logResults = true)
+    TestConfig(useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true)
   )
   test("summary-BAP") {
     summary("testresult-BAP")
@@ -328,7 +328,6 @@ class SimplifySystemTests extends SystemTests {
 }
 
 class SimplifyMemorySystemTests extends SystemTests {
-  Logger.setLevel(LogLevel.DEBUG)
   val staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA))
   runTests(
     "correct",

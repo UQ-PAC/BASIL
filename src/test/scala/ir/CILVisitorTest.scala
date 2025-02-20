@@ -2,7 +2,7 @@ package ir
 
 import scala.collection.mutable
 import scala.collection.immutable.*
-import org.scalatest.funsuite.AnyFunSuite
+import munit.FunSuite
 import util.intrusive_list.*
 import ir.dsl.*
 import ir.cilvisitor.*
@@ -51,7 +51,7 @@ class AddGammas extends CILVisitor {
   }
 }
 
-class CILVisitorTest extends AnyFunSuite {
+class CILVisitorTest extends FunSuite {
 
   def getRegister(name: String) = Register(name, 64)
   test("trace prog") {
