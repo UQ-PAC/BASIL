@@ -365,19 +365,19 @@ enum Predicate {
   /**
    * Remove atomic expressions containing `term` (replacing with True if needed)
    */
-  def remove(term: BVTerm): Predicate = this match {
-    case a: Atomic => if a.contains(term) then True else this
-    case Conj(s) => Conj(s.map(_.remove(term)))
-    case Disj(s) => Disj(s.map(_.remove(term)))
+  def remove(term: BVTerm, default: Predicate): Predicate = this match {
+    case a: Atomic => if a.contains(term) then default else this
+    case Conj(s) => Conj(s.map(_.remove(term, default)))
+    case Disj(s) => Disj(s.map(_.remove(term, default)))
   }
 
   /**
-   * Remove atomic expressions containing `term` (replacing with True if needed)
+   * Remove atomic expressions containing `term` (replacing with default if needed)
    */
-  def remove(term: GammaTerm): Predicate = this match {
-    case a: Atomic => if a.contains(term) then True else this
-    case Conj(s) => Conj(s.map(_.remove(term)))
-    case Disj(s) => Disj(s.map(_.remove(term)))
+  def remove(term: GammaTerm, default: Predicate): Predicate = this match {
+    case a: Atomic => if a.contains(term) then default else this
+    case Conj(s) => Conj(s.map(_.remove(term, default)))
+    case Disj(s) => Disj(s.map(_.remove(term, default)))
   }
 
   /**

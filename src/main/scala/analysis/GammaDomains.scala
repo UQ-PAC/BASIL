@@ -147,7 +147,7 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
         b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get)
           .replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get)
           .simplify
-      case a: MemoryLoad => b.remove(BVTerm.Var(a.lhs)).remove(GammaTerm.Var(a.lhs)).simplify
+      case a: MemoryLoad => b.remove(BVTerm.Var(a.lhs), True).remove(GammaTerm.Var(a.lhs), True).simplify
       case m: MemoryStore => b
       case a: Assume => {
         if (a.checkSecurity) {
@@ -202,7 +202,7 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
         b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get)
           .replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get)
           .simplify
-      case a: MemoryLoad => b.remove(BVTerm.Var(a.lhs)).remove(GammaTerm.Var(a.lhs)).simplify
+      case a: MemoryLoad => b.remove(BVTerm.Var(a.lhs), False).remove(GammaTerm.Var(a.lhs), False).simplify
       case m: MemoryStore => b
       case a: Assume => {
         if (a.checkSecurity) {
@@ -212,7 +212,7 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
         }
       }
       case a: Assert => or(b, not(exprToPredicate(a.body).get)).simplify
-      case i: IndirectCall => top
+      case i: IndirectCall => bot
       case c: DirectCall =>
         not(c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>
           p.replace(BVTerm.Var(v), exprToBVTerm(e).get).replace(GammaTerm.Var(v), exprToGammaTerm(e).get).simplify

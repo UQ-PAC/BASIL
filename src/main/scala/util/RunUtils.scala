@@ -347,30 +347,28 @@ object IRTransform {
     }
   }
 
-  def generateProcedureSummaries(
-    ctx: IRContext,
-    IRProgram: Program,
-    simplified: Boolean = false,
-  ): Boolean = {
+  def generateProcedureSummaries(ctx: IRContext, IRProgram: Program, simplified: Boolean = false): Boolean = {
     var modified = false
     // Need to know modifies clauses to generate summaries, but this is probably out of place
     val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
     ctx.program.setModifies(specModifies)
 
     val summaryGenerator = SummaryGenerator(IRProgram, simplified)
-    IRProgram.procedures.filter {
-      p => p != IRProgram.mainProcedure
-    }.foreach {
-      procedure => {
-        val req = summaryGenerator.generateRequires(procedure)
-        modified = modified | procedure.requires != req
-        procedure.requires = req
-
-        val ens = summaryGenerator.generateEnsures(procedure)
-        modified = modified | procedure.ensures != ens
-        procedure.ensures = ens
+    IRProgram.procedures
+      .filter { p =>
+        p != IRProgram.mainProcedure
       }
-    }
+      .foreach { procedure =>
+        {
+          val req = summaryGenerator.generateRequires(procedure)
+          modified = modified | procedure.requires != req
+          procedure.requires = req
+
+          val ens = summaryGenerator.generateEnsures(procedure)
+          modified = modified | procedure.ensures != ens
+          procedure.ensures = ens
+        }
+      }
 
     modified
   }
