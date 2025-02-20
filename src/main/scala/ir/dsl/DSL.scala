@@ -57,6 +57,15 @@ type NonCallStatement =
 
 type CallStatement = DirectCall | IndirectCall
 
+def cloneStatement(x: NonCallStatement): NonCallStatement = x match {
+  case LocalAssign(a, b, c) => LocalAssign(a, b, c)
+  case MemoryStore(a, b, c, d, e, f) => MemoryStore(a, b, c, d, e, f)
+  case MemoryLoad(a, b, c, d, e, f) => MemoryLoad(a, b, c, d, e, f)
+  case x: NOP => NOP(x.label) // FIXME: no unapply for NOP atm
+  case Assert(a, b, c) => Assert(a, b, c)
+  case Assume(a, b, c, d) => Assume(a, b, c, d)
+}
+
 val R0: Register = Register("R0", 64)
 val R1: Register = Register("R1", 64)
 val R2: Register = Register("R2", 64)
@@ -98,12 +107,25 @@ case class DelayNameResolve(ident: String) {
   }
 }
 
-trait EventuallyStatement {
+sealed trait EventuallyStatement {
   def resolve(p: Program): Statement
+  def cloneable = this
 }
 
-case class ResolvableStatement(s: NonCallStatement) extends EventuallyStatement {
-  override def resolve(p: Program): Statement = IRToDSL.cloneStatement(s)
+case class CloneableStatement(s: NonCallStatement) extends EventuallyStatement {
+  override def resolve(p: Program): Statement = cloneStatement(s)
+}
+case class IdentityStatement(s: NonCallStatement) extends EventuallyStatement {
+  var resolved = false
+  override def resolve(p: Program): Statement = {
+    assert(
+      !resolved,
+      s"DSL statement '$s' has already been resolved! to make a DSL statement that can be resolved multiple times, wrap it in clonedStmt() or use .cloneable on its block."
+    )
+    resolved = true
+    s
+  }
+  override def cloneable = CloneableStatement(s)
 }
 
 trait EventuallyJump {
@@ -148,6 +170,8 @@ case class EventuallyReturn(params: Iterable[(String, Expr)], label: Option[Stri
 case class EventuallyUnreachable(label: Option[String] = None) extends EventuallyJump {
   override def resolve(p: Program, proc: Procedure) = Unreachable(label)
 }
+
+def clonedStmt(s: NonCallStatement) = CloneableStatement(s)
 
 def goto(targets: List[String]): EventuallyGoto = {
   EventuallyGoto(targets.map(p => DelayNameResolve(p)))
@@ -210,11 +234,13 @@ case class EventuallyBlock(
     resolve(prog, proc)
     b
   }
+
+  def cloneable = this.copy(sl = sl.map(_.cloneable))
 }
 
 def block(label: String, sl: (NonCallStatement | EventuallyStatement | EventuallyJump)*): EventuallyBlock = {
   val statements: Seq[EventuallyStatement] = sl.flatMap {
-    case s: NonCallStatement => Some(ResolvableStatement(s))
+    case s: NonCallStatement => Some(IdentityStatement(s))
     case o: EventuallyStatement => Some(o)
     case g: EventuallyJump => None
   }
@@ -277,6 +303,7 @@ case class EventuallyProcedure(
     proc
   }
 
+  def cloneable = this.copy(blocks = blocks.map(_.cloneable))
 }
 
 def proc(label: String, blocks: EventuallyBlock*): EventuallyProcedure = {
@@ -301,8 +328,7 @@ case class EventuallyProgram(
   otherProcedures: collection.Iterable[EventuallyProcedure] = Seq(),
   initialMemory: collection.Iterable[MemorySection] = Seq()
 ) {
-
-  val allProcedures = Seq(mainProcedure) ++ otherProcedures
+  val allProcedures = Seq(mainProcedure) :++ otherProcedures
 
   def resolve: Program = {
     val memory = mutable.TreeMap.from(initialMemory.map(v => (v.address, v)))
@@ -317,19 +343,23 @@ case class EventuallyProgram(
     assert(ir.invariant.cfgCorrect(p))
     p
   }
+
+  def cloneable = this.copy(mainProcedure = mainProcedure.cloneable, otherProcedures = otherProcedures.map(_.cloneable))
 }
 
-def prog(mainProc: EventuallyProcedure, procedures: EventuallyProcedure*) =
-  EventuallyProgram(mainProc, procedures).resolve
+def prog(mainProc: EventuallyProcedure, procedures: EventuallyProcedure*): Program =
+  prog(Seq(), mainProc, procedures: _*)
 
-def genProg(mainProc: EventuallyProcedure, procedures: EventuallyProcedure*): EventuallyProgram = {
-  EventuallyProgram(mainProc, procedures)
-}
+def prog(initialMemory: Iterable[MemorySection], mainProc: EventuallyProcedure, procedures: EventuallyProcedure*): Program =
+  progUnresolved(initialMemory, mainProc, procedures: _*).resolve
 
-def genProg(
+def progUnresolved(mainProc: EventuallyProcedure, procedures: EventuallyProcedure*): EventuallyProgram =
+  progUnresolved(Seq(), mainProc, procedures: _*)
+
+def progUnresolved(
   initialMemory: Iterable[MemorySection],
   mainProc: EventuallyProcedure,
   procedures: EventuallyProcedure*
-): EventuallyProgram = {
+): EventuallyProgram =
   EventuallyProgram(mainProc, procedures, initialMemory)
-}
+

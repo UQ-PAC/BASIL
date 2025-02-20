@@ -24,17 +24,7 @@ object IRToDSL {
     case GoTo(targs, label) => EventuallyGoto(targs.map(t => DelayNameResolve(t.label)).toList, label)
   }
 
-  def cloneStatement(x: NonCallStatement): NonCallStatement = x match {
-    case LocalAssign(a, b, c) => LocalAssign(a, b, c)
-    case MemoryStore(a, b, c, d, e, f) => MemoryStore(a, b, c, d, e, f)
-    case MemoryLoad(a, b, c, d, e, f) => MemoryLoad(a, b, c, d, e, f)
-    case x: NOP => NOP(x.label) // FIXME: no unapply for NOP atm
-    case Assert(a, b, c) => Assert(a, b, c)
-    case Assume(a, b, c, d) => Assume(a, b, c, d)
-  }
-
-  def convertNonControlStatement(x: NonCallStatement): EventuallyStatement =
-    ResolvableStatement(x)
+  def convertNonControlStatement(x: NonCallStatement): EventuallyStatement = clonedStmt(x)
 
   def convertControlStatement(x: CallStatement): EventuallyStatement = x match {
     case DirectCall(targ, outs, actuals, label) =>
@@ -65,4 +55,5 @@ object IRToDSL {
   def convertProgram(x: Program) =
     val others = x.procedures.filter(_ != x.mainProcedure).map(convertProcedure)
     EventuallyProgram(convertProcedure(x.mainProcedure), others.toArray, x.initialMemory.values)
+
 }
