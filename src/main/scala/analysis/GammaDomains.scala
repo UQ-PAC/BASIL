@@ -118,7 +118,7 @@ class ReachabilityConditions extends PredicateEncodingDomain[Predicate] {
 }
 
 /**
- * Effectively a weakest precondition.
+ * An abstract domain where abstract states are predicates (and concretise to the set of states satisfying the predicate).
  * This analysis should be run backwards.
  */
 class PredicateDomain(summaries: Procedure => ProcedureSummary) extends PredicateEncodingDomain[Predicate] {
@@ -157,6 +157,55 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
   }
 
   override def init(b: Block): Predicate = if b.isReturn then /*Conj(summaries(b.parent).ensures.map(_.pred).toSet)*/ top else bot
+
+  def top: Predicate = True
+  def bot: Predicate = False
+
+  def toPred(x: Predicate): Predicate = x
+  override def fromPred(p: Predicate): Predicate = p
+}
+
+/**
+ * An abstract domain which computes conditions (as predicates) for assertions (including the check that gammas are low on branches) to be violated.
+ *
+ * See the ICFEM 2013 paper "Path-Sensitive Data Flow Analysis Simplified"
+ */
+class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEncodingDomain[Predicate] {
+  import Predicate.*
+
+  private var atTop = Set[Block]()
+
+  def join(a: Predicate, b: Predicate, pos: Block): Predicate =
+    if a.size + b.size > 100 then atTop += pos
+    if atTop.contains(pos) then top else or(a, b).simplify
+
+  private def lowExpr(e: Expr): Predicate = gammaLeq(GammaTerm.Join(e.variables.map(v => GammaTerm.Var(v))), GammaTerm.Low)
+
+  def transfer(b: Predicate, c: Command): Predicate = {
+    c match {
+      case a: LocalAssign  => b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get).replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get).simplify
+      case a: MemoryLoad   => b.remove(BVTerm.Var(a.lhs)).remove(GammaTerm.Var(a.lhs)).simplify
+      case m: MemoryStore  => b
+      case a: Assume       => {
+        if (a.checkSecurity) {
+          or(and(b, exprToPredicate(a.body).get), not(lowExpr(a.body))).simplify
+        } else {
+          and(b, exprToPredicate(a.body).get).simplify
+        }
+      }
+      case a: Assert       => or(b, not(exprToPredicate(a.body).get)).simplify
+      case i: IndirectCall => top
+      case c: DirectCall   => not(c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>
+        p.replace(BVTerm.Var(v), exprToBVTerm(e).get).replace(GammaTerm.Var(v), exprToGammaTerm(e).get).simplify
+      })
+      case g: GoTo         => b
+      case r: Return       => b
+      case r: Unreachable  => b
+      case n: NOP          => b
+    }
+  }
+
+  override def init(b: Block): Predicate = bot
 
   def top: Predicate = True
   def bot: Predicate = False

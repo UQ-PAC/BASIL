@@ -146,11 +146,11 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
 
     // Predicate domain / mini wp
     Logger.debug(s"Generating mini wp preconditions for $procedure")
-    val wpDomain = PredicateDomain(map)
+    val wpDomain = WpDualDomain(map)
     val (wpDomainResults, _) = worklistSolver(wpDomain).solveProc(procedure, true)
 
     val wp = procedure.entryBlock.flatMap(b => wpDomainResults.get(b)).toList.flatMap(p =>
-        p.simplify.split
+        not(p).simplify.split
       ).map(Condition(_, Some("Weakest precondition")))
 
     val requires = (curRequires ++ mustGammasWithConditions ++ wp).filter(_ != TrueBLiteral).distinct
