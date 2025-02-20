@@ -22,7 +22,7 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{estimateStackSizes, getStackSize, computeDSADomain, Constraint, DataStructureAnalysis, FieldDSA, FieldGraph, Graph, SadDSA, SadGraph, SetDSA, SetGraph, SymValueSet, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValueDomain, SymbolicValues, generateConstraints, getSymbolicValues}
+import analysis.data_structure_analysis.{Constraint, DataStructureAnalysis, DirectCallConstraint, FieldDSA, FieldGraph, Graph, SadDSA, SadGraph, SetDSA, SetGraph, SymValueSet, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValueDomain, SymbolicValues, computeDSADomain, estimateStackSizes, generateConstraints, getStackSize, getSymbolicValues}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
@@ -869,6 +869,11 @@ object RunUtils {
           sadDSATD(proc).TDPhase(sadDSATD)
           visited += proc
 
+//      val mainGraph = sadDSATD.collectFirst{case (proc, graph) if proc.name.startsWith("main") => graph}.get
+//      val ind = mainGraph.constraints.collectFirst{case dcc: DirectCallConstraint if dcc.target.name == "indirect_call_launchpad" => dcc}.get
+//      val funcPointer = ind.inParams.collectFirst {case (formal, actual) if formal.name.startsWith("indirectCallTarget") => actual}.get
+//      val resCells = mainGraph.exprToCells(funcPointer)
+//      println("")
     if (q.runInterpret) {
       Logger.info("Start interpret")
       val fs = eval.interpretTrace(ctx)
