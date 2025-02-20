@@ -2,9 +2,11 @@ package analysis.data_structure_analysis
 
 import analysis.data_structure_analysis.DSAPhase.{BU, Local, TD}
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
+import boogie.{FuncEntry, SpecGlobal}
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.{BitVecType, Expr, LocalVar, Procedure}
-import util.{DSALogger, SadDSALogger as Logger}
+import specification.{ExternalFunction, SymbolTableEntry}
+import util.{DSALogger, IRContext, SadDSALogger as Logger}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{SortedSet, mutable}
@@ -15,22 +17,61 @@ class SadDSA
 case class NodeTerm(v: SadNode) extends analysis.solvers.Var[NodeTerm]
 
 
-def globalGraph(): SadGraph = {
-  ???
-}
+//def globalNode(globals: Set[SymbolTableEntry],
+//            globalOffsets: Map[BigInt, BigInt],
+//            externalFunctions: Set[ExternalFunction]): SadNode = {
+//  val symBase = Global
+//  SadGraph()
+//  val globalNode = SadNode()
+//  globals.foreach {
+//    case FuncEntry(name, size, address) =>
+//
+//    case SpecGlobal(name, size, arraySize, address) =>
+//  }
+//}
 
 /**
  * Data Structure Graph
  */
 class SadGraph(proc: Procedure, ph: DSAPhase,
+               irContext: IRContext,
                symValues: Option[SymbolicValues] = None,
                cons: Option[Set[Constraint]] = None)
   extends
     DSAGraph[OffsetUnionFindSolver[NodeTerm], SadCell, SadCell, SadCell, SadNode]
-      (proc, ph, OffsetUnionFindSolver[NodeTerm](), symValues, cons)
+      (proc, ph, irContext, OffsetUnionFindSolver[NodeTerm](), symValues, cons)
 {
+  def globalNode(globals: Set[SymbolTableEntry],
+                 globalOffsets: Map[BigInt, BigInt],
+                 externalFunctions: Set[ExternalFunction]): SadNode = {
+    val symBase = Global
+    val globalNode = SadNode(this, mutable.Map(symBase -> 0))
+    globalNode.add(0)
+    globalNode.flags.global = true
+    globals.foreach {
+      case FuncEntry(name, size, address) =>
+        globalNode.add(Interval(address.toInt, address.toInt + (size/8)))
+      case SpecGlobal(name, size, arraySize, address) =>
+        globalNode.add(Interval(address.toInt, address.toInt + (size/8)))
+    }
 
-  // Procceses all non call constraints
+    globalOffsets.foreach {
+      case (address, relocated) =>
+        globalNode.add(address.toInt)
+        globalNode.add(relocated.toInt)
+    }
+
+    globalOffsets.map(_.swap).foreach {
+      case (address, relocated) =>
+        val pointee = globalNode.get(address.toInt)
+        val pointer = globalNode.add(Interval(relocated.toInt, relocated.toInt + 8))
+        pointer.setPointee(pointee)
+    }
+
+    globalNode
+  }
+
+  // Processes all non call constraints
    override def localPhase(): Unit = {
      var processed = Set[Constraint]()
      constraints.toSeq.sortBy(f => f.label).foreach(
@@ -63,6 +104,13 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
       case dcc: DirectCallConstraint if bus.contains(dcc.target) && skip.forall(f => dcc.target.name.startsWith(f)) && !dcc.target.isExternal.getOrElse(false) =>
         val oldToNew = mutable.Map[SadNode, SadNode]()
         val callee = bus(dcc.call.target)
+
+        val calleeGlobal = callee.find(callee.nodes(Global).get(0))
+        var callerGlobal = find(nodes(Global).get(0))
+        val globalNode = callerGlobal.node.clone(callee, true, oldToNew)
+        callerGlobal = globalNode.get(calleeGlobal.interval)
+        callee.mergeCells(callerGlobal, calleeGlobal)
+
         DSALogger.warn(s"cloning ${this.proc.name} into ${callee.proc.name}")
         dcc.inParams.foreach {
           case (formal, actual) =>
@@ -111,7 +159,14 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
     phase = BU
     constraints.toSeq.sortBy(c => c.label).foreach {
       case dcc: DirectCallConstraint if locals.contains(dcc.target) && skip.forall(f => dcc.target.name.startsWith(f)) &&  !dcc.target.isExternal.getOrElse(false) =>
+
         val oldToNew = mutable.Map[SadNode, SadNode]()
+        var calleeGlobal = locals(dcc.target).find(locals(dcc.target).nodes(Global).get(0))
+        val callerGlobal = find(nodes(Global).get(0))
+        val globalNode = calleeGlobal.node.clone(this, true, oldToNew)
+        calleeGlobal = globalNode.get(calleeGlobal.interval)
+        mergeCells(callerGlobal, calleeGlobal)
+
         dcc.inParams/*.filterNot(f => f._1.name.startsWith("R31"))*/.toSeq.sortBy(f => f._1.name).foreach {
           case (formal, actual) =>
             val formals = locals(dcc.target)
@@ -122,6 +177,9 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
                 val (node, offset) = findNode(cell
                   .node
                   .clone(this, true, oldToNew))
+
+                assert(node.graph == this)
+//                println(offset)
                 node
                   .get(cell.interval.move(i => i + offset))
             )
@@ -212,7 +270,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
   var secondLast: Option[(SadCell, SadCell)] = None
   override def clone: SadGraph = {
     val oldToNew: mutable.Map[SadNode, SadNode] = mutable.Map()
-    val copy = SadGraph(proc, phase, Some(sva), Some(constraints))
+    val copy = SadGraph(proc, phase, irContext, Some(sva), Some(constraints))
     val queue = mutable.Queue[SadNode]()
     this.nodes.foreach { // in addition to current nodes
       case (base, node) => // clone old nodes in base to node map to carry offset info
@@ -518,7 +576,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
   }
 
   override def mergeCells(c1: SadCell, c2: SadCell): SadCell = {
-    require(c1.node.graph == c2.node.graph)
+    require(c1.node.graph == c2.node.graph && c1.node.graph == this)
     val cell1 = find(c1)
     val cell2 = find(c2)
     Logger.debug(s"merging $cell1")
@@ -553,37 +611,10 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
     assert(result.equiv(get(cell2)))
     if cell1.hasPointee then assert(result.getPointee.equiv(get(cell1.getPointee)))
     if cell2.hasPointee then
-//      Logger.debug(result.getPointee)
-//      Logger.debug(get(cell2._pointee.get))
-//      Logger.debug(cell2._pointee.get)
 //      assert(result.getPointee == get(cell2._pointee.get))
     if cell1.node.cells.filter(_.hasPointee).nonEmpty then
       cell1.node.cells.filter(_.hasPointee).foreach(
         f =>
-          if get(f.getPointee) != get(f).getPointee then
-            Logger.debug(s"unifying $cell1 and $cell2")
-            cell1.node.cells.foreach(
-              cell =>
-                Logger.debug(s"Node 1 had cell: $cell")
-                if cell.hasPointee then
-                  Logger.debug(s"with pointee ${cell._pointee}")
-                  Logger.debug(s"updated pointee ${get(cell._pointee.get)}")
-            )
-            cell2.node.cells.foreach(
-              cell =>
-                Logger.debug(s"Node 2 had cell: $cell")
-                if cell.hasPointee then
-                  Logger.debug(s"with pointee ${cell._pointee}")
-                  Logger.debug(s"updated pointee ${get(cell._pointee.get)}")
-
-            )
-
-
-            Logger.warn(f)
-            Logger.warn(f._pointee)
-            Logger.warn(f.getPointee)
-            Logger.warn(get(f))
-            Logger.warn(get(f).getPointee)
           assert(get(f.getPointee).equiv(get(f).getPointee))
           assert(get(f).node == result.node)
       )
@@ -611,9 +642,6 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
     (newNode, cell.interval.move(i => i + offset))
   }
 
-
-
-
   def findNode(node: SadNode): (SadNode, Int) = {
     val (term, offset) = solver.findWithOffset(node.term)
     assert(solver.findWithOffset(term)._1 == term)
@@ -624,6 +652,9 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
     findNode(node)._1
   }
 
+  // find the most uptodate version of cell
+  // if the cell was unified changing it's size
+  // creates a dummy cell with cell's interval size
   override def find(cell: SadCell): SadCell = {
     val (newNode, newInterval) = findExact(cell)
     val res = newNode.add(newInterval)
@@ -634,6 +665,9 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
     res
   }
 
+  // find the most uptodate version of cell
+  // if cell was unified with others, retuns a cell with
+  // unified interval
   def get(cell: SadCell): SadCell = {
     val (newNode, newInterval) = findExact(cell)
     val res = newNode.get(newInterval)
@@ -653,8 +687,13 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
 class SadNode(val graph: SadGraph, val bases: mutable.Map[SymBase, Int]= mutable.Map.empty, size: Option[Int] = None, val id: Int = SadNodeCounter.increment()) extends DSANode[SadCell](size) {
   Logger.debug(s"created node with id $id")
 
-  // clones this node into newGraph
-  // oldToNew a map from already cloned nodes from this graph to newGraph
+  /**
+   * clones this node into the another newGraph
+   * clone pointee nodes if recurse
+   * oldToNew set of already cloned nodes don't clone if the node is a key in this map
+   * will clone pointees if recurse is set and pointee nodes aren't in oldToNew
+   * returns the cloned version of this node in the newGraph
+   */
   def clone(newGraph: SadGraph, recurse: Boolean = false,
             oldToNew: mutable.Map[SadNode, SadNode] = mutable.Map()): SadNode  = {
     if recurse then assert(isUptoDate)
@@ -715,7 +754,7 @@ class SadNode(val graph: SadGraph, val bases: mutable.Map[SymBase, Int]= mutable
   val term: NodeTerm = NodeTerm(this)
   val children = mutable.Set[Int]()
   override def hashCode(): Int = id
-  override def toString: String = s"Node($id, $bases, ${if isCollapsed then "C" else selfMerged})"
+  override def toString: String = s"Node($id, ${bases.keys}, ${if isCollapsed then "C" else selfMerged})"
 
   var selfMerged: Set[Set[SadCell]] = Set.empty
   private def getMerged(cell: SadCell): Set[SadCell] = {
@@ -786,7 +825,7 @@ class SadNode(val graph: SadGraph, val bases: mutable.Map[SymBase, Int]= mutable
     if (!(node.isCollapsed)) {
       val oldPointees = cells.filter(_.hasPointee).map(_.getPointee)
       val collapseNode: SadNode = SadNode(graph, bases, size)
-      collapseNode.children.addAll(this.children)
+      collapseNode.children.addAll(this.children + this.id)
       var collapsedCell: SadCell = collapseNode.add(0)
       collapseNode._collapsed = Some(collapsedCell)
       // delay unification
@@ -794,8 +833,16 @@ class SadNode(val graph: SadGraph, val bases: mutable.Map[SymBase, Int]= mutable
       if  node.cells.exists(_.hasPointee) then
         val pointToItself = node.cells.filter(_.hasPointee).map(_.getPointee).exists(c => c.node == node)
         var pointees = node.cells.filter(_.hasPointee).map(_.getPointee).filter(_.node != node)
+        val pointeeNodes = pointees.map(_.node).toSet
         // if a collapsed node points to itself collapse all other pointees first
-        if pointToItself then pointees.map(f => graph.find(f).node.collapse())
+        if pointToItself then pointees.map(f =>
+          // break all points-to relationship from pointees to this or other pointees
+          // all pointees are collapsed and merged together
+          graph.find(f).node.cells.
+            filter(_.hasPointee).
+            filter(f => pointeeNodes.map(graph.find).contains(f.getPointee.node))
+            .foreach(_.removePointee)
+          graph.find(f).node.collapse())
         pointees = pointees.map(graph.find)
         var pointee = if pointees.nonEmpty then graph.mergeCells(pointees) else collapsedCell
 
@@ -835,6 +882,7 @@ class SadNode(val graph: SadGraph, val bases: mutable.Map[SymBase, Int]= mutable
 
 
   /**
+   * if the nodes is collapsed return collapsed node else
    * Adds a cell with this interval if it doesn't exists already
    * if a cell with the exact interval exists return it
    * if a cell exists which contains this interval return a dummy cell with the exact intervals provided
@@ -877,9 +925,9 @@ class SadNode(val graph: SadGraph, val bases: mutable.Map[SymBase, Int]= mutable
     if isCollapsed then collapsed.get else
       val exactMatches = cells.filter(_.interval.contains(interval))
       if exactMatches.size != 1 then
-        Logger.error(s"mathced ${exactMatches.size} instead of 1")
-        Logger.error(s"cells in the node $cells")
-        Logger.error(s"matching $interval")
+        println(s"mathced ${exactMatches.size} instead of 1")
+        println(s"cells in the node $cells")
+        println(s"matching $interval")
       assert(exactMatches.size == 1, "Expected exactly one overlapping interval")
       exactMatches.head
   }
@@ -891,10 +939,12 @@ class SadNode(val graph: SadGraph, val bases: mutable.Map[SymBase, Int]= mutable
  * @param node the node this cell belongs to 
  * @param interval the interval of the cell
  * 
- * Additionally may have a pointee
- * Only cells in the node have their pointees updated
+ * Additionally may have a pointee only cells in the node have their pointees updated
  * All pointee operations (set, remove, hasPointee) on
  * dummy cells (old slices) are treated as operations on their corresponding cell in the node
+ *
+ * the reason is that a node cell may not have pointee when dummy cell corresponding to it is created
+ * if that cell is later assigned a pointee, avoid the need for update to all dummy cells
  */
 class SadCell(val node: SadNode, override val interval: Interval) extends NodeCell(interval) {
   var _pointee: Option[SadCell] = None
@@ -974,10 +1024,12 @@ class SadCell(val node: SadNode, override val interval: Interval) extends NodeCe
 }
 
 object SadDSA {
-  def getLocal(proc: Procedure, symValues: Option[SymbolicValues] = None,
+  def getLocal(proc: Procedure,
+               context: IRContext,
+               symValues: Option[SymbolicValues] = None,
                cons: Option[Set[Constraint]] = None,
               ): SadGraph = {
-    val graph = SadGraph(proc, Local, symValues, cons)
+    val graph = SadGraph(proc, Local, context, symValues, cons)
     graph.localPhase()
     graph.localCorrectness()
     graph
