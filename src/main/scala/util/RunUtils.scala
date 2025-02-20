@@ -798,7 +798,7 @@ object RunUtils {
       var sadDSA: Map[Procedure, SadGraph] = Map.empty
       var sadDSABU: Map[Procedure, SadGraph] = Map.empty
       computeDSADomain(ctx.program.mainProcedure).toSeq.sortBy(_.name).foreach(
-//      computeDSADomain(ctx.program.procedures.collectFirst{case p if p.name.startsWith("config_close") => p}.get).foreach(
+//      computeDSADomain(ctx.program.procedures.collectFirst{case p if p.name.startsWith("prepare_http_connect") => p}.get).foreach(
         proc =>
 //          if proc.name.startsWith("des_key_schedule") then
             val SVAResults = getSymbolicValues(proc)
@@ -810,7 +810,7 @@ object RunUtils {
               writeToFile(setGraph.toDot, s"cntlm_${proc.name}.SetDSA")
               setDSA += (proc -> setGraph)*/
 //            if config.analyses.contains(DSAAnalysis.Norm) then
-              val sadGraph = SadDSA.getLocal(proc, Some(SVAResults), Some(constraints))
+              val sadGraph = SadDSA.getLocal(proc, ctx, Some(SVAResults), Some(constraints))
               writeToFile(sadGraph.toDot, s"cntlm_${proc.name}.SadDSA")
               sadDSA += (proc -> sadGraph)
 
