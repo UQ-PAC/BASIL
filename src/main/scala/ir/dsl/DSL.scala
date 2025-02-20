@@ -118,7 +118,10 @@ case class CloneableStatement(s: NonCallStatement) extends EventuallyStatement {
 case class IdentityStatement(s: NonCallStatement) extends EventuallyStatement {
   var resolved = false
   override def resolve(p: Program): Statement = {
-    assert(!resolved, s"DSL statement '$s' has already been resolved! to make a DSL statement that can be resolved multiple times, wrap it in clonedStmt() or use .cloneable on its block.")
+    assert(
+      !resolved,
+      s"DSL statement '$s' has already been resolved! to make a DSL statement that can be resolved multiple times, wrap it in clonedStmt() or use .cloneable on its block."
+    )
     resolved = true
     s
   }
@@ -329,7 +332,7 @@ case class EventuallyProgram(mainProcedure: EventuallyProcedure, otherProcedures
 }
 
 def prog(mainProc: EventuallyProcedure, procedures: EventuallyProcedure*) =
-  progUnresolved(mainProc, procedures : _*).resolve
+  progUnresolved(mainProc, procedures: _*).resolve
 
 def progUnresolved(mainProc: EventuallyProcedure, procedures: EventuallyProcedure*) =
   EventuallyProgram(mainProc, procedures.toArray)
