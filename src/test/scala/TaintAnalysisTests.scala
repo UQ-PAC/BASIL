@@ -8,11 +8,17 @@ import LatticeSet.*
 
 @test_util.tags.UnitTest
 class TaintAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
-  def getTaintAnalysisResults(program: Program, taint: Map[CFGPosition, Set[Variable]]): Map[CFGPosition, Set[Variable]] = {
-    TaintAnalysis(program, taint).analyze().map { (c, m) => (c, m.map { (v, _) => v }.toSet)}
+  def getTaintAnalysisResults(
+    program: Program,
+    taint: Map[CFGPosition, Set[Variable]]
+  ): Map[CFGPosition, Set[Variable]] = {
+    TaintAnalysis(program, taint).analyze().map { (c, m) => (c, m.map { (v, _) => v }.toSet) }
   }
 
-  def getVarDepResults(program: Program, procedure: Procedure): Map[CFGPosition, Map[Variable, LatticeSet[Variable]]] = {
+  def getVarDepResults(
+    program: Program,
+    procedure: Procedure
+  ): Map[CFGPosition, Map[Variable, LatticeSet[Variable]]] = {
     val variables = registers
     ProcVariableDependencyAnalysis(program, variables, Map(), procedure).analyze()
   }
@@ -92,41 +98,16 @@ class TaintAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest
 
   test("interproc") {
     val program = prog(
-        proc("main",
-          block("main",
-            directCall("f"),
-            goto("mainRet")
-          ),
-          block("mainRet", ret)
-        ),
-        proc("f",
-          block("branch",
-            goto("a", "b"),
-          ),
-          block("a",
-            LocalAssign(R1, R1, None),
-            directCall("g"),
-            goto("fReturnBlock"),
-          ),
-          block("b",
-            LocalAssign(R1, R2, None),
-            directCall("g"),
-            goto("fReturnBlock"),
-          ),
-          block("fReturnBlock",
-            ret
-          ),
-        ),
-        proc("g",
-          block("body",
-            LocalAssign(R0, R1, None),
-            goto("gReturnBlock"),
-          ),
-          block("gReturnBlock",
-            ret
-          ),
-        ),
-      )
+      proc("main", block("main", directCall("f"), goto("mainRet")), block("mainRet", ret)),
+      proc(
+        "f",
+        block("branch", goto("a", "b")),
+        block("a", LocalAssign(R1, R1, None), directCall("g"), goto("fReturnBlock")),
+        block("b", LocalAssign(R1, R2, None), directCall("g"), goto("fReturnBlock")),
+        block("fReturnBlock", ret)
+      ),
+      proc("g", block("body", LocalAssign(R0, R1, None), goto("gReturnBlock")), block("gReturnBlock", ret))
+    )
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)

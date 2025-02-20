@@ -328,7 +328,7 @@ class BottomUpCallgraphWorklistSolver[L](transferProcedure: (Procedure => L, L, 
   }
 }
 
-class SCCCallgraphWorklistSolver[L](transferProcedure: (Procedure => L, L, Procedure) => L, init: Procedure => L)  {
+class SCCCallgraphWorklistSolver[L](transferProcedure: (Procedure => L, L, Procedure) => L, init: Procedure => L) {
 
   def solve(p: Program) = {
     var old_summaries = Map[Procedure, L]()

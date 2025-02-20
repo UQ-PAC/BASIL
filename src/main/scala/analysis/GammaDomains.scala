@@ -26,17 +26,21 @@ trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[Variable, Lat
 
   def transfer(m: VarGammaMap, c: Command): VarGammaMap = {
     c match {
-      case c: LocalAssign  => m + (c.lhs -> c.rhs.variables.foldLeft(LatticeSet.Bottom[Variable]())((s, v) => s.union(m(v))))
-      case c: MemoryLoad   => m + (c.lhs -> topTerm)
-      case c: MemoryStore  => m
-      case c: Assume       => m
-      case c: Assert       => m
+      case c: LocalAssign =>
+        m + (c.lhs -> c.rhs.variables.foldLeft(LatticeSet.Bottom[Variable]())((s, v) => s.union(m(v))))
+      case c: MemoryLoad => m + (c.lhs -> topTerm)
+      case c: MemoryStore => m
+      case c: Assume => m
+      case c: Assert => m
       case c: IndirectCall => top
-      case c: DirectCall   => top
-      case c: GoTo         => m
-      case c: Return       => m ++ c.outParams.map((l, e) => l -> e.variables.foldLeft(LatticeSet.Bottom[Variable]())((s, v) => s.union(m(v)))).toMap
-      case c: Unreachable  => m
-      case c: NOP          => m
+      case c: DirectCall => top
+      case c: GoTo => m
+      case c: Return =>
+        m ++ c.outParams
+          .map((l, e) => l -> e.variables.foldLeft(LatticeSet.Bottom[Variable]())((s, v) => s.union(m(v))))
+          .toMap
+      case c: Unreachable => m
+      case c: NOP => m
     }
   }
 
@@ -47,8 +51,8 @@ trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[Variable, Lat
   def termToPred(m: LatticeMap[Variable, LatticeSet[Variable]], v: Variable, s: LatticeSet[Variable]): Predicate =
     (v, s) match {
       case (v: Variable, LatticeSet.FiniteSet(s)) => {
-        val g = s.foldLeft(Some(GammaTerm.Low)) {
-          (q: Option[GammaTerm], t) => (q, t) match {
+        val g = s.foldLeft(Some(GammaTerm.Low)) { (q: Option[GammaTerm], t) =>
+          (q, t) match {
             case (Some(q), v: Variable) => Some(GammaTerm.Join(Set(q, GammaTerm.OldVar(v))))
             case _ => None
           }
@@ -66,7 +70,9 @@ trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[Variable, Lat
 /**
  * A may gamma domain. See `GammaDomain`. This is a forwards analysis.
  */
-class MayGammaDomain(initialState: VarGammaMap) extends GammaDomain(initialState) with MayPredMapDomain[Variable, LatticeSet[Variable]] {
+class MayGammaDomain(initialState: VarGammaMap)
+    extends GammaDomain(initialState)
+    with MayPredMapDomain[Variable, LatticeSet[Variable]] {
   def joinTerm(a: LatticeSet[Variable], b: LatticeSet[Variable], pos: Block): LatticeSet[Variable] = a.union(b)
 
   def topTerm: LatticeSet[Variable] = LatticeSet.Top()
@@ -76,7 +82,9 @@ class MayGammaDomain(initialState: VarGammaMap) extends GammaDomain(initialState
 /**
  * A must gamma domain. See `GammaDomain`. This is a forwards analysis.
  */
-class MustGammaDomain(initialState: VarGammaMap) extends GammaDomain(initialState) with MustPredMapDomain[Variable, LatticeSet[Variable]]{
+class MustGammaDomain(initialState: VarGammaMap)
+    extends GammaDomain(initialState)
+    with MustPredMapDomain[Variable, LatticeSet[Variable]] {
   // Meeting on places we would normally join is how we get our must analysis.
   def joinTerm(a: LatticeSet[Variable], b: LatticeSet[Variable], pos: Block): LatticeSet[Variable] = a.intersect(b)
 
@@ -97,17 +105,17 @@ class ReachabilityConditions extends PredicateEncodingDomain[Predicate] {
 
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
-      case a: LocalAssign  => b
-      case a: MemoryLoad   => b
-      case m: MemoryStore  => b
-      case a: Assume       => b
-      case a: Assert       => b
+      case a: LocalAssign => b
+      case a: MemoryLoad => b
+      case m: MemoryStore => b
+      case a: Assume => b
+      case a: Assert => b
       case i: IndirectCall => b
-      case c: DirectCall   => b
-      case g: GoTo         => if g.targets.size == 1 then b else Predicate.False
-      case r: Return       => b
-      case r: Unreachable  => b
-      case n: NOP          => b
+      case c: DirectCall => b
+      case g: GoTo => if g.targets.size == 1 then b else Predicate.False
+      case r: Return => b
+      case r: Unreachable => b
+      case n: NOP => b
     }
   }
 
@@ -130,33 +138,39 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
     if a.size + b.size > 100 then atTop += pos
     if atTop.contains(pos) then top else or(a, b).simplify
 
-  private def lowExpr(e: Expr): Predicate = gammaLeq(GammaTerm.Join(e.variables.map(v => GammaTerm.Var(v))), GammaTerm.Low)
+  private def lowExpr(e: Expr): Predicate =
+    gammaLeq(GammaTerm.Join(e.variables.map(v => GammaTerm.Var(v))), GammaTerm.Low)
 
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
-      case a: LocalAssign  => b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get).replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get).simplify
-      case a: MemoryLoad   => b.remove(BVTerm.Var(a.lhs)).remove(GammaTerm.Var(a.lhs)).simplify
-      case m: MemoryStore  => b
-      case a: Assume       => {
+      case a: LocalAssign =>
+        b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get)
+          .replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get)
+          .simplify
+      case a: MemoryLoad => b.remove(BVTerm.Var(a.lhs)).remove(GammaTerm.Var(a.lhs)).simplify
+      case m: MemoryStore => b
+      case a: Assume => {
         if (a.checkSecurity) {
           and(b, exprToPredicate(a.body).get, lowExpr(a.body)).simplify
         } else {
           and(b, exprToPredicate(a.body).get).simplify
         }
       }
-      case a: Assert       => and(b, exprToPredicate(a.body).get).simplify
+      case a: Assert => and(b, exprToPredicate(a.body).get).simplify
       case i: IndirectCall => top
-      case c: DirectCall   => c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>
-        p.replace(BVTerm.Var(v), exprToBVTerm(e).get).replace(GammaTerm.Var(v), exprToGammaTerm(e).get).simplify
-      }
-      case g: GoTo         => b
-      case r: Return       => b
-      case r: Unreachable  => b
-      case n: NOP          => b
+      case c: DirectCall =>
+        c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>
+          p.replace(BVTerm.Var(v), exprToBVTerm(e).get).replace(GammaTerm.Var(v), exprToGammaTerm(e).get).simplify
+        }
+      case g: GoTo => b
+      case r: Return => b
+      case r: Unreachable => b
+      case n: NOP => b
     }
   }
 
-  override def init(b: Block): Predicate = if b.isReturn then /*Conj(summaries(b.parent).ensures.map(_.pred).toSet)*/ top else bot
+  override def init(b: Block): Predicate =
+    if b.isReturn then /*Conj(summaries(b.parent).ensures.map(_.pred).toSet)*/ top else bot
 
   def top: Predicate = True
   def bot: Predicate = False
@@ -179,29 +193,34 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
     if a.size + b.size > 100 then atTop += pos
     if atTop.contains(pos) then top else or(a, b).simplify
 
-  private def lowExpr(e: Expr): Predicate = gammaLeq(GammaTerm.Join(e.variables.map(v => GammaTerm.Var(v))), GammaTerm.Low)
+  private def lowExpr(e: Expr): Predicate =
+    gammaLeq(GammaTerm.Join(e.variables.map(v => GammaTerm.Var(v))), GammaTerm.Low)
 
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
-      case a: LocalAssign  => b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get).replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get).simplify
-      case a: MemoryLoad   => b.remove(BVTerm.Var(a.lhs)).remove(GammaTerm.Var(a.lhs)).simplify
-      case m: MemoryStore  => b
-      case a: Assume       => {
+      case a: LocalAssign =>
+        b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get)
+          .replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get)
+          .simplify
+      case a: MemoryLoad => b.remove(BVTerm.Var(a.lhs)).remove(GammaTerm.Var(a.lhs)).simplify
+      case m: MemoryStore => b
+      case a: Assume => {
         if (a.checkSecurity) {
           or(and(b, exprToPredicate(a.body).get), not(lowExpr(a.body))).simplify
         } else {
           and(b, exprToPredicate(a.body).get).simplify
         }
       }
-      case a: Assert       => or(b, not(exprToPredicate(a.body).get)).simplify
+      case a: Assert => or(b, not(exprToPredicate(a.body).get)).simplify
       case i: IndirectCall => top
-      case c: DirectCall   => not(c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>
-        p.replace(BVTerm.Var(v), exprToBVTerm(e).get).replace(GammaTerm.Var(v), exprToGammaTerm(e).get).simplify
-      })
-      case g: GoTo         => b
-      case r: Return       => b
-      case r: Unreachable  => b
-      case n: NOP          => b
+      case c: DirectCall =>
+        not(c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>
+          p.replace(BVTerm.Var(v), exprToBVTerm(e).get).replace(GammaTerm.Var(v), exprToGammaTerm(e).get).simplify
+        })
+      case g: GoTo => b
+      case r: Return => b
+      case r: Unreachable => b
+      case n: NOP => b
     }
   }
 

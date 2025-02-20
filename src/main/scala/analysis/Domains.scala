@@ -28,7 +28,8 @@ class ProductDomain[L1, L2](d1: AbstractDomain[L1], d2: AbstractDomain[L2]) exte
  * Encodes the conjunction of two domain predicates.
  */
 class PredProductDomain[L1, L2](d1: PredicateEncodingDomain[L1], d2: PredicateEncodingDomain[L2])
-  extends ProductDomain[L1, L2](d1, d2) with PredicateEncodingDomain[(L1, L2)] {
+    extends ProductDomain[L1, L2](d1, d2)
+    with PredicateEncodingDomain[(L1, L2)] {
 
   def toPred(x: (L1, L2)): Predicate = Predicate.and(d1.toPred(x._1), d2.toPred(x._2))
 
@@ -36,6 +37,7 @@ class PredProductDomain[L1, L2](d1: PredicateEncodingDomain[L1], d2: PredicateEn
 }
 
 import collection.mutable
+
 /**
  * This domain stores as abstract values, sets of abstract values in the provided abstract domain.
  * A set of values represents the disjunction of the values in the set. For example, if S = {a, b, c},
@@ -50,7 +52,8 @@ class DisjunctiveCompletion[L](d: AbstractDomain[L]) extends AbstractDomain[Set[
 
   def join(a: Set[L], b: Set[L], pos: Block): Set[L] =
     joinCount += pos -> (joinCount.getOrElse(pos, 0) + 1)
-    if a.contains(d.top) || b.contains(d.top) then top else {
+    if a.contains(d.top) || b.contains(d.top) then top
+    else {
       // TODO this is manual widening, maybe widening should be added to the solver instead
       if pos.isLoopHeader() || joinCount(pos) > 20 then widen(a, b, pos) else a.union(b)
     }
@@ -71,7 +74,9 @@ class DisjunctiveCompletion[L](d: AbstractDomain[L]) extends AbstractDomain[Set[
 /**
  * Encodes a disjunctive completion as the disjunction of a set of predicates.
  */
-class PredDisjunctiveCompletion[L](d: PredicateEncodingDomain[L]) extends DisjunctiveCompletion[L](d) with PredicateEncodingDomain[Set[L]] {
+class PredDisjunctiveCompletion[L](d: PredicateEncodingDomain[L])
+    extends DisjunctiveCompletion[L](d)
+    with PredicateEncodingDomain[Set[L]] {
   def toPred(x: Set[L]): Predicate = x.foldLeft(Predicate.False) { (p, l) => Predicate.or(p, d.toPred(l)) }.simplify
 
   override def fromPred(p: Predicate): Set[L] = p match {
@@ -94,12 +99,16 @@ class BoundedDisjunctiveCompletion[L](d: AbstractDomain[L], bound: Int) extends 
 
   private var joinCount: mutable.Map[Block, Int] = mutable.Map()
 
-  def join(a: Set[L], b: Set[L], pos: Block): Set[L] = 
+  def join(a: Set[L], b: Set[L], pos: Block): Set[L] =
     joinCount += pos -> (joinCount.getOrElse(pos, 0) + 1)
-    bound(if a.contains(d.top) || b.contains(d.top) then top else {
-      // TODO this is manual widening, maybe widening should be added to the solver instead
-      if pos.isLoopHeader() || joinCount(pos) > 20 then widen(a, b, pos) else a.union(b)
-    }, pos)
+    bound(
+      if a.contains(d.top) || b.contains(d.top) then top
+      else {
+        // TODO this is manual widening, maybe widening should be added to the solver instead
+        if pos.isLoopHeader() || joinCount(pos) > 20 then widen(a, b, pos) else a.union(b)
+      },
+      pos
+    )
 
   override def widen(a: Set[L], b: Set[L], pos: Block): Set[L] =
     for {
@@ -118,7 +127,9 @@ class BoundedDisjunctiveCompletion[L](d: AbstractDomain[L], bound: Int) extends 
 /**
  * Encodes a bounded disjunctive completion as the disjunction of a set of predicates.
  */
-class PredBoundedDisjunctiveCompletion[L](d: PredicateEncodingDomain[L], bound: Int) extends BoundedDisjunctiveCompletion[L](d, bound) with PredicateEncodingDomain[Set[L]] {
+class PredBoundedDisjunctiveCompletion[L](d: PredicateEncodingDomain[L], bound: Int)
+    extends BoundedDisjunctiveCompletion[L](d, bound)
+    with PredicateEncodingDomain[Set[L]] {
   def toPred(x: Set[L]): Predicate = x.foldLeft(Predicate.False) { (p, l) => Predicate.or(p, d.toPred(l)) }.simplify
 
   override def fromPred(p: Predicate): Set[L] = p match {

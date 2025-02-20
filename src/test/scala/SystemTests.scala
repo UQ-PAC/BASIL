@@ -591,10 +591,14 @@ class MemoryRegionTestsNoRegion extends SystemTests {
 class ProcedureSummaryTests extends SystemTests {
   // TODO currently procedure_summary3 verifies despite incorrect procedure summary analysis
   // this is due to BASIL's currently limited handling of non-returning calls
-  runTests("procedure_summaries", TestConfig(summariseProcedures = true, simplify = true,
-    useBAPFrontend = true, expectVerify = true))
-  runTests("procedure_summaries", TestConfig(summariseProcedures = true, simplify = true,
-    useBAPFrontend = false, expectVerify = true))
+  runTests(
+    "procedure_summaries",
+    TestConfig(summariseProcedures = true, simplify = true, useBAPFrontend = true, expectVerify = true)
+  )
+  runTests(
+    "procedure_summaries",
+    TestConfig(summariseProcedures = true, simplify = true, useBAPFrontend = false, expectVerify = true)
+  )
 }
 
 // tests that require currently unimplemented functionality to pass

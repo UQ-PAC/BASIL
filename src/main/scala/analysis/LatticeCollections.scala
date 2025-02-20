@@ -207,17 +207,17 @@ private def latticeMapJoin[D, L](
   (a, b) match {
     case (Top(), _) => Top()
     case (Bottom(), b) => b
-    case (TopMap(a), TopMap(b)) => TopMap(
-      a.foldLeft(b) {
-        case (m, (k, v)) => m + (k -> join(m.getOrElse(k, top), v))
+    case (TopMap(a), TopMap(b)) =>
+      TopMap(a.foldLeft(b) { case (m, (k, v)) =>
+        m + (k -> join(m.getOrElse(k, top), v))
       })
-    case (TopMap(a), BottomMap(b)) => TopMap(
-      b.foldLeft(a) {
-        case (m, (k, v)) => m + (k -> join(m.getOrElse(k, top), v))
+    case (TopMap(a), BottomMap(b)) =>
+      TopMap(b.foldLeft(a) { case (m, (k, v)) =>
+        m + (k -> join(m.getOrElse(k, top), v))
       })
-    case (BottomMap(a), BottomMap(b)) => BottomMap(
-      a.foldLeft(b) {
-        case (m, (k, v)) => m + (k -> join(m.getOrElse(k, bottom), v))
+    case (BottomMap(a), BottomMap(b)) =>
+      BottomMap(a.foldLeft(b) { case (m, (k, v)) =>
+        m + (k -> join(m.getOrElse(k, bottom), v))
       })
     case (a, b) => latticeMapJoin(b, a, join, top, bottom)
   }
@@ -235,17 +235,17 @@ private def latticeMapMeet[D, L](
   (a, b) match {
     case (Top(), b) => b
     case (Bottom(), _) => Bottom()
-    case (TopMap(a), TopMap(b)) => TopMap(
-      a.foldLeft(b) {
-        case (m, (k, v)) => m + (k -> meet(m.getOrElse(k, top), v))
+    case (TopMap(a), TopMap(b)) =>
+      TopMap(a.foldLeft(b) { case (m, (k, v)) =>
+        m + (k -> meet(m.getOrElse(k, top), v))
       })
-    case (TopMap(a), BottomMap(b)) => BottomMap(
-      a.foldLeft(b) {
-        case (m, (k, v)) => m + (k -> meet(m.getOrElse(k, bottom), v))
+    case (TopMap(a), BottomMap(b)) =>
+      BottomMap(a.foldLeft(b) { case (m, (k, v)) =>
+        m + (k -> meet(m.getOrElse(k, bottom), v))
       })
-    case (BottomMap(a), BottomMap(b)) => BottomMap(
-      a.foldLeft(b) {
-        case (m, (k, v)) => m + (k -> meet(m.getOrElse(k, bottom), v))
+    case (BottomMap(a), BottomMap(b)) =>
+      BottomMap(a.foldLeft(b) { case (m, (k, v)) =>
+        m + (k -> meet(m.getOrElse(k, bottom), v))
       })
     case (a, b) => latticeMapMeet(b, a, meet, top, bottom)
   }
@@ -301,18 +301,22 @@ trait MapDomain[D, L] extends AbstractDomain[LatticeMap[D, L]] {
       case (a, Bottom()) => a
       case (Top(), _) => Top()
       case (_, Top()) => Top()
-      case (BottomMap(a), BottomMap(b)) => BottomMap(a.foldLeft(b) {
-        case (m, (b, v)) => m + (b -> widenTerm(m.getOrElse(b, botTerm), v, pos))
-      })
-      case (BottomMap(a), TopMap(b)) => TopMap(a.foldLeft(b) {
-        case (m, (b, v)) => m + (b -> widenTerm(m.getOrElse(b, botTerm), v, pos))
-      })
-      case (TopMap(a), BottomMap(b)) => TopMap(b.foldLeft(a) {
-        case (m, (a, v)) => m + (a -> widenTerm(v, m.getOrElse(a, botTerm), pos))
-      })
-      case (TopMap(a), TopMap(b)) => TopMap(a.foldLeft(b) {
-        case (m, (b, v)) => m + (b -> widenTerm(m.getOrElse(b, botTerm), v, pos))
-      })
+      case (BottomMap(a), BottomMap(b)) =>
+        BottomMap(a.foldLeft(b) { case (m, (b, v)) =>
+          m + (b -> widenTerm(m.getOrElse(b, botTerm), v, pos))
+        })
+      case (BottomMap(a), TopMap(b)) =>
+        TopMap(a.foldLeft(b) { case (m, (b, v)) =>
+          m + (b -> widenTerm(m.getOrElse(b, botTerm), v, pos))
+        })
+      case (TopMap(a), BottomMap(b)) =>
+        TopMap(b.foldLeft(a) { case (m, (a, v)) =>
+          m + (a -> widenTerm(v, m.getOrElse(a, botTerm), pos))
+        })
+      case (TopMap(a), TopMap(b)) =>
+        TopMap(a.foldLeft(b) { case (m, (b, v)) =>
+          m + (b -> widenTerm(m.getOrElse(b, botTerm), v, pos))
+        })
     }
 
   def bot: LatticeMap[D, L] = Bottom()
@@ -325,6 +329,7 @@ trait MapDomain[D, L] extends AbstractDomain[LatticeMap[D, L]] {
  * If you want to implement this trait, instead implement either `MayPredMapDomain` or `MustPredMapDomain`
  */
 trait PredMapDomain[D, L] extends MapDomain[D, L] with PredicateEncodingDomain[LatticeMap[D, L]] {
+
   /**
    * Encode the information the abstract value `l` represents, as a predicate, when `l` is the result
    * of applying `d` to `m`.
@@ -350,15 +355,16 @@ trait MayPredMapDomain[D, L] extends PredMapDomain[D, L] with MayAnalysis {
 
   def toPred(x: LatticeMap[D, L]): Predicate = x match {
     case Top() => Predicate.True
-    case TopMap(m) => m.foldLeft(Predicate.True) {
-      (p, z) => {
-        val (d, l) = z
-        termToPred(x, d, l) match {
-          case Predicate.True => p
-          case q => Predicate.and(p, q)
+    case TopMap(m) =>
+      m.foldLeft(Predicate.True) { (p, z) =>
+        {
+          val (d, l) = z
+          termToPred(x, d, l) match {
+            case Predicate.True => p
+            case q => Predicate.and(p, q)
+          }
         }
-      }
-    }.simplify
+      }.simplify
     case Bottom() => Predicate.False
     case BottomMap(m) => Predicate.False
   }
@@ -378,14 +384,15 @@ trait MustPredMapDomain[D, L] extends PredMapDomain[D, L] with MustAnalysis {
     case Top() => Predicate.False
     case TopMap(m) => Predicate.False
     case Bottom() => Predicate.True
-    case BottomMap(m) => m.foldLeft(Predicate.True) {
-      (p, z) => {
-        val (d, l) = z
-        termToPred(x, d, l) match {
-          case Predicate.True => p
-          case q => Predicate.and(p, q)
+    case BottomMap(m) =>
+      m.foldLeft(Predicate.True) { (p, z) =>
+        {
+          val (d, l) = z
+          termToPred(x, d, l) match {
+            case Predicate.True => p
+            case q => Predicate.and(p, q)
+          }
         }
-      }
-    }.simplify
+      }.simplify
   }
 }
