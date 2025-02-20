@@ -9,6 +9,9 @@ import util.*
 
 import scala.collection.immutable.{AbstractSeq, LinearSeq}
 
+import org.junit.experimental.categories.Category
+
+@Category(Array(classOf[test_util.AnalysisSystemTest]))
 class SVATest extends FunSuite {
 
   def runAnalysis(program: Program): StaticAnalysisContext = {

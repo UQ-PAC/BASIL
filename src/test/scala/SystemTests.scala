@@ -1,5 +1,6 @@
 import munit.FunSuite
 import util.{LogLevel, Logger, DebugDumpIRLogger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
+import org.junit.experimental.categories.Category
 
 import Numeric.Implicits.*
 import java.io.{BufferedWriter, File, FileWriter}
@@ -10,6 +11,8 @@ import test_util.BASILTest
 import test_util.BASILTest.*
 import test_util.Histogram
 import test_util.TestConfig
+import org.junit.experimental.categories.Category
+
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
@@ -230,7 +233,7 @@ trait SystemTests extends FunSuite, BASILTest {
     if (hasExpected) {
       if (!BASILTest.compareFiles(expectedOutPath, BPLPath)) {
         matchesExpected = false
-        println(s"Warning: Boogie file differs from expected: $BPLPath, $expectedOutPath")
+        println(s"Warning: Boogie file differs from expected: $expectedOutPath")
       }
     } else {
       println("Note: this test has not previously succeeded")
@@ -240,6 +243,7 @@ trait SystemTests extends FunSuite, BASILTest {
 
 }
 
+@Category(Array(classOf[test_util.BasicSystemTest]))
 class SystemTestsBAP extends SystemTests {
   runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true))
   runTests("incorrect", TestConfig(useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true))
@@ -248,6 +252,7 @@ class SystemTestsBAP extends SystemTests {
   }
 }
 
+@Category(Array(classOf[test_util.BasicSystemTest]))
 class SystemTestsGTIRB extends SystemTests {
   runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, checkExpected = true, logResults = true))
   runTests(
@@ -259,6 +264,7 @@ class SystemTestsGTIRB extends SystemTests {
   }
 }
 
+@Category(Array(classOf[test_util.BasicSystemTest]))
 class ExtraSpecTests extends SystemTests {
   // some of these tests have time out issues so they need more time, but some still time out even with this for unclear reasons
   val boogieFlags = Seq("/timeLimit:30", "/useArrayAxioms")
@@ -316,6 +322,8 @@ class NoSimplifySystemTests extends SystemTests {
     summary("nosimplify")
   }
 }
+
+@Category(Array(classOf[test_util.AnalysisSystemTest]))
 class SimplifySystemTests extends SystemTests {
   runTests("correct", TestConfig(simplify = true, useBAPFrontend = true, expectVerify = true, logResults = true))
   runTests("incorrect", TestConfig(simplify = true, useBAPFrontend = true, expectVerify = false, logResults = true))
@@ -326,6 +334,7 @@ class SimplifySystemTests extends SystemTests {
   }
 }
 
+@Category(Array(classOf[test_util.AnalysisSystemTest]))
 class SimplifyMemorySystemTests extends SystemTests {
   val staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA))
   runTests(
@@ -373,6 +382,7 @@ class SimplifyMemorySystemTests extends SystemTests {
   }
 }
 
+@Category(Array(classOf[test_util.AnalysisSystemTest]))
 class AnalysisSystemTestsBAP extends SystemTests {
   runTests(
     "correct",
@@ -384,6 +394,7 @@ class AnalysisSystemTestsBAP extends SystemTests {
   )
 }
 
+@Category(Array(classOf[test_util.AnalysisSystemTest]))
 class AnalysisSystemTestsGTIRB extends SystemTests {
   runTests(
     "correct",
@@ -395,6 +406,7 @@ class AnalysisSystemTestsGTIRB extends SystemTests {
   )
 }
 
+@Category(Array(classOf[test_util.AnalysisSystemTest]))
 class DSAMemoryRegionSystemTestsBAP extends SystemTests {
   runTests(
     "correct",
@@ -414,6 +426,7 @@ class DSAMemoryRegionSystemTestsBAP extends SystemTests {
   )
 }
 
+@Category(Array(classOf[test_util.AnalysisSystemTest]))
 class DSAMemoryRegionSystemTestsGTIRB extends SystemTests {
   runTests(
     "correct",
@@ -433,6 +446,7 @@ class DSAMemoryRegionSystemTestsGTIRB extends SystemTests {
   )
 }
 
+@Category(Array(classOf[test_util.AnalysisSystemTest]))
 class MRAMemoryRegionSystemTestsBAP extends SystemTests {
   runTests(
     "correct",
@@ -452,6 +466,7 @@ class MRAMemoryRegionSystemTestsBAP extends SystemTests {
   )
 }
 
+@Category(Array(classOf[test_util.AnalysisSystemTest]))
 class MRAMemoryRegionSystemTestsGTIRB extends SystemTests {
   runTests(
     "correct",
@@ -471,6 +486,7 @@ class MRAMemoryRegionSystemTestsGTIRB extends SystemTests {
   )
 }
 
+@Category(Array(classOf[test_util.AnalysisSystemTest]))
 class MemoryRegionTestsDSA extends SystemTests {
   // stack_pointer currently times out because Boogie is bad at handling abstract map accesses
   runTests(
@@ -483,6 +499,7 @@ class MemoryRegionTestsDSA extends SystemTests {
   )
 }
 
+@Category(Array(classOf[test_util.AnalysisSystemTest]))
 class MemoryRegionTestsMRA extends SystemTests {
   // stack_pointer currently times out because Boogie is bad at handling abstract map accesses
   runTests(
@@ -495,6 +512,7 @@ class MemoryRegionTestsMRA extends SystemTests {
   )
 }
 
+@Category(Array(classOf[test_util.AnalysisSystemTest]))
 class MemoryRegionTestsNoRegion extends SystemTests {
   runTests(
     "memory_regions",
@@ -502,6 +520,7 @@ class MemoryRegionTestsNoRegion extends SystemTests {
   )
 }
 
+@Category(Array(classOf[test_util.AnalysisSystemTest]))
 class ProcedureSummaryTests extends SystemTests {
   // TODO currently procedure_summary3 verifies despite incorrect procedure summary analysis
   // this is due to BASIL's currently limited handling of non-returning calls

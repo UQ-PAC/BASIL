@@ -11,10 +11,12 @@ import scala.collection.mutable
 import scala.io.Source
 import scala.sys.process.*
 import test_util.BASILTest.writeToFile
+import org.junit.experimental.categories.Category
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
   */
+@Category(Array(classOf[test_util.UnitTest]))
 class IrreducibleLoop extends FunSuite {
   val testPath = "./src/test/irreducible_loops"
   Logger.setLevel(LogLevel.ERROR)

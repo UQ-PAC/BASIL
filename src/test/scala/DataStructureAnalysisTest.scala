@@ -18,6 +18,8 @@ import util.{
 }
 import util.{LogLevel, Logger}
 import translating.PrettyPrinter.*
+import org.junit.experimental.categories.Category
+import test_util.UnitTest
 
 /** This is the test suite for testing DSA functionality The tests follow a general pattern of running BASIL analyses on
   * a test program and then asserting properties about the Data Structure Graph (DSG) of the function produced at
@@ -27,9 +29,12 @@ import translating.PrettyPrinter.*
   * BASILRESULT.analysis.get.bu is the set of graphs from the end of the bottom-up phase BASILRESULT.analysis.get.td is
   * the set of graphs from the end of the top-down phase
   */
+
+@Category(Array(classOf[UnitTest]))
 class DataStructureAnalysisTest extends FunSuite {
 
   def runAnalysis(program: Program): StaticAnalysisContext = {
+    Logger.setLevel(LogLevel.ERROR)
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program)
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)

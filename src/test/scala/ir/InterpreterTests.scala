@@ -11,6 +11,7 @@ import translating.BAPToIR
 import util.{LogLevel, Logger}
 import util.IRLoading.{loadBAP, loadReadELF}
 import util.{ILLoadingConfig, IRContext, IRLoading, IRTransform}
+import org.junit.experimental.categories.Category
 
 def load(s: InterpreterState, global: SpecGlobal): Option[BitVecLiteral] = {
   val f = NormalInterpreter
@@ -30,6 +31,8 @@ def mems[E, T <: Effects[T, E]](m: MemoryState): Map[BigInt, BitVecLiteral] = {
   m.getMem("mem").map((k, v) => k.value -> v)
 }
 
+
+@Category(Array(classOf[test_util.AnalysisSystemTest]))
 class InterpreterTests extends FunSuite {
 
 

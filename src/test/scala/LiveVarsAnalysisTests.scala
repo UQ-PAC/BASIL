@@ -21,6 +21,10 @@ import test_util.BASILTest
 import util.{BASILResult, StaticAnalysisConfig}
 import translating.PrettyPrinter.*
 
+import org.junit.experimental.categories.Category
+import test_util.UnitTest
+
+@Category(Array(classOf[UnitTest]))
 class LiveVarsAnalysisTests extends FunSuite, BASILTest {
   Logger.setLevel(LogLevel.ERROR)
   private val correctPath = "./src/test/correct/"

@@ -1,8 +1,10 @@
 package ir
-
 import ir.dsl._
-
 import munit.FunSuite
+import org.junit.experimental.categories.Category
+import test_util.UnitTest
+
+@Category(Array(classOf[UnitTest]))
 class InvariantTest extends FunSuite {
 
   test("sat singleCallBlockEnd case") {

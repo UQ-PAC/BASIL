@@ -5,6 +5,10 @@ import util.Logger
 
 import scala.runtime.stdLibPatches.Predef.assert
 
+import org.junit.experimental.categories.Category
+import test_util.UnitTest
+
+@Category(Array(classOf[UnitTest]))
 class BitVectorAnalysisTests extends FunSuite {
 
   test("BitVector to Natural - should convert BitVector to natural number") {

@@ -6,6 +6,8 @@ import munit.FunSuite
 import util.intrusive_list.*
 import ir.dsl.*
 import ir.cilvisitor.*
+import org.junit.experimental.categories.Category
+import test_util.UnitTest
 
 class FindVars extends CILVisitor {
   val vars = mutable.ArrayBuffer[Variable]()
@@ -51,6 +53,7 @@ class AddGammas extends CILVisitor {
   }
 }
 
+@Category(Array(classOf[UnitTest]))
 class CILVisitorTest extends FunSuite {
 
   def getRegister(name: String) = Register(name, 64)

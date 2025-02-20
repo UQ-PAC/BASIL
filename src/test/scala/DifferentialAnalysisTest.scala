@@ -20,6 +20,7 @@ import util.{
 }
 import ir.eval.{interpretTrace, interpret, ExecEffect, Stopped}
 import test_util.*
+import org.junit.experimental.categories.Category
 
 import java.io.IOException
 import java.nio.file.*
@@ -29,6 +30,7 @@ import util.RunUtils.loadAndTranslate
 
 import scala.collection.mutable
 
+@Category(Array(classOf[test_util.AnalysisSystemTest]))
 class DifferentialTest extends FunSuite {
 
   Logger.setLevel(LogLevel.WARN)

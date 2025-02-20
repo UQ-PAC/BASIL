@@ -29,7 +29,9 @@ import ir.dsl.*
 import util.RunUtils.loadAndTranslate
 
 import scala.collection.mutable
+import org.junit.experimental.categories.Category
 
+@Category(Array(classOf[test_util.AnalysisSystemTest]))
 class ConstPropInterpreterValidate extends FunSuite {
 
   Logger.setLevel(LogLevel.ERROR)

@@ -19,7 +19,9 @@ import test_util.BASILTest
 import test_util.TestConfig
 
 import java.io.{BufferedWriter, File, FileWriter}
+import org.junit.experimental.categories.Category
 
+@Category(Array(classOf[test_util.AnalysisSystemTest]))
 class IndirectCallTests extends FunSuite, BASILTest {
 
   /** @param label - the label of the IndirectCall to be resolved

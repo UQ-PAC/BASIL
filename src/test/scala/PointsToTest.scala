@@ -10,7 +10,9 @@ import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
 
 import ir.dsl.*
+import org.junit.experimental.categories.Category
 
+@Category(Array(classOf[test_util.AnalysisSystemTest]))
 class PointsToTest extends FunSuite {
 
   def runAnalyses(

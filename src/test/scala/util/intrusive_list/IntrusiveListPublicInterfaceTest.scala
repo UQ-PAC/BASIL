@@ -2,6 +2,10 @@ package util.intrusive_list
 import munit.FunSuite
 import scala.collection.mutable
 
+import org.junit.experimental.categories.Category
+import test_util.UnitTest
+
+@Category(Array(classOf[UnitTest]))
 class IntrusiveListPublicInterfaceTest extends FunSuite {
   class Elem(val t: Int) extends IntrusiveListElement[Elem]
 

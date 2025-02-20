@@ -5,6 +5,10 @@ import ir.dsl.*
 import munit.FunSuite
 import test_util.BASILTest
 
+import org.junit.experimental.categories.Category
+import test_util.UnitTest
+
+@Category(Array(classOf[UnitTest]))
 class TaintAnalysisTests extends FunSuite, BASILTest {
   def getTaintAnalysisResults(
     program: Program,

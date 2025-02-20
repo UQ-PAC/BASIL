@@ -1,10 +1,15 @@
 package test_util
 import java.io.{BufferedWriter, File, FileWriter}
+import org.junit.experimental.categories.Category
 
 import ir.{Block, Procedure, Program}
 import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, StaticAnalysisConfig}
 
 import java.io.File
+
+class UnitTest extends munit.Tag("UnitTest")
+class BasicSystemTest extends munit.Tag("BasicSystemTest")
+class AnalysisSystemTest extends munit.Tag("AnalysisSystemTest")
 
 trait TestUtil {
   val correctPath = "./src/test/correct/"

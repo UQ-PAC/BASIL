@@ -2,6 +2,10 @@ package util.intrusive_list
 
 import munit.FunSuite
 
+import org.junit.experimental.categories.Category
+import test_util.UnitTest
+
+@Category(Array(classOf[UnitTest]))
 class IntrusiveListTest extends FunSuite {
   case class Elem(t: Float) extends IntrusiveListElement[Elem]
 

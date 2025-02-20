@@ -4,6 +4,10 @@ import munit.FunSuite
 import test_util.BASILTest
 import util.{BASILResult, StaticAnalysisConfig, Logger, LogLevel}
 
+import org.junit.experimental.categories.Category
+import test_util.UnitTest
+
+@Category(Array(classOf[UnitTest]))
 class ParamAnalysisTests extends FunSuite, BASILTest {
   private val correctPath = "./src/test/correct/"
 

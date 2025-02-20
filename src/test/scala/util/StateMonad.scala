@@ -11,6 +11,10 @@ import util.ILLoadingConfig
 
 def add: State[Int, Unit, Unit] = State(s => (s + 1, Right(())))
 
+import org.junit.experimental.categories.Category
+import test_util.UnitTest
+
+@Category(Array(classOf[UnitTest]))
 class StateMonadTest extends FunSuite {
 
   test("forcompre") {

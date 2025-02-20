@@ -7,7 +7,10 @@ import util.intrusive_list.*
 import translating.serialiseIL
 import ir.dsl.*
 import ir.*
+import org.junit.experimental.categories.Category
+import test_util.UnitTest
 
+@Category(Array(classOf[UnitTest]))
 class IRTest extends FunSuite {
 
   test("blockintralinks") {
