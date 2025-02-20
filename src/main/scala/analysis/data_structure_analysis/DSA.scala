@@ -148,8 +148,8 @@ trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Nod
 
     // takes a map from symbolic bases to nodes and updates it based on constraint
   protected def binaryConstraintToNodes(constraint: BinaryConstraint, nodes: Map[SymBase, Node]): Map[SymBase, Node] = {
-    val arg1 = exprToSymVal(constraint.arg1.value).removeNonAddress(i => i >= 11000)
-    val arg2 = exprToSymVal(constraint.arg2.value).removeNonAddress(i => i >= 11000)
+    val arg1 = exprToSymVal(constraint.arg1.value).removeNonAddress(i => i >= 1000)
+    val arg2 = exprToSymVal(constraint.arg2.value).removeNonAddress(i => i >= 1000)
     val res = symValToNodes(arg1, nodes)
     symValToNodes(arg2, res)
   }
@@ -158,7 +158,7 @@ trait DSAGraph[Solver, Merged, Cell <: NodeCell & DSACell, CCell <: DSACell, Nod
     val global = globalNode(irContex.globals ++ irContex.funcEntries, irContex.globalOffsets, irContex.externalFunctions)
     val init = sva.state.foldLeft(Map[SymBase, Node](Global -> global)) {
       case (m, (variable, valueSet)) =>
-        symValToNodes(valueSet.removeNonAddress(i => i >= 11000), m)
+        symValToNodes(valueSet.removeNonAddress(i => i >= 1000), m)
     }
 
     constraints.foldLeft(init) {
