@@ -110,16 +110,17 @@ trait EventuallyJump {
   def resolve(p: Program, proc: Procedure): Jump
 }
 
-case class EventuallyIndirectCall(target: Variable) extends EventuallyStatement {
+case class EventuallyIndirectCall(target: Variable, label: Option[String] = None) extends EventuallyStatement {
   override def resolve(p: Program): Statement = {
-    IndirectCall(target)
+    IndirectCall(target, label)
   }
 }
 
 case class EventuallyCall(
   target: DelayNameResolve,
   lhs: Iterable[(String, Variable)],
-  actualParams: Iterable[(String, Expr)]
+  actualParams: Iterable[(String, Expr)],
+  label: Option[String] = None
 ) extends EventuallyStatement {
   override def resolve(p: Program): Statement = {
     val t = target.resolveProc(p) match {
@@ -128,24 +129,24 @@ case class EventuallyCall(
     }
     val actual = SortedMap.from(actualParams.map((name, value) => t.formalInParam.find(_.name == name).get -> value))
     val callLhs = SortedMap.from(lhs.map((name, value) => t.formalOutParam.find(_.name == name).get -> value))
-    DirectCall(t, None, callLhs, actual)
+    DirectCall(t, label, callLhs, actual)
   }
 }
 
-case class EventuallyGoto(targets: List[DelayNameResolve]) extends EventuallyJump {
+case class EventuallyGoto(targets: Iterable[DelayNameResolve], label: Option[String] = None) extends EventuallyJump {
   override def resolve(p: Program, proc: Procedure): GoTo = {
     val tgs = targets.flatMap(tn => tn.resolveBlock(p))
-    GoTo(tgs)
+    GoTo(tgs, label)
   }
 }
-case class EventuallyReturn(params: Iterable[(String, Expr)]) extends EventuallyJump {
+case class EventuallyReturn(params: Iterable[(String, Expr)], label: Option[String] = None) extends EventuallyJump {
   override def resolve(p: Program, proc: Procedure) = {
     val r = SortedMap.from(params.map((n, v) => proc.formalOutParam.find(_.name == n).get -> v))
-    Return(None, r)
+    Return(label, r)
   }
 }
-case class EventuallyUnreachable() extends EventuallyJump {
-  override def resolve(p: Program, proc: Procedure) = Unreachable()
+case class EventuallyUnreachable(label: Option[String] = None) extends EventuallyJump {
+  override def resolve(p: Program, proc: Procedure) = Unreachable(label)
 }
 
 def goto(targets: List[String]): EventuallyGoto = {
@@ -183,10 +184,15 @@ def indirectCall(tgt: Variable): EventuallyIndirectCall = EventuallyIndirectCall
  *
  */
 
-case class EventuallyBlock(label: String, sl: Seq[EventuallyStatement], j: EventuallyJump) {
+case class EventuallyBlock(
+  label: String,
+  sl: Iterable[EventuallyStatement],
+  j: EventuallyJump,
+  address: Option[BigInt] = None
+) {
 
   def makeResolver: (Block, (Program, Procedure) => Unit) = {
-    val tempBlock: Block = Block(label, None, List(), GoTo(List.empty))
+    val tempBlock: Block = Block(label, address, List(), GoTo(List.empty))
 
     def cont(prog: Program, proc: Procedure): Block = {
       assert(tempBlock.statements.isEmpty)
@@ -221,18 +227,24 @@ case class EventuallyProcedure(
   label: String,
   in: Map[String, IRType] = Map(),
   out: Map[String, IRType] = Map(),
-  blocks: Seq[EventuallyBlock]
+  blocks: Seq[EventuallyBlock],
+  entryBlockLabel: Option[String] = None,
+  returnBlockLabel: Option[String] = None,
+  address: Option[BigInt] = None
 ) {
 
   def makeResolver: (Procedure, Program => Unit) = {
 
     val (tempBlocks, resolvers) = blocks.map(_.makeResolver).unzip
 
+    val entry = entryBlockLabel.flatMap(b => tempBlocks.find(_.label == b)).orElse(tempBlocks.headOption)
+    val returnBlock = returnBlockLabel.flatMap(b => tempBlocks.find(_.label == b))
+
     val tempProc: Procedure = Procedure(
       label,
-      None,
-      tempBlocks.headOption,
-      None,
+      address,
+      entry,
+      returnBlock,
       tempBlocks,
       in.map((n, t) => LocalVar(n, t)),
       out.map((n, t) => LocalVar(n, t))
@@ -268,7 +280,7 @@ case class EventuallyProcedure(
 }
 
 def proc(label: String, blocks: EventuallyBlock*): EventuallyProcedure = {
-  EventuallyProcedure(label, SortedMap(), SortedMap(), blocks)
+  EventuallyProcedure(label, SortedMap(), SortedMap(), blocks, blocks.headOption.map(_.label))
 }
 
 def proc(
@@ -277,23 +289,28 @@ def proc(
   out: Iterable[(String, IRType)],
   blocks: EventuallyBlock*
 ): EventuallyProcedure = {
-  EventuallyProcedure(label, in.to(SortedMap), out.to(SortedMap), blocks)
+  EventuallyProcedure(label, in.to(SortedMap), out.to(SortedMap), blocks, blocks.headOption.map(_.label))
 }
 
 def mem: SharedMemory = SharedMemory("mem", 64, 8)
 
 def stack: SharedMemory = SharedMemory("stack", 64, 8)
 
-case class EventuallyProgram(mainProcedure: EventuallyProcedure, otherProcedures: EventuallyProcedure*) {
-  val allProcedures = mainProcedure +: otherProcedures
+case class EventuallyProgram(
+  mainProcedure: EventuallyProcedure,
+  otherProcedures: collection.Iterable[EventuallyProcedure] = Seq(),
+  initialMemory: collection.Iterable[MemorySection] = Seq()
+) {
+
+  val allProcedures = Seq(mainProcedure) ++ otherProcedures
 
   def resolve: Program = {
-    val initialMemory = mutable.TreeMap[BigInt, MemorySection]()
+    val memory = mutable.TreeMap.from(initialMemory.map(v => (v.address, v)))
 
     val (tempProcs, resolvers) = allProcedures.map(_.makeResolver).unzip
     val procs = ArrayBuffer.from(tempProcs)
 
-    val p = Program(procs, procs.head, initialMemory)
+    val p = Program(procs, procs.head, memory)
 
     resolvers.foreach(_(p))
     assert(ir.invariant.correctCalls(p))
@@ -303,4 +320,16 @@ case class EventuallyProgram(mainProcedure: EventuallyProcedure, otherProcedures
 }
 
 def prog(mainProc: EventuallyProcedure, procedures: EventuallyProcedure*) =
-  EventuallyProgram(mainProc, procedures: _*).resolve
+  EventuallyProgram(mainProc, procedures).resolve
+
+def genProg(mainProc: EventuallyProcedure, procedures: EventuallyProcedure*): EventuallyProgram = {
+  EventuallyProgram(mainProc, procedures)
+}
+
+def genProg(
+  initialMemory: Iterable[MemorySection],
+  mainProc: EventuallyProcedure,
+  procedures: EventuallyProcedure*
+): EventuallyProgram = {
+  EventuallyProgram(mainProc, procedures, initialMemory)
+}

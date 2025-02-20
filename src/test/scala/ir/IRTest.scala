@@ -366,4 +366,5 @@ class IRTest extends AnyFunSuite {
     assert(prog(recursiveproc) != null)
     assert(recursiveproc.addToProg(emptyprog) != null)
   }
+
 }

@@ -7,6 +7,17 @@ import util.intrusive_list.*
 import translating.serialiseIL
 import ir.dsl.*
 import ir.*
+import util.{
+  BASILConfig,
+  BASILResult,
+  BoogieGeneratorConfig,
+  ILLoadingConfig,
+  RunUtils,
+  StaticAnalysisConfig,
+  Logger,
+  LogLevel
+}
+import translating.PrettyPrinter
 
 import org.scalactic.Prettifier
 import org.scalactic._
@@ -49,27 +60,27 @@ class IRToDSLTest extends AnyFunSuite {
   test("commands to dsl") {
     val lassign = LocalAssign(R0, bv64(10))
     assertResultWithToString(ResolvableStatement(lassign)) {
-      IRToDSL.convertCommand(lassign)
+      IRToDSL.convertStatement(lassign)
     }
 
     val directcallstmt = p.preOrderIterator.collectFirst { case x: DirectCall => x }.head
     assertResult(directCall("p1")) {
-      IRToDSL.convertCommand(directcallstmt)
+      IRToDSL.convertStatement(directcallstmt)
     }
 
     val gotostmt = p.preOrderIterator.collectFirst { case x: GoTo => x }.head
     assertResult(goto("returntarget")) {
-      IRToDSL.convertCommand(gotostmt)
+      IRToDSL.convertJump(gotostmt)
     }
 
     val retstmt = p.preOrderIterator.collectFirst { case x: Return => x }.head
     assertResult(ret) {
-      IRToDSL.convertCommand(retstmt)
+      IRToDSL.convertJump(retstmt)
     }
 
     val indircall = p.preOrderIterator.collectFirst { case x: IndirectCall => x }.head
     assertResult(indirectCall(R0)) {
-      IRToDSL.convertCommand(indircall)
+      IRToDSL.convertStatement(indircall)
     }
   }
 
@@ -102,6 +113,88 @@ class IRToDSLTest extends AnyFunSuite {
     assertResultWithToString(p) {
       IRToDSL.convertProgram(p).resolve
     }
+  }
+
+  test("equality on loaded ir params") {
+    Logger.setLevel(LogLevel.ERROR)
+    val path = "src/test/correct/function1/gcc/function1"
+
+    val loaded = util.RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf", specFile = None, dumpIL = None),
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out.bpl",
+        simplify = true
+      )
+    )
+
+    val prog = loaded.ir.program
+    val cloned = IRToDSL.convertProgram(prog).resolve
+
+    for (orig <- prog) {
+      for (clone <- cloned) {
+        assert(orig ne cloned, "No references to control-flow objects shared between IR")
+      }
+    }
+
+    prog.sortProceduresRPO()
+    cloned.sortProceduresRPO()
+
+    val main = prog.mainProcedure
+    val clonedMain = cloned.mainProcedure
+
+    assert(main.address.nonEmpty)
+    assert(clonedMain.address == main.address)
+    assert(clonedMain.procName == main.procName)
+    assert(clonedMain.name == main.name)
+
+    assert(clonedMain.formalInParam == main.formalInParam)
+    assert(clonedMain.formalOutParam == main.formalOutParam)
+
+    assertResultWithToString(PrettyPrinter.pp_prog(prog))(PrettyPrinter.pp_prog(cloned))
+    // info(PrettyPrinter.pp_prog(cloned))
+  }
+
+  test("equality on loaded ir no params") {
+    Logger.setLevel(LogLevel.ERROR)
+    val path = "src/test/correct/function1/gcc/function1"
+
+    val loaded = util.RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf", specFile = None, dumpIL = None),
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out.bpl",
+        simplify = false
+      )
+    )
+
+    val prog = loaded.ir.program
+    val cloned = IRToDSL.convertProgram(prog).resolve
+
+    for (orig <- prog) {
+      for (clone <- cloned) {
+        assert(orig ne cloned, "No references to control-flow objects shared between IR")
+      }
+    }
+
+    prog.sortProceduresRPO()
+    cloned.sortProceduresRPO()
+
+    val main = prog.mainProcedure
+    val clonedMain = cloned.mainProcedure
+
+    assert(main.address.nonEmpty)
+    assert(clonedMain.address == main.address)
+    assert(clonedMain.procName == main.procName)
+    assert(clonedMain.name == main.name)
+
+    assert(clonedMain.formalInParam == main.formalInParam)
+    assert(clonedMain.formalOutParam == main.formalOutParam)
+
+    assertResultWithToString(PrettyPrinter.pp_prog(prog))(PrettyPrinter.pp_prog(cloned))
+    // info(PrettyPrinter.pp_prog(cloned))
   }
 
 }
