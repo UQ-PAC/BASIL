@@ -121,7 +121,7 @@ class ReachabilityConditions extends PredicateEncodingDomain[Predicate] {
  * Effectively a weakest precondition.
  * This analysis should be run backwards.
  */
-class PredicateDomain(summaries: Procedure => List[Predicate]) extends PredicateEncodingDomain[Predicate] {
+class PredicateDomain(summaries: Procedure => ProcedureSummary) extends PredicateEncodingDomain[Predicate] {
   import Predicate.*
 
   private var atTop = Set[Block]()
@@ -146,7 +146,7 @@ class PredicateDomain(summaries: Procedure => List[Predicate]) extends Predicate
       }
       case a: Assert       => and(b, exprToPredicate(a.body).get).simplify
       case i: IndirectCall => top
-      case c: DirectCall   => c.actualParams.foldLeft(Conj(summaries(c.target).toSet).simplify) { case (p, (v, e)) =>
+      case c: DirectCall   => c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>
         p.replace(BVTerm.Var(v), exprToBVTerm(e).get).replace(GammaTerm.Var(v), exprToGammaTerm(e).get).simplify
       }
       case g: GoTo         => b
@@ -156,7 +156,7 @@ class PredicateDomain(summaries: Procedure => List[Predicate]) extends Predicate
     }
   }
 
-  override def init(b: Block): Predicate = top
+  override def init(b: Block): Predicate = if b.isReturn then /*Conj(summaries(b.parent).ensures.map(_.pred).toSet)*/ top else bot
 
   def top: Predicate = True
   def bot: Predicate = False

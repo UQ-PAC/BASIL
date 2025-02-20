@@ -327,3 +327,35 @@ class BottomUpCallgraphWorklistSolver[L](transferProcedure: (Procedure => L, L, 
     summaries
   }
 }
+
+class SCCCallgraphWorklistSolver[L](transferProcedure: (Procedure => L, L, Procedure) => L, init: Procedure => L)  {
+
+  def solve(p: Program) = {
+    var old_summaries = Map[Procedure, L]()
+    var summaries = Map[Procedure, L]()
+
+    val scc = stronglyConnectedComponents(CallGraph, List(p.mainProcedure))
+
+    for component <- scc do {
+      val worklist = mutable.LinkedHashSet[Procedure]()
+
+      worklist.addAll(component)
+
+      while (worklist.nonEmpty) {
+        val p = worklist.head
+        worklist.remove(p)
+        old_summaries = summaries
+
+        def getSummary(p: Procedure) = old_summaries.get(p).getOrElse(init(p))
+        val s = getSummary(p)
+        val r = transferProcedure(getSummary, s, p)
+        if (r != s) {
+          summaries = summaries.updated(p, r)
+          worklist.addAll(p.incomingCalls().map(_.target).filter(component.contains(_)))
+          worklist.addAll(p.calls.filter(component.contains(_)))
+        }
+      }
+    }
+    summaries
+  }
+}

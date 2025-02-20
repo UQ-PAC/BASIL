@@ -6,7 +6,7 @@ import analysis.*
 import ir.*
 import boogie.*
 import boogie.SpecGlobal
-import ir.transforms.{AbstractDomain, BottomUpCallgraphWorklistSolver, ProcAbstractDomain, reversePostOrder, worklistSolver}
+import ir.transforms.{AbstractDomain, BottomUpCallgraphWorklistSolver, ProcAbstractDomain, SCCCallgraphWorklistSolver, reversePostOrder, worklistSolver}
 
 // TODO annotated preconditions and postconditions
 // TODO don't convert to boogie until translating, so that we can use conditions in analyses
@@ -146,7 +146,7 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
 
     // Predicate domain / mini wp
     Logger.debug(s"Generating mini wp preconditions for $procedure")
-    val wpDomain = PredicateDomain(k => map(k).requires.map(_.pred))
+    val wpDomain = PredicateDomain(map)
     val (wpDomainResults, _) = worklistSolver(wpDomain).solveProc(procedure, true)
 
     val wp = procedure.entryBlock.flatMap(b => wpDomainResults.get(b)).toList.flatMap(p =>
@@ -219,7 +219,7 @@ class SummaryGenerator(
   parameterForm: Boolean = false,
 ) {
   val interprocGenerator = InterprocSummaryGenerator(program, parameterForm)
-  val interprocResults: Map[Procedure, ProcedureSummary] = BottomUpCallgraphWorklistSolver(interprocGenerator.transfer, interprocGenerator.init).solve(program)
+  val interprocResults: Map[Procedure, ProcedureSummary] = SCCCallgraphWorklistSolver(interprocGenerator.transfer, interprocGenerator.init).solve(program)
 
   /**
    * Generate requires clauses for a procedure.
