@@ -92,7 +92,6 @@ class SVATest extends FunSuite {
     val results = runTest(context)
     val mainProc = results.ir.program.mainProcedure
     val sva = results.dsa.get.sva(mainProc)
-    println(sva)
     val r0SVA = sva.getSorted("R0")
 //    val r1SVA = sva.getSorted("R1")
 
@@ -149,7 +148,7 @@ class SVATest extends FunSuite {
     assert(returnedValSet.state.head._2.getOffsets == Set(0), "incorrect offset for returned symbolic value")
 
     val outPram = r0SVA.lastKey
-    assert(r0SVA(outPram) == returnedValSet.apply(i => i + 10), "should be malloc symValueSet oplus 10")
+    assertEquals(r0SVA(outPram), returnedValSet.apply(i => i + 10), "should be malloc symValueSet oplus 10")
   }
 
   test("proc entry") {

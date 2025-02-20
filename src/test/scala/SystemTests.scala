@@ -15,29 +15,31 @@ import test_util.TestConfig
   * directory structure and file-name patterns.
   */
 
+case class TestResult(
+  name: String,
+  passed: Boolean,
+  verified: Boolean,
+  shouldVerify: Boolean,
+  hasExpected: Boolean,
+  timedOut: Boolean,
+  matchesExpected: Boolean,
+  translateTime: Long,
+  verifyTime: Long,
+  failingAssertions: List[String]
+) {
+  val toCsv =
+    s"$name,$passed,$verified,$shouldVerify,$hasExpected,$timedOut,$matchesExpected,$translateTime,$verifyTime"
+}
+
+object TestResult {
+  val csvHeader =
+    "testCase,passed,verified,shouldVerify,hasExpected,timedOut,matchesExpected,translateTime,verifyTime"
+}
+
 trait SystemTests extends FunSuite, BASILTest {
-  case class TestResult(
-    name: String,
-    passed: Boolean,
-    verified: Boolean,
-    shouldVerify: Boolean,
-    hasExpected: Boolean,
-    timedOut: Boolean,
-    matchesExpected: Boolean,
-    translateTime: Long,
-    verifyTime: Long
-  ) {
-    val toCsv =
-      s"$name,$passed,$verified,$shouldVerify,$hasExpected,$timedOut,$matchesExpected,$translateTime,$verifyTime"
-  }
 
   Logger.setLevel(LogLevel.WARN)
   DebugDumpIRLogger.setLevel(LogLevel.OFF)
-
-  object TestResult {
-    val csvHeader =
-      "testCase,passed,verified,shouldVerify,hasExpected,timedOut,matchesExpected,translateTime,verifyTime"
-  }
 
   val testResults: ArrayBuffer[TestResult] = ArrayBuffer()
 
@@ -163,13 +165,12 @@ trait SystemTests extends FunSuite, BASILTest {
     val verifyTime = timer.checkPoint("verify")
     val (boogieFailureMsg, verified, timedOut) = checkVerify(boogieResult, resultPath, conf.expectVerify)
 
-    def parseError(e: String, context: Int = 3) = {
+    def parseError(e: String, context: Int = 3): List[String] = {
       val lines = e.split('\n')
-      for (l <- lines) {
+      lines.toList.flatMap(l => {
         if (
-          l.endsWith(": Error: this assertion could not be proved") || l.contains(
-            "this is the postcondition that could not be proved"
-          )
+          l.endsWith(": Error: this assertion could not be proved") || l
+            .contains("this is the postcondition that could not be proved")
         ) {
           val b = l.trim()
           val parts = b.split("\\(").map(_.split("\\)")).flatten.map(_.split(",")).flatten
@@ -189,14 +190,12 @@ trait SystemTests extends FunSuite, BASILTest {
             s"$carat ${x + 1} | ${lines(x)}"
           })
 
-          println(s"Failing assertion $fname:$line")
-          println(errorLines.mkString("\n").trim)
-
-        }
-      }
+          List(errorLines.mkString("\n").trim)
+        } else List()
+      })
     }
 
-    if (conf.expectVerify) parseError(boogieResult)
+    val failingAssertions = parseError(boogieResult)
 
     val (hasExpected, matchesExpected) = if (conf.checkExpected) {
       checkExpected(expectedOutPath, BPLPath)
@@ -204,22 +203,25 @@ trait SystemTests extends FunSuite, BASILTest {
       (false, false)
     }
 
-    val passed = boogieFailureMsg.isEmpty
+    val result = TestResult(
+      s"$name/$variation$testSuffix",
+      boogieFailureMsg.isEmpty,
+      verified,
+      conf.expectVerify,
+      hasExpected,
+      timedOut,
+      matchesExpected,
+      translateTime,
+      verifyTime,
+      failingAssertions
+    )
+
     if (conf.logResults) {
-      val result = TestResult(
-        s"$name/$variation$testSuffix",
-        passed,
-        verified,
-        conf.expectVerify,
-        hasExpected,
-        timedOut,
-        matchesExpected,
-        translateTime,
-        verifyTime
-      )
       testResults.append(result)
     }
-    if (!passed) fail(boogieFailureMsg.get)
+    if (!result.passed) {
+      fail(boogieFailureMsg.get, clues(failingAssertions))
+    }
   }
 
   def checkExpected(expectedOutPath: String, BPLPath: String): (Boolean, Boolean) = {
@@ -228,7 +230,7 @@ trait SystemTests extends FunSuite, BASILTest {
     if (hasExpected) {
       if (!BASILTest.compareFiles(expectedOutPath, BPLPath)) {
         matchesExpected = false
-        println("Warning: Boogie file differs from expected")
+        println(s"Warning: Boogie file differs from expected: $BPLPath, $expectedOutPath")
       }
     } else {
       println("Note: this test has not previously succeeded")
@@ -240,10 +242,7 @@ trait SystemTests extends FunSuite, BASILTest {
 
 class SystemTestsBAP extends SystemTests {
   runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true))
-  runTests(
-    "incorrect",
-    TestConfig(useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true)
-  )
+  runTests("incorrect", TestConfig(useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true))
   test("summary-BAP") {
     summary("testresult-BAP")
   }
