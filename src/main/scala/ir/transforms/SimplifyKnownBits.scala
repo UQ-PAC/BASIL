@@ -424,7 +424,7 @@ case class TNumValue(value: BigInt, mask: BigInt) extends TNum {
 
     // Two's complement negation
     def TNEG(): TNumValue = {
-        TNumValue(-this.value & ~this.mask, this.mask)
+        TNumValue(BigInt(0), BigInt(0)).TSUB(this)
     }
 
     // Bitwise Not
@@ -785,6 +785,6 @@ class SimplifyKnownBits() {
 
     def applyTransform(procedure: Procedure): Unit = {
         val (beforeIn, afterIn) = solver.solveProc(procedure, backwards = false)
-        util.writeToFile(translating.PrettyPrinter.pp_proc_with_analysis_results(beforeIn, afterIn, procedure, x => x.toString), "known_bits.il")
+        util.writeToFile(translating.PrettyPrinter.pp_proc_with_analysis_results(beforeIn, afterIn, procedure, x => x.toString), s"${procedure.name}known_bits.il")
     }
 }

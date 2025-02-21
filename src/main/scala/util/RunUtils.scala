@@ -794,7 +794,7 @@ object RunUtils {
 
       dsaContext = Some(DSAContext(sva, cons))
       
-      transforms.SimplifyKnownBits().applyTransform(ctx.program)
+    transforms.SimplifyKnownBits().applyTransform(ctx.program)
 
     if (q.runInterpret) {
       Logger.info("Start interpret")
