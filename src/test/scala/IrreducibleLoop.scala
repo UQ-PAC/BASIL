@@ -35,6 +35,7 @@ class IrreducibleLoop extends FunSuite {
     val args = Array("-o", s"$outPath", "-i", s"$path.adt", "-r", s"$path.relf", "-s", s"$path.spec", "--analyse")
 
     Main.main(args)
+    Logger.setLevel(LogLevel.ERROR)
 
     val boogieResult = Seq("boogie", "/smoke", "/timeLimit:10", "/useArrayAxioms", outPath).!!
 
@@ -88,6 +89,7 @@ class IrreducibleLoop extends FunSuite {
     val args = Array("-o", s"$outPath", "-i", s"$path.adt", "-r", s"$path.relf", "-s", s"$path.spec")
 
     Main.main(args)
+    Logger.setLevel(LogLevel.ERROR)
 
     val boogieResult = Seq("boogie", "/useArrayAxioms", "/timeLimit:10", outPath).!!
     Logger.debug("Boogie result: " + boogieResult)

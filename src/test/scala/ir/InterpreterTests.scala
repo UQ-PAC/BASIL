@@ -300,7 +300,6 @@ class InterpreterTests extends FunSuite {
 
   test("fib breakpoints") {
 
-    Logger.setLevel(LogLevel.INFO)
     val fib = fibonacciProg(8)
     val watch = IRWalk.firstInProc((fib.procedures.find(_.name == "fib")).get).get
     val bp = BreakPoint(

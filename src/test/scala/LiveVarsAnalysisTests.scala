@@ -283,7 +283,7 @@ class LiveVarsAnalysisTests extends FunSuite, BASILTest {
     val result: BASILResult = runExample("basic_function_call_caller")
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.labelToBlock
-    println(
+    val clue = (
       analysisResults.keySet
         .collect { case b: Block =>
           b.label
@@ -301,6 +301,7 @@ class LiveVarsAnalysisTests extends FunSuite, BASILTest {
         R30 -> TwoElementTop,
         R31 -> TwoElementTop
       )
+    , clue
     )
     assert(analysisResults(blocks("lzero")) == Map(R31 -> TwoElementTop))
     assert(analysisResults(laftercall) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block

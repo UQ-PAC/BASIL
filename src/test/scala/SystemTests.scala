@@ -166,7 +166,7 @@ trait SystemTests extends FunSuite, BASILTest {
 
     val boogieResult = runBoogie(directoryPath, BPLPath, conf.boogieFlags)
     val verifyTime = timer.checkPoint("verify")
-    val (boogieFailureMsg, verified, timedOut) = checkVerify(boogieResult, resultPath, conf.expectVerify)
+    val (boogieFailureMsg, verified, timedOut, proveFailed) = checkVerify(boogieResult, resultPath, conf.expectVerify)
 
     def parseError(e: String, context: Int = 3): List[String] = {
       val lines = e.split('\n')
@@ -219,6 +219,14 @@ trait SystemTests extends FunSuite, BASILTest {
       failingAssertions
     )
 
+    assertEquals(false, result.timedOut, "Verifier timed out")
+    assertEquals(result.verified, !proveFailed,  "Make sure the result makes sense")
+    if (conf.expectVerify) {
+      assertNoDiff(boogieResult.strip(), "Boogie program verifier finished with 0 errors")
+    } else {
+      assertNotEquals(boogieResult.strip(), "Boogie program verifier finished with 0 errors")
+    }
+
     if (conf.logResults) {
       testResults.append(result)
     }
@@ -246,7 +254,7 @@ trait SystemTests extends FunSuite, BASILTest {
 @Category(Array(classOf[test_util.BasicSystemTest]))
 class SystemTestsBAP extends SystemTests {
   runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true))
-  runTests("incorrect", TestConfig(useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true))
+  runTests("incorrect", TestConfig(useBAPFrontend = true, expectVerify = false, checkExpected = true, logResults = true))
   test("summary-BAP") {
     summary("testresult-BAP")
   }

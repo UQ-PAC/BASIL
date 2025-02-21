@@ -5,7 +5,7 @@ import org.junit.experimental.categories.Category
 import test_util.UnitTest
 
 @Category(Array(classOf[UnitTest]))
-class InvariantTest extends FunSuite {
+class SingleCallInvariantTest extends FunSuite {
 
   test("sat singleCallBlockEnd case") {
     var program: Program = prog(

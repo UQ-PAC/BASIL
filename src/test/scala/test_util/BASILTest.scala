@@ -74,7 +74,7 @@ trait BASILTest {
     boogieResult: String,
     resultPath: String,
     shouldVerify: Boolean
-  ): (Option[String], Boolean, Boolean) = {
+  ): (Option[String], Boolean, Boolean, Boolean) = {
     BASILTest.writeToFile(boogieResult, resultPath)
     val verified = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
     val proveFailed = boogieResult.contains("could not be proved")
@@ -91,7 +91,7 @@ trait BASILTest {
         case (false, true, true) => Some("Expected verification success, but got failure.")
       }
     }
-    (failureMsg, verified, timedOut)
+    (failureMsg, verified, timedOut, proveFailed)
   }
 }
 

@@ -162,7 +162,6 @@ object Main {
       println(parser.helpText(sorted = false))
     }
 
-    Logger.setLevel(LogLevel.INFO, false)
     if (conf.verbose.value) {
       Logger.setLevel(LogLevel.DEBUG, true)
     }

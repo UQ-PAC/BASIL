@@ -89,7 +89,7 @@ class IndirectCallTests extends FunSuite, BASILTest {
     Logger.debug(s"$name/$variation$testSuffix DONE")
 
     val boogieResult = runBoogie(directoryPath, BPLPath, conf.boogieFlags)
-    val (boogieFailureMsg, _, _) = checkVerify(boogieResult, resultPath, conf.expectVerify)
+    val (boogieFailureMsg, _, _, _) = checkVerify(boogieResult, resultPath, conf.expectVerify)
 
     val fresolvedcalls = resolvedCalls.zip(indirectCallBlock).map((cr, l) => cr.copy(label = l))
     val indirectResolutionFailureMsg = checkIndirectCallResolution(basilResult.ir.program, fresolvedcalls)
