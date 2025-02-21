@@ -47,14 +47,6 @@ class TNum:
         val_cmp = ((self.v & ~other.m) == other.v)
         return mask_cmp & val_cmp
 
-        # self_m_extended = ZeroExt(self.w - self.m.size(), self.m)
-        # other_m_extended = ZeroExt(self.w - other.m.size(), other.m)
-        # self_v_extended = ZeroExt(self.w - self.v.size(), self.v)
-        # other_v_extended = ZeroExt(self.w - other.v.size(), other.v)
-        # mask_cmp = (self_m_extended & ~other_m_extended) == BitVecVal(0, self.w)
-        # val_cmp = (self_v_extended & ~other_m_extended) == other_v_extended
-        # return mask_cmp & val_cmp
-
     def union(self,other):
         mask = self.m | other.m | (self.v ^ other.v)
         val = self.v & ~mask
@@ -64,12 +56,9 @@ class TNum:
         return TNum(~self.v & ~self.m, self.m)
     
     def __neg__(self):
-        return TNum(-self.v & ~self.m, self.m)
+        tnum = TNum(BitVecVal(0, self.w), BitVecVal(0, self.w))
+        return tnum - self
 
-        # val = If(-self.v & ~self.m == self.v, ZeroExt(1, -self.v & ~self.m), ZeroExt(1, -self.v & ~self.m))
-        # mask = If(-self.v & ~self.m == self.v, ZeroExt(1, self.m), ZeroExt(1, self.m))
-        # return TNum(val, mask)
-    
     def __and__(self, other):
         alpha = self.v | self.m
         beta = other.v | other.m
@@ -398,7 +387,6 @@ test_bop("TNOR", lambda x, y: nor_tnum(x, y), nor_bitvec, prec=True)
 test_bop("TXNOR", lambda x, y: xnor_tnum(x, y), xnor_bitvec, prec=True)
 test_bop("TNAND", lambda x, y: nand_tnum(x, y), nand_bitvec, prec=True)
 test_bop("TADD", lambda x, y: x + y,  prec=True)
-
 test_bop("TSUB", lambda x, y: x - y,  prec=True)
 test_bop("TSHL", lambda x, y: x << y,  prec=True)
 test_bop("TASHR", lambda x, y: x >> y,  prec=True)
@@ -408,5 +396,5 @@ test_bop("TLSHR", lambda x, y: tlshr_tnum(x, y), tlshr_bitvec, prec=True)
 test_bop("CONCAT", lambda x, y: concat_tnum(x, y), concat_bitvec, prec=True)
 
 test_uop("INV", lambda x: ~x, prec=True)
-# test_uop("NEG", lambda x: -x, prec=True)
+test_uop("NEG", lambda x: -x, prec=True)
 # test_bop("TMUL", lambda x, y: x * y,  prec=True)
