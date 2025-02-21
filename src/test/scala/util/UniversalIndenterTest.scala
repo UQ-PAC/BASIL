@@ -20,6 +20,6 @@ class UniversalIndenterTest extends AnyFunSuite {
 
   test("boop") {
 
-    assert(util.UniversalIndenter(config).indent("(a(bbb))").toList == List("a"))
+    assert(util.UniversalIndenter(config).indent("(a,(bbb))").toList == List("a"))
   }
 }
