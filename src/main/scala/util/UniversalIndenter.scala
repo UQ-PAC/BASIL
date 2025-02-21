@@ -1,6 +1,7 @@
 package util
 
-import scala.util.matching.Regex
+import java.util.regex.{Pattern, Matcher, MatchResult}
+import scala.util.matching.{Regex}
 import scala.collection.mutable
 
 object UniversalIndenter {
@@ -12,24 +13,48 @@ object UniversalIndenter {
     case Close
   }
 
-  case class Config(tokens: Iterable[(Regex, TokenType)], maxWidth: Int, indentWidth: Int)
+  case class Config(
+    tokens: Iterable[(Pattern, TokenType)],
+    maxWidth: Int,
+    indentWidth: Int
+  )
 
   protected case class State(
+    parent: Option[State], // nullable
     start: Int, // index of beginning of open token
-    openLength: Int,
-    closeLength: Int,
     ty: TokenType,
-    var children: List[State] // child tokens
+    openLength: Int,
+    var bodyLength: Int = -1,
+    var closeLength: Int = -1,
+    var multiline: Boolean = false,
+    var children: Vector[State] = Vector.empty // child tokens
   ) {
+
     def add(s: State) = {
-      children = s +: children
+      children = children :+ s
       s
     }
+
+    override def toString: String = {
+      val sb = StringBuilder()
+      sb.append(s"State(<parent>, $start, $openLength, $bodyLength, $closeLength, $ty, List(")
+      if (children.nonEmpty) {
+        sb.append("\n")
+      }
+      for (child <- children) {
+        sb.append("  ")
+        sb.append(child.toString)
+        sb.append(",\n")
+      }
+      sb.append("))")
+      sb.toString
+    }
+
   }
 
-  // given Ordering[State] with {
-  //   def compare(x: State, y: State) = scala.runtime.signum(scala.runtime.RichInt(x.start - y.start))
-  // }
+  object State {
+    val orderByStart: Ordering[State] = Ordering.by(_.start)
+  }
 }
 
 /**
@@ -41,25 +66,75 @@ object UniversalIndenter {
 class UniversalIndenter(config: UniversalIndenter.Config) {
   import UniversalIndenter.*
 
-  var tokenPositions: mutable.HashMap[(Regex, TokenType), Option[State]] =
+  var tokenPositions: mutable.HashMap[(Pattern, TokenType), Option[State]] =
     config.tokens.map(x => (x(0), x(1)) -> None).to(mutable.HashMap)
 
   var stringPos = 0
   var string: CharSequence = null
-  var currentToken: State = null
+  var currentToken: State = State(
+    None,
+    0,
+    TokenType.Open,
+    0,
+  )
 
-  def nextToken() =
-    for (((re, ty), st) <- tokenPositions) {
-      if (st.fold(-1)(_.start) <= stringPos) {
-        tokenPositions((re, ty)) =
-          re.findFirstMatchIn(string).map(m => currentToken.add(State(m.start, m.end - m.start, -1, ty, List())))
-      }
-      println()
+  def newToken(parent: State, ty: TokenType, m: MatchResult): State = {
+    State(
+      Some(parent),
+      m.start,
+      ty,
+      m.end - m.start,
+    )
+  }
+
+  def getLiteralToken(next: Option[State]): Option[State] = {
+
+    val nextStart = next.fold(string.length - stringPos)(_.start)
+    if (nextStart > stringPos) {
+      val literalToken = State(
+        Some(currentToken),
+        stringPos,
+        TokenType.Literal,
+        nextStart - stringPos
+      )
+      Some(literalToken)
+    } else {
+      None
     }
+  }
+
+  def advanceToken() = {
+    for (((re, ty), st) <- tokenPositions) {
+      if (st.fold(-1)(_.start) < stringPos) {
+        val matcher = re.matcher(string)
+
+        val result = if (matcher.find(stringPos)) {
+          val parent = ty match {
+            case TokenType.Close => currentToken.parent.getOrElse(currentToken)
+            case _ => currentToken
+          }
+          Some(newToken(parent, ty, matcher.toMatchResult))
+        } else {
+          None
+        }
+
+        tokenPositions((re, ty)) = result
+      }
+    }
+
+    val next = tokenPositions.values.flatten.minOption(State.orderByStart)
+    val lit = getLiteralToken(next)
+    lit.map(currentToken.add(_))
+    next.map(currentToken.add(_))
+    currentToken = next.orElse(lit).getOrElse(throw Exception("advancing token returned neither literal nor token"))
+    stringPos += currentToken.openLength
+    println(currentToken.parent)
+  }
 
   def indent(s: String): Iterator[String] = {
     string = s
-    for ((re, ty) <- config.tokens) {}
+    advanceToken()
+    advanceToken()
 
     Iterator()
   }
