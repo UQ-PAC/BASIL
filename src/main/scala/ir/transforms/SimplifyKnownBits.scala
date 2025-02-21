@@ -1,5 +1,6 @@
 package ir.transforms
 import ir.*
+import util.writeToFile
 
 // A = definite 1 bits, B = unknown bits
 // A_[i] = 1, B_[i] = 0 -> Bit i of TNum _ is definitely 1
@@ -78,6 +79,7 @@ case class TNumValue(value: BigInt, mask: BigInt) extends TNum {
   override def toString() = {
     "v.%#016x m.%#016x".format(value, mask)
   }
+
   // Bitwise AND
   def TAND(that: TNumValue): TNumValue = {
     val alpha = this.value | this.mask
@@ -428,7 +430,7 @@ case class TNumValue(value: BigInt, mask: BigInt) extends TNum {
 
   // Two's complement negation
   def TNEG(): TNumValue = {
-    TNumValue(-this.value & ~this.mask, this.mask)
+    TNumValue(BigInt(0), BigInt(0)).TSUB(this)
   }
 
   // Bitwise Not
@@ -596,7 +598,6 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
       case IntLE => tn1.TSLE(tn2)
       case IntGT => tn1.TSGT(tn2)
       case IntGE => tn1.TSGE(tn2)
-      case _ => TNumValue(BigInt(0), BigInt(-1))
     }
   }
 
@@ -805,7 +806,7 @@ class SimplifyKnownBits() {
 
   def applyTransform(procedure: Procedure): Unit = {
     val (beforeIn, afterIn) = solver.solveProc(procedure, backwards = false)
-    util.writeToFile(
+    writeToFile(
       translating.PrettyPrinter.pp_proc_with_analysis_results(beforeIn, afterIn, procedure, x => x.toString),
       s"${procedure.name}_known_bits.il"
     )
