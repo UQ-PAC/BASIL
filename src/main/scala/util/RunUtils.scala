@@ -16,6 +16,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 import analysis.solvers.*
 import analysis.*
+import analysis.data_structure_analysis.DSAPhase.{BU, TD}
 import bap.*
 import ir.*
 import boogie.*
@@ -742,9 +743,6 @@ object RunUtils {
         case (proc, size) => proc.stackSize = Some(size)
       }
 
-//      .map {
-//      (proc, graph) => (proc.name, graph)
-//    }
 
     if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)
@@ -781,10 +779,6 @@ object RunUtils {
       doSimplify(ctx, conf.staticAnalysis)
     }
     val scc = stronglyConnectedComponents(CallGraph, List(ctx.program.mainProcedure))
-//    assert(scc.exists(s => s.size > 1))
-//    println(scc)
-
-
 
     var dsaContext: Option[DSAContext] = None
     if true then //conf.dsaConfig.nonEmpty then
@@ -844,7 +838,8 @@ object RunUtils {
         else
           println(s"did BU for ${proc.name}")
           DSALogger.info(s"performing BU for ${proc.name}")
-          sadDSABU(proc).BUPhase(sadDSABU)
+//          sadDSABU(proc).BUPhase(sadDSABU)
+          sadDSABU(proc).contextTransfer(BU, sadDSABU)
           visited += proc
 
 
@@ -866,10 +861,12 @@ object RunUtils {
           queue.enqueue(proc)
         else
           DSALogger.info(s"performing TD for ${proc.name}")
-          sadDSATD(proc).TDPhase(sadDSATD)
+          sadDSATD(proc).contextTransfer(TD, sadDSATD)
           visited += proc
-
-//      val mainGraph = sadDSATD.collectFirst{case (proc, graph) if proc.name.startsWith("main") => graph}.get
+      sadDSATD.map(_._2.localCorrectness())
+      val mainGraph = sadDSATD.collectFirst{case (proc, graph) if proc.name.startsWith("main") => graph}.get
+      val t = mainGraph.resolveIndirectCalls()
+      println(t.values)
 //      val ind = mainGraph.constraints.collectFirst{case dcc: DirectCallConstraint if dcc.target.name == "indirect_call_launchpad" => dcc}.get
 //      val funcPointer = ind.inParams.collectFirst {case (formal, actual) if formal.name.startsWith("indirectCallTarget") => actual}.get
 //      val resCells = mainGraph.exprToCells(funcPointer)

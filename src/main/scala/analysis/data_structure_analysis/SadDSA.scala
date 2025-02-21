@@ -16,20 +16,6 @@ class SadDSA
 
 case class NodeTerm(v: SadNode) extends analysis.solvers.Var[NodeTerm]
 
-
-//def globalNode(globals: Set[SymbolTableEntry],
-//            globalOffsets: Map[BigInt, BigInt],
-//            externalFunctions: Set[ExternalFunction]): SadNode = {
-//  val symBase = Global
-//  SadGraph()
-//  val globalNode = SadNode()
-//  globals.foreach {
-//    case FuncEntry(name, size, address) =>
-//
-//    case SpecGlobal(name, size, arraySize, address) =>
-//  }
-//}
-
 /**
  * Data Structure Graph
  */
@@ -128,6 +114,62 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
     }
   }
 
+  def contextTransfer(phase: DSAPhase, graphs: Map[Procedure, SadGraph]): Unit = {
+    require(phase == TD || phase == BU)
+    this.phase = phase
+    constraints.toSeq.sortBy(c => c.label).foreach {
+      case dcc: DirectCallConstraint if graphs.contains(dcc.target) && !dcc.target.isExternal.getOrElse(false) =>
+        val (source, target) = if phase == TD then (this, graphs(dcc.target)) else (graphs(dcc.target), this)
+        callTransfer(phase, dcc, source, target)
+      case _ =>
+    }
+
+  }
+
+  def callTransfer(phase: DSAPhase, cons: DirectCallConstraint, source: SadGraph, target: SadGraph): Unit = {
+    require(phase == TD || phase == BU)
+    val oldToNew = mutable.Map[SadNode, SadNode]()
+    val targetGlobal = target.find(target.nodes(Global).get(0))
+    var sourceGlobal = source.find(source.nodes(Global).get(0))
+    val old = source.nodes(Global).clone(target, false, oldToNew)
+    val globalNode = sourceGlobal.node.clone(target, true, oldToNew)
+
+    sourceGlobal = globalNode.get(targetGlobal.interval)
+    target.mergeCells(sourceGlobal, targetGlobal)
+    Logger.info(s"cloning ${source.proc.procName} into ${target.proc.procName}")
+    cons.inParams.foreach {
+      case (formal, actual) =>
+        val (sourceExpr, targetExpr) = if phase == TD then (actual, formal) else (formal, actual)
+        exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
+    }
+
+    cons.outParams.foreach {
+      case (out, actual) =>
+        val (sourceExpr, targetExpr) = if phase == TD then (actual, out) else (out, actual)
+        exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
+    }
+  }
+
+  def exprTransfer(sourceExpr: Expr, targetExpr: Expr, source: SadGraph, target: SadGraph, oldToNew: mutable.Map[SadNode, SadNode]): Unit = {
+    val sourceCells = source.exprToCells(sourceExpr).map(source.find).map(
+          cell =>
+            val (node, offset) =
+               target.findNode(
+                cell.node.clone(target, true, oldToNew)
+              )
+            if offset == 0 then node.get(cell.interval)
+            node.get(cell.interval.move(i => i + offset))
+        )
+    val targetCells = target.exprToCells(targetExpr).map(target.find)
+    target.localCorrectness()
+    if (targetCells ++ sourceCells).nonEmpty then target.mergeCells(targetCells ++ sourceCells)
+    target.localCorrectness()
+  }
+
+  private def isIndirectCall(dcc: DirectCallConstraint): Boolean = {
+    dcc.target.name == "indirect_call_launchpad"
+  }
+
   // clone and unify formals and actuals from this graph to it's callees
   def TDPhase(bus: Map[Procedure, SadGraph]): Unit = {
     phase = TD
@@ -143,10 +185,10 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
         callerGlobal = globalNode.get(calleeGlobal.interval)
         callee.mergeCells(callerGlobal, calleeGlobal)
 
-        DSALogger.warn(s"cloning ${this.proc.name} into ${callee.proc.name}")
+//        DSALogger.warn(s"cloning ${this.proc.name} into ${callee.proc.name}")
         dcc.inParams.foreach {
           case (formal, actual) =>
-            DSALogger.warn(s"cloning $actual into $formal")
+//            DSALogger.warn(s"cloning $actual into $formal")
             val formals = callee.exprToCells(formal).map(find)
             val actuals = exprToCells(actual).map(find).map (
               cell =>
@@ -158,14 +200,14 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
 
                 node.get(cell.interval.move(i => i + offset))
             )
-            localCorrectness()
+            callee.localCorrectness()
             if (actuals ++ formals).nonEmpty then callee.mergeCells(actuals ++ formals)
-            localCorrectness()
+            callee.localCorrectness()
         }
         
         dcc.outParams.foreach {
           case (out, actual) =>
-            DSALogger.warn(s"cloning $actual into $out")
+//            DSALogger.warn(s"cloning $actual into $out")
             val actuals = callee.exprToCells(out).map(find)
             val outs: Set[SadCell] = exprToCells(actual).map(find).map(
               cell =>
@@ -175,9 +217,9 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
                   )
                 node.get(cell.interval.move(i => i + offset))
             )
-            localCorrectness()
+            callee.localCorrectness()
             if (outs ++ actuals).nonEmpty then callee.mergeCells(outs ++ actuals)
-            localCorrectness()
+            callee.localCorrectness()
         }
       case _ =>
     }
@@ -711,7 +753,7 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
   }
 
   def unify(a: SadNode, b: SadNode, offset: Int = 0): Unit = {
-    Logger.debug(s"unifying ${b.id} with ${a.id} at offset ${offset}")
+    Logger.debug(s"unifying ${b.id} witnewNode.isUptoDateh ${a.id} at offset ${offset}")
     solver.unify(a.term, b.term, offset)
   }
 }
@@ -742,8 +784,9 @@ class SadNode(val graph: SadGraph, val bases: mutable.Map[SymBase, Int]= mutable
         oldToNew.update(node, v)
         v
       else
-        val (newNode, offset) = newGraph.findNode(oldToNew(node))
-        newNode
+        oldToNew(node)
+//        val (newNode, offset) = newGraph.findNode(oldToNew(node))
+//        newNode
 
 
     if recurse then
@@ -751,9 +794,9 @@ class SadNode(val graph: SadGraph, val bases: mutable.Map[SymBase, Int]= mutable
       while queue.nonEmpty do
         val old = queue.dequeue()
         assert(oldToNew.contains(old))
-        val (newNode, off) = newGraph.findNode(oldToNew(old))
         old.cells.foreach {
           case cell: SadCell if cell.hasPointee =>
+            val (newNode, off) = newGraph.findNode(oldToNew(old))
             val pointee = cell.getPointee
             assert(pointee == graph.find(cell).getPointee)
             val pointeeNode = pointee.node
@@ -764,8 +807,8 @@ class SadNode(val graph: SadGraph, val bases: mutable.Map[SymBase, Int]= mutable
                 newGraph.findNode(pointeeNode.clone(newGraph, false, oldToNew))
               else newGraph.findNode(oldToNew(pointeeNode))
 
-            val pointer = newNode.get(cell.interval.move(i => i + off))
-            assert(pointer == newGraph.find(pointer))
+            val pointer = newGraph.find(newNode.get(cell.interval.move(i => i + off)))
+            assert(pointer == newGraph.find(pointer), s"expected $pointer but got ${newGraph.find(pointer)}")
             val clonedPointee = clonedNode.get(pointee.interval.move(i => i + clonedOff))
             pointer.setPointee(clonedNode.get(pointee.interval.move(i => i + clonedOff)))
             assert(newNode.get(cell.interval.move(i => i + off)).getPointee == newGraph.find(clonedNode.get(pointee.interval.move(i => i + clonedOff))))
