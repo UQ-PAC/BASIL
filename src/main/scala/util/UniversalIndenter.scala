@@ -31,9 +31,12 @@ object UniversalIndenter {
   ) {
 
     def add(s: State) = {
+      // println(s"adding $s to $this")
       children = children :+ s
       s
     }
+
+    private val newline = raw"\n".r
 
     override def toString: String = {
       val sb = StringBuilder()
@@ -41,13 +44,13 @@ object UniversalIndenter {
         case None => "None"
         case Some(_) => "<parent>"
       }
-      sb.append(s"State($p, $start, $openLength, $bodyLength, $closeLength, $ty, List(")
+      sb.append(s"State($p, $start, $ty, $openLength, $bodyLength, $closeLength, $multiline, List(")
       if (children.nonEmpty) {
         sb.append("\n")
       }
       for (child <- children) {
         sb.append("  ")
-        sb.append(child.toString)
+        sb.append(newline.replaceAllIn(child.toString, "\n  "))
         sb.append(",\n")
       }
       sb.append("))")
@@ -86,9 +89,9 @@ class UniversalIndenter(config: UniversalIndenter.Config) {
     0,
   )
 
-  def newToken(parent: State, ty: TokenType, m: MatchResult): State = {
+  def newToken(ty: TokenType, m: MatchResult): State = {
     State(
-      Some(parent),
+      None,
       m.start,
       ty,
       m.end - m.start,
@@ -123,11 +126,7 @@ class UniversalIndenter(config: UniversalIndenter.Config) {
         val matcher = re.matcher(string)
 
         val result = if (matcher.find(stringPos)) {
-          val parent = ty match {
-            case TokenType.Close => currentOpen.parentOrSelf
-            case _ => currentOpen
-          }
-          Some(newToken(parent, ty, matcher.toMatchResult))
+          Some(newToken(ty, matcher.toMatchResult))
         } else {
           None
         }
@@ -136,18 +135,27 @@ class UniversalIndenter(config: UniversalIndenter.Config) {
       }
     }
 
-    val next = tokenPositions.values.flatten.minOption(State.orderByStart)
+    val next = tokenPositions.values.flatten.minOption(State.orderByStart).map(x => {
+      val parent = x.ty match {
+        case TokenType.Close => currentOpen.parentOrSelf
+        case _ => currentOpen
+      }
+      x.copy(parent=Some(parent))
+    })
     val lit = getLiteralToken(next)
-    lit.map(x => x.parent.foreach(_.add(x)))
-    next.map(x => x.parent.foreach(_.add(x)))
+    lit.map(x => x.parent.get.add(x))
+    next.map(x => x.parent.get.add(x))
     val lastToken = next.orElse(lit).getOrElse(throw Exception("advancing token returned neither literal nor token"))
+    println(lit)
+    println(next)
+    println()
 
     val newDistance = lastToken.start + lastToken.openLength - stringPos
     stringPos += newDistance
 
     if (lastToken.ty == TokenType.Separator) {
       sinceLastSep = 0
-    } else if (lastToken.ty == TokenType.Open){
+    } else if (lastToken.ty == TokenType.Open) {
       sinceLastSep = lastToken.openLength
     } else {
       sinceLastSep += newDistance
@@ -161,16 +169,16 @@ class UniversalIndenter(config: UniversalIndenter.Config) {
     if (lastToken.ty == TokenType.Open) {
       currentOpen = lastToken
     } else if (lastToken.ty == TokenType.Close) {
-      currentOpen = lastToken.parent.getOrElse(currentOpen)
+      currentOpen = lastToken.parentOrSelf
     }
   }
 
   def indent(s: String): Iterator[String] = {
     string = s
-    advanceToken()
-    advanceToken()
-
-    println(currentOpen.parent)
+    while (stringPos < string.length) {
+      advanceToken()
+    }
+    println(currentOpen)
 
     Iterator()
   }
