@@ -14,7 +14,7 @@ class UniversalIndenterTest extends AnyFunSuite {
       Pattern.compile(raw"\)") -> TokenType.Close,
       Pattern.compile(raw",") -> TokenType.Separator,
     ),
-    1,
+    9,
     2,
   )
 

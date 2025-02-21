@@ -146,9 +146,9 @@ class UniversalIndenter(config: UniversalIndenter.Config) {
     lit.map(x => x.parent.get.add(x))
     next.map(x => x.parent.get.add(x))
     val lastToken = next.orElse(lit).getOrElse(throw Exception("advancing token returned neither literal nor token"))
-    println(lit)
-    println(next)
-    println()
+    // println(lit)
+    // println(next)
+    // println()
 
     val newDistance = lastToken.start + lastToken.openLength - stringPos
     stringPos += newDistance
@@ -173,12 +173,52 @@ class UniversalIndenter(config: UniversalIndenter.Config) {
     }
   }
 
-  def indent(s: String): Iterator[String] = {
-    string = s
+  def tokenise(): State = {
     while (stringPos < string.length) {
       advanceToken()
     }
+    currentOpen
+  }
+
+  def print(s: State, multiline: Boolean, depth: Int = -1): Unit = {
+    s.ty match {
+      case TokenType.Close if multiline => {
+        Console.out.print("\n" + "  " * depth)
+      }
+      case _ => ()
+    }
+    Console.out.print(string.subSequence(s.start, s.start + s.openLength))
+    // TODO: an Open or a Separator should both insert newline + indent after them
+    s.ty match {
+      case TokenType.Separator | TokenType.Open if multiline => {
+        val d = depth + (if (s.ty == TokenType.Open) then 1 else 0)
+        Console.out.print("\n" + "  " * d)
+      }
+      case _ => ()
+    }
+
+    s.ty match {
+      case TokenType.Open => {
+        for (x <- s.children) {
+          print(x, x.multiline, depth + 1)
+          x.ty match {
+            case TokenType.Separator if multiline => {
+              Console.out.print("\n" + "  " * (depth + 1))
+            }
+            case _ => ()
+          }
+        }
+      }
+      case _ => ()
+    }
+  }
+
+  def indent(s: String): Iterator[String] = {
+    println(s)
+    string = s
+    tokenise()
     println(currentOpen)
+    print(currentOpen, currentOpen.multiline)
 
     Iterator()
   }
