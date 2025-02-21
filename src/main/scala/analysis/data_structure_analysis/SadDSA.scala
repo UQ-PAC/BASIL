@@ -41,6 +41,38 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
     DSAGraph[OffsetUnionFindSolver[NodeTerm], SadCell, SadCell, SadCell, SadNode]
       (proc, ph, irContext, OffsetUnionFindSolver[NodeTerm](), symValues, cons)
 {
+
+  def resolveIndirectCalls(): Map[Constraint, Set[Procedure]] = {
+    constraints.foldLeft(Map[Constraint, Set[Procedure]]()) {
+      (m, con) =>
+        con match
+          case dcc: DirectCallConstraint if dcc.target.name == "indirect_call_launchpad" =>
+            val (formal, actual) = dcc.inParams.collectFirst {case (f, a) if f.name.startsWith("indirectCallTarget") => (f,a)}.get
+            m + ( con ->
+              exprToCells(actual).map(get).foldLeft(Set[Procedure]()) {
+              (s, cell) =>
+                s ++ cellToProcs(cell)
+            })
+          case _ => m
+    }
+  }
+
+  def cellToProcs(cell: SadCell): Set[Procedure] = {
+    val symBase = Global
+    val globalNode = nodes(Global)
+    val actual = cell.node.get(cell.interval)
+    irContext.funcEntries.foldLeft(Set[Procedure]()) {
+      (s, funEntry) =>
+        if actual == get(globalNode.get(funEntry.address.toInt)) then
+          println(irContext.program.procedures.map(_.procName))
+          println(funEntry.name)
+          println(irContext.program.procedures.filter(p => p.procName == funEntry.name))
+          s + irContext.program.procedures.filter(p => p.procName == funEntry.name).head
+        else
+          s
+    }
+  }
+
   def globalNode(globals: Set[SymbolTableEntry],
                  globalOffsets: Map[BigInt, BigInt],
                  externalFunctions: Set[ExternalFunction]): SadNode = {
