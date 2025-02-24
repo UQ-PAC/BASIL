@@ -6,12 +6,12 @@ import boogie.{FuncEntry, SpecGlobal}
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.{BitVecType, Expr, LocalVar, Procedure}
 import specification.{ExternalFunction, SymbolTableEntry}
-import util.{DSALogger, IRContext, SadDSALogger as Logger}
+import util.{DSALogger, IRContext, IntervalDSALogger as Logger}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{SortedSet, mutable}
 
-object SadNodeCounter extends Counter
+object IntervalNodeCounter extends Counter
 
 case class NodeTerm(v: IntervalNode) extends analysis.solvers.Var[NodeTerm]
 
@@ -628,7 +628,7 @@ class IntervalGraph(val proc: Procedure, var phase: DSAPhase,
   }
 }
 
-class IntervalNode(val graph: IntervalGraph, val bases: mutable.Map[SymBase, Int]= mutable.Map.empty, val size: Option[Int] = None, val id: Int = SadNodeCounter.increment()) {
+class IntervalNode(val graph: IntervalGraph, val bases: mutable.Map[SymBase, Int]= mutable.Map.empty, val size: Option[Int] = None, val id: Int = IntervalNodeCounter.increment()) {
   Logger.debug(s"created node with id $id")
 
   val term: NodeTerm = NodeTerm(this)
