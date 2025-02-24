@@ -24,7 +24,19 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{Constraint, DataStructureAnalysis, Graph, IntervalDSA, IntervalGraph, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValues, computeDSADomain, generateConstraints, getSymbolicValues}
+import analysis.data_structure_analysis.{
+  Constraint,
+  DataStructureAnalysis,
+  Graph,
+  IntervalDSA,
+  IntervalGraph,
+  SymbolicAddress,
+  SymbolicAddressAnalysis,
+  SymbolicValues,
+  computeDSADomain,
+  generateConstraints,
+  getSymbolicValues
+}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
@@ -869,13 +881,14 @@ object RunUtils {
       val main = ctx.program.mainProcedure
       var sva: Map[Procedure, SymbolicValues] = Map.empty
       var cons: Map[Procedure, Set[Constraint]] = Map.empty
-      computeDSADomain(ctx.program.mainProcedure, ctx).toSeq.sortBy(_.name).foreach(
-        proc =>
-            val SVAResults = getSymbolicValues(proc)
-            val constraints = generateConstraints(proc)
-            sva += (proc -> SVAResults)
-            cons += (proc -> constraints)
-      )
+      computeDSADomain(ctx.program.mainProcedure, ctx).toSeq
+        .sortBy(_.name)
+        .foreach(proc =>
+          val SVAResults = getSymbolicValues(proc)
+          val constraints = generateConstraints(proc)
+          sva += (proc -> SVAResults)
+          cons += (proc -> constraints)
+        )
       dsaContext = Some(DSAContext(sva, cons, Map.empty, Map.empty, Map.empty))
 
       if config.analyses.contains(Norm) then
@@ -886,7 +899,7 @@ object RunUtils {
         val sadDSABU = IntervalDSA.getBUs(sadDSA)
         sadDSABU.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
-        val sadDSATD =  IntervalDSA.getTDs(sadDSABU)
+        val sadDSATD = IntervalDSA.getTDs(sadDSABU)
         sadDSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
         dsaContext = Some(dsaContext.get.copy(local = sadDSA, bottomUp = sadDSABU, topDown = sadDSATD))
