@@ -23,7 +23,7 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{Constraint, DataStructureAnalysis, DirectCallConstraint, FieldDSA, FieldGraph, Graph, SadDSA, SadGraph, SetDSA, SetGraph, SymValueSet, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValueDomain, SymbolicValues, computeDSADomain, estimateStackSizes, generateConstraints, getStackSize, getSymbolicValues}
+import analysis.data_structure_analysis.{Constraint, DataStructureAnalysis, DirectCallConstraint,  Graph, SadDSA, SadGraph, SymValueSet, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValueDomain, SymbolicValues, computeDSADomain, estimateStackSizes, generateConstraints, getStackSize, getSymbolicValues}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
@@ -79,8 +79,6 @@ case class StaticAnalysisContext(
 case class DSAContext(
   sva: Map[Procedure, SymbolicValues],
   constraints: Map[Procedure, Set[Constraint]],
-  setDSA: Map[Procedure, SetGraph],
-  fieldDSA: Map[Procedure, FieldGraph],
   sadDSA: Map[Procedure, SadGraph]
 )
 
@@ -787,8 +785,6 @@ object RunUtils {
       val main = ctx.program.mainProcedure
       var sva: Map[Procedure, SymbolicValues] = Map.empty
       var cons: Map[Procedure, Set[Constraint]] = Map.empty
-      var setDSA: Map[Procedure, SetGraph] = Map.empty
-      var fieldDSA: Map[Procedure, FieldGraph] = Map.empty
       var sadDSA: Map[Procedure, SadGraph] = Map.empty
       var sadDSABU: Map[Procedure, SadGraph] = Map.empty
       computeDSADomain(ctx.program.mainProcedure, ctx).toSeq.sortBy(_.name).foreach(
@@ -815,7 +811,7 @@ object RunUtils {
 
       DSALogger.info("Finished local phase")
 
-      dsaContext = Some(DSAContext(sva, cons, setDSA, fieldDSA, sadDSA))
+      dsaContext = Some(DSAContext(sva, cons, sadDSA))
       sadDSA.values.foreach(_.localCorrectness())
       DSALogger.info("performed correctness check")
       sadDSABU = sadDSA.view.mapValues(_.clone).toMap
