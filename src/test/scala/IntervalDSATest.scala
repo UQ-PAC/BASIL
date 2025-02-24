@@ -71,7 +71,7 @@ class IntervalDSATest extends AnyFunSuite {
 
   test("jumptable main") {
     val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable")
-    val dsg = results.dsa.get.sadDSA(results.ir.program.mainProcedure)
+    val dsg = results.dsa.get.topDown(results.ir.program.mainProcedure)
     dsg.localCorrectness()
   }
 

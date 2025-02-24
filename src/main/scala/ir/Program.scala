@@ -300,7 +300,6 @@ class Procedure private (
   def makeCall(label: Option[String] = None) = DirectCall(this, label, outParamDefaultBinding, inParamDefaultBinding)
 
   var isExternal: Option[Boolean] = None
-  var stackSize: Option[Int] = None
 
   /** Get an Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are
     * not guaranteed to be in any defined order.
