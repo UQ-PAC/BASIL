@@ -23,7 +23,7 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{Constraint, DataStructureAnalysis, DirectCallConstraint,  Graph, SadDSA, SadGraph, SymValueSet, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValueDomain, SymbolicValues, computeDSADomain, estimateStackSizes, generateConstraints, getStackSize, getSymbolicValues}
+import analysis.data_structure_analysis.{Constraint, DataStructureAnalysis, DirectCallConstraint, Graph, SadDSA, SadGraph, SymValueSet, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValueDomain, SymbolicValues, computeDSADomain, estimateStackSizes, generateConstraints, getStackSize, getSymbolicValues}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
@@ -34,6 +34,7 @@ import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
+import util.DSAAnalysis.Norm
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -79,7 +80,9 @@ case class StaticAnalysisContext(
 case class DSAContext(
   sva: Map[Procedure, SymbolicValues],
   constraints: Map[Procedure, Set[Constraint]],
-  sadDSA: Map[Procedure, SadGraph]
+  local: Map[Procedure, SadGraph],
+  bottomUp: Map[Procedure, SadGraph],
+  topDown: Map[Procedure, SadGraph]
 )
 
 /** Results of the main program execution.
@@ -779,94 +782,34 @@ object RunUtils {
     val scc = stronglyConnectedComponents(CallGraph, List(ctx.program.mainProcedure))
 
     var dsaContext: Option[DSAContext] = None
-    if true then //conf.dsaConfig.nonEmpty then
-//      val config = conf.dsaConfig.get
+    if conf.dsaConfig.nonEmpty then
+      val config = conf.dsaConfig.get
 
       val main = ctx.program.mainProcedure
       var sva: Map[Procedure, SymbolicValues] = Map.empty
       var cons: Map[Procedure, Set[Constraint]] = Map.empty
-      var sadDSA: Map[Procedure, SadGraph] = Map.empty
-      var sadDSABU: Map[Procedure, SadGraph] = Map.empty
       computeDSADomain(ctx.program.mainProcedure, ctx).toSeq.sortBy(_.name).foreach(
-//      computeDSADomain(ctx.program.procedures.collectFirst{case p if p.name.startsWith("prepare_http_connect") => p}.get).foreach(
         proc =>
-//          if proc.name.startsWith("des_key_schedule") then
             val SVAResults = getSymbolicValues(proc)
             val constraints = generateConstraints(proc)
             sva += (proc -> SVAResults)
             cons += (proc -> constraints)
-           /* if config.analyses.contains(DSAAnalysis.Set) then
-              val setGraph = SetDSA.getLocal(proc, Some(SVAResults), Some(constraints))
-              writeToFile(setGraph.toDot, s"cntlm_${proc.name}.SetDSA")
-              setDSA += (proc -> setGraph)*/
-//            if config.analyses.contains(DSAAnalysis.Norm) then
-              val sadGraph = SadDSA.getLocal(proc, ctx, Some(SVAResults), Some(constraints))
-              writeToFile(sadGraph.toDot, s"cntlm_${proc.name}.SadDSA")
-              sadDSA += (proc -> sadGraph)
-
-            writeToFile(SVAResults.pretty, s"cntlm_${proc.name}.SVA")
-            writeToFile(constraints.map(c => c.toString).toSeq.sorted.mkString("\n"), s"cntlm_${proc.name}.ConsExpr")
-            writeToFile(constraints.map(c => c.eval(Expr => SVAResults.exprToSymValSet(Expr))).toSeq.sorted.mkString("\n"), s"cntlm_${proc.name}.Cons")
       )
+      dsaContext = Some(DSAContext(sva, cons, Map.empty, Map.empty, Map.empty))
 
-      DSALogger.info("Finished local phase")
+      if config.analyses.contains(Norm) then
+        DSALogger.info("Finished Computing Constraints")
+        val sadDSA = SadDSA.getLocals(ctx, sva, cons)
+        sadDSA.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness check")
+        val sadDSABU = SadDSA.getBUs(sadDSA)
+        sadDSABU.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness check")
+        val sadDSATD =  SadDSA.getTDs(sadDSABU)
+        sadDSATD.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness check")
+        dsaContext = Some(dsaContext.get.copy(local = sadDSA, bottomUp = sadDSABU, topDown = sadDSATD))
 
-      dsaContext = Some(DSAContext(sva, cons, sadDSA))
-      sadDSA.values.foreach(_.localCorrectness())
-      DSALogger.info("performed correctness check")
-      sadDSABU = sadDSA.view.mapValues(_.clone).toMap
-
-      sadDSABU.values.foreach(_.localCorrectness())
-      DSALogger.info("performed cloning")
-
-      val visited: mutable.Set[Procedure] = mutable.Set.empty
-      val queue = mutable.Queue[Procedure]().enqueueAll(sadDSABU.keys.toSeq.sortBy(p => p.name))
-
-      var skip = Seq("croak", "myexit")
-      while queue.nonEmpty do
-        val proc = queue.dequeue()
-        if skip.exists(name => proc.name.startsWith(name)) then
-          DSALogger.info(s"skipped ${proc.name} due to scc")
-          visited += proc
-        else if !proc.calls.filter(proc => !proc.isExternal.getOrElse(false)).forall(visited.contains) then
-          DSALogger.info(s"procedure ${proc.name} was readded")
-          queue.enqueue(proc)
-        else
-          println(s"did BU for ${proc.name}")
-          DSALogger.info(s"performing BU for ${proc.name}")
-//          sadDSABU(proc).BUPhase(sadDSABU)
-          sadDSABU(proc).contextTransfer(BU, sadDSABU)
-          visited += proc
-
-
-      sadDSABU.values.foreach(_.localCorrectness())
-      val sadDSATD = sadDSABU.view.mapValues(_.clone).toMap
-      sadDSATD.values.foreach(_.localCorrectness())
-
-      DSALogger.info("finished BU phase")
-      visited.clear()
-      skip = Seq("croak", "myexit") // Seq.empty
-      queue.enqueueAll(sadDSATD.keys.toSeq.sortBy(p => p.name))
-      while queue.nonEmpty do
-        val proc = queue.dequeue()
-        if skip.exists(name => proc.name.startsWith(name)) then
-          DSALogger.info(s"skipped ${proc.name} due to scc")
-          visited += proc
-        else if !proc.callers().filter(f => sadDSATD.keySet.contains(f)).forall(f => visited.contains(f)) then
-          DSALogger.info(s"procedure ${proc.name} was readded")
-          queue.enqueue(proc)
-        else
-          DSALogger.info(s"performing TD for ${proc.name}")
-          sadDSATD(proc).contextTransfer(TD, sadDSATD)
-          visited += proc
-      sadDSATD.map(_._2.localCorrectness())
-//      val mainGraph = sadDSATD.collectFirst{case (proc, graph) if proc.name.startsWith("main") => graph}.get
-//      val t = mainGraph.resolveIndirectCalls()
-//      println(t.values)
-//      val ind = mainGraph.constraints.collectFirst{case dcc: DirectCallConstraint if dcc.target.name == "indirect_call_launchpad" => dcc}.get
-//      val funcPointer = ind.inParams.collectFirst {case (formal, actual) if formal.name.startsWith("indirectCallTarget") => actual}.get
-//      val resCells = mainGraph.exprToCells(funcPointer)
-//      println("")
     if (q.runInterpret) {
       Logger.info("Start interpret")
       val fs = eval.interpretTrace(ctx)
