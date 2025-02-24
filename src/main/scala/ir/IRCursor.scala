@@ -316,9 +316,17 @@ def dotBlockGraph(blocks: Iterable[Block], orphaned: Set[Block]): String = {
   toDot[Block](blocks.toSet, IntraProcBlockIRCursor, labels, orphaned)
 }
 
+
+def dotBlockGraph(program: Procedure, labels: Map[CFGPosition, String]): String = {
+  val domain = computeDomain[CFGPosition, Block](IntraProcBlockIRCursor, program.blocks.toSet)
+  val o = getDetachedBlocks(program).reachableFromBlockEmptyPred
+  toDot[Block](domain.toSet, IntraProcBlockIRCursor, labels, o)
+}
+
 def dotBlockGraph(program: Program, labels: Map[CFGPosition, String] = Map.empty): String = {
   val domain = computeDomain[CFGPosition, Block](IntraProcBlockIRCursor, program.procedures.flatMap(_.blocks).toSet)
-  toDot[Block](domain.toSet, IntraProcBlockIRCursor, labels, Set())
+  val e = program.procedures.toSet.flatMap(getDetachedBlocks(_).reachableFromBlockEmptyPred)
+  toDot[Block](domain.toSet, IntraProcBlockIRCursor, labels, e)
 }
 
 def toDot[T <: CFGPosition](
