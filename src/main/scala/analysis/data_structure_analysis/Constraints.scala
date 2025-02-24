@@ -77,8 +77,10 @@ sealed trait CallConstraint[T <: Call, V <: Procedure | Variable](call: T) exten
   def target: V
   val inParams: Map[LocalVar, Expr]
   val outParams: Map[LocalVar, LocalVar]
-  def inConstraints: Set[AssignmentConstraint] = inParams.map(pair => AssignmentConstraint(call, pair._1, pair._2)).toSet
-  def outConstraints: Set[AssignmentConstraint] = outParams.map(pair => AssignmentConstraint(call, pair._1, pair._2)).toSet
+  def inConstraints: Set[AssignmentConstraint] =
+    inParams.map(pair => AssignmentConstraint(call, pair._1, pair._2)).toSet
+  def outConstraints: Set[AssignmentConstraint] =
+    outParams.map(pair => AssignmentConstraint(call, pair._1, pair._2)).toSet
   override def source: T = call
   override def toString: String = eval()
 

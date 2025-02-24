@@ -1,20 +1,74 @@
 package analysis.data_structure_analysis
 
 import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
-import ir.{BVADD, BVAND, BVASHR, BVBinOp, BVCOMP, BVCONCAT, BVEQ, BVLSHR, BVMUL, BVNAND, BVNEQ, BVNOR, BVOR, BVSDIV, BVSGE, BVSGT, BVSHL, BVSLE, BVSLT, BVSMOD, BVSREM, BVSUB, BVUDIV, BVUGE, BVUGT, BVULE, BVULT, BVUREM, BVXNOR, BVXOR, BinaryExpr, BitVecLiteral, BitVecType, Block, BoolBinOp, Command, DirectCall, Expr, Extract, IntBinOp, Jump, Literal, LocalAssign, LocalVar, MemoryLoad, Procedure, Program, Register, Repeat, SignExtend, Statement, UnaryExpr, UninterpretedFunction, Variable, ZeroExtend}
+import ir.{
+  BVADD,
+  BVAND,
+  BVASHR,
+  BVBinOp,
+  BVCOMP,
+  BVCONCAT,
+  BVEQ,
+  BVLSHR,
+  BVMUL,
+  BVNAND,
+  BVNEQ,
+  BVNOR,
+  BVOR,
+  BVSDIV,
+  BVSGE,
+  BVSGT,
+  BVSHL,
+  BVSLE,
+  BVSLT,
+  BVSMOD,
+  BVSREM,
+  BVSUB,
+  BVUDIV,
+  BVUGE,
+  BVUGT,
+  BVULE,
+  BVULT,
+  BVUREM,
+  BVXNOR,
+  BVXOR,
+  BinaryExpr,
+  BitVecLiteral,
+  BitVecType,
+  Block,
+  BoolBinOp,
+  Command,
+  DirectCall,
+  Expr,
+  Extract,
+  IntBinOp,
+  Jump,
+  Literal,
+  LocalAssign,
+  LocalVar,
+  MemoryLoad,
+  Procedure,
+  Program,
+  Register,
+  Repeat,
+  SignExtend,
+  Statement,
+  UnaryExpr,
+  UninterpretedFunction,
+  Variable,
+  ZeroExtend
+}
 import ir.transforms.{AbstractDomain, PowerSetDomain, ProcedureSummaryGenerator}
 import util.StackLogger as Logger
 
 import scala.annotation.tailrec
 import scala.collection.mutable
 
-
-enum StackMaintained  {
+enum StackMaintained {
   case unsure
   case maintained
   case clobbered
 }
-
 
 enum StackStatus(maintained: Boolean = false, size: Option[Int] = None) {
   case Unmaintained extends StackStatus
@@ -31,7 +85,6 @@ enum StackStatus(maintained: Boolean = false, size: Option[Int] = None) {
       case (MaintainedWithSize(size1), MaintainedWithSize(size2)) =>
         MaintainedWithSize(math.max(size1, size2))
   }
-
 
   def move(f: Int => Int): StackStatus = {
     this match
@@ -50,16 +103,15 @@ def getStackSize(proc: Procedure, sva: SymbolicValues): Unit = {
     val init = stackPointers(stackPointers.firstKey)
     val end = stackPointers(stackPointers.lastKey)
     Logger.debug(s"found init $init and final $end")
-  else
-    Logger.debug(s"found R31 unchanged")
+  else Logger.debug(s"found R31 unchanged")
 }
 
-class StackStatusDomain(val isNotMaintained: String => Boolean, val proc: Procedure, val symVals: SymbolicValues) extends AbstractDomain[StackStatus] {
+class StackStatusDomain(val isNotMaintained: String => Boolean, val proc: Procedure, val symVals: SymbolicValues)
+    extends AbstractDomain[StackStatus] {
   val replacements: mutable.Map[LocalVar, LocalVar] = mutable.Map.empty
   def replace(in: LocalVar): LocalVar = {
     var cur = in
-    while replacements.contains(cur) do
-      cur = replacements(cur)
+    while replacements.contains(cur) do cur = replacements(cur)
     cur
   }
   override def init(b: Block): StackStatus = StackStatus.Bot
@@ -88,10 +140,7 @@ def estimateStackSize(proc: Procedure): Int = {
 
 def estimateStackSizes(program: Program): Map[Procedure, Int] = {
 
-  program.procedures.foldLeft(Map[Procedure, Int]()) {
-    case (m, proc) =>
-      m + (proc -> estimateStackSize(proc))
+  program.procedures.foldLeft(Map[Procedure, Int]()) { case (m, proc) =>
+    m + (proc -> estimateStackSize(proc))
   }
 }
-
-

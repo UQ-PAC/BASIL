@@ -32,7 +32,6 @@ class OffsetUnionFindSolver[T] extends UnionFindSolver[T] {
     (parent(t), offsets(t))
   }
 
-
   /** Creates an equivalence class for the term `t`, if it does not exists already.
    */
   def mkSet(t: Term[T]): Unit = {
@@ -42,4 +41,3 @@ class OffsetUnionFindSolver[T] extends UnionFindSolver[T] {
   }
 
 }
-
