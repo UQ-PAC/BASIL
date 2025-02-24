@@ -889,13 +889,13 @@ object RunUtils {
 
       if config.analyses.contains(Norm) then
         DSALogger.info("Finished Computing Constraints")
-        val sadDSA = SadDSA.getLocals(ctx, sva, cons)
+        val sadDSA = IntervalDSA.getLocals(ctx, sva, cons)
         sadDSA.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
-        val sadDSABU = SadDSA.getBUs(sadDSA)
+        val sadDSABU = IntervalDSA.getBUs(sadDSA)
         sadDSABU.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
-        val sadDSATD =  SadDSA.getTDs(sadDSABU)
+        val sadDSATD =  IntervalDSA.getTDs(sadDSABU)
         sadDSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
         dsaContext = Some(dsaContext.get.copy(local = sadDSA, bottomUp = sadDSABU, topDown = sadDSATD))

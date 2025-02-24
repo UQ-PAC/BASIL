@@ -1,4 +1,4 @@
-import analysis.data_structure_analysis.SadDSA
+import analysis.data_structure_analysis.IntervalDSA
 import boogie.SpecGlobal
 import ir.*
 import ir.dsl.{block, proc, prog, ret}
@@ -8,7 +8,7 @@ import specification.Specification
 import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, DSAAnalysis, DSAConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, StaticAnalysisContext}
 
 
-class SadDSATest extends AnyFunSuite {
+class IntervalDSATest extends AnyFunSuite {
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program)
@@ -93,7 +93,7 @@ class SadDSATest extends AnyFunSuite {
     val basilResult = runTest(context)
     val main = basilResult.ir.program.mainProcedure
 
-    val localGraph = SadDSA.getLocal(main, context)
+    val localGraph = IntervalDSA.getLocal(main, context)
 
     val test = 1
   }
