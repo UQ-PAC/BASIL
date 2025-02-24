@@ -24,21 +24,12 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{
-  Constraint,
-  DataStructureAnalysis,
-  getSymbolicValues,
-  generateConstraints,
-  Graph,
-  SymbolicAddress,
-  SymbolicValues,
-  SymbolicAddressAnalysis
-}
+import analysis.data_structure_analysis.{Constraint, DataStructureAnalysis, Graph, IntervalDSA, IntervalGraph, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValues, computeDSADomain, generateConstraints, getSymbolicValues}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
 import translating.*
-import util.{Logger, DebugDumpIRLogger, SimplifyLogger}
+import util.{DebugDumpIRLogger, Logger, SimplifyLogger}
 
 import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
@@ -90,9 +81,9 @@ case class StaticAnalysisContext(
 case class DSAContext(
   sva: Map[Procedure, SymbolicValues],
   constraints: Map[Procedure, Set[Constraint]],
-  local: Map[Procedure, SadGraph],
-  bottomUp: Map[Procedure, SadGraph],
-  topDown: Map[Procedure, SadGraph]
+  local: Map[Procedure, IntervalGraph],
+  bottomUp: Map[Procedure, IntervalGraph],
+  topDown: Map[Procedure, IntervalGraph]
 )
 
 /** Results of the main program execution.
