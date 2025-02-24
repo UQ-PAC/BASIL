@@ -17,6 +17,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 import analysis.solvers.*
 import analysis.*
+import analysis.data_structure_analysis.DSAPhase.{BU, TD}
 import bap.*
 import ir.*
 import boogie.*
@@ -43,6 +44,7 @@ import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
+import util.DSAAnalysis.Norm
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -85,7 +87,13 @@ case class StaticAnalysisContext(
   ssaResults: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
 )
 
-case class DSAContext(sva: Map[Procedure, SymbolicValues], constraints: Map[Procedure, Set[Constraint]])
+case class DSAContext(
+  sva: Map[Procedure, SymbolicValues],
+  constraints: Map[Procedure, Set[Constraint]],
+  local: Map[Procedure, SadGraph],
+  bottomUp: Map[Procedure, SadGraph],
+  topDown: Map[Procedure, SadGraph]
+)
 
 /** Results of the main program execution.
   */
@@ -870,18 +878,27 @@ object RunUtils {
       val main = ctx.program.mainProcedure
       var sva: Map[Procedure, SymbolicValues] = Map.empty
       var cons: Map[Procedure, Set[Constraint]] = Map.empty
-
-      ctx.program.procedures.foreach(proc =>
-        val SVAResults = getSymbolicValues(proc)
-        val constraints = generateConstraints(proc)
-        sva += (proc -> SVAResults)
-        cons += (proc -> constraints)
+      computeDSADomain(ctx.program.mainProcedure, ctx).toSeq.sortBy(_.name).foreach(
+        proc =>
+            val SVAResults = getSymbolicValues(proc)
+            val constraints = generateConstraints(proc)
+            sva += (proc -> SVAResults)
+            cons += (proc -> constraints)
       )
+      dsaContext = Some(DSAContext(sva, cons, Map.empty, Map.empty, Map.empty))
 
-      DSALogger.info("Finished local phase")
-
-      dsaContext = Some(DSAContext(sva, cons))
-    }
+      if config.analyses.contains(Norm) then
+        DSALogger.info("Finished Computing Constraints")
+        val sadDSA = SadDSA.getLocals(ctx, sva, cons)
+        sadDSA.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness check")
+        val sadDSABU = SadDSA.getBUs(sadDSA)
+        sadDSABU.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness check")
+        val sadDSATD =  SadDSA.getTDs(sadDSABU)
+        sadDSATD.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness check")
+        dsaContext = Some(dsaContext.get.copy(local = sadDSA, bottomUp = sadDSABU, topDown = sadDSATD))
 
     if (q.runInterpret) {
       Logger.info("Start interpret")

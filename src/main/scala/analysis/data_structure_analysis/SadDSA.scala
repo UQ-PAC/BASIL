@@ -624,7 +624,7 @@ class SadGraph(val proc: Procedure, var phase: DSAPhase,
   }
 
   def unify(a: SadNode, b: SadNode, offset: Int = 0): Unit = {
-    Logger.debug(s"unifying ${b.id} witnewNode.isUptoDateh ${a.id} at offset ${offset}")
+    Logger.debug(s"unifying ${b.id} with ${a.id} at offset ${offset}")
     solver.unify(a.term, b.term, offset)
   }
 }
@@ -946,6 +946,65 @@ object SadDSA {
     graph.localPhase()
     graph.localCorrectness()
     graph
+  }
+
+  def getLocals(ctx: IRContext, svas: Map[Procedure, SymbolicValues], cons: Map[Procedure, Set[Constraint]]):
+    Map[Procedure, SadGraph] = {
+    DSALogger.info("Performing local DSA")
+    computeDSADomain(ctx.program.mainProcedure, ctx).toSeq.sortBy(_.name).foldLeft(Map[Procedure, SadGraph]()) (
+      (m, proc) =>
+        m + (proc -> SadDSA.getLocal(proc, ctx, Some(svas(proc)), Some(cons(proc))))
+    )
+  }
+
+  def getBUs(locals: Map[Procedure, SadGraph]): Map[Procedure, SadGraph] = {
+
+    DSALogger.info("Performing DSA BU phase")
+    val bus = locals.view.mapValues(_.clone).toMap
+    bus.values.foreach(_.localCorrectness())
+    DSALogger.info("performed cloning")
+    val visited: mutable.Set[Procedure] = mutable.Set.empty
+    val queue = mutable.Queue[Procedure]().enqueueAll(bus.keys.toSeq.sortBy(p => p.name))
+
+    // TODO instead of skipping merge the scc and use it directly
+    var skip = Seq("croak", "myexit")
+    while queue.nonEmpty do
+      val proc = queue.dequeue()
+      if skip.exists(name => proc.name.startsWith(name)) then
+        DSALogger.info(s"skipped ${proc.name} due to scc")
+        visited += proc
+      else if !proc.calls.filter(proc => !proc.isExternal.getOrElse(false)).forall(visited.contains) then
+        DSALogger.info(s"procedure ${proc.name} was readded")
+        queue.enqueue(proc)
+      else
+        DSALogger.info(s"performing BU for ${proc.name}")
+        bus(proc).contextTransfer(BU, bus)
+        visited += proc
+    bus
+  }
+
+  def getTDs(bus: Map[Procedure, SadGraph]): Map[Procedure, SadGraph] = {
+    DSALogger.info("Performing DSA TD phase")
+    val tds = bus.view.mapValues(_.clone).toMap
+    val visited: mutable.Set[Procedure] = mutable.Set.empty
+    val queue = mutable.Queue[Procedure]().enqueueAll(tds.keys.toSeq.sortBy(p => p.name))
+    
+    // TODO instead of skipping merge the scc and use it directly
+    var skip = Seq("croak", "myexit")
+    while queue.nonEmpty do
+      val proc = queue.dequeue()
+      if skip.exists(name => proc.name.startsWith(name)) then
+        DSALogger.info(s"skipped ${proc.name} due to scc")
+        visited += proc
+      else if !proc.callers().filter(f => tds.keySet.contains(f)).forall(f => visited.contains(f)) then
+        DSALogger.info(s"procedure ${proc.name} was readded")
+        queue.enqueue(proc)
+      else
+        DSALogger.info(s"performing TD for ${proc.name}")
+        tds(proc).contextTransfer(TD, tds)
+        visited += proc
+
+    tds
   }
 }
 
