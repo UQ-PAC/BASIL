@@ -74,6 +74,10 @@ case class TNumBool(boolean: Int) extends TNum {
 }
 
 case class TNumValue(value: BigInt, mask: BigInt) extends TNum {
+
+  override def toString() = {
+    "v.%#016x m.%#016x".format(value, mask)
+  }
     // Bitwise AND
     def TAND(that: TNumValue): TNumValue = {
         val alpha = this.value | this.mask
@@ -603,7 +607,6 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
             case BoolOR => tn1.TOR(tn2)
             case BoolIMPLIES => tn1.TIMPLIES(tn2)
             case BoolEQUIV => tn1.TEQUIV(tn2)
-            case _ => TNumBool(0)
         }
     }
 
@@ -613,7 +616,6 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
             case BVNOT => tn.TNOT()
             case BVNEG => tn.TNEG()
             case IntNEG => tn.TNEG()
-            case _ => TNumValue(BigInt(0), BigInt(-1))
         }
     }
 
@@ -621,7 +623,6 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
         op match {
             case BoolNOT => tn.TNOT()
             case BoolToBV1 => tn.TToBV1()
-            case _ => TNumBool(0)
         }
     }
 
@@ -644,6 +645,9 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
                 case (opVal: BVUnOp, tnum: TNumValue) => evaluateValueUnOp(opVal, tnum)
                 case (opVal: IntUnOp, tnum: TNumValue) => evaluateValueUnOp(opVal, tnum)
                 case (opVal: BoolUnOp, tnum: TNumBool) => evaluateBoolUnOp(opVal, tnum)
+                case (opVal: BVUnOp, _) => throw Exception("type error")
+                case (opVal: IntUnOp, _) => throw Exception("type error")
+                case (opVal: BoolUnOp, _) => throw Exception("type error")
             }
 
         case BinaryExpr(op: BVBinOp, arg1: Expr, arg2: Expr) => 
@@ -654,6 +658,9 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
                 case (opVal: BVBinOp, tnum1: TNumValue, tnum2: TNumValue) => evaluateValueBinOp(opVal, tnum1, tnum2)
                 case (opVal: IntBinOp, tnum1: TNumValue, tnum2: TNumValue) => evaluateValueBinOp(opVal, tnum1, tnum2)
                 case (opVal: BoolBinOp, tnum1: TNumBool, tnum2: TNumBool) => evaluateBoolBinOp(opVal, tnum1, tnum2)
+                case (opVal: BVBinOp, _, _) => throw Exception("type error")
+                case (opVal: IntBinOp, _, _) => throw Exception("type error")
+                case (opVal: BoolBinOp, _, _) => throw Exception("type error")
             }
 
         case Extract(endIndex: Int, startIndex: Int, body: Expr) => 
@@ -664,6 +671,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
                     val bodyTNumValueExtract = (tnum.value >> startIndex) & ((BigInt(1) << (endIndex - startIndex)) - 1)
                     val bodyTNumMaskExtract = (tnum.mask >> startIndex) & ((BigInt(1) << (endIndex - startIndex)) - 1)
                     TNumValue(bodyTNumValueExtract, bodyTNumMaskExtract)
+                case _ : TNumBool => throw Exception("type error")
             }
             
         case Repeat(repeats: Int, body: Expr) =>
@@ -674,6 +682,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
                     val repeatedValue = (0 until repeats).foldLeft(BigInt(0)) { (acc, _) => (acc << tnum.value.bitLength) | tnum.value }
                     val repeatedMask = (0 until repeats).foldLeft(BigInt(0)) { (acc, _) => (acc << tnum.mask.bitLength) | tnum.mask }
                     TNumValue(repeatedValue, repeatedMask)
+                case _ : TNumBool => throw Exception("type error")
             }
 
         case ZeroExtend(extension: Int, body: Expr) =>
@@ -685,12 +694,14 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
                     val zeroExtendedValue = tnum.value & ((BigInt(1) << newLength) - 1)
                     val zeroExtendedMask = tnum.mask & ((BigInt(1) << newLength) - 1)
                     TNumValue(zeroExtendedValue, zeroExtendedMask)
+                case _ : TNumBool => throw Exception("type error")
             }
             
         case SignExtend(extension: Int, body: Expr) =>
             val bodyTNum = evaluateExprToTNum(s, body)
 
             bodyTNum match {
+                case tnum: TNumBool => throw Exception("type error")
                 case tnum: TNumValue =>
                     val valueMsb = (tnum.value >> (tnum.value.bitLength - 1)) & 1
                     val maskMsb = (tnum.mask >> (tnum.mask.bitLength - 1)) & 1
@@ -715,7 +726,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
                                 // If value has more bits, extend value with 1 and mask with 0
                                 val extendedPartValue = (BigInt(1) << extension) - 1
                                 (tnum.value | (extendedPartValue << tnum.value.bitLength), tnum.mask)
-                            } else if (tnum.value.bitLength < tnum.mask.bitLength) {
+                            } else { // if (tnum.value.bitLength < tnum.mask.bitLength) {
                                 // If value has less bits, extend value with 0 and mask with 1
                                 val extendedPartMask = (BigInt(1) << extension) - 1
                                 (tnum.value, tnum.mask | (extendedPartMask << tnum.mask.bitLength))
@@ -731,11 +742,11 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
     override def transfer(s: Map[Variable, TNum], b: Command): Map[Variable, TNum] = {
         b match {
             // Assign variable to variable (e.g. x = y)
-            case LocalAssign(lhs: Variable, rhs: Expr) =>
+            case LocalAssign(lhs: Variable, rhs: Expr, _) =>
                 s.updated(lhs, evaluateExprToTNum(s, rhs))
 
             // Load from memory and store in variable
-            case MemoryLoad(lhs: Variable, mem: Memory, index: Expr, endian: Endian, size: Int) 
+            case MemoryLoad(lhs: Variable, mem: Memory, index: Expr, endian: Endian, size: Int, _) 
                 if !s.contains(lhs) =>
                     // Overapproxiate memory values with Top
                     s.updated(lhs, TNumValue(BigInt(0), BigInt(-1)))
@@ -773,6 +784,12 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
     }
 }
 
+def knownBitsAnalysis(p: Program) = {
+  val solver = transforms.worklistSolver(TNumDomain())
+  val (beforeIn, afterIn) = solver.solveProgIntraProc(p, backwards = false)
+  (beforeIn, afterIn)
+}
+
 class SimplifyKnownBits() {
     val solver = transforms.worklistSolver(TNumDomain())
 
@@ -784,6 +801,6 @@ class SimplifyKnownBits() {
 
     def applyTransform(procedure: Procedure): Unit = {
         val (beforeIn, afterIn) = solver.solveProc(procedure, backwards = false)
-        util.writeToFile(translating.PrettyPrinter.pp_proc_with_analysis_results(beforeIn, afterIn, procedure, x => x.toString), "known_bits.il")
+        util.writeToFile(translating.PrettyPrinter.pp_proc_with_analysis_results(beforeIn, afterIn, procedure, x => x.toString), s"${procedure.name}_known_bits.il")
     }
 }
