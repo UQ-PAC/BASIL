@@ -31,7 +31,7 @@ enum DSAPhase {
 case class Interval(start: Int, end: Int) {
   require(start < end)
 
-  override def toString: String = s"$start-${end-1}"
+  override def toString: String = s"$start-${end - 1}"
   def size: Int = end - start
   def move(func: Int => Int): Interval = Interval(func(start), func(end))
   def isEmpty: Boolean = this.size == 0
@@ -41,7 +41,7 @@ case class Interval(start: Int, end: Int) {
     start <= interval.start && end >= interval.end
   def isOverlapping(other: Interval): Boolean = !(start >= other.end || other.start >= end)
   def join(other: Interval): Interval = {
-    //require(isOverlapping(other), "Expected overlapping Interval for a join")
+    // require(isOverlapping(other), "Expected overlapping Interval for a join")
     Interval(math.min(start, other.start), math.max(end, other.end))
   }
 }
@@ -92,7 +92,9 @@ def computeDSADomain(proc: Procedure, context: IRContext): Set[Procedure] = {
     stack.pushAll(current.calls.diff(domain))
   }
 
-  domain ++ (context.program.procedures.filter(f => context.funcEntries.map(_.name).filter(!_.startsWith("_")).contains(f.procName)))
+  domain ++ (context.program.procedures.filter(f =>
+    context.funcEntries.map(_.name).filter(!_.startsWith("_")).contains(f.procName)
+  ))
 }
 
 trait DSACell

@@ -5,8 +5,18 @@ import ir.dsl.{block, proc, prog, ret}
 import ir.{BitVecLiteral, Endian, MemoryLoad, Register, SharedMemory}
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, DSAAnalysis, DSAConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, StaticAnalysisContext}
-
+import util.{
+  BASILConfig,
+  BASILResult,
+  BoogieGeneratorConfig,
+  DSAAnalysis,
+  DSAConfig,
+  ILLoadingConfig,
+  IRContext,
+  RunUtils,
+  StaticAnalysisConfig,
+  StaticAnalysisContext
+}
 
 class IntervalDSATest extends AnyFunSuite {
   def runAnalysis(program: Program): StaticAnalysisContext = {
@@ -22,10 +32,7 @@ class IntervalDSATest extends AnyFunSuite {
   def runTest(path: String): BASILResult = {
     RunUtils.loadAndTranslate(
       BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = path + ".adt",
-          relfFile = path + ".relf",
-        ),
+        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf"),
         simplify = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
@@ -39,10 +46,7 @@ class IntervalDSATest extends AnyFunSuite {
     RunUtils.loadAndTranslate(
       BASILConfig(
         context = Some(context),
-        loading = ILLoadingConfig(
-          inputFile = "",
-          relfFile = "",
-        ),
+        loading = ILLoadingConfig(inputFile = "", relfFile = ""),
         simplify = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
@@ -52,7 +56,11 @@ class IntervalDSATest extends AnyFunSuite {
     )
   }
 
-  def programToContext(program: Program, globals: Set[SpecGlobal] = Set.empty, globalOffsets: Map[BigInt, BigInt] = Map.empty): IRContext = {
+  def programToContext(
+    program: Program,
+    globals: Set[SpecGlobal] = Set.empty,
+    globalOffsets: Map[BigInt, BigInt] = Map.empty
+  ): IRContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program)
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
@@ -61,13 +69,11 @@ class IntervalDSATest extends AnyFunSuite {
     IRContext(List(), Set(), globals, Set(), globalOffsets, spec, program)
   }
 
-
   test("jumptable main") {
     val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable")
     val dsg = results.dsa.get.sadDSA(results.ir.program.mainProcedure)
     dsg.localCorrectness()
   }
-
 
   test("Global Assignment") {
     val mem = SharedMemory("mem", 64, 8)
@@ -80,14 +86,7 @@ class IntervalDSATest extends AnyFunSuite {
 
     val load = MemoryLoad(R0, mem, xPointer, Endian.LittleEndian, 64, Some("001"))
 
-    val program = prog(
-      proc("main",
-        block("block",
-          load,
-          ret
-        )
-      )
-    )
+    val program = prog(proc("main", block("block", load, ret)))
 
     val context = programToContext(program, globals, globalOffsets)
     val basilResult = runTest(context)
