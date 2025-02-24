@@ -226,7 +226,7 @@ trait DSANode[Cell <: NodeCell & DSACell](val size: Option[Int]) {
 
 }
 
-def computeDSADomain(proc: Procedure): Set[Procedure] = {
+def computeDSADomain(proc: Procedure, context: IRContext): Set[Procedure] = {
   var domain: Set[Procedure] = Set(proc)
   val stack: mutable.Stack[Procedure] = mutable.Stack()
   stack.pushAll(proc.calls)
@@ -238,7 +238,7 @@ def computeDSADomain(proc: Procedure): Set[Procedure] = {
     stack.pushAll(current.calls.diff(domain))
   }
 
-  domain
+  domain ++ (context.program.procedures.filter(f => context.funcEntries.map(_.name).filter(!_.startsWith("_")).contains(f.procName)))
 }
 
 trait DSACell

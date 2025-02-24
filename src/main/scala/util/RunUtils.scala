@@ -791,7 +791,7 @@ object RunUtils {
       var fieldDSA: Map[Procedure, FieldGraph] = Map.empty
       var sadDSA: Map[Procedure, SadGraph] = Map.empty
       var sadDSABU: Map[Procedure, SadGraph] = Map.empty
-      computeDSADomain(ctx.program.mainProcedure).toSeq.sortBy(_.name).foreach(
+      computeDSADomain(ctx.program.mainProcedure, ctx).toSeq.sortBy(_.name).foreach(
 //      computeDSADomain(ctx.program.procedures.collectFirst{case p if p.name.startsWith("prepare_http_connect") => p}.get).foreach(
         proc =>
 //          if proc.name.startsWith("des_key_schedule") then
@@ -864,9 +864,9 @@ object RunUtils {
           sadDSATD(proc).contextTransfer(TD, sadDSATD)
           visited += proc
       sadDSATD.map(_._2.localCorrectness())
-      val mainGraph = sadDSATD.collectFirst{case (proc, graph) if proc.name.startsWith("main") => graph}.get
-      val t = mainGraph.resolveIndirectCalls()
-      println(t.values)
+//      val mainGraph = sadDSATD.collectFirst{case (proc, graph) if proc.name.startsWith("main") => graph}.get
+//      val t = mainGraph.resolveIndirectCalls()
+//      println(t.values)
 //      val ind = mainGraph.constraints.collectFirst{case dcc: DirectCallConstraint if dcc.target.name == "indirect_call_launchpad" => dcc}.get
 //      val funcPointer = ind.inParams.collectFirst {case (formal, actual) if formal.name.startsWith("indirectCallTarget") => actual}.get
 //      val resCells = mainGraph.exprToCells(funcPointer)

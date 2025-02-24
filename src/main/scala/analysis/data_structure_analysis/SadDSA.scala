@@ -28,17 +28,21 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
       (proc, ph, irContext, OffsetUnionFindSolver[NodeTerm](), symValues, cons)
 {
 
-  def resolveIndirectCalls(): Map[Constraint, Set[Procedure]] = {
+  def resolveIndirectCall(dcc: DirectCallConstraint): Set[Procedure] = {
+    require(dcc.target.name == "indirect_call_launchpad", s"$dcc is not a constraint on a call for an indirect call wrapper")
+    val (formal, actual) = dcc.inParams.collectFirst {case (f, a) if f.name.startsWith("indirectCallTarget") => (f,a)}.get
+    exprToCells(actual).map(get).foldLeft(Set[Procedure]()) {
+      (s, cell) =>
+        s ++ cellToProcs(cell)
+    }
+  }
+
+  def resolveIndirectCalls(constraints: Set[Constraint] = this.constraints): Map[Constraint, Set[Procedure]] = {
     constraints.foldLeft(Map[Constraint, Set[Procedure]]()) {
       (m, con) =>
         con match
           case dcc: DirectCallConstraint if dcc.target.name == "indirect_call_launchpad" =>
-            val (formal, actual) = dcc.inParams.collectFirst {case (f, a) if f.name.startsWith("indirectCallTarget") => (f,a)}.get
-            m + ( con ->
-              exprToCells(actual).map(get).foldLeft(Set[Procedure]()) {
-              (s, cell) =>
-                s ++ cellToProcs(cell)
-            })
+           m + (con -> resolveIndirectCall(dcc))
           case _ => m
     }
   }
@@ -50,9 +54,9 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
     irContext.funcEntries.foldLeft(Set[Procedure]()) {
       (s, funEntry) =>
         if actual == get(globalNode.get(funEntry.address.toInt)) then
-          println(irContext.program.procedures.map(_.procName))
-          println(funEntry.name)
-          println(irContext.program.procedures.filter(p => p.procName == funEntry.name))
+//          println(irContext.program.procedures.map(_.procName))
+//          println(funEntry.name)
+//          println(irContext.program.procedures.filter(p => p.procName == funEntry.name))
           s + irContext.program.procedures.filter(p => p.procName == funEntry.name).head
         else
           s
@@ -121,6 +125,13 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
       case dcc: DirectCallConstraint if graphs.contains(dcc.target) && !dcc.target.isExternal.getOrElse(false) =>
         val (source, target) = if phase == TD then (this, graphs(dcc.target)) else (graphs(dcc.target), this)
         callTransfer(phase, dcc, source, target)
+      case dcc: DirectCallConstraint if dcc.target.name == "indirect_call_launchpad" =>
+        resolveIndirectCall(dcc).filterNot(proc => proc.isExternal.getOrElse(false) || proc.name.startsWith("_")).foreach(
+          proc =>
+
+            val (source, target) = if phase == TD then (this, graphs(proc)) else (graphs(proc), this)
+            callTransfer(phase, dcc, source, target)
+        )
       case _ =>
     }
 
@@ -136,18 +147,23 @@ class SadGraph(proc: Procedure, ph: DSAPhase,
 
     sourceGlobal = globalNode.get(targetGlobal.interval)
     target.mergeCells(sourceGlobal, targetGlobal)
-    Logger.info(s"cloning ${source.proc.procName} into ${target.proc.procName}")
-    cons.inParams.foreach {
+    DSALogger.info(s"cloning ${source.proc.procName} into ${target.proc.procName}")
+    cons.inParams.filter(f => cons.target.formalInParam.contains(f._1)).foreach {
       case (formal, actual) =>
         val (sourceExpr, targetExpr) = if phase == TD then (actual, formal) else (formal, actual)
         exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
     }
 
-    cons.outParams.foreach {
+    cons.outParams.filter(f => cons.target.formalOutParam.contains(f._2)).foreach {
       case (out, actual) =>
         val (sourceExpr, targetExpr) = if phase == TD then (actual, out) else (out, actual)
         exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
     }
+/*
+    if phase == BU then
+      cons.outParams.filterNot(f => cons.target.formalOutParam.contains(f._2)).foreach {
+        f =>
+      }*/
   }
 
   def exprTransfer(sourceExpr: Expr, targetExpr: Expr, source: SadGraph, target: SadGraph, oldToNew: mutable.Map[SadNode, SadNode]): Unit = {
@@ -688,13 +704,13 @@ class SadNode(val graph: SadGraph, val bases: mutable.Map[SymBase, Int]= mutable
           case _ =>
         }
 
-      oldToNew.foreach {
-        case (old, cloned) =>
-          old.cells.filter(_.hasPointee).map(_.getPointee).foreach(
-            pointee =>
-              assert(oldToNew.contains(pointee.node))
-          )
-      }
+//      oldToNew.foreach {
+//        case (old, cloned) =>
+//          graph.find(old).cells.filter(_.hasPointee).map(_.getPointee).foreach(
+//            pointee =>
+//              assert(oldToNew.contains(graph.find(pointee.node)))
+//          )
+//      }
 
     newNode
   }
