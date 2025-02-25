@@ -791,11 +791,13 @@ class IntervalNode(
           assert(collapseNode.isUptoDate)
           assert(pointee.node.isCollapsed)
           pointee = graph.mergeCells(pointee, collapsedCell)
+          assert(pointee.node.isCollapsed)
           Logger.debug(pointee)
           collapsedCell = pointee
         }
 
         if !pointToItself then assert(!collapsedCell.hasPointee)
+//        DSALogger.warn(pointToItself)
         collapsedCell.setPointee(pointee)
         collapsedCell = graph.find(collapsedCell)
         if pointToItself then assert(collapsedCell.getPointee == collapsedCell)
@@ -910,7 +912,7 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
   // this checks if two cells correspond to the same unified cell in their node
   // weaker equals
   def equiv(other: IntervalCell): Boolean = {
-    this.node.get(this.interval).equals(other.node.get(other.interval))
+    graph.get(this.node.get(this.interval)).equals(graph.get(other.node.get(other.interval)))
   }
 
   def removePointee: Option[IntervalCell] = {
@@ -939,6 +941,17 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
     else if _pointee.isEmpty then
       _pointee = Some(cell)
       _pointee.get
+    else if cell.equiv(this) then
+      val pointee = this.removePointee.get
+      val newThis = graph.mergeCells(pointee, this)
+      graph.mergePointees(newThis, newThis.getPointee)
+//      assert(graph.get(this) == pointeeUpdated)
+      this._pointee = Some(graph.mergeCells(newThis, newThis.getPointee))
+      assert(this._pointee.get.equiv(pointee))
+      assert(this._pointee.get.equiv(this))
+//      graph.get(this)._pointee = this._pointee
+      _pointee.get
+
     else // if a cell points to itself break the link,
       graph.mergePointees(this.getPointee, cell)
       this._pointee = Some(graph.mergeCells(cell, graph.get(this).getPointee))
