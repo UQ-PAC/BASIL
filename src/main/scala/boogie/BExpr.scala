@@ -13,6 +13,8 @@ trait BExpr {
   def params: Set[BVar] = Set()
   def specGlobals: Set[SpecGlobalOrAccess] = Set()
   def oldSpecGlobals: Set[SpecGlobalOrAccess] = Set()
+  def specGammas: Set[SpecGlobalOrAccess] = Set()
+  def oldSpecGammas: Set[SpecGlobalOrAccess] = Set()
   def loads: Set[BExpr] = Set()
   def serialiseBoogie(w: Writer): Unit = w.append(toString)
   def acceptVisit(visitor: BVisitor): BExpr = this
@@ -56,6 +58,8 @@ case class BVExtract(end: Int, start: Int, body: BExpr) extends BExpr {
   override def params: Set[BVar] = body.params
   override def specGlobals: Set[SpecGlobalOrAccess] = body.specGlobals
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] = body.oldSpecGlobals
+  override def specGammas: Set[SpecGlobalOrAccess] = body.specGammas
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = body.oldSpecGammas
   override def loads: Set[BExpr] = body.loads
 
   override def serialiseBoogie(w: Writer): Unit = {
@@ -94,6 +98,8 @@ case class BVRepeat(repeats: Int, body: BExpr) extends BExpr {
   override def params: Set[BVar] = body.params
   override def specGlobals: Set[SpecGlobalOrAccess] = body.specGlobals
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] = body.oldSpecGlobals
+  override def specGammas: Set[SpecGlobalOrAccess] = body.specGammas
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = body.oldSpecGammas
   override def loads: Set[BExpr] = body.loads
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitBVRepeat(this)
 }
@@ -126,6 +132,8 @@ case class BVZeroExtend(extension: Int, body: BExpr) extends BExpr {
   override def params: Set[BVar] = body.params
   override def specGlobals: Set[SpecGlobalOrAccess] = body.specGlobals
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] = body.oldSpecGlobals
+  override def specGammas: Set[SpecGlobalOrAccess] = body.specGammas
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = body.oldSpecGammas
   override def loads: Set[BExpr] = body.loads
 
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitBVZeroExtend(this)
@@ -159,6 +167,8 @@ case class BVSignExtend(extension: Int, body: BExpr) extends BExpr {
   override def params: Set[BVar] = body.params
   override def specGlobals: Set[SpecGlobalOrAccess] = body.specGlobals
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] = body.oldSpecGlobals
+  override def specGammas: Set[SpecGlobalOrAccess] = body.specGammas
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = body.oldSpecGammas
   override def loads: Set[BExpr] = body.loads
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitBVSignExtend(this)
 }
@@ -223,6 +233,8 @@ case class BFunctionCall(name: String, args: List[BExpr], outType: BType, uninte
   override def params: Set[BVar] = args.flatMap(a => a.params).toSet
   override def specGlobals: Set[SpecGlobalOrAccess] = args.flatMap(a => a.specGlobals).toSet
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] = args.flatMap(a => a.oldSpecGlobals).toSet
+  override def specGammas: Set[SpecGlobalOrAccess] = args.flatMap(a => a.specGammas).toSet
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = args.flatMap(a => a.oldSpecGammas).toSet
   override def loads: Set[BExpr] = args.flatMap(a => a.loads).toSet
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitBFunctionCall(this)
 }
@@ -260,6 +272,8 @@ case class UnaryBExpr(op: UnOp, arg: BExpr) extends BExpr {
   override def params: Set[BVar] = arg.params
   override def specGlobals: Set[SpecGlobalOrAccess] = arg.specGlobals
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] = arg.oldSpecGlobals
+  override def specGammas: Set[SpecGlobalOrAccess] = arg.specGammas
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = arg.oldSpecGammas
   override def loads: Set[BExpr] = arg.loads
 
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitUnaryBExpr(this)
@@ -366,6 +380,8 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
   override def params: Set[BVar] = arg1.params ++ arg2.params
   override def specGlobals: Set[SpecGlobalOrAccess] = arg1.specGlobals ++ arg2.specGlobals
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] = arg1.oldSpecGlobals ++ arg2.oldSpecGlobals
+  override def specGammas: Set[SpecGlobalOrAccess] = arg1.specGammas ++ arg2.specGammas
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = arg1.oldSpecGammas ++ arg2.oldSpecGammas
   override def loads: Set[BExpr] = arg1.loads ++ arg2.loads
 
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitBinaryBExpr(this)
@@ -388,6 +404,9 @@ case class IfThenElse(guard: BExpr, thenExpr: BExpr, elseExpr: BExpr) extends BE
   override def specGlobals: Set[SpecGlobalOrAccess] = guard.specGlobals ++ thenExpr.specGlobals ++ elseExpr.specGlobals
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] =
     guard.oldSpecGlobals ++ thenExpr.oldSpecGlobals ++ elseExpr.oldSpecGlobals
+  override def specGammas: Set[SpecGlobalOrAccess] = guard.specGammas ++ thenExpr.specGammas ++ elseExpr.specGammas
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] =
+    guard.oldSpecGammas ++ thenExpr.oldSpecGammas ++ elseExpr.oldSpecGammas
   override def loads: Set[BExpr] = guard.loads ++ thenExpr.loads ++ elseExpr.loads
 
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitIfThenElse(this)
@@ -405,6 +424,8 @@ trait QuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr) extends B
   override def params: Set[BVar] = body.params -- bound.toSet
   override def specGlobals: Set[SpecGlobalOrAccess] = body.specGlobals
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] = body.oldSpecGlobals
+  override def specGammas: Set[SpecGlobalOrAccess] = body.specGammas
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = body.oldSpecGammas
   override def loads: Set[BExpr] = body.loads
 }
 
@@ -428,6 +449,7 @@ case class Old(body: BExpr) extends BExpr {
   override def globals: Set[BVar] = body.globals
   override def params: Set[BVar] = body.params
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] = body.specGlobals
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = body.specGammas
   override def loads: Set[BExpr] = body.loads
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitOld(this)
 }

@@ -21,8 +21,10 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
   private val relies = spec.relies.map(resolveSpec.visitBExpr)
   private val reliesParam = spec.relies.map(ResolveSpecParam.visitBExpr)
   private val reliesReflexive = spec.relies.map(removeOld.visitBExpr)
-  private val guarantees = spec.guarantees.map(g => resolveOld.visitBExpr(g) -> g.oldSpecGlobals).toMap
-  private val guaranteeRegions = guarantees.keys.map(g => g -> g.globals).toMap
+  private val guarantees = spec.guarantees.map(g => g -> resolveOld.visitBExpr(g)).toMap
+  private val guaranteeOldSpecGlobals = spec.guarantees.map(g => g -> g.oldSpecGlobals).toMap
+  private val guaranteeOldSpecGammas = spec.guarantees.map(g => g -> g.oldSpecGammas).toMap
+  private val guaranteeRegions = guarantees.map((k, v) => k -> v.globals)
   private val guaranteesParam = spec.guarantees.map(ResolveSpecParam.visitBExpr)
   private val guaranteesReflexive = spec.guarantees.map(removeOld.visitBExpr)
   private val requires = spec.subroutines.map(s => s.name -> s.requires.map(resolveSpec.visitBExpr)).toMap
@@ -858,13 +860,11 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
    */
   private def translateOldAssigns(memories: Set[Memory]): List[AssignCmd] = {
     val lhss: Set[BVar] = memories.map(_.toBoogie)
-    val oldVars = guarantees.keys.view.toSet.flatMap { g =>
-      guaranteeRegions(g).flatMap { h =>
-        if (lhss.contains(h)) {
-          guarantees(g)
-        } else {
-          Set()
-        }
+    val oldVars = guarantees.keys.flatMap { g =>
+      if (lhss.intersect(guaranteeRegions(g)).nonEmpty) {
+        guaranteeOldSpecGlobals(g)
+      } else {
+        Set()
       }
     }
     val assigns = oldVars.toList.sorted.map { g =>
@@ -884,7 +884,15 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     } else {
       throw Exception("inconsistent memory sizes")
     }
-    val gammaAssigns = controlled.map { g =>
+    val oldGammasGuarantee = guarantees.keys.flatMap { g =>
+      if (lhss.intersect(guaranteeRegions(g)).nonEmpty) {
+        guaranteeOldSpecGammas(g)
+      } else {
+        Set()
+      }
+    }
+    val oldGammas = oldGammasGuarantee ++ controlled
+    val gammaAssigns = oldGammas.map { g =>
       val gamma = if (regionInjector.isDefined) {
         regionInjector.get.getMergedRegion(g.address, g.size) match {
           case Some(region) =>
@@ -926,8 +934,8 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
   private def translateGuaranteeChecks(stores: Iterable[MemoryStore]): List[BCmd] = {
     val lhss = stores.map(_.mem.toBoogie)
     val asserts = lhss.flatMap { lhs =>
-      guarantees.keys.collect {
-        case g if guaranteeRegions(g).contains(lhs) => BAssert(g)
+      guarantees.collect {
+        case (k, v) if guaranteeRegions(k).contains(lhs) => BAssert(v)
       }
     }
     asserts.toList

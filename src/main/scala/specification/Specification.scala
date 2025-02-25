@@ -39,14 +39,15 @@ case class SpecGlobal(override val name: String, override val size: Int, arraySi
 }
 
 case class SpecGamma(global: SpecGlobal) extends SpecVar {
-  override val address = global.address
-  val size = global.size
+  override val address: BigInt = global.address
+  val size: Int = global.size
+  override def specGammas: Set[SpecGlobalOrAccess] = Set(this.global)
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitSpecGamma(this)
 }
 
 case class ArrayAccess(global: SpecGlobal, index: Int) extends SpecGlobalOrAccess {
-  val offset = index * (global.size / 8)
-  override val address = global.address + offset
+  val offset: Int = index * (global.size / 8)
+  override val address: BigInt = global.address + offset
   override val size: Int = global.size
   override val toOldVar: BVar = BVariable(s"${global.name}$$${index}_old", BitVecBType(global.size), Scope.Local)
   override val toAddrVar: BExpr = BinaryBExpr(BVADD, global.toAddrVar, BitVecBLiteral(offset, 64))
