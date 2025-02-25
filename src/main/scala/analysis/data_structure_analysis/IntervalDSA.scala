@@ -945,13 +945,10 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
       val pointee = this.removePointee.get
       val newThis = graph.mergeCells(pointee, this)
       graph.mergePointees(newThis, newThis.getPointee)
-//      assert(graph.get(this) == pointeeUpdated)
       this._pointee = Some(graph.mergeCells(newThis, newThis.getPointee))
       assert(this._pointee.get.equiv(pointee))
       assert(this._pointee.get.equiv(this))
-//      graph.get(this)._pointee = this._pointee
       _pointee.get
-
     else // if a cell points to itself break the link,
       graph.mergePointees(this.getPointee, cell)
       this._pointee = Some(graph.mergeCells(cell, graph.get(this).getPointee))
