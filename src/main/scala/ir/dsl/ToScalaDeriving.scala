@@ -23,7 +23,7 @@ import scala.compiletime.{summonInline, erasedValue, constValue, error}
  *       case A
  *       case B
  *     }
- *     given ToScala[EAAA] =
+ *     given ToScala[EAAA] with
  *       ToScala.deriveWithExclusions[EAAA, EAAA.A.type](
  *         (x: EAAA.A.type) => s"custom implementation for EAAA.A")
  */
