@@ -1,0 +1,59 @@
+package ir.dsl
+
+import scala.collection.immutable.SortedMap
+import ir.*
+
+/**
+ * Basil IR to DSL
+ * ===============
+ * This file implements conversion of Basil IR to DSL structures.
+ * The goal of this conversion is to easily support *cloning* of the Basil IR by
+ * first converting it to a DSL, then resolving that DSL. The resulting new
+ * Basil IR structure can then be used within a new program or appended into the
+ * original program.
+ */
+
+object IRToDSL {
+
+  def keyToString[T](x: (Variable, T)): (String, T) = (x(0).name, x(1))
+  def localVarToTuple(x: LocalVar) = (x.name, x.irType)
+
+  def convertJump(x: Jump): EventuallyJump = x match {
+    case Unreachable(label) => EventuallyUnreachable(label)
+    case Return(label, out) => EventuallyReturn(out.map(keyToString).toArray, label)
+    case GoTo(targs, label) => EventuallyGoto(targs.map(t => DelayNameResolve(t.label)).toList, label)
+  }
+
+  def convertNonControlStatement(x: NonCallStatement): EventuallyStatement = clonedStmt(x)
+
+  def convertControlStatement(x: CallStatement): EventuallyStatement = x match {
+    case DirectCall(targ, outs, actuals, label) =>
+      // XXX: be aware of ordering, .map() on a SortedMap may return a HashMap.
+      directCall(outs.toArray.map(keyToString), targ.name, actuals.toArray.map(keyToString): _*)
+    case IndirectCall(targ, label) => indirectCall(targ)
+  }
+
+  def convertStatement(x: Statement) = x match {
+    case x: NonCallStatement => convertNonControlStatement(x)
+    case x: CallStatement => convertControlStatement(x)
+  }
+
+  def convertBlock(x: Block) =
+    EventuallyBlock(x.label, x.statements.toArray.map(convertStatement), convertJump(x.jump), x.address)
+
+  def convertProcedure(x: Procedure) =
+    EventuallyProcedure(
+      x.procName,
+      x.formalInParam.toSeq.map(localVarToTuple).to(SortedMap),
+      x.formalOutParam.toSeq.map(localVarToTuple).to(SortedMap),
+      x.blocks.map(convertBlock).toArray,
+      x.entryBlock.map(_.label),
+      x.returnBlock.map(_.label),
+      x.address
+    )
+
+  def convertProgram(x: Program) =
+    val others = x.procedures.filter(_ != x.mainProcedure).map(convertProcedure)
+    EventuallyProgram(convertProcedure(x.mainProcedure), others.toArray, x.initialMemory.values)
+
+}

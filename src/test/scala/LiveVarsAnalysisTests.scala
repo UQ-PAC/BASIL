@@ -32,7 +32,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     runBASIL(inputFile, relfFile, None, outputFile, staticAnalysisConfig)
   }
 
-  def createSimpleProc(name: String, statements: Seq[Statement]): EventuallyProcedure = {
+  def createSimpleProc(name: String, statements: Seq[NonCallStatement]): EventuallyProcedure = {
     proc(name, block("l" + name, statements.:+(goto(name + "_return")): _*), block(name + "_return", ret))
   }
 
