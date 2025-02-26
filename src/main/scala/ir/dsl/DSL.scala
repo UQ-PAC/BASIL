@@ -197,14 +197,23 @@ def mem: SharedMemory = SharedMemory("mem", 64, 8)
 
 def stack: SharedMemory = SharedMemory("stack", 64, 8)
 
-def prog(procedures: EventuallyProcedure*): Program = {
+def prog(initialMemory: Iterable[MemorySection], procedures: Iterable[EventuallyProcedure]): Program = {
   require(procedures.nonEmpty)
 
-  val initialMemory = mutable.TreeMap[BigInt, MemorySection]()
-  val p = Program(ArrayBuffer.from(procedures.map(_.tempProc)), procedures.map(_.tempProc).head, initialMemory)
+  val progInitialMemory = mutable.TreeMap.from(initialMemory.map(v => v.address -> v))
+  val p = Program(ArrayBuffer.from(procedures.map(_.tempProc)), procedures.map(_.tempProc).head, progInitialMemory)
 
   procedures.foreach(_.resolve(p))
   assert(ir.invariant.correctCalls(p))
   assert(ir.invariant.cfgCorrect(p))
   p
+}
+
+
+def prog(procedures: EventuallyProcedure*): Program = {
+  prog(Seq(), procedures.toSeq)
+}
+
+def prog(initialMemory: Iterable[MemorySection], procedures: EventuallyProcedure*): Program = {
+  prog(initialMemory, procedures.toSeq)
 }

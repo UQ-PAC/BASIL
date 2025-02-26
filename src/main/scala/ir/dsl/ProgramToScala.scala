@@ -2,7 +2,7 @@ package ir.dsl
 
 import ir.*
 import ir.dsl.{ToScala, ToScalaLines}
-import util.{Twine, indentNested}
+import util.{Twine, indentNested, intersperse}
 
 import collection.immutable.{ListMap, SortedMap}
 import collection.immutable.{LazyList}
@@ -46,10 +46,37 @@ def procedureToScalaWith(blockToScala: Block => Twine)(x: Procedure): Twine =
 
   indentNested(s"proc(${x.name.toScala}", params #::: x.blocks.to(LazyList).map(blockToScala), ")", headSep = true)
 
+given ToScalaLines[MemorySection] with
+  extension (x: MemorySection)
+    def toScalaLines: Twine =
+      val array: Iterable[Twine] = List(
+        LazyList.from(
+          x.bytes.toSeq
+            .map(x => "0x" + x.value.toInt.toHexString)
+            .grouped(32)
+            .map(x => x.mkString(","))
+            .toSeq
+            .intersperse(",\n")
+        )
+      )
+      val bytes = indentNested("Seq(", array, ").map(BitVecLiteral(_, 8)).toSeq")
+      indentNested(
+        "MemorySection(",
+        List(
+          LazyList(x.name.toScala, ", ", x.address.toScala, ", ", x.size.toScala, ",\n") ++ bytes ++ LazyList(
+            ", ",
+            x.readOnly.toScala + ", ",
+            None.toScala
+          )
+        ),
+        ")"
+      )
+
 def programToScalaWith(procedureToScala: Procedure => Twine)(x: Program): Twine =
   val main = x.mainProcedure
   val others = x.procedures.to(LazyList).filter(_ ne main)
-  indentNested("prog(", (main #:: others).map(procedureToScala), ")")
+  val mem = indentNested("Seq(",  x.initialMemory.values.map(_.toScalaLines), ")")
+  indentNested("prog(", List(mem) ++ (main #:: others).map(procedureToScala), ")")
 
 /**
  * ToScala instances
