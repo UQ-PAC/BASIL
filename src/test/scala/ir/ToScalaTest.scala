@@ -395,7 +395,7 @@ case class A39() extends ASD
       case B
     }
     given ToScala[EAAA] =
-      ToScala.deriveWithExclusions[EAAA, EAAA.A.type](ToScala.Make(x => LazyList("custom", x.toString)))
+      ToScala.deriveWithExclusions[EAAA]((_,_) => None)
 
     sealed trait L derives ToScala
     case class N() extends L

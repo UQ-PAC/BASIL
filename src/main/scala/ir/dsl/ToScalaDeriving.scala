@@ -186,6 +186,8 @@ import scala.compiletime.{summonInline, erasedValue, constValue, error}
 
 object ToScalaDeriving {
 
+  type CustomToScala = (Any, String) => Option[ToScala[?]]
+
   /**
    * Support functions
    * -----------------
@@ -200,39 +202,39 @@ object ToScalaDeriving {
   /**
    * Summon ToScala instances for each type in the Elems tuple of types. Also handles exclusions.
    */
-  inline def summonInstances[T, Elems <: Tuple, Excl <: T](using
+  inline def summonInstances[T, Elems <: Tuple](using
     m: Mirror.Of[T]
-  )(custom: => ToScala[Excl]): List[ToScala[?]] =
+  )(inline custom: CustomToScala): List[ToScala[?]] =
 
     // NOTE: this is an unrolled recursion to avoid the "Maximal number of successive inlines (32) exceeded" error
     inline erasedValue[Elems] match
       case _: (t1 *: t2 *: t3 *: t4 *: rest) =>
-        summonOrCustom[T, t1, Excl](custom) // first field / case
-          :: summonOrCustom[T, t2, Excl](custom) // second field / case
-          :: summonOrCustom[T, t3, Excl](custom) // third field / case
-          :: summonOrCustom[T, t4, Excl](custom) // fourth field / case
-          :: summonInstances[T, rest, Excl](custom) // + 4
+        summonOrCustom[T, t1](custom) // first field / case
+          :: summonOrCustom[T, t2](custom) // second field / case
+          :: summonOrCustom[T, t3](custom) // third field / case
+          :: summonOrCustom[T, t4](custom) // fourth field / case
+          :: summonInstances[T, rest](custom) // + 4
       case _: (t1 *: t2 *: t3 *: EmptyTuple) =>
-        summonOrCustom[T, t1, Excl](custom) // first field / case
-          :: summonOrCustom[T, t2, Excl](custom) // second field / case
-          :: summonOrCustom[T, t3, Excl](custom) // third field / case
+        summonOrCustom[T, t1](custom) // first field / case
+          :: summonOrCustom[T, t2](custom) // second field / case
+          :: summonOrCustom[T, t3](custom) // third field / case
           :: List()
       case _: (t1 *: t2 *: EmptyTuple) =>
-        summonOrCustom[T, t1, Excl](custom) // first field / case
-          :: summonOrCustom[T, t2, Excl](custom) // second field / case
+        summonOrCustom[T, t1](custom) // first field / case
+          :: summonOrCustom[T, t2](custom) // second field / case
           :: List()
       case _: (t *: EmptyTuple) =>
-        summonOrCustom[T, t, Excl](custom) // first field / case
+        summonOrCustom[T, t](custom) // first field / case
           :: List()
       case _: EmptyTuple => Nil
 
   /**
    * Summon ToScala for the given type or apply a custom exclusion.
    */
-  inline def summonOrCustom[T, t, Excl <: T](using m: Mirror.Of[T])(custom: => ToScala[Excl]): ToScala[?] =
-    inline erasedValue[t] match
-      case _: Excl => custom
-      case _ => deriveOrSummon[T, t, Excl](custom)
+  inline def summonOrCustom[T, t](using m: Mirror.Of[T])(inline custom: CustomToScala): ToScala[?] =
+    inline custom(erasedValue[t], "a") match
+      case Some(x) => x
+      case None => deriveOrSummon[T, t](custom)
 
   /**
    * Obtain a ToScala for the given type, either by summoning an existing instance
@@ -242,7 +244,7 @@ object ToScalaDeriving {
    * Recursively derives subtypes (i.e. cases) of sum types.
    * Otherwise, summons an external ToScala instance for the given type.
    */
-  inline def deriveOrSummon[T, Elem, Excl <: T](using m: Mirror.Of[T])(custom: => ToScala[Excl]): ToScala[Elem] =
+  inline def deriveOrSummon[T, Elem](using m: Mirror.Of[T])(inline custom: CustomToScala): ToScala[Elem] =
     inline (erasedValue[Elem], erasedValue[T]) match
       // Elem <: T and T <: Elem means T == Elem
       case _: (T, Elem) =>
@@ -252,7 +254,7 @@ object ToScalaDeriving {
 
       // Elem <: T means the element is a subtype and we should recurse
       case _: (T, _) =>
-        deriveWithExclusions[Elem, Elem & Excl](using summonInline[Mirror.Of[Elem]])(
+        deriveWithExclusions[Elem](using summonInline[Mirror.Of[Elem]])(
           custom
         ) // recursively derive sum case
 
@@ -324,23 +326,25 @@ object ToScalaDeriving {
    */
   def absurd[T](x: Nothing): T = x
 
+  inline def noExclusions(a: Any, b: String) = None
+
   /**
    * Entry point for derivation. Used by Scala's "deriving ToScala" syntax.
    */
   inline def derived[T](using m: Mirror.Of[T]): ToScala[T] =
-    deriveWithExclusions(Make[Nothing](absurd)) // derive with defaults (no exclusions)
+    deriveWithExclusions(noExclusions) // derive with defaults (no exclusions)
 
   /**
    * Alternative entry point for deriving ToScala. Allows for specifying
    * a custom implementation for a certain subset of cases.
    */
-  inline def deriveWithExclusions[T, Excl <: T](using m: Mirror.Of[T])(custom: => ToScala[Excl]): ToScala[T] = {
+  inline def deriveWithExclusions[T](using m: Mirror.Of[T])(inline custom: CustomToScala): ToScala[T] = {
 
     lazy val elemInstances = inline m match
       case _: Mirror.SumOf[T] =>
-        summonInstances[T, m.MirroredElemTypes, Excl](custom) // obtain given instances for sum cases
+        summonInstances[T, m.MirroredElemTypes](custom) // obtain given instances for sum cases
       case _: Mirror.ProductOf[T] =>
-        summonInstances[T, m.MirroredElemTypes, Excl](custom) // obtain given instances for product fields
+        summonInstances[T, m.MirroredElemTypes](custom) // obtain given instances for product fields
 
     inline val name = constValue[m.MirroredLabel]
     Make[T]((x: T) =>
@@ -350,5 +354,4 @@ object ToScalaDeriving {
         case p: Mirror.ProductOf[T] => toScalaOfProduct[T](elemInstances, name, false, x)
     )
   }
-
 }

@@ -118,7 +118,8 @@ private object CaseIR {
     case x: GoTo => LazyList(s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})")
   }
 
-  given ToScala[Command] = ToScala.deriveWithExclusions[Command, Excluded](toScalaOfExcluded)
+  given ToScala[Command] = ???
+    // ToScala.deriveWithExclusions[Command, Excluded](toScalaOfExcluded)
 
 }
 
