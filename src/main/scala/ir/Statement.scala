@@ -6,7 +6,7 @@ import collection.mutable
 
 /*
   To support the state-free IL iteration in CFG order all Commands must be classes with a unique object ref.
-*/
+ */
 
 /** A Statement or Jump.
   *
@@ -34,14 +34,10 @@ sealed trait Assign extends Statement {
   var lhs: Variable
 }
 
-class LocalAssign(
-  var lhs: Variable,
-  var rhs: Expr,
-  override val label: Option[String] = None
-) extends Assign {
+class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[String] = None) extends Assign {
   override def modifies: Set[Global] = lhs match {
     case r: Register => Set(r)
-    case _           => Set()
+    case _ => Set()
   }
   override def toString: String = s"$labelStr$lhs := $rhs"
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitLocalAssign(this)
@@ -64,7 +60,8 @@ class MemoryStore(
 }
 
 object MemoryStore {
-  def unapply(m: MemoryStore): Option[(Memory, Expr, Expr, Endian, Int, Option[String])] = Some(m.mem, m.index, m.value, m.endian, m.size, m.label)
+  def unapply(m: MemoryStore): Option[(Memory, Expr, Expr, Endian, Int, Option[String])] =
+    Some(m.mem, m.index, m.value, m.endian, m.size, m.label)
 }
 
 class MemoryLoad(
@@ -84,7 +81,8 @@ class MemoryLoad(
 }
 
 object MemoryLoad {
-  def unapply(m: MemoryLoad): Option[(Variable, Memory, Expr, Endian, Int, Option[String])] = Some(m.lhs, m.mem, m.index, m.endian, m.size, m.label)
+  def unapply(m: MemoryLoad): Option[(Variable, Memory, Expr, Endian, Int, Option[String])] =
+    Some(m.lhs, m.mem, m.index, m.endian, m.size, m.label)
 }
 
 class NOP(override val label: Option[String] = None) extends Statement {
@@ -100,11 +98,8 @@ class AtomicEnd(override val label: Option[String] = None) extends NOP(label) {
   override def toString: String = s"AtomicEnd $labelStr"
 }
 
-class Assert(
-  var body: Expr,
-  var comment: Option[String] = None,
-  override val label: Option[String] = None
-) extends Statement {
+class Assert(var body: Expr, var comment: Option[String] = None, override val label: Option[String] = None)
+    extends Statement {
   override def toString: String = s"${labelStr}assert $body" + comment.map(" //" + _)
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssert(this)
 }
@@ -131,11 +126,12 @@ class Assume(
 }
 
 object Assume:
-  def unapply(a: Assume): Option[(Expr, Option[String], Option[String], Boolean)] = Some(a.body, a.comment, a.label, a.checkSecurity)
+  def unapply(a: Assume): Option[(Expr, Option[String], Option[String], Boolean)] =
+    Some(a.body, a.comment, a.label, a.checkSecurity)
 
 sealed trait Jump extends Command {
   def modifies: Set[Global] = Set()
-  //def locals: Set[Variable] = Set()
+  // def locals: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Jump = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
@@ -156,10 +152,8 @@ object Return {
   def unapply(r: Return): Option[Option[String]] = Some(r.label)
 }
 
-class GoTo private (
-  private val _targets: mutable.LinkedHashSet[Block],
-  override val label: Option[String]
-) extends Jump {
+class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override val label: Option[String])
+    extends Jump {
 
   def this(targets: Iterable[Block], label: Option[String] = None) = this(mutable.LinkedHashSet.from(targets), label)
 
@@ -185,7 +179,6 @@ class GoTo private (
     targets.foreach(_.removeIncomingJump(this))
   }
 
-
   def removeTarget(t: Block): Unit = {
     // making the assumption that blocks only contain the same outgoing edge once
     //  e.g. We don't have two edges going to the same block under different conditions
@@ -203,7 +196,6 @@ class GoTo private (
 object GoTo:
   def unapply(g: GoTo): Option[(Set[Block], Option[String])] = Some(g.targets, g.label)
 
-
 sealed trait Call extends Statement {
   def returnTarget: Option[Command] = successor match {
     case h: Unreachable => None
@@ -211,10 +203,7 @@ sealed trait Call extends Statement {
   }
 }
 
-class DirectCall(
-  val target: Procedure,
-  override val label: Option[String] = None
-) extends Call {
+class DirectCall(val target: Procedure, override val label: Option[String] = None) extends Call {
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals
     case None => Set()
@@ -238,10 +227,7 @@ class DirectCall(
 object DirectCall:
   def unapply(i: DirectCall): Option[(Procedure, Option[String])] = Some(i.target, i.label)
 
-class IndirectCall(
-  var target: Variable,
-  override val label: Option[String] = None
-) extends Call {
+class IndirectCall(var target: Variable, override val label: Option[String] = None) extends Call {
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals + target
     case None => Set(target)

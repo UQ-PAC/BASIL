@@ -6,8 +6,10 @@ import scala.collection.mutable
 sealed trait Expr {
   def toBoogie: BExpr
   def getType: IRType
+
   /** variables that occur in the expression NOT including those inside a load's index */
   def gammas: Set[Variable] = Set()
+
   /** all variables that occur in the expression */
   def variables: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Expr = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
@@ -110,21 +112,21 @@ case class UnaryExpr(op: UnOp, arg: Expr) extends Expr {
   override def gammas: Set[Variable] = arg.gammas
   override def variables: Set[Variable] = arg.variables
   override def getType: IRType = (op, arg.getType) match {
-    case (_: BoolUnOp, BoolType)     => BoolType
+    case (_: BoolUnOp, BoolType) => BoolType
     case (_: BVUnOp, bv: BitVecType) => bv
-    case (_: IntUnOp, IntType)       => IntType
+    case (_: IntUnOp, IntType) => IntType
     case _ => throw new Exception("type mismatch, operator " + op + " type doesn't match arg: " + arg)
   }
 
   private def inSize = arg.getType match {
     case bv: BitVecType => bv.size
-    case _              => throw new Exception("type mismatch")
+    case _ => throw new Exception("type mismatch")
   }
 
   override def toString: String = op match {
     case uOp: BoolUnOp => s"($uOp$arg)"
-    case uOp: BVUnOp   => s"bv$uOp$inSize($arg)"
-    case uOp: IntUnOp  => s"($uOp$arg)"
+    case uOp: BVUnOp => s"bv$uOp$inSize($arg)"
+    case uOp: IntUnOp => s"($uOp$arg)"
   }
 
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitUnaryExpr(this)
@@ -144,7 +146,6 @@ sealed trait IntUnOp(op: String) extends UnOp {
 }
 
 case object IntNEG extends IntUnOp("-")
-
 
 sealed trait BVUnOp(op: String) extends UnOp {
   override def toString: String = op
@@ -187,7 +188,7 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
       }
     case (intOp: IntBinOp, IntType, IntType) =>
       intOp match {
-        case IntADD | IntSUB | IntMUL | IntDIV | IntMOD     => IntType
+        case IntADD | IntSUB | IntMUL | IntDIV | IntMOD => IntType
         case IntEQ | IntNEQ | IntLT | IntLE | IntGT | IntGE => BoolType
       }
     case _ =>
@@ -196,7 +197,7 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
 
   private def inSize = arg1.getType match {
     case bv: BitVecType => bv.size
-    case _              => throw new Exception("type mismatch")
+    case _ => throw new Exception("type mismatch")
   }
 
   override def toString: String = op match {
@@ -270,12 +271,12 @@ sealed trait IntBinOp(op: String) extends BinOp {
     case IntSUB => BVSUB
     case IntDIV => BVSDIV
     case IntMOD => BVSMOD
-    case IntEQ  => BVEQ
+    case IntEQ => BVEQ
     case IntNEQ => BVNEQ
-    case IntLT  => BVSLT
-    case IntLE  => BVSLE
-    case IntGT  => BVSGT
-    case IntGE  => BVSGE
+    case IntLT => BVSLT
+    case IntLE => BVSLE
+    case IntGT => BVSGT
+    case IntGE => BVSGE
   }
 }
 
@@ -362,11 +363,13 @@ sealed trait Memory extends Global {
 }
 
 /** A stack area of memory, which is local to a thread. */
-case class StackMemory(override val name: String, override val addressSize: Int, override val valueSize: Int) extends Memory {
+case class StackMemory(override val name: String, override val addressSize: Int, override val valueSize: Int)
+    extends Memory {
   override def acceptVisit(visitor: Visitor): Memory = visitor.visitStackMemory(this)
 }
 
 /** A non-stack region of memory, which may be shared between threads. */
-case class SharedMemory(override val name: String, override val addressSize: Int, override val valueSize: Int) extends Memory {
+case class SharedMemory(override val name: String, override val addressSize: Int, override val valueSize: Int)
+    extends Memory {
   override def acceptVisit(visitor: Visitor): Memory = visitor.visitSharedMemory(this)
 }

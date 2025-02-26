@@ -16,12 +16,24 @@ import test_util.TestConfig
   */
 
 trait SystemTests extends AnyFunSuite, BASILTest {
-  case class TestResult(name: String, passed: Boolean, verified: Boolean, shouldVerify: Boolean, hasExpected: Boolean, timedOut: Boolean, matchesExpected: Boolean, translateTime: Long, verifyTime: Long) {
-    val toCsv = s"$name,$passed,$verified,$shouldVerify,$hasExpected,$timedOut,$matchesExpected,$translateTime,$verifyTime"
+  case class TestResult(
+    name: String,
+    passed: Boolean,
+    verified: Boolean,
+    shouldVerify: Boolean,
+    hasExpected: Boolean,
+    timedOut: Boolean,
+    matchesExpected: Boolean,
+    translateTime: Long,
+    verifyTime: Long
+  ) {
+    val toCsv =
+      s"$name,$passed,$verified,$shouldVerify,$hasExpected,$timedOut,$matchesExpected,$translateTime,$verifyTime"
   }
 
   object TestResult {
-    val csvHeader = "testCase,passed,verified,shouldVerify,hasExpected,timedOut,matchesExpected,translateTime,verifyTime"
+    val csvHeader =
+      "testCase,passed,verified,shouldVerify,hasExpected,timedOut,matchesExpected,translateTime,verifyTime"
   }
 
   val testResults: ArrayBuffer[TestResult] = ArrayBuffer()
@@ -53,7 +65,8 @@ trait SystemTests extends AnyFunSuite, BASILTest {
    * Writes test result data into .csv and .md files named according to given filename.
    */
   def summary(filename: String): Unit = {
-    val csv: String = TestResult.csvHeader + System.lineSeparator() + testResults.map(r => s"${r.toCsv}").mkString(System.lineSeparator())
+    val csv: String = TestResult.csvHeader + System
+      .lineSeparator() + testResults.map(r => s"${r.toCsv}").mkString(System.lineSeparator())
     writeToFile(csv, testPath + "full-" + filename + ".csv")
 
     val verifTimes = testResults.map(_.verifyTime.toDouble)
@@ -69,7 +82,9 @@ trait SystemTests extends AnyFunSuite, BASILTest {
     val meanVerifyTime = mean(verifTimes)
     val stdDevVerifyTime = stdDev(verifTimes)
 
-    info(s"Test summary: $numSuccess succeeded, $numFail failed: $numVerified verified, $numCounterexample did not verify (including $numTimeout timeouts).")
+    info(
+      s"Test summary: $numSuccess succeeded, $numFail failed: $numVerified verified, $numCounterexample did not verify (including $numTimeout timeouts)."
+    )
     if (verifying.nonEmpty)
       info(s"Average time to verify: ${verifying.sum / verifying.size}")
     if (counterExamples.nonEmpty)
@@ -85,7 +100,7 @@ trait SystemTests extends AnyFunSuite, BASILTest {
       "counterexampleTotalTime" -> counterExamples.sum,
       "meanVerifyTime" -> meanVerifyTime.toInt,
       "medianVerifyTime" -> medianVerifyTime.toInt,
-      "stdDevVerifyTime" -> stdDevVerifyTime.toInt,
+      "stdDevVerifyTime" -> stdDevVerifyTime.toInt
     )
     val summaryHeader = summaryMap.keys.mkString(",") + System.lineSeparator
     val summaryRow = summaryMap.values.mkString(",") + System.lineSeparator
@@ -105,18 +120,18 @@ trait SystemTests extends AnyFunSuite, BASILTest {
       || Metric |
       ||--------|
       |""".stripMargin
-      + mdMap.map((k, _) => s"| $k |${System.lineSeparator}").mkString
+        + mdMap.map((k, _) => s"| $k |${System.lineSeparator}").mkString
 
     val partMarkdown =
       s"""
       | $filename |
       |-------|
       |""".stripMargin
-      + mdMap.map((_, v) => s" $v |${System.lineSeparator}").mkString
+        + mdMap.map((_, v) => s" $v |${System.lineSeparator}").mkString
 
     val summaryMarkdown = leftMarkdown.linesIterator
       .zip(partMarkdown.linesIterator)
-      .map(_++_)
+      .map(_ ++ _)
       .mkString("", System.lineSeparator, System.lineSeparator)
 
     writeToFile(partMarkdown, testPath + "summary-" + filename + ".md.part")
@@ -131,7 +146,8 @@ trait SystemTests extends AnyFunSuite, BASILTest {
     val BPLPath = if conf.useBAPFrontend then variationPath + "_bap.bpl" else variationPath + "_gtirb.bpl"
     val specPath = directoryPath + name + ".spec"
     val RELFPath = variationPath + ".relf"
-    val resultPath = if conf.useBAPFrontend then variationPath + "_bap_result.txt" else variationPath + "_gtirb_result.txt"
+    val resultPath =
+      if conf.useBAPFrontend then variationPath + "_bap_result.txt" else variationPath + "_gtirb_result.txt"
     val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
     val expectedOutPath = if conf.useBAPFrontend then variationPath + ".expected" else variationPath + "_gtirb.expected"
 
@@ -153,7 +169,17 @@ trait SystemTests extends AnyFunSuite, BASILTest {
 
     val passed = boogieFailureMsg.isEmpty
     if (conf.logResults) {
-      val result = TestResult(s"$name/$variation$testSuffix", passed, verified, conf.expectVerify, hasExpected, timedOut, matchesExpected, translateTime, verifyTime)
+      val result = TestResult(
+        s"$name/$variation$testSuffix",
+        passed,
+        verified,
+        conf.expectVerify,
+        hasExpected,
+        timedOut,
+        matchesExpected,
+        translateTime,
+        verifyTime
+      )
       testResults.append(result)
     }
     if (!passed) fail(boogieFailureMsg.get)
@@ -177,7 +203,10 @@ trait SystemTests extends AnyFunSuite, BASILTest {
 
 class SystemTestsBAP extends SystemTests {
   runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true))
-  runTests("incorrect", TestConfig(useBAPFrontend = true, expectVerify = false, checkExpected = true, logResults = true))
+  runTests(
+    "incorrect",
+    TestConfig(useBAPFrontend = true, expectVerify = false, checkExpected = true, logResults = true)
+  )
   test("summary-BAP") {
     summary("testresult-BAP")
   }
@@ -185,7 +214,10 @@ class SystemTestsBAP extends SystemTests {
 
 class SystemTestsGTIRB extends SystemTests {
   runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, checkExpected = true, logResults = true))
-  runTests("incorrect", TestConfig(useBAPFrontend = false, expectVerify = false, checkExpected = true, logResults = true))
+  runTests(
+    "incorrect",
+    TestConfig(useBAPFrontend = false, expectVerify = false, checkExpected = true, logResults = true)
+  )
   test("summary-GTIRB") {
     summary("testresult-GTIRB")
   }
@@ -194,66 +226,199 @@ class SystemTestsGTIRB extends SystemTests {
 class ExtraSpecTests extends SystemTests {
   // some of these tests have time out issues so they need more time, but some still time out even with this for unclear reasons
   val boogieFlags = Seq("/timeLimit:30", "/useArrayAxioms")
-  runTests("extraspec_correct", TestConfig(boogieFlags = boogieFlags, useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true))
-  runTests("extraspec_correct", TestConfig(boogieFlags = boogieFlags, useBAPFrontend = false, expectVerify = true, checkExpected = true, logResults = true))
-  runTests("extraspec_incorrect", TestConfig(boogieFlags = boogieFlags, useBAPFrontend = true, expectVerify = false, checkExpected = true, logResults = true))
-  runTests("extraspec_incorrect", TestConfig(boogieFlags = boogieFlags, useBAPFrontend = false, expectVerify = false, checkExpected = true, logResults = true))
+  runTests(
+    "extraspec_correct",
+    TestConfig(
+      boogieFlags = boogieFlags,
+      useBAPFrontend = true,
+      expectVerify = true,
+      checkExpected = true,
+      logResults = true
+    )
+  )
+  runTests(
+    "extraspec_correct",
+    TestConfig(
+      boogieFlags = boogieFlags,
+      useBAPFrontend = false,
+      expectVerify = true,
+      checkExpected = true,
+      logResults = true
+    )
+  )
+  runTests(
+    "extraspec_incorrect",
+    TestConfig(
+      boogieFlags = boogieFlags,
+      useBAPFrontend = true,
+      expectVerify = false,
+      checkExpected = true,
+      logResults = true
+    )
+  )
+  runTests(
+    "extraspec_incorrect",
+    TestConfig(
+      boogieFlags = boogieFlags,
+      useBAPFrontend = false,
+      expectVerify = false,
+      checkExpected = true,
+      logResults = true
+    )
+  )
   test("summary-extraspec") {
     summary("testresult-extraspec")
   }
 }
 
 class AnalysisSystemTestsBAP extends SystemTests {
-  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = true))
-  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = false))
+  runTests(
+    "correct",
+    TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = true)
+  )
+  runTests(
+    "incorrect",
+    TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = false)
+  )
 }
 
 class AnalysisSystemTestsGTIRB extends SystemTests {
-  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = false, expectVerify = true))
-  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = false, expectVerify = false))
+  runTests(
+    "correct",
+    TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = false, expectVerify = true)
+  )
+  runTests(
+    "incorrect",
+    TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = false, expectVerify = false)
+  )
 }
 
 class DSAMemoryRegionSystemTestsBAP extends SystemTests {
-  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)), useBAPFrontend = true, expectVerify = true))
-  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)), useBAPFrontend = true, expectVerify = false))
+  runTests(
+    "correct",
+    TestConfig(
+      staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)),
+      useBAPFrontend = true,
+      expectVerify = true
+    )
+  )
+  runTests(
+    "incorrect",
+    TestConfig(
+      staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)),
+      useBAPFrontend = true,
+      expectVerify = false
+    )
+  )
 }
 
 class DSAMemoryRegionSystemTestsGTIRB extends SystemTests {
-  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)), useBAPFrontend = false, expectVerify = true))
-  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)), useBAPFrontend = false, expectVerify = false))
+  runTests(
+    "correct",
+    TestConfig(
+      staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)),
+      useBAPFrontend = false,
+      expectVerify = true
+    )
+  )
+  runTests(
+    "incorrect",
+    TestConfig(
+      staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)),
+      useBAPFrontend = false,
+      expectVerify = false
+    )
+  )
 }
 
 class MRAMemoryRegionSystemTestsBAP extends SystemTests {
-  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.MRA)), useBAPFrontend = true, expectVerify = true))
-  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.MRA)), useBAPFrontend = true, expectVerify = false))
+  runTests(
+    "correct",
+    TestConfig(
+      staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.MRA)),
+      useBAPFrontend = true,
+      expectVerify = true
+    )
+  )
+  runTests(
+    "incorrect",
+    TestConfig(
+      staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.MRA)),
+      useBAPFrontend = true,
+      expectVerify = false
+    )
+  )
 }
 
 class MRAMemoryRegionSystemTestsGTIRB extends SystemTests {
-  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.MRA)), useBAPFrontend = false, expectVerify = true))
-  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.MRA)), useBAPFrontend = false, expectVerify = false))
+  runTests(
+    "correct",
+    TestConfig(
+      staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.MRA)),
+      useBAPFrontend = false,
+      expectVerify = true
+    )
+  )
+  runTests(
+    "incorrect",
+    TestConfig(
+      staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.MRA)),
+      useBAPFrontend = false,
+      expectVerify = false
+    )
+  )
 }
 
 class MemoryRegionTestsDSA extends SystemTests {
   // stack_pointer currently times out because Boogie is bad at handling abstract map accesses
-  runTests("memory_regions", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)), useBAPFrontend = true, expectVerify = true))
+  runTests(
+    "memory_regions",
+    TestConfig(
+      staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA)),
+      useBAPFrontend = true,
+      expectVerify = true
+    )
+  )
 }
 
 class MemoryRegionTestsMRA extends SystemTests {
   // stack_pointer currently times out because Boogie is bad at handling abstract map accesses
-  runTests("memory_regions", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.MRA)), useBAPFrontend = true, expectVerify = true))
+  runTests(
+    "memory_regions",
+    TestConfig(
+      staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.MRA)),
+      useBAPFrontend = true,
+      expectVerify = true
+    )
+  )
 }
 
 class MemoryRegionTestsNoRegion extends SystemTests {
-  runTests("memory_regions", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = true))
+  runTests(
+    "memory_regions",
+    TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = true)
+  )
 }
 
 class ProcedureSummaryTests extends SystemTests {
   // TODO currently procedure_summary3 verifies despite incorrect procedure summary analysis
   // this is due to BASIL's currently limited handling of non-returning calls
-  runTests("procedure_summaries", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(summariseProcedures = true)),
-    useBAPFrontend = true, expectVerify = true))
-  runTests("procedure_summaries", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(summariseProcedures = true)),
-    useBAPFrontend = false, expectVerify = true))
+  runTests(
+    "procedure_summaries",
+    TestConfig(
+      staticAnalysisConfig = Some(StaticAnalysisConfig(summariseProcedures = true)),
+      useBAPFrontend = true,
+      expectVerify = true
+    )
+  )
+  runTests(
+    "procedure_summaries",
+    TestConfig(
+      staticAnalysisConfig = Some(StaticAnalysisConfig(summariseProcedures = true)),
+      useBAPFrontend = false,
+      expectVerify = true
+    )
+  )
 }
 
 // tests that require currently unimplemented functionality to pass

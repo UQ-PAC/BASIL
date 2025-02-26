@@ -10,6 +10,7 @@ import util.Logger
 trait Lattice[T]:
 
   type Element = T
+
   /** The bottom element of this lattice.
    */
   val bottom: T
@@ -109,7 +110,10 @@ class SASILattice extends Lattice[StridedWrappedInterval] {
           if ((a == c) && (b == d) && ((st == 0 && sr == 0) || (st != 0 && (sr mod st) == 0))) { // added check for zero division that is not in paper
             return true
           }
-          membershipFunction(a, t) && membershipFunction(b, t) && (!membershipFunction(c, r) || !membershipFunction(d, r)) && ((a - c) mod st) == 0 && (sr mod st) == 0
+          membershipFunction(a, t) && membershipFunction(b, t) && (!membershipFunction(c, r) || !membershipFunction(
+            d,
+            r
+          )) && ((a - c) mod st) == 0 && (sr mod st) == 0
         case _ => false
       }
     }
@@ -131,18 +135,29 @@ class SASILattice extends Lattice[StridedWrappedInterval] {
         if (orderingOperator(t, r)) {
           return r
         }
-        if (membershipFunction(a, t) && membershipFunction(b, t) && membershipFunction(c, r) && membershipFunction(d, r)) {
+        if (
+          membershipFunction(a, t) && membershipFunction(b, t) && membershipFunction(c, r) && membershipFunction(d, r)
+        ) {
           return SITop
         }
-        if (membershipFunction(c, r) && membershipFunction(b, t) && !membershipFunction(a, t) && !membershipFunction(d, r)) {
+        if (
+          membershipFunction(c, r) && membershipFunction(b, t) && !membershipFunction(a, t) && !membershipFunction(d, r)
+        ) {
           return SI(sr.gcd(st).gcd(modularMinus(d, a, w)), a, d, w)
         }
-        if (membershipFunction(a, t) && membershipFunction(d, r) && !membershipFunction(c, r) && !membershipFunction(b, t)) {
+        if (
+          membershipFunction(a, t) && membershipFunction(d, r) && !membershipFunction(c, r) && !membershipFunction(b, t)
+        ) {
           return SI(sr.gcd(st).gcd(modularMinus(b, c, w)), c, b, w)
         }
         val sad = SI(sr.gcd(st).gcd(modularMinus(d, a, w)), a, d, w)
         val scb = SI(sr.gcd(st).gcd(modularMinus(b, c, w)), c, b, w)
-        if (!membershipFunction(a, t) && !membershipFunction(d, r) && !membershipFunction(c, r) && !membershipFunction(b, t) && cardinalityFunction(sad, w) <= cardinalityFunction(scb, w)) {
+        if (
+          !membershipFunction(a, t) && !membershipFunction(d, r) && !membershipFunction(c, r) && !membershipFunction(
+            b,
+            t
+          ) && cardinalityFunction(sad, w) <= cardinalityFunction(scb, w)
+        ) {
           return sad
         }
         return scb
@@ -179,8 +194,8 @@ class SASILattice extends Lattice[StridedWrappedInterval] {
       SIBottom
     } else {
       // create singleton intervals for each value and then join them
-      x.foldLeft(bottom) {
-        case (acc, v) => lub(acc, singletonSI(v, w))
+      x.foldLeft(bottom) { case (acc, v) =>
+        lub(acc, singletonSI(v, w))
       }
     }
   }
@@ -197,7 +212,8 @@ class SASILattice extends Lattice[StridedWrappedInterval] {
     (s, t) match {
       case (SIBottom, _) => SIBottom // TODO: is this correct?
       case (_, SIBottom) => SIBottom // TODO: is this correct?
-      case (SI(ss, a, b, w1), SI(st, c, d, w2)) if (cardinalityFunction(s, w1) + cardinalityFunction(t, w2)) <= BigInt(2).pow(w1.toInt) =>
+      case (SI(ss, a, b, w1), SI(st, c, d, w2))
+          if (cardinalityFunction(s, w1) + cardinalityFunction(t, w2)) <= BigInt(2).pow(w1.toInt) =>
         assert(w1 == w2)
         return SI(ss.gcd(st), modularPlus(a, c, w1), modularPlus(b, d, w1), w1)
       case _ => SITop
@@ -217,7 +233,8 @@ class SASILattice extends Lattice[StridedWrappedInterval] {
     (s, t) match {
       case (SIBottom, _) => SIBottom // TODO: is this correct?
       case (_, SIBottom) => SIBottom // TODO: is this correct?
-      case (SI(ss, a, b, w1), SI(st, c, d, w2)) if (cardinalityFunction(s, w1) + cardinalityFunction(t, w2)) <= BigInt(2).pow(w1.toInt) =>
+      case (SI(ss, a, b, w1), SI(st, c, d, w2))
+          if (cardinalityFunction(s, w1) + cardinalityFunction(t, w2)) <= BigInt(2).pow(w1.toInt) =>
         assert(w1 == w2)
         return SI(ss.gcd(st), modularMinus(a, d, w1), modularMinus(b, c, w1), w1)
       case _ => SITop
@@ -236,7 +253,8 @@ class SASILattice extends Lattice[StridedWrappedInterval] {
 
 sealed trait ValueSet[T]
 
-case class VS[T](m: Map[T, StridedWrappedInterval]) extends ValueSet[T] { // TODO: default value in map must be assumed to be SIBottom
+case class VS[T](m: Map[T, StridedWrappedInterval])
+    extends ValueSet[T] { // TODO: default value in map must be assumed to be SIBottom
   override def toString: String = m.toString
 }
 
@@ -265,11 +283,10 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
       case (VSTop, _) => VSTop
       case (_, VSTop) => VSTop
       case (VS(m1), VS(m2)) =>
-        VS(m1.keys.foldLeft(m2) {
-          case (acc, k) =>
-            val v1 = m1(k)
-            val v2 = m2(k)
-            acc + (k -> lattice.lub(v1, v2))
+        VS(m1.keys.foldLeft(m2) { case (acc, k) =>
+          val v1 = m1(k)
+          val v2 = m2(k)
+          acc + (k -> lattice.lub(v1, v2))
         })
     }
   }
@@ -296,9 +313,10 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
         bvOp match
           case BVAND => ???
           case BVOR => ???
-          case BVADD => rhs match
-            case Left(vs) => add(lhs, vs)
-            case Right(bitVecLiteral) => add(lhs, bitVecLiteral)
+          case BVADD =>
+            rhs match
+              case Left(vs) => add(lhs, vs)
+              case Right(bitVecLiteral) => add(lhs, bitVecLiteral)
           case BVMUL => ???
           case BVUDIV => ???
           case BVUREM => ???
@@ -310,9 +328,10 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
           case BVXOR => ???
           case BVXNOR => ???
           case BVCOMP => ???
-          case BVSUB => rhs match
-            case Left(vs) => sub(lhs, vs)
-            case Right(bitVecLiteral) => sub(lhs, bitVecLiteral)
+          case BVSUB =>
+            rhs match
+              case Left(vs) => sub(lhs, vs)
+              case Right(bitVecLiteral) => sub(lhs, bitVecLiteral)
           case BVSDIV => ???
           case BVSREM => ???
           case BVSMOD => ???
@@ -361,11 +380,10 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
       case (VSTop, _) => VSTop
       case (_, VSTop) => VSTop
       case (VS(m1), VS(m2)) =>
-        VS(m1.keys.foldLeft(m2) {
-          case (acc, k) =>
-            val v1 = m1(k)
-            val v2 = m2(k)
-            acc + (k -> lattice.add(v1, v2))
+        VS(m1.keys.foldLeft(m2) { case (acc, k) =>
+          val v1 = m1(k)
+          val v2 = m2(k)
+          acc + (k -> lattice.add(v1, v2))
         })
     }
   }
@@ -375,8 +393,8 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
       case VSBottom => VSBottom
       case VSTop => VSTop
       case VS(m) =>
-        VS(m.map {
-          case (k, s) => k -> lattice.add(s, y.value, y.size) // TODO: is the size correct here?
+        VS(m.map { case (k, s) =>
+          k -> lattice.add(s, y.value, y.size) // TODO: is the size correct here?
         })
     }
   }
@@ -388,11 +406,10 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
       case (VSBottom, t) => VSBottom
       case (t, VSBottom) => t
       case (VS(m1), VS(m2)) =>
-        VS(m1.keys.foldLeft(m2) {
-          case (acc, k) =>
-            val v1 = m1(k)
-            val v2 = m2(k)
-            acc + (k -> lattice.sub(v1, v2))
+        VS(m1.keys.foldLeft(m2) { case (acc, k) =>
+          val v1 = m1(k)
+          val v2 = m2(k)
+          acc + (k -> lattice.sub(v1, v2))
         })
     }
   }
@@ -402,8 +419,8 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
       case VSTop => VSTop
       case VSBottom => VSBottom
       case VS(m) =>
-        VS(m.map {
-          case (k, s) => k -> lattice.sub(s, y.value, y.size) // TODO: is the size correct here?
+        VS(m.map { case (k, s) =>
+          k -> lattice.sub(s, y.value, y.size) // TODO: is the size correct here?
         })
     }
   }
@@ -429,8 +446,8 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
       case VSBottom => VSBottom
       case VSTop => VSTop
       case VS(m) =>
-        VS(m.map {
-          case (k, SI(s, l, u, w)) => k -> SI(s, lattice.lowestPossibleValue, u, w)
+        VS(m.map { case (k, SI(s, l, u, w)) =>
+          k -> SI(s, lattice.lowestPossibleValue, u, w)
         })
     }
   }
@@ -440,8 +457,8 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
       case VSBottom => VSBottom
       case VSTop => VSTop
       case VS(m) =>
-        VS(m.map {
-          case (k, SI(s, l, u, w)) => k -> SI(s, l, lattice.highestPossibleValue, w)
+        VS(m.map { case (k, SI(s, l, u, w)) =>
+          k -> SI(s, l, lattice.highestPossibleValue, w)
         })
     }
   }
@@ -511,21 +528,22 @@ case class FlagMap(m: Map[Flags, Bool3]) extends Flag {
   override def toString: String = m.toString
 }
 
-
 /** The lattice of booleans with the standard ordering.
  */
 class FlagLattice extends Lattice[Flag] {
 
   override val bottom: Flag = BOTTOM_Flag
 
-  override def top: Flag = FlagMap(Map(
-    Flags.CF -> MAYBE_BOOL3,
-    Flags.ZF -> MAYBE_BOOL3,
-    Flags.SF -> MAYBE_BOOL3,
-    Flags.PF -> MAYBE_BOOL3,
-    Flags.AF -> MAYBE_BOOL3,
-    Flags.OF -> MAYBE_BOOL3
-  ))
+  override def top: Flag = FlagMap(
+    Map(
+      Flags.CF -> MAYBE_BOOL3,
+      Flags.ZF -> MAYBE_BOOL3,
+      Flags.SF -> MAYBE_BOOL3,
+      Flags.PF -> MAYBE_BOOL3,
+      Flags.AF -> MAYBE_BOOL3,
+      Flags.OF -> MAYBE_BOOL3
+    )
+  )
 
   val lattice: Bool3Lattice = Bool3Lattice()
 
@@ -534,11 +552,10 @@ class FlagLattice extends Lattice[Flag] {
       case (BOTTOM_Flag, t) => t
       case (t, BOTTOM_Flag) => t
       case (FlagMap(m1), FlagMap(m2)) =>
-        FlagMap(m1.keys.foldLeft(m2) {
-          case (acc, k) =>
-            val v1 = m1(k)
-            val v2 = m2(k)
-            acc + (k -> lattice.lub(v1, v2))
+        FlagMap(m1.keys.foldLeft(m2) { case (acc, k) =>
+          val v1 = m1(k)
+          val v2 = m2(k)
+          acc + (k -> lattice.lub(v1, v2))
         })
     }
   }
@@ -571,6 +588,7 @@ case class Lift[T](el: T) extends LiftedElement[T] {
 case object LiftedBottom extends LiftedElement[Nothing] {
   override def toString = "LiftBot"
 }
+
 /**
  * The lift lattice for `sublattice`.
  * Supports implicit lifting and unlifting.
@@ -607,7 +625,6 @@ trait TwoElement
 
 case object TwoElementTop extends TwoElement
 case object TwoElementBottom extends TwoElement
-
 
 /**
  * A lattice with only top and bottom
@@ -663,7 +680,8 @@ class FlatLatticeWithDefault[X](val f: () => X) extends Lattice[FlatElement[X]] 
   }
 }
 
-class TupleLattice[+L1 <: Lattice[T1], +L2 <: Lattice[T2], T1, T2](val lattice1: L1, val lattice2: L2) extends Lattice[(T1, T2)] {
+class TupleLattice[+L1 <: Lattice[T1], +L2 <: Lattice[T2], T1, T2](val lattice1: L1, val lattice2: L2)
+    extends Lattice[(T1, T2)] {
   override val bottom: (T1, T2) = (lattice1.bottom, lattice2.bottom)
 
   override def lub(x: (T1, T2), y: (T1, T2)): (T1, T2) = {
@@ -693,7 +711,11 @@ class MapLattice[A, T, +L <: Lattice[T]](val sublattice: L) extends Lattice[Map[
  *
  */
 class ConstantPropagationLattice extends FlatLattice[BitVecLiteral] {
-  private def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = try {
+  private def apply(
+    op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral,
+    a: FlatElement[BitVecLiteral],
+    b: FlatElement[BitVecLiteral]
+  ): FlatElement[BitVecLiteral] = try {
     (a, b) match
       case (FlatEl(x), FlatEl(y)) => FlatEl(op(x, y))
       case (Bottom, _) => Bottom
@@ -706,44 +728,70 @@ class ConstantPropagationLattice extends FlatLattice[BitVecLiteral] {
       throw e
   }
 
-  private def apply(op: BitVecLiteral => BitVecLiteral, a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = a match
-    case FlatEl(x) => FlatEl(op(x))
-    case Top => Top
-    case Bottom => Bottom
+  private def apply(op: BitVecLiteral => BitVecLiteral, a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    a match
+      case FlatEl(x) => FlatEl(op(x))
+      case Top => Top
+      case Bottom => Bottom
 
   def bv(a: BitVecLiteral): FlatElement[BitVecLiteral] = FlatEl(a)
-  def bvadd(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvadd, a, b)
-  def bvsub(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvsub, a, b)
-  def bvmul(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvmul, a, b)
-  def bvudiv(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvudiv, a, b)
-  def bvsdiv(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvsdiv, a, b)
-  def bvsrem(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvsrem, a, b)
-  def bvurem(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvurem, a, b)
-  def bvsmod(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvsmod, a, b)
-  def bvand(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvand, a, b)
-  def bvor(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvor, a, b)
-  def bvxor(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvxor, a, b)
-  def bvnand(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvnand, a, b)
-  def bvnor(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvnor, a, b)
-  def bvxnor(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvxnor, a, b)
+  def bvadd(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_bvadd, a, b)
+  def bvsub(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_bvsub, a, b)
+  def bvmul(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_bvmul, a, b)
+  def bvudiv(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_bvudiv, a, b)
+  def bvsdiv(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_bvsdiv, a, b)
+  def bvsrem(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_bvsrem, a, b)
+  def bvurem(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_bvurem, a, b)
+  def bvsmod(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_bvsmod, a, b)
+  def bvand(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_bvand, a, b)
+  def bvor(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_bvor, a, b)
+  def bvxor(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_bvxor, a, b)
+  def bvnand(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_bvnand, a, b)
+  def bvnor(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_bvnor, a, b)
+  def bvxnor(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_bvxnor, a, b)
   def bvnot(a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvnot, a)
   def bvneg(a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvneg, a)
-  def bvshl(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvshl, a, b)
-  def bvlshr(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvlshr, a, b)
-  def bvashr(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvashr, a, b)
-  def bvcomp(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvcomp, a, b)
-  def zero_extend(width: Int, a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_zero_extend(width, _: BitVecLiteral), a)
-  def sign_extend(width: Int, a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_sign_extend(width, _: BitVecLiteral), a)
+  def bvshl(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_bvshl, a, b)
+  def bvlshr(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_bvlshr, a, b)
+  def bvashr(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_bvashr, a, b)
+  def bvcomp(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_bvcomp, a, b)
+  def zero_extend(width: Int, a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_zero_extend(width, _: BitVecLiteral), a)
+  def sign_extend(width: Int, a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_sign_extend(width, _: BitVecLiteral), a)
   def extract(high: Int, low: Int, a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
     apply(BitVectorEval.boogie_extract(high, low, _: BitVecLiteral), a)
-  def concat(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_concat, a, b)
+  def concat(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.smt_concat, a, b)
 }
 
 /** Constant propagation lattice.
  *
  */
 class ConstantPropagationLatticeWithSSA extends PowersetLattice[BitVecLiteral] {
-  private def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] =
+  private def apply(
+    op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral,
+    a: Set[BitVecLiteral],
+    b: Set[BitVecLiteral]
+  ): Set[BitVecLiteral] =
     val res = for {
       x <- a
       y <- b
@@ -777,8 +825,10 @@ class ConstantPropagationLatticeWithSSA extends PowersetLattice[BitVecLiteral] {
   def bvlshr(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvlshr, a, b)
   def bvashr(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvashr, a, b)
   def bvcomp(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvcomp, a, b)
-  def zero_extend(width: Int, a: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_zero_extend(width, _: BitVecLiteral), a)
-  def sign_extend(width: Int, a: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_sign_extend(width, _: BitVecLiteral), a)
+  def zero_extend(width: Int, a: Set[BitVecLiteral]): Set[BitVecLiteral] =
+    apply(BitVectorEval.smt_zero_extend(width, _: BitVecLiteral), a)
+  def sign_extend(width: Int, a: Set[BitVecLiteral]): Set[BitVecLiteral] =
+    apply(BitVectorEval.smt_sign_extend(width, _: BitVecLiteral), a)
 
   def extract(high: Int, low: Int, a: Set[BitVecLiteral]): Set[BitVecLiteral] =
     apply(BitVectorEval.boogie_extract(high, low, _: BitVecLiteral), a)

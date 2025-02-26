@@ -1,13 +1,27 @@
 package analysis
 
 import analysis.solvers.SimplePushDownWorklistFixpointSolver
-import ir.{LocalAssign, CFGPosition, DirectCall, IntraProcIRCursor, MemoryLoad, Procedure, Program, Register, Variable, computeDomain}
+import ir.{
+  LocalAssign,
+  CFGPosition,
+  DirectCall,
+  IntraProcIRCursor,
+  MemoryLoad,
+  Procedure,
+  Program,
+  Register,
+  Variable,
+  computeDomain
+}
 
-abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[Register]]) extends Analysis[Map[CFGPosition, Map[Variable, Set[CFGPosition]]]] {
+abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[Register]])
+    extends Analysis[Map[CFGPosition, Map[Variable, Set[CFGPosition]]]] {
 
   val mallocRegister = Register("R0", 64)
   val domain: Set[CFGPosition] = computeDomain(IntraProcIRCursor, program.procedures).toSet
-  val lattice: MapLattice[CFGPosition, Map[Variable, Set[CFGPosition]], MapLattice[Variable, Set[CFGPosition], PowersetLattice[CFGPosition]]] = MapLattice(MapLattice(PowersetLattice[CFGPosition]()))
+  val lattice: MapLattice[CFGPosition, Map[Variable, Set[CFGPosition]], MapLattice[Variable, Set[
+    CFGPosition
+  ], PowersetLattice[CFGPosition]]] = MapLattice(MapLattice(PowersetLattice[CFGPosition]()))
 
   def transfer(n: CFGPosition, s: Map[Variable, Set[CFGPosition]]): Map[Variable, Set[CFGPosition]] = {
     n match {
@@ -29,6 +43,9 @@ abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[Regis
 
 }
 
-class ReachingDefsAnalysis(program: Program, writesTo: Map[Procedure, Set[Register]]) extends ReachingDefs(program, writesTo), IRIntraproceduralForwardDependencies,
-  SimplePushDownWorklistFixpointSolver[CFGPosition, Map[Variable, Set[CFGPosition]], MapLattice[Variable, Set[CFGPosition], PowersetLattice[CFGPosition]]]
-
+class ReachingDefsAnalysis(program: Program, writesTo: Map[Procedure, Set[Register]])
+    extends ReachingDefs(program, writesTo),
+      IRIntraproceduralForwardDependencies,
+      SimplePushDownWorklistFixpointSolver[CFGPosition, Map[Variable, Set[CFGPosition]], MapLattice[Variable, Set[
+        CFGPosition
+      ], PowersetLattice[CFGPosition]]]

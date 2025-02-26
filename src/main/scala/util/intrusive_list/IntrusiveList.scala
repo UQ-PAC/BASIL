@@ -28,9 +28,9 @@ import scala.collection.mutable.ArrayBuffer
   * @tparam T
   */
 final class IntrusiveList[T <: IntrusiveListElement[T]] private (
-    var numElems: Int,
-    var firstElem: Option[T],
-    var lastElem: Option[T]
+  var numElems: Int,
+  var firstElem: Option[T],
+  var lastElem: Option[T]
 ) extends mutable.Iterable[T],
       mutable.Growable[T]:
   /* Method called on the element whenever it is inserted to this list. */
@@ -114,7 +114,6 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
    */
   def reverseIterator: Iterator[T] = IntrusiveListIterator(lastElem, false)
 
-
   /**
    * Return an iterator beginning at a specific element in the list. O(1)
    * It is safe to modify or remove elements returned by the iterator.
@@ -122,7 +121,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
    * @param forward Iterate forwards (defualt) or backwards.
    * @return The iterator
    */
-  def iteratorFrom(elem: T, forward : Boolean = true): Iterator[T] = {
+  def iteratorFrom(elem: T, forward: Boolean = true): Iterator[T] = {
     assert(elem.first() == firstElem.get)
     IntrusiveListIterator(Some(elem), forward)
   }
@@ -257,7 +256,6 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     newlist
   }
 
-
   /**
    * Remove an element from the list.
    *
@@ -298,7 +296,6 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     intrusiveListElement.insertAfter(newElem)
   }
 
-
   /**
    * Insert an element after another element in the list.
    * @param intrusiveListElement The element in the list to insert after, or None to indicate the beginning.
@@ -307,9 +304,9 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
    */
   def insertAllAfter(intrusiveListElement: Option[T], newElems: Iterable[T]): Option[T] = {
     intrusiveListElement match {
-      case None => 
+      case None =>
         newElems.toList.reverse.map(prepend).headOption.orElse(intrusiveListElement)
-      case Some(n) => 
+      case Some(n) =>
         var p = n
         for (i <- newElems) {
           p = insertAfter(p, i)
@@ -317,7 +314,6 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
         Some(p)
     }
   }
-
 
   /**
    * Insert an element before another element in the list.
@@ -327,9 +323,9 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
    */
   def insertAllBefore(intrusiveListElement: Option[T], newElems: Iterable[T]): Option[T] = {
     intrusiveListElement match {
-      case None => 
+      case None =>
         newElems.map(append).lastOption.orElse(intrusiveListElement)
-      case Some(n) => 
+      case Some(n) =>
         var p = n
         for (i <- newElems.toList.reverse) {
           p = insertBefore(p, i)
@@ -337,7 +333,6 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
         Some(p)
     }
   }
-
 
   /**
    * Insert an element before another element in the list.
@@ -358,7 +353,6 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     onInsert(newElem)
     intrusiveListElement.insertBefore(newElem)
   }
-
 
   /**
    * Unsafely return the element after a given element.
@@ -483,14 +477,14 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
   private[intrusive_list] final def last(): T = {
     next match {
       case Some(n) => n.last()
-      case None    => this.asInstanceOf[T]
+      case None => this.asInstanceOf[T]
     }
   }
 
   private[intrusive_list] final def first(): T = {
     prev match {
       case Some(n) => n.first()
-      case None    => this.asInstanceOf[T]
+      case None => this.asInstanceOf[T]
     }
   }
 

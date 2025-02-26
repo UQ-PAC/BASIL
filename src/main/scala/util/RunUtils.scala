@@ -40,13 +40,13 @@ import scala.collection.mutable
   * transformation.
   */
 case class IRContext(
-    symbols: List[ELFSymbol],
-    externalFunctions: Set[ExternalFunction],
-    globals: Set[SpecGlobal],
-    funcEntries: Set[FuncEntry],
-    globalOffsets: Map[BigInt, BigInt],
-    specification: Specification,
-    program: Program // internally mutable
+  symbols: List[ELFSymbol],
+  externalFunctions: Set[ExternalFunction],
+  globals: Set[SpecGlobal],
+  funcEntries: Set[FuncEntry],
+  globalOffsets: Map[BigInt, BigInt],
+  specification: Specification,
+  program: Program // internally mutable
 )
 
 /** Stores the results of the static analyses.
@@ -82,14 +82,23 @@ object IRLoading {
   /** Create a context from just an IR program.
     */
   def load(p: Program): IRContext = {
-    IRContext(List.empty, Set.empty, Set.empty, Set.empty, Map.empty, IRLoading.loadSpecification(None, p, Set.empty), p)
+    IRContext(
+      List.empty,
+      Set.empty,
+      Set.empty,
+      Set.empty,
+      Map.empty,
+      IRLoading.loadSpecification(None, p, Set.empty),
+      p
+    )
   }
 
   /** Load a program from files using the provided configuration.
     */
   def load(q: ILLoadingConfig): IRContext = {
     // TODO: this tuple is large, should be a case class
-    val (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) = IRLoading.loadReadELF(q.relfFile, q)
+    val (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
+      IRLoading.loadReadELF(q.relfFile, q)
 
     val program: Program = if (q.inputFile.endsWith(".adt")) {
       val bapProgram = loadBAP(q.inputFile)
@@ -151,10 +160,10 @@ object IRLoading {
     }
 
     implicit object InsnSemanticsFormat extends JsonFormat[InsnSemantics] {
-      def write(m: InsnSemantics): JsValue =  ???
+      def write(m: InsnSemantics): JsValue = ???
       def read(json: JsValue): InsnSemantics = json match {
         case JsObject(fields) => {
-          val m : Map[String, JsValue] = fields.get("decode_error") match {
+          val m: Map[String, JsValue] = fields.get("decode_error") match {
             case Some(JsObject(m)) => m
             case _ => deserializationError(s"Bad sem format $json")
           }
@@ -176,7 +185,7 @@ object IRLoading {
   def loadReadELF(
     fileName: String,
     config: ILLoadingConfig
-  ): (List[ELFSymbol], Set[ExternalFunction], Set[SpecGlobal],  Set[FuncEntry], Map[BigInt, BigInt], BigInt) = {
+  ): (List[ELFSymbol], Set[ExternalFunction], Set[SpecGlobal], Set[FuncEntry], Map[BigInt, BigInt], BigInt) = {
     val lexer = ReadELFLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(lexer)
     val parser = ReadELFParser(tokens)
@@ -271,7 +280,7 @@ object IRTransform {
     ctx: IRContext,
     IRProgram: Program,
     constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
+    varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]]
   ): Boolean = {
     var modified = false
     // Need to know modifies clauses to generate summaries, but this is probably out of place
@@ -279,20 +288,23 @@ object IRTransform {
     ctx.program.setModifies(specModifies)
 
     val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
-    val summaryGenerator = SummaryGenerator(IRProgram, ctx.specification.globals, specGlobalAddresses, constPropResult, varDepsSummaries)
-    IRProgram.procedures.filter {
-      p => p != IRProgram.mainProcedure
-    }.foreach {
-      procedure => {
-        val req = summaryGenerator.generateRequires(procedure)
-        modified = modified | procedure.requires != req
-        procedure.requires = req
-
-        val ens = summaryGenerator.generateEnsures(procedure)
-        modified = modified | procedure.ensures != ens
-        procedure.ensures = ens
+    val summaryGenerator =
+      SummaryGenerator(IRProgram, ctx.specification.globals, specGlobalAddresses, constPropResult, varDepsSummaries)
+    IRProgram.procedures
+      .filter { p =>
+        p != IRProgram.mainProcedure
       }
-    }
+      .foreach { procedure =>
+        {
+          val req = summaryGenerator.generateRequires(procedure)
+          modified = modified | procedure.requires != req
+          procedure.requires = req
+
+          val ens = summaryGenerator.generateEnsures(procedure)
+          modified = modified | procedure.ensures != ens
+          procedure.ensures = ens
+        }
+      }
 
     modified
   }
@@ -302,13 +314,14 @@ object IRTransform {
 /** Methods relating to program static analysis.
   */
 object StaticAnalysis {
+
   /** Run all static analysis passes on the provided IRProgram.
     */
   def analyse(
-      ctx: IRContext,
-      config: StaticAnalysisConfig,
-      iteration: Int,
-      previousResults: Option[StaticAnalysisContext] = None
+    ctx: IRContext,
+    config: StaticAnalysisConfig,
+    iteration: Int,
+    previousResults: Option[StaticAnalysisContext] = None
   ): StaticAnalysisContext = {
     val IRProgram: Program = ctx.program
     val externalFunctions: Set[ExternalFunction] = ctx.externalFunctions
@@ -344,8 +357,14 @@ object StaticAnalysis {
       newLoops.foreach(l => Logger.debug(s"Loop found: ${l.name}"))
 
       config.analysisDotPath.foreach { s =>
-        writeToFile(dotBlockGraph(IRProgram, IRProgram.map(b => b -> b.toString).toMap), s"${s}_graph-after-loop-reduce-$iteration.dot")
-        writeToFile(dotBlockGraph(IRProgram, IRProgram.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-loop-reduce-$iteration.dot")
+        writeToFile(
+          dotBlockGraph(IRProgram, IRProgram.map(b => b -> b.toString).toMap),
+          s"${s}_graph-after-loop-reduce-$iteration.dot"
+        )
+        writeToFile(
+          dotBlockGraph(IRProgram, IRProgram.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap),
+          s"${s}_blockgraph-after-loop-reduce-$iteration.dot"
+        )
       }
     }
 
@@ -364,7 +383,8 @@ object StaticAnalysis {
 
     Logger.debug("[!] Running Inter-procedural Constant Propagation")
     val interProcConstProp = InterProcConstantPropagation(IRProgram)
-    val interProcConstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] = interProcConstProp.analyze()
+    val interProcConstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] =
+      interProcConstProp.analyze()
 
     config.analysisResultsPath.foreach { s =>
       writeToFile(printAnalysisResults(IRProgram, interProcConstPropResult), s"${s}OGconstprop$iteration.txt")
@@ -373,10 +393,17 @@ object StaticAnalysis {
     Logger.debug("[!] Variable dependency summaries")
     val scc = stronglyConnectedComponents(CallGraph, List(IRProgram.mainProcedure))
     val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
-    val varDepsSummaries = VariableDependencyAnalysis(IRProgram, ctx.specification.globals, specGlobalAddresses, interProcConstPropResult, scc).analyze()
+    val varDepsSummaries = VariableDependencyAnalysis(
+      IRProgram,
+      ctx.specification.globals,
+      specGlobalAddresses,
+      interProcConstPropResult,
+      scc
+    ).analyze()
 
     val intraProcConstProp = IntraProcConstantPropagation(IRProgram)
-    val intraProcConstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] = intraProcConstProp.analyze()
+    val intraProcConstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] =
+      intraProcConstProp.analyze()
 
     config.analysisResultsPath.foreach { s =>
       writeToFile(printAnalysisResults(IRProgram, intraProcConstPropResult), s"${s}_new_ir_constprop$iteration.txt")
@@ -392,7 +419,11 @@ object StaticAnalysis {
 
     config.analysisDotPath.foreach { s =>
       writeToFile(
-        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> reachingDefinitionsAnalysisResults(b).toString).toMap, true),
+        toDot(
+          IRProgram,
+          IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> reachingDefinitionsAnalysisResults(b).toString).toMap,
+          true
+        ),
         s"${s}_reachingDefinitions$iteration.dot"
       )
     }
@@ -420,11 +451,26 @@ object StaticAnalysis {
     }
 
     Logger.debug("[!] Running GRA")
-    val graSolver = GlobalRegionAnalysisSolver(IRProgram, domain.toSet, interProcConstPropResult, reachingDefinitionsAnalysisResults, mmm, previousVSAResults)
+    val graSolver = GlobalRegionAnalysisSolver(
+      IRProgram,
+      domain.toSet,
+      interProcConstPropResult,
+      reachingDefinitionsAnalysisResults,
+      mmm,
+      previousVSAResults
+    )
     val graResult = graSolver.analyze()
 
     Logger.debug("[!] Running MRA")
-    val mraSolver = MemoryRegionAnalysisSolver(IRProgram, domain.toSet, interProcConstPropResult, reachingDefinitionsAnalysisResults, graResult, mmm, previousVSAResults)
+    val mraSolver = MemoryRegionAnalysisSolver(
+      IRProgram,
+      domain.toSet,
+      interProcConstPropResult,
+      reachingDefinitionsAnalysisResults,
+      graResult,
+      mmm,
+      previousVSAResults
+    )
     val mraResult = mraSolver.analyze()
 
     config.analysisDotPath.foreach { s =>
@@ -435,7 +481,10 @@ object StaticAnalysis {
       )
 
       writeToFile(
-        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> intraProcConstPropResult(b).toString).toMap),
+        toDot(
+          IRProgram,
+          IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> intraProcConstPropResult(b).toString).toMap
+        ),
         s"${s}_new_ir_constprop$iteration.dot"
       )
 
@@ -461,7 +510,14 @@ object StaticAnalysis {
     }
 
     Logger.debug("[!] Running MMM")
-    mmm.convertMemoryRegions(mraSolver.procedureToStackRegions, mraSolver.procedureToHeapRegions, mraResult, mraSolver.procedureToSharedRegions, graSolver.getDataMap, graResult)
+    mmm.convertMemoryRegions(
+      mraSolver.procedureToStackRegions,
+      mraSolver.procedureToHeapRegions,
+      mraResult,
+      mraSolver.procedureToSharedRegions,
+      graSolver.getDataMap,
+      graResult
+    )
     mmm.logRegions()
 
     Logger.debug("[!] Running VSA")
@@ -543,7 +599,7 @@ object StaticAnalysis {
             "    " + b.jump.toString + contentStr(b.jump)
           ).mkString("\n")
         case s: Statement => s"    Statement $s${contentStr(s)}"
-        case s: Jump      => s"  Jump $s${contentStr(s)}"
+        case s: Jump => s"  Jump $s${contentStr(s)}"
       results.addOne(t)
     }
     results.mkString(System.lineSeparator())
@@ -574,8 +630,8 @@ object RunUtils {
     IRTransform.doCleanup(ctx)
 
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(ctx.program), s"$s-before-analysis.il"))
-    val analysis = q.staticAnalysis.map {
-      conf => staticAnalysis(conf, ctx)
+    val analysis = q.staticAnalysis.map { conf =>
+      staticAnalysis(conf, ctx)
     }
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(ctx.program), s"$s-after-analysis.il"))
 
@@ -594,12 +650,14 @@ object RunUtils {
       val outPrograms = ArrayBuffer[BProgram]()
       for (thread <- ctx.program.threads) {
         val fileName = q.outputPrefix.stripSuffix(".bpl") + "_" + thread.entry.name + ".bpl"
-        val boogieTranslator = IRToBoogie(ctx.program, ctx.specification, Some(thread), fileName, regionInjector, q.boogieTranslation)
+        val boogieTranslator =
+          IRToBoogie(ctx.program, ctx.specification, Some(thread), fileName, regionInjector, q.boogieTranslation)
         outPrograms.addOne(boogieTranslator.translate)
       }
       outPrograms
     } else {
-      val boogieTranslator = IRToBoogie(ctx.program, ctx.specification, None, q.outputPrefix, regionInjector, q.boogieTranslation)
+      val boogieTranslator =
+        IRToBoogie(ctx.program, ctx.specification, None, q.outputPrefix, regionInjector, q.boogieTranslation)
       ArrayBuffer(boogieTranslator.translate)
     }
     assert(invariant.singleCallBlockEnd(ctx.program))
@@ -626,16 +684,15 @@ object RunUtils {
         result.steensgaardResults,
         result.reachingDefs
       ).resolveIndirectCalls()
-      */
+       */
 
-      if (config.memoryRegions == MemoryRegionsMode.MRA && (previousResult.isEmpty || result.vsaResult != previousResult.get.vsaResult)) {
+      if (
+        config.memoryRegions == MemoryRegionsMode.MRA && (previousResult.isEmpty || result.vsaResult != previousResult.get.vsaResult)
+      ) {
         modified = true
       } else {
-        modified = transforms.VSAIndirectCallResolution(
-          ctx.program,
-          result.vsaResult,
-          result.mmmResults
-        ).resolveIndirectCalls()
+        modified =
+          transforms.VSAIndirectCallResolution(ctx.program, result.vsaResult, result.mmmResults).resolveIndirectCalls()
       }
 
       Logger.debug("[!] Generating Procedure Summaries")
@@ -670,7 +727,17 @@ object RunUtils {
 
     Logger.debug("[!] Running DSA Analysis")
     val symbolTableEntries: Set[SymbolTableEntry] = ctx.globals ++ ctx.funcEntries
-    val dsa = DataStructureAnalysis(ctx.program, symResults, analysisResult.last.interProcConstProp, symbolTableEntries, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, analysisResult.last.writesToResult, analysisResult.last.paramResults)
+    val dsa = DataStructureAnalysis(
+      ctx.program,
+      symResults,
+      analysisResult.last.interProcConstProp,
+      symbolTableEntries,
+      ctx.globalOffsets,
+      ctx.externalFunctions,
+      reachingDefs,
+      analysisResult.last.writesToResult,
+      analysisResult.last.paramResults
+    )
     dsa.analyze()
 
     config.analysisDotPath.foreach { s =>

@@ -141,9 +141,9 @@ trait GlobalRegionAnalysis(
         }
         converted = converted ++ Set(dataMap(i.start))
       } else {
-  //        val highestRegion = accesses.maxBy(_.start)
-  //        dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(highestRegion.end - i.start))
-  //        dataMap(i.start)
+        //        val highestRegion = accesses.maxBy(_.start)
+        //        dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(highestRegion.end - i.start))
+        //        dataMap(i.start)
         dataMap.remove(i.start)
         accesses.foreach(a => dataPoolMaster(a.start, a.size, false))
         converted = converted ++ accesses.map(a => dataMap(a.start))
@@ -169,7 +169,7 @@ trait GlobalRegionAnalysis(
       case _ =>
         Set()
     }
- }
+  }
 
 }
 
@@ -181,6 +181,6 @@ class GlobalRegionAnalysisSolver(
   mmm: MemoryModelMap,
   vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
 ) extends GlobalRegionAnalysis(program, domain, constantProp, reachingDefs, mmm, vsaResult)
-  with IRIntraproceduralForwardDependencies
-  with Analysis[Map[CFGPosition, Set[DataRegion]]]
-  with SimpleWorklistFixpointSolver[CFGPosition, Set[DataRegion], PowersetLattice[DataRegion]]
+    with IRIntraproceduralForwardDependencies
+    with Analysis[Map[CFGPosition, Set[DataRegion]]]
+    with SimpleWorklistFixpointSolver[CFGPosition, Set[DataRegion], PowersetLattice[DataRegion]]

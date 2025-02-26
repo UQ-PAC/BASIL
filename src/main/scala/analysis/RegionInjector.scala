@@ -60,7 +60,7 @@ class RegionInjectorMRA(override val program: Program, mmm: MemoryModelMap) exte
     for (access <- accessToRegion.keys) {
       val regions = accessToRegion(access)
       if (regions.isEmpty) {
-        //throw Exception("no regions found for " + access)
+        // throw Exception("no regions found for " + access)
       } else {
         mergeRegions(regions)
       }
@@ -156,7 +156,14 @@ class RegionInjectorMRA(override val program: Program, mmm: MemoryModelMap) exte
           val size = region.size.toInt
           val bytes = section.getBytes(region.start, size)
           // should probably check that region is entirely contained within section but shouldn't happen in practice?
-          val newSection = MemorySection(region.regionIdentifier, region.start, size, bytes, section.readOnly, Some(mergedRegions(region)))
+          val newSection = MemorySection(
+            region.regionIdentifier,
+            region.start,
+            size,
+            bytes,
+            section.readOnly,
+            Some(mergedRegions(region))
+          )
           program.usedMemory(region.start) = newSection
         case None =>
       }
@@ -173,7 +180,9 @@ class RegionInjectorMRA(override val program: Program, mmm: MemoryModelMap) exte
         mergedRegions(region.get) = newRegion
         Some(newRegion)
       } else {
-        throw Exception(s"MMM returned region for $address with size ${region.get.size} bytes which does not match requested size ${size / 8} bytes")
+        throw Exception(
+          s"MMM returned region for $address with size ${region.get.size} bytes which does not match requested size ${size / 8} bytes"
+        )
       }
     } else {
       throw Exception(s"failed to find region with address $address of size ${size / 8} bytes")
@@ -181,13 +190,14 @@ class RegionInjectorMRA(override val program: Program, mmm: MemoryModelMap) exte
   }
 
   override def sharedRegions(): Iterable[MergedRegion] = {
-    mergedRegions.collect {
-      case (_: DataRegion | _: HeapRegion, region: MergedRegion) => region
+    mergedRegions.collect { case (_: DataRegion | _: HeapRegion, region: MergedRegion) =>
+      region
     }
   }
 }
 
-class RegionInjectorDSA(override val program: Program, DSATopDown: mutable.Map[Procedure, Graph]) extends RegionInjector {
+class RegionInjectorDSA(override val program: Program, DSATopDown: mutable.Map[Procedure, Graph])
+    extends RegionInjector {
   private val mergedRegions: mutable.Map[Cell, MergedRegionDSA] = mutable.Map()
 
   private var sharedMemoryCounter = 0
@@ -278,7 +288,14 @@ class RegionInjectorDSA(override val program: Program, DSATopDown: mutable.Map[P
             val size = cell.largestAccessedSize
             val bytes = section.getBytes(range.start, size)
             // should probably check that region is entirely contained within section but shouldn't happen in practice?
-            val newSection = MemorySection(mergedRegions(cell).name, range.start, size, bytes, section.readOnly, Some(mergedRegions(cell)))
+            val newSection = MemorySection(
+              mergedRegions(cell).name,
+              range.start,
+              size,
+              bytes,
+              section.readOnly,
+              Some(mergedRegions(cell))
+            )
             program.usedMemory(range.start) = newSection
           case None =>
         }

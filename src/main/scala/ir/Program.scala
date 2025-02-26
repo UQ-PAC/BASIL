@@ -7,12 +7,14 @@ import analysis.{BitVectorEval, MergedRegion}
 import util.intrusive_list.*
 import translating.serialiseIL
 
-
 /**
   * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are
   * not guaranteed to be in any defined order.
   */
-private class ILForwardIterator(private val begin: IterableOnce[CFGPosition], val walk: IRWalk[CFGPosition, CFGPosition]) extends Iterator[CFGPosition] {
+private class ILForwardIterator(
+  private val begin: IterableOnce[CFGPosition],
+  val walk: IRWalk[CFGPosition, CFGPosition]
+) extends Iterator[CFGPosition] {
   val seen = mutable.Set[CFGPosition]()
   private val stack = mutable.Stack[CFGPosition]()
   stack.pushAll(begin)
@@ -104,8 +106,10 @@ class Program(
 
   // this is very crude but the simplest thing for now until we have a more sophisticated specification system that can relate to the IR instead of the Boogie
   def nameToGlobal(name: String): Global = {
-    if ((name.startsWith("R") || name.startsWith("V")) && (name.length == 2 || name.length == 3)
-      && name.substring(1).forall(_.isDigit)) {
+    if (
+      (name.startsWith("R") || name.startsWith("V")) && (name.length == 2 || name.length == 3)
+      && name.substring(1).forall(_.isDigit)
+    ) {
       if (name.startsWith("R")) {
         Register(name, 64)
       } else {
@@ -179,7 +183,6 @@ class Program(
   }
 }
 
-
 // if creationSite == None then it is the initial thread
 class ProgramThread(
   val entry: Procedure,
@@ -196,7 +199,7 @@ class Procedure private (
   var in: ArrayBuffer[Parameter],
   var out: ArrayBuffer[Parameter],
   var requires: List[BExpr],
-  var ensures: List[BExpr],
+  var ensures: List[BExpr]
 ) extends Iterable[CFGPosition] {
   private val _callers = mutable.HashSet[DirectCall]()
   _blocks.foreach(_.parent = this)
@@ -215,7 +218,17 @@ class Procedure private (
     requires: IterableOnce[BExpr] = ArrayBuffer(),
     ensures: IterableOnce[BExpr] = ArrayBuffer()
   ) = {
-    this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out), List.from(requires), List.from(ensures))
+    this(
+      name,
+      address,
+      entryBlock,
+      returnBlock,
+      mutable.LinkedHashSet.from(blocks),
+      ArrayBuffer.from(in),
+      ArrayBuffer.from(out),
+      List.from(requires),
+      List.from(ensures)
+    )
   }
 
   /**
@@ -333,7 +346,6 @@ class Procedure private (
     block
   }
 
-
   /**
    * Remove block(s) and all jumps that target it
    * @param blocks the blocks to remove
@@ -350,7 +362,6 @@ class Procedure private (
   def removeBlocksDisconnect(blocks: Block*): Unit = {
     removeBlocksDisconnect(blocks.toSeq)
   }
-  
 
   def removeBlocks(blocks: IterableOnce[Block]): Unit = {
     for (elem <- blocks.iterator) {
@@ -394,11 +405,11 @@ class Parameter(var name: String, var size: Int, var value: Register) {
 }
 
 class Block private (
- val label: String,
- val address: Option[BigInt],
- val statements: IntrusiveList[Statement],
- private var _jump: Jump,
- private val _incomingJumps: mutable.HashSet[GoTo],
+  val label: String,
+  val address: Option[BigInt],
+  val statements: IntrusiveList[Statement],
+  private var _jump: Jump,
+  private val _incomingJumps: mutable.HashSet[GoTo]
 ) extends HasParent[Procedure] {
   var atomicSection: Option[AtomicSection] = None
   _jump.setParent(this)
@@ -407,7 +418,12 @@ class Block private (
   statements.onInsert = x => x.setParent(this)
   statements.onRemove = x => x.deParent()
 
-  def this(label: String, address: Option[BigInt] = None, statements: IterableOnce[Statement] = Set.empty, jump: Jump = GoTo(Set.empty)) = {
+  def this(
+    label: String,
+    address: Option[BigInt] = None,
+    statements: IterableOnce[Statement] = Set.empty,
+    jump: Jump = GoTo(Set.empty)
+  ) = {
     this(label, address, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty)
   }
 
@@ -438,18 +454,18 @@ class Block private (
   def incomingJumps: immutable.Set[GoTo] = _incomingJumps.toSet
 
   def addIncomingJump(g: GoTo): Boolean = _incomingJumps.add(g)
-  
+
   def removeIncomingJump(g: GoTo): Unit = {
     _incomingJumps.remove(g)
     assert(!incomingJumps.contains(g))
   }
 
-  def calls: Set[Procedure] = statements.toSet.collect {
-    case d: DirectCall => d.target
+  def calls: Set[Procedure] = statements.toSet.collect { case d: DirectCall =>
+    d.target
   }
 
   def modifies: Set[Global] = statements.flatMap(_.modifies).toSet
-  //def locals: Set[Variable] = statements.flatMap(_.locals).toSet ++ jumps.flatMap(_.locals).toSet
+  // def locals: Set[Variable] = statements.flatMap(_.locals).toSet ++ jumps.flatMap(_.locals).toSet
 
   def calledBy: Set[Block] = {
     Set.empty
@@ -537,7 +553,9 @@ case class MemorySection(
     for (i <- 0 until num) yield {
       val index = startIndex + i
       if (index >= bytes.size || index < 0) {
-        throw Exception(s"can't get $num bytes from section $name with size $size starting at index $startIndex (access address $addr)")
+        throw Exception(
+          s"can't get $num bytes from section $name with size $size starting at index $startIndex (access address $addr)"
+        )
       }
       bytes(index)
     }

@@ -16,7 +16,6 @@ case class ChangeTo[T](e: T) extends VisitAction[T]
 // changes to e, then visits children of e, then applies f to the result
 case class ChangeDoChildrenPost[T](e: T, f: T => T) extends VisitAction[T]
 
-
 trait CILVisitor:
   def vprog(e: Program): VisitAction[Program] = DoChildren()
   def vproc(e: Procedure): VisitAction[List[Procedure]] = DoChildren()
@@ -34,21 +33,20 @@ trait CILVisitor:
   def enter_scope(params: ArrayBuffer[Parameter]): Unit = ()
   def leave_scope(outparam: ArrayBuffer[Parameter]): Unit = ()
 
-
 def doVisitList[T](v: CILVisitor, a: VisitAction[List[T]], n: T, continue: T => T): List[T] = {
   a match {
-    case SkipChildren()             => List(n)
-    case ChangeTo(z)                => z
-    case DoChildren()               => List(continue(n))
+    case SkipChildren() => List(n)
+    case ChangeTo(z) => z
+    case DoChildren() => List(continue(n))
     case ChangeDoChildrenPost(x, f) => f(x.map(continue(_)))
   }
 }
 
 def doVisit[T](v: CILVisitor, a: VisitAction[T], n: T, continue: T => T): T = {
   a match {
-    case SkipChildren()             => n
-    case DoChildren()               => continue(n)
-    case ChangeTo(z)                => z
+    case SkipChildren() => n
+    case DoChildren() => continue(n)
+    case ChangeTo(z) => z
     case ChangeDoChildrenPost(x, f) => f(continue(x))
   }
 }
@@ -63,11 +61,9 @@ class CILVisitorImpl(val v: CILVisitor) {
     doVisit(v, v.vvar(n), n, n => n)
   }
 
-
   def visit_mem(n: Memory): Memory = {
     doVisit(v, v.vmem(n), n, n => n)
   }
-
 
   def visit_jump(j: Jump): Jump = {
     doVisit(v, v.vjump(j), j, j => j)
@@ -79,14 +75,14 @@ class CILVisitorImpl(val v: CILVisitor) {
 
   def visit_expr(n: Expr): Expr = {
     def continue(n: Expr): Expr = n match {
-      case n: Literal                           => n
-      case Extract(end, start, arg)             => Extract(end, start, visit_expr(arg))
-      case Repeat(repeats, arg)                 => Repeat(repeats, visit_expr(arg))
-      case ZeroExtend(bits, arg)                => ZeroExtend(bits, visit_expr(arg))
-      case SignExtend(bits, arg)                => SignExtend(bits, visit_expr(arg))
-      case BinaryExpr(op, arg, arg2)            => BinaryExpr(op, visit_expr(arg), visit_expr(arg2))
-      case UnaryExpr(op, arg)                   => UnaryExpr(op, visit_expr(arg))
-      case v: Variable                          => visit_var(v)
+      case n: Literal => n
+      case Extract(end, start, arg) => Extract(end, start, visit_expr(arg))
+      case Repeat(repeats, arg) => Repeat(repeats, visit_expr(arg))
+      case ZeroExtend(bits, arg) => ZeroExtend(bits, visit_expr(arg))
+      case SignExtend(bits, arg) => SignExtend(bits, visit_expr(arg))
+      case BinaryExpr(op, arg, arg2) => BinaryExpr(op, visit_expr(arg), visit_expr(arg2))
+      case UnaryExpr(op, arg) => UnaryExpr(op, visit_expr(arg))
+      case v: Variable => visit_var(v)
       case UninterpretedFunction(n, params, rt) => UninterpretedFunction(n, params.map(visit_expr), rt)
     }
     doVisit(v, v.vexpr(n), n, continue)

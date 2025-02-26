@@ -5,12 +5,12 @@ import ir.*
 
 import scala.collection.mutable
 
+def splitThreads(
+  program: Program,
+  pointsTo: Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]],
+  reachingDefs: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
+): Unit = {
 
-def splitThreads(program: Program,
-                 pointsTo: Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]],
-                 reachingDefs: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
-                ): Unit = {
-  
   // iterate over all commands - if call is to pthread_create, look up
   program.foreach {
     case d: DirectCall if d.target.name == "pthread_create" =>

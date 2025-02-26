@@ -8,27 +8,30 @@ import scala.sys.process.*
 import scala.io.Source
 import java.io.{BufferedWriter, File, FileWriter}
 
-case class TestConfig(boogieFlags: Seq[String] = Seq("/timeLimit:10", "/useArrayAxioms"),
-                      staticAnalysisConfig: Option[StaticAnalysisConfig] = None,
-                      useBAPFrontend: Boolean,
-                      expectVerify: Boolean,
-                      checkExpected: Boolean = false,
-                      logResults: Boolean = false
-                     )
+case class TestConfig(
+  boogieFlags: Seq[String] = Seq("/timeLimit:10", "/useArrayAxioms"),
+  staticAnalysisConfig: Option[StaticAnalysisConfig] = None,
+  useBAPFrontend: Boolean,
+  expectVerify: Boolean,
+  checkExpected: Boolean = false,
+  logResults: Boolean = false
+)
 
 trait BASILTest {
-  def runBASIL(inputPath: String, RELFPath: String, specPath: Option[String], BPLPath: String, staticAnalysisConf: Option[StaticAnalysisConfig]): BASILResult = {
+  def runBASIL(
+    inputPath: String,
+    RELFPath: String,
+    specPath: Option[String],
+    BPLPath: String,
+    staticAnalysisConf: Option[StaticAnalysisConfig]
+  ): BASILResult = {
     val specFile = if (specPath.isDefined && File(specPath.get).exists) {
       specPath
     } else {
       None
     }
     val config = BASILConfig(
-      loading = ILLoadingConfig(
-        inputFile = inputPath,
-        relfFile = RELFPath,
-        specFile = specFile
-      ),
+      loading = ILLoadingConfig(inputFile = inputPath, relfFile = RELFPath, specFile = specFile),
       staticAnalysis = staticAnalysisConf,
       outputPrefix = BPLPath
     )
@@ -38,7 +41,11 @@ trait BASILTest {
   }
 
   def runBoogie(directoryPath: String, bplPath: String, boogieFlags: Seq[String]): String = {
-    val extraSpec = List.from(File(directoryPath).listFiles()).map(_.toString).filter(_.endsWith(".bpl")).filterNot(_.endsWith(bplPath))
+    val extraSpec = List
+      .from(File(directoryPath).listFiles())
+      .map(_.toString)
+      .filter(_.endsWith(".bpl"))
+      .filterNot(_.endsWith(bplPath))
     val boogieCmd = Seq("boogie", "/printVerifiedProceduresCount:0") ++ boogieFlags ++ Seq(bplPath) ++ extraSpec
     Logger.debug(s"Verifying... ${boogieCmd.mkString(" ")}")
     val boogieResult = boogieCmd.!!
@@ -51,7 +58,11 @@ trait BASILTest {
     *         param 1: whether the Boogie output verified
     *         param 2: whether Boogie timed out
     */
-  def checkVerify(boogieResult: String, resultPath: String, shouldVerify: Boolean): (Option[String], Boolean, Boolean) = {
+  def checkVerify(
+    boogieResult: String,
+    resultPath: String,
+    shouldVerify: Boolean
+  ): (Option[String], Boolean, Boolean) = {
     BASILTest.writeToFile(boogieResult, resultPath)
     val verified = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
     val proveFailed = boogieResult.contains("could not be proved")
@@ -131,4 +142,3 @@ object BASILTest {
 
   def stdDev(xs: Iterable[Double]): Double = math.sqrt(variance(xs))
 }
-

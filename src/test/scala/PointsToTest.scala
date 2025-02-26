@@ -13,13 +13,23 @@ import ir.dsl.*
 
 class PointsToTest extends AnyFunSuite with OneInstancePerTest {
 
-  def runAnalyses(program: Program,
-                  externalFunctions: Set[ExternalFunction] = Set.empty,
-                  globals: Set[SpecGlobal] = Set.empty,
-                  funcEntries: Set[FuncEntry] = Set.empty,
-                  globalOffsets: Map[BigInt, BigInt] = Map.empty): StaticAnalysisContext = {
+  def runAnalyses(
+    program: Program,
+    externalFunctions: Set[ExternalFunction] = Set.empty,
+    globals: Set[SpecGlobal] = Set.empty,
+    funcEntries: Set[FuncEntry] = Set.empty,
+    globalOffsets: Map[BigInt, BigInt] = Map.empty
+  ): StaticAnalysisContext = {
 
-    val ctx = IRContext(List.empty, externalFunctions, globals, funcEntries, globalOffsets, Specification(Set(), Set(), Map(), List(), List(), List(), Set()), program)
+    val ctx = IRContext(
+      List.empty,
+      externalFunctions,
+      globals,
+      funcEntries,
+      globalOffsets,
+      Specification(Set(), Set(), Map(), List(), List(), List(), Set()),
+      program
+    )
     StaticAnalysis.analyse(ctx, StaticAnalysisConfig(), 1)
   }
 
@@ -28,18 +38,15 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
    */
   test("stack pointer aliasing: MMM Stage") {
     var program: Program = prog(
-      proc("main",
-        block("0x0",
-          LocalAssign(R6, R31),
-          goto("0x1")
-        ),
-        block("0x1",
+      proc(
+        "main",
+        block("0x0", LocalAssign(R6, R31), goto("0x1")),
+        block(
+          "0x1",
           MemoryStore(mem, BinaryExpr(BVADD, R6, bv64(4)), bv64(10), LittleEndian, 64),
           goto("returntarget")
         ),
-        block("returntarget",
-          ret
-        )
+        block("returntarget", ret)
       )
     )
 
@@ -58,18 +65,16 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
    */
   test("approximate stack region: MMM Stage") {
     var program: Program = prog(
-      proc("main",
-        block("0x0",
+      proc(
+        "main",
+        block(
+          "0x0",
           MemoryLoad(R1, mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64),
           MemoryLoad(R3, mem, BinaryExpr(BVADD, R31, bv64(4)), LittleEndian, 64),
           goto("0x1")
         ),
-        block("0x1",
-          goto("returntarget")
-        ),
-        block("returntarget",
-          ret
-        )
+        block("0x1", goto("returntarget")),
+        block("returntarget", ret)
       )
     )
     transforms.addReturnBlocks(program)
@@ -133,28 +138,21 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
    */
   test("collects single function shared regions: MMM Stage") {
     val program: Program = prog(
-      proc("main",
-        block("0x0",
+      proc(
+        "main",
+        block(
+          "0x0",
           MemoryLoad(R0, mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64),
           LocalAssign(R1, BinaryExpr(BVADD, R31, bv64(10))),
           goto("0x1")
         ),
-        block("0x1",
-          directCall("p2"), goto("returntarget")
-        ),
-        block("returntarget",
-          ret
-        )
+        block("0x1", directCall("p2"), goto("returntarget")),
+        block("returntarget", ret)
       ),
-      proc("p2",
-        block("l_p2",
-          LocalAssign(R3, R0),
-          MemoryLoad(R2, mem, R1, LittleEndian, 64),
-          goto("l_p2_1"),
-        ),
-        block("l_p2_1",
-          ret,
-        )
+      proc(
+        "p2",
+        block("l_p2", LocalAssign(R3, R0), MemoryLoad(R2, mem, R1, LittleEndian, 64), goto("l_p2_1")),
+        block("l_p2_1", ret)
       )
     )
 
@@ -182,38 +180,32 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
    */
   test("collects multiple functions shared regions: MMM Stage") {
     val program: Program = prog(
-      proc("main",
-        block("0x0",
+      proc(
+        "main",
+        block(
+          "0x0",
           MemoryLoad(R0, mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64),
           LocalAssign(R1, BinaryExpr(BVADD, R31, bv64(10))),
           goto("0x1")
         ),
-        block("0x1",
-          directCall("p2"), goto("returntarget")
-        ),
-        block("returntarget",
-          ret
-        )
+        block("0x1", directCall("p2"), goto("returntarget")),
+        block("returntarget", ret)
       ),
-      proc("foo",
-        block("l_foo",
+      proc(
+        "foo",
+        block(
+          "l_foo",
           MemoryLoad(R0, mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64),
           LocalAssign(R1, BinaryExpr(BVADD, R31, bv64(10))),
-          directCall("p2"), goto("l_foo_1")
+          directCall("p2"),
+          goto("l_foo_1")
         ),
-        block("l_foo_1",
-          ret,
-        )
+        block("l_foo_1", ret)
       ),
-      proc("p2",
-        block("l_p2",
-          LocalAssign(R3, R0),
-          MemoryLoad(R2, mem, R1, LittleEndian, 64),
-          goto("l_p2_1"),
-        ),
-        block("l_p2_1",
-          ret,
-        )
+      proc(
+        "p2",
+        block("l_p2", LocalAssign(R3, R0), MemoryLoad(R2, mem, R1, LittleEndian, 64), goto("l_p2_1")),
+        block("l_p2_1", ret)
       )
     )
 

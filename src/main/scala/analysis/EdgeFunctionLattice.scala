@@ -24,7 +24,6 @@ trait EdgeFunction[T] extends (T => T) {
   def joinWith(e: EdgeFunction[T]): EdgeFunction[T]
 }
 
-
 /**
   * The lattice of edge functions, used by [[IDEAnalysis]].
 * A map lattice, but maps are represent differently than in `MapLattice`.

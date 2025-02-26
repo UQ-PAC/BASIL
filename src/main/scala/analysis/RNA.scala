@@ -22,7 +22,8 @@ trait RNAAnalysis(program: Program, ignoreStack: Boolean = true) {
   private val linkRegister = Register("R30", 64)
   private val framePointer = Register("R29", 64)
 
-  private val ignoreRegions: Set[Variable] = if ignoreStack then Set(linkRegister, framePointer, stackPointer) else Set()
+  private val ignoreRegions: Set[Variable] =
+    if ignoreStack then Set(linkRegister, framePointer, stackPointer) else Set()
 
   def eval(cmd: Command, s: Set[Variable]): Set[Variable] = {
     cmd match {
@@ -59,7 +60,8 @@ trait RNAAnalysis(program: Program, ignoreStack: Boolean = true) {
 
 }
 
-class RNAAnalysisSolver(program: Program, ignoreStack: Boolean = true) extends RNAAnalysis(program, ignoreStack)
+class RNAAnalysisSolver(program: Program, ignoreStack: Boolean = true)
+    extends RNAAnalysis(program, ignoreStack)
     with IRIntraproceduralBackwardDependencies
     with Analysis[Map[CFGPosition, Set[Variable]]]
     with SimpleWorklistFixpointSolver[CFGPosition, Set[Variable], PowersetLattice[Variable]]

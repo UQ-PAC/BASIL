@@ -1,4 +1,3 @@
-
 import org.scalatest.funsuite.AnyFunSuite
 import util.{Logger, PerformanceTimer, ILLoadingConfig, RunUtils, IRLoading}
 import translating.BAPToIR
@@ -19,7 +18,7 @@ import test_util.BASILTest.writeToFile
 class IrreducibleLoop extends AnyFunSuite {
   val testPath = "./src/test/irreducible_loops"
 
-  def load(conf: ILLoadingConfig) : Program = {
+  def load(conf: ILLoadingConfig): Program = {
     val bapProgram = IRLoading.loadBAP(conf.inputFile)
     val (_, _, _, _, _, mainAddress) = IRLoading.loadReadELF(conf.relfFile, conf)
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
@@ -37,14 +36,20 @@ class IrreducibleLoop extends AnyFunSuite {
 
     val foundLoops = LoopDetector.identify_loops(program)
 
-    writeToFile(dotBlockGraph(program, program.collect { case b: Block => b -> b.toString }.toMap), s"${variationPath}_blockgraph-before-reduce.dot")
+    writeToFile(
+      dotBlockGraph(program, program.collect { case b: Block => b -> b.toString }.toMap),
+      s"${variationPath}_blockgraph-before-reduce.dot"
+    )
 
     foundLoops.identifiedLoops.foreach(l => Logger.debug(s"found loops${System.lineSeparator()}$l"))
 
     val newLoops = foundLoops.reducibleTransformIR()
     newLoops.identifiedLoops.foreach(l => Logger.debug(s"newloops${System.lineSeparator()}$l"))
 
-    writeToFile(dotBlockGraph(program, program.collect { case b: Block => b -> b.toString }.toMap), s"${variationPath}_blockgraph-after-reduce.dot")
+    writeToFile(
+      dotBlockGraph(program, program.collect { case b: Block => b -> b.toString }.toMap),
+      s"${variationPath}_blockgraph-after-reduce.dot"
+    )
     val foundLoops2 = LoopDetector.identify_loops(program)
     assert(foundLoops2.identifiedLoops.count(_.reducible) == foundLoops.identifiedLoops.size)
     assert(foundLoops2.identifiedLoops.count(_.reducible) > foundLoops.identifiedLoops.count(_.reducible))

@@ -16,8 +16,6 @@ val R29: Register = Register("R29", 64)
 val R30: Register = Register("R30", 64)
 val R31: Register = Register("R31", 64)
 
-
-
 def bv32(i: Int): BitVecLiteral = BitVecLiteral(i, 32)
 
 def bv64(i: Int): BitVecLiteral = BitVecLiteral(i, 64)
@@ -41,7 +39,7 @@ trait EventuallyStatement {
 }
 
 case class ResolvableStatement(s: Statement) extends EventuallyStatement {
-  override def resolve(p: Program) : Statement = s
+  override def resolve(p: Program): Statement = s
 }
 
 trait EventuallyJump {
@@ -64,7 +62,6 @@ case class EventuallyCall(target: DelayNameResolve) extends EventuallyStatement 
   }
 }
 
-
 case class EventuallyGoto(targets: List[DelayNameResolve]) extends EventuallyJump {
   override def resolve(p: Program): GoTo = {
     val tgs = targets.flatMap(tn => tn.resolveBlock(p))
@@ -74,7 +71,7 @@ case class EventuallyGoto(targets: List[DelayNameResolve]) extends EventuallyJum
 case class EventuallyReturn() extends EventuallyJump {
   override def resolve(p: Program) = Return()
 }
-case class EventuallyUnreachable() extends EventuallyJump  {
+case class EventuallyUnreachable() extends EventuallyJump {
   override def resolve(p: Program) = Unreachable()
 }
 
@@ -85,7 +82,7 @@ def goto(targets: String*): EventuallyGoto = {
 }
 
 def ret: EventuallyReturn = EventuallyReturn()
-def unreachable: EventuallyUnreachable= EventuallyUnreachable()
+def unreachable: EventuallyUnreachable = EventuallyUnreachable()
 
 def goto(targets: List[String]): EventuallyGoto = {
   EventuallyGoto(targets.map(p => DelayNameResolve(p)))
@@ -95,7 +92,6 @@ def directCall(tgt: String): EventuallyCall = EventuallyCall(DelayNameResolve(tg
 
 def indirectCall(tgt: Variable): EventuallyIndirectCall = EventuallyIndirectCall(tgt)
 // def directcall(tgt: String) = EventuallyCall(DelayNameResolve(tgt), None)
-
 
 case class EventuallyBlock(label: String, sl: Seq[EventuallyStatement], j: EventuallyJump) {
   val tempBlock: Block = Block(label, None, List(), GoTo(List.empty))
@@ -109,13 +105,13 @@ case class EventuallyBlock(label: String, sl: Seq[EventuallyStatement], j: Event
 }
 
 def block(label: String, sl: (Statement | EventuallyStatement | EventuallyJump)*): EventuallyBlock = {
-  val statements : Seq[EventuallyStatement] = sl.flatMap {
+  val statements: Seq[EventuallyStatement] = sl.flatMap {
     case s: Statement => Some(ResolvableStatement(s))
     case o: EventuallyStatement => Some(o)
     case g: EventuallyJump => None
   }
-  val jump = sl.collectFirst {
-    case j: EventuallyJump => j
+  val jump = sl.collectFirst { case j: EventuallyJump =>
+    j
   }
   EventuallyBlock(label, statements, jump.get)
 }
@@ -131,18 +127,15 @@ case class EventuallyProcedure(label: String, blocks: Seq[EventuallyBlock]) {
     tempProc
   }
 
-
 }
 
 def proc(label: String, blocks: EventuallyBlock*): EventuallyProcedure = {
   EventuallyProcedure(label, blocks)
 }
 
-
 def mem: SharedMemory = SharedMemory("mem", 64, 8)
 
 def stack: SharedMemory = SharedMemory("stack", 64, 8)
-
 
 def prog(procedures: EventuallyProcedure*): Program = {
   require(procedures.nonEmpty)
@@ -153,5 +146,3 @@ def prog(procedures: EventuallyProcedure*): Program = {
   procedures.foreach(_.resolve(p))
   p
 }
-
-

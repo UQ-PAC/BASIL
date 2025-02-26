@@ -13,7 +13,7 @@ private def label(p: Block) = "block." + p.label
 /*
  * Loop Identification
  *
- * 
+ *
  */
 
 /* A connection between to IL nodes, purely for the representation of loops in
@@ -81,10 +81,10 @@ object LoopDetector {
    * Returns the set of loops for each procedure in the program.
    */
   def identify_loops(cfg: Program): State = {
-    cfg.procedures.toSet.flatMap(_.entryBlock)
+    cfg.procedures.toSet
+      .flatMap(_.entryBlock)
       .foldLeft(State())((st, eb) => traverse_loops_dfs(st, eb, 1))
   }
-
 
   private def processVisitedNodeOutgoingEdge(istate: State, edge: LoopEdge): State = {
     var st = istate
@@ -249,14 +249,16 @@ object LoopDetector {
 
         case Action.ContinueDFS =>
           sf.processingEdges match {
-            case edge::tl =>
+            case edge :: tl =>
               sf = sf.copy(processingEdges = tl)
 
               if (!st.visitedNodes.contains(edge.to)) {
                 // (a) not visited before: BeginProcessNode on this successor
-                st = st.copy(edgeStack = edge::st.edgeStack)
+                st = st.copy(edgeStack = edge :: st.edgeStack)
                 stack.push(sf.copy(action = Action.ProcessVisitedNode)) // continue after processing this successor
-                stack.push(sf.copy(istate = st, b0 = edge.to, pos = sf.pos + 1, action = Action.BeginProcessNode)) // process this successor
+                stack.push(
+                  sf.copy(istate = st, b0 = edge.to, pos = sf.pos + 1, action = Action.BeginProcessNode)
+                ) // process this successor
               } else {
                 // (b-e) visited before: finish processing this edge
                 st = processVisitedNodeOutgoingEdge(st, edge)
@@ -273,7 +275,7 @@ object LoopDetector {
           val (nst, newhead) = retval
           st = nst
           st = newhead.foldLeft(st)((st, b) => tag_lhead(st, sf.b0, b))
-          sf = sf.copy(action=Action.ContinueDFS, istate = st) // continue iteration
+          sf = sf.copy(action = Action.ContinueDFS, istate = st) // continue iteration
           stack.push(sf)
 
         case Action.FinishProcessNode =>
@@ -318,7 +320,6 @@ object LoopDetector {
   }
 }
 
-
 object LoopTransform {
 
   /* For every irreducible loop, transform it into a reducible one. The algorithm
@@ -352,7 +353,7 @@ object LoopTransform {
 
     val P_e: Set[LoopEdge] = entryEdges // N entry edges
     val P_b: Set[LoopEdge] = entryEdges.flatMap { e =>
-      val predNodes = e.to.prevBlocks 
+      val predNodes = e.to.prevBlocks
       predNodes.map(a => LoopEdge(a, e.to))
     } -- P_e // N back edges
     val body: Set[LoopEdge] = loop.edges.toSet -- P_b // Regular control flow in the loop
@@ -368,13 +369,13 @@ object LoopTransform {
       block.statements.prepend(LocalAssign(LocalVar("FromEntryIdx", IntType), IntLiteral(BigInt(id))))
     }
 
-    P_e.groupBy(_.to).map { (destBlock,origins) =>
+    P_e.groupBy(_.to).map { (destBlock, origins) =>
       val idexs = origins.map { b =>
         BinaryExpr(IntEQ, LocalVar("FromEntryIdx", IntType), IntLiteral(BigInt(entryids(b.from))))
       }
       idexs.toList match {
         case Nil => ()
-        case h::tl =>
+        case h :: tl =>
           val cond = tl.foldLeft(h)((l, r) => BinaryExpr(BoolOR, l, r))
           destBlock.statements.prepend(Assume(cond))
       }

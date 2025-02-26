@@ -4,12 +4,12 @@ import com.google.protobuf.ByteString
 import java.io.ByteArrayInputStream
 import java.nio.charset.StandardCharsets
 
-/* 
-* Provides some useful decoders for certian AuxData sections in gtirb.
-*
-* See https://grammatech.github.io/gtirb/python/_modules/gtirb/serialization.html#MappingCodec.decode, this was pulled
-* from their python API, and converted into scala 
-*/
+/*
+ * Provides some useful decoders for certian AuxData sections in gtirb.
+ *
+ * See https://grammatech.github.io/gtirb/python/_modules/gtirb/serialization.html#MappingCodec.decode, this was pulled
+ * from their python API, and converted into scala
+ */
 object MapDecoder {
   def decode_set(totalBytes: Seq[ByteString]): Map[ByteString, Set[ByteString]] = {
     val totalMap: Map[ByteString, Set[ByteString]] = (for {

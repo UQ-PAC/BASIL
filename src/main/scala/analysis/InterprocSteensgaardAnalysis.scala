@@ -18,11 +18,13 @@ case class RegisterWrapperEqualSets(variable: Variable, ssa: FlatElement[Int])
 class InterprocSteensgaardAnalysis(
   domain: Set[CFGPosition],
   mmm: MemoryModelMap,
-  reachingDefs: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])],
+  reachingDefs: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
 ) extends Analysis[Any] {
 
   val solver: UnionFindSolver[StTerm] = UnionFindSolver()
-  val callSiteSummary: mutable.Map[DirectCall, Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]]] = mutable.Map()
+  val callSiteSummary
+    : mutable.Map[DirectCall, Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]]] =
+    mutable.Map()
 
   private val mallocVariable = Register("R0", 64)
 
@@ -68,7 +70,10 @@ class InterprocSteensgaardAnalysis(
             val defs = getSSADefinition(variable, directCall.target, reachingDefs)
             v1.foreach {
               case AddressValue(region) =>
-                solverCopy.unify(IdentifierVariable(RegisterWrapperEqualSets(variable, defs)), PointerRef(AllocVariable(region)))
+                solverCopy.unify(
+                  IdentifierVariable(RegisterWrapperEqualSets(variable, defs)),
+                  PointerRef(AllocVariable(region))
+                )
               case LiteralValue(_) => ???
               case _ => ???
             }
@@ -99,13 +104,19 @@ class InterprocSteensgaardAnalysis(
           // X1 = X2: [[X1]] = [[X2]]
           val X1 = assign.lhs
           val X2 = unwrapped.get
-          unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, assign, reachingDefs))), IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, assign, reachingDefs))))
+          unify(
+            IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, assign, reachingDefs))),
+            IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, assign, reachingDefs)))
+          )
         } else {
           // X1 = *X2: [[X2]] = ↑a ^ [[X1]] = a where a is a fresh term variable TODO: this rule has been adapted to match [[X1]] = ↑[[alloc_X2]]
           val X1 = assign.lhs
           val X2_star = mmm.nodeToRegion(node)
           X2_star.foreach { x =>
-            unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, assign, reachingDefs))), PointerRef(AllocVariable(x)))
+            unify(
+              IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, assign, reachingDefs))),
+              PointerRef(AllocVariable(x))
+            )
           }
         }
       case memoryStore: MemoryStore =>
@@ -117,10 +128,13 @@ class InterprocSteensgaardAnalysis(
           val X2 = unwrapped.get
           val alpha = FreshVariable()
           X1_star.foreach { x =>
-            //unify(PointerRef(AllocVariable(x)), PointerRef(alpha))
-            unify(IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, memoryStore, reachingDefs))), PointerRef(AllocVariable(x)))
+            // unify(PointerRef(AllocVariable(x)), PointerRef(alpha))
+            unify(
+              IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, memoryStore, reachingDefs))),
+              PointerRef(AllocVariable(x))
+            )
           }
-          //unify(IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, memoryStore, reachingDefs))), alpha)
+          // unify(IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, memoryStore, reachingDefs))), alpha)
           //            X1_star.foreach { x =>
           //              unify(PointerRef(AllocVariable(x)), IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, memoryAssign, reachingDefs))))
           //            }
@@ -132,13 +146,19 @@ class InterprocSteensgaardAnalysis(
           // X1 = X2: [[X1]] = [[X2]]
           val X1 = load.lhs
           val X2 = unwrapped.get
-          unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, load, reachingDefs))), IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, load, reachingDefs))))
+          unify(
+            IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, load, reachingDefs))),
+            IdentifierVariable(RegisterWrapperEqualSets(X2, getSSAUse(X2, load, reachingDefs)))
+          )
         } else {
           // X1 = *X2: [[X2]] = ↑a ^ [[X1]] = a where a is a fresh term variable TODO: this rule has been adapted to match [[X1]] = ↑[[alloc_X2]]
           val X1 = load.lhs
           val X2_star = mmm.nodeToRegion(node)
           X2_star.foreach { x =>
-            unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, load, reachingDefs))), PointerRef(AllocVariable(x)))
+            unify(
+              IdentifierVariable(RegisterWrapperEqualSets(X1, getSSADefinition(X1, load, reachingDefs))),
+              PointerRef(AllocVariable(x))
+            )
           }
         }
       case _ => // do nothing
@@ -146,25 +166,27 @@ class InterprocSteensgaardAnalysis(
   }
 
   private def unify(t1: Term[StTerm], t2: Term[StTerm]): Unit = {
-    //Logger.info(s"univfying constraint $t1 = $t2\n")
+    // Logger.info(s"univfying constraint $t1 = $t2\n")
     solver.unify(t1, t2)
     // note that unification cannot fail, because there is only one kind of term constructor and no constants
   }
 
   /** @inheritdoc
    */
-  def pointsTo(eqSolver: UnionFindSolver[StTerm] = solver): Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]] = {
+  def pointsTo(
+    eqSolver: UnionFindSolver[StTerm] = solver
+  ): Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]] = {
     val solution = eqSolver.solution()
     val unifications = eqSolver.unifications()
     Logger.debug(s"Solution: \n${solution.mkString(",\n")}\n")
-    Logger.debug(s"Sets: \n${unifications.values.map { s => s"{ ${s.mkString(",")} }"}.mkString(", ")}")
+    Logger.debug(s"Sets: \n${unifications.values.map { s => s"{ ${s.mkString(",")} }" }.mkString(", ")}")
 
     val vars = solution.keys.collect { case id: IdentifierVariable => id }
     val emptyMap = Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]]()
     val pointsto = vars.foldLeft(emptyMap) { (a, v: IdentifierVariable) =>
       val pt: Set[RegisterWrapperEqualSets | MemoryRegion] = unifications(solution(v)).collect {
         case PointerRef(IdentifierVariable(id)) => id
-        case PointerRef(AllocVariable(alloc))   => alloc
+        case PointerRef(AllocVariable(alloc)) => alloc
       }.toSet
       a + (v.id -> pt)
     }
@@ -207,7 +229,6 @@ object FreshVariable {
 
   def apply(): FreshVariable = FreshVariable(next())
 }
-
 
 /** A constructor term that represents a pointer to another term.
   */

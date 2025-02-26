@@ -94,11 +94,9 @@ class Node(val graph: Option[Graph], var size: BigInt = 0, val id: Int = NodeCou
     }
   }
 
-
   def addCell(offset: BigInt, size: Int): Cell = {
 //    this.updateSize(offset + size)
-    if collapsed then
-      cells(0)
+    if collapsed then cells(0)
     else if !cells.contains(offset) then
       val cell = Cell(Some(this), offset)
       cells.update(offset, cell)
@@ -205,7 +203,6 @@ class Cell(val node: Option[Node], val offset: BigInt) {
   override def toString: String = s"Cell(${if node.isDefined then node.get.toString else "NONE"}, $offset)"
 }
 
-
 /**
  * a slice made from a cell and an internal offset
  */
@@ -221,18 +218,18 @@ case class Slice(cell: Cell, internalOffset: BigInt) {
  */
 class CallSite(val call: DirectCall, val graph: Graph) {
   val proc: Procedure = call.target
-  val paramCells: mutable.Map[Variable, Slice] = graph.params(proc).foldLeft(mutable.Map[Variable, Slice]()) {
-    (m, reg) =>
+  val paramCells: mutable.Map[Variable, Slice] =
+    graph.params(proc).foldLeft(mutable.Map[Variable, Slice]()) { (m, reg) =>
       val node = Node(Some(graph))
       node.flags.incomplete = true
       m += (reg -> Slice(node.cells(0), 0))
-  }
-  val returnCells: mutable.Map[Variable, Slice] = graph.writesTo(proc).foldLeft(mutable.Map[Variable, Slice]()) {
-    (m, reg) =>
+    }
+  val returnCells: mutable.Map[Variable, Slice] =
+    graph.writesTo(proc).foldLeft(mutable.Map[Variable, Slice]()) { (m, reg) =>
       val node = Node(Some(graph))
       node.flags.incomplete = true
       m += (reg -> Slice(node.cells(0), 0))
-  }
+    }
 }
 
 case class DSAGlobal(addressRange: AddressRange, field: Field) {

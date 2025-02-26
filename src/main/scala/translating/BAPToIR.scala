@@ -188,7 +188,9 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     }
 
     if (atomicSectionStart.isDefined || atomicSectionEnd.isDefined || atomicSectionContents.nonEmpty) {
-      throw Exception("error handling atomic sections - left atomic section partially resolved after traversing procedure")
+      throw Exception(
+        "error handling atomic sections - left atomic section partially resolved after traversing procedure"
+      )
     }
 
   }
@@ -199,12 +201,22 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       if (mem != translateMemory(b.rhs.memory)) {
         throw Exception(s"$b has conflicting lhs ${b.lhs} and rhs ${b.rhs.memory}")
       }
-      Seq(MemoryStore(mem, translateExprOnly(b.rhs.index), translateExprOnly(b.rhs.value), b.rhs.endian, b.rhs.size, Some(b.line)))
+      Seq(
+        MemoryStore(
+          mem,
+          translateExprOnly(b.rhs.index),
+          translateExprOnly(b.rhs.value),
+          b.rhs.endian,
+          b.rhs.size,
+          Some(b.line)
+        )
+      )
     case b: BAPLocalAssign =>
       val lhs = translateVar(b.lhs)
       val (rhs, load) = translateExpr(b.rhs)
       if (load.isDefined) {
-        val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, Some(b.line + "$0"))
+        val loadWithLabel =
+          MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, Some(b.line + "$0"))
         val assign = LocalAssign(lhs, rhs, Some(b.line + "$1"))
         Seq(loadWithLabel, assign)
       } else {
@@ -253,10 +265,11 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       }
       (extract, load)
     case literal: BAPLiteral => (translateLiteral(literal), None)
-    case BAPUnOp(operator, exp) => operator match {
-      case NOT => (UnaryExpr(BVNOT, translateExprOnly(exp)), None)
-      case NEG => (UnaryExpr(BVNEG, translateExprOnly(exp)), None)
-    }
+    case BAPUnOp(operator, exp) =>
+      operator match {
+        case NOT => (UnaryExpr(BVNOT, translateExprOnly(exp)), None)
+        case NEG => (UnaryExpr(BVNEG, translateExprOnly(exp)), None)
+      }
     case BAPBinOp(operator, lhs, rhs) =>
       val (lhsIR, lhsLoad) = translateExpr(lhs)
       val (rhsIR, rhsLoad) = translateExpr(rhs)
@@ -345,7 +358,10 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     * Translates a list of jumps from BAP into a single Jump at the IR level by moving any conditions on jumps to
     * Assume statements in new blocks
     * */
-  private def translate(jumps: List[BAPJump], block: Block): (Option[Call], Jump, ArrayBuffer[Block], Iterable[Statement]) = {
+  private def translate(
+    jumps: List[BAPJump],
+    block: Block
+  ): (Option[Call], Jump, ArrayBuffer[Block], Iterable[Statement]) = {
     if (jumps.size > 1) {
       val targets = ArrayBuffer[Block]()
       val conditions = ArrayBuffer[Expr]()
@@ -366,8 +382,8 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
                   // condition is true and previous conditions existing means this condition
                   // is actually that all previous conditions are false
                   val conditionsIR = conditions.map(c => convertConditionBool(c, true))
-                  val condition = conditionsIR.tail.foldLeft(conditionsIR.head) {
-                    (ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands)
+                  val condition = conditionsIR.tail.foldLeft(conditionsIR.head) { (ands: Expr, next: Expr) =>
+                    BinaryExpr(BoolAND, next, ands)
                   }
                   val newBlock = newBlockCondition(block, target, condition)
                   newBlocks.append(newBlock)
@@ -385,8 +401,8 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
                   // if this is not the first condition, then we need to need to add
                   // that all previous conditions are false
                   val conditionsIR = conditions.map(c => convertConditionBool(c, true))
-                  conditionsIR.tail.foldLeft(currentCondition) {
-                    (ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands)
+                  conditionsIR.tail.foldLeft(currentCondition) { (ands: Expr, next: Expr) =>
+                    BinaryExpr(BoolAND, next, ands)
                   }
                 }
                 val newBlock = newBlockCondition(block, target, condition)
@@ -404,11 +420,13 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
           b.target match {
             case "intrinsic$AtomicStart" =>
               val atomicStart = AtomicStart(Some(b.line))
-              val goto = b.returnTarget.map(t => labelToBlock(t)).map(x => GoTo(Set(x), Some(b.line))).getOrElse(Unreachable())
+              val goto =
+                b.returnTarget.map(t => labelToBlock(t)).map(x => GoTo(Set(x), Some(b.line))).getOrElse(Unreachable())
               (None, goto, ArrayBuffer(), ArrayBuffer(atomicStart))
             case "intrinsic$AtomicEnd" =>
               val atomicEnd = AtomicEnd(Some(b.line))
-              val goto = b.returnTarget.map(t => labelToBlock(t)).map(x => GoTo(Set(x), Some(b.line))).getOrElse(Unreachable())
+              val goto =
+                b.returnTarget.map(t => labelToBlock(t)).map(x => GoTo(Set(x), Some(b.line))).getOrElse(Unreachable())
               (None, goto, ArrayBuffer(), ArrayBuffer(atomicEnd))
             case _ =>
               val call = Some(DirectCall(nameToProcedure(b.target), Some(b.line)))

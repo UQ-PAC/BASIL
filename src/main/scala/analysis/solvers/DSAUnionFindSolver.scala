@@ -18,6 +18,7 @@ class DSAUnionFindSolver extends UnionFindSolver[UniTerm] {
     val (rep2, _) = findWithOffset(t2)
 
     if (rep1 != rep2) {
+
       /** Perform the union of the equivalence classes of `t1` and `t2`, such that `t2` becomes the new canonical element.
         * We assume `t1` and `t2` to be distinct canonical elements. This implementation does not use
         * [[https://en.wikipedia.org/wiki/Disjoint-set_data_structure union-by-rank]].
@@ -26,7 +27,7 @@ class DSAUnionFindSolver extends UnionFindSolver[UniTerm] {
       offsets += t1 -> offset
     }
   }
-  
+
   def findWithOffset(t: DSAUniTerm): (DSAUniTerm, BigInt) = {
     mkSet(t)
     if (parent(t) != t)
@@ -36,7 +37,6 @@ class DSAUnionFindSolver extends UnionFindSolver[UniTerm] {
 
     (parent(t), offsets(t))
   }
-
 
   /** Creates an equivalence class for the term `t`, if it does not exists already.
    */
@@ -58,4 +58,3 @@ case class DSAUniTerm(node: Node) extends Var[UniTerm] {
 
   override def toString: String = s"Term{$node}"
 }
-

@@ -14,23 +14,23 @@ object Logger:
   import LogLevel.*
 
   def write(
-      logLevel: LogLevel,
-      arg: Any,
-      line: sourcecode.Line,
-      file: sourcecode.FileName,
-      name: sourcecode.Name
+    logLevel: LogLevel,
+    arg: Any,
+    line: sourcecode.Line,
+    file: sourcecode.FileName,
+    name: sourcecode.Name
   ): Unit = {
 
     val colour = logLevel match
       case DEBUG => AnsiColor.RESET
-      case INFO  => AnsiColor.GREEN
-      case WARN  => AnsiColor.YELLOW
+      case INFO => AnsiColor.GREEN
+      case WARN => AnsiColor.YELLOW
       case ERROR => AnsiColor.RED
 
     val showPosition = (logLevel, level) match
-      case (_, DEBUG) => true 
-      case (ERROR, _) => true 
-      case (WARN, _) => true 
+      case (_, DEBUG) => true
+      case (ERROR, _) => true
+      case (WARN, _) => true
       case (INFO, _) => false
       case (DEBUG, _) => false
 
@@ -38,7 +38,7 @@ object Logger:
 
     val space = "  "
     val prefix = s"[$colour$logLevel${AnsiColor.RESET}]$space"
-    val text = arg.toString().replace("\n", "\n " + (" " * (logLevel.toString).length()) + "  " + space )
+    val text = arg.toString().replace("\n", "\n " + (" " * (logLevel.toString).length()) + "  " + space)
 
     if (level.id <= logLevel.id) {
       System.err.println(s"$prefix $text$position")

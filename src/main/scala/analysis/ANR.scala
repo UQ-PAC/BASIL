@@ -63,8 +63,8 @@ trait ANRAnalysis(program: Program) {
   }
 }
 
-class ANRAnalysisSolver(program: Program) extends ANRAnalysis(program)
+class ANRAnalysisSolver(program: Program)
+    extends ANRAnalysis(program)
     with IRIntraproceduralForwardDependencies
     with Analysis[Map[CFGPosition, Set[Variable]]]
-    with SimpleWorklistFixpointSolver[CFGPosition, Set[Variable], PowersetLattice[Variable]] {
-}
+    with SimpleWorklistFixpointSolver[CFGPosition, Set[Variable], PowersetLattice[Variable]] {}

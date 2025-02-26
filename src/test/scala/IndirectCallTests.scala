@@ -1,6 +1,16 @@
 import ir.{Block, Command, DirectCall, GoTo, Procedure, Program, Statement}
 import org.scalatest.funsuite.*
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, LogLevel, Logger, PerformanceTimer, RunUtils, StaticAnalysisConfig}
+import util.{
+  BASILConfig,
+  BASILResult,
+  BoogieGeneratorConfig,
+  ILLoadingConfig,
+  LogLevel,
+  Logger,
+  PerformanceTimer,
+  RunUtils,
+  StaticAnalysisConfig
+}
 
 import scala.collection.mutable.ArrayBuffer
 import test_util.BASILTest
@@ -8,8 +18,8 @@ import test_util.TestConfig
 
 import java.io.{BufferedWriter, File, FileWriter}
 
-
 class IndirectCallTests extends AnyFunSuite, BASILTest {
+
   /**
     *
     * @param label - the label of the IndirectCall to be resolved
@@ -19,7 +29,12 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
     * An indirect call must resolve to either procedures or blocks, not both, so if procTargets is not empty,
     * that implies blockTargets is empty, and vice-versa
     */
-  case class IndirectCallResolution(label: String, labelProcedure: String, procTargets: Set[String], blockTargets: Set[BigInt]) {
+  case class IndirectCallResolution(
+    label: String,
+    labelProcedure: String,
+    procTargets: Set[String],
+    blockTargets: Set[BigInt]
+  ) {
     override def toString: String = {
       val (targetsStr, targetsName) = if (procTargets.nonEmpty) {
         (procTargets.mkString(", "), "Procedures")
@@ -39,7 +54,8 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
     val BPLPath = if conf.useBAPFrontend then variationPath + "_bap.bpl" else variationPath + "_gtirb.bpl"
     val specPath = directoryPath + name + ".spec"
     val RELFPath = variationPath + ".relf"
-    val resultPath = if conf.useBAPFrontend then variationPath + "_bap_result.txt" else variationPath + "_gtirb_result.txt"
+    val resultPath =
+      if conf.useBAPFrontend then variationPath + "_bap_result.txt" else variationPath + "_gtirb_result.txt"
     val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
 
     Logger.debug(s"$name/$variation$testSuffix")
@@ -94,14 +110,18 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
       val resolutionsSet = resolutions.toSet
       val inBoth = results.map(_.resolution).toSet.intersect(resolutionsSet)
       val missing = resolutionsSet -- inBoth
-      Some("no matching statements found for the following attempted indirect call resolutions: " + missing.mkString(", "))
+      Some(
+        "no matching statements found for the following attempted indirect call resolutions: " + missing.mkString(", ")
+      )
     } else {
       None
     }
 
     val failures = results.filter(!_.success)
     if (failures.nonEmpty || missingStatements.isDefined) {
-      val failureStrings: ArrayBuffer[String] = failures.map(r => "Resolving IndirectCall " + r.resolution.toString + " failed:" + System.lineSeparator() + "  " + r.message.get)
+      val failureStrings: ArrayBuffer[String] = failures.map(r =>
+        "Resolving IndirectCall " + r.resolution.toString + " failed:" + System.lineSeparator() + "  " + r.message.get
+      )
       failureStrings.addAll(missingStatements)
       Some(failureStrings.mkString(System.lineSeparator()))
     } else {
@@ -110,7 +130,9 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
   }
 
   def checkCallSite(callSite: Command, resolution: IndirectCallResolution): IndirectCallResult = {
-    assert((resolution.blockTargets.nonEmpty || resolution.procTargets.nonEmpty) && (resolution.blockTargets.isEmpty || resolution.procTargets.isEmpty))
+    assert(
+      (resolution.blockTargets.nonEmpty || resolution.procTargets.nonEmpty) && (resolution.blockTargets.isEmpty || resolution.procTargets.isEmpty)
+    )
     if (resolution.blockTargets.nonEmpty) {
       callSite match {
         case GoTo(targets, _) =>
@@ -122,7 +144,9 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
             } else {
               // fail - expected call to be resolved to goto to block with specified address
               val goToBlockAddresses = targets.map(_.address)
-              val failMsg = "resolved to incorrect target: " + callSite.toString + " with target address(es): [" + goToBlockAddresses.mkString(", ") + "]"
+              val failMsg =
+                "resolved to incorrect target: " + callSite.toString + " with target address(es): [" + goToBlockAddresses
+                  .mkString(", ") + "]"
               IndirectCallResult(resolution, false, Some(failMsg))
             }
           } else {
@@ -138,7 +162,9 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
                 IndirectCallResult(resolution, true, None)
               } else {
                 // fail - expected targets to match
-                val failMsg = "resolved GoTo target blocks do not have correct targets: " + callSite.toString + " with target block jump address(es): [" + targetAddresses.mkString(", ") + "]"
+                val failMsg =
+                  "resolved GoTo target blocks do not have correct targets: " + callSite.toString + " with target block jump address(es): [" + targetAddresses
+                    .mkString(", ") + "]"
                 IndirectCallResult(resolution, false, Some(failMsg))
               }
             } else {
@@ -179,7 +205,9 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
                 IndirectCallResult(resolution, true, None)
               } else {
                 // fail - expected goto to lead to blocks with direct calls to targets procedures
-                val failMsg = "resolved GoTo target blocks do not have correct targets: " + callSite.toString + " with target block calls: [" + targetNames.mkString(", ") + "]"
+                val failMsg =
+                  "resolved GoTo target blocks do not have correct targets: " + callSite.toString + " with target block calls: [" + targetNames
+                    .mkString(", ") + "]"
                 IndirectCallResult(resolution, false, Some(failMsg))
               }
             } else {
@@ -196,9 +224,11 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
       }
     }
   }
-  
-  private val BAPConfig = TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = true)
-  private val GTIRBConfig = TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = false, expectVerify = true)
+
+  private val BAPConfig =
+    TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = true)
+  private val GTIRBConfig =
+    TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = false, expectVerify = true)
 
   test("functionpointer/clang:BAP") {
     val resolvedCalls = Seq(IndirectCallResolution("%0000045d", "main", Set("set_six", "set_two", "set_seven"), Set()))
@@ -365,37 +395,51 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
   }
 
   test("jumptable3/clang:GTIRB") {
-    val resolvedCalls = Seq(IndirectCallResolution("1944$2", "main", Set(), Set(
-      BigInt(1948),
-      BigInt(1956),
-      BigInt(1964),
-      BigInt(1980),
-      BigInt(1984),
-      BigInt(1992),
-      BigInt(2004),
-      BigInt(2012),
-      BigInt(2020),
-      BigInt(2032),
-      BigInt(2044),
-      BigInt(2066)
-    )))
+    val resolvedCalls = Seq(
+      IndirectCallResolution(
+        "1944$2",
+        "main",
+        Set(),
+        Set(
+          BigInt(1948),
+          BigInt(1956),
+          BigInt(1964),
+          BigInt(1980),
+          BigInt(1984),
+          BigInt(1992),
+          BigInt(2004),
+          BigInt(2012),
+          BigInt(2020),
+          BigInt(2032),
+          BigInt(2044),
+          BigInt(2066)
+        )
+      )
+    )
     runTest("jumptable3", "clang", GTIRBConfig, resolvedCalls)
   }
 
   test("jumptable3/clang_O2:GTIRB") {
-    val resolvedCalls = Seq(IndirectCallResolution("1908$2", "main", Set(), Set(
-      BigInt(1920),
-      BigInt(1936),
-      BigInt(1948),
-      BigInt(1912),
-      BigInt(1964),
-      BigInt(1980),
-      BigInt(1992),
-      BigInt(2004),
-      BigInt(2016),
-      BigInt(2032),
-      BigInt(2048)
-    )))
+    val resolvedCalls = Seq(
+      IndirectCallResolution(
+        "1908$2",
+        "main",
+        Set(),
+        Set(
+          BigInt(1920),
+          BigInt(1936),
+          BigInt(1948),
+          BigInt(1912),
+          BigInt(1964),
+          BigInt(1980),
+          BigInt(1992),
+          BigInt(2004),
+          BigInt(2016),
+          BigInt(2032),
+          BigInt(2048)
+        )
+      )
+    )
     runTest("jumptable3", "clang_O2", GTIRBConfig, resolvedCalls)
   }
 
@@ -406,13 +450,14 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
   }
 
   test("switch2/clang:GTIRB") {
-    val resolvedCalls = Seq(IndirectCallResolution("1892$2", "main", Set(), Set(
-      BigInt(1908),
-      BigInt(1920),
-      BigInt(1896),
-      BigInt(1932),
-      BigInt(1944)
-    )))
+    val resolvedCalls = Seq(
+      IndirectCallResolution(
+        "1892$2",
+        "main",
+        Set(),
+        Set(BigInt(1908), BigInt(1920), BigInt(1896), BigInt(1932), BigInt(1944))
+      )
+    )
     runTest("switch2", "clang", GTIRBConfig, resolvedCalls)
   }
 

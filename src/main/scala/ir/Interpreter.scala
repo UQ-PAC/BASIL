@@ -55,24 +55,24 @@ class Interpreter() {
           s"\tBinaryExpr(0x${left.value.toString(16)}[u${left.size}] ${bin.op} 0x${right.value.toString(16)}[u${right.size}])"
         )
         bin.op match {
-          case BVAND    => smt_bvand(left, right)
-          case BVOR     => smt_bvor(left, right)
-          case BVADD    => smt_bvadd(left, right)
-          case BVMUL    => smt_bvmul(left, right)
-          case BVUDIV   => smt_bvudiv(left, right)
-          case BVUREM   => smt_bvurem(left, right)
-          case BVSHL    => smt_bvshl(left, right)
-          case BVLSHR   => smt_bvlshr(left, right)
-          case BVNAND   => smt_bvnand(left, right)
-          case BVNOR    => smt_bvnor(left, right)
-          case BVXOR    => smt_bvxor(left, right)
-          case BVXNOR   => smt_bvxnor(left, right)
-          case BVCOMP   => smt_bvcomp(left, right)
-          case BVSUB    => smt_bvsub(left, right)
-          case BVSDIV   => smt_bvsdiv(left, right)
-          case BVSREM   => smt_bvsrem(left, right)
-          case BVSMOD   => smt_bvsmod(left, right)
-          case BVASHR   => smt_bvashr(left, right)
+          case BVAND => smt_bvand(left, right)
+          case BVOR => smt_bvor(left, right)
+          case BVADD => smt_bvadd(left, right)
+          case BVMUL => smt_bvmul(left, right)
+          case BVUDIV => smt_bvudiv(left, right)
+          case BVUREM => smt_bvurem(left, right)
+          case BVSHL => smt_bvshl(left, right)
+          case BVLSHR => smt_bvlshr(left, right)
+          case BVNAND => smt_bvnand(left, right)
+          case BVNOR => smt_bvnor(left, right)
+          case BVXOR => smt_bvxor(left, right)
+          case BVXNOR => smt_bvxnor(left, right)
+          case BVCOMP => smt_bvcomp(left, right)
+          case BVSUB => smt_bvsub(left, right)
+          case BVSDIV => smt_bvsdiv(left, right)
+          case BVSREM => smt_bvsrem(left, right)
+          case BVSMOD => smt_bvsmod(left, right)
+          case BVASHR => smt_bvashr(left, right)
           case BVCONCAT => smt_concat(left, right)
           case _ => ???
         }
@@ -81,8 +81,8 @@ class Interpreter() {
         val arg = eval(un.arg, env)
         Logger.debug(s"\tUnaryExpr($un)")
         un.op match {
-          case BVNEG   => smt_bvneg(arg)
-          case BVNOT   => smt_bvnot(arg)
+          case BVNEG => smt_bvneg(arg)
+          case BVNOT => smt_bvnot(arg)
         }
 
       case u: UninterpretedFunction =>
@@ -170,7 +170,7 @@ class Interpreter() {
       val currentString: String = current.value.toString(2).reverse.padTo(8, '0').reverse
       endian match {
         case Endian.LittleEndian => (currentString + acc._1, acc._2 + current.size)
-        case Endian.BigEndian    => (acc._1 + currentString, acc._2 + current.size)
+        case Endian.BigEndian => (acc._1 + currentString, acc._2 + current.size)
       }
     }
 
@@ -178,11 +178,11 @@ class Interpreter() {
   }
 
   def setMemory(
-      index: BigInt,
-      size: Int,
-      endian: Endian,
-      value: BitVecLiteral,
-      env: mutable.Map[BigInt, BitVecLiteral]
+    index: BigInt,
+    size: Int,
+    endian: Endian,
+    value: BitVecLiteral,
+    env: mutable.Map[BigInt, BitVecLiteral]
   ): BitVecLiteral = {
     val binaryString: String = value.value.toString(2).reverse.padTo(size, '0').reverse
 
@@ -216,11 +216,11 @@ class Interpreter() {
     // Procedure.Block
     p.entryBlock match {
       case Some(block) => nextCmd = Some(block.statements.headOption.getOrElse(block.jump))
-      case None        => nextCmd = Some(returnCmd.pop())
+      case None => nextCmd = Some(returnCmd.pop())
     }
   }
 
-  private def interpretJump(j: Jump) : Unit = {
+  private def interpretJump(j: Jump): Unit = {
     Logger.debug(s"jump:")
     breakable {
       j match {
@@ -229,12 +229,13 @@ class Interpreter() {
           for (g <- gt.targets) {
             val condition: Option[Expr] = g.statements.headOption.collect { case a: Assume => a.body }
             condition match {
-              case Some(e) => evalBool(e, regs) match {
-                case TrueLiteral =>
-                  nextCmd = Some(g.statements.headOption.getOrElse(g.jump))
-                  break
-                case _ =>
-              }
+              case Some(e) =>
+                evalBool(e, regs) match {
+                  case TrueLiteral =>
+                    nextCmd = Some(g.statements.headOption.getOrElse(g.jump))
+                    break
+                  case _ =>
+                }
               case None =>
                 nextCmd = Some(g.statements.headOption.getOrElse(g.jump))
                 break
@@ -265,9 +266,9 @@ class Interpreter() {
 
         val index: Int = eval(store.index, regs).value.toInt
         val value: BitVecLiteral = eval(store.value, regs)
-        Logger.debug(s"\tMemoryStore(mem:${store.mem}, index:0x${index.toHexString}, value:0x${
-          value.value.toString(16)
-        }[u${value.size}], size:${store.size})")
+        Logger.debug(
+          s"\tMemoryStore(mem:${store.mem}, index:0x${index.toHexString}, value:0x${value.value.toString(16)}[u${value.size}], size:${store.size})"
+        )
 
         val evalStore = setMemory(index, store.size, store.endian, value, mems)
         evalStore match {
@@ -284,7 +285,7 @@ class Interpreter() {
           case BitVecLiteral(value, size) =>
             Logger.debug(s"MemoryStore ${load.lhs} := 0x${value.toString(16)}[u$size]\n")
         }
-      case _ : NOP => ()
+      case _: NOP => ()
       case assert: Assert =>
         // TODO
         Logger.debug(assert)
@@ -313,7 +314,7 @@ class Interpreter() {
           if (returnCmd.nonEmpty) {
             nextCmd = Some(returnCmd.pop())
           } else {
-            //Exit Interpreter
+            // Exit Interpreter
             nextCmd = None
           }
           break
@@ -327,15 +328,16 @@ class Interpreter() {
     // initialize memory array from IRProgram
     var currentAddress = BigInt(0)
     IRProgram.initialMemory.values.foreach { im =>
-        if (im.address + im.size > currentAddress) {
-          val start = im.address.max(currentAddress)
-          val data = if (im.address < currentAddress) im.bytes.slice((currentAddress - im.address).toInt, im.size) else im.bytes
-          data.zipWithIndex.foreach { (byte, index) =>
-            mems(start + index) = byte
-          }
-          currentAddress = im.address + im.size
+      if (im.address + im.size > currentAddress) {
+        val start = im.address.max(currentAddress)
+        val data =
+          if (im.address < currentAddress) im.bytes.slice((currentAddress - im.address).toInt, im.size) else im.bytes
+        data.zipWithIndex.foreach { (byte, index) =>
+          mems(start + index) = byte
         }
+        currentAddress = im.address + im.size
       }
+    }
 
     // Initial SP, FP and LR to regs
     regs += (Register("R31", 64) -> SP)
@@ -345,8 +347,8 @@ class Interpreter() {
     // Program.Procedure
     interpretProcedure(IRProgram.mainProcedure)
     while (nextCmd.isDefined) {
-      nextCmd.get match  {
-        case c: Statement => interpretStatement(c) 
+      nextCmd.get match {
+        case c: Statement => interpretStatement(c)
         case c: Jump => interpretJump(c)
       }
     }

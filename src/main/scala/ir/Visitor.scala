@@ -30,7 +30,6 @@ abstract class Visitor {
     node
   }
 
-
   def visitAssume(node: Assume): Statement = {
     node.body = visitExpr(node.body)
     node
@@ -350,12 +349,12 @@ class StackSubstituter extends IntraproceduralControlFlowVisitor {
 class Substituter(variables: Map[Variable, Variable] = Map(), memories: Map[Memory, Memory] = Map()) extends Visitor {
   override def visitVariable(node: Variable): Variable = variables.get(node) match {
     case Some(v: Variable) => v
-    case None              => node
+    case None => node
   }
 
   override def visitMemory(node: Memory): Memory = memories.get(node) match {
     case Some(m: Memory) => m
-    case None            => node
+    case None => node
   }
 }
 

@@ -1,6 +1,19 @@
 import analysis.{InterLiveVarsAnalysis, TwoElementTop}
 import ir.dsl.*
-import ir.{BitVecLiteral, BitVecType, dsl, LocalAssign, LocalVar, Program, Register, Statement, Variable, transforms, cilvisitor, Procedure}
+import ir.{
+  BitVecLiteral,
+  BitVecType,
+  dsl,
+  LocalAssign,
+  LocalVar,
+  Program,
+  Register,
+  Statement,
+  Variable,
+  transforms,
+  cilvisitor,
+  Procedure
+}
 import util.{Logger, LogLevel}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest
@@ -18,14 +31,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
   }
 
   def createSimpleProc(name: String, statements: Seq[Statement]): EventuallyProcedure = {
-    proc(name,
-      block("l" + name,
-        statements.:+(goto(name + "_return")): _*
-      ),
-      block(name + "_return",
-        ret
-      )
-    )
+    proc(name, block("l" + name, statements.:+(goto(name + "_return")): _*), block(name + "_return", ret))
   }
 
   def differentCalleesBothLive(): Unit = {
@@ -36,20 +42,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     val r2r1Assign = LocalAssign(R2, R1, Some("00004"))
 
     val program: Program = prog(
-      proc("main",
-        block("first_call",
-          r0ConstantAssign,
-          r1ConstantAssign,
-          directCall("callee1"),
-          goto("second_call")
-        ),
-        block("second_call",
-          directCall("callee2"),
-          goto("returnBlock")
-        ),
-        block("returnBlock",
-          ret
-        )
+      proc(
+        "main",
+        block("first_call", r0ConstantAssign, r1ConstantAssign, directCall("callee1"), goto("second_call")),
+        block("second_call", directCall("callee2"), goto("returnBlock")),
+        block("returnBlock", ret)
       ),
       createSimpleProc("callee1", Seq(r2r0Assign)),
       createSimpleProc("callee2", Seq(r2r1Assign))
@@ -67,7 +64,6 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     assert(liveVarAnalysisResults(procs("callee2")) == Map(R1 -> TwoElementTop))
   }
 
-
   def differentCalleesOneAlive(): Unit = {
     val constant1 = bv64(1)
     val r0ConstantAssign = LocalAssign(R0, constant1, Some("00001"))
@@ -77,18 +73,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     val r1Reassign = LocalAssign(R1, BitVecLiteral(2, 64), Some("00005"))
 
     val program: Program = prog(
-      proc("main",
-        block("first_call",
-          r0ConstantAssign,
-          r1ConstantAssign,
-          directCall("callee1"), goto("second_call")
-        ),
-        block("second_call",
-          directCall("callee2"), goto("returnBlock")
-        ),
-        block("returnBlock",
-          ret
-        )
+      proc(
+        "main",
+        block("first_call", r0ConstantAssign, r1ConstantAssign, directCall("callee1"), goto("second_call")),
+        block("second_call", directCall("callee2"), goto("returnBlock")),
+        block("returnBlock", ret)
       ),
       createSimpleProc("callee1", Seq(r1Reassign, r2r0Assign)),
       createSimpleProc("callee2", Seq(r2r1Assign))
@@ -113,38 +102,25 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     val r2Assign = LocalAssign(R0, R2, Some("00003"))
 
     val program = prog(
-      proc("main",
-        block("main_first_call",
-          directCall("wrapper1"),
-          goto("main_second_call")
-        ),
-        block("main_second_call",
-          directCall("wrapper2"),
-          goto("main_return")
-        ),
+      proc(
+        "main",
+        block("main_first_call", directCall("wrapper1"), goto("main_second_call")),
+        block("main_second_call", directCall("wrapper2"), goto("main_return")),
         block("main_return", ret)
       ),
       createSimpleProc("callee", Seq(r0ConstantAssign)),
       createSimpleProc("callee2", Seq(r1Assign)),
       createSimpleProc("callee3", Seq(r2Assign)),
-      proc("wrapper1",
-        block("wrapper1_first_call",
-          LocalAssign(R1, constant1),
-          directCall("callee"),
-          goto("wrapper1_second_call")
-        ),
-        block("wrapper1_second_call",
-          directCall("callee2"),
-          goto("wrapper1_return")),
+      proc(
+        "wrapper1",
+        block("wrapper1_first_call", LocalAssign(R1, constant1), directCall("callee"), goto("wrapper1_second_call")),
+        block("wrapper1_second_call", directCall("callee2"), goto("wrapper1_return")),
         block("wrapper1_return", ret)
       ),
-      proc("wrapper2",
-        block("wrapper2_first_call",
-          LocalAssign(R2, constant1),
-          directCall("callee"), goto("wrapper2_second_call")
-        ),
-        block("wrapper2_second_call",
-          directCall("callee3"), goto("wrapper2_return")),
+      proc(
+        "wrapper2",
+        block("wrapper2_first_call", LocalAssign(R2, constant1), directCall("callee"), goto("wrapper2_second_call")),
+        block("wrapper2_second_call", directCall("callee3"), goto("wrapper2_return")),
         block("wrapper2_return", ret)
       )
     )
@@ -162,14 +138,10 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
 
   def deadBeforeCall(): Unit = {
     val program = prog(
-      proc("main",
-        block("lmain",
-          directCall("killer"), goto("aftercall")
-        ),
-        block("aftercall",
-          LocalAssign(R0, R1),
-          ret
-        )
+      proc(
+        "main",
+        block("lmain", directCall("killer"), goto("aftercall")),
+        block("aftercall", LocalAssign(R0, R1), ret)
       ),
       createSimpleProc("killer", Seq(LocalAssign(R1, bv64(1))))
     )
@@ -189,23 +161,12 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     val r1Assign = LocalAssign(R0, R1, Some("00001"))
     val r2Assign = LocalAssign(R0, R2, Some("00002"))
 
-    val program : Program = prog(
+    val program: Program = prog(
       proc(
         "main",
-        block(
-          "lmain",
-          goto("branch1", "branch2")
-        ),
-        block(
-          "branch1",
-          r1Assign,
-          goto("main_return")
-        ),
-        block(
-          "branch2",
-          r2Assign,
-          goto("main_return")
-        ),
+        block("lmain", goto("branch1", "branch2")),
+        block("branch1", r1Assign, goto("main_return")),
+        block("branch2", r2Assign, goto("main_return")),
         block("main_return", ret)
       )
     )
@@ -224,17 +185,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
   }
 
   def recursionInfinite(): Unit = { // can't handle this infinite recursion case
-    val program : Program = prog(
-      proc("main",
-        block(
-          "lmain",
-          LocalAssign(R0, R1),
-          directCall("main"), goto("return")
-        ),
-        block("return",
-          LocalAssign(R0, R2),
-          ret
-        )
+    val program: Program = prog(
+      proc(
+        "main",
+        block("lmain", LocalAssign(R0, R1), directCall("main"), goto("return")),
+        block("return", LocalAssign(R0, R2), ret)
       )
     )
 
@@ -249,26 +204,13 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
 
   def recursionBaseCase(): Unit = {
     val program: Program = prog(
-      proc("main",
-        block("lmain",
-          LocalAssign(R0, R1),
-          goto("recursion", "non-recursion")
-        ),
-        block(
-          "recursion",
-          directCall("main"), goto("assign")
-        ),
-        block("assign",
-          LocalAssign(R0, R2),
-          goto("return")
-        ),
-        block(
-          "non-recursion",
-          goto("return")
-        ),
-        block("return",
-          ret
-        )
+      proc(
+        "main",
+        block("lmain", LocalAssign(R0, R1), goto("recursion", "non-recursion")),
+        block("recursion", directCall("main"), goto("assign")),
+        block("assign", LocalAssign(R0, R2), goto("return")),
+        block("non-recursion", goto("return")),
+        block("return", ret)
       )
     )
 
@@ -335,7 +277,14 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     val blocks = result.ir.program.labelToBlock
 
     // main has parameter, callee (zero) has return and no parameter
-    assert(analysisResults(blocks("lmain")) == Map(R0 -> TwoElementTop, R29 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(
+      analysisResults(blocks("lmain")) == Map(
+        R0 -> TwoElementTop,
+        R29 -> TwoElementTop,
+        R30 -> TwoElementTop,
+        R31 -> TwoElementTop
+      )
+    )
     assert(analysisResults(blocks("lzero")) == Map(R31 -> TwoElementTop))
     assert(analysisResults(blocks("l00000323")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block
     assert(analysisResults(blocks("zero_basil_return")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop))
@@ -350,7 +299,14 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     assert(analysisResults(blocks("lmain")) == Map(R29 -> TwoElementTop, R31 -> TwoElementTop, R30 -> TwoElementTop))
     assert(analysisResults(blocks("l000003ec")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // get_two aftercall
     assert(analysisResults(blocks("l00000430")) == Map(R31 -> TwoElementTop)) // printf aftercall
-    assert(analysisResults(blocks("lget_two")) == Map(R0 -> TwoElementTop, R1 -> TwoElementTop, R2 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(
+      analysisResults(blocks("lget_two")) == Map(
+        R0 -> TwoElementTop,
+        R1 -> TwoElementTop,
+        R2 -> TwoElementTop,
+        R31 -> TwoElementTop
+      )
+    )
     assert(analysisResults(blocks("get_two_basil_return")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop))
   }
 
@@ -362,9 +318,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
     // block after branch
     assert(analysisResults(blocks("l00000342")) == Map(R31 -> TwoElementTop))
     // branch blocks
-    assert(analysisResults(blocks("lmain_goto_l00000330")) == Map(Register("ZF", 1) -> TwoElementTop,
-      R31 -> TwoElementTop))
-    assert(analysisResults(blocks("lmain_goto_l00000369")) == Map(Register("ZF", 1) -> TwoElementTop,
-      R31 -> TwoElementTop))
+    assert(
+      analysisResults(blocks("lmain_goto_l00000330")) == Map(Register("ZF", 1) -> TwoElementTop, R31 -> TwoElementTop)
+    )
+    assert(
+      analysisResults(blocks("lmain_goto_l00000369")) == Map(Register("ZF", 1) -> TwoElementTop, R31 -> TwoElementTop)
+    )
   }
 }

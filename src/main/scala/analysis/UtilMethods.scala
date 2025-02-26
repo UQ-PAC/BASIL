@@ -13,7 +13,10 @@ import scala.annotation.tailrec
   * @return:
   *   The evaluated expression (e.g. 0x69632)
   */
-def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[BitVecLiteral]]): Option[BitVecLiteral] = {
+def evaluateExpression(
+  exp: Expr,
+  constantPropResult: Map[Variable, FlatElement[BitVecLiteral]]
+): Option[BitVecLiteral] = {
   exp match {
     case binOp: BinaryExpr =>
       val lhs = evaluateExpression(binOp.arg1, constantPropResult)
@@ -49,7 +52,7 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
     case extend: ZeroExtend =>
       evaluateExpression(extend.body, constantPropResult) match {
         case Some(b: BitVecLiteral) => Some(BitVectorEval.smt_zero_extend(extend.extension, b))
-        case None                => None
+        case None => None
       }
     case extend: SignExtend =>
       evaluateExpression(extend.body, constantPropResult) match {
@@ -59,36 +62,52 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
     case e: Extract =>
       evaluateExpression(e.body, constantPropResult) match {
         case Some(b: BitVecLiteral) => Some(BitVectorEval.boogie_extract(e.end, e.start, b))
-        case None               => None
+        case None => None
       }
     case variable: Variable =>
       constantPropResult(variable) match {
         case FlatEl(value) => Some(value)
-        case Top           => None
-        case Bottom        => None
+        case Top => None
+        case Bottom => None
       }
     case b: BitVecLiteral => Some(b)
-    case _ => //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
+    case _ => // throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
       None
   }
 }
 
-def getDefinition(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[Assign] = {
+def getDefinition(
+  variable: Variable,
+  node: CFGPosition,
+  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
+): Set[Assign] = {
   val (in, _) = reachingDefs(node)
   in.getOrElse(variable, Set())
 }
 
-def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[Assign] = {
+def getUse(
+  variable: Variable,
+  node: CFGPosition,
+  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
+): Set[Assign] = {
   val (_, out) = reachingDefs(node)
   out.getOrElse(variable, Set())
 }
 
-def getSSADefinition(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]): FlatElement[Int] = {
+def getSSADefinition(
+  variable: Variable,
+  node: CFGPosition,
+  reachingDefs: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
+): FlatElement[Int] = {
   val (in, _) = reachingDefs(node)
   in(variable)
 }
 
-def getSSAUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]): FlatElement[Int] = {
+def getSSAUse(
+  variable: Variable,
+  node: CFGPosition,
+  reachingDefs: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
+): FlatElement[Int] = {
   val (_, out) = reachingDefs(node)
   out(variable)
 }

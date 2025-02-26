@@ -27,21 +27,28 @@ sealed trait BCmd() extends BCmdOrBlock with HasAttributes {
   }
 }
 
-case class BAssert(body: BExpr, comment: Option[String] = None, override val attributes: List[BAttribute] = List.empty) extends BCmd {
+case class BAssert(body: BExpr, comment: Option[String] = None, override val attributes: List[BAttribute] = List.empty)
+    extends BCmd {
   override def toString: String = s"assert $attrString$body;"
   override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
 }
 
-case class BAssume(body: BExpr, comment: Option[String] = None, override val attributes: List[BAttribute] = List.empty) extends BCmd {
+case class BAssume(body: BExpr, comment: Option[String] = None, override val attributes: List[BAttribute] = List.empty)
+    extends BCmd {
   override def toString: String = s"assume $attrString$body;"
   override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
 }
 
-case class BProcedureCall(name: String, lhss: Seq[BVar] = Seq(), params: Seq[BExpr] = Seq(), comment: Option[String] = None) extends BCmd {
+case class BProcedureCall(
+  name: String,
+  lhss: Seq[BVar] = Seq(),
+  params: Seq[BExpr] = Seq(),
+  comment: Option[String] = None
+) extends BCmd {
   override def toString: String = {
     if (lhss.isEmpty) {
       s"call $attrString$name();"

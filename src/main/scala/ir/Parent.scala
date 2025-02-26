@@ -17,7 +17,9 @@ trait HasParent[T]:
       case Some(p) => p
       case None =>
         val msg = s"Trying to get the parent of a node that is detached from the progam: $this. " +
-          s"Node was last attached to: ${last_parent.map(_._1)}, detached at ${last_parent.map(x => x._2 + x._3 + "@" + x._4)} "
+          s"Node was last attached to: ${last_parent.map(
+              _._1
+            )}, detached at ${last_parent.map(x => x._2 + x._3 + "@" + x._4)} "
         Logger.error(msg)
         throw new RuntimeException(msg)
     }
@@ -26,7 +28,6 @@ trait HasParent[T]:
   def hasParent: Boolean = _parent.isDefined
 
   def parent_=(value: T): Unit = setParent(value)
-
 
   /**
    * Update any IL control-flow links implied by this relation.
@@ -45,7 +46,6 @@ trait HasParent[T]:
    * NOT necessarily idempotent.
    */
   protected[this] def unlinkParent(): Unit = ()
-
 
   /**
    * Remove this element's parent and update any IL control-flow links implied by this relation.
@@ -75,4 +75,3 @@ trait HasParent[T]:
         _parent = Some(p)
         linkParent(p)
   }
-

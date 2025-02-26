@@ -1,7 +1,21 @@
 package analysis
 
 import analysis.solvers.BackwardIDESolver
-import ir.{Assert, LocalAssign, Assume, CFGPosition, Command, DirectCall, IndirectCall, MemoryLoad, MemoryStore, Procedure, Program, Return, Variable}
+import ir.{
+  Assert,
+  LocalAssign,
+  Assume,
+  CFGPosition,
+  Command,
+  DirectCall,
+  IndirectCall,
+  MemoryLoad,
+  MemoryStore,
+  Procedure,
+  Program,
+  Return,
+  Variable
+}
 
 /**
  * Micro-transfer-functions for LiveVar analysis
@@ -39,25 +53,22 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement
       case LocalAssign(variable, expr, _) => // (s - variable) ++ expr.variables
         d match {
           case Left(value) =>
-            if value == variable then
-              Map()
-            else
-              Map(d -> IdEdge())
+            if value == variable then Map()
+            else Map(d -> IdEdge())
           case Right(_) =>
-            expr.variables.foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
-              (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
+            expr.variables.foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) { (mp, expVar) =>
+              mp + (Left(expVar) -> ConstEdge(TwoElementTop))
             }
         }
       case MemoryLoad(lhs, _, index, _, _, _) =>
         d match {
           case Left(value) =>
-            if value == lhs then
-              Map()
-            else
-              Map(d -> IdEdge())
-          case Right(_) => index.variables.foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
-            (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
-          }
+            if value == lhs then Map()
+            else Map(d -> IdEdge())
+          case Right(_) =>
+            index.variables.foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) { (mp, expVar) =>
+              mp + (Left(expVar) -> ConstEdge(TwoElementTop))
+            }
         }
       case MemoryStore(_, index, value, _, _, _) => // s ++ store.index.variables ++ store.value.variables
         d match {
@@ -71,16 +82,16 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement
         d match {
           case Left(_) => Map(d -> IdEdge())
           case Right(_) =>
-            expr.variables.foldLeft(Map(d -> IdEdge()): Map[DL, EdgeFunction[TwoElement]]) {
-              (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
+            expr.variables.foldLeft(Map(d -> IdEdge()): Map[DL, EdgeFunction[TwoElement]]) { (mp, expVar) =>
+              mp + (Left(expVar) -> ConstEdge(TwoElementTop))
             }
         }
       case Assert(expr, _, _) => // s ++ expr.variables
         d match {
           case Left(_) => Map(d -> IdEdge())
           case Right(_) =>
-            expr.variables.foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
-              (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
+            expr.variables.foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) { (mp, expVar) =>
+              mp + (Left(expVar) -> ConstEdge(TwoElementTop))
             }
         }
       case IndirectCall(variable, _) =>
@@ -94,9 +105,5 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement
 }
 
 class InterLiveVarsAnalysis(program: Program)
-  extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program), LiveVarsAnalysisFunctions
-
-
-
-
-
+    extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program),
+      LiveVarsAnalysisFunctions

@@ -17,11 +17,11 @@ case class BAPProgram(subroutines: List[BAPSubroutine], memorySections: List[BAP
 }
 
 case class BAPSubroutine(
-    name: String,
-    address: Option[BigInt],
-    blocks: List[BAPBlock],
-    in: List[BAPParameter],
-    out: List[BAPParameter]
+  name: String,
+  address: Option[BigInt],
+  blocks: List[BAPBlock],
+  in: List[BAPParameter],
+  out: List[BAPParameter]
 ) {
   override def toString: String = s"$name $address $in $out [\n${blocks.mkString("\n")}\n]"
 
