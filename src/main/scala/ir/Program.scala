@@ -118,8 +118,7 @@ class Program(
   }
 
   override def toString(): String = {
-    // serialiseIL(this)
-    translating.PrettyPrinter.pp_prog(this)
+    serialiseIL(this)
   }
 
   def setModifies(specModifies: Map[String, List[String]]): Unit = {
@@ -315,8 +314,7 @@ class Procedure private (
   }
 
   override def toString: String = {
-    // s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${formalInParam.size} in and ${formalOutParam.size} out parameters"
-    translating.PrettyPrinter.pp_proc(this)
+    s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${formalInParam.size} in and ${formalOutParam.size} out parameters"
   }
 
   def calls: Set[Procedure] = blocks.iterator.flatMap(_.calls).toSet
