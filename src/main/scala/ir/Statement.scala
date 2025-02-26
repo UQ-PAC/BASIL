@@ -97,6 +97,9 @@ class NOP(override val label: Option[String] = None) extends Statement {
   override def toString: String = s"NOP $labelStr"
   override def acceptVisit(visitor: Visitor): Statement = this
 }
+object NOP {
+  def unapply(x: NOP) = Some(x.label)
+}
 
 class Assert(var body: Expr, var comment: Option[String] = None, override val label: Option[String] = None)
     extends Statement {
