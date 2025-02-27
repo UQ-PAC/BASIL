@@ -31,14 +31,14 @@ BIN_NAME=${BIN_NAME:=$(echo "$CFILE_NAME" | sed -s 's/.c$//')}
 export BIN_NAME
 export CFILE_NAME
 
-make -f - $@ << EOF
+make $@ -f - << EOF
 CC ?= aarch64-linux-gnu-gcc
 DDISASM ?= ddisasm
 READELF ?= readelf
 GTIRBSEM ?= gtirb_semantics
 BAP ?= bap
-DDISASM ?= ddisasm
 
+.PHONY=all clean 
 all: \$(BIN_NAME).adt \$(BIN_NAME).relf \$(BIN_NAME).gts
 
 \$(BIN_NAME): \$(CFILE_NAME)
@@ -54,5 +54,9 @@ all: \$(BIN_NAME).adt \$(BIN_NAME).relf \$(BIN_NAME).gts
 	\$(GTIRBSEM) \$(BIN_NAME).gtirb \$(BIN_NAME).gts
 
 \$(BIN_NAME).gtirb: \$(BIN_NAME)
-	ddisasm \$(BIN_NAME) --ir \$(BIN_NAME).gtirb
+	\$(DDISASM) \$(BIN_NAME) --ir \$(BIN_NAME).gtirb
+
+clean:
+	rm -f \$(BIN_NAME).adt \$(BIN_NAME).relf \$(BIN_NAME).gts \$(BIN_NAME)
 EOF
+
