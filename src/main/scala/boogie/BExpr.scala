@@ -710,8 +710,13 @@ trait SpecGlobalOrAccess extends SpecVar with Ordered[SpecGlobalOrAccess] {
   def compare(that: SpecGlobalOrAccess): Int = address.compare(that.address)
 }
 
-case class SpecGlobal(override val name: String, override val size: Int, arraySize: Option[Int], override val address: BigInt)
-  extends SymbolTableEntry, SpecGlobalOrAccess {
+case class SpecGlobal(
+  override val name: String,
+  override val size: Int,
+  arraySize: Option[Int],
+  override val address: BigInt
+) extends SymbolTableEntry,
+      SpecGlobalOrAccess {
   override def specGlobals: Set[SpecGlobalOrAccess] = Set(this)
   override val toAddrVar: BVar = BVariable("$" + s"${name}_addr", BitVecBType(64), Scope.Const)
   override val toOldVar: BVar = BVariable(s"${name}_old", BitVecBType(size), Scope.Local)

@@ -210,7 +210,9 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     }
 
     if (atomicSectionStart.isDefined || atomicSectionEnd.isDefined || atomicSectionContents.nonEmpty) {
-      throw Exception("error handling atomic sections - left atomic section partially resolved after traversing procedure")
+      throw Exception(
+        "error handling atomic sections - left atomic section partially resolved after traversing procedure"
+      )
     }
 
   }
@@ -285,10 +287,11 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       }
       (extract, load)
     case literal: BAPLiteral => (translateLiteral(literal), None)
-    case BAPUnOp(operator, exp) => operator match {
-      case NOT => (UnaryExpr(BVNOT, translateExprOnly(exp)), None)
-      case NEG => (UnaryExpr(BVNEG, translateExprOnly(exp)), None)
-    }
+    case BAPUnOp(operator, exp) =>
+      operator match {
+        case NOT => (UnaryExpr(BVNOT, translateExprOnly(exp)), None)
+        case NEG => (UnaryExpr(BVNEG, translateExprOnly(exp)), None)
+      }
     case BAPBinOp(operator, lhs, rhs) =>
       val (lhsIR, lhsLoad) = translateExpr(lhs)
       val (rhsIR, rhsLoad) = translateExpr(rhs)
@@ -421,7 +424,10 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     * Translates a list of jumps from BAP into a single Jump at the IR level by moving any conditions on jumps to
     * Assume statements in new blocks
     * */
-  private def translate(jumps: List[BAPJump], block: Block): (Option[Call], Jump, ArrayBuffer[Block], Iterable[Statement]) = {
+  private def translate(
+    jumps: List[BAPJump],
+    block: Block
+  ): (Option[Call], Jump, ArrayBuffer[Block], Iterable[Statement]) = {
     if (jumps.size > 1) {
       val targets = ArrayBuffer[Block]()
       val conditions = ArrayBuffer[Expr]()
@@ -480,11 +486,13 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
           b.target match {
             case "intrinsic$AtomicStart" =>
               val atomicStart = AtomicStart(Some(b.line))
-              val goto = b.returnTarget.map(t => labelToBlock(t)).map(x => GoTo(Set(x), Some(b.line))).getOrElse(Unreachable())
+              val goto =
+                b.returnTarget.map(t => labelToBlock(t)).map(x => GoTo(Set(x), Some(b.line))).getOrElse(Unreachable())
               (None, goto, ArrayBuffer(), ArrayBuffer(atomicStart))
             case "intrinsic$AtomicEnd" =>
               val atomicEnd = AtomicEnd(Some(b.line))
-              val goto = b.returnTarget.map(t => labelToBlock(t)).map(x => GoTo(Set(x), Some(b.line))).getOrElse(Unreachable())
+              val goto =
+                b.returnTarget.map(t => labelToBlock(t)).map(x => GoTo(Set(x), Some(b.line))).getOrElse(Unreachable())
               (None, goto, ArrayBuffer(), ArrayBuffer(atomicEnd))
             case _ =>
               val call = Some(DirectCall(nameToProcedure(b.target), Some(b.line)))

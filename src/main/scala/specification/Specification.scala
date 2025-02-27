@@ -4,13 +4,14 @@ import boogie.*
 import ir.*
 import util.Logger
 
-trait SymbolTableEntry{
+trait SymbolTableEntry {
   val name: String
   val size: Int
   val address: BigInt
 }
 
-case class FuncEntry(override val name: String, override val size: Int, override val address: BigInt) extends SymbolTableEntry
+case class FuncEntry(override val name: String, override val size: Int, override val address: BigInt)
+    extends SymbolTableEntry
 
 case class Specification(
   funcs: Set[FuncEntry],

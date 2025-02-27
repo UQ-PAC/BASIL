@@ -106,11 +106,8 @@ class AtomicEnd(override val label: Option[String] = None) extends NOP(label) {
   override def toString: String = s"AtomicEnd $labelStr"
 }
 
-class Assert(
-  var body: Expr,
-  var comment: Option[String] = None,
-  override val label: Option[String] = None
-) extends Statement {
+class Assert(var body: Expr, var comment: Option[String] = None, override val label: Option[String] = None)
+    extends Statement {
   override def toString: String = s"${labelStr}assert $body" + comment.map(" //" + _)
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssert(this)
 }
@@ -139,7 +136,8 @@ class Assume(
 }
 
 object Assume {
-  def unapply(a: Assume): Option[(Expr, Option[String], Option[String], Boolean)] = Some(a.body, a.comment, a.label, a.checkSecurity)
+  def unapply(a: Assume): Option[(Expr, Option[String], Option[String], Boolean)] =
+    Some(a.body, a.comment, a.label, a.checkSecurity)
 }
 
 sealed trait Jump extends Command {

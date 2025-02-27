@@ -755,14 +755,14 @@ class IRToBoogie(
 
   private def translateAtomicStart(a: AtomicSection): List[BCmd] = {
     val sharedLoads = a.getBlocks.flatMap { b =>
-      b.statements.collect {
-        case load @ MemoryLoad(_, _: SharedMemory, _, _, _, _) => load
+      b.statements.collect { case load @ MemoryLoad(_, _: SharedMemory, _, _, _, _) =>
+        load
       }
     }
 
     val sharedStores = a.getBlocks.flatMap { b =>
-      b.statements.collect {
-        case store @ MemoryStore(_: SharedMemory, _, _, _, _, _) => store
+      b.statements.collect { case store @ MemoryStore(_: SharedMemory, _, _, _, _, _) =>
+        store
       }
     }
 
@@ -784,8 +784,8 @@ class IRToBoogie(
 
   private def translateAtomicEnd(a: AtomicSection): List[BCmd] = {
     val sharedStores = a.getBlocks.flatMap { b =>
-      b.statements.collect {
-        case store@MemoryStore(_: SharedMemory, _, _, _, _, _) => store
+      b.statements.collect { case store @ MemoryStore(_: SharedMemory, _, _, _, _, _) =>
+        store
       }
     }
 

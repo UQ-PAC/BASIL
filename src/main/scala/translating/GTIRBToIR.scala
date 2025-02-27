@@ -318,7 +318,10 @@ class GTIRBToIR(
 
   // makes label boogie friendly
   private def convertLabel(procedure: Procedure, label: ByteString, blockCount: Int): String = {
-    procedure.name + "__" + blockCount + "__" + byteStringToString(label).replace("=", "").replace("-", "~").replace("/", "\'")
+    procedure.name + "__" + blockCount + "__" + byteStringToString(label)
+      .replace("=", "")
+      .replace("-", "~")
+      .replace("/", "\'")
   }
 
   /**
