@@ -141,16 +141,15 @@ class GTIRBToIR(
 
   // TODO this is a hack to imitate BAP so that the existing specifications relying on this will work
   // we cannot and should not rely on this at all
-  private def createArguments(name: String): (Map[LocalVar, Expr], ArrayBuffer[LocalVar]) = {
-    var regNum = 0
+  private def createArguments(name: String): (mutable.Map[LocalVar, Expr], ArrayBuffer[LocalVar]) = {
 
-    val in: Map[LocalVar, Expr] = if (name == "main") {
-      Map(
-        (LocalVar("main_argc", BitVecType(32)) -> Extract(32, 0, Register("R0", (64)))),
-        (LocalVar("main_argv", BitVecType(32)) -> Extract(32, 0, Register("R1", (64))))
+    val in: mutable.Map[LocalVar, Expr] = if (name == "main") {
+      mutable.Map(
+        LocalVar("main_argc", BitVecType(32)) -> Extract(32, 0, Register("R0", 64)),
+        LocalVar("main_argv", BitVecType(32)) -> Extract(32, 0, Register("R1", 64))
       )
     } else {
-      Map()
+      mutable.Map()
     }
 
     val out = ArrayBuffer[LocalVar]()
@@ -730,12 +729,12 @@ class GTIRBToIR(
       val target = getPCTarget(block)
       val label = removePCAssign(block)
 
-      (Some(IndirectCall(target, label)), GoTo(Set(returnTarget)))
+      (Some(IndirectCall(target, label)), GoTo(mutable.Set(returnTarget)))
     } else {
       // resolved indirect call
       val target = entranceUUIDtoProcedure(call.targetUuid)
       val label = removePCAssign(block)
-      (Some(DirectCall(target, label)), GoTo(Set(returnTarget)))
+      (Some(DirectCall(target, label)), GoTo(mutable.Set(returnTarget)))
     }
   }
 
@@ -755,7 +754,7 @@ class GTIRBToIR(
     val target = entranceUUIDtoProcedure(call.targetUuid)
     val returnTarget = uuidToBlock(fallthrough.targetUuid)
     removePCAssign(block)
-    (Some(DirectCall(target)), GoTo(Set(returnTarget)))
+    (Some(DirectCall(target)), GoTo(mutable.Set(returnTarget)))
   }
 
   private def handleConditionalBranch(fallthrough: Edge, branch: Edge, block: Block, procedure: Procedure): GoTo = {

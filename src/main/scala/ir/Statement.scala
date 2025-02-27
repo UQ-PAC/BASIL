@@ -136,7 +136,7 @@ class Assume(
 }
 
 object Assume {
-  def unapply(a: Assume): Option[(Expr, Option[String], Option[String], Boolean)] =
+  def unapply(a: Assume): Some[(Expr, Option[String], Option[String], Boolean)] =
     Some(a.body, a.comment, a.label, a.checkSecurity)
 }
 
