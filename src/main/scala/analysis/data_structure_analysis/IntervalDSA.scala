@@ -6,6 +6,7 @@ import boogie.{FuncEntry, SpecGlobal}
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.{BitVecType, Expr, LocalVar, Procedure}
 import specification.{ExternalFunction, SymbolTableEntry}
+import translating.PrettyPrinter.pp_proc
 import util.{DSALogger, IRContext, IntervalDSALogger as Logger}
 
 import scala.collection.mutable.ArrayBuffer
@@ -1000,7 +1001,7 @@ object IntervalDSA {
         DSALogger.info(s"skipped ${proc.name} due to scc")
         visited += proc
       else if !proc.calls.filter(proc => !proc.isExternal.getOrElse(false)).forall(visited.contains) then
-        DSALogger.info(s"procedure ${proc.name} was readded")
+        DSALogger.info(s"BU procedure ${proc.name} was readded")
         queue.enqueue(proc)
       else
         DSALogger.info(s"performing BU for ${proc.name}")
@@ -1023,7 +1024,7 @@ object IntervalDSA {
         DSALogger.info(s"skipped ${proc.name} due to scc")
         visited += proc
       else if !proc.callers().filter(f => tds.keySet.contains(f)).forall(f => visited.contains(f)) then
-        DSALogger.info(s"procedure ${proc.name} was readded")
+        DSALogger.info(s"TD procedure ${proc.name} was readded")
         queue.enqueue(proc)
       else
         DSALogger.info(s"performing TD for ${proc.name}")

@@ -893,16 +893,16 @@ object RunUtils {
 
       if config.analyses.contains(Norm) then
         DSALogger.info("Finished Computing Constraints")
-        val sadDSA = IntervalDSA.getLocals(ctx, sva, cons)
-        sadDSA.values.foreach(_.localCorrectness())
+        val DSA = IntervalDSA.getLocals(ctx, sva, cons)
+        DSA.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
-        val sadDSABU = IntervalDSA.getBUs(sadDSA)
-        sadDSABU.values.foreach(_.localCorrectness())
+        val DSABU = IntervalDSA.getBUs(DSA)
+        DSABU.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
-        val sadDSATD = IntervalDSA.getTDs(sadDSABU)
-        sadDSATD.values.foreach(_.localCorrectness())
+        val DSATD = IntervalDSA.getTDs(DSABU)
+        DSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
-        dsaContext = Some(dsaContext.get.copy(local = sadDSA, bottomUp = sadDSABU, topDown = sadDSATD))
+        dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
 
     if (q.runInterpret) {
       Logger.info("Start interpret")

@@ -3,7 +3,8 @@ package analysis.data_structure_analysis
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver, UnionFindSolver}
 import ir.{Expr, Procedure, Program}
 import specification.{ExternalFunction, SymbolTableEntry}
-import util.IRContext
+import util.{DSALogger, IRContext}
+import java.io.File
 
 import scala.collection.{SortedSet, mutable}
 
@@ -81,9 +82,12 @@ class DSFlag {
 }
 
 def computeDSADomain(proc: Procedure, context: IRContext): Set[Procedure] = {
-  var domain: Set[Procedure] = Set(proc)
+  var domain: Set[Procedure] = Set(proc) ++ (context.program.procedures.filter(f =>
+    context.funcEntries.map(_.name).filter(!_.startsWith("_")).contains(f.procName)
+  ))
+
   val stack: mutable.Stack[Procedure] = mutable.Stack()
-  stack.pushAll(proc.calls)
+  stack.pushAll(domain.flatMap(_.calls))
 
   // calculate the procedures used in the program
   while (stack.nonEmpty) {
@@ -92,9 +96,7 @@ def computeDSADomain(proc: Procedure, context: IRContext): Set[Procedure] = {
     stack.pushAll(current.calls.diff(domain))
   }
 
-  domain ++ (context.program.procedures.filter(f =>
-    context.funcEntries.map(_.name).filter(!_.startsWith("_")).contains(f.procName)
-  ))
+  domain
 }
 
 trait DSACell
