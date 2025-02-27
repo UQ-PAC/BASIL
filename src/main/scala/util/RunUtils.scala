@@ -320,6 +320,20 @@ object IRTransform {
     renamer.visitProgram(ctx.program)
 
     assert(invariant.singleCallBlockEnd(ctx.program))
+
+    // check all blocks with an atomic section exist within the same procedure
+    val visited = mutable.Set[Block]()
+    for (p <- ctx.program.procedures) {
+      for (b <- p.blocks) {
+        if (!visited.contains(b)) {
+          if (b.atomicSection.isDefined) {
+            b.atomicSection.get.getBlocks.foreach { a => assert(a.parent == p) }
+            visited.addAll(b.atomicSection.get.getBlocks)
+          }
+          visited.addOne(b)
+        }
+      }
+    }
   }
 
   def generateProcedureSummaries(
@@ -848,7 +862,7 @@ object RunUtils {
 
     // SVA
     var dsaContext: Option[DSAContext] = None
-    if conf.dsaConfig.nonEmpty then
+    if (conf.dsaConfig.nonEmpty) {
       val config = conf.dsaConfig.get
 
       val main = ctx.program.mainProcedure
@@ -865,6 +879,7 @@ object RunUtils {
       DSALogger.info("Finished local phase")
 
       dsaContext = Some(DSAContext(sva, cons))
+    }
 
     if (q.runInterpret) {
       Logger.info("Start interpret")

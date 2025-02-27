@@ -478,7 +478,7 @@ def coalesceBlocks(p: Program): Boolean = {
         && b.prevBlocks.head.nextBlocks.size == 1
         && b.prevBlocks.head.statements.lastOption.forall(s => !s.isInstanceOf[Call])
         && !(b.parent.entryBlock.contains(b) || b.parent.returnBlock.contains(b))
-        && b.atomicSection.isEmpty && b.prevBlocks.forall(_atomicSection.isEmpty)
+        && b.atomicSection.isEmpty && b.prevBlocks.forall(_.atomicSection.isEmpty)
       ) {
         didAny = true
         // append topredecessor
