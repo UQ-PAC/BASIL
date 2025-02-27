@@ -1,6 +1,6 @@
 package analysis.data_structure_analysis
 
-import analysis.BitVectorEval.{bv2SignedInt, isNegative}
+import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
 import analysis.solvers.ForwardIDESolver
 import analysis.*
 import ir.*
@@ -14,7 +14,6 @@ case class SymbolicAddress(accessor: Variable, symbolicBase: MemoryLocation, off
 trait MemoryLocation {
   val regionIdentifier: String
 }
-
 
 trait GlobalLocation {
   val start: BigInt
@@ -30,7 +29,8 @@ case class HeapLocation(override val regionIdentifier: String, proc: Procedure, 
 }
 
 case class DataLocation(override val regionIdentifier: String, override val start: BigInt, override val size: BigInt)
-extends MemoryLocation, GlobalLocation {
+    extends MemoryLocation,
+      GlobalLocation {
   override def toString: String = s"Data($regionIdentifier, $start, $size)"
 }
 
@@ -38,23 +38,21 @@ case class ExternalLocation(override val regionIdentifier: String) extends Memor
   override def toString: String = s"External($regionIdentifier)"
 }
 
-case class Function(regionIdentifier: String, start: BigInt, size: BigInt) extends MemoryLocation, GlobalLocation{
+case class Function(regionIdentifier: String, start: BigInt, size: BigInt) extends MemoryLocation, GlobalLocation {
   override def toString: String = s"Func($regionIdentifier, $start, $size)"
 }
-
 
 case class UnknownLocation(override val regionIdentifier: String, proc: Procedure) extends MemoryLocation {
   override def toString: String = s"Unknown($regionIdentifier)"
 }
 
-/**
- * environment transformers for SAA or symbolic access analysis
- * Combination of reaching definitions and constant propagation
- * elements in D are symbolic accesses of the form (variable, symbolic base, concrete offset)
- * lattice L is a binary lattice with top being the definition is valid (alive) and bottom being
- * the definition is dead or no longer affects the environment
- */
-trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends ForwardIDEAnalysis[SymbolicAddress, TwoElement, TwoElementLattice] {
+/** environment transformers for SAA or symbolic access analysis Combination of reaching definitions and constant
+  * propagation elements in D are symbolic accesses of the form (variable, symbolic base, concrete offset) lattice L is
+  * a binary lattice with top being the definition is valid (alive) and bottom being the definition is dead or no longer
+  * affects the environment
+  */
+trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]])
+    extends ForwardIDEAnalysis[SymbolicAddress, TwoElement, TwoElementLattice] {
 
   private val stackPointer = Register("R31", 64)
   private val mallocVariable = Register("R0", 64)
@@ -116,27 +114,34 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
                     case Right(_) =>
                       val size = bv2SignedInt(v)
                       val procedure = IRWalk.procedure(n)
-                      Map(d -> IdEdge(), Left(SymbolicAddress(variable, StackLocation(s"Stack_${procedure.name}", procedure, -size), 0)) -> ConstEdge(TwoElementTop))
+                      Map(
+                        d -> IdEdge(),
+                        Left(
+                          SymbolicAddress(variable, StackLocation(s"Stack_${procedure.name}", procedure, -size), 0)
+                        ) -> ConstEdge(TwoElementTop)
+                      )
                 else
                   d match
                     case Left(value) if value.accessor == arg1 =>
                       val offsetUpdate = evaluateExpression(arg2, constProp(n)).get.value
-                      val result: Map[DL, EdgeFunction[TwoElement]] = Map(Left(SymbolicAddress(variable, value.symbolicBase, value.offset + offsetUpdate)) -> ConstEdge(TwoElementTop))
-                      if value.accessor != variable then
-                        result + (d -> IdEdge())
-                      else
-                        result
+                      val result: Map[DL, EdgeFunction[TwoElement]] = Map(
+                        Left(SymbolicAddress(variable, value.symbolicBase, value.offset + offsetUpdate)) -> ConstEdge(
+                          TwoElementTop
+                        )
+                      )
+                      if value.accessor != variable then result + (d -> IdEdge())
+                      else result
                     case Left(value) if value.accessor == variable => Map()
                     case _ => Map(d -> IdEdge())
               case None => Map(d -> IdEdge())
           case arg: Variable =>
             d match
               case Left(value) if value.accessor == arg =>
-                val result: Map[DL, EdgeFunction[TwoElement]] = Map(Left(SymbolicAddress(variable, value.symbolicBase, value.offset)) -> ConstEdge(TwoElementTop))
-                if value.accessor != variable then
-                  result + (d -> IdEdge())
-                else
-                  result
+                val result: Map[DL, EdgeFunction[TwoElement]] = Map(
+                  Left(SymbolicAddress(variable, value.symbolicBase, value.offset)) -> ConstEdge(TwoElementTop)
+                )
+                if value.accessor != variable then result + (d -> IdEdge())
+                else result
               case Left(value) if value.accessor == variable => Map()
               case _ => Map(d -> IdEdge())
           case _ =>
@@ -147,8 +152,14 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
         d match
           case Left(value) if value.accessor == lhs => Map()
           case Left(_) => Map(d -> IdEdge())
-          case Right(_) => Map(d -> IdEdge(), Left(SymbolicAddress(lhs, UnknownLocation(nextunknownCount, IRWalk.procedure(n)), 0)) -> ConstEdge(TwoElementTop))
-      case DirectCall(target, _) if target.name == "malloc" =>
+          case Right(_) =>
+            Map(
+              d -> IdEdge(),
+              Left(SymbolicAddress(lhs, UnknownLocation(nextunknownCount, IRWalk.procedure(n)), 0)) -> ConstEdge(
+                TwoElementTop
+              )
+            )
+      case DirectCall(target, _, _, _) if target.procName == "malloc" =>
         d match
           case Left(value) if value.accessor == mallocVariable => Map()
           case Left(_) => Map(d -> IdEdge())
@@ -156,8 +167,13 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
             val size: BigInt = evaluateExpression(mallocVariable, constProp(n)) match
               case Some(value) => value.value
               case None => -1
-            Map(d -> IdEdge(), Left(SymbolicAddress(mallocVariable, HeapLocation(nextMallocCount, IRWalk.procedure(n), size), 0)) -> ConstEdge(TwoElementTop))
-      case DirectCall(target, _) if target.returnBlock.isEmpty => // for when calls are non returning, kills the stack dataflow facts
+            Map(
+              d -> IdEdge(),
+              Left(
+                SymbolicAddress(mallocVariable, HeapLocation(nextMallocCount, IRWalk.procedure(n), size), 0)
+              ) -> ConstEdge(TwoElementTop)
+            )
+      case DirectCall(target, _, _, _) if target.returnBlock.isEmpty => // for when calls are non returning, kills the stack dataflow facts
         d match
           case Left(value) =>
             value.symbolicBase match
@@ -168,4 +184,5 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
 }
 
 class SymbolicAddressAnalysis(program: Program, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]])
-  extends ForwardIDESolver[SymbolicAddress, TwoElement, TwoElementLattice](program), SymbolicAddressFunctions(constProp)
+    extends ForwardIDESolver[SymbolicAddress, TwoElement, TwoElementLattice](program),
+      SymbolicAddressFunctions(constProp)

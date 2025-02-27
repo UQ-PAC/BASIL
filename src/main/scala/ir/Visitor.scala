@@ -30,7 +30,6 @@ abstract class Visitor {
     node
   }
 
-
   def visitAssume(node: Assume): Statement = {
     node.body = visitExpr(node.body)
     node
@@ -48,7 +47,9 @@ abstract class Visitor {
   }
 
   def visitDirectCall(node: DirectCall): Statement = {
-    node
+    val ins = node.actualParams.map(i => i._1 -> visitExpr(i._2))
+    val outs = node.outParams.map(i => i._1 -> visitVariable(i._2))
+    DirectCall(node.target, node.label, outs, ins)
   }
 
   def visitIndirectCall(node: IndirectCall): Statement = {
@@ -68,17 +69,8 @@ abstract class Visitor {
     for (b <- node.blocks) {
       node.replaceBlock(b, visitBlock(b))
     }
-    for (i <- node.in.indices) {
-      node.in(i) = visitParameter(node.in(i))
-    }
-    for (i <- node.out.indices) {
-      node.out(i) = visitParameter(node.out(i))
-    }
-    node
-  }
-
-  def visitParameter(node: Parameter): Parameter = {
-    node.value = visitRegister(node.value)
+    node.formalInParam = node.formalInParam.map(visitLocalVar)
+    node.formalOutParam = node.formalOutParam.map(visitLocalVar)
     node
   }
 
@@ -205,6 +197,8 @@ abstract class ReadOnlyVisitor extends Visitor {
   }
 
   override def visitDirectCall(node: DirectCall): Statement = {
+    node.actualParams.foreach(i => visitExpr(i._2))
+    node.outParams.foreach(i => visitVariable(i._2))
     node
   }
 
@@ -225,17 +219,12 @@ abstract class ReadOnlyVisitor extends Visitor {
     for (i <- node.blocks) {
       visitBlock(i)
     }
-    for (i <- node.in) {
-      visitParameter(i)
+    for (i <- node.formalInParam) {
+      visitLocalVar(i)
     }
-    for (i <- node.out) {
-      visitParameter(i)
+    for (i <- node.formalOutParam) {
+      visitLocalVar(i)
     }
-    node
-  }
-
-  override def visitParameter(node: Parameter): Parameter = {
-    visitRegister(node.value)
     node
   }
 
@@ -255,12 +244,9 @@ abstract class ReadOnlyVisitor extends Visitor {
 
 }
 
-/**
-  * Visits all reachable blocks in a procedure, depth-first, in the order they are reachable from the start of the
-  * procedure.
-  * Does not jump to other procedures.
-  * Only modifies statements and jumps.
-  * */
+/** Visits all reachable blocks in a procedure, depth-first, in the order they are reachable from the start of the
+  * procedure. Does not jump to other procedures. Only modifies statements and jumps.
+  */
 abstract class IntraproceduralControlFlowVisitor extends Visitor {
   private val visitedBlocks: mutable.Set[Block] = mutable.Set()
 
@@ -306,16 +292,25 @@ class StackSubstituter extends IntraproceduralControlFlowVisitor {
     // reset for each procedure
     stackRefs.clear()
     stackRefs.add(stackPointer)
+    stackRefs.add(LocalVar("R31_in", BitVecType(64)))
+    stackRefs.add(LocalVar("R31", BitVecType(64)))
     super.visitProcedure(node)
+  }
+
+  def isStackPtr(v: Variable) = {
+    (v match {
+      case l: LocalVar if l.varName == "R31" => true
+      case r: Variable if r.name == "R31" => true
+      case _ => false
+    }) || stackRefs.contains(v)
   }
 
   override def visitMemoryLoad(node: MemoryLoad): MemoryLoad = {
     // replace mem with stack in load if index contains stack references
-    val loadStackRefs = node.index.variables.intersect(stackRefs)
-
-    if (loadStackRefs.nonEmpty) {
+    if (node.index.variables.exists(isStackPtr)) {
       node.mem = stackMemory
     }
+
     if (stackRefs.contains(node.lhs) && node.lhs != stackPointer) {
       stackRefs.remove(node.lhs)
     }
@@ -328,18 +323,16 @@ class StackSubstituter extends IntraproceduralControlFlowVisitor {
     val variableVisitor = VariablesWithoutStoresLoads()
     variableVisitor.visitExpr(node.rhs)
 
-    val rhsStackRefs = variableVisitor.variables.toSet.intersect(stackRefs)
-    if (rhsStackRefs.nonEmpty) {
+    if (variableVisitor.variables.exists(isStackPtr)) {
       stackRefs.add(node.lhs)
-    } else if (stackRefs.contains(node.lhs) && node.lhs != stackPointer) {
+    } else if (stackRefs.contains(node.lhs) && node.lhs.name != stackPointer.name) {
       stackRefs.remove(node.lhs)
     }
     node
   }
 
   override def visitMemoryStore(node: MemoryStore): Statement = {
-    val indexStackRefs = node.index.variables.intersect(stackRefs)
-    if (indexStackRefs.nonEmpty) {
+    if (node.index.variables.exists(isStackPtr)) {
       node.mem = stackMemory
     }
     node
@@ -350,18 +343,17 @@ class StackSubstituter extends IntraproceduralControlFlowVisitor {
 class Substituter(variables: Map[Variable, Variable] = Map(), memories: Map[Memory, Memory] = Map()) extends Visitor {
   override def visitVariable(node: Variable): Variable = variables.get(node) match {
     case Some(v: Variable) => v
-    case None              => node
+    case None => node
   }
 
   override def visitMemory(node: Memory): Memory = memories.get(node) match {
     case Some(m: Memory) => m
-    case None            => node
+    case None => node
   }
 }
 
-/**
-  * Prevents strings in 'reserved' from being used as the name of anything by adding a '#' to the start.
-  * Useful for avoiding Boogie's reserved keywords.
+/** Prevents strings in 'reserved' from being used as the name of anything by adding a '#' to the start. Useful for
+  * avoiding Boogie's reserved keywords.
   */
 class Renamer(reserved: Set[String]) extends Visitor {
   override def visitProgram(node: Program): Program = {
@@ -377,8 +369,8 @@ class Renamer(reserved: Set[String]) extends Visitor {
   }
 
   override def visitLocalVar(node: LocalVar): LocalVar = {
-    if (reserved.contains(node.name)) {
-      node.copy(name = s"#${node.name}")
+    if (reserved.contains(node.varName)) {
+      node.copy(varName = s"#${node.varName}")
     } else {
       node
     }
@@ -400,16 +392,9 @@ class Renamer(reserved: Set[String]) extends Visitor {
     }
   }
 
-  override def visitParameter(node: Parameter): Parameter = {
-    if (reserved.contains(node.name)) {
-      node.name = s"#${node.name}"
-    }
-    super.visitParameter(node)
-  }
-
   override def visitProcedure(node: Procedure): Procedure = {
-    if (reserved.contains(node.name)) {
-      node.name = s"#${node.name}"
+    if (reserved.contains(node.procName)) {
+      node.procName = s"#${node.procName}"
     }
     super.visitProcedure(node)
   }
@@ -418,7 +403,7 @@ class Renamer(reserved: Set[String]) extends Visitor {
 
 class ExternalRemover(external: Set[String]) extends Visitor {
   override def visitProcedure(node: Procedure): Procedure = {
-    if (external.contains(node.name)) {
+    if (external.contains(node.procName)) {
       // update the modifies set before removing the body
       node.modifies.addAll(node.blocks.flatMap(_.modifies))
       node.replaceBlocks(Seq())
@@ -428,7 +413,7 @@ class ExternalRemover(external: Set[String]) extends Visitor {
 }
 
 /** Gives variables that are not contained within a MemoryStore or the rhs of a MemoryLoad
-  * */
+  */
 class VariablesWithoutStoresLoads extends ReadOnlyVisitor {
   val variables: mutable.Set[Variable] = mutable.Set()
 

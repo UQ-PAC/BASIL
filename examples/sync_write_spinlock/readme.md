@@ -1,7 +1,7 @@
 This verifies if the following loop invariant is added to the Boogie output:
 
 ```
-$main$__1__$rlVqjjqoR6uHwOYvPCS15g:
+main_1812__1__rlVqjjqoR6uHwOYvPCS15g:
   assume memory_load32_le(stack, bvadd64(R31, 24bv64)) == 0bv32;
   assume gamma_load32(Gamma_stack, bvadd64(R31, 24bv64));
 ```

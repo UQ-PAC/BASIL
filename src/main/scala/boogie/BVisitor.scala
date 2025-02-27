@@ -2,7 +2,7 @@ package boogie
 
 import analysis.RegionInjector
 import ir.{Endian, IntBinOp, IntUnOp}
-import specification.{ArrayAccess, SpecGamma, SpecGlobal}
+import boogie.{ArrayAccess, SpecGamma, SpecGlobal}
 
 trait BVisitor {
   def visitBExpr(node: BExpr): BExpr = node.acceptVisit(this)
@@ -24,7 +24,11 @@ trait BVisitor {
   }
 
   def visitIfThenElse(node: IfThenElse): BExpr = {
-    node.copy(guard = visitBExpr(node.guard), thenExpr = visitBExpr(node.thenExpr), elseExpr = visitBExpr(node.elseExpr))
+    node.copy(
+      guard = visitBExpr(node.guard),
+      thenExpr = visitBExpr(node.thenExpr),
+      elseExpr = visitBExpr(node.elseExpr)
+    )
   }
 
   def visitOld(node: Old): BExpr = node.copy(body = visitBExpr(node.body))

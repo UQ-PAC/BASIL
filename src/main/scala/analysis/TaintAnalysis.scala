@@ -3,34 +3,29 @@ package analysis
 import analysis.solvers.ForwardIDESolver
 import ir.*
 import boogie.*
-import util.Logger
 
-/**
- * A value which can propogate taint/be tainted.
- */
+/** A value which can propogate taint/be tainted.
+  */
 type Taintable = Variable | GlobalVariable /*| LocalStackVariable*/ | UnknownMemory
 
 // TODO global and stack variables should just be `Variable`s after an IL transformation, in the future they shouldn't need to be defined here.
 
-/**
- * A global variable in memory.
- */
+/** A global variable in memory.
+  */
 case class GlobalVariable(mem: Memory, address: BitVecLiteral, size: Int, identifier: String) {
   override def toString(): String = {
     s"GlobalVariable($mem, $identifier, $size, $address)"
   }
 
-  /**
-   * The security classification of this global variable as a boogie expression.
-   */
+  /** The security classification of this global variable as a boogie expression.
+    */
   def L: BExpr = {
     val bAddr = BVariable("$" + s"${identifier}_addr", BitVecBType(64), Scope.Const)
     BFunctionCall("L", List(mem.toBoogie, bAddr), BoolBType)
   }
 
-  /**
-   * The boogie expression corresponding to the gamma of this global variable.
-   */
+  /** The boogie expression corresponding to the gamma of this global variable.
+    */
   def toGamma: BExpr = {
     val bAddr = BVariable("$" + s"${identifier}_addr", BitVecBType(64), Scope.Const)
     GammaLoad(mem.toGamma, bAddr, size, size / mem.valueSize)
@@ -49,9 +44,8 @@ case class LocalStackVariable(val address: BitVecLiteral, val size: Int) {
   }
 }*/
 
-/**
- * Represents a memory address with no known information.
- */
+/** Represents a memory address with no known information.
+  */
 case class UnknownMemory() {
   override def toString(): String = {
     "UnknownMemory"
@@ -64,8 +58,8 @@ def getMemoryVariable(
   expression: Expr,
   size: Int,
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-  globals: Map[BigInt, String],
-): Option[GlobalVariable/*| LocalStackVariable*/] = {
+  globals: Map[BigInt, String]
+): Option[GlobalVariable /*| LocalStackVariable*/ ] = {
   // TODO unsoundly gets stack variable which can lead to unsound analysis
 
   val stackPointer = Register("R31", 64)
@@ -77,17 +71,18 @@ def getMemoryVariable(
         // TODO This assumes that all stack variables are initialized local variables, which is not necessarily the case.
         //      If a stack address is read, without being assigned a value in this procedure, it will be
         //      assumed untainted, when in reality it may be UnknownMemory.
-        //case Some(addr) => Some(LocalStackVariable(addr, size))
+        // case Some(addr) => Some(LocalStackVariable(addr, size))
         case Some(_) => None
         case None => None
-    //case v: Variable if v == stackPointer => Some(LocalStackVariable(BitVecLiteral(0, 64), size))
+    // case v: Variable if v == stackPointer => Some(LocalStackVariable(BitVecLiteral(0, 64), size))
     case v: Variable if v == stackPointer => None
     case _ =>
       // TOOD check that the global access has the right size
       evaluateExpression(expression, constProp(n)) match
-        case Some(addr) => globals.get(addr.value) match
-          case Some(global) => Some(GlobalVariable(mem, addr, size, global))
-          case None => None
+        case Some(addr) =>
+          globals.get(addr.value) match
+            case Some(global) => Some(GlobalVariable(mem, addr, size, global))
+            case None => None
         case None => None
   }
 }
@@ -95,7 +90,7 @@ def getMemoryVariable(
 trait TaintAnalysisFunctions(
   globals: Map[BigInt, String],
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-  tainted: Map[CFGPosition, Set[Taintable]],
+  tainted: Map[CFGPosition, Set[Taintable]]
 ) extends ForwardIDEAnalysis[Taintable, TwoElement, TwoElementLattice] {
   val valuelattice = TwoElementLattice()
   val edgelattice = EdgeFunctionLattice(valuelattice)
@@ -135,7 +130,8 @@ trait TaintAnalysisFunctions(
           case _ => Map(d -> IdEdge())
         }
       case MemoryLoad(lhs, mem, index, _, size, _) =>
-        val memoryVariable: Taintable = getMemoryVariable(n, mem, index, size, constProp, globals).getOrElse(UnknownMemory())
+        val memoryVariable: Taintable =
+          getMemoryVariable(n, mem, index, size, constProp, globals).getOrElse(UnknownMemory())
         d match {
           case Left(v: Variable) if index.variables.contains(v) => Map(d -> IdEdge(), Left(lhs) -> IdEdge())
           case Left(v: Variable) if v == lhs => Map()
@@ -146,22 +142,22 @@ trait TaintAnalysisFunctions(
     }) ++ (
       d match
         case Left(_) => Map()
-        case Right(_) => tainted.getOrElse(n, Set()).foldLeft(Map[DL, EdgeFunction[TwoElement]]()) {
-          (m, t) => m + (Left(t) -> ConstEdge(valuelattice.top))
-        }
+        case Right(_) =>
+          tainted.getOrElse(n, Set()).foldLeft(Map[DL, EdgeFunction[TwoElement]]()) { (m, t) =>
+            m + (Left(t) -> ConstEdge(valuelattice.top))
+          }
     )
   }
 }
 
-/**
- * Performs taint analysis on a program. Variables (`Taintable`s) are marked as tainted at points in the program as
- * specified by `tainted`, and propogate their taint throughout the program. Assignments containing tainted variables
- * mark the assigned value as tainted.
- */
+/** Performs taint analysis on a program. Variables (`Taintable`s) are marked as tainted at points in the program as
+  * specified by `tainted`, and propogate their taint throughout the program. Assignments containing tainted variables
+  * mark the assigned value as tainted.
+  */
 class TaintAnalysis(
   program: Program,
   globals: Map[BigInt, String],
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-  tainted: Map[CFGPosition, Set[Taintable]],
+  tainted: Map[CFGPosition, Set[Taintable]]
 ) extends ForwardIDESolver[Taintable, TwoElement, TwoElementLattice](program),
-    TaintAnalysisFunctions(globals, constProp, tainted)
+      TaintAnalysisFunctions(globals, constProp, tainted)

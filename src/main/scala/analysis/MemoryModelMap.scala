@@ -2,7 +2,7 @@ package analysis
 
 import analysis.*
 import ir.*
-import util.Logger
+import util.MRALogger
 
 import scala.collection.immutable.TreeMap
 import scala.collection.mutable
@@ -21,9 +21,9 @@ case class RangeKey(start: BigInt, end: BigInt) extends Ordered[RangeKey] {
 }
 
 /** Custom data structure for storing range-to-object mappings.
- *
- * Provides a structure for how the program is accessing different memory regions.
- */
+  *
+  * Provides a structure for how the program is accessing different memory regions.
+  */
 class MemoryModelMap(
   val globalOffsets: Map[BigInt, BigInt],
   val externalFunctions: Map[BigInt, String],
@@ -43,13 +43,14 @@ class MemoryModelMap(
   /** Caches the results of `stackMap` for each function that has been visited. */
   private val bufferedStackMap: mutable.Map[String, mutable.Map[RangeKey, StackRegion]] = mutable.Map()
   private val sharedStackMap: mutable.Map[Procedure, mutable.TreeMap[RangeKey, StackRegion]] = mutable.Map()
-  private val bufferedSharedStackMap: mutable.Map[String, mutable.Map[Procedure, mutable.TreeMap[RangeKey, StackRegion]]] = mutable.Map()
+  private val bufferedSharedStackMap
+    : mutable.Map[String, mutable.Map[Procedure, mutable.TreeMap[RangeKey, StackRegion]]] = mutable.Map()
 
   /** Maps an interval of heap offsets to the heap region.
     *
-    * Note that heap start offsets are allocated globally across the whole program.
-    * For example, if main has malloc(8) and malloc(4), those regions will have start offsets of 0 and 8.
-    * Then if another function has malloc(16) and malloc(4), those regions will have start offset of 12 and 28.
+    * Note that heap start offsets are allocated globally across the whole program. For example, if main has malloc(8)
+    * and malloc(4), those regions will have start offsets of 0 and 8. Then if another function has malloc(16) and
+    * malloc(4), those regions will have start offset of 12 and 28.
     */
   private val heapMap: mutable.Map[RangeKey, HeapRegion] = mutable.TreeMap()
 
@@ -64,12 +65,15 @@ class MemoryModelMap(
 
   /** Handles the pointers-to-pointers in the global relocation tables.
     *
-    * So this maps an address of a relocation table entry to the address of the resolved object after linking.
-    * This saves having to look up the relation table every time a function (or global data) is called.
+    * So this maps an address of a relocation table entry to the address of the resolved object after linking. This
+    * saves having to look up the relation table every time a function (or global data) is called.
     */
   private var relocatedAddressesMap: Map[BigInt, DataRegion] = Map()
-  val contextMapVSA: mutable.Map[Procedure, mutable.Map[DirectCall, Map[Variable | MemoryRegion, Set[Value]]]] = mutable.Map()
-  val callSiteSummaries: mutable.Map[DirectCall, Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]]] = mutable.Map()
+  val contextMapVSA: mutable.Map[Procedure, mutable.Map[DirectCall, Map[Variable | MemoryRegion, Set[Value]]]] =
+    mutable.Map()
+  val callSiteSummaries
+    : mutable.Map[DirectCall, Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]]] =
+    mutable.Map()
 
   /** Maps load and store instructions to the stack data regions that it might be accessing. */
   private val stackAllocationSites: mutable.Map[CFGPosition, Set[StackRegion]] = mutable.Map()
@@ -85,13 +89,14 @@ class MemoryModelMap(
   val stackSubAccesses: mutable.Map[StackRegion, mutable.Set[BigInt]] = mutable.Map()
 
   /** Add a range and object to the mapping
-   *
-   * @param offset the offset of the range, if a heap region is given, the offsets controls the shift of regions from
-   *                the start
-   * @param region the region to add
-   * @param shared if the region is shared. When true, the region is added to the sharedStackMap
-   *                otherwise to the stackMap
-   */
+    *
+    * @param offset
+    *   the offset of the range, if a heap region is given, the offsets controls the shift of regions from the start
+    * @param region
+    *   the region to add
+    * @param shared
+    *   if the region is shared. When true, the region is added to the sharedStackMap otherwise to the stackMap
+    */
   def add(offset: BigInt, region: MemoryRegion, shared: Boolean = false): Unit = {
     def maxSize(r: MemoryRegion): BigInt = {
       r match {
@@ -137,7 +142,9 @@ class MemoryModelMap(
         } else {
           val currentMaxRange = currentDataMap.keys.maxBy(_.end)
           if (regionsOverlap(currentMaxRange, RangeKey(offset, maxSize(d) - 1))) {
-            currentDataMap.remove(currentMaxRange) // TODO: this removes previously overlapping parent region (jumptable2 example) which favours more fine grained regions
+            currentDataMap.remove(
+              currentMaxRange
+            ) // TODO: this removes previously overlapping parent region (jumptable2 example) which favours more fine grained regions
             currentDataMap(RangeKey(offset, maxSize(d) - 1)) = d
           } else {
             currentDataMap(RangeKey(offset, maxSize(d) - 1)) = d
@@ -169,7 +176,9 @@ class MemoryModelMap(
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
     val filteredGlobalOffsets = globalAddresses.filterNot((offset, _) => externalFunctions.contains(offset))
 
-    val externalFunctionRgns = (externalFunctions ++ filteredGlobalOffsets).map((offset, name) => DataRegion(name, offset, (globalSizes.getOrElse(name, 1).toDouble / 8).ceil.toInt))
+    val externalFunctionRgns = (externalFunctions ++ filteredGlobalOffsets).map((offset, name) =>
+      DataRegion(name, offset, (globalSizes.getOrElse(name, 1).toDouble / 8).ceil.toInt)
+    )
 
     // add externalFunctionRgn to dataRgns and sort by value
     val allDataRgns = (externalFunctionRgns ++ relocRegions).toList.sortBy(_.start)
@@ -187,14 +196,14 @@ class MemoryModelMap(
     })
   }
 
-  /** Post load VSA relations
-   * Creates context for every function and creates VSA contexts for every call site
-   * Filters non parameter variables from the context
-   * Does not take in account return values
-   */
-  def postLoadVSARelations(vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
-                           ANRResult: Map[CFGPosition, Set[Variable]],
-                           RNAResult: Map[CFGPosition, Set[Variable]]): Unit = {
+  /** Post load VSA relations Creates context for every function and creates VSA contexts for every call site Filters
+    * non parameter variables from the context Does not take in account return values
+    */
+  def postLoadVSARelations(
+    vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
+    ANRResult: Map[CFGPosition, Set[Variable]],
+    RNAResult: Map[CFGPosition, Set[Variable]]
+  ): Unit = {
     // 1. Construct context for every function ie. Map[Procedure, Map[Variable | MemoryRegion, Set[Value]]]]
     // 2. For every directCall to that function, get VSA result and merge in context
     // 3. Filter non parameter variables from the context
@@ -215,7 +224,11 @@ class MemoryModelMap(
     }
   }
 
-  def setCallSiteSummaries(callSiteSummary: mutable.Map[DirectCall, Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]]]) = {
+  def setCallSiteSummaries(
+    callSiteSummary: mutable.Map[DirectCall, Map[RegisterWrapperEqualSets, Set[
+      RegisterWrapperEqualSets | MemoryRegion
+    ]]]
+  ) = {
     callSiteSummaries ++= callSiteSummary
   }
 
@@ -223,13 +236,15 @@ class MemoryModelMap(
     relocatedAddressesMap.get(value)
   }
 
-  def convertMemoryRegions(stackRegionsPerProcedure: mutable.Map[Procedure, mutable.Set[StackRegion]],
-                           heapRegions: mutable.Map[DirectCall, HeapRegion],
-                           allocationSites: Map[CFGPosition, ((Set[StackRegion], Set[Variable]), Set[HeapRegion])],
-                           procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]],
-                           graRegions: mutable.HashMap[BigInt, DataRegion],
-                           graResults: Map[CFGPosition, Set[DataRegion]]): Unit = {
-    //val keepData = dataMap.filterNot((range, region) => graRegions.contains(region.start)).map((range, region) => region)
+  def convertMemoryRegions(
+    stackRegionsPerProcedure: mutable.Map[Procedure, mutable.Set[StackRegion]],
+    heapRegions: mutable.Map[DirectCall, HeapRegion],
+    allocationSites: Map[CFGPosition, ((Set[StackRegion], Set[Variable]), Set[HeapRegion])],
+    procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]],
+    graRegions: mutable.HashMap[BigInt, DataRegion],
+    graResults: Map[CFGPosition, Set[DataRegion]]
+  ): Unit = {
+    // val keepData = dataMap.filterNot((range, region) => graRegions.contains(region.start)).map((range, region) => region)
     val oldRegions = dataMap.values.toSet
     dataMap.clear()
     for (dr <- graRegions.values) {
@@ -238,7 +253,8 @@ class MemoryModelMap(
     for (dr <- oldRegions) {
       val obj = findDataObject(dr.start)
       if (obj.isEmpty) {
-        Logger.debug(s"Data region $dr not found in the new data map")
+        MRALogger.debug(s"Data region $dr not found in the new data map")
+        MRALogger.debug(s"Data region $dr not found in the new data map")
         add(dr.start, dr)
       } else {
         val isRelocated = relocatedDataRegion(dr.start)
@@ -342,21 +358,26 @@ class MemoryModelMap(
     stackMap.find((range, _) => range.start <= value && value <= range.end).map((_, obj) => returnRegion(obj))
 
   def findSharedStackObject(value: BigInt): Set[StackRegion] =
-    sharedStackMap.values.flatMap(_.find((range, _) => range.start <= value && value <= range.end).map((_, obj) => returnRegion(obj))).toSet
+    sharedStackMap.values
+      .flatMap(_.find((range, _) => range.start <= value && value <= range.end).map((_, obj) => returnRegion(obj)))
+      .toSet
 
   def findDataObject(value: BigInt): Option[DataRegion] =
     dataMap.find((range, _) => range.start <= value && value <= range.end).map((_, obj) => returnRegion(obj))
 
   def findDataObjectWithSize(value: BigInt, size: BigInt): (Set[DataRegion], Set[DataRegion]) = {
     // get regions that are between value and value + size and put partial regions (if part of the regions is between value and value + size) in a separate set
-    dataMap.foldLeft((Set.empty[DataRegion], Set.empty[DataRegion])) { case ((fullRegions, partialRegions), (range, region)) =>
-      if (range.start >= value && range.end <= value + size - 1) {
-        (fullRegions + returnRegion(region), partialRegions)
-      } else if ((range.start < value && range.end >= value) || (range.start <= value + size - 1 && range.end > value + size - 1)) {
-        (fullRegions, partialRegions + returnRegion(region))
-      } else {
-        (fullRegions, partialRegions)
-      }
+    dataMap.foldLeft((Set.empty[DataRegion], Set.empty[DataRegion])) {
+      case ((fullRegions, partialRegions), (range, region)) =>
+        if (range.start >= value && range.end <= value + size - 1) {
+          (fullRegions + returnRegion(region), partialRegions)
+        } else if (
+          (range.start < value && range.end >= value) || (range.start <= value + size - 1 && range.end > value + size - 1)
+        ) {
+          (fullRegions, partialRegions + returnRegion(region))
+        } else {
+          (fullRegions, partialRegions)
+        }
     }
   }
 
@@ -366,38 +387,38 @@ class MemoryModelMap(
     def logRegion(range: RangeKey, region: MemoryRegion, shared: Boolean = false): Unit = {
       // the spacing level is based on region type
       val spacing = region match {
-          case _: StackRegion => if shared then "           " else "       "
-          case _: HeapRegion => "  "
-          case _: DataRegion => "  "
+        case _: StackRegion => if shared then "           " else "       "
+        case _: HeapRegion => "  "
+        case _: DataRegion => "  "
       }
-      Logger.debug(s"$spacing$range -> $region")
+      MRALogger.debug(s"$spacing$range -> $region")
       region match
-        case region1: DataRegion if relfContent.contains(region1) => for value <- relfContent(region1) do
-          Logger.debug(s"$spacing    $value")
+        case region1: DataRegion if relfContent.contains(region1) =>
+          for value <- relfContent(region1) do MRALogger.debug(s"$spacing    $value")
         case _ =>
     }
-    Logger.debug("Stack:")
+    MRALogger.debug("Stack:")
     for name <- localStacks.keys do
       popContext()
       pushContext(name)
-      Logger.debug(s"  Function: $name")
-      if stackMap.nonEmpty then Logger.debug(s"    Local:")
+      MRALogger.debug(s"  Function: $name")
+      if stackMap.nonEmpty then MRALogger.debug(s"    Local:")
       // must sort by ranges
       for ((range, region) <- stackMap) {
         logRegion(range, region)
       }
-      if sharedStackMap.nonEmpty then Logger.debug(s"    Shared:")
+      if sharedStackMap.nonEmpty then MRALogger.debug(s"    Shared:")
       for ((parent, treeMap) <- sharedStackMap) {
-        Logger.debug(s"        Parent: ${parent.name}")
+        MRALogger.debug(s"        Parent: ${parent.name}")
         for ((range, region) <- treeMap) {
           logRegion(range, region, true)
         }
       }
-    Logger.debug("Stack Union-Find Roots:")
+    MRALogger.debug("Stack Union-Find Roots:")
     for name <- localStacks.keys do
       popContext()
       pushContext(name)
-      Logger.debug(s"  Function: $name")
+      MRALogger.debug(s"  Function: $name")
       var parentCount = 0
       // get root regions
       for ((range, region) <- stackMap) {
@@ -406,17 +427,17 @@ class MemoryModelMap(
           logRegion(range, root)
           parentCount += 1
       }
-      if parentCount == 0 then Logger.debug("    No root regions") else Logger.debug(s"    Parents: $parentCount/${stackMap.size}")
-    Logger.debug("Shared Stacks:")
+      if parentCount == 0 then MRALogger.debug("    No root regions")
+      else MRALogger.debug(s"    Parents: $parentCount/${stackMap.size}")
+    MRALogger.debug("Shared Stacks:")
     for (name, sharedStacks) <- sharedStacks do
-      Logger.debug(s"  Function: $name")
-      for region <- sharedStacks do
-        Logger.debug(s"    $region")
-    Logger.debug("Heap:")
+      MRALogger.debug(s"  Function: $name")
+      for region <- sharedStacks do MRALogger.debug(s"    $region")
+    MRALogger.debug("Heap:")
     for ((range, region) <- heapMap) {
       logRegion(range, region)
     }
-    Logger.debug("Data:")
+    MRALogger.debug("Data:")
     for ((range, region) <- dataMap) {
       logRegion(range, region)
     }
@@ -442,7 +463,7 @@ class MemoryModelMap(
   }
 
   def getHeap(directCall: DirectCall): HeapRegion = {
-    require(directCall.target.name == "malloc", "Should be a malloc call")
+    require(directCall.target.procName == "malloc", "Should be a malloc call")
     heapCalls(directCall)
   }
 
@@ -475,24 +496,28 @@ trait MemoryRegion {
 
 /** Stack regions track a contiguous portion inside a stack frame.
   *
-  * @param regionIdentifier a unique stack name within each procedure.
-  * @param start            an real offset from the frame pointer to the start of this memory.
-  * @param parent           the procedure associated with this stack frame.
+  * @param regionIdentifier
+  *   a unique stack name within each procedure.
+  * @param start
+  *   an real offset from the frame pointer to the start of this memory.
+  * @param parent
+  *   the procedure associated with this stack frame.
   */
-case class StackRegion(
-  override val regionIdentifier: String,
-  override val start: BigInt,
-  parent: Procedure
-) extends MemoryRegion {
+case class StackRegion(override val regionIdentifier: String, override val start: BigInt, parent: Procedure)
+    extends MemoryRegion {
   override def toString: String = s"Stack($regionIdentifier, $start, ${parent.name}"
 }
 
 /** Heap regions track a contiguous portion inside a block of allocated heap memory.
   *
-  * @param regionIdentifier identifies which malloc allocated the heap.
-  * @param start a virtual offset for this memory, being the sum of sizes of previous mallocs in the same function.
-  * @param size the size of the allocated heap memory.
-  * @param parent the function that contained the malloc.
+  * @param regionIdentifier
+  *   identifies which malloc allocated the heap.
+  * @param start
+  *   a virtual offset for this memory, being the sum of sizes of previous mallocs in the same function.
+  * @param size
+  *   the size of the allocated heap memory.
+  * @param parent
+  *   the function that contained the malloc.
   */
 case class HeapRegion(
   override val regionIdentifier: String,
@@ -505,15 +530,15 @@ case class HeapRegion(
 
 /** Data regions track a contiguous portion of the global data section.
   *
-  * @param regionIdentifier a real name from the global symbol table if available, else a unique generated id.
-  * @param start            absolute address of the start of this region.
-  * @param size             the size, either from the symbol table or estimated.
+  * @param regionIdentifier
+  *   a real name from the global symbol table if available, else a unique generated id.
+  * @param start
+  *   absolute address of the start of this region.
+  * @param size
+  *   the size, either from the symbol table or estimated.
   */
-case class DataRegion(
-  override val regionIdentifier: String,
-  override val start: BigInt,
-  size: BigInt
-) extends MemoryRegion {
+case class DataRegion(override val regionIdentifier: String, override val start: BigInt, size: BigInt)
+    extends MemoryRegion {
   override def toString: String = s"Data($regionIdentifier, $start, $size)"
   val end: BigInt = start + size - 1
 }
