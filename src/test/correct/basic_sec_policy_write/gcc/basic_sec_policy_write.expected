@@ -73,7 +73,7 @@ implementation {:extern} guarantee_reflexive()
   assert ((memory_load32_le(mem, $z_addr) != 0bv32) ==> (memory_load32_le(mem, $z_addr) != 0bv32));
 }
 
-procedure main();
+procedure main_1812();
   modifies Gamma_R0, Gamma_R1, Gamma_R31, Gamma_mem, Gamma_stack, R0, R1, R31, mem, stack;
   requires (Gamma_R0 == false);
   free requires (memory_load64_le(mem, 69632bv64) == 0bv64);
@@ -91,11 +91,11 @@ procedure main();
   free ensures (memory_load64_le(mem, 69616bv64) == 1812bv64);
   free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
 
-implementation main()
+implementation main_1812()
 {
-  var $load$18: bv32;
-  var Gamma_$load$18: bool;
+  var Gamma_load18: bool;
   var Gamma_x_old: bool;
+  var load18: bv32;
   var z_old: bv32;
   lmain:
     assume {:captureState "lmain"} true;
@@ -106,21 +106,21 @@ implementation main()
     R0, Gamma_R0 := bvadd64(R0, 24bv64), Gamma_R0;
     R1, Gamma_R1 := 1bv64, true;
     call rely();
-    assert (L(mem, R0) ==> Gamma_R1);
     z_old := memory_load32_le(mem, $z_addr);
     Gamma_x_old := (gamma_load32(Gamma_mem, $x_addr) || L(mem, $x_addr));
+    assert (L(mem, R0) ==> Gamma_R1);
     mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
     assert ((R0 == $z_addr) ==> (L(mem, $x_addr) ==> Gamma_x_old));
     assert ((z_old != 0bv32) ==> (memory_load32_le(mem, $z_addr) != 0bv32));
     assume {:captureState "%0000031e"} true;
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 20bv64), Gamma_R0;
-    $load$18, Gamma_$load$18 := memory_load32_le(stack, bvadd64(R31, 12bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
-    R1, Gamma_R1 := zero_extend32_32($load$18), Gamma_$load$18;
+    load18, Gamma_load18 := memory_load32_le(stack, bvadd64(R31, 12bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
+    R1, Gamma_R1 := zero_extend32_32(load18), Gamma_load18;
     call rely();
-    assert (L(mem, R0) ==> Gamma_R1);
     z_old := memory_load32_le(mem, $z_addr);
     Gamma_x_old := (gamma_load32(Gamma_mem, $x_addr) || L(mem, $x_addr));
+    assert (L(mem, R0) ==> Gamma_R1);
     mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
     assert ((R0 == $z_addr) ==> (L(mem, $x_addr) ==> Gamma_x_old));
     assert ((z_old != 0bv32) ==> (memory_load32_le(mem, $z_addr) != 0bv32));
@@ -128,9 +128,9 @@ implementation main()
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 20bv64), Gamma_R0;
     call rely();
-    assert (L(mem, R0) ==> true);
     z_old := memory_load32_le(mem, $z_addr);
     Gamma_x_old := (gamma_load32(Gamma_mem, $x_addr) || L(mem, $x_addr));
+    assert (L(mem, R0) ==> true);
     mem, Gamma_mem := memory_store32_le(mem, R0, 0bv32), gamma_store32(Gamma_mem, R0, true);
     assert ((R0 == $z_addr) ==> (L(mem, $x_addr) ==> Gamma_x_old));
     assert ((z_old != 0bv32) ==> (memory_load32_le(mem, $z_addr) != 0bv32));
@@ -139,18 +139,18 @@ implementation main()
     R0, Gamma_R0 := bvadd64(R0, 24bv64), Gamma_R0;
     R1, Gamma_R1 := 2bv64, true;
     call rely();
-    assert (L(mem, R0) ==> Gamma_R1);
     z_old := memory_load32_le(mem, $z_addr);
     Gamma_x_old := (gamma_load32(Gamma_mem, $x_addr) || L(mem, $x_addr));
+    assert (L(mem, R0) ==> Gamma_R1);
     mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
     assert ((R0 == $z_addr) ==> (L(mem, $x_addr) ==> Gamma_x_old));
     assert ((z_old != 0bv32) ==> (memory_load32_le(mem, $z_addr) != 0bv32));
     assume {:captureState "%00000362"} true;
     R0, Gamma_R0 := 0bv64, true;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
-    goto main_basil_return;
-  main_basil_return:
-    assume {:captureState "main_basil_return"} true;
+    goto main_1812_basil_return;
+  main_1812_basil_return:
+    assume {:captureState "main_1812_basil_return"} true;
     return;
 }
 

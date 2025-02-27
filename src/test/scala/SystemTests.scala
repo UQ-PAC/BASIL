@@ -172,12 +172,12 @@ trait SystemTests extends AnyFunSuite, BASILTest {
           )
         ) {
           val b = l.trim()
-          val parts = b.split("\\(").map(_.split("\\)")).flatten.map(_.split(",")).flatten
+          val parts = b.split("\\(").flatMap(_.split("\\)")).flatMap(_.split(","))
           val fname = parts(0)
-          val line = Integer(parts(1))
+          val line = Integer.parseInt(parts(1))
           val col = parts(2)
 
-          val lines = util.readFormFile(fname).toArray
+          val lines = util.readFromFile(fname).toArray
 
           val lineOffset = line - 1
 

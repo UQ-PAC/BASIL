@@ -234,7 +234,7 @@ class ProgramThread(
   val entry: Procedure,
   val procedures: mutable.LinkedHashSet[Procedure],
   val creationSite: Option[DirectCall]
-) {}
+)
 
 /*
  * R0 := call procname(R0, R1, R2)
@@ -337,7 +337,7 @@ class Procedure private (
   def returnBlock_=(value: Block): Unit = {
     if (!returnBlock.contains(value)) {
       _returnBlock.foreach(removeBlocks)
-      _returnBlock = Some(addBlocks(value))
+      _returnBlock = Some(addBlock(value))
     }
   }
 
@@ -346,11 +346,11 @@ class Procedure private (
   def entryBlock_=(value: Block): Unit = {
     if (!entryBlock.contains(value)) {
       _entryBlock.foreach(removeBlocks)
-      _entryBlock = Some(addBlocks(value))
+      _entryBlock = Some(addBlock(value))
     }
   }
 
-  def addBlocks(block: Block): Block = {
+  def addBlock(block: Block): Block = {
     if (!_blocks.contains(block)) {
       block.parent = this
       _blocks.add(block)
@@ -360,7 +360,7 @@ class Procedure private (
 
   def addBlocks(blocks: Iterable[Block]): Unit = {
     for (elem <- blocks) {
-      addBlocks(elem)
+      addBlock(elem)
     }
   }
 
@@ -371,7 +371,7 @@ class Procedure private (
       val isReturn: Boolean = returnBlock.contains(oldBlock)
       val incoming = oldBlock.incomingJumps
       removeBlocksDisconnect(oldBlock)
-      addBlocks(block)
+      addBlock(block)
       for (elem <- incoming) {
         elem.addTarget(block)
       }
@@ -483,6 +483,7 @@ class Block private (
   private var _jump: Jump,
   private val _incomingJumps: mutable.HashSet[GoTo]
 ) extends HasParent[Procedure] {
+  var atomicSection: Option[AtomicSection] = None
   _jump.setParent(this)
   statements.foreach(_.setParent(this))
 
@@ -613,7 +614,7 @@ class Block private (
     require(nextBlocks.toSet.contains(b2))
     val b1 = this
     val nb = Block(b1.label + label + b2.label)
-    b1.parent.addBlocks(nb)
+    b1.parent.addBlock(nb)
     b1.jump match {
       case g: GoTo => {
         g.addTarget(nb)
@@ -626,10 +627,10 @@ class Block private (
   }
 
   def createBlockOnEdgeWith(b2: Block, label: String = "_goto_"): Block = {
-    require((nextBlocks ++ prevBlocks).find(_ == b2).isDefined)
-    if (nextBlocks.find(_ == b2).isDefined) {
+    require((nextBlocks ++ prevBlocks).exists(_ == b2))
+    if (nextBlocks.exists(_ == b2)) {
       createBlockBetween(b2, label)
-    } else if (prevBlocks.find(_ == b2).isDefined) {
+    } else if (prevBlocks.exists(_ == b2)) {
       b2.createBlockBetween(this, "_goto_")
     } else {
       throw IllegalArgumentException(s"This block does not have edge with ${b2.label}")
@@ -679,4 +680,24 @@ case class MemorySection(
     }
   }
 
+}
+
+class AtomicSection(start: Block, end: Block, blocks: mutable.Set[Block]) {
+  def isStart(b: Block): Boolean = {
+    if (start == b) {
+      true
+    } else {
+      false
+    }
+  }
+
+  def isEnd(b: Block): Boolean = {
+    if (end == b) {
+      true
+    } else {
+      false
+    }
+  }
+
+  def getBlocks: mutable.Set[Block] = blocks
 }

@@ -4,6 +4,15 @@ import boogie.*
 import ir.*
 import util.Logger
 
+trait SymbolTableEntry {
+  val name: String
+  val size: Int
+  val address: BigInt
+}
+
+case class FuncEntry(override val name: String, override val size: Int, override val address: BigInt)
+    extends SymbolTableEntry
+
 case class Specification(
   funcs: Set[FuncEntry],
   globals: Set[SpecGlobal],
@@ -18,12 +27,6 @@ case class Specification(
     controlledBy.toSet.flatMap((k, v) => v.map(_ -> k)).groupMap(_(0))(_(1))
   }
   val controlled: Set[SpecGlobal] = controls.values.flatten.toSet
-}
-
-trait SymbolTableEntry {
-  val name: String
-  val size: Int
-  val address: BigInt
 }
 
 case class SubroutineSpec(
