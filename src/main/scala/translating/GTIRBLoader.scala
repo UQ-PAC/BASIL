@@ -498,6 +498,34 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val argsIR = args.flatMap(visitExprOnly).toSeq
         (Some(UninterpretedFunction(name, argsIR, BitVecType(32))), None)
 
+      case "cvt_bits_uint.0" | "cvt_bits_sint.0" =>
+        // ignore conversion between bitvector/integer for now
+        checkArgs(function, 1, 1, typeArgs.size, args.size, ctx.getText)
+        val inSize = parseInt(typeArgs(0)).toInt
+        val argIR = visitExprOnly(args.head)
+        if (argIR.isDefined) {
+          argIR.get.getType match {
+            case BitVecType(size) =>
+              if (inSize == size) {
+                (argIR, None)
+              } else if (inSize > size) {
+                if (function == "cvt_bits_uint.0") {
+                  (Some(ZeroExtend(inSize - size, argIR.get)), None)
+                } else {
+                  // "cvt_bits_sint.0"
+                  (Some(SignExtend(inSize - size, argIR.get)), None)
+                }
+              } else {
+                (Some(Extract(inSize, 0, argIR.get)), None)
+              }
+            case _ =>
+              Logger.error(s"type mismatch: ${ctx.getText}")
+              (None, None)
+          }
+        } else {
+          (None, None)
+        }
+
       case _ =>
         // known ASLp methods not yet handled:
         // FPRoundBase, BFRound - take asl type 'real' as input, need to see this in practice and requires consideration
