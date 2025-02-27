@@ -186,7 +186,7 @@ import scala.compiletime.{summonInline, erasedValue, constValue, error}
 
 object ToScalaDeriving {
 
-  type CustomToScala = (Any, String) => Option[ToScala[?]]
+  type CustomToScala = [A] => String => Option[ToScala[A]]
 
   /**
    * Support functions
@@ -232,8 +232,8 @@ object ToScalaDeriving {
    * Summon ToScala for the given type or apply a custom exclusion.
    */
   inline def summonOrCustom[T, t](using m: Mirror.Of[T])(inline custom: CustomToScala): ToScala[?] =
-    inline custom(erasedValue[t], "a") match
-      case Some(x) => x
+    inline custom[t]("a") match
+      case Some(x) => ???
       case None => deriveOrSummon[T, t](custom)
 
   /**
@@ -326,13 +326,11 @@ object ToScalaDeriving {
    */
   def absurd[T](x: Nothing): T = x
 
-  inline def noExclusions(a: Any, b: String) = None
-
   /**
    * Entry point for derivation. Used by Scala's "deriving ToScala" syntax.
    */
   inline def derived[T](using m: Mirror.Of[T]): ToScala[T] =
-    deriveWithExclusions(noExclusions) // derive with defaults (no exclusions)
+    deriveWithExclusions([A] => (x: String) => None) // derive with defaults (no exclusions)
 
   /**
    * Alternative entry point for deriving ToScala. Allows for specifying

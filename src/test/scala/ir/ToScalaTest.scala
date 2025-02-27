@@ -10,7 +10,7 @@ import ir.dsl.*
 import ir.dsl.{given}
 import ir.*
 
-import scala.runtime.stdLibPatches.Predef.assert
+import scala.compiletime.{erasedValue}
 
 class ToScalaTest extends AnyFunSuite with TimeLimitedTests with BeforeAndAfterEachTestData {
 
@@ -394,8 +394,12 @@ case class A39() extends ASD
       case A
       case B
     }
+    inline def custom[T](s: String) =
+      inline (erasedValue[T], s) match
+        case _: (EAAA, "A") => Some(ToScala.MakeString(Function.const("customA")))
+        case _ => None
     given ToScala[EAAA] =
-      ToScala.deriveWithExclusions[EAAA]((_,_) => None)
+      ToScala.deriveWithExclusions[EAAA]([A] => (x: String) => custom[A](x))
 
     sealed trait L derives ToScala
     case class N() extends L
