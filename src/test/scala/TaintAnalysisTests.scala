@@ -90,7 +90,7 @@ class TaintAnalysisTests extends AnyFunSuite, BASILTest {
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(IRWalk.lastInProc(f).get).contains(baseRegisterMap + (R0 -> Set(R1, R2))))
+    assert(varDepResults.get(IRWalk.lastInProc(f).get) == Some(baseRegisterMap + (R0 -> Set(R1, R2))))
   }
 
   test("interproc") {
@@ -99,11 +99,11 @@ class TaintAnalysisTests extends AnyFunSuite, BASILTest {
       proc(
         "f",
         block("branch", goto("a", "b")),
-        block("a", LocalAssign(R1, R1, None), directCall("g"), goto("returnBlock")),
-        block("b", LocalAssign(R1, R2, None), directCall("g"), goto("returnBlock")),
-        block("returnBlock", ret)
+        block("a", LocalAssign(R1, R1, None), directCall("g"), goto("fReturnBlock")),
+        block("b", LocalAssign(R1, R2, None), directCall("g"), goto("fReturnBlock")),
+        block("fReturnBlock", ret)
       ),
-      proc("g", block("body", LocalAssign(R0, R1, None), goto("returnBlock")), block("returnBlock", ret))
+      proc("g", block("body", LocalAssign(R0, R1, None), goto("gReturnBlock")), block("gReturnBlock", ret))
     )
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it

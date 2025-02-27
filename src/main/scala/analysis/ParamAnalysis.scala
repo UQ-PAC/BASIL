@@ -1,15 +1,16 @@
 package analysis
+import translating.PrettyPrinter.*
 
-import ir.{BitVecType, Procedure, Program, Register, Variable}
+import ir.{BitVecType, Procedure, Program, Register, Variable, Block, Return, Unreachable, GoTo}
 
-/**
- * This analysis uses the interprocedural and intraprocedural live variable analyses to
- * find the parameters to procedures in a given program
- * @param program program to be analysed
- */
+/** This analysis uses the interprocedural and intraprocedural live variable analyses to find the parameters to
+  * procedures in a given program
+  * @param program
+  *   program to be analysed
+  */
 class ParamAnalysis(val program: Program) extends Analysis[Any] {
   private val intraLivenessResults = IntraLiveVarsAnalysis(program).analyze()
-  private val interLivenessResults = InterLiveVarsAnalysis(program).analyze()
+  private val interLivenessResults = InterLiveVarsAnalysis(program, true).analyze()
   private var completeProcs: Set[Procedure] = Set()
   private var visitedProcs: Set[Procedure] = Set()
   private var results: Map[Procedure, Set[Variable]] = Map()
@@ -52,7 +53,19 @@ class ParamAnalysis(val program: Program) extends Analysis[Any] {
         val nonParams = interLivenessResults(proc).keys.toSet
           .diff(ignoreRegisters)
           .diff(intraLivenessResults(proc).union(calleeParams))
-        nonParams.foreach(v => assert(interLivenessResults(exit).keys.toSet.contains(v)))
+        nonParams.foreach(v => {
+          if (interLivenessResults.contains(exit)) {
+            assert(interLivenessResults(exit).keys.toSet.contains(v))
+          } else {
+            // exit should be the nominated main procedure
+            exit match {
+              case _: Unreachable => ()
+              case r: Return =>
+                assert(r.parent.statements.isEmpty && r.outParams.isEmpty && r.parent.parent.incomingCalls().isEmpty)
+              case g: GoTo => assert(false)
+            }
+          }
+        })
 
         results += (proc -> params)
 

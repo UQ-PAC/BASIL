@@ -3,7 +3,7 @@ import analysis.{RegionInjector, DataRegion, HeapRegion, MergedRegion}
 import ir.{BoolOR, *}
 import boogie.*
 import specification.*
-import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
+import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion, Logger}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -144,7 +144,8 @@ class IRToBoogie(
     val functionsUsed2 = functionsUsed1.map(p => functionOpToDefinition(p))
     val functionsUsed3 = functionsUsed2.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
     val functionsUsed4 = functionsUsed3.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
-    val functionsUsed = (functionsUsed2 ++ functionsUsed3 ++ functionsUsed4).toList.sorted
+    val functionsUsed5 = functionsUsed4.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
+    val functionsUsed = (functionsUsed2 ++ functionsUsed3 ++ functionsUsed4 ++ functionsUsed5).toList.sorted
 
     val globalVars = procedures.flatMap(_.globals) ++ rgProcs.flatMap(_.globals)
     val globalDecls = globalVars.map(b => BVarDecl(b, List(externAttr))).distinct.sorted.toList
@@ -319,14 +320,12 @@ class IRToBoogie(
     )
   }
 
-  /**
-   * A predicate used to assert the value of all readonly memory.
-   * (Boogie does not like this it if it is too large due to it being a single expression)
-   *
-   * E.g.
-   *  val readOnlyMemoryFunction = readOnlyMemoryPredicate(memoryToCondition(program.readOnlyMemory), mem)
-   *  val readOnlyMemory = List(BFunctionCall(readOnlyMemoryFunction.name, List(mem), BoolBType))
-   */
+  /** A predicate used to assert the value of all readonly memory. (Boogie does not like this it if it is too large due
+    * to it being a single expression)
+    *
+    * E.g. val readOnlyMemoryFunction = readOnlyMemoryPredicate(memoryToCondition(program.readOnlyMemory), mem) val
+    * readOnlyMemory = List(BFunctionCall(readOnlyMemoryFunction.name, List(mem), BoolBType))
+    */
   private def readOnlyMemoryPredicate(readonly: List[BExpr], mem: BVar): BFunction = {
     BFunction(
       "readonly_memory",
@@ -339,6 +338,12 @@ class IRToBoogie(
 
   def functionOpToDefinition(f: FunctionOp): BFunction = {
     f match {
+      case b @ BoolToBV1Op(arg) => {
+        val invar = BParam("arg", BoolBType)
+        val outvar = BParam(BitVecBType(1))
+        val body = IfThenElse(invar, BitVecBLiteral(1, 1), BitVecBLiteral(0, 1))
+        BFunction(b.fnName, List(invar), outvar, Some(body), List(externAttr))
+      }
       case b: BVFunctionOp => BFunction(b.name, b.in, b.out, None, List(externAttr, b.attribute))
       case m: MemoryLoadOp =>
         val memVar = BMapVar("memory", MapBType(BitVecBType(m.addressSize), BitVecBType(m.valueSize)), Scope.Parameter)
@@ -357,8 +362,13 @@ class IRToBoogie(
           case Endian.LittleEndian => accesses
         }
 
-        val body: BExpr = accessesEndian.tail.foldLeft(accessesEndian.head) { (concat: BExpr, next: MapAccess) =>
-          BinaryBExpr(BVCONCAT, next, concat)
+        val body: BExpr = accessesEndian.toList match {
+          case h :: Nil => h
+          case h :: tail =>
+            tail.foldLeft(h) { (concat: BExpr, next: MapAccess) =>
+              BinaryBExpr(BVCONCAT, next, concat)
+            }
+          case Nil => throw Exception(s"Zero byte access: $f")
         }
 
         BFunction(m.fnName, in, out, Some(body), List(externAttr))
@@ -562,7 +572,10 @@ class IRToBoogie(
   }
 
   def translateProcedure(p: Procedure, readOnlyMemory: List[BExpr], initialMemory: List[BExpr]): BProcedure = {
-    val body = (p.entryBlock.view ++ p.blocks.filterNot(x => p.entryBlock.contains(x))).map(translateBlock).toList
+    val body = (p.entryBlock.view ++
+      ArrayBuffer.from(p.blocks).sortBy(x => -x.rpoOrder).filterNot(x => p.entryBlock.contains(x)))
+      .map(translateBlock)
+      .toList
 
     val modifies: Seq[BVar] = p.modifies.toSeq
       .flatMap {
@@ -575,11 +588,11 @@ class IRToBoogie(
     val modifiedPreserve = modifies.collect { case m: BVar if modifiedCheck.contains(m) => m }
     val modifiedPreserveEnsures: List[BExpr] = modifiedPreserve.map(m => BinaryBExpr(BoolEQ, m, Old(m))).toList
 
-    val procRequires: List[BExpr] = p.requires ++ requires.getOrElse(p.name, List())
-    val procEnsures: List[BExpr] = p.ensures ++ ensures.getOrElse(p.name, List())
+    val procRequires: List[BExpr] = p.requires ++ requires.getOrElse(p.procName, List())
+    val procEnsures: List[BExpr] = p.ensures ++ ensures.getOrElse(p.procName, List())
 
-    val procRequiresDirect: List[String] = requiresDirect.getOrElse(p.name, List())
-    val procEnsuresDirect: List[String] = ensuresDirect.getOrElse(p.name, List())
+    val procRequiresDirect: List[String] = requiresDirect.getOrElse(p.procName, List())
+    val procEnsuresDirect: List[String] = ensuresDirect.getOrElse(p.procName, List())
 
     val freeRequires: List[BExpr] = if (p == program.mainProcedure) {
       initialMemory ++ readOnlyMemory
@@ -589,10 +602,13 @@ class IRToBoogie(
 
     val freeEnsures = modifiedPreserveEnsures ++ readOnlyMemory
 
+    val inparams = p.formalInParam.toList.flatMap(para => Seq(para.toBoogie, para.toGamma))
+    val outparams = p.formalOutParam.toList.flatMap(para => Seq(para.toBoogie, para.toGamma))
+
     BProcedure(
       p.name,
-      List(),
-      List(),
+      inparams,
+      outparams,
       procEnsures,
       procRequires,
       procEnsuresDirect,
@@ -607,83 +623,85 @@ class IRToBoogie(
   private def memoryToCondition(memorySections: Iterable[MemorySection]): List[BExpr] = {
 
     def coalesced: List[BExpr] = {
-      val sections = memorySections.flatMap { s =>
-        // Phrase the memory condition in terms of 64-bit operations, as long as the memory
-        // section's size is a multiple of 64-bits and 64-bits (8 bytes) aligned
-        // If the memory section is not aligned, the initial unaligned part of it will not be coalesced into a 64-bit
-        // representations and remain as an 8-bit representations
-        // If the memory section's size is not a multiple of 64-bits, the last part of it that cannot be coalesced into
-        // a 64-bit representation will remain as an 8-bit representation
+      val sections = memorySections
+        .filter(_.size > 0)
+        .flatMap { s =>
+          // Phrase the memory condition in terms of 64-bit operations, as long as the memory
+          // section's size is a multiple of 64-bits and 64-bits (8 bytes) aligned
+          // If the memory section is not aligned, the initial unaligned part of it will not be coalesced into a 64-bit
+          // representations and remain as an 8-bit representations
+          // If the memory section's size is not a multiple of 64-bits, the last part of it that cannot be coalesced into
+          // a 64-bit representation will remain as an 8-bit representation
 
-        val memory = s.region match {
-          case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
-          case None => mem
-        }
+          val memory = s.region match {
+            case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+            case None => mem
+          }
 
-        if (s.bytes.size <= 8) {
-          // if section is less than 8 bytes, just represent it with one access
-          val combined = s.bytes.indices.foldLeft(BigInt(0))((x, y) => x + (s.bytes(y).value * BigInt(2).pow(y * 8)))
-          val bits = s.bytes.size * 8
-          Seq(
-            BinaryBExpr(
-              BVEQ,
-              BMemoryLoad(memory, BitVecBLiteral(s.address, 64), Endian.LittleEndian, bits),
-              BitVecBLiteral(combined, bits)
+          if (s.bytes.size <= 8) {
+            // if section is less than 8 bytes, just represent it with one access
+            val combined = s.bytes.indices.foldLeft(BigInt(0))((x, y) => x + (s.bytes(y).value * BigInt(2).pow(y * 8)))
+            val bits = s.bytes.size * 8
+            Seq(
+              BinaryBExpr(
+                BVEQ,
+                BMemoryLoad(memory, BitVecBLiteral(s.address, 64), Endian.LittleEndian, bits),
+                BitVecBLiteral(combined, bits)
+              )
             )
-          )
-        } else {
-          val aligned: Int = (s.address % 8).toInt
+          } else {
+            val aligned: Int = (s.address % 8).toInt
 
-          val alignedSizeMultiple = (s.bytes.size - aligned) % 8
-          // index of the byte that marks the end of the part that is a multiple of 64-bits
-          val alignedEnd = s.bytes.size - alignedSizeMultiple
+            val alignedSizeMultiple = (s.bytes.size - aligned) % 8
+            // index of the byte that marks the end of the part that is a multiple of 64-bits
+            val alignedEnd = s.bytes.size - alignedSizeMultiple
 
-          // Aligned section that is safe to convert to 64-bit values
-          val alignedSection = for (b <- aligned until alignedEnd by 8) yield {
+            // Aligned section that is safe to convert to 64-bit values
+            val alignedSection = for (b <- aligned until alignedEnd by 8) yield {
+              // Combine the byte constants into a 64-bit value
+              val combined: BigInt =
+                (0 until 8).foldLeft(BigInt(0))((x, y) => x + (s.bytes(b + y).value * BigInt(2).pow(y * 8)))
+              BinaryBExpr(
+                BVEQ,
+                BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 64),
+                BitVecBLiteral(combined, 64)
+              )
+            }
+
+            // If memory section is somehow not aligned (is this possible?) then don't convert the initial non-aligned
+            // section to 64-bit operations, just the rest
+            val unalignedStartSection = if (aligned == 0) {
+              Seq()
+            } else {
+              for (b <- 0 until aligned) yield {
+                BinaryBExpr(
+                  BVEQ,
+                  BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
+                  s.bytes(b).toBoogie
+                )
+              }
+            }
+
+            // If the memory section is not a multiple of 64-bits then don't convert the last section to 64-bits
+            // This is not ideal but will do for now
+            // Ideal solution is to match the sizes based on the sizes listed in the symbol table, dividing further
+            // for values greater than 64-bit as much as possible
+            // But that requires more work
             // Combine the byte constants into a 64-bit value
-            val combined: BigInt =
-              (0 until 8).foldLeft(BigInt(0))((x, y) => x + (s.bytes(b + y).value * BigInt(2).pow(y * 8)))
-            BinaryBExpr(
-              BVEQ,
-              BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 64),
-              BitVecBLiteral(combined, 64)
-            )
-          }
-
-          // If memory section is somehow not aligned (is this possible?) then don't convert the initial non-aligned
-          // section to 64-bit operations, just the rest
-          val unalignedStartSection = if (aligned == 0) {
-            Seq()
-          } else {
-            for (b <- 0 until aligned) yield {
-              BinaryBExpr(
-                BVEQ,
-                BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
-                s.bytes(b).toBoogie
-              )
+            val unalignedEndSection = if (alignedSizeMultiple == 0) {
+              Seq()
+            } else {
+              for (b <- alignedEnd until s.bytes.size) yield {
+                BinaryBExpr(
+                  BVEQ,
+                  BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
+                  s.bytes(b).toBoogie
+                )
+              }
             }
+            unalignedStartSection ++ alignedSection ++ unalignedEndSection
           }
-
-          // If the memory section is not a multiple of 64-bits then don't convert the last section to 64-bits
-          // This is not ideal but will do for now
-          // Ideal solution is to match the sizes based on the sizes listed in the symbol table, dividing further
-          // for values greater than 64-bit as much as possible
-          // But that requires more work
-          // Combine the byte constants into a 64-bit value
-          val unalignedEndSection = if (alignedSizeMultiple == 0) {
-            Seq()
-          } else {
-            for (b <- alignedEnd until s.bytes.size) yield {
-              BinaryBExpr(
-                BVEQ,
-                BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
-                s.bytes(b).toBoogie
-              )
-            }
-          }
-          unalignedStartSection ++ alignedSection ++ unalignedEndSection
         }
-      }
       sections.toList
     }
 
@@ -915,13 +933,26 @@ class IRToBoogie(
       }
       val jump = GoToCmd(g.targets.map(_.label).toSeq)
       conditionAssert :+ jump
-    case _: Return => List(ReturnCmd)
+    case r: Return => {
+      val out = r.outParams.toList
+      if (out.nonEmpty) then
+        List(
+          AssignCmd(out.map(_._1.toBoogie), out.map(_._2.toBoogie)),
+          AssignCmd(out.map(_._1.toGamma), out.map(c => exprToGamma(c._2))),
+          ReturnCmd
+        )
+      else List(ReturnCmd)
+    }
     case _: Unreachable => List(BAssume(FalseBLiteral))
   }
 
   def translate(j: Call): List[BCmd] = j match {
     case d: DirectCall =>
-      val call = BProcedureCall(d.target.name)
+      val call = BProcedureCall(
+        d.target.name,
+        d.outParams.toList.flatMap(c => Seq(c._2.toBoogie, c._2.gammas.head.toGamma)),
+        d.actualParams.toList.flatMap(c => Seq(c._2.toBoogie, exprToGamma(c._2)))
+      )
 
       (config.procedureRely match {
         case Some(ProcRelyVersion.Function) =>

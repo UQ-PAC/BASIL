@@ -4,7 +4,8 @@ import analysis.solvers.{DSAUniTerm, DSAUnionFindSolver, UnionFindSolver, Var}
 import analysis.*
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.*
-import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
+import specification.{ExternalFunction, SymbolTableEntry}
+import boogie.SpecGlobal
 import util.Logger
 
 import scala.collection.mutable
@@ -51,9 +52,8 @@ class Flags() {
     function = function || other.function
 }
 
-/**
- * a Data structure Node
- */
+/** a Data structure Node
+  */
 class Node(val graph: Option[Graph], var size: BigInt = 0, val id: Int = NodeCounter.getCounter) {
 
   val term: DSAUniTerm = DSAUniTerm(this)
@@ -165,11 +165,12 @@ class Node(val graph: Option[Graph], var size: BigInt = 0, val id: Int = NodeCou
 
 }
 
-/**
- * a cell in DSA
- * @param node the node this cell belongs to
- * @param offset the offset of the cell
- */
+/** a cell in DSA
+  * @param node
+  *   the node this cell belongs to
+  * @param offset
+  *   the offset of the cell
+  */
 class Cell(val node: Option[Node], val offset: BigInt) {
   var largestAccessedSize: Int = 0
 
@@ -203,19 +204,19 @@ class Cell(val node: Option[Node], val offset: BigInt) {
   override def toString: String = s"Cell(${if node.isDefined then node.get.toString else "NONE"}, $offset)"
 }
 
-/**
- * a slice made from a cell and an internal offset
- */
+/** a slice made from a cell and an internal offset
+  */
 case class Slice(cell: Cell, internalOffset: BigInt) {
   def node: Node = cell.node.get
   def offset: BigInt = cell.offset
 }
 
-/**
- * represents a direct call in DSA
- * @param call instance of the call
- * @param graph caller's DSG
- */
+/** represents a direct call in DSA
+  * @param call
+  *   instance of the call
+  * @param graph
+  *   caller's DSG
+  */
 class CallSite(val call: DirectCall, val graph: Graph) {
   val proc: Procedure = call.target
   val paramCells: mutable.Map[Variable, Slice] =

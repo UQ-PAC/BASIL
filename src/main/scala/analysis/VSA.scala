@@ -7,7 +7,7 @@ import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import scala.collection.immutable
-import util.Logger
+import util.VSALogger
 
 /** ValueSets are PowerSet of possible values */
 trait Value
@@ -61,7 +61,7 @@ trait ValueSetAnalysis(program: Program, mmm: MemoryModelMap) {
     */
   def eval(cmd: Command, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = {
     cmd match {
-      case directCall: DirectCall if directCall.target.name == "malloc" =>
+      case directCall: DirectCall if directCall.target.procName == "malloc" =>
         val regions = mmm.nodeToRegion(cmd)
         // malloc variable
         s + (mallocVariable -> regions.map(r => AddressValue(r)))
@@ -75,7 +75,7 @@ trait ValueSetAnalysis(program: Program, mmm: MemoryModelMap) {
             case Some(v: Variable) =>
               s + (localAssign.lhs -> s(v))
             case None =>
-              Logger.debug(s"Too Complex: $localAssign") // do nothing
+              VSALogger.debug(s"Too Complex: $localAssign") // do nothing
               s
           }
         }
@@ -92,7 +92,7 @@ trait ValueSetAnalysis(program: Program, mmm: MemoryModelMap) {
                 .flatMap(r => findLoadedWithPreDefined(s, r.asInstanceOf[AddressValue].region))
                 .map(r => AddressValue(r)))
             case None =>
-              Logger.debug(s"Too Complex: $load") // do nothing
+              VSALogger.debug(s"Too Complex: $load") // do nothing
               s
           }
         }
@@ -103,7 +103,7 @@ trait ValueSetAnalysis(program: Program, mmm: MemoryModelMap) {
           case Some(v: Variable) =>
             s ++ regions.map(r => r -> s(v))
           case None =>
-            Logger.debug(s"Too Complex: $store") // do nothing
+            VSALogger.debug(s"Too Complex: $store") // do nothing
             s
         }
       case _ =>

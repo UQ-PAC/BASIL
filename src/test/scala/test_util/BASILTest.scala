@@ -2,7 +2,16 @@ package test_util
 
 import org.scalatest.funsuite.AnyFunSuite
 import ir.{Block, Procedure, Program}
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, Logger, RunUtils, StaticAnalysisConfig}
+import util.{
+  BASILConfig,
+  BASILResult,
+  BoogieGeneratorConfig,
+  ILLoadingConfig,
+  Logger,
+  RunUtils,
+  StaticAnalysisConfig,
+  IRContext
+}
 
 import scala.sys.process.*
 import scala.io.Source
@@ -14,7 +23,8 @@ case class TestConfig(
   useBAPFrontend: Boolean,
   expectVerify: Boolean,
   checkExpected: Boolean = false,
-  logResults: Boolean = false
+  logResults: Boolean = false,
+  simplify: Boolean = false
 )
 
 trait BASILTest {
@@ -23,7 +33,9 @@ trait BASILTest {
     RELFPath: String,
     specPath: Option[String],
     BPLPath: String,
-    staticAnalysisConf: Option[StaticAnalysisConfig]
+    staticAnalysisConf: Option[StaticAnalysisConfig],
+    simplify: Boolean = false,
+    postLoad: IRContext => Unit = s => ()
   ): BASILResult = {
     val specFile = if (specPath.isDefined && File(specPath.get).exists) {
       specPath
@@ -31,11 +43,14 @@ trait BASILTest {
       None
     }
     val config = BASILConfig(
-      loading = ILLoadingConfig(inputFile = inputPath, relfFile = RELFPath, specFile = specFile),
+      loading = ILLoadingConfig(inputFile = inputPath, relfFile = RELFPath, specFile = specFile, parameterForm = false),
+      simplify = simplify,
       staticAnalysis = staticAnalysisConf,
+      boogieTranslation =
+        util.BoogieGeneratorConfig().copy(memoryFunctionType = util.BoogieMemoryAccessMode.SuccessiveStoreSelect),
       outputPrefix = BPLPath
     )
-    val result = RunUtils.loadAndTranslate(config)
+    val result = RunUtils.loadAndTranslate(config, postLoad = postLoad)
     RunUtils.writeOutput(result)
     result
   }
@@ -52,11 +67,9 @@ trait BASILTest {
     boogieResult
   }
 
-  /**
-    *
-    * @return param 0: None if passes, Some(failure message) if doesn't pass
-    *         param 1: whether the Boogie output verified
-    *         param 2: whether Boogie timed out
+  /** @return
+    *   param 0: None if passes, Some(failure message) if doesn't pass param 1: whether the Boogie output verified param
+    *   2: whether Boogie timed out
     */
   def checkVerify(
     boogieResult: String,
@@ -117,9 +130,9 @@ object BASILTest {
   }
 
   /** @param directoryName
-    * of the parent directory
+    *   of the parent directory
     * @return
-    * the names all subdirectories of the given parent directory
+    *   the names all subdirectories of the given parent directory
     */
   def getSubdirectories(directoryName: String): Array[String] = {
     Option(File(directoryName).listFiles(_.isDirectory)) match {

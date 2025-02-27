@@ -15,15 +15,18 @@ trait AntlrModule extends JavaModule {
   def antlrGenerateListener: Boolean = false
 
   def antlrGrammarSourceFiles = T {
-    antlrGrammarSources().flatMap { source =>
-      if (os.isDir(source.path)) {
-        os.walk(source.path)
-      } else {
-        Seq(source.path)
+    antlrGrammarSources()
+      .flatMap { source =>
+        if (os.isDir(source.path)) {
+          os.walk(source.path)
+        } else {
+          Seq(source.path)
+        }
       }
-    }.filter { path =>
-      os.isFile(path) && path.ext == "g4"
-    }.map(PathRef(_))
+      .filter { path =>
+        os.isFile(path) && path.ext == "g4"
+      }
+      .map(PathRef(_))
   }
 
   def antlrGenerate = T {

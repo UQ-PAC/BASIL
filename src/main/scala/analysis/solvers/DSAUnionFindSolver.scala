@@ -19,8 +19,8 @@ class DSAUnionFindSolver extends UnionFindSolver[UniTerm] {
 
     if (rep1 != rep2) {
 
-      /** Perform the union of the equivalence classes of `t1` and `t2`, such that `t2` becomes the new canonical element.
-        * We assume `t1` and `t2` to be distinct canonical elements. This implementation does not use
+      /** Perform the union of the equivalence classes of `t1` and `t2`, such that `t2` becomes the new canonical
+        * element. We assume `t1` and `t2` to be distinct canonical elements. This implementation does not use
         * [[https://en.wikipedia.org/wiki/Disjoint-set_data_structure union-by-rank]].
         */
       parent += t1 -> t2
@@ -39,7 +39,7 @@ class DSAUnionFindSolver extends UnionFindSolver[UniTerm] {
   }
 
   /** Creates an equivalence class for the term `t`, if it does not exists already.
-   */
+    */
   private def mkSet(t: DSAUniTerm): Unit = {
     if (!parent.contains(t))
       parent += (t -> t)
@@ -49,11 +49,11 @@ class DSAUnionFindSolver extends UnionFindSolver[UniTerm] {
 }
 
 /** Terms used in unification.
- */
+  */
 sealed trait UniTerm
 
 /** A term variable in the solver
- */
+  */
 case class DSAUniTerm(node: Node) extends Var[UniTerm] {
 
   override def toString: String = s"Term{$node}"

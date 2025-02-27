@@ -3,6 +3,7 @@ import ir.Endian.LittleEndian
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import specification.*
+import boogie.*
 import util.{RunUtils, StaticAnalysisConfig, StaticAnalysis, StaticAnalysisContext, IRContext}
 
 import java.io.IOException
@@ -33,9 +34,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
     StaticAnalysis.analyse(ctx, StaticAnalysisConfig(), 1)
   }
 
-  /**
-   * Test that the analysis correctly identifies the stack pointer even when it is aliased
-   */
+  /** Test that the analysis correctly identifies the stack pointer even when it is aliased
+    */
   test("stack pointer aliasing: MMM Stage") {
     var program: Program = prog(
       proc(
@@ -60,9 +60,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
     assert(results.mmmResults.findStackObject(BigInt(4)).get.regionIdentifier == "stack_1")
   }
 
-  /**
-   * Test that the analysis correctly identifies stack pointers within regions
-   */
+  /** Test that the analysis correctly identifies stack pointers within regions
+    */
   test("approximate stack region: MMM Stage") {
     var program: Program = prog(
       proc(
@@ -133,9 +132,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
 //    assert(results.mmmResults.findStackObject(BigInt(20)).get.start == bv64(20))
 //  }
 
-  /**
-   * Test that the analysis correctly collects shared regions and exposes only the shared ones
-   */
+  /** Test that the analysis correctly collects shared regions and exposes only the shared ones
+    */
   test("collects single function shared regions: MMM Stage") {
     val program: Program = prog(
       proc(
@@ -175,9 +173,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
     assert(results.mmmResults.findSharedStackObject(BigInt(10)).head.start == BigInt(10))
   }
 
-  /**
-   * Test that the analysis correctly collects shared regions from multiple functions
-   */
+  /** Test that the analysis correctly collects shared regions from multiple functions
+    */
   test("collects multiple functions shared regions: MMM Stage") {
     val program: Program = prog(
       proc(

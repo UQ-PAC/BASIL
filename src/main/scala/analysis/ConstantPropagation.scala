@@ -42,12 +42,14 @@ trait ConstantPropagation {
           case BVASHR => bvashr(left, right)
           case BVCOMP => bvcomp(left, right)
           case BVCONCAT => concat(left, right)
+          case x => Top
         }
       case un: UnaryExpr =>
         val arg = eval(un.arg, env)
         un.op match {
           case BVNOT => bvnot(arg)
           case BVNEG => bvneg(arg)
+          case x => Top
         }
       case _ => valuelattice.top
     }

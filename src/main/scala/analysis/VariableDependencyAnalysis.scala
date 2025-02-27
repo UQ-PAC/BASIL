@@ -3,8 +3,8 @@ package analysis
 import analysis.solvers.ForwardIDESolver
 import ir.*
 import boogie.*
-import util.Logger
-import specification.SpecGlobal
+import util.StaticAnalysisLogger
+import boogie.SpecGlobal
 
 import scala.collection.mutable
 
@@ -94,9 +94,9 @@ trait ProcVariableDependencyAnalysisFunctions(
   }
 }
 
-/**
- * Calculates the set of "input variables" that a variable has been affected by at each CFG node, starting at the given procedure.
- */
+/** Calculates the set of "input variables" that a variable has been affected by at each CFG node, starting at the given
+  * procedure.
+  */
 class ProcVariableDependencyAnalysis(
   program: Program,
   variables: Set[Taintable],
@@ -132,7 +132,7 @@ class VariableDependencyAnalysis(
     var varDepsSummariesTransposed = Map[Procedure, Map[Taintable, Set[Taintable]]]()
     scc.flatten.filter(_.blocks.nonEmpty).foreach { procedure =>
       {
-        Logger.debug("Generating variable dependencies for " + procedure)
+        StaticAnalysisLogger.debug("Generating variable dependencies for " + procedure)
         val varDepResults = ProcVariableDependencyAnalysis(
           program,
           varDepVariables,

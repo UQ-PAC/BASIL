@@ -5,18 +5,20 @@ import analysis.solvers.DSAUnionFindSolver
 import analysis.evaluateExpression
 import cfg_visualiser.*
 import ir.*
-import specification.{ExternalFunction, FuncEntry, SpecGlobal, SymbolTableEntry}
+import specification.{ExternalFunction, SymbolTableEntry}
+import boogie.{FuncEntry, SpecGlobal}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.Breaks.{break, breakable}
 
-/**
-  * Data Structure Graph for DSA
+/** Data Structure Graph for DSA
   *
-  * @param proc procedure of DSG
+  * @param proc
+  *   procedure of DSG
   * @param constProp
-  * @param varToSym mapping flow-sensitive (position sensitive) mapping from registers to their set of symbolic accesses
+  * @param varToSym
+  *   mapping flow-sensitive (position sensitive) mapping from registers to their set of symbolic accesses
   * @param globals
   * @param globalOffsets
   * @param externalFunctions
@@ -121,9 +123,8 @@ class Graph(
     nextValidOffset = offset + byteSize
   }
 
-  /**
-   * Takes a cell and returns all corresponding stack offsets to it if any
-   */
+  /** Takes a cell and returns all corresponding stack offsets to it if any
+    */
   def getStackOffsets(cell: Cell): Set[BigInt] = { // TODO replace with tracking through merges
     stackMapping.foldLeft(Set[BigInt]()) { (s, f) =>
       f match
@@ -175,6 +176,33 @@ class Graph(
 
   private val swappedOffsets = globalOffsets.map(_.swap)
 
+  /** Converts a global name to an Address range
+    * @param name
+    *   the name of the global region used as a reference
+    * @param size
+    *   size of the Address region to be returned if 0 the size is instead one specified by SpecGlobals
+    * @param relocated
+    *   value determines the level of relocation, if 0 return address range begining at start of global region name.
+    *   otherwise attempt to find a global address pointing to x through "relocated" number of indirections
+    * @return
+    */
+  def getGlobal(name: String, size: Int = 0, relocated: Int = 0): Option[AddressRange] = {
+    val matchedName = globals.filter(_.name == name)
+    assert(matchedName.size <= 1)
+    if matchedName.isEmpty then None
+    else
+      val global = matchedName.head
+      if relocated == 0 then
+        Some(AddressRange(global.address, global.address + (if size == 0 then global.size / 8 else size)))
+      else
+        var i = relocated
+        var address = global.address
+        while i > 0 do
+          address = swappedOffsets.getOrElse(address, -1)
+          i -= 1
+        if address == -1 then None
+        else Some(AddressRange(address, address + size))
+  }
   // creates the globals from the symbol tables
   val globalMapping = mutable.Map[AddressRange, Field]()
   globals.foreach {
@@ -308,8 +336,7 @@ class Graph(
     }
   }
 
-  /**
-    * collects all the nodes that are currently in the DSG and updates nodes member variable
+  /** collects all the nodes that are currently in the DSG and updates nodes member variable
     */
   def collectNodes(): Unit = {
     nodes.clear()
@@ -430,11 +457,10 @@ class Graph(
       )
     }
 
-    StructDotGraph(proc.name, structs, arrows).toDotString
+    StructDotGraph(proc.procName, structs, arrows).toDotString
   }
 
-  /**
-    * Collapses the node causing it to lose field sensitivity
+  /** Collapses the node causing it to lose field sensitivity
     */
   def collapseNode(n: Node): Node = {
     val (term, _) = solver.findWithOffset(n.term)
@@ -488,9 +514,8 @@ class Graph(
     }
   }
 
-  /**
-    * this function merges all the overlapping cells in the given node
-    * The node DOESN'T lose field sensitivity after this
+  /** this function merges all the overlapping cells in the given node The node DOESN'T lose field sensitivity after
+    * this
     */
   def selfCollapse(node: Node): Unit = {
     var lastOffset: BigInt = -1
@@ -511,8 +536,7 @@ class Graph(
     removed.foreach(node.cells.remove)
   }
 
-  /**
-    * merges two neighbouring cells into one
+  /** merges two neighbouring cells into one
     */
   private def mergeNeighbours(cell1: Cell, cell2: Cell): Cell = {
     require(cell1.node.equals(cell2.node) && cell1.offset < cell2.offset)
@@ -535,10 +559,11 @@ class Graph(
   //  private val parent = mutable.Map[DSC, DSC]()
   val solver: DSAUnionFindSolver = DSAUnionFindSolver()
 
-  /**
-    * wrapper for find functionality of the union-find
-    * @param node the node to perform find on
-    * @return a field which is the tuple (parent node of the input node, starting offset of the input node in its parent)
+  /** wrapper for find functionality of the union-find
+    * @param node
+    *   the node to perform find on
+    * @return
+    *   a field which is the tuple (parent node of the input node, starting offset of the input node in its parent)
     */
   def find(node: Node): Field = {
     val (n, offset) = solver.findWithOffset(node.term)
@@ -546,11 +571,12 @@ class Graph(
     Field(resultNode, offset)
   }
 
-  /**
-    * wrapper for find functionality of the union-find
+  /** wrapper for find functionality of the union-find
     *
-    * @param cell the cell to perform find on
-    * @return the input cell's equivalent cell in the parent
+    * @param cell
+    *   the cell to perform find on
+    * @return
+    *   the input cell's equivalent cell in the parent
     */
   def find(cell: Cell): Cell = {
     val node = cell.node.get
@@ -572,11 +598,11 @@ class Graph(
     newCell.node.get.getCell(newCell.offset)
   }
 
-  /**
-    * merges two cells and unifies their nodes
+  /** merges two cells and unifies their nodes
     * @param cell1
     * @param cell2
-    * @return the resulting cell in the unified node
+    * @return
+    *   the resulting cell in the unified node
     */
   def mergeCells(c1: Cell, c2: Cell): Cell = {
     var cell1 = c1
@@ -780,10 +806,10 @@ class Graph(
         }
         val node = Node(Some(this))
         varToCell(pos) = mutable.Map(lhs -> Slice(node.cells(0), 0))
-      case pos @ DirectCall(target, _) if target.name == "malloc" =>
+      case pos @ DirectCall(target, _, _, _) if target.procName == "malloc" =>
         val node = Node(Some(this))
         varToCell(pos) = mutable.Map(mallocRegister -> Slice(node.cells(0), 0))
-      case pos @ DirectCall(target, _) if writesTo.contains(target) =>
+      case pos @ DirectCall(target, _, _, _) if writesTo.contains(target) =>
         val result = mutable.Map[Variable, Slice]()
         writesTo(target).foreach { variable =>
           val node = Node(Some(this))
@@ -807,16 +833,16 @@ class Graph(
   }
 
   def SSAVar(posLabel: String, varName: String): Slice = {
-    assert(posLabel.matches("%[0-9]{8}?\\$\\d"))
+    assert(posLabel.matches("%[0-9a-f]{8}?\\$\\d"), s"posLabel not matching BAP format '$posLabel'")
 
     val res = varToCell.keys.filter(pos => pos.toShortString.startsWith(posLabel))
-    assert(res.size == 1)
+    assert(res.size == 1, s"failed to get SSAVar for '$posLabel' and '$varName'. matched label: ${res}")
     val key = res.head
 
     val map = varToCell(key).toMap
 
     val temp = map.keys.filter(variable => variable.name == varName)
-    assert(temp.size == 1)
+    assert(temp.size == 1, s"failed to get SSAVar for '$posLabel' and '$varName'. matched name: ${temp}")
     val variable = temp.head
     map(variable)
   }

@@ -1,30 +1,34 @@
 package analysis
 
 import ir._
-import analysis.BitVectorEval
+import ir.eval.BitVectorEval
 import math.pow
-import util.Logger
+import util.StaticAnalysisLogger
 
 /** Basic lattice
- */
+  */
 trait Lattice[T]:
 
   type Element = T
 
   /** The bottom element of this lattice.
-   */
+    */
   val bottom: T
 
   /** The top element of this lattice. Default: not implemented.
-   */
+    */
   def top: T = ???
 
   /** The least upper bound of `x` and `y`.
-   */
+    */
   def lub(x: T, y: T): T
 
+  /** The greatest lower bound of `x` and `y`
+    */
+  def glb(x: T, y: T): T = ???
+
   /** Returns true whenever `x` <= `y`.
-   */
+    */
   def leq(x: T, y: T): Boolean = lub(x, y) == y // rarely used, but easy to implement :-)
 
 trait StridedWrappedInterval
@@ -183,12 +187,14 @@ class SASILattice extends Lattice[StridedWrappedInterval] {
   //      }
   //    }
 
-  /**
-   * Convert a set of values to a strided interval. Assumes the widths are the same.
-   * @param x the set of values
-   * @param w the width of each value
-   * @return the strided interval representing the values in the set
-   */
+  /** Convert a set of values to a strided interval. Assumes the widths are the same.
+    * @param x
+    *   the set of values
+    * @param w
+    *   the width of each value
+    * @return
+    *   the strided interval representing the values in the set
+    */
   def valuesToSI(x: Set[BigInt], w: BigInt): StridedWrappedInterval = {
     if (x.isEmpty) {
       SIBottom
@@ -200,14 +206,11 @@ class SASILattice extends Lattice[StridedWrappedInterval] {
     }
   }
 
-  /**
-   * s + t =
-   * BOT   if s = BOT or t = BOT
-   * gcd(s, t)(|a +w c, b +w d|)  if s = (|a, b|), t = (|c, d|) and #s + #t <= 2^w
-   * @param s
-   * @param t
-   * @return
-   */
+  /** s + t = BOT if s = BOT or t = BOT gcd(s, t)(|a +w c, b +w d|) if s = (|a, b|), t = (|c, d|) and #s + #t <= 2^w
+    * @param s
+    * @param t
+    * @return
+    */
   def add(s: StridedWrappedInterval, t: StridedWrappedInterval): StridedWrappedInterval = {
     (s, t) match {
       case (SIBottom, _) => SIBottom // TODO: is this correct?
@@ -259,7 +262,7 @@ case class VS[T](m: Map[T, StridedWrappedInterval])
 }
 
 /** The lattice of integers with the standard ordering.
- */
+  */
 class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
 
   case object VSBottom extends ValueSet[T] {
@@ -356,7 +359,6 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
           case BoolEQUIV => ???
       case intOp: IntBinOp =>
         applyOp(intOp.toBV, lhs, rhs)
-      case _ => ???
   }
 
   def applyOp(op: UnOp, rhs: ValueSet[T]): ValueSet[T] = {
@@ -368,9 +370,9 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
       case boolOp: BoolUnOp =>
         boolOp match
           case BoolNOT => ???
+          case BoolToBV1 => ???
       case intOp: IntUnOp =>
         applyOp(intOp.toBV, rhs)
-      case _ => ???
   }
 
   def add(x: ValueSet[T], y: ValueSet[T]): ValueSet[T] = {
@@ -483,7 +485,7 @@ case object MAYBE_BOOL3 extends Bool3 {
 }
 
 /** The lattice of booleans with the standard ordering.
- */
+  */
 class Bool3Lattice extends Lattice[Bool3] {
 
   override val bottom: Bool3 = BOTTOM_BOOL3
@@ -510,14 +512,9 @@ enum Flags {
   case OF // Overflow Flag
 }
 
-/**
- * case CF // Carry Flag
- * case ZF // Zero Flag
- * case SF // Sign Flag
- * case PF // Parity Flag
- * case AF // Auxiliary Flag
- * case OF // Overflow Flag
- */
+/** case CF // Carry Flag case ZF // Zero Flag case SF // Sign Flag case PF // Parity Flag case AF // Auxiliary Flag
+  * case OF // Overflow Flag
+  */
 trait Flag
 
 case object BOTTOM_Flag extends Flag {
@@ -529,7 +526,7 @@ case class FlagMap(m: Map[Flags, Bool3]) extends Flag {
 }
 
 /** The lattice of booleans with the standard ordering.
- */
+  */
 class FlagLattice extends Lattice[Flag] {
 
   override val bottom: Flag = BOTTOM_Flag
@@ -566,7 +563,7 @@ class FlagLattice extends Lattice[Flag] {
 }
 
 /** The powerset lattice of a set of elements of type `A` with subset ordering.
- */
+  */
 class PowersetLattice[A] extends Lattice[Set[A]] {
   val bottom: Set[A] = Set.empty
   def lub(x: Set[A], y: Set[A]): Set[A] = x.union(y)
@@ -589,10 +586,8 @@ case object LiftedBottom extends LiftedElement[Nothing] {
   override def toString = "LiftBot"
 }
 
-/**
- * The lift lattice for `sublattice`.
- * Supports implicit lifting and unlifting.
- */
+/** The lift lattice for `sublattice`. Supports implicit lifting and unlifting.
+  */
 class LiftLattice[T, +L <: Lattice[T]](val sublattice: L) extends Lattice[LiftedElement[T]] {
 
   val bottom: LiftedElement[T] = LiftedBottom
@@ -604,17 +599,14 @@ class LiftLattice[T, +L <: Lattice[T]](val sublattice: L) extends Lattice[Lifted
       case (Lift(a), Lift(b)) => Lift(sublattice.lub(a, b))
     }
 
-  /**
-   * Lift elements of the sublattice to this lattice.
-   * Note that this method is declared as implicit, so the conversion can be done automatically.
-   */
+  /** Lift elements of the sublattice to this lattice. Note that this method is declared as implicit, so the conversion
+    * can be done automatically.
+    */
   def lift(x: T): LiftedElement[T] = Lift(x)
 
-  /**
-   * Un-lift elements of this lattice to the sublattice.
-   * Throws an IllegalArgumentException if trying to unlift the bottom element
-   * Note that this method is declared as implicit, so the conversion can be done automatically.
-   */
+  /** Un-lift elements of this lattice to the sublattice. Throws an IllegalArgumentException if trying to unlift the
+    * bottom element Note that this method is declared as implicit, so the conversion can be done automatically.
+    */
   def unlift(x: LiftedElement[T]): T = x match {
     case Lift(s) => s
     case LiftedBottom => throw new IllegalArgumentException("Cannot unlift bottom")
@@ -626,9 +618,8 @@ trait TwoElement
 case object TwoElementTop extends TwoElement
 case object TwoElementBottom extends TwoElement
 
-/**
- * A lattice with only top and bottom
- */
+/** A lattice with only top and bottom
+  */
 class TwoElementLattice extends Lattice[TwoElement]:
   override val bottom: TwoElement = TwoElementBottom
   override val top: TwoElement = TwoElementTop
@@ -644,8 +635,8 @@ case object Top extends FlatElement[Nothing]
 case object Bottom extends FlatElement[Nothing]
 
 /** The flat lattice made of element of `X`. Top is greater than every other element, and Bottom is less than every
- * other element. No additional ordering is defined.
- */
+  * other element. No additional ordering is defined.
+  */
 class FlatLattice[X] extends Lattice[FlatElement[X]] {
 
   val bottom: FlatElement[X] = Bottom
@@ -663,7 +654,7 @@ class FlatLattice[X] extends Lattice[FlatElement[X]] {
 }
 
 /** The flat lattice made of element of `X` with a default value generator `f`. Top is greater than every other element,
- */
+  */
 class FlatLatticeWithDefault[X](val f: () => X) extends Lattice[FlatElement[X]] {
 
   val bottom: FlatElement[X] = FlatEl(f())
@@ -700,7 +691,7 @@ class TupleLattice[+L1 <: Lattice[T1], +L2 <: Lattice[T2], T1, T2](val lattice1:
 }
 
 /** A lattice of maps from a set of elements of type `A` to a lattice with element `L'. Bottom is the default value.
- */
+  */
 class MapLattice[A, T, +L <: Lattice[T]](val sublattice: L) extends Lattice[Map[A, T]] {
   val bottom: Map[A, T] = Map().withDefaultValue(sublattice.bottom)
   def lub(x: Map[A, T], y: Map[A, T]): Map[A, T] =
@@ -708,8 +699,7 @@ class MapLattice[A, T, +L <: Lattice[T]](val sublattice: L) extends Lattice[Map[
 }
 
 /** Constant propagation lattice.
- *
- */
+  */
 class ConstantPropagationLattice extends FlatLattice[BitVecLiteral] {
   private def apply(
     op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral,
@@ -724,7 +714,7 @@ class ConstantPropagationLattice extends FlatLattice[BitVecLiteral] {
       case (Top, _) => Top
   } catch {
     case e: Exception =>
-      Logger.error(s"Failed on op $op with $a and $b")
+      StaticAnalysisLogger.error(s"Failed on op $op with $a and $b")
       throw e
   }
 
@@ -784,8 +774,7 @@ class ConstantPropagationLattice extends FlatLattice[BitVecLiteral] {
 }
 
 /** Constant propagation lattice.
- *
- */
+  */
 class ConstantPropagationLatticeWithSSA extends PowersetLattice[BitVecLiteral] {
   private def apply(
     op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral,

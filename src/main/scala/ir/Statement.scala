@@ -1,6 +1,8 @@
 package ir
+import util.Logger
 import util.intrusive_list.IntrusiveListElement
 import boogie.{BMapVar, GammaStore}
+import collection.immutable.SortedMap
 
 import collection.mutable
 
@@ -10,7 +12,7 @@ import collection.mutable
 
 /** A Statement or Jump.
   *
-  * Note that some commands have optional labels.  For example, jump destinations.
+  * Note that some commands have optional labels. For example, jump destinations.
   */
 sealed trait Command extends HasParent[Block] {
   val label: Option[String]
@@ -27,14 +29,20 @@ sealed trait Statement extends Command, IntrusiveListElement[Statement] {
   def acceptVisit(visitor: Visitor): Statement = throw new Exception(
     "visitor " + visitor + " unimplemented for: " + this
   )
+  def predecessor: Option[Command] = parent.statements.prevOption(this)
   def successor: Command = parent.statements.nextOption(this).getOrElse(parent.jump)
 }
 
 sealed trait Assign extends Statement {
-  var lhs: Variable
+  def assignees: Set[Variable]
 }
 
-class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[String] = None) extends Assign {
+sealed trait SingleAssign extends Assign {
+  def lhs: Variable
+  override def assignees = Set(lhs)
+}
+
+class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[String] = None) extends SingleAssign {
   override def modifies: Set[Global] = lhs match {
     case r: Register => Set(r)
     case _ => Set()
@@ -44,7 +52,7 @@ class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[S
 }
 
 object LocalAssign:
-  def unapply(l: LocalAssign): Option[(Variable, Expr, Option[String])] = Some(l.lhs, l.rhs, l.label)
+  def unapply(l: LocalAssign): Some[(Variable, Expr, Option[String])] = Some(l.lhs, l.rhs, l.label)
 
 class MemoryStore(
   var mem: Memory,
@@ -60,7 +68,7 @@ class MemoryStore(
 }
 
 object MemoryStore {
-  def unapply(m: MemoryStore): Option[(Memory, Expr, Expr, Endian, Int, Option[String])] =
+  def unapply(m: MemoryStore): Some[(Memory, Expr, Expr, Endian, Int, Option[String])] =
     Some(m.mem, m.index, m.value, m.endian, m.size, m.label)
 }
 
@@ -71,7 +79,7 @@ class MemoryLoad(
   var endian: Endian,
   var size: Int,
   override val label: Option[String] = None
-) extends Assign {
+) extends SingleAssign {
   override def modifies: Set[Global] = lhs match {
     case r: Register => Set(r)
     case _ => Set()
@@ -81,7 +89,7 @@ class MemoryLoad(
 }
 
 object MemoryLoad {
-  def unapply(m: MemoryLoad): Option[(Variable, Memory, Expr, Endian, Int, Option[String])] =
+  def unapply(m: MemoryLoad): Some[(Variable, Memory, Expr, Endian, Int, Option[String])] =
     Some(m.lhs, m.mem, m.index, m.endian, m.size, m.label)
 }
 
@@ -105,14 +113,15 @@ class Assert(var body: Expr, var comment: Option[String] = None, override val la
 }
 
 object Assert:
-  def unapply(a: Assert): Option[(Expr, Option[String], Option[String])] = Some(a.body, a.comment, a.label)
+  def unapply(a: Assert): Some[(Expr, Option[String], Option[String])] = Some(a.body, a.comment, a.label)
 
 /** Assumptions express control flow restrictions and other properties that can be assumed to be true.
-  * 
-  * For example, an `if (C) S else T` statement in C will eventually be translated to IR with a non-deterministic
-  * goto to two blocks, one with `assume C; S` and the other with `assume not(C); T`.
   *
-  * checkSecurity is true if this is a branch condition that we want to assert has a security level of low before branching
+  * For example, an `if (C) S else T` statement in C will eventually be translated to IR with a non-deterministic goto
+  * to two blocks, one with `assume C; S` and the other with `assume not(C); T`.
+  *
+  * checkSecurity is true if this is a branch condition that we want to assert has a security level of low before
+  * branching
   */
 class Assume(
   var body: Expr,
@@ -126,7 +135,7 @@ class Assume(
 }
 
 object Assume:
-  def unapply(a: Assume): Option[(Expr, Option[String], Option[String], Boolean)] =
+  def unapply(a: Assume): Some[(Expr, Option[String], Option[String], Boolean)] =
     Some(a.body, a.comment, a.label, a.checkSecurity)
 
 sealed trait Jump extends Command {
@@ -140,16 +149,18 @@ class Unreachable(override val label: Option[String] = None) extends Jump {
   override def acceptVisit(visitor: Visitor): Jump = this
 }
 
-object Unreachable {
-  def unapply(u: Unreachable): Option[Option[String]] = Some(u.label)
+class Return(override val label: Option[String] = None, var outParams: SortedMap[LocalVar, Expr] = SortedMap())
+    extends Jump {
+  override def acceptVisit(visitor: Visitor): Jump = this
+  override def toString = s"Return(${outParams.mkString(",")})"
 }
 
-class Return(override val label: Option[String] = None) extends Jump {
-  override def acceptVisit(visitor: Visitor): Jump = this
+object Unreachable {
+  def unapply(u: Unreachable): Some[Option[String]] = Some(u.label)
 }
 
 object Return {
-  def unapply(r: Return): Option[Option[String]] = Some(r.label)
+  def unapply(r: Return): Some[(Option[String], SortedMap[LocalVar, Expr])] = Some((r.label, r.outParams))
 }
 
 class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override val label: Option[String])
@@ -194,7 +205,7 @@ class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override
 }
 
 object GoTo:
-  def unapply(g: GoTo): Option[(Set[Block], Option[String])] = Some(g.targets, g.label)
+  def unapply(g: GoTo): Some[(Set[Block], Option[String])] = Some(g.targets, g.label)
 
 sealed trait Call extends Statement {
   def returnTarget: Option[Command] = successor match {
@@ -203,14 +214,23 @@ sealed trait Call extends Statement {
   }
 }
 
-class DirectCall(val target: Procedure, override val label: Option[String] = None) extends Call {
+class DirectCall(
+  val target: Procedure,
+  override val label: Option[String] = None,
+  var outParams: SortedMap[LocalVar, Variable] = SortedMap(), // out := formal
+  var actualParams: SortedMap[LocalVar, Expr] = SortedMap() // formal := actual
+) extends Call
+    with Assign {
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals
     case None => Set()
   } */
   def calls: Set[Procedure] = Set(target)
-  override def toString: String = s"${labelStr}DirectCall(${target.name})"
+  override def toString: String =
+    s"${labelStr}${outParams.map(_._2.name).mkString(",")} := DirectCall(${target.name})(${actualParams.map(_._2).mkString(",")})"
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitDirectCall(this)
+
+  def assignees = outParams.map(_._2).toSet
 
   override def linkParent(p: Block): Unit = {
     super.linkParent(p)
@@ -225,7 +245,8 @@ class DirectCall(val target: Procedure, override val label: Option[String] = Non
 }
 
 object DirectCall:
-  def unapply(i: DirectCall): Option[(Procedure, Option[String])] = Some(i.target, i.label)
+  def unapply(i: DirectCall): Some[(Procedure, Map[LocalVar, Variable], Map[LocalVar, Expr], Option[String])] =
+    Some(i.target, i.outParams, i.actualParams, i.label)
 
 class IndirectCall(var target: Variable, override val label: Option[String] = None) extends Call {
   /* override def locals: Set[Variable] = condition match {
@@ -237,4 +258,4 @@ class IndirectCall(var target: Variable, override val label: Option[String] = No
 }
 
 object IndirectCall:
-  def unapply(i: IndirectCall): Option[(Variable, Option[String])] = Some(i.target, i.label)
+  def unapply(i: IndirectCall): Some[(Variable, Option[String])] = Some(i.target, i.label)

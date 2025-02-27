@@ -45,6 +45,6 @@ case class BAPBlock(label: String, address: Option[BigInt], statements: List[BAP
 
 }
 
-case class BAPParameter(name: String, size: Int, value: BAPVar)
+case class BAPParameter(name: String, size: Int, value: BAPVar) {}
 
 case class BAPMemorySection(name: String, address: BigInt, size: Int, bytes: Seq[BAPLiteral])

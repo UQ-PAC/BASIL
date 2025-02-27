@@ -1,4 +1,5 @@
 import ir.{Block, Command, DirectCall, GoTo, Procedure, Program, Statement}
+import ir.*
 import org.scalatest.funsuite.*
 import util.{
   BASILConfig,
@@ -13,6 +14,7 @@ import util.{
 }
 
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable
 import test_util.BASILTest
 import test_util.TestConfig
 
@@ -20,9 +22,7 @@ import java.io.{BufferedWriter, File, FileWriter}
 
 class IndirectCallTests extends AnyFunSuite, BASILTest {
 
-  /**
-    *
-    * @param label - the label of the IndirectCall to be resolved
+  /** @param label - the label of the IndirectCall to be resolved
     * @param labelProcedure - the name of the procedure containing the IndirectCall to be resolved
     * @param procTargets - the names of procedures that the IndirectCall should resolve to
     * @param blockTargets - the addresses of blocks that the IndirectCall should resolve to
@@ -47,6 +47,29 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
 
   case class IndirectCallResult(resolution: IndirectCallResolution, success: Boolean, message: Option[String])
 
+  def getIndirectCalls(p: Program): Seq[IndirectCall] = {
+    p.mainProcedure.preOrderIterator.collect { case c: IndirectCall => c }.toSeq
+  }
+
+  def runBASILWithIndirectCalls(
+    inputPath: String,
+    RELFPath: String,
+    specPath: Option[String],
+    BPLPath: String,
+    staticAnalysisConf: Option[StaticAnalysisConfig]
+  ) = {
+    var indircalls = Seq[IndirectCall]()
+    val basilresult = runBASIL(
+      inputPath,
+      RELFPath,
+      specPath,
+      BPLPath,
+      staticAnalysisConf,
+      postLoad = ctx => { indircalls = getIndirectCalls(ctx.program); }
+    )
+    (basilresult, indircalls.map(_.label.get))
+  }
+
   def runTest(name: String, variation: String, conf: TestConfig, resolvedCalls: Seq[IndirectCallResolution]): Unit = {
     val directoryPath = "./src/test/indirect_calls/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
@@ -59,13 +82,15 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
     val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
 
     Logger.debug(s"$name/$variation$testSuffix")
-    val basilResult = runBASIL(inputPath, RELFPath, Some(specPath), BPLPath, Some(StaticAnalysisConfig()))
+    val (basilResult, indirectCallBlock) =
+      runBASILWithIndirectCalls(inputPath, RELFPath, Some(specPath), BPLPath, Some(StaticAnalysisConfig()))
     Logger.debug(s"$name/$variation$testSuffix DONE")
 
     val boogieResult = runBoogie(directoryPath, BPLPath, conf.boogieFlags)
     val (boogieFailureMsg, _, _) = checkVerify(boogieResult, resultPath, conf.expectVerify)
 
-    val indirectResolutionFailureMsg = checkIndirectCallResolution(basilResult.ir.program, resolvedCalls)
+    val fresolvedcalls = resolvedCalls.zip(indirectCallBlock).map((cr, l) => cr.copy(label = l))
+    val indirectResolutionFailureMsg = checkIndirectCallResolution(basilResult.ir.program, fresolvedcalls)
 
     (indirectResolutionFailureMsg, boogieFailureMsg) match {
       case (Some(msg), None) => fail(msg)
@@ -75,9 +100,8 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
     }
   }
 
-  /**
-    *
-    * @return None if passes, Some(failure message) if doesn't pass
+  /** @return
+    *   None if passes, Some(failure message) if doesn't pass
     */
   def checkIndirectCallResolution(program: Program, resolutions: Seq[IndirectCallResolution]): Option[String] = {
     val nameToProc: Map[String, Procedure] = program.nameToProcedure
@@ -197,7 +221,7 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
             if (targets.size == resolution.procTargets.size) {
               val targetNames = targets.flatMap {
                 _.statements.lastElem match {
-                  case Some(DirectCall(target, _)) => Some(target.name)
+                  case Some(DirectCall(target, _, _, _)) => Some(target.name)
                   case _ => None
                 }
               }

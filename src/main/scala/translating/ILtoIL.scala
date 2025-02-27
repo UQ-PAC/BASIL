@@ -1,4 +1,5 @@
 package translating
+import ir.cilvisitor.*
 import ir.*
 
 private class ILSerialiser extends ReadOnlyVisitor {
@@ -53,6 +54,13 @@ private class ILSerialiser extends ReadOnlyVisitor {
     node
   }
 
+  override def visitAssume(node: Assume): Statement = {
+    program ++= "Assume("
+    visitExpr(node.body)
+    program ++= ")"
+    node
+  }
+
   override def visitMemoryLoad(node: MemoryLoad): Statement = {
     program ++= "MemoryLoad("
     visitVariable(node.lhs)
@@ -90,7 +98,9 @@ private class ILSerialiser extends ReadOnlyVisitor {
 
   override def visitDirectCall(node: DirectCall): Statement = {
     program ++= "DirectCall("
+    program ++= "(" + node.outParams.map(_._2).mkString(", ") + ") := call "
     program ++= procedureIdentifier(node.target)
+    program ++= "(" + node.actualParams + ")"
     program ++= ")" // DirectCall
     node
   }
@@ -135,19 +145,10 @@ private class ILSerialiser extends ReadOnlyVisitor {
     indentLevel += 1
 
     program ++= "in("
-    for (i <- node.in.indices) {
-      visitParameter(node.in(i))
-      if (i != node.in.size - 1) {
-        program ++= ", "
-      }
-    }
+    program ++= node.formalInParam.mkString(", ")
     program ++= "), "
     program ++= "out("
-    for (i <- node.out.indices) {
-      visitParameter(node.out(i))
-      if (i != node.out.size - 1)
-        program ++= ", "
-    }
+    program ++= node.formalOutParam.mkString(", ")
     program ++= "), "
     program ++= "blocks(\n"
     for (b <- node.blocks) {
@@ -155,13 +156,6 @@ private class ILSerialiser extends ReadOnlyVisitor {
     }
     program ++= ")),\n"
     indentLevel -= 1
-    node
-  }
-
-  override def visitParameter(node: Parameter): Parameter = {
-    program ++= "Parameter("
-    visitRegister(node.value)
-    program ++= ")"
     node
   }
 
@@ -248,6 +242,12 @@ private class ILSerialiser extends ReadOnlyVisitor {
     node
   }
 
+}
+
+def serialiseIL(p: Procedure): String = {
+  val s = ILSerialiser()
+  s.visitProcedure(p)
+  s.program.toString()
 }
 
 def serialiseIL(p: Program): String = {

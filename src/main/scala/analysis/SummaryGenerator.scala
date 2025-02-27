@@ -3,12 +3,10 @@ package analysis
 import analysis.*
 import ir.*
 import boogie.*
-import util.Logger
-import specification.SpecGlobal
+import boogie.SpecGlobal
 
-/**
- * A temporary copy of RNA analysis which works on Taintables.
- */
+/** A temporary copy of RNA analysis which works on Taintables.
+  */
 import analysis.solvers.SimpleWorklistFixpointSolver
 
 private trait RNATaintableAnalysis(
@@ -68,10 +66,9 @@ private class RNATaintableSolver(
     with Analysis[Map[CFGPosition, Set[Taintable]]]
     with SimpleWorklistFixpointSolver[CFGPosition, Set[Taintable], PowersetLattice[Taintable]]
 
-/**
- * Generates summaries (requires and ensures clauses) for procedures that necessarily must hold (assuming a correct implementation).
- * This helps because the verifier cannot make any assumptions about procedures with no summaries.
- */
+/** Generates summaries (requires and ensures clauses) for procedures that necessarily must hold (assuming a correct
+  * implementation). This helps because the verifier cannot make any assumptions about procedures with no summaries.
+  */
 class SummaryGenerator(
   program: Program,
   specGlobals: Set[SpecGlobal],
@@ -109,23 +106,20 @@ class SummaryGenerator(
     }
   }
 
-  /**
-   * Get a map of variables to variables which have tainted it in the procedure.
-   */
+  /** Get a map of variables to variables which have tainted it in the procedure.
+    */
   private def getTainters(procedure: Procedure, variables: Set[Taintable]): Map[Taintable, Set[Taintable]] = {
     varDepsSummaries.getOrElse(procedure, Map())
   }
 
-  /**
-   * Generate requires clauses for a procedure. Currently this does nothing.
-   */
+  /** Generate requires clauses for a procedure. Currently this does nothing.
+    */
   def generateRequires(procedure: Procedure): List[BExpr] = List()
 
-  /**
-   * Generate ensures clauses for a procedure. Currently, all generated ensures clauses are of the form (for example)
-   *   ensures Gamma_R2 || (Gamma_R2 == old(Gamma_y)) || (Gamma_R2 == old(Gamma_R1)) || (Gamma_R2 == old(Gamma_R2));
-   * whenever this can be done soundly.
-   */
+  /** Generate ensures clauses for a procedure. Currently, all generated ensures clauses are of the form (for example)
+    * ensures Gamma_R2 || (Gamma_R2 == old(Gamma_y)) || (Gamma_R2 == old(Gamma_R1)) || (Gamma_R2 == old(Gamma_R2));
+    * whenever this can be done soundly.
+    */
   def generateEnsures(procedure: Procedure): List[BExpr] = {
     if procedure.blocks.isEmpty then return List()
 

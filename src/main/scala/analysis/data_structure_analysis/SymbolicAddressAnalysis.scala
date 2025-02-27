@@ -1,6 +1,6 @@
 package analysis.data_structure_analysis
 
-import analysis.BitVectorEval.{bv2SignedInt, isNegative}
+import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
 import analysis.solvers.ForwardIDESolver
 import analysis.*
 import ir.*
@@ -46,13 +46,11 @@ case class UnknownLocation(override val regionIdentifier: String, proc: Procedur
   override def toString: String = s"Unknown($regionIdentifier)"
 }
 
-/**
- * environment transformers for SAA or symbolic access analysis
- * Combination of reaching definitions and constant propagation
- * elements in D are symbolic accesses of the form (variable, symbolic base, concrete offset)
- * lattice L is a binary lattice with top being the definition is valid (alive) and bottom being
- * the definition is dead or no longer affects the environment
- */
+/** environment transformers for SAA or symbolic access analysis Combination of reaching definitions and constant
+  * propagation elements in D are symbolic accesses of the form (variable, symbolic base, concrete offset) lattice L is
+  * a binary lattice with top being the definition is valid (alive) and bottom being the definition is dead or no longer
+  * affects the environment
+  */
 trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]])
     extends ForwardIDEAnalysis[SymbolicAddress, TwoElement, TwoElementLattice] {
 
@@ -161,7 +159,7 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
                 TwoElementTop
               )
             )
-      case DirectCall(target, _) if target.name == "malloc" =>
+      case DirectCall(target, _, _, _) if target.procName == "malloc" =>
         d match
           case Left(value) if value.accessor == mallocVariable => Map()
           case Left(_) => Map(d -> IdEdge())
@@ -175,7 +173,7 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
                 SymbolicAddress(mallocVariable, HeapLocation(nextMallocCount, IRWalk.procedure(n), size), 0)
               ) -> ConstEdge(TwoElementTop)
             )
-      case DirectCall(target, _) if target.returnBlock.isEmpty => // for when calls are non returning, kills the stack dataflow facts
+      case DirectCall(target, _, _, _) if target.returnBlock.isEmpty => // for when calls are non returning, kills the stack dataflow facts
         d match
           case Left(value) =>
             value.symbolicBase match

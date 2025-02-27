@@ -1,26 +1,32 @@
 package analysis
 
-import analysis.BitVectorEval.bv2SignedInt
+import ir.eval.BitVectorEval.bv2SignedInt
 import analysis.solvers.SimpleWorklistFixpointSolver
 import ir.*
-import util.Logger
+import util.MRALogger
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
 /** Identifies stack and heap regions.
- *
- * This is iterated until results reach a fixpoint.
- * Subsequent runs may refine the definition of global data regions as well.
- *
- * @param program
- * @param domain reachable parts of the program
- * @param constantProp constant propagation results
- * @param reachingDefs maps each CFG node to two maps: variable definitions and variables uses.
- * @param graResult results from global region analysis.
- * @param mmm preloaded globals from symbol table.
- * @param vsaResult extra information from VSA results of previous passes.
- */
+  *
+  * This is iterated until results reach a fixpoint. Subsequent runs may refine the definition of global data regions as
+  * well.
+  *
+  * @param program
+  * @param domain
+  *   reachable parts of the program
+  * @param constantProp
+  *   constant propagation results
+  * @param reachingDefs
+  *   maps each CFG node to two maps: variable definitions and variables uses.
+  * @param graResult
+  *   results from global region analysis.
+  * @param mmm
+  *   preloaded globals from symbol table.
+  * @param vsaResult
+  *   extra information from VSA results of previous passes.
+  */
 trait MemoryRegionAnalysis(
   val program: Program,
   val domain: Set[CFGPosition],
@@ -46,14 +52,16 @@ trait MemoryRegionAnalysis(
     s"stack_$stackCount"
   }
 
-  /**
-   * Controls the pool of stack regions. Each pool is unique to a function.
-   * If the offset has already been defined in the context of the function, then the same region is returned.
-   *
-   * @param base   : the offset
-   * @param parent : the function entry node
-   * @return the stack region corresponding to the offset
-   */
+  /** Controls the pool of stack regions. Each pool is unique to a function. If the offset has already been defined in
+    * the context of the function, then the same region is returned.
+    *
+    * @param base
+    *   : the offset
+    * @param parent
+    *   : the function entry node
+    * @return
+    *   the stack region corresponding to the offset
+    */
   private def poolMaster(base: BigInt, stackBase: Procedure, subAccess: BigInt): StackRegion = {
     assert(subAccess >= 0)
     val stackPool = stackMap.getOrElseUpdate(stackBase, mutable.HashMap())
@@ -215,7 +223,7 @@ trait MemoryRegionAnalysis(
           Set.empty
         // we cannot evaluate this to a concrete value, we need VSA for this
         case _ =>
-          Logger.debug(s"type: ${exp.getClass} $exp\n")
+          MRALogger.debug(s"type: ${exp.getClass} $exp\n")
           throw new Exception("Unknown type")
       }
     }
@@ -245,7 +253,7 @@ trait MemoryRegionAnalysis(
   }
 
   /** Transfer function for state lattice elements.
-   */
+    */
   def transfer(
     n: CFGPosition,
     s: ((Set[StackRegion], Set[Variable]), Set[HeapRegion])
@@ -253,7 +261,7 @@ trait MemoryRegionAnalysis(
     val stackPointerVariables = stackDetection(n, s(0)(1))
     n match {
       case directCall: DirectCall =>
-        if (directCall.target.name == "malloc") {
+        if (directCall.target.procName == "malloc") {
           evaluateExpression(mallocVariable, constantProp(n)) match {
             case Some(b: BitVecLiteral) =>
               val negB = bv2SignedInt(b)

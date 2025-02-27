@@ -49,19 +49,18 @@ trait MapLatticeSolver[N, T, L <: Lattice[T]] extends LatticeSolver[Map[N, T]] w
     val states = indep(n).map(o(_))
     states.foldLeft(lattice.sublattice.bottom)((acc, pred) => lattice.sublattice.lub(acc, pred))
 
-/**
- * Base trait for solvers for map lattices with lifted co-domains.
- * @tparam N type of the elements in the map domain.
- */
+/** Base trait for solvers for map lattices with lifted co-domains.
+  * @tparam N
+  *   type of the elements in the map domain.
+  */
 trait MapLiftLatticeSolver[N, T, L <: Lattice[T]]
     extends MapLatticeSolver[N, LiftedElement[T], LiftLattice[T, L]]
     with Dependencies[N] {
 
   val lattice: MapLattice[N, LiftedElement[T], LiftLattice[T, L]]
 
-  /**
-   * The transfer function for the sub-sub-lattice.
-   */
+  /** The transfer function for the sub-sub-lattice.
+    */
   def transferUnlifted(n: N, s: T): T
 
   override def transfer(n: N, s: LiftedElement[T]): LiftedElement[T] = {
@@ -103,10 +102,8 @@ trait Worklist[N]:
   * @tparam N
   *   type of the elements in the worklist.
   *
-  * Note:
-  *  add(m) is O(n * m)
-  *  worklist.run() is O(|first|^2)
-  *    - ListSet.tail() and ListSet.head() are both O(n)
+  * Note: add(m) is O(n * m) worklist.run() is O(|first|^2)
+  *   - ListSet.tail() and ListSet.head() are both O(n)
   */
 trait ListSetWorklist[N] extends Worklist[N]:
 
@@ -188,18 +185,17 @@ trait SimpleWorklistFixpointSolver[N, T, L <: Lattice[T]] extends WorklistFixpoi
     run(domain)
     x
 
-/**
- * The worklist-based fixpoint solver with reachability.
- *
- * This solver works for map lattices with lifted co-domains, where the extra bottom element typically represents "unreachable".
- */
+/** The worklist-based fixpoint solver with reachability.
+  *
+  * This solver works for map lattices with lifted co-domains, where the extra bottom element typically represents
+  * "unreachable".
+  */
 trait WorklistFixpointSolverWithReachability[N, T, L <: Lattice[T]]
     extends WorklistFixpointSolver[N, LiftedElement[T], LiftLattice[T, L]]
     with MapLiftLatticeSolver[N, T, L] {
 
-  /**
-   * The start locations, used as the initial contents of the worklist.
-   */
+  /** The start locations, used as the initial contents of the worklist.
+    */
   val first: Set[N]
 
   def analyze(): Map[N, LiftedElement[T]] = {
@@ -209,25 +205,26 @@ trait WorklistFixpointSolverWithReachability[N, T, L <: Lattice[T]]
   }
 }
 
-/**
- * Common trait for pushdown worklist solvers
- *
- * @tparam N
- *   type of the elements in the worklist.
- * @tparam T Type of the elements in the sublattice
- * @tparam L Sublattice
- */
+/** Common trait for pushdown worklist solvers
+  *
+  * @tparam N
+  *   type of the elements in the worklist.
+  * @tparam T
+  *   Type of the elements in the sublattice
+  * @tparam L
+  *   Sublattice
+  */
 trait PushDownWorklistFixPointFunctions[N, T, L <: Lattice[T]] extends LinkedHashSetWorklist[N]:
 
   val lattice: MapLattice[N, T, L]
 
   /** The current lattice element.
-   */
+    */
   var x: Map[N, T] = _
 
   /** Propagates lattice element y to node m.
-   * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/FixpointSolvers.scala#L286
-   */
+    * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/FixpointSolvers.scala#L286
+    */
   def propagate(y: T, m: N): Unit = {
     val xm = x(m)
     if (xm != y) {
@@ -284,14 +281,15 @@ trait SimplePushDownWorklistFixpointSolver[N, T, L <: Lattice[T]] extends PushDo
     run(domain)
     x
 
-/**
- * Push down worklist solver that maps first to init
- *
- * @tparam N
- *   type of the elements in the worklist.
- * @tparam T Type of the elements in the sublattice
- * @tparam L Sublattice
- */
+/** Push down worklist solver that maps first to init
+  *
+  * @tparam N
+  *   type of the elements in the worklist.
+  * @tparam T
+  *   Type of the elements in the sublattice
+  * @tparam L
+  *   Sublattice
+  */
 trait InitializingPushDownWorklistFixpointSolver[N, T, L <: Lattice[T]]
     extends PushDownWorklistFixPointFunctions[N, T, L]:
 

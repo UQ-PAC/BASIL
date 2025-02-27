@@ -4,7 +4,7 @@ import scala.annotation.tailrec
 import ir.{Block, Command, IntraProcIRCursor, Program, Procedure, GoTo, IRWalk}
 import ir.{LocalAssign, Assume, IntLiteral, IntType, IntEQ, BoolOR, LocalVar, BinaryExpr}
 import util.intrusive_list.IntrusiveList
-import util.Logger
+import util.StaticAnalysisLogger
 
 import scala.collection.mutable
 
@@ -70,6 +70,15 @@ object LoopDetector {
 
     def reducibleTransformIR(): State = {
       this.copy(loops = LoopTransform.llvm_transform(loops.values).map(l => l.header -> l).toMap)
+    }
+
+    def updateIrWithLoops() = {
+      for ((hd, l) <- loops) {
+        hd.inLoop = Set(l)
+        for (participant <- l.nodes) {
+          participant.inLoop = participant.inLoop + l
+        }
+      }
     }
   }
 
@@ -199,29 +208,26 @@ object LoopDetector {
    */
   private def traverse_loops_dfs(_istate: State, _b0: Block, _DFSPpos: Int): State = {
 
-    /**
-     * The recursion is flattened using a state machine operating over the stack of operations
-     * to perform
-     *
-     *      +--> BeginProcessNode <--+     Start DFS on node: push ContinueDFS with node's successors
-     *      |           |            |
-     *      |           |       succ not visited 
-     *      |           |    (push self & successor)
-     *      |           v            |
-     *      |       ContinueDFS -----+     if not previously visited, traverse to successors (a),
-     *      |           |            |     otherwise process this edge (b-e) then continue procesing edges.
-     *      |      succ visited      |
-     *  siblings        |       no successors           (siblings = processingEdges) 
-     *      |           V            |
-     *      +---- ProcesVisitedNode  |      we have returned after processing successor edges
-     *                  |            |
-     *              no siblings      |
-     *                  |            |
-     *                  v            |
-     *          FinishProcessNode <--+     all outgoing edges have been processed, finish this node
-     *
-     *
-     */
+    /** The recursion is flattened using a state machine operating over the stack of operations
+      * to perform
+      *
+      *      +--> BeginProcessNode <--+     Start DFS on node: push ContinueDFS with node's successors
+      *      |           |            |
+      *      |           |       succ not visited
+      *      |           |    (push self & successor)
+      *      |           v            |
+      *      |       ContinueDFS -----+     if not previously visited, traverse to successors (a),
+      *      |           |            |     otherwise process this edge (b-e) then continue procesing edges.
+      *      |      succ visited      |
+      *  siblings        |       no successors           (siblings = processingEdges)
+      *      |           V            |
+      *      +---- ProcesVisitedNode  |      we have returned after processing successor edges
+      *                  |            |
+      *              no siblings      |
+      *                  |            |
+      *                  v            |
+      *          FinishProcessNode <--+     all outgoing edges have been processed, finish this node
+      */
     enum Action {
       case BeginProcessNode
       case ContinueDFS
@@ -289,7 +295,6 @@ object LoopDetector {
   }
 
   /** Sets the most inner loop header `h` for a given node `b`
-    *
     */
   private def tag_lhead(istate: State, b: Block, h: Block): State = {
     var cur1: Block = b

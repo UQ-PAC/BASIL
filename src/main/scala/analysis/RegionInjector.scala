@@ -2,14 +2,12 @@ package analysis
 
 import analysis.data_structure_analysis.{AddressRange, Cell, Graph, Slice}
 import ir.*
-import util.Logger
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-/**
- * Replaces the region access with the calculated memory region.
- */
+/** Replaces the region access with the calculated memory region.
+  */
 
 trait MergedRegion {
   var name: String = ""
@@ -257,10 +255,10 @@ class RegionInjectorDSA(override val program: Program, DSATopDown: mutable.Map[P
     val stack = cell.node.get.flags.stack
     val name = if (stack) {
       stackCounter += 1
-      s"stack$$${stackCounter}"
+      s"stack_${stackCounter}"
     } else {
       sharedMemoryCounter += 1
-      s"mem$$${sharedMemoryCounter}"
+      s"mem_${sharedMemoryCounter}"
     }
     MergedRegionDSA(name, cell, stack)
   }

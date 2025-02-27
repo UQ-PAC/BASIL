@@ -3,34 +3,29 @@ package analysis
 import analysis.solvers.ForwardIDESolver
 import ir.*
 import boogie.*
-import util.Logger
 
-/**
- * A value which can propogate taint/be tainted.
- */
+/** A value which can propogate taint/be tainted.
+  */
 type Taintable = Variable | GlobalVariable /*| LocalStackVariable*/ | UnknownMemory
 
 // TODO global and stack variables should just be `Variable`s after an IL transformation, in the future they shouldn't need to be defined here.
 
-/**
- * A global variable in memory.
- */
+/** A global variable in memory.
+  */
 case class GlobalVariable(mem: Memory, address: BitVecLiteral, size: Int, identifier: String) {
   override def toString(): String = {
     s"GlobalVariable($mem, $identifier, $size, $address)"
   }
 
-  /**
-   * The security classification of this global variable as a boogie expression.
-   */
+  /** The security classification of this global variable as a boogie expression.
+    */
   def L: BExpr = {
     val bAddr = BVariable("$" + s"${identifier}_addr", BitVecBType(64), Scope.Const)
     BFunctionCall("L", List(mem.toBoogie, bAddr), BoolBType)
   }
 
-  /**
-   * The boogie expression corresponding to the gamma of this global variable.
-   */
+  /** The boogie expression corresponding to the gamma of this global variable.
+    */
   def toGamma: BExpr = {
     val bAddr = BVariable("$" + s"${identifier}_addr", BitVecBType(64), Scope.Const)
     GammaLoad(mem.toGamma, bAddr, size, size / mem.valueSize)
@@ -49,9 +44,8 @@ case class LocalStackVariable(val address: BitVecLiteral, val size: Int) {
   }
 }*/
 
-/**
- * Represents a memory address with no known information.
- */
+/** Represents a memory address with no known information.
+  */
 case class UnknownMemory() {
   override def toString(): String = {
     "UnknownMemory"
@@ -156,11 +150,10 @@ trait TaintAnalysisFunctions(
   }
 }
 
-/**
- * Performs taint analysis on a program. Variables (`Taintable`s) are marked as tainted at points in the program as
- * specified by `tainted`, and propogate their taint throughout the program. Assignments containing tainted variables
- * mark the assigned value as tainted.
- */
+/** Performs taint analysis on a program. Variables (`Taintable`s) are marked as tainted at points in the program as
+  * specified by `tainted`, and propogate their taint throughout the program. Assignments containing tainted variables
+  * mark the assigned value as tainted.
+  */
 class TaintAnalysis(
   program: Program,
   globals: Map[BigInt, String],

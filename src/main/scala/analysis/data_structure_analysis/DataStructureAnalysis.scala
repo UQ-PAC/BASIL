@@ -2,24 +2,27 @@ package analysis.data_structure_analysis
 
 import analysis.*
 import ir.*
-import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
+import specification.{ExternalFunction, SymbolTableEntry}
+import boogie.SpecGlobal
 
 import scala.collection.mutable
 
-/**
- * Data Structure Analysis
- * Performs all phases of DSA and stores the results in member variables
- * local, bottom-up, top-down results in member variables locals, bu and td respectively.
- * @param program program to be analysed
- * @param symResults result of symbolic access analysis
- * @param constProp
- * @param globals
- * @param globalOffsets
- * @param externalFunctions
- * @param reachingDefs
- * @param writesTo mapping from procedures to registers they change
- * @param params mapping from procedures to their parameters
- */
+/** Data Structure Analysis Performs all phases of DSA and stores the results in member variables local, bottom-up,
+  * top-down results in member variables locals, bu and td respectively.
+  * @param program
+  *   program to be analysed
+  * @param symResults
+  *   result of symbolic access analysis
+  * @param constProp
+  * @param globals
+  * @param globalOffsets
+  * @param externalFunctions
+  * @param reachingDefs
+  * @param writesTo
+  *   mapping from procedures to registers they change
+  * @param params
+  *   mapping from procedures to their parameters
+  */
 class DataStructureAnalysis(
   program: Program,
   symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],

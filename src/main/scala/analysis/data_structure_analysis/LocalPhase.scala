@@ -1,27 +1,31 @@
 package analysis.data_structure_analysis
 
-import analysis.BitVectorEval.{bv2SignedInt, isNegative}
+import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
 import analysis.*
 import ir.*
-import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
+import boogie.SpecGlobal
+import specification.{ExternalFunction, SymbolTableEntry}
 import util.writeToFile
 
 import java.math.BigInteger
 import scala.collection.mutable
 import scala.util.control.Breaks.{break, breakable}
 
-/**
- * The local phase of Data Structure Analysis
- * @param proc procedure to be analysed
- * @param symResults result of symbolic access analysis
- * @param constProp
- * @param globals
- * @param globalOffsets
- * @param externalFunctions
- * @param reachingDefs
- * @param writesTo mapping from procedures to registers they change
- * @param params mapping from procedures to their parameters
- */
+/** The local phase of Data Structure Analysis
+  * @param proc
+  *   procedure to be analysed
+  * @param symResults
+  *   result of symbolic access analysis
+  * @param constProp
+  * @param globals
+  * @param globalOffsets
+  * @param externalFunctions
+  * @param reachingDefs
+  * @param writesTo
+  *   mapping from procedures to registers they change
+  * @param params
+  *   mapping from procedures to their parameters
+  */
 class LocalPhase(
   proc: Procedure,
   symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
@@ -51,21 +55,21 @@ class LocalPhase(
     position -> newMap
   }
 
-  /**
-   * if an expr is the address of a global location return its corresponding cell
-   *
-   * @param pos IL position where the expression is used
-   */
+  /** if an expr is the address of a global location return its corresponding cell
+    *
+    * @param pos
+    *   IL position where the expression is used
+    */
   def isGlobal(expr: Expr, pos: CFGPosition, size: Int = 0): Option[Cell] = {
     val value = evaluateExpression(expr, constProp(pos))
     if value.isDefined then graph.getGlobal(value.get.value, size)
     else None
   }
 
-  /**
-   * if an expr is the address of a stack location return its corresponding cell
-   * @param pos IL position where the expression is used
-   */
+  /** if an expr is the address of a stack location return its corresponding cell
+    * @param pos
+    *   IL position where the expression is used
+    */
   private def isStack(expr: Expr, pos: CFGPosition, size: Int = 0): Option[Cell] = {
     expr match
       case BinaryExpr(_, arg1: Variable, arg2)
@@ -101,17 +105,23 @@ class LocalPhase(
   val graph: Graph =
     Graph(proc, constProp, varToSym, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params)
 
-  /**
-   * Handles unification for instructions of the form R_x = R_y [+ offset] where R_y is a pointer and [+ offset] is optional
-   * @param position the cfg position being visited (note this might be a local assign of the form R_x = R_y [+ offset]
-   *                 or it might be memory load/store where the index is of the form R_y [+ offset]
-   * @param lhs Ev(R_x) if position is local assign or a cell from an empty node if R_y [+ offset] is the index of a memoryStore
-   * @param rhs R_y, reachingDefs(position)(R_y) can be used to find the set of SSA variables that may define R_x
-   * @param pointee if false, the position is local pointer arithmetic therefore Ev(R_y [+ offset]) is merged with lhs
-   *                else, the position is a memory read/write therefore E(Ev(R_y [+ offset])) is merged with lhs
-   * @param offset offset if [+ offset] is present
-   * @return the cell resulting from the unification
-   */
+  /** Handles unification for instructions of the form R_x = R_y [+ offset] where R_y is a pointer and [+ offset] is
+    * optional
+    * @param position
+    *   the cfg position being visited (note this might be a local assign of the form R_x = R_y [+ offset] or it might
+    *   be memory load/store where the index is of the form R_y [+ offset]
+    * @param lhs
+    *   Ev(R_x) if position is local assign or a cell from an empty node if R_y [+ offset] is the index of a memoryStore
+    * @param rhs
+    *   R_y, reachingDefs(position)(R_y) can be used to find the set of SSA variables that may define R_x
+    * @param pointee
+    *   if false, the position is local pointer arithmetic therefore Ev(R_y [+ offset]) is merged with lhs else, the
+    *   position is a memory read/write therefore E(Ev(R_y [+ offset])) is merged with lhs
+    * @param offset
+    *   offset if [+ offset] is present
+    * @return
+    *   the cell resulting from the unification
+    */
   private def visitPointerArithmeticOperation(
     position: CFGPosition,
     lhs: Cell,
@@ -163,9 +173,8 @@ class LocalPhase(
     graph.selfCollapse(result.node.get)
     graph.handleOverlapping(result.node.get.getCell(result.offset))
 
-  /**
-   * handles unsupported pointer arithmetic by collapsing all the nodes invloved
-   */
+  /** handles unsupported pointer arithmetic by collapsing all the nodes invloved
+    */
   private def unsupportedPointerArithmeticOperation(n: CFGPosition, expr: Expr, lhsCell: Cell): Cell = {
     val cell = expr.variables.foldLeft(lhsCell) { (c, v) =>
       val cells: Set[Slice] = graph.getCells(n, v)
@@ -182,13 +191,15 @@ class LocalPhase(
     node.cells(0)
   }
 
-  /**
-   * Performs  overlapping access to the pointer cell while preserving size each dereferenced cell as separate
-   * (not collapsing them together)
-   * @param lhsOrValue either lhs in a load or value in a store
-   * @param pointer the cell which is being dereferenced
-   * @param size size of the dereference
-   */
+  /** Performs overlapping access to the pointer cell while preserving size each dereferenced cell as separate (not
+    * collapsing them together)
+    * @param lhsOrValue
+    *   either lhs in a load or value in a store
+    * @param pointer
+    *   the cell which is being dereferenced
+    * @param size
+    *   size of the dereference
+    */
   def multiAccess(lhsOrValue: Cell, pointer: Cell, size: Int): Cell = {
     // TODO there should be another check here to see we cover the bytesize
     // otherwise can fall back on expanding
@@ -223,7 +234,7 @@ class LocalPhase(
     if visited.contains(n) then return
     else visited.add(n)
     n match
-      case DirectCall(target, _) if target.name == "malloc" => // R0 = Malloc()
+      case DirectCall(target, _, _, _) if target.procName == "malloc" => // R0 = Malloc()
         val size: BigInt = evaluateExpression(mallocRegister, constProp(n)) match
           case Some(value) => value.value
           case None => 0

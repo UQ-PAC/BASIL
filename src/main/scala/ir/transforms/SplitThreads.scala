@@ -13,7 +13,7 @@ def splitThreads(
 
   // iterate over all commands - if call is to pthread_create, look up
   program.foreach {
-    case d: DirectCall if d.target.name == "pthread_create" =>
+    case d: DirectCall if d.target.procName == "pthread_create" =>
       // R2 should hold the function pointer of the function that begins the thread
       // look up R2 value using points to results
       val R2 = Register("R2", 64)

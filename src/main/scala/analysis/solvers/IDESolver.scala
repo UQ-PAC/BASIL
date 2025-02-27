@@ -34,11 +34,9 @@ import util.Logger
 import scala.collection.immutable.Map
 import scala.collection.mutable
 
-/**
- * (A variant of) the IDE analysis algorithm.
- * Adapted from Tip
- * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/IDESolver.scala
- */
+/** (A variant of) the IDE analysis algorithm. Adapted from Tip
+  * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/IDESolver.scala
+  */
 abstract class IDESolver[
   E <: Procedure | Command,
   EE <: Procedure | Command,
@@ -63,12 +61,9 @@ abstract class IDESolver[
   def phase2Init: T = valuelattice.top
   def start: CFGPosition = startNode
 
-  /**
-   * Phase 1 of the IDE algorithm.
-   * Computes Path functions and Summary functions
-   * The original version of the algorithm uses summary edges from call nodes to after-call nodes
-   * instead of `callJumpCache` and `exitJumpCache`.
-   */
+  /** Phase 1 of the IDE algorithm. Computes Path functions and Summary functions The original version of the algorithm
+    * uses summary edges from call nodes to after-call nodes instead of `callJumpCache` and `exitJumpCache`.
+    */
   private class Phase1
       extends InitializingPushDownWorklistFixpointSolver[
         (CFGPosition, DL, DL),
@@ -79,16 +74,14 @@ abstract class IDESolver[
     val lattice: MapLattice[(CFGPosition, DL, DL), EdgeFunction[T], EdgeFunctionLattice[T, L]] = MapLattice(edgelattice)
     val first: Set[(CFGPosition, DL, DL)] = Set((start, Right(Lambda()), Right(Lambda())))
 
-    /**
-     * callJumpCache(funentry, d1, call)(d3) returns the composition of the edges (call.funentry, d3) -> (call, *) -> (funentry, d1).
-     * Allows faster lookup than scanning through the current lattice element.
-     */
+    /** callJumpCache(funentry, d1, call)(d3) returns the composition of the edges (call.funentry, d3) -> (call, *) ->
+      * (funentry, d1). Allows faster lookup than scanning through the current lattice element.
+      */
     private val callJumpCache = mutable.Map[(E, DL, C), mutable.Map[DL, EdgeFunction[T]]]()
 
-    /**
-     * exitJumpCache(funentry, d1) contains d2 if there is a non-bottom edge (funentry, d1) -> (funentry.exit, d2).
-     * Allows faster lookup than scanning through the current lattice element.
-     */
+    /** exitJumpCache(funentry, d1) contains d2 if there is a non-bottom edge (funentry, d1) -> (funentry.exit, d2).
+      * Allows faster lookup than scanning through the current lattice element.
+      */
     private val exitJumpCache = mutable.Map[(E, DL), mutable.Set[DL]]()
 
     private def storeCallJump(funentry: E, d1: DL, call: C, e: EdgeFunction[T], d3: DL): Unit = {
@@ -187,18 +180,15 @@ abstract class IDESolver[
     }
   }
 
-  /**
-   * Phase 2 of the IDE algorithm.
-   * Performs a forward dataflow analysis using the decomposed lattice and the micro-transformers.
-   * The original RHS version of IDE uses jump functions for all nodes, not only at exits, but the analysis result and complexity is the same.
-   */
+  /** Phase 2 of the IDE algorithm. Performs a forward dataflow analysis using the decomposed lattice and the
+    * micro-transformers. The original RHS version of IDE uses jump functions for all nodes, not only at exits, but the
+    * analysis result and complexity is the same.
+    */
   private class Phase2(val phase1: Phase1) extends InitializingPushDownWorklistFixpointSolver[(CFGPosition, DL), T, L] {
     val lattice: MapLattice[(CFGPosition, DL), T, L] = MapLattice(valuelattice)
     val first: Set[(CFGPosition, DL)] = Set((start, Right(Lambda())))
 
-    /**
-      * Function summaries from phase 1.
-      * Built when first invoked.
+    /** Function summaries from phase 1. Built when first invoked.
       */
     lazy val summaries: mutable.Map[Procedure, mutable.Map[DL, mutable.Map[DL, EdgeFunction[T]]]] = phase1.summaries()
 
@@ -239,8 +229,7 @@ abstract class IDESolver[
       MapLattice(valuelattice)
     )
 
-    /**
-      * Restructures the analysis output to match `restructuredlattice`.
+    /** Restructures the analysis output to match `restructuredlattice`.
       */
     def restructure(y: lattice.Element): restructuredlattice.Element = {
       y.foldLeft(Map[CFGPosition, Map[D, valuelattice.Element]]()) { case (acc, ((n, dl), e)) =>
