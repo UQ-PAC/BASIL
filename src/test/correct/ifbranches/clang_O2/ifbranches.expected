@@ -56,7 +56,7 @@ procedure {:extern} rely_reflexive();
 procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
 
-procedure main();
+procedure main_1812();
   modifies CF, Gamma_CF, Gamma_NF, Gamma_R0, Gamma_R8, Gamma_VF, Gamma_ZF, NF, R0, R8, VF, ZF;
   requires (Gamma_R0 == true);
   free requires (memory_load64_le(mem, 69664bv64) == 0bv64);
@@ -72,7 +72,7 @@ procedure main();
   free ensures (memory_load64_le(mem, 69592bv64) == 1812bv64);
   free ensures (memory_load64_le(mem, 69672bv64) == 69672bv64);
 
-implementation main()
+implementation main_1812()
 {
   var #4: bv32;
   var Gamma_#4: bool;
@@ -86,27 +86,27 @@ implementation main()
     NF, Gamma_NF := bvadd32(#4, 1bv32)[32:31], Gamma_#4;
     assert Gamma_ZF;
     goto lmain_goto_l000002db, lmain_goto_l000002df;
-  l000002df:
-    assume {:captureState "l000002df"} true;
-    R0, Gamma_R0 := zero_extend32_32(bvadd32(R8[32:0], 1bv32)), Gamma_R8;
-    goto l000002e2;
-  l000002db:
-    assume {:captureState "l000002db"} true;
-    R0, Gamma_R0 := zero_extend32_32(R8[32:0]), Gamma_R8;
-    goto l000002e2;
-  l000002e2:
-    assume {:captureState "l000002e2"} true;
-    goto main_basil_return;
-  lmain_goto_l000002db:
-    assume {:captureState "lmain_goto_l000002db"} true;
-    assume (bvcomp1(ZF, 1bv1) != 0bv1);
-    goto l000002db;
   lmain_goto_l000002df:
     assume {:captureState "lmain_goto_l000002df"} true;
     assume (bvcomp1(ZF, 1bv1) == 0bv1);
+    R0, Gamma_R0 := zero_extend32_32(bvadd32(R8[32:0], 1bv32)), Gamma_R8;
     goto l000002df;
-  main_basil_return:
-    assume {:captureState "main_basil_return"} true;
+  l000002df:
+    assume {:captureState "l000002df"} true;
+    goto l000002e2;
+  lmain_goto_l000002db:
+    assume {:captureState "lmain_goto_l000002db"} true;
+    assume (bvcomp1(ZF, 1bv1) != 0bv1);
+    R0, Gamma_R0 := zero_extend32_32(R8[32:0]), Gamma_R8;
+    goto l000002db;
+  l000002db:
+    assume {:captureState "l000002db"} true;
+    goto l000002e2;
+  l000002e2:
+    assume {:captureState "l000002e2"} true;
+    goto main_1812_basil_return;
+  main_1812_basil_return:
+    assume {:captureState "main_1812_basil_return"} true;
     return;
 }
 
