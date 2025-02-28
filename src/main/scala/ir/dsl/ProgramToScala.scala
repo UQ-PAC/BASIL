@@ -49,34 +49,35 @@ def procedureToScalaWith(blockToScala: Block => Twine)(x: Procedure): Twine =
 given ToScalaLines[MemorySection] with
   extension (x: MemorySection)
     def toScalaLines: Twine =
-      val array: Iterable[Twine] = List(
-        LazyList.from(
-          x.bytes.toSeq
-            .map(x => "0x" + x.value.toInt.toHexString)
-            .grouped(32)
-            .map(x => x.mkString(","))
-            .toSeq
-            .intersperse(",\n")
-        )
-      )
-      val bytes = indentNested("Seq(", array, ").map(BitVecLiteral(_, 8)).toSeq")
+      val byteLines: Seq[Twine] =
+        x.bytes
+          .map(x => f"${x.value}%#04x")
+          .grouped(32)
+          .map(x => LazyList(x.mkString(",")))
+          .toSeq
+
+      val byteTwine = indentNested("Seq(", byteLines, ").map(BitVecLiteral(_, 8)).toSeq")
+
+      // in the second argument of indentNested, list elements will be separated by newlines.
       indentNested(
         "MemorySection(",
-        List(
-          LazyList(x.name.toScala, ", ", x.address.toScala, ", ", x.size.toScala, ",\n") ++ bytes ++ LazyList(
-            ", ",
-            x.readOnly.toScala + ", ",
-            None.toScala
-          )
-        ),
+        LazyList(x.name.toScala, ", ", x.address.toScala, ", ", x.size.toScala)
+        #:: byteTwine
+        #:: ("readOnly = " #:: x.readOnly.toScalaLines)
+        #:: ("region = " #:: None.toScalaLines) // TODO: ToScala for region??
+        #:: LazyList(),
         ")"
       )
 
 def programToScalaWith(procedureToScala: Procedure => Twine)(x: Program): Twine =
   val main = x.mainProcedure
   val others = x.procedures.to(LazyList).filter(_ ne main)
-  val mem = indentNested("Seq(",  x.initialMemory.values.map(_.toScalaLines), ")")
-  indentNested("prog(", List(mem) ++ (main #:: others).map(procedureToScala), ")")
+  val mem = if (x.initialMemory.nonEmpty) {
+    Some(indentNested("Seq(",  x.initialMemory.values.map(_.toScalaLines), ")"))
+  } else {
+    None
+  }
+  indentNested("prog(", mem ++: (main #:: others).map(procedureToScala), ")")
 
 /**
  * ToScala instances
