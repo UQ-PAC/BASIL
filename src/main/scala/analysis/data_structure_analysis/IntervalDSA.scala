@@ -43,7 +43,7 @@ class IntervalGraph(
       base match
         case Heap(call) => node.flags.heap = true
         case Stack(proc) => node.flags.stack = true
-        case Global => node.flags.stack = true
+        case Global => node.flags.global = true
         case NonPointer =>
           throw new Exception("Attempted to create a node from an Non-pointer symbolic base")
         case unknown: (Ret | Loaded | Par) =>
