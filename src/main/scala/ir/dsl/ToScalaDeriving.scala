@@ -29,6 +29,15 @@ import scala.compiletime.{summonInline, erasedValue, constValue, error}
  */
 
 /**
+ * NOTE: The version of Scala we use is the 3.3.x LTS and it predates a syntax change
+ * for given declarations. Namely, in 3.6, the `given` syntax was changed to use `=`
+ * instead of `with`. We must use the `with` syntax, otherwise a syntax error will be
+ * reported.
+ *
+ * See: https://docs.scala-lang.org/scala3/reference/contextual/previous-givens.html
+ */
+
+/**
  * Mirrors
  * -------
  *
@@ -342,12 +351,15 @@ object ToScalaDeriving {
       case _: Mirror.ProductOf[T] =>
         summonInstances[T, m.MirroredElemTypes, Excl](custom) // obtain given instances for product fields
 
+    inline val isSingleton = inline m match
+      case _: Mirror.Singleton | _: Mirror.SingletonProxy => true
+      case _ => false
+
     inline val name = constValue[m.MirroredLabel]
     Make[T]((x: T) =>
       inline m match
         case s: Mirror.SumOf[T] => toScalaOfSum[T](elemInstances, name, s.ordinal(x), x)
-        case p: Mirror.Singleton => toScalaOfProduct[T](elemInstances, name, true, x)
-        case p: Mirror.ProductOf[T] => toScalaOfProduct[T](elemInstances, name, false, x)
+        case p: Mirror.ProductOf[T] => toScalaOfProduct[T](elemInstances, name, isSingleton, x)
     )
   }
 
