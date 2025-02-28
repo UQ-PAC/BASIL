@@ -217,3 +217,4 @@ def visit_prog(v: CILVisitor, b: Program): Program = CILVisitorImpl(v).visit_pro
 def visit_stmt(v: CILVisitor, e: Statement): List[Statement] = CILVisitorImpl(v).visit_stmt(e)
 def visit_jump(v: CILVisitor, e: Jump): Jump = CILVisitorImpl(v).visit_jump(e)
 def visit_expr(v: CILVisitor, e: Expr): Expr = CILVisitorImpl(v).visit_expr(e)
+def visit_rvar(v: CILVisitor, e: Variable): Variable = CILVisitorImpl(v).visit_rvar(e)
