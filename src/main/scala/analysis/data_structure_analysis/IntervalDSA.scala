@@ -287,20 +287,27 @@ class IntervalGraph(
 
   var last: Option[(IntervalCell, IntervalCell)] = None
   var secondLast: Option[(IntervalCell, IntervalCell)] = None
+
+  /**
+   * Clones a graph
+   * all middle nodes in the union-find are lost
+   * @return cloned graph
+   */
   override def clone: IntervalGraph = {
     val oldToNew: mutable.Map[IntervalNode, IntervalNode] = mutable.Map()
     val copy = IntervalGraph(proc, phase, irContext, sva, constraints, Some(() => Map[SymBase, IntervalNode]()))
-    val queue = mutable.Queue[IntervalNode]()
     this.nodes.foreach { // in addition to current nodes
       case (base, node) => // clone old nodes in base to node map to carry offset info
         val (current, offset) = this.findNode(node)
-        queue.enqueue(current)
-        val oldCopy = node.clone(copy, false, oldToNew)
-        val curCopy = current.clone(copy, true, oldToNew)
-        queue.enqueue(current)
-        copy.unify(oldCopy, curCopy, offset)
+        if current != node then
+          val oldCopy = node.clone(copy, false, oldToNew)
+          val curCopy = current.clone(copy, true, oldToNew)
+          copy.unify(oldCopy, curCopy, offset)
+        else
+          current.clone(copy, true, oldToNew)
     }
 
+      s"size of this's solver ${this.solver.size}")
     copy.nodes = this.nodes.view.mapValues(oldToNew.apply).toMap
     assert(copy.nodes.keys == this.nodes.keys)
     copy.localCorrectness()
@@ -710,26 +717,28 @@ class IntervalNode(
       val queue = mutable.Queue[IntervalNode](node)
       while queue.nonEmpty do
         val old = queue.dequeue()
+        assert(old.isUptoDate)
         assert(oldToNew.contains(old))
         old.cells.foreach {
           case cell: IntervalCell if cell.hasPointee =>
             val (newNode, off) = newGraph.findNode(oldToNew(old))
+            assert(newNode.isCollapsed || newNode.cells.exists(c => c.interval.contains(cell.interval.move(i => i + off))), s"expected cloned cell to include same intervals")
+            assert(newGraph.find(newNode) == newNode)
             val pointee = cell.getPointee
-            assert(pointee == graph.find(cell).getPointee)
-            val pointeeNode = pointee.node
-            assert(pointeeNode.isUptoDate)
-            if !oldToNew.contains(pointeeNode) then queue.enqueue(pointeeNode)
-            val (clonedNode, clonedOff) =
-              if !oldToNew.contains(pointeeNode) then newGraph.findNode(pointeeNode.clone(newGraph, false, oldToNew))
-              else newGraph.findNode(oldToNew(pointeeNode))
+            assert(pointee.node.isUptoDate, s"expected updated pointee")
+            if !oldToNew.contains(pointee.node) then queue.enqueue(pointee.node)
+            val (clonedPointee, pointeeOff) =
+              if !oldToNew.contains(pointee.node) then
+                (pointee.node.clone(newGraph, false, oldToNew), 0)
+              else newGraph.findNode(oldToNew(pointee.node))
 
-            val pointer = newGraph.find(newNode.get(cell.interval.move(i => i + off)))
-            assert(pointer == newGraph.find(pointer), s"expected $pointer but got ${newGraph.find(pointer)}")
-            pointer.setPointee(clonedNode.get(pointee.interval.move(i => i + clonedOff)))
-            assert(
-              newNode.get(cell.interval.move(i => i + off)).getPointee == newGraph
-                .find(clonedNode.get(pointee.interval.move(i => i + clonedOff)))
-            )
+            assert(newGraph.find(clonedPointee) == clonedPointee, s"expected cloned pointee to remain uptodate")
+            val newPointee = clonedPointee.add(pointee.interval.move(i => i + pointeeOff))
+            assert(pointee.interval.move(i => i + pointeeOff) == newPointee.interval || newPointee.node.isCollapsed, s"pointee interval: ${pointee.interval}, moved by $pointeeOff, cloned Pointee interval: ${newPointee.interval}")
+            val pointer = newNode.get(cell.interval.move(i => i + off))
+            assert(pointer.node.isCollapsed || pointer.interval.contains(cell.interval.move(i => i + off)))
+            assert(!pointer.hasPointee || pointer.getPointee == newPointee)
+            if !pointer.hasPointee then pointer.setPointee(newPointee)
           case _ =>
         }
 
