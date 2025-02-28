@@ -33,7 +33,7 @@ case class Interval(start: Int, end: Int) {
   require(start < end)
 
   override def toString: String = s"$start-${end - 1}"
-  def size: Int = end - start
+  def size: Int = end - 1 - start
   def move(func: Int => Int): Interval = Interval(func(start), func(end))
   def isEmpty: Boolean = this.size == 0
   def growTo(size: Int): Interval = Interval(start, math.max(end, start + size))
