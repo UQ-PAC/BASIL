@@ -307,6 +307,7 @@ class IntervalGraph(
           current.clone(copy, true, oldToNew)
     }
 
+    assert(copy.solver.size <= this.solver.size, s"size of copy's solver ${copy.solver.size}," +
       s"size of this's solver ${this.solver.size}")
     copy.nodes = this.nodes.view.mapValues(oldToNew.apply).toMap
     assert(copy.nodes.keys == this.nodes.keys)
@@ -980,7 +981,7 @@ object IntervalDSA {
     val graph = IntervalGraph(proc, Local, context, symValues, cons, None)
     graph.localPhase()
     graph.localCorrectness()
-    graph
+    graph.clone
   }
 
   def getLocals(
@@ -1019,7 +1020,7 @@ object IntervalDSA {
         DSALogger.info(s"performing BU for ${proc.name}")
         bus(proc).contextTransfer(BU, bus)
         visited += proc
-    bus
+    bus.view.mapValues(_.clone).toMap
   }
 
   def getTDs(bus: Map[Procedure, IntervalGraph]): Map[Procedure, IntervalGraph] = {
@@ -1043,6 +1044,6 @@ object IntervalDSA {
         tds(proc).contextTransfer(TD, tds)
         visited += proc
 
-    tds
+    tds.view.mapValues(_.clone).toMap
   }
 }
