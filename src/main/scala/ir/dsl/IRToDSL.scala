@@ -24,9 +24,9 @@ object IRToDSL {
     case GoTo(targs, label) => EventuallyGoto(targs.map(t => DelayNameResolve(t.label)).toList, label)
   }
 
-  def convertNonControlStatement(x: NonCallStatement): EventuallyStatement = clonedStmt(x)
+  def convertNonCallStatement(x: NonCallStatement): EventuallyStatement = clonedStmt(x)
 
-  def convertControlStatement(x: CallStatement): EventuallyStatement = x match {
+  def convertCallStatement(x: Call): EventuallyStatement = x match {
     case DirectCall(targ, outs, actuals, label) =>
       // XXX: be aware of ordering, .map() on a SortedMap may return a HashMap.
       directCall(outs.toArray.map(keyToString), targ.name, actuals.toArray.map(keyToString): _*)
@@ -34,8 +34,8 @@ object IRToDSL {
   }
 
   def convertStatement(x: Statement) = x match {
-    case x: NonCallStatement => convertNonControlStatement(x)
-    case x: CallStatement => convertControlStatement(x)
+    case x: NonCallStatement => convertNonCallStatement(x)
+    case x: Call => convertCallStatement(x)
   }
 
   def convertBlock(x: Block) =

@@ -51,11 +51,15 @@ import scala.collection.immutable.*
  * and build the Basil IR with the correct links.
  */
 
-// TODO: naming?
+/**
+ *  Type of `Statement`s which are *not* `Call`s.
+ *
+ *  Basically, this is needed to express `Statement & ~Call` which
+ *  cannot be expressed through Scala's subtyping hierarchy.
+ *  Together, NonCallStatement and Call should partition Statement.
+ */
 type NonCallStatement =
   LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume
-
-type CallStatement = DirectCall | IndirectCall
 
 def cloneStatement(x: NonCallStatement): NonCallStatement = x match {
   case LocalAssign(a, b, c) => LocalAssign(a, b, c)
