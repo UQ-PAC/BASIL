@@ -85,11 +85,16 @@ given [T](using ToScala[T]): ToScalaLines[Seq[T]] with
     def toScalaLines =
       indentNested("Seq(", x.map(_.toScala).map(LazyList(_)), ")")
 
-given [T](using ToScala[T]): ToScalaString[Option[T]] with
-  extension (x: Option[T])
+given [T](using ToScala[T]): ToScalaString[Some[T]] with
+  extension (x: Some[T])
     def toScala: String = x match
-      case None => "None"
       case Some(x) => s"Some(${x.toScala})"
+
+given ToScalaString[None.type] with
+  extension (x: None.type)
+    def toScala: String = "None"
+
+given [T](using ToScala[T]) : ToScala[Option[T]] = ToScala.derived
 
 given [K, V](using ToScala[K])(using ToScala[V]): ToScalaString[(K, V)] with
   extension (x: (K, V))
