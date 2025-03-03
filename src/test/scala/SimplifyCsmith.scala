@@ -109,13 +109,13 @@ class SimplifyCsmith extends AnyFunSuite {
     val icrc = breakResultInitial.headOption
       .flatMap(_._3.headOption)
       .map(_._3 match {
-        case b: BitVecLiteral => "checksum = %X".format(b.value.doubleValue)
+        case b: BitVecLiteral => "checksum = %X".format(b.value)
         case _                => ???
       })
     val simpcrc = breakResultSimplified.headOption
       .flatMap(_._3.headOption)
       .map(_._3 match {
-        case b: BitVecLiteral => "checksum = %X".format(b.value.doubleValue)
+        case b: BitVecLiteral => "checksum = %X".format(b.value)
         case _                => ???
       })
 
@@ -130,6 +130,7 @@ class SimplifyCsmith extends AnyFunSuite {
   }
 
   def testProgram(testName: String, examplePath: String, suffix: String = ".adt") = {
+    println(testName)
     val loading = ILLoadingConfig(
       inputFile = examplePath + testName + suffix,
       relfFile = examplePath + testName + ".relf",
