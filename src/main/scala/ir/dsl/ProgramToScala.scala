@@ -46,6 +46,16 @@ def procedureToScalaWith(blockToScala: Block => Twine)(x: Procedure): Twine =
 
   indentNested(s"proc(${x.name.toScala}", params #::: x.blocks.to(LazyList).map(blockToScala), ")", headSep = true)
 
+def programToScalaWith(procedureToScala: Procedure => Twine)(x: Program): Twine =
+  val main = x.mainProcedure
+  val others = x.procedures.to(LazyList).filter(_ ne main)
+  val mem = if (false) then {
+    Some(indentNested("Seq(",  x.initialMemory.values.map(_.toScalaLines), ")"))
+  } else {
+    None
+  }
+  indentNested("prog(", mem ++: (main #:: others).map(procedureToScala), ")")
+
 given ToScalaLines[MemorySection] with
   extension (x: MemorySection)
     def toScalaLines: Twine =
@@ -69,15 +79,6 @@ given ToScalaLines[MemorySection] with
         ")"
       )
 
-def programToScalaWith(procedureToScala: Procedure => Twine)(x: Program): Twine =
-  val main = x.mainProcedure
-  val others = x.procedures.to(LazyList).filter(_ ne main)
-  val mem = if (x.initialMemory.nonEmpty) {
-    Some(indentNested("Seq(",  x.initialMemory.values.map(_.toScalaLines), ")"))
-  } else {
-    None
-  }
-  indentNested("prog(", mem ++: (main #:: others).map(procedureToScala), ")")
 
 /**
  * ToScala instances
