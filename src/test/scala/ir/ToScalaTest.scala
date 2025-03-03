@@ -10,7 +10,7 @@ import ir.dsl.*
 import ir.dsl.{given}
 import ir.*
 
-import scala.runtime.stdLibPatches.Predef.assert
+import org.scalactic.source.Position
 
 class ToScalaTest extends AnyFunSuite with TimeLimitedTests with BeforeAndAfterEachTestData {
 
@@ -122,7 +122,8 @@ prog(
    */
   def cleanOutput(s: String): String = s.trim.split("\n", -1).map(_.stripTrailing()).mkString("\n")
 
-  def checkOutput(expected: String, actual: String) = {
+  // `inline` allows the assertResult to report line numbers of the call site
+  inline def checkOutput(expected: String, actual: String) = {
     if (cleanOutput(expected) != cleanOutput(actual)) {
       val name = currentTestCaseName.get()
       println(s"output for \"$name\" differs from expected. new output:")
@@ -474,7 +475,7 @@ prog(
 )
 """
 
-    checkOutput(expected, program.toScala)
+    checkOutput(expected, new ToScalaWithInitialMemory {}.programToScala(program).mkString(""))
   }
 
 }

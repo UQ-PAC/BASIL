@@ -24,6 +24,10 @@ import collection.mutable.{LinkedHashSet}
  *
  */
 
+// FIXME: introduce and justify use of traits as mixins
+
+// FIXME: doc comment is outdated
+
 trait BasilIRToScala {
 
   def commandListToScala(x: Iterable[Command]): Iterable[Twine] = {
@@ -51,18 +55,12 @@ trait BasilIRToScala {
     indentNested(s"proc(${x.name.toScala}", params #::: x.blocks.to(LazyList).map(blockToScala), ")", headSep = true)
   }
 
-  def initialMemoryToScala(x: Program): Twine = {
-    LazyList()
-  }
+  def initialMemoryToScala(x: Program): Option[Twine] = None
 
   def programToScala(x: Program): Twine = {
     val main = x.mainProcedure
     val others = x.procedures.to(LazyList).filter(_ ne main)
-    val mem = if (false) then {
-      Some(indentNested("Seq(",  x.initialMemory.values.map(_.toScalaLines), ")"))
-    } else {
-      None
-    }
+    val mem = initialMemoryToScala(x)
     indentNested("prog(", mem ++: (main #:: others).map(procedureToScala), ")")
   }
 }
@@ -141,11 +139,15 @@ given ToScalaLines[Program] with
  */
 object ToScalaWithSplitting {
 
+  // NOTE: a new instance must be created for every use of toScalaLines, since
+  // the class has mutable state.
+  private def instance = new ToScalaWithSplitting {}
+
   given ToScalaLines[Program] with
-    extension (x: Program) def toScalaLines = new ToScalaWithSplitting {}.programToScalaWithDecls(x)
+    extension (x: Program) def toScalaLines = instance.programToScalaWithDecls(x)
 
   given ToScalaLines[Procedure] with
-    extension (x: Procedure) def toScalaLines = new ToScalaWithSplitting {}.procedureToScalaWithDecls(x)
+    extension (x: Procedure) def toScalaLines = instance.procedureToScalaWithDecls(x)
 
 }
 
@@ -243,6 +245,12 @@ trait ToScalaWithSplitting extends BasilIRToScala {
   def declsToScala(decls: Map[String, Twine]): Iterable[Twine] =
     decls.map((k, v) => s"def $k = " +: v)
 
+
+  // NOTE: the following two methods *do not* override the BasilIRToScala methods,
+  // because we want to allow either a procedure or program to be a top-level
+  // structure. if procedureToScala was overriden, that overriden version would
+  // be used by programToScala.
+
   def procedureToScalaWithDecls(x: Procedure): Twine =
     toScalaAndDeclsWith(procedureToScala)(x.name, x)
 
@@ -250,8 +258,10 @@ trait ToScalaWithSplitting extends BasilIRToScala {
     toScalaAndDeclsWith(programToScala)("program", x)
 }
 
+// FIXME: add doc comment for initial memory
 
 trait ToScalaWithInitialMemory extends BasilIRToScala {
-
+  override def initialMemoryToScala(x: Program) =
+    Some(indentNested("Seq(",  x.initialMemory.values.map(_.toScalaLines), ")"))
 }
 
