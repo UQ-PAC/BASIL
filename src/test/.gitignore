@@ -3,3 +3,4 @@
 *.md
 *.md.part
 *.svg
+analysis-regression/loopy_*

@@ -9,9 +9,9 @@ NAME=$(notdir $(shell pwd))
 GIT_ROOT?=$(realpath ../../../../)
 
 #CFLAGS=-fno-pic -fno-plt
-TARGET=aarch64-linux-gnu
+TARGET ?= -target aarch64-linux-gnu
 GCC ?= aarch64-linux-gnu-gcc
-CLANG ?= clang-15 -target $(TARGET)
+CLANG ?= clang $(TARGET)
 CC ?= $(GCC)
 
 BAP?=bap

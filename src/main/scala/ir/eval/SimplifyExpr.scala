@@ -248,17 +248,34 @@ object SimplifyValidation {
   var validate: Boolean = false
   var debugTrace = mutable.ArrayBuffer[(Expr, Expr, sourcecode.Line, sourcecode.FileName, sourcecode.Name)]()
 
+  def clearLog() = {
+    traceLog.clear()
+    debugTrace.clear()
+  }
+
+
+  def makeEQ(a: Expr, b: Expr) = {
+    require(a.getType == b.getType)
+    a.getType match {
+      case BitVecType(sz) => BinaryExpr(BVEQ, a, b)
+      case IntType        => BinaryExpr(IntEQ, a, b)
+      case BoolType       => BinaryExpr(BoolEQ, a, b)
+      case m: MapType     => ???
+    }
+  }
+
+  def getSatQueries() : List[util.z3.SatTest] = {
+    var ind = 0
+
+    traceLog.toList.map((o, n, sname) => {
+      ind += 1
+      val equal = UnaryExpr(BoolNOT, makeEQ(o, n))
+      util.z3.SatTest(equal, Some(s"simp.$ind$sname"))
+    })
+  }
+
   def makeValidation(writer: BufferedWriter) = {
 
-    def makeEQ(a: Expr, b: Expr) = {
-      require(a.getType == b.getType)
-      a.getType match {
-        case BitVecType(sz) => BinaryExpr(BVEQ, a, b)
-        case IntType        => BinaryExpr(IntEQ, a, b)
-        case BoolType       => BinaryExpr(BoolEQ, a, b)
-        case m: MapType     => ???
-      }
-    }
 
     var ind = 0
 
