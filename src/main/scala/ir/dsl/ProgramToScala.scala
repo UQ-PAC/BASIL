@@ -24,8 +24,6 @@ import collection.mutable.{LinkedHashSet}
  *
  */
 
-object BasilIRToScala extends BasilIRToScala {}
-
 trait BasilIRToScala {
 
   def commandListToScala(x: Iterable[Command]): Iterable[Twine] = {
@@ -51,6 +49,10 @@ trait BasilIRToScala {
     }
 
     indentNested(s"proc(${x.name.toScala}", params #::: x.blocks.to(LazyList).map(blockToScala), ")", headSep = true)
+  }
+
+  def initialMemoryToScala(x: Program): Twine = {
+    LazyList()
   }
 
   def programToScala(x: Program): Twine = {
@@ -97,13 +99,13 @@ given ToScalaLines[MemorySection] with
  */
 
 given ToScalaLines[Block] with
-  extension (x: Block) def toScalaLines: Twine = BasilIRToScala.blockToScala(x)
+  extension (x: Block) def toScalaLines: Twine = new BasilIRToScala {}.blockToScala(x)
 
 given ToScalaLines[Procedure] with
-  extension (x: Procedure) def toScalaLines: Twine = BasilIRToScala.procedureToScala(x)
+  extension (x: Procedure) def toScalaLines: Twine = new BasilIRToScala {}.procedureToScala(x)
 
 given ToScalaLines[Program] with
-  extension (x: Program) def toScalaLines: Twine = BasilIRToScala.programToScala(x)
+  extension (x: Program) def toScalaLines: Twine = new BasilIRToScala {}.programToScala(x)
 
 /**
  * ToScala with splitting
@@ -246,5 +248,10 @@ trait ToScalaWithSplitting extends BasilIRToScala {
 
   def programToScalaWithDecls(x: Program): Twine =
     toScalaAndDeclsWith(programToScala)("program", x)
+}
+
+
+trait ToScalaWithInitialMemory extends BasilIRToScala {
+
 }
 
