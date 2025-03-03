@@ -2,7 +2,7 @@ package ir.dsl
 
 import ir.*
 import ir.dsl.{ToScala, ToScalaLines}
-import util.{Twine, indentNested}
+import util.{Twine, indentNested, intersperse}
 
 import collection.immutable.{ListMap, SortedMap}
 import collection.immutable.{LazyList}
@@ -24,32 +24,70 @@ import collection.mutable.{LinkedHashSet}
  *
  */
 
-def commandListToScala(x: Iterable[Command]): Iterable[Twine] =
-  x.map(_.toScalaLines).to(LazyList)
+// FIXME: introduce and justify use of traits as mixins
 
-def blockToScalaWith(commandListToScala: Iterable[Command] => Iterable[Twine])(x: Block): Twine =
-  // XXX: using a Seq here allows the size to be known, avoiding excessive splitting.
-  val commands = x.statements ++ Seq(x.jump)
-  indentNested(s"block(${x.label.toScala}", commandListToScala(commands), ")", headSep = true)
+// FIXME: doc comment is outdated
 
-def procedureToScalaWith(blockToScala: Block => Twine)(x: Procedure): Twine =
-  def extractParam(x: LocalVar) = x match
-    case LocalVar(nm, ty, _) => (x.name, ty)
-  def formalParamsToScala(x: mutable.SortedSet[LocalVar]) =
-    x.iterator.map(extractParam).toSeq.toScalaLines
+trait BasilIRToScala {
 
-  val params = if (x.formalInParam.isEmpty && x.formalOutParam.isEmpty) {
-    LazyList.empty
-  } else {
-    LazyList(formalParamsToScala(x.formalInParam), formalParamsToScala(x.formalOutParam))
+  def commandListToScala(x: Iterable[Command]): Iterable[Twine] = {
+    x.map(_.toScalaLines).to(LazyList)
   }
 
-  indentNested(s"proc(${x.name.toScala}", params #::: x.blocks.to(LazyList).map(blockToScala), ")", headSep = true)
+  def blockToScala(x: Block): Twine = {
+    // XXX: using a Seq here allows the size to be known, avoiding excessive splitting.
+    val commands = x.statements ++ Seq(x.jump)
+    indentNested(s"block(${x.label.toScala}", commandListToScala(commands), ")", headSep = true)
+  }
 
-def programToScalaWith(procedureToScala: Procedure => Twine)(x: Program): Twine =
-  val main = x.mainProcedure
-  val others = x.procedures.to(LazyList).filter(_ ne main)
-  indentNested("prog(", (main #:: others).map(procedureToScala), ")")
+  def procedureToScala(x: Procedure): Twine = {
+
+    def extractParam(x: LocalVar) = x match { case LocalVar(nm, ty, _) => (x.name, ty) }
+    def formalParamsToScala(x: mutable.SortedSet[LocalVar]) =
+      x.iterator.map(extractParam).toSeq.toScalaLines
+
+    val params = if (x.formalInParam.isEmpty && x.formalOutParam.isEmpty) {
+      LazyList.empty
+    } else {
+      LazyList(formalParamsToScala(x.formalInParam), formalParamsToScala(x.formalOutParam))
+    }
+
+    indentNested(s"proc(${x.name.toScala}", params #::: x.blocks.to(LazyList).map(blockToScala), ")", headSep = true)
+  }
+
+  def initialMemoryToScala(x: Program): Option[Twine] = None
+
+  def programToScala(x: Program): Twine = {
+    val main = x.mainProcedure
+    val others = x.procedures.to(LazyList).filter(_ ne main)
+    val mem = initialMemoryToScala(x)
+    indentNested("prog(", mem ++: (main #:: others).map(procedureToScala), ")")
+  }
+}
+
+given ToScalaLines[MemorySection] with
+  extension (x: MemorySection)
+    def toScalaLines: Twine =
+      val byteLines: Seq[Twine] =
+        x.bytes
+          .map(x => f"${x.value}%#04x")
+          .grouped(32)
+          .map(x => LazyList(x.mkString(",")))
+          .toSeq
+
+      val byteTwine = indentNested("Seq(", byteLines, ").map(BitVecLiteral(_, 8)).toSeq")
+
+      // in the second argument of indentNested, list elements will be separated by newlines.
+      indentNested(
+        "MemorySection(",
+        LazyList(x.name.toScala, ", ", x.address.toScala, ", ", x.size.toScala)
+        #:: byteTwine
+        #:: ("readOnly = " #:: x.readOnly.toScalaLines)
+        #:: ("region = " #:: None.toScalaLines) // TODO: ToScala for region??
+        #:: LazyList(),
+        ")"
+      )
+
 
 /**
  * ToScala instances
@@ -59,13 +97,13 @@ def programToScalaWith(procedureToScala: Procedure => Twine)(x: Program): Twine 
  */
 
 given ToScalaLines[Block] with
-  extension (x: Block) def toScalaLines: Twine = blockToScalaWith(commandListToScala)(x)
+  extension (x: Block) def toScalaLines: Twine = new BasilIRToScala {}.blockToScala(x)
 
 given ToScalaLines[Procedure] with
-  extension (x: Procedure) def toScalaLines: Twine = procedureToScalaWith(_.toScalaLines)(x)
+  extension (x: Procedure) def toScalaLines: Twine = new BasilIRToScala {}.procedureToScala(x)
 
 given ToScalaLines[Program] with
-  extension (x: Program) def toScalaLines: Twine = programToScalaWith(_.toScalaLines)(x)
+  extension (x: Program) def toScalaLines: Twine = new BasilIRToScala {}.programToScala(x)
 
 /**
  * ToScala with splitting
@@ -101,11 +139,15 @@ given ToScalaLines[Program] with
  */
 object ToScalaWithSplitting {
 
+  // NOTE: a new instance must be created for every use of toScalaLines, since
+  // the class has mutable state.
+  private def instance = new ToScalaWithSplitting {}
+
   given ToScalaLines[Program] with
-    extension (x: Program) def toScalaLines = ToScalaWithSplitting().toScalaLines(x)
+    extension (x: Program) def toScalaLines = instance.programToScalaWithDecls(x)
 
   given ToScalaLines[Procedure] with
-    extension (x: Procedure) def toScalaLines = ToScalaWithSplitting().toScalaLines(x)
+    extension (x: Procedure) def toScalaLines = instance.procedureToScalaWithDecls(x)
 
 }
 
@@ -113,7 +155,7 @@ object ToScalaWithSplitting {
  * Implementation of ToScalaWithSplitting. This is automatically instantiated
  * by the ToScalaWithSplitting given instances.
  */
-class ToScalaWithSplitting {
+trait ToScalaWithSplitting extends BasilIRToScala {
   private var _decls: Map[String, Twine] = ListMap()
   private var _chunkCount: Long = 0
 
@@ -148,15 +190,15 @@ class ToScalaWithSplitting {
    *
    *     f(1, 2, 3)
    */
-  protected def commandsSplitting(cmds: Iterable[Command]): Iterable[Twine] =
+  override def commandListToScala(cmds: Iterable[Command]): Iterable[Twine] =
     val size = cmds.knownSize
     if (size >= 0 && size < 10) {
-      commandListToScala(cmds)
+      super.commandListToScala(cmds)
     } else {
       val chunks = cmds.grouped(10).toList
       val chunkNames = chunks.map(chunk => {
         val name = nextChunk
-        addDecl(name, indentNested("Vector(", commandListToScala(chunk), ")"))
+        addDecl(name, indentNested("Vector(", super.commandListToScala(chunk), ")"))
         name
       })
       Iterable(indentNested("Vector(", chunkNames.map(LazyList(_)), ").flatten : _*"))
@@ -165,25 +207,25 @@ class ToScalaWithSplitting {
   /**
    * Extracts large blocks into a separate definition.
    */
-  protected def blockSplitting(x: Block): Twine =
+  override def blockToScala(x: Block): Twine =
     val size = x.statements.knownSize
     if (size >= 0 && size <= 1) {
-      blockToScalaWith(commandsSplitting)(x).force
+      super.blockToScala(x).force
     } else {
       val name = s"`block:${x.parent.name}.${x.label}`"
-      addDecl(name, blockToScalaWith(commandsSplitting)(x).force)
+      addDecl(name, super.blockToScala(x).force)
       LazyList(name)
     }
 
   /**
    * Extracts non-empty procedures into a separate definition.
    */
-  protected def procedureSplitting(x: Procedure): Twine =
+  override def procedureToScala(x: Procedure): Twine =
     if (x.blocks.isEmpty) {
-      procedureToScalaWith(blockSplitting)(x).force
+      super.procedureToScala(x).force
     } else {
       val name = s"`procedure:${x.name}`"
-      addDecl(name, procedureToScalaWith(blockSplitting)(x).force)
+      addDecl(name, super.procedureToScala(x).force)
       LazyList(name)
     }
 
@@ -203,11 +245,23 @@ class ToScalaWithSplitting {
   def declsToScala(decls: Map[String, Twine]): Iterable[Twine] =
     decls.map((k, v) => s"def $k = " +: v)
 
-  protected def programSplitting = programToScalaWith(procedureSplitting)
 
-  def toScalaLines(x: Procedure): Twine =
-    toScalaAndDeclsWith(procedureSplitting)(x.name, x)
+  // NOTE: the following two methods *do not* override the BasilIRToScala methods,
+  // because we want to allow either a procedure or program to be a top-level
+  // structure. if procedureToScala was overriden, that overriden version would
+  // be used by programToScala.
 
-  def toScalaLines(x: Program): Twine =
-    toScalaAndDeclsWith(programSplitting)("program", x)
+  def procedureToScalaWithDecls(x: Procedure): Twine =
+    toScalaAndDeclsWith(procedureToScala)(x.name, x)
+
+  def programToScalaWithDecls(x: Program): Twine =
+    toScalaAndDeclsWith(programToScala)("program", x)
 }
+
+// FIXME: add doc comment for initial memory
+
+trait ToScalaWithInitialMemory extends BasilIRToScala {
+  override def initialMemoryToScala(x: Program) =
+    Some(indentNested("Seq(",  x.initialMemory.values.map(_.toScalaLines), ")"))
+}
+
