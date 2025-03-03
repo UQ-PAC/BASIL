@@ -328,7 +328,7 @@ class SimplifySystemTests extends SystemTests {
 }
 
 class SimplifyMemorySystemTests extends SystemTests {
-  Logger.setLevel(LogLevel.DEBUG)
+  // Logger.setLevel(LogLevel.DEBUG)
   val staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA))
   runTests(
     "correct",
