@@ -169,3 +169,5 @@ jobs:
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly AnalysisSystemTestsGTIRB
         if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly SimplifySystemTests
+        if: ${{ ! cancelled() }}
