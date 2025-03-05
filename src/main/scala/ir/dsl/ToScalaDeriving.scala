@@ -30,9 +30,9 @@ import scala.compiletime.{summonInline, erasedValue, constValue, error}
 
 /**
  * NOTE: The version of Scala we use is the 3.3.x LTS and it predates a syntax change
- * for given declarations. Namely, in 3.6, the `given` syntax was changed to use `=`
+ * for given declarations. In 3.6, the `given` syntax was changed to use `=`
  * instead of `with`. We must use the `with` syntax, otherwise a syntax error will be
- * reported.
+ * reported. Be aware that online documentation might use the newer syntax.
  *
  * See: https://docs.scala-lang.org/scala3/reference/contextual/previous-givens.html
  */

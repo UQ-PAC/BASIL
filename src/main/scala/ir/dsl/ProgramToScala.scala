@@ -194,15 +194,14 @@ given ToScalaLines[Program] with
  */
 object ToScalaWithSplitting {
 
-  // NOTE: a new instance must be created for every use of toScalaLines, since
-  // the class has mutable state.
-  private def instance = new ToScalaWithSplitting {}
+  // note: a new ToScalaWithSplitting instance must be created for every use of
+  // toScalaLines, since the class has mutable state.
 
   given ToScalaLines[Program] with
-    extension (x: Program) def toScalaLines = instance.programToScalaWithDecls(x)
+    extension (x: Program) def toScalaLines = new ToScalaWithSplitting {}.programToScalaWithDecls(x)
 
   given ToScalaLines[Procedure] with
-    extension (x: Procedure) def toScalaLines = instance.procedureToScalaWithDecls(x)
+    extension (x: Procedure) def toScalaLines = new ToScalaWithSplitting {}.procedureToScalaWithDecls(x)
 
 }
 
@@ -348,11 +347,12 @@ given ToScalaLines[MemorySection] with
       // in the second argument of indentNested, list elements will be separated by newlines.
       indentNested(
         "MemorySection(",
-        LazyList(x.name.toScala, ", ", x.address.toScala, ", ", x.size.toScala)
-        #:: byteTwine
-        #:: ("readOnly = " #:: x.readOnly.toScalaLines)
-        #:: ("region = " #:: None.toScalaLines) // TODO: ToScala for region??
-        #:: LazyList(),
+        List(
+          LazyList(x.name.toScala, ", ", x.address.toScala, ", ", x.size.toScala),
+          byteTwine,
+          "readOnly = " #:: x.readOnly.toScalaLines,
+          "region = " #:: None.toScalaLines
+        ),
         ")"
       )
 
