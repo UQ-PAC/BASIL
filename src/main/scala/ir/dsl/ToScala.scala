@@ -91,10 +91,9 @@ given [T](using ToScala[T]): ToScalaString[Some[T]] with
       case Some(x) => s"Some(${x.toScala})"
 
 given ToScalaString[None.type] with
-  extension (x: None.type)
-    def toScala: String = "None"
+  extension (x: None.type) def toScala: String = "None"
 
-given [T](using ToScala[T]) : ToScala[Option[T]] = ToScala.derived
+given [T](using ToScala[T]): ToScala[Option[T]] = ToScala.derived
 
 given [K, V](using ToScala[K])(using ToScala[V]): ToScalaString[(K, V)] with
   extension (x: (K, V))

@@ -100,7 +100,6 @@ import collection.mutable.{LinkedHashSet}
  *
  */
 
-
 /**
  * Base trait defining default implementations of toScala methods for the main
  * Basil IR structures. This should be inherited from to customise the behaviour.
@@ -141,7 +140,6 @@ trait BasilIRToScala {
     indentNested("prog(", mem ++: (main #:: others).map(procedureToScala), ")")
   }
 }
-
 
 /**
  * ToScala instances
@@ -299,7 +297,6 @@ trait ToScalaWithSplitting extends BasilIRToScala {
   def declsToScala(decls: Map[String, Twine]): Iterable[Twine] =
     decls.map((k, v) => s"def $k = " +: v)
 
-
   // NOTE: the following two methods *do not* override the BasilIRToScala methods,
   // because we want to allow either a procedure or program to be the entry point
   // for toScala. the declarations list should only be emitted at the entry point.
@@ -312,7 +309,6 @@ trait ToScalaWithSplitting extends BasilIRToScala {
   def programToScalaWithDecls(x: Program): Twine =
     toScalaAndDeclsWith(programToScala)("program", x)
 }
-
 
 /**
  * Alternative implementation of ToScala[Program] which additionally
@@ -329,7 +325,7 @@ object ToScalaWithInitialMemory {
  */
 trait ToScalaWithInitialMemory extends BasilIRToScala {
   override def initialMemoryToScala(x: Program) =
-    Some(indentNested("Seq(",  x.initialMemory.values.map(_.toScalaLines), ")"))
+    Some(indentNested("Seq(", x.initialMemory.values.map(_.toScalaLines), ")"))
 }
 
 given ToScalaLines[MemorySection] with
@@ -355,4 +351,3 @@ given ToScalaLines[MemorySection] with
         ),
         ")"
       )
-
