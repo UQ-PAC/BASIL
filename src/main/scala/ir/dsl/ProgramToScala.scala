@@ -12,22 +12,99 @@ import collection.mutable.{LinkedHashSet}
 /**
  * ToScala instances for Program, Procedure, and Block
  * ===================================================
+ * This file defines ToScala instances for these members of the Basil IR
+ * hierarchy. This is implemented so that there are options to customise
+ * the output (e.g., by splitting up large expressions or by
+ * including/excluding initial program memory). A sensible default
+ * implementation is provided as the ToScala given instance, with other
+ * implementations available using the mechanisms in this file (see below).
+ *
+ * Example usage:
+ *
+ *     // Import default ToScala instances.
+ *     import ir.dsl.given
+ *
+ *     println(program.toScala)
+ *
+ * Usage of customised instances:
+ *
+ *     // Import customised instances from companion objects.
+ *     // This can be placed within class or method bodies.
+ *
+ *     import ir.dsl.ToScalaWithInitialMemory.given
+ *     // or...
+ *     import ir.dsl.ToScalaWithSplitting.given
+ *
+ *     println(program.toScala)
+ *
  */
 
 /**
- * Base functions
- * --------------
+ * Customisation of ToScala behaviour
+ * ==================================
+ * For some Basil IR structures, it is desirable to allow some customisation
+ * of how they are converted to Scala strings. Customisation should be possible
+ * at each level of the program-procedure-block hierarchy.
  *
- * These helper functions are used to implement for the command, block, procedure, program hierarchy.
- * Functions ending in `...With` require an argument implementing the ToScala of the
- * next type in this hierarchy.
+ * This documentation section will discuss the goals of the customisation
+ * design, its implementation, and its limitations.
+ *
+ * Background & Goals
+ * ------------------
+ * When designing this customisation mechanism, we have the following
+ * requirements:
+ *
+ * - customisation of an inner level (e.g., blocks) should be automatically
+ *   inherited by the outer levels (e.g., procedures),
+ *
+ * - when defining a customised version of a function, one should be able
+ *   to invoke the original version of that function if desired, and
+ *
+ * - customisations should be modular and composable.
+ *
+ * An aside about typeclasses
+ * --------------------------
+ * We note that customisation is usually incompatible with typeclasses, as
+ * typeclasses have the limitation that there can only be one instance for
+ * each type.
+ *
+ * As such, the customisation sits alongside but does not replace typeclasses.
+ * We define typeclasses to invoke a particular sensible default version of the
+ * function, and we leave it up to the user to manually invoke custom versions
+ * if needed.
+ *
+ * Implementation with mixins
+ * --------------------------
+ * We find that using Scala traits as *mixins* satisfies the requirements.
+ * A base BasilIRToScala trait defines the default implementation of
+ * toScala for comand lists, blocks, procedures, and programs. Customisation
+ * is achieved by inheriting from this trait and overriding methods as needed.
+ * The original method can be accessed as usual with `super`. Dynamic dispatch
+ * allows the overriden methods to be called by non-overriden methods in the
+ * base class. Each trait should define a particular customisation, and
+ * composition of customisations is achieved by multiple inheritance.
+ *
+ * Usage example:
+ *
+ *     // Create a new BasilIRToScala with the given mixin(s)
+ *     val toscala = new BasilIRToScala with A with B with C {}
+ *
+ *     println(toscala.programToScala(program))
+ *
+ * Limitations
+ * -----------
+ * The main limitation of this approach is that customisation is only possible
+ * at pre-defined points. That is, all functions which might be overriden must
+ * be defined in the base trait. Also, in some cases, composition of customisations
+ * might be sensitive to order.
  *
  */
 
-// FIXME: introduce and justify use of traits as mixins
 
-// FIXME: doc comment is outdated
-
+/**
+ * Base trait defining default implementations of toScala methods for the main
+ * Basil IR structures. This should be inherited from to customise the behaviour.
+ */
 trait BasilIRToScala {
 
   def commandListToScala(x: Iterable[Command]): Iterable[Twine] = {
@@ -65,35 +142,13 @@ trait BasilIRToScala {
   }
 }
 
-given ToScalaLines[MemorySection] with
-  extension (x: MemorySection)
-    def toScalaLines: Twine =
-      val byteLines: Seq[Twine] =
-        x.bytes
-          .map(x => f"${x.value}%#04x")
-          .grouped(32)
-          .map(x => LazyList(x.mkString(",")))
-          .toSeq
-
-      val byteTwine = indentNested("Seq(", byteLines, ").map(BitVecLiteral(_, 8)).toSeq")
-
-      // in the second argument of indentNested, list elements will be separated by newlines.
-      indentNested(
-        "MemorySection(",
-        LazyList(x.name.toScala, ", ", x.address.toScala, ", ", x.size.toScala)
-        #:: byteTwine
-        #:: ("readOnly = " #:: x.readOnly.toScalaLines)
-        #:: ("region = " #:: None.toScalaLines) // TODO: ToScala for region??
-        #:: LazyList(),
-        ")"
-      )
-
 
 /**
  * ToScala instances
  * =================
  *
- * Provides ToScala instances for the block, procedure, and program types.
+ * Provides default ToScala instances for the block, procedure, and program
+ * types.
  */
 
 given ToScalaLines[Block] with
@@ -152,7 +207,7 @@ object ToScalaWithSplitting {
 }
 
 /**
- * Implementation of ToScalaWithSplitting. This is automatically instantiated
+ * Implementation of ToScalaWithSplitting mixin. This is automatically instantiated
  * by the ToScalaWithSplitting given instances.
  */
 trait ToScalaWithSplitting extends BasilIRToScala {
@@ -247,8 +302,9 @@ trait ToScalaWithSplitting extends BasilIRToScala {
 
 
   // NOTE: the following two methods *do not* override the BasilIRToScala methods,
-  // because we want to allow either a procedure or program to be a top-level
-  // structure. if procedureToScala was overriden, that overriden version would
+  // because we want to allow either a procedure or program to be the entry point
+  // for toScala. the declarations list should only be emitted at the entry point.
+  // if procedureToScala was overriden, that overriden version would
   // be used by programToScala.
 
   def procedureToScalaWithDecls(x: Procedure): Twine =
@@ -258,10 +314,45 @@ trait ToScalaWithSplitting extends BasilIRToScala {
     toScalaAndDeclsWith(programToScala)("program", x)
 }
 
-// FIXME: add doc comment for initial memory
 
+/**
+ * Alternative implementation of ToScala[Program] which additionally
+ * emits the initial memory within `prog()`.
+ */
+object ToScalaWithInitialMemory {
+  private lazy val instance = new ToScalaWithInitialMemory {}
+  given ToScalaLines[Program] with
+    extension (x: Program) def toScalaLines = instance.programToScala(x)
+}
+
+/**
+ * Implementation of ToScalaWithInitialMemory mixin.
+ */
 trait ToScalaWithInitialMemory extends BasilIRToScala {
   override def initialMemoryToScala(x: Program) =
     Some(indentNested("Seq(",  x.initialMemory.values.map(_.toScalaLines), ")"))
 }
+
+given ToScalaLines[MemorySection] with
+  extension (x: MemorySection)
+    def toScalaLines: Twine =
+      val byteLines: Seq[Twine] =
+        x.bytes
+          .map(x => f"${x.value}%#04x")
+          .grouped(32)
+          .map(x => LazyList(x.mkString(",")))
+          .toSeq
+
+      val byteTwine = indentNested("Seq(", byteLines, ").map(BitVecLiteral(_, 8)).toSeq")
+
+      // in the second argument of indentNested, list elements will be separated by newlines.
+      indentNested(
+        "MemorySection(",
+        LazyList(x.name.toScala, ", ", x.address.toScala, ", ", x.size.toScala)
+        #:: byteTwine
+        #:: ("readOnly = " #:: x.readOnly.toScalaLines)
+        #:: ("region = " #:: None.toScalaLines) // TODO: ToScala for region??
+        #:: LazyList(),
+        ")"
+      )
 
