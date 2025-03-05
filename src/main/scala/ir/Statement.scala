@@ -21,7 +21,6 @@ sealed trait Command extends HasParent[Block] {
     case Some(s) => s"$s: "
     case None => ""
   }
-
 }
 
 sealed trait Statement extends Command, IntrusiveListElement[Statement] {
@@ -51,8 +50,9 @@ class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[S
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitLocalAssign(this)
 }
 
-object LocalAssign:
+object LocalAssign {
   def unapply(l: LocalAssign): Some[(Variable, Expr, Option[String])] = Some(l.lhs, l.rhs, l.label)
+}
 
 class MemoryStore(
   var mem: Memory,
@@ -101,14 +101,23 @@ object NOP {
   def unapply(x: NOP) = Some(x.label)
 }
 
+class AtomicStart(override val label: Option[String] = None) extends NOP(label) {
+  override def toString: String = s"AtomicStart $labelStr"
+}
+
+class AtomicEnd(override val label: Option[String] = None) extends NOP(label) {
+  override def toString: String = s"AtomicEnd $labelStr"
+}
+
 class Assert(var body: Expr, var comment: Option[String] = None, override val label: Option[String] = None)
     extends Statement {
   override def toString: String = s"${labelStr}assert $body" + comment.map(" //" + _)
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssert(this)
 }
 
-object Assert:
+object Assert {
   def unapply(a: Assert): Some[(Expr, Option[String], Option[String])] = Some(a.body, a.comment, a.label)
+}
 
 /** Assumptions express control flow restrictions and other properties that can be assumed to be true.
   *
@@ -129,13 +138,13 @@ class Assume(
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssume(this)
 }
 
-object Assume:
+object Assume {
   def unapply(a: Assume): Some[(Expr, Option[String], Option[String], Boolean)] =
     Some(a.body, a.comment, a.label, a.checkSecurity)
+}
 
 sealed trait Jump extends Command {
   def modifies: Set[Global] = Set()
-  // def locals: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Jump = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
@@ -199,8 +208,9 @@ class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitGoTo(this)
 }
 
-object GoTo:
+object GoTo {
   def unapply(g: GoTo): Some[(Set[Block], Option[String])] = Some(g.targets, g.label)
+}
 
 sealed trait Call extends Statement {
   def returnTarget: Option[Command] = successor match {
@@ -222,10 +232,10 @@ class DirectCall(
   } */
   def calls: Set[Procedure] = Set(target)
   override def toString: String =
-    s"${labelStr}${outParams.map(_._2.name).mkString(",")} := DirectCall(${target.name})(${actualParams.map(_._2).mkString(",")})"
+    s"${labelStr}${outParams.values.map(_.name).mkString(",")} := DirectCall(${target.name})(${actualParams.values.mkString(",")})"
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitDirectCall(this)
 
-  def assignees = outParams.map(_._2).toSet
+  def assignees: Set[Variable] = outParams.values.toSet
 
   override def linkParent(p: Block): Unit = {
     super.linkParent(p)
@@ -239,9 +249,10 @@ class DirectCall(
 
 }
 
-object DirectCall:
+object DirectCall {
   def unapply(i: DirectCall): Some[(Procedure, Map[LocalVar, Variable], Map[LocalVar, Expr], Option[String])] =
     Some(i.target, i.outParams, i.actualParams, i.label)
+}
 
 class IndirectCall(var target: Variable, override val label: Option[String] = None) extends Call {
   /* override def locals: Set[Variable] = condition match {
@@ -252,5 +263,6 @@ class IndirectCall(var target: Variable, override val label: Option[String] = No
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitIndirectCall(this)
 }
 
-object IndirectCall:
+object IndirectCall {
   def unapply(i: IndirectCall): Some[(Variable, Option[String])] = Some(i.target, i.label)
+}

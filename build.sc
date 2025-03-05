@@ -12,8 +12,8 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
   // def scalacOptions: T[Seq[String]] = Seq("-Xprint:typer")
 
   val javaTests = ivy"com.novocode:junit-interface:0.11"
-  val scalaTests = ivy"org.scalatest::scalatest:3.2.10"
-  val scalactic = ivy"org.scalactic::scalactic:3.2.10"
+  val scalaTests = ivy"org.scalatest::scalatest:3.2.19"
+  val scalactic = ivy"org.scalactic::scalactic:3.2.19"
   val antlrRuntime = ivy"org.antlr:antlr4-runtime:4.9"
   val sourceCode = ivy"com.lihaoyi::sourcecode:0.3.0"
   val mainArgs = ivy"com.lihaoyi::mainargs:0.5.1"

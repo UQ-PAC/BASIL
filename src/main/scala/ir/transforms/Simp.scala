@@ -2,7 +2,7 @@ package ir.transforms
 import translating.serialiseIL
 import translating.PrettyPrinter.*
 
-import boogie.FuncEntry
+import specification.FuncEntry
 import util.SimplifyLogger
 import ir.eval.AlgebraicSimplifications
 import ir.eval.AssumeConditionSimplifications
@@ -476,8 +476,9 @@ def coalesceBlocks(p: Program): Boolean = {
       if (
         b.prevBlocks.size == 1 && b.prevBlocks.head.statements.nonEmpty && b.statements.nonEmpty
         && b.prevBlocks.head.nextBlocks.size == 1
-        && b.prevBlocks.head.statements.lastOption.map(s => !(s.isInstanceOf[Call])).getOrElse(true)
+        && b.prevBlocks.head.statements.lastOption.forall(s => !s.isInstanceOf[Call])
         && !(b.parent.entryBlock.contains(b) || b.parent.returnBlock.contains(b))
+        && b.atomicSection.isEmpty && b.prevBlocks.forall(_.atomicSection.isEmpty)
       ) {
         didAny = true
         // append topredecessor
@@ -489,8 +490,9 @@ def coalesceBlocks(p: Program): Boolean = {
       } else if (
         b.nextBlocks.size == 1 && b.nextBlocks.head.statements.nonEmpty && b.statements.nonEmpty
         && b.nextBlocks.head.prevBlocks.size == 1
-        && b.statements.lastOption.map(s => !(s.isInstanceOf[Call])).getOrElse(true)
+        && b.statements.lastOption.forall(s => !s.isInstanceOf[Call])
         && !(b.parent.entryBlock.contains(b) || b.parent.returnBlock.contains(b))
+        && b.atomicSection.isEmpty && b.nextBlocks.forall(_.atomicSection.isEmpty)
       ) {
         didAny = true
         // append to successor
@@ -638,7 +640,7 @@ def removeInvariantOutParameters(
               if (g.targets.size == 1 && g.targets.forall(_.label == label)) then g.targets.head
               else {
                 val b = Block(label)
-                g.parent.parent.addBlocks(b)
+                g.parent.parent.addBlock(b)
                 g.parent.replaceJump(GoTo(b))
                 b.replaceJump(GoTo(tgts))
               }
@@ -1087,7 +1089,9 @@ object CopyProp {
     val state = mutable.HashMap[Variable, PropState]()
     var poisoned = false // we have an indirect call
 
-    val doLoadReasoning = true
+    // This is obviously invalid to do flow-insensitively as we don't have
+    // a DSA form on memory imposing the order of loads/stores
+    val doLoadReasoning = false
 
     def transfer(c: mutable.HashMap[Variable, PropState], s: Statement): Unit = {
       // val callClobbers = ((0 to 7) ++ (19 to 30)).map("R" + _).map(c => Register(c, 64))

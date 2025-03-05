@@ -182,23 +182,21 @@ object IRLoading {
     }
 
     implicit object InsnSemanticsFormat extends JsonFormat[InsnSemantics] {
-      def write(m: InsnSemantics) = ???
-      def read(json: JsValue) = json match {
-        case JsObject(fields) => {
+      def write(m: InsnSemantics): JsValue = ???
+      def read(json: JsValue): InsnSemantics = json match {
+        case JsObject(fields) =>
           val m: Map[String, JsValue] = fields.get("decode_error") match {
             case Some(JsObject(m)) => m
             case _ => deserializationError(s"Bad sem format $json")
           }
           InsnSemantics.Error(m("opcode").convertTo[String], m("error").convertTo[String])
-        }
-        case array @ JsArray(_) => {
+        case array @ JsArray(_) =>
           val xs = array.convertTo[Array[String]].map(parse_asl_stmt)
           if (xs.exists(_.isEmpty)) {
             InsnSemantics.Error("?", "parseError")
           } else {
             InsnSemantics.Result(xs.map(_.get))
           }
-        }
         case s => deserializationError(s"Bad sem format $s")
       }
     }
@@ -206,6 +204,7 @@ object IRLoading {
     val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, List[InsnSemantics]]])
 
     val parserMap: Map[String, List[InsnSemantics]] = semantics.flatten.toMap
+
     val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress)
     GTIRBConverter.createIR()
   }
@@ -264,12 +263,10 @@ object IRTransform {
 
     transforms.applyRPO(ctx.program)
     val nonReturning = transforms.findDefinitelyExits(ctx.program)
-    ctx.program.mainProcedure.foreach(s =>
-      s match {
-        case d: DirectCall if nonReturning.nonreturning.contains(d.target) => d.parent.replaceJump(Return())
-        case _ => ()
-      }
-    )
+    ctx.program.mainProcedure.foreach {
+      case d: DirectCall if nonReturning.nonreturning.contains(d.target) => d.parent.replaceJump(Return())
+      case _ =>
+    }
 
     // FIXME: Main will often maintain the stack by loading R30 from the caller's stack frame
     //        before returning, which makes the R30 assertin faile. Hence we currently skip this
@@ -286,9 +283,7 @@ object IRTransform {
     val externalRemover = ExternalRemover(externalNamesLibRemoved.toSet)
     externalRemover.visitProgram(ctx.program)
     for (p <- ctx.program.procedures) {
-      p.isExternal = Some(
-        ctx.externalFunctions.find(e => e.name == p.procName || p.address.contains(e.offset)).isDefined
-      )
+      p.isExternal = Some(ctx.externalFunctions.exists(e => e.name == p.procName || p.address.contains(e.offset)))
     }
 
     assert(invariant.singleCallBlockEnd(ctx.program))
@@ -326,6 +321,20 @@ object IRTransform {
     renamer.visitProgram(ctx.program)
 
     assert(invariant.singleCallBlockEnd(ctx.program))
+
+    // check all blocks with an atomic section exist within the same procedure
+    val visited = mutable.Set[Block]()
+    for (p <- ctx.program.procedures) {
+      for (b <- p.blocks) {
+        if (!visited.contains(b)) {
+          if (b.atomicSection.isDefined) {
+            b.atomicSection.get.getBlocks.foreach { a => assert(a.parent == p) }
+            visited.addAll(b.atomicSection.get.getBlocks)
+          }
+          visited.addOne(b)
+        }
+      }
+    }
   }
 
   def generateProcedureSummaries(
@@ -672,8 +681,8 @@ object StaticAnalysis {
     }
     results.mkString(System.lineSeparator())
   }
-
 }
+
 object RunUtils {
 
   def run(q: BASILConfig): Unit = {
@@ -787,13 +796,6 @@ object RunUtils {
       ir.eval.SimplifyValidation.makeValidation(w)
       w.close()
     }
-    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
-      val dir = File("./graphs/")
-      if (!dir.exists()) then dir.mkdirs()
-      for (p <- ctx.program.procedures) {
-        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
-      }
-    }
 
     Logger.info("[!] Simplify :: finished")
   }
@@ -851,10 +853,17 @@ object RunUtils {
 
       doSimplify(ctx, conf.staticAnalysis)
     }
+    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
+      val dir = File("./graphs/")
+      if (!dir.exists()) then dir.mkdirs()
+      for (p <- ctx.program.procedures) {
+        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
+      }
+    }
 
     // SVA
     var dsaContext: Option[DSAContext] = None
-    if conf.dsaConfig.nonEmpty then
+    if (conf.dsaConfig.nonEmpty) {
       val config = conf.dsaConfig.get
 
       val main = ctx.program.mainProcedure
@@ -871,22 +880,23 @@ object RunUtils {
       DSALogger.info("Finished local phase")
 
       dsaContext = Some(DSAContext(sva, cons))
+    }
 
     if (q.runInterpret) {
       Logger.info("Start interpret")
-      val fs = eval.interpretTrace(ctx)
+      val (fs, trace) = eval.interpretTrace(ctx)
 
-      val stdout = fs._1.memoryState.getMem("stdout").toList.sortBy(_._1.value).map(_._2.value.toChar).mkString("")
+      val stdout = fs.memoryState.getMem("stdout").toList.sortBy(_._1.value).map(_._2.value.toChar).mkString("")
 
       Logger.info(s"Interpreter stdout:\n${stdout}")
 
       q.loading.dumpIL.foreach(f => {
         val tf = f"${f}-interpret-trace.txt"
-        writeToFile((fs._2.t.mkString("\n")), tf)
+        writeToFile(trace.t.mkString("\n"), tf)
         Logger.info(s"Finished interpret: trace written to $tf")
       })
 
-      val stopState = fs._1.nextCmd
+      val stopState = fs.nextCmd
       if (stopState != eval.Stopped()) {
         Logger.error(s"Interpreter exited with $stopState")
       } else {
@@ -1029,7 +1039,7 @@ object RunUtils {
   }
 }
 
-def readFormFile(fileName: String): Iterable[String] = {
+def readFromFile(fileName: String): Iterable[String] = {
   Files.readAllLines(Paths.get(fileName)).asScala
 }
 

@@ -37,7 +37,7 @@ procedure {:extern} rely_reflexive();
 procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
 
-procedure main();
+procedure main_1812();
   free requires (memory_load64_le(mem, 69664bv64) == 0bv64);
   free requires (memory_load64_le(mem, 69672bv64) == 69672bv64);
   free requires (memory_load32_le(mem, 1836bv64) == 131073bv32);
@@ -51,13 +51,13 @@ procedure main();
   free ensures (memory_load64_le(mem, 69592bv64) == 1812bv64);
   free ensures (memory_load64_le(mem, 69672bv64) == 69672bv64);
 
-implementation main()
+implementation main_1812()
 {
   lmain:
     assume {:captureState "lmain"} true;
-    goto main_basil_return;
-  main_basil_return:
-    assume {:captureState "main_basil_return"} true;
+    goto main_1812_basil_return;
+  main_1812_basil_return:
+    assume {:captureState "main_1812_basil_return"} true;
     return;
 }
 

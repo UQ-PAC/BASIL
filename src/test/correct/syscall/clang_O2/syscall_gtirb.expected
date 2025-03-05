@@ -49,7 +49,7 @@ procedure {:extern} rely_reflexive();
 procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
 
-procedure main();
+procedure main_1876();
   modifies Gamma_R16, Gamma_R17, Gamma_mem, R16, R17, mem;
   free requires (memory_load64_le(mem, 69672bv64) == 0bv64);
   free requires (memory_load64_le(mem, 69680bv64) == 69680bv64);
@@ -64,15 +64,18 @@ procedure main();
   free ensures (memory_load64_le(mem, 69592bv64) == 1876bv64);
   free ensures (memory_load64_le(mem, 69680bv64) == 69680bv64);
 
-implementation main()
+implementation main_1876()
 {
-  $main$__0__$noLlJkgwRnOvXgJivIONmQ:
-    assume {:captureState "$main$__0__$noLlJkgwRnOvXgJivIONmQ"} true;
-    call .L_610();
-    assume false;
+  main_1876__0__noLlJkgwRnOvXgJivIONmQ:
+    assume {:captureState "main_1876__0__noLlJkgwRnOvXgJivIONmQ"} true;
+    call .L_610_1552();
+    goto main_1876_basil_return;
+  main_1876_basil_return:
+    assume {:captureState "main_1876_basil_return"} true;
+    return;
 }
 
-procedure .L_610();
+procedure .L_610_1552();
   modifies Gamma_R16, Gamma_R17, Gamma_mem, R16, R17, mem;
   free requires (memory_load32_le(mem, 1900bv64) == 131073bv32);
   free requires (memory_load64_le(mem, 69064bv64) == 1872bv64);
@@ -85,19 +88,22 @@ procedure .L_610();
   free ensures (memory_load64_le(mem, 69592bv64) == 1876bv64);
   free ensures (memory_load64_le(mem, 69680bv64) == 69680bv64);
 
-implementation .L_610()
+implementation .L_610_1552()
 {
-  var $load7: bv64;
-  var Gamma_$load7: bool;
-  $.L_610$__0__$gey1dltDQsGWPLJ2NyIKRg:
-    assume {:captureState "$.L_610$__0__$gey1dltDQsGWPLJ2NyIKRg"} true;
+  var Gamma_load7: bool;
+  var load7: bv64;
+  .L_610_1552__0__gey1dltDQsGWPLJ2NyIKRg:
+    assume {:captureState ".L_610_1552__0__gey1dltDQsGWPLJ2NyIKRg"} true;
     R16, Gamma_R16 := 69632bv64, true;
     call rely();
-    $load7, Gamma_$load7 := memory_load64_le(mem, bvadd64(R16, 16bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 16bv64)) || L(mem, bvadd64(R16, 16bv64)));
-    R17, Gamma_R17 := $load7, Gamma_$load7;
+    load7, Gamma_load7 := memory_load64_le(mem, bvadd64(R16, 16bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 16bv64)) || L(mem, bvadd64(R16, 16bv64)));
+    R17, Gamma_R17 := load7, Gamma_load7;
     R16, Gamma_R16 := bvadd64(R16, 16bv64), Gamma_R16;
     call fork();
-    assume false;
+    goto .L_610_1552_basil_return;
+  .L_610_1552_basil_return:
+    assume {:captureState ".L_610_1552_basil_return"} true;
+    return;
 }
 
 procedure fork();

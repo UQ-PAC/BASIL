@@ -163,8 +163,8 @@ class IRTest extends AnyFunSuite {
 
     assert(p.mainProcedure eq p.procedures.find(_.name == "main").get)
 
-    called.addBlocks(b1)
-    called.addBlocks(b2)
+    called.addBlock(b1)
+    called.addBlock(b2)
     // no longer implicitly set entryblock to the first block
     called.entryBlock = b1
 
@@ -195,7 +195,7 @@ class IRTest extends AnyFunSuite {
     p.mainProcedure.replaceBlock(b3, b3)
     assert(called.incomingCalls().toSet == Set(b3.statements.last))
     assert(olds == blocks.size)
-    p.mainProcedure.addBlocks(block("test", ret).resolve(p, p.mainProcedure))
+    p.mainProcedure.addBlock(block("test", ret).resolve(p, p.mainProcedure))
     blocks = p.labelToBlock
     assert(olds != blocks.size)
 
@@ -421,6 +421,16 @@ class IRTest extends AnyFunSuite {
     )
 
     assert(program.initialMemory.nonEmpty)
+  }
+
+  test("dsl procedure with self-recursive call") {
+    // this should be correctly resolved
+    val emptyprog = prog(proc("main"))
+    val recursiveproc = proc("p2", block("b1", LocalAssign(R0, bv64(10)), directCall("p2"), goto("b1"))).cloneable
+
+    // these calls should not throw
+    assert(prog(recursiveproc) != null)
+    assert(recursiveproc.addToProg(emptyprog) != null)
   }
 
 }

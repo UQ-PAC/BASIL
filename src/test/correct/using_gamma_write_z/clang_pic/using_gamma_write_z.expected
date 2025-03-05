@@ -75,7 +75,7 @@ implementation {:extern} guarantee_reflexive()
   assert (gamma_load32(Gamma_mem, $x_addr) ==> gamma_load32(Gamma_mem, $x_addr));
 }
 
-procedure main();
+procedure main_1876();
   modifies Gamma_R0, Gamma_R8, Gamma_R9, Gamma_mem, R0, R8, R9, mem;
   requires ((memory_load32_le(mem, $z_addr) == 0bv32) ==> gamma_load32(Gamma_mem, $x_addr));
   free requires (memory_load64_le(mem, 69664bv64) == 0bv64);
@@ -93,28 +93,28 @@ procedure main();
   free ensures (memory_load64_le(mem, 69592bv64) == 1876bv64);
   free ensures (memory_load64_le(mem, 69672bv64) == 69672bv64);
 
-implementation main()
+implementation main_1876()
 {
-  var $load$18: bv64;
-  var Gamma_$load$18: bool;
+  var Gamma_load18: bool;
   var Gamma_x_old: bool;
+  var load18: bv64;
   lmain:
     assume {:captureState "lmain"} true;
     R9, Gamma_R9 := 65536bv64, true;
     call rely();
-    $load$18, Gamma_$load$18 := memory_load64_le(mem, bvadd64(R9, 4040bv64)), (gamma_load64(Gamma_mem, bvadd64(R9, 4040bv64)) || L(mem, bvadd64(R9, 4040bv64)));
-    R9, Gamma_R9 := $load$18, Gamma_$load$18;
+    load18, Gamma_load18 := memory_load64_le(mem, bvadd64(R9, 4040bv64)), (gamma_load64(Gamma_mem, bvadd64(R9, 4040bv64)) || L(mem, bvadd64(R9, 4040bv64)));
+    R9, Gamma_R9 := load18, Gamma_load18;
     R8, Gamma_R8 := 1bv64, true;
     call rely();
-    assert (L(mem, R9) ==> Gamma_R8);
     Gamma_x_old := (gamma_load32(Gamma_mem, $x_addr) || L(mem, $x_addr));
+    assert (L(mem, R9) ==> Gamma_R8);
     mem, Gamma_mem := memory_store32_le(mem, R9, R8[32:0]), gamma_store32(Gamma_mem, R9, Gamma_R8);
     assert ((R9 == $z_addr) ==> (L(mem, $x_addr) ==> Gamma_x_old));
     assume {:captureState "%000002d9"} true;
     R0, Gamma_R0 := 0bv64, true;
-    goto main_basil_return;
-  main_basil_return:
-    assume {:captureState "main_basil_return"} true;
+    goto main_1876_basil_return;
+  main_1876_basil_return:
+    assume {:captureState "main_1876_basil_return"} true;
     return;
 }
 

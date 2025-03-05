@@ -5,8 +5,8 @@ import analysis.solvers.DSAUnionFindSolver
 import analysis.evaluateExpression
 import cfg_visualiser.*
 import ir.*
-import specification.{ExternalFunction, SymbolTableEntry}
-import boogie.{FuncEntry, SpecGlobal}
+import specification.{ExternalFunction, FuncEntry, SymbolTableEntry}
+import boogie.SpecGlobal
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer

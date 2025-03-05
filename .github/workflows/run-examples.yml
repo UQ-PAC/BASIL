@@ -128,6 +128,8 @@ jobs:
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly ir.IRTest
         if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly ir.IRToDSLTest
+        if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly ir.CILVisitorTest
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly ir.InterpreterTests
@@ -168,4 +170,6 @@ jobs:
       - run: ./mill test.testOnly AnalysisSystemTestsBAP
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly AnalysisSystemTestsGTIRB
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly SimplifySystemTests
         if: ${{ ! cancelled() }}
