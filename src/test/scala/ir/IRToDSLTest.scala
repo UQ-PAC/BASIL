@@ -2,7 +2,7 @@ package ir
 
 import scala.collection.mutable
 import scala.collection.immutable.*
-import org.scalatest.funsuite.AnyFunSuite
+import munit.FunSuite
 import util.intrusive_list.*
 import translating.serialiseIL
 import ir.dsl.*
@@ -22,7 +22,10 @@ import translating.PrettyPrinter
 import org.scalactic.Prettifier
 import org.scalactic._
 
-class IRToDSLTest extends AnyFunSuite {
+class IRToDSLTest extends FunSuite {
+  inline def assertResult[T](expected: T)(actual: T) = {
+    assertEquals(expected, actual)
+  }
 
   val mainproc = proc(
     "main",
