@@ -877,6 +877,7 @@ object RunUtils {
     var dsaContext: Option[DSAContext] = None
     if (conf.dsaConfig.nonEmpty) {
       val config = conf.dsaConfig.get
+      DSATimer.checkPoint("test")
 
       val main = ctx.program.mainProcedure
       var sva: Map[Procedure, SymbolicValues] = Map.empty
@@ -889,17 +890,22 @@ object RunUtils {
           sva += (proc -> SVAResults)
           cons += (proc -> constraints)
         )
+
+      DSATimer.checkPoint("Finished SVA")
       dsaContext = Some(DSAContext(sva, cons, Map.empty, Map.empty, Map.empty))
 
       if config.analyses.contains(Norm) then
         DSALogger.info("Finished Computing Constraints")
         val DSA = IntervalDSA.getLocals(ctx, sva, cons)
+        DSATimer.checkPoint("Finished DSA Local Phase")
         DSA.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
         val DSABU = IntervalDSA.getBUs(DSA)
+        DSATimer.checkPoint("Finished DSA BU Phase")
         DSABU.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
         val DSATD = IntervalDSA.getTDs(DSABU)
+        DSATimer.checkPoint("Finished DSA TD Phase")
         DSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
         dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
