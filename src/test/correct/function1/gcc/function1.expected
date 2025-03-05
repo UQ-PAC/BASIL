@@ -110,7 +110,7 @@ procedure {:extern} rely_reflexive();
 procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
 
-procedure get_two();
+procedure get_two_1876();
   modifies Gamma_R0, Gamma_R1, Gamma_R31, Gamma_stack, R0, R1, R31, stack;
   free requires (memory_load64_le(mem, 2048bv64) == 131073bv64);
   free requires (memory_load8_le(mem, 2056bv64) == 37bv8);
@@ -133,14 +133,14 @@ procedure get_two();
   free ensures (memory_load64_le(mem, 69616bv64) == 1924bv64);
   free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
 
-implementation get_two()
+implementation get_two_1876()
 {
-  var $load$18: bv8;
-  var $load$19: bv32;
-  var $load$20: bv64;
-  var Gamma_$load$18: bool;
-  var Gamma_$load$19: bool;
-  var Gamma_$load$20: bool;
+  var Gamma_load18: bool;
+  var Gamma_load19: bool;
+  var Gamma_load20: bool;
+  var load18: bv8;
+  var load19: bv32;
+  var load20: bv64;
   lget_two:
     assume {:captureState "lget_two"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
@@ -150,23 +150,23 @@ implementation get_two()
     assume {:captureState "%00000356"} true;
     stack, Gamma_stack := memory_store64_le(stack, R31, R2), gamma_store64(Gamma_stack, R31, Gamma_R2);
     assume {:captureState "%0000035e"} true;
-    $load$18, Gamma_$load$18 := memory_load8_le(stack, bvadd64(R31, 15bv64)), gamma_load8(Gamma_stack, bvadd64(R31, 15bv64));
-    R1, Gamma_R1 := zero_extend56_8($load$18), Gamma_$load$18;
-    $load$19, Gamma_$load$19 := memory_load32_le(stack, bvadd64(R31, 8bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 8bv64));
-    R0, Gamma_R0 := zero_extend32_32($load$19), Gamma_$load$19;
+    load18, Gamma_load18 := memory_load8_le(stack, bvadd64(R31, 15bv64)), gamma_load8(Gamma_stack, bvadd64(R31, 15bv64));
+    R1, Gamma_R1 := zero_extend56_8(load18), Gamma_load18;
+    load19, Gamma_load19 := memory_load32_le(stack, bvadd64(R31, 8bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 8bv64));
+    R0, Gamma_R0 := zero_extend32_32(load19), Gamma_load19;
     R0, Gamma_R0 := zero_extend32_32(bvadd32(R1[32:0], R0[32:0])), (Gamma_R0 && Gamma_R1);
     R1, Gamma_R1 := zero_extend32_32(R0[32:0]), Gamma_R0;
-    $load$20, Gamma_$load$20 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
-    R0, Gamma_R0 := $load$20, Gamma_$load$20;
+    load20, Gamma_load20 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
+    R0, Gamma_R0 := load20, Gamma_load20;
     R0, Gamma_R0 := zero_extend32_32(bvadd32(R1[32:0], R0[32:0])), (Gamma_R0 && Gamma_R1);
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
-    goto get_two_basil_return;
-  get_two_basil_return:
-    assume {:captureState "get_two_basil_return"} true;
+    goto get_two_1876_basil_return;
+  get_two_1876_basil_return:
+    assume {:captureState "get_two_1876_basil_return"} true;
     return;
 }
 
-procedure main();
+procedure main_1924();
   modifies Gamma_R0, Gamma_R1, Gamma_R16, Gamma_R17, Gamma_R2, Gamma_R29, Gamma_R30, Gamma_R31, Gamma_mem, Gamma_stack, R0, R1, R16, R17, R2, R29, R30, R31, mem, stack;
   free requires (memory_load64_le(mem, 69632bv64) == 0bv64);
   free requires (memory_load64_le(mem, 69640bv64) == 69640bv64);
@@ -193,16 +193,16 @@ procedure main();
   free ensures (memory_load64_le(mem, 69616bv64) == 1924bv64);
   free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
 
-implementation main()
+implementation main_1924()
 {
   var #4: bv64;
-  var $load$21: bv32;
-  var $load$22: bv64;
-  var $load$23: bv64;
   var Gamma_#4: bool;
-  var Gamma_$load$21: bool;
-  var Gamma_$load$22: bool;
-  var Gamma_$load$23: bool;
+  var Gamma_load21: bool;
+  var Gamma_load22: bool;
+  var Gamma_load23: bool;
+  var load21: bv32;
+  var load22: bv64;
+  var load23: bv64;
   lmain:
     assume {:captureState "lmain"} true;
     #4, Gamma_#4 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
@@ -225,7 +225,7 @@ implementation main()
     R1, Gamma_R1 := 10bv64, true;
     R0, Gamma_R0 := 97bv64, true;
     R30, Gamma_R30 := 1972bv64, true;
-    call get_two();
+    call get_two_1876();
     goto l000003ec;
   l000003ec:
     assume {:captureState "l000003ec"} true;
@@ -239,29 +239,29 @@ implementation main()
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 24bv64), Gamma_R0;
     call rely();
-    $load$21, Gamma_$load$21 := memory_load32_le(mem, R0), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
-    R0, Gamma_R0 := zero_extend32_32($load$21), Gamma_$load$21;
+    load21, Gamma_load21 := memory_load32_le(mem, R0), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
+    R0, Gamma_R0 := zero_extend32_32(load21), Gamma_load21;
     R1, Gamma_R1 := zero_extend32_32(R0[32:0]), Gamma_R0;
     R0, Gamma_R0 := 0bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 2056bv64), Gamma_R0;
     R30, Gamma_R30 := 2016bv64, true;
-    call printf();
+    call printf_1584();
     goto l00000430;
   l00000430:
     assume {:captureState "l00000430"} true;
     R0, Gamma_R0 := 0bv64, true;
-    $load$22, Gamma_$load$22 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
-    R29, Gamma_R29 := $load$22, Gamma_$load$22;
-    $load$23, Gamma_$load$23 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
-    R30, Gamma_R30 := $load$23, Gamma_$load$23;
+    load22, Gamma_load22 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
+    R29, Gamma_R29 := load22, Gamma_load22;
+    load23, Gamma_load23 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
+    R30, Gamma_R30 := load23, Gamma_load23;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
-    goto main_basil_return;
-  main_basil_return:
-    assume {:captureState "main_basil_return"} true;
+    goto main_1924_basil_return;
+  main_1924_basil_return:
+    assume {:captureState "main_1924_basil_return"} true;
     return;
 }
 
-procedure printf();
+procedure printf_1584();
   modifies Gamma_R16, Gamma_R17, R16, R17;
   free requires (memory_load64_le(mem, 2048bv64) == 131073bv64);
   free requires (memory_load8_le(mem, 2056bv64) == 37bv8);

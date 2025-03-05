@@ -123,14 +123,23 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         } else {
           None
         }
-      case "unsupported_opcode.0" => {
+
+      case "AtomicStart.0" =>
+        checkArgs(function, 0, 0, typeArgs.size, args.size, ctx.getText)
+        Some(AtomicStart(label))
+
+      case "AtomicEnd.0" =>
+        checkArgs(function, 0, 0, typeArgs.size, args.size, ctx.getText)
+        Some(AtomicEnd(label))
+
+      case "unsupported_opcode.0" =>
         val op = args.headOption.flatMap(visitExprOnly) match {
           case Some(IntLiteral(s)) => Some("%08x".format(s))
           case c => c.map(_.toString)
         }
         val comment = " unsupported opcode" + op.map(": " + _).getOrElse("")
         Some(Assert(FalseLiteral, Some(comment)))
-      }
+
       case _ =>
         Logger.error(s"Unidentified function call $function: ${ctx.getText}")
         Some(Assert(FalseLiteral, Some(" unsupported: " + ctx.getText)))
@@ -345,20 +354,20 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         (result, load)
 
       case "not_bool.0" => (resolveUnaryOp(BoolNOT, function, 0, typeArgs, args, ctx.getText), None)
-      case "eq_enum.0" => (resolveBinaryOp(BoolEQ, function, 0, typeArgs, args, ctx.getText))
-      case "or_bool.0" => (resolveBinaryOp(BoolOR, function, 0, typeArgs, args, ctx.getText))
-      case "and_bool.0" => (resolveBinaryOp(BoolAND, function, 0, typeArgs, args, ctx.getText))
+      case "eq_enum.0" => resolveBinaryOp(BoolEQ, function, 0, typeArgs, args, ctx.getText)
+      case "or_bool.0" => resolveBinaryOp(BoolOR, function, 0, typeArgs, args, ctx.getText)
+      case "and_bool.0" => resolveBinaryOp(BoolAND, function, 0, typeArgs, args, ctx.getText)
 
-      case "or_bits.0" => (resolveBinaryOp(BVOR, function, 1, typeArgs, args, ctx.getText))
-      case "and_bits.0" => (resolveBinaryOp(BVAND, function, 1, typeArgs, args, ctx.getText))
-      case "eor_bits.0" => (resolveBinaryOp(BVXOR, function, 1, typeArgs, args, ctx.getText))
-      case "eq_bits.0" => (resolveBinaryOp(BVEQ, function, 1, typeArgs, args, ctx.getText))
-      case "add_bits.0" => (resolveBinaryOp(BVADD, function, 1, typeArgs, args, ctx.getText))
-      case "sub_bits.0" => (resolveBinaryOp(BVSUB, function, 1, typeArgs, args, ctx.getText))
-      case "mul_bits.0" => (resolveBinaryOp(BVMUL, function, 1, typeArgs, args, ctx.getText))
-      case "sdiv_bits.0" => (resolveBinaryOp(BVSDIV, function, 1, typeArgs, args, ctx.getText))
-      case "slt_bits.0" => (resolveBinaryOp(BVSLT, function, 1, typeArgs, args, ctx.getText))
-      case "sle_bits.0" => (resolveBinaryOp(BVSLE, function, 1, typeArgs, args, ctx.getText))
+      case "or_bits.0" => resolveBinaryOp(BVOR, function, 1, typeArgs, args, ctx.getText)
+      case "and_bits.0" => resolveBinaryOp(BVAND, function, 1, typeArgs, args, ctx.getText)
+      case "eor_bits.0" => resolveBinaryOp(BVXOR, function, 1, typeArgs, args, ctx.getText)
+      case "eq_bits.0" => resolveBinaryOp(BVEQ, function, 1, typeArgs, args, ctx.getText)
+      case "add_bits.0" => resolveBinaryOp(BVADD, function, 1, typeArgs, args, ctx.getText)
+      case "sub_bits.0" => resolveBinaryOp(BVSUB, function, 1, typeArgs, args, ctx.getText)
+      case "mul_bits.0" => resolveBinaryOp(BVMUL, function, 1, typeArgs, args, ctx.getText)
+      case "sdiv_bits.0" => resolveBinaryOp(BVSDIV, function, 1, typeArgs, args, ctx.getText)
+      case "slt_bits.0" => resolveBinaryOp(BVSLT, function, 1, typeArgs, args, ctx.getText)
+      case "sle_bits.0" => resolveBinaryOp(BVSLE, function, 1, typeArgs, args, ctx.getText)
 
       case "not_bits.0" => (resolveUnaryOp(BVNOT, function, 1, typeArgs, args, ctx.getText), None)
 
@@ -497,6 +506,34 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val name = function.stripSuffix(".0")
         val argsIR = args.flatMap(visitExprOnly).toSeq
         (Some(UninterpretedFunction(name, argsIR, BitVecType(32))), None)
+
+      case "cvt_bits_uint.0" | "cvt_bits_sint.0" =>
+        // ignore conversion between bitvector/integer for now
+        checkArgs(function, 1, 1, typeArgs.size, args.size, ctx.getText)
+        val inSize = parseInt(typeArgs(0)).toInt
+        val argIR = visitExprOnly(args.head)
+        if (argIR.isDefined) {
+          argIR.get.getType match {
+            case BitVecType(size) =>
+              if (inSize == size) {
+                (argIR, None)
+              } else if (inSize > size) {
+                if (function == "cvt_bits_uint.0") {
+                  (Some(ZeroExtend(inSize - size, argIR.get)), None)
+                } else {
+                  // "cvt_bits_sint.0"
+                  (Some(SignExtend(inSize - size, argIR.get)), None)
+                }
+              } else {
+                (Some(Extract(inSize, 0, argIR.get)), None)
+              }
+            case _ =>
+              Logger.error(s"type mismatch: ${ctx.getText}")
+              (None, None)
+          }
+        } else {
+          (None, None)
+        }
 
       case _ =>
         // known ASLp methods not yet handled:

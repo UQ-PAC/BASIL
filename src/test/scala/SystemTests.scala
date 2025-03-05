@@ -176,12 +176,12 @@ trait SystemTests extends FunSuite, BASILTest {
             .contains("this is the postcondition that could not be proved")
         ) {
           val b = l.trim()
-          val parts = b.split("\\(").map(_.split("\\)")).flatten.map(_.split(",")).flatten
+          val parts = b.split("\\(").flatMap(_.split("\\)")).flatMap(_.split(","))
           val fname = parts(0)
-          val line = Integer(parts(1))
+          val line = Integer.parseInt(parts(1))
           val col = parts(2)
 
-          val lines = util.readFormFile(fname).toArray
+          val lines = util.readFromFile(fname).toArray
 
           val lineOffset = line - 1
 
@@ -344,6 +344,7 @@ class SimplifySystemTests extends SystemTests {
 
 @Category(Array(classOf[test_util.AnalysisSystemTest]))
 class SimplifyMemorySystemTests extends SystemTests {
+  // Logger.setLevel(LogLevel.DEBUG)
   val staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA))
   runTests(
     "correct",

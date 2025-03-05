@@ -1,10 +1,10 @@
-name: Run Examples 
-on: 
+name: Run Examples
+on:
   push:
-    branches: 
+    branches:
       - main
   pull_request:
-    branches: 
+    branches:
       - main
   workflow_dispatch:
 jobs:
@@ -109,14 +109,14 @@ jobs:
 
         # note: tests prefixed with '!' are expected to fail.
         #       if they are fixed, the '!' should be removed.
-        
+
       - run: ./mill test.testOnly IrreducibleLoop
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly BitVectorAnalysisTests
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly '*IntrusiveListPublicInterfaceTest'
         if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly util.intrusive_list.IntrusiveListTest 
+      - run: ./mill test.testOnly util.intrusive_list.IntrusiveListTest
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly DataStructureAnalysisTest
         if: ${{ ! cancelled() }}
@@ -125,6 +125,8 @@ jobs:
       - run: ./mill test.testOnly LiveVarsAnalysisTests
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly ir.IRTest
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly ir.IRToDSLTest
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly ir.CILVisitorTest
         if: ${{ ! cancelled() }}
@@ -166,4 +168,6 @@ jobs:
       - run: ./mill test.testOnly AnalysisSystemTestsBAP
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly AnalysisSystemTestsGTIRB
+        if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly SimplifySystemTests
         if: ${{ ! cancelled() }}

@@ -10,9 +10,9 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
   def scalaVersion = "3.3.4"
 
   val javaTests = ivy"com.novocode:junit-interface:0.11"
-  val scalaTests = ivy"org.scalatest::scalatest:3.2.10"
-  val munit = ivy"org.scalameta::munit::1.0.4"
-  val scalactic = ivy"org.scalactic::scalactic:3.2.10"
+  val munit = ivy"org.scalameta::munit::1.1.0"
+  val scalaTests = ivy"org.scalatest::scalatest:3.2.19"
+  val scalactic = ivy"org.scalactic::scalactic:3.2.19"
   val antlrRuntime = ivy"org.antlr:antlr4-runtime:4.9"
   val sourceCode = ivy"com.lihaoyi::sourcecode:0.3.0"
   val mainArgs = ivy"com.lihaoyi::mainargs:0.5.1"

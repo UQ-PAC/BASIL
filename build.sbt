@@ -4,7 +4,7 @@ ThisBuild / scalaVersion := "3.3.4"
 ThisBuild / version := "0.0.1"
 ThisBuild / organization := "uq.pac"
 
-val scalactic = "org.scalactic" %% "scalactic" % "3.2.10"
+val scalactic = "org.scalactic" %% "scalactic" % "3.2.19"
 val antlrRuntime = "org.antlr" % "antlr4-runtime" % "4.9.3"
 val sourceCode = "com.lihaoyi" %% "sourcecode" % "0.3.0"
 val mainArgs = "com.lihaoyi" %% "mainargs" % "0.5.1"
@@ -22,7 +22,7 @@ lazy val root = project
     libraryDependencies += scalactic,
     libraryDependencies += sourceCode,
     libraryDependencies += mainArgs,
-    libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test
+    libraryDependencies += "org.scalameta" %% "munit" % "1.1.0" % Test
   )
 
 scalacOptions ++= Seq("-deprecation", "-feature")

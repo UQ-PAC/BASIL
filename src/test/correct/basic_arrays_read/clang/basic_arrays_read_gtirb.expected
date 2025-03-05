@@ -71,7 +71,7 @@ implementation {:extern} guarantee_reflexive()
   assert true;
 }
 
-procedure main();
+procedure main_1812();
   modifies Gamma_R0, Gamma_R31, Gamma_R8, Gamma_mem, Gamma_stack, R0, R31, R8, mem, stack;
   free requires (memory_load64_le(mem, 69664bv64) == 0bv64);
   free requires (memory_load64_le(mem, 69672bv64) == 69672bv64);
@@ -88,27 +88,27 @@ procedure main();
   free ensures (memory_load64_le(mem, 69592bv64) == 1812bv64);
   free ensures (memory_load64_le(mem, 69672bv64) == 69672bv64);
 
-implementation main()
+implementation main_1812()
 {
-  var $load8: bv32;
-  var Gamma_$load8: bool;
-  $main$__0__$nH8DWmocTJOsal3tXpRbMg:
-    assume {:captureState "$main$__0__$nH8DWmocTJOsal3tXpRbMg"} true;
+  var Gamma_load8: bool;
+  var load8: bv32;
+  main_1812__0__nH8DWmocTJOsal3tXpRbMg:
+    assume {:captureState "main_1812__0__nH8DWmocTJOsal3tXpRbMg"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 12bv64), 0bv32), gamma_store32(Gamma_stack, bvadd64(R31, 12bv64), true);
-    assume {:captureState "1816$0"} true;
+    assume {:captureState "1816_0"} true;
     R8, Gamma_R8 := 69632bv64, true;
     call rely();
     assert (L(mem, bvadd64(R8, 52bv64)) ==> true);
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R8, 52bv64), 0bv32), gamma_store32(Gamma_mem, bvadd64(R8, 52bv64), true);
-    assume {:captureState "1824$0"} true;
+    assume {:captureState "1824_0"} true;
     call rely();
-    $load8, Gamma_$load8 := memory_load32_le(mem, bvadd64(R8, 52bv64)), (gamma_load32(Gamma_mem, bvadd64(R8, 52bv64)) || L(mem, bvadd64(R8, 52bv64)));
-    R0, Gamma_R0 := zero_extend32_32($load8), Gamma_$load8;
+    load8, Gamma_load8 := memory_load32_le(mem, bvadd64(R8, 52bv64)), (gamma_load32(Gamma_mem, bvadd64(R8, 52bv64)) || L(mem, bvadd64(R8, 52bv64)));
+    R0, Gamma_R0 := zero_extend32_32(load8), Gamma_load8;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
-    goto main_basil_return;
-  main_basil_return:
-    assume {:captureState "main_basil_return"} true;
+    goto main_1812_basil_return;
+  main_1812_basil_return:
+    assume {:captureState "main_1812_basil_return"} true;
     return;
 }
 
