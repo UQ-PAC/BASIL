@@ -12,14 +12,14 @@ enum SatResult {
 def checkSATSMT2(smt: String, softTimeoutMillis: Option[Int] = None): SatResult = {
   val cmd =
     Seq("z3", "-smt2", "-in") ++ (if (softTimeoutMillis.isDefined) then Seq(s"-t:${softTimeoutMillis.get}") else Seq())
-  val output = 
-  try (cmd #< ByteArrayInputStream(smt.getBytes("UTF-8"))).!!
-  catch {
-    case e => {
-      Logger.error(e.toString())
-      ""
+  val output =
+    try (cmd #< ByteArrayInputStream(smt.getBytes("UTF-8"))).!!
+    catch {
+      case e => {
+        Logger.error(e.toString())
+        ""
+      }
     }
-  }
   if (output == "sat\n") {
     SatResult.SAT
   } else if (output == "unsat\n") {

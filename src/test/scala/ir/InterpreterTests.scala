@@ -31,10 +31,8 @@ def mems[E, T <: Effects[T, E]](m: MemoryState): Map[BigInt, BitVecLiteral] = {
   m.getMem("mem").map((k, v) => k.value -> v)
 }
 
-
 @Category(Array(classOf[test_util.AnalysisSystemTest]))
 class InterpreterTests extends FunSuite {
-
 
   def getProgram(name: String, path: String): IRContext = {
     val compiler = "gcc"

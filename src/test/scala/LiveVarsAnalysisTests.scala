@@ -300,8 +300,8 @@ class LiveVarsAnalysisTests extends FunSuite, BASILTest {
         R29 -> TwoElementTop,
         R30 -> TwoElementTop,
         R31 -> TwoElementTop
-      )
-    , clue
+      ),
+      clue
     )
     assert(analysisResults(blocks("lzero")) == Map(R31 -> TwoElementTop))
     assert(analysisResults(laftercall) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block

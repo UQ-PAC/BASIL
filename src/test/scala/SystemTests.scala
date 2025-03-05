@@ -13,7 +13,6 @@ import test_util.Histogram
 import test_util.TestConfig
 import org.junit.experimental.categories.Category
 
-
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
   */
@@ -220,7 +219,7 @@ trait SystemTests extends FunSuite, BASILTest {
     )
 
     assertEquals(false, result.timedOut, "Verifier timed out")
-    assertEquals(result.verified, !proveFailed,  "Make sure the result makes sense")
+    assertEquals(result.verified, !proveFailed, "Make sure the result makes sense")
     if (conf.expectVerify) {
       assertNoDiff(boogieResult.strip(), "Boogie program verifier finished with 0 errors")
     } else {
@@ -254,7 +253,10 @@ trait SystemTests extends FunSuite, BASILTest {
 @Category(Array(classOf[test_util.BasicSystemTest]))
 class SystemTestsBAP extends SystemTests {
   runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true))
-  runTests("incorrect", TestConfig(useBAPFrontend = true, expectVerify = false, checkExpected = true, logResults = true))
+  runTests(
+    "incorrect",
+    TestConfig(useBAPFrontend = true, expectVerify = false, checkExpected = true, logResults = true)
+  )
   test("summary-BAP") {
     summary("testresult-BAP")
   }

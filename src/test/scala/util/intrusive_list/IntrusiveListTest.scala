@@ -13,8 +13,8 @@ class IntrusiveListTest extends FunSuite {
     val x = IntrusiveList[Elem]()
     val toInsert = Elem(10)
     val f = x.append(toInsert)
-    assertEquals(x.size , 1)
-    assertEquals(f.last() , f)
+    assertEquals(x.size, 1)
+    assertEquals(f.last(), f)
     assert(f eq toInsert)
   }
 
