@@ -475,8 +475,8 @@ class IntervalGraph(
   protected def mergeCellsHelper(cell1: IntervalCell, cell2: IntervalCell): IntervalCell = {
     assert(cell1.node.isUptoDate)
     assert(cell2.node.isUptoDate)
-    val (stableCell, toBeMoved) = if cell1.interval.start > cell2.interval.start then (cell1, cell2) else (cell2, cell1)
-    val delta = stableCell.interval.start - toBeMoved.interval.start
+    val (stableCell, toBeMoved) = if cell1.interval.start.get > cell2.interval.start.get then (cell1, cell2) else (cell2, cell1)
+    val delta = stableCell.interval.start.get - toBeMoved.interval.start.get
 
     val stableNode = stableCell.node
     val nodeToBeMoved = toBeMoved.node
@@ -908,7 +908,7 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
 
   def grow(interval: Interval): IntervalCell = {
     require(this.interval.start == interval.start, "expected same interval start for growing cell")
-    val newCell = IntervalCell(this.node, Interval(interval.start, math.max(interval.end, this.interval.end)))
+    val newCell = IntervalCell(this.node, this.interval.join(interval))
     newCell._pointee = _pointee
     newCell
   }
