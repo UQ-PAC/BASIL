@@ -5,6 +5,7 @@ import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest
 
+@test_util.tags.UnitTest
 class TaintAnalysisTests extends AnyFunSuite, BASILTest {
   def getTaintAnalysisResults(
     program: Program,

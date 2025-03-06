@@ -27,6 +27,7 @@ import translating.PrettyPrinter.*
   * BASILRESULT.analysis.get.bu is the set of graphs from the end of the bottom-up phase BASILRESULT.analysis.get.td is
   * the set of graphs from the end of the top-down phase
   */
+@test_util.tags.UnitTest
 class DataStructureAnalysisTest extends AnyFunSuite {
 
   def runAnalysis(program: Program): StaticAnalysisContext = {

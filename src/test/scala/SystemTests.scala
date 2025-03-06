@@ -1,4 +1,5 @@
 import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.Retries
 import util.{LogLevel, Logger, DebugDumpIRLogger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
 
 import Numeric.Implicits.*
@@ -15,7 +16,7 @@ import test_util.TestConfig
   * directory structure and file-name patterns.
   */
 
-trait SystemTests extends AnyFunSuite, BASILTest {
+trait SystemTests extends AnyFunSuite, BASILTest, Retries {
   case class TestResult(
     name: String,
     passed: Boolean,
@@ -43,6 +44,21 @@ trait SystemTests extends AnyFunSuite, BASILTest {
 
   private val testPath = "./src/test/"
 
+  override def withFixture(test: NoArgTest) = {
+    if (isRetryable(test))
+      withRetry { super.withFixture(test) }
+    else
+      super.withFixture(test)
+  }
+
+  protected def annotateTestCase(folder: String, program: String, variation: String, conf: TestConfig): (=> Unit) => Unit = {
+    (folder, program, variation) match {
+      // case ("procedure_summaries", "procedure_summary3", "gcc_O2") if !conf.useBAPFrontend =>
+      //   x => assume(false, "cancelling flaky provedure summaries test")
+      case _ => identity
+    }
+  }
+
   def runTests(folder: String, conf: TestConfig): Unit = {
     val path = testPath + folder
     val programs = getSubdirectories(path)
@@ -57,7 +73,9 @@ trait SystemTests extends AnyFunSuite, BASILTest {
         val inputPath = if conf.useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
         if (File(inputPath).exists) {
           test(folder + "/" + p + "/" + t + testSuffix) {
-            runTest(path, p, t, conf)
+            annotateTestCase(folder, p, t, conf) {
+              runTest(path, p, t, conf)
+            }
           }
         }
       }
@@ -317,6 +335,8 @@ class NoSimplifySystemTests extends SystemTests {
     summary("nosimplify")
   }
 }
+
+@test_util.tags.AnalysisSystemTest
 class SimplifySystemTests extends SystemTests {
   runTests("correct", TestConfig(simplify = true, useBAPFrontend = true, expectVerify = true, logResults = true))
   runTests("incorrect", TestConfig(simplify = true, useBAPFrontend = true, expectVerify = false, logResults = true))
@@ -375,6 +395,7 @@ class SimplifyMemorySystemTests extends SystemTests {
   }
 }
 
+@test_util.tags.AnalysisSystemTest
 class AnalysisSystemTestsBAP extends SystemTests {
   runTests(
     "correct",
@@ -386,6 +407,7 @@ class AnalysisSystemTestsBAP extends SystemTests {
   )
 }
 
+@test_util.tags.AnalysisSystemTest
 class AnalysisSystemTestsGTIRB extends SystemTests {
   runTests(
     "correct",
@@ -397,6 +419,7 @@ class AnalysisSystemTestsGTIRB extends SystemTests {
   )
 }
 
+@test_util.tags.AnalysisSystemTest
 class DSAMemoryRegionSystemTestsBAP extends SystemTests {
   runTests(
     "correct",
@@ -416,6 +439,7 @@ class DSAMemoryRegionSystemTestsBAP extends SystemTests {
   )
 }
 
+@test_util.tags.AnalysisSystemTest
 class DSAMemoryRegionSystemTestsGTIRB extends SystemTests {
   runTests(
     "correct",
@@ -504,6 +528,7 @@ class MemoryRegionTestsNoRegion extends SystemTests {
   )
 }
 
+@test_util.tags.UnitTest
 class ProcedureSummaryTests extends SystemTests {
   // TODO currently procedure_summary3 verifies despite incorrect procedure summary analysis
   // this is due to BASIL's currently limited handling of non-returning calls
