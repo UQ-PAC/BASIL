@@ -66,7 +66,7 @@ trait SystemTests extends AnyFunSuite, BASILTest, Retries {
   ): (=> Unit) => Unit = {
     (folder, program, variation) match {
       case ("procedure_summaries", "procedure_summary3", "gcc_O2") =>
-        _ => assume(false, "cancelling flaky procedure summaries test")
+        _ => cancel("cancelling flaky procedure summaries test")
       case _ => identity
     }
   }
