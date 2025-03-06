@@ -997,7 +997,7 @@ object IntervalDSA {
       )
   }
 
-  def getBUs(locals: Map[Procedure, IntervalGraph]): Map[Procedure, IntervalGraph] = {
+  def solveBUs(locals: Map[Procedure, IntervalGraph]): Map[Procedure, IntervalGraph] = {
 
     DSALogger.info("Performing DSA BU phase")
     val bus = locals.view.mapValues(_.clone).toMap
@@ -1023,7 +1023,7 @@ object IntervalDSA {
     bus.view.mapValues(_.clone).toMap
   }
 
-  def getTDs(bus: Map[Procedure, IntervalGraph]): Map[Procedure, IntervalGraph] = {
+  def solveTDs(bus: Map[Procedure, IntervalGraph]): Map[Procedure, IntervalGraph] = {
     DSALogger.info("Performing DSA TD phase")
     val tds = bus.view.mapValues(_.clone).toMap
     val visited: mutable.Set[Procedure] = mutable.Set.empty
