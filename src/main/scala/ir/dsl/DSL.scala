@@ -354,6 +354,10 @@ case class EventuallyProgram(
 def prog(mainProc: EventuallyProcedure, procedures: EventuallyProcedure*): Program =
   prog(Seq(), mainProc, procedures: _*)
 
+def prog(initialMemory: Iterable[MemorySection], procedures: Iterable[EventuallyProcedure]): Program =
+  val (hd, tl) = procedures.toSeq.splitAt(1)
+  prog(initialMemory, hd.head, tl: _*)
+
 def prog(
   initialMemory: Iterable[MemorySection],
   mainProc: EventuallyProcedure,
