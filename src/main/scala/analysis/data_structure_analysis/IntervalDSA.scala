@@ -258,7 +258,18 @@ class IntervalGraph(
     symValToCells(exprToSymVal(expr).removeNonAddress(i => i > 1000))
   }
 
-  // check that local constraints hold after processing
+  /**
+   * Checks local phase memory (memory access) constraints are maintained
+   *
+   * For a memory access constraint
+   * checks that the cell representing the memory accessed index points to
+   * the cell representing the value assigned or read from the memory region
+   *
+   * It additionally checks that constraint checking is performed on the
+   * most up-to-date version of each node,
+   * guarantees that a later unification hasn't broken the local memory constraints
+   * @param constraints constriants to check
+   */
   def localCorrectness(constraints: Set[Constraint] = this.constraints): Unit = {
     constraints.toSeq.sortBy(f => f.label).foreach {
       case constraint: MemoryAccessConstraint[_] =>
