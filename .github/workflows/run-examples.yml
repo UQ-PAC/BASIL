@@ -124,6 +124,8 @@ jobs:
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly LiveVarsAnalysisTests
         if: ${{ ! cancelled() }}
+      - run: ./mill test.testOnly ir.ToScalaTest
+        if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly ir.IRTest
         if: ${{ ! cancelled() }}
       - run: ./mill test.testOnly ir.IRToDSLTest

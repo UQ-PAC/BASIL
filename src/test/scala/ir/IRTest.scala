@@ -358,11 +358,77 @@ class IRTest extends AnyFunSuite {
 
   }
 
+  test("initial memory") {
+
+    val program = prog(
+      Seq(
+        MemorySection(
+          ".interp",
+          BigInt("4194872"),
+          110,
+          Seq(
+            0x2f, 0x6e, 0x69, 0x78, 0x2f, 0x73, 0x74, 0x6f, 0x72, 0x65, 0x2f, 0x61, 0x31, 0x33, 0x61, 0x31, 0x71, 0x69,
+            0x32, 0x6b, 0x6e, 0x71, 0x61, 0x30, 0x73, 0x64, 0x31, 0x67, 0x76, 0x6d, 0x35, 0x78, 0x33, 0x34, 0x70, 0x72,
+            0x35, 0x33, 0x77, 0x67, 0x30, 0x69, 0x6c, 0x2d, 0x67, 0x6c, 0x69, 0x62, 0x63, 0x2d, 0x61, 0x61, 0x72, 0x63,
+            0x68, 0x36, 0x34, 0x2d, 0x75, 0x6e, 0x6b, 0x6e, 0x6f, 0x77, 0x6e, 0x2d, 0x6c, 0x69, 0x6e, 0x75, 0x78, 0x2d,
+            0x67, 0x6e, 0x75, 0x2d, 0x32, 0x2e, 0x33, 0x38, 0x2d, 0x34, 0x34, 0x2f, 0x6c, 0x69, 0x62, 0x2f, 0x6c, 0x64,
+            0x2d, 0x6c, 0x69, 0x6e, 0x75, 0x78, 0x2d, 0x61, 0x61, 0x72, 0x63, 0x68, 0x36, 0x34, 0x2e, 0x73, 0x6f, 0x2e,
+            0x31, 0x0
+          ).map(BitVecLiteral(_, 8)).toSeq,
+          false,
+          None
+        )
+      ),
+      proc(
+        "knownBitsExample_4196164",
+        Seq("R0_in" -> BitVecType(64), "R1_in" -> BitVecType(64)),
+        Seq("R0_out" -> BitVecType(64), "R2_out" -> BitVecType(64), "R3_out" -> BitVecType(64)),
+        block(
+          "lknownBitsExample",
+          LocalAssign(
+            LocalVar("R2", BitVecType(64), 2),
+            BinaryExpr(
+              BVOR,
+              BinaryExpr(
+                BVAND,
+                LocalVar("R0_in", BitVecType(64), 0),
+                BitVecLiteral(BigInt("18374966859414961920"), 64)
+              ),
+              BitVecLiteral(BigInt("18446744069414584320"), 64)
+            ),
+            Some("%0000023e")
+          ),
+          LocalAssign(
+            LocalVar("R0", BitVecType(64), 3),
+            BinaryExpr(
+              BVOR,
+              BinaryExpr(
+                BVAND,
+                LocalVar("R0_in", BitVecType(64), 0),
+                BitVecLiteral(BigInt("18374966859414961920"), 64)
+              ),
+              BitVecLiteral(BigInt("71777218305454335"), 64)
+            ),
+            Some("%00000257")
+          ),
+          ret(
+            "R0_out" -> LocalVar("R0", BitVecType(64), 3),
+            "R2_out" -> LocalVar("R2", BitVecType(64), 2),
+            "R3_out" -> BitVecLiteral(BigInt("71777218305454335"), 64)
+          )
+        )
+      )
+    )
+
+    assert(program.initialMemory.nonEmpty)
+  }
+
   test("dsl procedure with self-recursive call") {
     // this should be correctly resolved
     val emptyprog = prog(proc("main"))
-    val recursiveproc = proc("p2", block("b1", LocalAssign(R0, bv64(10)), directCall("p2"), goto("b1")).cloneable)
+    val recursiveproc = proc("p2", block("b1", LocalAssign(R0, bv64(10)), directCall("p2"), goto("b1"))).cloneable
 
+    // these calls should not throw
     assert(prog(recursiveproc) != null)
     assert(recursiveproc.addToProg(emptyprog) != null)
   }
