@@ -12,7 +12,7 @@ import translating.PrettyPrinter.*
 trait TestValueDomainWithInterpreter[T] {
 
   /**
-   * Construct a Basil IR expression which evaluates to true true iff 
+   * Construct a Basil IR expression which evaluates to true iff 
    * the concrete expression `concrete` is contained in the abstract value `absval`.
    */
   def valueInAbstractValue(absval: T, concrete: Expr): Expr
