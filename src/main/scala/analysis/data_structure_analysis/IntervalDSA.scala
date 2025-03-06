@@ -426,7 +426,6 @@ class IntervalGraph(
         case (true, true) =>
           val pointee1 = cell1.removePointee.get
           val pointee2 = cell2.removePointee.get
-          assert(!(cell1.getPointee == cell2 && cell2.getPointee == cell1))
           var resPointee = mergeCells(pointee1, pointee2)
           cell1 = get(cell1)
           resPointee = cell1.setPointee(resPointee)
