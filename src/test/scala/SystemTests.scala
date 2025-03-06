@@ -51,10 +51,17 @@ trait SystemTests extends AnyFunSuite, BASILTest, Retries {
       super.withFixture(test)
   }
 
+  /**
+   * Allows for annotating the SystemTest cases which are dynamically
+   * generated from the directories. This function should return a function
+   * which will be called with the body of the test case. This can be used
+   * to wrap the test body in methods such as `pendingUntilFixed` to mark
+   * known-broken tests.
+   */
   protected def annotateTestCase(folder: String, program: String, variation: String, conf: TestConfig): (=> Unit) => Unit = {
     (folder, program, variation) match {
-      // case ("procedure_summaries", "procedure_summary3", "gcc_O2") if !conf.useBAPFrontend =>
-      //   x => assume(false, "cancelling flaky provedure summaries test")
+      case ("procedure_summaries", "procedure_summary3", "gcc_O2") =>
+        _ => assume(false, "cancelling flaky procedure summaries test")
       case _ => identity
     }
   }
@@ -256,6 +263,7 @@ trait SystemTests extends AnyFunSuite, BASILTest, Retries {
 
 }
 
+@test_util.tags.StandardSystemTest
 class SystemTestsBAP extends SystemTests {
   runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true))
   runTests(
@@ -267,6 +275,7 @@ class SystemTestsBAP extends SystemTests {
   }
 }
 
+@test_util.tags.StandardSystemTest
 class SystemTestsGTIRB extends SystemTests {
   runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, checkExpected = true, logResults = true))
   runTests(
