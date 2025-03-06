@@ -381,6 +381,9 @@ def toDot[T <: CFGPosition](
   new DotGraph("CursorCFG", allNodes, dotArrows).toDotString
 }
 
+/**
+ * This doesn't implement free vars for block or proc, it just returns the rvars.
+ */
 def freeVarsPos(s: CFGPosition): Set[Variable] = s match {
   case a: LocalAssign => a.rhs.variables
   case l: MemoryLoad => l.index.variables
@@ -397,4 +400,15 @@ def freeVarsPos(s: CFGPosition): Set[Variable] = s match {
   case p: DirectCall => p.actualParams.flatMap(_._2.variables).toSet
   case p: Return => p.outParams.flatMap(_._2.variables).toSet
   case _: Unreachable | _: GoTo | _: NOP => Set[Variable]()
+}
+
+def allVarsPos(s: CFGPosition): Set[Variable] = s match {
+  case a: Assign => freeVarsPos(a) ++ a.assignees
+  case p: Procedure =>
+    p.flatMap {
+      case c: Command => allVarsPos(c)
+      case _ => Set()
+    }.toSet
+  case p: Block => p.statements.flatMap(allVarsPos).toSet
+  case o => freeVarsPos(o)
 }
