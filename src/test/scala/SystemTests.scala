@@ -58,7 +58,12 @@ trait SystemTests extends AnyFunSuite, BASILTest, Retries {
    * to wrap the test body in methods such as `pendingUntilFixed` to mark
    * known-broken tests.
    */
-  protected def annotateTestCase(folder: String, program: String, variation: String, conf: TestConfig): (=> Unit) => Unit = {
+  protected def annotateTestCase(
+    folder: String,
+    program: String,
+    variation: String,
+    conf: TestConfig
+  ): (=> Unit) => Unit = {
     (folder, program, variation) match {
       case ("procedure_summaries", "procedure_summary3", "gcc_O2") =>
         _ => assume(false, "cancelling flaky procedure summaries test")
