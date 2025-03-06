@@ -67,7 +67,6 @@ trait TestValueDomainWithInterpreter[T] {
 
   def assertCorrectResult(breakres: List[CheckResult]) = {
     assert(breakres.nonEmpty)
-    assert(breakres.nonEmpty)
 
     // assert all the collected breakpoint watches have evaluated to true
     for (b <- breakres) {
