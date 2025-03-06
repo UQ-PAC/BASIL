@@ -20,7 +20,7 @@ shift $((OPTIND-1))
 
 if [[ -z "$CFILE_NAME" ]] ; then 
     echo "Usage: -c cfile.c [-b binaryname] [ -- make args]"
-    echo "Optinoally variables CC, CFLAGS, DDISASM, READELF, GTIRBSEM, BAP to change the the binary path to the lifter tools"
+    echo "Optionally variables CC, CFLAGS, DDISASM, READELF, GTIRBSEM, BAP to change the the binary path to the lifter tools"
     exit 1
 fi
 
@@ -28,7 +28,7 @@ BIN_NAME=${BIN_NAME:=$(echo "$CFILE_NAME" | sed -s 's/.c$//' | tr -d ' ')}
 export BIN_NAME
 export CFILE_NAME
 
-make $@ -f - << 'EOF'
+make "$@" -f - << 'EOF'
 CC ?= aarch64-linux-gnu-gcc
 DDISASM ?= ddisasm
 READELF ?= readelf
