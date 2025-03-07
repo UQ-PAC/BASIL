@@ -284,26 +284,34 @@ case object Eval {
         case _ => State.setError(Errored(s"not byte $c"))
       }
     } yield (res)
+
 }
 
-class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S, InterpreterError](f) {
+enum InterpretReturn {
+  case ReturnVal(outs: Map[LocalVar, Literal])
+  case Void
+}
 
-  def interpretOne: State[S, Boolean, InterpreterError] = {
+class BASILInterpreter[S](f: Effects[S, InterpreterError])
+    extends Interpreter[S, InterpretReturn, InterpreterError](f) {
+
+  def interpretOne: State[S, Next, InterpreterError] = {
     val next = for {
       next <- f.getNext
       _ <- State.pure(Logger.debug(s"$next"))
-      r: Boolean <- (next match {
-        case Intrinsic(tgt) => LibcIntrinsic.intrinsics(tgt)(f).map(_ => true)
-        case Run(c: Statement) => interpretStatement(f)(c).map(_ => true)
-        case ReturnTo(c) => interpretReturn(f)(c).map(_ => true)
-        case Run(c: Jump) => interpretJump(f)(c).map(_ => true)
-        case Stopped() => State.pure(false)
-        case ErrorStop(e) => State.pure(false)
+      r: Next <- (next match {
+        case Intrinsic(tgt) => LibcIntrinsic.intrinsics(tgt)(f).map(_ => Next.Continue)
+        case Run(c: Statement) => interpretStatement(f)(c).map(_ => Next.Continue)
+        case ReturnTo(c) => interpretReturn(f)(c).map(v => Next.Stop(InterpretReturn.ReturnVal(v)))
+        case ReturnFrom(c) => evaluateReturn(f)(c).map(v => Next.Stop(InterpretReturn.ReturnVal(v)))
+        case Run(c: Jump) => interpretJump(f)(c).map(_ => Next.Continue)
+        case Stopped() => State.pure(Next.Stop(InterpretReturn.Void))
+        case ErrorStop(e) => State.pure(Next.Stop(InterpretReturn.Void))
       })
     } yield (r)
 
     next.flatMapE((e: InterpreterError) => {
-      f.setNext(ErrorStop(e)).map(_ => false)
+      f.setNext(ErrorStop(e)).map(_ => Next.Stop(InterpretReturn.Void))
     })
   }
 
@@ -350,19 +358,43 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
     }
   }
 
-  def interpretReturn[S, T <: Effects[S, InterpreterError]](f: T)(s: DirectCall): State[S, Unit, InterpreterError] = {
+  /**
+   * Evaluates the formal out params and assigns them to the corresponding lhs variables of the direct call.
+   */
+  def interpretReturn[S, T <: Effects[S, InterpreterError]](
+    f: T
+  )(s: DirectCall): State[S, Map[LocalVar, Literal], InterpreterError] = {
+    case class Param(val lhs: Variable, formal: LocalVar, value: Literal)
     for {
       outs <- State.mapM(
         ((bindout: (LocalVar, Variable)) => {
           for {
             rhs <- Eval.evalLiteral(f)(bindout._1)
-          } yield (bindout._2, rhs)
+          } yield (Param(bindout._2, bindout._1, rhs))
         }),
         s.outParams
       )
-      c <- State.sequence(State.pure(()), outs.map(m => f.storeVar(m._1.name, m._1.toBoogie.scope, Scalar(m._2))))
+      _ <- State.sequence(State.pure(()), outs.map(m => f.storeVar(m.lhs.name, m.lhs.toBoogie.scope, Scalar(m.value))))
       _ <- f.setNext(Run(s.successor))
-    } yield (c)
+    } yield (outs.map(p => (p.formal, p.value)).toMap)
+  }
+
+  /**
+   * Evaluates the formal out params and returns a map totheir values.
+   */
+  def evaluateReturn[S, T <: Effects[S, InterpreterError]](
+    f: T
+  )(returnFrom: ProcSig): State[S, Map[LocalVar, Literal], InterpreterError] = {
+    for {
+      outs <- State.mapM(
+        ((bindout: (LocalVar)) => {
+          for {
+            rhs <- Eval.evalLiteral(f)(bindout)
+          } yield (bindout, rhs)
+        }),
+        returnFrom.formalOutParam
+      )
+    } yield (outs.toMap)
   }
 
   def interpretStatement[S, T <: Effects[S, InterpreterError]](f: T)(s: Statement): State[S, Unit, InterpreterError] = {
@@ -593,6 +625,49 @@ object InterpFuns {
     )
     // l <- State.sequence(State.pure(()), mainfun.formalInParam.toList.map(i => f.storeVar(i.name, i.toBoogie.scope, Scalar(BitVecLiteral(0, size(i).get)))))
     s
+  }
+
+  // case class FunctionCall(target: String, inParams: List[(String, Literal)])
+  def callProcedure[S, T <: Effects[S, InterpreterError]](
+    f: T
+  )(target: Procedure, params: List[(LocalVar, Expr)]) /*: State[S, List[(String, Literal)], InterpreterError] */ = {
+
+    val call = for {
+      actualParams <- State.mapM(
+        (p: (LocalVar, Expr)) =>
+          for {
+            v <- Eval.evalLiteral(f)(p._2)
+          } yield (p._1, v),
+        params
+      )
+      v <- {
+        if (LibcIntrinsic.intrinsics.contains(target.procName)) {
+          f.call(
+            target.name,
+            Intrinsic(target.procName),
+            ReturnFrom(ProcSig(target.name, target.formalInParam.toList, target.formalOutParam.toList))
+          )
+        } else if (target.entryBlock.isDefined) {
+          val block = target.entryBlock.get
+          f.call(
+            target.name,
+            Run(block.statements.headOption.getOrElse(block.jump)),
+            ReturnFrom(ProcSig(target.name, target.formalInParam.toList, target.formalOutParam.toList))
+          )
+        } else {
+          State.setError(Errored(s"call to empty procedure: ${target.name}"))
+        }
+      }
+      _ <- State.sequence(
+        State.pure(()),
+        actualParams.map(m => f.storeVar(m._1.name, m._1.toBoogie.scope, Scalar(m._2)))
+      )
+    } yield (v)
+
+
+    // set in params
+    // call procedure
+    // return outparams
   }
 
   def initBSS[S, T <: Effects[S, InterpreterError]](f: T)(is: S, p: IRContext): S = {
