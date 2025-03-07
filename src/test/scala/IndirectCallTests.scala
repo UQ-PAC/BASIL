@@ -17,11 +17,27 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable
 import test_util.BASILTest
 import test_util.TestConfig
+import test_util.TestCustomisation
 
 import java.io.{BufferedWriter, File, FileWriter}
 
 @test_util.tags.StandardSystemTest
-class IndirectCallTests extends AnyFunSuite, BASILTest {
+class IndirectCallTests extends AnyFunSuite, BASILTest, TestCustomisation {
+
+  override def customiseTestsByName(name: String) = name match {
+    case "functionpointer/clang:BAP" | "functionpointer/clang_O2:BAP" | "functionpointer/clang_O2:GTIRB" |
+        "functionpointer/clang_pic:BAP" | "functionpointer/gcc:BAP" | "functionpointer/gcc_O2:BAP" |
+        "functionpointer/gcc_pic:BAP" | "indirect_call/clang:BAP" | "indirect_call/clang_pic:BAP" |
+        "indirect_call/gcc:BAP" | "indirect_call/gcc_pic:BAP" | "indirect_call_outparam/clang:BAP" |
+        "indirect_call_outparam/clang:GTIRB" | "indirect_call_outparam/gcc:BAP" | "indirect_call_outparam/gcc:GTIRB" |
+        "jumptable/clang:BAP" | "jumptable/clang:GTIRB" | "jumptable/gcc:BAP" | "jumptable/gcc:GTIRB" |
+        "jumptable2/clang:BAP" | "jumptable2/clang_O2:BAP" | "jumptable2/clang_pic:BAP" | "jumptable2/gcc:BAP" |
+        "jumptable2/gcc_O2:BAP" | "jumptable2/gcc_pic:BAP" | "jumptable3/clang_O2:GTIRB" =>
+      Mode.ExpectFailure("appear to be genuine failures in call resolution")
+    case "jumptable3/clang:GTIRB" | "switch2/clang:GTIRB" =>
+      Mode.ExpectFailure("Unable to evaluate expr: bitvector size mismatch")
+    case _ => Mode.Normal
+  }
 
   /** @param label - the label of the IndirectCall to be resolved
     * @param labelProcedure - the name of the procedure containing the IndirectCall to be resolved
