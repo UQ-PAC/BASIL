@@ -1,10 +1,11 @@
 package ir
 
 import util.PerformanceTimer
-import util.functional._
-import ir.eval._
+import util.functional.*
+import translating.PrettyPrinter.*
+import ir.eval.*
 import boogie.Scope
-import ir.dsl._
+import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.BeforeAndAfter
 import boogie.SpecGlobal
@@ -86,6 +87,100 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     )
     assert(normalTermination(fstate.nextCmd), fstate.nextCmd)
     assert(expected == actual)
+  }
+
+  test("structured fib program if else") {
+
+    val n_in = LocalVar("n_in", BitVecType(64))
+    val n_out = LocalVar("n_out", BitVecType(64))
+    val returnv = LocalVar("rval", BitVecType(64))
+    val p1 = LocalVar("p1", BitVecType(64))
+    val p2 = LocalVar("p2", BitVecType(64))
+
+    val p = prog(
+      proc(
+        "fib",
+        Seq("n_in" -> bv_t(64)),
+        Seq("n_out" -> bv_t(64)),
+        sequence(
+          ifElse(
+            BinaryExpr(BVEQ, bv64(0), n_in),
+            List(block("base_0", LocalAssign(returnv, bv64(0)))),
+            ifElse(
+              BinaryExpr(BVEQ, bv64(1), n_in),
+              List(block("base_1", LocalAssign(returnv, bv64(1)))),
+              List(
+                block(
+                  "rec",
+                  directCall(Seq(("n_out" -> p2)), "fib", "n_in" -> BinaryExpr(BVSUB, n_in, bv64(2))),
+                  directCall(Seq(("n_out" -> p1)), "fib", "n_in" -> BinaryExpr(BVSUB, n_in, bv64(1))),
+                  LocalAssign(returnv, BinaryExpr(BVADD, p1, p2))
+                )
+              )
+            )
+          ),
+          List(block("end", ret("n_out" -> returnv)))
+        ): _*
+      )
+    )
+
+    val begin = InterpFuns.initialiseProgram(NormalInterpreter)(InterpreterState(), p)
+    def interpret(n: Int) = evalProc(p, p.mainProcedure, Map(n_in -> bv64(n)))(n_out)
+
+    assert(interpret(5) == bv64(fib(5)))
+    assert(interpret(9) == bv64(fib(9)))
+    assert(interpret(0) == bv64(fib(0)))
+
+  }
+
+  test("whileprog") {
+    val acc = LocalVar("acc", BitVecType(64))
+    val i = LocalVar("i", BitVecType(64))
+
+    val p = prog(
+      proc(
+        "sumto",
+        Seq("i" -> bv_t(64)),
+        Seq("n_out" -> bv_t(64)),
+        sequence(
+          List(block("entry", LocalAssign(acc, bv64(0)))),
+          sequence(
+            ifElse(
+              BinaryExpr(BVSLT, i, bv64(0)),
+              List(block("lt0", LocalAssign(acc, bv64(0)))),
+              whileDo(
+                BinaryExpr(BVSGE, i, bv64(0)),
+                List(
+                  block(
+                    "body",
+                    LocalAssign(acc, BinaryExpr(BVADD, acc, i)),
+                    LocalAssign(i, BinaryExpr(BVSUB, i, bv64(1)))
+                  )
+                )
+              )
+            ),
+            List(block("returnbl", ret("n_out" -> acc)))
+          )
+        ): _*
+      )
+    )
+
+    def compar(i: Int) = {
+      if (i < 0) {
+        bv64(0)
+      } else {
+        bv64((0 to i).foldLeft(0)((a, b) => a + b))
+      }
+    }
+
+    def interpret(n: Int) =
+      val v = ir.eval.BitVectorEval.signedInt2BV(64, n)
+      ir.eval.evalProc(p, p.mainProcedure, Map(i -> v))(LocalVar("n_out", bv_t(64)))
+
+    for (i <- -5 to 10) {
+      assert(compar(i) == interpret(i))
+    }
+
   }
 
   test("initialise") {

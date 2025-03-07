@@ -756,6 +756,14 @@ object InterpFuns {
   }
 }
 
+def evalProc(p: Program, proc: Procedure, args: Map[LocalVar, Literal] = Map()): Map[LocalVar, Literal] = {
+  val begin = InterpFuns.initialiseProgram(NormalInterpreter)(InterpreterState(), p)
+  InterpFuns.callProcedure(NormalInterpreter)(proc, args).f(begin)._2 match {
+    case Right(r) => r
+    case Left(l) => throw Exception("interp error: " + l)
+  }
+}
+
 def interpret(IRProgram: Program): InterpreterState = {
   InterpFuns.interpretProg(NormalInterpreter)(IRProgram, InterpreterState())
 }

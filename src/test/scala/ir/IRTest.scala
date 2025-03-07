@@ -5,6 +5,7 @@ import scala.collection.immutable.*
 import org.scalatest.funsuite.AnyFunSuite
 import util.intrusive_list.*
 import translating.serialiseIL
+import translating.PrettyPrinter.*
 import ir.dsl.*
 import ir.*
 
@@ -433,5 +434,6 @@ class IRTest extends AnyFunSuite {
     assert(prog(recursiveproc) != null)
     assert(recursiveproc.addToProg(emptyprog) != null)
   }
+
 
 }
