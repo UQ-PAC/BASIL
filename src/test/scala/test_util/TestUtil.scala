@@ -71,9 +71,8 @@ def log(text: String, path: String): Unit = {
  * usually easier and clearer to make the modifications directly in
  * the test case.
  *
- * Users should implement the customiseTestsByName method. This method
- * is called with a test case name and it should return the behaviour
- * of that test case (use Mode.Normal for unremarkable tests).
+ * Users should implement the customiseTestsByName method (see doc
+ * comment below).
  *
  */
 trait TestCustomisation extends TestSuite with Retries {
@@ -94,6 +93,10 @@ trait TestCustomisation extends TestSuite with Retries {
       case _ => this
     }
 
+  /**
+   * This method is called with a test case name and it should return the behaviour
+   * of that test case (use Mode.Normal for unremarkable tests).
+   */
   def customiseTestsByName(name: String): Mode
 
   override def withFixture(test: NoArgTest) = {

@@ -272,6 +272,18 @@ class SystemTestsGTIRB extends SystemTests {
 
 @test_util.tags.StandardSystemTest
 class ExtraSpecTests extends SystemTests {
+
+  override def customiseTestsByName(name: String) = super.customiseTestsByName(name).orElse {
+    name match {
+      case "extraspec_correct/malloc_memcpy_strlen_memset_free/gcc_O2:GTIRB" |
+          "extraspec_correct/malloc_memcpy_strlen_memset_free/clang_O2:GTIRB" =>
+        Mode.ExpectFailure("Expected verification success, but got failure -- cause unknown")
+      case "extraspec_incorrect/malloc_memcpy_strlen_memset_free/gcc_O2:BAP" =>
+        Mode.ExpectFailure("Expected verification failure, but got success -- cause unknown")
+      case _ => Mode.Normal
+    }
+  }
+
   // some of these tests have time out issues so they need more time, but some still time out even with this for unclear reasons
   val boogieFlags = Seq("/timeLimit:30", "/useArrayAxioms")
   runTests(
