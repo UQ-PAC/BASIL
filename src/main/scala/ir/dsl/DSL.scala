@@ -193,6 +193,11 @@ def ret(params: (String, Expr)*): EventuallyReturn = EventuallyReturn(params)
 
 def unreachable: EventuallyUnreachable = EventuallyUnreachable()
 
+case class Call(target: String, actualParams: (String, Expr)*)
+
+def directCall(lhs: Iterable[(String, Variable)], rhs: Call): EventuallyCall =
+  EventuallyCall(DelayNameResolve(rhs.target), lhs.toArray, rhs.actualParams)
+
 def directCall(lhs: Iterable[(String, Variable)], tgt: String, actualParams: (String, Expr)*): EventuallyCall =
   EventuallyCall(DelayNameResolve(tgt), lhs.to(ArraySeq), actualParams)
 
@@ -487,3 +492,140 @@ def progUnresolved(
   procedures: EventuallyProcedure*
 ): EventuallyProgram =
   EventuallyProgram(mainProc, procedures, initialMemory)
+
+  /**
+   * Expr construction
+   */
+
+extension (lvar: Variable) infix def :=(j: Expr) = LocalAssign(lvar, j)
+
+extension (lvar: List[(String, Variable)]) infix def :=(j: Call) = directCall(lvar, j)
+extension (lvar: Seq[(String, Variable)]) infix def :=(j: Call) = directCall(lvar, j)
+
+extension (i: Expr)
+  infix def ===(j: Expr): Expr = i.getType match {
+    case IntType => BinaryExpr(IntEQ, i, j)
+    case b: BitVecType => BinaryExpr(BVEQ, i, j)
+    case BoolType => BinaryExpr(BoolEQ, i, j)
+    case m: MapType => ???
+  }
+  infix def !==(j: Expr): Expr = i.getType match {
+    case IntType => BinaryExpr(IntNEQ, i, j)
+    case b: BitVecType => BinaryExpr(BVNEQ, i, j)
+    case BoolType => BinaryExpr(BoolNEQ, i, j)
+    case m: MapType => ???
+  }
+  infix def +(j: Expr): Expr = i.getType match {
+    case IntType => BinaryExpr(IntADD, i, j)
+    case b: BitVecType => BinaryExpr(BVADD, i, j)
+    case BoolType => BinaryExpr(BoolOR, i, j)
+    case m: MapType => ???
+  }
+  infix def -(j: Expr): Expr = i.getType match {
+    case IntType => BinaryExpr(IntSUB, i, j)
+    case b: BitVecType => BinaryExpr(BVSUB, i, j)
+    case BoolType => ???
+    case m: MapType => ???
+  }
+  infix def *(j: Expr): Expr = i.getType match {
+    case IntType => BinaryExpr(IntMUL, i, j)
+    case b: BitVecType => BinaryExpr(BVMUL, i, j)
+    case BoolType => BinaryExpr(BoolAND, i, j)
+    case m: MapType => ???
+  }
+  infix def /(j: Expr): Expr = i.getType match {
+    case IntType => BinaryExpr(IntDIV, i, j)
+    case b: BitVecType => BinaryExpr(BVSDIV, i, j)
+    case BoolType => ???
+    case m: MapType => ???
+  }
+  infix def &&(j: Expr): Expr = i.getType match {
+    case IntType => ???
+    case b: BitVecType => BinaryExpr(BVAND, i, j)
+    case BoolType => BinaryExpr(BoolAND, i, j)
+    case m: MapType => ???
+  }
+  infix def ||(j: Expr): Expr = i.getType match {
+    case IntType => ???
+    case b: BitVecType => BinaryExpr(BVOR, i, j)
+    case BoolType => BinaryExpr(BoolOR, i, j)
+    case m: MapType => ???
+  }
+  infix def <<(j: Expr): Expr = i.getType match {
+    case IntType => ???
+    case b: BitVecType => BinaryExpr(BVSHL, i, j)
+    case BoolType => ???
+    case m: MapType => ???
+  }
+  infix def >>(j: Expr): Expr = i.getType match {
+    case IntType => ???
+    case b: BitVecType => BinaryExpr(BVASHR, i, j)
+    case BoolType => ???
+    case m: MapType => ???
+  }
+  infix def >>>(j: Expr): Expr = i.getType match {
+    case IntType => ???
+    case b: BitVecType => BinaryExpr(BVLSHR, i, j)
+    case BoolType => ???
+    case m: MapType => ???
+  }
+  infix def %(j: Expr): Expr = i.getType match {
+    case IntType => BinaryExpr(IntMOD, i, j)
+    case b: BitVecType => BinaryExpr(BVSMOD, i, j)
+    case BoolType => ???
+    case m: MapType => ???
+  }
+  infix def <(j: Expr): Expr = i.getType match {
+    case IntType => BinaryExpr(IntLT, i, j)
+    case b: BitVecType => BinaryExpr(BVSLT, i, j)
+    case BoolType => ???
+    case m: MapType => ???
+  }
+  infix def >(j: Expr): Expr = i.getType match {
+    case IntType => BinaryExpr(IntGT, i, j)
+    case b: BitVecType => BinaryExpr(BVSGT, i, j)
+    case BoolType => ???
+    case m: MapType => ???
+  }
+  infix def <=(j: Expr): Expr = i.getType match {
+    case IntType => BinaryExpr(IntLE, i, j)
+    case b: BitVecType => BinaryExpr(BVSLE, i, j)
+    case BoolType => ???
+    case m: MapType => ???
+  }
+  infix def >=(j: Expr): Expr = i.getType match {
+    case IntType => BinaryExpr(IntGE, i, j)
+    case b: BitVecType => BinaryExpr(BVSGE, i, j)
+    case BoolType => ???
+    case m: MapType => ???
+  }
+  infix def ult(j: Expr): Expr = i.getType match {
+    case IntType => ???
+    case b: BitVecType => BinaryExpr(BVULT, i, j)
+    case BoolType => ???
+    case m: MapType => ???
+  }
+  infix def ugt(j: Expr): Expr = i.getType match {
+    case IntType => ???
+    case b: BitVecType => BinaryExpr(BVUGT, i, j)
+    case BoolType => ???
+    case m: MapType => ???
+  }
+  infix def ule(j: Expr): Expr = i.getType match {
+    case IntType => ???
+    case b: BitVecType => BinaryExpr(BVULE, i, j)
+    case BoolType => ???
+    case m: MapType => ???
+  }
+  infix def uge(j: Expr): Expr = i.getType match {
+    case IntType => ???
+    case b: BitVecType => BinaryExpr(BVUGE, i, j)
+    case BoolType => ???
+    case m: MapType => ???
+  }
+  infix def ++(j: Expr): Expr = i.getType match {
+    case IntType => ???
+    case b: BitVecType => BinaryExpr(BVCONCAT, i, j)
+    case BoolType => ???
+    case m: MapType => ???
+  }

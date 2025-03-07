@@ -102,16 +102,16 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
         Seq("n_in" -> bv_t(64)),
         Seq("n_out" -> bv_t(64)),
         If(
-          BinaryExpr(BVEQ, bv64(0), n_in),
-          Then(LocalAssign(returnv, bv64(0))),
+          bv64(0) === n_in,
+          Then(returnv := bv64(0)),
           Else(
             If(
-              BinaryExpr(BVEQ, bv64(1), n_in),
-              Then(LocalAssign(returnv, bv64(1))),
+              bv64(1) === n_in,
+              Then(returnv := bv64(1)),
               Else(
-                directCall(Seq(("n_out" -> p2)), "fib", "n_in" -> BinaryExpr(BVSUB, n_in, bv64(2))),
-                directCall(Seq(("n_out" -> p1)), "fib", "n_in" -> BinaryExpr(BVSUB, n_in, bv64(1))),
-                LocalAssign(returnv, BinaryExpr(BVADD, p1, p2))
+                Seq("n_out" -> p2) := Call("fib", "n_in" -> (n_in - bv64(2))),
+                Seq("n_out" -> p1) := Call("fib", "n_in" -> (n_in - bv64(1))),
+                returnv := p1 + p2
               )
             )
           )
@@ -138,18 +138,17 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
         "sumto",
         Seq("i" -> bv_t(64)),
         Seq("n_out" -> bv_t(64)),
-        stmts(LocalAssign(acc, bv64(0)))
+          stmts(acc := bv64(0))
           `;`
             If(
-              BinaryExpr(BVSLT, i, bv64(0)),
-              Then(LocalAssign(acc, bv64(0))),
+              i < bv64(0),
+              Then(acc := bv64(0)),
               Else(
                 While(
-                  BinaryExpr(BVSGE, i, bv64(0)),
-                  stmts(LocalAssign(acc, BinaryExpr(BVADD, acc, i)), LocalAssign(i, BinaryExpr(BVSUB, i, bv64(1))))
+                  i >= bv64(0),
+                  stmts(acc := acc + i, i := i - bv64(1))
                 )
-              )
-            )
+            ))
             `;`
             block("returnbl", ret("n_out" -> acc))
       )
