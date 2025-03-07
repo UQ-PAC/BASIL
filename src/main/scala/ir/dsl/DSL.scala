@@ -1,5 +1,6 @@
 package ir.dsl
 import ir.*
+import translating.PrettyPrinter.*
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.immutable.*
@@ -100,6 +101,8 @@ def bv8(i: Int): BitVecLiteral = BitVecLiteral(i, 8)
 def bv16(i: Int): BitVecLiteral = BitVecLiteral(i, 16)
 
 def R(i: Int): Register = Register(s"R$i", 64)
+
+def bv_t(i: Int) = BitVecType(i)
 
 case class DelayNameResolve(ident: String) {
   def resolveProc(prog: Program): Option[Procedure] = prog.collectFirst {
@@ -215,7 +218,7 @@ def indirectCall(tgt: Variable): EventuallyIndirectCall = EventuallyIndirectCall
 case class EventuallyBlock(
   label: String,
   sl: Iterable[EventuallyStatement],
-  j: EventuallyJump,
+  var j: EventuallyJump,
   address: Option[BigInt] = None
 ) {
 
@@ -249,8 +252,9 @@ def block(label: String, sl: (NonCallStatement | EventuallyStatement | Eventuall
     case g: EventuallyJump => None
   }
   val jump = sl.collect { case j: EventuallyJump => j }
-  require(jump.length == 1, s"DSL block '$label' must contain exactly one jump statement")
-  EventuallyBlock(label, statements, jump.head)
+  require(jump.length <= 1, s"DSL block '$label' must contain no more than one jump statement")
+  val rjump = if (jump.isEmpty) then unreachable else jump.head
+  EventuallyBlock(label, statements, rjump)
 }
 
 case class EventuallyProcedure(
@@ -349,6 +353,67 @@ case class EventuallyProgram(
   }
 
   def cloneable = this.copy(mainProcedure = mainProcedure.cloneable, otherProcedures = otherProcedures.map(_.cloneable))
+}
+
+object Counter {
+  var count = 1
+  def next() = {
+    count += 1
+    count
+  }
+
+  def nlabel(name: String = "id"): String = {
+    name + "_" + next()
+  }
+}
+
+def sequence(first: List[EventuallyBlock], rest: List[EventuallyBlock]) = {
+  require(first.nonEmpty)
+  require(rest.nonEmpty)
+  require(first.last.j.isInstanceOf[EventuallyUnreachable])
+  val last = first.last
+  last.j = goto(rest.head.label)
+  first ++ rest
+}
+
+def setSucc(first: List[EventuallyBlock], rest: EventuallyBlock*) = {
+  require(first.nonEmpty)
+  require(rest.nonEmpty)
+  require(first.last.j.isInstanceOf[EventuallyUnreachable])
+  val last = first.last
+  last.j = goto(rest.head.label)
+  first
+}
+
+def whileDo(cond: Expr, body: List[EventuallyBlock]): List[EventuallyBlock] = {
+  val loopExit = Counter.nlabel("while_exit")
+  val loopBackedge = Counter.nlabel("while_backedge")
+  val loopEntry = Counter.nlabel("while_entry")
+  val loopBody = Counter.nlabel("while_body")
+  List(block(loopEntry, goto(loopBody, loopExit)))
+    ++
+      sequence(sequence(List(block(loopBody, Assume(cond))), body), List(block(loopBackedge, goto(loopEntry))))
+      ++
+      List(block(loopExit, Assume(UnaryExpr(BoolNOT, cond)), unreachable))
+}
+
+def ifElse(cond: Expr, ifThen: List[EventuallyBlock], ifElse: List[EventuallyBlock]): List[EventuallyBlock] = {
+  val ifEntry = Counter.nlabel("if_entry")
+  val thenCase = Counter.nlabel("if_then")
+  val elseCase = Counter.nlabel("if_else")
+  val ifExit = Counter.nlabel("if_exit")
+
+  val thenNonempty = if (ifThen.isEmpty) then List(block(Counter.nlabel("if_then_empty"), unreachable)) else ifThen
+  val elseNonempty = if (ifElse.isEmpty) then List(block(Counter.nlabel("if_else_empty"), unreachable)) else ifElse
+
+  val exitBlock = block(ifExit, unreachable)
+  val thenBlocks = setSucc(thenNonempty, exitBlock)
+  val elseBlocks = setSucc(elseNonempty, exitBlock)
+
+  List(block(ifEntry, goto(thenCase, elseCase)))
+    ++ sequence(List(block(thenCase, Assume(cond), unreachable)), thenBlocks)
+    ++ sequence(List(block(elseCase, Assume(UnaryExpr(BoolNOT, cond)), unreachable)), elseBlocks)
+    ++ List(exitBlock)
 }
 
 def prog(mainProc: EventuallyProcedure, procedures: EventuallyProcedure*): Program =
