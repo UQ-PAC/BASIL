@@ -18,22 +18,7 @@ jobs:
           java-version: '21'
       - run: './mill test.compile'
       - name: Check all test suites have at least one tag
-        run: |
-          echo "all unit test suites:"
-          tests="$(./mill test.testOnly -- -t '' -oW | tr -d ':')"
-          echo "$tests"
-          echo
-          ok=true
-          for t in $tests; do
-            defn="$(grep 'class\s\+'"$t"'[ (]' --before-context=2 -R src/test)"
-            if ! grep -q '@test_util.tags.' <<< "$defn"; then
-              echo 'test case has no `@test_util.tags.TAGNAME` annotation:' >&2
-              grep 'class\s\+'"$t"'[ (]' -R src/test
-              echo
-              ok=false
-            fi
-          done
-          $ok
+        run: .github/workflows/check-test-tagging.sh
 
   Scalafmt:
     runs-on: ubuntu-latest

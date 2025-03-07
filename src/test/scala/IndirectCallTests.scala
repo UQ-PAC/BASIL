@@ -20,6 +20,7 @@ import test_util.TestConfig
 
 import java.io.{BufferedWriter, File, FileWriter}
 
+@test_util.tags.StandardSystemTest
 class IndirectCallTests extends AnyFunSuite, BASILTest {
 
   /** @param label - the label of the IndirectCall to be resolved
