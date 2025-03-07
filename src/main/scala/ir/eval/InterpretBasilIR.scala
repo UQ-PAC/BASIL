@@ -624,8 +624,6 @@ object InterpFuns {
     s
   }
 
-  // case class FunctionCall(target: String, inParams: List[(String, Literal)])
-
   /*
    * Calls a procedure that has a return, immediately evaluating the procedure
    *
