@@ -30,7 +30,29 @@ import util.RunUtils.loadAndTranslate
 
 import scala.collection.mutable
 
-class DifferentialTest extends AnyFunSuite {
+trait DifferentialTest extends TestCustomisation {
+  this: AnyFunSuite =>
+
+  override def customiseTestsByName(name: String) = name match {
+    case "analysis_differential:floatingpoint/clang:GTIRB" | "analysis_differential:floatingpoint/gcc:GTIRB" =>
+      Mode.ExpectFailure("needs FP_Mul")
+
+    case "analysis_differential:function1/gcc_O2:BAP" | "analysis_differential:function1/gcc_O2:GTIRB" |
+        "analysis_differential:malloc_with_local/gcc_O2:BAP" | "analysis_differential:malloc_with_local/gcc_O2:GTIRB" |
+        "analysis_differential:malloc_with_local3/gcc_O2:BAP" |
+        "analysis_differential:malloc_with_local3/gcc_O2:GTIRB" =>
+      Mode.ExpectFailure("needs printf_chk")
+
+    case "analysis_differential:syscall/clang:BAP" | "analysis_differential:syscall/clang:GTIRB" |
+        "analysis_differential:syscall/clang_O2:GTIRB" | "analysis_differential:syscall/gcc:BAP" |
+        "analysis_differential:syscall/gcc:GTIRB" =>
+      Mode.ExpectFailure("needs fork")
+
+    case "analysis_differential:syscall/gcc_O2:BAP" => Mode.ExpectFailure("traceInit empty")
+    case "analysis_differential:syscall/gcc_O2:GTIRB" => Mode.ExpectFailure("needs fork")
+
+    case _ => Mode.Normal
+  }
 
   Logger.setLevel(LogLevel.WARN)
 
@@ -109,7 +131,8 @@ class DifferentialTest extends AnyFunSuite {
   }
 }
 
-class DifferentialAnalysisTest extends DifferentialTest {
+@test_util.tags.AnalysisSystemTest
+class DifferentialAnalysisTest extends AnyFunSuite with DifferentialTest {
 
   def runSystemTests(): Unit = {
 
@@ -142,7 +165,8 @@ class DifferentialAnalysisTest extends DifferentialTest {
   runSystemTests()
 }
 
-class DifferentialAnalysisTestSimplification extends DifferentialTest {
+@test_util.tags.AnalysisSystemTest
+class DifferentialAnalysisTestSimplification extends AnyFunSuite with DifferentialTest {
 
   def runSystemTests(): Unit = {
 

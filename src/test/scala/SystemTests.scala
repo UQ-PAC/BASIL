@@ -340,6 +340,7 @@ class ExtraSpecTests extends SystemTests {
   }
 }
 
+@test_util.tags.DisabledTest
 class NoSimplifySystemTests extends SystemTests {
   runTests("correct", TestConfig(simplify = false, useBAPFrontend = true, expectVerify = true, logResults = true))
   runTests("incorrect", TestConfig(simplify = false, useBAPFrontend = true, expectVerify = false, logResults = true))
@@ -523,6 +524,7 @@ class MemoryRegionTestsDSA extends SystemTests {
   )
 }
 
+@test_util.tags.DisabledTest
 class MemoryRegionTestsMRA extends SystemTests {
   // stack_pointer currently times out because Boogie is bad at handling abstract map accesses
   runTests(

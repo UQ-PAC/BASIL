@@ -4,6 +4,8 @@ import java.io.{BufferedWriter, File, FileWriter}
 import ir.{Block, Procedure, Program}
 import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, StaticAnalysisConfig}
 
+import org.scalatest.{TestSuite, Retries, Failed, Exceptional, Pending, Canceled, Succeeded}
+
 import java.io.File
 
 trait TestUtil {
@@ -59,4 +61,53 @@ def log(text: String, path: String): Unit = {
   writer.write(text)
   writer.flush()
   writer.close()
+}
+
+/**
+ * A mixin for TestSuite (including AnyFunSuite) which allows
+ * for customisation of expected test outcomes, based on the string
+ * name of a test case. This is most useful in conjunction with
+ * dynamically-generated test cases. For manually-written tests, it is
+ * usually easier and clearer to make the modifications directly in
+ * the test case.
+ *
+ * Users should implement the customiseTestsByName method. This method
+ * is called with a test case name and it should return the behaviour
+ * of that test case (use Mode.Normal for unremarkable tests).
+ *
+ */
+trait TestCustomisation extends TestSuite with Retries {
+
+  enum Mode(val reason: Option[String]):
+    case Normal extends Mode(None)
+    case Retry(s: String) extends Mode(Some(s))
+    case ExpectFailure(s: String) extends Mode(Some(s))
+    case Disabled(s: String) extends Mode(Some(s))
+
+  def customiseTestsByName(name: String): Mode
+
+
+  override def withFixture(test: NoArgTest) = {
+
+    val mode = customiseTestsByName(test.name)
+
+    def invokeTest() = super.withFixture(test)
+
+    val reason = mode.reason.map(x => s"($x)")
+    withClue(reason.getOrElse("")) {
+      mode match {
+        case Mode.Normal => invokeTest()
+        case Mode.Retry(s) => withRetry { invokeTest() }
+        case Mode.ExpectFailure(s) => {
+          val res = invokeTest()
+          res match {
+            case Succeeded => fail("test succeeded but failure was expected")
+            case Exceptional(_) | Failed(_) => Pending
+            case Canceled(_) | Pending => res
+          }
+        }
+        case Mode.Disabled(s) => cancel("test explicitly disabled")
+      }
+    }
+  }
 }
