@@ -378,7 +378,7 @@ object LibcIntrinsic {
       "free" -> singleArg("free"),
       "#free" -> singleArg("free"),
       "calloc" -> calloc,
-      "strlen" -> singleArg("strlen") 
+      "strlen" -> singleArg("strlen")
     )
 
 }
@@ -662,7 +662,7 @@ enum Next[+V] {
  */
 def evalInterpreter[S, V, E](f: Effects[S, E], doStep: State[S, Next[V], E]): State[S, Option[V], E] = {
   @tailrec
-  def runEval(begin: S) : (S, Either[E, Option[V]]) = {
+  def runEval(begin: S): (S, Either[E, Option[V]]) = {
     val (fs, cont) = doStep.f(begin)
 
     cont match {
