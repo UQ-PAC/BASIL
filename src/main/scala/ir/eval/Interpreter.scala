@@ -34,7 +34,6 @@ sealed trait ExecutionContinuation
 case class Stopped() extends ExecutionContinuation /* normal program stop  */
 case class ErrorStop(error: InterpreterError) extends ExecutionContinuation /* program stop in error state */
 case class Run(next: Command) extends ExecutionContinuation /* continue by executing next command */
-case class ReturnTo(call: DirectCall) extends ExecutionContinuation /* return from a call and continue at caller */
 case class ReturnFrom(target: ProcSig) extends ExecutionContinuation /* return from a call without continuing */
 case class Intrinsic(name: String) extends ExecutionContinuation /* a named intrinsic instruction */
 

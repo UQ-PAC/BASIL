@@ -311,7 +311,6 @@ object InterpFuns {
       r: Next[InterpretReturn] <- (next match {
         case Intrinsic(tgt) => LibcIntrinsic.intrinsics(tgt)(f).map(_ => Next.Continue)
         case Run(c: Statement) => interpretStatement(f)(c).map(_ => Next.Continue)
-        case ReturnTo(c) => interpretReturn(f)(c).map(v => Next.Stop(InterpretReturn.ReturnVal(v)))
         case ReturnFrom(c) => evaluateReturn(f)(c).map(v => Next.Stop(InterpretReturn.ReturnVal(v)))
         case Run(c: Jump) => interpretJump(f)(c).map(_ => Next.Continue)
         case Stopped() => State.pure(Next.Stop(InterpretReturn.Void))
@@ -365,27 +364,6 @@ object InterpFuns {
       }
       case h: Unreachable => State.setError(EscapedControlFlow(h))
     }
-  }
-
-  /**
-   * Evaluates the formal out params and assigns them to the corresponding lhs variables of the direct call.
-   */
-  def interpretReturn[S, T <: Effects[S, InterpreterError]](
-    f: T
-  )(s: DirectCall): State[S, Map[LocalVar, Literal], InterpreterError] = {
-    case class Param(val lhs: Variable, formal: LocalVar, value: Literal)
-    for {
-      outs <- State.mapM(
-        ((bindout: (LocalVar, Variable)) => {
-          for {
-            rhs <- Eval.evalLiteral(f)(bindout._1)
-          } yield (Param(bindout._2, bindout._1, rhs))
-        }),
-        s.outParams
-      )
-      _ <- State.sequence(State.pure(()), outs.map(m => f.storeVar(m.lhs.name, m.lhs.toBoogie.scope, Scalar(m.value))))
-      _ <- f.setNext(Run(s.successor))
-    } yield (outs.map(p => (p.formal, p.value)).toMap)
   }
 
   /**
