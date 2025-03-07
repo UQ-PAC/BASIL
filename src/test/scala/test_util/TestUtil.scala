@@ -4,8 +4,7 @@ import java.io.{BufferedWriter, File, FileWriter}
 import ir.{Block, Procedure, Program}
 import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, StaticAnalysisConfig}
 
-import org.scalatest.{Retries, Failed, Exceptional, Pending, Canceled, Succeeded}
-import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.{TestSuite, Informing, Retries, Failed, Exceptional, Pending, Canceled, Succeeded}
 
 import java.io.File
 
@@ -76,7 +75,8 @@ def log(text: String, path: String): Unit = {
  * comment below).
  *
  */
-trait TestCustomisation extends AnyFunSuite with Retries {
+trait TestCustomisation extends TestSuite with Retries {
+  this: Informing =>
 
   enum Mode(val reason: Option[String]):
     case Normal extends Mode(None)
@@ -116,7 +116,7 @@ trait TestCustomisation extends AnyFunSuite with Retries {
       case Mode.ExpectFailure(s) => {
         val res = invokeTest()
         res match {
-          case _ => fail(s"Expected failure, but no exception/assertion was thrown")
+          case Succeeded => fail(s"Expected failure, but no exception/assertion was thrown")
           case Exceptional(_) | Failed(_) => Pending
           case Canceled(_) | Pending => res
         }
