@@ -725,8 +725,9 @@ object RunUtils {
     Logger.info("[!] Simplify :: DynamicSingleAssignment")
     DebugDumpIRLogger.writeToFile(File("il-before-dsa.il"), pp_prog(program))
 
-    // transforms.DynamicSingleAssignment.applyTransform(program, liveVars)
     transforms.OnePassDSA().applyTransform(program)
+
+    transforms.inlinePLTLaunchpad(ctx.program)
 
     transforms.removeEmptyBlocks(program)
 
