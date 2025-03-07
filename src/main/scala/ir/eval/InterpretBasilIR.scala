@@ -627,13 +627,6 @@ object InterpFuns {
     s = State.execute(s, f.call("init_activation", Stopped(), Stopped()))
     s = initMemory(s, "mem", p.initialMemory.values)
     s = initMemory(s, "stack", p.initialMemory.values)
-
-    // val initialParams = mainfun.formalInParam.map(lv => lv -> BitVecLiteral(0, size(lv).get))
-
-    // mainfun.entryBlock.foreach(startBlock =>
-    //  s = State.execute(s, f.call(mainfun.name, Run(IRWalk.firstInBlock(startBlock)), Stopped()))
-    // )
-    // l <- State.sequence(State.pure(()), mainfun.formalInParam.toList.map(i => f.storeVar(i.name, i.toBoogie.scope, Scalar(BitVecLiteral(0, size(i).get)))))
     s
   }
 
@@ -695,41 +688,6 @@ object InterpFuns {
         }
     } yield (rv)
   }
-  // /*
-  //  * Lookup procsig in program and call it, attempting to tdispatch to an intrinsic if the
-  //  * procedure is not resolved, or resolves to a stub.
-  //  */
-  // def callProcedure[S, T <: Effects[S, InterpreterError]](f: T)(
-  //   program: Program,
-  //   proc: ProcSig,
-  //   actualParams: Map[LocalVar, Literal],
-  //   returnTo: Option[DirectCall] = None
-  // ): State[S, Unit, InterpreterError] = {
-
-  //   val target = program.procedures.find(_.name == proc.name)
-
-  //   val call = for {
-  //     // evaluate actual parms
-  //     v <- {
-  //       // perform call and push return stack frame and continuation
-  //       if (LibcIntrinsic.intrinsics.contains(target.map(_.procName).getOrElse(proc.name))) {
-  //         f.call(proc.name, Intrinsic(proc.name), ReturnFrom(proc))
-  //       } else if (target.exists(_.entryBlock.isDefined)) {
-  //         val block = target.get.entryBlock.get
-  //         val continue = returnTo.map(ReturnTo(_)).getOrElse(ReturnFrom(proc))
-  //         f.call(target.get.name, Run(IRWalk.firstInBlock(block)), continue)
-  //       } else {
-  //         State.setError(Errored(s"call to empty procedure: ${proc.name} / $target"))
-  //       }
-  //     }
-  //     // set actual params in the callee state
-  //     _ <- State.sequence(
-  //       State.pure(()),
-  //       actualParams.map(m => f.storeVar(m._1.name, m._1.toBoogie.scope, Scalar(m._2)))
-  //     )
-  //   } yield ()
-  //   call
-  // }
 
   def initBSS[S, T <: Effects[S, InterpreterError]](f: T)(is: S, p: IRContext): S = {
     val bss = for {
