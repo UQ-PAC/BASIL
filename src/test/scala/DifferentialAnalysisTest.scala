@@ -30,8 +30,7 @@ import util.RunUtils.loadAndTranslate
 
 import scala.collection.mutable
 
-trait DifferentialTest extends TestCustomisation {
-  this: AnyFunSuite =>
+abstract class DifferentialTest extends AnyFunSuite, TestCustomisation {
 
   override def customiseTestsByName(name: String) = name match {
     case "analysis_differential:floatingpoint/clang:GTIRB" | "analysis_differential:floatingpoint/gcc:GTIRB" =>
@@ -132,7 +131,7 @@ trait DifferentialTest extends TestCustomisation {
 }
 
 @test_util.tags.AnalysisSystemTest
-class DifferentialAnalysisTest extends AnyFunSuite with DifferentialTest {
+class DifferentialAnalysisTest extends DifferentialTest {
 
   def runSystemTests(): Unit = {
 
@@ -166,7 +165,7 @@ class DifferentialAnalysisTest extends AnyFunSuite with DifferentialTest {
 }
 
 @test_util.tags.AnalysisSystemTest
-class DifferentialAnalysisTestSimplification extends AnyFunSuite with DifferentialTest {
+class DifferentialAnalysisTestSimplification extends DifferentialTest {
 
   def runSystemTests(): Unit = {
 

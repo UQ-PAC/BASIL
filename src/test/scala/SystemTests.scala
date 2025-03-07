@@ -11,12 +11,13 @@ import test_util.BASILTest
 import test_util.BASILTest.*
 import test_util.Histogram
 import test_util.TestConfig
+import test_util.TestCustomisation
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
   */
 
-trait SystemTests extends AnyFunSuite, BASILTest, Retries {
+trait SystemTests extends AnyFunSuite, BASILTest, Retries, TestCustomisation {
   case class TestResult(
     name: String,
     passed: Boolean,
@@ -44,31 +45,10 @@ trait SystemTests extends AnyFunSuite, BASILTest, Retries {
 
   private val testPath = "./src/test/"
 
-  override def withFixture(test: NoArgTest) = {
-    if (isRetryable(test))
-      withRetry { super.withFixture(test) }
-    else
-      super.withFixture(test)
-  }
-
-  /**
-   * Allows for annotating the SystemTest cases which are dynamically
-   * generated from the directories. This function should return a function
-   * which will be called with the body of the test case. This can be used
-   * to wrap the test body in methods such as `pendingUntilFixed` to mark
-   * known-broken tests.
-   */
-  protected def annotateTestCase(
-    folder: String,
-    program: String,
-    variation: String,
-    conf: TestConfig
-  ): (=> Unit) => Unit = {
-    (folder, program, variation) match {
-      case ("procedure_summaries", "procedure_summary3", "gcc_O2") =>
-        _ => cancel("cancelling flaky procedure summaries test")
-      case _ => identity
-    }
+  override def customiseTestsByName(name: String) = name match {
+    case "procedure_summaries/procedure_summary3/gcc_O2:BAP" | "procedure_summaries/procedure_summary3/gcc_O2:GTIRB" =>
+      Mode.Disabled("this procedure summaries test is unpredictably flaky")
+    case _ => Mode.Normal
   }
 
   def runTests(folder: String, conf: TestConfig): Unit = {
@@ -85,9 +65,7 @@ trait SystemTests extends AnyFunSuite, BASILTest, Retries {
         val inputPath = if conf.useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
         if (File(inputPath).exists) {
           test(folder + "/" + p + "/" + t + testSuffix) {
-            annotateTestCase(folder, p, t, conf) {
-              runTest(path, p, t, conf)
-            }
+            runTest(path, p, t, conf)
           }
         }
       }
@@ -362,6 +340,7 @@ class SimplifySystemTests extends SystemTests {
   }
 }
 
+@test_util.tags.AnalysisSystemTest
 class SimplifyMemorySystemTests extends SystemTests {
   // Logger.setLevel(LogLevel.DEBUG)
   val staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA))
@@ -474,6 +453,7 @@ class DSAMemoryRegionSystemTestsGTIRB extends SystemTests {
   )
 }
 
+@test_util.tags.DisabledTest
 class MRAMemoryRegionSystemTestsBAP extends SystemTests {
   runTests(
     "correct",
@@ -493,6 +473,7 @@ class MRAMemoryRegionSystemTestsBAP extends SystemTests {
   )
 }
 
+@test_util.tags.DisabledTest
 class MRAMemoryRegionSystemTestsGTIRB extends SystemTests {
   runTests(
     "correct",
@@ -512,6 +493,7 @@ class MRAMemoryRegionSystemTestsGTIRB extends SystemTests {
   )
 }
 
+@test_util.tags.StandardSystemTest
 class MemoryRegionTestsDSA extends SystemTests {
   // stack_pointer currently times out because Boogie is bad at handling abstract map accesses
   runTests(
@@ -537,6 +519,7 @@ class MemoryRegionTestsMRA extends SystemTests {
   )
 }
 
+@test_util.tags.DisabledTest
 class MemoryRegionTestsNoRegion extends SystemTests {
   runTests(
     "memory_regions",
@@ -567,6 +550,7 @@ class ProcedureSummaryTests extends SystemTests {
 }
 
 // tests that require currently unimplemented functionality to pass
+@test_util.tags.DisabledTest
 class UnimplementedTests extends SystemTests {
   runTests("unimplemented", TestConfig(useBAPFrontend = false, expectVerify = true))
   runTests("unimplemented", TestConfig(useBAPFrontend = true, expectVerify = false))

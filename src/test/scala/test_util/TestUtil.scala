@@ -86,7 +86,6 @@ trait TestCustomisation extends TestSuite with Retries {
 
   def customiseTestsByName(name: String): Mode
 
-
   override def withFixture(test: NoArgTest) = {
 
     val mode = customiseTestsByName(test.name)
