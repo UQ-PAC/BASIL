@@ -65,7 +65,7 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill compile
-      - run: ./mill test.runMain org.scalatest.tools.Runner -oI -R out/test/compile.dest/classes -n test_util.tags.StandardSystemTest
+      - run: ./mill test.runMain org.scalatest.tools.Runner -oID -R out/test/compile.dest/classes -n test_util.tags.StandardSystemTest
 
       - uses: actions/upload-artifact@v4
         with:
@@ -116,7 +116,7 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
-      - run: ./mill test.runMain org.scalatest.tools.Runner -oI -R out/test/compile.dest/classes -n test_util.tags.UnitTest
+      - run: ./mill test.runMain org.scalatest.tools.Runner -oID -R out/test/compile.dest/classes -n test_util.tags.UnitTest
 
         # every test with package prefix:
         # sbt "show test:definedTests"
@@ -144,4 +144,4 @@ jobs:
       - run: echo "All systemtest suites:" && ./mill test.testOnly '*SystemTests*' -- -z 'xxxx'
 
       - run: ./mill compile
-      - run: ./mill test.runMain org.scalatest.tools.Runner -oI -R out/test/compile.dest/classes -n test_util.tags.AnalysisSystemTest
+      - run: ./mill test.runMain org.scalatest.tools.Runner -oID -R out/test/compile.dest/classes -n test_util.tags.AnalysisSystemTest
