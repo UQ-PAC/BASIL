@@ -4,6 +4,7 @@ import translating.PrettyPrinter.*
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.immutable.*
+import scala.annotation.targetName
 
 /**
  * IR construction DSL
@@ -257,6 +258,10 @@ def block(label: String, sl: (NonCallStatement | EventuallyStatement | Eventuall
   EventuallyBlock(label, statements, rjump)
 }
 
+def stmts(sl: (NonCallStatement | EventuallyStatement | EventuallyJump)*): EventuallyBlock = {
+  block(Counter.nlabel("block"), sl: _*)
+}
+
 case class EventuallyProcedure(
   label: String,
   in: Map[String, IRType] = Map(),
@@ -322,9 +327,18 @@ def proc(
   label: String,
   in: Iterable[(String, IRType)],
   out: Iterable[(String, IRType)],
+  blocks: Iterable[EventuallyBlock]
+): EventuallyProcedure = {
+  EventuallyProcedure(label, in.to(SortedMap), out.to(SortedMap), blocks.toSeq, blocks.headOption.map(_.label))
+}
+
+def proc(
+  label: String,
+  in: Iterable[(String, IRType)],
+  out: Iterable[(String, IRType)],
   blocks: EventuallyBlock*
 ): EventuallyProcedure = {
-  EventuallyProcedure(label, in.to(SortedMap), out.to(SortedMap), blocks, blocks.headOption.map(_.label))
+  proc(label, in, out, blocks.toSeq)
 }
 
 def mem: SharedMemory = SharedMemory("mem", 64, 8)
@@ -367,7 +381,23 @@ object Counter {
   }
 }
 
-def sequence(first: List[EventuallyBlock], rest: List[EventuallyBlock]) = {
+extension (i: EventuallyBlock)
+  @targetName("sequenceblock")
+  infix def `;`(j: EventuallyBlock): List[EventuallyBlock] = sequence(List(i), List(j))
+  @targetName("sequenceblock")
+  infix def `;`(j: Iterable[EventuallyBlock]): List[EventuallyBlock] = sequence(List(i), j.toList)
+
+extension (i: List[EventuallyBlock])
+  @targetName("sequenceblock")
+  infix def `;`(j: EventuallyBlock): List[EventuallyBlock] = sequence(i.toList, List(j))
+  @targetName("sequenceblock")
+  infix def `;`(j: Iterable[EventuallyBlock]): List[EventuallyBlock] = sequence(i.toList, j.toList)
+
+def sequence(first: List[EventuallyBlock], rest: EventuallyBlock*): List[EventuallyBlock] = {
+  sequence(first, rest.toList)
+}
+
+def sequence(first: List[EventuallyBlock], rest: List[EventuallyBlock]): List[EventuallyBlock] = {
   require(first.nonEmpty)
   require(rest.nonEmpty)
   require(first.last.j.isInstanceOf[EventuallyUnreachable])
@@ -385,6 +415,10 @@ def setSucc(first: List[EventuallyBlock], rest: EventuallyBlock*) = {
   first
 }
 
+def whileDo(cond: Expr, body: EventuallyBlock*): List[EventuallyBlock] = {
+  whileDo(cond, body.toList)
+}
+
 def whileDo(cond: Expr, body: List[EventuallyBlock]): List[EventuallyBlock] = {
   val loopExit = Counter.nlabel("while_exit")
   val loopBackedge = Counter.nlabel("while_backedge")
@@ -392,19 +426,29 @@ def whileDo(cond: Expr, body: List[EventuallyBlock]): List[EventuallyBlock] = {
   val loopBody = Counter.nlabel("while_body")
   List(block(loopEntry, goto(loopBody, loopExit)))
     ++
-      sequence(sequence(List(block(loopBody, Assume(cond))), body), List(block(loopBackedge, goto(loopEntry))))
+      sequence(sequence(List(block(loopBody, Assume(cond))), body), block(loopBackedge, goto(loopEntry)))
       ++
       List(block(loopExit, Assume(UnaryExpr(BoolNOT, cond)), unreachable))
 }
 
-def ifElse(cond: Expr, ifThen: List[EventuallyBlock], ifElse: List[EventuallyBlock]): List[EventuallyBlock] = {
+private case class ThenV(body: List[EventuallyBlock])
+private case class ElseV(body: List[EventuallyBlock])
+
+def Then(body: Iterable[EventuallyBlock]): ThenV = ThenV(body.toList)
+def Else(body: Iterable[EventuallyBlock]): ElseV = ElseV(body.toList)
+def Then(body: EventuallyBlock*): ThenV = ThenV(body.toList)
+def Else(body: EventuallyBlock*): ElseV = ElseV(body.toList)
+
+def If(cond: Expr, ifThen: ThenV, ifElse: ElseV): List[EventuallyBlock] = {
   val ifEntry = Counter.nlabel("if_entry")
   val thenCase = Counter.nlabel("if_then")
   val elseCase = Counter.nlabel("if_else")
   val ifExit = Counter.nlabel("if_exit")
 
-  val thenNonempty = if (ifThen.isEmpty) then List(block(Counter.nlabel("if_then_empty"), unreachable)) else ifThen
-  val elseNonempty = if (ifElse.isEmpty) then List(block(Counter.nlabel("if_else_empty"), unreachable)) else ifElse
+  val thenNonempty =
+    if (ifThen.body.isEmpty) then List(block(Counter.nlabel("if_then_empty"), unreachable)) else ifThen.body.toList
+  val elseNonempty =
+    if (ifElse.body.isEmpty) then List(block(Counter.nlabel("if_else_empty"), unreachable)) else ifElse.body.toList
 
   val exitBlock = block(ifExit, unreachable)
   val thenBlocks = setSucc(thenNonempty, exitBlock)
