@@ -3,9 +3,10 @@ import util.{LogLevel, Logger, DebugDumpIRLogger, MemoryRegionsMode, Performance
 
 import Numeric.Implicits.*
 import java.io.{BufferedWriter, File, FileWriter}
-import scala.collection.immutable.ListMap
+import scala.collection.immutable.{ListMap, HashMap}
 import scala.collection.mutable.ArrayBuffer
 import scala.sys.process.*
+import scala.util.{Using}
 import test_util.BASILTest
 import test_util.BASILTest.*
 import test_util.Histogram
@@ -14,6 +15,39 @@ import test_util.TestConfig
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
   */
+
+object SystemTests {
+
+  private val mapLock = java.util.concurrent.locks.ReentrantReadWriteLock()
+  private val read = mapLock.readLock
+  private val write = mapLock.writeLock
+
+  private var locksMap: HashMap[String, AnyRef] = HashMap()
+
+  protected def withLock(key: String)(body: => Unit): Unit = {
+    read.lock
+    var lock = locksMap.get(key)
+    if (lock.isEmpty) {
+      read.unlock
+      write.lock
+      lock = locksMap.get(key)
+      if (lock.isEmpty) {
+        locksMap = locksMap + (key -> Object())
+        lock = Some(locksMap(key))
+      }
+      read.lock
+      write.unlock
+    }
+    try {
+      lock.get.synchronized {
+        body
+      }
+    } finally {
+      read.unlock
+    }
+  }
+
+}
 
 trait SystemTests extends AnyFunSuite, BASILTest {
   case class TestResult(
@@ -142,6 +176,14 @@ trait SystemTests extends AnyFunSuite, BASILTest {
   }
 
   def runTest(path: String, name: String, variation: String, conf: TestConfig): Unit = {
+    val directoryPath = path + "/" + name + "/"
+    val variationPath = directoryPath + variation + "/" + name
+    SystemTests.withLock(variationPath) {
+      runTestUnsynchronised(path, name, variation, conf)
+    }
+  }
+
+  def runTestUnsynchronised(path: String, name: String, variation: String, conf: TestConfig): Unit = {
     val directoryPath = path + "/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
     val inputPath = if conf.useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
