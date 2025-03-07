@@ -18,6 +18,13 @@ import scala.util.control.Breaks.{break, breakable}
  * Procedure signature used when returning from procedures and intrinsics.
  * This is mainly used to describe the formalOutparams, where the return values of the procedure
  * are stored to be read by the return value.
+ *
+ * @param name
+ *  The full name of the procedure (i.e. procedure.name if a real procedure, otherwise the name of the intrinsic)
+ * @param formalInParam
+ *  The list of formal input parameters (corresponding to procedure.formalInParam)
+ * @param formalOutParam
+ *  The list of formal outpur params (corresponding to procedure.formalOutParam)
  */
 case class ProcSig(name: String, formalInParam: List[LocalVar], formalOutParam: List[LocalVar])
 
@@ -53,6 +60,12 @@ case class FunPointer(addr: BitVecLiteral, name: String, call: ExecutionContinua
 
 sealed trait MapValue {
   def value: Map[BasilValue, BasilValue]
+}
+
+def normalTermination(is: ExecutionContinuation) = is match {
+  case Stopped() => true
+  case ReturnFrom(_) => true
+  case _ => false
 }
 
 /* We erase the type of basil values and enforce the invariant that
@@ -364,7 +377,8 @@ object LibcIntrinsic {
       "__libc_malloc_impl" -> singleArg("malloc"),
       "free" -> singleArg("free"),
       "#free" -> singleArg("free"),
-      "calloc" -> calloc
+      "calloc" -> calloc,
+      "strlen" -> singleArg("strlen") 
     )
 
 }
@@ -638,29 +652,36 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
     )
 }
 
-trait Interpreter[S, V, E](val f: Effects[S, E]) {
+enum Next[+V] {
+  case Continue
+  case Stop(value: V)
+}
 
-  enum Next {
-    case Continue
-    case Stop(value: V)
+/**
+ * Force the evaluation of the state monad steps in an explicit iteration to avoid too much buildup
+ */
+def evalInterpreter[S, V, E](f: Effects[S, E], doStep: State[S, Next[V], E]): State[S, Option[V], E] = {
+  @tailrec
+  def runEval(begin: S) : (S, Either[E, Option[V]]) = {
+    val (fs, cont) = doStep.f(begin)
+
+    cont match {
+      case Right(Next.Stop(v)) => (fs, Right(Some(v)))
+      case Right(Next.Continue) => runEval(fs)
+      case Left(e) => (fs, Left(e))
+    }
   }
+
+  State(begin => runEval(begin))
+}
+
+trait Interpreter[S, V, E](val f: Effects[S, E]) {
 
   /*
    * Returns value deciding whether to continue.
    */
-  def interpretOne: State[S, Next, E]
+  def interpretOne: State[S, Next[V], E]
 
-  @tailrec
-  final def eval(begin: S): (S, Option[V]) = {
-    val (fs, cont) = interpretOne.f(begin)
-
-    cont match {
-      case Right(Next.Stop(v)) => (fs, Some(v))
-      case Right(Next.Continue) => eval(fs)
-      case Left(_) => (fs, None)
-    }
-  }
-
-  final def run(begin: S): S = (eval(begin))._1
+  final def run(begin: S): S = State.execute(begin, (evalInterpreter(f, interpretOne)))
 
 }
