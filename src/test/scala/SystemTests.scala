@@ -496,7 +496,15 @@ class MRAMemoryRegionSystemTestsGTIRB extends SystemTests {
 
 @test_util.tags.StandardSystemTest
 class MemoryRegionTestsDSA extends SystemTests {
-  // stack_pointer currently times out because Boogie is bad at handling abstract map accesses
+
+  override def customiseTestsByName(name: String) = super.customiseTestsByName(name).orElse {
+    name match {
+      case "memory_regions/stack_pointer/clang:BAP" | "memory_regions/stack_pointer/clang_pic:BAP" =>
+        Mode.Disabled("stack_pointer currently times out because Boogie is bad at handling abstract map accesses")
+      case _ => Mode.Normal
+    }
+  }
+
   runTests(
     "memory_regions",
     TestConfig(
@@ -509,7 +517,15 @@ class MemoryRegionTestsDSA extends SystemTests {
 
 @test_util.tags.DisabledTest
 class MemoryRegionTestsMRA extends SystemTests {
-  // stack_pointer currently times out because Boogie is bad at handling abstract map accesses
+
+  override def customiseTestsByName(name: String) = super.customiseTestsByName(name).orElse {
+    name match {
+      case "memory_regions/stack_pointer/clang:BAP" | "memory_regions/stack_pointer/clang_pic:BAP" =>
+        Mode.Disabled("stack_pointer currently times out because Boogie is bad at handling abstract map accesses")
+      case _ => Mode.Normal
+    }
+  }
+
   runTests(
     "memory_regions",
     TestConfig(

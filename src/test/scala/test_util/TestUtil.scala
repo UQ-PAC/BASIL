@@ -84,6 +84,16 @@ trait TestCustomisation extends TestSuite with Retries {
     case ExpectFailure(s: String) extends Mode(Some(s))
     case Disabled(s: String) extends Mode(Some(s))
 
+    /**
+     * Simple chaining of customisation modes. The current
+     * mode is returned if it is abnormal, otherwise the second (given)
+     * mode is returned.
+     */
+    def orElse(other: => Mode): Mode = this match {
+      case Normal => other
+      case _ => this
+    }
+
   def customiseTestsByName(name: String): Mode
 
   override def withFixture(test: NoArgTest) = {
