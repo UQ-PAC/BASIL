@@ -102,25 +102,24 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
         "fib",
         Seq("n_in" -> bv_t(64)),
         Seq("n_out" -> bv_t(64)),
-        sequence(
-          ifElse(
-            BinaryExpr(BVEQ, bv64(0), n_in),
-            List(block("base_0", LocalAssign(returnv, bv64(0)))),
-            ifElse(
+        If(
+          BinaryExpr(BVEQ, bv64(0), n_in),
+          Then(stmts(LocalAssign(returnv, bv64(0)))),
+          Else(
+            If(
               BinaryExpr(BVEQ, bv64(1), n_in),
-              List(block("base_1", LocalAssign(returnv, bv64(1)))),
-              List(
-                block(
-                  "rec",
+              Then(stmts(LocalAssign(returnv, bv64(1)))),
+              Else(
+                stmts(
                   directCall(Seq(("n_out" -> p2)), "fib", "n_in" -> BinaryExpr(BVSUB, n_in, bv64(2))),
                   directCall(Seq(("n_out" -> p1)), "fib", "n_in" -> BinaryExpr(BVSUB, n_in, bv64(1))),
                   LocalAssign(returnv, BinaryExpr(BVADD, p1, p2))
                 )
               )
             )
-          ),
-          List(block("end", ret("n_out" -> returnv)))
-        ): _*
+          )
+        ) `;`
+          stmts(ret("n_out" -> returnv))
       )
     )
 
@@ -142,26 +141,22 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
         "sumto",
         Seq("i" -> bv_t(64)),
         Seq("n_out" -> bv_t(64)),
-        sequence(
-          List(block("entry", LocalAssign(acc, bv64(0)))),
-          sequence(
-            ifElse(
+        List(stmts(LocalAssign(acc, bv64(0))))
+          `;`
+            If(
               BinaryExpr(BVSLT, i, bv64(0)),
-              List(block("lt0", LocalAssign(acc, bv64(0)))),
-              whileDo(
-                BinaryExpr(BVSGE, i, bv64(0)),
-                List(
-                  block(
-                    "body",
-                    LocalAssign(acc, BinaryExpr(BVADD, acc, i)),
-                    LocalAssign(i, BinaryExpr(BVSUB, i, bv64(1)))
+              Then(stmts(LocalAssign(acc, bv64(0)))),
+              Else(
+                whileDo(
+                  BinaryExpr(BVSGE, i, bv64(0)),
+                  List(
+                    stmts(LocalAssign(acc, BinaryExpr(BVADD, acc, i)), LocalAssign(i, BinaryExpr(BVSUB, i, bv64(1))))
                   )
                 )
               )
-            ),
+            )
+            `;`
             List(block("returnbl", ret("n_out" -> acc)))
-          )
-        ): _*
       )
     )
 
