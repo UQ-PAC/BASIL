@@ -5,6 +5,7 @@ import scala.collection.immutable.*
 import org.scalatest.funsuite.AnyFunSuite
 import util.intrusive_list.*
 import translating.serialiseIL
+import translating.PrettyPrinter.*
 import ir.dsl.*
 import ir.*
 
