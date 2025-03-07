@@ -4,7 +4,8 @@ import java.io.{BufferedWriter, File, FileWriter}
 import ir.{Block, Procedure, Program}
 import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, StaticAnalysisConfig}
 
-import org.scalatest.{TestSuite, Retries, Failed, Exceptional, Pending, Canceled, Succeeded}
+import org.scalatest.{Retries, Failed, Exceptional, Pending, Canceled, Succeeded}
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.io.File
 
@@ -75,7 +76,7 @@ def log(text: String, path: String): Unit = {
  * comment below).
  *
  */
-trait TestCustomisation extends TestSuite with Retries {
+trait TestCustomisation extends AnyFunSuite with Retries {
 
   enum Mode(val reason: Option[String]):
     case Normal extends Mode(None)
@@ -105,21 +106,22 @@ trait TestCustomisation extends TestSuite with Retries {
 
     def invokeTest() = super.withFixture(test)
 
-    val reason = mode.reason.map(x => s"($x)")
-    withClue(reason.getOrElse("")) {
-      mode match {
-        case Mode.Normal => invokeTest()
-        case Mode.Retry(s) => withRetry { invokeTest() }
-        case Mode.ExpectFailure(s) => {
-          val res = invokeTest()
-          res match {
-            case Succeeded => fail("test succeeded but failure was expected")
-            case Exceptional(_) | Failed(_) => Pending
-            case Canceled(_) | Pending => res
-          }
+    if (mode != Mode.Normal) {
+      info(s"NOTE: Test case is customised with: \"$mode\"\n")
+    }
+
+    mode match {
+      case Mode.Normal => invokeTest()
+      case Mode.Retry(s) => withRetry { invokeTest() }
+      case Mode.ExpectFailure(s) => {
+        val res = invokeTest()
+        res match {
+          case _ => fail(s"Expected failure, but no exception/assertion was thrown")
+          case Exceptional(_) | Failed(_) => Pending
+          case Canceled(_) | Pending => res
         }
-        case Mode.Disabled(s) => cancel("test explicitly disabled")
       }
+      case Mode.Disabled(s) => cancel(s"Test has been explicitly disabled")
     }
   }
 }

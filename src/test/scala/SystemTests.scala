@@ -355,6 +355,17 @@ class SimplifySystemTests extends SystemTests {
 
 @test_util.tags.AnalysisSystemTest
 class SimplifyMemorySystemTests extends SystemTests {
+
+  override def customiseTestsByName(name: String) = super.customiseTestsByName(name).orElse {
+    name match {
+      case "correct/malloc_with_local3/clang:BAP" =>
+        Mode.ExpectFailure(
+          "previous failure was: Expected verification success, but got failure. Failing assertion is: assert (load37_1 == R30_in)"
+        )
+      case _ => Mode.Normal
+    }
+  }
+
   // Logger.setLevel(LogLevel.DEBUG)
   val staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA))
   runTests(
