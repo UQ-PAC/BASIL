@@ -14,13 +14,21 @@ import scala.collection.mutable
 import scala.collection.immutable
 import scala.util.control.Breaks.{break, breakable}
 
+/**
+ * Procedure signature used when returning from procedures and intrinsics.
+ * This is mainly used to describe the formalOutparams, where the return values of the procedure
+ * are stored to be read by the return value.
+ */
+case class ProcSig(name: String, formalInParam: List[LocalVar], formalOutParam: List[LocalVar])
+
 /** Interpreter status type, either stopped, run next command or error
   */
 sealed trait ExecutionContinuation
 case class Stopped() extends ExecutionContinuation /* normal program stop  */
 case class ErrorStop(error: InterpreterError) extends ExecutionContinuation /* program stop in error state */
 case class Run(next: Command) extends ExecutionContinuation /* continue by executing next command */
-case class ReturnTo(call: DirectCall) extends ExecutionContinuation /* continue by executing next command */
+case class ReturnTo(call: DirectCall) extends ExecutionContinuation /* return from a call and continue at caller */
+case class ReturnFrom(target: ProcSig) extends ExecutionContinuation /* return from a call without continuing */
 case class Intrinsic(name: String) extends ExecutionContinuation /* a named intrinsic instruction */
 
 sealed trait InterpreterError
@@ -630,21 +638,29 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
     )
 }
 
-trait Interpreter[S, E](val f: Effects[S, E]) {
+trait Interpreter[S, V, E](val f: Effects[S, E]) {
+
+  enum Next {
+    case Continue
+    case Stop(value: V)
+  }
 
   /*
    * Returns value deciding whether to continue.
    */
-  def interpretOne: State[S, Boolean, E]
+  def interpretOne: State[S, Next, E]
 
   @tailrec
-  final def run(begin: S): S = {
+  final def eval(begin: S): (S, Option[V]) = {
     val (fs, cont) = interpretOne.f(begin)
 
-    if (cont.contains(true)) then {
-      run(fs)
-    } else {
-      fs
+    cont match {
+      case Right(Next.Stop(v)) => (fs, Some(v))
+      case Right(Next.Continue) => eval(fs)
+      case Left(_) => (fs, None)
     }
   }
+
+  final def run(begin: S): S = (eval(begin))._1
+
 }
