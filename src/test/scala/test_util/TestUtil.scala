@@ -107,7 +107,7 @@ trait TestCustomisation extends TestSuite with Retries {
     def invokeTest() = super.withFixture(test)
 
     if (mode != Mode.Normal) {
-      info(s"NOTE: Test case is customised with: \"$mode\"\n")
+      info(s"NOTE: Test case is customised with: \"$mode\"")
     }
 
     mode match {
@@ -117,7 +117,10 @@ trait TestCustomisation extends TestSuite with Retries {
         val res = invokeTest()
         res match {
           case Succeeded => fail(s"Expected failure, but no exception/assertion was thrown")
-          case Exceptional(_) | Failed(_) => Pending
+          case Exceptional(ex)  => {
+            info("Current outcome: " + res)
+            Pending
+          }
           case Canceled(_) | Pending => res
         }
       }
