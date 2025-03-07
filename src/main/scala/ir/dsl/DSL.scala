@@ -415,11 +415,11 @@ def setSucc(first: List[EventuallyBlock], rest: EventuallyBlock*) = {
   first
 }
 
-def whileDo(cond: Expr, body: EventuallyBlock*): List[EventuallyBlock] = {
-  whileDo(cond, body.toList)
+def While(cond: Expr, body: EventuallyBlock*): List[EventuallyBlock] = {
+  While(cond, body.toList)
 }
 
-def whileDo(cond: Expr, body: List[EventuallyBlock]): List[EventuallyBlock] = {
+def While(cond: Expr, body: List[EventuallyBlock]): List[EventuallyBlock] = {
   val loopExit = Counter.nlabel("while_exit")
   val loopBackedge = Counter.nlabel("while_backedge")
   val loopEntry = Counter.nlabel("while_entry")
@@ -438,6 +438,10 @@ def Then(body: Iterable[EventuallyBlock]): ThenV = ThenV(body.toList)
 def Else(body: Iterable[EventuallyBlock]): ElseV = ElseV(body.toList)
 def Then(body: EventuallyBlock*): ThenV = ThenV(body.toList)
 def Else(body: EventuallyBlock*): ElseV = ElseV(body.toList)
+@targetName("thenStatements")
+def Then(body: (NonCallStatement | EventuallyStatement | EventuallyJump)*): ThenV = ThenV(List(stmts(body: _*)))
+@targetName("elseStatements")
+def Else(body: (NonCallStatement | EventuallyStatement | EventuallyJump)*): ElseV = ElseV(List(stmts(body: _*)))
 
 def If(cond: Expr, ifThen: ThenV, ifElse: ElseV): List[EventuallyBlock] = {
   val ifEntry = Counter.nlabel("if_entry")

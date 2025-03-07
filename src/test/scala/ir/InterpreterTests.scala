@@ -90,7 +90,6 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
   }
 
   test("structured fib program if else") {
-
     val n_in = LocalVar("n_in", BitVecType(64))
     val n_out = LocalVar("n_out", BitVecType(64))
     val returnv = LocalVar("rval", BitVecType(64))
@@ -104,17 +103,15 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
         Seq("n_out" -> bv_t(64)),
         If(
           BinaryExpr(BVEQ, bv64(0), n_in),
-          Then(stmts(LocalAssign(returnv, bv64(0)))),
+          Then(LocalAssign(returnv, bv64(0))),
           Else(
             If(
               BinaryExpr(BVEQ, bv64(1), n_in),
-              Then(stmts(LocalAssign(returnv, bv64(1)))),
+              Then(LocalAssign(returnv, bv64(1))),
               Else(
-                stmts(
-                  directCall(Seq(("n_out" -> p2)), "fib", "n_in" -> BinaryExpr(BVSUB, n_in, bv64(2))),
-                  directCall(Seq(("n_out" -> p1)), "fib", "n_in" -> BinaryExpr(BVSUB, n_in, bv64(1))),
-                  LocalAssign(returnv, BinaryExpr(BVADD, p1, p2))
-                )
+                directCall(Seq(("n_out" -> p2)), "fib", "n_in" -> BinaryExpr(BVSUB, n_in, bv64(2))),
+                directCall(Seq(("n_out" -> p1)), "fib", "n_in" -> BinaryExpr(BVSUB, n_in, bv64(1))),
+                LocalAssign(returnv, BinaryExpr(BVADD, p1, p2))
               )
             )
           )
@@ -141,22 +138,20 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
         "sumto",
         Seq("i" -> bv_t(64)),
         Seq("n_out" -> bv_t(64)),
-        List(stmts(LocalAssign(acc, bv64(0))))
+        stmts(LocalAssign(acc, bv64(0)))
           `;`
             If(
               BinaryExpr(BVSLT, i, bv64(0)),
-              Then(stmts(LocalAssign(acc, bv64(0)))),
+              Then(LocalAssign(acc, bv64(0))),
               Else(
-                whileDo(
+                While(
                   BinaryExpr(BVSGE, i, bv64(0)),
-                  List(
-                    stmts(LocalAssign(acc, BinaryExpr(BVADD, acc, i)), LocalAssign(i, BinaryExpr(BVSUB, i, bv64(1))))
-                  )
+                  stmts(LocalAssign(acc, BinaryExpr(BVADD, acc, i)), LocalAssign(i, BinaryExpr(BVSUB, i, bv64(1))))
                 )
               )
             )
             `;`
-            List(block("returnbl", ret("n_out" -> acc)))
+            block("returnbl", ret("n_out" -> acc))
       )
     )
 
@@ -398,7 +393,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
   test("fib breakpoints") {
 
-    Logger.setLevel(LogLevel.INFO)
+    Logger.setLevel(LogLevel.ERROR)
     val fib = fibonacciProg(8)
     val watch = IRWalk.firstInProc((fib.procedures.find(_.name == "fib")).get).get
     val bp = BreakPoint(
