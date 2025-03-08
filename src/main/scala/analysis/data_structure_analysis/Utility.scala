@@ -61,7 +61,11 @@ class Flags() {
 
 /** a Data structure Node
   */
-class Node(using nodeCounter: NodeCounter)(val graph: Option[Graph], var size: BigInt = 0, val id: Int = nodeCounter.getCounter) {
+class Node(using nodeCounter: NodeCounter)(
+  val graph: Option[Graph],
+  var size: BigInt = 0,
+  val id: Int = nodeCounter.getCounter
+) {
 
   val term: DSAUniTerm = DSAUniTerm(this)
   val children: mutable.Map[Node, BigInt] = mutable.Map()

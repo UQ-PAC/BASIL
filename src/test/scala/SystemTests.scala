@@ -18,6 +18,7 @@ import test_util.LockManager
   */
 
 object SystemTests {
+
   /** Locks are shared by all SystemTests instances. */
   val locks = LockManager()
 }

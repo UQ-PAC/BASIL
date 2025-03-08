@@ -10,6 +10,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
  * and executes the body while holding the specified lock.
  */
 class LockManager {
+
   /** An internal-use lock around the map of keyed locks. */
   private val mapLock = ReentrantReadWriteLock()
   private val read = mapLock.readLock
