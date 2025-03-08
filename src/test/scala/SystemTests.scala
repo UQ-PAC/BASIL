@@ -11,42 +11,15 @@ import test_util.BASILTest
 import test_util.BASILTest.*
 import test_util.Histogram
 import test_util.TestConfig
+import test_util.LockManager
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
   */
 
 object SystemTests {
-
-  private val mapLock = java.util.concurrent.locks.ReentrantReadWriteLock()
-  private val read = mapLock.readLock
-  private val write = mapLock.writeLock
-
-  private var locksMap: HashMap[String, AnyRef] = HashMap()
-
-  protected def withLock(key: String)(body: => Unit): Unit = {
-    read.lock
-    var lock = locksMap.get(key)
-    if (lock.isEmpty) {
-      read.unlock
-      write.lock
-      lock = locksMap.get(key)
-      if (lock.isEmpty) {
-        locksMap = locksMap + (key -> Object())
-        lock = Some(locksMap(key))
-      }
-      read.lock
-      write.unlock
-    }
-    try {
-      lock.get.synchronized {
-        body
-      }
-    } finally {
-      read.unlock
-    }
-  }
-
+  /** Locks are shared by all SystemTests instances. */
+  val locks = LockManager()
 }
 
 trait SystemTests extends AnyFunSuite, BASILTest {
@@ -178,7 +151,7 @@ trait SystemTests extends AnyFunSuite, BASILTest {
   def runTest(path: String, name: String, variation: String, conf: TestConfig): Unit = {
     val directoryPath = path + "/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
-    SystemTests.withLock(variationPath) {
+    SystemTests.locks.withLock(variationPath) {
       runTestUnsynchronised(path, name, variation, conf)
     }
   }
