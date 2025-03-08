@@ -15,6 +15,7 @@ object PrettyPrinter {
   def pp_jump(s: Jump) = BasilIRPrettyPrinter()(s)
   def pp_prog(s: Program) = BasilIRPrettyPrinter()(s)
   def pp_proc(s: Procedure) = BasilIRPrettyPrinter()(s)
+  def pp_proc_sig(s: Procedure) = BasilIRPrettyPrinter().pp_proc_sig(s)
 
   def pp_prog_with_analysis_results[T](
     before: Map[Block, T],
@@ -38,6 +39,19 @@ object PrettyPrinter {
       with_analysis_results_begin = block => before.get(block).map(resultPrinter),
       block => after.get(block).map(resultPrinter)
     )(p)
+  }
+
+  def pp_dot_prog(program: Program) = {
+    dotBlockGraph(
+      program,
+      (program.collect {
+
+        case b: Block if b.parent.entryBlock.contains(b) =>
+          b -> (pp_proc_sig(b.parent) + "\n" + pp_block(b))
+        case b: Block =>
+          b -> pp_block(b)
+      }).toMap
+    )
   }
 
 }
@@ -287,6 +301,13 @@ class BasilIRPrettyPrinter(
     s"${l.name}:${vtype { l.getType }}"
   }
 
+  def pp_proc_sig(p: Procedure) = {
+    val name = p.name
+    val inParams = p.formalInParam.toList.map(vparam)
+    val outParams = p.formalOutParam.toList.map(vparam)
+    s"proc $name(${inParams.mkString(", ")}) -> (${outParams.mkString(", ")})"
+  }
+
   override def vproc(p: Procedure): PPProg[Procedure] = {
     seenVars.clear()
     val decls = locals(p).map(vardecl)
@@ -318,7 +339,9 @@ class BasilIRPrettyPrinter(
 
     val blocks = (pname ++ addr ++ iblocks ++ mblocks.toList).map(_ + ";").mkString("\n")
 
-    Proc(s"proc $name(${inParams.mkString(", ")}) -> (${outParams.mkString(", ")})", localDecls, blocks)
+    val header = pp_proc_sig(p)
+
+    Proc(header, localDecls, blocks)
   }
 
   def vproc(

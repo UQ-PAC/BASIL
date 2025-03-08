@@ -434,5 +434,4 @@ class IRTest extends AnyFunSuite {
     assert(recursiveproc.addToProg(emptyprog) != null)
   }
 
-
 }
