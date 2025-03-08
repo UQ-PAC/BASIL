@@ -1,7 +1,6 @@
 package test_util
 
 import scala.collection.mutable.HashMap
-import java.util.concurrent.locks.ReentrantReadWriteLock
 
 /**
  * Manages a number of mutex locks, each identified by a key.

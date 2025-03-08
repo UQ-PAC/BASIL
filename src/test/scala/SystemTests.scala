@@ -3,10 +3,9 @@ import util.{LogLevel, Logger, DebugDumpIRLogger, MemoryRegionsMode, Performance
 
 import Numeric.Implicits.*
 import java.io.{BufferedWriter, File, FileWriter}
-import scala.collection.immutable.{ListMap, HashMap}
+import scala.collection.immutable.ListMap
 import scala.collection.mutable.ArrayBuffer
 import scala.sys.process.*
-import scala.util.{Using}
 import test_util.BASILTest
 import test_util.BASILTest.*
 import test_util.Histogram
