@@ -1,27 +1,28 @@
 package test_util
 
-import scala.collection.immutable.HashMap
+import scala.collection.mutable.HashMap
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 /**
- * A manager of mutually-exclusive locks keyed by strings.
- * Users should construct an instance and place it in a
- * shared location. The `withLock` method takes a lock name
- * and executes the body while holding the specified lock.
+ * Manages a number of mutex locks, each identified by a key.
+ * Users should construct an instance of this class and place
+ * it in a shared location. The `withLock` method takes a lock
+ * name and executes the body while holding the specified lock.
+ *
+ * The key values will be used as HashMap keys, so they must be
+ * hashable with sensible equality.
  */
-class LockManager {
-
-  /** An internal-use lock around the map of keyed locks. */
-  private val mapLock = ReentrantReadWriteLock()
-  private val read = mapLock.readLock
-  private val write = mapLock.writeLock
+class LockManager[T] {
 
   /**
-   * The map containing the locks keyed by strings. The
-   * "locks" are simply AnyRef objects which act as locks
-   * through the `synchronized` method.
+   * The map containing the locks. The "locks" are simply AnyRef
+   * objects which act as locks through the `synchronized` method.
+   * Additionally, the map object itself is used to synchronise
+   * reads/writes to the map.
+   *
+   * This is a mutable map.
    */
-  private var locksMap: HashMap[String, AnyRef] = HashMap()
+  private val locksMap: HashMap[T, AnyRef] = HashMap()
 
   /**
    * Executes the given body while holding the given lock.
@@ -29,51 +30,20 @@ class LockManager {
    *
    * Usage:
    *
+   *     val manager = LockManager[String]()
+   *
+   *     // ...
+   *
    *     manager.withLock("lock name") {
    *       println("this code will hold the lock!")
    *     }
    */
-  def withLock(key: String)(body: => Unit): Unit = {
-
-    /*
-     * This code uses read-write locks to synchronise
-     * access to the hashmap of locks.
-     *
-     * First, the read lock is acquired. If the key has an
-     * existing lock, that is used. Otherwise, the lock
-     * is upgraded to a write lock and a new lock is created
-     * and inserted for that key.
-     *
-     * There is an additional consideration when upgrading
-     * the lock from read to write. The read lock must be dropped
-     * before the write lock is obtained. Thus, it is possible for
-     * another thread to modify the map in the intervening time.
-     * After acquiring the write lock, we must check again that
-     * the key does not exist before creating a new lock.
-     */
-
-    read.lock
-    var namedLock = locksMap.get(key)
-    if (namedLock.isEmpty) {
-      // upgrade the lock, checking for possible modifications
-      // that occured after `read` was dropped.
-      read.unlock
-      write.lock
-      namedLock = locksMap.get(key)
-      if (namedLock.isEmpty) {
-        locksMap = locksMap + (key -> Object())
-        namedLock = Some(locksMap(key))
-      }
-      assert(namedLock.nonEmpty)
-      // downgrade the write lock to a read lock and continue
-      read.lock
-      write.unlock
+  def withLock(key: T)(body: => Unit): Unit = {
+    val lock = locksMap.synchronized {
+      locksMap.getOrElseUpdate(key, Object())
     }
-    // it is safe to drop the read lock here, as locks are
-    // never modified or deleted once inserted into the map.
-    read.unlock
 
-    namedLock.get.synchronized {
+    lock.synchronized {
       body
     }
   }
