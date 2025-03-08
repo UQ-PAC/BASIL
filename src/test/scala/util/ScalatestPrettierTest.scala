@@ -13,6 +13,7 @@ object ScalatestPrettierTest {
 
 }
 
+@test_util.tags.UnitTest
 class ScalatestPrettierTest extends AnyFunSuite {
 
   import ScalatestPrettierTest.*

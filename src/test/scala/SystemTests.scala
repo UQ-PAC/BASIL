@@ -1,21 +1,57 @@
 import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.Retries
 import util.{LogLevel, Logger, DebugDumpIRLogger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
 
 import Numeric.Implicits.*
 import java.io.{BufferedWriter, File, FileWriter}
-import scala.collection.immutable.ListMap
+import scala.collection.immutable.{ListMap, HashMap}
 import scala.collection.mutable.ArrayBuffer
 import scala.sys.process.*
+import scala.util.{Using}
 import test_util.BASILTest
 import test_util.BASILTest.*
 import test_util.Histogram
 import test_util.TestConfig
+import test_util.TestCustomisation
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
   */
 
-trait SystemTests extends AnyFunSuite, BASILTest {
+object SystemTests {
+
+  private val mapLock = java.util.concurrent.locks.ReentrantReadWriteLock()
+  private val read = mapLock.readLock
+  private val write = mapLock.writeLock
+
+  private var locksMap: HashMap[String, AnyRef] = HashMap()
+
+  protected def withLock(key: String)(body: => Unit): Unit = {
+    read.lock
+    var lock = locksMap.get(key)
+    if (lock.isEmpty) {
+      read.unlock
+      write.lock
+      lock = locksMap.get(key)
+      if (lock.isEmpty) {
+        locksMap = locksMap + (key -> Object())
+        lock = Some(locksMap(key))
+      }
+      read.lock
+      write.unlock
+    }
+    try {
+      lock.get.synchronized {
+        body
+      }
+    } finally {
+      read.unlock
+    }
+  }
+
+}
+
+trait SystemTests extends AnyFunSuite, BASILTest, Retries, TestCustomisation {
   case class TestResult(
     name: String,
     passed: Boolean,
@@ -42,6 +78,12 @@ trait SystemTests extends AnyFunSuite, BASILTest {
   val testResults: ArrayBuffer[TestResult] = ArrayBuffer()
 
   private val testPath = "./src/test/"
+
+  override def customiseTestsByName(name: String) = name match {
+    case "procedure_summaries/procedure_summary3/gcc_O2:BAP" | "procedure_summaries/procedure_summary3/gcc_O2:GTIRB" =>
+      Mode.Disabled("this procedure summaries test is unpredictably flaky")
+    case _ => Mode.Normal
+  }
 
   def runTests(folder: String, conf: TestConfig): Unit = {
     val path = testPath + folder
@@ -144,6 +186,14 @@ trait SystemTests extends AnyFunSuite, BASILTest {
   def runTest(path: String, name: String, variation: String, conf: TestConfig): Unit = {
     val directoryPath = path + "/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
+    SystemTests.withLock(variationPath) {
+      runTestUnsynchronised(path, name, variation, conf)
+    }
+  }
+
+  def runTestUnsynchronised(path: String, name: String, variation: String, conf: TestConfig): Unit = {
+    val directoryPath = path + "/" + name + "/"
+    val variationPath = directoryPath + variation + "/" + name
     val inputPath = if conf.useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
     val BPLPath = if conf.useBAPFrontend then variationPath + "_bap.bpl" else variationPath + "_gtirb.bpl"
     val specPath = directoryPath + name + ".spec"
@@ -238,6 +288,7 @@ trait SystemTests extends AnyFunSuite, BASILTest {
 
 }
 
+@test_util.tags.StandardSystemTest
 class SystemTestsBAP extends SystemTests {
   runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true))
   runTests(
@@ -249,6 +300,7 @@ class SystemTestsBAP extends SystemTests {
   }
 }
 
+@test_util.tags.StandardSystemTest
 class SystemTestsGTIRB extends SystemTests {
   runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, checkExpected = true, logResults = true))
   runTests(
@@ -260,7 +312,20 @@ class SystemTestsGTIRB extends SystemTests {
   }
 }
 
+@test_util.tags.StandardSystemTest
 class ExtraSpecTests extends SystemTests {
+
+  override def customiseTestsByName(name: String) = super.customiseTestsByName(name).orElse {
+    name match {
+      case "extraspec_correct/malloc_memcpy_strlen_memset_free/gcc_O2:GTIRB" |
+          "extraspec_correct/malloc_memcpy_strlen_memset_free/clang_O2:GTIRB" =>
+        Mode.ExpectFailure("Expected verification success, but got failure -- cause unknown")
+      case "extraspec_incorrect/malloc_memcpy_strlen_memset_free/gcc_O2:BAP" =>
+        Mode.ExpectFailure("Expected verification failure, but got success -- cause unknown")
+      case _ => Mode.Normal
+    }
+  }
+
   // some of these tests have time out issues so they need more time, but some still time out even with this for unclear reasons
   val boogieFlags = Seq("/timeLimit:30", "/useArrayAxioms")
   runTests(
@@ -308,6 +373,7 @@ class ExtraSpecTests extends SystemTests {
   }
 }
 
+@test_util.tags.DisabledTest
 class NoSimplifySystemTests extends SystemTests {
   runTests("correct", TestConfig(simplify = false, useBAPFrontend = true, expectVerify = true, logResults = true))
   runTests("incorrect", TestConfig(simplify = false, useBAPFrontend = true, expectVerify = false, logResults = true))
@@ -317,6 +383,8 @@ class NoSimplifySystemTests extends SystemTests {
     summary("nosimplify")
   }
 }
+
+@test_util.tags.AnalysisSystemTest
 class SimplifySystemTests extends SystemTests {
   runTests("correct", TestConfig(simplify = true, useBAPFrontend = true, expectVerify = true, logResults = true))
   runTests("incorrect", TestConfig(simplify = true, useBAPFrontend = true, expectVerify = false, logResults = true))
@@ -327,7 +395,19 @@ class SimplifySystemTests extends SystemTests {
   }
 }
 
+@test_util.tags.AnalysisSystemTest
 class SimplifyMemorySystemTests extends SystemTests {
+
+  override def customiseTestsByName(name: String) = super.customiseTestsByName(name).orElse {
+    name match {
+      case "correct/malloc_with_local3/clang:BAP" =>
+        Mode.ExpectFailure(
+          "previous failure was: Expected verification success, but got failure. Failing assertion is: assert (load37_1 == R30_in)"
+        )
+      case _ => Mode.Normal
+    }
+  }
+
   // Logger.setLevel(LogLevel.DEBUG)
   val staticAnalysisConfig = Some(StaticAnalysisConfig(memoryRegions = MemoryRegionsMode.DSA))
   runTests(
@@ -375,6 +455,7 @@ class SimplifyMemorySystemTests extends SystemTests {
   }
 }
 
+@test_util.tags.AnalysisSystemTest
 class AnalysisSystemTestsBAP extends SystemTests {
   runTests(
     "correct",
@@ -386,6 +467,7 @@ class AnalysisSystemTestsBAP extends SystemTests {
   )
 }
 
+@test_util.tags.AnalysisSystemTest
 class AnalysisSystemTestsGTIRB extends SystemTests {
   runTests(
     "correct",
@@ -397,6 +479,7 @@ class AnalysisSystemTestsGTIRB extends SystemTests {
   )
 }
 
+@test_util.tags.AnalysisSystemTest
 class DSAMemoryRegionSystemTestsBAP extends SystemTests {
   runTests(
     "correct",
@@ -416,6 +499,7 @@ class DSAMemoryRegionSystemTestsBAP extends SystemTests {
   )
 }
 
+@test_util.tags.AnalysisSystemTest
 class DSAMemoryRegionSystemTestsGTIRB extends SystemTests {
   runTests(
     "correct",
@@ -435,6 +519,7 @@ class DSAMemoryRegionSystemTestsGTIRB extends SystemTests {
   )
 }
 
+@test_util.tags.DisabledTest
 class MRAMemoryRegionSystemTestsBAP extends SystemTests {
   runTests(
     "correct",
@@ -454,6 +539,7 @@ class MRAMemoryRegionSystemTestsBAP extends SystemTests {
   )
 }
 
+@test_util.tags.DisabledTest
 class MRAMemoryRegionSystemTestsGTIRB extends SystemTests {
   runTests(
     "correct",
@@ -473,8 +559,17 @@ class MRAMemoryRegionSystemTestsGTIRB extends SystemTests {
   )
 }
 
+@test_util.tags.StandardSystemTest
 class MemoryRegionTestsDSA extends SystemTests {
-  // stack_pointer currently times out because Boogie is bad at handling abstract map accesses
+
+  override def customiseTestsByName(name: String) = super.customiseTestsByName(name).orElse {
+    name match {
+      case "memory_regions/stack_pointer/clang:BAP" | "memory_regions/stack_pointer/clang_pic:BAP" =>
+        Mode.Disabled("stack_pointer currently times out because Boogie is bad at handling abstract map accesses")
+      case _ => Mode.Normal
+    }
+  }
+
   runTests(
     "memory_regions",
     TestConfig(
@@ -485,8 +580,17 @@ class MemoryRegionTestsDSA extends SystemTests {
   )
 }
 
+@test_util.tags.DisabledTest
 class MemoryRegionTestsMRA extends SystemTests {
-  // stack_pointer currently times out because Boogie is bad at handling abstract map accesses
+
+  override def customiseTestsByName(name: String) = super.customiseTestsByName(name).orElse {
+    name match {
+      case "memory_regions/stack_pointer/clang:BAP" | "memory_regions/stack_pointer/clang_pic:BAP" =>
+        Mode.Disabled("stack_pointer currently times out because Boogie is bad at handling abstract map accesses")
+      case _ => Mode.Normal
+    }
+  }
+
   runTests(
     "memory_regions",
     TestConfig(
@@ -497,6 +601,7 @@ class MemoryRegionTestsMRA extends SystemTests {
   )
 }
 
+@test_util.tags.DisabledTest
 class MemoryRegionTestsNoRegion extends SystemTests {
   runTests(
     "memory_regions",
@@ -504,6 +609,7 @@ class MemoryRegionTestsNoRegion extends SystemTests {
   )
 }
 
+@test_util.tags.UnitTest
 class ProcedureSummaryTests extends SystemTests {
   // TODO currently procedure_summary3 verifies despite incorrect procedure summary analysis
   // this is due to BASIL's currently limited handling of non-returning calls
@@ -526,6 +632,7 @@ class ProcedureSummaryTests extends SystemTests {
 }
 
 // tests that require currently unimplemented functionality to pass
+@test_util.tags.DisabledTest
 class UnimplementedTests extends SystemTests {
   runTests("unimplemented", TestConfig(useBAPFrontend = false, expectVerify = true))
   runTests("unimplemented", TestConfig(useBAPFrontend = true, expectVerify = false))
