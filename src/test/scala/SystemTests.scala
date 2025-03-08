@@ -232,7 +232,9 @@ trait SystemTests extends AnyFunSuite, BASILTest {
         translateTime,
         verifyTime
       )
-      testResults.append(result)
+      testResults.synchronized {
+        testResults.append(result)
+      }
     }
     if (!passed) fail(boogieFailureMsg.get)
   }
