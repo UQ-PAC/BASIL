@@ -16,7 +16,9 @@ import scala.util.control.Breaks.{break, breakable}
  * An incrementing counter for generating node IDs.
  * An instance of this should be constructed and managed
  * by the entry point of the DSA. A NodeCounter instance
- * should not be re-used for multiple analysis runs.
+ * cannot be reset and should not be re-used for multiple
+ * analysis runs (a new instance should be constructed if
+ * needed).
  *
  * Generally, this is injected to the classes which require it
  * by a "using" parameter.
@@ -27,10 +29,6 @@ class NodeCounter {
   def getCounter: Int = {
     counter = counter + 1
     counter
-  }
-
-  def reset(): Unit = {
-    counter = 0
   }
 }
 

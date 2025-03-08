@@ -35,7 +35,7 @@ class DataStructureAnalysis(
   params: Map[Procedure, Set[Variable]]
 ) extends Analysis[Map[Procedure, Graph]] {
 
-  val nodeCounter = NodeCounter()
+  private val nodeCounter = NodeCounter()
   given NodeCounter = nodeCounter
 
   val local: mutable.Map[Procedure, Graph] = mutable.Map()
@@ -61,7 +61,6 @@ class DataStructureAnalysis(
   private val queue = mutable.Queue[Procedure]()
 
   override def analyze(): Map[Procedure, Graph] = {
-    nodeCounter.reset()
     var domain: Set[Procedure] = Set(program.mainProcedure)
     val stack: mutable.Stack[Procedure] = mutable.Stack()
     stack.pushAll(program.mainProcedure.calls)
