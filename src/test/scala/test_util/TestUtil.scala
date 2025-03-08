@@ -117,7 +117,7 @@ trait TestCustomisation extends TestSuite with Retries {
         val res = invokeTest()
         res match {
           case Succeeded => fail(s"Expected failure, but no exception/assertion was thrown")
-          case Exceptional(ex)  => {
+          case Exceptional(ex) => {
             info("Current outcome: " + res)
             Pending
           }
