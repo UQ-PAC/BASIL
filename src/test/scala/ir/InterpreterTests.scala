@@ -166,6 +166,56 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
   }
 
+  test("fixed square root") {
+    // Example borrowed from : https://github.com/ssloy/tinycompiler/tree/main
+    val n = LocalVar("n", bv64)
+    val shift = LocalVar("shift", bv64)
+    val x = LocalVar("x", bv64)
+    val x_old = LocalVar("x_old", bv64)
+    val n_one = LocalVar("n_one", bv64)
+    val temp = LocalVar("temp", bv64)
+    val out = LocalVar("out", bv64)
+
+    val p = prog(
+      proc(
+        "sqrt",
+        Seq("n" -> bv64, "shift" -> bv64),
+        Seq("out" -> bv64),
+        If(
+          n > (2147483647.bv64 / shift),
+          Then(
+            stmts(
+              Seq("out" -> temp) := Call("sqrt", "n" -> (n / 4.bv64), "shift" -> shift),
+              ret("out" -> 2.bv64 * temp)
+            )
+          )
+        ) `;`
+          stmts(x := shift, n_one := n * shift)
+          `;`
+          While(
+            TrueLiteral,
+            stmts(
+              x_old := x,
+              x := ((x + (n_one / x)) / 2.bv64),
+              Seq("abs_out" -> temp) := Call("abs", "x" -> (x - x_old))
+            ) `;`
+              If(temp <= 1.bv64, Then(ret("out" -> x)))
+          )
+      ),
+      proc(
+        "abs",
+        Seq("x" -> bv64),
+        Seq("abs_out" -> bv64),
+        If(x < 0.bv64, Then(ret("abs_out" -> (0.bv64 - x))), Else(ret("abs_out" -> x)))
+      )
+    )
+
+    def doSqrt(_n: Int, _shift: Int) = evalProc(p, p.mainProcedure, Map(n -> _n.bv64, shift -> _shift.bv64))(out)
+
+    assert(doSqrt(25735, 8192) == 14519.bv64)
+
+  }
+
   test("whileprog") {
     val acc = LocalVar("acc", BitVecType(64))
     val i = LocalVar("i", BitVecType(64))

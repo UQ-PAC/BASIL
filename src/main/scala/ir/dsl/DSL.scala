@@ -255,7 +255,7 @@ def block(label: String, sl: (NonCallStatement | EventuallyStatement | Eventuall
   EventuallyBlock(label, statements, rjump)
 }
 
-def stmts(sl: (NonCallStatement | EventuallyStatement | EventuallyJump)*): EventuallyBlock = {
+def stmts(sl: (EventuallyCall | NonCallStatement | EventuallyStatement | EventuallyJump)*): EventuallyBlock = {
   block(Counter.nlabel("block"), sl: _*)
 }
 
