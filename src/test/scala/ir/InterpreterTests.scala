@@ -89,6 +89,43 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     assert(expected == actual)
   }
 
+  test("is prime function") {
+
+    val n = LocalVar("n", bv64)
+    val i = LocalVar("i", bv64)
+    val ans = LocalVar("ans", bv1)
+
+    val p = prog(
+      proc(
+        "is_prime",
+        Seq("n" -> bv64),
+        Seq("ans" -> bv1),
+        If(
+          n <= 1.bv64,
+          Then(ret("ans" -> (0.bv1))),
+          Else(For(i := (2.bv64), i < n, i := i + (1.bv64), If(n % i === (0.bv64), Then(ret("ans" -> (0.bv1))))))
+        ) `;` stmts(ret("ans" -> (1.bv1)))
+      )
+    )
+
+    def isPrime(test: Int): Boolean = (evalProc(p, p.mainProcedure, Map(n -> test.bv64))(ans)) == 1.bv1
+
+    assert(!isPrime(1))
+    assert(isPrime(2))
+    assert(isPrime(3))
+    assert(!isPrime(4))
+    assert(isPrime(5))
+    assert(!isPrime(6))
+    assert(isPrime(7))
+    assert(!isPrime(8))
+    assert(!isPrime(9))
+    assert(!isPrime(10))
+    assert(isPrime(13))
+    assert(isPrime(23))
+    assert(isPrime(1009))
+
+  }
+
   test("structured fib program if else") {
     val n_in = LocalVar("n_in", BitVecType(64))
     val n_out = LocalVar("n_out", BitVecType(64))
@@ -99,8 +136,8 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     val p = prog(
       proc(
         "fib",
-        Seq("n_in" -> bv_t(64)),
-        Seq("n_out" -> bv_t(64)),
+        Seq("n_in" -> bv64),
+        Seq("n_out" -> bv64),
         If(
           bv64(0) === n_in,
           Then(returnv := bv64(0)),
@@ -138,17 +175,9 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
         "sumto",
         Seq("i" -> bv_t(64)),
         Seq("n_out" -> bv_t(64)),
-          stmts(acc := bv64(0))
+        stmts(acc := bv64(0))
           `;`
-            If(
-              i < bv64(0),
-              Then(acc := bv64(0)),
-              Else(
-                While(
-                  i >= bv64(0),
-                  stmts(acc := acc + i, i := i - bv64(1))
-                )
-            ))
+            If(i < bv64(0), Then(acc := bv64(0)), Else(While(i >= bv64(0), stmts(acc := acc + i, i := i - bv64(1)))))
             `;`
             block("returnbl", ret("n_out" -> acc))
       )

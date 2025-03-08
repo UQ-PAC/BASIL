@@ -93,14 +93,6 @@ def exprEq(l: Expr, r: Expr): Expr = (l, r) match {
   case _ => FalseLiteral
 }
 
-def bv32(i: Int): BitVecLiteral = BitVecLiteral(i, 32)
-
-def bv64(i: Int): BitVecLiteral = BitVecLiteral(i, 64)
-
-def bv8(i: Int): BitVecLiteral = BitVecLiteral(i, 8)
-
-def bv16(i: Int): BitVecLiteral = BitVecLiteral(i, 16)
-
 def R(i: Int): Register = Register(s"R$i", 64)
 
 def bv_t(i: Int) = BitVecType(i)
@@ -411,17 +403,49 @@ def sequence(first: List[EventuallyBlock], rest: List[EventuallyBlock]): List[Ev
   first ++ rest
 }
 
-def setSucc(first: List[EventuallyBlock], rest: EventuallyBlock*) = {
+def setSuccIfUndef(first: List[EventuallyBlock], rest: EventuallyBlock*) = {
   require(first.nonEmpty)
   require(rest.nonEmpty)
-  require(first.last.j.isInstanceOf[EventuallyUnreachable])
-  val last = first.last
-  last.j = goto(rest.head.label)
+
+  if (first.last.j.isInstanceOf[EventuallyUnreachable]) {
+    val last = first.last
+    last.j = goto(rest.head.label)
+  }
   first
 }
 
 def While(cond: Expr, body: EventuallyBlock*): List[EventuallyBlock] = {
   While(cond, body.toList)
+}
+
+def For(
+  init: List[EventuallyBlock],
+  cond: Expr,
+  after: List[EventuallyBlock],
+  body: List[EventuallyBlock]
+): List[EventuallyBlock] = {
+  require(after.nonEmpty)
+  require(init.nonEmpty)
+  val internal = sequence(body, after)
+  val loop = While(cond, internal)
+  sequence(init, loop)
+}
+
+def For(init: EventuallyBlock, cond: Expr, after: EventuallyBlock, body: EventuallyBlock*): List[EventuallyBlock] = {
+  For(List(init), cond, List(after), body.toList)
+}
+
+def For(init: NonCallStatement, cond: Expr, after: NonCallStatement, body: EventuallyBlock*): List[EventuallyBlock] = {
+  require(body.nonEmpty)
+  For(List(stmts(init)), cond, List(stmts(after)), body.toList)
+}
+def For(
+  init: NonCallStatement,
+  cond: Expr,
+  after: NonCallStatement,
+  body: List[EventuallyBlock]
+): List[EventuallyBlock] = {
+  For(List(stmts(init)), cond, List(stmts(after)), body.toList)
 }
 
 def While(cond: Expr, body: List[EventuallyBlock]): List[EventuallyBlock] = {
@@ -448,7 +472,7 @@ def Then(body: (NonCallStatement | EventuallyStatement | EventuallyJump)*): Then
 @targetName("elseStatements")
 def Else(body: (NonCallStatement | EventuallyStatement | EventuallyJump)*): ElseV = ElseV(List(stmts(body: _*)))
 
-def If(cond: Expr, ifThen: ThenV, ifElse: ElseV): List[EventuallyBlock] = {
+def If(cond: Expr, ifThen: ThenV, ifElse: ElseV = ElseV(List(stmts()))): List[EventuallyBlock] = {
   val ifEntry = Counter.nlabel("if_entry")
   val thenCase = Counter.nlabel("if_then")
   val elseCase = Counter.nlabel("if_else")
@@ -460,8 +484,8 @@ def If(cond: Expr, ifThen: ThenV, ifElse: ElseV): List[EventuallyBlock] = {
     if (ifElse.body.isEmpty) then List(block(Counter.nlabel("if_else_empty"), unreachable)) else ifElse.body.toList
 
   val exitBlock = block(ifExit, unreachable)
-  val thenBlocks = setSucc(thenNonempty, exitBlock)
-  val elseBlocks = setSucc(elseNonempty, exitBlock)
+  val thenBlocks = setSuccIfUndef(thenNonempty, exitBlock)
+  val elseBlocks = setSuccIfUndef(elseNonempty, exitBlock)
 
   List(block(ifEntry, goto(thenCase, elseCase)))
     ++ sequence(List(block(thenCase, Assume(cond), unreachable)), thenBlocks)
@@ -497,10 +521,40 @@ def progUnresolved(
    * Expr construction
    */
 
-extension (lvar: Variable) infix def :=(j: Expr) = LocalAssign(lvar, j)
+extension (lvar: Variable)
+  infix def :=(j: Expr) = LocalAssign(lvar, j)
+  def :=(j: Int) = lvar.getType match {
+    case BitVecType(sz) => LocalAssign(lvar, BitVecLiteral(j, sz))
+    case IntType => LocalAssign(lvar, IntLiteral(j))
+    case _ => ???
+  }
+  def :=(j: Boolean) = lvar.getType match {
+    case BoolType => LocalAssign(lvar, if j then TrueLiteral else FalseLiteral)
+    case _ => ???
+  }
 
 extension (lvar: List[(String, Variable)]) infix def :=(j: Call) = directCall(lvar, j)
 extension (lvar: Seq[(String, Variable)]) infix def :=(j: Call) = directCall(lvar, j)
+
+extension (v: Int)
+  @targetName("ibv64")
+  def bv64 = BitVecLiteral(v, 64)
+  @targetName("ibv32")
+  def bv32 = BitVecLiteral(v, 32)
+  @targetName("ibv16")
+  def bv16 = BitVecLiteral(v, 16)
+  @targetName("ibv8")
+  def bv8 = BitVecLiteral(v, 8)
+  @targetName("ibv1")
+  def bv1 = BitVecLiteral(v, 1)
+  @targetName("itobv")
+  def bv(sz: Int) = BitVecLiteral(v, sz)
+
+def bv64 = BitVecType(64)
+def bv32 = BitVecType(32)
+def bv16 = BitVecType(16)
+def bv8 = BitVecType(8)
+def bv1 = BitVecType(1)
 
 extension (i: Expr)
   infix def ===(j: Expr): Expr = i.getType match {
