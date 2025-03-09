@@ -499,10 +499,10 @@ class IntervalGraph(
 
     val stableNode = stableCell.node
     val nodeToBeMoved = toBeMoved.node
-    assert(stableCell.interval.isOverlapping(toBeMoved.move(i => i + delta).interval))
+    assert(stableCell.interval.isOverlapping(toBeMoved.moved(i => i + delta).interval))
 
     val stableCells = stableNode.cells
-    val movedCells = nodeToBeMoved.cells.map(_.move(i => i + delta))
+    val movedCells = nodeToBeMoved.cells.map(_.moved(i => i + delta))
     val allCells = (stableCells ++ movedCells).sorted
     val updatedBases = stableNode.bases ++ (nodeToBeMoved.bases.view.mapValues(f => f + delta))
     val resultNode = IntervalNode(this, updatedBases)
@@ -520,7 +520,7 @@ class IntervalGraph(
     assert(
       resultNode.cells.exists(c =>
         c.interval.isOverlapping(stableCell.interval) && c.interval
-          .isOverlapping(toBeMoved.move(i => i + delta).interval)
+          .isOverlapping(toBeMoved.moved(i => i + delta).interval)
       )
     )
     // set pointees
@@ -919,13 +919,13 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
 
   override def toString: String = s"Cell($node, $interval)"
 
-  def move(f: Int => Int): IntervalCell = {
+  def moved(f: Int => Int): IntervalCell = {
     val newCell = IntervalCell(node, interval.move(f))
     newCell._pointee = _pointee
     newCell
   }
 
-  def grow(interval: Interval): IntervalCell = {
+  def grown(interval: Interval): IntervalCell = {
     require(this.interval.start == interval.start, "expected same interval start for growing cell")
     val newCell = IntervalCell(this.node, this.interval.join(interval))
     newCell._pointee = _pointee
@@ -959,9 +959,10 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
   def getPointee: IntervalCell = {
     if node.get(this.interval) != this then node.get(this.interval).getPointee
     else if _pointee.isEmpty then
-      assert(this.node.isUptoDate)
+      throw Exception("expected a pointee")
+      /*assert(this.node.isUptoDate)
       _pointee = Some(IntervalNode(graph, mutable.Map.empty).add(0))
-      _pointee.get
+      _pointee.get*/
     else graph.find(_pointee.get)
   }
 
