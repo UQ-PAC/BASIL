@@ -386,11 +386,10 @@ class IntervalGraph(
     val exprCells = cells.map(find)
 
     if constraintArg.contents && !ignoreContents then
-      val t = exprCells.map(_.getPointee)
-      t
+      exprCells.map(_.getPointee)
     else
-      val t = exprCells
-      t
+      exprCells
+
   }
 
   def processConstraint(constraint: Constraint): Unit = {
@@ -965,13 +964,20 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
       temp
   }
 
+  /**
+   * returns this cell's pointee if it has one
+   * if the cell doesn't have a pointee create a placeholder cell,
+   * sets it as the cell pointee and return it
+   *
+   * Can check if a cell has pointee without creating one for it with hasPointee
+   */
   def getPointee: IntervalCell = {
     if node.get(this.interval) != this then node.get(this.interval).getPointee
     else if _pointee.isEmpty then
-      throw Exception("expected a pointee")
-      /*assert(this.node.isUptoDate)
+//      throw Exception("expected a pointee")
+      assert(this.node.isUptoDate)
       _pointee = Some(IntervalNode(graph, mutable.Map.empty).add(0))
-      _pointee.get*/
+      _pointee.get
     else graph.find(_pointee.get)
   }
 
