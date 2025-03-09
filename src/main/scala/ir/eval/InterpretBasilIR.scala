@@ -635,7 +635,13 @@ object InterpFuns {
     params: Iterable[(LocalVar, Literal)]
   ): State[S, Map[LocalVar, Literal], InterpreterError] = {
 
-    val actualParams = params.toList.sortBy(p => p._1.name.stripPrefix("R").stripPrefix("V").stripSuffix("_in").toInt)
+    def intOf(n: String) = try {
+      n.toInt
+    } catch {
+      case _ => n.hashCode()
+    }
+
+    val actualParams = params.toList.sortBy(p => intOf(p._1.name.stripPrefix("R").stripPrefix("V").stripSuffix("_in")))
 
     val target = targetProc match {
       case p: Procedure => Some(p)
