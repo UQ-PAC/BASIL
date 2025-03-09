@@ -774,6 +774,15 @@ class IntervalNode(
     assert(nonOverlappingProperty, "expected non overlapping cells")
   }
 
+
+  /**
+   * Checks this node is set representative in `this.graph` union-find solver
+   * If true the node is the most "up-to-date" version of itself. meaning it hasn't been
+   *  involved in any merges which will create a new version
+   *
+   * New nodes could be created invalidating this check if a node is involved in
+   * any merge or collapse operations.
+   */
   def isUptoDate: Boolean = {
     graph.find(this) == this
   }
