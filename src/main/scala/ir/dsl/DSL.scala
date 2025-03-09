@@ -385,14 +385,10 @@ object Counter {
 }
 
 extension (i: EventuallyBlock)
-  @targetName("sequenceblock")
-  infix def `;`(j: EventuallyBlock): List[EventuallyBlock] = sequence(List(i), List(j))
   @targetName("sequenceblocklist")
   infix def `;`(j: List[EventuallyBlock]): List[EventuallyBlock] = sequence(List(i), j)
 
 extension (i: List[EventuallyBlock])
-  @targetName("sequenceblock")
-  infix def `;`(j: EventuallyBlock): List[EventuallyBlock] = sequence(i.toList, List(j))
   @targetName("sequenceblocklist")
   infix def `;`(j: List[EventuallyBlock]): List[EventuallyBlock] = sequence(i, j)
 
@@ -403,6 +399,15 @@ def sequence(first: List[EventuallyBlock], rest: List[EventuallyBlock]): List[Ev
   val last = first.last
   last.j = goto(rest.head.label)
   first ++ rest
+}
+
+def blocks(blocks: List[EventuallyBlock]*): List[EventuallyBlock] = {
+  blocks.toList match {
+    case Nil => List()
+    case h :: Nil => h
+    case h :: tail => tail.foldLeft(h)((acc, nextb) => sequence(acc, nextb))
+  }
+
 }
 
 def setSuccIfUndef(first: List[EventuallyBlock], rest: EventuallyBlock*) = {

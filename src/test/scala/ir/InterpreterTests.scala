@@ -139,19 +139,20 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
         "fib",
         Seq("n_in" -> bv64),
         Seq("n_out" -> bv64),
-        (If(bv64(0) === n_in)
-          Then (returnv := bv64(0))
-          Else (
-            If(bv64(1) === n_in)
-              Then (returnv := bv64(1))
-              Else (
-                Seq("n_out" -> p2) := Call("fib", "n_in" -> (n_in - bv64(2))),
-                Seq("n_out" -> p1) := Call("fib", "n_in" -> (n_in - bv64(1))),
-                returnv := p1 + p2
-              )
-          ))
-          `;`
-            stmts(ret("n_out" -> returnv))
+        blocks(
+          (If(bv64(0) === n_in)
+            Then (returnv := bv64(0))
+            Else (
+              If(bv64(1) === n_in)
+                Then (returnv := bv64(1))
+                Else (
+                  Seq("n_out" -> p2) := Call("fib", "n_in" -> (n_in - bv64(2))),
+                  Seq("n_out" -> p1) := Call("fib", "n_in" -> (n_in - bv64(1))),
+                  returnv := p1 + p2
+                )
+            )),
+          stmts(ret("n_out" -> returnv))
+        )
       )
     )
 
@@ -179,25 +180,25 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
         "sqrt",
         Seq("n" -> bv64, "shift" -> bv64),
         Seq("out" -> bv64),
-        (If(n > (2147483647.bv64 / shift))
-          Then (
-            stmts(
-              Seq("out" -> temp) := Call("sqrt", "n" -> (n / 4.bv64), "shift" -> shift),
-              ret("out" -> 2.bv64 * temp)
-            )
-          ))
-          `;`
-            stmts(x := shift, n_one := n * shift)
-            `;`
-            (While(TrueLiteral)
-              Do (sequence(
-                stmts(
-                  x_old := x,
-                  x := ((x + (n_one / x)) / 2.bv64),
-                  Seq("abs_out" -> temp) := Call("abs", "x" -> (x - x_old))
-                ),
-                (If(temp <= 1.bv64) Then (ret("out" -> x)))
-              )))
+        blocks(
+          (If(n > (2147483647.bv64 / shift))
+            Then (
+              stmts(
+                Seq("out" -> temp) := Call("sqrt", "n" -> (n / 4.bv64), "shift" -> shift),
+                ret("out" -> 2.bv64 * temp)
+              )
+            )),
+          stmts(x := shift, n_one := n * shift),
+          (While(TrueLiteral)
+            Do blocks(
+              stmts(
+                x_old := x,
+                x := ((x + (n_one / x)) / 2.bv64),
+                Seq("abs_out" -> temp) := Call("abs", "x" -> (x - x_old))
+              ),
+              (If(temp <= 1.bv64) Then (ret("out" -> x)))
+            ))
+        )
       ),
       proc(
         "abs",
@@ -222,13 +223,13 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
         "sumto",
         Seq("i" -> bv_t(64)),
         Seq("n_out" -> bv_t(64)),
-        stmts(acc := bv64(0))
-          `;`
-            (If(i < bv64(0))
-              Then (acc := bv64(0))
-              Else (While(i >= bv64(0)) Do (acc := acc + i, i := i - bv64(1))))
-            `;`
-            ret("n_out" -> acc)
+        blocks(
+          stmts(acc := bv64(0)),
+          (If(i < bv64(0))
+            Then (acc := bv64(0))
+            Else (While(i >= bv64(0)) Do (acc := acc + i, i := i - bv64(1)))),
+          ret("n_out" -> acc)
+        )
       )
     )
 
