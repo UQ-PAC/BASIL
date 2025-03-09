@@ -256,7 +256,13 @@ def block(label: String, sl: (NonCallStatement | EventuallyStatement | Eventuall
 }
 
 def stmts(sl: (EventuallyCall | NonCallStatement | EventuallyStatement | EventuallyJump)*): EventuallyBlock = {
-  block(Counter.nlabel("block"), sl: _*)
+
+  val stmts =
+    if (sl.isEmpty) then List(unreachable)
+    else if (!sl.last.isInstanceOf[EventuallyJump]) then (sl.toList ++ List(unreachable))
+    else sl
+
+  block(Counter.nlabel("block"), stmts: _*)
 }
 
 case class EventuallyProcedure(
@@ -381,18 +387,14 @@ object Counter {
 extension (i: EventuallyBlock)
   @targetName("sequenceblock")
   infix def `;`(j: EventuallyBlock): List[EventuallyBlock] = sequence(List(i), List(j))
-  @targetName("sequenceblock")
-  infix def `;`(j: Iterable[EventuallyBlock]): List[EventuallyBlock] = sequence(List(i), j.toList)
+  @targetName("sequenceblocklist")
+  infix def `;`(j: List[EventuallyBlock]): List[EventuallyBlock] = sequence(List(i), j)
 
 extension (i: List[EventuallyBlock])
   @targetName("sequenceblock")
   infix def `;`(j: EventuallyBlock): List[EventuallyBlock] = sequence(i.toList, List(j))
-  @targetName("sequenceblock")
-  infix def `;`(j: Iterable[EventuallyBlock]): List[EventuallyBlock] = sequence(i.toList, j.toList)
-
-def sequence(first: List[EventuallyBlock], rest: EventuallyBlock*): List[EventuallyBlock] = {
-  sequence(first, rest.toList)
-}
+  @targetName("sequenceblocklist")
+  infix def `;`(j: List[EventuallyBlock]): List[EventuallyBlock] = sequence(i, j)
 
 def sequence(first: List[EventuallyBlock], rest: List[EventuallyBlock]): List[EventuallyBlock] = {
   require(first.nonEmpty)
@@ -414,9 +416,9 @@ def setSuccIfUndef(first: List[EventuallyBlock], rest: EventuallyBlock*) = {
   first
 }
 
-def While(cond: Expr, body: EventuallyBlock*): List[EventuallyBlock] = {
-  While(cond, body.toList)
-}
+//def While(cond: Expr, body: EventuallyBlock*): List[EventuallyBlock] = {
+//  While(cond, body.toList)
+//}
 
 def For(
   init: List[EventuallyBlock],
@@ -427,26 +429,37 @@ def For(
   require(after.nonEmpty)
   require(init.nonEmpty)
   val internal = sequence(body, after)
-  val loop = While(cond, internal)
+  val loop = While(cond) Do (internal)
   sequence(init, loop)
 }
 
-def For(init: EventuallyBlock, cond: Expr, after: EventuallyBlock, body: EventuallyBlock*): List[EventuallyBlock] = {
-  For(List(init), cond, List(after), body.toList)
+//def For(init: EventuallyBlock, cond: Expr, after: EventuallyBlock, body: EventuallyBlock*): List[EventuallyBlock] = {
+//  For(List(init), cond, List(after), body.toList)
+//}
+//
+//def For(init: NonCallStatement, cond: Expr, after: NonCallStatement, body: EventuallyBlock*): List[EventuallyBlock] = {
+//  require(body.nonEmpty)
+//  For(List(stmts(init)), cond, List(stmts(after)), body.toList)
+//}
+//def For(
+//  init: NonCallStatement,
+//  cond: Expr,
+//  after: NonCallStatement,
+//  body: List[EventuallyBlock]
+//): List[EventuallyBlock] = {
+//  For(List(stmts(init)), cond, List(stmts(after)), body.toList)
+//}
+
+case class WhileDo(cond: Expr) {
+  def Do(body: Iterable[EventuallyBlock]) = While(cond, (body.toList))
+  @targetName("doBlocks")
+  def Do(body: EventuallyBlock*) = While(cond, (body.toList))
+  @targetName("doStatements")
+  def Do(sl: (EventuallyCall | NonCallStatement | EventuallyStatement | EventuallyJump)*) =
+    While(cond, (List(stmts(sl: _*))))
 }
 
-def For(init: NonCallStatement, cond: Expr, after: NonCallStatement, body: EventuallyBlock*): List[EventuallyBlock] = {
-  require(body.nonEmpty)
-  For(List(stmts(init)), cond, List(stmts(after)), body.toList)
-}
-def For(
-  init: NonCallStatement,
-  cond: Expr,
-  after: NonCallStatement,
-  body: List[EventuallyBlock]
-): List[EventuallyBlock] = {
-  For(List(stmts(init)), cond, List(stmts(after)), body.toList)
-}
+def While(cond: Expr) = WhileDo(cond)
 
 def While(cond: Expr, body: List[EventuallyBlock]): List[EventuallyBlock] = {
   val loopExit = Counter.nlabel("while_exit")
@@ -455,33 +468,53 @@ def While(cond: Expr, body: List[EventuallyBlock]): List[EventuallyBlock] = {
   val loopBody = Counter.nlabel("while_body")
   List(block(loopEntry, goto(loopBody, loopExit)))
     ++
-      sequence(sequence(List(block(loopBody, Assume(cond))), body), block(loopBackedge, goto(loopEntry)))
+      sequence(sequence(List(block(loopBody, Assume(cond))), body), List(block(loopBackedge, goto(loopEntry))))
       ++
       List(block(loopExit, Assume(UnaryExpr(BoolNOT, cond)), unreachable))
 }
 
-private case class ThenV(body: List[EventuallyBlock])
-private case class ElseV(body: List[EventuallyBlock])
+case class ThenV(cond: Expr, body: List[EventuallyBlock]) {
+  def Else(els: Iterable[EventuallyBlock]): List[EventuallyBlock] = If(cond, body, els.toList)
+  def Else(els: EventuallyBlock*): List[EventuallyBlock] = If(cond, body, els.toList)
+  @targetName("elseStatements")
+  def Else(els: (NonCallStatement | EventuallyStatement | EventuallyJump)*): List[EventuallyBlock] =
+    If(cond, body, List(stmts(els: _*)))
+}
 
-def Then(body: Iterable[EventuallyBlock]): ThenV = ThenV(body.toList)
-def Else(body: Iterable[EventuallyBlock]): ElseV = ElseV(body.toList)
-def Then(body: EventuallyBlock*): ThenV = ThenV(body.toList)
-def Else(body: EventuallyBlock*): ElseV = ElseV(body.toList)
-@targetName("thenStatements")
-def Then(body: (NonCallStatement | EventuallyStatement | EventuallyJump)*): ThenV = ThenV(List(stmts(body: _*)))
-@targetName("elseStatements")
-def Else(body: (NonCallStatement | EventuallyStatement | EventuallyJump)*): ElseV = ElseV(List(stmts(body: _*)))
+case class ElseV(cond: Expr, thenBody: List[EventuallyBlock], body: List[EventuallyBlock])
 
-def If(cond: Expr, ifThen: ThenV, ifElse: ElseV = ElseV(List(stmts()))): List[EventuallyBlock] = {
+given IfThenBlocks: Conversion[ThenV, List[EventuallyBlock]] with
+  def apply(x: ThenV): List[EventuallyBlock] = If(x.cond, x.body, List())
+
+given StmtList
+  : Conversion[EventuallyCall | NonCallStatement | EventuallyStatement | EventuallyJump, List[EventuallyBlock]] with
+  def apply(x: EventuallyCall | NonCallStatement | EventuallyStatement | EventuallyJump): List[EventuallyBlock] = List(
+    stmts(x)
+  )
+
+given BlockList: Conversion[EventuallyBlock, List[EventuallyBlock]] with
+  def apply(b: EventuallyBlock) = List(b)
+
+case class IfThen(cond: Expr) {
+  def Then(body: Iterable[EventuallyBlock]): ThenV = ThenV(cond, body.toList)
+  def Then(body: EventuallyBlock*): ThenV = ThenV(cond, body.toList)
+  @targetName("thenStatements")
+  def Then(body: (NonCallStatement | EventuallyStatement | EventuallyJump)*): ThenV = ThenV(cond, List(stmts(body: _*)))
+
+}
+
+def If(cond: Expr) = IfThen(cond)
+
+def If(cond: Expr, ifThen: List[EventuallyBlock], ifElse: List[EventuallyBlock]): List[EventuallyBlock] = {
   val ifEntry = Counter.nlabel("if_entry")
   val thenCase = Counter.nlabel("if_then")
   val elseCase = Counter.nlabel("if_else")
   val ifExit = Counter.nlabel("if_exit")
 
   val thenNonempty =
-    if (ifThen.body.isEmpty) then List(block(Counter.nlabel("if_then_empty"), unreachable)) else ifThen.body.toList
+    if (ifThen.isEmpty) then List(block(Counter.nlabel("if_then_empty"), unreachable)) else ifThen
   val elseNonempty =
-    if (ifElse.body.isEmpty) then List(block(Counter.nlabel("if_else_empty"), unreachable)) else ifElse.body.toList
+    if (ifElse.isEmpty) then List(block(Counter.nlabel("if_else_empty"), unreachable)) else ifElse.toList
 
   val exitBlock = block(ifExit, unreachable)
   val thenBlocks = setSuccIfUndef(thenNonempty, exitBlock)

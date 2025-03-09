@@ -13,6 +13,8 @@ import translating.BAPToIR
 import util.{LogLevel, Logger}
 import util.IRLoading.{loadBAP, loadReadELF}
 import util.{ILLoadingConfig, IRContext, IRLoading, IRTransform}
+import ir.dsl.given
+import ir.dsl.IfThenBlocks
 
 def load(s: InterpreterState, global: SpecGlobal): Option[BitVecLiteral] = {
   val f = NormalInterpreter
@@ -100,11 +102,10 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
         "is_prime",
         Seq("n" -> bv64),
         Seq("ans" -> bv1),
-        If(
-          n <= 1.bv64,
-          Then(ret("ans" -> (0.bv1))),
-          Else(For(i := (2.bv64), i < n, i := i + (1.bv64), If(n % i === (0.bv64), Then(ret("ans" -> (0.bv1))))))
-        ) `;` stmts(ret("ans" -> (1.bv1)))
+        (If(n <= 1.bv64)
+          Then (ret("ans" -> (0.bv1)))
+          Else (For(i := (2.bv64), i < n, i := i + (1.bv64), If(n % i === (0.bv64)) Then (ret("ans" -> (0.bv1))))))
+          `;` stmts(ret("ans" -> (1.bv1)))
       )
     )
 
@@ -138,22 +139,19 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
         "fib",
         Seq("n_in" -> bv64),
         Seq("n_out" -> bv64),
-        If(
-          bv64(0) === n_in,
-          Then(returnv := bv64(0)),
-          Else(
-            If(
-              bv64(1) === n_in,
-              Then(returnv := bv64(1)),
-              Else(
+        (If(bv64(0) === n_in)
+          Then (returnv := bv64(0))
+          Else (
+            If(bv64(1) === n_in)
+              Then (returnv := bv64(1))
+              Else (
                 Seq("n_out" -> p2) := Call("fib", "n_in" -> (n_in - bv64(2))),
                 Seq("n_out" -> p1) := Call("fib", "n_in" -> (n_in - bv64(1))),
                 returnv := p1 + p2
               )
-            )
-          )
-        ) `;`
-          stmts(ret("n_out" -> returnv))
+          ))
+          `;`
+            stmts(ret("n_out" -> returnv))
       )
     )
 
@@ -181,32 +179,31 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
         "sqrt",
         Seq("n" -> bv64, "shift" -> bv64),
         Seq("out" -> bv64),
-        If(
-          n > (2147483647.bv64 / shift),
-          Then(
+        (If(n > (2147483647.bv64 / shift))
+          Then (
             stmts(
               Seq("out" -> temp) := Call("sqrt", "n" -> (n / 4.bv64), "shift" -> shift),
               ret("out" -> 2.bv64 * temp)
             )
-          )
-        ) `;`
-          stmts(x := shift, n_one := n * shift)
+          ))
           `;`
-          While(
-            TrueLiteral,
-            stmts(
-              x_old := x,
-              x := ((x + (n_one / x)) / 2.bv64),
-              Seq("abs_out" -> temp) := Call("abs", "x" -> (x - x_old))
-            ) `;`
-              If(temp <= 1.bv64, Then(ret("out" -> x)))
-          )
+            stmts(x := shift, n_one := n * shift)
+            `;`
+            (While(TrueLiteral)
+              Do (sequence(
+                stmts(
+                  x_old := x,
+                  x := ((x + (n_one / x)) / 2.bv64),
+                  Seq("abs_out" -> temp) := Call("abs", "x" -> (x - x_old))
+                ),
+                (If(temp <= 1.bv64) Then (ret("out" -> x)))
+              )))
       ),
       proc(
         "abs",
         Seq("x" -> bv64),
         Seq("abs_out" -> bv64),
-        If(x < 0.bv64, Then(ret("abs_out" -> (0.bv64 - x))), Else(ret("abs_out" -> x)))
+        If(x < 0.bv64) Then (ret("abs_out" -> (0.bv64 - x))) Else (ret("abs_out" -> x))
       )
     )
 
@@ -227,9 +224,11 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
         Seq("n_out" -> bv_t(64)),
         stmts(acc := bv64(0))
           `;`
-            If(i < bv64(0), Then(acc := bv64(0)), Else(While(i >= bv64(0), stmts(acc := acc + i, i := i - bv64(1)))))
+            (If(i < bv64(0))
+              Then (acc := bv64(0))
+              Else (While(i >= bv64(0)) Do (acc := acc + i, i := i - bv64(1))))
             `;`
-            block("returnbl", ret("n_out" -> acc))
+            ret("n_out" -> acc)
       )
     )
 
