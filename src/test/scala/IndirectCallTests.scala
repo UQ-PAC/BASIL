@@ -12,7 +12,7 @@ import util.{
   RunUtils,
   StaticAnalysisConfig
 }
-
+import analysis.data_structure_analysis.*
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable
 import test_util.BASILTest
@@ -151,6 +151,14 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
     } else {
       None // test passed
     }
+  }
+
+  def checkResolvedCalls(callSite: DirectCall, dsg: IntervalGraph,  resolution: IndirectCallResolution): IndirectCallResult = {
+    require(callSite.target.name == "indirect_call_launchpad")
+    val targetExpr = callSite.actualParams(LocalVar("indirectCallTarget", BitVecType(64)))
+    val procs = dsg.exprToCells(targetExpr).map(dsg.cellToProcs).flatten
+    val result = resolution.procTargets.forall(name => procs.map(_.procName).contains(name))
+    IndirectCallResult(resolution, result, None)
   }
 
   def checkCallSite(callSite: Command, resolution: IndirectCallResolution): IndirectCallResult = {
