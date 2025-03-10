@@ -101,10 +101,13 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
         "is_prime",
         Seq("n" -> bv64),
         Seq("ans" -> bv1),
-        (If(n <= 1.bv64)
-          Then (ret("ans" -> (0.bv1)))
-          Else (For(i := (2.bv64), i < n, i := i + (1.bv64), If(n % i === (0.bv64)) Then (ret("ans" -> (0.bv1))))))
-          `;` stmts(ret("ans" -> (1.bv1)))
+        blocks(
+          If(n <= 1.bv64)
+            Then (ret("ans" -> (0.bv1)))
+            Else (For(i := (2.bv64), i < n, i := i + (1.bv64))
+              Do (If(n % i === (0.bv64)) Then (ret("ans" -> (0.bv1))))),
+          ret("ans" -> (1.bv1))
+        )
       )
     )
 

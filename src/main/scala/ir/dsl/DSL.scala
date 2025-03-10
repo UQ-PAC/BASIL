@@ -372,6 +372,17 @@ case class EventuallyProgram(
   def cloneable = this.copy(mainProcedure = mainProcedure.cloneable, otherProcedures = otherProcedures.map(_.cloneable))
 }
 
+/**
+ * Construction of basil IR programs from high level while langauge. 
+ *
+ * These functions uniformly return a list of eventually block, where the first block 
+ * is the entry point and the last block is the exit point. 
+ * These lists are then concatenated  by the functions [[sequence]] and [[blocks]]. 
+ * The function  [[blocks]] is essentially list.concat, but it connects each sublist 
+ * with jumps.
+ *
+ */
+
 object Counter {
   var count = 1
   def next() = {
@@ -421,11 +432,16 @@ def setSuccIfUndef(first: List[EventuallyBlock], rest: EventuallyBlock*) = {
   first
 }
 
-//def While(cond: Expr, body: EventuallyBlock*): List[EventuallyBlock] = {
-//  While(cond, body.toList)
-//}
+case class For(init: List[EventuallyBlock], cond: Expr, after: List[EventuallyBlock]) {
+  def Do(body: Iterable[EventuallyBlock]) = mkFor(init, cond, after, (body.toList))
+  @targetName("doBlocks")
+  def Do(body: EventuallyBlock*) = mkFor(init, cond, after, (body.toList))
+  @targetName("doStatements")
+  def Do(sl: (EventuallyCall | NonCallStatement | EventuallyStatement | EventuallyJump)*) =
+    mkFor(init, cond, after, (List(stmts(sl: _*))))
+}
 
-def For(
+private def mkFor(
   init: List[EventuallyBlock],
   cond: Expr,
   after: List[EventuallyBlock],
@@ -437,23 +453,6 @@ def For(
   val loop = While(cond) Do (internal)
   sequence(init, loop)
 }
-
-//def For(init: EventuallyBlock, cond: Expr, after: EventuallyBlock, body: EventuallyBlock*): List[EventuallyBlock] = {
-//  For(List(init), cond, List(after), body.toList)
-//}
-//
-//def For(init: NonCallStatement, cond: Expr, after: NonCallStatement, body: EventuallyBlock*): List[EventuallyBlock] = {
-//  require(body.nonEmpty)
-//  For(List(stmts(init)), cond, List(stmts(after)), body.toList)
-//}
-//def For(
-//  init: NonCallStatement,
-//  cond: Expr,
-//  after: NonCallStatement,
-//  body: List[EventuallyBlock]
-//): List[EventuallyBlock] = {
-//  For(List(stmts(init)), cond, List(stmts(after)), body.toList)
-//}
 
 case class WhileDo(cond: Expr) {
   def Do(body: Iterable[EventuallyBlock]) = While(cond, (body.toList))
@@ -555,9 +554,12 @@ def progUnresolved(
 ): EventuallyProgram =
   EventuallyProgram(mainProc, procedures, initialMemory)
 
-  /**
-   * Expr construction
-   */
+/**
+ * Expr and statement construction; this defined infix operators which construct
+ * BASIL IR statements and expressions.
+ *
+ * Typically with binops we default to signed ops, and provide named unsigned alternatives.
+ */
 
 extension (lvar: Variable)
   infix def :=(j: Expr) = LocalAssign(lvar, j)
