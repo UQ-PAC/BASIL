@@ -698,10 +698,11 @@ object StaticAnalysis {
 
 object RunUtils {
 
-  def run(q: BASILConfig): Unit = {
+  def run(q: BASILConfig): BASILResult = {
     val result = loadAndTranslate(q)
     Logger.info("Writing output")
     writeOutput(result)
+    result
   }
 
   def writeOutput(result: BASILResult): Unit = {
