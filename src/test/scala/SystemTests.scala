@@ -10,10 +10,17 @@ import test_util.BASILTest
 import test_util.BASILTest.*
 import test_util.Histogram
 import test_util.TestConfig
+import test_util.LockManager
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
   */
+
+object SystemTests {
+
+  /** Locks are shared by all SystemTests instances. */
+  val locks = LockManager[String]()
+}
 
 trait SystemTests extends AnyFunSuite, BASILTest {
   case class TestResult(
@@ -144,6 +151,14 @@ trait SystemTests extends AnyFunSuite, BASILTest {
   def runTest(path: String, name: String, variation: String, conf: TestConfig): Unit = {
     val directoryPath = path + "/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
+    SystemTests.locks.withLock(variationPath) {
+      runTestUnsynchronised(path, name, variation, conf)
+    }
+  }
+
+  def runTestUnsynchronised(path: String, name: String, variation: String, conf: TestConfig): Unit = {
+    val directoryPath = path + "/" + name + "/"
+    val variationPath = directoryPath + variation + "/" + name
     val inputPath = if conf.useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
     val BPLPath = if conf.useBAPFrontend then variationPath + "_bap.bpl" else variationPath + "_gtirb.bpl"
     val specPath = directoryPath + name + ".spec"
@@ -217,7 +232,9 @@ trait SystemTests extends AnyFunSuite, BASILTest {
         translateTime,
         verifyTime
       )
-      testResults.append(result)
+      testResults.synchronized {
+        testResults.append(result)
+      }
     }
     if (!passed) fail(boogieFailureMsg.get)
   }
