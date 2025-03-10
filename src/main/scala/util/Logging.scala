@@ -84,7 +84,7 @@ class GenericLogger(
 
   private def writeLog(
     logLevel: LogLevel,
-    arg: Any,
+    arg: => Any,
     line: sourcecode.Line,
     file: sourcecode.FileName,
     name: sourcecode.Name

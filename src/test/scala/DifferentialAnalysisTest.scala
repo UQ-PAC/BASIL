@@ -42,7 +42,7 @@ class DifferentialTest extends AnyFunSuite {
       val interpreter = LayerInterpreter(tracingInterpreter(NormalInterpreter), EffectsRLimit(instructionLimit))
       val initialState = InterpFuns.initProgState(NormalInterpreter)(p, InterpreterState())
       // Logger.setLevel(LogLevel.DEBUG)
-      val r = BASILInterpreter(interpreter).run((initialState, Trace(List())), 0)._1
+      val r = BASILInterpreter(interpreter).run((initialState, Trace.empty), 0)._1
       // Logger.setLevel(LogLevel.WARN)
       r
     }
@@ -50,7 +50,7 @@ class DifferentialTest extends AnyFunSuite {
     val (initialRes, traceInit) = interp(initial)
     val (result, traceRes) = interp(transformed)
 
-    def filterEvents(trace: List[ExecEffect]) = {
+    def filterEvents(trace: Iterable[ExecEffect]) = {
       trace.collect {
         case e @ ExecEffect.Call(_, _, _) => e
         case e @ ExecEffect.StoreMem("mem", _) => e
