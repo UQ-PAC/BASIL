@@ -3,6 +3,8 @@ package ir
 import ir.dsl._
 
 import org.scalatest.funsuite.AnyFunSuite
+
+@test_util.tags.UnitTest
 class InvariantTest extends AnyFunSuite {
 
   test("sat singleCallBlockEnd case") {

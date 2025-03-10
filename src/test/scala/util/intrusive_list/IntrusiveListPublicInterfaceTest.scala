@@ -2,6 +2,7 @@ package util.intrusive_list
 import org.scalatest.funsuite.AnyFunSuite
 import scala.collection.mutable
 
+@test_util.tags.UnitTest
 class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
   class Elem(val t: Int) extends IntrusiveListElement[Elem]
 

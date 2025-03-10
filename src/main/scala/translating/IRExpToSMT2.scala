@@ -205,7 +205,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     }
 
     val terms = list(sym("push")) :: BasilIRToSMT2.extractDecls(e)
-      ++ List(assert, list(sym("set-option"), sym(":smt.timeout"), sym("1")), list(sym("check-sat")))
+      ++ List(assert, list(sym("check-sat")))
       ++ (if (getModel) then
             List(list(sym("echo"), sym("\"" + name.getOrElse("") + "  ::  " + e + "\"")), list(sym("get-model")))
           else List())

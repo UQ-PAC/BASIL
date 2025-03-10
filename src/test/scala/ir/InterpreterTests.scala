@@ -31,6 +31,7 @@ def mems[E, T <: Effects[T, E]](m: MemoryState): Map[BigInt, BitVecLiteral] = {
   m.getMem("mem").map((k, v) => k.value -> v)
 }
 
+@test_util.tags.UnitTest
 class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
   Logger.setLevel(LogLevel.WARN)
