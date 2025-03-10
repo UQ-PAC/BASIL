@@ -6,11 +6,12 @@ import util.{
   BASILConfig,
   BASILResult,
   BoogieGeneratorConfig,
+  DSAConfig,
   ILLoadingConfig,
+  IRContext,
   Logger,
   RunUtils,
-  StaticAnalysisConfig,
-  IRContext
+  StaticAnalysisConfig
 }
 
 import scala.sys.process.*
@@ -35,6 +36,7 @@ trait BASILTest {
     BPLPath: String,
     staticAnalysisConf: Option[StaticAnalysisConfig],
     simplify: Boolean = false,
+    dsa: Option[DSAConfig] = None,
     postLoad: IRContext => Unit = s => ()
   ): BASILResult = {
     val specFile = if (specPath.isDefined && File(specPath.get).exists) {
@@ -48,7 +50,8 @@ trait BASILTest {
       staticAnalysis = staticAnalysisConf,
       boogieTranslation =
         util.BoogieGeneratorConfig().copy(memoryFunctionType = util.BoogieMemoryAccessMode.SuccessiveStoreSelect),
-      outputPrefix = BPLPath
+      outputPrefix = BPLPath,
+      dsaConfig = dsa
     )
     val result = RunUtils.loadAndTranslate(config, postLoad = postLoad)
     RunUtils.writeOutput(result)

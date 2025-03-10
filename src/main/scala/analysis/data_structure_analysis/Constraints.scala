@@ -76,11 +76,11 @@ sealed trait CallConstraint[T <: Call, V <: Procedure | Variable](call: T) exten
   def caller: Procedure = call.parent.parent
   def target: V
   val inParams: Map[LocalVar, Expr]
-  val outParmas: Map[LocalVar, LocalVar]
+  val outParams: Map[LocalVar, LocalVar]
   def inConstraints: Set[AssignmentConstraint] =
     inParams.map(pair => AssignmentConstraint(call, pair._1, pair._2)).toSet
   def outConstraints: Set[AssignmentConstraint] =
-    outParmas.map(pair => AssignmentConstraint(call, pair._1, pair._2)).toSet
+    outParams.map(pair => AssignmentConstraint(call, pair._1, pair._2)).toSet
   override def source: T = call
   override def toString: String = eval()
 
@@ -94,7 +94,7 @@ case class DirectCallConstraint(call: DirectCall) extends CallConstraint[DirectC
   override def target: Procedure = call.target
 
   override val inParams: Map[LocalVar, Expr] = call.actualParams
-  override val outParmas: Map[LocalVar, LocalVar] = call.outParams.view.mapValues(_.asInstanceOf[LocalVar]).toMap
+  override val outParams: Map[LocalVar, LocalVar] = call.outParams.view.mapValues(_.asInstanceOf[LocalVar]).toMap
 }
 
 case class IndirectCallConstraint(call: IndirectCall) extends CallConstraint[IndirectCall, Variable](call) {
@@ -102,7 +102,7 @@ case class IndirectCallConstraint(call: IndirectCall) extends CallConstraint[Ind
   override def target: Variable = call.target
 
   override val inParams: Map[LocalVar, Expr] = Map.empty
-  override val outParmas: Map[LocalVar, LocalVar] = Map.empty
+  override val outParams: Map[LocalVar, LocalVar] = Map.empty
 }
 
 def generateConstraints(proc: Procedure): Set[Constraint] = {
