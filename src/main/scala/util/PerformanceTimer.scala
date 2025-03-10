@@ -19,7 +19,7 @@ case class RegionTimer(name: String) {
     total += (System.currentTimeMillis() - entered)
   }
 
-  def getTotal() =  total
+  def getTotal() = total
 
   override def toString() = {
     s"$name : ${getTotal()} (ms)"

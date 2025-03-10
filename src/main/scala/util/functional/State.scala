@@ -109,7 +109,7 @@ object State {
     file: sourcecode.FileName,
     name: sourcecode.Name
   ): State[S, List[B], E] = {
-    //monlog.debug(s"State.mapM (${xs.size} items) ${file.value}:${line.value}")
+    // monlog.debug(s"State.mapM (${xs.size} items) ${file.value}:${line.value}")
     xs.foldRight(pure(List[B]()))((b, acc) => acc.flatMap(c => m(b).map(v => v :: c)))
   }
 
