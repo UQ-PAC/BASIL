@@ -2,7 +2,8 @@ package analysis.data_structure_analysis
 
 import analysis.data_structure_analysis.DSAPhase.{BU, Local, TD}
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
-import boogie.{FuncEntry, SpecGlobal}
+import boogie.{SpecGlobal}
+import specification.FuncEntry
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.{BitVecType, Expr, LocalVar, Procedure}
 import specification.{ExternalFunction, SymbolTableEntry}

@@ -24,19 +24,7 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{
-  Constraint,
-  DataStructureAnalysis,
-  Graph,
-  IntervalDSA,
-  IntervalGraph,
-  SymbolicAddress,
-  SymbolicAddressAnalysis,
-  SymbolicValues,
-  computeDSADomain,
-  generateConstraints,
-  getSymbolicValues
-}
+import analysis.data_structure_analysis.{Constraint, DataStructureAnalysis, Graph, IntervalDSA, IntervalGraph, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValues, computeDSADomain, generateConstraints, getSymbolicValues}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
@@ -48,6 +36,7 @@ import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
 import util.DSAAnalysis.Norm
+import util.LogLevel.INFO
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -877,7 +866,7 @@ object RunUtils {
     var dsaContext: Option[DSAContext] = None
     if (conf.dsaConfig.nonEmpty) {
       val config = conf.dsaConfig.get
-      DSATimer.checkPoint("test")
+      val DSATimer = PerformanceTimer("DSA Timer", INFO)
 
       val main = ctx.program.mainProcedure
       var sva: Map[Procedure, SymbolicValues] = Map.empty
@@ -909,6 +898,7 @@ object RunUtils {
         DSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
         dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
+    }
 
     if (q.runInterpret) {
       Logger.info("Start interpret")
