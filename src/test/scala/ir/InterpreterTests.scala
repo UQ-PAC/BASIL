@@ -102,10 +102,13 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
         "is_prime",
         Seq("n" -> bv64),
         Seq("ans" -> bv1),
-        (If(n <= 1.bv64)
-          Then (ret("ans" -> (0.bv1)))
-          Else (For(i := (2.bv64), i < n, i := i + (1.bv64), If(n % i === (0.bv64)) Then (ret("ans" -> (0.bv1))))))
-          `;` stmts(ret("ans" -> (1.bv1)))
+        blocks(
+          If(n <= 1.bv64)
+            Then (ret("ans" -> (0.bv1)))
+            Else (For(i := (2.bv64), i < n, i := i + (1.bv64))
+              Do (If(n % i === (0.bv64)) Then (ret("ans" -> (0.bv1))))),
+          ret("ans" -> (1.bv1))
+        )
       )
     )
 
@@ -146,8 +149,8 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
               If(bv64(1) === n_in)
                 Then (returnv := bv64(1))
                 Else (
-                  Seq("n_out" -> p2) := Call("fib", "n_in" -> (n_in - bv64(2))),
-                  Seq("n_out" -> p1) := Call("fib", "n_in" -> (n_in - bv64(1))),
+                  Seq("n_out" -> p2) := call("fib", "n_in" -> (n_in - bv64(2))),
+                  Seq("n_out" -> p1) := call("fib", "n_in" -> (n_in - bv64(1))),
                   returnv := p1 + p2
                 )
             )),
@@ -184,7 +187,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
           (If(n > (2147483647.bv64 / shift))
             Then (
               stmts(
-                Seq("out" -> temp) := Call("sqrt", "n" -> (n / 4.bv64), "shift" -> shift),
+                Seq("out" -> temp) := call("sqrt", "n" -> (n / 4.bv64), "shift" -> shift),
                 ret("out" -> 2.bv64 * temp)
               )
             )),
@@ -194,7 +197,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
               stmts(
                 x_old := x,
                 x := ((x + (n_one / x)) / 2.bv64),
-                Seq("abs_out" -> temp) := Call("abs", "x" -> (x - x_old))
+                Seq("abs_out" -> temp) := call("abs", "x" -> (x - x_old))
               ),
               (If(temp <= 1.bv64) Then (ret("out" -> x)))
             ))
