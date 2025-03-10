@@ -173,15 +173,13 @@ case class If(cond: Expr) {
   def Then(body: (NonCallStatement | EventuallyStatement | EventuallyJump)*): ThenV = ThenV(cond, List(stmts(body: _*)))
 }
 
-case class ThenV(cond: Expr, body: List[EventuallyBlock]) {
+private case class ThenV(cond: Expr, body: List[EventuallyBlock]) {
   def Else(els: Iterable[EventuallyBlock]): List[EventuallyBlock] = mkIf(cond, body, els.toList)
   def Else(els: EventuallyBlock*): List[EventuallyBlock] = mkIf(cond, body, els.toList)
   @targetName("elseStatements")
   def Else(els: (NonCallStatement | EventuallyStatement | EventuallyJump)*): List[EventuallyBlock] =
     mkIf(cond, body, List(stmts(els: _*)))
 }
-
-case class ElseV(cond: Expr, thenBody: List[EventuallyBlock], body: List[EventuallyBlock])
 
 /**
  * Implicit conversions so that we are more flexible with what can be passed to these constructs,
