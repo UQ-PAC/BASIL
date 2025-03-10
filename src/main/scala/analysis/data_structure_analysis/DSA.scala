@@ -31,49 +31,49 @@ enum DSAPhase {
 
 enum Interval(val start: Option[Int], val end: Option[Int]) {
   case Top extends Interval(None, None)
-  case Value(s: Int, e: Int) extends Interval (Some(s), Some(e))
-  
+  case Value(s: Int, e: Int) extends Interval(Some(s), Some(e))
+
   override def toString: String =
     this match
       case Interval.Top => "Top"
       case Interval.Value(start, end) => s"$start-${end - 1}"
-      
+
   def size: Option[Int] =
     this match
       case Interval.Top => None
       case Interval.Value(start, end) => Some(end - 1 - start)
-      
+
   def move(func: Int => Int): Interval =
     this match
       case Interval.Top => Interval.Top
       case Interval.Value(start, end) => Value(func(start), func(end))
-  
+
   def isEmpty: Boolean = this.size.contains(0)
-      
+
   def growTo(size: Int): Interval =
     this match
       case Interval.Top => Interval.Top
       case Interval.Value(start, end) => Interval(start, math.max(end, start + size))
-      
+
   def contains(offset: Int): Boolean =
     this match
       case Interval.Top => true
       case Interval.Value(start, end) => start <= offset && end > offset
-      
+
   def contains(interval: Interval): Boolean =
     (this, interval) match
       case (Interval.Top, _) => true
-      case (_, Interval.Top) => false // this is not top 
+      case (_, Interval.Top) => false // this is not top
       case (Interval.Value(start1, end1), Interval.Value(start2, end2)) =>
         start1 <= start2 && end1 >= end2
-  
+
   def isOverlapping(other: Interval): Boolean =
     (this, other) match
       case (Interval.Top, _) => true
       case (_, Interval.Top) => true
       case (Interval.Value(start1, end1), Interval.Value(start2, end2)) =>
         !(start1 >= end2 || start2 >= end1)
-        
+
   def join(other: Interval): Interval = {
     (this, other) match
       case (Interval.Top, _) => Interval.Top
@@ -83,13 +83,12 @@ enum Interval(val start: Option[Int], val end: Option[Int]) {
   }
 }
 
-
 object Interval {
   def apply(start: Int, end: Int) = Interval.Value(start, end)
   def join(interval1: Interval, interval2: Interval): Interval = interval1.join(interval2)
   implicit def orderingByTuple[T <: Interval]: Ordering[T] =
-    Ordering.by {
-      case Interval.Value(start, end) => (start, end)
+    Ordering.by { case Interval.Value(start, end) =>
+      (start, end)
     }
 }
 

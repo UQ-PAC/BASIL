@@ -1,7 +1,19 @@
 import ir.{Block, Command, DirectCall, GoTo, Procedure, Program, Statement}
 import ir.*
 import org.scalatest.funsuite.*
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, DSAConfig, DSAContext, ILLoadingConfig, LogLevel, Logger, PerformanceTimer, RunUtils, StaticAnalysisConfig}
+import util.{
+  BASILConfig,
+  BASILResult,
+  BoogieGeneratorConfig,
+  DSAConfig,
+  DSAContext,
+  ILLoadingConfig,
+  LogLevel,
+  Logger,
+  PerformanceTimer,
+  RunUtils,
+  StaticAnalysisConfig
+}
 import analysis.data_structure_analysis.*
 
 import scala.collection.mutable.ArrayBuffer
@@ -84,7 +96,8 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
     val (boogieFailureMsg, _, _) = checkVerify(boogieResult, resultPath, conf.expectVerify)
 
     val fresolvedcalls = resolvedCalls.zip(indirectCallBlock).map((cr, l) => cr.copy(label = l))
-    val indirectResolutionFailureMsg = checkIndirectCallResolution(basilResult.ir.program, fresolvedcalls, checkResolvedCalls(basilResult.dsa.get))
+    val indirectResolutionFailureMsg =
+      checkIndirectCallResolution(basilResult.ir.program, fresolvedcalls, checkResolvedCalls(basilResult.dsa.get))
 
     (indirectResolutionFailureMsg, boogieFailureMsg) match {
       case (Some(msg), None) => fail(msg)
@@ -97,7 +110,11 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
   /** @return
     *   None if passes, Some(failure message) if doesn't pass
     */
-  def checkIndirectCallResolution(program: Program, resolutions: Seq[IndirectCallResolution], checker: ((Command, IndirectCallResolution) => IndirectCallResult)): Option[String] = {
+  def checkIndirectCallResolution(
+    program: Program,
+    resolutions: Seq[IndirectCallResolution],
+    checker: ((Command, IndirectCallResolution) => IndirectCallResult)
+  ): Option[String] = {
     val nameToProc: Map[String, Procedure] = program.nameToProcedure
     val labelToResolution: Map[String, IndirectCallResolution] = resolutions.map(r => r.label -> r).toMap
     val procedures: Set[Procedure] = resolutions.map(r => nameToProc(r.labelProcedure)).toSet

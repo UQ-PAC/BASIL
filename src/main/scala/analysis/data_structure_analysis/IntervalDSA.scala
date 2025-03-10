@@ -28,7 +28,7 @@ class IntervalGraph(
   val constraints: Set[Constraint],
   val nodeBuilder: Option[() => Map[SymBase, IntervalNode]]
 ) {
-  def this(proc: Procedure, phase: DSAPhase, irContext: IRContext)  = {
+  def this(proc: Procedure, phase: DSAPhase, irContext: IRContext) = {
     this(proc, phase, irContext, getSymbolicValues(proc), generateConstraints(proc), None)
   }
 
@@ -119,11 +119,10 @@ class IntervalGraph(
   }
 
   def isGlobal(address: Int): Boolean = {
-    (irContext.globals ++ irContext.funcEntries).exists(
-      g => Interval(g.address.toInt, g.address.toInt + (g.size /8)).contains(address)
-    ) || irContext.globalOffsets.exists(
-      (g1, g2) =>
-        Interval(g1.toInt, g1.toInt + 8).contains(address)
+    (irContext.globals ++ irContext.funcEntries).exists(g =>
+      Interval(g.address.toInt, g.address.toInt + (g.size / 8)).contains(address)
+    ) || irContext.globalOffsets.exists((g1, g2) =>
+      Interval(g1.toInt, g1.toInt + 8).contains(address)
         || Interval(g2.toInt, g2.toInt + 8).contains(address)
     )
   }
@@ -324,12 +323,14 @@ class IntervalGraph(
           val oldCopy = node.clone(copy, false, oldToNew)
           val curCopy = current.clone(copy, true, oldToNew)
           copy.unify(oldCopy, curCopy, offset)
-        else
-          current.clone(copy, true, oldToNew)
+        else current.clone(copy, true, oldToNew)
     }
 
-    assert(copy.solver.size <= this.solver.size, s"size of copy's solver ${copy.solver.size}," +
-      s"size of this's solver ${this.solver.size}")
+    assert(
+      copy.solver.size <= this.solver.size,
+      s"size of copy's solver ${copy.solver.size}," +
+        s"size of this's solver ${this.solver.size}"
+    )
     copy.nodes = this.nodes.view.mapValues(oldToNew.apply).toMap
     assert(copy.nodes.keys == this.nodes.keys)
     copy.localCorrectness()
@@ -386,10 +387,8 @@ class IntervalGraph(
     val cells = symValToCells(exprToSymVal(constraintArg.value).removeNonAddress(i => i >= 1000))
     val exprCells = cells.map(find)
 
-    if constraintArg.contents && !ignoreContents then
-      exprCells.map(_.getPointee)
-    else
-      exprCells
+    if constraintArg.contents && !ignoreContents then exprCells.map(_.getPointee)
+    else exprCells
 
   }
 
@@ -494,7 +493,8 @@ class IntervalGraph(
   protected def mergeCellsHelper(cell1: IntervalCell, cell2: IntervalCell): IntervalCell = {
     assert(cell1.node.isUptoDate)
     assert(cell2.node.isUptoDate)
-    val (stableCell, toBeMoved) = if cell1.interval.start.get > cell2.interval.start.get then (cell1, cell2) else (cell2, cell1)
+    val (stableCell, toBeMoved) =
+      if cell1.interval.start.get > cell2.interval.start.get then (cell1, cell2) else (cell2, cell1)
     val delta = stableCell.interval.start.get - toBeMoved.interval.start.get
 
     val stableNode = stableCell.node
@@ -742,19 +742,24 @@ class IntervalNode(
         old.cells.foreach {
           case cell: IntervalCell if cell.hasPointee =>
             val (newNode, off) = newGraph.findNode(oldToNew(old))
-            assert(newNode.isCollapsed || newNode.cells.exists(c => c.interval.contains(cell.interval.move(i => i + off))), s"expected cloned cell to include same intervals")
+            assert(
+              newNode.isCollapsed || newNode.cells.exists(c => c.interval.contains(cell.interval.move(i => i + off))),
+              s"expected cloned cell to include same intervals"
+            )
             assert(newGraph.find(newNode) == newNode)
             val pointee = cell.getPointee
             assert(pointee.node.isUptoDate, s"expected updated pointee")
             if !oldToNew.contains(pointee.node) then queue.enqueue(pointee.node)
             val (clonedPointee, pointeeOff) =
-              if !oldToNew.contains(pointee.node) then
-                (pointee.node.clone(newGraph, false, oldToNew), 0)
+              if !oldToNew.contains(pointee.node) then (pointee.node.clone(newGraph, false, oldToNew), 0)
               else newGraph.findNode(oldToNew(pointee.node))
 
             assert(newGraph.find(clonedPointee) == clonedPointee, s"expected cloned pointee to remain uptodate")
             val newPointee = clonedPointee.add(pointee.interval.move(i => i + pointeeOff))
-            assert(pointee.interval.move(i => i + pointeeOff) == newPointee.interval || newPointee.node.isCollapsed, s"pointee interval: ${pointee.interval}, moved by $pointeeOff, cloned Pointee interval: ${newPointee.interval}")
+            assert(
+              pointee.interval.move(i => i + pointeeOff) == newPointee.interval || newPointee.node.isCollapsed,
+              s"pointee interval: ${pointee.interval}, moved by $pointeeOff, cloned Pointee interval: ${newPointee.interval}"
+            )
             val pointer = newNode.get(cell.interval.move(i => i + off))
             assert(pointer.node.isCollapsed || pointer.interval.contains(cell.interval.move(i => i + off)))
             assert(!pointer.hasPointee || pointer.getPointee == newPointee)
@@ -773,7 +778,6 @@ class IntervalNode(
     _cells = _cells.appended(cell).sorted
     assert(nonOverlappingProperty, "expected non overlapping cells")
   }
-
 
   /**
    * Checks this node is set representative in `this.graph` union-find solver
@@ -1008,12 +1012,7 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
 }
 
 object IntervalDSA {
-  def getLocal(
-    proc: Procedure,
-    context: IRContext,
-    symValues: SymbolicValues,
-    cons: Set[Constraint],
-  ): IntervalGraph = {
+  def getLocal(proc: Procedure, context: IRContext, symValues: SymbolicValues, cons: Set[Constraint]): IntervalGraph = {
     val graph = IntervalGraph(proc, Local, context, symValues, cons, None)
     graph.localPhase()
     graph.localCorrectness()

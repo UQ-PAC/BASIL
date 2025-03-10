@@ -2,7 +2,17 @@ package test_util
 
 import org.scalatest.funsuite.AnyFunSuite
 import ir.{Block, Procedure, Program}
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, DSAConfig, ILLoadingConfig, IRContext, Logger, RunUtils, StaticAnalysisConfig}
+import util.{
+  BASILConfig,
+  BASILResult,
+  BoogieGeneratorConfig,
+  DSAConfig,
+  ILLoadingConfig,
+  IRContext,
+  Logger,
+  RunUtils,
+  StaticAnalysisConfig
+}
 
 import scala.sys.process.*
 import scala.io.Source

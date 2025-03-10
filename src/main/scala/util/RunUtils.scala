@@ -24,7 +24,19 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{Constraint, DataStructureAnalysis, Graph, IntervalDSA, IntervalGraph, SymbolicAddress, SymbolicAddressAnalysis, SymbolicValues, computeDSADomain, generateConstraints, getSymbolicValues}
+import analysis.data_structure_analysis.{
+  Constraint,
+  DataStructureAnalysis,
+  Graph,
+  IntervalDSA,
+  IntervalGraph,
+  SymbolicAddress,
+  SymbolicAddressAnalysis,
+  SymbolicValues,
+  computeDSADomain,
+  generateConstraints,
+  getSymbolicValues
+}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}

@@ -5,7 +5,18 @@ import ir.dsl.{block, proc, prog, ret}
 import ir.{BitVecLiteral, Endian, MemoryLoad, Register, SharedMemory}
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, DSAAnalysis, DSAConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, StaticAnalysisContext}
+import util.{
+  BASILConfig,
+  BASILResult,
+  BoogieGeneratorConfig,
+  DSAAnalysis,
+  DSAConfig,
+  ILLoadingConfig,
+  IRContext,
+  RunUtils,
+  StaticAnalysisConfig,
+  StaticAnalysisContext
+}
 
 class IntervalDSATest extends AnyFunSuite {
   def runAnalysis(program: Program): StaticAnalysisContext = {

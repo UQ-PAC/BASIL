@@ -125,7 +125,7 @@ case class SymValueSet(state: Map[SymBase, SymOffsets]) {
       .collect {
         case (base: SymBase, offsets: SymOffsets) if other.state.contains(base) && other.state(base) != offsets =>
           (base, SymOffsets.top)
-        case (base: SymBase, offsets: SymOffsets) if !offsets.isTop && offsets.getOffsets.size > 10  =>
+        case (base: SymBase, offsets: SymOffsets) if !offsets.isTop && offsets.getOffsets.size > 10 =>
           (base, SymOffsets.top)
       }
     join(other).join(SymValueSet(update))
