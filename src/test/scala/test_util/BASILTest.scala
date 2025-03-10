@@ -2,16 +2,7 @@ package test_util
 
 import org.scalatest.funsuite.AnyFunSuite
 import ir.{Block, Procedure, Program}
-import util.{
-  BASILConfig,
-  BASILResult,
-  BoogieGeneratorConfig,
-  ILLoadingConfig,
-  Logger,
-  RunUtils,
-  StaticAnalysisConfig,
-  IRContext
-}
+import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, DSAConfig, ILLoadingConfig, IRContext, Logger, RunUtils, StaticAnalysisConfig}
 
 import scala.sys.process.*
 import scala.io.Source
@@ -35,6 +26,7 @@ trait BASILTest {
     BPLPath: String,
     staticAnalysisConf: Option[StaticAnalysisConfig],
     simplify: Boolean = false,
+    dsa: Option[DSAConfig] = None,
     postLoad: IRContext => Unit = s => ()
   ): BASILResult = {
     val specFile = if (specPath.isDefined && File(specPath.get).exists) {
@@ -48,7 +40,8 @@ trait BASILTest {
       staticAnalysis = staticAnalysisConf,
       boogieTranslation =
         util.BoogieGeneratorConfig().copy(memoryFunctionType = util.BoogieMemoryAccessMode.SuccessiveStoreSelect),
-      outputPrefix = BPLPath
+      outputPrefix = BPLPath,
+      dsaConfig = dsa
     )
     val result = RunUtils.loadAndTranslate(config, postLoad = postLoad)
     RunUtils.writeOutput(result)
