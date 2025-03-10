@@ -250,4 +250,100 @@ Further validation of the simplification pass is enabled by the `--validate-simp
 3. Approximate stack identification if memoryregions are disabled
 4. Boogie backend
 
+## Known Bits Representation and Simplification
 
+- see [src/main/scala/ir/transforms/SimplifyKnownBits.scala](../../src/main/scala/ir/transforms/SimplifyKnownBits.scala)
+
+### Representation ###
+
+#### Bit Vectors ####
+At different program states, there may be partially or fully unknown bitvector values in bitwise computations. For example, a variable `x` could be assigned a bitwise `OR` expression between two variables `y` and `z`, where `y` equals the binary value `00001111`, and `z` is not yet determined. To produce a value for `x` at the given program state, we will utilise a known bits representation, notably used in the Linux kernel and mentioned in [*Sound, Precise, and Fast Abstract Interpretation with Tristate Numbers*](https://people.cs.rutgers.edu/~sn349/papers/cgo-2022.pdf), to simultaneously track definite bits (`definite 0 / definite 1`) and unknown bits (`Top or T`).
+
+The known bits representation can also be referred to as a ***TNum*** (tristate number) and consists of a value bitvector and a mask bitvector, stored within the TNumValue class as `TNumValue(value, mask)`. The value bitvector tracks the index of definite 1 bits and the mask bitvector tracks the index of unknown bits (T). This would mean that, if the value bit is 1 and the mask bit is 0, the TNum should represent a definite 1 at that specific index. On the other hand, if the value bit is 0 and the mask bit is 1, the TNum should represent T (Top) at the index. This would also mean that the index of definite 0 bits can be inferred when the value and mask bits at a certain index are both 0. Furthermore, the value and mask bits at the same index can never be 1 simultaneously as this is not a valid state. 
+
+With this system, we can represent the variable `y` in our previous example as `y = TNumValue(00001111, 00000000)` and the variable `z` as `z = TNumValue(00000000, 11111111)`, which are equivalent to `00001111` and `TTTTTTTT`, respectively. 
+
+#### Booleans ####
+The section below will outline all supported TNum operations, which also include comparison operators that return a boolean type. Thus, a TNum boolean type will also be required to maintain consistency in the TNum abstract domain. The TNum boolean class will take the form of `TNumBool(boolean: Int)`, where its boolean value is expressed as either 1 or 0, indicating true or false respectively.
+
+### Simplification ###
+The simplification of TNumValue expressions is also supported within the TNumValue class. Taking our example earlier and substituting in TNums `y` and `z`, we have:
+
+```
+x = TNumValue(00001111, 00000000) | TNumValue(00000000, 11111111)
+```
+
+or equivalently,
+
+```
+x = 00001111 | TTTTTTTT
+```
+
+All supported operators can be found under the TNumValue and TNumBool classes as class methods. These methods ensure that all uncertainty are propagated correctly. For example, the bitwise `OR` operation method, `TOR`, which can be found under the TNumValue class, follows the logic:
+
+```scala
+def TOR(that: TNumValue): TNumValue = {
+  val v = this.value | that.value
+  val mu = this.mask | that.mask
+  TNumValue(v, (mu & ~v));
+}
+```
+The return value of this method is equivalent to computing the equation above, that is, simplifying both TNumValues `y` and `z`, and storing the result in a new TNumValue `x`. The new value bitvector `v` of `x` can be obtained by applying the bitwise `OR` operation on both value bitvectors of `y` and `z`:
+
+```scala
+val v = 00001111 | 00000000 = 00001111
+```
+
+The new mask bitvector `x` can be obtained by first applying the bitwise `OR` operation on both mask bitvectors of `y` and `z` (`mu`), and then applying the bitwise `AND` operation on both `mu` and `NOT` `v`:
+
+```scala
+val mu = 00000000 | 11111111 = 11111111
+mu & ~v = 11111111 & ~00001111 = 11111111 & 11110000 = 11110000
+```
+
+We finally obtain:
+
+```
+x = TNumValue(00001111, 11110000) = TTTT1111
+```
+
+This result aligns with the expected TNum logic since `0 | T` must be `T` given that T could be either 0 or 1, and `1 | T` can be immediately simplified to `1` since the expression will always evaluate to 1 regardless of the value of T.
+
+#### Usage / Purpose ####
+
+The known bits simplification technique has been proven to reduce computational overhead by eliminating redundant instructions. Suppose we have the following condition:
+
+```scala
+if (x[0] == 1) {
+  ...
+}
+```
+
+By simplifying:
+
+```
+x = 00001111 | TTTTTTTT
+```
+
+into
+
+```
+x = TTTT1111
+```
+
+we can deduce beforehand that index 0 of *x*, `x[0]`, will always be 1, and the condition will be satisfied.
+
+#### Simplification Testing ####
+
+- see [scripts/tnum_test_z3.py](../../scripts/tnum_test_z3.py)
+
+Within the provided Z3 Python script, the supported operator methods have been translated to Python/Z3-equivalent methods that utilise the same logic but with varying syntax. The Z3 solver is then able to deduce whether the TNumValue returned after the operation adequately represents the full range of possible results and correctly propagates any uncertainty. The logic of each method is deemed "correct" if it satisfies three different criteria: ***soundness***, ***wellformedness***, and ***precision***.
+
+***Soundness*** refers to whether the abstract TNumValue contains all concrete results, that is, the TNumValue must be able to represent every possible correct concrete value. For example, if an operation is expected to output any of the following binary values: `001`, `010`, `011`, then any logic returning `0TT`, or `TNumValue(000, 011)`, would be a sound solution.
+
+***Wellformedness*** refers to the condition that a TNumValue does not violate the defined structure of a typical TNumValue. Specifically, a TNumValue is only wellformed if it does not have a value bit and a mask bit set to 1 at the **same** index, as this is not a valid state for a TNumValue. For example, `TNumValue(100, 100)` is not wellformed.
+
+***Precision*** refers to how precise the TNumValue is. In other words, a precise TNumValue should not over-approximate the range of possible results, unnecessarily represent values that should not appear, or neglect bits that are already known. For example, if an operation is expected to output any of the following binary values: `001`, `010`, `011`, then any logic returning `0TT`, or `TNumValue(000, 011)`, would be more precise than logic that returns `TTT`, or `TNum(000, 111)`. This is because we can clearly identify the MSB as 0, and therefore, the definite 0 bit should be retained rather than approximating it as either 0 or 1.
+
+### Transfer Function ###
+The known bits analysis mainly focuses on simplifying local assignment commands or statements (`LocalAssign`), and handles `MemoryLoad` statements by defaulting to a fully unknown TNumValue. This can be seen within the `transfer(s: Map[Variable, TNum], b: Command): Map[Variable, TNum]` method that converts each `Command` expression into a TNum, maps the assigned variable to the resultant TNum, and returns the variable mapping of the current program state. To simplify the transfer method, the `evaluateExprToTNum(s: Map[Variable, TNum], expr: Expr): TNum` method has been implemented to allow for recursive evaluation of both nested and non-nested expressions that appear within `LocalAssign` statements.
