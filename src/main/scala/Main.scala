@@ -263,12 +263,18 @@ object Main {
       dsaConfig = dsa
     )
 
-    RunUtils.run(q)
+    val result = RunUtils.run(q)
     if (conf.verify.value) {
-      Logger.info("Running boogie")
-      val timer = PerformanceTimer("Verify", LogLevel.INFO)
-      Seq("boogie", "/useArrayAxioms", q.outputPrefix).!
-      timer.checkPoint("Finish")
+      assert(result.boogie.nonEmpty)
+      for (b <- result.boogie) {
+        val fname = b.filename
+        val timer = PerformanceTimer("Verify", LogLevel.INFO)
+        val cmd = Seq("boogie", "/useArrayAxioms", fname, "/printVerifiedProceduresCount:0")
+        Logger.info(s"Running: ${cmd.mkString(" ")}")
+        val output = cmd.!!
+        Logger.info(util.boogie_interaction.parseOutput(output))
+        timer.checkPoint("Finish")
+      }
     }
   }
 
