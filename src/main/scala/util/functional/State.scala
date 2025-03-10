@@ -20,7 +20,7 @@ case class State[S, A, E](f: S => (S, Either[E, A])) {
   def flatMap[B](
     f: A => State[S, B, E]
   )(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): State[S, B, E] = State(s => {
-    monlog.debug(s"State.flatMap ${file.value}:${line.value}")
+    // monlog.debug(s"State.flatMap ${file.value}:${line.value}")
     val (s2, a) = this.f(s)
     val r = a match {
       case Left(l) => (s2, Left(l))
@@ -67,7 +67,7 @@ object State {
     file: sourcecode.FileName,
     name: sourcecode.Name
   ): S = {
-    Logger.debug(s"state.execute")(line, file, name)
+    // Logger.debug(s"state.execute")(line, file, name)
     c.f(s) match {
       case (s, Left(r)) => {
         monlog.info(s"ERROR: $r")
@@ -109,7 +109,7 @@ object State {
     file: sourcecode.FileName,
     name: sourcecode.Name
   ): State[S, List[B], E] = {
-    monlog.debug(s"State.mapM (${xs.size} items) ${file.value}:${line.value}")
+    //monlog.debug(s"State.mapM (${xs.size} items) ${file.value}:${line.value}")
     xs.foldRight(pure(List[B]()))((b, acc) => acc.flatMap(c => m(b).map(v => v :: c)))
   }
 
