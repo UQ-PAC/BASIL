@@ -15,6 +15,16 @@ case class BoogieResult(kind: BoogieResultKind, errors: Array[BoogieError]) {
 }
 
 case class BoogieLine(number: Int, text: String, isError: Boolean) {
+
+  /**
+   * Print this line in the format: 
+   *
+   *     line number | line content
+   *
+   *  If this line reprsents a failing assertion (isError) then:
+   *
+   *   > line number | line content
+   */
   def prettyPrint(numPadding: Integer = (number / 10 + 1)) = {
     val padded = number.toString().reverse.padTo(7, ' ').reverse
     val carat = if isError then " > " else "   "
@@ -22,6 +32,16 @@ case class BoogieLine(number: Int, text: String, isError: Boolean) {
   }
 }
 
+/**
+ * Information about a line containing a failing assertion.
+ *
+ * @param fileName
+ *  The Boogie file the assertion is from
+ * @param line 
+ *  the line number containing the assertion
+ * @param errorSnippet
+ *  List of surrounding lines in the Boogie file
+ */
 case class BoogieError(fileName: String, line: Int, errorSnippet: Option[List[BoogieLine]]) {
   def formattedAssertionSnippet: Option[String] = {
     for {
@@ -32,6 +52,12 @@ case class BoogieError(fileName: String, line: Int, errorSnippet: Option[List[Bo
   }
 }
 
+/*
+ * Parse the output of the boogie tool and return a symbolic structure representing
+ * the verification decision, and a list of errors.
+ *
+ * Assumes boogie is invoked with [/printVerifiedProceduresCount:0].
+ */
 def parseOutput(boogieStdout: String): BoogieResult = {
   println(boogieStdout)
   val verified = boogieStdout.strip().equals("Boogie program verifier finished with 0 errors")
@@ -53,6 +79,9 @@ def parseOutput(boogieStdout: String): BoogieResult = {
   BoogieResult(kind, errors)
 }
 
+/**
+ * Get a list of assertion failures from the boogie output. 
+ */
 def parseErrors(boogieStdoutMessage: String, snippetContext: Int = 3): Array[BoogieError] = {
   val lines = boogieStdoutMessage.split('\n')
   lines.collect {
