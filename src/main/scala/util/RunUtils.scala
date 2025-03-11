@@ -813,6 +813,8 @@ object RunUtils {
 
     ctx = IRTransform.doCleanup(ctx, conf.simplify)
 
+    transforms.inlinePLTLaunchpad(ctx.program)
+
     if (q.loading.trimEarly) {
       val before = ctx.program.procedures.size
       transforms.stripUnreachableFunctions(ctx.program, q.loading.procedureTrimDepth)
