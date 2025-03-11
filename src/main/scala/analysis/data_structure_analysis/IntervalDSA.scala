@@ -363,22 +363,21 @@ class IntervalGraph(
   }
 
   protected def collect(): (Set[IntervalNode], Set[(IntervalCell, IntervalCell)]) = {
-    var nodes: Set[IntervalNode] = Set.empty
-    var pointsTo: Set[(IntervalCell, IntervalCell)] = Set.empty
+    val nodes: mutable.Set[IntervalNode] = mutable.Set()
+    val pointsTo: mutable.Set[(IntervalCell, IntervalCell)] = mutable.Set()
     constraints.foreach {
-      case constraint: BinaryConstraint =>
+      case constraint: BinaryConstraint => 
         val valueCells = constraintArgToCells(constraint.arg2).map(get)
-        var valueCell: Option[IntervalCell] = None
-        if valueCells.size == 1 then
-          valueCell = Some(valueCells.head)
-          nodes += valueCell.get.node
-
         val indexCells = constraintArgToCells(constraint.arg1).map(get)
-        if indexCells.nonEmpty then nodes = nodes.union(indexCells.map(_.node))
+        valueCells.foreach(c => nodes.add(c.node))
+        indexCells.foreach(c => nodes.add(c.node))
+        indexCells.foreach (
+          pointer => valueCells.foreach(pointee => pointsTo.add(pointer, pointee))
+        )
       case _ =>
     }
 
-    (nodes, pointsTo)
+    (nodes.toSet, pointsTo.toSet)
   }
 
   def init(symBase: SymBase, size: Option[Int]): IntervalNode = IntervalNode(this, mutable.Map(symBase -> 0), size)
