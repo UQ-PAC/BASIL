@@ -346,16 +346,16 @@ class IntervalGraph(
     val arrows = ArrayBuffer[StructArrow]()
 
     nodes.foreach { n =>
-      structs.append(DotStruct(n.id.toString, n.toString, Some(n.cells.map(o => o.interval.toString)), true))
+      structs.append(DotStruct(n.id.toString, n.toString, Some(n.cells.map(o => o.interval.start.get.toString)), true))
     }
 
     pointsTo.foreach { (pointer, pointee) =>
       val pointerID = pointer.node.id.toString
-      val pointerOffset = pointer.interval.toString
+      val pointerOffset = pointer.interval.start.get.toString
       arrows.append(
         StructArrow(
           DotStructElement(pointerID, Some(pointerOffset)),
-          DotStructElement(pointee.node.id.toString, Some(pointee.interval.toString))
+          DotStructElement(pointee.node.id.toString, Some(pointee.interval.start.get.toString))
         )
       )
     }
@@ -366,7 +366,7 @@ class IntervalGraph(
     val nodes: mutable.Set[IntervalNode] = mutable.Set()
     val pointsTo: mutable.Set[(IntervalCell, IntervalCell)] = mutable.Set()
     constraints.foreach {
-      case constraint: BinaryConstraint => 
+      case constraint: BinaryConstraint =>
         val valueCells = constraintArgToCells(constraint.arg2).map(get)
         val indexCells = constraintArgToCells(constraint.arg1).map(get)
         valueCells.foreach(c => nodes.add(c.node))

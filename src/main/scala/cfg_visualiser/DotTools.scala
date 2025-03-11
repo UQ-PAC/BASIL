@@ -167,7 +167,7 @@ class DotStruct(val id: String, val details: String, val fields: Option[Iterable
   override def toString: String = toDotString
 
   override def toDotString: String =
-    s"$id " + "[label=" + escape(label) + "]"
+    s"$id " + "[label=" + label + "]"
 }
 
 class DotStructElement(val id: String, val field: Option[String]) extends DotElement {
