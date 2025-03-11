@@ -262,7 +262,7 @@ class SystemTestsGTIRB extends SystemTests {
 
 class ExtraSpecTests extends SystemTests {
   // some of these tests have time out issues so they need more time, but some still time out even with this for unclear reasons
-  val boogieFlags = Seq("/timeLimit:30", "/useArrayAxioms")
+  val boogieFlags = Seq("/timeLimit:30", "/proverOpt:O:smt.array.extensional=false")
   runTests(
     "extraspec_correct",
     TestConfig(
