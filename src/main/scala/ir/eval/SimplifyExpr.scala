@@ -149,6 +149,13 @@ def simplifyExprFixpoint: Simplifier = simpFixedPoint(
   SimpExpr(simpFixedPoint(sequenceSimp(simplifyExpr, SimpExpr(fastPartialEvalExpr))))
 )
 
+/**
+ * Perform regular simplification to a fixed point, then cleanup bitvector extension ops.
+ */
+def simplifyPaddingAndSlicingExprFixpoint: Simplifier = simpFixedPoint(
+  sequenceSimp(simplifyExprFixpoint, SimpExpr(cleanupExtends))
+)
+
 /** Perform (expensive) simplification of inequalities and attempt to lift flag calculations to inequalities.
   *
   * Sequences [[simplifyCmpInequalities]] with [[simplifyExprFixpoint]] since we expect the normal form to apply for
