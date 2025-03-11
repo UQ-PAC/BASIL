@@ -25,17 +25,16 @@ import java.io.{BufferedWriter, File, FileWriter}
 class IndirectCallTests extends AnyFunSuite, BASILTest, TestCustomisation {
 
   override def customiseTestsByName(name: String) = name match {
-    case "functionpointer/clang:BAP" | "functionpointer/clang_O2:BAP" | "functionpointer/clang_O2:GTIRB" |
-        "functionpointer/clang_pic:BAP" | "functionpointer/gcc:BAP" | "functionpointer/gcc_O2:BAP" |
-        "functionpointer/gcc_pic:BAP" | "indirect_call/clang:BAP" | "indirect_call/clang_pic:BAP" |
-        "indirect_call/gcc:BAP" | "indirect_call/gcc_pic:BAP" | "indirect_call_outparam/clang:BAP" |
-        "indirect_call_outparam/clang:GTIRB" | "indirect_call_outparam/gcc:BAP" | "indirect_call_outparam/gcc:GTIRB" |
-        "jumptable/clang:BAP" | "jumptable/clang:GTIRB" | "jumptable/gcc:BAP" | "jumptable/gcc:GTIRB" |
-        "jumptable2/clang:BAP" | "jumptable2/clang_O2:BAP" | "jumptable2/clang_pic:BAP" | "jumptable2/gcc:BAP" |
-        "jumptable2/gcc_O2:BAP" | "jumptable2/gcc_pic:BAP" | "jumptable3/clang_O2:GTIRB" =>
-      Mode.TempFailure("appear to be failing after simplification pass")
-    case "jumptable3/clang:GTIRB" | "switch2/clang:GTIRB" =>
-      Mode.TempFailure("Unable to evaluate expr: bitvector size mismatch")
+    case "indirect_call_outparam/clang:BAP" | "indirect_call_outparam/clang:GTIRB" | "indirect_call_outparam/gcc:BAP" |
+        "indirect_call_outparam/gcc:GTIRB" | "jumptable/clang:BAP" | "jumptable/clang:GTIRB" =>
+      Mode.TempFailure("indirect call not resolved to correct target")
+
+    case "jumptable3/clang:GTIRB" | "jumptable3/clang_O2:GTIRB" | "switch2/clang:GTIRB" =>
+      Mode.TempFailure("indirect call not resolved to goto")
+
+    case "jumptable/gcc:BAP" | "jumptable/gcc:GTIRB" =>
+      Mode.TempFailure("Expected verification success, but got failure")
+
     case _ => Mode.Normal
   }
 
