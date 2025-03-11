@@ -4,7 +4,6 @@ import java.io.{BufferedWriter, File, FileWriter}
 import ir.{Block, Procedure, Program}
 import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, StaticAnalysisConfig}
 
-
 import java.io.File
 
 trait TestUtil {
@@ -61,4 +60,3 @@ def log(text: String, path: String): Unit = {
   writer.flush()
   writer.close()
 }
-
