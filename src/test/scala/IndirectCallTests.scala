@@ -88,6 +88,7 @@ class IndirectCallTests extends AnyFunSuite, BASILTest, TestCustomisation {
   }
 
   def runTest(name: String, variation: String, conf: TestConfig, resolvedCalls: Seq[IndirectCallResolution]): Unit = {
+    Logger.setLevel(LogLevel.ERROR)
     val directoryPath = "./src/test/indirect_calls/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
     val inputPath = if conf.useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
@@ -224,7 +225,7 @@ class IndirectCallTests extends AnyFunSuite, BASILTest, TestCustomisation {
       if (resolution.procTargets.size == 1) {
         // only one procedure target -> check if call is resolved to direct call
         callSite match {
-          case d: DirectCall if d.target.name == resolution.procTargets.head =>
+          case d: DirectCall if d.target.procName == resolution.procTargets.head =>
             IndirectCallResult(resolution, true, None)
           case _ =>
             // fail - expected call to be resolved to direct call with target x
@@ -238,7 +239,7 @@ class IndirectCallTests extends AnyFunSuite, BASILTest, TestCustomisation {
             if (targets.size == resolution.procTargets.size) {
               val targetNames = targets.flatMap {
                 _.statements.lastElem match {
-                  case Some(DirectCall(target, _, _, _)) => Some(target.name)
+                  case Some(DirectCall(target, _, _, _)) => Some(target.procName)
                   case _ => None
                 }
               }

@@ -610,6 +610,14 @@ class Block private (
     jump.deParent()
   }
 
+  def createBlockAfter(suffix: String): Block = {
+    val nb = Block(label + suffix)
+    parent.addBlock(nb)
+    val ojump = jump
+    replaceJump(GoTo(nb))
+    nb.replaceJump(ojump)
+  }
+
   def createBlockBetween(b2: Block, label: String = "_goto_"): Block = {
     require(nextBlocks.toSet.contains(b2))
     val b1 = this
