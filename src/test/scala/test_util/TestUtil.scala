@@ -79,9 +79,19 @@ trait TestCustomisation extends TestSuite with Retries {
   this: Informing =>
 
   enum Mode(val reason: Option[String]):
+    /** Test should execute normally and succeed (no customisation). */
     case Normal extends Mode(None)
+
+    /** Test should be retried once if it fails. */
     case Retry(s: String) extends Mode(Some(s))
-    case ExpectFailure(s: String) extends Mode(Some(s))
+
+    /** Test is expected to fail due to temporary issues which should be fixed soon. */
+    case TempFailure(s: String) extends Mode(Some(s))
+
+    /** Test is expected to fail due to not-yet-implemented features. */
+    case NotImplemented(s: String) extends Mode(Some(s))
+
+    /** Test is not run. This should be used very sparingly. */
     case Disabled(s: String) extends Mode(Some(s))
 
     /**
@@ -113,11 +123,12 @@ trait TestCustomisation extends TestSuite with Retries {
     mode match {
       case Mode.Normal => invokeTest()
       case Mode.Retry(s) => withRetry { invokeTest() }
-      case Mode.ExpectFailure(s) => {
+      case Mode.TempFailure(_) | Mode.NotImplemented(_) => {
+        val s = mode.reason.get
         val res = invokeTest()
         res match {
           case Succeeded => fail(s"Expected failure, but no exception/assertion was thrown")
-          case Exceptional(ex)  => {
+          case Exceptional(_) | Failed(_) => {
             info("Current outcome: " + res)
             Pending
           }

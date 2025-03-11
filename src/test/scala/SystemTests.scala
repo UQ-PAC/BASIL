@@ -47,7 +47,9 @@ trait SystemTests extends AnyFunSuite, BASILTest, Retries, TestCustomisation {
 
   override def customiseTestsByName(name: String) = name match {
     case "procedure_summaries/procedure_summary3/gcc_O2:BAP" | "procedure_summaries/procedure_summary3/gcc_O2:GTIRB" =>
-      Mode.Disabled("this procedure summaries test is unpredictably flaky")
+      Mode.Disabled(
+        "this procedure summaries test is unpredictably flaky, sometimes passing and sometimes failing with assertion failure"
+      )
     case _ => Mode.Normal
   }
 
@@ -277,9 +279,9 @@ class ExtraSpecTests extends SystemTests {
     name match {
       case "extraspec_correct/malloc_memcpy_strlen_memset_free/gcc_O2:GTIRB" |
           "extraspec_correct/malloc_memcpy_strlen_memset_free/clang_O2:GTIRB" =>
-        Mode.ExpectFailure("Expected verification success, but got failure -- cause unknown")
+        Mode.TempFailure("Expected verification success, but got failure -- cause unknown")
       case "extraspec_incorrect/malloc_memcpy_strlen_memset_free/gcc_O2:BAP" =>
-        Mode.ExpectFailure("Expected verification failure, but got success -- cause unknown")
+        Mode.TempFailure("Expected verification failure, but got success -- cause unknown")
       case _ => Mode.Normal
     }
   }
@@ -359,7 +361,7 @@ class SimplifyMemorySystemTests extends SystemTests {
   override def customiseTestsByName(name: String) = super.customiseTestsByName(name).orElse {
     name match {
       case "correct/malloc_with_local3/clang:BAP" =>
-        Mode.ExpectFailure(
+        Mode.TempFailure(
           "previous failure was: Expected verification success, but got failure. Failing assertion is: assert (load37_1 == R30_in)"
         )
       case _ => Mode.Normal

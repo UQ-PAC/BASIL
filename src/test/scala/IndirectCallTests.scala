@@ -33,9 +33,9 @@ class IndirectCallTests extends AnyFunSuite, BASILTest, TestCustomisation {
         "jumptable/clang:BAP" | "jumptable/clang:GTIRB" | "jumptable/gcc:BAP" | "jumptable/gcc:GTIRB" |
         "jumptable2/clang:BAP" | "jumptable2/clang_O2:BAP" | "jumptable2/clang_pic:BAP" | "jumptable2/gcc:BAP" |
         "jumptable2/gcc_O2:BAP" | "jumptable2/gcc_pic:BAP" | "jumptable3/clang_O2:GTIRB" =>
-      Mode.ExpectFailure("appear to be genuine failures in call resolution")
+      Mode.TempFailure("appear to be failing after simplification pass")
     case "jumptable3/clang:GTIRB" | "switch2/clang:GTIRB" =>
-      Mode.ExpectFailure("Unable to evaluate expr: bitvector size mismatch")
+      Mode.TempFailure("Unable to evaluate expr: bitvector size mismatch")
     case _ => Mode.Normal
   }
 
