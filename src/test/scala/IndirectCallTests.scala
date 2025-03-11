@@ -71,6 +71,7 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
   }
 
   def runTest(name: String, variation: String, conf: TestConfig, resolvedCalls: Seq[IndirectCallResolution]): Unit = {
+    Logger.setLevel(LogLevel.ERROR)
     val directoryPath = "./src/test/indirect_calls/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
     val inputPath = if conf.useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
