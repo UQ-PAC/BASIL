@@ -7,6 +7,7 @@ int secret;
 int main() {
   int expected = 0;
   while (!atomic_compare_exchange_weak(&z, &expected, 1)) {
+    expected = 0;
     while (z != 0) {
     }
   }
