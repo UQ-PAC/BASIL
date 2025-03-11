@@ -570,7 +570,7 @@ def specToProcForm(
       case b: QuantifierExpr => b
       case b: Old => {
         if (isPost) {
-          convVarToOld(varInPre, varInPost, false)(b.body)
+          Old(convVarToOld(varInPre, varInPost, false)(b.body))
         } else {
           throw Exception("Illegal nested or non-relation Old()")
         }
