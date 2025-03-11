@@ -7,6 +7,13 @@ case class RegionTimer(name: String) {
   private var entered: Long = 0
   private var inside: Boolean = false
 
+  def within[T](body: => T): T = {
+    enter()
+    val result = body
+    exit()
+    result
+  }
+
   def enter() = {
     require(!inside)
     inside = true
