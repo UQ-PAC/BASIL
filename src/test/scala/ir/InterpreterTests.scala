@@ -288,7 +288,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       info(t.toString)
     }
     val total = NormalInterpreter.getTimes().map(_.getTotal()).sum
-    info("Total time: "  + totalTime)
+    info("Total time: " + totalTime)
     info("Effects[T] time: " + total)
 
   }
