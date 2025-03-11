@@ -261,6 +261,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     Logger.setLevel(LogLevel.ERROR)
     var res = List[(Int, Double, Double, Int)]()
 
+    val initial = PerformanceTimer("total")
     for (i <- 0 to 20) {
       val prog = fibonacciProg(i)
 
@@ -275,12 +276,20 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       res = (i, native.toDouble, it.toDouble, ir._2) :: res
 
     }
+    val totalTime = initial.elapsed()
 
     info(
       ("fibonacci runtime table:\nFibNumber,ScalaRunTime,interpreterRunTime,instructionCycleCount" :: (res.map(x =>
         s"${x._1},${x._2},${x._3},${x._4}"
       ))).mkString("\n")
     )
+
+    for (t <- NormalInterpreter.getTimes()) {
+      info(t.toString)
+    }
+    val total = NormalInterpreter.getTimes().map(_.getTotal()).sum
+    info("Total time: " + totalTime)
+    info("Effects[T] time: " + total)
 
   }
 

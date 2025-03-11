@@ -23,12 +23,13 @@ enum ExecEffect:
   case LoadMem(vname: String, addrs: List[BasilValue])
   case FindProc(addr: Int)
 
-case class Trace(val t: List[ExecEffect])
+case class Trace(val t: Vector[ExecEffect])
 
 case object Trace {
   def add[E](e: ExecEffect): State[Trace, Unit, E] = {
     State.modify((t: Trace) => Trace(t.t.appended(e)))
   }
+  def empty = Trace(Vector())
 }
 
 case class TraceGen[E]() extends NopEffects[Trace, E] {
@@ -63,7 +64,7 @@ def interpretWithTrace[I](
   innerInterpreter: Effects[I, InterpreterError],
   innerInitialState: I
 ): (I, Trace) = {
-  InterpFuns.interpretProg(tracingInterpreter(innerInterpreter))(p, (innerInitialState, Trace(List())))
+  InterpFuns.interpretProg(tracingInterpreter(innerInterpreter))(p, (innerInitialState, Trace.empty))
 }
 
 def interpretWithTrace[I](
@@ -72,9 +73,9 @@ def interpretWithTrace[I](
   innerInitialState: I
 ): (I, Trace) = {
   val tracingInterpreter = ProductInterpreter(innerInterpreter, TraceGen())
-  val begin = InterpFuns.initProgState(tracingInterpreter)(p, (innerInitialState, Trace(List())))
+  val begin = InterpFuns.initProgState(tracingInterpreter)(p, (innerInitialState, Trace.empty))
   // throw away initialisation trace
-  BASILInterpreter(tracingInterpreter).run((begin._1, Trace(List())))
+  BASILInterpreter(tracingInterpreter).run((begin._1, Trace.empty))
 }
 
 def interpretTrace(p: Program) = {
