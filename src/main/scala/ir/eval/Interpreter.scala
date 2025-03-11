@@ -510,12 +510,11 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
   }
 
   def loadVar(v: String) = {
-    State.getE((s: InterpreterState) => {
-      tLoadVar.enter()
-      val r = s.memoryState.getVar(v)
-      tLoadVar.exit()
-      r
-    })
+    State.getE((s: InterpreterState) =>
+      tLoadVar.within {
+        s.memoryState.getVar(v)
+      }
+    )
   }
 
   def evalAddrToProc(addr: Int) =
@@ -569,13 +568,12 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
   }
 
   def loadMem(v: String, addrs: List[BasilValue]) = {
-    State.getE((s: InterpreterState) => {
-      tLoadMem.enter()
-      val r = s.memoryState.doLoad(v, addrs)
-      // Logger.debug(s"    eff : LOAD ${addrs.head} x ${addrs.size}")
-      tLoadMem.exit()
-      r
-    })
+    State.getE((s: InterpreterState) =>
+      tLoadMem.within {
+        // Logger.debug(s"    eff : LOAD ${addrs.head} x ${addrs.size}")
+        s.memoryState.doLoad(v, addrs)
+      }
+    )
   }
 
   def getNext = State.get((s: InterpreterState) => s.nextCmd)
@@ -586,54 +584,50 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
   })
 
   def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation) =
-    modify((s: InterpreterState) => {
-      // Logger.debug(s"    eff : CALL $target")
-      tCall.enter()
-      val r = s.copy(
-        nextCmd = beginFrom,
-        callStack = returnTo :: s.callStack,
-        memoryState = s.memoryState.pushStackFrame(target)
-      )
-      tCall.exit()
-      r
-    })
+    modify((s: InterpreterState) =>
+      tCall.within {
+        // Logger.debug(s"    eff : CALL $target")
+        s.copy(
+          nextCmd = beginFrom,
+          callStack = returnTo :: s.callStack,
+          memoryState = s.memoryState.pushStackFrame(target)
+        )
+      }
+    )
 
   def doReturn() = {
     // Logger.debug(s"    eff : RETURN")
-    modifyE((s: InterpreterState) => {
-      tReturn.enter()
-      val r = s.callStack match {
-        case Nil => Right(s.copy(nextCmd = Stopped()))
-        case h :: tl =>
-          for {
-            ms <- s.memoryState.popStackFrame()
-          } yield (s.copy(nextCmd = h, callStack = tl, memoryState = ms))
+    modifyE((s: InterpreterState) =>
+      tReturn.within {
+        s.callStack match {
+          case Nil => Right(s.copy(nextCmd = Stopped()))
+          case h :: tl =>
+            for {
+              ms <- s.memoryState.popStackFrame()
+            } yield (s.copy(nextCmd = h, callStack = tl, memoryState = ms))
+        }
       }
-      tReturn.exit()
-      r
-    })
+    )
   }
 
   def storeVar(v: String, scope: Scope, value: BasilValue): State[InterpreterState, Unit, InterpreterError] = {
     // Logger.debug(s"    eff : SET $v := $value")
-    State.modify((s: InterpreterState) => {
-      tStoreVar.enter()
-      val r = s.copy(memoryState = s.memoryState.defVar(v, scope, value))
-      tStoreVar.exit()
-      r
-    })
+    State.modify((s: InterpreterState) =>
+      tStoreVar.within {
+        s.copy(memoryState = s.memoryState.defVar(v, scope, value))
+      }
+    )
   }
 
   def storeMem(vname: String, update: Map[BasilValue, BasilValue]) =
-    State.modifyE((s: InterpreterState) => {
-      // Logger.debug(s"    eff : STORE ${formatStore(vname, update)}")
-      tStoreMem.enter()
-      val r = for {
-        ms <- s.memoryState.doStore(vname, update)
-      } yield (s.copy(memoryState = ms))
-      tStoreMem.exit()
-      r
-    })
+    State.modifyE((s: InterpreterState) =>
+      tStoreMem.within {
+        // Logger.debug(s"    eff : STORE ${formatStore(vname, update)}")
+        for {
+          ms <- s.memoryState.doStore(vname, update)
+        } yield (s.copy(memoryState = ms))
+      }
+    )
 }
 
 trait Interpreter[S, E](val f: Effects[S, E]) {
