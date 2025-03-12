@@ -121,10 +121,7 @@ class IntervalDSATest extends AnyFunSuite {
 
     val dsg = result.dsa.get.local(main)
     val xPointerCells = dsg.exprToCells(xPointer)
-    // FIXME: broken "Set() had size 0 instead of expected size 1"
-    pendingUntilFixed {
-      assert(xPointerCells.size == 1)
-    }
+    assert(xPointerCells.size == 1)
     val xPointerCell = xPointerCells.head
     val xAddressCells = dsg.exprToCells(xAddress)
     assert(xAddressCells.size == 1)
