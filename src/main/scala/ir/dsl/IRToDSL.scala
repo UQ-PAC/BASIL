@@ -1,6 +1,6 @@
 package ir.dsl
 
-import scala.collection.immutable.SortedMap
+import scala.collection.immutable.{SortedMap, ArraySeq}
 import ir.*
 
 /**
@@ -20,7 +20,7 @@ object IRToDSL {
 
   def convertJump(x: Jump): EventuallyJump = x match {
     case Unreachable(label) => EventuallyUnreachable(label)
-    case Return(label, out) => EventuallyReturn(out.map(keyToString).toArray, label)
+    case Return(label, out) => EventuallyReturn(out.map(keyToString).to(ArraySeq), label)
     case GoTo(targs, label) => EventuallyGoto(targs.map(t => DelayNameResolve(t.label)).toList, label)
   }
 
@@ -29,7 +29,7 @@ object IRToDSL {
   def convertCallStatement(x: Call): EventuallyStatement = x match {
     case DirectCall(targ, outs, actuals, label) =>
       // XXX: be aware of ordering, .map() on a SortedMap may return a HashMap.
-      directCall(outs.toArray.map(keyToString), targ.name, actuals.toArray.map(keyToString): _*)
+      directCall(outs.to(ArraySeq).map(keyToString), targ.name, actuals.to(ArraySeq).map(keyToString): _*)
     case IndirectCall(targ, label) => indirectCall(targ)
   }
 
@@ -39,14 +39,14 @@ object IRToDSL {
   }
 
   def convertBlock(x: Block) =
-    EventuallyBlock(x.label, x.statements.toArray.map(convertStatement), convertJump(x.jump), x.address)
+    EventuallyBlock(x.label, x.statements.to(ArraySeq).map(convertStatement), convertJump(x.jump), x.address)
 
   def convertProcedure(x: Procedure) =
     EventuallyProcedure(
       x.procName,
       x.formalInParam.toSeq.map(localVarToTuple).to(SortedMap),
       x.formalOutParam.toSeq.map(localVarToTuple).to(SortedMap),
-      x.blocks.map(convertBlock).toArray,
+      x.blocks.map(convertBlock).to(ArraySeq),
       x.entryBlock.map(_.label),
       x.returnBlock.map(_.label),
       x.address
@@ -54,6 +54,6 @@ object IRToDSL {
 
   def convertProgram(x: Program) =
     val others = x.procedures.filter(_ != x.mainProcedure).map(convertProcedure)
-    EventuallyProgram(convertProcedure(x.mainProcedure), others.toArray, x.initialMemory.values)
+    EventuallyProgram(convertProcedure(x.mainProcedure), others.to(ArraySeq), x.initialMemory.values)
 
 }

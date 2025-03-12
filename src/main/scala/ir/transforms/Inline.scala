@@ -6,6 +6,7 @@ import ir.dsl.IRToDSL.*
 import ir.dsl.*
 
 import scala.collection.mutable
+import scala.collection.immutable.{ArraySeq}
 
 object Counter {
   var id = 0
@@ -64,9 +65,11 @@ def convertJumpRenaming(blockName: String => String, varName: CILVisitor, x: Jum
   case Unreachable(label) => EventuallyUnreachable(label)
   case Return(label, out) =>
     EventuallyReturn(
-      out.toList.map { case (v: Variable, e: Expr) =>
-        ((v.name, visit_expr(varName, e)))
-      }.toArray,
+      out.toList
+        .map { case (v: Variable, e: Expr) =>
+          ((v.name, visit_expr(varName, e)))
+        }
+        .to(ArraySeq),
       label
     )
 }
@@ -77,9 +80,9 @@ def keyToString[T](varRenamer: CILVisitor)(x: (Variable, Expr)): (String, Expr) 
 def convertStatementRenaming(varRenamer: CILVisitor)(x: Statement): EventuallyStatement = x match {
   case DirectCall(targ, outs, actuals, label) =>
     directCall(
-      outs.toArray.map(v => (v(0).name, visit_rvar(varRenamer, v(1)))),
+      outs.to(ArraySeq).map(v => (v(0).name, visit_rvar(varRenamer, v(1)))),
       targ.name,
-      actuals.toArray.map(keyToString(varRenamer)): _*
+      actuals.to(ArraySeq).map(keyToString(varRenamer)): _*
     )
   case IndirectCall(targ, label) => indirectCall(visit_rvar(varRenamer, targ))
   case x: NonCallStatement =>
@@ -89,7 +92,7 @@ def convertStatementRenaming(varRenamer: CILVisitor)(x: Statement): EventuallySt
 def convertBlockRenaming(varRenamer: CILVisitor, blockName: String => String)(x: Block) = {
   EventuallyBlock(
     blockName(x.label),
-    x.statements.toArray.map(convertStatementRenaming(varRenamer)),
+    x.statements.to(ArraySeq).map(convertStatementRenaming(varRenamer)),
     convertJumpRenaming(blockName, varRenamer, x.jump),
     x.address
   )
@@ -98,7 +101,7 @@ def convertBlockRenaming(varRenamer: CILVisitor, blockName: String => String)(x:
 /**
   * Inline a procedure call to the calling procedure;
   *
-  * - maintains param form 
+  * - maintains param form
   * - maintain dsa form if both procedures are in dsa form
   *
   * require invariant.SingleCallBlockEnd
