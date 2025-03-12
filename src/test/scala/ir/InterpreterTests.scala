@@ -47,6 +47,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
     val p = IRLoading.load(loading)
     val ctx = IRTransform.doCleanup(p)
+    ir.transforms.clearParams(ctx.program)
     // val bapProgram = loadBAP(loading.inputFile)
     // val (symbols, externalFunctions, globals, _, mainAddress) = loadReadELF(loading.relfFile, loading)
     // val IRTranslator = BAPToIR(bapProgram, mainAddress)
@@ -83,7 +84,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     val actual: Map[String, Int] = expected.flatMap((name, expected) =>
       globals.find(_.name == name).flatMap(global => load(fstate, global).map(gv => name -> gv.value.toInt))
     )
-    assert(fstate.nextCmd == Stopped())
+    assert(normalTermination(fstate.nextCmd), fstate.nextCmd)
     assert(expected == actual)
   }
 
@@ -249,7 +250,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     Logger.setLevel(LogLevel.ERROR)
     val fib = fibonacciProg(8)
     val r = interpret(fib)
-    assert(r.nextCmd == Stopped())
+    assert(normalTermination(r.nextCmd), r.nextCmd)
     // Show interpreted result
     // r.regs.foreach { (key, value) =>
     //   Logger.info(s"$key := $value")
@@ -300,9 +301,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
     val r = interpretTrace(fib)
 
-    assert(r._1.nextCmd == Stopped())
-    // Show interpreted result
-    //
+    assert(normalTermination(r._1.nextCmd), r._1.nextCmd)
 
   }
 
