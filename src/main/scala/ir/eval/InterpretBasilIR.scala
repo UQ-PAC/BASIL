@@ -293,7 +293,7 @@ enum InterpretReturn {
 }
 
 class BASILInterpreter[S](f: Effects[S, InterpreterError])
-    extends Interpreter[S, InterpretReturn, InterpreterError](f) {
+/*extends Interpreter[S, InterpretReturn, InterpreterError](f) */ {
 
   def interpretOne: util.functional.State[S, Next[InterpretReturn], InterpreterError] =
     InterpFuns.interpretContinuation(f)
@@ -724,14 +724,19 @@ object InterpFuns {
     }.toMap
   }
 
-  def interpretEvalProcExc(program: IRContext | Program, functionName: String, params: Map[String, Literal]) = {}
-
   /* Intialise from ELF and Interpret program */
   def interpretEvalProg[S, T <: Effects[S, InterpreterError]](
     f: T
   )(p: IRContext, is: S): (S, Either[InterpreterError, Map[LocalVar, Literal]]) = {
     val begin = initProgState(f)(p, is)
     val main = p.program.mainProcedure
+    callProcedure(f)(main, mainDefaultFunctionArguments(main)).f(begin)
+  }
+
+  def interpretEvalProgSkipInit[S, T <: Effects[S, InterpreterError]](
+    f: T
+  )(p: Program, begin: S): (S, Either[InterpreterError, Map[LocalVar, Literal]]) = {
+    val main = p.mainProcedure
     callProcedure(f)(main, mainDefaultFunctionArguments(main)).f(begin)
   }
 

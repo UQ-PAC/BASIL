@@ -75,7 +75,7 @@ def interpretWithTrace[I](
   val tracingInterpreter = ProductInterpreter(innerInterpreter, TraceGen())
   val begin = InterpFuns.initProgState(tracingInterpreter)(p, (innerInitialState, Trace.empty))
   // throw away initialisation trace
-  BASILInterpreter(tracingInterpreter).run((begin._1, Trace.empty))
+  InterpFuns.interpretEvalProgSkipInit(tracingInterpreter)(p.program, (begin._1, Trace.empty))._1
 }
 
 def interpretTrace(p: Program) = {

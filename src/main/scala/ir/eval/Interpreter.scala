@@ -673,14 +673,3 @@ def evalInterpreter[S, V, E](f: Effects[S, E], doStep: State[S, Next[V], E]): St
 
   State(begin => runEval(begin))
 }
-
-trait Interpreter[S, V, E](val f: Effects[S, E]) {
-
-  /*
-   * Returns value deciding whether to continue.
-   */
-  def interpretOne: State[S, Next[V], E]
-
-  final def run(begin: S): S = State.execute(begin, (evalInterpreter(f, interpretOne)))
-
-}

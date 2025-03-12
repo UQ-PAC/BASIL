@@ -50,7 +50,7 @@ def interpretWithRLimit[I](
   val rlimitInterpreter = LayerInterpreter(innerInterpreter, EffectsRLimit(instructionLimit))
   val begin = InterpFuns.initProgState(rlimitInterpreter)(p, (innerInitialState, 0))
   // throw away initialisation trace
-  BASILInterpreter(rlimitInterpreter).run((begin._1, 0))
+  InterpFuns.interpretEvalProgSkipInit(rlimitInterpreter)(p.program, (begin._1, 0))._1
 }
 
 def interpretRLimit(p: Program, instructionLimit: Int): (InterpreterState, Int) = {
