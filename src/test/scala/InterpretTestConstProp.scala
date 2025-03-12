@@ -60,7 +60,7 @@ class ConstPropInterpreterValidate extends AnyFunSuite with TestValueDomainWithI
     }.toMap
 
     val result = runTestInterpreter(ictx, analysisres)
-    assertCorrectResult(result)
+    assert(result.getFailures.isEmpty)
 
   }
 

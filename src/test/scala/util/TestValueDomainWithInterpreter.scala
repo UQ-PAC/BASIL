@@ -23,11 +23,32 @@ trait TestValueDomainWithInterpreter[T] {
     case AllVarsInAbstract
     case VarsLiveInBlock
 
+  case class InterpreterTestResult(stopCondition: ExecutionContinuation, checks: List[CheckResult]) {
+    def getFailures = {
+      // require nonzero number of checks to ensure test is not vacuous
+      var noChecks = if (checks.isEmpty) then Seq("no checks hit") else Seq()
+      val termination =
+        if (!normalTermination(stopCondition)) then Seq(s"Stopped with error condition: ${stopCondition}") else Seq()
+      termination ++ noChecks ++ checksFailed
+    }
+
+    def checksFailed = {
+      // collected breakpoints evaluate to true
+      checks.flatMap(b => {
+        val loc = b.breakpoint.location match {
+          case BreakPointLoc.CMD(c) => c.parent.label
+          case _ => ??? /* not used here */
+        }
+        if (b.evaluatedTestExpr != TrueLiteral) then Seq(s"${b.name} @ $loc") else Seq()
+      })
+    }
+  }
+
   def runTestInterpreter(
     ictx: IRContext,
     testResultBefore: Map[Block, Map[Variable, T]],
     testVars: Heuristic = Heuristic.AllVarsInAbstract
-  ): List[CheckResult] = {
+  ): InterpreterTestResult = {
 
     val breaks: List[BreakPoint] = ictx.program.collect {
       // convert analysis result to a list of breakpoints, each which evaluates an expression describing
@@ -56,25 +77,14 @@ trait TestValueDomainWithInterpreter[T] {
     // run the interpreter evaluating the analysis result at each command with a breakpoint
     val interpretResult = interpretWithBreakPoints(ictx, breaks.toList, NormalInterpreter, InterpreterState())
 
-    assert(interpretResult._1.nextCmd == Stopped())
     val breakres: List[(BreakPoint, _, List[(String, Expr, Expr)])] = interpretResult._2
-    breakres.flatMap { case (bp, _, l) =>
+    val checkResults = breakres.flatMap { case (bp, _, l) =>
       l.map { case (name, test, evaled) =>
         CheckResult(name, bp, test, evaled)
       }
     }.toList
+
+    InterpreterTestResult(interpretResult._1.nextCmd, checkResults)
   }
 
-  def assertCorrectResult(breakres: List[CheckResult]) = {
-    assert(breakres.nonEmpty)
-
-    // assert all the collected breakpoint watches have evaluated to true
-    for (b <- breakres) {
-      val loc = b.breakpoint.location match {
-        case BreakPointLoc.CMD(c) => c.parent.label
-        case _ => ??? /* not used here */
-      }
-      assert(b.evaluatedTestExpr == TrueLiteral, s"${b.name} @ $loc")
-    }
-  }
 }
