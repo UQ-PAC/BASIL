@@ -8,7 +8,18 @@ import specification.Specification
 import test_util.BASILTest.writeToFile
 import util.DSAAnalysis.Norm
 import util.RunUtils.{loadAndTranslate, staticAnalysis}
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, DSAAnalysis, DSAConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, StaticAnalysisContext}
+import util.{
+  BASILConfig,
+  BASILResult,
+  BoogieGeneratorConfig,
+  DSAAnalysis,
+  DSAConfig,
+  ILLoadingConfig,
+  IRContext,
+  RunUtils,
+  StaticAnalysisConfig,
+  StaticAnalysisContext
+}
 
 class IntervalDSATest extends AnyFunSuite {
   def runAnalysis(program: Program): StaticAnalysisContext = {
@@ -67,51 +78,51 @@ class IntervalDSATest extends AnyFunSuite {
     dsg.localCorrectness()
   }
 
-   test("Global Dereference") {
-     val mem = SharedMemory("mem", 64, 8)
-     val V0 = Register("V0", 64)
-     val xAddress = BitVecLiteral(2000, 64)
-     val yAddress = BitVecLiteral(3000, 64)
-     val xPointer = BitVecLiteral(1000, 64)
-     val yPointer = BitVecLiteral(1008, 64)
-     val globalOffsets = Map(xPointer.value -> xAddress.value, yPointer.value -> yAddress.value)
-     val x = SpecGlobal("x", 64, None, xAddress.value)
-     val y = SpecGlobal("y", 64, None, yAddress.value)
-     val globals = Set(x, y)
+  test("Global Dereference") {
+    val mem = SharedMemory("mem", 64, 8)
+    val V0 = Register("V0", 64)
+    val xAddress = BitVecLiteral(2000, 64)
+    val yAddress = BitVecLiteral(3000, 64)
+    val xPointer = BitVecLiteral(1000, 64)
+    val yPointer = BitVecLiteral(1008, 64)
+    val globalOffsets = Map(xPointer.value -> xAddress.value, yPointer.value -> yAddress.value)
+    val x = SpecGlobal("x", 64, None, xAddress.value)
+    val y = SpecGlobal("y", 64, None, yAddress.value)
+    val globals = Set(x, y)
 
-     val load = MemoryLoad(V0, mem, xPointer, Endian.LittleEndian, 64, Some("001"))
+    val load = MemoryLoad(V0, mem, xPointer, Endian.LittleEndian, 64, Some("001"))
 
-     val program = prog(proc("main", block("block", load, ret)))
+    val program = prog(proc("main", block("block", load, ret)))
 
-     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-     transforms.addReturnBlocks(program)
-     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
-     val context = programToContext(program, globals, globalOffsets)
-     val basilResult = runTest(context)
-     val main = basilResult.ir.program.mainProcedure
+    val context = programToContext(program, globals, globalOffsets)
+    val basilResult = runTest(context)
+    val main = basilResult.ir.program.mainProcedure
 
-     val result = RunUtils.loadAndTranslate(
-        BASILConfig(
-          loading = ILLoadingConfig(inputFile = ".adt", relfFile = ".relf", specFile = None, dumpIL = None),
-          staticAnalysis = None,
-          boogieTranslation = BoogieGeneratorConfig(),
-          simplify = true,
-          context = Some(context),
-          dsaConfig = Some(DSAConfig(Set(Norm))),
-          outputPrefix = "boogie_out"
-        )
+    val result = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(inputFile = ".adt", relfFile = ".relf", specFile = None, dumpIL = None),
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        simplify = true,
+        context = Some(context),
+        dsaConfig = Some(DSAConfig(Set(Norm))),
+        outputPrefix = "boogie_out"
       )
+    )
 
-     val dsg = result.dsa.get.local(main)
-     val xPointerCells = dsg.exprToCells(xPointer)
-     assert(xPointerCells.size == 1)
-     val xPointerCell = xPointerCells.head
-     val xAddressCells = dsg.exprToCells(xAddress)
-     assert(xAddressCells.size == 1)
-     val xAddressCell = xAddressCells.head
-     assert(xPointerCell.getPointee.equiv(xAddressCell))
+    val dsg = result.dsa.get.local(main)
+    val xPointerCells = dsg.exprToCells(xPointer)
+    assert(xPointerCells.size == 1)
+    val xPointerCell = xPointerCells.head
+    val xAddressCells = dsg.exprToCells(xAddress)
+    assert(xAddressCells.size == 1)
+    val xAddressCell = xAddressCells.head
+    assert(xPointerCell.getPointee.equiv(xAddressCell))
 
-   }
+  }
 
 }

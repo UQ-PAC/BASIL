@@ -371,9 +371,7 @@ class IntervalGraph(
         val indexCells = constraintArgToCells(constraint.arg1, ignoreContents = true).map(get)
         valueCells.foreach(c => nodes.add(c.node))
         indexCells.foreach(c => nodes.add(c.node))
-        indexCells.foreach (
-          pointer => valueCells.foreach(pointee => pointsTo.add(pointer, pointee))
-        )
+        indexCells.foreach(pointer => valueCells.foreach(pointee => pointsTo.add(pointer, pointee)))
       case _ =>
     }
 
