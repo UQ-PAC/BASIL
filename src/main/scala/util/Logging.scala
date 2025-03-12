@@ -84,7 +84,7 @@ class GenericLogger(
 
   private def writeLog(
     logLevel: LogLevel,
-    arg: Any,
+    arg: => Any,
     line: sourcecode.Line,
     file: sourcecode.FileName,
     name: sourcecode.Name
@@ -171,5 +171,6 @@ val SteensLogger = StaticAnalysisLogger.deriveLogger("steensgaard")
 // DSA Loggers
 val DSALogger = Logger.deriveLogger("DSA", System.out).setLevel(LogLevel.OFF)
 val ConstGenLogger = DSALogger.deriveLogger("Constraint Gen", System.out).setLevel(LogLevel.INFO)
-val SVALogger = DSALogger.deriveLogger("VSA", System.out)
-val SadDSALogger = DSALogger.deriveLogger("SadDSA", System.out)
+val SVALogger = DSALogger.deriveLogger("SVA", System.out)
+val IntervalDSALogger = DSALogger.deriveLogger("SadDSA", System.out).setLevel(LogLevel.OFF)
+val StackLogger = Logger.deriveLogger("Stack", System.out).setLevel(LogLevel.INFO)

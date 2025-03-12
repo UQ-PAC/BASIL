@@ -5,6 +5,8 @@ import util.{
   BASILConfig,
   BASILResult,
   BoogieGeneratorConfig,
+  DSAConfig,
+  DSAContext,
   ILLoadingConfig,
   LogLevel,
   Logger,
@@ -12,12 +14,14 @@ import util.{
   RunUtils,
   StaticAnalysisConfig
 }
+import analysis.data_structure_analysis.*
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable
 import test_util.BASILTest
 import test_util.TestConfig
 import test_util.TestCustomisation
+import util.DSAAnalysis.Norm
 
 import java.io.{BufferedWriter, File, FileWriter}
 
@@ -81,6 +85,8 @@ class IndirectCallTests extends AnyFunSuite, BASILTest, TestCustomisation {
       specPath,
       BPLPath,
       staticAnalysisConf,
+      dsa = Some(DSAConfig(Set(Norm))),
+      simplify = true,
       postLoad = ctx => { indircalls = getIndirectCalls(ctx.program); }
     )
     (basilresult, indircalls.map(_.label.get))
@@ -107,7 +113,8 @@ class IndirectCallTests extends AnyFunSuite, BASILTest, TestCustomisation {
     val (boogieFailureMsg, _, _) = checkVerify(boogieResult, resultPath, conf.expectVerify)
 
     val fresolvedcalls = resolvedCalls.zip(indirectCallBlock).map((cr, l) => cr.copy(label = l))
-    val indirectResolutionFailureMsg = checkIndirectCallResolution(basilResult.ir.program, fresolvedcalls)
+    val indirectResolutionFailureMsg =
+      checkIndirectCallResolution(basilResult.ir.program, fresolvedcalls, checkResolvedCalls(basilResult.dsa.get))
 
     (indirectResolutionFailureMsg, boogieFailureMsg) match {
       case (Some(msg), None) => fail(msg)
@@ -120,7 +127,11 @@ class IndirectCallTests extends AnyFunSuite, BASILTest, TestCustomisation {
   /** @return
     *   None if passes, Some(failure message) if doesn't pass
     */
-  def checkIndirectCallResolution(program: Program, resolutions: Seq[IndirectCallResolution]): Option[String] = {
+  def checkIndirectCallResolution(
+    program: Program,
+    resolutions: Seq[IndirectCallResolution],
+    checker: ((Command, IndirectCallResolution) => IndirectCallResult)
+  ): Option[String] = {
     val nameToProc: Map[String, Procedure] = program.nameToProcedure
     val labelToResolution: Map[String, IndirectCallResolution] = resolutions.map(r => r.label -> r).toMap
     val procedures: Set[Procedure] = resolutions.map(r => nameToProc(r.labelProcedure)).toSet
@@ -133,13 +144,13 @@ class IndirectCallTests extends AnyFunSuite, BASILTest, TestCustomisation {
     } {
       if (b.jump.label.isDefined && labelToResolution.contains(b.jump.label.get)) {
         val resolution = labelToResolution(b.jump.label.get)
-        val result: IndirectCallResult = checkCallSite(b.jump, resolution)
+        val result: IndirectCallResult = checker(b.jump, resolution)
         results.append(result)
       } else {
         b.statements.lastElem match {
           case Some(s: Statement) if s.label.isDefined && labelToResolution.contains(s.label.get) =>
             val resolution = labelToResolution(s.label.get)
-            val result: IndirectCallResult = checkCallSite(s, resolution)
+            val result: IndirectCallResult = checker(s, resolution)
             results.append(result)
           case _ =>
         }
@@ -168,6 +179,19 @@ class IndirectCallTests extends AnyFunSuite, BASILTest, TestCustomisation {
     } else {
       None // test passed
     }
+  }
+
+  def checkResolvedCalls(dsa: DSAContext)(call: Command, resolution: IndirectCallResolution): IndirectCallResult = {
+    call match
+      case callSite: DirectCall if callSite.target.name == "indirect_call_launchpad" =>
+        val dsg = dsa.topDown(call.parent.parent)
+        val targetExpr = callSite.actualParams(LocalVar("indirectCallTarget", BitVecType(64)))
+        val procs = dsg.exprToCells(targetExpr).flatMap(dsg.cellToProcs)
+        val result = resolution.procTargets.forall(name => procs.map(_.procName).contains(name))
+        IndirectCallResult(resolution, result, None)
+      case _ =>
+        // ignore blocks
+        IndirectCallResult(resolution, true, None)
   }
 
   def checkCallSite(callSite: Command, resolution: IndirectCallResolution): IndirectCallResult = {

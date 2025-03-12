@@ -2,6 +2,37 @@ package util
 import scala.collection.mutable
 import scala.collection
 
+case class RegionTimer(name: String) {
+  private var total: Long = 0
+  private var entered: Long = 0
+  private var inside: Boolean = false
+
+  def within[T](body: => T): T = {
+    enter()
+    val result = body
+    exit()
+    result
+  }
+
+  def enter() = {
+    require(!inside)
+    inside = true
+    entered = System.currentTimeMillis()
+  }
+
+  def exit() = {
+    require(inside)
+    inside = false
+    total += (System.currentTimeMillis() - entered)
+  }
+
+  def getTotal() = total
+
+  override def toString() = {
+    s"$name : ${getTotal()} (ms)"
+  }
+}
+
 case class PerformanceTimer(timerName: String = "", logLevel: LogLevel = LogLevel.DEBUG) {
   private var lastCheckpoint: Long = System.currentTimeMillis()
   private var end: Long = 0
