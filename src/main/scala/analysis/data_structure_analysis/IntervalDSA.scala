@@ -368,7 +368,7 @@ class IntervalGraph(
     constraints.foreach {
       case constraint: BinaryConstraint =>
         val valueCells = constraintArgToCells(constraint.arg2).map(get)
-        val indexCells = constraintArgToCells(constraint.arg1).map(get)
+        val indexCells = constraintArgToCells(constraint.arg1, ignoreContents = true).map(get)
         valueCells.foreach(c => nodes.add(c.node))
         indexCells.foreach(c => nodes.add(c.node))
         indexCells.foreach (
@@ -428,7 +428,6 @@ class IntervalGraph(
           assert(first.map(get) == sec.map(get), "cells should be the same after unification")
         else Logger.warn(s"$cons had an empty argument")
 
-        val test = 1
       case _ => // ignore
   }
 
