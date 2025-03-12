@@ -1,7 +1,6 @@
 package ir.transforms
 import translating.serialiseIL
 import translating.PrettyPrinter.*
-
 import specification.FuncEntry
 import util.SimplifyLogger
 import ir.eval.AlgebraicSimplifications
@@ -9,8 +8,11 @@ import ir.eval.AssumeConditionSimplifications
 import ir.eval.simplifyExprFixpoint
 import ir.cilvisitor.*
 import ir.*
+
 import scala.collection.mutable
-import analysis._
+import analysis.*
+import analysis.data_structure_analysis.IntervalGraph
+
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
@@ -1415,6 +1417,26 @@ def findDefinitelyExits(p: Program) = {
   )
 }
 
+
+class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
+  override def vstmt(e: Statement) = {
+    if dsa.contains(e.parent.parent) then
+      e match
+        case load: MemoryLoad =>
+          val indices = dsa(e.parent.parent).exprToCells(load.index)
+          assert(indices.size == 1, load.index)
+          val index = indices.head
+          assert(index.hasPointee)
+          val value = index.getPointee
+          val rhs = LocalVar(value.toString, BitVecType(value.interval.size.getOrElse(64)))
+          val localAssign = LocalAssign(load.lhs, rhs)
+          ChangeTo(List(localAssign))
+        case store: MemoryStore =>
+          ChangeTo(List(store))
+        case _ => SkipChildren()
+    else SkipChildren()
+  }
+}
 class Simplify(val res: Variable => Option[Expr], val initialBlock: Block = null) extends CILVisitor {
 
   var madeAnyChange = false
