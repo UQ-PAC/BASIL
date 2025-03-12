@@ -188,7 +188,9 @@ class IntervalGraph(
         callTransfer(phase, dcc, source, target)
       case dcc: DirectCallConstraint if dcc.target.name == "indirect_call_launchpad" =>
         resolveIndirectCall(dcc)
-          .filterNot(proc => dcc.call.parent.parent == proc || proc.isExternal.getOrElse(false) || proc.name.startsWith("_"))
+          .filterNot(proc =>
+            dcc.call.parent.parent == proc || proc.isExternal.getOrElse(false) || proc.name.startsWith("_")
+          )
           .foreach(proc =>
 
             val (source, target) = if phase == TD then (this, graphs(proc)) else (graphs(proc), this)
