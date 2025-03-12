@@ -11,6 +11,7 @@ import gtirb.*
 import translating.PrettyPrinter.*
 import ir.dsl.*
 import ir.dsl.given
+import ir.eval.*
 
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
@@ -916,11 +917,17 @@ object RunUtils {
 
     if (q.runInterpret) {
       Logger.info("Start interpret")
-      val (fs, trace) = eval.interpretTrace(ctx)
+
+      val ((fs, trace), value) =
+        InterpFuns.interpretEvalProg(tracingInterpreter(NormalInterpreter))(ctx, (InterpreterState(), Trace.empty))
 
       val stdout = fs.memoryState.getMem("stdout").toList.sortBy(_._1.value).map(_._2.value.toChar).mkString("")
 
       Logger.info(s"Interpreter stdout:\n${stdout}")
+      value match {
+        case Right(r) => Logger.info(s"Interpreter returned: ${r.map(v => v._1.name + " -> " + v._2).mkString(", ")}")
+        case _ => ()
+      }
 
       q.loading.dumpIL.foreach(f => {
         val tf = f"${f}-interpret-trace.txt"
@@ -929,7 +936,7 @@ object RunUtils {
       })
 
       val stopState = fs.nextCmd
-      if (stopState != eval.Stopped()) {
+      if (!normalTermination(stopState)) {
         Logger.error(s"Interpreter exited with $stopState")
       } else {
         Logger.info("Interpreter stopped normally.")

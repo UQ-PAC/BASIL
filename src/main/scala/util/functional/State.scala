@@ -1,9 +1,9 @@
 package util.functional
-import util.Logger
+import util.{GenericLogger, LogLevel}
 import sourcecode.Line, sourcecode.FileName
 import java.io.*
 
-val monlog = Logger.deriveLogger("statemonad")
+val monlog = GenericLogger("monad", LogLevel.ERROR, System.out, System.console() != null)
 
 /*
  * Flattened state monad with error.
@@ -67,7 +67,7 @@ object State {
     file: sourcecode.FileName,
     name: sourcecode.Name
   ): S = {
-    // Logger.debug(s"state.execute")(line, file, name)
+    // monlog.debug(s"state.execute")(line, file, name)
     c.f(s) match {
       case (s, Left(r)) => {
         monlog.info(s"ERROR: $r")
