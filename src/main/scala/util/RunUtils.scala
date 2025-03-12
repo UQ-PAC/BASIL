@@ -17,6 +17,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 import analysis.solvers.*
 import analysis.*
+import analysis.data_structure_analysis.DSAPhase.{BU, TD}
 import bap.*
 import ir.*
 import boogie.*
@@ -26,23 +27,28 @@ import Parsers.ASLpParser.*
 import analysis.data_structure_analysis.{
   Constraint,
   DataStructureAnalysis,
-  getSymbolicValues,
-  generateConstraints,
   Graph,
+  IntervalDSA,
+  IntervalGraph,
   SymbolicAddress,
+  SymbolicAddressAnalysis,
   SymbolicValues,
-  SymbolicAddressAnalysis
+  computeDSADomain,
+  generateConstraints,
+  getSymbolicValues
 }
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
 import translating.*
-import util.{Logger, DebugDumpIRLogger, SimplifyLogger}
+import util.{DebugDumpIRLogger, Logger, SimplifyLogger}
 
 import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
+import util.DSAAnalysis.Norm
+import util.LogLevel.INFO
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -85,7 +91,13 @@ case class StaticAnalysisContext(
   ssaResults: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
 )
 
-case class DSAContext(sva: Map[Procedure, SymbolicValues], constraints: Map[Procedure, Set[Constraint]])
+case class DSAContext(
+  sva: Map[Procedure, SymbolicValues],
+  constraints: Map[Procedure, Set[Constraint]],
+  local: Map[Procedure, IntervalGraph],
+  bottomUp: Map[Procedure, IntervalGraph],
+  topDown: Map[Procedure, IntervalGraph]
+)
 
 /** Results of the main program execution.
   */
@@ -868,21 +880,38 @@ object RunUtils {
     var dsaContext: Option[DSAContext] = None
     if (conf.dsaConfig.nonEmpty) {
       val config = conf.dsaConfig.get
+      val DSATimer = PerformanceTimer("DSA Timer", INFO)
 
       val main = ctx.program.mainProcedure
       var sva: Map[Procedure, SymbolicValues] = Map.empty
       var cons: Map[Procedure, Set[Constraint]] = Map.empty
+      computeDSADomain(ctx.program.mainProcedure, ctx).toSeq
+        .sortBy(_.name)
+        .foreach(proc =>
+          val SVAResults = getSymbolicValues(proc)
+          val constraints = generateConstraints(proc)
+          sva += (proc -> SVAResults)
+          cons += (proc -> constraints)
+        )
 
-      ctx.program.procedures.foreach(proc =>
-        val SVAResults = getSymbolicValues(proc)
-        val constraints = generateConstraints(proc)
-        sva += (proc -> SVAResults)
-        cons += (proc -> constraints)
-      )
+      DSATimer.checkPoint("Finished SVA")
+      dsaContext = Some(DSAContext(sva, cons, Map.empty, Map.empty, Map.empty))
 
-      DSALogger.info("Finished local phase")
-
-      dsaContext = Some(DSAContext(sva, cons))
+      if config.analyses.contains(Norm) then
+        DSALogger.info("Finished Computing Constraints")
+        val DSA = IntervalDSA.getLocals(ctx, sva, cons)
+        DSATimer.checkPoint("Finished DSA Local Phase")
+        DSA.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness check")
+        val DSABU = IntervalDSA.solveBUs(DSA)
+        DSATimer.checkPoint("Finished DSA BU Phase")
+        DSABU.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness check")
+        val DSATD = IntervalDSA.solveTDs(DSABU)
+        DSATimer.checkPoint("Finished DSA TD Phase")
+        DSATD.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness check")
+        dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
     }
 
     if (q.runInterpret) {

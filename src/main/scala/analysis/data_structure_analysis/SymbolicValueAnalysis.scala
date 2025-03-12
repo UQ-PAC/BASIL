@@ -1,76 +1,7 @@
 package analysis.data_structure_analysis
 
 import ir.eval.BitVectorEval.bv2SignedInt
-import ir.{
-  Assert,
-  Assign,
-  Assume,
-  BVADD,
-  BVAND,
-  BVASHR,
-  BVBinOp,
-  BVCOMP,
-  BVCONCAT,
-  BVEQ,
-  BVLSHR,
-  BVMUL,
-  BVNAND,
-  BVNEQ,
-  BVNOR,
-  BVOR,
-  BVSDIV,
-  BVSGE,
-  BVSGT,
-  BVSHL,
-  BVSLE,
-  BVSLT,
-  BVSMOD,
-  BVSREM,
-  BVSUB,
-  BVUDIV,
-  BVUGE,
-  BVUGT,
-  BVULE,
-  BVULT,
-  BVUREM,
-  BVXNOR,
-  BVXOR,
-  BinOp,
-  BinaryExpr,
-  BitVecLiteral,
-  BitVecType,
-  Block,
-  BoolBinOp,
-  BoolLit,
-  CFGPosition,
-  Call,
-  Command,
-  DirectCall,
-  Expr,
-  Extract,
-  GoTo,
-  IndirectCall,
-  IntBinOp,
-  IntLiteral,
-  Jump,
-  Literal,
-  LocalAssign,
-  LocalVar,
-  MemoryLoad,
-  MemoryStore,
-  NOP,
-  Procedure,
-  Repeat,
-  Return,
-  SignExtend,
-  SingleAssign,
-  Statement,
-  UnaryExpr,
-  UninterpretedFunction,
-  Unreachable,
-  Variable,
-  ZeroExtend
-}
+import ir.*
 import ir.transforms.{AbstractDomain, worklistSolver}
 import util.SVALogger as Logger
 
@@ -194,6 +125,8 @@ case class SymValueSet(state: Map[SymBase, SymOffsets]) {
       .collect {
         case (base: SymBase, offsets: SymOffsets) if other.state.contains(base) && other.state(base) != offsets =>
           (base, SymOffsets.top)
+        case (base: SymBase, offsets: SymOffsets) if !offsets.isTop && offsets.getOffsets.size > 10 =>
+          (base, SymOffsets.top)
       }
     join(other).join(SymValueSet(update))
   }
@@ -313,8 +246,7 @@ case class SymbolicValues(state: Map[LocalVar, SymValueSet]) {
           .collect { case locVar: LocalVar if state.contains(locVar) => state(locVar) }
           .foldLeft(SymValueSet.empty)((result, operand) => result.join(operand))
           .toTop
-      case _ =>
-        ???
+      case _ => ???
   }
 
   def contains(variable: LocalVar): Boolean = state.contains(variable)
