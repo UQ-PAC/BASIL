@@ -61,11 +61,14 @@ abstract class DifferentialTest extends AnyFunSuite, TestCustomisation {
 
     def interp(p: IRContext): (InterpreterState, Trace) = {
       val interpreter = LayerInterpreter(tracingInterpreter(NormalInterpreter), EffectsRLimit(instructionLimit))
-      val initialState = InterpFuns.initProgState(NormalInterpreter)(p, InterpreterState())
+      val initialState = ((InterpFuns.initProgState(NormalInterpreter)(p, InterpreterState()), Trace.empty), 0)
       // Logger.setLevel(LogLevel.DEBUG)
-      val r = BASILInterpreter(interpreter).run((initialState, Trace.empty), 0)._1
-      // Logger.setLevel(LogLevel.WARN)
-      r
+
+      val main = p.program.mainProcedure
+      val r = InterpFuns
+        .callProcedure(interpreter)(main, InterpFuns.mainDefaultFunctionArguments(main))
+        .f(initialState)
+      r._1._1
     }
 
     val (initialRes, traceInit) = interp(initial)
@@ -83,11 +86,13 @@ abstract class DifferentialTest extends AnyFunSuite, TestCustomisation {
     val initstdout =
       initialRes.memoryState.getMem("stdout").toList.sortBy(_._1.value).map(_._2.value.toChar).mkString("")
     val comparstdout = result.memoryState.getMem("stdout").toList.sortBy(_._1.value).map(_._2.value.toChar).mkString("")
-    info("STDOUT: \"" + initstdout + "\"")
+    if (initstdout.nonEmpty) {
+      info("STDOUT: \"" + initstdout + "\"")
+    }
     // Logger.info(initialRes.memoryState.getMem("stderr").toList.sortBy(_._1.value).map(_._2).mkString(""))
     assert(initstdout == comparstdout)
-    assert(initialRes.nextCmd == Stopped())
-    assert(result.nextCmd == Stopped())
+    assert(normalTermination(initialRes.nextCmd), initialRes.nextCmd)
+    assert(normalTermination(result.nextCmd), initialRes.nextCmd)
     assert(Set.empty == initialRes.memoryState.getMem("mem").toSet.diff(result.memoryState.getMem("mem").toSet))
     assert(traceInit.t.nonEmpty)
     assert(traceRes.t.nonEmpty)

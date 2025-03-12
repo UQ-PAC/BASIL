@@ -302,6 +302,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     val r = interpretTrace(fib)
 
     assert(normalTermination(r._1.nextCmd), r._1.nextCmd)
+    assert(r._2.t.nonEmpty, "Trace was empty")
 
   }
 
