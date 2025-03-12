@@ -25,12 +25,12 @@ import util.DSAAnalysis.Norm
 
 import java.io.{BufferedWriter, File, FileWriter}
 
-@test_util.tags.StandardSystemTest
+@test_util.tags.AnalysisSystemTest
 class IndirectCallTests extends AnyFunSuite, BASILTest, TestCustomisation {
 
   override def customiseTestsByName(name: String) = name match {
     case "indirect_call_outparam/clang:BAP" | "indirect_call_outparam/clang:GTIRB" | "indirect_call_outparam/gcc:BAP" |
-        "indirect_call_outparam/gcc:GTIRB" | "jumptable/clang:BAP" | "jumptable/clang:GTIRB" =>
+        "indirect_call_outparam/gcc:GTIRB" =>
       Mode.NotImplemented("indirect call not resolved to correct target -- overapproximate result")
 
     case "jumptable3/clang:GTIRB" | "jumptable3/clang_O2:GTIRB" | "switch2/clang:GTIRB" =>
