@@ -8,6 +8,20 @@
 # NOTE: executing the runner through this script may try to start a GUI.
 #       to avoid this and use the console, pass -o.
 
+# useful commands
+# ---------------
+#
+# - to include only a specific tag, use -n.
+# - to exclude a specific tag, use -l.
+# - these can be combined. for example, to select all StandardSystemTest except Slow ones:
+#
+#     ./scripts/scalatest.sh -o -n test_util.tags.StandardSystemTest -l test_util.tags.Slow
+#
+# - when passing tags through the command line, the fully-qualified name must be used.
+# - to print individual test durations, pass D to -o. for example, -oD.
+# - to print a summary of failing tests at the end of the output, pass I to -o.
+#
+
 classes="$(./mill show test.compile | grep '"classes"' | cut -d'"' -f4 | cut -d: -f4)"
 
 if ! [[ -d "$classes" ]]; then
