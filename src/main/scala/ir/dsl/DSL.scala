@@ -190,7 +190,7 @@ def ret(params: (String, Expr)*): EventuallyReturn = EventuallyReturn(params)
 def unreachable: EventuallyUnreachable = EventuallyUnreachable()
 
 def directCall(lhs: Iterable[(String, Variable)], tgt: String, actualParams: (String, Expr)*): EventuallyCall =
-  EventuallyCall(DelayNameResolve(tgt), lhs.toArray, actualParams)
+  EventuallyCall(DelayNameResolve(tgt), lhs.to(ArraySeq), actualParams)
 
 def directCall(tgt: String): EventuallyCall = directCall(Nil, tgt)
 
