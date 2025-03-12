@@ -23,6 +23,12 @@ object SystemTests {
 }
 
 trait SystemTests extends AnyFunSuite, BASILTest {
+
+  /**
+   * A suffix appended to output file names, in order to avoid clashes between test suites.
+   */
+  def testSuiteSuffix = "_" + this.getClass.getSimpleName
+
   case class TestResult(
     name: String,
     passed: Boolean,
@@ -151,22 +157,22 @@ trait SystemTests extends AnyFunSuite, BASILTest {
   def runTest(path: String, name: String, variation: String, conf: TestConfig): Unit = {
     val directoryPath = path + "/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
-    SystemTests.locks.withLock(variationPath) {
-      runTestUnsynchronised(path, name, variation, conf)
-    }
-  }
+    val suiteSuffix = testSuiteSuffix
 
-  def runTestUnsynchronised(path: String, name: String, variation: String, conf: TestConfig): Unit = {
-    val directoryPath = path + "/" + name + "/"
-    val variationPath = directoryPath + variation + "/" + name
-    val inputPath = if conf.useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
-    val BPLPath = if conf.useBAPFrontend then variationPath + "_bap.bpl" else variationPath + "_gtirb.bpl"
+    // input files:
+    val inputPath = variationPath + (if conf.useBAPFrontend then ".adt" else ".gts")
     val specPath = directoryPath + name + ".spec"
     val RELFPath = variationPath + ".relf"
-    val resultPath =
-      if conf.useBAPFrontend then variationPath + "_bap_result.txt" else variationPath + "_gtirb_result.txt"
-    val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
+
+    // output files:
+    val lifterString = if conf.useBAPFrontend then s"_bap" else s"_gtirb"
+    val BPLPath = variationPath + lifterString + suiteSuffix + ".bpl"
+    val resultPath = variationPath + lifterString + suiteSuffix + "_result.txt"
+
+    // reference file:
     val expectedOutPath = if conf.useBAPFrontend then variationPath + ".expected" else variationPath + "_gtirb.expected"
+
+    val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
 
     Logger.info(s"$name/$variation$testSuffix")
     val timer = PerformanceTimer(s"test $name/$variation$testSuffix")
@@ -256,6 +262,7 @@ trait SystemTests extends AnyFunSuite, BASILTest {
 }
 
 class SystemTestsBAP extends SystemTests {
+  override def testSuiteSuffix = ""
   runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true))
   runTests(
     "incorrect",
@@ -267,6 +274,7 @@ class SystemTestsBAP extends SystemTests {
 }
 
 class SystemTestsGTIRB extends SystemTests {
+  override def testSuiteSuffix = ""
   runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, checkExpected = true, logResults = true))
   runTests(
     "incorrect",
