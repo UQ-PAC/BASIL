@@ -21,6 +21,7 @@ import util.{
   StaticAnalysisContext
 }
 
+@test_util.tags.UnitTest
 class IntervalDSATest extends AnyFunSuite {
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
