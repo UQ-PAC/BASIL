@@ -886,7 +886,7 @@ class IntervalNode(
 
         val pointee = if pointees.nonEmpty then Some(graph.mergeCells(pointees)) else None
         _cells = cells.diff(overlapping).appended(res).sorted
-        if pointees.nonEmpty then res.setPointee(pointee.get)
+        if pointees.nonEmpty then graph.find(res).setPointee(pointee.get)
         init(interval)
 
       assert(nonOverlappingProperty, "expected non overlapping cells")
