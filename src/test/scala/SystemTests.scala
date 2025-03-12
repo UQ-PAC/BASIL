@@ -58,7 +58,7 @@ trait SystemTests extends AnyFunSuite, BASILTest {
 
   def runTests(folder: String, conf: TestConfig): Unit = {
     val path = testPath + folder
-    val programs = scala.util.Random.shuffle(getSubdirectories(path))
+    val programs = getSubdirectories(path)
 
     // get all variations of each program
     val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
