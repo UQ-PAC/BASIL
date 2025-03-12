@@ -960,7 +960,7 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
   }
 
   def removePointee: Option[IntervalCell] = {
-    if node.get(this.interval) != this then node.get(this.interval).removePointee
+    if node.get(this.interval) ne this then node.get(this.interval).removePointee
     else
       val temp = _pointee.map(graph.find)
       _pointee = None
@@ -975,7 +975,7 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
    * Can check if a cell has pointee without creating one for it with hasPointee
    */
   def getPointee: IntervalCell = {
-    if node.get(this.interval) != this then node.get(this.interval).getPointee
+    if node.get(this.interval) ne this then node.get(this.interval).getPointee
     else if _pointee.isEmpty then
 //      throw Exception("expected a pointee")
       assert(this.node.isUptoDate)
@@ -989,11 +989,13 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
   def setPointee(cell: IntervalCell): IntervalCell = {
     assert(this.node.isUptoDate)
     assert(cell.node.isUptoDate)
-    if node.get(this.interval) != this then node.get(this.interval).setPointee(cell)
+    if node.get(this.interval) ne this then node.get(this.interval).setPointee(cell)
     else if _pointee.isEmpty then
+      assert(node.cells.contains(this))
       _pointee = Some(cell)
       _pointee.get
     else if cell.equiv(this) then
+      assert(node.cells.contains(this))
       val pointee = this.removePointee.get
       val newThis = graph.mergeCells(pointee, this)
       graph.mergePointees(newThis, newThis.getPointee)
@@ -1002,6 +1004,7 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
       assert(this._pointee.get.equiv(this))
       _pointee.get
     else // if a cell points to itself break the link,
+      assert(node.cells.contains(this))
       graph.mergePointees(this.getPointee, cell)
       this._pointee = Some(graph.mergeCells(cell, graph.get(this).getPointee))
       graph.get(this)._pointee = this._pointee
