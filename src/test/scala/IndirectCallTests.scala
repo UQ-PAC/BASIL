@@ -27,13 +27,13 @@ class IndirectCallTests extends AnyFunSuite, BASILTest, TestCustomisation {
   override def customiseTestsByName(name: String) = name match {
     case "indirect_call_outparam/clang:BAP" | "indirect_call_outparam/clang:GTIRB" | "indirect_call_outparam/gcc:BAP" |
         "indirect_call_outparam/gcc:GTIRB" | "jumptable/clang:BAP" | "jumptable/clang:GTIRB" =>
-      Mode.TempFailure("indirect call not resolved to correct target")
+      Mode.NotImplemented("indirect call not resolved to correct target -- overapproximate result")
 
     case "jumptable3/clang:GTIRB" | "jumptable3/clang_O2:GTIRB" | "switch2/clang:GTIRB" =>
-      Mode.TempFailure("indirect call not resolved to goto")
+      Mode.NotImplemented("indirect call not resolved to goto -- not yet handled")
 
     case "jumptable/gcc:BAP" | "jumptable/gcc:GTIRB" =>
-      Mode.TempFailure("Expected verification success, but got failure")
+      Mode.NotImplemented("needs specifications about the security level of the jumptable in the binary's data section")
 
     case _ => Mode.Normal
   }
