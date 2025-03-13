@@ -96,7 +96,6 @@ case class TNumValue(value: BigInt, mask: BigInt, width: Int) extends TNum {
     TNumValue(v, (alpha & beta & ~v), this.width)
   }
 
-
   // Bitwise OR
   def TOR(that: TNumValue): TNumValue = {
     require(this.width == that.width, s"$this $that bv width")
@@ -331,7 +330,8 @@ case class TNumValue(value: BigInt, mask: BigInt, width: Int) extends TNum {
       return TNumValue(BigInt(0), BigInt(-1), width)
     }
 
-    val maxBitLength = this.width // dividendL.bitLength max dividendH.bitLength max divisorL.bitLength max divisorH.bitLength
+    val maxBitLength =
+      this.width // dividendL.bitLength max dividendH.bitLength max divisorL.bitLength max divisorH.bitLength
 
     // Sign extend both dividend and divisor and convert to signed representation before division
     val q1 = toSigned(signExtend(dividendL, maxBitLength)) / toSigned(signExtend(divisorL, maxBitLength))
@@ -385,7 +385,8 @@ case class TNumValue(value: BigInt, mask: BigInt, width: Int) extends TNum {
     }
 
     // Determine maximum bit length for sign extension
-    val maxBitLength = this.width // dividendL.bitLength max dividendH.bitLength max divisorL.bitLength max divisorH.bitLength
+    val maxBitLength =
+      this.width // dividendL.bitLength max dividendH.bitLength max divisorL.bitLength max divisorH.bitLength
 
     // Sign extend both dividend and divisor and convert to signed representation before division
     val r1 = toSigned(signExtend(dividendL, maxBitLength)) % toSigned(signExtend(divisorL, maxBitLength))
@@ -427,7 +428,8 @@ case class TNumValue(value: BigInt, mask: BigInt, width: Int) extends TNum {
     }
 
     // Determine maximum bit length for sign extension
-    val maxBitLength = this.width // dividendL.bitLength max dividendH.bitLength max divisorL.bitLength max divisorH.bitLength
+    val maxBitLength =
+      this.width // dividendL.bitLength max dividendH.bitLength max divisorL.bitLength max divisorH.bitLength
 
     // Sign extend both dividend and divisor and convert to signed representation
     val r1 = toSigned(signExtend(dividendL, maxBitLength)) % toSigned(signExtend(divisorL, maxBitLength))
