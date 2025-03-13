@@ -868,6 +868,29 @@ object RunUtils {
       DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
 
       doSimplify(ctx, conf.staticAnalysis)
+
+      transforms.applyRPO(ctx.program)
+      val (kbb, kba) = transforms.knownBitsAnalysis(ctx.program)
+      DebugDumpIRLogger.writeToFile(
+        File("known-bits.il"),
+        pp_prog_with_analysis_results(kbb, kba, ctx.program, x => x.toString)
+      )
+
+      DebugDumpIRLogger.writeToFile(
+        File(s"known_bits_blockgraph.dot"),
+        dotBlockGraph(
+          ctx.program.mainProcedure,
+          ctx.program.mainProcedure.blocks.collect { case b: Block =>
+            b -> pp_block_with_analysis_results(
+              kbb,
+              kba,
+              b,
+              x => "{" + x.map((k, v) => s"${k.name} -> ($v)").mkString(", ") + "}"
+            )
+          }.toMap
+        )
+      )
+
     }
     if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
       val dir = File("./graphs/")
