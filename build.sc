@@ -8,6 +8,7 @@ import contrib.scalapblib._
 
 object basil extends RootModule with ScalaModule with antlr.AntlrModule with ScalaPBModule {
   def scalaVersion = "3.3.4"
+  def ammoniteVersion = "3.0.2"
 
   def scalacOptions: T[Seq[String]] = Seq("-deprecation")
 
