@@ -41,7 +41,7 @@ class IntervalDSATest extends AnyFunSuite {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set.empty))
+        dsaConfig = Some(DSAConfig(Set(Norm)))
       )
     )
   }
