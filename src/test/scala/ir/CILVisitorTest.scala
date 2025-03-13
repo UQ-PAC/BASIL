@@ -51,6 +51,7 @@ class AddGammas extends CILVisitor {
   }
 }
 
+@test_util.tags.UnitTest
 class CILVisitorTest extends AnyFunSuite {
 
   def getRegister(name: String) = Register(name, 64)

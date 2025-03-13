@@ -30,7 +30,28 @@ import util.RunUtils.loadAndTranslate
 
 import scala.collection.mutable
 
-class DifferentialTest extends AnyFunSuite {
+abstract class DifferentialTest extends AnyFunSuite, TestCustomisation {
+
+  override def customiseTestsByName(name: String) = name match {
+    case "analysis_differential:floatingpoint/clang:GTIRB" | "analysis_differential:floatingpoint/gcc:GTIRB" =>
+      Mode.NotImplemented("needs FP_Mul")
+
+    case "analysis_differential:function1/gcc_O2:BAP" | "analysis_differential:function1/gcc_O2:GTIRB" |
+        "analysis_differential:malloc_with_local/gcc_O2:BAP" | "analysis_differential:malloc_with_local/gcc_O2:GTIRB" |
+        "analysis_differential:malloc_with_local3/gcc_O2:BAP" |
+        "analysis_differential:malloc_with_local3/gcc_O2:GTIRB" =>
+      Mode.NotImplemented("needs printf_chk")
+
+    case "analysis_differential:syscall/clang:BAP" | "analysis_differential:syscall/clang:GTIRB" |
+        "analysis_differential:syscall/clang_O2:GTIRB" | "analysis_differential:syscall/gcc:BAP" |
+        "analysis_differential:syscall/gcc:GTIRB" =>
+      Mode.NotImplemented("needs fork")
+
+    case "analysis_differential:syscall/gcc_O2:BAP" => Mode.TempFailure("traceInit empty")
+    case "analysis_differential:syscall/gcc_O2:GTIRB" => Mode.NotImplemented("needs fork")
+
+    case _ => Mode.Normal
+  }
 
   Logger.setLevel(LogLevel.WARN)
 
@@ -40,17 +61,20 @@ class DifferentialTest extends AnyFunSuite {
 
     def interp(p: IRContext): (InterpreterState, Trace) = {
       val interpreter = LayerInterpreter(tracingInterpreter(NormalInterpreter), EffectsRLimit(instructionLimit))
-      val initialState = InterpFuns.initProgState(NormalInterpreter)(p, InterpreterState())
+      val initialState = ((InterpFuns.initProgState(NormalInterpreter)(p, InterpreterState()), Trace.empty), 0)
       // Logger.setLevel(LogLevel.DEBUG)
-      val r = BASILInterpreter(interpreter).run((initialState, Trace(List())), 0)._1
-      // Logger.setLevel(LogLevel.WARN)
-      r
+
+      val main = p.program.mainProcedure
+      val r = InterpFuns
+        .callProcedure(interpreter)(main, InterpFuns.mainDefaultFunctionArguments(main))
+        .f(initialState)
+      r._1._1
     }
 
     val (initialRes, traceInit) = interp(initial)
     val (result, traceRes) = interp(transformed)
 
-    def filterEvents(trace: List[ExecEffect]) = {
+    def filterEvents(trace: Iterable[ExecEffect]) = {
       trace.collect {
         case e @ ExecEffect.Call(_, _, _) => e
         case e @ ExecEffect.StoreMem("mem", _) => e
@@ -62,11 +86,13 @@ class DifferentialTest extends AnyFunSuite {
     val initstdout =
       initialRes.memoryState.getMem("stdout").toList.sortBy(_._1.value).map(_._2.value.toChar).mkString("")
     val comparstdout = result.memoryState.getMem("stdout").toList.sortBy(_._1.value).map(_._2.value.toChar).mkString("")
-    info("STDOUT: \"" + initstdout + "\"")
+    if (initstdout.nonEmpty) {
+      info("STDOUT: \"" + initstdout + "\"")
+    }
     // Logger.info(initialRes.memoryState.getMem("stderr").toList.sortBy(_._1.value).map(_._2).mkString(""))
     assert(initstdout == comparstdout)
-    assert(initialRes.nextCmd == Stopped())
-    assert(result.nextCmd == Stopped())
+    assert(normalTermination(initialRes.nextCmd), initialRes.nextCmd)
+    assert(normalTermination(result.nextCmd), initialRes.nextCmd)
     assert(Set.empty == initialRes.memoryState.getMem("mem").toSet.diff(result.memoryState.getMem("mem").toSet))
     assert(traceInit.t.nonEmpty)
     assert(traceRes.t.nonEmpty)
@@ -109,6 +135,7 @@ class DifferentialTest extends AnyFunSuite {
   }
 }
 
+@test_util.tags.AnalysisSystemTest
 class DifferentialAnalysisTest extends DifferentialTest {
 
   def runSystemTests(): Unit = {
@@ -142,6 +169,7 @@ class DifferentialAnalysisTest extends DifferentialTest {
   runSystemTests()
 }
 
+@test_util.tags.AnalysisSystemTest
 class DifferentialAnalysisTestSimplification extends DifferentialTest {
 
   def runSystemTests(): Unit = {

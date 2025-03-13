@@ -31,6 +31,7 @@ def mems[E, T <: Effects[T, E]](m: MemoryState): Map[BigInt, BitVecLiteral] = {
   m.getMem("mem").map((k, v) => k.value -> v)
 }
 
+@test_util.tags.UnitTest
 class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
   Logger.setLevel(LogLevel.WARN)
@@ -46,6 +47,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
     val p = IRLoading.load(loading)
     val ctx = IRTransform.doCleanup(p)
+    ir.transforms.clearParams(ctx.program)
     // val bapProgram = loadBAP(loading.inputFile)
     // val (symbols, externalFunctions, globals, _, mainAddress) = loadReadELF(loading.relfFile, loading)
     // val IRTranslator = BAPToIR(bapProgram, mainAddress)
@@ -82,7 +84,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     val actual: Map[String, Int] = expected.flatMap((name, expected) =>
       globals.find(_.name == name).flatMap(global => load(fstate, global).map(gv => name -> gv.value.toInt))
     )
-    assert(fstate.nextCmd == Stopped())
+    assert(normalTermination(fstate.nextCmd), fstate.nextCmd)
     assert(expected == actual)
   }
 
@@ -248,7 +250,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     Logger.setLevel(LogLevel.ERROR)
     val fib = fibonacciProg(8)
     val r = interpret(fib)
-    assert(r.nextCmd == Stopped())
+    assert(normalTermination(r.nextCmd), r.nextCmd)
     // Show interpreted result
     // r.regs.foreach { (key, value) =>
     //   Logger.info(s"$key := $value")
@@ -261,6 +263,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     Logger.setLevel(LogLevel.ERROR)
     var res = List[(Int, Double, Double, Int)]()
 
+    val initial = PerformanceTimer("total")
     for (i <- 0 to 20) {
       val prog = fibonacciProg(i)
 
@@ -275,12 +278,20 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       res = (i, native.toDouble, it.toDouble, ir._2) :: res
 
     }
+    val totalTime = initial.elapsed()
 
     info(
       ("fibonacci runtime table:\nFibNumber,ScalaRunTime,interpreterRunTime,instructionCycleCount" :: (res.map(x =>
         s"${x._1},${x._2},${x._3},${x._4}"
       ))).mkString("\n")
     )
+
+    for (t <- NormalInterpreter.getTimes()) {
+      info(t.toString)
+    }
+    val total = NormalInterpreter.getTimes().map(_.getTotal()).sum
+    info("Total time: " + totalTime)
+    info("Effects[T] time: " + total)
 
   }
 
@@ -290,9 +301,8 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
     val r = interpretTrace(fib)
 
-    assert(r._1.nextCmd == Stopped())
-    // Show interpreted result
-    //
+    assert(normalTermination(r._1.nextCmd), r._1.nextCmd)
+    assert(r._2.t.nonEmpty, "Trace was empty")
 
   }
 

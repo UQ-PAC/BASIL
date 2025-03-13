@@ -2,6 +2,7 @@ package util.intrusive_list
 
 import org.scalatest.funsuite.AnyFunSuite
 
+@test_util.tags.UnitTest
 class IntrusiveListTest extends AnyFunSuite {
   case class Elem(t: Float) extends IntrusiveListElement[Elem]
 

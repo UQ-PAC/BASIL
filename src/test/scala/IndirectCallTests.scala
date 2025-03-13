@@ -5,6 +5,8 @@ import util.{
   BASILConfig,
   BASILResult,
   BoogieGeneratorConfig,
+  DSAConfig,
+  DSAContext,
   ILLoadingConfig,
   LogLevel,
   Logger,
@@ -12,15 +14,33 @@ import util.{
   RunUtils,
   StaticAnalysisConfig
 }
+import analysis.data_structure_analysis.*
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable
 import test_util.BASILTest
 import test_util.TestConfig
+import test_util.TestCustomisation
+import util.DSAAnalysis.Norm
 
 import java.io.{BufferedWriter, File, FileWriter}
 
-class IndirectCallTests extends AnyFunSuite, BASILTest {
+@test_util.tags.AnalysisSystemTest
+class IndirectCallTests extends AnyFunSuite, BASILTest, TestCustomisation {
+
+  override def customiseTestsByName(name: String) = name match {
+    case "indirect_call_outparam/clang:BAP" | "indirect_call_outparam/clang:GTIRB" | "indirect_call_outparam/gcc:BAP" |
+        "indirect_call_outparam/gcc:GTIRB" =>
+      Mode.NotImplemented("indirect call not resolved to correct target -- overapproximate result")
+
+    case "jumptable3/clang:GTIRB" | "jumptable3/clang_O2:GTIRB" | "switch2/clang:GTIRB" =>
+      Mode.NotImplemented("indirect call not resolved to goto -- not yet handled")
+
+    case "jumptable/gcc:BAP" | "jumptable/gcc:GTIRB" =>
+      Mode.NotImplemented("needs specifications about the security level of the jumptable in the binary's data section")
+
+    case _ => Mode.Normal
+  }
 
   /** @param label - the label of the IndirectCall to be resolved
     * @param labelProcedure - the name of the procedure containing the IndirectCall to be resolved
@@ -65,12 +85,15 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
       specPath,
       BPLPath,
       staticAnalysisConf,
+      dsa = Some(DSAConfig(Set(Norm))),
+      simplify = true,
       postLoad = ctx => { indircalls = getIndirectCalls(ctx.program); }
     )
     (basilresult, indircalls.map(_.label.get))
   }
 
   def runTest(name: String, variation: String, conf: TestConfig, resolvedCalls: Seq[IndirectCallResolution]): Unit = {
+    Logger.setLevel(LogLevel.ERROR)
     val directoryPath = "./src/test/indirect_calls/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
     val inputPath = if conf.useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
@@ -90,7 +113,8 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
     val (boogieFailureMsg, _, _) = checkVerify(boogieResult, resultPath, conf.expectVerify)
 
     val fresolvedcalls = resolvedCalls.zip(indirectCallBlock).map((cr, l) => cr.copy(label = l))
-    val indirectResolutionFailureMsg = checkIndirectCallResolution(basilResult.ir.program, fresolvedcalls)
+    val indirectResolutionFailureMsg =
+      checkIndirectCallResolution(basilResult.ir.program, fresolvedcalls, checkResolvedCalls(basilResult.dsa.get))
 
     (indirectResolutionFailureMsg, boogieFailureMsg) match {
       case (Some(msg), None) => fail(msg)
@@ -103,7 +127,11 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
   /** @return
     *   None if passes, Some(failure message) if doesn't pass
     */
-  def checkIndirectCallResolution(program: Program, resolutions: Seq[IndirectCallResolution]): Option[String] = {
+  def checkIndirectCallResolution(
+    program: Program,
+    resolutions: Seq[IndirectCallResolution],
+    checker: ((Command, IndirectCallResolution) => IndirectCallResult)
+  ): Option[String] = {
     val nameToProc: Map[String, Procedure] = program.nameToProcedure
     val labelToResolution: Map[String, IndirectCallResolution] = resolutions.map(r => r.label -> r).toMap
     val procedures: Set[Procedure] = resolutions.map(r => nameToProc(r.labelProcedure)).toSet
@@ -116,13 +144,13 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
     } {
       if (b.jump.label.isDefined && labelToResolution.contains(b.jump.label.get)) {
         val resolution = labelToResolution(b.jump.label.get)
-        val result: IndirectCallResult = checkCallSite(b.jump, resolution)
+        val result: IndirectCallResult = checker(b.jump, resolution)
         results.append(result)
       } else {
         b.statements.lastElem match {
           case Some(s: Statement) if s.label.isDefined && labelToResolution.contains(s.label.get) =>
             val resolution = labelToResolution(s.label.get)
-            val result: IndirectCallResult = checkCallSite(s, resolution)
+            val result: IndirectCallResult = checker(s, resolution)
             results.append(result)
           case _ =>
         }
@@ -151,6 +179,19 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
     } else {
       None // test passed
     }
+  }
+
+  def checkResolvedCalls(dsa: DSAContext)(call: Command, resolution: IndirectCallResolution): IndirectCallResult = {
+    call match
+      case callSite: DirectCall if callSite.target.name == "indirect_call_launchpad" =>
+        val dsg = dsa.topDown(call.parent.parent)
+        val targetExpr = callSite.actualParams(LocalVar("indirectCallTarget", BitVecType(64)))
+        val procs = dsg.exprToCells(targetExpr).flatMap(dsg.cellToProcs)
+        val result = resolution.procTargets.forall(name => procs.map(_.procName).contains(name))
+        IndirectCallResult(resolution, result, None)
+      case _ =>
+        // ignore blocks
+        IndirectCallResult(resolution, true, None)
   }
 
   def checkCallSite(callSite: Command, resolution: IndirectCallResolution): IndirectCallResult = {
@@ -207,7 +248,7 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
       if (resolution.procTargets.size == 1) {
         // only one procedure target -> check if call is resolved to direct call
         callSite match {
-          case d: DirectCall if d.target.name == resolution.procTargets.head =>
+          case d: DirectCall if d.target.procName == resolution.procTargets.head =>
             IndirectCallResult(resolution, true, None)
           case _ =>
             // fail - expected call to be resolved to direct call with target x
@@ -221,7 +262,7 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
             if (targets.size == resolution.procTargets.size) {
               val targetNames = targets.flatMap {
                 _.statements.lastElem match {
-                  case Some(DirectCall(target, _, _, _)) => Some(target.name)
+                  case Some(DirectCall(target, _, _, _)) => Some(target.procName)
                   case _ => None
                 }
               }

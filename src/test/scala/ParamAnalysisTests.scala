@@ -4,6 +4,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest
 import util.{BASILResult, StaticAnalysisConfig, Logger, LogLevel}
 
+@test_util.tags.UnitTest
 class ParamAnalysisTests extends AnyFunSuite, BASILTest {
   private val correctPath = "./src/test/correct/"
 

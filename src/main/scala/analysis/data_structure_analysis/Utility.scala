@@ -37,6 +37,9 @@ class Flags() {
   var function = false
   var stack = false
   var heap = false
+  var loaded = false
+  var par = false
+  var ret = false
   var global = false
   var unknown = false
   var read = false
@@ -258,14 +261,19 @@ case class AddressRange(start: BigInt, end: BigInt)
 case class Field(node: Node, offset: BigInt)
 
 // unwraps internal padding and slicing and returns the expression
-def unwrapPaddingAndSlicing(expr: Expr): Expr =
-  expr match
-    case literal: Literal => literal
-    case Repeat(repeats, body) => Repeat(repeats, unwrapPaddingAndSlicing(body))
-    case SignExtend(extension, body) => SignExtend(extension, unwrapPaddingAndSlicing(body))
-    case UnaryExpr(op, arg) => UnaryExpr(op, arg)
-    case BinaryExpr(op, arg1, arg2) => BinaryExpr(op, unwrapPaddingAndSlicing(arg1), unwrapPaddingAndSlicing(arg2))
-    case variable: Variable => variable
-    case Extract(_, _, body) /*if start == 0 && end == 32*/ => unwrapPaddingAndSlicing(body) // this may make it unsound
-    case ZeroExtend(_, body) => unwrapPaddingAndSlicing(body)
-    case _ => expr
+def unwrapPaddingAndSlicing(expr: Expr): Expr = {
+  // TODO: if we really want we can implement a rewriter to coerce
+  // an expression to a 64 bit precision expression in a similar way to
+  // the rewriter that converts bv1 to bool exprs:
+  // Expand inner expressions, wrap in an extract(32, 0) expr to maintain
+  // internal type safety, and push the extract up the until until it is at the
+  // outermost expression.
+  val r = ir.eval.simplifyPaddingAndSlicingExprFixpoint(expr)(0) match {
+    case Extract(_, 0, x) => x
+    case ZeroExtend(_, x) => x
+    case BinaryExpr(BVADD, Extract(hi, 0, x), y: Literal) =>
+      ir.eval.fastPartialEvalExpr(BinaryExpr(BVADD, x, SignExtend(size(x).get - size(y).get, y)))(0)
+    case o => o
+  }
+  r
+}
