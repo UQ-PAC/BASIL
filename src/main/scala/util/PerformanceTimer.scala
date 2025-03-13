@@ -1,32 +1,20 @@
 package util
 import scala.collection.mutable
 import scala.collection
+import java.util.concurrent.atomic.AtomicLong
 
 case class RegionTimer(name: String) {
-  private var total: Long = 0
-  private var entered: Long = 0
-  private var inside: Boolean = false
+  private val total: AtomicLong = AtomicLong(0)
 
   def within[T](body: => T): T = {
-    enter()
+    val begin = System.currentTimeMillis()
     val result = body
-    exit()
+    val finish = System.currentTimeMillis()
+    val _ = total.addAndGet(finish - begin)
     result
   }
 
-  def enter() = {
-    require(!inside)
-    inside = true
-    entered = System.currentTimeMillis()
-  }
-
-  def exit() = {
-    require(inside)
-    inside = false
-    total += (System.currentTimeMillis() - entered)
-  }
-
-  def getTotal() = total
+  def getTotal(): Long = total.get
 
   override def toString() = {
     s"$name : ${getTotal()} (ms)"
