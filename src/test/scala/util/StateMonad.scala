@@ -12,6 +12,7 @@ import util.ILLoadingConfig
 
 def add: State[Int, Unit, Unit] = State(s => (s + 1, Right(())))
 
+@test_util.tags.UnitTest
 class StateMonadTest extends AnyFunSuite {
 
   test("forcompre") {

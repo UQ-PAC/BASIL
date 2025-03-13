@@ -15,6 +15,7 @@ import test_util.BASILTest.writeToFile
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
   */
+@test_util.tags.UnitTest
 class IrreducibleLoop extends AnyFunSuite {
   val testPath = "./src/test/irreducible_loops"
   Logger.setLevel(LogLevel.ERROR)

@@ -20,11 +20,27 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable
 import test_util.BASILTest
 import test_util.TestConfig
+import test_util.TestCustomisation
 import util.DSAAnalysis.Norm
 
 import java.io.{BufferedWriter, File, FileWriter}
 
-class IndirectCallTests extends AnyFunSuite, BASILTest {
+@test_util.tags.AnalysisSystemTest
+class IndirectCallTests extends AnyFunSuite, BASILTest, TestCustomisation {
+
+  override def customiseTestsByName(name: String) = name match {
+    case "indirect_call_outparam/clang:BAP" | "indirect_call_outparam/clang:GTIRB" | "indirect_call_outparam/gcc:BAP" |
+        "indirect_call_outparam/gcc:GTIRB" =>
+      Mode.NotImplemented("indirect call not resolved to correct target -- overapproximate result")
+
+    case "jumptable3/clang:GTIRB" | "jumptable3/clang_O2:GTIRB" | "switch2/clang:GTIRB" =>
+      Mode.NotImplemented("indirect call not resolved to goto -- not yet handled")
+
+    case "jumptable/gcc:BAP" | "jumptable/gcc:GTIRB" =>
+      Mode.NotImplemented("needs specifications about the security level of the jumptable in the binary's data section")
+
+    case _ => Mode.Normal
+  }
 
   /** @param label - the label of the IndirectCall to be resolved
     * @param labelProcedure - the name of the procedure containing the IndirectCall to be resolved

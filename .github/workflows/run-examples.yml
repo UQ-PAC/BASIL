@@ -8,6 +8,18 @@ on:
       - main
   workflow_dispatch:
 jobs:
+  CheckTestTagging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - run: './mill test.compile'
+      - name: Check all test suites have at least one tag
+        run: .github/workflows/check-test-tagging.sh
+
   Scalafmt:
     runs-on: ubuntu-latest
     steps:
@@ -52,8 +64,9 @@ jobs:
       - run: sudo apt-get install -y z3='4.8.12-*'
       - run: dotnet tool install --global boogie --version '3.4.3'
 
-      - name: System Tests
-        run: ./mill test.testOnly 'SystemTests*'
+      - run: ./mill compile
+      - run: ./scripts/scalatest.sh -oID -n test_util.tags.StandardSystemTest
+
       - uses: actions/upload-artifact@v4
         with:
           name: testresult-${{ github.run_number }}
@@ -103,43 +116,10 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
+      - run: ./scripts/scalatest.sh -oID -n test_util.tags.UnitTest
 
         # every test with package prefix:
         # sbt "show test:definedTests"
-
-        # note: tests prefixed with '!' are expected to fail.
-        #       if they are fixed, the '!' should be removed.
-
-      - run: ./mill test.testOnly IrreducibleLoop
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly BitVectorAnalysisTests
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly '*IntrusiveListPublicInterfaceTest'
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly util.intrusive_list.IntrusiveListTest
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly DataStructureAnalysisTest
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly ParamAnalysisTests
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly LiveVarsAnalysisTests
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly ir.ToScalaTest
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly ir.IRTest
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly ir.IRToDSLTest
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly ir.CILVisitorTest
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly ir.InterpreterTests
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly ir.InvariantTest
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly ProcedureSummaryTests || true
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly TaintAnalysisTests
-        if: ${{ ! cancelled() }}
 
   AnalysisSystemTests:
     runs-on: ubuntu-latest
@@ -161,15 +141,7 @@ jobs:
       - run: sudo apt-get install -y z3='4.8.12-*'
       - run: dotnet tool install --global boogie --version '3.4.3'
 
-      - run: echo "All systemtest suites:" & ./mill test.testOnly '*SystemTests*' -- -z 'xxxx'
+      - run: echo "All systemtest suites:" && ./mill test.testOnly '*SystemTests*' -- -z 'xxxx'
 
-      - run: ./mill test.testOnly DSAMemoryRegionSystemTestsBAP
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly DSAMemoryRegionSystemTestsGTIRB
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly AnalysisSystemTestsBAP
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly AnalysisSystemTestsGTIRB
-        if: ${{ ! cancelled() }}
-      - run: ./mill test.testOnly SimplifySystemTests
-        if: ${{ ! cancelled() }}
+      - run: ./mill compile
+      - run: ./scripts/scalatest.sh -oID -n test_util.tags.AnalysisSystemTest

@@ -8,6 +8,7 @@ import translating.serialiseIL
 import ir.dsl.*
 import ir.*
 
+@test_util.tags.UnitTest
 class IRTest extends AnyFunSuite {
 
   test("blockintralinks") {

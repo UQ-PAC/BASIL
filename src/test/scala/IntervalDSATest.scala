@@ -21,6 +21,7 @@ import util.{
   StaticAnalysisContext
 }
 
+@test_util.tags.UnitTest
 class IntervalDSATest extends AnyFunSuite {
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
@@ -74,6 +75,7 @@ class IntervalDSATest extends AnyFunSuite {
 
   test("jumptable main") {
     val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable")
+
     val dsg = results.dsa.get.topDown(results.ir.program.mainProcedure)
     dsg.localCorrectness()
   }

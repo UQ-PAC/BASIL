@@ -22,6 +22,7 @@ import translating.PrettyPrinter
 import org.scalactic.Prettifier
 import org.scalactic._
 
+@test_util.tags.UnitTest
 class IRToDSLTest extends AnyFunSuite {
 
   val mainproc = proc(

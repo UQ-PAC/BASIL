@@ -12,6 +12,7 @@ import ir.*
 
 import org.scalactic.source.Position
 
+@test_util.tags.UnitTest
 class ToScalaTest extends AnyFunSuite with TimeLimitedTests with BeforeAndAfterEachTestData {
 
   override def timeLimit = Span(2, Seconds)
