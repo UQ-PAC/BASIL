@@ -76,11 +76,8 @@ class IntervalDSATest extends AnyFunSuite {
   test("jumptable main") {
     val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable")
 
-    // FIXME: broken "key not found: Procedure main_1936"
-    pendingUntilFixed {
-      val dsg = results.dsa.get.topDown(results.ir.program.mainProcedure)
-      dsg.localCorrectness()
-    }
+    val dsg = results.dsa.get.topDown(results.ir.program.mainProcedure)
+    dsg.localCorrectness()
   }
 
   test("Global Dereference") {
