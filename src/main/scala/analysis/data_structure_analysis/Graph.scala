@@ -26,7 +26,7 @@ import scala.util.control.Breaks.{break, breakable}
   * @param writesTo
   * @param params
   */
-class Graph(
+class Graph(using NodeCounter)(
   val proc: Procedure,
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
   varToSym: Map[CFGPosition, Map[Variable, Set[SymbolicAddress]]],

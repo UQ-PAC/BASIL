@@ -26,7 +26,7 @@ import scala.util.control.Breaks.{break, breakable}
   * @param params
   *   mapping from procedures to their parameters
   */
-class LocalPhase(
+class LocalPhase(using NodeCounter)(
   proc: Procedure,
   symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],

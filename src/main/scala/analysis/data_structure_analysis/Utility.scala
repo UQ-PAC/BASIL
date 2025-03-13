@@ -12,16 +12,23 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.Breaks.{break, breakable}
 
-object NodeCounter {
+/**
+ * An incrementing counter for generating node IDs.
+ * An instance of this should be constructed and managed
+ * by the entry point of the DSA. A NodeCounter instance
+ * cannot be reset and should not be re-used for multiple
+ * analysis runs (a new instance should be constructed if
+ * needed).
+ *
+ * Generally, this is injected to the classes which require it
+ * by a "using" parameter.
+ */
+class NodeCounter {
   private var counter: Int = 0
 
   def getCounter: Int = {
     counter = counter + 1
     counter
-  }
-
-  def reset(): Unit = {
-    counter = 0
   }
 }
 
@@ -57,7 +64,11 @@ class Flags() {
 
 /** a Data structure Node
   */
-class Node(val graph: Option[Graph], var size: BigInt = 0, val id: Int = NodeCounter.getCounter) {
+class Node(using nodeCounter: NodeCounter)(
+  val graph: Option[Graph],
+  var size: BigInt = 0,
+  val id: Int = nodeCounter.getCounter
+) {
 
   val term: DSAUniTerm = DSAUniTerm(this)
   val children: mutable.Map[Node, BigInt] = mutable.Map()
@@ -174,7 +185,7 @@ class Node(val graph: Option[Graph], var size: BigInt = 0, val id: Int = NodeCou
   * @param offset
   *   the offset of the cell
   */
-class Cell(val node: Option[Node], val offset: BigInt) {
+class Cell(using NodeCounter)(val node: Option[Node], val offset: BigInt) {
   var largestAccessedSize: Int = 0
 
   // the cell's pointee
@@ -220,7 +231,7 @@ case class Slice(cell: Cell, internalOffset: BigInt) {
   * @param graph
   *   caller's DSG
   */
-class CallSite(val call: DirectCall, val graph: Graph) {
+class CallSite(using NodeCounter)(val call: DirectCall, val graph: Graph) {
   val proc: Procedure = call.target
   val paramCells: mutable.Map[Variable, Slice] =
     graph.params(proc).foldLeft(mutable.Map[Variable, Slice]()) { (m, reg) =>

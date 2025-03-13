@@ -11,13 +11,26 @@ import test_util.BASILTest
 import test_util.BASILTest.*
 import test_util.Histogram
 import test_util.TestConfig
+import test_util.LockManager
 import test_util.TestCustomisation
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
   */
 
-trait SystemTests extends AnyFunSuite, BASILTest, Retries, TestCustomisation {
+object SystemTests {
+
+  /** Locks are shared by all SystemTests instances. */
+  val locks = LockManager[String]()
+}
+
+trait SystemTests extends AnyFunSuite, BASILTest, TestCustomisation {
+
+  /**
+   * A suffix appended to output file names, in order to avoid clashes between test suites.
+   */
+  def testSuiteSuffix = "_" + this.getClass.getSimpleName
+
   case class TestResult(
     name: String,
     passed: Boolean,
@@ -154,14 +167,22 @@ trait SystemTests extends AnyFunSuite, BASILTest, Retries, TestCustomisation {
   def runTest(path: String, name: String, variation: String, conf: TestConfig): Unit = {
     val directoryPath = path + "/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
-    val inputPath = if conf.useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
-    val BPLPath = if conf.useBAPFrontend then variationPath + "_bap.bpl" else variationPath + "_gtirb.bpl"
+    val suiteSuffix = testSuiteSuffix
+
+    // input files:
+    val inputPath = variationPath + (if conf.useBAPFrontend then ".adt" else ".gts")
     val specPath = directoryPath + name + ".spec"
     val RELFPath = variationPath + ".relf"
-    val resultPath =
-      if conf.useBAPFrontend then variationPath + "_bap_result.txt" else variationPath + "_gtirb_result.txt"
-    val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
+
+    // output files:
+    val lifterString = if conf.useBAPFrontend then s"_bap" else s"_gtirb"
+    val BPLPath = variationPath + lifterString + suiteSuffix + ".bpl"
+    val resultPath = variationPath + lifterString + suiteSuffix + "_result.txt"
+
+    // reference file:
     val expectedOutPath = if conf.useBAPFrontend then variationPath + ".expected" else variationPath + "_gtirb.expected"
+
+    val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
 
     Logger.info(s"$name/$variation$testSuffix")
     val timer = PerformanceTimer(s"test $name/$variation$testSuffix")
@@ -227,7 +248,9 @@ trait SystemTests extends AnyFunSuite, BASILTest, Retries, TestCustomisation {
         translateTime,
         verifyTime
       )
-      testResults.append(result)
+      testResults.synchronized {
+        testResults.append(result)
+      }
     }
     if (!passed) fail(boogieFailureMsg.get)
   }
@@ -250,6 +273,7 @@ trait SystemTests extends AnyFunSuite, BASILTest, Retries, TestCustomisation {
 
 @test_util.tags.StandardSystemTest
 class SystemTestsBAP extends SystemTests {
+  override def testSuiteSuffix = ""
   runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true))
   runTests(
     "incorrect",
@@ -262,6 +286,7 @@ class SystemTestsBAP extends SystemTests {
 
 @test_util.tags.StandardSystemTest
 class SystemTestsGTIRB extends SystemTests {
+  override def testSuiteSuffix = ""
   runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, checkExpected = true, logResults = true))
   runTests(
     "incorrect",
@@ -275,6 +300,12 @@ class SystemTestsGTIRB extends SystemTests {
 @test_util.tags.Slow
 @test_util.tags.StandardSystemTest
 class ExtraSpecTests extends SystemTests {
+
+  override def customiseTestsByName(name: String) = super.customiseTestsByName(name).orElse {
+    name match {
+      case _ => Mode.Retry("timeout issues")
+    }
+  }
 
   // some of these tests have time out issues so they need more time, but some still time out even with this for unclear reasons
   val boogieFlags = Seq("/timeLimit:30", "/proverOpt:O:smt.array.extensional=false")
