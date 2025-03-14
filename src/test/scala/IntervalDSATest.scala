@@ -55,7 +55,7 @@ class IntervalDSATest extends AnyFunSuite {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set.empty))
+        dsaConfig = Some(DSAConfig(Set(Norm)))
       )
     )
   }
@@ -104,17 +104,7 @@ class IntervalDSATest extends AnyFunSuite {
     val basilResult = runTest(context)
     val main = basilResult.ir.program.mainProcedure
 
-    val result = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(inputFile = ".adt", relfFile = ".relf", specFile = None, dumpIL = None),
-        staticAnalysis = None,
-        boogieTranslation = BoogieGeneratorConfig(),
-        simplify = true,
-        context = Some(context),
-        dsaConfig = Some(DSAConfig(Set(Norm))),
-        outputPrefix = "boogie_out"
-      )
-    )
+    val result =  runTest(context)
 
     val dsg = result.dsa.get.local(main)
     val xPointerCells = dsg.exprToCells(xPointer)
@@ -124,7 +114,6 @@ class IntervalDSATest extends AnyFunSuite {
     assert(xAddressCells.size == 1)
     val xAddressCell = xAddressCells.head
     assert(xPointerCell.getPointee.equiv(xAddressCell))
-
   }
 
 }
