@@ -12,6 +12,7 @@ import translating.BAPToIR
 import util.{LogLevel, Logger}
 import util.IRLoading.{loadBAP, loadReadELF}
 import util.{ILLoadingConfig, IRContext, IRLoading, IRTransform}
+import test_util.CaptureOutput
 
 def load(s: InterpreterState, global: SpecGlobal): Option[BitVecLiteral] = {
   val f = NormalInterpreter
@@ -32,7 +33,7 @@ def mems[E, T <: Effects[T, E]](m: MemoryState): Map[BigInt, BitVecLiteral] = {
 }
 
 @test_util.tags.UnitTest
-class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
+class InterpreterTests extends AnyFunSuite with BeforeAndAfter with CaptureOutput {
 
   Logger.setLevel(LogLevel.WARN)
 
