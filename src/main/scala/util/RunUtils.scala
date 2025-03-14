@@ -37,6 +37,7 @@ import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
+import ir.transforms.MemoryTransform
 import util.DSAAnalysis.Norm
 import util.LogLevel.INFO
 
@@ -923,6 +924,8 @@ object RunUtils {
         DSATimer.checkPoint("Finished DSA TD Phase")
         DSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
+
+        visit_prog(MemoryTransform(DSATD), ctx.program)
         dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
     }
 
