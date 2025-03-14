@@ -2,6 +2,7 @@ package analysis.data_structure_analysis
 
 import analysis.*
 import ir.*
+import util.Counter
 import specification.{ExternalFunction, SymbolTableEntry}
 import boogie.SpecGlobal
 
@@ -35,8 +36,8 @@ class DataStructureAnalysis(
   params: Map[Procedure, Set[Variable]]
 ) extends Analysis[Map[Procedure, Graph]] {
 
-  private val nodeCounter = NodeCounter()
-  given NodeCounter = nodeCounter
+  private val counter = Counter()
+  given Counter = counter
 
   val local: mutable.Map[Procedure, Graph] = mutable.Map()
   val bottomUp: mutable.Map[Procedure, Graph] = mutable.Map()

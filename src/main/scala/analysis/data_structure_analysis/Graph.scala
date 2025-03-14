@@ -5,6 +5,7 @@ import analysis.solvers.DSAUnionFindSolver
 import analysis.evaluateExpression
 import cfg_visualiser.*
 import ir.*
+import util.Counter
 import specification.{ExternalFunction, FuncEntry, SymbolTableEntry}
 import boogie.SpecGlobal
 
@@ -26,7 +27,7 @@ import scala.util.control.Breaks.{break, breakable}
   * @param writesTo
   * @param params
   */
-class Graph(using NodeCounter)(
+class Graph(using Counter)(
   val proc: Procedure,
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
   varToSym: Map[CFGPosition, Map[Variable, Set[SymbolicAddress]]],
