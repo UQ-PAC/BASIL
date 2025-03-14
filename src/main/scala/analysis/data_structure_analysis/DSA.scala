@@ -8,23 +8,6 @@ import java.io.File
 
 import scala.collection.{SortedSet, mutable}
 
-trait Counter(val init: Int = 0) {
-  private var counter = init
-  def increment(by: Int = 1): Int = {
-    counter += by
-    counter
-  }
-
-  def decrement(by: Int = 1): Int = {
-    counter -= by
-    counter
-  }
-
-  def get: Int = counter
-
-  def reset(): Unit = counter = init
-}
-
 enum DSAPhase {
   case Pre, Local, BU, TD
 }

@@ -13,7 +13,7 @@ import util.{DSALogger, IRContext, IntervalDSALogger as Logger}
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{SortedSet, mutable}
 
-object IntervalNodeCounter extends Counter
+private val intervalNodeCounter = util.Counter()
 
 case class NodeTerm(v: IntervalNode) extends analysis.solvers.Var[NodeTerm]
 
@@ -678,7 +678,7 @@ class IntervalNode(
   val graph: IntervalGraph,
   val bases: mutable.Map[SymBase, Int] = mutable.Map.empty,
   val size: Option[Int] = None,
-  val id: Int = IntervalNodeCounter.increment()
+  val id: Int = intervalNodeCounter.next().toInt
 ) {
   Logger.debug(s"created node with id $id")
 
@@ -915,9 +915,9 @@ object IntervalCell {
 
 /**
  * A data structure cell
- * @param node the node this cell belongs to 
+ * @param node the node this cell belongs to
  * @param interval the interval of the cell
- * 
+ *
  * Additionally may have a pointee only cells in the node have their pointees updated
  * All pointee operations (set, remove, hasPointee) on
  * dummy cells (old slices) are treated as operations on their corresponding cell in the node
