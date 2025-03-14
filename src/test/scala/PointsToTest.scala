@@ -13,7 +13,7 @@ import java.nio.file.attribute.BasicFileAttributes
 import ir.dsl.*
 
 @test_util.tags.DisabledTest
-class PointsToTest extends AnyFunSuite with OneInstancePerTest {
+class PointsToTest extends AnyFunSuite with test_util.CaptureOutput with OneInstancePerTest {
 
   def runAnalyses(
     program: Program,

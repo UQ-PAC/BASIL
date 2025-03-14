@@ -6,7 +6,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest
 
 @test_util.tags.UnitTest
-class TaintAnalysisTests extends AnyFunSuite, BASILTest {
+class TaintAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
   def getTaintAnalysisResults(
     program: Program,
     taint: Map[CFGPosition, Set[Taintable]]
