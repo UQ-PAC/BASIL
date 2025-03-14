@@ -32,7 +32,10 @@ import util.RunUtils.loadAndTranslate
 import scala.collection.mutable
 
 @test_util.tags.StandardSystemTest
-class ConstPropInterpreterValidate extends AnyFunSuite with test_util.CaptureOutput with TestValueDomainWithInterpreter[FlatElement[BitVecLiteral]] {
+class ConstPropInterpreterValidate
+    extends AnyFunSuite
+    with test_util.CaptureOutput
+    with TestValueDomainWithInterpreter[FlatElement[BitVecLiteral]] {
 
   Logger.setLevel(LogLevel.ERROR)
 

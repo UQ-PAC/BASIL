@@ -8,6 +8,8 @@ import java.io.FileNotFoundException;
 import java.io.PrintStream;
 import java.io.IOException;
 
+// taken, with modifications and simplifications from: https://barzeer.github.io/java/thread_sys_out.html
+
 /** A ThreadPrintStream replaces the normal System.out and
  * ensures that output to System.out goes to a different
  * PrintStream for each thread. It does this by using
