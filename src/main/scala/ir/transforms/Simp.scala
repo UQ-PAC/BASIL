@@ -11,7 +11,8 @@ import ir.*
 
 import scala.collection.mutable
 import analysis.*
-import analysis.data_structure_analysis.IntervalGraph
+import analysis.data_structure_analysis.{IntervalCell, IntervalGraph}
+import ir.transforms.MemoryTransform.cellToLocalVars
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -1420,7 +1421,6 @@ def findDefinitelyExits(p: Program) = {
   )
 }
 
-
 class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
   override def vstmt(e: Statement) = {
     if dsa.contains(e.parent.parent) then
@@ -1431,15 +1431,28 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
           val index = indices.head
           assert(index.hasPointee)
           val value = index.getPointee
-          val rhs = LocalVar(value.toString, BitVecType(value.interval.size.getOrElse(64)))
-          val localAssign = LocalAssign(load.lhs, rhs)
-          ChangeTo(List(localAssign))
+          val rhss = cellToLocalVars(value, load.lhs.irType)
+          val localAssigns = rhss.foldLeft(List[LocalAssign]()) {
+            (s, rhs) => s.appended(LocalAssign(load.lhs, rhs, load.label))
+          }
+          ChangeTo(localAssigns)
         case store: MemoryStore =>
           ChangeTo(List(store))
         case _ => SkipChildren()
     else SkipChildren()
   }
 }
+
+
+object MemoryTransform {
+  def cellToLocalVars(cell: IntervalCell, irType: IRType): Iterable[LocalVar] = {
+    cell.node.bases
+      .filter((base, offset) => offset < cell.interval.end.get)
+      .map((base, offset) => (base, cell.interval.move(i => i - offset)))
+      .map(pair => LocalVar(pair.toString, irType))
+  } 
+}
+
 class Simplify(val res: Variable => Option[Expr], val initialBlock: Block = null) extends CILVisitor {
 
   var madeAnyChange = false
