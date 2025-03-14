@@ -636,8 +636,42 @@ object InterpFuns {
         // perform call and push return stack frame and continuation
 
         val intrinsicName = target.map(_.procName).getOrElse(proc.name)
-        if (LibcIntrinsic.intrinsics.contains(intrinsicName)) {
-          f.call(intrinsicName, Intrinsic(intrinsicName), ReturnFrom(proc))
+        if (LibcIntrinsic.intrinsicSigs.contains(intrinsicName)) {
+          val intrinsic = LibcIntrinsic.intrinsicSigs(intrinsicName)
+          // TODO if actual.isEmpty then load registes
+          val actual = actualParams.toMap
+
+          for {
+            params: List[BasilValue] <-
+              (if (actualParams.nonEmpty) {
+                 // we were passed a list of parameters
+                 State.mapM(
+                   (p: LocalVar) =>
+                     actual.get(p) match {
+                       case Some(v) => State.pure[S, BasilValue, InterpreterError](Scalar(v))
+                       case None => State.setError(Errored(s"Undefined intrinsic param $p in call $targetProc"))
+                     },
+                   intrinsic.formalInParam
+                 )
+               } else {
+                 // likely not in parameter form, load registers
+                 State.mapM((p: LocalVar) => f.loadVar(p.name.stripSuffix("_in")), intrinsic.formalInParam)
+               })
+
+            returnval <- f.callIntrinsic(intrinsic.name, params.toList)
+            // _ <- f.doReturn()
+            outparam = (returnval, proc.formalOutParam) match {
+              case (_, Nil) => Map()
+              case (Some(returnval), h :: Nil) => Map(h -> returnval)
+              case (Some(returnval), h :: tl) =>
+                Map(h -> returnval) ++ tl.map(t => t -> Scalar(BitVecLiteral(1234, size(t).get))).toMap
+              case (None, rs) => rs.map(t => t -> Scalar(BitVecLiteral(1234, size(t).get))).toMap
+            }
+            stores = outparam.map(m => f.storeVar(m._1.name, m._1.toBoogie.scope, m._2))
+            // store out params
+            x <- State.sequence(State.pure(()), stores)
+            x <- f.setNext(ReturnFrom(proc))
+          } yield (())
         } else if (target.exists(_.entryBlock.isDefined)) {
           val block = target.get.entryBlock.get
           f.call(target.get.name, Run(IRWalk.firstInBlock(block)), ReturnFrom(proc))
@@ -655,11 +689,12 @@ object InterpFuns {
     for {
       r <- call
       ret <- evalInterpreter(f, interpretContinuation(f))
+      n <- f.getNext
       rv <-
         if (ret.isDefined) {
           ret.get match {
             case InterpretReturn.ReturnVal(v) => State.pure(v)
-            case v => State.setError(Errored(s"Call didn't return value (got $v) $proc"))
+            case v => State.setError(Errored(s"Call didn't return value (got $v) $proc $n"))
           }
         } else {
           State.setError(Errored(s"Call to pure function should have returned a value, $proc"))

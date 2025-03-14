@@ -365,6 +365,28 @@ object LibcIntrinsic {
     _ <- s.doReturn()
   } yield (())
 
+  val r0_out = LocalVar("R0_out", BitVecType(64))
+  val r0 = LocalVar("R0_in", BitVecType(64))
+  val r1 = LocalVar("R0_in", BitVecType(64))
+
+  def intrinsicSigs = Map(
+    "putc" -> ProcSig("putc", List(r0), List()),
+    "puts" -> ProcSig("puts", List(r0), List()),
+    "printf" -> ProcSig("print", List(r0), List()),
+    "write" -> ProcSig("write", List(r0, r1), List()),
+    "malloc" -> ProcSig("malloc", List(r0), List(r0_out)),
+    "__libc_malloc_impl" -> ProcSig("malloc", List(r0), List(r0_out)),
+    "free" -> ProcSig("free", List(r0), List()),
+    "#free" -> ProcSig("free", List(r0), List()),
+    "calloc" -> ProcSig("calloc", List(r0), List()),
+    "strlen" -> ProcSig("strlen", List(r0), List(r0))
+  )
+
+  // def callIntrinsic(sig: ProcSig, actual: List[BasilValue]) = {
+  //def callIntrinsic[S, E, T <: Effects[S, E]](s: T)(name: String, params: List[BasilValue]): State[S, Unit, E] =
+  //  s.callIntrinsic(name, actual)
+  //}
+
   def intrinsics[S, T <: Effects[S, InterpreterError]] =
     Map[String, T => State[S, Unit, InterpreterError]](
       "putc" -> singleArg("putc"),
@@ -487,7 +509,9 @@ object IntrinsicImpl {
 case class InterpreterState(
   val nextCmd: ExecutionContinuation = Stopped(),
   val callStack: List[ExecutionContinuation] = List.empty,
-  val memoryState: MemoryState = MemoryState()
+  val memoryState: MemoryState = MemoryState().pushStackFrame("entryinit")
+
+
 )
 
 /** Implementation of Effects for InterpreterState concrete state representation.
