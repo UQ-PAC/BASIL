@@ -29,14 +29,16 @@ import analysis.data_structure_analysis.{
   Constraint,
   DataStructureAnalysis,
   Graph,
+  Global,
   IntervalDSA,
   IntervalGraph,
+  SymBase,
   SymbolicAddress,
   SymbolicAddressAnalysis,
   SymbolicValues,
   computeDSADomain,
   generateConstraints,
-  getSymbolicValues
+  getSymbolicValues,
 }
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
@@ -914,7 +916,19 @@ object RunUtils {
         DSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
 
-        visit_prog(MemoryTransform(DSATD), ctx.program)
+        // collect all the regions all the resulting graphs
+        val regions = DSATD.values.flatMap(_.nodes.keySet)
+
+        def checkConsistentRegions(base: SymBase) = {
+          val regions = DSATD
+            .filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
+            .map((proc, graph) => (proc, graph.find(graph.nodes(base)).bases.keySet))
+          assert(regions.values.toSet.size == 1, s"$base was inconsistent")
+        }
+
+        regions.foreach(checkConsistentRegions)
+
+//        visit_prog(MemoryTransform(DSATD), ctx.program)
         dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
     }
 
