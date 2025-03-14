@@ -26,7 +26,7 @@ import util.DSAAnalysis.Norm
 import java.io.{BufferedWriter, File, FileWriter}
 
 @test_util.tags.AnalysisSystemTest
-class IndirectCallTests extends AnyFunSuite, BASILTest, TestCustomisation {
+class IndirectCallTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest, TestCustomisation {
 
   override def customiseTestsByName(name: String) = name match {
     case "indirect_call_outparam/clang:BAP" | "indirect_call_outparam/clang:GTIRB" | "indirect_call_outparam/gcc:BAP" |

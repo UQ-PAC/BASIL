@@ -24,7 +24,7 @@ object SystemTests {
   val locks = LockManager[String]()
 }
 
-trait SystemTests extends AnyFunSuite, BASILTest, TestCustomisation {
+trait SystemTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest, TestCustomisation {
 
   /**
    * A suffix appended to output file names, in order to avoid clashes between test suites.

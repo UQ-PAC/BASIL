@@ -28,7 +28,7 @@ import translating.PrettyPrinter.*
   * the set of graphs from the end of the top-down phase
   */
 @test_util.tags.UnitTest
-class DataStructureAnalysisTest extends AnyFunSuite {
+class DataStructureAnalysisTest extends AnyFunSuite with test_util.CaptureOutput {
 
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)

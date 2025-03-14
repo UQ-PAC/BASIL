@@ -10,7 +10,7 @@ import util.*
 import scala.collection.immutable.{AbstractSeq, LinearSeq}
 
 @test_util.tags.UnitTest
-class SVATest extends AnyFunSuite {
+class SVATest extends AnyFunSuite with test_util.CaptureOutput {
 
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)

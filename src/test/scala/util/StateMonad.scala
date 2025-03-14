@@ -13,7 +13,7 @@ import util.ILLoadingConfig
 def add: State[Int, Unit, Unit] = State(s => (s + 1, Right(())))
 
 @test_util.tags.UnitTest
-class StateMonadTest extends AnyFunSuite {
+class StateMonadTest extends AnyFunSuite with test_util.CaptureOutput {
 
   test("forcompre") {
     val s = for {

@@ -33,7 +33,7 @@ def mems[E, T <: Effects[T, E]](m: MemoryState): Map[BigInt, BitVecLiteral] = {
 }
 
 @test_util.tags.UnitTest
-class InterpreterTests extends AnyFunSuite with BeforeAndAfter with CaptureOutput {
+class InterpreterTests extends AnyFunSuite with test_util.CaptureOutput with BeforeAndAfter {
 
   Logger.setLevel(LogLevel.WARN)
 

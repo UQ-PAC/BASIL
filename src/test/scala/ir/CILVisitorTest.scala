@@ -52,7 +52,7 @@ class AddGammas extends CILVisitor {
 }
 
 @test_util.tags.UnitTest
-class CILVisitorTest extends AnyFunSuite {
+class CILVisitorTest extends AnyFunSuite with test_util.CaptureOutput {
 
   def getRegister(name: String) = Register(name, 64)
   test("trace prog") {

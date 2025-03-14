@@ -14,7 +14,7 @@ object ScalatestPrettierTest {
 }
 
 @test_util.tags.UnitTest
-class ScalatestPrettierTest extends AnyFunSuite {
+class ScalatestPrettierTest extends AnyFunSuite with test_util.CaptureOutput {
 
   import ScalatestPrettierTest.*
 

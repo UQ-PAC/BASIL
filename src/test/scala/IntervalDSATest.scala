@@ -22,7 +22,7 @@ import util.{
 }
 
 @test_util.tags.UnitTest
-class IntervalDSATest extends AnyFunSuite {
+class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program)
