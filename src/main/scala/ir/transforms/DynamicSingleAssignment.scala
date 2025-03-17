@@ -69,10 +69,10 @@ class OnePassDSA(
   ): Unit = {
     def st(b: Block) = withDefault(state)(b)
 
-    var renames = st(block).renamesBefore
+    var renames = st(block).renamesBefore.toMap
 
     for (s <- block.statements) {
-      visit_stmt(StmtRenamer(Map(), renames.toMap), s)
+      visit_stmt(StmtRenamer(Map(), renames), s)
       s match {
         case d: Assign => {
           val vars = d.assignees
@@ -86,7 +86,7 @@ class OnePassDSA(
       }
     }
 
-    visit_jump(StmtRenamer(Map(), renames.toMap), block.jump)
+    visit_jump(StmtRenamer(Map(), renames), block.jump)
     st(block).renamesAfter.addAll(renames)
     st(block).filled = true
 
