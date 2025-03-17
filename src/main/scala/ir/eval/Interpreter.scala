@@ -383,7 +383,6 @@ object LibcIntrinsic {
     "strlen" -> ProcSig("strlen", List(r0), List(r0))
   )
 
-
 }
 
 object IntrinsicImpl {
@@ -492,8 +491,6 @@ case class InterpreterState(
   val nextCmd: ExecutionContinuation = Stopped(),
   val callStack: List[ExecutionContinuation] = List.empty,
   val memoryState: MemoryState = MemoryState().pushStackFrame("entryinit")
-
-
 )
 
 /** Implementation of Effects for InterpreterState concrete state representation.

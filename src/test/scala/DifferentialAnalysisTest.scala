@@ -135,7 +135,6 @@ abstract class DifferentialTest extends AnyFunSuite, TestCustomisation {
   }
 }
 
-
 /**
  * Disable analysis differential test because it makes no 
  * IR transforms, these examples contain no indirect calls.
