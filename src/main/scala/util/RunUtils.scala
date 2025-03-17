@@ -903,6 +903,7 @@ object RunUtils {
 
       if config.analyses.contains(Norm) then
         DSALogger.info("Finished Computing Constraints")
+        val globalGraph = IntervalDSA.getLocal(ctx.program.mainProcedure, ctx, SymbolicValues.empty, Set[Constraint]())
         val DSA = IntervalDSA.getLocals(ctx, sva, cons)
         DSATimer.checkPoint("Finished DSA Local Phase")
         DSA.values.foreach(_.localCorrectness())
@@ -915,8 +916,14 @@ object RunUtils {
         DSATimer.checkPoint("Finished DSA TD Phase")
         DSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
+        DSATD.values.foreach(g => globalGraph.globalTransfer(g, globalGraph))
+        DSATD.values.foreach(g => globalGraph.globalTransfer(globalGraph, g))
+        DSATimer.checkPoint("Finished DSA global graph")
+        DSATD.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness check")
 
-        // collect all the regions all the resulting graphs
+
+        // collect all the regions  from all the resulting graphs
         val regions = DSATD.filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
           .values.flatMap(_.nodes.keySet)
 
@@ -926,19 +933,20 @@ object RunUtils {
             .filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
             .filter((proc, graph) => graph.nodes.contains(base))
             .map((proc, graph) => (proc, graph.find(graph.nodes(base)).bases.keySet))
-          if base != Global && regions.values.toSet.size != 1 then
+          if (regions.values.toSet.size != 1) {
             val seen = mutable.Map[Procedure, Set[SymBase]]()
             regions.foreach((proc, bases) =>
               if !seen.values.toSet.contains(bases) && bases.diff(seen.values.flatten.toSet).nonEmpty then
                 seen.update(proc, bases.diff(seen.values.flatten.toSet).toSet)
             )
-            throw Exception(s"$base was inconsistent with $seen")
+            throw Exception(s"$base was inconsistent with $seen") 
+          }
+           
           regions
         }
 
         regions.foreach(r => checkConsistentRegions(r))
 
-//        writeToFile(results, "helper.txt")
 
 //        visit_prog(MemoryTransform(DSATD), ctx.program)
         dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
