@@ -841,6 +841,7 @@ class IntervalNode(
       val collapseNode: IntervalNode = IntervalNode(graph, bases, size)
       collapseNode.children.addAll(this.children)
       collapseNode.children.add(this.id)
+      collapseNode.flags.join(this.flags)
       var collapsedCell: IntervalCell = collapseNode.add(0)
       collapseNode._collapsed = Some(collapsedCell)
       // delay unification
