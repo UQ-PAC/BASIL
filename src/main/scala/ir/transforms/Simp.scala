@@ -1426,10 +1426,9 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
       e match
         case load: MemoryLoad =>
           val indices = dsa(e.parent.parent).exprToCells(load.index)
-          assert(indices.size == 1, indices.size.toString + load.index)
-          val index = indices.head
-          assert(index.hasPointee)
-          val value = index.getPointee
+          assert(indices.forall(_.hasPointee))
+          assert(indices.map(_.getPointee).size == 1)
+          val value = indices.map(_.getPointee).head
           val varName =  value.node.bases.keySet.toString() + value.interval
           val rhs = if value.node.flags.global || value.node.flags.heap then
             MemoryVar(varName, load.size)
@@ -1438,10 +1437,9 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
           ChangeTo(List(localAssign))
         case store: MemoryStore =>
           val indices = dsa(e.parent.parent).exprToCells(store.index)
-          assert(indices.size == 1, store.index)
-          val index = indices.head
-          assert(index.hasPointee)
-          val content = index.getPointee
+          assert(indices.forall(_.hasPointee))
+          assert(indices.map(_.getPointee).size == 1)
+          val content = indices.map(_.getPointee).head
           val varName =  content.node.bases.keySet.toString() + content.interval
           val assign = if content.node.flags.global || content.node.flags.heap then
             val lhs = MemoryVar(varName, store.size)
