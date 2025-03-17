@@ -77,7 +77,7 @@ abstract class DifferentialTest extends AnyFunSuite, TestCustomisation {
     def filterEvents(trace: Iterable[ExecEffect]) = {
       trace.collect {
         // Ignore calls to allow inlining etc
-       // case e @ ExecEffect.Call(tgt, _, _) => ExecEffect.Call(tgt, ErrorStop(Errored("placeholder")), ErrorStop(Errored("placeholder")))
+        // case e @ ExecEffect.Call(tgt, _, _) => ExecEffect.Call(tgt, ErrorStop(Errored("placeholder")), ErrorStop(Errored("placeholder")))
         case e @ ExecEffect.StoreMem("mem", _) => e
         case e @ ExecEffect.LoadMem("mem", _) => e
       }
@@ -106,14 +106,15 @@ abstract class DifferentialTest extends AnyFunSuite, TestCustomisation {
     testName: String,
     examplePath: String,
     suffix: String = ".adt",
-    staticAnalysisConfig: StaticAnalysisConfig = StaticAnalysisConfig(None, None, None),
+    staticAnalysisConfig: Option[StaticAnalysisConfig] = Some(StaticAnalysisConfig(None, None, None)),
     simplify: Boolean = false
   ) = {
 
     val loading = ILLoadingConfig(
       inputFile = examplePath + testName + suffix,
       relfFile = examplePath + testName + ".relf",
-      dumpIL = None
+      dumpIL = None,
+      trimEarly = true /* no instances of indirectcalls in these examples */
     )
 
     var ictx = IRLoading.load(loading)
@@ -126,12 +127,14 @@ abstract class DifferentialTest extends AnyFunSuite, TestCustomisation {
 
     ir.transforms.clearParams(comparectx.program)
 
-    val analysisres = RunUtils.staticAnalysis(staticAnalysisConfig, comparectx)
+    for (analysis <- staticAnalysisConfig) {
+      RunUtils.staticAnalysis(analysis, comparectx)
+    }
 
     if (simplify) {
       ictx = ir.transforms.liftProcedureCallAbstraction(ictx)
       comparectx = ir.transforms.liftProcedureCallAbstraction(comparectx)
-      RunUtils.doSimplify(ictx, Some(staticAnalysisConfig))
+      RunUtils.doSimplify(ictx, staticAnalysisConfig)
     }
 
     diffTest(ictx, comparectx)
@@ -192,12 +195,24 @@ class DifferentialAnalysisTestSimplification extends DifferentialTest {
         val gtirbPath = path + "/" + p + "/" + variation + "/" + p + ".gts"
         if (File(bapPath).exists) {
           test("analysis_differential:" + p + "/" + variation + ":BAP") {
-            testProgram(p, path + "/" + p + "/" + variation + "/", suffix = ".adt", simplify=true)
+            testProgram(
+              p,
+              path + "/" + p + "/" + variation + "/",
+              suffix = ".adt",
+              simplify = true,
+              staticAnalysisConfig = None
+            )
           }
         }
         if (File(gtirbPath).exists) {
           test("analysis_differential:" + p + "/" + variation + ":GTIRB") {
-            testProgram(p, path + "/" + p + "/" + variation + "/", suffix = ".gts", simplify=true)
+            testProgram(
+              p,
+              path + "/" + p + "/" + variation + "/",
+              suffix = ".gts",
+              simplify = true,
+              staticAnalysisConfig = None
+            )
           }
         }
 
