@@ -948,7 +948,7 @@ object RunUtils {
         regions.foreach(r => checkConsistentRegions(r))
 
 
-//        visit_prog(MemoryTransform(DSATD), ctx.program)
+        visit_prog(MemoryTransform(DSATD), ctx.program)
         dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
     }
 
