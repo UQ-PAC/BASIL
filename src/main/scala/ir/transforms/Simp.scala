@@ -12,7 +12,7 @@ import ir.*
 import scala.collection.mutable
 import analysis.*
 import analysis.data_structure_analysis.{IntervalCell, IntervalGraph}
-import ir.transforms.MemoryTransform.cellToLocalVars
+import ir.transforms.MemoryTransform.{cellToLocalVar }
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -1428,15 +1428,18 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
           val index = indices.head
           assert(index.hasPointee)
           val value = index.getPointee
-          val rhss = cellToLocalVars(value, load.lhs.irType)
-          val localAssigns = rhss.foldLeft(List[LocalAssign]()) {
-            (s, rhs) => s.appended(LocalAssign(load.lhs, rhs, load.label))
-          }
-          assert(localAssigns.nonEmpty)
-          DSALogger.info(localAssigns)
-//          ChangeTo(List(load))
-          ChangeTo(localAssigns)
+          val rhs = cellToLocalVar(value, load.lhs.irType)
+          val localAssign = MemoryAssign(load.lhs, rhs, load.label)
+          ChangeTo(List(localAssign))
         case store: MemoryStore =>
+          val indices = dsa(e.parent.parent).exprToCells(store.index)
+          assert(indices.size == 1, store.index)
+          val index = indices.head
+          assert(index.hasPointee)
+          val value = index.getPointee
+          val lhs = cellToLocalVar(value, store.value.getType)
+          val localAssign = MemoryAssign(lhs, store.value, store.label)
+          ChangeTo(List(localAssign))
           ChangeTo(List(store))
         case _ => SkipChildren()
     else SkipChildren()
@@ -1445,11 +1448,8 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
 
 
 object MemoryTransform {
-  def cellToLocalVars(cell: IntervalCell, irType: IRType): Iterable[LocalVar] = {
-    cell.node.bases
-      .filter((base, offset) => offset < cell.interval.end.get)
-      .map((base, offset) => (base, cell.interval.move(i => i - offset)))
-      .map(pair => LocalVar(pair.toString, irType))
+  def cellToLocalVar(cell: IntervalCell, irType: IRType): LocalVar = {
+    LocalVar(cell.node.bases.keySet.toString() + cell.interval, irType)
   } 
 }
 
