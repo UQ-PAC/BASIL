@@ -35,7 +35,7 @@ case class Stopped() extends ExecutionContinuation /* normal program stop  */
 case class ErrorStop(error: InterpreterError) extends ExecutionContinuation /* program stop in error state */
 case class Run(next: Command) extends ExecutionContinuation /* continue by executing next command */
 case class ReturnFrom(target: ProcSig) extends ExecutionContinuation /* return from a call without continuing */
-case class Intrinsic(name: String) extends ExecutionContinuation /* a named intrinsic instruction */
+case class Intrinsic(target: ProcSig) extends ExecutionContinuation /* a named intrinsic instruction */
 
 sealed trait InterpreterError
 case class FailedAssertion(a: Assert) extends InterpreterError
@@ -382,6 +382,8 @@ object LibcIntrinsic {
     "calloc" -> ProcSig("calloc", List(r0), List()),
     "strlen" -> ProcSig("strlen", List(r0), List(r0))
   )
+
+
 }
 
 object IntrinsicImpl {

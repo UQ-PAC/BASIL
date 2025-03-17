@@ -309,7 +309,7 @@ object InterpFuns {
       next <- f.getNext
       _ <- State.pure(Logger.debug(s"$next"))
       r: Next[InterpretReturn] <- (next match {
-        case Intrinsic(tgt) => LibcIntrinsic.intrinsics(tgt)(f).map(_ => Next.Continue)
+        case Intrinsic(tgt) => callProcedure(f)(tgt, List()).map(ret => Next.Stop(InterpretReturn.ReturnVal(ret)))
         case Run(c: Statement) => interpretStatement(f)(c).map(_ => Next.Continue)
         case ReturnFrom(c) => evaluateReturn(f)(c).map(v => Next.Stop(InterpretReturn.ReturnVal(v)))
         case Run(c: Jump) => interpretJump(f)(c).map(_ => Next.Continue)
@@ -460,10 +460,19 @@ object InterpFuns {
         } else {
           for {
             addr <- Eval.evalBV(f)(ic.target)
-            fp <- f.evalAddrToProc(addr.value.toInt)
-            _ <- fp match {
-              case Some(fp) => f.call(fp.name, fp.call, Run(ic.successor))
-              case none => State.setError(EscapedControlFlow(ic))
+            block = ic.parent.parent.blocks.find(_.address.contains(addr.value))
+            _ <- block match {
+              case Some(b: Block) => {
+                f.setNext(Run(IRWalk.firstInBlock(b)))
+              }
+              case None =>
+                for {
+                  fp <- f.evalAddrToProc(addr.value.toInt)
+                  _ <- fp match {
+                    case Some(fp) => f.call(fp.name, fp.call, Run(ic.successor))
+                    case none => State.setError(EscapedControlFlow(ic))
+                  }
+                } yield (())
             }
           } yield ()
         }
@@ -485,9 +494,9 @@ object InterpFuns {
       addr
     }
 
-    for ((fname, fun) <- LibcIntrinsic.intrinsics) {
+    for ((fname, funSig) <- LibcIntrinsic.intrinsicSigs) {
       val name = fname.takeWhile(c => c != '@')
-      x = (name, FunPointer(BitVecLiteral(newAddr(), 64), name, Intrinsic(name))) :: x
+      x = (name, FunPointer(BitVecLiteral(newAddr(), 64), name, Intrinsic(funSig))) :: x
     }
 
     val intrinsics = x.toMap

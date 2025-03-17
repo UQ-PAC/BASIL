@@ -1536,9 +1536,6 @@ def fixupGuards(p: Program) = {
 
   for (bl <- concerning) {
     val assume = findAssume(bl)
-    if (assume.isEmpty) {
-      println("no assume " + bl.label)
-    }
     for (a <- assume) {
       bl.statements.prepend(a)
     }
