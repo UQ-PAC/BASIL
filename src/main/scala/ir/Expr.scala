@@ -370,6 +370,19 @@ case class Register(override val name: String, size: Int) extends Variable with 
   override val irType: BitVecType = BitVecType(size)
 }
 
+case class MemoryVar(override val name: String, size: Int) extends Variable with Global {
+  override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Global)
+  override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Global)
+  override def toString: String = s"MemoryVar(${name}, $irType)"
+  override def acceptVisit(visitor: Visitor): Variable = visitor.visitMemoryVar(this)
+  override val irType: BitVecType = BitVecType(size)
+}
+
+object MemoryVar {
+  def unapply(m: MemoryVar): Some[(String, IRType)] = Some((m.name, m.irType))
+}
+
+
 /** Variable with scope local to the procedure, typically a temporary variable created in the lifting process. */
 case class LocalVar(varName: String, override val irType: IRType, val index: Int = 0)
     extends Variable
