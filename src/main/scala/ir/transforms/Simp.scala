@@ -2,7 +2,7 @@ package ir.transforms
 import translating.serialiseIL
 import translating.PrettyPrinter.*
 import specification.FuncEntry
-import util.SimplifyLogger
+import util.{DSALogger, SimplifyLogger}
 import ir.eval.AlgebraicSimplifications
 import ir.eval.AssumeConditionSimplifications
 import ir.eval.simplifyExprFixpoint
@@ -1432,6 +1432,9 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
           val localAssigns = rhss.foldLeft(List[LocalAssign]()) {
             (s, rhs) => s.appended(LocalAssign(load.lhs, rhs, load.label))
           }
+          assert(localAssigns.nonEmpty)
+          DSALogger.info(localAssigns)
+//          ChangeTo(List(load))
           ChangeTo(localAssigns)
         case store: MemoryStore =>
           ChangeTo(List(store))
