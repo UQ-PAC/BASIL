@@ -201,8 +201,8 @@ class IntervalGraph(
 
   }
 
-  def callTransfer(phase: DSAPhase, cons: DirectCallConstraint, source: IntervalGraph, target: IntervalGraph): Unit = {
-    require(phase == TD || phase == BU)
+  def globalTransfer(source: IntervalGraph, target: IntervalGraph): Unit = {
+    DSALogger.info(s"cloning globalNode from ${source.proc.procName}")
     val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
     val targetGlobal = target.find(target.nodes(Global).get(0))
     var sourceGlobal = source.find(source.nodes(Global).get(0))
@@ -211,6 +211,17 @@ class IntervalGraph(
 
     sourceGlobal = globalNode.get(targetGlobal.interval)
     target.mergeCells(sourceGlobal, targetGlobal)
+  }
+  def callTransfer(phase: DSAPhase, cons: DirectCallConstraint, source: IntervalGraph, target: IntervalGraph): Unit = {
+    require(phase == TD || phase == BU)
+    val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
+//    val targetGlobal = target.find(target.nodes(Global).get(0))
+//    var sourceGlobal = source.find(source.nodes(Global).get(0))
+//    val old = source.nodes(Global).clone(target, false, oldToNew)
+//    val globalNode = sourceGlobal.node.clone(target, true, oldToNew)
+//
+//    sourceGlobal = globalNode.get(targetGlobal.interval)
+//    target.mergeCells(sourceGlobal, targetGlobal)
     DSALogger.info(s"cloning ${source.proc.procName} into ${target.proc.procName}, $phase")
     cons.inParams.filter(f => cons.target.formalInParam.contains(f._1)).foreach { case (formal, actual) =>
       val (sourceExpr, targetExpr) = if phase == TD then (actual, formal) else (formal, actual)
