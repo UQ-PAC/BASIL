@@ -506,7 +506,7 @@ class IntervalGraph(
     val updatedBases = stableNode.bases ++ (nodeToBeMoved.bases.view.mapValues(f => f + delta))
     val resultNode = IntervalNode(this, updatedBases)
     Logger.debug(s"created result node with id ${resultNode.id}")
-    resultNode.children.addAll(stableNode.children ++ nodeToBeMoved.children + stableNode.id + nodeToBeMoved.id)
+    resultNode.children.addAll(stableNode.children ++ nodeToBeMoved.children ++ Set(stableNode.id, nodeToBeMoved.id))
     resultNode.flags.join(stableNode.flags)
     resultNode.flags.join(nodeToBeMoved.flags)
     val queue: mutable.Queue[IntervalCell] = mutable.Queue(allCells: _*)
@@ -804,7 +804,8 @@ class IntervalNode(
     if (!(node.isCollapsed)) {
       val oldPointees = cells.filter(_.hasPointee).map(_.getPointee)
       val collapseNode: IntervalNode = IntervalNode(graph, bases, size)
-      collapseNode.children.addAll(this.children + this.id)
+      collapseNode.children.addAll(this.children)
+      collapseNode.children.add(this.id)
       var collapsedCell: IntervalCell = collapseNode.add(0)
       collapseNode._collapsed = Some(collapsedCell)
       // delay unification
