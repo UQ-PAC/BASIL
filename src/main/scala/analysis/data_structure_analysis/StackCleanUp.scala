@@ -28,6 +28,8 @@ enum StackStatus(maintained: Boolean = false, size: Option[Int] = None) {
       case (_, MaintainedNoSize) => MaintainedNoSize
       case (MaintainedWithSize(size1), MaintainedWithSize(size2)) =>
         MaintainedWithSize(math.max(size1, size2))
+      case (Bot, x) => x
+      case (x, Bot) => x
   }
 
   def move(f: Int => Int): StackStatus = {
