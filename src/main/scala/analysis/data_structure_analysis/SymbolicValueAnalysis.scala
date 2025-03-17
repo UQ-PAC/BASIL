@@ -26,7 +26,10 @@ sealed trait SymBase
 sealed trait Known extends SymBase
 
 case class Heap(call: DirectCall) extends Known {
-  assert(call.target.name.startsWith("malloc"), "Expected a call to malloc")
+  assert(
+    call.target.name.startsWith("malloc") || call.target.name.startsWith("calloc"),
+    "Expected a call to malloc-like function"
+  )
   private val procName = call.parent.parent.name
   private val label = labelToPC(call.label)
   override def toString: String = s"Heap(${procName}_$label)"
@@ -321,16 +324,14 @@ class SymbolicValueDomain extends AbstractDomain[SymbolicValues] {
       case load @ MemoryLoad(lhs: LocalVar, _, rhs, _, size, label) =>
         val update = SymbolicValues(Map(lhs -> SymValueSet(Loaded(load))))
         a.join(update)
-      case mal @ DirectCall(target, outParams, inParams, label) if target.name.startsWith("malloc") =>
+      case mal @ DirectCall(target, outParams, inParams, label)
+          if target.name.startsWith("malloc") || target.name.startsWith("calloc") =>
         val (malloc, others) = outParams.values
           .map(_.asInstanceOf[LocalVar])
           .partition(outParam => outParam.name.startsWith("R0")) // malloc ret R0
         assert(malloc.size == 1, s"SVA expected only one R0 returned from $mal")
         val update = SymbolicValues( // assume call to malloc only changes the value of R0
-          Map(malloc.head -> SymValueSet(Heap(mal))) ++
-            others // set every other out param to it's DSA index - 1
-              .map(DSAVartoLast)
-              .collect { case param: LocalVar if a.contains(param) => (param, a(param)) }
+          Map(malloc.head -> SymValueSet(Heap(mal)))
         )
         a.join(update)
       case call @ DirectCall(target, outParams, inParams, label) =>
