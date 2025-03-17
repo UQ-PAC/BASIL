@@ -15,6 +15,7 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
 import ExecutionContext.Implicits.global
+import scala.util.boundary, boundary.break
 
 /** Simplification pass, see also: docs/development/simplification-solvers.md
   */
@@ -468,6 +469,34 @@ def removeEmptyBlocks(p: Program) = {
   }
 }
 
+/**
+ * If we have two consecutive branches with a join between, duplicate the join for each 
+ * side of the first branch so that the subsequent analyses can differentiate dependency
+ * behaviour of the second branch depending on which of the first branches was taken.
+ */
+def coalesceBlocksCrossBranchDependency(p: Program): Boolean = {
+  val candidate = p.procedures.flatMap(_.blocks).collect {
+    case b if b.statements.isEmpty && b.prevBlocks.size == 2 && b.nextBlocks.size == 2 => b
+  }
+
+  for (b <- candidate) {
+    val left = b.nextBlocks.head
+    val right = b.nextBlocks.last
+
+    val proc = b.parent
+    val nb = Block(b.label + "_disambiguate")
+    proc.addBlock(nb)
+
+    b.jump.asInstanceOf[GoTo].removeTarget(right)
+    nb.replaceJump(GoTo(right))
+
+    for (ic <- b.prevBlocks) {
+      ic.jump.asInstanceOf[GoTo].addTarget(nb)
+    }
+  }
+  candidate.nonEmpty
+}
+
 def coalesceBlocks(p: Program): Boolean = {
   var didAny = false
   for (proc <- p.procedures) {
@@ -755,6 +784,7 @@ def copyPropParamFixedPoint(p: Program, rela: Map[BigInt, BigInt]): Int = {
   while (changed && iterations < maxIterations) {
     changed = false
     SimplifyLogger.info(s"Simplify:: Copyprop iteration $iterations")
+    transforms.removeTriviallyDeadBranches(p)
     doCopyPropTransform(p, rela)
     val extraInlined = removeInvariantOutParameters(p, inlinedOutParams)
     inlinedOutParams = extraInlined.foldLeft(inlinedOutParams)((acc, v) =>
@@ -1305,7 +1335,21 @@ class Substitute(val res: Variable => Option[Expr], val recurse: Boolean = true,
           SkipChildren()
         } else if (recurse) {
           madeAnyChange = true
-          ChangeDoChildrenPost(changeTo, x => x)
+
+          var newChange = changeTo
+          var madeNewChange = true
+
+          while (newChange.isInstanceOf[Variable] && madeNewChange) do {
+            res(newChange.asInstanceOf[Variable]) match {
+              case Some(v) =>
+                newChange = v
+                madeNewChange = true
+              case _ =>
+                madeNewChange = false
+            }
+          }
+
+          ChangeDoChildrenPost(newChange, x => x)
         } else {
           madeAnyChange = true
           ChangeTo(changeTo)
@@ -1446,4 +1490,121 @@ class Simplify(val res: Variable => Option[Expr], val initialBlock: Block = null
     block = b
     DoChildren()
   }
+}
+
+def fixupGuards(p: Program) = {
+  // the DSA transform can insert phi nodes on edges between a nondet branch and the block containing the guard
+  // This breaks the interpreter because it can't immediately evaluate the guard.
+
+  // This fixup clones assumes back to the statement immediately after the
+
+  val concerning = p.collect {
+    case b: Block if b.nextBlocks.size > 1 =>
+      b.nextBlocks.filterNot(succ => IRWalk.firstInBlock(succ).isInstanceOf[Assume])
+  }.flatten
+
+  // println(concerning.map(_.label).toList)
+
+  // traverse a straight-line path to find an assume, while evaluating the code
+  def findAssume(b: Block): Option[Assume] = boundary {
+    val assignment = mutable.Map[Variable, Expr]()
+
+    var block = b
+    while {
+      for (s <- block.statements) {
+        s match {
+          case l: LocalAssign => assignment(l.lhs) = l.rhs
+          case a: Assume => {
+            val body = Substitute(assignment.get, true)(a.body).getOrElse(a.body)
+            break(Some(Assume(body, Some("propagated"))))
+          }
+          case n: NOP => ()
+          case _ => break(None)
+        }
+      }
+
+      if (block.nextBlocks.size != 1) {
+        break(None)
+      }
+
+      block = block.nextBlocks.head
+      true
+    } do {}
+
+    None
+  }
+
+  for (bl <- concerning) {
+    val assume = findAssume(bl)
+    if (assume.isEmpty) {
+      println("no assume " + bl.label)
+    }
+    for (a <- assume) {
+      bl.statements.prepend(a)
+    }
+  }
+}
+
+def removeDuplicateGuard(p: Program) = {
+  p.procedures.flatMap(_.blocks).foreach {
+    case block: Block if IRWalk.firstInBlock(block).isInstanceOf[Assume] => {
+      val assumes = block.statements.collect { case a: Assume =>
+        a
+      }.toList
+
+      val chosen = assumes.head.body
+
+      for (a <- assumes.tail) {
+        if (a.body == TrueLiteral) {
+          block.statements.remove(a)
+        } else if (a.body == chosen) {
+          block.statements.remove(a)
+        }
+
+      }
+    }
+    case _ => Seq()
+  }
+}
+
+def findSimpleChain(b: Block) = {
+  var block = b
+
+  var before = List[Block]()
+  var after = List[Block]()
+
+  while (block.prevBlocks.size == 1 && block.prevBlocks.forall(_.nextBlocks.size == 1)) {
+    block = block.prevBlocks.head
+    before = block :: before
+  }
+
+  while (block.nextBlocks.size == 1 && block.nextBlocks.forall(_.prevBlocks.size == 1)) {
+    block = block.nextBlocks.head
+    after = block :: before
+  }
+
+  before ++ Seq(b) ++ after
+}
+
+def removeTriviallyDeadBranches(p: Program): Boolean = {
+
+  /**
+   * This will remove branch on high checks, but since we can only eliminate branches
+   * based on program constants (classified low), we can only realistically eliminate branches on low.
+   */
+  val dead = p.procedures.flatMap(_.blocks).map(IRWalk.firstInBlock(_)).collect {
+    case a @ Assume(FalseLiteral, _, _, _) => a.parent
+  }
+
+  for (b <- dead) {
+    if (b.hasParent) {
+      val ch = findSimpleChain(b)
+      val proc = b.parent
+
+      proc.removeBlocksDisconnect(ch)
+
+    }
+  }
+
+  dead.nonEmpty
 }
