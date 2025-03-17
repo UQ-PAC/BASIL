@@ -41,6 +41,17 @@ sealed trait SingleAssign extends Assign {
   override def assignees = Set(lhs)
 }
 
+class MemoryAssign(var lhs:Variable, var rhs: Expr, override val label: Option[String]  = None) extends SingleAssign {
+  override def modifies: Set[Global] = lhs match {
+    case r: Register => Set(r)
+    case _ => Set()
+  }
+  override def toString: String = s"$labelStr$lhs := $rhs"
+}
+
+object MemoryAssign {
+  def unapply(l: LocalAssign): Some[(Variable, Expr, Option[String])] = Some(l.lhs, l.rhs, l.label)
+}
 class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[String] = None) extends SingleAssign {
   override def modifies: Set[Global] = lhs match {
     case r: Register => Set(r)
