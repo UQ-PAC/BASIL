@@ -87,8 +87,10 @@ object Interval {
   def apply(start: Int, end: Int) = Interval.Value(start, end)
   def join(interval1: Interval, interval2: Interval): Interval = interval1.join(interval2)
   implicit def orderingByTuple[T <: Interval]: Ordering[T] =
-    Ordering.by { case Interval.Value(start, end) =>
-      (start, end)
+    Ordering.by {
+      case Interval.Value(start, end) =>
+        (start, end)
+      case _ => (Int.MinValue, Int.MinValue)
     }
 }
 
