@@ -367,12 +367,13 @@ object LibcIntrinsic {
 
   val r0_out = LocalVar("R0_out", BitVecType(64))
   val r0 = LocalVar("R0_in", BitVecType(64))
-  val r1 = LocalVar("R0_in", BitVecType(64))
+  val r1 = LocalVar("R1_in", BitVecType(64))
 
   def intrinsicSigs = Map(
     "putc" -> ProcSig("putc", List(r0), List()),
     "puts" -> ProcSig("puts", List(r0), List()),
     "printf" -> ProcSig("print", List(r0), List()),
+    "__printf_chk" -> ProcSig("__printf_chk", List(r0, r1), List()),
     "write" -> ProcSig("write", List(r0, r1), List()),
     "malloc" -> ProcSig("malloc", List(r0), List(r0_out)),
     "__libc_malloc_impl" -> ProcSig("malloc", List(r0), List(r0_out)),
@@ -381,27 +382,6 @@ object LibcIntrinsic {
     "calloc" -> ProcSig("calloc", List(r0), List()),
     "strlen" -> ProcSig("strlen", List(r0), List(r0))
   )
-
-  // def callIntrinsic(sig: ProcSig, actual: List[BasilValue]) = {
-  //def callIntrinsic[S, E, T <: Effects[S, E]](s: T)(name: String, params: List[BasilValue]): State[S, Unit, E] =
-  //  s.callIntrinsic(name, actual)
-  //}
-
-  def intrinsics[S, T <: Effects[S, InterpreterError]] =
-    Map[String, T => State[S, Unit, InterpreterError]](
-      "putc" -> singleArg("putc"),
-      "putchar" -> singleArg("putc"),
-      "puts" -> singleArg("puts"),
-      "printf" -> singleArg("print"),
-      "write" -> twoArg("write"),
-      "malloc" -> singleArg("malloc"),
-      "__libc_malloc_impl" -> singleArg("malloc"),
-      "free" -> singleArg("free"),
-      "#free" -> singleArg("free"),
-      "calloc" -> calloc,
-      "strlen" -> singleArg("strlen")
-    )
-
 }
 
 object IntrinsicImpl {
@@ -547,6 +527,7 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
           _ <- storeVar("R0", Scope.Global, r)
         } yield (Some(r))
       case "print" => IntrinsicImpl.print(this)(args.head)
+      case "__printf_chk" => IntrinsicImpl.print(this)(args.tail.head)
       case "puts" =>
         IntrinsicImpl.print(this)(args.head) >> IntrinsicImpl.putc(this)(Scalar(BitVecLiteral('\n'.toInt, 64)))
       case "write" => IntrinsicImpl.write(this)(args(1), args(2))

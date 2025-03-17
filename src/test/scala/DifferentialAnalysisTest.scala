@@ -36,12 +36,6 @@ abstract class DifferentialTest extends AnyFunSuite, TestCustomisation {
     case "analysis_differential:floatingpoint/clang:GTIRB" | "analysis_differential:floatingpoint/gcc:GTIRB" =>
       Mode.NotImplemented("needs FP_Mul")
 
-    case "analysis_differential:function1/gcc_O2:BAP" | "analysis_differential:function1/gcc_O2:GTIRB" |
-        "analysis_differential:malloc_with_local/gcc_O2:BAP" | "analysis_differential:malloc_with_local/gcc_O2:GTIRB" |
-        "analysis_differential:malloc_with_local3/gcc_O2:BAP" |
-        "analysis_differential:malloc_with_local3/gcc_O2:GTIRB" =>
-      Mode.NotImplemented("needs printf_chk")
-
     case "analysis_differential:syscall/clang:BAP" | "analysis_differential:syscall/clang:GTIRB" |
         "analysis_differential:syscall/clang_O2:GTIRB" | "analysis_differential:syscall/gcc:BAP" |
         "analysis_differential:syscall/gcc:GTIRB" =>
@@ -141,8 +135,12 @@ abstract class DifferentialTest extends AnyFunSuite, TestCustomisation {
   }
 }
 
-@test_util.tags.AnalysisSystemTest
-@test_util.tags.Fast
+
+/**
+ * Disable analysis differential test because it makes no 
+ * IR transforms, these examples contain no indirect calls.
+ */
+@test_util.tags.DisabledTest
 class DifferentialAnalysisTest extends DifferentialTest {
 
   def runSystemTests(): Unit = {
@@ -177,7 +175,6 @@ class DifferentialAnalysisTest extends DifferentialTest {
 }
 
 @test_util.tags.AnalysisSystemTest
-@test_util.tags.Fast
 class DifferentialAnalysisTestSimplification extends DifferentialTest {
 
   def runSystemTests(): Unit = {
