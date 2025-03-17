@@ -12,7 +12,6 @@ import ir.*
 import scala.collection.mutable
 import analysis.*
 import analysis.data_structure_analysis.{IntervalCell, IntervalGraph}
-import ir.transforms.MemoryTransform.{cellToLocalVar }
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -1428,30 +1427,32 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
           val index = indices.head
           assert(index.hasPointee)
           val value = index.getPointee
-          val rhs = cellToLocalVar(value, load.lhs.irType)
-          val localAssign = MemoryAssign(load.lhs, rhs, load.label)
+          val varName =  value.node.bases.keySet.toString() + value.interval
+          val rhs = if value.node.flags.global || value.node.flags.heap then 
+            MemoryVar(varName, load.size)
+          else LocalVar(varName, load.lhs.getType)
+          val localAssign = LocalAssign(load.lhs, rhs, load.label)
           ChangeTo(List(localAssign))
         case store: MemoryStore =>
           val indices = dsa(e.parent.parent).exprToCells(store.index)
           assert(indices.size == 1, store.index)
           val index = indices.head
           assert(index.hasPointee)
-          val value = index.getPointee
-          val lhs = cellToLocalVar(value, store.value.getType)
-          val localAssign = MemoryAssign(lhs, store.value, store.label)
-          ChangeTo(List(localAssign))
-          ChangeTo(List(store))
+          val content = index.getPointee
+          val varName =  content.node.bases.keySet.toString() + content.interval
+          val assign = if content.node.flags.global || content.node.flags.heap then 
+            val lhs = MemoryVar(varName, store.size)
+            MemoryAssign(lhs, store.value, store.label)
+          else 
+            val lhs = LocalVar(varName, store.value.getType)
+            LocalAssign(lhs, store.value, store.label)
+          ChangeTo(List(assign))
         case _ => SkipChildren()
     else SkipChildren()
   }
 }
 
 
-object MemoryTransform {
-  def cellToLocalVar(cell: IntervalCell, irType: IRType): LocalVar = {
-    LocalVar(cell.node.bases.keySet.toString() + cell.interval, irType)
-  } 
-}
 
 class Simplify(val res: Variable => Option[Expr], val initialBlock: Block = null) extends CILVisitor {
 
