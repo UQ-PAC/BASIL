@@ -202,7 +202,10 @@ class BasilIRPrettyPrinter(
     val address = b.address
     val statements = b.statements.toList.map(vstmt)
     val terminator = vjump(b.jump)
-    val entryComent = with_analysis_results_begin(b).map(c => s"${blockIndent}// ${c}")
+    val entryComent = with_analysis_results_begin(b).map(c => {
+      val broken = c.split('\n').mkString("\n" + blockIndent + "// ")
+      s"${blockIndent}// $broken"
+    })
     val exitComment = with_analysis_results_end(b).map(c => s"${blockIndent}// ${c}")
     val addr = address.map(a => s"{address = ${vaddress(a)}}")
     PBlock(label, addr, statements.map(_.toString) ++ Seq(terminator.toString), entryComent, exitComment)
