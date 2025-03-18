@@ -1067,7 +1067,7 @@ object IntervalDSA {
       .filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
       .filter((proc, graph) => graph.nodes.contains(base))
       .map((proc, graph) => (proc, graph.find(graph.nodes(base)).bases.keys.toSet))
-    assert(regions.values.toSet.size != 1, s"$base was inconsistent across DSA TD graphs")
+    assert(regions.values.toSet.size == 1, s"$base was inconsistent across DSA TD graphs")
   }
 
 
