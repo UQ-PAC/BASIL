@@ -104,7 +104,7 @@ class IntervalDSATest extends AnyFunSuite {
     val basilResult = runTest(context)
     val main = basilResult.ir.program.mainProcedure
 
-    val result =  runTest(context)
+    val result = runTest(context)
 
     val dsg = result.dsa.get.local(main)
     val xPointerCells = dsg.exprToCells(xPointer)
