@@ -29,6 +29,12 @@ def getSymbolicValues(p: Procedure): SymbolicValues = {
     .fold(SymbolicValues.empty)(SymbolicValues.join)
 }
 
+def isPlaceHolder(base: SymBase): Boolean = {
+  base match
+    case known: Known => false
+    case unknown: Unknown => true
+}
+
 // a symbolic base address
 sealed trait SymBase
 

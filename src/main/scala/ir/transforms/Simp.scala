@@ -11,8 +11,7 @@ import ir.*
 
 import scala.collection.mutable
 import analysis.*
-import analysis.data_structure_analysis.{Const, Heap, IntervalCell, IntervalGraph, Known, Loaded, Par, Ret, Stack, SymBase, Unknown}
-import ir.transforms.MemoryTransform.isPlaceHolder
+import analysis.data_structure_analysis.{Const, Heap, IntervalCell, IntervalGraph, Known, Loaded, Par, Ret, Stack, SymBase, Unknown, isPlaceHolder}
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -1451,13 +1450,6 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
   }
 }
 
-object MemoryTransform {
-  def isPlaceHolder(base: SymBase): Boolean = {
-    base match
-      case known: Known => false
-      case unknown: Unknown => true
-  }
-}
 
 
 
