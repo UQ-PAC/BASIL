@@ -122,8 +122,6 @@ abstract class Visitor {
 
   def visitLocalVar(node: LocalVar): LocalVar = node
 
-  def visitMemoryVar(node: MemoryVar): MemoryVar = node
-
   def visitLiteral(node: Literal): Literal = node
 
   def visitUninterpretedFunction(node: UninterpretedFunction): UninterpretedFunction = {
