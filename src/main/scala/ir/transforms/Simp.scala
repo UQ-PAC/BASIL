@@ -1514,9 +1514,9 @@ def fixupGuards(p: Program) = {
       for (s <- block.statements) {
         s match {
           case l: LocalAssign => assignment(l.lhs) = l.rhs
-          case a: Assume => {
-            val body = Substitute(assignment.get, true)(a.body).getOrElse(a.body)
-            break(Some(Assume(body, Some("propagated"))))
+          case Assume(oBody, a, b, c) => {
+            val body = Substitute(assignment.get, true)(oBody).getOrElse(oBody)
+            break(Some(Assume(body, a, b, c)))
           }
           case n: NOP => ()
           case _ => break(None)
