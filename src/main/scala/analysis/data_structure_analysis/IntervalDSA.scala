@@ -1057,8 +1057,10 @@ object IntervalDSA {
 
   def checkConsistentRegions(DSA: Map[Procedure, IntervalGraph]): Unit = {
     // collect all the regions  from all the resulting graphs
-    DSA.filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
-      .values.flatMap(_.nodes.keySet)
+    DSA
+      .filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
+      .values
+      .flatMap(_.nodes.keySet)
       .foreach(r => checkUnifiedRegions(r, DSA))
   }
 

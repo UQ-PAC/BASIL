@@ -14,10 +14,10 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
             assert(indices.forall(_.hasPointee))
             assert(indices.map(_.getPointee).size == 1, s"${indices.map(_.getPointee).size}, $load")
             val value = indices.map(_.getPointee).head
-            val varName =  value.node.bases.keySet.filterNot(isPlaceHolder).toString() + value.interval
-            val rhs = if value.node.flags.global || value.node.flags.heap then
-              Register(varName, load.size)
-            else LocalVar(varName, load.lhs.getType)
+            val varName = value.node.bases.keySet.filterNot(isPlaceHolder).toString() + value.interval
+            val rhs =
+              if value.node.flags.global || value.node.flags.heap then Register(varName, load.size)
+              else LocalVar(varName, load.lhs.getType)
             val localAssign = LocalAssign(load.lhs, rhs, load.label)
             ChangeTo(List(localAssign))
           } else SkipChildren()
@@ -27,7 +27,7 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
             assert(indices.forall(_.hasPointee))
             assert(indices.map(_.getPointee).size == 1)
             val content = indices.map(_.getPointee).head
-            val varName =  content.node.bases.keySet.filterNot(isPlaceHolder).toString() + content.interval
+            val varName = content.node.bases.keySet.filterNot(isPlaceHolder).toString() + content.interval
             val assign = if content.node.flags.global || content.node.flags.heap then
               val lhs = Register(varName, store.size)
               MemoryAssign(lhs, store.value, store.label)
