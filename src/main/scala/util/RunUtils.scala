@@ -25,21 +25,7 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{
-  Constraint,
-  DataStructureAnalysis,
-  Graph,
-  Global,
-  IntervalDSA,
-  IntervalGraph,
-  SymBase,
-  SymbolicAddress,
-  SymbolicAddressAnalysis,
-  SymbolicValues,
-  computeDSADomain,
-  generateConstraints,
-  getSymbolicValues,
-}
+import analysis.data_structure_analysis.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
@@ -922,34 +908,10 @@ object RunUtils {
         DSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
 
-
-        // collect all the regions  from all the resulting graphs
-        val regions = DSATD.filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
-          .values.flatMap(_.nodes.keySet)
-
-
-        def checkConsistentRegions(base: SymBase, thr:Boolean = false) = {
-           val regions = DSATD
-            .filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
-            .filter((proc, graph) => graph.nodes.contains(base))
-            .map((proc, graph) => (proc, graph.find(graph.nodes(base)).bases.keySet))
-          if (regions.values.toSet.size != 1) {
-            val seen = mutable.Map[Procedure, Set[SymBase]]()
-            regions.foreach((proc, bases) =>
-              if !seen.values.toSet.contains(bases) && bases.diff(seen.values.flatten.toSet).nonEmpty then
-                seen.update(proc, bases.diff(seen.values.flatten.toSet).toSet)
-            )
-            throw Exception(s"$base was inconsistent with $seen") 
-          }
-           
-          regions
-        }
-
-        regions.foreach(r => checkConsistentRegions(r))
-
+        IntervalDSA.checkConsistentRegions(DSATD)
+        dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
 
         visit_prog(MemoryTransform(DSATD), ctx.program)
-        dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
     }
 
     if (q.runInterpret) {
