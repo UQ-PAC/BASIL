@@ -3,6 +3,7 @@ package analysis.data_structure_analysis
 import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
 import analysis.*
 import ir.*
+import util.Counter
 import boogie.SpecGlobal
 import specification.{ExternalFunction, SymbolTableEntry}
 import util.writeToFile
@@ -26,7 +27,7 @@ import scala.util.control.Breaks.{break, breakable}
   * @param params
   *   mapping from procedures to their parameters
   */
-class LocalPhase(using NodeCounter)(
+class LocalPhase(using Counter)(
   proc: Procedure,
   symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
