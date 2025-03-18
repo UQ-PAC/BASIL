@@ -11,7 +11,20 @@ import ir.*
 
 import scala.collection.mutable
 import analysis.*
-import analysis.data_structure_analysis.{Const, Heap, IntervalCell, IntervalGraph, Known, Loaded, Par, Ret, Stack, SymBase, Unknown, isPlaceHolder}
+import analysis.data_structure_analysis.{
+  Const,
+  Heap,
+  IntervalCell,
+  IntervalGraph,
+  Known,
+  Loaded,
+  Par,
+  Ret,
+  Stack,
+  SymBase,
+  Unknown,
+  isPlaceHolder
+}
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -1419,7 +1432,6 @@ def findDefinitelyExits(p: Program) = {
     }.toSet
   )
 }
-
 
 class Simplify(val res: Variable => Option[Expr], val initialBlock: Block = null) extends CILVisitor {
 
