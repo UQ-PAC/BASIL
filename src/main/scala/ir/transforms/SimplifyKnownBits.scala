@@ -94,7 +94,6 @@ case class TNumValue(value: BigInt, mask: BigInt, width: Int) extends TNum {
     TNumValue(v, mu, this.width);
   }
 
-
   // Bitwise AND
   def TAND(that: TNumValue): TNumValue = {
     require(this.width == that.width, s"$this $that bv width")

@@ -18,7 +18,14 @@ trait TestValueDomainWithInterpreter[T] {
    */
   def valueInAbstractValue(absval: T, concrete: Expr): Expr
 
-  case class CheckResult(name: String, breakpoint: BreakPoint, testExpr: Expr, variable: Expr, variableValue: Expr, evaluatedTestExpr: Expr)
+  case class CheckResult(
+    name: String,
+    breakpoint: BreakPoint,
+    testExpr: Expr,
+    variable: Expr,
+    variableValue: Expr,
+    evaluatedTestExpr: Expr
+  )
 
   enum Heuristic:
     case AllVarsInAbstract
