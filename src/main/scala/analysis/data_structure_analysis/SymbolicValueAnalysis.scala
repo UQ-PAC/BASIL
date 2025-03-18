@@ -8,6 +8,16 @@ import util.SVALogger as Logger
 import scala.annotation.tailrec
 import scala.collection.{SortedMap, mutable}
 
+def mapMerge[K, V](a: Map[K, V], b: Map[K, V], f: (V, V) => V): Map[K, V] = {
+  var merged = a
+  for ((key, value) <- b)
+    merged = merged.updatedWith(key) {
+      case None => Some(value)
+      case Some(existing) => Some(f(existing, value))
+    }
+  merged
+}
+
 def getSymbolicValues(p: Procedure): SymbolicValues = {
   Logger.info(s"Generating Symbolic Values for ${p.name}")
   val symValDomain = SymbolicValueDomain()
@@ -105,9 +115,7 @@ case class SymValueSet(state: Map[SymBase, SymOffsets]) {
   def this(base: SymBase, symOffsets: SymOffsets) = this(Map(base -> symOffsets))
 
   def join(other: SymValueSet): SymValueSet = {
-    val joinedMap = (this.state.toSeq ++ other.state.toSeq)
-      .groupMapReduce(_._1)(_._2)(SymOffsets.join)
-
+    val joinedMap = mapMerge(this.state, other.state, SymOffsets.join)
     SymValueSet(joinedMap)
   }
 
@@ -221,8 +229,7 @@ case class SymbolicValues(state: Map[LocalVar, SymValueSet]) {
   }
 
   def join(other: SymbolicValues): SymbolicValues = {
-    val newState = (state.toSeq ++ other.state.toSeq)
-      .groupMapReduce(_._1)(_._2)(SymValueSet.join)
+    val newState = mapMerge(state, other.state, SymValueSet.join)
     SymbolicValues(newState)
   }
 
@@ -311,7 +318,6 @@ class SymbolicValueDomain extends AbstractDomain[SymbolicValues] {
 
   override def join(a: SymbolicValues, b: SymbolicValues, pos: Block): SymbolicValues = {
     count.update(pos, count(pos) + 1)
-//    if count(pos) >= 10 then SVALogger.debug(s"Visiting ${pos.label} for ${count(pos)}th time")
     if count(pos) < 10 then a.join(b) else widen(a, b, pos)
   }
 
