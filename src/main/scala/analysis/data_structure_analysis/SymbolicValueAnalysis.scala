@@ -30,6 +30,12 @@ def getSymbolicValues[T <: Offsets](p: Procedure)(using valSetDomain: SymValSetD
     .fold(symValuesDomain.bot)((x, y) => symValuesDomain.join(x, y, p.entryBlock.get))
 }
 
+def isPlaceHolder(base: SymBase): Boolean = {
+  base match
+    case known: Known => false
+    case unknown: Unknown => true
+}
+
 // a symbolic base address
 sealed trait SymBase
 
