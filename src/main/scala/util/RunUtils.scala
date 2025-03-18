@@ -721,7 +721,6 @@ object RunUtils {
 
     ctx.program.sortProceduresRPO()
 
-    transforms.liftLinuxAssertFail(ctx)
     transforms.liftSVComp(ctx.program)
 
     DebugDumpIRLogger.writeToFile(File("il-before-simp.il"), pp_prog(program))
