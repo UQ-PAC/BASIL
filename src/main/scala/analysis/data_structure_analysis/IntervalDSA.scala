@@ -1054,6 +1054,23 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
 }
 
 object IntervalDSA {
+
+  def checkConsistentRegions(DSA: Map[Procedure, IntervalGraph]): Unit = {
+    // collect all the regions  from all the resulting graphs
+    DSA.filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
+      .values.flatMap(_.nodes.keySet)
+      .foreach(r => checkUnifiedRegions(r, DSA))
+  }
+
+  private def checkUnifiedRegions(base: SymBase, DSA: Map[Procedure, IntervalGraph]): Unit = {
+    val regions = DSA
+      .filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
+      .filter((proc, graph) => graph.nodes.contains(base))
+      .map((proc, graph) => (proc, graph.find(graph.nodes(base)).bases.keys.toSet))
+    assert(regions.values.toSet.size != 1, s"$base was inconsistent across DSA TD graphs")
+  }
+
+
   def getLocal(
     proc: Procedure,
     context: IRContext,
