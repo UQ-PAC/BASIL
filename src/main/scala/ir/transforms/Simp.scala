@@ -11,7 +11,8 @@ import ir.*
 
 import scala.collection.mutable
 import analysis.*
-import analysis.data_structure_analysis.{IntervalCell, IntervalGraph}
+import analysis.data_structure_analysis.{Const, Heap, IntervalCell, IntervalGraph, Known, Loaded, Par, Ret, Stack, SymBase, Unknown}
+import ir.transforms.MemoryTransform.isPlaceHolder
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -1424,11 +1425,11 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
         case load: MemoryLoad =>
           val indices = dsa(e.parent.parent).exprToCells(load.index)
           assert(indices.forall(_.hasPointee))
-          assert(indices.map(_.getPointee).size == 1)
+          assert(indices.map(_.getPointee).size == 1, s"${indices.map(_.getPointee).size}, $load")
           val value = indices.map(_.getPointee).head
-          val varName =  value.node.bases.keySet.toString() + value.interval
+          val varName =  value.node.bases.keySet.filterNot(isPlaceHolder).toString() + value.interval
           val rhs = if value.node.flags.global || value.node.flags.heap then
-            MemoryVar(varName, load.size)
+            Register(varName, load.size)
           else LocalVar(varName, load.lhs.getType)
           val localAssign = LocalAssign(load.lhs, rhs, load.label)
           ChangeTo(List(localAssign))
@@ -1437,9 +1438,9 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
           assert(indices.forall(_.hasPointee))
           assert(indices.map(_.getPointee).size == 1)
           val content = indices.map(_.getPointee).head
-          val varName =  content.node.bases.keySet.toString() + content.interval
+          val varName =  content.node.bases.keySet.filterNot(isPlaceHolder).toString() + content.interval
           val assign = if content.node.flags.global || content.node.flags.heap then
-            val lhs = MemoryVar(varName, store.size)
+            val lhs = Register(varName, store.size)
             MemoryAssign(lhs, store.value, store.label)
           else
             val lhs = LocalVar(varName, store.value.getType)
@@ -1447,6 +1448,14 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
           ChangeTo(List(assign))
         case _ => SkipChildren()
     else SkipChildren()
+  }
+}
+
+object MemoryTransform {
+  def isPlaceHolder(base: SymBase): Boolean = {
+    base match
+      case known: Known => false
+      case unknown: Unknown => true
   }
 }
 
