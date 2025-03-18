@@ -84,8 +84,16 @@ case class TNumBool(boolean: Int) extends TNum {
 case class TNumValue(value: BigInt, mask: BigInt, width: Int) extends TNum {
 
   override def toString() = {
-    "(%#016x, %#016x)bv%d".format(value, mask, width)
+    "(%#016x, %#016x, bv%d)".format(value, mask, width)
   }
+
+  def join(that: TNumValue): TNumValue = {
+    require(this.width == that.width, s"$this $that bv width")
+    val mu = this.mask | that.mask | (this.value ^ that.value)
+    val v = this.value & that.value
+    TNumValue(v, mu, this.width);
+  }
+
 
   // Bitwise AND
   def TAND(that: TNumValue): TNumValue = {
@@ -812,11 +820,12 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
         key -> rightTNum
       } else {
         // Merge the TNum of variables that appear in both program states but need to be compatible
+        // OR the unknown bits, AND the known bits
         (leftTNum, rightTNum) match {
           case (left: TNumValue, right: TNumValue) if left.width == right.width => {
-            key -> left.TOR(right)
+            key -> left.join(right)
           }
-          case (left: TNumBool, right: TNumBool) => key -> left.TOR(right)
+          // case (left: TNumBool, right: TNumBool) => key -> left.TOR(right)
           case _ => key -> TNumValue(BigInt(0), BigInt(-1), leftTNum.width)
         }
       }
@@ -825,6 +834,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
 }
 
 def knownBitsAnalysis(p: Program) = {
+  applyRPO(p)
   val solver = transforms.worklistSolver(TNumDomain())
   val (beforeIn, afterIn) = solver.solveProgIntraProc(p, backwards = false)
   (beforeIn, afterIn)
