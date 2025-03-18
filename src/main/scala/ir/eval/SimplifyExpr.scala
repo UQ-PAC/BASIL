@@ -219,7 +219,7 @@ object cleanupSimplify extends CILVisitor {
   }
 
   def apply(p: Procedure) = {
-    visit_proc(AlgebraicSimplifications, p)
+    visit_proc(cleanupSimplify, p)
   }
 
 }
@@ -1027,11 +1027,11 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
     case Extract(ed, bg, SignExtend(x, expr)) if (bg < size(expr).get) && (ed < size(expr).get) =>
       logSimp(e, Extract(ed, bg, expr))
 
-    case ZeroExtend(ed, Extract(hi, 0, e)) if size(e).get == hi + ed =>
-      logSimp(
-        e,
-        BinaryExpr(BVAND, e, BinaryExpr(BVCONCAT, BitVecLiteral(0, ed), BitVecLiteral(BigInt(2).pow(hi) - 1, hi)))
-      )
+    //case ZeroExtend(ed, Extract(hi, 0, e)) if size(e).get == hi + ed =>
+    //  logSimp(
+    //    e,
+    //    BinaryExpr(BVAND, e, BinaryExpr(BVCONCAT, BitVecLiteral(0, ed), BitVecLiteral(BigInt(2).pow(hi) - 1, hi)))
+    //  )
 
     case BinaryExpr(BVSHL, body, BitVecLiteral(n, _)) if size(body).get <= n =>
       logSimp(e, BitVecLiteral(0, size(body).get))
