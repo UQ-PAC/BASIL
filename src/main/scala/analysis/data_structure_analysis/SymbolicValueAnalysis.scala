@@ -75,7 +75,7 @@ case class Loaded(load: MemoryLoad) extends Unknown {
 
 // Represents a set of offsets
 // None represents top or all offsets
-case class OffsetSet(set: Option[Set[Int]]) {
+case class OffsetSet(set: Option[Set[Int]]) extends OffsetDomainElement {
   def this(i: Int) = this(Some(Set(i)))
   def this(s: Set[Int]) = this(Some(s))
 
@@ -304,7 +304,8 @@ object SymbolicValues {
 }
 
 
-trait OffsetDomain[T] {
+sealed trait OffsetDomainElement
+trait OffsetDomain[T <: OffsetDomainElement] {
   val bot: T
   val top: T
   def join(a: T, b:T): T
@@ -315,7 +316,7 @@ trait OffsetDomain[T] {
   def init(s: Set[Int]): T
 }
 
-case class IntervalOffset(i: Option[Interval])
+case class IntervalOffset(i: Option[Interval]) extends OffsetDomainElement
 
 object IntervalOffsetDomain extends OffsetDomain[IntervalOffset] {
   override val bot: IntervalOffset = IntervalOffset(None)
