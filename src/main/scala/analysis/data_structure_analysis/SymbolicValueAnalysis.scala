@@ -303,6 +303,42 @@ object SymbolicValues {
   def join(a: SymbolicValues, b: SymbolicValues): SymbolicValues = a.join(b)
 }
 
+
+trait OffsetDomain[T] {
+  val bot: T
+  val top: T
+  def join(a: T, b:T): T
+  def shouldWiden(v: T): Boolean = false
+  def isTop(v: T): Boolean = v == top
+  def isBot(v: T): Boolean = v == bot
+  def init(i: Int): T
+  def init(s: Set[Int]): T
+}
+
+case class IntervalOffset(i: Option[Interval])
+
+object IntervalOffsetDomain extends OffsetDomain[IntervalOffset] {
+  override val bot: IntervalOffset = IntervalOffset(None)
+  override val top: IntervalOffset = IntervalOffset(Some(Interval.Top))
+  override def join(a: IntervalOffset, b: IntervalOffset): IntervalOffset = {
+    (a, b) match
+      case (this.bot, x) => x
+      case (x, this.bot) => x
+      case (IntervalOffset(Some(x)), IntervalOffset(Some(y))) => IntervalOffset(Some(x.join(y)))
+  }
+  override def init(i: Int): IntervalOffset = IntervalOffset(Some(Interval.Value(i, i)))
+  override def init(s: Set[Int]): IntervalOffset = IntervalOffset(Some(Interval.Value(s.reduce(math.min), s.reduce(math.max))))
+}
+
+object SetOffsetDomain extends OffsetDomain[OffsetSet] {
+  override val bot: OffsetSet =  OffsetSet(Some(Set.empty))
+  override val top: OffsetSet = OffsetSet(None)
+  override def join(a: OffsetSet, b: OffsetSet): OffsetSet = a.join(b)
+  override def init(i: Int): OffsetSet = OffsetSet(i)
+  override def init(s: Set[Int]): OffsetSet = OffsetSet(s)
+}
+
+
 class SymbolicValueDomain extends AbstractDomain[SymbolicValues] {
 
   private val count: mutable.Map[Block, Int] = mutable.Map.empty.withDefault(_ => 0)
