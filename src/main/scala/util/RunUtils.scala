@@ -931,6 +931,8 @@ object RunUtils {
         DSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
 
+        IntervalDSA.checkConsistentRegions(DSATD)
+        IntervalDSA.checkReachable(ctx.program, DSATD)
         visit_prog(MemoryTransform(DSATD), ctx.program)
         dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
     }
