@@ -14,9 +14,12 @@ enum LogLevel(val id: Int):
 class GenericLogger(
   val name: String,
   val defaultLevel: LogLevel = LogLevel.INFO,
-  output: => PrintStream = Console.out,
+  defaultOutput: => PrintStream = Console.out,
   var ANSIColour: Boolean = true
 ) {
+
+  private var _output = () => defaultOutput
+  def output = _output()
 
   val children: HashSet[GenericLogger] = HashSet()
 
@@ -38,7 +41,7 @@ class GenericLogger(
   def disableColour(setChildren: Boolean = false) = setColour(false, setChildren)
   def enableColour(setChildren: Boolean = false): Unit = setColour(true, setChildren)
 
-  def deriveLogger(sname: String, stream: PrintStream): GenericLogger = {
+  def deriveLogger(sname: String, stream: => PrintStream): GenericLogger = {
     val l = GenericLogger(name + "." + sname, level, stream, ANSIColour)
     children.add(l)
     l
@@ -50,7 +53,7 @@ class GenericLogger(
 
   def deriveLogger(name: String): GenericLogger = deriveLogger(name, output)
 
-  // def setOutput(stream: PrintStream) = output = stream
+  def setOutput(stream: => PrintStream) = _output = () => stream
 
   def writeToFile(file: File, content: => String) = {
     if (level.id < LogLevel.OFF.id) {
