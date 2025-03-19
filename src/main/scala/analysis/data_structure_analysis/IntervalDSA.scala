@@ -172,7 +172,7 @@ class IntervalGraph(
   // returns the cells corresponding to the
   def symValToCells(symVal: SymValueSet): Set[IntervalCell] = {
     val pairs = symVal.state
-    pairs.foldLeft(Set[IntervalCell]()) { case (results, (base: SymBase, offsets: SymOffsets)) =>
+    pairs.foldLeft(Set[IntervalCell]()) { case (results, (base: SymBase, offsets: OffsetSet)) =>
       val (node, adjustment) = findNode(nodes(base))
       if offsets.isTop then results + node.collapse()
       else results ++ offsets.getOffsets.map(i => i + adjustment).map(node.add)

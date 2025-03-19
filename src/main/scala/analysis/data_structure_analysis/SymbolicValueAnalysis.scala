@@ -75,17 +75,17 @@ case class Loaded(load: MemoryLoad) extends Unknown {
 
 // Represents a set of offsets
 // None represents top or all offsets
-case class SymOffsets(set: Option[Set[Int]]) {
+case class OffsetSet(set: Option[Set[Int]]) {
   def this(i: Int) = this(Some(Set(i)))
   def this(s: Set[Int]) = this(Some(s))
 
   override def toString: String = if set.nonEmpty then set.get.mkString("offSets(", ",", ")") else "T"
 
-  def join(other: SymOffsets): SymOffsets = {
+  def join(other: OffsetSet): OffsetSet = {
     (this.set, other.set) match
       case (None, _) => this
       case (_, None) => other
-      case (Some(set1), Some(set2)) => SymOffsets(Some(set1.union(set2)))
+      case (Some(set1), Some(set2)) => OffsetSet(Some(set1.union(set2)))
   }
 
   def isTop: Boolean = set.isEmpty
@@ -93,35 +93,35 @@ case class SymOffsets(set: Option[Set[Int]]) {
     if set.nonEmpty then set.get
     else throw new Exception("Attempted to get a set of offsets from SymOffsets with value TOP")
   }
-  def apply(f: Int => Int): SymOffsets = if set.isEmpty then this else SymOffsets(Some(set.get.map(f)))
-  def filter(f: Int => Boolean): SymOffsets = SymOffsets(set.map(offs => offs.filter(f)))
+  def apply(f: Int => Int): OffsetSet = if set.isEmpty then this else OffsetSet(Some(set.get.map(f)))
+  def filter(f: Int => Boolean): OffsetSet = OffsetSet(set.map(offs => offs.filter(f)))
 }
 
-object SymOffsets {
-  def empty: SymOffsets = SymOffsets(Some(Set.empty))
-  def top: SymOffsets = SymOffsets(None)
-  def join(symOffsets1: SymOffsets, symOffsets2: SymOffsets): SymOffsets = symOffsets1.join(symOffsets2)
-  def apply(i: Int) = new SymOffsets(i)
-  def apply(s: Set[Int]) = new SymOffsets(s)
+object OffsetSet {
+  def bot: OffsetSet = OffsetSet(Some(Set.empty))
+  def top: OffsetSet = OffsetSet(None)
+  def join(symOffsets1: OffsetSet, symOffsets2: OffsetSet): OffsetSet = symOffsets1.join(symOffsets2)
+  def apply(i: Int) = new OffsetSet(i)
+  def apply(s: Set[Int]) = new OffsetSet(s)
 }
 
 // Symbolic Value Set
 // mapping from Symbolic Bases (representing regions) and the different offsets into those bases
 // represents a set of addresses/constant values
-case class SymValueSet(state: Map[SymBase, SymOffsets]) {
+case class SymValueSet(state: Map[SymBase, OffsetSet]) {
 
-  def this(base: SymBase, value: Int = 0) = this(Map(base -> SymOffsets(value)))
-  def this(base: SymBase, valueSet: Set[Int]) = this(Map(base -> SymOffsets(valueSet)))
-  def this(base: SymBase, symOffsets: SymOffsets) = this(Map(base -> symOffsets))
+  def this(base: SymBase, value: Int = 0) = this(Map(base -> OffsetSet(value)))
+  def this(base: SymBase, valueSet: Set[Int]) = this(Map(base -> OffsetSet(valueSet)))
+  def this(base: SymBase, symOffsets: OffsetSet) = this(Map(base -> symOffsets))
 
   def join(other: SymValueSet): SymValueSet = {
-    val joinedMap = mapMerge(this.state, other.state, SymOffsets.join)
+    val joinedMap = mapMerge(this.state, other.state, OffsetSet.join)
     SymValueSet(joinedMap)
   }
 
   def size = state.size
 
-  def get(base: SymBase): SymOffsets = this.state.getOrElse(base, SymOffsets.empty)
+  def get(base: SymBase): OffsetSet = this.state.getOrElse(base, OffsetSet.bot)
   def contains(base: SymBase): Boolean = this.state.contains(base)
 
   def apply(f: Int => Int): SymValueSet = {
@@ -129,15 +129,15 @@ case class SymValueSet(state: Map[SymBase, SymOffsets]) {
   }
 
   def toTop: SymValueSet =
-    SymValueSet(state.view.mapValues(_ => SymOffsets.top).toMap)
+    SymValueSet(state.view.mapValues(_ => OffsetSet.top).toMap)
 
   def widen(other: SymValueSet): SymValueSet = {
     val update = state
       .collect {
-        case (base: SymBase, offsets: SymOffsets) if other.state.contains(base) && other.state(base) != offsets =>
-          (base, SymOffsets.top)
-        case (base: SymBase, offsets: SymOffsets) if !offsets.isTop && offsets.getOffsets.size > 10 =>
-          (base, SymOffsets.top)
+        case (base: SymBase, offsets: OffsetSet) if other.state.contains(base) && other.state(base) != offsets =>
+          (base, OffsetSet.top)
+        case (base: SymBase, offsets: OffsetSet) if !offsets.isTop && offsets.getOffsets.size > 10 =>
+          (base, OffsetSet.top)
       }
     join(other).join(SymValueSet(update))
   }
@@ -164,7 +164,7 @@ object SymValueSet {
   def join(symValueSet1: SymValueSet, symValueSet2: SymValueSet): SymValueSet = symValueSet1.join(symValueSet2)
   def apply(base: SymBase, value: Int = 0): SymValueSet = new SymValueSet(base, value)
   def apply(base: SymBase, valueSet: Set[Int]): SymValueSet = new SymValueSet(base, valueSet)
-  def apply(base: SymBase, offsets: SymOffsets): SymValueSet = new SymValueSet(base, offsets)
+  def apply(base: SymBase, offsets: OffsetSet): SymValueSet = new SymValueSet(base, offsets)
 }
 
 def labelToPC(label: Option[String]): String = {
@@ -248,7 +248,7 @@ case class SymbolicValues(state: Map[LocalVar, SymValueSet]) {
         val oPlus = toOffsetMove(binExp.op, arg2)
         exprToSymValSet(arg1, oPlus)
       case variable: LocalVar => state.getOrElse(replace(variable), SymValueSet.empty).apply(transform)
-      case Extract(end, start, body) if end - start < 64 => SymValueSet(NonPointer, SymOffsets.top)
+      case Extract(end, start, body) if end - start < 64 => SymValueSet(NonPointer, OffsetSet.top)
       case BinaryExpr(BVCOMP, _, _) => SymValueSet(NonPointer, Set(0, 1)).apply(transform)
       case e @ (BinaryExpr(_, _, _) | SignExtend(_, _) | UnaryExpr(_, _)) =>
         e.variables
