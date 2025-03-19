@@ -6,6 +6,7 @@ import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
 import boogie.SpecGlobal
 import specification.FuncEntry
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
+import ir.{BitVecType, Expr, IRWalk, IntraProcIRCursor, LocalVar, MemoryLoad, MemoryStore, Procedure, Program, computeDomain}
 import ir.{BitVecType, Block, Expr, LocalVar, Procedure}
 import specification.{ExternalFunction, SymbolTableEntry}
 import translating.PrettyPrinter.pp_proc
@@ -1055,6 +1056,30 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
 
 object IntervalDSA {
 
+  /**
+   *  checks that all reachable memory load and stores in DSA's domain have a dsa node
+   *  which corresponds to their index expr
+   */
+  def checkReachable(program: Program, DSA: Map[Procedure, IntervalGraph]): Unit = {
+    val reachable = computeDomain(IntraProcIRCursor, program.procedures)
+    for (pos <- reachable) {
+      val proc = IRWalk.procedure(pos)
+      if DSA.contains(proc) then
+        val dsg = DSA(proc)
+        pos match
+          case load: MemoryLoad =>
+            assert(dsg.exprToCells(load.index).nonEmpty)
+          case store: MemoryStore =>
+            assert(dsg.exprToCells(store.index).nonEmpty)
+          case _ =>
+    }
+  }
+
+  /**
+   * Checks that unified Symbolic bases are the same across DS graphs of different procedures
+   * that is if (A and B) are unified in on procedure they are unified across all procedures
+   * Should hold at the end of DSA
+   */
   def checkConsistentRegions(DSA: Map[Procedure, IntervalGraph]): Unit = {
     // collect all the regions  from all the resulting graphs
     DSA
