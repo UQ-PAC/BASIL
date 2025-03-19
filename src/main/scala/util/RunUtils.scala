@@ -912,7 +912,7 @@ object RunUtils {
         IntervalDSA.checkReachable(ctx.program, DSATD)
         dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
 
-        visit_prog(MemoryTransform(DSATD), ctx.program)
+        if q.memoryTransform then visit_prog(MemoryTransform(DSATD), ctx.program)
     }
 
     if (q.runInterpret) {
