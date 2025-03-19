@@ -5,7 +5,18 @@ import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
 import boogie.SpecGlobal
 import specification.FuncEntry
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
-import ir.{BitVecType, Expr, IRWalk, IntraProcIRCursor, LocalVar, MemoryLoad, MemoryStore, Procedure, Program, computeDomain}
+import ir.{
+  BitVecType,
+  Expr,
+  IRWalk,
+  IntraProcIRCursor,
+  LocalVar,
+  MemoryLoad,
+  MemoryStore,
+  Procedure,
+  Program,
+  computeDomain
+}
 import specification.{ExternalFunction, SymbolTableEntry}
 import translating.PrettyPrinter.pp_proc
 import util.{DSALogger, IRContext, IntervalDSALogger as Logger}
@@ -1046,7 +1057,7 @@ object IntervalDSA {
           case _ =>
     }
   }
-  
+
   /**
    * Checks that unified Symbolic bases are the same across DS graphs of different procedures
    * that is if (A and B) are unified in on procedure they are unified across all procedures

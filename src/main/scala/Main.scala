@@ -146,7 +146,7 @@ object Main {
     )
     dsaType: Option[String],
     @arg(name = "memory-transform", doc = "Transform memory access to region accesses")
-    memoryTransform: Flag,
+    memoryTransform: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -263,7 +263,7 @@ object Main {
       boogieTranslation = boogieGeneratorConfig,
       outputPrefix = conf.outFileName,
       dsaConfig = dsa,
-      memoryTransform = conf.memoryTransform.value,
+      memoryTransform = conf.memoryTransform.value
     )
 
     RunUtils.run(q)
