@@ -151,7 +151,6 @@ object Main {
     dsaType: Option[String],
     @arg(name = "memory-transform", doc = "Transform memory access to region accesses")
     memoryTransform: Flag,
-    dsaType: Option[String],
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
     noif: Flag
   )
@@ -271,7 +270,7 @@ object Main {
       boogieTranslation = boogieGeneratorConfig,
       outputPrefix = conf.outFileName,
       dsaConfig = dsa,
-      memoryTransform = conf.memoryTransform.value,
+      memoryTransform = conf.memoryTransform.value
     )
 
     val result = RunUtils.run(q)
