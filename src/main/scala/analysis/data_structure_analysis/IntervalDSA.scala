@@ -2,10 +2,21 @@ package analysis.data_structure_analysis
 
 import analysis.data_structure_analysis.DSAPhase.{BU, Local, TD}
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
-import boogie.{SpecGlobal}
+import boogie.SpecGlobal
 import specification.FuncEntry
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
-import ir.{BitVecType, Expr, LocalVar, Procedure}
+import ir.{
+  BitVecType,
+  Expr,
+  IRWalk,
+  IntraProcIRCursor,
+  LocalVar,
+  MemoryLoad,
+  MemoryStore,
+  Procedure,
+  Program,
+  computeDomain
+}
 import specification.{ExternalFunction, SymbolTableEntry}
 import translating.PrettyPrinter.pp_proc
 import util.{DSALogger, IRContext, IntervalDSALogger as Logger}
@@ -201,8 +212,8 @@ class IntervalGraph(
 
   }
 
-  def callTransfer(phase: DSAPhase, cons: DirectCallConstraint, source: IntervalGraph, target: IntervalGraph): Unit = {
-    require(phase == TD || phase == BU)
+  def globalTransfer(source: IntervalGraph, target: IntervalGraph): Unit = {
+    DSALogger.info(s"cloning globalNode from ${source.proc.procName}")
     val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
     val targetGlobal = target.find(target.nodes(Global).get(0))
     var sourceGlobal = source.find(source.nodes(Global).get(0))
@@ -211,6 +222,17 @@ class IntervalGraph(
 
     sourceGlobal = globalNode.get(targetGlobal.interval)
     target.mergeCells(sourceGlobal, targetGlobal)
+  }
+  def callTransfer(phase: DSAPhase, cons: DirectCallConstraint, source: IntervalGraph, target: IntervalGraph): Unit = {
+    require(phase == TD || phase == BU)
+    val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
+//    val targetGlobal = target.find(target.nodes(Global).get(0))
+//    var sourceGlobal = source.find(source.nodes(Global).get(0))
+//    val old = source.nodes(Global).clone(target, false, oldToNew)
+//    val globalNode = sourceGlobal.node.clone(target, true, oldToNew)
+//
+//    sourceGlobal = globalNode.get(targetGlobal.interval)
+//    target.mergeCells(sourceGlobal, targetGlobal)
     DSALogger.info(s"cloning ${source.proc.procName} into ${target.proc.procName}, $phase")
     cons.inParams.filter(f => cons.target.formalInParam.contains(f._1)).foreach { case (formal, actual) =>
       val (sourceExpr, targetExpr) = if phase == TD then (actual, formal) else (formal, actual)
@@ -806,6 +828,7 @@ class IntervalNode(
       val collapseNode: IntervalNode = IntervalNode(graph, bases, size)
       collapseNode.children.addAll(this.children)
       collapseNode.children.add(this.id)
+      collapseNode.flags.join(this.flags)
       var collapsedCell: IntervalCell = collapseNode.add(0)
       collapseNode._collapsed = Some(collapsedCell)
       // delay unification
@@ -1015,6 +1038,48 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
 }
 
 object IntervalDSA {
+
+  /**
+   *  checks that all reachable memory load and stores in DSA's domain have a dsa node
+   *  which corresponds to their index expr
+   */
+  def checkReachable(program: Program, DSA: Map[Procedure, IntervalGraph]): Unit = {
+    val reachable = computeDomain(IntraProcIRCursor, program.procedures)
+    for (pos <- reachable) {
+      val proc = IRWalk.procedure(pos)
+      if DSA.contains(proc) then
+        val dsg = DSA(proc)
+        pos match
+          case load: MemoryLoad =>
+            assert(dsg.exprToCells(load.index).nonEmpty)
+          case store: MemoryStore =>
+            assert(dsg.exprToCells(store.index).nonEmpty)
+          case _ =>
+    }
+  }
+
+  /**
+   * Checks that unified Symbolic bases are the same across DS graphs of different procedures
+   * that is if (A and B) are unified in on procedure they are unified across all procedures
+   * Should hold at the end of DSA
+   */
+  def checkConsistentRegions(DSA: Map[Procedure, IntervalGraph]): Unit = {
+    // collect all the regions  from all the resulting graphs
+    DSA
+      .filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
+      .values
+      .flatMap(_.nodes.keySet)
+      .foreach(r => checkUnifiedRegions(r, DSA))
+  }
+
+  private def checkUnifiedRegions(base: SymBase, DSA: Map[Procedure, IntervalGraph]): Unit = {
+    val regions = DSA
+      .filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
+      .filter((proc, graph) => graph.nodes.contains(base))
+      .map((proc, graph) => (proc, graph.find(graph.nodes(base)).bases.keys.toSet))
+    assert(regions.values.toSet.size == 1, s"$base was inconsistent across DSA TD graphs")
+  }
+
   def getLocal(proc: Procedure, context: IRContext, symValues: SymbolicValues, cons: Set[Constraint]): IntervalGraph = {
     val graph = IntervalGraph(proc, Local, context, symValues, cons, None)
     graph.localPhase()
