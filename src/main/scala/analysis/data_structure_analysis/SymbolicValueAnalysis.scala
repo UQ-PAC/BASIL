@@ -159,14 +159,16 @@ given OSetDomain: OffsetDomain[OSet] with {
 case class SymValSet[T <: Offsets](state: Map[SymBase, T])
 
 object SymValSet {
-
+  def transform[T <: Offsets](s: SymValSet[T], f: Int => Int)(using oDomain: OffsetDomain[T]): SymValSet[T] = {
+    SymValSet(s.state.map((base, offsets) => (base, oDomain.transform(offsets, f))))
+  }
 }
 
 given OSetSymValSetDomain: SymValSetDomain[OSet] = SymValSetDomain[OSet]()
 
 class SymValSetDomain[T <: Offsets](using val offsetDomain: OffsetDomain[T]) extends AbstractDomain[SymValSet[T]] {
 
-  override def join(a: SymValSet[T], b: SymValSet[T], pos: Block): SymValSet[T] = {
+  override def join(a: SymValSet[T], b: SymValSet[T], pos: Block = Block("")): SymValSet[T] = {
     SymValSet(mapMerge(a.state, b.state, (x, y) => offsetDomain.join(x, y, pos)))
   }
 
@@ -202,9 +204,31 @@ class SymValSetDomain[T <: Offsets](using val offsetDomain: OffsetDomain[T]) ext
 
 
 
-case class SymValues[T <: Offsets](state: Map[LocalVar, SymValSet[T]])
+case class SymValues[T <: Offsets](state: Map[LocalVar, SymValSet[T]]) {
+  def apply(lvar: LocalVar): SymValSet[T] = state(lvar)
+}
+
 
 object SymValues {
+
+  private def sort[T <: Offsets](state: Map[LocalVar, SymValSet[T]]): SortedMap[LocalVar, SymValSet[T]] = {
+    require(state.keys.map(f => f.name.take(3)).toSet.size <= 1, "Expected one or less Variable in state")
+    SortedMap.sortedMapFactory[LocalVar, SymValSet[T]](DSAVarOrdering).fromSpecific(state)
+  }
+
+
+  // get the Symbolic Values of local Vars with prefix in their names
+  private def get[T <: Offsets](state: Map[LocalVar, SymValSet[T]], prefix: String): SymValues[T] = {
+    val newState = state.collect {
+      case entry @ (loc: LocalVar, _) if loc.name.startsWith(prefix) => entry
+    }
+    SymValues(newState)
+  }
+
+  def getSorted[T <: Offsets](s: SymValues[T], prefix: String): SortedMap[LocalVar, SymValSet[T]] = {
+    sort(get(s.state, prefix).state)
+  }
+
   @tailrec
   final def exprToSymValSet[T <: Offsets]
   (using symValSetDomain: SymValSetDomain[T])
