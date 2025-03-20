@@ -21,14 +21,10 @@ import scala.annotation.targetName
  */
 
 object Counter {
-  var count = 1
-  def next() = {
-    count += 1
-    count
-  }
+  val counter = util.Counter()
 
   def nlabel(name: String = "id"): String = {
-    name + "_" + next()
+    name + "_" + counter.next()
   }
 }
 
