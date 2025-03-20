@@ -51,130 +51,114 @@ def bv16 = BitVecType(16)
 def bv8 = BitVecType(8)
 def bv1 = BitVecType(1)
 
+private def panic(op: String, i: Expr, j: Expr) = throw Exception(s"$op not defiend for (${i.getType}, ${j.getType})")
+
 extension (i: Expr)
+
   infix def ===(j: Expr): Expr = i.getType match {
     case IntType => BinaryExpr(IntEQ, i, j)
     case b: BitVecType => BinaryExpr(BVEQ, i, j)
     case BoolType => BinaryExpr(BoolEQ, i, j)
-    case m: MapType => ???
+    case _ => panic("Equal", i, j)
   }
   infix def !==(j: Expr): Expr = i.getType match {
     case IntType => BinaryExpr(IntNEQ, i, j)
     case b: BitVecType => BinaryExpr(BVNEQ, i, j)
     case BoolType => BinaryExpr(BoolNEQ, i, j)
-    case m: MapType => ???
+    case _ => panic("Not Equal", i, j)
   }
   infix def +(j: Expr): Expr = i.getType match {
     case IntType => BinaryExpr(IntADD, i, j)
     case b: BitVecType => BinaryExpr(BVADD, i, j)
     case BoolType => BinaryExpr(BoolOR, i, j)
-    case m: MapType => ???
+    case _ => panic("Addition", i, j)
   }
   infix def -(j: Expr): Expr = i.getType match {
     case IntType => BinaryExpr(IntSUB, i, j)
     case b: BitVecType => BinaryExpr(BVSUB, i, j)
-    case BoolType => ???
-    case m: MapType => ???
+    case _ => panic("Subtraction", i, j)
   }
   infix def *(j: Expr): Expr = i.getType match {
     case IntType => BinaryExpr(IntMUL, i, j)
     case b: BitVecType => BinaryExpr(BVMUL, i, j)
     case BoolType => BinaryExpr(BoolAND, i, j)
-    case m: MapType => ???
+    case _ => panic("Multiplication", i, j)
   }
   infix def /(j: Expr): Expr = i.getType match {
     case IntType => BinaryExpr(IntDIV, i, j)
     case b: BitVecType => BinaryExpr(BVSDIV, i, j)
-    case BoolType => ???
-    case m: MapType => ???
+    case _ => panic("Signed Division", i, j)
   }
   infix def &&(j: Expr): Expr = i.getType match {
-    case IntType => ???
-    case b: BitVecType => BinaryExpr(BVAND, i, j)
     case BoolType => BinaryExpr(BoolAND, i, j)
-    case m: MapType => ???
+    case _ => panic("Logical AND", i, j)
   }
   infix def ||(j: Expr): Expr = i.getType match {
-    case IntType => ???
-    case b: BitVecType => BinaryExpr(BVOR, i, j)
     case BoolType => BinaryExpr(BoolOR, i, j)
-    case m: MapType => ???
+    case _ => panic("Logical OR", i, j)
+  }
+  infix def &(j: Expr): Expr = i.getType match {
+    case b: BitVecType => BinaryExpr(BVAND, i, j)
+    case _ => panic("Bitwise AND", i, j)
+  }
+  infix def |(j: Expr): Expr = i.getType match {
+    case b: BitVecType => BinaryExpr(BVOR, i, j)
+    case _ => panic("Bitwise OR", i, j)
   }
   infix def <<(j: Expr): Expr = i.getType match {
-    case IntType => ???
     case b: BitVecType => BinaryExpr(BVSHL, i, j)
-    case BoolType => ???
-    case m: MapType => ???
+    case _ => panic("Shift Left", i, j)
   }
   infix def >>(j: Expr): Expr = i.getType match {
-    case IntType => ???
     case b: BitVecType => BinaryExpr(BVASHR, i, j)
-    case BoolType => ???
-    case m: MapType => ???
+    case _ => panic("Arithmetic Shift Right", i, j)
   }
   infix def >>>(j: Expr): Expr = i.getType match {
-    case IntType => ???
     case b: BitVecType => BinaryExpr(BVLSHR, i, j)
-    case BoolType => ???
-    case m: MapType => ???
+    case _ => panic("Logical Shift Right", i, j)
   }
   infix def %(j: Expr): Expr = i.getType match {
     case IntType => BinaryExpr(IntMOD, i, j)
     case b: BitVecType => BinaryExpr(BVSMOD, i, j)
-    case BoolType => ???
-    case m: MapType => ???
+    case _ => panic("Signed Modulo", i, j)
   }
   infix def <(j: Expr): Expr = i.getType match {
     case IntType => BinaryExpr(IntLT, i, j)
     case b: BitVecType => BinaryExpr(BVSLT, i, j)
-    case BoolType => ???
-    case m: MapType => ???
+    case _ => panic("Less Than", i, j)
   }
   infix def >(j: Expr): Expr = i.getType match {
     case IntType => BinaryExpr(IntGT, i, j)
     case b: BitVecType => BinaryExpr(BVSGT, i, j)
-    case BoolType => ???
-    case m: MapType => ???
+    case _ => panic("Greater Than", i, j)
   }
   infix def <=(j: Expr): Expr = i.getType match {
     case IntType => BinaryExpr(IntLE, i, j)
     case b: BitVecType => BinaryExpr(BVSLE, i, j)
-    case BoolType => ???
-    case m: MapType => ???
+    case _ => panic("Less Than or Equal", i, j)
   }
   infix def >=(j: Expr): Expr = i.getType match {
     case IntType => BinaryExpr(IntGE, i, j)
     case b: BitVecType => BinaryExpr(BVSGE, i, j)
-    case BoolType => ???
-    case m: MapType => ???
+    case _ => panic("Greater Than or Equal", i, j)
   }
   infix def ult(j: Expr): Expr = i.getType match {
-    case IntType => ???
     case b: BitVecType => BinaryExpr(BVULT, i, j)
-    case BoolType => ???
-    case m: MapType => ???
+    case _ => panic("ULT", i, j)
   }
   infix def ugt(j: Expr): Expr = i.getType match {
-    case IntType => ???
     case b: BitVecType => BinaryExpr(BVUGT, i, j)
-    case BoolType => ???
-    case m: MapType => ???
+    case _ => panic("UGT", i, j)
   }
   infix def ule(j: Expr): Expr = i.getType match {
-    case IntType => ???
     case b: BitVecType => BinaryExpr(BVULE, i, j)
-    case BoolType => ???
-    case m: MapType => ???
+    case _ => panic("ULE", i, j)
   }
   infix def uge(j: Expr): Expr = i.getType match {
-    case IntType => ???
     case b: BitVecType => BinaryExpr(BVUGE, i, j)
-    case BoolType => ???
-    case m: MapType => ???
+    case _ => panic("UGE", i, j)
   }
   infix def ++(j: Expr): Expr = i.getType match {
-    case IntType => ???
     case b: BitVecType => BinaryExpr(BVCONCAT, i, j)
-    case BoolType => ???
-    case m: MapType => ???
+    case _ => panic("Concat Bits", i, j)
   }
