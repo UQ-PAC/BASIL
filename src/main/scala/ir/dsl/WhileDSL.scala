@@ -68,7 +68,7 @@ private def mkWhile(cond: Expr, body: List[EventuallyBlock]): List[EventuallyBlo
   val loopBody = Counter.nlabel("while_body")
   List(block(loopEntry, goto(loopBody, loopExit)))
     ++
-      sequence(sequence(List(block(loopBody, Assume(cond))), body), List(block(loopBackedge, goto(loopEntry))))
+      blocks(block(loopBody, Assume(cond)), body, block(loopBackedge, goto(loopEntry)))
       ++
       List(block(loopExit, Assume(UnaryExpr(BoolNOT, cond)), unreachable))
 }
@@ -90,7 +90,7 @@ private def mkFor(
 }
 
 /**
- * Concatenate two lists of [[EventuallyBlock]], they make a diamond shape control flow, 
+ * Concatenate two lists of [[EventuallyBlock]], they can be treated as linear section of control flow, 
  * with their first block being the entry and the last block being the exit. 
  *
  * This simply makes the last block of the first list jump to the first block of 
@@ -114,14 +114,15 @@ extension (i: List[EventuallyBlock])
   infix def `;`(j: List[EventuallyBlock]): List[EventuallyBlock] = sequence(i, j)
 
 /**
-  * Sequence a list of lists of blocks, where each is its own diamond, 
+  * Sequence a list of lists of blocks, where each is its own section
+  * with designated entry and exit, 
   * so that each list element is executes in sequential order.
   */
 def blocks(blocks: List[EventuallyBlock]*): List[EventuallyBlock] = {
   blocks.toList match {
     case Nil => List()
     case h :: Nil => h
-    case h :: tail => tail.foldLeft(h)((acc, nextb) => sequence(acc, nextb))
+    case h :: tail => tail.foldLeft(h)(sequence)
   }
 
 }
