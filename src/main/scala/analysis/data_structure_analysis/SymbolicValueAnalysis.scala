@@ -1,5 +1,6 @@
 package analysis.data_structure_analysis
 
+import analysis.data_structure_analysis.OSet.Values
 import ir.eval.BitVectorEval.bv2SignedInt
 import ir.*
 import ir.transforms.{AbstractDomain, worklistSolver}
@@ -18,16 +19,19 @@ def mapMerge[K, V](a: Map[K, V], b: Map[K, V], f: (V, V) => V): Map[K, V] = {
   merged
 }
 
-def getSymbolicValues(p: Procedure): SymbolicValues = {
+
+def getSymbolicValues[T <: Offsets, G <: OffsetDomain[T]](p: Procedure, offsetDomain: G): SymValues[T] = {
   Logger.info(s"Generating Symbolic Values for ${p.name}")
-  val symValDomain = SymbolicValueDomain()
-  val symValSolver = worklistSolver[SymbolicValues, symValDomain.type](symValDomain)
+  val valSetDomain = SymValSetDomain(offsetDomain)
+  val symValuesDomain = SymValuesDomain(valSetDomain)
+  val symValSolver = worklistSolver[SymValues[T], symValuesDomain.type](symValuesDomain)
   symValSolver
     .solveProc(p)
     ._2
     .values
-    .fold(SymbolicValues.empty)(SymbolicValues.join)
+    .fold(symValuesDomain.bot)((x, y) => symValuesDomain.join(x, y, p.entryBlock.get))
 }
+
 
 // a symbolic base address
 sealed trait SymBase
@@ -73,6 +77,34 @@ case class Loaded(load: MemoryLoad) extends Unknown {
   override def toString: String = s"Loaded(${procName}_$label)"
 }
 
+def labelToPC(label: Option[String]): String = {
+  //  assert(label.nonEmpty)
+  label.getOrElse("no_label").takeWhile(_ != ':')
+}
+
+def DSAVartoLast(DSAVar: LocalVar): LocalVar = {
+  if DSAVar.index > 1 then LocalVar(DSAVar.varName, DSAVar.irType, DSAVar.index - 1)
+  else if DSAVar.index == 1 then LocalVar(DSAVar.varName + "_in", DSAVar.irType)
+  else throw Exception(s"Attempted to get previous version of DSA variable without one")
+}
+
+object DSAVarOrdering extends Ordering[LocalVar] {
+  def compare(a: LocalVar, b: LocalVar) = {
+    if a.name == b.name then 0
+    else if a.name.endsWith("_in") || b.name.endsWith("_out") then -1
+    else if a.name.endsWith("_out") then 1
+    else a.index - b.index
+  }
+}
+
+def toOffsetMove(op: BinOp, arg: BitVecLiteral): Int => Int = {
+  op match
+    case BVADD => (i: Int) => i + bv2SignedInt(arg).toInt
+    case BVSUB => (i: Int) => i - bv2SignedInt(arg).toInt
+    case _ => throw Exception(s"Usupported Binary Op $op")
+}
+
+/*
 // Represents a set of offsets
 // None represents top or all offsets
 case class OffsetSet(set: Option[Set[Int]]) extends OffsetDomainElement {
@@ -305,6 +337,8 @@ object SymbolicValues {
 
 
 sealed trait OffsetDomainElement
+val t = Map[Int, OffsetDomainElement]()
+
 trait OffsetDomain[T <: OffsetDomainElement] {
   val bot: T
   val top: T
@@ -398,4 +432,331 @@ class SymbolicValueDomain extends AbstractDomain[SymbolicValues] {
   override def top: SymbolicValues = ???
 
   override def bot: SymbolicValues = SymbolicValues.empty
+}*/
+
+
+/*
+
+// Symbolic Value Set
+// mapping from Symbolic Bases (representing regions) and the different offsets into those bases
+// represents a set of addresses/constant values
+case class SymbolicValues2[T](state: Map[LocalVar, SymValueSet]) {
+
+  def this(proc: Procedure) = {
+    this(SymbolicValues2.procInitState(proc))
+  }
+
+  def pretty: String = {
+    state
+      .map { case (localVar: LocalVar, symValSet: SymValueSet) =>
+        localVar.toString + ": " + symValSet.toString
+      }
+      .mkString("\n")
+  }
+
+  // get the Symbolic Values of local Vars with prefix in their names
+  def get(prefix: String): SymbolicValues = {
+    val newState = state.collect {
+      case entry @ (loc: LocalVar, _) if loc.name.startsWith(prefix) => entry
+    }
+    SymbolicValues(newState)
+  }
+
+  private def sort: SortedMap[LocalVar, SymValueSet] = {
+    require(state.keys.map(f => f.name.take(3)).toSet.size <= 1, "Expected one or less Variable in state")
+    SortedMap.sortedMapFactory[LocalVar, SymValueSet](DSAVarOrdering).fromSpecific(state)
+  }
+
+  def getSorted(prefix: String): SortedMap[LocalVar, SymValueSet] = {
+    get(prefix).sort
+  }
+
+  def join(other: SymbolicValues): SymbolicValues = {
+    val newState = mapMerge(state, other.state, SymValueSet.join)
+    SymbolicValues(newState)
+  }
+
+  @tailrec
+  final def exprToSymValSet(
+    expr: Expr,
+    transform: Int => Int = identity,
+    replace: LocalVar => LocalVar = identity
+  ): SymValueSet = {
+    expr match
+      case literal @ BitVecLiteral(value, size) => SymValueSet(Global, bv2SignedInt(literal).toInt).apply(transform)
+      case Extract(end, start, body) if end - start >= 64 => exprToSymValSet(body, transform)
+      case Extract(32, 0, body) => exprToSymValSet(body, transform) // todo incorrectly assuming value is preserved
+      case ZeroExtend(extension, body) => exprToSymValSet(body, transform)
+      case binExp @ BinaryExpr(BVADD | BVSUB, arg1, arg2: BitVecLiteral) =>
+        val oPlus = toOffsetMove(binExp.op, arg2)
+        exprToSymValSet(arg1, oPlus)
+      case variable: LocalVar => state.getOrElse(replace(variable), SymValueSet.empty).apply(transform)
+      case Extract(end, start, body) if end - start < 64 => SymValueSet(NonPointer, OffsetSet.top)
+      case BinaryExpr(BVCOMP, _, _) => SymValueSet(NonPointer, Set(0, 1)).apply(transform)
+      case e @ (BinaryExpr(_, _, _) | SignExtend(_, _) | UnaryExpr(_, _)) =>
+        e.variables
+          .map(_.asInstanceOf[LocalVar])
+          .collect { case locVar: LocalVar if state.contains(locVar) => state(locVar) }
+          .foldLeft(SymValueSet.empty)((result, operand) => result.join(operand))
+          .toTop
+      case _ => ???
+  }
+
+  def contains(variable: LocalVar): Boolean = state.contains(variable)
+  def apply(variable: LocalVar): SymValueSet = state(variable)
+  def isEmpty: Boolean = this == SymbolicValues.empty
+
+  def widen(other: SymbolicValues): SymbolicValues = {
+    val update = state.collect { // widen iff localVar is in both a and b todo this could be wrong
+      case (localVar: LocalVar, symValueSet: SymValueSet)
+          if other.contains(localVar) && symValueSet != other(localVar) =>
+        (localVar, symValueSet.widen(other(localVar)))
+    }
+
+    join(other).join(SymbolicValues(update))
+  }
+
 }
+
+object SymbolicValues2 {
+
+  private val stackPointer = LocalVar("R31_in", BitVecType(64))
+  private val linkRegister = LocalVar("R30_in", BitVecType(64)) // Register("R30", 64)
+  private val framePointer = LocalVar("R29_in", BitVecType(64))
+  private val calleePreserved = (19 to 29).appended(31).map(i => "R" + i)
+  private val implicitFormals = Set(stackPointer, linkRegister, framePointer)
+
+  private def procInitState(proc: Procedure): Map[LocalVar, SymValueSet] = {
+    Map(
+      stackPointer -> SymValueSet(Stack(proc), proc.stackSize.getOrElse(0)),
+      linkRegister -> SymValueSet(Par(proc, linkRegister)),
+      framePointer -> SymValueSet(Par(proc, framePointer))
+    ) ++
+      proc.formalInParam
+        .filterNot(param => implicitFormals.map(f => f.name.take(3)).exists(name => param.name.startsWith(name)))
+        .toSet
+        .map(param => (param, SymValueSet(Par(proc, param))))
+        .toMap
+  }
+
+  def apply(proc: Procedure) = new SymbolicValues(proc)
+
+  def empty: SymbolicValues = SymbolicValues(Map.empty)
+
+  def join(a: SymbolicValues, b: SymbolicValues): SymbolicValues = a.join(b)
+}
+
+
+*/
+
+trait Offsets
+trait OffsetDomain[T <: Offsets] extends AbstractDomain[T] {
+  def init(i: Int): T
+  def init(s: Set[Int]): T
+  def shouldWiden(v: T): Boolean
+  def transform(v: T, f: Int => Int): T
+}
+
+enum OSet extends Offsets {
+  case Top
+  case Values(v: Set[Int])
+}
+
+class OSetDomain extends OffsetDomain[OSet] {
+  override def join(a: OSet, b: OSet, pos: Block): OSet = {
+    (a, b) match
+      case (OSet.Top, _) => OSet.Top
+      case (_, OSet.Top) => OSet.Top
+      case (OSet.Values(x), OSet.Values(y)) => OSet.Values(x.union(y))
+  }
+  override def transfer(a: OSet, b: Command): OSet = ???
+  override def top: OSet = OSet.Top
+  override def bot: OSet = OSet.Values(Set.empty)
+  override def widen(a: OSet, b: OSet, pos: Block): OSet = {
+    OSet.Top
+  }
+  override def init(i: Int): OSet = Values(Set(i))
+
+  override def shouldWiden(v: OSet): Boolean = {
+    v match
+      case OSet.Top => false
+      case OSet.Values(v) => v.size > 10
+  }
+
+
+  override def transform(v: OSet, f: Int => Int): OSet = {
+    v match
+      case OSet.Top => OSet.Top
+      case OSet.Values(v) => Values(v.map(f))
+  }
+
+  override def init(s: Set[Int]): OSet = Values(s)
+}
+
+
+case class SymValSet[T <: Offsets](state: Map[SymBase, T])
+class SymValSetDomain[T <: Offsets, G <: OffsetDomain[T]](val offsetDomain: G) extends AbstractDomain[SymValSet[T]] {
+
+  override def join(a: SymValSet[T], b: SymValSet[T], pos: Block): SymValSet[T] = {
+    SymValSet(mapMerge(a.state, b.state, (x, y) => offsetDomain.join(x, y, pos)))
+  }
+
+  override def widen(a: SymValSet[T], b: SymValSet[T], pos: Block): SymValSet[T] = {
+    val update = a.state
+      .collect {
+        case (base: SymBase, offsets: T) if b.state.contains(base) && b.state(base) != offsets =>
+          (base, offsetDomain.widen(offsets, b.state(base), pos))
+        case (base: SymBase, offsets: T) if offsetDomain.shouldWiden(offsets) =>
+          (base, offsetDomain.widen(offsets, b.state(base), pos))
+      }
+    join(a, join(b, SymValSet(update), pos), pos)
+  }
+
+  def init(base: SymBase, value: Int = 0): SymValSet[T] = {
+    SymValSet(Map(base -> offsetDomain.init(value)))
+  }
+
+  def init(base: SymBase, values: Set[Int]): SymValSet[T] = {
+    SymValSet(Map(base -> offsetDomain.init(values)))
+  }
+  def init(base: SymBase, offsets: T): SymValSet[T] = {
+    SymValSet(Map(base -> offsets))
+  }
+
+  override def transfer(a: SymValSet[T], b: Command): SymValSet[T] = ???
+  def transform(s: SymValSet[T], f: Int => Int): SymValSet[T] = {
+    SymValSet(s.state.map((base, offsets) => (base, offsetDomain.transform(offsets, f))))
+  }
+  override def top: SymValSet[T] = ???
+  override def bot: SymValSet[T] = SymValSet(Map.empty)
+}
+
+
+
+case class SymValues[T <: Offsets](state: Map[LocalVar, SymValSet[T]])
+class SymValuesDomain[T <: Offsets, G <: OffsetDomain[T]](val symValSetDomain: SymValSetDomain[T, G]) extends AbstractDomain[SymValues[T]] {
+
+  private val stackPointer = LocalVar("R31_in", BitVecType(64))
+  private val linkRegister = LocalVar("R30_in", BitVecType(64)) // Register("R30", 64)
+  private val framePointer = LocalVar("R29_in", BitVecType(64))
+  private val calleePreserved = (19 to 29).appended(31).map(i => "R" + i)
+  private val implicitFormals = Set(stackPointer, linkRegister, framePointer)
+
+  private val count: mutable.Map[Block, Int] = mutable.Map.empty.withDefault(_ => 0)
+
+
+  override def widen(a: SymValues[T], b: SymValues[T], pos: Block): SymValues[T] = {
+    val update = a.state.collect {
+      case (localVar: LocalVar, symValSet: SymValSet[T])
+        if b.state.contains(localVar) && symValSet != b.state(localVar) =>
+        (localVar, symValSetDomain.widen(symValSet, b.state(localVar), pos))
+    }
+
+    joinHelper(a, joinHelper(b, SymValues(update), pos), pos)
+  }
+
+  private def joinHelper(a: SymValues[T], b: SymValues[T], pos: Block): SymValues[T] = {
+    SymValues(mapMerge(a.state, b.state, (x, y) => symValSetDomain.join(x, y, pos)))
+  }
+
+  private def procInitState(b: Block): Map[LocalVar, SymValSet[T]] = {
+    val proc = b.parent
+    Map(
+      stackPointer -> symValSetDomain.init(Stack(proc), proc.stackSize.getOrElse(0)),
+      linkRegister -> symValSetDomain.init(Par(proc, linkRegister)),
+      framePointer -> symValSetDomain.init(Par(proc, framePointer))
+    ) ++
+      proc.formalInParam
+        .filterNot(param => implicitFormals.map(f => f.name.take(3)).exists(name => param.name.startsWith(name)))
+        .toSet
+        .map(param => (param, symValSetDomain.init(Par(proc, param))))
+        .toMap
+  }
+
+
+  override def init(b: Block): SymValues[T] = {
+    if b.isEntry then
+      SymValues(procInitState(b))
+    else bot
+  }
+
+
+  override def join(a: SymValues[T], b: SymValues[T], pos: Block): SymValues[T] = {
+    count.update(pos, count(pos) + 1)
+    if count(pos) < 10 then joinHelper(a, b, pos) else widen(a, b, pos)
+  }
+
+  @tailrec
+  final def exprToSymValSet(
+    symValues: SymValues[T],
+    expr: Expr,
+    b: Block,
+    transform: Int => Int = identity,
+    replace: LocalVar => LocalVar = identity
+  ): SymValSet[T] = {
+    expr match
+      case literal @ BitVecLiteral(value, size) => symValSetDomain.init(Global, transform(bv2SignedInt(literal).toInt))
+      case Extract(end, start, body) if end - start >= 64 => exprToSymValSet(symValues, body, b, transform)
+      case Extract(32, 0, body) => exprToSymValSet(symValues, body, b,  transform) // todo incorrectly assuming value is preserved
+      case ZeroExtend(extension, body) => exprToSymValSet(symValues, body, b, transform)
+      case binExp @ BinaryExpr(BVADD | BVSUB, arg1, arg2: BitVecLiteral) =>
+        val oPlus = toOffsetMove(binExp.op, arg2)
+        exprToSymValSet(symValues, arg1, b, oPlus)
+      case variable: LocalVar => symValSetDomain.transform(symValues.state.getOrElse(replace(variable), symValSetDomain.bot), transform)
+      case Extract(end, start, body) if end - start < 64 => symValSetDomain.init(NonPointer, symValSetDomain.offsetDomain.top)
+      case BinaryExpr(BVCOMP, _, _) => symValSetDomain.init(NonPointer, Set(0, 1).map(transform))
+      case e @ (BinaryExpr(_, _, _) | SignExtend(_, _) | UnaryExpr(_, _)) =>
+        val updated = e.variables
+          .map(_.asInstanceOf[LocalVar])
+          .collect { case locVar: LocalVar if symValues.state.contains(locVar) => symValues.state(locVar) }
+          .flatMap(_.state)
+          .map((base, _) => (base, symValSetDomain.offsetDomain.top)).toMap
+        SymValSet(updated)
+      case _ => ???
+  }
+
+  override def transfer(a: SymValues[T], b: Command): SymValues[T] = {
+    val proc = b.parent.parent
+    val block = b.parent
+    b match
+      case LocalAssign(lhs: LocalVar, rhs: Expr, _) =>
+        val update = SymValues(Map(lhs -> exprToSymValSet(a, rhs, block)))
+        join(a, update, block)
+      case load @ MemoryLoad(lhs: LocalVar, _, rhs, _, size, label) =>
+        val update = SymValues(Map(lhs -> symValSetDomain.init(Loaded(load))))
+        join(a, update, block)
+      case mal @ DirectCall(target, outParams, inParams, label)
+          if target.name.startsWith("malloc") || target.name.startsWith("calloc") =>
+        val (malloc, others) = outParams.values
+          .map(_.asInstanceOf[LocalVar])
+          .partition(outParam => outParam.name.startsWith("R0")) // malloc ret R0
+        assert(malloc.size == 1, s"SVA expected only one R0 returned from $mal")
+        val update = SymValues( // assume call to malloc only changes the value of R0
+          Map(malloc.head -> symValSetDomain.init(Heap(mal)))
+        )
+        join(a, update, block)
+      case call @ DirectCall(target, outParams, inParams, label) =>
+        val retInitSymValSet = SymValues(
+          outParams.values
+            .map(_.asInstanceOf[LocalVar])
+            .map(param => (param, symValSetDomain.init(Ret(call, param))))
+            .toMap
+        )
+        join(a, retInitSymValSet, block)
+      case ind: IndirectCall => a // TODO possibly map every live variable to top
+      case ret: Return =>
+        val update = SymValues(ret.outParams.map { case (outVar: LocalVar, value: Expr) =>
+          outVar -> exprToSymValSet(a, value, block)
+        })
+
+        join(a, update, block)
+      case _ => a
+  }
+
+
+  override def top: SymValues[T] = ???
+
+  override def bot: SymValues[T] = SymValues(Map.empty)
+}
+
+
