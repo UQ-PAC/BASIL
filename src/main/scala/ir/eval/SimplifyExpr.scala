@@ -146,7 +146,7 @@ def simpFixedPoint(s: Simplifier)(e: Expr): (Expr, Boolean) = {
   *   [[simplifyExpr]]
   */
 def simplifyExprFixpoint: Simplifier = simpFixedPoint(
-  SimpExpr(simpFixedPoint(sequenceSimp(simplifyExpr, SimpExpr(fastPartialEvalExpr))))
+  SimpExpr(simpFixedPoint(sequenceSimp(simplifyExpr, SimpExpr(fastPartialEvalExprTopLevel))))
 )
 
 /**

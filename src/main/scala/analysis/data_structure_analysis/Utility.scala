@@ -249,7 +249,7 @@ def unwrapPaddingAndSlicing(expr: Expr): Expr = {
     case Extract(_, 0, x) => x
     case ZeroExtend(_, x) => x
     case BinaryExpr(BVADD, Extract(hi, 0, x), y: Literal) =>
-      ir.eval.fastPartialEvalExpr(BinaryExpr(BVADD, x, SignExtend(size(x).get - size(y).get, y)))(0)
+      ir.eval.partialEvaluateExpr(BinaryExpr(BVADD, x, SignExtend(size(x).get - size(y).get, y)))
     case o => o
   }
   r
