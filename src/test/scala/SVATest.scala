@@ -6,6 +6,7 @@ import ir.*
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
 import util.*
+import analysis.data_structure_analysis.OSetDomain
 
 import scala.collection.immutable.{AbstractSeq, LinearSeq}
 
@@ -93,29 +94,22 @@ class SVATest extends AnyFunSuite {
     val results = runTest(context)
     val mainProc = results.ir.program.mainProcedure
     val sva = results.dsa.get.sva(mainProc)
-    println(sva)
-    val r0SVA = sva.getSorted("R0")
+    val r0SVA = SymValues.getSorted(sva, "R0")
 //    val r1SVA = sva.getSorted("R1")
 
-    val inParam = r0SVA.firstKey // TODO look into why there is an inParam
-    assert(r0SVA(inParam) == SymValueSet(Par(mainProc, inParam)), "input param not set correctly")
-
-//    val mallocCall: DirectCall = computeDomain(IntraProcIRCursor, Set(mainProc))
-//      .collectFirst {
-//        case call: DirectCall if call.target.name.startsWith("malloc") => call
-//      }.get // this doesn't work because the call is changed somewhere after the analysis
-//
-//    val mallocSB: SymBase = Heap(mallocCall)
+    val domain = SymValSetDomain[OSet]()
+    val inParam = r0SVA.firstKey
+    assert(r0SVA(inParam) == domain.init(Par(mainProc, inParam)), "input param not set correctly")
 
     val mallocValSet = r0SVA.collectFirst {
-      case (variable: LocalVar, valueSet: SymValueSet)
-          if valueSet.state.keys.exists(_.isInstanceOf[Heap]) && valueSet.size == 1 =>
+      case (variable: LocalVar, valueSet: SymValSet[OSet])
+          if valueSet.state.keys.exists(_.isInstanceOf[Heap]) && valueSet.state.size == 1 =>
         valueSet
     }.get // expect exactly 1 value set matching the case
-    assert(mallocValSet.state.head._2.getOffsets == Set(0), "incorrect offset for malloc symbolic value")
+    assert(mallocValSet.state.head._2.toOffsets == Set(0), "incorrect offset for malloc symbolic value")
 
     val outPram = r0SVA.lastKey
-    assert(r0SVA(outPram) == mallocValSet.apply(i => i + 10), "should be malloc symValueSet oplus 10")
+    assert(r0SVA(outPram) == SymValSet.transform(mallocValSet, i => i + 10), "should be malloc symValueSet oplus 10")
   }
 
   test("call") {
@@ -140,17 +134,17 @@ class SVATest extends AnyFunSuite {
     val context = programToContext(program, globals, globalOffsets)
     val main = program.mainProcedure
     val sva = runTest(context).dsa.get.sva(main)
-    val r0SVA = sva.getSorted(regName)
+    val r0SVA = SymValues.getSorted(sva, regName)
 
     val returnedValSet = r0SVA.collectFirst {
-      case (variable: LocalVar, valueSet: SymValueSet)
-          if valueSet.state.keys.exists(_.isInstanceOf[Ret]) && valueSet.size == 1 =>
+      case (variable: LocalVar, valueSet: SymValSet[OSet])
+          if valueSet.state.keys.exists(_.isInstanceOf[Ret]) && valueSet.state.size == 1 =>
         valueSet
     }.get // expect exactly 1 value set matching the case
-    assert(returnedValSet.state.head._2.getOffsets == Set(0), "incorrect offset for returned symbolic value")
+    assert(returnedValSet.state.head._2.toOffsets == Set(0), "incorrect offset for returned symbolic value")
 
     val outPram = r0SVA.lastKey
-    assert(r0SVA(outPram) == returnedValSet.apply(i => i + 10), "should be malloc symValueSet oplus 10")
+    assert(r0SVA(outPram) == SymValSet.transform(returnedValSet, i => i + 10), "should be return symValueSet oplus 10")
   }
 
   test("proc entry") {
@@ -181,8 +175,9 @@ class SVATest extends AnyFunSuite {
     assert(main.formalInParam.contains(R0in), "Expected R0 as an input parameter")
     assert(main.formalInParam.contains(R1in), "Expected R1 as an input parameter")
 
-    assert(sva(R0in) == SymValueSet(Par(main, R0in)), "Incorrect SymbolicValueSet for R0_in")
-    assert(sva(R1in) == SymValueSet(Par(main, R1in)), "Incorrect SymbolicValueSet for R1_in")
+    val domain = SymValSetDomain[OSet]()
+    assert(sva(R0in) == domain.init(Par(main, R0in)), "Incorrect SymbolicValueSet for R0_in")
+    assert(sva(R1in) == domain.init(Par(main, R1in)), "Incorrect SymbolicValueSet for R1_in")
 
     assert(sva(R0in) == sva(R2out), "Expected input param to propagate to output")
     assert(sva(R1in) == sva(R3out), "Expected input param to propagate to output")
@@ -212,11 +207,13 @@ class SVATest extends AnyFunSuite {
 
     assert(main.formalInParam.contains(R0in), "Expected R0 as an input parameter")
 
-    assert(sva(R0in) == SymValueSet(Par(main, R0in)), "Incorrect SymbolicValueSet for R0_in")
+    val domain = SymValSetDomain[OSet]()
+    assert(sva(R0in) == domain.init(Par(main, R0in)), "Incorrect SymbolicValueSet for R0_in")
 
     assert(sva(R0in) == sva(R1out), "Expected input param to propagate to output")
-    assert(sva(R0out) == sva(R0in).apply(i => i + 10), "Expected updated input param to propagate to output")
+    assert(sva(R0out) == SymValSet.transform(sva(R0in), i => i + 10), "Expected updated input param to propagate to output")
   }
+
 
   test("branch") {
     val R0 = Register("R0", 64)
@@ -247,14 +244,17 @@ class SVATest extends AnyFunSuite {
     val main = program.mainProcedure
     val sva = runTest(context).dsa.get.sva(main)
 
-    val (_, lastValSet) = sva.getSorted("R0").last
+    val domain = SymValSetDomain[OSet]()
+    val (_, lastValSet) = SymValues.getSorted(sva, "R0").last
 
-    assert(sva(R0in) == SymValueSet(Par(main, R0in)), "Incorrect SymbolicValueSet for R0_in")
+    assert(sva(R0in) == domain.init(Par(main, R0in)), "Incorrect SymbolicValueSet for R0_in")
+    println(lastValSet)
     assert(
-      lastValSet == sva(R0in).join(sva(R0in).apply(i => i + 10).join(sva(R0in).apply(i => i + 45))),
+      lastValSet == domain.join(domain.join(sva(R0in), SymValSet.transform(sva(R0in),i => i + 10)), SymValSet.transform(sva(R0in), i => i + 45)),
       "Incorrect set of offsets"
     )
   }
+
 
   test("loop") {
     val R0 = Register("R0", 64)
@@ -280,11 +280,13 @@ class SVATest extends AnyFunSuite {
     val context = programToContext(program, globals, globalOffsets)
     val main = context.program.mainProcedure
     val sva = runTest(context).dsa.get.sva(main)
-    val R0last = sva.getSorted("R0").lastKey
+    val R0last = SymValues.getSorted(sva, "R0").lastKey
 
-    assert(sva(R0in) == SymValueSet(Par(main, R0in)), "Incorrect SymbolicValueSet for R0_in")
-    assert(sva(R0last) == sva(R0in).toTop, "Incorrect set of offsets")
+    val domain = SymValSetDomain[OSet]()
+    assert(sva(R0in) == domain.init(Par(main, R0in)), "Incorrect SymbolicValueSet for R0_in")
+    assert(sva(R0last) == SymValSet(sva(R0in).state.view.mapValues(_ => OSet.Top).toMap), "Incorrect set of offsets")
   }
+
 
   test("load") {
     val mem = SharedMemory("mem", 64, 8)
@@ -306,15 +308,15 @@ class SVATest extends AnyFunSuite {
     val procedure: Procedure = program.mainProcedure
     val sva = runTest(context).dsa.get.sva(procedure)
 
-    val r0SVA = sva.getSorted(regName)
+    val r0SVA = SymValues.getSorted(sva, regName)
 
     val loadValSet = r0SVA.collectFirst {
-      case (variable: LocalVar, valueSet: SymValueSet) if valueSet.contains(Loaded(load)) && valueSet.size == 1 =>
+      case (variable: LocalVar, valueSet: SymValSet[OSet]) if valueSet.state.contains(Loaded(load)) && valueSet.state.size == 1 =>
         valueSet
     }.get // expect exactly 1 value set matching the case
-    assert(loadValSet.get(Loaded(load)).getOffsets == Set(0), "incorrect offset for loaded symbolic value")
-
+    assert(loadValSet.state(Loaded(load)).toOffsets == Set(0), "incorrect offset for loaded symbolic value")
+    
     val outPram = r0SVA.lastKey
-    assert(r0SVA(outPram) == loadValSet.apply(i => i + 10), "should be load symValueSet oplus 10")
+    assert(r0SVA(outPram) == SymValSet.transform(loadValSet, i => i + 10), "should be load symValueSet oplus 10")
   }
 }
