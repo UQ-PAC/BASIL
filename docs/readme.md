@@ -13,6 +13,7 @@ To get started on development, see [development](development).
     - [tool-installation](development/tool-installation.md) Guide to lifter, etc. tool installation
     - [cfg](development/cfg.md) Explanation of the old CFG datastructure 
     - [interpreter](development/interpreter.md) Explanation of IR interpreter
+    - [simplification-solvers](development/simplification-solvers.md) Explanation of ir transforms and simplifications
 - [basil-ir](basil-ir.md) explanation of BASIL's intermediate representation
 - [compiler-explorer](compiler-explorer.md) guide to the compiler explorer basil interface
 - [il-cfg](il-cfg.md) explanation of the IL cfg iterator design
@@ -108,6 +109,10 @@ it additionally inserts assertions and specifications to make Boogie check infor
 3. Analysis
     - Static analysis over the [BASIL IR](basil-ir.md) collects information used for translation.
     - The goal is to lift the program constructs present to constructs that afford more local reasoning.
+    - Simplifications (see [simplification-solvers](development/simplification-solvers.md))
+      - Parameter form
+      - Dynamic Single Assignment
+      - Simplifications (copyprop & branch condition simplifications)
 4. Translation & Verification condition generation 
     - Verification conditions implementing the $wp_{if}^{\cal R G}$ logic, based on the function and rely/guarantee specifications 
     from the `.spec` file are added to the program when it is translated to the **Boogie IR**.

@@ -172,6 +172,14 @@ enum LatticeMap[D, L] {
     case BottomMap(m) => BottomMap(m.filter(pred))
   }
 
+  def toMap: Map[D, L] = this match {
+    case Top() => Map()
+    case Bottom() => Map()
+    case TopMap(m) => m
+    case BottomMap(m) => m
+  }
+
+
   def + (kv: (D, L)): LatticeMap[D, L] = update(kv._1, kv._2)
   def ++ (kv: Map[D, L]): LatticeMap[D, L] = kv.foldLeft(this) { (m, kv) => m + kv }
 

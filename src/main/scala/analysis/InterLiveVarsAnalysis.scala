@@ -13,7 +13,7 @@ import ir.{Assert, LocalAssign, Assume, CFGPosition, Command, DirectCall, Indire
  * Tip SPA IDE Slides include a short and clear explanation of microfunctions
  * https://cs.au.dk/~amoeller/spa/8-distributive.pdf
  */
-trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement, TwoElementLattice] {
+trait LiveVarsAnalysisFunctions(inline: Boolean) extends BackwardIDEAnalysis[Variable, TwoElement, TwoElementLattice] {
 
   val valuelattice: TwoElementLattice = TwoElementLattice()
   val edgelattice: EdgeFunctionLattice[TwoElement, TwoElementLattice] = EdgeFunctionLattice(valuelattice)
@@ -21,7 +21,10 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement
 
   def edgesCallToEntry(call: Command, entry: Return)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     d match {
-      case Left(l) => Map() // maps all variables before the call to bottom
+      case Left(l) if inline => {
+        Map(d -> IdEdge())
+      }
+      case Left(l) => Map()
       case Right(_) => entry.outParams.flatMap(_._2.variables).foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
               (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
       }
@@ -98,7 +101,7 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement
         val reads = ir.transforms.externalCallReads(c.target.procName).toSet[Variable]
         d match {
           case Left(value) =>
-            if reads.contains(value) then
+            if writes.contains(value) then
               Map()
             else
               Map(d -> IdEdge())
@@ -113,7 +116,7 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement
         val reads = c.actualParams.flatMap(_._2.variables).toSet
         d match {
           case Left(value) =>
-            if reads.contains(value) then
+            if writes.contains(value) then
               Map()
             else
               Map(d -> IdEdge())
@@ -129,9 +132,10 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement
 }
 
 class InterLiveVarsAnalysis(program: Program)
-  extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program), LiveVarsAnalysisFunctions
+  extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program), LiveVarsAnalysisFunctions(false)
 
 
-
+class InlineInterLiveVarsAnalysis(program: Program)
+  extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program), LiveVarsAnalysisFunctions(true)
 
 

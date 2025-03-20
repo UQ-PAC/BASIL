@@ -249,33 +249,54 @@ def stronglyConnectedComponents[T <: CFGPosition, O <: T](walker: IRWalk[T, O], 
 def toDot(program: Program, labels: Map[CFGPosition, String] = Map.empty, inter: Boolean = false): String = {
   if (inter) {
     val domain = computeDomain[CFGPosition, CFGPosition](InterProcIRCursor, program.procedures).toSet
-    toDot[CFGPosition](domain, InterProcIRCursor, labels)
+    toDot[CFGPosition](domain, InterProcIRCursor, labels, Set())
   } else {
     val domain = computeDomain[CFGPosition, CFGPosition](IntraProcIRCursor, program.procedures).toSet
-    toDot[CFGPosition](domain, IntraProcIRCursor, labels)
+    toDot[CFGPosition](domain, IntraProcIRCursor, labels, Set())
   }
 }
 
 
 def dotCallGraph(program: Program, labels: Map[CFGPosition, String] = Map.empty): String = {
   val domain = computeDomain[Procedure, Procedure](CallGraph, program.procedures)
-  toDot[Procedure](domain.toSet, CallGraph, labels)
+  toDot[Procedure](domain.toSet, CallGraph, labels, Set())
+}
+
+
+case class DetachedEntry(blocksEmptyPred: Set[Block], reachableFromBlockEmptyPred: Set[Block])
+
+def getDetachedBlocks(p: Procedure) = {
+  val b = p.blocks.filter(b => !p.entryBlock.contains(b) && b.prevBlocks.isEmpty )
+
+  var oldReachable = Set[Block]()
+  var reachable = b.toSet
+
+  while (oldReachable != reachable) {
+    oldReachable = reachable
+
+    reachable = reachable.flatMap(b => Set(b) ++ b.nextBlocks)
+  }
+
+  DetachedEntry(b.toSet, reachable)
 }
 
 
 def dotBlockGraph(proc: Procedure) : String = {
+  val o = getDetachedBlocks(proc)
   dotBlockGraph(proc.collect {
     case b: Block => b
-  })
+  }, o.reachableFromBlockEmptyPred)
 }
 
 def dotBlockGraph(prog: Program) : String = {
+  val e = prog.procedures.toSet.flatMap(getDetachedBlocks(_).reachableFromBlockEmptyPred)
+
   dotBlockGraph(prog.collect {
     case b: Block => b
-  })
+  }, e)
 }
 
-def dotBlockGraph(blocks: Iterable[Block]) : String = {
+def dotBlockGraph(blocks: Iterable[Block], orphaned: Set[Block]) : String = {
     val printer = translating.BasilIRPrettyPrinter()
     val labels : Map[CFGPosition, String] = (blocks.collect {
       case b : Block => b -> {
@@ -288,18 +309,19 @@ def dotBlockGraph(blocks: Iterable[Block]) : String = {
       }
     }).toMap
 
-    toDot[Block](blocks.toSet, IntraProcBlockIRCursor, labels)
+    toDot[Block](blocks.toSet, IntraProcBlockIRCursor, labels, orphaned)
 }
 
 def dotBlockGraph(program: Program, labels: Map[CFGPosition, String] = Map.empty): String = {
   val domain = computeDomain[CFGPosition, Block](IntraProcBlockIRCursor, program.procedures.flatMap(_.blocks).toSet)
-  toDot[Block](domain.toSet, IntraProcBlockIRCursor, labels)
+  toDot[Block](domain.toSet, IntraProcBlockIRCursor, labels, Set())
 }
 
 def toDot[T <: CFGPosition](
     domain: Set[T],
     iterator: IRWalk[? >: T, ?],
-    labels: Map[CFGPosition, String]
+    labels: Map[CFGPosition, String],
+    filled: Set[T],
 ): String = {
 
   val visited: mutable.Set[CFGPosition] = mutable.Set.from(domain)
@@ -330,9 +352,9 @@ def toDot[T <: CFGPosition](
 
   for (node <- domain) {
     node match
-      case s: Command => dotNodes.addOne(s -> DotNode(label(s.label), nodeText(s)))
-      case s: Block   => dotNodes.addOne(s -> DotNode(label(Some(s.label)), nodeText(s)))
-      case s          => dotNodes.addOne(s -> DotNode(label(Some(s.toString)), nodeText(s)))
+      case s: Command => dotNodes.addOne(s -> DotNode(label(s.label), nodeText(s), filled.contains(node)))
+      case s: Block   => dotNodes.addOne(s -> DotNode(label(Some(s.label)), nodeText(s), filled.contains(node)))
+      case s          => dotNodes.addOne(s -> DotNode(label(Some(s.toString)), nodeText(s), filled.contains(node)))
   }
 
   def getArrow(s: CFGPosition, n: CFGPosition) = {

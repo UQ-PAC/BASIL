@@ -50,10 +50,19 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
           for ((s, i) <- instruction.zipWithIndex) {
             val label = blockAddress.map {(a: BigInt) =>
               val instructionAddress = a + (opcodeSize * instructionCount)
-              instructionAddress.toString + "$" + i
+              instructionAddress.toString + "_" + i
             }
 
-            statements.appendAll(visitStmt(s, label))
+            statements.appendAll(
+              try {
+                visitStmt(s, label)
+              } catch {
+                case e => {
+                  Logger.error(s"Failed to load insn: $e\n${e.getStackTrace.mkString("\n")}")
+                  Seq(Assert(FalseLiteral, Some(" Failed to load instruction")))
+                }
+              }
+            )
           }
           instructionCount += 1
         }
@@ -171,8 +180,8 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
     val (expr, load) = visitExpr(ctx.expr)
     if (expr.isDefined) {
       if (load.isDefined) {
-        val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0"))
-        val assign = LocalAssign(LocalVar(name, ty), expr.get, label.map(_ + "$1"))
+        val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "_0"))
+        val assign = LocalAssign(LocalVar(name, ty), expr.get, label.map(_ + "_1"))
         Seq(loadWithLabel, assign)
       } else {
         val assign = LocalAssign(LocalVar(name, ty), expr.get, label)
@@ -188,8 +197,8 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
     val (rhs, load) = visitExpr(ctx.expr)
     if (lhs.isDefined && rhs.isDefined) {
       if (load.isDefined) {
-        val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0"))
-        val assign = LocalAssign(lhs.get, rhs.get, label.map(_ + "$1"))
+        val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "_0"))
+        val assign = LocalAssign(lhs.get, rhs.get, label.map(_ + "_1"))
         Seq(loadWithLabel, assign)
       } else {
         val assign = LocalAssign(lhs.get, rhs.get, label)
@@ -208,10 +217,10 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
     if (expr.isDefined) {
       if (load.isDefined) {
         val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0"))
-        val assign = LocalAssign(LocalVar(name + "$" + blockCount + "$" + instructionCount, ty), expr.get, label.map(_ + "$1"))
+        val assign = LocalAssign(LocalVar(name + "_" + blockCount + "_" + instructionCount, ty), expr.get, label.map(_ + "$1"))
         Seq(loadWithLabel, assign)
       } else {
-        val assign = LocalAssign(LocalVar(name + "$" + blockCount + "$" + instructionCount, ty), expr.get, label)
+        val assign = LocalAssign(LocalVar(name + "_" + blockCount + "_" + instructionCount, ty), expr.get, label)
         Seq(assign)
       }
     } else {
@@ -260,7 +269,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
   private def visitExprVar(ctx: ExprVarContext): Option[Expr] = {
     val name = visitIdent(ctx.ident)
     name match {
-      case n if constMap.contains(n) => Some(LocalVar(n + "$" + blockCount + "$" + instructionCount, constMap(n)))
+      case n if constMap.contains(n) => Some(LocalVar(n + "_" + blockCount + "_" + instructionCount, constMap(n)))
       case v if varMap.contains(v) => Some(LocalVar(v, varMap(v)))
       case "SP_EL0" => Some(Register("R31", 64))
       case "_PC" => Some(Register("_PC", 64))
@@ -322,7 +331,6 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
             case o => UnaryExpr(BoolToBV1, o)
           }
         (result, load)
-
 
       case "not_bool.0" => (resolveUnaryOp(BoolNOT, function, 0, typeArgs, args, ctx.getText), None)
       case "eq_enum.0" => (resolveBinaryOp(BoolEQ, function, 0, typeArgs, args, ctx.getText))
@@ -401,14 +409,14 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0))
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + size, argsIR, BoolType)), None)
+        (Some(UninterpretedFunction(name + "_" + size, argsIR, BoolType)), None)
 
       case "FPAdd.0" | "FPMul.0" | "FPDiv.0" | "FPMulX.0" | "FPMax.0" | "FPMin.0" | "FPMaxNum.0" | "FPMinNum.0" | "FPSub.0" =>
         checkArgs(function, 1, 3, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0)).toInt
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size))), None)
+        (Some(UninterpretedFunction(name + "_" + size, argsIR, BitVecType(size))), None)
 
       case "FPMulAddH.0" | "FPMulAdd.0" |
            "FPRoundInt.0" |
@@ -417,7 +425,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0)).toInt
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size))), None)
+        (Some(UninterpretedFunction(name + "_" + size, argsIR, BitVecType(size))), None)
 
       case "FPRecpX.0" | "FPSqrt.0" | "FPRecipEstimate.0" |
            "FPRSqrtStepFused.0" | "FPRecipStepFused.0" =>
@@ -425,14 +433,14 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0)).toInt
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size))), None)
+        (Some(UninterpretedFunction(name + "_" + size, argsIR, BitVecType(size))), None)
 
       case "FPCompare.0" =>
         checkArgs(function, 1, 4, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0))
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(4))), None)
+        (Some(UninterpretedFunction(name + "_" + size, argsIR, BitVecType(4))), None)
 
       case "FPConvert.0" =>
         checkArgs(function, 2, 3, typeArgs.size, args.size, ctx.getText)
@@ -440,7 +448,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val outSize = parseInt(typeArgs(0)).toInt
         val inSize = parseInt(typeArgs(1))
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize))), None)
+        (Some(UninterpretedFunction(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "FPToFixed.0" =>
         checkArgs(function, 2, 5, typeArgs.size, args.size, ctx.getText)
@@ -449,7 +457,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val inSize = parseInt(typeArgs(1))
         // need to specifically handle the integer parameter
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize))), None)
+        (Some(UninterpretedFunction(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "FixedToFP.0" =>
         checkArgs(function, 2, 5, typeArgs.size, args.size, ctx.getText)
@@ -458,7 +466,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val outSize = parseInt(typeArgs(1)).toInt
         // need to specifically handle the integer parameter
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize))), None)
+        (Some(UninterpretedFunction(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "FPConvertBF.0" =>
         checkArgs(function, 0, 3, typeArgs.size, args.size, ctx.getText)
@@ -472,7 +480,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val inSize = parseInt(typeArgs(0))
         val outSize = parseInt(typeArgs(1)).toInt
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize))), None)
+        (Some(UninterpretedFunction(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "BFAdd.0" | "BFMul.0" =>
         checkArgs(function, 0, 2, typeArgs.size, args.size, ctx.getText)
@@ -617,7 +625,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
   private def visitLExprVar(ctx: LExprVarContext): Option[Variable] = {
     val name = visitIdent(ctx.ident)
     name match {
-      case n if constMap.contains(n) => Some(LocalVar(n + "$" + blockCount + "$" + instructionCount, constMap(n)))
+      case n if constMap.contains(n) => Some(LocalVar(n + "_" + blockCount + "_" + instructionCount, constMap(n)))
       case v if varMap.contains(v) => Some(LocalVar(v, varMap(v)))
       case "SP_EL0" => Some(Register("R31", 64))
       case "_PC" => Some(Register("_PC", 64))

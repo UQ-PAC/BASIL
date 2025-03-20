@@ -16,6 +16,11 @@ import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
 import ExecutionContext.Implicits.global
 
+
+/**
+ * Simplification pass, see also: docs/development/simplification-solvers.md
+ */
+
 def getLiveVars(p: Procedure): (Map[Block, Set[Variable]], Map[Block, Set[Variable]]) = {
   val liveVarsDom = IntraLiveVarsDomain()
   val liveVarsSolver = worklistSolver(liveVarsDom)
@@ -67,8 +72,6 @@ def basicReachingDefs(p: Procedure): Map[Command, Map[Variable, Set[Assign | Dir
   merged
 }
 
-case class DefUse(defined: Map[Variable, Assign])
-
 // map v -> definitions reached here
 class DefUseDomain(liveBefore: Map[Block, Set[Variable]]) extends AbstractDomain[Map[Variable, Set[Assign]]] {
 
@@ -91,7 +94,37 @@ class DefUseDomain(liveBefore: Map[Block, Set[Variable]]) extends AbstractDomain
       })
       .toMap
   }
+}
 
+
+enum Def {
+  case Def(a: Assign)
+  case Entry
+}
+
+// map v -> definitions reached here
+class DefUseEntryDomain() extends AbstractDomain[Map[Variable, Set[Def]]] {
+
+  override def transfer(s: Map[Variable, Set[Def]], b: Command) = {
+    b match {
+      case a: LocalAssign => s.updated(a.lhs, Set(Def.Def(a)))
+      case a: MemoryLoad  => s.updated(a.lhs, Set(Def.Def(a)))
+      case d: DirectCall  => d.outParams.map(_._2).foldLeft(s)((s, r) => s.updated(r, Set(Def.Def(d))))
+      case _              => s
+    }
+  }
+  override def top = ???
+  def bot = Map[Variable, Set[Def]]()
+  def init = Map[Variable, Set[Def]]().withDefaultValue(Def.Entry)
+
+  def join(l: Map[Variable, Set[Def]], r: Map[Variable, Set[Def]], pos: Block) = {
+    l.keySet
+      .union(r.keySet)
+      .map(k => {
+        k -> (l.get(k).getOrElse(Set(Def.Entry)) ++ r.get(k).getOrElse(Set(Def.Entry)))
+      })
+      .toMap
+  }
 }
 
 class IntraLiveVarsDomain extends PowerSetDomain[Variable] {
@@ -438,7 +471,7 @@ def removeEmptyBlocks(p: Program) = {
   }
 }
 
-def coalesceBlocks(p: Program) = {
+def coalesceBlocks(p: Program) : Boolean = {
   var didAny = false
   for (proc <- p.procedures) {
     val blocks = proc.blocks.toList
@@ -469,7 +502,12 @@ def coalesceBlocks(p: Program) = {
         val stmts = b.statements.map(b.statements.remove).toList
         nextBlock.statements.prependAll(stmts)
         // leave empty block b and cleanup with removeEmptyBlocks
-      }
+      } else if (
+        b.jump.isInstanceOf[Unreachable] && b.statements.isEmpty && b.prevBlocks.size == 1
+        ) {
+          b.prevBlocks.head.replaceJump(Unreachable())
+          b.parent.removeBlocks(b)
+        }
     }
   }
   didAny
@@ -532,14 +570,20 @@ def removeInvariantOutParameters(p: Program, alreadyInlined : Map[Procedure, Set
 
     // remove invariant params from outparam signature, and outparam list of return, and out param list of all calls,
     // and add assignment after the call of bound actual param to bound outparam
+    // TODO: dependency from specification into account when removing outparams
+    val overApproxSpecDependency = ((0 to 7).map(n => LocalVar(s"R${n}_in", BitVecType(64))) ++ (0 to 7).map(n => LocalVar(s"R${n}_out", BitVecType(64)))).toSet
+
     for ((invariantOutFormal, binding) <- invariantParams.filterNot((k,v) => doneAlready.contains(k))) {
       doneNow = doneNow + invariantOutFormal
 
       modified = true
-      // TODO: uncomment and take dependency from specification into account when removing outparams
-      //
-      // proc.formalOutParam.remove(invariantOutFormal)
-      // ret.outParams = ret.outParams.removed(invariantOutFormal)
+
+      val remove = !overApproxSpecDependency.contains(invariantOutFormal)
+
+      if (remove) {
+        proc.formalOutParam.remove(invariantOutFormal)
+        ret.outParams = ret.outParams.removed(invariantOutFormal)
+      }
 
       val calls = proc.incomingCalls()
 
@@ -566,9 +610,9 @@ def removeInvariantOutParameters(p: Program, alreadyInlined : Map[Procedure, Set
         }
         call.outParams = call.outParams + (invariantOutFormal -> callLHS)
 
-        // TODO: uncomment and take dependency from specification into account when removing outparams
-        //
-        // call.outParams = call.outParams.removed(invariantOutFormal)
+        if (remove) {
+          call.outParams = call.outParams.removed(invariantOutFormal)
+        }
 
         // insert assignment of to successor to maintain singleCallBlockEnd invariant
         // TODO: this would really be simpler if we just broke the singleCallBlockEnd invariant
@@ -703,7 +747,9 @@ def copyPropParamFixedPoint(p: Program, rela: Map[BigInt, BigInt]): Int = {
     doCopyPropTransform(p, rela)
     val extraInlined = removeInvariantOutParameters(p, inlinedOutParams)
     inlinedOutParams = extraInlined.foldLeft(inlinedOutParams)((acc, v) => acc + (v._1 -> (acc.getOrElse(v._1, Set[Variable]()) ++ v._2)))
-    changed = changed || extraInlined.nonEmpty || removeDeadInParams(p)
+    var deadIn = removeDeadInParams(p)
+    while (removeDeadInParams(p))
+    changed = changed || extraInlined.nonEmpty || deadIn 
     cleanupBlocks(p)
     iterations += 1
   }
@@ -1199,6 +1245,9 @@ object CopyProp {
 
 }
 
+/**
+ * Use this to count the number of subexpressions in a basil-ir expression
+ */
 class ExprComplexity extends CILVisitor {
   // count the nodes in the expression AST
   var count = 0
@@ -1220,14 +1269,12 @@ class ExprComplexity extends CILVisitor {
   }
 }
 
-/** Use this as a partially applied function. Substitute(Map.from(substs).get, recurse = false)
+/** 
+ *  Use this as a partially applied function. Substitute(Map.from(substs).get, recurse = false)
   *
-  * @res:
-  *   defines the substitutions to make
-  * @recurse:
-  *   continue substituting with `res` into each substituted expression
-  * @complexityThreshold:
-  *   Stop substituting after the AST node count has increased by this much
+  * @param res defines the substitutions to make
+  * @param recurse continue substituting with `res` into each substituted expression
+  * @param complexityThreshold Stop substituting after the AST node count has increased by this much
   */
 class Substitute(val res: Variable => Option[Expr], val recurse: Boolean = true, val complexityThreshold: Int = 0)
     extends CILVisitor {
