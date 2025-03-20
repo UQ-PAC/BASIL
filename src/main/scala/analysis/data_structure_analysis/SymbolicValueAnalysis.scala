@@ -103,7 +103,9 @@ def toOffsetMove(op: BinOp, arg: BitVecLiteral): Int => Int = {
     case _ => throw Exception(s"Usupported Binary Op $op")
 }
 
-trait Offsets
+trait Offsets {
+  def toOffsets: Set[Int]
+}
 trait OffsetDomain[T <: Offsets] extends AbstractDomain[T] {
   def init(i: Int): T
   def init(s: Set[Int]): T
@@ -114,6 +116,12 @@ trait OffsetDomain[T <: Offsets] extends AbstractDomain[T] {
 enum OSet extends Offsets {
   case Top
   case Values(v: Set[Int])
+
+  override def toOffsets: Set[Int] = {
+    this match
+      case OSet.Top => throw Exception("Attempted to retrieve offsets from Top")
+      case OSet.Values(v) =>  v
+  }
 }
 
 given OSetDomain: OffsetDomain[OSet] with {
@@ -211,10 +219,10 @@ object SymValues {
       case literal @ BitVecLiteral(value, size) => symValSetDomain.init(Global, transform(bv2SignedInt(literal).toInt))
       case Extract(end, start, body) if end - start >= 64 => exprToSymValSet(symValues) (body, b, transform)
       case Extract(32, 0, body) => exprToSymValSet(symValues) (body, b, transform) // todo incorrectly assuming value is preserved
-      case ZeroExtend(extension, body) => exprToSymValSet(symValues) (body, b, transform) 
+      case ZeroExtend(extension, body) => exprToSymValSet(symValues) (body, b, transform)
       case binExp @ BinaryExpr(BVADD | BVSUB, arg1, arg2: BitVecLiteral) =>
         val oPlus = toOffsetMove(binExp.op, arg2)
-        exprToSymValSet(symValues) (arg1, b, oPlus) 
+        exprToSymValSet(symValues) (arg1, b, oPlus)
       case variable: LocalVar => symValSetDomain.transform(symValues.state.getOrElse(replace(variable), symValSetDomain.bot), transform)
       case Extract(end, start, body) if end - start < 64 => symValSetDomain.init(NonPointer, symValSetDomain.offsetDomain.top)
       case BinaryExpr(BVCOMP, _, _) => symValSetDomain.init(NonPointer, Set(0, 1).map(transform))
