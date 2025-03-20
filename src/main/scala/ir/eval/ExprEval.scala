@@ -24,7 +24,7 @@ def evalBVBinExpr(b: BVBinOp, l: BitVecLiteral, r: BitVecLiteral): BitVecLiteral
     case BVUREM => BitVectorEval.smt_bvurem(l, r)
     case BVSMOD => BitVectorEval.smt_bvsmod(l, r)
     case BVAND => BitVectorEval.smt_bvand(l, r)
-    case BVOR => BitVectorEval.smt_bvxor(l, r)
+    case BVOR => BitVectorEval.smt_bvor(l, r)
     case BVXOR => BitVectorEval.smt_bvxor(l, r)
     case BVNAND => BitVectorEval.smt_bvnand(l, r)
     case BVNOR => BitVectorEval.smt_bvnor(l, r)
