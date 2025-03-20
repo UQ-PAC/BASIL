@@ -1,11 +1,3 @@
-/** Todo:
-  * - Use function summaries developed by Ben to get more precise results for
-  *   get_two.
-  * - Use Ben's disjunctive completion domain to get accurate results for a
-  *   bigger example.
-  * - Enquire about going to top for mem calls - this seems stifling.
-  */
-
 package analysis
 
 import ir.*
