@@ -608,8 +608,6 @@ object InterpFuns {
     s
   }
 
-  // case class FunctionCall(target: String, inParams: List[(String, Literal)])
-
   /*
    * Calls a procedure that has a return, immediately evaluating the procedure
    *
@@ -755,6 +753,14 @@ object InterpFuns {
 
   def interpretProg[S, T <: Effects[S, InterpreterError]](f: T)(p: Program, is: S): S = {
     interpretEvalProg(f)(p, is)._1
+  }
+}
+
+def evalProc(p: Program, proc: Procedure, args: Map[LocalVar, Literal] = Map()): Map[LocalVar, Literal] = {
+  val begin = InterpFuns.initialiseProgram(NormalInterpreter)(InterpreterState(), p)
+  InterpFuns.callProcedure(NormalInterpreter)(proc, args).f(begin)._2 match {
+    case Right(r) => r
+    case Left(l) => throw Exception("interp error: " + l)
   }
 }
 
