@@ -239,18 +239,18 @@ object SymValues {
   (symValues: SymValues[T])
   (
     expr: Expr,
-    b: Block,
     transform: Int => Int = identity,
-    replace: LocalVar => LocalVar = identity
+    replace: LocalVar => LocalVar = identity,
+    block: Block = Block("")
   ): SymValSet[T] = {
     expr match
       case literal @ BitVecLiteral(value, size) => symValSetDomain.init(Global, transform(bv2SignedInt(literal).toInt))
-      case Extract(end, start, body) if end - start >= 64 => exprToSymValSet(symValues) (body, b, transform)
-      case Extract(32, 0, body) => exprToSymValSet(symValues) (body, b, transform) // todo incorrectly assuming value is preserved
-      case ZeroExtend(extension, body) => exprToSymValSet(symValues) (body, b, transform)
+      case Extract(end, start, body) if end - start >= 64 => exprToSymValSet(symValues) (body, transform)
+      case Extract(32, 0, body) => exprToSymValSet(symValues) (body, transform) // todo incorrectly assuming value is preserved
+      case ZeroExtend(extension, body) => exprToSymValSet(symValues) (body, transform)
       case binExp @ BinaryExpr(BVADD | BVSUB, arg1, arg2: BitVecLiteral) =>
         val oPlus = toOffsetMove(binExp.op, arg2)
-        exprToSymValSet(symValues) (arg1, b, oPlus)
+        exprToSymValSet(symValues) (arg1, oPlus)
       case variable: LocalVar => symValSetDomain.transform(symValues.state.getOrElse(replace(variable), symValSetDomain.bot), transform)
       case Extract(end, start, body) if end - start < 64 => symValSetDomain.init(NonPointer, symValSetDomain.offsetDomain.top)
       case BinaryExpr(BVCOMP, _, _) => symValSetDomain.init(NonPointer, Set(0, 1).map(transform))
@@ -324,7 +324,7 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) e
     val block = b.parent
     b match
       case LocalAssign(lhs: LocalVar, rhs: Expr, _) =>
-        val update = SymValues(Map(lhs -> SymValues.exprToSymValSet(a)(rhs, block)))
+        val update = SymValues(Map(lhs -> SymValues.exprToSymValSet(a)(rhs)))
         join(a, update, block)
       case load @ MemoryLoad(lhs: LocalVar, _, rhs, _, size, label) =>
         val update = SymValues(Map(lhs -> symValSetDomain.init(Loaded(load))))
@@ -350,7 +350,7 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) e
       case ind: IndirectCall => a // TODO possibly map every live variable to top
       case ret: Return =>
         val update = SymValues(ret.outParams.map { case (outVar: LocalVar, value: Expr) =>
-          outVar -> SymValues.exprToSymValSet(a)(value, block)
+          outVar -> SymValues.exprToSymValSet(a)(value)
         })
 
         join(a, update, block)
