@@ -1,6 +1,6 @@
 package util
 
-class RingTrace[T](bound: Int, name: String = "")  {
+class RingTrace[T](bound: Int, name: String = "") {
 
   private var log = Vector[T]()
 

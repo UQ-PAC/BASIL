@@ -1007,14 +1007,7 @@ object CopyProp {
     }
   }
 
-
-  case class PropState(
-    var e: Expr,
-    val deps: mutable.Set[Variable],
-    var clobbered: Boolean,
-    var useCount: Int,
-  )
-
+  case class PropState(var e: Expr, val deps: mutable.Set[Variable], var clobbered: Boolean, var useCount: Int)
 
   def clobberFull(c: mutable.HashMap[Variable, PropState], l: Variable): Unit = {
     clobberOne(c, l)
@@ -1041,10 +1034,7 @@ object CopyProp {
     case _ => false
   }
 
-  def canPropTo(
-    s: mutable.HashMap[Variable, PropState],
-    e: Expr
-  ): Option[(Expr, Set[Variable])] = {
+  def canPropTo(s: mutable.HashMap[Variable, PropState], e: Expr): Option[(Expr, Set[Variable])] = {
 
     def proped(e: Expr) = {
       var deps = Set[Variable]() ++ e.variables
