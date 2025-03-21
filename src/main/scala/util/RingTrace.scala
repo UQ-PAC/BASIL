@@ -1,5 +1,8 @@
 package util
 
+/**
+ * Bounded list for storing a trace of at most [[bound]] items.
+ */
 class RingTrace[T](bound: Int, name: String = "") {
 
   private var log = Vector[T]()
@@ -11,6 +14,6 @@ class RingTrace[T](bound: Int, name: String = "") {
 
   def trace = log
 
-  override def toString() = s"$name backtrace (most recent event last)\n" + log.mkString("\n")
+  override def toString() = s"$name backtrace (most recent event last)\n    " + log.mkString("\n    ")
 
 }

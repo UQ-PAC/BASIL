@@ -936,6 +936,8 @@ object RunUtils {
       q.loading.dumpIL.foreach(f => {
         val tf = f"${f}-interpret-trace.txt"
         writeToFile(trace.t.mkString("\n"), tf)
+        val sf = f"${f}-stdout.txt"
+        writeToFile(stdout, sf)
         Logger.info(s"Finished interpret: trace written to $tf")
       })
 

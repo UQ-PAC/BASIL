@@ -20,8 +20,6 @@ import scala.util.boundary, boundary.break
 /** Simplification pass, see also: docs/development/simplification-solvers.md
   */
 
-val substTrace = util.RingTrace[String](10)
-
 def getLiveVars(p: Procedure): (Map[Block, Set[Variable]], Map[Block, Set[Variable]]) = {
   val liveVarsDom = IntraLiveVarsDomain()
   val liveVarsSolver = worklistSolver(liveVarsDom)
@@ -444,9 +442,6 @@ def copypropTransform(
   constRead: (BigInt, Int) => Option[BitVecLiteral]
 ) = {
   val t = util.PerformanceTimer(s"simplify ${p.name} (${p.blocks.size} blocks)")
-  // val dom = ConstCopyProp()
-  // val solver = worklistSolver(dom)
-
   // SimplifyLogger.info(s"${p.name} ExprComplexity ${ExprComplexity()(p)}")
   // val result = solver.solveProc(p, true).withDefaultValue(dom.bot)
   val result = CopyProp.DSACopyProp(p, procFrames, funcEntries, constRead)
@@ -886,16 +881,6 @@ def applyRPO(p: Program) = {
   }
 }
 
-// case class CopyProp(from: Expr, expr: Expr, deps: Set[Variable])
-
-enum CopyProp {
-  case Bot
-  case Prop(expr: Expr, deps: Set[Variable])
-  case Clobbered
-}
-
-case class CCP(val state: Map[Variable, CopyProp] = Map())
-
 object getProcFrame {
   class GetProcFrame(frames: Procedure => Set[Memory]) extends CILVisitor {
     var modifies = Set[Memory]()
@@ -920,33 +905,6 @@ object getProcFrame {
 
   }
 
-}
-
-object CCP {
-
-  def toSubstitutions(c: CCP): Map[Variable, Expr] = {
-    c.state.collect { case (v, CopyProp.Prop(e, _)) =>
-      v -> e
-    }
-  }
-
-  def clobberFull(c: CCP, l: Variable) = {
-    val p = clobber(c, l)
-    p.copy(state = p.state + (l -> CopyProp.Clobbered))
-  }
-
-  def clobber(c: CCP, l: Variable) = {
-    CCP(
-      c.state
-        .map((k, v) =>
-          k -> (v match {
-            case CopyProp.Prop(_, deps) if deps.contains(l) => CopyProp.Clobbered
-            case o => o
-          })
-        )
-        .withDefaultValue(CopyProp.Bot)
-    )
-  }
 }
 
 object CopyProp {
@@ -1049,7 +1007,7 @@ object CopyProp {
               case _ => None
             }
           },
-          false
+          true
         )(e)
 
       // partial eval after prop
@@ -1061,8 +1019,8 @@ object CopyProp {
       case l: Literal => Some(l, deps)
       case l: Variable => Some(l, deps)
       case e @ BinaryExpr(o, v: Variable, c: Literal) => Some(e, deps)
-      case e: Expr => Some(e, deps)
-      case e => None
+      case e: Expr if (e.variables.size < 2) => Some(e, deps)
+      case _ => None
     }
   }
 
@@ -1088,7 +1046,6 @@ object CopyProp {
 
     // This is obviously invalid to do flow-insensitively as we don't have
     // a DSA form on memory imposing the order of loads/stores
-    val doLoadReasoning = false
 
     def transfer(c: mutable.HashMap[Variable, PropState], s: Statement): Unit = {
       // val callClobbers = ((0 to 7) ++ (19 to 30)).map("R" + _).map(c => Register(c, 64))
@@ -1131,9 +1088,7 @@ object CopyProp {
         case x: IndirectCall => {
           // need a reaching-defs to get inout args (just assume register name matches?)
           // this reduce we have to clobber with the indirect call this round
-          if (!doLoadReasoning) {
-            poisoned = true
-          }
+          poisoned = true
           val r = for {
             (addr, deps) <- canPropTo(c, x.target)
             addr <- addr match {
@@ -1226,7 +1181,6 @@ class Substitute(val res: Variable => Option[Expr], val recurse: Boolean = true,
     e match {
       case v: Variable if res(v).isDefined => {
         val changeTo = res(v).get
-        substTrace.add(s"Rewrite $v -> $changeTo")
         if (complexityThreshold > 0) {
           complexity += ExprComplexity()(changeTo) - ExprComplexity()(e)
         }
@@ -1491,7 +1445,7 @@ def findSimpleChain(b: Block) = {
   before ++ Seq(b) ++ after
 }
 
-def removeTriviallyDeadBranches(p: Program): Boolean = {
+def removeTriviallyDeadBranches(p: Program, removeAllUnreachableBlocks: Boolean = false): Boolean = {
 
   /**
    * This will remove branch on high checks, but since we can only eliminate branches
@@ -1511,11 +1465,13 @@ def removeTriviallyDeadBranches(p: Program): Boolean = {
     }
   }
 
-  for (proc <- p.procedures) {
-    val reachable = computeDomain(IntraProcBlockIRCursor, proc.entryBlock)
-    for (b <- proc.blocks) {
-      if (!reachable.contains(b)) {
-        proc.removeBlocksDisconnect(b)
+  if (removeAllUnreachableBlocks) {
+    for (proc <- p.procedures) {
+      val reachable = computeDomain(IntraProcBlockIRCursor, proc.entryBlock)
+      for (b <- proc.blocks) {
+        if (!reachable.contains(b)) {
+          proc.removeBlocksDisconnect(b)
+        }
       }
     }
   }

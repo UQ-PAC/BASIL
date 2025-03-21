@@ -371,6 +371,7 @@ object LibcIntrinsic {
     ),
     "write" -> ProcSig("write", List(r0, r1), List()),
     "malloc" -> ProcSig("malloc", List(r0), List(r0_out)),
+    "memset" -> ProcSig("memset", List(r0, r1), List()),
     "__libc_malloc_impl" -> ProcSig("malloc", List(r0), List(r0_out)),
     "free" -> ProcSig("free", List(r0), List()),
     "#free" -> ProcSig("free", List(r0), List()),
@@ -577,9 +578,7 @@ object IntrinsicImpl {
     } yield (None)
   }
 
-  def malloc[S, T <: Effects[S, InterpreterError]](
-    f: T
-  )(size: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
+  def malloc[S, T <: Effects[S, InterpreterError]](f: T)(size: BasilValue): State[S, BasilValue, InterpreterError] = {
     for {
       size <- (size match {
         case (x @ Scalar(_: BitVecLiteral)) => State.pure(x)
@@ -591,8 +590,23 @@ object IntrinsicImpl {
       x_end <- State.pureE(BasilValue.add(x_gap, size))
       _ <- f.storeVar("ghost_malloc_top", Scope.Global, x_end)
       _ <- f.storeVar("R0", Scope.Global, x_gap)
-    } yield (Some(x_gap))
+    } yield (x_gap)
   }
+
+  def memset[S, T <: Effects[S, InterpreterError]](
+    f: T
+  )(ptr: BasilValue, size: BasilValue): State[S, Unit, InterpreterError] = for {
+    sizeVal <- State.pureE(BasilValue.toBV(size))
+    values = (0 to sizeVal.value.toInt).map(v => Scalar(BitVecLiteral(0, 8)))
+    r <- Eval.store(f)("mem", ptr, values.toList, Endian.LittleEndian)
+  } yield (r)
+
+  def calloc[S, T <: Effects[S, InterpreterError]](f: T)(size: BasilValue): State[S, BasilValue, InterpreterError] =
+    for {
+      r <- malloc(f)(size)
+      _ <- memset(f)(r, size)
+    } yield (r)
+
 }
 
 case class InterpreterState(
@@ -624,7 +638,9 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
   ): State[InterpreterState, Option[BasilValue], InterpreterError] = {
     name match {
       case "free" => State.pure(None)
-      case "malloc" => IntrinsicImpl.malloc(this)(args.head)
+      case "malloc" => IntrinsicImpl.malloc(this)(args.head).map(x => Some(x))
+      case "calloc" => IntrinsicImpl.calloc(this)(args.head).map(x => Some(x))
+      case "memset" => IntrinsicImpl.memset(this)(args.head, args.tail.head).map(x => None)
       case "fopen" => IntrinsicImpl.fopen(this)(args.head)
       case "putc" => IntrinsicImpl.putc(this)(args.head)
       case "strlen" =>

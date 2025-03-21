@@ -671,7 +671,7 @@ object InterpFuns {
                  for {
                    fs <- (State.mapM(
                      (p: LocalVar) =>
-                       f.loadVar(p.name.stripSuffix("_in")).catchS {
+                       f.loadVar(p.name.stripSuffix("_in")).catchE {
                          case Left(l) if !intrinsic.variadic =>
                            State.setError(Errored(s"Undefined intrinsic param $p in call $targetProc ($l)"))
                          case Left(l) => State.pure(None)
