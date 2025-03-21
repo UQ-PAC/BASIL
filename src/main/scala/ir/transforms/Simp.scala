@@ -448,8 +448,8 @@ def copypropTransform(
   val solve = t.checkPoint("Solve CopyProp")
 
   if (result.nonEmpty) {
-    val r = CopyProp.toResult(result, false)
-    val vis = Simplify(CopyProp.toResult(result, false))
+    val r = CopyProp.toResult(result, true)
+    val vis = Simplify(CopyProp.toResult(result, true))
     visit_proc(vis, p)
 
     val gvis = GuardVisitor()
