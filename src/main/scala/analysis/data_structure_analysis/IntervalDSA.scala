@@ -37,7 +37,7 @@ class IntervalGraph(
   val builder: () => Map[SymBase, IntervalNode] = nodeBuilder.getOrElse(buildNodes)
   var nodes: Map[SymBase, IntervalNode] = builder()
 
-  def exprToSymVal(expr: Expr): SymValSet[OSet] = SymValues.exprToSymValSet(sva)(expr, Block(""))
+  def exprToSymVal(expr: Expr): SymValSet[OSet] = SymValues.exprToSymValSet(sva)(expr)
 
   protected def symValToNodes(symVal: SymValSet[OSet], current: Map[SymBase, IntervalNode], f: Int => Boolean = i => i >= 1000): Map[SymBase, IntervalNode] = {
     symVal.state.filter((base, _) => base != NonPointer).foldLeft(current) { case (result, (base, symOffsets)) =>
@@ -52,7 +52,7 @@ class IntervalGraph(
           node.flags.unknown = true
           node.flags.incomplete = true
       if symOffsets == Top then node.collapse()
-      else symOffsets.toOffsets.filter(f).map(node.add)
+      else symOffsets.toOffsets.filter(i => f(i) || base != Global).map(node.add)
       result + (base -> node)
     }
   }
@@ -176,7 +176,7 @@ class IntervalGraph(
     pairs.foldLeft(Set[IntervalCell]()) { case (results, (base: SymBase, offsets: OSet)) =>
       val (node, adjustment) = findNode(nodes(base))
       if offsets  == Top then results + node.collapse()
-      else results ++ offsets.toOffsets.filter(i => i >= 1000).map(i => i + adjustment).map(node.add)
+      else results ++ offsets.toOffsets.filter(i => base != Global ||i >= 1000).map(i => i + adjustment).map(node.add)
     }
   }
 
