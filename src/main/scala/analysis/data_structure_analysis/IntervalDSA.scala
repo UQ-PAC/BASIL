@@ -771,7 +771,7 @@ class IntervalNode(
   }
 
   override def hashCode(): Int = id
-  override def toString: String = s"Node($id, ${bases.keys}, ${if isCollapsed then "C" else ""})"
+  override def toString: String = s"Node($id, ${bases.keys}, ${if isCollapsed then "C" else cells.map(_.interval).sorted})"
 
   def add(cell: IntervalCell): Unit = {
     require(cell.node == this, "added cell must have a reference to this node")
