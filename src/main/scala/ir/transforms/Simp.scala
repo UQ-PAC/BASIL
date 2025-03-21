@@ -981,6 +981,7 @@ object CopyProp {
     entry.clobbered = true
   }
 
+  // TODO: consider copies where there is only one use trivial
   def isTrivial(e: Expr): Boolean = e match {
     case l: Literal => true
     case l: Variable => true
