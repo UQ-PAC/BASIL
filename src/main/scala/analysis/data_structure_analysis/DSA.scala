@@ -12,14 +12,25 @@ enum DSAPhase {
   case Pre, Local, BU, TD
 }
 
-enum Interval(val start: Option[Int], val end: Option[Int]) {
-  case Top extends Interval(None, None)
-  case Value(s: Int, e: Int) extends Interval(Some(s), Some(e))
+enum Interval extends Offsets {
+  case Top
+  case Bot
+  case Value(s: Int, e: Int)
 
   override def toString: String =
     this match
       case Interval.Top => "Top"
       case Interval.Value(start, end) => s"$start-${end - 1}"
+
+  def start: Option[Int] =
+    this match
+      case Interval.Value(s, e) => Some(s)
+      case _ => None
+
+  def end: Option[Int] =
+     this match
+      case Interval.Value(s, e) => Some(e)
+      case _ => None
 
   def size: Option[Int] =
     this match
@@ -64,6 +75,13 @@ enum Interval(val start: Option[Int], val end: Option[Int]) {
       case (Interval.Value(start1, end1), Interval.Value(start2, end2)) =>
         Interval(math.min(start1, start2), math.max(end1, end2))
   }
+
+  override def toOffsets: Set[Int] = {
+    this match
+      case Interval.Value(s, e) => s.to(e).toSet
+      case _ => throw Exception("Attempted to retrieve offsets from top/bot")
+  }
+
 }
 
 object Interval {
