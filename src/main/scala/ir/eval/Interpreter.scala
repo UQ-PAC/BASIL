@@ -26,7 +26,12 @@ import scala.util.control.Breaks.{break, breakable}
  * @param formalOutParam
  *  The list of formal outpur params (corresponding to procedure.formalOutParam)
  */
-case class ProcSig(name: String, formalInParam: List[LocalVar], formalOutParam: List[LocalVar])
+case class ProcSig(
+  name: String,
+  formalInParam: List[LocalVar],
+  formalOutParam: List[LocalVar],
+  variadic: Boolean = false
+)
 
 /** Interpreter status type, either stopped, run next command or error
   */
@@ -357,8 +362,13 @@ object LibcIntrinsic {
   def intrinsicSigs = Map(
     "putc" -> ProcSig("putc", List(r0), List()),
     "puts" -> ProcSig("puts", List(r0), List()),
-    "printf" -> ProcSig("printf", (0 to 7).map(i => LocalVar(s"R${i}_in", BitVecType(64))).toList, List()),
-    "__printf_chk" -> ProcSig("__printf_chk", (0 to 7).map(i => LocalVar(s"R${i}_in", BitVecType(64))).toList, List()),
+    "printf" -> ProcSig("printf", (0 to 7).map(i => LocalVar(s"R${i}_in", BitVecType(64))).toList, List(), true),
+    "__printf_chk" -> ProcSig(
+      "__printf_chk",
+      (0 to 7).map(i => LocalVar(s"R${i}_in", BitVecType(64))).toList,
+      List(),
+      true
+    ),
     "write" -> ProcSig("write", List(r0, r1), List()),
     "malloc" -> ProcSig("malloc", List(r0), List(r0_out)),
     "__libc_malloc_impl" -> ProcSig("malloc", List(r0), List(r0_out)),
@@ -510,6 +520,9 @@ object IntrinsicImpl {
         v =>
           v match {
             case FormatStr.Text(t) => State.pure(t)
+            case FormatStr.FormatCode(fmtCode, index) if args.size <= index => {
+              State.pure("missing param: " + fmtCode)
+            }
             case FormatStr.FormatCode(fmtCode, index) => {
               val value = args(index) match {
                 case Scalar(b: BitVecLiteral) => b.value
@@ -623,7 +636,8 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
 
       case "print" => IntrinsicImpl.print(this)(args.head)
       case "printf" => IntrinsicImpl.printf(this)(args.head, args.tail.toArray)
-      case "__printf_chk" => IntrinsicImpl.printf(this)(args.head, args.tail.toArray)
+      // https://refspecs.linuxbase.org/LSB_4.1.0/LSB-Core-generic/LSB-Core-generic/libc---printf-chk-1.html
+      case "__printf_chk" => IntrinsicImpl.printf(this)(args.tail.head, args.tail.tail.toArray)
       case "puts" =>
         IntrinsicImpl.print(this)(args.head) >> IntrinsicImpl.putc(this)(Scalar(BitVecLiteral('\n'.toInt, 64)))
       case "write" => IntrinsicImpl.write(this)(args(1), args(2))

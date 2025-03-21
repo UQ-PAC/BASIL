@@ -653,14 +653,16 @@ object InterpFuns {
           val actual = actualParams.toMap
 
           for {
-            params: List[BasilValue] <-
+            loadedParams: List[Option[BasilValue]] <-
               (if (actualParams.nonEmpty) {
                  // we were passed a list of parameters
                  State.mapM(
                    (p: LocalVar) =>
                      actual.get(p) match {
-                       case Some(v) => State.pure[S, BasilValue, InterpreterError](Scalar(v))
-                       case None => State.setError(Errored(s"Undefined intrinsic param $p in call $targetProc"))
+                       case Some(v) => State.pure[S, Option[BasilValue], InterpreterError](Some(Scalar(v)))
+                       case None if !intrinsic.variadic =>
+                         State.setError(Errored(s"Undefined intrinsic param $p in call $targetProc"))
+                       case None => State.pure(None)
                      },
                    intrinsic.formalInParam
                  )
@@ -670,16 +672,17 @@ object InterpFuns {
                    fs <- (State.mapM(
                      (p: LocalVar) =>
                        f.loadVar(p.name.stripSuffix("_in")).catchS {
+                         case Left(l) if !intrinsic.variadic =>
+                           State.setError(Errored(s"Undefined intrinsic param $p in call $targetProc ($l)"))
                          case Left(l) => State.pure(None)
                          case Right(r) => State.pure(Some(r))
                        },
                      intrinsic.formalInParam
                    ))
-                   good = fs.takeWhile(_.isDefined).flatten
-                 } yield (good)
+                 } yield (fs)
                })
-
-            returnval <- f.callIntrinsic(intrinsic.name, params.toList)
+            params: List[BasilValue] = loadedParams.takeWhile(_.isDefined).flatten
+            returnval <- f.callIntrinsic(intrinsic.name, params)
             outparam = (returnval, proc.formalOutParam) match {
               case (_, Nil) => Map()
               case (Some(returnval), h :: Nil) => Map(h -> returnval)

@@ -37,7 +37,7 @@ val builtinSigs: Map[String, FunSig] = Map(
   // https://refspecs.linuxfoundation.org/LSB_1.3.0/gLSB/gLSB/baselib---assert-fail-1.html
   "__assert_fail" -> FunSig(List(R(0), R(1), R(2), R(3)), List()),
   "__stack_chk_fail" -> FunSig(List(), List()),
-  "__printf_chk" -> FunSig(List(R(0), R(1)), List(R(0))),
+  // "__printf_chk" -> FunSig(List(R(0), R(1)), List(R(0))),
   "__syslog_chk" -> FunSig(List(R(0)), List()),
   "indirect_call_launchpad" -> indirectCallFunsig,
   "__VERIFIER_assert" -> FunSig(List(R(0)), List()),
