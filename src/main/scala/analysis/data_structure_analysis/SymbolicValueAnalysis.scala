@@ -229,6 +229,10 @@ object SymValues {
     sort(get(s.state, prefix).state)
   }
 
+  def pretty[T <: Offsets](s: SymValues[T]): String = {
+    s.state.map((lvar, valSet) => s"$lvar: $valSet").mkString("\n")
+  }
+
   @tailrec
   final def exprToSymValSet[T <: Offsets]
   (using symValSetDomain: SymValSetDomain[T])
