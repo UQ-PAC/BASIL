@@ -21,8 +21,8 @@ trait InterferenceCompatibleLattice[S] extends Lattice[S] {
   * 
   * @param l: A lattice over individual intervals, like [4, 7].
   */
-class IntervalLatticeExtension(l: IntervalLattice)
-    extends LatticeMapLattice[Variable, Interval, IntervalLattice](l)
+class IntervalLatticeExtension()
+    extends LatticeMapLattice[Variable, Interval, IntervalLattice](IntervalLattice())
     with InterferenceCompatibleLattice[LatticeMap[Variable, Interval]] {
 
   def drop(v: Variable, s: LatticeMap[Variable, Interval]):

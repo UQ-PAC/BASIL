@@ -336,11 +336,11 @@ object IRTransform {
     like to add them to the IR. */
     type StateLatticeElement = LatticeMap[Variable, Interval]
     type InterferenceLatticeElement = Map[Variable, StateLatticeElement]
-    val stateLattice = IntervalLatticeExtension(IntervalLattice())
+    val stateLattice = IntervalLatticeExtension()
     val stateTransfer = SignedIntervalDomain().transfer
     val intDom = ConditionalWritesDomain[StateLatticeElement](
       stateLattice, stateTransfer)
-    val relyGuarantees = 
+    val relyGuarantees =
       RelyGuaranteeGenerator[InterferenceLatticeElement, StateLatticeElement](
         intDom).generate(threads)
     for ((p, (rely, guar)) <- relyGuarantees) {
