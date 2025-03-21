@@ -48,9 +48,34 @@ case class State[S, A, E](f: S => (S, Either[E, A])) {
       }
     })
   }
+
+  def catchS[A2](f: Either[E, A] => State[S, A2, E]): State[S, A2, E] = {
+    State(s => {
+      val (s2, a) = this.f(s)
+      f(a).f(s2)
+    })
+  }
+
 }
 
 object State {
+
+  // def catchh[S, E]: State[S, Either[A,E], E] = ???
+  // def bimap[S, A, E, A2, E2](f: A => Either[E2, A2], g: E => Either[E2, A2]): State[S, Either[A,E], E] = ???
+  // def catchE[S, A, E, E2](f: E => Either[E2, A]): State[S, A, E] => State[S, A, E2] =  {
+  //   State(s => {
+  //
+
+  //   })
+  // }
+
+  // x <- State.getE
+  // match x {
+  //  case Left(l : A) => State.pure(l)
+  //  case Left(l : B) => State.setError(l)
+  //  case Right(l) => State.pure(l)
+  // }
+
   def get[S, A, E](f: S => A): State[S, A, E] = State(s => (s, Right(f(s))))
   def getE[S, A, E](f: S => Either[E, A]): State[S, A, E] = State(s => (s, f(s)))
   def getS[S, E]: State[S, S, E] = State((s: S) => (s, Right(s)))

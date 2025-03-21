@@ -627,8 +627,10 @@ object InterpFuns {
    */
   def callProcedure[S, T <: Effects[S, InterpreterError]](f: T)(
     targetProc: ProcSig | Procedure,
-    actualParams: Iterable[(LocalVar, Literal)]
+    params: Iterable[(LocalVar, Literal)]
   ): State[S, Map[LocalVar, Literal], InterpreterError] = {
+
+    val actualParams = params.toList.sortBy(p => p._1.name.stripPrefix("R").stripPrefix("V").stripSuffix("_in").toInt)
 
     val target = targetProc match {
       case p: Procedure => Some(p)
@@ -663,12 +665,21 @@ object InterpFuns {
                    intrinsic.formalInParam
                  )
                } else {
-                 // likely not in parameter form, load registers
-                 State.mapM((p: LocalVar) => f.loadVar(p.name.stripSuffix("_in")), intrinsic.formalInParam)
+                 // likely not in parameter form, load registers until we get an undefined one
+                 for {
+                   fs <- (State.mapM(
+                     (p: LocalVar) =>
+                       f.loadVar(p.name.stripSuffix("_in")).catchS {
+                         case Left(l) => State.pure(None)
+                         case Right(r) => State.pure(Some(r))
+                       },
+                     intrinsic.formalInParam
+                   ))
+                   good = fs.takeWhile(_.isDefined).flatten
+                 } yield (good)
                })
 
             returnval <- f.callIntrinsic(intrinsic.name, params.toList)
-            // _ <- f.doReturn()
             outparam = (returnval, proc.formalOutParam) match {
               case (_, Nil) => Map()
               case (Some(returnval), h :: Nil) => Map(h -> returnval)
