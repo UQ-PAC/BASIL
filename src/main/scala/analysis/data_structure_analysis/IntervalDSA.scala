@@ -1,7 +1,7 @@
 package analysis.data_structure_analysis
 
 import analysis.data_structure_analysis.DSAPhase.{BU, Local, TD}
-import analysis.data_structure_analysis.OSet.Top
+import analysis.data_structure_analysis.Interval.Top
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
 import boogie.SpecGlobal
 import specification.FuncEntry
@@ -25,21 +25,21 @@ class IntervalGraph(
   val proc: Procedure,
   var phase: DSAPhase,
   val irContext: IRContext,
-  val sva: SymValues[OSet],
+  val sva: SymValues[Interval],
   val constraints: Set[Constraint],
   val nodeBuilder: Option[() => Map[SymBase, IntervalNode]]
 ) {
-  def this(proc: Procedure, phase: DSAPhase, irContext: IRContext) = {
-    this(proc, phase, irContext, getSymbolicValues(proc), generateConstraints(proc), None)
-  }
+//  def this(proc: Procedure, phase: DSAPhase, irContext: IRContext) = {
+//    this(proc, phase, irContext, getSymbolicValues(proc), generateConstraints(proc), None)
+//  }
 
   val solver = OffsetUnionFindSolver[NodeTerm]()
   val builder: () => Map[SymBase, IntervalNode] = nodeBuilder.getOrElse(buildNodes)
   var nodes: Map[SymBase, IntervalNode] = builder()
 
-  def exprToSymVal(expr: Expr): SymValSet[OSet] = SymValues.exprToSymValSet(sva)(expr)
+  def exprToSymVal(expr: Expr): SymValSet[Interval] = SymValues.exprToSymValSet(sva)(expr)
 
-  protected def symValToNodes(symVal: SymValSet[OSet], current: Map[SymBase, IntervalNode], f: Int => Boolean = i => i >= 1000): Map[SymBase, IntervalNode] = {
+  protected def symValToNodes(symVal: SymValSet[Interval], current: Map[SymBase, IntervalNode], f: Int => Boolean = i => i >= 1000): Map[SymBase, IntervalNode] = {
     symVal.state.filter((base, _) => base != NonPointer).foldLeft(current) { case (result, (base, symOffsets)) =>
       val node = find(result.getOrElse(base, init(base, None)))
       base match
@@ -171,9 +171,9 @@ class IntervalGraph(
   }
 
   // returns the cells corresponding to the
-  def symValToCells(symVal: SymValSet[OSet]): Set[IntervalCell] = {
+  def symValToCells(symVal: SymValSet[Interval]): Set[IntervalCell] = {
     val pairs = symVal.state.filter((base, _) => base != NonPointer)
-    pairs.foldLeft(Set[IntervalCell]()) { case (results, (base: SymBase, offsets: OSet)) =>
+    pairs.foldLeft(Set[IntervalCell]()) { case (results, (base: SymBase, offsets: Interval)) =>
       val (node, adjustment) = findNode(nodes(base))
       if offsets  == Top then results + node.collapse()
       else results ++ offsets.toOffsets.filter(i => base != Global ||i >= 1000).map(i => i + adjustment).map(node.add)
@@ -1016,7 +1016,7 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
 }
 
 object IntervalDSA {
-  def getLocal(proc: Procedure, context: IRContext, symValues: SymValues[OSet], cons: Set[Constraint]): IntervalGraph = {
+  def getLocal(proc: Procedure, context: IRContext, symValues: SymValues[Interval], cons: Set[Constraint]): IntervalGraph = {
     val graph = IntervalGraph(proc, Local, context, symValues, cons, None)
     graph.localPhase()
     graph.localCorrectness()
@@ -1025,7 +1025,7 @@ object IntervalDSA {
 
   def getLocals(
     ctx: IRContext,
-    svas: Map[Procedure, SymValues[OSet]],
+    svas: Map[Procedure, SymValues[Interval]],
     cons: Map[Procedure, Set[Constraint]]
   ): Map[Procedure, IntervalGraph] = {
     DSALogger.info("Performing local DSA")
