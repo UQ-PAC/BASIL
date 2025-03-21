@@ -9,7 +9,7 @@ import ir.dsl.*
 import ir.*
 
 @test_util.tags.UnitTest
-class IRTest extends AnyFunSuite {
+class IRTest extends AnyFunSuite with test_util.CaptureOutput {
 
   test("blockintralinks") {
     val p = prog(proc("main", block("lmain", goto("lmain1")), block("lmain1", goto("lmain2")), block("lmain2", ret)))
