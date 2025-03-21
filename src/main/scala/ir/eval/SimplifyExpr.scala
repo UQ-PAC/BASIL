@@ -1079,6 +1079,9 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
   (res, changedAnything)
 }
 
+private val assocOps: Set[BinOp] =
+  Set(BVADD, BVMUL, BVOR, BVAND, BVEQ, BoolAND, BoolEQ, BoolOR, BoolEQUIV, BoolEQ, IntADD, IntMUL, IntEQ)
+
 /** Simplifier implementing basic canonicalisation and simplifications of experssions without changing them too much.
   *
   *   - Normalises predicate calculations to boolean form rather than bitvector form.
@@ -1087,9 +1090,6 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
   *   - Removes redundant expressions
   */
 def simplifyExpr(e: Expr): (Expr, Boolean) = {
-
-  val assocOps: Set[BinOp] =
-    Set(BVADD, BVMUL, BVOR, BVAND, BVEQ, BoolAND, BoolEQ, BoolOR, BoolEQUIV, BoolEQ, IntADD, IntMUL, IntEQ)
 
   // println((0 until indent).map(" ").mkString("") + e)
 

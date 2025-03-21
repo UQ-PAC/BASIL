@@ -51,7 +51,7 @@ private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extend
 
     stack.pushAll(n match {
       case p: Procedure => p.blocks
-      case b: Block => Seq() ++ b.statements.toSeq ++ Seq(b.jump)
+      case b: Block => b.statements ++ Iterator(b.jump)
       case s: Command => Seq()
     })
     n
