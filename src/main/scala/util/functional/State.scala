@@ -48,9 +48,18 @@ case class State[S, A, E](f: S => (S, Either[E, A])) {
       }
     })
   }
+
+  def catchE[A2](f: Either[E, A] => State[S, A2, E]): State[S, A2, E] = {
+    State(s => {
+      val (s2, a) = this.f(s)
+      f(a).f(s2)
+    })
+  }
+
 }
 
 object State {
+
   def get[S, A, E](f: S => A): State[S, A, E] = State(s => (s, Right(f(s))))
   def getE[S, A, E](f: S => Either[E, A]): State[S, A, E] = State(s => (s, f(s)))
   def getS[S, E]: State[S, S, E] = State((s: S) => (s, Right(s)))

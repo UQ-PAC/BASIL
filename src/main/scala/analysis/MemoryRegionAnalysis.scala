@@ -146,9 +146,9 @@ trait MemoryRegionAnalysis(
             val stackRegions = ctx.flatMap {
               case l: LocalAssign => eval(l.rhs, stackPointerVariables, l, subAccess)
               case _: MemoryLoad => Set()
-              case unhandled =>
+              case unhandled: DirectCall =>
                 throw Exception(
-                  s"Memory Regions Analysis attempted to retrieve stack regions from unsupported instruction :$unhandled"
+                  s"Memory Regions Analysis attempted to retrieve stack regions from direct call, unsupported: $unhandled"
                 )
             }
             for (stackRegion <- stackRegions) yield {
@@ -183,8 +183,8 @@ trait MemoryRegionAnalysis(
         i match {
           case l: LocalAssign => eval(l.rhs, stackPointerVariables, l, subAccess)
           case m: MemoryLoad => eval(m.index, stackPointerVariables, m, m.size)
-          case unhandled =>
-            throw Exception(s"attempted to reduce variables from an instruction which is not supported: $unhandled")
+          case d: DirectCall =>
+            throw Exception(s"attempted to reduce variables from direct call, unssupported: $d")
         }
       } else {
         Set()

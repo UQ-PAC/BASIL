@@ -26,7 +26,12 @@ import scala.util.control.Breaks.{break, breakable}
  * @param formalOutParam
  *  The list of formal outpur params (corresponding to procedure.formalOutParam)
  */
-case class ProcSig(name: String, formalInParam: List[LocalVar], formalOutParam: List[LocalVar])
+case class ProcSig(
+  name: String,
+  formalInParam: List[LocalVar],
+  formalOutParam: List[LocalVar],
+  variadic: Boolean = false
+)
 
 /** Interpreter status type, either stopped, run next command or error
   */
@@ -35,7 +40,7 @@ case class Stopped() extends ExecutionContinuation /* normal program stop  */
 case class ErrorStop(error: InterpreterError) extends ExecutionContinuation /* program stop in error state */
 case class Run(next: Command) extends ExecutionContinuation /* continue by executing next command */
 case class ReturnFrom(target: ProcSig) extends ExecutionContinuation /* return from a call without continuing */
-case class Intrinsic(name: String) extends ExecutionContinuation /* a named intrinsic instruction */
+case class Intrinsic(target: ProcSig) extends ExecutionContinuation /* a named intrinsic instruction */
 
 sealed trait InterpreterError
 case class FailedAssertion(a: Assert) extends InterpreterError
@@ -338,21 +343,6 @@ object LibcIntrinsic {
     * part of the intrinsics behaviour)
     */
 
-  def singleArg[S, E, T <: Effects[S, E]](name: String)(s: T): State[S, Unit, E] = for {
-    c <- s.loadVar("R0")
-    res <- s.callIntrinsic(name, List(c))
-    _ <- if res.isDefined then s.storeVar("R0", Scope.Global, res.get) else State.pure(())
-    _ <- s.doReturn()
-  } yield (())
-
-  def twoArg[S, E, T <: Effects[S, E]](name: String)(s: T): State[S, Unit, E] = for {
-    c1 <- s.loadVar("R0")
-    c2 <- s.loadVar("R1")
-    res <- s.callIntrinsic(name, List(c1, c2))
-    _ <- if res.isDefined then s.storeVar("R0", Scope.Global, res.get) else State.pure(())
-    _ <- s.doReturn()
-  } yield (())
-
   def calloc[S, T <: Effects[S, InterpreterError]](s: T): State[S, Unit, InterpreterError] = for {
     size <- s.loadVar("R0")
     res <- s.callIntrinsic("malloc", List(size))
@@ -365,20 +355,29 @@ object LibcIntrinsic {
     _ <- s.doReturn()
   } yield (())
 
-  def intrinsics[S, T <: Effects[S, InterpreterError]] =
-    Map[String, T => State[S, Unit, InterpreterError]](
-      "putc" -> singleArg("putc"),
-      "putchar" -> singleArg("putc"),
-      "puts" -> singleArg("puts"),
-      "printf" -> singleArg("print"),
-      "write" -> twoArg("write"),
-      "malloc" -> singleArg("malloc"),
-      "__libc_malloc_impl" -> singleArg("malloc"),
-      "free" -> singleArg("free"),
-      "#free" -> singleArg("free"),
-      "calloc" -> calloc,
-      "strlen" -> singleArg("strlen")
-    )
+  val r0_out = LocalVar("R0_out", BitVecType(64))
+  val r0 = LocalVar("R0_in", BitVecType(64))
+  val r1 = LocalVar("R1_in", BitVecType(64))
+
+  def intrinsicSigs = Map(
+    "putc" -> ProcSig("putc", List(r0), List()),
+    "puts" -> ProcSig("puts", List(r0), List()),
+    "printf" -> ProcSig("printf", (0 to 7).map(i => LocalVar(s"R${i}_in", BitVecType(64))).toList, List(), true),
+    "__printf_chk" -> ProcSig(
+      "__printf_chk",
+      (0 to 7).map(i => LocalVar(s"R${i}_in", BitVecType(64))).toList,
+      List(),
+      true
+    ),
+    "write" -> ProcSig("write", List(r0, r1), List()),
+    "malloc" -> ProcSig("malloc", List(r0), List(r0_out)),
+    "memset" -> ProcSig("memset", List(r0, r1), List()),
+    "__libc_malloc_impl" -> ProcSig("malloc", List(r0), List(r0_out)),
+    "free" -> ProcSig("free", List(r0), List()),
+    "#free" -> ProcSig("free", List(r0), List()),
+    "calloc" -> ProcSig("calloc", List(r0), List()),
+    "strlen" -> ProcSig("strlen", List(r0), List(r0))
+  )
 
 }
 
@@ -450,6 +449,119 @@ object IntrinsicImpl {
     } yield (None)
   }
 
+  enum FormatStr {
+    case FormatCode(s: String, position: Int)
+    case Text(s: String)
+  }
+
+  def parseFormatStr(input: String) = {
+
+    case class ParseState(
+      formatCodes: List[FormatStr],
+      currentFormatCode: String,
+      inFormat: Boolean,
+      inNumberFormat: Boolean,
+      inDecimalFormat: Boolean,
+      formatCodeCount: Int
+    ) {
+      def commit = {
+        if (inFormat) {
+          ParseState(
+            FormatStr.FormatCode(currentFormatCode, formatCodeCount) :: formatCodes,
+            "",
+            false,
+            false,
+            false,
+            formatCodeCount + 1
+          )
+        } else {
+          ParseState(FormatStr.Text(currentFormatCode) :: formatCodes, "", false, false, false, formatCodeCount)
+        }
+      }
+      def push(c: String) = {
+        this.copy(currentFormatCode = currentFormatCode + c)
+      }
+      def push(c: Char) = {
+        this.copy(currentFormatCode = currentFormatCode + c)
+      }
+    }
+
+    var s = ParseState(List(), "", false, false, false, 0)
+
+    for (char <- input) {
+      s = (s.currentFormatCode, char) match {
+        case ("%", '-') => s.push(char).copy(inNumberFormat = true)
+        case ("%", char) if char.isDigit => s.push(char).copy(inNumberFormat = true)
+        case ("%", '.') if s.inNumberFormat => s.push(char).copy(inDecimalFormat = true)
+        case ("\\", '%') => s.copy(currentFormatCode = "%%").commit
+        case (_, '%') if (!s.inFormat) => s.commit.push("%").copy(inFormat = true)
+        case (_, '%') if (s.inFormat) => s.push("%").commit
+        case (_, char) if s.inFormat && Set('c', 'd', 'e', 'f', 'i', 'o', 's', 'x').contains(char.toLower) =>
+          s.push(char).commit
+        case (_, char) if (!s.inFormat) => s.push(char)
+        case (_, _) => s.push(char)
+
+        /** probably malformed format code, but we don't want to error */
+      }
+    }
+
+    s = s.commit
+
+    s.formatCodes.reverse
+  }
+
+  def printf[S, T <: Effects[S, InterpreterError]](
+    f: T
+  )(strptr: BasilValue, args: Array[BasilValue]): State[S, Option[BasilValue], InterpreterError] = {
+    for {
+      inputFormatStr: List[BitVecLiteral] <- Eval.getNullTerminatedString(f)("mem", strptr)
+      formatStr = inputFormatStr.map(_.value.toChar).mkString("")
+      formatCodes = parseFormatStr(formatStr)
+      formattedTokens <- State.mapM(
+        v =>
+          v match {
+            case FormatStr.Text(t) => State.pure(t)
+            case FormatStr.FormatCode(fmtCode, index) if args.size <= index => {
+              State.pure("missing param: " + fmtCode)
+            }
+            case FormatStr.FormatCode(fmtCode, index) => {
+              val value = args(index) match {
+                case Scalar(b: BitVecLiteral) => b.value
+                case _ => ???
+              }
+              val strVal = fmtCode match {
+                case "%c" => State.pure("" + value.toChar)
+                case "%X" => State.pure("%X".format(value))
+                case "%x" => State.pure("%x".format(value))
+                case "%d" => State.pure("%d".format(value))
+                case "%f" => State.pure("%f".format(value))
+                case "%e" => State.pure("%e".format(value))
+                case "%i" => State.pure("%i".format(value))
+                case "%u" => State.pure("%u".format(value))
+                case "%s" =>
+                  for {
+                    l <- Eval.getNullTerminatedString(f)("mem", args(index))
+                    v = l.map(_.value.toChar).mkString("")
+                  } yield (v)
+                case _ => State.pure(s"(unsupp. fmt code : $fmtCode)")
+              }
+              strVal
+            }
+          },
+        formatCodes
+      )
+      resultStr = formattedTokens.mkString("").toList.map(c => BitVecLiteral(c.toInt, 8))
+      baseptr: List[BasilValue] <- f.loadMem("ghost-file-bookkeeping", List(Symbol("stdout-ptr")))
+      offs: List[BasilValue] <- State.mapM(
+        ((i: Int) => State.pureE(BasilValue.unsafeAdd(baseptr.head, i))),
+        (0 until (resultStr.size + 1))
+      )
+      _ <- f.storeMem("stdout", offs.zip(resultStr.map(Scalar(_))).toMap)
+      naddr <- State.pureE(BasilValue.unsafeAdd(baseptr.head, resultStr.size))
+      _ <- f.storeMem("ghost-file-bookkeeping", Map(Symbol("stdout-ptr") -> naddr))
+    } yield (None)
+  }
+
   def print[S, T <: Effects[S, InterpreterError]](
     f: T
   )(strptr: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
@@ -466,9 +578,7 @@ object IntrinsicImpl {
     } yield (None)
   }
 
-  def malloc[S, T <: Effects[S, InterpreterError]](
-    f: T
-  )(size: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
+  def malloc[S, T <: Effects[S, InterpreterError]](f: T)(size: BasilValue): State[S, BasilValue, InterpreterError] = {
     for {
       size <- (size match {
         case (x @ Scalar(_: BitVecLiteral)) => State.pure(x)
@@ -480,14 +590,29 @@ object IntrinsicImpl {
       x_end <- State.pureE(BasilValue.add(x_gap, size))
       _ <- f.storeVar("ghost_malloc_top", Scope.Global, x_end)
       _ <- f.storeVar("R0", Scope.Global, x_gap)
-    } yield (Some(x_gap))
+    } yield (x_gap)
   }
+
+  def memset[S, T <: Effects[S, InterpreterError]](
+    f: T
+  )(ptr: BasilValue, size: BasilValue): State[S, Unit, InterpreterError] = for {
+    sizeVal <- State.pureE(BasilValue.toBV(size))
+    values = (0 to sizeVal.value.toInt).map(v => Scalar(BitVecLiteral(0, 8)))
+    r <- Eval.store(f)("mem", ptr, values.toList, Endian.LittleEndian)
+  } yield (r)
+
+  def calloc[S, T <: Effects[S, InterpreterError]](f: T)(size: BasilValue): State[S, BasilValue, InterpreterError] =
+    for {
+      r <- malloc(f)(size)
+      _ <- memset(f)(r, size)
+    } yield (r)
+
 }
 
 case class InterpreterState(
   val nextCmd: ExecutionContinuation = Stopped(),
   val callStack: List[ExecutionContinuation] = List.empty,
-  val memoryState: MemoryState = MemoryState()
+  val memoryState: MemoryState = MemoryState().pushStackFrame("entryinit")
 )
 
 /** Implementation of Effects for InterpreterState concrete state representation.
@@ -513,7 +638,9 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
   ): State[InterpreterState, Option[BasilValue], InterpreterError] = {
     name match {
       case "free" => State.pure(None)
-      case "malloc" => IntrinsicImpl.malloc(this)(args.head)
+      case "malloc" => IntrinsicImpl.malloc(this)(args.head).map(x => Some(x))
+      case "calloc" => IntrinsicImpl.calloc(this)(args.head).map(x => Some(x))
+      case "memset" => IntrinsicImpl.memset(this)(args.head, args.tail.head).map(x => None)
       case "fopen" => IntrinsicImpl.fopen(this)(args.head)
       case "putc" => IntrinsicImpl.putc(this)(args.head)
       case "strlen" =>
@@ -522,7 +649,11 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
           r = Scalar(BitVecLiteral(str.length, 64))
           _ <- storeVar("R0", Scope.Global, r)
         } yield (Some(r))
+
       case "print" => IntrinsicImpl.print(this)(args.head)
+      case "printf" => IntrinsicImpl.printf(this)(args.head, args.tail.toArray)
+      // https://refspecs.linuxbase.org/LSB_4.1.0/LSB-Core-generic/LSB-Core-generic/libc---printf-chk-1.html
+      case "__printf_chk" => IntrinsicImpl.printf(this)(args.tail.head, args.tail.tail.toArray)
       case "puts" =>
         IntrinsicImpl.print(this)(args.head) >> IntrinsicImpl.putc(this)(Scalar(BitVecLiteral('\n'.toInt, 64)))
       case "write" => IntrinsicImpl.write(this)(args(1), args(2))

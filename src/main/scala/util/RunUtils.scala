@@ -721,7 +721,6 @@ object RunUtils {
 
     ctx.program.sortProceduresRPO()
 
-    transforms.liftLinuxAssertFail(ctx)
     transforms.liftSVComp(ctx.program)
 
     DebugDumpIRLogger.writeToFile(File("il-before-simp.il"), pp_prog(program))
@@ -733,12 +732,15 @@ object RunUtils {
     transforms.coalesceBlocks(program)
     transforms.removeEmptyBlocks(program)
 
+    transforms.coalesceBlocksCrossBranchDependency(program)
     DebugDumpIRLogger.writeToFile(File("blockgraph-before-dsa.dot"), dotBlockGraph(program.mainProcedure))
 
     Logger.info("[!] Simplify :: DynamicSingleAssignment")
     DebugDumpIRLogger.writeToFile(File("il-before-dsa.il"), pp_prog(program))
 
     transforms.OnePassDSA().applyTransform(program)
+
+    transforms.fixupGuards(program)
 
     transforms.inlinePLTLaunchpad(ctx.program)
 
@@ -778,6 +780,9 @@ object RunUtils {
     AnalysisResultDotLogger.writeToFile(File("blockgraph-before-copyprop.dot"), dotBlockGraph(program.mainProcedure))
     Logger.info("Copyprop Start")
     transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
+
+    transforms.removeDuplicateGuard(program)
+
     AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
 
     transforms.liftLinuxAssertFail(ctx)
@@ -796,7 +801,6 @@ object RunUtils {
       assert(x)
       Logger.info("DSA Check succeeded")
     }
-
     // run this after cond recovery because sign bit calculations often need high bits
     // which go away in high level conss
     DebugDumpIRLogger.writeToFile(File("il-after-slices.il"), pp_prog(program))
@@ -932,6 +936,8 @@ object RunUtils {
       q.loading.dumpIL.foreach(f => {
         val tf = f"${f}-interpret-trace.txt"
         writeToFile(trace.t.mkString("\n"), tf)
+        val sf = f"${f}-stdout.txt"
+        writeToFile(stdout, sf)
         Logger.info(s"Finished interpret: trace written to $tf")
       })
 

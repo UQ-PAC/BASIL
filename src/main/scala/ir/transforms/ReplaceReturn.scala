@@ -33,7 +33,7 @@ class ReplaceReturns(insertR30InvariantAssertion: Procedure => Boolean = (_ => t
             val R30Begin = LocalVar("R30_begin", BitVecType(64))
             i.parent.replaceJump(Return())
             if (assertR30Addr) {
-              ChangeTo(List(Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin)), i))
+              ChangeTo(List(Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin), Some("R30 = R30_in")), i))
             } else {
               SkipChildren()
             }
@@ -51,7 +51,7 @@ class ReplaceReturns(insertR30InvariantAssertion: Procedure => Boolean = (_ => t
             val R30Begin = LocalVar("R30_begin", BitVecType(64))
             d.parent.replaceJump(GoTo((d.parent.parent.entryBlock.get)))
             if (assertR30Addr) {
-              ChangeTo(List(Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin)), d))
+              ChangeTo(List(Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin), Some("R30 = R30_in")), d))
             } else {
               SkipChildren()
             }
@@ -60,7 +60,7 @@ class ReplaceReturns(insertR30InvariantAssertion: Procedure => Boolean = (_ => t
             val R30Begin = LocalVar("R30_begin", BitVecType(64))
             d.parent.replaceJump(Return())
             if (assertR30Addr) {
-              ChangeTo(List(Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin)), d))
+              ChangeTo(List(Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin), Some("R30 = R30_in")), d))
             } else {
               SkipChildren()
             }

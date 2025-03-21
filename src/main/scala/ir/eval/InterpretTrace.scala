@@ -22,6 +22,7 @@ enum ExecEffect:
   case StoreMem(vname: String, update: Map[BasilValue, BasilValue])
   case LoadMem(vname: String, addrs: List[BasilValue])
   case FindProc(addr: Int)
+  case SetNext(continuation: ExecutionContinuation)
 
 case class Trace(val t: Vector[ExecEffect])
 
@@ -45,6 +46,10 @@ case class TraceGen[E]() extends NopEffects[Trace, E] {
 
   override def doReturn() = for {
     s <- Trace.add(ExecEffect.Return)
+  } yield (())
+
+  override def setNext(c: ExecutionContinuation) = for {
+    s <- Trace.add(ExecEffect.SetNext(c))
   } yield (())
 
   override def storeVar(v: String, scope: Scope, value: BasilValue) = for {

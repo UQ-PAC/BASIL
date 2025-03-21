@@ -42,10 +42,14 @@ def liftLinuxAssertFail(ctx: IRContext) = {
   val asserts: Map[DirectCall, Replace] = ctx.program.collect {
     case d: DirectCall if d.target.procName == "__assert_fail" => {
       d -> AssertFail(
-        getBV(d.actualParams(assertParam)).flatMap(getString),
-        getBV(d.actualParams(fileParam)).flatMap(getString),
-        getBV(d.actualParams(lineNo)).map(_.value.toInt),
-        getBV(d.actualParams(funNameParam)).flatMap(getString)
+        None,
+        None,
+        None,
+        None
+        // getBV(d.actualParams(assertParam)).flatMap(getString),
+        // getBV(d.actualParams(fileParam)).flatMap(getString),
+        // getBV(d.actualParams(lineNo)).map(_.value.toInt),
+        // getBV(d.actualParams(funNameParam)).flatMap(getString)
       )
     }
     case d: DirectCall if d.target.procName == "abort" => {
@@ -63,7 +67,7 @@ def liftLinuxAssertFail(ctx: IRContext) = {
               val msg = af.info.getOrElse("")
               val line = af.filename.map(fn => s" $fn:${af.lineNo.map(_.toString).getOrElse("?")}").getOrElse("")
               val fun = af.function.map(f => s" @ $f").getOrElse("")
-              ChangeTo(List(Assert(FalseLiteral, Some(s"$msg$fun$line"))))
+              ChangeTo(List(Assert(FalseLiteral, Some(s"call __assert_fail $msg$fun$line"))))
             }
             case a: Abort => {
               ChangeTo(List(Assert(FalseLiteral, Some("abort"))))
