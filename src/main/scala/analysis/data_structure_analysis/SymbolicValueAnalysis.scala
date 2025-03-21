@@ -124,6 +124,30 @@ enum OSet extends Offsets {
   }
 }
 
+
+given IntervalDomain: OffsetDomain[Interval] with {
+
+  override def init(i: Int): Interval = Interval(i, i)
+
+  override def init(s: Set[Int]): Interval = Interval(s.min, s.max)
+
+  override def shouldWiden(v: Interval): Boolean = false
+
+  override def transform(v: Interval, f: Int => Int): Interval = {
+    v.move(f)
+  }
+
+  override def widen(a: Interval, b: Interval, pos: Block): Interval = Interval.Top
+
+  override def join(a: Interval, b: Interval, pos: Block): Interval = a.join(b)
+
+  override def transfer(a: Interval, b: Command): Interval = ???
+
+  override def top: Interval = Interval.Top
+
+  override def bot: Interval = Interval.Bot
+}
+
 given OSetDomain: OffsetDomain[OSet] with {
   override def join(a: OSet, b: OSet, pos: Block): OSet = {
     (a, b) match
@@ -165,7 +189,7 @@ object SymValSet {
 }
 
 given OSetSymValSetDomain: SymValSetDomain[OSet] = SymValSetDomain[OSet]()
-
+given IntervalSymValDomain: SymValSetDomain[Interval] = SymValSetDomain[Interval]()
 class SymValSetDomain[T <: Offsets](using val offsetDomain: OffsetDomain[T]) extends AbstractDomain[SymValSet[T]] {
 
   override def join(a: SymValSet[T], b: SymValSet[T], pos: Block = Block("")): SymValSet[T] = {
@@ -235,8 +259,8 @@ object SymValues {
 
   @tailrec
   final def exprToSymValSet[T <: Offsets]
-  (using symValSetDomain: SymValSetDomain[T])
   (symValues: SymValues[T])
+  (using symValSetDomain: SymValSetDomain[T])
   (
     expr: Expr,
     transform: Int => Int = identity,
