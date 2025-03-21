@@ -1005,19 +1005,16 @@ object CopyProp {
 
   def clobberFull(c: mutable.HashMap[Variable, PropState], l: Variable): Unit = {
     clobberOne(c, l)
-    for (v <- c.keys) {
-      if (c(v).deps.contains(l)) {
+    for ((v, x) <- c) {
+      if (x.deps.contains(l)) {
         clobberOne(c, v)
       }
     }
   }
 
   def clobberOne(c: mutable.HashMap[Variable, PropState], l: Variable): Unit = {
-    if (c.contains(l) && !c(l).clobbered) {
-      c(l).clobbered = true
-    } else if (!c.contains(l)) {
-      c(l) = PropState(FalseLiteral, mutable.Set(), true, 0, false)
-    }
+    val entry = c.getOrElseUpdate(l, PropState(FalseLiteral, mutable.Set(), true, 0, false))
+    entry.clobbered = true
   }
 
   def isTrivial(e: Expr): Boolean = e match {
