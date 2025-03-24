@@ -26,7 +26,7 @@ import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
 import analysis.data_structure_analysis.*
-import analysis.data_structure_analysis.OSetSymValSetDomain
+import analysis.data_structure_analysis.given 
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
@@ -82,7 +82,7 @@ case class StaticAnalysisContext(
 )
 
 case class DSAContext(
-  sva: Map[Procedure, SymValues[OSet]],
+  sva: Map[Procedure, SymValues[Interval]],
   constraints: Map[Procedure, Set[Constraint]],
   local: Map[Procedure, IntervalGraph],
   bottomUp: Map[Procedure, IntervalGraph],
@@ -873,12 +873,12 @@ object RunUtils {
       val DSATimer = PerformanceTimer("DSA Timer", INFO)
 
       val main = ctx.program.mainProcedure
-      var sva: Map[Procedure, SymValues[OSet]] = Map.empty
+      var sva: Map[Procedure, SymValues[Interval]] = Map.empty
       var cons: Map[Procedure, Set[Constraint]] = Map.empty
       computeDSADomain(ctx.program.mainProcedure, ctx).toSeq
         .sortBy(_.name)
         .foreach(proc =>
-          val SVAResults = getSymbolicValues(proc)
+          val SVAResults = getSymbolicValues[Interval](proc)
           val constraints = generateConstraints(proc)
           sva += (proc -> SVAResults)
           cons += (proc -> constraints)
