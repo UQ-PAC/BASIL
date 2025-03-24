@@ -6,9 +6,7 @@ import ir.*
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
 import util.*
-import analysis.data_structure_analysis.OSetDomain
-
-import scala.collection.immutable.{AbstractSeq, LinearSeq}
+import analysis.data_structure_analysis.given
 
 @test_util.tags.UnitTest
 class SVATest extends AnyFunSuite {
@@ -31,7 +29,7 @@ class SVATest extends AnyFunSuite {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set.empty))
+        dsaConfig = None // Some(DSAConfig(Set.empty))
       )
     )
   }
@@ -45,7 +43,7 @@ class SVATest extends AnyFunSuite {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set.empty))
+        dsaConfig = None // Some(DSAConfig(Set.empty))
       )
     )
   }
@@ -71,8 +69,6 @@ class SVATest extends AnyFunSuite {
     val globals: Set[SpecGlobal] = Set.empty
 
     val load = MemoryLoad(R0, mem, R0, Endian.LittleEndian, 64, Some("001"))
-//    val assign = LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("assign"))
-//    val use = MemoryStore(mem, R0, R1, Endian.LittleEndian, 64, Some("use"))
     val use = LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(10, 64)), Some("use"))
     val use1 = LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(10, 64)), Some("use1"))
 
@@ -93,7 +89,7 @@ class SVATest extends AnyFunSuite {
     val context = programToContext(program, globals, globalOffsets)
     val results = runTest(context)
     val mainProc = results.ir.program.mainProcedure
-    val sva = results.dsa.get.sva(mainProc)
+    val sva = getSymbolicValues[OSet](mainProc) //  results.dsa.get.sva(mainProc)
     val r0SVA = SymValues.getSorted(sva, "R0")
 //    val r1SVA = sva.getSorted("R1")
 
@@ -132,8 +128,9 @@ class SVATest extends AnyFunSuite {
     )
 
     val context = programToContext(program, globals, globalOffsets)
+    val results = runTest(context)
     val main = program.mainProcedure
-    val sva = runTest(context).dsa.get.sva(main)
+    val sva = getSymbolicValues[OSet](main) //  results.dsa.get.sva(mainProc)
     val r0SVA = SymValues.getSorted(sva, regName)
 
     val returnedValSet = r0SVA.collectFirst {
@@ -164,7 +161,8 @@ class SVATest extends AnyFunSuite {
 
     val context = programToContext(program, globals, globalOffsets)
     val main = program.mainProcedure
-    val sva = runTest(context).dsa.get.sva(main)
+    runTest(context)
+    val sva = getSymbolicValues[OSet](main) //  results.dsa.get.sva(mainProc)
 
     val R0in = LocalVar("R0_in", bv64)
     val R1in = LocalVar("R1_in", bv64)
@@ -198,7 +196,8 @@ class SVATest extends AnyFunSuite {
 
     val context = programToContext(program, globals, globalOffsets)
     val main = program.mainProcedure
-    val sva = runTest(context).dsa.get.sva(main)
+    runTest(context)
+    val sva = getSymbolicValues[OSet](main) //  results.dsa.get.sva(mainProc)
 
     val R0in = LocalVar("R0_in", bv64)
 
@@ -244,7 +243,8 @@ class SVATest extends AnyFunSuite {
 
     val context = programToContext(program, globals, globalOffsets)
     val main = program.mainProcedure
-    val sva = runTest(context).dsa.get.sva(main)
+    runTest(context)
+    val sva = getSymbolicValues[OSet](main) //  results.dsa.get.sva(mainProc)
 
     val domain = SymValSetDomain[OSet]()
     val (_, lastValSet) = SymValues.getSorted(sva, "R0").last
@@ -283,7 +283,8 @@ class SVATest extends AnyFunSuite {
 
     val context = programToContext(program, globals, globalOffsets)
     val main = context.program.mainProcedure
-    val sva = runTest(context).dsa.get.sva(main)
+    runTest(context)
+    val sva = getSymbolicValues[OSet](main) //  results.dsa.get.sva(mainProc)
     val R0last = SymValues.getSorted(sva, "R0").lastKey
 
     val domain = SymValSetDomain[OSet]()
@@ -309,8 +310,8 @@ class SVATest extends AnyFunSuite {
     val context = programToContext(program, globals, globalOffsets)
 
     val procedure: Procedure = program.mainProcedure
-    val sva = runTest(context).dsa.get.sva(procedure)
-
+    runTest(context)
+    val sva = getSymbolicValues[OSet](procedure) //  results.dsa.get.sva(mainProc)
     val r0SVA = SymValues.getSorted(sva, regName)
 
     val loadValSet = r0SVA.collectFirst {
