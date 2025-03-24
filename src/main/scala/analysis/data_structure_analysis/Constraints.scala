@@ -123,13 +123,3 @@ def generateConstraints(proc: Procedure): Set[Constraint] = {
 
   constraints
 }
-
-case class SVAConstraints(sva: SymbolicValues, constraints: Set[Constraint]) {
-  def this(proc: Procedure) = {
-    this(getSymbolicValues(proc), generateConstraints(proc))
-  }
-  def exprToSymVal(expr: Expr): SymValueSet = sva.exprToSymValSet(expr)
-}
-object SVAConstraints {
-  def apply(proc: Procedure) = new SVAConstraints(proc)
-}
