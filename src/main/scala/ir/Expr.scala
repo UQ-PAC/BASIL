@@ -417,11 +417,13 @@ enum QuantifierSort:
   case forall
 
 case class LambdaExpr(binds: List[LocalVar], body: Expr) extends Expr {
-  override def getType = body.getType
+  override def getType = uncurryFunctionType(binds.map(_.getType), body.getType)
   override def toBoogie = Lambda(binds.map(_.toBoogie), body.toBoogie)
+  def returnType = body.getType
 }
 
 case class QuantifierExpr(kind: QuantifierSort, body: LambdaExpr) extends Expr {
+  require(body.returnType == BoolType, "Type error: quantifier with non-boolean body")
   override def getType: IRType = BoolType
   def toBoogie: BExpr = {
     val b = body.binds.map(_.toBoogie)
