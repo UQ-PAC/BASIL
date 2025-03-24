@@ -949,13 +949,15 @@ object RunUtils {
     q.loading.dumpIL.foreach(s => {
       writeToFile(pp_prog(ctx.program), s"$s-output.il")
       writeToFile(ctx.program.toScala, s"$s-output.scala")
-      writeToFile(translating.BoogieTranslator.translateProg(ctx.program).toString, s"$s-output.bpl")
     })
     Logger.info("[!] Translating to Boogie")
 
     val regionInjector = analysis.flatMap(a => a.regionInjector)
 
-    val boogiePrograms = if (q.boogieTranslation.threadSplit && ctx.program.threads.nonEmpty) {
+    val boogiePrograms = if (q.boogieTranslation.directTranslation) {
+      Logger.info("Disabling WPIF VCs")
+      ArrayBuffer(translating.BoogieTranslator.translateProg(ctx.program, q.outputPrefix))
+    } else if (q.boogieTranslation.threadSplit && ctx.program.threads.nonEmpty) {
       val outPrograms = ArrayBuffer[BProgram]()
       for (thread <- ctx.program.threads) {
         val fileName = q.outputPrefix.stripSuffix(".bpl") + "_" + thread.entry.name + ".bpl"
