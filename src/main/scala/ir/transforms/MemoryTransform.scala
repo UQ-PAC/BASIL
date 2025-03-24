@@ -26,7 +26,7 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
             val rhs =
               if flag.global || flag.heap then Register(varName, load.size)
               else LocalVar(varName, load.lhs.getType)
-            val localAssign = LocalAssign(load.lhs, rhs, load.label)
+            val localAssign = LocalAssign(load.lhs, rhs, load.label, false)
             ChangeTo(List(localAssign))
           } else SkipChildren()
         case store: MemoryStore =>
@@ -50,7 +50,7 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
               MemoryAssign(lhs, store.value, store.label)
             else
               val lhs = LocalVar(varName, store.value.getType)
-              LocalAssign(lhs, store.value, store.label)
+              LocalAssign(lhs, store.value, store.label, false)
             ChangeTo(List(assign))
           } else SkipChildren()
         case _ => SkipChildren()
