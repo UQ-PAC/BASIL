@@ -5,33 +5,7 @@ import specification.*
 import scala.collection.mutable
 import ir.cilvisitor.*
 
-trait Translator[TYP, EXP, PROC, BLOCK, STMT, JMP, VAR, MEM, PA, BA] {
-  def translateType(e: IRType): TYP
-
-  def translateVar(e: Variable): VAR
-  def translateMem(e: Memory): MEM
-
-  def translateExpr(e: Expr): EXP
-
-  def translateStatement(s: Statement): STMT
-  def translateJump(j: Jump): JMP
-
-  def translateBlock(b: Block, attrs: BA): BLOCK
-
-  def translateProc(e: Procedure): PROC
-
-}
-
-case class ProcAttrs(
-  modifies: List[Variable],
-  requires: List[Expr],
-  ensures: List[Expr],
-  freeRequires: List[Expr],
-  freeEnsures: List[Expr]
-)
-
-class BoogieTranslator
-    extends Translator[BType, BExpr, BProcedure, BBlock, BCmd, BCmd, BVar, BMapVar, ProcAttrs, Unit] {
+object BoogieTranslator {
 
   def translateType(e: IRType): BType = e match {
     case BoolType => BoolBType
@@ -126,7 +100,9 @@ class BoogieTranslator
     BBlock(b.label, slToBoogie(b.statements.toList) ++ List(translateJump(b.jump)))
   }
 
-  def translateProc(e: Procedure): BProcedure = {
+  def translateProc(freeRequires: Iterable[BExpr] = Set(), freeEnsures: Iterable[BExpr] = Set())(
+    e: Procedure
+  ): BProcedure = {
 
     val locals = {
       val vars = FindVars()
@@ -144,12 +120,12 @@ class BoogieTranslator
       e.name,
       inparams,
       outparams,
-      e.requiresExpr.map(translateExpr), //  pa.requires.map(translateExpr),
-      e.ensuresExpr.map(translateExpr), // pa.ensures.map(translateExpr),
+      e.requires ++ e.requiresExpr.map(translateExpr),
+      e.ensures ++ e.ensuresExpr.map(translateExpr),
       List(),
       List(),
-      List(), // pa.freeRequires.map(translateExpr),
-      List(), // pa.freeEnsures.map(translateExpr),
+      freeEnsures.toList,
+      freeRequires.toList,
       e.modifies.map(translateGlobal).toSet,
       body
     )
@@ -182,7 +158,15 @@ class BoogieTranslator
 
     val globalVarDecls = vvis.globals.map(translateGlobal).map(BVarDecl(_))
 
-    val procs = p.procedures.map(translateProc)
+    val readOnlySections = p.usedMemory.values.filter(_.readOnly)
+    val readOnlyMemory = memoryToConditionCoalesced(readOnlySections)
+    val initialSections = p.usedMemory.values.filter(!_.readOnly)
+    val initialMemory = memoryToConditionCoalesced(initialSections)
+
+    val procs = p.procedures.map {
+      case proc if p.mainProcedure eq proc => translateProc(initialMemory ++ readOnlyMemory)(proc)
+      case proc => translateProc(readOnlyMemory)(proc)
+    }
 
     val functionOpDefinitions = functionOpToDecl(globalVarDecls ++ procs)
     val decls = globalVarDecls.toList ++ functionOpDefinitions ++ procs

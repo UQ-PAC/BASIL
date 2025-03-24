@@ -949,7 +949,7 @@ object RunUtils {
     q.loading.dumpIL.foreach(s => {
       writeToFile(pp_prog(ctx.program), s"$s-output.il")
       writeToFile(ctx.program.toScala, s"$s-output.scala")
-      writeToFile(translating.BoogieTranslator().translateProg(ctx.program).toString, s"$s-output.bpl")
+      writeToFile(translating.BoogieTranslator.translateProg(ctx.program).toString, s"$s-output.bpl")
     })
     Logger.info("[!] Translating to Boogie")
 
