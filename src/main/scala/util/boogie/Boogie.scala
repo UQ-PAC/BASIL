@@ -1,10 +1,12 @@
 package util.boogie_interaction
 
 enum BoogieResultKind {
-  case Verified
+  case Verified(count: Int = -1, errors: Int = -1)
   case Timeout
   case Unknown(string: String)
   case AssertionFailed
+
+  def isVerified = this.isInstanceOf[BoogieResultKind.Verified]
 }
 
 case class BoogieResult(kind: BoogieResultKind, errors: Array[BoogieError]) {
@@ -52,6 +54,26 @@ case class BoogieError(fileName: String, line: Int, errorSnippet: Option[List[Bo
   }
 }
 
+def parseVerifyMessage(m: String) = {
+  val x = m.trim.split(" ").toList
+  x match {
+    case List(
+          "Boogie",
+          "program",
+          "verifier",
+          "finished",
+          "with",
+          verif: String,
+          "verified,",
+          errors: String,
+          "errors"
+        ) =>
+      Some(BoogieResultKind.Verified(verif.toInt, errors.toInt))
+    case _ if m == "Boogie program verifier finished with 0 errors" => Some(BoogieResultKind.Verified(-1, 0))
+    case _ => None
+  }
+}
+
 /*
  * Parse the output of the boogie tool and return a symbolic structure representing
  * the verification decision, and a list of errors.
@@ -59,8 +81,8 @@ case class BoogieError(fileName: String, line: Int, errorSnippet: Option[List[Bo
  * Assumes boogie is invoked with [/printVerifiedProceduresCount:0].
  */
 def parseOutput(boogieStdout: String): BoogieResult = {
-  println(boogieStdout)
-  val verified = boogieStdout.strip().equals("Boogie program verifier finished with 0 errors")
+  val verified = parseVerifyMessage(boogieStdout)
+  val verif = parseVerifyMessage
   val proveFailed = boogieStdout.contains("could not be proved")
   val timedOut = boogieStdout.strip().contains("timed out")
 
@@ -68,8 +90,8 @@ def parseOutput(boogieStdout: String): BoogieResult = {
 
   val kind = if (timedOut) then {
     BoogieResultKind.Timeout
-  } else if (verified) then {
-    BoogieResultKind.Verified
+  } else if (verified.isDefined) then {
+    verified.get
   } else if (proveFailed) then {
     BoogieResultKind.AssertionFailed
   } else {
