@@ -81,6 +81,14 @@ class CILVisitorImpl(val v: CILVisitor) {
 
   def visit_expr(n: Expr): Expr = {
     def continue(n: Expr): Expr = n match {
+      case o: OldExpr => {
+        val n = visit_expr(o.body)
+        if (n ne o.body) then OldExpr(n) else o
+      }
+      case q: QuantifierExpr => {
+        // needs careful handling of free vars and bound vars
+        q
+      }
       case n: Literal => n
       case Extract(end, start, arg) => {
         val narg = visit_expr(arg)

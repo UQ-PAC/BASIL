@@ -411,3 +411,54 @@ case class SharedMemory(override val name: String, override val addressSize: Int
     extends Memory {
   override def acceptVisit(visitor: Visitor): Memory = visitor.visitSharedMemory(this)
 }
+
+enum QuantifierSort:
+  case exists
+  case lambda
+  case forall
+
+enum QuantifierGuard:
+  // Structured quantifier guard for finite quantifiers we may want to expand into a disjunction, or domains
+  // we otherwise might want to handle in a special way.
+  case IntRange(v: LocalVar, begin: Int, lastExclusive: Int)
+  case BVRange(v: LocalVar, bvsize: Int, begin: Int, lastExclusive: Int) // all vars must have same bvsize
+
+object QuantifierGuard:
+  def toCond(g: QuantifierGuard) = {
+    g match {
+      case IntRange(v, b, e) =>
+        BinaryExpr(BoolAND, BinaryExpr(IntGE, IntLiteral(b), v), BinaryExpr(IntLT, v, IntLiteral(e)))
+      case BVRange(v, sz, b, e) =>
+        BinaryExpr(BoolAND, BinaryExpr(BVUGE, BitVecLiteral(sz, b), v), BinaryExpr(BVULT, v, BitVecLiteral(sz, e)))
+    }
+  }
+
+case class QuantifierExpr(kind: QuantifierSort, binds: List[LocalVar], guard: List[QuantifierGuard], body: Expr)
+    extends Expr {
+  override def getType: IRType = BoolType
+  def toBoogie: BExpr = {
+    val b = binds.map(_.toBoogie)
+    val g = guard
+      .map(QuantifierGuard.toCond)
+      .foldLeft(TrueLiteral: Expr)((l, r) => BinaryExpr(BoolAND, l, r))
+    val bdy = if (guard.isEmpty) {
+      body
+    } else {
+      BinaryExpr(BoolIMPLIES, g, body)
+    }
+    kind match {
+      case QuantifierSort.forall => ForAll(b, bdy.toBoogie)
+      case QuantifierSort.lambda => Lambda(b, bdy.toBoogie)
+      case QuantifierSort.exists => Exists(b, bdy.toBoogie)
+    }
+  }
+  override def variables: Set[Variable] = body.variables.toSet.diff(binds.toSet)
+
+}
+
+case class OldExpr(body: Expr) extends Expr {
+  override def acceptVisit(visitor: Visitor): Expr = body.acceptVisit(visitor)
+  override def toString = s"old($body)"
+  def getType = body.getType
+  def toBoogie = Old(body.toBoogie)
+}

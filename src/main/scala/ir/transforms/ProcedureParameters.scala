@@ -567,7 +567,7 @@ def specToProcForm(
       case b: UnaryBExpr => b.copy(arg = varToOld(b.arg))
       case b: BinaryBExpr => b.copy(arg1 = varToOld(b.arg1), arg2 = varToOld(b.arg2))
       case b: IfThenElse => IfThenElse(varToOld(b.guard), varToOld(b.thenExpr), varToOld(b.elseExpr))
-      case b: QuantifierExpr => b
+      case b: BQuantifierExpr => b
       case b: Old => {
         if (isPost) {
           Old(convVarToOld(varInPre, varInPost, false)(b.body))

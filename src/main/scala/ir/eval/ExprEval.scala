@@ -201,6 +201,8 @@ def fastPartialEvalExprTopLevel(exp: Expr): (Expr, Boolean) = {
 def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S, Expr, InterpreterError] = {
   val eval = statePartialEvalExpr(l)
   val ns = exp match {
+    case f: OldExpr => State.pure(f)
+    case f: QuantifierExpr => State.pure(f)
     case f: UninterpretedFunction => State.pure(f)
     case unOp: UnaryExpr =>
       for {
