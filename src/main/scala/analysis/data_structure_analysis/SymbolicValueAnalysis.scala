@@ -105,6 +105,7 @@ def toOffsetMove(op: BinOp, arg: BitVecLiteral): Int => Int = {
 
 trait Offsets {
   def toOffsets: Set[Int]
+  def toIntervals: Set[Interval]
 }
 trait OffsetDomain[T <: Offsets] extends AbstractDomain[T] {
   def init(i: Int): T
@@ -117,6 +118,11 @@ enum OSet extends Offsets {
   case Top
   case Values(v: Set[Int])
 
+  override def toIntervals: Set[Interval] = {
+    this match
+      case OSet.Top => Set(Interval.Top)
+      case OSet.Values(v) => v.map(i => Interval(i, i + 1))
+  }
   override def toOffsets: Set[Int] = {
     this match
       case OSet.Top => throw Exception("Attempted to retrieve offsets from Top")
@@ -127,7 +133,7 @@ enum OSet extends Offsets {
 
 given IntervalDomain: OffsetDomain[Interval] with {
 
-  override def init(i: Int): Interval = Interval(i, i)
+  override def init(i: Int): Interval = Interval(i, i+1)
 
   override def init(s: Set[Int]): Interval = Interval(s.min, s.max)
 
