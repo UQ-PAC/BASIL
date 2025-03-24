@@ -3,9 +3,19 @@ import ir.*
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
 import util.DSAAnalysis.Norm
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, DSAConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, StaticAnalysisContext}
+import util.{
+  BASILConfig,
+  BASILResult,
+  BoogieGeneratorConfig,
+  DSAConfig,
+  ILLoadingConfig,
+  IRContext,
+  RunUtils,
+  StaticAnalysisConfig,
+  StaticAnalysisContext
+}
 
-class MemoryTransfromTests extends AnyFunSuite  {
+class MemoryTransfromTests extends AnyFunSuite {
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program)
@@ -25,7 +35,7 @@ class MemoryTransfromTests extends AnyFunSuite  {
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
         dsaConfig = Some(DSAConfig(Set(Norm))),
-        memoryTransform = true,
+        memoryTransform = true
       )
     )
   }
@@ -40,7 +50,7 @@ class MemoryTransfromTests extends AnyFunSuite  {
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
         dsaConfig = Some(DSAConfig(Set(Norm))),
-        memoryTransform = true,
+        memoryTransform = true
       )
     )
   }
@@ -58,14 +68,12 @@ class MemoryTransfromTests extends AnyFunSuite  {
     IRContext(List(), Set(), globals, Set(), globalOffsets, spec, program)
   }
 
-
-
   test("simple call") {
     val results = runTest("src/test/memory_transform/clasloc/clang/clasloc")
 
     val source = results.ir.program.nameToProcedure("source")
-    val memoryAssigns = source.collect {
-      case ma: MemoryAssign => ma
+    val memoryAssigns = source.collect { case ma: MemoryAssign =>
+      ma
     }
     assert(memoryAssigns.size == 1)
     val memoryAssign = memoryAssigns.head
