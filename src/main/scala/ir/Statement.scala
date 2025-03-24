@@ -44,6 +44,7 @@ sealed trait SingleAssign extends Assign {
 class MemoryAssign(var lhs: Register, var rhs: Expr, override val label: Option[String] = None) extends SingleAssign {
   override def modifies: Set[Global] = Set(lhs)
   override def toString: String = s"$labelStr$lhs := $rhs"
+  override def acceptVisit(visitor: Visitor): Statement = visitor.visitMemoryAssign(this)
 }
 
 object MemoryAssign {

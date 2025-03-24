@@ -9,6 +9,12 @@ abstract class Visitor {
   def visitExpr(node: Expr): Expr = node.acceptVisit(this)
 
   def visitStatement(node: Statement): Statement = node.acceptVisit(this)
+  
+  def visitMemoryAssign(node: MemoryAssign): Statement = {
+    node.lhs = visitRegister(node.lhs)
+    node.rhs = visitExpr(node.rhs)
+    node
+  }
 
   def visitLocalAssign(node: LocalAssign): Statement = {
     node.lhs = visitVariable(node.lhs)
