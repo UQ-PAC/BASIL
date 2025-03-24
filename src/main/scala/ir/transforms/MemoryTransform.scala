@@ -17,7 +17,11 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
             indices.foreach(c => flag.join(c.node.flags))
             val value = indices.map(_.getPointee).head
             val varName = indices
-              .map(i => (i.node.bases.keySet.filterNot(isPlaceHolder), i.node.get(i.interval).interval))
+              .flatMap(i =>
+                i.node.bases.keySet
+                  .filterNot(isPlaceHolder)
+                  .map(base => (base, i.node.get(i.interval).interval.move(f => f - i.node.bases(base))))
+              )
               .mkString("|")
             val rhs =
               if flag.global || flag.heap then Register(varName, load.size)
@@ -35,7 +39,11 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
             indices.foreach(c => flag.join(c.node.flags))
             val content = indices.map(_.getPointee).head
             val varName = indices
-              .map(i => (i.node.bases.keySet.filterNot(isPlaceHolder), i.node.get(i.interval).interval))
+              .flatMap(i =>
+                i.node.bases.keySet
+                  .filterNot(isPlaceHolder)
+                  .map(base => (base, i.node.get(i.interval).interval.move(f => f - i.node.bases(base))))
+              )
               .mkString("|")
             val assign = if flag.global || flag.heap then
               val lhs = Register(varName, store.size)
