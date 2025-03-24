@@ -19,7 +19,7 @@ enum Interval(val start: Option[Int], val end: Option[Int]) {
   override def toString: String =
     this match
       case Interval.Top => "Top"
-      case Interval.Value(start, end) => s"$start-${end - 1}"
+      case Interval.Value(start, end) => s"$start:${end - 1}"
 
   def size: Option[Int] =
     this match
