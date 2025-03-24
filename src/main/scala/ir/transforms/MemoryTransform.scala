@@ -1,6 +1,6 @@
 package ir.transforms
 
-import analysis.data_structure_analysis.{IntervalGraph, isPlaceHolder}
+import analysis.data_structure_analysis.{DSFlag, IntervalGraph, isPlaceHolder}
 import ir.cilvisitor.{CILVisitor, ChangeTo, SkipChildren}
 import ir.{LocalAssign, LocalVar, MemoryAssign, MemoryLoad, MemoryStore, Procedure, Register, Statement}
 
@@ -13,10 +13,12 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
           if indices.nonEmpty then {
             assert(indices.forall(_.hasPointee))
             assert(indices.map(_.getPointee).size == 1, s"${indices.map(_.getPointee).size}, $load")
+            val flag = DSFlag()
+            indices.foreach(c => flag.join(c.node.flags))
             val value = indices.map(_.getPointee).head
-            val varName = value.node.bases.keySet.filterNot(isPlaceHolder).toString() + value.interval
+            val varName = indices.map(i => (i.node.bases.keySet.filterNot(isPlaceHolder), i.node.get(i.interval).interval)).mkString("|")
             val rhs =
-              if value.node.flags.global || value.node.flags.heap then Register(varName, load.size)
+              if flag.global || flag.heap then Register(varName, load.size)
               else LocalVar(varName, load.lhs.getType)
             val localAssign = LocalAssign(load.lhs, rhs, load.label)
             ChangeTo(List(localAssign))
@@ -26,9 +28,12 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
           if indices.nonEmpty then {
             assert(indices.forall(_.hasPointee))
             assert(indices.map(_.getPointee).size == 1)
+            assert(indices.size == 1)
+            val flag = DSFlag()
+            indices.foreach(c => flag.join(c.node.flags))
             val content = indices.map(_.getPointee).head
-            val varName = content.node.bases.keySet.filterNot(isPlaceHolder).toString() + content.interval
-            val assign = if content.node.flags.global || content.node.flags.heap then
+            val varName = indices.map(i => (i.node.bases.keySet.filterNot(isPlaceHolder), i.node.get(i.interval).interval)).mkString("|")
+            val assign = if flag.global || flag.heap then
               val lhs = Register(varName, store.size)
               MemoryAssign(lhs, store.value, store.label)
             else
