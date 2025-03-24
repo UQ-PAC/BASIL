@@ -1,3 +1,4 @@
+import analysis.data_structure_analysis.{Global, Interval}
 import boogie.SpecGlobal
 import ir.*
 import org.scalatest.funsuite.AnyFunSuite
@@ -69,19 +70,23 @@ class MemoryTransfromTests extends AnyFunSuite {
     IRContext(List(), Set(), globals, Set(), globalOffsets, spec, program)
   }
 
-  test("simple call") {
+  test("global assignment") {
     val results = runTest("src/test/memory_transform/clasloc/clang/clasloc")
 
     val source = results.ir.program.nameToProcedure("source")
     val memoryAssigns = source.collect { case ma: MemoryAssign =>
       ma
     }
-    assert(memoryAssigns.size == 1)
+    assert(memoryAssigns.size == 1, "Expected Assignment to Z")
     val memoryAssign = memoryAssigns.head
     val global = memoryAssign.lhs
-
-    println(global)
-
+    val z = results.ir.globals
+      .collectFirst { case SpecGlobal("z", size, arraySize, address) =>
+        (Global, Interval(address.toInt, address.toInt + (size / 8)))
+      }
+      .get
+      .toString()
+    assert(global.name.contains(z), s"Expected variable to be named $z")
   }
 
 }
