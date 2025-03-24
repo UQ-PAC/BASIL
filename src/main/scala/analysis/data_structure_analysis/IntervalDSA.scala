@@ -412,7 +412,7 @@ class IntervalGraph(
           indices
             .map(findExact)
             .foreach { case (node, interval) =>
-              node.add(interval.growTo(cons.size))
+              if cons.size > 0 then node.add(interval.growTo(cons.size - 1))
             }
           val res = mergeCells(indexPointee)
           val correctPointee =
@@ -711,11 +711,11 @@ class IntervalNode(
 
   def isCollapsed: Boolean = collapsed.nonEmpty
   def add(offset: Int): IntervalCell = {
-    add(Interval(offset, offset + 1))
+    add(Interval(offset, offset))
   }
 
   def get(offset: Int): IntervalCell = {
-    get(Interval(offset, offset + 1))
+    get(Interval(offset, offset))
   }
 
   /**

@@ -25,7 +25,7 @@ enum Interval extends Offsets {
     this match
       case Interval.Top => "Top"
       case Interval.Bot => "Bot"
-      case Interval.Value(start, end) => s"$start-${end - 1}"
+      case Interval.Value(start, end) => s"$start-$end"
 
   def start: Option[Int] =
     this match
@@ -39,7 +39,7 @@ enum Interval extends Offsets {
 
   def size: Option[Int] =
     this match
-      case Interval.Value(start, end) => Some(end - 1 - start)
+      case Interval.Value(start, end) => Some(end - start)
       case _ => None
 
   def move(func: Int => Int): Interval =
@@ -58,7 +58,7 @@ enum Interval extends Offsets {
   def contains(offset: Int): Boolean =
     this match
       case Interval.Top => true
-      case Interval.Value(start, end) => start <= offset && end > offset
+      case Interval.Value(start, end) => start <= offset && end >= offset
       case _ => false
 
   def contains(interval: Interval): Boolean =
@@ -74,7 +74,7 @@ enum Interval extends Offsets {
       case (Interval.Top, _) => true
       case (_, Interval.Top) => true
       case (Interval.Value(start1, end1), Interval.Value(start2, end2)) =>
-        !(start1 >= end2 || start2 >= end1)
+        !(start1 > end2 || start2 > end1)
       case _ => false
 
   def join(other: Interval): Interval = {
