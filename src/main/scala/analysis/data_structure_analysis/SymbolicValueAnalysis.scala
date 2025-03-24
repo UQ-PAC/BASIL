@@ -130,7 +130,7 @@ enum OSet extends Offsets {
 
 given IntervalDomain: OffsetDomain[Interval] with {
 
-  override def init(i: Int): Interval = Interval(i, i + 1)
+  override def init(i: Int): Interval = Interval(i, i)
 
   override def init(s: Set[Int]): Interval = Interval(s.min, s.max)
 
