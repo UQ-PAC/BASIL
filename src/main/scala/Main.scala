@@ -13,6 +13,7 @@ import scala.language.postfixOps
 import scala.sys.process.*
 import util.*
 import mainargs.{main, arg, ParserForClass, Flag}
+import util.boogie_interaction.BoogieResultKind
 
 object Main {
 
@@ -263,12 +264,26 @@ object Main {
       dsaConfig = dsa
     )
 
-    RunUtils.run(q)
+    val result = RunUtils.run(q)
     if (conf.verify.value) {
-      Logger.info("Running boogie")
-      val timer = PerformanceTimer("Verify", LogLevel.INFO)
-      Seq("boogie", "/useArrayAxioms", q.outputPrefix).!
-      timer.checkPoint("Finish")
+      assert(result.boogie.nonEmpty)
+      var failed = false
+      for (b <- result.boogie) {
+        val fname = b.filename
+        val timer = PerformanceTimer("Verify", LogLevel.INFO)
+        val cmd = Seq("boogie", "/useArrayAxioms", fname, "/printVerifiedProceduresCount:0")
+        Logger.info(s"Running: ${cmd.mkString(" ")}")
+        val output = cmd.!!
+        val result = util.boogie_interaction.parseOutput(output)
+        if (result.kind != BoogieResultKind.Verified) {
+          failed = true
+        }
+        println(result)
+        timer.checkPoint("Finish")
+      }
+      if (failed) {
+        throw Exception("Verification failed")
+      }
     }
   }
 
