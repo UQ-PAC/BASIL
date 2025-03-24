@@ -414,45 +414,24 @@ case class SharedMemory(override val name: String, override val addressSize: Int
 
 enum QuantifierSort:
   case exists
-  case lambda
   case forall
 
-enum QuantifierGuard:
-  // Structured quantifier guard for finite quantifiers we may want to expand into a disjunction, or domains
-  // we otherwise might want to handle in a special way.
-  case IntRange(v: LocalVar, begin: Int, lastExclusive: Int)
-  case BVRange(v: LocalVar, bvsize: Int, begin: Int, lastExclusive: Int) // all vars must have same bvsize
+case class LambdaExpr(binds: List[LocalVar], body: Expr) extends Expr {
+  override def getType = body.getType
+  override def toBoogie = Lambda(binds.map(_.toBoogie), body.toBoogie)
+}
 
-object QuantifierGuard:
-  def toCond(g: QuantifierGuard) = {
-    g match {
-      case IntRange(v, b, e) =>
-        BinaryExpr(BoolAND, BinaryExpr(IntGE, IntLiteral(b), v), BinaryExpr(IntLT, v, IntLiteral(e)))
-      case BVRange(v, sz, b, e) =>
-        BinaryExpr(BoolAND, BinaryExpr(BVUGE, BitVecLiteral(sz, b), v), BinaryExpr(BVULT, v, BitVecLiteral(sz, e)))
-    }
-  }
-
-case class QuantifierExpr(kind: QuantifierSort, binds: List[LocalVar], guard: List[QuantifierGuard], body: Expr)
-    extends Expr {
+case class QuantifierExpr(kind: QuantifierSort, body: LambdaExpr) extends Expr {
   override def getType: IRType = BoolType
   def toBoogie: BExpr = {
-    val b = binds.map(_.toBoogie)
-    val g = guard
-      .map(QuantifierGuard.toCond)
-      .foldLeft(TrueLiteral: Expr)((l, r) => BinaryExpr(BoolAND, l, r))
-    val bdy = if (guard.isEmpty) {
-      body
-    } else {
-      BinaryExpr(BoolIMPLIES, g, body)
-    }
+    val b = body.binds.map(_.toBoogie)
+    val bdy = body.body.toBoogie
     kind match {
-      case QuantifierSort.forall => ForAll(b, bdy.toBoogie)
-      case QuantifierSort.lambda => Lambda(b, bdy.toBoogie)
-      case QuantifierSort.exists => Exists(b, bdy.toBoogie)
+      case QuantifierSort.forall => ForAll(b, bdy)
+      case QuantifierSort.exists => Exists(b, bdy)
     }
   }
-  override def variables: Set[Variable] = body.variables.toSet.diff(binds.toSet)
+  override def variables: Set[Variable] = body.variables
 
 }
 

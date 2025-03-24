@@ -29,23 +29,6 @@ object BoogieTranslator {
     }
   }
 
-  def translateQuant(q: QuantifierExpr) = {
-    val b = q.binds.map(_.toBoogie)
-    val g = q.guard
-      .map(QuantifierGuard.toCond)
-      .foldLeft(TrueLiteral: Expr)((l, r) => BinaryExpr(BoolAND, l, r))
-    val bdy = if (q.guard.isEmpty) {
-      q.body
-    } else {
-      BinaryExpr(BoolIMPLIES, g, q.body)
-    }
-    q.kind match {
-      case QuantifierSort.forall => ForAll(b, bdy.toBoogie)
-      case QuantifierSort.lambda => Lambda(b, bdy.toBoogie)
-      case QuantifierSort.exists => Exists(b, bdy.toBoogie)
-    }
-  }
-
   def translateExpr(e: Expr): BExpr = e.toBoogie
 
   def slToBoogie(e: List[Statement]) = e.map(translateStatement)

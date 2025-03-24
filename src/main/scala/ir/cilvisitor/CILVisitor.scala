@@ -2,6 +2,7 @@ package ir.cilvisitor
 
 import ir.*
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable
 
 /** A new visitor based off CIL.
   *
@@ -29,7 +30,7 @@ trait CILVisitor:
   def vlvar(e: Variable): VisitAction[Variable] = DoChildren()
   def vmem(e: Memory): VisitAction[Memory] = DoChildren()
 
-  def enter_scope(params: Map[LocalVar, Expr]): Unit = ()
+  def enter_scope(bound: Iterable[Variable]): Unit = ()
   def leave_scope(): Unit = ()
 
 def doVisitList[T](v: CILVisitor, a: VisitAction[List[T]], n: T, continue: T => T): List[T] = {
@@ -51,6 +52,7 @@ def doVisit[T](v: CILVisitor, a: VisitAction[T], n: T, continue: T => T): T = {
 }
 
 class CILVisitorImpl(val v: CILVisitor) {
+  val boundVariables = mutable.Set[Variable]()
 
   def visit_rvar(n: Variable): Variable = {
     // variable in right expression
@@ -79,15 +81,28 @@ class CILVisitorImpl(val v: CILVisitor) {
     doVisit(v, v.vjump(j), j, continue)
   }
 
+  def with_locals[A, B](localVars: Iterable[Variable], f: A => B, x: A) = {
+    v.enter_scope(localVars)
+    val r = f(x)
+    v.leave_scope()
+    r
+  }
+
+  def visit_lambda(l: LambdaExpr): LambdaExpr = {
+    val r = with_locals(l.binds, visit_expr, l.body)
+    if r ne l.body then LambdaExpr(l.binds, r) else l
+  }
+
   def visit_expr(n: Expr): Expr = {
     def continue(n: Expr): Expr = n match {
       case o: OldExpr => {
         val n = visit_expr(o.body)
         if (n ne o.body) then OldExpr(n) else o
       }
+      case l: LambdaExpr => visit_lambda(l)
       case q: QuantifierExpr => {
-        // needs careful handling of free vars and bound vars
-        q
+        val r = visit_lambda(q.body)
+        if (r ne q.body) then QuantifierExpr(q.kind, r) else q
       }
       case n: Literal => n
       case Extract(end, start, arg) => {
@@ -130,7 +145,6 @@ class CILVisitorImpl(val v: CILVisitor) {
       case d: DirectCall =>
         val actuals = d.actualParams.map(i => i._1 -> visit_expr(i._2))
         val outs = d.outParams.map(i => i._1 -> visit_lvar(i._2))
-        v.enter_scope(actuals)
         d.outParams = outs
         d.actualParams = actuals
         d
@@ -182,12 +196,11 @@ class CILVisitorImpl(val v: CILVisitor) {
 
   def visit_proc(p: Procedure): List[Procedure] = {
     def continue(p: Procedure) = {
-      // manage scope on call/return
-      // v.enter_scope(ArrayBuffer())
+      v.enter_scope(p.formalInParam)
       for (b <- p.blocks) {
         p.replaceBlock(b, visit_block(b))
       }
-      // v.leave_scope(ArrayBuffer())
+      v.leave_scope()
       p
     }
 

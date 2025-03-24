@@ -47,6 +47,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
       case v: Variable => vrvar(v)
       case f @ UninterpretedFunction(n, params, rt) => vuninterp_function(n, params.map(vexpr))
       case q: QuantifierExpr => ???
+      case q: LambdaExpr => ???
       case r: OldExpr => ???
     }
   }
@@ -153,6 +154,7 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
       case v: Variable => vrvar(v)
       case f @ UninterpretedFunction(n, params, rt) => vuninterp_function(n, params.map(vexpr))
       case q: QuantifierExpr => ???
+      case q: LambdaExpr => ???
       case r: OldExpr => ???
     }
   }
