@@ -52,7 +52,7 @@ class IntervalGraph(
           node.flags.unknown = true
           node.flags.incomplete = true
       if symOffsets == Top then node.collapse()
-      else symOffsets.toOffsets.filter(i => f(i) || base != Global).map(node.add)
+      else symOffsets.toIntervals.filter(i => f(i.end.get) || base != Global).map(node.add)
       result + (base -> node)
     }
   }
@@ -176,7 +176,7 @@ class IntervalGraph(
     pairs.foldLeft(Set[IntervalCell]()) { case (results, (base: SymBase, offsets: Interval)) =>
       val (node, adjustment) = findNode(nodes(base))
       if offsets  == Top then results + node.collapse()
-      else results ++ offsets.toOffsets.filter(i => base != Global ||i >= 1000).map(i => i + adjustment).map(node.add)
+      else results ++ offsets.toIntervals.filter(i => base != Global ||i.end.get >= 1000).map(_.move(i => i + adjustment)).map(node.add)
     }
   }
 
@@ -905,7 +905,7 @@ class IntervalNode(
     if isCollapsed then collapsed.get
     else
       val exactMatches = cells.filter(_.interval.contains(interval))
-      assert(exactMatches.size == 1, s"Expected exactly one overlapping interval instead got ${exactMatches.size}")
+      assert(exactMatches.size == 1, s"Expected exactly one overlapping interval instead got ${exactMatches.size}, with ${cells.map(_.interval)}")
       exactMatches.head
   }
 }
