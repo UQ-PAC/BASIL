@@ -710,7 +710,7 @@ class IntervalGraph(
 
 class IntervalNode(
   val graph: IntervalGraph,
-  val bases: mutable.Map[SymBase, Int] = mutable.Map.empty,
+  var bases: mutable.Map[SymBase, Int] = mutable.Map.empty,
   val size: Option[Int] = None,
   val id: Int = intervalNodeCounter.next().toInt
 ) {
@@ -760,6 +760,8 @@ class IntervalNode(
     val newNode =
       if !oldToNew.contains(node) then
         val v = newGraph.init(node.bases, node.size)
+        v.bases = node.bases
+        v.flags.join(node.flags)
         node.cells.foreach(cell => v.add(cell.interval))
         if node.isCollapsed then v._collapsed = Some(v.get(0))
         oldToNew.update(node, v)
