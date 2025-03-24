@@ -15,6 +15,7 @@ import util.{
   StaticAnalysisContext
 }
 
+@test_util.tags.UnitTest
 class MemoryTransfromTests extends AnyFunSuite {
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
