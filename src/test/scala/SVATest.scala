@@ -61,7 +61,15 @@ class SVATest extends AnyFunSuite {
     IRContext(List(), Set(), globals, Set(), globalOffsets, spec, program)
   }
 
-  test("malloc") {
+  test("malloc-OSet") {
+    mallocTest[OSet]
+  }
+
+  test("malloc-Interval") {
+    mallocTest[Interval]
+  }
+
+  def mallocTest[T <: Offsets](using domain: SymValSetDomain[T])(using oDomain: OffsetDomain[T]): Unit = {
     val mem = SharedMemory("mem", 64, 8)
     val R0 = Register("R0", 64)
     val R1 = Register("R1", 64)
@@ -89,16 +97,15 @@ class SVATest extends AnyFunSuite {
     val context = programToContext(program, globals, globalOffsets)
     val results = runTest(context)
     val mainProc = results.ir.program.mainProcedure
-    val sva = getSymbolicValues[OSet](mainProc) //  results.dsa.get.sva(mainProc)
-    val r0SVA = SymValues.getSorted(sva, "R0")
-//    val r1SVA = sva.getSorted("R1")
 
-    val domain = SymValSetDomain[OSet]()
+    val sva = getSymbolicValues[T](mainProc) //  results.dsa.get.sva(mainProc)
+    val r0SVA = SymValues.getSorted(sva, "R0")
+
     val inParam = r0SVA.firstKey
     assert(r0SVA(inParam) == domain.init(Par(mainProc, inParam)), "input param not set correctly")
 
     val mallocValSet = r0SVA.collectFirst {
-      case (variable: LocalVar, valueSet: SymValSet[OSet])
+      case (variable: LocalVar, valueSet: SymValSet[T])
           if valueSet.state.keys.exists(_.isInstanceOf[Heap]) && valueSet.state.size == 1 =>
         valueSet
     }.get // expect exactly 1 value set matching the case
@@ -108,7 +115,14 @@ class SVATest extends AnyFunSuite {
     assert(r0SVA(outPram) == SymValSet.transform(mallocValSet, i => i + 10), "should be malloc symValueSet oplus 10")
   }
 
-  test("call") {
+  test("call-OSet") {
+    callTest[OSet]
+  }
+
+  test("call-Interval") {
+    callTest[Interval]
+  }
+  def callTest[T <: Offsets](using domain: SymValSetDomain[T])(using oDomain: OffsetDomain[T]): Unit = {
     val mem = SharedMemory("mem", 64, 8)
     val regName = "R0"
     val R0 = Register(regName, 64)
@@ -130,11 +144,11 @@ class SVATest extends AnyFunSuite {
     val context = programToContext(program, globals, globalOffsets)
     val results = runTest(context)
     val main = program.mainProcedure
-    val sva = getSymbolicValues[OSet](main) //  results.dsa.get.sva(mainProc)
+    val sva = getSymbolicValues[T](main) //  results.dsa.get.sva(mainProc)
     val r0SVA = SymValues.getSorted(sva, regName)
 
     val returnedValSet = r0SVA.collectFirst {
-      case (variable: LocalVar, valueSet: SymValSet[OSet])
+      case (variable: LocalVar, valueSet: SymValSet[T])
           if valueSet.state.keys.exists(_.isInstanceOf[Ret]) && valueSet.state.size == 1 =>
         valueSet
     }.get // expect exactly 1 value set matching the case
@@ -144,7 +158,14 @@ class SVATest extends AnyFunSuite {
     assert(r0SVA(outPram) == SymValSet.transform(returnedValSet, i => i + 10), "should be return symValueSet oplus 10")
   }
 
-  test("proc entry") {
+  test("procEntry-OSet") {
+    procEntry[OSet]
+  }
+
+  test("procEntry-Interval") {
+    procEntry[Interval]
+  }
+  def procEntry[T <: Offsets](using domain: SymValSetDomain[T])(using oDomain: OffsetDomain[T]): Unit = {
     val R0 = Register("R0", 64)
     val R1 = Register("R1", 64)
     val R2 = Register("R2", 64)
@@ -162,7 +183,7 @@ class SVATest extends AnyFunSuite {
     val context = programToContext(program, globals, globalOffsets)
     val main = program.mainProcedure
     runTest(context)
-    val sva = getSymbolicValues[OSet](main) //  results.dsa.get.sva(mainProc)
+    val sva = getSymbolicValues[T](main) //  results.dsa.get.sva(mainProc)
 
     val R0in = LocalVar("R0_in", bv64)
     val R1in = LocalVar("R1_in", bv64)
@@ -173,7 +194,7 @@ class SVATest extends AnyFunSuite {
     assert(main.formalInParam.contains(R0in), "Expected R0 as an input parameter")
     assert(main.formalInParam.contains(R1in), "Expected R1 as an input parameter")
 
-    val domain = SymValSetDomain[OSet]()
+    val domain = SymValSetDomain[T]()
     assert(sva(R0in) == domain.init(Par(main, R0in)), "Incorrect SymbolicValueSet for R0_in")
     assert(sva(R1in) == domain.init(Par(main, R1in)), "Incorrect SymbolicValueSet for R1_in")
 
@@ -182,7 +203,14 @@ class SVATest extends AnyFunSuite {
 
   }
 
-  test("reassignment") {
+  test("reassignment-OSet") {
+    reassignment[OSet]
+  }
+
+  test("reassignment-Interval") {
+    reassignment[Interval]
+  }
+  def reassignment[T <: Offsets](using domain: SymValSetDomain[T])(using oDomain: OffsetDomain[T]): Unit = {
     val R0 = Register("R0", 64)
     val R1 = Register("R1", 64)
     val bv64 = BitVecType(64)
@@ -197,7 +225,7 @@ class SVATest extends AnyFunSuite {
     val context = programToContext(program, globals, globalOffsets)
     val main = program.mainProcedure
     runTest(context)
-    val sva = getSymbolicValues[OSet](main) //  results.dsa.get.sva(mainProc)
+    val sva = getSymbolicValues[T](main) //  results.dsa.get.sva(mainProc)
 
     val R0in = LocalVar("R0_in", bv64)
 
@@ -206,7 +234,7 @@ class SVATest extends AnyFunSuite {
 
     assert(main.formalInParam.contains(R0in), "Expected R0 as an input parameter")
 
-    val domain = SymValSetDomain[OSet]()
+    val domain = SymValSetDomain[T]()
     assert(sva(R0in) == domain.init(Par(main, R0in)), "Incorrect SymbolicValueSet for R0_in")
 
     assert(sva(R0in) == sva(R1out), "Expected input param to propagate to output")
@@ -216,7 +244,15 @@ class SVATest extends AnyFunSuite {
     )
   }
 
-  test("branch") {
+  test("branch-OSet") {
+    branch[OSet]
+  }
+
+  test("branch-Interval") {
+    branch[Interval]
+  }
+
+  def branch[T <: Offsets](using domain: SymValSetDomain[T])(using oDomain: OffsetDomain[T]): Unit = {
     val R0 = Register("R0", 64)
     val bv64 = BitVecType(64)
     val globalOffsets: Map[BigInt, BigInt] = Map.empty
@@ -244,9 +280,9 @@ class SVATest extends AnyFunSuite {
     val context = programToContext(program, globals, globalOffsets)
     val main = program.mainProcedure
     runTest(context)
-    val sva = getSymbolicValues[OSet](main) //  results.dsa.get.sva(mainProc)
+    val sva = getSymbolicValues[T](main) //  results.dsa.get.sva(mainProc)
 
-    val domain = SymValSetDomain[OSet]()
+    val domain = SymValSetDomain[T]()
     val (_, lastValSet) = SymValues.getSorted(sva, "R0").last
 
     assert(sva(R0in) == domain.init(Par(main, R0in)), "Incorrect SymbolicValueSet for R0_in")
@@ -260,7 +296,14 @@ class SVATest extends AnyFunSuite {
     )
   }
 
-  test("loop") {
+  test("loop-OSet") {
+    loop[OSet]
+  }
+
+  test("loop-Interval") {
+    loop[Interval]
+  }
+  def loop[T <: Offsets](using domain: SymValSetDomain[T])(using oDomain: OffsetDomain[T]): Unit = {
     val R0 = Register("R0", 64)
     val bv64 = BitVecType(64)
     val globalOffsets: Map[BigInt, BigInt] = Map.empty
@@ -284,15 +327,15 @@ class SVATest extends AnyFunSuite {
     val context = programToContext(program, globals, globalOffsets)
     val main = context.program.mainProcedure
     runTest(context)
-    val sva = getSymbolicValues[OSet](main) //  results.dsa.get.sva(mainProc)
+    val sva = getSymbolicValues[T](main) //  results.dsa.get.sva(mainProc)
     val R0last = SymValues.getSorted(sva, "R0").lastKey
 
-    val domain = SymValSetDomain[OSet]()
+    val domain = SymValSetDomain[T]()
     assert(sva(R0in) == domain.init(Par(main, R0in)), "Incorrect SymbolicValueSet for R0_in")
-    assert(sva(R0last) == SymValSet(sva(R0in).state.view.mapValues(_ => OSet.Top).toMap), "Incorrect set of offsets")
+    assert(sva(R0last) == SymValSet(sva(R0in).state.view.mapValues(_ => oDomain.top).toMap), "Incorrect set of offsets")
   }
 
-  test("load") {
+  def load[T <: Offsets](using domain: SymValSetDomain[T])(using oDomain: OffsetDomain[T]): Unit = {
     val mem = SharedMemory("mem", 64, 8)
     val regName = "R0"
     val R0 = Register(regName, 64)
@@ -311,11 +354,11 @@ class SVATest extends AnyFunSuite {
 
     val procedure: Procedure = program.mainProcedure
     runTest(context)
-    val sva = getSymbolicValues[OSet](procedure) //  results.dsa.get.sva(mainProc)
+    val sva = getSymbolicValues[T](procedure) //  results.dsa.get.sva(mainProc)
     val r0SVA = SymValues.getSorted(sva, regName)
 
     val loadValSet = r0SVA.collectFirst {
-      case (variable: LocalVar, valueSet: SymValSet[OSet])
+      case (variable: LocalVar, valueSet: SymValSet[T])
           if valueSet.state.contains(Loaded(load)) && valueSet.state.size == 1 =>
         valueSet
     }.get // expect exactly 1 value set matching the case
