@@ -26,7 +26,7 @@ import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
 import analysis.data_structure_analysis.*
-import analysis.data_structure_analysis.given 
+import analysis.data_structure_analysis.given
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}

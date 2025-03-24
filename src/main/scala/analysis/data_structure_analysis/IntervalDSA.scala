@@ -39,7 +39,11 @@ class IntervalGraph(
 
   def exprToSymVal(expr: Expr): SymValSet[Interval] = SymValues.exprToSymValSet(sva)(expr)
 
-  protected def symValToNodes(symVal: SymValSet[Interval], current: Map[SymBase, IntervalNode], f: Int => Boolean = i => i >= 1000): Map[SymBase, IntervalNode] = {
+  protected def symValToNodes(
+    symVal: SymValSet[Interval],
+    current: Map[SymBase, IntervalNode],
+    f: Int => Boolean = i => i >= 1000
+  ): Map[SymBase, IntervalNode] = {
     symVal.state.filter((base, _) => base != NonPointer).foldLeft(current) { case (result, (base, symOffsets)) =>
       val node = find(result.getOrElse(base, init(base, None)))
       base match
@@ -62,8 +66,8 @@ class IntervalGraph(
     constraint: BinaryConstraint,
     nodes: Map[SymBase, IntervalNode]
   ): Map[SymBase, IntervalNode] = {
-    val arg1 = exprToSymVal(constraint.arg1.value)// .removeNonAddress(i => i >= 1000)
-    val arg2 = exprToSymVal(constraint.arg2.value)//.removeNonAddress(i => i >= 1000)
+    val arg1 = exprToSymVal(constraint.arg1.value) // .removeNonAddress(i => i >= 1000)
+    val arg2 = exprToSymVal(constraint.arg2.value) // .removeNonAddress(i => i >= 1000)
     val res = symValToNodes(arg1, nodes)
     symValToNodes(arg2, res)
   }
@@ -175,8 +179,12 @@ class IntervalGraph(
     val pairs = symVal.state.filter((base, _) => base != NonPointer)
     pairs.foldLeft(Set[IntervalCell]()) { case (results, (base: SymBase, offsets: Interval)) =>
       val (node, adjustment) = findNode(nodes(base))
-      if offsets  == Top then results + node.collapse()
-      else results ++ offsets.toIntervals.filter(i => base != Global ||i.end.get >= 1000).map(_.move(i => i + adjustment)).map(node.add)
+      if offsets == Top then results + node.collapse()
+      else
+        results ++ offsets.toIntervals
+          .filter(i => base != Global || i.end.get >= 1000)
+          .map(_.move(i => i + adjustment))
+          .map(node.add)
     }
   }
 
@@ -771,7 +779,8 @@ class IntervalNode(
   }
 
   override def hashCode(): Int = id
-  override def toString: String = s"Node($id, ${bases.keys}, ${if isCollapsed then "C" else cells.map(_.interval).sorted})"
+  override def toString: String =
+    s"Node($id, ${bases.keys}, ${if isCollapsed then "C" else cells.map(_.interval).sorted})"
 
   def add(cell: IntervalCell): Unit = {
     require(cell.node == this, "added cell must have a reference to this node")
@@ -905,7 +914,10 @@ class IntervalNode(
     if isCollapsed then collapsed.get
     else
       val exactMatches = cells.filter(_.interval.contains(interval))
-      assert(exactMatches.size == 1, s"Expected exactly one overlapping interval instead got ${exactMatches.size}, with ${cells.map(_.interval)}")
+      assert(
+        exactMatches.size == 1,
+        s"Expected exactly one overlapping interval instead got ${exactMatches.size}, with ${cells.map(_.interval)}"
+      )
       exactMatches.head
   }
 }
@@ -1016,7 +1028,12 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
 }
 
 object IntervalDSA {
-  def getLocal(proc: Procedure, context: IRContext, symValues: SymValues[Interval], cons: Set[Constraint]): IntervalGraph = {
+  def getLocal(
+    proc: Procedure,
+    context: IRContext,
+    symValues: SymValues[Interval],
+    cons: Set[Constraint]
+  ): IntervalGraph = {
     val graph = IntervalGraph(proc, Local, context, symValues, cons, None)
     graph.localPhase()
     graph.localCorrectness()

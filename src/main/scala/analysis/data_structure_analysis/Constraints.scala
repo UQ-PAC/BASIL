@@ -123,4 +123,3 @@ def generateConstraints(proc: Procedure): Set[Constraint] = {
 
   constraints
 }
-

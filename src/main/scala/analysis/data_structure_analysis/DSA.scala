@@ -33,7 +33,7 @@ enum Interval extends Offsets {
       case _ => None
 
   def end: Option[Int] =
-     this match
+    this match
       case Interval.Value(s, e) => Some(e)
       case _ => None
 

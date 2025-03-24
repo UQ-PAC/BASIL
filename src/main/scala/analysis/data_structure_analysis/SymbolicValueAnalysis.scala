@@ -19,7 +19,6 @@ def mapMerge[K, V](a: Map[K, V], b: Map[K, V], f: (V, V) => V): Map[K, V] = {
   merged
 }
 
-
 def getSymbolicValues[T <: Offsets](p: Procedure)(using valSetDomain: SymValSetDomain[T]): SymValues[T] = {
   Logger.info(s"Generating Symbolic Values for ${p.name}")
   val symValuesDomain = SymValuesDomain()
@@ -30,7 +29,6 @@ def getSymbolicValues[T <: Offsets](p: Procedure)(using valSetDomain: SymValSetD
     .values
     .fold(symValuesDomain.bot)((x, y) => symValuesDomain.join(x, y, p.entryBlock.get))
 }
-
 
 // a symbolic base address
 sealed trait SymBase
@@ -126,14 +124,13 @@ enum OSet extends Offsets {
   override def toOffsets: Set[Int] = {
     this match
       case OSet.Top => throw Exception("Attempted to retrieve offsets from Top")
-      case OSet.Values(v) =>  v
+      case OSet.Values(v) => v
   }
 }
 
-
 given IntervalDomain: OffsetDomain[Interval] with {
 
-  override def init(i: Int): Interval = Interval(i, i+1)
+  override def init(i: Int): Interval = Interval(i, i + 1)
 
   override def init(s: Set[Int]): Interval = Interval(s.min, s.max)
 
@@ -175,7 +172,6 @@ given OSetDomain: OffsetDomain[OSet] with {
       case OSet.Values(v) => v.size > 10
   }
 
-
   override def transform(v: OSet, f: Int => Int): OSet = {
     v match
       case OSet.Top => OSet.Top
@@ -184,7 +180,6 @@ given OSetDomain: OffsetDomain[OSet] with {
 
   override def init(s: Set[Int]): OSet = Values(s)
 }
-
 
 case class SymValSet[T <: Offsets](state: Map[SymBase, T])
 
@@ -232,12 +227,9 @@ class SymValSetDomain[T <: Offsets](using val offsetDomain: OffsetDomain[T]) ext
   override def bot: SymValSet[T] = SymValSet(Map.empty)
 }
 
-
-
 case class SymValues[T <: Offsets](state: Map[LocalVar, SymValSet[T]]) {
   def apply(lvar: LocalVar): SymValSet[T] = state(lvar)
 }
-
 
 object SymValues {
 
@@ -245,7 +237,6 @@ object SymValues {
     require(state.keys.map(f => f.name.take(3)).toSet.size <= 1, "Expected one or less Variable in state")
     SortedMap.sortedMapFactory[LocalVar, SymValSet[T]](DSAVarOrdering).fromSpecific(state)
   }
-
 
   // get the Symbolic Values of local Vars with prefix in their names
   private def get[T <: Offsets](state: Map[LocalVar, SymValSet[T]], prefix: String): SymValues[T] = {
@@ -264,10 +255,9 @@ object SymValues {
   }
 
   @tailrec
-  final def exprToSymValSet[T <: Offsets]
-  (symValues: SymValues[T])
-  (using symValSetDomain: SymValSetDomain[T])
-  (
+  final def exprToSymValSet[T <: Offsets](symValues: SymValues[T])(using
+    symValSetDomain: SymValSetDomain[T]
+  )(
     expr: Expr,
     transform: Int => Int = identity,
     replace: LocalVar => LocalVar = identity,
@@ -275,26 +265,29 @@ object SymValues {
   ): SymValSet[T] = {
     expr match
       case literal @ BitVecLiteral(value, size) => symValSetDomain.init(Global, transform(bv2SignedInt(literal).toInt))
-      case Extract(end, start, body) if end - start >= 64 => exprToSymValSet(symValues) (body, transform)
-      case Extract(32, 0, body) => exprToSymValSet(symValues) (body, transform) // todo incorrectly assuming value is preserved
-      case ZeroExtend(extension, body) => exprToSymValSet(symValues) (body, transform)
+      case Extract(end, start, body) if end - start >= 64 => exprToSymValSet(symValues)(body, transform)
+      case Extract(32, 0, body) =>
+        exprToSymValSet(symValues)(body, transform) // todo incorrectly assuming value is preserved
+      case ZeroExtend(extension, body) => exprToSymValSet(symValues)(body, transform)
       case binExp @ BinaryExpr(BVADD | BVSUB, arg1, arg2: BitVecLiteral) =>
         val oPlus = toOffsetMove(binExp.op, arg2)
-        exprToSymValSet(symValues) (arg1, oPlus)
-      case variable: LocalVar => symValSetDomain.transform(symValues.state.getOrElse(replace(variable), symValSetDomain.bot), transform)
-      case Extract(end, start, body) if end - start < 64 => symValSetDomain.init(NonPointer, symValSetDomain.offsetDomain.top)
+        exprToSymValSet(symValues)(arg1, oPlus)
+      case variable: LocalVar =>
+        symValSetDomain.transform(symValues.state.getOrElse(replace(variable), symValSetDomain.bot), transform)
+      case Extract(end, start, body) if end - start < 64 =>
+        symValSetDomain.init(NonPointer, symValSetDomain.offsetDomain.top)
       case BinaryExpr(BVCOMP, _, _) => symValSetDomain.init(NonPointer, Set(0, 1).map(transform))
       case e @ (BinaryExpr(_, _, _) | SignExtend(_, _) | UnaryExpr(_, _)) =>
         val updated = e.variables
           .map(_.asInstanceOf[LocalVar])
           .collect { case locVar: LocalVar if symValues.state.contains(locVar) => symValues.state(locVar) }
           .flatMap(_.state)
-          .map((base, _) => (base, symValSetDomain.offsetDomain.top)).toMap
+          .map((base, _) => (base, symValSetDomain.offsetDomain.top))
+          .toMap
         SymValSet(updated)
       case _ => ???
   }
 }
-
 
 class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) extends AbstractDomain[SymValues[T]] {
 
@@ -306,11 +299,10 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) e
 
   private val count: mutable.Map[Block, Int] = mutable.Map.empty.withDefault(_ => 0)
 
-
   override def widen(a: SymValues[T], b: SymValues[T], pos: Block): SymValues[T] = {
     val update = a.state.collect {
       case (localVar: LocalVar, symValSet: SymValSet[T])
-        if b.state.contains(localVar) && symValSet != b.state(localVar) =>
+          if b.state.contains(localVar) && symValSet != b.state(localVar) =>
         (localVar, symValSetDomain.widen(symValSet, b.state(localVar), pos))
     }
 
@@ -335,19 +327,15 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) e
         .toMap
   }
 
-
   override def init(b: Block): SymValues[T] = {
-    if b.isEntry then
-      SymValues(procInitState(b))
+    if b.isEntry then SymValues(procInitState(b))
     else bot
   }
-
 
   override def join(a: SymValues[T], b: SymValues[T], pos: Block): SymValues[T] = {
     count.update(pos, count(pos) + 1)
     if count(pos) < 10 then joinHelper(a, b, pos) else widen(a, b, pos)
   }
-
 
   override def transfer(a: SymValues[T], b: Command): SymValues[T] = {
     val proc = b.parent.parent
@@ -387,10 +375,7 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) e
       case _ => a
   }
 
-
   override def top: SymValues[T] = ???
 
   override def bot: SymValues[T] = SymValues(Map.empty)
 }
-
-
