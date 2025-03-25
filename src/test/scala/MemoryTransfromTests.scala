@@ -1,20 +1,11 @@
 import analysis.data_structure_analysis.{Global, Interval}
 import boogie.SpecGlobal
 import ir.*
+import ir.dsl.{block, directCall, goto, proc, prog, ret}
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
+import util.*
 import util.DSAAnalysis.Norm
-import util.{
-  BASILConfig,
-  BASILResult,
-  BoogieGeneratorConfig,
-  DSAConfig,
-  ILLoadingConfig,
-  IRContext,
-  RunUtils,
-  StaticAnalysisConfig,
-  StaticAnalysisContext
-}
 
 @test_util.tags.UnitTest
 class MemoryTransfromTests extends AnyFunSuite {
@@ -74,9 +65,7 @@ class MemoryTransfromTests extends AnyFunSuite {
     val results = runTest("src/test/memory_transform/clasloc/clang/clasloc")
 
     val source = results.ir.program.nameToProcedure("source")
-    val memoryAssigns = source.collect { case ma: MemoryAssign =>
-      ma
-    }
+    val memoryAssigns = source.collect { case ma: MemoryAssign => ma}
     assert(memoryAssigns.size == 1, "Expected Assignment to Z")
     val memoryAssign = memoryAssigns.head
     val global = memoryAssign.lhs
@@ -89,4 +78,36 @@ class MemoryTransfromTests extends AnyFunSuite {
     assert(global.name.contains(z), s"Expected variable to be named $z")
   }
 
+
+  test("multi proc global assignment") {
+     val mem = SharedMemory("mem", 64, 8)
+    val regName = "R0"
+    val R0 = Register(regName, 64)
+    val xAddress = BitVecLiteral(2000, 64)
+    val xPointer = BitVecLiteral(1000, 64)
+    val globalOffsets = Map(xPointer.value -> xAddress.value)
+    val x = SpecGlobal("x", 64, None, xAddress.value)
+    val globals = Set(x)
+
+    val store1  = MemoryStore(mem, xAddress, BitVecLiteral(10000, 64), Endian.LittleEndian, 64, Some("001"))
+    val store2  = MemoryStore(mem, xAddress, BitVecLiteral(40000, 64), Endian.LittleEndian, 64, Some("002"))
+
+    val program = prog(
+      proc("main",
+        block("start",  goto("caller1", "caller2")),
+        block("caller1", directCall("func1"), goto("end")),
+        block("caller2", directCall("func2"), goto("end")),
+        block("end", ret)
+      ),
+      proc("func1", block("block", store1, ret)),
+      proc("func2", block("block", store2, ret))
+    )
+
+    val context = programToContext(program, globals, globalOffsets)
+
+    val results = runTest(context)
+
+    val memoryAssigns = results.ir.program.collect { case ma: MemoryAssign => ma}
+    assert(memoryAssigns.size == 2)
+  }
 }
