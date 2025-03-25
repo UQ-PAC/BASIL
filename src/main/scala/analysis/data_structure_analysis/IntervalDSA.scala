@@ -6,7 +6,7 @@ import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
 import boogie.SpecGlobal
 import specification.FuncEntry
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
-import ir.{BitVecType, Expr, IRWalk, IntraProcIRCursor, LocalVar, MemoryLoad, MemoryStore, Procedure, Program, computeDomain}
+import ir.*
 import specification.{ExternalFunction, SymbolTableEntry}
 import translating.PrettyPrinter.pp_proc
 import util.{DSALogger, IRContext, IntervalDSALogger as Logger}
@@ -1058,6 +1058,28 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
 }
 
 object IntervalDSA {
+
+  /**
+   *  checks that each region only belongs to a single node
+   *  holds after local phase
+   *
+   *  potentially should be maintained through BU and TD phases
+   */
+  def checkUniqueNodesPerRegion(graph: IntervalGraph): Unit = {
+    val found = mutable.Map[SymBase, IntervalNode]()
+    val seen = mutable.Set[IntervalNode]()
+    val queue = mutable.Queue[IntervalNode]().enqueueAll(graph.nodes.values.map(graph.find))
+    while queue.nonEmpty do
+      {
+        val node = queue.dequeue()
+        node.bases.keys.foreach(base => assert(!found.contains(base) || found(base) == node, s"$base was in $node and ${found(base)}"))
+        assert(node.bases.keys.forall(base => !found.contains(base) || found(base) == node))
+        node.bases.keys.foreach(found.update(_, node))
+        seen.add(node)
+        val toDo = node.cells.filter(_.hasPointee).map(_.getPointee).map(_.node).filterNot(seen.contains)
+        queue.enqueueAll(toDo)
+      }
+  }
 
   /**
    *  checks that all reachable memory load and stores in DSA's domain have a dsa node
