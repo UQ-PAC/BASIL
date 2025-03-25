@@ -927,7 +927,6 @@ object CopyProp {
       s match {
         case l: LocalAssign => {
           val nrhs = subst(l.rhs)
-          st = st.removedAll(st.keys)
           st = st.updated(l.lhs, nrhs)
           l.rhs = nrhs
           SkipChildren()
