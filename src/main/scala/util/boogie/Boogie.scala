@@ -69,8 +69,8 @@ def parseVerifyMessage(m: String) = {
           "errors"
         ) =>
       Some(BoogieResultKind.Verified(verif.toInt, errors.toInt))
-    case _ if m == "Boogie program verifier finished with 0 errors" => Some(BoogieResultKind.Verified(-1, 0))
-    case _ => None
+    case _ if m.trim == "Boogie program verifier finished with 0 errors" => Some(BoogieResultKind.Verified(-1, 0))
+    case _ => println(m); None
   }
 }
 
