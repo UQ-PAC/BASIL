@@ -503,6 +503,8 @@ class IntervalGraph(
     cell1 = get(cell1)
 
     val collapsedNode = IntervalNode(this, cell1.node.bases ++ cell2.node.bases)
+    collapsedNode.flags.join(cell1.node.flags)
+    collapsedNode.flags.join(cell2.node.flags)
     collapsedNode.children.addAll(cell1.node.children)
     collapsedNode.children.addAll(cell2.node.children)
     val collapsedCell = collapsedNode.collapse()
