@@ -270,6 +270,8 @@ object IRTransform {
       }
     }
 
+    ctx.program.procedures.foreach(ir.transforms.makeProcEntryNonLoop)
+
     // useful for ReplaceReturns
     // (pushes single block with `Unreachable` into its predecessor)
     while (transforms.coalesceBlocks(ctx.program)) {}
@@ -302,6 +304,7 @@ object IRTransform {
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
+    assert(invariant.procEntryNoIncoming(ctx.program))
     ctx
   }
 
@@ -740,6 +743,13 @@ object RunUtils {
     DebugDumpIRLogger.writeToFile(File("il-before-dsa.il"), pp_prog(program))
 
     transforms.OnePassDSA().applyTransform(program)
+    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
+      val dir = File("./graphs/")
+      if (!dir.exists()) then dir.mkdirs()
+      for (p <- ctx.program.procedures) {
+        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-dot-simp.dot"), dotBlockGraph(p))
+      }
+    }
 
     transforms.inlinePLTLaunchpad(ctx.program)
 
