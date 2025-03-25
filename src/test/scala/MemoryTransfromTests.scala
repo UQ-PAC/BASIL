@@ -1,0 +1,113 @@
+import analysis.data_structure_analysis.{Global, Interval}
+import boogie.SpecGlobal
+import ir.*
+import ir.dsl.{block, directCall, goto, proc, prog, ret}
+import org.scalatest.funsuite.AnyFunSuite
+import specification.Specification
+import util.*
+import util.DSAAnalysis.Norm
+
+@test_util.tags.UnitTest
+class MemoryTransfromTests extends AnyFunSuite {
+  def runAnalysis(program: Program): StaticAnalysisContext = {
+    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+
+    val emptySpec = Specification(Set(), Set(), Map(), List(), List(), List(), Set())
+    val emptyContext = IRContext(List(), Set(), Set(), Set(), Map(), emptySpec, program)
+    RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
+  }
+
+  def runTest(path: String): BASILResult = {
+    RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf"),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(DSAConfig(Set(Norm))),
+        memoryTransform = true
+      )
+    )
+  }
+
+  def runTest(context: IRContext): BASILResult = {
+    RunUtils.loadAndTranslate(
+      BASILConfig(
+        context = Some(context),
+        loading = ILLoadingConfig(inputFile = "", relfFile = ""),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(DSAConfig(Set(Norm))),
+        memoryTransform = true
+      )
+    )
+  }
+
+  def programToContext(
+    program: Program,
+    globals: Set[SpecGlobal] = Set.empty,
+    globalOffsets: Map[BigInt, BigInt] = Map.empty
+  ): IRContext = {
+    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+
+    val spec = Specification(Set(), globals, Map(), List(), List(), List(), Set())
+    IRContext(List(), Set(), globals, Set(), globalOffsets, spec, program)
+  }
+
+  test("global assignment") {
+    val results = runTest("src/test/memory_transform/clasloc/clang/clasloc")
+
+    val source = results.ir.program.nameToProcedure("source")
+    val memoryAssigns = source.collect { case ma: MemoryAssign => ma }
+    assert(memoryAssigns.size == 1, "Expected Assignment to Z")
+    val memoryAssign = memoryAssigns.head
+    val global = memoryAssign.lhs
+    val z = results.ir.globals
+      .collectFirst { case SpecGlobal("z", size, arraySize, address) =>
+        (Global, Interval(address.toInt, address.toInt + (size / 8)))
+      }
+      .get
+      .toString()
+    assert(global.name.contains(z), s"Expected variable to be named $z")
+  }
+
+  test("multi proc global assignment") {
+    val mem = SharedMemory("mem", 64, 8)
+    val regName = "R0"
+    val R0 = Register(regName, 64)
+    val xAddress = BitVecLiteral(2000, 64)
+    val xPointer = BitVecLiteral(1000, 64)
+    val globalOffsets = Map(xPointer.value -> xAddress.value)
+    val x = SpecGlobal("x", 64, None, xAddress.value)
+    val globals = Set(x)
+
+    val store1 = MemoryStore(mem, xAddress, BitVecLiteral(10000, 64), Endian.LittleEndian, 64, Some("001"))
+    val store2 = MemoryStore(mem, xAddress, BitVecLiteral(40000, 64), Endian.LittleEndian, 64, Some("002"))
+
+    val program = prog(
+      proc(
+        "main",
+        block("start", goto("caller1", "caller2")),
+        block("caller1", directCall("func1"), goto("end")),
+        block("caller2", directCall("func2"), goto("end")),
+        block("end", ret)
+      ),
+      proc("func1", block("block", store1, ret)),
+      proc("func2", block("block", store2, ret))
+    )
+
+    val context = programToContext(program, globals, globalOffsets)
+
+    val results = runTest(context)
+
+    val memoryAssigns = results.ir.program.collect { case ma: MemoryAssign => ma }
+    assert(memoryAssigns.size == 2)
+  }
+}

@@ -1,16 +1,31 @@
 package ir.transforms
 import translating.serialiseIL
 import translating.PrettyPrinter.*
-
 import specification.FuncEntry
-import util.SimplifyLogger
+import util.{DSALogger, SimplifyLogger}
 import ir.eval.AlgebraicSimplifications
 import ir.eval.AssumeConditionSimplifications
 import ir.eval.simplifyExprFixpoint
 import ir.cilvisitor.*
 import ir.*
+
 import scala.collection.mutable
-import analysis._
+import analysis.*
+import analysis.data_structure_analysis.{
+  Const,
+  Heap,
+  IntervalCell,
+  IntervalGraph,
+  Known,
+  Loaded,
+  Par,
+  Ret,
+  Stack,
+  SymBase,
+  Unknown,
+  isPlaceHolder
+}
+
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
@@ -306,7 +321,7 @@ def getRedundantAssignments(procedure: Procedure): Set[Assign] = {
 
   for (c <- procedure) {
     c match {
-      case a: LocalAssign => {
+      case a: LocalAssign if a.reducible => {
         assignedNotRead(a.lhs) = joinVS(assignedNotRead(a.lhs), VS.Assigned(Set(a)))
         a.rhs.variables.foreach(v => {
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(a)))

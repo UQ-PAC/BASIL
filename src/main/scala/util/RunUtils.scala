@@ -25,19 +25,7 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{
-  Constraint,
-  DataStructureAnalysis,
-  Graph,
-  IntervalDSA,
-  IntervalGraph,
-  SymbolicAddress,
-  SymbolicAddressAnalysis,
-  SymbolicValues,
-  computeDSADomain,
-  generateConstraints,
-  getSymbolicValues
-}
+import analysis.data_structure_analysis.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
@@ -48,6 +36,7 @@ import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
+import ir.transforms.MemoryTransform
 import util.DSAAnalysis.Norm
 import util.LogLevel.INFO
 
@@ -296,7 +285,10 @@ object IRTransform {
     val externalRemover = ExternalRemover(externalNamesLibRemoved.toSet)
     externalRemover.visitProgram(ctx.program)
     for (p <- ctx.program.procedures) {
-      p.isExternal = Some(ctx.externalFunctions.exists(e => e.name == p.procName || p.address.contains(e.offset)))
+      p.isExternal = Some(
+        ctx.externalFunctions.exists(e => e.name == p.procName || p.address.contains(e.offset)) || p.isExternal
+          .getOrElse(false)
+      )
     }
 
     assert(invariant.singleCallBlockEnd(ctx.program))
@@ -901,19 +893,36 @@ object RunUtils {
 
       if config.analyses.contains(Norm) then
         DSALogger.info("Finished Computing Constraints")
+        val globalGraph = IntervalDSA.getLocal(ctx.program.mainProcedure, ctx, SymbolicValues.empty, Set[Constraint]())
         val DSA = IntervalDSA.getLocals(ctx, sva, cons)
         DSATimer.checkPoint("Finished DSA Local Phase")
+        DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
         DSA.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
         val DSABU = IntervalDSA.solveBUs(DSA)
         DSATimer.checkPoint("Finished DSA BU Phase")
         DSABU.values.foreach(_.localCorrectness())
+//        DSABU.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
         DSALogger.info("Performed correctness check")
         val DSATD = IntervalDSA.solveTDs(DSABU)
+//        DSATD.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
         DSATimer.checkPoint("Finished DSA TD Phase")
         DSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
+        DSATD.values.foreach(g => globalGraph.globalTransfer(g, globalGraph))
+        DSATD.values.foreach(g => globalGraph.globalTransfer(globalGraph, g))
+        DSATimer.checkPoint("Finished DSA global graph")
+        DSATD.values.foreach(_.localCorrectness())
+//        DSATD.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
+        DSALogger.info("Performed correctness check")
+
+        IntervalDSA.checkConsistentRegions(DSATD)
+        IntervalDSA.checkReachable(ctx.program, DSATD)
+
+        DSATimer.checkPoint("Finished DSA Invariant Check")
         dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
+
+        if q.memoryTransform then visit_prog(MemoryTransform(DSATD), ctx.program)
     }
 
     if (q.runInterpret) {

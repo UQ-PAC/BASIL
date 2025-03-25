@@ -145,7 +145,9 @@ object Main {
       doc =
         "Perform Data Structure Analysis if no version is specified perform constraint generation (requires --simplify flag) (none|norm|field|set|all)"
     )
-    dsaType: Option[String]
+    dsaType: Option[String],
+    @arg(name = "memory-transform", doc = "Transform memory access to region accesses")
+    memoryTransform: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -261,7 +263,8 @@ object Main {
       staticAnalysis = staticAnalysis,
       boogieTranslation = boogieGeneratorConfig,
       outputPrefix = conf.outFileName,
-      dsaConfig = dsa
+      dsaConfig = dsa,
+      memoryTransform = conf.memoryTransform.value
     )
 
     val result = RunUtils.run(q)
