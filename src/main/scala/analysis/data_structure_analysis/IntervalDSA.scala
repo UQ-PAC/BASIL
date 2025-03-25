@@ -1080,7 +1080,7 @@ object IntervalDSA {
 
   /**
    * Checks that unified Symbolic bases are the same across DS graphs of different procedures
-   * that is if (A and B) are unified in on procedure they are unified across all procedures
+   * that is if (A and B) are unified in one procedure they are unified across all procedures
    * Should hold at the end of DSA
    */
   def checkConsistentRegions(DSA: Map[Procedure, IntervalGraph]): Unit = {
