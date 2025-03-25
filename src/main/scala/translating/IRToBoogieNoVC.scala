@@ -69,18 +69,24 @@ object BoogieTranslator {
     case f: IndirectCall => BAssert(FalseBLiteral, Some("IndirectCall" + f.target.toString))
   }
 
-  def translateJump(j: Jump): BCmd = {
+  def translateJump(j: Jump): List[BCmd] = {
     j match {
-      case g: GoTo => GoToCmd(g.targets.map(_.label).toSeq)
-      case r: Return => ReturnCmd
-      case u: Unreachable => BAssume(FalseBLiteral)
+      case g: GoTo => List(GoToCmd(g.targets.map(_.label).toSeq))
+      case r: Return =>
+        if (r.outParams.nonEmpty) {
+          val lhss = r.outParams.keys.toSeq
+          val rhss = r.outParams.values.toSeq
+          List(AssignCmd(lhss.map(_.toBoogie), rhss.map(_.toBoogie)), ReturnCmd)
+        } else {
+          List(ReturnCmd)
+        }
+      case u: Unreachable => List(BAssume(FalseBLiteral))
     }
-
   }
 
   def translateBlock(b: Block, unused: Unit = ()): BBlock = translateBlock(b)
   def translateBlock(b: Block): BBlock = {
-    BBlock(b.label, slToBoogie(b.statements.toList) ++ List(translateJump(b.jump)))
+    BBlock(b.label, slToBoogie(b.statements.toList) ++ translateJump(b.jump))
   }
 
   def translateProc(freeRequires: Iterable[BExpr] = Set(), freeEnsures: Iterable[BExpr] = Set())(
