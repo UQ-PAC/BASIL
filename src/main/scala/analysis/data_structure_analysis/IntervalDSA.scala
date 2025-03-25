@@ -239,7 +239,7 @@ class IntervalGraph(
       exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
     }
 
-    cons.outParams.filter(f => cons.target.formalOutParam.contains(f._2)).foreach { case (out, actual) =>
+    cons.outParams.filter(f => cons.target.formalOutParam.contains(f._1)).foreach { case (out, actual) =>
       val (sourceExpr, targetExpr) = if phase == TD then (actual, out) else (out, actual)
       exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
     }
