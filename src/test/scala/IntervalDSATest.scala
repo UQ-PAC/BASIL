@@ -105,7 +105,6 @@ class IntervalDSATest extends AnyFunSuite {
     assert(xPointerCell.getPointee.equiv(xAddressCell))
   }
 
-
   /**
    * checks dsa-context sensitivity
    * two heap regions are expected to be distinct in caller main
@@ -127,25 +126,43 @@ class IntervalDSATest extends AnyFunSuite {
 
     val program =
       prog(
-        proc("main",
+        proc(
+          "main",
           Set(("R0", BitVecType(64))),
           Set(("R0", BitVecType(64)), ("R1", BitVecType(64)), ("R2", BitVecType(64))),
           block("entry", mallocCall, goto("b1", "b2")),
-          block("b1", LocalAssign(R1, R0, Some("01")), directCall(Set(("R0", R0)), "wmalloc", ("R0", R0)), goto("exit")),
-          block("b2", LocalAssign(R2, R0, Some("02")), directCall(Set(("R0", R0)), "wmalloc", ("R0", R0)), goto("exit")),
-          block("exit", LocalAssign(R1, R0, Some("03")), LocalAssign(R2, R0, Some("04")), ret(("R0", R0), ("R1", R0), ("R2", R0))),
+          block(
+            "b1",
+            LocalAssign(R1, R0, Some("01")),
+            directCall(Set(("R0", R0)), "wmalloc", ("R0", R0)),
+            goto("exit")
+          ),
+          block(
+            "b2",
+            LocalAssign(R2, R0, Some("02")),
+            directCall(Set(("R0", R0)), "wmalloc", ("R0", R0)),
+            goto("exit")
+          ),
+          block(
+            "exit",
+            LocalAssign(R1, R0, Some("03")),
+            LocalAssign(R2, R0, Some("04")),
+            ret(("R0", R0), ("R1", R0), ("R2", R0))
+          )
         ),
-        proc("wmalloc",
+        proc(
+          "wmalloc",
           Set(("R0", BitVecType(64))),
           Set(("R0", BitVecType(64))),
-          block("en",  mallocCall, ret(("R0", R0))),
+          block("en", mallocCall, ret(("R0", R0)))
         ),
-        proc("malloc", // fake malloc
-          Set(("R0", BitVecType(64))), Set(("R0", BitVecType(64))),
+        proc(
+          "malloc", // fake malloc
+          Set(("R0", BitVecType(64))),
+          Set(("R0", BitVecType(64))),
           block("malloc_b", load, ret(("R0", R0)))
         )
       )
-
 
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program)
@@ -159,9 +176,11 @@ class IntervalDSATest extends AnyFunSuite {
 
     val wmallocDSG = results.dsa.get.topDown(results.ir.program.nameToProcedure("wmalloc"))
 
-    val mainHeap = mainDSG.nodes.filter((base, _) => base.isInstanceOf[Ret]).values.map(mainDSG.find).map(_.bases.keySet)
+    val mainHeap =
+      mainDSG.nodes.filter((base, _) => base.isInstanceOf[Ret]).values.map(mainDSG.find).map(_.bases.keySet)
     assert(mainHeap.forall(s => s.exists(base => base.isInstanceOf[Heap])))
-    val wmallocHeap = wmallocDSG.nodes.filter((base, _) => base.isInstanceOf[Heap]).values.map(wmallocDSG.find).map(_.bases.keySet)
+    val wmallocHeap =
+      wmallocDSG.nodes.filter((base, _) => base.isInstanceOf[Heap]).values.map(wmallocDSG.find).map(_.bases.keySet)
     assert(wmallocHeap.size == 1)
     assert(wmallocHeap.head.exists(base => base.isInstanceOf[Heap]))
     assert(mainHeap != wmallocHeap)
