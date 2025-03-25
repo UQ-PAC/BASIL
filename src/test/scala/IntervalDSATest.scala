@@ -1,25 +1,14 @@
-import analysis.data_structure_analysis.{IntervalDSA, generateConstraints, getSymbolicValues}
+import analysis.data_structure_analysis.{Heap, IntervalDSA, Ret, SymBase, generateConstraints, getSymbolicValues}
 import boogie.SpecGlobal
 import ir.*
-import ir.dsl.{block, proc, prog, ret}
+import ir.Endian.{BigEndian, LittleEndian}
+import ir.dsl.{block, directCall, goto, proc, prog, ret}
 import ir.{BitVecLiteral, Endian, MemoryLoad, Register, SharedMemory}
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
 import test_util.BASILTest.writeToFile
+import util.*
 import util.DSAAnalysis.Norm
-import util.RunUtils.{loadAndTranslate, staticAnalysis}
-import util.{
-  BASILConfig,
-  BASILResult,
-  BoogieGeneratorConfig,
-  DSAAnalysis,
-  DSAConfig,
-  ILLoadingConfig,
-  IRContext,
-  RunUtils,
-  StaticAnalysisConfig,
-  StaticAnalysisContext
-}
 
 @test_util.tags.UnitTest
 class IntervalDSATest extends AnyFunSuite {
@@ -116,4 +105,67 @@ class IntervalDSATest extends AnyFunSuite {
     assert(xPointerCell.getPointee.equiv(xAddressCell))
   }
 
+
+  /**
+   * checks dsa-context sensitivity
+   * two heap regions are expected to be distinct in caller main
+   * but the corresponding ret regions from the caller are expected to be unified in the callee
+   */
+  test("disjoint in caller") {
+    val mem = SharedMemory("mem", 64, 8)
+    val R0 = Register("R0", 64)
+    val R1 = Register("R1", 64)
+    val R2 = Register("R2", 64)
+    val R3 = Register("R3", 64)
+    val r1Assign = LocalAssign(R1, R0, Some("01"))
+    val r2Assign = LocalAssign(R2, R0, Some("02"))
+    val load = MemoryLoad(R0, mem, R0, Endian.LittleEndian, 64, Some("load"))
+    val store = MemoryStore(mem, R0, R0, LittleEndian, 64, Some("store"))
+    val store1 = MemoryStore(mem, R3, R1, LittleEndian, 64, Some("store1"))
+    val store2 = MemoryStore(mem, R3, R2, LittleEndian, 64, Some("store2"))
+    val mallocCall = directCall(Set(("R0", R0)), "malloc", ("R0", R0))
+
+    val program =
+      prog(
+        proc("main",
+          Set(("R0", BitVecType(64))),
+          Set(("R0", BitVecType(64)), ("R1", BitVecType(64)), ("R2", BitVecType(64))),
+          block("entry", mallocCall, goto("b1", "b2")),
+          block("b1", LocalAssign(R1, R0, Some("01")), directCall(Set(("R0", R0)), "wmalloc", ("R0", R0)), goto("exit")),
+          block("b2", LocalAssign(R2, R0, Some("02")), directCall(Set(("R0", R0)), "wmalloc", ("R0", R0)), goto("exit")),
+          block("exit", LocalAssign(R1, R0, Some("03")), LocalAssign(R2, R0, Some("04")), ret(("R0", R0), ("R1", R0), ("R2", R0))),
+        ),
+        proc("wmalloc",
+          Set(("R0", BitVecType(64))),
+          Set(("R0", BitVecType(64))),
+          block("en",  mallocCall, ret(("R0", R0))),
+        ),
+        proc("malloc", // fake malloc
+          Set(("R0", BitVecType(64))), Set(("R0", BitVecType(64))),
+          block("malloc_b", load, ret(("R0", R0)))
+        )
+      )
+
+
+    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+
+    val context = programToContext(program, Set.empty, Map.empty)
+    val malloc = context.program.nameToProcedure("malloc")
+    malloc.isExternal = Some(true)
+    val results = runTest(context)
+    val mainDSG = results.dsa.get.topDown(results.ir.program.mainProcedure)
+
+    val wmallocDSG = results.dsa.get.topDown(results.ir.program.nameToProcedure("wmalloc"))
+
+    val mainHeap = mainDSG.nodes.filter((base, _) => base.isInstanceOf[Ret]).values.map(mainDSG.find).map(_.bases.keySet)
+    assert(mainHeap.forall(s => s.exists(base => base.isInstanceOf[Heap])))
+    val wmallocHeap = wmallocDSG.nodes.filter((base, _) => base.isInstanceOf[Heap]).values.map(wmallocDSG.find).map(_.bases.keySet)
+    assert(wmallocHeap.size == 1)
+    assert(wmallocHeap.head.exists(base => base.isInstanceOf[Heap]))
+    assert(mainHeap != wmallocHeap)
+    assert(mainHeap.flatten.toSet == wmallocHeap.flatten.toSet)
+
+  }
 }
