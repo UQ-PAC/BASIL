@@ -614,6 +614,7 @@ class IntervalGraph(
       Logger.debug(s"merged $cell1 with itself")
       cell1
     else if cell1.node.equals(cell2.node) then
+      println(s"hit this case in $proc")
       Logger.debug(s"collapsed $cell1 and $cell2")
       val res = cell1.node.collapse()
       Logger.debug(s"collapsed $cell1 and $cell2")
@@ -1069,16 +1070,17 @@ object IntervalDSA {
     val found = mutable.Map[SymBase, IntervalNode]()
     val seen = mutable.Set[IntervalNode]()
     val queue = mutable.Queue[IntervalNode]().enqueueAll(graph.nodes.values.map(graph.find))
-    while queue.nonEmpty do
-      {
-        val node = queue.dequeue()
-        node.bases.keys.foreach(base => assert(!found.contains(base) || found(base) == node, s"$base was in $node and ${found(base)}"))
-        assert(node.bases.keys.forall(base => !found.contains(base) || found(base) == node))
-        node.bases.keys.foreach(found.update(_, node))
-        seen.add(node)
-        val toDo = node.cells.filter(_.hasPointee).map(_.getPointee).map(_.node).filterNot(seen.contains)
-        queue.enqueueAll(toDo)
-      }
+    while queue.nonEmpty do {
+      val node = queue.dequeue()
+      node.bases.keys.foreach(base =>
+        assert(!found.contains(base) || found(base) == node, s"$base was in $node and ${found(base)}")
+      )
+      assert(node.bases.keys.forall(base => !found.contains(base) || found(base) == node))
+      node.bases.keys.foreach(found.update(_, node))
+      seen.add(node)
+      val toDo = node.cells.filter(_.hasPointee).map(_.getPointee).map(_.node).filterNot(seen.contains)
+      queue.enqueueAll(toDo)
+    }
   }
 
   /**
