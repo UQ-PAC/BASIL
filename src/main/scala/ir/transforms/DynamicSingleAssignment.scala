@@ -69,9 +69,22 @@ class OnePassDSA(
   ): Unit = {
     def st(b: Block) = withDefault(state)(b)
 
+    val params = block.parent.formalInParam
     var renames = st(block).renamesBefore.toMap
 
     for (s <- block.statements) {
+
+      // to handle blocks unreachable from the entry we increment the index of the RHS variable
+      // for non-parameter free variables that don't have a rename defined by their predecessor
+      val incomingRenames = (freeVarsPos(s) -- params -- renames.keySet).map(v => {
+        count(v) = count(v) + 1
+        v -> count(v)
+      })
+      val paramDeps = (params.toSet -- renames.keySet).map(_ -> 0) // also add missing params to analysis state
+      st(block).renamesBefore.addAll(incomingRenames ++ paramDeps)
+      renames = renames ++ incomingRenames ++ paramDeps
+
+      // perform rename
       visit_stmt(StmtRenamer(Map(), renames), s)
       s match {
         case d: Assign => {
@@ -198,6 +211,7 @@ class OnePassDSA(
 
         for (v <- definedVars) {
           if (!state(nb).renamesAfter.contains(v)) {
+            // pre-emptively create a copy for this branch entry, e.g. to create a new copy for loop headers
             count(v) = count(v) + 1
             state(nb).renamesAfter(v) = count(v)
           }

@@ -346,7 +346,6 @@ class Procedure private (
 
   def entryBlock_=(value: Block): Unit = {
     if (!entryBlock.contains(value)) {
-      _entryBlock.foreach(removeBlocks)
       _entryBlock = Some(addBlock(value))
     }
   }

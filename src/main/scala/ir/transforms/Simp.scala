@@ -1447,3 +1447,15 @@ class Simplify(val res: Variable => Option[Expr], val initialBlock: Block = null
     DoChildren()
   }
 }
+
+// ensure procedure entry has no incoming jumps, if it does replace with new
+// block jumping to the old procedure entry
+def makeProcEntryNonLoop(p: Procedure) = {
+  if (p.entryBlock.exists(_.prevBlocks.nonEmpty)) {
+    val nb = Block(p.name + "_entry")
+    p.addBlock(nb)
+    val eb = p.entryBlock.get
+    nb.replaceJump(GoTo(eb))
+    p.entryBlock = nb
+  }
+}
