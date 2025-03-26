@@ -938,7 +938,7 @@ object RunUtils {
 //        DSATD.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
         DSALogger.info("Performed correctness check")
 
-        IntervalDSA.checkConsistentRegions(DSATD)
+        IntervalDSA.checkConsistGlobals(DSATD, globalGraph)
         IntervalDSA.checkReachable(ctx.program, DSATD)
 
         DSATimer.checkPoint("Finished DSA Invariant Check")
