@@ -400,14 +400,24 @@ def inlineCond(a: Assume): Option[Expr] = boundary {
 
   var cond = a.body
   var block = a.parent
-  while (block.prevBlocks.size == 1 && !seenBlocks.contains(block.prevBlocks.head) && seenBlocks.size < 4) {
+
+  def goodSubst(v: Variable) = {
+    v.name.startsWith("Cse")
+    || v.name.startsWith("ZF")
+    || v.name.startsWith("VF")
+    || v.name.startsWith("CF")
+    || v.name.startsWith("NF")
+  }
+
+  while (block.prevBlocks.size == 1 && !seenBlocks.contains(block.prevBlocks.head) && seenBlocks.size < 1) {
     block = block.prevBlocks.head
     seenBlocks = seenBlocks + block
 
     for (s <- block.statements.reverseIterator) {
       s match {
         case assign: LocalAssign => {
-          cond = Substitute(v => if (assign.lhs == v) then Some(assign.rhs) else None)(cond).getOrElse(cond)
+          cond =
+            Substitute(v => if (assign.lhs == v) && goodSubst(v) then Some(assign.rhs) else None)(cond).getOrElse(cond)
         }
         case n: Assume => ()
         case n: Assert => ()
@@ -419,6 +429,15 @@ def inlineCond(a: Assume): Option[Expr] = boundary {
   }
 
   Some(cond)
+}
+
+def collectUses(p: Procedure): Map[Variable, Set[Command]] = {
+  val as = p.flatMap {
+    case a: Command => freeVarsPos(a).map((_, a))
+    case _ => Seq()
+  }
+
+  as.groupBy(_._1).map((v, r) => v -> r.map(_._2).toSet).toMap
 }
 
 class GuardVisitor extends CILVisitor {
@@ -915,7 +934,7 @@ object CopyProp {
     var st = Map[Variable, Expr]()
 
     def subst(e: Expr): Expr = {
-      simplifyExprFixpoint(Substitute(v => st.get(v), true)(e).getOrElse(e))(0)
+      simplifyExprFixpoint(Substitute(v => st.get(v).filter(isTrivial), true)(e).getOrElse(e))(0)
     }
 
     override def vblock(b: Block) = {
@@ -997,18 +1016,20 @@ object CopyProp {
     def proped(e: Expr) = {
       var deps = Set[Variable]() ++ e.variables
       val ne =
-        Substitute(
-          v => {
-            s.get(v) match {
-              case Some(vs) if !vs.clobbered => {
-                deps = deps ++ vs.deps + v
-                Some(vs.e)
+        if e.variables.size > 1 then Some(e)
+        else
+          Substitute(
+            v => {
+              s.get(v) match {
+                case Some(vs) if !vs.clobbered => {
+                  deps = deps ++ vs.deps + v
+                  Some(vs.e)
+                }
+                case _ => None
               }
-              case _ => None
-            }
-          },
-          true
-        )(e)
+            },
+            true
+          )(e)
 
       // partial eval after prop
       (simplifyExprFixpoint(ne.getOrElse(e))._1, deps)

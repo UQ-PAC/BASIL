@@ -740,8 +740,6 @@ object RunUtils {
 
     transforms.OnePassDSA().applyTransform(program)
 
-    transforms.fixupGuards(program)
-
     transforms.inlinePLTLaunchpad(ctx.program)
 
     transforms.removeEmptyBlocks(program)
@@ -781,6 +779,7 @@ object RunUtils {
     Logger.info("Copyprop Start")
     transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
 
+    transforms.fixupGuards(program)
     transforms.removeDuplicateGuard(program)
 
     AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
