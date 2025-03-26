@@ -1103,25 +1103,23 @@ object IntervalDSA {
   }
 
   /**
-   * Checks that unified Symbolic bases are the same across DS graphs of different procedures
-   * that is if (A and B) are unified in one procedure they are unified across all procedures
+   * Checks that the same regions are unified with global across all procedures
+   * that is if (A and Global) are unified at offset C in one procedure they are unified at offset C
+   * across all procedures
    * Should hold at the end of DSA
    */
-  def checkConsistentRegions(DSA: Map[Procedure, IntervalGraph]): Unit = {
+  def checkConsistGlobals(DSA: Map[Procedure, IntervalGraph], global: IntervalGraph): Unit = {
     // collect all the regions  from all the resulting graphs
+    val unifiedRegions = global.nodes(Global).bases
     DSA
       .filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
-      .values
-      .flatMap(_.nodes.keySet)
-      .foreach(r => checkUnifiedRegions(r, DSA))
-  }
-
-  private def checkUnifiedRegions(base: SymBase, DSA: Map[Procedure, IntervalGraph]): Unit = {
-    val regions = DSA
-      .filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
-      .filter((proc, graph) => graph.nodes.contains(base))
-      .map((proc, graph) => (proc, graph.find(graph.nodes(base)).bases.keys.toSet))
-    assert(regions.values.toSet.size == 1, s"$base was inconsistent across DSA TD graphs")
+      .foreach((p, graph) =>
+        val graphRegions = graph.nodes(Global).bases
+        assert(
+          unifiedRegions == graphRegions,
+          s"Procedure ${p.procName} had a differing unified global sets than compared to the global graph"
+        )
+      )
   }
 
 
