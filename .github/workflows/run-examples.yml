@@ -144,4 +144,4 @@ jobs:
       - run: echo "All systemtest suites:" && ./mill test.testOnly '*SystemTests*' -- -z 'xxxx'
 
       - run: ./mill compile
-      - run: ./scripts/scalatest.sh -oID -PS3 -T 1000000 -n test_util.tags.AnalysisSystemTest
+      - run: ./scripts/scalatest.sh -oID -PS3 -T 1000000 -n test_util.tags.AnalysisSystemTest -F 2
