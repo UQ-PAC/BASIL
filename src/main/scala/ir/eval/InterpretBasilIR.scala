@@ -689,7 +689,7 @@ object InterpFuns {
     } yield (st)
 
     bss match {
-      case None => Logger.error("No BSS initialised"); is
+      case None => Logger.debug("Interpreter init: No BSS section initialised"); is
       case Some(init) => init
     }
   }
