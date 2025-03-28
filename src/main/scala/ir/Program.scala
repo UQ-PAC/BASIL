@@ -301,6 +301,24 @@ class Procedure private (
     )
   }
 
+  def normaliseBlockNames() = {
+    var counter = 0
+    var loopCounter = 0
+    ir.transforms.reversePostOrder(this)
+    val bl = Array.from(blocks).sortInPlaceBy(_.rpoOrder)
+    for (b <- bl) {
+      counter += 1
+      val loop = if b.isLoopHeader() then {
+        loopCounter += 1
+        "_loop_header_" + loopCounter
+      } else ""
+
+      b.label = name + "_" + counter + loopCounter
+
+    }
+
+  }
+
   def makeCall(label: Option[String] = None) = DirectCall(this, label, outParamDefaultBinding, inParamDefaultBinding)
 
   var isExternal: Option[Boolean] = None
@@ -482,7 +500,7 @@ class Procedure private (
 }
 
 class Block private (
-  val label: String,
+  var label: String,
   val address: Option[BigInt],
   val statements: IntrusiveList[Statement],
   private var _jump: Jump,
