@@ -885,6 +885,17 @@ object RunUtils {
       DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
 
       doSimplify(ctx, conf.staticAnalysis)
+
+      val ts = toTransitionSystem(ctx.program)
+
+      if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
+        val dir = File("./graphs/")
+        if (!dir.exists()) then dir.mkdirs()
+        for (p <- ts.procedures) {
+          DebugDumpIRLogger.writeToFile(File(s"graphs/transition-${p.name}-after-simp.dot"), dotBlockGraph(p))
+        }
+      }
+
     }
     if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
       val dir = File("./graphs/")
