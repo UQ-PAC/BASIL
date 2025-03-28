@@ -28,6 +28,8 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
 
   private val opcodeSize = 4
 
+  private val branchTakenVar = LocalVar("__BranchTaken", BoolType)
+
   def visitBlock(blockUUID: ByteString, blockCountIn: Int, blockAddress: Option[BigInt]): ArrayBuffer[Statement] = {
     blockCount = blockCountIn
     instructionCount = 0
@@ -54,7 +56,14 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
             }
 
             statements.appendAll(try {
-              visitStmt(s, label)
+              val basilStmts = visitStmt(s, label)
+              println(basilStmts)
+              val assignedVars = basilStmts.flatMap(ir.allVarsPos)
+              if (assignedVars.contains(branchTakenVar)) {
+                println(assignedVars)
+              } else {
+              }
+              basilStmts
             } catch {
               case e => {
                 Logger.error(s"Failed to load insn: $e\n${e.getStackTrace.mkString("\n")}")
@@ -298,7 +307,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
       case "FALSE" => Some(FalseLiteral)
       case "FPCR" => Some(Register("FPCR", 32))
       // ignore the following
-      case "__BranchTaken" => None
+      // case "__BranchTaken" => None
       case "BTypeNext" => None
       case "BTypeCompatible" => None
       case "TPIDR_EL0" => Some(Register(name, 64))
@@ -683,7 +692,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
       // ignore the following
       case "TRUE" => throw Exception(s"Boolean literal $name in LExpr ${ctx.getText}")
       case "FALSE" => throw Exception(s"Boolean literal $name in LExpr ${ctx.getText}")
-      case "__BranchTaken" => None
+      case "__BranchTaken" => Some(branchTakenVar)
       case "BTypeNext" => None
       case "BTypeCompatible" => None
       case "TPIDR_EL0" => Some(Register(name, 64))
