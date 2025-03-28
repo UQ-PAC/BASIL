@@ -745,12 +745,18 @@ object RunUtils {
     Logger.info("[!] Simplify :: DynamicSingleAssignment")
     DebugDumpIRLogger.writeToFile(File("il-before-dsa.il"), pp_prog(program))
 
-    transforms.OnePassDSA().applyTransform(program)
+
+    val ts = transforms.OnePassDSA().applyTransformWithvalidate(program)
+    val bplfile = BoogieTranslator.translateProg(ts, "dsa-translation-validate.bpl")
+    DebugDumpIRLogger.writeToFile(File("dsa-translation-validate.bpl"),
+      bplfile.toString)
+
+
     if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
       val dir = File("./graphs/")
       if (!dir.exists()) then dir.mkdirs()
-      for (p <- ctx.program.procedures) {
-        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-dot-simp.dot"), dotBlockGraph(p))
+      for (p <- ts.procedures) {
+        DebugDumpIRLogger.writeToFile(File(s"graphs/dsav-${p.name}-after-simp.dot"), dotBlockGraph(p))
       }
     }
 
