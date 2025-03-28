@@ -1,6 +1,10 @@
 package ir.transforms
 
+import ir.dsl.IRToDSL.sequenceTransitionSystems
+import ir.invariant.*
+import translating.PrettyPrinter.*
 import util.Logger
+import java.io.File
 import ir.cilvisitor.*
 import translating.*
 import ir.*
@@ -317,6 +321,65 @@ class OnePassDSA(
     p.ssaCount = maxIndex + 1
 
   }
+
+
+  def applyTransformWithvalidate(p: Program): Program = {
+
+    val beforeProg = toTransitionSystem(p)
+
+    for (proc <- p.procedures) {
+      applyTransform(proc)
+    }
+
+    val afterProg = toTransitionSystem(p)
+
+
+    for (proc <- p.procedures) {
+      val after = afterProg.procedures.find(_.name == proc.name).get
+      val before = beforeProg.procedures.find(_.name == proc.name).get
+
+      val beforeRenamer = NamespaceState("target")
+      val afterRenamer = NamespaceState("source")
+
+      val pcInv = BinaryExpr(BVEQ, 
+        visit_rvar(beforeRenamer, transitionSystemPCVar),
+        visit_rvar(afterRenamer, transitionSystemPCVar))
+
+      val registers = allVarsPos(before).map(v => v.name -> v).toMap
+
+      val invariant = allVarsPos(after).flatMap{
+        case r : Register if registers.contains(r.name) => {
+          val before  = visit_rvar(beforeRenamer, registers(r.name))
+          val after = visit_rvar(afterRenamer, r)
+          Seq(polyEqual(before, after))
+        }
+        case r : LocalVar if registers.contains(r.varName) => {
+          val before  = visit_rvar(beforeRenamer, registers(r.varName))
+          val after = visit_rvar(afterRenamer, r)
+          Seq(polyEqual(before, after))
+        }
+        case _ => Seq()
+      }.foldLeft(pcInv)((acc, r) => BinaryExpr(BoolAND, acc, r))
+
+      visit_proc(beforeRenamer, before)
+      visit_proc(afterRenamer, after)
+
+      val combined = sequenceTransitionSystems(beforeProg, before, after)
+
+      combined.entryBlock.get.statements.prepend(Assume(invariant, Some("INVARIANT")))
+      combined.returnBlock.get.statements.append(Assert(invariant, Some("INVARIANT")))
+
+      val bidx = beforeProg.procedures.indexOf(before)
+      beforeProg.procedures.remove(bidx)
+    }
+    assert(invariant.blocksUniqueToEachProcedure(beforeProg))
+
+
+    beforeProg
+
+  }
+
+
 
 }
 
