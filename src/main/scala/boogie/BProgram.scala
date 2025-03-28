@@ -13,6 +13,8 @@ trait BDeclaration extends HasAttributes {
   override def attributes: List[BAttribute] = List()
   def toBoogie: List[String] = List(toString)
 
+  def functionOps: Set[FunctionOp] = Set()
+
   final def writeToString(w: Writer): Unit = {
     for (elem <- toBoogie) {
       w.append(elem)
@@ -75,7 +77,7 @@ case class BProcedure(
     procList ++ implList ++ List("")
   }
   override def toString: String = toBoogie.mkString("\n")
-  def functionOps: Set[FunctionOp] = {
+  override def functionOps: Set[FunctionOp] = {
     val bodyOps = body.flatMap(_.functionOps)
     val ensuresOps = ensures.flatMap(_.functionOps) ++ freeEnsures.flatMap(_.functionOps)
     val requiresOps = requires.flatMap(_.functionOps) ++ freeRequires.flatMap(_.functionOps)
@@ -121,7 +123,7 @@ case class BFunction(
     List(s.toString)
   }
   override def toString: String = toBoogie.mkString("\n")
-  def functionOps: Set[FunctionOp] = body match {
+  override def functionOps: Set[FunctionOp] = body match {
     case Some(b) => b.functionOps
     case None => Set()
   }

@@ -256,7 +256,9 @@ class Procedure private (
   var inParamDefaultBinding: immutable.SortedMap[LocalVar, Expr],
   var outParamDefaultBinding: immutable.SortedMap[LocalVar, Variable],
   var requires: List[BExpr],
-  var ensures: List[BExpr]
+  var ensures: List[BExpr],
+  var requiresExpr: List[Expr],
+  var ensuresExpr: List[Expr]
 ) extends Iterable[CFGPosition] {
 
   def name = procName + address.map("_" + _).getOrElse("")
@@ -293,7 +295,9 @@ class Procedure private (
       immutable.SortedMap.from(inParamDefaultBinding),
       immutable.SortedMap.from(outParamDefaultBinding),
       List.from(requires),
-      List.from(ensures)
+      List.from(ensures),
+      List(),
+      List()
     )
   }
 

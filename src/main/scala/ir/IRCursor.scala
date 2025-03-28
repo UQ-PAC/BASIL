@@ -3,6 +3,7 @@ import util.Logger
 import cfg_visualiser.DotElement
 import cfg_visualiser.{DotArrow, DotGraph, DotInlineArrow, DotInterArrow, DotIntraArrow, DotNode, DotRegularArrow}
 
+import ir.cilvisitor.*
 import collection.mutable
 import scala.annotation.tailrec
 

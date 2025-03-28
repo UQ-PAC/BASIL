@@ -23,15 +23,18 @@ object Main {
   }
 
   def loadDirectory(i: ChooseInput = ChooseInput.Gtirb, d: String): ILLoadingConfig = {
-    val p = d.split("/")
-    val tryName = Seq(p.last, p.dropRight(1).last)
+
+    val x = d.stripSuffix(".gts").stripSuffix(".adt")
+    val p = x.split("/")
+    val tryName = Seq(x + "/" + p.last, x + "/" + p.dropRight(1).last, x, p.last, p.dropRight(1).mkString("/"))
 
     tryName
       .flatMap(name => {
-        val trySpec = Seq((p ++ Seq(s"$name.spec")).mkString("/"), (p.dropRight(1) ++ Seq(s"$name.spec")).mkString("/"))
-        val adt = (p ++ Seq(s"$name.adt")).mkString("/")
-        val relf = (p ++ Seq(s"$name.relf")).mkString("/")
-        val gtirb = (p ++ Seq(s"$name.gts")).mkString("/")
+        val trySpec =
+          tryName.map(n => n + ".spec") ++ Seq(p.dropRight(1).mkString("/") + "/" + p.dropRight(1).last + ".spec")
+        val adt = s"$name.adt"
+        val relf = s"$name.relf"
+        val gtirb = s"$name.gts"
 
         val spec = trySpec
           .flatMap(s => {
@@ -145,7 +148,9 @@ object Main {
       doc =
         "Perform Data Structure Analysis if no version is specified perform constraint generation (requires --simplify flag) (none|norm|field|set|all)"
     )
-    dsaType: Option[String]
+    dsaType: Option[String],
+    @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
+    noif: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -230,7 +235,8 @@ object Main {
     } else {
       BoogieMemoryAccessMode.SuccessiveStoreSelect
     }
-    val boogieGeneratorConfig = BoogieGeneratorConfig(boogieMemoryAccessMode, true, rely, conf.threadSplit.value)
+    val boogieGeneratorConfig =
+      BoogieGeneratorConfig(boogieMemoryAccessMode, true, rely, conf.threadSplit.value, conf.noif.value)
 
     val loadingInputs = if (conf.bapInputDirName.isDefined) then {
       loadDirectory(ChooseInput.Bap, conf.bapInputDirName.get)
@@ -271,14 +277,15 @@ object Main {
       for (b <- result.boogie) {
         val fname = b.filename
         val timer = PerformanceTimer("Verify", LogLevel.INFO)
-        val cmd = Seq("boogie", "/useArrayAxioms", fname, "/printVerifiedProceduresCount:0")
+        val cmd = Seq("boogie", "/useArrayAxioms", fname)
         Logger.info(s"Running: ${cmd.mkString(" ")}")
         val output = cmd.!!
         val result = util.boogie_interaction.parseOutput(output)
-        if (result.kind != BoogieResultKind.Verified) {
-          failed = true
+        result.kind match {
+          case BoogieResultKind.Verified(c, _) if c > 0 => ()
+          case _ => failed = true
         }
-        println(result)
+        Logger.info(result.toString)
         timer.checkPoint("Finish")
       }
       if (failed) {

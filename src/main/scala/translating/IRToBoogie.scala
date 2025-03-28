@@ -8,6 +8,108 @@ import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion, Log
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
+def memoryToConditionCoalesced(memorySections: Iterable[MemorySection]): List[BExpr] = {
+  val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+  val sections = memorySections
+    .filter(_.size > 0)
+    .flatMap { s =>
+      // Phrase the memory condition in terms of 64-bit operations, as long as the memory
+      // section's size is a multiple of 64-bits and 64-bits (8 bytes) aligned
+      // If the memory section is not aligned, the initial unaligned part of it will not be coalesced into a 64-bit
+      // representations and remain as an 8-bit representations
+      // If the memory section's size is not a multiple of 64-bits, the last part of it that cannot be coalesced into
+      // a 64-bit representation will remain as an 8-bit representation
+
+      val memory = s.region match {
+        case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+        case None => mem
+      }
+
+      if (s.bytes.size <= 8) {
+        // if section is less than 8 bytes, just represent it with one access
+        val combined = s.bytes.indices.foldLeft(BigInt(0))((x, y) => x + (s.bytes(y).value * BigInt(2).pow(y * 8)))
+        val bits = s.bytes.size * 8
+        Seq(
+          BinaryBExpr(
+            BVEQ,
+            BMemoryLoad(memory, BitVecBLiteral(s.address, 64), Endian.LittleEndian, bits),
+            BitVecBLiteral(combined, bits)
+          )
+        )
+      } else {
+        val aligned: Int = (s.address % 8).toInt
+
+        val alignedSizeMultiple = (s.bytes.size - aligned) % 8
+        // index of the byte that marks the end of the part that is a multiple of 64-bits
+        val alignedEnd = s.bytes.size - alignedSizeMultiple
+
+        // Aligned section that is safe to convert to 64-bit values
+        val alignedSection = for (b <- aligned until alignedEnd by 8) yield {
+          // Combine the byte constants into a 64-bit value
+          val combined: BigInt =
+            (0 until 8).foldLeft(BigInt(0))((x, y) => x + (s.bytes(b + y).value * BigInt(2).pow(y * 8)))
+          BinaryBExpr(
+            BVEQ,
+            BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 64),
+            BitVecBLiteral(combined, 64)
+          )
+        }
+
+        // If memory section is somehow not aligned (is this possible?) then don't convert the initial non-aligned
+        // section to 64-bit operations, just the rest
+        val unalignedStartSection = if (aligned == 0) {
+          Seq()
+        } else {
+          for (b <- 0 until aligned) yield {
+            BinaryBExpr(
+              BVEQ,
+              BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
+              s.bytes(b).toBoogie
+            )
+          }
+        }
+
+        // If the memory section is not a multiple of 64-bits then don't convert the last section to 64-bits
+        // This is not ideal but will do for now
+        // Ideal solution is to match the sizes based on the sizes listed in the symbol table, dividing further
+        // for values greater than 64-bit as much as possible
+        // But that requires more work
+        // Combine the byte constants into a 64-bit value
+        val unalignedEndSection = if (alignedSizeMultiple == 0) {
+          Seq()
+        } else {
+          for (b <- alignedEnd until s.bytes.size) yield {
+            BinaryBExpr(
+              BVEQ,
+              BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
+              s.bytes(b).toBoogie
+            )
+          }
+        }
+        unalignedStartSection ++ alignedSection ++ unalignedEndSection
+      }
+    }
+  sections.toList
+}
+
+def memoryToConditionBytes(memorySections: Iterable[MemorySection]): List[BExpr] = {
+  val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+  val sections = memorySections.flatMap { s =>
+    val memory = s.region match {
+      case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+      case None => mem
+    }
+    for (b <- s.bytes.indices) yield {
+      BinaryBExpr(
+        BVEQ,
+        BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
+        s.bytes(b).toBoogie
+      )
+    }
+  }
+  sections.toList
+}
+
 class IRToBoogie(
   var program: Program,
   var spec: Specification,
@@ -96,6 +198,11 @@ class IRToBoogie(
     } else {
       List(mem)
     }
+  }
+
+  def memoryToCondition(memorySections: Iterable[MemorySection]) = {
+    if (config.coalesceConstantMemory) then memoryToConditionCoalesced(memorySections)
+    else memoryToConditionBytes(memorySections)
   }
 
   def translate: BProgram = {
@@ -338,39 +445,7 @@ class IRToBoogie(
 
   def functionOpToDefinition(f: FunctionOp): BFunction = {
     f match {
-      case b: BoolToBV1Op =>
-        val invar = BParam("arg", BoolBType)
-        val outvar = BParam(BitVecBType(1))
-        val body = IfThenElse(invar, BitVecBLiteral(1, 1), BitVecBLiteral(0, 1))
-        BFunction(b.fnName, List(invar), outvar, Some(body), List(externAttr))
-      case b: BVFunctionOp => BFunction(b.name, b.in, b.out, None, List(externAttr, b.attribute))
-      case m: MemoryLoadOp =>
-        val memVar = BMapVar("memory", MapBType(BitVecBType(m.addressSize), BitVecBType(m.valueSize)), Scope.Parameter)
-        val indexVar = BParam("index", BitVecBType(m.addressSize))
-        val in = List(memVar, indexVar)
-        val out = BParam(BitVecBType(m.bits))
-        val accesses: Seq[MapAccess] = for (i <- 0 until m.accesses) yield {
-          if (i == 0) {
-            MapAccess(memVar, indexVar)
-          } else {
-            MapAccess(memVar, BinaryBExpr(BVADD, indexVar, BitVecBLiteral(i, m.addressSize)))
-          }
-        }
-        val accessesEndian = m.endian match {
-          case Endian.BigEndian => accesses.reverse
-          case Endian.LittleEndian => accesses
-        }
-
-        val body: BExpr = accessesEndian.toList match {
-          case h :: Nil => h
-          case h :: tail =>
-            tail.foldLeft(h) { (concat: BExpr, next: MapAccess) =>
-              BinaryBExpr(BVCONCAT, next, concat)
-            }
-          case Nil => throw Exception(s"Zero byte access: $f")
-        }
-
-        BFunction(m.fnName, in, out, Some(body), List(externAttr))
+      case b: BasilIRFunctionOp => genFunctionOpDefinition(b, config.memoryFunctionType)
       case g: GammaLoadOp =>
         val gammaMapVar = BMapVar("gammaMap", MapBType(BitVecBType(g.addressSize), BoolBType), Scope.Parameter)
         val indexVar = BParam("index", BitVecBType(g.addressSize))
@@ -389,54 +464,6 @@ class IRToBoogie(
         }
 
         BFunction(g.fnName, in, out, Some(body), List(externAttr))
-      case m: MemoryStoreOp =>
-        val memType = MapBType(BitVecBType(m.addressSize), BitVecBType(m.valueSize))
-        val memVar = BMapVar("memory", memType, Scope.Parameter)
-        val indexVar = BParam("index", BitVecBType(m.addressSize))
-        val valueVar = BParam("value", BitVecBType(m.bits))
-        val in = List(memVar, indexVar, valueVar)
-        val out = BParam(memType)
-        val body: BExpr = config.memoryFunctionType match {
-          case BoogieMemoryAccessMode.SuccessiveStoreSelect =>
-            val indices: Seq[BExpr] = for (i <- 0 until m.accesses) yield {
-              if (i == 0) {
-                indexVar
-              } else {
-                BinaryBExpr(BVADD, indexVar, BitVecBLiteral(i, m.addressSize))
-              }
-            }
-            val values: Seq[BExpr] = for (i <- 0 until m.accesses) yield {
-              BVExtract((i + 1) * m.valueSize, i * m.valueSize, valueVar)
-            }
-            val valuesEndian = m.endian match {
-              case Endian.BigEndian => values.reverse
-              case Endian.LittleEndian => values
-            }
-            val indiceValues = for (i <- 0 until m.accesses) yield {
-              (indices(i), valuesEndian(i))
-            }
-
-            indiceValues.tail.foldLeft(MapUpdate(memVar, indices.head, valuesEndian.head)) {
-              (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next(0), next(1))
-            }
-
-          case BoogieMemoryAccessMode.LambdaStoreSelect =>
-            if (m.accesses == 1) {
-              MapUpdate(memVar, indexVar, valueVar)
-            } else {
-              val i = BVariable("i", BitVecBType(m.addressSize), Scope.Local)
-              Lambda(
-                List(i),
-                IfThenElse(
-                  BInBounds(indexVar, BitVecBLiteral(m.accesses, m.addressSize), m.endian, i),
-                  BByteExtract(valueVar, BinaryBExpr(BVSUB, i, indexVar)),
-                  MapAccess(memVar, i)
-                )
-              )
-            }
-        }
-
-        BFunction(m.fnName, in, out, Some(body), List(externAttr))
       case g: GammaStoreOp =>
         val gammaMapType = MapBType(BitVecBType(g.addressSize), BoolBType)
         val gammaMapVar = BMapVar("gammaMap", gammaMapType, Scope.Parameter)
@@ -507,44 +534,6 @@ class IRToBoogie(
           List(BParam("mem$in", mem.bType))
         }
         BFunction("L", params :+ indexVar, BParam(BoolBType), Some(body), List(externAttr))
-      case b: ByteExtract =>
-        val valueVar = BParam("value", BitVecBType(b.valueSize))
-        val offsetVar = BParam("offset", BitVecBType(b.offsetSize))
-        val in = List(valueVar, offsetVar)
-        val out = BParam(BitVecBType(8))
-        val shift = BinaryBExpr(BVMUL, offsetVar, BitVecBLiteral(8, b.offsetSize))
-        val eshift = if (b.valueSize < b.offsetSize) {
-          BVExtract(b.valueSize, 0, shift)
-        } else if (b.valueSize == b.offsetSize) {
-          shift
-        } else {
-          BVZeroExtend(b.valueSize - b.offsetSize, shift)
-        }
-        val body = BVExtract(8, 0, BinaryBExpr(BVLSHR, valueVar, eshift))
-        BFunction(b.fnName, in, out, Some(body), List(inlineAttr))
-      case b: InBounds =>
-        val baseVar = BParam("base", BitVecBType(b.bits))
-        val lenVar = BParam("len", BitVecBType(b.bits))
-        val iVar = BParam("i", BitVecBType(b.bits))
-        val in = List(baseVar, lenVar, iVar)
-        val out = BParam(BoolBType)
-        val begin = b.endian match {
-          case Endian.LittleEndian => baseVar
-          case Endian.BigEndian => BinaryBExpr(BVSUB, baseVar, lenVar)
-        }
-        val end = b.endian match {
-          case Endian.LittleEndian => BinaryBExpr(BVADD, baseVar, lenVar)
-          case Endian.BigEndian => baseVar
-        }
-
-        val above = BinaryBExpr(BVULE, begin, iVar)
-        val below = BinaryBExpr(BVULT, iVar, end)
-        val wrap = BinaryBExpr(BVULE, baseVar, end)
-        val body = IfThenElse(wrap, BinaryBExpr(BoolAND, above, below), BinaryBExpr(BoolOR, above, below))
-        BFunction(b.fnName, in, out, Some(body), List(inlineAttr))
-
-      case u: BUninterpreted =>
-        BFunction(u.name, u.in.map(BParam(_)), BParam(u.out), None)
     }
   }
 
@@ -618,111 +607,6 @@ class IRToBoogie(
       modifies.toSet,
       body
     )
-  }
-
-  private def memoryToCondition(memorySections: Iterable[MemorySection]): List[BExpr] = {
-
-    def coalesced: List[BExpr] = {
-      val sections = memorySections
-        .filter(_.size > 0)
-        .flatMap { s =>
-          // Phrase the memory condition in terms of 64-bit operations, as long as the memory
-          // section's size is a multiple of 64-bits and 64-bits (8 bytes) aligned
-          // If the memory section is not aligned, the initial unaligned part of it will not be coalesced into a 64-bit
-          // representations and remain as an 8-bit representations
-          // If the memory section's size is not a multiple of 64-bits, the last part of it that cannot be coalesced into
-          // a 64-bit representation will remain as an 8-bit representation
-
-          val memory = s.region match {
-            case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
-            case None => mem
-          }
-
-          if (s.bytes.size <= 8) {
-            // if section is less than 8 bytes, just represent it with one access
-            val combined = s.bytes.indices.foldLeft(BigInt(0))((x, y) => x + (s.bytes(y).value * BigInt(2).pow(y * 8)))
-            val bits = s.bytes.size * 8
-            Seq(
-              BinaryBExpr(
-                BVEQ,
-                BMemoryLoad(memory, BitVecBLiteral(s.address, 64), Endian.LittleEndian, bits),
-                BitVecBLiteral(combined, bits)
-              )
-            )
-          } else {
-            val aligned: Int = (s.address % 8).toInt
-
-            val alignedSizeMultiple = (s.bytes.size - aligned) % 8
-            // index of the byte that marks the end of the part that is a multiple of 64-bits
-            val alignedEnd = s.bytes.size - alignedSizeMultiple
-
-            // Aligned section that is safe to convert to 64-bit values
-            val alignedSection = for (b <- aligned until alignedEnd by 8) yield {
-              // Combine the byte constants into a 64-bit value
-              val combined: BigInt =
-                (0 until 8).foldLeft(BigInt(0))((x, y) => x + (s.bytes(b + y).value * BigInt(2).pow(y * 8)))
-              BinaryBExpr(
-                BVEQ,
-                BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 64),
-                BitVecBLiteral(combined, 64)
-              )
-            }
-
-            // If memory section is somehow not aligned (is this possible?) then don't convert the initial non-aligned
-            // section to 64-bit operations, just the rest
-            val unalignedStartSection = if (aligned == 0) {
-              Seq()
-            } else {
-              for (b <- 0 until aligned) yield {
-                BinaryBExpr(
-                  BVEQ,
-                  BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
-                  s.bytes(b).toBoogie
-                )
-              }
-            }
-
-            // If the memory section is not a multiple of 64-bits then don't convert the last section to 64-bits
-            // This is not ideal but will do for now
-            // Ideal solution is to match the sizes based on the sizes listed in the symbol table, dividing further
-            // for values greater than 64-bit as much as possible
-            // But that requires more work
-            // Combine the byte constants into a 64-bit value
-            val unalignedEndSection = if (alignedSizeMultiple == 0) {
-              Seq()
-            } else {
-              for (b <- alignedEnd until s.bytes.size) yield {
-                BinaryBExpr(
-                  BVEQ,
-                  BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
-                  s.bytes(b).toBoogie
-                )
-              }
-            }
-            unalignedStartSection ++ alignedSection ++ unalignedEndSection
-          }
-        }
-      sections.toList
-    }
-
-    def bytes: List[BExpr] = {
-      val sections = memorySections.flatMap { s =>
-        val memory = s.region match {
-          case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
-          case None => mem
-        }
-        for (b <- s.bytes.indices) yield {
-          BinaryBExpr(
-            BVEQ,
-            BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
-            s.bytes(b).toBoogie
-          )
-        }
-      }
-      sections.toList
-    }
-
-    if config.coalesceConstantMemory then coalesced else bytes
   }
 
   def captureStateStatement(stateName: String): BAssume = {

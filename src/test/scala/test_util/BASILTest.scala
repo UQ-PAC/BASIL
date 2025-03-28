@@ -84,10 +84,10 @@ trait BASILTest {
 
   def checkVerify(boogieResult: BoogieResult, expectVerify: Boolean): (Option[String], Boolean, Boolean) = {
     val failureMsg = boogieResult.kind match {
-      case BoogieResultKind.Verified if expectVerify => None
+      case BoogieResultKind.Verified(_, _) if expectVerify => None
       case BoogieResultKind.AssertionFailed if !expectVerify => None
       case BoogieResultKind.Timeout => Some("SMT Solver timed out")
-      case BoogieResultKind.Verified if !expectVerify => Some("Expected verification failure, but got success.")
+      case BoogieResultKind.Verified(_, _) if !expectVerify => Some("Expected verification failure, but got success.")
       case BoogieResultKind.AssertionFailed if expectVerify => Some("Expected verification success, but got failure.")
       case k: BoogieResultKind.Unknown => Some(k.toString)
     }
