@@ -1,4 +1,4 @@
-import analysis.data_structure_analysis.{Heap, IntervalDSA, Ret, SymBase, generateConstraints, getSymbolicValues}
+import analysis.data_structure_analysis.{Heap, IntervalDSA, Par, Ret, SymBase, generateConstraints, getSymbolicValues}
 import boogie.SpecGlobal
 import ir.*
 import ir.Endian.{BigEndian, LittleEndian}
@@ -105,6 +105,59 @@ class IntervalDSATest extends AnyFunSuite {
     assert(xPointerCell.getPointee.equiv(xAddressCell))
   }
 
+  test("alias") {
+    val mem = SharedMemory("mem", 64, 8)
+    val R0 = Register("R0", 64)
+    val R1 = Register("R1", 64)
+    val R2 = Register("R2", 64)
+
+    val xAddress = BitVecLiteral(2000, 64)
+    val yAddress = BitVecLiteral(3000, 64)
+    val xPointer = BitVecLiteral(1010, 64)
+    val yPointer = BitVecLiteral(1018, 64)
+    val globalOffsets = Map(xPointer.value -> xAddress.value, yPointer.value -> yAddress.value)
+    val x = SpecGlobal("x", 64, None, xAddress.value)
+    val y = SpecGlobal("y", 64, None, yAddress.value)
+    val globals = Set(x, y)
+
+    val irType = BitVecType(64)
+
+    val program = prog(
+      proc("main", Set(("R0", irType)), Set(("R0", irType), ("R1", irType)),
+        block("en",
+          LocalAssign(R1, R0, Some("01")),
+          directCall(Set(("R0", R0), ("R1", R1)), "callee", ("R0", R0), ("R1", R1), ("R2", R2)),
+          ret(("R0", R0), ("R1", R1))
+        )
+      ),
+      proc("callee", Set(("R0", irType), ("R1", irType), ("R2", irType)), Set(("R0", irType), ("R1", irType)),
+        block("calleeEn",
+          MemoryStore(mem, R0, xAddress, LittleEndian, 64, Some("02")),
+          MemoryStore(mem, R1, R2, LittleEndian, 64, Some("03")),
+          ret(("R0", R0), ("R1", R1))
+        )
+      )
+    )
+
+    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+
+    val context = programToContext(program, globals, globalOffsets)
+    val basilResult = runTest(context)
+    val main = basilResult.ir.program.mainProcedure
+    val callee = basilResult.ir.program.nameToProcedure("callee")
+    val dsgMain = basilResult.dsa.get.topDown(main)
+    val dsgCallee = basilResult.dsa.get.topDown(callee)
+    val in = dsgMain.get(dsgMain.nodes(Par(main, LocalVar("R0_in", irType))).get(0))
+    val calleein1 = dsgCallee.get(dsgCallee.nodes(Par(callee, LocalVar("R0_in", irType))).get(0))
+    val calleein2 = dsgCallee.get(dsgCallee.nodes(Par(callee, LocalVar("R1_in", irType))).get(0))
+
+    assert(calleein1 == calleein2)
+    assert(in.interval == calleein1.interval)
+    assert(in.node.bases == calleein1.node.bases)
+  }
+
   /**
    * checks dsa-context sensitivity
    * two heap regions are expected to be distinct in caller main
@@ -184,7 +237,7 @@ class IntervalDSATest extends AnyFunSuite {
     assert(wmallocHeap.size == 1)
     assert(wmallocHeap.head.exists(base => base.isInstanceOf[Heap]))
     assert(mainHeap != wmallocHeap)
+    println(mainHeap)
     assert(mainHeap.flatten.toSet == wmallocHeap.flatten.toSet)
-
   }
 }
