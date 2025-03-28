@@ -268,6 +268,18 @@ class IntervalGraph(
     val targetCells = target.exprToCells(targetExpr).map(target.find)
     target.localCorrectness()
     if (targetCells ++ sourceCells).nonEmpty then target.mergeCells(targetCells ++ sourceCells)
+
+    sourceCells.foreach(
+      cell =>
+        val node = cell.node
+        val sourceBases = node.bases
+        sourceBases.foreach {
+          case (base, offset) if target.nodes.contains(base) =>
+            target.mergeCells(node.get(offset), target.find(target.nodes(base).get(0)))
+          case _ =>
+        }
+
+    )
     target.localCorrectness()
   }
 
