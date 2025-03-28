@@ -393,10 +393,22 @@ class CleanupAssignments() extends CILVisitor {
 
 }
 
+val condPropDebugLogger = SimplifyLogger.deriveLogger("inlineCond")
+
+/**
+ * Propagate flag calculation into this assume statement, finding a linear 
+ * backwards chain from this block until the first side-effecting or non-linear branch
+ * and inlines the meet of all the assignments.
+ *
+ * Doesn't preserve assignment order or reason about clobbers so requires DSA form to be valid
+ * and to correctly identify the linear backwards dependency.
+ *
+ * TODO: would be much more efficient if we memoised, as we are finding and evaluating 
+ * the backwards path twice for each branch.
+ */
 def inlineCond(a: Assume): Option[Expr] = boundary {
-  var visited = List[LocalAssign]()
-  var joinCount = 0
-  var seenBlocks = Set[Block]()
+
+  condPropDebugLogger.debug(s"START : ${a.parent.label}")
 
   var cond = a.body
   var block = a.parent
@@ -408,25 +420,90 @@ def inlineCond(a: Assume): Option[Expr] = boundary {
     || v.name.startsWith("CF")
     || v.name.startsWith("NF")
   }
+  val interesting = a.body.variables.filter(goodSubst)
+  if (interesting.isEmpty) {
+    break(None)
+  }
 
-  while (block.prevBlocks.size == 1 && !seenBlocks.contains(block.prevBlocks.head) && seenBlocks.size < 1) {
-    block = block.prevBlocks.head
-    seenBlocks = seenBlocks + block
+  var worklist = List(List(block))
 
-    for (s <- block.statements.reverseIterator) {
+  def processChain(incoming: Map[Variable, Expr])(bs: List[Block]) = boundary {
+    var st = incoming
+
+    for (s <- Vector.from(bs).flatMap(_.statements).reverseIterator) {
       s match {
         case assign: LocalAssign => {
-          cond =
-            Substitute(v => if (assign.lhs == v) && goodSubst(v) then Some(assign.rhs) else None)(cond).getOrElse(cond)
+          st = st.updated(assign.lhs, assign.rhs)
         }
         case n: Assume => ()
         case n: Assert => ()
         case n: NOP => ()
-        case _ => break(None)
+        case _ => break((st, false))
       }
     }
-
+    (st, true)
   }
+
+  var first = true
+  var currJoin = Map[Variable, Expr]()
+  var abortNow = false
+  var seen = 1
+  currJoin = boundary {
+    while (worklist.nonEmpty) {
+      condPropDebugLogger.debug(currJoin)
+
+      val strata = worklist.head.map(findSimpleBackwardsChain)
+
+      worklist = worklist.tail
+      val extra = interesting.flatMap(currJoin.get(_).toSet.flatMap(_.variables))
+      val extra2 = extra.flatMap(currJoin.get(_).toSet.flatMap(_.variables))
+
+      val nextJoin = strata match {
+        case (join :: _) :: Nil => join
+        case (join :: _) :: tail if (tail.forall(_.headOption.contains(join))) => join
+        case xs => {
+          condPropDebugLogger.debug(s"Abort nonsame or empty head\n ${xs.map(_.headOption.map(_.label)).toList} ")
+          break(currJoin)
+        }
+      }
+      condPropDebugLogger.debug(s"Next join: ${nextJoin.label}")
+
+      seen += strata.map(_.size).sum
+
+      val res = strata.map(processChain(currJoin))
+      condPropDebugLogger.debug(s"Res ${res.size} ${strata.map(_.map(_.label)).mkString("\n  ")}")
+
+      currJoin = if (res.size == 1) {
+        res.head._1
+      } else if (res.forall(_._2)) {
+        res
+          .map(_._1)
+          .reduce((acc, r) => {
+            acc.keySet.intersect(r.keySet).filter(k => acc(k) == r(k)).map(k => k -> acc(k)).toMap
+          })
+      } else {
+        condPropDebugLogger.debug(s"Abort found side effect:\n $res")
+        break(currJoin)
+      }
+
+      if (seen > 20) {
+        condPropDebugLogger.debug("Abort depth")
+        break(currJoin)
+      }
+
+      if (!nextJoin.isLoopHeader()) {
+        worklist = (nextJoin.prevBlocks.toList) :: worklist
+      } else {
+        condPropDebugLogger.debug("Abort loop header")
+      }
+
+    }
+
+    currJoin
+  }
+
+  condPropDebugLogger.debug(s"subst $currJoin")
+  cond = Substitute(currJoin.get, true)(cond).getOrElse(cond)
 
   Some(cond)
 }
@@ -467,8 +544,7 @@ def copypropTransform(
   val solve = t.checkPoint("Solve CopyProp")
 
   if (result.nonEmpty) {
-    val r = CopyProp.toResult(result, true)
-    val vis = Simplify(CopyProp.toResult(result, true))
+    val vis = Simplify(CopyProp.toResult(result))
     visit_proc(vis, p)
 
     val gvis = GuardVisitor()
@@ -1152,7 +1228,7 @@ object CopyProp {
     if (!poisoned) state else mutable.HashMap()
   }
 
-  def toResult(s: mutable.Map[Variable, PropState], trivialOnly: Boolean = true)(v: Variable): Option[Expr] = {
+  def toResult(s: mutable.Map[Variable, PropState])(trivialOnly: Boolean = true)(v: Variable): Option[Expr] = {
     s.get(v) match {
       case Some(c) if !c.clobbered && (!trivialOnly || isTrivial(c.e)) => Some(c.e)
       case _ => None
@@ -1333,16 +1409,32 @@ def findDefinitelyExits(p: Program) = {
   )
 }
 
-class Simplify(val res: Variable => Option[Expr], val initialBlock: Block = null) extends CILVisitor {
+class Simplify(val res: Boolean => Variable => Option[Expr], val initialBlock: Block = null) extends CILVisitor {
 
   var madeAnyChange = false
   var block: Block = initialBlock
   var skipped = Set[String]()
+  var trivialOnly = true
+
+  override def vstmt(s: Statement) = {
+    s match {
+      case _: Assume => {
+        trivialOnly = false
+      }
+      case LocalAssign(_, rhs: Variable, _) => {
+        trivialOnly = true
+      }
+      case _ => {
+        trivialOnly = true
+      }
+    }
+    DoChildren()
+  }
 
   override def vexpr(e: Expr) = {
     val threshold = 500
     val variables = e.variables.toSet
-    val subst = Substitute(res, true, threshold)
+    val subst = Substitute(res(trivialOnly), true, threshold)
     var old: Expr = e
     var result = subst(e).getOrElse(e)
     while (old != result) {
@@ -1445,6 +1537,22 @@ def removeDuplicateGuard(p: Program) = {
     }
     case _ => Seq()
   }
+}
+
+def findSimpleBackwardsChain(b: Block) = {
+  var block = b
+
+  var before = List[Block]()
+
+  while {
+    if (block.prevBlocks.size == 1) {
+      block = block.prevBlocks.head
+      before = block :: before
+    }
+    block.prevBlocks.size == 1 && block.prevBlocks.forall(_.nextBlocks.size == 1)
+  } do {}
+
+  before ++ Seq(b)
 }
 
 def findSimpleChain(b: Block) = {

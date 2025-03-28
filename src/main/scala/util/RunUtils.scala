@@ -719,6 +719,14 @@ object RunUtils {
     val timer = PerformanceTimer("Simplify")
     val program = ctx.program
 
+    val foundLoops = LoopDetector.identify_loops(program)
+    val newLoops = foundLoops.reducibleTransformIR()
+    newLoops.updateIrWithLoops()
+
+    for (p <- program.procedures) {
+      p.normaliseBlockNames()
+    }
+
     ctx.program.sortProceduresRPO()
 
     transforms.liftSVComp(ctx.program)
@@ -732,7 +740,7 @@ object RunUtils {
     transforms.coalesceBlocks(program)
     transforms.removeEmptyBlocks(program)
 
-    transforms.coalesceBlocksCrossBranchDependency(program)
+    // transforms.coalesceBlocksCrossBranchDependency(program)
     DebugDumpIRLogger.writeToFile(File("blockgraph-before-dsa.dot"), dotBlockGraph(program.mainProcedure))
 
     Logger.info("[!] Simplify :: DynamicSingleAssignment")
@@ -781,6 +789,8 @@ object RunUtils {
 
     transforms.fixupGuards(program)
     transforms.removeDuplicateGuard(program)
+    // transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
+    transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
 
     AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
 
