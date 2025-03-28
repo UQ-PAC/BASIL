@@ -1066,21 +1066,24 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
 object IntervalDSA {
 
   /**
-   *  checks that each region only belongs to a single node
+   *  checks that (non Heap/Ret) regions only belongs to a single node
    *  holds after local phase
+   *
+   *
+   *  Heap and Ret may be duplicated due to multiple calls to the same function
    *
    *  potentially should be maintained through BU and TD phases
    */
   def checkUniqueNodesPerRegion(graph: IntervalGraph): Unit = {
     val found = mutable.Map[SymBase, IntervalNode]()
     val seen = mutable.Set[IntervalNode]()
-    val queue = mutable.Queue[IntervalNode]().enqueueAll(graph.nodes.values.map(graph.find))
+    val entry = graph.nodes.values.map(graph.find)
+    val queue = mutable.Queue[IntervalNode]().enqueueAll(entry)
     while queue.nonEmpty do {
       val node = queue.dequeue()
-      node.bases.keys.foreach(base =>
+      node.bases.keys.filterNot(b => b.isInstanceOf[Ret] || b.isInstanceOf[Heap])foreach(base =>
         assert(!found.contains(base) || found(base) == node, s"$base was in $node and ${found(base)}")
       )
-      assert(node.bases.keys.forall(base => !found.contains(base) || found(base) == node))
       node.bases.keys.foreach(found.update(_, node))
       seen.add(node)
       val toDo = node.cells.filter(_.hasPointee).map(_.getPointee).map(_.node).filterNot(seen.contains)
