@@ -176,6 +176,14 @@ class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override
 
   def targets: Set[Block] = _targets.toSet
 
+  def fixTargets = {
+    for (t <- targets) {
+      if (!t.incomingJumps.contains(this)) {
+        t.addIncomingJump(this)
+      }
+    }
+  }
+
   def addAllTargets(t: Iterable[Block]): Unit = {
     t.foreach(addTarget)
   }

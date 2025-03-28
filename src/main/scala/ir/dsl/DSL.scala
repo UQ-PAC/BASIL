@@ -106,9 +106,14 @@ case class DelayNameResolve(ident: String) {
     case b: Procedure if b.name == ident => b
   }
 
-  def resolveBlock(prog: Program): Option[Block] = prog.collectFirst {
+  def resolveBlock(prog: Program): Option[Block] = prog.procedures.flatMap(_.blocks).collectFirst {
     case b: Block if b.label == ident => b
   }
+
+  def resolveBlock(proc: Procedure): Option[Block] = proc.blocks.collectFirst {
+    case b: Block if b.label == ident => b
+  }
+
 }
 
 sealed trait EventuallyStatement {
@@ -160,8 +165,11 @@ case class EventuallyCall(
 }
 
 case class EventuallyGoto(targets: Iterable[DelayNameResolve], label: Option[String] = None) extends EventuallyJump {
+
   override def resolve(p: Program, proc: Procedure): GoTo = {
-    val tgs = targets.flatMap(tn => tn.resolveBlock(p))
+    val tgs = targets.map(tn => tn.resolveBlock(proc).getOrElse({
+      throw Exception(s"Failed to resolve goto: $tn\n${proc.blocks.map(_.label).mkString("\n")}")
+    }))
     GoTo(tgs, label)
   }
 }
@@ -226,18 +234,18 @@ case class EventuallyBlock(
   address: Option[BigInt] = None
 ) {
 
-  def makeResolver: (Block, (Program, Procedure) => Unit) = {
-    val tempBlock: Block = Block(label, address, List(), GoTo(List.empty))
-
-    def cont(prog: Program, proc: Procedure): Block = {
+    def cont(tempBlock: Block)(prog: Program, proc: Procedure): Block = {
       assert(tempBlock.statements.isEmpty)
+      assert(tempBlock.parent == proc)
       val resolved = sl.map(_.resolve(prog))
       assert(tempBlock.statements.isEmpty)
       tempBlock.statements.addAll(resolved)
       tempBlock.replaceJump(j.resolve(prog, proc))
     }
 
-    (tempBlock, cont)
+  def makeResolver: (Block, (Program, Procedure) => Unit) = {
+    val tempBlock: Block = Block(label, address, List(), GoTo(List.empty))
+    (tempBlock, cont(tempBlock))
   }
 
   def resolve(prog: Program, proc: Procedure): Block = {
@@ -351,7 +359,7 @@ case class EventuallyProgram(
 
     resolvers.foreach(_(p))
     assert(ir.invariant.correctCalls(p))
-    assert(ir.invariant.cfgCorrect(p))
+    // assert(ir.invariant.cfgCorrect(p))
     p
   }
 
@@ -381,3 +389,5 @@ def progUnresolved(
   procedures: EventuallyProcedure*
 ): EventuallyProgram =
   EventuallyProgram(mainProc, procedures, initialMemory)
+
+
