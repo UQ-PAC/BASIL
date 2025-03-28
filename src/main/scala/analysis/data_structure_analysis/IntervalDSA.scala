@@ -224,13 +224,6 @@ class IntervalGraph(
   def callTransfer(phase: DSAPhase, cons: DirectCallConstraint, source: IntervalGraph, target: IntervalGraph): Unit = {
     require(phase == TD || phase == BU)
     val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
-//    val targetGlobal = target.find(target.nodes(Global).get(0))
-//    var sourceGlobal = source.find(source.nodes(Global).get(0))
-//    val old = source.nodes(Global).clone(target, false, oldToNew)
-//    val globalNode = sourceGlobal.node.clone(target, true, oldToNew)
-//
-//    sourceGlobal = globalNode.get(targetGlobal.interval)
-//    target.mergeCells(sourceGlobal, targetGlobal)
     DSALogger.info(s"cloning ${source.proc.procName} into ${target.proc.procName}, $phase")
     cons.inParams
       .filterNot(f => f._1.name.startsWith("R31"))
@@ -274,7 +267,6 @@ class IntervalGraph(
       )
     val targetCells = target.exprToCells(targetExpr).map(target.find)
     target.localCorrectness()
-
     if (targetCells ++ sourceCells).nonEmpty then target.mergeCells(targetCells ++ sourceCells)
     target.localCorrectness()
   }
