@@ -610,7 +610,8 @@ class IntervalGraph(
     Logger.debug(s"with $cell2")
     if cell2.hasPointee then Logger.debug(s"pointee ${cell2.getPointee}")
 
-    val result = if cell1.equals(cell2) then
+    val result = if cell1.node == cell2.node && cell1.interval.start.equals(cell2.interval.start) then
+      assert(cell1.node.get(cell1.interval).interval.contains(cell2.interval))
       Logger.debug(s"merged $cell1 with itself")
       cell1
     else if cell1.node.equals(cell2.node) then
