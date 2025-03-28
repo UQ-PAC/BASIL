@@ -789,8 +789,6 @@ object RunUtils {
 
     transforms.fixupGuards(program)
     transforms.removeDuplicateGuard(program)
-    // transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
-    transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
 
     AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
 
