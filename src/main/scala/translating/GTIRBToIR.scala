@@ -41,7 +41,9 @@ class TempIf(
   val thenStmts: mutable.Buffer[Statement],
   val elseStmts: mutable.Buffer[Statement],
   override val label: Option[String] = None
-) extends NOP(label)
+) extends NOP(label) {
+  override def toString = s"TempIf(${cond}, ${thenStmts}, ${elseStmts}, ${label})"
+}
 
 /** GTIRBToIR class. Forms an IR as close as possible to the one produced by BAP by using GTIRB instead
   *
@@ -240,7 +242,7 @@ class GTIRBToIR(
     block.statements.last match {
       case last @ LocalAssign(lhs: Register, _, _) if lhs.name == "_PC" =>
         val label = last.label
-        block.statements.remove(last)
+        // block.statements.remove(last)
         label
       case _ => throw Exception(s"expected block ${block.label} to have a program counter assignment at its end")
     }
@@ -781,7 +783,8 @@ class GTIRBToIR(
 
     val newBlocks = ArrayBuffer(trueBlock, falseBlock)
     procedure.addBlocks(newBlocks)
-    block.statements.remove(tempIf)
+    // block.statements.remove(tempIf)
+    println(tempIf)
 
     GoTo(newBlocks)
   }
