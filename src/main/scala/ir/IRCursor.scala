@@ -2,7 +2,9 @@ package ir
 import util.Logger
 import cfg_visualiser.DotElement
 import cfg_visualiser.{DotArrow, DotGraph, DotInlineArrow, DotInterArrow, DotIntraArrow, DotNode, DotRegularArrow}
+import translating.BasilIRPrettyPrinter
 
+import translating.PrettyPrinter.*
 import ir.cilvisitor.*
 import collection.mutable
 import scala.annotation.tailrec
@@ -363,6 +365,17 @@ def toDot[T <: CFGPosition](
   }
 
   def getArrow(s: CFGPosition, n: CFGPosition) = {
+
+    if (!dotNodes.contains(n)) {
+      val r = n match { 
+        case p: Program => (BasilIRPrettyPrinter()(p))
+        case p: Block => (BasilIRPrettyPrinter()(p))
+        case p: Statement => (BasilIRPrettyPrinter()(p))
+        case _ => s"UNK: $n"
+      }
+      dotNodes(n) = DotNode(n.toString, r, true)
+
+    }
     if (IRWalk.procedure(n) eq IRWalk.procedure(s)) {
       DotRegularArrow(dotNodes(s), dotNodes(n))
     } else {
@@ -373,7 +386,9 @@ def toDot[T <: CFGPosition](
   for (node <- domain) {
     node match {
       case s =>
-        iterator.succ(s).foreach(n => dotArrows.addOne(getArrow(s, n)))
+        assert(dotNodes.contains(s))
+        iterator.succ(s).foreach(n => 
+            dotArrows.addOne(getArrow(s, n)))
       //       iterator.pred(s).foreach(n => dotArrows.addOne(getArrow(s,n)))
     }
   }
