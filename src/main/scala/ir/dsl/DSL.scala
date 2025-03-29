@@ -168,9 +168,12 @@ case class EventuallyCall(
 case class EventuallyGoto(targets: Iterable[DelayNameResolve], label: Option[String] = None) extends EventuallyJump {
 
   override def resolve(p: Program, proc: Procedure): GoTo = {
-    val tgs = targets.map(tn => tn.resolveBlock(proc).getOrElse({
-      throw Exception(s"Failed to resolve goto: $tn\n${proc.blocks.map(_.label).mkString("\n")}")
-    }))
+    val tgs = targets.map(tn =>
+      tn.resolveBlock(proc)
+        .getOrElse({
+          throw Exception(s"Failed to resolve goto: $tn\n${proc.blocks.map(_.label).mkString("\n")}")
+        })
+    )
     GoTo(tgs, label)
   }
 }
@@ -235,14 +238,14 @@ case class EventuallyBlock(
   address: Option[BigInt] = None
 ) {
 
-    def cont(tempBlock: Block)(prog: Program, proc: Procedure): Block = {
-      assert(tempBlock.statements.isEmpty)
-      assert(tempBlock.parent == proc)
-      val resolved = sl.map(_.resolve(prog))
-      assert(tempBlock.statements.isEmpty)
-      tempBlock.statements.addAll(resolved)
-      tempBlock.replaceJump(j.resolve(prog, proc))
-    }
+  def cont(tempBlock: Block)(prog: Program, proc: Procedure): Block = {
+    assert(tempBlock.statements.isEmpty)
+    assert(tempBlock.parent == proc)
+    val resolved = sl.map(_.resolve(prog))
+    assert(tempBlock.statements.isEmpty)
+    tempBlock.statements.addAll(resolved)
+    tempBlock.replaceJump(j.resolve(prog, proc))
+  }
 
   def makeResolver: (Block, (Program, Procedure) => Unit) = {
     val tempBlock: Block = Block(label, address, List(), GoTo(List.empty))
@@ -390,5 +393,3 @@ def progUnresolved(
   procedures: EventuallyProcedure*
 ): EventuallyProgram =
   EventuallyProgram(mainProc, procedures, initialMemory)
-
-
