@@ -98,6 +98,7 @@ import PCMan.*
 def procToTransition(p: Procedure, loops: Set[Loop]) = {
 
   val pcVar = transitionSystemPCVar
+  var cutPoints = Map[String, Block]()
 
   val synthEntryJump = GoTo(Seq())
   val synthEntry = Block(s"${p.name}_SYNTH_ENTRY", None, Seq(), synthEntryJump)
@@ -109,7 +110,15 @@ def procToTransition(p: Procedure, loops: Set[Loop]) = {
   p.entryBlock.foreach(e => {
     e.statements.prepend(pcGuard("ENTRY"))
     synthEntryJump.addTarget(e)
+    cutPoints = cutPoints.updated("ENTRY", e)
   })
+
+  p.returnBlock.foreach(e => {
+    e.statements.append(setPCLabel("RETURN"))
+    e.replaceJump(GoTo(synthExit))
+    cutPoints = cutPoints.updated("RETURN", e)
+  })
+
   p.entryBlock = synthEntry
   p.returnBlock = synthExit
 
@@ -123,14 +132,20 @@ def procToTransition(p: Procedure, loops: Set[Loop]) = {
     synthEntryJump.addTarget(loopEntry)
 
     for (backedge <- l.backEdges) {
-      backedge.from.statements.append(LocalAssign(pcVar, PCSym(s"Loop${loopCount}"), Some("Loop${loopCount}")))
+      val label = s"Loop${loopCount}"
+      val nb = synthEntry.createBlockBetween(backedge.to)
+      nb.statements.prepend(pcGuard(label))
+      cutPoints = cutPoints.updated(label, backedge.from)
+      backedge.from.statements.append(LocalAssign(pcVar, PCSym(label), Some(label)))
       backedge.from.replaceJump(GoTo(synthExit))
     }
   }
 
+  var once = true
   for (s <- p) {
     s match {
       case r: Return => {
+        assert(once, "expect proc in single return form")
         r.parent.statements.append(setPCLabel("RETURN"))
         r.parent.replaceJump(GoTo(synthExit))
       }
@@ -155,6 +170,7 @@ def procToTransition(p: Procedure, loops: Set[Loop]) = {
   synthExit.replaceJump(Return())
   synthAbort.replaceJump(Return())
   visit_proc(RewriteSideEffects(), p)
+  cutPoints
 
 }
 
@@ -168,11 +184,13 @@ def toTransitionSystem(iprogram: Program) = {
   val loops = analysis.LoopDetector.identify_loops(program)
   val floops = loops.identifiedLoops
 
-  for (p <- program.procedures) {
-    procToTransition(p, floops.toSet)
-  }
+  val cutPoints = program.procedures
+    .map(p => {
+      p -> procToTransition(p, floops.toSet)
+    })
+    .toMap
 
-  program
+  (program, cutPoints)
 }
 
 /**
@@ -219,9 +237,6 @@ def sequentialComposeTransitionSystems(p1prog: Program, p1: Procedure, p2: Proce
   exit1.replaceJump(GoTo(entry2))
   exit2.replaceJump(Return())
 
-  for (p <- p1prog.mainProcedure.blocks) {
-    println(p.label)
-  }
   assert(invariant.cfgCorrect(p1prog))
   p1
 }
@@ -231,6 +246,10 @@ class TranslationValidator {
   var initProg: Option[Program] = None
   var beforeProg: Option[Program] = None
   var afterProg: Option[Program] = None
+
+  var beforeCuts: Map[Procedure, Map[String, Block]] = Map()
+  var afterCuts: Map[Procedure, Map[String, Block]] = Map()
+
   val invariants = mutable.Map[String, List[Expr]]()
 
   val beforeRenamer = NamespaceState("target")
@@ -240,10 +259,33 @@ class TranslationValidator {
   def varInTarget(v: Variable) = visit_rvar(beforeRenamer, v)
 
   def setEqualVarsInvariant = {
+
+    // call this after running transform so initProg corresponds to the source / after program.
+
+    val procs = initProg.get.procedures.view.map(p => p.name -> p).toMap
+
     for (p <- afterProg.get.procedures) {
-      val vars = allVarsPos(p).toSet -- Seq(transitionSystemPCVar, traceVar)
-      val inv = vars.map(v => polyEqual(varInSource(v), varInTarget(v))).toList
-      setInvariant(p.name, inv)
+      val (livesBefore, livesAfter) = transforms.getLiveVars(procs(p.name))
+
+      val lives = livesBefore.map { case (k, v) =>
+        k.label -> v
+      }.toMap
+
+      val inv = afterCuts(p).map {
+        case (label, cutPoint) => {
+          val vars = lives.get(cutPoint.label).toSet.flatten -- Seq(transitionSystemPCVar)
+          val assertion = vars
+            .map(v => polyEqual(varInSource(v), varInTarget(v)))
+            .foldLeft(TrueLiteral: Expr)((acc, r) => BinaryExpr(BoolAND, acc, r))
+          BinaryExpr(
+            BoolIMPLIES,
+            BinaryExpr(IntEQ, visit_rvar(afterRenamer, transitionSystemPCVar), PCMan.PCSym(label)),
+            assertion
+          )
+        }
+      }
+
+      setInvariant(p.name, inv.toList)
     }
   }
 
@@ -254,10 +296,14 @@ class TranslationValidator {
 
   def setTargetProg(p: Program) = {
     initProg = Some(p)
-    beforeProg = Some(toTransitionSystem(p))
+    val (prog, cuts) = toTransitionSystem(p)
+    beforeProg = Some(prog)
+    beforeCuts = cuts
   }
   def setSourceProg(p: Program) = {
-    afterProg = Some(toTransitionSystem(p))
+    val (prog, cuts) = toTransitionSystem(p)
+    afterProg = Some(prog)
+    afterCuts = cuts
   }
 
   def setInvariant(p: String, l: List[Expr]) = {

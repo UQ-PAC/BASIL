@@ -748,15 +748,21 @@ object RunUtils {
     DebugDumpIRLogger.writeToFile(File("il-before-dsa.il"), pp_prog(program))
 
     val ts = transforms.OnePassDSA().applyTransform(program)
-    //val bplfile = BoogieTranslator.translateProg(ts, "dsa-translation-validate.bpl")
-    //DebugDumpIRLogger.writeToFile(File("dsa-translation-validate.bpl"),
+    // val bplfile = BoogieTranslator.translateProg(ts, "dsa-translation-validate.bpl")
+    // DebugDumpIRLogger.writeToFile(File("dsa-translation-validate.bpl"),
     //  bplfile.toString)
 
     val exprSimp = transforms.localExprSimplify(program)
-    DebugDumpIRLogger.writeToFile(File("exprsimp-translation-validate.bpl"), BoogieTranslator.translateProg(exprSimp).toString)
+    DebugDumpIRLogger.writeToFile(
+      File("exprsimp-translation-validate.bpl"),
+      BoogieTranslator.translateProg(exprSimp).toString
+    )
 
     val cpValidate = transforms.copyPropOnce(program)
-    DebugDumpIRLogger.writeToFile(File("copyprop-translation-validate.bpl"), BoogieTranslator.translateProg(cpValidate).toString)
+    DebugDumpIRLogger.writeToFile(
+      File("copyprop-translation-validate.bpl"),
+      BoogieTranslator.translateProg(cpValidate).toString
+    )
 
     if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
       val dir = File("./graphs/")
@@ -897,7 +903,7 @@ object RunUtils {
 
       doSimplify(ctx, conf.staticAnalysis)
 
-      val ts = toTransitionSystem(ctx.program)
+      val (ts, _) = toTransitionSystem(ctx.program)
 
       if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
         val dir = File("./graphs/")

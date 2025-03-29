@@ -307,7 +307,6 @@ class OnePassDSA(
 
   }
 
-
   def applyTransformWithvalidate(p: Program): Program = {
 
     val validator = TranslationValidator()
@@ -320,8 +319,7 @@ class OnePassDSA(
       applyTransform(proc)
     }
 
-
-    //for (proc <- p.procedures) {
+    // for (proc <- p.procedures) {
     //  val before = validator.beforeProg.get.procedures.find(_.name == proc.name).get
     //  val after = validator.afterProg.get.procedures.find(_.name == proc.name).get
 
@@ -342,15 +340,13 @@ class OnePassDSA(
     //  }
     //  validator.setInvariant(proc.name, invariant.toList)
 
-    //}
+    // }
 
     val nprog = validator.getValidationProg
     assert(invariant.blocksUniqueToEachProcedure(nprog))
 
     nprog
   }
-
-
 
 }
 

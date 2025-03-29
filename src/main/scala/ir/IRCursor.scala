@@ -367,7 +367,7 @@ def toDot[T <: CFGPosition](
   def getArrow(s: CFGPosition, n: CFGPosition) = {
 
     if (!dotNodes.contains(n)) {
-      val r = n match { 
+      val r = n match {
         case p: Program => (BasilIRPrettyPrinter()(p))
         case p: Block => (BasilIRPrettyPrinter()(p))
         case p: Statement => (BasilIRPrettyPrinter()(p))
@@ -387,8 +387,7 @@ def toDot[T <: CFGPosition](
     node match {
       case s =>
         assert(dotNodes.contains(s))
-        iterator.succ(s).foreach(n => 
-            dotArrows.addOne(getArrow(s, n)))
+        iterator.succ(s).foreach(n => dotArrows.addOne(getArrow(s, n)))
       //       iterator.pred(s).foreach(n => dotArrows.addOne(getArrow(s,n)))
     }
   }
