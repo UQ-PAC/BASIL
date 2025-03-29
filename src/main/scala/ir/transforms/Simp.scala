@@ -553,7 +553,12 @@ def localExprSimplify(prog: Program) = {
 }
 
 def copyPropOnce(prog: Program) = {
-  wrapShapePreservingTransformInValidation(p => visit_prog(CopyProp.BlockyProp(), p))(prog)
+
+  def trans(p: Program) = {
+    visit_prog(CopyProp.BlockyProp(), p)
+    visit_prog(CleanupAssignments(), p)
+  }
+  wrapShapePreservingTransformInValidation(trans)(prog)
 }
 
 def wrapShapePreservingTransformInValidation(transform : Program => Unit)(p: Program) = {
