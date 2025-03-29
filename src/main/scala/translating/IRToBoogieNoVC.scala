@@ -17,6 +17,7 @@ object BoogieTranslator {
   def translateVar(e: Variable): BVar = e match {
     case Register(n, s) => BVariable(n, translateType(e.getType), Scope.Global)
     case v: LocalVar => BVariable(v.name, translateType(v.getType), Scope.Local)
+    case v: GlobalVar => BVariable(v.name, translateType(v.getType), Scope.Global)
   }
 
   def translateMem(e: Memory): BMapVar =
@@ -149,6 +150,12 @@ object BoogieTranslator {
     val vvis = FindVars()
     visit_prog(vvis, p)
 
+    for (proc <- p.procedures) {
+      val vvis = FindVars()
+      visit_proc(vvis, proc)
+      proc.modifies.addAll(vvis.globals)
+    }
+
     val globalVarDecls = vvis.globals.map(translateGlobal).map(BVarDecl(_))
 
     val readOnlySections = p.usedMemory.values.filter(_.readOnly)
@@ -172,6 +179,7 @@ object BoogieTranslator {
 class FindVars extends CILVisitor {
   val vars = mutable.Set[Variable]()
   val mems = mutable.Set[Memory]()
+  var procsSeen = mutable.Set[Procedure]()
 
   override def vmem(m: Memory) = {
     mems += m
@@ -182,9 +190,23 @@ class FindVars extends CILVisitor {
     vars += v
     SkipChildren()
   }
+
+  override def vproc(p: Procedure) = {
+    procsSeen.add(p)
+    DoChildren()
+  }
+
   override def vlvar(v: Variable) = {
     vars += v
     SkipChildren()
+  }
+
+  override def vstmt(s: Statement) = {
+    s match {
+      case s: DirectCall if !procsSeen.contains(s.target) => visit_proc(this, s.target)
+      case _ => ()
+    }
+    DoChildren()
   }
 
   def globals = (vars ++ mems).collect { case g: Global =>
