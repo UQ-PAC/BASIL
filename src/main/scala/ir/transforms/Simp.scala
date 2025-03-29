@@ -531,6 +531,29 @@ class GuardVisitor extends CILVisitor {
 
 }
 
+def localExprSimplify(prog: Program) = {
+  def ts(p: Program) = for (proc <- p.procedures) {
+      AlgebraicSimplifications(proc)
+      AssumeConditionSimplifications(proc)
+    }
+
+  wrapShapePreservingTransformInValidation(p => visit_prog(CopyProp.BlockyProp(), p))(prog)
+}
+
+def copyPropOnce(prog: Program) = {
+  wrapShapePreservingTransformInValidation(p => visit_prog(CopyProp.BlockyProp(), p))(prog)
+}
+
+def wrapShapePreservingTransformInValidation(transform : Program => Unit)(p: Program) = {
+  val validator = TranslationValidator()
+  validator.setTargetProg(p)
+  transform(p)
+  validator.setSourceProg(p)
+  validator.setEqualVarsInvariant
+  validator.getValidationProg
+}
+
+
 def copypropTransform(
   p: Procedure,
   procFrames: Map[Procedure, Set[Memory]],
