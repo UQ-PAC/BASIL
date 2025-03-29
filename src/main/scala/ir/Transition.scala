@@ -5,6 +5,7 @@ import analysis.Loop
 import ir.dsl.IRToDSL
 import ir.cilvisitor.*
 import translating.PrettyPrinter.*
+import ir.dsl.IRToDSL.sequenceTransitionSystems
 import util.Logger
 
 def polyEqual(e1: Expr, e2: Expr) = {
@@ -31,10 +32,12 @@ class NamespaceState(namespace: String) extends CILVisitor {
   override def vlvar(v: Variable) = v match {
     case l: LocalVar => ChangeTo(l.copy(varName = namespace + "__" + l.varName))
     case l: Register => ChangeTo(l.copy(name = namespace + "__" + l.name))
+    case l: GlobalVar => ChangeTo(l.copy(name = namespace + "__" + l.name))
   }
   override def vrvar(v: Variable) = v match {
     case l: LocalVar => ChangeTo(l.copy(varName = namespace + "__" + l.varName))
     case l: Register => ChangeTo(l.copy(name = namespace + "__" + l.name))
+    case l: GlobalVar => ChangeTo(l.copy(name = namespace + "__" + l.name))
   }
 
   override def vmem(m: Memory) = m match {
@@ -43,35 +46,63 @@ class NamespaceState(namespace: String) extends CILVisitor {
   }
 }
 
-val transitionSystemPCVar = Register("SYNTH_PC", 64)
+val transitionSystemPCVar = GlobalVar("SYNTH_PC", IntType)
+val traceVar = GlobalVar("TRACE", IntType)
 
-def procToTransition(p: Procedure, loops: Set[Loop]) = {
+class RewriteSideEffects extends CILVisitor {
 
-  val pcVar = transitionSystemPCVar
+  def loadFunc(lhs: Variable, size: Int, addr: Expr) = {
+    LocalAssign(lhs, UninterpretedFunction("load_" + size, Seq(traceVar, addr, IntLiteral(size)), BitVecType(size)))
+  }
 
-  val allocatedPCS = mutable.Map[String, BitVecLiteral]()
+  def storeFunc(size: Int, addr: Expr, value: Expr) =
+    LocalAssign(
+      traceVar,
+      UninterpretedFunction("store_" + size, Seq(traceVar, addr, value: Expr, IntLiteral(size)), IntType)
+    )
+
+  override def vstmt(s: Statement) = s match {
+    case m: MemoryLoad => ChangeTo(List(loadFunc(m.lhs, m.size, m.index)))
+    case m: MemoryStore => ChangeTo(List(storeFunc(m.size, m.index, m.value)))
+    case _ => SkipChildren()
+
+  }
+}
+
+object PCMan {
+
+  val allocatedPCS = mutable.Map[String, IntLiteral]()
   var pcCounter = 0
   def PCSym(s: String) = {
     allocatedPCS.getOrElseUpdate(
       s, {
         pcCounter += 1
-        BitVecLiteral(pcCounter, 64)
+        IntLiteral(pcCounter)
       }
     )
   }
 
   def setPCLabel(label: String) = {
+    val pcVar = transitionSystemPCVar
     LocalAssign(pcVar, PCSym(label), Some(label))
   }
 
   def pcGuard(label: String) = {
-    Assume(BinaryExpr(BVEQ, pcVar, PCSym(label)), Some(s"PC = $label"))
+    val pcVar = transitionSystemPCVar
+    Assume(BinaryExpr(IntEQ, pcVar, PCSym(label)), Some(s"PC = $label"))
   }
+}
+
+import PCMan.*
+
+def procToTransition(p: Procedure, loops: Set[Loop]) = {
+
+  val pcVar = transitionSystemPCVar
 
   val synthEntryJump = GoTo(Seq())
   val synthEntry = Block(s"${p.name}_SYNTH_ENTRY", None, Seq(), synthEntryJump)
   val synthExit = Block(s"${p.name}_SYNTH_EXIT")
-  val synthAbort = Block(s"${p.name}_SYNTH_ABORT")
+  val synthAbort = Block(s"${p.name}_SYNTH_ABORT", None, Seq(setPCLabel("ABORT")), Return())
 
   p.addBlocks(Seq(synthEntry, synthExit, synthAbort))
 
@@ -104,6 +135,7 @@ def procToTransition(p: Procedure, loops: Set[Loop]) = {
         r.parent.replaceJump(GoTo(synthExit))
       }
       case u: Unreachable => u.parent.replaceJump(GoTo(synthAbort))
+      case g: GoTo if g.targets.isEmpty => g.parent.replaceJump(GoTo(synthAbort))
       // case a: Assert => {
       //  val start = a.parent
       //  val stmts = a.parent.statements.splitOn(a)
@@ -121,7 +153,8 @@ def procToTransition(p: Procedure, loops: Set[Loop]) = {
 
   }
   synthExit.replaceJump(Return())
-  synthAbort.replaceJump(Unreachable())
+  synthAbort.replaceJump(Return())
+  visit_proc(RewriteSideEffects(), p)
 
 }
 
@@ -142,7 +175,6 @@ def toTransitionSystem(iprogram: Program) = {
   program
 }
 
-
 /**
   * Clone p2 into p1, p2 
   *
@@ -162,9 +194,14 @@ def sequentialComposeTransitionSystems(p1prog: Program, p1: Procedure, p2: Proce
   val (entry2, rentry2) = entryBB.makeResolver
 
   val tempBlocks = (p2.blocks.toSet -- Seq(p2.entryBlock.get, p2.returnBlock.get)).map(IRToDSL.convertBlock)
-  val temps = tempBlocks.map(v => (v.makeResolver match {
-    case (b, r) => b
-    }, v))
+  val temps = tempBlocks.map(v =>
+    (
+      v.makeResolver match {
+        case (b, r) => b
+      },
+      v
+    )
+  )
 
   p1.addBlock(entry2)
   p1.addBlock(exit2)
@@ -187,4 +224,64 @@ def sequentialComposeTransitionSystems(p1prog: Program, p1: Procedure, p2: Proce
   }
   assert(invariant.cfgCorrect(p1prog))
   p1
+}
+
+class TranslationValidator {
+
+  var initProg: Option[Program] = None
+  var beforeProg: Option[Program] = None
+  var afterProg: Option[Program] = None
+  val invariants = mutable.Map[String, List[Expr]]()
+
+  val beforeRenamer = NamespaceState("target")
+  val afterRenamer = NamespaceState("source")
+
+  def varInSource(v: Variable) = visit_rvar(afterRenamer, v)
+  def varInTarget(v: Variable) = visit_rvar(beforeRenamer, v)
+
+  def setEqualVarsInvariant = {
+    for (p <- afterProg.get.procedures) {
+      val vars = allVarsPos(p).toSet -- Seq(transitionSystemPCVar, traceVar)
+      val inv = vars.map(v => polyEqual(varInSource(v), varInTarget(v))).toList
+      setInvariant(p.name, inv)
+    }
+  }
+
+  val pcInv =
+    BinaryExpr(BVEQ, visit_rvar(beforeRenamer, transitionSystemPCVar), visit_rvar(afterRenamer, transitionSystemPCVar))
+
+  val traceInv = BinaryExpr(BVEQ, visit_rvar(beforeRenamer, traceVar), visit_rvar(afterRenamer, traceVar))
+
+  def setTargetProg(p: Program) = {
+    initProg = Some(p)
+    beforeProg = Some(toTransitionSystem(p))
+  }
+  def setSourceProg(p: Program) = {
+    afterProg = Some(toTransitionSystem(p))
+  }
+
+  def setInvariant(p: String, l: List[Expr]) = {
+    invariants(p) = l
+  }
+
+  def getValidationProg = {
+    for (proc <- initProg.get.procedures) {
+      val after = afterProg.get.procedures.find(_.name == proc.name).get
+      val before = beforeProg.get.procedures.find(_.name == proc.name).get
+
+      visit_proc(beforeRenamer, before)
+      visit_proc(afterRenamer, after)
+
+      val combined = sequenceTransitionSystems(beforeProg.get, before, after)
+      val invariant = Seq(pcInv, traceInv) ++ invariants(proc.name)
+
+      combined.entryBlock.get.statements.prependAll(invariant.map(Assume(_, Some("INVARIANT"))))
+      combined.returnBlock.get.statements.appendAll(invariant.map(Assert(_, Some("INVARIANT"))))
+
+      val bidx = beforeProg.get.procedures.indexOf(before)
+      // beforeProg.get.procedures.remove(bidx)
+    }
+    beforeProg.get
+  }
+
 }

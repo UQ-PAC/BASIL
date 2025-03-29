@@ -370,6 +370,16 @@ case class Register(override val name: String, size: Int) extends Variable with 
   override val irType: BitVecType = BitVecType(size)
 }
 
+
+case class GlobalVar(override val name: String, override val irType: IRType)
+    extends Variable
+    with CachedHashCode with Global {
+  override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Global)
+  override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Global)
+  override def toString: String = s"GlobalVar (${name}, $irType)"
+  override def acceptVisit(visitor: Visitor): Variable = this
+}
+
 /** Variable with scope local to the procedure, typically a temporary variable created in the lifting process. */
 case class LocalVar(varName: String, override val irType: IRType, val index: Int = 0)
     extends Variable

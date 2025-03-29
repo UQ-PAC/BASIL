@@ -747,16 +747,21 @@ object RunUtils {
     Logger.info("[!] Simplify :: DynamicSingleAssignment")
     DebugDumpIRLogger.writeToFile(File("il-before-dsa.il"), pp_prog(program))
 
-    val ts = transforms.OnePassDSA().applyTransformWithvalidate(program)
-    val bplfile = BoogieTranslator.translateProg(ts, "dsa-translation-validate.bpl")
-    DebugDumpIRLogger.writeToFile(File("dsa-translation-validate.bpl"),
-      bplfile.toString)
+    val ts = transforms.OnePassDSA().applyTransform(program)
+    //val bplfile = BoogieTranslator.translateProg(ts, "dsa-translation-validate.bpl")
+    //DebugDumpIRLogger.writeToFile(File("dsa-translation-validate.bpl"),
+    //  bplfile.toString)
 
+    val exprSimp = transforms.localExprSimplify(program)
+    DebugDumpIRLogger.writeToFile(File("exprsimp-translation-validate.bpl"), BoogieTranslator.translateProg(exprSimp).toString)
+
+    val cpValidate = transforms.copyPropOnce(program)
+    DebugDumpIRLogger.writeToFile(File("copyprop-translation-validate.bpl"), BoogieTranslator.translateProg(cpValidate).toString)
 
     if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
       val dir = File("./graphs/")
       if (!dir.exists()) then dir.mkdirs()
-      for (p <- ts.procedures) {
+      for (p <- cpValidate.procedures) {
         DebugDumpIRLogger.writeToFile(File(s"graphs/dsav-${p.name}-after-simp.dot"), dotBlockGraph(p))
       }
     }
@@ -808,7 +813,6 @@ object RunUtils {
     transforms.liftLinuxAssertFail(ctx)
 
     // assert(program.procedures.forall(transforms.rdDSAProperty))
-
     assert(invariant.blockUniqueLabels(program))
     Logger.info(s"CopyProp ${timer.checkPoint("Simplify")} ms ")
     DebugDumpIRLogger.writeToFile(File("il-after-copyprop.il"), pp_prog(program))
