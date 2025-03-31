@@ -150,13 +150,13 @@ def parseErrors(boogieStdoutMessage: String, snippetContext: Int = 3): Array[Boo
 def boogieBatchQuery(boogieFileText: String, proc: Option[String] = None) = {
   util.writeToFile(boogieFileText, "boogiefile.bpl")
   val procSelect = proc.toSeq.flatMap(p => Seq("/proc", p))
-  val boogieCmd = Seq("boogie", "/proverOpt:SOLVER=noop", "/proverLog", "proverLog", "boogiefile.bpl") ++ procSelect
+  val boogieCmd = Seq("boogie", "/vcsSplitOnEveryAssert", "/proverOpt:SOLVER=noop", "/proverLog", "proverLog", "boogiefile.bpl") ++ procSelect
   Logger.info(s"Batch proving ${boogieCmd.mkString(" ")}")
   val output = boogieCmd.!!
   val splits = getSMTSplitsFromFile("proverLog")
   val res = splits.map(r => {
 
-    val res = z3.checkSATSMT2(r)
+    val res = z3.checkSATSMT2(r, Some(2000))
     if (res != SatResult.UNSAT) {
       Logger.error(s"Verify failed: $res")
       Logger.debug(s"QUERY:\n$r")

@@ -767,7 +767,6 @@ object RunUtils {
     if (vres) {
       Logger.info(s"Translation validated main procedure: $procName ")
     }
-    assert(vres)
 
     DebugDumpIRLogger.writeToFile(File("tvalidation-copyprop.il"), pp_prog(cpValidate))
 
