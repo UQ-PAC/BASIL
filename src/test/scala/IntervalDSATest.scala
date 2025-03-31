@@ -237,7 +237,6 @@ class IntervalDSATest extends AnyFunSuite {
     assert(wmallocHeap.size == 1)
     assert(wmallocHeap.head.exists(base => base.isInstanceOf[Heap]))
     assert(mainHeap != wmallocHeap)
-    println(mainHeap)
     assert(mainHeap.flatten.toSet == wmallocHeap.flatten.toSet)
   }
 }
