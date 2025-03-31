@@ -1,4 +1,8 @@
 package util.boogie_interaction
+import scala.sys.process.*
+import util.z3
+import util.z3.SatResult
+import util.Logger
 
 enum BoogieResultKind {
   case Verified(count: Int = -1, errors: Int = -1)
@@ -141,4 +145,87 @@ def parseErrors(boogieStdoutMessage: String, snippetContext: Int = 3): Array[Boo
       BoogieError(fname, line, Some(boogieLines.toList))
     }
   }
+}
+
+def boogieBatchQuery(boogieFileText: String, proc: Option[String] = None) = {
+  util.writeToFile(boogieFileText, "boogiefile.bpl")
+  val procSelect = proc.toSeq.flatMap(p => Seq("/proc", p))
+  val boogieCmd = Seq("boogie", "/proverOpt:SOLVER=noop", "/proverLog", "proverLog", "boogiefile.bpl") ++ procSelect
+  Logger.info(s"Batch proving ${boogieCmd.mkString(" ")}")
+  val output = boogieCmd.!!
+  val splits = getSMTSplitsFromFile("proverLog")
+  val res = splits.map(r => {
+
+    val res = z3.checkSATSMT2(r)
+    if (res != SatResult.UNSAT) {
+      Logger.error(s"Verify failed: $res")
+      Logger.debug(s"QUERY:\n$r")
+    }
+    res
+  })
+
+  val result = res.forall(_ == SatResult.UNSAT)
+  if (result) {
+    Logger.info(s"Proved ${res.size} queries")
+  }
+  result
+
+}
+
+def getSMTSplitsFromFile(fname: String) = {
+  val loadFile = util.readFromFile(fname)
+
+  var queryStack = List[String]()
+  var queryList = List[String]()
+  var currentQuery = ""
+
+  var first = true
+  var depth = 0
+  var initialSetup = ""
+  var check_sat = false
+
+  for (l <- loadFile) {
+    val ln = l.trim.stripPrefix("(").stripSuffix(")").split(" ").toList
+    ln match {
+      case "check-sat" :: Nil => {
+        currentQuery = currentQuery + "\n" + l
+
+        check_sat = true
+      }
+      case "push" :: n :: Nil if (n.toInt != 1) => {
+        throw Exception("Sequential push")
+      }
+      case "push" :: n :: Nil if (n.toInt == 1) => {
+        if (depth > 0) {
+          throw Exception("Sequential push")
+        }
+        if (first) {
+          first = false
+          initialSetup = currentQuery + "\n"
+          currentQuery = initialSetup
+        }
+        depth += 1
+      }
+      case "pop" :: n :: Nil if (n.toInt != 1) => {
+        throw Exception("Sequential pop")
+      }
+      case "pop" :: n :: Nil if (n.toInt == 1) => {
+        check_sat = false
+        depth -= 1
+        if (depth != 0) {
+          throw Exception("Sequential pop")
+        }
+        queryList = currentQuery :: queryList
+        currentQuery = initialSetup
+      }
+      case _ => {
+        currentQuery = currentQuery + "\n" + l
+      }
+    }
+  }
+
+  // if (check_sat) {
+  //   queryList = currentQuery :: queryList
+  // }
+  queryList.reverse
 }

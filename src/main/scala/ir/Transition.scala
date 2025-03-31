@@ -6,6 +6,7 @@ import ir.dsl.IRToDSL
 import ir.cilvisitor.*
 import translating.PrettyPrinter.*
 import ir.dsl.IRToDSL.sequenceTransitionSystems
+import scala.collection.mutable.ArrayBuffer
 import util.Logger
 
 def polyEqual(e1: Expr, e2: Expr) = {
@@ -247,6 +248,8 @@ def sequentialComposeTransitionSystems(p1prog: Program, p1: Procedure, p2: Proce
 
 class TranslationValidator {
 
+  var validationProcs = Map[String, Procedure]()
+
   var initProg: Option[Program] = None
   var beforeProg: Option[Program] = None
   var afterProg: Option[Program] = None
@@ -278,14 +281,14 @@ class TranslationValidator {
       val inv = afterCuts(p).map {
         case (label, cutPoint) => {
           val vars = lives.get(cutPoint.label).toSet.flatten -- Seq(transitionSystemPCVar)
+
           val assertion = vars
             .map(v => polyEqual(varInSource(v), varInTarget(v)))
             .foldLeft(TrueLiteral: Expr)((acc, r) => BinaryExpr(BoolAND, acc, r))
-          BinaryExpr(
-            BoolIMPLIES,
-            BinaryExpr(IntEQ, visit_rvar(afterRenamer, transitionSystemPCVar), PCMan.PCSym(label)),
-            assertion
-          )
+
+          val guard = BinaryExpr(IntEQ, visit_rvar(afterRenamer, transitionSystemPCVar), PCMan.PCSym(label))
+
+          BinaryExpr(BoolIMPLIES, guard, assertion)
         }
       }
 
@@ -322,16 +325,23 @@ class TranslationValidator {
       visit_proc(beforeRenamer, before)
       visit_proc(afterRenamer, after)
 
-      val combined = sequenceTransitionSystems(beforeProg.get, before, after)
+      val combined = sequenceTransitionSystems(afterProg.get, after, before)
       val invariant = Seq(pcInv, traceInv) ++ invariants(proc.name)
 
       combined.entryBlock.get.statements.prependAll(invariant.map(Assume(_, Some("INVARIANT"))))
       combined.returnBlock.get.statements.appendAll(invariant.map(Assert(_, Some("INVARIANT"))))
 
-      val bidx = beforeProg.get.procedures.indexOf(before)
+      validationProcs = validationProcs.updated(proc.name, combined)
+
+      val bidx = afterProg.get.procedures.indexOf(before)
       // beforeProg.get.procedures.remove(bidx)
     }
-    beforeProg.get
+
+    // TODO: fix when implementing calls
+    // val interesting = validationProcs(afterProg.get.mainProcedure.name)
+    // afterProg.get.procedures = ArrayBuffer(interesting)
+
+    afterProg.get
   }
 
 }
