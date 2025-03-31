@@ -42,7 +42,7 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
     if dsa.contains(proc) then
       e match
         case load: MemoryLoad =>
-          val indices = dsa(e.parent.parent).exprToCells(load.index).toSeq
+          val indices = dsa(proc).exprToCells(load.index).map(dsa(proc).get).toSeq
           if indices.nonEmpty then {
             assert(indices.forall(_.hasPointee))
             assert(indices.map(_.getPointee).size == 1, s"${indices.map(_.getPointee).size}, $load")
@@ -62,7 +62,7 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
 
 
         case store: MemoryStore =>
-          val indices = dsa(e.parent.parent).exprToCells(store.index).toSeq
+          val indices = dsa(proc).exprToCells(store.index).map(dsa(proc).get).toSeq
           if indices.nonEmpty then {
             assert(indices.forall(_.hasPointee))
             assert(indices.map(_.getPointee).size == 1)

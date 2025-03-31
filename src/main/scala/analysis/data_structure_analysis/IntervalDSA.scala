@@ -29,9 +29,6 @@ class IntervalGraph(
   val constraints: Set[Constraint],
   val nodeBuilder: Option[() => Map[SymBase, IntervalNode]]
 ) {
-//  def this(proc: Procedure, phase: DSAPhase, irContext: IRContext) = {
-//    this(proc, phase, irContext, getSymbolicValues(proc), generateConstraints(proc), None)
-//  }
 
   val solver = OffsetUnionFindSolver[NodeTerm]()
   val builder: () => Map[SymBase, IntervalNode] = nodeBuilder.getOrElse(buildNodes)
@@ -154,7 +151,7 @@ class IntervalGraph(
 
     globalOffsets.map(_.swap).foreach { case (address, relocated) =>
       val pointee = find(globalNode.get(address.toInt))
-      val pointer = find(globalNode).add(Interval(relocated.toInt, relocated.toInt + 8))
+      val pointer = find(globalNode).add(Interval(relocated.toInt, relocated.toInt + 7))
       pointer.setPointee(pointee)
     }
 
