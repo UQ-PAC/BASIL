@@ -109,5 +109,42 @@ class MemoryTransfromTests extends AnyFunSuite {
 
     val memoryAssigns = results.ir.program.collect { case ma: MemoryAssign => ma }
     assert(memoryAssigns.size == 2)
+    assert(memoryAssigns.map(_.lhs).toSet.size == 1, "global assignments across procs must be replace by same reference")
+  }
+
+  test("multi global assignment") {
+    val mem = SharedMemory("mem", 64, 8)
+    val regName = "R0"
+    val R0 = Register(regName, 64)
+    val xAddress = BitVecLiteral(2000, 64)
+    val yAddress = BitVecLiteral(3000, 64)
+    val xPointer = BitVecLiteral(1000, 64)
+    val globalOffsets = Map(xPointer.value -> xAddress.value)
+    val x = SpecGlobal("x", 64, None, xAddress.value)
+    val y = SpecGlobal("y", 64, None, yAddress.value)
+    val globals = Set(x, y)
+
+    val store1 = MemoryStore(mem, xAddress, BitVecLiteral(10000, 64), Endian.LittleEndian, 64, Some("001"))
+    val store2 = MemoryStore(mem, yAddress, BitVecLiteral(40000, 64), Endian.LittleEndian, 64, Some("002"))
+
+    val program = prog(
+      proc(
+        "main",
+        block("start", goto("caller1", "caller2")),
+        block("caller1", directCall("func1"), goto("end")),
+        block("caller2", directCall("func2"), goto("end")),
+        block("end", ret)
+      ),
+      proc("func1", block("block", store1, ret)),
+      proc("func2", block("block", store2, ret))
+    )
+
+    val context = programToContext(program, globals, globalOffsets)
+
+    val results = runTest(context)
+
+    val memoryAssigns = results.ir.program.collect { case ma: MemoryAssign => ma }
+    assert(memoryAssigns.size == 2)
+    assert(memoryAssigns.map(_.lhs).toSet.size == 2, "global assignments across procs must be replace by different references")
   }
 }
