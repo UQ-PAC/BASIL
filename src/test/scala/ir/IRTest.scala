@@ -342,7 +342,7 @@ class IRTest extends AnyFunSuite {
         block("l_main", indirectCall(R1), goto("returntarget")),
         block(
           "block2",
-          directCall(Seq(("R0_out" -> R0)), "p1", "R0_in" -> BitVecLiteral(150, 64)),
+          directCall(Seq(("R0_out" -> R0)), "p1", Set("R0_in" -> BitVecLiteral(150, 64))),
           goto("returntarget")
         ),
         block("returntarget", ret("R0_out" -> BitVecLiteral(1, 64)))
