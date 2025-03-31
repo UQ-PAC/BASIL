@@ -1072,7 +1072,7 @@ object IntervalDSA {
    *
    *  Heap and Ret may be duplicated due to multiple calls to the same function
    *
-   *  potentially should be maintained through BU and TD phases
+   *  potentially violated by BU and TD phases due to cloning duplicate regions
    */
   def checkUniqueNodesPerRegion(graph: IntervalGraph): Unit = {
     val found = mutable.Map[SymBase, IntervalNode]()
@@ -1081,7 +1081,7 @@ object IntervalDSA {
     val queue = mutable.Queue[IntervalNode]().enqueueAll(entry)
     while queue.nonEmpty do {
       val node = queue.dequeue()
-      node.bases.keys.filterNot(b => b.isInstanceOf[Ret] || b.isInstanceOf[Heap])foreach(base =>
+      node.bases.keys/*.filterNot(b => b.isInstanceOf[Ret] || b.isInstanceOf[Heap] || b.isInstanceOf[Par])*/.foreach(base =>
         assert(!found.contains(base) || found(base) == node, s"$base was in $node and ${found(base)}")
       )
       node.bases.keys.foreach(found.update(_, node))
