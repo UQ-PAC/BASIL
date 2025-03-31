@@ -95,7 +95,7 @@ object PCMan {
 
 import PCMan.*
 
-def procToTransition(p: Procedure, loops: Set[Loop]) = {
+def procToTransition(p: Procedure, loops: List[Loop]) = {
 
   val pcVar = transitionSystemPCVar
   var cutPoints = Map[String, Block]()
@@ -125,17 +125,21 @@ def procToTransition(p: Procedure, loops: Set[Loop]) = {
   var loopCount = 0
 
   for (l <- loops.filter(l => p.blocks.contains(l.header))) {
+    var loopBECount = 0
     loopCount += 1
-    synthEntryJump.addTarget(l.header)
-    val loopEntry = Block(s"${p.name}LoopEntry$loopCount", None, Seq(pcGuard(s"Loop${loopCount}")), GoTo(l.header))
-    p.addBlock(loopEntry)
-    synthEntryJump.addTarget(loopEntry)
+    // synthEntryJump.addTarget(l.header)
+    // val loopEntry = Block(s"${p.name}LoopEntry$loopCount", None, Seq(pcGuard(s"Loop${loopCount}")), GoTo(l.header))
+    // p.addBlock(loopEntry)
+    // synthEntryJump.addTarget(loopEntry)
 
-    for (backedge <- l.backEdges) {
-      val label = s"Loop${loopCount}"
-      val nb = synthEntry.createBlockBetween(backedge.to)
+    val backedges = l.backEdges.toList.sortBy(e => s"${e.from.label}_${e.to.label}")
+    for (backedge <- backedges) {
+      loopBECount += 1
+      val label = s"Loop${loopCount}_be${loopBECount}"
+      synthEntryJump.addTarget(backedge.to)
+      val nb = synthEntry.createBlockBetween(backedge.to, "cut_back_edge_" + label)
       nb.statements.prepend(pcGuard(label))
-      cutPoints = cutPoints.updated(label, backedge.from)
+      cutPoints = cutPoints.updated(label, backedge.to)
       backedge.from.statements.append(LocalAssign(pcVar, PCSym(label), Some(label)))
       backedge.from.replaceJump(GoTo(synthExit))
     }
@@ -182,11 +186,11 @@ def toTransitionSystem(iprogram: Program) = {
   val program = IRToDSL.convertProgram(iprogram).resolve
 
   val loops = analysis.LoopDetector.identify_loops(program)
-  val floops = loops.identifiedLoops
+  val floops = loops.identifiedLoops.toList.sortBy(_.header.label)
 
   val cutPoints = program.procedures
     .map(p => {
-      p -> procToTransition(p, floops.toSet)
+      p -> procToTransition(p, floops)
     })
     .toMap
 
@@ -290,7 +294,7 @@ class TranslationValidator {
   }
 
   val pcInv =
-    BinaryExpr(BVEQ, visit_rvar(beforeRenamer, transitionSystemPCVar), visit_rvar(afterRenamer, transitionSystemPCVar))
+    BinaryExpr(IntEQ, visit_rvar(beforeRenamer, transitionSystemPCVar), visit_rvar(afterRenamer, transitionSystemPCVar))
 
   val traceInv = BinaryExpr(BVEQ, visit_rvar(beforeRenamer, traceVar), visit_rvar(afterRenamer, traceVar))
 

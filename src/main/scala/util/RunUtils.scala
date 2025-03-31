@@ -744,6 +744,8 @@ object RunUtils {
     DebugDumpIRLogger.writeToFile(File("dsa-translation-validate.bpl"),
       bplfile.toString)
 
+    transforms.fixupGuards(program)
+    transforms.removeDuplicateGuard(program)
     val exprSimp = transforms.localExprSimplify(program)
     DebugDumpIRLogger.writeToFile(
       File("exprsimp-translation-validate.bpl"),
