@@ -1,6 +1,7 @@
 import analysis.data_structure_analysis.{Global, Interval}
 import boogie.SpecGlobal
 import ir.*
+import ir.Endian.{BigEndian, LittleEndian}
 import ir.dsl.{block, directCall, goto, proc, prog, ret}
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
@@ -80,8 +81,7 @@ class MemoryTransfromTests extends AnyFunSuite {
 
   test("multi proc global assignment") {
     val mem = SharedMemory("mem", 64, 8)
-    val regName = "R0"
-    val R0 = Register(regName, 64)
+    val R0 = Register("R0", 64)
     val xAddress = BitVecLiteral(2000, 64)
     val xPointer = BitVecLiteral(1000, 64)
     val globalOffsets = Map(xPointer.value -> xAddress.value)
@@ -114,8 +114,7 @@ class MemoryTransfromTests extends AnyFunSuite {
 
   test("multi global assignment") {
     val mem = SharedMemory("mem", 64, 8)
-    val regName = "R0"
-    val R0 = Register(regName, 64)
+    val R0 = Register("R0", 64)
     val xAddress = BitVecLiteral(2000, 64)
     val yAddress = BitVecLiteral(3000, 64)
     val xPointer = BitVecLiteral(1000, 64)
@@ -147,4 +146,33 @@ class MemoryTransfromTests extends AnyFunSuite {
     assert(memoryAssigns.size == 2)
     assert(memoryAssigns.map(_.lhs).toSet.size == 2, "global assignments across procs must be replace by different references")
   }
+
+  test("Local Assignment") {
+    val mem = SharedMemory("mem", 64, 8)
+    val R0 = Register("R0", 64)
+    val R31 = Register("R31", 64)
+    val irType = BitVecType(64)
+
+    val program = prog(
+      proc("main", Set(("R0", irType)), Set(("R0", irType)),
+        block("b",
+          MemoryStore(mem, R31, R0, LittleEndian, 64, Some("01")),
+          MemoryLoad(R0, mem, R31, LittleEndian, 64, Some("02")),
+          ret(("R0", R0))
+        )
+      )
+    )
+
+    val context = programToContext(program)
+    val results = runTest(context)
+
+    val lassigns = results.ir.program.collect {case la: LocalAssign => la}
+    assert(lassigns.size == 2)
+    println(lassigns)
+    val read = lassigns.collectFirst {case read @ LocalAssign(lhs, rhs, label) if lhs.name.startsWith("R0") => read}.get
+    val write = lassigns.filterNot(_ == read).head
+    assert(read.rhs == write.lhs)
+  }
+
+
 }
