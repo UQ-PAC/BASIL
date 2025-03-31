@@ -198,8 +198,8 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     val res = util.z3.checkSATSMT2(query, softTimeoutMillis)
     res match {
       case util.z3.SatResult.UNSAT => Some(true)
-      case util.z3.SatResult.SAT => Some(false)
-      case util.z3.SatResult.Unknown(_) => None
+      case util.z3.SatResult.SAT(_) => Some(false)
+      case util.z3.SatResult.Unknown(_, _) => None
     }
   }
 
