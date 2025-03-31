@@ -174,5 +174,41 @@ class MemoryTransfromTests extends AnyFunSuite {
     assert(read.rhs == write.lhs)
   }
 
+  test("Heap Assignment") {
+    val mem = SharedMemory("mem", 64, 8)
+    val R0 = Register("R0", 64)
+    val R1 = Register("R1", 64)
+    val R31 = Register("R31", 64)
+    val m = MemoryLoad(R0, mem, R0, Endian.LittleEndian, 64, Some("load"))
 
+    val irType = BitVecType(64)
+
+    val program = prog(
+      proc("main", Set(("R0", irType), ("R1", irType)), Set(("R1", irType)),
+        block("call",
+          directCall(Set(("R0", R0)), "malloc", Set(("R0", R0))),
+          goto("b")
+        ),
+        block("b",
+          MemoryStore(mem, R0, R1, LittleEndian, 64, Some("01")),
+          MemoryLoad(R0, mem, R0, LittleEndian, 64, Some("02")),
+          ret(("R1", R0))
+        )
+      ),
+     proc(
+        "malloc", // fake malloc
+        Set(("R0", BitVecType(64))),
+        Set(("R0", BitVecType(64))),
+        block("malloc_b", m, ret(("R0", R0)))
+      )
+    )
+
+    val context = programToContext(program)
+    val results = runTest(context)
+
+
+    val load = results.ir.program.collect {case la: MemoryLoad => la}.head
+    val store = results.ir.program.collect {case s: MemoryStore => s}.head
+    assert(load.mem == store.mem)
+  }
 }
