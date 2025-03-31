@@ -12,6 +12,11 @@ enum DSAPhase {
   case Pre, Local, BU, TD
 }
 
+/**
+ * Integer Interval with top and bottom
+ * start (s) <= end (e)
+ * For purposes of overlapping and size the interval is inclusive of s and e
+ */
 enum Interval extends Offsets {
   case Top
   case Bot
