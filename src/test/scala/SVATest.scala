@@ -97,12 +97,10 @@ class SVATest extends AnyFunSuite {
     val context = programToContext(program, globals, globalOffsets)
     val results = runTest(context)
     val mainProc = results.ir.program.mainProcedure
-
-    val sva = getSymbolicValues[T](mainProc) //  results.dsa.get.sva(mainProc)
-    val r0SVA = SymValues.getSorted(sva, "R0")
-
-    val inParam = r0SVA.firstKey
-    assert(r0SVA(inParam) == domain.init(Par(mainProc, inParam)), "input param not set correctly")
+    val sva = results.dsa.get.sva(mainProc)
+    val r0SVA = sva.getSorted("R0")
+    val inParam = r0SVA.firstKey // TODO look into why there is an inParam
+    assert(r0SVA(inParam) == SymValueSet(Par(mainProc, inParam)), "input param not set correctly")
 
     val mallocValSet = r0SVA.collectFirst {
       case (variable: LocalVar, valueSet: SymValSet[T])
