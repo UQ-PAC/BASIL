@@ -396,7 +396,7 @@ class IntervalGraph(
     StructDotGraph(proc.name, structs, arrows).toDotString
   }
 
-  protected def collect(): (Set[IntervalNode], Set[(IntervalCell, IntervalCell)]) = {
+  def collect(): (Set[IntervalNode], Set[(IntervalCell, IntervalCell)]) = {
     val nodes: mutable.Set[IntervalNode] = mutable.Set()
     val pointsTo: mutable.Set[(IntervalCell, IntervalCell)] = mutable.Set()
     constraints.foreach {
@@ -1064,6 +1064,11 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
 }
 
 object IntervalDSA {
+  
+  def getPointers(graph: IntervalGraph): Map[IntervalCell, Set[IntervalCell]] = {
+    val (nodes, edges) = graph.collect()
+    edges.groupMap((_, pointee) => pointee)((pointer, _) => pointer)
+  }
 
   /**
    *  checks that (non Heap/Ret) regions only belongs to a single node
