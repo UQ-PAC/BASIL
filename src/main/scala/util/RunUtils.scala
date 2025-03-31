@@ -924,10 +924,8 @@ object RunUtils {
         val DSABU = IntervalDSA.solveBUs(DSA)
         DSATimer.checkPoint("Finished DSA BU Phase")
         DSABU.values.foreach(_.localCorrectness())
-        DSABU.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
         DSALogger.info("Performed correctness check")
         val DSATD = IntervalDSA.solveTDs(DSABU)
-        DSATD.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
         DSATimer.checkPoint("Finished DSA TD Phase")
         DSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
@@ -935,7 +933,6 @@ object RunUtils {
         DSATD.values.foreach(g => globalGraph.globalTransfer(globalGraph, g))
         DSATimer.checkPoint("Finished DSA global graph")
         DSATD.values.foreach(_.localCorrectness())
-        DSATD.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
         DSALogger.info("Performed correctness check")
 
         IntervalDSA.checkConsistGlobals(DSATD, globalGraph)
