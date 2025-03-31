@@ -211,4 +211,37 @@ class MemoryTransfromTests extends AnyFunSuite {
     val store = results.ir.program.collect {case s: MemoryStore => s}.head
     assert(load.mem == store.mem)
   }
+
+  test("Unified Global/Stack") {
+    val mem = SharedMemory("mem", 64, 8)
+    val R0 = Register("R0", 64)
+    val R31 = Register("R31", 64)
+    val xAddress = BitVecLiteral(2000, 64)
+    val yAddress = BitVecLiteral(3000, 64)
+    val xPointer = BitVecLiteral(1000, 64)
+    val globalOffsets = Map(xPointer.value -> xAddress.value)
+    val x = SpecGlobal("x", 64, None, xAddress.value)
+    val y = SpecGlobal("y", 64, None, yAddress.value)
+    val globals = Set(x, y)
+    val irType = BitVecType(64)
+
+    val program = prog(
+      proc("main", Set(("R0", irType)), Set(("R0", irType)),
+        block("b",
+          MemoryStore(mem, xAddress, R0, Endian.LittleEndian, 64, Some("00")),
+          MemoryStore(mem, R31, R0, LittleEndian, 64, Some("01")),
+          MemoryLoad(R0, mem, R31, LittleEndian, 64, Some("02")),
+          ret(("R0", R0))
+        )
+      )
+    )
+
+    val context = programToContext(program)
+    val results = runTest(context)
+
+    val load = results.ir.program.collect { case la: MemoryLoad => la}
+    val stores = results.ir.program.collect {case i: MemoryStore => i}
+    assert(load.nonEmpty, "multiple local pointers, shouldn't be converted to scalar variable")
+    assert(stores.nonEmpty, "multiple local pointers, shouldn't be converted to scalar variable")
+  }
 }
