@@ -195,7 +195,7 @@ def directCall(
   actualParams: Iterable[(String, Expr)],
   label: Option[String] = None
 ): EventuallyCall =
-  EventuallyCall(DelayNameResolve(tgt), lhs.to(ArraySeq), actualParams, label)
+  EventuallyCall(DelayNameResolve(tgt), lhs.to(ArraySeq), actualParams.to(ArraySeq), label)
 
 def directCall(tgt: String): EventuallyCall = directCall(Nil, tgt, Nil)
 
