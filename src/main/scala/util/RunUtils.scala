@@ -739,10 +739,17 @@ object RunUtils {
     )
 
     val cpValidate = transforms.copyPropOnce(program)
-    DebugDumpIRLogger.writeToFile(
-      File("copyprop-translation-validate.bpl"),
-      BoogieTranslator.translateProg(cpValidate).toString
-    )
+    val copyPropBoogieFile = BoogieTranslator.translateProg(cpValidate).toString
+    DebugDumpIRLogger.writeToFile(File("copyprop-translation-validate.bpl"), copyPropBoogieFile)
+
+    val procName = program.mainProcedure.procName + "_seq_" + program.mainProcedure.name
+    val vres = util.boogie_interaction.boogieBatchQuery(copyPropBoogieFile, Some(procName))
+    if (vres) {
+      Logger.info(s"Translation validated main procedure: $procName ")
+    }
+    assert(vres)
+
+    DebugDumpIRLogger.writeToFile(File("tvalidation-copyprop.il"), pp_prog(cpValidate))
 
     if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
       val dir = File("./graphs/")
