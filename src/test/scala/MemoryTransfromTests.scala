@@ -187,7 +187,7 @@ class MemoryTransfromTests extends AnyFunSuite {
     val program = prog(
       proc("main", Set(("R0", irType), ("R1", irType)), Set(("R1", irType)),
         block("call",
-          directCall(Set(("R0", R0)), "malloc", Set(("R0", R0))),
+          directCall(Set(("R0", R0)), "malloc", (("R0", R0))),
           goto("b")
         ),
         block("b",
@@ -266,7 +266,7 @@ class MemoryTransfromTests extends AnyFunSuite {
       proc("main", Set(("R0", irType)), Set(("R0", irType)),
         block("m",
           MemoryStore(mem, xAddress, R0, Endian.LittleEndian, 64, Some("00")),
-          directCall(Set(("R0", R0)), "callee", Set(("R0", R0))),
+          directCall(Set(("R0", R0)), "callee", (("R0", R0))),
           ret(("R0", R0))
         )
       ),
