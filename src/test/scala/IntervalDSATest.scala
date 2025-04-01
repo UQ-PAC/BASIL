@@ -130,7 +130,7 @@ class IntervalDSATest extends AnyFunSuite {
         block(
           "en",
           LocalAssign(R1, R0, Some("01")),
-          directCall(Set(("R0", R0), ("R1", R1)), "callee", ("R0", R0), ("R1", R1), ("R2", R2)),
+          directCall(Set(("R0", R0), ("R1", R1)), "callee", Set(("R0", R0), ("R1", R1), ("R2", R2))),
           ret(("R0", R0), ("R1", R1))
         )
       ),
@@ -183,7 +183,7 @@ class IntervalDSATest extends AnyFunSuite {
     val store = MemoryStore(mem, R0, R0, LittleEndian, 64, Some("store"))
     val store1 = MemoryStore(mem, R3, R1, LittleEndian, 64, Some("store1"))
     val store2 = MemoryStore(mem, R3, R2, LittleEndian, 64, Some("store2"))
-    val mallocCall = directCall(Set(("R0", R0)), "malloc", ("R0", R0))
+    val mallocCall = directCall(Set(("R0", R0)), "malloc", Set(("R0", R0)))
 
     val program =
       prog(
@@ -195,13 +195,13 @@ class IntervalDSATest extends AnyFunSuite {
           block(
             "b1",
             LocalAssign(R1, R0, Some("01")),
-            directCall(Set(("R0", R0)), "wmalloc", ("R0", R0)),
+            directCall(Set(("R0", R0)), "wmalloc", Set(("R0", R0))),
             goto("exit")
           ),
           block(
             "b2",
             LocalAssign(R2, R0, Some("02")),
-            directCall(Set(("R0", R0)), "wmalloc", ("R0", R0)),
+            directCall(Set(("R0", R0)), "wmalloc", Set(("R0", R0))),
             goto("exit")
           ),
           block(
