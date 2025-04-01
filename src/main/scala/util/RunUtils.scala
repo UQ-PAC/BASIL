@@ -758,25 +758,25 @@ object RunUtils {
       BoogieTranslator.translateProg(exprSimp).toString
     )
 
-    val cpValidate = transforms.copyPropOnce(program)
-    val copyPropBoogieFile = BoogieTranslator.translateProg(cpValidate).toString
-    DebugDumpIRLogger.writeToFile(File("copyprop-translation-validate.bpl"), copyPropBoogieFile)
+    // val cpValidate = transforms.copyPropOnce(program)
+    // val copyPropBoogieFile = BoogieTranslator.translateProg(cpValidate).toString
+    // DebugDumpIRLogger.writeToFile(File("copyprop-translation-validate.bpl"), copyPropBoogieFile)
 
-    val procName = program.mainProcedure.procName + "_seq_" + program.mainProcedure.name
-    val vres = util.boogie_interaction.boogieBatchQuery(copyPropBoogieFile, Some(procName))
-    if (vres) {
-      Logger.info(s"Translation validated main procedure: $procName ")
-    }
+    //val procName = program.mainProcedure.procName + "_seq_" + program.mainProcedure.name
+    //val vres = util.boogie_interaction.boogieBatchQuery(copyPropBoogieFile, Some(procName))
+    //if (vres) {
+    //  Logger.info(s"Translation validated main procedure: $procName ")
+    //}
 
-    DebugDumpIRLogger.writeToFile(File("tvalidation-copyprop.il"), pp_prog(cpValidate))
+    //DebugDumpIRLogger.writeToFile(File("tvalidation-copyprop.il"), pp_prog(cpValidate))
 
-    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
-      val dir = File("./graphs/")
-      if (!dir.exists()) then dir.mkdirs()
-      for (p <- cpValidate.procedures) {
-        DebugDumpIRLogger.writeToFile(File(s"graphs/dsav-${p.name}-after-simp.dot"), dotBlockGraph(p))
-      }
-    }
+    //if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
+    //  val dir = File("./graphs/")
+    //  if (!dir.exists()) then dir.mkdirs()
+    //  for (p <- cpValidate.procedures) {
+    //    DebugDumpIRLogger.writeToFile(File(s"graphs/dsav-${p.name}-after-simp.dot"), dotBlockGraph(p))
+    //  }
+    //}
 
     transforms.inlinePLTLaunchpad(ctx.program)
 
@@ -815,7 +815,9 @@ object RunUtils {
     // assert(program.procedures.forall(transforms.rdDSAProperty))
     AnalysisResultDotLogger.writeToFile(File("blockgraph-before-copyprop.dot"), dotBlockGraph(program.mainProcedure))
     Logger.info("Copyprop Start")
-    transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
+    // transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
+
+    transforms.validatedSimplifyPipeline(program)
 
     transforms.fixupGuards(program)
     transforms.removeDuplicateGuard(program)

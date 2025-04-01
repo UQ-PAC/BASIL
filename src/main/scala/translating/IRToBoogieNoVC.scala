@@ -12,6 +12,7 @@ object BoogieTranslator {
     case IntType => IntBType
     case BitVecType(s) => BitVecBType(s)
     case MapType(p, r) => MapBType(translateType(p), translateType(r))
+    case CustomSort(s) => CustomBType(s)
   }
 
   def translateVar(e: Variable): BVar = e match {
@@ -156,6 +157,9 @@ object BoogieTranslator {
       proc.modifies.addAll(vvis.globals)
     }
 
+    val typeDecls = vvis.typeDecls.map(_.toBoogie).collect {
+      case b @ CustomBType(_) => b
+    }.map(BTypeDecl(_))
     val globalVarDecls = vvis.globals.map(translateGlobal).map(BVarDecl(_))
 
     val readOnlySections = p.usedMemory.values.filter(_.readOnly)
@@ -171,7 +175,7 @@ object BoogieTranslator {
     val functionOpDefinitions = functionOpToDecl(globalVarDecls ++ procs)
     val decls = globalVarDecls.toList ++ functionOpDefinitions ++ procs
 
-    BProgram(decls, fname)
+    BProgram(typeDecls.toList ++ decls, fname)
   }
 
 }
@@ -180,6 +184,7 @@ class FindVars extends CILVisitor {
   val vars = mutable.Set[Variable]()
   val mems = mutable.Set[Memory]()
   var procsSeen = mutable.Set[Procedure]()
+  val typeDecls = mutable.Set[CustomSort]()
 
   override def vmem(m: Memory) = {
     mems += m
@@ -199,6 +204,14 @@ class FindVars extends CILVisitor {
   override def vlvar(v: Variable) = {
     vars += v
     SkipChildren()
+  }
+
+  override def vexpr(e: Expr) = {
+    e.getType match {
+      case s @ CustomSort(_) => typeDecls.add(s)
+      case _ => ()
+    }
+  DoChildren()
   }
 
   override def vstmt(s: Statement) = {

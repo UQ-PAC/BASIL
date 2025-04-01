@@ -7,6 +7,7 @@ import ir.cilvisitor.*
 import translating.PrettyPrinter.*
 import ir.dsl.IRToDSL.sequenceTransitionSystems
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable
 import util.Logger
 
 def polyEqual(e1: Expr, e2: Expr) = {
@@ -47,23 +48,29 @@ class NamespaceState(namespace: String) extends CILVisitor {
   }
 }
 
+val traceType = CustomSort("Tr")
 val transitionSystemPCVar = GlobalVar("SYNTH_PC", IntType)
-val traceVar = GlobalVar("TRACE", IntType)
+
+val traceVar = {
+  GlobalVar("TRACE", traceType)
+}
 
 class RewriteSideEffects extends CILVisitor {
 
   def loadFunc(lhs: Variable, size: Int, addr: Expr) = {
-    LocalAssign(lhs, UninterpretedFunction("load_" + size, Seq(traceVar, addr, IntLiteral(size)), BitVecType(size)))
+    val loadValue = LocalAssign(lhs, UninterpretedFunction("load_" + size, Seq(traceVar, addr), BitVecType(size)))
+    val trace = LocalAssign(traceVar, UninterpretedFunction("trace_load_" + size, Seq(traceVar, addr), traceType))
+    List(loadValue, trace)
   }
 
   def storeFunc(size: Int, addr: Expr, value: Expr) =
     LocalAssign(
       traceVar,
-      UninterpretedFunction("store_" + size, Seq(traceVar, addr, value: Expr, IntLiteral(size)), IntType)
+      UninterpretedFunction("store_" + size, Seq(traceVar, addr, value: Expr), traceType)
     )
 
   override def vstmt(s: Statement) = s match {
-    case m: MemoryLoad => ChangeTo(List(loadFunc(m.lhs, m.size, m.index)))
+    case m: MemoryLoad => ChangeTo(loadFunc(m.lhs, m.size, m.index))
     case m: MemoryStore => ChangeTo(List(storeFunc(m.size, m.index, m.value)))
     case _ => SkipChildren()
 
@@ -299,7 +306,7 @@ class TranslationValidator {
   val pcInv =
     BinaryExpr(IntEQ, visit_rvar(beforeRenamer, transitionSystemPCVar), visit_rvar(afterRenamer, transitionSystemPCVar))
 
-  val traceInv = BinaryExpr(BVEQ, visit_rvar(beforeRenamer, traceVar), visit_rvar(afterRenamer, traceVar))
+  val traceInv = BinaryExpr(BoolEQ, visit_rvar(beforeRenamer, traceVar), visit_rvar(afterRenamer, traceVar))
 
   def setTargetProg(p: Program) = {
     initProg = Some(p)
@@ -338,10 +345,12 @@ class TranslationValidator {
     }
 
     // TODO: fix when implementing calls
-    // val interesting = validationProcs(afterProg.get.mainProcedure.name)
-    // afterProg.get.procedures = ArrayBuffer(interesting)
+    val interesting = validationProcs(afterProg.get.mainProcedure.name)
+    afterProg.get.procedures = ArrayBuffer(interesting)
 
     afterProg.get
   }
 
 }
+
+

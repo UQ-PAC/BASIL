@@ -12,4 +12,6 @@ case class BitVecBType(size: Int) extends BType("bv" + size)
 
 case class MapBType(param: BType, result: BType) extends BType(s"[$param]$result")
 
+case class CustomBType(override val name: String) extends BType(name)
+
 case object SpecType extends BType("spec")

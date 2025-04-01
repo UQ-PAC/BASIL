@@ -1,6 +1,9 @@
 package ir.transforms
 import translating.serialiseIL
 import translating.PrettyPrinter.*
+import java.io.{BufferedWriter, File, FileInputStream, FileWriter, IOException, PrintWriter}
+
+import util.DebugDumpIRLogger
 import specification.FuncEntry
 import util.SimplifyLogger
 import ir.eval.AlgebraicSimplifications
@@ -570,6 +573,96 @@ def wrapShapePreservingTransformInValidation(transform: Program => Unit)(p: Prog
   validator.getValidationProg
 }
 
+
+def transformAndValidate(transform: Program => Unit, name: String)(p: Program) = {
+  val validationProg = wrapShapePreservingTransformInValidation(transform)(p)
+
+  val copyPropBoogieFile = translating.BoogieTranslator.translateProg(validationProg).toString
+  DebugDumpIRLogger.writeToFile(File(s"$name-translation-validate.bpl"), copyPropBoogieFile)
+
+  val procName = p.mainProcedure.procName + "_seq_" + p.mainProcedure.name
+  val vres = util.boogie_interaction.boogieBatchQuery(copyPropBoogieFile, Some(procName))
+  assert(vres)
+}
+
+
+def validatedSimplifyPipeline(p: Program) = {
+
+  def fixGuardsDSA(program: Program) = {
+    transforms.fixupGuards(program)
+    transforms.removeDuplicateGuard(program)
+  }
+
+  def copyProp(prog: Program) = for (p <- prog.procedures) {
+    val result = CopyProp.DSACopyProp(p, Map(), Map(), (x,y) => None)
+    if (result.nonEmpty) {
+      val vis = Simplify(CopyProp.toResult(result))
+      visit_proc(vis, p)
+    }
+  }
+
+  def simplifyGuards(prog: Program) = {
+    val gvis = GuardVisitor()
+    visit_prog(gvis, prog)
+  }
+
+  def intraBlockCopyProp(prog: Program) = {
+    visit_prog(CopyProp.BlockyProp(), prog)
+  }
+
+  def deadAssignmentElimination(prog: Program) = {
+    visit_prog(CleanupAssignments(), prog)
+  }
+
+  def simplifyConds(prog: Program) = {
+    for (p <- prog.procedures) {
+      AssumeConditionSimplifications(p)
+    }
+  }
+
+  def sliceCleanup(prog: Program) = {
+    removeSlices(prog)
+    for (p <- prog.procedures) {
+      ir.eval.cleanupSimplify(p)
+      AlgebraicSimplifications(p)
+    }
+  }
+
+  def combineBlocks(program: Program) = {
+    removeEmptyBlocks(program)
+    while (coalesceBlocks(program)) {}
+    removeEmptyBlocks(program)
+  }
+
+  applyRPO(p)
+
+  def combined(p: Program) =  {
+    combineBlocks(p)
+    fixGuardsDSA(p)
+    copyProp(p)
+    simplifyGuards(p)
+    simplifyConds(p)
+    intraBlockCopyProp(p)
+    deadAssignmentElimination(p)
+    sliceCleanup(p)
+    fixGuardsDSA(p)
+  }
+  transformAndValidate(combineBlocks, "combineBlocks")(p)
+  transformAndValidate(fixGuardsDSA, "fixGuardsDSA")(p)
+  transformAndValidate(copyProp, "DSACopyProp")(p)
+  transformAndValidate(simplifyGuards, "simplifyGuards")(p)
+  transformAndValidate(simplifyConds, "simplifyConds")(p)
+  transformAndValidate(intraBlockCopyProp, "blockyProp")(p)
+  transformAndValidate(deadAssignmentElimination, "deadAssignmentElimination")(p)
+  transformAndValidate(sliceCleanup, "BitectorExtractAndSlicesCleanup")(p)
+  transformAndValidate(fixGuardsDSA, "fixGuardsDSA")(p)
+  transformAndValidate(deadAssignmentElimination, "deadAssignmentElimination")(p)
+  //transformAndValidate(combined, "allSimplifyCombined")(p)
+
+  p
+}
+
+
 def copypropTransform(
   p: Procedure,
   procFrames: Map[Procedure, Set[Memory]],
@@ -612,31 +705,35 @@ def copypropTransform(
 
 }
 
-def removeEmptyBlocks(p: Program) = {
-  for (proc <- p.procedures) {
-    val blocks = proc.blocks.toList
-    for (b <- blocks) {
-      b match {
-        case b: Block if b.statements.size == 0 && b.prevBlocks.size == 1 && b.jump.isInstanceOf[GoTo] => {
-          val prev = b.prevBlocks
-          val next = b.nextBlocks
-          for (p <- prev) {
-            p.jump match {
-              case g: GoTo => {
-                for (n <- next) {
-                  g.addTarget(n)
-                }
-                g.removeTarget(b)
+def removeEmptyBlocks(proc: Procedure) : Unit = {
+  val blocks = proc.blocks.toList
+  for (b <- blocks) {
+    b match {
+      case b: Block if b.statements.size == 0 && b.prevBlocks.size == 1 && b.jump.isInstanceOf[GoTo] => {
+        val prev = b.prevBlocks
+        val next = b.nextBlocks
+        for (p <- prev) {
+          p.jump match {
+            case g: GoTo => {
+              for (n <- next) {
+                g.addTarget(n)
               }
-              case _ => throw Exception("Must have goto")
+              g.removeTarget(b)
             }
+            case _ => throw Exception("Must have goto")
           }
-          b.replaceJump(Unreachable())
-          b.parent.removeBlocks(b)
         }
-        case _ => ()
+        b.replaceJump(Unreachable())
+        b.parent.removeBlocks(b)
       }
+      case _ => ()
     }
+  }
+}
+
+def removeEmptyBlocks(p: Program) : Unit = {
+  for (proc <- p.procedures) {
+    removeEmptyBlocks(proc)
   }
 }
 
@@ -668,44 +765,51 @@ def coalesceBlocksCrossBranchDependency(p: Program): Boolean = {
   candidate.nonEmpty
 }
 
+def coalesceBlocks(proc: Procedure) : Boolean = {
+  var didAny = false
+  val blocks = proc.blocks.toList
+  for (b <- blocks.sortBy(_.rpoOrder)) {
+    if (
+      b.prevBlocks.size == 1 && b.prevBlocks.head.statements.nonEmpty && b.statements.nonEmpty
+      && b.prevBlocks.head.nextBlocks.size == 1
+      && b.prevBlocks.head.statements.lastOption.forall(s => !s.isInstanceOf[Call])
+      && !(b.parent.entryBlock.contains(b) || b.parent.returnBlock.contains(b))
+      && b.atomicSection.isEmpty && b.prevBlocks.forall(_.atomicSection.isEmpty)
+    ) {
+      didAny = true
+      // append topredecessor
+      // we know prevBlock is only jumping to b and has no call at the end
+      val prevBlock = b.prevBlocks.head
+      val stmts = b.statements.map(b.statements.remove).toList
+      prevBlock.statements.appendAll(stmts)
+      // leave empty block b and cleanup with removeEmptyBlocks
+    } else if (
+      b.nextBlocks.size == 1 && b.nextBlocks.head.statements.nonEmpty && b.statements.nonEmpty
+      && b.nextBlocks.head.prevBlocks.size == 1
+      && b.statements.lastOption.forall(s => !s.isInstanceOf[Call])
+      && !(b.parent.entryBlock.contains(b) || b.parent.returnBlock.contains(b))
+      && b.atomicSection.isEmpty && b.nextBlocks.forall(_.atomicSection.isEmpty)
+    ) {
+      didAny = true
+      // append to successor
+      // we know b is only jumping to nextBlock and does not end in a call
+      val nextBlock = b.nextBlocks.head
+      val stmts = b.statements.map(b.statements.remove).toList
+      nextBlock.statements.prependAll(stmts)
+      // leave empty block b and cleanup with removeEmptyBlocks
+    } else if (b.jump.isInstanceOf[Unreachable] && b.statements.isEmpty && b.prevBlocks.size == 1) {
+      b.prevBlocks.head.replaceJump(Unreachable())
+      b.parent.removeBlocks(b)
+    }
+  }
+  didAny
+}
+
+
 def coalesceBlocks(p: Program): Boolean = {
   var didAny = false
   for (proc <- p.procedures) {
-    val blocks = proc.blocks.toList
-    for (b <- blocks.sortBy(_.rpoOrder)) {
-      if (
-        b.prevBlocks.size == 1 && b.prevBlocks.head.statements.nonEmpty && b.statements.nonEmpty
-        && b.prevBlocks.head.nextBlocks.size == 1
-        && b.prevBlocks.head.statements.lastOption.forall(s => !s.isInstanceOf[Call])
-        && !(b.parent.entryBlock.contains(b) || b.parent.returnBlock.contains(b))
-        && b.atomicSection.isEmpty && b.prevBlocks.forall(_.atomicSection.isEmpty)
-      ) {
-        didAny = true
-        // append topredecessor
-        // we know prevBlock is only jumping to b and has no call at the end
-        val prevBlock = b.prevBlocks.head
-        val stmts = b.statements.map(b.statements.remove).toList
-        prevBlock.statements.appendAll(stmts)
-        // leave empty block b and cleanup with removeEmptyBlocks
-      } else if (
-        b.nextBlocks.size == 1 && b.nextBlocks.head.statements.nonEmpty && b.statements.nonEmpty
-        && b.nextBlocks.head.prevBlocks.size == 1
-        && b.statements.lastOption.forall(s => !s.isInstanceOf[Call])
-        && !(b.parent.entryBlock.contains(b) || b.parent.returnBlock.contains(b))
-        && b.atomicSection.isEmpty && b.nextBlocks.forall(_.atomicSection.isEmpty)
-      ) {
-        didAny = true
-        // append to successor
-        // we know b is only jumping to nextBlock and does not end in a call
-        val nextBlock = b.nextBlocks.head
-        val stmts = b.statements.map(b.statements.remove).toList
-        nextBlock.statements.prependAll(stmts)
-        // leave empty block b and cleanup with removeEmptyBlocks
-      } else if (b.jump.isInstanceOf[Unreachable] && b.statements.isEmpty && b.prevBlocks.size == 1) {
-        b.prevBlocks.head.replaceJump(Unreachable())
-        b.parent.removeBlocks(b)
-      }
-    }
+    didAny = didAny | coalesceBlocks(proc)
   }
   didAny
 }
