@@ -201,7 +201,7 @@ class MemoryTransfromTests extends AnyFunSuite {
         "main",
         Set(("R0", irType), ("R1", irType)),
         Set(("R1", irType)),
-        block("call", directCall(Set(("R0", R0)), "malloc", (("R0", R0))), goto("b")),
+        block("call", directCall(Set(("R0", R0)), "malloc", Set(("R0", R0))), goto("b")),
         block(
           "b",
           MemoryStore(mem, R0, R1, LittleEndian, 64, Some("01")),
@@ -286,7 +286,7 @@ class MemoryTransfromTests extends AnyFunSuite {
         block(
           "m",
           MemoryStore(mem, xAddress, R0, Endian.LittleEndian, 64, Some("00")),
-          directCall(Set(("R0", R0)), "callee", (("R0", R0))),
+          directCall(Set(("R0", R0)), "callee", Set(("R0", R0))),
           ret(("R0", R0))
         )
       ),
