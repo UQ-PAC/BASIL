@@ -95,6 +95,7 @@ class CILVisitorImpl(val v: CILVisitor) {
 
   def visit_expr(n: Expr): Expr = {
     def continue(n: Expr): Expr = n match {
+      case m: Memory => visit_mem(m)
       case o: OldExpr => {
         val n = visit_expr(o.body)
         if (n ne o.body) then OldExpr(n) else o
@@ -243,3 +244,4 @@ def visit_stmt(v: CILVisitor, e: Statement): List[Statement] = CILVisitorImpl(v)
 def visit_jump(v: CILVisitor, e: Jump): Jump = CILVisitorImpl(v).visit_jump(e)
 def visit_expr(v: CILVisitor, e: Expr): Expr = CILVisitorImpl(v).visit_expr(e)
 def visit_rvar(v: CILVisitor, e: Variable): Variable = CILVisitorImpl(v).visit_rvar(e)
+def visit_mem(v: CILVisitor, e: Memory): Memory = CILVisitorImpl(v).visit_mem(e)

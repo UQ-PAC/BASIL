@@ -177,6 +177,7 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr with Cache
   override def gammas: Set[Variable] = arg1.gammas ++ arg2.gammas
   override def variables: Set[Variable] = arg1.variables ++ arg2.variables
   override def getType: IRType = (op, arg1.getType, arg2.getType) match {
+    case (BoolEQ, _, _) => BoolType /* repurpose booleq as polymorphic equality */
     case (_: BoolBinOp, BoolType, BoolType) => BoolType
     case (binOp: BVBinOp, bv1: BitVecType, bv2: BitVecType) =>
       binOp match {
@@ -403,7 +404,7 @@ object LocalVar {
 }
 
 /** A global memory section (subject to shared-memory concurrent accesses from multiple threads). */
-sealed trait Memory extends Global {
+sealed trait Memory extends Expr with Global {
   val name: String
   val addressSize: Int
   val valueSize: Int
@@ -412,7 +413,7 @@ sealed trait Memory extends Global {
   val getType: IRType = MapType(BitVecType(addressSize), BitVecType(valueSize))
   override def toString: String = s"Memory($name, $addressSize, $valueSize)"
 
-  def acceptVisit(visitor: Visitor): Memory =
+  override def acceptVisit(visitor: Visitor): Memory =
     throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
