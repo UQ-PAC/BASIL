@@ -98,7 +98,7 @@ class SVATest extends AnyFunSuite {
     val results = runTest(context)
     val mainProc = results.ir.program.mainProcedure
     val sva = getSymbolicValues(mainProc)
-    val r0SVA =  SymValues.getSorted(sva, "R0")
+    val r0SVA = SymValues.getSorted(sva, "R0")
     val inParam = r0SVA.firstKey // TODO look into why there is an inParam
     assert(r0SVA(inParam) == domain.init(Par(mainProc, inParam)), "input param not set correctly")
 
