@@ -1086,8 +1086,10 @@ object IntervalDSA {
   }
 
   /**
-   *  checks that all reachable memory load and stores in DSA's domain have a dsa node
+   *  checks that all reachable memory load and stores in DSA's domain have dsa cell(s)
    *  which corresponds to their index expr
+   *
+   *  additionally checks the index cell(s) have unified pointee or don't have any pointees (skipped constraint)
    */
   def checkReachable(program: Program, DSA: Map[Procedure, IntervalGraph]): Unit = {
     val reachable = computeDomain(IntraProcIRCursor, program.procedures)
@@ -1097,9 +1099,33 @@ object IntervalDSA {
         val dsg = DSA(proc)
         pos match
           case load: MemoryLoad =>
-            assert(dsg.exprToCells(load.index).nonEmpty)
+            val pointers = dsg.exprToCells(load.index)
+            assert(
+              pointers.nonEmpty,
+              "Expected cells for indices used in reachable memory access to have corresponding DSA cells"
+            )
+            assert(
+              pointers.filter(_.hasPointee).map(_.getPointee).size == 1,
+              "Expected index cells to have unified pointer"
+            )
+            assert(
+              !pointers.exists(_.hasPointee) || pointers.forall(_.hasPointee),
+              "expected all/none of the pointers to have pointer"
+            )
           case store: MemoryStore =>
-            assert(dsg.exprToCells(store.index).nonEmpty)
+            val pointers = dsg.exprToCells(store.index)
+            assert(
+              pointers.nonEmpty,
+              "Expected cells for indices used in reachable memory access to have corresponding DSA cells"
+            )
+            assert(
+              pointers.filter(_.hasPointee).map(_.getPointee).size == 1,
+              "Expected index cells to have unified pointer"
+            )
+            assert(
+              !pointers.exists(_.hasPointee) || pointers.forall(_.hasPointee),
+              "expected all/none of the pointers to have pointer"
+            )
           case _ =>
     }
   }
