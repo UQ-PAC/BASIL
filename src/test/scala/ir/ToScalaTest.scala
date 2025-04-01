@@ -237,7 +237,7 @@ prog(
         Seq("R0_out" -> BitVecType(64), "R1_out" -> BitVecType(64), "R31_out" -> BitVecType(64)),
         block(
           "get_two_1876_basil_return",
-          directCall(Seq("out" -> R0), "printf", "in" -> LocalVar("R0", BitVecType(64), 0)),
+          directCall(Seq("out" -> R0), "printf", Seq("in" -> LocalVar("R0", BitVecType(64), 0))),
           ret(
             "R0_out" -> LocalVar("R0", BitVecType(64), 0),
             "R1_out" -> LocalVar("R1", BitVecType(64), 0),

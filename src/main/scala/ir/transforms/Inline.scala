@@ -76,7 +76,8 @@ def convertStatementRenaming(varRenamer: CILVisitor)(x: Statement): EventuallySt
     directCall(
       outs.to(ArraySeq).map(v => (v(0).name, visit_rvar(varRenamer, v(1)))),
       targ.name,
-      actuals.to(ArraySeq).map(keyToString(varRenamer)): _*
+      actuals.to(ArraySeq).map(keyToString(varRenamer)),
+      label
     )
   case IndirectCall(targ, label) => indirectCall(visit_rvar(varRenamer, targ))
   case x: NonCallStatement =>
