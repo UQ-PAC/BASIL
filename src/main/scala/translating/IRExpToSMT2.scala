@@ -12,6 +12,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
   def vstmt(s: Statement): Repr[Statement] = {
     s match {
       case a: LocalAssign => vassign(vlvar(a.lhs), vexpr(a.rhs))
+      case m: MemoryAssign => vassign(vlvar(m.lhs), vexpr(m.rhs))
       case m: MemoryLoad => vload(vlvar(m.lhs), m.mem.name, vexpr(m.index), m.endian, m.size)
       case m: MemoryStore => vstore(m.mem.name, vexpr(m.index), vexpr(m.value), m.endian, m.size)
       case c: DirectCall =>
