@@ -123,15 +123,23 @@ class IntervalDSATest extends AnyFunSuite {
     val irType = BitVecType(64)
 
     val program = prog(
-      proc("main", Set(("R0", irType)), Set(("R0", irType), ("R1", irType)),
-        block("en",
+      proc(
+        "main",
+        Set(("R0", irType)),
+        Set(("R0", irType), ("R1", irType)),
+        block(
+          "en",
           LocalAssign(R1, R0, Some("01")),
           directCall(Set(("R0", R0), ("R1", R1)), "callee", ("R0", R0), ("R1", R1), ("R2", R2)),
           ret(("R0", R0), ("R1", R1))
         )
       ),
-      proc("callee", Set(("R0", irType), ("R1", irType), ("R2", irType)), Set(("R0", irType), ("R1", irType)),
-        block("calleeEn",
+      proc(
+        "callee",
+        Set(("R0", irType), ("R1", irType), ("R2", irType)),
+        Set(("R0", irType), ("R1", irType)),
+        block(
+          "calleeEn",
           MemoryStore(mem, R0, xAddress, LittleEndian, 64, Some("02")),
           MemoryStore(mem, R1, R2, LittleEndian, 64, Some("03")),
           ret(("R0", R0), ("R1", R1))
