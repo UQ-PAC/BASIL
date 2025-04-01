@@ -1,12 +1,40 @@
 package ir.transforms
 
-import analysis.data_structure_analysis.{DSFlag, IntervalCell, IntervalDSA, IntervalGraph, isPlaceHolder}
+import analysis.data_structure_analysis.{DSFlag, IntervalCell, IntervalDSA, IntervalGraph, IntervalNode, isPlaceHolder}
 import ir.cilvisitor.{CILVisitor, ChangeTo, DoChildren, SkipChildren, VisitAction}
-import ir.{LocalAssign, LocalVar, Memory, MemoryAssign, MemoryLoad, MemoryStore, Procedure, Register, SharedMemory, Statement}
+import ir.*
+
+import scala.collection.mutable
 
 class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
+  val revEdges: Map[Procedure, Map[IntervalCell, Set[IntervalCell]]] =
+    dsa.map((proc, graph) => (proc, IntervalDSA.getPointers(graph)))
+  val interProcCells = computeRelations()
 
-  val revEdges = dsa.map((proc, graph) => (proc, IntervalDSA.getPointers(graph)))
+  def computeRelations(): Map[IntervalCell, Set[IntervalCell]] = {
+    val cellMapping = mutable.Map[IntervalCell, Set[IntervalCell]]()
+    dsa.foreach((proc, graph) =>
+      val callerDSG = dsa(proc)
+      proc.foreach {
+        case dc: DirectCall if dsa.contains(dc.target) =>
+          val calleeDSG = dsa(dc.target)
+          dc.actualParams.foreach((formal, actual) =>
+            val cell1 = callerDSG.exprToCells(actual).head
+            val cell2 = calleeDSG.exprToCells(formal).head
+            cellMapping.update(cell1, cellMapping.getOrElse(cell1, Set.empty) + cell2)
+            cellMapping.update(cell2, cellMapping.getOrElse(cell2, Set.empty) + cell1)
+          )
+          dc.outParams.foreach((formal, actual) =>
+            val cell1 = callerDSG.exprToCells(actual).head
+            val cell2 = calleeDSG.exprToCells(formal).head
+            cellMapping.update(cell1, cellMapping.getOrElse(cell1, Set.empty) + cell2)
+            cellMapping.update(cell2, cellMapping.getOrElse(cell2, Set.empty) + cell1)
+          )
+        case _ =>
+      }
+    )
+    cellMapping.toMap
+  }
 
   def hasUniquePointer(cell: IntervalCell): Boolean = {
     revEdges(cell.node.graph.proc).get(cell) match
