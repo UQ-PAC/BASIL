@@ -19,16 +19,16 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
         case dc: DirectCall if dsa.contains(dc.target) =>
           val calleeDSG = dsa(dc.target)
           dc.actualParams.foreach((formal, actual) =>
-            val cell1 = callerDSG.exprToCells(actual).head
-            val cell2 = calleeDSG.exprToCells(formal).head
-            cellMapping.update(cell1, cellMapping.getOrElse(cell1, Set.empty) + cell2)
-            cellMapping.update(cell2, cellMapping.getOrElse(cell2, Set.empty) + cell1)
+            val cells1 = callerDSG.exprToCells(actual)
+            val cells2 = calleeDSG.exprToCells(formal)
+            cells1.foreach(cell => cellMapping.update(cell, cellMapping.getOrElse(cell, Set.empty) ++ cells2))
+            cells2.foreach(cell => cellMapping.update(cell, cellMapping.getOrElse(cell, Set.empty) ++ cells1))
           )
           dc.outParams.foreach((formal, actual) =>
-            val cell1 = callerDSG.exprToCells(actual).head
-            val cell2 = calleeDSG.exprToCells(formal).head
-            cellMapping.update(cell1, cellMapping.getOrElse(cell1, Set.empty) + cell2)
-            cellMapping.update(cell2, cellMapping.getOrElse(cell2, Set.empty) + cell1)
+            val cells1 = callerDSG.exprToCells(actual)
+            val cells2 = calleeDSG.exprToCells(formal)
+            cells1.foreach(cell => cellMapping.update(cell, cellMapping.getOrElse(cell, Set.empty) ++ cells2))
+            cells2.foreach(cell => cellMapping.update(cell, cellMapping.getOrElse(cell, Set.empty) ++ cells1))
           )
         case _ =>
       }
