@@ -26,7 +26,6 @@ given ToScala[Expr] = ToScala.derived
 given ToScala[UnOp] = ToScala.derived
 given ToScala[BinOp] = ToScala.derived
 given ToScala[Endian] = ToScala.derived
-given ToScala[Global] = ToScala.derived
 given ToScala[IRType] = ToScala.derived
 
 // NOTE: Unfortunately, for the Command trait, this is not straightforward because the classes are not case classes.

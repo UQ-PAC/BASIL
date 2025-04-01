@@ -15,6 +15,10 @@ case object IntType extends IRType("int") {
   override def toBoogie: BType = IntBType
 }
 
+case class CustomSort(override val name: String) extends IRType(name) {
+  override def toBoogie: BType = CustomBType(name)
+}
+
 case class BitVecType(size: Int) extends IRType("bv" + size) {
   override def toBoogie: BType = BitVecBType(size)
 }
