@@ -37,9 +37,25 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
   }
 
   def hasUniquePointer(cell: IntervalCell): Boolean = {
-    revEdges(cell.node.graph.proc).get(cell) match
-      case Some(value) =>  value.size == 1
-      case None => true // skipped due to assignment of non-address
+    val proc = cell.node.graph.proc
+    revEdges(proc).get(cell) match
+      case Some(value) if value.size > 1 => false
+      case Some(value) if interProcCells.contains(cell) =>
+        var seenPointers = value
+        var seenCells = Set(cell)
+        var num = value.size
+        val queue = mutable.Queue().enqueueAll(interProcCells(cell))
+        while queue.nonEmpty && num <= 1 do
+          val eq = queue.dequeue()
+          val pointers = revEdges(eq.node.graph.proc)
+            .getOrElse(eq, Set.empty)
+            .diff(seenPointers)
+            .filterNot(p => interProcCells.getOrElse(p, Set.empty).exists(seenPointers.contains))
+          num += pointers.size
+
+        num <= 1
+      case _ => true
+
   }
 
   def joinFlags(pointers: Iterable[IntervalCell]): DSFlag = {
@@ -49,7 +65,8 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
   }
 
   def cellsToName(cells: IntervalCell*): String = {
-    cells.flatMap(i =>
+    cells
+      .flatMap(i =>
         i.node.bases.keySet
           .filterNot(isPlaceHolder)
           .map(base => (base, i.node.get(i.interval).interval.move(f => f - i.node.bases(base))))
@@ -76,7 +93,7 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
             assert(indices.map(_.getPointee).size == 1, s"${indices.map(_.getPointee).size}, $load")
             val flag = joinFlags(indices)
             val value = indices.map(_.getPointee).head
-            val varName = cellsToName(indices:_*)
+            val varName = cellsToName(indices: _*)
 
             if isGlobal(flag) && hasUniquePointer(value) then
               ChangeTo(List(LocalAssign(load.lhs, Register(varName, load.size), load.label)))
@@ -84,10 +101,9 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
               ChangeTo(List(LocalAssign(load.lhs, LocalVar(varName, load.lhs.getType), load.label)))
             else
               val newMem = SharedMemory(cellsToName(value), value.interval.size.getOrElse(0), load.mem.valueSize)
-              val newLoad = MemoryLoad(load.lhs, newMem, load.index, load.endian, load.size,  load.label)
+              val newLoad = MemoryLoad(load.lhs, newMem, load.index, load.endian, load.size, load.label)
               ChangeTo(List(newLoad))
           } else SkipChildren()
-
 
         case store: MemoryStore =>
           val indices = dsa(proc).exprToCells(store.index).map(dsa(proc).get).toSeq
@@ -97,10 +113,10 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
             assert(indices.size == 1)
             val flag = joinFlags(indices)
             val content = indices.map(_.getPointee).head
-            val varName = cellsToName(indices:_*)
+            val varName = cellsToName(indices: _*)
             if isGlobal(flag) && hasUniquePointer(content) then
               ChangeTo(List(MemoryAssign(Register(varName, store.size), store.value, store.label)))
-            else if isLocal(flag) && hasUniquePointer(content)then
+            else if isLocal(flag) && hasUniquePointer(content) then
               ChangeTo(List(LocalAssign(LocalVar(varName, store.value.getType), store.value, store.label, false)))
             else
               val newMem = SharedMemory(cellsToName(content), content.interval.size.getOrElse(0), store.mem.valueSize)
