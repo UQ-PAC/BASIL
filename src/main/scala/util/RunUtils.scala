@@ -918,6 +918,7 @@ object RunUtils {
         val globalGraph =
           IntervalDSA.getLocal(ctx.program.mainProcedure, ctx, SymValues[Interval](Map.empty), Set[Constraint]())
         val DSA = IntervalDSA.getLocals(ctx, sva, cons)
+        IntervalDSA.checkReachable(ctx.program, DSA)
         DSATimer.checkPoint("Finished DSA Local Phase")
         DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
         DSA.values.foreach(_.localCorrectness())
