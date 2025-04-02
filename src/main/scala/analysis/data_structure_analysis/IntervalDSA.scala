@@ -221,15 +221,21 @@ class IntervalGraph(
     sourceGlobal = globalNode.get(targetGlobal.interval)
     target.mergeCells(sourceGlobal, targetGlobal)
     DSALogger.info(s"cloning ${source.proc.procName} into ${target.proc.procName}, $phase")
-    cons.inParams.filter(f => cons.target.formalInParam.contains(f._1)).foreach { case (formal, actual) =>
-      val (sourceExpr, targetExpr) = if phase == TD then (actual, formal) else (formal, actual)
-      exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
-    }
+    cons.inParams
+      .filterNot(f => f._1.name.startsWith("R31"))
+      .filter(f => cons.target.formalInParam.contains(f._1))
+      .foreach { case (formal, actual) =>
+        val (sourceExpr, targetExpr) = if phase == TD then (actual, formal) else (formal, actual)
+        exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
+      }
 
-    cons.outParams.filter(f => cons.target.formalOutParam.contains(f._2)).foreach { case (out, actual) =>
-      val (sourceExpr, targetExpr) = if phase == TD then (actual, out) else (out, actual)
-      exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
-    }
+    cons.outParams
+      .filterNot(f => f._1.name.startsWith("R31"))
+      .filter(f => cons.target.formalOutParam.contains(f._1))
+      .foreach { case (out, actual) =>
+        val (sourceExpr, targetExpr) = if phase == TD then (actual, out) else (out, actual)
+        exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
+      }
     // TODO add unification between unused indirect call out params and their corresponding input version
     /*
     if phase == BU then
@@ -257,6 +263,7 @@ class IntervalGraph(
       )
     val targetCells = target.exprToCells(targetExpr).map(target.find)
     target.localCorrectness()
+
     if (targetCells ++ sourceCells).nonEmpty then target.mergeCells(targetCells ++ sourceCells)
     target.localCorrectness()
   }
@@ -438,6 +445,13 @@ class IntervalGraph(
           assert(first.map(get) == sec.map(get), "cells should be the same after unification")
         else Logger.warn(s"$cons had an empty argument")
 
+      case dc: DirectCallConstraint =>
+        val h = dc.inParams.filter(f => f._1.name.startsWith("R31"))
+        val g = dc.outParams.filter(f => f._1.name.startsWith("R31"))
+        if g.nonEmpty && h.nonEmpty then
+          val (_, in) = h.head
+          val (_, out) = g.head
+          mergeCells(exprToCells(in) ++ exprToCells(out))
       case _ => // ignore
   }
 
