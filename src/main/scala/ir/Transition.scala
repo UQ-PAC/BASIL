@@ -64,10 +64,7 @@ class RewriteSideEffects extends CILVisitor {
   }
 
   def storeFunc(size: Int, addr: Expr, value: Expr) =
-    LocalAssign(
-      traceVar,
-      UninterpretedFunction("store_" + size, Seq(traceVar, addr, value: Expr), traceType)
-    )
+    LocalAssign(traceVar, UninterpretedFunction("store_" + size, Seq(traceVar, addr, value: Expr), traceType))
 
   override def vstmt(s: Statement) = s match {
     case m: MemoryLoad => ChangeTo(loadFunc(m.lhs, m.size, m.index))
@@ -103,7 +100,7 @@ object PCMan {
 
 import PCMan.*
 
-def procToTransition(p: Procedure, loops: List[Loop]) = {
+def procToTransition(p: Procedure, loops: List[Loop], cutJoins: Boolean = false) = {
 
   val pcVar = transitionSystemPCVar
   var cutPoints = Map[String, Block]()
@@ -122,8 +119,20 @@ def procToTransition(p: Procedure, loops: List[Loop]) = {
   })
 
   p.returnBlock.foreach(e => {
-    e.statements.append(setPCLabel("RETURN"))
-    e.replaceJump(GoTo(synthExit))
+    e.jump match {
+      case r: Return => {
+        val outAssigns = r.outParams.map((formal, actual) => {
+          val l = LocalAssign(formal, actual)
+          l.comment = Some("synth return param")
+          l
+        })
+        r.parent.statements.appendAll(outAssigns)
+        r.parent.statements.append(setPCLabel("RETURN"))
+        r.parent.replaceJump(GoTo(synthExit))
+      }
+      case _ => ???
+    }
+
     cutPoints = cutPoints.updated("RETURN", e)
   })
 
@@ -141,26 +150,53 @@ def procToTransition(p: Procedure, loops: List[Loop]) = {
     // synthEntryJump.addTarget(loopEntry)
 
     val backedges = l.backEdges.toList.sortBy(e => s"${e.from.label}_${e.to.label}")
+    val label = s"Loop${loopCount}"
+    synthEntryJump.addTarget(l.header)
+
+    val nb = synthEntry.createBlockBetween(l.header, "cut_join_to_" + label)
+    nb.statements.prepend(pcGuard(label))
+
+    cutPoints = cutPoints.updated(label, l.header)
     for (backedge <- backedges) {
-      loopBECount += 1
-      val label = s"Loop${loopCount}_be${loopBECount}"
-      synthEntryJump.addTarget(backedge.to)
-      val nb = synthEntry.createBlockBetween(backedge.to, "cut_back_edge_" + label)
-      nb.statements.prepend(pcGuard(label))
-      cutPoints = cutPoints.updated(label, backedge.to)
+      assert(l.header == backedge.to)
       backedge.from.statements.append(LocalAssign(pcVar, PCSym(label), Some(label)))
       backedge.from.replaceJump(GoTo(synthExit))
+    }
+  }
+
+  var joinCount = 0
+  if (cutJoins) {
+
+    val cuts = p.blocks.filter(c =>
+      c.prevBlocks.size > 1
+        && c.prevBlocks.flatMap(_.nextBlocks).forall(_ == c)
+        && !p.returnBlock.contains(c) && !p.entryBlock.contains(c)
+    ).toList.sortBy(_.label)
+
+    for (c <- cuts) {
+      var incCount = 1
+      joinCount = joinCount + 1
+      val label = s"Join${joinCount}"
+      cutPoints = cutPoints.updated(label, c)
+
+      for (incoming <- c.prevBlocks) {
+        incoming.statements.append(LocalAssign(pcVar, PCSym(label), Some(label)))
+        incoming.replaceJump(GoTo(synthExit))
+      }
+
+      synthEntryJump.addTarget(c)
+      val nb = synthEntry.createBlockBetween(c, "cut_join_to_" + label)
+      nb.statements.prepend(pcGuard(label))
+
     }
   }
 
   var once = true
   for (s <- p) {
     s match {
-      case r: Return => {
-        assert(once, "expect proc in single return form")
-        r.parent.statements.append(setPCLabel("RETURN"))
-        r.parent.replaceJump(GoTo(synthExit))
-      }
+      // case r: Return => {
+      //  assert(once, "expect proc in single return form")
+      // }
       case u: Unreachable => u.parent.replaceJump(GoTo(synthAbort))
       case g: GoTo if g.targets.isEmpty => g.parent.replaceJump(GoTo(synthAbort))
       // case a: Assert => {
@@ -258,19 +294,69 @@ class TranslationValidator {
   var validationProcs = Map[String, Procedure]()
 
   var initProg: Option[Program] = None
+
   var beforeProg: Option[Program] = None
+  var liveBefore = Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])]()
+
   var afterProg: Option[Program] = None
+  var liveAfter = Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])]()
 
   var beforeCuts: Map[Procedure, Map[String, Block]] = Map()
   var afterCuts: Map[Procedure, Map[String, Block]] = Map()
 
-  val invariants = mutable.Map[String, List[Expr]]()
+  val invariants = mutable.Map[String, List[(Expr, Option[String])]]()
 
   val beforeRenamer = NamespaceState("target")
   val afterRenamer = NamespaceState("source")
 
   def varInSource(v: Variable) = visit_rvar(afterRenamer, v)
   def varInTarget(v: Variable) = visit_rvar(beforeRenamer, v)
+
+  def setDSAInvariant = {
+
+    val procs = initProg.get.procedures.view.map(p => p.name -> p).toMap
+
+    for (p <- afterProg.get.procedures) {
+      val (liveVarsTarget, _) = liveBefore(p.name)
+      val (liveVarsSource, _) = liveAfter(p.name)
+
+      /** has index **/
+
+      def removeIndex(v: Variable) = v match {
+        case l: LocalVar => l.copy(index = 0)
+        case g => g
+      }
+
+      val returnInv = procs(p.name).returnBlock
+        .map(_.jump match {
+          case r: Return => procs(p.name).returnBlock.get.label -> r.outParams.map((formal, actual) => formal).toSet
+          case _ => ???
+        })
+        .toSeq
+
+      val lives = liveVarsSource.collect {
+        case (block, v) if afterCuts(p).exists((_, b) => block.label == b.label) =>
+          block.label -> v.filter(v => liveVarsTarget(block).contains(removeIndex(v)))
+      }.toMap ++ returnInv
+
+      val inv = afterCuts(p).map {
+        case (label, cutPoint) => {
+          val vars = lives.get(cutPoint.label).toSet.flatten -- Seq(transitionSystemPCVar)
+
+          val assertion = vars
+            .map(v => polyEqual(varInSource(v), varInTarget(removeIndex(v))))
+            .foldLeft(TrueLiteral: Expr)((acc, r) => BinaryExpr(BoolAND, acc, r))
+
+          val guard = BinaryExpr(IntEQ, visit_rvar(afterRenamer, transitionSystemPCVar), PCMan.PCSym(label))
+
+          (BinaryExpr(BoolIMPLIES, guard, assertion), Some(s"INVARIANT at $label"))
+        }
+      }
+
+      setInvariant(p.name, inv.toList)
+    }
+
+  }
 
   def setEqualVarsInvariant = {
 
@@ -279,11 +365,22 @@ class TranslationValidator {
     val procs = initProg.get.procedures.view.map(p => p.name -> p).toMap
 
     for (p <- afterProg.get.procedures) {
-      val (livesBefore, livesAfter) = transforms.getLiveVars(procs(p.name))
+      val (liveVarsTarget, _) = liveAfter(p.name)
+      val (liveVarsSource, _) = liveBefore(p.name)
 
-      val lives = livesBefore.map { case (k, v) =>
-        k.label -> v
-      }.toMap
+      // intersect of live of source and target
+
+      val returnInv = procs(p.name).returnBlock
+        .map(_.jump match {
+          case r: Return => procs(p.name).returnBlock.get.label -> r.outParams.map((formal, actual) => formal).toSet
+          case _ => ???
+        })
+        .toSeq
+
+      val lives = liveVarsSource.collect {
+        case (block, v) if afterCuts(p).exists((_, b) => block.label == b.label) =>
+          block.label -> v.filter(liveVarsTarget(block).contains)
+      }.toMap ++ returnInv
 
       val inv = afterCuts(p).map {
         case (label, cutPoint) => {
@@ -295,7 +392,7 @@ class TranslationValidator {
 
           val guard = BinaryExpr(IntEQ, visit_rvar(afterRenamer, transitionSystemPCVar), PCMan.PCSym(label))
 
-          BinaryExpr(BoolIMPLIES, guard, assertion)
+          (BinaryExpr(BoolIMPLIES, guard, assertion), Some(s"INVARIANT at $label"))
         }
       }
 
@@ -311,16 +408,18 @@ class TranslationValidator {
   def setTargetProg(p: Program) = {
     initProg = Some(p)
     val (prog, cuts) = toTransitionSystem(p)
+    liveBefore = p.procedures.map(p => p.name -> transforms.getLiveVars(p)).toMap
     beforeProg = Some(prog)
     beforeCuts = cuts
   }
   def setSourceProg(p: Program) = {
     val (prog, cuts) = toTransitionSystem(p)
+    liveAfter = p.procedures.map(p => p.name -> transforms.getLiveVars(p)).toMap
     afterProg = Some(prog)
     afterCuts = cuts
   }
 
-  def setInvariant(p: String, l: List[Expr]) = {
+  def setInvariant(p: String, l: List[(Expr, Option[String])]) = {
     invariants(p) = l
   }
 
@@ -333,10 +432,10 @@ class TranslationValidator {
       visit_proc(afterRenamer, after)
 
       val combined = sequenceTransitionSystems(afterProg.get, after, before)
-      val invariant = Seq(pcInv, traceInv) ++ invariants(proc.name)
+      val invariant = Seq((pcInv, Some("PC INVARIANT")), (traceInv, Some("Trace INVARIANT"))) ++ invariants(proc.name)
 
-      combined.entryBlock.get.statements.prependAll(invariant.map(Assume(_, Some("INVARIANT"))))
-      combined.returnBlock.get.statements.appendAll(invariant.map(Assert(_, Some("INVARIANT"))))
+      combined.entryBlock.get.statements.prependAll(invariant.map((i, l) => Assume(i, l)))
+      combined.returnBlock.get.statements.appendAll(invariant.map((i, l) => Assert(i, l)))
 
       validationProcs = validationProcs.updated(proc.name, combined)
 
@@ -352,5 +451,3 @@ class TranslationValidator {
   }
 
 }
-
-
