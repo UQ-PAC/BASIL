@@ -153,9 +153,12 @@ object BoogieTranslator {
       proc.modifies.addAll(vvis.globals)
     }
 
-    val typeDecls = vvis.typeDecls.map(_.toBoogie).collect {
-      case b @ CustomBType(_) => b
-    }.map(BTypeDecl(_))
+    val typeDecls = vvis.typeDecls
+      .map(_.toBoogie)
+      .collect { case b @ CustomBType(_) =>
+        b
+      }
+      .map(BTypeDecl(_))
     val globalVarDecls = vvis.globals.map(translateGlobal).map(BVarDecl(_))
 
     val readOnlySections = p.usedMemory.values.filter(_.readOnly)
@@ -207,7 +210,7 @@ class FindVars extends CILVisitor {
       case s @ CustomSort(_) => typeDecls.add(s)
       case _ => ()
     }
-  DoChildren()
+    DoChildren()
   }
 
   override def vstmt(s: Statement) = {

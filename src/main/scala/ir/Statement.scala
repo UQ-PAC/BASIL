@@ -17,6 +17,8 @@ import collection.mutable
 sealed trait Command extends HasParent[Block] {
   val label: Option[String]
 
+  var comment: Option[String] = None
+
   def labelStr: String = label match {
     case Some(s) => s"$s: "
     case None => ""
@@ -109,8 +111,9 @@ class AtomicEnd(override val label: Option[String] = None) extends NOP(label) {
   override def toString: String = s"AtomicEnd $labelStr"
 }
 
-class Assert(var body: Expr, var comment: Option[String] = None, override val label: Option[String] = None)
+class Assert(var body: Expr, acomment: Option[String] = None, override val label: Option[String] = None)
     extends Statement {
+  comment = acomment
   override def toString: String = s"${labelStr}assert $body" + comment.map(" //" + _)
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssert(this)
 }
@@ -129,11 +132,12 @@ object Assert {
   */
 class Assume(
   var body: Expr,
-  var comment: Option[String] = None,
+  acomment: Option[String] = None,
   override val label: Option[String] = None,
   var checkSecurity: Boolean = false
 ) extends Statement {
 
+  comment = acomment
   override def toString: String = s"${labelStr}assume $body" + comment.map(" //" + _)
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssume(this)
 }

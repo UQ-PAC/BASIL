@@ -2,6 +2,7 @@ package ir.transforms
 import translating.serialiseIL
 import translating.PrettyPrinter.*
 import java.io.{BufferedWriter, File, FileInputStream, FileWriter, IOException, PrintWriter}
+import util.LogLevel
 
 import util.DebugDumpIRLogger
 import specification.FuncEntry
@@ -560,28 +561,37 @@ def wrapShapePreservingTransformInValidation(transform: Program => Unit)(p: Prog
   validator.getValidationProg
 }
 
+def validate(validationProg: Program, procName: String, name: String) = {
+
+  val boogieFile = translating.BoogieTranslator.translateProg(validationProg).toString
+  val boogieFileName = s"$name-translation-validate.bpl"
+  util.writeToFile(boogieFile, boogieFileName)
+  if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
+    val dir = File("./graphs/")
+    if (!dir.exists()) then dir.mkdirs()
+    for (p <- validationProg.procedures) {
+      DebugDumpIRLogger.writeToFile(File(s"graphs/transition-${p.name}-${name}.dot"), dotBlockGraph(p))
+    }
+  }
+
+  val vres = util.boogie_interaction.boogieBatchQuery(boogieFileName, Some(procName), 1)
+  // assert(vres)
+  vres
+
+}
 
 def transformAndValidate(transform: Program => Unit, name: String)(p: Program) = {
   val validationProg = wrapShapePreservingTransformInValidation(transform)(p)
-
-  val copyPropBoogieFile = translating.BoogieTranslator.translateProg(validationProg).toString
-  DebugDumpIRLogger.writeToFile(File(s"$name-translation-validate.bpl"), copyPropBoogieFile)
-
   val procName = p.mainProcedure.procName + "_seq_" + p.mainProcedure.name
-  val vres = util.boogie_interaction.boogieBatchQuery(copyPropBoogieFile, Some(procName))
-  assert(vres)
+  validate(validationProg, procName, name)
 }
-
 
 def validatedSimplifyPipeline(p: Program) = {
 
-  def fixGuardsDSA(program: Program) = {
-    transforms.fixupGuards(program)
-    transforms.removeDuplicateGuard(program)
-  }
+  def fixGuardsDSA(program: Program) = {}
 
   def copyProp(prog: Program) = for (p <- prog.procedures) {
-    val result = CopyProp.DSACopyProp(p, Map(), Map(), (x,y) => None)
+    val result = CopyProp.DSACopyProp(p, Map(), Map(), (x, y) => None)
     if (result.nonEmpty) {
       val vis = Simplify(CopyProp.toResult(result))
       visit_proc(vis, p)
@@ -623,8 +633,8 @@ def validatedSimplifyPipeline(p: Program) = {
 
   applyRPO(p)
 
-  def combined(p: Program) =  {
-    combineBlocks(p)
+  def combined(p: Program) = {
+    // combineBlocks(p)
     fixGuardsDSA(p)
     copyProp(p)
     simplifyGuards(p)
@@ -634,21 +644,35 @@ def validatedSimplifyPipeline(p: Program) = {
     sliceCleanup(p)
     fixGuardsDSA(p)
   }
+
+  def dsa(p: Program) = {
+    val validator = TranslationValidator()
+    validator.setTargetProg(p)
+    OnePassDSA().applyTransform(p)
+    transforms.fixupGuards(p)
+    transforms.removeDuplicateGuard(p)
+    validator.setSourceProg(p)
+    validator.setDSAInvariant
+    val prog = validator.getValidationProg
+
+    val procName = p.mainProcedure.procName + "_seq_" + p.mainProcedure.name
+    validate(prog, procName, "DynamicSingleAssignment")
+  }
+
+  dsa(p)
   transformAndValidate(combineBlocks, "combineBlocks")(p)
-  transformAndValidate(fixGuardsDSA, "fixGuardsDSA")(p)
   transformAndValidate(copyProp, "DSACopyProp")(p)
-  transformAndValidate(simplifyGuards, "simplifyGuards")(p)
   transformAndValidate(simplifyConds, "simplifyConds")(p)
   transformAndValidate(intraBlockCopyProp, "blockyProp")(p)
   transformAndValidate(deadAssignmentElimination, "deadAssignmentElimination")(p)
+  transformAndValidate(simplifyGuards, "simplifyGuards")(p)
   transformAndValidate(sliceCleanup, "BitectorExtractAndSlicesCleanup")(p)
   transformAndValidate(fixGuardsDSA, "fixGuardsDSA")(p)
   transformAndValidate(deadAssignmentElimination, "deadAssignmentElimination")(p)
-  //transformAndValidate(combined, "allSimplifyCombined")(p)
+  transformAndValidate(combineBlocks, "combineBlocks")(p)
 
   p
 }
-
 
 def copypropTransform(
   p: Procedure,
@@ -693,7 +717,7 @@ def copypropTransform(
 
 }
 
-def removeEmptyBlocks(proc: Procedure) : Unit = {
+def removeEmptyBlocks(proc: Procedure): Unit = {
   val blocks = proc.blocks.toList
   for (b <- blocks) {
     b match {
@@ -719,7 +743,7 @@ def removeEmptyBlocks(proc: Procedure) : Unit = {
   }
 }
 
-def removeEmptyBlocks(p: Program) : Unit = {
+def removeEmptyBlocks(p: Program): Unit = {
   for (proc <- p.procedures) {
     removeEmptyBlocks(proc)
   }
@@ -753,7 +777,7 @@ def coalesceBlocksCrossBranchDependency(p: Program): Boolean = {
   candidate.nonEmpty
 }
 
-def coalesceBlocks(proc: Procedure) : Boolean = {
+def coalesceBlocks(proc: Procedure): Boolean = {
   var didAny = false
   val blocks = proc.blocks.toList
   for (b <- blocks.sortBy(_.rpoOrder)) {
@@ -792,7 +816,6 @@ def coalesceBlocks(proc: Procedure) : Boolean = {
   }
   didAny
 }
-
 
 def coalesceBlocks(p: Program): Boolean = {
   var didAny = false
@@ -1403,6 +1426,7 @@ class Substitute(val res: Variable => Option[Expr], val recurse: Boolean = true,
     extends CILVisitor {
   var madeAnyChange = false
   var complexity = 0
+  var seen = Map[Variable, Variable]()
 
   override def vexpr(e: Expr) = {
     e match {
