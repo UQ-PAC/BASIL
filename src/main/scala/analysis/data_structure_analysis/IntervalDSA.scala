@@ -615,7 +615,6 @@ class IntervalGraph(
       Logger.debug(s"merged $cell1 with itself")
       cell1
     else if cell1.node.equals(cell2.node) then
-      println(s"hit this case in $proc")
       Logger.debug(s"collapsed $cell1 and $cell2")
       val res = cell1.node.collapse()
       Logger.debug(s"collapsed $cell1 and $cell2")
