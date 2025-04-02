@@ -692,7 +692,26 @@ object RunUtils {
     }
   }
 
+  def simpPreprocess(program: Program) = {
+    for (p <- program.procedures) {
+      p.normaliseBlockNames()
+    }
+    val foundLoops = LoopDetector.identify_loops(program)
+    val newLoops = foundLoops.reducibleTransformIR()
+    newLoops.updateIrWithLoops()
+    program.sortProceduresRPO()
+    transforms.removeEmptyBlocks(program)
+    transforms.coalesceBlocks(program)
+    transforms.removeEmptyBlocks(program)
+  }
+
   def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]): Unit = {
+    val program = ctx.program
+    simpPreprocess(program)
+    transforms.validatedSimplifyPipeline(program)
+  }
+
+  def doSimplifyOld(ctx: IRContext, config: Option[StaticAnalysisConfig]): Unit = {
     // writeToFile(dotBlockGraph(program, program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
     Logger.info("[!] Running Simplify")
     val timer = PerformanceTimer("Simplify")
@@ -742,21 +761,21 @@ object RunUtils {
     // val copyPropBoogieFile = BoogieTranslator.translateProg(cpValidate).toString
     // DebugDumpIRLogger.writeToFile(File("copyprop-translation-validate.bpl"), copyPropBoogieFile)
 
-    //val procName = program.mainProcedure.procName + "_seq_" + program.mainProcedure.name
-    //val vres = util.boogie_interaction.boogieBatchQuery(copyPropBoogieFile, Some(procName))
-    //if (vres) {
+    // val procName = program.mainProcedure.procName + "_seq_" + program.mainProcedure.name
+    // val vres = util.boogie_interaction.boogieBatchQuery(copyPropBoogieFile, Some(procName))
+    // if (vres) {
     //  Logger.info(s"Translation validated main procedure: $procName ")
-    //}
+    // }
 
-    //DebugDumpIRLogger.writeToFile(File("tvalidation-copyprop.il"), pp_prog(cpValidate))
+    // DebugDumpIRLogger.writeToFile(File("tvalidation-copyprop.il"), pp_prog(cpValidate))
 
-    //if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
+    // if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
     //  val dir = File("./graphs/")
     //  if (!dir.exists()) then dir.mkdirs()
     //  for (p <- cpValidate.procedures) {
     //    DebugDumpIRLogger.writeToFile(File(s"graphs/dsav-${p.name}-after-simp.dot"), dotBlockGraph(p))
     //  }
-    //}
+    // }
 
     transforms.inlinePLTLaunchpad(ctx.program)
 

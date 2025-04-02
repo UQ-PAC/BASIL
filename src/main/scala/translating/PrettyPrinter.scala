@@ -397,12 +397,17 @@ class BasilIRPrettyPrinter(
 
   override def vindirect(target: PPProg[Variable]): PPProg[IndirectCall] = BST(s"indirect call ${target} ")
   override def vassert(body: Assert): PPProg[Assert] = {
-    val comment = body.comment.map(c => s" /* $c */").getOrElse("")
-    BST(s"assert ${vexpr(body.body)}$comment")
+    BST(s"assert ${vexpr(body.body)}")
   }
+
+  override def vstmt(s: Statement) = {
+    val comment = s.comment.map(c => s" /* $c */").getOrElse("")
+    val res = super.vstmt(s).toString
+    BST(res + comment)
+  }
+
   override def vassume(body: Assume): PPProg[Assume] = {
-    val comment = body.comment.map(c => s" /* $c */").getOrElse("")
-    BST(s"assume ${vexpr(body.body)}$comment")
+    BST(s"assume ${vexpr(body.body)}")
   }
   override def vnop(): PPProg[NOP] = BST("nop")
 
@@ -417,6 +422,7 @@ class BasilIRPrettyPrinter(
     case IntType => "nat"
     case BoolType => "bool"
     case m: MapType => s"map ${vtype(m.result)}[${vtype(m.param)}]"
+    case CustomSort(n) => n
   }
 
   override def vrvar(e: Variable): PPProg[Variable] = BST(s"${e.name}:${vtype(e.getType)}")

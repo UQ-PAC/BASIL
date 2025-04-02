@@ -23,7 +23,7 @@ trait BDeclaration extends HasAttributes {
   }
 }
 
-case class BTypeDecl(t : CustomBType) extends BDeclaration {
+case class BTypeDecl(t: CustomBType) extends BDeclaration {
   override def toString() = s"type $t;"
 }
 
