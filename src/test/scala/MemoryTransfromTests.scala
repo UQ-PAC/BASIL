@@ -89,8 +89,8 @@ class MemoryTransfromTests extends AnyFunSuite {
     val x = SpecGlobal("x", 64, None, xAddress.value)
     val globals = Set(x)
 
-    val store1 = MemoryStore(mem, xAddress, BitVecLiteral(10000, 64), Endian.LittleEndian, 64, Some("001"))
-    val store2 = MemoryStore(mem, xAddress, BitVecLiteral(40000, 64), Endian.LittleEndian, 64, Some("002"))
+    val store1 = MemoryStore(mem, xAddress, BitVecLiteral(10, 64), Endian.LittleEndian, 64, Some("001"))
+    val store2 = MemoryStore(mem, xAddress, BitVecLiteral(20, 64), Endian.LittleEndian, 64, Some("002"))
 
     val program = prog(
       proc(
@@ -373,7 +373,6 @@ class MemoryTransfromTests extends AnyFunSuite {
     assert(sca.size == 1)
   }
 
-
   test("Multi region mixed pointer") {
     val mem = SharedMemory("mem", 64, 8)
     val R0 = Register("R0", 64)
@@ -406,7 +405,6 @@ class MemoryTransfromTests extends AnyFunSuite {
           ret(("R0", R0))
         )
       ),
-
       proc(
         "callee",
         Set(("R0", irType), ("R1", irType)),
@@ -422,7 +420,7 @@ class MemoryTransfromTests extends AnyFunSuite {
       )
     )
 
-    val context = programToContext(program,globals)
+    val context = programToContext(program, globals)
     val results = runTest(context)
   }
 }
