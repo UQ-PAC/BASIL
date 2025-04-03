@@ -325,8 +325,6 @@ class MemoryTransfromTests extends AnyFunSuite {
     val R31 = Register("R31", 64)
     val xAddress = BitVecLiteral(2000, 64)
     val yAddress = BitVecLiteral(3000, 64)
-    val xPointer = BitVecLiteral(1000, 64)
-    val globalOffsets = Map(xPointer.value -> xAddress.value)
     val x = SpecGlobal("x", 64, None, xAddress.value)
     val y = SpecGlobal("y", 64, None, yAddress.value)
     val globals = Set(x, y)
@@ -360,7 +358,7 @@ class MemoryTransfromTests extends AnyFunSuite {
       )
     )
 
-    val context = programToContext(program)
+    val context = programToContext(program, globals)
     val results = runTest(context)
     val loads = results.ir.program.collect { case la: MemoryLoad => la }
     val globalStores = results.ir.program.collect { case i: MemoryStore if i.index.isInstanceOf[BitVecLiteral] => i }
@@ -373,5 +371,58 @@ class MemoryTransfromTests extends AnyFunSuite {
     assert(stackStores.size == 1)
     assert(ma.size == 1)
     assert(sca.size == 1)
+  }
+
+
+  test("Multi region mixed pointer") {
+    val mem = SharedMemory("mem", 64, 8)
+    val R0 = Register("R0", 64)
+    val R1 = Register("R1", 64)
+    val R2 = Register("R2", 64)
+    val R31 = Register("R31", 64)
+    val xAddress = BitVecLiteral(2000, 64)
+    val yAddress = BitVecLiteral(3000, 64)
+    val zAddress = BitVecLiteral(4000, 64)
+    val gAddress = BitVecLiteral(5000, 64)
+    val x = SpecGlobal("x", 64, None, xAddress.value)
+    val y = SpecGlobal("y", 64, None, yAddress.value)
+    val z = SpecGlobal("z", 64, None, zAddress.value)
+    val g = SpecGlobal("g", 64, None, gAddress.value)
+    val globals = Set(x, y, z, g)
+    val irType = BitVecType(64)
+
+    // some regions have unique pointers (Callee R31 + 10, Global y) and other don't
+    val program = prog(
+      proc(
+        "main",
+        Set(("R0", irType), ("R1", irType), ("R2", irType)),
+        Set(("R0", irType)),
+        block(
+          "m",
+          LocalAssign(R0, zAddress),
+          MemoryStore(mem, xAddress, R0, Endian.LittleEndian, 64, Some("00")),
+          MemoryStore(mem, yAddress, gAddress, LittleEndian, 64, Some("01")),
+          directCall(Set(("R0", R0)), "callee", Set(("R0", R0), ("R1", R1))),
+          ret(("R0", R0))
+        )
+      ),
+
+      proc(
+        "callee",
+        Set(("R0", irType), ("R1", irType)),
+        Set(("R0", irType)),
+        block(
+          "b",
+          MemoryStore(mem, R31, R0, LittleEndian, 64, Some("02")),
+          MemoryStore(mem, BinaryExpr(BVADD, R31, BitVecLiteral(10, 64)), gAddress, LittleEndian, 64, Some("03")),
+          MemoryStore(mem, BinaryExpr(BVADD, R31, BitVecLiteral(20, 64)), R1, LittleEndian, 64, Some("04")),
+          MemoryLoad(R0, mem, R31, LittleEndian, 64, Some("05")),
+          ret(("R0", R0))
+        )
+      )
+    )
+
+    val context = programToContext(program,globals)
+    val results = runTest(context)
   }
 }
