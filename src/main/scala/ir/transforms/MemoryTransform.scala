@@ -1,6 +1,6 @@
 package ir.transforms
 
-import analysis.data_structure_analysis.{DSFlag, IntervalCell, IntervalDSA, IntervalGraph, IntervalNode, isPlaceHolder}
+import analysis.data_structure_analysis.{DSFlag, Global, IntervalCell, IntervalDSA, IntervalGraph, IntervalNode, isPlaceHolder}
 import ir.cilvisitor.{CILVisitor, ChangeTo, DoChildren, SkipChildren, VisitAction}
 import ir.*
 
@@ -36,24 +36,33 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
     cellMapping.toMap
   }
 
+  private def getCorrespondingGlobals(cell: IntervalCell) = {
+    if cell.node.flags.global then
+      dsa.values.map(g => g.find(g.nodes(Global)).get(cell.interval)).toSet
+    else
+      Set.empty
+  }
+
+
   def hasUniquePointer(cell: IntervalCell): Boolean = {
     val proc = cell.node.graph.proc
     revEdges(proc).get(cell) match
       case Some(value) if value.size > 1 => false
-      case Some(value) if interProcCells.contains(cell) =>
-        var seenPointers = value
+      case v @ _ if interProcCells.contains(cell) ||  getCorrespondingGlobals(cell).size > 1=>
+        var seenPointers = v.getOrElse(Set.empty)
         var seenCells = Set(cell)
-        var num = value.size
-        val queue = mutable.Queue().enqueueAll(interProcCells(cell))
-        while queue.nonEmpty && num <= 1 do
+        val queue = mutable.Queue().enqueueAll(interProcCells.getOrElse(cell, Set.empty))
+        queue.enqueueAll(getCorrespondingGlobals(cell).diff(seenCells))
+        while queue.nonEmpty && seenPointers.size <= 1 do
           val eq = queue.dequeue()
+          seenCells += cell
           val pointers = revEdges(eq.node.graph.proc)
             .getOrElse(eq, Set.empty)
             .diff(seenPointers)
             .filterNot(p => interProcCells.getOrElse(p, Set.empty).exists(seenPointers.contains))
-          num += pointers.size
+          seenPointers = seenPointers.union(pointers)
 
-        num <= 1
+        seenPointers.size <= 1
       case _ => true
 
   }
