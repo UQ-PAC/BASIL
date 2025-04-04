@@ -332,6 +332,13 @@ class BasilIRPrettyPrinter(
 
   override def vassign(lhs: PPProg[Variable], rhs: PPProg[Expr]): PPProg[LocalAssign] = BST(s"${lhs} := ${rhs}")
   override def vmemassign(lhs: PPProg[Variable], rhs: PPProg[Expr]): PPProg[LocalAssign] = BST(s"${lhs} mem:= ${rhs}")
+  override def vsimulassign(assignments: List[(PPProg[Variable], PPProg[Expr])]): PPProg[SimulAssign] = BST(
+    assignments
+      .map { case (l, r) =>
+        vassign(l, r)
+      }
+      .mkString(", ")
+  )
 
   override def vstore(
     mem: String,

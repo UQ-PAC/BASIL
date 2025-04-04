@@ -16,6 +16,13 @@ abstract class Visitor {
     node
   }
 
+  def visitSimulAssign(node: SimulAssign): Statement = {
+    node.assignments = node.assignments.map { case (l, r) =>
+      (visitVariable(l), visitExpr(r))
+    }.toMap
+    node
+  }
+
   def visitLocalAssign(node: LocalAssign): Statement = {
     node.lhs = visitVariable(node.lhs)
     node.rhs = visitExpr(node.rhs)

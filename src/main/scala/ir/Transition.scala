@@ -31,6 +31,16 @@ class NamespaceState(namespace: String) extends CILVisitor {
     DoChildren()
   }
 
+  override def vexpr(e: Expr) = e match {
+    case f @ UninterpretedFunction(n, p, r) if n.startsWith("load") =>
+      ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
+    case f @ UninterpretedFunction(n, p, r) if n.startsWith("trace_load") =>
+      ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
+    case f @ UninterpretedFunction(n, p, r) if n.startsWith("store") =>
+      ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
+    case _ => DoChildren()
+  }
+
   override def vlvar(v: Variable) = v match {
     case l: LocalVar => ChangeTo(l.copy(varName = namespace + "__" + l.varName))
     case l: Register => ChangeTo(l.copy(name = namespace + "__" + l.name))
@@ -55,20 +65,47 @@ val traceVar = {
   GlobalVar("TRACE", traceType)
 }
 
-class RewriteSideEffects extends CILVisitor {
+class RewriteSideEffects() extends CILVisitor {
 
   def loadFunc(lhs: Variable, size: Int, addr: Expr) = {
-    val loadValue = LocalAssign(lhs, UninterpretedFunction("load_" + size, Seq(traceVar, addr), BitVecType(size)))
-    val trace = LocalAssign(traceVar, UninterpretedFunction("trace_load_" + size, Seq(traceVar, addr), traceType))
+    val loadValue =
+      LocalAssign(lhs, UninterpretedFunction("load_" + size, Seq(traceVar, addr), BitVecType(size)))
+    val trace =
+      LocalAssign(traceVar, UninterpretedFunction("trace_load_" + size, Seq(traceVar, addr), traceType))
     List(loadValue, trace)
   }
 
   def storeFunc(size: Int, addr: Expr, value: Expr) =
     LocalAssign(traceVar, UninterpretedFunction("store_" + size, Seq(traceVar, addr, value: Expr), traceType))
 
+  def directCallFunc(m: DirectCall) = {
+    val trace =
+      LocalAssign(
+        traceVar,
+        UninterpretedFunction("Call_" + m.target.name, traceVar :: m.actualParams.map(_._2).toList, traceType)
+      )
+    val outParams = m.outParams
+      .map(p =>
+        LocalAssign(
+          p._2,
+          UninterpretedFunction(
+            "Call_" + m.target.name + "_" + p._1.name,
+            traceVar :: m.actualParams.map(_._2).toList,
+            p._2.getType
+          )
+        )
+      )
+      .toList
+
+    trace :: outParams
+  }
+
   override def vstmt(s: Statement) = s match {
     case m: MemoryLoad => ChangeTo(loadFunc(m.lhs, m.size, m.index))
     case m: MemoryStore => ChangeTo(List(storeFunc(m.size, m.index, m.value)))
+    case m: IndirectCall =>
+      ChangeTo(List(LocalAssign(traceVar, UninterpretedFunction("indirCall", traceVar :: m.target :: Nil, traceType))))
+    case m: DirectCall => ChangeTo(directCallFunc(m))
     case _ => SkipChildren()
 
   }
@@ -100,7 +137,7 @@ object PCMan {
 
 import PCMan.*
 
-def procToTransition(p: Procedure, loops: List[Loop], cutJoins: Boolean = false) = {
+def procToTransition(p: Procedure, loops: List[Loop], cutJoins: Boolean = true) = {
 
   val pcVar = transitionSystemPCVar
   var cutPoints = Map[String, Block]()
@@ -167,11 +204,14 @@ def procToTransition(p: Procedure, loops: List[Loop], cutJoins: Boolean = false)
   var joinCount = 0
   if (cutJoins) {
 
-    val cuts = p.blocks.filter(c =>
-      c.prevBlocks.size > 1
-        && c.prevBlocks.flatMap(_.nextBlocks).forall(_ == c)
-        && !p.returnBlock.contains(c) && !p.entryBlock.contains(c)
-    ).toList.sortBy(_.label)
+    val cuts = p.blocks
+      .filter(c =>
+        c.prevBlocks.size > 1
+          && c.prevBlocks.flatMap(_.nextBlocks).forall(_ == c)
+          && !p.returnBlock.contains(c) && !p.entryBlock.contains(c)
+      )
+      .toList
+      .sortBy(_.label)
 
     for (c <- cuts) {
       var incCount = 1
@@ -297,6 +337,8 @@ class TranslationValidator {
 
   var beforeProg: Option[Program] = None
   var liveBefore = Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])]()
+  // proc -> block -> absdom
+  var reachingDefsBefore = Map[String, (Map[String, Map[Variable, Set[Assign]]])]()
 
   var afterProg: Option[Program] = None
   var liveAfter = Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])]()
@@ -309,6 +351,8 @@ class TranslationValidator {
   val beforeRenamer = NamespaceState("target")
   val afterRenamer = NamespaceState("source")
 
+  def exprInSource(v: Expr) = visit_expr(afterRenamer, v)
+  def exprInTarget(v: Expr) = visit_expr(beforeRenamer, v)
   def varInSource(v: Variable) = visit_rvar(afterRenamer, v)
   def varInTarget(v: Variable) = visit_rvar(beforeRenamer, v)
 
@@ -405,10 +449,19 @@ class TranslationValidator {
 
   val traceInv = BinaryExpr(BoolEQ, visit_rvar(beforeRenamer, traceVar), visit_rvar(afterRenamer, traceVar))
 
+  def reachingDefs(p: Procedure) = {
+    val (beforeLive, afterLive) = transforms.getLiveVars(p)
+    val dom = transforms.DefUseDomain(beforeLive)
+    val solver = transforms.worklistSolver(dom)
+    val (beforeRes, afterRes) = solver.solveProc(p)
+    beforeRes.map((k, v) => k.label -> v)
+  }
+
   def setTargetProg(p: Program) = {
     initProg = Some(p)
     val (prog, cuts) = toTransitionSystem(p)
     liveBefore = p.procedures.map(p => p.name -> transforms.getLiveVars(p)).toMap
+    reachingDefsBefore = p.procedures.map(p => p.name -> reachingDefs(p)).toMap
     beforeProg = Some(prog)
     beforeCuts = cuts
   }
@@ -419,8 +472,42 @@ class TranslationValidator {
     afterCuts = cuts
   }
 
+  def addInvariant(p: String, l: List[(Expr, Option[String])]) = {
+    invariants(p) = invariants(p) ++ l
+  }
+
   def setInvariant(p: String, l: List[(Expr, Option[String])]) = {
     invariants(p) = l
+  }
+
+  def addRDInvariant() = {
+    beforeCuts
+      .filter((proc, _) => reachingDefsBefore.contains(proc.name))
+      .foreach((proc, cuts) =>
+        cuts.foreach {
+          case (label, block) => {
+            val rd = reachingDefsBefore(proc.name)(block.label)
+            val inv = rd.toSeq.flatMap { case (v, assigns) =>
+              assigns.collect {
+                case LocalAssign(lhs, rhs, _) => v -> rhs
+                case s: SimulAssign =>
+                  s.assignments.collect {
+                    case (l, r) if l == v => l -> r
+                  }.head
+              }
+            }
+            val preds = inv.map { case (v, defin) =>
+              polyEqual(v, defin)
+            }
+            if (preds.nonEmpty) {
+              val pred = preds.reduce((l, r) => BinaryExpr(BoolAND, l, r))
+              val guarded =
+                exprInTarget(BinaryExpr(BoolIMPLIES, BinaryExpr(IntEQ, transitionSystemPCVar, PCSym(label)), pred))
+              addInvariant(proc.name, List((guarded, Some(s"Reaching Defs $label"))))
+            }
+          }
+        }
+      )
   }
 
   def getValidationProg = {
@@ -444,8 +531,8 @@ class TranslationValidator {
     }
 
     // TODO: fix when implementing calls
-    val interesting = validationProcs(afterProg.get.mainProcedure.name)
-    afterProg.get.procedures = ArrayBuffer(interesting)
+    val interesting = validationProcs.map(_._2)
+    afterProg.get.procedures = ArrayBuffer.from(interesting)
 
     afterProg.get
   }

@@ -33,46 +33,55 @@ object BoogieTranslator {
 
   def translateExpr(e: Expr): BExpr = e.toBoogie
 
-  def slToBoogie(e: List[Statement]) = e.map(translateStatement)
+  def slToBoogie(e: List[Statement]) = e.flatMap(translateStatement)
 
   def captureStateStatement(stateName: String): BAssume = {
     BAssume(TrueBLiteral, None, List(BAttribute("captureState", Some(s"\"$stateName\""))))
   }
 
-  def translateStatement(s: Statement): BCmd = s match {
-    case m: NOP => BAssume(TrueBLiteral, Some("NOP"))
+  def translateStatement(s: Statement): Iterable[BCmd] = s match {
+    case m: NOP => Seq()
+    case m: SimulAssign if m.assignments.isEmpty => Seq()
+    case m: SimulAssign => {
+      val a = m.assignments
+      val lhs = a.map(_._1).map(translateVar).toList
+      val rhs = a.map(_._2).map(translateExpr).toList
+      Seq(AssignCmd(lhs, rhs))
+    }
     case l: LocalAssign =>
       val lhs: BVar = translateVar(l.lhs)
       val rhs = translateExpr(l.rhs)
-      AssignCmd(List(lhs), List(rhs))
+      Seq(AssignCmd(List(lhs), List(rhs)))
     case l: MemoryAssign =>
       val lhs: BVar = translateVar(l.lhs)
       val rhs = translateExpr(l.rhs)
-      AssignCmd(List(lhs), List(rhs))
+      Seq(AssignCmd(List(lhs), List(rhs)))
     case a: Assert =>
       val body = translateExpr(a.body)
-      BAssert(body, a.comment)
+      Seq(BAssert(body, a.comment))
     case a: Assume =>
       val body = translateExpr(a.body)
-      BAssume(body, a.comment)
+      Seq(BAssume(body, a.comment))
     case m: MemoryStore =>
       val lhs = m.mem.toBoogie
       val rhs = BMemoryStore(m.mem.toBoogie, m.index.toBoogie, m.value.toBoogie, m.endian, m.size)
       val store = AssignCmd(List(lhs), List(rhs))
-      store
+      Seq(store)
     case m: MemoryLoad =>
       val lhs = m.lhs.toBoogie
       val rhs = BMemoryLoad(m.mem.toBoogie, m.index.toBoogie, m.endian, m.size)
       val assign = AssignCmd(List(lhs), List(rhs))
       // add rely call if is a non-stack load
-      assign
+      Seq(assign)
     case d: DirectCall =>
-      BProcedureCall(
-        d.target.name,
-        d.outParams.values.toSeq.map(_.toBoogie),
-        d.actualParams.values.toSeq.map(_.toBoogie)
+      Seq(
+        BProcedureCall(
+          d.target.name,
+          d.outParams.values.toSeq.map(_.toBoogie),
+          d.actualParams.values.toSeq.map(_.toBoogie)
+        )
       )
-    case f: IndirectCall => BAssert(FalseBLiteral, Some("IndirectCall" + f.target.toString))
+    case f: IndirectCall => Seq(BAssert(FalseBLiteral, Some("IndirectCall" + f.target.toString)))
   }
 
   def translateJump(j: Jump): List[BCmd] = {
