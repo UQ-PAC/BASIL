@@ -3,10 +3,13 @@ package ir.transforms
 import analysis.data_structure_analysis.*
 import ir.cilvisitor.{CILVisitor, ChangeTo, DoChildren, SkipChildren, VisitAction}
 import ir.*
+import util.Counter
 
 import scala.collection.mutable
 
 class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
+  val counter: Counter = Counter()
+  val regions: mutable.Map[String, String] = mutable.Map()
   val revEdges: Map[Procedure, Map[IntervalCell, Set[IntervalCell]]] = Map.empty
 //    dsa.map((proc, graph) => (proc, IntervalDSA.getPointers(graph)))
   val interProcCells: Map[IntervalCell, Set[IntervalCell]] = Map.empty // computeRelations()
@@ -92,15 +95,16 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
             assert(indices.map(_.getPointee).toSet.size == 1, s"$proc, ${indices.map(_.getPointee).size}, $load")
             assert(indices.size == 1, indices)
             val index = indices.head
-            val flag = joinFlags(indices)
-            val value = indices.map(_.getPointee).head
-            val varName = cellsToName(indices: _*)
+            val flag = index.node.flags
+            val value = index.getPointee
+            val varName = cellsToName(index)
 
             if isGlobal(flag) then ChangeTo(List(LocalAssign(load.lhs, Register(varName, load.size), load.label)))
             else if isLocal(flag) && !flag.escapes then
               ChangeTo(List(LocalAssign(load.lhs, LocalVar(varName, load.lhs.getType), load.label)))
             else if !flag.escapes then
-              val newMem = SharedMemory(cellsToName(index), value.interval.size.getOrElse(0), load.mem.valueSize)
+              val memName = regions.getOrElseUpdate(varName, s"mem_${counter.next()}")
+              val newMem = SharedMemory(memName, value.interval.size.getOrElse(0), load.mem.valueSize)
               val newLoad = MemoryLoad(load.lhs, newMem, load.index, load.endian, load.size, load.label)
               ChangeTo(List(newLoad))
             else SkipChildren()
@@ -112,14 +116,15 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
             assert(indices.map(_.getPointee).toSet.size == 1)
             assert(indices.size == 1, indices)
             val index = indices.head
-            val flag = joinFlags(indices)
-            val content = indices.map(_.getPointee).head
-            val varName = cellsToName(indices: _*)
+            val flag = index.node.flags
+            val content = index.getPointee
+            val varName = cellsToName(index)
             if isGlobal(flag) then ChangeTo(List(MemoryAssign(Register(varName, store.size), store.value, store.label)))
             else if isLocal(flag) && !flag.escapes then
               ChangeTo(List(LocalAssign(LocalVar(varName, store.value.getType), store.value, store.label, false)))
             else if !flag.escapes then
-              val newMem = SharedMemory(cellsToName(index), content.interval.size.getOrElse(0), store.mem.valueSize)
+              val memName = regions.getOrElseUpdate(varName, s"mem_${counter.next()}")
+              val newMem = SharedMemory(memName, content.interval.size.getOrElse(0), store.mem.valueSize)
               val newStore = MemoryStore(newMem, store.index, store.value, store.endian, store.size, store.label)
               ChangeTo(List(newStore))
             else // ignore the case where the address escapes
