@@ -90,35 +90,42 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
           val indices = dsa(proc).exprToCells(load.index).map(dsa(proc).get).toSeq
           if indices.nonEmpty && indices.forall(_.hasPointee) then {
             assert(indices.map(_.getPointee).toSet.size == 1, s"$proc, ${indices.map(_.getPointee).size}, $load")
+            assert(indices.size == 1, indices)
+            val index = indices.head
             val flag = joinFlags(indices)
             val value = indices.map(_.getPointee).head
             val varName = cellsToName(indices: _*)
 
-            if isGlobal(flag) && hasUniquePointer(value) then
+            if isGlobal(flag) then
               ChangeTo(List(LocalAssign(load.lhs, Register(varName, load.size), load.label)))
-            else if isLocal(flag) && hasUniquePointer(value) then
+            else if isLocal(flag) && !flag.escapes then
               ChangeTo(List(LocalAssign(load.lhs, LocalVar(varName, load.lhs.getType), load.label)))
-            else
-              val newMem = SharedMemory(cellsToName(value), value.interval.size.getOrElse(0), load.mem.valueSize)
+            else if !flag.escapes then
+              val newMem = SharedMemory(cellsToName(index), value.interval.size.getOrElse(0), load.mem.valueSize)
               val newLoad = MemoryLoad(load.lhs, newMem, load.index, load.endian, load.size, load.label)
               ChangeTo(List(newLoad))
+            else SkipChildren()
           } else SkipChildren()
 
         case store: MemoryStore =>
           val indices = dsa(proc).exprToCells(store.index).map(dsa(proc).get).toSeq
           if indices.nonEmpty && indices.forall(_.hasPointee) then {
             assert(indices.map(_.getPointee).toSet.size == 1)
+            assert(indices.size == 1, indices)
+            val index = indices.head
             val flag = joinFlags(indices)
             val content = indices.map(_.getPointee).head
             val varName = cellsToName(indices: _*)
-            if isGlobal(flag) && hasUniquePointer(content) then
+            if isGlobal(flag) then
               ChangeTo(List(MemoryAssign(Register(varName, store.size), store.value, store.label)))
-            else if isLocal(flag) && hasUniquePointer(content) then
+            else if isLocal(flag) && !flag.escapes then
               ChangeTo(List(LocalAssign(LocalVar(varName, store.value.getType), store.value, store.label, false)))
-            else
-              val newMem = SharedMemory(cellsToName(content), content.interval.size.getOrElse(0), store.mem.valueSize)
+            else if !flag.escapes then
+              val newMem = SharedMemory(cellsToName(index), content.interval.size.getOrElse(0), store.mem.valueSize)
               val newStore = MemoryStore(newMem, store.index, store.value, store.endian, store.size, store.label)
               ChangeTo(List(newStore))
+            else // ignore the case where the address escapes
+              SkipChildren()
           } else SkipChildren()
         case _ => SkipChildren()
     else SkipChildren()
