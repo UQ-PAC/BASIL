@@ -166,6 +166,16 @@ class CILVisitorImpl(val v: CILVisitor) {
         m.rhs = visit_expr(m.rhs)
         m.lhs = visit_lvar(m.lhs)
         m
+      case m: SimulAssign => {
+        var changed = false
+        val ns = m.assignments.map { case (lhs, rhs) =>
+          val (nl, nr) = (visit_lvar(lhs), visit_expr(rhs))
+          changed = changed || nl != lhs || nr != rhs
+          (nl, nr)
+        }
+        if changed then m.assignments = ns.toMap
+        m
+      }
       case s: Assert =>
         s.body = visit_expr(s.body)
         s

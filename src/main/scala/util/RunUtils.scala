@@ -707,15 +707,20 @@ object RunUtils {
   }
 
   def simpPreprocess(program: Program) = {
+    println("loops")
+    val foundLoops = LoopDetector.identify_loops(program)
+    foundLoops.updateIrWithLoops()
     for (p <- program.procedures) {
       p.normaliseBlockNames()
     }
-    val foundLoops = LoopDetector.identify_loops(program)
-    val newLoops = foundLoops.reducibleTransformIR()
-    newLoops.updateIrWithLoops()
+    transforms.liftSVComp(program)
+    println("rpo")
     program.sortProceduresRPO()
+    println("empty")
     transforms.removeEmptyBlocks(program)
+    println("coalesce")
     transforms.coalesceBlocks(program)
+    println("empty")
     transforms.removeEmptyBlocks(program)
   }
 
@@ -760,8 +765,7 @@ object RunUtils {
 
     val ts = transforms.OnePassDSA().applyTransformWithvalidate(program)
     val bplfile = BoogieTranslator.translateProg(ts, "dsa-translation-validate.bpl")
-    DebugDumpIRLogger.writeToFile(File("dsa-translation-validate.bpl"),
-      bplfile.toString)
+    DebugDumpIRLogger.writeToFile(File("dsa-translation-validate.bpl"), bplfile.toString)
 
     transforms.fixupGuards(program)
     transforms.removeDuplicateGuard(program)
