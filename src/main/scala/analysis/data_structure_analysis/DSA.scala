@@ -150,9 +150,9 @@ class DSFlag {
 }
 
 def joinFlags(pointers: Iterable[IntervalCell]): DSFlag = {
-    val flag = DSFlag()
-    pointers.foreach(c => flag.join(c.node.flags))
-    flag
+  val flag = DSFlag()
+  pointers.foreach(c => flag.join(c.node.flags))
+  flag
 }
 
 def computeDSADomain(proc: Procedure, context: IRContext): Set[Procedure] = {

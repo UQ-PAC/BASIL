@@ -9,7 +9,7 @@ import scala.collection.mutable
 class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
   val revEdges: Map[Procedure, Map[IntervalCell, Set[IntervalCell]]] = Map.empty
 //    dsa.map((proc, graph) => (proc, IntervalDSA.getPointers(graph)))
-  val interProcCells: Map[IntervalCell, Set[IntervalCell]]  =  Map.empty // computeRelations()
+  val interProcCells: Map[IntervalCell, Set[IntervalCell]] = Map.empty // computeRelations()
 
   def computeRelations(): Map[IntervalCell, Set[IntervalCell]] = {
     val cellMapping = mutable.Map[IntervalCell, Set[IntervalCell]]()
@@ -96,8 +96,7 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
             val value = indices.map(_.getPointee).head
             val varName = cellsToName(indices: _*)
 
-            if isGlobal(flag) then
-              ChangeTo(List(LocalAssign(load.lhs, Register(varName, load.size), load.label)))
+            if isGlobal(flag) then ChangeTo(List(LocalAssign(load.lhs, Register(varName, load.size), load.label)))
             else if isLocal(flag) && !flag.escapes then
               ChangeTo(List(LocalAssign(load.lhs, LocalVar(varName, load.lhs.getType), load.label)))
             else if !flag.escapes then
@@ -116,8 +115,7 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
             val flag = joinFlags(indices)
             val content = indices.map(_.getPointee).head
             val varName = cellsToName(indices: _*)
-            if isGlobal(flag) then
-              ChangeTo(List(MemoryAssign(Register(varName, store.size), store.value, store.label)))
+            if isGlobal(flag) then ChangeTo(List(MemoryAssign(Register(varName, store.size), store.value, store.label)))
             else if isLocal(flag) && !flag.escapes then
               ChangeTo(List(LocalAssign(LocalVar(varName, store.value.getType), store.value, store.label, false)))
             else if !flag.escapes then
