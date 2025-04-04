@@ -621,7 +621,7 @@ def validate(validationProg: Program, procName: String, name: String, timeout: I
     }
   }
 
-  val vres = util.boogie_interaction.boogieBatchQuery(boogieFileName, Some(procName), timeout)
+  val vres = util.boogie_interaction.boogieBatchQuery(List(boogieFileName, "axioms.bpl"), Some(procName), timeout)
   // assert(vres)
   vres
 
