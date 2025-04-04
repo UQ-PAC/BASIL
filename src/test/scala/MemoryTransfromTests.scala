@@ -238,10 +238,11 @@ class MemoryTransfromTests extends AnyFunSuite {
     val globals = Set(x, y)
     val irType = BitVecType(64)
 
-
     val program = prog(
-      proc("main",
-        block("b",
+      proc(
+        "main",
+        block(
+          "b",
           MemoryStore(mem, xAddress, yAddress, Endian.LittleEndian, 64, Some("00")),
           MemoryStore(mem, xAddress, R31, LittleEndian, 64, Some("01")),
           MemoryLoad(R0, mem, xAddress, LittleEndian, 64, Some("02")),
@@ -254,7 +255,7 @@ class MemoryTransfromTests extends AnyFunSuite {
     val results = runTest(context)
 
     val loads = results.ir.program.collect { case la: MemoryLoad => la }
-    val stores = results.ir.program.collect {case m: MemoryStore => m}
+    val stores = results.ir.program.collect { case m: MemoryStore => m }
     assert(stores.size == 2)
     assert(loads.size == 1)
     val load = loads.head
@@ -263,7 +264,6 @@ class MemoryTransfromTests extends AnyFunSuite {
     assert(stores.forall(_.mem == newMem))
 
   }
-
 
   test("escaped in-param") {
     val mem = SharedMemory("mem", 64, 8)
@@ -286,14 +286,14 @@ class MemoryTransfromTests extends AnyFunSuite {
           MemoryLoad(R1, mem, R0, LittleEndian, 64, Some("01")),
           ret(("R1", R1))
         )
-      ),
+      )
     )
 
     val context = programToContext(program)
     val results = runTest(context)
 
-    val load = results.ir.program.collect { case la: MemoryLoad => la}.head
-    val store = results.ir.program.collect {case m: MemoryStore => m}.head
+    val load = results.ir.program.collect { case la: MemoryLoad => la }.head
+    val store = results.ir.program.collect { case m: MemoryStore => m }.head
     assert(load.mem == mem)
     assert(store.mem == mem)
   }
@@ -313,11 +313,7 @@ class MemoryTransfromTests extends AnyFunSuite {
         "main",
         Set(("R0", irType)),
         Set(("R1", irType)),
-        block(
-          "a",
-          directCall(Set(("R1", R0)), "callee", Set(("R0", R0))),
-          goto("b")
-        ),
+        block("a", directCall(Set(("R1", R0)), "callee", Set(("R0", R0))), goto("b")),
         block(
           "b",
           MemoryStore(mem, R1, xAddress, LittleEndian, 64, Some("00")),
@@ -329,19 +325,15 @@ class MemoryTransfromTests extends AnyFunSuite {
         "callee",
         Set(("R0", irType)),
         Set(("R1", irType)),
-        block(
-          "c",
-          MemoryLoad(R1, mem, R0, LittleEndian, 64, Some("01")),
-          ret(("R1", R0))
-        )
-      ),
+        block("c", MemoryLoad(R1, mem, R0, LittleEndian, 64, Some("01")), ret(("R1", R0)))
+      )
     )
 
     val context = programToContext(program)
     val results = runTest(context)
 
-    val load = results.ir.program.mainProcedure.collect { case la: MemoryLoad => la}.head
-    val store = results.ir.program.mainProcedure.collect {case m: MemoryStore => m}.head
+    val load = results.ir.program.mainProcedure.collect { case la: MemoryLoad => la }.head
+    val store = results.ir.program.mainProcedure.collect { case m: MemoryStore => m }.head
     assert(load.mem == mem)
     assert(store.mem == mem)
   }
@@ -361,28 +353,20 @@ class MemoryTransfromTests extends AnyFunSuite {
         "main",
         Set(("R0", irType)),
         Set(),
+        block("a", directCall(Set(("R0", R0)), "malloc", Set(("R0", R0)), Some("heap1")), goto("b")),
         block(
-          "a",
-          directCall(Set(("R0", R0)), "malloc", Set(("R0", R0)), Some("heap1")),
-          goto("b")
-        ),
-        block("b",
+          "b",
           MemoryStore(mem, R0, xAddress, LittleEndian, 64, Some("01")),
           directCall(Set(("R0", R0)), "malloc", Set(("R0", R0)), Some("heap2")),
           goto("c")
         ),
-        block("c",
-          MemoryStore(mem, R0, xAddress, LittleEndian, 64, Some("02")),
-          ret
-        )
+        block("c", MemoryStore(mem, R0, xAddress, LittleEndian, 64, Some("02")), ret)
       ),
       proc(
         "malloc",
         Set(("R0", BitVecType(64))),
         Set(("R0", BitVecType(64))),
-        block("malloc_b",
-          MemoryLoad(R0, mem, R0, LittleEndian, 64, None),
-          ret(("R0", R0)))
+        block("malloc_b", MemoryLoad(R0, mem, R0, LittleEndian, 64, None), ret(("R0", R0)))
       )
     )
 
@@ -390,7 +374,7 @@ class MemoryTransfromTests extends AnyFunSuite {
     val context = programToContext(program)
     val results = runTest(context)
 
-    val stores = results.ir.program.mainProcedure.collect {case m: MemoryStore => m}
+    val stores = results.ir.program.mainProcedure.collect { case m: MemoryStore => m }
     assert(stores.size == 2)
     assert(stores.forall(_.mem != mem))
     assert(stores.map(_.mem).toSet.size == 2)
@@ -412,43 +396,31 @@ class MemoryTransfromTests extends AnyFunSuite {
         "main",
         Set(("R0", irType)),
         Set(),
-        block(
-          "a",
-          directCall(Set(("R0", R0)), "malloc", Set(("R0", R0)), Some("heap1")),
-          goto("b", "c")
-        ),
-        block("b",
-          MemoryStore(mem, xAddress, R0, LittleEndian, 64, Some("01")),
-          directCall("callee1"),
-          goto("d")
-        ),
-        block("c",
-          MemoryStore(mem, xAddress, R0,  LittleEndian, 64, Some("02")),
-          directCall("callee2"),
-          goto("d")
-        ),
-        block("d",
-          ret
-        )
+        block("a", directCall(Set(("R0", R0)), "malloc", Set(("R0", R0)), Some("heap1")), goto("b", "c")),
+        block("b", MemoryStore(mem, xAddress, R0, LittleEndian, 64, Some("01")), directCall("callee1"), goto("d")),
+        block("c", MemoryStore(mem, xAddress, R0, LittleEndian, 64, Some("02")), directCall("callee2"), goto("d")),
+        block("d", ret)
       ),
       proc(
         "malloc",
         Set(("R0", BitVecType(64))),
         Set(("R0", BitVecType(64))),
-        block("malloc_b",
-          MemoryLoad(R0, mem, R0, LittleEndian, 64, None),
-          ret(("R0", R0)))
+        block("malloc_b", MemoryLoad(R0, mem, R0, LittleEndian, 64, None), ret(("R0", R0)))
       ),
-      proc("callee1",
-        block("c1b",
+      proc(
+        "callee1",
+        block(
+          "c1b",
           MemoryLoad(R1, mem, xAddress, LittleEndian, 64, Some("03")),
           MemoryStore(mem, R1, BitVecLiteral(10, 64), LittleEndian, 64, Some("04")),
           LocalAssign(R1, BitVecLiteral(30, 64), Some("07")),
           ret
         )
       ),
-      proc("callee2",
-        block("c2b",
+      proc(
+        "callee2",
+        block(
+          "c2b",
           MemoryLoad(R1, mem, xAddress, LittleEndian, 64, Some("05")),
           MemoryStore(mem, R1, BitVecLiteral(20, 64), LittleEndian, 64, Some("06")),
           LocalAssign(R1, BitVecLiteral(30, 64), Some("08")),
@@ -461,17 +433,16 @@ class MemoryTransfromTests extends AnyFunSuite {
     val context = programToContext(program, globals)
     val results = runTest(context)
 
-    val mainStores = results.ir.program.mainProcedure.collect {case m : MemoryAssign => m}
-    val loads = results.ir.program.collect {case l: LocalAssign if l.rhs.isInstanceOf[Register] => l}
+    val mainStores = results.ir.program.mainProcedure.collect { case m: MemoryAssign => m }
+    val loads = results.ir.program.collect { case l: LocalAssign if l.rhs.isInstanceOf[Register] => l }
     assert(mainStores.map(_.lhs).toSet.size == 1)
     assert(loads.map(_.rhs).toSet.size == 1)
     assert(loads.map(_.rhs).toSet.head == mainStores.map(_.lhs).toSet.head)
-    val callee1Store = results.ir.program.nameToProcedure("callee1").collect {case m : MemoryStore => m}.head
-    val callee2Store = results.ir.program.nameToProcedure("callee2").collect {case m : MemoryStore => m}.head
+    val callee1Store = results.ir.program.nameToProcedure("callee1").collect { case m: MemoryStore => m }.head
+    val callee2Store = results.ir.program.nameToProcedure("callee2").collect { case m: MemoryStore => m }.head
     assert(callee2Store.mem == callee1Store.mem)
     assert(callee1Store.mem != mem)
 
   }
 
-  
 }

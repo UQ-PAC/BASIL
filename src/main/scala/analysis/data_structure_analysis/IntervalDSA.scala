@@ -425,8 +425,8 @@ class IntervalGraph(
         val indices = constraintArgToCells(cons.arg1, ignoreContents = true)
         val indexPointee = constraintArgToCells(cons.arg1)
         val indexFlag = joinFlags(indices)
-        if cons.arg1.value.variables.intersect(proc.formalInParam.filterNot(_.name.startsWith("R31")).toSet).nonEmpty then
-          indices.map(_.node).foreach(_.flags.escapes = true)
+        if cons.arg1.value.variables.intersect(proc.formalInParam.filterNot(_.name.startsWith("R31")).toSet).nonEmpty
+        then indices.map(_.node).foreach(_.flags.escapes = true)
         cons match
           case MemoryReadConstraint(pos) =>
             indices.map(_.node).foreach(_.flags.read = true)
