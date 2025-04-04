@@ -64,12 +64,6 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
 
   }
 
-  def joinFlags(pointers: Iterable[IntervalCell]): DSFlag = {
-    val flag = DSFlag()
-    pointers.foreach(c => flag.join(c.node.flags))
-    flag
-  }
-
   def cellsToName(cells: IntervalCell*): String = {
     cells
       .flatMap(i =>
