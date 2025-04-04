@@ -424,13 +424,15 @@ class IntervalGraph(
         Logger.debug(s"Processing constraint $cons")
         val indices = constraintArgToCells(cons.arg1, ignoreContents = true)
         val indexPointee = constraintArgToCells(cons.arg1)
+        val indexFlag = joinFlags(indices)
         if cons.arg1.value.variables.intersect(proc.formalInParam.filterNot(_.name.startsWith("R31")).toSet).nonEmpty then
           indices.map(_.node).foreach(_.flags.escapes = true)
         cons match
-          case MemoryReadConstraint(pos) => indices.map(_.node).foreach(_.flags.read = true)
+          case MemoryReadConstraint(pos) =>
+            indices.map(_.node).foreach(_.flags.read = true)
+            if indexFlag.heap then indexPointee.map(_.node).foreach(_.flags.escapes = true)
           case MemoryWriteConstraint(pos) =>
             indices.map(_.node).foreach(_.flags.modified = true)
-            val indexFlag = joinFlags(indices)
             if indexFlag.heap then indexPointee.map(_.node).foreach(_.flags.escapes = true)
         val values = constraintArgToCells(cons.arg2)
         val first = if indexPointee.nonEmpty then
