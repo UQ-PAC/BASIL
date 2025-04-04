@@ -7,9 +7,9 @@ import ir.*
 import scala.collection.mutable
 
 class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
-  val revEdges: Map[Procedure, Map[IntervalCell, Set[IntervalCell]]] =
-    dsa.map((proc, graph) => (proc, IntervalDSA.getPointers(graph)))
-  val interProcCells = computeRelations()
+  val revEdges: Map[Procedure, Map[IntervalCell, Set[IntervalCell]]] = Map.empty
+//    dsa.map((proc, graph) => (proc, IntervalDSA.getPointers(graph)))
+  val interProcCells: Map[IntervalCell, Set[IntervalCell]]  =  Map.empty // computeRelations()
 
   def computeRelations(): Map[IntervalCell, Set[IntervalCell]] = {
     val cellMapping = mutable.Map[IntervalCell, Set[IntervalCell]]()
