@@ -217,6 +217,7 @@ class MemoryTransfromTests extends AnyFunSuite {
       )
     )
 
+    program.nameToProcedure("malloc").isExternal = Some(true)
     val context = programToContext(program)
     val results = runTest(context)
 
@@ -226,59 +227,51 @@ class MemoryTransfromTests extends AnyFunSuite {
     assert(load.mem != mem)
   }
 
-  test("Multi pointers") {
+  test("unified global/stack") {
     val mem = SharedMemory("mem", 64, 8)
-    val R0 = Register("R0", 64)
     val R31 = Register("R31", 64)
+    val R0 = Register("R0", 64)
     val xAddress = BitVecLiteral(2000, 64)
     val yAddress = BitVecLiteral(3000, 64)
-    val xPointer = BitVecLiteral(1000, 64)
-    val globalOffsets = Map(xPointer.value -> xAddress.value)
     val x = SpecGlobal("x", 64, None, xAddress.value)
     val y = SpecGlobal("y", 64, None, yAddress.value)
     val globals = Set(x, y)
     val irType = BitVecType(64)
 
-    // R31 and x point to same region due to R0 being stored in both
-    // Therefore stores and loads to either shouldn't be converted to scalar assignment
+
     val program = prog(
-      proc(
-        "main",
-        Set(("R0", irType)),
-        Set(("R0", irType)),
-        block(
-          "b",
-          MemoryStore(mem, xAddress, R0, Endian.LittleEndian, 64, Some("00")),
-          MemoryStore(mem, R31, R0, LittleEndian, 64, Some("01")),
-          MemoryLoad(R0, mem, R31, LittleEndian, 64, Some("02")),
-          ret(("R0", R0))
+      proc("main",
+        block("b",
+          MemoryStore(mem, xAddress, yAddress, Endian.LittleEndian, 64, Some("00")),
+          MemoryStore(mem, xAddress, R31, LittleEndian, 64, Some("01")),
+          MemoryLoad(R0, mem, xAddress, LittleEndian, 64, Some("02")),
+          ret
         )
       )
     )
 
-    val context = programToContext(program)
+    val context = programToContext(program, globals)
     val results = runTest(context)
 
-    val load = results.ir.program.collect { case la: MemoryLoad => la }.head
-    val globalStore = results.ir.program.collect { case i: MemoryStore if i.index == xAddress => i }.head
-    val stackStore = results.ir.program.collect { case i: MemoryStore if i.index.isInstanceOf[LocalVar] => i }.head
-    assert(mem != load.mem, "memory should be transformed for the load")
-    assert(globalStore.mem != mem, "memory should be transformed for the global mem Store")
-    assert(stackStore.mem == load.mem, "load and store should have same regions for the same position on stack")
+    val loads = results.ir.program.collect { case la: MemoryLoad => la }
+    val stores = results.ir.program.collect {case m: MemoryStore => m}
+    assert(stores.size == 2)
+    assert(loads.size == 1)
+    val load = loads.head
+    val newMem = load.mem
+    assert(newMem != mem)
+    assert(stores.forall(_.mem == newMem))
 
   }
 
-  test("Multi pointer interprocedural") {
+
+  test("escaped in-param") {
     val mem = SharedMemory("mem", 64, 8)
     val R0 = Register("R0", 64)
-    val R31 = Register("R31", 64)
+    val R1 = Register("R1", 64)
     val xAddress = BitVecLiteral(2000, 64)
-    val yAddress = BitVecLiteral(3000, 64)
-    val xPointer = BitVecLiteral(1000, 64)
-    val globalOffsets = Map(xPointer.value -> xAddress.value)
     val x = SpecGlobal("x", 64, None, xAddress.value)
-    val y = SpecGlobal("y", 64, None, yAddress.value)
-    val globals = Set(x, y)
+    val globals = Set(x)
     val irType = BitVecType(64)
 
     // same as Multi Pointer but multiple pointers are split across procedures
@@ -286,141 +279,199 @@ class MemoryTransfromTests extends AnyFunSuite {
       proc(
         "main",
         Set(("R0", irType)),
-        Set(("R0", irType)),
+        Set(("R1", irType)),
         block(
           "m",
-          MemoryStore(mem, xAddress, R0, Endian.LittleEndian, 64, Some("00")),
-          directCall(Set(("R0", R0)), "callee", Set(("R0", R0))),
-          ret(("R0", R0))
+          MemoryStore(mem, R0, xAddress, Endian.LittleEndian, 64, Some("00")),
+          MemoryLoad(R1, mem, R0, LittleEndian, 64, Some("01")),
+          ret(("R1", R1))
         )
       ),
-      proc(
-        "callee",
-        Set(("R0", irType)),
-        Set(("R0", irType)),
-        block(
-          "b",
-          MemoryStore(mem, R31, R0, LittleEndian, 64, Some("01")),
-          MemoryLoad(R0, mem, R31, LittleEndian, 64, Some("02")),
-          ret(("R0", R0))
-        )
-      )
     )
 
     val context = programToContext(program)
     val results = runTest(context)
-    val load = results.ir.program.collect { case la: MemoryLoad => la }.head
-    val globalStore = results.ir.program.collect { case i: MemoryStore if i.index == xAddress => i }.head
-    val stackStore = results.ir.program.collect { case i: MemoryStore if i.index.isInstanceOf[LocalVar] => i }.head
-    assert(mem != load.mem, "memory should be transformed for the load")
-    assert(globalStore.mem != mem, "memory should be transformed for the global mem Store")
-    assert(stackStore.mem == load.mem, "load and store should have same regions for the same position on stack")
+
+    val load = results.ir.program.collect { case la: MemoryLoad => la}.head
+    val store = results.ir.program.collect {case m: MemoryStore => m}.head
+    assert(load.mem == mem)
+    assert(store.mem == mem)
   }
 
-  test("Mixed pointers") {
+  test("escaped out-param") {
     val mem = SharedMemory("mem", 64, 8)
     val R0 = Register("R0", 64)
     val R1 = Register("R1", 64)
-    val R2 = Register("R2", 64)
-    val R31 = Register("R31", 64)
     val xAddress = BitVecLiteral(2000, 64)
-    val yAddress = BitVecLiteral(3000, 64)
     val x = SpecGlobal("x", 64, None, xAddress.value)
-    val y = SpecGlobal("y", 64, None, yAddress.value)
-    val globals = Set(x, y)
+    val globals = Set(x)
     val irType = BitVecType(64)
 
-    // some regions have unique pointers (Callee R31 + 10, Global y) and other don't
+    // same as Multi Pointer but multiple pointers are split across procedures
     val program = prog(
       proc(
         "main",
-        Set(("R0", irType), ("R1", irType), ("R2", irType)),
         Set(("R0", irType)),
+        Set(("R1", irType)),
         block(
-          "m",
-          MemoryStore(mem, yAddress, R2, LittleEndian, 64, Some("03")),
-          MemoryStore(mem, xAddress, R0, Endian.LittleEndian, 64, Some("00")),
-          directCall(Set(("R0", R0)), "callee", Set(("R0", R0), ("R1", R1))),
-          ret(("R0", R0))
+          "a",
+          directCall(Set(("R1", R0)), "callee", Set(("R0", R0))),
+          goto("b")
+        ),
+        block(
+          "b",
+          MemoryStore(mem, R1, xAddress, LittleEndian, 64, Some("00")),
+          MemoryLoad(R1, mem, R1, LittleEndian, 64, Some("01")),
+          ret(("R1", R0))
         )
       ),
       proc(
         "callee",
-        Set(("R0", irType), ("R1", irType)),
         Set(("R0", irType)),
+        Set(("R1", irType)),
         block(
-          "b",
-          MemoryStore(mem, BinaryExpr(BVADD, R31, BitVecLiteral(10, 64)), R1, LittleEndian, 64, Some("04")),
-          MemoryStore(mem, R31, R0, LittleEndian, 64, Some("01")),
-          MemoryLoad(R0, mem, R31, LittleEndian, 64, Some("02")),
-          ret(("R0", R0))
+          "c",
+          MemoryLoad(R1, mem, R0, LittleEndian, 64, Some("01")),
+          ret(("R1", R0))
         )
+      ),
+    )
+
+    val context = programToContext(program)
+    val results = runTest(context)
+
+    val load = results.ir.program.mainProcedure.collect { case la: MemoryLoad => la}.head
+    val store = results.ir.program.mainProcedure.collect {case m: MemoryStore => m}.head
+    assert(load.mem == mem)
+    assert(store.mem == mem)
+  }
+
+  test("Multi regions") {
+    val mem = SharedMemory("mem", 64, 8)
+    val R0 = Register("R0", 64)
+    val R1 = Register("R1", 64)
+    val xAddress = BitVecLiteral(2000, 64)
+    val x = SpecGlobal("x", 64, None, xAddress.value)
+    val globals = Set(x)
+    val irType = BitVecType(64)
+
+    // same as Multi Pointer but multiple pointers are split across procedures
+    val program = prog(
+      proc(
+        "main",
+        Set(("R0", irType)),
+        Set(),
+        block(
+          "a",
+          directCall(Set(("R0", R0)), "malloc", Set(("R0", R0)), Some("heap1")),
+          goto("b")
+        ),
+        block("b",
+          MemoryStore(mem, R0, xAddress, LittleEndian, 64, Some("01")),
+          directCall(Set(("R0", R0)), "malloc", Set(("R0", R0)), Some("heap2")),
+          goto("c")
+        ),
+        block("c",
+          MemoryStore(mem, R0, xAddress, LittleEndian, 64, Some("02")),
+          ret
+        )
+      ),
+      proc(
+        "malloc",
+        Set(("R0", BitVecType(64))),
+        Set(("R0", BitVecType(64))),
+        block("malloc_b",
+          MemoryLoad(R0, mem, R0, LittleEndian, 64, None),
+          ret(("R0", R0)))
       )
     )
 
-    val context = programToContext(program, globals)
+    program.nameToProcedure("malloc").isExternal = Some(true)
+    val context = programToContext(program)
     val results = runTest(context)
-    val loads = results.ir.program.collect { case la: MemoryLoad => la }
-    val globalStores = results.ir.program.collect { case i: MemoryStore if i.index.isInstanceOf[BitVecLiteral] => i }
-    val stackStores = results.ir.program.collect { case i: MemoryStore if i.index.isInstanceOf[LocalVar] => i }
-    val ma = results.ir.program.collect { case i: MemoryAssign => i }
-    val sca = results.ir.program.collect { case i: LocalAssign if i.lhs.name.startsWith("(Stack") => i }
 
-    assert(loads.size == 1)
-    assert(globalStores.size == 1)
-    assert(stackStores.size == 1)
-    assert(ma.size == 1)
-    assert(sca.size == 1)
+    val stores = results.ir.program.mainProcedure.collect {case m: MemoryStore => m}
+    assert(stores.size == 2)
+    assert(stores.forall(_.mem != mem))
+    assert(stores.map(_.mem).toSet.size == 2)
   }
 
-  test("Multi region mixed pointer") {
+  test("global escape") {
     val mem = SharedMemory("mem", 64, 8)
     val R0 = Register("R0", 64)
     val R1 = Register("R1", 64)
     val R2 = Register("R2", 64)
-    val R31 = Register("R31", 64)
     val xAddress = BitVecLiteral(2000, 64)
-    val yAddress = BitVecLiteral(3000, 64)
-    val zAddress = BitVecLiteral(4000, 64)
-    val gAddress = BitVecLiteral(5000, 64)
     val x = SpecGlobal("x", 64, None, xAddress.value)
-    val y = SpecGlobal("y", 64, None, yAddress.value)
-    val z = SpecGlobal("z", 64, None, zAddress.value)
-    val g = SpecGlobal("g", 64, None, gAddress.value)
-    val globals = Set(x, y, z, g)
+    val globals = Set(x)
     val irType = BitVecType(64)
 
-    // some regions have unique pointers (Callee R31 + 10, Global y) and other don't
+    // same as Multi Pointer but multiple pointers are split across procedures
     val program = prog(
       proc(
         "main",
-        Set(("R0", irType), ("R1", irType), ("R2", irType)),
         Set(("R0", irType)),
+        Set(),
         block(
-          "m",
-          LocalAssign(R0, zAddress),
-          MemoryStore(mem, xAddress, R0, Endian.LittleEndian, 64, Some("00")),
-          MemoryStore(mem, yAddress, gAddress, LittleEndian, 64, Some("01")),
-          directCall(Set(("R0", R0)), "callee", Set(("R0", R0), ("R1", R1))),
-          ret(("R0", R0))
+          "a",
+          directCall(Set(("R0", R0)), "malloc", Set(("R0", R0)), Some("heap1")),
+          goto("b", "c")
+        ),
+        block("b",
+          MemoryStore(mem, xAddress, R0, LittleEndian, 64, Some("01")),
+          directCall("callee1"),
+          goto("d")
+        ),
+        block("c",
+          MemoryStore(mem, xAddress, R0,  LittleEndian, 64, Some("02")),
+          directCall("callee2"),
+          goto("d")
+        ),
+        block("d",
+          ret
         )
       ),
       proc(
-        "callee",
-        Set(("R0", irType), ("R1", irType)),
-        Set(("R0", irType)),
-        block(
-          "b",
-          MemoryStore(mem, R31, R0, LittleEndian, 64, Some("02")),
-          MemoryStore(mem, BinaryExpr(BVADD, R31, BitVecLiteral(10, 64)), gAddress, LittleEndian, 64, Some("03")),
-          MemoryStore(mem, BinaryExpr(BVADD, R31, BitVecLiteral(20, 64)), R1, LittleEndian, 64, Some("04")),
-          MemoryLoad(R0, mem, R31, LittleEndian, 64, Some("05")),
-          ret(("R0", R0))
+        "malloc",
+        Set(("R0", BitVecType(64))),
+        Set(("R0", BitVecType(64))),
+        block("malloc_b",
+          MemoryLoad(R0, mem, R0, LittleEndian, 64, None),
+          ret(("R0", R0)))
+      ),
+      proc("callee1",
+        block("c1b",
+          MemoryLoad(R1, mem, xAddress, LittleEndian, 64, Some("03")),
+          MemoryStore(mem, R1, BitVecLiteral(10, 64), LittleEndian, 64, Some("04")),
+          LocalAssign(R1, BitVecLiteral(30, 64), Some("07")),
+          ret
+        )
+      ),
+      proc("callee2",
+        block("c2b",
+          MemoryLoad(R1, mem, xAddress, LittleEndian, 64, Some("05")),
+          MemoryStore(mem, R1, BitVecLiteral(20, 64), LittleEndian, 64, Some("06")),
+          LocalAssign(R1, BitVecLiteral(30, 64), Some("08")),
+          ret
         )
       )
     )
 
+    program.nameToProcedure("malloc").isExternal = Some(true)
     val context = programToContext(program, globals)
     val results = runTest(context)
+
+    val mainStores = results.ir.program.mainProcedure.collect {case m : MemoryAssign => m}
+    val loads = results.ir.program.collect {case l: LocalAssign if l.rhs.isInstanceOf[Register] => l}
+    assert(mainStores.map(_.lhs).toSet.size == 1)
+    assert(loads.map(_.rhs).toSet.size == 1)
+    assert(loads.map(_.rhs).toSet.head == mainStores.map(_.lhs).toSet.head)
+    val callee1Store = results.ir.program.nameToProcedure("callee1").collect {case m : MemoryStore => m}.head
+    val callee2Store = results.ir.program.nameToProcedure("callee2").collect {case m : MemoryStore => m}.head
+    assert(callee2Store.mem == callee1Store.mem)
+    assert(callee1Store.mem != mem)
+
   }
+
+  
 }
