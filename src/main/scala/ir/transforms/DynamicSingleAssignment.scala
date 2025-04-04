@@ -319,6 +319,22 @@ class OnePassDSA(
     }).max
     p.ssaCount = maxIndex + 1
 
+    // combine phis
+
+    for (b <- p.blocks) {
+      if (_st(b).isPhi) {
+        val assignments = {
+          val ns = SimulAssign(b.statements.map {
+            case l: LocalAssign => (l.lhs, l.rhs)
+            case _ => throw Exception("Expect phi block to only contain assignments")
+          }.toMap)
+          b.statements.clear()
+          b.statements.prepend(ns)
+        }
+
+      }
+    }
+
   }
 
   def applyTransformWithvalidate(p: Program): Program = {
@@ -372,6 +388,10 @@ class StmtRenamer(renamesL: Map[Variable, Int] = Map(), renames: Map[Variable, I
       case Register(n, sz) => {
         throw Exception("Should not SSA registers")
         Register(n + "_" + idx, sz)
+      }
+      case GlobalVar(n, t) => {
+        throw Exception("Should not SSA globals")
+        GlobalVar(n + "_" + idx, t)
       }
       case v: LocalVar => LocalVar(v.varName, v.irType, idx)
     }

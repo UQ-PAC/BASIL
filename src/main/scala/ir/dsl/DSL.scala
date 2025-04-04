@@ -61,7 +61,7 @@ import scala.annotation.targetName
  *  Together, NonCallStatement and Call should partition Statement.
  */
 type NonCallStatement =
-  LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume | MemoryAssign
+  LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume | MemoryAssign | SimulAssign
 
 def cloneStatement(x: NonCallStatement): NonCallStatement = x match {
   case LocalAssign(a, b, c) => LocalAssign(a, b, c)
@@ -71,6 +71,7 @@ def cloneStatement(x: NonCallStatement): NonCallStatement = x match {
   case x: NOP => NOP(x.label) // FIXME: no unapply for NOP atm
   case Assert(a, b, c) => Assert(a, b, c)
   case Assume(a, b, c, d) => Assume(a, b, c, d)
+  case a: SimulAssign => SimulAssign(a.assignments, a.label)
 }
 
 val R0: Register = Register("R0", 64)

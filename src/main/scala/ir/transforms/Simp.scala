@@ -90,7 +90,7 @@ class DefUseDomain(liveBefore: Map[Block, Set[Variable]]) extends AbstractDomain
   def join(l: Map[Variable, Set[Assign]], r: Map[Variable, Set[Assign]], pos: Block) = {
     l.keySet
       .union(r.keySet)
-      .filter(k => liveBefore(pos).contains(k))
+      // .filter(k => liveBefore(pos).contains(k))
       .map(k => {
         k -> (l.get(k).getOrElse(Set()) ++ r.get(k).getOrElse(Set()))
       })
@@ -135,6 +135,7 @@ class IntraLiveVarsDomain extends PowerSetDomain[Variable] {
     a match {
       case a: LocalAssign => (s - a.lhs) ++ a.rhs.variables
       case a: MemoryAssign => (s - a.lhs) ++ a.rhs.variables
+      case c: SimulAssign => (s -- c.assignments.map(_._1)) ++ c.assignments.flatMap(_._2.variables)
       case a: MemoryLoad => (s - a.lhs) ++ a.index.variables
       case m: MemoryStore => s ++ m.index.variables ++ m.value.variables
       case a: Assume => s ++ a.body.variables
@@ -285,7 +286,7 @@ def removeSlices(p: Procedure): Unit = {
   visit_proc(ReplaceAlwaysSlicedVars(toSmallen), p)
 }
 
-def getRedundantAssignments(procedure: Procedure): Set[Assign] = {
+def getRedundantAssignments(procedure: Procedure): Set[Variable] = {
 
   /** Get all assign statements which define a variable never used, assuming ssa form and proc parameters so that
     * interprocedural check is not required.
@@ -323,6 +324,16 @@ def getRedundantAssignments(procedure: Procedure): Set[Assign] = {
         a.rhs.variables.foreach(v => {
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(a)))
         })
+      }
+      case m: SimulAssign => {
+        m.assignments.toSeq.foreach { case (lhs, r) =>
+          assignedNotRead(lhs) = joinVS(assignedNotRead(lhs), VS.Assigned(Set(m)))
+        }
+        m.assignments.toSeq
+          .flatMap(_._2.variables)
+          .foreach(v => {
+            assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(m)))
+          })
       }
       case a: MemoryLoad => {
         assignedNotRead(a.lhs) = joinVS(assignedNotRead(a.lhs), VS.Assigned(Set(a)))
@@ -376,30 +387,53 @@ def getRedundantAssignments(procedure: Procedure): Set[Assign] = {
   var toRemove = assignedNotRead
   var removeOld = toRemove
 
-  val r = toRemove
-    .collect { case (v, VS.Assigned(d)) =>
-      d
-    }
-    .toSet
-    .flatten
-  r
+  toRemove.map(_._1).toSet
 }
 
 class CleanupAssignments() extends CILVisitor {
-  var redundantAssignments = Set[Assign]()
+  var deadVariables = Set[Variable]()
+  var modified = false
 
-  def isRedundant(a: LocalAssign) = {
-    a.lhs == a.rhs || redundantAssignments.contains(a)
-  }
+  // def isRedundant(a: LocalAssign) = {
+  //  a.lhs == a.rhs || redundantAssignments.contains(a)
+  // }
 
   override def vproc(p: Procedure) = {
-    redundantAssignments = getRedundantAssignments(p)
+    modified = false
+    deadVariables = getRedundantAssignments(p)
     DoChildren()
   }
 
-  override def vstmt(s: Statement) = s match {
-    case a: LocalAssign if isRedundant(a) => ChangeTo(List())
-    case _ => SkipChildren()
+  override def vstmt(s: Statement) = {
+    var didAny = true
+    val action: VisitAction[List[Statement]] = s match {
+      case a: SimulAssign if a.assignments.isEmpty => ChangeTo(List())
+      case a: LocalAssign if deadVariables.contains(a.lhs) => ChangeTo(List())
+      case LocalAssign(lhs, rhs, _) if lhs == rhs => ChangeTo(List())
+      case a: SimulAssign =>
+        a.assignments = a.assignments.filterNot { case (lhs, rhs) =>
+          deadVariables.contains(lhs)
+        }
+        if a.assignments.isEmpty then ChangeTo(List()) else SkipChildren()
+      case _ =>
+        didAny = false
+        SkipChildren()
+    }
+    modified = modified || didAny
+    action
+  }
+
+  def transform(p: Procedure): Unit = {
+    while (modified) {
+      modified = false
+      visit_proc(this, p)
+    }
+  }
+  def transform(p: Program): Unit = {
+    for (p <- p.procedures) {
+      val v = CleanupAssignments()
+      v.transform(p)
+    }
   }
 
 }
@@ -560,7 +594,7 @@ def copyPropOnce(prog: Program) = {
 
   def trans(p: Program) = {
     visit_prog(CopyProp.BlockyProp(), p)
-    visit_prog(CleanupAssignments(), p)
+    CleanupAssignments().transform(p)
   }
   wrapShapePreservingTransformInValidation(trans)(prog)
 }
@@ -574,7 +608,7 @@ def wrapShapePreservingTransformInValidation(transform: Program => Unit)(p: Prog
   validator.getValidationProg
 }
 
-def validate(validationProg: Program, procName: String, name: String) = {
+def validate(validationProg: Program, procName: String, name: String, timeout: Int = 10) = {
 
   val boogieFile = translating.BoogieTranslator.translateProg(validationProg).toString
   val boogieFileName = s"$name-translation-validate.bpl"
@@ -587,7 +621,7 @@ def validate(validationProg: Program, procName: String, name: String) = {
     }
   }
 
-  val vres = util.boogie_interaction.boogieBatchQuery(boogieFileName, Some(procName), 1)
+  val vres = util.boogie_interaction.boogieBatchQuery(boogieFileName, Some(procName), timeout)
   // assert(vres)
   vres
 
@@ -603,12 +637,78 @@ def validatedSimplifyPipeline(p: Program) = {
 
   def fixGuardsDSA(program: Program) = {}
 
-  def copyProp(prog: Program) = for (p <- prog.procedures) {
-    val result = CopyProp.DSACopyProp(p, Map(), Map(), (x, y) => None)
-    if (result.nonEmpty) {
-      val vis = Simplify(CopyProp.toResult(result))
-      visit_proc(vis, p)
+  def copyProp(prog: Program) = {
+
+    val validator = TranslationValidator()
+    validator.setTargetProg(prog)
+
+    val results = prog.procedures.map(p => p.name -> CopyProp.DSACopyProp(p, Map(), Map(), (x, y) => None)).toMap
+    prog.procedures.foreach(p => {
+      val result = results(p.name)
+      if (result.nonEmpty) {
+        val vis = Simplify(CopyProp.toResult(result))
+        visit_proc(vis, p)
+        CleanupAssignments().transform(p)
+
+      }
+    })
+
+    combineBlocks(p)
+    removeDuplicateGuard(p)
+
+    validator.setSourceProg(prog)
+    validator.setEqualVarsInvariant
+    // validator.addRDInvariant()
+
+    val invs = results.toList.map {
+      case (proc, result) => {
+        val (lvs, _) = validator.liveBefore(proc)
+        val lives = lvs.map((b, v) => b.label -> v).toMap
+        val cuts = validator.afterCuts(validator.afterProg.get.procedures.find(_.name == proc).get)
+
+        for ((cutName, block) <- cuts) {
+          val inv = result.collect {
+            case (v, ps) if lives(block.label).contains(v) && !ps.clobbered => {
+              polyEqual(v, ps.e)
+            }
+          }
+          if (inv.nonEmpty) {
+            val guard = BinaryExpr(IntEQ, validator.varInTarget(transitionSystemPCVar), PCMan.PCSym(cutName))
+            val condTarget = validator.exprInTarget(inv.reduce((a, b) => BinaryExpr(BoolAND, a, b)))
+
+            val propVars = result
+              .collect {
+                case (v, ps) if lives(block.label).contains(v) && !ps.clobbered => v
+              }
+              .map(v => polyEqual(validator.varInTarget(v), validator.varInSource(v)))
+            val eqPropVars = propVars.reduce((l, r) => BinaryExpr(BoolAND, l, r))
+
+            val condSource = validator.exprInSource(inv.reduce((a, b) => BinaryExpr(BoolAND, a, b)))
+            val invariantdef = List(
+              (BinaryExpr(BoolIMPLIES, guard, condSource), Some(s"$cutName CopyProp Dom Source")),
+              (BinaryExpr(BoolIMPLIES, guard, eqPropVars), Some(s"$cutName CopyProp vars correspond"))
+            )
+
+            validator.addInvariant(proc, invariantdef)
+          }
+          // val inv2 = result.collect {
+          //   case (v, ps) if !ps.clobbered  => (polyEqual(validator.exprInTarget(v), validator.exprInSource(v)), Some("CopyProp Subst equal across tx"))
+          // }
+
+        }
+        // val invExp : Expr = if inv.nonEmpty then {
+        //  inv.reduce((a: Expr, b) => BinaryExpr(BoolAND, a, b))
+        // } else TrueLiteral
+
+        // val x = inv.map(e => (validator.exprInTarget(e), Some("CopyProp Result Invariant"))).toList
+        // validator.addInvariant(proc, x)
+      }
     }
+
+    val vprog = validator.getValidationProg
+
+    val procName = prog.mainProcedure.procName + "_seq_" + prog.mainProcedure.name
+    validate(vprog, procName, "DSACopyProp", 10)
   }
 
   def simplifyGuards(prog: Program) = {
@@ -621,7 +721,7 @@ def validatedSimplifyPipeline(p: Program) = {
   }
 
   def deadAssignmentElimination(prog: Program) = {
-    visit_prog(CleanupAssignments(), prog)
+    CleanupAssignments().transform(prog)
   }
 
   def simplifyConds(prog: Program) = {
@@ -644,8 +744,6 @@ def validatedSimplifyPipeline(p: Program) = {
     removeEmptyBlocks(program)
   }
 
-  applyRPO(p)
-
   def combined(p: Program) = {
     // combineBlocks(p)
     fixGuardsDSA(p)
@@ -662,19 +760,34 @@ def validatedSimplifyPipeline(p: Program) = {
     val validator = TranslationValidator()
     validator.setTargetProg(p)
     OnePassDSA().applyTransform(p)
+    val x = p.procedures.forall(transforms.rdDSAProperty)
+    assert(x)
+
     transforms.fixupGuards(p)
     transforms.removeDuplicateGuard(p)
+    // copyProp(p)
+    // intraBlockCopyProp(p)
+    // deadAssignmentElimination(p)
     validator.setSourceProg(p)
     validator.setDSAInvariant
+    // validator.addRDInvariant()
     val prog = validator.getValidationProg
 
     val procName = p.mainProcedure.procName + "_seq_" + p.mainProcedure.name
-    validate(prog, procName, "DynamicSingleAssignment")
+    // validate(prog, procName, "DynamicSingleAssignment", 3)
   }
 
+  // rpo
+  println("Rpo")
+  combineBlocks(p)
+  applyRPO(p)
+  println("DSA")
   dsa(p)
-  transformAndValidate(combineBlocks, "combineBlocks")(p)
-  transformAndValidate(copyProp, "DSACopyProp")(p)
+//  transformAndValidate(combineBlocks, "combineBlocks")(p)
+
+  println("COpyprop")
+  copyProp(p)
+// transformAndValidate(copyProp, "DSACopyProp")(p)
   transformAndValidate(simplifyConds, "simplifyConds")(p)
   transformAndValidate(intraBlockCopyProp, "blockyProp")(p)
   transformAndValidate(deadAssignmentElimination, "deadAssignmentElimination")(p)
@@ -711,7 +824,7 @@ def copypropTransform(
   val xf = t.checkPoint("transform")
   // SimplifyLogger.info(s"    ${p.name} after transform expr complexity ${ExprComplexity()(p)}")
 
-  visit_proc(CleanupAssignments(), p)
+  CleanupAssignments().transform(p)
   t.checkPoint("redundant assignments")
   // SimplifyLogger.info(s"    ${p.name} after dead var cleanup expr complexity ${ExprComplexity()(p)}")
 
@@ -1062,13 +1175,13 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
   SimplifyLogger.info("[!] Simplify :: Dead variable elimination")
 
   // cleanup
-  visit_prog(CleanupAssignments(), p)
+  CleanupAssignments().transform(p)
 
   SimplifyLogger.info("[!] Simplify :: Merge empty blocks")
   cleanupBlocks(p)
 
   visit_prog(CopyProp.BlockyProp(), p)
-  visit_prog(CleanupAssignments(), p)
+  CleanupAssignments().transform(p)
 
 }
 
@@ -1206,6 +1319,17 @@ object CopyProp {
           l.rhs = nrhs
           SkipChildren()
         }
+
+        case l: SimulAssign => {
+          val assignments = l.assignments.map { case (l, r) =>
+            (l, subst(r))
+          }
+          assignments.foreach { case (l, r) =>
+            st = st.updated(l, r)
+          }
+          l.assignments = assignments
+          SkipChildren()
+        }
         case x: Assert => {
           x.body = subst(x.body)
           SkipChildren()
@@ -1331,6 +1455,7 @@ object CopyProp {
 
     def transfer(c: mutable.HashMap[Variable, PropState], s: Statement): Unit = {
       // val callClobbers = ((0 to 7) ++ (19 to 30)).map("R" + _).map(c => Register(c, 64))
+
       s match {
         case l: MemoryStore => {
           ()
@@ -1341,6 +1466,35 @@ object CopyProp {
         case l: MemoryAssign => {
           clobberFull(c, l.lhs)
         }
+        case s: SimulAssign =>
+          s.assignments.foreach {
+            case (l, r) => {
+              var prop = canPropTo(c, r)
+              val existing = c.get(l)
+
+              val toDo = (prop, existing) match {
+                case (Some(evaled, deps), None) => {
+                  Seq(l -> PropState(evaled, mutable.Set.from(deps), false, 0))
+                }
+                case (_, Some(ps)) if ps.clobbered => {
+                  Seq()
+                }
+                case (Some(evaled, deps), Some(ps))
+                    if ps.e == r || ps.e == evaled || (canPropTo(c, ps.e).contains(evaled)) => {
+                  Seq(l -> c(l).copy(e = evaled, deps = c(l).deps ++ deps))
+                }
+                case _ => {
+                  // ps.e != evaled and have prop
+                  Seq(l -> "clobber")
+                }
+              }
+              toDo.foreach {
+                case (l, n: PropState) => c(l) = n
+                case (l, "clobber") => clobberFull(c, l)
+                case _ => ???
+              }
+            }
+          }
         case LocalAssign(l, r, lb) => {
 
           var prop = canPropTo(c, r)
@@ -1634,7 +1788,9 @@ class Simplify(val res: Boolean => Variable => Option[Expr], val initialBlock: B
     val subst = Substitute(res(trivialOnly), true, threshold)
     var old: Expr = e
     var result = subst(e).getOrElse(e)
-    while (old != result) {
+    var limit = 0
+    while (old != result && limit < 5) {
+      limit += 1
       old = result
       result = subst(e).getOrElse(e)
     }
@@ -1668,7 +1824,7 @@ def fixupGuards(p: Program) = {
 
   // traverse a straight-line path to find an assume, while evaluating the code
   def findAssume(b: Block): Option[Assume] = boundary {
-    var visited = List[LocalAssign]()
+    var visited = List[LocalAssign | SimulAssign]()
     var joinCount = 0
     var seenBlocks = Set[Block]()
 
@@ -1680,10 +1836,22 @@ def fixupGuards(p: Program) = {
       for (s <- block.statements) {
         s match {
           case l: LocalAssign => visited = l :: visited
+          case l: SimulAssign => visited = l :: visited
           case Assume(oBody, _, b, c) => {
             var body = oBody
             for (assign <- visited) {
-              body = Substitute(v => if (assign.lhs == v) then Some(assign.rhs) else None)(body).getOrElse(body)
+              body = Substitute(v =>
+                if (!assign.assignees.contains(v)) then None
+                else {
+                  assign match {
+                    case l: LocalAssign => Some(l.rhs)
+                    case l: SimulAssign =>
+                      l.assignments.collect {
+                        case (lhs, r) if v == lhs => r
+                      }.headOption
+                  }
+                }
+              )(body).getOrElse(body)
             }
             break(Some(Assume(body, Some(s"prop from ${block.label}"), b, c)))
           }

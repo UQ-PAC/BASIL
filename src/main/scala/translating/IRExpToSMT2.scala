@@ -13,6 +13,11 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
     s match {
       case a: LocalAssign => vassign(vlvar(a.lhs), vexpr(a.rhs))
       case m: MemoryAssign => vmemassign(vlvar(m.lhs), vexpr(m.rhs))
+      case a: SimulAssign =>
+        vsimulassign(a.assignments.toList.map { case (lhs, rhs) =>
+          vlvar(lhs) -> vexpr(rhs)
+        })
+
       case m: MemoryLoad => vload(vlvar(m.lhs), m.mem.name, vexpr(m.index), m.endian, m.size)
       case m: MemoryStore => vstore(m.mem.name, vexpr(m.index), vexpr(m.value), m.endian, m.size)
       case c: DirectCall =>
@@ -84,6 +89,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
 
   def vassign(lhs: Repr[Variable], rhs: Repr[Expr]): Repr[LocalAssign]
   def vmemassign(lhs: Repr[Variable], rhs: Repr[Expr]): Repr[LocalAssign]
+  def vsimulassign(assignments: List[(Repr[Variable], Repr[Expr])]): Repr[SimulAssign]
   def vload(lhs: Repr[Variable], mem: String, index: Repr[Expr], endian: Endian, size: Int): Repr[MemoryLoad]
   def vstore(mem: String, index: Repr[Expr], value: Repr[Expr], endian: Endian, size: Int): Repr[MemoryStore]
   def vcall(

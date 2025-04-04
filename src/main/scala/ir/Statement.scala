@@ -65,6 +65,24 @@ class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[S
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitLocalAssign(this)
 }
 
+class SimulAssign(var assignments: Map[Variable, Expr], override val label: Option[String] = None) extends Assign {
+  override def modifies: Set[Global] = assignments.collect { case (r: Global, _) =>
+    r
+  }.toSet
+
+  def assignees = assignments.map(_._1).toSet
+  override def toString: String = s"$labelStr${assignments
+      .map { case (lhs, rhs) =>
+        lhs.toString + " := " + rhs
+      }
+      .mkString(", ")}"
+  override def acceptVisit(visitor: Visitor): Statement = visitor.visitSimulAssign(this)
+}
+
+object SimulAssign {
+  def unapply(l: SimulAssign): Some[(Map[Variable, Expr], Option[String])] = Some((l.assignments, l.label))
+}
+
 object LocalAssign {
   def unapply(l: LocalAssign): Some[(Variable, Expr, Option[String])] = Some(l.lhs, l.rhs, l.label)
 }
