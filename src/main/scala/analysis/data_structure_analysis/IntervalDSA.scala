@@ -8,7 +8,6 @@ import specification.FuncEntry
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.*
 import specification.{ExternalFunction, SymbolTableEntry}
-import translating.PrettyPrinter.pp_proc
 import util.{DSALogger, IRContext, IntervalDSALogger as Logger}
 
 import scala.collection.mutable.ArrayBuffer
@@ -425,6 +424,14 @@ class IntervalGraph(
         Logger.debug(s"Processing constraint $cons")
         val indices = constraintArgToCells(cons.arg1, ignoreContents = true)
         val indexPointee = constraintArgToCells(cons.arg1)
+        if cons.arg1.value.variables.intersect(proc.formalInParam.filterNot(_.name.startsWith("R31")).toSet).nonEmpty then
+          indices.map(_.node).foreach(_.flags.escapes = true)
+        cons match
+          case MemoryReadConstraint(pos) => indices.map(_.node).foreach(_.flags.read = true)
+          case MemoryWriteConstraint(pos) =>
+            indices.map(_.node).foreach(_.flags.modified = true)
+            val indexFlag = joinFlags(indices)
+            if indexFlag.heap then indexPointee.map(_.node).foreach(_.flags.escapes = true)
         val values = constraintArgToCells(cons.arg2)
         val first = if indexPointee.nonEmpty then
           indices
@@ -457,6 +464,13 @@ class IntervalGraph(
         else Logger.warn(s"$cons had an empty argument")
 
       case dc: DirectCallConstraint =>
+        if !dc.target.name.startsWith("malloc") && !dc.target.name.startsWith("calloc") then
+          dc.outParams
+            .filterNot(f => f._1.name.startsWith("R31"))
+            .values
+            .flatMap(exprToCells)
+            .map(_.node)
+            .foreach(_.flags.escapes = true)
         val h = dc.inParams.filter(f => f._1.name.startsWith("R31"))
         val g = dc.outParams.filter(f => f._1.name.startsWith("R31"))
         if g.nonEmpty && h.nonEmpty then
