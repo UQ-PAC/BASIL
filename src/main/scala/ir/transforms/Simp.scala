@@ -1,7 +1,6 @@
 package ir.transforms
 import translating.serialiseIL
 import translating.PrettyPrinter.*
-
 import specification.FuncEntry
 import util.SimplifyLogger
 import ir.eval.AlgebraicSimplifications
@@ -307,7 +306,7 @@ def getRedundantAssignments(procedure: Procedure): Set[Assign] = {
 
   for (c <- procedure) {
     c match {
-      case a: LocalAssign => {
+      case a: LocalAssign if a.reducible => {
         assignedNotRead(a.lhs) = joinVS(assignedNotRead(a.lhs), VS.Assigned(Set(a)))
         a.rhs.variables.foreach(v => {
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(a)))
@@ -396,14 +395,14 @@ class CleanupAssignments() extends CILVisitor {
 val condPropDebugLogger = SimplifyLogger.deriveLogger("inlineCond")
 
 /**
- * Propagate flag calculation into this assume statement, finding a linear 
+ * Propagate flag calculation into this assume statement, finding a linear
  * backwards chain from this block until the first side-effecting or non-linear branch
  * and inlines the meet of all the assignments.
  *
  * Doesn't preserve assignment order or reason about clobbers so requires DSA form to be valid
  * and to correctly identify the linear backwards dependency.
  *
- * TODO: would be much more efficient if we memoised, as we are finding and evaluating 
+ * TODO: would be much more efficient if we memoised, as we are finding and evaluating
  * the backwards path twice for each branch.
  */
 def inlineCond(a: Assume): Option[Expr] = boundary {
@@ -603,7 +602,7 @@ def removeEmptyBlocks(p: Program) = {
 }
 
 /**
- * If we have two consecutive branches with a join between, duplicate the join for each 
+ * If we have two consecutive branches with a join between, duplicate the join for each
  * side of the first branch so that the subsequent analyses can differentiate dependency
  * behaviour of the second branch depending on which of the first branches was taken.
  */

@@ -30,6 +30,12 @@ def getSymbolicValues[T <: Offsets](p: Procedure)(using valSetDomain: SymValSetD
     .fold(symValuesDomain.bot)((x, y) => symValuesDomain.join(x, y, p.entryBlock.get))
 }
 
+def isPlaceHolder(base: SymBase): Boolean = {
+  base match
+    case known: Known => false
+    case unknown: Unknown => true
+}
+
 // a symbolic base address
 sealed trait SymBase
 
@@ -265,6 +271,7 @@ object SymValues {
   ): SymValSet[T] = {
     expr match
       case literal @ BitVecLiteral(value, size) => symValSetDomain.init(Global, transform(bv2SignedInt(literal).toInt))
+      case literal @ IntLiteral(value) => symValSetDomain.init(Global, value.toInt)
       case Extract(end, start, body) if end - start >= 64 => exprToSymValSet(symValues)(body, transform)
       case Extract(32, 0, body) =>
         exprToSymValSet(symValues)(body, transform) // todo incorrectly assuming value is preserved
