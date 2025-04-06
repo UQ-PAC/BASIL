@@ -7,9 +7,8 @@ import util.Counter
 
 import scala.collection.mutable
 
-class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
+class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalNode, IntervalNode]) extends CILVisitor {
   val counter: Counter = Counter()
-  val regions: mutable.Map[String, String] = mutable.Map()
   val revEdges: Map[Procedure, Map[IntervalCell, Set[IntervalCell]]] = Map.empty
 //    dsa.map((proc, graph) => (proc, IntervalDSA.getPointers(graph)))
   val interProcCells: Map[IntervalCell, Set[IntervalCell]] = Map.empty // computeRelations()
@@ -97,14 +96,14 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
             val index = indices.head
             val flag = index.node.flags
             val value = index.getPointee
-            val varName = cellsToName(index)
+            var varName = cellsToName(index)
 
             if isGlobal(flag) then ChangeTo(List(LocalAssign(load.lhs, Register(varName, load.size), load.label)))
             else if isLocal(flag) && !flag.escapes then
               ChangeTo(List(LocalAssign(load.lhs, LocalVar(varName, load.lhs.getType), load.label)))
             else if !flag.escapes then
-              val memName = regions.getOrElseUpdate(varName, s"mem_${counter.next()}")
-              val newMem = SharedMemory(memName, value.interval.size.getOrElse(0), load.mem.valueSize)
+              if globals.contains(index.node) then varName = cellsToName(globals(index.node).get(index.interval))
+              val newMem = SharedMemory(varName, value.interval.size.getOrElse(0), load.mem.valueSize)
               val newLoad = MemoryLoad(load.lhs, newMem, load.index, load.endian, load.size, load.label)
               ChangeTo(List(newLoad))
             else SkipChildren()
@@ -118,13 +117,13 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph]) extends CILVisitor {
             val index = indices.head
             val flag = index.node.flags
             val content = index.getPointee
-            val varName = cellsToName(index)
+            var varName = cellsToName(index)
             if isGlobal(flag) then ChangeTo(List(MemoryAssign(Register(varName, store.size), store.value, store.label)))
             else if isLocal(flag) && !flag.escapes then
               ChangeTo(List(LocalAssign(LocalVar(varName, store.value.getType), store.value, store.label, false)))
             else if !flag.escapes then
-              val memName = regions.getOrElseUpdate(varName, s"mem_${counter.next()}")
-              val newMem = SharedMemory(memName, content.interval.size.getOrElse(0), store.mem.valueSize)
+              if globals.contains(index.node) then varName = cellsToName(globals(index.node).get(index.interval))
+              val newMem = SharedMemory(varName, content.interval.size.getOrElse(0), store.mem.valueSize)
               val newStore = MemoryStore(newMem, store.index, store.value, store.endian, store.size, store.label)
               ChangeTo(List(newStore))
             else // ignore the case where the address escapes
