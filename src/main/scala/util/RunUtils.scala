@@ -932,7 +932,11 @@ object RunUtils {
         DSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
         DSATD.values.foreach(g => globalGraph.globalTransfer(g, globalGraph))
-        DSATD.values.foreach(g => globalGraph.globalTransfer(globalGraph, g))
+        val globalMapping = DSATD.values.foldLeft(Map[IntervalNode, IntervalNode]()) { (m, g) =>
+          val oldToNew = globalGraph.globalTransfer(globalGraph, g)
+          m ++ oldToNew.map((common, spec) => (spec, common))
+
+        }
         DSATimer.checkPoint("Finished DSA global graph")
         DSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
@@ -943,7 +947,7 @@ object RunUtils {
         DSATimer.checkPoint("Finished DSA Invariant Check")
         dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
 
-        if q.memoryTransform then visit_prog(MemoryTransform(DSATD), ctx.program)
+        if q.memoryTransform then visit_prog(MemoryTransform(DSATD, globalMapping), ctx.program)
     }
 
     if (q.runInterpret) {
