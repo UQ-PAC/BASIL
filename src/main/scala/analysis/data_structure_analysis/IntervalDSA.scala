@@ -206,7 +206,7 @@ class IntervalGraph(
 
   }
 
-  def globalTransfer(source: IntervalGraph, target: IntervalGraph): Unit = {
+  def globalTransfer(source: IntervalGraph, target: IntervalGraph): Map[IntervalNode, IntervalNode] = {
     DSALogger.info(s"cloning globalNode from ${source.proc.procName}")
     val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
     val targetGlobal = target.find(target.nodes(Global).get(0))
@@ -216,7 +216,9 @@ class IntervalGraph(
 
     sourceGlobal = globalNode.get(targetGlobal.interval)
     target.mergeCells(sourceGlobal, targetGlobal)
+    oldToNew.map((old, outdatedNew) => (old, target.find(outdatedNew))).toMap
   }
+
   def callTransfer(phase: DSAPhase, cons: DirectCallConstraint, source: IntervalGraph, target: IntervalGraph): Unit = {
     require(phase == TD || phase == BU)
     val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
