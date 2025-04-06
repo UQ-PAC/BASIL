@@ -432,10 +432,10 @@ class IntervalGraph(
         cons match
           case MemoryReadConstraint(pos) =>
             indices.map(_.node).foreach(_.flags.read = true)
-            if indexFlag.heap then indexPointee.map(_.node).foreach(_.flags.escapes = true)
+            if indexFlag.heap || indexFlag.escapes then indexPointee.map(_.node).foreach(_.flags.escapes = true)
           case MemoryWriteConstraint(pos) =>
             indices.map(_.node).foreach(_.flags.modified = true)
-            if indexFlag.heap then indexPointee.map(_.node).foreach(_.flags.escapes = true)
+            if indexFlag.heap || indexFlag.escapes then indexPointee.map(_.node).foreach(_.flags.escapes = true)
         val values = constraintArgToCells(cons.arg2)
         val first = if indexPointee.nonEmpty then
           indices
