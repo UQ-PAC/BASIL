@@ -947,7 +947,7 @@ object RunUtils {
         DSATimer.checkPoint("Finished DSA Invariant Check")
         dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
 
-        if q.memoryTransform then 
+        if q.memoryTransform then
           visit_prog(MemoryTransform(DSATD, globalMapping), ctx.program)
           DSATimer.checkPoint("Performed Memory Transform")
     }

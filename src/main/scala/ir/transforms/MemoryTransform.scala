@@ -9,6 +9,7 @@ import scala.collection.mutable
 
 class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalNode, IntervalNode]) extends CILVisitor {
   val counter: Counter = Counter()
+  val memVals = mutable.Map[IntervalCell, String]()
   val revEdges: Map[Procedure, Map[IntervalCell, Set[IntervalCell]]] = Map.empty
 //    dsa.map((proc, graph) => (proc, IntervalDSA.getPointers(graph)))
   val interProcCells: Map[IntervalCell, Set[IntervalCell]] = Map.empty // computeRelations()
@@ -102,8 +103,11 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
             else if isLocal(flag) && !flag.escapes then
               ChangeTo(List(LocalAssign(load.lhs, LocalVar(varName, load.lhs.getType), load.label)))
             else if !flag.escapes then
-              if globals.contains(index.node) then varName = cellsToName(globals(index.node).get(index.interval))
-              val newMem = SharedMemory(varName, value.interval.size.getOrElse(0), load.mem.valueSize)
+              val memName = memVals.getOrElseUpdate(
+                globals.getOrElse(index.node, index.node).get(index.interval),
+                s"mem_${counter.next()}"
+              )
+              val newMem = SharedMemory(memName, value.interval.size.getOrElse(0), load.mem.valueSize)
               val newLoad = MemoryLoad(load.lhs, newMem, load.index, load.endian, load.size, load.label)
               ChangeTo(List(newLoad))
             else SkipChildren()
@@ -122,8 +126,11 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
             else if isLocal(flag) && !flag.escapes then
               ChangeTo(List(LocalAssign(LocalVar(varName, store.value.getType), store.value, store.label, false)))
             else if !flag.escapes then
-              if globals.contains(index.node) then varName = cellsToName(globals(index.node).get(index.interval))
-              val newMem = SharedMemory(varName, content.interval.size.getOrElse(0), store.mem.valueSize)
+              val memName = memVals.getOrElseUpdate(
+                globals.getOrElse(index.node, index.node).get(index.interval),
+                s"mem_${counter.next()}"
+              )
+              val newMem = SharedMemory(memName, content.interval.size.getOrElse(0), store.mem.valueSize)
               val newStore = MemoryStore(newMem, store.index, store.value, store.endian, store.size, store.label)
               ChangeTo(List(newStore))
             else // ignore the case where the address escapes
