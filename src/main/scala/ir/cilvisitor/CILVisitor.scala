@@ -163,7 +163,7 @@ class CILVisitorImpl(val v: CILVisitor) {
         m
       case m: MemoryAssign =>
         m.rhs = visit_expr(m.rhs)
-        m.lhs = visit_lvar(m.lhs).asInstanceOf[Register]
+        m.lhs = visit_lvar(m.lhs)
         m
       case m: LocalAssign =>
         m.rhs = visit_expr(m.rhs)
