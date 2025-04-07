@@ -263,7 +263,9 @@ prog(
           "out" -> Register("R0", 64)
         ),
         "printf",
-        "in" -> LocalVar("R0", BitVecType(64), 0)
+        Seq(
+          "in" -> LocalVar("R0", BitVecType(64), 0)
+        )
       ),
       ret(
         "R0_out" -> LocalVar("R0", BitVecType(64), 0),
