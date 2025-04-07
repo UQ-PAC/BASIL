@@ -947,9 +947,16 @@ object RunUtils {
         DSATimer.checkPoint("Finished DSA Invariant Check")
         dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
 
+        var domain = computeDomain[CFGPosition, CFGPosition](IntraProcIRCursor, Set(ctx.program.mainProcedure)).toSet
+        var h = toDot[CFGPosition](domain, IntraProcIRCursor, Map.empty, Set())
+        writeToFile(h, "before.dot")
         if q.memoryTransform then
           visit_prog(MemoryTransform(DSATD, globalMapping), ctx.program)
           DSATimer.checkPoint("Performed Memory Transform")
+
+        domain = computeDomain[CFGPosition, CFGPosition](IntraProcIRCursor, Set(ctx.program.mainProcedure)).toSet
+        h = toDot[CFGPosition](domain, IntraProcIRCursor, Map.empty, Set())
+        writeToFile(h, "after.dot")
     }
 
     if (q.runInterpret) {
