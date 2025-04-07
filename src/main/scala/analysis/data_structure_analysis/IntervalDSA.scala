@@ -138,9 +138,9 @@ class IntervalGraph(
     globalNode.flags.global = true
     globals.foreach {
       case FuncEntry(name, size, address) =>
-        globalNode.add(Interval(address.toInt, address.toInt + (size / 8)))
+        globalNode.add(Interval(address.toInt, address.toInt + (size / 8) - 1))
       case SpecGlobal(name, size, arraySize, address) =>
-        globalNode.add(Interval(address.toInt, address.toInt + (size / 8)))
+        globalNode.add(Interval(address.toInt, address.toInt)) // ignore size, could be a composite type
     }
 
     globalOffsets.foreach { case (address, relocated) =>
@@ -426,6 +426,7 @@ class IntervalGraph(
       case cons: MemoryAccessConstraint[_] =>
         Logger.debug(s"Processing constraint $cons")
         val indices = constraintArgToCells(cons.arg1, ignoreContents = true)
+        indices.foreach(cell => cell.node.add(cell.interval.growTo(cons.size - 1)))
         val indexPointee = constraintArgToCells(cons.arg1)
         val indexFlag = joinFlags(indices)
         if cons.arg1.value.variables.intersect(proc.formalInParam.filterNot(_.name.startsWith("R31")).toSet).nonEmpty
@@ -441,9 +442,6 @@ class IntervalGraph(
         val first = if indexPointee.nonEmpty then
           indices
             .map(findExact)
-            .foreach { case (node, interval) =>
-              if cons.size > 0 then node.add(interval.growTo(cons.size - 1))
-            }
           val res = mergeCells(indexPointee)
           val correctPointee =
             indices
