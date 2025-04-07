@@ -93,16 +93,15 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
           val indices = dsa(proc).exprToCells(load.index).map(dsa(proc).get).toSeq
           if indices.nonEmpty && indices.forall(_.hasPointee) then {
             assert(indices.map(_.getPointee).toSet.size == 1, s"$proc, ${indices.map(_.getPointee).size}, $load")
-            assert(indices.size == 1, indices)
             val index = indices.head
-            val flag = index.node.flags
+            val flag = joinFlags(indices)
             val value = index.getPointee
-            var varName = cellsToName(index)
+            val varName = cellsToName(index)
 
             if isGlobal(flag) then ChangeTo(List(LocalAssign(load.lhs, Register(varName, load.size), load.label)))
             else if isLocal(flag) && !flag.escapes then
               ChangeTo(List(LocalAssign(load.lhs, LocalVar(varName, load.lhs.getType), load.label)))
-            else if !flag.escapes then
+            else if !flag.escapes && indices.size == 1 then
               val memName = memVals.getOrElseUpdate(
                 globals.getOrElse(index.node, index.node).get(index.interval),
                 s"mem_${counter.next()}"
@@ -117,15 +116,14 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
           val indices = dsa(proc).exprToCells(store.index).map(dsa(proc).get).toSeq
           if indices.nonEmpty && indices.forall(_.hasPointee) then {
             assert(indices.map(_.getPointee).toSet.size == 1)
-            assert(indices.size == 1, indices)
             val index = indices.head
-            val flag = index.node.flags
+            val flag = joinFlags(indices)
             val content = index.getPointee
-            var varName = cellsToName(index)
+            val varName = cellsToName(index)
             if isGlobal(flag) then ChangeTo(List(MemoryAssign(Register(varName, store.size), store.value, store.label)))
             else if isLocal(flag) && !flag.escapes then
               ChangeTo(List(LocalAssign(LocalVar(varName, store.value.getType), store.value, store.label, false)))
-            else if !flag.escapes then
+            else if !flag.escapes && indices.size == 1 then
               val memName = memVals.getOrElseUpdate(
                 globals.getOrElse(index.node, index.node).get(index.interval),
                 s"mem_${counter.next()}"
