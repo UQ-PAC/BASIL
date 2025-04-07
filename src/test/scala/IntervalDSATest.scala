@@ -1,4 +1,4 @@
-import analysis.data_structure_analysis.{Heap, IntervalDSA, Par, Ret, SymBase, generateConstraints, getSymbolicValues}
+import analysis.data_structure_analysis.{Heap, IntervalDSA, Par, Ret, Stack, SymBase, generateConstraints, getSymbolicValues}
 import boogie.SpecGlobal
 import ir.*
 import ir.Endian.{BigEndian, LittleEndian}
@@ -275,11 +275,19 @@ class IntervalDSATest extends AnyFunSuite {
 
   test("stack interproc overlapping") {
     val results = runTest("src/test/dsa/stack_interproc_overlapping/stack_interproc_overlapping")
-
-    // the dsg of the main procedure after the all phases
     val program = results.ir.program
 
     // Local Callee
-    val dsgCallee = results.analysis.get.localDSA(program.nameToProcedure("set_fields"))
+    val dsgCallee = results.dsa.get.local(program.nameToProcedure("set_fields"))
+    val inParam = dsgCallee.exprToCells(LocalVar("R0_in", BitVecType(64))).map(dsgCallee.get).head
+    val stackNode = dsgCallee.find(dsgCallee.nodes(Stack(program.nameToProcedure("set_fields"))))
+    println(inParam)
+    assert(stackNode.cells.filter(_.hasPointee).exists(_.getPointee.equiv(inParam)))
+    assert(inParam.interval.size.get == 8)
+
   }
+
+
+
+
 }
