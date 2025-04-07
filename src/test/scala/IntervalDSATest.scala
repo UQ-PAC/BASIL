@@ -50,10 +50,10 @@ class IntervalDSATest extends AnyFunSuite {
   }
 
   def programToContext(
-    program: Program,
-    globals: Set[SpecGlobal] = Set.empty,
-    globalOffsets: Map[BigInt, BigInt] = Map.empty
-  ): IRContext = {
+                        program: Program,
+                        globals: Set[SpecGlobal] = Set.empty,
+                        globalOffsets: Map[BigInt, BigInt] = Map.empty
+                      ): IRContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program)
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
@@ -61,6 +61,12 @@ class IntervalDSATest extends AnyFunSuite {
     val spec = Specification(Set(), globals, Map(), List(), List(), List(), Set())
     IRContext(List(), Set(), globals, Set(), globalOffsets, spec, program)
   }
+
+  def globalsToLiteral(ctx: IRContext) = {
+    ctx.globals.map(g => (g.name, BitVecLiteral(g.address, 64))).toMap
+      ++ (ctx.funcEntries.map(f => (f.name, BitVecLiteral(f.address.toInt, 64))).toMap)
+  }
+
 
   test("jumptable main") {
     val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable")
@@ -246,5 +252,34 @@ class IntervalDSATest extends AnyFunSuite {
     assert(wmallocHeap.head.exists(base => base.isInstanceOf[Heap]))
     assert(mainHeap != wmallocHeap)
     assert(mainHeap.flatten.toSet == wmallocHeap.flatten.toSet)
+  }
+
+
+  test("overlapping access") {
+    val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable")
+
+    // the dsg of the main procedure after the local phase
+    val program = results.ir.program
+    val dsg = results.dsa.get.local(program.mainProcedure)
+
+    val globals = globalsToLiteral(results.ir)
+    val add_two = globals("add_two")
+    val add_six = globals("add_six")
+    val sub_sev = globals("sub_seven")
+
+    assert(dsg.exprToCells(add_two) == dsg.exprToCells(add_six))
+    assert(dsg.exprToCells(add_two).size == 1)
+    assert(dsg.exprToCells(add_two).head.node.isCollapsed)
+  }
+
+
+  test("stack interproc overlapping") {
+    val results = runTest("src/test/dsa/stack_interproc_overlapping/stack_interproc_overlapping")
+
+    // the dsg of the main procedure after the all phases
+    val program = results.ir.program
+
+    // Local Callee
+    val dsgCallee = results.analysis.get.localDSA(program.nameToProcedure("set_fields"))
   }
 }
