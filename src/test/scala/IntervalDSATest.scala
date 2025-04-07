@@ -281,9 +281,27 @@ class IntervalDSATest extends AnyFunSuite {
     val dsgCallee = results.dsa.get.local(program.nameToProcedure("set_fields"))
     val inParam = dsgCallee.exprToCells(LocalVar("R0_in", BitVecType(64))).map(dsgCallee.get).head
     val stackNode = dsgCallee.find(dsgCallee.nodes(Stack(program.nameToProcedure("set_fields"))))
-    println(inParam)
+    // stack should point to in parameter
     assert(stackNode.cells.filter(_.hasPointee).exists(_.getPointee.equiv(inParam)))
-    assert(inParam.interval.size.get == 8)
+    // two in param cells both of size 8 starting at 0 and 16
+    assert(inParam.node.cells.forall(_.interval.size.get == 8))
+    assert(inParam.node.cells.size == 2)
+    assert(inParam.node.cells.map(_.interval.start.get).toSet == Set(0, 16))
+
+
+    // local caller
+    val dsgCaller = results.dsa.get.local(program.mainProcedure)
+    val stack32 = dsgCaller.nodes(Stack(program.mainProcedure)).get(-32)
+    val stack48 = dsgCaller.nodes(Stack(program.mainProcedure)).get(-48)
+    assert(stack32 != stack48)
+
+
+    // top down caller
+    val dsg = results.dsa.get.topDown(program.mainProcedure)
+    val stack32td = dsg.nodes(Stack(program.mainProcedure)).get(-32)
+    val stack48td = dsg.nodes(Stack(program.mainProcedure)).get(-48)
+    assert(stack48td != stack32td)
+    println(stack32td.node.cells)
 
   }
 
