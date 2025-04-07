@@ -96,11 +96,29 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
             val index = indices.head
             val flag = joinFlags(indices)
             val value = index.getPointee
-            val varName = cellsToName(index)
-
-            if isGlobal(flag) then ChangeTo(List(LocalAssign(load.lhs, Register(varName, load.size), load.label)))
-            else if isLocal(flag) && !flag.escapes then
-              ChangeTo(List(LocalAssign(load.lhs, LocalVar(varName, load.lhs.getType), load.label)))
+            if isGlobal(flag) then
+              ChangeTo(
+                List(
+                  LocalAssign(
+                    load.lhs,
+                    Register(s"Global_${index.interval.move(i => i - index.node.bases(Global))}", load.size),
+                    load.label
+                  )
+                )
+              )
+            else if isLocal(flag) && !flag.escapes && index.node.bases.contains(Stack(proc)) then
+              ChangeTo(
+                List(
+                  LocalAssign(
+                    load.lhs,
+                    LocalVar(
+                      s"Stack_${index.interval.move(i => i - index.node.bases(Stack(proc)))}".replace("-", "n"),
+                      load.lhs.getType
+                    ),
+                    load.label
+                  )
+                )
+              )
             else if !flag.escapes && indices.size == 1 then
               val memName = memVals.getOrElseUpdate(
                 globals.getOrElse(index.node, index.node).get(index.interval),
@@ -119,10 +137,29 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
             val index = indices.head
             val flag = joinFlags(indices)
             val content = index.getPointee
-            val varName = cellsToName(index)
-            if isGlobal(flag) then ChangeTo(List(MemoryAssign(Register(varName, store.size), store.value, store.label)))
-            else if isLocal(flag) && !flag.escapes then
-              ChangeTo(List(LocalAssign(LocalVar(varName, store.value.getType), store.value, store.label, false)))
+            if isGlobal(flag) then
+              ChangeTo(
+                List(
+                  MemoryAssign(
+                    Register(s"Global_${index.interval.move(i => i - index.node.bases(Global))}", store.size),
+                    store.value,
+                    store.label
+                  )
+                )
+              )
+            else if isLocal(flag) && !flag.escapes && index.node.bases.contains(Stack(proc)) then
+              ChangeTo(
+                List(
+                  LocalAssign(
+                    LocalVar(
+                      s"Stack_${index.interval.move(i => i - index.node.bases(Stack(proc)))}".replace("-", "n"),
+                      store.value.getType
+                    ),
+                    store.value,
+                    store.label
+                  )
+                )
+              )
             else if !flag.escapes && indices.size == 1 then
               val memName = memVals.getOrElseUpdate(
                 globals.getOrElse(index.node, index.node).get(index.interval),
