@@ -105,4 +105,5 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
     os.read.lines(path1) == os.read.lines(path2)
   }
 
+  def scalafmt = mill.scalalib.scalafmt.ScalafmtModule 
 }

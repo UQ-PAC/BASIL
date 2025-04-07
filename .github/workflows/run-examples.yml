@@ -23,12 +23,11 @@ jobs:
   Scalafmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: olafurpg/setup-scala@v11
-        with:
-          java-version: openjdk@1.17.0
-      - uses: actions/checkout@v1
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Check Source Formatting
-        run: sbt scalafmtCheckAll
+        run: ./mill scalafmt.checkFormat
 
   Compile:
     runs-on: ubuntu-latest

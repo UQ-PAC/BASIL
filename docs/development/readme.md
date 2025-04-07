@@ -95,6 +95,22 @@ To achieve this for a new result in development use the following method defined
 def printAnalysisResults(prog: Program, result: Map[CFGPosition, _]): String 
 ```
 
+
+## Code Formatting
+
+All Pull Requests must conform to the style produced by `scalafmt`. This is checked automatically in CI, it can be run locally with:
+
+```bash
+./mill scalafmt.checkFormat
+```
+
+Sources can be reformatted with:
+
+```bash
+./mill scalafmt.reformat
+```
+
+
 ## Tests
 
 
@@ -136,4 +152,5 @@ sudo sysctl kernel.kptr_restrict=0
 ## Managing docker containers
 
 [See docker readme](../../docker/readme.md)
+
 
