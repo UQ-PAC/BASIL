@@ -30,7 +30,7 @@ enum Interval extends Offsets {
     this match
       case Interval.Top => "Top"
       case Interval.Bot => "Bot"
-      case Interval.Value(start, end) => s"$start-$end"
+      case Interval.Value(start, end) => s"${start}_$end"
 
   def start: Option[Int] =
     this match
