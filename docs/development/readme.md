@@ -97,61 +97,11 @@ def printAnalysisResults(prog: Program, result: Map[CFGPosition, _]): String
 
 ## Tests
 
-### Unit tests
-
-We use the [ScalaTest](https://www.scalatest.org/) unit testing framework. Example unit tests can be found in [src/test/scala](../src/test/scala/).
-
-The [dsl](../basil-ir.md#constructing-programs-in-code) can be used to construct simple example BASIL IR programs, which can then be fed through into the whole pipeline via `IRLoading.load()` in
-`RunUtils.scala`. Prefer to write tests that depend only on the single piece of code under test rather than the whole BASIL translation. 
-
-### Integration tests
-
-These are the `SystemTests.scala` test case with the files present in `src/test/correct` for examples that should verify and `src/test/incorrect`
-for examples that should not verify. 
-
-These are lifted via the Makefiles, to add another test simply add a directory, c source file, and optionally specification file and run 
-
-```sh
-cd src/test/
-make
-```
-
-The `config.mk` file in the test directory can be used to exclude unnecessary compilers, and change compilation flags. 
-Full details can be found [here](../src/test/readme.md).
 
 ### Running Tests
 
-The test suites use [ScalaTest](https://www.scalatest.org/).
+See [testing](testing.md).
 
-To run the primary SystemTests suites (SystemTestsBAP and SystemTestsGTIRB) (which require Boogie):
-
-```
-$ ./mill test.testOnly 'SystemTests*'
-```
-
-To run a single test from a test suite, it can be selected using globbing on the full test class name with the `testOnly` task:
-
-```
-$ ./mill test.testOnly 'SystemTestsBAP' -- -z basic_arrays_read/gcc:BAP
-```
-
-To update the expected BASIL output files from the SystemTests results run:
-
-```
-$ ./mill updateExpected
-```
-
-To run another test suite, just use the name of the class containing the test suite (in this case LiveVarsAnalysisTests):
-
-```
-$ ./mill test.testOnly 'LiveVarsAnalysisTests'
-```
-
-To list all test suites:
-
-```
-$ ./mill test.testOnly '*' -- -t ''
-```
 
 ## Performance profiling
 
