@@ -44,7 +44,7 @@ enum Interval extends Offsets {
 
   def size: Option[Int] =
     this match
-      case Interval.Value(start, end) => Some(end - start)
+      case Interval.Value(start, end) => Some(end - start + 1)
       case _ => None
 
   def move(func: Int => Int): Interval =
