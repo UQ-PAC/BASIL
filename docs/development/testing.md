@@ -12,11 +12,16 @@ and maintaining test cases.
 
 Writing test cases
 ------------------
+
+We use the [ScalaTest](https://www.scalatest.org/) unit testing framework. Example unit tests can be found in [src/test/scala](../src/test/scala/).
+
 Test cases are written in Scalatest using its
 [`AnyFunSuite`](https://www.scalatest.org/scaladoc/3.1.2/org/scalatest/funsuite/AnyFunSuite.html) style.
 See the AnyFunSuite documentation or existing test cases for syntax and examples.
 
 ### Exporting IR structures into test cases
+
+The [dsl](../basil-ir.md#constructing-programs-in-code) can be used to construct simple example BASIL IR programs, which can then be fed through into the whole pipeline via `IRLoading.load()` in
 
 Often, you might have found a particular Basil IR program which demonstrates some bug in the code.
 It is good practice to extract this into a test case, both to validate the fix and ensure the bug doesn't reoccur.
