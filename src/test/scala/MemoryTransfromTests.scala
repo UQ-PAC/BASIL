@@ -65,19 +65,14 @@ class MemoryTransfromTests extends AnyFunSuite {
 
   test("global assignment") {
     val results = runTest("src/test/memory_transform/clasloc/clang/clasloc")
-
     val source = results.ir.program.nameToProcedure("source")
     val memoryAssigns = source.collect { case ma: MemoryAssign => ma }
     assert(memoryAssigns.size == 1, "Expected Assignment to Z")
     val memoryAssign = memoryAssigns.head
     val global = memoryAssign.lhs
-    val z = results.ir.globals
-      .collectFirst { case SpecGlobal("z", size, arraySize, address) =>
-        (Global, Interval(address.toInt, address.toInt + (size / 8)))
-      }
-      .get
-      .toString()
-    assert(global.name.contains(z), s"Expected variable to be named $z")
+    val z = results.ir.globals.collectFirst { case g @ SpecGlobal("z", size, arraySize, address) => g }.get
+
+    assert(global.name == (s"Global_${z.address}_${z.address + z.size / 8}"), s"Expected variable to be named $z")
   }
 
   test("multi proc global assignment") {
