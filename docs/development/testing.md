@@ -147,7 +147,7 @@ The disabled mode will show as "cancelled".
 Both of these will be output in yellow text if your console is using colour.
 
 
-## Runnign Individual suites
+## Running Individual suites
 
 From git root directory run `mill test.testOnly`, tests suite names are glob matched against its argument, 
 for example to run all the SystemTest variants use:
