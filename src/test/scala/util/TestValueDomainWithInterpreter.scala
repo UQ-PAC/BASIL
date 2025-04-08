@@ -9,6 +9,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest
 import util.{BASILResult, StaticAnalysisConfig, IRContext}
 import translating.PrettyPrinter.*
+import org.scalacheck.{Arbitrary, Gen}
 
 trait TestValueDomainWithInterpreter[T] {
 
@@ -17,6 +18,15 @@ trait TestValueDomainWithInterpreter[T] {
    * the concrete expression `concrete` is contained in the abstract value `absval`.
    */
   def valueInAbstractValue(absval: T, concrete: Expr): Expr
+
+  def abstractEvalSoundnessProperty(evaluate: Expr => T)(expr: Expr) = {
+    // val expr = BinaryExpr(op, BitVecLiteral(lhs, size), BitVecLiteral(rhs, size))
+    val abs: T = evaluate(expr)
+    val concrete = ir.eval.evaluateExpr(expr).get
+    val test = valueInAbstractValue(abs, concrete)
+    val result = ir.eval.evaluateExpr(test).get
+    (result == TrueLiteral, s"${pp_expr(concrete)} ∈ $abs test (${pp_expr(test)}) evaluated to $result")
+  }
 
   case class CheckResult(
     name: String,

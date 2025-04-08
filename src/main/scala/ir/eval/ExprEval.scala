@@ -83,7 +83,7 @@ def evalBoolLogBinExpr(b: BoolBinOp, l: Boolean, r: Boolean): Boolean = b match 
   case BoolIMPLIES => l || (!r)
 }
 
-def evalUnOp(op: UnOp, body: Literal): Expr = {
+def evalUnOp(op: UnOp, body: Literal): Literal = {
   (body, op) match {
     case (b: BitVecLiteral, BVNOT) => BitVectorEval.smt_bvnot(b)
     case (b: BitVecLiteral, BVNEG) => BitVectorEval.smt_bvneg(b)
