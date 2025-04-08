@@ -721,14 +721,12 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
           val zeroExtendedValue = tnum.value & ((BigInt(1) << newLength) - 1)
           val zeroExtendedMask = tnum.mask & ((BigInt(1) << newLength) - 1)
           TNumValue(zeroExtendedValue, zeroExtendedMask, tnum.width + extension)
-        case _: TNumValue => throw Exception("type error")
       }
 
     case SignExtend(extension: Int, body: Expr) =>
       val bodyTNum = evaluateExprToTNum(s, body)
 
       bodyTNum match {
-        case tnum: TNumValue => throw Exception("type error")
         case tnum: TNumValue =>
           val valueMsb = (tnum.value >> (tnum.value.bitLength - 1)) & 1
           val maskMsb = (tnum.mask >> (tnum.mask.bitLength - 1)) & 1
