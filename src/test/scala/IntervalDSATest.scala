@@ -1,4 +1,4 @@
-import analysis.data_structure_analysis.{Heap, IntervalDSA, Par, Ret, Stack, SymBase, generateConstraints, getSymbolicValues}
+import analysis.data_structure_analysis.{Heap, Interval, IntervalDSA, Par, Ret, Stack, SymBase, generateConstraints, getSymbolicValues}
 import boogie.SpecGlobal
 import ir.*
 import ir.Endian.{BigEndian, LittleEndian}
@@ -9,6 +9,8 @@ import specification.Specification
 import test_util.BASILTest.writeToFile
 import util.*
 import util.DSAAnalysis.Norm
+import analysis.data_structure_analysis.given
+import translating.PrettyPrinter.pp_proc
 
 @test_util.tags.UnitTest
 class IntervalDSATest extends AnyFunSuite {
@@ -301,11 +303,43 @@ class IntervalDSATest extends AnyFunSuite {
     val stack32td = dsg.nodes(Stack(program.mainProcedure)).get(-32)
     val stack48td = dsg.nodes(Stack(program.mainProcedure)).get(-48)
     assert(stack48td != stack32td)
-    println(stack32td.node.cells)
-
   }
 
 
+  test("http_parse_basic") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = path + ".adt",
+          relfFile = path + ".relf",
+          mainProcedureName = "http_parse_basic",
+          trimEarly = true
+        ),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(DSAConfig(Set(Norm))),
+      )
+    )
 
+    val proc = res.ir.program.mainProcedure
+    writeToFile(dotBlockGraph(proc), "helper.dot")
+    writeToFile(pp_proc(proc), "helper.txt")
+    val symValues = getSymbolicValues[Interval](proc)
+    writeToFile(symValues.state.mkString("\n"), "helper.sva")
+    val const = generateConstraints(proc)
+//    val dsg = IntervalDSA.getLocal(proc, res.ir, symValues, const)
+    val dsg = res.dsa.get.bottomUp(res.ir.program.mainProcedure)
+    res.dsa.get.local.foreach(
+      (proc, graph) =>
+        if graph.nodes.contains(Stack(proc)) then
+          println(s"${proc.procName} is collapsed: ${graph.find(graph.nodes(Stack(proc))).isCollapsed}")
+    )
+    println(res.ir.program.mainProcedure.calls)
+    writeToFile(dsg.toDot, "dsg.dot")
 
+    print("")
+  }
 }
