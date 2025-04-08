@@ -39,16 +39,22 @@ import org.scalacheck.Prop.forAll
 import org.scalacheck.{Arbitrary, Gen}
 
 @test_util.tags.UnitTest
-class KnownBits
+class TestKnownBitsInterpreter
     extends AnyFunSuite
     with TestValueDomainWithInterpreter[TNum]
     with org.scalatestplus.scalacheck.ScalaCheckPropertyChecks {
 
   def valueInAbstractValue(absVal: TNum, concrete: Expr) = {
-    absVal match {
-      case TNumValue(v, m, w) =>
+    (absVal, concrete.getType) match {
+      case (TNumValue(v, m, w), _: BitVecType) =>
         BinaryExpr(BVEQ, BitVecLiteral(v, w), BinaryExpr(BVAND, concrete, UnaryExpr(BVNOT, BitVecLiteral(m, w))))
-      case _: TNumBool => TrueLiteral
+      case (TNumValue(v, m, w), BoolType) =>
+        BinaryExpr(
+          BVEQ,
+          BitVecLiteral(v, w),
+          BinaryExpr(BVAND, UnaryExpr(BoolToBV1, concrete), UnaryExpr(BVNOT, BitVecLiteral(m, w)))
+        )
+      case _ => ???
     }
   }
 
@@ -208,33 +214,33 @@ class KnownBits
       BVLSHR,
       BVULT,
       BVNAND,
-      // BVNOR,
+      BVNOR,
       BVXOR,
       BVXNOR,
       BVCOMP,
       BVSUB,
-      BVASHR
-      // BVUREM, // broken
-      // BVSREM, // broken
-      // BVSMOD, // broken
-      // BVUDIV, // broken
-      // BVSDIV, // broken
-      // BVULE,
-      // BVUGT,
-      // BVUGE,
-      // BVSLT,
-      // BVSLE,
-      // BVSGT,
-      // BVSGE,
-      // BVEQ,
-      // BVNEQ,
-      // BVCONCAT
+      BVASHR,
+      BVUREM, // broken
+      BVSREM, // broken
+      BVSMOD, // broken
+      BVUDIV, // broken
+      BVSDIV, // broken
+      BVULE,
+      BVUGT,
+      BVUGE,
+      BVSLT,
+      BVSLE,
+      BVSGT,
+      BVSGE,
+      BVEQ,
+      BVNEQ,
+      BVCONCAT
     )
 
   implicit lazy val arbExpr: Arbitrary[Expr] = Arbitrary(for {
     size <- Gen.chooseNum(1, 70)
     op <- arbBinOp
-    maxVal = (BigInt(2).pow(size) - 2)
+    maxVal = (BigInt(2).pow(size) - 1)
     smallMax = maxVal.min(255)
     rhs <- op match {
       case BVSDIV => Gen.chooseNum(BigInt(1), maxVal)
@@ -252,18 +258,20 @@ class KnownBits
 
   def evaluateAbstract(e: Expr): TNum = TNumDomain().evaluateExprToTNum(Map(), e)
 
-  forAll { (e: Expr) =>
-    {
-      val (r, c) =
-        try {
-          abstractEvalSoundnessProperty(evaluateAbstract)(e: Expr)
-        } catch {
-          case ex => {
-            val msg = ex.toString + "\n" + ex.getStackTrace.mkString("\n")
-            (false, msg)
+  test("binopprop") {
+    forAll { (e: Expr) =>
+      {
+        val (r, c) =
+          try {
+            abstractEvalSoundnessProperty(evaluateAbstract)(e: Expr)
+          } catch {
+            case ex => {
+              val msg = ex.toString + "\n" + ex.getStackTrace.mkString("\n")
+              (false, msg)
+            }
           }
-        }
-      assert(r, c)
+        assert(r, c)
+      }
     }
   }
 
