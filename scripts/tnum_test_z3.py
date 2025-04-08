@@ -165,7 +165,6 @@ class TNum:
     def __lshift__(self, other):
         thatLB = other.v & ~other.m
         thatUB = other.v | other.m
-        print(thatUB)
 
         # Shift self by the lower bound of other
         acc_v = self.v << thatLB
@@ -179,11 +178,9 @@ class TNum:
             # Otherwise, don't modify accumulator
             acc_m = If (test, acc_m | (self.m << i) | ((self.v << i) ^ acc_v), acc_m)
             acc_v = If (test, acc_v & (self.v << i), acc_v)
-        print(thatUB)
 
         # If a shift value greater than or equal to width is possible, need to merge in 0
         test = UGE(thatUB, self.w)
-        print(test)
         acc_m = If (test, acc_m | acc_v, acc_m)
         acc_v = If (test, 0, acc_v)
         return TNum(acc_v, acc_m)
