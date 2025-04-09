@@ -371,12 +371,20 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) e
             .map(_.asInstanceOf[LocalVar])
             .partition(v => unchanged.exists(r => v.name.startsWith(r)))
         val n = maintained
-          .map(l => (l, inParams.collectFirst{case (in, act) if in.name.take(3) == l.name.take(3) => SymValues.exprToSymValSet(a)(act)}.get)).toMap
+          .map(l =>
+            (
+              l,
+              inParams.collectFirst {
+                case (in, act) if in.name.take(3) == l.name.take(3) => SymValues.exprToSymValSet(a)(act)
+              }.get
+            )
+          )
+          .toMap
         val retInitSymValSet = SymValues(
           notMaintained
             .map(param => (param, symValSetDomain.init(Ret(call, param))))
             .toMap
-          ++ n
+            ++ n
         )
         join(a, retInitSymValSet, block)
       case ind: IndirectCall => a // TODO possibly map every live variable to top

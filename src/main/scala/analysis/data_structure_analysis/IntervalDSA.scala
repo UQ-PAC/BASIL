@@ -617,8 +617,7 @@ class IntervalGraph(
 
   def mergeCells(c1: IntervalCell, c2: IntervalCell): IntervalCell = {
 
-    if Set(c1, c2).map(_.node).filter(_.bases.contains(Stack(irContext.program.mainProcedure))).nonEmpty then
-      print("")
+    if Set(c1, c2).map(_.node).filter(_.bases.contains(Stack(irContext.program.mainProcedure))).nonEmpty then print("")
 
     require(c1.node.graph == c2.node.graph && c1.node.graph == this)
     val cell1 = find(c1)

@@ -1,4 +1,14 @@
-import analysis.data_structure_analysis.{Heap, Interval, IntervalDSA, Par, Ret, Stack, SymBase, generateConstraints, getSymbolicValues}
+import analysis.data_structure_analysis.{
+  Heap,
+  Interval,
+  IntervalDSA,
+  Par,
+  Ret,
+  Stack,
+  SymBase,
+  generateConstraints,
+  getSymbolicValues
+}
 import boogie.SpecGlobal
 import ir.*
 import ir.Endian.{BigEndian, LittleEndian}
@@ -52,10 +62,10 @@ class IntervalDSATest extends AnyFunSuite {
   }
 
   def programToContext(
-                        program: Program,
-                        globals: Set[SpecGlobal] = Set.empty,
-                        globalOffsets: Map[BigInt, BigInt] = Map.empty
-                      ): IRContext = {
+    program: Program,
+    globals: Set[SpecGlobal] = Set.empty,
+    globalOffsets: Map[BigInt, BigInt] = Map.empty
+  ): IRContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program)
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
@@ -68,7 +78,6 @@ class IntervalDSATest extends AnyFunSuite {
     ctx.globals.map(g => (g.name, BitVecLiteral(g.address, 64))).toMap
       ++ (ctx.funcEntries.map(f => (f.name, BitVecLiteral(f.address.toInt, 64))).toMap)
   }
-
 
   test("jumptable main") {
     val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable")
@@ -256,7 +265,6 @@ class IntervalDSATest extends AnyFunSuite {
     assert(mainHeap.flatten.toSet == wmallocHeap.flatten.toSet)
   }
 
-
   test("overlapping access") {
     val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable")
 
@@ -274,7 +282,6 @@ class IntervalDSATest extends AnyFunSuite {
     assert(dsg.exprToCells(add_two).head.node.isCollapsed)
   }
 
-
   test("stack interproc overlapping") {
     val results = runTest("src/test/dsa/stack_interproc_overlapping/stack_interproc_overlapping")
     val program = results.ir.program
@@ -290,13 +297,11 @@ class IntervalDSATest extends AnyFunSuite {
     assert(inParam.node.cells.size == 2)
     assert(inParam.node.cells.map(_.interval.start.get).toSet == Set(0, 16))
 
-
     // local caller
     val dsgCaller = results.dsa.get.local(program.mainProcedure)
     val stack32 = dsgCaller.nodes(Stack(program.mainProcedure)).get(-32)
     val stack48 = dsgCaller.nodes(Stack(program.mainProcedure)).get(-48)
     assert(stack32 != stack48)
-
 
     // top down caller
     val dsg = results.dsa.get.topDown(program.mainProcedure)
@@ -304,7 +309,6 @@ class IntervalDSATest extends AnyFunSuite {
     val stack48td = dsg.nodes(Stack(program.mainProcedure)).get(-48)
     assert(stack48td != stack32td)
   }
-
 
   test("http_parse_basic") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
@@ -320,7 +324,7 @@ class IntervalDSATest extends AnyFunSuite {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Norm))),
+        dsaConfig = Some(DSAConfig(Set(Norm)))
       )
     )
 
