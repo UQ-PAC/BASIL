@@ -202,7 +202,6 @@ case class Call(target: String, actualParams: (String, Expr)*)
 def directCall(lhs: Iterable[(String, Variable)], rhs: Call): EventuallyCall =
   EventuallyCall(DelayNameResolve(rhs.target), lhs.toArray, rhs.actualParams)
 
-
 def directCall(tgt: String): EventuallyCall = directCall(Nil, tgt, Nil)
 
 def directCall(tgt: String, label: Option[String]): EventuallyCall = directCall(Nil, tgt, Nil)
