@@ -44,5 +44,6 @@ def coerceToBool(e: Expr): Expr = {
     case IntType => BinaryExpr(IntNEQ, e, IntLiteral(0))
     case BoolType => e
     case MapType(_, _) => ???
+    case _ => ???
   }
 }

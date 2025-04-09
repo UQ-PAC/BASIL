@@ -137,7 +137,7 @@ object PCMan {
 
 import PCMan.*
 
-def procToTransition(p: Procedure, loops: List[Loop], cutJoins: Boolean = true) = {
+def procToTransition(p: Procedure, loops: List[Loop], cutJoins: Boolean = false) = {
 
   val pcVar = transitionSystemPCVar
   var cutPoints = Map[String, Block]()

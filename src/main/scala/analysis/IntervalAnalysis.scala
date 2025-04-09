@@ -9,64 +9,154 @@ import specification.{ExternalFunction, SymbolTableEntry}
 import util.{DSALogger, IRContext}
 import java.io.File
 
-sealed trait Value {
+trait AbsValue {
 
-  def top() : Value
+  def top() : AbsValue
 
-  def bvnot(): Value = top()
-  def bvneg(): Value = top()
-  def boolnot(): Value = top()
+  def fromliteral(l: Literal) : AbsValue = top() 
+  def frominterval(lIncl: BigInt, hIncl: BigInt) : AbsValue = top()
 
-  def equal(other: Value): Value = top()
-  def bvcomp(other: Value): Value = top()
-  def bvand(other: Value): Value = top()
-  def bvor(other: Value): Value = top()
-  def bvadd(other: Value): Value = top()
-  def bvmul(other: Value): Value = top()
-  def bvshl(other: Value): Value = top()
-  def bvlshr(other: Value): Value = top()
-  def bvashr(other: Value): Value = top()
-  def bvshr(other: Value): Value = top()
-  def bvult(other: Value): Value = top()
-  def bvxor(other: Value): Value = top()
-  def bvsub(other: Value): Value = top()
-  def bvurem(other: Value): Value = top()
-  def bvsrem(other: Value): Value = top()
-  def bvsmod(other: Value): Value = top()
-  def bvudiv(other: Value): Value = top()
-  def bvsdiv(other: Value): Value = top()
-  def bvule(other: Value): Value = top()
-  def bvugt(other: Value): Value = top()
-  def bvslt(other: Value): Value = top()
-  def bvsle(other: Value): Value = top()
-  def bvsgt(other: Value): Value = top()
-  def bvsge(other: Value): Value = top()
-  def bvuge(other: Value): Value = top()
-  def bvconcat(other: Value): Value = top()
+  def intersect(other: AbsValue) : AbsValue
+  def union(other: AbsValue) : AbsValue
+  def bvnot(): AbsValue = top()
+  def bvneg(): AbsValue = top()
+  def intneg(): AbsValue = top()
+  def boolnot(): AbsValue = top()
+  def booltobv1() : AbsValue = top()
 
-  def intlt(other: Value): Value = top()
-  def intle(other: Value): Value = top()
-  def intgt(other: Value): Value = top()
-  def intge(other: Value): Value = top()
-  def intadd(other: Value): Value = top()
-  def intsub(other: Value): Value = top()
-  def intmul(other: Value): Value = top()
-  def intdiv(other: Value): Value = top()
-  def intmod(other: Value): Value = top()
+  def equal(other: AbsValue): AbsValue = top()
+  def bvcomp(other: AbsValue): AbsValue = top()
+  def bvand(other: AbsValue): AbsValue = top()
+  def bvor(other: AbsValue): AbsValue = top()
+  def bvadd(other: AbsValue): AbsValue = top()
+  def bvmul(other: AbsValue): AbsValue = top()
+  def bvshl(other: AbsValue): AbsValue = top()
+  def bvlshr(other: AbsValue): AbsValue = top()
+  def bvashr(other: AbsValue): AbsValue = top()
+  def bvshr(other: AbsValue): AbsValue = top()
+  def bvult(other: AbsValue): AbsValue = top()
+  def bvxor(other: AbsValue): AbsValue = top()
+  def bvsub(other: AbsValue): AbsValue = top()
+  def bvurem(other: AbsValue): AbsValue = top()
+  def bvsrem(other: AbsValue): AbsValue = top()
+  def bvsmod(other: AbsValue): AbsValue = top()
+  def bvudiv(other: AbsValue): AbsValue = top()
+  def bvsdiv(other: AbsValue): AbsValue = top()
+  def bvule(other: AbsValue): AbsValue = top()
+  def bvugt(other: AbsValue): AbsValue = top()
+  def bvslt(other: AbsValue): AbsValue = top()
+  def bvsle(other: AbsValue): AbsValue = top()
+  def bvsgt(other: AbsValue): AbsValue = top()
+  def bvsge(other: AbsValue): AbsValue = top()
+  def bvuge(other: AbsValue): AbsValue = top()
+  def bvconcat(other: AbsValue): AbsValue = top()
 
-  def booland(other: Value): Value = top()
-  def boolor(other: Value): Value = top()
+  def intlt(other: AbsValue): AbsValue = top()
+  def intle(other: AbsValue): AbsValue = top()
+  def intgt(other: AbsValue): AbsValue = top()
+  def intge(other: AbsValue): AbsValue = top()
+  def intadd(other: AbsValue): AbsValue = top()
+  def intsub(other: AbsValue): AbsValue = top()
+  def intmul(other: AbsValue): AbsValue = top()
+  def intdiv(other: AbsValue): AbsValue = top()
+  def intmod(other: AbsValue): AbsValue = top()
 
+  def booland(other: AbsValue): AbsValue = top()
+  def boolor(other: AbsValue): AbsValue = top()
 
+  def bvextract(hi: Int, lo: Int) : AbsValue = top()
+  def zeroextend(bits: Int) : AbsValue = top()
+  def signextend(bits: Int) : AbsValue = top()
+  def repeat(bits: Int) : AbsValue = top()
 }
 
-class IntraStateDomain(d: Value) extends AbstractDomain[Map[Variable, Value]] {
+//class IntervalValue extends ValueDom[Interval] {
+//  import analysis.data_structure_analysis.Interval.*
+//
+//  override def top() = Top
+//  extension (t: Interval)
+//    def intersect(other: Interval) : Interval = t.intersect(other)
+//    def union(other: Interval) : Interval = t.union(other)
+//
+//    def bvnot(): Interval = top()
+//    def bvneg(): Interval = top()
+//    def intneg(): Interval = top()
+//    def boolnot(): Interval = top()
+//    def booltobv1() : Interval = top()
+//
+//    def equal(other: Interval): Interval = top()
+//    def bvcomp(other: Interval): Interval = top()
+//    def bvand(other: Interval): Interval = top()
+//    def bvor(other: Interval): Interval = top()
+//    def bvadd(other: Interval): Interval = top()
+//    def bvmul(other: Interval): Interval = top()
+//    def bvshl(other: Interval): Interval = top()
+//    def bvlshr(other: Interval): Interval = top()
+//    def bvashr(other: Interval): Interval = top()
+//    def bvshr(other: Interval): Interval = top()
+//    def bvult(other: Interval): Interval = top()
+//    def bvxor(other: Interval): Interval = top()
+//    def bvsub(other: Interval): Interval = top()
+//    def bvurem(other: Interval): Interval = top()
+//    def bvsrem(other: Interval): Interval = top()
+//    def bvsmod(other: Interval): Interval = top()
+//    def bvudiv(other: Interval): Interval = top()
+//    def bvsdiv(other: Interval): Interval = top()
+//    def bvule(other: Interval): Interval = top()
+//    def bvugt(other: Interval): Interval = top()
+//    def bvslt(other: Interval): Interval = top()
+//    def bvsle(other: Interval): Interval = top()
+//    def bvsgt(other: Interval): Interval = top()
+//    def bvsge(other: Interval): Interval = top()
+//    def bvuge(other: Interval): Interval = top()
+//    def bvconcat(other: Interval): Interval = top()
+//
+//    def intlt(other: Interval): Interval = top()
+//    def intle(other: Interval): Interval = top()
+//    def intgt(other: Interval): Interval = top()
+//    def intge(other: Interval): Interval = top()
+//    def intadd(other: Interval): Interval = top()
+//    def intsub(other: Interval): Interval = top()
+//    def intmul(other: Interval): Interval = top()
+//    def intdiv(other: Interval): Interval = top()
+//    def intmod(other: Interval): Interval = top()
+//
+//    def booland(other: Interval): Interval = top()
+//    def boolor(other: Interval): Interval = top()
+//
+//    def bvextract(hi: Int, lo: Int) : Interval = top()
+//    def zeroextend(bits: Int) : Interval = top()
+//    def signextend(bits: Int) : Interval = top()
+//    def repeat(bits: Int) : Interval = top()
+//
+//}
 
-  override def join(l: Map[Variable, Value], r: Map[Variable, Value], loc: Command) = {
+class IntraStateDomain(d: AbsValue) extends AbstractDomain[Map[Variable, AbsValue]] {
+  import d.*
 
+  override def bot = Map[Variable, AbsValue]()
+  override def top = Map[Variable, AbsValue]()
+
+  override def join(l: Map[Variable, AbsValue], r: Map[Variable, AbsValue], loc: Block) = {
+    (l.keys ++ r.keys).map(v => v -> (l.get(v), r.get(v))).map {
+      case (v, (Some(l), Some(r))) => v -> l.intersect(r)
+      case (v, (None, Some(r))) => v -> r 
+      case (v, (Some(r), None)) => v -> r 
+      case (v, (None, None)) => ???
+    }.toMap
   }
 
-  def evalBinExpr(op: BinOp, l: Value, r: Value) : Value = {
+  def evalUnaryExpr(op: UnOp, arg: AbsValue) : AbsValue = {
+    op match {
+      case BoolNOT => arg.boolnot()
+      case BVNEG => arg.bvneg()
+      case BVNOT => arg.bvnot()
+      case IntNEG => arg.intneg()
+      case BoolToBV1 => arg.booltobv1()
+    }
+  }
+
+  def evalBinExpr(op: BinOp, l: AbsValue, r: AbsValue) : AbsValue = {
     op match {
       case BVADD => l.bvadd(r)
       case BVSUB => l.bvsub(r)
@@ -117,26 +207,73 @@ class IntraStateDomain(d: Value) extends AbstractDomain[Map[Variable, Value]] {
     }
   }
 
-  def evalExpr(s: Map[Variable, Value], e: Expr) : Value = {
+  def evalExpr(s: Map[Variable, AbsValue], e: Expr) : AbsValue = {
     e match {
       case BinaryExpr(op, l, r) => evalBinExpr(op, evalExpr(s, l), evalExpr(s, r))
+      case UnaryExpr(op, arg) => evalUnaryExpr(op, evalExpr(s, arg))
+      case u : UninterpretedFunction => d.top()
+      case l: Literal => d.fromliteral(l)
+      case Extract(hi, lo, e) => evalExpr(s, e).bvextract(hi, lo)
+      case v: Variable => s.get(v).getOrElse(d.top())
+      case ZeroExtend(sz, e) => evalExpr(s, e).zeroextend(sz)
+      case SignExtend(sz, e) => evalExpr(s, e).signextend(sz)
+      case Repeat(repeats, e) => evalExpr(s, e).repeat(repeats)
+      case _: Memory => d.top()
+      case l: LambdaExpr => d.top()
+      case l: QuantifierExpr => d.top()
+      case l: OldExpr => d.top()
     }
   }
 
-  def transfer(l: Map[Variable, Value], c: Command) = {
+  def narrow(st: Map[Variable, AbsValue], e: Expr) = e match {
+    case (BinaryExpr(BVEQ, v: Variable, v2: Literal)) =>  {
+      st.updated(v, d.fromliteral(v2))
+    }
+    case (BinaryExpr(BVULE, v: Variable, v2: BitVecLiteral)) =>  {
+      val nv = d.frominterval(0, v2.value)
+      val ov = st.get(v).getOrElse(d.top())
+      st.updated(v, ov.intersect(nv))
+    }
+    case (BinaryExpr(BVUGE, v: Variable, v2: BitVecLiteral)) =>  {
+      val nv = d.frominterval(v2.value, BigInt(2).pow(v2.getType.size) - 1)
+      val ov = st.get(v).getOrElse(d.top())
+      st.updated(v, ov.intersect(nv))
+    }
+    case (BinaryExpr(BVULT, v: Variable, v2: BitVecLiteral)) =>  {
+      val nv = d.frominterval(0, v2.value - 1)
+      val ov = st.get(v).getOrElse(d.top())
+      st.updated(v, ov.intersect(nv))
+    }
+    case (BinaryExpr(BVUGT, v: Variable, v2: BitVecLiteral)) =>  {
+      val nv = d.frominterval(v2.value + 1, BigInt(2).pow(v2.getType.size) - 1)
+      val ov = st.get(v).getOrElse(d.top())
+      st.updated(v, ov.intersect(nv))
+    }
+    case _ => st
+  }
+
+  def transfer(st: Map[Variable, AbsValue], c: Command) = {
     c match {
-      case LocalAssign(lhs, rhs, _) => l.updated(lhs, evalExpr(l, rhs))
+      case LocalAssign(lhs, rhs, _) => st.updated(lhs, evalExpr(st, rhs))
       case c: DirectCall => {
-        var s = l
-        c.outParams.foreach {
-          case (formal, actual) => s = s.updated(actual, d.top())
-        }
-        s
+        st ++ (c.outParams.map {
+          case (formal, actual) => actual -> d.top()
+        })
       }
-      case a : Assume => l
-      case a : Assert => l
-      case n: NOP => l
+      case a: MemoryStore => st
+      case a: MemoryLoad => st.updated(a.lhs, d.top())
+      case a : Assume => narrow(st, a.body)
+      case a : Assert => st
+      case n: NOP => st
       case i: IndirectCall => Map()
+      case j: SimulAssign => {
+         st ++ j.assignments.toSeq.map {
+          case (l, r) => l -> evalExpr(st, r)
+        }
+      }
+      case r : Return => st
+      case r : GoTo => st
+      case r : Unreachable => st
     }
   }
 

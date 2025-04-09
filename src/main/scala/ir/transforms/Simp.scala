@@ -778,6 +778,8 @@ def validatedSimplifyPipeline(p: Program) = {
   }
 
   // rpo
+  println("Noop test")
+  transformAndValidate(x => (), "NoopTXTest")(p)
   println("Rpo")
   combineBlocks(p)
   applyRPO(p)
