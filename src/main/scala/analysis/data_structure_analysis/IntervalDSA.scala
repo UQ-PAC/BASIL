@@ -222,9 +222,10 @@ class IntervalGraph(
   def callTransfer(phase: DSAPhase, cons: DirectCallConstraint, source: IntervalGraph, target: IntervalGraph): Unit = {
     require(phase == TD || phase == BU)
     val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
+    val unchanged = Set("R29", "R30", "R31")
     DSALogger.info(s"cloning ${source.proc.procName} into ${target.proc.procName}, $phase")
     cons.inParams
-      .filterNot(f => f._1.name.startsWith("R31"))
+      .filterNot(f => unchanged.exists(i => f._1.name.startsWith(i)))
       .filter(f => cons.target.formalInParam.contains(f._1))
       .foreach { case (formal, actual) =>
         val (sourceExpr, targetExpr) = if phase == TD then (actual, formal) else (formal, actual)
@@ -232,7 +233,7 @@ class IntervalGraph(
       }
 
     cons.outParams
-      .filterNot(f => f._1.name.startsWith("R31"))
+      .filterNot(f => unchanged.exists(i => f._1.name.startsWith(i)))
       .filter(f => cons.target.formalOutParam.contains(f._1))
       .foreach { case (out, actual) =>
         val (sourceExpr, targetExpr) = if phase == TD then (actual, out) else (out, actual)
@@ -466,19 +467,20 @@ class IntervalGraph(
         else Logger.warn(s"$cons had an empty argument")
 
       case dc: DirectCallConstraint =>
-        if !dc.target.name.startsWith("malloc") && !dc.target.name.startsWith("calloc") then
-          dc.outParams
-            .filterNot(f => f._1.name.startsWith("R31"))
-            .values
-            .flatMap(exprToCells)
-            .map(_.node)
-            .foreach(_.flags.escapes = true)
-        val h = dc.inParams.filter(f => f._1.name.startsWith("R31"))
-        val g = dc.outParams.filter(f => f._1.name.startsWith("R31"))
-        if g.nonEmpty && h.nonEmpty then
-          val (_, in) = h.head
-          val (_, out) = g.head
-          mergeCells(exprToCells(in) ++ exprToCells(out))
+//        if !dc.target.name.startsWith("malloc") && !dc.target.name.startsWith("calloc") then
+//          dc.outParams
+//            .filterNot(f => f._1.name.startsWith("R31"))
+//            .values
+//            .flatMap(exprToCells)
+//            .map(_.node)
+//            .foreach(_.flags.escapes = true)
+//        val h = dc.inParams.filter(f => f._1.name.startsWith("R31"))
+//        val g = dc.outParams.filter(f => f._1.name.startsWith("R31"))
+//        if g.nonEmpty && h.nonEmpty then
+//          val (_, in) = h.head
+//          val (_, out) = g.head
+//          val cells = exprToCells(in) ++ exprToCells(out)
+//          if cells.nonEmpty then mergeCells(cells)
       case _ => // ignore
   }
 
@@ -614,6 +616,9 @@ class IntervalGraph(
   }
 
   def mergeCells(c1: IntervalCell, c2: IntervalCell): IntervalCell = {
+
+    if Set(c1, c2).map(_.node).filter(_.bases.contains(Stack(irContext.program.mainProcedure))).nonEmpty then
+      print("")
 
     require(c1.node.graph == c2.node.graph && c1.node.graph == this)
     val cell1 = find(c1)
