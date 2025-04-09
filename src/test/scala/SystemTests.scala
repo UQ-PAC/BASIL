@@ -188,7 +188,16 @@ trait SystemTests extends AnyFunSuite, BASILTest, TestCustomisation {
 
     Logger.info(s"$name/$variation$testSuffix")
     val timer = PerformanceTimer(s"test $name/$variation$testSuffix")
-    runBASIL(inputPath, RELFPath, Some(specPath), BPLPath, conf.staticAnalysisConfig, conf.simplify, dsa = conf.dsa)
+    runBASIL(
+      inputPath,
+      RELFPath,
+      Some(specPath),
+      BPLPath,
+      conf.staticAnalysisConfig,
+      conf.simplify,
+      dsa = conf.dsa,
+      memoryTransform = conf.memoryTransform
+    )
     val translateTime = timer.checkPoint("translate-boogie")
     Logger.info(s"$name/$variation$testSuffix DONE")
 
@@ -601,7 +610,7 @@ class UnimplementedTests extends SystemTests {
   runTests("unimplemented", TestConfig(useBAPFrontend = true, expectVerify = false))
 }
 
-@test_util.tags.UnitTest
+@test_util.tags.AnalysisSystemTest
 class IntervalDSASystemTests extends SystemTests {
   runTests(
     "correct",
@@ -611,5 +620,30 @@ class IntervalDSASystemTests extends SystemTests {
   runTests(
     "incorrect",
     TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSAConfig(Set(Norm))))
+  )
+}
+
+@test_util.tags.DisabledTest
+class MemoryTransformSystemTests extends SystemTests {
+  runTests(
+    "correct",
+    TestConfig(
+      useBAPFrontend = true,
+      expectVerify = false,
+      simplify = true,
+      dsa = Some(DSAConfig(Set(Norm))),
+      memoryTransform = true
+    )
+  )
+
+  runTests(
+    "incorrect",
+    TestConfig(
+      useBAPFrontend = false,
+      expectVerify = false,
+      simplify = true,
+      dsa = Some(DSAConfig(Set(Norm))),
+      memoryTransform = true
+    )
   )
 }
