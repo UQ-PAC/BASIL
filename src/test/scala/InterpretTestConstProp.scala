@@ -62,6 +62,7 @@ class ConstPropInterpreterValidate extends AnyFunSuite with TestValueDomainWithI
 
     val result = runTestInterpreter(ictx, analysisres)
     assert(result.getFailures.isEmpty)
+    info(s"${result.checksPassed.size} checks passed")
 
   }
 
