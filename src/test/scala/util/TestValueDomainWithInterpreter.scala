@@ -22,7 +22,7 @@ trait TestValueDomainWithInterpreter[T] {
   def abstractEvalSoundnessProperty(evaluate: Expr => T)(expr: Expr) = {
     // val expr = BinaryExpr(op, BitVecLiteral(lhs, size), BitVecLiteral(rhs, size))
     val abs: T = evaluate(expr)
-    val concrete = ir.eval.evaluateExpr(expr).get
+    val concrete = ir.eval.evaluateExpr(expr).getOrElse(throw Exception(s"Failed to eval expr : $expr"))
     val test = valueInAbstractValue(abs, concrete)
     val result = ir.eval.evaluateExpr(test).get
     (result == TrueLiteral, s"${pp_expr(concrete)} ∈ $abs test (${pp_expr(test)}) evaluated to $result")

@@ -9,8 +9,8 @@ object BitVectorEval {
     * such that b(m-1)*2^{m-1} + ⋯ + b(0)*2^0 = n rem 2^m
     */
   def nat2bv(bitSize: Int, n: BigInt): BitVecLiteral =
-    require(bitSize > 0, "length of bitvector must be positive")
-    require(n >= 0, "input must be non-negative")
+    require(bitSize >= 0, "length of bitvector must be positive")
+    require(n >= 0, s"input must be non-negative: $n")
 
     BitVecLiteral(n % BigInt(2).pow(bitSize), bitSize)
 
