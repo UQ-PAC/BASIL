@@ -17,7 +17,7 @@ case object IntType extends IRType("int") {
 
 case class BitVecType(size: Int) extends IRType("bv" + size) {
   override def toBoogie: BType = BitVecBType(size)
-  def maxValue = BitVecLiteral(BigInt(2).pow(size) - 1, size)
+  def maxValue = BigInt(2).pow(size + 1) - 1
 }
 
 case class MapType(param: IRType, result: IRType) extends IRType(s"[$param]$result") {

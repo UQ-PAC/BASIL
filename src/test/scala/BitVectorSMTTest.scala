@@ -12,7 +12,7 @@ import specification.*
 class BitVectorEvalTest extends AnyFunSuite {
 
   def genSMT(size: Int) = {
-    val max = BitVecType(size).maxValue.value.toInt
+    val max = BitVecType(size).maxValue.toInt
 
     val ops = List(
       BVAND,
