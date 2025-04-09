@@ -216,6 +216,17 @@ private class ILSerialiser extends ReadOnlyVisitor {
     node
   }
 
+  override def visitUninterpretedFunction(node: UninterpretedFunction): UninterpretedFunction = {
+    program ++= "UninterpretedFunction("
+    program ++= "\"" + node.name + '"'
+    node.params.foreach(x => {
+      program ++= ", "
+      visitExpr(x)
+    })
+    program ++= ")"
+    node
+  }
+
   override def visitMemory(node: Memory): Memory = {
     program ++= "Memory("
     program ++= s"\"${node.name}\", ${node.addressSize}, ${node.valueSize})"
