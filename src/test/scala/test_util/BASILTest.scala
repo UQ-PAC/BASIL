@@ -26,7 +26,8 @@ case class TestConfig(
   expectVerify: Boolean,
   checkExpected: Boolean = false,
   logResults: Boolean = false,
-  simplify: Boolean = false
+  simplify: Boolean = false,
+  dsa: Option[DSAConfig] = None,
 )
 
 trait BASILTest {
