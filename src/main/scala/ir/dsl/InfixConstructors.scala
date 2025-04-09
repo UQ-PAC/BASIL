@@ -70,7 +70,6 @@ extension (i: Expr)
   infix def +(j: Expr): Expr = i.getType match {
     case IntType => BinaryExpr(IntADD, i, j)
     case b: BitVecType => BinaryExpr(BVADD, i, j)
-    case BoolType => BinaryExpr(BoolOR, i, j)
     case _ => panic("Addition", i, j)
   }
   infix def -(j: Expr): Expr = i.getType match {
