@@ -170,11 +170,11 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
 
   private def visitIf(ctx: IfContext, label: Option[String] = None): Option[TempIf] = {
     val condition = visitExprOnly(ctx.cond)
-    val thenStmts = ctx.thenStmts.stmt.asScala.flatMap(visitStmt(_, label))
+    val thenStmts = ctx.thenStmts.stmt.asScala.flatMap(visitStmt(_, label)).toSeq
 
     val elseStmts = Option(ctx.elseStmts) match {
-      case Some(_) => ctx.elseStmts.stmt.asScala.flatMap(visitStmt(_, label))
-      case None => mutable.Buffer()
+      case Some(_) => ctx.elseStmts.stmt.asScala.flatMap(visitStmt(_, label)).toSeq
+      case None => immutable.Seq()
     }
 
     if (condition.isDefined) {

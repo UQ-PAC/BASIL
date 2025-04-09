@@ -27,11 +27,13 @@ class GTIRBLoaderTest extends AnyFunSuite {
     IRLoading.loadGTIRB(gtsFile, mainAddress)
   }
 
-
   test("sdiv loads with ite expression") {
     val (prog, errs) = withLogCapture {
       loadGTIRB("src/test/correct/sdiv/gcc_O2/sdiv.relf", "src/test/correct/sdiv/gcc_O2/sdiv.gts")
     }
+    import ir.dsl.{given}
+    println(prog.mainProcedure.toScala)
+
     // assert(!(errs.contains("\"ite.0\"")))
     assert(errs.isEmpty)
 
@@ -45,5 +47,6 @@ class GTIRBLoaderTest extends AnyFunSuite {
     val v = FindUninterpretedFunctions()
     visit_proc(v, prog.mainProcedure)
     assert(v.uninterp.isEmpty)
+
   }
 }

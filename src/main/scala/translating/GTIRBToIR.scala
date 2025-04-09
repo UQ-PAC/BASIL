@@ -39,8 +39,8 @@ import util.Logger
   */
 class TempIf(
   val cond: Expr,
-  val thenStmts: mutable.Buffer[Statement],
-  val elseStmts: mutable.Buffer[Statement],
+  val thenStmts: Seq[Statement],
+  val elseStmts: Seq[Statement],
   override val label: Option[String] = None
 ) extends NOP(label) {
   override def toString = s"TEMPIF($cond, $thenStmts, $elseStmts)"
@@ -70,10 +70,7 @@ class ConvertITEToTempIf(prefix: String) extends CILVisitor {
   def makeTempIf(cond: Expr, tcase: Expr, fcase: Expr): LocalVar = {
     val name = "ite_result_" + prefix + "_" + counter.next()
     val localvar = LocalVar(name, tcase.getType)
-    val tempif = TempIf(cond,
-      mutable.Buffer(LocalAssign(localvar, tcase)),
-      mutable.Buffer(LocalAssign(localvar, fcase))
-    )
+    val tempif = TempIf(cond, Seq(LocalAssign(localvar, tcase)), Seq(LocalAssign(localvar, fcase)))
     iteResults = iteResults + (name -> tempif)
     localvar
   }
@@ -88,16 +85,20 @@ class ConvertITEToTempIf(prefix: String) extends CILVisitor {
     }
 
   override def vstmt(s: Statement) = {
+    assert(!s.isInstanceOf[TempIf], "tempif should be handled outside of cil visitor because of nop confusion")
+    assert(
+      iteResults.isEmpty,
+      "this would only happen if statements are nested - impossible in basil ir aside from tempif"
+    )
     iteResults = iteResults.empty
-    ChangeDoChildrenPost(List(s), ss => {
-      val x = iteResults.values ++: ss
-      x
-    })
-    // XXX: FAILING because the visitor doesn't know to recurse into the NOP TempIF !!!!*#*@
-  }
-
-  def convertStatements(s: Iterable[Statement]): Seq[Statement] = {
-    s.flatMap(x => cilvisitor.visit_stmt(this, x)).toSeq
+    ChangeDoChildrenPost(
+      List(s),
+      ss => {
+        val x = iteResults.values ++: ss
+        iteResults = iteResults.empty
+        x
+      }
+    )
   }
 }
 
@@ -236,7 +237,7 @@ class GTIRBToIR(
         {
           val statements = semanticsLoader.visitBlock(blockUUID, blockCount, block.address)
           blockCount += 1
-          block.statements.addAll(convertITEToTempIF(blockUUID, statements))
+          block.statements.addAll(convertITEToTempIf(blockUUID, statements))
         }
 
         if (block.statements.isEmpty && !blockOutgoingEdges.contains(blockUUID)) {
@@ -296,8 +297,20 @@ class GTIRBToIR(
     Program(procedures, intialProc, initialMemory)
   }
 
-  private def convertITEToTempIF(uuid: ByteString, stmts: Iterable[Statement]) = {
-    ConvertITEToTempIf(byteStringToString(uuid)).convertStatements(stmts)
+  private def convertITEToTempIf(uuid: ByteString, s: Iterable[Statement]): Iterable[Statement] = {
+    val prefix = byteStringToString(uuid)
+    val vis = ConvertITEToTempIf(prefix)
+
+    // XXX: here, we handle TempIf outside of cilvisitor because cilvisitor sees TempIf as NOP T_T
+    s.flatMap {
+      case x: TempIf => {
+        val c = cilvisitor.visit_expr(vis, x.cond)
+        val ts = cilvisitor.visit_stmts(vis, x.thenStmts)
+        val fs = cilvisitor.visit_stmts(vis, x.elseStmts)
+        Seq(TempIf(c, ts, fs))
+      }
+      case x => cilvisitor.visit_stmt(vis, x)
+    }
   }
 
   private def removePCAssign(block: Block): Option[String] = {
