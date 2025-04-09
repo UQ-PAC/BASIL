@@ -259,7 +259,7 @@ class TestKnownBitsInterpreter
   def evaluateAbstract(e: Expr): TNum = TNumDomain().evaluateExprToTNum(Map(), e)
 
   test("binopprop") {
-    forAll { (e: Expr) =>
+    forAll(minSuccessful(50000)) { (e: Expr) =>
       {
         val (r, c) =
           try {
