@@ -33,8 +33,8 @@ trait TestValueDomainWithInterpreter[T] {
     breakpoint: BreakPoint,
     testExpr: Expr,
     variable: Expr,
-    variableValue: Expr,
-    evaluatedTestExpr: Expr
+    variableValue: Option[Expr],
+    evaluatedTestExpr: Option[Expr]
   )
 
   enum Heuristic:
@@ -44,7 +44,7 @@ trait TestValueDomainWithInterpreter[T] {
   case class InterpreterTestResult(stopCondition: ExecutionContinuation, checks: List[CheckResult]) {
     def getFailures = {
       // require nonzero number of checks to ensure test is not vacuous
-      var noChecks = if (checks.isEmpty) then Seq("no checks hit") else Seq()
+      var noChecks = if (checks.filter(_.evaluatedTestExpr.isDefined).isEmpty) then Seq("no checks hit") else Seq()
       val termination =
         if (!normalTermination(stopCondition)) then Seq(s"Stopped with error condition: ${stopCondition}") else Seq()
       termination ++ noChecks ++ checksFailed
@@ -57,7 +57,8 @@ trait TestValueDomainWithInterpreter[T] {
           case BreakPointLoc.CMD(c) => c.parent.label
           case _ => ??? /* not used here */
         }
-        if (b.evaluatedTestExpr != TrueLiteral) then Seq(s"${b.name} @ $loc :: ${b.evaluatedTestExpr}") else Seq()
+        if (b.evaluatedTestExpr.contains(FalseLiteral)) then Seq(s"${b.name} @ $loc :: ${b.evaluatedTestExpr}")
+        else Seq()
       })
     }
 
@@ -68,7 +69,8 @@ trait TestValueDomainWithInterpreter[T] {
           case BreakPointLoc.CMD(c) => c.parent.label
           case _ => ??? /* not used here */
         }
-        if (b.evaluatedTestExpr == TrueLiteral) then Seq(s"${b.name} @ $loc :: ${b.evaluatedTestExpr}") else Seq()
+        if (b.evaluatedTestExpr.contains(TrueLiteral)) then Seq(s"${b.name} @ $loc :: ${b.evaluatedTestExpr}")
+        else Seq()
       })
     }
 
@@ -79,7 +81,10 @@ trait TestValueDomainWithInterpreter[T] {
             case BreakPointLoc.CMD(c) => c.parent
             case _ => ??? /* not used here */
           }
-          (loc, s"${b.name} (${pp_expr(b.variable)} = ${pp_expr(b.variableValue)}) = ${b.evaluatedTestExpr}")
+          (
+            loc,
+            s"${b.name} (${pp_expr(b.variable)} = ${b.variableValue.map(pp_expr).getOrElse("eval error")} ) = ${b.evaluatedTestExpr.map(pp_expr).getOrElse("eval error")}"
+          )
         })
         .groupBy(_._1)
         .map((g, v) => g -> v.map(_._2).mkString("\n"))
@@ -128,7 +133,7 @@ trait TestValueDomainWithInterpreter[T] {
     val initState = (innerInitState, List())
     val interpretResult = State.execute(initState, InterpFuns.callProcedure(interp)(startProc, startParams))
 
-    val breakres: List[(BreakPoint, _, List[(String, Expr, Expr)])] = interpretResult._2
+    val breakres: List[(BreakPoint, _, List[(String, Expr, Option[Expr])])] = interpretResult._2
     val checkResults = breakres.flatMap { case (bp, _, evaledExprs) =>
       evaledExprs.grouped(2).map(_.toList).map { case List((_, variable, varValue), (name, test, evaled)) =>
         CheckResult(name, bp, test, variable, varValue, evaled)
