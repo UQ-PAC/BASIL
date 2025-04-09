@@ -600,3 +600,16 @@ class UnimplementedTests extends SystemTests {
   runTests("unimplemented", TestConfig(useBAPFrontend = false, expectVerify = true))
   runTests("unimplemented", TestConfig(useBAPFrontend = true, expectVerify = false))
 }
+
+@test_util.tags.UnitTest
+class IntervalDSASystemTests extends SystemTests {
+  runTests(
+    "correct",
+    TestConfig(useBAPFrontend = true, expectVerify = true, simplify = true, dsa = Some(DSAConfig(Set(Norm))))
+  )
+
+  runTests(
+    "incorrect",
+    TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSAConfig(Set(Norm))))
+  )
+}
