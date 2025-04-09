@@ -619,7 +619,7 @@ class IntervalDSASystemTests extends SystemTests {
 
   runTests(
     "incorrect",
-    TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSAConfig(Set(Norm))))
+    TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSAConfig(Set(Norm))))
   )
 }
 
