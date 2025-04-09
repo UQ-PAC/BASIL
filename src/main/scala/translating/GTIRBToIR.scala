@@ -305,8 +305,8 @@ class GTIRBToIR(
     s.flatMap {
       case x: TempIf => {
         val c = cilvisitor.visit_expr(vis, x.cond)
-        val ts = cilvisitor.visit_stmts(vis, x.thenStmts)
-        val fs = cilvisitor.visit_stmts(vis, x.elseStmts)
+        val ts = convertITEToTempIf(uuid, x.thenStmts).toSeq
+        val fs = convertITEToTempIf(uuid, x.elseStmts).toSeq
         Seq(TempIf(c, ts, fs))
       }
       case x => cilvisitor.visit_stmt(vis, x)
