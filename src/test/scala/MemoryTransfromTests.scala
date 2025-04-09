@@ -246,14 +246,8 @@ class MemoryTransfromTests extends AnyFunSuite {
           MemoryStore(mem, zAddress, R0, LittleEndian, 64, Some("03")),
           goto("k")
         ),
-        block(
-          "h",
-          goto("k")
-        ),
-        block(
-          "k",
-          ret
-        )
+        block("h", goto("k")),
+        block("k", ret)
       )
     )
 

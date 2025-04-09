@@ -160,8 +160,7 @@ class IntervalGraph(
   // Processes all non call constraints
   def localPhase(): Unit = {
     val unchanged = Set("R29", "R30", "R31")
-    (proc.formalInParam ++ proc.formalOutParam)
-      .iterator
+    (proc.formalInParam ++ proc.formalOutParam).iterator
       .filterNot(p => unchanged.exists(n => p.name.startsWith(n)))
       .flatMap(exprToCells)
       .map(get)
