@@ -52,7 +52,7 @@ class IntervalGraph(
           node.flags.unknown = true
           node.flags.incomplete = true
       if symOffsets == Top then node.collapse()
-      else symOffsets.toIntervals.filter(i => f(i.end.get) || base != Global).map(node.add)
+      else symOffsets.toIntervals.filter(i => isGlobal(i.start.get) || base != Global).map(node.add)
       result + (base -> node)
     }
   }
@@ -196,7 +196,7 @@ class IntervalGraph(
       if offsets == Top then results + node.collapse()
       else
         results ++ offsets.toIntervals
-          .filter(i => base != Global || i.end.get >= 1000)
+          .filter(i => base != Global || isGlobal(i.start.get))
           .map(_.move(i => i + adjustment))
           .map(node.add)
     }
