@@ -422,6 +422,7 @@ class IntervalGraph(
   }
 
   def processConstraint(constraint: Constraint): Unit = {
+    val unchanged = Set("R29", "R30", "R31")
     constraint match
       case cons: MemoryAccessConstraint[_] =>
         Logger.debug(s"Processing constraint $cons")
@@ -429,7 +430,9 @@ class IntervalGraph(
         indices.foreach(cell => cell.node.add(cell.interval.growTo(cons.size - 1)))
         val indexPointee = constraintArgToCells(cons.arg1)
         val indexFlag = joinFlags(indices)
-        if cons.arg1.value.variables.intersect(proc.formalInParam.filterNot(_.name.startsWith("R31")).toSet).nonEmpty
+        if cons.arg1.value.variables
+            .intersect(proc.formalInParam.filterNot(p => unchanged.exists(n => p.name.startsWith(n))).toSet)
+            .nonEmpty
         then indices.map(_.node).foreach(_.flags.escapes = true)
         cons match
           case MemoryReadConstraint(pos) =>
@@ -465,22 +468,6 @@ class IntervalGraph(
           assert(correctPointee, "an index cell doesn't point to it's pointee")
           assert(first.map(get) == sec.map(get), "cells should be the same after unification")
         else Logger.warn(s"$cons had an empty argument")
-
-      case dc: DirectCallConstraint =>
-//        if !dc.target.name.startsWith("malloc") && !dc.target.name.startsWith("calloc") then
-//          dc.outParams
-//            .filterNot(f => f._1.name.startsWith("R31"))
-//            .values
-//            .flatMap(exprToCells)
-//            .map(_.node)
-//            .foreach(_.flags.escapes = true)
-//        val h = dc.inParams.filter(f => f._1.name.startsWith("R31"))
-//        val g = dc.outParams.filter(f => f._1.name.startsWith("R31"))
-//        if g.nonEmpty && h.nonEmpty then
-//          val (_, in) = h.head
-//          val (_, out) = g.head
-//          val cells = exprToCells(in) ++ exprToCells(out)
-//          if cells.nonEmpty then mergeCells(cells)
       case _ => // ignore
   }
 
