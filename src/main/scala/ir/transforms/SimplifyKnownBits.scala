@@ -54,6 +54,7 @@ case class TNumValue(value: BigInt, mask: BigInt, width: Int) extends TNum {
   def unkBool = TNumValue(0, 1, 1)
 
   override def toString() = {
+    val padwidth = width / 4 + (if width % 4 != 0 then 1 else 0)
     def padded(number: BigInt) = {
       "0x" + ("%x".format(number).reverse.padTo(width / 4, '0').reverse)
     }
@@ -277,7 +278,7 @@ case class TNumValue(value: BigInt, mask: BigInt, width: Int) extends TNum {
     val divisorH = that.value | that.mask
 
     if (divisorL == 0 || divisorH == 0) {
-      return TNumValue(BigInt(0), BigInt(-1), this.width)
+      return TNumValue(BigInt(0), BigInt(0), this.width).top()
     }
 
     val q1 = dividendL / divisorL
@@ -322,7 +323,7 @@ case class TNumValue(value: BigInt, mask: BigInt, width: Int) extends TNum {
     val divisorH = that.value | that.mask
 
     if (divisorL == 0 || divisorH == 0) {
-      return TNumValue(BigInt(0), BigInt(-1), width)
+      return top()
     }
 
     val maxBitLength =
@@ -351,7 +352,7 @@ case class TNumValue(value: BigInt, mask: BigInt, width: Int) extends TNum {
     val divisorH = that.value | that.mask
 
     if (divisorL == 0 || divisorH == 0) {
-      return TNumValue(BigInt(0), BigInt(-1), width)
+      return top()
     }
 
     val r1 = dividendL % divisorL
@@ -376,7 +377,7 @@ case class TNumValue(value: BigInt, mask: BigInt, width: Int) extends TNum {
     val divisorH = that.value | that.mask
 
     if (divisorL == 0 || divisorH == 0) {
-      return TNumValue(BigInt(0), BigInt(-1), width)
+      return top()
     }
 
     // Determine maximum bit length for sign extension
@@ -419,7 +420,7 @@ case class TNumValue(value: BigInt, mask: BigInt, width: Int) extends TNum {
     val divisorH = that.value | that.mask
 
     if (divisorL == 0 || divisorH == 0) {
-      return TNumValue(BigInt(0), BigInt(-1), this.width)
+      return top()
     }
 
     // Determine maximum bit length for sign extension
@@ -594,17 +595,17 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
       case BVXNOR => tn1.TXNOR(tn2)
       case BVNAND => tn1.TNAND(tn2)
       case BVADD => tn1.TADD(tn2)
-      case BVMUL => tn1.top() // tn1.TMUL(tn2)
-      case BVUDIV => tn1.top() // tn1.TUDIV(tn2)
-      case BVUREM => tn1.top() // tn1.TUREM(tn2)
+      case BVMUL => tn1.top() // tn1.TMUL(tn2) // broken, overflows
+      case BVUDIV => tn1.TUDIV(tn2)
+      case BVUREM => tn1.TUREM(tn2)
       case BVSHL => tn1.TSHL(tn2)
       case BVLSHR => tn1.TLSHR(tn2)
       case BVULT => tn1.TULT(tn2)
       case BVCOMP => tn1.TCOMP(tn2)
       case BVSUB => tn1.TSUB(tn2)
-      case BVSDIV => tn1.top() // tn1.TSDIV(tn2)
-      case BVSREM => tn1.top() // tn1.TSREM(tn2)
-      case BVSMOD => tn1.top() // tn1.TSMOD(tn2)
+      case BVSDIV => tn1.top() // tn1.TSDIV(tn2) // broken
+      case BVSREM => tn1.top() // tn1.TSREM(tn2) // broken
+      case BVSMOD => tn1.top() // tn1.TSMOD(tn2) // broken
       case BVASHR => tn1.TASHR(tn2)
       case BVULE => tn1.TULE(tn2)
       case BVUGT => tn1.TUGT(tn2)
@@ -667,7 +668,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
 
     case FalseLiteral => TNumValue(0, 0, 1)
 
-    case v: Variable => s.getOrElse(v, TNumValue(BigInt(0), BigInt(-1), sizeBits(v.getType)))
+    case v: Variable => s.getOrElse(v, TNumValue(BigInt(0), BigInt(0), sizeBits(v.getType)).top())
 
     case UnaryExpr(op: UnOp, arg: Expr) =>
       val argTNum = evaluateExprToTNum(s, arg)
@@ -760,7 +761,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
           TNumValue(extendedValue, extendedMask, tnum.width + extension)
       }
 
-    case expr => TNumValue(BigInt(0), BigInt(-1), sizeBits(expr.getType))
+    case expr => TNumValue(BigInt(0), BigInt(0), sizeBits(expr.getType)).top()
   }
 
   // s is the abstract state from previous command/block
@@ -773,7 +774,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
       // Load from memory and store in variable
       case MemoryLoad(lhs: Variable, mem: Memory, index: Expr, endian: Endian, size: Int, _) if !s.contains(lhs) =>
         // Overapproxiate memory values with Top
-        s.updated(lhs, TNumValue(BigInt(0), BigInt(-1), size))
+        s.updated(lhs, TNumValue(BigInt(0), BigInt(0), size).top())
 
       // Default case
       case _ => s
@@ -790,8 +791,8 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
    */
   override def join(left: Map[Variable, TNum], right: Map[Variable, TNum], pos: Block): Map[Variable, TNum] = {
     (left.keySet ++ right.keySet).map { key =>
-      val leftTNum = left.getOrElse(key, TNumValue(BigInt(0), BigInt(-1), sizeBits(key.getType)))
-      val rightTNum = right.getOrElse(key, TNumValue(BigInt(0), BigInt(-1), sizeBits(key.getType)))
+      val leftTNum = left.getOrElse(key, TNumValue(BigInt(0), BigInt(0), sizeBits(key.getType)).top())
+      val rightTNum = right.getOrElse(key, TNumValue(BigInt(0), BigInt(0), sizeBits(key.getType)).top())
 
       if (left.contains(key) && !right.contains(key)) {
         // Only left map contains key
@@ -807,7 +808,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
             key -> left.join(right)
           }
           // case (left: TNumValue, right: TNumValue) => key -> left.TOR(right)
-          case _ => key -> TNumValue(BigInt(0), BigInt(-1), leftTNum.width)
+          case _ => key -> TNumValue(BigInt(0), BigInt(0), leftTNum.width).top()
         }
       }
     }.toMap
