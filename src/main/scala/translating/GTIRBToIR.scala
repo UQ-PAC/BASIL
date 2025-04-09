@@ -10,6 +10,7 @@ import com.grammatech.gtirb.proto.Symbol.Symbol
 import Parsers.ASLpParser.*
 import gtirb.*
 import ir.*
+import ir.cilvisitor.{CILVisitor, SkipChildren, ChangeDoChildrenPost, DoChildren, ChangeTo}
 
 import scala.collection.mutable
 import scala.collection.mutable.Set
@@ -41,7 +42,64 @@ class TempIf(
   val thenStmts: mutable.Buffer[Statement],
   val elseStmts: mutable.Buffer[Statement],
   override val label: Option[String] = None
-) extends NOP(label)
+) extends NOP(label) {
+  override def toString = s"TEMPIF($cond, $thenStmts, $elseStmts)"
+}
+
+class FindUninterpretedFunctions extends CILVisitor {
+  var uninterp = List[UninterpretedFunction]()
+
+  override def vexpr(e: Expr) =
+    e match
+      case u: UninterpretedFunction => uninterp = u :: uninterp
+      case _ => ()
+    DoChildren()
+}
+
+def findITEExpressions(x: Iterable[Statement]) = {
+  val v = FindUninterpretedFunctions()
+  x.foreach(s => cilvisitor.visit_stmt(v, s))
+  v.uninterp.filter(_.name == iteFunctionName)
+}
+
+class ConvertITEToTempIf(prefix: String) extends CILVisitor {
+  private var iteResults = immutable.Map[String, TempIf]()
+
+  private val counter = util.Counter()
+
+  def makeTempIf(cond: Expr, tcase: Expr, fcase: Expr): LocalVar = {
+    val name = "ite_result_" + prefix + "_" + counter.next()
+    val localvar = LocalVar(name, tcase.getType)
+    val tempif = TempIf(cond,
+      mutable.Buffer(LocalAssign(localvar, tcase)),
+      mutable.Buffer(LocalAssign(localvar, fcase))
+    )
+    iteResults = iteResults + (name -> tempif)
+    localvar
+  }
+
+  override def vexpr(e: Expr) =
+    e match {
+      case u: UninterpretedFunction => {
+        val Seq(cond, t, f) = u.params
+        ChangeTo(makeTempIf(cond, t, f))
+      }
+      case _ => DoChildren()
+    }
+
+  override def vstmt(s: Statement) = {
+    iteResults = iteResults.empty
+    ChangeDoChildrenPost(List(s), ss => {
+      val x = iteResults.values ++: ss
+      x
+    })
+    // XXX: FAILING because the visitor doesn't know to recurse into the NOP TempIF !!!!*#*@
+  }
+
+  def convertStatements(s: Iterable[Statement]): Seq[Statement] = {
+    s.flatMap(x => cilvisitor.visit_stmt(this, x)).toSeq
+  }
+}
 
 /** GTIRBToIR class. Forms an IR as close as possible to the one produced by BAP by using GTIRB instead
   *
@@ -175,9 +233,11 @@ class GTIRBToIR(
       for (blockUUID <- blockUUIDs) {
         val block = uuidToBlock(blockUUID)
 
-        val statements = semanticsLoader.visitBlock(blockUUID, blockCount, block.address)
-        blockCount += 1
-        block.statements.addAll(statements)
+        {
+          val statements = semanticsLoader.visitBlock(blockUUID, blockCount, block.address)
+          blockCount += 1
+          block.statements.addAll(convertITEToTempIF(blockUUID, statements))
+        }
 
         if (block.statements.isEmpty && !blockOutgoingEdges.contains(blockUUID)) {
           // remove blocks that are just nop padding
@@ -234,6 +294,10 @@ class GTIRBToIR(
     val intialProc: Procedure = procedures.find(_.address.get == mainAddress).get
 
     Program(procedures, intialProc, initialMemory)
+  }
+
+  private def convertITEToTempIF(uuid: ByteString, stmts: Iterable[Statement]) = {
+    ConvertITEToTempIf(byteStringToString(uuid)).convertStatements(stmts)
   }
 
   private def removePCAssign(block: Block): Option[String] = {

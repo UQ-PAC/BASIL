@@ -18,6 +18,8 @@ enum InsnSemantics {
   case Error(opcode: String, error: String)
 }
 
+private val iteFunctionName = "ite.temp"
+
 class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
 
   private val constMap = mutable.Map[String, IRType]()
@@ -536,8 +538,10 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         }
 
       case "ite.0" =>
+        checkArgs(function, 1, 3, typeArgs.size, args.size, ctx.getText)
+        val size = parseInt(typeArgs(0)).toInt
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction("ASDJIO", argsIR, argsIR.head.getType)), None)
+        (Some(UninterpretedFunction(iteFunctionName, argsIR, BitVecType(size))), None)
 
       case _ =>
         // known ASLp methods not yet handled:
