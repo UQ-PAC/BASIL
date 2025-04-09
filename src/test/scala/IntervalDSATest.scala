@@ -325,21 +325,7 @@ class IntervalDSATest extends AnyFunSuite {
     )
 
     val proc = res.ir.program.mainProcedure
-    writeToFile(dotBlockGraph(proc), "helper.dot")
-    writeToFile(pp_proc(proc), "helper.txt")
-    val symValues = getSymbolicValues[Interval](proc)
-    writeToFile(symValues.state.mkString("\n"), "helper.sva")
-    val const = generateConstraints(proc)
-//    val dsg = IntervalDSA.getLocal(proc, res.ir, symValues, const)
-    val dsg = res.dsa.get.bottomUp(res.ir.program.mainProcedure)
-    res.dsa.get.local.foreach(
-      (proc, graph) =>
-        if graph.nodes.contains(Stack(proc)) then
-          println(s"${proc.procName} is collapsed: ${graph.find(graph.nodes(Stack(proc))).isCollapsed}")
-    )
-    println(res.ir.program.mainProcedure.calls)
-    writeToFile(dsg.toDot, "dsg.dot")
-
-    print("")
+    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
   }
 }
