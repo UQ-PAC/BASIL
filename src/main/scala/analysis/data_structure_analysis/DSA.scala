@@ -1,7 +1,9 @@
 package analysis.data_structure_analysis
 
+import analysis.AbsValue
+
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver, UnionFindSolver}
-import ir.{Expr, Procedure, Program}
+import ir.{Expr, Procedure, Program, IntLiteral, BitVecLiteral, TrueLiteral, FalseLiteral, Literal}
 import specification.{ExternalFunction, SymbolTableEntry}
 import util.{DSALogger, IRContext}
 import java.io.File
@@ -25,6 +27,84 @@ enum Interval extends Offsets {
   this match
     case Interval.Value(s, e) => assert(s <= e, "start of interval should be less than its end")
     case _ =>
+
+  def top() = Top
+  def bot() = Bot
+
+  def fromliteral(l: Literal) = l match {
+    case IntLiteral(i) => Value(i.toInt, i.toInt)
+    case BitVecLiteral(v, s) => Value(v.toInt, v.toInt)
+    case TrueLiteral => Value(1, 1)
+    case FalseLiteral => Value(0, 0)
+  }
+
+  def intersect(other: Interval) = {
+    (this, other) match {
+      case (Top, x) => x
+      case (x, Top) => x
+      case (Bot, _) => Bot
+      case (_, Bot) => Bot
+      case (Value(lo1, hi1), Value(lo2, hi2)) => {
+        Value(Integer.max(lo1, lo2), Integer.min(hi1, hi2))
+      }
+    }
+  }
+
+  def union(other: Interval) = {
+    (this, other) match {
+      case (Top, _) => Top
+      case (_, Top) => Top
+      case (Bot, x) => x
+      case (x, Bot) => x
+      case (Value(lo1, hi1), Value(lo2, hi2)) => {
+        Value(Integer.min(lo1, lo2), Integer.max(hi1, hi2))
+      }
+    }
+  }
+
+  def bvneg() = this match {
+    case Value(lo, hi) => Value(-lo, -hi)
+    case o => o
+  }
+
+  def intadd(o: Interval) = (this, o) match {
+    case (Value(lo1, hi1), Value(lo2, hi2)) => {
+      Value(lo1 + lo2, hi1 + hi2)
+    }
+    case (Top, v) => Top
+    case (v, Top) => Top
+    case (v, Bot) => Bot
+    case (Bot, v) => Bot
+  }
+  def bvadd(o: Interval) = intadd(o)
+  
+  def intmul(o: Interval) = (this, o) match {
+    case (Value(lo1, hi1), Value(lo2, hi2)) => {
+      Value(Seq(lo1 * lo2, lo1 * hi2, hi1 * lo1, hi1 * hi2).min, Seq(lo1 * lo2, lo1 * hi2, hi1 * lo1, hi1 * hi2).max)
+    }
+    case (Top, _) => Top
+    case (_, Top) => Top
+    case (_, Bot) => Bot
+    case (Bot, _) => Bot
+  }
+  def bvmul(o: Interval) = intmul(o)
+
+  def intdiv(o: Interval) = (this, o) match {
+    case (Value(lo1, hi1), Value(lo2, hi2)) if 1 <= lo2 => {
+      Value(Integer.min(lo1 / lo2, lo1 / hi2), Integer.max(hi1 / lo2, hi1 / hi2))
+    }
+    case (Value(lo1, hi1), Value(lo2, hi2)) if hi2 <= -1 => {
+      Value(Integer.min(hi1 / lo2, hi1 / hi2), Integer.max(lo1 / lo2, lo1 / hi2))
+    }
+    case (Value(lo1, hi1), Value(lo2, hi2))  => {
+      Top
+    }
+    case (Top, _) => Top
+    case (_, Top) => Top
+    case (_, Bot) => Bot
+    case (Bot, _) => Bot
+  }
+
 
   override def toString: String =
     this match

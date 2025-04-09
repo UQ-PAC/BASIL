@@ -49,7 +49,7 @@ case object FalseLiteral extends BoolLit {
 case class BitVecLiteral(value: BigInt, size: Int) extends Literal with CachedHashCode {
   assert(size >= 0)
   override def toBoogie: BitVecBLiteral = BitVecBLiteral(value, size)
-  override def getType: IRType = BitVecType(size)
+  override def getType: BitVecType = BitVecType(size)
   override def toString: String = s"${value}bv$size"
 }
 
