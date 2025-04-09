@@ -127,6 +127,7 @@ class IntervalGraph(
         || Interval(g2.toInt, g2.toInt + 8).contains(address)
     )
   }
+
   def globalNode(
     globals: Set[SymbolTableEntry],
     globalOffsets: Map[BigInt, BigInt],
@@ -147,6 +148,14 @@ class IntervalGraph(
       globalNode.add(address.toInt)
       globalNode.add(relocated.toInt)
     }
+
+    externalFunctions.foreach(
+      e =>
+        val extPointer = globalNode.add(e.offset.toInt)
+        val ext = extPointer.getPointee
+        ext.node.flags.function = true
+        ext.node.flags.foreign = true
+    )
 
     globalOffsets.map(_.swap).foreach { case (address, relocated) =>
       val pointee = find(globalNode.get(address.toInt))
@@ -210,7 +219,6 @@ class IntervalGraph(
           )
       case _ =>
     }
-
   }
 
   def globalTransfer(source: IntervalGraph, target: IntervalGraph): Map[IntervalNode, IntervalNode] = {
