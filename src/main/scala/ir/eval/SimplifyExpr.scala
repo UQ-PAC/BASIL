@@ -146,7 +146,7 @@ def simpFixedPoint(s: Simplifier)(e: Expr): (Expr, Boolean) = {
   *   [[simplifyExpr]]
   */
 def simplifyExprFixpoint: Simplifier = simpFixedPoint(
-  SimpExpr(simpFixedPoint(sequenceSimp(simplifyExpr, SimpExpr(fastPartialEvalExpr))))
+  SimpExpr(simpFixedPoint(sequenceSimp(simplifyExpr, SimpExpr(fastPartialEvalExprTopLevel))))
 )
 
 /**
@@ -219,7 +219,7 @@ object cleanupSimplify extends CILVisitor {
   }
 
   def apply(p: Procedure) = {
-    visit_proc(AlgebraicSimplifications, p)
+    visit_proc(cleanupSimplify, p)
   }
 
 }
@@ -1027,11 +1027,11 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
     case Extract(ed, bg, SignExtend(x, expr)) if (bg < size(expr).get) && (ed < size(expr).get) =>
       logSimp(e, Extract(ed, bg, expr))
 
-    case ZeroExtend(ed, Extract(hi, 0, e)) if size(e).get == hi + ed =>
-      logSimp(
-        e,
-        BinaryExpr(BVAND, e, BinaryExpr(BVCONCAT, BitVecLiteral(0, ed), BitVecLiteral(BigInt(2).pow(hi) - 1, hi)))
-      )
+    // case ZeroExtend(ed, Extract(hi, 0, e)) if size(e).get == hi + ed =>
+    //  logSimp(
+    //    e,
+    //    BinaryExpr(BVAND, e, BinaryExpr(BVCONCAT, BitVecLiteral(0, ed), BitVecLiteral(BigInt(2).pow(hi) - 1, hi)))
+    //  )
 
     case BinaryExpr(BVSHL, body, BitVecLiteral(n, _)) if size(body).get <= n =>
       logSimp(e, BitVecLiteral(0, size(body).get))
@@ -1079,6 +1079,9 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
   (res, changedAnything)
 }
 
+private val assocOps: Set[BinOp] =
+  Set(BVADD, BVMUL, BVOR, BVAND, BVEQ, BoolAND, BoolEQ, BoolOR, BoolEQUIV, BoolEQ, IntADD, IntMUL, IntEQ)
+
 /** Simplifier implementing basic canonicalisation and simplifications of experssions without changing them too much.
   *
   *   - Normalises predicate calculations to boolean form rather than bitvector form.
@@ -1087,9 +1090,6 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
   *   - Removes redundant expressions
   */
 def simplifyExpr(e: Expr): (Expr, Boolean) = {
-
-  val assocOps: Set[BinOp] =
-    Set(BVADD, BVMUL, BVOR, BVAND, BVEQ, BoolAND, BoolEQ, BoolOR, BoolEQUIV, BoolEQ, IntADD, IntMUL, IntEQ)
 
   // println((0 until indent).map(" ").mkString("") + e)
 

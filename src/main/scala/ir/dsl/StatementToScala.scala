@@ -21,6 +21,7 @@ import util.{Twine, indentNested}
  *
  */
 
+given ToScala[QuantifierSort] = ToScala.derived
 given ToScala[Expr] = ToScala.derived
 given ToScala[UnOp] = ToScala.derived
 given ToScala[BinOp] = ToScala.derived

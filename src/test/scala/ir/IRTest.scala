@@ -342,7 +342,7 @@ class IRTest extends AnyFunSuite with test_util.CaptureOutput {
         block("l_main", indirectCall(R1), goto("returntarget")),
         block(
           "block2",
-          directCall(Seq(("R0_out" -> R0)), "p1", "R0_in" -> BitVecLiteral(150, 64)),
+          directCall(Seq(("R0_out" -> R0)), "p1", Set("R0_in" -> BitVecLiteral(150, 64))),
           goto("returntarget")
         ),
         block("returntarget", ret("R0_out" -> BitVecLiteral(1, 64)))
@@ -432,6 +432,19 @@ class IRTest extends AnyFunSuite with test_util.CaptureOutput {
     // these calls should not throw
     assert(prog(recursiveproc) != null)
     assert(recursiveproc.addToProg(emptyprog) != null)
+  }
+
+  test("LambdaTypes") {
+    val x = LocalVar("x", BitVecType(64))
+    val y = LocalVar("y", BitVecType(8))
+    val l = LambdaExpr(List(x, y), BinaryExpr(BVCONCAT, x, y))
+
+    assert(l.getType == MapType(x.getType, MapType(y.getType, BitVecType(64 + 8))))
+
+    assert(l.returnType == BitVecType(64 + 8))
+    val (pt, rt) = curryFunctionType(l.getType)
+    assert(rt == l.returnType)
+    assert(pt == List(x.getType, y.getType))
   }
 
 }

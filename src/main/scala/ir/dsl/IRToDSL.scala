@@ -29,7 +29,7 @@ object IRToDSL {
   def convertCallStatement(x: Call): EventuallyStatement = x match {
     case DirectCall(targ, outs, actuals, label) =>
       // XXX: be aware of ordering, .map() on a SortedMap may return a HashMap.
-      directCall(outs.to(ArraySeq).map(keyToString), targ.name, actuals.to(ArraySeq).map(keyToString): _*)
+      directCall(outs.to(ArraySeq).map(keyToString), targ.name, actuals.to(ArraySeq).map(keyToString), label)
     case IndirectCall(targ, label) => indirectCall(targ)
   }
 

@@ -8,13 +8,7 @@ import ir.dsl.*
 import scala.collection.mutable
 import scala.collection.immutable.{ArraySeq}
 
-object Counter {
-  var id = 0
-  def next() = {
-    id += 1
-    id
-  }
-}
+private val counter = util.Counter()
 
 def memoise[K, V](f: K => V): K => V = {
   val rn = mutable.Map[K, V]()
@@ -30,7 +24,7 @@ def memoise[K, V](f: K => V): K => V = {
 }
 
 def renameBlock(s: String): String = {
-  s + "_" + (Counter.next())
+  s + "_" + (counter.next())
 }
 
 class VarRenamer(proc: Procedure) extends CILVisitor {
@@ -82,7 +76,8 @@ def convertStatementRenaming(varRenamer: CILVisitor)(x: Statement): EventuallySt
     directCall(
       outs.to(ArraySeq).map(v => (v(0).name, visit_rvar(varRenamer, v(1)))),
       targ.name,
-      actuals.to(ArraySeq).map(keyToString(varRenamer)): _*
+      actuals.to(ArraySeq).map(keyToString(varRenamer)),
+      label
     )
   case IndirectCall(targ, label) => indirectCall(visit_rvar(varRenamer, targ))
   case x: NonCallStatement =>

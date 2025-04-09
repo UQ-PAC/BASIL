@@ -13,6 +13,7 @@ import util.{
   RunUtils,
   StaticAnalysisConfig
 }
+import util.boogie_interaction.*
 
 import scala.sys.process.*
 import scala.io.Source
@@ -71,31 +72,26 @@ trait BASILTest {
   }
 
   /** @return
-    *   param 0: None if passes, Some(failure message) if doesn't pass param 1: whether the Boogie output verified param
-    *   2: whether Boogie timed out
+   *
+    *   param 0: None if passes, Some(failure message) if doesn't pass 
+    *   param 1: whether the Boogie output verified 
+    *   param 2: whether Boogie timed out
     */
-  def checkVerify(
-    boogieResult: String,
-    resultPath: String,
-    shouldVerify: Boolean
-  ): (Option[String], Boolean, Boolean) = {
-    BASILTest.writeToFile(boogieResult, resultPath)
-    val verified = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
-    val proveFailed = boogieResult.contains("could not be proved")
-    val timedOut = boogieResult.strip().contains("timed out")
+  def checkVerify(boogieStdout: String, expectVerify: Boolean): (Option[String], Boolean, Boolean) = {
+    val boogieResult = parseOutput(boogieStdout)
+    checkVerify(boogieResult, expectVerify)
+  }
 
-    val failureMsg = if (timedOut) {
-      Some("SMT Solver timed out")
-    } else {
-      (verified, shouldVerify, BASILTest.xor(verified, proveFailed)) match {
-        case (true, true, true) => None
-        case (false, false, true) => None
-        case (_, _, false) => Some("Prover error: unknown result: " + boogieResult)
-        case (true, false, true) => Some("Expected verification failure, but got success.")
-        case (false, true, true) => Some("Expected verification success, but got failure.")
-      }
+  def checkVerify(boogieResult: BoogieResult, expectVerify: Boolean): (Option[String], Boolean, Boolean) = {
+    val failureMsg = boogieResult.kind match {
+      case BoogieResultKind.Verified(_, _) if expectVerify => None
+      case BoogieResultKind.AssertionFailed if !expectVerify => None
+      case BoogieResultKind.Timeout => Some("SMT Solver timed out")
+      case BoogieResultKind.Verified(_, _) if !expectVerify => Some("Expected verification failure, but got success.")
+      case BoogieResultKind.AssertionFailed if expectVerify => Some("Expected verification success, but got failure.")
+      case k: BoogieResultKind.Unknown => Some(k.toString)
     }
-    (failureMsg, verified, timedOut)
+    (failureMsg, boogieResult.kind == BoogieResultKind.Verified, boogieResult.kind == BoogieResultKind.Timeout)
   }
 }
 

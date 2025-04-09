@@ -51,7 +51,7 @@ private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extend
 
     stack.pushAll(n match {
       case p: Procedure => p.blocks
-      case b: Block => Seq() ++ b.statements.toSeq ++ Seq(b.jump)
+      case b: Block => b.statements ++ Iterator(b.jump)
       case s: Command => Seq()
     })
     n
@@ -256,7 +256,9 @@ class Procedure private (
   var inParamDefaultBinding: immutable.SortedMap[LocalVar, Expr],
   var outParamDefaultBinding: immutable.SortedMap[LocalVar, Variable],
   var requires: List[BExpr],
-  var ensures: List[BExpr]
+  var ensures: List[BExpr],
+  var requiresExpr: List[Expr],
+  var ensuresExpr: List[Expr]
 ) extends Iterable[CFGPosition] {
 
   def name = procName + address.map("_" + _).getOrElse("")
@@ -293,8 +295,28 @@ class Procedure private (
       immutable.SortedMap.from(inParamDefaultBinding),
       immutable.SortedMap.from(outParamDefaultBinding),
       List.from(requires),
-      List.from(ensures)
+      List.from(ensures),
+      List(),
+      List()
     )
+  }
+
+  def normaliseBlockNames() = {
+    var counter = 0
+    var loopCounter = 0
+    ir.transforms.reversePostOrder(this)
+    val bl = Array.from(blocks).sortInPlaceBy(_.rpoOrder)
+    for (b <- bl) {
+      counter += 1
+      val loop = if b.isLoopHeader() then {
+        loopCounter += 1
+        "_loop_header_" + loopCounter
+      } else ""
+
+      b.label = name + "_" + counter + loopCounter
+
+    }
+
   }
 
   def makeCall(label: Option[String] = None) = DirectCall(this, label, outParamDefaultBinding, inParamDefaultBinding)
@@ -346,7 +368,6 @@ class Procedure private (
 
   def entryBlock_=(value: Block): Unit = {
     if (!entryBlock.contains(value)) {
-      _entryBlock.foreach(removeBlocks)
       _entryBlock = Some(addBlock(value))
     }
   }
@@ -478,7 +499,7 @@ class Procedure private (
 }
 
 class Block private (
-  val label: String,
+  var label: String,
   val address: Option[BigInt],
   val statements: IntrusiveList[Statement],
   private var _jump: Jump,

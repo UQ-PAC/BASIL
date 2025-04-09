@@ -13,6 +13,7 @@ import scala.language.postfixOps
 import scala.sys.process.*
 import util.*
 import mainargs.{main, arg, ParserForClass, Flag}
+import util.boogie_interaction.BoogieResultKind
 
 object Main {
 
@@ -22,15 +23,18 @@ object Main {
   }
 
   def loadDirectory(i: ChooseInput = ChooseInput.Gtirb, d: String): ILLoadingConfig = {
-    val p = d.split("/")
-    val tryName = Seq(p.last, p.dropRight(1).last)
+
+    val x = d.stripSuffix(".gts").stripSuffix(".adt")
+    val p = x.split("/")
+    val tryName = Seq(x + "/" + p.last, x + "/" + p.dropRight(1).last, x, p.last, p.dropRight(1).mkString("/"))
 
     tryName
       .flatMap(name => {
-        val trySpec = Seq((p ++ Seq(s"$name.spec")).mkString("/"), (p.dropRight(1) ++ Seq(s"$name.spec")).mkString("/"))
-        val adt = (p ++ Seq(s"$name.adt")).mkString("/")
-        val relf = (p ++ Seq(s"$name.relf")).mkString("/")
-        val gtirb = (p ++ Seq(s"$name.gts")).mkString("/")
+        val trySpec =
+          tryName.map(n => n + ".spec") ++ Seq(p.dropRight(1).mkString("/") + "/" + p.dropRight(1).last + ".spec")
+        val adt = s"$name.adt"
+        val relf = s"$name.relf"
+        val gtirb = s"$name.gts"
 
         val spec = trySpec
           .flatMap(s => {
@@ -144,7 +148,9 @@ object Main {
       doc =
         "Perform Data Structure Analysis if no version is specified perform constraint generation (requires --simplify flag) (none|norm|field|set|all)"
     )
-    dsaType: Option[String]
+    dsaType: Option[String],
+    @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
+    noif: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -229,7 +235,8 @@ object Main {
     } else {
       BoogieMemoryAccessMode.SuccessiveStoreSelect
     }
-    val boogieGeneratorConfig = BoogieGeneratorConfig(boogieMemoryAccessMode, true, rely, conf.threadSplit.value)
+    val boogieGeneratorConfig =
+      BoogieGeneratorConfig(boogieMemoryAccessMode, true, rely, conf.threadSplit.value, conf.noif.value)
 
     val loadingInputs = if (conf.bapInputDirName.isDefined) then {
       loadDirectory(ChooseInput.Bap, conf.bapInputDirName.get)
@@ -263,12 +270,27 @@ object Main {
       dsaConfig = dsa
     )
 
-    RunUtils.run(q)
+    val result = RunUtils.run(q)
     if (conf.verify.value) {
-      Logger.info("Running boogie")
-      val timer = PerformanceTimer("Verify", LogLevel.INFO)
-      Seq("boogie", "/useArrayAxioms", q.outputPrefix).!
-      timer.checkPoint("Finish")
+      assert(result.boogie.nonEmpty)
+      var failed = false
+      for (b <- result.boogie) {
+        val fname = b.filename
+        val timer = PerformanceTimer("Verify", LogLevel.INFO)
+        val cmd = Seq("boogie", "/useArrayAxioms", fname)
+        Logger.info(s"Running: ${cmd.mkString(" ")}")
+        val output = cmd.!!
+        val result = util.boogie_interaction.parseOutput(output)
+        result.kind match {
+          case BoogieResultKind.Verified(c, _) if c > 0 => ()
+          case _ => failed = true
+        }
+        Logger.info(result.toString)
+        timer.checkPoint("Finish")
+      }
+      if (failed) {
+        throw Exception("Verification failed")
+      }
     }
   }
 

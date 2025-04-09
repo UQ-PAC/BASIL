@@ -13,6 +13,7 @@ import test_util.Histogram
 import test_util.TestConfig
 import test_util.LockManager
 import test_util.TestCustomisation
+import util.boogie_interaction.*
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
@@ -190,44 +191,24 @@ trait SystemTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest, TestC
     val translateTime = timer.checkPoint("translate-boogie")
     Logger.info(s"$name/$variation$testSuffix DONE")
 
-    val boogieResult = runBoogie(directoryPath, BPLPath, conf.boogieFlags)
+    val boogieOutput = runBoogie(directoryPath, BPLPath, conf.boogieFlags)
+
     val verifyTime = timer.checkPoint("verify")
-    val (boogieFailureMsg, verified, timedOut) = checkVerify(boogieResult, resultPath, conf.expectVerify)
+    val boogieResult = parseOutput(boogieOutput)
 
-    def parseError(e: String, context: Int = 3) = {
-      val lines = e.split('\n')
-      for (l <- lines) {
-        if (
-          l.endsWith(": Error: this assertion could not be proved") || l.contains(
-            "this is the postcondition that could not be proved"
-          )
-        ) {
-          val b = l.trim()
-          val parts = b.split("\\(").flatMap(_.split("\\)")).flatMap(_.split(","))
-          val fname = parts(0)
-          val line = Integer.parseInt(parts(1))
-          val col = parts(2)
+    BASILTest.writeToFile(boogieOutput, resultPath)
+    val (boogieFailureMsg, verified, timedOut) = checkVerify(boogieResult, conf.expectVerify)
 
-          val lines = util.readFromFile(fname).toArray
+    if (boogieFailureMsg.isDefined) {
+      info(boogieResult.toString)
 
-          val lineOffset = line - 1
-
-          val beginLine = Integer.max(0, lineOffset - context)
-          val endLine = Integer.min(lines.length, lineOffset + context)
-
-          val errorLines = (beginLine to endLine).map(x => {
-            val carat = if x == lineOffset then " > " else "   "
-            s"$carat ${x + 1} | ${lines(x)}"
-          })
-
-          info(s"Failing assertion $fname:$line")
-          info(errorLines.mkString("\n").trim)
-
+      for (e <- boogieResult.errors) {
+        info(s"Failing assertion ${e.fileName}:${e.line}")
+        for (msg <- e.formattedAssertionSnippet) {
+          info(msg.trim + "\n")
         }
       }
     }
-
-    if (conf.expectVerify) parseError(boogieResult)
 
     val (hasExpected, matchesExpected) = if (conf.checkExpected) {
       checkExpected(expectedOutPath, BPLPath)
