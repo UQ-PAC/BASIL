@@ -228,9 +228,11 @@ class MemoryTransfromTests extends AnyFunSuite {
     val R0 = Register("R0", 64)
     val xAddress = BitVecLiteral(2000, 64)
     val yAddress = BitVecLiteral(3000, 64)
+    val zAddress = BitVecLiteral(4000, 64)
     val x = SpecGlobal("x", 64, None, xAddress.value)
     val y = SpecGlobal("y", 64, None, yAddress.value)
-    val globals = Set(x, y)
+    val z = SpecGlobal("z", 64, None, zAddress.value)
+    val globals = Set(x, y, z)
     val irType = BitVecType(64)
 
     val program = prog(
@@ -241,6 +243,15 @@ class MemoryTransfromTests extends AnyFunSuite {
           MemoryStore(mem, xAddress, yAddress, Endian.LittleEndian, 64, Some("00")),
           MemoryStore(mem, xAddress, R31, LittleEndian, 64, Some("01")),
           MemoryLoad(R0, mem, xAddress, LittleEndian, 64, Some("02")),
+          MemoryStore(mem, zAddress, R0, LittleEndian, 64, Some("03")),
+          goto("k")
+        ),
+        block(
+          "h",
+          goto("k")
+        ),
+        block(
+          "k",
           ret
         )
       )
@@ -251,12 +262,13 @@ class MemoryTransfromTests extends AnyFunSuite {
 
     val loads = results.ir.program.collect { case la: MemoryLoad => la }
     val stores = results.ir.program.collect { case m: MemoryStore => m }
-    assert(stores.size == 2)
+    assert(stores.size == 3)
     assert(loads.size == 1)
     val load = loads.head
     val newMem = load.mem
     assert(newMem != mem)
-    assert(stores.forall(_.mem == newMem))
+    assert(stores.filter(_.index == xAddress).forall(_.mem == newMem))
+    assert(stores.filter(_.index == zAddress).forall(i => i.mem != mem && i.mem != newMem))
 
   }
 
