@@ -159,6 +159,14 @@ class IntervalGraph(
 
   // Processes all non call constraints
   def localPhase(): Unit = {
+    val unchanged = Set("R29", "R30", "R31")
+    (proc.formalInParam ++ proc.formalOutParam)
+      .iterator
+      .filterNot(p => unchanged.exists(n => p.name.startsWith(n)))
+      .flatMap(exprToCells)
+      .map(get)
+      .map(_.node)
+      .foreach(_.flags.escapes = true)
     var processed = Set[Constraint]()
     constraints.toSeq
       .sortBy(f => f.label)
@@ -422,7 +430,6 @@ class IntervalGraph(
   }
 
   def processConstraint(constraint: Constraint): Unit = {
-    val unchanged = Set("R29", "R30", "R31")
     constraint match
       case cons: MemoryAccessConstraint[_] =>
         Logger.debug(s"Processing constraint $cons")
@@ -430,10 +437,7 @@ class IntervalGraph(
         indices.foreach(cell => cell.node.add(cell.interval.growTo(cons.size - 1)))
         val indexPointee = constraintArgToCells(cons.arg1)
         val indexFlag = joinFlags(indices)
-        if cons.arg1.value.variables
-            .intersect(proc.formalInParam.filterNot(p => unchanged.exists(n => p.name.startsWith(n))).toSet)
-            .nonEmpty
-        then indices.map(_.node).foreach(_.flags.escapes = true)
+
         cons match
           case MemoryReadConstraint(pos) =>
             indices.map(_.node).foreach(_.flags.read = true)
@@ -603,8 +607,6 @@ class IntervalGraph(
   }
 
   def mergeCells(c1: IntervalCell, c2: IntervalCell): IntervalCell = {
-
-    if Set(c1, c2).map(_.node).filter(_.bases.contains(Stack(irContext.program.mainProcedure))).nonEmpty then print("")
 
     require(c1.node.graph == c2.node.graph && c1.node.graph == this)
     val cell1 = find(c1)
