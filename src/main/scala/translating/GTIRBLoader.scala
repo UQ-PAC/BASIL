@@ -535,6 +535,10 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
           (None, None)
         }
 
+      case "ite.0" =>
+        val argsIR = args.flatMap(visitExprOnly).toSeq
+        (Some(UninterpretedFunction("ASDJIO", argsIR, argsIR.head.getType)), None)
+
       case _ =>
         // known ASLp methods not yet handled:
         // FPRoundBase, BFRound - take asl type 'real' as input, need to see this in practice and requires consideration

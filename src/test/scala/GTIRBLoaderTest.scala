@@ -35,5 +35,7 @@ class GTIRBLoaderTest extends AnyFunSuite {
     withClue(errs) {
       assert(assertFalses.isEmpty)
     }
+    // println(prog.toList)
+    println(prog)
   }
 }
