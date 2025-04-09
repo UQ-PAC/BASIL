@@ -31,8 +31,8 @@ class GTIRBLoaderTest extends AnyFunSuite {
     val (prog, errs) = withLogCapture {
       loadGTIRB("src/test/correct/sdiv/gcc_O2/sdiv.relf", "src/test/correct/sdiv/gcc_O2/sdiv.gts")
     }
-    import ir.dsl.{given}
-    println(prog.mainProcedure.toScala)
+    // import ir.dsl.{given}
+    // println(prog.mainProcedure.toScala)
 
     // assert(!(errs.contains("\"ite.0\"")))
     assert(errs.isEmpty)
