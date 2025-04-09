@@ -3,7 +3,7 @@ import util.{Twine, indent, indentNested, StringEscape}
 import org.scalatest.funsuite.AnyFunSuite
 
 @test_util.tags.UnitTest
-class StringUtilsTest extends AnyFunSuite {
+class StringUtilsTest extends AnyFunSuite with test_util.CaptureOutput {
   test("indent one line") {
     assert(indent(LazyList("a")) == LazyList("a"))
     assert(indent(LazyList("a", " b")) == LazyList("a", " b"))

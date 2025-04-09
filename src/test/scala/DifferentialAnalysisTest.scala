@@ -30,7 +30,7 @@ import util.RunUtils.loadAndTranslate
 
 import scala.collection.mutable
 
-abstract class DifferentialTest extends AnyFunSuite, TestCustomisation {
+abstract class DifferentialTest extends AnyFunSuite, test_util.CaptureOutput, TestCustomisation {
 
   override def customiseTestsByName(name: String) = name match {
     case "analysis_differential:floatingpoint/clang:GTIRB" | "analysis_differential:floatingpoint/gcc:GTIRB" =>

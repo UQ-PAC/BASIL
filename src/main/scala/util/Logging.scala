@@ -2,7 +2,7 @@ package util
 import sourcecode.Line, sourcecode.FileName
 import scala.io.AnsiColor
 import collection.mutable.HashSet
-import java.io.*
+import java.io.{File, PrintStream}
 
 enum LogLevel(val id: Int):
   case DEBUG extends LogLevel(0)
@@ -14,9 +14,12 @@ enum LogLevel(val id: Int):
 class GenericLogger(
   val name: String,
   val defaultLevel: LogLevel = LogLevel.INFO,
-  var output: PrintStream = System.out,
+  defaultOutput: => PrintStream = Console.out,
   var ANSIColour: Boolean = true
 ) {
+
+  private var _output = () => defaultOutput
+  def output = _output()
 
   val children: HashSet[GenericLogger] = HashSet()
 
@@ -38,7 +41,7 @@ class GenericLogger(
   def disableColour(setChildren: Boolean = false) = setColour(false, setChildren)
   def enableColour(setChildren: Boolean = false): Unit = setColour(true, setChildren)
 
-  def deriveLogger(sname: String, stream: PrintStream): GenericLogger = {
+  def deriveLogger(sname: String, stream: => PrintStream): GenericLogger = {
     val l = GenericLogger(name + "." + sname, level, stream, ANSIColour)
     children.add(l)
     l
@@ -50,7 +53,7 @@ class GenericLogger(
 
   def deriveLogger(name: String): GenericLogger = deriveLogger(name, output)
 
-  def setOutput(stream: PrintStream) = output = stream
+  def setOutput(stream: => PrintStream) = _output = () => stream
 
   def writeToFile(file: File, content: => String) = {
     if (level.id < LogLevel.OFF.id) {
@@ -160,17 +163,17 @@ class GenericLogger(
 // doesn't work with `mill run`
 def isAConsole = System.console() != null
 
-val Logger = GenericLogger("log", LogLevel.DEBUG, System.out, isAConsole).setLevel(LogLevel.INFO, true)
-val StaticAnalysisLogger = Logger.deriveLogger("analysis", System.out)
-val SimplifyLogger = Logger.deriveLogger("simplify", System.out)
+val Logger = GenericLogger("log", LogLevel.DEBUG, Console.out, isAConsole).setLevel(LogLevel.INFO, true)
+val StaticAnalysisLogger = Logger.deriveLogger("analysis", Console.out)
+val SimplifyLogger = Logger.deriveLogger("simplify", Console.out)
 val DebugDumpIRLogger = Logger.deriveLogger("debugdumpir").setLevel(LogLevel.OFF)
 val AnalysisResultDotLogger = Logger.deriveLogger("analysis-results-dot").setLevel(LogLevel.OFF)
 val VSALogger = StaticAnalysisLogger.deriveLogger("vsa")
 val MRALogger = StaticAnalysisLogger.deriveLogger("mra").setLevel(LogLevel.INFO)
 val SteensLogger = StaticAnalysisLogger.deriveLogger("steensgaard")
 // DSA Loggers
-val DSALogger = Logger.deriveLogger("DSA", System.out).setLevel(LogLevel.OFF)
-val ConstGenLogger = DSALogger.deriveLogger("Constraint Gen", System.out).setLevel(LogLevel.INFO)
-val SVALogger = DSALogger.deriveLogger("SVA", System.out)
-val IntervalDSALogger = DSALogger.deriveLogger("SadDSA", System.out).setLevel(LogLevel.OFF)
-val StackLogger = Logger.deriveLogger("Stack", System.out).setLevel(LogLevel.INFO)
+val DSALogger = Logger.deriveLogger("DSA", Console.out).setLevel(LogLevel.OFF)
+val ConstGenLogger = DSALogger.deriveLogger("Constraint Gen", Console.out).setLevel(LogLevel.INFO)
+val SVALogger = DSALogger.deriveLogger("SVA", Console.out)
+val IntervalDSALogger = DSALogger.deriveLogger("SadDSA", Console.out).setLevel(LogLevel.OFF)
+val StackLogger = Logger.deriveLogger("Stack", Console.out).setLevel(LogLevel.INFO)
