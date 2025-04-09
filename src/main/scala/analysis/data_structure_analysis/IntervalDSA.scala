@@ -125,6 +125,8 @@ class IntervalGraph(
     ) || irContext.globalOffsets.exists((g1, g2) =>
       Interval(g1.toInt, g1.toInt + 8).contains(address)
         || Interval(g2.toInt, g2.toInt + 8).contains(address)
+    ) || irContext.externalFunctions.exists(g =>
+      Interval(g.offset.toInt, g.offset.toInt + 8).contains(address)
     )
   }
 
