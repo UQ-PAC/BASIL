@@ -158,8 +158,14 @@ def evaluateExpr(exp: Expr): Option[Literal] = {
 }
 
 def partialEvaluateExpr(exp: Expr): Expr = {
-  val (e, _) = simpFixedPoint(SimpExpr(fastPartialEvalExprTopLevel).apply)(exp)
-  e
+  try {
+    val (e, _) = simpFixedPoint(SimpExpr(fastPartialEvalExprTopLevel).apply)(exp)
+    e
+  } catch {
+    case exc => 
+      val m = s"Error eval expr: $exp :: ${exc.getStackTrace.mkString("\n")}"
+      throw Exception(m)
+  }
 }
 
 def fastPartialEvalExprTopLevel(exp: Expr): (Expr, Boolean) = {
