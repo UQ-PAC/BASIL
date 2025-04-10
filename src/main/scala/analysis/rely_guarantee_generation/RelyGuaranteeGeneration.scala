@@ -90,6 +90,7 @@ class RelyGuaranteeGenerator[T, S](intDom: InterferenceDomain[T, S]) {
             rely = intDom.join(rely, new_guars(other_p))
           }
         }
+        // fixme: derive transitive closure for this rely???
         // generate new guar for p
         val localDom = InterferenceProductDomain[T, S](intDom, rely)
         val summaryGenerator = GuarGenSummaryGenerator[T, S](localDom)

@@ -7,6 +7,8 @@ import analysis.*
   * these additional functions.
   */
 trait InterferenceCompatibleLattice[S] extends Lattice[S] {
+  // checks if s contains v
+  def contains(s: S, v: Variable): Boolean
   // weakens s by eliminating v
   def drop(v: Variable, s: S): S
   // greatest lower bound, i.e. meet
@@ -24,6 +26,9 @@ trait InterferenceCompatibleLattice[S] extends Lattice[S] {
 class IntervalLatticeExtension()
     extends LatticeMapLattice[Variable, Interval, IntervalLattice](IntervalLattice())
     with InterferenceCompatibleLattice[LatticeMap[Variable, Interval]] {
+
+  def contains(s: LatticeMap[Variable, Interval], v: Variable): Boolean =
+    s.toMap.contains(v)
 
   def drop(v: Variable, s: LatticeMap[Variable, Interval]):
       LatticeMap[Variable, Interval] =

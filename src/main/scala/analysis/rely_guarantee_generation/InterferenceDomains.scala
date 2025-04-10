@@ -30,28 +30,32 @@ abstract class InterferenceDomain[T, S](
   val stateLattice: InterferenceCompatibleLattice[S],
   val stateTransfer: (S, Command) => S
 ) {
+  // the empty set of state transitions
   def bot: T
+  // the state transitions that may occur by executing c in a state satisfying s
   def derive(s: S, c: Command): T
+  // a weakened version of s that accounts for all transitions in t
   def apply(t: T, s: S): S
+  // an overapproximation of the union of transitions captured by t1 and t2
   def join(t1: T, t2: T): T
+  // an overapproximation of the transitive closure of t
   def close(t: T): T
+  // representation of t as a predicate over primed and unprimed variables
   def toString(t: T): String
 }
 
 /** The conditional-writes domain is an interference domain that represents
   * guarantee conditions of the form:
   * (!P_1 ==> v_1' == v_1) && (!P_2 ==> v_2' == v_2) && ...
+  * where P_i is an element of our state domain and v_i is a variable.
   * 
-  * This is implemented with a map [v_i -> P_i] from variables to an
-  * overapproximation of the set of states under which they may be written to in
-  * the thread. Variables that are never written to are omitted from the map,
-  * rather than being mapped to bot.
+  * This is implemented with a map [v_i -> P_i]. Variables that are never
+  * written to are omitted from the map, rather than being mapped to bot.
   */
 case class ConditionalWritesDomain[S](
   override val stateLattice: InterferenceCompatibleLattice[S], 
   override val stateTransfer: (S, Command) => S
 ) extends InterferenceDomain[Map[Variable, S], S](stateLattice, stateTransfer) {
-  
   // an empty map means no variables have been written to
   def bot: Map[Variable, S] = Map.empty[Variable, S]
   
@@ -134,9 +138,23 @@ case class ConditionalWritesDomain[S](
   }
 }
 
+/** We use this enum for the Direction lattice, to indicate the direction in
+  * which a variable may be modified.
+  */
 enum Direction:
-  case Top, Increasing, Decreasing, Bot
+  case Top, // no constraints; variable can either increase or decrease
+       Increasing, // variable only ever increases, or stays the same
+       Decreasing, // variable only ever decreases, or stays the same
+       Bot // variable stays the same; neither increases nor decreases
 
+/** The Direction lattice is the core part of the monotonicity domain. The
+  * lattice elements are the values of the Direction enum. It takes the shape:
+  *   Top
+  *   / \
+  * Inc Dec
+  *   \ /
+  *   Bot
+  */
 object DirectionLattice extends Lattice[Direction] {
   val bottom: Direction = Direction.Bot
 
@@ -155,37 +173,57 @@ object DirectionLattice extends Lattice[Direction] {
     else Direction.Bot
 }
 
+/** The monotonicity domain is an interference domain that represents
+  * guarantee conditions of the form:
+  * (v_1' <*> v_1) && (v_2' <*> v_2) && ...
+  * where each v_i is a variable and <*> is any of: <, <=, ==, >=, >
+  * 
+  * This is implemented with a map [v_i -> Direction]. Variables that are never
+  * written to are omitted from the map, rather than being mapped to bot.
+  */
 case class MonotonicityDomain[S](
   override val stateLattice: InterferenceCompatibleLattice[S], 
   override val stateTransfer: (S, Command) => S
-) extends InterferenceDomain[Map[Variable, Direction], S](stateLattice, stateTransfer) {
+) extends InterferenceDomain[Map[Variable, Direction], S](stateLattice, 
+  stateTransfer) {
   
+  /* Fixme: This may result in naming clashes, however we don't always have a
+  Procedure at hand to call getFreshSSAVar(...). Ideally, we might pass around
+  some kind of variable factory. */
+  private def get_temp(ty: IRType): LocalVar = LocalVar("rg_temp_variable", ty, 0)
+
   // an empty map means no variables have been written to
   def bot: Map[Variable, Direction] = Map.empty[Variable, Direction]
-  
+
+  /** To derive the direction in which an assignment v := E changes v, we
+    * perform the assignment v' := E for a fresh variable v', then check whether
+    * we can prove that v' <*> v for any <*> in: <, <=, ==, >=, >.
+    */
   def derive(s: S, c: Command): Map[Variable, Direction] =
     if (s == stateLattice.bottom) Map.empty
     else c match {
       case a: LocalAssign => {
         // create fresh variable x
-        val x = c.parent.parent.getFreshSSAVar("temp", a.lhs.irType)
+        val x = get_temp(a.lhs.irType)
         // do the assignment on x, with pre-state s
-        val postState = stateTransfer(s, LocalAssign(x, a.rhs))
+        val post = stateTransfer(s, LocalAssign(x, a.rhs))
         // apply the transfer function to assume x' > x and assume x' < x
-        val decreases = stateTransfer(postState, Assume(BinaryExpr(BVSGT, x, a.lhs))) == stateLattice.bottom
-        val increases = stateTransfer(postState, Assume(BinaryExpr(BVSLT, x, a.lhs))) == stateLattice.bottom
-        // if both result in bot, then x' == x. if one results in bot, then x' >= x or x' <= x
+        val assumeInc = stateTransfer(post, Assume(BinaryExpr(BVSGT, x, a.lhs)))
+        val decreases = assumeInc == stateLattice.bottom
+        val assumeDec = stateTransfer(post, Assume(BinaryExpr(BVSLT, x, a.lhs)))
+        val increases = assumeDec == stateLattice.bottom
+        // from the above, derive the direction in which x moved from a.lhs
         val dir =
-          if (decreases && increases) then Direction.Bot
-          else if (decreases) then Direction.Decreasing
-          else if (increases) then Direction.Increasing
-          else Direction.Top
-        // map x to the appropriate result
+          if (decreases && increases) then Direction.Bot // x' <= x && x' >= x
+          else if (decreases) then Direction.Decreasing // x' <= x
+          else if (increases) then Direction.Increasing // x' >= x
+          else Direction.Top // could not prove any constraints of x' w.r.t. x
+        // map a.lhs to the appropriate result
         Map(a.lhs -> dir)
       }
-      case _ => bot
+      case _ => bot // fixme: for now, we only handle LocalAssigns
     }
-  
+
   /** To simulate interference on a variable v, we introduce a temporary
     * variable y, together with an "assume" statement to add the appropriate
     * constraints to y, then we assign v := y, and finally remove y from the
@@ -198,7 +236,7 @@ case class MonotonicityDomain[S](
       // todo: to create a variable, we need access to the program
       // this is resolved in crab by having a var factory passed to every analysis
       // val y = c.parent.parent.getFreshSSAVar("temp", a.lhs.irType)
-      val y = LocalVar("temp", v.irType) // fixme: possible naming clash?
+      val y = get_temp(v.irType)
       // apply assume statement to add constraints to y
       val yConstraints = d match {
         case Direction.Bot => stateTransfer(postState, Assume(BinaryExpr(IntEQ, y, v)))
@@ -245,6 +283,69 @@ case class MonotonicityDomain[S](
     sb.append("forall v in Vars - {")
     sb.append(vars.map(_.name).mkString(", "))
     sb.append("} :: v' == v")
+    sb.toString()
+  }
+}
+
+case class TransitionPair[S](pre: S, inst: LocalAssign)
+
+case class PreciseDomain[S](
+  override val stateLattice: InterferenceCompatibleLattice[S], 
+  override val stateTransfer: (S, Command) => S
+) extends InterferenceDomain[Set[TransitionPair[S]], S](stateLattice,
+  stateTransfer) {
+  
+  /* Fixme: This may result in naming clashes, however we don't always have a
+  Procedure at hand to call getFreshSSAVar(...). Ideally, we might pass around
+  some kind of variable factory. */
+  private def get_temp(ty: IRType): LocalVar = LocalVar("rg_temp_variable", ty, 0)
+
+  def bot: Set[TransitionPair[S]] = Set.empty[TransitionPair[S]]
+
+  def derive(s: S, c: Command): Set[TransitionPair[S]] =
+    if (s == stateLattice.bottom) Set.empty
+    else c match {
+      case a: LocalAssign => Set(TransitionPair[S](s, a))
+      case _ => bot // fixme: for now, we only handle LocalAssigns
+    }
+
+  def apply(t: Set[TransitionPair[S]], s: S): S = {
+    var new_s = s
+    for (transition <- t) {
+      // fixme: this applies every transition once instead of deriving a fixpoint
+      // it might be good to make transitivity optional for particular domains
+      // this would allow fixpoints to be computed only where it makes sense,
+      // like in this domain (but not say, conditional writes?)
+      val meet = stateLattice.glb(new_s, transition.pre)
+      new_s = stateLattice.lub(new_s, stateTransfer(meet, transition.inst))
+    }
+    new_s
+  }
+
+  /* Fixme: This implementation requires that interference domain elements are
+  cleared on every iteration of RG-Gen for this thread. This differs from the
+  approach taken by Mine, so we have to confirm this is what we want to do. */
+  def join(t1: Set[TransitionPair[S]], 
+    t2: Set[TransitionPair[S]]): Set[TransitionPair[S]] = t1 | t2
+
+  // todo; not sure if this is possible
+  def close(t: Set[TransitionPair[S]]): Set[TransitionPair[S]] = t
+
+  def toString(t: Set[TransitionPair[S]]): String = {
+    if (t.isEmpty) {
+      return "forall v in Vars :: v' == v"
+    }
+    val sb = new StringBuilder
+    for (transition <- t) {
+      sb.append("(")
+      sb.append(stateLattice.toPredString(transition.pre))
+      sb.append(" && ")
+      sb.append(transition.inst.lhs.name)
+      sb.append("' == ")
+      sb.append(transition.inst.rhs) // todo: convert expr into string?
+      sb.append(") || \n")
+    }
+    sb.append("forall v in Vars :: v' == v")
     sb.toString()
   }
 }
