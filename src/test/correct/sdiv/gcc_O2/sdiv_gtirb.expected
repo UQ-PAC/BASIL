@@ -1,0 +1,99 @@
+var {:extern} Gamma_R0: bool;
+var {:extern} Gamma_R1: bool;
+var {:extern} Gamma_mem: [bv64]bool;
+var {:extern} R0: bv64;
+var {:extern} R1: bv64;
+var {:extern} mem: [bv64]bv8;
+function {:extern} {:bvbuiltin "bvadd"} bvadd64(bv64, bv64) returns (bv64);
+function {:extern} {:bvbuiltin "bvsdiv"} bvsdiv64(bv64, bv64) returns (bv64);
+function {:extern} memory_load32_le(memory: [bv64]bv8, index: bv64) returns (bv32) {
+  (memory[bvadd64(index, 3bv64)] ++ (memory[bvadd64(index, 2bv64)] ++ (memory[bvadd64(index, 1bv64)] ++ memory[index])))
+}
+
+function {:extern} memory_load64_le(memory: [bv64]bv8, index: bv64) returns (bv64) {
+  (memory[bvadd64(index, 7bv64)] ++ (memory[bvadd64(index, 6bv64)] ++ (memory[bvadd64(index, 5bv64)] ++ (memory[bvadd64(index, 4bv64)] ++ (memory[bvadd64(index, 3bv64)] ++ (memory[bvadd64(index, 2bv64)] ++ (memory[bvadd64(index, 1bv64)] ++ memory[index])))))))
+}
+
+function {:extern} {:bvbuiltin "sign_extend 32"} sign_extend32_32(bv32) returns (bv64);
+function {:extern} {:bvbuiltin "sign_extend 64"} sign_extend64_64(bv64) returns (bv128);
+procedure {:extern} rely();
+  modifies Gamma_mem, mem;
+  ensures (Gamma_mem == old(Gamma_mem));
+  ensures (mem == old(mem));
+  free ensures (memory_load32_le(mem, 2280bv64) == 131073bv32);
+  free ensures (memory_load64_le(mem, 130472bv64) == 2256bv64);
+  free ensures (memory_load64_le(mem, 130480bv64) == 2176bv64);
+  free ensures (memory_load64_le(mem, 131032bv64) == 1920bv64);
+  free ensures (memory_load64_le(mem, 131112bv64) == 131112bv64);
+
+procedure {:extern} rely_transitive();
+  modifies Gamma_mem, mem;
+  ensures (Gamma_mem == old(Gamma_mem));
+  ensures (mem == old(mem));
+
+implementation {:extern} rely_transitive()
+{
+  call rely();
+  call rely();
+}
+
+procedure {:extern} rely_reflexive();
+
+procedure {:extern} guarantee_reflexive();
+  modifies Gamma_mem, mem;
+
+procedure main_1920();
+  modifies Gamma_R0, R0;
+  requires Gamma_R1;
+  requires Gamma_R0;
+  free requires (memory_load64_le(mem, 131104bv64) == 0bv64);
+  free requires (memory_load64_le(mem, 131112bv64) == 131112bv64);
+  free requires (memory_load32_le(mem, 2280bv64) == 131073bv32);
+  free requires (memory_load64_le(mem, 130472bv64) == 2256bv64);
+  free requires (memory_load64_le(mem, 130480bv64) == 2176bv64);
+  free requires (memory_load64_le(mem, 131032bv64) == 1920bv64);
+  free requires (memory_load64_le(mem, 131112bv64) == 131112bv64);
+  free ensures (memory_load32_le(mem, 2280bv64) == 131073bv32);
+  free ensures (memory_load64_le(mem, 130472bv64) == 2256bv64);
+  free ensures (memory_load64_le(mem, 130480bv64) == 2176bv64);
+  free ensures (memory_load64_le(mem, 131032bv64) == 1920bv64);
+  free ensures (memory_load64_le(mem, 131112bv64) == 131112bv64);
+
+implementation main_1920()
+{
+  var Gamma_ite_result__1: bool;
+  var ite_result__1: bv128;
+  main_1920__0__xdU61Ad4R3aE_hVJ17n5eQ:
+    assume {:captureState "main_1920__0__xdU61Ad4R3aE_hVJ17n5eQ"} true;
+    R0, Gamma_R0 := sign_extend32_32(R0[32:0]), Gamma_R0;
+    assert Gamma_R1;
+    goto main_1920__0__xdU61Ad4R3aE_hVJ17n5eQ$__0, main_1920__0__xdU61Ad4R3aE_hVJ17n5eQ$__1;
+  main_1920__0__xdU61Ad4R3aE_hVJ17n5eQ$__1:
+    assume {:captureState "main_1920__0__xdU61Ad4R3aE_hVJ17n5eQ$__1"} true;
+    assume (!(R1 == 0bv64));
+    assert (Gamma_R0 && Gamma_R1);
+    goto main_1920__0__xdU61Ad4R3aE_hVJ17n5eQ$__2, main_1920__0__xdU61Ad4R3aE_hVJ17n5eQ$__3;
+  main_1920__0__xdU61Ad4R3aE_hVJ17n5eQ$__3:
+    assume {:captureState "main_1920__0__xdU61Ad4R3aE_hVJ17n5eQ$__3"} true;
+    assume (!((R0 == 9223372036854775808bv64) && (R1 == 18446744073709551615bv64)));
+    ite_result__1, Gamma_ite_result__1 := sign_extend64_64(bvsdiv64(R0, R1)), (Gamma_R1 && Gamma_R0);
+    goto main_1920__0__xdU61Ad4R3aE_hVJ17n5eQ$__4;
+  main_1920__0__xdU61Ad4R3aE_hVJ17n5eQ$__2:
+    assume {:captureState "main_1920__0__xdU61Ad4R3aE_hVJ17n5eQ$__2"} true;
+    assume ((R0 == 9223372036854775808bv64) && (R1 == 18446744073709551615bv64));
+    ite_result__1, Gamma_ite_result__1 := 9223372036854775808bv128, true;
+    goto main_1920__0__xdU61Ad4R3aE_hVJ17n5eQ$__4;
+  main_1920__0__xdU61Ad4R3aE_hVJ17n5eQ$__4:
+    assume {:captureState "main_1920__0__xdU61Ad4R3aE_hVJ17n5eQ$__4"} true;
+    R0, Gamma_R0 := ite_result__1[64:0], Gamma_ite_result__1;
+    goto main_1920_basil_return;
+  main_1920__0__xdU61Ad4R3aE_hVJ17n5eQ$__0:
+    assume {:captureState "main_1920__0__xdU61Ad4R3aE_hVJ17n5eQ$__0"} true;
+    assume (R1 == 0bv64);
+    R0, Gamma_R0 := 0bv64, true;
+    goto main_1920_basil_return;
+  main_1920_basil_return:
+    assume {:captureState "main_1920_basil_return"} true;
+    return;
+}
+

@@ -169,6 +169,8 @@ class GTIRBToIR(
   // mapping from an external procedure's name to the IR procedure
   private val externalProcedures = mutable.Map[String, Procedure]()
 
+  private val convertITE = ConvertITEToTempIf("")
+
   // maps block UUIDs to their address
   private def createAddresses(): immutable.Map[ByteString, BigInt] = {
     val blockAddresses: immutable.Map[ByteString, BigInt] = (for {
@@ -255,8 +257,7 @@ class GTIRBToIR(
         {
           val statements = semanticsLoader.visitBlock(blockUUID, blockCount, block.address)
           blockCount += 1
-          val converter = ConvertITEToTempIf(byteStringToString(blockUUID))
-          block.statements.addAll(converter.convertNestedStatements(statements))
+          block.statements.addAll(convertITE.convertNestedStatements(statements))
         }
 
         if (block.statements.isEmpty && !blockOutgoingEdges.contains(blockUUID)) {
