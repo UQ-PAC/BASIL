@@ -306,7 +306,7 @@ def getRedundantAssignments(procedure: Procedure): Set[Assign] = {
 
   for (c <- procedure) {
     c match {
-      case a: LocalAssign if a.reducible => {
+      case a: LocalAssign => {
         assignedNotRead(a.lhs) = joinVS(assignedNotRead(a.lhs), VS.Assigned(Set(a)))
         a.rhs.variables.foreach(v => {
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(a)))
