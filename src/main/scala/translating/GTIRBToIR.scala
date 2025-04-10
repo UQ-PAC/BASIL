@@ -84,13 +84,16 @@ class ConvertITEToTempIf(prefix: String) extends CILVisitor {
   }
 
   override def vexpr(e: Expr) =
-    e match {
-      case u: UninterpretedFunction if u.name == iteFunctionName => {
-        val Seq(cond, t, f) = u.params
-        ChangeTo(makeTempIf(cond, t, f))
+    ChangeDoChildrenPost(
+      e,
+      {
+        case u: UninterpretedFunction if u.name == iteFunctionName => {
+          val Seq(cond, t, f) = u.params
+          makeTempIf(cond, t, f)
+        }
+        case x => x
       }
-      case _ => DoChildren()
-    }
+    )
 
   override def vstmt(s: Statement) = {
     assert(!s.isInstanceOf[TempIf], "tempif should be handled outside of cil visitor because of nop confusion")
