@@ -6,6 +6,7 @@ ThisBuild / organization := "uq.pac"
 
 val javaTests = "com.novocode" % "junit-interface" % "0.11" % "test"
 val scalaTests = "org.scalatest" %% "scalatest" % "3.2.19" % "test"
+val scalaCheck = "org.scalatestplus" %% "scalacheck-1-18" % "3.2.19.0" % "test"
 val scalactic = "org.scalactic" %% "scalactic" % "3.2.19"
 val antlrRuntime = "org.antlr" % "antlr4-runtime" % "4.9.3"
 val sourceCode = "com.lihaoyi" %% "sourcecode" % "0.3.0"
@@ -24,6 +25,7 @@ lazy val root = project
     libraryDependencies += antlrRuntime,
     libraryDependencies += scalactic,
     libraryDependencies += scalaTests,
+    libraryDependencies += scalaCheck,
     libraryDependencies += sourceCode,
     libraryDependencies += mainArgs,
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test
