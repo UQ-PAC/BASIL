@@ -6,7 +6,22 @@ object WordList {
    * Gets the n-th word in the word list, wrapping around
    * if the given integer is out of range or negative.
    */
-  def getWord(n: Int) = words(Math.abs(n) % words.length)
+  def getWord(n: Int): String = words(Math.abs(n) % words.length)
+
+  /**
+   * Gets a word from the word list by considering all bytes in the
+   * given array.
+   */
+  def getWord(b: Array[Byte]): String = getWord(hashBytes(b))
+
+  /**
+   * Computes an integer, derived from the hash of the given bytes.
+   */
+  def hashBytes(b: Array[Byte]): Int = {
+    val hasher = java.security.MessageDigest.getInstance("SHA-256")
+    val buf = java.nio.ByteBuffer.wrap(hasher.digest(b))
+    buf.getInt()
+  }
 
   val words = scala.collection.immutable.ArraySeq(
     "abacus",

@@ -256,11 +256,7 @@ class GTIRBToIR(
 
   private def byteStringToString(byteString: ByteString): String = {
     val bytes = byteString.toByteArray
-
-    val buf = ByteBuffer.wrap(bytes)
-    val word = WordList.getWord(buf.getShort())
-
-    word + "_" + Base64.getUrlEncoder.encodeToString(bytes)
+    WordList.getWord(bytes) + "_" + Base64.getUrlEncoder.encodeToString(bytes)
   }
 
   private def createProcedure(functionUUID: ByteString, symbolUUID: ByteString): Procedure = {
