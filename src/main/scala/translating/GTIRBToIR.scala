@@ -24,6 +24,7 @@ import boundary.break
 import java.nio.ByteBuffer
 import util.intrusive_list.*
 import util.Logger
+import util.WordList
 
 /** TempIf class, used to temporarily store information about Jumps so that multiple parse runs are not needed.
   * Specifically, this is useful in the case that the IF statment has multiple conditions( and elses) and as such many
@@ -254,7 +255,12 @@ class GTIRBToIR(
   }
 
   private def byteStringToString(byteString: ByteString): String = {
-    Base64.getUrlEncoder.encodeToString(byteString.toByteArray)
+    val bytes = byteString.toByteArray
+
+    val buf = ByteBuffer.wrap(bytes)
+    val word = WordList.getWord(buf.getShort())
+
+    word + "_" + Base64.getUrlEncoder.encodeToString(bytes)
   }
 
   private def createProcedure(functionUUID: ByteString, symbolUUID: ByteString): Procedure = {
