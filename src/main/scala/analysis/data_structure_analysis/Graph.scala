@@ -785,6 +785,15 @@ class Graph(using Counter)(
     val varToCell = mutable.Map[CFGPosition, mutable.Map[Variable, Slice]]()
     val domain = computeDomain(IntraProcIRCursor, Set(proc))
     domain.foreach {
+      case a: Assume =>
+        a.body.variables.foreach { v =>
+          if (isFormal(a, v)) {
+            val node = Node(Some(this))
+            node.flags.incomplete = true
+            nodes.add(node)
+            formals.update(v, Slice(node.cells(0), 0))
+          }
+        }
       case pos @ LocalAssign(variable, value, _) =>
         value.variables.foreach { v =>
           if (isFormal(pos, v)) {
