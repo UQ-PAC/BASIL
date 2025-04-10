@@ -55,22 +55,14 @@ We do not have a strict code style however
 
 ## Development tasks
 
+Mill should always be run from the git root directory (`git rev-parse --show-toplevel`).
+
 ## Building
 
-The sbt shell can also be used for multiple tasks with less overhead by executing `sbt` and then the relevant sbt commands.
+To build the project you can use `./mill build`. Often the incremental compilation database won't be properly invalidated on 
+`git switch`/`git checkout`/`git pull`: in these cases `./mill clean` is needed to trigger a full rebuild.
 
-To build a standalone `.jar` file, use the following command:
-
-`mill assembly`
-
-From `sbt` the resulting `.jar` is located at `target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar` and from 
-`mill` this is `out/assembly.dest/out.jar`.
-
-To compile the source without running it - this helps IntelliJ highlight things properly:
-
-`mill compile`
-
-This is used to keep track of which tests have passed previously, as well as changes to the basil output.
+To build a standalone `.jar` file, use `./mill assembly`. This can be found at `out/assembly.dest/out.jar`.
 
 ### Debugging
 
