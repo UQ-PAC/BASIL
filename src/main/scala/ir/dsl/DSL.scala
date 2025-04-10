@@ -59,7 +59,7 @@ import scala.collection.immutable.*
  *  Together, NonCallStatement and Call should partition Statement.
  */
 type NonCallStatement =
-  LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume
+  LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume | MemoryAssign
 
 def cloneStatement(x: NonCallStatement): NonCallStatement = x match {
   case LocalAssign(a, b, c) => LocalAssign(a, b, c)

@@ -26,7 +26,9 @@ case class TestConfig(
   expectVerify: Boolean,
   checkExpected: Boolean = false,
   logResults: Boolean = false,
-  simplify: Boolean = false
+  simplify: Boolean = false,
+  dsa: Option[DSAConfig] = None,
+  memoryTransform: Boolean = false
 )
 
 trait BASILTest {
@@ -38,6 +40,7 @@ trait BASILTest {
     staticAnalysisConf: Option[StaticAnalysisConfig],
     simplify: Boolean = false,
     dsa: Option[DSAConfig] = None,
+    memoryTransform: Boolean = false,
     postLoad: IRContext => Unit = s => ()
   ): BASILResult = {
     val specFile = if (specPath.isDefined && File(specPath.get).exists) {
@@ -52,7 +55,8 @@ trait BASILTest {
       boogieTranslation =
         util.BoogieGeneratorConfig().copy(memoryFunctionType = util.BoogieMemoryAccessMode.SuccessiveStoreSelect),
       outputPrefix = BPLPath,
-      dsaConfig = dsa
+      dsaConfig = dsa,
+      memoryTransform = memoryTransform
     )
     val result = RunUtils.loadAndTranslate(config, postLoad = postLoad)
     RunUtils.writeOutput(result)

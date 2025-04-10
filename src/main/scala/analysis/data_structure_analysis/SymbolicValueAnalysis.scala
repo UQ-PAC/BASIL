@@ -30,6 +30,12 @@ def getSymbolicValues[T <: Offsets](p: Procedure)(using valSetDomain: SymValSetD
     .fold(symValuesDomain.bot)((x, y) => symValuesDomain.join(x, y, p.entryBlock.get))
 }
 
+def isPlaceHolder(base: SymBase): Boolean = {
+  base match
+    case known: Known => false
+    case unknown: Unknown => true
+}
+
 // a symbolic base address
 sealed trait SymBase
 
@@ -265,6 +271,7 @@ object SymValues {
   ): SymValSet[T] = {
     expr match
       case literal @ BitVecLiteral(value, size) => symValSetDomain.init(Global, transform(bv2SignedInt(literal).toInt))
+      case literal @ IntLiteral(value) => symValSetDomain.init(Global, value.toInt)
       case Extract(end, start, body) if end - start >= 64 => exprToSymValSet(symValues)(body, transform)
       case Extract(32, 0, body) =>
         exprToSymValSet(symValues)(body, transform) // todo incorrectly assuming value is preserved
@@ -334,7 +341,7 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) e
 
   override def join(a: SymValues[T], b: SymValues[T], pos: Block): SymValues[T] = {
     count.update(pos, count(pos) + 1)
-    if count(pos) < 10 then joinHelper(a, b, pos) else widen(a, b, pos)
+    if count(pos) < 100 then joinHelper(a, b, pos) else widen(a, b, pos)
   }
 
   override def transfer(a: SymValues[T], b: Command): SymValues[T] = {
@@ -358,11 +365,26 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) e
         )
         join(a, update, block)
       case call @ DirectCall(target, outParams, inParams, label) =>
-        val retInitSymValSet = SymValues(
+        val unchanged = Set("R29", "R30", "R31")
+        val (maintained, notMaintained) =
           outParams.values
             .map(_.asInstanceOf[LocalVar])
+            .partition(v => unchanged.exists(r => v.name.startsWith(r)))
+        val n = maintained
+          .map(l =>
+            (
+              l,
+              inParams.collectFirst {
+                case (in, act) if in.name.take(3) == l.name.take(3) => SymValues.exprToSymValSet(a)(act)
+              }.get
+            )
+          )
+          .toMap
+        val retInitSymValSet = SymValues(
+          notMaintained
             .map(param => (param, symValSetDomain.init(Ret(call, param))))
             .toMap
+            ++ n
         )
         join(a, retInitSymValSet, block)
       case ind: IndirectCall => a // TODO possibly map every live variable to top

@@ -30,7 +30,7 @@ enum Interval extends Offsets {
     this match
       case Interval.Top => "Top"
       case Interval.Bot => "Bot"
-      case Interval.Value(start, end) => s"$start-$end"
+      case Interval.Value(start, end) => s"${start}_$end"
 
   def start: Option[Int] =
     this match
@@ -44,7 +44,7 @@ enum Interval extends Offsets {
 
   def size: Option[Int] =
     this match
-      case Interval.Value(start, end) => Some(end - start)
+      case Interval.Value(start, end) => Some(end - start + 1)
       case _ => None
 
   def move(func: Int => Int): Interval =
@@ -127,6 +127,7 @@ class DSFlag {
   var heap = false
   var global = false
   var unknown = false
+  var escapes = false
   var read = false
   var modified = false
   var incomplete = false
@@ -140,11 +141,18 @@ class DSFlag {
     global = other.global || global
     unknown = other.unknown || unknown
     read = other.read || read
+    escapes = escapes || other.escapes
     modified = other.modified || modified
     incomplete = other.incomplete || incomplete
     foreign = other.foreign && foreign
     merged = true
     function = function || other.function
+}
+
+def joinFlags(pointers: Iterable[IntervalCell]): DSFlag = {
+  val flag = DSFlag()
+  pointers.foreach(c => flag.join(c.node.flags))
+  flag
 }
 
 def computeDSADomain(proc: Procedure, context: IRContext): Set[Procedure] = {

@@ -161,6 +161,10 @@ class CILVisitorImpl(val v: CILVisitor) {
         m.mem = visit_mem(m.mem)
         m.lhs = visit_lvar(m.lhs)
         m
+      case m: MemoryAssign =>
+        m.rhs = visit_expr(m.rhs)
+        m.lhs = visit_lvar(m.lhs)
+        m
       case m: LocalAssign =>
         m.rhs = visit_expr(m.rhs)
         m.lhs = visit_lvar(m.lhs)
