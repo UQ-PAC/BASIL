@@ -18,6 +18,7 @@ enum InsnSemantics {
   case Error(opcode: String, error: String)
 }
 
+/** Name given to the uninterpreted function for if-then-else expressions. */
 private val iteFunctionName = "ite.temp"
 
 class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {

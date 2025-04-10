@@ -56,17 +56,15 @@ class FindUninterpretedFunctions extends CILVisitor {
     DoChildren()
 }
 
-def findITEExpressions(x: Iterable[Statement]) = {
-  val v = FindUninterpretedFunctions()
-  x.foreach(s => cilvisitor.visit_stmt(v, s))
-  v.uninterp.filter(_.name == iteFunctionName)
-}
-
 class ConvertITEToTempIf(prefix: String) extends CILVisitor {
   private var iteResults = immutable.Map[String, TempIf]()
 
   private val counter = util.Counter()
 
+  /**
+   * Makes a new TempIf structure for the given ite expression, and
+   * adds it to the iteResults map.
+   */
   def makeTempIf(cond: Expr, tcase: Expr, fcase: Expr): LocalVar = {
     val name = "ite_result_" + prefix + "_" + counter.next()
     val localvar = LocalVar(name, tcase.getType)
@@ -75,9 +73,19 @@ class ConvertITEToTempIf(prefix: String) extends CILVisitor {
     localvar
   }
 
+  /**
+   * Returns the list of statements required to compute the ITE expressions
+   * which have been visited, then clears the internal map of ITE results.
+   */
+  def popITEComputations(): Iterable[TempIf] = {
+    val x = iteResults.values
+    iteResults = iteResults.empty
+    x
+  }
+
   override def vexpr(e: Expr) =
     e match {
-      case u: UninterpretedFunction => {
+      case u: UninterpretedFunction if u.name == iteFunctionName => {
         val Seq(cond, t, f) = u.params
         ChangeTo(makeTempIf(cond, t, f))
       }
@@ -90,16 +98,26 @@ class ConvertITEToTempIf(prefix: String) extends CILVisitor {
       iteResults.isEmpty,
       "this would only happen if statements are nested - impossible in basil ir aside from tempif"
     )
-    iteResults = iteResults.empty
-    ChangeDoChildrenPost(
-      List(s),
-      ss => {
-        val x = iteResults.values ++: ss
-        iteResults = iteResults.empty
-        x
-      }
-    )
+    ChangeDoChildrenPost(List(s), ss => popITEComputations() ++: ss)
   }
+
+  def convertNestedStatements(s: Iterable[Statement]): Iterable[Statement] = {
+    assert(iteResults.isEmpty)
+
+    // XXX: here, we handle TempIf outside of cilvisitor because cilvisitor sees TempIf as NOP T_T
+    s.flatMap {
+      case x: TempIf => {
+        val c = cilvisitor.visit_expr(this, x.cond)
+        val pre = popITEComputations()
+        val ts = convertNestedStatements(x.thenStmts).toSeq
+        val fs = convertNestedStatements(x.elseStmts).toSeq
+
+        pre ++ Iterable(TempIf(c, ts, fs))
+      }
+      case x => cilvisitor.visit_stmt(this, x)
+    }
+  }
+
 }
 
 /** GTIRBToIR class. Forms an IR as close as possible to the one produced by BAP by using GTIRB instead
@@ -237,7 +255,8 @@ class GTIRBToIR(
         {
           val statements = semanticsLoader.visitBlock(blockUUID, blockCount, block.address)
           blockCount += 1
-          block.statements.addAll(convertITEToTempIf(blockUUID, statements))
+          val converter = ConvertITEToTempIf(byteStringToString(blockUUID))
+          block.statements.addAll(converter.convertNestedStatements(statements))
         }
 
         if (block.statements.isEmpty && !blockOutgoingEdges.contains(blockUUID)) {
@@ -295,22 +314,6 @@ class GTIRBToIR(
     val intialProc: Procedure = procedures.find(_.address.get == mainAddress).get
 
     Program(procedures, intialProc, initialMemory)
-  }
-
-  private def convertITEToTempIf(uuid: ByteString, s: Iterable[Statement]): Iterable[Statement] = {
-    val prefix = byteStringToString(uuid)
-    val vis = ConvertITEToTempIf(prefix)
-
-    // XXX: here, we handle TempIf outside of cilvisitor because cilvisitor sees TempIf as NOP T_T
-    s.flatMap {
-      case x: TempIf => {
-        val c = cilvisitor.visit_expr(vis, x.cond)
-        val ts = convertITEToTempIf(uuid, x.thenStmts).toSeq
-        val fs = convertITEToTempIf(uuid, x.elseStmts).toSeq
-        Seq(TempIf(c, ts, fs))
-      }
-      case x => cilvisitor.visit_stmt(vis, x)
-    }
   }
 
   private def removePCAssign(block: Block): Option[String] = {
