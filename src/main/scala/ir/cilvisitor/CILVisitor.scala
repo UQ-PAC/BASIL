@@ -239,3 +239,7 @@ def visit_stmt(v: CILVisitor, e: Statement): List[Statement] = CILVisitorImpl(v)
 def visit_jump(v: CILVisitor, e: Jump): Jump = CILVisitorImpl(v).visit_jump(e)
 def visit_expr(v: CILVisitor, e: Expr): Expr = CILVisitorImpl(v).visit_expr(e)
 def visit_rvar(v: CILVisitor, e: Variable): Variable = CILVisitorImpl(v).visit_rvar(e)
+def visit_stmts(v: CILVisitor, e: Iterable[Statement]): List[Statement] = {
+  val impl = CILVisitorImpl(v)
+  e.flatMap(impl.visit_stmt).toList
+}
