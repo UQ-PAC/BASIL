@@ -44,7 +44,11 @@ class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T)
     // derive post-state from the stabilised pre-state
     val post_state = intDom.stateTransfer(pre_state, b)
     // derive the possible state transitions resulting from this statement
-    val transitions = intDom.derive(pre_state, b)
+    // todo: for now, we only consider "interference" from LocalAssigns
+    val transitions = b match {
+      case a: Assign => intDom.derive(pre_state, a)
+      case _ => intDom.bot
+    }
     // update the guarantee by joining these transitions
     val guar = intDom.join(a._1, transitions)
     // return results

@@ -33,7 +33,8 @@ abstract class InterferenceDomain[T, S](
   // the empty set of state transitions
   def bot: T
   // the state transitions that may occur by executing c in a state satisfying s
-  def derive(s: S, c: Command): T
+  // todo: until memory regions are complete, we test RG gen on local variables
+  def derive(s: S, c: Assign): T
   // a weakened version of s that accounts for all transitions in t
   def apply(t: T, s: S): S
   // an overapproximation of the union of transitions captured by t1 and t2
@@ -43,6 +44,11 @@ abstract class InterferenceDomain[T, S](
   // representation of t as a predicate over primed and unprimed variables
   def toString(t: T): String
 }
+
+/* Fixme: This may result in naming clashes, however we don't always have a
+Procedure at hand to call getFreshSSAVar(...). Ideally, we might pass around
+some kind of variable factory. */
+def get_temp(ty: IRType): LocalVar = LocalVar("rg_tmp_var", ty, 0)
 
 /** The conditional-writes domain is an interference domain that represents
   * guarantee conditions of the form:
@@ -59,35 +65,42 @@ case class ConditionalWritesDomain[S](
   // an empty map means no variables have been written to
   def bot: Map[Variable, S] = Map.empty[Variable, S]
   
-  // simply map all assigned variables to the precondition
-  def derive(s: S, c: Command): Map[Variable, S] = 
-    if (s == stateLattice.bottom) Map.empty
-    else c match {
-      case a: Assign => a.assignees.map(v => v -> s).toMap
-      case _ => bot
-    }
+  // simply map the assigned variable to the precondition
+  def derive(s: S, c: Assign): Map[Variable, S] =
+    if s == stateLattice.bottom then bot else c.assignees.map(v => v -> s).toMap
   
   /* If a variable v maps to a set of states that intersects s, then there
   exists a state satisfying s under which v can be written. Thus, we stabilise s
-  by eliminating v. */
+  by eliminating v. Since this weakens s, we have to keep doing this until we
+  reach a fixpoint. (However, we may not need to if t is transitive?) */
   def apply(t: Map[Variable, S], s: S): S = {
+    var old_s = s
     var new_s = s
-    t.foreach {
-      case (v, cond) if stateLattice.glb(cond, s) != stateLattice.bottom =>
-        new_s = stateLattice.drop(v, new_s)
-      case _ =>
+    var fixpoint = false
+    while (!fixpoint) {
+      for ((v, cond) <- t) {
+        if (stateLattice.glb(cond, s) != stateLattice.bottom) {
+          new_s = stateLattice.drop(v, new_s)
+        }
+      }
+      fixpoint = new_s == old_s
+      old_s = new_s
     }
     new_s
   }
 
   // the join of two elements is just the component-wise join over the map
   def join(t1: Map[Variable, S], t2: Map[Variable, S]): Map[Variable, S] = {
+    // set new_t = t1, then add everything in t2 to new_t
     var new_t = t1
-    t2.foreach {
-      case (v, cond) if new_t.contains(v) =>
+    for ((v, cond) <- t2) {
+      if (new_t.contains(v)) {
+        // take the join
         new_t = new_t + (v -> stateLattice.lub(new_t(v), cond))
-      case (v, cond) =>
+      } else {
+        // just insert (v, cond) into new_t
         new_t = new_t + (v -> cond)
+      }
     }
     new_t
   }
@@ -186,11 +199,6 @@ case class MonotonicityDomain[S](
   override val stateTransfer: (S, Command) => S
 ) extends InterferenceDomain[Map[Variable, Direction], S](stateLattice, 
   stateTransfer) {
-  
-  /* Fixme: This may result in naming clashes, however we don't always have a
-  Procedure at hand to call getFreshSSAVar(...). Ideally, we might pass around
-  some kind of variable factory. */
-  private def get_temp(ty: IRType): LocalVar = LocalVar("rg_temp_variable", ty, 0)
 
   // an empty map means no variables have been written to
   def bot: Map[Variable, Direction] = Map.empty[Variable, Direction]
@@ -199,18 +207,17 @@ case class MonotonicityDomain[S](
     * perform the assignment v' := E for a fresh variable v', then check whether
     * we can prove that v' <*> v for any <*> in: <, <=, ==, >=, >.
     */
-  def derive(s: S, c: Command): Map[Variable, Direction] =
-    if (s == stateLattice.bottom) Map.empty
-    else c match {
-      case a: LocalAssign => {
+  def derive(s: S, a: Assign): Map[Variable, Direction] =
+    if s == stateLattice.bottom then Map.empty else a match {
+      case c: LocalAssign => {
         // create fresh variable x
-        val x = get_temp(a.lhs.irType)
+        val x = get_temp(c.lhs.irType)
         // do the assignment on x, with pre-state s
-        val post = stateTransfer(s, LocalAssign(x, a.rhs))
+        val post = stateTransfer(s, LocalAssign(x, c.rhs))
         // apply the transfer function to assume x' > x and assume x' < x
-        val assumeInc = stateTransfer(post, Assume(BinaryExpr(BVSGT, x, a.lhs)))
+        val assumeInc = stateTransfer(post, Assume(BinaryExpr(BVSGT, x, c.lhs)))
         val decreases = assumeInc == stateLattice.bottom
-        val assumeDec = stateTransfer(post, Assume(BinaryExpr(BVSLT, x, a.lhs)))
+        val assumeDec = stateTransfer(post, Assume(BinaryExpr(BVSLT, x, c.lhs)))
         val increases = assumeDec == stateLattice.bottom
         // from the above, derive the direction in which x moved from a.lhs
         val dir =
@@ -219,29 +226,30 @@ case class MonotonicityDomain[S](
           else if (increases) then Direction.Increasing // x' >= x
           else Direction.Top // could not prove any constraints of x' w.r.t. x
         // map a.lhs to the appropriate result
-        Map(a.lhs -> dir)
+        Map(c.lhs -> dir)
       }
-      case _ => bot // fixme: for now, we only handle LocalAssigns
+      case _ => bot
     }
 
   /** To simulate interference on a variable v, we introduce a temporary
     * variable y, together with an "assume" statement to add the appropriate
     * constraints to y, then we assign v := y, and finally remove y from the
-    * abstract state. We do this for every entry in our map.
+    * abstract state. We do this for every entry in our map. We do not need a
+    * fixpoint computation here, since the result after one pass is stable.
     */
   def apply(t: Map[Variable, Direction], s: S): S = {
     var postState = s
     for ((v, d) <- t) {
       // create fresh variable y
-      // todo: to create a variable, we need access to the program
-      // this is resolved in crab by having a var factory passed to every analysis
-      // val y = c.parent.parent.getFreshSSAVar("temp", a.lhs.irType)
       val y = get_temp(v.irType)
       // apply assume statement to add constraints to y
       val yConstraints = d match {
-        case Direction.Bot => stateTransfer(postState, Assume(BinaryExpr(IntEQ, y, v)))
-        case Direction.Increasing => stateTransfer(postState, Assume(BinaryExpr(BVSGE, y, v)))
-        case Direction.Decreasing => stateTransfer(postState, Assume(BinaryExpr(BVSLE, y, v)))
+        case Direction.Bot =>
+          stateTransfer(postState, Assume(BinaryExpr(IntEQ, y, v)))
+        case Direction.Increasing =>
+          stateTransfer(postState, Assume(BinaryExpr(BVSGE, y, v)))
+        case Direction.Decreasing =>
+          stateTransfer(postState, Assume(BinaryExpr(BVSLE, y, v)))
         case Direction.Top => postState // add no constraints
       }
       // assign v := y
@@ -253,13 +261,20 @@ case class MonotonicityDomain[S](
   }
 
   // the join of two elements is just the component-wise join over the map
-  def join(t1: Map[Variable, Direction], t2: Map[Variable, Direction]): Map[Variable, Direction] = {
-    var result = Map.empty[Variable, Direction]
-    for ((v, d) <- t1) {
-      val direction = if (t2.contains(v)) DirectionLattice.lub(d, t2(v)) else d
-      result = result + (v -> direction)
+  def join(t1: Map[Variable, Direction], t2: Map[Variable, Direction])
+    : Map[Variable, Direction] = {
+    // set new_t = t1, then add everything in t2 to new_t
+    var new_t = t1
+    for ((v, dir) <- t2) {
+      if (new_t.contains(v)) {
+        // take the join
+        new_t = new_t + (v -> DirectionLattice.lub(new_t(v), dir))
+      } else {
+        // just insert (v, dir) into new_t
+        new_t = new_t + (v -> dir)
+      }
     }
-    result
+    new_t
   }
 
   // this domain is inherently transitive
@@ -287,62 +302,78 @@ case class MonotonicityDomain[S](
   }
 }
 
-case class TransitionPair[S](pre: S, inst: LocalAssign)
-
 case class PreciseDomain[S](
   override val stateLattice: InterferenceCompatibleLattice[S], 
   override val stateTransfer: (S, Command) => S
-) extends InterferenceDomain[Set[TransitionPair[S]], S](stateLattice,
+) extends InterferenceDomain[Map[LocalAssign, S], S](stateLattice,
   stateTransfer) {
-  
-  /* Fixme: This may result in naming clashes, however we don't always have a
-  Procedure at hand to call getFreshSSAVar(...). Ideally, we might pass around
-  some kind of variable factory. */
-  private def get_temp(ty: IRType): LocalVar = LocalVar("rg_temp_variable", ty, 0)
 
-  def bot: Set[TransitionPair[S]] = Set.empty[TransitionPair[S]]
+  def bot: Map[LocalAssign, S] = Map.empty[LocalAssign, S]
 
-  def derive(s: S, c: Command): Set[TransitionPair[S]] =
-    if (s == stateLattice.bottom) Set.empty
-    else c match {
-      case a: LocalAssign => Set(TransitionPair[S](s, a))
-      case _ => bot // fixme: for now, we only handle LocalAssigns
+  def derive(s: S, a: Assign): Map[LocalAssign, S] =
+    if (s == stateLattice.bottom) then Map.empty[LocalAssign, S]
+    else a match {
+      case c: LocalAssign => Map(c -> s)
+      case _ => bot
     }
 
-  def apply(t: Set[TransitionPair[S]], s: S): S = {
+  /** Stabilising s under and element e in t requires adding to s the states
+    * that are reachable by executing e.inst under the meet of e.pre and s. This
+    * needs to be repeated for each element in t until a fixpoint is reached.
+    * (The requirement to compute a fixpoint may be possibly avoided if t has
+    * been made transitive.) Since we do not have a decent means of widening,
+    * our fixpoint computation involves going to top after reaching some maximum
+    * number of iterations.
+    */
+  def apply(t: Map[LocalAssign, S], s: S): S = {
+    var old_s = s
     var new_s = s
-    for (transition <- t) {
-      // fixme: this applies every transition once instead of deriving a fixpoint
-      // it might be good to make transitivity optional for particular domains
-      // this would allow fixpoints to be computed only where it makes sense,
-      // like in this domain (but not say, conditional writes?)
-      val meet = stateLattice.glb(new_s, transition.pre)
-      new_s = stateLattice.lub(new_s, stateTransfer(meet, transition.inst))
+    var fixpoint = false
+    var iterations = 0
+    val maxIterations = 10
+    while (!fixpoint && iterations < 10) {
+      for ((inst, pre) <- t) {
+        val meet = stateLattice.glb(new_s, pre)
+        new_s = stateLattice.lub(new_s, stateTransfer(meet, inst))
+      }
+      fixpoint = new_s == old_s
+      old_s = new_s
+      iterations = iterations + 1
     }
     new_s
   }
 
-  /* Fixme: This implementation requires that interference domain elements are
-  cleared on every iteration of RG-Gen for this thread. This differs from the
-  approach taken by Mine, so we have to confirm this is what we want to do. */
-  def join(t1: Set[TransitionPair[S]], 
-    t2: Set[TransitionPair[S]]): Set[TransitionPair[S]] = t1 | t2
+  def join(t1: Map[LocalAssign, S], t2: Map[LocalAssign, S])
+    : Map[LocalAssign, S] = {
+    // set new_t = t1, then add everything in t2 to new_t
+    var new_t = t1
+    for ((c, s) <- t2) {
+      if (new_t.contains(c)) {
+        // take the join
+        new_t = new_t + (c -> stateLattice.lub(new_t(c), s))
+      } else {
+        // just insert (c, s) into new_t
+        new_t = new_t + (c -> s)
+      }
+    }
+    new_t
+  }
 
-  // todo; not sure if this is possible
-  def close(t: Set[TransitionPair[S]]): Set[TransitionPair[S]] = t
+  // todo: not sure if this is possible
+  def close(t: Map[LocalAssign, S]): Map[LocalAssign, S] = t
 
-  def toString(t: Set[TransitionPair[S]]): String = {
+  def toString(t: Map[LocalAssign, S]): String = {
     if (t.isEmpty) {
       return "forall v in Vars :: v' == v"
     }
     val sb = new StringBuilder
-    for (transition <- t) {
+    for ((inst, pre) <- t) {
       sb.append("(")
-      sb.append(stateLattice.toPredString(transition.pre))
+      sb.append(stateLattice.toPredString(pre))
       sb.append(" && ")
-      sb.append(transition.inst.lhs.name)
+      sb.append(inst.lhs.name)
       sb.append("' == ")
-      sb.append(transition.inst.rhs) // todo: convert expr into string?
+      sb.append(inst.rhs) // todo: convert expr into string?
       sb.append(") || \n")
     }
     sb.append("forall v in Vars :: v' == v")
