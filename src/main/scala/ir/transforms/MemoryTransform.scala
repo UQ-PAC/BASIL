@@ -101,10 +101,8 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
               )
             else if !flag.escapes then
               val memName =
-                if isGlobal(flag) then
-                  "Global"
-                else if isLocal(flag) then
-                  "Stack"
+                if isGlobal(flag) then "Global"
+                else if isLocal(flag) then "Stack"
                 else
                   memVals.getOrElseUpdate(
                     globals.getOrElse(index.node, index.node).get(index.interval),
@@ -134,10 +132,8 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
               )
             else if !flag.escapes then
               val memName =
-                if isGlobal(flag) then
-                  "Global"
-                else if isLocal(flag) then
-                  "Stack"
+                if isGlobal(flag) then "Global"
+                else if isLocal(flag) then "Stack"
                 else
                   memVals.getOrElseUpdate(
                     globals.getOrElse(index.node, index.node).get(index.interval),
