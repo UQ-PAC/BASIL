@@ -121,13 +121,11 @@ class IntervalGraph(
 
   def isGlobal(address: Int): Boolean = {
     (irContext.globals ++ irContext.funcEntries).exists(g =>
-      Interval(g.address.toInt, g.address.toInt + (g.size / 8)).contains(address)
+      Interval(g.address.toInt, g.address.toInt + g.size / 8).contains(address)
     ) || irContext.globalOffsets.exists((g1, g2) =>
       Interval(g1.toInt, g1.toInt + 8).contains(address)
         || Interval(g2.toInt, g2.toInt + 8).contains(address)
-    ) || irContext.externalFunctions.exists(g =>
-      Interval(g.offset.toInt, g.offset.toInt + 8).contains(address)
-    )
+    ) || irContext.externalFunctions.exists(g => Interval(g.offset.toInt, g.offset.toInt + 8).contains(address))
   }
 
   def globalNode(
@@ -139,9 +137,9 @@ class IntervalGraph(
     val globalNode = IntervalNode(this, mutable.Map(symBase -> 0))
     globalNode.add(0)
     globalNode.flags.global = true
-    globals.foreach {
+    globals.toSeq.sortBy(_.address).foreach {
       case FuncEntry(name, size, address) =>
-        globalNode.add(Interval(address.toInt, address.toInt + (size / 8) - 1))
+        globalNode.add(Interval(address.toInt, address.toInt + size / 8))
       case SpecGlobal(name, size, arraySize, address) =>
         globalNode.add(Interval(address.toInt, address.toInt)) // ignore size, could be a composite type
     }
@@ -151,12 +149,11 @@ class IntervalGraph(
       globalNode.add(relocated.toInt)
     }
 
-    externalFunctions.foreach(
-      e =>
-        val extPointer = globalNode.add(e.offset.toInt)
-        val ext = extPointer.getPointee
-        ext.node.flags.function = true
-        ext.node.flags.foreign = true
+    externalFunctions.foreach(e =>
+      val extPointer = globalNode.add(e.offset.toInt)
+      val ext = extPointer.getPointee
+      ext.node.flags.function = true
+      ext.node.flags.foreign = true
     )
 
     globalOffsets.map(_.swap).foreach { case (address, relocated) =>
@@ -443,7 +440,7 @@ class IntervalGraph(
       case cons: MemoryAccessConstraint[_] =>
         Logger.debug(s"Processing constraint $cons")
         val indices = constraintArgToCells(cons.arg1, ignoreContents = true)
-        indices.foreach(cell => cell.node.add(cell.interval.growTo(cons.size - 1)))
+        indices.foreach(cell => cell.node.add(cell.interval.growTo(cons.size)))
         val indexPointee = constraintArgToCells(cons.arg1)
         val indexFlag = joinFlags(indices)
 
