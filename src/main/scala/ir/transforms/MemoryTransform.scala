@@ -91,22 +91,15 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
       e match
         case load: MemoryLoad =>
           val indices = dsa(proc).exprToCells(load.index).map(dsa(proc).get).toSeq
-          if indices.nonEmpty && indices.forall(_.hasPointee) then {
+          if indices.size == 1 then {
             assert(indices.map(_.getPointee).toSet.size == 1, s"$proc, ${indices.map(_.getPointee).size}, $load")
             val index = indices.head
             val flag = joinFlags(indices)
             val value = index.getPointee
-            if isGlobal(flag) then
-              ChangeTo(
-                List(
-                  LocalAssign(
-                    load.lhs,
-                    Register(s"Global_${index.interval.move(i => i - index.node.bases(Global))}", load.size),
-                    load.label
-                  )
-                )
-              )
-            else if isLocal(flag) && !flag.escapes && index.node.bases.contains(Stack(proc)) then
+            if isGlobal(flag) && !index.node.isCollapsed then
+              ChangeTo(List(LocalAssign(load.lhs, Register(scalarName(index), load.size), load.label)))
+            else if isLocal(flag) && !index.node.isCollapsed && !flag.escapes && index.node.bases.contains(Stack(proc))
+            then
               ChangeTo(
                 List(
                   LocalAssign(
@@ -132,12 +125,15 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
 
         case store: MemoryStore =>
           val indices = dsa(proc).exprToCells(store.index).map(dsa(proc).get).toSeq
-          if indices.nonEmpty && indices.forall(_.hasPointee) then {
+          if indices.size == 1 then {
             assert(indices.map(_.getPointee).toSet.size == 1)
             val index = indices.head
             val flag = joinFlags(indices)
             val content = index.getPointee
-            if isGlobal(flag) then
+            if isGlobal(flag) && !index.node.isCollapsed then
+              ChangeTo(List(MemoryAssign(Register(scalarName(index), store.size), store.value, store.label)))
+            else if isLocal(flag) && !index.node.isCollapsed && !flag.escapes && index.node.bases.contains(Stack(proc))
+            then
               ChangeTo(
                 List(
                   MemoryAssign(
