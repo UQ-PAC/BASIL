@@ -100,10 +100,16 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
                 List(LocalAssign(load.lhs, LocalVar(scalarName(index, Some(proc)), load.lhs.getType), load.label))
               )
             else if !flag.escapes then
-              val memName = memVals.getOrElseUpdate(
-                globals.getOrElse(index.node, index.node).get(index.interval),
-                s"mem_${counter.next()}"
-              )
+              val memName =
+                if isGlobal(flag) then
+                  "Global"
+                else if isLocal(flag) then
+                  "Stack"
+                else
+                  memVals.getOrElseUpdate(
+                    globals.getOrElse(index.node, index.node).get(index.interval),
+                    s"mem_${counter.next()}"
+                  )
               val newMem = SharedMemory(memName, value.interval.size.getOrElse(0), load.mem.valueSize)
               val newLoad = MemoryLoad(load.lhs, newMem, load.index, load.endian, load.size, load.label)
               ChangeTo(List(newLoad))
@@ -127,10 +133,16 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
                 )
               )
             else if !flag.escapes then
-              val memName = memVals.getOrElseUpdate(
-                globals.getOrElse(index.node, index.node).get(index.interval),
-                s"mem_${counter.next()}"
-              )
+              val memName =
+                if isGlobal(flag) then
+                  "Global"
+                else if isLocal(flag) then
+                  "Stack"
+                else
+                  memVals.getOrElseUpdate(
+                    globals.getOrElse(index.node, index.node).get(index.interval),
+                    s"mem_${counter.next()}"
+                  )
               val newMem = SharedMemory(memName, content.interval.size.getOrElse(0), store.mem.valueSize)
               val newStore = MemoryStore(newMem, store.index, store.value, store.endian, store.size, store.label)
               ChangeTo(List(newStore))
