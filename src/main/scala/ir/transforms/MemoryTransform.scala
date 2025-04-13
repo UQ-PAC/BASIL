@@ -67,22 +67,18 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
 
   }
 
-  def cellsToName(cells: IntervalCell*): String = {
-    cells
-      .flatMap(i =>
-        i.node.bases.keySet
-          .filterNot(isPlaceHolder)
-          .map(base => (base, i.node.get(i.interval).interval.move(f => f - i.node.bases(base))))
-      )
-      .mkString("|")
-  }
-
   def isGlobal(flag: DSFlag): Boolean = {
     flag.global && !flag.stack && !flag.heap
   }
 
   def isLocal(flag: DSFlag): Boolean = {
     !flag.global && flag.stack && !flag.heap
+  }
+
+  def scalarName(index: IntervalCell, proc: Option[Procedure] = None) = {
+    proc match
+      case Some(value) => s"Stack_${index.interval.move(i => i - index.node.bases(Stack(value)))}".replace("-", "n")
+      case None => s"Global_${index.interval.move(i => i - index.node.bases(Global))}"
   }
 
   override def vstmt(e: Statement) = {
@@ -94,25 +90,16 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
           if indices.size == 1 then {
             assert(indices.map(_.getPointee).toSet.size == 1, s"$proc, ${indices.map(_.getPointee).size}, $load")
             val index = indices.head
-            val flag = joinFlags(indices)
+            val flag = index.node.flags
             val value = index.getPointee
             if isGlobal(flag) && !index.node.isCollapsed then
               ChangeTo(List(LocalAssign(load.lhs, Register(scalarName(index), load.size), load.label)))
             else if isLocal(flag) && !index.node.isCollapsed && !flag.escapes && index.node.bases.contains(Stack(proc))
             then
               ChangeTo(
-                List(
-                  LocalAssign(
-                    load.lhs,
-                    LocalVar(
-                      s"Stack_${index.interval.move(i => i - index.node.bases(Stack(proc)))}".replace("-", "n"),
-                      load.lhs.getType
-                    ),
-                    load.label
-                  )
-                )
+                List(LocalAssign(load.lhs, LocalVar(scalarName(index, Some(proc)), load.lhs.getType), load.label))
               )
-            else if !flag.escapes && indices.size == 1 then
+            else if !flag.escapes then
               val memName = memVals.getOrElseUpdate(
                 globals.getOrElse(index.node, index.node).get(index.interval),
                 s"mem_${counter.next()}"
@@ -128,7 +115,7 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
           if indices.size == 1 then {
             assert(indices.map(_.getPointee).toSet.size == 1)
             val index = indices.head
-            val flag = joinFlags(indices)
+            val flag = index.node.flags
             val content = index.getPointee
             if isGlobal(flag) && !index.node.isCollapsed then
               ChangeTo(List(MemoryAssign(Register(scalarName(index), store.size), store.value, store.label)))
@@ -136,27 +123,10 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
             then
               ChangeTo(
                 List(
-                  MemoryAssign(
-                    Register(s"Global_${index.interval.move(i => i - index.node.bases(Global))}", store.size),
-                    store.value,
-                    store.label
-                  )
+                  LocalAssign(LocalVar(scalarName(index, Some(proc)), store.value.getType), store.value, store.label)
                 )
               )
-            else if isLocal(flag) && !flag.escapes && index.node.bases.contains(Stack(proc)) then
-              ChangeTo(
-                List(
-                  LocalAssign(
-                    LocalVar(
-                      s"Stack_${index.interval.move(i => i - index.node.bases(Stack(proc)))}".replace("-", "n"),
-                      store.value.getType
-                    ),
-                    store.value,
-                    store.label
-                  )
-                )
-              )
-            else if !flag.escapes && indices.size == 1 then
+            else if !flag.escapes then
               val memName = memVals.getOrElseUpdate(
                 globals.getOrElse(index.node, index.node).get(index.interval),
                 s"mem_${counter.next()}"
