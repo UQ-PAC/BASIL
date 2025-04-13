@@ -99,7 +99,7 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
               ChangeTo(
                 List(LocalAssign(load.lhs, LocalVar(scalarName(index, Some(proc)), load.lhs.getType), load.label))
               )
-            else if !flag.escapes then
+            else if !flag.escapes || isGlobal(flag) then
               val memName =
                 if isGlobal(flag) then "Global"
                 else if isLocal(flag) then "Stack"
@@ -108,7 +108,7 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
                     globals.getOrElse(index.node, index.node).get(index.interval),
                     s"mem_${counter.next()}"
                   )
-              val newMem = SharedMemory(memName, value.interval.size.getOrElse(0), load.mem.valueSize)
+              val newMem = SharedMemory(memName, load.mem.addressSize, load.mem.valueSize)
               val newLoad = MemoryLoad(load.lhs, newMem, load.index, load.endian, load.size, load.label)
               ChangeTo(List(newLoad))
             else SkipChildren()
@@ -130,7 +130,7 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
                   LocalAssign(LocalVar(scalarName(index, Some(proc)), store.value.getType), store.value, store.label)
                 )
               )
-            else if !flag.escapes then
+            else if !flag.escapes || isGlobal(flag) then
               val memName =
                 if isGlobal(flag) then "Global"
                 else if isLocal(flag) then "Stack"
@@ -139,7 +139,7 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
                     globals.getOrElse(index.node, index.node).get(index.interval),
                     s"mem_${counter.next()}"
                   )
-              val newMem = SharedMemory(memName, content.interval.size.getOrElse(0), store.mem.valueSize)
+              val newMem = SharedMemory(memName, store.mem.addressSize, store.mem.valueSize)
               val newStore = MemoryStore(newMem, store.index, store.value, store.endian, store.size, store.label)
               ChangeTo(List(newStore))
             else // ignore the case where the address escapes
