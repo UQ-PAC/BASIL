@@ -158,7 +158,7 @@ class IntervalGraph(
 
     globalOffsets.map(_.swap).foreach { case (address, relocated) =>
       val pointee = find(globalNode.get(address.toInt))
-      val pointer = find(globalNode).add(Interval(relocated.toInt, relocated.toInt + 7))
+      val pointer = find(globalNode).add(Interval(relocated.toInt, relocated.toInt + 8))
       pointer.setPointee(pointee)
     }
 
