@@ -162,7 +162,7 @@ class DotStruct(val id: String, val details: String, val fields: Option[Iterable
   def equals(other: DotStruct): Boolean = toDotString.equals(other.toDotString)
 
   val label = s"\"{<$id> ${if verbose then wrap(details, 80) else id} ${
-      if fields.isDefined then s" | {${fields.get.map(f => s"<$f> $f").mkString("|")}}" else ""
+      if fields.isDefined then s" | {${fields.get.mkString("|")}}" else ""
     }}\""
   override def toString: String = toDotString
 
