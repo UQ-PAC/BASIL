@@ -392,7 +392,8 @@ class IntervalGraph(
     val arrows = ArrayBuffer[StructArrow]()
 
     nodes.foreach { n =>
-      structs.append(DotStruct(n.id.toString, n.toString, Some(n.cells.map(o => s"<${o.interval.start.getOrElse(0)}> ${o.interval}")), true))
+      structs.append(DotStruct(n.id.toString, s"Node ${n.id}\\n${n.bases.mkString("\\n").replace("->", ":")}",
+        Some(n.cells.map(o => s"<${o.interval.start.getOrElse(0)}> ${o.interval}")), true))
     }
 
     pointsTo.foreach { (pointer, pointee) =>
@@ -600,7 +601,8 @@ class IntervalGraph(
     assert(result.equiv(get(cell1)))
     assert(result.equiv(get(cell2)))
     if cell1.hasPointee then assert(result.getPointee.equiv(get(cell1.getPointee)))
-    if cell2.hasPointee then assert(result.getPointee.equiv(get(cell2.getPointee)))
+    if cell2.hasPointee then
+      assert(result.getPointee.equiv(get(cell2.getPointee)), s"${proc.procName}")
 
     if node1Pointees.nonEmpty then
       node1Pointees.foreach((pointer, pointee) =>
@@ -659,7 +661,7 @@ class IntervalGraph(
   }
 
   // find the most uptodate version of cell
-  // if cell was unified with others, retuns a cell with
+  // if cell was unified with others, returns a cell with
   // unified interval
   def get(cell: IntervalCell): IntervalCell = {
     val (newNode, newInterval) = findExact(cell)
