@@ -1016,8 +1016,23 @@ object CopyProp {
 
     var st = Map[Variable, Expr]()
 
+    def replaceVar(lhs: Variable, rhs: Option[Expr] = None) = {
+      st = st
+        .filterNot { case (l, r) =>
+          r.variables.contains(lhs) || l == lhs
+        }
+      rhs.foreach(nrhs => st = st.updated(lhs, nrhs))
+    }
+
     def subst(e: Expr): Expr = {
-      simplifyExprFixpoint(Substitute(v => st.get(v).filter(isTrivial), true)(e).getOrElse(e))(0)
+      // val normed = normedST
+      def getter(v: Variable) =
+        st.get(v) match {
+          case Some(n: Variable) if n != v => Some(n)
+          case Some(n) if isTrivial(n) && !n.variables.contains(v) => Some(n)
+          case _ => None
+        }
+      simplifyExprFixpoint(Substitute(getter, true)(e).getOrElse(e))(0)
     }
 
     override def vblock(b: Block) = {
@@ -1029,7 +1044,7 @@ object CopyProp {
       s match {
         case l: LocalAssign => {
           val nrhs = subst(l.rhs)
-          st = st.updated(l.lhs, nrhs)
+          replaceVar(l.lhs, Some(nrhs))
           l.rhs = nrhs
           SkipChildren()
         }
@@ -1044,12 +1059,12 @@ object CopyProp {
         case x: DirectCall => {
           x.actualParams = x.actualParams.map((l, r) => (l, subst(r)))
           val lhs = x.outParams.map(_._2)
-          st = st.removedAll(lhs)
+          lhs.foreach(replaceVar(_, None))
           SkipChildren()
         }
         case d: MemoryLoad => {
           d.index = subst(d.index)
-          st = st.removed(d.lhs)
+          replaceVar(d.lhs, None)
           SkipChildren()
         }
         case d: MemoryStore => {
@@ -1059,7 +1074,7 @@ object CopyProp {
         }
         case d: MemoryAssign => {
           d.rhs = subst(d.rhs)
-          st = st.removed(d.lhs)
+          replaceVar(d.lhs, None)
           SkipChildren()
         }
         case x: IndirectCall => {
@@ -1165,6 +1180,9 @@ object CopyProp {
         case l: MemoryLoad => {
           clobberFull(c, l.lhs)
         }
+        case l: MemoryAssign => {
+          clobberFull(c, l.lhs)
+        }
         case LocalAssign(l, r, lb) => {
 
           var prop = canPropTo(c, r)
@@ -1194,6 +1212,7 @@ object CopyProp {
             clobberFull(c, l)
           }
         }
+
         case x: IndirectCall => {
           // need a reaching-defs to get inout args (just assume register name matches?)
           // this reduce we have to clobber with the indirect call this round
@@ -1280,6 +1299,13 @@ class ExprComplexity extends CILVisitor {
   *   continue substituting with `res` into each substituted expression
   * @param complexityThreshold
   *   Stop substituting after the AST node count has increased by this much
+  *
+  *  TODO: The recursive substitution here is a broken when res produces substitution loops. 
+  *  I want a substituter that takes a set of replacements to a canonical
+  *  closure under substitution, but is more subtle to implement than it initially appears.
+  *  One possibility is a union find on the set of rewrites to partition cycles it into canonical representative
+  *  expressions, but generally we want analyses to establish a correct terminating rewrite rather than post-process to
+  *  achieve it. I.e. stack overflows here are usually errors in the analysis used to produce the substitution [[res]].
   */
 class Substitute(val res: Variable => Option[Expr], val recurse: Boolean = true, val complexityThreshold: Int = 0)
     extends CILVisitor {
@@ -1301,15 +1327,15 @@ class Substitute(val res: Variable => Option[Expr], val recurse: Boolean = true,
           var newChange = changeTo
           var madeNewChange = true
 
-          while (newChange.isInstanceOf[Variable] && madeNewChange) do {
-            res(newChange.asInstanceOf[Variable]) match {
-              case Some(v) =>
-                newChange = v
-                madeNewChange = true
-              case _ =>
-                madeNewChange = false
-            }
-          }
+          // while (newChange.isInstanceOf[Variable] && madeNewChange) do {
+          //  res(newChange.asInstanceOf[Variable]) match {
+          //    case Some(v) =>
+          //      newChange = v
+          //      madeNewChange = true
+          //    case _ =>
+          //      madeNewChange = false
+          //  }
+          // }
 
           ChangeDoChildrenPost(newChange, x => x)
         } else {
