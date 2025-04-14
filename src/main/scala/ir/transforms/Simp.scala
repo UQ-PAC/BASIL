@@ -440,8 +440,13 @@ def inlineCond(a: Assume): Option[Expr] = boundary {
     for (s <- Vector.from(bs).flatMap(_.statements).reverseIterator) {
       s match {
         case assign: LocalAssign => {
-          st = st.updated(assign.lhs, assign.rhs)
+          st = st.filterNot(_._2.variables.contains(assign.lhs)).updated(assign.lhs, assign.rhs)
         }
+        case assign: MemoryLoad => {
+          st = st.filterNot(_._2.variables.contains(assign.lhs))
+        }
+        case n: MemoryStore => ()
+        case n: Assume => ()
         case n: Assume => ()
         case n: Assert => ()
         case n: NOP => ()
@@ -554,11 +559,10 @@ def copypropTransform(
     val vis = Simplify(CopyProp.toResult(result))
     visit_proc(vis, p)
 
-    val gvis = GuardVisitor()
-    visit_proc(gvis, p)
-
   }
   visit_proc(CopyProp.BlockyProp(), p)
+  val gvis = GuardVisitor()
+  visit_proc(gvis, p)
 
   val xf = t.checkPoint("transform")
   // SimplifyLogger.info(s"    ${p.name} after transform expr complexity ${ExprComplexity()(p)}")
