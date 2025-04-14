@@ -557,7 +557,7 @@ class IntervalGraph(
     selfPointers.foreach((pointer, pointee) => pointer.setPointee(pointee))
     connectSCC(scc1)
     connectSCC(scc2)
-    stableCell
+    find(stableCell)
 
   }
 
