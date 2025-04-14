@@ -392,16 +392,16 @@ class IntervalGraph(
     val arrows = ArrayBuffer[StructArrow]()
 
     nodes.foreach { n =>
-      structs.append(DotStruct(n.id.toString, n.toString, Some(n.cells.map(o => s"<${o.interval.start.get}> ${o.interval}")), true))
+      structs.append(DotStruct(n.id.toString, n.toString, Some(n.cells.map(o => s"<${o.interval.start.getOrElse(0)}> ${o.interval}")), true))
     }
 
     pointsTo.foreach { (pointer, pointee) =>
       val pointerID = pointer.node.id.toString
-      val pointerOffset = pointer.interval.start.get.toString
+      val pointerOffset = pointer.interval.start.getOrElse(0).toString
       arrows.append(
         StructArrow(
           DotStructElement(pointerID, Some(pointerOffset)),
-          DotStructElement(pointee.node.id.toString, Some(pointee.interval.start.get.toString))
+          DotStructElement(pointee.node.id.toString, Some(pointee.interval.start.getOrElse(0).toString))
         )
       )
     }
