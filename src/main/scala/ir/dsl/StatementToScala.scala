@@ -53,6 +53,7 @@ private object CaseIR {
   sealed trait Call extends Statement
 
   case class LocalAssign(lhs: Variable, rhs: Expr, label: Option[String] = None) extends SingleAssign
+  case class MemoryAssign(lhs: Variable, rhs: Expr, label: Option[String] = None) extends SingleAssign
   case class MemoryStore(mem: Memory, index: Expr, value: Expr, endian: Endian, size: Int, label: Option[String] = None) extends Statement
   case class MemoryLoad(lhs: Variable, mem: Memory, index: Expr, endian: Endian, size: Int, label: Option[String] = None) extends SingleAssign
   case class NOP(label: Option[String] = None) extends Statement
@@ -77,6 +78,7 @@ private object CaseIR {
     // XXX: order changed in DirectCall params
     case ir.DirectCall(a,b,c,d) => DirectCall(a,d,b,c)
     case ir.IndirectCall(a,b) => IndirectCall(a,b)
+    case ir.MemoryAssign(lhs, rhs, l) => MemoryAssign(lhs, rhs, l)
   }
 
   // format: on
@@ -111,7 +113,7 @@ private object CaseIR {
           s"directCall(",
           outs.toSeq.toScalaLines
             #:: tgt.name.toScalaLines
-            #:: actuals.to(LazyList).map(_.toScalaLines),
+            #:: LazyList(actuals.toSeq).map(_.toScalaLines),
           ")"
         )
       }

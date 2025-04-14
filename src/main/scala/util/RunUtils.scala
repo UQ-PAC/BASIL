@@ -37,6 +37,7 @@ import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
+import ir.transforms.MemoryTransform
 import util.DSAAnalysis.Norm
 import util.LogLevel.INFO
 
@@ -287,7 +288,10 @@ object IRTransform {
     val externalRemover = ExternalRemover(externalNamesLibRemoved.toSet)
     externalRemover.visitProgram(ctx.program)
     for (p <- ctx.program.procedures) {
-      p.isExternal = Some(ctx.externalFunctions.exists(e => e.name == p.procName || p.address.contains(e.offset)))
+      p.isExternal = Some(
+        ctx.externalFunctions.exists(e => e.name == p.procName || p.address.contains(e.offset)) || p.isExternal
+          .getOrElse(false)
+      )
     }
 
     assert(invariant.singleCallBlockEnd(ctx.program))
@@ -314,7 +318,9 @@ object IRTransform {
     val dupProcNames = ctx.program.procedures.groupBy(_.name).filter((_, p) => p.size > 1).toList.flatMap(_(1))
     assert(dupProcNames.isEmpty)
 
-    if (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled)) {
+    if (
+      !config.memoryTransform && (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled))
+    ) {
       val stackIdentification = StackSubstituter()
       stackIdentification.visitProgram(ctx.program)
     }
@@ -911,8 +917,12 @@ object RunUtils {
 
       if config.analyses.contains(Norm) then
         DSALogger.info("Finished Computing Constraints")
+        val globalGraph =
+          IntervalDSA.getLocal(ctx.program.mainProcedure, ctx, SymValues[Interval](Map.empty), Set[Constraint]())
         val DSA = IntervalDSA.getLocals(ctx, sva, cons)
+        IntervalDSA.checkReachable(ctx.program, DSA)
         DSATimer.checkPoint("Finished DSA Local Phase")
+        DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
         DSA.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
         val DSABU = IntervalDSA.solveBUs(DSA)
@@ -923,7 +933,25 @@ object RunUtils {
         DSATimer.checkPoint("Finished DSA TD Phase")
         DSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
+        DSATD.values.foreach(g => globalGraph.globalTransfer(g, globalGraph))
+        val globalMapping = DSATD.values.foldLeft(Map[IntervalNode, IntervalNode]()) { (m, g) =>
+          val oldToNew = globalGraph.globalTransfer(globalGraph, g)
+          m ++ oldToNew.map((common, spec) => (spec, common))
+
+        }
+        DSATimer.checkPoint("Finished DSA global graph")
+        DSATD.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness check")
+
+        IntervalDSA.checkConsistGlobals(DSATD, globalGraph)
+        IntervalDSA.checkReachable(ctx.program, DSATD)
+
+        DSATimer.checkPoint("Finished DSA Invariant Check")
         dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
+
+        if q.memoryTransform then
+          visit_prog(MemoryTransform(DSATD, globalMapping), ctx.program)
+          DSATimer.checkPoint("Performed Memory Transform")
     }
 
     if (q.runInterpret) {
