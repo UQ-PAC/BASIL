@@ -844,17 +844,13 @@ class IntervalNode(
     else if overlapping.size == 1 && overlapping.head.interval == (interval) then this.get(interval)
     else if overlapping.size == 1 && overlapping.head.interval.contains(interval) then init(interval)
     else
-      println(interval)
-      println(_cells.map(_.interval))
       val unifiedInterval = overlapping.map(_.interval).fold(interval)(Interval.join)
       val res = init(unifiedInterval)
       val pointees = overlapping.filter(_.hasPointee).map(_.getPointee)
-      val selfPointers = graph.disconnectSelfPointers(this)
 
-      val pointee = if pointees.nonEmpty then Some(graph.mergeCells(pointees)) else None
       _cells = cells.diff(overlapping).appended(res).sorted
+      val pointee = if pointees.nonEmpty then Some(graph.mergeCells(pointees)) else None
       if pointees.nonEmpty then graph.find(res).setPointee(pointee.get)
-      selfPointers.foreach((pointer, pointee) => pointer.setPointee(pointee))
       init(interval)
 
     assert(nonOverlappingProperty, "expected non overlapping cells")
