@@ -228,7 +228,7 @@ class IntervalGraph(
     val old = source.nodes(Global).clone(target, false, oldToNew)
     val globalNode = sourceGlobal.node.clone(target, true, oldToNew)
 
-    sourceGlobal = globalNode.get(targetGlobal.interval)
+    sourceGlobal = globalNode.get(if targetGlobal.interval != Interval.Top then targetGlobal.interval else Interval(0,0))
     target.mergeCells(sourceGlobal, targetGlobal)
     oldToNew.map((old, outdatedNew) => (old, target.find(outdatedNew))).toMap
   }
@@ -481,63 +481,14 @@ class IntervalGraph(
       case _ => // ignore
   }
 
-  /**
-   * merge the pointees of the two cells and return it
-   * None if neither of them has a pointee
-   */
-  def mergePointees(c1: IntervalCell, c2: IntervalCell): Option[IntervalCell] = {
-    var cell1 = get(c1)
-    var cell2 = get(c2)
-    if cell1 != cell2 then
-      (cell1.hasPointee, cell2.hasPointee) match
-        case (true, true) =>
-          val pointee1 = cell1.removePointee.get
-          val pointee2 = cell2.removePointee.get
-          var resPointee = mergeCells(pointee1, pointee2)
-          cell1 = get(cell1)
-          resPointee = cell1.setPointee(resPointee)
-          cell2 = get(cell2)
-          val res = Some(cell2.setPointee(resPointee))
-          res
-        case (_, true) => Some(cell1.setPointee(cell2.getPointee))
-        case (true, _) => Some(cell2.setPointee(cell1.getPointee))
-        case (_, _) => None // Logger.warn(s"neither $cell1, or $cell2 had a pointee")
-    else Some(cell1.getPointee)
-
-  }
 
   protected def collapseAndMerge(c1: IntervalCell, c2: IntervalCell): IntervalCell = {
     assert(c1.node.isUptoDate)
     assert(c2.node.isUptoDate)
 
     var cell1 = c1.node.collapse()
-
-    cell1 = get(cell1) // collapsing cell2 may affect cell1
-    var cell2 = get(c2)
-    cell2 = cell2.node.collapse()
-    cell1 = get(cell1)
-
-    val collapsedNode = IntervalNode(this, cell1.node.bases ++ cell2.node.bases)
-    collapsedNode.flags.join(cell1.node.flags)
-    collapsedNode.flags.join(cell2.node.flags)
-    collapsedNode.children.addAll(cell1.node.children)
-    collapsedNode.children.addAll(cell2.node.children)
-    val collapsedCell = collapsedNode.collapse()
-
-    val pointee: Option[IntervalCell] = mergePointees(cell1, cell2)
-    cell1 = get(cell1)
-    cell2 = get(cell2)
-
-    if c1.hasPointee || c2.hasPointee then assert(pointee.nonEmpty)
-    if pointee.nonEmpty then collapsedCell.setPointee(find(pointee.get))
-
-    unify(cell1.node, collapsedNode)
-    unify(cell2.node, collapsedNode)
-
-    cell1 = get(cell1)
-    cell2 = get(cell2)
-
-    collapsedCell
+    var cell2 = find(c2).node.collapse()
+    mergeCellsHelper(cell1, cell2)
   }
 
   def isInSCC(cell: IntervalCell): Seq[IntervalCell] = {
@@ -580,73 +531,42 @@ class IntervalGraph(
   protected def mergeCellsHelper(cell1: IntervalCell, cell2: IntervalCell): IntervalCell = {
     assert(cell1.node.isUptoDate)
     assert(cell2.node.isUptoDate)
+
+    val scc1 = isInSCC(cell1)
+    disconnectSCC(scc1)
+    val scc2 = isInSCC(cell2)
+    disconnectSCC(scc2)
+    var delta: Option[Int] = None
     val (stableCell, toBeMoved) =
-      if cell1.interval.start.get > cell2.interval.start.get then (cell1, cell2) else (cell2, cell1)
-    val delta = stableCell.interval.start.get - toBeMoved.interval.start.get
+      if cell1.node.isCollapsed then (cell1, cell2)
+      else if cell2.node.isCollapsed then (cell2, cell1)
+      else if cell1.interval.start.get > cell2.interval.start.get then (cell1, cell2)
+      else (cell2, cell1)
+    if !stableCell.node.isCollapsed then delta = Some(stableCell.interval.start.get - toBeMoved.interval.start.get)
 
     val stableNode = stableCell.node
     val nodeToBeMoved = toBeMoved.node
-    assert(stableCell.interval.isOverlapping(toBeMoved.moved(i => i + delta).interval))
 
-    val stableCells = stableNode.cells
-    val movedCells = nodeToBeMoved.cells.map(_.moved(i => i + delta))
-    val allCells = (stableCells ++ movedCells).sorted
-    val updatedBases = stableNode.bases ++ (nodeToBeMoved.bases.view.mapValues(f => f + delta))
-    val resultNode = IntervalNode(this, updatedBases)
-    Logger.debug(s"created result node with id ${resultNode.id}")
-    resultNode.children.addAll(stableNode.children ++ nodeToBeMoved.children ++ Set(stableNode.id, nodeToBeMoved.id))
-    resultNode.flags.join(stableNode.flags)
-    resultNode.flags.join(nodeToBeMoved.flags)
-    val queue: mutable.Queue[IntervalCell] = mutable.Queue(allCells: _*)
-    allCells.foreach(c => resultNode.add(c.interval))
+    stableNode.flags.join(nodeToBeMoved.flags)
+    stableNode.bases ++= nodeToBeMoved.bases
 
-    // unify old and new nodes
-    unify(stableNode, resultNode)
-    unify(nodeToBeMoved, resultNode, delta)
+    val selfPointers = disconnectSelfPointers(stableNode)
 
-    assert(
-      resultNode.cells.exists(c =>
-        c.interval.isOverlapping(stableCell.interval) && c.interval
-          .isOverlapping(toBeMoved.moved(i => i + delta).interval)
-      )
-    )
-    // set pointees
-    val pointeeResult = mutable.Map[IntervalCell, IntervalCell]()
-    resultNode.cells.foreach(cell =>
-      var newCell = get(cell)
-      val pointees = allCells
-        .filter(_.interval.isOverlapping(cell.interval)) // newToOlds
-        .collect { case cell: IntervalCell if cell._pointee.nonEmpty => find(cell._pointee.get) }
-      if pointees.nonEmpty then
-        val mergedPointees = mergeCells(pointees)
-        newCell = get(newCell) // above merge may change the cell if the node points to itself
-        pointeeResult.update(cell, mergedPointees)
-        pointees.foreach(f => assert(get(f).equiv(mergedPointees)))
-        newCell.setPointee(mergedPointees)
-        pointeeResult.keys.foreach(cell =>
-          val actual = get(cell)
-          val pointees = allCells
-            .filter(c => c.interval.isOverlapping(cell.interval))
-            .filter(_._pointee.nonEmpty)
-            .map(_._pointee.get)
-          if !pointees.forall(f => get(f).equiv(actual.getPointee)) then
-            Logger.debug(s"result node cell: $cell")
-            Logger.debug(s"result cell udpated: ${actual} ")
-            Logger.debug(s"Unified Cells: ${allCells.filter(_.interval.isOverlapping(cell.interval))}")
-            Logger.debug(s"non-unified pointees: ${pointees}")
-            Logger.debug(s"updated pointees: ${pointees.map(get)}")
-            Logger.debug(s"updated result cell pointee: ${actual.getPointee}")
-            pointees.foreach(f =>
-              assert(
-                get(f).equiv(actual.getPointee),
-                s"pointee $f has updated version ${get(f)},\n but the pointer $actual has pointee ${actual.getPointee}"
-              )
-            )
-        )
+    nodeToBeMoved.cells.foreach(
+      c =>
+        val cell = stableNode.add(c.interval.move(i => i + delta.getOrElse(0)))
+        if c.hasPointee then
+          cell.setPointee(c.getPointee)
+
     )
 
-    assert(resultNode.nonOverlappingProperty)
-    find(stableCell)
+    unify(nodeToBeMoved, stableNode,  delta.getOrElse(0))
+
+    selfPointers.foreach((pointer, pointee) => pointer.setPointee(pointee))
+    connectSCC(scc1)
+    connectSCC(scc2)
+    stableCell
+
   }
 
   def mergeCells(c1: IntervalCell, c2: IntervalCell): IntervalCell = {
@@ -777,8 +697,6 @@ class IntervalNode(
   val flags: DSFlag = DSFlag()
   protected var _cells: Seq[IntervalCell] = Seq.empty
   def cells: Seq[IntervalCell] = _cells
-  protected var _collapsed: Option[IntervalCell] = None
-  def collapsed: Option[IntervalCell] = _collapsed
 
   def nonOverlappingProperty: Boolean = {
     if cells.size <= 1 then true
@@ -789,7 +707,7 @@ class IntervalNode(
       )
   }
 
-  def isCollapsed: Boolean = collapsed.nonEmpty
+  def isCollapsed: Boolean = _cells.nonEmpty && _cells.head.interval == Interval.Top
   def add(offset: Int): IntervalCell = {
     add(Interval(offset, offset))
   }
@@ -818,7 +736,6 @@ class IntervalNode(
         v.bases = node.bases
         v.flags.join(node.flags)
         node.cells.foreach(cell => v.add(cell.interval))
-        if node.isCollapsed then v._collapsed = Some(v.get(0))
         oldToNew.update(node, v)
         v
       else oldToNew(node)
@@ -847,12 +764,12 @@ class IntervalNode(
             assert(newGraph.find(clonedPointee) == clonedPointee, s"expected cloned pointee to remain uptodate")
             val newPointee = clonedPointee.add(pointee.interval.move(i => i + pointeeOff))
             assert(
-              pointee.interval.move(i => i + pointeeOff) == newPointee.interval || newPointee.node.isCollapsed,
+              pointee.interval.move(i => i + pointeeOff) == newPointee.interval,
               s"pointee interval: ${pointee.interval}, moved by $pointeeOff, cloned Pointee interval: ${newPointee.interval}"
             )
             val pointer = newNode.get(cell.interval.move(i => i + off))
-            assert(pointer.node.isCollapsed || pointer.interval.contains(cell.interval.move(i => i + off)))
-            assert(!pointer.hasPointee || pointer.getPointee == newPointee)
+            assert(pointer.interval.contains(cell.interval.move(i => i + off)))
+            assert(!pointer.hasPointee || pointer.getPointee.equiv(newPointee))
             if !pointer.hasPointee then pointer.setPointee(newPointee)
           case _ =>
         }
@@ -904,69 +821,8 @@ class IntervalNode(
 
   def collapse(): IntervalCell = {
     assert(isUptoDate)
-    val node = this
-    if (!(node.isCollapsed)) {
-      val oldPointees = cells.filter(_.hasPointee).map(_.getPointee)
-      val collapseNode: IntervalNode = IntervalNode(graph, bases, size)
-      collapseNode.children.addAll(this.children)
-      collapseNode.children.add(this.id)
-      collapseNode.flags.join(this.flags)
-      var collapsedCell: IntervalCell = collapseNode.add(0)
-      collapseNode._collapsed = Some(collapsedCell)
-      // delay unification
-      // treat collapsed node completely distinct to current node
-      if node.cells.exists(_.hasPointee) then
-        val pointToItself = node.cells.filter(_.hasPointee).map(_.getPointee).exists(c => c.node == node)
-        var pointees = node.cells.filter(_.hasPointee).map(_.getPointee).filter(_.node != node)
-        val pointeeNodes = pointees.map(_.node).toSet
-        // if a collapsed node points to itself collapse all other pointees first
-        if pointToItself then
-          pointees.map(f =>
-            // break all points-to relationship from pointees to this or other pointees
-            // all pointees are collapsed and merged together
-            graph
-              .find(f)
-              .node
-              .cells
-              .filter(_.hasPointee)
-              .filter(f => pointeeNodes.map(graph.find).contains(f.getPointee.node))
-              .foreach(_.removePointee)
-            graph.find(f).node.collapse()
-          )
-        pointees = pointees.map(graph.find)
-        var pointee = if pointees.nonEmpty then graph.mergeCells(pointees) else collapsedCell
-
-        if (pointToItself) {
-          assert(!collapsedCell.hasPointee)
-          val oldPointee = pointee.node
-          assert(collapseNode.isUptoDate)
-          assert(pointee.node.isCollapsed)
-          pointee = graph.mergeCells(pointee, collapsedCell)
-          assert(pointee.node.isCollapsed)
-          Logger.debug(pointee)
-          collapsedCell = pointee
-        }
-
-        if !pointToItself then assert(!collapsedCell.hasPointee)
-//        DSALogger.warn(pointToItself)
-        collapsedCell.setPointee(pointee)
-        collapsedCell = graph.find(collapsedCell)
-        if pointToItself then assert(collapsedCell.getPointee == collapsedCell)
-        assert(collapsedCell.hasPointee)
-        assert(collapsedCell.getPointee == graph.find(pointee))
-        assert(collapsedCell.node.cells.size == 1)
-
-      // unify collapsed node and current node
-      graph.unify(node, collapsedCell.node)
-      cells.foreach(f => assert(graph.find(f) == collapsedCell))
-      if node.cells.exists(_.hasPointee) then assert(graph.find(collapsedCell).hasPointee)
-      assert(oldPointees.map(graph.find).forall(f => f.equiv(graph.find(collapsedCell).getPointee)))
-      graph.find(collapsedCell)
-
-    } else {
-      graph.find(node.collapsed.get)
-    }
-
+    flags.collapsed = true
+    add(Interval.Top)
   }
 
   /**
@@ -980,40 +836,40 @@ class IntervalNode(
    */
   def add(interval: Interval): IntervalCell = {
     assert(isUptoDate)
-    if !isCollapsed then
-      val overlapping: Seq[IntervalCell] = cells.filter(_.interval.isOverlapping(interval))
-      val newCell = if overlapping.isEmpty then
-        val res = init(interval)
-        _cells = _cells.appended(res)
-        res
-      else if overlapping.size == 1 && overlapping.head.interval == (interval) then this.get(interval)
-      else if overlapping.size == 1 && overlapping.head.interval.contains(interval) then init(interval)
-      else
-        val unifiedInterval = overlapping.map(_.interval).fold(interval)(Interval.join)
-        val res = init(unifiedInterval)
-        val pointees = overlapping.filter(_.hasPointee).map(_.getPointee)
+    val overlapping: Seq[IntervalCell] = cells.filter(_.interval.isOverlapping(interval))
+    val newCell = if overlapping.isEmpty then
+      val res = init(interval)
+      _cells = _cells.appended(res)
+      res
+    else if overlapping.size == 1 && overlapping.head.interval == (interval) then this.get(interval)
+    else if overlapping.size == 1 && overlapping.head.interval.contains(interval) then init(interval)
+    else
+      println(interval)
+      println(_cells.map(_.interval))
+      val unifiedInterval = overlapping.map(_.interval).fold(interval)(Interval.join)
+      val res = init(unifiedInterval)
+      val pointees = overlapping.filter(_.hasPointee).map(_.getPointee)
+      val selfPointers = graph.disconnectSelfPointers(this)
 
-        val pointee = if pointees.nonEmpty then Some(graph.mergeCells(pointees)) else None
-        _cells = cells.diff(overlapping).appended(res).sorted
-        if pointees.nonEmpty then graph.find(res).setPointee(pointee.get)
-        init(interval)
+      val pointee = if pointees.nonEmpty then Some(graph.mergeCells(pointees)) else None
+      _cells = cells.diff(overlapping).appended(res).sorted
+      if pointees.nonEmpty then graph.find(res).setPointee(pointee.get)
+      selfPointers.foreach((pointer, pointee) => pointer.setPointee(pointee))
+      init(interval)
 
-      assert(nonOverlappingProperty, "expected non overlapping cells")
-      newCell
-    else collapsed.get
+    assert(nonOverlappingProperty, "expected non overlapping cells")
+    newCell
   }
 
   // get the cell which contains this interval in the node
   // expects exactly 1 corresponding cell since they are non-overlapping
   def get(interval: Interval): IntervalCell = {
-    if isCollapsed then collapsed.get
-    else
-      val exactMatches = cells.filter(_.interval.contains(interval))
-      assert(
-        exactMatches.size == 1,
-        s"Expected exactly one overlapping interval instead got ${exactMatches.size}, with ${cells.map(_.interval)}"
-      )
-      exactMatches.head
+    val exactMatches = cells.filter(_.interval.contains(interval))
+    assert(
+      exactMatches.size == 1,
+      s"Expected exactly one overlapping interval instead got ${exactMatches.size}, ${interval}, with ${cells.map(_.interval)}"
+    )
+    exactMatches.head
   }
 }
 
@@ -1090,7 +946,7 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
 //      throw Exception("expected a pointee")
       assert(this.node.isUptoDate)
       _pointee = Some(IntervalNode(graph, mutable.Map.empty).add(0))
-      _pointee.get
+      graph.find(_pointee.get)
     else graph.find(_pointee.get)
   }
 
@@ -1103,22 +959,9 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
     else if _pointee.isEmpty then
       assert(node.cells.contains(this))
       _pointee = Some(cell)
-      _pointee.get
-    else if cell.equiv(this) then
-      assert(node.cells.contains(this))
-      val pointee = this.removePointee.get
-      val newThis = graph.mergeCells(pointee, this)
-      graph.mergePointees(newThis, newThis.getPointee)
-      this._pointee = Some(graph.mergeCells(newThis, newThis.getPointee))
-      assert(this._pointee.get.equiv(pointee))
-      assert(this._pointee.get.equiv(this))
-      _pointee.get
-    else // if a cell points to itself break the link,
-      assert(node.cells.contains(this))
-      graph.mergePointees(this.getPointee, cell)
-      this._pointee = Some(graph.mergeCells(cell, graph.get(this).getPointee))
-      graph.get(this)._pointee = this._pointee
-      _pointee.get
+      cell
+    else
+      graph.mergeCells(cell, this.getPointee)
   }
 }
 
