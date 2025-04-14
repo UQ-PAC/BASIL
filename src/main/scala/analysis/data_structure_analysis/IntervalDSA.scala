@@ -821,8 +821,13 @@ class IntervalNode(
 
   def collapse(): IntervalCell = {
     assert(isUptoDate)
+    val pointees = _cells.filter(_.hasPointee).map(_.getPointee)
+    val cells = _cells.iterator
     flags.collapsed = true
-    add(Interval.Top)
+    val res = graph.get(add(Interval.Top))
+    assert(pointees.map(graph.get).forall(_.equiv(graph.find(res).getPointee)))
+    assert(cells.map(graph.get).forall(_ == res))
+    res
   }
 
   /**
