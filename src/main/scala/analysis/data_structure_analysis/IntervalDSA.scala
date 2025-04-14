@@ -1208,11 +1208,11 @@ object IntervalDSA {
    */
   def checkConsistGlobals(DSA: Map[Procedure, IntervalGraph], global: IntervalGraph): Unit = {
     // collect all the regions  from all the resulting graphs
-    val unifiedRegions = global.nodes(Global).bases
+    val unifiedRegions = global.find(global.nodes(Global)).bases
     DSA
       .filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
       .foreach((p, graph) =>
-        val graphRegions = graph.nodes(Global).bases
+        val graphRegions = graph.find(graph.nodes(Global)).bases
         assert(
           unifiedRegions == graphRegions,
           s"Procedure ${p.procName} had a differing unified global sets than compared to the global graph"
