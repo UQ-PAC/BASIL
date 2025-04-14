@@ -332,4 +332,28 @@ class IntervalDSATest extends AnyFunSuite {
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
     assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
   }
+
+   test("acl_check") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = path + ".adt",
+          relfFile = path + ".relf",
+          mainProcedureName = "acl_check",
+          trimEarly = true
+        ),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(DSAConfig(Set(Norm)))
+      )
+    )
+
+    val proc = res.ir.program.mainProcedure
+    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
+    writeToFile(dsg.toDot, "helper.dot")
+  }
 }
