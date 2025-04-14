@@ -386,6 +386,13 @@ object InterpFuns {
 
   def interpretStatement[S, T <: Effects[S, InterpreterError]](f: T)(s: Statement): State[S, Unit, InterpreterError] = {
     s match {
+      case assign: MemoryAssign => {
+        for {
+          rhs <- Eval.evalLiteral(f)(assign.rhs)
+          st <- f.storeVar(assign.lhs.name, assign.lhs.toBoogie.scope, Scalar(rhs))
+          n <- f.setNext(Run(s.successor))
+        } yield (st)
+      }
       case assign: LocalAssign => {
         for {
           rhs <- Eval.evalLiteral(f)(assign.rhs)

@@ -43,6 +43,10 @@ object BoogieTranslator {
       val lhs: BVar = translateVar(l.lhs)
       val rhs = translateExpr(l.rhs)
       AssignCmd(List(lhs), List(rhs))
+    case l: MemoryAssign =>
+      val lhs: BVar = translateVar(l.lhs)
+      val rhs = translateExpr(l.rhs)
+      AssignCmd(List(lhs), List(rhs))
     case a: Assert =>
       val body = translateExpr(a.body)
       BAssert(body, a.comment)

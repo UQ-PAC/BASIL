@@ -103,6 +103,7 @@ def getCommonDefinitionVariableRenaming(
 
   toVisit.foreach {
     case a: LocalAssign => unifyVarsUses(a.rhs.variables, a)
+    case a: MemoryAssign => unifyVarsUses(a.rhs.variables, a)
     case l: MemoryLoad => unifyVarsUses(l.index.variables, l)
     case a: MemoryStore => unifyVarsUses(a.index.variables ++ a.value.variables, a)
     case a: Assert => unifyVarsUses(a.body.variables, a)

@@ -130,6 +130,7 @@ class IntraLiveVarsDomain extends PowerSetDomain[Variable] {
   def transfer(s: Set[Variable], a: Command): Set[Variable] = {
     a match {
       case a: LocalAssign => (s - a.lhs) ++ a.rhs.variables
+      case a: MemoryAssign => (s - a.lhs) ++ a.rhs.variables
       case a: MemoryLoad => (s - a.lhs) ++ a.index.variables
       case m: MemoryStore => s ++ m.index.variables ++ m.value.variables
       case a: Assume => s ++ a.body.variables
@@ -306,7 +307,14 @@ def getRedundantAssignments(procedure: Procedure): Set[Assign] = {
 
   for (c <- procedure) {
     c match {
+
       case a: LocalAssign => {
+        assignedNotRead(a.lhs) = joinVS(assignedNotRead(a.lhs), VS.Assigned(Set(a)))
+        a.rhs.variables.foreach(v => {
+          assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(a)))
+        })
+      }
+      case a: MemoryAssign => {
         assignedNotRead(a.lhs) = joinVS(assignedNotRead(a.lhs), VS.Assigned(Set(a)))
         a.rhs.variables.foreach(v => {
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(a)))
@@ -1047,6 +1055,11 @@ object CopyProp {
         case d: MemoryStore => {
           d.index = subst(d.index)
           d.value = subst(d.value)
+          SkipChildren()
+        }
+        case d: MemoryAssign => {
+          d.rhs = subst(d.rhs)
+          st = st.removed(d.lhs)
           SkipChildren()
         }
         case x: IndirectCall => {

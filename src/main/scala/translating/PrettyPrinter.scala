@@ -331,6 +331,7 @@ class BasilIRPrettyPrinter(
   ): PPProg[Procedure] = ???
 
   override def vassign(lhs: PPProg[Variable], rhs: PPProg[Expr]): PPProg[LocalAssign] = BST(s"${lhs} := ${rhs}")
+  override def vmemassign(lhs: PPProg[Variable], rhs: PPProg[Expr]): PPProg[LocalAssign] = BST(s"${lhs} mem:= ${rhs}")
 
   override def vstore(
     mem: String,
