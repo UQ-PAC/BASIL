@@ -65,6 +65,7 @@ class ConstPropInterpreterValidate
 
     val result = runTestInterpreter(ictx, analysisres)
     assert(result.getFailures.isEmpty)
+    info(s"${result.checksPassed.size} checks passed")
 
   }
 

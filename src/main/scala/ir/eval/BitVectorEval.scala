@@ -10,7 +10,7 @@ object BitVectorEval {
     */
   def nat2bv(bitSize: Int, n: BigInt): BitVecLiteral =
     require(bitSize > 0, "length of bitvector must be positive")
-    require(n >= 0, "input must be non-negative")
+    require(n >= 0, s"input must be non-negative : ($n, $bitSize)")
 
     BitVecLiteral(n % BigInt(2).pow(bitSize), bitSize)
 

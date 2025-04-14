@@ -47,9 +47,10 @@ case object FalseLiteral extends BoolLit {
 }
 
 case class BitVecLiteral(value: BigInt, size: Int) extends Literal with CachedHashCode {
-  assert(size >= 0)
+  require(size >= 0)
+  require(value <= getType.maxValue, s"bad value: $value for width $size")
   override def toBoogie: BitVecBLiteral = BitVecBLiteral(value, size)
-  override def getType: IRType = BitVecType(size)
+  override def getType: BitVecType = BitVecType(size)
   override def toString: String = s"${value}bv$size"
 }
 
@@ -141,6 +142,7 @@ case class UnaryExpr(op: UnOp, arg: Expr) extends Expr with CachedHashCode {
   }
 
   override def toString: String = op match {
+    case BoolToBV1 => s"booltobv1($arg)"
     case uOp: BoolUnOp => s"($uOp$arg)"
     case uOp: BVUnOp => s"bv$uOp$inSize($arg)"
     case uOp: IntUnOp => s"($uOp$arg)"
