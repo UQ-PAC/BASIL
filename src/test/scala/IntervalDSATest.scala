@@ -277,12 +277,12 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val add_six = globals("add_six")
     val sub_sev = globals("sub_seven")
 
-    assert(dsg.exprToCells(add_two) == dsg.exprToCells(add_six))
+    assert(dsg.exprToCells(add_two).map(dsg.get) == dsg.exprToCells(add_six).map(dsg.get))
     assert(dsg.exprToCells(add_two).size == 1)
     assert(dsg.exprToCells(add_two).head.node.isCollapsed)
   }
 
-  test("stack interproc overlapping") {
+  test("stack interproc") {
     val results = runTest("src/test/dsa/stack_interproc_overlapping/stack_interproc_overlapping")
     val program = results.ir.program
 
@@ -333,7 +333,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
   }
 
-   test("acl_check") {
+  test("acl_check") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
