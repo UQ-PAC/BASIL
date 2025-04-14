@@ -76,7 +76,13 @@ enum Interval extends Offsets {
       case _ => false
 
   def isOverlapping(other: Interval): Boolean =
-    this.contains(other) || other.contains(this)
+    (this, other) match
+      case (Interval.Top, _) => true
+      case (_, Interval.Top) => true
+      case (a, b) if a == b => true
+      case (Interval.Value(s1, e1), Interval.Value(s2, e2)) =>
+        (s2 < e1 && s2 >= s1) || (s1 < e2 && s1 >= s2)
+
 
   def join(other: Interval): Interval = {
     (this, other) match
