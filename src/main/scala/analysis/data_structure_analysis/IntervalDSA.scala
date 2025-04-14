@@ -482,14 +482,6 @@ class IntervalGraph(
   }
 
 
-  protected def collapseAndMerge(c1: IntervalCell, c2: IntervalCell): IntervalCell = {
-    assert(c1.node.isUptoDate)
-    assert(c2.node.isUptoDate)
-
-    var cell1 = c1.node.collapse()
-    var cell2 = find(c2).node.collapse()
-    mergeCellsHelper(cell1, cell2)
-  }
 
   def isInSCC(cell: IntervalCell): Seq[IntervalCell] = {
     var seen = Seq[IntervalCell]()
@@ -593,7 +585,9 @@ class IntervalGraph(
       res
     else if cell1.node.isCollapsed || cell2.node.isCollapsed then
       Logger.debug(s"merge and collapse $cell1 and $cell2")
-      val res = collapseAndMerge(cell1, cell2)
+      cell1.node.collapse()
+      find(cell2).node.collapse()
+      val res = mergeCellsHelper(find(cell1), find(cell2))
       Logger.debug(s"merge and collapse $cell1 and $cell2")
       res
     else
