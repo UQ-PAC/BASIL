@@ -392,7 +392,7 @@ class IntervalGraph(
     val arrows = ArrayBuffer[StructArrow]()
 
     nodes.foreach { n =>
-      structs.append(DotStruct(n.id.toString, n.toString, Some(n.cells.map(o => o.interval.start.get.toString)), true))
+      structs.append(DotStruct(n.id.toString, n.pretty(), Some(n.cells.map(o => s"<${o.interval.start.get}> ${o.interval}")), true))
     }
 
     pointsTo.foreach { (pointer, pointee) =>
@@ -824,6 +824,18 @@ class IntervalNode(
   }
 
   override def hashCode(): Int = id
+
+  def pretty(verbose: Boolean = false): String = {
+    val baseString =
+      if verbose then bases.mkString("\n")
+      else bases.filterNot(i => isPlaceHolder(i._1)).mkString("\n")
+
+    val intervals =
+      if isCollapsed then Interval.Top.toString
+      else cells.map(_.interval).map(_.toString).mkString("\n")
+
+    s"Node $id\n$baseString\n$intervals"
+  }
   override def toString: String =
     s"Node($id, ${bases.keys}, ${if isCollapsed then "C" else cells.map(_.interval).sorted})"
 
