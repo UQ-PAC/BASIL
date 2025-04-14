@@ -540,6 +540,43 @@ class IntervalGraph(
     collapsedCell
   }
 
+  def isInSCC(cell: IntervalCell): Seq[IntervalCell] = {
+    var seen = Seq[IntervalCell]()
+    var cur = cell
+    while cur.hasPointee && !seen.contains(cell) && !seen.contains(cur) do
+      cur = get(cur.getPointee)
+      seen = seen.appended(cur)
+
+    if seen.contains(cell) then seen else Seq.empty
+  }
+
+  def disconnectSCC(scc: Seq[IntervalCell]): Unit = {
+    scc.foreach(_.removePointee)
+  }
+
+  def connectSCC(scc: Seq[IntervalCell]): Unit = {
+    if scc.nonEmpty then
+      val head = scc.head
+      var cur = head
+      var tail = scc.tail
+      while tail.nonEmpty do
+        find(cur).setPointee(find(tail.head))
+        cur = tail.head
+        tail = tail.tail
+      get(scc.last).setPointee(get(head))
+  }
+
+  def getSelfPointers(node: IntervalNode): Map[IntervalCell, IntervalCell] = {
+    node.cells.filter(_.hasPointee).filter(_.getPointee.node == node).map(c => (c, c.getPointee)).toMap
+  }
+
+
+  def disconnectSelfPointers(node: IntervalNode): Map[IntervalCell, IntervalCell] = {
+    val selfPointers = getSelfPointers(node)
+    selfPointers.keys.foreach(_.removePointee)
+    selfPointers
+  }
+
   protected def mergeCellsHelper(cell1: IntervalCell, cell2: IntervalCell): IntervalCell = {
     assert(cell1.node.isUptoDate)
     assert(cell2.node.isUptoDate)
