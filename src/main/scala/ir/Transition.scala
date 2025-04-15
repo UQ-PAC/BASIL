@@ -538,7 +538,7 @@ class TranslationValidator {
   private def getUninterps(p: Procedure) =
     val v = CollectUninterps()
     visit_proc(v, p)
-    v.funcs
+    v.funcs.map(u => u.name -> u).toMap
 
   def getValidationProgWPConj = {
 
@@ -555,7 +555,9 @@ class TranslationValidator {
       val source = after
       val target = before
 
-      val uninterpfuncs = getUninterps(before).toSet.intersect(getUninterps(after).toSet)
+      val ufs = getUninterps(after)
+      val uninterpfuncs = getUninterps(before).keys.toSet.intersect(ufs.keys.toSet).map(ufs(_))
+
       val uninterpAxioms = uninterpfuncs.map {
         case UninterpretedFunction(n, p, rt, _) => {
 
