@@ -448,7 +448,7 @@ class IRTest extends AnyFunSuite with test_util.CaptureOutput {
     assert(pt == List(x.getType, y.getType))
   }
 
-  test ("BoolExp") {
+  test("BoolExp") {
     val x = BoolExp(BoolAND, List(LocalVar("x", BoolType), LocalVar("y", BoolType)))
     assert(x.variables.map(_.name).toSet == Set("x", "y"))
 

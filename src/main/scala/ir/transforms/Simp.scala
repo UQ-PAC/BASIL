@@ -676,7 +676,7 @@ def validateProc(
 
   def tryVerify(splitname: String) = {
     currentSplit
-    validate(validationProg, proc.name, name + proc.name +  "split" + splitname, timeout)
+    validate(validationProg, proc.name, name + proc.name + "split" + splitname, timeout)
   }
 
   def makeSplit() = {
@@ -825,15 +825,20 @@ def validatedSimplifyPipeline(p: Program) = {
 
     val (vprog, splits) = validator.getValidationProgWPConj
 
-    val sorted = vprog.toList.map(p => {
-      val x = ExprComplexity()
-      visit_prog(x, p)
-      p -> x.count
-    }).filter(_._2 > 50).sortBy(_._2).map(_._1)
+    val sorted = vprog.toList
+      .map(p => {
+        val x = ExprComplexity()
+        visit_prog(x, p)
+        p -> x.count
+      })
+      .filter(_._2 > 50)
+      .sortBy(_._2)
+      .map(_._1)
 
     val procName = prog.mainProcedure.procName + "_par_" + prog.mainProcedure.name
     sorted.foreach(validateProg(_, "DSACopyProp", splits, false))
 
+    assert(false)
   }
 
   def simplifyGuards(prog: Program) = {
