@@ -524,6 +524,8 @@ class IntervalGraph(
   protected def mergeCellsHelper(cell1: IntervalCell, cell2: IntervalCell): IntervalCell = {
     assert(cell1.node.isUptoDate)
     assert(cell2.node.isUptoDate)
+    val node1Pointees = cell1.node.cells.filter(_.hasPointee).map(c => (c, c.getPointee)).toMap
+    val node2Pointees = cell2.node.cells.filter(_.hasPointee).map(c => (c, c.getPointee)).toMap
 
     val scc1 = isInSCC(cell1)
     disconnectSCC(scc1)
@@ -558,6 +560,26 @@ class IntervalGraph(
     selfPointers.foreach((pointer, pointee) => pointer.setPointee(pointee))
     connectSCC(scc1)
     connectSCC(scc2)
+
+    if node1Pointees.nonEmpty then
+      node1Pointees.foreach((pointer, pointee) =>
+        assert(
+          get(pointee).equiv(get(pointer).getPointee),
+          s"$pointer doesn't point to updated version of its pointee after merge"
+        )
+        assert(get(pointer).node == find(stableNode))
+      )
+
+    if node2Pointees.nonEmpty then
+      node2Pointees.foreach((pointer, pointee) =>
+        assert(
+          get(pointee).equiv(get(pointer).getPointee),
+          s"$pointer doesn't point to updated version of its pointee after merge" +
+            s"\n ${get(pointee)}" +
+            s"\n ${get(pointer).getPointee}"
+        )
+        assert(get(pointer).node == find(stableNode))
+      )
     find(stableCell)
 
   }
