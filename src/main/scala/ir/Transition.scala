@@ -558,6 +558,9 @@ class TranslationValidator {
 
     val trueFun = FunctionDecl("TRUE", List(), BoolType, None, List("builtin" -> Some("\"true\"")))
     val falseFun = FunctionDecl("FALSE", List(), BoolType, None, List("builtin" -> Some("\"false\"")))
+    var decls = Vector[Decl](trueFun, falseFun)
+
+    var splitCandidates = Map[Procedure, ArrayBuffer[GoTo]]()
 
     for (proc <- initProg.get.procedures) {
       val after = afterProg.get.procedures.find(_.name == proc.name).get
@@ -634,18 +637,29 @@ class TranslationValidator {
       combined.entryBlock.get.statements.prependAll(proof)
 
       validationProcs = validationProcs.updated(proc.name, combined)
-      afterProg.get.declarations.addAll(Seq(wpconjTargetFun, wpconjSourceFun))
+      decls = decls ++ Seq(wpconjTargetFun, wpconjSourceFun)
+
+      val internalLabels = before.blocks.map(_.label).toSet ++ after.blocks.map(_.label)
+
+      val splitJumps = combined.blocks.map(_.jump).collect {
+        case g: GoTo if g.targets.size > 1 && internalLabels.contains(g.parent.label) => g
+      }
+      splitCandidates = splitCandidates.updated(combined, ArrayBuffer.from(splitJumps))
 
       val bidx = afterProg.get.procedures.indexOf(before)
       // beforeProg.get.procedures.remove(bidx)
     }
-    afterProg.get.declarations.addAll(Seq(trueFun, falseFun))
 
     // TODO: fix when implementing calls
     val interesting = validationProcs.map(_._2)
-    afterProg.get.procedures = ArrayBuffer.from(interesting)
+    val validationProg = Program(
+      ArrayBuffer.from(interesting),
+      interesting.find(_.name.startsWith(afterProg.get.mainProcedure.procName)).get,
+      afterProg.get.initialMemory
+    )
+    validationProg.declarations.addAll(decls)
 
-    afterProg.get
+    (validationProg, splitCandidates)
   }
 
   def getValidationProg = {

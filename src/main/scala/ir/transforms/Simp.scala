@@ -19,6 +19,7 @@ import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
 import ExecutionContext.Implicits.global
 import scala.util.boundary, boundary.break
+import util.boogie_interaction.BoogieResultKind
 
 /** Simplification pass, see also: docs/development/simplification-solvers.md
   */
@@ -605,8 +606,23 @@ def wrapShapePreservingTransformInValidation(transform: Program => Unit)(p: Prog
   transform(p)
   validator.setSourceProg(p)
   validator.setEqualVarsInvariant
-  val prog = validator.getValidationProgWPConj
+  val (prog, _) = validator.getValidationProgWPConj
   prog
+}
+
+def validateProg(validationProg: Program, n: String, splits: Map[Procedure, mutable.ArrayBuffer[GoTo]]) = {
+  val procs = validationProg.procedures.toArray
+    .map(p => {
+      val v = ExprComplexity()
+      visit_proc(v, p)
+      p -> v.count
+    })
+    .sortBy(_._2)
+
+  for ((p, comp) <- procs) {
+    SimplifyLogger.info(s"Validating proc ${p.name} (compl ${comp})")
+    validateProc(validationProg, p, n, 3, splits(p))
+  }
 }
 
 def validate(validationProg: Program, procName: String, name: String, timeout: Int = 10) = {
@@ -625,6 +641,91 @@ def validate(validationProg: Program, procName: String, name: String, timeout: I
   val vres = util.boogie_interaction.boogieBatchQuery(List(boogieFileName, "axioms.bpl"), Some(procName), timeout)
   // assert(vres)
   vres
+
+}
+
+def validateProc(
+  validationProg: Program,
+  proc: Procedure,
+  name: String,
+  timeout: Int = 3,
+  isplits: mutable.ArrayBuffer[GoTo]
+) = {
+  var splits = List.from(isplits)
+  var choices = List[(GoTo, Set[Block])]()
+  var decisionStack = List[Block]()
+
+  var original = isplits.map(g => g -> g.targets.toSet).toMap
+
+  def currentSplit = {
+    isplits
+      .filter(g => g.targets != original(g))
+      .foreach(g => {
+        SimplifyLogger.info(g.parent.label)
+        SimplifyLogger.info("   current: " + g.targets.map(_.label).mkString(","))
+        SimplifyLogger.info("  original: " + original(g).map(_.label).mkString(","))
+      })
+
+  }
+
+  def tryVerify(splitname: String) = {
+    currentSplit
+    validate(validationProg, proc.name, name + "split" + splitname, timeout)
+  }
+
+  def makeSplit() = {
+    val next = splits.head
+    splits = splits.tail
+    choices = (next, next.targets.toSet) :: choices
+  }
+
+  def tryChoice() = boundary {
+    val (g, remTargets) = choices.head
+    if (remTargets.isEmpty) {
+      choices = choices.tail
+      if (choices.nonEmpty) {
+        val (g, remTargets) = choices.head
+        val discharged = decisionStack.head
+        choices = (g, remTargets - discharged) :: choices.tail
+      }
+      break()
+    }
+    val next = remTargets.head
+    val tgs = g.targets.toList
+    g.addTarget(next)
+    tgs.foreach(t => if t != next then g.removeTarget(t))
+    val verificationRes = tryVerify(s"${choices.size}_${choices.map(_._2.size).mkString("_")}")
+    verificationRes.kind match {
+      case BoogieResultKind.Verified(count, errors) => {
+        choices = (g, remTargets - next) :: choices.tail
+      }
+      case BoogieResultKind.Timeout => {
+        decisionStack = next :: decisionStack
+        // timed out
+        makeSplit()
+      }
+      case e => {
+        SimplifyLogger.error(s"Verification error $verificationRes")
+        break()
+      }
+    }
+  }
+
+  if (splits.nonEmpty) {
+    makeSplit()
+    while (choices.nonEmpty) {
+      tryChoice()
+    }
+    choices.empty
+  } else {
+    val vres = tryVerify("wholeprogram")
+    vres.kind match {
+      case BoogieResultKind.Verified(count, errors) => {
+        true
+      }
+      case _ => false
+    }
+  }
 
 }
 
@@ -706,10 +807,10 @@ def validatedSimplifyPipeline(p: Program) = {
       }
     }
 
-    val vprog = validator.getValidationProgWPConj
+    val (vprog, splits) = validator.getValidationProgWPConj
 
     val procName = prog.mainProcedure.procName + "_par_" + prog.mainProcedure.name
-    validate(vprog, procName, "DSACopyProp", 10)
+    validateProg(vprog, "DSACopyProp", splits)
   }
 
   def simplifyGuards(prog: Program) = {
@@ -772,7 +873,7 @@ def validatedSimplifyPipeline(p: Program) = {
     validator.setSourceProg(p)
     validator.setDSAInvariant
     // validator.addRDInvariant()
-    val prog = validator.getValidationProgWPConj
+    val (prog, _) = validator.getValidationProgWPConj
 
     val procName = p.mainProcedure.procName + "_par_" + p.mainProcedure.name
     // validate(prog, procName, "DynamicSingleAssignment", 3)
@@ -781,14 +882,11 @@ def validatedSimplifyPipeline(p: Program) = {
   // rpo
   // println("Noop test")
   // transformAndValidate(x => (), "NoopTXTest")(p)
-  println("Rpo")
   combineBlocks(p)
   applyRPO(p)
-  println("DSA")
   dsa(p)
 //  transformAndValidate(combineBlocks, "combineBlocks")(p)
 
-  println("COpyprop")
   copyProp(p)
 // transformAndValidate(copyProp, "DSACopyProp")(p)
   transformAndValidate(simplifyConds, "simplifyConds")(p)
