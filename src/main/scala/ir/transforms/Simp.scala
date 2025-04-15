@@ -631,9 +631,8 @@ def validateProg(
 }
 
 def validate(validationProg: Program, procName: String, name: String, timeout: Int = 10) = {
-
-  val boogieFile = translating.BoogieTranslator.translateProg(validationProg).toString
   val boogieFileName = s"$name-translation-validate.bpl"
+  val boogieFile = translating.BoogieTranslator.translateProg(validationProg).toString
   util.writeToFile(boogieFile, boogieFileName)
   if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
     val dir = File("./graphs/")
@@ -643,7 +642,7 @@ def validate(validationProg: Program, procName: String, name: String, timeout: I
     }
   }
 
-  val vres = util.boogie_interaction.boogieBatchQuery(List(boogieFileName, "axioms.bpl"), Some(procName), timeout)
+  val vres = util.boogie_interaction.boogieBatchQuery(List(boogieFileName), Some(procName), timeout)
   // assert(vres)
   vres
 
@@ -826,8 +825,14 @@ def validatedSimplifyPipeline(p: Program) = {
 
     val (vprog, splits) = validator.getValidationProgWPConj
 
+    val sorted = vprog.toList.map(p => {
+      val x = ExprComplexity()
+      visit_prog(x, p)
+      p -> x.count
+    }).filter(_._2 > 50).sortBy(_._2).map(_._1)
+
     val procName = prog.mainProcedure.procName + "_par_" + prog.mainProcedure.name
-    vprog.foreach(validateProg(_, "DSACopyProp", splits, true))
+    sorted.foreach(validateProg(_, "DSACopyProp", splits, false))
 
   }
 

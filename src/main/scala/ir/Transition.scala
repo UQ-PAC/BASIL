@@ -359,13 +359,15 @@ class TranslationValidator {
   def varInSource(v: Variable) = visit_rvar(afterRenamer, v)
   def varInTarget(v: Variable) = visit_rvar(beforeRenamer, v)
 
-  def boolAnd(exps: Iterable[Expr]) =
+  def boolAnd2(exps: Iterable[Expr]) =
     val l = exps.toList
     l.size match {
       case 0 => TrueLiteral
       case 1 => l.head
       case _ => BoolExp(BoolAND, l)
     }
+  def boolAnd(exps: Iterable[Expr]) =
+    exps.foldLeft(TrueLiteral : Expr)((l, r) => BinaryExpr(BoolAND, l, r))
 
   def setDSAInvariant = {
 
@@ -608,7 +610,7 @@ class TranslationValidator {
       // add inv on transition system
       combined.blocks.find(_.label == after.entryBlock.get.label).get.statements.append(Assume(trueFun.makeCall()))
       combined.blocks.find(_.label == before.entryBlock.get.label).get.statements.append(Assume(trueFun.makeCall()))
-      val invVariables = invariants.values.flatten.toSet.flatMap(_._1.variables)
+      val invVariables = invariants(proc.name).flatMap(_._1.variables).toSet
       val QSource =
         val sourceInvVariables =
           invVariables.filter(_.name.startsWith(afterRenamer.namespace)) ++ Seq(transitionSystemPCVar, traceVar).map(
