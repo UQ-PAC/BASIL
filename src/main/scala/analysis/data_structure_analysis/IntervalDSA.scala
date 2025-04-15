@@ -38,7 +38,6 @@ class IntervalGraph(
   protected def symValToNodes(
     symVal: SymValSet[Interval],
     current: Map[SymBase, IntervalNode],
-    f: Int => Boolean = i => i >= 1000
   ): Map[SymBase, IntervalNode] = {
     symVal.state.filter((base, _) => base != NonPointer).foldLeft(current) { case (result, (base, symOffsets)) =>
       val node = find(result.getOrElse(base, init(base, None)))
