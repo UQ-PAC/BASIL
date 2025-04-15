@@ -63,7 +63,7 @@ enum Interval extends Offsets {
   def contains(offset: Int): Boolean =
     this match
       case Interval.Top => true
-      case Interval.Value(start, end) => start <= offset && end > offset
+      case Interval.Value(start, end) => start <= offset && (end > offset || end == start)
       case _ => false
 
   def contains(interval: Interval): Boolean =
@@ -71,8 +71,9 @@ enum Interval extends Offsets {
       case (Interval.Top, _) => true
       case (_, Interval.Top) => false // this is not top
       case (a, b) if a == b => true
+      case (Interval.Value(s, e), _) if s == e => false
       case (Interval.Value(start1, end1), Interval.Value(start2, end2)) =>
-        start1 <= start2 && end1 > end2
+        start1 <= start2 && (end1 > end2 || (start2 < end2 && end1 >= end2))
       case _ => false
 
   def isOverlapping(other: Interval): Boolean =
