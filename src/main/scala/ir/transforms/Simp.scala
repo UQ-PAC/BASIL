@@ -605,7 +605,8 @@ def wrapShapePreservingTransformInValidation(transform: Program => Unit)(p: Prog
   transform(p)
   validator.setSourceProg(p)
   validator.setEqualVarsInvariant
-  validator.getValidationProg
+  val prog = validator.getValidationProgWPConj
+  prog
 }
 
 def validate(validationProg: Program, procName: String, name: String, timeout: Int = 10) = {
@@ -629,7 +630,7 @@ def validate(validationProg: Program, procName: String, name: String, timeout: I
 
 def transformAndValidate(transform: Program => Unit, name: String)(p: Program) = {
   val validationProg = wrapShapePreservingTransformInValidation(transform)(p)
-  val procName = p.mainProcedure.procName + "_seq_" + p.mainProcedure.name
+  val procName = p.mainProcedure.procName + "_par_" + p.mainProcedure.name
   validate(validationProg, procName, name)
 }
 
@@ -705,9 +706,9 @@ def validatedSimplifyPipeline(p: Program) = {
       }
     }
 
-    val vprog = validator.getValidationProg
+    val vprog = validator.getValidationProgWPConj
 
-    val procName = prog.mainProcedure.procName + "_seq_" + prog.mainProcedure.name
+    val procName = prog.mainProcedure.procName + "_par_" + prog.mainProcedure.name
     validate(vprog, procName, "DSACopyProp", 10)
   }
 
@@ -771,15 +772,15 @@ def validatedSimplifyPipeline(p: Program) = {
     validator.setSourceProg(p)
     validator.setDSAInvariant
     // validator.addRDInvariant()
-    val prog = validator.getValidationProg
+    val prog = validator.getValidationProgWPConj
 
-    val procName = p.mainProcedure.procName + "_seq_" + p.mainProcedure.name
+    val procName = p.mainProcedure.procName + "_par_" + p.mainProcedure.name
     // validate(prog, procName, "DynamicSingleAssignment", 3)
   }
 
   // rpo
-  println("Noop test")
-  transformAndValidate(x => (), "NoopTXTest")(p)
+  // println("Noop test")
+  // transformAndValidate(x => (), "NoopTXTest")(p)
   println("Rpo")
   combineBlocks(p)
   applyRPO(p)

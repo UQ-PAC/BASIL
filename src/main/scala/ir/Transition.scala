@@ -17,12 +17,13 @@ def polyEqual(e1: Expr, e2: Expr) = {
     case (BitVecType(sz1), BitVecType(sz2)) if sz1 == sz2 => BinaryExpr(BVEQ, e1, e2)
     case (BitVecType(sz1), BitVecType(sz2)) if sz1 > sz2 => BinaryExpr(BVEQ, Extract(sz2, 0, e1), e2)
     case (BitVecType(sz1), BitVecType(sz2)) if sz1 < sz2 => BinaryExpr(BVEQ, e1, Extract(sz1, 0, e2))
+    case (CustomSort(x), CustomSort(y)) if x == y => BinaryExpr(BoolEQ, e1, e2)
     case (_, _) => ???
   }
 
 }
 
-class NamespaceState(namespace: String) extends CILVisitor {
+class NamespaceState(val namespace: String) extends CILVisitor {
 
   def stipNamespace(n: String) = n.stripPrefix(namespace + "__")
 
@@ -32,11 +33,11 @@ class NamespaceState(namespace: String) extends CILVisitor {
   }
 
   override def vexpr(e: Expr) = e match {
-    case f @ UninterpretedFunction(n, p, r) if n.startsWith("load") =>
+    case f @ UninterpretedFunction(n, p, r, _) if n.startsWith("load") =>
       ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
-    case f @ UninterpretedFunction(n, p, r) if n.startsWith("trace_load") =>
+    case f @ UninterpretedFunction(n, p, r, _) if n.startsWith("trace_load") =>
       ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
-    case f @ UninterpretedFunction(n, p, r) if n.startsWith("store") =>
+    case f @ UninterpretedFunction(n, p, r, _) if n.startsWith("store") =>
       ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
     case _ => DoChildren()
   }
@@ -137,7 +138,7 @@ object PCMan {
 
 import PCMan.*
 
-def procToTransition(p: Procedure, loops: List[Loop], cutJoins: Boolean = false) = {
+def procToTransition(p: Procedure, loops: List[Loop], cutJoins: Boolean = true) = {
 
   val pcVar = transitionSystemPCVar
   var cutPoints = Map[String, Block]()
@@ -279,6 +280,49 @@ def toTransitionSystem(iprogram: Program) = {
     .toMap
 
   (program, cutPoints)
+}
+
+def createWPConjParTV(p1prog: Program, p1: Procedure, p2: Procedure) = {
+
+  val entry1 = p1.entryBlock.get
+  val exit1 = p1.returnBlock.get
+
+  // val entry2 = p2.entryBlock.get
+  // val exit2 = p2.returnBlock.get
+
+  val exitBB = IRToDSL.convertBlock(p2.returnBlock.get)
+  val entryBB = IRToDSL.convertBlock(p2.entryBlock.get)
+  val (exit2, rexit2) = exitBB.makeResolver
+  val (entry2, rentry2) = entryBB.makeResolver
+
+  val tempBlocks = (p2.blocks.toSet -- Seq(p2.entryBlock.get, p2.returnBlock.get)).map(IRToDSL.convertBlock)
+  val temps = tempBlocks.map(v =>
+    (
+      v.makeResolver match {
+        case (b, r) => b
+      },
+      v
+    )
+  )
+
+  p1.addBlock(entry2)
+  p1.addBlock(exit2)
+  temps.foreach { case (b, r) =>
+    p1.addBlock(b)
+  }
+  temps.foreach { case (b, r) =>
+    r.cont(b)(p1prog, p1)
+  }
+
+  exitBB.cont(exit2)(p1prog, p1)
+  entryBB.cont(entry2)(p1prog, p1)
+
+  p1.returnBlock = exit2
+  exit1.replaceJump(GoTo(entry2))
+  exit2.replaceJump(Return())
+
+  assert(invariant.cfgCorrect(p1prog))
+  p1
 }
 
 /**
@@ -508,6 +552,100 @@ class TranslationValidator {
           }
         }
       )
+  }
+
+  def getValidationProgWPConj = {
+
+    val trueFun = FunctionDecl("TRUE", List(), BoolType, None, List("builtin" -> Some("\"true\"")))
+    val falseFun = FunctionDecl("FALSE", List(), BoolType, None, List("builtin" -> Some("\"false\"")))
+
+    for (proc <- initProg.get.procedures) {
+      val after = afterProg.get.procedures.find(_.name == proc.name).get
+      val before = beforeProg.get.procedures.find(_.name == proc.name).get
+      val source = after
+      val target = before
+
+      visit_proc(beforeRenamer, before)
+      visit_proc(afterRenamer, after)
+
+      // matches the smtlib let def emitted by boogie for the wp at the block
+      val wpconjSourceFun =
+        FunctionDecl(
+          proc.name + "_source",
+          List(),
+          BoolType,
+          None,
+          List("builtin" -> Some("\"" + source.entryBlock.get.label + "_correct\""))
+        )
+      val wpconjTargetFun =
+        FunctionDecl(
+          proc.name + "_target",
+          List(),
+          BoolType,
+          None,
+          List("builtin" -> Some("\"" + target.entryBlock.get.label + "_correct\""))
+        )
+
+      val combined = IRToDSL.parTransitionSystems(afterProg.get, after, before)
+
+      val prime = NamespaceState("P")
+
+      // add inv on transition system
+      combined.blocks.find(_.label == after.entryBlock.get.label).get.statements.append(Assume(trueFun.makeCall()))
+      combined.blocks.find(_.label == before.entryBlock.get.label).get.statements.append(Assume(trueFun.makeCall()))
+      val invVariables = invariants.values.flatten.toSet.flatMap(_._1.variables)
+      val QSource =
+        val sourceInvVariables =
+          invVariables.filter(_.name.startsWith(afterRenamer.namespace)) ++ Seq(transitionSystemPCVar, traceVar).map(
+            visit_rvar(afterRenamer, _)
+          )
+        val vars = sourceInvVariables.map(v => polyEqual(visit_expr(prime, v), v))
+        vars.foldLeft(TrueLiteral: Expr)((l, r) => BinaryExpr(BoolAND, l, r))
+      val QTarget =
+        val targetInvVariables =
+          invVariables.filter(_.name.startsWith(beforeRenamer.namespace)) ++ Seq(transitionSystemPCVar, traceVar).map(
+            visit_rvar(beforeRenamer, _)
+          )
+        val vars = targetInvVariables.map(v => polyEqual(visit_expr(prime, v), v))
+        vars.foldLeft(TrueLiteral: Expr)((l, r) => BinaryExpr(BoolAND, l, r))
+
+      combined.blocks
+        .find(_.label == after.returnBlock.get.label)
+        .get
+        .statements
+        .append(Assert(UnaryExpr(BoolNOT, QSource)))
+      combined.blocks
+        .find(_.label == before.returnBlock.get.label)
+        .get
+        .statements
+        .append(Assert(UnaryExpr(BoolNOT, QTarget)))
+
+      // add invariant to combined
+      val invariant = Seq((pcInv, Some("PC INVARIANT")), (traceInv, Some("Trace INVARIANT"))) ++ invariants(proc.name)
+      val primedInv = invariant.map((i, l) => Assert(visit_expr(prime, i), l))
+      val proof =
+        invariant.map((i, l) => Assume(i, l))
+          ++ List(
+            Assume(UnaryExpr(BoolNOT, wpconjSourceFun.makeCall()), Some(" wp conjugate of source program")),
+            Assume(UnaryExpr(BoolNOT, wpconjTargetFun.makeCall()), Some(" wp conjugate of taregt program"))
+          )
+          ++ primedInv
+          ++ List(Assume(falseFun.makeCall()))
+      combined.entryBlock.get.statements.prependAll(proof)
+
+      validationProcs = validationProcs.updated(proc.name, combined)
+      afterProg.get.declarations.addAll(Seq(wpconjTargetFun, wpconjSourceFun))
+
+      val bidx = afterProg.get.procedures.indexOf(before)
+      // beforeProg.get.procedures.remove(bidx)
+    }
+    afterProg.get.declarations.addAll(Seq(trueFun, falseFun))
+
+    // TODO: fix when implementing calls
+    val interesting = validationProcs.map(_._2)
+    afterProg.get.procedures = ArrayBuffer.from(interesting)
+
+    afterProg.get
   }
 
   def getValidationProg = {

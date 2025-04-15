@@ -169,7 +169,7 @@ class Assume(
 ) extends Statement {
 
   comment = acomment
-  override def toString: String = s"${labelStr}assume $body" + comment.map(" //" + _)
+  override def toString: String = s"${labelStr}assume $body" + comment.map(" // " + _)
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssume(this)
 }
 
