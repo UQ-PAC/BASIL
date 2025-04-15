@@ -1015,7 +1015,7 @@ object IntervalDSA {
               "Expected cells for indices used in reachable memory access to have corresponding DSA cells"
             )
             assert(
-              pointers.filter(_.hasPointee).map(_.getPointee).size == 1,
+              pointers.filter(_.hasPointee).map(_.getPointee).map(dsg.get).size == 1,
               "Expected index cells to have unified pointer"
             )
             assert(
@@ -1029,8 +1029,8 @@ object IntervalDSA {
               "Expected cells for indices used in reachable memory access to have corresponding DSA cells"
             )
             assert(
-              pointers.filter(_.hasPointee).map(_.getPointee).size == 1,
-              "Expected index cells to have unified pointer"
+              pointers.filter(_.hasPointee).map(_.getPointee).map(dsg.get).size == 1,
+              s"Expected index cells to have unified pointer"
             )
             assert(
               !pointers.exists(_.hasPointee) || pointers.forall(_.hasPointee),
