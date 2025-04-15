@@ -33,12 +33,14 @@ class NamespaceState(val namespace: String) extends CILVisitor {
   }
 
   override def vexpr(e: Expr) = e match {
-    case f @ UninterpretedFunction(n, p, r, _) if n.startsWith("load") =>
+    case f @ UninterpretedFunction(n, p, r, _) =>
       ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
-    case f @ UninterpretedFunction(n, p, r, _) if n.startsWith("trace_load") =>
-      ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
-    case f @ UninterpretedFunction(n, p, r, _) if n.startsWith("store") =>
-      ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
+    // case f @ UninterpretedFunction(n, p, r, _) if n.startsWith("load") =>
+    //  ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
+    // case f @ UninterpretedFunction(n, p, r, _) if n.startsWith("trace_load") =>
+    //  ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
+    // case f @ UninterpretedFunction(n, p, r, _) if n.startsWith("store") =>
+    //  ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
     case _ => DoChildren()
   }
 
@@ -138,7 +140,7 @@ object PCMan {
 
 import PCMan.*
 
-def procToTransition(p: Procedure, loops: List[Loop], cutJoins: Boolean = true) = {
+def procToTransition(p: Procedure, loops: List[Loop], cutJoins: Boolean = false) = {
 
   val pcVar = transitionSystemPCVar
   var cutPoints = Map[String, Block]()
@@ -282,49 +284,6 @@ def toTransitionSystem(iprogram: Program) = {
   (program, cutPoints)
 }
 
-def createWPConjParTV(p1prog: Program, p1: Procedure, p2: Procedure) = {
-
-  val entry1 = p1.entryBlock.get
-  val exit1 = p1.returnBlock.get
-
-  // val entry2 = p2.entryBlock.get
-  // val exit2 = p2.returnBlock.get
-
-  val exitBB = IRToDSL.convertBlock(p2.returnBlock.get)
-  val entryBB = IRToDSL.convertBlock(p2.entryBlock.get)
-  val (exit2, rexit2) = exitBB.makeResolver
-  val (entry2, rentry2) = entryBB.makeResolver
-
-  val tempBlocks = (p2.blocks.toSet -- Seq(p2.entryBlock.get, p2.returnBlock.get)).map(IRToDSL.convertBlock)
-  val temps = tempBlocks.map(v =>
-    (
-      v.makeResolver match {
-        case (b, r) => b
-      },
-      v
-    )
-  )
-
-  p1.addBlock(entry2)
-  p1.addBlock(exit2)
-  temps.foreach { case (b, r) =>
-    p1.addBlock(b)
-  }
-  temps.foreach { case (b, r) =>
-    r.cont(b)(p1prog, p1)
-  }
-
-  exitBB.cont(exit2)(p1prog, p1)
-  entryBB.cont(entry2)(p1prog, p1)
-
-  p1.returnBlock = exit2
-  exit1.replaceJump(GoTo(entry2))
-  exit2.replaceJump(Return())
-
-  assert(invariant.cfgCorrect(p1prog))
-  p1
-}
-
 /**
   * Clone p2 into p1, p2 
   *
@@ -400,6 +359,14 @@ class TranslationValidator {
   def varInSource(v: Variable) = visit_rvar(afterRenamer, v)
   def varInTarget(v: Variable) = visit_rvar(beforeRenamer, v)
 
+  def boolAnd(exps: Iterable[Expr]) =
+    val l = exps.toList
+    l.size match {
+      case 0 => TrueLiteral
+      case 1 => l.head
+      case _ => BoolExp(BoolAND, l)
+    }
+
   def setDSAInvariant = {
 
     val procs = initProg.get.procedures.view.map(p => p.name -> p).toMap
@@ -431,9 +398,7 @@ class TranslationValidator {
         case (label, cutPoint) => {
           val vars = lives.get(cutPoint.label).toSet.flatten -- Seq(transitionSystemPCVar)
 
-          val assertion = vars
-            .map(v => polyEqual(varInSource(v), varInTarget(removeIndex(v))))
-            .foldLeft(TrueLiteral: Expr)((acc, r) => BinaryExpr(BoolAND, acc, r))
+          val assertion = boolAnd(vars.map(v => polyEqual(varInSource(v), varInTarget(removeIndex(v)))).toList)
 
           val guard = BinaryExpr(IntEQ, visit_rvar(afterRenamer, transitionSystemPCVar), PCMan.PCSym(label))
 
@@ -474,9 +439,10 @@ class TranslationValidator {
         case (label, cutPoint) => {
           val vars = lives.get(cutPoint.label).toSet.flatten -- Seq(transitionSystemPCVar)
 
-          val assertion = vars
-            .map(v => polyEqual(varInSource(v), varInTarget(v)))
-            .foldLeft(TrueLiteral: Expr)((acc, r) => BinaryExpr(BoolAND, acc, r))
+          val assertion = boolAnd(
+            vars
+              .map(v => polyEqual(varInSource(v), varInTarget(v)))
+          )
 
           val guard = BinaryExpr(IntEQ, visit_rvar(afterRenamer, transitionSystemPCVar), PCMan.PCSym(label))
 
@@ -554,19 +520,65 @@ class TranslationValidator {
       )
   }
 
+  private class CollectUninterps extends CILVisitor {
+
+    var funcs = List[UninterpretedFunction]()
+
+    override def vexpr(e: Expr) =
+      e match {
+        case u: UninterpretedFunction =>
+          funcs = u :: funcs
+          SkipChildren()
+        case _ => DoChildren()
+      }
+  }
+
+  private def getUninterps(p: Procedure) =
+    val v = CollectUninterps()
+    visit_proc(v, p)
+    v.funcs
+
   def getValidationProgWPConj = {
 
     val trueFun = FunctionDecl("TRUE", List(), BoolType, None, List("builtin" -> Some("\"true\"")))
     val falseFun = FunctionDecl("FALSE", List(), BoolType, None, List("builtin" -> Some("\"false\"")))
-    var decls = Vector[Decl](trueFun, falseFun)
 
     var splitCandidates = Map[Procedure, ArrayBuffer[GoTo]]()
+
+    var progs = List[Program]()
 
     for (proc <- initProg.get.procedures) {
       val after = afterProg.get.procedures.find(_.name == proc.name).get
       val before = beforeProg.get.procedures.find(_.name == proc.name).get
       val source = after
       val target = before
+
+      val uninterpfuncs = getUninterps(before).toSet.intersect(getUninterps(after).toSet)
+      val uninterpAxioms = uninterpfuncs.collect { case UninterpretedFunction(n, p, rt, true) =>
+        val params = p.toList.zipWithIndex.map { case (p, i) =>
+          LocalVar(s"arg$i", p.getType)
+        }
+        val srcParams = params.map(varInSource).map { case l: LocalVar =>
+          l
+        }
+        val tgtParams = params.map(varInTarget).map { case l: LocalVar =>
+          l
+        }
+
+        val lhs = boolAnd(params.map(r => polyEqual(exprInSource(r), exprInTarget(r))))
+        val rhs = polyEqual(
+          exprInSource(UninterpretedFunction(n, srcParams, rt, true)),
+          exprInTarget(UninterpretedFunction(n, tgtParams, rt, true))
+        )
+        val q = QuantifierExpr(
+          QuantifierSort.forall,
+          LambdaExpr(
+            srcParams.zip(tgtParams).flatMap((a, b) => List[LocalVar](a, b)),
+            BinaryExpr(BoolIMPLIES, lhs, rhs)
+          )
+        )
+        AxiomDecl(q)
+      }
 
       visit_proc(beforeRenamer, before)
       visit_proc(afterRenamer, after)
@@ -603,14 +615,15 @@ class TranslationValidator {
             visit_rvar(afterRenamer, _)
           )
         val vars = sourceInvVariables.map(v => polyEqual(visit_expr(prime, v), v))
-        vars.foldLeft(TrueLiteral: Expr)((l, r) => BinaryExpr(BoolAND, l, r))
+        boolAnd(vars)
+
       val QTarget =
         val targetInvVariables =
           invVariables.filter(_.name.startsWith(beforeRenamer.namespace)) ++ Seq(transitionSystemPCVar, traceVar).map(
             visit_rvar(beforeRenamer, _)
           )
         val vars = targetInvVariables.map(v => polyEqual(visit_expr(prime, v), v))
-        vars.foldLeft(TrueLiteral: Expr)((l, r) => BinaryExpr(BoolAND, l, r))
+        boolAnd(vars)
 
       combined.blocks
         .find(_.label == after.returnBlock.get.label)
@@ -637,7 +650,6 @@ class TranslationValidator {
       combined.entryBlock.get.statements.prependAll(proof)
 
       validationProcs = validationProcs.updated(proc.name, combined)
-      decls = decls ++ Seq(wpconjTargetFun, wpconjSourceFun)
 
       val internalLabels = before.blocks.map(_.label).toSet ++ after.blocks.map(_.label)
 
@@ -646,20 +658,14 @@ class TranslationValidator {
       }
       splitCandidates = splitCandidates.updated(combined, ArrayBuffer.from(splitJumps))
 
+      val decls = ArrayBuffer[Decl](trueFun, falseFun, wpconjTargetFun, wpconjSourceFun) ++ uninterpAxioms
       val bidx = afterProg.get.procedures.indexOf(before)
+
+      progs = Program(ArrayBuffer(combined), combined, afterProg.get.initialMemory, decls) :: progs
       // beforeProg.get.procedures.remove(bidx)
     }
 
-    // TODO: fix when implementing calls
-    val interesting = validationProcs.map(_._2)
-    val validationProg = Program(
-      ArrayBuffer.from(interesting),
-      interesting.find(_.name.startsWith(afterProg.get.mainProcedure.procName)).get,
-      afterProg.get.initialMemory
-    )
-    validationProg.declarations.addAll(decls)
-
-    (validationProg, splitCandidates)
+    (progs, splitCandidates)
   }
 
   def getValidationProg = {

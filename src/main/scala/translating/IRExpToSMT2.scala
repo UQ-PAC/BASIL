@@ -49,6 +49,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
       case ZeroExtend(bits, arg) => vzeroextend(bits, vexpr(arg))
       case SignExtend(bits, arg) => vsignextend(bits, vexpr(arg))
       case BinaryExpr(op, arg, arg2) => vbinary_expr(op, vexpr(arg), vexpr(arg2))
+      case BoolExp(op, arg) => vbool_expr(op, arg.map(vexpr))
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
       case v: Variable => vrvar(v)
       case f @ UninterpretedFunction(n, params, rt, _) => vuninterp_function(n, params.map(vexpr))
@@ -116,6 +117,7 @@ trait BasilIRExp[Repr[+_]] {
   def vzeroextend(bits: Int, b: Repr[Expr]): Repr[Expr]
   def vsignextend(bits: Int, b: Repr[Expr]): Repr[Expr]
   def vbinary_expr(e: BinOp, l: Repr[Expr], r: Repr[Expr]): Repr[Expr]
+  def vbool_expr(e: BoolBinOp, l: List[Repr[Expr]]): Repr[Expr]
   def vunary_expr(e: UnOp, arg: Repr[Expr]): Repr[Expr]
   def vliteral(l: Literal): Repr[Literal] = {
     l match {
@@ -269,6 +271,8 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   override def vextract(ed: Int, start: Int, a: Sexp[Expr]): Sexp[Expr] =
     list(list(sym("_"), sym("extract"), int2smt(ed - 1), int2smt(start)), a)
   override def vbinary_expr(e: BinOp, l: Sexp[Expr], r: Sexp[Expr]): Sexp[Expr] = list(sym(opnameToFun(e)), l, r)
+  override def vbool_expr(e: BoolBinOp, l: List[Sexp[Expr]]): Sexp[Expr] =
+    Sexp.Slist(sym(opnameToFun(e)) :: l)
   override def vunary_expr(e: UnOp, arg: Sexp[Expr]): Sexp[Expr] = list(sym(unaryOpnameToFun(e)), arg)
 
   override def vliteral(arg: Literal): Sexp[Literal] = arg match {

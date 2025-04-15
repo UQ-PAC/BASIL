@@ -144,7 +144,7 @@ object BoogieTranslator {
     while (oldFops != fops) {
       oldFops = fops
       decls = fops.flatMap {
-        case f: BasilIRFunctionOp => genFunctionOpDefinitionAxiomOps(f)
+        case f: BasilIRFunctionOp => Seq(genFunctionOpDefinition(f))
         case f => throw Exception(s"function op not supported on direct translation mode : $f")
       }
       val newOps = decls.flatMap(_.functionOps)

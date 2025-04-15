@@ -693,20 +693,15 @@ object RunUtils {
   }
 
   def simpPreprocess(program: Program) = {
-    println("loops")
     val foundLoops = LoopDetector.identify_loops(program)
     foundLoops.updateIrWithLoops()
     for (p <- program.procedures) {
       p.normaliseBlockNames()
     }
     transforms.liftSVComp(program)
-    println("rpo")
     program.sortProceduresRPO()
-    println("empty")
     transforms.removeEmptyBlocks(program)
-    println("coalesce")
     transforms.coalesceBlocks(program)
-    println("empty")
     transforms.removeEmptyBlocks(program)
   }
 
@@ -755,11 +750,6 @@ object RunUtils {
 
     transforms.fixupGuards(program)
     transforms.removeDuplicateGuard(program)
-    val exprSimp = transforms.localExprSimplify(program)
-    DebugDumpIRLogger.writeToFile(
-      File("exprsimp-translation-validate.bpl"),
-      BoogieTranslator.translateProg(exprSimp).toString
-    )
 
     // val cpValidate = transforms.copyPropOnce(program)
     // val copyPropBoogieFile = BoogieTranslator.translateProg(cpValidate).toString

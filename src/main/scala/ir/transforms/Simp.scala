@@ -610,7 +610,12 @@ def wrapShapePreservingTransformInValidation(transform: Program => Unit)(p: Prog
   prog
 }
 
-def validateProg(validationProg: Program, n: String, splits: Map[Procedure, mutable.ArrayBuffer[GoTo]]) = {
+def validateProg(
+  validationProg: Program,
+  n: String,
+  splits: Map[Procedure, mutable.ArrayBuffer[GoTo]],
+  splitImmediate: Boolean = false
+) = {
   val procs = validationProg.procedures.toArray
     .map(p => {
       val v = ExprComplexity()
@@ -621,7 +626,7 @@ def validateProg(validationProg: Program, n: String, splits: Map[Procedure, muta
 
   for ((p, comp) <- procs) {
     SimplifyLogger.info(s"Validating proc ${p.name} (compl ${comp})")
-    validateProc(validationProg, p, n, 3, splits(p))
+    validateProc(validationProg, p, n, 8, splits(p), splitImmediate)
   }
 }
 
@@ -649,8 +654,10 @@ def validateProc(
   proc: Procedure,
   name: String,
   timeout: Int = 3,
-  isplits: mutable.ArrayBuffer[GoTo]
+  isplits: mutable.ArrayBuffer[GoTo],
+  splitImmediate: Boolean = false
 ) = {
+  // FIXME: I don't think this is properly covering every combination of splits
   var splits = List.from(isplits)
   var choices = List[(GoTo, Set[Block])]()
   var decisionStack = List[Block]()
@@ -694,10 +701,19 @@ def validateProc(
     val tgs = g.targets.toList
     g.addTarget(next)
     tgs.foreach(t => if t != next then g.removeTarget(t))
-    val verificationRes = tryVerify(s"${choices.size}_${choices.map(_._2.size).mkString("_")}")
-    verificationRes.kind match {
+
+    val verificationRes =
+      if (splitImmediate && splits.nonEmpty) then BoogieResultKind.Timeout
+      else tryVerify(s"${choices.size}_${choices.map(_._2.size).mkString("_")}").kind
+
+    verificationRes match {
       case BoogieResultKind.Verified(count, errors) => {
         choices = (g, remTargets - next) :: choices.tail
+      }
+
+      case BoogieResultKind.Timeout if splits.isEmpty => {
+        SimplifyLogger.error("Timed out on smallest split")
+        break()
       }
       case BoogieResultKind.Timeout => {
         decisionStack = next :: decisionStack
@@ -730,9 +746,10 @@ def validateProc(
 }
 
 def transformAndValidate(transform: Program => Unit, name: String)(p: Program) = {
-  val validationProg = wrapShapePreservingTransformInValidation(transform)(p)
-  val procName = p.mainProcedure.procName + "_par_" + p.mainProcedure.name
-  validate(validationProg, procName, name)
+  val validationProgs = wrapShapePreservingTransformInValidation(transform)(p)
+  for (p <- validationProgs) {
+    validate(p, p.mainProcedure.name, name)
+  }
 }
 
 def validatedSimplifyPipeline(p: Program) = {
@@ -810,7 +827,8 @@ def validatedSimplifyPipeline(p: Program) = {
     val (vprog, splits) = validator.getValidationProgWPConj
 
     val procName = prog.mainProcedure.procName + "_par_" + prog.mainProcedure.name
-    validateProg(vprog, "DSACopyProp", splits)
+    vprog.foreach(validateProg(_, "DSACopyProp", splits, true))
+
   }
 
   def simplifyGuards(prog: Program) = {
