@@ -327,7 +327,7 @@ case class NaryBinExpr(op: BoolBinOp | BVEQ.type | IntEQ.type | IntADD.type, arg
     arg.last.serialiseBoogie(w)
     w.append(")")
   }
-  override def toString = s"(${arg.mkString(op.toString)})"
+  override def toString = s"(${arg.mkString(" " + op.toString + " ")})"
 }
 
 case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
