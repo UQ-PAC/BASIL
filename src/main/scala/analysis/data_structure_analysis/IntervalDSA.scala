@@ -1006,7 +1006,7 @@ object IntervalDSA {
     val queue = mutable.Queue[IntervalNode]().enqueueAll(entry)
     while queue.nonEmpty do {
       val node = queue.dequeue()
-      node.bases.keys /*.filterNot(b => b.isInstanceOf[Ret] || b.isInstanceOf[Heap] || b.isInstanceOf[Par])*/ .foreach(
+      node.bases.keys .foreach(
         base => assert(!found.contains(base) || found(base) == node, s"$base was in $node and ${found(base)}")
       )
       node.bases.keys.foreach(found.update(_, node))
