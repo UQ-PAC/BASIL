@@ -125,6 +125,7 @@ class IntervalGraph(
       Interval(g1.toInt, g1.toInt + 8).contains(address)
         || Interval(g2.toInt, g2.toInt + 8).contains(address)
     ) || irContext.externalFunctions.exists(g => Interval(g.offset.toInt, g.offset.toInt + 8).contains(address))
+      || irContext.symbols.exists(sym => Interval(sym.value.toInt, sym.value.toInt + (sym.size / 8)).contains(address))
   }
 
   def globalNode(
