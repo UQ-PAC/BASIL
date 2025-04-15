@@ -72,7 +72,7 @@ class MemoryTransfromTests extends AnyFunSuite with test_util.CaptureOutput {
     val global = memoryAssign.lhs
     val z = results.ir.globals.collectFirst { case g @ SpecGlobal("z", size, arraySize, address) => g }.get
 
-    assert(global.name == (s"Global_${z.address}_${z.address + (z.size / 8) - 1}"), s"Expected variable to be named $z")
+    assert(global.name == (s"Global_${z.address}_${z.address + (z.size / 8)}"), s"Expected variable to be named $z")
   }
 
   test("multi proc global assignment") {
