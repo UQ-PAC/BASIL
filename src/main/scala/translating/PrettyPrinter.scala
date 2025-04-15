@@ -425,6 +425,11 @@ class BasilIRPrettyPrinter(
     val opn = e.getClass.getSimpleName.toLowerCase.stripSuffix("$")
     BST(s"$opn($l, $r)")
   }
+  override def vbool_expr(e: BoolBinOp, l: List[PPProg[Expr]]): PPProg[Expr] = {
+    val opn = e.getClass.getSimpleName.toLowerCase.stripSuffix("$")
+    BST(s"$opn(${l.mkString(",")})")
+  }
+
   override def vunary_expr(e: UnOp, arg: PPProg[Expr]): PPProg[Expr] = {
     val opn = e.getClass.getSimpleName.toLowerCase.stripSuffix("$")
     BST(s"$opn($arg)")

@@ -172,6 +172,15 @@ sealed trait BVUnOp(op: String) extends UnOp {
 case object BVNOT extends BVUnOp("not")
 case object BVNEG extends BVUnOp("neg")
 
+case class BoolExp(op: BoolBinOp, args: List[Expr]) extends Expr with CachedHashCode {
+  require(args.size >= 2)
+  override def getType: IRType = BoolType
+  override def toBoogie: BExpr = NaryBinExpr(op, args.map(_.toBoogie))
+  override def gammas: Set[Variable] = args.flatMap(_.gammas).toSet
+  override def variables = args.flatMap(_.variables).toSet
+  override def toString() = "(" + args.mkString(op.toString) + ")"
+}
+
 case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr with CachedHashCode {
   override def toBoogie: BExpr = BinaryBExpr(op, arg1.toBoogie, arg2.toBoogie)
   override def gammas: Set[Variable] = arg1.gammas ++ arg2.gammas
@@ -345,18 +354,33 @@ case class FunctionDecl(
   params: List[LocalVar],
   returnType: IRType,
   definition: Option[Expr],
-  attribs: List[(String, Option[String])] = List()
+  attribs: List[(String, Option[String])] = List(),
+  inlineDef: Boolean = false
 ) extends Decl {
-  def toBoogie = BFunction(
-    name,
-    params.map(p => BParam(p.name, p.getType.toBoogie)),
-    BParam(returnType.toBoogie),
-    definition.map(_.toBoogie),
-    attribs.map((n, v) => BAttribute(n, v))
-  )
+  def toBoogie =
+
+    val bparams = params.map(p => BParam(p.name, p.getType.toBoogie))
+
+    val body = definition
+      .map(_.toBoogie)
+      .orElse(name match {
+        case s"and_${_}" => Some(NaryBinExpr(BoolAND, bparams))
+        case s"or_${_}" => Some(NaryBinExpr(BoolOR, bparams))
+        case s"eq_${_}" => Some(NaryBinExpr(BoolEQ, bparams))
+        case s"implies_${_}" => Some(NaryBinExpr(BoolIMPLIES, bparams))
+        case s"intadd_${_}" => Some(NaryBinExpr(IntADD, bparams))
+        case _ => None
+      })
+
+    BFunction(name, bparams, BParam(returnType.toBoogie), body, attribs.map((n, v) => BAttribute(n, v)))
   def makeCall(actualParams: List[Expr] = List()) = {
     require(params.map(_.getType) == actualParams.map(_.getType))
-    UninterpretedFunction(name, actualParams, returnType, false)
+    if (!inlineDef || definition.isEmpty) then {
+      UninterpretedFunction(name, actualParams, returnType, false)
+    } else {
+      val l = LambdaExpr(params, definition.get)
+      ir.eval.evalLambdaApply(l, UninterpretedFunction(name, params, returnType, false))
+    }
   }
 }
 
@@ -462,15 +486,15 @@ case class LambdaExpr(binds: List[LocalVar], body: Expr) extends Expr {
   def returnType = body.getType
 }
 
-case class QuantifierExpr(kind: QuantifierSort, body: LambdaExpr) extends Expr {
+case class QuantifierExpr(kind: QuantifierSort, body: LambdaExpr, triggers: List[Expr] = List()) extends Expr {
   require(body.returnType == BoolType, "Type error: quantifier with non-boolean body")
   override def getType: IRType = BoolType
   def toBoogie: BExpr = {
     val b = body.binds.map(_.toBoogie)
     val bdy = body.body.toBoogie
     kind match {
-      case QuantifierSort.forall => ForAll(b, bdy)
-      case QuantifierSort.exists => Exists(b, bdy)
+      case QuantifierSort.forall => ForAll(b, bdy, triggers.map(_.toBoogie))
+      case QuantifierSort.exists => Exists(b, bdy, triggers.map(_.toBoogie))
     }
   }
   override def variables: Set[Variable] = body.variables

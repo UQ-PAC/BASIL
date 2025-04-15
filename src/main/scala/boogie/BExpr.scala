@@ -283,6 +283,23 @@ case class UnaryBExpr(op: UnOp, arg: BExpr) extends BExpr {
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitUnaryBExpr(this)
 }
 
+case class NaryBinExpr(op: BoolBinOp | BVEQ.type | IntEQ.type | IntADD.type, arg: List[BExpr]) extends BExpr {
+  require(arg.size >= 2)
+  override def getType = BinaryBExpr(op, arg.head, arg.tail.head).getType
+  override def serialiseBoogie(w: Writer): Unit = {
+    w.append("(")
+    arg
+      .dropRight(1)
+      .foreach(a => {
+        a.serialiseBoogie(w)
+        w.append(",")
+      })
+    arg.last.serialiseBoogie(w)
+    w.append(")")
+  }
+  override def toString = s"(${arg.mkString(op.toString)})"
+}
+
 case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
   override def getType: BType = (op, arg1.getType, arg2.getType) match {
     case (_: BoolBinOp, BoolBType, BoolBType) => BoolBType
