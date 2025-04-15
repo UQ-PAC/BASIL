@@ -546,15 +546,14 @@ class IntervalGraph(
 
     val selfPointers = disconnectSelfPointers(stableNode)
 
+    unify(nodeToBeMoved, stableNode,  delta.getOrElse(0))
     nodeToBeMoved.cells.foreach(
       c =>
         val cell = stableNode.add(c.interval.move(i => i + delta.getOrElse(0)))
         if c.hasPointee then
           cell.setPointee(c.getPointee)
-
     )
 
-    unify(nodeToBeMoved, stableNode,  delta.getOrElse(0))
 
     selfPointers.foreach((pointer, pointee) => pointer.setPointee(pointee))
     connectSCC(scc1)
