@@ -353,7 +353,7 @@ sealed trait Decl {
   def toBoogie: BDeclaration
 }
 case class AxiomDecl(e: Expr) extends Decl {
-  def toBoogie = BAxiom(e.toBoogie, List(BAttribute("extern")))
+  def toBoogie = BAxiom(e.toBoogie, List())
 }
 case class FunctionDecl(
   name: String,

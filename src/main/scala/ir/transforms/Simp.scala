@@ -642,7 +642,7 @@ def validate(validationProg: Program, procName: String, name: String, timeout: I
     }
   }
 
-  val vres = util.boogie_interaction.boogieBatchQuery(List(boogieFileName), Some(procName), timeout)
+  val vres = util.boogie_interaction.boogieBatchQuery(List(boogieFileName, "axioms.bpl"), Some(procName), timeout)
   // assert(vres)
   vres
 
@@ -676,7 +676,7 @@ def validateProc(
 
   def tryVerify(splitname: String) = {
     currentSplit
-    validate(validationProg, proc.name, name + "split" + splitname, timeout)
+    validate(validationProg, proc.name, name + proc.name +  "split" + splitname, timeout)
   }
 
   def makeSplit() = {
@@ -726,7 +726,7 @@ def validateProc(
     }
   }
 
-  if (splits.nonEmpty) {
+  if (false && splits.nonEmpty) {
     makeSplit()
     while (choices.nonEmpty) {
       tryChoice()
