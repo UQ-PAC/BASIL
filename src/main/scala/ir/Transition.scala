@@ -367,7 +367,7 @@ class TranslationValidator {
       case _ => BoolExp(BoolAND, l)
     }
   def boolAnd(exps: Iterable[Expr]) =
-    exps.foldLeft(TrueLiteral : Expr)((l, r) => BinaryExpr(BoolAND, l, r))
+    exps.foldLeft(TrueLiteral: Expr)((l, r) => BinaryExpr(BoolAND, l, r))
 
   def setDSAInvariant = {
 
@@ -530,7 +530,7 @@ class TranslationValidator {
       e match {
         case u: UninterpretedFunction =>
           funcs = u :: funcs
-          SkipChildren()
+          DoChildren()
         case _ => DoChildren()
       }
   }
@@ -556,30 +556,33 @@ class TranslationValidator {
       val target = before
 
       val uninterpfuncs = getUninterps(before).toSet.intersect(getUninterps(after).toSet)
-      val uninterpAxioms = uninterpfuncs.collect { case UninterpretedFunction(n, p, rt, true) =>
-        val params = p.toList.zipWithIndex.map { case (p, i) =>
-          LocalVar(s"arg$i", p.getType)
-        }
-        val srcParams = params.map(varInSource).map { case l: LocalVar =>
-          l
-        }
-        val tgtParams = params.map(varInTarget).map { case l: LocalVar =>
-          l
-        }
+      val uninterpAxioms = uninterpfuncs.map {
+        case UninterpretedFunction(n, p, rt, _) => {
 
-        val lhs = boolAnd(params.map(r => polyEqual(exprInSource(r), exprInTarget(r))))
-        val rhs = polyEqual(
-          exprInSource(UninterpretedFunction(n, srcParams, rt, true)),
-          exprInTarget(UninterpretedFunction(n, tgtParams, rt, true))
-        )
-        val q = QuantifierExpr(
-          QuantifierSort.forall,
-          LambdaExpr(
-            srcParams.zip(tgtParams).flatMap((a, b) => List[LocalVar](a, b)),
-            BinaryExpr(BoolIMPLIES, lhs, rhs)
+          val params = p.toList.zipWithIndex.map { case (p, i) =>
+            LocalVar(s"arg$i", p.getType)
+          }
+          val srcParams = params.map(varInSource).map { case l: LocalVar =>
+            l
+          }
+          val tgtParams = params.map(varInTarget).map { case l: LocalVar =>
+            l
+          }
+
+          val lhs = boolAnd(params.map(r => polyEqual(exprInSource(r), exprInTarget(r))))
+          val rhs = polyEqual(
+            UninterpretedFunction("source__" + n, srcParams, rt, true),
+            UninterpretedFunction("target__" + n, tgtParams, rt, true)
           )
-        )
-        AxiomDecl(q)
+          val q = QuantifierExpr(
+            QuantifierSort.forall,
+            LambdaExpr(
+              srcParams.zip(tgtParams).flatMap((a, b) => List[LocalVar](a, b)),
+              BinaryExpr(BoolIMPLIES, lhs, rhs)
+            )
+          )
+          AxiomDecl(q)
+        }
       }
 
       visit_proc(beforeRenamer, before)
@@ -660,10 +663,10 @@ class TranslationValidator {
       }
       splitCandidates = splitCandidates.updated(combined, ArrayBuffer.from(splitJumps))
 
-      val decls = ArrayBuffer[Decl](trueFun, falseFun, wpconjTargetFun, wpconjSourceFun) ++ uninterpAxioms
+      val decls = (List(trueFun, falseFun, wpconjTargetFun, wpconjSourceFun) ++ uninterpAxioms)
       val bidx = afterProg.get.procedures.indexOf(before)
 
-      progs = Program(ArrayBuffer(combined), combined, afterProg.get.initialMemory, decls) :: progs
+      progs = Program(ArrayBuffer(combined), combined, afterProg.get.initialMemory, ArrayBuffer.from(decls)) :: progs
       // beforeProg.get.procedures.remove(bidx)
     }
 
