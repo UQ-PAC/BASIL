@@ -311,14 +311,15 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("http_parse_basic") {
-    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val path = "examples/cntlm-o3/cntlm-noduk"
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
           inputFile = path + ".adt",
           relfFile = path + ".relf",
           mainProcedureName = "http_parse_basic",
-          trimEarly = true
+          trimEarly = true,
+//          procedureTrimDepth = 1,
         ),
         simplify = true,
         staticAnalysis = None,
@@ -329,13 +330,14 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     )
 
     val proc = res.ir.program.mainProcedure
+//    val dsg = IntervalDSA.getLocal(proc, res.ir, getSymbolicValues(proc), generateConstraints(proc))
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
     assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
   }
 
 
   test("md5_process_block") {
-    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val path = "examples/cntlm-o3/cntlm-noduk"
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
@@ -357,7 +359,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("acl_check") {
-    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val path = "examples/cntlm-o3/cntlm-noduk"
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
