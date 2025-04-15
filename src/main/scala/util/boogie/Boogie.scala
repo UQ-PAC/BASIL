@@ -151,7 +151,7 @@ def boogieBatchQuery(boogieFileNames: Iterable[String], proc: Option[String] = N
   val procSelect = proc.toSeq.flatMap(p => Seq("/proc", p))
   val x = "/proverOpt:C:combined_solver.solver2_timeout=3"
   val boogieCmd =
-    Seq("boogie", "/vcsSplitOnEveryAssert", "/timeLimit", timeout.toString, x) ++  boogieFileNames ++  procSelect
+    Seq("boogie", "/timeLimit", timeout.toString, x) ++ boogieFileNames ++ procSelect
   Logger.info(s"Batch proving ${boogieCmd.mkString(" ")}")
   val output = boogieCmd.!!
 

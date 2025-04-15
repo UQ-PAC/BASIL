@@ -8,6 +8,30 @@ val inlineAttr = BAttribute("inline")
 type BasilIRFunctionOp = BoolToBV1Op | BVFunctionOp | MemoryLoadOp | MemoryStoreOp | ByteExtract | InBounds |
   BUninterpreted
 
+def genFunctionOpDefinitionAxiomOps(
+  f: BasilIRFunctionOp,
+  memory: BoogieMemoryAccessMode = BoogieMemoryAccessMode.SuccessiveStoreSelect
+): Iterable[BDeclaration] = f match {
+  case b: BVFunctionOp => {
+    val iters = b.in.zipWithIndex.map((v, i) => BVariable(s"arg$i", v.getType, Scope.Local))
+    val impl = BFunction(b.name + "_impl", b.in, b.out, None, List(externAttr, b.attribute))
+    val func = BFunction(b.name, b.in, b.out, None, List(externAttr))
+    val axiom = BAxiom(
+      ForAll(
+        iters,
+        BinaryBExpr(
+          BVEQ,
+          BFunctionCall(b.name + "_impl", iters, b.out.getType),
+          BFunctionCall(b.name, iters, b.out.getType)
+        ),
+        List(BFunctionCall(b.name, iters, b.out.getType))
+      )
+    )
+    Seq(impl, func, axiom)
+  }
+  case o => Seq(genFunctionOpDefinition(f, memory))
+}
+
 def genFunctionOpDefinition(
   f: BasilIRFunctionOp,
   memory: BoogieMemoryAccessMode = BoogieMemoryAccessMode.SuccessiveStoreSelect

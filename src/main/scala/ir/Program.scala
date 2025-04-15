@@ -61,7 +61,8 @@ private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extend
 class Program(
   var procedures: ArrayBuffer[Procedure],
   var mainProcedure: Procedure,
-  val initialMemory: mutable.TreeMap[BigInt, MemorySection]
+  val initialMemory: mutable.TreeMap[BigInt, MemorySection],
+  val declarations: mutable.ArrayBuffer[Decl] = mutable.ArrayBuffer()
 ) extends Iterable[CFGPosition] {
 
   val threads: ArrayBuffer[ProgramThread] = ArrayBuffer()

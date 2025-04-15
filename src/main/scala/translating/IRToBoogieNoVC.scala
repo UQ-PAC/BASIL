@@ -136,15 +136,15 @@ object BoogieTranslator {
 
   }
 
-  private def functionOpToDecl(functionOps: Iterable[BDeclaration]): Iterable[BFunction] = {
-    var decls = Set[BFunction]()
+  private def functionOpToDecl(functionOps: Iterable[BDeclaration]): Iterable[BDeclaration] = {
+    var decls = Set[BDeclaration]()
     var oldFops = Set[FunctionOp]()
     var fops: Set[FunctionOp] = functionOps.flatMap(_.functionOps).toSet
 
     while (oldFops != fops) {
       oldFops = fops
-      decls = fops.map {
-        case f: BasilIRFunctionOp => genFunctionOpDefinition(f)
+      decls = fops.flatMap {
+        case f: BasilIRFunctionOp => genFunctionOpDefinitionAxiomOps(f)
         case f => throw Exception(s"function op not supported on direct translation mode : $f")
       }
       val newOps = decls.flatMap(_.functionOps)
@@ -172,6 +172,8 @@ object BoogieTranslator {
         b
       }
       .map(BTypeDecl(_))
+
+    val globalDecls = p.declarations.map(_.toBoogie)
     val globalVarDecls = vvis.globals.map(translateGlobal).map(BVarDecl(_))
 
     val readOnlySections = p.usedMemory.values.filter(_.readOnly)
@@ -184,8 +186,8 @@ object BoogieTranslator {
       case proc => translateProc(readOnlyMemory)(proc)
     }
 
-    val functionOpDefinitions = functionOpToDecl(globalVarDecls ++ procs)
-    val decls = globalVarDecls.toList ++ functionOpDefinitions ++ procs
+    val functionOpDefinitions = functionOpToDecl(globalDecls ++ globalVarDecls ++ procs)
+    val decls = globalVarDecls.toList ++ globalDecls ++ functionOpDefinitions ++ procs
 
     BProgram(typeDecls.toList ++ decls, fname)
   }

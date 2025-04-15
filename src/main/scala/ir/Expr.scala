@@ -323,12 +323,41 @@ enum Endian {
   case BigEndian
 }
 
-case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IRType) extends Expr with CachedHashCode {
+case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IRType, uninterpreted: Boolean = true)
+    extends Expr
+    with CachedHashCode {
   override def getType: IRType = returnType
-  override def toBoogie: BFunctionCall = BFunctionCall(name, params.map(_.toBoogie).toList, returnType.toBoogie, true)
+  override def toBoogie: BFunctionCall =
+    BFunctionCall(name, params.map(_.toBoogie).toList, returnType.toBoogie, uninterpreted)
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitUninterpretedFunction(this)
-  override def variables: Set[Variable] = params.flatMap(_.variables).toSet
+  override def variables: Set[Variable] = params.flatMap(_.variables).toSet // suspect
   override def toString = s"$name(${params.mkString(", ")})"
+}
+
+sealed trait Decl {
+  def toBoogie: BDeclaration
+}
+case class AxiomDecl(e: Expr) extends Decl {
+  def toBoogie = BAxiom(e.toBoogie, List(BAttribute("extern")))
+}
+case class FunctionDecl(
+  name: String,
+  params: List[LocalVar],
+  returnType: IRType,
+  definition: Option[Expr],
+  attribs: List[(String, Option[String])] = List()
+) extends Decl {
+  def toBoogie = BFunction(
+    name,
+    params.map(p => BParam(p.name, p.getType.toBoogie)),
+    BParam(returnType.toBoogie),
+    definition.map(_.toBoogie),
+    attribs.map((n, v) => BAttribute(n, v))
+  )
+  def makeCall(actualParams: List[Expr] = List()) = {
+    require(params.map(_.getType) == actualParams.map(_.getType))
+    UninterpretedFunction(name, actualParams, returnType, false)
+  }
 }
 
 /** Something that has a global scope from the perspective of the IR and Boogie.

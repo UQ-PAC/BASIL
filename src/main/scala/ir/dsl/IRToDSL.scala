@@ -15,6 +15,25 @@ import ir.*
 
 object IRToDSL {
 
+  def parTransitionSystems(p: Program, p1: Procedure, p2: Procedure) = {
+    val entryName = p1.name + "_P_ENTRY"
+    val eproc = EventuallyProcedure(
+      p1.procName + "_par_" + p2.procName,
+      p1.formalInParam.toSeq.map(localVarToTuple).to(SortedMap),
+      p1.formalOutParam.toSeq.map(localVarToTuple).to(SortedMap),
+      Seq(block(entryName, goto(p1.entryBlock.get.label, p2.entryBlock.get.label))) ++ (p1.blocks ++ p2.blocks).toSet
+        .map(convertBlock)
+        .to(ArraySeq),
+      Some(entryName),
+      p2.returnBlock.map(_.label),
+      p1.address
+    )
+
+    val n = eproc.copy(blocks = eproc.blocks).resolve(p)
+    p.procedures.addOne(n)
+    n
+  }
+
   def sequenceTransitionSystems(p: Program, p1: Procedure, p2: Procedure) = {
     val eproc = EventuallyProcedure(
       p1.procName + "_seq_" + p2.procName,

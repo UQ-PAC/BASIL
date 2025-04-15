@@ -77,7 +77,7 @@ enum Interval extends Offsets {
     case (Bot, v) => Bot
   }
   def bvadd(o: Interval) = intadd(o)
-  
+
   def intmul(o: Interval) = (this, o) match {
     case (Value(lo1, hi1), Value(lo2, hi2)) => {
       Value(Seq(lo1 * lo2, lo1 * hi2, hi1 * lo1, hi1 * hi2).min, Seq(lo1 * lo2, lo1 * hi2, hi1 * lo1, hi1 * hi2).max)
@@ -96,7 +96,7 @@ enum Interval extends Offsets {
     case (Value(lo1, hi1), Value(lo2, hi2)) if hi2 <= -1 => {
       Value(Integer.min(hi1 / lo2, hi1 / hi2), Integer.max(lo1 / lo2, lo1 / hi2))
     }
-    case (Value(lo1, hi1), Value(lo2, hi2))  => {
+    case (Value(lo1, hi1), Value(lo2, hi2)) => {
       Top
     }
     case (Top, _) => Top
@@ -104,7 +104,6 @@ enum Interval extends Offsets {
     case (_, Bot) => Bot
     case (Bot, _) => Bot
   }
-
 
   override def toString: String =
     this match
