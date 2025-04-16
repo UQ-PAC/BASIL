@@ -8,12 +8,13 @@ import util.intrusive_list.*
 import translating.serialiseIL
 import eval.BitVectorEval
 
-
-/**
-  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
-  * not guaranteed to be in any defined order. 
+/** Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are not
+  * guaranteed to be in any defined order.
   */
-private class ILForwardIterator(private val begin: IterableOnce[CFGPosition], val walk: IRWalk[CFGPosition, CFGPosition]) extends Iterator[CFGPosition] {
+private class ILForwardIterator(
+  private val begin: IterableOnce[CFGPosition],
+  val walk: IRWalk[CFGPosition, CFGPosition]
+) extends Iterator[CFGPosition] {
   val seen = mutable.Set[CFGPosition]()
   private val stack = mutable.Stack[CFGPosition]()
   stack.pushAll(begin)
@@ -34,9 +35,8 @@ private class ILForwardIterator(private val begin: IterableOnce[CFGPosition], va
   }
 }
 
-/**
-  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
-  * not guaranteed to be in any defined order. 
+/** Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are not
+  * guaranteed to be in any defined order.
   */
 private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extends Iterator[CFGPosition] {
   private val stack = mutable.Stack[CFGPosition]()
@@ -51,22 +51,23 @@ private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extend
 
     stack.pushAll(n match {
       case p: Procedure => p.blocks
-      case b: Block => Seq() ++ b.statements.toSeq ++ Seq(b.jump)
+      case b: Block => b.statements ++ Iterator(b.jump)
       case s: Command => Seq()
     })
     n
   }
 }
 
-
-class Program(var procedures: ArrayBuffer[Procedure],
-              var mainProcedure: Procedure,
-              val initialMemory: mutable.TreeMap[BigInt, MemorySection]) extends Iterable[CFGPosition] {
+class Program(
+  var procedures: ArrayBuffer[Procedure],
+  var mainProcedure: Procedure,
+  val initialMemory: mutable.TreeMap[BigInt, MemorySection]
+) extends Iterable[CFGPosition] {
 
   val threads: ArrayBuffer[ProgramThread] = ArrayBuffer()
   val usedMemory: mutable.Map[BigInt, MemorySection] = mutable.TreeMap()
 
-  def removeProcedure(i: Int) : Unit = {
+  def removeProcedure(i: Int): Unit = {
     val p = procedures(i)
     for (b <- p.blocks) {
       b.deParent()
@@ -74,7 +75,7 @@ class Program(var procedures: ArrayBuffer[Procedure],
     procedures.remove(i)
   }
 
-  def removeProcedure(p: Procedure) : Unit = {
+  def removeProcedure(p: Procedure): Unit = {
     removeProcedure(procedures.indexOf(p))
   }
 
@@ -91,7 +92,7 @@ class Program(var procedures: ArrayBuffer[Procedure],
     val seen = mutable.HashSet[Procedure]()
     val ordering = mutable.HashMap[Procedure, Int]()
 
-    def walk(p: Procedure) : Unit = {
+    def walk(p: Procedure): Unit = {
       seen += p
       for (n <- p.calls) {
         if (!seen.contains(n)) {
@@ -119,7 +120,6 @@ class Program(var procedures: ArrayBuffer[Procedure],
   override def toString(): String = {
     serialiseIL(this)
   }
-
 
   def setModifies(specModifies: Map[String, List[String]]): Unit = {
     val procToCalls: mutable.Map[Procedure, Set[Procedure]] = mutable.Map()
@@ -154,8 +154,10 @@ class Program(var procedures: ArrayBuffer[Procedure],
 
   // this is very crude but the simplest thing for now until we have a more sophisticated specification system that can relate to the IR instead of the Boogie
   def nameToGlobal(name: String): Global = {
-    if ((name.startsWith("R") || name.startsWith("V")) && (name.length == 2 || name.length == 3)
-      && name.substring(1).forall(_.isDigit)) {
+    if (
+      (name.startsWith("R") || name.startsWith("V")) && (name.length == 2 || name.length == 3)
+      && name.substring(1).forall(_.isDigit)
+    ) {
       if (name.startsWith("R")) {
         Register(name, 64)
       } else {
@@ -168,8 +170,7 @@ class Program(var procedures: ArrayBuffer[Procedure],
     }
   }
 
-  /**
-    * Takes all the memory sections we get from the ADT (previously in initialMemory) and restricts initialMemory to
+  /** Takes all the memory sections we get from the ADT (previously in initialMemory) and restricts initialMemory to
     * just the .data section (which contains things such as global variables which are mutable) and puts the .rodata
     * section in readOnlyMemory. It also takes the .rela.dyn entries taken from the readelf output and adds them to the
     * .rodata section, as they are the global offset table entries that we can assume are constant.
@@ -194,10 +195,9 @@ class Program(var procedures: ArrayBuffer[Procedure],
 
   }
 
-  /**
-   * Get an Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
-   * not guaranteed to be in any defined order. 
-   */
+  /** Get an Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are
+    * not guaranteed to be in any defined order.
+    */
   def iterator: Iterator[CFGPosition] = {
     ILLexicalIterator(this.procedures)
   }
@@ -221,7 +221,7 @@ class Program(var procedures: ArrayBuffer[Procedure],
   def initialMemoryLookup(address: BigInt): Option[MemorySection] = memoryLookup(initialMemory, address)
 
   def nameToProcedure: Map[String, Procedure] = {
-    procedures.view.map(p => p.name -> p).toMap
+    procedures.view.map(p => p.procName -> p).toMap
   }
 
   def labelToBlock: Map[String, Block] = {
@@ -229,37 +229,41 @@ class Program(var procedures: ArrayBuffer[Procedure],
   }
 }
 
-
 // if creationSite == None then it is the initial thread
-class ProgramThread(val entry: Procedure,
-                    val procedures: mutable.LinkedHashSet[Procedure],
-                    val creationSite: Option[DirectCall]) {
-}
+class ProgramThread(
+  val entry: Procedure,
+  val procedures: mutable.LinkedHashSet[Procedure],
+  val creationSite: Option[DirectCall]
+)
 
 /*
  * R0 := call procname(R0, R1, R2)
  *
- * procname (R0a, R1a, R2a):  
+ * procname (R0a, R1a, R2a):
  *  ...
  *  return (R0)
  *
-*/
+ */
 
 class Procedure private (
-                  var procName: String,
-                  var address: Option[BigInt],
-                  private var _entryBlock: Option[Block],
-                  private var _returnBlock: Option[Block],
-                  private val _blocks: mutable.LinkedHashSet[Block],
-                  var formalInParam: mutable.SortedSet[LocalVar],
-                  var formalOutParam: mutable.SortedSet[LocalVar],
-                  var inParamDefaultBinding: immutable.SortedMap[LocalVar, Expr],
-                  var outParamDefaultBinding: immutable.SortedMap[LocalVar, Variable],
-                  var requires: List[BExpr],
-                  var ensures: List[BExpr],
-                ) extends Iterable[CFGPosition] {
+  var procName: String,
+  var address: Option[BigInt],
+  private var _entryBlock: Option[Block],
+  private var _returnBlock: Option[Block],
+  private val _blocks: mutable.LinkedHashSet[Block],
+  var formalInParam: mutable.SortedSet[LocalVar],
+  var formalOutParam: mutable.SortedSet[LocalVar],
+  var inParamDefaultBinding: immutable.SortedMap[LocalVar, Expr],
+  var outParamDefaultBinding: immutable.SortedMap[LocalVar, Variable],
+  var requires: List[BExpr],
+  var ensures: List[BExpr],
+  var requiresExpr: List[Expr],
+  var ensuresExpr: List[Expr]
+) extends Iterable[CFGPosition] {
 
-  def name = procName + address.map("_" + _).getOrElse("") 
+  def name = procName + address.map("_" + _).getOrElse("")
+
+  var stackSize: Option[Int] = None
 
   private val _callers = mutable.HashSet[DirectCall]()
   _blocks.foreach(_.parent = this)
@@ -267,32 +271,67 @@ class Procedure private (
   require(_returnBlock.forall(b => _blocks.contains(b)) && _entryBlock.forall(b => _blocks.contains(b)))
   require(_blocks.isEmpty == _entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
 
-  def this(name: String, address: Option[BigInt] = None , entryBlock: Option[Block] = None, 
-      returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), 
-      formalInParam: IterableOnce[LocalVar] = ArrayBuffer(), formalOutParam: IterableOnce[LocalVar] = ArrayBuffer(), 
-      inParamDefaultBinding: Map[LocalVar, Expr] = Map(), outParamDefaultBinding: Map[LocalVar, Variable] = Map(), 
-      requires: IterableOnce[BExpr] = ArrayBuffer(), ensures: IterableOnce[BExpr] = ArrayBuffer()) = {
-    this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), mutable.SortedSet.from(formalInParam), mutable.SortedSet.from(formalOutParam), 
-      immutable.SortedMap.from(inParamDefaultBinding), immutable.SortedMap.from(outParamDefaultBinding),
-      List.from(requires), List.from(ensures))
+  def this(
+    name: String,
+    address: Option[BigInt] = None,
+    entryBlock: Option[Block] = None,
+    returnBlock: Option[Block] = None,
+    blocks: Iterable[Block] = ArrayBuffer(),
+    formalInParam: IterableOnce[LocalVar] = ArrayBuffer(),
+    formalOutParam: IterableOnce[LocalVar] = ArrayBuffer(),
+    inParamDefaultBinding: Map[LocalVar, Expr] = Map(),
+    outParamDefaultBinding: Map[LocalVar, Variable] = Map(),
+    requires: IterableOnce[BExpr] = ArrayBuffer(),
+    ensures: IterableOnce[BExpr] = ArrayBuffer()
+  ) = {
+    this(
+      name,
+      address,
+      entryBlock,
+      returnBlock,
+      mutable.LinkedHashSet.from(blocks),
+      mutable.SortedSet.from(formalInParam),
+      mutable.SortedSet.from(formalOutParam),
+      immutable.SortedMap.from(inParamDefaultBinding),
+      immutable.SortedMap.from(outParamDefaultBinding),
+      List.from(requires),
+      List.from(ensures),
+      List(),
+      List()
+    )
+  }
+
+  def normaliseBlockNames() = {
+    var counter = 0
+    var loopCounter = 0
+    ir.transforms.reversePostOrder(this)
+    val bl = Array.from(blocks).sortInPlaceBy(_.rpoOrder)
+    for (b <- bl) {
+      counter += 1
+      val loop = if b.isLoopHeader() then {
+        loopCounter += 1
+        "_loop_header_" + loopCounter
+      } else ""
+
+      b.label = name + "_" + counter + loopCounter
+
+    }
+
   }
 
   def makeCall(label: Option[String] = None) = DirectCall(this, label, outParamDefaultBinding, inParamDefaultBinding)
 
-  var isExternal : Option[Boolean] = None
-  var stackSize : Option[Int] = None
+  var isExternal: Option[Boolean] = None
 
-  /**
-   * Get an Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
-   * not guaranteed to be in any defined order. 
-   */
+  /** Get an Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are
+    * not guaranteed to be in any defined order.
+    */
   def iterator: Iterator[CFGPosition] = {
     ILLexicalIterator(Seq(this))
   }
 
-  /**
-   * Iterate in cfg pre order.
-   */
+  /** Iterate in cfg pre order.
+    */
   def preOrderIterator: Iterator[CFGPosition] = {
     ILForwardIterator(Seq(this), IntraProcIRCursor)
   }
@@ -303,10 +342,9 @@ class Procedure private (
 
   def calls: Set[Procedure] = blocks.iterator.flatMap(_.calls).toSet
 
-  /**
-   * Block iteration order is defined such that that the entryBlock is first, and no order is defined beyond that.
-   * Both entry block and return block are elements of _blocks.
-   */
+  /** Block iteration order is defined such that that the entryBlock is first, and no order is defined beyond that. Both
+    * entry block and return block are elements of _blocks.
+    */
   def blocks: Iterator[Block] = _blocks.iterator
 
   def addCaller(c: DirectCall): Unit = {
@@ -322,7 +360,7 @@ class Procedure private (
   def returnBlock_=(value: Block): Unit = {
     if (!returnBlock.contains(value)) {
       _returnBlock.foreach(removeBlocks)
-      _returnBlock = Some(addBlocks(value))
+      _returnBlock = Some(addBlock(value))
     }
   }
 
@@ -330,12 +368,11 @@ class Procedure private (
 
   def entryBlock_=(value: Block): Unit = {
     if (!entryBlock.contains(value)) {
-      _entryBlock.foreach(removeBlocks)
-      _entryBlock = Some(addBlocks(value))
+      _entryBlock = Some(addBlock(value))
     }
   }
 
-  def addBlocks(block: Block): Block = {
+  def addBlock(block: Block): Block = {
     if (!_blocks.contains(block)) {
       block.parent = this
       _blocks.add(block)
@@ -345,7 +382,7 @@ class Procedure private (
 
   def addBlocks(blocks: Iterable[Block]): Unit = {
     for (elem <- blocks) {
-      addBlocks(elem)
+      addBlock(elem)
     }
   }
 
@@ -356,7 +393,7 @@ class Procedure private (
       val isReturn: Boolean = returnBlock.contains(oldBlock)
       val incoming = oldBlock.incomingJumps
       removeBlocksDisconnect(oldBlock)
-      addBlocks(block)
+      addBlock(block)
       for (elem <- incoming) {
         elem.addTarget(block)
       }
@@ -366,24 +403,26 @@ class Procedure private (
     block
   }
 
-  /**
-   * Removes all blocks and replaces them with the provided iterator.
-   *
-   * @param newBlocks the new set of blocks
-   * @return an iterator to the new block set
-   */
+  /** Removes all blocks and replaces them with the provided iterator.
+    *
+    * @param newBlocks
+    *   the new set of blocks
+    * @return
+    *   an iterator to the new block set
+    */
   def replaceBlocks(newBlocks: Iterable[Block]): Unit = {
     clearBlocks()
     addBlocks(newBlocks)
   }
 
-  /**
-   * Removes a block assuming no existing blocks jump to it.
-   * @param block the block to remove
-   * @return the removed block
-   */
+  /** Removes a block assuming no existing blocks jump to it.
+    * @param block
+    *   the block to remove
+    * @return
+    *   the removed block
+    */
   def removeBlocks(block: Block): Block = {
-    require(_blocks.contains(block)) 
+    require(_blocks.contains(block))
     require(block.incomingJumps.isEmpty) // don't leave jumps dangling
     block.deParent()
     _blocks.remove(block)
@@ -396,11 +435,10 @@ class Procedure private (
     block
   }
 
-
-  /**
-   * Remove block(s) and all jumps that target it
-   * @param blocks the blocks to remove
-   */
+  /** Remove block(s) and all jumps that target it
+    * @param blocks
+    *   the blocks to remove
+    */
   def removeBlocksDisconnect(blocks: Iterable[Block]): Unit = {
     for (elem <- blocks) {
       for (j <- elem.incomingJumps) {
@@ -413,7 +451,6 @@ class Procedure private (
   def removeBlocksDisconnect(blocks: Block*): Unit = {
     removeBlocksDisconnect(blocks.toSeq)
   }
-  
 
   def removeBlocks(blocks: IterableOnce[Block]): Unit = {
     for (elem <- blocks.iterator) {
@@ -454,9 +491,8 @@ class Procedure private (
     reachable.toSet
   }
 
-  /**
-   * SSA Form
-   */
+  /** SSA Form
+    */
 
   var ssaCount = 0
   def getFreshSSAVar(name: String, ty: IRType) = {
@@ -467,19 +503,25 @@ class Procedure private (
 }
 
 class Block private (
- val label: String,
- val address: Option[BigInt],
- val statements: IntrusiveList[Statement],
- private var _jump: Jump,
- private val _incomingJumps: mutable.HashSet[GoTo],
+  var label: String,
+  val address: Option[BigInt],
+  val statements: IntrusiveList[Statement],
+  private var _jump: Jump,
+  private val _incomingJumps: mutable.HashSet[GoTo]
 ) extends HasParent[Procedure] {
+  var atomicSection: Option[AtomicSection] = None
   _jump.setParent(this)
   statements.foreach(_.setParent(this))
 
   statements.onInsert = x => x.setParent(this)
   statements.onRemove = x => x.deParent()
 
-  def this(label: String, address: Option[BigInt] = None, statements: IterableOnce[Statement] = Set.empty, jump: Jump = GoTo(Set.empty)) = {
+  def this(
+    label: String,
+    address: Option[BigInt] = None,
+    statements: IterableOnce[Statement] = Set.empty,
+    jump: Jump = GoTo(Set.empty)
+  ) = {
     this(label, address, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty)
   }
 
@@ -487,12 +529,12 @@ class Block private (
   def isEntry: Boolean = parent.entryBlock.contains(this)
 
   var inLoop: Set[Loop] = Set()
-  def isLoopHeader () = inLoop.exists(x => x.header == this)
-  def isLoopParticipant () = inLoop.nonEmpty
+  def isLoopHeader() = inLoop.exists(x => x.header == this)
+  def isLoopParticipant() = inLoop.nonEmpty
 
   def jump: Jump = _jump
 
-  var rpoOrder : Long = -1
+  var rpoOrder: Long = -1
 
   private def jump_=(j: Jump): Unit = {
     require(!j.hasParent)
@@ -516,18 +558,18 @@ class Block private (
   def incomingJumps: immutable.Set[GoTo] = _incomingJumps.toSet
 
   def addIncomingJump(g: GoTo): Boolean = _incomingJumps.add(g)
-  
+
   def removeIncomingJump(g: GoTo): Unit = {
     _incomingJumps.remove(g)
     assert(!incomingJumps.contains(g))
   }
 
-  def calls: Set[Procedure] = statements.toSet.collect {
-    case d: DirectCall => d.target
+  def calls: Set[Procedure] = statements.toSet.collect { case d: DirectCall =>
+    d.target
   }
 
   def modifies: Set[Global] = statements.flatMap(_.modifies).toSet
-  //def locals: Set[Variable] = statements.flatMap(_.locals).toSet ++ jumps.flatMap(_.locals).toSet
+  // def locals: Set[Variable] = statements.flatMap(_.locals).toSet ++ jumps.flatMap(_.locals).toSet
 
   def calledBy: Set[Block] = {
     Set.empty
@@ -538,9 +580,9 @@ class Block private (
     s"Block $label with $statementsString\n$jump"
   }
 
-  /**
-   * @return The intra-procedural set of successor blocks. If the block ends in a call then the empty set is returned.
-   */
+  /** @return
+    *   The intra-procedural set of successor blocks. If the block ends in a call then the empty set is returned.
+    */
   def nextBlocks: Iterable[Block] = {
     jump match {
       case c: GoTo => c.targets
@@ -548,18 +590,18 @@ class Block private (
     }
   }
 
-  /**
-   * @return The intra-procedural set of predecessor blocks.
-   */
+  /** @return
+    *   The intra-procedural set of predecessor blocks.
+    */
   def prevBlocks: Iterable[Block] = {
     incomingJumps.map(_.parent)
   }
 
-  /**
-   * If the block has a single block successor then this returns that block, otherwise None.
-   *
-   * @return The successor block if there is exactly one
-   */
+  /** If the block has a single block successor then this returns that block, otherwise None.
+    *
+    * @return
+    *   The successor block if there is exactly one
+    */
   def singleSuccessor: Option[Block] = {
     jump match {
       case c: GoTo if c.targets.size == 1 => c.targets.headOption
@@ -567,11 +609,11 @@ class Block private (
     }
   }
 
-  /**
-   * If the block has a single block predecessor then this returns that block, otherwise None.
-   *
-   * @return The predecessor block if there is exactly one
-   */
+  /** If the block has a single block predecessor then this returns that block, otherwise None.
+    *
+    * @return
+    *   The predecessor block if there is exactly one
+    */
   def singlePredecessor: Option[Block] = {
     if incomingJumps.size == 1 then {
       incomingJumps.headOption.map(_.parent)
@@ -594,11 +636,19 @@ class Block private (
     jump.deParent()
   }
 
+  def createBlockAfter(suffix: String): Block = {
+    val nb = Block(label + suffix)
+    parent.addBlock(nb)
+    val ojump = jump
+    replaceJump(GoTo(nb))
+    nb.replaceJump(ojump)
+  }
+
   def createBlockBetween(b2: Block, label: String = "_goto_"): Block = {
     require(nextBlocks.toSet.contains(b2))
     val b1 = this
     val nb = Block(b1.label + label + b2.label)
-    b1.parent.addBlocks(nb)
+    b1.parent.addBlock(nb)
     b1.jump match {
       case g: GoTo => {
         g.addTarget(nb)
@@ -610,17 +660,16 @@ class Block private (
     nb
   }
 
-  def createBlockOnEdgeWith(b2: Block, label: String = "_goto_") : Block = {
-    require((nextBlocks ++ prevBlocks).find(_ == b2).isDefined)
-    if (nextBlocks.find(_ == b2).isDefined) {
+  def createBlockOnEdgeWith(b2: Block, label: String = "_goto_"): Block = {
+    require((nextBlocks ++ prevBlocks).exists(_ == b2))
+    if (nextBlocks.exists(_ == b2)) {
       createBlockBetween(b2, label)
-    } else if (prevBlocks.find(_ == b2).isDefined) {
+    } else if (prevBlocks.exists(_ == b2)) {
       b2.createBlockBetween(this, "_goto_")
     } else {
       throw IllegalArgumentException(s"This block does not have edge with ${b2.label}")
     }
   }
-
 
 }
 
@@ -630,15 +679,25 @@ object Block {
   }
 }
 
-/**
-  * @param name name
-  * @param address initial offset of memory section
-  * @param size number of bytes
-  * @param bytes sequence of bytes represented by BitVecLiterals of size 8
+/** @param name
+  *   name
+  * @param address
+  *   initial offset of memory section
+  * @param size
+  *   number of bytes
+  * @param bytes
+  *   sequence of bytes represented by BitVecLiterals of size 8
   */
-case class MemorySection(name: String, address: BigInt, size: Int, bytes: Seq[BitVecLiteral], readOnly: Boolean, region: Option[MergedRegion] = None) {
+case class MemorySection(
+  name: String,
+  address: BigInt,
+  size: Int,
+  bytes: Seq[BitVecLiteral],
+  readOnly: Boolean,
+  region: Option[MergedRegion] = None
+) {
 
-  def canGetBytes(addr: BigInt, num: Int) : Boolean = {
+  def canGetBytes(addr: BigInt, num: Int): Boolean = {
     (addr >= address) && (addr + num < (address + size))
   }
 
@@ -647,10 +706,32 @@ case class MemorySection(name: String, address: BigInt, size: Int, bytes: Seq[Bi
     for (i <- 0 until num) yield {
       val index = startIndex + i
       if (index >= bytes.size || index < 0) {
-        throw Exception(s"can't get $num bytes from section $name with size $size starting at index $startIndex (access address $addr)")
+        throw Exception(
+          s"can't get $num bytes from section $name with size $size starting at index $startIndex (access address $addr)"
+        )
       }
       bytes(index)
     }
   }
 
+}
+
+class AtomicSection(start: Block, end: Block, blocks: mutable.Set[Block]) {
+  def isStart(b: Block): Boolean = {
+    if (start == b) {
+      true
+    } else {
+      false
+    }
+  }
+
+  def isEnd(b: Block): Boolean = {
+    if (end == b) {
+      true
+    } else {
+      false
+    }
+  }
+
+  def getBlocks: mutable.Set[Block] = blocks
 }

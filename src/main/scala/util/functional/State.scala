@@ -1,9 +1,9 @@
 package util.functional
-import util.Logger
+import util.{GenericLogger, LogLevel}
 import sourcecode.Line, sourcecode.FileName
 import java.io.*
 
-val monlog = Logger.deriveLogger("statemonad")
+val monlog = GenericLogger("monad", LogLevel.ERROR, System.out, System.console() != null)
 
 /*
  * Flattened state monad with error.
@@ -20,10 +20,10 @@ case class State[S, A, E](f: S => (S, Either[E, A])) {
   def flatMap[B](
     f: A => State[S, B, E]
   )(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): State[S, B, E] = State(s => {
-    monlog.debug(s"State.flatMap ${file.value}:${line.value}")
+    // monlog.debug(s"State.flatMap ${file.value}:${line.value}")
     val (s2, a) = this.f(s)
     val r = a match {
-      case Left(l)  => (s2, Left(l))
+      case Left(l) => (s2, Left(l))
       case Right(a) => f(a).f(s2)
     }
     r
@@ -33,7 +33,7 @@ case class State[S, A, E](f: S => (S, Either[E, A])) {
     State(s => {
       val (s2, a) = this.f(s)
       a match {
-        case Left(l)  => (s2, Left(l))
+        case Left(l) => (s2, Left(l))
         case Right(a) => (s2, Right(f(a)))
       }
     })
@@ -43,14 +43,23 @@ case class State[S, A, E](f: S => (S, Either[E, A])) {
     State(s => {
       val (s2, a) = this.f(s)
       a match {
-        case Left(l)  => f(l).f(s2)
+        case Left(l) => f(l).f(s2)
         case Right(_) => (s2, a)
       }
     })
   }
+
+  def catchE[A2](f: Either[E, A] => State[S, A2, E]): State[S, A2, E] = {
+    State(s => {
+      val (s2, a) = this.f(s)
+      f(a).f(s2)
+    })
+  }
+
 }
 
 object State {
+
   def get[S, A, E](f: S => A): State[S, A, E] = State(s => (s, Right(f(s))))
   def getE[S, A, E](f: S => Either[E, A]): State[S, A, E] = State(s => (s, f(s)))
   def getS[S, E]: State[S, S, E] = State((s: S) => (s, Right(s)))
@@ -59,7 +68,7 @@ object State {
   def modifyE[S, E](f: S => Either[E, S]): State[S, Unit, E] = State(s =>
     f(s) match {
       case Right(ns) => (ns, Right(()))
-      case Left(e)   => (s, Left(e))
+      case Left(e) => (s, Left(e))
     }
   )
   def execute[S, A, E](s: S, c: State[S, A, E])(implicit
@@ -67,7 +76,7 @@ object State {
     file: sourcecode.FileName,
     name: sourcecode.Name
   ): S = {
-    Logger.debug(s"state.execute")(line, file, name)
+    // monlog.debug(s"state.execute")(line, file, name)
     c.f(s) match {
       case (s, Left(r)) => {
         monlog.info(s"ERROR: $r")
@@ -86,7 +95,7 @@ object State {
   )(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): State[S, A, E] = {
     a match {
       case Left(l) => monlog.info(s"pureE error $l")(line, file, name)
-      case _       => ()
+      case _ => ()
     }
     State((s: S) => (s, a))
   }
@@ -109,7 +118,7 @@ object State {
     file: sourcecode.FileName,
     name: sourcecode.Name
   ): State[S, List[B], E] = {
-    monlog.debug(s"State.mapM (${xs.size} items) ${file.value}:${line.value}")
+    // monlog.debug(s"State.mapM (${xs.size} items) ${file.value}:${line.value}")
     xs.foldRight(pure(List[B]()))((b, acc) => acc.flatMap(c => m(b).map(v => v :: c)))
   }
 

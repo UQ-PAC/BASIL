@@ -9,18 +9,24 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
 /** Identifies stack and heap regions.
- *
- * This is iterated until results reach a fixpoint.
- * Subsequent runs may refine the definition of global data regions as well.
- *
- * @param program
- * @param domain reachable parts of the program
- * @param constantProp constant propagation results
- * @param reachingDefs maps each CFG node to two maps: variable definitions and variables uses.
- * @param graResult results from global region analysis.
- * @param mmm preloaded globals from symbol table.
- * @param vsaResult extra information from VSA results of previous passes.
- */
+  *
+  * This is iterated until results reach a fixpoint. Subsequent runs may refine the definition of global data regions as
+  * well.
+  *
+  * @param program
+  * @param domain
+  *   reachable parts of the program
+  * @param constantProp
+  *   constant propagation results
+  * @param reachingDefs
+  *   maps each CFG node to two maps: variable definitions and variables uses.
+  * @param graResult
+  *   results from global region analysis.
+  * @param mmm
+  *   preloaded globals from symbol table.
+  * @param vsaResult
+  *   extra information from VSA results of previous passes.
+  */
 trait MemoryRegionAnalysis(
   val program: Program,
   val domain: Set[CFGPosition],
@@ -37,7 +43,7 @@ trait MemoryRegionAnalysis(
 
   private def nextMallocCount(size: BigInt) = {
     val start = mallocCount
-    mallocCount += (size.toDouble/8).ceil.toInt + 1
+    mallocCount += (size.toDouble / 8).ceil.toInt + 1
     (s"malloc_$mallocCount", start)
   }
 
@@ -46,14 +52,16 @@ trait MemoryRegionAnalysis(
     s"stack_$stackCount"
   }
 
-  /**
-   * Controls the pool of stack regions. Each pool is unique to a function.
-   * If the offset has already been defined in the context of the function, then the same region is returned.
-   *
-   * @param base   : the offset
-   * @param parent : the function entry node
-   * @return the stack region corresponding to the offset
-   */
+  /** Controls the pool of stack regions. Each pool is unique to a function. If the offset has already been defined in
+    * the context of the function, then the same region is returned.
+    *
+    * @param base
+    *   : the offset
+    * @param parent
+    *   : the function entry node
+    * @return
+    *   the stack region corresponding to the offset
+    */
   private def poolMaster(base: BigInt, stackBase: Procedure, subAccess: BigInt): StackRegion = {
     assert(subAccess >= 0)
     val stackPool = stackMap.getOrElseUpdate(stackBase, mutable.HashMap())
@@ -65,7 +73,8 @@ trait MemoryRegionAnalysis(
       stackPool += (base -> newRegion)
       newRegion
     }
-    mmm.stackSubAccesses(region) = mmm.stackSubAccesses.getOrElse(region, mutable.Set()) += (subAccess.toDouble/8).ceil.toInt
+    mmm.stackSubAccesses(region) =
+      mmm.stackSubAccesses.getOrElse(region, mutable.Set()) += (subAccess.toDouble / 8).ceil.toInt
     region
   }
 
@@ -94,12 +103,17 @@ trait MemoryRegionAnalysis(
 
   val stackLattice: PowersetLattice[StackRegion] = PowersetLattice()
   val stackPointerLattice: PowersetLattice[Variable] = PowersetLattice()
-  val stackTupleLattice: TupleLattice[PowersetLattice[StackRegion], PowersetLattice[Variable], Set[StackRegion], Set[Variable]] = TupleLattice(stackLattice, stackPointerLattice)
+  val stackTupleLattice
+    : TupleLattice[PowersetLattice[StackRegion], PowersetLattice[Variable], Set[StackRegion], Set[Variable]] =
+    TupleLattice(stackLattice, stackPointerLattice)
 
   val heapLattice: PowersetLattice[HeapRegion] = PowersetLattice()
-  val tupleLattice: TupleLattice[stackTupleLattice.type, heapLattice.type, (Set[StackRegion], Set[Variable]), Set[HeapRegion]] = TupleLattice(stackTupleLattice, heapLattice)
+  val tupleLattice
+    : TupleLattice[stackTupleLattice.type, heapLattice.type, (Set[StackRegion], Set[Variable]), Set[HeapRegion]] =
+    TupleLattice(stackTupleLattice, heapLattice)
 
-  val lattice: MapLattice[CFGPosition, ((Set[StackRegion], Set[Variable]), Set[HeapRegion]), tupleLattice.type] = MapLattice(tupleLattice)
+  val lattice: MapLattice[CFGPosition, ((Set[StackRegion], Set[Variable]), Set[HeapRegion]), tupleLattice.type] =
+    MapLattice(tupleLattice)
 
   val first: Set[CFGPosition] = Set.empty + program.mainProcedure
 
@@ -118,7 +132,12 @@ trait MemoryRegionAnalysis(
     procedureToHeapRegions.put(directCall, returnRegion)
   }
 
-  def reducibleToRegion(binExpr: BinaryExpr, n: Command, subAccess: BigInt, stackPointerVariables: Set[Variable]): Set[StackRegion] = {
+  def reducibleToRegion(
+    binExpr: BinaryExpr,
+    n: Command,
+    subAccess: BigInt,
+    stackPointerVariables: Set[Variable]
+  ): Set[StackRegion] = {
     val reducedRegions: Set[StackRegion] = binExpr.arg1 match {
       case variable: Variable if !stackPointerVariables.contains(variable) =>
         evaluateExpression(binExpr.arg2, constantProp(n)) match {
@@ -127,10 +146,18 @@ trait MemoryRegionAnalysis(
             val stackRegions = ctx.flatMap {
               case l: LocalAssign => eval(l.rhs, stackPointerVariables, l, subAccess)
               case _: MemoryLoad => Set()
+              case unhandled: DirectCall =>
+                throw Exception(
+                  s"Memory Regions Analysis attempted to retrieve stack regions from direct call, unsupported: $unhandled"
+                )
             }
             for (stackRegion <- stackRegions) yield {
               val negB = bv2SignedInt(b)
-              val nextOffset = bitVectorOpToBigIntOp(binExpr.op, stackRegion.start, negB) // TODO: should the operation be minus if the value is negative?
+              val nextOffset = bitVectorOpToBigIntOp(
+                binExpr.op,
+                stackRegion.start,
+                negB
+              ) // TODO: should the operation be minus if the value is negative?
               poolMaster(nextOffset, IRWalk.procedure(n), subAccess)
             }
           case None =>
@@ -142,7 +169,12 @@ trait MemoryRegionAnalysis(
     reducedRegions
   }
 
-  def reducibleVariable(variable: Variable, n: Command, subAccess: BigInt, stackPointerVariables: Set[Variable]): Set[StackRegion] = {
+  def reducibleVariable(
+    variable: Variable,
+    n: Command,
+    subAccess: BigInt,
+    stackPointerVariables: Set[Variable]
+  ): Set[StackRegion] = {
     val ctx = getDefinition(variable, n, reachingDefs)
 
     // TODO: nicer way to deal with loops (a variable is being incremented in a loop)
@@ -151,6 +183,8 @@ trait MemoryRegionAnalysis(
         i match {
           case l: LocalAssign => eval(l.rhs, stackPointerVariables, l, subAccess)
           case m: MemoryLoad => eval(m.index, stackPointerVariables, m, m.size)
+          case d: DirectCall =>
+            throw Exception(s"attempted to reduce variables from direct call, unssupported: $d")
         }
       } else {
         Set()
@@ -225,12 +259,15 @@ trait MemoryRegionAnalysis(
   }
 
   /** Transfer function for state lattice elements.
-   */
-  def transfer(n: CFGPosition, s: ((Set[StackRegion], Set[Variable]), Set[HeapRegion])): ((Set[StackRegion], Set[Variable]), Set[HeapRegion]) = {
+    */
+  def transfer(
+    n: CFGPosition,
+    s: ((Set[StackRegion], Set[Variable]), Set[HeapRegion])
+  ): ((Set[StackRegion], Set[Variable]), Set[HeapRegion]) = {
     val stackPointerVariables = stackDetection(n, s(0)(1))
     n match {
       case directCall: DirectCall =>
-        if (directCall.target.name == "malloc") {
+        if (directCall.target.procName == "malloc") {
           evaluateExpression(mallocVariable, constantProp(n)) match {
             case Some(b: BitVecLiteral) =>
               val negB = bv2SignedInt(b)
@@ -281,6 +318,15 @@ class MemoryRegionAnalysisSolver(
   mmm: MemoryModelMap,
   vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
 ) extends MemoryRegionAnalysis(program, domain, constantProp, reachingDefs, graResult, mmm, vsaResult)
-  with IRIntraproceduralForwardDependencies
-  with Analysis[Map[CFGPosition, ((Set[StackRegion], Set[Variable]), Set[HeapRegion])]]
-  with SimpleWorklistFixpointSolver[CFGPosition, ((Set[StackRegion], Set[Variable]), Set[HeapRegion]), TupleLattice[TupleLattice[PowersetLattice[StackRegion], PowersetLattice[Variable], Set[StackRegion], Set[Variable]], PowersetLattice[HeapRegion], (Set[StackRegion], Set[Variable]), Set[HeapRegion]]]
+    with IRIntraproceduralForwardDependencies
+    with Analysis[Map[CFGPosition, ((Set[StackRegion], Set[Variable]), Set[HeapRegion])]]
+    with SimpleWorklistFixpointSolver[
+      CFGPosition,
+      ((Set[StackRegion], Set[Variable]), Set[HeapRegion]),
+      TupleLattice[
+        TupleLattice[PowersetLattice[StackRegion], PowersetLattice[Variable], Set[StackRegion], Set[Variable]],
+        PowersetLattice[HeapRegion],
+        (Set[StackRegion], Set[Variable]),
+        Set[HeapRegion]
+      ]
+    ]

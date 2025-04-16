@@ -3,6 +3,7 @@ package analysis.data_structure_analysis
 import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
 import analysis.*
 import ir.*
+import util.Counter
 import boogie.SpecGlobal
 import specification.{ExternalFunction, SymbolTableEntry}
 import util.writeToFile
@@ -11,27 +12,32 @@ import java.math.BigInteger
 import scala.collection.mutable
 import scala.util.control.Breaks.{break, breakable}
 
-/**
- * The local phase of Data Structure Analysis
- * @param proc procedure to be analysed
- * @param symResults result of symbolic access analysis
- * @param constProp
- * @param globals
- * @param globalOffsets
- * @param externalFunctions
- * @param reachingDefs
- * @param writesTo mapping from procedures to registers they change
- * @param params mapping from procedures to their parameters
- */
-class LocalPhase(proc: Procedure,
-                 symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
-                 constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-                 globals: Set[SymbolTableEntry], globalOffsets: Map[BigInt, BigInt],
-                 externalFunctions: Set[ExternalFunction],
-                 reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
-                 writesTo: Map[Procedure, Set[Register]],
-                 params: Map[Procedure, Set[Variable]]
-                ) extends Analysis[Any] {
+/** The local phase of Data Structure Analysis
+  * @param proc
+  *   procedure to be analysed
+  * @param symResults
+  *   result of symbolic access analysis
+  * @param constProp
+  * @param globals
+  * @param globalOffsets
+  * @param externalFunctions
+  * @param reachingDefs
+  * @param writesTo
+  *   mapping from procedures to registers they change
+  * @param params
+  *   mapping from procedures to their parameters
+  */
+class LocalPhase(using Counter)(
+  proc: Procedure,
+  symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
+  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+  globals: Set[SymbolTableEntry],
+  globalOffsets: Map[BigInt, BigInt],
+  externalFunctions: Set[ExternalFunction],
+  reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
+  writesTo: Map[Procedure, Set[Register]],
+  params: Map[Procedure, Set[Variable]]
+) extends Analysis[Any] {
 
   private val mallocRegister = Register("R0", 64)
   private val stackPointer = Register("R31", 64)
@@ -50,28 +56,26 @@ class LocalPhase(proc: Procedure,
     position -> newMap
   }
 
-
-  /**
-   * if an expr is the address of a global location return its corresponding cell
-   *
-   * @param pos IL position where the expression is used
-   */
+  /** if an expr is the address of a global location return its corresponding cell
+    *
+    * @param pos
+    *   IL position where the expression is used
+    */
   def isGlobal(expr: Expr, pos: CFGPosition, size: Int = 0): Option[Cell] = {
     val value = evaluateExpression(expr, constProp(pos))
-    if value.isDefined then
-      graph.getGlobal(value.get.value, size)
-    else
-      None
+    if value.isDefined then graph.getGlobal(value.get.value, size)
+    else None
   }
 
-  /**
-   * if an expr is the address of a stack location return its corresponding cell
-   * @param pos IL position where the expression is used
-   */
-  private def isStack(expr: Expr, pos: CFGPosition, size : Int = 0): Option[Cell] = {
+  /** if an expr is the address of a stack location return its corresponding cell
+    * @param pos
+    *   IL position where the expression is used
+    */
+  private def isStack(expr: Expr, pos: CFGPosition, size: Int = 0): Option[Cell] = {
     expr match
-      case BinaryExpr(_, arg1: Variable, arg2) if varToSym.contains(pos) && varToSym(pos).contains(arg1) &&
-        varToSym(pos)(arg1).exists(s => s.symbolicBase.isInstanceOf[StackLocation]) =>
+      case BinaryExpr(_, arg1: Variable, arg2)
+          if varToSym.contains(pos) && varToSym(pos).contains(arg1) &&
+            varToSym(pos)(arg1).exists(s => s.symbolicBase.isInstanceOf[StackLocation]) =>
         evaluateExpression(arg2, constProp(pos)) match
           case Some(v) =>
             val stackRegions = varToSym(pos)(arg1).filter(s => s.symbolicBase.isInstanceOf[StackLocation])
@@ -81,12 +85,12 @@ class LocalPhase(proc: Procedure,
             }
             Some(res)
           case None => None
-      case arg: Variable if varToSym.contains(pos) && varToSym(pos).contains(arg) &&
-        varToSym(pos)(arg).exists(s => s.symbolicBase.isInstanceOf[StackLocation]) =>
+      case arg: Variable
+          if varToSym.contains(pos) && varToSym(pos).contains(arg) &&
+            varToSym(pos)(arg).exists(s => s.symbolicBase.isInstanceOf[StackLocation]) =>
         val stackRegions = varToSym(pos)(arg).filter(s => s.symbolicBase.isInstanceOf[StackLocation])
-        val res = stackRegions.tail.foldLeft(graph.getStack(stackRegions.head.offset, size)) {
-          (res, sym) =>
-            graph.mergeCells(res, graph.getStack(sym.offset, size))
+        val res = stackRegions.tail.foldLeft(graph.getStack(stackRegions.head.offset, size)) { (res, sym) =>
+          graph.mergeCells(res, graph.getStack(sym.offset, size))
         }
         Some(res)
       case _ => None
@@ -99,48 +103,59 @@ class LocalPhase(proc: Procedure,
     s"malloc_$mallocCount"
   }
 
-  val graph: Graph = Graph(proc, constProp, varToSym, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params)
+  val graph: Graph =
+    Graph(proc, constProp, varToSym, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params)
 
-  /**
-   * Handles unification for instructions of the form R_x = R_y [+ offset] where R_y is a pointer and [+ offset] is optional
-   * @param position the cfg position being visited (note this might be a local assign of the form R_x = R_y [+ offset]
-   *                 or it might be memory load/store where the index is of the form R_y [+ offset]
-   * @param lhs Ev(R_x) if position is local assign or a cell from an empty node if R_y [+ offset] is the index of a memoryStore
-   * @param rhs R_y, reachingDefs(position)(R_y) can be used to find the set of SSA variables that may define R_x
-   * @param pointee if false, the position is local pointer arithmetic therefore Ev(R_y [+ offset]) is merged with lhs
-   *                else, the position is a memory read/write therefore E(Ev(R_y [+ offset])) is merged with lhs
-   * @param offset offset if [+ offset] is present
-   * @return the cell resulting from the unification
-   */
-  private def visitPointerArithmeticOperation(position: CFGPosition, lhs: Cell, rhs: Variable, size: Int, pointee: Boolean = false, offset: BigInt = 0, collapse: Boolean = false): Cell =
+  /** Handles unification for instructions of the form R_x = R_y [+ offset] where R_y is a pointer and [+ offset] is
+    * optional
+    * @param position
+    *   the cfg position being visited (note this might be a local assign of the form R_x = R_y [+ offset] or it might
+    *   be memory load/store where the index is of the form R_y [+ offset]
+    * @param lhs
+    *   Ev(R_x) if position is local assign or a cell from an empty node if R_y [+ offset] is the index of a memoryStore
+    * @param rhs
+    *   R_y, reachingDefs(position)(R_y) can be used to find the set of SSA variables that may define R_x
+    * @param pointee
+    *   if false, the position is local pointer arithmetic therefore Ev(R_y [+ offset]) is merged with lhs else, the
+    *   position is a memory read/write therefore E(Ev(R_y [+ offset])) is merged with lhs
+    * @param offset
+    *   offset if [+ offset] is present
+    * @return
+    *   the cell resulting from the unification
+    */
+  private def visitPointerArithmeticOperation(
+    position: CFGPosition,
+    lhs: Cell,
+    rhs: Variable,
+    size: Int,
+    pointee: Boolean = false,
+    offset: BigInt = 0,
+    collapse: Boolean = false
+  ): Cell =
     // visit all the defining pointer operation on rhs variable first
     reachingDefs(position)(rhs).foreach(visit)
     // get the cells of all the SSA variables in the set
-    val cells: Set[Slice] = graph.getCells(position, rhs).foldLeft(Set[Slice]()) {
-      (col, slice) =>
-        col + Slice(graph.find(slice.cell), slice.internalOffset)
+    val cells: Set[Slice] = graph.getCells(position, rhs).foldLeft(Set[Slice]()) { (col, slice) =>
+      col + Slice(graph.find(slice.cell), slice.internalOffset)
     }
     // merge the cells or their pointees with lhs
-    var result = cells.foldLeft(lhs) {
-      (c, t) =>
-        val cell = t.cell
-        val internalOffset = t.internalOffset
-        if !collapse then  // offset != 0 then // it's R_x = R_y + offset
-          val node = cell.node.get // get the node of R_y
-          var field = offset + cell.offset + internalOffset // calculate the total offset
-          node.addCell(field, size) // add cell there if doesn't already exists
-          if node.collapsed then
-            field = 0
-          graph.mergeCells(c,
-            if pointee then
-              graph.adjust(node.getCell(field).getPointee)
-            else
-              node.getCell(field)
-          )
-        else
-          var node = cell.node.get
-          node = graph.collapseNode(node)
-          graph.mergeCells(c, if pointee then graph.adjust(node.cells(0).getPointee) else node.cells(0))
+    var result = cells.foldLeft(lhs) { (c, t) =>
+      val cell = t.cell
+      val internalOffset = t.internalOffset
+      if !collapse then // offset != 0 then // it's R_x = R_y + offset
+        val node = cell.node.get // get the node of R_y
+        var field = offset + cell.offset + internalOffset // calculate the total offset
+        node.addCell(field, size) // add cell there if doesn't already exists
+        if node.collapsed then field = 0
+        graph.mergeCells(
+          c,
+          if pointee then graph.adjust(node.getCell(field).getPointee)
+          else node.getCell(field)
+        )
+      else
+        var node = cell.node.get
+        node = graph.collapseNode(node)
+        graph.mergeCells(c, if pointee then graph.adjust(node.cells(0).getPointee) else node.cells(0))
 
     }
     if pointee then
@@ -153,25 +168,21 @@ class LocalPhase(proc: Procedure,
           graph.selfCollapse(node)
           //            assert(graph.pointTo.contains(node.getCell(offset))) TODO
           result = graph.find(graph.find(node.getCell(offset)).getPointee.cell)
-        else
-          graph.selfCollapse(node)
+        else graph.selfCollapse(node)
       }
     val resultOffset = result.offset
     graph.selfCollapse(result.node.get)
     graph.handleOverlapping(result.node.get.getCell(result.offset))
 
-  /**
-   * handles unsupported pointer arithmetic by collapsing all the nodes invloved
-   */
+  /** handles unsupported pointer arithmetic by collapsing all the nodes invloved
+    */
   private def unsupportedPointerArithmeticOperation(n: CFGPosition, expr: Expr, lhsCell: Cell): Cell = {
-    val cell = expr.variables.foldLeft(lhsCell) {
-      (c, v) =>
-        val cells: Set[Slice] = graph.getCells(n, v)
+    val cell = expr.variables.foldLeft(lhsCell) { (c, v) =>
+      val cells: Set[Slice] = graph.getCells(n, v)
 
-        cells.foldLeft(c) {
-          (c, p) =>
-            graph.mergeCells(c, p.cell)
-        }
+      cells.foldLeft(c) { (c, p) =>
+        graph.mergeCells(c, p.cell)
+      }
     }
 
     val node = cell.node.get
@@ -181,14 +192,15 @@ class LocalPhase(proc: Procedure,
     node.cells(0)
   }
 
-
-  /**
-   * Performs  overlapping access to the pointer cell while preserving size each dereferenced cell as separate
-   * (not collapsing them together)
-   * @param lhsOrValue either lhs in a load or value in a store
-   * @param pointer the cell which is being dereferenced
-   * @param size size of the dereference
-   */
+  /** Performs overlapping access to the pointer cell while preserving size each dereferenced cell as separate (not
+    * collapsing them together)
+    * @param lhsOrValue
+    *   either lhs in a load or value in a store
+    * @param pointer
+    *   the cell which is being dereferenced
+    * @param size
+    *   size of the dereference
+    */
   def multiAccess(lhsOrValue: Cell, pointer: Cell, size: Int): Cell = {
     // TODO there should be another check here to see we cover the bytesize
     // otherwise can fall back on expanding
@@ -208,21 +220,22 @@ class LocalPhase(proc: Procedure,
 //       graph.handleOverlapping(res)
 //    }
 
-    val collapse = pointer.node.get.cells.filter((offset, _) => offset >= startPointerOffset && offset < startPointerOffset + size).toSeq.sortBy((offset, cell) => offset).size != 1
+    val collapse = pointer.node.get.cells
+      .filter((offset, _) => offset >= startPointerOffset && offset < startPointerOffset + size)
+      .toSeq
+      .sortBy((offset, cell) => offset)
+      .size != 1
     pointer.growSize(size)
     graph.selfCollapse(pointer.node.get)
     if collapse then graph.collapseNode(graph.find(graph.find(pointer).getPointee.node).node)
     graph.mergeCells(lhsOrValue, graph.adjust(graph.find(pointer).getPointee))
   }
 
-
   def visit(n: CFGPosition): Unit = {
-    if visited.contains(n) then
-      return
-    else
-      visited.add(n)
+    if visited.contains(n) then return
+    else visited.add(n)
     n match
-      case DirectCall(target, _, _, _) if target.name == "malloc" => // R0 = Malloc()
+      case DirectCall(target, _, _, _) if target.procName == "malloc" => // R0 = Malloc()
         val size: BigInt = evaluateExpression(mallocRegister, constProp(n)) match
           case Some(value) => value.value
           case None => 0
@@ -255,9 +268,9 @@ class LocalPhase(proc: Procedure,
             case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) => // Rx = Rx + c
               val arg2Offset = evaluateExpression(arg2, constProp(n))
               if op.equals(BVADD) && arg1.equals(stackPointer)
-              && arg2Offset.isDefined && isNegative(arg2Offset.get) then
-                () // the stack is handled prior to this
-              else if /*varToSym.contains(n) &&  varToSym(n).contains(arg1) && */  arg2Offset.isDefined then
+                && arg2Offset.isDefined && isNegative(arg2Offset.get)
+              then () // the stack is handled prior to this
+              else if /*varToSym.contains(n) &&  varToSym(n).contains(arg1) && */ arg2Offset.isDefined then
                 // merge lhs with cell(s) corresponding to (arg1 + arg2) where arg1 is cell and arg2 is an offset
                 val offset = evaluateExpression(arg2, constProp(n)).get.value
                 visitPointerArithmeticOperation(n, lhsCell, arg1, 0, false, offset)
@@ -266,10 +279,10 @@ class LocalPhase(proc: Procedure,
 
             // Rx = Ry merge corresponding cells to Rx and Ry
             case arg: Variable /*if varToSym.contains(n) && varToSym(n).contains(arg)*/ =>
-             visitPointerArithmeticOperation(n, lhsCell, arg, 0)
+              visitPointerArithmeticOperation(n, lhsCell, arg, 0)
             case _ =>
               unsupportedPointerArithmeticOperation(n, expr, lhsCell)
-        
+
       case load @ MemoryLoad(lhs, _, index, _, size, _) => // Rx = Mem[Ry], merge Rx and pointee of Ry (E(Ry))
         val indexUnwrapped = unwrapPaddingAndSlicing(index)
         val lhsCell = graph.adjust(graph.varToCell(n)(lhs))

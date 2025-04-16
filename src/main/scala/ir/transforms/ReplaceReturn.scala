@@ -33,7 +33,7 @@ class ReplaceReturns(insertR30InvariantAssertion: Procedure => Boolean = (_ => t
             val R30Begin = LocalVar("R30_begin", BitVecType(64))
             i.parent.replaceJump(Return())
             if (assertR30Addr) {
-              ChangeTo(List(Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin)), i))
+              ChangeTo(List(Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin), Some("R30 = R30_in")), i))
             } else {
               SkipChildren()
             }
@@ -43,15 +43,15 @@ class ReplaceReturns(insertR30InvariantAssertion: Procedure => Boolean = (_ => t
       case d: DirectCall => {
         (d.predecessor, d.parent.jump) match {
           // d.parent.jump == d.successor,  from singleprocend invariant
-          // case (Some(l: LocalAssign), _) if l.lhs.name == "R30" && l.rhs.isInstanceOf[BitVecLiteral] => SkipChildren() 
-            // ^ we can resolve the exact return target if we are assigning a constant
-            // If we can't find one 
+          // case (Some(l: LocalAssign), _) if l.lhs.name == "R30" && l.rhs.isInstanceOf[BitVecLiteral] => SkipChildren()
+          // ^ we can resolve the exact return target if we are assigning a constant
+          // If we can't find one
           case (_, _: Unreachable) if d.target == d.parent.parent => {
             // recursive tailcall
             val R30Begin = LocalVar("R30_begin", BitVecType(64))
             d.parent.replaceJump(GoTo((d.parent.parent.entryBlock.get)))
             if (assertR30Addr) {
-              ChangeTo(List(Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin)), d))
+              ChangeTo(List(Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin), Some("R30 = R30_in")), d))
             } else {
               SkipChildren()
             }
@@ -60,7 +60,7 @@ class ReplaceReturns(insertR30InvariantAssertion: Procedure => Boolean = (_ => t
             val R30Begin = LocalVar("R30_begin", BitVecType(64))
             d.parent.replaceJump(Return())
             if (assertR30Addr) {
-              ChangeTo(List(Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin)), d))
+              ChangeTo(List(Assert(BinaryExpr(BVEQ, Register("R30", 64), R30Begin), Some("R30 = R30_in")), d))
             } else {
               SkipChildren()
             }
@@ -76,18 +76,24 @@ class ReplaceReturns(insertR30InvariantAssertion: Procedure => Boolean = (_ => t
   override def vjump(j: Jump) = SkipChildren()
 }
 
-def addReturnBlocks(p: Program, toAll: Boolean = false) = {
+def addReturnBlocks(
+  p: Program,
+  toAll: Boolean = false,
+  insertR30InvariantAssertion: Procedure => Boolean = _ => false
+) = {
   p.procedures.foreach(p => {
     val containsReturn = p.blocks.map(_.jump).find(_.isInstanceOf[Return]).isDefined
     if (toAll && p.blocks.isEmpty && p.entryBlock.isEmpty && p.returnBlock.isEmpty) {
       p.returnBlock = (Block(label = p.name + "_basil_return", jump = Return()))
       p.entryBlock = (Block(label = p.name + "_basil_entry", jump = GoTo(p.returnBlock.get)))
     } else if (p.returnBlock.isEmpty && (toAll || containsReturn)) {
-      p.returnBlock = p.addBlocks(Block(label = p.name + "_basil_return", jump = Return()))
+      p.returnBlock = p.addBlock(Block(label = p.name + "_basil_return", jump = Return()))
     }
-    for (eb <- p.entryBlock) {
-      val R30Begin = LocalVar("R30_begin", BitVecType(64))
-      p.entryBlock.get.statements.prepend(LocalAssign(R30Begin, Register("R30", 64)))
+    if (insertR30InvariantAssertion(p)) {
+      for (eb <- p.entryBlock) {
+        val R30Begin = LocalVar("R30_begin", BitVecType(64))
+        p.entryBlock.get.statements.prepend(LocalAssign(R30Begin, Register("R30", 64)))
+      }
     }
   })
 }

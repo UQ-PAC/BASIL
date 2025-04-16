@@ -2,7 +2,7 @@ package util
 import sourcecode.Line, sourcecode.FileName
 import scala.io.AnsiColor
 import collection.mutable.HashSet
-import java.io.*
+import java.io.{File, PrintStream}
 
 enum LogLevel(val id: Int):
   case DEBUG extends LogLevel(0)
@@ -14,9 +14,12 @@ enum LogLevel(val id: Int):
 class GenericLogger(
   val name: String,
   val defaultLevel: LogLevel = LogLevel.INFO,
-  var output: PrintStream = System.out,
+  defaultOutput: => PrintStream = Console.out,
   var ANSIColour: Boolean = true
 ) {
+
+  private var _output = () => defaultOutput
+  def output = _output()
 
   val children: HashSet[GenericLogger] = HashSet()
 
@@ -38,7 +41,7 @@ class GenericLogger(
   def disableColour(setChildren: Boolean = false) = setColour(false, setChildren)
   def enableColour(setChildren: Boolean = false): Unit = setColour(true, setChildren)
 
-  def deriveLogger(sname: String, stream: PrintStream): GenericLogger = {
+  def deriveLogger(sname: String, stream: => PrintStream): GenericLogger = {
     val l = GenericLogger(name + "." + sname, level, stream, ANSIColour)
     children.add(l)
     l
@@ -50,7 +53,7 @@ class GenericLogger(
 
   def deriveLogger(name: String): GenericLogger = deriveLogger(name, output)
 
-  def setOutput(stream: PrintStream) = output = stream
+  def setOutput(stream: => PrintStream) = _output = () => stream
 
   def writeToFile(file: File, content: => String) = {
     if (level.id < LogLevel.OFF.id) {
@@ -84,7 +87,7 @@ class GenericLogger(
 
   private def writeLog(
     logLevel: LogLevel,
-    arg: Any,
+    arg: => Any,
     line: sourcecode.Line,
     file: sourcecode.FileName,
     name: sourcecode.Name
@@ -96,18 +99,18 @@ class GenericLogger(
         else
           logLevel match
             case DEBUG => AnsiColor.RESET
-            case INFO  => AnsiColor.GREEN
-            case WARN  => AnsiColor.YELLOW
+            case INFO => AnsiColor.GREEN
+            case WARN => AnsiColor.YELLOW
             case ERROR => AnsiColor.RED
-            case OFF   => ???
+            case OFF => ???
 
       val showPosition = (logLevel, level) match
         case (_, DEBUG) => true
         case (ERROR, _) => true
-        case (WARN, _)  => true
-        case (INFO, _)  => false
+        case (WARN, _) => true
+        case (INFO, _) => false
         case (DEBUG, _) => false
-        case (OFF, _)   => ???
+        case (OFF, _) => ???
 
       val position = if showPosition then s" [${name.value}@${file.value}:${line.value}]" else ""
 
@@ -135,7 +138,7 @@ class GenericLogger(
     writeLog(LogLevel.INFO, arg, line, file, name)
   }
 
-  def setLevel(logLevel: LogLevel, setChildren: Boolean = true) : GenericLogger = {
+  def setLevel(logLevel: LogLevel, setChildren: Boolean = true): GenericLogger = {
     level = logLevel
     if (setChildren) {
       for (c <- children) {
@@ -160,9 +163,9 @@ class GenericLogger(
 // doesn't work with `mill run`
 def isAConsole = System.console() != null
 
-val Logger = GenericLogger("log", LogLevel.DEBUG, System.out, isAConsole).setLevel(LogLevel.INFO, true)
-val StaticAnalysisLogger = Logger.deriveLogger("analysis", System.out)
-val SimplifyLogger = Logger.deriveLogger("simplify", System.out)
+val Logger = GenericLogger("log", LogLevel.DEBUG, Console.out, isAConsole).setLevel(LogLevel.INFO, true)
+val StaticAnalysisLogger = Logger.deriveLogger("analysis", Console.out)
+val SimplifyLogger = Logger.deriveLogger("simplify", Console.out)
 val DebugDumpIRLogger = Logger.deriveLogger("debugdumpir").setLevel(LogLevel.OFF)
 val AnalysisResultDotLogger = Logger.deriveLogger("analysis-results-dot").setLevel(LogLevel.OFF)
 val VSALogger = StaticAnalysisLogger.deriveLogger("vsa")
@@ -172,5 +175,6 @@ val SteensLogger = StaticAnalysisLogger.deriveLogger("steensgaard")
 val DSALogger = Logger.deriveLogger("DSA", System.out).setLevel(LogLevel.OFF)
 val ConstGenLogger = DSALogger.deriveLogger("Constraint Gen", System.out).setLevel(LogLevel.INFO)
 val SVALogger = DSALogger.deriveLogger("VSA", System.out)
-val SadDSALogger = DSALogger.deriveLogger("SadDSA", System.out)
 val ProcedureSummariesLogger = StaticAnalysisLogger.deriveLogger("procedure-summaries")
+val IntervalDSALogger = DSALogger.deriveLogger("SadDSA", Console.out).setLevel(LogLevel.OFF)
+val StackLogger = Logger.deriveLogger("Stack", Console.out).setLevel(LogLevel.INFO)

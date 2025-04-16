@@ -66,7 +66,7 @@ implementation {:extern} guarantee_reflexive()
   assert (memory_load32_le(mem, $y_addr) == memory_load32_le(mem, $y_addr));
 }
 
-procedure main();
+procedure main_1536();
   modifies Gamma_R0, Gamma_R1, Gamma_mem, R0, R1, mem;
   free requires (memory_load64_le(mem, 69632bv64) == 0bv64);
   free requires (memory_load64_le(mem, 69640bv64) == 69640bv64);
@@ -81,40 +81,40 @@ procedure main();
   free ensures (memory_load64_le(mem, 69616bv64) == 1536bv64);
   free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
 
-implementation main()
+implementation main_1536()
 {
-  var $load$18: bv32;
-  var $load$19: bv32;
-  var Gamma_$load$18: bool;
-  var Gamma_$load$19: bool;
+  var Gamma_load18: bool;
+  var Gamma_load19: bool;
+  var load18: bv32;
+  var load19: bv32;
   lmain:
     assume {:captureState "lmain"} true;
     R0, Gamma_R0 := 69632bv64, true;
     R1, Gamma_R1 := bvadd64(R0, 20bv64), Gamma_R0;
     call rely();
-    $load$18, Gamma_$load$18 := memory_load32_le(mem, bvadd64(R0, 20bv64)), (gamma_load32(Gamma_mem, bvadd64(R0, 20bv64)) || L(mem, bvadd64(R0, 20bv64)));
-    R0, Gamma_R0 := zero_extend32_32($load$18), Gamma_$load$18;
+    load18, Gamma_load18 := memory_load32_le(mem, bvadd64(R0, 20bv64)), (gamma_load32(Gamma_mem, bvadd64(R0, 20bv64)) || L(mem, bvadd64(R0, 20bv64)));
+    R0, Gamma_R0 := zero_extend32_32(load18), Gamma_load18;
     assert Gamma_R0;
     goto lmain_goto_l000001bc, lmain_goto_l00000398;
+  lmain_goto_l00000398:
+    assume {:captureState "lmain_goto_l00000398"} true;
+    assume (bvcomp32(R0[32:0], 0bv32) == 0bv1);
+    call rely();
+    load19, Gamma_load19 := memory_load32_le(mem, bvadd64(R1, 4bv64)), (gamma_load32(Gamma_mem, bvadd64(R1, 4bv64)) || L(mem, bvadd64(R1, 4bv64)));
+    R0, Gamma_R0 := zero_extend32_32(load19), Gamma_load19;
+    goto l00000398;
   l00000398:
     assume {:captureState "l00000398"} true;
-    call rely();
-    $load$19, Gamma_$load$19 := memory_load32_le(mem, bvadd64(R1, 4bv64)), (gamma_load32(Gamma_mem, bvadd64(R1, 4bv64)) || L(mem, bvadd64(R1, 4bv64)));
-    R0, Gamma_R0 := zero_extend32_32($load$19), Gamma_$load$19;
     goto l000001bc;
-  l000001bc:
-    assume {:captureState "l000001bc"} true;
-    goto main_basil_return;
   lmain_goto_l000001bc:
     assume {:captureState "lmain_goto_l000001bc"} true;
     assume (bvcomp32(R0[32:0], 0bv32) != 0bv1);
     goto l000001bc;
-  lmain_goto_l00000398:
-    assume {:captureState "lmain_goto_l00000398"} true;
-    assume (bvcomp32(R0[32:0], 0bv32) == 0bv1);
-    goto l00000398;
-  main_basil_return:
-    assume {:captureState "main_basil_return"} true;
+  l000001bc:
+    assume {:captureState "l000001bc"} true;
+    goto main_1536_basil_return;
+  main_1536_basil_return:
+    assume {:captureState "main_1536_basil_return"} true;
     return;
 }
 

@@ -30,18 +30,27 @@ case class Histogram(bins: List[Int], numBins: Int, minBin: Double, maxBin: Doub
     val maxHeight = bins.max
     val binWidth: Double = histWidth.doubleValue / bins.size
     val heightScaling: Double = histHeight.doubleValue / maxHeight
-    val binPos = (0 to bins.size).map(i => (leftMargin + i * binWidth, binWidth * (i + 1)))
+    val binPos = (0 to bins.size)
+      .map(i => (leftMargin + i * binWidth, binWidth * (i + 1)))
       .zip(bins.map(bh => heightScaling * bh))
 
     val rects = binPos.map((binXX, height) =>
-      mkRect(binWidth.ceil.intValue, height.intValue, binXX(0).floor.intValue, histHeight.intValue - height.intValue + topMargin))
+      mkRect(
+        binWidth.ceil.intValue,
+        height.intValue,
+        binXX(0).floor.intValue,
+        histHeight.intValue - height.intValue + topMargin
+      )
+    )
 
     val labels = {
-      (text(title, imgWidth / 8, topMargin - 5),
+      (
+        text(title, imgWidth / 8, topMargin - 5),
         text("0", 0, histHeight + topMargin),
         text(maxHeight.toString, 0, topMargin),
         text(minBin.toInt.toString, 0, imgHeight),
-        text(maxBin.toInt.toString, (binWidth * bins.size).intValue - leftMargin, imgHeight))
+        text(maxBin.toInt.toString, (binWidth * bins.size).intValue - leftMargin, imgHeight)
+      )
     }
 
     val bg = mkRect(imgWidth, imgHeight, 0, 0, fill = "White")
@@ -60,7 +69,8 @@ object Histogram {
     val maxB = Seq(meanX + 2.25 * stdDevX, xs.max).min
     val (minBin, maxBin) = bounds.getOrElse(minB, maxB)
     val binSize = ((maxBin - minBin) / numBins) * 1.000001
-    val bins = (0 to numBins).map(x => (minBin + x * binSize, minBin + (x + 1) * binSize))
+    val bins = (0 to numBins)
+      .map(x => (minBin + x * binSize, minBin + (x + 1) * binSize))
       .map((left, right) => xs.count(x => x >= left && x < right))
       .toList
     Histogram(bins, numBins, minBin, maxBin)

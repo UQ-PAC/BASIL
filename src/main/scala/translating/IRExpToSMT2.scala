@@ -12,7 +12,8 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
   def vstmt(s: Statement): Repr[Statement] = {
     s match {
       case a: LocalAssign => vassign(vlvar(a.lhs), vexpr(a.rhs))
-      case m: MemoryLoad  => vload(vlvar(m.lhs), m.mem.name, vexpr(m.index), m.endian, m.size)
+      case m: MemoryAssign => vassign(vlvar(m.lhs), vexpr(m.rhs))
+      case m: MemoryLoad => vload(vlvar(m.lhs), m.mem.name, vexpr(m.index), m.endian, m.size)
       case m: MemoryStore => vstore(m.mem.name, vexpr(m.index), vexpr(m.value), m.endian, m.size)
       case c: DirectCall =>
         vcall(
@@ -21,31 +22,34 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
           c.actualParams.toList.map((l, r) => (l, vexpr(r)))
         )
       case i: IndirectCall => vindirect(vrvar(i.target))
-      case a: Assert       => vassert(a)
-      case a: Assume       => vassume(a)
-      case n: NOP          => vnop()
+      case a: Assert => vassert(a)
+      case a: Assume => vassume(a)
+      case n: NOP => vnop()
     }
   }
 
   def vjump(j: Jump): Repr[Jump] = {
     j match {
-      case g: GoTo        => vgoto(g.targets.toList.map(_.label))
+      case g: GoTo => vgoto(g.targets.toList.map(_.label))
       case g: Unreachable => vunreachable()
-      case r: Return      => vreturn(r.outParams.toList.map((l, r) => (vlvar(l), vexpr(r))))
+      case r: Return => vreturn(r.outParams.toList.map((l, r) => (vlvar(l), vexpr(r))))
     }
   }
 
   def vexpr(e: Expr): Repr[Expr] = {
     e match {
-      case n: Literal                               => vliteral(n)
-      case Extract(ed, start, arg)                  => vextract(ed, start, vexpr(arg))
-      case Repeat(repeats, arg)                     => vrepeat(repeats, vexpr(arg))
-      case ZeroExtend(bits, arg)                    => vzeroextend(bits, vexpr(arg))
-      case SignExtend(bits, arg)                    => vsignextend(bits, vexpr(arg))
-      case BinaryExpr(op, arg, arg2)                => vbinary_expr(op, vexpr(arg), vexpr(arg2))
-      case UnaryExpr(op, arg)                       => vunary_expr(op, vexpr(arg))
-      case v: Variable                              => vrvar(v)
+      case n: Literal => vliteral(n)
+      case Extract(ed, start, arg) => vextract(ed, start, vexpr(arg))
+      case Repeat(repeats, arg) => vrepeat(repeats, vexpr(arg))
+      case ZeroExtend(bits, arg) => vzeroextend(bits, vexpr(arg))
+      case SignExtend(bits, arg) => vsignextend(bits, vexpr(arg))
+      case BinaryExpr(op, arg, arg2) => vbinary_expr(op, vexpr(arg), vexpr(arg2))
+      case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
+      case v: Variable => vrvar(v)
       case f @ UninterpretedFunction(n, params, rt) => vuninterp_function(n, params.map(vexpr))
+      case q: QuantifierExpr => ???
+      case q: LambdaExpr => ???
+      case r: OldExpr => ???
     }
   }
 
@@ -108,9 +112,9 @@ trait BasilIRExp[Repr[+_]] {
   def vunary_expr(e: UnOp, arg: Repr[Expr]): Repr[Expr]
   def vliteral(l: Literal): Repr[Literal] = {
     l match {
-      case TrueLiteral      => vboollit(true)
-      case FalseLiteral     => vboollit(false)
-      case v: IntLiteral    => vintlit(v.value)
+      case TrueLiteral => vboollit(true)
+      case FalseLiteral => vboollit(false)
+      case v: IntLiteral => vintlit(v.value)
       case b: BitVecLiteral => vbvlit(b)
     }
   }
@@ -132,7 +136,7 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
 
   def vexpr(e: Expr): Repr[Expr] = {
     e match {
-      case n: Literal              => vliteral(n)
+      case n: Literal => vliteral(n)
       case Extract(ed, start, arg) => vextract(ed, start, vexpr(arg))
       case Repeat(repeats, arg) => {
         vexpr((0 until (repeats - 1)).foldLeft(arg)((acc, n) => BinaryExpr(BVCONCAT, acc, arg)))
@@ -142,14 +146,17 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
         vexpr(BinaryExpr(BVCONCAT, Repeat(bits, Extract(size(arg).get, size(arg).get - 1, arg)), arg))
       case BinaryExpr(op, arg, arg2) =>
         op match {
-          case BVNEQ   => vunary_expr(BoolNOT, vbinary_expr(BVEQ, vexpr(arg), vexpr(arg2)))
-          case IntNEQ  => vunary_expr(BoolNOT, vbinary_expr(IntEQ, vexpr(arg), vexpr(arg2)))
+          case BVNEQ => vunary_expr(BoolNOT, vbinary_expr(BVEQ, vexpr(arg), vexpr(arg2)))
+          case IntNEQ => vunary_expr(BoolNOT, vbinary_expr(IntEQ, vexpr(arg), vexpr(arg2)))
           case BoolNEQ => vunary_expr(BoolNOT, vbinary_expr(BoolEQ, vexpr(arg), vexpr(arg2)))
-          case _       => vbinary_expr(op, vexpr(arg), vexpr(arg2))
+          case _ => vbinary_expr(op, vexpr(arg), vexpr(arg2))
         }
-      case UnaryExpr(op, arg)                       => vunary_expr(op, vexpr(arg))
-      case v: Variable                              => vrvar(v)
+      case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
+      case v: Variable => vrvar(v)
       case f @ UninterpretedFunction(n, params, rt) => vuninterp_function(n, params.map(vexpr))
+      case q: QuantifierExpr => ???
+      case q: LambdaExpr => ???
+      case r: OldExpr => ???
     }
   }
 
@@ -163,7 +170,7 @@ enum Sexp[+T] {
 object Sexp {
 
   def print[T](s: Sexp[T]): String = s match {
-    case Sexp.Symb(a)  => a
+    case Sexp.Symb(a) => a
     case Sexp.Slist(v) => "(" + v.map(print).mkString(" ") + ")"
   }
 }
@@ -191,8 +198,8 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     val query = exprUnsat(e, None, false)
     val res = util.z3.checkSATSMT2(query, softTimeoutMillis)
     res match {
-      case util.z3.SatResult.UNSAT      => Some(true)
-      case util.z3.SatResult.SAT        => Some(false)
+      case util.z3.SatResult.UNSAT => Some(true)
+      case util.z3.SatResult.SAT => Some(false)
       case util.z3.SatResult.Unknown(_) => None
     }
   }
@@ -205,7 +212,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     }
 
     val terms = list(sym("push")) :: BasilIRToSMT2.extractDecls(e)
-      ++ List(assert, list(sym("set-option"), sym(":smt.timeout"), sym("1")), list(sym("check-sat")))
+      ++ List(assert, list(sym("check-sat")))
       ++ (if (getModel) then
             List(list(sym("echo"), sym("\"" + name.getOrElse("") + "  ::  " + e + "\"")), list(sym("get-model")))
           else List())
@@ -216,27 +223,27 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
 
   def unaryOpnameToFun(b: UnOp) = {
     b match {
-      case BoolNOT   => "not"
-      case BVNOT     => "bvnot"
-      case BVNEG     => "bvneg"
-      case IntNEG    => "-"
+      case BoolNOT => "not"
+      case BVNOT => "bvnot"
+      case BVNEG => "bvneg"
+      case IntNEG => "-"
       case BoolToBV1 => "bool2bv1"
     }
   }
 
   def opnameToFun(b: BinOp) = {
     b match {
-      case IntEQ        => "="
-      case BoolEQ       => "="
-      case BVEQ         => "="
-      case BVNEQ        => ???
-      case IntNEQ       => ???
-      case BoolNEQ      => ???
-      case BoolOR       => "or"
-      case BVCONCAT     => "concat"
-      case b: BVBinOp   => "bv" + b.opName
+      case IntEQ => "="
+      case BoolEQ => "="
+      case BVEQ => "="
+      case BVNEQ => ???
+      case IntNEQ => ???
+      case BoolNEQ => ???
+      case BoolOR => "or"
+      case BVCONCAT => "concat"
+      case b: BVBinOp => "bv" + b.opName
       case b: BoolBinOp => b.opName
-      case b: IntBinOp  => b.opName
+      case b: IntBinOp => b.opName
     }
   }
 
@@ -244,7 +251,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     n.map(c =>
       c match {
         case '#' => 'x'
-        case c   => c
+        case c => c
       }
     ).mkString("")
   }
@@ -259,9 +266,9 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
 
   override def vliteral(arg: Literal): Sexp[Literal] = arg match {
     case bv @ BitVecLiteral(value, size) => bv2smt(bv)
-    case IntLiteral(i)                   => sym(i.toString)
-    case TrueLiteral                     => sym("true")
-    case FalseLiteral                    => sym("false")
+    case IntLiteral(i) => sym(i.toString)
+    case TrueLiteral => sym("true")
+    case FalseLiteral => sym("false")
   }
 
   def endianToBool(endian: Endian): Sexp[Expr] = {
@@ -279,9 +286,9 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
 
   def basilTypeToSMTType(v: IRType): Sexp[Expr] = {
     v match {
-      case BoolType        => sym("Bool")
-      case IntType         => sym("Int")
-      case BitVecType(sz)  => list(sym("_"), sym("BitVec"), int2smt(sz))
+      case BoolType => sym("Bool")
+      case IntType => sym("Int")
+      case BitVecType(sz) => list(sym("_"), sym("BitVec"), int2smt(sz))
       case MapType(pt, rt) => list(sym("Array"), basilTypeToSMTType(pt), basilTypeToSMTType(rt))
     }
   }

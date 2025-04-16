@@ -25,7 +25,7 @@ case class StVarLoader[S, F <: Effects[S, InterpreterError]](f: F) extends Loade
       v <- f.loadVar(v.name)
     } yield ((v match {
       case Scalar(l) => Some(l)
-      case _         => None
+      case _ => None
     }))
   }
 
@@ -43,11 +43,11 @@ case class StVarLoader[S, F <: Effects[S, InterpreterError]](f: F) extends Loade
             .map((v: BasilValue) =>
               v match {
                 case Scalar(l) => Some(l)
-                case _         => None
+                case _ => None
               }
             )
         case l: Literal => Eval.loadBV(f)(m.name, Scalar(l), endian, size).map(Some(_))
-        case _          => get((s: S) => None)
+        case _ => get((s: S) => None)
       }
     } yield (r)
   }
@@ -94,7 +94,7 @@ case object Eval {
       res <- evalExpr(f)(e)
       r <- State.pureE(res match {
         case l: Literal => Right(l)
-        case _          => Left((Errored(s"Eval BV residual $e")))
+        case _ => Left((Errored(s"Eval BV residual $e")))
       })
     } yield (r)
   }
@@ -104,7 +104,7 @@ case object Eval {
       res <- evalExpr(f)(e)
       r <- State.pureE(res match {
         case l: BitVecLiteral => Right(l)
-        case _                => Left((Errored(s"Eval BV residual $e")))
+        case _ => Left((Errored(s"Eval BV residual $e")))
       })
     } yield (r)
   }
@@ -114,7 +114,7 @@ case object Eval {
       res <- evalExpr(f)(e)
       r <- State.pureE(res match {
         case l: IntLiteral => Right(l.value)
-        case _             => Left((Errored(s"Eval Int residual $e")))
+        case _ => Left((Errored(s"Eval Int residual $e")))
       })
     } yield (r)
   }
@@ -124,7 +124,7 @@ case object Eval {
       res <- evalExpr(f)(e)
       r <- State.pureE(res match {
         case l: BoolLit => Right(l == TrueLiteral)
-        case _          => Left((Errored(s"Eval Bool residual $e")))
+        case _ => Left((Errored(s"Eval Bool residual $e")))
       })
     } yield (r)
   }
@@ -143,7 +143,7 @@ case object Eval {
       values <- f.loadMem(vname, keys.toList)
       vals = endian match {
         case Endian.LittleEndian => values.reverse
-        case Endian.BigEndian    => values
+        case Endian.BigEndian => values
       }
     } yield (vals.toList)
   }
@@ -208,7 +208,7 @@ case object Eval {
       keys <- State.mapM((i: Int) => State.pureE(BasilValue.unsafeAdd(addr, i)), (0 until values.size))
       vals = endian match {
         case Endian.LittleEndian => values.reverse
-        case Endian.BigEndian    => values
+        case Endian.BigEndian => values
       }
       x <- f.storeMem(vname, keys.zip(vals).toMap)
     } yield (x)
@@ -247,7 +247,7 @@ case object Eval {
       extractVals = (0 until cells).map(i => BitVectorEval.boogie_extract((i + 1) * vsize, i * vsize, value)).toList
       vs = endian match {
         case Endian.LittleEndian => extractVals.map(Scalar(_))
-        case Endian.BigEndian    => extractVals.reverse.map(Scalar(_))
+        case Endian.BigEndian => extractVals.reverse.map(Scalar(_))
       }
 
       keys <- State.mapM((i: Int) => State.pureE(BasilValue.unsafeAdd(addr, i)), (0 until cells))
@@ -270,7 +270,7 @@ case object Eval {
     for {
       srv: BitVecLiteral <- src match {
         case Scalar(b: BitVecLiteral) => State.pure(b)
-        case _                        => State.setError(Errored(s"Not pointer : $src"))
+        case _ => State.setError(Errored(s"Not pointer : $src"))
       }
       c <- f.loadMem(rgn, List(src))
       res <- c.head match {
@@ -284,26 +284,42 @@ case object Eval {
         case _ => State.setError(Errored(s"not byte $c"))
       }
     } yield (res)
+
 }
 
-class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S, InterpreterError](f) {
+enum InterpretReturn {
+  case ReturnVal(outs: Map[LocalVar, Literal])
+  case Void
+}
 
-  def interpretOne: State[S, Boolean, InterpreterError] = {
+class BASILInterpreter[S](f: Effects[S, InterpreterError])
+/*extends Interpreter[S, InterpretReturn, InterpreterError](f) */ {
+
+  def interpretOne: util.functional.State[S, Next[InterpretReturn], InterpreterError] =
+    InterpFuns.interpretContinuation(f)
+
+}
+
+object InterpFuns {
+
+  def interpretContinuation[S, T <: Effects[S, InterpreterError]](
+    f: T
+  ): State[S, Next[InterpretReturn], InterpreterError] = {
     val next = for {
       next <- f.getNext
       _ <- State.pure(Logger.debug(s"$next"))
-      r: Boolean <- (next match {
-        case Intrinsic(tgt)    => LibcIntrinsic.intrinsics(tgt)(f).map(_ => true)
-        case Run(c: Statement) => interpretStatement(f)(c).map(_ => true)
-        case ReturnTo(c)       => interpretReturn(f)(c).map(_ => true)
-        case Run(c: Jump)      => interpretJump(f)(c).map(_ => true)
-        case Stopped()         => State.pure(false)
-        case ErrorStop(e)      => State.pure(false)
+      r: Next[InterpretReturn] <- (next match {
+        case Intrinsic(tgt) => callProcedure(f)(tgt, List()).map(ret => Next.Stop(InterpretReturn.ReturnVal(ret)))
+        case Run(c: Statement) => interpretStatement(f)(c).map(_ => Next.Continue)
+        case ReturnFrom(c) => evaluateReturn(f)(c).map(v => Next.Stop(InterpretReturn.ReturnVal(v)))
+        case Run(c: Jump) => interpretJump(f)(c).map(_ => Next.Continue)
+        case Stopped() => State.pure(Next.Stop(InterpretReturn.Void))
+        case ErrorStop(e) => State.pure(Next.Stop(InterpretReturn.Void))
       })
     } yield (r)
 
     next.flatMapE((e: InterpreterError) => {
-      f.setNext(ErrorStop(e)).map(_ => false)
+      f.setNext(ErrorStop(e)).map(_ => Next.Stop(InterpretReturn.Void))
     })
   }
 
@@ -326,9 +342,9 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
           chosen: List[Assume] <- filterM((a: Assume) => Eval.evalBool(f)(a.body), assumes)
 
           res <- chosen match {
-            case Nil      => State.setError(Errored(s"No jump target satisfied $gt"))
+            case Nil => State.setError(Errored(s"No jump target satisfied $gt"))
             case h :: Nil => f.setNext(Run(h))
-            case h :: tl  => State.setError(Errored(s"More than one jump guard satisfied $gt"))
+            case h :: tl => State.setError(Errored(s"More than one jump guard satisfied $gt"))
           }
         } yield (res)
       case r: Return => {
@@ -350,19 +366,22 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
     }
   }
 
-  def interpretReturn[S, T <: Effects[S, InterpreterError]](f: T)(s: DirectCall): State[S, Unit, InterpreterError] = {
+  /**
+   * Evaluates the formal out params and returns a map totheir values.
+   */
+  def evaluateReturn[S, T <: Effects[S, InterpreterError]](
+    f: T
+  )(returnFrom: ProcSig): State[S, Map[LocalVar, Literal], InterpreterError] = {
     for {
       outs <- State.mapM(
-        ((bindout: (LocalVar, Variable)) => {
+        ((bindout: (LocalVar)) => {
           for {
-            rhs <- Eval.evalLiteral(f)(bindout._1)
-          } yield (bindout._2, rhs)
+            rhs <- Eval.evalLiteral(f)(bindout)
+          } yield (bindout, rhs)
         }),
-        s.outParams
+        returnFrom.formalOutParam
       )
-      c <- State.sequence(State.pure(()), outs.map(m => f.storeVar(m._1.name, m._1.toBoogie.scope, Scalar(m._2))))
-      _ <- f.setNext(Run(s.successor))
-    } yield (c)
+    } yield (outs.toMap)
   }
 
   def interpretStatement[S, T <: Effects[S, InterpreterError]](f: T)(s: Statement): State[S, Unit, InterpreterError] = {
@@ -411,6 +430,7 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
         } yield (n)
       case dc: DirectCall => {
         for {
+          // eval actual
           actualParams <- State.mapM(
             (p: (LocalVar, Expr)) =>
               for {
@@ -418,20 +438,20 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
               } yield (p._1, v),
             dc.actualParams
           )
-          _ <- {
-            if (LibcIntrinsic.intrinsics.contains(dc.target.procName)) {
-              f.call(dc.target.name, Intrinsic(dc.target.procName), ReturnTo(dc))
-            } else if (dc.target.entryBlock.isDefined) {
-              val block = dc.target.entryBlock.get
-              f.call(dc.target.name, Run(block.statements.headOption.getOrElse(block.jump)), ReturnTo(dc))
-            } else {
-              State.setError(EscapedControlFlow(dc))
+          // call procedure (immediately evaluated)
+          ret <- callProcedure(f)(dc.target, actualParams)
+          // assign return values of procedure
+          outs =
+            dc.outParams.map { (formal: LocalVar, lhs: Variable) =>
+              (formal, lhs, ret(formal))
             }
-          }
           _ <- State.sequence(
             State.pure(()),
-            actualParams.map(m => f.storeVar(m._1.name, m._1.toBoogie.scope, Scalar(m._2)))
+            outs.map { (formal, lhs, value) =>
+              f.storeVar(lhs.name, lhs.toBoogie.scope, Scalar(value))
+            }
           )
+          _ <- f.setNext(Run(s.successor))
         } yield ()
       }
       case ic: IndirectCall => {
@@ -440,10 +460,19 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
         } else {
           for {
             addr <- Eval.evalBV(f)(ic.target)
-            fp <- f.evalAddrToProc(addr.value.toInt)
-            _ <- fp match {
-              case Some(fp) => f.call(fp.name, fp.call, Run(ic.successor))
-              case none     => State.setError(EscapedControlFlow(ic))
+            block = ic.parent.parent.blocks.find(_.address.contains(addr.value))
+            _ <- block match {
+              case Some(b: Block) => {
+                f.setNext(Run(IRWalk.firstInBlock(b)))
+              }
+              case None =>
+                for {
+                  fp <- f.evalAddrToProc(addr.value.toInt)
+                  _ <- fp match {
+                    case Some(fp) => f.call(fp.name, fp.call, Run(ic.successor))
+                    case none => State.setError(EscapedControlFlow(ic))
+                  }
+                } yield (())
             }
           } yield ()
         }
@@ -451,9 +480,6 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
       case _: NOP => f.setNext(Run(s.successor))
     }
   }
-}
-
-object InterpFuns {
 
   def initRelocTable[S, T <: Effects[S, InterpreterError]](s: T)(ctx: IRContext): State[S, Unit, InterpreterError] = {
 
@@ -468,9 +494,9 @@ object InterpFuns {
       addr
     }
 
-    for ((fname, fun) <- LibcIntrinsic.intrinsics) {
+    for ((fname, funSig) <- LibcIntrinsic.intrinsicSigs) {
       val name = fname.takeWhile(c => c != '@')
-      x = (name, FunPointer(BitVecLiteral(newAddr(), 64), name, Intrinsic(name))) :: x
+      x = (name, FunPointer(BitVecLiteral(newAddr(), 64), name, Intrinsic(funSig))) :: x
     }
 
     val intrinsics = x.toMap
@@ -537,6 +563,7 @@ object InterpFuns {
       l <- s.storeVar("R30_in", Scope.Global, Scalar(LR))
       l <- s.storeVar("R0", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       l <- s.storeVar("R1", Scope.Global, Scalar(BitVecLiteral(0, 64)))
+
       /** callee saved * */
       l <- s.storeVar("R19", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       l <- s.storeVar("R20", Scope.Global, Scalar(BitVecLiteral(0, 64)))
@@ -548,6 +575,7 @@ object InterpFuns {
       l <- s.storeVar("R26", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       l <- s.storeVar("R27", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       l <- s.storeVar("R28", Scope.Global, Scalar(BitVecLiteral(0, 64)))
+
       /** end callee saved * */
       _ <- s.storeVar("ghost-funtable", Scope.Global, BasilMapValue(Map.empty, MapType(BitVecType(64), BitVecType(64))))
       _ <- IntrinsicImpl.initFileGhostRegions(s)
@@ -586,9 +614,115 @@ object InterpFuns {
     s = State.execute(s, f.call("init_activation", Stopped(), Stopped()))
     s = initMemory(s, "mem", p.initialMemory.values)
     s = initMemory(s, "stack", p.initialMemory.values)
-    mainfun.entryBlock.foreach(startBlock => s = State.execute(s, f.call(mainfun.name, Run(IRWalk.firstInBlock(startBlock)), Stopped())))
-    // l <- State.sequence(State.pure(()), mainfun.formalInParam.toList.map(i => f.storeVar(i.name, i.toBoogie.scope, Scalar(BitVecLiteral(0, size(i).get)))))
     s
+  }
+
+  // case class FunctionCall(target: String, inParams: List[(String, Literal)])
+
+  /*
+   * Calls a procedure that has a return, immediately evaluating the procedure
+   *
+   * Call a function, possibly dispatching to an intrinsic if the
+   * procedure is not resolved, or resolves to a stub.
+   */
+  def callProcedure[S, T <: Effects[S, InterpreterError]](f: T)(
+    targetProc: ProcSig | Procedure,
+    params: Iterable[(LocalVar, Literal)]
+  ): State[S, Map[LocalVar, Literal], InterpreterError] = {
+
+    val actualParams = params.toList.sortBy(p => p._1.name.stripPrefix("R").stripPrefix("V").stripSuffix("_in").toInt)
+
+    val target = targetProc match {
+      case p: Procedure => Some(p)
+      case _ => None
+    }
+    val proc = targetProc match {
+      case p: ProcSig => p
+      case p: Procedure => ProcSig(p.name, p.formalInParam.toList, p.formalOutParam.toList)
+    }
+
+    val call = for {
+      // evaluate actual parms
+      v <- {
+        // perform call and push return stack frame and continuation
+
+        val intrinsicName = target.map(_.procName).getOrElse(proc.name)
+        if (LibcIntrinsic.intrinsicSigs.contains(intrinsicName)) {
+          val intrinsic = LibcIntrinsic.intrinsicSigs(intrinsicName)
+          // TODO if actual.isEmpty then load registes
+          val actual = actualParams.toMap
+
+          for {
+            loadedParams: List[Option[BasilValue]] <-
+              (if (actualParams.nonEmpty) {
+                 // we were passed a list of parameters
+                 State.mapM(
+                   (p: LocalVar) =>
+                     actual.get(p) match {
+                       case Some(v) => State.pure[S, Option[BasilValue], InterpreterError](Some(Scalar(v)))
+                       case None if !intrinsic.variadic =>
+                         State.setError(Errored(s"Undefined intrinsic param $p in call $targetProc"))
+                       case None => State.pure(None)
+                     },
+                   intrinsic.formalInParam
+                 )
+               } else {
+                 // likely not in parameter form, load registers until we get an undefined one
+                 for {
+                   fs <- (State.mapM(
+                     (p: LocalVar) =>
+                       f.loadVar(p.name.stripSuffix("_in")).catchE {
+                         case Left(l) if !intrinsic.variadic =>
+                           State.setError(Errored(s"Undefined intrinsic param $p in call $targetProc ($l)"))
+                         case Left(l) => State.pure(None)
+                         case Right(r) => State.pure(Some(r))
+                       },
+                     intrinsic.formalInParam
+                   ))
+                 } yield (fs)
+               })
+            params: List[BasilValue] = loadedParams.takeWhile(_.isDefined).flatten
+            returnval <- f.callIntrinsic(intrinsic.name, params)
+            outparam = (returnval, proc.formalOutParam) match {
+              case (_, Nil) => Map()
+              case (Some(returnval), h :: Nil) => Map(h -> returnval)
+              case (Some(returnval), h :: tl) =>
+                Map(h -> returnval) ++ tl.map(t => t -> Scalar(BitVecLiteral(1234, size(t).get))).toMap
+              case (None, rs) => rs.map(t => t -> Scalar(BitVecLiteral(1234, size(t).get))).toMap
+            }
+            stores = outparam.map(m => f.storeVar(m._1.name, m._1.toBoogie.scope, m._2))
+            // store out params
+            x <- State.sequence(State.pure(()), stores)
+            x <- f.setNext(ReturnFrom(proc))
+          } yield (())
+        } else if (target.exists(_.entryBlock.isDefined)) {
+          val block = target.get.entryBlock.get
+          f.call(target.get.name, Run(IRWalk.firstInBlock(block)), ReturnFrom(proc))
+        } else {
+          State.setError(Errored(s"call to empty procedure: ${proc.name} / $target"))
+        }
+      }
+      // set actual params in the callee state
+      _ <- State.sequence(
+        State.pure(()),
+        actualParams.map(m => f.storeVar(m._1.name, m._1.toBoogie.scope, Scalar(m._2)))
+      )
+    } yield ()
+
+    for {
+      r <- call
+      ret <- evalInterpreter(f, interpretContinuation(f))
+      n <- f.getNext
+      rv <-
+        if (ret.isDefined) {
+          ret.get match {
+            case InterpretReturn.ReturnVal(v) => State.pure(v)
+            case v => State.setError(Errored(s"Call didn't return value (got $v) $proc $n"))
+          }
+        } else {
+          State.setError(Errored(s"Call to pure function should have returned a value, $proc"))
+        }
+    } yield (rv)
   }
 
   def initBSS[S, T <: Effects[S, InterpreterError]](f: T)(is: S, p: IRContext): S = {
@@ -613,7 +747,7 @@ object InterpFuns {
     } yield (st)
 
     bss match {
-      case None       => Logger.error("No BSS initialised"); is
+      case None => Logger.error("No BSS initialised"); is
       case Some(init) => init
     }
   }
@@ -626,22 +760,59 @@ object InterpFuns {
     val (fs, v) = st.f(is)
     v match {
       case Right(r) => fs
-      case Left(e)  => throw Exception(s"Init failed $e")
+      case Left(e) => throw Exception(s"Init failed $e")
     }
   }
 
+  def mainDefaultFunctionArguments(
+    proc: Procedure,
+    overlay: Map[String, BitVecLiteral] = Map()
+  ): Map[LocalVar, Literal] = {
+    val SP: BitVecLiteral = BitVecLiteral(0x78000000, 64)
+    val FP: BitVecLiteral = SP
+    val LR: BitVecLiteral = BitVecLiteral(BigInt("78000000", 16), 64)
+
+    proc.formalInParam.toList.map {
+      case l: LocalVar if overlay.contains(l.name) => l -> overlay(l.name)
+      case l: LocalVar if l.name.startsWith("R0") => l -> BitVecLiteral(1, size(l).get)
+      case l: LocalVar if l.name.startsWith("R31") => l -> SP
+      case l: LocalVar if l.name.startsWith("R29") => l -> FP
+      case l: LocalVar if l.name.startsWith("R30") => l -> LR
+      case l: LocalVar => l -> BitVecLiteral(0, size(l).get)
+    }.toMap
+  }
+
   /* Intialise from ELF and Interpret program */
-  def interpretProg[S, T <: Effects[S, InterpreterError]](f: T)(p: IRContext, is: S): S = {
+  def interpretEvalProg[S, T <: Effects[S, InterpreterError]](
+    f: T
+  )(p: IRContext, is: S): (S, Either[InterpreterError, Map[LocalVar, Literal]]) = {
     val begin = initProgState(f)(p, is)
-    val interp = BASILInterpreter(f)
-    interp.run(begin)
+    val main = p.program.mainProcedure
+    callProcedure(f)(main, mainDefaultFunctionArguments(main)).f(begin)
+  }
+
+  def interpretEvalProgSkipInit[S, T <: Effects[S, InterpreterError]](
+    f: T
+  )(p: Program, begin: S): (S, Either[InterpreterError, Map[LocalVar, Literal]]) = {
+    val main = p.mainProcedure
+    callProcedure(f)(main, mainDefaultFunctionArguments(main)).f(begin)
   }
 
   /* Interpret IR program */
-  def interpretProg[S, T <: Effects[S, InterpreterError]](f: T)(p: Program, is: S): S = {
+  def interpretEvalProg[S, T <: Effects[S, InterpreterError]](
+    f: T
+  )(p: Program, is: S): (S, Either[InterpreterError, Map[LocalVar, Literal]]) = {
     val begin = initialiseProgram(f)(is, p)
-    val interp = BASILInterpreter(f)
-    interp.run(begin)
+    val main = p.mainProcedure
+    callProcedure(f)(main, mainDefaultFunctionArguments(main)).f(begin)
+  }
+
+  def interpretProg[S, T <: Effects[S, InterpreterError]](f: T)(p: IRContext, is: S): S = {
+    interpretEvalProg(f)(p, is)._1
+  }
+
+  def interpretProg[S, T <: Effects[S, InterpreterError]](f: T)(p: Program, is: S): S = {
+    interpretEvalProg(f)(p, is)._1
   }
 }
 
@@ -651,4 +822,12 @@ def interpret(IRProgram: Program): InterpreterState = {
 
 def interpret(IRProgram: IRContext): InterpreterState = {
   InterpFuns.interpretProg(NormalInterpreter)(IRProgram, InterpreterState())
+}
+
+def interpretEval(IRProgram: Program): (InterpreterState, Either[InterpreterError, Map[LocalVar, Literal]]) = {
+  InterpFuns.interpretEvalProg(NormalInterpreter)(IRProgram, InterpreterState())
+}
+
+def interpretEval(IRProgram: IRContext): (InterpreterState, Either[InterpreterError, Map[LocalVar, Literal]]) = {
+  InterpFuns.interpretEvalProg(NormalInterpreter)(IRProgram, InterpreterState())
 }

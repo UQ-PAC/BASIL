@@ -7,44 +7,38 @@ import scala.collection.mutable
 import java.io.{BufferedWriter}
 import ir.cilvisitor.*
 
-/********************************************************************************** 
- *  Combination of Simplifiers
- **********************************************************************************/
+/** ******************************************************************************** Combination of Simplifiers
+  */
 
-
-/**
- *
- * Expr => (Expr, Boolean)
- *
- *  Expression simplification functions have this signature, taking an expression and returning 
- *  an updated expression and a boolean indicating whether a simplification rule was applied.
- *
- *  def simplifier(expr: Expr) : (Expr, Boolean) 
- *
- *
- * This is so that a fixed-point can be computed without performing a structural equality 
- * test at every step.
- *
- */
+/** Expr => (Expr, Boolean)
+  *
+  * Expression simplification functions have this signature, taking an expression and returning an updated expression
+  * and a boolean indicating whether a simplification rule was applied.
+  *
+  * def simplifier(expr: Expr) : (Expr, Boolean)
+  *
+  * This is so that a fixed-point can be computed without performing a structural equality test at every step.
+  */
 @FunctionalInterface
 trait Simplifier {
- /** 
-  *  Apply this simplification.
-  *
-  *   @ensures return._2 ==> (return._1 != expr)
-  */
-  def apply(expr: Expr): (Expr, Boolean) 
+
+  /** Apply this simplification.
+    *
+    * @ensures
+    *   return._2 ==> (return._1 != expr)
+    */
+  def apply(expr: Expr): (Expr, Boolean)
 }
 
-/**
- * Perform a simplification down the expression tree and then up the expression tree.
- *
- * @param simplifier: simplification function which returns an updated expression and whether it was changed
- *
- * @throws Exception when simplifier returns true indicating that the expression was changed but it 
- *  returned the same output as input, or a cycle is detected through repeated applications of the simplification.
- *
- */
+/** Perform a simplification down the expression tree and then up the expression tree.
+  *
+  * @param simplifier:
+  *   simplification function which returns an updated expression and whether it was changed
+  *
+  * @throws Exception
+  *   when simplifier returns true indicating that the expression was changed but it returned the same output as input,
+  *   or a cycle is detected through repeated applications of the simplification.
+  */
 class SimpExpr(simplifier: Simplifier) extends CILVisitor with Simplifier {
   var changedAnything = false
   var count = 0
@@ -74,12 +68,11 @@ class SimpExpr(simplifier: Simplifier) extends CILVisitor with Simplifier {
     )
   }
 
-  /**
-   * Apply this simplification to an expression.
-   *
-   * @return the updated expression and whether it was changed.
-   *
-   */
+  /** Apply this simplification to an expression.
+    *
+    * @return
+    *   the updated expression and whether it was changed.
+    */
   def apply(e: Expr) = {
     val ns = SimpExpr(simplifier)
     val ne = visit_expr(ns, e)
@@ -87,13 +80,13 @@ class SimpExpr(simplifier: Simplifier) extends CILVisitor with Simplifier {
   }
 }
 
-/**
- * Apply two simplification functions in sequence. 
- *
- * @implements Simplifier
- * @ensures return._2  ==> return._1 != e
- *
- */
+/** Apply two simplification functions in sequence.
+  *
+  * @implements
+  *   Simplifier
+  * @ensures
+  *   return._2 ==> return._1 != e
+  */
 def sequenceSimp(a: Simplifier, b: Simplifier)(e: Expr): (Expr, Boolean) = {
   val (ne1, changed1) = a(e)
   if (ne1 == e && changed1) {
@@ -102,23 +95,23 @@ def sequenceSimp(a: Simplifier, b: Simplifier)(e: Expr): (Expr, Boolean) = {
   }
   val (ne2, changed2) = b(ne1)
   if (ne2 == ne1 && changed2) {
-    val change = SimplifyValidation.debugTrace.takeRight(5).map("  " + _ ).mkString("\n")
+    val change = SimplifyValidation.debugTrace.takeRight(5).map("  " + _).mkString("\n")
     throw Exception(s"$change\nSimplifier returned 'changed' for identical expression $ne1 \n  -> $ne2")
   }
   if (ne2 == e && (changed1 || changed2)) {
-    val change = SimplifyValidation.debugTrace.takeRight(5).map("  " + _ ).mkString("\n")
+    val change = SimplifyValidation.debugTrace.takeRight(5).map("  " + _).mkString("\n")
     throw Exception(s"$change\nSimplifier returned 'changed' for identical expression $e \n  -> $ne1\n  -> $ne2")
   }
   (ne2, changed1 || changed2)
 }
 
-/**
- * Apply a simplifier to a fixed point
- *
- * @implements Simplifier
- * @ensures return._2  ==> return._1 != e
- *
- */
+/** Apply a simplifier to a fixed point
+  *
+  * @implements
+  *   Simplifier
+  * @ensures
+  *   return._2 ==> return._1 != e
+  */
 def simpFixedPoint(s: Simplifier)(e: Expr): (Expr, Boolean) = {
   var expr = e
   var changed = true
@@ -141,39 +134,45 @@ def simpFixedPoint(s: Simplifier)(e: Expr): (Expr, Boolean) = {
   (expr, changedAny)
 }
 
+/** ******************************************************************************** Expression simplifier functions
+  */
 
-/********************************************************************************** 
- *  Expression simplifier functions
- **********************************************************************************/
-
-
-/**
- * Perform general-purpose expression simplifications and partial evaluation to remove redundant operations.
- * - Normalises predicate calculations to boolean form rather than bitvector form. 
- * - Normalises BinaryExpr(BVNEQ, a, b) to unaryExpr(BoolNOT, BinaryExpr(BVEQ, a, b))
- * - Normalises BinaryExpr(BVSUB, a, b) to BinaryExpr(BVADD, a, UnaryExpr(BVNEG, b))
- *
- * @see [[simplifyExpr]]
- */
-def simplifyExprFixpoint : Simplifier = simpFixedPoint(SimpExpr(simpFixedPoint(sequenceSimp(simplifyExpr, SimpExpr(fastPartialEvalExpr)))))
-
-/**
- * Perform (expensive) simplification of inequalities and attempt to lift flag calculations to inequalities.
- *
- * Sequences [[simplifyCmpInequalities]] with [[simplifyExprFixpoint]] since we expect the normal
- * form to apply for these rules to work.
- *
- */
-def simplifyCondFixpoint : Simplifier = simpFixedPoint(SimpExpr(simpFixedPoint(
-    sequenceSimp(simpFixedPoint(SimpExpr(simpFixedPoint(simplifyCmpInequalities))), simplifyExprFixpoint)
-  )))
+/** Perform general-purpose expression simplifications and partial evaluation to remove redundant operations.
+  *   - Normalises predicate calculations to boolean form rather than bitvector form.
+  *   - Normalises BinaryExpr(BVNEQ, a, b) to unaryExpr(BoolNOT, BinaryExpr(BVEQ, a, b))
+  *   - Normalises BinaryExpr(BVSUB, a, b) to BinaryExpr(BVADD, a, UnaryExpr(BVNEG, b))
+  *
+  * @see
+  *   [[simplifyExpr]]
+  */
+def simplifyExprFixpoint: Simplifier = simpFixedPoint(
+  SimpExpr(simpFixedPoint(sequenceSimp(simplifyExpr, SimpExpr(fastPartialEvalExprTopLevel))))
+)
 
 /**
- * Apply [[simplifyCondFixpoint]] to every Assert or Assume condition in a procedure.
- *
- * These are the only places we expect to see predicate expressions once we have applied
- * flag copy-prop.
+ * Perform regular simplification to a fixed point, then cleanup bitvector extension ops.
  */
+def simplifyPaddingAndSlicingExprFixpoint: Simplifier = simpFixedPoint(
+  sequenceSimp(simplifyExprFixpoint, SimpExpr(cleanupExtends))
+)
+
+/** Perform (expensive) simplification of inequalities and attempt to lift flag calculations to inequalities.
+  *
+  * Sequences [[simplifyCmpInequalities]] with [[simplifyExprFixpoint]] since we expect the normal form to apply for
+  * these rules to work.
+  */
+def simplifyCondFixpoint: Simplifier = simpFixedPoint(
+  SimpExpr(
+    simpFixedPoint(
+      sequenceSimp(simpFixedPoint(SimpExpr(simpFixedPoint(simplifyCmpInequalities))), simplifyExprFixpoint)
+    )
+  )
+)
+
+/** Apply [[simplifyCondFixpoint]] to every Assert or Assume condition in a procedure.
+  *
+  * These are the only places we expect to see predicate expressions once we have applied flag copy-prop.
+  */
 object AssumeConditionSimplifications extends CILVisitor {
   override def vstmt(s: Statement) = s match {
     case a: Assert => {
@@ -195,54 +194,46 @@ object AssumeConditionSimplifications extends CILVisitor {
   }
 }
 
-/**
- * Apply the [[simplifyExprFixpoint]] to every expression in a procedure.
- */
+/** Apply the [[simplifyExprFixpoint]] to every expression in a procedure.
+  */
 object AlgebraicSimplifications extends CILVisitor {
   override def vexpr(e: Expr) = {
     ChangeTo(simplifyExprFixpoint(e)._1)
   }
 
-  def apply(p: Procedure)  = {
+  def apply(p: Procedure) = {
     visit_proc(AlgebraicSimplifications, p)
   }
 }
 
-/**
- * CleanupExtends simplifier. This tries to minimise redundant bitvector operations using local
- * syntactically known bits.
- *
- * Do not perform this before assume condition simplification as the flag calculation detection
- * is sensitive to the structure of bitvector operations emitted by the lifter.
- */
+/** CleanupExtends simplifier. This tries to minimise redundant bitvector operations using local syntactically known
+  * bits.
+  *
+  * Do not perform this before assume condition simplification as the flag calculation detection is sensitive to the
+  * structure of bitvector operations emitted by the lifter.
+  */
 object cleanupSimplify extends CILVisitor {
 
   override def vexpr(e: Expr) = {
     ChangeTo(simpFixedPoint(SimpExpr(cleanupExtends))(e)._1)
   }
 
-
-  def apply(p: Procedure)  = {
-    visit_proc(AlgebraicSimplifications, p)
+  def apply(p: Procedure) = {
+    visit_proc(cleanupSimplify, p)
   }
 
 }
 
+/** ******************************************************************************** Simplification logging and
+  * validation *
+  */
 
-/********************************************************************************** 
- *  Simplification logging and validation                                         *
- **********************************************************************************/
-
-
-/**
- * Global logging of simplifications.
- *
- *  - stores a bounded history of simplifications applied for debugging (debugTrace)
- *  - if `validate` has been set; stores a set of all unique normalised simplifications 
- *    applied for the life of the program. The normalisation only extends to variable names,
- *    so we still get many duplicates.
- *
- */
+/** Global logging of simplifications.
+  *
+  *   - stores a bounded history of simplifications applied for debugging (debugTrace)
+  *   - if `validate` has been set; stores a set of all unique normalised simplifications applied for the life of the
+  *     program. The normalisation only extends to variable names, so we still get many duplicates.
+  */
 object SimplifyValidation {
   var traceLog = mutable.LinkedHashSet[(Expr, Expr, String)]()
   var validate: Boolean = false
@@ -254,9 +245,9 @@ object SimplifyValidation {
       require(a.getType == b.getType)
       a.getType match {
         case BitVecType(sz) => BinaryExpr(BVEQ, a, b)
-        case IntType        => BinaryExpr(IntEQ, a, b)
-        case BoolType       => BinaryExpr(BoolEQ, a, b)
-        case m: MapType     => ???
+        case IntType => BinaryExpr(IntEQ, a, b)
+        case BoolType => BinaryExpr(BoolEQ, a, b)
+        case m: MapType => ???
       }
     }
 
@@ -308,17 +299,15 @@ def logSimp(e: Expr, ne: Expr, actual: Boolean = true)(implicit
   ne
 }
 
-/**
- * Normalises variable names to a counted sequence in the order of traversal.
- * Only used to deduplicate log entries.
- */
+/** Normalises variable names to a counted sequence in the order of traversal. Only used to deduplicate log entries.
+  */
 class VarNameNormalise() extends CILVisitor {
   var count = 1
   val assigned = mutable.Map[Variable, Variable]()
 
   def rename(v: Variable, newName: String) = {
     v match {
-      case l: LocalVar     => LocalVar(newName, l.irType)
+      case l: LocalVar => LocalVar(newName, l.irType)
       case Register(n, sz) => Register(newName, sz)
     }
   }
@@ -350,17 +339,16 @@ def bvLogOpToBoolOp = Map[BinOp, BinOp](
   BVOR -> BoolOR
 )
 
-/********************************************************************************** 
- *  Expression simplifier implementations
- **********************************************************************************/
+/** ******************************************************************************** Expression simplifier
+  * implementations
+  */
 
-
-/**
- * Simplifier which reduces branch conditions on assembly flags to inequality expression.
- * Assuming normal form provided by simplifyExprFixpoint.
- *
- * @see [[Simplifier]]
- */
+/** Simplifier which reduces branch conditions on assembly flags to inequality expression. Assuming normal form provided
+  * by simplifyExprFixpoint.
+  *
+  * @see
+  *   [[Simplifier]]
+  */
 def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
 
   var didAnything = true
@@ -369,15 +357,16 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
   }
 
   val r = e match {
+
     /** canonicalising to boolean operations */
     /* remove bool2bv in boolean context */
-    case BinaryExpr(BVEQ, UnaryExpr(BoolToBV1, body), BitVecLiteral(1, 1))  => logSimp(e, body)
+    case BinaryExpr(BVEQ, UnaryExpr(BoolToBV1, body), BitVecLiteral(1, 1)) => logSimp(e, body)
     case BinaryExpr(BVEQ, UnaryExpr(BoolToBV1, l), UnaryExpr(BoolToBV1, r)) => logSimp(e, BinaryExpr(BoolEQ, (l), (r)))
 
     case BinaryExpr(BVADD, l @ UnaryExpr(BVNEG, x), r) if !r.isInstanceOf[Literal] && ! {
           r match {
             case UnaryExpr(BVNEG, _) => true
-            case _                   => false
+            case _ => false
           }
         } =>
       logSimp(e, BinaryExpr(BVADD, r, l))
@@ -782,7 +771,9 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
           UnaryExpr(BoolNOT, BinaryExpr(BVEQ, lhs2, rhs2: BitVecLiteral))
         )
         if (ineqToStrict.contains(op) || strictIneq
-          .contains(op)) && rhs.getType == rhs2.getType && simplifyCond(BinaryExpr(ineqToStrict.get(op).getOrElse(op), rhs, rhs2)) == TrueLiteral
+          .contains(op)) && rhs.getType == rhs2.getType && simplifyCond(
+          BinaryExpr(ineqToStrict.get(op).getOrElse(op), rhs, rhs2)
+        ) == TrueLiteral
           && lhs == lhs2 => {
       logSimp(e, l)
     }
@@ -890,7 +881,7 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
             val rs = simplifyCond(BinaryExpr(BoolOR, r, d))
             (ls, rs) match {
               case (BinaryExpr(_, l, r: Literal), BinaryExpr(_, ll, rr: Literal)) => true
-              case _                                                              => false
+              case _ => false
             }
           } => {
       logSimp(e, BinaryExpr(BoolAND, simplifyCond(BinaryExpr(BoolOR, l, d)), simplifyCond(BinaryExpr(BoolOR, r, d))))
@@ -934,9 +925,9 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
       logSimp(
         e,
         simplifyCond(BinaryExpr(BVULT, y, z)) match {
-          case TrueLiteral  => BinaryExpr(BVULT, x, y)
+          case TrueLiteral => BinaryExpr(BVULT, x, y)
           case FalseLiteral => BinaryExpr(BVULT, x, z)
-          case _            => e
+          case _ => e
         }
       )
     }
@@ -945,9 +936,9 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
       logSimp(
         e,
         simplifyCond(BinaryExpr(BVSLT, y, z)) match {
-          case TrueLiteral  => BinaryExpr(BVSLT, x, y)
+          case TrueLiteral => BinaryExpr(BVSLT, x, y)
           case FalseLiteral => BinaryExpr(BVSLT, x, z)
-          case _            => e
+          case _ => e
         }
       )
     }
@@ -963,8 +954,8 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
 def bool2bv1(e: Expr) = {
   e.getType match {
     case BitVecType(1) => e
-    case BoolType      => UnaryExpr(BoolToBV1, e)
-    case _             => ???
+    case BoolType => UnaryExpr(BoolToBV1, e)
+    case _ => ???
   }
 
 }
@@ -983,22 +974,21 @@ val strictToNonStrict = Map[BinOp, BinOp](BVSGT -> BVSGE, BVUGT -> BVUGE, BVSLT 
 
 val strictIneq = Set[BinOp](BVSGT, BVUGT, BVSLT, BVULT)
 
-/**
- * Simplify bitvector extract and extending expressions based on bits we locally know based on the expression.
- *
- * This 'de-canonicalises' to some extent, but makes the resulting program simpler, so we perform as a post pass
- */
+/** Simplify bitvector extract and extending expressions based on bits we locally know based on the expression.
+  *
+  * This 'de-canonicalises' to some extent, but makes the resulting program simpler, so we perform as a post pass
+  */
 def cleanupExtends(e: Expr): (Expr, Boolean) = {
 
   var changedAnything = true
 
   val res = e match {
-    case Extract(ed, 0, body) if size(body).get == ed                                    => logSimp(e, body)
-    case ZeroExtend(0, body)                                                             => logSimp(e, body)
-    case SignExtend(0, body)                                                             => logSimp(e, body)
-    case BinaryExpr(BVADD, body, BitVecLiteral(0, _))                                    => logSimp(e, body)
-    case BinaryExpr(BVMUL, body, BitVecLiteral(1, _))                                    => logSimp(e, body)
-    case Repeat(1, body)                                                                 => logSimp(e, body)
+    case Extract(ed, 0, body) if size(body).get == ed => logSimp(e, body)
+    case ZeroExtend(0, body) => logSimp(e, body)
+    case SignExtend(0, body) => logSimp(e, body)
+    case BinaryExpr(BVADD, body, BitVecLiteral(0, _)) => logSimp(e, body)
+    case BinaryExpr(BVMUL, body, BitVecLiteral(1, _)) => logSimp(e, body)
+    case Repeat(1, body) => logSimp(e, body)
     case Extract(ed, 0, ZeroExtend(extension, body)) if (body.getType == BitVecType(ed)) => logSimp(e, body)
     case Extract(ed, 0, SignExtend(extension, body)) if (body.getType == BitVecType(ed)) => logSimp(e, body)
     case Extract(ed, 0, ZeroExtend(exts, body)) if exts + size(body).get >= ed && ed > size(body).get =>
@@ -1012,13 +1002,13 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
 
     // compose slices
     case Extract(ed1, be1, Extract(ed2, be2, body)) => logSimp(e, Extract(ed1 + be2, be1 + be2, (body)))
-    case SignExtend(sz1, SignExtend(sz2, exp))      => logSimp(e, SignExtend(sz1 + sz2, exp))
-    case ZeroExtend(sz1, ZeroExtend(sz2, exp))      => logSimp(e, ZeroExtend(sz1 + sz2, exp))
+    case SignExtend(sz1, SignExtend(sz2, exp)) => logSimp(e, SignExtend(sz1 + sz2, exp))
+    case ZeroExtend(sz1, ZeroExtend(sz2, exp)) => logSimp(e, ZeroExtend(sz1 + sz2, exp))
 
     // make subs more readable
-    //case BinaryExpr(BVADD, x, b: BitVecLiteral) if eval.BitVectorEval.isNegative(b) => {
+    // case BinaryExpr(BVADD, x, b: BitVecLiteral) if eval.BitVectorEval.isNegative(b) => {
     //  BinaryExpr(BVSUB, x, eval.BitVectorEval.smt_bvneg(b))
-    //}
+    // }
 
     // extract(hi, m+e, 0) ++ zeroextend(e, extract(m, 0, r0)) to  bitmask
     case BinaryExpr(BVCONCAT, Extract(hi1, lo1, x1), ZeroExtend(ext, Extract(hi2, 0, x2))) if lo1 == ext + hi2 => {
@@ -1031,12 +1021,19 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
     // extract extended zero part
     case Extract(ed, bg, ZeroExtend(x, expr)) if (bg > size(expr).get) => logSimp(e, BitVecLiteral(0, ed - bg))
     // extract below extend
-    case Extract(ed, bg, ZeroExtend(x, expr)) if (bg < size(expr).get) && (ed < size(expr).get) => logSimp(e, Extract(ed, bg, expr))
-    case Extract(ed, bg, SignExtend(x, expr)) if (bg < size(expr).get) && (ed < size(expr).get) => logSimp(e, Extract(ed, bg, expr))
+    case Extract(ed, bg, ZeroExtend(x, expr)) if (bg < size(expr).get) && (ed < size(expr).get) =>
+      logSimp(e, Extract(ed, bg, expr))
+    case Extract(ed, bg, SignExtend(x, expr)) if (bg < size(expr).get) && (ed < size(expr).get) =>
+      logSimp(e, Extract(ed, bg, expr))
 
-    case ZeroExtend(ed, Extract(hi, 0, e)) if size(e).get == hi + ed => logSimp(e, BinaryExpr(BVAND, e, BinaryExpr(BVCONCAT, BitVecLiteral(0, ed), BitVecLiteral(BigInt(2).pow(hi)-1, hi))))
+    // case ZeroExtend(ed, Extract(hi, 0, e)) if size(e).get == hi + ed =>
+    //  logSimp(
+    //    e,
+    //    BinaryExpr(BVAND, e, BinaryExpr(BVCONCAT, BitVecLiteral(0, ed), BitVecLiteral(BigInt(2).pow(hi) - 1, hi)))
+    //  )
 
-    case BinaryExpr(BVSHL, body, BitVecLiteral(n, _)) if size(body).get <= n => logSimp(e, BitVecLiteral(0, size(body).get))
+    case BinaryExpr(BVSHL, body, BitVecLiteral(n, _)) if size(body).get <= n =>
+      logSimp(e, BitVecLiteral(0, size(body).get))
 
     // simplify convoluted bit test
     case BinaryExpr(BVEQ, BinaryExpr(BVSHL, ZeroExtend(n1, body), BitVecLiteral(n, _)), BitVecLiteral(0, _))
@@ -1081,19 +1078,17 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
   (res, changedAnything)
 }
 
-/**
- * Simplifier implementing basic canonicalisation and simplifications of experssions without changing them too much.
- *
- * - Normalises predicate calculations to boolean form rather than bitvector form. 
- * - Normalises BinaryExpr(BVNEQ, a, b) to unaryExpr(BoolNOT, BinaryExpr(BVEQ, a, b))
- * - Normalises BinaryExpr(BVSUB, a, b) to BinaryExpr(BVADD, a, UnaryExpr(BVNEG, b))
- * - Removes redundant expressions
- *
- */
-def simplifyExpr(e: Expr): (Expr, Boolean) = {
+private val assocOps: Set[BinOp] =
+  Set(BVADD, BVMUL, BVOR, BVAND, BVEQ, BoolAND, BoolEQ, BoolOR, BoolEQUIV, BoolEQ, IntADD, IntMUL, IntEQ)
 
-  val assocOps: Set[BinOp] =
-    Set(BVADD, BVMUL, BVOR, BVAND, BVEQ, BoolAND, BoolEQ, BoolOR, BoolEQUIV, BoolEQ, IntADD, IntMUL, IntEQ)
+/** Simplifier implementing basic canonicalisation and simplifications of experssions without changing them too much.
+  *
+  *   - Normalises predicate calculations to boolean form rather than bitvector form.
+  *   - Normalises BinaryExpr(BVNEQ, a, b) to unaryExpr(BoolNOT, BinaryExpr(BVEQ, a, b))
+  *   - Normalises BinaryExpr(BVSUB, a, b) to BinaryExpr(BVADD, a, UnaryExpr(BVNEG, b))
+  *   - Removes redundant expressions
+  */
+def simplifyExpr(e: Expr): (Expr, Boolean) = {
 
   // println((0 until indent).map(" ").mkString("") + e)
 
@@ -1157,8 +1152,7 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
     case BinaryExpr(BVADD, ed @ SignExtend(sz, UnaryExpr(BVNOT, x)), bo @ BitVecLiteral(bv, sz2))
         if size(ed).contains(sz2) && !BitVectorEval.isNegative(bo) =>
       didAnything = false
-      logSimp(e, BinaryExpr(BVADD, UnaryExpr(BVNEG, SignExtend(sz, x)), BitVecLiteral(bv - 1, sz2)), 
-        actual = false)
+      logSimp(e, BinaryExpr(BVADD, UnaryExpr(BVNEG, SignExtend(sz, x)), BitVecLiteral(bv - 1, sz2)), actual = false)
 
     case BinaryExpr(BVADD, BinaryExpr(BVADD, y, ed @ UnaryExpr(BVNOT, x)), bo @ BitVecLiteral(off, sz2))
         if size(ed).contains(sz2) && !(y.isInstanceOf[BitVecLiteral]) && !BitVectorEval.isNegative(bo) =>
@@ -1178,13 +1172,13 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
         actual = false
       )
 
-    //case BinaryExpr(BVADD, UnaryExpr(BVNEG, x), BitVecLiteral(c, sz)) if c == BitVectorEval.smt_bvneg(BitVecLiteral(1, sz)).value => logSimp(e, UnaryExpr(BVNOT, x))
-    //case BinaryExpr(BVADD, BitVecLiteral(1, _), UnaryExpr(BVNEG, x)) => logSimp(e, UnaryExpr(BVNOT, x))
+    // case BinaryExpr(BVADD, UnaryExpr(BVNEG, x), BitVecLiteral(c, sz)) if c == BitVectorEval.smt_bvneg(BitVecLiteral(1, sz)).value => logSimp(e, UnaryExpr(BVNOT, x))
+    // case BinaryExpr(BVADD, BitVecLiteral(1, _), UnaryExpr(BVNEG, x)) => logSimp(e, UnaryExpr(BVNOT, x))
     // case BinaryExpr(BVADD, UnaryExpr(BVNEG, x), BitVecLiteral(c, sz)) => logSimp(e, BinaryExpr(UnaryExpr(BVNOT, x), ))
 
     case BinaryExpr(BVADD, UnaryExpr(BVNOT, x), BitVecLiteral(1, _)) => logSimp(e, UnaryExpr(BVNEG, x))
 
-    //case BinaryExpr(BVEQ, BinaryExpr(BVADD, x, y: BitVecLiteral), BitVecLiteral(0, _))
+    // case BinaryExpr(BVEQ, BinaryExpr(BVADD, x, y: BitVecLiteral), BitVecLiteral(0, _))
     //    if (eval.BitVectorEval.isNegative(y)) =>
     //  logSimp(e, BinaryExpr(BVEQ, x, eval.BitVectorEval.smt_bvneg(y)))
 
@@ -1198,10 +1192,10 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
     case BinaryExpr(BVEQ, l, BitVecLiteral(0, 1)) =>
       logSimp(e, UnaryExpr(BoolNOT, BinaryExpr(BVEQ, l, BitVecLiteral(1, 1))))
 
-    case BinaryExpr(BoolAND, x, TrueLiteral)  => logSimp(e, x)
+    case BinaryExpr(BoolAND, x, TrueLiteral) => logSimp(e, x)
     case BinaryExpr(BoolAND, x, FalseLiteral) => logSimp(e, FalseLiteral)
-    case BinaryExpr(BoolOR, x, FalseLiteral)  => logSimp(e, x)
-    case BinaryExpr(BoolOR, x, TrueLiteral)   => logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolOR, x, FalseLiteral) => logSimp(e, x)
+    case BinaryExpr(BoolOR, x, TrueLiteral) => logSimp(e, TrueLiteral)
 
     case BinaryExpr(BVCONCAT, BitVecLiteral(0, sz), expr) => logSimp(e, ZeroExtend(sz, expr))
     case BinaryExpr(BVCONCAT, expr, BitVecLiteral(0, sz)) if (BigInt(2).pow(sz + size(expr).get) > sz) =>
@@ -1213,10 +1207,10 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
         e,
         e.getType match {
           case BitVecType(sz) => BitVecLiteral(0, sz)
-          case _              => throw Exception("Type error (should be unreachable)")
+          case _ => throw Exception("Type error (should be unreachable)")
         }
       )
-    case BinaryExpr(BoolEQ, x, FalseLiteral)       => logSimp(e, UnaryExpr(BoolNOT, x))
+    case BinaryExpr(BoolEQ, x, FalseLiteral) => logSimp(e, UnaryExpr(BoolNOT, x))
     case BinaryExpr(BVADD, x, BitVecLiteral(0, _)) => logSimp(e, x)
 
     case BinaryExpr(BoolIMPLIES, FalseLiteral, _) => logSimp(e, TrueLiteral)
@@ -1226,8 +1220,8 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
     case BinaryExpr(BoolIMPLIES, x, y) if x == y => logSimp(e, TrueLiteral)
 
     // double negation
-    case UnaryExpr(BVNOT, UnaryExpr(BVNOT, body))     => logSimp(e, body)
-    case UnaryExpr(BVNEG, UnaryExpr(BVNEG, body))     => logSimp(e, body)
+    case UnaryExpr(BVNOT, UnaryExpr(BVNOT, body)) => logSimp(e, body)
+    case UnaryExpr(BVNEG, UnaryExpr(BVNEG, body)) => logSimp(e, body)
     case UnaryExpr(BoolNOT, UnaryExpr(BoolNOT, body)) => logSimp(e, body)
     case BinaryExpr(BoolIMPLIES, UnaryExpr(BoolNOT, a), b) => logSimp(e, BinaryExpr(BoolOR, a, b))
 
@@ -1238,13 +1232,13 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
         if !(y.isInstanceOf[BitVecLiteral]) =>
       logSimp(e, BinaryExpr(BVADD, y, UnaryExpr(BVNEG, x)))
 
-    //case BinaryExpr(BVEQ, BinaryExpr(BVADD, x, y: BitVecLiteral), BitVecLiteral(0, s)) =>
+    // case BinaryExpr(BVEQ, BinaryExpr(BVADD, x, y: BitVecLiteral), BitVecLiteral(0, s)) =>
     //  logSimp(e, BinaryExpr(BVEQ, x, UnaryExpr(BVNEG, y)))
     //
-    //case BinaryExpr(BVEQ, BinaryExpr(BVADD, x, UnaryExpr(BVNEG, y)), BitVecLiteral(0, _)) =>
+    // case BinaryExpr(BVEQ, BinaryExpr(BVADD, x, UnaryExpr(BVNEG, y)), BitVecLiteral(0, _)) =>
     //  logSimp(e, BinaryExpr(BVEQ, x, y))
 
-    //case BinaryExpr(op, BinaryExpr(BVADD, x, UnaryExpr(BVNEG, y)), BitVecLiteral(0, _)) if strictIneq.contains(op) || op == BVEQ || ineqToStrict.contains(op) =>
+    // case BinaryExpr(op, BinaryExpr(BVADD, x, UnaryExpr(BVNEG, y)), BitVecLiteral(0, _)) if strictIneq.contains(op) || op == BVEQ || ineqToStrict.contains(op) =>
     //  logSimp(e, BinaryExpr(op, x, y))
 
     case BinaryExpr(BVSUB, x: Expr, y: BitVecLiteral) => logSimp(e, BinaryExpr(BVADD, x, UnaryExpr(BVNEG, y)))

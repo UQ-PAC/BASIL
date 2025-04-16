@@ -11,17 +11,15 @@ object IDGenerator {
   }
 }
 
-
-def escape(s: String) =  {
+def escape(s: String) = {
   val n = s.replace("\"", "\\\"")
   n
 }
 
-
-def wrap(_input: String, width: Integer = 20, first : Boolean = true): String =
+def wrap(_input: String, width: Integer = 20, first: Boolean = true): String =
   var input = _input
 
-  def cannotSplit(c:Char) = {
+  def cannotSplit(c: Char) = {
     c.isLetterOrDigit || ("_$".contains(c))
   }
 
@@ -30,10 +28,10 @@ def wrap(_input: String, width: Integer = 20, first : Boolean = true): String =
   } else if ({
     val index = input.indexOf('\n')
     index != -1 && index <= width
-    }) {
+  }) {
     var splitPoint = input.indexOf('\n')
     val (line, rest) = (input.substring(0, splitPoint).replace("\n", "\\l"), input.substring(splitPoint + 1))
-    (if (!first) then "    " else "") + line  + "\\l" + wrap(rest, width=width, true)
+    (if (!first) then "    " else "") + line + "\\l" + wrap(rest, width = width, true)
   } else {
     var splitPoint = width
     while (cannotSplit(input.charAt(splitPoint)) && splitPoint > width / 3) {
@@ -45,9 +43,8 @@ def wrap(_input: String, width: Integer = 20, first : Boolean = true): String =
       splitPoint = width
     }
     val (line, rest) = (input.substring(0, splitPoint).replace("\n", "\\l"), input.substring(splitPoint))
-    (if (!first) then "    " else "") + line  + "\\l" + wrap(rest, width=width, false)
+    (if (!first) then "    " else "") + line + "\\l" + wrap(rest, width = width, false)
   }
-
 
 /** Super-class for elements of a Graphviz dot file.
   */
@@ -68,7 +65,6 @@ class DotNode(val id: String, val label: String, highlight: Boolean = false) ext
 
   def equals(other: DotNode): Boolean = toDotString.equals(other.toDotString)
 
-
   def hl = if (highlight) then "style=filled, fillcolor=\"orangered\", " else ""
 
   def toDotString: String =
@@ -78,17 +74,16 @@ class DotNode(val id: String, val label: String, highlight: Boolean = false) ext
 
 /** Represents an edge between two nodes in a Graphviz dot file.
   */
- case class DotArrow(
-    fromNode: DotNode,
-    arrow: String,
-    toNode: DotNode,
-    label: String,
-    style: String = "solid",
-    colour: String = "black"
+case class DotArrow(
+  fromNode: DotNode,
+  arrow: String,
+  toNode: DotNode,
+  label: String,
+  style: String = "solid",
+  colour: String = "black"
 ) extends DotElement {
 
   def equals(other: DotArrow): Boolean = toDotString.equals(other.toDotString)
-
 
   def toDotString: String =
     s"\"${fromNode.id}\" $arrow \"${toNode.id}\"[label=\"${escape(label)}\", style=\"$style\", color=\"$colour\"]"
@@ -156,21 +151,23 @@ class DotGraph(val title: String, val nodes: Iterable[DotNode], val edges: Itera
 
   override def toString: String = toDotString
 
-  val graph = "graph [ fontsize=18 ];" 
-  def toDotString: String = "digraph " + title + " {\n" + graph + "\n" + (nodes ++ edges).foldLeft("")((str, elm) => str + elm.toDotString + "\n") + "}"
+  val graph = "graph [ fontsize=18 ];"
+  def toDotString: String = "digraph " + title + " {\n" + graph + "\n" + (nodes ++ edges).foldLeft("")((str, elm) =>
+    str + elm.toDotString + "\n"
+  ) + "}"
 }
 
-
-
-class DotStruct(val id: String, val details: String, val fields: Option[Iterable[String]], val verbose: Boolean = true) extends DotElement {
+class DotStruct(val id: String, val details: String, val fields: Option[Iterable[String]], val verbose: Boolean = true)
+    extends DotElement {
   def equals(other: DotStruct): Boolean = toDotString.equals(other.toDotString)
 
-
-  val label = s"\"{<$id> ${if verbose then wrap(details, 80) else id} ${if fields.isDefined then  s" | {${fields.get.map(f => s"<$f> $f").mkString("|")}}" else "" }}\""
+  val label = s"\"{<$id> ${if verbose then wrap(details, 80) else id} ${
+      if fields.isDefined then s" | {${fields.get.map(f => s"<$f> $f").mkString("|")}}" else ""
+    }}\""
   override def toString: String = toDotString
 
   override def toDotString: String =
-    s"$id " + "[label=" + escape(label) + "]"
+    s"$id " + "[label=" + label + "]"
 }
 
 class DotStructElement(val id: String, val field: Option[String]) extends DotElement {
@@ -182,12 +179,13 @@ class DotStructElement(val id: String, val field: Option[String]) extends DotEle
 }
 
 case class StructArrow(
-                        from: DotStructElement,
-                        to: DotStructElement,
-                        label: String = "",
-                        arrow: String = "->",
-                        style: String = "solid",
-                        colour: String = "black") extends DotElement {
+  from: DotStructElement,
+  to: DotStructElement,
+  label: String = "",
+  arrow: String = "->",
+  style: String = "solid",
+  colour: String = "black"
+) extends DotElement {
 
   def equals(other: DotArrow): Boolean = toDotString.equals(other.toDotString)
 
@@ -195,10 +193,10 @@ case class StructArrow(
     s"${from.toString} $arrow ${to.toString} [label=\"${escape(label)}\", style=\"$style\", color=\"$colour\"]"
 }
 
-
 /** Represents a Graphviz dot graph.
- */
-class StructDotGraph(val title: String, val nodes: Iterable[DotStruct], val edges: Iterable[StructArrow]) extends DotElement {
+  */
+class StructDotGraph(val title: String, val nodes: Iterable[DotStruct], val edges: Iterable[StructArrow])
+    extends DotElement {
 
   def this(nodes: List[DotStruct], edges: List[StructArrow]) = this("", nodes, edges)
 
@@ -221,6 +219,8 @@ class StructDotGraph(val title: String, val nodes: Iterable[DotStruct], val edge
 
   override def toString: String = toDotString
 
-  def toDotString: String = "digraph " + title + " {\nrankdir=\"LR\"\nnode [shape=record];\n" + (nodes ++ edges).foldLeft("")((str, elm) => str + elm.toDotString + "\n") + "}"
+  def toDotString: String =
+    "digraph " + title + " {\nrankdir=\"LR\"\nnode [shape=record];\n" + (nodes ++ edges).foldLeft("")((str, elm) =>
+      str + elm.toDotString + "\n"
+    ) + "}"
 }
-

@@ -6,6 +6,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest
 import LatticeSet.*
 
+@test_util.tags.UnitTest
 class TaintAnalysisTests extends AnyFunSuite, BASILTest {
   def getTaintAnalysisResults(program: Program, taint: Map[CFGPosition, Set[Variable]]): Map[CFGPosition, Set[Variable]] = {
     TaintAnalysis(program, taint).analyze().map { (c, m) => (c, m.map { (v, _) => v }.toSet)}
@@ -21,23 +22,9 @@ class TaintAnalysisTests extends AnyFunSuite, BASILTest {
 
   test("constantLiteral") {
     val program = prog(
-        proc("main",
-          block("main",
-            directCall("f"),
-            goto("mainRet")
-          ),
-          block("mainRet", ret)
-        ),
-        proc("f",
-          block("assign",
-            LocalAssign(R0, bv64(2), None),
-            goto("returnBlock"),
-          ),
-          block("returnBlock",
-            ret
-          ),
-        )
-      )
+      proc("main", block("main", directCall("f"), goto("mainRet")), block("mainRet", ret)),
+      proc("f", block("assign", LocalAssign(R0, bv64(2), None), goto("returnBlock")), block("returnBlock", ret))
+    )
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
@@ -55,23 +42,13 @@ class TaintAnalysisTests extends AnyFunSuite, BASILTest {
 
   test("arguments") {
     val program = prog(
-        proc("main",
-          block("main",
-            directCall("f"),
-            goto("mainRet")
-          ),
-          block("mainRet", ret)
-        ),
-        proc("f",
-          block("assign",
-            LocalAssign(R0, BinaryExpr(BVADD, R0, R1), None),
-            goto("returnBlock"),
-          ),
-          block("returnBlock",
-            ret
-          ),
-        ),
+      proc("main", block("main", directCall("f"), goto("mainRet")), block("mainRet", ret)),
+      proc(
+        "f",
+        block("assign", LocalAssign(R0, BinaryExpr(BVADD, R0, R1), None), goto("returnBlock")),
+        block("returnBlock", ret)
       )
+    )
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
@@ -89,30 +66,15 @@ class TaintAnalysisTests extends AnyFunSuite, BASILTest {
 
   test("branching") {
     val program = prog(
-        proc("main",
-          block("main",
-            directCall("f"),
-            goto("mainRet")
-          ),
-          block("mainRet", ret)
-        ),
-        proc("f",
-          block("branch",
-            goto("a", "b"),
-          ),
-          block("a",
-            LocalAssign(R0, R1, None),
-            goto("returnBlock"),
-          ),
-          block("b",
-            LocalAssign(R0, R2, None),
-            goto("returnBlock"),
-          ),
-          block("returnBlock",
-            ret
-          ),
-        ),
+      proc("main", block("main", directCall("f"), goto("mainRet")), block("mainRet", ret)),
+      proc(
+        "f",
+        block("branch", goto("a", "b")),
+        block("a", LocalAssign(R0, R1, None), goto("returnBlock")),
+        block("b", LocalAssign(R0, R2, None), goto("returnBlock")),
+        block("returnBlock", ret)
       )
+    )
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
@@ -130,41 +92,16 @@ class TaintAnalysisTests extends AnyFunSuite, BASILTest {
 
   test("interproc") {
     val program = prog(
-        proc("main",
-          block("main",
-            directCall("f"),
-            goto("mainRet")
-          ),
-          block("mainRet", ret)
-        ),
-        proc("f",
-          block("branch",
-            goto("a", "b"),
-          ),
-          block("a",
-            LocalAssign(R1, R1, None),
-            directCall("g"),
-            goto("returnBlock"),
-          ),
-          block("b",
-            LocalAssign(R1, R2, None),
-            directCall("g"),
-            goto("returnBlock"),
-          ),
-          block("returnBlock",
-            ret
-          ),
-        ),
-        proc("g",
-          block("body",
-            LocalAssign(R0, R1, None),
-            goto("returnBlock"),
-          ),
-          block("returnBlock",
-            ret
-          ),
-        ),
-      )
+      proc("main", block("main", directCall("f"), goto("mainRet")), block("mainRet", ret)),
+      proc(
+        "f",
+        block("branch", goto("a", "b")),
+        block("a", LocalAssign(R1, R1, None), directCall("g"), goto("fReturnBlock")),
+        block("b", LocalAssign(R1, R2, None), directCall("g"), goto("fReturnBlock")),
+        block("fReturnBlock", ret)
+      ),
+      proc("g", block("body", LocalAssign(R0, R1, None), goto("gReturnBlock")), block("gReturnBlock", ret))
+    )
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
@@ -182,30 +119,15 @@ class TaintAnalysisTests extends AnyFunSuite, BASILTest {
 
   test("loop") {
     val program = prog(
-        proc("main",
-          block("main",
-            directCall("f"),
-            goto("mainRet")
-          ),
-          block("mainRet", ret)
-        ),
-        proc("f",
-          block("branch",
-            goto("a", "b"),
-          ),
-          block("a",
-            LocalAssign(R0, BinaryExpr(BVADD, R0, R1), None),
-            goto("branch"),
-          ),
-          block("b",
-            LocalAssign(R0, R2, None),
-            goto("returnBlock"),
-          ),
-          block("returnBlock",
-            ret
-          ),
-        ),
+      proc("main", block("main", directCall("f"), goto("mainRet")), block("mainRet", ret)),
+      proc(
+        "f",
+        block("branch", goto("a", "b")),
+        block("a", LocalAssign(R0, BinaryExpr(BVADD, R0, R1), None), goto("branch")),
+        block("b", LocalAssign(R0, R2, None), goto("returnBlock")),
+        block("returnBlock", ret)
       )
+    )
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)

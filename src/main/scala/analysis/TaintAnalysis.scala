@@ -49,9 +49,10 @@ trait TaintAnalysisFunctions(
     }) ++ (
       d match
         case Left(_) => Map()
-        case Right(_) => tainted.getOrElse(n, Set()).foldLeft(Map[DL, EdgeFunction[TwoElement]]()) {
-          (m, t) => m + (Left(t) -> ConstEdge(valuelattice.top))
-        }
+        case Right(_) =>
+          tainted.getOrElse(n, Set()).foldLeft(Map[DL, EdgeFunction[TwoElement]]()) { (m, t) =>
+            m + (Left(t) -> ConstEdge(valuelattice.top))
+          }
     )
   }
 }

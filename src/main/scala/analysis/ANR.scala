@@ -5,10 +5,9 @@ import analysis.solvers._
 
 import scala.collection.immutable
 
-/**
- * Calculates the set of variables that are not read after being written up to that point in the program.
- * Useful for detecting dead stores, constants and which variables are passed as parameters in a function call.
- */
+/** Calculates the set of variables that are not read after being written up to that point in the program. Useful for
+  * detecting dead stores, constants and which variables are passed as parameters in a function call.
+  */
 trait ANRAnalysis(program: Program, ignoreStackPtrs: Boolean = false) {
 
   val powersetLattice: PowersetLattice[Variable] = PowersetLattice()
@@ -21,7 +20,8 @@ trait ANRAnalysis(program: Program, ignoreStackPtrs: Boolean = false) {
   private val linkRegister = Register("R30", 64)
   private val framePointer = Register("R29", 64)
 
-  private val ignoreRegions: Set[Expr] = if (ignoreStackPtrs) then Set(linkRegister, framePointer, stackPointer) else Set()
+  private val ignoreRegions: Set[Expr] =
+    if (ignoreStackPtrs) then Set(linkRegister, framePointer, stackPointer) else Set()
 
   /** Default implementation of eval.
     */
@@ -36,8 +36,8 @@ trait ANRAnalysis(program: Program, ignoreStackPtrs: Boolean = false) {
       case indirectCall: IndirectCall =>
         s - indirectCall.target
       case call: DirectCall =>
-        s.diff(call.actualParams.flatMap(_._2.variables).toSet.filterNot(ignoreRegions.contains(_))) 
-        ++ call.outParams.map(_._2).toSet
+        s.diff(call.actualParams.flatMap(_._2.variables).toSet.filterNot(ignoreRegions.contains(_)))
+          ++ call.outParams.map(_._2).toSet
       case assign: LocalAssign =>
         val m = s.diff(assign.rhs.variables)
         if (ignoreRegions.contains(assign.lhs)) {
@@ -66,8 +66,8 @@ trait ANRAnalysis(program: Program, ignoreStackPtrs: Boolean = false) {
   }
 }
 
-class ANRAnalysisSolver(program: Program, ignoreStack : Boolean = true) extends ANRAnalysis(program, ignoreStack)
+class ANRAnalysisSolver(program: Program, ignoreStack: Boolean = true)
+    extends ANRAnalysis(program, ignoreStack)
     with IRIntraproceduralForwardDependencies
     with Analysis[Map[CFGPosition, Set[Variable]]]
-    with SimpleWorklistFixpointSolver[CFGPosition, Set[Variable], PowersetLattice[Variable]] {
-}
+    with SimpleWorklistFixpointSolver[CFGPosition, Set[Variable], PowersetLattice[Variable]] {}

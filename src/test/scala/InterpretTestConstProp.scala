@@ -6,10 +6,22 @@ import ir.Endian.LittleEndian
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import specification.*
-import util.{BASILConfig, IRLoading, ILLoadingConfig, IRContext, RunUtils, StaticAnalysis, StaticAnalysisConfig, StaticAnalysisContext, BASILResult, Logger, LogLevel, IRTransform}
+import util.{
+  BASILConfig,
+  IRLoading,
+  ILLoadingConfig,
+  IRContext,
+  RunUtils,
+  StaticAnalysis,
+  StaticAnalysisConfig,
+  StaticAnalysisContext,
+  BASILResult,
+  Logger,
+  LogLevel,
+  IRTransform
+}
 import ir.eval.{interpretTrace, interpret, ExecEffect, Stopped}
 import ir.dsl
-
 
 import java.io.IOException
 import java.nio.file.*
@@ -19,107 +31,51 @@ import util.RunUtils.loadAndTranslate
 
 import scala.collection.mutable
 
-class ConstPropInterpreterValidate extends AnyFunSuite {
+@test_util.tags.StandardSystemTest
+class ConstPropInterpreterValidate
+    extends AnyFunSuite
+    with test_util.CaptureOutput
+    with TestValueDomainWithInterpreter[FlatElement[BitVecLiteral]] {
 
   Logger.setLevel(LogLevel.ERROR)
 
+  def valueInAbstractValue(absval: FlatElement[BitVecLiteral], concrete: Expr) = {
+    absval match {
+      case Top => TrueLiteral
+      case Bottom => TrueLiteral /* deliberately don't check */
+      case FlatEl(value) => BinaryExpr(BVEQ, value, concrete)
+    }
+  }
+
   def testInterpretConstProp(testName: String, examplePath: String) = {
-    val loading = ILLoadingConfig(inputFile = examplePath + testName + ".adt",
+    val loading = ILLoadingConfig(
+      inputFile = examplePath + testName + ".adt",
       relfFile = examplePath + testName + ".relf",
-      dumpIL = None,
+      dumpIL = None
     )
 
     var ictx = IRLoading.load(loading)
     ictx = IRTransform.doCleanup(ictx)
-    val analysisres = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), ictx)
+    ir.transforms.clearParams(ictx.program)
+    val analyses = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), ictx)
 
-    val breaks : List[BreakPoint] = analysisres.intraProcConstProp.collect {
-      // convert analysis result to a list of breakpoints, each which evaluates an expression describing 
-      // the invariant inferred by the analysis (the assignment of registers) at a corresponding program point
+    val analysisres = analyses.intraProcConstProp.collect { case (block: Block, v) =>
+      block -> v
+    }.toMap
 
-      case (command: Command, v) => {
-        val expectedPredicates : List[(String, Expr)] = v.toList.map(r => {
-          val (variable, value) = r
-          val assertion = value match {
-            case Top => TrueLiteral
-            case Bottom => FalseLiteral /* unreachable */
-            case FlatEl(value) => BinaryExpr(BVEQ, variable, value)
-          }
-          (variable.name, assertion)
-        })
-        BreakPoint(location=BreakPointLoc.CMD(command), BreakPointAction(saveState=false,evalExprs=expectedPredicates))
-      }
-    }.toList
+    val result = runTestInterpreter(ictx, analysisres)
+    assert(result.getFailures.isEmpty)
 
-    assert(breaks.nonEmpty)
-
-    // run the interpreter evaluating the analysis result at each command with a breakpoint
-    val interpretResult = interpretWithBreakPoints(ictx, breaks.toList, NormalInterpreter, InterpreterState())
-    val breakres  : List[(BreakPoint, _, List[(String, Expr, Expr)])] = interpretResult._2
-    assert(interpretResult._1.nextCmd == Stopped())
-    assert(breakres.nonEmpty)
-
-    // assert all the collected breakpoint watches have evaluated to true
-    for (b <- breakres) {
-      val (_, _, evaluatedexprs) = b
-      evaluatedexprs.forall(c => {
-        val (n, before, evaled) = c
-        evaled == TrueLiteral
-      })
-    }
   }
 
-  test("indirect_call_example") {
-    val testName = "indirect_call"
-    val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
-    testInterpretConstProp(testName, examplePath)
-  }
-
-  test("indirect_call_gcc_example") {
-    val testName = "indirect_call"
-    val examplePath = System.getProperty("user.dir") + s"/src/test/correct/$testName/gcc/"
-    testInterpretConstProp(testName, examplePath)
-  }
-
-  test("indirect_call_clang_example") {
-    val testName = "indirect_call"
+  test("function1/clang") {
+    val testName = "function1"
     val examplePath = System.getProperty("user.dir") + s"/src/test/correct/$testName/clang/"
     testInterpretConstProp(testName, examplePath)
   }
-
-  test("jumptable2_example") {
-    val testName = "jumptable2"
-    val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
-    testInterpretConstProp(testName, examplePath)
-  }
-
-  test("jumptable2_gcc_example") {
-    val testName = "jumptable2"
+  test("function1/gcc") {
+    val testName = "function1"
     val examplePath = System.getProperty("user.dir") + s"/src/test/correct/$testName/gcc/"
-    testInterpretConstProp(testName, examplePath)
-  }
-
-  test("jumptable2_clang_example") {
-    val testName = "jumptable2"
-    val examplePath = System.getProperty("user.dir") + s"/src/test/correct/$testName/clang/"
-    testInterpretConstProp(testName, examplePath)
-  }
-
-  test("functionpointer_example") {
-    val testName = "functionpointer"
-    val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
-    testInterpretConstProp(testName, examplePath)
-  }
-
-  test("functionpointer_gcc_example") {
-    val testName = "functionpointer"
-    val examplePath = System.getProperty("user.dir") + s"/src/test/correct/$testName/gcc/"
-    testInterpretConstProp(testName, examplePath)
-  }
-
-  test("functionpointer_clang_example") {
-    val testName = "functionpointer"
-    val examplePath = System.getProperty("user.dir") + s"/src/test/correct/$testName/clang/"
     testInterpretConstProp(testName, examplePath)
   }
 

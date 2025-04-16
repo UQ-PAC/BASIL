@@ -34,14 +34,14 @@ class OnePassDSA(
   def renameLHS(c: Command, variable: Variable, index: Int) = {
     c match {
       case s: Statement => visit_stmt(StmtRenamer(Map((variable -> index)), Map()), s)
-      case j: Jump      => visit_jump(StmtRenamer(Map((variable -> index)), Map()), j)
+      case j: Jump => visit_jump(StmtRenamer(Map((variable -> index)), Map()), j)
     }
   }
 
   def renameRHS(c: Command, variable: Variable, index: Int) = {
     c match {
       case s: Statement => visit_stmt(StmtRenamer(Map(), Map((variable -> index))), s)
-      case j: Jump      => visit_jump(StmtRenamer(Map(), Map((variable -> index))), j)
+      case j: Jump => visit_jump(StmtRenamer(Map(), Map((variable -> index))), j)
     }
   }
 
@@ -69,10 +69,23 @@ class OnePassDSA(
   ): Unit = {
     def st(b: Block) = withDefault(state)(b)
 
-    var renames = st(block).renamesBefore
+    val params = block.parent.formalInParam
+    var renames = st(block).renamesBefore.toMap
 
     for (s <- block.statements) {
-      visit_stmt(StmtRenamer(Map(), renames.toMap), s)
+
+      // to handle blocks unreachable from the entry we increment the index of the RHS variable
+      // for non-parameter free variables that don't have a rename defined by their predecessor
+      val incomingRenames = (freeVarsPos(s) -- params -- renames.keySet).map(v => {
+        count(v) = count(v) + 1
+        v -> count(v)
+      })
+      val paramDeps = (params.toSet -- renames.keySet).map(_ -> 0) // also add missing params to analysis state
+      st(block).renamesBefore.addAll(incomingRenames ++ paramDeps)
+      renames = renames ++ incomingRenames ++ paramDeps
+
+      // perform rename
+      visit_stmt(StmtRenamer(Map(), renames), s)
       s match {
         case d: Assign => {
           val vars = d.assignees
@@ -86,7 +99,7 @@ class OnePassDSA(
       }
     }
 
-    visit_jump(StmtRenamer(Map(), renames.toMap), block.jump)
+    visit_jump(StmtRenamer(Map(), renames), block.jump)
     st(block).renamesAfter.addAll(renames)
     st(block).filled = true
 
@@ -120,7 +133,7 @@ class OnePassDSA(
         .map(v => v -> toJoin.map(state(_).renamesAfter.get(v).getOrElse(0)))
         .filter((v, rns) => {
           rns.toList match {
-            case Nil      => false
+            case Nil => false
             case h :: Nil => false
             // if there is no renaming such that all the incoming renames agree
             // then we create a new copy
@@ -128,7 +141,7 @@ class OnePassDSA(
               tl.foldLeft(Some(h): Option[Int])((acc: Option[Int], rn: Int) =>
                 acc match {
                   case Some(v) if v == rn => Some(v)
-                  case _                  => None
+                  case _ => None
                 }
               ).isEmpty
           }
@@ -198,6 +211,7 @@ class OnePassDSA(
 
         for (v <- definedVars) {
           if (!state(nb).renamesAfter.contains(v)) {
+            // pre-emptively create a copy for this branch entry, e.g. to create a new copy for loop headers
             count(v) = count(v) + 1
             state(nb).renamesAfter(v) = count(v)
           }
@@ -212,7 +226,7 @@ class OnePassDSA(
         state(nb).isPhi = true
         liveBefore(nb) = liveAfter(block)
         liveAfter(nb) = liveBefore(b)
-      } 
+      }
     }
   }
 
@@ -297,7 +311,7 @@ class OnePassDSA(
     // fix up rpo index of added phi blocks
     reversePostOrder(p)
 
-    val maxIndex = (Seq(0) ++ freeVarsPos(p).collect  {
+    val maxIndex = (Seq(0) ++ freeVarsPos(p).collect {
       case l: LocalVar if l.index != 0 => l.index
     }).max
     p.ssaCount = maxIndex + 1
@@ -321,12 +335,12 @@ class StmtRenamer(renamesL: Map[Variable, Int] = Map(), renames: Map[Variable, I
 
   override def vrvar(v: Variable) = v match {
     case v if renames.contains(v) && renames(v) != -1 => ChangeTo(addIndex(v, renames(v)))
-    case _                                            => DoChildren()
+    case _ => DoChildren()
   }
 
   override def vlvar(v: Variable) = v match {
     case v if renamesL.contains(v) && renamesL(v) != -1 => ChangeTo(addIndex(v, renamesL(v)))
-    case _                                              => DoChildren()
+    case _ => DoChildren()
   }
 }
 
@@ -339,8 +353,8 @@ def rdDSAProperty(p: Procedure): Boolean = {
   val defs: Map[Variable, Set[Assign]] = p
     .flatMap {
       case a: SingleAssign => Seq((a.lhs, (a: Assign)))
-      case a: DirectCall   => a.outParams.map(_._2).map((l: Variable) => (l, (a: Assign))).toSeq
-      case _               => Seq()
+      case a: DirectCall => a.outParams.map(_._2).map((l: Variable) => (l, (a: Assign))).toSeq
+      case _ => Seq()
     }
     .groupBy(_._1)
     .map((v, vs) => (v, vs.map(_._2).toSet))
@@ -367,7 +381,7 @@ def rdDSAProperty(p: Procedure): Boolean = {
           // Logger.error(s"DSA Property violated on $v at $stmt @ ${stmt.parent.parent.name}::${stmt.parent.label}\n\t ${allDefs.diff(reachDefs)} defs not reached")
           Logger.error(
             s"DSA Property violated on $v at $stmt @ ${stmt.parent.parent.name}::${stmt.parent.label}\n\t ${allDefs
-              .diff(reachDefs)} defs not reached\n\t${reachDefs}"
+                .diff(reachDefs)} defs not reached\n\t${reachDefs}"
           )
         }
       }
@@ -401,22 +415,22 @@ object DSAPropCheck {
 
   def getUses(s: CFGPosition): Set[Variable] = {
     s match {
-      case a: LocalAssign  => a.rhs.variables
-      case a: MemoryStore  => a.index.variables ++ a.value.variables
-      case a: MemoryLoad   => a.index.variables
-      case a: DirectCall   => a.actualParams.flatMap(_._2.variables).toSet
-      case a: Return       => a.outParams.flatMap(_._2.variables).toSet
+      case a: LocalAssign => a.rhs.variables
+      case a: MemoryStore => a.index.variables ++ a.value.variables
+      case a: MemoryLoad => a.index.variables
+      case a: DirectCall => a.actualParams.flatMap(_._2.variables).toSet
+      case a: Return => a.outParams.flatMap(_._2.variables).toSet
       case a: IndirectCall => Set(a.target)
-      case a: Assert       => a.body.variables
-      case a: Assume       => a.body.variables
-      case _               => Set()
+      case a: Assert => a.body.variables
+      case a: Assume => a.body.variables
+      case _ => Set()
     }
   }
 
   def getDefinitions(s: CFGPosition): Set[Variable] = {
     s match {
       case a: Assign => a.assignees
-      case _         => Set()
+      case _ => Set()
     }
   }
 
@@ -501,11 +515,11 @@ object DSAPropCheck {
         val v = getVarIdx(vn)
         list(sym("assert"), list(sym("isUse"), BasilIRToSMT2.int2smt(nodeID), BasilIRToSMT2.int2smt(v)))
       })
-      ++
-      getDefinitions(p).map(vn => {
-        val v = getVarIdx(vn)
-        list(sym("assert"), list(sym("isUse"), BasilIRToSMT2.int2smt(nodeID), BasilIRToSMT2.int2smt(v)))
-      })
+        ++
+          getDefinitions(p).map(vn => {
+            val v = getVarIdx(vn)
+            list(sym("assert"), list(sym("isUse"), BasilIRToSMT2.int2smt(nodeID), BasilIRToSMT2.int2smt(v)))
+          })
     })
     val axioms = List(
       "(assert (forall ((x Int) (y Int) (z Int)) (implies (and (dominates x y) (dominates y z)) (dominates x z))))",

@@ -34,9 +34,9 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](f: I, break
     State.filterM(
       b =>
         b.location match {
-          case BreakPointLoc.CMD(bc) if (bc == c)      => State.pure(true)
+          case BreakPointLoc.CMD(bc) if (bc == c) => State.pure(true)
           case BreakPointLoc.CMDCond(bc, e) if bc == c => doLeft(Eval.evalBool(f)(e))
-          case _                                       => State.pure(false)
+          case _ => State.pure(false)
         },
       breaks
     )
@@ -72,7 +72,7 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](f: I, break
                           if (action.log) {
                             val bpn = breakpoint.name
                             val bpcond = breakpoint.location match {
-                              case BreakPointLoc.CMD(c)        => s"${c.parent.label}:$c"
+                              case BreakPointLoc.CMD(c) => s"${c.parent.label}:$c"
                               case BreakPointLoc.CMDCond(c, e) => s"${c.parent.label}:$c when $e"
                             }
                             val saving = if action.saveState then " stashing state, " else ""

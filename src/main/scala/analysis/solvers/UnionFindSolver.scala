@@ -13,7 +13,7 @@ class UnionFindSolver[A] {
     * equivalent (unified) if one is reachable from the other along zero or more parent links. The parent of a term may
     * be the term itself, in which case it is the representative for its equivalence class.
     */
-  private val parent = mutable.Map[Term[A], Term[A]]()
+  protected val parent = mutable.Map[Term[A], Term[A]]()
 
   /** Performs the unification of the two terms `t1` and `t2`. When unifying a variable and a non-variable term, the
     * non-variable term has higher priority for becoming the representative.
@@ -99,8 +99,7 @@ class UnionFindSolver[A] {
 
 /** Exception thrown in case of unification failure.
   */
-class UnificationFailure(message: String)
-  extends Exception(message) {
+class UnificationFailure(message: String) extends Exception(message) {
 
   def this(message: String, cause: Throwable) = {
     this(message)

@@ -1,6 +1,19 @@
 package ir.transforms
 
-import analysis.{AddressValue, DataRegion, FlatElement, Lift, LiftedElement, LiteralValue, MemoryModelMap, MemoryRegion, RegisterWrapperEqualSets, StackRegion, Value, getSSAUse}
+import analysis.{
+  AddressValue,
+  DataRegion,
+  FlatElement,
+  Lift,
+  LiftedElement,
+  LiteralValue,
+  MemoryModelMap,
+  MemoryRegion,
+  RegisterWrapperEqualSets,
+  StackRegion,
+  Value,
+  getSSAUse
+}
 import ir.*
 import util.Logger
 
@@ -45,7 +58,7 @@ class SteensgaardIndirectCallResolution(
                   )
               }
             case memoryRegion: MemoryRegion =>
-              //searchRegion(memoryRegion)
+              // searchRegion(memoryRegion)
               Set(memoryRegion.regionIdentifier) // TODO: fix me
           }
         } else {
@@ -66,7 +79,7 @@ class SteensgaardIndirectCallResolution(
                   )
               }
             case memoryRegion: MemoryRegion =>
-              //searchRegion(memoryRegion))
+              // searchRegion(memoryRegion))
               Set(memoryRegion.regionIdentifier) // TODO: fix me
           }
           names + dataRegion.regionIdentifier // TODO: may need to investigate if we should add the parent region
@@ -80,7 +93,7 @@ class SteensgaardIndirectCallResolution(
       case Some(values) =>
         values.flatMap {
           case v: RegisterWrapperEqualSets => resolveAddresses(v.variable, i)
-          case m: MemoryRegion             => searchRegion(m)
+          case m: MemoryRegion => searchRegion(m)
         }
       case None => Set()
     }
@@ -96,18 +109,19 @@ class VSAIndirectCallResolution(
 
   override def resolveAddresses(variable: Variable, i: IndirectCall): Set[String] = {
     vsaResult.get(i) match {
-      case Some(Lift(el)) => el.get(variable) match {
-        case Some(values) =>
-          values.flatMap {
-            case addressValue: AddressValue =>
-              addressValue.region match {
-                case dataRegion: DataRegion => mmm.relfContent.getOrElse(dataRegion, Set())
-                case _ => Set()
-              }
-            case _: LiteralValue => Set()
-          }
-        case _ => Set()
-      }
+      case Some(Lift(el)) =>
+        el.get(variable) match {
+          case Some(values) =>
+            values.flatMap {
+              case addressValue: AddressValue =>
+                addressValue.region match {
+                  case dataRegion: DataRegion => mmm.relfContent.getOrElse(dataRegion, Set())
+                  case _ => Set()
+                }
+              case _: LiteralValue => Set()
+            }
+          case _ => Set()
+        }
       case _ => Set()
     }
   }
@@ -174,9 +188,9 @@ trait IndirectCallResolution {
 
           /* copy the goto node resulting */
           val fallthrough = oft match {
-            case g: GoTo        => GoTo(g.targets, g.label)
+            case g: GoTo => GoTo(g.targets, g.label)
             case _: Unreachable => Unreachable()
-            case _: Return      => Return()
+            case _: Return => Return()
           }
           newBlocks.append(Block(newLabel, None, ArrayBuffer(assume, directCall), fallthrough))
         }

@@ -5,19 +5,21 @@ import analysis.solvers.DSAUnionFindSolver
 import analysis.evaluateExpression
 import cfg_visualiser.*
 import ir.*
-import specification.{ExternalFunction, SymbolTableEntry}
-import boogie.{FuncEntry, SpecGlobal}
+import util.Counter
+import specification.{ExternalFunction, FuncEntry, SymbolTableEntry}
+import boogie.SpecGlobal
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.Breaks.{break, breakable}
 
-/**
-  * Data Structure Graph for DSA
+/** Data Structure Graph for DSA
   *
-  * @param proc procedure of DSG
+  * @param proc
+  *   procedure of DSG
   * @param constProp
-  * @param varToSym mapping flow-sensitive (position sensitive) mapping from registers to their set of symbolic accesses
+  * @param varToSym
+  *   mapping flow-sensitive (position sensitive) mapping from registers to their set of symbolic accesses
   * @param globals
   * @param globalOffsets
   * @param externalFunctions
@@ -25,16 +27,17 @@ import scala.util.control.Breaks.{break, breakable}
   * @param writesTo
   * @param params
   */
-class Graph(val proc: Procedure,
-            constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-            varToSym: Map[CFGPosition, Map[Variable, Set[SymbolicAddress]]],
-            globals: Set[SymbolTableEntry],
-            globalOffsets: Map[BigInt, BigInt],
-            externalFunctions: Set[ExternalFunction],
-            val reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
-            val writesTo: Map[Procedure, Set[Register]],
-            val params: Map[Procedure, Set[Variable]]
-           ) {
+class Graph(using Counter)(
+  val proc: Procedure,
+  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+  varToSym: Map[CFGPosition, Map[Variable, Set[SymbolicAddress]]],
+  globals: Set[SymbolTableEntry],
+  globalOffsets: Map[BigInt, BigInt],
+  externalFunctions: Set[ExternalFunction],
+  val reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
+  val writesTo: Map[Procedure, Set[Register]],
+  val params: Map[Procedure, Set[Variable]]
+) {
 
   // DSNodes owned by this graph, only updated once analysis is done,
   val nodes: mutable.Set[Node] = mutable.Set()
@@ -54,28 +57,22 @@ class Graph(val proc: Procedure,
       (results, pos) =>
         pos match {
           case LocalAssign(_, expr, _) =>
-            visitStackAccess(pos, expr, 0).foldLeft(results) {
-              (res, access) =>
-                if !res.contains(access.offset) || (res.getOrElse(access.offset, -1) < access.size) then
-                  res + (access.offset -> access.size)
-                else
-                  res
+            visitStackAccess(pos, expr, 0).foldLeft(results) { (res, access) =>
+              if !res.contains(access.offset) || (res.getOrElse(access.offset, -1) < access.size) then
+                res + (access.offset -> access.size)
+              else res
             }
           case MemoryStore(_, index, _, _, size, _) =>
-            visitStackAccess(pos, index, size).foldLeft(results) {
-              (res, access) =>
-                if !res.contains(access.offset) || (res.getOrElse(access.offset, -1) < access.size) then
-                  res + (access.offset -> access.size)
-                else
-                  res
+            visitStackAccess(pos, index, size).foldLeft(results) { (res, access) =>
+              if !res.contains(access.offset) || (res.getOrElse(access.offset, -1) < access.size) then
+                res + (access.offset -> access.size)
+              else res
             }
           case MemoryLoad(_, _, index, _, size, _) =>
-            visitStackAccess(pos, index, size).foldLeft(results) {
-              (res, access) =>
-                if !res.contains(access.offset) || (res.getOrElse(access.offset, -1) < access.size) then
-                  res + (access.offset -> access.size)
-                else
-                  res
+            visitStackAccess(pos, index, size).foldLeft(results) { (res, access) =>
+              if !res.contains(access.offset) || (res.getOrElse(access.offset, -1) < access.size) then
+                res + (access.offset -> access.size)
+              else res
             }
           case _ => results
         }
@@ -88,8 +85,9 @@ class Graph(val proc: Procedure,
     assert(size % 8 == 0)
     val byteSize = size / 8
     index match
-      case BinaryExpr(_, arg1: Variable, arg2) if varToSym.contains(pos) && varToSym(pos).contains(arg1) &&
-        evaluateExpression(arg2, constProp(pos)).isDefined =>
+      case BinaryExpr(_, arg1: Variable, arg2)
+          if varToSym.contains(pos) && varToSym(pos).contains(arg1) &&
+            evaluateExpression(arg2, constProp(pos)).isDefined =>
         val offset = evaluateExpression(arg2, constProp(pos)).get.value
         varToSym(pos)(arg1).flatMap {
           case SymbolicAddress(_, _: StackLocation, symOffset) => // only consider stack accesses
@@ -126,24 +124,18 @@ class Graph(val proc: Procedure,
     nextValidOffset = offset + byteSize
   }
 
-
-  /**
-   * Takes a cell and returns all corresponding stack offsets to it if any
-   */
+  /** Takes a cell and returns all corresponding stack offsets to it if any
+    */
   def getStackOffsets(cell: Cell): Set[BigInt] = { // TODO replace with tracking through merges
-    stackMapping.foldLeft(Set[BigInt]()) {
-      (s, f) =>
-        f match
-          case (offset: BigInt, node: Node) =>
-            s ++ node.cells.foldLeft(Set[BigInt]()) {
-              (se, g) =>
-                g match
-                  case (internal: BigInt, stackCell: Cell) =>
-                    if cell == find(stackCell) then
-                      se + (offset + internal)
-                    else
-                      se
-            }
+    stackMapping.foldLeft(Set[BigInt]()) { (s, f) =>
+      f match
+        case (offset: BigInt, node: Node) =>
+          s ++ node.cells.foldLeft(Set[BigInt]()) { (se, g) =>
+            g match
+              case (internal: BigInt, stackCell: Cell) =>
+                if cell == find(stackCell) then se + (offset + internal)
+                else se
+          }
     }
   }
 
@@ -157,12 +149,9 @@ class Graph(val proc: Procedure,
         stackMapping(offset).cells(0)
       else
         breakable {
-          stackMapping.keys.toSeq.sorted.foreach(
-            elementOffset =>
-              if offset < elementOffset then
-                break
-              else
-                last = elementOffset
+          stackMapping.keys.toSeq.sorted.foreach(elementOffset =>
+            if offset < elementOffset then break
+            else last = elementOffset
           )
         }
         val diff = offset - last
@@ -175,35 +164,60 @@ class Graph(val proc: Procedure,
     // However, the above approach prevents distinct multi loads
     // find(head).growSize(size)
     val headOffset = headNodeOffset + head.offset
-    stackMapping.keys.toSeq.filter(off => off > headOffset && off < headOffset + size).sorted.foreach {
-      off =>
-        val stackDiff = off - headOffset
-        val updatedHead = find(head)
-        val newHeadOffset = updatedHead.offset
-        val headNode = updatedHead.node.get
-        mergeCells(headNode.addCell(newHeadOffset + stackDiff, 0), find(stackMapping(off).cells(0)))
+    stackMapping.keys.toSeq.filter(off => off > headOffset && off < headOffset + size).sorted.foreach { off =>
+      val stackDiff = off - headOffset
+      val updatedHead = find(head)
+      val newHeadOffset = updatedHead.offset
+      val headNode = updatedHead.node.get
+      mergeCells(headNode.addCell(newHeadOffset + stackDiff, 0), find(stackMapping(off).cells(0)))
     }
     // selfCollapse(head.node.get)
     find(head)
   }
 
-
   private val swappedOffsets = globalOffsets.map(_.swap)
 
+  /** Converts a global name to an Address range
+    * @param name
+    *   the name of the global region used as a reference
+    * @param size
+    *   size of the Address region to be returned if 0 the size is instead one specified by SpecGlobals
+    * @param relocated
+    *   value determines the level of relocation, if 0 return address range begining at start of global region name.
+    *   otherwise attempt to find a global address pointing to x through "relocated" number of indirections
+    * @return
+    */
+  def getGlobal(name: String, size: Int = 0, relocated: Int = 0): Option[AddressRange] = {
+    val matchedName = globals.filter(_.name == name)
+    assert(matchedName.size <= 1)
+    if matchedName.isEmpty then None
+    else
+      val global = matchedName.head
+      if relocated == 0 then
+        Some(AddressRange(global.address, global.address + (if size == 0 then global.size / 8 else size)))
+      else
+        var i = relocated
+        var address = global.address
+        while i > 0 do
+          address = swappedOffsets.getOrElse(address, -1)
+          i -= 1
+        if address == -1 then None
+        else Some(AddressRange(address, address + size))
+  }
   // creates the globals from the symbol tables
   val globalMapping = mutable.Map[AddressRange, Field]()
   globals.foreach {
     case FuncEntry(name, size, address) =>
 
-      val function = Node(Some(this), size/8)
-      function.cells(0).growSize(size/8)
+      val function = Node(Some(this), size / 8)
+      function.cells(0).growSize(size / 8)
       function.allocationRegions.add(Function(name, address, size / 8)) // todo check that size 0 is correct
       function.flags.global = true
       function.flags.incomplete = true
       globalMapping.update(AddressRange(address, address + (size / 8)), Field(function, 0))
     case SpecGlobal(name, size, arraySize, address) =>
 
-      val node = Node(Some(this), size/8)
+      val node = Node(Some(this), size / 8)
       node.allocationRegions.add(DataLocation(name, address, size / 8))
       node.flags.global = true
       node.flags.incomplete = true
@@ -218,8 +232,7 @@ class Graph(val proc: Procedure,
     breakable {
       while (swappedOffsets.contains(address)) {
         val relocatedAddress = swappedOffsets(address)
-        if relocatedAddress == address then
-          break
+        if relocatedAddress == address then break
 
         var field: BigInt = 0
         val node: Node = isGlobal(relocatedAddress) match
@@ -276,13 +289,11 @@ class Graph(val proc: Procedure,
     for ((range, field) <- globalMapping) {
       if (address < range.end && range.start < address + size) ||
         (address + size > range.end && address < range.end) ||
-        (address >= range.start && (address < range.end || (range.start == range.end && range.end == address))) then
-        global = global ++ Seq(DSAGlobal(range, field))
+        (address >= range.start && (address < range.end || (range.start == range.end && range.end == address)))
+      then global = global ++ Seq(DSAGlobal(range, field))
 
     }
     global.sortBy(f => f.addressRange.start)
-
-
 
   def getGlobal(address: BigInt, size: Int): Option[Cell] = {
     val globals = getGlobals(address, size)
@@ -296,30 +307,25 @@ class Graph(val proc: Procedure,
       // However, the above approach prevent distinct multi loads
       // graph.selfCollapse(headNode)
       val tail = globals.tail
-      tail.foreach {
-        g =>
-          val DSAGlobal(range: AddressRange, Field(node, internal)) = g
-          val offset: BigInt = if address > range.start then address - range.start + internal else internal
-          node.addCell(offset, 0)
-          selfCollapse(node)
-          assert(range.start >= address)
-          mergeCells(find(headNode.addCell(range.start - address, 0)), find(node.getCell(offset)))
+      tail.foreach { g =>
+        val DSAGlobal(range: AddressRange, Field(node, internal)) = g
+        val offset: BigInt = if address > range.start then address - range.start + internal else internal
+        node.addCell(offset, 0)
+        selfCollapse(node)
+        assert(range.start >= address)
+        mergeCells(find(headNode.addCell(range.start - address, 0)), find(node.getCell(offset)))
       }
       selfCollapse(find(headCell).node.get)
       Some(find(headCell))
-    else
-      None
+    else None
   }
 
   def getGlobalAddresses(cell: Cell): Set[BigInt] = {
-    globalMapping.foldLeft(Set[BigInt]()) {
-      (s, g) =>
-        g match
-          case (range: AddressRange, field: Field) =>
-            if cell == find(field.node.getCell(field.offset)) then
-              s + range.start
-            else
-              s
+    globalMapping.foldLeft(Set[BigInt]()) { (s, g) =>
+      g match
+        case (range: AddressRange, field: Field) =>
+          if cell == find(field.node.getCell(field.offset)) then s + range.start
+          else s
     }
   }
 
@@ -331,9 +337,7 @@ class Graph(val proc: Procedure,
     }
   }
 
-
-  /**
-    * collects all the nodes that are currently in the DSG and updates nodes member variable
+  /** collects all the nodes that are currently in the DSG and updates nodes member variable
     */
   def collectNodes(): Unit = {
     nodes.clear()
@@ -384,12 +388,24 @@ class Graph(val proc: Procedure,
     pointsto.foreach { (cell, pointee) =>
       val pointerID = cell.node.get.id.toString
       val pointerOffset = cell.offset.toString
-      arrows.append(StructArrow(DotStructElement(pointerID, Some(pointerOffset)), DotStructElement(pointee.node.id.toString, Some(pointee.cell.offset.toString)), pointee.internalOffset.toString))
+      arrows.append(
+        StructArrow(
+          DotStructElement(pointerID, Some(pointerOffset)),
+          DotStructElement(pointee.node.id.toString, Some(pointee.cell.offset.toString)),
+          pointee.internalOffset.toString
+        )
+      )
     }
 
     formals.foreach { (variable, slice) =>
       val value = find(slice)
-      arrows.append(StructArrow(DotStructElement(s"Formal_${variable.name.filterNot(toRemove)}", None), DotStructElement(value.node.id.toString, Some(value.cell.offset.toString)), value.internalOffset.toString))
+      arrows.append(
+        StructArrow(
+          DotStructElement(s"Formal_${variable.name.filterNot(toRemove)}", None),
+          DotStructElement(value.node.id.toString, Some(value.cell.offset.toString)),
+          value.internalOffset.toString
+        )
+      )
     }
 
     varToCell.foreach { (pos, mapping) =>
@@ -402,7 +418,13 @@ class Graph(val proc: Procedure,
         val varName = variable.name.filterNot(toRemove)
         structs.append(DotStruct(s"SSA_${id}_$varName", s"SSA_${pos}_$varName", None, false))
         val value = find(slice)
-        arrows.append(StructArrow(DotStructElement(s"SSA_${id}_$varName", None), DotStructElement(value.node.id.toString, Some(value.cell.offset.toString)), value.internalOffset.toString))
+        arrows.append(
+          StructArrow(
+            DotStructElement(s"SSA_${id}_$varName", None),
+            DotStructElement(value.node.id.toString, Some(value.cell.offset.toString)),
+            value.internalOffset.toString
+          )
+        )
       }
     }
 
@@ -412,7 +434,13 @@ class Graph(val proc: Procedure,
       val offset = field.offset + find(field.node).offset
       val cellOffset = node.getCell(offset).offset
       val internalOffset = offset - cellOffset
-      arrows.append(StructArrow(DotStructElement(s"Global_${range.start}_${range.end}", None), DotStructElement(node.id.toString, Some(cellOffset.toString)), internalOffset.toString))
+      arrows.append(
+        StructArrow(
+          DotStructElement(s"Global_${range.start}_${range.end}", None),
+          DotStructElement(node.id.toString, Some(cellOffset.toString)),
+          internalOffset.toString
+        )
+      )
     }
 
     stackMapping.foreach { (offset, dsn) =>
@@ -421,15 +449,19 @@ class Graph(val proc: Procedure,
       val nodeOffset = find(dsn).offset
       val cellOffset = node.getCell(nodeOffset).offset
       val internalOffset = nodeOffset - cellOffset
-      arrows.append(StructArrow(DotStructElement(s"Stack_$offset", None), DotStructElement(node.id.toString, Some(cellOffset.toString)), internalOffset.toString))
+      arrows.append(
+        StructArrow(
+          DotStructElement(s"Stack_$offset", None),
+          DotStructElement(node.id.toString, Some(cellOffset.toString)),
+          internalOffset.toString
+        )
+      )
     }
 
-    StructDotGraph(proc.name, structs, arrows).toDotString
+    StructDotGraph(proc.procName, structs, arrows).toDotString
   }
 
-
-  /**
-    * Collapses the node causing it to lose field sensitivity
+  /** Collapses the node causing it to lose field sensitivity
     */
   def collapseNode(n: Node): Node = {
     val (term, _) = solver.findWithOffset(n.term)
@@ -483,10 +515,8 @@ class Graph(val proc: Procedure,
     }
   }
 
-
-  /**
-    * this function merges all the overlapping cells in the given node
-    * The node DOESN'T lose field sensitivity after this
+  /** this function merges all the overlapping cells in the given node The node DOESN'T lose field sensitivity after
+    * this
     */
   def selfCollapse(node: Node): Unit = {
     var lastOffset: BigInt = -1
@@ -507,8 +537,7 @@ class Graph(val proc: Procedure,
     removed.foreach(node.cells.remove)
   }
 
-  /**
-    * merges two neighbouring cells into one
+  /** merges two neighbouring cells into one
     */
   private def mergeNeighbours(cell1: Cell, cell2: Cell): Cell = {
     require(cell1.node.equals(cell2.node) && cell1.offset < cell2.offset)
@@ -531,10 +560,11 @@ class Graph(val proc: Procedure,
   //  private val parent = mutable.Map[DSC, DSC]()
   val solver: DSAUnionFindSolver = DSAUnionFindSolver()
 
-  /**
-    * wrapper for find functionality of the union-find
-    * @param node the node to perform find on
-    * @return a field which is the tuple (parent node of the input node, starting offset of the input node in its parent)
+  /** wrapper for find functionality of the union-find
+    * @param node
+    *   the node to perform find on
+    * @return
+    *   a field which is the tuple (parent node of the input node, starting offset of the input node in its parent)
     */
   def find(node: Node): Field = {
     val (n, offset) = solver.findWithOffset(node.term)
@@ -542,11 +572,12 @@ class Graph(val proc: Procedure,
     Field(resultNode, offset)
   }
 
-  /**
-    * wrapper for find functionality of the union-find
+  /** wrapper for find functionality of the union-find
     *
-    * @param cell the cell to perform find on
-    * @return the input cell's equivalent cell in the parent
+    * @param cell
+    *   the cell to perform find on
+    * @return
+    *   the input cell's equivalent cell in the parent
     */
   def find(cell: Cell): Cell = {
     val node = cell.node.get
@@ -568,20 +599,18 @@ class Graph(val proc: Procedure,
     newCell.node.get.getCell(newCell.offset)
   }
 
-  /**
-    * merges two cells and unifies their nodes
+  /** merges two cells and unifies their nodes
     * @param cell1
     * @param cell2
-    * @return the resulting cell in the unified node
+    * @return
+    *   the resulting cell in the unified node
     */
   def mergeCells(c1: Cell, c2: Cell): Cell = {
     var cell1 = c1
     var cell2 = c2
-    if c1.node.isDefined then
-      cell1 = find(c1)
+    if c1.node.isDefined then cell1 = find(c1)
 
-    if c2.node.isDefined then
-      cell2 = find(c2)
+    if c2.node.isDefined then cell2 = find(c2)
 
     if cell1.equals(cell2) then // same cell no action required
       cell1
@@ -610,8 +639,7 @@ class Graph(val proc: Procedure,
           val slice2 = node2.cells(0).getPointee
           val result = mergeCells(adjust(slice1), adjust(slice2))
           node2.cells(0).pointee = Some(Slice(result, slice1.internalOffset.max(slice2.internalOffset)))
-        else
-          node2.cells(0).pointee = node1.cells(0).pointee
+        else node2.cells(0).pointee = node1.cells(0).pointee
       //      node1.cells(0).pointee = None
       //      replace(node1.cells(0), node2.cells(0), 0)
       solver.unify(node1.term, node2.term, 0)
@@ -627,7 +655,6 @@ class Graph(val proc: Procedure,
         delta = cell2.offset - cell1.offset
         node1 = cell2.node.get
         node2 = cell1.node.get
-
 
       // create a seq of all cells from both nodes in order of their offsets in the resulting unified node
 
@@ -694,9 +721,8 @@ class Graph(val proc: Procedure,
         if (outgoing.size == 1) {
           collapsedCell.pointee = Some(outgoing.head)
         } else if (outgoing.size > 1) {
-          val result = outgoing.tail.foldLeft(adjust(outgoing.head)) {
-            (result, pointee) =>
-              mergeCells(result, adjust(pointee))
+          val result = outgoing.tail.foldLeft(adjust(outgoing.head)) { (result, pointee) =>
+            mergeCells(result, adjust(pointee))
           }
           collapsedCell.pointee = Some(deadjust(result))
         }
@@ -704,10 +730,8 @@ class Graph(val proc: Procedure,
 
       solver.unify(node1.term, resultNode.term, 0)
       solver.unify(node2.term, resultNode.term, delta)
-      if cell1.offset >= cell2.offset then
-        resultNode.getCell(cell1.offset)
-      else
-        resultNode.getCell(cell2.offset)
+      if cell1.offset >= cell2.offset then resultNode.getCell(cell1.offset)
+      else resultNode.getCell(cell2.offset)
   }
 
   def adjust(cell: Cell, internalOffset: BigInt): Cell = {
@@ -732,26 +756,21 @@ class Graph(val proc: Procedure,
   }
 
   def handleOverlapping(cell: Cell): Cell = {
-    val size =  cell.node.get.getSize - cell.offset // if it's stack the size is rest of the node
+    val size = cell.node.get.getSize - cell.offset // if it's stack the size is rest of the node
     val result =
       if cell.node.get.flags.stack then
-        getStackOffsets(cell).foldLeft(cell) {
-          (res, offset) =>
-            val stack = getStack(offset, size.toInt)
-            mergeCells(res, stack)
+        getStackOffsets(cell).foldLeft(cell) { (res, offset) =>
+          val stack = getStack(offset, size.toInt)
+          mergeCells(res, stack)
         }
-      else
-        cell
-
+      else cell
 
 //    size = result.largestAccessedSize
     if result.node.get.flags.global then
-      getGlobalAddresses(result).foldLeft(result) {
-        (res, offset) =>
-          mergeCells(res, getGlobal(offset, size.toInt).get)
+      getGlobalAddresses(result).foldLeft(result) { (res, offset) =>
+        mergeCells(res, getGlobal(offset, size.toInt).get)
       }
-    else
-      result
+    else result
   }
 
   private def isFormal(pos: CFGPosition, variable: Variable): Boolean = !reachingDefs(pos).contains(variable)
@@ -766,6 +785,15 @@ class Graph(val proc: Procedure,
     val varToCell = mutable.Map[CFGPosition, mutable.Map[Variable, Slice]]()
     val domain = computeDomain(IntraProcIRCursor, Set(proc))
     domain.foreach {
+      case a: Assume =>
+        a.body.variables.foreach { v =>
+          if (isFormal(a, v)) {
+            val node = Node(Some(this))
+            node.flags.incomplete = true
+            nodes.add(node)
+            formals.update(v, Slice(node.cells(0), 0))
+          }
+        }
       case pos @ LocalAssign(variable, value, _) =>
         value.variables.foreach { v =>
           if (isFormal(pos, v)) {
@@ -788,7 +816,7 @@ class Graph(val proc: Procedure,
         }
         val node = Node(Some(this))
         varToCell(pos) = mutable.Map(lhs -> Slice(node.cells(0), 0))
-      case pos @ DirectCall(target, _, _, _) if target.name == "malloc" =>
+      case pos @ DirectCall(target, _, _, _) if target.procName == "malloc" =>
         val node = Node(Some(this))
         varToCell(pos) = mutable.Map(mallocRegister -> Slice(node.cells(0), 0))
       case pos @ DirectCall(target, _, _, _) if writesTo.contains(target) =>
@@ -814,21 +842,20 @@ class Graph(val proc: Procedure,
     varToCell
   }
 
-  def SSAVar(posLabel:String, varName: String): Slice = {
-    assert(posLabel.matches("%[0-9]{8}?\\$\\d"))
+  def SSAVar(posLabel: String, varName: String): Slice = {
+    assert(posLabel.matches("%[0-9a-f]{8}?\\$\\d"), s"posLabel not matching BAP format '$posLabel'")
 
     val res = varToCell.keys.filter(pos => pos.toShortString.startsWith(posLabel))
-    assert(res.size == 1)
+    assert(res.size == 1, s"failed to get SSAVar for '$posLabel' and '$varName'. matched label: ${res}")
     val key = res.head
 
     val map = varToCell(key).toMap
 
-    val temp =  map.keys.filter(variable => variable.name == varName)
-    assert(temp.size == 1)
+    val temp = map.keys.filter(variable => variable.name == varName)
+    assert(temp.size == 1, s"failed to get SSAVar for '$posLabel' and '$varName'. matched name: ${temp}")
     val variable = temp.head
     map(variable)
   }
-
 
   val accessIndexToSlice: mutable.Map[Statement, Slice] = accessIndexToSliceInit(proc)
 
@@ -847,9 +874,9 @@ class Graph(val proc: Procedure,
     accessIndexToSlice
   }
 
-
   def cloneSelf(): Graph = {
-    val newGraph = Graph(proc, constProp, varToSym, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params)
+    val newGraph =
+      Graph(proc, constProp, varToSym, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params)
     assert(formals.size == newGraph.formals.size)
     val nodes = mutable.Set[Node]()
     val idToNode: mutable.Map[Int, Node] = mutable.Map()
@@ -878,7 +905,9 @@ class Graph(val proc: Procedure,
           val newNode = node.cloneSelf(newGraph)
           idToNode.update(node.id, newNode)
         }
-        newGraph.varToCell(position).update(variable, Slice(idToNode(node.id).cells(slice.offset), slice.internalOffset))
+        newGraph
+          .varToCell(position)
+          .update(variable, Slice(idToNode(node.id).cells(slice.offset), slice.internalOffset))
       }
     }
 
@@ -922,7 +951,10 @@ class Graph(val proc: Procedure,
       if !idToNode.contains(finalNode.id) then
         val newNode = finalNode.cloneSelf(newGraph)
         idToNode.update(finalNode.id, newNode)
-      newGraph.globalMapping.update(range, Field(idToNode(finalNode.id), cell.offset + (offset - finalNode.getCell(offset).offset)))
+      newGraph.globalMapping.update(
+        range,
+        Field(idToNode(finalNode.id), cell.offset + (offset - finalNode.getCell(offset).offset))
+      )
     }
 
     val queue = mutable.Queue[Node]()
@@ -939,7 +971,8 @@ class Graph(val proc: Procedure,
             val newNode = pointee.node.cloneSelf(newGraph)
             idToNode.update(pointeeId, newNode)
           }
-          idToNode(id).cells(cell.offset).pointee = Some(Slice(idToNode(pointeeId).cells(pointee.offset), pointee.internalOffset))
+          idToNode(id).cells(cell.offset).pointee =
+            Some(Slice(idToNode(pointeeId).cells(pointee.offset), pointee.internalOffset))
         }
       }
     }

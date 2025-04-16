@@ -13,6 +13,7 @@ import scala.language.postfixOps
 import scala.sys.process.*
 import util.*
 import mainargs.{main, arg, ParserForClass, Flag}
+import util.boogie_interaction.BoogieResultKind
 
 object Main {
 
@@ -22,29 +23,32 @@ object Main {
   }
 
   def loadDirectory(i: ChooseInput = ChooseInput.Gtirb, d: String): ILLoadingConfig = {
-    val p = d.split("/")
-    val tryName = Seq(p.last, p.dropRight(1).last)
 
-    tryName.flatMap(name =>  {
-      val trySpec = Seq((p ++ Seq(s"$name.spec")).mkString("/"), (p.dropRight(1) ++ Seq(s"$name.spec")).mkString("/"))
-      val adt = (p ++ Seq(s"$name.adt")).mkString("/")
-      val relf = (p ++ Seq(s"$name.relf")).mkString("/")
-      val gtirb = (p ++ Seq(s"$name.gts")).mkString("/")
+    val x = d.stripSuffix(".gts").stripSuffix(".adt")
+    val p = x.split("/")
+    val tryName = Seq(x + "/" + p.last, x + "/" + p.dropRight(1).last, x, p.last, p.dropRight(1).mkString("/"))
 
+    tryName
+      .flatMap(name => {
+        val trySpec =
+          tryName.map(n => n + ".spec") ++ Seq(p.dropRight(1).mkString("/") + "/" + p.dropRight(1).last + ".spec")
+        val adt = s"$name.adt"
+        val relf = s"$name.relf"
+        val gtirb = s"$name.gts"
 
-      val spec = trySpec
-        .flatMap(s => {
-          if (File(s).exists) {
-            Seq(s)
-          } else {
-            Seq()
-          }
-        })
-        .headOption
+        val spec = trySpec
+          .flatMap(s => {
+            if (File(s).exists) {
+              Seq(s)
+            } else {
+              Seq()
+            }
+          })
+          .headOption
 
-      val input = i match
-        case ChooseInput.Gtirb => gtirb
-        case ChooseInput.Bap   => adt
+        val input = i match
+          case ChooseInput.Gtirb => gtirb
+          case ChooseInput.Bap => adt
 
         if (File(input).exists() && File(relf).exists()) {
           Logger.info(s"Found $input $relf ${spec.getOrElse("")}")
@@ -52,21 +56,16 @@ object Main {
         } else {
           Seq()
         }
-    }).head
+      })
+      .head
 
   }
 
   @main(name = "BASIL")
   case class Config(
-    @arg(
-      name = "load-directory-bap",
-      doc = "Load relf, adt, and bir from directory (and spec from parent directory)"
-    )
+    @arg(name = "load-directory-bap", doc = "Load relf, adt, and bir from directory (and spec from parent directory)")
     bapInputDirName: Option[String],
-    @arg(
-      name = "load-directory-gtirb",
-      doc = "Load relf, gts, and bir from directory (and spec from parent directory)"
-    )
+    @arg(name = "load-directory-gtirb", doc = "Load relf, gts, and bir from directory (and spec from parent directory)")
     gtirbInputDirName: Option[String],
     @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file")
     inputFileName: Option[String],
@@ -138,15 +137,27 @@ object Main {
     validateSimplify: Flag,
     @arg(name = "verify", doc = "Run boogie on the resulting file")
     verify: Flag,
-    @arg(name = "memory-regions", doc = "Performs static analysis to separate memory into discrete regions in Boogie output (requires --analyse flag) (mra|dsa) (dsa is recommended over mra)")
+    @arg(
+      name = "memory-regions",
+      doc =
+        "Performs static analysis to separate memory into discrete regions in Boogie output (requires --analyse flag) (mra|dsa) (dsa is recommended over mra)"
+    )
     memoryRegions: Option[String],
     @arg(
       name = "no-irreducible-loops",
       doc = "Disable producing irreducible loops when --analyse is passed (does nothing without --analyse)"
     )
     noIrreducibleLoops: Flag,
-    @arg(name = "dsa", doc = "Perform Data Structure Analysis if no version is specified perform constraint generation (requires --simplify flag) (none|norm|field|set|all)")
+    @arg(
+      name = "dsa",
+      doc =
+        "Perform Data Structure Analysis if no version is specified perform constraint generation (requires --simplify flag) (none|norm|field|set|all)"
+    )
     dsaType: Option[String],
+    @arg(name = "memory-transform", doc = "Transform memory access to region accesses")
+    memoryTransform: Flag,
+    @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
+    noif: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -187,8 +198,8 @@ object Main {
 
     val rely = conf.procedureRG match {
       case Some("function") => Some(ProcRelyVersion.Function)
-      case Some("ifblock")  => Some(ProcRelyVersion.IfCommandContradiction)
-      case None             => None
+      case Some("ifblock") => Some(ProcRelyVersion.IfCommandContradiction)
+      case None => None
       case Some(_) =>
         throw new IllegalArgumentException("Illegal option to boogie-procedure-rg, allowed are: ifblock, function")
     }
@@ -196,7 +207,7 @@ object Main {
       val memoryRegionsMode = conf.memoryRegions match {
         case Some("dsa") => MemoryRegionsMode.DSA
         case Some("mra") => MemoryRegionsMode.MRA
-        case None        => MemoryRegionsMode.Disabled
+        case None => MemoryRegionsMode.Disabled
         case Some(_) => throw new IllegalArgumentException("Illegal option to memory-regions, allowed are: dsa, mra")
       }
       Some(
@@ -213,15 +224,16 @@ object Main {
       None
     }
 
-    val dsa: Option[DSAConfig] =  if (conf.simplify.value) {
+    val dsa: Option[DSAConfig] = if (conf.simplify.value) {
       conf.dsaType match
         case Some("set") => Some(DSAConfig(immutable.Set(DSAAnalysis.Set)))
         case Some("field") => Some(DSAConfig(immutable.Set(DSAAnalysis.Field)))
         case Some("norm") => Some(DSAConfig(immutable.Set(DSAAnalysis.Norm)))
-        case Some("all") =>  Some(DSAConfig(immutable.Set(DSAAnalysis.Set, DSAAnalysis.Field, DSAAnalysis.Norm)))
+        case Some("all") => Some(DSAConfig(immutable.Set(DSAAnalysis.Set, DSAAnalysis.Field, DSAAnalysis.Norm)))
         case Some("none") => Some(DSAConfig(immutable.Set.empty))
         case None => None
-        case Some(_) => throw new IllegalArgumentException("Illegal option to dsa, allowed are: (none|set|field|norm|all)")
+        case Some(_) =>
+          throw new IllegalArgumentException("Illegal option to dsa, allowed are: (none|set|field|norm|all)")
     } else {
       None
     }
@@ -231,7 +243,8 @@ object Main {
     } else {
       BoogieMemoryAccessMode.SuccessiveStoreSelect
     }
-    val boogieGeneratorConfig = BoogieGeneratorConfig(boogieMemoryAccessMode, true, rely, conf.threadSplit.value)
+    val boogieGeneratorConfig =
+      BoogieGeneratorConfig(boogieMemoryAccessMode, true, rely, conf.threadSplit.value, conf.noif.value)
 
     val loadingInputs = if (conf.bapInputDirName.isDefined) then {
       loadDirectory(ChooseInput.Bap, conf.bapInputDirName.get)
@@ -264,15 +277,31 @@ object Main {
       staticAnalysis = staticAnalysis,
       boogieTranslation = boogieGeneratorConfig,
       outputPrefix = conf.outFileName,
-      dsaConfig = dsa
+      dsaConfig = dsa,
+      memoryTransform = conf.memoryTransform.value
     )
 
-    RunUtils.run(q)
+    val result = RunUtils.run(q)
     if (conf.verify.value) {
-      Logger.info("Running boogie")
-      val timer = PerformanceTimer("Verify", LogLevel.INFO)
-      Seq("boogie", "/useArrayAxioms", q.outputPrefix).!
-      timer.checkPoint("Finish")
+      assert(result.boogie.nonEmpty)
+      var failed = false
+      for (b <- result.boogie) {
+        val fname = b.filename
+        val timer = PerformanceTimer("Verify", LogLevel.INFO)
+        val cmd = Seq("boogie", "/useArrayAxioms", fname)
+        Logger.info(s"Running: ${cmd.mkString(" ")}")
+        val output = cmd.!!
+        val result = util.boogie_interaction.parseOutput(output)
+        result.kind match {
+          case BoogieResultKind.Verified(c, _) if c > 0 => ()
+          case _ => failed = true
+        }
+        Logger.info(result.toString)
+        timer.checkPoint("Finish")
+      }
+      if (failed) {
+        throw Exception("Verification failed")
+      }
     }
   }
 

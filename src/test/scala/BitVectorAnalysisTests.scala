@@ -5,7 +5,8 @@ import util.Logger
 
 import scala.runtime.stdLibPatches.Predef.assert
 
-class BitVectorAnalysisTests extends AnyFunSuite {
+@test_util.tags.UnitTest
+class BitVectorAnalysisTests extends AnyFunSuite with test_util.CaptureOutput {
 
   test("BitVector to Natural - should convert BitVector to natural number") {
     val result = bv2nat(BitVecLiteral(2, 4))

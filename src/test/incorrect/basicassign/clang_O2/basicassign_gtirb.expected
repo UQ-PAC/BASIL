@@ -70,7 +70,7 @@ implementation {:extern} rely_reflexive()
 procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
 
-procedure main();
+procedure main_1812();
   modifies Gamma_R0, Gamma_R10, Gamma_R8, Gamma_R9, Gamma_mem, R0, R10, R8, R9, mem;
   free requires (memory_load64_le(mem, 69664bv64) == 0bv64);
   free requires (memory_load64_le(mem, 69672bv64) == 69672bv64);
@@ -85,30 +85,30 @@ procedure main();
   free ensures (memory_load64_le(mem, 69592bv64) == 1812bv64);
   free ensures (memory_load64_le(mem, 69672bv64) == 69672bv64);
 
-implementation main()
+implementation main_1812()
 {
-  var $load18: bv32;
-  var Gamma_$load18: bool;
-  $main$__0__$u9YlOfvWQuymdyQoiJ6f2w:
-    assume {:captureState "$main$__0__$u9YlOfvWQuymdyQoiJ6f2w"} true;
+  var Gamma_load18: bool;
+  var load18: bv32;
+  main_1812__0__u9YlOfvWQuymdyQoiJ6f2w:
+    assume {:captureState "main_1812__0__u9YlOfvWQuymdyQoiJ6f2w"} true;
     R8, Gamma_R8 := 69632bv64, true;
     R0, Gamma_R0 := 0bv64, true;
     R9, Gamma_R9 := 69632bv64, true;
     R10, Gamma_R10 := 69632bv64, true;
     call rely();
-    $load18, Gamma_$load18 := memory_load32_le(mem, bvadd64(R8, 52bv64)), (gamma_load32(Gamma_mem, bvadd64(R8, 52bv64)) || L(mem, bvadd64(R8, 52bv64)));
-    R8, Gamma_R8 := zero_extend32_32($load18), Gamma_$load18;
+    load18, Gamma_load18 := memory_load32_le(mem, bvadd64(R8, 52bv64)), (gamma_load32(Gamma_mem, bvadd64(R8, 52bv64)) || L(mem, bvadd64(R8, 52bv64)));
+    R8, Gamma_R8 := zero_extend32_32(load18), Gamma_load18;
     call rely();
     assert (L(mem, bvadd64(R9, 56bv64)) ==> Gamma_R8);
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R9, 56bv64), R8[32:0]), gamma_store32(Gamma_mem, bvadd64(R9, 56bv64), Gamma_R8);
-    assume {:captureState "1832$0"} true;
+    assume {:captureState "1832_0"} true;
     call rely();
     assert (L(mem, bvadd64(R10, 60bv64)) ==> Gamma_R8);
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R10, 60bv64), R8[32:0]), gamma_store32(Gamma_mem, bvadd64(R10, 60bv64), Gamma_R8);
-    assume {:captureState "1836$0"} true;
-    goto main_basil_return;
-  main_basil_return:
-    assume {:captureState "main_basil_return"} true;
+    assume {:captureState "1836_0"} true;
+    goto main_1812_basil_return;
+  main_1812_basil_return:
+    assume {:captureState "main_1812_basil_return"} true;
     return;
 }
 

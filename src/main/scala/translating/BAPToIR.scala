@@ -2,7 +2,7 @@ package translating
 
 import bap.*
 import boogie.UnaryBExpr
-import ir.{UnaryExpr, BinaryExpr, *}
+import ir.*
 import specification.*
 import ir.cilvisitor.*
 
@@ -27,7 +27,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       val procedure = Procedure(s.name, s.address)
       for (b <- s.blocks) {
         val block = Block(b.label, b.address)
-        procedure.addBlocks(block)
+        procedure.addBlock(block)
         if (b.address.isDefined && b.address.isDefined && b.address.get == procedure.address.get) {
           procedure.entryBlock = block
         }
@@ -35,8 +35,11 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       }
       procedure.formalInParam = mutable.SortedSet.from(s.in.map(translateParam))
       procedure.formalOutParam = mutable.SortedSet.from(s.out.filterNot(_.name.endsWith("_result")).map(translateParam))
-      procedure.inParamDefaultBinding = immutable.SortedMap.from(s.in.map(s => translateParam(s)-> paramRegisterRVal(s)))
-      procedure.outParamDefaultBinding = immutable.SortedMap.from(s.out.filterNot(_.name.endsWith("_result")).map(s => translateParam(s) -> paramRegisterLVal(s)))
+      procedure.inParamDefaultBinding =
+        immutable.SortedMap.from(s.in.map(s => translateParam(s) -> paramRegisterRVal(s)))
+      procedure.outParamDefaultBinding = immutable.SortedMap.from(
+        s.out.filterNot(_.name.endsWith("_result")).map(s => translateParam(s) -> paramRegisterLVal(s))
+      )
 
       if (s.address.contains(mainAddress)) {
         mainProcedure = Some(procedure)
@@ -55,11 +58,16 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
             block.statements.append(s)
           }
         }
-        val (call, jump, newBlocks) = translate(b.jumps, block)
+        val (call, jump, newBlocks, atomic) = translate(b.jumps, block)
+        block.statements.addAll(atomic)
         procedure.addBlocks(newBlocks)
         call.foreach(c => block.statements.append(c))
         block.replaceJump(jump)
         assert(jump.hasParent)
+      }
+
+      if (procedure.blocks.nonEmpty) {
+        handleAtomicSections(procedure)
       }
 
       // Set entry block to the block with the same address as the procedure or the first in sequence
@@ -85,10 +93,10 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
         case d: DirectCall => {
           if (subroutines.contains(d.target.name)) {
             val s = subroutines(d.target.name)
-            ChangeTo(List(DirectCall(d.target, d.label, 
-              d.target.outParamDefaultBinding,
-              d.target.inParamDefaultBinding)))
-          }  else {
+            ChangeTo(
+              List(DirectCall(d.target, d.label, d.target.outParamDefaultBinding, d.target.inParamDefaultBinding))
+            )
+          } else {
             SkipChildren()
           }
         }
@@ -101,18 +109,136 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     prog
   }
 
+  private def handleAtomicSections(procedure: Procedure): Unit = {
+    val queue = mutable.Queue[Block](procedure.entryBlock.get)
+    var atomicSectionStart: Option[Block] = None
+    var atomicSectionEnd: Option[Block] = None
+    val atomicSectionContents: mutable.Set[Block] = mutable.Set()
+    val visited = mutable.Set[Block]()
+
+    while (queue.nonEmpty) {
+      val block = queue.dequeue()
+
+      if (atomicSectionStart.isDefined) {
+        atomicSectionContents.add(block)
+      }
+
+      if (block.statements.nonEmpty) {
+        var statement = block.statements.head
+        var breakLoop = false
+        while (!breakLoop) {
+          statement match {
+            case a: AtomicStart =>
+              if (atomicSectionStart.nonEmpty) {
+                // this should not happen and if there is ever any combination of instructions that causes it to happen
+                // it probably produces undefined behaviour
+                throw Exception("nested atomic sections")
+              }
+
+              val nextBlock = block.jump.match {
+                case g: GoTo if g.targets.size == 1 => g.targets.head
+                case _ => throw Exception("expected block with AtomicStart to have GoTo to single target")
+              }
+
+              if (block.statements.hasNext(a)) {
+                throw Exception("expected AtomicStart to be final statement in block")
+              }
+
+              atomicSectionStart = Some(nextBlock)
+
+              block.statements.insertAfter(a, Assert(TrueLiteral, Some("next block is atomic start")))
+              block.statements.remove(a)
+
+            case a: AtomicEnd =>
+              if (atomicSectionStart.isEmpty) {
+                // this should not happen and if there is ever any combination of instructions that causes it to happen
+                // it probably produces undefined behaviour on the actual hardware
+                throw Exception("nested atomic sections")
+              }
+
+              block.jump.match {
+                case g: GoTo if g.targets.size == 1 =>
+                case _ => throw Exception("expected block with AtomicEnd to have GoTo to single target")
+              }
+
+              if (block.statements.hasNext(a)) {
+                throw Exception("expected AtomicEnd to be final statement in block")
+              }
+
+              atomicSectionEnd = Some(block)
+
+              block.statements.insertAfter(a, Assert(TrueLiteral, Some("this block is atomic end")))
+              block.statements.remove(a)
+
+            case _ =>
+          }
+          if (block.statements.hasNext(statement)) {
+            statement = block.statements.getNext(statement)
+          } else {
+            breakLoop = true
+          }
+        }
+      }
+
+      // only resolve atomic section if all blocks between the start and end of the atomic section have been traversed
+      if (atomicSectionEnd.contains(block)) {
+        if (queue.isEmpty) {
+          val atomicSection = AtomicSection(atomicSectionStart.get, block, atomicSectionContents.clone())
+          atomicSectionContents.foreach(_.atomicSection = Some(atomicSection))
+          atomicSectionStart = None
+          atomicSectionEnd = None
+          atomicSectionContents.clear()
+          visited.add(block)
+        }
+      } else {
+        visited.add(block)
+      }
+
+      // do not traverse blocks past the end of the atomic section unless all blocks in the atomic section have
+      // been traversed
+      if (visited.contains(block)) {
+        block.jump match {
+          case g: GoTo =>
+            g.targets.foreach { target =>
+              if (!visited.contains(target)) {
+                queue.enqueue(target)
+              }
+            }
+          case _ =>
+        }
+      }
+    }
+
+    if (atomicSectionStart.isDefined || atomicSectionEnd.isDefined || atomicSectionContents.nonEmpty) {
+      throw Exception(
+        "error handling atomic sections - left atomic section partially resolved after traversing procedure"
+      )
+    }
+
+  }
+
   private def translateStatement(s: BAPStatement): Seq[Statement] = s match {
     case b: BAPMemAssign =>
       val mem = translateMemory(b.lhs)
       if (mem != translateMemory(b.rhs.memory)) {
         throw Exception(s"$b has conflicting lhs ${b.lhs} and rhs ${b.rhs.memory}")
       }
-      Seq(MemoryStore(mem, translateExprOnly(b.rhs.index), translateExprOnly(b.rhs.value), b.rhs.endian, b.rhs.size, Some(b.line)))
+      Seq(
+        MemoryStore(
+          mem,
+          translateExprOnly(b.rhs.index),
+          translateExprOnly(b.rhs.value),
+          b.rhs.endian,
+          b.rhs.size,
+          Some(b.line)
+        )
+      )
     case b: BAPLocalAssign =>
       val lhs = translateVar(b.lhs)
       val (rhs, load) = translateExpr(b.rhs)
       if (load.isDefined) {
-        val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, Some(b.line + "$0"))
+        val loadWithLabel =
+          MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, Some(b.line + "$0"))
         val assign = LocalAssign(lhs, rhs, Some(b.line + "$1"))
         Seq(loadWithLabel, assign)
       } else {
@@ -161,48 +287,58 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       }
       (extract, load)
     case literal: BAPLiteral => (translateLiteral(literal), None)
-    case BAPUnOp(operator, exp) => operator match {
-      case NOT => (UnaryExpr(BVNOT, translateExprOnly(exp)), None)
-      case NEG => (UnaryExpr(BVNEG, translateExprOnly(exp)), None)
-    }
-    case BAPBinOp(operator, lhs, rhs) => operator match {
-      case PLUS => (BinaryExpr(BVADD, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case MINUS => (BinaryExpr(BVSUB, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case TIMES => (BinaryExpr(BVMUL, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case DIVIDE => (BinaryExpr(BVUDIV, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case SDIVIDE => (BinaryExpr(BVSDIV, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      // counterintuitive but correct according to BAP source
-      case MOD => (BinaryExpr(BVSREM, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      // counterintuitive but correct according to BAP source
-      case SMOD => (BinaryExpr(BVUREM, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case LSHIFT => // BAP says caring about this case is necessary?
-        if (lhs.size == rhs.size) {
-          (BinaryExpr(BVSHL, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-        } else {
-          (BinaryExpr(BVSHL, translateExprOnly(lhs), ZeroExtend(lhs.size - rhs.size, translateExprOnly(rhs))), None)
-        }
-      case RSHIFT =>
-        if (lhs.size == rhs.size) {
-          (BinaryExpr(BVLSHR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-        } else {
-          (BinaryExpr(BVLSHR, translateExprOnly(lhs), ZeroExtend(lhs.size - rhs.size, translateExprOnly(rhs))), None)
-        }
-      case ARSHIFT =>
-        if (lhs.size == rhs.size) {
-          (BinaryExpr(BVASHR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-        } else {
-          (BinaryExpr(BVASHR, translateExprOnly(lhs), ZeroExtend(lhs.size - rhs.size, translateExprOnly(rhs))), None)
-        }
-      case AND => (BinaryExpr(BVAND, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case OR => (BinaryExpr(BVOR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case XOR => (BinaryExpr(BVXOR, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case EQ => (BinaryExpr(BVCOMP, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case NEQ => (UnaryExpr(BVNOT, BinaryExpr(BVCOMP, translateExprOnly(lhs), translateExprOnly(rhs))), None)
-      case LT => (BinaryExpr(BVULT, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case LE => (BinaryExpr(BVULE, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case SLT => (BinaryExpr(BVSLT, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-      case SLE => (BinaryExpr(BVSLE, translateExprOnly(lhs), translateExprOnly(rhs)), None)
-    }
+    case BAPUnOp(operator, exp) =>
+      operator match {
+        case NOT => (UnaryExpr(BVNOT, translateExprOnly(exp)), None)
+        case NEG => (UnaryExpr(BVNEG, translateExprOnly(exp)), None)
+      }
+    case BAPBinOp(operator, lhs, rhs) =>
+      val (lhsIR, lhsLoad) = translateExpr(lhs)
+      val (rhsIR, rhsLoad) = translateExpr(rhs)
+      val load: Option[MemoryLoad] = (lhsLoad, rhsLoad) match {
+        case (Some(_), Some(_)) => throw Exception("memory load found in both sides of BAP binary expression")
+        case (Some(x), None) => Some(x)
+        case (None, Some(y)) => Some(y)
+        case (None, None) => None
+      }
+      operator match {
+        case PLUS => (BinaryExpr(BVADD, lhsIR, rhsIR), load)
+        case MINUS => (BinaryExpr(BVSUB, lhsIR, rhsIR), load)
+        case TIMES => (BinaryExpr(BVMUL, lhsIR, rhsIR), load)
+        case DIVIDE => (BinaryExpr(BVUDIV, lhsIR, rhsIR), load)
+        case SDIVIDE => (BinaryExpr(BVSDIV, lhsIR, rhsIR), load)
+        // counterintuitive but correct according to BAP source
+        case MOD => (BinaryExpr(BVSREM, lhsIR, rhsIR), load)
+        // counterintuitive but correct according to BAP source
+        case SMOD => (BinaryExpr(BVUREM, lhsIR, rhsIR), load)
+        case LSHIFT => // BAP says caring about this case is necessary?
+          if (lhs.size == rhs.size) {
+            (BinaryExpr(BVSHL, lhsIR, rhsIR), load)
+          } else {
+            (BinaryExpr(BVSHL, lhsIR, ZeroExtend(lhs.size - rhs.size, rhsIR)), load)
+          }
+        case RSHIFT =>
+          if (lhs.size == rhs.size) {
+            (BinaryExpr(BVLSHR, lhsIR, rhsIR), load)
+          } else {
+            (BinaryExpr(BVLSHR, lhsIR, ZeroExtend(lhs.size - rhs.size, rhsIR)), load)
+          }
+        case ARSHIFT =>
+          if (lhs.size == rhs.size) {
+            (BinaryExpr(BVASHR, lhsIR, rhsIR), load)
+          } else {
+            (BinaryExpr(BVASHR, lhsIR, ZeroExtend(lhs.size - rhs.size, rhsIR)), load)
+          }
+        case AND => (BinaryExpr(BVAND, lhsIR, rhsIR), load)
+        case OR => (BinaryExpr(BVOR, lhsIR, rhsIR), load)
+        case XOR => (BinaryExpr(BVXOR, lhsIR, rhsIR), load)
+        case EQ => (BinaryExpr(BVCOMP, lhsIR, rhsIR), load)
+        case NEQ => (UnaryExpr(BVNOT, BinaryExpr(BVCOMP, lhsIR, rhsIR)), load)
+        case LT => (BinaryExpr(BVULT, lhsIR, rhsIR), load)
+        case LE => (BinaryExpr(BVULE, lhsIR, rhsIR), load)
+        case SLT => (BinaryExpr(BVSLT, lhsIR, rhsIR), load)
+        case SLE => (BinaryExpr(BVSLE, lhsIR, rhsIR), load)
+      }
     case b: BAPVar => (translateVar(b), None)
     case BAPMemAccess(memory, index, endian, size) =>
       val temp = LocalVar("load" + loadCounter, BitVecType(size))
@@ -220,10 +356,10 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
   }
 
   private def paramRegisterLVal(param: BAPParameter): Variable = translateVar(param.value)
-  private def toIROutParam(param: BAPParameter) =  {
+  private def toIROutParam(param: BAPParameter) = {
     paramRegisterLVal(param) match {
       case r: Register => {
-        if (r.size == param.size) then {
+        if (r.size == param.size) {
           translateParam(param)
         } else {
           LocalVar(param.name, BitVecType(r.size))
@@ -233,13 +369,13 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     }
 
   }
-  
+
   private def paramRegisterRVal(p: BAPParameter): Expr = {
     paramRegisterLVal(p) match {
       case r: Register => {
-        if (r.size == p.size) then {
+        if (r.size == p.size) {
           r
-        } else if (r.size > p.size){
+        } else if (r.size > p.size) {
           Extract(p.size, 0, r)
         } else {
           ZeroExtend(p.size - r.size, r)
@@ -251,7 +387,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
   def paramVariableRVal(p: BAPParameter): Expr = {
     paramRegisterLVal(p) match {
       case r: Register => {
-        if (r.size == p.size) then {
+        if (r.size == p.size) {
           translateParam(p)
         } else {
           ZeroExtend(r.size - p.size, translateParam(p))
@@ -261,11 +397,11 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     }
   }
 
-  def toAssignOut(p: BAPParameter) : LocalAssign = {
+  def toAssignOut(p: BAPParameter): LocalAssign = {
     LocalAssign(translateParam(p), paramRegisterRVal(p))
   }
 
-  def toAssignIn(p: BAPParameter) : LocalAssign = {
+  def toAssignIn(p: BAPParameter): LocalAssign = {
     LocalAssign(paramRegisterLVal(p), paramVariableRVal(p))
   }
 
@@ -280,24 +416,24 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     SharedMemory(memory.name, memory.addressSize, memory.valueSize)
   }
 
-
-
-
   private def translateLiteral(literal: BAPLiteral) = {
     BitVecLiteral(literal.value, literal.size)
   }
-
 
   /**
     * Translates a list of jumps from BAP into a single Jump at the IR level by moving any conditions on jumps to
     * Assume statements in new blocks
     * */
-  private def translate(jumps: List[BAPJump], block: Block): (Option[Call], Jump, ArrayBuffer[Block]) = {
+  private def translate(
+    jumps: List[BAPJump],
+    block: Block
+  ): (Option[Call], Jump, ArrayBuffer[Block], Iterable[Statement]) = {
     if (jumps.size > 1) {
       val targets = ArrayBuffer[Block]()
-      val conditions = ArrayBuffer[BAPExpr]()
+      val conditions = ArrayBuffer[Expr]()
       val line = jumps.head.line
       val newBlocks = ArrayBuffer[Block]()
+      val newStatements = ArrayBuffer[Statement]()
       for (j <- jumps) {
         j match {
           case b: BAPGoTo =>
@@ -312,8 +448,8 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
                   // condition is true and previous conditions existing means this condition
                   // is actually that all previous conditions are false
                   val conditionsIR = conditions.map(c => convertConditionBool(c, true))
-                  val condition = conditionsIR.tail.foldLeft(conditionsIR.head) {
-                    (ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands)
+                  val condition = conditionsIR.tail.foldLeft(conditionsIR.head) { (ands: Expr, next: Expr) =>
+                    BinaryExpr(BoolAND, next, ands)
                   }
                   val newBlock = newBlockCondition(block, target, condition)
                   newBlocks.append(newBlock)
@@ -321,7 +457,9 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
                 }
               // non-true condition
               case _ =>
-                val currentCondition = convertConditionBool(b.condition, false)
+                val (expr, load) = translateExpr(b.condition)
+                val currentCondition = convertConditionBool(expr, false)
+                newStatements.appendAll(load)
                 val condition = if (conditions.isEmpty) {
                   // if this is the first condition then it is the only relevant part of the condition
                   currentCondition
@@ -329,55 +467,68 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
                   // if this is not the first condition, then we need to need to add
                   // that all previous conditions are false
                   val conditionsIR = conditions.map(c => convertConditionBool(c, true))
-                  conditionsIR.tail.foldLeft(currentCondition) {
-                    (ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands)
+                  conditionsIR.tail.foldLeft(currentCondition) { (ands: Expr, next: Expr) =>
+                    BinaryExpr(BoolAND, next, ands)
                   }
                 }
                 val newBlock = newBlockCondition(block, target, condition)
                 newBlocks.append(newBlock)
                 targets.append(newBlock)
-                conditions.append(b.condition)
+                conditions.append(expr)
             }
           case _ => throw Exception("translation error, call where not expected: " + jumps.mkString(", "))
         }
       }
-      (None, GoTo(targets, Some(line)), newBlocks)
+      (None, GoTo(targets, Some(line)), newBlocks, newStatements)
     } else {
       jumps.head match {
         case b: BAPDirectCall =>
-          val call = Some(DirectCall(nameToProcedure(b.target), Some(b.line)))
-          val ft = b.returnTarget.map(t => labelToBlock(t)).map(x => GoTo(Set(x))).getOrElse(Unreachable())
-          (call, ft, ArrayBuffer())
+          b.target match {
+            case "intrinsic$AtomicStart" =>
+              val atomicStart = AtomicStart(Some(b.line))
+              val goto =
+                b.returnTarget.map(t => labelToBlock(t)).map(x => GoTo(Set(x), Some(b.line))).getOrElse(Unreachable())
+              (None, goto, ArrayBuffer(), ArrayBuffer(atomicStart))
+            case "intrinsic$AtomicEnd" =>
+              val atomicEnd = AtomicEnd(Some(b.line))
+              val goto =
+                b.returnTarget.map(t => labelToBlock(t)).map(x => GoTo(Set(x), Some(b.line))).getOrElse(Unreachable())
+              (None, goto, ArrayBuffer(), ArrayBuffer(atomicEnd))
+            case _ =>
+              val call = Some(DirectCall(nameToProcedure(b.target), Some(b.line)))
+              val ft = b.returnTarget.map(t => labelToBlock(t)).map(x => GoTo(Set(x))).getOrElse(Unreachable())
+              (call, ft, ArrayBuffer(), None)
+          }
         case b: BAPIndirectCall =>
           val call = IndirectCall(translateVar(b.target), Some(b.line))
           val ft = b.returnTarget.map(t => labelToBlock(t)).map(x => GoTo(Set(x))).getOrElse(Unreachable())
-          (Some(call), ft, ArrayBuffer())
+          (Some(call), ft, ArrayBuffer(), None)
         case b: BAPGoTo =>
           val target = labelToBlock(b.target)
           b.condition match {
             // condition is true
             case l: BAPLiteral if l.value > BigInt(0) =>
-              (None, GoTo(ArrayBuffer(target), Some(b.line)), ArrayBuffer())
+              (None, GoTo(ArrayBuffer(target), Some(b.line)), ArrayBuffer(), None)
             // non-true condition
             case _ =>
-              val condition = convertConditionBool(b.condition, false)
+              val (expr, load) = translateExpr(b.condition)
+              val condition = convertConditionBool(expr, false)
               val newBlock = newBlockCondition(block, target, condition)
-              (None, GoTo(ArrayBuffer(newBlock), Some(b.line)), ArrayBuffer(newBlock))
+              (None, GoTo(ArrayBuffer(newBlock), Some(b.line)), ArrayBuffer(newBlock), load)
           }
       }
     }
   }
 
   /**
-    * Converts a BAPExpr condition that returns a bitvector of size 1 to an Expr condition that returns a Boolean
+    * Converts an Expr condition that returns a bitvector of size 1 to an Expr condition that returns a Boolean
     *
     * If negative is true then the negation of the condition is returned
     *
-    * If the BAPExpr uses a comparator that returns a Boolean then no further conversion is performed except negation,
+    * If the Expr uses a comparator that returns a Boolean then no further conversion is performed except negation,
     * if necessary.
-    * */
-  private def convertConditionBool(expr: BAPExpr, negative: Boolean): Expr = {
-    val e = translateExprOnly(expr)
+    */
+  private def convertConditionBool(e: Expr, negative: Boolean): Expr = {
     e.getType match {
       case BitVecType(s) =>
         if (negative) {

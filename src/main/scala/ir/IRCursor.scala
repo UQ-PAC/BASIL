@@ -3,11 +3,13 @@ import util.Logger
 import cfg_visualiser.DotElement
 import cfg_visualiser.{DotArrow, DotGraph, DotInlineArrow, DotInterArrow, DotIntraArrow, DotNode, DotRegularArrow}
 
+import ir.cilvisitor.*
 import collection.mutable
 import scala.annotation.tailrec
 
-/** This file defines functions to get the successor and predecessor of a IR node for control flow.
-  */
+/** 
+ *  This file defines functions to get the successor and predecessor of a IR node for control flow.
+ */
 
 /*
  * Defines a position in the IL / CFG; this becomes the lhs of the state map lattice in a static analysis.
@@ -17,7 +19,7 @@ type CFGPosition = Procedure | Block | Command
 def isAfterCall(c: Command) = {
   (IRWalk.prevCommandInBlock(c)) match {
     case Some(c: Call) => true
-    case _             => false
+    case _ => false
   }
 }
 
@@ -25,8 +27,8 @@ extension (p: CFGPosition)
   def toShortString: String =
     p match
       case procedure: Procedure => procedure.toString
-      case block: Block         => s"Block ${block.label}"
-      case command: Command     => command.toString
+      case block: Block => s"Block ${block.label}"
+      case command: Command => command.toString
 
 // todo: we could just use the dependencies trait directly instead to avoid the instantiation issue
 trait IRWalk[IN <: CFGPosition, NT <: CFGPosition & IN] {
@@ -38,35 +40,35 @@ object IRWalk:
 
   def prevCommandInBlock(c: Command): Option[Command] = c match {
     case s: Statement => c.parent.statements.prevOption(s)
-    case j: Jump      => c.parent.statements.lastOption
+    case j: Jump => c.parent.statements.lastOption
   }
 
   def nextCommandInBlock(c: Command): Option[Command] = c match {
     case s: Statement => Some(s.successor)
-    case j: Jump      => None
+    case j: Jump => None
   }
 
   def procedure(pos: CFGPosition): Procedure = {
     pos match {
       case p: Procedure => p
-      case b: Block     => b.parent
-      case c: Command   => c.parent.parent
+      case b: Block => b.parent
+      case c: Command => c.parent.parent
     }
   }
 
   def blockBegin(pos: CFGPosition): Option[Block] = {
     pos match {
       case p: Procedure => p.entryBlock
-      case b: Block     => Some(b)
-      case c: Command   => Some(c.parent)
+      case b: Block => Some(b)
+      case c: Command => Some(c.parent)
     }
   }
 
   def commandBegin(pos: CFGPosition): Option[Command] = {
     pos match {
       case p: Procedure => p.entryBlock.map(b => b.statements.headOption.getOrElse(b.jump))
-      case b: Block     => Some(b.statements.headOption.getOrElse(b.jump))
-      case c: Command   => Some(c)
+      case b: Block => Some(b.statements.headOption.getOrElse(b.jump))
+      case c: Command => Some(c)
     }
   }
 
@@ -76,14 +78,13 @@ object IRWalk:
   def firstInProc(p: Procedure): Option[Command] = p.entryBlock.map(firstInBlock)
   def lastInProc(p: Procedure): Option[Command] = p.returnBlock.map(lastInBlock)
 
-
 // extension (p: Block)
 //   def isProcEntry: Boolean = p.parent.entryBlock.contains(p)
 //   def isProcReturn: Boolean = p.parent.returnBlock.contains(p)
-// 
+//
 //   def begin: CFGPosition = p
 //   def end: CFGPosition = p.jump
-// 
+//
 // extension (p: Procedure)
 //   def begin: CFGPosition = p
 //   def end: CFGPosition = p.returnBlock.map(_.end).getOrElse(p)
@@ -95,20 +96,20 @@ trait IntraProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
   def succ(pos: CFGPosition): Set[CFGPosition] = {
     pos match {
       case proc: Procedure => proc.entryBlock.toSet
-      case b: Block        => b.statements.headOption.orElse(Some(b.jump)).toSet
-      case n: GoTo         => n.targets.asInstanceOf[Set[CFGPosition]]
-      case h: Unreachable  => Set()
-      case h: Return       => Set()
-      case c: Statement    => IRWalk.nextCommandInBlock(c).toSet
+      case b: Block => b.statements.headOption.orElse(Some(b.jump)).toSet
+      case n: GoTo => n.targets.asInstanceOf[Set[CFGPosition]]
+      case h: Unreachable => Set()
+      case h: Return => Set()
+      case c: Statement => IRWalk.nextCommandInBlock(c).toSet
     }
   }
 
   def pred(pos: CFGPosition): Set[CFGPosition] = {
     pos match {
-      case c: Command                => Set(IRWalk.prevCommandInBlock(c).getOrElse(c.parent))
-      case b: Block if b.isEntry     => Set(b.parent)
-      case b: Block                  => b.incomingJumps.asInstanceOf[Set[CFGPosition]]
-      case proc: Procedure           => Set() // intraproc
+      case c: Command => Set(IRWalk.prevCommandInBlock(c).getOrElse(c.parent))
+      case b: Block if b.isEntry => Set(b.parent)
+      case b: Block => b.incomingJumps.asInstanceOf[Set[CFGPosition]]
+      case proc: Procedure => Set() // intraproc
     }
   }
 }
@@ -120,8 +121,8 @@ trait IntraProcBlockIRCursor extends IRWalk[CFGPosition, Block] {
   @tailrec
   final def succ(pos: CFGPosition): Set[Block] = {
     pos match {
-      case b: Block     => b.nextBlocks.toSet
-      case s: Command   => succ(s.parent)
+      case b: Block => b.nextBlocks.toSet
+      case s: Command => succ(s.parent)
       case s: Procedure => s.entryBlock.toSet
     }
   }
@@ -129,10 +130,10 @@ trait IntraProcBlockIRCursor extends IRWalk[CFGPosition, Block] {
   @tailrec
   final def pred(pos: CFGPosition): Set[Block] = {
     pos match {
-      case b: Block if b.isEntry     => Set.empty
-      case b: Block                  => b.incomingJumps.map(_.parent).toSet
-      case j: Command                => pred(j.parent)
-      case s: Procedure              => Set.empty
+      case b: Block if b.isEntry => Set.empty
+      case b: Block => b.incomingJumps.map(_.parent).toSet
+      case j: Command => pred(j.parent)
+      case s: Procedure => Set.empty
     }
   }
 }
@@ -148,21 +149,21 @@ object IntraProcBlockIRCursor extends IntraProcBlockIRCursor
 trait InterProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
 
   final def succ(pos: CFGPosition): Set[CFGPosition] = {
-      pos match
-        case c: DirectCall if c.target.blocks.nonEmpty => Set(c.target)
-        case c: Return => c.parent.parent.incomingCalls().map(_.successor).toSet
-        case _         => IntraProcIRCursor.succ(pos)
+    pos match
+      case c: DirectCall if c.target.blocks.nonEmpty => Set(c.target)
+      case c: Return => c.parent.parent.incomingCalls().map(_.successor).toSet
+      case _ => IntraProcIRCursor.succ(pos)
   }
 
   final def pred(pos: CFGPosition): Set[CFGPosition] = {
-      pos match
-        case c: Command =>
-          IRWalk.prevCommandInBlock(c) match {
-            case Some(d: DirectCall) if d.target.blocks.nonEmpty => d.target.returnBlock.toSet
-            case o            => o.toSet ++ IntraProcIRCursor.pred(pos)
-          }
-        case c: Procedure => c.incomingCalls().toSet.asInstanceOf[Set[CFGPosition]]
-        case _            => IntraProcIRCursor.pred(pos)
+    pos match
+      case c: Command =>
+        IRWalk.prevCommandInBlock(c) match {
+          case Some(d: DirectCall) if d.target.blocks.nonEmpty => d.target.returnBlock.toSet
+          case o => o.toSet ++ IntraProcIRCursor.pred(pos)
+        }
+      case c: Procedure => c.incomingCalls().toSet.asInstanceOf[Set[CFGPosition]]
+      case _ => IntraProcIRCursor.pred(pos)
   }
 }
 
@@ -256,17 +257,15 @@ def toDot(program: Program, labels: Map[CFGPosition, String] = Map.empty, inter:
   }
 }
 
-
 def dotCallGraph(program: Program, labels: Map[CFGPosition, String] = Map.empty): String = {
   val domain = computeDomain[Procedure, Procedure](CallGraph, program.procedures)
   toDot[Procedure](domain.toSet, CallGraph, labels, Set())
 }
 
-
 case class DetachedEntry(blocksEmptyPred: Set[Block], reachableFromBlockEmptyPred: Set[Block])
 
 def getDetachedBlocks(p: Procedure) = {
-  val b = p.blocks.filter(b => !p.entryBlock.contains(b) && b.prevBlocks.isEmpty )
+  val b = p.blocks.filter(b => !p.entryBlock.contains(b) && b.prevBlocks.isEmpty)
 
   var oldReachable = Set[Block]()
   var reachable = b.toSet
@@ -280,36 +279,41 @@ def getDetachedBlocks(p: Procedure) = {
   DetachedEntry(b.toSet, reachable)
 }
 
-
-def dotBlockGraph(proc: Procedure) : String = {
+def dotBlockGraph(proc: Procedure): String = {
   val o = getDetachedBlocks(proc)
-  dotBlockGraph(proc.collect {
-    case b: Block => b
-  }, o.reachableFromBlockEmptyPred)
+  dotBlockGraph(
+    proc.collect { case b: Block =>
+      b
+    },
+    o.reachableFromBlockEmptyPred
+  )
 }
 
-def dotBlockGraph(prog: Program) : String = {
+def dotBlockGraph(prog: Program): String = {
   val e = prog.procedures.toSet.flatMap(getDetachedBlocks(_).reachableFromBlockEmptyPred)
 
-  dotBlockGraph(prog.collect {
-    case b: Block => b
-  }, e)
+  dotBlockGraph(
+    prog.collect { case b: Block =>
+      b
+    },
+    e
+  )
 }
 
-def dotBlockGraph(blocks: Iterable[Block], orphaned: Set[Block]) : String = {
-    val printer = translating.BasilIRPrettyPrinter()
-    val labels : Map[CFGPosition, String] = (blocks.collect {
-      case b : Block => b -> {
-        (b.statements.toList.map(printer.apply(_) + ";")  ++ {
-          b.jump match {
-            case g: GoTo => List()
-            case o => List(printer(o) + ";")
-          }
-        }).map("  " + _).mkString("\n")
-      }
-    }).toMap
+def dotBlockGraph(blocks: Iterable[Block], orphaned: Set[Block]): String = {
+  val printer = translating.BasilIRPrettyPrinter()
+  val labels: Map[CFGPosition, String] = (blocks.collect { case b: Block =>
+    b -> {
+      (b.statements.toList.map(printer.apply(_) + ";") ++ {
+        b.jump match {
+          case g: GoTo => List()
+          case o => List(printer(o) + ";")
+        }
+      }).map("  " + _).mkString("\n")
+    }
+  }).toMap
 
-    toDot[Block](blocks.toSet, IntraProcBlockIRCursor, labels, orphaned)
+  toDot[Block](blocks.toSet, IntraProcBlockIRCursor, labels, orphaned)
 }
 
 def dotBlockGraph(program: Program, labels: Map[CFGPosition, String] = Map.empty): String = {
@@ -318,10 +322,10 @@ def dotBlockGraph(program: Program, labels: Map[CFGPosition, String] = Map.empty
 }
 
 def toDot[T <: CFGPosition](
-    domain: Set[T],
-    iterator: IRWalk[? >: T, ?],
-    labels: Map[CFGPosition, String],
-    filled: Set[T],
+  domain: Set[T],
+  iterator: IRWalk[? >: T, ?],
+  labels: Map[CFGPosition, String],
+  filled: Set[T]
 ): String = {
 
   val visited: mutable.Set[CFGPosition] = mutable.Set.from(domain)
@@ -342,7 +346,7 @@ def toDot[T <: CFGPosition](
   def nodeText(node: CFGPosition): String = {
     var text = node match {
       case s: Block => f"[Block] ${s.label} ${s.rpoOrder}"
-      case s        => s.toString
+      case s => s.toString
     }
     if (labels.contains(node)) {
       text = text + "\n\n" + labels(node)
@@ -353,8 +357,8 @@ def toDot[T <: CFGPosition](
   for (node <- domain) {
     node match
       case s: Command => dotNodes.addOne(s -> DotNode(label(s.label), nodeText(s), filled.contains(node)))
-      case s: Block   => dotNodes.addOne(s -> DotNode(label(Some(s.label)), nodeText(s), filled.contains(node)))
-      case s          => dotNodes.addOne(s -> DotNode(label(Some(s.toString)), nodeText(s), filled.contains(node)))
+      case s: Block => dotNodes.addOne(s -> DotNode(label(Some(s.label)), nodeText(s), filled.contains(node)))
+      case s => dotNodes.addOne(s -> DotNode(label(Some(s.toString)), nodeText(s), filled.contains(node)))
   }
 
   def getArrow(s: CFGPosition, n: CFGPosition) = {
@@ -377,7 +381,9 @@ def toDot[T <: CFGPosition](
   new DotGraph("CursorCFG", allNodes, dotArrows).toDotString
 }
 
-
+/**
+ * This doesn't implement free vars for block or proc, it just returns the rvars.
+ */
 def freeVarsPos(s: CFGPosition): Set[Variable] = s match {
   case a: LocalAssign => a.rhs.variables
   case l: MemoryLoad => l.index.variables
@@ -385,13 +391,24 @@ def freeVarsPos(s: CFGPosition): Set[Variable] = s match {
   case a: Assert => a.body.variables
   case a: Assume => a.body.variables
   case a: IndirectCall => a.target.variables
-  case p: Procedure => p.flatMap {
-    case c: Command => freeVarsPos(c)
-    case _ => Set()
-  }.toSet
+  case p: Procedure =>
+    p.flatMap {
+      case c: Command => freeVarsPos(c)
+      case _ => Set()
+    }.toSet
   case p: Block => p.statements.flatMap(freeVarsPos).toSet
-  case p: DirectCall  => p.actualParams.flatMap(_._2.variables).toSet
-  case p: Return  => p.outParams.flatMap(_._2.variables).toSet
-  case  _: Unreachable |  _: GoTo | _: NOP => Set[Variable]()
+  case p: DirectCall => p.actualParams.flatMap(_._2.variables).toSet
+  case p: Return => p.outParams.flatMap(_._2.variables).toSet
+  case _: Unreachable | _: GoTo | _: NOP => Set[Variable]()
 }
 
+def allVarsPos(s: CFGPosition): Set[Variable] = s match {
+  case a: Assign => freeVarsPos(a) ++ a.assignees
+  case p: Procedure =>
+    p.flatMap {
+      case c: Command => allVarsPos(c)
+      case _ => Set()
+    }.toSet
+  case p: Block => p.statements.flatMap(allVarsPos).toSet
+  case o => freeVarsPos(o)
+}

@@ -8,7 +8,8 @@ case class BoogieGeneratorConfig(
   memoryFunctionType: BoogieMemoryAccessMode = BoogieMemoryAccessMode.SuccessiveStoreSelect,
   coalesceConstantMemory: Boolean = true,
   procedureRely: Option[ProcRelyVersion] = None,
-  threadSplit: Boolean = false
+  threadSplit: Boolean = false,
+  directTranslation: Boolean = false
 )
 
 case class ILLoadingConfig(
@@ -19,7 +20,7 @@ case class ILLoadingConfig(
   mainProcedureName: String = "main",
   procedureTrimDepth: Int = Int.MaxValue,
   parameterForm: Boolean = false,
-  trimEarly: Boolean = false,
+  trimEarly: Boolean = false
 )
 
 case class StaticAnalysisConfig(
@@ -30,7 +31,6 @@ case class StaticAnalysisConfig(
   memoryRegions: MemoryRegionsMode = MemoryRegionsMode.Disabled,
   irreducibleLoops: Boolean = true
 )
-
 
 enum DSAAnalysis {
   case Norm, Set, Field
@@ -55,6 +55,7 @@ case class BASILConfig(
   dsaConfig: Option[DSAConfig] = None,
   summariseProcedures: Boolean = false,
   generateRelyGuarantees: Boolean = false,
+  memoryTransform: Boolean = false,
   staticAnalysis: Option[StaticAnalysisConfig] = None,
   boogieTranslation: BoogieGeneratorConfig = BoogieGeneratorConfig(),
   outputPrefix: String

@@ -1,6 +1,25 @@
 package util
 import scala.collection.mutable
 import scala.collection
+import java.util.concurrent.atomic.AtomicLong
+
+case class RegionTimer(name: String) {
+  private val total: AtomicLong = AtomicLong(0)
+
+  def within[T](body: => T): T = {
+    val begin = System.currentTimeMillis()
+    val result = body
+    val finish = System.currentTimeMillis()
+    val _ = total.addAndGet(finish - begin)
+    result
+  }
+
+  def getTotal(): Long = total.get
+
+  override def toString() = {
+    s"$name : ${getTotal()} (ms)"
+  }
+}
 
 case class PerformanceTimer(timerName: String = "", logLevel: LogLevel = LogLevel.DEBUG) {
   private var lastCheckpoint: Long = System.currentTimeMillis()
@@ -13,10 +32,10 @@ case class PerformanceTimer(timerName: String = "", logLevel: LogLevel = LogLeve
     checkpoints.put(name, delta)
     logLevel match {
       case LogLevel.DEBUG => Logger.debug(s"PerformanceTimer $timerName [$name]: ${delta}ms")
-      case LogLevel.INFO  => Logger.info(s"PerformanceTimer $timerName [$name]: ${delta}ms")
-      case LogLevel.WARN  => Logger.warn(s"PerformanceTimer $timerName [$name]: ${delta}ms")
+      case LogLevel.INFO => Logger.info(s"PerformanceTimer $timerName [$name]: ${delta}ms")
+      case LogLevel.WARN => Logger.warn(s"PerformanceTimer $timerName [$name]: ${delta}ms")
       case LogLevel.ERROR => Logger.error(s"PerformanceTimer $timerName [$name]: ${delta}ms")
-      case _              => ???
+      case _ => ???
     }
     delta
   }

@@ -2,6 +2,7 @@ package ir.cilvisitor
 
 import ir.*
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable
 
 /** A new visitor based off CIL.
   *
@@ -29,28 +30,29 @@ trait CILVisitor:
   def vlvar(e: Variable): VisitAction[Variable] = DoChildren()
   def vmem(e: Memory): VisitAction[Memory] = DoChildren()
 
-  def enter_scope(params: Map[LocalVar, Expr]): Unit = ()
+  def enter_scope(bound: Iterable[Variable]): Unit = ()
   def leave_scope(): Unit = ()
 
 def doVisitList[T](v: CILVisitor, a: VisitAction[List[T]], n: T, continue: T => T): List[T] = {
   a match {
-    case SkipChildren()             => List(n)
-    case ChangeTo(z)                => z
-    case DoChildren()               => List(continue(n))
+    case SkipChildren() => List(n)
+    case ChangeTo(z) => z
+    case DoChildren() => List(continue(n))
     case ChangeDoChildrenPost(x, f) => f(x.map(continue(_)))
   }
 }
 
 def doVisit[T](v: CILVisitor, a: VisitAction[T], n: T, continue: T => T): T = {
   a match {
-    case SkipChildren()             => n
-    case DoChildren()               => continue(n)
-    case ChangeTo(z)                => z
+    case SkipChildren() => n
+    case DoChildren() => continue(n)
+    case ChangeTo(z) => z
     case ChangeDoChildrenPost(x, f) => f(continue(x))
   }
 }
 
 class CILVisitorImpl(val v: CILVisitor) {
+  val boundVariables = mutable.Set[Variable]()
 
   def visit_rvar(n: Variable): Variable = {
     // variable in right expression
@@ -79,10 +81,29 @@ class CILVisitorImpl(val v: CILVisitor) {
     doVisit(v, v.vjump(j), j, continue)
   }
 
+  def with_locals[A, B](localVars: Iterable[Variable], f: A => B, x: A) = {
+    v.enter_scope(localVars)
+    val r = f(x)
+    v.leave_scope()
+    r
+  }
 
+  def visit_lambda(l: LambdaExpr): LambdaExpr = {
+    val r = with_locals(l.binds, visit_expr, l.body)
+    if r ne l.body then LambdaExpr(l.binds, r) else l
+  }
 
-   def visit_expr(n: Expr): Expr = {
+  def visit_expr(n: Expr): Expr = {
     def continue(n: Expr): Expr = n match {
+      case o: OldExpr => {
+        val n = visit_expr(o.body)
+        if (n ne o.body) then OldExpr(n) else o
+      }
+      case l: LambdaExpr => visit_lambda(l)
+      case q: QuantifierExpr => {
+        val r = visit_lambda(q.body)
+        if (r ne q.body) then QuantifierExpr(q.kind, r) else q
+      }
       case n: Literal => n
       case Extract(end, start, arg) => {
         val narg = visit_expr(arg)
@@ -114,7 +135,7 @@ class CILVisitorImpl(val v: CILVisitor) {
         val nparams = params.map(visit_expr)
         val updated = (params.zip(nparams).map((a, b) => a ne b)).contains(true)
         if (updated) UninterpretedFunction(name, nparams, rt) else n
-      } 
+      }
     }
     doVisit(v, v.vexpr(n), n, continue)
   }
@@ -124,7 +145,6 @@ class CILVisitorImpl(val v: CILVisitor) {
       case d: DirectCall =>
         val actuals = d.actualParams.map(i => i._1 -> visit_expr(i._2))
         val outs = d.outParams.map(i => i._1 -> visit_lvar(i._2))
-        v.enter_scope(actuals)
         d.outParams = outs
         d.actualParams = actuals
         d
@@ -139,6 +159,10 @@ class CILVisitorImpl(val v: CILVisitor) {
       case m: MemoryLoad =>
         m.index = visit_expr(m.index)
         m.mem = visit_mem(m.mem)
+        m.lhs = visit_lvar(m.lhs)
+        m
+      case m: MemoryAssign =>
+        m.rhs = visit_expr(m.rhs)
         m.lhs = visit_lvar(m.lhs)
         m
       case m: LocalAssign =>
@@ -176,12 +200,11 @@ class CILVisitorImpl(val v: CILVisitor) {
 
   def visit_proc(p: Procedure): List[Procedure] = {
     def continue(p: Procedure) = {
-      // manage scope on call/return
-      // v.enter_scope(ArrayBuffer())
+      v.enter_scope(p.formalInParam)
       for (b <- p.blocks) {
         p.replaceBlock(b, visit_block(b))
       }
-      // v.leave_scope(ArrayBuffer())
+      v.leave_scope()
       p
     }
 
@@ -192,16 +215,16 @@ class CILVisitorImpl(val v: CILVisitor) {
     def continue(p: Program) = {
       for (i <- (0 until p.procedures.size)) {
         visit_proc(p.procedures(i)) match {
-          case h::Nil if p.procedures(i) eq h => {}
-          case h::Nil if !(p.procedures(i) eq h) => {
+          case h :: Nil if p.procedures(i) eq h => {}
+          case h :: Nil if !(p.procedures(i) eq h) => {
             // TODO: need some better approximation of knowing whether this procedure requires relinking?
             p.removeProcedure(i)
             p.addProcedure(h)
           }
           case Nil => p.removeProcedure(i)
-          case h::tl => {
+          case h :: tl => {
             p.removeProcedure(i)
-            for (x <- h::tl) {
+            for (x <- h :: tl) {
               p.addProcedure(x)
             }
           }
@@ -219,3 +242,4 @@ def visit_prog(v: CILVisitor, b: Program): Program = CILVisitorImpl(v).visit_pro
 def visit_stmt(v: CILVisitor, e: Statement): List[Statement] = CILVisitorImpl(v).visit_stmt(e)
 def visit_jump(v: CILVisitor, e: Jump): Jump = CILVisitorImpl(v).visit_jump(e)
 def visit_expr(v: CILVisitor, e: Expr): Expr = CILVisitorImpl(v).visit_expr(e)
+def visit_rvar(v: CILVisitor, e: Variable): Variable = CILVisitorImpl(v).visit_rvar(e)
