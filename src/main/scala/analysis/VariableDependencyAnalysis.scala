@@ -7,6 +7,7 @@ import util.StaticAnalysisLogger
 import scala.collection.mutable
 
 private def getLiveVars(p: Procedure): Map[CFGPosition, Set[Variable]] = {
+  transforms.reversePostOrder(p)
   val liveVarsDom = transforms.IntraLiveVarsDomain()
   val (before, after) = transforms.getLiveVars(p)
   /* Taken from Simp.scala
