@@ -560,7 +560,11 @@ class TranslationValidator {
 
     var progs = List[Program]()
 
-    for (proc <- initProg.get.procedures) {
+    val interesting = initProg.get.procedures
+      .filterNot(_.isExternal.contains(true))
+      .filterNot(_.procName.startsWith("indirect_call_launchpad"))
+
+    for (proc <- interesting) {
       val after = afterProg.get.procedures.find(_.name == proc.name).get
       val before = beforeProg.get.procedures.find(_.name == proc.name).get
       val source = after

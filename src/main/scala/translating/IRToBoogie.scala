@@ -885,6 +885,18 @@ class IRToBoogie(
       val lhsGamma = l.lhs.toGamma
       val rhsGamma = exprToGamma(l.rhs)
       List(AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma)))
+    case l: SimulAssign =>
+      val (lhs, rhs) = l.assignments.toList
+        .sortBy(_._1.name)
+        .map { case (l, r) =>
+          val lhs = l.toBoogie
+          val lhsGamma = l.toGamma
+          val rhs = r.toBoogie
+          val rhsGamma = exprToGamma(r)
+          (List(lhs, lhsGamma), List(rhs, rhsGamma))
+        }
+        .unzip
+      List(AssignCmd(lhs.flatten, rhs.flatten))
     case m: MemoryAssign =>
       val lhs = m.lhs.toBoogie
       val rhs = m.rhs.toBoogie
