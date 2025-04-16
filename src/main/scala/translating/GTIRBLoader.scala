@@ -26,14 +26,18 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
   private var blockCount = 0
   private var loadCounter = 0
 
-  private val opcodeSize = 4
+  val opcodeSize = 4
 
-  def visitBlock(blockUUID: ByteString, blockCountIn: Int, blockAddress: Option[BigInt]): ArrayBuffer[Statement] = {
+  def visitBlock(
+    blockUUID: ByteString,
+    blockCountIn: Int,
+    blockAddress: Option[BigInt]
+  ): ArrayBuffer[immutable.Seq[Statement]] = {
     blockCount = blockCountIn
     instructionCount = 0
     val instructions = parserMap(Base64.getEncoder.encodeToString(blockUUID.toByteArray))
 
-    val statements: ArrayBuffer[Statement] = ArrayBuffer()
+    val statements: ArrayBuffer[immutable.Seq[Statement]] = ArrayBuffer()
 
     for (instsem <- instructions) {
       constMap.clear
@@ -43,17 +47,19 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         case InsnSemantics.Error(op, err) => {
           val message = s"$op ${err.replace("\n", " :: ")}"
           Logger.warn(s"Program contains lifter unsupported opcode: $message")
-          statements.append(Assert(FalseLiteral, Some(s"Lifter error: $message")))
+          statements.append(immutable.Seq(Assert(FalseLiteral, Some(s"Lifter error: $message"))))
           instructionCount += 1
         }
-        case InsnSemantics.Result(instruction) => {
-          for ((s, i) <- instruction.zipWithIndex) {
+        case InsnSemantics.Result(aslstmts) => {
+          var stmts = immutable.LinearSeq[Statement]()
+
+          for ((s, i) <- aslstmts.zipWithIndex) {
             val label = blockAddress.map { (a: BigInt) =>
               val instructionAddress = a + (opcodeSize * instructionCount)
               instructionAddress.toString + "_" + i
             }
 
-            statements.appendAll(try {
+            stmts = stmts ++ (try {
               visitStmt(s, label)
             } catch {
               case e => {
@@ -62,6 +68,8 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
               }
             })
           }
+
+          statements.append(stmts)
           instructionCount += 1
         }
       }
@@ -176,7 +184,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
     }
 
     if (condition.isDefined) {
-      Some(TempIf(condition.get, thenStmts, elseStmts, label))
+      Some(TempIf(condition.get, thenStmts.to(immutable.LinearSeq), elseStmts.to(immutable.LinearSeq), label))
     } else {
       None
     }
@@ -298,7 +306,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
       case "FALSE" => Some(FalseLiteral)
       case "FPCR" => Some(Register("FPCR", 32))
       // ignore the following
-      case "__BranchTaken" => None
+      case "__BranchTaken" => Some(LocalVar("__BranchTaken", BoolType))
       case "BTypeNext" => None
       case "BTypeCompatible" => None
       case "TPIDR_EL0" => Some(Register(name, 64))
@@ -683,7 +691,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
       // ignore the following
       case "TRUE" => throw Exception(s"Boolean literal $name in LExpr ${ctx.getText}")
       case "FALSE" => throw Exception(s"Boolean literal $name in LExpr ${ctx.getText}")
-      case "__BranchTaken" => None
+      case "__BranchTaken" => Some(LocalVar("__BranchTaken", BoolType))
       case "BTypeNext" => None
       case "BTypeCompatible" => None
       case "TPIDR_EL0" => Some(Register(name, 64))
