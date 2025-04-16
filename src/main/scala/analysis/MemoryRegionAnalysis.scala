@@ -145,6 +145,7 @@ trait MemoryRegionAnalysis(
             val ctx = getUse(variable, n, reachingDefs)
             val stackRegions = ctx.flatMap {
               case l: LocalAssign => eval(l.rhs, stackPointerVariables, l, subAccess)
+              case l: MemoryAssign => eval(l.rhs, stackPointerVariables, l, subAccess)
               case _: MemoryLoad => Set()
               case unhandled: DirectCall =>
                 throw Exception(
@@ -181,6 +182,7 @@ trait MemoryRegionAnalysis(
     val regions = ctx.flatMap { i =>
       if (i != n) {
         i match {
+          case l: MemoryAssign => eval(l.rhs, stackPointerVariables, l, subAccess)
           case l: LocalAssign => eval(l.rhs, stackPointerVariables, l, subAccess)
           case m: MemoryLoad => eval(m.index, stackPointerVariables, m, m.size)
           case d: DirectCall =>

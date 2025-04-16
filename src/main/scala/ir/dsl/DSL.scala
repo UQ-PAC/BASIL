@@ -63,6 +63,7 @@ type NonCallStatement =
 
 def cloneStatement(x: NonCallStatement): NonCallStatement = x match {
   case LocalAssign(a, b, c) => LocalAssign(a, b, c)
+  case MemoryAssign(a, b, c) => MemoryAssign(a, b, c)
   case MemoryStore(a, b, c, d, e, f) => MemoryStore(a, b, c, d, e, f)
   case MemoryLoad(a, b, c, d, e, f) => MemoryLoad(a, b, c, d, e, f)
   case x: NOP => NOP(x.label) // FIXME: no unapply for NOP atm
