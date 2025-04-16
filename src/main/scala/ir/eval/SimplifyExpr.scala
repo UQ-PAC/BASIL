@@ -520,7 +520,7 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
         ) if x == x2 && z.value == y.value + 1 => {
       logSimp(e, BinaryExpr(BVUGT, x, z))
     }
-    case  BinaryExpr(
+    case BinaryExpr(
           BoolAND,
           BinaryExpr(BVULE, x, y: BitVecLiteral),
           UnaryExpr(BoolNOT, (BinaryExpr(BVEQ, x2, z: BitVecLiteral)))
@@ -1257,14 +1257,22 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
     case UnaryExpr(BoolNOT, BinaryExpr(BVULE, lhs, rhs)) => logSimp(e, BinaryExpr(BVUGT, lhs, rhs))
     case UnaryExpr(BoolNOT, BinaryExpr(BVUGE, lhs, rhs)) => logSimp(e, BinaryExpr(BVULT, lhs, rhs))
 
-    case BinaryExpr(BoolOR, BinaryExpr(BVUGE, x, y), BinaryExpr(BVULT, x1, y1)) if x1 == x && y1 == y => logSimp(e, TrueLiteral)
-    case BinaryExpr(BoolOR, BinaryExpr(BVUGT, x, y), BinaryExpr(BVULE, x1, y1)) if x1 == x && y1 == y => logSimp(e, TrueLiteral)
-    case BinaryExpr(BoolOR, BinaryExpr(BVULT, x, y), BinaryExpr(BVUGE, x1, y1)) if x1 == x && y1 == y => logSimp(e, TrueLiteral)
-    case BinaryExpr(BoolOR, BinaryExpr(BVULE, x, y), BinaryExpr(BVUGT, x1, y1)) if x1 == x && y1 == y => logSimp(e, TrueLiteral)
-    case BinaryExpr(BoolOR, BinaryExpr(BVSGE, x, y), BinaryExpr(BVSLT, x1, y1)) if x1 == x && y1 == y => logSimp(e, TrueLiteral)
-    case BinaryExpr(BoolOR, BinaryExpr(BVSGT, x, y), BinaryExpr(BVSLE, x1, y1)) if x1 == x && y1 == y => logSimp(e, TrueLiteral)
-    case BinaryExpr(BoolOR, BinaryExpr(BVSLT, x, y), BinaryExpr(BVSGE, x1, y1)) if x1 == x && y1 == y => logSimp(e, TrueLiteral)
-    case BinaryExpr(BoolOR, BinaryExpr(BVSLE, x, y), BinaryExpr(BVSGT, x1, y1)) if x1 == x && y1 == y => logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolOR, BinaryExpr(BVUGE, x, y), BinaryExpr(BVULT, x1, y1)) if x1 == x && y1 == y =>
+      logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolOR, BinaryExpr(BVUGT, x, y), BinaryExpr(BVULE, x1, y1)) if x1 == x && y1 == y =>
+      logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolOR, BinaryExpr(BVULT, x, y), BinaryExpr(BVUGE, x1, y1)) if x1 == x && y1 == y =>
+      logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolOR, BinaryExpr(BVULE, x, y), BinaryExpr(BVUGT, x1, y1)) if x1 == x && y1 == y =>
+      logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolOR, BinaryExpr(BVSGE, x, y), BinaryExpr(BVSLT, x1, y1)) if x1 == x && y1 == y =>
+      logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolOR, BinaryExpr(BVSGT, x, y), BinaryExpr(BVSLE, x1, y1)) if x1 == x && y1 == y =>
+      logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolOR, BinaryExpr(BVSLT, x, y), BinaryExpr(BVSGE, x1, y1)) if x1 == x && y1 == y =>
+      logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolOR, BinaryExpr(BVSLE, x, y), BinaryExpr(BVSGT, x1, y1)) if x1 == x && y1 == y =>
+      logSimp(e, TrueLiteral)
 
     case BinaryExpr(BoolOR, a, UnaryExpr(BoolNOT, b)) if a == b => logSimp(e, TrueLiteral)
     case BinaryExpr(BoolOR, UnaryExpr(BoolNOT, a), b) if a == b => logSimp(e, TrueLiteral)
@@ -1278,8 +1286,8 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
     case BinaryExpr(BoolOR, BinaryExpr(BoolAND, a, b), BinaryExpr(BoolAND, c, d)) if b == d =>
       logSimp(e, BinaryExpr(BoolAND, BinaryExpr(BoolOR, a, c), b))
 
-    //case BinaryExpr(BoolOR, UnaryExpr(BoolNOT, a), b) => logSimp(e, BinaryExpr(BoolIMPLIES, a, b))
-    //case BinaryExpr(BoolOR, a, UnaryExpr(BoolNOT, b)) => logSimp(e, BinaryExpr(BoolIMPLIES, b, a))
+    // case BinaryExpr(BoolOR, UnaryExpr(BoolNOT, a), b) => logSimp(e, BinaryExpr(BoolIMPLIES, a, b))
+    // case BinaryExpr(BoolOR, a, UnaryExpr(BoolNOT, b)) => logSimp(e, BinaryExpr(BoolIMPLIES, b, a))
 
     case r => {
       didAnything = false

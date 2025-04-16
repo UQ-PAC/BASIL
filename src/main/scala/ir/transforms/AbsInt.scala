@@ -272,7 +272,6 @@ class interprocSummaryFixpointSolver[SummaryAbsVal, LocalAbsVal, A <: AbstractDo
     sg.updateSummary(a, b, beforeRes, afterRes)
   }
 
-
   def solveProcsInterProc(procedures: Iterable[Procedure], backwards: Boolean = false) = {
     var old_summaries = Map[Procedure, SummaryAbsVal]()
     var summaries = Map[Procedure, SummaryAbsVal]()

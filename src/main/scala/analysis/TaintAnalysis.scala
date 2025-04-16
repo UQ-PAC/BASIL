@@ -4,9 +4,8 @@ import analysis.solvers.ForwardIDESolver
 import ir.*
 import boogie.*
 
-trait TaintAnalysisFunctions(
-  tainted: Map[CFGPosition, Set[Variable]],
-) extends ForwardIDEAnalysis[Variable, TwoElement, TwoElementLattice] {
+trait TaintAnalysisFunctions(tainted: Map[CFGPosition, Set[Variable]])
+    extends ForwardIDEAnalysis[Variable, TwoElement, TwoElementLattice] {
   val valuelattice = TwoElementLattice()
   val edgelattice = EdgeFunctionLattice(valuelattice)
   import edgelattice.{IdEdge, ConstEdge}
@@ -32,16 +31,18 @@ trait TaintAnalysisFunctions(
           case _ => Map(d -> IdEdge())
         }
       // TODO taint regions
-      case MemoryLoad(lhs, mem, index, _, size, _) => d match {
-        case Left(_) => Map(d -> IdEdge())
-        case Right(_) => Map(d -> IdEdge(), Left(lhs) -> ConstEdge(valuelattice.top))
-      }
-      case Return(_, out) => out.toMap.flatMap {
-        (variable, expression) => {
-          d match {
-            case Left(v) if expression.variables.contains(v) => Map(d -> IdEdge(), Left(variable) -> IdEdge())
-            case Left(v) if v == variable => Map()
-            case _ => Map(d -> IdEdge())
+      case MemoryLoad(lhs, mem, index, _, size, _) =>
+        d match {
+          case Left(_) => Map(d -> IdEdge())
+          case Right(_) => Map(d -> IdEdge(), Left(lhs) -> ConstEdge(valuelattice.top))
+        }
+      case Return(_, out) =>
+        out.toMap.flatMap { (variable, expression) =>
+          {
+            d match {
+              case Left(v) if expression.variables.contains(v) => Map(d -> IdEdge(), Left(variable) -> IdEdge())
+              case Left(v) if v == variable => Map()
+              case _ => Map(d -> IdEdge())
             }
           }
         }
@@ -62,8 +63,6 @@ trait TaintAnalysisFunctions(
  * specified by `tainted`, and propogate their taint throughout the program. Assignments containing tainted variables
  * mark the assigned value as tainted.
  */
-class TaintAnalysis(
-  program: Program,
-  tainted: Map[CFGPosition, Set[Variable]],
-) extends ForwardIDESolver[Variable, TwoElement, TwoElementLattice](program),
-    TaintAnalysisFunctions(tainted)
+class TaintAnalysis(program: Program, tainted: Map[CFGPosition, Set[Variable]])
+    extends ForwardIDESolver[Variable, TwoElement, TwoElementLattice](program),
+      TaintAnalysisFunctions(tainted)

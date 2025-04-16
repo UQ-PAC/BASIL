@@ -347,30 +347,28 @@ object IRTransform {
     }
   }
 
-  def generateProcedureSummaries(
-    ctx: IRContext,
-    IRProgram: Program,
-    simplified: Boolean = false,
-  ): Boolean = {
+  def generateProcedureSummaries(ctx: IRContext, IRProgram: Program, simplified: Boolean = false): Boolean = {
     var modified = false
     // Need to know modifies clauses to generate summaries, but this is probably out of place
     val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
     ctx.program.setModifies(specModifies)
 
     val summaryGenerator = SummaryGenerator(IRProgram, simplified)
-    IRProgram.procedures.filter {
-      p => p != IRProgram.mainProcedure
-    }.foreach {
-      procedure => {
-        val req = summaryGenerator.generateRequires(procedure)
-        modified = modified | procedure.requires != req
-        procedure.requires = req
-
-        val ens = summaryGenerator.generateEnsures(procedure)
-        modified = modified | procedure.ensures != ens
-        procedure.ensures = ens
+    IRProgram.procedures
+      .filter { p =>
+        p != IRProgram.mainProcedure
       }
-    }
+      .foreach { procedure =>
+        {
+          val req = summaryGenerator.generateRequires(procedure)
+          modified = modified | procedure.requires != req
+          procedure.requires = req
+
+          val ens = summaryGenerator.generateEnsures(procedure)
+          modified = modified | procedure.ensures != ens
+          procedure.ensures = ens
+        }
+      }
 
     modified
   }
@@ -382,11 +380,9 @@ object IRTransform {
     type InterferenceLatticeElement = Map[Variable, StateLatticeElement]
     val stateLattice = IntervalLatticeExtension()
     val stateTransfer = SignedIntervalDomain().transfer
-    val intDom = ConditionalWritesDomain[StateLatticeElement](
-      stateLattice, stateTransfer)
+    val intDom = ConditionalWritesDomain[StateLatticeElement](stateLattice, stateTransfer)
     val relyGuarantees =
-      RelyGuaranteeGenerator[InterferenceLatticeElement, StateLatticeElement](
-        intDom).generate(threads)
+      RelyGuaranteeGenerator[InterferenceLatticeElement, StateLatticeElement](intDom).generate(threads)
     for ((p, (rely, guar)) <- relyGuarantees) {
       println("--- " + p.procName + " " + "-" * 50 + "\n")
       println("Rely:")
@@ -920,7 +916,12 @@ object RunUtils {
       if config.analyses.contains(Norm) then
         DSALogger.info("Finished Computing Constraints")
         val globalGraph =
-          IntervalDSA.getLocal(ctx.program.mainProcedure, ctx, SymValues[data_structure_analysis.Interval](Map.empty), Set[Constraint]())
+          IntervalDSA.getLocal(
+            ctx.program.mainProcedure,
+            ctx,
+            SymValues[data_structure_analysis.Interval](Map.empty),
+            Set[Constraint]()
+          )
         val DSA = IntervalDSA.getLocals(ctx, sva, cons)
         IntervalDSA.checkReachable(ctx.program, DSA)
         DSATimer.checkPoint("Finished DSA Local Phase")

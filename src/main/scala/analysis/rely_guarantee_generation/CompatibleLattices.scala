@@ -30,8 +30,7 @@ class IntervalLatticeExtension()
   def contains(s: LatticeMap[Variable, Interval], v: Variable): Boolean =
     s.toMap.contains(v)
 
-  def drop(v: Variable, s: LatticeMap[Variable, Interval]):
-      LatticeMap[Variable, Interval] =
+  def drop(v: Variable, s: LatticeMap[Variable, Interval]): LatticeMap[Variable, Interval] =
     s + (v -> Interval.Top)
 
   // glb is already defined in LatticeMapLattice

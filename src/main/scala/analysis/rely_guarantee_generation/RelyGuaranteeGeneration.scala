@@ -16,8 +16,7 @@ import scala.collection.mutable.Queue
   * @param intDom: Instance of the interference domain, to provide operations.
   * @param rely: The rely condition under which we stabilise generated states.
   */
-class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T)
-    extends AbstractDomain[(T, S)] {
+class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T) extends AbstractDomain[(T, S)] {
 
   /* We initialise the interference domain to bottom, meaning we have
   encountered no reachable state transitions. However, we initialise the state
@@ -26,7 +25,7 @@ class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T)
 
   // this is undefined because top is undefined for InterferenceDomains
   def top: (T, S) = ???
-  
+
   // this is a bit of a sketchy definition
   def bot: (T, S) = (intDom.bot, intDom.stateLattice.bottom)
 
@@ -36,7 +35,7 @@ class InterferenceProductDomain[T, S](intDom: InterferenceDomain[T, S], rely: T)
   // join without the position argument
   def pureJoin(a: (T, S), b: (T, S)): (T, S) =
     (intDom.join(a._1, b._1), intDom.stateLattice.lub(a._2, b._2))
-  
+
   // updates and stabilises the state while collecting reachable transitions
   def transfer(a: (T, S), b: Command): (T, S) = {
     // stabilise the pre-state under the rely
@@ -137,13 +136,16 @@ class GuarGenSummaryGenerator[T, S](dom: InterferenceProductDomain[T, S])
 
   def transfer(a: (T, S), b: Procedure): (T, S) = ???
 
-  def localTransferCall(localState: (T, S), summaryForTarget: (T, S),
-      call: DirectCall) : (T, S) =
+  def localTransferCall(localState: (T, S), summaryForTarget: (T, S), call: DirectCall): (T, S) =
     // the postcondition of a procedure call is simply the procedure's summary
     summaryForTarget
 
-  def updateSummary(prevSummary: (T, S), p: Procedure,
-      resBefore: Map[Block, (T, S)], resAfter: Map[Block, (T, S)]) : (T, S) =
+  def updateSummary(
+    prevSummary: (T, S),
+    p: Procedure,
+    resBefore: Map[Block, (T, S)],
+    resAfter: Map[Block, (T, S)]
+  ): (T, S) =
     // we want to expand the previous postcondition by joining this one
     dom.pureJoin(prevSummary, resAfter(p.returnBlock.get))
 }

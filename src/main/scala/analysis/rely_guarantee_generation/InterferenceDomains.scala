@@ -59,16 +59,16 @@ def get_temp(ty: IRType): LocalVar = LocalVar("rg_tmp_var", ty, 0)
   * written to are omitted from the map, rather than being mapped to bot.
   */
 case class ConditionalWritesDomain[S](
-  override val stateLattice: InterferenceCompatibleLattice[S], 
+  override val stateLattice: InterferenceCompatibleLattice[S],
   override val stateTransfer: (S, Command) => S
 ) extends InterferenceDomain[Map[Variable, S], S](stateLattice, stateTransfer) {
   // an empty map means no variables have been written to
   def bot: Map[Variable, S] = Map.empty[Variable, S]
-  
+
   // simply map the assigned variable to the precondition
   def derive(s: S, c: Assign): Map[Variable, S] =
     if s == stateLattice.bottom then bot else c.assignees.map(v => v -> s).toMap
-  
+
   /* If a variable v maps to a set of states that intersects s, then there
   exists a state satisfying s under which v can be written. Thus, we stabilise s
   by eliminating v. Since this weakens s, we have to keep doing this until we
@@ -156,9 +156,9 @@ case class ConditionalWritesDomain[S](
   */
 enum Direction:
   case Top, // no constraints; variable can either increase or decrease
-       Increasing, // variable only ever increases, or stays the same
-       Decreasing, // variable only ever decreases, or stays the same
-       Bot // variable stays the same; neither increases nor decreases
+    Increasing, // variable only ever increases, or stays the same
+    Decreasing, // variable only ever decreases, or stays the same
+    Bot // variable stays the same; neither increases nor decreases
 
 /** The Direction lattice is the core part of the monotonicity domain. The
   * lattice elements are the values of the Direction enum. It takes the shape:
@@ -195,10 +195,9 @@ object DirectionLattice extends Lattice[Direction] {
   * written to are omitted from the map, rather than being mapped to bot.
   */
 case class MonotonicityDomain[S](
-  override val stateLattice: InterferenceCompatibleLattice[S], 
+  override val stateLattice: InterferenceCompatibleLattice[S],
   override val stateTransfer: (S, Command) => S
-) extends InterferenceDomain[Map[Variable, Direction], S](stateLattice, 
-  stateTransfer) {
+) extends InterferenceDomain[Map[Variable, Direction], S](stateLattice, stateTransfer) {
 
   // an empty map means no variables have been written to
   def bot: Map[Variable, Direction] = Map.empty[Variable, Direction]
@@ -208,28 +207,30 @@ case class MonotonicityDomain[S](
     * we can prove that v' <*> v for any <*> in: <, <=, ==, >=, >.
     */
   def derive(s: S, a: Assign): Map[Variable, Direction] =
-    if s == stateLattice.bottom then Map.empty else a match {
-      case c: LocalAssign => {
-        // create fresh variable x
-        val x = get_temp(c.lhs.irType)
-        // do the assignment on x, with pre-state s
-        val post = stateTransfer(s, LocalAssign(x, c.rhs))
-        // apply the transfer function to assume x' > x and assume x' < x
-        val assumeInc = stateTransfer(post, Assume(BinaryExpr(BVSGT, x, c.lhs)))
-        val decreases = assumeInc == stateLattice.bottom
-        val assumeDec = stateTransfer(post, Assume(BinaryExpr(BVSLT, x, c.lhs)))
-        val increases = assumeDec == stateLattice.bottom
-        // from the above, derive the direction in which x moved from a.lhs
-        val dir =
-          if (decreases && increases) then Direction.Bot // x' <= x && x' >= x
-          else if (decreases) then Direction.Decreasing // x' <= x
-          else if (increases) then Direction.Increasing // x' >= x
-          else Direction.Top // could not prove any constraints of x' w.r.t. x
-        // map a.lhs to the appropriate result
-        Map(c.lhs -> dir)
+    if s == stateLattice.bottom then Map.empty
+    else
+      a match {
+        case c: LocalAssign => {
+          // create fresh variable x
+          val x = get_temp(c.lhs.irType)
+          // do the assignment on x, with pre-state s
+          val post = stateTransfer(s, LocalAssign(x, c.rhs))
+          // apply the transfer function to assume x' > x and assume x' < x
+          val assumeInc = stateTransfer(post, Assume(BinaryExpr(BVSGT, x, c.lhs)))
+          val decreases = assumeInc == stateLattice.bottom
+          val assumeDec = stateTransfer(post, Assume(BinaryExpr(BVSLT, x, c.lhs)))
+          val increases = assumeDec == stateLattice.bottom
+          // from the above, derive the direction in which x moved from a.lhs
+          val dir =
+            if (decreases && increases) then Direction.Bot // x' <= x && x' >= x
+            else if (decreases) then Direction.Decreasing // x' <= x
+            else if (increases) then Direction.Increasing // x' >= x
+            else Direction.Top // could not prove any constraints of x' w.r.t. x
+          // map a.lhs to the appropriate result
+          Map(c.lhs -> dir)
+        }
+        case _ => bot
       }
-      case _ => bot
-    }
 
   /** To simulate interference on a variable v, we introduce a temporary
     * variable y, together with an "assume" statement to add the appropriate
@@ -261,8 +262,7 @@ case class MonotonicityDomain[S](
   }
 
   // the join of two elements is just the component-wise join over the map
-  def join(t1: Map[Variable, Direction], t2: Map[Variable, Direction])
-    : Map[Variable, Direction] = {
+  def join(t1: Map[Variable, Direction], t2: Map[Variable, Direction]): Map[Variable, Direction] = {
     // set new_t = t1, then add everything in t2 to new_t
     var new_t = t1
     for ((v, dir) <- t2) {
@@ -303,19 +303,19 @@ case class MonotonicityDomain[S](
 }
 
 case class PreciseDomain[S](
-  override val stateLattice: InterferenceCompatibleLattice[S], 
+  override val stateLattice: InterferenceCompatibleLattice[S],
   override val stateTransfer: (S, Command) => S
-) extends InterferenceDomain[Map[LocalAssign, S], S](stateLattice,
-  stateTransfer) {
+) extends InterferenceDomain[Map[LocalAssign, S], S](stateLattice, stateTransfer) {
 
   def bot: Map[LocalAssign, S] = Map.empty[LocalAssign, S]
 
   def derive(s: S, a: Assign): Map[LocalAssign, S] =
     if (s == stateLattice.bottom) then Map.empty[LocalAssign, S]
-    else a match {
-      case c: LocalAssign => Map(c -> s)
-      case _ => bot
-    }
+    else
+      a match {
+        case c: LocalAssign => Map(c -> s)
+        case _ => bot
+      }
 
   /** Stabilising s under and element e in t requires adding to s the states
     * that are reachable by executing e.inst under the meet of e.pre and s. This
@@ -343,8 +343,7 @@ case class PreciseDomain[S](
     new_s
   }
 
-  def join(t1: Map[LocalAssign, S], t2: Map[LocalAssign, S])
-    : Map[LocalAssign, S] = {
+  def join(t1: Map[LocalAssign, S], t2: Map[LocalAssign, S]): Map[LocalAssign, S] = {
     // set new_t = t1, then add everything in t2 to new_t
     var new_t = t1
     for ((c, s) <- t2) {

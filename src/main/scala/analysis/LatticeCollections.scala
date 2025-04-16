@@ -327,6 +327,7 @@ trait MapDomain[D, L] extends AbstractDomain[LatticeMap[D, L]] {
  * If you want to implement this trait, instead implement either `MayPredMapDomain` or `MustPredMapDomain`
  */
 trait PredMapDomain[D, L] extends MapDomain[D, L] with PredicateEncodingDomain[LatticeMap[D, L]] {
+
   /**
    * Encode the information the abstract value `l` represents, as a predicate, when `l` is the result
    * of applying `d` to `m`.
@@ -352,15 +353,16 @@ trait MayPredMapDomain[D, L] extends PredMapDomain[D, L] with MayAnalysis {
 
   def toPred(x: LatticeMap[D, L]): Predicate = x match {
     case Top() => Predicate.True
-    case TopMap(m) => m.foldLeft(Predicate.True) {
-      (p, z) => {
-        val (d, l) = z
-        termToPred(x, d, l) match {
-          case Predicate.True => p
-          case q => Predicate.and(p, q)
+    case TopMap(m) =>
+      m.foldLeft(Predicate.True) { (p, z) =>
+        {
+          val (d, l) = z
+          termToPred(x, d, l) match {
+            case Predicate.True => p
+            case q => Predicate.and(p, q)
+          }
         }
-      }
-    }.simplify
+      }.simplify
     case Bottom() => Predicate.False
     case BottomMap(m) => Predicate.False
   }
@@ -380,14 +382,15 @@ trait MustPredMapDomain[D, L] extends PredMapDomain[D, L] with MustAnalysis {
     case Top() => Predicate.False
     case TopMap(m) => Predicate.False
     case Bottom() => Predicate.True
-    case BottomMap(m) => m.foldLeft(Predicate.True) {
-      (p, z) => {
-        val (d, l) = z
-        termToPred(x, d, l) match {
-          case Predicate.True => p
-          case q => Predicate.and(p, q)
+    case BottomMap(m) =>
+      m.foldLeft(Predicate.True) { (p, z) =>
+        {
+          val (d, l) = z
+          termToPred(x, d, l) match {
+            case Predicate.True => p
+            case q => Predicate.and(p, q)
+          }
         }
-      }
-    }.simplify
+      }.simplify
   }
 }

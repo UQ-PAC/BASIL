@@ -8,11 +8,17 @@ import LatticeSet.*
 
 @test_util.tags.UnitTest
 class TaintAnalysisTests extends AnyFunSuite, BASILTest {
-  def getTaintAnalysisResults(program: Program, taint: Map[CFGPosition, Set[Variable]]): Map[CFGPosition, Set[Variable]] = {
-    TaintAnalysis(program, taint).analyze().map { (c, m) => (c, m.map { (v, _) => v }.toSet)}
+  def getTaintAnalysisResults(
+    program: Program,
+    taint: Map[CFGPosition, Set[Variable]]
+  ): Map[CFGPosition, Set[Variable]] = {
+    TaintAnalysis(program, taint).analyze().map { (c, m) => (c, m.map { (v, _) => v }.toSet) }
   }
 
-  def getVarDepResults(program: Program, procedure: Procedure): Map[CFGPosition, Map[Variable, LatticeSet[Variable]]] = {
+  def getVarDepResults(
+    program: Program,
+    procedure: Procedure
+  ): Map[CFGPosition, Map[Variable, LatticeSet[Variable]]] = {
     val variables = registers
     ProcVariableDependencyAnalysis(program, variables, Map(), procedure).analyze()
   }
@@ -114,7 +120,11 @@ class TaintAnalysisTests extends AnyFunSuite, BASILTest {
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(IRWalk.lastInProc(f).get).contains(baseRegisterMap + (R0 -> FiniteSet(Set(R1, R2))) + (R1 -> FiniteSet(Set(R1, R2)))))
+    assert(
+      varDepResults
+        .get(IRWalk.lastInProc(f).get)
+        .contains(baseRegisterMap + (R0 -> FiniteSet(Set(R1, R2))) + (R1 -> FiniteSet(Set(R1, R2))))
+    )
   }
 
   test("loop") {

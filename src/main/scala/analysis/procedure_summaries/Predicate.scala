@@ -54,12 +54,12 @@ enum BVTerm {
     if this.simplified then return this
     val ret = this match {
       // TODO const prop
-      //case Uop(op, x) => Uop(op, x.simplify)
-      //case Bop(op, x, y) => Bop(op, x.simplify, y.simplify)
-      //case Extract(end, start, body) => Extract(end, start, body.simplify)
-      //case Repeat(repeats, body) => Repeat(repeats, body.simplify)
-      //case ZeroExtend(extension, body) => ZeroExtend(extension, body.simplify)
-      //case SignExtend(extension, body) => SignExtend(extension, body.simplify)
+      // case Uop(op, x) => Uop(op, x.simplify)
+      // case Bop(op, x, y) => Bop(op, x.simplify, y.simplify)
+      // case Extract(end, start, body) => Extract(end, start, body.simplify)
+      // case Repeat(repeats, body) => Repeat(repeats, body.simplify)
+      // case ZeroExtend(extension, body) => ZeroExtend(extension, body.simplify)
+      // case SignExtend(extension, body) => SignExtend(extension, body.simplify)
       case _ => this
     }
     ret.simplified = true
@@ -85,15 +85,17 @@ enum BVTerm {
   /**
    * Determines whether the provided term is a subexpression of this expression
    */
-  def contains(term: BVTerm): Boolean = if this == term then true else this match {
-    case Uop(op, x) => x.contains(term)
-    case Bop(op, x, y) => x.contains(term) || y.contains(term)
-    case Extract(end, start, body) => body.contains(term)
-    case Repeat(repeats, body) => body.contains(term)
-    case ZeroExtend(extension, body) => body.contains(term)
-    case SignExtend(extension, body) => body.contains(term)
-    case _ => false
-  }
+  def contains(term: BVTerm): Boolean = if this == term then true
+  else
+    this match {
+      case Uop(op, x) => x.contains(term)
+      case Bop(op, x, y) => x.contains(term) || y.contains(term)
+      case Extract(end, start, body) => body.contains(term)
+      case Repeat(repeats, body) => body.contains(term)
+      case ZeroExtend(extension, body) => body.contains(term)
+      case SignExtend(extension, body) => body.contains(term)
+      case _ => false
+    }
 }
 
 /**
@@ -139,8 +141,8 @@ enum GammaTerm {
     if this.simplified then return this
     val ret = this match {
       case Join(s) => {
-        val set = s.map(g => g.simplify).foldLeft(Set[GammaTerm]()) {
-          (s, g) => g match {
+        val set = s.map(g => g.simplify).foldLeft(Set[GammaTerm]()) { (s, g) =>
+          g match {
             case Join(s2) => s ++ s2
             case g => s + g
           }
@@ -168,13 +170,15 @@ enum GammaTerm {
   /**
    * Determines whether the provided term is a subexpression of this expression
    */
-  def contains(term: GammaTerm): Boolean = if this == term then true else this match {
-    case Lit(x) => false
-    case Var(v) => false
-    case OldVar(v) => false
-    case Uop(op, x) => x.contains(term)
-    case Join(s) => s.exists(_.contains(term))
-  }
+  def contains(term: GammaTerm): Boolean = if this == term then true
+  else
+    this match {
+      case Lit(x) => false
+      case Var(v) => false
+      case OldVar(v) => false
+      case Uop(op, x) => x.contains(term)
+      case Join(s) => s.exists(_.contains(term))
+    }
 }
 
 object GammaTerm {
@@ -221,11 +225,15 @@ enum Predicate {
     case Conj(s) =>
       if s.size == 0 then Some(TrueLiteral)
       else if s.size == 1 then s.head.toBasil
-      else s.tail.foldLeft(s.head.toBasil) { (p, q) => p.flatMap { p => q.toBasil.map { q => BinaryExpr(BoolAND, p, q) } } }
+      else
+        s.tail.foldLeft(s.head.toBasil) { (p, q) =>
+          p.flatMap { p => q.toBasil.map { q => BinaryExpr(BoolAND, p, q) } }
+        }
     case Disj(s) =>
       if s.size == 0 then Some(FalseLiteral)
       else if s.size == 1 then s.head.toBasil
-      else s.tail.foldLeft(s.head.toBasil) { (p, q) => p.flatMap { p => q.toBasil.map { q => BinaryExpr(BoolOR, p, q) } } }
+      else
+        s.tail.foldLeft(s.head.toBasil) { (p, q) => p.flatMap { p => q.toBasil.map { q => BinaryExpr(BoolOR, p, q) } } }
     case BVCmp(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
     case GammaCmp(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
   }
@@ -354,11 +362,14 @@ enum Predicate {
     }
     case Disj(s) => {
       if s.size == 1 then s.head.inDnf
-      else s.forall(x => x match {
-        case a: Atomic => true
-        case Conj(s) => s.forall(_.isInstanceOf[Atomic])
-        case Disj(s) => x.inDnf
-      })
+      else
+        s.forall(x =>
+          x match {
+            case a: Atomic => true
+            case Conj(s) => s.forall(_.isInstanceOf[Atomic])
+            case Disj(s) => x.inDnf
+          }
+        )
     }
   }
 
@@ -373,11 +384,14 @@ enum Predicate {
     }
     case Conj(s) => {
       if s.size == 1 then s.head.inCnf
-      else s.forall(x => x match {
-        case a: Atomic => true
-        case Disj(s) => s.forall(_.isInstanceOf[Atomic])
-        case Conj(s) => x.inCnf
-      })
+      else
+        s.forall(x =>
+          x match {
+            case a: Atomic => true
+            case Disj(s) => s.forall(_.isInstanceOf[Atomic])
+            case Conj(s) => x.inCnf
+          }
+        )
     }
   }
 
@@ -438,11 +452,16 @@ enum Predicate {
               case Lit(TrueLiteral) => cur - p
               case Lit(FalseLiteral) => Set(Lit(FalseLiteral))
               case Conj(s2) => cur - p ++ s2
-              case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSLE, b, a)) => cur - p - BVCmp(BVSLE, b, a) + BVCmp(BVEQ, a, b)
-              case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSGE, a, b)) => cur - p - BVCmp(BVSGE, a, b) + BVCmp(BVEQ, a, b)
-              case BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVULE, b, a)) => cur - p - BVCmp(BVULE, b, a) + BVCmp(BVEQ, a, b)
-              case BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVUGE, a, b)) => cur - p - BVCmp(BVUGE, a, b) + BVCmp(BVEQ, a, b)
-              case GammaCmp(BoolIMPLIES, a, b) if cur.contains(GammaCmp(BoolIMPLIES, b, a)) => cur - p - GammaCmp(BoolIMPLIES, b, a) + GammaCmp(BoolEQ, a, b)
+              case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSLE, b, a)) =>
+                cur - p - BVCmp(BVSLE, b, a) + BVCmp(BVEQ, a, b)
+              case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSGE, a, b)) =>
+                cur - p - BVCmp(BVSGE, a, b) + BVCmp(BVEQ, a, b)
+              case BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVULE, b, a)) =>
+                cur - p - BVCmp(BVULE, b, a) + BVCmp(BVEQ, a, b)
+              case BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVUGE, a, b)) =>
+                cur - p - BVCmp(BVUGE, a, b) + BVCmp(BVEQ, a, b)
+              case GammaCmp(BoolIMPLIES, a, b) if cur.contains(GammaCmp(BoolIMPLIES, b, a)) =>
+                cur - p - GammaCmp(BoolIMPLIES, b, a) + GammaCmp(BoolEQ, a, b)
               case _ => cur
             }
             changed = cur != cur1
@@ -530,7 +549,8 @@ def exprToBVTerm(e: Expr): Option[BVTerm] = e match {
   case b: BitVecLiteral => Some(BVTerm.Lit(b))
   case v: Variable => Some(BVTerm.Var(v))
   case UnaryExpr(op: BVUnOp, arg) => exprToBVTerm(arg).map(x => BVTerm.Uop(op, x))
-  case BinaryExpr(op: BVBinOp, arg1, arg2) => exprToBVTerm(arg1).flatMap(x => exprToBVTerm(arg2).map(y => BVTerm.Bop(op, x, y)))
+  case BinaryExpr(op: BVBinOp, arg1, arg2) =>
+    exprToBVTerm(arg1).flatMap(x => exprToBVTerm(arg2).map(y => BVTerm.Bop(op, x, y)))
   case Extract(end, start, body) => exprToBVTerm(body).map(x => BVTerm.Extract(end, start, x))
   case Repeat(repeats, body) => exprToBVTerm(body).map(x => BVTerm.Repeat(repeats, x))
   case ZeroExtend(extension, body) => exprToBVTerm(body).map(x => BVTerm.ZeroExtend(extension, x))
@@ -545,7 +565,8 @@ def exprToGammaTerm(e: Expr): Option[GammaTerm] = e match {
   case b: BitVecLiteral => Some(GammaTerm.Low)
   case v: Variable => Some(GammaTerm.Var(v))
   case UnaryExpr(op: BVUnOp, arg) => exprToGammaTerm(arg)
-  case BinaryExpr(op: BVBinOp, arg1, arg2) => exprToGammaTerm(arg1).flatMap(x => exprToGammaTerm(arg2).map(y => GammaTerm.Join(Set(x, y))))
+  case BinaryExpr(op: BVBinOp, arg1, arg2) =>
+    exprToGammaTerm(arg1).flatMap(x => exprToGammaTerm(arg2).map(y => GammaTerm.Join(Set(x, y))))
   case Extract(end, start, body) => exprToGammaTerm(body)
   case Repeat(repeats, body) => exprToGammaTerm(body)
   case ZeroExtend(extension, body) => exprToGammaTerm(body)
@@ -559,8 +580,10 @@ def exprToGammaTerm(e: Expr): Option[GammaTerm] = e match {
 def exprToPredicate(e: Expr): Option[Predicate] = e match {
   case b: BoolLit => Some(Predicate.Lit(b))
   case UnaryExpr(BoolNOT, arg) => exprToPredicate(arg).map(p => Predicate.not(p))
-  case BinaryExpr(op: BoolBinOp, arg1, arg2) => exprToPredicate(arg1).flatMap(p => exprToPredicate(arg2).map(q => Predicate.bop(op, p, q)))
-  case BinaryExpr(op: BVCmpOp, arg1, arg2) => exprToBVTerm(arg1).flatMap(p => exprToBVTerm(arg2).map(q => Predicate.BVCmp(op, p, q)))
+  case BinaryExpr(op: BoolBinOp, arg1, arg2) =>
+    exprToPredicate(arg1).flatMap(p => exprToPredicate(arg2).map(q => Predicate.bop(op, p, q)))
+  case BinaryExpr(op: BVCmpOp, arg1, arg2) =>
+    exprToBVTerm(arg1).flatMap(p => exprToBVTerm(arg2).map(q => Predicate.BVCmp(op, p, q)))
   case _ => None
 }
 
@@ -577,6 +600,7 @@ def exprToPredicate(e: Expr): Option[Predicate] = e match {
  * Intuitively, the predicate should be an approximation of the abstract state, cannot soundly be more precise than the domain itself.
  */
 trait PredicateEncodingDomain[L] extends AbstractDomain[L] {
+
   /**
    * Convert an abstract value to a predicate encoding its meaning.
    */

@@ -28,7 +28,8 @@ class ProductDomain[L1, L2](d1: AbstractDomain[L1], d2: AbstractDomain[L2]) exte
  * Encodes the conjunction of two domain predicates.
  */
 class PredProductDomain[L1, L2](d1: PredicateEncodingDomain[L1], d2: PredicateEncodingDomain[L2])
-  extends ProductDomain[L1, L2](d1, d2) with PredicateEncodingDomain[(L1, L2)] {
+    extends ProductDomain[L1, L2](d1, d2)
+    with PredicateEncodingDomain[(L1, L2)] {
 
   def toPred(x: (L1, L2)): Predicate = Predicate.and(d1.toPred(x._1), d2.toPred(x._2))
 
@@ -58,7 +59,9 @@ class DisjunctiveCompletion[L](d: AbstractDomain[L]) extends AbstractDomain[Set[
 /**
  * Encodes a disjunctive completion as the disjunction of a set of predicates.
  */
-class PredDisjunctiveCompletion[L](d: PredicateEncodingDomain[L]) extends DisjunctiveCompletion[L](d) with PredicateEncodingDomain[Set[L]] {
+class PredDisjunctiveCompletion[L](d: PredicateEncodingDomain[L])
+    extends DisjunctiveCompletion[L](d)
+    with PredicateEncodingDomain[Set[L]] {
   def toPred(x: Set[L]): Predicate = x.foldLeft(Predicate.False) { (p, l) => Predicate.or(p, d.toPred(l)) }.simplify
 
   override def fromPred(p: Predicate): Set[L] = p match {
@@ -92,7 +95,9 @@ class BoundedDisjunctiveCompletion[L](d: AbstractDomain[L], bound: Int) extends 
 /**
  * Encodes a bounded disjunctive completion as the disjunction of a set of predicates.
  */
-class PredBoundedDisjunctiveCompletion[L](d: PredicateEncodingDomain[L], bound: Int) extends BoundedDisjunctiveCompletion[L](d, bound) with PredicateEncodingDomain[Set[L]] {
+class PredBoundedDisjunctiveCompletion[L](d: PredicateEncodingDomain[L], bound: Int)
+    extends BoundedDisjunctiveCompletion[L](d, bound)
+    with PredicateEncodingDomain[Set[L]] {
   def toPred(x: Set[L]): Predicate = x.foldLeft(Predicate.False) { (p, l) => Predicate.or(p, d.toPred(l)) }.simplify
 
   override def fromPred(p: Predicate): Set[L] = p match {
