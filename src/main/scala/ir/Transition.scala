@@ -10,6 +10,8 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable
 import util.Logger
 
+val linkUninterpByAxioms = true
+
 def polyEqual(e1: Expr, e2: Expr) = {
   (e1.getType, e2.getType) match {
     case (BoolType, BoolType) => BinaryExpr(BoolEQ, e1, e2)
@@ -33,7 +35,7 @@ class NamespaceState(val namespace: String) extends CILVisitor {
   }
 
   override def vexpr(e: Expr) = e match {
-    case f @ UninterpretedFunction(n, p, r, _) =>
+    case f @ UninterpretedFunction(n, p, r, _) if linkUninterpByAxioms =>
       ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
     // case f @ UninterpretedFunction(n, p, r, _) if n.startsWith("load") =>
     //  ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
@@ -66,6 +68,13 @@ val transitionSystemPCVar = GlobalVar("SYNTH_PC", IntType)
 
 val traceVar = {
   GlobalVar("TRACE", traceType)
+}
+
+object AssertsToAssumes extends CILVisitor {
+  override def vstmt(s: Statement) = s match {
+    case Assert(a, b, c) => ChangeTo(List(Assume(a, b, Some("(passified assert) " + c.getOrElse("")))))
+    case _ => SkipChildren()
+  }
 }
 
 class RewriteSideEffects() extends CILVisitor {
@@ -211,7 +220,8 @@ def procToTransition(p: Procedure, loops: List[Loop], cutJoins: Boolean = false)
       .filter(c =>
         c.prevBlocks.size > 1
           && c.prevBlocks.flatMap(_.nextBlocks).forall(_ == c)
-          && !p.returnBlock.contains(c) && !p.entryBlock.contains(c)
+          && !p.returnBlock.contains(c)
+          && !p.entryBlock.contains(c)
       )
       .toList
       .sortBy(_.label)
@@ -341,7 +351,6 @@ class TranslationValidator {
   var beforeProg: Option[Program] = None
   var liveBefore = Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])]()
   // proc -> block -> absdom
-  var reachingDefsBefore = Map[String, (Map[String, Map[Variable, Set[Assign]]])]()
 
   var afterProg: Option[Program] = None
   var liveAfter = Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])]()
@@ -462,6 +471,7 @@ class TranslationValidator {
   val traceInv = BinaryExpr(BoolEQ, visit_rvar(beforeRenamer, traceVar), visit_rvar(afterRenamer, traceVar))
 
   def reachingDefs(p: Procedure) = {
+    transforms.reversePostOrder(p)
     val (beforeLive, afterLive) = transforms.getLiveVars(p)
     val dom = transforms.DefUseDomain(beforeLive)
     val solver = transforms.worklistSolver(dom)
@@ -473,10 +483,10 @@ class TranslationValidator {
     initProg = Some(p)
     val (prog, cuts) = toTransitionSystem(p)
     liveBefore = p.procedures.map(p => p.name -> transforms.getLiveVars(p)).toMap
-    reachingDefsBefore = p.procedures.map(p => p.name -> reachingDefs(p)).toMap
     beforeProg = Some(prog)
     beforeCuts = cuts
   }
+
   def setSourceProg(p: Program) = {
     val (prog, cuts) = toTransitionSystem(p)
     liveAfter = p.procedures.map(p => p.name -> transforms.getLiveVars(p)).toMap
@@ -493,12 +503,13 @@ class TranslationValidator {
   }
 
   def addRDInvariant() = {
+    val defsSource = initProg.get.procedures.map(p => p.name -> reachingDefs(p)).toMap
     beforeCuts
-      .filter((proc, _) => reachingDefsBefore.contains(proc.name))
+      .filter((proc, _) => defsSource.contains(proc.name))
       .foreach((proc, cuts) =>
         cuts.foreach {
           case (label, block) => {
-            val rd = reachingDefsBefore(proc.name)(block.label)
+            val rd = defsSource(proc.name)(block.label)
             val inv = rd.toSeq.flatMap { case (v, assigns) =>
               assigns.collect {
                 case LocalAssign(lhs, rhs, _) => v -> rhs
@@ -514,7 +525,7 @@ class TranslationValidator {
             if (preds.nonEmpty) {
               val pred = preds.reduce((l, r) => BinaryExpr(BoolAND, l, r))
               val guarded =
-                exprInTarget(BinaryExpr(BoolIMPLIES, BinaryExpr(IntEQ, transitionSystemPCVar, PCSym(label)), pred))
+                exprInSource(BinaryExpr(BoolIMPLIES, BinaryExpr(IntEQ, transitionSystemPCVar, PCSym(label)), pred))
               addInvariant(proc.name, List((guarded, Some(s"Reaching Defs $label"))))
             }
           }
@@ -555,37 +566,42 @@ class TranslationValidator {
       val source = after
       val target = before
 
+      visit_proc(AssertsToAssumes, source)
+
       val ufs = getUninterps(after)
       val uninterpfuncs = getUninterps(before).keys.toSet.intersect(ufs.keys.toSet).map(ufs(_))
 
-      val uninterpAxioms = uninterpfuncs.map {
-        case UninterpretedFunction(n, p, rt, _) => {
+      val uninterpAxioms =
+        if (!linkUninterpByAxioms) then Set()
+        else
+          uninterpfuncs.map {
+            case UninterpretedFunction(n, p, rt, _) => {
 
-          val params = p.toList.zipWithIndex.map { case (p, i) =>
-            LocalVar(s"arg$i", p.getType)
-          }
-          val srcParams = params.map(varInSource).map { case l: LocalVar =>
-            l
-          }
-          val tgtParams = params.map(varInTarget).map { case l: LocalVar =>
-            l
-          }
+              val params = p.toList.zipWithIndex.map { case (p, i) =>
+                LocalVar(s"arg$i", p.getType)
+              }
+              val srcParams = params.map(varInSource).map { case l: LocalVar =>
+                l
+              }
+              val tgtParams = params.map(varInTarget).map { case l: LocalVar =>
+                l
+              }
 
-          val lhs = boolAnd(params.map(r => polyEqual(exprInSource(r), exprInTarget(r))))
-          val rhs = polyEqual(
-            UninterpretedFunction("source__" + n, srcParams, rt, true),
-            UninterpretedFunction("target__" + n, tgtParams, rt, true)
-          )
-          val q = QuantifierExpr(
-            QuantifierSort.forall,
-            LambdaExpr(
-              srcParams.zip(tgtParams).flatMap((a, b) => List[LocalVar](a, b)),
-              BinaryExpr(BoolIMPLIES, lhs, rhs)
-            )
-          )
-          AxiomDecl(q)
-        }
-      }
+              val lhs = boolAnd(params.map(r => polyEqual(exprInSource(r), exprInTarget(r))))
+              val srccall = UninterpretedFunction("source__" + n, srcParams, rt, true)
+              val tgtcall = UninterpretedFunction("target__" + n, tgtParams, rt, true)
+              val rhs = polyEqual(srccall, tgtcall)
+              val q = QuantifierExpr(
+                QuantifierSort.forall,
+                LambdaExpr(
+                  srcParams.zip(tgtParams).flatMap((a, b) => List[LocalVar](a, b)),
+                  BinaryExpr(BoolIMPLIES, lhs, rhs)
+                ),
+                List(srccall, tgtcall)
+              )
+              AxiomDecl(q)
+            }
+          }
 
       visit_proc(beforeRenamer, before)
       visit_proc(afterRenamer, after)

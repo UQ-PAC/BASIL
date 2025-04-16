@@ -188,9 +188,6 @@ object BoogieTranslator {
 
     val functionOpDefinitions = functionOpToDecl(globalDecls ++ globalVarDecls ++ procs)
     val decls = globalVarDecls.toList ++ globalDecls ++ functionOpDefinitions ++ procs
-    println(p.mainProcedure.name)
-    println("GLOBAL DECLS")
-    println(globalDecls.mkString("\n"))
 
     BProgram(typeDecls.toList ++ decls, fname)
   }

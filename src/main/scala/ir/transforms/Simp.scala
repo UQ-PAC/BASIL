@@ -19,7 +19,7 @@ import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
 import ExecutionContext.Implicits.global
 import scala.util.boundary, boundary.break
-import util.boogie_interaction.BoogieResultKind
+import util.boogie_interaction.{BoogieResultKind, BoogieResult}
 
 /** Simplification pass, see also: docs/development/simplification-solvers.md
   */
@@ -91,7 +91,7 @@ class DefUseDomain(liveBefore: Map[Block, Set[Variable]]) extends AbstractDomain
   def join(l: Map[Variable, Set[Assign]], r: Map[Variable, Set[Assign]], pos: Block) = {
     l.keySet
       .union(r.keySet)
-      // .filter(k => liveBefore(pos).contains(k))
+      .filter(k => liveBefore(pos).contains(k))
       .map(k => {
         k -> (l.get(k).getOrElse(Set()) ++ r.get(k).getOrElse(Set()))
       })
@@ -606,8 +606,27 @@ def wrapShapePreservingTransformInValidation(transform: Program => Unit)(p: Prog
   transform(p)
   validator.setSourceProg(p)
   validator.setEqualVarsInvariant
-  val (prog, _) = validator.getValidationProgWPConj
-  prog
+  validator.getValidationProgWPConj
+}
+
+def validateProgs(
+  vprog: Iterable[Program],
+  n: String,
+  splits: Map[Procedure, mutable.ArrayBuffer[GoTo]],
+  splitImmediate: Boolean = false
+) = {
+
+  val sorted = vprog.toList
+    .map(p => {
+      val x = ExprComplexity()
+      visit_prog(x, p)
+      p -> x.count
+    })
+    .filter(_._2 > 50)
+    .sortBy(_._2)
+    .map(_._1)
+
+  sorted.foreach(validateProg(_, n, splits))
 }
 
 def validateProg(
@@ -626,7 +645,7 @@ def validateProg(
 
   for ((p, comp) <- procs) {
     SimplifyLogger.info(s"Validating proc ${p.name} (compl ${comp})")
-    validateProc(validationProg, p, n, 8, splits(p), splitImmediate)
+    validateProcWithSplits(validationProg, p, n, 8, splits(p), 5)
   }
 }
 
@@ -638,117 +657,103 @@ def validate(validationProg: Program, procName: String, name: String, timeout: I
     val dir = File("./graphs/")
     if (!dir.exists()) then dir.mkdirs()
     for (p <- validationProg.procedures) {
-      DebugDumpIRLogger.writeToFile(File(s"graphs/transition-${p.name}-${name}.dot"), dotBlockGraph(p))
+      val blockGraph = dotBlockGraph(p)
+      util.writeToFile(blockGraph, (s"graphs/transition-${p.name}-${name}.dot"))
     }
   }
 
-  val vres = util.boogie_interaction.boogieBatchQuery(List(boogieFileName, "axioms.bpl"), Some(procName), timeout)
-  // assert(vres)
-  vres
+  val nonincremental = Future[BoogieResult] {
+    util.boogie_interaction.boogieBatchQuery(List(boogieFileName), Some(procName), timeout, Some(timeout / 2))
+  }
+  val combined = Future[BoogieResult] {
+    util.boogie_interaction.boogieBatchQuery(List(boogieFileName), Some(procName), timeout)
+  }
 
+  Await
+    .result(
+      Future.find(List(nonincremental, combined))((acc: BoogieResult) => (acc.kind != BoogieResultKind.Timeout)),
+      (timeout + 3).seconds
+    )
+    .getOrElse(Await.result(nonincremental, 0.seconds))
 }
 
-def validateProc(
+def chooseSplits(splits: Iterable[(GoTo, Iterable[Block])]) = {
+  val x = splits.toList
+
+  val cartprod = splits.foldLeft(Vector(Vector[(GoTo, Block)]())) { case (acc, (g, tgts)) =>
+    tgts.toVector.flatMap(t => acc.map(a => a ++ Seq(g -> t)))
+  }
+  cartprod
+}
+
+def applySplit(split: Vector[(GoTo, Block)]) = {
+  split.foreach {
+    case (jump, target) => {
+      jump.addTarget(target)
+      val tgts = jump.targets
+      tgts.filterNot(_ == target).foreach(jump.removeTarget)
+    }
+  }
+}
+
+def validateProcWithSplits(
   validationProg: Program,
   proc: Procedure,
   name: String,
   timeout: Int = 3,
   isplits: mutable.ArrayBuffer[GoTo],
-  splitImmediate: Boolean = false
+  maxSplitDepth: Int = 0
 ) = {
-  // FIXME: I don't think this is properly covering every combination of splits
-  var splits = List.from(isplits)
-  var choices = List[(GoTo, Set[Block])]()
-  var decisionStack = List[Block]()
 
-  var original = isplits.map(g => g -> g.targets.toSet).toMap
-
-  def currentSplit = {
-    isplits
-      .filter(g => g.targets != original(g))
-      .foreach(g => {
-        SimplifyLogger.info(g.parent.label)
-        SimplifyLogger.info("   current: " + g.targets.map(_.label).mkString(","))
-        SimplifyLogger.info("  original: " + original(g).map(_.label).mkString(","))
-      })
-
-  }
-
-  def tryVerify(splitname: String) = {
-    currentSplit
-    validate(validationProg, proc.name, name + proc.name + "split" + splitname, timeout)
-  }
-
-  def makeSplit() = {
-    val next = splits.head
-    splits = splits.tail
-    choices = (next, next.targets.toSet) :: choices
-  }
-
-  def tryChoice() = boundary {
-    val (g, remTargets) = choices.head
-    if (remTargets.isEmpty) {
-      choices = choices.tail
-      if (choices.nonEmpty) {
-        val (g, remTargets) = choices.head
-        val discharged = decisionStack.head
-        choices = (g, remTargets - discharged) :: choices.tail
-      }
-      break()
-    }
-    val next = remTargets.head
-    val tgs = g.targets.toList
-    g.addTarget(next)
-    tgs.foreach(t => if t != next then g.removeTarget(t))
-
-    val verificationRes =
-      if (splitImmediate && splits.nonEmpty) then BoogieResultKind.Timeout
-      else tryVerify(s"${choices.size}_${choices.map(_._2.size).mkString("_")}").kind
-
-    verificationRes match {
-      case BoogieResultKind.Verified(count, errors) => {
-        choices = (g, remTargets - next) :: choices.tail
-      }
-
-      case BoogieResultKind.Timeout if splits.isEmpty => {
-        SimplifyLogger.error("Timed out on smallest split")
-        break()
-      }
-      case BoogieResultKind.Timeout => {
-        decisionStack = next :: decisionStack
-        // timed out
-        makeSplit()
-      }
-      case e => {
-        SimplifyLogger.error(s"Verification error $verificationRes")
-        break()
-      }
+  if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
+    val dir = File("./graphs/")
+    if (!dir.exists()) then dir.mkdirs()
+    for (p <- validationProg.procedures) {
+      val blockGraph = dotBlockGraph(p)
+      util.writeToFile(blockGraph, (s"graphs/presplittransition-${p.name}-${name}.dot"))
     }
   }
+  var splitDepth = 0
 
-  if (false && splits.nonEmpty) {
-    makeSplit()
-    while (choices.nonEmpty) {
-      tryChoice()
+  val splitTargets = isplits.toList.map(g => g -> g.targets)
+
+  var result = Seq(BoogieResultKind.Timeout)
+  while (
+    !result.forall(
+      _.isInstanceOf[BoogieResultKind.Verified]
+    ) && splitDepth <= maxSplitDepth && splitDepth <= isplits.length
+  ) {
+    splitDepth += 1
+    SimplifyLogger.info(s"Restart verification with split depth $splitDepth")
+
+    SimplifyLogger.info(s"Choose Splits ${isplits.length} of ${isplits.length}")
+    val splits = chooseSplits(splitTargets.take(splitDepth))
+
+    SimplifyLogger.info("Verify Splits")
+    var splitIndex = 0
+    result = boundary {
+      splits.map(s =>
+        splitIndex += 1
+        applySplit(s)
+        SimplifyLogger.info(s"try split ${splitIndex} of ${splits.length}")
+        val r = validate(validationProg, proc.name, name + proc.name + "_split" + splitIndex, timeout).kind
+        if (r.isInstanceOf[BoogieResultKind.Verified]) then r else break(Seq(r))
+      )
     }
-    choices.empty
+
+  }
+
+  if (result.forall(_.isInstanceOf[BoogieResultKind.Verified])) {
+    SimplifyLogger.info(s"TV success for: $name ${proc.name}")
   } else {
-    val vres = tryVerify("wholeprogram")
-    vres.kind match {
-      case BoogieResultKind.Verified(count, errors) => {
-        true
-      }
-      case _ => false
-    }
+    SimplifyLogger.error(s"TV failure for: $name ${proc.name} :: $result")
   }
 
 }
 
 def transformAndValidate(transform: Program => Unit, name: String)(p: Program) = {
-  val validationProgs = wrapShapePreservingTransformInValidation(transform)(p)
-  for (p <- validationProgs) {
-    validate(p, p.mainProcedure.name, name)
-  }
+  val (progs, splits) = wrapShapePreservingTransformInValidation(transform)(p)
+  validateProgs(progs, name, splits)
 }
 
 def validatedSimplifyPipeline(p: Program) = {
@@ -771,8 +776,8 @@ def validatedSimplifyPipeline(p: Program) = {
       }
     })
 
-    combineBlocks(p)
-    removeDuplicateGuard(p)
+    // combineBlocks(p)
+    // removeDuplicateGuard(p)
 
     validator.setSourceProg(prog)
     validator.setEqualVarsInvariant
@@ -825,20 +830,8 @@ def validatedSimplifyPipeline(p: Program) = {
 
     val (vprog, splits) = validator.getValidationProgWPConj
 
-    val sorted = vprog.toList
-      .map(p => {
-        val x = ExprComplexity()
-        visit_prog(x, p)
-        p -> x.count
-      })
-      .filter(_._2 > 50)
-      .sortBy(_._2)
-      .map(_._1)
+    validateProgs(vprog, "DSACopyProp", splits)
 
-    val procName = prog.mainProcedure.procName + "_par_" + prog.mainProcedure.name
-    sorted.foreach(validateProg(_, "DSACopyProp", splits, false))
-
-    assert(false)
   }
 
   def simplifyGuards(prog: Program) = {

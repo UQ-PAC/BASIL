@@ -284,12 +284,7 @@ def getDetachedBlocks(p: Procedure) = {
 
 def dotBlockGraph(proc: Procedure): String = {
   val o = getDetachedBlocks(proc)
-  dotBlockGraph(
-    proc.collect { case b: Block =>
-      b
-    },
-    o.reachableFromBlockEmptyPred
-  )
+  dotBlockGraph(proc.blocks.toList, o.reachableFromBlockEmptyPred)
 }
 
 def dotBlockGraph(prog: Program): String = {
