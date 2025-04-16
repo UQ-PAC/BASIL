@@ -74,7 +74,7 @@ def parseVerifyMessage(m: String) = {
         ) =>
       Some(BoogieResultKind.Verified(verif.toInt, errors.toInt))
     case _ if m.trim == "Boogie program verifier finished with 0 errors" => Some(BoogieResultKind.Verified(-1, 0))
-    case _ => println(m); None
+    case _ => None
   }
 }
 
@@ -147,16 +147,21 @@ def parseErrors(boogieStdoutMessage: String, snippetContext: Int = 3): Array[Boo
   }
 }
 
-def boogieBatchQuery(boogieFileNames: Iterable[String], proc: Option[String] = None, timeout: Int = 30) = {
+def boogieBatchQuery(
+  boogieFileNames: Iterable[String],
+  proc: Option[String] = None,
+  timeout: Int = 30,
+  solver2Timeout: Option[Int] = None
+) = {
   val procSelect = proc.toSeq.flatMap(p => Seq("/proc", p))
-  val x = "/proverOpt:C:combined_solver.solver2_timeout=3"
+  val x = solver2Timeout.map(s => s"/proverOpt:C:combined_solver.solver2_timeout=$s").toSeq
   val boogieCmd =
-    Seq("boogie", "/timeLimit", timeout.toString, x) ++ boogieFileNames ++ procSelect
-  Logger.info(s"Batch proving ${boogieCmd.mkString(" ")}")
+    Seq("boogie", "/timeLimit", timeout.toString) ++ x ++ boogieFileNames ++ procSelect
+  Logger.debug(s"Batch proving ${boogieCmd.mkString(" ")}")
   val output = boogieCmd.!!
 
   val res = parseOutput(output)
-  Logger.info(res)
+  Logger.debug(res)
   res
 }
 
