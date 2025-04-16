@@ -817,9 +817,12 @@ object RunUtils {
 
   def loadAndTranslate(conf: BASILConfig, postLoad: IRContext => Unit = s => ()): BASILResult = {
     Logger.info("[!] Loading Program")
+    val scalability = PerformanceTimer("Scalability")
     val q = conf
     var ctx = q.context.getOrElse(IRLoading.load(q.loading))
     postLoad(ctx) // allows extracting information from the original loaded program
+
+    Logger.info(s"Scalability After-Loading ${scalability.checkPoint("After Loading")} ms ")
 
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))
@@ -843,6 +846,9 @@ object RunUtils {
     } else {
       ir.transforms.clearParams(ctx.program)
     }
+
+    Logger.info(s"Scalability After-Parameter-Analysis ${scalability.checkPoint("After Parameter Analysis")} ms ")
+
     assert(invariant.correctCalls(ctx.program))
 
     assert(invariant.singleCallBlockEnd(ctx.program))
@@ -855,6 +861,8 @@ object RunUtils {
       staticAnalysis(conf, ctx)
     }
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
+
+    Logger.info(s"Scalability After-Static-Analysis ${scalability.checkPoint("After Static Analysis")} ms ")
 
     ir.eval.SimplifyValidation.validate = conf.validateSimp
     if (conf.simplify) {
@@ -877,6 +885,8 @@ object RunUtils {
         DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
       }
     }
+
+    Logger.info(s"Scalability After-Simplify ${scalability.checkPoint("After Simplify")} ms ")
 
     // SVA
     var dsaContext: Option[DSAContext] = None
@@ -916,6 +926,8 @@ object RunUtils {
         dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
     }
 
+    Logger.info(s"Scalability After-DSA ${scalability.checkPoint("After DSA")} ms ")
+
     if (q.runInterpret) {
       Logger.info("Start interpret")
 
@@ -946,6 +958,8 @@ object RunUtils {
 
     IRTransform.prepareForTranslation(q, ctx)
 
+    Logger.info(s"Scalability After-Prepare-Translation ${scalability.checkPoint("After Prepare for Translation")} ms ")
+
     q.loading.dumpIL.foreach(s => {
       writeToFile(pp_prog(ctx.program), s"$s-output.il")
       writeToFile(ctx.program.toScala, s"$s-output.scala")
@@ -970,6 +984,7 @@ object RunUtils {
     }
     assert(invariant.singleCallBlockEnd(ctx.program))
 
+    Logger.info(s"Scalability End ${scalability.checkPoint("End")} ms ")
     BASILResult(ctx, analysis, dsaContext, boogiePrograms)
   }
 
