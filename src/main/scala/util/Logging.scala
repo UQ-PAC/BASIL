@@ -185,3 +185,4 @@ val ConstGenLogger = DSALogger.deriveLogger("Constraint Gen", Console.out).setLe
 val SVALogger = DSALogger.deriveLogger("SVA")
 val IntervalDSALogger = DSALogger.deriveLogger("SadDSA", Console.out).setLevel(LogLevel.OFF)
 val StackLogger = Logger.deriveLogger("Stack").setLevel(LogLevel.INFO)
+val condPropDebugLogger = SimplifyLogger.deriveLogger("inlineCond")

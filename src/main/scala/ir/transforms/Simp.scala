@@ -6,7 +6,7 @@ import util.LogLevel
 
 import util.DebugDumpIRLogger
 import specification.FuncEntry
-import util.SimplifyLogger
+import util.{SimplifyLogger, condPropDebugLogger}
 import ir.eval.AlgebraicSimplifications
 import ir.eval.AssumeConditionSimplifications
 import ir.eval.simplifyExprFixpoint
@@ -439,8 +439,6 @@ class CleanupAssignments() extends CILVisitor {
 
 }
 
-val condPropDebugLogger = SimplifyLogger.deriveLogger("inlineCond")
-
 /**
  * Propagate flag calculation into this assume statement, finding a linear
  * backwards chain from this block until the first side-effecting or non-linear branch
@@ -555,6 +553,7 @@ def inlineCond(a: Assume): Option[Expr] = boundary {
 
   condPropDebugLogger.debug(s"subst $currJoin")
   cond = Substitute(currJoin.get, true)(cond).getOrElse(cond)
+  condPropDebugLogger.debug(cond)
 
   Some(cond)
 }
@@ -644,8 +643,8 @@ def validateProg(
     .sortBy(_._2)
 
   for ((p, comp) <- procs) {
-    SimplifyLogger.info(s"Validating proc ${p.name} (compl ${comp})")
-    validateProcWithSplits(validationProg, p, n, 8, splits(p), 5)
+    SimplifyLogger.info(s"Validating $n proc ${p.name} (compl ${comp})")
+    validateProcWithSplits(validationProg, p, n, 4, splits(p), 5)
   }
 }
 
@@ -677,21 +676,32 @@ def validate(validationProg: Program, procName: String, name: String, timeout: I
     .getOrElse(Await.result(nonincremental, 0.seconds))
 }
 
-def chooseSplits(splits: Iterable[(GoTo, Iterable[Block])]) = {
-  val x = splits.toList
-
-  val cartprod = splits.foldLeft(Vector(Vector[(GoTo, Block)]())) { case (acc, (g, tgts)) =>
-    tgts.toVector.flatMap(t => acc.map(a => a ++ Seq(g -> t)))
+def chooseSplits(splits: Iterable[(GoTo, Iterable[Block])]): Vector[Vector[(GoTo, Iterable[Block])]] = {
+  val cartprod = splits.foldLeft(Vector(Vector[(GoTo, Iterable[Block])]())) { case (acc, (g, tgts)) =>
+    tgts.toVector.flatMap(t => acc.map(a => a ++ Seq(g -> Seq(t))))
   }
   cartprod
 }
 
-def applySplit(split: Vector[(GoTo, Block)]) = {
+def chooseSplits(splits: Iterable[(GoTo, Iterable[Block])], depth: Int): Vector[Vector[(GoTo, Iterable[Block])]] = {
+  val madeSplits = chooseSplits(splits.take(depth))
+
+  val rest = splits.drop(depth)
+
+  madeSplits.map(g =>
+    g.flatMap { case (gb, tgt) =>
+      Vector(gb -> tgt) ++ rest
+    }
+  )
+}
+
+def applySplit(split: Vector[(GoTo, Iterable[Block])]) = {
   split.foreach {
     case (jump, target) => {
-      jump.addTarget(target)
+      val t = target.toSet
+      target.foreach(jump.addTarget)
       val tgts = jump.targets
-      tgts.filterNot(_ == target).foreach(jump.removeTarget)
+      tgts.filterNot(t.contains(_)).foreach(jump.removeTarget)
     }
   }
 }
@@ -726,8 +736,8 @@ def validateProcWithSplits(
     splitDepth += 1
     SimplifyLogger.info(s"Restart verification with split depth $splitDepth")
 
-    SimplifyLogger.info(s"Choose Splits ${isplits.length} of ${isplits.length}")
-    val splits = chooseSplits(splitTargets.take(splitDepth))
+    SimplifyLogger.info(s"Choose ${splitDepth} splits of ${isplits.length} avail")
+    val splits = chooseSplits(splitTargets, splitDepth)
 
     SimplifyLogger.info("Verify Splits")
     var splitIndex = 0
@@ -758,8 +768,6 @@ def transformAndValidate(transform: Program => Unit, name: String)(p: Program) =
 
 def validatedSimplifyPipeline(p: Program) = {
 
-  def fixGuardsDSA(program: Program) = {}
-
   def copyProp(prog: Program) = {
 
     val validator = TranslationValidator()
@@ -776,8 +784,11 @@ def validatedSimplifyPipeline(p: Program) = {
       }
     })
 
-    // combineBlocks(p)
-    // removeDuplicateGuard(p)
+    visit_prog(CopyProp.BlockyProp(), p)
+    simplifyConds(p)
+    sliceCleanup(p)
+    deadAssignmentElimination(p)
+    combineBlocks(p)
 
     validator.setSourceProg(prog)
     validator.setEqualVarsInvariant
@@ -869,14 +880,12 @@ def validatedSimplifyPipeline(p: Program) = {
 
   def combined(p: Program) = {
     // combineBlocks(p)
-    fixGuardsDSA(p)
     copyProp(p)
     simplifyGuards(p)
     simplifyConds(p)
     intraBlockCopyProp(p)
     deadAssignmentElimination(p)
     sliceCleanup(p)
-    fixGuardsDSA(p)
   }
 
   def dsa(p: Program) = {
@@ -894,9 +903,10 @@ def validatedSimplifyPipeline(p: Program) = {
     validator.setSourceProg(p)
     validator.setDSAInvariant
     // validator.addRDInvariant()
-    val (prog, _) = validator.getValidationProgWPConj
 
-    val procName = p.mainProcedure.procName + "_par_" + p.mainProcedure.name
+    val (vprog, splits) = validator.getValidationProgWPConj
+    validateProgs(vprog, "DynamicSingleAssignment", splits)
+
     // validate(prog, procName, "DynamicSingleAssignment", 3)
   }
 
@@ -909,15 +919,25 @@ def validatedSimplifyPipeline(p: Program) = {
 //  transformAndValidate(combineBlocks, "combineBlocks")(p)
 
   copyProp(p)
+  transformAndValidate(
+    p => {
+      simplifyGuards(p)
+      removeDuplicateGuard(p)
+      simplifyConds(p)
+      sliceCleanup(p)
+      combineBlocks(p)
+    },
+    "branch cleanup"
+  )(p)
+
 // transformAndValidate(copyProp, "DSACopyProp")(p)
-  transformAndValidate(simplifyConds, "simplifyConds")(p)
-  transformAndValidate(intraBlockCopyProp, "blockyProp")(p)
-  transformAndValidate(deadAssignmentElimination, "deadAssignmentElimination")(p)
-  transformAndValidate(simplifyGuards, "simplifyGuards")(p)
-  transformAndValidate(sliceCleanup, "BitectorExtractAndSlicesCleanup")(p)
-  transformAndValidate(fixGuardsDSA, "fixGuardsDSA")(p)
-  transformAndValidate(deadAssignmentElimination, "deadAssignmentElimination")(p)
-  transformAndValidate(combineBlocks, "combineBlocks")(p)
+  // transformAndValidate(simplifyConds, "simplifyConds")(p)
+  // transformAndValidate(intraBlockCopyProp, "blockyProp")(p)
+  // transformAndValidate(deadAssignmentElimination, "deadAssignmentElimination")(p)
+  // transformAndValidate(simplifyGuards, "simplifyGuards")(p)
+  // transformAndValidate(sliceCleanup, "BitectorExtractAndSlicesCleanup")(p)
+  // transformAndValidate(deadAssignmentElimination, "deadAssignmentElimination")(p)
+  // transformAndValidate(combineBlocks, "combineBlocks")(p)
 
   p
 }
