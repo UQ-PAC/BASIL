@@ -1,5 +1,3 @@
-package ir
-
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import scala.util.{Try, Failure, Success}
@@ -9,9 +7,9 @@ import ir.*
 import ir.dsl.*
 
 @test_util.tags.UnitTest
-class EvalTest extends AnyFunSuite with test_util.CaptureOutput with Matchers {
+class EvalScalaTest extends AnyFunSuite with test_util.CaptureOutput with Matchers {
 
-  import ir.Eval.EvalResult
+  import util.EvalScala.EvalResult
 
   import ir.dsl.{given}
 
@@ -34,9 +32,9 @@ class EvalTest extends AnyFunSuite with test_util.CaptureOutput with Matchers {
   )
 
   test("basic eval") {
-    assertResult(Success(10)) { ir.Eval.eval("1+9").result }
-    assertResult(Success("asd")) { ir.Eval.eval("\"asd\"").result }
-    assertResult(Success(List(1, 2, 3))) { ir.Eval.eval("scala.collection.immutable.Seq(1, 2, 3)").result }
+    assertResult(Success(10)) { util.EvalScala.eval("1+9").result }
+    assertResult(Success("asd")) { util.EvalScala.eval("\"asd\"").result }
+    assertResult(Success(List(1, 2, 3))) { util.EvalScala.eval("scala.collection.immutable.Seq(1, 2, 3)").result }
   }
 
   test("eval runtime failures") {
@@ -44,22 +42,22 @@ class EvalTest extends AnyFunSuite with test_util.CaptureOutput with Matchers {
     // if they start failing because the returned exceptions differ from the expected types,
     // check that method.
 
-    ir.Eval.eval("1 match { case 2 => () }").failure should matchPattern { case _: MatchError => }
-    ir.Eval.eval("throw new Exception(\"boop\")").failure should matchPattern {
+    util.EvalScala.eval("1 match { case 2 => () }").failure should matchPattern { case _: MatchError => }
+    util.EvalScala.eval("throw new Exception(\"boop\")").failure should matchPattern {
       case x: Exception if x.getMessage == "boop" =>
     }
-    ir.Eval.eval("1 / 0").failure should matchPattern { case _: ArithmeticException => }
-    ir.Eval.eval("1 / 0\n1+2").failure should matchPattern { case _: ArithmeticException => }
+    util.EvalScala.eval("1 / 0").failure should matchPattern { case _: ArithmeticException => }
+    util.EvalScala.eval("1 / 0\n1+2").failure should matchPattern { case _: ArithmeticException => }
   }
 
   test("eval compile failures") {
-    ir.Eval.eval("1+") should matchPattern { case EvalResult(Failure(_), s) if s != "" => }
-    ir.Eval.eval("undefinedvariable") should matchPattern { case EvalResult(Failure(_), s) if s != "" => }
-    ir.Eval.eval(".") should matchPattern { case EvalResult(Failure(_), s) if s != "" => }
+    util.EvalScala.eval("1+") should matchPattern { case EvalResult(Failure(_), s) if s != "" => }
+    util.EvalScala.eval("undefinedvariable") should matchPattern { case EvalResult(Failure(_), s) if s != "" => }
+    util.EvalScala.eval(".") should matchPattern { case EvalResult(Failure(_), s) if s != "" => }
   }
 
   test("eval of toscala") {
-    val p2 = ir.Eval.evalDSL(program.toScala).get
+    val p2 = util.EvalScala.evalDSL(program.toScala).get
     assertResult(program.toString) { p2.toString }
   }
 }

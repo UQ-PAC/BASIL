@@ -1,4 +1,4 @@
-package ir
+package util
 
 import scala.util.{Try, Failure}
 
@@ -6,7 +6,7 @@ import scala.util.{Try, Failure}
  * Implements runtime evaluation of Scala code strings.
  * Not to be confused with "evaluation" of Basil IR literals.
  */
-object Eval {
+object EvalScala {
 
   /**
    * An evaluation result is the value result (as a Try[Any]) and the compiler
