@@ -411,3 +411,35 @@ case class SharedMemory(override val name: String, override val addressSize: Int
     extends Memory {
   override def acceptVisit(visitor: Visitor): Memory = visitor.visitSharedMemory(this)
 }
+
+enum QuantifierSort:
+  case exists
+  case forall
+
+case class LambdaExpr(binds: List[LocalVar], body: Expr) extends Expr {
+  override def getType = uncurryFunctionType(binds.map(_.getType), body.getType)
+  override def toBoogie = Lambda(binds.map(_.toBoogie), body.toBoogie)
+  def returnType = body.getType
+}
+
+case class QuantifierExpr(kind: QuantifierSort, body: LambdaExpr) extends Expr {
+  require(body.returnType == BoolType, "Type error: quantifier with non-boolean body")
+  override def getType: IRType = BoolType
+  def toBoogie: BExpr = {
+    val b = body.binds.map(_.toBoogie)
+    val bdy = body.body.toBoogie
+    kind match {
+      case QuantifierSort.forall => ForAll(b, bdy)
+      case QuantifierSort.exists => Exists(b, bdy)
+    }
+  }
+  override def variables: Set[Variable] = body.variables
+
+}
+
+case class OldExpr(body: Expr) extends Expr {
+  override def acceptVisit(visitor: Visitor): Expr = body.acceptVisit(visitor)
+  override def toString = s"old($body)"
+  def getType = body.getType
+  def toBoogie = Old(body.toBoogie)
+}

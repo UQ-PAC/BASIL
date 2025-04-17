@@ -23,12 +23,11 @@ jobs:
   Scalafmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: olafurpg/setup-scala@v11
-        with:
-          java-version: openjdk@1.17.0
-      - uses: actions/checkout@v1
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Check Source Formatting
-        run: sbt scalafmtCheckAll
+        run: ./mill scalafmt.checkFormat
 
   Compile:
     runs-on: ubuntu-latest
@@ -44,6 +43,8 @@ jobs:
       - name: Compile BASIL Mill
         run: ./mill compile
 
+  # INFO: Scalatest runner arguments (i.e., arguments to scalatest.sh) can be
+  # found at: https://www.scalatest.org/user_guide/using_the_runner
 
   StandardSystemTests:
     runs-on: ubuntu-latest
@@ -65,7 +66,7 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill compile
-      - run: ./scripts/scalatest.sh -oID -PS3 -T 1000000 -n test_util.tags.StandardSystemTest
+      - run: ./scripts/scalatest.sh -oGD -PS3 -T 1000000 -n test_util.tags.StandardSystemTest
 
       - uses: actions/upload-artifact@v4
         with:
@@ -116,7 +117,7 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
-      - run: ./scripts/scalatest.sh -oID -PS3 -T 1000000 -n test_util.tags.UnitTest
+      - run: ./scripts/scalatest.sh -oGD -PS3 -T 1000000 -n test_util.tags.UnitTest
 
         # every test with package prefix:
         # sbt "show test:definedTests"
@@ -144,4 +145,4 @@ jobs:
       - run: echo "All systemtest suites:" && ./mill test.testOnly '*SystemTests*' -- -z 'xxxx'
 
       - run: ./mill compile
-      - run: ./scripts/scalatest.sh -oID -PS3 -T 1000000 -n test_util.tags.AnalysisSystemTest -F 2
+      - run: ./scripts/scalatest.sh -oGD -PS3 -T 1000000 -n test_util.tags.AnalysisSystemTest -F 2

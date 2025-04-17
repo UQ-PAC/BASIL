@@ -55,22 +55,14 @@ We do not have a strict code style however
 
 ## Development tasks
 
+Mill should always be run from the git root directory (`git rev-parse --show-toplevel`).
+
 ## Building
 
-The sbt shell can also be used for multiple tasks with less overhead by executing `sbt` and then the relevant sbt commands.
+To build the project you can use `./mill build`. Often the incremental compilation database won't be properly invalidated on 
+`git switch`/`git checkout`/`git pull`: in these cases `./mill clean` is needed to trigger a full rebuild.
 
-To build a standalone `.jar` file, use the following command:
-
-`mill assembly`
-
-From `sbt` the resulting `.jar` is located at `target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar` and from 
-`mill` this is `out/assembly.dest/out.jar`.
-
-To compile the source without running it - this helps IntelliJ highlight things properly:
-
-`mill compile`
-
-This is used to keep track of which tests have passed previously, as well as changes to the basil output.
+To build a standalone `.jar` file, use `./mill assembly`. This can be found at `out/assembly.dest/out.jar`.
 
 ### Debugging
 
@@ -95,63 +87,29 @@ To achieve this for a new result in development use the following method defined
 def printAnalysisResults(prog: Program, result: Map[CFGPosition, _]): String 
 ```
 
-## Tests
 
-### Unit tests
+## Code Formatting
 
-We use the [ScalaTest](https://www.scalatest.org/) unit testing framework. Example unit tests can be found in [src/test/scala](../src/test/scala/).
+All Pull Requests must conform to the style produced by `scalafmt`. This is checked automatically in CI, it can be run locally with:
 
-The [dsl](../basil-ir.md#constructing-programs-in-code) can be used to construct simple example BASIL IR programs, which can then be fed through into the whole pipeline via `IRLoading.load()` in
-`RunUtils.scala`. Prefer to write tests that depend only on the single piece of code under test rather than the whole BASIL translation. 
-
-### Integration tests
-
-These are the `SystemTests.scala` test case with the files present in `src/test/correct` for examples that should verify and `src/test/incorrect`
-for examples that should not verify. 
-
-These are lifted via the Makefiles, to add another test simply add a directory, c source file, and optionally specification file and run 
-
-```sh
-cd src/test/
-make
+```bash
+./mill scalafmt.checkFormat
 ```
 
-The `config.mk` file in the test directory can be used to exclude unnecessary compilers, and change compilation flags. 
-Full details can be found [here](../src/test/readme.md).
+Sources can be reformatted with:
+
+```bash
+./mill scalafmt.reformat
+```
+
+
+## Tests
+
 
 ### Running Tests
 
-The test suites use [ScalaTest](https://www.scalatest.org/).
+See [testing](testing.md).
 
-To run the primary SystemTests suites (SystemTestsBAP and SystemTestsGTIRB) (which require Boogie):
-
-```
-$ ./mill test.testOnly 'SystemTests*'
-```
-
-To run a single test from a test suite, it can be selected using globbing on the full test class name with the `testOnly` task:
-
-```
-$ ./mill test.testOnly 'SystemTestsBAP' -- -z basic_arrays_read/gcc:BAP
-```
-
-To update the expected BASIL output files from the SystemTests results run:
-
-```
-$ ./mill updateExpected
-```
-
-To run another test suite, just use the name of the class containing the test suite (in this case LiveVarsAnalysisTests):
-
-```
-$ ./mill test.testOnly 'LiveVarsAnalysisTests'
-```
-
-To list all test suites:
-
-```
-$ ./mill test.testOnly '*' -- -t ''
-```
 
 ## Performance profiling
 
@@ -186,4 +144,5 @@ sudo sysctl kernel.kptr_restrict=0
 ## Managing docker containers
 
 [See docker readme](../../docker/readme.md)
+
 

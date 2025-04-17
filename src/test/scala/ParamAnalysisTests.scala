@@ -5,7 +5,7 @@ import test_util.BASILTest
 import util.{BASILResult, StaticAnalysisConfig, Logger, LogLevel}
 
 @test_util.tags.UnitTest
-class ParamAnalysisTests extends AnyFunSuite, BASILTest {
+class ParamAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
   private val correctPath = "./src/test/correct/"
 
   def runExample(name: String): BASILResult = {

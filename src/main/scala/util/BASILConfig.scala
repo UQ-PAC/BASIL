@@ -8,7 +8,8 @@ case class BoogieGeneratorConfig(
   memoryFunctionType: BoogieMemoryAccessMode = BoogieMemoryAccessMode.SuccessiveStoreSelect,
   coalesceConstantMemory: Boolean = true,
   procedureRely: Option[ProcRelyVersion] = None,
-  threadSplit: Boolean = false
+  threadSplit: Boolean = false,
+  directTranslation: Boolean = false
 )
 
 case class ILLoadingConfig(
@@ -53,6 +54,7 @@ case class BASILConfig(
   simplify: Boolean = false,
   validateSimp: Boolean = false,
   dsaConfig: Option[DSAConfig] = None,
+  memoryTransform: Boolean = false,
   staticAnalysis: Option[StaticAnalysisConfig] = None,
   boogieTranslation: BoogieGeneratorConfig = BoogieGeneratorConfig(),
   outputPrefix: String

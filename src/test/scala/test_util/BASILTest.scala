@@ -30,14 +30,15 @@ case class TestConfig(
   expectVerify: Boolean,
   checkExpected: Boolean = false,
   logResults: Boolean = false,
-  simplify: Boolean = false
+  simplify: Boolean = false,
+  dsa: Option[DSAConfig] = None,
+  memoryTransform: Boolean = false
 ) {
   private val scaledtimespans = new ScaledTimeSpans {}
   def timeoutFlag =
     val seconds = scaledtimespans.scaled(Span(timeout, Seconds)).millisPart / 1000
     s"/timeLimit:${seconds}"
   def boogieFlags = timeoutFlag +: baseBoogieFlags
-
 }
 
 trait BASILTest {
@@ -49,6 +50,7 @@ trait BASILTest {
     staticAnalysisConf: Option[StaticAnalysisConfig],
     simplify: Boolean = false,
     dsa: Option[DSAConfig] = None,
+    memoryTransform: Boolean = false,
     postLoad: IRContext => Unit = s => ()
   ): BASILResult = {
     val specFile = if (specPath.isDefined && File(specPath.get).exists) {
@@ -63,7 +65,8 @@ trait BASILTest {
       boogieTranslation =
         util.BoogieGeneratorConfig().copy(memoryFunctionType = util.BoogieMemoryAccessMode.SuccessiveStoreSelect),
       outputPrefix = BPLPath,
-      dsaConfig = dsa
+      dsaConfig = dsa,
+      memoryTransform = memoryTransform
     )
     val result = RunUtils.loadAndTranslate(config, postLoad = postLoad)
     RunUtils.writeOutput(result)
@@ -95,10 +98,10 @@ trait BASILTest {
 
   def checkVerify(boogieResult: BoogieResult, expectVerify: Boolean): (Option[String], Boolean, Boolean) = {
     val failureMsg = boogieResult.kind match {
-      case BoogieResultKind.Verified if expectVerify => None
+      case BoogieResultKind.Verified(_, _) if expectVerify => None
       case BoogieResultKind.AssertionFailed if !expectVerify => None
       case BoogieResultKind.Timeout => Some("SMT Solver timed out")
-      case BoogieResultKind.Verified if !expectVerify => Some("Expected verification failure, but got success.")
+      case BoogieResultKind.Verified(_, _) if !expectVerify => Some("Expected verification failure, but got success.")
       case BoogieResultKind.AssertionFailed if expectVerify => Some("Expected verification success, but got failure.")
       case k: BoogieResultKind.Unknown => Some(k.toString)
     }

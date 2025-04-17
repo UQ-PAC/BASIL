@@ -1,10 +1,11 @@
 package ir
 
 import util.PerformanceTimer
-import util.functional._
-import ir.eval._
+import util.functional.*
+import translating.PrettyPrinter.*
+import ir.eval.*
 import boogie.Scope
-import ir.dsl._
+import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.BeforeAndAfter
 import boogie.SpecGlobal
@@ -12,6 +13,9 @@ import translating.BAPToIR
 import util.{LogLevel, Logger}
 import util.IRLoading.{loadBAP, loadReadELF}
 import util.{ILLoadingConfig, IRContext, IRLoading, IRTransform}
+import test_util.CaptureOutput
+import ir.dsl.given
+import ir.dsl.IfThenBlocks
 
 def load(s: InterpreterState, global: SpecGlobal): Option[BitVecLiteral] = {
   val f = NormalInterpreter
@@ -32,7 +36,7 @@ def mems[E, T <: Effects[T, E]](m: MemoryState): Map[BigInt, BitVecLiteral] = {
 }
 
 @test_util.tags.UnitTest
-class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
+class InterpreterTests extends AnyFunSuite with test_util.CaptureOutput with BeforeAndAfter {
 
   Logger.setLevel(LogLevel.WARN)
 
@@ -86,6 +90,169 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     )
     assert(normalTermination(fstate.nextCmd), fstate.nextCmd)
     assert(expected == actual)
+  }
+
+  test("is prime function") {
+
+    val n = LocalVar("n", bv64)
+    val i = LocalVar("i", bv64)
+    val ans = LocalVar("ans", bv1)
+
+    val p = prog(
+      proc(
+        "is_prime",
+        Seq("n" -> bv64),
+        Seq("ans" -> bv1),
+        blocks(
+          If(n <= 1.bv64)
+            Then (ret("ans" -> (0.bv1)))
+            Else (For(i := (2.bv64), i < n, i := i + (1.bv64))
+              Do (If(n % i === (0.bv64)) Then (ret("ans" -> (0.bv1))))),
+          ret("ans" -> (1.bv1))
+        )
+      )
+    )
+
+    def isPrime(test: Int): Boolean = (evalProc(p, p.mainProcedure, Map(n -> test.bv64))(ans)) == 1.bv1
+
+    assert(!isPrime(1))
+    assert(isPrime(2))
+    assert(isPrime(3))
+    assert(!isPrime(4))
+    assert(isPrime(5))
+    assert(!isPrime(6))
+    assert(isPrime(7))
+    assert(!isPrime(8))
+    assert(!isPrime(9))
+    assert(!isPrime(10))
+    assert(isPrime(13))
+    assert(isPrime(23))
+    assert(isPrime(1009))
+
+  }
+
+  test("structured fib program if else") {
+    val n_in = LocalVar("n_in", BitVecType(64))
+    val n_out = LocalVar("n_out", BitVecType(64))
+    val returnv = LocalVar("rval", BitVecType(64))
+    val p1 = LocalVar("p1", BitVecType(64))
+    val p2 = LocalVar("p2", BitVecType(64))
+
+    val p = prog(
+      proc(
+        "fib",
+        Seq("n_in" -> bv64),
+        Seq("n_out" -> bv64),
+        blocks(
+          (If(bv64(0) === n_in)
+            Then (returnv := bv64(0))
+            Else (
+              If(bv64(1) === n_in)
+                Then (returnv := bv64(1))
+                Else (
+                  Seq("n_out" -> p2) := call("fib", "n_in" -> (n_in - bv64(2))),
+                  Seq("n_out" -> p1) := call("fib", "n_in" -> (n_in - bv64(1))),
+                  returnv := p1 + p2
+                )
+            )),
+          stmts(ret("n_out" -> returnv))
+        )
+      )
+    )
+
+    val begin = InterpFuns.initialiseProgram(NormalInterpreter)(InterpreterState(), p)
+    def interpret(n: Int) = evalProc(p, p.mainProcedure, Map(n_in -> bv64(n)))(n_out)
+
+    assert(interpret(5) == bv64(fib(5)))
+    assert(interpret(9) == bv64(fib(9)))
+    assert(interpret(0) == bv64(fib(0)))
+
+  }
+
+  test("fixed square root") {
+    // Example borrowed from : https://github.com/ssloy/tinycompiler/tree/main
+    val n = LocalVar("n", bv64)
+    val shift = LocalVar("shift", bv64)
+    val x = LocalVar("x", bv64)
+    val x_old = LocalVar("x_old", bv64)
+    val n_one = LocalVar("n_one", bv64)
+    val temp = LocalVar("temp", bv64)
+    val out = LocalVar("out", bv64)
+
+    val p = prog(
+      proc(
+        "sqrt",
+        Seq("n" -> bv64, "shift" -> bv64),
+        Seq("out" -> bv64),
+        blocks(
+          (If(n > (2147483647.bv64 / shift))
+            Then (
+              stmts(
+                Seq("out" -> temp) := call("sqrt", "n" -> (n / 4.bv64), "shift" -> shift),
+                ret("out" -> 2.bv64 * temp)
+              )
+            )),
+          stmts(x := shift, n_one := n * shift),
+          (While(TrueLiteral)
+            Do blocks(
+              stmts(
+                x_old := x,
+                x := ((x + (n_one / x)) / 2.bv64),
+                Seq("abs_out" -> temp) := call("abs", "x" -> (x - x_old))
+              ),
+              (If(temp <= 1.bv64) Then (ret("out" -> x)))
+            ))
+        )
+      ),
+      proc(
+        "abs",
+        Seq("x" -> bv64),
+        Seq("abs_out" -> bv64),
+        If(x < 0.bv64) Then (ret("abs_out" -> (0.bv64 - x))) Else (ret("abs_out" -> x))
+      )
+    )
+
+    def doSqrt(_n: Int, _shift: Int) = evalProc(p, p.mainProcedure, Map(n -> _n.bv64, shift -> _shift.bv64))(out)
+
+    assert(doSqrt(25735, 8192) == 14519.bv64)
+
+  }
+
+  test("whileprog") {
+    val acc = LocalVar("acc", BitVecType(64))
+    val i = LocalVar("i", BitVecType(64))
+
+    val p = prog(
+      proc(
+        "sumto",
+        Seq("i" -> bv_t(64)),
+        Seq("n_out" -> bv_t(64)),
+        blocks(
+          stmts(acc := bv64(0)),
+          (If(i < bv64(0))
+            Then (acc := bv64(0))
+            Else (While(i >= bv64(0)) Do (acc := acc + i, i := i - bv64(1)))),
+          ret("n_out" -> acc)
+        )
+      )
+    )
+
+    def compar(i: Int) = {
+      if (i < 0) {
+        bv64(0)
+      } else {
+        bv64((0 to i).foldLeft(0)((a, b) => a + b))
+      }
+    }
+
+    def interpret(n: Int) =
+      val v = ir.eval.BitVectorEval.signedInt2BV(64, n)
+      ir.eval.evalProc(p, p.mainProcedure, Map(i -> v))(LocalVar("n_out", bv_t(64)))
+
+    for (i <- -5 to 10) {
+      assert(compar(i) == interpret(i))
+    }
+
   }
 
   test("initialise") {
@@ -308,7 +475,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
   test("fib breakpoints") {
 
-    Logger.setLevel(LogLevel.INFO)
+    Logger.setLevel(LogLevel.ERROR)
     val fib = fibonacciProg(8)
     val watch = IRWalk.firstInProc((fib.procedures.find(_.name == "fib")).get).get
     val bp = BreakPoint(

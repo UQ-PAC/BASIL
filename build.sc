@@ -19,6 +19,7 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
   val mainArgs = ivy"com.lihaoyi::mainargs:0.5.1"
   val sprayJson = ivy"io.spray::spray-json:1.3.6"
   val scalapb = ivy"com.thesamet.scalapb::scalapb-runtime:0.11.15"
+  val scalaCompiler = ivy"org.scala-lang::scala3-compiler:3.3.4"
 
   def scalaPBVersion = "0.11.15"
 
@@ -26,7 +27,7 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
 
   override def scalaPBSources = T.sources { Seq(PathRef(this.millSourcePath / "main" / "protobuf")) }
   def millSourcePath = super.millSourcePath / "src"
-  def ivyDeps = Agg(scalactic, antlrRuntime, sourceCode, mainArgs, sprayJson, scalapb)
+  def ivyDeps = Agg(scalactic, antlrRuntime, sourceCode, mainArgs, sprayJson, scalapb, scalaCompiler)
   def sources = T.sources { Seq(PathRef(this.millSourcePath / "main" / "scala")) }
 
   override def antlrPackage: Option[String] = Some("Parsers")
@@ -105,4 +106,5 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
     os.read.lines(path1) == os.read.lines(path2)
   }
 
+  def scalafmt = mill.scalalib.scalafmt.ScalafmtModule
 }

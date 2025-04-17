@@ -88,6 +88,7 @@ object IRToDSLTestData {
             "R31_out" -> LocalVar("R31", BitVecType(64), 0)
           ),
           "get_two_1876",
+          Seq(
           "R0_in" -> LocalVar("R0", BitVecType(64), 0),
           "R10_in" -> LocalVar("R10", BitVecType(64), 0),
           "R11_in" -> LocalVar("R11", BitVecType(64), 0),
@@ -109,6 +110,7 @@ object IRToDSLTestData {
           "R7_in" -> LocalVar("R7", BitVecType(64), 0),
           "R8_in" -> LocalVar("R8", BitVecType(64), 0),
           "R9_in" -> LocalVar("R9", BitVecType(64), 0)
+          )
         ),
         goto("l000003ec")
       ),
@@ -150,6 +152,7 @@ object IRToDSLTestData {
             "R9_out" -> LocalVar("R9", BitVecType(64), 0)
           ),
           "printf_1584",
+          Seq(
           "R0_in" -> LocalVar("R0", BitVecType(64), 0),
           "R10_in" -> LocalVar("R10", BitVecType(64), 0),
           "R11_in" -> LocalVar("R11", BitVecType(64), 0),
@@ -171,6 +174,7 @@ object IRToDSLTestData {
           "R7_in" -> LocalVar("R7", BitVecType(64), 0),
           "R8_in" -> LocalVar("R8", BitVecType(64), 0),
           "R9_in" -> LocalVar("R9", BitVecType(64), 0)
+          )
         ),
         goto("l00000430")
       ),

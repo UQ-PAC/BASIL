@@ -3,6 +3,7 @@ import util.Logger
 import cfg_visualiser.DotElement
 import cfg_visualiser.{DotArrow, DotGraph, DotInlineArrow, DotInterArrow, DotIntraArrow, DotNode, DotRegularArrow}
 
+import ir.cilvisitor.*
 import collection.mutable
 import scala.annotation.tailrec
 
@@ -386,6 +387,7 @@ def toDot[T <: CFGPosition](
  */
 def freeVarsPos(s: CFGPosition): Set[Variable] = s match {
   case a: LocalAssign => a.rhs.variables
+  case a: MemoryAssign => a.rhs.variables
   case l: MemoryLoad => l.index.variables
   case a: MemoryStore => a.index.variables ++ a.value.variables
   case a: Assert => a.body.variables

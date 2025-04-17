@@ -12,11 +12,16 @@ and maintaining test cases.
 
 Writing test cases
 ------------------
+
+We use the [ScalaTest](https://www.scalatest.org/) unit testing framework. Example unit tests can be found in [src/test/scala](../src/test/scala/).
+
 Test cases are written in Scalatest using its
 [`AnyFunSuite`](https://www.scalatest.org/scaladoc/3.1.2/org/scalatest/funsuite/AnyFunSuite.html) style.
 See the AnyFunSuite documentation or existing test cases for syntax and examples.
 
 ### Exporting IR structures into test cases
+
+The [dsl](../basil-ir.md#constructing-programs-in-code) can be used to construct simple example BASIL IR programs, which can then be fed through into the whole pipeline via `IRLoading.load()` in
 
 Often, you might have found a particular Basil IR program which demonstrates some bug in the code.
 It is good practice to extract this into a test case, both to validate the fix and ensure the bug doesn't reoccur.
@@ -146,3 +151,43 @@ executing scalatest.
 The disabled mode will show as "cancelled".
 Both of these will be output in yellow text if your console is using colour.
 
+
+## Running Individual suites
+
+From git root directory run `mill test.testOnly`, tests suite names are glob matched against its argument, 
+for example to run all the SystemTest variants use:
+
+```
+$ ./mill test.testOnly 'SystemTests*'
+```
+
+
+### Compiling the Integration test binaries
+
+These are checked in to the respository, but can be recompiled (and new tests compiled) with the following instructions: 
+
+These are the `SystemTests.scala` test case with the files present in `src/test/correct` for examples that should verify and `src/test/incorrect`
+for examples that should not verify. 
+
+These are lifted via the Makefiles, to add another test simply add a directory, c source file, and optionally specification file and run 
+
+```sh
+cd src/test/
+make
+```
+
+The `config.mk` file in the test directory can be used to exclude unnecessary compilers, and change compilation flags. 
+Full details can be found [here](../src/test/readme.md).
+
+
+To update the expected BASIL output files from the SystemTests results run:
+
+```
+$ ./mill updateExpected
+```
+
+To list all test suites:
+
+```
+$ ./mill test.testOnly '*' -- -t ''
+```

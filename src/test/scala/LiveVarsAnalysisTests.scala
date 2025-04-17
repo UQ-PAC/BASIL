@@ -22,7 +22,7 @@ import util.{BASILResult, StaticAnalysisConfig}
 import translating.PrettyPrinter.*
 
 @test_util.tags.UnitTest
-class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
+class LiveVarsAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
   Logger.setLevel(LogLevel.ERROR)
   private val correctPath = "./src/test/correct/"
   def runExample(name: String): BASILResult = {

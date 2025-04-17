@@ -25,19 +25,8 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.{
-  Constraint,
-  DataStructureAnalysis,
-  Graph,
-  IntervalDSA,
-  IntervalGraph,
-  SymbolicAddress,
-  SymbolicAddressAnalysis,
-  SymbolicValues,
-  computeDSADomain,
-  generateConstraints,
-  getSymbolicValues
-}
+import analysis.data_structure_analysis.*
+import analysis.data_structure_analysis.given
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
@@ -48,6 +37,7 @@ import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
+import ir.transforms.MemoryTransform
 import util.DSAAnalysis.Norm
 import util.LogLevel.INFO
 
@@ -93,7 +83,7 @@ case class StaticAnalysisContext(
 )
 
 case class DSAContext(
-  sva: Map[Procedure, SymbolicValues],
+  sva: Map[Procedure, SymValues[Interval]],
   constraints: Map[Procedure, Set[Constraint]],
   local: Map[Procedure, IntervalGraph],
   bottomUp: Map[Procedure, IntervalGraph],
@@ -270,6 +260,8 @@ object IRTransform {
       }
     }
 
+    ctx.program.procedures.foreach(ir.transforms.makeProcEntryNonLoop)
+
     // useful for ReplaceReturns
     // (pushes single block with `Unreachable` into its predecessor)
     while (transforms.coalesceBlocks(ctx.program)) {}
@@ -296,12 +288,16 @@ object IRTransform {
     val externalRemover = ExternalRemover(externalNamesLibRemoved.toSet)
     externalRemover.visitProgram(ctx.program)
     for (p <- ctx.program.procedures) {
-      p.isExternal = Some(ctx.externalFunctions.exists(e => e.name == p.procName || p.address.contains(e.offset)))
+      p.isExternal = Some(
+        ctx.externalFunctions.exists(e => e.name == p.procName || p.address.contains(e.offset)) || p.isExternal
+          .getOrElse(false)
+      )
     }
 
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
+    assert(invariant.procEntryNoIncoming(ctx.program))
     ctx
   }
 
@@ -322,7 +318,9 @@ object IRTransform {
     val dupProcNames = ctx.program.procedures.groupBy(_.name).filter((_, p) => p.size > 1).toList.flatMap(_(1))
     assert(dupProcNames.isEmpty)
 
-    if (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled)) {
+    if (
+      !config.memoryTransform && (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled))
+    ) {
       val stackIdentification = StackSubstituter()
       stackIdentification.visitProgram(ctx.program)
     }
@@ -720,9 +718,16 @@ object RunUtils {
     val timer = PerformanceTimer("Simplify")
     val program = ctx.program
 
+    val foundLoops = LoopDetector.identify_loops(program)
+    val newLoops = foundLoops.reducibleTransformIR()
+    newLoops.updateIrWithLoops()
+
+    for (p <- program.procedures) {
+      p.normaliseBlockNames()
+    }
+
     ctx.program.sortProceduresRPO()
 
-    transforms.liftLinuxAssertFail(ctx)
     transforms.liftSVComp(ctx.program)
 
     DebugDumpIRLogger.writeToFile(File("il-before-simp.il"), pp_prog(program))
@@ -734,12 +739,20 @@ object RunUtils {
     transforms.coalesceBlocks(program)
     transforms.removeEmptyBlocks(program)
 
+    // transforms.coalesceBlocksCrossBranchDependency(program)
     DebugDumpIRLogger.writeToFile(File("blockgraph-before-dsa.dot"), dotBlockGraph(program.mainProcedure))
 
     Logger.info("[!] Simplify :: DynamicSingleAssignment")
     DebugDumpIRLogger.writeToFile(File("il-before-dsa.il"), pp_prog(program))
 
     transforms.OnePassDSA().applyTransform(program)
+    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
+      val dir = File("./graphs/")
+      if (!dir.exists()) then dir.mkdirs()
+      for (p <- ctx.program.procedures) {
+        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-dot-simp.dot"), dotBlockGraph(p))
+      }
+    }
 
     transforms.inlinePLTLaunchpad(ctx.program)
 
@@ -779,6 +792,10 @@ object RunUtils {
     AnalysisResultDotLogger.writeToFile(File("blockgraph-before-copyprop.dot"), dotBlockGraph(program.mainProcedure))
     Logger.info("Copyprop Start")
     transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
+
+    transforms.fixupGuards(program)
+    transforms.removeDuplicateGuard(program)
+
     AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
 
     transforms.liftLinuxAssertFail(ctx)
@@ -797,7 +814,6 @@ object RunUtils {
       assert(x)
       Logger.info("DSA Check succeeded")
     }
-
     // run this after cond recovery because sign bit calculations often need high bits
     // which go away in high level conss
     DebugDumpIRLogger.writeToFile(File("il-after-slices.il"), pp_prog(program))
@@ -885,12 +901,12 @@ object RunUtils {
       val DSATimer = PerformanceTimer("DSA Timer", INFO)
 
       val main = ctx.program.mainProcedure
-      var sva: Map[Procedure, SymbolicValues] = Map.empty
+      var sva: Map[Procedure, SymValues[Interval]] = Map.empty
       var cons: Map[Procedure, Set[Constraint]] = Map.empty
       computeDSADomain(ctx.program.mainProcedure, ctx).toSeq
         .sortBy(_.name)
         .foreach(proc =>
-          val SVAResults = getSymbolicValues(proc)
+          val SVAResults = getSymbolicValues[Interval](proc)
           val constraints = generateConstraints(proc)
           sva += (proc -> SVAResults)
           cons += (proc -> constraints)
@@ -901,8 +917,12 @@ object RunUtils {
 
       if config.analyses.contains(Norm) then
         DSALogger.info("Finished Computing Constraints")
+        val globalGraph =
+          IntervalDSA.getLocal(ctx.program.mainProcedure, ctx, SymValues[Interval](Map.empty), Set[Constraint]())
         val DSA = IntervalDSA.getLocals(ctx, sva, cons)
+        IntervalDSA.checkReachable(ctx.program, DSA)
         DSATimer.checkPoint("Finished DSA Local Phase")
+        DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
         DSA.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
         val DSABU = IntervalDSA.solveBUs(DSA)
@@ -913,7 +933,27 @@ object RunUtils {
         DSATimer.checkPoint("Finished DSA TD Phase")
         DSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
+        DSATD.values.foreach(g => globalGraph.globalTransfer(g, globalGraph))
+        val globalMapping = DSATD.values.foldLeft(Map[IntervalNode, IntervalNode]()) { (m, g) =>
+          val oldToNew = globalGraph.globalTransfer(globalGraph, g)
+          m ++ oldToNew.map((common, spec) => (spec, common))
+
+        }
+        DSATimer.checkPoint("Finished DSA global graph")
+        DSATD.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness check")
+
+        IntervalDSA.checkConsistGlobals(DSATD, globalGraph)
+        IntervalDSA.checkReachable(ctx.program, DSATD)
+
+        DSATimer.checkPoint("Finished DSA Invariant Check")
         dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
+
+        if q.memoryTransform then {
+          visit_prog(MemoryTransform(DSATD, globalMapping), ctx.program)
+          DSATimer.checkPoint("Performed Memory Transform")
+          // doSimplify(ctx, None)
+        }
     }
 
     if (q.runInterpret) {
@@ -933,6 +973,8 @@ object RunUtils {
       q.loading.dumpIL.foreach(f => {
         val tf = f"${f}-interpret-trace.txt"
         writeToFile(trace.t.mkString("\n"), tf)
+        val sf = f"${f}-stdout.txt"
+        writeToFile(stdout, sf)
         Logger.info(s"Finished interpret: trace written to $tf")
       })
 
@@ -954,7 +996,10 @@ object RunUtils {
 
     val regionInjector = analysis.flatMap(a => a.regionInjector)
 
-    val boogiePrograms = if (q.boogieTranslation.threadSplit && ctx.program.threads.nonEmpty) {
+    val boogiePrograms = if (q.boogieTranslation.directTranslation) {
+      Logger.info("Disabling WPIF VCs")
+      ArrayBuffer(translating.BoogieTranslator.translateProg(ctx.program, q.outputPrefix))
+    } else if (q.boogieTranslation.threadSplit && ctx.program.threads.nonEmpty) {
       val outPrograms = ArrayBuffer[BProgram]()
       for (thread <- ctx.program.threads) {
         val fileName = q.outputPrefix.stripSuffix(".bpl") + "_" + thread.entry.name + ".bpl"

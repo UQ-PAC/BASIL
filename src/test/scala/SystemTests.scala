@@ -1,6 +1,6 @@
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.Retries
-import util.{LogLevel, Logger, DebugDumpIRLogger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
+import util.{DSAConfig, DebugDumpIRLogger, LogLevel, Logger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
 
 import Numeric.Implicits.*
 import java.io.{BufferedWriter, File, FileWriter}
@@ -13,6 +13,7 @@ import test_util.Histogram
 import test_util.TestConfig
 import test_util.LockManager
 import test_util.TestCustomisation
+import util.DSAAnalysis.Norm
 import util.boogie_interaction.*
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
@@ -25,7 +26,7 @@ object SystemTests {
   val locks = LockManager[String]()
 }
 
-trait SystemTests extends AnyFunSuite, BASILTest, TestCustomisation {
+trait SystemTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest, TestCustomisation {
 
   /**
    * A suffix appended to output file names, in order to avoid clashes between test suites.
@@ -187,7 +188,16 @@ trait SystemTests extends AnyFunSuite, BASILTest, TestCustomisation {
 
     Logger.info(s"$name/$variation$testSuffix")
     val timer = PerformanceTimer(s"test $name/$variation$testSuffix")
-    runBASIL(inputPath, RELFPath, Some(specPath), BPLPath, conf.staticAnalysisConfig, conf.simplify)
+    runBASIL(
+      inputPath,
+      RELFPath,
+      Some(specPath),
+      BPLPath,
+      conf.staticAnalysisConfig,
+      conf.simplify,
+      dsa = conf.dsa,
+      memoryTransform = conf.memoryTransform
+    )
     val translateTime = timer.checkPoint("translate-boogie")
     Logger.info(s"$name/$variation$testSuffix DONE")
 
@@ -603,4 +613,42 @@ class ProcedureSummaryTests extends SystemTests {
 class UnimplementedTests extends SystemTests {
   runTests("unimplemented", TestConfig(useBAPFrontend = false, expectVerify = true))
   runTests("unimplemented", TestConfig(useBAPFrontend = true, expectVerify = false))
+}
+
+@test_util.tags.AnalysisSystemTest
+class IntervalDSASystemTests extends SystemTests {
+  runTests(
+    "correct",
+    TestConfig(useBAPFrontend = true, expectVerify = true, simplify = true, dsa = Some(DSAConfig(Set(Norm))))
+  )
+
+  runTests(
+    "incorrect",
+    TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSAConfig(Set(Norm))))
+  )
+}
+
+@test_util.tags.DisabledTest
+class MemoryTransformSystemTests extends SystemTests {
+  runTests(
+    "correct",
+    TestConfig(
+      useBAPFrontend = true,
+      expectVerify = false,
+      simplify = true,
+      dsa = Some(DSAConfig(Set(Norm))),
+      memoryTransform = true
+    )
+  )
+
+  runTests(
+    "incorrect",
+    TestConfig(
+      useBAPFrontend = false,
+      expectVerify = false,
+      simplify = true,
+      dsa = Some(DSAConfig(Set(Norm))),
+      memoryTransform = true
+    )
+  )
 }
