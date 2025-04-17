@@ -55,11 +55,12 @@ object EvalScala {
 
     val manager = new javax.script.ScriptEngineManager(getClass().getClassLoader())
 
+    // captures compiler output (e.g. errors and warnings) but not output
+    // printed from the user's code.
     val engine = Console.withOut(baos) {
       manager.getEngineByName("scala")
     }
 
-    // TODO: capture compile warnings somehow
     val result = Try(engine.eval(s)).filter(_ != null).recoverWith(x => Failure(unwrapScalaEvalException(x)))
 
     val output = new String(baos.toByteArray(), java.nio.charset.Charset.defaultCharset());
