@@ -42,7 +42,15 @@ def difftestLiveVars(p: Procedure, compareResult: Map[CFGPosition, Set[Variable]
 }
 
 def basicReachingDefs(p: Procedure): Map[Command, Map[Variable, Set[Assign | DirectCall]]] = {
-  val (beforeLive, afterLive) = getLiveVars(p)
+  val lives = getLiveVars(p)
+  basicReachingDefs(p, lives)
+}
+
+def basicReachingDefs(
+  p: Procedure,
+  liveVars: (Map[Block, Set[Variable]], Map[Block, Set[Variable]])
+): Map[Command, Map[Variable, Set[Assign | DirectCall]]] = {
+  val (beforeLive, afterLive) = liveVars
   val dom = DefUseDomain(beforeLive)
   val solver = worklistSolver(dom)
   // type rtype = Map[Block, Map[Variable, Set[Assign | DirectCall]]]
@@ -75,9 +83,7 @@ class DefUseDomain(liveBefore: Map[Block, Set[Variable]]) extends AbstractDomain
 
   override def transfer(s: Map[Variable, Set[Assign]], b: Command) = {
     b match {
-      case a: LocalAssign => s.updated(a.lhs, Set(a))
-      case a: MemoryLoad => s.updated(a.lhs, Set(a))
-      case d: DirectCall => d.outParams.map(_._2).foldLeft(s)((s, r) => s.updated(r, Set(d)))
+      case d: Assign => d.assignees.foldLeft(s)((s, r) => s.updated(r, Set(d)))
       case _ => s
     }
   }
@@ -142,6 +148,34 @@ class IntraLiveVarsDomain extends PowerSetDomain[Variable] {
       case r: Unreachable => s
       case n: NOP => s
     }
+  }
+}
+
+class LiveVarsDomWatchFlags(defs: Map[Variable, Set[Assign]]) extends IntraLiveVarsDomain {
+
+  val g = GuardVisitor()
+
+  def substitute(deps: mutable.Set[Variable])(v: Variable) = {
+    if (g.goodSubst(v) && defs.get(v).isDefined && defs(v).size == 1) {
+      deps.add(v)
+      defs(v).head match {
+        case l: LocalAssign =>
+          deps.addAll(l.rhs.variables)
+          deps.add(v)
+          Some(l.rhs)
+        case _ => None
+      }
+    } else None
+  }
+
+  override def transfer(s: Set[Variable], a: Command): Set[Variable] = a match {
+    case a: Assume => {
+      val deps = mutable.Set[Variable]()
+      deps.addAll(a.body.variables)
+      Substitute(substitute(deps), true)(a.body)
+      s ++ deps
+    }
+    case o => super.transfer(s, a)
   }
 }
 
@@ -531,10 +565,94 @@ def collectUses(p: Procedure): Map[Variable, Set[Command]] = {
 
 class GuardVisitor extends CILVisitor {
 
+  // heavily relies on the dsa visitor
+
+  def allDefinitions(p: Procedure) = {
+    p.collect { case a: Assign =>
+      a.assignees.map(l => l -> a)
+    }.flatten
+      .groupBy(_._1)
+      .map { case (v, ass) =>
+        v -> ass.map(_._2).toSet
+      }
+  }
+
+  def goodSubst(v: Variable) = {
+    v.name.startsWith("Cse")
+    || v.name.startsWith("ZF")
+    || v.name.startsWith("VF")
+    || v.name.startsWith("CF")
+    || v.name.startsWith("NF")
+  }
+
+  var defs = Map[Variable, Set[Assign]]()
+  var reachingDefs: Map[Command, Map[Variable, Set[Assign]]] = Map()
+  var inparams = Set[Variable]()
+
+  def getLiveVars(p: Procedure): (Map[Block, Set[Variable]], Map[Block, Set[Variable]]) = {
+    val liveVarsDom = LiveVarsDomWatchFlags(defs)
+    val liveVarsSolver = worklistSolver(liveVarsDom)
+    liveVarsSolver.solveProc(p, backwards = true)
+  }
+
+  def getReachingDefs(p: Procedure) = {
+    basicReachingDefs(p, getLiveVars(p))
+  }
+
+  override def vproc(p: Procedure) = {
+    while (coalesceBlocks(p)) {}
+    removeEmptyBlocks(p)
+    transforms.fixupGuards(p)
+    util.writeToFile(dotBlockGraph(p), s"graphs/blockgraph-${p.name}-boo.dot")
+    inparams = p.formalInParam.toSet[Variable]
+    defs = allDefinitions(p)
+    reachingDefs = getReachingDefs(p)
+    DoChildren()
+  }
+
+  def substitute(pos: Command)(v: Variable): Option[Expr] = {
+    if (goodSubst(v)) {
+      val res = defs.get(v).getOrElse(Set())
+
+      def propOK(e: Expr) = {
+        // all dependent variables satisfy dsa property for the use we want to propage to
+        // DSA property: our reaching definitions are all definitions of the variable
+        e.variables.map(v => v -> reachingDefs(pos).get(v)).forall {
+          case (v, d) => {
+            val ok = (inparams.contains(v) && defs
+              .get(v)
+              .forall(_.isEmpty)) || (d.isDefined && d.get.toSet == defs.get(v).toSet.flatten)
+            if (!ok)
+              println(s"prop not ok $v $d")
+            ok
+          }
+        }
+      }
+
+      if (res.size == 1) {
+        res.head match {
+          case l @ LocalAssign(lhs, rhs, _) if propOK(rhs) => {
+            Some(rhs)
+          }
+          case _ => None
+        }
+      } else {
+        None
+      }
+    } else {
+      None
+    }
+  }
+
   override def vstmt(s: Statement) = s match {
-    case a @ Assume(_, b, c, d) =>
-      inlineCond(a) match {
-        case Some(cond) => ChangeTo(List(Assume(cond, b, c, d)))
+    case a @ Assume(body, b, c, d) if a.body.variables.exists(goodSubst) =>
+      val deps = mutable.Set[Variable]()
+      val depBlocks = mutable.Set[Assign]()
+      Substitute(substitute(s))(a.body) match {
+        case Some(cond) => {
+          ChangeTo(List(Assume(cond, b, c, d)))
+          // SkipChildren()
+        }
         case _ => SkipChildren()
       }
     case _ => SkipChildren()
@@ -585,31 +703,35 @@ def copypropTransform(
 
 }
 
-def removeEmptyBlocks(p: Program) = {
-  for (proc <- p.procedures) {
-    val blocks = proc.blocks.toList
-    for (b <- blocks) {
-      b match {
-        case b: Block if b.statements.size == 0 && b.prevBlocks.size == 1 && b.jump.isInstanceOf[GoTo] => {
-          val prev = b.prevBlocks
-          val next = b.nextBlocks
-          for (p <- prev) {
-            p.jump match {
-              case g: GoTo => {
-                for (n <- next) {
-                  g.addTarget(n)
-                }
-                g.removeTarget(b)
+def removeEmptyBlocks(proc: Procedure): Unit = {
+  val blocks = proc.blocks.toList
+  for (b <- blocks) {
+    b match {
+      case b: Block if b.statements.size == 0 && b.prevBlocks.size == 1 && b.jump.isInstanceOf[GoTo] => {
+        val prev = b.prevBlocks
+        val next = b.nextBlocks
+        for (p <- prev) {
+          p.jump match {
+            case g: GoTo => {
+              for (n <- next) {
+                g.addTarget(n)
               }
-              case _ => throw Exception("Must have goto")
+              g.removeTarget(b)
             }
+            case _ => throw Exception("Must have goto")
           }
-          b.replaceJump(Unreachable())
-          b.parent.removeBlocks(b)
         }
-        case _ => ()
+        b.replaceJump(Unreachable())
+        b.parent.removeBlocks(b)
       }
+      case _ => ()
     }
+  }
+}
+
+def removeEmptyBlocks(p: Program): Unit = {
+  for (proc <- p.procedures) {
+    removeEmptyBlocks(proc)
   }
 }
 
@@ -641,44 +763,51 @@ def coalesceBlocksCrossBranchDependency(p: Program): Boolean = {
   candidate.nonEmpty
 }
 
+def coalesceBlocks(proc: Procedure): Boolean = {
+  var didAny = false
+
+  val blocks = proc.blocks.toList
+  for (b <- blocks.sortBy(_.rpoOrder)) {
+    if (
+      b.prevBlocks.size == 1 && b.prevBlocks.head.statements.nonEmpty && b.statements.nonEmpty
+      && b.prevBlocks.head.nextBlocks.size == 1
+      && b.prevBlocks.head.statements.lastOption.forall(s => !s.isInstanceOf[Call])
+      && !(b.parent.entryBlock.contains(b) || b.parent.returnBlock.contains(b))
+      && b.atomicSection.isEmpty && b.prevBlocks.forall(_.atomicSection.isEmpty)
+    ) {
+      didAny = true
+      // append topredecessor
+      // we know prevBlock is only jumping to b and has no call at the end
+      val prevBlock = b.prevBlocks.head
+      val stmts = b.statements.map(b.statements.remove).toList
+      prevBlock.statements.appendAll(stmts)
+      // leave empty block b and cleanup with removeEmptyBlocks
+    } else if (
+      b.nextBlocks.size == 1 && b.nextBlocks.head.statements.nonEmpty && b.statements.nonEmpty
+      && b.nextBlocks.head.prevBlocks.size == 1
+      && b.statements.lastOption.forall(s => !s.isInstanceOf[Call])
+      && !(b.parent.entryBlock.contains(b) || b.parent.returnBlock.contains(b))
+      && b.atomicSection.isEmpty && b.nextBlocks.forall(_.atomicSection.isEmpty)
+    ) {
+      didAny = true
+      // append to successor
+      // we know b is only jumping to nextBlock and does not end in a call
+      val nextBlock = b.nextBlocks.head
+      val stmts = b.statements.map(b.statements.remove).toList
+      nextBlock.statements.prependAll(stmts)
+      // leave empty block b and cleanup with removeEmptyBlocks
+    } else if (b.jump.isInstanceOf[Unreachable] && b.statements.isEmpty && b.prevBlocks.size == 1) {
+      b.prevBlocks.head.replaceJump(Unreachable())
+      b.parent.removeBlocks(b)
+    }
+  }
+  didAny
+}
+
 def coalesceBlocks(p: Program): Boolean = {
   var didAny = false
   for (proc <- p.procedures) {
-    val blocks = proc.blocks.toList
-    for (b <- blocks.sortBy(_.rpoOrder)) {
-      if (
-        b.prevBlocks.size == 1 && b.prevBlocks.head.statements.nonEmpty && b.statements.nonEmpty
-        && b.prevBlocks.head.nextBlocks.size == 1
-        && b.prevBlocks.head.statements.lastOption.forall(s => !s.isInstanceOf[Call])
-        && !(b.parent.entryBlock.contains(b) || b.parent.returnBlock.contains(b))
-        && b.atomicSection.isEmpty && b.prevBlocks.forall(_.atomicSection.isEmpty)
-      ) {
-        didAny = true
-        // append topredecessor
-        // we know prevBlock is only jumping to b and has no call at the end
-        val prevBlock = b.prevBlocks.head
-        val stmts = b.statements.map(b.statements.remove).toList
-        prevBlock.statements.appendAll(stmts)
-        // leave empty block b and cleanup with removeEmptyBlocks
-      } else if (
-        b.nextBlocks.size == 1 && b.nextBlocks.head.statements.nonEmpty && b.statements.nonEmpty
-        && b.nextBlocks.head.prevBlocks.size == 1
-        && b.statements.lastOption.forall(s => !s.isInstanceOf[Call])
-        && !(b.parent.entryBlock.contains(b) || b.parent.returnBlock.contains(b))
-        && b.atomicSection.isEmpty && b.nextBlocks.forall(_.atomicSection.isEmpty)
-      ) {
-        didAny = true
-        // append to successor
-        // we know b is only jumping to nextBlock and does not end in a call
-        val nextBlock = b.nextBlocks.head
-        val stmts = b.statements.map(b.statements.remove).toList
-        nextBlock.statements.prependAll(stmts)
-        // leave empty block b and cleanup with removeEmptyBlocks
-      } else if (b.jump.isInstanceOf[Unreachable] && b.statements.isEmpty && b.prevBlocks.size == 1) {
-        b.prevBlocks.head.replaceJump(Unreachable())
-        b.parent.removeBlocks(b)
-      }
-    }
+    didAny = didAny || coalesceBlocks(proc)
   }
   didAny
 }
@@ -1015,7 +1144,7 @@ object getProcFrame {
 
 object CopyProp {
 
-  class BlockyProp() extends CILVisitor {
+  class BlockyProp(trivialOnly: Boolean = true, var transform: Boolean = true) extends CILVisitor {
     /* Flow-sensitive intra-block copyprop */
 
     var st = Map[Variable, Expr]()
@@ -1033,7 +1162,7 @@ object CopyProp {
       def getter(v: Variable) =
         st.get(v) match {
           case Some(n: Variable) if n != v => Some(n)
-          case Some(n) if isTrivial(n) && !n.variables.contains(v) => Some(n)
+          case Some(n) if (!trivialOnly || isTrivial(n)) && !n.variables.contains(v) => Some(n)
           case _ => None
         }
       simplifyExprFixpoint(Substitute(getter, true)(e).getOrElse(e))(0)
@@ -1049,35 +1178,35 @@ object CopyProp {
         case l: LocalAssign => {
           val nrhs = subst(l.rhs)
           replaceVar(l.lhs, Some(nrhs))
-          l.rhs = nrhs
+          if transform then l.rhs = nrhs
           SkipChildren()
         }
         case x: Assert => {
-          x.body = subst(x.body)
+          if transform then x.body = subst(x.body)
           SkipChildren()
         }
         case x: Assume => {
-          x.body = subst(x.body)
+          if transform then x.body = subst(x.body)
           SkipChildren()
         }
         case x: DirectCall => {
-          x.actualParams = x.actualParams.map((l, r) => (l, subst(r)))
+          if transform then x.actualParams = x.actualParams.map((l, r) => (l, subst(r)))
           val lhs = x.outParams.map(_._2)
           lhs.foreach(replaceVar(_, None))
           SkipChildren()
         }
         case d: MemoryLoad => {
-          d.index = subst(d.index)
+          if transform then d.index = subst(d.index)
           replaceVar(d.lhs, None)
           SkipChildren()
         }
         case d: MemoryStore => {
-          d.index = subst(d.index)
-          d.value = subst(d.value)
+          if transform then d.index = subst(d.index)
+          if transform then d.value = subst(d.value)
           SkipChildren()
         }
         case d: MemoryAssign => {
-          d.rhs = subst(d.rhs)
+          if transform then d.rhs = subst(d.rhs)
           replaceVar(d.lhs, None)
           SkipChildren()
         }
@@ -1500,7 +1629,11 @@ class Simplify(val res: Boolean => Variable => Option[Expr], val initialBlock: B
   }
 }
 
-def fixupGuards(p: Program) = {
+def fixupGuards(p: Program): Unit = {
+  p.procedures.foreach(fixupGuards)
+}
+
+def fixupGuards(p: Procedure): Unit = {
   // the DSA transform can insert phi nodes on edges between a nondet branch and the block containing the guard
   // This breaks the interpreter because it can't immediately evaluate the guard.
 

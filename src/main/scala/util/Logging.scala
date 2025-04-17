@@ -62,9 +62,13 @@ class GenericLogger(
   def setOutput(stream: PrintStream) = _output = () => stream
   def setOutput(streamProducer: () => PrintStream) = _output = streamProducer
 
-  def writeToFile(file: File, content: => String) = {
+  def writeToFile(file: File, content: => String)(implicit
+    line: sourcecode.Line,
+    filepos: sourcecode.FileName,
+    name: sourcecode.Name
+  ) = {
     if (level.id < LogLevel.OFF.id) {
-      this.debug(s"Writing $file")
+      this.debug(s"Writing $file")(line, filepos, name)
       val l = deriveLogger(file.getName(), file)
       l.print(content)
       l.close()
@@ -181,7 +185,7 @@ val SteensLogger = StaticAnalysisLogger.deriveLogger("steensgaard")
 val ProcedureSummariesLogger = StaticAnalysisLogger.deriveLogger("procedure-summaries")
 // DSA Loggers
 val DSALogger = Logger.deriveLogger("DSA").setLevel(LogLevel.OFF)
-val ConstGenLogger = DSALogger.deriveLogger("Constraint Gen", Console.out).setLevel(LogLevel.INFO)
+val ConstGenLogger = DSALogger.deriveLogger("Constraint Gen").setLevel(LogLevel.INFO)
 val SVALogger = DSALogger.deriveLogger("SVA")
-val IntervalDSALogger = DSALogger.deriveLogger("SadDSA", Console.out).setLevel(LogLevel.OFF)
+val IntervalDSALogger = DSALogger.deriveLogger("SadDSA").setLevel(LogLevel.OFF)
 val StackLogger = Logger.deriveLogger("Stack").setLevel(LogLevel.INFO)
