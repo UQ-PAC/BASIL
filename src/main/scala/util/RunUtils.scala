@@ -890,7 +890,7 @@ object RunUtils {
       val dir = File("./graphs/")
       if (!dir.exists()) then dir.mkdirs()
       for (p <- ctx.program.procedures) {
-        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
+        writeToFile(dotBlockGraph(p), s"graphs/blockgraph-${p.name}-after-simp.dot")
       }
     }
 
