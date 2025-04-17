@@ -134,7 +134,7 @@ class IntervalGraph(
     externalFunctions: Set[ExternalFunction]
   ): IntervalNode = {
     val symBase = Global
-    val globalNode = IntervalNode(this, mutable.Map(symBase -> 0))
+    val globalNode = IntervalNode(this, mutable.Map(symBase -> Set(0)))
     globalNode.add(0)
     globalNode.flags.global = true
     globals.toSeq.sortBy(_.address).foreach {
@@ -284,11 +284,16 @@ class IntervalGraph(
     if (targetCells ++ sourceCells).nonEmpty then target.mergeCells(targetCells ++ sourceCells)
 
     sourceCells.foreach(cell =>
-      val node = cell.node
+      val node = target.find(cell.node)
       val sourceBases = node.bases
       sourceBases.foreach {
-        case (base, offset) if target.nodes.contains(base) =>
-          target.mergeCells(node.get(offset), target.find(target.nodes(base).get(0)))
+        case (base, off) if target.nodes.contains(base) && (base ==  Stack(target.proc) || base == Global) =>
+          val t = target.find(target.nodes(base).get(0))
+          if t.node.isCollapsed then
+            target.mergeCells(cell, t)
+          else
+            assert(off.size <= 1, s"$base, $off,  ${source.proc.procName},  ${target.proc.procName}")
+            target.mergeCells(node.get(off.head), t)
         case _ =>
       }
     )
@@ -543,7 +548,7 @@ class IntervalGraph(
     val nodeToBeMoved = toBeMoved.node
 
     stableNode.flags.join(nodeToBeMoved.flags)
-    stableNode.bases ++= nodeToBeMoved.bases
+    stableNode.bases ++= nodeToBeMoved.bases.map((base, set) => (base, stableNode.bases.getOrElse(base, Set.empty) ++ set.map(_ + delta.getOrElse(0)))).toMap
 
     val selfPointers = disconnectSelfPointers(stableNode)
 
@@ -643,6 +648,8 @@ class IntervalGraph(
         )
         assert(get(pointer).node == result.node)
       )
+
+    assert(result.node.isUptoDate)
     result
   }
 
@@ -703,7 +710,7 @@ class IntervalGraph(
 
 class IntervalNode(
   val graph: IntervalGraph,
-  var bases: mutable.Map[SymBase, Int] = mutable.Map.empty,
+  var bases: mutable.Map[SymBase, Set[Int]] = mutable.Map.empty,
   val size: Option[Int] = None,
   val id: Int = intervalNodeCounter.next().toInt
 ) {
@@ -713,7 +720,7 @@ class IntervalNode(
   val children = mutable.Set[Int]()
 
   val flags: DSFlag = DSFlag()
-  protected var _cells: Seq[IntervalCell] = Seq.empty
+  protected var _cells: Seq[IntervalCell] = Seq(IntervalCell(this, Interval(0, 0)))
   def cells: Seq[IntervalCell] = _cells
 
   def nonOverlappingProperty: Boolean = {
@@ -750,8 +757,7 @@ class IntervalNode(
     val node = this
     val newNode =
       if !oldToNew.contains(node) then
-        val v = newGraph.init(node.bases, node.size)
-        v.bases = node.bases
+        val v = IntervalNode(newGraph, node.bases, node.size)
         v.flags.join(node.flags)
         node.cells.foreach(cell => v.add(cell.interval))
         oldToNew.update(node, v)
@@ -843,6 +849,8 @@ class IntervalNode(
     val cells = _cells.iterator
     flags.collapsed = true
     val res = graph.get(add(Interval.Top))
+    this.bases.view.mapValues(Set.empty)
+    assert(graph.find(this).isCollapsed)
     assert(pointees.map(graph.get).forall(_.equiv(graph.find(res).getPointee)))
     assert(cells.map(graph.get).forall(_ == res))
     res
