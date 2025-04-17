@@ -10,7 +10,7 @@ import ir.transforms
 import translating.PrettyPrinter.*
 
 @test_util.tags.UnitTest
-class SingleAssignmentTest extends AnyFunSuite {
+class SingleAssignmentTest extends AnyFunSuite with test_util.CaptureOutput {
 
   test("tight loop") {
     val x = LocalVar("x", BitVecType(32))

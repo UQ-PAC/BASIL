@@ -10,7 +10,7 @@ import util.*
 import util.DSAAnalysis.Norm
 
 @test_util.tags.UnitTest
-class MemoryTransfromTests extends AnyFunSuite {
+class MemoryTransfromTests extends AnyFunSuite with test_util.CaptureOutput {
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program)
