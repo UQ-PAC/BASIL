@@ -806,7 +806,7 @@ class IRToBoogie(
       } else {
         Nil
       }
-      val jump = GoToCmd(g.targets.map(_.label).toSeq)
+      val jump = if (g.targets.isEmpty) then BAssume(FalseBLiteral, Some("Replaced empty goto")) else GoToCmd(g.targets.map(_.label).toSeq)
       conditionAssert :+ jump
     case r: Return =>
       if (r.outParams.nonEmpty) {
