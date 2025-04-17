@@ -1,8 +1,10 @@
 package ir.dsl
 import ir.*
+import translating.PrettyPrinter.*
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.immutable.*
+import scala.annotation.targetName
 
 /**
  * IR construction DSL
@@ -92,15 +94,9 @@ def exprEq(l: Expr, r: Expr): Expr = (l, r) match {
   case _ => FalseLiteral
 }
 
-def bv32(i: Int): BitVecLiteral = BitVecLiteral(i, 32)
-
-def bv64(i: Int): BitVecLiteral = BitVecLiteral(i, 64)
-
-def bv8(i: Int): BitVecLiteral = BitVecLiteral(i, 8)
-
-def bv16(i: Int): BitVecLiteral = BitVecLiteral(i, 16)
-
 def R(i: Int): Register = Register(s"R$i", 64)
+
+def bv_t(i: Int) = BitVecType(i)
 
 case class DelayNameResolve(ident: String) {
   def resolveProc(prog: Program): Option[Procedure] = prog.collectFirst {
@@ -198,6 +194,14 @@ def directCall(
 ): EventuallyCall =
   EventuallyCall(DelayNameResolve(tgt), lhs.to(ArraySeq), actualParams.to(ArraySeq), label)
 
+def directCall(lhs: Iterable[(String, Variable)], tgt: String, actualParams: (String, Expr)*): EventuallyCall =
+  EventuallyCall(DelayNameResolve(tgt), lhs.to(ArraySeq), actualParams)
+
+case class Call(target: String, actualParams: (String, Expr)*)
+
+def directCall(lhs: Iterable[(String, Variable)], rhs: Call): EventuallyCall =
+  EventuallyCall(DelayNameResolve(rhs.target), lhs.toArray, rhs.actualParams)
+
 def directCall(tgt: String): EventuallyCall = directCall(Nil, tgt, Nil)
 
 def directCall(tgt: String, label: Option[String]): EventuallyCall = directCall(Nil, tgt, Nil)
@@ -223,7 +227,7 @@ def indirectCall(tgt: Variable): EventuallyIndirectCall = EventuallyIndirectCall
 case class EventuallyBlock(
   label: String,
   sl: Iterable[EventuallyStatement],
-  j: EventuallyJump,
+  var j: EventuallyJump,
   address: Option[BigInt] = None
 ) {
 
@@ -257,8 +261,22 @@ def block(label: String, sl: (NonCallStatement | EventuallyStatement | Eventuall
     case g: EventuallyJump => None
   }
   val jump = sl.collect { case j: EventuallyJump => j }
-  require(jump.length == 1, s"DSL block '$label' must contain exactly one jump statement")
-  EventuallyBlock(label, statements, jump.head)
+  require(jump.length <= 1, s"DSL block '$label' must contain no more than one jump statement")
+  val rjump = if (jump.isEmpty) then unreachable else jump.head
+  EventuallyBlock(label, statements, rjump)
+}
+
+/**
+ * Construct a block from a list of statements with a default name.
+ */
+def stmts(sl: (EventuallyCall | NonCallStatement | EventuallyStatement | EventuallyJump)*): EventuallyBlock = {
+
+  val stmts =
+    if (sl.isEmpty) then List(unreachable)
+    else if (!sl.last.isInstanceOf[EventuallyJump]) then (sl.toList ++ List(unreachable))
+    else sl
+
+  block(Counter.nlabel("block"), stmts: _*)
 }
 
 case class EventuallyProcedure(
@@ -326,9 +344,18 @@ def proc(
   label: String,
   in: Iterable[(String, IRType)],
   out: Iterable[(String, IRType)],
+  blocks: Iterable[EventuallyBlock]
+): EventuallyProcedure = {
+  EventuallyProcedure(label, in.to(SortedMap), out.to(SortedMap), blocks.toSeq, blocks.headOption.map(_.label))
+}
+
+def proc(
+  label: String,
+  in: Iterable[(String, IRType)],
+  out: Iterable[(String, IRType)],
   blocks: EventuallyBlock*
 ): EventuallyProcedure = {
-  EventuallyProcedure(label, in.to(SortedMap), out.to(SortedMap), blocks, blocks.headOption.map(_.label))
+  proc(label, in, out, blocks.toSeq)
 }
 
 def mem: SharedMemory = SharedMemory("mem", 64, 8)
