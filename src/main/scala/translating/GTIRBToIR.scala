@@ -10,6 +10,7 @@ import com.grammatech.gtirb.proto.Symbol.Symbol
 import Parsers.ASLpParser.*
 import gtirb.*
 import ir.*
+import ir.cilvisitor.{CILVisitor, SkipChildren, ChangeDoChildrenPost, DoChildren, ChangeTo}
 
 import scala.collection.mutable
 import scala.collection.mutable.Set
@@ -38,10 +39,89 @@ import util.Logger
   */
 class TempIf(
   val cond: Expr,
-  val thenStmts: mutable.Buffer[Statement],
-  val elseStmts: mutable.Buffer[Statement],
+  val thenStmts: Seq[Statement],
+  val elseStmts: Seq[Statement],
   override val label: Option[String] = None
-) extends NOP(label)
+) extends NOP(label) {
+  override def toString = s"TEMPIF($cond, $thenStmts, $elseStmts)"
+}
+
+class FindUninterpretedFunctions extends CILVisitor {
+  var uninterp = List[UninterpretedFunction]()
+
+  override def vexpr(e: Expr) =
+    e match
+      case u: UninterpretedFunction => uninterp = u :: uninterp
+      case _ => ()
+    DoChildren()
+}
+
+class ConvertITEToTempIf(prefix: String) extends CILVisitor {
+  private var iteResults = immutable.Map[String, TempIf]()
+
+  private val counter = util.Counter()
+
+  /**
+   * Makes a new TempIf structure for the given ite expression, and
+   * adds it to the iteResults map.
+   */
+  def makeTempIf(cond: Expr, tcase: Expr, fcase: Expr): LocalVar = {
+    val name = "ite_result_" + prefix + "_" + counter.next()
+    val localvar = LocalVar(name, tcase.getType)
+    val tempif = TempIf(cond, Seq(LocalAssign(localvar, tcase)), Seq(LocalAssign(localvar, fcase)))
+    iteResults = iteResults + (name -> tempif)
+    localvar
+  }
+
+  /**
+   * Returns the list of statements required to compute the ITE expressions
+   * which have been visited, then clears the internal map of ITE results.
+   */
+  def popITEComputations(): Iterable[TempIf] = {
+    val x = iteResults.values
+    iteResults = iteResults.empty
+    x
+  }
+
+  override def vexpr(e: Expr) =
+    ChangeDoChildrenPost(
+      e,
+      {
+        case u: UninterpretedFunction if u.name == iteFunctionName => {
+          val Seq(cond, t, f) = u.params
+          makeTempIf(cond, t, f)
+        }
+        case x => x
+      }
+    )
+
+  override def vstmt(s: Statement) = {
+    assert(!s.isInstanceOf[TempIf], "tempif should be handled outside of cil visitor because of nop confusion")
+    assert(
+      iteResults.isEmpty,
+      "this would only happen if statements are nested - impossible in basil ir aside from tempif"
+    )
+    ChangeDoChildrenPost(List(s), ss => popITEComputations() ++: ss)
+  }
+
+  def convertNestedStatements(s: Iterable[Statement]): Iterable[Statement] = {
+    assert(iteResults.isEmpty)
+
+    // XXX: here, we handle TempIf outside of cilvisitor because cilvisitor sees TempIf as NOP T_T
+    s.flatMap {
+      case x: TempIf => {
+        val c = cilvisitor.visit_expr(this, x.cond)
+        val pre = popITEComputations()
+        val ts = convertNestedStatements(x.thenStmts).toSeq
+        val fs = convertNestedStatements(x.elseStmts).toSeq
+
+        pre ++ Iterable(TempIf(c, ts, fs))
+      }
+      case x => cilvisitor.visit_stmt(this, x)
+    }
+  }
+
+}
 
 /** GTIRBToIR class. Forms an IR as close as possible to the one produced by BAP by using GTIRB instead
   *
@@ -91,6 +171,8 @@ class GTIRBToIR(
 
   // mapping from an external procedure's name to the IR procedure
   private val externalProcedures = mutable.Map[String, Procedure]()
+
+  private val convertITE = ConvertITEToTempIf("")
 
   // maps block UUIDs to their address
   private def createAddresses(): immutable.Map[ByteString, BigInt] = {
@@ -175,9 +257,11 @@ class GTIRBToIR(
       for (blockUUID <- blockUUIDs) {
         val block = uuidToBlock(blockUUID)
 
-        val statements = semanticsLoader.visitBlock(blockUUID, blockCount, block.address)
-        blockCount += 1
-        block.statements.addAll(statements)
+        {
+          val statements = semanticsLoader.visitBlock(blockUUID, blockCount, block.address)
+          blockCount += 1
+          block.statements.addAll(convertITE.convertNestedStatements(statements))
+        }
 
         if (block.statements.isEmpty && !blockOutgoingEdges.contains(blockUUID)) {
           // remove blocks that are just nop padding

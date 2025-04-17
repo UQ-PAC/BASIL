@@ -18,6 +18,9 @@ enum InsnSemantics {
   case Error(opcode: String, error: String)
 }
 
+/** Name given to the uninterpreted function for if-then-else expressions. */
+private val iteFunctionName = "ite.temp"
+
 class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
 
   private val constMap = mutable.Map[String, IRType]()
@@ -168,11 +171,11 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
 
   private def visitIf(ctx: IfContext, label: Option[String] = None): Option[TempIf] = {
     val condition = visitExprOnly(ctx.cond)
-    val thenStmts = ctx.thenStmts.stmt.asScala.flatMap(visitStmt(_, label))
+    val thenStmts = ctx.thenStmts.stmt.asScala.flatMap(visitStmt(_, label)).toSeq
 
     val elseStmts = Option(ctx.elseStmts) match {
-      case Some(_) => ctx.elseStmts.stmt.asScala.flatMap(visitStmt(_, label))
-      case None => mutable.Buffer()
+      case Some(_) => ctx.elseStmts.stmt.asScala.flatMap(visitStmt(_, label)).toSeq
+      case None => immutable.Seq()
     }
 
     if (condition.isDefined) {
@@ -535,6 +538,12 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         } else {
           (None, None)
         }
+
+      case "ite.0" =>
+        checkArgs(function, 1, 3, typeArgs.size, args.size, ctx.getText)
+        val size = parseInt(typeArgs(0)).toInt
+        val argsIR = args.flatMap(visitExprOnly).toSeq
+        (Some(UninterpretedFunction(iteFunctionName, argsIR, BitVecType(size))), None)
 
       case _ =>
         // known ASLp methods not yet handled:
