@@ -77,8 +77,8 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
 
   def scalarName(index: IntervalCell, proc: Option[Procedure] = None) = {
     proc match
-      case Some(value) => s"Stack_${index.interval.move(i => i - index.node.bases(Stack(value)))}".replace("-", "n")
-      case None => s"Global_${index.interval.move(i => i - index.node.bases(Global))}"
+      case Some(value) => s"Stack_${index.interval.move(i => i - index.node.bases(Stack(value)).head)}".replace("-", "n")
+      case None => s"Global_${index.interval.move(i => i - index.node.bases(Global).head)}"
   }
 
   override def vstmt(e: Statement) = {
