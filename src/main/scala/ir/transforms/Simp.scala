@@ -644,7 +644,7 @@ def validateProg(
 
   for ((p, comp) <- procs) {
     SimplifyLogger.info(s"Validating $n proc ${p.name} (compl ${comp})")
-    validateProcWithSplits(validationProg, p, n, 4, splits(p), 5)
+    validateProcWithSplits(validationProg, p, n, 10, splits(p), 5)
   }
 }
 
@@ -671,9 +671,9 @@ def validate(validationProg: Program, procName: String, name: String, timeout: I
   Await
     .result(
       Future.find(List(nonincremental, combined))((acc: BoogieResult) => (acc.kind != BoogieResultKind.Timeout)),
-      (timeout + 3).seconds
+      (timeout * 2).seconds
     )
-    .getOrElse(Await.result(nonincremental, 0.seconds))
+    .getOrElse(Await.result(nonincremental, 1.seconds))
 }
 
 def chooseSplits(splits: Iterable[(GoTo, Iterable[Block])]): Vector[Vector[(GoTo, Iterable[Block])]] = {

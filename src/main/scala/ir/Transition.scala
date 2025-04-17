@@ -92,24 +92,20 @@ class RewriteSideEffects() extends CILVisitor {
 
   def directCallFunc(m: DirectCall) = {
     val trace =
-      LocalAssign(
-        traceVar,
+      traceVar -> 
         UninterpretedFunction("Call_" + m.target.name, traceVar :: m.actualParams.map(_._2).toList, traceType)
-      )
     val outParams = m.outParams
       .map(p =>
-        LocalAssign(
-          p._2,
+          p._2 ->
           UninterpretedFunction(
             "Call_" + m.target.name + "_" + p._1.name,
             traceVar :: m.actualParams.map(_._2).toList,
             p._2.getType
           )
         )
-      )
       .toList
 
-    trace :: outParams
+      List(SimulAssign((trace :: outParams).toMap))
   }
 
   override def vstmt(s: Statement) = s match {
