@@ -6,7 +6,7 @@ import ir.dsl.*
 import scala.collection.immutable
 
 @test_util.tags.UnitTest
-class DominatorsTest extends AnyFunSuite {
+class DominatorsTest extends AnyFunSuite with test_util.CaptureOutput {
   import analysis.Dominators.*
 
   def domsToStringMap(doms: Result) =
