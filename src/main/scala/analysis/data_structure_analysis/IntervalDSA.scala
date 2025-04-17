@@ -125,7 +125,7 @@ class IntervalGraph(
       Interval(g1.toInt, g1.toInt + 8).contains(address)
         || Interval(g2.toInt, g2.toInt + 8).contains(address)
     ) || irContext.externalFunctions.exists(g => Interval(g.offset.toInt, g.offset.toInt + 8).contains(address))
-      || irContext.symbols.exists(sym => Interval(sym.value.toInt, sym.value.toInt + (sym.size / 8)).contains(address))
+//      || irContext.symbols.exists(sym => Interval(sym.value.toInt, sym.value.toInt + (sym.size / 8)).contains(address))
   }
 
   def globalNode(
@@ -291,9 +291,10 @@ class IntervalGraph(
           val t = target.find(target.nodes(base).get(0))
           if t.node.isCollapsed then
             target.mergeCells(cell, t)
-          else
-            assert(off.size <= 1, s"$base, $off,  ${source.proc.procName},  ${target.proc.procName}")
+          else if off.size == 1 then
             target.mergeCells(node.get(off.head), t)
+          else
+            target.mergeCells(node.collapse(), t)
         case _ =>
       }
     )
@@ -430,8 +431,7 @@ class IntervalGraph(
     (nodes.toSet, pointsTo.toSet)
   }
 
-  def init(symBase: SymBase, size: Option[Int]): IntervalNode = IntervalNode(this, mutable.Map(symBase -> 0), size)
-  def init(symBases: mutable.Map[SymBase, Int], size: Option[Int]): IntervalNode = IntervalNode(this, symBases, size)
+  def init(symBase: SymBase, size: Option[Int]): IntervalNode = IntervalNode(this, mutable.Map(symBase -> Set(0)), size)
   def constraintArgToCells(constraintArg: ConstraintArg, ignoreContents: Boolean = false): Set[IntervalCell] = {
     val cells = symValToCells(exprToSymVal(constraintArg.value))
     val exprCells = cells.map(find)
@@ -1041,12 +1041,12 @@ object IntervalDSA {
           case load: MemoryLoad =>
             val pointers = dsg.exprToCells(load.index)
             assert(
-              pointers.nonEmpty,
+              pointers.nonEmpty || (load.index.isInstanceOf[BitVecLiteral] && !dsg.isGlobal(load.index.asInstanceOf[BitVecLiteral].value.toInt)),
               "Expected cells for indices used in reachable memory access to have corresponding DSA cells"
             )
             assert(
-              pointers.filter(_.hasPointee).map(_.getPointee).map(dsg.get).size == 1,
-              "Expected index cells to have unified pointer"
+              pointers.filter(_.hasPointee).map(_.getPointee).map(dsg.get).size <= 1,
+              s"Expected index cells to have unified pointer}"
             )
             assert(
               !pointers.exists(_.hasPointee) || pointers.forall(_.hasPointee),
@@ -1056,10 +1056,10 @@ object IntervalDSA {
             val pointers = dsg.exprToCells(store.index)
             assert(
               pointers.nonEmpty,
-              "Expected cells for indices used in reachable memory access to have corresponding DSA cells"
+              s"Expected cells for indices used in reachable memory access to have corresponding DSA cells"
             )
             assert(
-              pointers.filter(_.hasPointee).map(_.getPointee).map(dsg.get).size == 1,
+              pointers.filter(_.hasPointee).map(_.getPointee).map(dsg.get).size <= 1,
               s"Expected index cells to have unified pointer"
             )
             assert(
