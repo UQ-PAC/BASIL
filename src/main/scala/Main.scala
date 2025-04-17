@@ -123,6 +123,11 @@ object Main {
       doc = "Generates summaries of procedures which are used in pre/post-conditions (requires --analyse flag)"
     )
     summariseProcedures: Flag,
+    @arg(
+      name = "generate-rely-guarantees",
+      doc = "Generates rely-guarantee conditions for each procedure that contains a return node."
+    )
+    generateRelyGuarantees: Flag,
     @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (implies --parameter-form)")
     simplify: Flag,
     @arg(
@@ -174,6 +179,8 @@ object Main {
     if (conf.verbose.value) {
       Logger.setLevel(LogLevel.DEBUG, true)
     }
+    DebugDumpIRLogger.setLevel(LogLevel.OFF)
+    AnalysisResultDotLogger.setLevel(LogLevel.OFF)
     for (v <- conf.verboseLog) {
       Logger.findLoggerByName(v) match {
         case None =>
@@ -209,7 +216,6 @@ object Main {
           conf.analysisResults,
           conf.analysisResultsDot,
           conf.threadSplit.value,
-          conf.summariseProcedures.value,
           memoryRegionsMode,
           !conf.noIrreducibleLoops.value
         )
@@ -266,6 +272,8 @@ object Main {
       runInterpret = conf.interpret.value,
       simplify = conf.simplify.value,
       validateSimp = conf.validateSimplify.value,
+      summariseProcedures = conf.summariseProcedures.value,
+      generateRelyGuarantees = conf.generateRelyGuarantees.value,
       staticAnalysis = staticAnalysis,
       boogieTranslation = boogieGeneratorConfig,
       outputPrefix = conf.outFileName,

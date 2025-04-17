@@ -28,6 +28,7 @@ case class TestConfig(
   logResults: Boolean = false,
   simplify: Boolean = false,
   dsa: Option[DSAConfig] = None,
+  summariseProcedures: Boolean = false,
   memoryTransform: Boolean = false
 )
 
@@ -41,7 +42,8 @@ trait BASILTest {
     simplify: Boolean = false,
     dsa: Option[DSAConfig] = None,
     memoryTransform: Boolean = false,
-    postLoad: IRContext => Unit = s => ()
+    postLoad: IRContext => Unit = s => (),
+    summariseProcedures: Boolean = false
   ): BASILResult = {
     val specFile = if (specPath.isDefined && File(specPath.get).exists) {
       specPath
@@ -51,6 +53,7 @@ trait BASILTest {
     val config = BASILConfig(
       loading = ILLoadingConfig(inputFile = inputPath, relfFile = RELFPath, specFile = specFile, parameterForm = false),
       simplify = simplify,
+      summariseProcedures = summariseProcedures,
       staticAnalysis = staticAnalysisConf,
       boogieTranslation =
         util.BoogieGeneratorConfig().copy(memoryFunctionType = util.BoogieMemoryAccessMode.SuccessiveStoreSelect),

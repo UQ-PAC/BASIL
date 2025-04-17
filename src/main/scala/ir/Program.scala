@@ -464,6 +464,10 @@ class Procedure private (
     removeBlocksDisconnect(_blocks.toList)
   }
 
+  def labelToBlock: Map[String, Block] = {
+    blocks.map(p => p.label -> p).toMap
+  }
+
   def callers(): Iterable[Procedure] = _callers.map(_.parent.parent).toSet[Procedure]
   def incomingCalls(): Iterator[DirectCall] = _callers.iterator
 

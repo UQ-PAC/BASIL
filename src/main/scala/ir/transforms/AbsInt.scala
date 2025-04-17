@@ -14,9 +14,9 @@ import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
 import ExecutionContext.Implicits.global
 
-/** ******************************************************************************** Block-level abstract interpreter
-  * framework.
-  */
+/**********************************************************************************
+ * Block-level abstract interpreter framework.
+ *********************************************************************************/
 
 /** The abstract domain used for an analysis.
   *
@@ -272,7 +272,7 @@ class interprocSummaryFixpointSolver[SummaryAbsVal, LocalAbsVal, A <: AbstractDo
     sg.updateSummary(a, b, beforeRes, afterRes)
   }
 
-  def solveProgInterProc(p: Program, backwards: Boolean = false) = {
+  def solveProcsInterProc(procedures: Iterable[Procedure], backwards: Boolean = false) = {
     var old_summaries = Map[Procedure, SummaryAbsVal]()
     var summaries = Map[Procedure, SummaryAbsVal]()
     var first = true
@@ -280,13 +280,17 @@ class interprocSummaryFixpointSolver[SummaryAbsVal, LocalAbsVal, A <: AbstractDo
       first = false
       old_summaries = summaries
 
-      for (p <- p.procedures) {
+      for (p <- procedures) {
         def getSummary(p: Procedure) = old_summaries.get(p).getOrElse(sg.init(p))
         val r = transferProcedure(getSummary(p), p, getSummary, backwards)
         summaries = summaries.updated(p, r)
       }
     }
     summaries
+  }
+
+  def solveProgInterProc(p: Program, backwards: Boolean = false) = {
+    solveProcsInterProc(p.procedures, backwards)
   }
 }
 

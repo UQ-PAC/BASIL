@@ -7,8 +7,9 @@ import ir.cilvisitor.*
 import collection.mutable
 import scala.annotation.tailrec
 
-/** This file defines functions to get the successor and predecessor of a IR node for control flow.
-  */
+/** 
+ *  This file defines functions to get the successor and predecessor of a IR node for control flow.
+ */
 
 /*
  * Defines a position in the IL / CFG; this becomes the lhs of the state map lattice in a static analysis.
@@ -197,13 +198,13 @@ def computeDomain[T <: CFGPosition, O <: T](walker: IRWalk[T, O], initial: Itera
   domain
 }
 
-/** Compute the set of strongly connected subcomponents (flattened) in a topological sort order using Tarjan's strongly
-  * connected components algorithm
-  */
+/** Compute the set of strongly connected subcomponents (flattened) in a topological sort order using
+ *  Tarjan's strongly connected components algorithm
+ */
 def stronglyConnectedComponents[T <: CFGPosition, O <: T](
   walker: IRWalk[T, O],
   initial: IterableOnce[O]
-): mutable.ListBuffer[mutable.Set[O]] = {
+): List[Set[O]] = {
   var index = 0;
   var stack = mutable.Stack[O]()
   var vIndex = mutable.Map[O, Int]()
@@ -244,8 +245,9 @@ def stronglyConnectedComponents[T <: CFGPosition, O <: T](
       out += component
     }
   }
+  assert(stack.size == 0)
 
-  out
+  out.map(_.toSet).toList
 }
 
 def toDot(program: Program, labels: Map[CFGPosition, String] = Map.empty, inter: Boolean = false): String = {

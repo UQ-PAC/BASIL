@@ -588,7 +588,8 @@ class ProcedureSummaryTests extends SystemTests {
   runTests(
     "procedure_summaries",
     TestConfig(
-      staticAnalysisConfig = Some(StaticAnalysisConfig(summariseProcedures = true)),
+      staticAnalysisConfig = Some(StaticAnalysisConfig()),
+      summariseProcedures = true,
       useBAPFrontend = true,
       expectVerify = true
     )
@@ -596,7 +597,8 @@ class ProcedureSummaryTests extends SystemTests {
   runTests(
     "procedure_summaries",
     TestConfig(
-      staticAnalysisConfig = Some(StaticAnalysisConfig(summariseProcedures = true)),
+      staticAnalysisConfig = Some(StaticAnalysisConfig()),
+      summariseProcedures = true,
       useBAPFrontend = false,
       expectVerify = true
     )

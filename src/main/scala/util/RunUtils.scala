@@ -72,7 +72,6 @@ case class StaticAnalysisContext(
   steensgaardResults: Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]],
   mmmResults: MemoryModelMap,
   reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-  varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
   regionInjector: Option[RegionInjector],
   symbolicAddresses: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
   localDSA: Map[Procedure, Graph],
@@ -83,7 +82,7 @@ case class StaticAnalysisContext(
 )
 
 case class DSAContext(
-  sva: Map[Procedure, SymValues[Interval]],
+  sva: Map[Procedure, SymValues[data_structure_analysis.Interval]],
   constraints: Map[Procedure, Set[Constraint]],
   local: Map[Procedure, IntervalGraph],
   bottomUp: Map[Procedure, IntervalGraph],
@@ -348,20 +347,13 @@ object IRTransform {
     }
   }
 
-  def generateProcedureSummaries(
-    ctx: IRContext,
-    IRProgram: Program,
-    constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]]
-  ): Boolean = {
+  def generateProcedureSummaries(ctx: IRContext, IRProgram: Program, simplified: Boolean = false): Boolean = {
     var modified = false
     // Need to know modifies clauses to generate summaries, but this is probably out of place
     val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
     ctx.program.setModifies(specModifies)
 
-    val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
-    val summaryGenerator =
-      SummaryGenerator(IRProgram, ctx.specification.globals, specGlobalAddresses, constPropResult, varDepsSummaries)
+    val summaryGenerator = SummaryGenerator(IRProgram, simplified)
     IRProgram.procedures
       .filter { p =>
         p != IRProgram.mainProcedure
@@ -381,6 +373,24 @@ object IRTransform {
     modified
   }
 
+  def generateRelyGuaranteeConditions(threads: List[Procedure]): Unit = {
+    /* Todo: For the moment we are printing these to stdout, but in future we'd
+    like to add them to the IR. */
+    type StateLatticeElement = LatticeMap[Variable, analysis.Interval]
+    type InterferenceLatticeElement = Map[Variable, StateLatticeElement]
+    val stateLattice = IntervalLatticeExtension()
+    val stateTransfer = SignedIntervalDomain().transfer
+    val intDom = ConditionalWritesDomain[StateLatticeElement](stateLattice, stateTransfer)
+    val relyGuarantees =
+      RelyGuaranteeGenerator[InterferenceLatticeElement, StateLatticeElement](intDom).generate(threads)
+    for ((p, (rely, guar)) <- relyGuarantees) {
+      println("--- " + p.procName + " " + "-" * 50 + "\n")
+      println("Rely:")
+      println(intDom.toString(rely) + "\n")
+      println("Guarantee:")
+      println(intDom.toString(guar) + "\n")
+    }
+  }
 }
 
 /** Methods relating to program static analysis.
@@ -471,17 +481,6 @@ object StaticAnalysis {
         printAnalysisResults(IRProgram, interProcConstPropResult)
       )
     }
-
-    StaticAnalysisLogger.debug("[!] Variable dependency summaries")
-    val scc = stronglyConnectedComponents(CallGraph, List(IRProgram.mainProcedure))
-    val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
-    val varDepsSummaries = VariableDependencyAnalysis(
-      IRProgram,
-      ctx.specification.globals,
-      specGlobalAddresses,
-      interProcConstPropResult,
-      scc
-    ).analyze()
 
     val intraProcConstProp = IntraProcConstantPropagation(IRProgram)
     val intraProcConstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] =
@@ -632,8 +631,8 @@ object StaticAnalysis {
     val interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = InterLiveVarsAnalysis(IRProgram).analyze()
 
     StaticAnalysisContext(
-      intraProcConstProp = interProcConstPropResult,
-      interProcConstProp = intraProcConstPropResult,
+      intraProcConstProp = intraProcConstPropResult,
+      interProcConstProp = interProcConstPropResult,
       memoryRegionResult = mraResult,
       vsaResult = vsaResult,
       interLiveVarsResults = interLiveVarsResults,
@@ -642,7 +641,6 @@ object StaticAnalysis {
       mmmResults = mmm,
       symbolicAddresses = Map.empty,
       reachingDefs = reachingDefinitionsAnalysisResults,
-      varDepsSummaries = varDepsSummaries,
       regionInjector = None,
       localDSA = Map.empty,
       bottomUpDSA = Map.empty,
@@ -901,12 +899,12 @@ object RunUtils {
       val DSATimer = PerformanceTimer("DSA Timer", INFO)
 
       val main = ctx.program.mainProcedure
-      var sva: Map[Procedure, SymValues[Interval]] = Map.empty
+      var sva: Map[Procedure, SymValues[data_structure_analysis.Interval]] = Map.empty
       var cons: Map[Procedure, Set[Constraint]] = Map.empty
       computeDSADomain(ctx.program.mainProcedure, ctx).toSeq
         .sortBy(_.name)
         .foreach(proc =>
-          val SVAResults = getSymbolicValues[Interval](proc)
+          val SVAResults = getSymbolicValues[data_structure_analysis.Interval](proc)
           val constraints = generateConstraints(proc)
           sva += (proc -> SVAResults)
           cons += (proc -> constraints)
@@ -918,7 +916,12 @@ object RunUtils {
       if config.analyses.contains(Norm) then
         DSALogger.info("Finished Computing Constraints")
         val globalGraph =
-          IntervalDSA.getLocal(ctx.program.mainProcedure, ctx, SymValues[Interval](Map.empty), Set[Constraint]())
+          IntervalDSA.getLocal(
+            ctx.program.mainProcedure,
+            ctx,
+            SymValues[data_structure_analysis.Interval](Map.empty),
+            Set[Constraint]()
+          )
         val DSA = IntervalDSA.getLocals(ctx, sva, cons)
         IntervalDSA.checkReachable(ctx.program, DSA)
         DSATimer.checkPoint("Finished DSA Local Phase")
@@ -956,6 +959,11 @@ object RunUtils {
         }
     }
 
+    if (conf.summariseProcedures) {
+      StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
+      IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify)
+    }
+
     if (q.runInterpret) {
       Logger.info("Start interpret")
 
@@ -987,6 +995,11 @@ object RunUtils {
     }
 
     IRTransform.prepareForTranslation(q, ctx)
+
+    if (conf.generateRelyGuarantees) {
+      StaticAnalysisLogger.info("[!] Generating Rely-Guarantee Conditions")
+      IRTransform.generateRelyGuaranteeConditions(ctx.program.procedures.toList.filter(p => p.returnBlock != None))
+    }
 
     q.loading.dumpIL.foreach(s => {
       writeToFile(pp_prog(ctx.program), s"$s-output.il")
@@ -1046,11 +1059,6 @@ object RunUtils {
       } else {
         modified =
           transforms.VSAIndirectCallResolution(ctx.program, result.vsaResult, result.mmmResults).resolveIndirectCalls()
-      }
-
-      StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
-      if (config.summariseProcedures) {
-        IRTransform.generateProcedureSummaries(ctx, ctx.program, result.intraProcConstProp, result.varDepsSummaries)
       }
 
       if (modified) {
