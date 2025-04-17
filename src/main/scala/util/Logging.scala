@@ -19,7 +19,7 @@ class GenericLogger(
 ) {
 
   private var _output = () => defaultOutput
-  def output = _output()
+  def output: PrintStream = _output()
 
   val children: HashSet[GenericLogger] = HashSet()
 
@@ -48,7 +48,10 @@ class GenericLogger(
   }
 
   def deriveLogger(name: String, file: File): GenericLogger = {
-    deriveLogger(name, PrintStream(file))
+    // WARN: PrintStream must be constructed outside of the "=>" param
+    // so there is a single PrintStream instance.
+    val stream = PrintStream(file)
+    deriveLogger(name, stream)
   }
 
   def deriveLogger(name: String): GenericLogger = deriveLogger(name, output)
