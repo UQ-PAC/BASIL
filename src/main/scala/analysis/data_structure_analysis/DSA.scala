@@ -1,11 +1,12 @@
 package analysis.data_structure_analysis
 
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver, UnionFindSolver}
-import ir.{Expr, Procedure, Program}
+import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
+import ir.{BVADD, BinaryExpr, BitVecLiteral, Expr, LocalAssign, Procedure, Program, Register}
 import specification.{ExternalFunction, SymbolTableEntry}
 import util.{DSALogger, IRContext}
-import java.io.File
 
+import java.io.File
 import scala.collection.{SortedSet, mutable}
 
 enum DSAPhase {
@@ -156,6 +157,17 @@ def joinFlags(pointers: Iterable[IntervalCell]): DSFlag = {
   val flag = DSFlag()
   pointers.foreach(c => flag.join(c.node.flags))
   flag
+}
+
+def estimateStackSize(program: Program): Unit = {
+  program.procedures.foreach(
+    proc =>
+      val size = proc.collectFirst {
+        case LocalAssign(_, BinaryExpr(BVADD, Register("R31", 64), arg2: BitVecLiteral), _) if isNegative(arg2) =>
+          bv2SignedInt(arg2).toInt * -1
+      }
+      proc.stackSize = size
+  )
 }
 
 def computeDSADomain(proc: Procedure, context: IRContext): Set[Procedure] = {
