@@ -1,14 +1,4 @@
-import analysis.data_structure_analysis.{
-  Heap,
-  Interval,
-  IntervalDSA,
-  Par,
-  Ret,
-  Stack,
-  SymBase,
-  generateConstraints,
-  getSymbolicValues
-}
+import analysis.data_structure_analysis.{Global, Heap, Interval, IntervalDSA, Par, Ret, Stack, SymBase, generateConstraints, getSymbolicValues, given}
 import boogie.SpecGlobal
 import ir.*
 import ir.Endian.{BigEndian, LittleEndian}
@@ -299,19 +289,19 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
     // local caller
     val dsgCaller = results.dsa.get.local(program.mainProcedure)
-    val stack32 = dsgCaller.nodes(Stack(program.mainProcedure)).get(-32)
-    val stack48 = dsgCaller.nodes(Stack(program.mainProcedure)).get(-48)
+    val stack32 = dsgCaller.nodes(Stack(program.mainProcedure)).get(32)
+    val stack48 = dsgCaller.nodes(Stack(program.mainProcedure)).get(48)
     assert(stack32 != stack48)
 
     // top down caller
     val dsg = results.dsa.get.topDown(program.mainProcedure)
-    val stack32td = dsg.nodes(Stack(program.mainProcedure)).get(-32)
-    val stack48td = dsg.nodes(Stack(program.mainProcedure)).get(-48)
+    val stack32td = dsg.nodes(Stack(program.mainProcedure)).get(32)
+    val stack48td = dsg.nodes(Stack(program.mainProcedure)).get(48)
     assert(stack48td != stack32td)
   }
 
   test("http_parse_basic") {
-    val path = "examples/cntlm-o3/cntlm-noduk"
+    val path = "examples/cntlm-noduk/cntlm-noduk"
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
@@ -332,12 +322,14 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val proc = res.ir.program.mainProcedure
 //    val dsg = IntervalDSA.getLocal(proc, res.ir, getSymbolicValues(proc), generateConstraints(proc))
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    writeToFile(dsg.toDot,"dsg.dot")
     assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
+    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
   }
 
 
   test("md5_process_block") {
-    val path = "examples/cntlm-o3/cntlm-noduk"
+    val path = "examples/cntlm-noduk/cntlm-noduk"
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
@@ -381,11 +373,81 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
     writeToFile(dsg.toDot, "helper.dot")
   }
+  
+  
+  test("www_authenticate") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = path + ".adt",
+          relfFile = path + ".relf",
+          mainProcedureName = "www_authenticate",
+          trimEarly = true
+        ),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(DSAConfig(Set(Norm)))
+      )
+    )
+
+    val proc = res.ir.program.mainProcedure
+    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+  }
+
+  test("hmac_md5") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = path + ".adt",
+          relfFile = path + ".relf",
+          mainProcedureName = "hmac_md5",
+          trimEarly = true
+        ),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(DSAConfig(Set(Norm)))
+      )
+    )
+
+    val proc = res.ir.program.mainProcedure
+    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+  }
+
+
+  test("des_key_schedule") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = path + ".adt",
+          relfFile = path + ".relf",
+          mainProcedureName = "des_key_schedule",
+          trimEarly = true
+        ),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(DSAConfig(Set(Norm)))
+      )
+    )
+
+    val proc = res.ir.program.mainProcedure
+    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
+    writeToFile(dsg.toDot, "helper.dot")
+  }
 
 
 
   test("plist_free") {
-    val path = "examples/cntlm-o3/cntlm-noduk"
+    val path = "examples/cntlm-noduk/cntlm-noduk"
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
