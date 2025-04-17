@@ -29,7 +29,10 @@ object BitVectorEval {
     if isNegative(b) then b.value - BigInt(2).pow(b.size)
     else b.value
 
-  /** Converts a bitvector value to its corresponding signed integer
+  /** Converts a signed integer value to its corresponding Bitvector, 
+   *  assuming it falls within the representable range of the bitvector
+   *  with size [[size]].
+   *
     */
   def signedInt2BV(size: Int, i: BigInt): BitVecLiteral =
     if (i > 0) then BitVecLiteral(i, size) else smt_bvneg(BitVecLiteral(-i, size))
