@@ -199,7 +199,7 @@ object Ackermann {
         // skip statements within stright lines of execution
         n = IntraProcIRCursor.succ(n.head)
       }
-      val r = n.filter(!seen.contains(_)).map {
+      val r = n.filterNot(seen.contains(_)).map {
         case s: SimulAssign if instantiations.contains(s) => (Some(s), s)
         case s => (None, s)
       }
@@ -232,23 +232,31 @@ object Ackermann {
         }
       }
 
+      def label(s: CFGPosition) = s match {
+        case p: Procedure => p.name
+        case b: Block => b.label
+        case s: Command => s.getClass.getSimpleName
+
+      }
+      println(s"${label(srcPos)} , ${label(tgtPos)}")
+      println(s"    ${srcCall.map(_.parent.label)} , ${tgtCall.map(_.parent.label)}")
       (srcCall, tgtCall) match {
         case (None, None) => advanceBoth()
         case (None, Some(_)) => advanceSrc()
         case (Some(_), None) => advanceTgt()
         case (Some(src), Some(tgt)) => {
+            seen = seen ++ Seq(src, tgt)
+
           val srcInfo = instantiations(src)
           val tgtInfo = instantiations(tgt)
           if (srcInfo.call == tgtInfo.call) {
-            seen = seen ++ Seq(src, tgt)
-
-            val argsEqual = srcInfo.args.zip(tgtInfo.args).map(polyEqual)
-            val returnsEqual = srcInfo.returns.zip(tgtInfo.returns).map(polyEqual)
+            val argsEqual = srcInfo.args.toList.zip(tgtInfo.args).map(polyEqual)
+            val returnsEqual = srcInfo.returns.toList.zip(tgtInfo.returns).map(polyEqual)
             invariant = BinaryExpr(BoolIMPLIES, boolAnd(argsEqual), boolAnd(returnsEqual)) :: invariant
             advanceBoth()
           }
-
         }
+        case _ => ()
 
       }
 
