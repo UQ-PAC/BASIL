@@ -99,15 +99,10 @@ object Ackermann {
     returns: List[Variable]
   )
 
-  class MakeAckAssumes(result: Map[SimulAssign, Info]) extends CILVisitor {
-    val transformed = result.flatMap {
-      case (s, i) => Seq(i.argAssign -> i, i.returnAssign -> i)
-      case _ => Seq()
-    }.toMap
-
+  class ToAssume(axioms: Map[SimulAssign, Info]) extends CILVisitor {
     override def vstmt(s: Statement) = s match {
-      case a : SimulAssign if transformed.contains(a) => {
-        ChangeTo(a.assignments.map(polyEqual).map(Assume(_, Some(transformed(a).call))).toList)
+      case s: SimulAssign if axioms.contains(s) => {
+        ChangeTo(s.assignments.map(polyEqual).map(x => Assume(x, Some(axioms(s).call))).toList)
       }
       case _ => SkipChildren()
     }
@@ -244,7 +239,6 @@ object Ackermann {
         case (Some(src), Some(tgt)) => {
           val srcInfo = instantiations(src)
           val tgtInfo = instantiations(tgt)
-          println(s"${srcInfo.call}, ${tgtInfo.call}")
           if (srcInfo.call == tgtInfo.call) {
             seen = seen ++ Seq(src, tgt)
 
@@ -281,11 +275,11 @@ class RewriteSideEffects() extends CILVisitor {
     ))
 
   def directCallFunc(m: DirectCall) = {
-    val params = traceVar :: m.actualParams.map(_._2).toList
+    val params = traceVar :: m.actualParams.toList.map(_._2)
     val trace =
       traceVar ->
         UninterpretedFunction("Call_" + m.target.name, params, traceType)
-    val outParams = m.outParams
+    val outParams = m.outParams.toList
       .map(p =>
         p._2 ->
           UninterpretedFunction("Call_" + m.target.name + "_" + p._1.name, params, p._2.getType)
@@ -809,8 +803,7 @@ class TranslationValidator {
 
       val ackInv = Ackermann.instantiateAxioms(srce, tgte, ackermannTransforms)
       // val ackInv = Ackermann.naiveInvariant(ackermannTransforms)
-
-      visit_proc(Ackermann.MakeAckAssumes(ackermannTransforms), combined)
+      visit_proc(Ackermann.ToAssume(ackermannTransforms), combined)
 
       // addInvariant(proc.name, ackInv.map(v => (v, Some("ackermannisation"))))
 
@@ -859,7 +852,7 @@ class TranslationValidator {
           ++ primedInv
           ++ List(Assume(falseFun.makeCall()))
       combined.entryBlock.get.statements.prependAll(proof)
-      combined.entryBlock.get.statements.prependAll(ackInv.map(Assume(_, Some("ackermann"))))
+      combined.entryBlock.get.statements.prependAll(ackInv.map(a => Assume(a, Some("ackermann"))))
       validationProcs = validationProcs.updated(proc.name, combined)
 
       val internalLabels = before.blocks.map(_.label).toSet ++ after.blocks.map(_.label)
