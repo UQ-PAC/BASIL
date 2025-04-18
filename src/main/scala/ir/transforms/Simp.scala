@@ -644,7 +644,7 @@ def validateProg(
 
   for (p <- validationProg.procedures) {
     SimplifyLogger.info(s"Validating $n proc ${p.name}")
-    validateProcWithSplits(validationProg, p, n, 50, splits(p), 0)
+    validateProcWithSplits(validationProg, p, n, 50, splits(p), 5)
   }
 }
 

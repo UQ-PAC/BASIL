@@ -238,14 +238,12 @@ object Ackermann {
         case s: Command => s.getClass.getSimpleName
 
       }
-      println(s"${label(srcPos)} , ${label(tgtPos)}")
-      println(s"    ${srcCall.map(_.parent.label)} , ${tgtCall.map(_.parent.label)}")
       (srcCall, tgtCall) match {
         case (None, None) => advanceBoth()
         case (None, Some(_)) => advanceSrc()
         case (Some(_), None) => advanceTgt()
         case (Some(src), Some(tgt)) => {
-            seen = seen ++ Seq(src, tgt)
+          seen = seen ++ Seq(src, tgt)
 
           val srcInfo = instantiations(src)
           val tgtInfo = instantiations(tgt)
