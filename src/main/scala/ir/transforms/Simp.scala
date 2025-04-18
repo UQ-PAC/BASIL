@@ -615,17 +615,17 @@ def validateProgs(
   splitImmediate: Boolean = false
 ) = {
 
-  val sorted = vprog.toList
-    .map(p => {
-      val x = ExprComplexity()
-      visit_prog(x, p)
-      p -> x.count
-    })
-    .filter(_._2 > 50)
-    .sortBy(_._2)
-    .map(_._1)
+  // val sorted = vprog.toList
+  //  .map(p => {
+  //    val x = ExprComplexity()
+  //    visit_prog(x, p)
+  //    p -> x.count
+  //  })
+  //  .filter(_._2 > 50)
+  //  .sortBy(_._2)
+  //  .map(_._1)
 
-  sorted.foreach(validateProg(_, n, splits))
+  vprog.toList.foreach(validateProg(_, n, splits))
 }
 
 def validateProg(
@@ -634,17 +634,17 @@ def validateProg(
   splits: Map[Procedure, mutable.ArrayBuffer[GoTo]],
   splitImmediate: Boolean = false
 ) = {
-  val procs = validationProg.procedures.toArray
-    .map(p => {
-      val v = ExprComplexity()
-      visit_proc(v, p)
-      p -> v.count
-    })
-    .sortBy(_._2)
+  // val procs = validationProg.procedures.toArray
+  //  .map(p => {
+  //    val v = ExprComplexity()
+  //    visit_proc(v, p)
+  //    p -> v.count
+  //  })
+  //  .sortBy(_._2)
 
-  for ((p, comp) <- procs) {
-    SimplifyLogger.info(s"Validating $n proc ${p.name} (compl ${comp})")
-    validateProcWithSplits(validationProg, p, n, 10, splits(p), 5)
+  for (p <- validationProg.procedures) {
+    SimplifyLogger.info(s"Validating $n proc ${p.name}")
+    validateProcWithSplits(validationProg, p, n, 50, splits(p), 0)
   }
 }
 
@@ -724,16 +724,12 @@ def validateProcWithSplits(
       util.writeToFile(blockGraph, (s"graphs/presplittransition-${p.name}-${name}.dot"))
     }
   }
-  var splitDepth = 0
+  var splitDepth = -1
 
   val splitTargets = isplits.toList.map(g => g -> g.targets)
 
   var result = Seq(BoogieResultKind.Timeout)
-  while (
-    !result.forall(
-      _.isInstanceOf[BoogieResultKind.Verified]
-    ) && splitDepth <= maxSplitDepth && splitDepth <= isplits.length
-  ) {
+  while (result.exists(_ == BoogieResultKind.Timeout) && splitDepth <= maxSplitDepth && splitDepth <= isplits.length) {
     splitDepth += 1
     SimplifyLogger.info(s"Restart verification with split depth $splitDepth")
 
