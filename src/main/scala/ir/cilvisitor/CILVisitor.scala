@@ -181,7 +181,7 @@ class CILVisitorImpl(val v: CILVisitor) {
           changed = changed || nl != lhs || nr != rhs
           (nl, nr)
         }
-        if changed then m.assignments = ns.toMap
+        if changed then m.assignments = ns
         m
       }
       case s: Assert =>

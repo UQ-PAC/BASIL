@@ -12,6 +12,16 @@ import util.Logger
 
 val linkUninterpByAxioms = true
 
+def boolAnd2(exps: Iterable[Expr]) =
+  val l = exps.toList
+  l.size match {
+    case 0 => TrueLiteral
+    case 1 => l.head
+    case _ => BoolExp(BoolAND, l)
+  }
+def boolAnd(exps: Iterable[Expr]) =
+  exps.foldLeft(TrueLiteral: Expr)((l, r) => BinaryExpr(BoolAND, l, r))
+
 def polyEqual(e1: Expr, e2: Expr) = {
   (e1.getType, e2.getType) match {
     case (BoolType, BoolType) => BinaryExpr(BoolEQ, e1, e2)
@@ -20,14 +30,14 @@ def polyEqual(e1: Expr, e2: Expr) = {
     case (BitVecType(sz1), BitVecType(sz2)) if sz1 > sz2 => BinaryExpr(BVEQ, Extract(sz2, 0, e1), e2)
     case (BitVecType(sz1), BitVecType(sz2)) if sz1 < sz2 => BinaryExpr(BVEQ, e1, Extract(sz1, 0, e2))
     case (CustomSort(x), CustomSort(y)) if x == y => BinaryExpr(BoolEQ, e1, e2)
-    case (_, _) => ???
+    case (a, b) => throw Exception(s"wierd type $a == $b")
   }
 
 }
 
 class NamespaceState(val namespace: String) extends CILVisitor {
 
-  def stipNamespace(n: String) = n.stripPrefix(namespace + "__")
+  def stripNamespace(n: String) = n.stripPrefix(namespace + "__")
 
   override def vblock(b: Block) = {
     b.label = namespace + "__" + b.label
@@ -77,35 +87,197 @@ object AssertsToAssumes extends CILVisitor {
   }
 }
 
+object Ackermann {
+
+  case class Info(
+    call: String,
+    prefix: String,
+    argAssign: SimulAssign,
+    returnAssign: SimulAssign,
+    // to maintain arg order to correspond with target
+    args: List[Variable],
+    returns: List[Variable]
+  )
+
+  class AckermannTransform(stripNamespace: String => String, traceVars: Set[Variable]) extends CILVisitor {
+    // expected to run on the program with side effects removed,
+    // prior to namespacing
+    //
+
+    var axioms = Map[SimulAssign, Info]()
+
+    var counter = 0
+
+    override def vstmt(s: Statement) = s match {
+      case s: SimulAssign if s.assignees.exists(traceVars.contains) => {
+        counter += 1
+
+        val rg = s.assignments.find(v => traceVars.contains(v._1)).get
+
+        val (fname, args) = rg._2 match {
+          case UninterpretedFunction(name, args, rt, _) => (name, args)
+        }
+
+        val newargs = args.zipWithIndex.map { case (rhs, index) =>
+          LocalVar(s"${fname}_ackarg${counter}_${index}", rhs.getType) -> rhs
+        }
+        val newreturns = s.assignments.zipWithIndex.map { case ((lhs, rhs), index) =>
+          lhs -> LocalVar(s"${fname}_ackret_${counter}_${index}", lhs.getType)
+        }
+
+        val (argAssign, returnAssign) = (SimulAssign(newargs.toVector), SimulAssign(newreturns.toVector))
+
+        val argvars = newargs.map(_._1).toList
+        val returnvars = newreturns.map(_._2).toList
+
+        val prefix = fname.stripSuffix(stripNamespace(fname))
+
+        axioms =
+          axioms.updated(argAssign, Info(stripNamespace(fname), prefix, argAssign, returnAssign, argvars, returnvars))
+
+        ChangeTo(List(argAssign, returnAssign))
+      }
+      case _ => SkipChildren()
+    }
+  }
+
+  def doTransform(p: Procedure, srcNamespace: NamespaceState, tgtNamespace: NamespaceState): Map[SimulAssign, Info] = {
+    def stripNamespace(s: String) = {
+      tgtNamespace.stripNamespace(srcNamespace.stripNamespace(s))
+    }
+
+    val v =
+      AckermannTransform(stripNamespace, Set(visit_rvar(srcNamespace, traceVar), visit_rvar(tgtNamespace, traceVar)))
+    visit_proc(v, p)
+    v.axioms
+  }
+
+  def naiveInvariant(inst: Map[SimulAssign, Info]): List[Expr] = {
+
+    val compat = inst.groupBy(_._2.call)
+
+    compat
+      .flatMap((pref, insts) => {
+        val gs = inst.groupBy(_._2.prefix).toList
+        val fst = gs.head._2
+        val snd = gs.tail.head._2
+        assert(gs.tail.tail.isEmpty)
+
+        for {
+          s <- fst
+          t <- snd
+          argsEqual = s._2.args.zip(t._2.args).map(polyEqual)
+          returnsEqual = s._2.returns.zip(t._2.returns).map(polyEqual)
+        } yield (BinaryExpr(BoolIMPLIES, boolAnd(argsEqual), boolAnd(returnsEqual)))
+      })
+      .toList
+
+  }
+
+  def instantiateAxioms(sourceEntry: Block, targetEntry: Block, instantiations: Map[SimulAssign, Info]) = {
+
+    var seen = Set[CFGPosition]()
+    var invariant = List[Expr]()
+
+    def succ(p: CFGPosition) =
+      var n = IntraProcIRCursor.succ(p)
+      while (
+        (n.size == 1) && (n.head match {
+          case s: SimulAssign if instantiations.contains(s) => false
+          case _ => true
+        })
+      ) {
+        // skip statements within stright lines of execution
+        n = IntraProcIRCursor.succ(n.head)
+      }
+      val r = n.filter(!seen.contains(_)).map {
+        case s: SimulAssign if instantiations.contains(s) => (Some(s), s)
+        case s => (None, s)
+      }
+      seen = seen ++ n
+      r
+
+    val q = mutable.Queue[((Option[SimulAssign], CFGPosition), (Option[SimulAssign], CFGPosition))]()
+    val start = ((None, sourceEntry), (None, targetEntry))
+    q.enqueue(start)
+
+    while (q.nonEmpty) {
+      val ((srcCall, srcPos), (tgtCall, tgtPos)) = q.dequeue
+
+      def advanceBoth() = {
+        for (s <- succ(srcPos)) {
+          for (t <- succ(tgtPos)) {
+            q.enqueue((s, t))
+          }
+        }
+      }
+
+      def advanceSrc() = {
+        for (s <- succ(srcPos)) {
+          q.enqueue((s, (tgtCall, tgtPos)))
+        }
+      }
+
+      def advanceTgt() = {
+        for (t <- succ(tgtPos)) {
+          q.enqueue(((srcCall, srcPos), t))
+        }
+      }
+
+      (srcCall, tgtCall) match {
+        case (None, None) => advanceBoth()
+        case (None, Some(_)) => advanceSrc()
+        case (Some(_), None) => advanceTgt()
+        case (Some(src), Some(tgt)) => {
+          val srcInfo = instantiations(src)
+          val tgtInfo = instantiations(tgt)
+          println(s"${srcInfo.call}, ${tgtInfo.call}")
+          if (srcInfo.call == tgtInfo.call) {
+            val argsEqual = srcInfo.args.zip(tgtInfo.args).map(polyEqual)
+            val returnsEqual = srcInfo.returns.zip(tgtInfo.returns).map(polyEqual)
+            invariant = BinaryExpr(BoolIMPLIES, boolAnd(argsEqual), boolAnd(returnsEqual)) :: invariant
+            advanceBoth()
+          }
+
+        }
+
+      }
+
+    }
+
+    invariant
+  }
+}
+
 class RewriteSideEffects() extends CILVisitor {
 
   def loadFunc(lhs: Variable, size: Int, addr: Expr) = {
     val loadValue =
-      LocalAssign(lhs, UninterpretedFunction("load_" + size, Seq(traceVar, addr), BitVecType(size)))
+      (lhs, UninterpretedFunction("load_" + size, Seq(traceVar, addr), BitVecType(size)))
     val trace =
-      LocalAssign(traceVar, UninterpretedFunction("trace_load_" + size, Seq(traceVar, addr), traceType))
-    List(loadValue, trace)
+      (traceVar, UninterpretedFunction("trace_load_" + size, Seq(traceVar, addr), traceType))
+    List(SimulAssign(Vector(trace, loadValue)))
+
   }
 
   def storeFunc(size: Int, addr: Expr, value: Expr) =
-    LocalAssign(traceVar, UninterpretedFunction("store_" + size, Seq(traceVar, addr, value: Expr), traceType))
+    (SimulAssign(
+      Vector(traceVar -> UninterpretedFunction("store_" + size, Seq(traceVar, addr, value: Expr), traceType))
+    ))
 
   def directCallFunc(m: DirectCall) = {
+    val params = traceVar :: m.actualParams.map(_._2).toList
     val trace =
-      traceVar -> 
-        UninterpretedFunction("Call_" + m.target.name, traceVar :: m.actualParams.map(_._2).toList, traceType)
+      traceVar ->
+        UninterpretedFunction("Call_" + m.target.name, params, traceType)
     val outParams = m.outParams
       .map(p =>
-          p._2 ->
-          UninterpretedFunction(
-            "Call_" + m.target.name + "_" + p._1.name,
-            traceVar :: m.actualParams.map(_._2).toList,
-            p._2.getType
-          )
-        )
+        p._2 ->
+          UninterpretedFunction("Call_" + m.target.name + "_" + p._1.name, params, p._2.getType)
+      )
       .toList
 
-      List(SimulAssign((trace :: outParams).toMap))
+    List(SimulAssign((trace :: outParams).toVector))
   }
 
   override def vstmt(s: Statement) = s match {
@@ -364,16 +536,6 @@ class TranslationValidator {
   def varInSource(v: Variable) = visit_rvar(afterRenamer, v)
   def varInTarget(v: Variable) = visit_rvar(beforeRenamer, v)
 
-  def boolAnd2(exps: Iterable[Expr]) =
-    val l = exps.toList
-    l.size match {
-      case 0 => TrueLiteral
-      case 1 => l.head
-      case _ => BoolExp(BoolAND, l)
-    }
-  def boolAnd(exps: Iterable[Expr]) =
-    exps.foldLeft(TrueLiteral: Expr)((l, r) => BinaryExpr(BoolAND, l, r))
-
   def setDSAInvariant = {
 
     val procs = initProg.get.procedures.view.map(p => p.name -> p).toMap
@@ -626,6 +788,15 @@ class TranslationValidator {
 
       val combined = IRToDSL.parTransitionSystems(afterProg.get, after, before)
 
+      val ackermannTransforms = Ackermann.doTransform(combined, afterRenamer, beforeRenamer)
+      val srce = combined.blocks.find(_.label == after.entryBlock.get.label).get
+      val tgte = combined.blocks.find(_.label == before.entryBlock.get.label).get
+
+      val ackInv = Ackermann.instantiateAxioms(srce, tgte, ackermannTransforms)
+      //  val ackInv = Ackermann.naiveInvariant(ackermannTransforms)
+
+      addInvariant(proc.name, ackInv.map(v => (v, Some("ackermannisation"))))
+
       val prime = NamespaceState("P")
 
       // add inv on transition system
@@ -681,7 +852,7 @@ class TranslationValidator {
       }
       splitCandidates = splitCandidates.updated(combined, ArrayBuffer.from(splitJumps))
 
-      val decls = (List(trueFun, falseFun, wpconjTargetFun, wpconjSourceFun) ++ uninterpAxioms)
+      val decls = (List(trueFun, falseFun, wpconjTargetFun, wpconjSourceFun))
       val bidx = afterProg.get.procedures.indexOf(before)
 
       progs = Program(ArrayBuffer(combined), combined, afterProg.get.initialMemory, ArrayBuffer.from(decls)) :: progs

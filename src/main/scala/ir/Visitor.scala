@@ -19,7 +19,7 @@ abstract class Visitor {
   def visitSimulAssign(node: SimulAssign): Statement = {
     node.assignments = node.assignments.map { case (l, r) =>
       (visitVariable(l), visitExpr(r))
-    }.toMap
+    }
     node
   }
 

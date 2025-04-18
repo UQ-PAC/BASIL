@@ -65,7 +65,7 @@ class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[S
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitLocalAssign(this)
 }
 
-class SimulAssign(var assignments: Map[Variable, Expr], override val label: Option[String] = None) extends Assign {
+class SimulAssign(var assignments: Vector[(Variable, Expr)], override val label: Option[String] = None) extends Assign {
   override def modifies: Set[Global] = assignments.collect { case (r: Global, _) =>
     r
   }.toSet
@@ -80,7 +80,7 @@ class SimulAssign(var assignments: Map[Variable, Expr], override val label: Opti
 }
 
 object SimulAssign {
-  def unapply(l: SimulAssign): Some[(Map[Variable, Expr], Option[String])] = Some((l.assignments, l.label))
+  def unapply(l: SimulAssign): Some[(Vector[(Variable, Expr)], Option[String])] = Some((l.assignments, l.label))
 }
 
 object LocalAssign {
