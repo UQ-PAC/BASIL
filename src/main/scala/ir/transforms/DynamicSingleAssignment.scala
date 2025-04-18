@@ -327,7 +327,7 @@ class OnePassDSA(
           val ns = SimulAssign(b.statements.map {
             case l: LocalAssign => (l.lhs, l.rhs)
             case _ => throw Exception("Expect phi block to only contain assignments")
-          }.toMap)
+          }.toVector)
           b.statements.clear()
           b.statements.prepend(ns)
         }

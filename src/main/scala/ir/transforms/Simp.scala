@@ -651,6 +651,7 @@ def validateProg(
 def validate(validationProg: Program, procName: String, name: String, timeout: Int = 10) = {
   val boogieFileName = s"$name-translation-validate.bpl"
   val boogieFile = translating.BoogieTranslator.translateProg(validationProg).toString
+  SimplifyLogger.info(boogieFileName)
   util.writeToFile(boogieFile, boogieFileName)
   if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
     val dir = File("./graphs/")
