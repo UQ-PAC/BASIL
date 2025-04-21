@@ -1076,3 +1076,75 @@ object IntervalDSA {
     tds
   }
 }
+
+
+enum DSAPhase {
+  case Pre, Local, BU, TD
+}
+
+
+class DSFlag {
+  var collapsed = false
+  var function = false
+  var stack = false
+  var heap = false
+  var global = false
+  var unknown = false
+  var escapes = false
+  var read = false
+  var modified = false
+  var incomplete = false
+  var foreign = false
+  var merged = false
+
+  def join(other: DSFlag): Unit =
+    collapsed = collapsed || other.collapsed
+    stack = other.stack || stack
+    heap = other.heap || heap
+    global = other.global || global
+    unknown = other.unknown || unknown
+    read = other.read || read
+    escapes = escapes || other.escapes
+    modified = other.modified || modified
+    incomplete = other.incomplete || incomplete
+    foreign = other.foreign && foreign
+    merged = true
+    function = function || other.function
+}
+
+def joinFlags(pointers: Iterable[IntervalCell]): DSFlag = {
+  val flag = DSFlag()
+  pointers.foreach(c => flag.join(c.node.flags))
+  flag
+}
+
+def estimateStackSize(program: Program): Unit = {
+  program.procedures.foreach(
+    proc =>
+      val size = proc.collectFirst {
+        case LocalAssign(_, BinaryExpr(BVADD, Register("R31", 64), arg2: BitVecLiteral), _) if isNegative(arg2) =>
+          bv2SignedInt(arg2).toInt * -1
+      }
+      proc.stackSize = size
+  )
+}
+
+def computeDSADomain(proc: Procedure, context: IRContext): Set[Procedure] = {
+  var domain: Set[Procedure] = Set(proc) ++ (context.program.procedures.filter(f =>
+    context.funcEntries.map(_.name).filter(!_.startsWith("_")).contains(f.procName)
+  ))
+
+  val stack: mutable.Stack[Procedure] = mutable.Stack()
+  stack.pushAll(domain.flatMap(_.calls))
+
+  // calculate the procedures used in the program
+  while (stack.nonEmpty) {
+    val current = stack.pop()
+    domain += current
+    stack.pushAll(current.calls.diff(domain))
+  }
+
+  domain
+}
+
+
