@@ -134,7 +134,6 @@ class IntervalGraph(
   ): IntervalNode = {
     val symBase = Global
     val globalNode = IntervalNode(this, mutable.Map(symBase -> Set(0)))
-    globalNode.add(0)
     globalNode.flags.global = true
     globals.toSeq.sortBy(_.address).foreach {
       case FuncEntry(name, size, address) =>
@@ -267,8 +266,6 @@ class IntervalGraph(
     }
   }
 
-  var last: Option[(IntervalCell, IntervalCell)] = None
-  var secondLast: Option[(IntervalCell, IntervalCell)] = None
 
   /**
    * Clones a graph
