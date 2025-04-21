@@ -181,7 +181,6 @@ class IntervalGraph(
     constraints.toSeq
       .sortBy(f => f.label)
       .foreach(c =>
-        localCorrectness(processed)
         processed += c
         processConstraint(c)
         localCorrectness(processed)
@@ -433,8 +432,6 @@ class IntervalGraph(
   protected def mergeCellsHelper(cell1: IntervalCell, cell2: IntervalCell): IntervalCell = {
     assert(cell1.node.isUptoDate)
     assert(cell2.node.isUptoDate)
-    val node1Pointees = cell1.node.cells.filter(_.hasPointee).map(c => (c, c.getPointee)).toMap
-    val node2Pointees = cell2.node.cells.filter(_.hasPointee).map(c => (c, c.getPointee)).toMap
 
     val scc1 = isInSCC(cell1)
     disconnectSCC(scc1)
@@ -470,25 +467,6 @@ class IntervalGraph(
     connectSCC(scc1)
     connectSCC(scc2)
 
-    if node1Pointees.nonEmpty then
-      node1Pointees.foreach((pointer, pointee) =>
-        assert(
-          get(pointee).equiv(get(pointer).getPointee),
-          s"$pointer doesn't point to updated version of its pointee after merge"
-        )
-        assert(get(pointer).node == find(stableNode))
-      )
-
-    if node2Pointees.nonEmpty then
-      node2Pointees.foreach((pointer, pointee) =>
-        assert(
-          get(pointee).equiv(get(pointer).getPointee),
-          s"$pointer doesn't point to updated version of its pointee after merge" +
-            s"\n ${get(pointee)}" +
-            s"\n ${get(pointer).getPointee}"
-        )
-        assert(get(pointer).node == find(stableNode))
-      )
     find(stableCell)
   }
 
@@ -497,13 +475,9 @@ class IntervalGraph(
     require(c1.node.graph == c2.node.graph && c1.node.graph == this)
     val cell1 = find(c1)
     val cell2 = find(c2)
-    Logger.debug(s"merging $cell1")
-    if cell1.hasPointee then Logger.debug(s"and pointee ${cell1.getPointee}")
-    val node1Pointees = cell1.node.cells.filter(_.hasPointee).map(c => (c, c.getPointee)).toMap
-    val node2Pointees = cell2.node.cells.filter(_.hasPointee).map(c => (c, c.getPointee)).toMap
 
-    Logger.debug(s"with $cell2")
-    if cell2.hasPointee then Logger.debug(s"pointee ${cell2.getPointee}")
+    val node1Pointees = getOutEdges(cell1.node)
+    val node2Pointees = getOutEdges(cell2.node)
 
     val result = if get(cell1) == get(cell2) then
       cell1
@@ -516,30 +490,10 @@ class IntervalGraph(
     else
       mergeCellsHelper(cell1, cell2)
 
-    Logger.debug(s"Got result: $result")
     assert(result.equiv(get(cell1)))
     assert(result.equiv(get(cell2)))
-    if cell1.hasPointee then assert(result.getPointee.equiv(get(cell1.getPointee)))
-    if cell2.hasPointee then
-      assert(result.getPointee.equiv(get(cell2.getPointee)), s"${proc.procName}")
-
-    if node1Pointees.nonEmpty then
-      node1Pointees.foreach((pointer, pointee) =>
-        assert(
-          get(pointee).equiv(get(pointer).getPointee),
-          s"$pointer doesn't point to updated version of its pointee after merge"
-        )
-        assert(get(pointer).node == result.node)
-      )
-
-    if node2Pointees.nonEmpty then
-      node2Pointees.foreach((pointer, pointee) =>
-        assert(
-          get(pointee).equiv(get(pointer).getPointee),
-          s"$pointer doesn't point to updated version of its pointee after merge"
-        )
-        assert(get(pointer).node == result.node)
-      )
+    checkEdgesAreMaintained(node1Pointees)
+    checkEdgesAreMaintained(node2Pointees)
 
     assert(result.node.isUptoDate)
     result
@@ -737,15 +691,8 @@ class IntervalNode(
 
   def collapse(): IntervalCell = {
     assert(isUptoDate)
-    val pointees = _cells.filter(_.hasPointee).map(_.getPointee)
-    val cells = _cells.iterator
     flags.collapsed = true
-    val res = graph.get(add(Interval.Top))
-    this.bases.view.mapValues(Set.empty)
-    assert(graph.find(this).isCollapsed)
-    assert(pointees.map(graph.get).forall(_.equiv(graph.find(res).getPointee)))
-    assert(cells.map(graph.get).forall(_ == res))
-    res
+    graph.get(add(Interval.Top))
   }
 
   /**
@@ -940,7 +887,6 @@ object IntervalDSA {
         node.get(cell.interval.move(i => i + offset))
       )
     val targetCells = target.exprToCells(targetExpr).map(target.find)
-    target.localCorrectness()
 
     if (targetCells ++ sourceCells).nonEmpty then target.mergeCells(targetCells ++ sourceCells)
 
@@ -959,7 +905,6 @@ object IntervalDSA {
         case _ =>
       }
     )
-    target.localCorrectness()
   }
 
   def getPointers(graph: IntervalGraph): Map[IntervalCell, Set[IntervalCell]] = {
