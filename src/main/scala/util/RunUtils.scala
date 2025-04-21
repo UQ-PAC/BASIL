@@ -38,7 +38,7 @@ import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
 import ir.transforms.MemoryTransform
-import util.DSAConfig.{Checks, Standard}
+import util.DSAConfig.{Checks, Prereq, Standard}
 import util.LogLevel.INFO
 
 import scala.annotation.tailrec
@@ -903,7 +903,7 @@ object RunUtils {
       val dsaResults = IntervalDSA(ctx).dsa(conf.dsaConfig.get)
       dsaContext = Some(dsaResults)
 
-      if q.memoryTransform then
+      if q.memoryTransform && conf.dsaConfig.get != Prereq then // need more than prereq
         val memTransferTimer = PerformanceTimer("Mem Transfer Timer", INFO)
         visit_prog(MemoryTransform(dsaResults.topDown, dsaResults.globals), ctx.program)
         memTransferTimer.checkPoint("Performed Memory Transform")
