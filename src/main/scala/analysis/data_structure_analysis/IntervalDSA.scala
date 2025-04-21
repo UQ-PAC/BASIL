@@ -30,7 +30,6 @@ class IntervalGraph(
 ) {
 
   val solver = OffsetUnionFindSolver[NodeTerm]()
-  markParams()
   val builder: () => Map[SymBase, IntervalNode] = nodeBuilder.getOrElse(buildNodes)
   var nodes: Map[SymBase, IntervalNode] = builder()
 
@@ -48,9 +47,11 @@ class IntervalGraph(
         case Global => node.flags.global = true
         case NonPointer =>
           throw new Exception("Attempted to create a node from an Non-pointer symbolic base")
-        case unknown: (Ret | Loaded | Par) =>
+        case unknown: Loaded =>
           node.flags.unknown = true
           node.flags.incomplete = true
+        case param:  (Ret | Par) =>
+          node.flags.escapes = true
       if symOffsets == Top then node.collapse()
       else symOffsets.toIntervals.filter(i => base != Global || isGlobal(i.start.get) ).map(node.add)
       result + (base -> node)
