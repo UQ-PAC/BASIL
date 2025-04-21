@@ -619,7 +619,7 @@ class IntervalNode(
           case cell: IntervalCell if cell.hasPointee =>
             val (newNode, off) = newGraph.findNode(oldToNew(old))
             assert(
-              newNode.isCollapsed || newNode.cells.exists(c => c.interval.contains(cell.interval.move(i => i + off))),
+              newNode.cells.exists(c => c.interval.contains(cell.interval.move(i => i + off))),
               s"expected cloned cell to include same intervals"
             )
             assert(newGraph.find(newNode) == newNode)
