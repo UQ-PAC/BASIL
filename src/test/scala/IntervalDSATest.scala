@@ -8,9 +8,9 @@ import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
 import test_util.BASILTest.writeToFile
 import util.*
-import util.DSAAnalysis.Norm
 import analysis.data_structure_analysis.given
 import translating.PrettyPrinter.pp_proc
+import util.DSAConfig.Checks
 
 @test_util.tags.UnitTest
 class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
@@ -32,7 +32,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Norm)))
+        dsaConfig = Some(Checks)
       )
     )
   }
@@ -46,7 +46,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Norm)))
+        dsaConfig = Some(Checks)
       )
     )
   }
@@ -315,7 +315,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Norm)))
+        dsaConfig = Some(Checks)
       )
     )
 
@@ -340,7 +340,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Norm)))
+        dsaConfig = Some(Checks)
       )
     )
 
@@ -363,7 +363,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Norm)))
+        dsaConfig = Some(Checks)
       )
     )
 
@@ -388,7 +388,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Norm)))
+        dsaConfig = Some(Checks)
       )
     )
 
@@ -459,7 +459,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Norm)))
+        dsaConfig = Some(Checks)
       )
     )
 
@@ -485,7 +485,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Norm)))
+        dsaConfig = Some(Checks)
       )
     )
 

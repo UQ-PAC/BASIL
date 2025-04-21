@@ -13,7 +13,7 @@ import test_util.Histogram
 import test_util.TestConfig
 import test_util.LockManager
 import test_util.TestCustomisation
-import util.DSAAnalysis.Norm
+import util.DSAConfig.Checks
 import util.boogie_interaction.*
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
@@ -619,12 +619,12 @@ class UnimplementedTests extends SystemTests {
 class IntervalDSASystemTests extends SystemTests {
   runTests(
     "correct",
-    TestConfig(useBAPFrontend = true, expectVerify = true, simplify = true, dsa = Some(DSAConfig(Set(Norm))))
+    TestConfig(useBAPFrontend = true, expectVerify = true, simplify = true, dsa = Some(Checks))
   )
 
   runTests(
     "incorrect",
-    TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSAConfig(Set(Norm))))
+    TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(Checks))
   )
 }
 
@@ -636,7 +636,7 @@ class MemoryTransformSystemTests extends SystemTests {
       useBAPFrontend = true,
       expectVerify = false,
       simplify = true,
-      dsa = Some(DSAConfig(Set(Norm))),
+      dsa = Some(Checks),
       memoryTransform = true
     )
   )
@@ -647,7 +647,7 @@ class MemoryTransformSystemTests extends SystemTests {
       useBAPFrontend = false,
       expectVerify = false,
       simplify = true,
-      dsa = Some(DSAConfig(Set(Norm))),
+      dsa = Some(Checks),
       memoryTransform = true
     )
   )

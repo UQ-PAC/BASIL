@@ -7,7 +7,7 @@ import org.scalatest.Ignore
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
 import util.*
-import util.DSAAnalysis.Norm
+import util.DSAConfig.Checks
 
 @test_util.tags.UnitTest
 class MemoryTransfromTests extends AnyFunSuite with test_util.CaptureOutput {
@@ -29,7 +29,7 @@ class MemoryTransfromTests extends AnyFunSuite with test_util.CaptureOutput {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Norm))),
+        dsaConfig = Some(Checks),
         memoryTransform = true
       )
     )
@@ -44,7 +44,7 @@ class MemoryTransfromTests extends AnyFunSuite with test_util.CaptureOutput {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Norm))),
+        dsaConfig = Some(Checks),
         memoryTransform = true
       )
     )
