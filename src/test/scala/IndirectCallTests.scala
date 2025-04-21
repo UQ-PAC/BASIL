@@ -1,7 +1,19 @@
 import ir.{Block, Command, DirectCall, GoTo, Procedure, Program, Statement}
 import ir.*
 import org.scalatest.funsuite.*
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, DSAConfig, DSAContext, ILLoadingConfig, LogLevel, Logger, PerformanceTimer, RunUtils, StaticAnalysisConfig}
+import util.{
+  BASILConfig,
+  BASILResult,
+  BoogieGeneratorConfig,
+  DSAConfig,
+  DSAContext,
+  ILLoadingConfig,
+  LogLevel,
+  Logger,
+  PerformanceTimer,
+  RunUtils,
+  StaticAnalysisConfig
+}
 import analysis.data_structure_analysis.*
 
 import scala.collection.mutable.ArrayBuffer

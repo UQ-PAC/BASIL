@@ -617,28 +617,16 @@ class UnimplementedTests extends SystemTests {
 
 @test_util.tags.AnalysisSystemTest
 class IntervalDSASystemTests extends SystemTests {
-  runTests(
-    "correct",
-    TestConfig(useBAPFrontend = true, expectVerify = true, simplify = true, dsa = Some(Checks))
-  )
+  runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, simplify = true, dsa = Some(Checks)))
 
-  runTests(
-    "incorrect",
-    TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(Checks))
-  )
+  runTests("incorrect", TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(Checks)))
 }
 
 @test_util.tags.DisabledTest
 class MemoryTransformSystemTests extends SystemTests {
   runTests(
     "correct",
-    TestConfig(
-      useBAPFrontend = true,
-      expectVerify = false,
-      simplify = true,
-      dsa = Some(Checks),
-      memoryTransform = true
-    )
+    TestConfig(useBAPFrontend = true, expectVerify = false, simplify = true, dsa = Some(Checks), memoryTransform = true)
   )
 
   runTests(

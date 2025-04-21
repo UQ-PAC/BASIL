@@ -244,7 +244,7 @@ object Main {
     val dsa: Option[DSAConfig] = if (conf.simplify.value) {
       conf.dsaType match
         case Some("prereq") => Some(Prereq)
-        case Some("checks") =>  Some(Checks)
+        case Some("checks") => Some(Checks)
         case Some("standard") => Some(Standard)
         case None => Some(Standard)
         case Some(_) =>

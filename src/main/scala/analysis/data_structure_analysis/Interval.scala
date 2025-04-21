@@ -81,7 +81,6 @@ enum Interval extends Offsets {
       case (Interval.Value(s1, e1), Interval.Value(s2, e2)) =>
         (s2 < e1 && s2 >= s1) || (s1 < e2 && s1 >= s2)
 
-
   def join(other: Interval): Interval = {
     (this, other) match
       case (Interval.Top, _) => Interval.Top
@@ -119,5 +118,3 @@ object Interval {
       case _ => (Int.MinValue, Int.MinValue)
     }
 }
-
-

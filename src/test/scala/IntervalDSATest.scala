@@ -1,4 +1,16 @@
-import analysis.data_structure_analysis.{Global, Heap, Interval, IntervalDSA, Par, Ret, Stack, SymBase, generateConstraints, getSymbolicValues, given}
+import analysis.data_structure_analysis.{
+  Global,
+  Heap,
+  Interval,
+  IntervalDSA,
+  Par,
+  Ret,
+  Stack,
+  SymBase,
+  generateConstraints,
+  getSymbolicValues,
+  given
+}
 import boogie.SpecGlobal
 import ir.*
 import ir.Endian.{BigEndian, LittleEndian}
@@ -308,7 +320,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
           inputFile = path + ".adt",
           relfFile = path + ".relf",
           mainProcedureName = "http_parse_basic",
-          trimEarly = true,
+          trimEarly = true
 //          procedureTrimDepth = 1,
         ),
         simplify = true,
@@ -324,7 +336,6 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
     assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
   }
-
 
   test("md5_process_block") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
@@ -372,8 +383,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
     assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
   }
-  
-  
+
   ignore("www_authenticate") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
     val res = RunUtils.loadAndTranslate(
@@ -444,7 +454,6 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
   }
 
-
   test("des_key_schedule") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
     val res = RunUtils.loadAndTranslate(
@@ -468,8 +477,6 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
     assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
   }
-
-
 
   test("plist_free") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
