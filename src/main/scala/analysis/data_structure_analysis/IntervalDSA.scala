@@ -416,6 +416,19 @@ class IntervalGraph(
     selfPointers
   }
 
+  def getOutEdges(node: IntervalNode): Map[IntervalCell, IntervalCell] = {
+    node.cells.filter(_.hasPointee).map(c => (c, c.getPointee)).toMap
+  }
+
+  def checkEdgesAreMaintained(edges: Map[IntervalCell, IntervalCell]): Unit = {
+     edges.foreach((pointer, pointee) =>
+        assert(
+          pointee.equiv(get(pointer).getPointee),
+          s"$pointer doesn't point to updated version of its pointee"
+        )
+      )
+  }
+
   protected def mergeCellsHelper(cell1: IntervalCell, cell2: IntervalCell): IntervalCell = {
     assert(cell1.node.isUptoDate)
     assert(cell2.node.isUptoDate)
