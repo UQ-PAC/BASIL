@@ -891,8 +891,8 @@ class IntervalDSA(irContext: IRContext) {
         IntervalDSA.checkConsistGlobals(DSATD, globalGraph)
         IntervalDSA.checkReachable(irContext.program, DSATD)
         DSALogger.info("Performed correctness check")
+        DSATimer.checkPoint("Finished DSA Invariant Check")
 
-      DSATimer.checkPoint("Finished DSA Invariant Check")
       dsaContext = dsaContext.copy(local = DSA, bottomUp = DSABU, topDown = DSATD, globals = globalMapping)
 
     dsaContext
