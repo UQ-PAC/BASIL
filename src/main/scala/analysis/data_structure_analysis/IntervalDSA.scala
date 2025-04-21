@@ -51,7 +51,7 @@ class IntervalGraph(
           node.flags.unknown = true
           node.flags.incomplete = true
       if symOffsets == Top then node.collapse()
-      else symOffsets.toIntervals.filter(i => isGlobal(i.start.get) || base != Global).map(node.add)
+      else symOffsets.toIntervals.filter(i => base != Global || isGlobal(i.start.get) ).map(node.add)
       result + (base -> node)
     }
   }
