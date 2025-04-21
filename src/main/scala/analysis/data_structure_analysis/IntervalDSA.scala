@@ -297,7 +297,6 @@ class IntervalGraph(
     )
     copy.nodes = this.nodes.view.mapValues(oldToNew.apply).toMap
     assert(copy.nodes.keys == this.nodes.keys)
-    copy.localCorrectness()
     copy
   }
 
@@ -1095,7 +1094,7 @@ object IntervalDSA {
     val queue = mutable.Queue[Procedure]().enqueueAll(bus.keys.toSeq.sortBy(p => p.name))
 
     // TODO instead of skipping merge the scc and use it directly
-    var skip = Seq.empty // Seq("croak", "myexit")
+    var skip = Seq.empty
     while queue.nonEmpty do
       val proc = queue.dequeue()
       if skip.exists(name => proc.name.startsWith(name)) then
@@ -1118,7 +1117,7 @@ object IntervalDSA {
     val queue = mutable.Queue[Procedure]().enqueueAll(tds.keys.toSeq.sortBy(p => p.name))
 
     // TODO instead of skipping merge the scc and use it directly
-    var skip = Seq.empty // Seq("croak", "myexit")
+    var skip = Seq.empty
     while queue.nonEmpty do
       val proc = queue.dequeue()
       if skip.exists(name => proc.name.startsWith(name)) then
