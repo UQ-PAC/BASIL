@@ -205,7 +205,7 @@ class IntervalGraph(
     constraints.toSeq.sortBy(c => c.label).foreach {
       case dcc: DirectCallConstraint if graphs.contains(dcc.target) && !dcc.target.isExternal.getOrElse(false) =>
         val (source, target) = if phase == TD then (this, graphs(dcc.target)) else (graphs(dcc.target), this)
-        callTransfer(phase, dcc, source, target)
+        IntervalDSA.callTransfer(phase, dcc, source, target)
       case dcc: DirectCallConstraint if dcc.target.name == "indirect_call_launchpad" =>
         resolveIndirectCall(dcc)
           .filterNot(proc =>
@@ -214,92 +214,13 @@ class IntervalGraph(
           .foreach(proc =>
 
             val (source, target) = if phase == TD then (this, graphs(proc)) else (graphs(proc), this)
-            callTransfer(phase, dcc, source, target)
+            IntervalDSA.callTransfer(phase, dcc, source, target)
           )
       case _ =>
     }
   }
 
-  def globalTransfer(source: IntervalGraph, target: IntervalGraph): Map[IntervalNode, IntervalNode] = {
-    DSALogger.info(s"cloning globalNode from ${source.proc.procName}")
-    val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
-    val targetGlobal = target.find(target.nodes(Global).get(0))
-    var sourceGlobal = source.find(source.nodes(Global).get(0))
-    val old = source.nodes(Global).clone(target, false, oldToNew)
-    val globalNode = sourceGlobal.node.clone(target, true, oldToNew)
 
-    sourceGlobal = globalNode.get(if targetGlobal.interval != Interval.Top then targetGlobal.interval else Interval(0,0))
-    target.mergeCells(sourceGlobal, targetGlobal)
-    oldToNew.map((old, outdatedNew) => (old, target.find(outdatedNew))).toMap
-  }
-
-  def callTransfer(phase: DSAPhase, cons: DirectCallConstraint, source: IntervalGraph, target: IntervalGraph): Unit = {
-    require(phase == TD || phase == BU)
-    val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
-    val unchanged = Set("R29", "R30", "R31")
-    DSALogger.info(s"cloning ${source.proc.procName} into ${target.proc.procName}, $phase")
-    cons.inParams
-      .filterNot(f => unchanged.exists(i => f._1.name.startsWith(i)))
-      .filter(f => cons.target.formalInParam.contains(f._1))
-      .foreach { case (formal, actual) =>
-        val (sourceExpr, targetExpr) = if phase == TD then (actual, formal) else (formal, actual)
-        exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
-      }
-
-    cons.outParams
-      .filterNot(f => unchanged.exists(i => f._1.name.startsWith(i)))
-      .filter(f => cons.target.formalOutParam.contains(f._1))
-      .foreach { case (out, actual) =>
-        val (sourceExpr, targetExpr) = if phase == TD then (actual, out) else (out, actual)
-        exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
-      }
-    // TODO add unification between unused indirect call out params and their corresponding input version
-    /*
-    if phase == BU then
-      cons.outParams.filterNot(f => cons.target.formalOutParam.contains(f._2)).foreach {
-        f =>
-      }*/
-  }
-
-  def exprTransfer(
-    sourceExpr: Expr,
-    targetExpr: Expr,
-    source: IntervalGraph,
-    target: IntervalGraph,
-    oldToNew: mutable.Map[IntervalNode, IntervalNode]
-  ): Unit = {
-    val sourceCells = source
-      .exprToCells(sourceExpr)
-      .map(source.find)
-      .map(cell =>
-        assert(cell.node.isUptoDate)
-        val (node, offset) =
-          target.findNode(cell.node.clone(target, true, oldToNew))
-        if offset == 0 then node.get(cell.interval)
-        node.get(cell.interval.move(i => i + offset))
-      )
-    val targetCells = target.exprToCells(targetExpr).map(target.find)
-    target.localCorrectness()
-
-    if (targetCells ++ sourceCells).nonEmpty then target.mergeCells(targetCells ++ sourceCells)
-
-    sourceCells.foreach(cell =>
-      val node = target.find(cell.node)
-      val sourceBases = node.bases
-      sourceBases.foreach {
-        case (base, off) if target.nodes.contains(base) && (base ==  Stack(target.proc) || base == Global) =>
-          val t = target.find(target.nodes(base).get(0))
-          if t.node.isCollapsed then
-            target.mergeCells(cell, t)
-          else if off.size == 1 then
-            target.mergeCells(node.get(off.head), t)
-          else
-            target.mergeCells(node.collapse(), t)
-        case _ =>
-      }
-    )
-    target.localCorrectness()
-  }
 
   private def isIndirectCall(dcc: DirectCallConstraint): Boolean = {
     dcc.target.name == "indirect_call_launchpad"
@@ -993,6 +914,82 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
 }
 
 object IntervalDSA {
+
+  def globalTransfer(source: IntervalGraph, target: IntervalGraph): Map[IntervalNode, IntervalNode] = {
+    DSALogger.info(s"cloning globalNode from ${source.proc.procName}")
+    val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
+    val targetGlobal = target.find(target.nodes(Global).get(0))
+    var sourceGlobal = source.find(source.nodes(Global).get(0))
+    val old = source.nodes(Global).clone(target, false, oldToNew)
+    val globalNode = sourceGlobal.node.clone(target, true, oldToNew)
+
+    sourceGlobal = globalNode.get(if targetGlobal.interval != Interval.Top then targetGlobal.interval else Interval(0,0))
+    target.mergeCells(sourceGlobal, targetGlobal)
+    oldToNew.map((old, outdatedNew) => (old, target.find(outdatedNew))).toMap
+  }
+
+  def callTransfer(phase: DSAPhase, cons: DirectCallConstraint, source: IntervalGraph, target: IntervalGraph): Unit = {
+    require(phase == TD || phase == BU)
+    val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
+    val unchanged = Set("R29", "R30", "R31")
+    DSALogger.info(s"cloning ${source.proc.procName} into ${target.proc.procName}, $phase")
+    cons.inParams
+      .filterNot(f => unchanged.exists(i => f._1.name.startsWith(i)))
+      .filter(f => cons.target.formalInParam.contains(f._1))
+      .foreach { case (formal, actual) =>
+        val (sourceExpr, targetExpr) = if phase == TD then (actual, formal) else (formal, actual)
+        exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
+      }
+
+    cons.outParams
+      .filterNot(f => unchanged.exists(i => f._1.name.startsWith(i)))
+      .filter(f => cons.target.formalOutParam.contains(f._1))
+      .foreach { case (out, actual) =>
+        val (sourceExpr, targetExpr) = if phase == TD then (actual, out) else (out, actual)
+        exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
+      }
+    // TODO add unification between unused indirect call out params and their corresponding input version
+  }
+
+  def exprTransfer(
+    sourceExpr: Expr,
+    targetExpr: Expr,
+    source: IntervalGraph,
+    target: IntervalGraph,
+    oldToNew: mutable.Map[IntervalNode, IntervalNode]
+  ): Unit = {
+    val sourceCells = source
+      .exprToCells(sourceExpr)
+      .map(source.find)
+      .map(cell =>
+        assert(cell.node.isUptoDate)
+        val (node, offset) =
+          target.findNode(cell.node.clone(target, true, oldToNew))
+        if offset == 0 then node.get(cell.interval)
+        node.get(cell.interval.move(i => i + offset))
+      )
+    val targetCells = target.exprToCells(targetExpr).map(target.find)
+    target.localCorrectness()
+
+    if (targetCells ++ sourceCells).nonEmpty then target.mergeCells(targetCells ++ sourceCells)
+
+    sourceCells.foreach(cell =>
+      val node = target.find(cell.node)
+      val sourceBases = node.bases
+      sourceBases.foreach {
+        case (base, off) if target.nodes.contains(base) && (base ==  Stack(target.proc) || base == Global) =>
+          val t = target.find(target.nodes(base).get(0))
+          if t.node.isCollapsed then
+            target.mergeCells(cell, t)
+          else if off.size == 1 then
+            target.mergeCells(node.get(off.head), t)
+          else
+            target.mergeCells(node.collapse(), t)
+        case _ =>
+      }
+    )
+    target.localCorrectness()
+  }
 
   def getPointers(graph: IntervalGraph): Map[IntervalCell, Set[IntervalCell]] = {
     val (nodes, edges) = graph.collect()
