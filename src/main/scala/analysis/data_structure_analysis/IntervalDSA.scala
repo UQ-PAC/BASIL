@@ -61,8 +61,8 @@ class IntervalGraph(
     constraint: BinaryConstraint,
     nodes: Map[SymBase, IntervalNode]
   ): Map[SymBase, IntervalNode] = {
-    val arg1 = exprToSymVal(constraint.arg1.value) // .removeNonAddress(i => i >= 1000)
-    val arg2 = exprToSymVal(constraint.arg2.value) // .removeNonAddress(i => i >= 1000)
+    val arg1 = exprToSymVal(constraint.arg1.value)
+    val arg2 = exprToSymVal(constraint.arg2.value)
     val res = symValToNodes(arg1, nodes)
     symValToNodes(arg2, res)
   }
