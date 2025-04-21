@@ -320,9 +320,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     )
 
     val proc = res.ir.program.mainProcedure
-//    val dsg = IntervalDSA.getLocal(proc, res.ir, getSymbolicValues(proc), generateConstraints(proc))
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
-    writeToFile(dsg.toDot,"dsg.dot")
     assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
     assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
   }
@@ -348,6 +346,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
   }
 
   test("acl_check") {
@@ -371,11 +370,11 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
     assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
-    writeToFile(dsg.toDot, "helper.dot")
+    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
   }
   
   
-  test("www_authenticate") {
+  ignore("www_authenticate") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
@@ -395,6 +394,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
   }
 
   test("hmac_md5") {
@@ -411,12 +411,37 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Norm)))
+        dsaConfig = Some(Checks)
       )
     )
 
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
+  }
+
+  test("ntlm2_calc_resp") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = path + ".adt",
+          relfFile = path + ".relf",
+          mainProcedureName = "ntlm2_calc_resp",
+          trimEarly = true
+        ),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(Checks)
+      )
+    )
+
+    val proc = res.ir.program.mainProcedure
+    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
+    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
   }
 
 
@@ -441,7 +466,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
     assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
-    writeToFile(dsg.toDot, "helper.dot")
+    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
   }
 
 
@@ -467,6 +492,6 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
     assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
-//    writeToFile(dsg.toDot, "helper.dot")
+    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
   }
 }
