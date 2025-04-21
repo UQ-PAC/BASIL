@@ -182,7 +182,6 @@ class IntervalGraph(
       .foreach(c =>
         processed += c
         processConstraint(c)
-        localCorrectness(processed)
       )
   }
 
@@ -1017,7 +1016,6 @@ object IntervalDSA {
   ): IntervalGraph = {
     val graph = IntervalGraph(proc, Local, context, symValues, cons, None)
     graph.localPhase()
-    graph.localCorrectness()
     graph
   }
 
@@ -1038,7 +1036,6 @@ object IntervalDSA {
 
     DSALogger.info("Performing DSA BU phase")
     val bus = locals.view.mapValues(_.clone).toMap
-    bus.values.foreach(_.localCorrectness())
     DSALogger.info("performed cloning")
     val visited: mutable.Set[Procedure] = mutable.Set.empty
     val queue = mutable.Queue[Procedure]().enqueueAll(bus.keys.toSeq.sortBy(p => p.name))
