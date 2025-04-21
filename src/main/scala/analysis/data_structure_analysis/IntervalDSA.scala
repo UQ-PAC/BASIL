@@ -490,7 +490,6 @@ class IntervalGraph(
         assert(get(pointer).node == find(stableNode))
       )
     find(stableCell)
-
   }
 
   def mergeCells(c1: IntervalCell, c2: IntervalCell): IntervalCell = {
@@ -1068,7 +1067,7 @@ object IntervalDSA {
     val graph = IntervalGraph(proc, Local, context, symValues, cons, None)
     graph.localPhase()
     graph.localCorrectness()
-    graph.clone
+    graph
   }
 
   def getLocals(
@@ -1107,7 +1106,7 @@ object IntervalDSA {
         DSALogger.info(s"performing BU for ${proc.name}")
         bus(proc).contextTransfer(BU, bus)
         visited += proc
-    bus.view.mapValues(_.clone).toMap
+    bus
   }
 
   def solveTDs(bus: Map[Procedure, IntervalGraph]): Map[Procedure, IntervalGraph] = {
@@ -1130,7 +1129,6 @@ object IntervalDSA {
         DSALogger.info(s"performing TD for ${proc.name}")
         tds(proc).contextTransfer(TD, tds)
         visited += proc
-
-    tds.view.mapValues(_.clone).toMap
+    tds
   }
 }
