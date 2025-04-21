@@ -125,7 +125,6 @@ class IntervalGraph(
       Interval(g1.toInt, g1.toInt + 8).contains(address)
         || Interval(g2.toInt, g2.toInt + 8).contains(address)
     ) || irContext.externalFunctions.exists(g => Interval(g.offset.toInt, g.offset.toInt + 8).contains(address))
-//      || irContext.symbols.exists(sym => Interval(sym.value.toInt, sym.value.toInt + (sym.size / 8)).contains(address))
   }
 
   def globalNode(
@@ -256,24 +255,14 @@ class IntervalGraph(
         if indexCells.nonEmpty then
           if indexCells.nonEmpty && valueCells.nonEmpty then
             indexCells.foreach(indexCell =>
-              if !(indexCell.hasPointee && indexCell.getPointee == valueCell.get) then
-                Logger.debug(s"index has a pointer: ${indexCell.hasPointee}")
-                Logger.debug(s"index cell: ${indexCell}")
-                if indexCell.hasPointee then
-                  Logger.debug(s"index pointee: ${indexCell.getPointee}")
-                  Logger.debug(s"index pointee children: ${indexCell.getPointee.node.children}")
-                Logger.debug(s"got valueCell: ${valueCell.get}")
-                Logger.debug(s"value childeren: ${valueCell.get.node.children}")
               assert(indexCell.node.isUptoDate, "outdated cell in local correctness check")
               assert(indexCell.getPointee.node.isUptoDate, "outdated cell in local correctness check")
               assert(valueCell.get.node.isUptoDate, "outdated cell in local correctness check")
-
               assert(
                 indexCell.hasPointee && indexCell.getPointee.equiv(valueCell.get),
                 s"$constraint, $indexCell doesn't point to ${valueCell.get} instead ${indexCell.getPointee}"
               )
             )
-
       case _ =>
     }
   }
@@ -362,48 +351,28 @@ class IntervalGraph(
 
   }
 
+  def markEscapes(constraint: MemoryAccessConstraint[_], indices: Set[IntervalCell], pointees: Set[IntervalCell]): Unit = {
+    val indexFlag = joinFlags(indices)
+    constraint match
+      case MemoryReadConstraint(pos) =>
+        indices.map(_.node).foreach(_.flags.read = true)
+        if indexFlag.heap || indexFlag.escapes then pointees.map(_.node).foreach(_.flags.escapes = true)
+      case MemoryWriteConstraint(pos) =>
+        indices.map(_.node).foreach(_.flags.modified = true)
+        if indexFlag.heap || indexFlag.escapes then pointees.map(_.node).foreach(_.flags.escapes = true)
+  }
+
   def processConstraint(constraint: Constraint): Unit = {
     constraint match
       case cons: MemoryAccessConstraint[_] =>
         Logger.debug(s"Processing constraint $cons")
         val indices = constraintArgToCells(cons.arg1, ignoreContents = true)
         indices.foreach(cell => cell.node.add(cell.interval.growTo(cons.size)))
-        val indexPointee = constraintArgToCells(cons.arg1)
-        val indexFlag = joinFlags(indices)
+        val pointees = constraintArgToCells(cons.arg1)
 
-        cons match
-          case MemoryReadConstraint(pos) =>
-            indices.map(_.node).foreach(_.flags.read = true)
-            if indexFlag.heap || indexFlag.escapes then indexPointee.map(_.node).foreach(_.flags.escapes = true)
-          case MemoryWriteConstraint(pos) =>
-            indices.map(_.node).foreach(_.flags.modified = true)
-            if indexFlag.heap || indexFlag.escapes then indexPointee.map(_.node).foreach(_.flags.escapes = true)
+        markEscapes(cons, indices, pointees)
         val values = constraintArgToCells(cons.arg2)
-        val first = if indexPointee.nonEmpty then
-          indices
-            .map(findExact)
-          val res = mergeCells(indexPointee)
-          val correctPointee =
-            indices
-              .map(get)
-              .foldLeft(true)((f: Boolean, pointer: IntervalCell) =>
-                f && pointer.hasPointee && pointer.getPointee.equiv(res)
-              )
-          assert(correctPointee)
-          Some(res)
-        else None
-        val sec = if values.nonEmpty then Some(mergeCells(values)) else None
-        if first.nonEmpty && sec.nonEmpty then
-          val res = mergeCells(first.get, sec.get)
-          assert(constraintArgToCells(cons.arg1).map(get) == constraintArgToCells(cons.arg2).map(get))
-          val correctPointee =
-            indices
-              .map(get)
-              .foldLeft(true)((f: Boolean, pointer: IntervalCell) =>
-                f && pointer.hasPointee && pointer.getPointee.equiv(first.map(get).get)
-              )
-          assert(correctPointee, "an index cell doesn't point to it's pointee")
-          assert(first.map(get) == sec.map(get), "cells should be the same after unification")
+        if pointees.nonEmpty || values.nonEmpty then mergeCells(pointees ++ values)
         else Logger.warn(s"$cons had an empty argument")
       case _ => // ignore
   }
@@ -524,26 +493,15 @@ class IntervalGraph(
     if cell2.hasPointee then Logger.debug(s"pointee ${cell2.getPointee}")
 
     val result = if get(cell1) == get(cell2) then
-      assert(cell1.node.get(cell1.interval).interval.contains(cell2.interval))
-      Logger.debug(s"merged $cell1 with itself")
       cell1
     else if cell1.node.equals(cell2.node) then
-      Logger.debug(s"collapsed $cell1 and $cell2")
-      val res = cell1.node.collapse()
-      Logger.debug(s"collapsed $cell1 and $cell2")
-      res
+      cell1.node.collapse()
     else if cell1.node.isCollapsed || cell2.node.isCollapsed then
-      Logger.debug(s"merge and collapse $cell1 and $cell2")
       cell1.node.collapse()
       find(cell2).node.collapse()
-      val res = mergeCellsHelper(find(cell1), find(cell2))
-      Logger.debug(s"merge and collapse $cell1 and $cell2")
-      res
+      mergeCellsHelper(find(cell1), find(cell2))
     else
-      Logger.debug(s"merged $cell1 and $cell2")
-      val res = mergeCellsHelper(cell1, cell2)
-      Logger.debug(s"merged $cell1 and $cell2")
-      res
+      mergeCellsHelper(cell1, cell2)
 
     Logger.debug(s"Got result: $result")
     assert(result.equiv(get(cell1)))
@@ -1122,7 +1080,7 @@ object IntervalDSA {
     val queue = mutable.Queue[Procedure]().enqueueAll(bus.keys.toSeq.sortBy(p => p.name))
 
     // TODO instead of skipping merge the scc and use it directly
-    var skip = Seq("croak", "myexit")
+    var skip = Seq.empty // Seq("croak", "myexit")
     while queue.nonEmpty do
       val proc = queue.dequeue()
       if skip.exists(name => proc.name.startsWith(name)) then
@@ -1145,7 +1103,7 @@ object IntervalDSA {
     val queue = mutable.Queue[Procedure]().enqueueAll(tds.keys.toSeq.sortBy(p => p.name))
 
     // TODO instead of skipping merge the scc and use it directly
-    var skip = Seq("croak", "myexit")
+    var skip = Seq.empty // Seq("croak", "myexit")
     while queue.nonEmpty do
       val proc = queue.dequeue()
       if skip.exists(name => proc.name.startsWith(name)) then
