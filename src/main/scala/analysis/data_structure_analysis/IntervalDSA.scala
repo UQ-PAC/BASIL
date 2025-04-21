@@ -30,6 +30,7 @@ class IntervalGraph(
 ) {
 
   val solver = OffsetUnionFindSolver[NodeTerm]()
+  markParams()
   val builder: () => Map[SymBase, IntervalNode] = nodeBuilder.getOrElse(buildNodes)
   var nodes: Map[SymBase, IntervalNode] = builder()
 
@@ -163,8 +164,8 @@ class IntervalGraph(
     globalNode
   }
 
-  // Processes all non call constraints
-  def localPhase(): Unit = {
+
+  def markParams(): Unit = {
     val unchanged = Set("R29", "R30", "R31")
     (proc.formalInParam ++ proc.formalOutParam).iterator
       .filterNot(p => unchanged.exists(n => p.name.startsWith(n)))
@@ -172,6 +173,10 @@ class IntervalGraph(
       .map(get)
       .map(_.node)
       .foreach(_.flags.escapes = true)
+  }
+
+  // Processes all non call constraints
+  def localPhase(): Unit = {
     var processed = Set[Constraint]()
     constraints.toSeq
       .sortBy(f => f.label)
