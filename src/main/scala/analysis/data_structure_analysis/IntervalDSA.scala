@@ -7,8 +7,11 @@ import boogie.SpecGlobal
 import specification.FuncEntry
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.*
+import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
 import specification.{ExternalFunction, SymbolTableEntry}
-import util.{DSALogger, IRContext, IntervalDSALogger as Logger}
+import util.DSAConfig.{Checks, Standard}
+import util.LogLevel.INFO
+import util.{DSAConfig, DSAContext, DSALogger, IRContext, PerformanceTimer, IntervalDSALogger as Logger}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{SortedSet, mutable}
@@ -827,6 +830,76 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
     else
       graph.mergeCells(cell, this.getPointee)
   }
+}
+
+
+class IntervalDSA(irContext: IRContext) {
+  def pre(): (Map[Procedure, SymValues[Interval]], Map[Procedure, Set[Constraint]]) = {
+    var sva: Map[Procedure, SymValues[Interval]] = Map.empty
+    var cons: Map[Procedure, Set[Constraint]] = Map.empty
+    computeDSADomain(irContext.program.mainProcedure, irContext).toSeq
+      .sortBy(_.name)
+      .foreach(proc =>
+        val SVAResults = getSymbolicValues[Interval](proc)
+        val constraints = generateConstraints(proc)
+        sva += (proc -> SVAResults)
+        cons += (proc -> constraints)
+      )
+    (sva, cons)
+  }
+
+
+  def dsa(config: DSAConfig): DSAContext = {
+    val DSATimer = PerformanceTimer("DSA Timer", INFO)
+    val (sva, cons) = pre()
+    DSATimer.checkPoint("Finished SVA")
+
+    var dsaContext = DSAContext(sva, cons, Map.empty, Map.empty, Map.empty, Map.empty)
+    if (config == Standard || config == Checks) then
+      val checks = config == Checks
+      DSALogger.info("Finished Computing Constraints")
+      val globalGraph =
+        IntervalDSA.getLocal(irContext.program.mainProcedure, irContext, SymValues[Interval](Map.empty), Set[Constraint]())
+      val DSA = IntervalDSA.getLocals(irContext, sva, cons)
+      DSATimer.checkPoint("Finished DSA Local Phase")
+      if checks then
+        IntervalDSA.checkReachable(irContext.program, DSA)
+        DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
+        DSA.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness checks")
+
+      val DSABU = IntervalDSA.solveBUs(DSA)
+      DSATimer.checkPoint("Finished DSA BU Phase")
+      if checks then
+        DSABU.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness check")
+      val DSATD = IntervalDSA.solveTDs(DSABU)
+      DSATimer.checkPoint("Finished DSA TD Phase")
+      if checks then
+        DSATD.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness check")
+
+      DSATD.values.foreach(g => IntervalDSA.globalTransfer(g, globalGraph))
+      val globalMapping = DSATD.values.foldLeft(Map[IntervalNode, IntervalNode]()) { (m, g) =>
+        val oldToNew = IntervalDSA.globalTransfer(globalGraph, g)
+        m ++ oldToNew.map((common, spec) => (spec, common))
+
+      }
+      DSATimer.checkPoint("Finished DSA global graph")
+
+      if checks then
+        DSATD.values.foreach(_.localCorrectness())
+        IntervalDSA.checkConsistGlobals(DSATD, globalGraph)
+        IntervalDSA.checkReachable(irContext.program, DSATD)
+        DSALogger.info("Performed correctness check")
+
+      DSATimer.checkPoint("Finished DSA Invariant Check")
+      dsaContext = dsaContext.copy(local = DSA, bottomUp = DSABU, topDown = DSATD, globals = globalMapping)
+
+
+    dsaContext
+  }
+
 }
 
 object IntervalDSA {
