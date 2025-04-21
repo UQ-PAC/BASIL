@@ -937,6 +937,13 @@ object IntervalDSA {
     }
   }
 
+  private def isStackGuard(expr: Expr, isGlobal: Int => Boolean): Boolean = {
+    expr match
+      case literal: BitVecLiteral =>
+        !isGlobal(literal.value.toInt)
+      case _ => false
+  }
+
   /**
    *  checks that all reachable memory load and stores in DSA's domain have dsa cell(s)
    *  which corresponds to their index expr
@@ -953,7 +960,7 @@ object IntervalDSA {
           case load: MemoryLoad =>
             val pointers = dsg.exprToCells(load.index)
             assert(
-              pointers.nonEmpty || (load.index.isInstanceOf[BitVecLiteral] && !dsg.isGlobal(load.index.asInstanceOf[BitVecLiteral].value.toInt)),
+              pointers.nonEmpty || isStackGuard(load.index, dsg.isGlobal),
               "Expected cells for indices used in reachable memory access to have corresponding DSA cells"
             )
             assert(
