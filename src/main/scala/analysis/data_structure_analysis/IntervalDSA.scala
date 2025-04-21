@@ -122,10 +122,8 @@ class IntervalGraph(
   def isGlobal(address: Int): Boolean = {
     (irContext.globals ++ irContext.funcEntries).exists(g =>
       Interval(g.address.toInt, g.address.toInt + g.size / 8).contains(address)
-    ) || irContext.globalOffsets.exists((g1, g2) =>
-      Interval(g1.toInt, g1.toInt + 8).contains(address)
-        || Interval(g2.toInt, g2.toInt + 8).contains(address)
-    ) || irContext.externalFunctions.exists(g => Interval(g.offset.toInt, g.offset.toInt + 8).contains(address))
+    ) || irContext.globalOffsets.exists((g1, g2) => g1 == address || g2 == address
+    ) || irContext.externalFunctions.exists(g => address == g.offset)
   }
 
   def globalNode(
