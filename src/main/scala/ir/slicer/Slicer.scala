@@ -32,7 +32,23 @@ class Slicer(program: Program, globals: Set[SpecGlobal], globalOffsets: Map[BigI
     result
   }
 
+    private def buildLabels(summaries: Map[CFGPosition, Summary]): Map[CFGPosition, String] = {
+    (summaries.keys.toSet)
+      .map(s =>
+        s -> {
+          var data = summaries.getOrElse(s, Summary())
+          s"Entry: ${data.entry}\nExit:  ${data.exit}"
+        }
+      )
+      .toMap
+  }
+
   def run(): Unit = {
+
+    import util.PerformanceTimer
+    import util.LogLevel
+
+    val timer = PerformanceTimer("Slicer Timer", LogLevel.WARN)
 
     val slicingCriterion: Map[CFGPosition, StatementSlice] = Map(
     )
@@ -42,7 +58,14 @@ class Slicer(program: Program, globals: Set[SpecGlobal], globalOffsets: Map[BigI
       .map({ case (k, v) =>
         (k -> v.keys.toSet)
       })
+    timer.checkPoint("Finished Slice IDE")
 
-    SlicerLogger.info(setsToString(build(results, slicingCriterion)))
+    val built = build(results, slicingCriterion)
+
+    timer.checkPoint("Finished Slice Set Building")
+
+    SlicerLogger.info(setsToString(built))
+
+    println(dotBlockGraph(program))
   }
 }

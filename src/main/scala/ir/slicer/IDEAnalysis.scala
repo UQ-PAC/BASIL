@@ -105,9 +105,6 @@ trait SliceAnalysisFunctions(slicingCriterion: Map[CFGPosition, StatementSlice])
       }
       case g: GoTo => Map(d -> IdEdge())
       case r: Return => {
-        println(d)
-        println(r.outParams)
-        println()
         d match {
           case Left(value: LocalVar) => {
             r.outParams.get(value) match {

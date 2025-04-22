@@ -49,7 +49,7 @@ def build(
       case p: Procedure => {
         p.returnBlock match {
           case Some(block) => Summary(Left(() => summary(block).entry), Right(result ++ criterion))
-          case None => Summary()
+          case None => ??? //Summary()
         }
       }
       case b: Block => {
