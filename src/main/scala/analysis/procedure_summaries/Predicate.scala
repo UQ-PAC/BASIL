@@ -40,20 +40,19 @@ enum BVTerm {
     case SignExtend(extension, body) => BVSignExtend(extension, body.toBoogie)
   }
 
-  // TODO maybe remove option type as OldExpr now exists.
   /**
    * Encode this term as a basil expression
    */
-  def toBasil: Option[Expr] = this match {
-    case Lit(x) => Some(x)
-    case Var(v) => Some(v)
-    case OldVar(v) => Some(OldExpr(v))
-    case Uop(op, x) => x.toBasil.map(x => UnaryExpr(op, x))
-    case Bop(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
-    case Extract(end, start, body) => body.toBasil.map(x => ir.Extract(end, start, x))
-    case Repeat(repeats, body) => body.toBasil.map(x => ir.Repeat(repeats, x))
-    case ZeroExtend(extension, body) => body.toBasil.map(x => ir.ZeroExtend(extension, x))
-    case SignExtend(extension, body) => body.toBasil.map(x => ir.SignExtend(extension, x))
+  def toBasil: Expr = this match {
+    case Lit(x) => x
+    case Var(v) => v
+    case OldVar(v) => OldExpr(v)
+    case Uop(op, x) => UnaryExpr(op, x.toBasil)
+    case Bop(op, x, y) => BinaryExpr(op, x.toBasil, y.toBasil)
+    case Extract(end, start, body) => ir.Extract(end, start, body.toBasil)
+    case Repeat(repeats, body) => ir.Repeat(repeats, body.toBasil)
+    case ZeroExtend(extension, body) => ir.ZeroExtend(extension, body.toBasil)
+    case SignExtend(extension, body) => ir.SignExtend(extension, body.toBasil)
   }
 
   /**
@@ -165,19 +164,18 @@ enum GammaTerm {
       else s.tail.foldLeft(s.head.toBoogie) { (p, g) => BinaryBExpr(BoolAND, p, g.toBoogie) }
   }
 
-  // TODO maybe remove option type as OldExpr now exists.
   /**
    * Encode this term as a basil expression
    */
-  def toBasil: Option[Expr] = this match {
-    case Lit(x) => Some(x)
-    case Var(v) => Some(LocalVar(s"Gamma_${v.name}", BoolType))
-    case OldVar(v) => Var(v).toBasil.map(OldExpr(_))
-    case Uop(op, x) => x.toBasil.map(x => UnaryExpr(op, x))
+  def toBasil: Expr = this match {
+    case Lit(x) => x
+    case Var(v) => LocalVar(s"Gamma_${v.name}", BoolType)
+    case OldVar(v) => OldExpr(Var(v).toBasil)
+    case Uop(op, x) => UnaryExpr(op, x.toBasil)
     case Join(s) =>
-      if s.size == 0 then Some(TrueLiteral)
+      if s.size == 0 then TrueLiteral
       else if s.size == 1 then s.head.toBasil
-      else s.tail.foldLeft(s.head.toBasil) { (p, g) => g.toBasil.flatMap(g => p.map(p => BinaryExpr(BoolAND, p, g))) }
+      else s.tail.foldLeft(s.head.toBasil) { (p, g) => BinaryExpr(BoolAND, p, g.toBasil) }
   }
 
   def simplify: GammaTerm = {
@@ -233,7 +231,7 @@ object GammaTerm {
 
 sealed trait Atomic
 
-/** A predicate written in negation normal form.
+/** A predicate written in negation normal form (i.e. only atomics can be negated).
  */
 enum Predicate {
   import Predicate.*
@@ -265,31 +263,33 @@ enum Predicate {
     case GammaCmp(op, x, y) => BinaryBExpr(op, x.toBoogie, y.toBoogie)
   }
 
-  // TODO option
   /**
    * Encode this predicate as a basil expression of type BoolType
    */
-  def toBasil: Option[Expr] = this match {
-    case Lit(x) => Some(x)
-    case Not(x) => x.toBasil.map(x => UnaryExpr(BoolNOT, x))
+  def toBasil: Expr = this match {
+    case Lit(x) => x
+    case Not(x) => UnaryExpr(BoolNOT, x.toBasil)
     case Conj(s) =>
-      if s.size == 0 then Some(TrueLiteral)
+      if s.size == 0 then TrueLiteral
       else if s.size == 1 then s.head.toBasil
       else
         s.tail.foldLeft(s.head.toBasil) { (p, q) =>
-          p.flatMap { p => q.toBasil.map { q => BinaryExpr(BoolAND, p, q) } }
+          BinaryExpr(BoolAND, p, q.toBasil)
         }
     case Disj(s) =>
-      if s.size == 0 then Some(FalseLiteral)
+      if s.size == 0 then FalseLiteral
       else if s.size == 1 then s.head.toBasil
       else
-        s.tail.foldLeft(s.head.toBasil) { (p, q) => p.flatMap { p => q.toBasil.map { q => BinaryExpr(BoolOR, p, q) } } }
-    case BVCmp(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
-    case GammaCmp(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
+        s.tail.foldLeft(s.head.toBasil) { (p, q) =>
+          BinaryExpr(BoolOR, p, q.toBasil)
+        }
+    case BVCmp(op, x, y) => BinaryExpr(op, x.toBasil, y.toBasil)
+    case GammaCmp(op, x, y) => BinaryExpr(op, x.toBasil, y.toBasil)
   }
 
-  // TODO perhaps an alternative syntax would be ideal, as this would remove ambiguities with bracketing.
-  // Perhaps it would also help if such an alternative syntax could be input into source code easily.
+  // TODO perhaps an alternative syntax would be ideal, as this it would then be distinct from
+  // boogie syntax, and there would be no pointless bracketing. Perhaps it would also help if
+  // such an alternative syntax could be input into source code easily.
   override def toString(): String = this.toBoogie.toString
 
   def size: Int = this match {
