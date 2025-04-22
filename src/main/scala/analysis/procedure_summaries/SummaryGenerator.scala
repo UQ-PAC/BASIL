@@ -40,54 +40,6 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
     }
   }
 
-  // TODO move these to the predicate file
-  /**
-   * Determines whether the term contains only variables in vars
-   */
-  def varsAllIn(b: BVTerm, vars: Set[Variable]): Boolean = {
-    import BVTerm.*
-    b match {
-      case Lit(x) => true
-      case Var(v) => vars.contains(v)
-      case OldVar(v) => true
-      case Uop(op, x) => varsAllIn(x, vars)
-      case Bop(op, x, y) => varsAllIn(x, vars) && varsAllIn(y, vars)
-      case Repeat(repeats, body) => varsAllIn(body, vars)
-      case Extract(end, start, body) => varsAllIn(body, vars)
-      case ZeroExtend(extension, body) => varsAllIn(body, vars)
-      case SignExtend(extension, body) => varsAllIn(body, vars)
-    }
-  }
-
-  /**
-   * Determines whether the term contains only variables in vars
-   */
-  def varsAllIn(g: GammaTerm, vars: Set[Variable]): Boolean = {
-    import GammaTerm.*
-    g match {
-      case Lit(x) => true
-      case Var(v) => vars.contains(v)
-      case OldVar(v) => true
-      case Uop(op, x) => varsAllIn(x, vars)
-      case Join(s) => s.forall(varsAllIn(_, vars))
-    }
-  }
-
-  /**
-   * Removes all parts of the predicate containing variables not in vars (replacing the subexpression with default).
-   */
-  private def filterPred(p: Predicate, vars: Set[Variable], default: Predicate): Predicate = {
-    import Predicate.*
-    p match {
-      case Lit(x) => p
-      case Not(x) => not(filterPred(x, vars, default))
-      case Conj(s) => Conj(s.map(filterPred(_, vars, default)))
-      case Disj(s) => Disj(s.map(filterPred(_, vars, default)))
-      case BVCmp(op, x, y) => if varsAllIn(x, vars) && varsAllIn(y, vars) then p else default
-      case GammaCmp(op, x, y) => if varsAllIn(x, vars) && varsAllIn(y, vars) then p else default
-    }
-  }
-
   def transfer(map: Procedure => ProcedureSummary, p: ProcedureSummary, procedure: Procedure): ProcedureSummary = {
     if procedure.blocks.isEmpty then return ProcedureSummary(List(), List())
 
@@ -213,7 +165,7 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
       .map(b =>
         afterAbsInt
           .get(b)
-          .map(l => filterPred(predAbsIntDomain.toPred(l), outVars ++ inVars, Predicate.True).split.map(_.simplify))
+          .map(l => predAbsIntDomain.toPred(l).filterOut(outVars ++ inVars, Predicate.True).split.map(_.simplify))
       )
       .flatten
       .toList

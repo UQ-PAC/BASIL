@@ -122,16 +122,34 @@ enum BVTerm {
    * Determines whether the provided term is a subexpression of this expression
    */
   def contains(term: BVTerm): Boolean = if this == term then true
-  else
+    else
+      this match {
+        case Uop(op, x) => x.contains(term)
+        case Bop(op, x, y) => x.contains(term) || y.contains(term)
+        case Extract(end, start, body) => body.contains(term)
+        case Repeat(repeats, body) => body.contains(term)
+        case ZeroExtend(extension, body) => body.contains(term)
+        case SignExtend(extension, body) => body.contains(term)
+        case _ => false
+      }
+
+  /**
+   * Determines whether the term contains only variables in vars
+   */
+  def containsOnly(vars: Set[Variable]): Boolean = {
     this match {
-      case Uop(op, x) => x.contains(term)
-      case Bop(op, x, y) => x.contains(term) || y.contains(term)
-      case Extract(end, start, body) => body.contains(term)
-      case Repeat(repeats, body) => body.contains(term)
-      case ZeroExtend(extension, body) => body.contains(term)
-      case SignExtend(extension, body) => body.contains(term)
-      case _ => false
+      case Lit(x) => true
+      case Var(v) => vars.contains(v)
+      case OldVar(v) => true
+      case Uop(op, x) => x.containsOnly(vars)
+      case Bop(op, x, y) => x.containsOnly(vars) && y.containsOnly(vars)
+      case Repeat(repeats, body) => body.containsOnly(vars)
+      case Extract(end, start, body) => body.containsOnly(vars)
+      case ZeroExtend(extension, body) => body.containsOnly(vars)
+      case SignExtend(extension, body) => body.containsOnly(vars)
     }
+  }
+
 }
 
 /**
@@ -212,14 +230,29 @@ enum GammaTerm {
    * Determines whether the provided term is a subexpression of this expression
    */
   def contains(term: GammaTerm): Boolean = if this == term then true
-  else
+    else
+      this match {
+        case Lit(x) => false
+        case Var(v) => false
+        case OldVar(v) => false
+        case Uop(op, x) => x.contains(term)
+        case Join(s) => s.exists(_.contains(term))
+      }
+
+  /**
+   * Determines whether the term contains only variables in vars
+   */
+  def containsOnly(vars: Set[Variable]): Boolean = {
+    import GammaTerm.*
     this match {
-      case Lit(x) => false
-      case Var(v) => false
-      case OldVar(v) => false
-      case Uop(op, x) => x.contains(term)
-      case Join(s) => s.exists(_.contains(term))
+      case Lit(x) => true
+      case Var(v) => vars.contains(v)
+      case OldVar(v) => true
+      case Uop(op, x) => x.containsOnly(vars)
+      case Join(s) => s.forall(_.containsOnly(vars))
     }
+  }
+
 }
 
 object GammaTerm {
@@ -677,6 +710,21 @@ enum Predicate {
     }
     ret.simplified = true
     ret
+  }
+
+  /**
+   * Removes all parts of the predicate containing variables not in vars (replacing the subexpression with default).
+   */
+  def filterOut(vars: Set[Variable], default: Predicate): Predicate = {
+    import Predicate.*
+    this match {
+      case Lit(x) => this
+      case Not(x) => not(x.filterOut(vars, default))
+      case Conj(s) => Conj(s.map(_.filterOut(vars, default)))
+      case Disj(s) => Disj(s.map(_.filterOut(vars, default)))
+      case BVCmp(op, x, y) => if x.containsOnly(vars) && y.containsOnly(vars) then this else default
+      case GammaCmp(op, x, y) => if x.containsOnly(vars) && y.containsOnly(vars) then this else default
+    }
   }
 }
 
