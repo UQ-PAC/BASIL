@@ -8,6 +8,7 @@ import ir.transforms.AbstractDomain
 // TODO DAG predicates (don't represent the same subexpression twice)
 
 /**
+ * A bitvector expression.
  */
 enum BVTerm {
   case Lit(x: BitVecLiteral)
@@ -24,6 +25,9 @@ enum BVTerm {
 
   override def toString(): String = this.toBoogie.toString()
 
+  /**
+   * Convert to a boogie expression of type BitVecBType
+   */
   def toBoogie: BExpr = this match {
     case Lit(x) => x.toBoogie
     case Var(v) => v.toBoogie
@@ -36,10 +40,14 @@ enum BVTerm {
     case SignExtend(extension, body) => BVSignExtend(extension, body.toBoogie)
   }
 
+  // TODO maybe remove option type as OldExpr now exists.
+  /**
+   * Encode this term as a basil expression
+   */
   def toBasil: Option[Expr] = this match {
     case Lit(x) => Some(x)
     case Var(v) => Some(v)
-    case OldVar(v) => None
+    case OldVar(v) => Some(OldExpr(v))
     case Uop(op, x) => x.toBasil.map(x => UnaryExpr(op, x))
     case Bop(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
     case Extract(end, start, body) => body.toBasil.map(x => ir.Extract(end, start, x))
@@ -66,12 +74,12 @@ enum BVTerm {
   }
 
   /**
+   * Simplify this expression
    */
   def simplify: BVTerm = {
     import eval.BitVectorEval.*
     if this.simplified then return this
     val ret = this match {
-      // TODO const prop
       case Uop(op, x) =>
         (op, x.simplify) match {
           case (BVNEG, Lit(x)) => Lit(smt_bvneg(x))
@@ -128,6 +136,7 @@ enum BVTerm {
 }
 
 /**
+ * A gamma expression.
  */
 enum GammaTerm {
   import GammaTerm.*
@@ -142,6 +151,9 @@ enum GammaTerm {
 
   override def toString(): String = this.toBoogie.toString()
 
+  /**
+   * Convert to a boogie expression of type BoolBType
+   */
   def toBoogie: BExpr = this match {
     case Lit(x) => x.toBoogie
     case Var(v) => v.toGamma
@@ -153,10 +165,14 @@ enum GammaTerm {
       else s.tail.foldLeft(s.head.toBoogie) { (p, g) => BinaryBExpr(BoolAND, p, g.toBoogie) }
   }
 
+  // TODO maybe remove option type as OldExpr now exists.
+  /**
+   * Encode this term as a basil expression
+   */
   def toBasil: Option[Expr] = this match {
     case Lit(x) => Some(x)
     case Var(v) => Some(LocalVar(s"Gamma_${v.name}", BoolType))
-    case OldVar(v) => None
+    case OldVar(v) => Var(v).toBasil.map(OldExpr(_))
     case Uop(op, x) => x.toBasil.map(x => UnaryExpr(op, x))
     case Join(s) =>
       if s.size == 0 then Some(TrueLiteral)
@@ -164,8 +180,6 @@ enum GammaTerm {
       else s.tail.foldLeft(s.head.toBasil) { (p, g) => g.toBasil.flatMap(g => p.map(p => BinaryExpr(BoolAND, p, g))) }
   }
 
-  /**
-   */
   def simplify: GammaTerm = {
     if this.simplified then return this
     val ret = this match {
@@ -219,7 +233,7 @@ object GammaTerm {
 
 sealed trait Atomic
 
-/**
+/** A predicate written in negation normal form.
  */
 enum Predicate {
   import Predicate.*
@@ -233,6 +247,9 @@ enum Predicate {
 
   private var simplified: Boolean = false
 
+  /**
+   * Encode this predicate as a boogie expression of type BoolBType.
+   */
   def toBoogie: BExpr = this match {
     case Lit(x) => x.toBoogie
     case Not(x) => UnaryBExpr(BoolNOT, x.toBoogie)
@@ -248,6 +265,10 @@ enum Predicate {
     case GammaCmp(op, x, y) => BinaryBExpr(op, x.toBoogie, y.toBoogie)
   }
 
+  // TODO option
+  /**
+   * Encode this predicate as a basil expression of type BoolType
+   */
   def toBasil: Option[Expr] = this match {
     case Lit(x) => Some(x)
     case Not(x) => x.toBasil.map(x => UnaryExpr(BoolNOT, x))
@@ -267,6 +288,8 @@ enum Predicate {
     case GammaCmp(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
   }
 
+  // TODO perhaps an alternative syntax would be ideal, as this would remove ambiguities with bracketing.
+  // Perhaps it would also help if such an alternative syntax could be input into source code easily.
   override def toString(): String = this.toBoogie.toString
 
   def size: Int = this match {
@@ -460,8 +483,12 @@ enum Predicate {
     ret
 
   /**
+   * Simplify this predicate.
    */
   def simplify: Predicate = {
+    /* It is assumed (and not currently verified) that simplification is idempotent (i.e. p.simplify.simplify = p.simplify forall p).
+     * Hence we can use a flag to keep track of wether we have simplified each predicate, and don't simplify again if we already have.
+     */
     if this.simplified then return this
     val ret = this match {
       case Not(a) =>
@@ -472,12 +499,22 @@ enum Predicate {
         }
       case Conj(s) => {
         var cur = s.map(_.simplify)
+        // Repeatedly apply simplification rules until none can be applied.
         var changed = true
         while (changed) {
           changed = false
 
           // There's some nondeterminism here because we may iterate over hashsets
 
+          // Join disjunctions with common terms together.
+          // For example, this will replace
+          // (a || b || c) && (a || b || d) && e
+          // with
+          // (a || b || (c && d)) && e
+          //
+          // Note that this is probably quite slow!
+          // It could probably be sped up an okay amount if we speed up predicate equality checks
+          // with some sort of hash
           var disjs = Set[Disj]()
 
           for p <- cur if disjs.size < 2 do {
@@ -500,6 +537,7 @@ enum Predicate {
               cur = cur1
           }
 
+          // Apply simplification rules
           for p <- cur if !changed do {
             val cur1 = p match {
               case Lit(TrueLiteral) => cur - p
@@ -534,11 +572,17 @@ enum Predicate {
       case Disj(s) => {
         var cur = s.map(_.simplify)
         var changed = true
+        // Repeatedly apply simplification rules until none can be applied.
         while (changed) {
           changed = false
 
           // There's some nondeterminism here because we may iterate over hashsets
 
+          // Join conjunctions with common terms together.
+          // For example, this will replace
+          // (a && b && c) || (a && b && d) || e
+          // with
+          // (a && b && (c || d)) || e
           var conjs = Set[Conj]()
 
           for p <- cur if conjs.size < 2 do {
@@ -561,6 +605,7 @@ enum Predicate {
               cur = cur1
           }
 
+          // Apply simplification rules
           for p <- cur if !changed do {
             val cur1 = p match {
               case Disj(s2) => cur - p ++ s2
