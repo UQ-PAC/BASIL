@@ -3,6 +3,8 @@ package analysis
 import ir.*
 import ir.transforms.AbstractDomain
 
+import scala.annotation.implicitNotFound
+
 /** Lattice structure internal to a type.
   */
 trait InternalLattice[T <: InternalLattice[T]] {
@@ -133,6 +135,12 @@ class LatticeSetLattice[T] extends Lattice[LatticeSet[T]] {
 
 /** A map which defaults to either the top or bottom element of a lattice. This is more efficient to use in static
   * analyses as it is common to default most values in a map to either top or bottom.
+  *
+  * In order to call `apply`, `join` or `meet`, an implicit term of type L must be declared, and L must implement the `InternalLattice` trait.
+  * For example, to declare an implicit interval, we write (outside the scope of any classes that we are implementing)
+  * ```scala
+  * private implicit val intervalTerm: Interval = Interval.Bottom
+  * ```
   */
 enum LatticeMap[D, L] {
   /* PERFORMANCE:
@@ -178,17 +186,26 @@ enum LatticeMap[D, L] {
 
   /** Evaluate the function at `v`, accounting for defaulting behaviour.
     */
-  def apply[L1 <: InternalLattice[L1]](v: D)(implicit s: L <:< L1, l: L1): L1 = this match {
+  def apply[L1 <: InternalLattice[L1]](v: D)(implicit
+    s: L <:< L1,
+    @implicitNotFound("No implicit of type ${L1} was found. See LatticeMap docs for more info.") l: L1
+  ): L1 = this match {
     case Top() => l.top
     case Bottom() => l.bottom
     case TopMap(m) => m.getOrElse(v, l.top).asInstanceOf[L1]
     case BottomMap(m) => m.getOrElse(v, l.bottom).asInstanceOf[L1]
   }
 
-  def join[L1 <: InternalLattice[L1]](other: LatticeMap[D, L1])(implicit s: L <:< L1, l: L1): LatticeMap[D, L1] =
+  def join[L1 <: InternalLattice[L1]](other: LatticeMap[D, L1])(implicit
+    s: L <:< L1,
+    @implicitNotFound("No implicit of type ${L1} was found. See LatticeMap docs for more info.") l: L1
+  ): LatticeMap[D, L1] =
     latticeMapJoin(this.asInstanceOf[LatticeMap[D, L1]], other, (a, b) => a.join(b), l.top, l.bottom)
 
-  def meet[L1 <: InternalLattice[L1]](other: LatticeMap[D, L1])(implicit s: L <:< L1, l: L1): LatticeMap[D, L1] =
+  def meet[L1 <: InternalLattice[L1]](other: LatticeMap[D, L1])(implicit
+    s: L <:< L1,
+    @implicitNotFound("No implicit of type ${L1} was found. See LatticeMap docs for more info.") l: L1
+  ): LatticeMap[D, L1] =
     latticeMapMeet(this.asInstanceOf[LatticeMap[D, L1]], other, (a, b) => a.meet(b), l.top, l.bottom)
 
   def top: LatticeMap[D, L] = Top()
