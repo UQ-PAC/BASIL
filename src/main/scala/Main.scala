@@ -196,8 +196,6 @@ object Main {
     if (conf.verbose.value) {
       Logger.setLevel(LogLevel.DEBUG, true)
     }
-    DebugDumpIRLogger.setLevel(LogLevel.OFF)
-    AnalysisResultDotLogger.setLevel(LogLevel.OFF)
     for (v <- conf.verboseLog) {
       Logger.findLoggerByName(v) match {
         case None =>

@@ -15,9 +15,6 @@ import ir.transforms.{
   worklistSolver
 }
 
-// TODO annotated preconditions and postconditions
-// TODO don't convert to boogie until translating, so that we can use conditions in analyses
-
 case class Condition(pred: Predicate, label: Option[String] = None)
 
 case class ProcedureSummary(requires: List[Condition], ensures: List[Condition])
