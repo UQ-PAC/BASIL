@@ -2,7 +2,7 @@ package ir.slicer
 
 import ir.*
 
-type SlicingParameter = Variable 
+type SlicingParameter = Variable
 
 type StatementSlice = Set[SlicingParameter]
 object StatementSlice {
@@ -33,7 +33,7 @@ def build(
   slicingCriterion: Map[CFGPosition, StatementSlice]
 ): Map[CFGPosition, Summary] = {
 
-  def flatten(ns: Iterable[CFGPosition]): StatementSlice = {
+  def flatten(ns: Iterable[Block]): StatementSlice = {
     ns.toList.flatMap(b => results.get(b).toList) match {
       case Nil => Set.empty
       case h :: Nil => h
@@ -47,10 +47,13 @@ def build(
 
     n match {
       case p: Procedure => {
-        p.returnBlock match {
-          case Some(block) => Summary(Left(() => summary(block).entry), Right(result ++ criterion))
-          case None => ??? //Summary()
-        }
+        Summary(
+          (p.returnBlock match {
+            case Some(block) => Left(() => summary(block).entry)
+            case None => Left(() => p.incomingCalls().flatMap(s => summary(s).entry).toSet)
+          }),
+          Right(result ++ criterion)
+        )
       }
       case b: Block => {
         b.nextBlocks match {
@@ -58,7 +61,17 @@ def build(
           case blocks => Summary(Right(flatten(blocks)), Right(result ++ criterion))
         }
       }
-      case c: DirectCall => Summary(Left(() => summary(c.successor).exit), Right(result ++ criterion))
+      case s: (Assign | MemoryStore | Assume | Assert) => {
+        Summary(
+          Right(result),
+          s.predecessor match {
+            case Some(pred) => Left(() => summary(pred).entry ++ criterion)
+            case None => Left(() => summary(s.parent).exit ++ criterion)
+          }
+        )
+      }
+      case c: Call => Summary(Left(() => summary(c.successor).exit), Right(result ++ criterion))
+      case n: NOP => Summary(Left(() => summary(n.successor).exit), Right(result ++ criterion))
       case g: GoTo => Summary(Right(flatten(g.targets)), Right(result ++ criterion))
       case r: Return => {
         Summary(
@@ -69,25 +82,13 @@ def build(
           }
         )
       }
-      // case s: Statement => {
-      case s: (LocalAssign | MemoryAssign | MemoryLoad | MemoryStore | Assume | Assert) => {
-        Summary(
-          Right(result),
-          s.predecessor match {
-            case Some(pred) => Left(() => summary(pred).entry ++ criterion)
-            case None => Left(() => summary(s.parent).exit ++ criterion)
-          }
-        )
+      case u: Unreachable => {
+        Summary(Left(() => summary(u.parent).entry), Right(result ++ criterion))
       }
-      case i: IndirectCall => Summary(Right(result), Right(result ++ criterion))
-      case u: Unreachable => Summary(Right(result), Right(result ++ criterion))
-      case n: NOP => Summary(Right(result), Right(result ++ criterion))
     }
   }
 
   results
     .map((n, result) => n -> summary(n))
-    .toMap
     .withDefault(n => summary(n))
 }
-
