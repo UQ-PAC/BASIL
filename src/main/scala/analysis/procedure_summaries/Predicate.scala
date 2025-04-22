@@ -122,16 +122,16 @@ enum BVTerm {
    * Determines whether the provided term is a subexpression of this expression
    */
   def contains(term: BVTerm): Boolean = if this == term then true
-    else
-      this match {
-        case Uop(op, x) => x.contains(term)
-        case Bop(op, x, y) => x.contains(term) || y.contains(term)
-        case Extract(end, start, body) => body.contains(term)
-        case Repeat(repeats, body) => body.contains(term)
-        case ZeroExtend(extension, body) => body.contains(term)
-        case SignExtend(extension, body) => body.contains(term)
-        case _ => false
-      }
+  else
+    this match {
+      case Uop(op, x) => x.contains(term)
+      case Bop(op, x, y) => x.contains(term) || y.contains(term)
+      case Extract(end, start, body) => body.contains(term)
+      case Repeat(repeats, body) => body.contains(term)
+      case ZeroExtend(extension, body) => body.contains(term)
+      case SignExtend(extension, body) => body.contains(term)
+      case _ => false
+    }
 
   /**
    * Determines whether the term contains only variables in vars
@@ -230,14 +230,14 @@ enum GammaTerm {
    * Determines whether the provided term is a subexpression of this expression
    */
   def contains(term: GammaTerm): Boolean = if this == term then true
-    else
-      this match {
-        case Lit(x) => false
-        case Var(v) => false
-        case OldVar(v) => false
-        case Uop(op, x) => x.contains(term)
-        case Join(s) => s.exists(_.contains(term))
-      }
+  else
+    this match {
+      case Lit(x) => false
+      case Var(v) => false
+      case OldVar(v) => false
+      case Uop(op, x) => x.contains(term)
+      case Join(s) => s.exists(_.contains(term))
+    }
 
   /**
    * Determines whether the term contains only variables in vars
