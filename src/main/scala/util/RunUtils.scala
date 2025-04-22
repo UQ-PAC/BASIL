@@ -17,7 +17,7 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 import analysis.solvers.*
-import analysis.*
+import analysis.{Interval as _, *}
 import analysis.data_structure_analysis.DSAPhase.{BU, TD}
 import bap.*
 import ir.*
