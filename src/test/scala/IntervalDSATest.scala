@@ -361,7 +361,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("acl_check") {
-    val path = "examples/cntlm-o3/cntlm-noduk"
+    val path = "examples/cntlm-noduk/cntlm-noduk"
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
