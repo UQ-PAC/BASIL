@@ -1,8 +1,6 @@
 package ir.slicer
 
 import ir.*
-import boogie.*
-import analysis.RangeKey
 import analysis.*
 
 import analysis.solvers.*
@@ -26,8 +24,8 @@ trait SliceAnalysisFunctions(slicingCriterion: Map[CFGPosition, StatementSlice])
     val params: Map[LocalVar, Variable] = predecessor match {
       case Some(command) => {
         command match {
-          case i: IndirectCall => Map()
           case c: DirectCall => c.outParams
+          case i: IndirectCall => Map()
           case s: Statement => ???
           case j: Jump => ???
         }
@@ -36,7 +34,7 @@ trait SliceAnalysisFunctions(slicingCriterion: Map[CFGPosition, StatementSlice])
     }
 
     d match {
-      case Left(value) if params.map(_._2).toSet.contains(value) => fold(params.filter(_._2 == value).map(_._1))
+      case Left(value) if params.values.toSet.contains(value) => fold(params.filter(_._2 == value).keys)
       case _ => Map(d -> IdEdge())
     }
   }
@@ -96,13 +94,14 @@ trait SliceAnalysisFunctions(slicingCriterion: Map[CFGPosition, StatementSlice])
           case Right(_) => Map(d -> IdEdge()) ++ fold(a.body.variables)
         }
       }
-      case i: IndirectCall => Map(d -> IdEdge())
       case c: DirectCall => {
         d match {
-          case Left(value) if c.outParams.map(_._2).toSet.contains(value) => Map()
+          case Left(value) if c.outParams.values.toSet.contains(value) => Map()
           case _ => Map(d -> IdEdge())
         }
       }
+      case i: IndirectCall => Map(d -> IdEdge())
+      case n: NOP => Map(d -> IdEdge())
       case g: GoTo => Map(d -> IdEdge())
       case r: Return => {
         d match {
@@ -116,7 +115,6 @@ trait SliceAnalysisFunctions(slicingCriterion: Map[CFGPosition, StatementSlice])
         }
       }
       case u: Unreachable => Map(d -> IdEdge())
-      case n: NOP => Map(d -> IdEdge())
     }) ++ fold(slicingCriterion.getOrElse(n, Set()))
   }
 }
