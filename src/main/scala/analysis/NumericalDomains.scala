@@ -95,6 +95,7 @@ class IntervalDomain(
   def transfer(b: LatticeMap[Variable, Interval], c: Command): LatticeMap[Variable, Interval] = {
     c match {
       case c: LocalAssign => b + (c.lhs -> eval(c.rhs, b))
+      case c: MemoryAssign => b + (c.lhs -> eval(c.rhs, b))
       case c: MemoryLoad => b + (c.lhs -> Top)
       case c: MemoryStore => b
       case c: Assume => exprToPredicate(c.body).map(p => b.meet(fromPred(p))).getOrElse(b)

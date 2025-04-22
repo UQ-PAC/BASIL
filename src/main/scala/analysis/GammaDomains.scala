@@ -28,6 +28,8 @@ trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[Variable, Lat
     c match {
       case c: LocalAssign =>
         m + (c.lhs -> c.rhs.variables.foldLeft(LatticeSet.Bottom[Variable]())((s, v) => s.union(m(v))))
+      case c: MemoryAssign =>
+        m + (c.lhs -> c.rhs.variables.foldLeft(LatticeSet.Bottom[Variable]())((s, v) => s.union(m(v))))
       case c: MemoryLoad => m + (c.lhs -> topTerm)
       case c: MemoryStore => m
       case c: Assume => m
@@ -106,6 +108,7 @@ class ReachabilityConditions extends PredicateEncodingDomain[Predicate] {
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
       case a: LocalAssign => b
+      case c: MemoryAssign => b
       case a: MemoryLoad => b
       case m: MemoryStore => b
       case a: Assume => b
@@ -144,6 +147,10 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
       case a: LocalAssign =>
+        b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get)
+          .replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get)
+          .simplify
+      case a: MemoryAssign =>
         b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get)
           .replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get)
           .simplify
@@ -199,6 +206,10 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
       case a: LocalAssign =>
+        b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get)
+          .replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get)
+          .simplify
+      case a: MemoryAssign =>
         b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get)
           .replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get)
           .simplify
