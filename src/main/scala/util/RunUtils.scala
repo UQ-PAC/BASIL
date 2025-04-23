@@ -17,7 +17,7 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 import analysis.solvers.*
-import analysis.*
+import analysis.{Interval as _, *}
 import analysis.data_structure_analysis.DSAPhase.{BU, TD}
 import bap.*
 import ir.*
@@ -72,7 +72,6 @@ case class StaticAnalysisContext(
   steensgaardResults: Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]],
   mmmResults: MemoryModelMap,
   reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-  varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
   regionInjector: Option[RegionInjector],
   symbolicAddresses: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
   localDSA: Map[Procedure, Graph],
@@ -348,20 +347,13 @@ object IRTransform {
     }
   }
 
-  def generateProcedureSummaries(
-    ctx: IRContext,
-    IRProgram: Program,
-    constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]]
-  ): Boolean = {
+  def generateProcedureSummaries(ctx: IRContext, IRProgram: Program, simplified: Boolean = false): Boolean = {
     var modified = false
     // Need to know modifies clauses to generate summaries, but this is probably out of place
     val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
     ctx.program.setModifies(specModifies)
 
-    val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
-    val summaryGenerator =
-      SummaryGenerator(IRProgram, ctx.specification.globals, specGlobalAddresses, constPropResult, varDepsSummaries)
+    val summaryGenerator = SummaryGenerator(IRProgram, simplified)
     IRProgram.procedures
       .filter { p =>
         p != IRProgram.mainProcedure
@@ -471,17 +463,6 @@ object StaticAnalysis {
         printAnalysisResults(IRProgram, interProcConstPropResult)
       )
     }
-
-    StaticAnalysisLogger.debug("[!] Variable dependency summaries")
-    val scc = stronglyConnectedComponents(CallGraph, List(IRProgram.mainProcedure))
-    val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
-    val varDepsSummaries = VariableDependencyAnalysis(
-      IRProgram,
-      ctx.specification.globals,
-      specGlobalAddresses,
-      interProcConstPropResult,
-      scc
-    ).analyze()
 
     val intraProcConstProp = IntraProcConstantPropagation(IRProgram)
     val intraProcConstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] =
@@ -632,8 +613,8 @@ object StaticAnalysis {
     val interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = InterLiveVarsAnalysis(IRProgram).analyze()
 
     StaticAnalysisContext(
-      intraProcConstProp = interProcConstPropResult,
-      interProcConstProp = intraProcConstPropResult,
+      intraProcConstProp = intraProcConstPropResult,
+      interProcConstProp = interProcConstPropResult,
       memoryRegionResult = mraResult,
       vsaResult = vsaResult,
       interLiveVarsResults = interLiveVarsResults,
@@ -642,7 +623,6 @@ object StaticAnalysis {
       mmmResults = mmm,
       symbolicAddresses = Map.empty,
       reachingDefs = reachingDefinitionsAnalysisResults,
-      varDepsSummaries = varDepsSummaries,
       regionInjector = None,
       localDSA = Map.empty,
       bottomUpDSA = Map.empty,
@@ -956,6 +936,11 @@ object RunUtils {
         }
     }
 
+    if (conf.summariseProcedures) {
+      StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
+      IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify)
+    }
+
     if (q.runInterpret) {
       Logger.info("Start interpret")
 
@@ -1046,11 +1031,6 @@ object RunUtils {
       } else {
         modified =
           transforms.VSAIndirectCallResolution(ctx.program, result.vsaResult, result.mmmResults).resolveIndirectCalls()
-      }
-
-      StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
-      if (config.summariseProcedures) {
-        IRTransform.generateProcedureSummaries(ctx, ctx.program, result.intraProcConstProp, result.varDepsSummaries)
       }
 
       if (modified) {

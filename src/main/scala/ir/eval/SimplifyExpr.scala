@@ -277,6 +277,9 @@ def logSimp(e: Expr, ne: Expr, actual: Boolean = true)(implicit
     return ne
   }
 
+  e.getType
+  ne.getType
+
   if (SimplifyValidation.debugTrace.length > 50) {
     SimplifyValidation.debugTrace.drop(SimplifyValidation.debugTrace.length - 50)
   }
@@ -503,21 +506,21 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
         ) if x == x2 && z.value == y.value + 1 => {
       logSimp(e, BinaryExpr(BVUGT, x, z))
     }
-    case e @ BinaryExpr(
+    case BinaryExpr(
           BoolAND,
           BinaryExpr(BVULT, x, y: BitVecLiteral),
           UnaryExpr(BoolNOT, (BinaryExpr(BVEQ, x2, z: BitVecLiteral)))
         ) if x == x2 && z.value == y.value - 1 => {
       logSimp(e, BinaryExpr(BVULT, x, z))
     }
-    case e @ BinaryExpr(
+    case BinaryExpr(
           BoolAND,
           BinaryExpr(BVUGE, x, y: BitVecLiteral),
           UnaryExpr(BoolNOT, (BinaryExpr(BVEQ, x2, z: BitVecLiteral)))
         ) if x == x2 && z.value == y.value + 1 => {
       logSimp(e, BinaryExpr(BVUGT, x, z))
     }
-    case e @ BinaryExpr(
+    case BinaryExpr(
           BoolAND,
           BinaryExpr(BVULE, x, y: BitVecLiteral),
           UnaryExpr(BoolNOT, (BinaryExpr(BVEQ, x2, z: BitVecLiteral)))
@@ -846,10 +849,6 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
         ) if isIneq(op1) && isIneq(op2) && isIneq(op3) && isIneq(op4) && lhs1 == lhs2 && lhs3 != lhs1 => {
       logSimp(e, BinaryExpr(BoolAND, BinaryExpr(BoolAND, a, c), BinaryExpr(BoolAND, b, d)))
     }
-
-    case BinaryExpr(BoolOR, BinaryExpr(BVUGT, x, y), BinaryExpr(BVULE, x1, y1)) if x1 == x && y1 == y => TrueLiteral
-    case BinaryExpr(BoolOR, BinaryExpr(BVULT, x, y), BinaryExpr(BVUGE, x1, y1)) if x1 == x && y1 == y => TrueLiteral
-    case BinaryExpr(BoolOR, BinaryExpr(BVULE, x, y), BinaryExpr(BVUGT, x1, y1)) if x1 == x && y1 == y => TrueLiteral
 
     // case orig @ BinaryExpr(
     //       BoolAND,
@@ -1214,10 +1213,17 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
     case BinaryExpr(BoolEQ, x, FalseLiteral) => logSimp(e, UnaryExpr(BoolNOT, x))
     case BinaryExpr(BVADD, x, BitVecLiteral(0, _)) => logSimp(e, x)
 
+    case BinaryExpr(BoolIMPLIES, FalseLiteral, _) => logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolIMPLIES, _, TrueLiteral) => logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolIMPLIES, TrueLiteral, x) => logSimp(e, x)
+    case BinaryExpr(BoolIMPLIES, x, FalseLiteral) => logSimp(e, UnaryExpr(BoolNOT, x))
+    case BinaryExpr(BoolIMPLIES, x, y) if x == y => logSimp(e, TrueLiteral)
+
     // double negation
     case UnaryExpr(BVNOT, UnaryExpr(BVNOT, body)) => logSimp(e, body)
     case UnaryExpr(BVNEG, UnaryExpr(BVNEG, body)) => logSimp(e, body)
     case UnaryExpr(BoolNOT, UnaryExpr(BoolNOT, body)) => logSimp(e, body)
+    case BinaryExpr(BoolIMPLIES, UnaryExpr(BoolNOT, a), b) => logSimp(e, BinaryExpr(BoolOR, a, b))
 
     // syntactic equality
     case BinaryExpr(BVEQ, a, b) if a == b => logSimp(e, TrueLiteral)
@@ -1250,6 +1256,38 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
     case UnaryExpr(BoolNOT, BinaryExpr(BVSGE, lhs, rhs)) => logSimp(e, BinaryExpr(BVSLT, lhs, rhs))
     case UnaryExpr(BoolNOT, BinaryExpr(BVULE, lhs, rhs)) => logSimp(e, BinaryExpr(BVUGT, lhs, rhs))
     case UnaryExpr(BoolNOT, BinaryExpr(BVUGE, lhs, rhs)) => logSimp(e, BinaryExpr(BVULT, lhs, rhs))
+
+    case BinaryExpr(BoolOR, BinaryExpr(BVUGE, x, y), BinaryExpr(BVULT, x1, y1)) if x1 == x && y1 == y =>
+      logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolOR, BinaryExpr(BVUGT, x, y), BinaryExpr(BVULE, x1, y1)) if x1 == x && y1 == y =>
+      logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolOR, BinaryExpr(BVULT, x, y), BinaryExpr(BVUGE, x1, y1)) if x1 == x && y1 == y =>
+      logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolOR, BinaryExpr(BVULE, x, y), BinaryExpr(BVUGT, x1, y1)) if x1 == x && y1 == y =>
+      logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolOR, BinaryExpr(BVSGE, x, y), BinaryExpr(BVSLT, x1, y1)) if x1 == x && y1 == y =>
+      logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolOR, BinaryExpr(BVSGT, x, y), BinaryExpr(BVSLE, x1, y1)) if x1 == x && y1 == y =>
+      logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolOR, BinaryExpr(BVSLT, x, y), BinaryExpr(BVSGE, x1, y1)) if x1 == x && y1 == y =>
+      logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolOR, BinaryExpr(BVSLE, x, y), BinaryExpr(BVSGT, x1, y1)) if x1 == x && y1 == y =>
+      logSimp(e, TrueLiteral)
+
+    case BinaryExpr(BoolOR, a, UnaryExpr(BoolNOT, b)) if a == b => logSimp(e, TrueLiteral)
+    case BinaryExpr(BoolOR, UnaryExpr(BoolNOT, a), b) if a == b => logSimp(e, TrueLiteral)
+
+    case BinaryExpr(BoolOR, BinaryExpr(BoolAND, a, b), BinaryExpr(BoolAND, c, d)) if a == c =>
+      logSimp(e, BinaryExpr(BoolAND, BinaryExpr(BoolOR, b, d), a))
+    case BinaryExpr(BoolOR, BinaryExpr(BoolAND, a, b), BinaryExpr(BoolAND, c, d)) if b == c =>
+      logSimp(e, BinaryExpr(BoolAND, BinaryExpr(BoolOR, a, d), b))
+    case BinaryExpr(BoolOR, BinaryExpr(BoolAND, a, b), BinaryExpr(BoolAND, c, d)) if a == d =>
+      logSimp(e, BinaryExpr(BoolAND, BinaryExpr(BoolOR, b, c), a))
+    case BinaryExpr(BoolOR, BinaryExpr(BoolAND, a, b), BinaryExpr(BoolAND, c, d)) if b == d =>
+      logSimp(e, BinaryExpr(BoolAND, BinaryExpr(BoolOR, a, c), b))
+
+    // case BinaryExpr(BoolOR, UnaryExpr(BoolNOT, a), b) => logSimp(e, BinaryExpr(BoolIMPLIES, a, b))
+    // case BinaryExpr(BoolOR, a, UnaryExpr(BoolNOT, b)) => logSimp(e, BinaryExpr(BoolIMPLIES, b, a))
 
     case r => {
       didAnything = false

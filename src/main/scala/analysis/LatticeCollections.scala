@@ -3,6 +3,8 @@ package analysis
 import ir.*
 import ir.transforms.AbstractDomain
 
+import scala.annotation.implicitNotFound
+
 /** Lattice structure internal to a type.
   */
 trait InternalLattice[T <: InternalLattice[T]] {
@@ -13,9 +15,23 @@ trait InternalLattice[T <: InternalLattice[T]] {
   def bottom: T
 }
 
-/** An element of a powerset lattice. This type represents Top and Bottom and finite sets, and is closed under unions,
-  * intersections, and set difference.
-  */
+/**
+ * A Lattice over a type that implements the InternalLattice trait.
+ *
+ * The `term` parameter can be any term of the type L, it just needs to exist to be able to call the top and bottom methods.
+ */
+class InternalLatticeLattice[L <: InternalLattice[L]](term: L) extends Lattice[L] {
+  def lub(x: L, y: L): L = x.join(y)
+  override def glb(x: L, y: L): L = x.meet(y)
+
+  val bottom: L = term.bottom
+  override def top: L = term.top
+}
+
+/**
+ * An element of a powerset lattice. This type represents Top and Bottom and finite sets, and is closed under
+ * unions, intersections, and set difference.
+ */
 enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
   /* The set of all terms of type T */
   case Top[T1]() extends LatticeSet[T1]
@@ -94,6 +110,14 @@ enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
       case DiffSet(_) => None
     }
   }
+
+  /**
+   * Returns whether this set is Top or Top minus some elements
+   */
+  def topped: Boolean = this match {
+    case Top() | DiffSet(_) => true
+    case _ => false
+  }
 }
 
 class LatticeSetLattice[T] extends Lattice[LatticeSet[T]] {
@@ -111,6 +135,12 @@ class LatticeSetLattice[T] extends Lattice[LatticeSet[T]] {
 
 /** A map which defaults to either the top or bottom element of a lattice. This is more efficient to use in static
   * analyses as it is common to default most values in a map to either top or bottom.
+  *
+  * In order to call `apply`, `join` or `meet`, an implicit term of type L must be declared, and L must implement the `InternalLattice` trait.
+  * For example, to declare an implicit interval, we write (outside the scope of any classes that we are implementing)
+  * ```scala
+  * private implicit val intervalTerm: Interval = Interval.Bottom
+  * ```
   */
 enum LatticeMap[D, L] {
   /* PERFORMANCE:
@@ -156,17 +186,26 @@ enum LatticeMap[D, L] {
 
   /** Evaluate the function at `v`, accounting for defaulting behaviour.
     */
-  def apply[L1 <: InternalLattice[L1]](v: D)(implicit s: L <:< L1, l: L1): L1 = this match {
+  def apply[L1 <: InternalLattice[L1]](v: D)(implicit
+    s: L <:< L1,
+    @implicitNotFound("No implicit of type ${L1} was found. See LatticeMap docs for more info.") l: L1
+  ): L1 = this match {
     case Top() => l.top
     case Bottom() => l.bottom
     case TopMap(m) => m.getOrElse(v, l.top).asInstanceOf[L1]
     case BottomMap(m) => m.getOrElse(v, l.bottom).asInstanceOf[L1]
   }
 
-  def join[L1 <: InternalLattice[L1]](other: LatticeMap[D, L1])(implicit s: L <:< L1, l: L1): LatticeMap[D, L1] =
+  def join[L1 <: InternalLattice[L1]](other: LatticeMap[D, L1])(implicit
+    s: L <:< L1,
+    @implicitNotFound("No implicit of type ${L1} was found. See LatticeMap docs for more info.") l: L1
+  ): LatticeMap[D, L1] =
     latticeMapJoin(this.asInstanceOf[LatticeMap[D, L1]], other, (a, b) => a.join(b), l.top, l.bottom)
 
-  def meet[L1 <: InternalLattice[L1]](other: LatticeMap[D, L1])(implicit s: L <:< L1, l: L1): LatticeMap[D, L1] =
+  def meet[L1 <: InternalLattice[L1]](other: LatticeMap[D, L1])(implicit
+    s: L <:< L1,
+    @implicitNotFound("No implicit of type ${L1} was found. See LatticeMap docs for more info.") l: L1
+  ): LatticeMap[D, L1] =
     latticeMapMeet(this.asInstanceOf[LatticeMap[D, L1]], other, (a, b) => a.meet(b), l.top, l.bottom)
 
   def top: LatticeMap[D, L] = Top()
@@ -186,20 +225,17 @@ private def latticeMapJoin[D, L](
     case (Top(), _) => Top()
     case (Bottom(), b) => b
     case (TopMap(a), TopMap(b)) =>
-      TopMap(a.foldLeft(b)((m, p) => {
-        val (k, v) = p
+      TopMap(a.foldLeft(b) { case (m, (k, v)) =>
         m + (k -> join(m.getOrElse(k, top), v))
-      }))
+      })
     case (TopMap(a), BottomMap(b)) =>
-      TopMap(b.foldLeft(a)((m, p) => {
-        val (k, v) = p
+      TopMap(b.foldLeft(a) { case (m, (k, v)) =>
         m + (k -> join(m.getOrElse(k, top), v))
-      }))
+      })
     case (BottomMap(a), BottomMap(b)) =>
-      BottomMap(a.foldLeft(b)((m, p) => {
-        val (k, v) = p
+      BottomMap(a.foldLeft(b) { case (m, (k, v)) =>
         m + (k -> join(m.getOrElse(k, bottom), v))
-      }))
+      })
     case (a, b) => latticeMapJoin(b, a, join, top, bottom)
   }
 }
@@ -217,20 +253,17 @@ private def latticeMapMeet[D, L](
     case (Top(), b) => b
     case (Bottom(), _) => Bottom()
     case (TopMap(a), TopMap(b)) =>
-      TopMap(a.foldLeft(b)((m, p) => {
-        val (k, v) = p
+      TopMap(a.foldLeft(b) { case (m, (k, v)) =>
         m + (k -> meet(m.getOrElse(k, top), v))
-      }))
+      })
     case (TopMap(a), BottomMap(b)) =>
-      BottomMap(a.foldLeft(b)((m, p) => {
-        val (k, v) = p
+      BottomMap(a.foldLeft(b) { case (m, (k, v)) =>
         m + (k -> meet(m.getOrElse(k, bottom), v))
-      }))
+      })
     case (BottomMap(a), BottomMap(b)) =>
-      BottomMap(a.foldLeft(b)((m, p) => {
-        val (k, v) = p
+      BottomMap(a.foldLeft(b) { case (m, (k, v)) =>
         m + (k -> meet(m.getOrElse(k, bottom), v))
-      }))
+      })
     case (a, b) => latticeMapMeet(b, a, meet, top, bottom)
   }
 }
@@ -283,18 +316,100 @@ trait MapDomain[D, L] extends AbstractDomain[LatticeMap[D, L]] {
     (a, b) match {
       case (Bottom(), b) => b
       case (a, Bottom()) => a
-      // TODO
-      case (BottomMap(a), BottomMap(b)) => ???
-      case (BottomMap(a), TopMap(b)) => ???
-      case (BottomMap(a), Top()) => ???
-      case (TopMap(a), BottomMap(b)) => ???
-      case (TopMap(a), TopMap(b)) => ???
-      case (TopMap(a), Top()) => ???
-      case (Top(), BottomMap(b)) => ???
-      case (Top(), TopMap(b)) => ???
-      case (Top(), Top()) => ???
+      case (Top(), _) => Top()
+      case (_, Top()) => Top()
+      case (BottomMap(a), BottomMap(b)) =>
+        BottomMap(a.foldLeft(b) { case (m, (b, v)) =>
+          m + (b -> widenTerm(m.getOrElse(b, botTerm), v, pos))
+        })
+      case (BottomMap(a), TopMap(b)) =>
+        TopMap(a.foldLeft(b) { case (m, (b, v)) =>
+          m + (b -> widenTerm(m.getOrElse(b, botTerm), v, pos))
+        })
+      case (TopMap(a), BottomMap(b)) =>
+        TopMap(b.foldLeft(a) { case (m, (a, v)) =>
+          m + (a -> widenTerm(v, m.getOrElse(a, botTerm), pos))
+        })
+      case (TopMap(a), TopMap(b)) =>
+        TopMap(a.foldLeft(b) { case (m, (b, v)) =>
+          m + (b -> widenTerm(m.getOrElse(b, botTerm), v, pos))
+        })
     }
 
   def bot: LatticeMap[D, L] = Bottom()
   def top: LatticeMap[D, L] = Top()
+}
+
+/**
+ * A map domain that encodes predicates per term of a map.
+ *
+ * If you want to implement this trait, instead implement either `MayPredMapDomain` or `MustPredMapDomain`
+ */
+trait PredMapDomain[D, L] extends MapDomain[D, L] with PredicateEncodingDomain[LatticeMap[D, L]] {
+
+  /**
+   * Encode the information the abstract value `l` represents, as a predicate, when `l` is the result
+   * of applying `d` to `m`.
+   */
+  def termToPred(m: LatticeMap[D, L], d: D, l: L): Predicate
+}
+
+/**
+ * A map domain encoding predicates that is a may analysis.
+ *
+ * As described in `PredicateEncodingDomain`, a may analysis must overapproximate its encoded predicate,
+ * where a concretised predicate should give a superset of the concretisation of the lattice element that
+ * encoded the predicate.
+ *
+ * Extending this trait gives a sound implementation of the toPred method over a map using termToPred
+ * for a may analysis, namely by mapping top to true, bottom and a map defaulting to bottom to false,
+ * and mapping a top defaulting map to a conjunction of each individual predicate of the non default
+ * elements. An analysis implementing this trait should thus have the initial state be a top defaulting
+ * map.
+ */
+trait MayPredMapDomain[D, L] extends PredMapDomain[D, L] with MayAnalysis {
+  import LatticeMap.{Top, Bottom, TopMap, BottomMap}
+
+  def toPred(x: LatticeMap[D, L]): Predicate = x match {
+    case Top() => Predicate.True
+    case TopMap(m) =>
+      m.foldLeft(Predicate.True) { (p, z) =>
+        {
+          val (d, l) = z
+          termToPred(x, d, l) match {
+            case Predicate.True => p
+            case q => Predicate.and(p, q)
+          }
+        }
+      }.simplify
+    case Bottom() => Predicate.False
+    case BottomMap(m) => Predicate.False
+  }
+}
+
+/**
+ * A map domain encoding predicates that is a must analysis.
+ *
+ * See `MayPredMapDomain` for a description, but replace superset with subset, and bottom with top.
+ * Importantly, note that an analysis implementing this trait should have the initial state be a
+ * bottom defaulting map.
+ */
+trait MustPredMapDomain[D, L] extends PredMapDomain[D, L] with MustAnalysis {
+  import LatticeMap.{Top, Bottom, TopMap, BottomMap}
+
+  def toPred(x: LatticeMap[D, L]): Predicate = x match {
+    case Top() => Predicate.False
+    case TopMap(m) => Predicate.False
+    case Bottom() => Predicate.True
+    case BottomMap(m) =>
+      m.foldLeft(Predicate.True) { (p, z) =>
+        {
+          val (d, l) = z
+          termToPred(x, d, l) match {
+            case Predicate.True => p
+            case q => Predicate.and(p, q)
+          }
+        }
+      }.simplify
+  }
 }

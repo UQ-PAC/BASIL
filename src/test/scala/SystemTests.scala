@@ -195,6 +195,7 @@ trait SystemTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest, TestC
       BPLPath,
       conf.staticAnalysisConfig,
       conf.simplify,
+      conf.summariseProcedures,
       dsa = conf.dsa,
       memoryTransform = conf.memoryTransform
     )
@@ -592,19 +593,11 @@ class ProcedureSummaryTests extends SystemTests {
   // this is due to BASIL's currently limited handling of non-returning calls
   runTests(
     "procedure_summaries",
-    TestConfig(
-      staticAnalysisConfig = Some(StaticAnalysisConfig(summariseProcedures = true)),
-      useBAPFrontend = true,
-      expectVerify = true
-    )
+    TestConfig(summariseProcedures = true, simplify = true, useBAPFrontend = true, expectVerify = true)
   )
   runTests(
     "procedure_summaries",
-    TestConfig(
-      staticAnalysisConfig = Some(StaticAnalysisConfig(summariseProcedures = true)),
-      useBAPFrontend = false,
-      expectVerify = true
-    )
+    TestConfig(summariseProcedures = true, simplify = true, useBAPFrontend = false, expectVerify = true)
   )
 }
 
