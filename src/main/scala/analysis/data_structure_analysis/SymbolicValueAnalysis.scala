@@ -341,7 +341,7 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) e
 
   override def join(a: SymValues[T], b: SymValues[T], pos: Block): SymValues[T] = {
     count.update(pos, count(pos) + 1)
-    if count(pos) < 100 then joinHelper(a, b, pos) else widen(a, b, pos)
+    if count(pos) < 1000 then joinHelper(a, b, pos) else widen(a, b, pos)
   }
 
   override def transfer(a: SymValues[T], b: Command): SymValues[T] = {
