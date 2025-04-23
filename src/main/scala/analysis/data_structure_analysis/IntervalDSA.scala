@@ -902,7 +902,16 @@ class IntervalDSA(irContext: IRContext) {
 
 object IntervalDSA {
 
-  def globalTransfer(source: IntervalGraph, target: IntervalGraph): Map[IntervalNode, IntervalNode] = {
+  def checksGlobalMaintained(graph: IntervalGraph): Unit = {
+    if (graph.find(graph.nodes(Global)).isCollapsed) then
+      DSALogger.warn(s"graph ${graph.proc.procName} had it's global collapsed")
+  }
+
+  def globalTransfer(
+    source: IntervalGraph,
+    target: IntervalGraph,
+    oldToNew: mutable.Map[IntervalNode, IntervalNode] = mutable.Map.empty
+  ): Map[IntervalNode, IntervalNode] = {
     DSALogger.info(s"cloning globalNode from ${source.proc.procName}")
     val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
     val targetGlobal = target.find(target.nodes(Global).get(0))
@@ -919,6 +928,7 @@ object IntervalDSA {
   def callTransfer(phase: DSAPhase, cons: DirectCallConstraint, source: IntervalGraph, target: IntervalGraph): Unit = {
     require(phase == TD || phase == BU)
     val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
+    globalTransfer(source, target, oldToNew)
     val unchanged = Set("R29", "R30", "R31")
     DSALogger.info(s"cloning ${source.proc.procName} into ${target.proc.procName}, $phase")
     cons.inParams
