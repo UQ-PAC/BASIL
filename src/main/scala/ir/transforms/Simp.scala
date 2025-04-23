@@ -42,7 +42,15 @@ def difftestLiveVars(p: Procedure, compareResult: Map[CFGPosition, Set[Variable]
 }
 
 def basicReachingDefs(p: Procedure): Map[Command, Map[Variable, Set[Assign | DirectCall]]] = {
-  val (beforeLive, afterLive) = getLiveVars(p)
+  val lives = getLiveVars(p)
+  basicReachingDefs(p, lives)
+}
+
+def basicReachingDefs(
+  p: Procedure,
+  liveVars: (Map[Block, Set[Variable]], Map[Block, Set[Variable]])
+): Map[Command, Map[Variable, Set[Assign | DirectCall]]] = {
+  val (beforeLive, afterLive) = liveVars
   val dom = DefUseDomain(beforeLive)
   val solver = worklistSolver(dom)
   // type rtype = Map[Block, Map[Variable, Set[Assign | DirectCall]]]
@@ -75,9 +83,7 @@ class DefUseDomain(liveBefore: Map[Block, Set[Variable]]) extends AbstractDomain
 
   override def transfer(s: Map[Variable, Set[Assign]], b: Command) = {
     b match {
-      case a: LocalAssign => s.updated(a.lhs, Set(a))
-      case a: MemoryLoad => s.updated(a.lhs, Set(a))
-      case d: DirectCall => d.outParams.map(_._2).foldLeft(s)((s, r) => s.updated(r, Set(d)))
+      case d: Assign => d.assignees.foldLeft(s)((s, r) => s.updated(r, Set(d)))
       case _ => s
     }
   }
@@ -142,6 +148,34 @@ class IntraLiveVarsDomain extends PowerSetDomain[Variable] {
       case r: Unreachable => s
       case n: NOP => s
     }
+  }
+}
+
+class LiveVarsDomWatchFlags(defs: Map[Variable, Set[Assign]]) extends IntraLiveVarsDomain {
+
+  val g = GuardVisitor()
+
+  def substitute(deps: mutable.Set[Variable])(v: Variable) = {
+    if (g.goodSubst(v) && defs.get(v).isDefined && defs(v).size == 1) {
+      deps.add(v)
+      defs(v).head match {
+        case l: LocalAssign =>
+          deps.addAll(l.rhs.variables)
+          deps.add(v)
+          Some(l.rhs)
+        case _ => None
+      }
+    } else None
+  }
+
+  override def transfer(s: Set[Variable], a: Command): Set[Variable] = a match {
+    case a: Assume => {
+      val deps = mutable.Set[Variable]()
+      deps.addAll(a.body.variables)
+      Substitute(substitute(deps), true)(a.body)
+      s ++ deps
+    }
+    case o => super.transfer(s, a)
   }
 }
 
@@ -552,25 +586,52 @@ class GuardVisitor extends CILVisitor {
   }
 
   var defs = Map[Variable, Set[Assign]]()
+  var reachingDefs: Map[Command, Map[Variable, Set[Assign]]] = Map()
+  var inparams = Set[Variable]()
+
+  def getLiveVars(p: Procedure): (Map[Block, Set[Variable]], Map[Block, Set[Variable]]) = {
+    val liveVarsDom = LiveVarsDomWatchFlags(defs)
+    val liveVarsSolver = worklistSolver(liveVarsDom)
+    liveVarsSolver.solveProc(p, backwards = true)
+  }
+
+  def getReachingDefs(p: Procedure) = {
+    basicReachingDefs(p, getLiveVars(p))
+  }
 
   override def vproc(p: Procedure) = {
     while (coalesceBlocks(p)) {}
     removeEmptyBlocks(p)
     transforms.fixupGuards(p)
     util.writeToFile(dotBlockGraph(p), s"graphs/blockgraph-${p.name}-boo.dot")
-
+    inparams = p.formalInParam.toSet[Variable]
     defs = allDefinitions(p)
+    reachingDefs = getReachingDefs(p)
     DoChildren()
   }
 
-  def substitute(deps: mutable.Set[Variable], depBlocks: mutable.Set[Assign])(v: Variable): Option[Expr] = {
+  def substitute(pos: Command)(v: Variable): Option[Expr] = {
     if (goodSubst(v)) {
       val res = defs.get(v).getOrElse(Set())
+
+      def propOK(e: Expr) = {
+        // all dependent variables satisfy dsa property for the use we want to propage to
+        // DSA property: our reaching definitions are all definitions of the variable
+        e.variables.map(v => v -> reachingDefs(pos).get(v)).forall {
+          case (v, d) => {
+            val ok = (inparams.contains(v) && defs
+              .get(v)
+              .forall(_.isEmpty)) || (d.isDefined && d.get.toSet == defs.get(v).toSet.flatten)
+            if (!ok)
+              println(s"prop not ok $v $d")
+            ok
+          }
+        }
+      }
+
       if (res.size == 1) {
         res.head match {
-          case l @ LocalAssign(lhs, rhs, _) => {
-            deps.addAll(rhs.variables)
-            depBlocks.add(l)
+          case l @ LocalAssign(lhs, rhs, _) if propOK(rhs) => {
             Some(rhs)
           }
           case _ => None
@@ -583,71 +644,14 @@ class GuardVisitor extends CILVisitor {
     }
   }
 
-  def checkClobbers(vars: mutable.Set[Variable], deps: mutable.Set[Assign], thisBlock: Block, thisStmt: Statement) =
-    boundary {
-
-      val blocks = deps.map(_.parent).toSet
-
-      if (blocks.size > 1) {
-        break(false)
-      }
-
-      if (!blocks.head.nextBlocks.exists(_ == thisBlock)) {
-        break(false)
-      }
-
-      val starting = blocks.head.statements.find {
-        case s: Assign => deps.contains(s)
-        case _ => false
-      }.get
-      var s = starting
-
-      val v = CopyProp.BlockyProp(false, false)
-
-      while {
-        visit_stmt(v, s)
-
-        blocks.head.statements.nextOption(s) match {
-          case Some(n) => {
-            s = n
-            true
-          }
-          case _ => false
-        }
-      } do {}
-
-      visit_jump(v, blocks.head.jump)
-      s = IRWalk.firstInBlock(thisBlock).asInstanceOf[Statement]
-
-      while {
-        s match {
-          case a: Assume => {
-            v.transform = true
-          }
-          case _ => v.transform = false
-        }
-        visit_stmt(v, s)
-
-        blocks.head.statements.nextOption(s) match {
-          case Some(n) if n != thisStmt => {
-            s = n
-            true
-          }
-          case _ => false
-        }
-      } do {}
-
-      vars.forall(v.st.contains)
-    }
-
   override def vstmt(s: Statement) = s match {
-    case a @ Assume(body, b, c, d) if IRWalk.firstInBlock(a.parent) == a && a.body.variables.exists(goodSubst) =>
+    case a @ Assume(body, b, c, d) if a.body.variables.exists(goodSubst) =>
       val deps = mutable.Set[Variable]()
       val depBlocks = mutable.Set[Assign]()
-      Substitute(substitute(deps, depBlocks))(a.body) match {
-        case Some(cond) if checkClobbers(deps, depBlocks, a.parent, a) => {
-          // ChangeTo(List(Assume(cond, b, c, d)))
-          SkipChildren()
+      Substitute(substitute(s))(a.body) match {
+        case Some(cond) => {
+          ChangeTo(List(Assume(cond, b, c, d)))
+          // SkipChildren()
         }
         case _ => SkipChildren()
       }
