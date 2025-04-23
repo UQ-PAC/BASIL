@@ -962,8 +962,7 @@ object IntervalDSA {
         assert(cell.node.isUptoDate)
         val (node, offset) =
           target.findNode(cell.node.clone(target, true, oldToNew))
-        if offset == 0 then node.get(cell.interval)
-        node.get(cell.interval.move(i => i + offset))
+        node.add(cell.interval.move(i => i + offset))
       )
     val targetCells = target.exprToCells(targetExpr).map(target.find)
 
