@@ -7,7 +7,7 @@ import test_util.BASILTest
 import LatticeSet.*
 
 @test_util.tags.UnitTest
-class TaintAnalysisTests extends AnyFunSuite, BASILTest {
+class TaintAnalysisTests extends AnyFunSuite with test_util.CaptureOutput with BASILTest {
   def getTaintAnalysisResults(
     program: Program,
     taint: Map[CFGPosition, Set[Variable]]

@@ -53,7 +53,7 @@ trait BASILTest {
     summariseProcedures: Boolean = false,
     dsa: Option[DSAConfig] = None,
     memoryTransform: Boolean = false,
-    postLoad: IRContext => Unit = s => (),
+    postLoad: IRContext => Unit = s => ()
   ): BASILResult = {
     val specFile = if (specPath.isDefined && File(specPath.get).exists) {
       specPath
