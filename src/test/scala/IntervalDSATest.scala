@@ -384,7 +384,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
   }
 
-  ignore("www_authenticate") {
+  test("www_authenticate") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
