@@ -176,6 +176,7 @@ class IntervalGraph(
 
   // Processes all non call constraints
   def localPhase(): Unit = {
+    (proc.formalInParam ++ proc.formalOutParam).foreach(exprToCells)
     var processed = Set[Constraint]()
     constraints.toSeq
       .sortBy(f => f.label)
@@ -960,7 +961,7 @@ object IntervalDSA {
         assert(cell.node.isUptoDate)
         val (node, offset) =
           target.findNode(cell.node.clone(target, true, oldToNew))
-        node.add(cell.interval.move(i => i + offset))
+        node.get(cell.interval.move(i => i + offset))
       )
     val targetCells = target.exprToCells(targetExpr).map(target.find)
 
