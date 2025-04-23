@@ -55,8 +55,6 @@ class IntervalGraph(
           node.flags.incomplete = true
         case param: (Ret | Par) =>
           node.flags.escapes = true
-      if symOffsets == Top then node.add(0) // don't collapse during building
-      else symOffsets.toIntervals.filter(i => base != Global || isGlobal(i.start.get)).map(node.add)
       result + (base -> node)
     }
   }
