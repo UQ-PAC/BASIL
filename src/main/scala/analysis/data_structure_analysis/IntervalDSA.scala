@@ -50,11 +50,9 @@ class IntervalGraph(
         case Global => node.flags.global = true
         case NonPointer =>
           throw new Exception("Attempted to create a node from an Non-pointer symbolic base")
-        case unknown: Loaded =>
+        case unknown: (Ret| Par | Loaded) =>
           node.flags.unknown = true
           node.flags.incomplete = true
-        case param: (Ret | Par) =>
-          node.flags.escapes = true
       result + (base -> node)
     }
   }
@@ -164,19 +162,21 @@ class IntervalGraph(
     globalNode
   }
 
-  def markParams(): Unit = {
+
+  def addParamCells(): Unit = {
     val unchanged = Set("R29", "R30", "R31")
-    (proc.formalInParam ++ proc.formalOutParam).iterator
-      .filterNot(p => unchanged.exists(n => p.name.startsWith(n)))
-      .flatMap(exprToCells)
-      .map(get)
-      .map(_.node)
-      .foreach(_.flags.escapes = true)
+    (proc.formalInParam ++ proc.formalOutParam)
+      .foreach(
+        v =>
+          val cells = exprToCells(v)
+          if unchanged.forall(n => !v.name.startsWith(n)) then
+            cells.map(_.node).foreach(_.flags.escapes = true)
+      )
   }
 
   // Processes all non call constraints
   def localPhase(): Unit = {
-    (proc.formalInParam ++ proc.formalOutParam).foreach(exprToCells)
+    addParamCells()
     var processed = Set[Constraint]()
     constraints.toSeq
       .sortBy(f => f.label)
