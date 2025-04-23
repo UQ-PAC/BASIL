@@ -913,7 +913,6 @@ object IntervalDSA {
     oldToNew: mutable.Map[IntervalNode, IntervalNode] = mutable.Map.empty
   ): Map[IntervalNode, IntervalNode] = {
     DSALogger.info(s"cloning globalNode from ${source.proc.procName}")
-    val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
     val targetGlobal = target.find(target.nodes(Global).get(0))
     var sourceGlobal = source.find(source.nodes(Global).get(0))
     val old = source.nodes(Global).clone(target, false, oldToNew)
