@@ -236,7 +236,6 @@ class SymValSetDomain[T <: Offsets](using val offsetDomain: OffsetDomain[T]) ext
     val update = a.state
       .collect {
         case (base: SymBase, offsets: T) if b.state.contains(base) && b.state(base) != offsets =>
-          if base == Global then println("hello")
           (base, offsetDomain.widen(offsets, b.state(base), pos))
         case (base: SymBase, offsets: T) if offsetDomain.shouldWiden(offsets) =>
           (base, offsetDomain.widen(offsets, b.state(base), pos))
