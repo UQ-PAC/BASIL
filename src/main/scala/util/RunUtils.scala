@@ -897,7 +897,6 @@ object RunUtils {
       }
     }
 
-    // SVA
     var dsaContext: Option[DSAContext] = None
     if (conf.dsaConfig.isDefined) {
       val dsaResults = IntervalDSA(ctx).dsa(conf.dsaConfig.get)
