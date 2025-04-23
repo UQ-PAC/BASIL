@@ -17,7 +17,7 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 import analysis.solvers.*
-import analysis.*
+import analysis.{Interval as _, *}
 import analysis.data_structure_analysis.DSAPhase.{BU, TD}
 import bap.*
 import ir.*
@@ -952,9 +952,16 @@ object RunUtils {
         DSATimer.checkPoint("Finished DSA Invariant Check")
         dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
 
-        if q.memoryTransform then
+        if q.memoryTransform then {
           visit_prog(MemoryTransform(DSATD, globalMapping), ctx.program)
           DSATimer.checkPoint("Performed Memory Transform")
+          // doSimplify(ctx, None)
+        }
+    }
+
+    if (conf.summariseProcedures) {
+      StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
+      IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify)
     }
 
     if (conf.summariseProcedures) {

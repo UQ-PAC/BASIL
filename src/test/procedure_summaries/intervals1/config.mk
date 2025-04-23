@@ -1,1 +1,1 @@
-ENABLED_COMPILERS = gcc gcc_O2 gcc_pic
+ENABLED_COMPILERS = gcc_O2

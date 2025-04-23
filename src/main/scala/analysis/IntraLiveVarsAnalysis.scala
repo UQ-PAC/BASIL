@@ -12,6 +12,7 @@ abstract class LivenessAnalysis(program: Program, addExternals: Boolean = true) 
       case p: Procedure => s
       case b: Block => s
       case a: LocalAssign => (s - a.lhs) ++ a.rhs.variables
+      case a: MemoryAssign => (s - a.lhs) ++ a.rhs.variables
       case m: MemoryStore => s ++ m.index.variables ++ m.value.variables
       case m: MemoryLoad => (s - m.lhs) ++ m.index.variables
       case a: Assume => s ++ a.body.variables

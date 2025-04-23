@@ -43,6 +43,8 @@ jobs:
       - name: Compile BASIL Mill
         run: ./mill compile
 
+  # INFO: Scalatest runner arguments (i.e., arguments to scalatest.sh) can be
+  # found at: https://www.scalatest.org/user_guide/using_the_runner
 
   StandardSystemTests:
     runs-on: ubuntu-latest
@@ -143,4 +145,4 @@ jobs:
       - run: echo "All systemtest suites:" && ./mill test.testOnly '*SystemTests*' -- -z 'xxxx'
 
       - run: ./mill compile
-      - run: ./scripts/scalatest.sh -oGD -PS3 -T 1000000 -n test_util.tags.AnalysisSystemTest
+      - run: ./scripts/scalatest.sh -oGD -PS3 -T 1000000 -n test_util.tags.AnalysisSystemTest -F 2

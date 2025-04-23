@@ -10,12 +10,14 @@ import ir.transforms.{
   AbstractDomain,
   BottomUpCallgraphWorklistSolver,
   ProcAbstractDomain,
+  SCCCallgraphWorklistSolver,
   reversePostOrder,
   worklistSolver
 }
 
-// TODO annotated preconditions and postconditions
-// TODO don't convert to boogie until translating, so that we can use conditions in analyses
+case class Condition(pred: Predicate, label: Option[String] = None)
+
+case class ProcedureSummary(requires: List[Condition], ensures: List[Condition])
 
 class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false) {
   import Predicate.*
@@ -38,62 +40,11 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
     }
   }
 
-  // TODO move these to the predicate file
-  /**
-   * Determines whether the term contains only variables in vars
-   */
-  def varsAllIn(b: BVTerm, vars: Set[Variable]): Boolean = {
-    import BVTerm.*
-    b match {
-      case Lit(x) => true
-      case Var(v) => vars.contains(v)
-      case OldVar(v) => true
-      case Uop(op, x) => varsAllIn(x, vars)
-      case Bop(op, x, y) => varsAllIn(x, vars) && varsAllIn(y, vars)
-      case Repeat(repeats, body) => varsAllIn(body, vars)
-      case Extract(end, start, body) => varsAllIn(body, vars)
-      case ZeroExtend(extension, body) => varsAllIn(body, vars)
-      case SignExtend(extension, body) => varsAllIn(body, vars)
-    }
-  }
+  def transfer(map: Procedure => ProcedureSummary, p: ProcedureSummary, procedure: Procedure): ProcedureSummary = {
+    if procedure.blocks.isEmpty then return ProcedureSummary(List(), List())
 
-  /**
-   * Determines whether the term contains only variables in vars
-   */
-  def varsAllIn(g: GammaTerm, vars: Set[Variable]): Boolean = {
-    import GammaTerm.*
-    g match {
-      case Lit(x) => true
-      case Var(v) => vars.contains(v)
-      case OldVar(v) => true
-      case Uop(op, x) => varsAllIn(x, vars)
-      case Join(s) => s.forall(varsAllIn(_, vars))
-    }
-  }
-
-  /**
-   * Removes all parts of the predicate containing variables not in vars (replacing the subexpression with default).
-   */
-  private def filterPred(p: Predicate, vars: Set[Variable], default: Predicate): Predicate = {
-    import Predicate.*
-    p match {
-      case Lit(x) => p
-      case Not(x) => not(filterPred(x, vars, default))
-      case Conj(s) => Conj(s.map(filterPred(_, vars, default)))
-      case Disj(s) => Disj(s.map(filterPred(_, vars, default)))
-      case BVCmp(op, x, y) => if varsAllIn(x, vars) && varsAllIn(y, vars) then p else default
-      case GammaCmp(op, x, y) => if varsAllIn(x, vars) && varsAllIn(y, vars) then p else default
-    }
-  }
-
-  def transfer(
-    map: Procedure => (List[Predicate], List[Predicate]),
-    p: (List[Predicate], List[Predicate]),
-    procedure: Procedure
-  ): (List[Predicate], List[Predicate]) = {
-    if procedure.blocks.isEmpty then return (List(), List())
-
-    val (curRequires, curEnsures) = p
+    val curRequires = p.requires
+    val curEnsures = p.ensures
 
     /* Gamma domain with reachability conditions
      *
@@ -146,15 +97,20 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
       })
       .map(_.simplify)
       .toList
+      .map(Condition(_, Some("Reachability conditions")))
 
     // Predicate domain / mini wp
     Logger.debug(s"Generating mini wp preconditions for $procedure")
-    val wpDomain = PredicateDomain(map)
+    val wpDomain = WpDualDomain(map)
     val (wpDomainResults, _) = worklistSolver(wpDomain).solveProc(procedure, true)
 
-    val wpThing = procedure.entryBlock.flatMap(b => wpDomainResults.get(b))
+    val wp = procedure.entryBlock
+      .flatMap(b => wpDomainResults.get(b))
+      .toList
+      .flatMap(p => not(p).simplify.split)
+      .map(Condition(_, Some("Weakest precondition")))
 
-    val requires = (curRequires ++ mustGammasWithConditions ++ wpThing).filter(_ != TrueBLiteral).distinct
+    val requires = (curRequires ++ mustGammasWithConditions ++ wp).filter(_ != TrueBLiteral).distinct
 
     /* Forwards variable dependency
      *
@@ -175,11 +131,13 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
       outVars.contains(variable)
     }
 
-    val dependencyPreds = dependencyMap.toList.map { (variable, dependencies) =>
-      {
-        Predicate.gammaLeq(GammaTerm.Var(variable), GammaTerm.Join(dependencies.map(GammaTerm.OldVar(_)))).simplify
+    val dependencyPreds = dependencyMap.toList
+      .map { (variable, dependencies) =>
+        {
+          Predicate.gammaLeq(GammaTerm.Var(variable), GammaTerm.Join(dependencies.map(GammaTerm.OldVar(_)))).simplify
+        }
       }
-    }
+      .map(Condition(_, Some("variable dependency analysis")))
 
     /* Abstract interpretation predicates
      *
@@ -207,18 +165,19 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
       .map(b =>
         afterAbsInt
           .get(b)
-          .map(l => filterPred(predAbsIntDomain.toPred(l), outVars ++ inVars, Predicate.True).split.map(_.simplify))
+          .map(l => predAbsIntDomain.toPred(l).filterOut(outVars ++ inVars, Predicate.True).split.map(_.simplify))
       )
       .flatten
       .toList
       .flatten
+      .map(Condition(_, Some("numerical analysis")))
 
     val ensures = (curEnsures ++ dependencyPreds ++ absIntPreds).filter(_ != True).distinct
 
-    (requires, ensures)
+    ProcedureSummary(requires, ensures)
   }
 
-  def init(p: Procedure): (List[Predicate], List[Predicate]) = (List(), List())
+  def init(p: Procedure): ProcedureSummary = ProcedureSummary(List(), List())
 }
 
 /**
@@ -227,20 +186,36 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
  */
 class SummaryGenerator(program: Program, parameterForm: Boolean = false) {
   val interprocGenerator = InterprocSummaryGenerator(program, parameterForm)
-  val interprocResults: Map[Procedure, (List[Predicate], List[Predicate])] =
-    BottomUpCallgraphWorklistSolver(interprocGenerator.transfer, interprocGenerator.init).solve(program)
+  val interprocResults: Map[Procedure, ProcedureSummary] =
+    SCCCallgraphWorklistSolver(interprocGenerator.transfer, interprocGenerator.init).solve(program)
 
   /**
    * Generate requires clauses for a procedure.
    */
   def generateRequires(procedure: Procedure): List[BExpr] = {
-    interprocResults.getOrElse(procedure, (List(), List()))._1.map(_.toBoogie.simplify).filter(_ != TrueBLiteral)
+    interprocResults
+      .getOrElse(procedure, interprocGenerator.init(procedure))
+      .requires
+      .map(c => {
+        val expr = c.pred.toBoogie.simplify
+        expr.label = c.label
+        expr
+      })
+      .filter(_ != TrueBLiteral)
   }
 
   /**
    * Generate ensures clauses for a procedure.
    */
   def generateEnsures(procedure: Procedure): List[BExpr] = {
-    interprocResults.getOrElse(procedure, (List(), List()))._2.map(_.toBoogie.simplify).filter(_ != TrueBLiteral)
+    interprocResults
+      .getOrElse(procedure, interprocGenerator.init(procedure))
+      .ensures
+      .map(c => {
+        val expr = c.pred.toBoogie.simplify
+        expr.label = c.label
+        expr
+      })
+      .filter(_ != TrueBLiteral)
   }
 }

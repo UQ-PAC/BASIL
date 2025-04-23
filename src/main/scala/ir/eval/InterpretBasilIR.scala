@@ -386,6 +386,13 @@ object InterpFuns {
 
   def interpretStatement[S, T <: Effects[S, InterpreterError]](f: T)(s: Statement): State[S, Unit, InterpreterError] = {
     s match {
+      case assign: MemoryAssign => {
+        for {
+          rhs <- Eval.evalLiteral(f)(assign.rhs)
+          st <- f.storeVar(assign.lhs.name, assign.lhs.toBoogie.scope, Scalar(rhs))
+          n <- f.setNext(Run(s.successor))
+        } yield (st)
+      }
       case assign: LocalAssign => {
         for {
           rhs <- Eval.evalLiteral(f)(assign.rhs)
@@ -617,8 +624,6 @@ object InterpFuns {
     s
   }
 
-  // case class FunctionCall(target: String, inParams: List[(String, Literal)])
-
   /*
    * Calls a procedure that has a return, immediately evaluating the procedure
    *
@@ -630,7 +635,13 @@ object InterpFuns {
     params: Iterable[(LocalVar, Literal)]
   ): State[S, Map[LocalVar, Literal], InterpreterError] = {
 
-    val actualParams = params.toList.sortBy(p => p._1.name.stripPrefix("R").stripPrefix("V").stripSuffix("_in").toInt)
+    def intOf(n: String) = try {
+      n.toInt
+    } catch {
+      case _ => n.hashCode()
+    }
+
+    val actualParams = params.toList.sortBy(p => intOf(p._1.name.stripPrefix("R").stripPrefix("V").stripSuffix("_in")))
 
     val target = targetProc match {
       case p: Procedure => Some(p)
@@ -813,6 +824,14 @@ object InterpFuns {
 
   def interpretProg[S, T <: Effects[S, InterpreterError]](f: T)(p: Program, is: S): S = {
     interpretEvalProg(f)(p, is)._1
+  }
+}
+
+def evalProc(p: Program, proc: Procedure, args: Map[LocalVar, Literal] = Map()): Map[LocalVar, Literal] = {
+  val begin = InterpFuns.initialiseProgram(NormalInterpreter)(InterpreterState(), p)
+  InterpFuns.callProcedure(NormalInterpreter)(proc, args).f(begin)._2 match {
+    case Right(r) => r
+    case Left(l) => throw Exception("interp error: " + l)
   }
 }
 

@@ -312,7 +312,7 @@ class BottomUpCallgraphWorklistSolver[L](transferProcedure: (Procedure => L, L, 
     p.sortProceduresRPO()
     val indexed = p.procedures.zipWithIndex
     val indexMap = indexed.toMap
-    val worklist = mutable.PriorityQueue[(Procedure, Int)]()(Ordering.by(_._2))
+    val worklist = mutable.PriorityQueue[(Procedure, Int)]()(Ordering.by(-_._2))
     worklist.addAll(indexed)
 
     while (worklist.nonEmpty) {
@@ -326,6 +326,38 @@ class BottomUpCallgraphWorklistSolver[L](transferProcedure: (Procedure => L, L, 
         summaries = summaries.updated(p, r)
         worklist.addAll(p.incomingCalls().map(p => (p.target, indexMap(p.target))))
         worklist.addAll(p.calls.map(p => (p, indexMap(p))))
+      }
+    }
+    summaries
+  }
+}
+
+class SCCCallgraphWorklistSolver[L](transferProcedure: (Procedure => L, L, Procedure) => L, init: Procedure => L) {
+
+  def solve(p: Program) = {
+    var old_summaries = Map[Procedure, L]()
+    var summaries = Map[Procedure, L]()
+
+    val scc = stronglyConnectedComponents(CallGraph, List(p.mainProcedure))
+
+    for component <- scc do {
+      val worklist = mutable.LinkedHashSet[Procedure]()
+
+      worklist.addAll(component)
+
+      while (worklist.nonEmpty) {
+        val p = worklist.head
+        worklist.remove(p)
+        old_summaries = summaries
+
+        def getSummary(p: Procedure) = old_summaries.get(p).getOrElse(init(p))
+        val s = getSummary(p)
+        val r = transferProcedure(getSummary, s, p)
+        if (r != s) {
+          summaries = summaries.updated(p, r)
+          worklist.addAll(p.incomingCalls().map(_.target).filter(component.contains(_)))
+          worklist.addAll(p.calls.filter(component.contains(_)))
+        }
       }
     }
     summaries

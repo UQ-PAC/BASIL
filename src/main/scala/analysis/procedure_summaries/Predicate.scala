@@ -5,9 +5,10 @@ import ir.*
 import boogie.*
 import ir.transforms.AbstractDomain
 
-// TODO DAG predicates (don't represent the same expression twice)
+// TODO DAG predicates (don't represent the same subexpression twice)
 
 /**
+ * A bitvector expression.
  */
 enum BVTerm {
   case Lit(x: BitVecLiteral)
@@ -24,6 +25,9 @@ enum BVTerm {
 
   override def toString(): String = this.toBoogie.toString()
 
+  /**
+   * Convert to a boogie expression of type BitVecBType
+   */
   def toBoogie: BExpr = this match {
     case Lit(x) => x.toBoogie
     case Var(v) => v.toBoogie
@@ -36,30 +40,62 @@ enum BVTerm {
     case SignExtend(extension, body) => BVSignExtend(extension, body.toBoogie)
   }
 
-  def toBasil: Option[Expr] = this match {
-    case Lit(x) => Some(x)
-    case Var(v) => Some(v)
-    case OldVar(v) => None
-    case Uop(op, x) => x.toBasil.map(x => UnaryExpr(op, x))
-    case Bop(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
-    case Extract(end, start, body) => body.toBasil.map(x => ir.Extract(end, start, x))
-    case Repeat(repeats, body) => body.toBasil.map(x => ir.Repeat(repeats, x))
-    case ZeroExtend(extension, body) => body.toBasil.map(x => ir.ZeroExtend(extension, x))
-    case SignExtend(extension, body) => body.toBasil.map(x => ir.SignExtend(extension, x))
+  /**
+   * Encode this term as a basil expression
+   */
+  def toBasil: Expr = this match {
+    case Lit(x) => x
+    case Var(v) => v
+    case OldVar(v) => OldExpr(v)
+    case Uop(op, x) => UnaryExpr(op, x.toBasil)
+    case Bop(op, x, y) => BinaryExpr(op, x.toBasil, y.toBasil)
+    case Extract(end, start, body) => ir.Extract(end, start, body.toBasil)
+    case Repeat(repeats, body) => ir.Repeat(repeats, body.toBasil)
+    case ZeroExtend(extension, body) => ir.ZeroExtend(extension, body.toBasil)
+    case SignExtend(extension, body) => ir.SignExtend(extension, body.toBasil)
   }
 
   /**
+   * Return the number of bits in this bitvector
+   */
+  def size: Int = this match {
+    case Lit(x) => x.size
+    case Var(v) => ir.size(v).get
+    case OldVar(v) => ir.size(v).get
+    case Uop(op, x) => x.size
+    case Bop(op, x, y) =>
+      assert(x.size == y.size)
+      x.size
+    case Extract(end, start, body) => end - start
+    case Repeat(repeats, body) => body.size * repeats
+    case ZeroExtend(extension, body) => body.size + extension
+    case SignExtend(extension, body) => body.size + extension
+  }
+
+  /**
+   * Simplify this expression
    */
   def simplify: BVTerm = {
+    import eval.BitVectorEval.*
     if this.simplified then return this
     val ret = this match {
-      // TODO const prop
-      // case Uop(op, x) => Uop(op, x.simplify)
-      // case Bop(op, x, y) => Bop(op, x.simplify, y.simplify)
-      // case Extract(end, start, body) => Extract(end, start, body.simplify)
-      // case Repeat(repeats, body) => Repeat(repeats, body.simplify)
-      // case ZeroExtend(extension, body) => ZeroExtend(extension, body.simplify)
-      // case SignExtend(extension, body) => SignExtend(extension, body.simplify)
+      case Uop(op, x) =>
+        (op, x.simplify) match {
+          case (BVNEG, Lit(x)) => Lit(smt_bvneg(x))
+          case (BVNOT, Lit(x)) => Lit(smt_bvnot(x))
+          case (op, x) => Uop(op, x)
+        }
+      case Bop(op, x, y) =>
+        (op, x.simplify, y.simplify) match {
+          case (BVADD, x, Lit(BitVecLiteral(0, _))) => x
+          case (BVADD, Lit(BitVecLiteral(0, _)), y) => y
+          case (op, Lit(a), Lit(b)) => Lit(eval.evalBVBinExpr(op, a, b))
+          case (op, x, y) => Bop(op, x, y)
+        }
+      case Extract(end, start, body) => Extract(end, start, body.simplify)
+      case Repeat(repeats, body) => Repeat(repeats, body.simplify)
+      case ZeroExtend(extension, body) => ZeroExtend(extension, body.simplify)
+      case SignExtend(extension, body) => SignExtend(extension, body.simplify)
       case _ => this
     }
     ret.simplified = true
@@ -96,9 +132,28 @@ enum BVTerm {
       case SignExtend(extension, body) => body.contains(term)
       case _ => false
     }
+
+  /**
+   * Determines whether the term contains only variables in vars
+   */
+  def containsOnly(vars: Set[Variable]): Boolean = {
+    this match {
+      case Lit(x) => true
+      case Var(v) => vars.contains(v)
+      case OldVar(v) => true
+      case Uop(op, x) => x.containsOnly(vars)
+      case Bop(op, x, y) => x.containsOnly(vars) && y.containsOnly(vars)
+      case Repeat(repeats, body) => body.containsOnly(vars)
+      case Extract(end, start, body) => body.containsOnly(vars)
+      case ZeroExtend(extension, body) => body.containsOnly(vars)
+      case SignExtend(extension, body) => body.containsOnly(vars)
+    }
+  }
+
 }
 
 /**
+ * A gamma expression.
  */
 enum GammaTerm {
   import GammaTerm.*
@@ -113,6 +168,9 @@ enum GammaTerm {
 
   override def toString(): String = this.toBoogie.toString()
 
+  /**
+   * Convert to a boogie expression of type BoolBType
+   */
   def toBoogie: BExpr = this match {
     case Lit(x) => x.toBoogie
     case Var(v) => v.toGamma
@@ -124,19 +182,20 @@ enum GammaTerm {
       else s.tail.foldLeft(s.head.toBoogie) { (p, g) => BinaryBExpr(BoolAND, p, g.toBoogie) }
   }
 
-  def toBasil: Option[Expr] = this match {
-    case Lit(x) => Some(x)
-    case Var(v) => Some(LocalVar(s"Gamma_${v.name}", BoolType))
-    case OldVar(v) => None
-    case Uop(op, x) => x.toBasil.map(x => UnaryExpr(op, x))
+  /**
+   * Encode this term as a basil expression
+   */
+  def toBasil: Expr = this match {
+    case Lit(x) => x
+    case Var(v) => LocalVar(s"Gamma_${v.name}", BoolType)
+    case OldVar(v) => OldExpr(Var(v).toBasil)
+    case Uop(op, x) => UnaryExpr(op, x.toBasil)
     case Join(s) =>
-      if s.size == 0 then Some(TrueLiteral)
+      if s.size == 0 then TrueLiteral
       else if s.size == 1 then s.head.toBasil
-      else s.tail.foldLeft(s.head.toBasil) { (p, g) => g.toBasil.flatMap(g => p.map(p => BinaryExpr(BoolAND, p, g))) }
+      else s.tail.foldLeft(s.head.toBasil) { (p, g) => BinaryExpr(BoolAND, p, g.toBasil) }
   }
 
-  /**
-   */
   def simplify: GammaTerm = {
     if this.simplified then return this
     val ret = this match {
@@ -179,6 +238,21 @@ enum GammaTerm {
       case Uop(op, x) => x.contains(term)
       case Join(s) => s.exists(_.contains(term))
     }
+
+  /**
+   * Determines whether the term contains only variables in vars
+   */
+  def containsOnly(vars: Set[Variable]): Boolean = {
+    import GammaTerm.*
+    this match {
+      case Lit(x) => true
+      case Var(v) => vars.contains(v)
+      case OldVar(v) => true
+      case Uop(op, x) => x.containsOnly(vars)
+      case Join(s) => s.forall(_.containsOnly(vars))
+    }
+  }
+
 }
 
 object GammaTerm {
@@ -190,7 +264,7 @@ object GammaTerm {
 
 sealed trait Atomic
 
-/**
+/** A predicate written in negation normal form (i.e. only atomics can be negated).
  */
 enum Predicate {
   import Predicate.*
@@ -204,6 +278,9 @@ enum Predicate {
 
   private var simplified: Boolean = false
 
+  /**
+   * Encode this predicate as a boogie expression of type BoolBType.
+   */
   def toBoogie: BExpr = this match {
     case Lit(x) => x.toBoogie
     case Not(x) => UnaryBExpr(BoolNOT, x.toBoogie)
@@ -219,25 +296,33 @@ enum Predicate {
     case GammaCmp(op, x, y) => BinaryBExpr(op, x.toBoogie, y.toBoogie)
   }
 
-  def toBasil: Option[Expr] = this match {
-    case Lit(x) => Some(x)
-    case Not(x) => x.toBasil.map(x => UnaryExpr(BoolNOT, x))
+  /**
+   * Encode this predicate as a basil expression of type BoolType
+   */
+  def toBasil: Expr = this match {
+    case Lit(x) => x
+    case Not(x) => UnaryExpr(BoolNOT, x.toBasil)
     case Conj(s) =>
-      if s.size == 0 then Some(TrueLiteral)
+      if s.size == 0 then TrueLiteral
       else if s.size == 1 then s.head.toBasil
       else
         s.tail.foldLeft(s.head.toBasil) { (p, q) =>
-          p.flatMap { p => q.toBasil.map { q => BinaryExpr(BoolAND, p, q) } }
+          BinaryExpr(BoolAND, p, q.toBasil)
         }
     case Disj(s) =>
-      if s.size == 0 then Some(FalseLiteral)
+      if s.size == 0 then FalseLiteral
       else if s.size == 1 then s.head.toBasil
       else
-        s.tail.foldLeft(s.head.toBasil) { (p, q) => p.flatMap { p => q.toBasil.map { q => BinaryExpr(BoolOR, p, q) } } }
-    case BVCmp(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
-    case GammaCmp(op, x, y) => x.toBasil.flatMap(x => y.toBasil.map(y => BinaryExpr(op, x, y)))
+        s.tail.foldLeft(s.head.toBasil) { (p, q) =>
+          BinaryExpr(BoolOR, p, q.toBasil)
+        }
+    case BVCmp(op, x, y) => BinaryExpr(op, x.toBasil, y.toBasil)
+    case GammaCmp(op, x, y) => BinaryExpr(op, x.toBasil, y.toBasil)
   }
 
+  // TODO perhaps an alternative syntax would be ideal, as this it would then be distinct from
+  // boogie syntax, and there would be no pointless bracketing. Perhaps it would also help if
+  // such an alternative syntax could be input into source code easily.
   override def toString(): String = this.toBoogie.toString
 
   def size: Int = this match {
@@ -278,7 +363,7 @@ enum Predicate {
         case (s, Disj(s2)) => s ++ s2
         case (s, p) => s + p
       }
-      if d.size == 0 then True
+      if d.size == 0 then False
       else if d.size == 1 then d.head
       else Disj(d)
     }
@@ -336,19 +421,19 @@ enum Predicate {
   /**
    * Remove atomic expressions containing `term` (replacing with True if needed)
    */
-  def remove(term: BVTerm): Predicate = this match {
-    case a: Atomic => if a.contains(term) then True else this
-    case Conj(s) => Conj(s.map(_.remove(term)))
-    case Disj(s) => Disj(s.map(_.remove(term)))
+  def remove(term: BVTerm, default: Predicate): Predicate = this match {
+    case a: Atomic => if a.contains(term) then default else this
+    case Conj(s) => Conj(s.map(_.remove(term, default)))
+    case Disj(s) => Disj(s.map(_.remove(term, default)))
   }
 
   /**
-   * Remove atomic expressions containing `term` (replacing with True if needed)
+   * Remove atomic expressions containing `term` (replacing with default if needed)
    */
-  def remove(term: GammaTerm): Predicate = this match {
-    case a: Atomic => if a.contains(term) then True else this
-    case Conj(s) => Conj(s.map(_.remove(term)))
-    case Disj(s) => Disj(s.map(_.remove(term)))
+  def remove(term: GammaTerm, default: Predicate): Predicate = this match {
+    case a: Atomic => if a.contains(term) then default else this
+    case Conj(s) => Conj(s.map(_.remove(term, default)))
+    case Disj(s) => Disj(s.map(_.remove(term, default)))
   }
 
   /**
@@ -431,8 +516,12 @@ enum Predicate {
     ret
 
   /**
+   * Simplify this predicate.
    */
   def simplify: Predicate = {
+    /* It is assumed (and not currently verified) that simplification is idempotent (i.e. p.simplify.simplify = p.simplify forall p).
+     * Hence we can use a flag to keep track of wether we have simplified each predicate, and don't simplify again if we already have.
+     */
     if this.simplified then return this
     val ret = this match {
       case Not(a) =>
@@ -443,54 +532,172 @@ enum Predicate {
         }
       case Conj(s) => {
         var cur = s.map(_.simplify)
+        // Repeatedly apply simplification rules until none can be applied.
         var changed = true
         while (changed) {
           changed = false
 
+          // There's some nondeterminism here because we may iterate over hashsets
+
+          // Join disjunctions with common terms together.
+          // For example, this will replace
+          // (a || b || c) && (a || b || d) && e
+          // with
+          // (a || b || (c && d)) && e
+          //
+          // Note that this is probably quite slow!
+          // It could probably be sped up an okay amount if we speed up predicate equality checks
+          // with some sort of hash
+          var disjs = Set[Disj]()
+
+          for p <- cur if disjs.size < 2 do {
+            p match {
+              case p: Disj => disjs = disjs + p
+              case _ => {}
+            }
+          }
+          if disjs.size >= 2 then {
+            assert(disjs.size == 2)
+
+            val l = disjs.toList
+            val a = l(0).s
+            val b = l(1).s
+
+            if a.intersect(b).nonEmpty then
+              val cur1 =
+                cur - Disj(a) - Disj(b) + or(Disj(a.intersect(b)), and(Disj(a.diff(b)), Disj(b.diff(a)))).simplify
+              changed = cur != cur1
+              cur = cur1
+          }
+
+          // Apply simplification rules
           for p <- cur if !changed do {
             val cur1 = p match {
               case Lit(TrueLiteral) => cur - p
-              case Lit(FalseLiteral) => Set(Lit(FalseLiteral))
+              case Lit(FalseLiteral) => Set(False)
               case Conj(s2) => cur - p ++ s2
+              case Not(p) if cur.contains(p) => Set(False)
               case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSLE, b, a)) =>
-                cur - p - BVCmp(BVSLE, b, a) + BVCmp(BVEQ, a, b)
+                cur - p - BVCmp(BVSLE, b, a) + BVCmp(BVEQ, a, b).simplify
               case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSGE, a, b)) =>
-                cur - p - BVCmp(BVSGE, a, b) + BVCmp(BVEQ, a, b)
+                cur - p - BVCmp(BVSGE, a, b) + BVCmp(BVEQ, a, b).simplify
+              case BVCmp(BVSGE, a, b) if cur.contains(BVCmp(BVSGE, b, a)) =>
+                cur - p - BVCmp(BVSGE, b, a) + BVCmp(BVEQ, a, b).simplify
               case BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVULE, b, a)) =>
-                cur - p - BVCmp(BVULE, b, a) + BVCmp(BVEQ, a, b)
+                cur - p - BVCmp(BVULE, b, a) + BVCmp(BVEQ, a, b).simplify
               case BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVUGE, a, b)) =>
-                cur - p - BVCmp(BVUGE, a, b) + BVCmp(BVEQ, a, b)
+                cur - p - BVCmp(BVUGE, a, b) + BVCmp(BVEQ, a, b).simplify
+              case BVCmp(BVUGE, a, b) if cur.contains(BVCmp(BVUGE, b, a)) =>
+                cur - p - BVCmp(BVUGE, b, a) + BVCmp(BVEQ, a, b).simplify
               case GammaCmp(BoolIMPLIES, a, b) if cur.contains(GammaCmp(BoolIMPLIES, b, a)) =>
-                cur - p - GammaCmp(BoolIMPLIES, b, a) + GammaCmp(BoolEQ, a, b)
+                cur - p - GammaCmp(BoolIMPLIES, b, a) + GammaCmp(BoolEQ, a, b).simplify
+              case Disj(s2) if s.intersect(s2).nonEmpty => cur - p
               case _ => cur
             }
             changed = cur != cur1
             cur = cur1
           }
         }
-        if cur.size == 1 then cur.head else Conj(cur)
+        if cur.size == 0 then True
+        else if cur.size == 1 then cur.head
+        else Conj(cur)
       }
       case Disj(s) => {
         var cur = s.map(_.simplify)
         var changed = true
+        // Repeatedly apply simplification rules until none can be applied.
         while (changed) {
           changed = false
 
+          // There's some nondeterminism here because we may iterate over hashsets
+
+          // Join conjunctions with common terms together.
+          // For example, this will replace
+          // (a && b && c) || (a && b && d) || e
+          // with
+          // (a && b && (c || d)) || e
+          var conjs = Set[Conj]()
+
+          for p <- cur if conjs.size < 2 do {
+            p match {
+              case p: Conj => conjs = conjs + p
+              case _ => {}
+            }
+          }
+          if conjs.size >= 2 then {
+            assert(conjs.size == 2)
+
+            val l = conjs.toList
+            val a = l(0).s
+            val b = l(1).s
+
+            if a.intersect(b).nonEmpty then
+              val cur1 =
+                cur - Conj(a) - Conj(b) + and(Conj(a.intersect(b)), or(Conj(a.diff(b)), Conj(b.diff(a)))).simplify
+              changed = cur != cur1
+              cur = cur1
+          }
+
+          // Apply simplification rules
           for p <- cur if !changed do {
             val cur1 = p match {
               case Disj(s2) => cur - p ++ s2
               case Lit(TrueLiteral) => Set(True)
               case Lit(FalseLiteral) => cur - p
+              case Not(p) if cur.contains(p) => Set(True)
+
+              case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSLE, b, a)) => cur - p - BVCmp(BVSLE, b, a) + True
+              case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSGE, a, b)) => cur - p - BVCmp(BVSGE, a, b) + True
+              case BVCmp(BVSGE, a, b) if cur.contains(BVCmp(BVSGE, b, a)) => cur - p - BVCmp(BVSGE, b, a) + True
+              case BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVULE, b, a)) => cur - p - BVCmp(BVULE, b, a) + True
+              case BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVUGE, a, b)) => cur - p - BVCmp(BVUGE, a, b) + True
+              case BVCmp(BVUGE, a, b) if cur.contains(BVCmp(BVUGE, b, a)) => cur - p - BVCmp(BVUGE, b, a) + True
+
+              case BVCmp(BVSLT, a, b) if cur.contains(BVCmp(BVSLE, b, a)) => cur - p - BVCmp(BVSLE, b, a) + True
+              case BVCmp(BVSLT, a, b) if cur.contains(BVCmp(BVSGE, a, b)) => cur - p - BVCmp(BVSGE, a, b) + True
+              case BVCmp(BVSGT, a, b) if cur.contains(BVCmp(BVSGE, b, a)) => cur - p - BVCmp(BVSGE, b, a) + True
+              case BVCmp(BVSGT, a, b) if cur.contains(BVCmp(BVSLE, a, b)) => cur - p - BVCmp(BVSLE, a, b) + True
+              case BVCmp(BVULT, a, b) if cur.contains(BVCmp(BVULE, b, a)) => cur - p - BVCmp(BVULE, b, a) + True
+              case BVCmp(BVULT, a, b) if cur.contains(BVCmp(BVUGE, a, b)) => cur - p - BVCmp(BVUGE, a, b) + True
+              case BVCmp(BVUGT, a, b) if cur.contains(BVCmp(BVUGE, b, a)) => cur - p - BVCmp(BVUGE, b, a) + True
+              case BVCmp(BVUGT, a, b) if cur.contains(BVCmp(BVULE, a, b)) => cur - p - BVCmp(BVULE, a, b) + True
+
+              case BVCmp(BVSLT, a, b) if cur.contains(BVCmp(BVEQ, a, b)) =>
+                cur - p - BVCmp(BVEQ, a, b) + BVCmp(BVSLE, a, b).simplify
+              case BVCmp(BVSLT, a, b) if cur.contains(BVCmp(BVEQ, b, a)) =>
+                cur - p - BVCmp(BVEQ, b, a) + BVCmp(BVSLE, a, b).simplify
+              case BVCmp(BVSGT, a, b) if cur.contains(BVCmp(BVEQ, a, b)) =>
+                cur - p - BVCmp(BVEQ, a, b) + BVCmp(BVSGE, a, b).simplify
+              case BVCmp(BVSGT, a, b) if cur.contains(BVCmp(BVEQ, b, a)) =>
+                cur - p - BVCmp(BVEQ, b, a) + BVCmp(BVSGE, a, b).simplify
+              case BVCmp(BVULT, a, b) if cur.contains(BVCmp(BVEQ, a, b)) =>
+                cur - p - BVCmp(BVEQ, a, b) + BVCmp(BVULE, a, b).simplify
+              case BVCmp(BVULT, a, b) if cur.contains(BVCmp(BVEQ, b, a)) =>
+                cur - p - BVCmp(BVEQ, b, a) + BVCmp(BVULE, a, b).simplify
+              case BVCmp(BVUGT, a, b) if cur.contains(BVCmp(BVEQ, a, b)) =>
+                cur - p - BVCmp(BVEQ, a, b) + BVCmp(BVUGE, a, b).simplify
+              case BVCmp(BVUGT, a, b) if cur.contains(BVCmp(BVEQ, b, a)) =>
+                cur - p - BVCmp(BVEQ, b, a) + BVCmp(BVUGE, a, b).simplify
+
+              case Conj(s2) if s.intersect(s2).nonEmpty => cur - p
               case _ => cur
             }
             changed = cur != cur1
             cur = cur1
           }
         }
-        if cur.size == 1 then cur.head else Disj(cur)
+        if cur.size == 0 then False
+        else if cur.size == 1 then cur.head
+        else Disj(cur)
       }
       case BVCmp(op, a, b) =>
+        import eval.evalBVLogBinExpr
+        import BVTerm.*
         (op, a.simplify, b.simplify) match {
+          case (op, BVTerm.Lit(a), BVTerm.Lit(b)) => if evalBVLogBinExpr(op, a, b) then True else False
+          case (BVEQ, a, b) if a == b => True
+          case (BVEQ, a, Uop(BVNEG, b)) => BVCmp(BVEQ, Bop(BVADD, a, b), BVTerm.Lit(BitVecLiteral(0, a.size))).simplify
+          case (BVEQ, l: BVTerm.Lit, v: Var) => BVCmp(BVEQ, v, l) // Canonical form-ish (to remove duplicate terms
           case (op, a, b) => BVCmp(op, a, b)
         }
       case GammaCmp(op, a, b) =>
@@ -503,6 +710,21 @@ enum Predicate {
     }
     ret.simplified = true
     ret
+  }
+
+  /**
+   * Removes all parts of the predicate containing variables not in vars (replacing the subexpression with default).
+   */
+  def filterOut(vars: Set[Variable], default: Predicate): Predicate = {
+    import Predicate.*
+    this match {
+      case Lit(x) => this
+      case Not(x) => not(x.filterOut(vars, default))
+      case Conj(s) => Conj(s.map(_.filterOut(vars, default)))
+      case Disj(s) => Disj(s.map(_.filterOut(vars, default)))
+      case BVCmp(op, x, y) => if x.containsOnly(vars) && y.containsOnly(vars) then this else default
+      case GammaCmp(op, x, y) => if x.containsOnly(vars) && y.containsOnly(vars) then this else default
+    }
   }
 }
 
@@ -536,6 +758,8 @@ object Predicate {
       case BoolEQUIV => bop(BoolEQ, a, b)
     }
   }
+
+  def implies(a: Predicate, b: Predicate): Predicate = bop(BoolIMPLIES, a, b)
 
   def gammaLeq(a: GammaTerm, b: GammaTerm) = GammaCmp(BoolIMPLIES, b, a)
   def gammaGeq(a: GammaTerm, b: GammaTerm) = GammaCmp(BoolIMPLIES, a, b)

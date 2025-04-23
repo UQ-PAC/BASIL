@@ -19,6 +19,8 @@ sealed trait BExpr {
   def serialiseBoogie(w: Writer): Unit = w.append(toString)
   def acceptVisit(visitor: BVisitor): BExpr = this
 
+  var label: Option[String] = None
+
   def simplify: BExpr =
     this match {
       case BinaryBExpr(BoolAND, a, b) =>
@@ -603,6 +605,7 @@ case class BInBounds(base: BExpr, len: BExpr, endian: Endian, i: BExpr) extends 
 }
 
 case class BoolToBV1Op(arg: BExpr) extends FunctionOp {
+  def attribute: BAttribute = BAttribute("inline", None)
   val fnName: String = "bool2bv1"
 }
 

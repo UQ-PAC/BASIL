@@ -304,6 +304,10 @@ object ReadWriteAnalysis {
           ir.map(addWrites(Seq(s.lhs)))
             .map(addReads(s.rhs.variables))
         }
+        case s: MemoryAssign => {
+          ir.map(addWrites(Seq(s.lhs)))
+            .map(addReads(s.rhs.variables))
+        }
         case s: MemoryLoad => {
           ir.map(addWrites(Seq(s.lhs)))
             .map(addReads(s.index.variables))
