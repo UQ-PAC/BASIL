@@ -313,7 +313,7 @@ class Procedure private (
         "_loop_header_" + loopCounter
       } else ""
 
-      b.label = name + "_" + counter + loopCounter
+      b.label = name + "_" + counter
 
     }
 
