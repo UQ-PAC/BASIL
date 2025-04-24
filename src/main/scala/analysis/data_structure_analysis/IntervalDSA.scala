@@ -51,13 +51,12 @@ class IntervalGraph(
         case Global => node.flags.global = true
         case NonPointer =>
           throw new Exception("Attempted to create a node from an Non-pointer symbolic base")
-        case unknown: (Ret| Par | Loaded) =>
+        case unknown: (Ret | Par | Loaded) =>
           node.flags.unknown = true
           node.flags.incomplete = true
       result + (base -> node)
     }
   }
-
 
   def buildNodes(): Map[SymBase, IntervalNode] = {
     val global =
@@ -143,15 +142,12 @@ class IntervalGraph(
     globalNode
   }
 
-
   def addParamCells(): Unit = {
     val unchanged = Set("R29", "R30", "R31")
     (proc.formalInParam ++ proc.formalOutParam)
-      .foreach(
-        v =>
-          val cells = exprToCells(v)
-          if unchanged.forall(n => !v.name.startsWith(n)) then
-            cells.map(_.node).foreach(_.flags.escapes = true)
+      .foreach(v =>
+        val cells = exprToCells(v)
+        if unchanged.forall(n => !v.name.startsWith(n)) then cells.map(_.node).foreach(_.flags.escapes = true)
       )
   }
 
@@ -896,8 +892,7 @@ object IntervalDSA {
     var sourceGlobal = source.find(source.nodes(Global).get(0))
     val globalNode = sourceGlobal.node.clone(target, true, oldToNew)
 
-    sourceGlobal =
-      globalNode.get(sourceGlobal.interval)
+    sourceGlobal = globalNode.get(sourceGlobal.interval)
     target.mergeCells(sourceGlobal, targetGlobal)
     oldToNew.map((old, outdatedNew) => (old, target.find(outdatedNew))).toMap
   }
@@ -941,7 +936,8 @@ object IntervalDSA {
         val (node, offset) =
           target.findNode(cell.node.clone(target, true, oldToNew))
         node.get(cell.interval.move(i => i + offset))
-      ).map(target.find)
+      )
+      .map(target.find)
     val targetCells = target.exprToCells(targetExpr).map(target.find)
 
     if (targetCells ++ sourceCells).nonEmpty then target.mergeCells(targetCells ++ sourceCells)

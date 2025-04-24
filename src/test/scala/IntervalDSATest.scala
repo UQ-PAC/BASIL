@@ -1,4 +1,16 @@
-import analysis.data_structure_analysis.{Global, Heap, Interval, IntervalDSA, Par, Ret, Stack, SymBase, generateConstraints, getSymbolicValues, given}
+import analysis.data_structure_analysis.{
+  Global,
+  Heap,
+  Interval,
+  IntervalDSA,
+  Par,
+  Ret,
+  Stack,
+  SymBase,
+  generateConstraints,
+  getSymbolicValues,
+  given
+}
 import boogie.SpecGlobal
 import ir.*
 import ir.Endian.{BigEndian, LittleEndian}
@@ -532,7 +544,6 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
     assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
   }
-
 
   test("direct_request") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
