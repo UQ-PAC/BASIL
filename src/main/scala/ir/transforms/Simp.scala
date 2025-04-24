@@ -651,7 +651,6 @@ def validateProg(
 def validate(validationProg: Program, procName: String, name: String, timeout: Int = 10) = {
   val boogieFileName = s"$name-translation-validate.bpl"
   val boogieFile = translating.BoogieTranslator.translateProg(validationProg).toString
-  SimplifyLogger.info(boogieFileName)
   util.writeToFile(boogieFile, boogieFileName)
   if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
     val dir = File("./graphs/")
@@ -716,6 +715,11 @@ def validateProcWithSplits(
   maxSplitDepth: Int = 0
 ) = {
 
+  val doms = analysis.Dominators.computeDominatorTree(proc)
+  val ordered = analysis.Dominators.dominatorOrder(doms).zipWithIndex.toMap
+  isplits.sortInPlaceBy(b => ordered.get(b.parent).getOrElse(0))
+
+
   if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
     val dir = File("./graphs/")
     if (!dir.exists()) then dir.mkdirs()
@@ -724,7 +728,7 @@ def validateProcWithSplits(
       util.writeToFile(blockGraph, (s"graphs/presplittransition-${p.name}-${name}.dot"))
     }
   }
-  var splitDepth = 0
+  var splitDepth = 7 
 
   val splitTargets = isplits.toList.map(g => g -> g.targets)
 
