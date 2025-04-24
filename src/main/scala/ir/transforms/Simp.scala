@@ -603,6 +603,7 @@ class GuardVisitor extends CILVisitor {
     while (coalesceBlocks(p)) {}
     removeEmptyBlocks(p)
     transforms.fixupGuards(p)
+    transforms.removeDuplicateGuard(p.blocks.toSeq)
     util.writeToFile(dotBlockGraph(p), s"graphs/blockgraph-${p.name}-boo.dot")
     inparams = p.formalInParam.toSet[Variable]
     defs = allDefinitions(p)
@@ -1663,7 +1664,7 @@ def fixupGuards(p: Procedure): Unit = {
             for (assign <- visited) {
               body = Substitute(v => if (assign.lhs == v) then Some(assign.rhs) else None)(body).getOrElse(body)
             }
-            break(Some(Assume(body, Some(s"prop from ${block.label}"), b, c)))
+            break(Some(Assume(body, None, b, c)))
           }
           case n: NOP => ()
           case _ => break(None)
@@ -1692,8 +1693,8 @@ def fixupGuards(p: Procedure): Unit = {
 
 }
 
-def removeDuplicateGuard(p: Program) = {
-  p.procedures.flatMap(_.blocks).foreach {
+def removeDuplicateGuard(b: Iterable[Block]) : Unit = {
+  b.foreach {
     case block: Block if IRWalk.firstInBlock(block).isInstanceOf[Assume] => {
       val assumes = block.statements.collect { case a: Assume =>
         a
@@ -1712,6 +1713,10 @@ def removeDuplicateGuard(p: Program) = {
     }
     case _ => Seq()
   }
+}
+
+def removeDuplicateGuard(p: Program) : Unit = {
+  removeDuplicateGuard(p.procedures.flatMap(_.blocks).toSeq)
 }
 
 def findSimpleBackwardsChain(b: Block) = {
