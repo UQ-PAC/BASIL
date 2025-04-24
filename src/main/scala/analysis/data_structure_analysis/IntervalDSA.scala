@@ -836,6 +836,8 @@ class IntervalDSA(irContext: IRContext) {
       val DSA = IntervalDSA.getLocals(irContext, sva, cons)
       DSATimer.checkPoint("Finished DSA Local Phase")
       if checks then
+        DSA.values.foreach(checkUniqueGlobal)
+        DSA.values.foreach(checksGlobalMaintained)
         IntervalDSA.checkReachable(irContext.program, DSA)
         DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
         DSA.values.foreach(_.localCorrectness())
@@ -844,11 +846,13 @@ class IntervalDSA(irContext: IRContext) {
       val DSABU = IntervalDSA.solveBUs(DSA)
       DSATimer.checkPoint("Finished DSA BU Phase")
       if checks then
+        DSABU.values.foreach(checkUniqueGlobal)
         DSABU.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
       val DSATD = IntervalDSA.solveTDs(DSABU)
       DSATimer.checkPoint("Finished DSA TD Phase")
       if checks then
+        DSATD.values.foreach(checkUniqueGlobal)
         DSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
 
@@ -861,6 +865,7 @@ class IntervalDSA(irContext: IRContext) {
       DSATimer.checkPoint("Finished DSA global graph")
 
       if checks then
+        DSATD.values.foreach(checkUniqueGlobal)
         DSATD.values.foreach(_.localCorrectness())
         IntervalDSA.checkConsistGlobals(DSATD, globalGraph)
         IntervalDSA.checkReachable(irContext.program, DSATD)
@@ -877,8 +882,7 @@ class IntervalDSA(irContext: IRContext) {
 object IntervalDSA {
 
   def checksGlobalMaintained(graph: IntervalGraph): Unit = {
-    if (graph.find(graph.nodes(Global)).isCollapsed) then
-      DSALogger.warn(s"graph ${graph.proc.procName} had it's global collapsed")
+    assert(!graph.find(graph.nodes(Global)).isCollapsed, s"${graph.proc.procName} had it's global node collapsed}")
   }
 
   def globalTransfer(
@@ -981,6 +985,23 @@ object IntervalDSA {
         assert(!found.contains(base) || found(base) == node, s"$base was in $node and ${found(base)}")
       )
       node.bases.keys.foreach(found.update(_, node))
+      seen.add(node)
+      val toDo = node.cells.filter(_.hasPointee).map(_.getPointee).map(_.node).filterNot(seen.contains)
+      queue.enqueueAll(toDo)
+    }
+  }
+
+  def checkUniqueGlobal(graph: IntervalGraph): Unit = {
+    var found: Option[IntervalNode] = None
+    val seen = mutable.Set[IntervalNode]()
+    val entry = graph.nodes.values.map(graph.find)
+    val queue = mutable.Queue[IntervalNode]().enqueueAll(entry)
+    while queue.nonEmpty do {
+      val node = queue.dequeue()
+      if node.bases.contains(Global) then {
+        assert(found.isEmpty || found.get == node)
+        found = Some(node)
+      }
       seen.add(node)
       val toDo = node.cells.filter(_.hasPointee).map(_.getPointee).map(_.node).filterNot(seen.contains)
       queue.enqueueAll(toDo)
