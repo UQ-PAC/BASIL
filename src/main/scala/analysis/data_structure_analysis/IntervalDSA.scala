@@ -2,6 +2,7 @@ package analysis.data_structure_analysis
 
 import analysis.data_structure_analysis.DSAPhase.{BU, Local, TD}
 import analysis.data_structure_analysis.Interval.Top
+import analysis.data_structure_analysis.IntervalDSA.{checkUniqueGlobal, checksGlobalMaintained}
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
 import boogie.SpecGlobal
 import specification.FuncEntry
@@ -940,7 +941,7 @@ object IntervalDSA {
         val (node, offset) =
           target.findNode(cell.node.clone(target, true, oldToNew))
         node.get(cell.interval.move(i => i + offset))
-      )
+      ).map(target.find)
     val targetCells = target.exprToCells(targetExpr).map(target.find)
 
     if (targetCells ++ sourceCells).nonEmpty then target.mergeCells(targetCells ++ sourceCells)
