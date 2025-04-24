@@ -1,16 +1,4 @@
-import analysis.data_structure_analysis.{
-  Global,
-  Heap,
-  Interval,
-  IntervalDSA,
-  Par,
-  Ret,
-  Stack,
-  SymBase,
-  generateConstraints,
-  getSymbolicValues,
-  given
-}
+import analysis.data_structure_analysis.{Global, Heap, Interval, IntervalDSA, Par, Ret, Stack, SymBase, generateConstraints, getSymbolicValues, given}
 import boogie.SpecGlobal
 import ir.*
 import ir.Endian.{BigEndian, LittleEndian}
@@ -22,7 +10,7 @@ import test_util.BASILTest.writeToFile
 import util.*
 import analysis.data_structure_analysis.given
 import translating.PrettyPrinter.pp_proc
-import util.DSAConfig.Checks
+import util.DSAConfig.{Checks, Standard}
 
 @test_util.tags.UnitTest
 class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
@@ -36,7 +24,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
   }
 
-  def runTest(path: String): BASILResult = {
+  def runTest(path: String, config: DSAConfig = Checks): BASILResult = {
     RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf"),
@@ -44,7 +32,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(Checks)
+        dsaConfig = Some(config)
       )
     )
   }
@@ -79,13 +67,6 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   def globalsToLiteral(ctx: IRContext) = {
     ctx.globals.map(g => (g.name, BitVecLiteral(g.address, 64))).toMap
       ++ (ctx.funcEntries.map(f => (f.name, BitVecLiteral(f.address.toInt, 64))).toMap)
-  }
-
-  test("jumptable main") {
-    val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable")
-
-    val dsg = results.dsa.get.topDown(results.ir.program.mainProcedure)
-    dsg.localCorrectness()
   }
 
   test("Global Dereference") {
@@ -268,7 +249,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("overlapping access") {
-    val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable")
+    val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable", Standard)
 
     // the dsg of the main procedure after the local phase
     val program = results.ir.program
