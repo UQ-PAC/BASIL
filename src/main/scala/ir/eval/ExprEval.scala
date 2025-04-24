@@ -162,7 +162,7 @@ def partialEvaluateExpr(exp: Expr): Expr = {
     val (e, _) = simpFixedPoint(SimpExpr(fastPartialEvalExprTopLevel).apply)(exp)
     e
   } catch {
-    case exc => 
+    case exc =>
       val m = s"Error eval expr: $exp :: ${exc.getStackTrace.mkString("\n")}"
       throw Exception(m)
   }

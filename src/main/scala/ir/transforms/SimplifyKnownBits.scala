@@ -2,6 +2,7 @@ package ir.transforms
 import ir.*
 import util.writeToFile
 import ir.eval.BitVectorEval
+import ir.eval.InfixBitVectorEval.*
 
 /**
  *
@@ -34,41 +35,55 @@ import ir.eval.BitVectorEval
  *  y = {T, T, 1, T}
  */
 
-
 def bvnot(v: BigInt, size: Int) = {
   val x = BitVecType(size).maxValue & v
   BitVectorEval.smt_bvnot(BitVecLiteral(x, size)).value
 }
 
-case class TNum(value: BigInt, mask: BigInt, width: Int) {
+object TNum {
+  def trueBool = TNum(1.bv1, 0.bv1)
+  def falseBool = TNum(0.bv1, 0.bv1)
+  def unkBool = TNum(0.bv1, 1.bv1)
+  def top(width: Int) = TNum(0.bv(width), BitVecLiteral(BitVecType(width).maxValue, width))
+}
 
-  def wellFormed : Boolean = {
-    value >= 0 && mask >= 0 && width >= 0 && ((value & mask) == 0)
+case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
+  import TNum.*
+
+  def width: Int = {
+    require(value.size == mask.size)
+    value.size
+  }
+
+  def wellFormed: Boolean = {
+    value.value >= 0 && mask.value >= 0 && value.size >= 0 && mask.size >= 0 && value.size == mask.size && ((value & mask) == 0
+      .bv(width))
   }
 
   assert(wellFormed, s"not well formed $this")
 
   def top() = {
-    TNum(0, BitVecType(width).maxValue, width)
+    TNum(0.bv(width), BitVecLiteral(BitVecType(width).maxValue, width))
   }
 
-  def trueBool = TNum(1, 0, 1)
-  def falseBool = TNum(0, 0, 1)
-  def unkBool = TNum(0, 1, 1)
+  def zero = TNum(0.bv(width), 0.bv(width))
+  def constant(n: Int) = {
+    TNum(n.bv(width), 0.bv(width))
+  }
 
   override def toString() = {
     val padwidth = width / 4 + (if width % 4 != 0 then 1 else 0)
     def padded(number: BigInt) = {
       "0x" + ("%x".format(number).reverse.padTo(width / 4, '0').reverse)
     }
-    "(%s, %s, bv%d)".format(padded(value), padded(mask), width)
+    "(%s, %s, bv%d)".format(padded(value.value), padded(mask.value), width)
   }
 
   def join(that: TNum): TNum = {
     require(this.width == that.width, s"$this $that bv width")
     val mu = this.mask | that.mask | (this.value ^ that.value)
     val v = this.value & that.value
-    TNum(v, mu, this.width);
+    TNum(v, mu);
   }
 
   // Bitwise AND
@@ -77,7 +92,7 @@ case class TNum(value: BigInt, mask: BigInt, width: Int) {
     val alpha = this.value | this.mask
     val beta = that.value | that.mask
     val v = this.value & that.value
-    TNum(v, (alpha & beta & bvnot(v, width)), this.width)
+    TNum(v, (alpha & beta & ~v))
   }
 
   // Bitwise OR
@@ -85,7 +100,7 @@ case class TNum(value: BigInt, mask: BigInt, width: Int) {
     require(this.width == that.width, s"$this $that bv width")
     val v = this.value | that.value
     val mu = this.mask | that.mask
-    TNum(v, (mu & bvnot(v, width)), this.width);
+    TNum(v, (mu & ~v));
   }
 
   // Bitwise XOR
@@ -93,7 +108,7 @@ case class TNum(value: BigInt, mask: BigInt, width: Int) {
     require(this.width == that.width, s"$this $that bv width")
     val v = this.value ^ that.value
     val mu = this.mask | that.mask
-    TNum((v & bvnot(mu, width)), mu, this.width)
+    TNum((v & ~mu), mu)
   }
 
   // Bitwise NOR
@@ -104,22 +119,23 @@ case class TNum(value: BigInt, mask: BigInt, width: Int) {
   // Bitwise XNOR
   def TXNOR(that: TNum): TNum = {
     require(this.width == that.width, s"$this $that bv width")
-    val v = bvnot(this.value ^ that.value, width)
-    val mu = this.mask | that.mask
-    TNum((v & bvnot(mu, width)), mu, this.width)
+    TXOR(that).TNOT()
+    // val v = ~(this.value ^ that.value)
+    // val mu = this.mask | that.mask
+    // TNum((v & ~mu), mu)
   }
 
   // Bitwise NAND
   def TNAND(that: TNum): TNum = {
-    require(this.width == that.width, s"$this $that bv width")
-    val alpha = this.value | this.mask
-    val beta = that.value | that.mask
-    val v = this.value & that.value
-    TNum(
-      (bvnot(v, width) & bvnot(alpha & beta & bvnot(v, width), width)),
-      (alpha & beta & bvnot(v, width)),
-      this.width
-    )
+    TAND(that).TNOT()
+    // require(this.width == that.width, s"$this $that bv width")
+    // val alpha = this.value | this.mask
+    // val beta = that.value | that.mask
+    // val v = this.value & that.value
+    // TNum(
+    //  (~v & ~(alpha & beta & ~v)),
+    //  (alpha & beta & ~v)
+    // )
   }
 
   // Addition
@@ -130,7 +146,7 @@ case class TNum(value: BigInt, mask: BigInt, width: Int) {
     val sigma = sm + sv
     val chi = sigma ^ sv
     val mu = chi | this.mask | that.mask
-    TNum(sv & bvnot(mu, width), mu, this.width)
+    TNum(sv & ~mu, mu)
   }
 
   // Multiplication
@@ -139,18 +155,18 @@ case class TNum(value: BigInt, mask: BigInt, width: Int) {
     var a = this
     var b = that
     val v = this.value * that.value
-    var mu = TNum(BigInt(0), BigInt(0), this.width)
+    var mu = zero
 
-    while ((a.value | a.mask) != 0) {
-      if ((a.value & BigInt(1)) != 0) {
-        mu = mu.TADD(TNum(BigInt(0), b.mask, this.width))
-      } else if ((a.mask & BigInt(1)) != 0) {
-        mu = mu.TADD(TNum(BigInt(0), b.value | b.mask, this.width))
+    while ((a.value | a.mask) != 0.bv(width)) {
+      if ((a.value & 1.bv(width)) != 0.bv(width)) {
+        mu = mu.TADD(TNum(0.bv(width), b.mask))
+      } else if ((a.mask & 1.bv(width)) != 0.bv(width)) {
+        mu = mu.TADD(TNum(0.bv(width), b.value | b.mask))
       }
-      a = a.TLSHR(TNum(BigInt(1), BigInt(0), this.width))
-      b = b.TSHL(TNum(BigInt(1), BigInt(0), this.width))
+      a = a.TLSHR(constant(1))
+      b = b.TSHL(constant(1))
     }
-    TNum(v, BigInt(0), this.width).TADD(mu)
+    TNum(v, 0.bv(width)).TADD(mu)
   }
 
   // Subtraction
@@ -162,127 +178,126 @@ case class TNum(value: BigInt, mask: BigInt, width: Int) {
     val beta = dv - that.mask
     val chi = alpha ^ beta
     val mu = chi | this.mask | that.mask
-    TNum((dv & bvnot(mu, width)), mu, this.width)
+    TNum((dv & ~mu), mu)
   }
 
   // Bitwise Comparison
   def TCOMP(that: TNum): TNum = {
     require(this.width == that.width, s"$this $that bv width")
-    if ((this.mask == 0 && that.mask == 0) && (this.value == that.value)) {
-      TNum(BigInt(1), BigInt(0), 1)
-    } else if (this.value != that.value) {
-      TNum(BigInt(0), BigInt(0), 1)
-    } else {
-      TNum(BigInt(0), BigInt(1), 1)
-    }
+    TEQ(that)
   }
 
   // Shift Left
   def TSHL(that: TNum): TNum = {
     require(this.width == that.width, s"$this $that bv width")
     // Lower and upper bounds of shift value
-    def thatLB = (that.value & bvnot(that.mask, that.width)).toInt
-    def thatUB = (that.value | that.mask).toInt
+    def thatLB = (that.value & ~that.mask)
+    def thatUB = (that.value | that.mask)
 
     // Value and mask accumulator begins with lower bound
-    var accValue = bvshl(this.value, thatLB, width)
-    var accMask = bvshl(this.mask, thatLB, width)
+    var accValue = this.value << thatLB
+    var accMask = this.mask << thatLB
 
     // Iterate through each shift value
 
-    val lower = thatLB.toInt
-    val upper = Math.min(thatUB, that.width)
-    for (i <- lower to upper) {
+    val lower = thatLB.value.toInt
+    val upper = Math.min(thatUB.value.toInt, that.width)
+    for (ii <- lower to upper) {
+      val i = ii.bv(width)
       // Check if the shift is possible
-      if ((i & bvnot(that.mask, that.width)) == that.value) {
-        accMask |= bvshl(this.mask, i, width) | (bvshl(this.value, i, width) ^ accValue)
-        accValue &= bvshl(this.value, i, width)
+      if ((i & ~that.mask) == that.value) {
+        accMask |= (this.mask << i) | ((this.value << i) ^ accValue)
+        accValue &= this.value << i
       }
     }
 
-    if (thatUB >= this.width) {
+    if (thatUB >= this.width.bv(width)) {
       accMask |= accValue
-      accValue = 0
+      accValue = 0.bv(width)
     }
 
-    TNum(accValue, accMask, this.width)
+    TNum(accValue, accMask)
   }
 
   // Logical Shift Right
   def TLSHR(that: TNum): TNum = {
     require(this.width == that.width, s"$this $that bv width")
-    // Handle logical shift right since >> is arithmetic shift right
-    def logicalShiftRight(n: BigInt, shift: Int): BigInt = {
-      n / BigInt(2).pow(shift)
-    }
 
     // Lower and upper bounds of shift value
-    val thatLB = (that.value & bvnot(that.mask, that.width)).toInt
-    val thatUB = (that.value | that.mask).toInt
+    val thatLB = (that.value & ~that.mask)
+    val thatUB = (that.value | that.mask)
 
     // Value and mask accumulator begins with lower bound
-    var accValue = logicalShiftRight(this.value, thatLB)
-    var accMask = logicalShiftRight(this.mask, thatLB)
+    var accValue = this.value >>> thatLB
+    var accMask = this.mask >>> thatLB
 
     // Iterate through each shift value
-    for (i <- thatLB to Math.min(thatUB, this.width - 1)) {
+
+    val lower = thatLB.value.toInt
+    val upper = Math.min(thatUB.value.toInt, this.width - 1)
+    for (ii <- lower to upper) {
+      val i = ii.bv(width)
       // Check if the shift is possible
-      if ((i & bvnot(that.mask, that.width)) == that.value) {
-        accMask |= logicalShiftRight(this.mask, i) | (logicalShiftRight(this.value, i) ^ accValue)
-        accValue &= logicalShiftRight(this.value, i)
+      if ((i & ~that.mask) == that.value) {
+        accMask = accMask | ((this.mask >>> i) | (this.value >>> i) ^ accValue)
+        accValue = accValue & (this.value >>> i)
       }
     }
 
-    if (thatUB >= width) {
+    if (thatUB >= width.bv(width)) {
       accMask |= accValue
-      accValue = 0
+      accValue = 0.bv(width)
     }
 
-    TNum(accValue, accMask, this.width)
+    TNum(accValue, accMask)
   }
 
   // Arithmetic Shift Right
   def TASHR(that: TNum): TNum = {
     require(this.width == that.width, s"$this $that bv width")
     // Lower and upper bounds of shift value
-    val thatLB = (that.value & bvnot(that.mask, that.width)).toInt
-    val thatUB = (that.value | that.mask).toInt
+    val thatLB = (that.value & ~that.mask)
+    val thatUB = (that.value | that.mask)
 
     // Value and mask accumulator begins with lower bound
-    var accValue = bvashr(this.value, thatLB, width)
-    var accMask = bvashr(this.mask, thatLB, width)
+    var accValue = this.value >> thatLB
+    var accMask = this.mask >> thatLB
 
     // Iterate through each shift value
-    for (i <- thatLB to Math.min(thatUB, this.width - 1)) {
+
+    val lower = thatLB.value.toInt
+    val upper = Math.min(thatUB.value.toInt, this.width - 1)
+    //  for (i <- thatLB to Math.min(thatUB, this.width - 1)) {
+
+    for (ii <- lower to upper) {
+      val i = ii.bv(width)
       // Check if the shift is possible
-      if ((i & bvnot(that.mask, that.width)) == that.value) {
-        accMask |= bvashr(this.mask, i, width) | (bvashr(this.value, i, width) ^ accValue)
-        accValue &= bvashr(this.value, i, width)
+      if ((i & ~that.mask) == that.value) {
+        accMask = accMask | ((this.mask >> i) | (this.value >> i) ^ accValue)
+        accValue = accValue & (this.value >> i)
       }
     }
 
-    assert(thatUB >= 0)
-    assert(this.width >= 0)
-    if (thatUB >= this.width) {
-      accMask |= bvashr(this.mask, this.width, width) | (bvashr(this.value, this.width, width) ^ accValue)
-      accValue &= bvashr(this.value, this.width, width)
+    if (thatUB >= this.width.bv(width)) {
+      accMask = accMask | (this.mask >> this.width.bv(width) | (this.value >> this.width.bv(width)) ^ accValue)
+      accValue = accValue & (this.value >> this.width.bv(width))
     }
 
-    TNum(accValue, accMask, this.width)
+    TNum(accValue, accMask)
   }
 
   // TODO
   // Unsigned Division
   def TUDIV(that: TNum): TNum = {
     require(this.width == that.width, s"$this $that bv width")
-    val dividendL = this.value & bvnot(this.mask, width)
+    val dividendL = this.value & ~this.mask
     val dividendH = this.value | this.mask
 
-    val divisorL = that.value & bvnot(that.mask, width)
+    val divisorL = that.value & ~that.mask
     val divisorH = that.value | that.mask
 
-    if (divisorL == 0 || divisorH == 0) {
-      return TNum(BigInt(0), BigInt(0), this.width).top()
+    if (divisorL == 0.bv(width) || divisorH == 0.bv(width)) {
+      return top()
     }
 
     val q1 = dividendL / divisorL
@@ -293,70 +308,50 @@ case class TNum(value: BigInt, mask: BigInt, width: Int) {
     val newValue = q1 & q2 & q3 & q4
     val newMask = (q1 ^ q2) | (q1 ^ q3) | (q1 ^ q4) | (q2 ^ q3) | (q2 ^ q4) | (q3 ^ q4)
 
-    TNum(newValue, newMask, this.width)
-  }
-
-  def bvshl(l: BigInt, r: BigInt, width: Int) = {
-    BitVectorEval.smt_bvshl(BitVecLiteral(l, width), BitVecLiteral(r, width)).value
-  }
-  def bvashr(l: BigInt, r: BigInt, width: Int) = {
-    BitVectorEval.smt_bvashr(BitVecLiteral(l, width), BitVecLiteral(r, width)).value
-  }
-
-  // Handles sign extension of BigInt binary values to targetBits
-  def signExtend(n: BigInt, targetBits: Int): BigInt = {
-    val msb = bvshl(BigInt(1), (this.width - 1), this.width)
-    val mask = bvshl(BigInt(1), targetBits, width) - 1
-    val highOnes = BitVecType(targetBits - this.width).maxValue
-    if ((n & msb) != 0) (n | (highOnes << (targetBits - this.width))) & mask else n
+    TNum(newValue, newMask)
   }
 
   // Converts a BigInt to signed representation
-  def toSigned(n: BigInt): BigInt = {
-    val msb = BigInt(1) << (this.width - 1)
-    if ((n & msb) != 0) n - (msb << 1) else n
+  def toSigned(n: BitVecLiteral): BigInt = {
+    BitVectorEval.bv2SignedInt(n)
   }
 
   // TODO
   // Signed Division
   def TSDIV(that: TNum): TNum = {
     require(this.width == that.width, s"$this $that bv width")
-    val dividendL = this.value & bvnot(this.mask, width)
+    val dividendL = this.value & ~this.mask
     val dividendH = this.value | this.mask
 
-    val divisorL = that.value & bvnot(that.mask, width)
+    val divisorL = that.value & ~that.mask
     val divisorH = that.value | that.mask
 
-    if (divisorL == 0 || divisorH == 0) {
+    if (divisorL == 0.bv(width) || divisorH == 0.bv(width)) {
       return top()
     }
 
-    val maxBitLength =
-      this.width // dividendL.bitLength max dividendH.bitLength max divisorL.bitLength max divisorH.bitLength
-
-    // Sign extend both dividend and divisor and convert to signed representation before division
-    val q1 = toSigned(signExtend(dividendL, maxBitLength)) / toSigned(signExtend(divisorL, maxBitLength))
-    val q2 = toSigned(signExtend(dividendL, maxBitLength)) / toSigned(signExtend(divisorH, maxBitLength))
-    val q3 = toSigned(signExtend(dividendH, maxBitLength)) / toSigned(signExtend(divisorL, maxBitLength))
-    val q4 = toSigned(signExtend(dividendH, maxBitLength)) / toSigned(signExtend(divisorH, maxBitLength))
+    val q1 = dividendL / divisorL
+    val q2 = dividendL / divisorH
+    val q3 = dividendH / divisorL
+    val q4 = dividendH / divisorH
 
     val newValue = q1 & q2 & q3 & q4
     val newMask = (q1 ^ q2) | (q1 ^ q3) | (q1 ^ q4) | (q2 ^ q3) | (q2 ^ q4) | (q3 ^ q4)
 
-    TNum(newValue, newMask, width)
+    TNum(newValue, newMask)
   }
 
   // TODO
   // Unsigned Remainder
   def TUREM(that: TNum): TNum = {
     require(this.width == that.width, s"$this $that bv width")
-    val dividendL = this.value & bvnot(this.mask, width)
+    val dividendL = this.value & ~this.mask
     val dividendH = this.value | this.mask
 
-    val divisorL = that.value & bvnot(that.mask, width)
+    val divisorL = that.value & ~that.mask
     val divisorH = that.value | that.mask
 
-    if (divisorL == 0 || divisorH == 0) {
+    if (divisorL == 0.bv(width) || divisorH == 0.bv(width)) {
       return top()
     }
 
@@ -368,43 +363,39 @@ case class TNum(value: BigInt, mask: BigInt, width: Int) {
     val newValue = r1 & r2 & r3 & r4
     val newMask = (r1 ^ r2) | (r1 ^ r3) | (r1 ^ r4) | (r2 ^ r3) | (r2 ^ r4) | (r3 ^ r4)
 
-    TNum(newValue, newMask, width)
+    TNum(newValue, newMask)
   }
 
   // TODO
   // Signed Remainder
   def TSREM(that: TNum): TNum = {
     require(this.width == that.width, s"$this $that bv width")
-    val dividendL = this.value & bvnot(this.mask, width)
+    val dividendL = this.value & ~this.mask
     val dividendH = this.value | this.mask
 
-    val divisorL = that.value & bvnot(that.mask, width)
+    val divisorL = that.value & ~that.mask
     val divisorH = that.value | that.mask
 
-    if (divisorL == 0 || divisorH == 0) {
+    if (divisorL == 0.bv(width) || divisorH == 0.bv(width)) {
       return top()
     }
 
-    // Determine maximum bit length for sign extension
-    val maxBitLength =
-      this.width // dividendL.bitLength max dividendH.bitLength max divisorL.bitLength max divisorH.bitLength
-
     // Sign extend both dividend and divisor and convert to signed representation before division
-    val r1 = toSigned(signExtend(dividendL, maxBitLength)) % toSigned(signExtend(divisorL, maxBitLength))
-    val r2 = toSigned(signExtend(dividendL, maxBitLength)) % toSigned(signExtend(divisorH, maxBitLength))
-    val r3 = toSigned(signExtend(dividendH, maxBitLength)) % toSigned(signExtend(divisorL, maxBitLength))
-    val r4 = toSigned(signExtend(dividendH, maxBitLength)) % toSigned(signExtend(divisorH, maxBitLength))
+    val r1 = dividendL % divisorL
+    val r2 = dividendL % divisorH
+    val r3 = dividendH % divisorL
+    val r4 = dividendH % divisorH
 
     val newValue = r1 & r2 & r3 & r4
     val newMask = (r1 ^ r2) | (r1 ^ r3) | (r1 ^ r4) | (r2 ^ r3) | (r2 ^ r4) | (r3 ^ r4)
 
-    TNum(newValue, newMask, width)
+    TNum(newValue, newMask)
   }
 
   // Converts a remainder to a modulo result
-  def toModulo(remainder: BigInt, dividend: BigInt, divisor: BigInt): BigInt = {
-    if (remainder < 0) {
-      if (divisor < 0) {
+  def toModulo(remainder: BitVecLiteral, dividend: BitVecLiteral, divisor: BitVecLiteral): BitVecLiteral = {
+    if (remainder < 0.bv(width)) {
+      if (divisor < 0.bv(width)) {
         remainder - divisor
       } else {
         remainder + divisor
@@ -418,25 +409,23 @@ case class TNum(value: BigInt, mask: BigInt, width: Int) {
   // Signed Modulo
   def TSMOD(that: TNum): TNum = {
     require(width == that.width)
-    val dividendL = this.value & bvnot(this.mask, width)
+    val dividendL = this.value & ~this.mask
     val dividendH = this.value | this.mask
 
-    val divisorL = that.value & bvnot(that.mask, width)
+    val divisorL = that.value & ~that.mask
     val divisorH = that.value | that.mask
 
-    if (divisorL == 0 || divisorH == 0) {
+    if (divisorL == 0.bv(width) || divisorH == 0.bv(width)) {
       return top()
     }
 
     // Determine maximum bit length for sign extension
-    val maxBitLength =
-      this.width // dividendL.bitLength max dividendH.bitLength max divisorL.bitLength max divisorH.bitLength
 
     // Sign extend both dividend and divisor and convert to signed representation
-    val r1 = toSigned(signExtend(dividendL, maxBitLength)) % toSigned(signExtend(divisorL, maxBitLength))
-    val r2 = toSigned(signExtend(dividendL, maxBitLength)) % toSigned(signExtend(divisorH, maxBitLength))
-    val r3 = toSigned(signExtend(dividendH, maxBitLength)) % toSigned(signExtend(divisorL, maxBitLength))
-    val r4 = toSigned(signExtend(dividendH, maxBitLength)) % toSigned(signExtend(divisorH, maxBitLength))
+    val r1 = dividendL % divisorL
+    val r2 = dividendL % divisorH
+    val r3 = dividendH % divisorL
+    val r4 = dividendH % divisorH
 
     val modr1 = toModulo(r1, dividendL, divisorL)
     val modr2 = toModulo(r2, dividendL, divisorH)
@@ -448,23 +437,23 @@ case class TNum(value: BigInt, mask: BigInt, width: Int) {
     val newMask =
       (modr1 ^ modr2) | (modr1 ^ modr3) | (modr1 ^ modr4) | (modr2 ^ modr3) | (modr2 ^ modr4) | (modr3 ^ modr4)
 
-    TNum(newValue, newMask, this.width)
+    TNum(newValue, newMask)
   }
 
   // Two's complement negation
   def TNEG(): TNum = {
-    TNum(BigInt(0), BigInt(0), width).TSUB(this)
+    constant(0).TSUB(this)
   }
 
   // Bitwise Not
   def TNOT(): TNum = {
-    TNum(bvnot(this.value, this.width) & bvnot(this.mask, this.width), this.mask, this.width)
+    TNum(~this.value & ~this.mask, this.mask)
   }
 
   // Equality (TNum cannot have Top elements when checking for equality)
   def TEQ(that: TNum): TNum = {
     require(width == that.width)
-    if ((this.mask == 0 && that.mask == 0)) then {
+    if ((this.mask == 0.bv(width) && that.mask == 0.bv(width))) then {
       if (this.value == that.value) then trueBool else falseBool
     } else {
       unkBool
@@ -477,22 +466,22 @@ case class TNum(value: BigInt, mask: BigInt, width: Int) {
   }
 
   // Get smallest possible unsigned value of the TNum (e.g. Min value of TT0 is 000)
-  def getUnsignedMinValue(): BigInt = {
-    this.value & bvnot(this.mask, width)
+  def getUnsignedMinValue(): BitVecLiteral = {
+    this.value & ~this.mask
   }
 
   // Get largest possible unsigned value of the TNum (e.g. Max value of TT0 is 110)
-  def getUnsignedMaxValue(): BigInt = {
+  def getUnsignedMaxValue(): BitVecLiteral = {
     this.value | this.mask
   }
 
   // Get smallest possible signed value of the TNum
-  def getSignedMinValue(): BigInt = {
-    toSigned(this.getUnsignedMinValue())
+  def getSignedMinValue() = {
+    toSigned(getUnsignedMinValue())
   }
 
   // Get largest possible signed value of the TNum
-  def getSignedMaxValue(): BigInt = {
+  def getSignedMaxValue() = {
     toSigned(this.getUnsignedMaxValue())
   }
 
@@ -514,8 +503,8 @@ case class TNum(value: BigInt, mask: BigInt, width: Int) {
 
   // Unsigned Less Than or Equal
   def TULE(that: TNum): TNum = {
-    val thisUnsignedMaxValue = this.getUnsignedMaxValue()
-    val thatUnsignedMinValue = that.getUnsignedMinValue()
+    val thisUnsignedMaxValue = this.getUnsignedMaxValue().value
+    val thatUnsignedMinValue = that.getUnsignedMinValue().value
 
     if (thisUnsignedMaxValue <= thatUnsignedMinValue) trueBool else unkBool
   }
@@ -530,8 +519,8 @@ case class TNum(value: BigInt, mask: BigInt, width: Int) {
 
   // Unsigned Greater Than
   def TUGT(that: TNum): TNum = {
-    val thisUnsignedMinValue = this.getUnsignedMinValue()
-    val thatUnsignedMaxValue = that.getUnsignedMaxValue()
+    val thisUnsignedMinValue = this.getUnsignedMinValue().value
+    val thatUnsignedMaxValue = that.getUnsignedMaxValue().value
 
     if (thisUnsignedMinValue > thatUnsignedMaxValue) trueBool else unkBool
   }
@@ -546,25 +535,25 @@ case class TNum(value: BigInt, mask: BigInt, width: Int) {
 
   // Unsigned Greater Than or Equal
   def TUGE(that: TNum): TNum = {
-    val thisUnsignedMinValue = this.getUnsignedMinValue()
-    val thatUnsignedMaxValue = that.getUnsignedMaxValue()
+    val thisUnsignedMinValue = this.getUnsignedMinValue().value
+    val thatUnsignedMaxValue = that.getUnsignedMaxValue().value
 
     if (thisUnsignedMinValue >= thatUnsignedMaxValue) trueBool else unkBool
   }
 
   // Signed Greater Than or Equal
   def TSGE(that: TNum): TNum = {
-    val thisSignedMinValue = this.getSignedMinValue()
-    val thatSignedMaxValue = that.getSignedMaxValue()
+    val thisSignedMinValue = this.getUnsignedMinValue()
+    val thatSignedMaxValue = that.getUnsignedMaxValue()
 
     if (thisSignedMinValue >= thatSignedMaxValue) trueBool else unkBool
   }
 
   // Concatenation
   def TCONCAT(that: TNum): TNum = {
-    val v = (this.value << that.width) | that.value
-    val mu = (this.mask <<  that.width) | that.mask
-    TNum(v, mu, width + that.width)
+    val v = this.value ++ that.value
+    val mu = this.mask ++ that.mask
+    TNum(v, mu)
   }
 }
 
@@ -580,14 +569,14 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
   }
 
   // Converts a bitvector or integer literal to a TNum
-  def toTNum(literal: BitVecLiteral | IntLiteral): TNum = literal match {
+  def ofLiteral(literal: Literal): TNum = literal match {
     case bv: BitVecLiteral =>
-      val mask = (BigInt(1) << bv.size) - 1
-      TNum(bv.value & mask, BigInt(0), bv.size)
-
+      TNum(bv, BitVecLiteral(0, bv.size))
     case iv: IntLiteral =>
-      val mask = (BigInt(1) << iv.value.bitLength) - 1
-      TNum(iv.value & mask, BigInt(0), sizeBits(IntType))
+      val w = sizeBits(iv.getType)
+      TNum(BitVecLiteral(iv.value, w), 0.bv(w))
+    case TrueLiteral => TNum.trueBool
+    case FalseLiteral => TNum.falseBool
   }
 
   // Evaluates binary operation and returns either a TNum or TNum
@@ -601,8 +590,8 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
       case BVNAND => tn1.TNAND(tn2)
       case BVADD => tn1.TADD(tn2)
       case BVMUL => tn1.top() // tn1.TMUL(tn2) // broken, overflows
-      case BVUDIV => tn1.TUDIV(tn2)
-      case BVUREM => tn1.TUREM(tn2)
+      case BVUDIV => tn1.top() // broken // tn1.TUDIV(tn2)
+      case BVUREM => tn1.top() // broekn tn1.TUREM(tn2)
       case BVSHL => tn1.TSHL(tn2)
       case BVLSHR => tn1.TLSHR(tn2)
       case BVULT => tn1.TULT(tn2)
@@ -664,103 +653,52 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
   }
 
   // Recursively evaluates nested or non-nested expression
-  def evaluateExprToTNum(s: Map[Variable, TNum], expr: Expr): TNum = expr match {
-    case b: BitVecLiteral => toTNum(b)
+  def evaluateExprToTNum(s: Map[Variable, TNum], expr: Expr): TNum =
+    val r = expr match {
+      case l: Literal => ofLiteral(l)
+      case v: Variable => s.getOrElse(v, TNum.top(sizeBits(v.getType)))
+      case UnaryExpr(op: UnOp, arg: Expr) =>
+        val argTNum = evaluateExprToTNum(s, arg)
+        (op, argTNum) match {
+          case (opVal: BVUnOp, tnum: TNum) => evaluateValueUnOp(opVal, tnum)
+          case (opVal: IntUnOp, tnum: TNum) => evaluateValueUnOp(opVal, tnum)
+          case (opVal: BoolUnOp, tnum: TNum) => evaluateBoolUnOp(opVal, tnum)
+        }
 
-    case i: IntLiteral => toTNum(i)
+      case BinaryExpr(op, arg1: Expr, arg2: Expr) =>
+        val arg1TNum = evaluateExprToTNum(s, arg1)
+        val arg2TNum = evaluateExprToTNum(s, arg2)
 
-    case TrueLiteral => TNum(1, 0, 1)
+        (op, arg1TNum, arg2TNum) match {
+          case (opVal: BVBinOp, tnum1: TNum, tnum2: TNum) => evaluateValueBinOp(opVal, tnum1, tnum2)
+          case (opVal: IntBinOp, tnum1: TNum, tnum2: TNum) => evaluateValueBinOp(opVal, tnum1, tnum2)
+          case (opVal: BoolBinOp, tnum1: TNum, tnum2: TNum) => evaluateBoolBinOp(opVal, tnum1, tnum2)
+        }
 
-    case FalseLiteral => TNum(0, 0, 1)
-
-    case v: Variable => s.getOrElse(v, TNum(BigInt(0), BigInt(0), sizeBits(v.getType)).top())
-
-    case UnaryExpr(op: UnOp, arg: Expr) =>
-      val argTNum = evaluateExprToTNum(s, arg)
-
-      (op, argTNum) match {
-        case (opVal: BVUnOp, tnum: TNum) => evaluateValueUnOp(opVal, tnum)
-        case (opVal: IntUnOp, tnum: TNum) => evaluateValueUnOp(opVal, tnum)
-        case (opVal: BoolUnOp, tnum: TNum) => evaluateBoolUnOp(opVal, tnum)
+      case Extract(hi: Int, lo: Int, body: Expr) => {
+        val tnum = evaluateExprToTNum(s, body)
+        TNum(tnum.value(hi, lo), tnum.mask(hi, lo))
       }
 
-    case BinaryExpr(op: BVBinOp, arg1: Expr, arg2: Expr) =>
-      val arg1TNum = evaluateExprToTNum(s, arg1)
-      val arg2TNum = evaluateExprToTNum(s, arg2)
+      case Repeat(repeats: Int, body: Expr) =>
+        val bodyTNum = evaluateExprToTNum(s, body)
 
-      (op, arg1TNum, arg2TNum) match {
-        case (opVal: BVBinOp, tnum1: TNum, tnum2: TNum) => evaluateValueBinOp(opVal, tnum1, tnum2)
-        case (opVal: IntBinOp, tnum1: TNum, tnum2: TNum) => evaluateValueBinOp(opVal, tnum1, tnum2)
-        case (opVal: BoolBinOp, tnum1: TNum, tnum2: TNum) => evaluateBoolBinOp(opVal, tnum1, tnum2)
-      }
+        bodyTNum match {
+          case tnum: TNum =>
+            val repeatedValue = BitVectorEval.repeat_bits(repeats, tnum.value)
+            val repeatedMask = BitVectorEval.repeat_bits(repeats, tnum.mask)
+            TNum(repeatedValue, repeatedMask)
+        }
 
-    case Extract(endIndex: Int, startIndex: Int, body: Expr) =>
-      val bodyTNum = evaluateExprToTNum(s, body)
+      case ZeroExtend(ex: Int, body: Expr) =>
+        val b = evaluateExprToTNum(s, body)
+        TNum(zero_extend(ex, b.value), zero_extend(ex, b.mask))
 
-      bodyTNum match {
-        case tnum: TNum =>
-          val bodyTNumExtract = (tnum.value >> startIndex) & ((BigInt(1) << (endIndex - startIndex)) - 1)
-          val bodyTNumMaskExtract = (tnum.mask >> startIndex) & ((BigInt(1) << (endIndex - startIndex)) - 1)
-          TNum(bodyTNumExtract, bodyTNumMaskExtract, endIndex - startIndex)
-      }
-
-    case Repeat(repeats: Int, body: Expr) =>
-      val bodyTNum = evaluateExprToTNum(s, body)
-
-      bodyTNum match {
-        case tnum: TNum =>
-          val repeatedValue = (0 until repeats).foldLeft(BigInt(0)) { (acc, _) =>
-            (acc << tnum.width) | tnum.value
-          }
-          val repeatedMask = (0 until repeats).foldLeft(BigInt(0)) { (acc, _) =>
-            (acc << tnum.width) | tnum.mask
-          }
-          TNum(repeatedValue, repeatedMask, tnum.width)
-      }
-
-    case ZeroExtend(extension: Int, body: Expr) =>
-      val bodyTNum = evaluateExprToTNum(s, body)
-
-        //val newLength = tnum.width + extension
-        //val zeroExtendedValue = tnum.value & ((BigInt(1) << newLength) - 1)
-        //val zeroExtendedMask = tnum.mask & ((BigInt(1) << newLength) - 1)
-        bodyTNum.copy(width = bodyTNum.width + extension)
-
-    case SignExtend(extension: Int, body: Expr) =>
-      val tnum = evaluateExprToTNum(s, body)
-
-      val valueMsb = (tnum.value >> (tnum.width - 1)) & 1
-      val maskMsb = (tnum.mask >> (tnum.width - 1)) & 1
-
-      val (extendedValue, extendedMask) = (valueMsb, maskMsb) match {
-        case (0, 0) =>
-          // If MSB of value is 0 and MSB of mask is 0, extend value and mask with 0
-          (tnum.value, tnum.mask)
-        case (1, 0) =>
-          // If MSB of value is 1 and MSB of mask is 0, extend value with 1 and mask with 0
-          val extendedPart = (BigInt(1) << extension) - 1
-          (tnum.value | (extendedPart << tnum.width), tnum.mask)
-        case (0, 1) =>
-          // If MSB of value is 0 and MSB of mask is 1, extend value with 0 and mask with 1
-          val extendedPartMask = (BigInt(1) << extension) - 1
-          (tnum.value, tnum.mask | (extendedPartMask << tnum.width))
-        case (1, 1) =>
-          // If MSB 0 in value or mask has been removed due to BigInt type
-          // (e.g. value = 001 = BigInt(1) != MSB 0, mask = 100), compare their bit lengths
-          // since (value, mask) can never be (1, 1) and have the same length
-          if (tnum.width > tnum.width) {
-            // If value has more bits, extend value with 1 and mask with 0
-            val extendedPartValue = (BigInt(1) << extension) - 1
-            (tnum.value | (extendedPartValue << tnum.width), tnum.mask)
-          } else { // if (tnum.width < tnum.mask.bitLength) {
-            // If value has less bits, extend value with 0 and mask with 1
-            val extendedPartMask = (BigInt(1) << extension) - 1
-            (tnum.value, tnum.mask | (extendedPartMask << tnum.width))
-          }
-      }
-      TNum(extendedValue, extendedMask, tnum.width + extension)
-
-  }
+      case SignExtend(ex: Int, body: Expr) =>
+        val tnum = evaluateExprToTNum(s, body)
+        TNum(sign_extend(ex, tnum.value), sign_extend(ex, tnum.mask))
+    }
+    r
 
   // s is the abstract state from previous command/block
   override def transfer(s: Map[Variable, TNum], b: Command): Map[Variable, TNum] = {
@@ -772,7 +710,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
       // Load from memory and store in variable
       case MemoryLoad(lhs: Variable, mem: Memory, index: Expr, endian: Endian, size: Int, _) if !s.contains(lhs) =>
         // Overapproxiate memory values with Top
-        s.updated(lhs, TNum(BigInt(0), BigInt(0), size).top())
+        s.updated(lhs, TNum.top(size))
 
       // Default case
       case _ => s
@@ -789,8 +727,9 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
    */
   override def join(left: Map[Variable, TNum], right: Map[Variable, TNum], pos: Block): Map[Variable, TNum] = {
     (left.keySet ++ right.keySet).map { key =>
-      val leftTNum = left.getOrElse(key, TNum(BigInt(0), BigInt(0), sizeBits(key.getType)).top())
-      val rightTNum = right.getOrElse(key, TNum(BigInt(0), BigInt(0), sizeBits(key.getType)).top())
+      val width = sizeBits(key.getType)
+      val leftTNum = left.getOrElse(key, TNum.top(width))
+      val rightTNum = right.getOrElse(key, TNum.top(width))
 
       if (left.contains(key) && !right.contains(key)) {
         // Only left map contains key
@@ -806,7 +745,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
             key -> left.join(right)
           }
           // case (left: TNum, right: TNum) => key -> left.TOR(right)
-          case _ => key -> TNum(BigInt(0), BigInt(0), leftTNum.width).top()
+          case _ => key -> TNum.top(leftTNum.width)
         }
       }
     }.toMap

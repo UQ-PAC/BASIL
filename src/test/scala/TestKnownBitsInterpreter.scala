@@ -46,14 +46,10 @@ class TestKnownBitsInterpreter
 
   def valueInAbstractValue(absVal: TNum, concrete: Expr) = {
     (absVal, concrete.getType) match {
-      case (TNum(v, m, w), _: BitVecType) =>
-        BinaryExpr(BVEQ, BitVecLiteral(v, w), BinaryExpr(BVAND, concrete, UnaryExpr(BVNOT, BitVecLiteral(m, w))))
-      case (TNum(v, m, w), BoolType) =>
-        BinaryExpr(
-          BVEQ,
-          BitVecLiteral(v, w),
-          BinaryExpr(BVAND, UnaryExpr(BoolToBV1, concrete), UnaryExpr(BVNOT, BitVecLiteral(m, w)))
-        )
+      case (TNum(v, m), _: BitVecType) =>
+        BinaryExpr(BVEQ, v, BinaryExpr(BVAND, concrete, UnaryExpr(BVNOT, m)))
+      case (TNum(v, m), BoolType) =>
+        BinaryExpr(BVEQ, v, BinaryExpr(BVAND, UnaryExpr(BoolToBV1, concrete), UnaryExpr(BVNOT, m)))
       case _ => ???
     }
   }
@@ -217,12 +213,12 @@ class TestKnownBitsInterpreter
       BVXOR,
       BVXNOR,
       BVSUB,
-      BVASHR,
+      BVASHR, // broken
       BVUREM, // broken
       BVSREM, // broken
       BVSMOD, // broken
       BVUDIV, // broken
-      BVSDIV, // broken
+      BVSDIV // broken
     )
 
   def arbBinComp = Gen.oneOf(BVULE, BVUGT, BVULT, BVUGE, BVSLT, BVSLE, BVSGT, BVSGE, BVEQ, BVNEQ, BVCOMP)
@@ -260,7 +256,7 @@ class TestKnownBitsInterpreter
     r <- genExpr(Some(genSize))
   } yield (BinaryExpr(op, l, r))
 
-  def genBinExp(givenSize: Option[Int] = None) : Gen[Expr] = {
+  def genBinExp(givenSize: Option[Int] = None): Gen[Expr] = {
     def genBV(min: BigInt, max: BigInt, size: Int) = for {
       v <- Gen.chooseNum(min, max)
     } yield BitVecLiteral(v, size)
@@ -283,8 +279,9 @@ class TestKnownBitsInterpreter
       lhs <- genExpr(Some(size))
       expr = BinaryExpr(op, lhs, rhs)
       nexpr <- expr.getType match {
-        case BoolType if size != 1 => Gen.oneOf(ZeroExtend(size - 1, UnaryExpr(BoolToBV1, expr)), SignExtend(size - 1, UnaryExpr(BoolToBV1, expr)))
-        case BoolType  => Gen.const(UnaryExpr(BoolToBV1, expr))
+        case BoolType if size != 1 =>
+          Gen.oneOf(ZeroExtend(size - 1, UnaryExpr(BoolToBV1, expr)), SignExtend(size - 1, UnaryExpr(BoolToBV1, expr)))
+        case BoolType => Gen.const(UnaryExpr(BoolToBV1, expr))
         case BitVecType(bvsz) if size > bvsz => Gen.oneOf(ZeroExtend(size - bvsz, expr), SignExtend(size - bvsz, expr))
         case BitVecType(sz) if size == sz => Gen.const(expr)
         case x => throw Exception(s"TYPE $x DOES NOT MATCH EXPECTED $size $expr")
@@ -294,8 +291,7 @@ class TestKnownBitsInterpreter
   }
 
   def genExpr(size: Option[Int] = None): Gen[Expr] =
-    if (size.exists(_ <= 1)) then genValue(size) else
-    Gen.oneOf(genBinExp(size), genUnExp(size), genValue(size))
+    if (size.exists(_ <= 1)) then genValue(size) else Gen.oneOf(genBinExp(size), genUnExp(size), genValue(size))
 
   implicit lazy val arbExpr: Arbitrary[Expr] = Arbitrary(for {
     sz <- Gen.chooseNum(0, 70)

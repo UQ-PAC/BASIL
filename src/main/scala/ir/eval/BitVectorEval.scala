@@ -340,4 +340,12 @@ object BitVectorEval {
       smt_zero_extend(i, s)
     }
   }
+
+  def repeat_bits(i: Int, s: BitVecLiteral) = {
+    var x = s
+    for (_ <- 1 until i) {
+      x = smt_concat(x, s)
+    }
+    x
+  }
 }
