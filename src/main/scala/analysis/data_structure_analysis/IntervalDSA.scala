@@ -57,32 +57,12 @@ class IntervalGraph(
     }
   }
 
-  // takes a map from symbolic bases to nodes and updates it based on constraint
-  protected def binaryConstraintToNodes(
-    constraint: BinaryConstraint,
-    nodes: Map[SymBase, IntervalNode]
-  ): Map[SymBase, IntervalNode] = {
-    val arg1 = exprToSymVal(constraint.arg1.value)
-    val arg2 = exprToSymVal(constraint.arg2.value)
-    val res = symValToNodes(arg1, nodes)
-    symValToNodes(arg2, res)
-  }
 
   def buildNodes(): Map[SymBase, IntervalNode] = {
     val global =
       globalNode(irContext.globals ++ irContext.funcEntries, irContext.globalOffsets, irContext.externalFunctions)
-    val init = sva.state.foldLeft(Map[SymBase, IntervalNode](Global -> global)) { case (m, (variable, valueSet)) =>
+    sva.state.foldLeft(Map[SymBase, IntervalNode](Global -> global)) { case (m, (variable, valueSet)) =>
       symValToNodes(valueSet, m)
-    }
-
-    constraints.foldLeft(init) { case (resultMap, constraint) =>
-      constraint match
-        case constraint: BinaryConstraint => binaryConstraintToNodes(constraint, resultMap)
-        case dcc @ DirectCallConstraint(call) =>
-          (dcc.inConstraints ++ dcc.outConstraints).foldLeft(resultMap) { case (updated, constraint) =>
-            binaryConstraintToNodes(constraint, updated)
-          }
-        case _ => resultMap
     }
   }
 
