@@ -1,6 +1,6 @@
 package analysis.data_structure_analysis
 
-import analysis.data_structure_analysis.OSet.Values
+import analysis.data_structure_analysis.OSet.{Top, Values}
 import ir.eval.BitVectorEval.bv2SignedInt
 import ir.*
 import ir.transforms.{AbstractDomain, worklistSolver}
@@ -211,7 +211,8 @@ given OSetDomain: OffsetDomain[OSet] with {
   override def init(s: Set[Int]): OSet = Values(s)
 
   override def add(a: OSet, b: OSet, neg: Boolean): OSet = {
-    if neg then init(a.toOffsets.flatMap(i => b.toOffsets.map(j => i - j)))
+    if a == Top || b == OSet.Top then OSet.Top
+    else if neg then init(a.toOffsets.flatMap(i => b.toOffsets.map(j => i - j)))
     else init(a.toOffsets.flatMap(i => b.toOffsets.map(j => i + j)))
   }
 }
