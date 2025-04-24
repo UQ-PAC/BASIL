@@ -112,7 +112,7 @@ class IntervalGraph(
     externalFunctions: Set[ExternalFunction]
   ): IntervalNode = {
     val symBase = Global
-    val globalNode = IntervalNode(this, mutable.Map(symBase -> Set(0)))
+    val globalNode = IntervalNode(this, Map(symBase -> Set(0)))
     globalNode.flags.global = true
     globals.toSeq.sortBy(_.address).foreach {
       case FuncEntry(name, size, address) =>
@@ -323,7 +323,7 @@ class IntervalGraph(
     (nodes.toSet, pointsTo.toSet)
   }
 
-  def init(symBase: SymBase, size: Option[Int]): IntervalNode = IntervalNode(this, mutable.Map(symBase -> Set(0)), size)
+  def init(symBase: SymBase, size: Option[Int]): IntervalNode = IntervalNode(this, Map(symBase -> Set(0)), size)
   def constraintArgToCells(constraintArg: ConstraintArg, ignoreContents: Boolean = false): Set[IntervalCell] = {
     val cells = symValToCells(exprToSymVal(constraintArg.value))
     val exprCells = cells.map(find)
@@ -527,7 +527,7 @@ class IntervalGraph(
 
 class IntervalNode(
   val graph: IntervalGraph,
-  var bases: mutable.Map[SymBase, Set[Int]] = mutable.Map.empty,
+  var bases: Map[SymBase, Set[Int]] = Map.empty,
   val size: Option[Int] = None,
   val id: Int = intervalNodeCounter.next().toInt
 ) {
@@ -663,6 +663,7 @@ class IntervalNode(
   def collapse(): IntervalCell = {
     assert(isUptoDate)
     flags.collapsed = true
+    bases = bases.view.mapValues(_ => Set(0)).toMap
     graph.get(add(Interval.Top))
   }
 
@@ -782,7 +783,7 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
     else if _pointee.isEmpty then
 //      throw Exception("expected a pointee")
       assert(this.node.isUptoDate)
-      _pointee = Some(IntervalNode(graph, mutable.Map.empty).add(0))
+      _pointee = Some(IntervalNode(graph, Map.empty).add(0))
       graph.find(_pointee.get)
     else graph.find(_pointee.get)
   }
