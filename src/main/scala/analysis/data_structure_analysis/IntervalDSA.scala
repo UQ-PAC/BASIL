@@ -505,9 +505,6 @@ class IntervalGraph(
   def find(cell: IntervalCell): IntervalCell = {
     val (newNode, newInterval) = findExact(cell)
     val res = newNode.add(newInterval)
-    if (findNode(res.node)._1 != res.node) then
-      Logger.warn(res.node)
-      Logger.warn(findNode(res.node)._1)
     assert(findNode(res.node)._1 == res.node)
     res
   }
@@ -518,9 +515,6 @@ class IntervalGraph(
   def get(cell: IntervalCell): IntervalCell = {
     val (newNode, newInterval) = findExact(cell)
     val res = newNode.get(newInterval)
-    if (findNode(res.node)._1 != res.node) then
-      Logger.warn(res.node)
-      Logger.warn(findNode(res.node)._1)
     assert(findNode(res.node)._1 == res.node)
     res
   }
