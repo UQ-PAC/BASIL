@@ -261,7 +261,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("overlapping access") {
-    val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable", Standard)
+    val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable")
 
     // the dsg of the main procedure after the local phase
     val program = results.ir.program
