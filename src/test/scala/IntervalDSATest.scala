@@ -401,30 +401,21 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(!dsg.find(dsg.nodes(Stack(proc))).isCollapsed)
   }
 
-  test("cntlm main") {
+  test("cntlm local globals") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = path + ".adt",
-          relfFile = path + ".relf",
-          mainProcedureName = "main",
-          procedureTrimDepth = 1,
-          trimEarly = true
-        ),
+        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf"),
         simplify = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = None
+        dsaConfig = Some(Checks)
       )
     )
 
-    val proc = res.ir.program.mainProcedure
-    val sva = getSymbolicValues[Interval](proc)
-    val cons = generateConstraints(proc)
-    val dsg = IntervalDSA.getLocal(proc, res.ir, sva, cons)
-    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
+    val locals = res.dsa.get.local
+    locals.values.foreach(IntervalDSA.checksGlobalMaintained)
   }
 
   test("www_authenticate") {
