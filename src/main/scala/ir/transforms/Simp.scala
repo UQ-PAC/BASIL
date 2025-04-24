@@ -570,9 +570,29 @@ def collectUses(p: Procedure): Map[Variable, Set[Command]] = {
 class GuardVisitor extends CILVisitor {
 
   override def vstmt(s: Statement) = s match {
+<<<<<<< Updated upstream
     case a @ Assume(_, b, c, d) =>
       inlineCond(a) match {
         case Some(cond) => ChangeTo(List(Assume(cond, b, c, d)))
+||||||| Stash base
+    case a @ Assume(body, b, c, d) if a.body.variables.exists(goodSubst) =>
+      val deps = mutable.Set[Variable]()
+      val depBlocks = mutable.Set[Assign]()
+      Substitute(substitute(s))(a.body) match {
+        case Some(cond) => {
+          ChangeTo(List(Assume(cond, b, c, d)))
+          // SkipChildren()
+        }
+=======
+    case a @ Assume(body, b, c, d) if a.body.variables.exists(goodSubst) =>
+      val deps = mutable.Set[Variable]()
+      val depBlocks = mutable.Set[Assign]()
+      Substitute(substitute(s))(a.body) match {
+        case Some(cond) => {
+          a.body = cond 
+          SkipChildren()
+        }
+>>>>>>> Stashed changes
         case _ => SkipChildren()
       }
     case _ => SkipChildren()
@@ -728,14 +748,14 @@ def validateProcWithSplits(
       util.writeToFile(blockGraph, (s"graphs/presplittransition-${p.name}-${name}.dot"))
     }
   }
-  var splitDepth = 7 
+  var splitDepth = 0
 
   val splitTargets = isplits.toList.map(g => g -> g.targets)
 
   var result = Seq(BoogieResultKind.Timeout)
   while (
-    !result.forall(
-      _.isInstanceOf[BoogieResultKind.Verified]
+    result.exists(
+      _ == BoogieResultKind.Timeout
     ) && splitDepth <= maxSplitDepth && splitDepth <= isplits.length
   ) {
     splitDepth += 1
@@ -912,7 +932,6 @@ def validatedSimplifyPipeline(p: Program) = {
     val (vprog, splits) = validator.getValidationProgWPConj
     validateProgs(vprog, "DynamicSingleAssignment", splits)
 
-    // validate(prog, procName, "DynamicSingleAssignment", 3)
   }
 
   // rpo
