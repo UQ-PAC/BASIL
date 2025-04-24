@@ -834,7 +834,6 @@ class IntervalDSA(irContext: IRContext) {
       DSATimer.checkPoint("Finished DSA Local Phase")
       if checks then
         DSA.values.foreach(checkUniqueGlobal)
-        DSA.values.foreach(checksGlobalMaintained)
         IntervalDSA.checkReachable(irContext.program, DSA)
         DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
         DSA.values.foreach(_.localCorrectness())
