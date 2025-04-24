@@ -950,11 +950,17 @@ object IntervalDSA {
       val node = target.find(cell.node)
       val sourceBases = node.bases
       sourceBases.foreach {
-        case (base, off) if target.nodes.contains(base) && (base == Stack(target.proc) || base == Global) =>
+        case (base, off) if target.nodes.contains(base) =>
           val t = target.find(target.nodes(base).get(0))
-          if t.node.isCollapsed then target.mergeCells(cell, t)
+          if t.node.isCollapsed || cell.node.isCollapsed then target.mergeCells(cell, t)
           else if off.size == 1 then target.mergeCells(node.get(off.head), t)
-          else target.mergeCells(node.collapse(), t)
+          else {
+            assert(base != Global)
+            DSALogger.warn(
+              s"hit this case, $base, $off, source: ${source.proc.procName}, Source Expr: $sourceExpr,  target: ${target.proc.procName}, targetExpr: $targetExpr "
+            )
+            target.mergeCells(node.collapse(), t)
+          }
         case _ =>
       }
     )
