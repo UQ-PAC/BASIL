@@ -11,7 +11,7 @@ import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
 import specification.{ExternalFunction, SymbolTableEntry}
 import util.DSAConfig.{Checks, Standard}
 import util.LogLevel.INFO
-import util.{DSAConfig, DSAContext, DSALogger, IRContext, PerformanceTimer, IntervalDSALogger as Logger}
+import util.{DSAConfig, DSAContext, DSALogger, IRContext, PerformanceTimer}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{SortedSet, mutable}
@@ -351,7 +351,7 @@ class IntervalGraph(
   def processConstraint(constraint: Constraint): Unit = {
     constraint match
       case cons: MemoryAccessConstraint[_] =>
-        Logger.debug(s"Processing constraint $cons")
+        DSALogger.debug(s"Processing constraint $cons")
         val indices = constraintArgToCells(cons.arg1, ignoreContents = true)
         indices.foreach(cell => cell.node.add(cell.interval.growTo(cons.size)))
         val pointees = constraintArgToCells(cons.arg1)
@@ -359,7 +359,7 @@ class IntervalGraph(
         markEscapes(cons, indices, pointees)
         val values = constraintArgToCells(cons.arg2)
         if pointees.nonEmpty || values.nonEmpty then mergeCells(pointees ++ values)
-        else Logger.warn(s"$cons had an empty argument")
+        else DSALogger.warn(s"$cons had an empty argument")
       case _ => // ignore
   }
 
@@ -520,7 +520,7 @@ class IntervalGraph(
   }
 
   def unify(a: IntervalNode, b: IntervalNode, offset: Int = 0): Unit = {
-    Logger.debug(s"unifying ${b.id} with ${a.id} at offset ${offset}")
+    DSALogger.debug(s"unifying ${b.id} with ${a.id} at offset ${offset}")
     solver.unify(a.term, b.term, offset)
   }
 }
@@ -531,7 +531,7 @@ class IntervalNode(
   val size: Option[Int] = None,
   val id: Int = intervalNodeCounter.next().toInt
 ) {
-  Logger.debug(s"created node with id $id")
+  DSALogger.debug(s"created node with id $id")
 
   val term: NodeTerm = NodeTerm(this)
   val children = mutable.Set[Int]()
