@@ -893,11 +893,10 @@ object IntervalDSA {
     DSALogger.info(s"cloning globalNode from ${source.proc.procName}")
     val targetGlobal = target.find(target.nodes(Global).get(0))
     var sourceGlobal = source.find(source.nodes(Global).get(0))
-    val old = source.nodes(Global).clone(target, false, oldToNew)
     val globalNode = sourceGlobal.node.clone(target, true, oldToNew)
 
     sourceGlobal =
-      globalNode.get(if targetGlobal.interval != Interval.Top then targetGlobal.interval else Interval(0, 0))
+      globalNode.get(sourceGlobal.interval)
     target.mergeCells(sourceGlobal, targetGlobal)
     oldToNew.map((old, outdatedNew) => (old, target.find(outdatedNew))).toMap
   }
