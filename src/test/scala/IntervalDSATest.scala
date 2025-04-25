@@ -310,7 +310,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = path + ".adt",
+          inputFile = path + ".gts",
           relfFile = path + ".relf",
           mainProcedureName = "http_parse_basic",
           trimEarly = true
@@ -335,7 +335,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = path + ".adt",
+          inputFile = path + ".gts",
           relfFile = path + ".relf",
           mainProcedureName = "md5_process_block",
           trimEarly = true
@@ -358,7 +358,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = path + ".adt",
+          inputFile = path + ".gts",
           relfFile = path + ".relf",
           mainProcedureName = "acl_check",
           trimEarly = true
@@ -382,7 +382,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = path + ".adt",
+          inputFile = path + ".gts",
           relfFile = path + ".relf",
           mainProcedureName = "gl_des_makekey",
           trimEarly = true
@@ -405,7 +405,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val path = "examples/cntlm-noduk/cntlm-noduk"
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
-        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf"),
+        loading = ILLoadingConfig(inputFile = path + ".gts", relfFile = path + ".relf"),
         simplify = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
@@ -423,7 +423,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = path + ".adt",
+          inputFile = path + ".gts",
           relfFile = path + ".relf",
           mainProcedureName = "www_authenticate",
           trimEarly = true
@@ -438,6 +438,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
     assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
   }
 
@@ -446,7 +447,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = path + ".adt",
+          inputFile = path + ".gts",
           relfFile = path + ".relf",
           mainProcedureName = "hmac_md5",
           trimEarly = true
@@ -469,7 +470,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = path + ".adt",
+          inputFile = path + ".gts",
           relfFile = path + ".relf",
           mainProcedureName = "ntlm2_calc_resp",
           trimEarly = true
@@ -493,7 +494,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = path + ".adt",
+          inputFile = path + ".gts",
           relfFile = path + ".relf",
           mainProcedureName = "des_key_schedule",
           trimEarly = true
@@ -517,7 +518,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = path + ".adt",
+          inputFile = path + ".gts",
           relfFile = path + ".relf",
           mainProcedureName = "plist_free",
           trimEarly = true
@@ -541,7 +542,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = path + ".adt",
+          inputFile = path + ".gts",
           relfFile = path + ".relf",
           mainProcedureName = "direct_request",
           trimEarly = true
@@ -557,5 +558,6 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
     assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
+    assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
   }
 }
