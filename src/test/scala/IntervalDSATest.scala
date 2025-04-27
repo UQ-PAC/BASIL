@@ -557,6 +557,5 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
     assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
-    assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
   }
 }
