@@ -418,30 +418,39 @@ class IntervalGraph(
     assert(cell1.node.isUptoDate)
     assert(cell2.node.isUptoDate)
 
-    val scc1 = isInSCC(cell1)
-    disconnectSCC(scc1)
-    val scc2 = isInSCC(cell2)
-    disconnectSCC(scc2)
+    // determine which node is to be moved and by how much
     val (stableCell, toBeMoved) =
       if cell1.node.isCollapsed then (cell1, cell2)
       else if cell2.node.isCollapsed then (cell2, cell1)
       else if cell1.interval.start.get > cell2.interval.start.get then (cell1, cell2)
       else (cell2, cell1)
-
     val delta: Option[Int] =
       if !stableCell.node.isCollapsed then Some(stableCell.interval.start.get - toBeMoved.interval.start.get) else None
 
     val stableNode = stableCell.node
     val nodeToBeMoved = toBeMoved.node
 
+    // bookkeeping
     stableNode.flags.join(nodeToBeMoved.flags)
-    stableNode.bases ++= nodeToBeMoved.bases
-      .map((base, set) => (base, stableNode.bases.getOrElse(base, Set.empty) ++ set.map(_ + delta.getOrElse(0))))
-      .toMap
+    stableNode.bases ++= nodeToBeMoved.bases // compute new region alignments
+      .map((base, set) =>
+        (
+          base,
+          stableNode.bases.getOrElse(base, Set.empty) ++ // don't overwrite regions common with stableNode
+            set.map(_ + delta.getOrElse(0)) // move regions in notToBeMoved by delta
+        )
+      )
 
+    // start unification
+    val scc1 = isInSCC(cell1)
+    disconnectSCC(scc1)
+    val scc2 = isInSCC(cell2)
+    disconnectSCC(scc2)
     val selfEdges = disconnectSelfEdges(stableNode)
 
+    // unify so that find(nodeToBeMoved, Interval) will give (stableNode, Interval + delta)
     unify(nodeToBeMoved, stableNode, delta.getOrElse(0))
+
     nodeToBeMoved.cells.foreach(c =>
       val (node, offset) = findNode(stableNode)
       val cell = node.add(c.interval.move(i => i + offset + delta.getOrElse(0)))
