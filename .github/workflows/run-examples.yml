@@ -149,7 +149,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - run: ./mill test.compile
 
       - uses: actions/setup-java@v4
         with:
@@ -166,5 +165,5 @@ jobs:
 
       - run: echo "All systemtest suites:" && ./mill test.testOnly '*SystemTests*' -- -z 'xxxx'
 
-      - run: ./mill compile
+      - run: ./mill test.compile
       - run: ./scripts/scalatest.sh -oGD -PS3 -T 1000000 -n test_util.tags.AnalysisSystemTest -F 2
