@@ -360,13 +360,17 @@ class IntervalGraph(
       case _ => // ignore
   }
 
+  /**
+   * if the cells is not in a scc returns an empty seq
+   * else return a seq of cells corresponding to a circle of cells pointing to each other
+   */
   def isInSCC(cell: IntervalCell): Seq[IntervalCell] = {
     var seen = Seq[IntervalCell]()
     var cur = cell
-    while cur.hasPointee && !seen.contains(cell) && !seen.contains(cur) do
+    while cur.hasPointee && !seen.contains(cell) && !seen.contains(cur) do {
       cur = get(cur.getPointee)
       seen = seen.appended(cur)
-
+    }
     if seen.contains(cell) then seen else Seq.empty
   }
 
@@ -379,10 +383,11 @@ class IntervalGraph(
       val head = scc.head
       var cur = head
       var tail = scc.tail
-      while tail.nonEmpty do
+      while tail.nonEmpty do {
         find(cur).setPointee(find(tail.head))
         cur = tail.head
         tail = tail.tail
+      }
       get(scc.last).setPointee(get(head))
   }
 
