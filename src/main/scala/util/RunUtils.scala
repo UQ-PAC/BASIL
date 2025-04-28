@@ -82,7 +82,7 @@ case class StaticAnalysisContext(
 )
 
 case class DSAContext(
-  sva: Map[Procedure, SymValues[Interval]],
+  sva: Map[Procedure, SymValues[data_structure_analysis.Interval]],
   constraints: Map[Procedure, Set[Constraint]],
   local: Map[Procedure, IntervalGraph],
   bottomUp: Map[Procedure, IntervalGraph],
@@ -373,6 +373,24 @@ object IRTransform {
     modified
   }
 
+  def generateRelyGuaranteeConditions(threads: List[Procedure]): Unit = {
+    /* Todo: For the moment we are printing these to stdout, but in future we'd
+    like to add them to the IR. */
+    type StateLatticeElement = LatticeMap[Variable, analysis.Interval]
+    type InterferenceLatticeElement = Map[Variable, StateLatticeElement]
+    val stateLattice = IntervalLatticeExtension()
+    val stateTransfer = SignedIntervalDomain().transfer
+    val intDom = ConditionalWritesDomain[StateLatticeElement](stateLattice, stateTransfer)
+    val relyGuarantees =
+      RelyGuaranteeGenerator[InterferenceLatticeElement, StateLatticeElement](intDom).generate(threads)
+    for ((p, (rely, guar)) <- relyGuarantees) {
+      println("--- " + p.procName + " " + "-" * 50 + "\n")
+      println("Rely:")
+      println(intDom.toString(rely) + "\n")
+      println("Guarantee:")
+      println(intDom.toString(guar) + "\n")
+    }
+  }
 }
 
 /** Methods relating to program static analysis.
@@ -881,12 +899,12 @@ object RunUtils {
       val DSATimer = PerformanceTimer("DSA Timer", INFO)
 
       val main = ctx.program.mainProcedure
-      var sva: Map[Procedure, SymValues[Interval]] = Map.empty
+      var sva: Map[Procedure, SymValues[data_structure_analysis.Interval]] = Map.empty
       var cons: Map[Procedure, Set[Constraint]] = Map.empty
       computeDSADomain(ctx.program.mainProcedure, ctx).toSeq
         .sortBy(_.name)
         .foreach(proc =>
-          val SVAResults = getSymbolicValues[Interval](proc)
+          val SVAResults = getSymbolicValues[data_structure_analysis.Interval](proc)
           val constraints = generateConstraints(proc)
           sva += (proc -> SVAResults)
           cons += (proc -> constraints)
@@ -898,7 +916,12 @@ object RunUtils {
       if config.analyses.contains(Norm) then
         DSALogger.info("Finished Computing Constraints")
         val globalGraph =
-          IntervalDSA.getLocal(ctx.program.mainProcedure, ctx, SymValues[Interval](Map.empty), Set[Constraint]())
+          IntervalDSA.getLocal(
+            ctx.program.mainProcedure,
+            ctx,
+            SymValues[data_structure_analysis.Interval](Map.empty),
+            Set[Constraint]()
+          )
         val DSA = IntervalDSA.getLocals(ctx, sva, cons)
         IntervalDSA.checkReachable(ctx.program, DSA)
         DSATimer.checkPoint("Finished DSA Local Phase")
@@ -941,6 +964,11 @@ object RunUtils {
       IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify)
     }
 
+    if (conf.summariseProcedures) {
+      StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
+      IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify)
+    }
+
     if (q.runInterpret) {
       Logger.info("Start interpret")
 
@@ -972,6 +1000,11 @@ object RunUtils {
     }
 
     IRTransform.prepareForTranslation(q, ctx)
+
+    if (conf.generateRelyGuarantees) {
+      StaticAnalysisLogger.info("[!] Generating Rely-Guarantee Conditions")
+      IRTransform.generateRelyGuaranteeConditions(ctx.program.procedures.toList.filter(p => p.returnBlock != None))
+    }
 
     q.loading.dumpIL.foreach(s => {
       writeToFile(pp_prog(ctx.program), s"$s-output.il")

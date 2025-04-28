@@ -183,5 +183,5 @@ val ProcedureSummariesLogger = StaticAnalysisLogger.deriveLogger("procedure-summ
 val DSALogger = Logger.deriveLogger("DSA").setLevel(LogLevel.OFF)
 val ConstGenLogger = DSALogger.deriveLogger("Constraint Gen", Console.out).setLevel(LogLevel.INFO)
 val SVALogger = DSALogger.deriveLogger("SVA")
-val IntervalDSALogger = DSALogger.deriveLogger("SadDSA", Console.out).setLevel(LogLevel.OFF)
+val IntervalDSALogger = DSALogger.deriveLogger("SadDSA").setLevel(LogLevel.OFF)
 val StackLogger = Logger.deriveLogger("Stack").setLevel(LogLevel.INFO)
