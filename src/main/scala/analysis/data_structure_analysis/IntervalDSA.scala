@@ -419,13 +419,14 @@ class IntervalGraph(
     disconnectSCC(scc1)
     val scc2 = isInSCC(cell2)
     disconnectSCC(scc2)
-    var delta: Option[Int] = None
     val (stableCell, toBeMoved) =
       if cell1.node.isCollapsed then (cell1, cell2)
       else if cell2.node.isCollapsed then (cell2, cell1)
       else if cell1.interval.start.get > cell2.interval.start.get then (cell1, cell2)
       else (cell2, cell1)
-    if !stableCell.node.isCollapsed then delta = Some(stableCell.interval.start.get - toBeMoved.interval.start.get)
+
+    val delta: Option[Int] =
+      if !stableCell.node.isCollapsed then Some(stableCell.interval.start.get - toBeMoved.interval.start.get) else None
 
     val stableNode = stableCell.node
     val nodeToBeMoved = toBeMoved.node
