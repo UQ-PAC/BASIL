@@ -393,14 +393,17 @@ class IntervalGraph(
       get(scc.last).setPointee(get(head))
   }
 
-  def getSelfPointers(node: IntervalNode): Map[IntervalCell, IntervalCell] = {
+  def getSelfEdges(node: IntervalNode): Map[IntervalCell, IntervalCell] = {
     node.cells.filter(_.hasPointee).filter(_.getPointee.node == node).map(c => (c, c.getPointee)).toMap
   }
 
-  def disconnectSelfPointers(node: IntervalNode): Map[IntervalCell, IntervalCell] = {
-    val selfPointers = getSelfPointers(node)
-    selfPointers.keys.foreach(_.removePointee)
-    selfPointers
+  /**
+   * disconnect edges from a node to itself (could be different cells in the same node)
+   */
+  def disconnectSelfEdges(node: IntervalNode): Map[IntervalCell, IntervalCell] = {
+    val selfEdges = getSelfEdges(node)
+    selfEdges.keys.foreach(_.removePointee)
+    selfEdges
   }
 
   def getOutEdges(node: IntervalNode): Map[IntervalCell, IntervalCell] = {
@@ -438,7 +441,7 @@ class IntervalGraph(
       .map((base, set) => (base, stableNode.bases.getOrElse(base, Set.empty) ++ set.map(_ + delta.getOrElse(0))))
       .toMap
 
-    val selfPointers = disconnectSelfPointers(stableNode)
+    val selfEdges = disconnectSelfEdges(stableNode)
 
     unify(nodeToBeMoved, stableNode, delta.getOrElse(0))
     nodeToBeMoved.cells.foreach(c =>
@@ -447,7 +450,7 @@ class IntervalGraph(
       if c.hasPointee then cell.setPointee(c.getPointee)
     )
 
-    selfPointers.foreach((pointer, pointee) => find(pointer).setPointee(find(pointee)))
+    selfEdges.foreach((pointer, pointee) => find(pointer).setPointee(find(pointee)))
     connectSCC(scc1)
     connectSCC(scc2)
 
