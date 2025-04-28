@@ -294,14 +294,14 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
     // local caller
     val dsgCaller = results.dsa.get.local(program.mainProcedure)
-    val stack32 = dsgCaller.nodes(Stack(program.mainProcedure)).get(32)
-    val stack48 = dsgCaller.nodes(Stack(program.mainProcedure)).get(48)
+    val stack32 = dsgCaller.nodes(Stack(program.mainProcedure)).get(-32)
+    val stack48 = dsgCaller.nodes(Stack(program.mainProcedure)).get(-48)
     assert(stack32 != stack48)
 
     // top down caller
     val dsg = results.dsa.get.topDown(program.mainProcedure)
-    val stack32td = dsg.nodes(Stack(program.mainProcedure)).get(32)
-    val stack48td = dsg.nodes(Stack(program.mainProcedure)).get(48)
+    val stack32td = dsg.nodes(Stack(program.mainProcedure)).get(-32)
+    val stack48td = dsg.nodes(Stack(program.mainProcedure)).get(-48)
     assert(stack48td != stack32td)
   }
 
