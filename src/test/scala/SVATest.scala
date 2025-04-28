@@ -66,7 +66,7 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("malloc-Interval") {
-    mallocTest[Interval]
+    mallocTest[DSInterval]
   }
 
   def mallocTest[T <: Offsets](using domain: SymValSetDomain[T])(using oDomain: OffsetDomain[T]): Unit = {
@@ -118,7 +118,7 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("call-Interval") {
-    callTest[Interval]
+    callTest[DSInterval]
   }
   def callTest[T <: Offsets](using domain: SymValSetDomain[T])(using oDomain: OffsetDomain[T]): Unit = {
     val mem = SharedMemory("mem", 64, 8)
@@ -161,7 +161,7 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("procEntry-Interval") {
-    procEntry[Interval]
+    procEntry[DSInterval]
   }
   def procEntry[T <: Offsets](using domain: SymValSetDomain[T])(using oDomain: OffsetDomain[T]): Unit = {
     val R0 = Register("R0", 64)
@@ -206,7 +206,7 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("reassignment-Interval") {
-    reassignment[Interval]
+    reassignment[DSInterval]
   }
   def reassignment[T <: Offsets](using domain: SymValSetDomain[T])(using oDomain: OffsetDomain[T]): Unit = {
     val R0 = Register("R0", 64)
@@ -247,7 +247,7 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("branch-Interval") {
-    branch[Interval]
+    branch[DSInterval]
   }
 
   def branch[T <: Offsets](using domain: SymValSetDomain[T])(using oDomain: OffsetDomain[T]): Unit = {
@@ -299,7 +299,7 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("loop-Interval") {
-    loop[Interval]
+    loop[DSInterval]
   }
   def loop[T <: Offsets](using domain: SymValSetDomain[T])(using oDomain: OffsetDomain[T]): Unit = {
     val R0 = Register("R0", 64)

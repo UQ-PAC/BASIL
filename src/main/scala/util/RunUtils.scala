@@ -38,7 +38,7 @@ import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
 import ir.transforms.MemoryTransform
-import util.DSAAnalysis.Norm
+import util.DSAConfig.{Checks, Prereq, Standard}
 import util.LogLevel.INFO
 
 import scala.annotation.tailrec
@@ -82,11 +82,12 @@ case class StaticAnalysisContext(
 )
 
 case class DSAContext(
-  sva: Map[Procedure, SymValues[Interval]],
+  sva: Map[Procedure, SymValues[DSInterval]],
   constraints: Map[Procedure, Set[Constraint]],
   local: Map[Procedure, IntervalGraph],
   bottomUp: Map[Procedure, IntervalGraph],
-  topDown: Map[Procedure, IntervalGraph]
+  topDown: Map[Procedure, IntervalGraph],
+  globals: Map[IntervalNode, IntervalNode]
 )
 
 /** Results of the main program execution.
@@ -874,66 +875,15 @@ object RunUtils {
       }
     }
 
-    // SVA
     var dsaContext: Option[DSAContext] = None
-    if (conf.dsaConfig.nonEmpty) {
-      val config = conf.dsaConfig.get
-      val DSATimer = PerformanceTimer("DSA Timer", INFO)
+    if (conf.dsaConfig.isDefined) {
+      val dsaResults = IntervalDSA(ctx).dsa(conf.dsaConfig.get)
+      dsaContext = Some(dsaResults)
 
-      val main = ctx.program.mainProcedure
-      var sva: Map[Procedure, SymValues[Interval]] = Map.empty
-      var cons: Map[Procedure, Set[Constraint]] = Map.empty
-      computeDSADomain(ctx.program.mainProcedure, ctx).toSeq
-        .sortBy(_.name)
-        .foreach(proc =>
-          val SVAResults = getSymbolicValues[Interval](proc)
-          val constraints = generateConstraints(proc)
-          sva += (proc -> SVAResults)
-          cons += (proc -> constraints)
-        )
-
-      DSATimer.checkPoint("Finished SVA")
-      dsaContext = Some(DSAContext(sva, cons, Map.empty, Map.empty, Map.empty))
-
-      if config.analyses.contains(Norm) then
-        DSALogger.info("Finished Computing Constraints")
-        val globalGraph =
-          IntervalDSA.getLocal(ctx.program.mainProcedure, ctx, SymValues[Interval](Map.empty), Set[Constraint]())
-        val DSA = IntervalDSA.getLocals(ctx, sva, cons)
-        IntervalDSA.checkReachable(ctx.program, DSA)
-        DSATimer.checkPoint("Finished DSA Local Phase")
-        DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
-        DSA.values.foreach(_.localCorrectness())
-        DSALogger.info("Performed correctness check")
-        val DSABU = IntervalDSA.solveBUs(DSA)
-        DSATimer.checkPoint("Finished DSA BU Phase")
-        DSABU.values.foreach(_.localCorrectness())
-        DSALogger.info("Performed correctness check")
-        val DSATD = IntervalDSA.solveTDs(DSABU)
-        DSATimer.checkPoint("Finished DSA TD Phase")
-        DSATD.values.foreach(_.localCorrectness())
-        DSALogger.info("Performed correctness check")
-        DSATD.values.foreach(g => globalGraph.globalTransfer(g, globalGraph))
-        val globalMapping = DSATD.values.foldLeft(Map[IntervalNode, IntervalNode]()) { (m, g) =>
-          val oldToNew = globalGraph.globalTransfer(globalGraph, g)
-          m ++ oldToNew.map((common, spec) => (spec, common))
-
-        }
-        DSATimer.checkPoint("Finished DSA global graph")
-        DSATD.values.foreach(_.localCorrectness())
-        DSALogger.info("Performed correctness check")
-
-        IntervalDSA.checkConsistGlobals(DSATD, globalGraph)
-        IntervalDSA.checkReachable(ctx.program, DSATD)
-
-        DSATimer.checkPoint("Finished DSA Invariant Check")
-        dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
-
-        if q.memoryTransform then {
-          visit_prog(MemoryTransform(DSATD, globalMapping), ctx.program)
-          DSATimer.checkPoint("Performed Memory Transform")
-          // doSimplify(ctx, None)
-        }
+      if q.memoryTransform && conf.dsaConfig.get != Prereq then // need more than prereq
+        val memTransferTimer = PerformanceTimer("Mem Transfer Timer", INFO)
+        visit_prog(MemoryTransform(dsaResults.topDown, dsaResults.globals), ctx.program)
+        memTransferTimer.checkPoint("Performed Memory Transform")
     }
 
     if (conf.summariseProcedures) {
