@@ -1216,7 +1216,7 @@ def estimateStackSize(program: Program): Unit = {
 
 def computeDSADomain(proc: Procedure, context: IRContext): Set[Procedure] = {
   var domain: Set[Procedure] = Set(proc) ++ (context.program.procedures.filter(f =>
-    context.funcEntries.map(_.name).filter(!_.startsWith("_")).contains(f.procName)
+    context.funcEntries.map(_.name).contains(f.procName)
   ))
 
   val stack: mutable.Stack[Procedure] = mutable.Stack()
