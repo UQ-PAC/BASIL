@@ -1,4 +1,4 @@
-import analysis.data_structure_analysis.{Global, Interval}
+import analysis.data_structure_analysis.{Global, DSInterval}
 import boogie.SpecGlobal
 import ir.*
 import ir.Endian.{BigEndian, LittleEndian}

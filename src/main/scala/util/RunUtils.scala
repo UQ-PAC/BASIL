@@ -83,12 +83,12 @@ case class StaticAnalysisContext(
 )
 
 case class DSAContext(
-  sva: Map[Procedure, SymValues[Interval]],
-  constraints: Map[Procedure, Set[Constraint]],
-  local: Map[Procedure, IntervalGraph],
-  bottomUp: Map[Procedure, IntervalGraph],
-  topDown: Map[Procedure, IntervalGraph],
-  globals: Map[IntervalNode, IntervalNode]
+                       sva: Map[Procedure, SymValues[DSInterval]],
+                       constraints: Map[Procedure, Set[Constraint]],
+                       local: Map[Procedure, IntervalGraph],
+                       bottomUp: Map[Procedure, IntervalGraph],
+                       topDown: Map[Procedure, IntervalGraph],
+                       globals: Map[IntervalNode, IntervalNode]
 )
 
 /** Results of the main program execution.

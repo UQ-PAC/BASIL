@@ -1,7 +1,7 @@
 package analysis.data_structure_analysis
 
 import analysis.data_structure_analysis.DSAPhase.{BU, Local, TD}
-import analysis.data_structure_analysis.Interval.Top
+import analysis.data_structure_analysis.DSInterval.Top
 import analysis.data_structure_analysis.IntervalDSA.{checkUniqueGlobal, checksGlobalMaintained}
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
 import boogie.SpecGlobal
@@ -25,23 +25,23 @@ case class NodeTerm(v: IntervalNode) extends analysis.solvers.Var[NodeTerm]
  * Data Structure Graph
  */
 class IntervalGraph(
-  val proc: Procedure,
-  var phase: DSAPhase,
-  val irContext: IRContext,
-  val sva: SymValues[Interval],
-  val constraints: Set[Constraint],
-  val nodeBuilder: Option[() => Map[SymBase, IntervalNode]]
+                     val proc: Procedure,
+                     var phase: DSAPhase,
+                     val irContext: IRContext,
+                     val sva: SymValues[DSInterval],
+                     val constraints: Set[Constraint],
+                     val nodeBuilder: Option[() => Map[SymBase, IntervalNode]]
 ) {
 
   val solver = OffsetUnionFindSolver[NodeTerm]()
   val builder: () => Map[SymBase, IntervalNode] = nodeBuilder.getOrElse(buildNodes)
   var nodes: Map[SymBase, IntervalNode] = builder()
 
-  def exprToSymVal(expr: Expr): SymValSet[Interval] = SymValues.exprToSymValSet(sva)(expr)
+  def exprToSymVal(expr: Expr): SymValSet[DSInterval] = SymValues.exprToSymValSet(sva)(expr)
 
   protected def symValToNodes(
-    symVal: SymValSet[Interval],
-    current: Map[SymBase, IntervalNode]
+                               symVal: SymValSet[DSInterval],
+                               current: Map[SymBase, IntervalNode]
   ): Map[SymBase, IntervalNode] = {
     symVal.state.filter((base, _) => base != NonPointer).foldLeft(current) { case (result, (base, symOffsets)) =>
       val node = find(result.getOrElse(base, init(base, None)))
@@ -68,9 +68,9 @@ class IntervalGraph(
     globalNode.flags.global = true
     globals.toSeq.sortBy(_.address).foreach {
       case FuncEntry(name, size, address) =>
-        globalNode.add(Interval(address.toInt, address.toInt + size / 8))
+        globalNode.add(DSInterval(address.toInt, address.toInt + size / 8))
       case SpecGlobal(name, size, arraySize, address) =>
-        globalNode.add(Interval(address.toInt, address.toInt)) // ignore size, could be a composite type
+        globalNode.add(DSInterval(address.toInt, address.toInt)) // ignore size, could be a composite type
     }
 
     globalOffsets.foreach { case (address, relocated) =>
@@ -87,7 +87,7 @@ class IntervalGraph(
 
     globalOffsets.map(_.swap).foreach { case (address, relocated) =>
       val pointee = find(globalNode.get(address.toInt))
-      val pointer = find(globalNode).add(Interval(relocated.toInt, relocated.toInt + 8))
+      val pointer = find(globalNode).add(DSInterval(relocated.toInt, relocated.toInt + 8))
       pointer.setPointee(pointee)
     }
 
@@ -137,7 +137,7 @@ class IntervalGraph(
 
   def isGlobal(address: Int): Boolean = {
     (irContext.globals ++ irContext.funcEntries).exists(g =>
-      Interval(g.address.toInt, g.address.toInt + g.size / 8).contains(address)
+      DSInterval(g.address.toInt, g.address.toInt + g.size / 8).contains(address)
     ) || irContext.globalOffsets.exists((g1, g2) => g1 == address || g2 == address) || irContext.externalFunctions
       .exists(g => address == g.offset)
   }
@@ -166,9 +166,9 @@ class IntervalGraph(
   }
 
   // returns the cells corresponding to the
-  def symValToCells(symVal: SymValSet[Interval]): Set[IntervalCell] = {
+  def symValToCells(symVal: SymValSet[DSInterval]): Set[IntervalCell] = {
     val pairs = symVal.state.filter((base, _) => base != NonPointer)
-    pairs.foldLeft(Set[IntervalCell]()) { case (results, (base: SymBase, offsets: Interval)) =>
+    pairs.foldLeft(Set[IntervalCell]()) { case (results, (base: SymBase, offsets: DSInterval)) =>
       val (node, adjustment) = findNode(nodes(base))
       if offsets == Top then results + node.collapse()
       else
@@ -491,7 +491,7 @@ class IntervalGraph(
     }
   }
 
-  def findExact(cell: IntervalCell): (IntervalNode, Interval) = {
+  def findExact(cell: IntervalCell): (IntervalNode, DSInterval) = {
     val node = cell.node
     val (newNode, offset) = findNode(node)
     (newNode, cell.interval.move(i => i + offset))
@@ -545,7 +545,7 @@ class IntervalNode(
   val children = mutable.Set[Int]()
 
   val flags: DSFlag = DSFlag()
-  protected var _cells: Seq[IntervalCell] = Seq(IntervalCell(this, Interval(0, 0)))
+  protected var _cells: Seq[IntervalCell] = Seq(IntervalCell(this, DSInterval(0, 0)))
   def cells: Seq[IntervalCell] = _cells
 
   def nonOverlappingProperty: Boolean = {
@@ -557,13 +557,13 @@ class IntervalNode(
       )
   }
 
-  def isCollapsed: Boolean = _cells.nonEmpty && _cells.head.interval == Interval.Top
+  def isCollapsed: Boolean = _cells.nonEmpty && _cells.head.interval == DSInterval.Top
   def add(offset: Int): IntervalCell = {
-    add(Interval(offset, offset))
+    add(DSInterval(offset, offset))
   }
 
   def get(offset: Int): IntervalCell = {
-    get(Interval(offset, offset))
+    get(DSInterval(offset, offset))
   }
 
   /**
@@ -634,7 +634,7 @@ class IntervalNode(
       else bases.filterNot(i => isPlaceHolder(i._1)).mkString("\n")
 
     val intervals =
-      if isCollapsed then Interval.Top.toString
+      if isCollapsed then DSInterval.Top.toString
       else cells.map(_.interval).map(_.toString).mkString("\n")
 
     s"Node $id\n$baseString\n$intervals"
@@ -660,7 +660,7 @@ class IntervalNode(
     graph.find(this) == this
   }
 
-  def init(interval: Interval): IntervalCell = IntervalCell(this, interval)
+  def init(interval: DSInterval): IntervalCell = IntervalCell(this, interval)
 
   override def equals(obj: Any): Boolean = {
     obj match
@@ -672,7 +672,7 @@ class IntervalNode(
     assert(isUptoDate)
     flags.collapsed = true
     bases = bases.view.mapValues(_ => Set(0)).toMap
-    graph.get(add(Interval.Top))
+    graph.get(add(DSInterval.Top))
   }
 
   /**
@@ -684,7 +684,7 @@ class IntervalNode(
    * @param interval interval of the newCell
    * @return a cell with this node and the provided interval
    */
-  def add(interval: Interval): IntervalCell = {
+  def add(interval: DSInterval): IntervalCell = {
     assert(isUptoDate)
     val overlapping: Seq[IntervalCell] = cells.filter(_.interval.isOverlapping(interval))
     val newCell = if overlapping.isEmpty then
@@ -694,7 +694,7 @@ class IntervalNode(
     else if overlapping.size == 1 && overlapping.head.interval == (interval) then this.get(interval)
     else if overlapping.size == 1 && overlapping.head.interval.contains(interval) then init(interval)
     else
-      val unifiedInterval = overlapping.map(_.interval).fold(interval)(Interval.join)
+      val unifiedInterval = overlapping.map(_.interval).fold(interval)(DSInterval.join)
       val res = init(unifiedInterval)
       val pointees = overlapping.filter(_.hasPointee).map(_.getPointee)
 
@@ -709,7 +709,7 @@ class IntervalNode(
 
   // get the cell which contains this interval in the node
   // expects exactly 1 corresponding cell since they are non-overlapping
-  def get(interval: Interval): IntervalCell = {
+  def get(interval: DSInterval): IntervalCell = {
     val exactMatches = cells.filter(_.interval.contains(interval))
     assert(
       exactMatches.size == 1,
@@ -736,7 +736,7 @@ object IntervalCell {
  * the reason is that a node cell may not have pointee when dummy cell corresponding to it is created
  * if that cell is later assigned a pointee, avoid the need for update to all dummy cells
  */
-class IntervalCell(val node: IntervalNode, val interval: Interval) {
+class IntervalCell(val node: IntervalNode, val interval: DSInterval) {
   var _pointee: Option[IntervalCell] = None
   private val graph: IntervalGraph = node.graph
 
@@ -748,7 +748,7 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
     newCell
   }
 
-  def grown(interval: Interval): IntervalCell = {
+  def grown(interval: DSInterval): IntervalCell = {
     require(this.interval.start == interval.start, "expected same interval start for growing cell")
     val newCell = IntervalCell(this.node, this.interval.join(interval))
     newCell._pointee = _pointee
@@ -811,13 +811,13 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
 }
 
 class IntervalDSA(irContext: IRContext) {
-  def pre(): (Map[Procedure, SymValues[Interval]], Map[Procedure, Set[Constraint]]) = {
-    var sva: Map[Procedure, SymValues[Interval]] = Map.empty
+  def pre(): (Map[Procedure, SymValues[DSInterval]], Map[Procedure, Set[Constraint]]) = {
+    var sva: Map[Procedure, SymValues[DSInterval]] = Map.empty
     var cons: Map[Procedure, Set[Constraint]] = Map.empty
     computeDSADomain(irContext.program.mainProcedure, irContext).toSeq
       .sortBy(_.name)
       .foreach(proc =>
-        val SVAResults = getSymbolicValues[Interval](proc)
+        val SVAResults = getSymbolicValues[DSInterval](proc)
         val constraints = generateConstraints(proc)
         sva += (proc -> SVAResults)
         cons += (proc -> constraints)
@@ -838,7 +838,7 @@ class IntervalDSA(irContext: IRContext) {
         IntervalDSA.getLocal(
           irContext.program.mainProcedure,
           irContext,
-          SymValues[Interval](Map.empty),
+          SymValues[DSInterval](Map.empty),
           Set[Constraint]()
         )
       val DSA = IntervalDSA.getLocals(irContext, sva, cons)
@@ -1093,10 +1093,10 @@ object IntervalDSA {
   }
 
   def getLocal(
-    proc: Procedure,
-    context: IRContext,
-    symValues: SymValues[Interval],
-    cons: Set[Constraint]
+                proc: Procedure,
+                context: IRContext,
+                symValues: SymValues[DSInterval],
+                cons: Set[Constraint]
   ): IntervalGraph = {
     val graph = IntervalGraph(proc, Local, context, symValues, cons, None)
     graph.localPhase()
@@ -1104,9 +1104,9 @@ object IntervalDSA {
   }
 
   def getLocals(
-    ctx: IRContext,
-    svas: Map[Procedure, SymValues[Interval]],
-    cons: Map[Procedure, Set[Constraint]]
+                 ctx: IRContext,
+                 svas: Map[Procedure, SymValues[DSInterval]],
+                 cons: Map[Procedure, Set[Constraint]]
   ): Map[Procedure, IntervalGraph] = {
     DSALogger.info("Performing local DSA")
     computeDSADomain(ctx.program.mainProcedure, ctx).toSeq

@@ -1,7 +1,7 @@
 import analysis.data_structure_analysis.{
   Global,
   Heap,
-  Interval,
+  DSInterval,
   IntervalDSA,
   Par,
   Ret,

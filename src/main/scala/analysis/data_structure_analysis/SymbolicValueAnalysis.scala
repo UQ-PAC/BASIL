@@ -113,7 +113,7 @@ def toOffsetMove[T <: Offsets](op: BinOp, arg: BitVecLiteral | T, domain: Offset
 
 trait Offsets {
   def toOffsets: Set[Int]
-  def toIntervals: Set[Interval]
+  def toIntervals: Set[DSInterval]
 }
 trait OffsetDomain[T <: Offsets] extends AbstractDomain[T] {
   def init(i: Int): T
@@ -128,10 +128,10 @@ enum OSet extends Offsets {
   case Top
   case Values(v: Set[Int])
 
-  override def toIntervals: Set[Interval] = {
+  override def toIntervals: Set[DSInterval] = {
     this match
-      case OSet.Top => Set(Interval.Top)
-      case OSet.Values(v) => v.map(i => Interval(i, i + 1))
+      case OSet.Top => Set(DSInterval.Top)
+      case OSet.Values(v) => v.map(i => DSInterval(i, i + 1))
   }
   override def toOffsets: Set[Int] = {
     this match
@@ -140,35 +140,35 @@ enum OSet extends Offsets {
   }
 }
 
-given IntervalDomain: OffsetDomain[Interval] with {
+given IntervalDomain: OffsetDomain[DSInterval] with {
 
-  override def init(i: Int): Interval = Interval(i, i)
+  override def init(i: Int): DSInterval = DSInterval(i, i)
 
-  override def init(s: Set[Int]): Interval = Interval(s.min, s.max)
+  override def init(s: Set[Int]): DSInterval = DSInterval(s.min, s.max)
 
-  override def shouldWiden(v: Interval): Boolean = false
+  override def shouldWiden(v: DSInterval): Boolean = false
 
-  override def transform(v: Interval, f: Int => Int): Interval = {
+  override def transform(v: DSInterval, f: Int => Int): DSInterval = {
     v.move(f)
   }
 
-  override def widen(a: Interval, b: Interval, pos: Block): Interval = Interval.Top
+  override def widen(a: DSInterval, b: DSInterval, pos: Block): DSInterval = DSInterval.Top
 
-  override def join(a: Interval, b: Interval, pos: Block): Interval = a.join(b)
+  override def join(a: DSInterval, b: DSInterval, pos: Block): DSInterval = a.join(b)
 
-  override def transfer(a: Interval, b: Command): Interval = ???
+  override def transfer(a: DSInterval, b: Command): DSInterval = ???
 
-  override def top: Interval = Interval.Top
+  override def top: DSInterval = DSInterval.Top
 
-  override def bot: Interval = Interval.Bot
+  override def bot: DSInterval = DSInterval.Bot
 
-  override def add(a: Interval, b: Interval, neg: Boolean): Interval = {
+  override def add(a: DSInterval, b: DSInterval, neg: Boolean): DSInterval = {
     (a, b) match {
-      case (Interval.Top, _) => Interval.Top
-      case (_, Interval.Top) => Interval.Top
-      case (a, Interval.Bot) => a
-      case (Interval.Bot, b) => b
-      case (Interval.Value(s1, e1), Interval.Value(s2, e2)) =>
+      case (DSInterval.Top, _) => DSInterval.Top
+      case (_, DSInterval.Top) => DSInterval.Top
+      case (a, DSInterval.Bot) => a
+      case (DSInterval.Bot, b) => b
+      case (DSInterval.Value(s1, e1), DSInterval.Value(s2, e2)) =>
         val (s3, e3) = if neg then (-s2, -e2) else (s2, e2)
         val o1 = s1 + s3
         val o2 = s1 + e3
@@ -176,7 +176,7 @@ given IntervalDomain: OffsetDomain[Interval] with {
         val o4 = e3 + e1
 
         val values = Set(o1, o2, o3, o4)
-        Interval(values.reduce(Math.min), values.reduce(Math.max))
+        DSInterval(values.reduce(Math.min), values.reduce(Math.max))
     }
   }
 }
@@ -226,7 +226,7 @@ object SymValSet {
 }
 
 given OSetSymValSetDomain: SymValSetDomain[OSet] = SymValSetDomain[OSet]()
-given IntervalSymValDomain: SymValSetDomain[Interval] = SymValSetDomain[Interval]()
+given IntervalSymValDomain: SymValSetDomain[DSInterval] = SymValSetDomain[DSInterval]()
 class SymValSetDomain[T <: Offsets](using val offsetDomain: OffsetDomain[T]) extends AbstractDomain[SymValSet[T]] {
 
   override def join(a: SymValSet[T], b: SymValSet[T], pos: Block = Block("")): SymValSet[T] = {
