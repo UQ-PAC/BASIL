@@ -197,9 +197,7 @@ def directCall(
 def directCall(lhs: Iterable[(String, Variable)], tgt: String, actualParams: (String, Expr)*): EventuallyCall =
   EventuallyCall(DelayNameResolve(tgt), lhs.to(ArraySeq), actualParams)
 
-case class Call(target: String, actualParams: (String, Expr)*)
-
-def directCall(lhs: Iterable[(String, Variable)], rhs: Call): EventuallyCall =
+def directCall(lhs: Iterable[(String, Variable)], rhs: call): EventuallyCall =
   EventuallyCall(DelayNameResolve(rhs.target), lhs.toArray, rhs.actualParams)
 
 def directCall(tgt: String): EventuallyCall = directCall(Nil, tgt, Nil)
