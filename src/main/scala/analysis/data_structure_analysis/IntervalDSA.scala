@@ -25,12 +25,12 @@ case class NodeTerm(v: IntervalNode) extends analysis.solvers.Var[NodeTerm]
  * Data Structure Graph
  */
 class IntervalGraph(
-                     val proc: Procedure,
-                     var phase: DSAPhase,
-                     val irContext: IRContext,
-                     val sva: SymValues[DSInterval],
-                     val constraints: Set[Constraint],
-                     val nodeBuilder: Option[() => Map[SymBase, IntervalNode]]
+  val proc: Procedure,
+  var phase: DSAPhase,
+  val irContext: IRContext,
+  val sva: SymValues[DSInterval],
+  val constraints: Set[Constraint],
+  val nodeBuilder: Option[() => Map[SymBase, IntervalNode]]
 ) {
 
   val solver = OffsetUnionFindSolver[NodeTerm]()
@@ -40,8 +40,8 @@ class IntervalGraph(
   def exprToSymVal(expr: Expr): SymValSet[DSInterval] = SymValues.exprToSymValSet(sva)(expr)
 
   protected def symValToNodes(
-                               symVal: SymValSet[DSInterval],
-                               current: Map[SymBase, IntervalNode]
+    symVal: SymValSet[DSInterval],
+    current: Map[SymBase, IntervalNode]
   ): Map[SymBase, IntervalNode] = {
     symVal.state.filter((base, _) => base != NonPointer).foldLeft(current) { case (result, (base, symOffsets)) =>
       val node = find(result.getOrElse(base, init(base, None)))
@@ -141,8 +141,6 @@ class IntervalGraph(
     ) || irContext.globalOffsets.exists((g1, g2) => g1 == address || g2 == address) || irContext.externalFunctions
       .exists(g => address == g.offset)
   }
-
-
 
   def addParamCells(): Unit = {
     val unchanged = Set("R29", "R30", "R31")
@@ -1093,10 +1091,10 @@ object IntervalDSA {
   }
 
   def getLocal(
-                proc: Procedure,
-                context: IRContext,
-                symValues: SymValues[DSInterval],
-                cons: Set[Constraint]
+    proc: Procedure,
+    context: IRContext,
+    symValues: SymValues[DSInterval],
+    cons: Set[Constraint]
   ): IntervalGraph = {
     val graph = IntervalGraph(proc, Local, context, symValues, cons, None)
     graph.localPhase()
@@ -1104,9 +1102,9 @@ object IntervalDSA {
   }
 
   def getLocals(
-                 ctx: IRContext,
-                 svas: Map[Procedure, SymValues[DSInterval]],
-                 cons: Map[Procedure, Set[Constraint]]
+    ctx: IRContext,
+    svas: Map[Procedure, SymValues[DSInterval]],
+    cons: Map[Procedure, Set[Constraint]]
   ): Map[Procedure, IntervalGraph] = {
     DSALogger.info("Performing local DSA")
     computeDSADomain(ctx.program.mainProcedure, ctx).toSeq
@@ -1215,9 +1213,8 @@ def estimateStackSize(program: Program): Unit = {
 }
 
 def computeDSADomain(proc: Procedure, context: IRContext): Set[Procedure] = {
-  var domain: Set[Procedure] = Set(proc) ++ (context.program.procedures.filter(f =>
-    context.funcEntries.map(_.name).contains(f.procName)
-  ))
+  var domain: Set[Procedure] =
+    Set(proc) ++ (context.program.procedures.filter(f => context.funcEntries.map(_.name).contains(f.procName)))
 
   val stack: mutable.Stack[Procedure] = mutable.Stack()
   stack.pushAll(domain.flatMap(_.calls))
