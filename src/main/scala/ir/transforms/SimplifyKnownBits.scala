@@ -312,8 +312,9 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
   }
 
   // Converts a BigInt to signed representation
-  def toSigned(n: BitVecLiteral): BigInt = {
-    BitVectorEval.bv2SignedInt(n)
+  def toSigned(n: BigInt): BigInt = {
+    val msb = BigInt(1) << (this.width - 1)
+    if ((n & msb) != 0) n - (msb << 1) else n
   }
 
   // TODO
@@ -466,88 +467,92 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
   }
 
   // Get smallest possible unsigned value of the TNum (e.g. Min value of TT0 is 000)
-  def getUnsignedMinValue(): BitVecLiteral = {
-    this.value & ~this.mask
-  }
+  def minUnsigned = (this.value & ~this.mask).value
 
   // Get largest possible unsigned value of the TNum (e.g. Max value of TT0 is 110)
-  def getUnsignedMaxValue(): BitVecLiteral = {
-    this.value | this.mask
+  def maxUnsigned = (this.value | this.mask).value
+
+  def mustBits = (this.value & ~this.mask)
+  def mustNotBits = ((~this.value) & ~this.mask)
+  def mayBits = this.value | this.mask
+
+  def maxPositive: Option[BitVecLiteral] = {
+    if (mustBits(width, width - 1) < 0.bv(width)) {
+      // must be negative
+      None
+    } else {
+      Some(zero_extend(1, mayBits(width, width - 1)))
+    }
+  }
+
+  def minPositive: Option[BitVecLiteral] = {
+    if (mustBits(width, width - 1) < 0.bv(width)) {
+      // must be negative
+      None
+    } else {
+      Some(mustBits)
+    }
+  }
+
+  def maxNegative: Option[BitVecLiteral] = {
+    if (mustBits(width, width - 1) > 0.bv(width)) {
+      // must be positive
+      None
+    } else {
+      // all possible bits set incl msb
+      Some(mayBits)
+    }
+  }
+
+  def minNegative: Option[BitVecLiteral] = {
+    if (mustBits(width, width - 1) > 0.bv(width)) {
+      // must be positive
+      None
+    } else {
+      // fewest bits set, and msb set
+      Some(mustBits | (1.bv(width) << (width - 1).bv(width)))
+    }
   }
 
   // Get smallest possible signed value of the TNum
-  def getSignedMinValue() = {
-    toSigned(getUnsignedMinValue())
-  }
+  def minSigned : BitVecLiteral = minNegative.getOrElse(minPositive.get)
 
   // Get largest possible signed value of the TNum
-  def getSignedMaxValue() = {
-    toSigned(this.getUnsignedMaxValue())
+  def maxSigned : BitVecLiteral = maxPositive.getOrElse(maxNegative.get)
+
+  def slt(that: TNum): Option[Boolean] = if (this.maxSigned < that.minSigned) then Some(true) else None
+  def sle(that: TNum): Option[Boolean] = if (this.maxSigned <= that.minSigned) then Some(true) else None
+  def ult(that: TNum): Option[Boolean] = if (this.maxUnsigned < that.minUnsigned) then Some(true) else None
+  def ule(that: TNum): Option[Boolean] = if (this.maxUnsigned <= that.minUnsigned) then Some(true) else None
+
+  def sgt(that: TNum): Option[Boolean] = if (this.minSigned > that.maxSigned) then Some(true) else None
+  def sge(that: TNum): Option[Boolean] = if (this.minSigned >= that.maxSigned) then Some(true) else None
+  def ugt(that: TNum): Option[Boolean] = if (this.minUnsigned > that.maxUnsigned) then Some(true) else None
+  def uge(that: TNum): Option[Boolean] = if (this.minUnsigned >= that.maxUnsigned) then Some(true) else None
+
+  def isOrElseNot(soundOp: TNum => Option[Boolean], soundDualOp: TNum => Option[Boolean])(t: TNum): TNum = {
+    soundOp(t).orElse(soundDualOp(t).map(x => !x)) match {
+      case Some(true) => trueBool
+      case Some(false) => falseBool
+      case None => unkBool
+    }
   }
 
-  // Unsigned Less Than
-  def TULT(that: TNum): TNum = {
-    val thisUnsignedMaxValue = this.getUnsignedMaxValue()
-    val thatUnsignedMinValue = that.getUnsignedMinValue()
+  def TULT(that: TNum): TNum = isOrElseNot(ult, uge)(that)
 
-    if (thisUnsignedMaxValue < thatUnsignedMinValue) trueBool else unkBool
-  }
+  def TSLT(that: TNum): TNum = isOrElseNot(slt, sge)(that)
 
-  // Signed Less Than
-  def TSLT(that: TNum): TNum = {
-    val thisSignedMaxValue = this.getSignedMaxValue()
-    val thatSignedMinValue = that.getSignedMinValue()
+  def TULE(that: TNum): TNum = isOrElseNot(ule, ugt)(that)
 
-    if (thisSignedMaxValue < thatSignedMinValue) trueBool else unkBool
-  }
+  def TSLE(that: TNum): TNum = isOrElseNot(sle, sgt)(that)
 
-  // Unsigned Less Than or Equal
-  def TULE(that: TNum): TNum = {
-    val thisUnsignedMaxValue = this.getUnsignedMaxValue().value
-    val thatUnsignedMinValue = that.getUnsignedMinValue().value
+  def TUGT(that: TNum): TNum = isOrElseNot(ugt, ule)(that)
 
-    if (thisUnsignedMaxValue <= thatUnsignedMinValue) trueBool else unkBool
-  }
+  def TSGT(that: TNum): TNum = isOrElseNot(sgt, sle)(that)
 
-  // Signed Less Than or Equal
-  def TSLE(that: TNum): TNum = {
-    val thisSignedMaxValue = this.getSignedMaxValue()
-    val thatSignedMinValue = that.getSignedMinValue()
+  def TUGE(that: TNum): TNum = isOrElseNot(uge, ult)(that)
 
-    if (thisSignedMaxValue <= thatSignedMinValue) trueBool else unkBool
-  }
-
-  // Unsigned Greater Than
-  def TUGT(that: TNum): TNum = {
-    val thisUnsignedMinValue = this.getUnsignedMinValue().value
-    val thatUnsignedMaxValue = that.getUnsignedMaxValue().value
-
-    if (thisUnsignedMinValue > thatUnsignedMaxValue) trueBool else unkBool
-  }
-
-  // Signed Greater Than
-  def TSGT(that: TNum): TNum = {
-    val thisSignedMinValue = this.getSignedMinValue()
-    val thatSignedMaxValue = that.getSignedMaxValue()
-
-    if (thisSignedMinValue > thatSignedMaxValue) trueBool else unkBool
-  }
-
-  // Unsigned Greater Than or Equal
-  def TUGE(that: TNum): TNum = {
-    val thisUnsignedMinValue = this.getUnsignedMinValue().value
-    val thatUnsignedMaxValue = that.getUnsignedMaxValue().value
-
-    if (thisUnsignedMinValue >= thatUnsignedMaxValue) trueBool else unkBool
-  }
-
-  // Signed Greater Than or Equal
-  def TSGE(that: TNum): TNum = {
-    val thisSignedMinValue = this.getUnsignedMinValue()
-    val thatSignedMaxValue = that.getUnsignedMaxValue()
-
-    if (thisSignedMinValue >= thatSignedMaxValue) trueBool else unkBool
-  }
+  def TSGE(that: TNum): TNum = isOrElseNot(sge, slt)(that)
 
   // Concatenation
   def TCONCAT(that: TNum): TNum = {

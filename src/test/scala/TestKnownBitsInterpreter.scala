@@ -300,7 +300,7 @@ class TestKnownBitsInterpreter
 
   def evaluateAbstract(e: Expr): TNum = TNumDomain().evaluateExprToTNum(Map(), e)
 
-  test("binopprop") {
+  test("TNUM soundness property") {
     forAll(minSuccessful(50000)) { (e: Expr) =>
       {
         val (r, c) =
