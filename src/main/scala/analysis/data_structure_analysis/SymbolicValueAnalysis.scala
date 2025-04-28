@@ -131,7 +131,7 @@ enum OSet extends Offsets {
   override def toIntervals: Set[DSInterval] = {
     this match
       case OSet.Top => Set(DSInterval.Top)
-      case OSet.Values(v) => v.map(i => DSInterval(i, i + 1))
+      case OSet.Values(v) => v.map(i => DSInterval(i, i))
   }
   override def toOffsets: Set[Int] = {
     this match
