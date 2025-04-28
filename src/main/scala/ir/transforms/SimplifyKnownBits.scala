@@ -3,8 +3,13 @@ import ir.*
 import util.writeToFile
 import ir.eval.BitVectorEval
 import ir.eval.InfixBitVectorEval.*
+import ir.eval.InfixBitVectorEval.given
 
 /**
+ *
+ * Known bits analysis using tristate numbers.
+ *
+ *  https://arxiv.org/abs/2105.05398
  *
  *  A = definite 1 bits, B = unknown bits
  *  A_[i] = 1, B_[i] = 0 -> Bit i of TNum _ is definitely 1
@@ -34,11 +39,6 @@ import ir.eval.InfixBitVectorEval.*
  *  By[i] = (Bx[i] | Bz[i])    ->    By[i] = 1101
  *  y = {T, T, 1, T}
  */
-
-def bvnot(v: BigInt, size: Int) = {
-  val x = BitVecType(size).maxValue & v
-  BitVectorEval.smt_bvnot(BitVecLiteral(x, size)).value
-}
 
 object TNum {
   def trueBool = TNum(1.bv1, 0.bv1)
@@ -70,6 +70,9 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
   def constant(n: Int) = {
     TNum(n.bv(width), 0.bv(width))
   }
+  def constant(n: BitVecLiteral) = {
+    TNum(n, 0.bv(n.size))
+  }
 
   override def toString() = {
     val padwidth = width / 4 + (if width % 4 != 0 then 1 else 0)
@@ -79,11 +82,16 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
     "(%s, %s, bv%d)".format(padded(value.value), padded(mask.value), width)
   }
 
-  def join(that: TNum): TNum = {
+  def intersect(that: TNum): TNum = {
     require(this.width == that.width, s"$this $that bv width")
     val mu = this.mask | that.mask | (this.value ^ that.value)
     val v = this.value & that.value
     TNum(v, mu);
+  }
+
+  def join(that: TNum): TNum = {
+    require(this.width == that.width, s"$this $that bv width")
+    this.intersect(that)
   }
 
   // Bitwise AND
@@ -152,21 +160,24 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
   // Multiplication
   def TMUL(that: TNum): TNum = {
     require(this.width == that.width, s"$this $that bv width")
+    var acc_v = this.value * that.value
+    var acc_m = constant(0)
+
     var a = this
     var b = that
-    val v = this.value * that.value
-    var mu = zero
 
     while ((a.value | a.mask) != 0.bv(width)) {
-      if ((a.value & 1.bv(width)) != 0.bv(width)) {
-        mu = mu.TADD(TNum(0.bv(width), b.mask))
-      } else if ((a.mask & 1.bv(width)) != 0.bv(width)) {
-        mu = mu.TADD(TNum(0.bv(width), b.value | b.mask))
+      if (a.value & 1.bv(a.width)) {
+        acc_m = acc_m.TADD(TNum(0.bv(b.width), b.mask))
+      } else if (a.mask & 1.bv(a.width)) {
+        acc_m = acc_m.TADD(TNum(0.bv(b.width), b.value | b.mask))
       }
+
       a = a.TLSHR(constant(1))
       b = b.TSHL(constant(1))
     }
-    TNum(v, 0.bv(width)).TADD(mu)
+
+    constant(acc_v).TADD(acc_m)
   }
 
   // Subtraction
@@ -594,17 +605,17 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
       case BVXNOR => tn1.TXNOR(tn2)
       case BVNAND => tn1.TNAND(tn2)
       case BVADD => tn1.TADD(tn2)
-      case BVMUL => tn1.top() // tn1.TMUL(tn2) // broken, overflows
+      case BVMUL => tn1.TMUL(tn2)
       case BVUDIV => tn1.top() // broken // tn1.TUDIV(tn2)
       case BVUREM => tn1.top() // broekn tn1.TUREM(tn2)
+      case BVSDIV => tn1.top() // tn1.TSDIV(tn2) // broken
+      case BVSREM => tn1.top() // tn1.TSREM(tn2) // broken
+      case BVSMOD => tn1.top() // tn1.TSMOD(tn2) // broken
       case BVSHL => tn1.TSHL(tn2)
       case BVLSHR => tn1.TLSHR(tn2)
       case BVULT => tn1.TULT(tn2)
       case BVCOMP => tn1.TCOMP(tn2)
       case BVSUB => tn1.TSUB(tn2)
-      case BVSDIV => tn1.top() // tn1.TSDIV(tn2) // broken
-      case BVSREM => tn1.top() // tn1.TSREM(tn2) // broken
-      case BVSMOD => tn1.top() // tn1.TSMOD(tn2) // broken
       case BVASHR => tn1.TASHR(tn2)
       case BVULE => tn1.TULE(tn2)
       case BVUGT => tn1.TUGT(tn2)
@@ -617,7 +628,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
       case BVNEQ => tn1.TNEQ(tn2)
       case BVCONCAT => tn1.TCONCAT(tn2)
       case IntADD => tn1.TADD(tn2)
-      case IntMUL => tn1.top() // tn1.TMUL(tn2)
+      case IntMUL => tn1.TMUL(tn2)
       case IntSUB => tn1.TSUB(tn2)
       case IntDIV => tn1.TSDIV(tn2)
       case IntMOD => tn1.TSMOD(tn2)
@@ -660,6 +671,10 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
   // Recursively evaluates nested or non-nested expression
   def evaluateExprToTNum(s: Map[Variable, TNum], expr: Expr): TNum =
     val r = expr match {
+      case u: UninterpretedFunction => TNum.top(sizeBits(u.getType))
+      case u: LambdaExpr => TNum.top(sizeBits(u.getType))
+      case u: QuantifierExpr => TNum.top(sizeBits(u.getType))
+      case u: OldExpr => TNum.top(sizeBits(u.getType))
       case l: Literal => ofLiteral(l)
       case v: Variable => s.getOrElse(v, TNum.top(sizeBits(v.getType)))
       case UnaryExpr(op: UnOp, arg: Expr) =>

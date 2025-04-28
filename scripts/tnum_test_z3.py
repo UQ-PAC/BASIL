@@ -397,4 +397,4 @@ test_bop("CONCAT", lambda x, y: concat_tnum(x, y), concat_bitvec, prec=True)
 
 test_uop("INV", lambda x: ~x, prec=True)
 test_uop("NEG", lambda x: -x, prec=True)
-# test_bop("TMUL", lambda x, y: x * y,  prec=False)
+test_bop("TMUL", lambda x, y: x * y,  prec=False)
