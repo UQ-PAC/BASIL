@@ -367,7 +367,7 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) e
   private def procInitState(b: Block): Map[LocalVar, SymValSet[T]] = {
     val proc = b.parent
     Map(
-      stackPointer -> symValSetDomain.init(Stack(proc), proc.stackSize.getOrElse(0)),
+      stackPointer -> symValSetDomain.init(Stack(proc)),
       linkRegister -> symValSetDomain.init(Par(proc, linkRegister)),
       framePointer -> symValSetDomain.init(Par(proc, framePointer))
     ) ++
