@@ -1212,13 +1212,12 @@ def joinFlags(pointers: Iterable[IntervalCell]): DSFlag = {
 }
 
 def estimateStackSize(program: Program): Map[Procedure, Option[Int]] = {
-  program.procedures.foldLeft(Map[Procedure, Option[Int]]()) {
-    (m, proc) =>
-      val size = proc.collectFirst {
-        case LocalAssign(_, BinaryExpr(BVADD, Register("R31", 64), arg2: BitVecLiteral), _) if isNegative(arg2) =>
-          bv2SignedInt(arg2).toInt * -1
-      }
-      m + (proc -> size)
+  program.procedures.foldLeft(Map[Procedure, Option[Int]]()) { (m, proc) =>
+    val size = proc.collectFirst {
+      case LocalAssign(_, BinaryExpr(BVADD, Register("R31", 64), arg2: BitVecLiteral), _) if isNegative(arg2) =>
+        bv2SignedInt(arg2).toInt * -1
+    }
+    m + (proc -> size)
   }
 }
 
