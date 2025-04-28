@@ -873,8 +873,6 @@ object RunUtils {
     }
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
 
-    estimateStackSize(ctx.program)
-
     ir.eval.SimplifyValidation.validate = conf.validateSimp
     if (conf.simplify) {
 
