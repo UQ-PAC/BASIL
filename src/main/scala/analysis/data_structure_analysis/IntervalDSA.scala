@@ -58,6 +58,42 @@ class IntervalGraph(
     }
   }
 
+  def globalNode(
+    globals: Set[SymbolTableEntry],
+    globalOffsets: Map[BigInt, BigInt],
+    externalFunctions: Set[ExternalFunction]
+  ): IntervalNode = {
+    val symBase = Global
+    val globalNode = IntervalNode(this, Map(symBase -> Set(0)))
+    globalNode.flags.global = true
+    globals.toSeq.sortBy(_.address).foreach {
+      case FuncEntry(name, size, address) =>
+        globalNode.add(Interval(address.toInt, address.toInt + size / 8))
+      case SpecGlobal(name, size, arraySize, address) =>
+        globalNode.add(Interval(address.toInt, address.toInt)) // ignore size, could be a composite type
+    }
+
+    globalOffsets.foreach { case (address, relocated) =>
+      globalNode.add(address.toInt)
+      globalNode.add(relocated.toInt)
+    }
+
+    externalFunctions.foreach(e =>
+      val extPointer = globalNode.add(e.offset.toInt)
+      val ext = extPointer.getPointee
+      ext.node.flags.function = true
+      ext.node.flags.foreign = true
+    )
+
+    globalOffsets.map(_.swap).foreach { case (address, relocated) =>
+      val pointee = find(globalNode.get(address.toInt))
+      val pointer = find(globalNode).add(Interval(relocated.toInt, relocated.toInt + 8))
+      pointer.setPointee(pointee)
+    }
+
+    globalNode
+  }
+
   def buildNodes(): Map[SymBase, IntervalNode] = {
     val global =
       globalNode(irContext.globals ++ irContext.funcEntries, irContext.globalOffsets, irContext.externalFunctions)
@@ -106,41 +142,7 @@ class IntervalGraph(
       .exists(g => address == g.offset)
   }
 
-  def globalNode(
-    globals: Set[SymbolTableEntry],
-    globalOffsets: Map[BigInt, BigInt],
-    externalFunctions: Set[ExternalFunction]
-  ): IntervalNode = {
-    val symBase = Global
-    val globalNode = IntervalNode(this, Map(symBase -> Set(0)))
-    globalNode.flags.global = true
-    globals.toSeq.sortBy(_.address).foreach {
-      case FuncEntry(name, size, address) =>
-        globalNode.add(Interval(address.toInt, address.toInt + size / 8))
-      case SpecGlobal(name, size, arraySize, address) =>
-        globalNode.add(Interval(address.toInt, address.toInt)) // ignore size, could be a composite type
-    }
 
-    globalOffsets.foreach { case (address, relocated) =>
-      globalNode.add(address.toInt)
-      globalNode.add(relocated.toInt)
-    }
-
-    externalFunctions.foreach(e =>
-      val extPointer = globalNode.add(e.offset.toInt)
-      val ext = extPointer.getPointee
-      ext.node.flags.function = true
-      ext.node.flags.foreign = true
-    )
-
-    globalOffsets.map(_.swap).foreach { case (address, relocated) =>
-      val pointee = find(globalNode.get(address.toInt))
-      val pointer = find(globalNode).add(Interval(relocated.toInt, relocated.toInt + 8))
-      pointer.setPointee(pointee)
-    }
-
-    globalNode
-  }
 
   def addParamCells(): Unit = {
     val unchanged = Set("R29", "R30", "R31")
