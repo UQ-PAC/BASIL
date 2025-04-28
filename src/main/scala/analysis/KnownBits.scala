@@ -1,9 +1,10 @@
-package ir.transforms
+package analysis
 import ir.*
 import util.writeToFile
 import ir.eval.BitVectorEval
 import ir.eval.InfixBitVectorEval.*
 import ir.eval.InfixBitVectorEval.given
+import ir.transforms.{applyRPO, AbstractDomain}
 
 /**
  *
