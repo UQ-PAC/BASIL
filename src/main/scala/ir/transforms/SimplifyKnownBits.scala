@@ -515,10 +515,10 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
   }
 
   // Get smallest possible signed value of the TNum
-  def minSigned : BitVecLiteral = minNegative.getOrElse(minPositive.get)
+  def minSigned: BitVecLiteral = minNegative.getOrElse(minPositive.get)
 
   // Get largest possible signed value of the TNum
-  def maxSigned : BitVecLiteral = maxPositive.getOrElse(maxNegative.get)
+  def maxSigned: BitVecLiteral = maxPositive.getOrElse(maxNegative.get)
 
   def slt(that: TNum): Option[Boolean] = if (this.maxSigned < that.minSigned) then Some(true) else None
   def sle(that: TNum): Option[Boolean] = if (this.maxSigned <= that.minSigned) then Some(true) else None
