@@ -28,7 +28,7 @@ class IntervalGraph(
   val proc: Procedure,
   var phase: DSAPhase,
   val irContext: IRContext,
-  val sva: SymValues[DSInterval],
+  val sva: SymValues[OSet],
   val constraints: Set[Constraint],
   val nodeBuilder: Option[() => Map[SymBase, IntervalNode]]
 ) {
@@ -37,10 +37,10 @@ class IntervalGraph(
   val builder: () => Map[SymBase, IntervalNode] = nodeBuilder.getOrElse(buildNodes)
   var nodes: Map[SymBase, IntervalNode] = builder()
 
-  def exprToSymVal(expr: Expr): SymValSet[DSInterval] = SymValues.exprToSymValSet(sva)(expr)
+  def exprToSymVal(expr: Expr): SymValSet[OSet] = SymValues.exprToSymValSet(sva)(expr)
 
   protected def symValToNodes(
-    symVal: SymValSet[DSInterval],
+    symVal: SymValSet[OSet],
     current: Map[SymBase, IntervalNode]
   ): Map[SymBase, IntervalNode] = {
     symVal.state.filter((base, _) => base != NonPointer).foldLeft(current) { case (result, (base, symOffsets)) =>
@@ -164,11 +164,11 @@ class IntervalGraph(
   }
 
   // returns the cells corresponding to the
-  def symValToCells(symVal: SymValSet[DSInterval]): Set[IntervalCell] = {
+  def symValToCells(symVal: SymValSet[OSet]): Set[IntervalCell] = {
     val pairs = symVal.state.filter((base, _) => base != NonPointer)
-    pairs.foldLeft(Set[IntervalCell]()) { case (results, (base: SymBase, offsets: DSInterval)) =>
+    pairs.foldLeft(Set[IntervalCell]()) { case (results, (base: SymBase, offsets: OSet)) =>
       val (node, adjustment) = findNode(nodes(base))
-      if offsets == Top then results + node.collapse()
+      if offsets == OSet.Top then results + node.collapse()
       else
         results ++ offsets.toIntervals
           .filter(i => base != Global || isGlobal(i.start.get))
@@ -818,13 +818,13 @@ class IntervalCell(val node: IntervalNode, val interval: DSInterval) {
 }
 
 class IntervalDSA(irContext: IRContext) {
-  def pre(): (Map[Procedure, SymValues[DSInterval]], Map[Procedure, Set[Constraint]]) = {
-    var sva: Map[Procedure, SymValues[DSInterval]] = Map.empty
+  def pre(): (Map[Procedure, SymValues[OSet]], Map[Procedure, Set[Constraint]]) = {
+    var sva: Map[Procedure, SymValues[OSet]] = Map.empty
     var cons: Map[Procedure, Set[Constraint]] = Map.empty
     computeDSADomain(irContext.program.mainProcedure, irContext).toSeq
       .sortBy(_.name)
       .foreach(proc =>
-        val SVAResults = getSymbolicValues[DSInterval](proc)
+        val SVAResults = getSymbolicValues[OSet](proc)
         val constraints = generateConstraints(proc)
         sva += (proc -> SVAResults)
         cons += (proc -> constraints)
@@ -845,7 +845,7 @@ class IntervalDSA(irContext: IRContext) {
         IntervalDSA.getLocal(
           irContext.program.mainProcedure,
           irContext,
-          SymValues[DSInterval](Map.empty),
+          SymValues[OSet](Map.empty),
           Set[Constraint]()
         )
       val DSA = IntervalDSA.getLocals(irContext, sva, cons)
@@ -1102,7 +1102,7 @@ object IntervalDSA {
   def getLocal(
     proc: Procedure,
     context: IRContext,
-    symValues: SymValues[DSInterval],
+    symValues: SymValues[OSet],
     cons: Set[Constraint]
   ): IntervalGraph = {
     val graph = IntervalGraph(proc, Local, context, symValues, cons, None)
@@ -1112,7 +1112,7 @@ object IntervalDSA {
 
   def getLocals(
     ctx: IRContext,
-    svas: Map[Procedure, SymValues[DSInterval]],
+    svas: Map[Procedure, SymValues[OSet]],
     cons: Map[Procedure, Set[Constraint]]
   ): Map[Procedure, IntervalGraph] = {
     DSALogger.info("Performing local DSA")
