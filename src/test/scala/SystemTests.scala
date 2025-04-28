@@ -60,13 +60,7 @@ trait SystemTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest, TestC
 
   private val testPath = "./src/test/"
 
-  override def customiseTestsByName(name: String) = name match {
-    case "procedure_summaries/procedure_summary3/gcc_O2:BAP" | "procedure_summaries/procedure_summary3/gcc_O2:GTIRB" =>
-      Mode.Disabled(
-        "this procedure summaries test is unpredictably flaky, sometimes passing and sometimes failing with assertion failure"
-      )
-    case _ => Mode.Normal
-  }
+  override def customiseTestsByName(name: String) = Mode.Normal
 
   def runTests(folder: String, conf: TestConfig): Unit = {
     val path = testPath + folder
@@ -589,8 +583,6 @@ class MemoryRegionTestsNoRegion extends SystemTests {
 
 @test_util.tags.UnitTest
 class ProcedureSummaryTests extends SystemTests {
-  // TODO currently procedure_summary3 verifies despite incorrect procedure summary analysis
-  // this is due to BASIL's currently limited handling of non-returning calls
   runTests(
     "procedure_summaries",
     TestConfig(summariseProcedures = true, simplify = true, useBAPFrontend = true, expectVerify = true)
