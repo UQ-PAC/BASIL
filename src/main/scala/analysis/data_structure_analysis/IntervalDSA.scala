@@ -1048,7 +1048,7 @@ object IntervalDSA {
         val dsg = DSA(proc)
         pos match
           case load: MemoryLoad =>
-            val pointers = dsg.exprToCells(load.index)
+            val pointers = dsg.exprToCells(load.index).map(dsg.find)
             assert(
               pointers.nonEmpty || isNonGlobalConstant(load.index, dsg.isGlobal),
               "Expected cells for indices used in reachable memory access to have corresponding DSA cells"
@@ -1062,7 +1062,7 @@ object IntervalDSA {
               "expected all/none of the pointers to have pointer"
             )
           case store: MemoryStore =>
-            val pointers = dsg.exprToCells(store.index)
+            val pointers = dsg.exprToCells(store.index).map(dsg.find)
             assert(
               pointers.nonEmpty,
               s"Expected cells for indices used in reachable memory access to have corresponding DSA cells"
@@ -1211,14 +1211,15 @@ def joinFlags(pointers: Iterable[IntervalCell]): DSFlag = {
   flag
 }
 
-def estimateStackSize(program: Program): Unit = {
-  program.procedures.foreach(proc =>
-    val size = proc.collectFirst {
-      case LocalAssign(_, BinaryExpr(BVADD, Register("R31", 64), arg2: BitVecLiteral), _) if isNegative(arg2) =>
-        bv2SignedInt(arg2).toInt * -1
-    }
-    proc.stackSize = size
-  )
+def estimateStackSize(program: Program): Map[Procedure, Option[Int]] = {
+  program.procedures.foldLeft(Map[Procedure, Option[Int]]()) {
+    (m, proc) =>
+      val size = proc.collectFirst {
+        case LocalAssign(_, BinaryExpr(BVADD, Register("R31", 64), arg2: BitVecLiteral), _) if isNegative(arg2) =>
+          bv2SignedInt(arg2).toInt * -1
+      }
+      m + (proc -> size)
+  }
 }
 
 def computeDSADomain(proc: Procedure, context: IRContext): Set[Procedure] = {
