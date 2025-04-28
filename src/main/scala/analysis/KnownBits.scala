@@ -129,22 +129,11 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
   def TXNOR(that: TNum): TNum = {
     require(this.width == that.width, s"$this $that bv width")
     TXOR(that).TNOT()
-    // val v = ~(this.value ^ that.value)
-    // val mu = this.mask | that.mask
-    // TNum((v & ~mu), mu)
   }
 
   // Bitwise NAND
   def TNAND(that: TNum): TNum = {
     TAND(that).TNOT()
-    // require(this.width == that.width, s"$this $that bv width")
-    // val alpha = this.value | this.mask
-    // val beta = that.value | that.mask
-    // val v = this.value & that.value
-    // TNum(
-    //  (~v & ~(alpha & beta & ~v)),
-    //  (alpha & beta & ~v)
-    // )
   }
 
   // Addition
@@ -244,7 +233,6 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
     var accMask = this.mask >>> thatLB
 
     // Iterate through each shift value
-
     val lower = thatLB.value.toInt
     val upper = Math.min(thatUB.value.toInt, this.width - 1)
     for (ii <- lower to upper) {
