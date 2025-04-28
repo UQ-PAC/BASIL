@@ -1693,7 +1693,7 @@ def fixupGuards(p: Procedure): Unit = {
 
 }
 
-def removeDuplicateGuard(b: Iterable[Block]) : Unit = {
+def removeDuplicateGuard(b: Iterable[Block]): Unit = {
   b.foreach {
     case block: Block if IRWalk.firstInBlock(block).isInstanceOf[Assume] => {
       val assumes = block.statements.collect { case a: Assume =>
@@ -1715,7 +1715,7 @@ def removeDuplicateGuard(b: Iterable[Block]) : Unit = {
   }
 }
 
-def removeDuplicateGuard(p: Program) : Unit = {
+def removeDuplicateGuard(p: Program): Unit = {
   removeDuplicateGuard(p.procedures.flatMap(_.blocks).toSeq)
 }
 
