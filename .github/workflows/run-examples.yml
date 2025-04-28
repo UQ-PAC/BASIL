@@ -97,6 +97,28 @@ jobs:
           echo "$pasted" > $GITHUB_STEP_SUMMARY
         shell: "bash -xe {0}"
 
+
+  UnitTestsWindows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - run: choco install z3
+      - run: dotnet tool install --global boogie --version '3.4.3'
+
+      - run: ./mill test.compile
+      - run: ./scripts/scalatest.sh -oGD -PS3 -T 1000000 -n test_util.tags.UnitTest
+
   UnitTests:
     runs-on: ubuntu-latest
 
