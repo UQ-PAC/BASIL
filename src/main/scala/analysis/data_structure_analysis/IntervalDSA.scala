@@ -359,6 +359,7 @@ class IntervalGraph(
         val values = constraintArgToCells(cons.arg2)
         if pointees.nonEmpty || values.nonEmpty then mergeCells(pointees ++ values)
         else DSALogger.warn(s"$cons had an empty argument")
+        (indices ++ values).map(_.node).map(find).filterNot(_.eqClassProperty()).toSet.foreach(_.maintainEqClasses())
       case _ => // ignore
   }
 
