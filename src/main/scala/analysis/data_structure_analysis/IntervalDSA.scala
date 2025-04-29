@@ -567,6 +567,52 @@ class IntervalNode(
       )
   }
 
+
+  def maintainEqClasses(): Unit = {
+    assert(this.isUptoDate)
+    eqClasses = eqClasses.map( // map to most updated intervals
+      eqClass => eqClass.map(c => this.get(c.interval))
+    )
+
+    cells.foreach(
+      c =>
+        val common = eqClasses.filter(_.contains(c))
+        eqClasses = (eqClasses -- common)
+        if common.flatten.nonEmpty then eqClasses = eqClasses + common.flatten
+    )
+
+    eqClasses.foreach(
+      eqClass =>
+        assert(eqClass.nonEmpty)
+        graph.mergeCells(eqClass.map(_.getPointee))
+    )
+
+      /*if !eqClassProperty() then {
+        eqClasses.foreach(
+        eqClass =>
+          val size = eqClass.map(_.interval.size.getOrElse(0)).max
+          eqClass.foreach(c => this.add(c.interval.growTo(size)))
+       )
+      }*/
+
+    if !graph.find(this).eqClassProperty() then graph.find(this).maintainEqClasses()
+  }
+
+  def eqClassProperty(): Boolean = {
+    assert(this.isUptoDate)
+    var seen: Set[IntervalCell] = Set.empty
+    eqClasses.foreach(
+      eqClass =>
+        /*!(eqClass.map(_.interval.size).toSet.size == 1) ||*/
+        if !(eqClass.map(_.getPointee).toSet.size == 1) ||
+          eqClass.exists(seen.contains) ||
+          !(eqClass.forall(c => cells.contains(c))) then return false
+        seen ++= eqClass
+    )
+
+    true
+  }
+
   def isCollapsed: Boolean = _cells.nonEmpty && _cells.head.interval == DSInterval.Top
   def add(offset: Int): IntervalCell = {
     add(DSInterval(offset, offset))
