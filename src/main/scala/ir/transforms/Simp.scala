@@ -624,12 +624,8 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
         // DSA property: our reaching definitions are all definitions of the variable
         e.variables.map(v => v -> reachingDefs(pos).get(v)).forall {
           case (v, d) => {
-            val ok = (inparams.contains(v) && defs
-              .get(v)
-              .forall(_.isEmpty)) || (d.isDefined && d.get.toSet == defs.get(v).toSet.flatten)
-            if (!ok)
-              println(s"prop not ok $v $d")
-            ok
+            (inparams.contains(v) && defs.get(v).forall(_.isEmpty))
+            || (d.isDefined && d.get.toSet == defs.get(v).toSet.flatten)
           }
         }
       }
