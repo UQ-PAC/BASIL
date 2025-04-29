@@ -951,6 +951,14 @@ class IntervalDSA(irContext: IRContext) {
 
 object IntervalDSA {
 
+  def equiv(cells: Set[IntervalCell]): Boolean = {
+    if cells.size > 1 then {
+      val head = cells.head
+      val tail = cells.tail
+      tail.forall(head.equiv)
+    } else true
+  }
+
   def checksGlobalMaintained(graph: IntervalGraph): Unit = {
     assert(!graph.find(graph.nodes(Global)).isCollapsed, s"${graph.proc.procName} had it's global node collapsed}")
   }
