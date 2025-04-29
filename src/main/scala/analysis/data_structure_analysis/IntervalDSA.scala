@@ -652,6 +652,7 @@ class IntervalNode(
         val v = IntervalNode(newGraph, node.bases, node.size)
         v.flags.join(node.flags)
         node.cells.foreach(cell => v.add(cell.interval))
+        v.eqClasses = node.eqClasses.map(eq => eq.map(cell => IntervalCell(v, cell.interval)))
         oldToNew.update(node, v)
         v
       else oldToNew(node)
@@ -661,6 +662,7 @@ class IntervalNode(
       while queue.nonEmpty do
         val old = queue.dequeue()
         assert(old.isUptoDate)
+        assert(old.eqClassProperty())
         assert(oldToNew.contains(old))
         old.cells.foreach {
           case cell: IntervalCell if cell.hasPointee =>
