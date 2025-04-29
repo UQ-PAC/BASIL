@@ -1,7 +1,6 @@
-//package net.mlbox.millantlr
+package build
 // https://github.com/da-tubi/antlr4-scala-example/blob/master/antlr.sc
 import mill._
-import mill.define._
 import mill.scalalib._
 import $ivy.`org.antlr:antlr4:4.9.3`
 import org.antlr.v4.tool.{ANTLRMessage, ANTLRToolListener}
@@ -14,7 +13,8 @@ trait AntlrModule extends JavaModule {
   def antlrGenerateVisitor: Boolean = false
   def antlrGenerateListener: Boolean = false
 
-  def antlrGrammarSourceFiles = T {
+  def antlrGrammarSourceFiles = Task {
+    println(antlrGrammarSources())
     antlrGrammarSources()
       .flatMap { source =>
         if (os.isDir(source.path)) {
@@ -29,12 +29,12 @@ trait AntlrModule extends JavaModule {
       .map(PathRef(_))
   }
 
-  def antlrGenerate = T {
+  def antlrGenerate = Task {
     val antlrToolArgs = mutable.ArrayBuffer.empty[String]
 
-    antlrToolArgs.appendAll(antlrGrammarSourceFiles().map(_.path.relativeTo(os.pwd).toString))
+    antlrToolArgs.appendAll(antlrGrammarSourceFiles().map(_.path.toString))
     antlrToolArgs.append("-o")
-    antlrToolArgs.append(s"${T.dest}")
+    antlrToolArgs.append(s"${Task.dest}")
     if (antlrGenerateVisitor) {
       antlrToolArgs.append("-visitor")
     }
@@ -50,10 +50,10 @@ trait AntlrModule extends JavaModule {
     antlrTool.addListener(new ToolListener())
     antlrTool.processGrammarsOnCommandLine()
 
-    os.walk(T.dest).filter(path => os.isFile(path) && path.ext == "java").map(PathRef(_))
+    os.walk(Task.dest).filter(path => os.isFile(path) && path.ext == "java").map(PathRef(_))
   }
 
-  override def generatedSources = T {
+  override def generatedSources = Task {
     super.generatedSources() ++ antlrGenerate()
   }
 }

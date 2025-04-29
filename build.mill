@@ -1,12 +1,13 @@
-import mill._, mill.define._, scalalib._
-
-import $file.antlr // https://index.scala-lang.org/ml86/mill-antlr
+package build
+import mill._
+import scalalib._
 
 import os.Path
 import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
+import $ivy.`net.mlbox::mill-antlr:0.1.0`
 import contrib.scalapblib._
 
-object basil extends RootModule with ScalaModule with antlr.AntlrModule with ScalaPBModule {
+object `package` extends RootModule with ScalaModule with antlr.AntlrModule with ScalaPBModule {
   def scalaVersion = "3.3.4"
 
   def scalacOptions: T[Seq[String]] = Seq("-deprecation")
@@ -25,26 +26,32 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
 
   def mainClass = Some("Main")
 
-  override def scalaPBSources = T.sources { Seq(PathRef(this.millSourcePath / "main" / "protobuf")) }
+  override def scalaPBSources = Task.Sources {
+    Seq(PathRef(this.millSourcePath / "main" / "protobuf"))
+  }
   def millSourcePath = super.millSourcePath / "src"
   def ivyDeps = Agg(scalactic, antlrRuntime, sourceCode, mainArgs, sprayJson, scalapb, scalaCompiler)
-  def sources = T.sources { Seq(PathRef(this.millSourcePath / "main" / "scala")) }
+  def sources = Task.Sources {
+    Seq(PathRef(this.millSourcePath / "main" / "scala"))
+  }
 
   override def antlrPackage: Option[String] = Some("Parsers")
   override def antlrGenerateVisitor = true
-  override def antlrGrammarSources = T.sources {
+  override def antlrGrammarSources = Task.Sources {
     Seq(PathRef(millSourcePath / "main" / "antlr4"))
   }
 
   object test extends ScalaTests with TestModule.ScalaTest {
     def ivyDeps = Agg(scalaTests, javaTests)
-    def sources = T.sources { Seq(PathRef(this.millSourcePath / "scala")) }
+    def sources = Task.Sources {
+      Seq(PathRef(this.millSourcePath / "scala"))
+    }
   }
 
   /** Updates the expected
     */
 
-  def updateExpectedBAP() = T.command {
+  def updateExpectedBAP() = Task.Command {
     val correctPath = test.millSourcePath / "correct"
     val incorrectPath = test.millSourcePath / "incorrect"
 
@@ -52,7 +59,7 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
     expectedUpdate(incorrectPath, false, true)
   }
 
-  def updateExpectedGTIRB() = T.command {
+  def updateExpectedGTIRB() = Task.Command {
     val correctPath = test.millSourcePath / "correct"
     val incorrectPath = test.millSourcePath / "incorrect"
 
@@ -60,7 +67,7 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
     expectedUpdate(incorrectPath, false, false)
   }
 
-  def updateExpectedExtraSpec() = T.command {
+  def updateExpectedExtraSpec() = Task.Command {
     val correctPath = test.millSourcePath / "extraspec_correct"
     val incorrectPath = test.millSourcePath / "extraspec_incorrect"
     expectedUpdate(correctPath, true, true)
