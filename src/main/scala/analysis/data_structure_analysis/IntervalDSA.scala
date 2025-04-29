@@ -521,7 +521,7 @@ class IntervalGraph(
   // creates a dummy cell with cell's interval size
   def find(cell: IntervalCell): IntervalCell = {
     val (newNode, newInterval) = findExact(cell)
-    val res = newNode.add(newInterval)
+    val res = IntervalCell(newNode, newInterval)
     assert(findNode(res.node)._1 == res.node)
     res
   }
