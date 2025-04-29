@@ -251,6 +251,55 @@ def stronglyConnectedComponents[T <: CFGPosition, O <: T](
   out.map(_.toSet).toList
 }
 
+object DepthFirstSearch {
+
+  enum Action {
+    case Continue
+    case Stop
+    case Abort
+  }
+
+  trait DFSVisitor[O <: CFGPosition] {
+    def visitNode(firstTime: Boolean, node: O) : Action
+  }
+
+  def blockDFS(start: Block, visitor: DFSVisitor[Block]) = graphDFS[CFGPosition, Block](IntraProcBlockIRCursor)(start, visitor)
+
+  def graphDFS[T <: CFGPosition, O <: T](walker: IRWalk[T, O])(start: O, visitor: DFSVisitor[O]) : Map[O, Set[O]] = {
+    /*
+     * DFS and return the spanning tree (digraph pointing to tree root)
+     */
+    var visited = Set[O]()
+    var stack = Vector[O](start)
+    var spanningTreeParentMap = Map[O, Set[O]]()
+
+    def addTreeEdge(child: O, parent: O) = {
+      val parents = spanningTreeParentMap.get(child).getOrElse(Set())
+      spanningTreeParentMap = spanningTreeParentMap.updated(child, parents + parent)
+    }
+
+    while (stack.nonEmpty) {
+      val v = stack.head
+      val seen = visited.contains(v)
+      val continue = visitor.visitNode(!seen, v)
+      visited = visited + v
+      continue match {
+        case Action.Continue if !seen => {
+          val next = walker.succ(v)
+          next.foreach(addTreeEdge(_, v))
+          stack = next.toVector ++ stack
+        }
+        case Action.Abort => {
+          stack = Vector()
+        }
+        case _ => ()
+      }
+    }
+    spanningTreeParentMap
+  }
+}
+
+
 def toDot(program: Program, labels: Map[CFGPosition, String] = Map.empty, inter: Boolean = false): String = {
   if (inter) {
     val domain = computeDomain[CFGPosition, CFGPosition](InterProcIRCursor, program.procedures).toSet

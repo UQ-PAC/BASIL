@@ -642,7 +642,7 @@ def validateProg(
 
   for (p <- validationProg.procedures) {
     SimplifyLogger.info(s"Validating $n proc ${p.name}")
-    validateProcWithSplits(validationProg, p, n, 50, splits(p), 0)
+    validateProcWithSplitsInteractive(validationProg, p, n, 8)
   }
 }
 
@@ -752,6 +752,79 @@ def validateProcWithSplits(
   } else {
     SimplifyLogger.error(s"TV failure for: $name ${proc.name} :: $result")
   }
+
+}
+
+
+def validateProcWithSplitsInteractive(
+  validationProg: Program,
+  proc: Procedure,
+  name: String,
+  timeout: Int = 3,
+) = {
+  val sourceBlocks = proc.blocks.filter(_.label.startsWith("source__")).toList
+
+  val isplits = sourceBlocks.map(_.jump).collect {
+    case g: GoTo => g
+  }
+  val sourceExit = sourceBlocks.find(_.label.endsWith("SYNTH_EXIT")).get
+  val sourceEntry = sourceBlocks.find(_.label.endsWith("SYNTH_ENTRY")).get
+
+  type Split = Vector[(GoTo, Iterable[Block])] // assignment of targets to set of jumps
+  val origSplit : Split = isplits.toVector.map(g => g -> g.targets)
+  val splitQueue = mutable.Queue[Split]()
+
+  val doms = analysis.Dominators.computeDominatorTree(proc)
+  val dominates = analysis.Dominators.dominates(doms) 
+  def findSplit(starting: Block) = {
+    // find a goto with multiple targets on the path from sourceEntry to sourceExit
+    // DOMINATES is wrong; need existence of a path not forall paths
+    isplits.find(g => {
+      g.targets.size > 1 
+      && dominates(starting, g.parent)
+      && dominates(g.parent, sourceExit)
+      // && g.targets.forall(t => dominates(t, sourceExit))
+    })
+  }
+
+  splitQueue.enqueue(Vector())
+  var finalResult = List[BoogieResultKind]()
+  var splitIndex = 0
+
+  while (splitQueue.nonEmpty) boundary {
+    splitIndex += 1
+    var currSplit = splitQueue.dequeue()
+    applySplit(origSplit)
+    applySplit(currSplit)
+    var result = validate(validationProg, proc.name, name + proc.name + "_split" + splitIndex, timeout).kind
+
+    if (result == BoogieResultKind.Timeout) {
+      SimplifyLogger.info(s"    Split timed out : queue length ${splitQueue.length}")
+      var nextSplit = findSplit(sourceEntry)
+      if (nextSplit.isDefined) {
+        val goto = nextSplit.get
+        val ns = goto.targets.map(s => currSplit ++ Vector(goto -> Seq(s)))
+        splitQueue.addAll(ns)
+        SimplifyLogger.info(s"     Found new split point : queue length ${splitQueue.length}")
+      } else {
+        println("failed to find split")
+        finalResult = BoogieResultKind.Timeout :: finalResult
+        break()
+      }
+    } else if (result.isInstanceOf[BoogieResultKind.Verified]) {
+      finalResult = result :: finalResult
+    } else {
+      finalResult = result :: finalResult
+      break()
+    }
+  }
+
+  if (finalResult.forall(_.isInstanceOf[BoogieResultKind.Verified])) {
+    SimplifyLogger.info(s"TV success for: $name ${proc.name}")
+  } else {
+    SimplifyLogger.error(s"TV failure for: $name ${proc.name} :: $finalResult")
+  }
+
 
 }
 

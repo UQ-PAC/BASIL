@@ -238,8 +238,6 @@ object Ackermann {
         case s: Command => s.getClass.getSimpleName
 
       }
-      println(s"${label(srcPos)} , ${label(tgtPos)}")
-      println(s"    ${srcCall.map(_.parent.label)} , ${tgtCall.map(_.parent.label)}")
       (srcCall, tgtCall) match {
         case (None, None) => advanceBoth()
         case (None, Some(_)) => advanceSrc()
