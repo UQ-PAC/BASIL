@@ -21,6 +21,8 @@ private val intervalNodeCounter = util.Counter()
 
 case class NodeTerm(v: IntervalNode) extends analysis.solvers.Var[NodeTerm]
 
+case class CellTerm(v: DSInterval) extends analysis.solvers.Var[CellTerm]
+
 /**
  * Data Structure Graph
  */
@@ -548,8 +550,9 @@ class IntervalNode(
 ) {
   DSALogger.debug(s"created node with id $id")
 
+  val solver: UnionFindSolver[CellTerm] = UnionFindSolver[CellTerm]()
+  var eqClasses: Set[Set[IntervalCell]] = Set.empty
   val term: NodeTerm = NodeTerm(this)
-  val children = mutable.Set[Int]()
 
   val flags: DSFlag = DSFlag()
   protected var _cells: Seq[IntervalCell] = Seq(IntervalCell(this, DSInterval(0, 0)))
