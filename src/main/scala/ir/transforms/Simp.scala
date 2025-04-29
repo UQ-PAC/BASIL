@@ -563,9 +563,21 @@ def collectUses(p: Procedure): Map[Variable, Set[Command]] = {
   as.groupBy(_._1).map((v, r) => v -> r.map(_._2).toSet).toMap
 }
 
-class GuardVisitor extends CILVisitor {
+class GuardVisitor(validate: Boolean = false) extends CILVisitor {
+  /**
+   *
+   * This takes all variables in guards and substitutes them for their definitions IFF they have 
+   * exactly one definition (Assuming DSA form).
+   *
+   * Due to dsa form this heuristic alone should prevent any copies across loop iterations / clobbers etc
+   * because transitively all definitions should dominate the use (the assume statement) we are propagating to. 
+   *
+   * The [[validate]] parameter further checks this is the case by checking the dsa property is preserved
+   * by the propagation, by checking the reaching-definitions set at the use site.
+   *
+   */
 
-  // heavily relies on the dsa visitor
+  var defs = Map[Variable, Set[Assign]]()
 
   def allDefinitions(p: Procedure) = {
     p.collect { case a: Assign =>
@@ -585,7 +597,8 @@ class GuardVisitor extends CILVisitor {
     || v.name.startsWith("NF")
   }
 
-  var defs = Map[Variable, Set[Assign]]()
+
+  // for validation
   var reachingDefs: Map[Command, Map[Variable, Set[Assign]]] = Map()
   var inparams = Set[Variable]()
 
@@ -595,19 +608,10 @@ class GuardVisitor extends CILVisitor {
     liveVarsSolver.solveProc(p, backwards = true)
   }
 
-  def getReachingDefs(p: Procedure) = {
-    basicReachingDefs(p, getLiveVars(p))
-  }
-
   override def vproc(p: Procedure) = {
-    while (coalesceBlocks(p)) {}
-    removeEmptyBlocks(p)
-    transforms.fixupGuards(p)
-    transforms.removeDuplicateGuard(p.blocks.toSeq)
-    util.writeToFile(dotBlockGraph(p), s"graphs/blockgraph-${p.name}-boo.dot")
-    inparams = p.formalInParam.toSet[Variable]
     defs = allDefinitions(p)
-    reachingDefs = getReachingDefs(p)
+    inparams = p.formalInParam.toSet[Variable]
+    reachingDefs = if validate then basicReachingDefs(p, getLiveVars(p)) else Map()
     DoChildren()
   }
 
@@ -632,7 +636,10 @@ class GuardVisitor extends CILVisitor {
 
       if (res.size == 1) {
         res.head match {
-          case l @ LocalAssign(lhs, rhs, _) if propOK(rhs) => {
+          case l @ LocalAssign(lhs, rhs, _) => {
+            if (validate) {
+              assert(propOK(rhs))
+            }
             Some(rhs)
           }
           case _ => None
@@ -652,7 +659,6 @@ class GuardVisitor extends CILVisitor {
       Substitute(substitute(s))(a.body) match {
         case Some(cond) => {
           ChangeTo(List(Assume(cond, b, c, d)))
-          // SkipChildren()
         }
         case _ => SkipChildren()
       }
@@ -660,6 +666,11 @@ class GuardVisitor extends CILVisitor {
 
   }
 
+}
+
+def simplifyCFG(p: Procedure) = {
+  while (coalesceBlocks(p)) {}
+  removeEmptyBlocks(p)
 }
 
 def copypropTransform(
@@ -677,10 +688,14 @@ def copypropTransform(
   if (result.nonEmpty) {
     val vis = Simplify(CopyProp.toResult(result))
     visit_proc(vis, p)
-
   }
+
   visit_proc(CopyProp.BlockyProp(), p)
-  val gvis = GuardVisitor()
+  simplifyCFG(p)
+  transforms.fixupGuards(p)
+  transforms.removeDuplicateGuard(p.blocks.toSeq)
+
+  val gvis = GuardVisitor(ir.eval.SimplifyValidation.validate)
   visit_proc(gvis, p)
 
   val xf = t.checkPoint("transform")
