@@ -564,6 +564,7 @@ def collectUses(p: Procedure): Map[Variable, Set[Command]] = {
 }
 
 class GuardVisitor(validate: Boolean = false) extends CILVisitor {
+
   /**
    *
    * This takes all variables in guards and substitutes them for their definitions IFF they have 
@@ -596,7 +597,6 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
     || v.name.startsWith("CF")
     || v.name.startsWith("NF")
   }
-
 
   // for validation
   var reachingDefs: Map[Command, Map[Variable, Set[Assign]]] = Map()
