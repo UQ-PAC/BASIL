@@ -417,7 +417,7 @@ def rdDSAProperty(p: Procedure): Boolean = {
   val defs: Map[Variable, Set[Assign]] = p
     .flatMap {
       // case a: SingleAssign => Seq((a.lhs, (a: Assign)))
-      case a: Assign => a.assignees.map((l: Variable) => (l, (a: Assign))).toSeq
+      case a: Assign => a.assignees.map((l: Variable) => (l, a)).toSeq
       case _ => Seq()
     }
     .groupBy(_._1)

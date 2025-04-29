@@ -80,9 +80,7 @@ class DefUseDomain(liveBefore: Map[Block, Set[Variable]]) extends AbstractDomain
 
   override def transfer(s: Map[Variable, Set[Assign]], b: Command) = {
     b match {
-      case a: LocalAssign => s.updated(a.lhs, Set(a))
-      case a: MemoryLoad => s.updated(a.lhs, Set(a))
-      case d: DirectCall => d.outParams.map(_._2).foldLeft(s)((s, r) => s.updated(r, Set(d)))
+      case a: Assign => a.assignees.foldLeft(s)((s, v) => s.updated(v, Set(a)))
       case _ => s
     }
   }
@@ -955,8 +953,8 @@ def copypropTransform(
 
   }
   visit_proc(CopyProp.BlockyProp(), p)
-  val gvis = GuardVisitor()
-  visit_proc(gvis, p)
+  // val gvis = GuardVisitor()
+  // visit_proc(gvis, p)
 
   val xf = t.checkPoint("transform")
   // SimplifyLogger.info(s"    ${p.name} after transform expr complexity ${ExprComplexity()(p)}")
