@@ -1,14 +1,18 @@
 package analysis.data_structure_analysis
 
 import analysis.data_structure_analysis.DSAPhase.{BU, Local, TD}
-import analysis.data_structure_analysis.Interval.Top
+import analysis.data_structure_analysis.DSInterval.Top
+import analysis.data_structure_analysis.IntervalDSA.{checkUniqueGlobal, checksGlobalMaintained}
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
 import boogie.SpecGlobal
 import specification.FuncEntry
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.*
+import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
 import specification.{ExternalFunction, SymbolTableEntry}
-import util.{DSALogger, IRContext, IntervalDSALogger as Logger}
+import util.DSAConfig.{Checks, Standard}
+import util.LogLevel.INFO
+import util.{DSAConfig, DSAContext, DSALogger, IRContext, PerformanceTimer}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{SortedSet, mutable}
@@ -24,7 +28,7 @@ class IntervalGraph(
   val proc: Procedure,
   var phase: DSAPhase,
   val irContext: IRContext,
-  val sva: SymValues[Interval],
+  val sva: SymValues[DSInterval],
   val constraints: Set[Constraint],
   val nodeBuilder: Option[() => Map[SymBase, IntervalNode]]
 ) {
@@ -33,12 +37,11 @@ class IntervalGraph(
   val builder: () => Map[SymBase, IntervalNode] = nodeBuilder.getOrElse(buildNodes)
   var nodes: Map[SymBase, IntervalNode] = builder()
 
-  def exprToSymVal(expr: Expr): SymValSet[Interval] = SymValues.exprToSymValSet(sva)(expr)
+  def exprToSymVal(expr: Expr): SymValSet[DSInterval] = SymValues.exprToSymValSet(sva)(expr)
 
   protected def symValToNodes(
-    symVal: SymValSet[Interval],
-    current: Map[SymBase, IntervalNode],
-    f: Int => Boolean = i => i >= 1000
+    symVal: SymValSet[DSInterval],
+    current: Map[SymBase, IntervalNode]
   ): Map[SymBase, IntervalNode] = {
     symVal.state.filter((base, _) => base != NonPointer).foldLeft(current) { case (result, (base, symOffsets)) =>
       val node = find(result.getOrElse(base, init(base, None)))
@@ -48,41 +51,54 @@ class IntervalGraph(
         case Global => node.flags.global = true
         case NonPointer =>
           throw new Exception("Attempted to create a node from an Non-pointer symbolic base")
-        case unknown: (Ret | Loaded | Par) =>
+        case unknown: (Ret | Par | Loaded) =>
           node.flags.unknown = true
           node.flags.incomplete = true
-      if symOffsets == Top then node.collapse()
-      else symOffsets.toIntervals.filter(i => f(i.end.get) || base != Global).map(node.add)
       result + (base -> node)
     }
   }
 
-  // takes a map from symbolic bases to nodes and updates it based on constraint
-  protected def binaryConstraintToNodes(
-    constraint: BinaryConstraint,
-    nodes: Map[SymBase, IntervalNode]
-  ): Map[SymBase, IntervalNode] = {
-    val arg1 = exprToSymVal(constraint.arg1.value) // .removeNonAddress(i => i >= 1000)
-    val arg2 = exprToSymVal(constraint.arg2.value) // .removeNonAddress(i => i >= 1000)
-    val res = symValToNodes(arg1, nodes)
-    symValToNodes(arg2, res)
+  def globalNode(
+    globals: Set[SymbolTableEntry],
+    globalOffsets: Map[BigInt, BigInt],
+    externalFunctions: Set[ExternalFunction]
+  ): IntervalNode = {
+    val symBase = Global
+    val globalNode = IntervalNode(this, Map(symBase -> Set(0)))
+    globalNode.flags.global = true
+    globals.toSeq.sortBy(_.address).foreach {
+      case FuncEntry(name, size, address) =>
+        globalNode.add(DSInterval(address.toInt, address.toInt + size / 8))
+      case SpecGlobal(name, size, arraySize, address) =>
+        globalNode.add(DSInterval(address.toInt, address.toInt)) // ignore size, could be a composite type
+    }
+
+    globalOffsets.foreach { case (address, relocated) =>
+      globalNode.add(address.toInt)
+      globalNode.add(relocated.toInt)
+    }
+
+    externalFunctions.foreach(e =>
+      val extPointer = globalNode.add(e.offset.toInt)
+      val ext = extPointer.getPointee
+      ext.node.flags.function = true
+      ext.node.flags.foreign = true
+    )
+
+    globalOffsets.map(_.swap).foreach { case (address, relocated) =>
+      val pointee = find(globalNode.get(address.toInt))
+      val pointer = find(globalNode).add(DSInterval(relocated.toInt, relocated.toInt + 8))
+      pointer.setPointee(pointee)
+    }
+
+    globalNode
   }
 
   def buildNodes(): Map[SymBase, IntervalNode] = {
     val global =
       globalNode(irContext.globals ++ irContext.funcEntries, irContext.globalOffsets, irContext.externalFunctions)
-    val init = sva.state.foldLeft(Map[SymBase, IntervalNode](Global -> global)) { case (m, (variable, valueSet)) =>
+    sva.state.foldLeft(Map[SymBase, IntervalNode](Global -> global)) { case (m, (variable, valueSet)) =>
       symValToNodes(valueSet, m)
-    }
-
-    constraints.foldLeft(init) { case (resultMap, constraint) =>
-      constraint match
-        case constraint: BinaryConstraint => binaryConstraintToNodes(constraint, resultMap)
-        case dcc @ DirectCallConstraint(call) =>
-          (dcc.inConstraints ++ dcc.outConstraints).foldLeft(resultMap) { case (updated, constraint) =>
-            binaryConstraintToNodes(constraint, updated)
-          }
-        case _ => resultMap
     }
   }
 
@@ -121,71 +137,41 @@ class IntervalGraph(
 
   def isGlobal(address: Int): Boolean = {
     (irContext.globals ++ irContext.funcEntries).exists(g =>
-      Interval(g.address.toInt, g.address.toInt + (g.size / 8)).contains(address)
-    ) || irContext.globalOffsets.exists((g1, g2) =>
-      Interval(g1.toInt, g1.toInt + 8).contains(address)
-        || Interval(g2.toInt, g2.toInt + 8).contains(address)
-    )
+      DSInterval(g.address.toInt, g.address.toInt + g.size / 8).contains(address)
+    ) || irContext.globalOffsets.exists((g1, g2) => g1 == address || g2 == address) || irContext.externalFunctions
+      .exists(g => address == g.offset)
   }
-  def globalNode(
-    globals: Set[SymbolTableEntry],
-    globalOffsets: Map[BigInt, BigInt],
-    externalFunctions: Set[ExternalFunction]
-  ): IntervalNode = {
-    val symBase = Global
-    val globalNode = IntervalNode(this, mutable.Map(symBase -> 0))
-    globalNode.add(0)
-    globalNode.flags.global = true
-    globals.foreach {
-      case FuncEntry(name, size, address) =>
-        globalNode.add(Interval(address.toInt, address.toInt + (size / 8) - 1))
-      case SpecGlobal(name, size, arraySize, address) =>
-        globalNode.add(Interval(address.toInt, address.toInt)) // ignore size, could be a composite type
-    }
 
-    globalOffsets.foreach { case (address, relocated) =>
-      globalNode.add(address.toInt)
-      globalNode.add(relocated.toInt)
-    }
-
-    globalOffsets.map(_.swap).foreach { case (address, relocated) =>
-      val pointee = find(globalNode.get(address.toInt))
-      val pointer = find(globalNode).add(Interval(relocated.toInt, relocated.toInt + 7))
-      pointer.setPointee(pointee)
-    }
-
-    globalNode
+  def addParamCells(): Unit = {
+    val unchanged = Set("R29", "R30", "R31")
+    (proc.formalInParam ++ proc.formalOutParam)
+      .foreach(v =>
+        val cells = exprToCells(v)
+        if unchanged.forall(n => !v.name.startsWith(n)) then cells.map(_.node).foreach(_.flags.escapes = true)
+      )
   }
 
   // Processes all non call constraints
   def localPhase(): Unit = {
-    val unchanged = Set("R29", "R30", "R31")
-    (proc.formalInParam ++ proc.formalOutParam).iterator
-      .filterNot(p => unchanged.exists(n => p.name.startsWith(n)))
-      .flatMap(exprToCells)
-      .map(get)
-      .map(_.node)
-      .foreach(_.flags.escapes = true)
+    addParamCells()
     var processed = Set[Constraint]()
     constraints.toSeq
       .sortBy(f => f.label)
       .foreach(c =>
-        localCorrectness(processed)
         processed += c
         processConstraint(c)
-        localCorrectness(processed)
       )
   }
 
   // returns the cells corresponding to the
-  def symValToCells(symVal: SymValSet[Interval]): Set[IntervalCell] = {
+  def symValToCells(symVal: SymValSet[DSInterval]): Set[IntervalCell] = {
     val pairs = symVal.state.filter((base, _) => base != NonPointer)
-    pairs.foldLeft(Set[IntervalCell]()) { case (results, (base: SymBase, offsets: Interval)) =>
+    pairs.foldLeft(Set[IntervalCell]()) { case (results, (base: SymBase, offsets: DSInterval)) =>
       val (node, adjustment) = findNode(nodes(base))
       if offsets == Top then results + node.collapse()
       else
         results ++ offsets.toIntervals
-          .filter(i => base != Global || i.end.get >= 1000)
+          .filter(i => base != Global || isGlobal(i.start.get))
           .map(_.move(i => i + adjustment))
           .map(node.add)
     }
@@ -197,7 +183,7 @@ class IntervalGraph(
     constraints.toSeq.sortBy(c => c.label).foreach {
       case dcc: DirectCallConstraint if graphs.contains(dcc.target) && !dcc.target.isExternal.getOrElse(false) =>
         val (source, target) = if phase == TD then (this, graphs(dcc.target)) else (graphs(dcc.target), this)
-        callTransfer(phase, dcc, source, target)
+        IntervalDSA.callTransfer(phase, dcc, source, target)
       case dcc: DirectCallConstraint if dcc.target.name == "indirect_call_launchpad" =>
         resolveIndirectCall(dcc)
           .filterNot(proc =>
@@ -206,86 +192,10 @@ class IntervalGraph(
           .foreach(proc =>
 
             val (source, target) = if phase == TD then (this, graphs(proc)) else (graphs(proc), this)
-            callTransfer(phase, dcc, source, target)
+            IntervalDSA.callTransfer(phase, dcc, source, target)
           )
       case _ =>
     }
-
-  }
-
-  def globalTransfer(source: IntervalGraph, target: IntervalGraph): Map[IntervalNode, IntervalNode] = {
-    DSALogger.info(s"cloning globalNode from ${source.proc.procName}")
-    val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
-    val targetGlobal = target.find(target.nodes(Global).get(0))
-    var sourceGlobal = source.find(source.nodes(Global).get(0))
-    val old = source.nodes(Global).clone(target, false, oldToNew)
-    val globalNode = sourceGlobal.node.clone(target, true, oldToNew)
-
-    sourceGlobal = globalNode.get(targetGlobal.interval)
-    target.mergeCells(sourceGlobal, targetGlobal)
-    oldToNew.map((old, outdatedNew) => (old, target.find(outdatedNew))).toMap
-  }
-
-  def callTransfer(phase: DSAPhase, cons: DirectCallConstraint, source: IntervalGraph, target: IntervalGraph): Unit = {
-    require(phase == TD || phase == BU)
-    val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
-    val unchanged = Set("R29", "R30", "R31")
-    DSALogger.info(s"cloning ${source.proc.procName} into ${target.proc.procName}, $phase")
-    cons.inParams
-      .filterNot(f => unchanged.exists(i => f._1.name.startsWith(i)))
-      .filter(f => cons.target.formalInParam.contains(f._1))
-      .foreach { case (formal, actual) =>
-        val (sourceExpr, targetExpr) = if phase == TD then (actual, formal) else (formal, actual)
-        exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
-      }
-
-    cons.outParams
-      .filterNot(f => unchanged.exists(i => f._1.name.startsWith(i)))
-      .filter(f => cons.target.formalOutParam.contains(f._1))
-      .foreach { case (out, actual) =>
-        val (sourceExpr, targetExpr) = if phase == TD then (actual, out) else (out, actual)
-        exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
-      }
-    // TODO add unification between unused indirect call out params and their corresponding input version
-    /*
-    if phase == BU then
-      cons.outParams.filterNot(f => cons.target.formalOutParam.contains(f._2)).foreach {
-        f =>
-      }*/
-  }
-
-  def exprTransfer(
-    sourceExpr: Expr,
-    targetExpr: Expr,
-    source: IntervalGraph,
-    target: IntervalGraph,
-    oldToNew: mutable.Map[IntervalNode, IntervalNode]
-  ): Unit = {
-    val sourceCells = source
-      .exprToCells(sourceExpr)
-      .map(source.find)
-      .map(cell =>
-        assert(cell.node.isUptoDate)
-        val (node, offset) =
-          target.findNode(cell.node.clone(target, true, oldToNew))
-        if offset == 0 then node.get(cell.interval)
-        node.get(cell.interval.move(i => i + offset))
-      )
-    val targetCells = target.exprToCells(targetExpr).map(target.find)
-    target.localCorrectness()
-
-    if (targetCells ++ sourceCells).nonEmpty then target.mergeCells(targetCells ++ sourceCells)
-
-    sourceCells.foreach(cell =>
-      val node = cell.node
-      val sourceBases = node.bases
-      sourceBases.foreach {
-        case (base, offset) if target.nodes.contains(base) =>
-          target.mergeCells(node.get(offset), target.find(target.nodes(base).get(0)))
-        case _ =>
-      }
-    )
-    target.localCorrectness()
   }
 
   private def isIndirectCall(dcc: DirectCallConstraint): Boolean = {
@@ -322,30 +232,17 @@ class IntervalGraph(
         if indexCells.nonEmpty then
           if indexCells.nonEmpty && valueCells.nonEmpty then
             indexCells.foreach(indexCell =>
-              if !(indexCell.hasPointee && indexCell.getPointee == valueCell.get) then
-                Logger.debug(s"index has a pointer: ${indexCell.hasPointee}")
-                Logger.debug(s"index cell: ${indexCell}")
-                if indexCell.hasPointee then
-                  Logger.debug(s"index pointee: ${indexCell.getPointee}")
-                  Logger.debug(s"index pointee children: ${indexCell.getPointee.node.children}")
-                Logger.debug(s"got valueCell: ${valueCell.get}")
-                Logger.debug(s"value childeren: ${valueCell.get.node.children}")
               assert(indexCell.node.isUptoDate, "outdated cell in local correctness check")
               assert(indexCell.getPointee.node.isUptoDate, "outdated cell in local correctness check")
               assert(valueCell.get.node.isUptoDate, "outdated cell in local correctness check")
-
               assert(
                 indexCell.hasPointee && indexCell.getPointee.equiv(valueCell.get),
                 s"$constraint, $indexCell doesn't point to ${valueCell.get} instead ${indexCell.getPointee}"
               )
             )
-
       case _ =>
     }
   }
-
-  var last: Option[(IntervalCell, IntervalCell)] = None
-  var secondLast: Option[(IntervalCell, IntervalCell)] = None
 
   /**
    * Clones a graph
@@ -372,7 +269,6 @@ class IntervalGraph(
     )
     copy.nodes = this.nodes.view.mapValues(oldToNew.apply).toMap
     assert(copy.nodes.keys == this.nodes.keys)
-    copy.localCorrectness()
     copy
   }
 
@@ -385,16 +281,23 @@ class IntervalGraph(
     val arrows = ArrayBuffer[StructArrow]()
 
     nodes.foreach { n =>
-      structs.append(DotStruct(n.id.toString, n.toString, Some(n.cells.map(o => o.interval.start.get.toString)), true))
+      structs.append(
+        DotStruct(
+          n.id.toString,
+          s"Node ${n.id}\\n${n.bases.mkString("\\n").replace("->", ":")}",
+          Some(n.cells.map(o => s"<${o.interval.start.getOrElse(0)}> ${o.interval}")),
+          true
+        )
+      )
     }
 
     pointsTo.foreach { (pointer, pointee) =>
       val pointerID = pointer.node.id.toString
-      val pointerOffset = pointer.interval.start.get.toString
+      val pointerOffset = pointer.interval.start.getOrElse(0).toString
       arrows.append(
         StructArrow(
           DotStructElement(pointerID, Some(pointerOffset)),
-          DotStructElement(pointee.node.id.toString, Some(pointee.interval.start.get.toString))
+          DotStructElement(pointee.node.id.toString, Some(pointee.interval.start.getOrElse(0).toString))
         )
       )
     }
@@ -417,8 +320,7 @@ class IntervalGraph(
     (nodes.toSet, pointsTo.toSet)
   }
 
-  def init(symBase: SymBase, size: Option[Int]): IntervalNode = IntervalNode(this, mutable.Map(symBase -> 0), size)
-  def init(symBases: mutable.Map[SymBase, Int], size: Option[Int]): IntervalNode = IntervalNode(this, symBases, size)
+  def init(symBase: SymBase, size: Option[Int]): IntervalNode = IntervalNode(this, Map(symBase -> Set(0)), size)
   def constraintArgToCells(constraintArg: ConstraintArg, ignoreContents: Boolean = false): Set[IntervalCell] = {
     val cells = symValToCells(exprToSymVal(constraintArg.value))
     val exprCells = cells.map(find)
@@ -428,180 +330,137 @@ class IntervalGraph(
 
   }
 
+  def markEscapes(
+    constraint: MemoryAccessConstraint[_],
+    indices: Set[IntervalCell],
+    pointees: Set[IntervalCell]
+  ): Unit = {
+    val indexFlag = joinFlags(indices)
+    constraint match
+      case MemoryReadConstraint(pos) =>
+        indices.map(_.node).foreach(_.flags.read = true)
+        if indexFlag.heap || indexFlag.escapes then pointees.map(_.node).foreach(_.flags.escapes = true)
+      case MemoryWriteConstraint(pos) =>
+        indices.map(_.node).foreach(_.flags.modified = true)
+        if indexFlag.heap || indexFlag.escapes then pointees.map(_.node).foreach(_.flags.escapes = true)
+  }
+
   def processConstraint(constraint: Constraint): Unit = {
     constraint match
       case cons: MemoryAccessConstraint[_] =>
-        Logger.debug(s"Processing constraint $cons")
+        DSALogger.debug(s"Processing constraint $cons")
         val indices = constraintArgToCells(cons.arg1, ignoreContents = true)
-        indices.foreach(cell => cell.node.add(cell.interval.growTo(cons.size - 1)))
-        val indexPointee = constraintArgToCells(cons.arg1)
-        val indexFlag = joinFlags(indices)
+        indices.foreach(cell => cell.node.add(cell.interval.growTo(cons.size)))
+        val pointees = constraintArgToCells(cons.arg1)
 
-        cons match
-          case MemoryReadConstraint(pos) =>
-            indices.map(_.node).foreach(_.flags.read = true)
-            if indexFlag.heap || indexFlag.escapes then indexPointee.map(_.node).foreach(_.flags.escapes = true)
-          case MemoryWriteConstraint(pos) =>
-            indices.map(_.node).foreach(_.flags.modified = true)
-            if indexFlag.heap || indexFlag.escapes then indexPointee.map(_.node).foreach(_.flags.escapes = true)
+        markEscapes(cons, indices, pointees)
         val values = constraintArgToCells(cons.arg2)
-        val first = if indexPointee.nonEmpty then
-          indices
-            .map(findExact)
-          val res = mergeCells(indexPointee)
-          val correctPointee =
-            indices
-              .map(get)
-              .foldLeft(true)((f: Boolean, pointer: IntervalCell) =>
-                f && pointer.hasPointee && pointer.getPointee.equiv(res)
-              )
-          assert(correctPointee)
-          Some(res)
-        else None
-        val sec = if values.nonEmpty then Some(mergeCells(values)) else None
-        if first.nonEmpty && sec.nonEmpty then
-          val res = mergeCells(first.get, sec.get)
-          assert(constraintArgToCells(cons.arg1).map(get) == constraintArgToCells(cons.arg2).map(get))
-          val correctPointee =
-            indices
-              .map(get)
-              .foldLeft(true)((f: Boolean, pointer: IntervalCell) =>
-                f && pointer.hasPointee && pointer.getPointee.equiv(first.map(get).get)
-              )
-          assert(correctPointee, "an index cell doesn't point to it's pointee")
-          assert(first.map(get) == sec.map(get), "cells should be the same after unification")
-        else Logger.warn(s"$cons had an empty argument")
+        if pointees.nonEmpty || values.nonEmpty then mergeCells(pointees ++ values)
+        else DSALogger.warn(s"$cons had an empty argument")
       case _ => // ignore
   }
 
   /**
-   * merge the pointees of the two cells and return it
-   * None if neither of them has a pointee
+   * if the cells is not in a scc returns an empty seq
+   * else return a seq of cells corresponding to a circle of cells pointing to each other
    */
-  def mergePointees(c1: IntervalCell, c2: IntervalCell): Option[IntervalCell] = {
-    var cell1 = get(c1)
-    var cell2 = get(c2)
-    if cell1 != cell2 then
-      (cell1.hasPointee, cell2.hasPointee) match
-        case (true, true) =>
-          val pointee1 = cell1.removePointee.get
-          val pointee2 = cell2.removePointee.get
-          var resPointee = mergeCells(pointee1, pointee2)
-          cell1 = get(cell1)
-          resPointee = cell1.setPointee(resPointee)
-          cell2 = get(cell2)
-          val res = Some(cell2.setPointee(resPointee))
-          res
-        case (_, true) => Some(cell1.setPointee(cell2.getPointee))
-        case (true, _) => Some(cell2.setPointee(cell1.getPointee))
-        case (_, _) => None // Logger.warn(s"neither $cell1, or $cell2 had a pointee")
-    else Some(cell1.getPointee)
-
+  def isInSCC(cell: IntervalCell): Seq[IntervalCell] = {
+    var seen = Seq[IntervalCell]()
+    var cur = cell
+    while cur.hasPointee && !seen.contains(cell) && !seen.contains(cur) do {
+      cur = get(cur.getPointee)
+      seen = seen.appended(cur)
+    }
+    if seen.contains(cell) then seen else Seq.empty
   }
 
-  protected def collapseAndMerge(c1: IntervalCell, c2: IntervalCell): IntervalCell = {
-    assert(c1.node.isUptoDate)
-    assert(c2.node.isUptoDate)
+  def disconnectSCC(scc: Seq[IntervalCell]): Unit = {
+    scc.foreach(_.removePointee)
+  }
 
-    var cell1 = c1.node.collapse()
+  def connectSCC(scc: Seq[IntervalCell]): Unit = {
+    if scc.nonEmpty then
+      val head = scc.head
+      var cur = head
+      var tail = scc.tail
+      while tail.nonEmpty do {
+        find(cur).setPointee(find(tail.head))
+        cur = tail.head
+        tail = tail.tail
+      }
+      get(scc.last).setPointee(get(head))
+  }
 
-    cell1 = get(cell1) // collapsing cell2 may affect cell1
-    var cell2 = get(c2)
-    cell2 = cell2.node.collapse()
-    cell1 = get(cell1)
+  def getSelfEdges(node: IntervalNode): Map[IntervalCell, IntervalCell] = {
+    node.cells.filter(_.hasPointee).filter(_.getPointee.node == node).map(c => (c, c.getPointee)).toMap
+  }
 
-    val collapsedNode = IntervalNode(this, cell1.node.bases ++ cell2.node.bases)
-    collapsedNode.flags.join(cell1.node.flags)
-    collapsedNode.flags.join(cell2.node.flags)
-    collapsedNode.children.addAll(cell1.node.children)
-    collapsedNode.children.addAll(cell2.node.children)
-    val collapsedCell = collapsedNode.collapse()
+  /**
+   * disconnect edges from a node to itself (could be different cells in the same node)
+   */
+  def disconnectSelfEdges(node: IntervalNode): Map[IntervalCell, IntervalCell] = {
+    val selfEdges = getSelfEdges(node)
+    selfEdges.keys.foreach(_.removePointee)
+    selfEdges
+  }
 
-    val pointee: Option[IntervalCell] = mergePointees(cell1, cell2)
-    cell1 = get(cell1)
-    cell2 = get(cell2)
+  def getOutEdges(node: IntervalNode): Map[IntervalCell, IntervalCell] = {
+    node.cells.filter(_.hasPointee).map(c => (c, c.getPointee)).toMap
+  }
 
-    if c1.hasPointee || c2.hasPointee then assert(pointee.nonEmpty)
-    if pointee.nonEmpty then collapsedCell.setPointee(find(pointee.get))
-
-    unify(cell1.node, collapsedNode)
-    unify(cell2.node, collapsedNode)
-
-    cell1 = get(cell1)
-    cell2 = get(cell2)
-
-    collapsedCell
+  def checkEdgesAreMaintained(edges: Map[IntervalCell, IntervalCell]): Unit = {
+    edges.foreach((pointer, pointee) =>
+      assert(pointee.equiv(get(pointer).getPointee), s"$pointer doesn't point to updated version of its pointee")
+    )
   }
 
   protected def mergeCellsHelper(cell1: IntervalCell, cell2: IntervalCell): IntervalCell = {
     assert(cell1.node.isUptoDate)
     assert(cell2.node.isUptoDate)
+
+    // determine which node is to be moved and by how much
     val (stableCell, toBeMoved) =
-      if cell1.interval.start.get > cell2.interval.start.get then (cell1, cell2) else (cell2, cell1)
-    val delta = stableCell.interval.start.get - toBeMoved.interval.start.get
+      if cell1.node.isCollapsed then (cell1, cell2)
+      else if cell2.node.isCollapsed then (cell2, cell1)
+      else if cell1.interval.start.get > cell2.interval.start.get then (cell1, cell2)
+      else (cell2, cell1)
+    val delta: Option[Int] =
+      if !stableCell.node.isCollapsed then Some(stableCell.interval.start.get - toBeMoved.interval.start.get) else None
 
     val stableNode = stableCell.node
     val nodeToBeMoved = toBeMoved.node
-    assert(stableCell.interval.isOverlapping(toBeMoved.moved(i => i + delta).interval))
 
-    val stableCells = stableNode.cells
-    val movedCells = nodeToBeMoved.cells.map(_.moved(i => i + delta))
-    val allCells = (stableCells ++ movedCells).sorted
-    val updatedBases = stableNode.bases ++ (nodeToBeMoved.bases.view.mapValues(f => f + delta))
-    val resultNode = IntervalNode(this, updatedBases)
-    Logger.debug(s"created result node with id ${resultNode.id}")
-    resultNode.children.addAll(stableNode.children ++ nodeToBeMoved.children ++ Set(stableNode.id, nodeToBeMoved.id))
-    resultNode.flags.join(stableNode.flags)
-    resultNode.flags.join(nodeToBeMoved.flags)
-    val queue: mutable.Queue[IntervalCell] = mutable.Queue(allCells: _*)
-    allCells.foreach(c => resultNode.add(c.interval))
-
-    // unify old and new nodes
-    unify(stableNode, resultNode)
-    unify(nodeToBeMoved, resultNode, delta)
-
-    assert(
-      resultNode.cells.exists(c =>
-        c.interval.isOverlapping(stableCell.interval) && c.interval
-          .isOverlapping(toBeMoved.moved(i => i + delta).interval)
-      )
-    )
-    // set pointees
-    val pointeeResult = mutable.Map[IntervalCell, IntervalCell]()
-    resultNode.cells.foreach(cell =>
-      var newCell = get(cell)
-      val pointees = allCells
-        .filter(_.interval.isOverlapping(cell.interval)) // newToOlds
-        .collect { case cell: IntervalCell if cell._pointee.nonEmpty => find(cell._pointee.get) }
-      if pointees.nonEmpty then
-        val mergedPointees = mergeCells(pointees)
-        newCell = get(newCell) // above merge may change the cell if the node points to itself
-        pointeeResult.update(cell, mergedPointees)
-        pointees.foreach(f => assert(get(f).equiv(mergedPointees)))
-        newCell.setPointee(mergedPointees)
-        pointeeResult.keys.foreach(cell =>
-          val actual = get(cell)
-          val pointees = allCells
-            .filter(c => c.interval.isOverlapping(cell.interval))
-            .filter(_._pointee.nonEmpty)
-            .map(_._pointee.get)
-          if !pointees.forall(f => get(f).equiv(actual.getPointee)) then
-            Logger.debug(s"result node cell: $cell")
-            Logger.debug(s"result cell udpated: ${actual} ")
-            Logger.debug(s"Unified Cells: ${allCells.filter(_.interval.isOverlapping(cell.interval))}")
-            Logger.debug(s"non-unified pointees: ${pointees}")
-            Logger.debug(s"updated pointees: ${pointees.map(get)}")
-            Logger.debug(s"updated result cell pointee: ${actual.getPointee}")
-            pointees.foreach(f =>
-              assert(
-                get(f).equiv(actual.getPointee),
-                s"pointee $f has updated version ${get(f)},\n but the pointer $actual has pointee ${actual.getPointee}"
-              )
-            )
+    // bookkeeping
+    stableNode.flags.join(nodeToBeMoved.flags)
+    stableNode.bases ++= nodeToBeMoved.bases // compute new region alignments
+      .map((base, set) =>
+        (
+          base,
+          stableNode.bases.getOrElse(base, Set.empty) ++ // don't overwrite regions common with stableNode
+            set.map(_ + delta.getOrElse(0)) // move regions in notToBeMoved by delta
         )
+      )
+
+    // start unification
+    val scc1 = isInSCC(cell1)
+    disconnectSCC(scc1)
+    val scc2 = isInSCC(cell2)
+    disconnectSCC(scc2)
+    val selfEdges = disconnectSelfEdges(stableNode)
+
+    // unify so that find(nodeToBeMoved, Interval) will give (stableNode, Interval + delta)
+    unify(nodeToBeMoved, stableNode, delta.getOrElse(0))
+
+    nodeToBeMoved.cells.foreach(c =>
+      val (node, offset) = findNode(stableNode)
+      val cell = node.add(c.interval.move(i => i + offset + delta.getOrElse(0)))
+      if c.hasPointee then cell.setPointee(c.getPointee)
     )
 
-    assert(resultNode.nonOverlappingProperty)
+    selfEdges.foreach((pointer, pointee) => find(pointer).setPointee(find(pointee)))
+    connectSCC(scc1)
+    connectSCC(scc2)
+
     find(stableCell)
   }
 
@@ -610,57 +469,25 @@ class IntervalGraph(
     require(c1.node.graph == c2.node.graph && c1.node.graph == this)
     val cell1 = find(c1)
     val cell2 = find(c2)
-    Logger.debug(s"merging $cell1")
-    if cell1.hasPointee then Logger.debug(s"and pointee ${cell1.getPointee}")
-    val node1Pointees = cell1.node.cells.filter(_.hasPointee).map(c => (c, c.getPointee)).toMap
-    val node2Pointees = cell2.node.cells.filter(_.hasPointee).map(c => (c, c.getPointee)).toMap
 
-    Logger.debug(s"with $cell2")
-    if cell2.hasPointee then Logger.debug(s"pointee ${cell2.getPointee}")
+    val node1Pointees = getOutEdges(cell1.node)
+    val node2Pointees = getOutEdges(cell2.node)
 
-    val result = if cell1.node == cell2.node && cell1.interval.start.equals(cell2.interval.start) then
-      assert(cell1.node.get(cell1.interval).interval.contains(cell2.interval))
-      Logger.debug(s"merged $cell1 with itself")
-      cell1
-    else if cell1.node.equals(cell2.node) then
-      Logger.debug(s"collapsed $cell1 and $cell2")
-      val res = cell1.node.collapse()
-      Logger.debug(s"collapsed $cell1 and $cell2")
-      res
-    else if cell1.node.isCollapsed || cell2.node.isCollapsed then
-      Logger.debug(s"merge and collapse $cell1 and $cell2")
-      val res = collapseAndMerge(cell1, cell2)
-      Logger.debug(s"merge and collapse $cell1 and $cell2")
-      res
-    else
-      Logger.debug(s"merged $cell1 and $cell2")
-      val res = mergeCellsHelper(cell1, cell2)
-      Logger.debug(s"merged $cell1 and $cell2")
-      res
+    val result =
+      if get(cell1) == get(cell2) then cell1
+      else if cell1.node.equals(cell2.node) then cell1.node.collapse()
+      else if cell1.node.isCollapsed || cell2.node.isCollapsed then
+        cell1.node.collapse()
+        find(cell2).node.collapse()
+        mergeCellsHelper(find(cell1), find(cell2))
+      else mergeCellsHelper(cell1, cell2)
 
-    Logger.debug(s"Got result: $result")
     assert(result.equiv(get(cell1)))
     assert(result.equiv(get(cell2)))
-    if cell1.hasPointee then assert(result.getPointee.equiv(get(cell1.getPointee)))
-    if cell2.hasPointee then assert(result.getPointee.equiv(get(cell2.getPointee)))
+    checkEdgesAreMaintained(node1Pointees)
+    checkEdgesAreMaintained(node2Pointees)
 
-    if node1Pointees.nonEmpty then
-      node1Pointees.foreach((pointer, pointee) =>
-        assert(
-          get(pointee).equiv(get(pointer).getPointee),
-          s"$pointer doesn't point to updated version of its pointee after merge"
-        )
-        assert(get(pointer).node == result.node)
-      )
-
-    if node2Pointees.nonEmpty then
-      node2Pointees.foreach((pointer, pointee) =>
-        assert(
-          get(pointee).equiv(get(pointer).getPointee),
-          s"$pointer doesn't point to updated version of its pointee after merge"
-        )
-        assert(get(pointer).node == result.node)
-      )
+    assert(result.node.isUptoDate)
     result
   }
 
@@ -671,7 +498,7 @@ class IntervalGraph(
     }
   }
 
-  def findExact(cell: IntervalCell): (IntervalNode, Interval) = {
+  def findExact(cell: IntervalCell): (IntervalNode, DSInterval) = {
     val node = cell.node
     val (newNode, offset) = findNode(node)
     (newNode, cell.interval.move(i => i + offset))
@@ -693,48 +520,40 @@ class IntervalGraph(
   def find(cell: IntervalCell): IntervalCell = {
     val (newNode, newInterval) = findExact(cell)
     val res = newNode.add(newInterval)
-    if (findNode(res.node)._1 != res.node) then
-      Logger.warn(res.node)
-      Logger.warn(findNode(res.node)._1)
     assert(findNode(res.node)._1 == res.node)
     res
   }
 
   // find the most uptodate version of cell
-  // if cell was unified with others, retuns a cell with
+  // if cell was unified with others, returns a cell with
   // unified interval
   def get(cell: IntervalCell): IntervalCell = {
     val (newNode, newInterval) = findExact(cell)
     val res = newNode.get(newInterval)
-    if (findNode(res.node)._1 != res.node) then
-      Logger.warn(res.node)
-      Logger.warn(findNode(res.node)._1)
     assert(findNode(res.node)._1 == res.node)
     res
   }
 
   def unify(a: IntervalNode, b: IntervalNode, offset: Int = 0): Unit = {
-    Logger.debug(s"unifying ${b.id} with ${a.id} at offset ${offset}")
+    DSALogger.debug(s"unifying ${b.id} with ${a.id} at offset ${offset}")
     solver.unify(a.term, b.term, offset)
   }
 }
 
 class IntervalNode(
   val graph: IntervalGraph,
-  var bases: mutable.Map[SymBase, Int] = mutable.Map.empty,
+  var bases: Map[SymBase, Set[Int]] = Map.empty,
   val size: Option[Int] = None,
   val id: Int = intervalNodeCounter.next().toInt
 ) {
-  Logger.debug(s"created node with id $id")
+  DSALogger.debug(s"created node with id $id")
 
   val term: NodeTerm = NodeTerm(this)
   val children = mutable.Set[Int]()
 
   val flags: DSFlag = DSFlag()
-  protected var _cells: Seq[IntervalCell] = Seq.empty
+  protected var _cells: Seq[IntervalCell] = Seq(IntervalCell(this, DSInterval(0, 0)))
   def cells: Seq[IntervalCell] = _cells
-  protected var _collapsed: Option[IntervalCell] = None
-  def collapsed: Option[IntervalCell] = _collapsed
 
   def nonOverlappingProperty: Boolean = {
     if cells.size <= 1 then true
@@ -745,13 +564,13 @@ class IntervalNode(
       )
   }
 
-  def isCollapsed: Boolean = collapsed.nonEmpty
+  def isCollapsed: Boolean = _cells.nonEmpty && _cells.head.interval == DSInterval.Top
   def add(offset: Int): IntervalCell = {
-    add(Interval(offset, offset))
+    add(DSInterval(offset, offset))
   }
 
   def get(offset: Int): IntervalCell = {
-    get(Interval(offset, offset))
+    get(DSInterval(offset, offset))
   }
 
   /**
@@ -770,11 +589,9 @@ class IntervalNode(
     val node = this
     val newNode =
       if !oldToNew.contains(node) then
-        val v = newGraph.init(node.bases, node.size)
-        v.bases = node.bases
+        val v = IntervalNode(newGraph, node.bases, node.size)
         v.flags.join(node.flags)
         node.cells.foreach(cell => v.add(cell.interval))
-        if node.isCollapsed then v._collapsed = Some(v.get(0))
         oldToNew.update(node, v)
         v
       else oldToNew(node)
@@ -789,7 +606,7 @@ class IntervalNode(
           case cell: IntervalCell if cell.hasPointee =>
             val (newNode, off) = newGraph.findNode(oldToNew(old))
             assert(
-              newNode.isCollapsed || newNode.cells.exists(c => c.interval.contains(cell.interval.move(i => i + off))),
+              newNode.cells.exists(c => c.interval.contains(cell.interval.move(i => i + off))),
               s"expected cloned cell to include same intervals"
             )
             assert(newGraph.find(newNode) == newNode)
@@ -803,12 +620,12 @@ class IntervalNode(
             assert(newGraph.find(clonedPointee) == clonedPointee, s"expected cloned pointee to remain uptodate")
             val newPointee = clonedPointee.add(pointee.interval.move(i => i + pointeeOff))
             assert(
-              pointee.interval.move(i => i + pointeeOff) == newPointee.interval || newPointee.node.isCollapsed,
+              pointee.interval.move(i => i + pointeeOff) == newPointee.interval,
               s"pointee interval: ${pointee.interval}, moved by $pointeeOff, cloned Pointee interval: ${newPointee.interval}"
             )
             val pointer = newNode.get(cell.interval.move(i => i + off))
-            assert(pointer.node.isCollapsed || pointer.interval.contains(cell.interval.move(i => i + off)))
-            assert(!pointer.hasPointee || pointer.getPointee == newPointee)
+            assert(pointer.interval.contains(cell.interval.move(i => i + off)))
+            assert(!pointer.hasPointee || pointer.getPointee.equiv(newPointee))
             if !pointer.hasPointee then pointer.setPointee(newPointee)
           case _ =>
         }
@@ -817,6 +634,18 @@ class IntervalNode(
   }
 
   override def hashCode(): Int = id
+
+  def pretty(verbose: Boolean = false): String = {
+    val baseString =
+      if verbose then bases.mkString("\n")
+      else bases.filterNot(i => isPlaceHolder(i._1)).mkString("\n")
+
+    val intervals =
+      if isCollapsed then DSInterval.Top.toString
+      else cells.map(_.interval).map(_.toString).mkString("\n")
+
+    s"Node $id\n$baseString\n$intervals"
+  }
   override def toString: String =
     s"Node($id, ${bases.keys}, ${if isCollapsed then "C" else cells.map(_.interval).sorted})"
 
@@ -838,7 +667,7 @@ class IntervalNode(
     graph.find(this) == this
   }
 
-  def init(interval: Interval): IntervalCell = IntervalCell(this, interval)
+  def init(interval: DSInterval): IntervalCell = IntervalCell(this, interval)
 
   override def equals(obj: Any): Boolean = {
     obj match
@@ -848,69 +677,9 @@ class IntervalNode(
 
   def collapse(): IntervalCell = {
     assert(isUptoDate)
-    val node = this
-    if (!(node.isCollapsed)) {
-      val oldPointees = cells.filter(_.hasPointee).map(_.getPointee)
-      val collapseNode: IntervalNode = IntervalNode(graph, bases, size)
-      collapseNode.children.addAll(this.children)
-      collapseNode.children.add(this.id)
-      collapseNode.flags.join(this.flags)
-      var collapsedCell: IntervalCell = collapseNode.add(0)
-      collapseNode._collapsed = Some(collapsedCell)
-      // delay unification
-      // treat collapsed node completely distinct to current node
-      if node.cells.exists(_.hasPointee) then
-        val pointToItself = node.cells.filter(_.hasPointee).map(_.getPointee).exists(c => c.node == node)
-        var pointees = node.cells.filter(_.hasPointee).map(_.getPointee).filter(_.node != node)
-        val pointeeNodes = pointees.map(_.node).toSet
-        // if a collapsed node points to itself collapse all other pointees first
-        if pointToItself then
-          pointees.map(f =>
-            // break all points-to relationship from pointees to this or other pointees
-            // all pointees are collapsed and merged together
-            graph
-              .find(f)
-              .node
-              .cells
-              .filter(_.hasPointee)
-              .filter(f => pointeeNodes.map(graph.find).contains(f.getPointee.node))
-              .foreach(_.removePointee)
-            graph.find(f).node.collapse()
-          )
-        pointees = pointees.map(graph.find)
-        var pointee = if pointees.nonEmpty then graph.mergeCells(pointees) else collapsedCell
-
-        if (pointToItself) {
-          assert(!collapsedCell.hasPointee)
-          val oldPointee = pointee.node
-          assert(collapseNode.isUptoDate)
-          assert(pointee.node.isCollapsed)
-          pointee = graph.mergeCells(pointee, collapsedCell)
-          assert(pointee.node.isCollapsed)
-          Logger.debug(pointee)
-          collapsedCell = pointee
-        }
-
-        if !pointToItself then assert(!collapsedCell.hasPointee)
-//        DSALogger.warn(pointToItself)
-        collapsedCell.setPointee(pointee)
-        collapsedCell = graph.find(collapsedCell)
-        if pointToItself then assert(collapsedCell.getPointee == collapsedCell)
-        assert(collapsedCell.hasPointee)
-        assert(collapsedCell.getPointee == graph.find(pointee))
-        assert(collapsedCell.node.cells.size == 1)
-
-      // unify collapsed node and current node
-      graph.unify(node, collapsedCell.node)
-      cells.foreach(f => assert(graph.find(f) == collapsedCell))
-      if node.cells.exists(_.hasPointee) then assert(graph.find(collapsedCell).hasPointee)
-      assert(oldPointees.map(graph.find).forall(f => f.equiv(graph.find(collapsedCell).getPointee)))
-      graph.find(collapsedCell)
-
-    } else {
-      graph.find(node.collapsed.get)
-    }
-
+    flags.collapsed = true
+    bases = bases.view.mapValues(_ => Set(0)).toMap
+    graph.get(add(DSInterval.Top))
   }
 
   /**
@@ -922,42 +691,38 @@ class IntervalNode(
    * @param interval interval of the newCell
    * @return a cell with this node and the provided interval
    */
-  def add(interval: Interval): IntervalCell = {
+  def add(interval: DSInterval): IntervalCell = {
     assert(isUptoDate)
-    if !isCollapsed then
-      val overlapping: Seq[IntervalCell] = cells.filter(_.interval.isOverlapping(interval))
-      val newCell = if overlapping.isEmpty then
-        val res = init(interval)
-        _cells = _cells.appended(res)
-        res
-      else if overlapping.size == 1 && overlapping.head.interval == (interval) then this.get(interval)
-      else if overlapping.size == 1 && overlapping.head.interval.contains(interval) then init(interval)
-      else
-        val unifiedInterval = overlapping.map(_.interval).fold(interval)(Interval.join)
-        val res = init(unifiedInterval)
-        val pointees = overlapping.filter(_.hasPointee).map(_.getPointee)
+    val overlapping: Seq[IntervalCell] = cells.filter(_.interval.isOverlapping(interval))
+    val newCell = if overlapping.isEmpty then
+      val res = init(interval)
+      _cells = _cells.appended(res)
+      res
+    else if overlapping.size == 1 && overlapping.head.interval == (interval) then this.get(interval)
+    else if overlapping.size == 1 && overlapping.head.interval.contains(interval) then init(interval)
+    else
+      val unifiedInterval = overlapping.map(_.interval).fold(interval)(DSInterval.join)
+      val res = init(unifiedInterval)
+      val pointees = overlapping.filter(_.hasPointee).map(_.getPointee)
 
-        val pointee = if pointees.nonEmpty then Some(graph.mergeCells(pointees)) else None
-        _cells = cells.diff(overlapping).appended(res).sorted
-        if pointees.nonEmpty then graph.find(res).setPointee(pointee.get)
-        init(interval)
+      _cells = cells.diff(overlapping).appended(res).sorted
+      val pointee = if pointees.nonEmpty then Some(graph.mergeCells(pointees)) else None
+      if pointees.nonEmpty then graph.find(res).setPointee(pointee.get)
+      init(interval)
 
-      assert(nonOverlappingProperty, "expected non overlapping cells")
-      newCell
-    else collapsed.get
+    assert(nonOverlappingProperty, "expected non overlapping cells")
+    newCell
   }
 
   // get the cell which contains this interval in the node
   // expects exactly 1 corresponding cell since they are non-overlapping
-  def get(interval: Interval): IntervalCell = {
-    if isCollapsed then collapsed.get
-    else
-      val exactMatches = cells.filter(_.interval.contains(interval))
-      assert(
-        exactMatches.size == 1,
-        s"Expected exactly one overlapping interval instead got ${exactMatches.size}, with ${cells.map(_.interval)}"
-      )
-      exactMatches.head
+  def get(interval: DSInterval): IntervalCell = {
+    val exactMatches = cells.filter(_.interval.contains(interval))
+    assert(
+      exactMatches.size == 1,
+      s"Expected exactly one overlapping interval instead got ${exactMatches.size}, ${interval}, with ${cells.map(_.interval)}"
+    )
+    exactMatches.head
   }
 }
 
@@ -978,7 +743,7 @@ object IntervalCell {
  * the reason is that a node cell may not have pointee when dummy cell corresponding to it is created
  * if that cell is later assigned a pointee, avoid the need for update to all dummy cells
  */
-class IntervalCell(val node: IntervalNode, val interval: Interval) {
+class IntervalCell(val node: IntervalNode, val interval: DSInterval) {
   var _pointee: Option[IntervalCell] = None
   private val graph: IntervalGraph = node.graph
 
@@ -990,7 +755,7 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
     newCell
   }
 
-  def grown(interval: Interval): IntervalCell = {
+  def grown(interval: DSInterval): IntervalCell = {
     require(this.interval.start == interval.start, "expected same interval start for growing cell")
     val newCell = IntervalCell(this.node, this.interval.join(interval))
     newCell._pointee = _pointee
@@ -1010,7 +775,7 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
   // this checks if two cells correspond to the same unified cell in their node
   // weaker equals
   def equiv(other: IntervalCell): Boolean = {
-    graph.get(this.node.get(this.interval)).equals(graph.get(other.node.get(other.interval)))
+    graph.get(this).equals(graph.get(other))
   }
 
   def removePointee: Option[IntervalCell] = {
@@ -1033,8 +798,8 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
     else if _pointee.isEmpty then
 //      throw Exception("expected a pointee")
       assert(this.node.isUptoDate)
-      _pointee = Some(IntervalNode(graph, mutable.Map.empty).add(0))
-      _pointee.get
+      _pointee = Some(IntervalNode(graph, Map.empty).add(0))
+      graph.find(_pointee.get)
     else graph.find(_pointee.get)
   }
 
@@ -1047,26 +812,172 @@ class IntervalCell(val node: IntervalNode, val interval: Interval) {
     else if _pointee.isEmpty then
       assert(node.cells.contains(this))
       _pointee = Some(cell)
-      _pointee.get
-    else if cell.equiv(this) then
-      assert(node.cells.contains(this))
-      val pointee = this.removePointee.get
-      val newThis = graph.mergeCells(pointee, this)
-      graph.mergePointees(newThis, newThis.getPointee)
-      this._pointee = Some(graph.mergeCells(newThis, newThis.getPointee))
-      assert(this._pointee.get.equiv(pointee))
-      assert(this._pointee.get.equiv(this))
-      _pointee.get
-    else // if a cell points to itself break the link,
-      assert(node.cells.contains(this))
-      graph.mergePointees(this.getPointee, cell)
-      this._pointee = Some(graph.mergeCells(cell, graph.get(this).getPointee))
-      graph.get(this)._pointee = this._pointee
-      _pointee.get
+      cell
+    else graph.mergeCells(cell, this.getPointee)
   }
 }
 
+class IntervalDSA(irContext: IRContext) {
+  def pre(): (Map[Procedure, SymValues[DSInterval]], Map[Procedure, Set[Constraint]]) = {
+    var sva: Map[Procedure, SymValues[DSInterval]] = Map.empty
+    var cons: Map[Procedure, Set[Constraint]] = Map.empty
+    computeDSADomain(irContext.program.mainProcedure, irContext).toSeq
+      .sortBy(_.name)
+      .foreach(proc =>
+        val SVAResults = getSymbolicValues[DSInterval](proc)
+        val constraints = generateConstraints(proc)
+        sva += (proc -> SVAResults)
+        cons += (proc -> constraints)
+      )
+    (sva, cons)
+  }
+
+  def dsa(config: DSAConfig): DSAContext = {
+    val DSATimer = PerformanceTimer("DSA Timer", INFO)
+    val (sva, cons) = pre()
+    DSATimer.checkPoint("Finished SVA")
+
+    var dsaContext = DSAContext(sva, cons, Map.empty, Map.empty, Map.empty, Map.empty)
+    if (config == Standard || config == Checks) then
+      val checks = config == Checks
+      DSALogger.info("Finished Computing Constraints")
+      val globalGraph =
+        IntervalDSA.getLocal(
+          irContext.program.mainProcedure,
+          irContext,
+          SymValues[DSInterval](Map.empty),
+          Set[Constraint]()
+        )
+      val DSA = IntervalDSA.getLocals(irContext, sva, cons)
+      DSATimer.checkPoint("Finished DSA Local Phase")
+      if checks then
+        DSA.values.foreach(checkUniqueGlobal)
+        IntervalDSA.checkReachable(irContext.program, DSA)
+        DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
+        DSA.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness checks")
+
+      val DSABU = IntervalDSA.solveBUs(DSA)
+      DSATimer.checkPoint("Finished DSA BU Phase")
+      if checks then
+        DSABU.values.foreach(checkUniqueGlobal)
+        DSABU.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness check")
+      val DSATD = IntervalDSA.solveTDs(DSABU)
+      DSATimer.checkPoint("Finished DSA TD Phase")
+      if checks then
+        DSATD.values.foreach(checkUniqueGlobal)
+        DSATD.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness check")
+
+      DSATD.values.foreach(g => IntervalDSA.globalTransfer(g, globalGraph))
+      val globalMapping = DSATD.values.foldLeft(Map[IntervalNode, IntervalNode]()) { (m, g) =>
+        val oldToNew = IntervalDSA.globalTransfer(globalGraph, g)
+        m ++ oldToNew.map((common, spec) => (spec, common))
+
+      }
+      DSATimer.checkPoint("Finished DSA global graph")
+
+      if checks then
+        DSATD.values.foreach(checkUniqueGlobal)
+        DSATD.values.foreach(_.localCorrectness())
+        IntervalDSA.checkConsistGlobals(DSATD, globalGraph)
+        IntervalDSA.checkReachable(irContext.program, DSATD)
+        DSALogger.info("Performed correctness check")
+        DSATimer.checkPoint("Finished DSA Invariant Check")
+
+      dsaContext = dsaContext.copy(local = DSA, bottomUp = DSABU, topDown = DSATD, globals = globalMapping)
+
+    dsaContext
+  }
+
+}
+
 object IntervalDSA {
+
+  def checksGlobalMaintained(graph: IntervalGraph): Unit = {
+    assert(!graph.find(graph.nodes(Global)).isCollapsed, s"${graph.proc.procName} had it's global node collapsed}")
+  }
+
+  def globalTransfer(
+    source: IntervalGraph,
+    target: IntervalGraph,
+    oldToNew: mutable.Map[IntervalNode, IntervalNode] = mutable.Map.empty
+  ): Map[IntervalNode, IntervalNode] = {
+    DSALogger.info(s"cloning globalNode from ${source.proc.procName}")
+    val targetGlobal = target.find(target.nodes(Global).get(0))
+    var sourceGlobal = source.find(source.nodes(Global).get(0))
+    val globalNode = sourceGlobal.node.clone(target, true, oldToNew)
+
+    sourceGlobal = globalNode.get(sourceGlobal.interval)
+    target.mergeCells(sourceGlobal, targetGlobal)
+    oldToNew.map((old, outdatedNew) => (old, target.find(outdatedNew))).toMap
+  }
+
+  def callTransfer(phase: DSAPhase, cons: DirectCallConstraint, source: IntervalGraph, target: IntervalGraph): Unit = {
+    require(phase == TD || phase == BU)
+    val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
+    globalTransfer(source, target, oldToNew)
+    val unchanged = Set("R29", "R30", "R31")
+    DSALogger.info(s"cloning ${source.proc.procName} into ${target.proc.procName}, $phase")
+    cons.inParams
+      .filterNot(f => unchanged.exists(i => f._1.name.startsWith(i)))
+      .filter(f => cons.target.formalInParam.contains(f._1))
+      .foreach { case (formal, actual) =>
+        val (sourceExpr, targetExpr) = if phase == TD then (actual, formal) else (formal, actual)
+        exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
+      }
+
+    cons.outParams
+      .filterNot(f => unchanged.exists(i => f._1.name.startsWith(i)))
+      .filter(f => cons.target.formalOutParam.contains(f._1))
+      .foreach { case (out, actual) =>
+        val (sourceExpr, targetExpr) = if phase == TD then (actual, out) else (out, actual)
+        exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
+      }
+    // TODO add unification between unused indirect call out params and their corresponding input version
+  }
+
+  def exprTransfer(
+    sourceExpr: Expr,
+    targetExpr: Expr,
+    source: IntervalGraph,
+    target: IntervalGraph,
+    oldToNew: mutable.Map[IntervalNode, IntervalNode]
+  ): Unit = {
+    val sourceCells = source
+      .exprToCells(sourceExpr)
+      .map(source.find)
+      .map(cell =>
+        assert(cell.node.isUptoDate)
+        val (node, offset) =
+          target.findNode(cell.node.clone(target, true, oldToNew))
+        node.get(cell.interval.move(i => i + offset))
+      )
+      .map(target.find)
+    val targetCells = target.exprToCells(targetExpr).map(target.find)
+
+    if (targetCells ++ sourceCells).nonEmpty then target.mergeCells(targetCells ++ sourceCells)
+
+    sourceCells.foreach(cell =>
+      val node = target.find(cell.node)
+      val sourceBases = node.bases
+      sourceBases.foreach {
+        case (base, off) if target.nodes.contains(base) =>
+          val t = target.find(target.nodes(base).get(0))
+          if t.node.isCollapsed || cell.node.isCollapsed then target.mergeCells(cell, t)
+          else if off.size == 1 then target.mergeCells(node.get(off.head), t)
+          else {
+            assert(base != Global)
+            DSALogger.warn(
+              s"hit this case, $base, $off, source: ${source.proc.procName}, Source Expr: $sourceExpr,  target: ${target.proc.procName}, targetExpr: $targetExpr "
+            )
+            target.mergeCells(node.collapse(), t)
+          }
+        case _ =>
+      }
+    )
+  }
 
   def getPointers(graph: IntervalGraph): Map[IntervalCell, Set[IntervalCell]] = {
     val (nodes, edges) = graph.collect()
@@ -1089,14 +1000,38 @@ object IntervalDSA {
     val queue = mutable.Queue[IntervalNode]().enqueueAll(entry)
     while queue.nonEmpty do {
       val node = queue.dequeue()
-      node.bases.keys /*.filterNot(b => b.isInstanceOf[Ret] || b.isInstanceOf[Heap] || b.isInstanceOf[Par])*/ .foreach(
-        base => assert(!found.contains(base) || found(base) == node, s"$base was in $node and ${found(base)}")
+      node.bases.keys.foreach(base =>
+        assert(!found.contains(base) || found(base) == node, s"$base was in $node and ${found(base)}")
       )
       node.bases.keys.foreach(found.update(_, node))
       seen.add(node)
       val toDo = node.cells.filter(_.hasPointee).map(_.getPointee).map(_.node).filterNot(seen.contains)
       queue.enqueueAll(toDo)
     }
+  }
+
+  def checkUniqueGlobal(graph: IntervalGraph): Unit = {
+    var found: Option[IntervalNode] = None
+    val seen = mutable.Set[IntervalNode]()
+    val entry = graph.nodes.values.map(graph.find)
+    val queue = mutable.Queue[IntervalNode]().enqueueAll(entry)
+    while queue.nonEmpty do {
+      val node = queue.dequeue()
+      if node.bases.contains(Global) then {
+        assert(found.isEmpty || found.get == node)
+        found = Some(node)
+      }
+      seen.add(node)
+      val toDo = node.cells.filter(_.hasPointee).map(_.getPointee).map(_.node).filterNot(seen.contains)
+      queue.enqueueAll(toDo)
+    }
+  }
+
+  private def isNonGlobalConstant(expr: Expr, isGlobal: Int => Boolean): Boolean = {
+    expr match
+      case literal: BitVecLiteral =>
+        !isGlobal(literal.value.toInt)
+      case _ => false
   }
 
   /**
@@ -1113,28 +1048,28 @@ object IntervalDSA {
         val dsg = DSA(proc)
         pos match
           case load: MemoryLoad =>
-            val pointers = dsg.exprToCells(load.index)
+            val pointers = dsg.exprToCells(load.index).map(dsg.find)
             assert(
-              pointers.nonEmpty,
+              pointers.nonEmpty || isNonGlobalConstant(load.index, dsg.isGlobal),
               "Expected cells for indices used in reachable memory access to have corresponding DSA cells"
             )
             assert(
-              pointers.filter(_.hasPointee).map(_.getPointee).size == 1,
-              "Expected index cells to have unified pointer"
+              pointers.filter(_.hasPointee).map(_.getPointee).map(dsg.get).size <= 1,
+              s"Expected index cells to have unified pointer}"
             )
             assert(
               !pointers.exists(_.hasPointee) || pointers.forall(_.hasPointee),
               "expected all/none of the pointers to have pointer"
             )
           case store: MemoryStore =>
-            val pointers = dsg.exprToCells(store.index)
+            val pointers = dsg.exprToCells(store.index).map(dsg.find)
             assert(
               pointers.nonEmpty,
-              "Expected cells for indices used in reachable memory access to have corresponding DSA cells"
+              s"Expected cells for indices used in reachable memory access to have corresponding DSA cells"
             )
             assert(
-              pointers.filter(_.hasPointee).map(_.getPointee).size == 1,
-              "Expected index cells to have unified pointer"
+              pointers.filter(_.hasPointee).map(_.getPointee).map(dsg.get).size <= 1,
+              s"Expected index cells to have unified pointer"
             )
             assert(
               !pointers.exists(_.hasPointee) || pointers.forall(_.hasPointee),
@@ -1152,11 +1087,11 @@ object IntervalDSA {
    */
   def checkConsistGlobals(DSA: Map[Procedure, IntervalGraph], global: IntervalGraph): Unit = {
     // collect all the regions  from all the resulting graphs
-    val unifiedRegions = global.nodes(Global).bases
+    val unifiedRegions = global.find(global.nodes(Global)).bases
     DSA
       .filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
       .foreach((p, graph) =>
-        val graphRegions = graph.nodes(Global).bases
+        val graphRegions = graph.find(graph.nodes(Global)).bases
         assert(
           unifiedRegions == graphRegions,
           s"Procedure ${p.procName} had a differing unified global sets than compared to the global graph"
@@ -1167,18 +1102,17 @@ object IntervalDSA {
   def getLocal(
     proc: Procedure,
     context: IRContext,
-    symValues: SymValues[Interval],
+    symValues: SymValues[DSInterval],
     cons: Set[Constraint]
   ): IntervalGraph = {
     val graph = IntervalGraph(proc, Local, context, symValues, cons, None)
     graph.localPhase()
-    graph.localCorrectness()
-    graph.clone
+    graph
   }
 
   def getLocals(
     ctx: IRContext,
-    svas: Map[Procedure, SymValues[Interval]],
+    svas: Map[Procedure, SymValues[DSInterval]],
     cons: Map[Procedure, Set[Constraint]]
   ): Map[Procedure, IntervalGraph] = {
     DSALogger.info("Performing local DSA")
@@ -1193,13 +1127,12 @@ object IntervalDSA {
 
     DSALogger.info("Performing DSA BU phase")
     val bus = locals.view.mapValues(_.clone).toMap
-    bus.values.foreach(_.localCorrectness())
     DSALogger.info("performed cloning")
     val visited: mutable.Set[Procedure] = mutable.Set.empty
     val queue = mutable.Queue[Procedure]().enqueueAll(bus.keys.toSeq.sortBy(p => p.name))
 
     // TODO instead of skipping merge the scc and use it directly
-    var skip = Seq("croak", "myexit")
+    var skip = Seq.empty
     while queue.nonEmpty do
       val proc = queue.dequeue()
       if skip.exists(name => proc.name.startsWith(name)) then
@@ -1212,7 +1145,7 @@ object IntervalDSA {
         DSALogger.info(s"performing BU for ${proc.name}")
         bus(proc).contextTransfer(BU, bus)
         visited += proc
-    bus.view.mapValues(_.clone).toMap
+    bus
   }
 
   def solveTDs(bus: Map[Procedure, IntervalGraph]): Map[Procedure, IntervalGraph] = {
@@ -1222,7 +1155,7 @@ object IntervalDSA {
     val queue = mutable.Queue[Procedure]().enqueueAll(tds.keys.toSeq.sortBy(p => p.name))
 
     // TODO instead of skipping merge the scc and use it directly
-    var skip = Seq("croak", "myexit")
+    var skip = Seq.empty
     while queue.nonEmpty do
       val proc = queue.dequeue()
       if skip.exists(name => proc.name.startsWith(name)) then
@@ -1235,7 +1168,72 @@ object IntervalDSA {
         DSALogger.info(s"performing TD for ${proc.name}")
         tds(proc).contextTransfer(TD, tds)
         visited += proc
-
-    tds.view.mapValues(_.clone).toMap
+    tds
   }
+}
+
+enum DSAPhase {
+  case Pre, Local, BU, TD
+}
+
+class DSFlag {
+  var collapsed = false
+  var function = false
+  var stack = false
+  var heap = false
+  var global = false
+  var unknown = false
+  var escapes = false
+  var read = false
+  var modified = false
+  var incomplete = false
+  var foreign = false
+  var merged = false
+
+  def join(other: DSFlag): Unit =
+    collapsed = collapsed || other.collapsed
+    stack = other.stack || stack
+    heap = other.heap || heap
+    global = other.global || global
+    unknown = other.unknown || unknown
+    read = other.read || read
+    escapes = escapes || other.escapes
+    modified = other.modified || modified
+    incomplete = other.incomplete || incomplete
+    foreign = other.foreign && foreign
+    merged = true
+    function = function || other.function
+}
+
+def joinFlags(pointers: Iterable[IntervalCell]): DSFlag = {
+  val flag = DSFlag()
+  pointers.foreach(c => flag.join(c.node.flags))
+  flag
+}
+
+def estimateStackSize(program: Program): Map[Procedure, Option[Int]] = {
+  program.procedures.foldLeft(Map[Procedure, Option[Int]]()) { (m, proc) =>
+    val size = proc.collectFirst {
+      case LocalAssign(_, BinaryExpr(BVADD, Register("R31", 64), arg2: BitVecLiteral), _) if isNegative(arg2) =>
+        bv2SignedInt(arg2).toInt * -1
+    }
+    m + (proc -> size)
+  }
+}
+
+def computeDSADomain(proc: Procedure, context: IRContext): Set[Procedure] = {
+  var domain: Set[Procedure] =
+    Set(proc) ++ (context.program.procedures.filter(f => context.funcEntries.map(_.name).contains(f.procName)))
+
+  val stack: mutable.Stack[Procedure] = mutable.Stack()
+  stack.pushAll(domain.flatMap(_.calls))
+
+  // calculate the procedures used in the program
+  while (stack.nonEmpty) {
+    val current = stack.pop()
+    domain += current
+    stack.pushAll(current.calls.diff(domain))
+  }
+
+  domain
 }

@@ -1,6 +1,6 @@
 package analysis.data_structure_analysis
 
-import analysis.data_structure_analysis.OSet.Values
+import analysis.data_structure_analysis.OSet.{Top, Values}
 import ir.eval.BitVectorEval.bv2SignedInt
 import ir.*
 import ir.transforms.{AbstractDomain, worklistSolver}
@@ -100,32 +100,38 @@ object DSAVarOrdering extends Ordering[LocalVar] {
   }
 }
 
-def toOffsetMove(op: BinOp, arg: BitVecLiteral): Int => Int = {
+def toOffsetMove[T <: Offsets](op: BinOp, arg: BitVecLiteral | T, domain: OffsetDomain[T]): T => T = {
+  val value = arg match {
+    case bv: BitVecLiteral => domain.init(bv2SignedInt(bv).toInt)
+    case off: T => off
+  }
   op match
-    case BVADD => (i: Int) => i + bv2SignedInt(arg).toInt
-    case BVSUB => (i: Int) => i - bv2SignedInt(arg).toInt
+    case BVADD => (i: T) => domain.add(i, value)
+    case BVSUB => (i: T) => domain.add(i, value, neg = true)
     case _ => throw Exception(s"Usupported Binary Op $op")
 }
 
 trait Offsets {
   def toOffsets: Set[Int]
-  def toIntervals: Set[Interval]
+  def toIntervals: Set[DSInterval]
 }
 trait OffsetDomain[T <: Offsets] extends AbstractDomain[T] {
   def init(i: Int): T
   def init(s: Set[Int]): T
   def shouldWiden(v: T): Boolean
   def transform(v: T, f: Int => Int): T
+  def transform(v: T, f: T => T)(implicit dummyImplicit: DummyImplicit): T = f(v)
+  def add(a: T, b: T, neg: Boolean = false): T
 }
 
 enum OSet extends Offsets {
   case Top
   case Values(v: Set[Int])
 
-  override def toIntervals: Set[Interval] = {
+  override def toIntervals: Set[DSInterval] = {
     this match
-      case OSet.Top => Set(Interval.Top)
-      case OSet.Values(v) => v.map(i => Interval(i, i + 1))
+      case OSet.Top => Set(DSInterval.Top)
+      case OSet.Values(v) => v.map(i => DSInterval(i, i + 1))
   }
   override def toOffsets: Set[Int] = {
     this match
@@ -134,27 +140,45 @@ enum OSet extends Offsets {
   }
 }
 
-given IntervalDomain: OffsetDomain[Interval] with {
+given IntervalDomain: OffsetDomain[DSInterval] with {
 
-  override def init(i: Int): Interval = Interval(i, i)
+  override def init(i: Int): DSInterval = DSInterval(i, i)
 
-  override def init(s: Set[Int]): Interval = Interval(s.min, s.max)
+  override def init(s: Set[Int]): DSInterval = DSInterval(s.min, s.max)
 
-  override def shouldWiden(v: Interval): Boolean = false
+  override def shouldWiden(v: DSInterval): Boolean = false
 
-  override def transform(v: Interval, f: Int => Int): Interval = {
+  override def transform(v: DSInterval, f: Int => Int): DSInterval = {
     v.move(f)
   }
 
-  override def widen(a: Interval, b: Interval, pos: Block): Interval = Interval.Top
+  override def widen(a: DSInterval, b: DSInterval, pos: Block): DSInterval = DSInterval.Top
 
-  override def join(a: Interval, b: Interval, pos: Block): Interval = a.join(b)
+  override def join(a: DSInterval, b: DSInterval, pos: Block): DSInterval = a.join(b)
 
-  override def transfer(a: Interval, b: Command): Interval = ???
+  override def transfer(a: DSInterval, b: Command): DSInterval = ???
 
-  override def top: Interval = Interval.Top
+  override def top: DSInterval = DSInterval.Top
 
-  override def bot: Interval = Interval.Bot
+  override def bot: DSInterval = DSInterval.Bot
+
+  override def add(a: DSInterval, b: DSInterval, neg: Boolean): DSInterval = {
+    (a, b) match {
+      case (DSInterval.Top, _) => DSInterval.Top
+      case (_, DSInterval.Top) => DSInterval.Top
+      case (a, DSInterval.Bot) => a
+      case (DSInterval.Bot, b) => b
+      case (DSInterval.Value(s1, e1), DSInterval.Value(s2, e2)) =>
+        val (s3, e3) = if neg then (-s2, -e2) else (s2, e2)
+        val o1 = s1 + s3
+        val o2 = s1 + e3
+        val o3 = s3 + e1
+        val o4 = e3 + e1
+
+        val values = Set(o1, o2, o3, o4)
+        DSInterval(values.reduce(Math.min), values.reduce(Math.max))
+    }
+  }
 }
 
 given OSetDomain: OffsetDomain[OSet] with {
@@ -185,6 +209,12 @@ given OSetDomain: OffsetDomain[OSet] with {
   }
 
   override def init(s: Set[Int]): OSet = Values(s)
+
+  override def add(a: OSet, b: OSet, neg: Boolean): OSet = {
+    if a == Top || b == OSet.Top then OSet.Top
+    else if neg then init(a.toOffsets.flatMap(i => b.toOffsets.map(j => i - j)))
+    else init(a.toOffsets.flatMap(i => b.toOffsets.map(j => i + j)))
+  }
 }
 
 case class SymValSet[T <: Offsets](state: Map[SymBase, T])
@@ -196,7 +226,7 @@ object SymValSet {
 }
 
 given OSetSymValSetDomain: SymValSetDomain[OSet] = SymValSetDomain[OSet]()
-given IntervalSymValDomain: SymValSetDomain[Interval] = SymValSetDomain[Interval]()
+given IntervalSymValDomain: SymValSetDomain[DSInterval] = SymValSetDomain[DSInterval]()
 class SymValSetDomain[T <: Offsets](using val offsetDomain: OffsetDomain[T]) extends AbstractDomain[SymValSet[T]] {
 
   override def join(a: SymValSet[T], b: SymValSet[T], pos: Block = Block("")): SymValSet[T] = {
@@ -228,6 +258,10 @@ class SymValSetDomain[T <: Offsets](using val offsetDomain: OffsetDomain[T]) ext
   override def transfer(a: SymValSet[T], b: Command): SymValSet[T] = ???
   def transform(s: SymValSet[T], f: Int => Int): SymValSet[T] = {
     SymValSet(s.state.map((base, offsets) => (base, offsetDomain.transform(offsets, f))))
+  }
+
+  def transform(s: SymValSet[T], f: T => T)(implicit dummyImplicit: DummyImplicit): SymValSet[T] = {
+    SymValSet(s.state.view.mapValues(f).toMap)
   }
   override def top: SymValSet[T] = ???
   override def bot: SymValSet[T] = SymValSet(Map.empty)
@@ -265,31 +299,41 @@ object SymValues {
     symValSetDomain: SymValSetDomain[T]
   )(
     expr: Expr,
-    transform: Int => Int = identity,
+    transform: (T => T) = identity[T],
     replace: LocalVar => LocalVar = identity,
     block: Block = Block("")
   ): SymValSet[T] = {
+    val oDomain = symValSetDomain.offsetDomain
     expr match
-      case literal @ BitVecLiteral(value, size) => symValSetDomain.init(Global, transform(bv2SignedInt(literal).toInt))
+      case literal @ BitVecLiteral(value, size) =>
+        symValSetDomain.init(Global, transform(oDomain.init(bv2SignedInt(literal).toInt)))
       case literal @ IntLiteral(value) => symValSetDomain.init(Global, value.toInt)
       case Extract(end, start, body) if end - start >= 64 => exprToSymValSet(symValues)(body, transform)
       case Extract(32, 0, body) =>
         exprToSymValSet(symValues)(body, transform) // todo incorrectly assuming value is preserved
       case ZeroExtend(extension, body) => exprToSymValSet(symValues)(body, transform)
       case binExp @ BinaryExpr(BVADD | BVSUB, arg1, arg2: BitVecLiteral) =>
-        val oPlus = toOffsetMove(binExp.op, arg2)
+        val oPlus = toOffsetMove(binExp.op, arg2, oDomain)
+        exprToSymValSet(symValues)(arg1, oPlus)
+      case binExp @ BinaryExpr(BVADD | BVSUB, arg1, arg2: Expr)
+          if arg2.variables.size == 1 && symValues.state
+            .getOrElse(arg2.variables.head.asInstanceOf[LocalVar], symValSetDomain.bot)
+            .state
+            .keySet == Set(Global) =>
+        val oPlus =
+          toOffsetMove(binExp.op, symValues.state(arg2.variables.head.asInstanceOf[LocalVar]).state(Global), oDomain)
         exprToSymValSet(symValues)(arg1, oPlus)
       case variable: LocalVar =>
         symValSetDomain.transform(symValues.state.getOrElse(replace(variable), symValSetDomain.bot), transform)
       case Extract(end, start, body) if end - start < 64 =>
-        symValSetDomain.init(NonPointer, symValSetDomain.offsetDomain.top)
-      case BinaryExpr(BVCOMP, _, _) => symValSetDomain.init(NonPointer, Set(0, 1).map(transform))
+        symValSetDomain.init(NonPointer, oDomain.top)
+      case BinaryExpr(BVCOMP, _, _) => symValSetDomain.transform(symValSetDomain.init(NonPointer, Set(0, 1)), transform)
       case e @ (BinaryExpr(_, _, _) | SignExtend(_, _) | UnaryExpr(_, _)) =>
         val updated = e.variables
           .map(_.asInstanceOf[LocalVar])
           .collect { case locVar: LocalVar if symValues.state.contains(locVar) => symValues.state(locVar) }
           .flatMap(_.state)
-          .map((base, _) => (base, symValSetDomain.offsetDomain.top))
+          .map((base, _) => (base, oDomain.top))
           .toMap
         SymValSet(updated)
       case _ => ???
@@ -323,7 +367,7 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) e
   private def procInitState(b: Block): Map[LocalVar, SymValSet[T]] = {
     val proc = b.parent
     Map(
-      stackPointer -> symValSetDomain.init(Stack(proc), proc.stackSize.getOrElse(0)),
+      stackPointer -> symValSetDomain.init(Stack(proc)),
       linkRegister -> symValSetDomain.init(Par(proc, linkRegister)),
       framePointer -> symValSetDomain.init(Par(proc, framePointer))
     ) ++
@@ -341,7 +385,7 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) e
 
   override def join(a: SymValues[T], b: SymValues[T], pos: Block): SymValues[T] = {
     count.update(pos, count(pos) + 1)
-    if count(pos) < 100 then joinHelper(a, b, pos) else widen(a, b, pos)
+    if count(pos) < 1000 then joinHelper(a, b, pos) else widen(a, b, pos)
   }
 
   override def transfer(a: SymValues[T], b: Command): SymValues[T] = {
