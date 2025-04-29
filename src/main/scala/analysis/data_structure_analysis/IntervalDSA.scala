@@ -480,21 +480,27 @@ class IntervalGraph(
     val node2Pointees = getOutEdges(cell2.node)
 
     val result =
-      if get(cell1) == get(cell2) then cell1
-      else if cell1.node.equals(cell2.node) then cell1.node.collapse()
-      else if cell1.node.isCollapsed || cell2.node.isCollapsed then
+      if cell1.equiv(cell2) then cell1
+      else if cell1.node.isCollapsed || cell2.node.isCollapsed then {
         cell1.node.collapse()
         find(cell2).node.collapse()
         mergeCellsHelper(find(cell1), find(cell2))
-      else mergeCellsHelper(cell1, cell2)
+      } else if cell1.node.equals(cell2.node) then {
+        cell1.node.eqClasses += Set(cell1, cell2)
+        cell1.node.maintainEqClasses()
+        assert(find(cell1).node.eqClassProperty())
+        find(cell1)
+      }  else mergeCellsHelper(cell1, cell2)
+
+    assert(result.node.isUptoDate)
+    assert(result.node.eqClassProperty())
 
     assert(result.equiv(get(cell1)))
     assert(result.equiv(get(cell2)))
     checkEdgesAreMaintained(node1Pointees)
     checkEdgesAreMaintained(node2Pointees)
 
-    assert(result.node.isUptoDate)
-    result
+   result
   }
 
   def mergeCells(cells: Iterable[IntervalCell]): IntervalCell = {
