@@ -3,7 +3,7 @@ package analysis.data_structure_analysis
 import analysis.data_structure_analysis.DSAPhase.{BU, Local, TD}
 import analysis.data_structure_analysis.DSInterval.Top
 import analysis.data_structure_analysis.IntervalDSA.{checkUniqueGlobal, checksGlobalMaintained}
-import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
+import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver, UnionFindSolver}
 import boogie.SpecGlobal
 import specification.FuncEntry
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
