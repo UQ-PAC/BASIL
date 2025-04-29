@@ -433,6 +433,7 @@ class IntervalGraph(
     val nodeToBeMoved = toBeMoved.node
 
     // bookkeeping
+    if delta.nonEmpty then stableNode.eqClasses ++= nodeToBeMoved.eqClasses.map(eq => eq.map(cell => stableNode.add(cell.interval.move(i => i + delta.get))))
     stableNode.flags.join(nodeToBeMoved.flags)
     stableNode.bases ++= nodeToBeMoved.bases // compute new region alignments
       .map((base, set) =>
@@ -463,6 +464,9 @@ class IntervalGraph(
     connectSCC(scc1)
     connectSCC(scc2)
 
+    // end of unification
+
+    find(stableNode).maintainEqClasses()
     find(stableCell)
   }
 
