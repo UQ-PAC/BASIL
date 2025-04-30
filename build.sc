@@ -8,6 +8,7 @@ import contrib.scalapblib._
 
 object basil extends RootModule with ScalaModule with antlr.AntlrModule with ScalaPBModule {
   def scalaVersion = "3.3.4"
+  override def ammoniteVersion = "3.0.2"
 
   def scalacOptions: T[Seq[String]] = Seq("-deprecation")
 
@@ -37,6 +38,7 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
   }
 
   object test extends ScalaTests with TestModule.ScalaTest {
+    override def ammoniteVersion = "3.0.2"
     def ivyDeps = Agg(scalaTests, javaTests)
     def sources = T.sources { Seq(PathRef(this.millSourcePath / "scala")) }
   }
