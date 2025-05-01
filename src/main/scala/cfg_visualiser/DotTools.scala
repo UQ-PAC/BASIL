@@ -16,7 +16,7 @@ def escape(s: String) = {
   n
 }
 
-def wrap(_input: String, width: Integer = 20, first: Boolean = true): String =
+private def wrap(_input: String, width: Integer = 20, first: Boolean = true): String =
   var input = _input
 
   def cannotSplit(c: Char) = {

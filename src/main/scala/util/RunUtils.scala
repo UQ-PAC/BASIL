@@ -727,13 +727,6 @@ object RunUtils {
     DebugDumpIRLogger.writeToFile(File("il-before-dsa.il"), pp_prog(program))
 
     transforms.OnePassDSA().applyTransform(program)
-    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
-      val dir = File("./graphs/")
-      if (!dir.exists()) then dir.mkdirs()
-      for (p <- ctx.program.procedures) {
-        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-dot-simp.dot"), dotBlockGraph(p))
-      }
-    }
 
     transforms.inlinePLTLaunchpad(ctx.program)
 
@@ -871,7 +864,7 @@ object RunUtils {
       val dir = File("./graphs/")
       if (!dir.exists()) then dir.mkdirs()
       for (p <- ctx.program.procedures) {
-        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
+        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-dot-simp.dot"), dotBlockGraph(p))
       }
     }
 
