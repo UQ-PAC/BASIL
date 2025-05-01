@@ -24,7 +24,7 @@ import analysis.data_structure_analysis.given
 import translating.PrettyPrinter.pp_proc
 import util.DSAConfig.{Checks, Standard}
 
-@test_util.tags.UnitTest
+@test_util.tags.AnalysisSystemTest
 class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
