@@ -576,11 +576,29 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
    * The [[validate]] parameter further checks this is the case by checking the dsa property is preserved
    * by the propagation, by checking the reaching-definitions set at the use site.
    *
+   * This possibly relies on an implementation detail of DSA that it introduces enough clones
+   * only at the beginning and very end of loops such that any loop exists can have any dependency on the
+   * original loop variables involved in cycles without breaking dsa form when these dependencies are propaated out of the loop.
+   * Unclear if the original DSA invariant is sufficient for this,
+   * i.e. constructing a valid dsa program:
+   *
+   *      x0 := y
+   *        |
+   *        v
+   *    +->
+   *    |  CF := f(x0)
+   *    |  x0 := x0 + 1
+   *    |  |  \
+   *    ---+   z := CF
+   *
+   *  Propagating CF to z (z := f(x0)) would break dsa form. However in practice we will duplicate x0
+   *  and place a copy on the back edge so this contrived structure can't be created.
+   *
    */
 
   var defs = Map[Variable, Set[Assign]]()
 
-  def allDefinitions(p: Procedure) = {
+  def allDefinitions(p: Procedure): Map[Variable, Set[Assign]] = {
     p.collect { case a: Assign =>
       a.assignees.map(l => l -> a)
     }.flatten
@@ -650,8 +668,6 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
 
   override def vstmt(s: Statement) = s match {
     case a @ Assume(body, b, c, d) if a.body.variables.exists(goodSubst) =>
-      val deps = mutable.Set[Variable]()
-      val depBlocks = mutable.Set[Assign]()
       Substitute(substitute(s))(a.body) match {
         case Some(cond) => {
           ChangeTo(List(Assume(cond, b, c, d)))
