@@ -694,15 +694,9 @@ def copypropTransform(
   val t = util.PerformanceTimer(s"simplify ${p.name} (${p.blocks.size} blocks)")
   // SimplifyLogger.info(s"${p.name} ExprComplexity ${ExprComplexity()(p)}")
   // val result = solver.solveProc(p, true).withDefaultValue(dom.bot)
-  val result = CopyProp.DSACopyProp(p, procFrames, funcEntries, constRead)
-  val solve = t.checkPoint("Solve CopyProp")
 
-  if (result.nonEmpty) {
-    val vis = Simplify(CopyProp.toResult(result))
-    visit_proc(vis, p)
-  }
+  MinCopyProp.transform(p)
 
-  visit_proc(CopyProp.BlockyProp(), p)
   simplifyCFG(p)
   transforms.fixupGuards(p)
   transforms.removeDuplicateGuard(p.blocks.toSeq)
@@ -1167,6 +1161,115 @@ object getProcFrame {
   def solveInterproc(p: Program) = {
     val solver = BottomUpCallgraphWorklistSolver[Set[Memory]](solveProc, _ => Set[Memory]())
     solver.solve(p)
+
+  }
+
+}
+
+object MinCopyProp {
+
+  // None -> Top
+  type Value = Option[Variable | Literal]
+
+  class CopyProp() {
+    val st = mutable.Map[Variable, Value]()
+    var giveUp = false
+
+    def find(v: Variable): Literal | Variable = {
+      var search: Variable = v
+
+      boundary {
+        while (st.contains(search)) {
+          st(search) match {
+            case None => break(search)
+            case Some(c: Literal) => break(c)
+            case Some(v: Variable) =>
+              search = v
+          }
+        }
+        search
+      }
+    }
+
+    def specJoinState(lhs: Variable, rhs: Variable | Literal): Option[(Variable, Value)] = {
+      rhs match {
+        case v: Variable if (!st.contains(lhs)) => Some(lhs -> Some(v))
+        case v: Literal if (!st.contains(lhs)) => Some(lhs -> Some(v))
+        case v: Variable if (find(lhs) != find(v)) => Some(lhs -> None)
+        case c: Literal if (find(lhs) != c) => Some(lhs -> None)
+        case _ => None
+      }
+    }
+
+    def joinState(lhs: Variable, rhs: Variable | Literal) = {
+      specJoinState(lhs, rhs) match {
+        case Some((l, r)) => st(l) = r
+        case _ => ()
+      }
+    }
+
+    def clob(v: Variable) = {
+      st(v) = None
+    }
+
+    def transfer(s: Statement) = s match {
+      case LocalAssign(l: Variable, r: Variable, _) => joinState(l, r)
+      case LocalAssign(l: Variable, r: Literal, _) => joinState(l, r)
+      case LocalAssign(l: Variable, _, _) => clob(l)
+      // case s: SimulAssign => s.assignments.flatMap {
+      //   case (l: Variable, r: Variable) => specJoinState(l, r).toSeq
+      //   case (l: Variable, r) => Seq(l -> None)
+      // }.foreach {
+      //   case (l, r) => st(l) = r
+      // }
+      case a: Assign => {
+        // memoryload and DirectCall
+        a.assignees.foreach(clob)
+      }
+      case _: MemoryStore => ()
+      case _: NOP => ()
+      case _: Assert => ()
+      case _: Assume => ()
+      case i: IndirectCall => giveUp = true
+    }
+
+    def analyse(p: Procedure): Map[Variable, Variable | Literal] = {
+      reversePostOrder(p)
+      val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
+      worklist.addAll(p.blocks)
+      while (worklist.nonEmpty && !giveUp) {
+        val b = worklist.dequeue()
+        b.statements.foreach(transfer)
+      }
+
+      val res: Map[Variable, Variable | Literal] =
+        if giveUp then Map()
+        else
+          st.collect {
+            case (v, Some(r: Variable)) => v -> find(r)
+            case (v, Some(c: Literal)) => v -> c
+          }.toMap
+
+      res
+    }
+
+  }
+
+  def transform(p: Procedure) = {
+    val solver = CopyProp()
+    val res = solver.analyse(p)
+
+    class SubstExprs(subst: Map[Variable, Expr]) extends CILVisitor {
+      override def vexpr(e: Expr) = {
+        Substitute(subst.get)(e) match {
+          case Some(n) => ChangeTo(n)
+          case _ => SkipChildren()
+        }
+      }
+    }
+    if (res.nonEmpty) {
+      visit_proc(SubstExprs(res), p)
+    }
 
   }
 
