@@ -201,6 +201,9 @@ def fastPartialEvalExprTopLevel(exp: Expr): (Expr, Boolean) = {
 def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S, Expr, InterpreterError] = {
   val eval = statePartialEvalExpr(l)
   val ns = exp match {
+    case m: SharedMemory => State.pure(m)
+    case m: StackMemory => State.pure(m)
+    case b: BoolExp => eval(b.toBinaryExpr)
     case f: OldExpr => State.pure(f)
     case f: QuantifierExpr => State.pure(f)
     case e: LambdaExpr => State.pure(e)
@@ -212,12 +215,14 @@ def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S,
         case l: Literal => evalUnOp(unOp.op, l)
         case o => UnaryExpr(unOp.op, body)
       })
+    case binOp: BoolExp => eval(binOp.toBinaryExpr)
     case binOp: BinaryExpr =>
       for {
         lhs <- eval(binOp.arg1)
         rhs <- eval(binOp.arg2)
       } yield (binOp.getType match {
         case m: MapType => binOp
+        case m: CustomSort => binOp
         case b: BitVecType => {
           (binOp.op, lhs, rhs) match {
             case (o: BVBinOp, l: BitVecLiteral, r: BitVecLiteral) => evalBVBinExpr(o, l, r)
@@ -326,7 +331,7 @@ class SubstOnce(s: Variable => Option[Expr]) extends CILVisitor {
     scopeStack = bound.toSet :: scopeStack
   }
   override def leave_scope(): Unit =
-    scopeStack match {
+    scopeStack = scopeStack match {
       case h :: tl => tl
       case Nil => Nil
     }

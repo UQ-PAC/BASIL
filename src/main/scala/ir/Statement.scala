@@ -80,7 +80,10 @@ class SimulAssign(var assignments: Vector[(Variable, Expr)], override val label:
 }
 
 object SimulAssign {
-  def unapply(l: SimulAssign): Some[(Vector[(Variable, Expr)], Option[String])] = Some((l.assignments, l.label))
+  def unapply(l: SimulAssign | LocalAssign): Some[(Vector[(Variable, Expr)], Option[String])] = l match {
+    case LocalAssign(lhs, rhs, label) => Some(Vector(lhs -> rhs), label)
+    case s: SimulAssign => Some((s.assignments, s.label))
+  }
 }
 
 object LocalAssign {

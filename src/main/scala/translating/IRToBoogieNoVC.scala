@@ -42,12 +42,11 @@ object BoogieTranslator {
   def translateStatement(s: Statement): Iterable[BCmd] = s match {
     case m: NOP => Seq()
     case m: SimulAssign if m.assignments.isEmpty => Seq()
-    case m: SimulAssign => {
+    case m: SimulAssign =>
       val a = m.assignments
       val lhs = a.map(_._1).map(translateVar).toList
       val rhs = a.map(_._2).map(translateExpr).toList
       Seq(AssignCmd(lhs, rhs))
-    }
     case l: LocalAssign =>
       val lhs: BVar = translateVar(l.lhs)
       val rhs = translateExpr(l.rhs)
@@ -107,12 +106,6 @@ object BoogieTranslator {
   def translateProc(freeRequires: Iterable[BExpr] = Set(), freeEnsures: Iterable[BExpr] = Set())(
     e: Procedure
   ): BProcedure = {
-
-    val locals = {
-      val vars = FindVars()
-      cilvisitor.visit_proc(vars, e)
-      vars.locals
-    }
 
     val body: List[BCmdOrBlock] =
       (e.entryBlock.view ++ e.blocks.filterNot(x => e.entryBlock.contains(x))).map(x => translateBlock(x)).toList

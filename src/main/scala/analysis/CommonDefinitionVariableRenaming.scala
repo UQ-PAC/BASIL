@@ -56,6 +56,10 @@ def getCommonDefinitionVariableRenaming(
       val (st, x) = acc
       val nx = s match {
         case a: SingleAssign => x.updated(a.lhs, nextSSACount())
+        case a: SimulAssign =>
+          a.assignments.foldLeft(x) { case (s, (lhs, rhs)) =>
+            s.updated(lhs, nextSSACount())
+          }
         case p: Procedure =>
           val params = RNAResult(p).map(v => (v, nextSSACount())).toMap
           Logger.debug(s"${p.name} $params")

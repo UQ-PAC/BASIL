@@ -260,12 +260,13 @@ object DepthFirstSearch {
   }
 
   trait DFSVisitor[O <: CFGPosition] {
-    def visitNode(firstTime: Boolean, node: O) : Action
+    def visitNode(firstTime: Boolean, node: O): Action
   }
 
-  def blockDFS(start: Block, visitor: DFSVisitor[Block]) = graphDFS[CFGPosition, Block](IntraProcBlockIRCursor)(start, visitor)
+  def blockDFS(start: Block, visitor: DFSVisitor[Block]) =
+    graphDFS[CFGPosition, Block](IntraProcBlockIRCursor)(start, visitor)
 
-  def graphDFS[T <: CFGPosition, O <: T](walker: IRWalk[T, O])(start: O, visitor: DFSVisitor[O]) : Map[O, Set[O]] = {
+  def graphDFS[T <: CFGPosition, O <: T](walker: IRWalk[T, O])(start: O, visitor: DFSVisitor[O]): Map[O, Set[O]] = {
     /*
      * DFS and return the spanning tree (digraph pointing to tree root)
      */
@@ -298,7 +299,6 @@ object DepthFirstSearch {
     spanningTreeParentMap
   }
 }
-
 
 def toDot(program: Program, labels: Map[CFGPosition, String] = Map.empty, inter: Boolean = false): String = {
   if (inter) {

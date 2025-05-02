@@ -12,14 +12,14 @@ import util.Logger
 
 val linkUninterpByAxioms = true
 
-def boolAnd2(exps: Iterable[Expr]) =
+def boolAnd(exps: Iterable[Expr]) =
   val l = exps.toList
   l.size match {
     case 0 => TrueLiteral
     case 1 => l.head
     case _ => BoolExp(BoolAND, l)
   }
-def boolAnd(exps: Iterable[Expr]) =
+def boolAnd2(exps: Iterable[Expr]) =
   exps.foldLeft(TrueLiteral: Expr)((l, r) => BinaryExpr(BoolAND, l, r))
 
 def polyEqual(e1: Expr, e2: Expr) = {
@@ -243,7 +243,7 @@ object Ackermann {
         case (None, Some(_)) => advanceSrc()
         case (Some(_), None) => advanceTgt()
         case (Some(src), Some(tgt)) => {
-            seen = seen ++ Seq(src, tgt)
+          seen = seen ++ Seq(src, tgt)
 
           val srcInfo = instantiations(src)
           val tgtInfo = instantiations(tgt)

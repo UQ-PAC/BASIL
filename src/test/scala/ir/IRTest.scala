@@ -449,12 +449,18 @@ class IRTest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("BoolExp") {
-    val x = BoolExp(BoolAND, List(LocalVar("x", BoolType), LocalVar("y", BoolType)))
+    val x = BoolExp(BoolAND, List(LocalVar("x", BoolType), LocalVar("y", BoolType), LocalVar("y", BoolType)))
     assert(x.variables.map(_.name).toSet == Set("x", "y"))
 
+    val s = Assert(x)
+
+    val n = prog(proc("x", block("xin", s, ret)))
+
     val v = translating.FindVars()
-    cilvisitor.visit_expr(v, x)
+    cilvisitor.visit_prog(v, n)
     assert(v.vars.map(_.name) == Set("x", "y"))
+    assert(v.locals.map(_.name) == Set("x", "y"))
+    assert(v.globals == Set())
 
   }
 

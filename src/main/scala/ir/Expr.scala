@@ -177,8 +177,15 @@ case class BoolExp(op: BoolBinOp, args: List[Expr]) extends Expr with CachedHash
   override def getType: IRType = BoolType
   override def toBoogie: BExpr = NaryBinExpr(op, args.map(_.toBoogie))
   override def gammas: Set[Variable] = args.flatMap(_.gammas).toSet
-  override def variables = args.flatMap(_.variables).toSet
+  override def variables = args.toSet.flatMap(_.variables).toSet
   override def toString() = "(" + args.mkString(op.toString) + ")"
+
+  def toBinaryExpr = {
+    val i = BinaryExpr(op, args.head, args.tail.head)
+    val rest = args.tail.tail
+    rest.foldLeft(i)((acc, n) => BinaryExpr(op, acc, n))
+  }
+
 }
 
 case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr with CachedHashCode {

@@ -327,7 +327,16 @@ case class NaryBinExpr(op: BoolBinOp | BVEQ.type | IntEQ.type | IntADD.type, arg
     arg.last.serialiseBoogie(w)
     w.append(")")
   }
+
   override def toString = s"(${arg.mkString(" " + op.toString + " ")})"
+  override def locals: Set[BVar] = arg.flatMap(_.locals).toSet
+  override def globals: Set[BVar] = arg.flatMap(_.globals).toSet
+  override def params: Set[BVar] = arg.flatMap(_.params).toSet
+  override def specGlobals: Set[SpecGlobalOrAccess] = arg.flatMap(_.specGlobals).toSet
+  override def oldSpecGlobals: Set[SpecGlobalOrAccess] = arg.flatMap(_.oldSpecGlobals).toSet
+  override def specGammas: Set[SpecGlobalOrAccess] = arg.flatMap(_.specGammas).toSet
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = arg.flatMap(_.oldSpecGammas).toSet
+  override def loads: Set[BExpr] = arg.flatMap(_.loads).toSet
 }
 
 case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {

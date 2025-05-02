@@ -248,6 +248,7 @@ object SimplifyValidation {
         case IntType => BinaryExpr(IntEQ, a, b)
         case BoolType => BinaryExpr(BoolEQ, a, b)
         case m: MapType => ???
+        case m: CustomSort => ???
       }
     }
 
@@ -307,6 +308,7 @@ class VarNameNormalise() extends CILVisitor {
 
   def rename(v: Variable, newName: String) = {
     v match {
+      case l: GlobalVar => GlobalVar(newName, l.irType)
       case l: LocalVar => LocalVar(newName, l.irType)
       case Register(n, sz) => Register(newName, sz)
     }

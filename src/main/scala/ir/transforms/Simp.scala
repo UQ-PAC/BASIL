@@ -894,32 +894,26 @@ def validateProcWithSplits(
 
 }
 
-
-def validateProcWithSplitsInteractive(
-  validationProg: Program,
-  proc: Procedure,
-  name: String,
-  timeout: Int = 3,
-) = {
+def validateProcWithSplitsInteractive(validationProg: Program, proc: Procedure, name: String, timeout: Int = 3) = {
   val sourceBlocks = proc.blocks.filter(_.label.startsWith("source__")).toList
 
-  val isplits = sourceBlocks.map(_.jump).collect {
-    case g: GoTo => g
+  val isplits = sourceBlocks.map(_.jump).collect { case g: GoTo =>
+    g
   }
   val sourceExit = sourceBlocks.find(_.label.endsWith("SYNTH_EXIT")).get
   val sourceEntry = sourceBlocks.find(_.label.endsWith("SYNTH_ENTRY")).get
 
   type Split = Vector[(GoTo, Iterable[Block])] // assignment of targets to set of jumps
-  val origSplit : Split = isplits.toVector.map(g => g -> g.targets)
+  val origSplit: Split = isplits.toVector.map(g => g -> g.targets)
   val splitQueue = mutable.Queue[Split]()
 
   val doms = analysis.Dominators.computeDominatorTree(proc)
-  val dominates = analysis.Dominators.dominates(doms) 
+  val dominates = analysis.Dominators.dominates(doms)
   def findSplit(starting: Block) = {
     // find a goto with multiple targets on the path from sourceEntry to sourceExit
     // DOMINATES is wrong; need existence of a path not forall paths
     isplits.find(g => {
-      g.targets.size > 1 
+      g.targets.size > 1
       && dominates(starting, g.parent)
       && dominates(g.parent, sourceExit)
       // && g.targets.forall(t => dominates(t, sourceExit))
@@ -963,7 +957,6 @@ def validateProcWithSplitsInteractive(
   } else {
     SimplifyLogger.error(s"TV failure for: $name ${proc.name} :: $finalResult")
   }
-
 
 }
 
