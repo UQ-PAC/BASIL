@@ -537,7 +537,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
         if (negative) {
           BinaryExpr(ir.EQ, e, BitVecLiteral(0, s))
         } else {
-          UnaryExpr(BoolNOT, BinaryExpr(ir.EQ, e, BitVecLiteral(0, s)))
+          BinaryExpr(ir.NEQ, e, BitVecLiteral(0, s))
         }
       case BoolType =>
         if (negative) {
