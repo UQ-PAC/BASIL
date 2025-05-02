@@ -715,12 +715,7 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
       ),
       block(
         "Sqrt_4196496__1__5jlZESzjQ4a4yO3~e1nyHQ$__3",
-        Assume(
-          UnaryExpr(BoolNOT, BinaryExpr(EQ, Register("CF", 1), BitVecLiteral(BigInt("1"), 1))),
-          None,
-          None,
-          true
-        ),
+        Assume(UnaryExpr(BoolNOT, BinaryExpr(EQ, Register("CF", 1), BitVecLiteral(BigInt("1"), 1))), None, None, true),
         LocalAssign(Register("R3", 64), Register("R3", 64), Some("4196540_0")),
         goto("Sqrt_4196496__1__5jlZESzjQ4a4yO3~e1nyHQ$__5")
       ),

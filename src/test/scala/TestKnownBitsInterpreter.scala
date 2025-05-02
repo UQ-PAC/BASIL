@@ -111,12 +111,7 @@ class TestKnownBitsInterpreter
       ),
       block(
         "lknownBitsExample_goto_l0000026d",
-        Assume(
-          BinaryExpr(EQ, LocalVar("R1_in", BitVecType(64), 0), BitVecLiteral(BigInt("0"), 64)),
-          None,
-          None,
-          true
-        ),
+        Assume(BinaryExpr(EQ, LocalVar("R1_in", BitVecType(64), 0), BitVecLiteral(BigInt("0"), 64)), None, None, true),
         LocalAssign(LocalVar("R2", BitVecType(64), 9), LocalVar("R0", BitVecType(64), 3), Some("phiback")),
         goto("l00000274")
       ),

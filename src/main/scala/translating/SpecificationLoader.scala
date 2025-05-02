@@ -368,7 +368,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   // may need to make this more sophisticated and check for bool == bool
   def visitRelOp(ctx: RelOpContext): BinOp = ctx.getText match {
     case "==" => EQ
-    case "!=" => NEQ 
+    case "!=" => NEQ
     case ">" => BVSGT
     case ">=" => BVSGE
     case "<" => BVSLT

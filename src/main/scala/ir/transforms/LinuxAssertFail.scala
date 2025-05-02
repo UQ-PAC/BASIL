@@ -140,15 +140,11 @@ def liftSVComp(p: Program) = {
       }
       case d: DirectCall if d.target.procName == "__VERIFIER_assert" => {
         val arg = d.actualParams(LocalVar("R0_in", BitVecType(64)))
-        ChangeTo(
-          List(Assert(UnaryExpr(BoolNOT, BinaryExpr(EQ, arg, BitVecLiteral(0, 64))), Some("__VERIFIER_assert")))
-        )
+        ChangeTo(List(Assert(UnaryExpr(BoolNOT, BinaryExpr(EQ, arg, BitVecLiteral(0, 64))), Some("__VERIFIER_assert"))))
       }
       case d: DirectCall if d.target.procName == "__VERIFIER_assume" => {
         val arg = d.actualParams(LocalVar("R0_in", BitVecType(64)))
-        ChangeTo(
-          List(Assume(UnaryExpr(BoolNOT, BinaryExpr(EQ, arg, BitVecLiteral(0, 64))), Some("__VERIFIER_assume")))
-        )
+        ChangeTo(List(Assume(UnaryExpr(BoolNOT, BinaryExpr(EQ, arg, BitVecLiteral(0, 64))), Some("__VERIFIER_assume"))))
       }
       case _ => SkipChildren()
     }

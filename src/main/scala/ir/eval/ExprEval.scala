@@ -78,7 +78,7 @@ def evalBoolLogBinExpr(b: BoolBinOp | PolyCmp, l: Boolean, r: Boolean): Boolean 
   case BoolAND => l && r
   case BoolOR => l || r
   case BoolIMPLIES => l || (!r)
-  case EQ => l  == r
+  case EQ => l == r
   case NEQ => l != r
 }
 

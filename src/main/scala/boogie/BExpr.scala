@@ -316,7 +316,7 @@ case class UnaryBExpr(op: UnOp, arg: BExpr) extends BExpr {
 case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
   override def getType: BType = (op, arg1.getType, arg2.getType) match {
     case (_: BoolBinOp, BoolBType, BoolBType) => BoolBType
-    case (EQ | NEQ , _ , _) => BoolBType
+    case (EQ | NEQ, _, _) => BoolBType
     case (binOp: BVBinOp, bv1: BitVecBType, bv2: BitVecBType) =>
       binOp match {
         case BVCONCAT =>
@@ -387,7 +387,7 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
 
   override def toString: String = op match {
     case bOp: BoolBinOp => s"($arg1 $bOp $arg2)"
-    case EQ | NEQ  => s"($arg1 $op $arg2)"
+    case EQ | NEQ => s"($arg1 $op $arg2)"
     case bOp: BVBinOp =>
       bOp match {
         case BVCONCAT =>
@@ -400,7 +400,7 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
 
   override def functionOps: Set[FunctionOp] = {
     val thisFn = op match {
-      case EQ | NEQ  => Set()
+      case EQ | NEQ => Set()
       case b: BVBinOp =>
         b match {
           case BVCONCAT => Set()
