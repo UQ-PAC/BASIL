@@ -191,6 +191,7 @@ object Main {
 
     if (conf.help.value) {
       println(parser.helpText(sorted = false))
+      return
     }
 
     Logger.setLevel(LogLevel.INFO, false)
