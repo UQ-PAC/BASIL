@@ -1045,7 +1045,7 @@ def validatedSimplifyPipeline(p: Program) = {
 
     val (vprog, splits) = validator.getValidationProgWPConj
 
-    writeValidationProg(vprog, "DSACopyProp")
+    writeValidationProg(vprog, "OffsetCopyProp")
 
   }
 

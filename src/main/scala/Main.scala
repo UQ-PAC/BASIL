@@ -312,7 +312,7 @@ object Main {
           case _ => failed = true
         }
         Logger.info(result.toString)
-        timer.checkPoint("Finish")
+        timer.checkPoint(fname)
       }
       if (failed) {
         throw Exception("Verification failed")

@@ -374,16 +374,7 @@ case class FunctionDecl(
 
     val bparams = params.map(p => BParam(p.name, p.getType.toBoogie))
 
-    val body = definition
-      .map(_.toBoogie)
-      .orElse(name match {
-        case s"and_${_}" => Some(NaryBinExpr(BoolAND, bparams))
-        case s"or_${_}" => Some(NaryBinExpr(BoolOR, bparams))
-        case s"eq_${_}" => Some(NaryBinExpr(BoolEQ, bparams))
-        case s"implies_${_}" => Some(NaryBinExpr(BoolIMPLIES, bparams))
-        case s"intadd_${_}" => Some(NaryBinExpr(IntADD, bparams))
-        case _ => None
-      })
+    val body = definition.map(_.toBoogie)
 
     BFunction(name, bparams, BParam(returnType.toBoogie), body, attribs.map((n, v) => BAttribute(n, v)))
   def makeCall(actualParams: List[Expr] = List()) = {
