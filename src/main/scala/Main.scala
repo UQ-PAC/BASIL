@@ -153,6 +153,8 @@ object Main {
       doc = "Emit SMT2 check for validation of simplification expression rewrites 'rewrites.smt2'"
     )
     validateSimplify: Flag,
+    @arg(name = "simplify-tv", doc = "Use translation validated simplify implementation")
+    validateSimplifyFull: Flag,
     @arg(name = "verify", doc = "Run boogie on the resulting file")
     verify: Flag,
     @arg(
@@ -286,6 +288,7 @@ object Main {
       runInterpret = conf.interpret.value,
       simplify = conf.simplify.value,
       validateSimp = conf.validateSimplify.value,
+      tvSimp = conf.validateSimplifyFull.value,
       summariseProcedures = conf.summariseProcedures.value,
       staticAnalysis = staticAnalysis,
       boogieTranslation = boogieGeneratorConfig,
@@ -298,8 +301,7 @@ object Main {
     if (conf.verify.value) {
       assert(result.boogie.nonEmpty)
       var failed = false
-      for (b <- result.boogie) {
-        val fname = b.filename
+      for (fname <- result.boogieWritten ++ result.boogie.map(_.filename)) {
         val timer = PerformanceTimer("Verify", LogLevel.INFO)
         val cmd = Seq("boogie", "/useArrayAxioms", fname)
         Logger.info(s"Running: ${cmd.mkString(" ")}")

@@ -96,7 +96,8 @@ case class BASILResult(
   ir: IRContext,
   analysis: Option[StaticAnalysisContext],
   dsa: Option[DSAContext],
-  boogie: ArrayBuffer[BProgram]
+  boogie: ArrayBuffer[BProgram],
+  boogieWritten: List[String]
 )
 
 /** Tools for loading the IR program into an IRContext.
@@ -706,29 +707,26 @@ object RunUtils {
     transforms.removeEmptyBlocks(program)
   }
 
-  def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]): Unit = {
+  def doSimplifyTV(ctx: IRContext, config: Option[StaticAnalysisConfig]): Unit = {
     val program = ctx.program
     simpPreprocess(program)
     transforms.validatedSimplifyPipeline(program)
   }
 
-  def doSimplifyOld(ctx: IRContext, config: Option[StaticAnalysisConfig]): Unit = {
+  def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]): Unit = {
     // writeToFile(dotBlockGraph(program, program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
     Logger.info("[!] Running Simplify")
     val timer = PerformanceTimer("Simplify")
     val program = ctx.program
 
     val foundLoops = LoopDetector.identify_loops(program)
-    val newLoops = foundLoops.reducibleTransformIR()
-    newLoops.updateIrWithLoops()
+    foundLoops.updateIrWithLoops()
 
     for (p <- program.procedures) {
       p.normaliseBlockNames()
     }
 
     ctx.program.sortProceduresRPO()
-
-    transforms.liftSVComp(ctx.program)
 
     DebugDumpIRLogger.writeToFile(File("il-before-simp.il"), pp_prog(program))
     transforms.applyRPO(program)
@@ -745,9 +743,9 @@ object RunUtils {
     Logger.info("[!] Simplify :: DynamicSingleAssignment")
     DebugDumpIRLogger.writeToFile(File("il-before-dsa.il"), pp_prog(program))
 
-    transforms.OnePassDSA().applyTransform(program)
-
     transforms.inlinePLTLaunchpad(ctx.program)
+
+    transforms.OnePassDSA().applyTransform(program)
 
     transforms.removeEmptyBlocks(program)
 
@@ -784,9 +782,7 @@ object RunUtils {
     // assert(program.procedures.forall(transforms.rdDSAProperty))
     AnalysisResultDotLogger.writeToFile(File("blockgraph-before-copyprop.dot"), dotBlockGraph(program.mainProcedure))
     Logger.info("Copyprop Start")
-    // transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
-
-    transforms.validatedSimplifyPipeline(program)
+    transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
 
     transforms.fixupGuards(program)
     transforms.removeDuplicateGuard(program)
@@ -867,7 +863,7 @@ object RunUtils {
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
 
     ir.eval.SimplifyValidation.validate = conf.validateSimp
-    if (conf.simplify) {
+    if (conf.simplify || conf.tvSimp) {
 
       ir.transforms.clearParams(ctx.program)
 
@@ -878,7 +874,11 @@ object RunUtils {
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
       DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
 
-      doSimplify(ctx, conf.staticAnalysis)
+      if (conf.tvSimp) {
+        doSimplifyTV(ctx, conf.staticAnalysis)
+      } else {
+        doSimplify(ctx, conf.staticAnalysis)
+      }
 
       val (ts, _) = toTransitionSystem(ctx.program)
 
@@ -974,7 +974,7 @@ object RunUtils {
     }
     assert(invariant.singleCallBlockEnd(ctx.program))
 
-    BASILResult(ctx, analysis, dsaContext, boogiePrograms)
+    BASILResult(ctx, analysis, dsaContext, boogiePrograms, ir.transforms.validationProgs)
   }
 
   /** Use static analysis to resolve indirect calls and replace them in the IR until fixed point.

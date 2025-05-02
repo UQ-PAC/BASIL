@@ -19,8 +19,6 @@ def boolAnd(exps: Iterable[Expr]) =
     case 1 => l.head
     case _ => BoolExp(BoolAND, l)
   }
-def boolAnd2(exps: Iterable[Expr]) =
-  exps.foldLeft(TrueLiteral: Expr)((l, r) => BinaryExpr(BoolAND, l, r))
 
 def polyEqual(e1: Expr, e2: Expr) = {
   (e1.getType, e2.getType) match {
@@ -32,7 +30,6 @@ def polyEqual(e1: Expr, e2: Expr) = {
     case (CustomSort(x), CustomSort(y)) if x == y => BinaryExpr(BoolEQ, e1, e2)
     case (a, b) => throw Exception(s"wierd type $a == $b")
   }
-
 }
 
 class NamespaceState(val namespace: String) extends CILVisitor {

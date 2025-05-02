@@ -785,6 +785,21 @@ def validateProg(
   }
 }
 
+var validationProgs = List[String]()
+
+def writeValidationProg(progs: Iterable[Program], passName: String) = {
+  val dir = File("./tv/")
+  if (!dir.exists()) then dir.mkdirs()
+  for (p <- progs) {
+    transforms.stripUnreachableFunctions(p)
+    val boogieFileName = s"tv/${passName}_${p.mainProcedure.name}-translation-validate.bpl"
+    val boogieFile = translating.BoogieTranslator.translateProg(p).toString
+    validationProgs = boogieFileName :: validationProgs
+    util.writeToFile(boogieFile, boogieFileName)
+    SimplifyLogger.info(s"Wrote TV program : $boogieFileName")
+  }
+}
+
 def validate(validationProg: Program, procName: String, name: String, timeout: Int = 10) = {
   val boogieFileName = s"$name-translation-validate.bpl"
   val boogieFile = translating.BoogieTranslator.translateProg(validationProg).toString
@@ -962,7 +977,7 @@ def validateProcWithSplitsInteractive(validationProg: Program, proc: Procedure, 
 
 def transformAndValidate(transform: Program => Unit, name: String)(p: Program) = {
   val (progs, splits) = wrapShapePreservingTransformInValidation(transform)(p)
-  validateProgs(progs, name, splits)
+  writeValidationProg(progs, name)
 }
 
 def validatedSimplifyPipeline(p: Program) = {
@@ -972,20 +987,10 @@ def validatedSimplifyPipeline(p: Program) = {
     val validator = TranslationValidator()
     validator.setTargetProg(prog)
 
-    val results = prog.procedures.map(p => p.name -> CopyProp.DSACopyProp(p, Map(), Map(), (x, y) => None)).toMap
-    prog.procedures.foreach(p => {
-      val result = results(p.name)
-      if (result.nonEmpty) {
-        val vis = Simplify(CopyProp.toResult(result))
-        visit_proc(vis, p)
-        CleanupAssignments().transform(p)
+    prog.procedures.foreach(AlgebraicSimplifications(_))
+    val results = prog.procedures.map(p => p.name -> OffsetProp.transform(p)).toMap
 
-      }
-    })
-
-    visit_prog(CopyProp.BlockyProp(), p)
-    simplifyConds(p)
-    sliceCleanup(p)
+    // sliceCleanup(p)
     deadAssignmentElimination(p)
     combineBlocks(p)
 
@@ -1001,8 +1006,8 @@ def validatedSimplifyPipeline(p: Program) = {
 
         for ((cutName, block) <- cuts) {
           val inv = result.collect {
-            case (v, ps) if lives(block.label).contains(v) && !ps.clobbered => {
-              polyEqual(v, ps.e)
+            case (v, ps) if lives(block.label).contains(v) => {
+              polyEqual(v, ps)
             }
           }
           if (inv.nonEmpty) {
@@ -1011,7 +1016,7 @@ def validatedSimplifyPipeline(p: Program) = {
 
             val propVars = result
               .collect {
-                case (v, ps) if lives(block.label).contains(v) && !ps.clobbered => v
+                case (v, ps) if lives(block.label).contains(v) => v
               }
               .map(v => polyEqual(validator.varInTarget(v), validator.varInSource(v)))
             val eqPropVars = propVars.reduce((l, r) => BinaryExpr(BoolAND, l, r))
@@ -1040,27 +1045,20 @@ def validatedSimplifyPipeline(p: Program) = {
 
     val (vprog, splits) = validator.getValidationProgWPConj
 
-    validateProgs(vprog, "DSACopyProp", splits)
+    writeValidationProg(vprog, "DSACopyProp")
 
   }
 
   def simplifyGuards(prog: Program) = {
     val gvis = GuardVisitor()
     visit_prog(gvis, prog)
-  }
-
-  def intraBlockCopyProp(prog: Program) = {
-    visit_prog(CopyProp.BlockyProp(), prog)
+    for (p <- prog.procedures) {
+      AssumeConditionSimplifications(p)
+    }
   }
 
   def deadAssignmentElimination(prog: Program) = {
     CleanupAssignments().transform(prog)
-  }
-
-  def simplifyConds(prog: Program) = {
-    for (p <- prog.procedures) {
-      AssumeConditionSimplifications(p)
-    }
   }
 
   def sliceCleanup(prog: Program) = {
@@ -1072,17 +1070,13 @@ def validatedSimplifyPipeline(p: Program) = {
   }
 
   def combineBlocks(program: Program) = {
-    removeEmptyBlocks(program)
-    while (coalesceBlocks(program)) {}
-    removeEmptyBlocks(program)
+    program.procedures.foreach(simplifyCFG)
   }
 
   def combined(p: Program) = {
     // combineBlocks(p)
     copyProp(p)
     simplifyGuards(p)
-    simplifyConds(p)
-    intraBlockCopyProp(p)
     deadAssignmentElimination(p)
     sliceCleanup(p)
   }
@@ -1096,46 +1090,28 @@ def validatedSimplifyPipeline(p: Program) = {
 
     transforms.fixupGuards(p)
     transforms.removeDuplicateGuard(p)
-    // copyProp(p)
-    // intraBlockCopyProp(p)
-    // deadAssignmentElimination(p)
     validator.setSourceProg(p)
     validator.setDSAInvariant
-    // validator.addRDInvariant()
 
     val (vprog, splits) = validator.getValidationProgWPConj
-    validateProgs(vprog, "DynamicSingleAssignment", splits)
+    writeValidationProg(vprog, "DynamicSingleAssignment")
+    // validateProgs(vprog, "DynamicSingleAssignment", splits)
 
   }
 
-  // rpo
-  // println("Noop test")
-  // transformAndValidate(x => (), "NoopTXTest")(p)
   combineBlocks(p)
   applyRPO(p)
   dsa(p)
-//  transformAndValidate(combineBlocks, "combineBlocks")(p)
-
   copyProp(p)
   transformAndValidate(
     p => {
       simplifyGuards(p)
       removeDuplicateGuard(p)
-      simplifyConds(p)
       sliceCleanup(p)
       combineBlocks(p)
     },
-    "branch cleanup"
+    "BranchCleanup"
   )(p)
-
-// transformAndValidate(copyProp, "DSACopyProp")(p)
-  // transformAndValidate(simplifyConds, "simplifyConds")(p)
-  // transformAndValidate(intraBlockCopyProp, "blockyProp")(p)
-  // transformAndValidate(deadAssignmentElimination, "deadAssignmentElimination")(p)
-  // transformAndValidate(simplifyGuards, "simplifyGuards")(p)
-  // transformAndValidate(sliceCleanup, "BitectorExtractAndSlicesCleanup")(p)
-  // transformAndValidate(deadAssignmentElimination, "deadAssignmentElimination")(p)
-  // transformAndValidate(combineBlocks, "combineBlocks")(p)
 
   p
 }
@@ -1513,13 +1489,13 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
   SimplifyLogger.info("[!] Simplify :: Dead variable elimination")
 
   // cleanup
-  CleanupAssignments().transform(p)
+  visit_prog(CleanupAssignments(), p)
 
   SimplifyLogger.info("[!] Simplify :: Merge empty blocks")
   cleanupBlocks(p)
 
   visit_prog(CopyProp.BlockyProp(), p)
-  CleanupAssignments().transform(p)
+  visit_prog(CleanupAssignments(), p)
 
 }
 
@@ -1733,7 +1709,7 @@ object OffsetProp {
 
   }
 
-  def transform(p: Procedure) = {
+  def transform(p: Procedure): Map[Variable, Expr] = {
     val solver = CopyProp()
     val res = solver.analyse(p)
 
@@ -1748,6 +1724,7 @@ object OffsetProp {
     if (res.nonEmpty) {
       visit_proc(SubstExprs(res), p)
     }
+    res
   }
 }
 
