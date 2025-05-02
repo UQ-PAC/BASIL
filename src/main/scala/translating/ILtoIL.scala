@@ -238,7 +238,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
     node
   }
 
-  override def visitRegister(node: Register): Register = {
+  override def visitGlobalVar(node: GlobalVar): GlobalVar = {
     program ++= node.toString()
     node
   }

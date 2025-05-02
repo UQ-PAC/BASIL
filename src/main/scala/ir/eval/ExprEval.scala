@@ -215,7 +215,6 @@ def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S,
         case l: Literal => evalUnOp(unOp.op, l)
         case o => UnaryExpr(unOp.op, body)
       })
-    case binOp: BoolExp => eval(binOp.toBinaryExpr)
     case binOp: BinaryExpr =>
       for {
         lhs <- eval(binOp.arg1)

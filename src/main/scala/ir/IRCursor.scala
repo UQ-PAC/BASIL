@@ -413,7 +413,6 @@ def toDot[T <: CFGPosition](
 
     if (!dotNodes.contains(n)) {
       val r = n match {
-        case p: Program => (BasilIRPrettyPrinter()(p))
         case p: Block => (BasilIRPrettyPrinter()(p))
         case p: Statement => (BasilIRPrettyPrinter()(p))
         case _ => s"UNK: $n"
@@ -445,7 +444,7 @@ def toDot[T <: CFGPosition](
  * This doesn't implement free vars for block or proc, it just returns the rvars.
  */
 def freeVarsPos(s: CFGPosition): Set[Variable] = s match {
-  case a: LocalAssign => a.rhs.variables
+  case SimulAssign(assigns, _) => assigns.toSet.flatMap(_._2.variables)
   case a: MemoryAssign => a.rhs.variables
   case l: MemoryLoad => l.index.variables
   case a: MemoryStore => a.index.variables ++ a.value.variables

@@ -45,7 +45,7 @@ sealed trait SingleAssign extends Assign {
 
 class MemoryAssign(var lhs: Variable, var rhs: Expr, override val label: Option[String] = None) extends SingleAssign {
   override def modifies: Set[Global] = lhs match
-    case r: Register => Set(r)
+    case r: GlobalVar => Set(r)
     case _ => Set()
 
   override def toString: String = s"$labelStr$lhs := $rhs"
@@ -58,7 +58,7 @@ object MemoryAssign {
 
 class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[String] = None) extends SingleAssign {
   override def modifies: Set[Global] = lhs match {
-    case r: Register => Set(r)
+    case r: GlobalVar => Set(r)
     case _ => Set()
   }
   override def toString: String = s"$labelStr$lhs := $rhs"
@@ -80,8 +80,8 @@ class SimulAssign(var assignments: Vector[(Variable, Expr)], override val label:
 }
 
 object SimulAssign {
-  def unapply(l: SimulAssign | LocalAssign): Some[(Vector[(Variable, Expr)], Option[String])] = l match {
-    case LocalAssign(lhs, rhs, label) => Some(Vector(lhs -> rhs), label)
+  def unapply(l: SimulAssign | LocalAssign): Some[(Iterable[(Variable, Expr)], Option[String])] = l match {
+    case LocalAssign(lhs, rhs, label) => Some(Seq(lhs -> rhs), label)
     case s: SimulAssign => Some((s.assignments, s.label))
   }
 }
@@ -117,7 +117,7 @@ class MemoryLoad(
   override val label: Option[String] = None
 ) extends SingleAssign {
   override def modifies: Set[Global] = lhs match {
-    case r: Register => Set(r)
+    case r: GlobalVar => Set(r)
     case _ => Set()
   }
   override def toString: String = s"$labelStr$lhs := MemoryLoad($mem, $index, $endian, $size)"

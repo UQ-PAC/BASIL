@@ -569,7 +569,7 @@ class IRToBoogie(
     val modifies: Seq[BVar] = p.modifies.toSeq
       .flatMap {
         case m: Memory => Seq(m.toBoogie, m.toGamma)
-        case r: Register => Seq(r.toBoogie, r.toGamma)
+        case r: GlobalVar => Seq(r.toBoogie, r.toGamma)
       }
       .distinct
       .sorted

@@ -56,6 +56,8 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
       case q: QuantifierExpr => ???
       case q: LambdaExpr => ???
       case r: OldExpr => ???
+      case r: SharedMemory => ???
+      case r: StackMemory => ???
     }
   }
 
@@ -163,9 +165,12 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
       case v: Variable => vrvar(v)
       case f @ UninterpretedFunction(n, params, rt, _) => vuninterp_function(n, params.map(vexpr))
+      case BoolExp(op, args) => vbool_expr(op, args.map(vexpr))
       case q: QuantifierExpr => ???
       case q: LambdaExpr => ???
       case r: OldExpr => ???
+      case r: SharedMemory => ???
+      case r: StackMemory => ???
     }
   }
 
@@ -301,6 +306,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       case IntType => sym("Int")
       case BitVecType(sz) => list(sym("_"), sym("BitVec"), int2smt(sz))
       case MapType(pt, rt) => list(sym("Array"), basilTypeToSMTType(pt), basilTypeToSMTType(rt))
+      case CustomSort(n) => sym(n)
     }
   }
 

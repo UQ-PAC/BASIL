@@ -58,12 +58,10 @@ class NamespaceState(val namespace: String) extends CILVisitor {
 
   override def vlvar(v: Variable) = v match {
     case l: LocalVar => ChangeTo(l.copy(varName = namespace + "__" + l.varName))
-    case l: Register => ChangeTo(l.copy(name = namespace + "__" + l.name))
     case l: GlobalVar => ChangeTo(l.copy(name = namespace + "__" + l.name))
   }
   override def vrvar(v: Variable) = v match {
     case l: LocalVar => ChangeTo(l.copy(varName = namespace + "__" + l.varName))
-    case l: Register => ChangeTo(l.copy(name = namespace + "__" + l.name))
     case l: GlobalVar => ChangeTo(l.copy(name = namespace + "__" + l.name))
   }
 
@@ -125,6 +123,7 @@ object Ackermann {
 
         val (fname, args) = rg._2 match {
           case UninterpretedFunction(name, args, rt, _) => (name, args)
+          case _ => ???
         }
 
         val newargs = args.zipWithIndex.map { case (rhs, index) =>
@@ -757,11 +756,13 @@ class TranslationValidator {
               val params = p.toList.zipWithIndex.map { case (p, i) =>
                 LocalVar(s"arg$i", p.getType)
               }
-              val srcParams = params.map(varInSource).map { case l: LocalVar =>
-                l
+              val srcParams = params.map(varInSource).map {
+                case l: LocalVar => l
+                case g: GlobalVar => throw Exception("should be fresh var")
               }
-              val tgtParams = params.map(varInTarget).map { case l: LocalVar =>
-                l
+              val tgtParams = params.map(varInTarget).map {
+                case l: LocalVar => l
+                case g: GlobalVar => throw Exception("should be fresh var")
               }
 
               val lhs = boolAnd(params.map(r => polyEqual(exprInSource(r), exprInTarget(r))))

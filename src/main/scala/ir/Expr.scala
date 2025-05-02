@@ -424,17 +424,12 @@ object Variable {
   implicit def ordering[V <: Variable]: Ordering[V] = Ordering.by(_.name)
 }
 
-/** Hardware registers.
-  *
-  * These are variables with global scope (in a 'accessible from any procedure' sense), not related to the concurrent
-  * shared memory sense.
-  */
-case class Register(override val name: String, size: Int) extends Variable with Global with CachedHashCode {
-  override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Global)
-  override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Global)
-  override def toString: String = s"Register(${name}, $irType)"
-  override def acceptVisit(visitor: Visitor): Variable = visitor.visitRegister(this)
-  override val irType: BitVecType = BitVecType(size)
+object Register {
+  def apply(name: String, size: Int) = GlobalVar(name, BitVecType(size))
+  def unapply(l: GlobalVar): Option[(String, Int)] = l.getType match {
+    case BitVecType(sz) => Some(l.name, sz)
+    case _ => None
+  }
 }
 
 case class GlobalVar(override val name: String, override val irType: IRType)

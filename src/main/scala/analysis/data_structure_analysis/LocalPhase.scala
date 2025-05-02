@@ -35,7 +35,7 @@ class LocalPhase(using Counter)(
   globalOffsets: Map[BigInt, BigInt],
   externalFunctions: Set[ExternalFunction],
   reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
-  writesTo: Map[Procedure, Set[Register]],
+  writesTo: Map[Procedure, Set[GlobalVar]],
   params: Map[Procedure, Set[Variable]]
 ) extends Analysis[Any] {
 

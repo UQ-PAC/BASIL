@@ -36,7 +36,7 @@ private def nextSSACount() = {
  */
 def getCommonDefinitionVariableRenaming(
   p: Program,
-  writesTo: Map[Procedure, Set[Register]]
+  writesTo: Map[Procedure, Set[GlobalVar]]
 ): Map[CFGPosition, (Map[Variable, FlatEl[Int]], Map[Variable, FlatEl[Int]])] = {
 
   val RNASolver = RNAAnalysisSolver(p, false)
@@ -106,7 +106,7 @@ def getCommonDefinitionVariableRenaming(
   }
 
   toVisit.foreach {
-    case a: LocalAssign => unifyVarsUses(a.rhs.variables, a)
+    case a @ SimulAssign(assigns, _) => unifyVarsUses(assigns.flatMap(_._2.variables), a)
     case a: MemoryAssign => unifyVarsUses(a.rhs.variables, a)
     case l: MemoryLoad => unifyVarsUses(l.index.variables, l)
     case a: MemoryStore => unifyVarsUses(a.index.variables ++ a.value.variables, a)

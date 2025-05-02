@@ -310,7 +310,6 @@ class VarNameNormalise() extends CILVisitor {
     v match {
       case l: GlobalVar => GlobalVar(newName, l.irType)
       case l: LocalVar => LocalVar(newName, l.irType)
-      case Register(n, sz) => Register(newName, sz)
     }
   }
 

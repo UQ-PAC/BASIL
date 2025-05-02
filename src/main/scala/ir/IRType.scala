@@ -15,7 +15,7 @@ case object IntType extends IRType("int") {
   override def toBoogie: BType = IntBType
 }
 
-case class CustomSort(override val name: String) extends IRType(name) {
+case class CustomSort(sortName: String) extends IRType(sortName) {
   override def toBoogie: BType = CustomBType(name)
 }
 
