@@ -613,16 +613,12 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
       case BVSLE => tn1.TSLE(tn2)
       case BVSGT => tn1.TSGT(tn2)
       case BVSGE => tn1.TSGE(tn2)
-      case BVEQ => tn1.TEQ(tn2)
-      case BVNEQ => tn1.TNEQ(tn2)
       case BVCONCAT => tn1.TCONCAT(tn2)
       case IntADD => tn1.TADD(tn2)
       case IntMUL => tn1.TMUL(tn2)
       case IntSUB => tn1.TSUB(tn2)
       case IntDIV => tn1.TSDIV(tn2)
       case IntMOD => tn1.TSMOD(tn2)
-      case IntEQ => tn1.TEQ(tn2)
-      case IntNEQ => tn1.TNEQ(tn2)
       case IntLT => tn1.TSLT(tn2)
       case IntLE => tn1.TSLE(tn2)
       case IntGT => tn1.TSGT(tn2)
@@ -632,12 +628,9 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
 
   def evaluateBoolBinOp(op: BoolBinOp, tn1: TNum, tn2: TNum): TNum = {
     op match {
-      case BoolEQ => tn1.TEQ(tn2)
-      case BoolNEQ => tn1.TNEQ(tn2)
       case BoolAND => tn1.TAND(tn2)
       case BoolOR => tn1.TOR(tn2)
       case BoolIMPLIES => (tn1.TOR(tn2.TNOT()))
-      case BoolEQUIV => tn1.TEQ(tn2)
     }
   }
 
@@ -679,6 +672,8 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
         val arg2TNum = evaluateExprToTNum(s, arg2)
 
         (op, arg1TNum, arg2TNum) match {
+          case (EQ, tn1, tn2) => tn1.TEQ(tn2)
+          case (NEQ, tn1, tn2) => tn1.TNEQ(tn2)
           case (opVal: BVBinOp, tnum1: TNum, tnum2: TNum) => evaluateValueBinOp(opVal, tnum1, tnum2)
           case (opVal: IntBinOp, tnum1: TNum, tnum2: TNum) => evaluateValueBinOp(opVal, tnum1, tnum2)
           case (opVal: BoolBinOp, tnum1: TNum, tnum2: TNum) => evaluateBoolBinOp(opVal, tnum1, tnum2)

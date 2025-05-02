@@ -37,8 +37,8 @@ def curryFunctionType(t: IRType, acc: List[IRType] = List()): (List[IRType], IRT
 
 def coerceToBool(e: Expr): Expr = {
   e.getType match {
-    case BitVecType(s) => BinaryExpr(BVNEQ, e, BitVecLiteral(0, s))
-    case IntType => BinaryExpr(IntNEQ, e, IntLiteral(0))
+    case BitVecType(s) => BinaryExpr(NEQ, e, BitVecLiteral(0, s))
+    case IntType => BinaryExpr(NEQ, e, IntLiteral(0))
     case BoolType => e
     case MapType(_, _) => ???
   }

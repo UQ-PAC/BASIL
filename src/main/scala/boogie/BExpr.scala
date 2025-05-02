@@ -316,6 +316,7 @@ case class UnaryBExpr(op: UnOp, arg: BExpr) extends BExpr {
 case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
   override def getType: BType = (op, arg1.getType, arg2.getType) match {
     case (_: BoolBinOp, BoolBType, BoolBType) => BoolBType
+    case (EQ | NEQ , _ , _) => BoolBType
     case (binOp: BVBinOp, bv1: BitVecBType, bv2: BitVecBType) =>
       binOp match {
         case BVCONCAT =>
@@ -339,13 +340,11 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
           } else {
             throw new Exception(s"bitvector size mismatch: $arg1, $arg2")
           }
-        case BVEQ | BVNEQ =>
-          BoolBType
       }
     case (intOp: IntBinOp, IntBType, IntBType) =>
       intOp match {
         case IntADD | IntSUB | IntMUL | IntDIV | IntMOD => IntBType
-        case IntEQ | IntNEQ | IntLT | IntLE | IntGT | IntGE => BoolBType
+        case IntLT | IntLE | IntGT | IntGE => BoolBType
       }
     case _ =>
       throw new Exception("type mismatch, operator " + op + " type doesn't match args: (" + arg1 + ", " + arg2 + ")")
@@ -370,10 +369,12 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
       next match
         case b: BinaryBExpr =>
           b.op match {
+            case EQ => infix(b)
+            case NEQ => infix(b)
             case bOp: BoolBinOp => infix(b)
             case bOp: BVBinOp =>
               bOp match {
-                case BVEQ | BVNEQ | BVCONCAT => infix(b)
+                case BVCONCAT => infix(b)
                 case _ => prefix(b)
               }
             case bOp: IntBinOp => infix(b)
@@ -386,9 +387,10 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
 
   override def toString: String = op match {
     case bOp: BoolBinOp => s"($arg1 $bOp $arg2)"
+    case EQ | NEQ  => s"($arg1 $op $arg2)"
     case bOp: BVBinOp =>
       bOp match {
-        case BVEQ | BVNEQ | BVCONCAT =>
+        case BVCONCAT =>
           s"($arg1 $bOp $arg2)"
         case _ =>
           s"bv$bOp$inSize($arg1, $arg2)"
@@ -398,9 +400,10 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
 
   override def functionOps: Set[FunctionOp] = {
     val thisFn = op match {
+      case EQ | NEQ  => Set()
       case b: BVBinOp =>
         b match {
-          case BVEQ | BVNEQ | BVCONCAT => Set()
+          case BVCONCAT => Set()
           case _ =>
             Set(
               BVFunctionOp(s"bv$b$inSize", s"bv$b", List(BParam(arg1.getType), BParam(arg2.getType)), BParam(getType))
@@ -752,7 +755,7 @@ case class SpecGlobal(
   override val toAddrVar: BVar = BVariable("$" + s"${name}_addr", BitVecBType(64), Scope.Const)
   override val toOldVar: BVar = BVariable(s"${name}_old", BitVecBType(size), Scope.Local)
   override val toOldGamma: BVar = BVariable(s"Gamma_${name}_old", BoolBType, Scope.Local)
-  val toAxiom: BAxiom = BAxiom(BinaryBExpr(BoolEQ, toAddrVar, BitVecBLiteral(address, 64)), List.empty)
+  val toAxiom: BAxiom = BAxiom(BinaryBExpr(EQ, toAddrVar, BitVecBLiteral(address, 64)), List.empty)
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitSpecGlobal(this)
 }
 
