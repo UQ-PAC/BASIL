@@ -13,7 +13,7 @@ import test_util.Histogram
 import test_util.TestConfig
 import test_util.LockManager
 import test_util.TestCustomisation
-import util.DSAAnalysis.Norm
+import util.DSAConfig.Checks
 import util.boogie_interaction.*
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
@@ -60,13 +60,7 @@ trait SystemTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest, TestC
 
   private val testPath = "./src/test/"
 
-  override def customiseTestsByName(name: String) = name match {
-    case "procedure_summaries/procedure_summary3/gcc_O2:BAP" | "procedure_summaries/procedure_summary3/gcc_O2:GTIRB" =>
-      Mode.Disabled(
-        "this procedure summaries test is unpredictably flaky, sometimes passing and sometimes failing with assertion failure"
-      )
-    case _ => Mode.Normal
-  }
+  override def customiseTestsByName(name: String) = Mode.Normal
 
   def runTests(folder: String, conf: TestConfig): Unit = {
     val path = testPath + folder
@@ -589,8 +583,6 @@ class MemoryRegionTestsNoRegion extends SystemTests {
 
 @test_util.tags.UnitTest
 class ProcedureSummaryTests extends SystemTests {
-  // TODO currently procedure_summary3 verifies despite incorrect procedure summary analysis
-  // this is due to BASIL's currently limited handling of non-returning calls
   runTests(
     "procedure_summaries",
     TestConfig(summariseProcedures = true, simplify = true, useBAPFrontend = true, expectVerify = true)
@@ -610,28 +602,16 @@ class UnimplementedTests extends SystemTests {
 
 @test_util.tags.AnalysisSystemTest
 class IntervalDSASystemTests extends SystemTests {
-  runTests(
-    "correct",
-    TestConfig(useBAPFrontend = true, expectVerify = true, simplify = true, dsa = Some(DSAConfig(Set(Norm))))
-  )
+  runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, simplify = true, dsa = Some(Checks)))
 
-  runTests(
-    "incorrect",
-    TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSAConfig(Set(Norm))))
-  )
+  runTests("incorrect", TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(Checks)))
 }
 
 @test_util.tags.DisabledTest
 class MemoryTransformSystemTests extends SystemTests {
   runTests(
     "correct",
-    TestConfig(
-      useBAPFrontend = true,
-      expectVerify = false,
-      simplify = true,
-      dsa = Some(DSAConfig(Set(Norm))),
-      memoryTransform = true
-    )
+    TestConfig(useBAPFrontend = true, expectVerify = false, simplify = true, dsa = Some(Checks), memoryTransform = true)
   )
 
   runTests(
@@ -640,7 +620,7 @@ class MemoryTransformSystemTests extends SystemTests {
       useBAPFrontend = false,
       expectVerify = false,
       simplify = true,
-      dsa = Some(DSAConfig(Set(Norm))),
+      dsa = Some(Checks),
       memoryTransform = true
     )
   )
