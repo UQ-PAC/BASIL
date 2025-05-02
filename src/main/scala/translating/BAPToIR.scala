@@ -335,8 +335,8 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
         case AND => (BinaryExpr(BVAND, lhsIR, rhsIR), load)
         case OR => (BinaryExpr(BVOR, lhsIR, rhsIR), load)
         case XOR => (BinaryExpr(BVXOR, lhsIR, rhsIR), load)
-        case EQ => (BinaryExpr(BVCOMP, lhsIR, rhsIR), load)
-        case NEQ => (UnaryExpr(BVNOT, BinaryExpr(BVCOMP, lhsIR, rhsIR)), load)
+        case bap.EQ => (BinaryExpr(BVCOMP, lhsIR, rhsIR), load)
+        case bap.NEQ => (UnaryExpr(BVNOT, BinaryExpr(BVCOMP, lhsIR, rhsIR)), load)
         case LT => (BinaryExpr(BVULT, lhsIR, rhsIR), load)
         case LE => (BinaryExpr(BVULE, lhsIR, rhsIR), load)
         case SLT => (BinaryExpr(BVSLT, lhsIR, rhsIR), load)
@@ -535,9 +535,9 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     e.getType match {
       case BitVecType(s) =>
         if (negative) {
-          BinaryExpr(BVEQ, e, BitVecLiteral(0, s))
+          BinaryExpr(ir.EQ, e, BitVecLiteral(0, s))
         } else {
-          BinaryExpr(BVNEQ, e, BitVecLiteral(0, s))
+          UnaryExpr(BoolNOT, BinaryExpr(ir.EQ, e, BitVecLiteral(0, s)))
         }
       case BoolType =>
         if (negative) {

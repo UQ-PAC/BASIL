@@ -45,7 +45,7 @@ class InterpretTestConstProp
     absval match {
       case Top => TrueLiteral
       case Bottom => TrueLiteral /* deliberately don't check */
-      case FlatEl(value) => BinaryExpr(BVEQ, value, concrete)
+      case FlatEl(value) => BinaryExpr(EQ, value, concrete)
     }
   }
 
