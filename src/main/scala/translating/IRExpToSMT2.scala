@@ -233,7 +233,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   def opnameToFun(b: BinOp) = {
     b match {
       case EQ => "="
-      case NEQ => ??? 
+      case NEQ => ???
       case BoolOR => "or"
       case BVCONCAT => "concat"
       case b: BVBinOp => "bv" + b.opName
