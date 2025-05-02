@@ -154,7 +154,7 @@ case class EventuallyCall(
   override def resolve(p: Program): Statement = {
     val t = target.resolveProc(p) match {
       case Some(x) => x
-      case None => throw Exception("can't resolve proc " + p)
+      case None => throw Exception(s"can't resolve target ${target} proc in prog")
     }
     val actual = SortedMap.from(actualParams.map((name, value) => t.formalInParam.find(_.name == name).get -> value))
     val callLhs = SortedMap.from(lhs.map((name, value) => t.formalOutParam.find(_.name == name).get -> value))
@@ -209,9 +209,7 @@ def directCall(
 def directCall(lhs: Iterable[(String, Variable)], tgt: String, actualParams: (String, Expr)*): EventuallyCall =
   EventuallyCall(DelayNameResolve(tgt), lhs.to(ArraySeq), actualParams)
 
-case class Call(target: String, actualParams: (String, Expr)*)
-
-def directCall(lhs: Iterable[(String, Variable)], rhs: Call): EventuallyCall =
+def directCall(lhs: Iterable[(String, Variable)], rhs: call): EventuallyCall =
   EventuallyCall(DelayNameResolve(rhs.target), lhs.toArray, rhs.actualParams)
 
 def directCall(tgt: String): EventuallyCall = directCall(Nil, tgt, Nil)

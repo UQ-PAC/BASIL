@@ -264,8 +264,6 @@ class Procedure private (
 
   def name = procName + address.map("_" + _).getOrElse("")
 
-  var stackSize: Option[Int] = None
-
   private val _callers = mutable.HashSet[DirectCall]()
   _blocks.foreach(_.parent = this)
   // class invariant
@@ -314,7 +312,7 @@ class Procedure private (
         "_loop_header_" + loopCounter
       } else ""
 
-      b.label = name + "_" + counter + loopCounter
+      b.label = name + "_" + counter
 
     }
 

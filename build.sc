@@ -7,7 +7,10 @@ import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
 import contrib.scalapblib._
 
 object basil extends RootModule with ScalaModule with antlr.AntlrModule with ScalaPBModule {
+  // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
+  // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
   def scalaVersion = "3.3.4"
+  override def ammoniteVersion = "3.0.2"
 
   def scalacOptions: T[Seq[String]] = Seq("-deprecation")
 
@@ -37,6 +40,7 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
   }
 
   object test extends ScalaTests with TestModule.ScalaTest {
+    override def ammoniteVersion = basil.ammoniteVersion
     def ivyDeps = Agg(scalaTests, javaTests)
     def sources = T.sources { Seq(PathRef(this.millSourcePath / "scala")) }
   }

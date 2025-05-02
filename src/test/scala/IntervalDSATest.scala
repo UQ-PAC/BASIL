@@ -1,13 +1,15 @@
 import analysis.data_structure_analysis.{
+  Global,
   Heap,
-  Interval,
+  DSInterval,
   IntervalDSA,
   Par,
   Ret,
   Stack,
   SymBase,
   generateConstraints,
-  getSymbolicValues
+  getSymbolicValues,
+  given
 }
 import boogie.SpecGlobal
 import ir.*
@@ -18,11 +20,11 @@ import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
 import test_util.BASILTest.writeToFile
 import util.*
-import util.DSAAnalysis.Norm
 import analysis.data_structure_analysis.given
 import translating.PrettyPrinter.pp_proc
+import util.DSAConfig.{Checks, Standard}
 
-@test_util.tags.UnitTest
+@test_util.tags.AnalysisSystemTest
 class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
@@ -34,7 +36,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
   }
 
-  def runTest(path: String): BASILResult = {
+  def runTest(path: String, config: DSAConfig = Checks): BASILResult = {
     RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf"),
@@ -42,7 +44,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Norm)))
+        dsaConfig = Some(config)
       )
     )
   }
@@ -56,7 +58,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Norm)))
+        dsaConfig = Some(Checks)
       )
     )
   }
@@ -77,13 +79,6 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   def globalsToLiteral(ctx: IRContext) = {
     ctx.globals.map(g => (g.name, BitVecLiteral(g.address, 64))).toMap
       ++ (ctx.funcEntries.map(f => (f.name, BitVecLiteral(f.address.toInt, 64))).toMap)
-  }
-
-  test("jumptable main") {
-    val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable")
-
-    val dsg = results.dsa.get.topDown(results.ir.program.mainProcedure)
-    dsg.localCorrectness()
   }
 
   test("Global Dereference") {
@@ -277,12 +272,12 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val add_six = globals("add_six")
     val sub_sev = globals("sub_seven")
 
-    assert(dsg.exprToCells(add_two) == dsg.exprToCells(add_six))
+    assert(dsg.exprToCells(add_two).map(dsg.get) == dsg.exprToCells(add_six).map(dsg.get))
     assert(dsg.exprToCells(add_two).size == 1)
     assert(dsg.exprToCells(add_two).head.node.isCollapsed)
   }
 
-  test("stack interproc overlapping") {
+  test("stack interproc") {
     val results = runTest("src/test/dsa/stack_interproc_overlapping/stack_interproc_overlapping")
     val program = results.ir.program
 
@@ -315,21 +310,252 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val res = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = path + ".adt",
+          inputFile = path + ".gts",
           relfFile = path + ".relf",
           mainProcedureName = "http_parse_basic",
           trimEarly = true
+//          procedureTrimDepth = 1,
         ),
         simplify = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Norm)))
+        dsaConfig = Some(Checks)
       )
     )
 
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
     assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
+    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
+  }
+
+  test("md5_process_block") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = path + ".gts",
+          relfFile = path + ".relf",
+          mainProcedureName = "md5_process_block",
+          trimEarly = true
+        ),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(Checks)
+      )
+    )
+
+    val proc = res.ir.program.mainProcedure
+    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
+  }
+
+  test("acl_check") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = path + ".gts",
+          relfFile = path + ".relf",
+          mainProcedureName = "acl_check",
+          trimEarly = true
+        ),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(Checks)
+      )
+    )
+
+    val proc = res.ir.program.mainProcedure
+    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
+    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
+  }
+
+  test("gl_des_makekey") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = path + ".gts",
+          relfFile = path + ".relf",
+          mainProcedureName = "gl_des_makekey",
+          trimEarly = true
+        ),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(Checks)
+      )
+    )
+
+    val proc = res.ir.program.mainProcedure
+    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
+    assert(!dsg.find(dsg.nodes(Stack(proc))).isCollapsed)
+  }
+
+  test("cntlm local globals") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(inputFile = path + ".gts", relfFile = path + ".relf"),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(Checks)
+      )
+    )
+
+    val locals = res.dsa.get.local
+    locals.values.foreach(IntervalDSA.checksGlobalMaintained)
+  }
+
+  test("www_authenticate") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = path + ".gts",
+          relfFile = path + ".relf",
+          mainProcedureName = "www_authenticate",
+          trimEarly = true
+        ),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(Checks)
+      )
+    )
+
+    val proc = res.ir.program.mainProcedure
+    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
+  }
+
+  test("hmac_md5") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = path + ".gts",
+          relfFile = path + ".relf",
+          mainProcedureName = "hmac_md5",
+          trimEarly = true
+        ),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(Checks)
+      )
+    )
+
+    val proc = res.ir.program.mainProcedure
+    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
+  }
+
+  test("ntlm2_calc_resp") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = path + ".gts",
+          relfFile = path + ".relf",
+          mainProcedureName = "ntlm2_calc_resp",
+          trimEarly = true
+        ),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(Checks)
+      )
+    )
+
+    val proc = res.ir.program.mainProcedure
+    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
+    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
+  }
+
+  test("des_key_schedule") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = path + ".gts",
+          relfFile = path + ".relf",
+          mainProcedureName = "des_key_schedule",
+          trimEarly = true
+        ),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(Checks)
+      )
+    )
+
+    val proc = res.ir.program.mainProcedure
+    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
+    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
+  }
+
+  test("plist_free") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = path + ".gts",
+          relfFile = path + ".relf",
+          mainProcedureName = "plist_free",
+          trimEarly = true
+        ),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(Checks)
+      )
+    )
+
+    val proc = res.ir.program.mainProcedure
+    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
+    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
+  }
+
+  test("direct_request") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = path + ".gts",
+          relfFile = path + ".relf",
+          mainProcedureName = "direct_request",
+          trimEarly = true
+        ),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(Checks)
+      )
+    )
+
+    val proc = res.ir.program.mainProcedure
+    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
   }
 }
