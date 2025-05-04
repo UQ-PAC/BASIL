@@ -47,6 +47,7 @@ def difftestLiveVars(p: Procedure, compareResult: Map[CFGPosition, Set[Variable]
 }
 
 def basicReachingDefs(p: Procedure): Map[Command, Map[Variable, Set[Assign | DirectCall]]] = {
+  reversePostOrder(p)
   val lives = getLiveVars(p)
   basicReachingDefs(p, lives)
 }
@@ -601,6 +602,16 @@ def collectUses(p: Procedure): Map[Variable, Set[Command]] = {
   as.groupBy(_._1).map((v, r) => v -> r.map(_._2).toSet).toMap
 }
 
+def allDefinitions(p: Procedure): Map[Variable, Set[Assign]] = {
+  p.collect { case a: Assign =>
+    a.assignees.map(l => l -> a)
+  }.flatten
+    .groupBy(_._1)
+    .map { case (v, ass) =>
+      v -> ass.map(_._2).toSet
+    }
+}
+
 class GuardVisitor(validate: Boolean = false) extends CILVisitor {
 
   /**
@@ -635,16 +646,6 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
    */
 
   var defs = Map[Variable, Set[Assign]]()
-
-  def allDefinitions(p: Procedure): Map[Variable, Set[Assign]] = {
-    p.collect { case a: Assign =>
-      a.assignees.map(l => l -> a)
-    }.flatten
-      .groupBy(_._1)
-      .map { case (v, ass) =>
-        v -> ass.map(_._2).toSet
-      }
-  }
 
   def goodSubst(v: Variable) = {
     v.name.startsWith("Cse")
@@ -791,6 +792,16 @@ def writeValidationProg(progs: Iterable[Program], passName: String) = {
   val dir = File("./tv/")
   if (!dir.exists()) then dir.mkdirs()
   for (p <- progs) {
+
+    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
+      val dir = File("./graphs/")
+      if (!dir.exists()) then dir.mkdirs()
+      for (p <- p.procedures) {
+        val blockGraph = dotBlockGraph(p)
+        DebugDumpIRLogger.writeToFile(File(s"graphs/transition-${p.name}-${passName}.dot"), blockGraph)
+      }
+    }
+
     transforms.stripUnreachableFunctions(p)
     val boogieFileName = s"tv/${passName}_${p.mainProcedure.name}-translation-validate.bpl"
     val boogieFile = translating.BoogieTranslator.translateProg(p).toString

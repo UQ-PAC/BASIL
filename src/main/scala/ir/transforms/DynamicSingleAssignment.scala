@@ -284,7 +284,7 @@ class OnePassDSA(
   def applyTransform(p: Procedure): Unit = {
     val _st = mutable.Map[Block, BlockState]()
     // ensure order is defined
-    reversePostOrder(p)
+    ir.transforms.reversePostOrder(p)
 
     val (liveBeforeIn, liveAfterIn) = liveVarsSolver.solveProc(p, backwards = true)
     val liveBefore = mutable.Map.from(liveBeforeIn)
@@ -312,7 +312,6 @@ class OnePassDSA(
     }
 
     // fix up rpo index of added phi blocks
-    reversePostOrder(p)
 
     val maxIndex = (Seq(0) ++ freeVarsPos(p).collect {
       case l: LocalVar if l.index != 0 => l.index

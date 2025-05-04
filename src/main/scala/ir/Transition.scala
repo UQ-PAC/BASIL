@@ -9,6 +9,7 @@ import ir.dsl.IRToDSL.sequenceTransitionSystems
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable
 import util.Logger
+import ir.transforms.Substitute
 
 val linkUninterpByAxioms = true
 
@@ -18,6 +19,14 @@ def boolAnd(exps: Iterable[Expr]) =
     case 0 => TrueLiteral
     case 1 => l.head
     case _ => BoolExp(BoolAND, l)
+  }
+
+def boolOr(exps: Iterable[Expr]) =
+  val l = exps.toList
+  l.size match {
+    case 0 => TrueLiteral
+    case 1 => l.head
+    case _ => BoolExp(BoolOR, l)
   }
 
 def polyEqual(e1: Expr, e2: Expr) = {
@@ -94,6 +103,19 @@ object Ackermann {
     returns: List[Variable]
   )
 
+  class Passify extends CILVisitor {
+    override def vstmt(s: Statement) = s match {
+      case SimulAssign(assignments, _) => {
+        ChangeTo(List(Assume(boolAnd(assignments.map(polyEqual)))))
+      }
+      case _ => SkipChildren()
+    }
+  }
+
+  def passify(p: Procedure) = {
+    visit_proc(Passify(), p)
+  }
+
   class ToAssume(axioms: Map[SimulAssign, Info]) extends CILVisitor {
     override def vstmt(s: Statement) = s match {
       case s: SimulAssign if axioms.contains(s) => {
@@ -112,11 +134,15 @@ object Ackermann {
 
     var counter = 0
 
+    def isTraceVar(v: Variable) = {
+      stripNamespace(v.name).startsWith("TRACE")
+    }
+
     override def vstmt(s: Statement) = s match {
-      case s: SimulAssign if s.assignees.exists(traceVars.contains) => {
+      case s: SimulAssign if s.assignees.exists(isTraceVar) => {
         counter += 1
 
-        val rg = s.assignments.find(v => traceVars.contains(v._1)).get
+        val rg = s.assignments.find(v => isTraceVar(v._1)).get
 
         val (fname, args) = rg._2 match {
           case UninterpretedFunction(name, args, rt, _) => (name, args)
@@ -179,7 +205,12 @@ object Ackermann {
 
   }
 
-  def instantiateAxioms(sourceEntry: Block, targetEntry: Block, instantiations: Map[SimulAssign, Info]) = {
+  def instantiateAxioms(
+    sourceEntry: Block,
+    targetEntry: Block,
+    instantiations: Map[SimulAssign, Info],
+    inlineArgs: Boolean = true
+  ) = {
 
     var seen = Set[CFGPosition]()
     var invariant = List[Expr]()
@@ -203,7 +234,9 @@ object Ackermann {
 
     val q = mutable.Queue[((Option[SimulAssign], CFGPosition), (Option[SimulAssign], CFGPosition))]()
     val start = ((None, sourceEntry), (None, targetEntry))
-    q.enqueue(start)
+    if (instantiations.nonEmpty) {
+      q.enqueue(start)
+    }
 
     while (q.nonEmpty) {
       val ((srcCall, srcPos), (tgtCall, tgtPos)) = q.dequeue
@@ -232,7 +265,6 @@ object Ackermann {
         case p: Procedure => p.name
         case b: Block => b.label
         case s: Command => s.getClass.getSimpleName
-
       }
       (srcCall, tgtCall) match {
         case (None, None) => advanceBoth()
@@ -241,10 +273,16 @@ object Ackermann {
         case (Some(src), Some(tgt)) => {
           seen = seen ++ Seq(src, tgt)
 
+          def getArgs(i: Info) = if inlineArgs then {
+            i.argAssign.assignments.map(_._2).toList
+          } else {
+            i.args.toList
+          }
+
           val srcInfo = instantiations(src)
           val tgtInfo = instantiations(tgt)
           if (srcInfo.call == tgtInfo.call) {
-            val argsEqual = srcInfo.args.toList.zip(tgtInfo.args).map(polyEqual)
+            val argsEqual = getArgs(srcInfo).zip(getArgs(tgtInfo)).map(polyEqual)
             val returnsEqual = srcInfo.returns.toList.zip(tgtInfo.returns).map(polyEqual)
             invariant = BinaryExpr(BoolIMPLIES, boolAnd(argsEqual), boolAnd(returnsEqual)) :: invariant
             advanceBoth()
@@ -254,6 +292,17 @@ object Ackermann {
 
       }
 
+    }
+
+    class RemoveArgCopy extends CILVisitor {
+      override def vstmt(s: Statement) = s match {
+        case s: SimulAssign if instantiations.contains(s) => ChangeTo(List())
+        case _ => SkipChildren()
+      }
+    }
+
+    if (inlineArgs) {
+      visit_proc(RemoveArgCopy(), sourceEntry.parent)
     }
 
     invariant
@@ -547,6 +596,146 @@ class TranslationValidator {
   def varInSource(v: Variable) = visit_rvar(afterRenamer, v)
   def varInTarget(v: Variable) = visit_rvar(beforeRenamer, v)
 
+  def ssaDAG(p: Procedure): ((Block, Command) => Command) = {
+
+    var renameCount = 0
+    var stRename = Map[Block, Map[Variable, Variable]]()
+    // use for blocks
+
+    def blockDone(b: Block) = {
+      LocalVar(b.label + "_done", BoolType)
+    }
+
+    var count = Map[Variable, Int]()
+
+    def freshName(v: Variable) =
+      renameCount = count.get(v).getOrElse(0) + 1
+      count = count + (v -> renameCount)
+      v match {
+        case l: LocalVar => l.copy(varName = l.name + "_AT" + renameCount, index = 0)
+        case l: GlobalVar => l.copy(name = l.name + "_AT" + renameCount)
+      }
+
+    class Subst(rn: Variable => Option[Variable]) extends CILVisitor {
+      override def vexpr(e: Expr) = {
+        ChangeTo(Substitute(rn, false)(e).getOrElse(e))
+      }
+    }
+
+    def renameRHS(rename: Map[Variable, Variable])(c: Command): Command = c match {
+      // rename all rvars
+      case s: Statement => visit_stmt(Subst(rename.get), s).head
+      case s: Jump => visit_jump(Subst(rename.get), s)
+    }
+
+    ir.transforms.reversePostOrder(p)
+    val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
+    worklist.addAll(p.blocks)
+
+    class RenameLHS(subst: Variable => Option[Variable]) extends CILVisitor {
+      override def vlvar(v: Variable) = subst(v) match {
+        case Some(vn) => ChangeTo(vn)
+        case none => SkipChildren()
+      }
+    }
+
+    def renameLHS(substs: Map[Variable, Variable], s: Statement) = {
+      visit_stmt(RenameLHS(substs.get), s)
+    }
+
+    while (worklist.nonEmpty) {
+      val b = worklist.dequeue()
+      var blockDoneCond = List[Expr](boolOr(b.prevBlocks.map(blockDone).toList))
+      var phis = Set[Statement]()
+
+      var renaming = if (b.prevBlocks.nonEmpty) then {
+        var joinedRenames = Map[Variable, Variable]()
+        val defines = b.prevBlocks.flatMap(b => stRename.get(b).map(b -> _).toSeq)
+        var varToRenamings: Map[Variable, Iterable[(Block, Variable, Variable)]] =
+          defines
+            .flatMap { case (b, rns) =>
+              rns.map { case (v, rn) =>
+                (b, v, rn)
+              }
+            }
+            .groupBy(_._2)
+        var inter: Set[Variable] = varToRenamings.collect {
+          case (v, defset) if defset.map(_._3).toSet.size > 1 => v
+        }.toSet
+        var disjoint: Map[Variable, Variable] = varToRenamings.collect {
+          case (v, defset) if !inter.contains(v) => {
+            assert(defset.tail.forall(_._3 == defset.head._3))
+            (defset.head._2, defset.head._3)
+          }
+          // case (v, defset) if defset.size == 1 => (defset.head._2, defset.head._3)
+        }.toMap
+        var nrenaming: Map[Variable, Variable] = disjoint
+        inter.foreach(v => {
+
+          val defsToJoin =
+            b.prevBlocks.filter(b => stRename.get(b).exists(_.contains(v)))
+            // .flatMap(b => {
+            //   stRename.get(b).flatMap(_.get(v)).map(v => b -> v).toSeq
+            // })
+            // .groupBy(_._2)
+            // .map { case (v, blocks) =>
+            //   v -> blocks.map(_._1).toSet
+            // }
+
+          val fresh = freshName(v)
+          val phicond = defsToJoin.map(b => {
+            // val others = UnaryExpr(BoolNOT, boolOr(defsToJoin.filterNot(_ == b).map(blockDone)))
+            BinaryExpr(BoolIMPLIES, blockDone(b), polyEqual(stRename(b)(v), fresh))
+          })
+          val oneOf = boolOr(defsToJoin.map(blockDone))
+          phis = phis + Assume(
+            boolAnd(oneOf :: phicond.toList),
+            Some(s"${fresh.name} = phi(${defsToJoin.map(stRename(_)(v).name).mkString(",")})")
+          )
+          joinedRenames = joinedRenames + (v -> fresh)
+        })
+
+        nrenaming = nrenaming ++ joinedRenames
+        // val disj = (rhs.map(_._1).toSet ++ lhs.map(_._1).toSet) -- inter
+        // val orenames = disj.map(v => v -> lhs.get(v).getOrElse(rhs(v))) ++ joinedRenames
+        // stRename = stRename + (b -> orenames.toMap)
+
+        stRename = stRename + (b -> nrenaming)
+        b.statements.prependAll(phis)
+        stRename(b)
+      } else {
+        stRename.get(b).getOrElse(Map())
+      }
+
+      for (s <- b.statements) {
+        val c = renameRHS(renaming)(s) // also modifies in-place
+        c match {
+          case a @ Assume(cond, _, _, _) if !phis.contains(a) =>
+            blockDoneCond = cond :: blockDoneCond
+          case a: Assign => {
+            a.assignees.foreach(v => {
+              val freshDef = freshName(v)
+              renameLHS(Map(v -> freshDef), a)
+              renaming = renaming + (v -> freshDef)
+            })
+          }
+          case _ => ()
+        }
+      }
+
+      renameRHS(renaming)(b.jump)
+      stRename = stRename + (b -> renaming)
+
+      val c =
+        if (b.parent.entryBlock.contains(b) || b.label.endsWith("SYNTH_ENTRY")) then TrueLiteral
+        else boolAnd(blockDoneCond)
+
+      b.statements.append(LocalAssign(blockDone(b), c))
+    }
+
+    (b, c) => renameRHS(stRename(b))(c)
+  }
+
   def setDSAInvariant = {
 
     val procs = initProg.get.procedures.view.map(p => p.name -> p).toMap
@@ -801,14 +990,6 @@ class TranslationValidator {
 
       val combined = IRToDSL.parTransitionSystems(afterProg.get, after, before)
 
-      val ackermannTransforms = Ackermann.doTransform(combined, afterRenamer, beforeRenamer)
-      val srce = combined.blocks.find(_.label == after.entryBlock.get.label).get
-      val tgte = combined.blocks.find(_.label == before.entryBlock.get.label).get
-
-      val ackInv = Ackermann.instantiateAxioms(srce, tgte, ackermannTransforms)
-      // val ackInv = Ackermann.naiveInvariant(ackermannTransforms)
-      visit_proc(Ackermann.ToAssume(ackermannTransforms), combined)
-
       // addInvariant(proc.name, ackInv.map(v => (v, Some("ackermannisation"))))
 
       val prime = NamespaceState("P")
@@ -851,12 +1032,27 @@ class TranslationValidator {
         invariant.map((i, l) => Assume(i, l))
           ++ List(
             Assume(UnaryExpr(BoolNOT, wpconjSourceFun.makeCall()), Some(" wp conjugate of source program")),
-            Assume(UnaryExpr(BoolNOT, wpconjTargetFun.makeCall()), Some(" wp conjugate of taregt program"))
+            Assume(UnaryExpr(BoolNOT, wpconjTargetFun.makeCall()), Some(" wp conjugate of target program"))
           )
           ++ primedInv
           ++ List(Assume(falseFun.makeCall()))
+
       combined.entryBlock.get.statements.prependAll(proof)
+      val renamer = ssaDAG(combined)
+
+      util.writeToFile(pp_proc(combined), "ssadag.il")
+      val ackermannTransforms = Ackermann.doTransform(combined, afterRenamer, beforeRenamer)
+      util.writeToFile(pp_proc(combined), "ssadagack.il")
+
+      val srce = combined.blocks.find(_.label == after.entryBlock.get.label).get
+      val tgte = combined.blocks.find(_.label == before.entryBlock.get.label).get
+      val ackInv = Ackermann.instantiateAxioms(srce, tgte, ackermannTransforms).toSet
+      // val ackInv = Ackermann.naiveInvariant(ackermannTransforms)
+      visit_proc(Ackermann.ToAssume(ackermannTransforms), combined)
       combined.entryBlock.get.statements.prependAll(ackInv.map(a => Assume(a, Some("ackermann"))))
+
+      Ackermann.passify(combined)
+
       validationProcs = validationProcs.updated(proc.name, combined)
 
       val internalLabels = before.blocks.map(_.label).toSet ++ after.blocks.map(_.label)

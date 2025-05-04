@@ -138,7 +138,7 @@ class CILVisitorImpl(val v: CILVisitor) {
       case v: Variable => visit_rvar(v)
       case UninterpretedFunction(name, params, rt, _) => {
         val nparams = params.map(visit_expr)
-        val updated = (params.zip(nparams).map((a, b) => a ne b)).contains(true)
+        val updated = (params.zip(nparams).exists((a, b) => a ne b))
         if (updated) UninterpretedFunction(name, nparams, rt) else n
       }
     }

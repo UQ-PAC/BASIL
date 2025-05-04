@@ -328,6 +328,7 @@ case class NaryBinExpr(op: BoolBinOp | BVEQ.type | IntEQ.type | IntADD.type, arg
     w.append(")")
   }
 
+  override def functionOps: Set[FunctionOp] = arg.flatMap(_.functionOps).toSet
   override def toString = s"(${arg.mkString(" " + op.toString + " ")})"
   override def locals: Set[BVar] = arg.flatMap(_.locals).toSet
   override def globals: Set[BVar] = arg.flatMap(_.globals).toSet
