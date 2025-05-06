@@ -1186,6 +1186,8 @@ object OffsetProp {
   class CopyProp() {
     val st = mutable.Map[Variable, Value]()
     var giveUp = false
+    val lastUpdate = mutable.Map[Block, Int]()
+    var stSequenceNo = 1
 
     def findOff(v: Variable, c: BitVecLiteral): BitVecLiteral | Variable | BinaryExpr = find(v) match {
       case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
@@ -1207,7 +1209,12 @@ object OffsetProp {
 
     def joinState(lhs: Variable, rhs: Expr) = {
       specJoinState(lhs, rhs) match {
-        case Some((l, r)) => st(l) = r
+        case Some((l, r)) => {
+          if (st.contains(l) && st(l) != r) {
+            stSequenceNo += 1
+          }
+          st(l) = r
+        }
         case _ => ()
       }
     }
@@ -1254,10 +1261,17 @@ object OffsetProp {
     def analyse(p: Procedure): Map[Variable, Expr] = {
       reversePostOrder(p)
       val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
-      worklist.addAll(p.blocks)
+      worklist.addAll(p.entryBlock)
       while (worklist.nonEmpty && !giveUp) {
         val b = worklist.dequeue()
+        val seq = lastUpdate.get(b).getOrElse(0)
+
         b.statements.foreach(transfer)
+
+        if (stSequenceNo != seq || seq == 0) {
+          lastUpdate(b) = stSequenceNo
+          worklist.addAll(b.nextBlocks)
+        }
       }
 
       val res: Map[Variable, Variable | Literal | BinaryExpr] =
@@ -1299,6 +1313,8 @@ object MinCopyProp {
 
   class CopyProp() {
     val st = mutable.Map[Variable, Value]()
+    val lastUpdate = mutable.Map[Block, Int]()
+    var stSequenceNo = 1
     var giveUp = false
 
     def find(v: Variable): Literal | Variable = {
@@ -1329,7 +1345,12 @@ object MinCopyProp {
 
     def joinState(lhs: Variable, rhs: Variable | Literal) = {
       specJoinState(lhs, rhs) match {
-        case Some((l, r)) => st(l) = r
+        case Some((l, r)) => {
+          if (st.contains(l) && st(l) != r) {
+            stSequenceNo += 1
+          }
+          st(l) = r
+        }
         case _ => ()
       }
     }
@@ -1362,10 +1383,17 @@ object MinCopyProp {
     def analyse(p: Procedure): Map[Variable, Variable | Literal] = {
       reversePostOrder(p)
       val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
-      worklist.addAll(p.blocks)
+      worklist.addAll(p.entryBlock)
       while (worklist.nonEmpty && !giveUp) {
         val b = worklist.dequeue()
+        val seq = lastUpdate.get(b).getOrElse(0)
+
         b.statements.foreach(transfer)
+
+        if (stSequenceNo != seq || seq == 0) {
+          lastUpdate(b) = stSequenceNo
+          worklist.addAll(b.nextBlocks)
+        }
       }
 
       val res: Map[Variable, Variable | Literal] =
