@@ -625,6 +625,40 @@ class TranslationValidator {
     LocalVar(b.label + "_done", BoolType)
   }
 
+  def extractProg(begin: Block) = {
+    val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
+    worklist.enqueue(begin)
+
+    var firstAssert = true 
+    var gotAssert = false
+    var assumes = List[Expr]()
+    var asserts = List[Expr]()
+
+    while (worklist.nonEmpty) {
+      val nb = worklist.dequeue()
+      nb.statements.foreach {
+        case s: Assume => {
+          assumes = s.body :: assumes
+        }
+        case s: Assume if gotAssert => {
+          // throw Exception("Bad structure")
+        }
+        case s: Assert => {
+          gotAssert = true
+          asserts = s.body :: asserts
+        }
+        case o => {
+          throw Exception(s"Program has other statements : $o")
+        }
+      }
+      // assuming no cycles in graph
+      worklist.addAll(nb.nextBlocks)
+    }
+
+    BinaryExpr(BoolIMPLIES, boolAnd(assumes), boolAnd(asserts))
+
+  }
+
   def ssaDAG(p: Procedure): ((Block, Command) => Command) = {
 
     var renameCount = 0
@@ -737,6 +771,7 @@ class TranslationValidator {
         c match {
           case a @ Assume(cond, _, _, _) if !phis.contains(a) =>
             blockDoneCond = cond :: blockDoneCond
+            b.statements.remove(a)
           case a: Assign => {
             a.assignees.foreach(v => {
               val freshDef = freshName(v)
@@ -936,6 +971,26 @@ class TranslationValidator {
     visit_proc(v, p)
     v.funcs.map(u => u.name -> u).toMap
 
+
+  //def getValidationSMT = {
+
+  //  val interesting = initProg.get.procedures
+  //    .filterNot(_.isExternal.contains(true))
+  //    .filterNot(_.procName.startsWith("indirect_call_launchpad"))
+
+  //  for (proc <- interesting) {
+  //    val after = afterProg.get.procedures.find(_.name == proc.name).get
+  //    val before = beforeProg.get.procedures.find(_.name == proc.name).get
+  //    val source = after
+  //    val target = before
+
+  //    renamesource = ssaDAG(source)
+  //    renametarget = ssaDAG(target)
+
+  //  }
+
+  //}
+
   def getValidationProgWPConj = {
 
     val trueFun = FunctionDecl("TRUE", List(), BoolType, None, List("builtin" -> Some("\"true\"")))
@@ -1017,13 +1072,19 @@ class TranslationValidator {
 
       val combined = IRToDSL.parTransitionSystems(afterProg.get, after, before)
 
+      val srce = combined.blocks.find(_.label == after.entryBlock.get.label).get
+      val tgte = combined.blocks.find(_.label == before.entryBlock.get.label).get
+      val srcExit = combined.blocks.find(_.label == after.returnBlock.get.label).get
+      val tgtExit = combined.blocks.find(_.label == before.returnBlock.get.label).get
+
+
       // addInvariant(proc.name, ackInv.map(v => (v, Some("ackermannisation"))))
 
       val prime = NamespaceState("P")
 
       // add inv on transition system
-      combined.blocks.find(_.label == after.entryBlock.get.label).get.statements.append(Assume(trueFun.makeCall()))
-      combined.blocks.find(_.label == before.entryBlock.get.label).get.statements.append(Assume(trueFun.makeCall()))
+      // srce.statements.append(Assume(trueFun.makeCall()))
+      // tgte.statements.append(Assume(trueFun.makeCall()))
       val invVariables = invariants(proc.name).flatMap(_.toAssume.body.variables).toSet
 
       val QSource =
@@ -1044,28 +1105,28 @@ class TranslationValidator {
 
       def exitDone(b: Block) = {}
 
-      combined.blocks
-        .find(_.label == after.returnBlock.get.label)
-        .map(b => {
-          b.statements.append(Assume(QSource))
-          b.statements.append(Assert(FalseLiteral))
-        })
-      combined.blocks
-        .find(_.label == before.returnBlock.get.label)
-        .map(b => {
-          b.statements.append(Assume(QTarget))
-          b.statements.append(Assert(FalseLiteral))
-        })
+      //combined.blocks
+      //  .find(_.label == after.returnBlock.get.label)
+      //  .map(b => {
+      //    b.statements.append(Assume(QSource))
+      //    b.statements.append(Assert(FalseLiteral))
+      //  })
+      //combined.blocks
+      //  .find(_.label == before.returnBlock.get.label)
+      //  .map(b => {
+      //    b.statements.append(Assume(QTarget))
+      //    b.statements.append(Assert(FalseLiteral))
+      //  })
 
-      val srce = combined.blocks.find(_.label == after.entryBlock.get.label).get
-      val tgte = combined.blocks.find(_.label == before.entryBlock.get.label).get
 
       srce.statements.prepend(LocalAssign(varInSource(transitionSystemPCVar), varInSource(transitionSystemPCVar)))
       srce.statements.prepend(LocalAssign(varInSource(traceVar), varInSource(traceVar)))
       tgte.statements.prepend(LocalAssign(varInTarget(transitionSystemPCVar), varInTarget(transitionSystemPCVar)))
       tgte.statements.prepend(LocalAssign(varInTarget(traceVar), varInTarget(traceVar)))
 
+
       val renamer: ((Block, Command) => Command) = ssaDAG(combined)
+
 
       // add invariant to combined
       val initInv = Seq(Inv.Global(pcInv, Some("PC INVARIANT")), Inv.Global(traceInv, Some("Trace INVARIANT")))
@@ -1106,6 +1167,29 @@ class TranslationValidator {
       combined.entryBlock.get.statements.prependAll(ackInv.map(a => Assume(a, Some("ackermann"))))
 
       Ackermann.passify(combined)
+
+      // smt
+
+      val qsrc = renamer(srcExit, Assume(QSource)).asInstanceOf[Assume].body
+      val qtrgt = renamer(tgtExit, Assume(QTarget)).asInstanceOf[Assume].body
+
+      val wpconjsource = UnaryExpr(BoolNOT, BinaryExpr(BoolIMPLIES, extractProg(srce), UnaryExpr(BoolNOT, qsrc)))
+      val wpconjtgt = UnaryExpr(BoolNOT, BinaryExpr(BoolIMPLIES, extractProg(tgte), UnaryExpr(BoolNOT, qtrgt)))
+
+      val b = translating.BasilIRToSMT2.Builder()
+
+      for (i <- invariant) {
+        b.addAssume(i.toAssume.body)
+      }
+      b.addAssume(wpconjsource)
+      b.addAssume(wpconjtgt)
+      for (i <- primedInv) {
+        b.addAssert(UnaryExpr(BoolNOT, i.body))
+      }
+      val s = b.getCheckSat() 
+      println(s)
+
+
 
       validationProcs = validationProcs.updated(proc.name, combined)
 

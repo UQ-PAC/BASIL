@@ -49,7 +49,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
       case ZeroExtend(bits, arg) => vzeroextend(bits, vexpr(arg))
       case SignExtend(bits, arg) => vsignextend(bits, vexpr(arg))
       case BinaryExpr(op, arg, arg2) => vbinary_expr(op, vexpr(arg), vexpr(arg2))
-      case BoolExp(op, arg) => vbool_expr(op, arg.map(vexpr))
+      case b @ BoolExp(op, arg) => vexpr(b.toBinaryExpr)
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
       case v: Variable => vrvar(v)
       case f @ UninterpretedFunction(n, params, rt, _) => vuninterp_function(n, params.map(vexpr))
@@ -204,6 +204,31 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   def vbvlit(b: BitVecLiteral): Sexp[BitVecLiteral] = ???
   def vintlit(b: BigInt): Sexp[IntLiteral] = ???
 
+  class Builder()  {
+    var exprs = Vector[Sexp[Expr]]()
+    var decls = Set[Sexp[Expr]]()
+    var typedecls = Set[Sexp[Expr]]()
+
+    def addAssume(e : Expr) = {
+      val (t,d) = BasilIRToSMT2.extractDecls(e)
+      decls = decls ++  d
+      typedecls = typedecls ++ t
+      exprs = exprs ++ List(list(sym("assume"), BasilIRToSMT2.vexpr(e)))
+    }
+
+    def addAssert(e : Expr) = {
+      val (t,d) = BasilIRToSMT2.extractDecls(e)
+      decls = decls ++  d
+      typedecls = typedecls ++ t
+      exprs = exprs ++ List(list(sym("assert"), BasilIRToSMT2.vexpr(e)))
+    }
+
+    def getCheckSat() = {
+      (typedecls.toVector ++ decls ++ exprs ++ List(list(sym("check-sat")))).map(Sexp.print).mkString("\n")
+    }
+
+  }
+
   /** Immediately invoke z3 and block until it returns a result.
     *
     * Return Some(true) when proven, Some(false) when counterexample found, and None when unknown.
@@ -225,7 +250,8 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       list(sym("assert"), BasilIRToSMT2.vexpr(e))
     }
 
-    val terms = list(sym("push")) :: BasilIRToSMT2.extractDecls(e)
+    val (typedecls, decls) = BasilIRToSMT2.extractDecls(e)
+    val terms = list(sym("push")) :: (typedecls.toVector ++ decls).toList
       ++ List(assert, list(sym("check-sat")))
       ++ (if (getModel) then
             List(list(sym("echo"), sym("\"" + name.getOrElse("") + "  ::  " + e + "\"")), list(sym("get-model")))
@@ -250,6 +276,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       case IntEQ => "="
       case BoolEQ => "="
       case BVEQ => "="
+      case BoolIMPLIES => "=>"
       case BVNEQ => ???
       case IntNEQ => ???
       case BoolNEQ => ???
@@ -339,37 +366,45 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     }
   }
 
-  def extractDecls(e: Expr): List[Sexp[Expr]] = {
+  def extractDecls(e: Expr): (Set[Sexp[Expr]],Set[Sexp[Expr]]) = {
 
     class ToDecl extends CILVisitor {
       var decled = Set[Sexp[Expr]]()
+      var typeDecled = Set[Sexp[Expr]]()
 
-      override def vexpr(e: Expr) = e match {
-        case f: UninterpretedFunction => {
-          val decl = interpretFun(f)
-          decled = decled ++ decl.toSet
-          DoChildren() // get variables out of args
+      override def vexpr(e: Expr) = 
+        e.getType match {
+          case CustomSort(b) => {
+            typeDecled = typeDecled + list(sym("declare-sort"), sym(b))
+          }
+          case _ => ()
         }
-        case UnaryExpr(BoolToBV1, _) => {
-          decled = decled + booltoBVDef
-          DoChildren()
+        e match {
+          case f: UninterpretedFunction => {
+            val decl = interpretFun(f)
+            decled = decled ++ decl.toSet
+            DoChildren() // get variables out of args
+          }
+          case UnaryExpr(BoolToBV1, _) => {
+            decled = decled + booltoBVDef
+            DoChildren()
+          }
+          case v: Variable => {
+            val decl = list(sym("declare-const"), sym(fixVname(v.name)), basilTypeToSMTType(v.getType))
+            decled = decled + decl
+            SkipChildren()
+          }
+          case _ => DoChildren()
         }
-        case v: Variable => {
-          val decl = list(sym("declare-const"), sym(fixVname(v.name)), basilTypeToSMTType(v.getType))
-          decled = decled + decl
-          SkipChildren()
-        }
-        case _ => DoChildren()
-      }
 
-      def getDecls(e: Expr): Set[Sexp[Expr]] = {
+      def getDecls(e: Expr) = {
         decled = Set()
         visit_expr(this, e)
-        decled
+        (typeDecled, decled)
       }
     }
 
-    ToDecl().getDecls(e).toList
+    ToDecl().getDecls(e)
   }
 
 }
