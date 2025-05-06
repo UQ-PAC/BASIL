@@ -570,7 +570,13 @@ def sequentialComposeTransitionSystems(p1prog: Program, p1: Procedure, p2: Proce
   p1
 }
 
+enum Inv {
+  case CutPoint(cutPointPCGuard: String, pred: Expr, comment: Option[String] = None)
+  case Global(pred: Expr, comment: Option[String] = None)
+}
+
 class TranslationValidator {
+  import Inv.*
 
   var validationProcs = Map[String, Procedure]()
 
@@ -586,7 +592,26 @@ class TranslationValidator {
   var beforeCuts: Map[Procedure, Map[String, Block]] = Map()
   var afterCuts: Map[Procedure, Map[String, Block]] = Map()
 
-  val invariants = mutable.Map[String, List[(Expr, Option[String])]]()
+  // proc -> List (pred, comment)
+
+  extension (i: Inv) {
+    def toAssume = i match {
+      case CutPoint(label, pred, c) => {
+        val guarded =
+          BinaryExpr(BoolIMPLIES, exprInSource(BinaryExpr(IntEQ, transitionSystemPCVar, PCSym(label))), pred)
+        Assume(guarded, c)
+      }
+      case Global(pred, c) => {
+        Assume(pred, c)
+      }
+    }
+
+    def toAssert = i.toAssume match {
+      case Assume(b, c, _, _) => Assert(b, c)
+    }
+  }
+
+  val invariants = mutable.Map[String, List[Inv]]()
 
   val beforeRenamer = NamespaceState("target")
   val afterRenamer = NamespaceState("source")
@@ -596,15 +621,15 @@ class TranslationValidator {
   def varInSource(v: Variable) = visit_rvar(afterRenamer, v)
   def varInTarget(v: Variable) = visit_rvar(beforeRenamer, v)
 
+  def blockDone(b: Block) = {
+    LocalVar(b.label + "_done", BoolType)
+  }
+
   def ssaDAG(p: Procedure): ((Block, Command) => Command) = {
 
     var renameCount = 0
     var stRename = Map[Block, Map[Variable, Variable]]()
     // use for blocks
-
-    def blockDone(b: Block) = {
-      LocalVar(b.label + "_done", BoolType)
-    }
 
     var count = Map[Variable, Int]()
 
@@ -689,7 +714,7 @@ class TranslationValidator {
           })
           val oneOf = boolOr(defsToJoin.map(blockDone))
           phis = phis + Assume(
-            boolAnd(oneOf :: phicond.toList),
+            boolAnd(phicond),
             Some(s"${fresh.name} = phi(${defsToJoin.map(stRename(_)(v).name).mkString(",")})")
           )
           joinedRenames = joinedRenames + (v -> fresh)
@@ -707,7 +732,7 @@ class TranslationValidator {
         stRename.get(b).getOrElse(Map())
       }
 
-      for (s <- b.statements) {
+      for (s <- b.statements.toList) {
         val c = renameRHS(renaming)(s) // also modifies in-place
         c match {
           case a @ Assume(cond, _, _, _) if !phis.contains(a) =>
@@ -730,7 +755,11 @@ class TranslationValidator {
         if (b.parent.entryBlock.contains(b) || b.label.endsWith("SYNTH_ENTRY")) then TrueLiteral
         else boolAnd(blockDoneCond)
 
-      b.statements.append(LocalAssign(blockDone(b), c))
+      if (!b.label.endsWith("SYNTH_EXIT")) {
+        b.statements.append(LocalAssign(blockDone(b), c))
+      } else {
+        b.statements.prepend(Assume(c, Some("blockdone")))
+      }
     }
 
     (b, c) => renameRHS(stRename(b))(c)
@@ -769,9 +798,7 @@ class TranslationValidator {
 
           val assertion = boolAnd(vars.map(v => polyEqual(varInSource(v), varInTarget(removeIndex(v)))).toList)
 
-          val guard = BinaryExpr(IntEQ, visit_rvar(afterRenamer, transitionSystemPCVar), PCMan.PCSym(label))
-
-          (BinaryExpr(BoolIMPLIES, guard, assertion), Some(s"INVARIANT at $label"))
+          Inv.CutPoint(label, assertion, Some(s"INVARIANT at $label"))
         }
       }
 
@@ -813,9 +840,9 @@ class TranslationValidator {
               .map(v => polyEqual(varInSource(v), varInTarget(v)))
           )
 
-          val guard = BinaryExpr(IntEQ, visit_rvar(afterRenamer, transitionSystemPCVar), PCMan.PCSym(label))
+          // val guard = BinaryExpr(IntEQ, visit_rvar(afterRenamer, transitionSystemPCVar), PCMan.PCSym(label))
 
-          (BinaryExpr(BoolIMPLIES, guard, assertion), Some(s"INVARIANT at $label"))
+          Inv.CutPoint(label, assertion, Some(s"INVARIANT at $label"))
         }
       }
 
@@ -852,11 +879,11 @@ class TranslationValidator {
     afterCuts = cuts
   }
 
-  def addInvariant(p: String, l: List[(Expr, Option[String])]) = {
+  def addInvariant(p: String, l: List[Inv]) = {
     invariants(p) = invariants(p) ++ l
   }
 
-  def setInvariant(p: String, l: List[(Expr, Option[String])]) = {
+  def setInvariant(p: String, l: List[Inv]) = {
     invariants(p) = l
   }
 
@@ -882,9 +909,9 @@ class TranslationValidator {
             }
             if (preds.nonEmpty) {
               val pred = preds.reduce((l, r) => BinaryExpr(BoolAND, l, r))
-              val guarded =
-                exprInSource(BinaryExpr(BoolIMPLIES, BinaryExpr(IntEQ, transitionSystemPCVar, PCSym(label)), pred))
-              addInvariant(proc.name, List((guarded, Some(s"Reaching Defs $label"))))
+              // val guarded =
+              //  exprInSource(BinaryExpr(BoolIMPLIES, BinaryExpr(IntEQ, transitionSystemPCVar, PCSym(label)), pred))
+              addInvariant(proc.name, List(Inv.CutPoint(label, pred, Some(s"Reaching Defs $label"))))
             }
           }
         }
@@ -997,7 +1024,8 @@ class TranslationValidator {
       // add inv on transition system
       combined.blocks.find(_.label == after.entryBlock.get.label).get.statements.append(Assume(trueFun.makeCall()))
       combined.blocks.find(_.label == before.entryBlock.get.label).get.statements.append(Assume(trueFun.makeCall()))
-      val invVariables = invariants(proc.name).flatMap(_._1.variables).toSet
+      val invVariables = invariants(proc.name).flatMap(_.toAssume.body.variables).toSet
+
       val QSource =
         val sourceInvVariables =
           invVariables.filter(_.name.startsWith(afterRenamer.namespace)) ++ Seq(transitionSystemPCVar, traceVar).map(
@@ -1014,22 +1042,51 @@ class TranslationValidator {
         val vars = targetInvVariables.map(v => polyEqual(visit_expr(prime, v), v))
         boolAnd(vars)
 
+      def exitDone(b: Block) = {}
+
       combined.blocks
         .find(_.label == after.returnBlock.get.label)
-        .get
-        .statements
-        .append(Assert(UnaryExpr(BoolNOT, QSource)))
+        .map(b => {
+          b.statements.append(Assume(QSource))
+          b.statements.append(Assert(FalseLiteral))
+        })
       combined.blocks
         .find(_.label == before.returnBlock.get.label)
-        .get
-        .statements
-        .append(Assert(UnaryExpr(BoolNOT, QTarget)))
+        .map(b => {
+          b.statements.append(Assume(QTarget))
+          b.statements.append(Assert(FalseLiteral))
+        })
+
+      val srce = combined.blocks.find(_.label == after.entryBlock.get.label).get
+      val tgte = combined.blocks.find(_.label == before.entryBlock.get.label).get
+
+      srce.statements.prepend(LocalAssign(varInSource(transitionSystemPCVar), varInSource(transitionSystemPCVar)))
+      srce.statements.prepend(LocalAssign(varInSource(traceVar), varInSource(traceVar)))
+      tgte.statements.prepend(LocalAssign(varInTarget(transitionSystemPCVar), varInTarget(transitionSystemPCVar)))
+      tgte.statements.prepend(LocalAssign(varInTarget(traceVar), varInTarget(traceVar)))
+
+      val renamer: ((Block, Command) => Command) = ssaDAG(combined)
 
       // add invariant to combined
-      val invariant = Seq((pcInv, Some("PC INVARIANT")), (traceInv, Some("Trace INVARIANT"))) ++ invariants(proc.name)
-      val primedInv = invariant.map((i, l) => Assert(visit_expr(prime, i), l))
+      val initInv = Seq(Inv.Global(pcInv, Some("PC INVARIANT")), Inv.Global(traceInv, Some("Trace INVARIANT")))
+      val invariant = initInv ++ invariants(proc.name).map {
+        case g: Inv.Global => g
+        case i @ CutPoint(l, b, comment) => {
+          val target = combined.blocks.find(_.label == beforeCuts(before)(l).label).get
+          val source = combined.blocks.find(_.label == afterCuts(after)(l).label).get
+          val inv1 = renamer(target, Assume(b))
+          val inv2 = renamer(source, inv1) match {
+            case a: Assume => a.body
+          }
+          CutPoint(l, inv2, comment)
+        }
+      }
+      val primedInv = (initInv ++ invariants(proc.name)).map(_.toAssume).map { case Assume(b, c, _, _) =>
+        Assert(visit_expr(prime, b), c)
+      }
+
       val proof =
-        invariant.map((i, l) => Assume(i, l))
+        invariant.map(i => i.toAssume)
           ++ List(
             Assume(UnaryExpr(BoolNOT, wpconjSourceFun.makeCall()), Some(" wp conjugate of source program")),
             Assume(UnaryExpr(BoolNOT, wpconjTargetFun.makeCall()), Some(" wp conjugate of target program"))
@@ -1038,14 +1095,11 @@ class TranslationValidator {
           ++ List(Assume(falseFun.makeCall()))
 
       combined.entryBlock.get.statements.prependAll(proof)
-      val renamer = ssaDAG(combined)
 
       util.writeToFile(pp_proc(combined), "ssadag.il")
       val ackermannTransforms = Ackermann.doTransform(combined, afterRenamer, beforeRenamer)
       util.writeToFile(pp_proc(combined), "ssadagack.il")
 
-      val srce = combined.blocks.find(_.label == after.entryBlock.get.label).get
-      val tgte = combined.blocks.find(_.label == before.entryBlock.get.label).get
       val ackInv = Ackermann.instantiateAxioms(srce, tgte, ackermannTransforms).toSet
       // val ackInv = Ackermann.naiveInvariant(ackermannTransforms)
       visit_proc(Ackermann.ToAssume(ackermannTransforms), combined)
@@ -1081,10 +1135,13 @@ class TranslationValidator {
       visit_proc(afterRenamer, after)
 
       val combined = sequenceTransitionSystems(afterProg.get, after, before)
-      val invariant = Seq((pcInv, Some("PC INVARIANT")), (traceInv, Some("Trace INVARIANT"))) ++ invariants(proc.name)
+      val invariant =
+        Seq(Inv.Global(pcInv, Some("PC INVARIANT")), Inv.Global(traceInv, Some("Trace INVARIANT"))) ++ invariants(
+          proc.name
+        )
 
-      combined.entryBlock.get.statements.prependAll(invariant.map((i, l) => Assume(i, l)))
-      combined.returnBlock.get.statements.appendAll(invariant.map((i, l) => Assert(i, l)))
+      combined.entryBlock.get.statements.prependAll(invariant.map(_.toAssume))
+      combined.returnBlock.get.statements.appendAll(invariant.map(_.toAssert))
 
       validationProcs = validationProcs.updated(proc.name, combined)
 

@@ -1022,7 +1022,7 @@ def validatedSimplifyPipeline(p: Program) = {
             }
           }
           if (inv.nonEmpty) {
-            val guard = BinaryExpr(IntEQ, validator.varInTarget(transitionSystemPCVar), PCMan.PCSym(cutName))
+            // val guard = BinaryExpr(IntEQ, validator.varInTarget(transitionSystemPCVar), PCMan.PCSym(cutName))
             val condTarget = validator.exprInTarget(inv.reduce((a, b) => BinaryExpr(BoolAND, a, b)))
 
             val propVars = result
@@ -1034,8 +1034,8 @@ def validatedSimplifyPipeline(p: Program) = {
 
             val condSource = validator.exprInSource(inv.reduce((a, b) => BinaryExpr(BoolAND, a, b)))
             val invariantdef = List(
-              (BinaryExpr(BoolIMPLIES, guard, condSource), Some(s"$cutName CopyProp Dom Source")),
-              (BinaryExpr(BoolIMPLIES, guard, eqPropVars), Some(s"$cutName CopyProp vars correspond"))
+              Inv.CutPoint(cutName, condSource, Some(s"$cutName CopyProp Dom Source")),
+              Inv.CutPoint(cutName, eqPropVars, Some(s"$cutName CopyProp vars correspond"))
             )
 
             validator.addInvariant(proc, invariantdef)
