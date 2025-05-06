@@ -1237,3 +1237,32 @@ def computeDSADomain(proc: Procedure, context: IRContext): Set[Procedure] = {
 
   domain
 }
+
+
+def globalIntervals(context: IRContext): Seq[DSInterval] = {
+  val globals = ctx.globals ++ ctx.funcEntries
+  val intervals = mutable.Set[DSInterval]()
+
+  globals.toSeq.sortBy(_.address).foreach {
+    case FuncEntry(name, size, address) =>
+      intervals += DSInterval(address.toInt, address.toInt + size / 8)
+    case SpecGlobal(name, size, arraySize, address) =>
+      intervals += DSInterval(address.toInt, address.toInt) // ignore size, could be a composite type
+  }
+
+  ctx.globalOffsets.foreach { case (address, relocated) =>
+    intervals += DSInterval.Value(address.toInt, address.toInt)
+    if !intervals.exists(_.contains(relocated.toInt)) then
+      intervals += DSInterval.Value(relocated.toInt, relocated.toInt)
+  }
+
+  ctx.externalFunctions.foreach(e =>
+    intervals += DSInterval.Value(e.offset.toInt, e.offset.toInt)
+  )
+
+  val seq = intervals.toSeq.sorted
+  seq.sliding(2).foreach(
+    v => assert(!v(0).isOverlapping(v(1)))
+  )
+  seq
+}
