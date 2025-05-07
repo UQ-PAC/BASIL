@@ -44,4 +44,13 @@ I call a html file with code to display the IR atm.
 ## I am up to
 I have displayed an IR now. I have not run it through any transform passes yet. This still needs to be done. 
 
+## classes changes
+build.sc - I needed to add dependencies (for imports such as http4)
+<br>
+ApiServer - Code that will run the API endpoints. I am hoping to refactor this later
+<br>
+api-information.md - ReadMe for the API changes
+<br>
+index.html - Contains the javascript and future ReactCode
+
 

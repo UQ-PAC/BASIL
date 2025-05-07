@@ -49,7 +49,7 @@ object ApiServer extends IOApp {
       summariseProcedures = true,
       staticAnalysis = None,
       //boogieTranslation = boogieConfig, //  I can in the future configure this myself if advantageous
-      outputPrefix = "test_output" // <-- required argument
+      outputPrefix = "out/test_output" // <-- required argument
     )
 
     // Run BASIL (assumed logic that returns the IR)
