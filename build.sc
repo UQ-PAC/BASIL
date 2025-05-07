@@ -20,6 +20,13 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
   val sprayJson = ivy"io.spray::spray-json:1.3.6"
   val scalapb = ivy"com.thesamet.scalapb::scalapb-runtime:0.11.15"
   val scalaCompiler = ivy"org.scala-lang::scala3-compiler:3.3.4"
+  
+  val apiDsl = ivy"org.http4s::http4s-dsl:0.23.23"
+  val apiBlaze = ivy"org.http4s::http4s-blaze-server:0.23.17"
+  val apiCircle = ivy"org.http4s::http4s-circe:0.23.23"
+  val apiGeneric = ivy"io.circe::circe-generic:0.14.6"
+  val slf4j = ivy"org.slf4j:slf4j-simple:2.0.12"
+  val scalaXml = ivy"org.scala-lang.modules::scala-xml:2.1.0"
 
   def scalaPBVersion = "0.11.15"
 
@@ -27,13 +34,16 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
 
   override def scalaPBSources = T.sources { Seq(PathRef(this.millSourcePath / "main" / "protobuf")) }
   def millSourcePath = super.millSourcePath / "src"
-  def ivyDeps = Agg(scalactic, antlrRuntime, sourceCode, mainArgs, sprayJson, scalapb, scalaCompiler)
+  def ivyDeps = Agg(scalactic, antlrRuntime, sourceCode, mainArgs, sprayJson, scalapb, scalaCompiler, apiDsl, apiBlaze, apiCircle, apiGeneric, slf4j, scalaXml)
   def sources = T.sources { Seq(PathRef(this.millSourcePath / "main" / "scala")) }
 
   override def antlrPackage: Option[String] = Some("Parsers")
   override def antlrGenerateVisitor = true
   override def antlrGrammarSources = T.sources {
     Seq(PathRef(millSourcePath / "main" / "antlr4"))
+  }
+  override def resources = T.sources {
+    Seq(PathRef(millSourcePath / "main" / "resources"))
   }
 
   object test extends ScalaTests with TestModule.ScalaTest {
