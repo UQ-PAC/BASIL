@@ -17,7 +17,7 @@ def genFunctionOpDefinition(
       val invar = BParam("arg", BoolBType)
       val outvar = BParam(BitVecBType(1))
       val body = IfThenElse(invar, BitVecBLiteral(1, 1), BitVecBLiteral(0, 1))
-      BFunction(b.fnName, List(invar), outvar, Some(body), List(externAttr))
+      BFunction(b.fnName, List(invar), outvar, Some(body), List(externAttr, b.attribute))
     case b: BVFunctionOp => BFunction(b.name, b.in, b.out, None, List(externAttr, b.attribute))
     case m: MemoryLoadOp => genLoadFunction(m)
     case m: MemoryStoreOp =>

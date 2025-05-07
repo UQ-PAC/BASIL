@@ -1,4 +1,4 @@
-import analysis.data_structure_analysis.{Global, Interval}
+import analysis.data_structure_analysis.{Global, DSInterval}
 import boogie.SpecGlobal
 import ir.*
 import ir.Endian.{BigEndian, LittleEndian}
@@ -7,10 +7,10 @@ import org.scalatest.Ignore
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
 import util.*
-import util.DSAAnalysis.Norm
+import util.DSAConfig.Checks
 
 @test_util.tags.UnitTest
-class MemoryTransfromTests extends AnyFunSuite {
+class MemoryTransformTests extends AnyFunSuite with test_util.CaptureOutput {
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program)
@@ -29,7 +29,7 @@ class MemoryTransfromTests extends AnyFunSuite {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Norm))),
+        dsaConfig = Some(Checks),
         memoryTransform = true
       )
     )
@@ -44,7 +44,7 @@ class MemoryTransfromTests extends AnyFunSuite {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(DSAConfig(Set(Norm))),
+        dsaConfig = Some(Checks),
         memoryTransform = true
       )
     )
@@ -72,7 +72,7 @@ class MemoryTransfromTests extends AnyFunSuite {
     val global = memoryAssign.lhs
     val z = results.ir.globals.collectFirst { case g @ SpecGlobal("z", size, arraySize, address) => g }.get
 
-    assert(global.name == (s"Global_${z.address}_${z.address + (z.size / 8) - 1}"), s"Expected variable to be named $z")
+    assert(global.name == (s"Global_${z.address}_${z.address + (z.size / 8)}"), s"Expected variable to be named $z")
   }
 
   test("multi proc global assignment") {

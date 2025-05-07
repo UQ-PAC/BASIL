@@ -263,8 +263,6 @@ class Procedure private (
 
   def name = procName + address.map("_" + _).getOrElse("")
 
-  var stackSize: Option[Int] = None
-
   private val _callers = mutable.HashSet[DirectCall]()
   _blocks.foreach(_.parent = this)
   // class invariant
@@ -313,7 +311,7 @@ class Procedure private (
         "_loop_header_" + loopCounter
       } else ""
 
-      b.label = name + "_" + counter + loopCounter
+      b.label = name + "_" + counter
 
     }
 
@@ -462,6 +460,10 @@ class Procedure private (
     // O(n) because we are careful to unlink the parents etc.
     // .toList to avoid modifying our own iterator
     removeBlocksDisconnect(_blocks.toList)
+  }
+
+  def labelToBlock: Map[String, Block] = {
+    blocks.map(p => p.label -> p).toMap
   }
 
   def callers(): Iterable[Procedure] = _callers.map(_.parent.parent).toSet[Procedure]

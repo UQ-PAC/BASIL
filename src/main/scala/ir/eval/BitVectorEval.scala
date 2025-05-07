@@ -10,7 +10,7 @@ object BitVectorEval {
     */
   def nat2bv(bitSize: Int, n: BigInt): BitVecLiteral =
     require(bitSize > 0, "length of bitvector must be positive")
-    require(n >= 0, "input must be non-negative")
+    require(n >= 0, s"input must be non-negative : ($n, $bitSize)")
 
     BitVecLiteral(n % BigInt(2).pow(bitSize), bitSize)
 
@@ -28,6 +28,14 @@ object BitVectorEval {
   def bv2SignedInt(b: BitVecLiteral): BigInt =
     if isNegative(b) then b.value - BigInt(2).pow(b.size)
     else b.value
+
+  /** Converts a signed integer value to its corresponding Bitvector, 
+   *  assuming it falls within the representable range of the bitvector
+   *  with size [[size]].
+   *
+    */
+  def signedInt2BV(size: Int, i: BigInt): BitVecLiteral =
+    if (i > 0) then BitVecLiteral(i, size) else smt_bvneg(BitVecLiteral(-i, size))
 
   /** (bvadd (_ BitVec m) (_ BitVec m) (_ BitVec m))
     *   - addition modulo 2^m
@@ -331,5 +339,13 @@ object BitVectorEval {
     } else {
       smt_zero_extend(i, s)
     }
+  }
+
+  def repeat_bits(i: Int, s: BitVecLiteral) = {
+    var x = s
+    for (_ <- 1 until i) {
+      x = smt_concat(x, s)
+    }
+    x
   }
 }

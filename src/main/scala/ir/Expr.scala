@@ -47,9 +47,10 @@ case object FalseLiteral extends BoolLit {
 }
 
 case class BitVecLiteral(value: BigInt, size: Int) extends Literal with CachedHashCode {
-  assert(size >= 0)
+  require(size >= 0)
+  require(value <= getType.maxValue, s"bad value: $value for width $size")
   override def toBoogie: BitVecBLiteral = BitVecBLiteral(value, size)
-  override def getType: IRType = BitVecType(size)
+  override def getType: BitVecType = BitVecType(size)
   override def toString: String = s"${value}bv$size"
 }
 
@@ -141,6 +142,7 @@ case class UnaryExpr(op: UnOp, arg: Expr) extends Expr with CachedHashCode {
   }
 
   override def toString: String = op match {
+    case BoolToBV1 => s"booltobv1($arg)"
     case uOp: BoolUnOp => s"($uOp$arg)"
     case uOp: BVUnOp => s"bv$uOp$inSize($arg)"
     case uOp: IntUnOp => s"($uOp$arg)"
@@ -193,12 +195,14 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr with Cache
           if (bv1.size == bv2.size) {
             BitVecType(1)
           } else {
+            println(this)
             throw new Exception("bitvector size mismatch")
           }
         case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
           if (bv1.size == bv2.size) {
             BoolType
           } else {
+            println(this)
             throw new Exception("bitvector size mismatch")
           }
         case BVEQ | BVNEQ =>
@@ -245,17 +249,21 @@ sealed trait BoolBinOp(op: String) extends BinOp {
   def opName = op
 }
 
-case object BoolEQ extends BoolBinOp("==")
+sealed trait BoolCmpOp extends BoolBinOp
+
+case object BoolEQ extends BoolBinOp("==") with BoolCmpOp
 case object BoolNEQ extends BoolBinOp("!=")
 case object BoolAND extends BoolBinOp("&&")
 case object BoolOR extends BoolBinOp("||")
-case object BoolIMPLIES extends BoolBinOp("==>")
+case object BoolIMPLIES extends BoolBinOp("==>") with BoolCmpOp
 case object BoolEQUIV extends BoolBinOp("<==>")
 
 sealed trait BVBinOp(op: String) extends BinOp {
   override def toString: String = op
   def opName = op
 }
+
+sealed trait BVCmpOp extends BVBinOp
 
 case object BVAND extends BVBinOp("and")
 case object BVOR extends BVBinOp("or")
@@ -265,7 +273,7 @@ case object BVUDIV extends BVBinOp("udiv")
 case object BVUREM extends BVBinOp("urem")
 case object BVSHL extends BVBinOp("shl")
 case object BVLSHR extends BVBinOp("lshr")
-case object BVULT extends BVBinOp("ult")
+case object BVULT extends BVBinOp("ult") with BVCmpOp
 case object BVNAND extends BVBinOp("nand")
 case object BVNOR extends BVBinOp("nor")
 case object BVXOR extends BVBinOp("xor")
@@ -276,15 +284,15 @@ case object BVSDIV extends BVBinOp("sdiv")
 case object BVSREM extends BVBinOp("srem")
 case object BVSMOD extends BVBinOp("smod")
 case object BVASHR extends BVBinOp("ashr")
-case object BVULE extends BVBinOp("ule")
-case object BVUGT extends BVBinOp("ugt")
-case object BVUGE extends BVBinOp("uge")
-case object BVSLT extends BVBinOp("slt")
-case object BVSLE extends BVBinOp("sle")
-case object BVSGT extends BVBinOp("sgt")
-case object BVSGE extends BVBinOp("sge")
-case object BVEQ extends BVBinOp("==")
-case object BVNEQ extends BVBinOp("!=")
+case object BVULE extends BVBinOp("ule") with BVCmpOp
+case object BVUGT extends BVBinOp("ugt") with BVCmpOp
+case object BVUGE extends BVBinOp("uge") with BVCmpOp
+case object BVSLT extends BVBinOp("slt") with BVCmpOp
+case object BVSLE extends BVBinOp("sle") with BVCmpOp
+case object BVSGT extends BVBinOp("sgt") with BVCmpOp
+case object BVSGE extends BVBinOp("sge") with BVCmpOp
+case object BVEQ extends BVBinOp("==") with BVCmpOp
+case object BVNEQ extends BVBinOp("!=") with BVCmpOp
 case object BVCONCAT extends BVBinOp("++")
 
 sealed trait IntBinOp(op: String) extends BinOp {

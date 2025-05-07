@@ -4,15 +4,16 @@ import bap.*
 import boogie.*
 import translating.*
 import util.RunUtils
-import scala.sys.process.*
 
+import scala.sys.process.*
 import java.io.File
 import scala.collection.mutable.{ArrayBuffer, Set}
 import scala.collection.{immutable, mutable}
 import scala.language.postfixOps
 import scala.sys.process.*
 import util.*
-import mainargs.{main, arg, ParserForClass, Flag}
+import mainargs.{Flag, ParserForClass, arg, main}
+import util.DSAConfig.{Checks, Prereq, Standard}
 import util.boogie_interaction.BoogieResultKind
 
 object Main {
@@ -22,50 +23,72 @@ object Main {
     case Bap
   }
 
+  private def replacePathExtension(p: java.nio.file.Path, newExtension: String) = {
+    val basename = p.getFileName().toString
+
+    val withoutExtension = if (basename.contains(".")) {
+      basename.split("\\.", -1).dropRight(1).mkString(".")
+    } else {
+      basename
+    }
+
+    p.resolveSibling(withoutExtension + newExtension)
+  }
+
   def loadDirectory(i: ChooseInput = ChooseInput.Gtirb, d: String): ILLoadingConfig = {
 
-    val x = d.stripSuffix(".gts").stripSuffix(".adt")
-    val p = x.split("/")
-    val tryName = Seq(x + "/" + p.last, x + "/" + p.dropRight(1).last, x, p.last, p.dropRight(1).mkString("/"))
+    // at this point, `path` is the given directory with file extensions removed (if any).
+    val path = replacePathExtension(java.nio.file.Paths.get(d), "")
 
-    tryName
+    // name of the parent directory.
+    // e.g., in "src/test/correct/TESTCASE/gcc_O2", this would be "TESTCASE".
+    val parentName = path.getParent().getFileName()
+
+    // the elements of this list are the filenames which will be tried. they will be
+    // suffixed with different extensions to get the different files needed.
+    val tryName = Seq(path.resolve(path.getFileName), path.resolve(parentName), path, path.getFileName, path.getParent)
+    // NOTE: path.resolve(subpath) acts like `path + "/" + subpath`
+
+    // helper function to locate a file adjacent to the given path, with the given extension,
+    // and ensure that it exists. returns None if file does not exist, otherwise Some(Path).
+    val findAdjacent = (x: java.nio.file.Path, ext: String) =>
+      Some(replacePathExtension(x, ext)).filter(_.toFile.exists)
+
+    val results = tryName
       .flatMap(name => {
-        val trySpec =
-          tryName.map(n => n + ".spec") ++ Seq(p.dropRight(1).mkString("/") + "/" + p.dropRight(1).last + ".spec")
-        val adt = s"$name.adt"
-        val relf = s"$name.relf"
-        val gtirb = s"$name.gts"
+        val trySpec = (tryName ++ Seq(path.getParent.resolve(parentName)))
+          .flatMap(findAdjacent(_, ".spec"))
+        val spec = trySpec.headOption
 
-        val spec = trySpec
-          .flatMap(s => {
-            if (File(s).exists) {
-              Seq(s)
-            } else {
-              Seq()
-            }
-          })
-          .headOption
+        val adt = findAdjacent(name, ".adt")
+        val relf = findAdjacent(name, ".relf")
+        val gtirb = findAdjacent(name, ".gts")
 
         val input = i match
           case ChooseInput.Gtirb => gtirb
           case ChooseInput.Bap => adt
 
-        if (File(input).exists() && File(relf).exists()) {
-          Logger.info(s"Found $input $relf ${spec.getOrElse("")}")
-          Seq(ILLoadingConfig(input, relf, spec))
-        } else {
-          Seq()
+        (input, relf) match {
+          case (Some(input), Some(relf)) => {
+            Logger.info(s"Found $input $relf ${spec.getOrElse("")}")
+            Seq(ILLoadingConfig(input.toString, relf.toString, spec.map(_.toString)))
+          }
+          case _ => Seq()
         }
       })
-      .head
 
+    results match {
+      case Nil => throw Exception(s"failed to load directory (tried: ${tryName.mkString(", ")})")
+      case Seq(x) => x
+      case more => throw Exception(s"found more than one potential input (${more.mkString(", ")})")
+    }
   }
 
   @main(name = "BASIL")
   case class Config(
     @arg(name = "load-directory-bap", doc = "Load relf, adt, and bir from directory (and spec from parent directory)")
     bapInputDirName: Option[String],
-    @arg(name = "load-directory-gtirb", doc = "Load relf, gts, and bir from directory (and spec from parent directory)")
+    @arg(name = "load-directory-gtirb", doc = "Load relf and gts from directory (and spec from parent directory)")
     gtirbInputDirName: Option[String],
     @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file")
     inputFileName: Option[String],
@@ -168,6 +191,7 @@ object Main {
 
     if (conf.help.value) {
       println(parser.helpText(sorted = false))
+      return
     }
 
     Logger.setLevel(LogLevel.INFO, false)
@@ -209,7 +233,6 @@ object Main {
           conf.analysisResults,
           conf.analysisResultsDot,
           conf.threadSplit.value,
-          conf.summariseProcedures.value,
           memoryRegionsMode,
           !conf.noIrreducibleLoops.value
         )
@@ -220,14 +243,12 @@ object Main {
 
     val dsa: Option[DSAConfig] = if (conf.simplify.value) {
       conf.dsaType match
-        case Some("set") => Some(DSAConfig(immutable.Set(DSAAnalysis.Set)))
-        case Some("field") => Some(DSAConfig(immutable.Set(DSAAnalysis.Field)))
-        case Some("norm") => Some(DSAConfig(immutable.Set(DSAAnalysis.Norm)))
-        case Some("all") => Some(DSAConfig(immutable.Set(DSAAnalysis.Set, DSAAnalysis.Field, DSAAnalysis.Norm)))
-        case Some("none") => Some(DSAConfig(immutable.Set.empty))
-        case None => None
+        case Some("prereq") => Some(Prereq)
+        case Some("checks") => Some(Checks)
+        case Some("standard") => Some(Standard)
+        case None => Some(Standard)
         case Some(_) =>
-          throw new IllegalArgumentException("Illegal option to dsa, allowed are: (none|set|field|norm|all)")
+          throw new IllegalArgumentException("Illegal option to dsa, allowed are: (prereq|standard|checks)")
     } else {
       None
     }
@@ -266,6 +287,7 @@ object Main {
       runInterpret = conf.interpret.value,
       simplify = conf.simplify.value,
       validateSimp = conf.validateSimplify.value,
+      summariseProcedures = conf.summariseProcedures.value,
       staticAnalysis = staticAnalysis,
       boogieTranslation = boogieGeneratorConfig,
       outputPrefix = conf.outFileName,

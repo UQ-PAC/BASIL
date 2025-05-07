@@ -7,18 +7,23 @@ import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
 import contrib.scalapblib._
 
 object basil extends RootModule with ScalaModule with antlr.AntlrModule with ScalaPBModule {
+  // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
+  // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
   def scalaVersion = "3.3.4"
+  override def ammoniteVersion = "3.0.2"
 
   def scalacOptions: T[Seq[String]] = Seq("-deprecation")
 
   val javaTests = ivy"com.novocode:junit-interface:0.11"
   val scalaTests = ivy"org.scalatest::scalatest:3.2.19"
+  val scalaCheck = ivy"org.scalatestplus::scalacheck-1-18:3.2.19.0"
   val scalactic = ivy"org.scalactic::scalactic:3.2.19"
   val antlrRuntime = ivy"org.antlr:antlr4-runtime:4.9"
   val sourceCode = ivy"com.lihaoyi::sourcecode:0.3.0"
   val mainArgs = ivy"com.lihaoyi::mainargs:0.5.1"
   val sprayJson = ivy"io.spray::spray-json:1.3.6"
   val scalapb = ivy"com.thesamet.scalapb::scalapb-runtime:0.11.15"
+  val scalaCompiler = ivy"org.scala-lang::scala3-compiler:3.3.4"
 
   def scalaPBVersion = "0.11.15"
 
@@ -26,7 +31,7 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
 
   override def scalaPBSources = T.sources { Seq(PathRef(this.millSourcePath / "main" / "protobuf")) }
   def millSourcePath = super.millSourcePath / "src"
-  def ivyDeps = Agg(scalactic, antlrRuntime, sourceCode, mainArgs, sprayJson, scalapb)
+  def ivyDeps = Agg(scalactic, antlrRuntime, sourceCode, mainArgs, sprayJson, scalapb, scalaCompiler)
   def sources = T.sources { Seq(PathRef(this.millSourcePath / "main" / "scala")) }
 
   override def antlrPackage: Option[String] = Some("Parsers")
@@ -36,7 +41,9 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
   }
 
   object test extends ScalaTests with TestModule.ScalaTest {
-    def ivyDeps = Agg(scalaTests, javaTests)
+    override def ammoniteVersion = basil.ammoniteVersion
+
+    def ivyDeps = Agg(scalaTests, scalaCheck, javaTests)
     def sources = T.sources { Seq(PathRef(this.millSourcePath / "scala")) }
   }
 
@@ -105,5 +112,5 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
     os.read.lines(path1) == os.read.lines(path2)
   }
 
-  def scalafmt = mill.scalalib.scalafmt.ScalafmtModule 
+  def scalafmt = mill.scalalib.scalafmt.ScalafmtModule
 }

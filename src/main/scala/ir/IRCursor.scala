@@ -197,13 +197,13 @@ def computeDomain[T <: CFGPosition, O <: T](walker: IRWalk[T, O], initial: Itera
   domain
 }
 
-/** Compute the set of strongly connected subcomponents (flattened) in a topological sort order using Tarjan's strongly
-  * connected components algorithm
-  */
+/** Compute the set of strongly connected subcomponents (flattened) in a topological sort order using
+ *  Tarjan's strongly connected components algorithm
+ */
 def stronglyConnectedComponents[T <: CFGPosition, O <: T](
   walker: IRWalk[T, O],
   initial: IterableOnce[O]
-): mutable.ListBuffer[mutable.Set[O]] = {
+): List[Set[O]] = {
   var index = 0;
   var stack = mutable.Stack[O]()
   var vIndex = mutable.Map[O, Int]()
@@ -244,8 +244,9 @@ def stronglyConnectedComponents[T <: CFGPosition, O <: T](
       out += component
     }
   }
+  assert(stack.size == 0)
 
-  out
+  out.map(_.toSet).toList
 }
 
 def toDot(program: Program, labels: Map[CFGPosition, String] = Map.empty, inter: Boolean = false): String = {
@@ -317,9 +318,16 @@ def dotBlockGraph(blocks: Iterable[Block], orphaned: Set[Block]): String = {
   toDot[Block](blocks.toSet, IntraProcBlockIRCursor, labels, orphaned)
 }
 
+def dotBlockGraph(program: Procedure, labels: Map[CFGPosition, String]): String = {
+  val domain = computeDomain[CFGPosition, Block](IntraProcBlockIRCursor, program.blocks.toSet)
+  val o = getDetachedBlocks(program).reachableFromBlockEmptyPred
+  toDot[Block](domain.toSet, IntraProcBlockIRCursor, labels, o)
+}
+
 def dotBlockGraph(program: Program, labels: Map[CFGPosition, String] = Map.empty): String = {
   val domain = computeDomain[CFGPosition, Block](IntraProcBlockIRCursor, program.procedures.flatMap(_.blocks).toSet)
-  toDot[Block](domain.toSet, IntraProcBlockIRCursor, labels, Set())
+  val e = program.procedures.toSet.flatMap(getDetachedBlocks(_).reachableFromBlockEmptyPred)
+  toDot[Block](domain.toSet, IntraProcBlockIRCursor, labels, e)
 }
 
 def toDot[T <: CFGPosition](

@@ -21,7 +21,7 @@ import scala.collection.mutable
 import test_util.BASILTest
 import test_util.TestConfig
 import test_util.TestCustomisation
-import util.DSAAnalysis.Norm
+import util.DSAConfig.Checks
 
 import java.io.{BufferedWriter, File, FileWriter}
 
@@ -85,7 +85,7 @@ class IndirectCallTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest,
       specPath,
       BPLPath,
       staticAnalysisConf,
-      dsa = Some(DSAConfig(Set(Norm))),
+      dsa = Some(Checks),
       simplify = true,
       postLoad = ctx => { indircalls = getIndirectCalls(ctx.program); }
     )

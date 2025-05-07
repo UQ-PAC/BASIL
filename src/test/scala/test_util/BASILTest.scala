@@ -1,6 +1,9 @@
 package test_util
 
 import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.concurrent.ScaledTimeSpans
+import org.scalatest.time.{Span, Seconds}
+
 import ir.{Block, Procedure, Program}
 import util.{
   BASILConfig,
@@ -20,16 +23,24 @@ import scala.io.Source
 import java.io.{BufferedWriter, File, FileWriter}
 
 case class TestConfig(
-  boogieFlags: Seq[String] = Seq("/timeLimit:10", "/useArrayAxioms"),
+  timeout: Int = 10,
+  baseBoogieFlags: Seq[String] = Seq("/useArrayAxioms"),
   staticAnalysisConfig: Option[StaticAnalysisConfig] = None,
   useBAPFrontend: Boolean,
   expectVerify: Boolean,
   checkExpected: Boolean = false,
   logResults: Boolean = false,
   simplify: Boolean = false,
+  summariseProcedures: Boolean = false,
   dsa: Option[DSAConfig] = None,
   memoryTransform: Boolean = false
-)
+) {
+  private val scaledtimespans = new ScaledTimeSpans {}
+  def timeoutFlag =
+    val seconds = scaledtimespans.scaled(Span(timeout, Seconds)).millisPart / 1000
+    s"/timeLimit:${seconds}"
+  def boogieFlags = timeoutFlag +: baseBoogieFlags
+}
 
 trait BASILTest {
   def runBASIL(
@@ -39,6 +50,7 @@ trait BASILTest {
     BPLPath: String,
     staticAnalysisConf: Option[StaticAnalysisConfig],
     simplify: Boolean = false,
+    summariseProcedures: Boolean = false,
     dsa: Option[DSAConfig] = None,
     memoryTransform: Boolean = false,
     postLoad: IRContext => Unit = s => ()
@@ -51,6 +63,7 @@ trait BASILTest {
     val config = BASILConfig(
       loading = ILLoadingConfig(inputFile = inputPath, relfFile = RELFPath, specFile = specFile, parameterForm = false),
       simplify = simplify,
+      summariseProcedures = summariseProcedures,
       staticAnalysis = staticAnalysisConf,
       boogieTranslation =
         util.BoogieGeneratorConfig().copy(memoryFunctionType = util.BoogieMemoryAccessMode.SuccessiveStoreSelect),
@@ -77,8 +90,8 @@ trait BASILTest {
 
   /** @return
    *
-    *   param 0: None if passes, Some(failure message) if doesn't pass 
-    *   param 1: whether the Boogie output verified 
+    *   param 0: None if passes, Some(failure message) if doesn't pass
+    *   param 1: whether the Boogie output verified
     *   param 2: whether Boogie timed out
     */
   def checkVerify(boogieStdout: String, expectVerify: Boolean): (Option[String], Boolean, Boolean) = {

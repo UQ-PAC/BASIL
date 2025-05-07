@@ -28,7 +28,7 @@ case class BreakPointAction(
 case class BreakPoint(name: String = "", location: BreakPointLoc, action: BreakPointAction)
 
 case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](f: I, breaks: List[BreakPoint])
-    extends NopEffects[(T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])]), InterpreterError] {
+    extends NopEffects[(T, List[(BreakPoint, Option[T], List[(String, Expr, Option[Expr])])]), InterpreterError] {
 
   def findBreaks[R](c: Command): State[(T, R), List[BreakPoint], InterpreterError] = {
     State.filterM(
@@ -42,8 +42,11 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](f: I, break
     )
   }
 
-  override def getNext
-    : State[(T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])]), ExecutionContinuation, InterpreterError] = {
+  override def getNext: State[
+    (T, List[(BreakPoint, Option[T], List[(String, Expr, Option[Expr])])]),
+    ExecutionContinuation,
+    InterpreterError
+  ] = {
     for {
       v: ExecutionContinuation <- doLeft(f.getNext)
       n <- v match {
@@ -51,7 +54,7 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](f: I, break
           for {
             breaks: List[BreakPoint] <- findBreaks(s)
             res <- State
-              .sequence[(T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])]), Unit, InterpreterError](
+              .sequence[(T, List[(BreakPoint, Option[T], List[(String, Expr, Option[Expr])])]), Unit, InterpreterError](
                 State.pure(()),
                 breaks.map((breakpoint: BreakPoint) =>
                   (breakpoint match {
@@ -64,7 +67,10 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](f: I, break
                         evals <- (State.mapM(
                           (e: (String, Expr)) =>
                             for {
-                              ev <- doLeft(Eval.evalExpr(f)(e._2))
+                              ev <- doLeft(Eval.evalExpr(f)(e._2)).catchE {
+                                case Left(l) => State.pure(None)
+                                case Right(l) => State.pure(Some(l))
+                              }
                             } yield (e._1, e._2, ev),
                           action.evalExprs
                         ))
@@ -84,8 +90,9 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](f: I, break
                         _ <-
                           if action.stop then doLeft(f.setNext(ErrorStop(Errored(s"Stopped at breakpoint ${name}"))))
                           else doLeft(State.pure(()))
-                        _ <- State.modify((istate: (T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])])) =>
-                          (istate._1, ((breakpoint, saved, evals) :: istate._2))
+                        _ <- State.modify(
+                          (istate: (T, List[(BreakPoint, Option[T], List[(String, Expr, Option[Expr])])])) =>
+                            (istate._1, ((breakpoint, saved, evals) :: istate._2))
                         )
                       } yield ()
                     )
@@ -104,7 +111,7 @@ def interpretWithBreakPoints[I](
   breakpoints: List[BreakPoint],
   innerInterpreter: Effects[I, InterpreterError],
   innerInitialState: I
-): (I, List[(BreakPoint, Option[I], List[(String, Expr, Expr)])]) = {
+): (I, List[(BreakPoint, Option[I], List[(String, Expr, Option[Expr])])]) = {
   val interp = LayerInterpreter(innerInterpreter, RememberBreakpoints(innerInterpreter, breakpoints))
   val res = InterpFuns.interpretProg(interp)(p, (innerInitialState, List()))
   res
@@ -115,7 +122,7 @@ def interpretWithBreakPoints[I](
   breakpoints: List[BreakPoint],
   innerInterpreter: Effects[I, InterpreterError],
   innerInitialState: I
-): (I, List[(BreakPoint, Option[I], List[(String, Expr, Expr)])]) = {
+): (I, List[(BreakPoint, Option[I], List[(String, Expr, Option[Expr])])]) = {
   val interp = LayerInterpreter(innerInterpreter, RememberBreakpoints(innerInterpreter, breakpoints))
   val res = InterpFuns.interpretProg(interp)(p, (innerInitialState, List()))
   res

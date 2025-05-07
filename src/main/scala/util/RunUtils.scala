@@ -17,7 +17,7 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 import analysis.solvers.*
-import analysis.*
+import analysis.{Interval as _, *}
 import analysis.data_structure_analysis.DSAPhase.{BU, TD}
 import bap.*
 import ir.*
@@ -38,7 +38,7 @@ import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
 import ir.transforms.MemoryTransform
-import util.DSAAnalysis.Norm
+import util.DSAConfig.{Checks, Prereq, Standard}
 import util.LogLevel.INFO
 
 import scala.annotation.tailrec
@@ -74,7 +74,6 @@ case class StaticAnalysisContext(
   steensgaardResults: Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]],
   mmmResults: MemoryModelMap,
   reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-  varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
   regionInjector: Option[RegionInjector],
   symbolicAddresses: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
   localDSA: Map[Procedure, Graph],
@@ -85,11 +84,12 @@ case class StaticAnalysisContext(
 )
 
 case class DSAContext(
-  sva: Map[Procedure, SymValues[Interval]],
+  sva: Map[Procedure, SymValues[DSInterval]],
   constraints: Map[Procedure, Set[Constraint]],
   local: Map[Procedure, IntervalGraph],
   bottomUp: Map[Procedure, IntervalGraph],
-  topDown: Map[Procedure, IntervalGraph]
+  topDown: Map[Procedure, IntervalGraph],
+  globals: Map[IntervalNode, IntervalNode]
 )
 
 /** Results of the main program execution.
@@ -350,20 +350,13 @@ object IRTransform {
     }
   }
 
-  def generateProcedureSummaries(
-    ctx: IRContext,
-    IRProgram: Program,
-    constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]]
-  ): Boolean = {
+  def generateProcedureSummaries(ctx: IRContext, IRProgram: Program, simplified: Boolean = false): Boolean = {
     var modified = false
     // Need to know modifies clauses to generate summaries, but this is probably out of place
     val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
     ctx.program.setModifies(specModifies)
 
-    val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
-    val summaryGenerator =
-      SummaryGenerator(IRProgram, ctx.specification.globals, specGlobalAddresses, constPropResult, varDepsSummaries)
+    val summaryGenerator = SummaryGenerator(IRProgram, simplified)
     IRProgram.procedures
       .filter { p =>
         p != IRProgram.mainProcedure
@@ -473,17 +466,6 @@ object StaticAnalysis {
         printAnalysisResults(IRProgram, interProcConstPropResult)
       )
     }
-
-    StaticAnalysisLogger.debug("[!] Variable dependency summaries")
-    val scc = stronglyConnectedComponents(CallGraph, List(IRProgram.mainProcedure))
-    val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
-    val varDepsSummaries = VariableDependencyAnalysis(
-      IRProgram,
-      ctx.specification.globals,
-      specGlobalAddresses,
-      interProcConstPropResult,
-      scc
-    ).analyze()
 
     val intraProcConstProp = IntraProcConstantPropagation(IRProgram)
     val intraProcConstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] =
@@ -634,8 +616,8 @@ object StaticAnalysis {
     val interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = InterLiveVarsAnalysis(IRProgram).analyze()
 
     StaticAnalysisContext(
-      intraProcConstProp = interProcConstPropResult,
-      interProcConstProp = intraProcConstPropResult,
+      intraProcConstProp = intraProcConstPropResult,
+      interProcConstProp = interProcConstPropResult,
       memoryRegionResult = mraResult,
       vsaResult = vsaResult,
       interLiveVarsResults = interLiveVarsResults,
@@ -644,7 +626,6 @@ object StaticAnalysis {
       mmmResults = mmm,
       symbolicAddresses = Map.empty,
       reachingDefs = reachingDefinitionsAnalysisResults,
-      varDepsSummaries = varDepsSummaries,
       regionInjector = None,
       localDSA = Map.empty,
       bottomUpDSA = Map.empty,
@@ -748,13 +729,6 @@ object RunUtils {
     DebugDumpIRLogger.writeToFile(File("il-before-dsa.il"), pp_prog(program))
 
     transforms.OnePassDSA().applyTransform(program)
-    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
-      val dir = File("./graphs/")
-      if (!dir.exists()) then dir.mkdirs()
-      for (p <- ctx.program.procedures) {
-        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-dot-simp.dot"), dotBlockGraph(p))
-      }
-    }
 
     transforms.inlinePLTLaunchpad(ctx.program)
 
@@ -892,70 +866,24 @@ object RunUtils {
       val dir = File("./graphs/")
       if (!dir.exists()) then dir.mkdirs()
       for (p <- ctx.program.procedures) {
-        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
+        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-dot-simp.dot"), dotBlockGraph(p))
       }
     }
 
-    // SVA
     var dsaContext: Option[DSAContext] = None
-    if (conf.dsaConfig.nonEmpty) {
-      val config = conf.dsaConfig.get
-      val DSATimer = PerformanceTimer("DSA Timer", INFO)
+    if (conf.dsaConfig.isDefined) {
+      val dsaResults = IntervalDSA(ctx).dsa(conf.dsaConfig.get)
+      dsaContext = Some(dsaResults)
 
-      val main = ctx.program.mainProcedure
-      var sva: Map[Procedure, SymValues[Interval]] = Map.empty
-      var cons: Map[Procedure, Set[Constraint]] = Map.empty
-      computeDSADomain(ctx.program.mainProcedure, ctx).toSeq
-        .sortBy(_.name)
-        .foreach(proc =>
-          val SVAResults = getSymbolicValues[Interval](proc)
-          val constraints = generateConstraints(proc)
-          sva += (proc -> SVAResults)
-          cons += (proc -> constraints)
-        )
+      if q.memoryTransform && conf.dsaConfig.get != Prereq then // need more than prereq
+        val memTransferTimer = PerformanceTimer("Mem Transfer Timer", INFO)
+        visit_prog(MemoryTransform(dsaResults.topDown, dsaResults.globals), ctx.program)
+        memTransferTimer.checkPoint("Performed Memory Transform")
+    }
 
-      DSATimer.checkPoint("Finished SVA")
-      dsaContext = Some(DSAContext(sva, cons, Map.empty, Map.empty, Map.empty))
-
-      if config.analyses.contains(Norm) then
-        DSALogger.info("Finished Computing Constraints")
-        val globalGraph =
-          IntervalDSA.getLocal(ctx.program.mainProcedure, ctx, SymValues[Interval](Map.empty), Set[Constraint]())
-        val DSA = IntervalDSA.getLocals(ctx, sva, cons)
-        IntervalDSA.checkReachable(ctx.program, DSA)
-        DSATimer.checkPoint("Finished DSA Local Phase")
-        DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
-        DSA.values.foreach(_.localCorrectness())
-        DSALogger.info("Performed correctness check")
-        val DSABU = IntervalDSA.solveBUs(DSA)
-        DSATimer.checkPoint("Finished DSA BU Phase")
-        DSABU.values.foreach(_.localCorrectness())
-        DSALogger.info("Performed correctness check")
-        val DSATD = IntervalDSA.solveTDs(DSABU)
-        DSATimer.checkPoint("Finished DSA TD Phase")
-        DSATD.values.foreach(_.localCorrectness())
-        DSALogger.info("Performed correctness check")
-        DSATD.values.foreach(g => globalGraph.globalTransfer(g, globalGraph))
-        val globalMapping = DSATD.values.foldLeft(Map[IntervalNode, IntervalNode]()) { (m, g) =>
-          val oldToNew = globalGraph.globalTransfer(globalGraph, g)
-          m ++ oldToNew.map((common, spec) => (spec, common))
-
-        }
-        DSATimer.checkPoint("Finished DSA global graph")
-        DSATD.values.foreach(_.localCorrectness())
-        DSALogger.info("Performed correctness check")
-
-        IntervalDSA.checkConsistGlobals(DSATD, globalGraph)
-        IntervalDSA.checkReachable(ctx.program, DSATD)
-
-        DSATimer.checkPoint("Finished DSA Invariant Check")
-        dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
-
-        if q.memoryTransform then {
-          visit_prog(MemoryTransform(DSATD, globalMapping), ctx.program)
-          DSATimer.checkPoint("Performed Memory Transform")
-          // doSimplify(ctx, None)
-        }
+    if (conf.summariseProcedures) {
+      StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
+      IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify)
     }
 
     if (q.runInterpret) {
@@ -1052,11 +980,6 @@ object RunUtils {
       } else {
         modified =
           transforms.VSAIndirectCallResolution(ctx.program, result.vsaResult, result.mmmResults).resolveIndirectCalls()
-      }
-
-      StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
-      if (config.summariseProcedures) {
-        IRTransform.generateProcedureSummaries(ctx, ctx.program, result.intraProcConstProp, result.varDepsSummaries)
       }
 
       if (modified) {
