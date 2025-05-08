@@ -7,16 +7,21 @@ In order to run the API, use the following command line:
 ```shell
 ./mill runMain API/ApiServer
 ```
+---
+In order to change th test file, navigate to ApiServer 
+located at (src/main/scala/API/ApiServer.scala) and change the 
+inputFile and relfFile. 
 
 ## Documentation
 This outlines briefly some documentation standards I have followed
 
-# Git commits
+### Git commits
 For each of my commits, I have added the name of the branch first: {Branch_name}: {Commit message}
 <br>
 e.g. Jesse-interface-thesis-proj: Creates a basic GET API endpoint which displays an IR in a html script
 
-
+### Javascript style
+I should get a code style plugin for this
 
 
 ---
