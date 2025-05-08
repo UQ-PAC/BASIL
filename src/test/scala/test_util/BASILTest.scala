@@ -1,10 +1,8 @@
 package test_util
 
-import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.concurrent.ScaledTimeSpans
 import org.scalatest.time.{Span, Seconds}
 
-import ir.{Block, Procedure, Program}
 import util.{
   BASILConfig,
   BASILResult,

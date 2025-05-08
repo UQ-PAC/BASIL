@@ -1,18 +1,11 @@
 import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.Retries
 import util.{DSAConfig, DebugDumpIRLogger, LogLevel, Logger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
 
-import Numeric.Implicits.*
-import java.io.{BufferedWriter, File, FileWriter}
+import java.io.File
 import scala.collection.immutable.ListMap
 import scala.collection.mutable.ArrayBuffer
-import scala.sys.process.*
-import test_util.BASILTest
+import test_util.{BASILTest, CaptureOutput, Histogram, TestConfig, TestCustomisation}
 import test_util.BASILTest.*
-import test_util.Histogram
-import test_util.TestConfig
-import test_util.LockManager
-import test_util.TestCustomisation
 import util.DSAConfig.Checks
 import util.boogie_interaction.*
 
@@ -20,18 +13,12 @@ import util.boogie_interaction.*
   * directory structure and file-name patterns.
   */
 
-object SystemTests {
-
-  /** Locks are shared by all SystemTests instances. */
-  val locks = LockManager[String]()
-}
-
-trait SystemTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest, TestCustomisation {
+trait SystemTests extends AnyFunSuite, CaptureOutput, BASILTest, TestCustomisation {
 
   /**
    * A suffix appended to output file names, in order to avoid clashes between test suites.
    */
-  def testSuiteSuffix = "_" + this.getClass.getSimpleName
+  def testSuiteSuffix: String = "_" + this.getClass.getSimpleName
 
   case class TestResult(
     name: String,
@@ -58,9 +45,9 @@ trait SystemTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest, TestC
 
   val testResults: ArrayBuffer[TestResult] = ArrayBuffer()
 
-  private val testPath = "./src/test/"
+  private val testPath = System.getenv("MILL_WORKSPACE_ROOT") + "/src/test/"
 
-  override def customiseTestsByName(name: String) = Mode.Normal
+  override def customiseTestsByName(name: String): Mode = Mode.Normal
 
   def runTests(folder: String, conf: TestConfig): Unit = {
     val path = testPath + folder

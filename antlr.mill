@@ -14,7 +14,6 @@ trait AntlrModule extends JavaModule {
   def antlrGenerateListener: Boolean = false
 
   def antlrGrammarSourceFiles = Task {
-    println(antlrGrammarSources())
     antlrGrammarSources()
       .flatMap { source =>
         if (os.isDir(source.path)) {

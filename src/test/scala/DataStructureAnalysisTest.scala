@@ -5,17 +5,8 @@ import ir.dsl.*
 import specification.{Specification, SymbolTableEntry}
 import translating.ELFSymbol
 import boogie.SpecGlobal
-import util.{
-  BASILConfig,
-  BASILResult,
-  BoogieGeneratorConfig,
-  ILLoadingConfig,
-  IRContext,
-  RunUtils,
-  StaticAnalysisConfig,
-  StaticAnalysisContext,
-  writeToFile
-}
+import test_util.CaptureOutput
+import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, StaticAnalysisContext, writeToFile}
 import util.{LogLevel, Logger}
 import translating.PrettyPrinter.*
 
@@ -28,7 +19,7 @@ import translating.PrettyPrinter.*
   * the set of graphs from the end of the top-down phase
   */
 @test_util.tags.UnitTest
-class DataStructureAnalysisTest extends AnyFunSuite with test_util.CaptureOutput {
+class DataStructureAnalysisTest extends AnyFunSuite with CaptureOutput {
 
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
@@ -40,7 +31,8 @@ class DataStructureAnalysisTest extends AnyFunSuite with test_util.CaptureOutput
     RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
   }
 
-  def runTest(path: String): BASILResult = {
+  def runTest(relativePath: String): BASILResult = {
+    val path = System.getenv("MILL_WORKSPACE_ROOT") + "/" + relativePath
 
     val result = RunUtils.loadAndTranslate(
       BASILConfig(

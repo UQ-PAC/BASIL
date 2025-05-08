@@ -1,21 +1,20 @@
 package ir
 
-import org.scalatest.concurrent.TimeLimits.failAfter
-import org.scalatest.concurrent.{Signaler, TimeLimitedTests, ThreadSignaler}
+import org.scalatest.concurrent.{TimeLimitedTests, ThreadSignaler}
 import org.scalatest.time.{Span, Seconds}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.{TestData, BeforeAndAfterEachTestData}
 import util.*
 import ir.dsl.*
-import ir.dsl.{given}
-import ir.*
+import ir.dsl.given
+import test_util.CaptureOutput
 
 import org.scalactic.source.Position
 
 @test_util.tags.UnitTest
 class ToScalaTest
     extends AnyFunSuite
-    with test_util.CaptureOutput
+    with CaptureOutput
     with TimeLimitedTests
     with BeforeAndAfterEachTestData {
 

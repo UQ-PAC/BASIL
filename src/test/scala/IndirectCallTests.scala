@@ -1,32 +1,15 @@
-import ir.{Block, Command, DirectCall, GoTo, Procedure, Program, Statement}
 import ir.*
 import org.scalatest.funsuite.*
-import util.{
-  BASILConfig,
-  BASILResult,
-  BoogieGeneratorConfig,
-  DSAConfig,
-  DSAContext,
-  ILLoadingConfig,
-  LogLevel,
-  Logger,
-  PerformanceTimer,
-  RunUtils,
-  StaticAnalysisConfig
-}
+import util.{BASILResult, DSAConfig, DSAContext, LogLevel, Logger, StaticAnalysisConfig}
 import analysis.data_structure_analysis.*
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable
-import test_util.BASILTest
-import test_util.TestConfig
-import test_util.TestCustomisation
+import test_util.{BASILTest, CaptureOutput, TestConfig, TestCustomisation}
 import util.DSAConfig.Checks
 
-import java.io.{BufferedWriter, File, FileWriter}
-
 @test_util.tags.AnalysisSystemTest
-class IndirectCallTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest, TestCustomisation {
+class IndirectCallTests extends AnyFunSuite, CaptureOutput, BASILTest, TestCustomisation {
 
   override def customiseTestsByName(name: String) = name match {
     case "indirect_call_outparam/clang:BAP" | "indirect_call_outparam/clang:GTIRB" | "indirect_call_outparam/gcc:BAP" |
@@ -94,7 +77,7 @@ class IndirectCallTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest,
 
   def runTest(name: String, variation: String, conf: TestConfig, resolvedCalls: Seq[IndirectCallResolution]): Unit = {
     Logger.setLevel(LogLevel.ERROR)
-    val directoryPath = "./src/test/indirect_calls/" + name + "/"
+    val directoryPath = System.getenv("MILL_WORKSPACE_ROOT") + "/src/test/indirect_calls/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
     val inputPath = if conf.useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
     val BPLPath = if conf.useBAPFrontend then variationPath + "_bap.bpl" else variationPath + "_gtirb.bpl"

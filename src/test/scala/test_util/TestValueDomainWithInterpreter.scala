@@ -1,13 +1,9 @@
+package test_util
+
 import ir.*
 import ir.eval.*
-import org.scalatest.*
-import org.scalatest.funsuite.*
-import specification.*
-import util.{Logger, LogLevel}
-import org.scalatest.funsuite.AnyFunSuite
-import test_util.BASILTest
-import util.{BASILResult, StaticAnalysisConfig, IRContext}
 import translating.PrettyPrinter.*
+import util.IRContext
 
 trait TestValueDomainWithInterpreter[T] {
 
@@ -77,14 +73,14 @@ trait TestValueDomainWithInterpreter[T] {
     // run the interpreter evaluating the analysis result at each command with a breakpoint
     val interpretResult = interpretWithBreakPoints(ictx, breaks.toList, NormalInterpreter, InterpreterState())
 
-    val breakres: List[(BreakPoint, _, List[(String, Expr, Expr)])] = interpretResult._2
+    val breakres: List[(BreakPoint, _, List[(String, Expr, Expr)])] = interpretResult(1)
     val checkResults = breakres.flatMap { case (bp, _, l) =>
       l.map { case (name, test, evaled) =>
         CheckResult(name, bp, test, evaled)
       }
     }.toList
 
-    InterpreterTestResult(interpretResult._1.nextCmd, checkResults)
+    InterpreterTestResult(interpretResult(0).nextCmd, checkResults)
   }
 
 }

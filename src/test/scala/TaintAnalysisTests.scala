@@ -3,11 +3,11 @@ import boogie.*
 import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.BASILTest
+import test_util.{BASILTest, CaptureOutput}
 import LatticeSet.*
 
 @test_util.tags.UnitTest
-class TaintAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
+class TaintAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
   def getTaintAnalysisResults(
     program: Program,
     taint: Map[CFGPosition, Set[Variable]]

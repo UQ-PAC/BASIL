@@ -1,30 +1,16 @@
 import analysis.{InterLiveVarsAnalysis, TwoElementTop}
 import ir.dsl.*
-import ir.{
-  BitVecLiteral,
-  Block,
-  BitVecType,
-  dsl,
-  LocalAssign,
-  LocalVar,
-  Program,
-  Register,
-  Statement,
-  Variable,
-  transforms,
-  cilvisitor,
-  Procedure
-}
-import util.{Logger, LogLevel}
+import ir.{BitVecLiteral, Block, LocalAssign, Program, Register, Variable, cilvisitor, dsl, transforms}
+import util.{LogLevel, Logger}
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.BASILTest
+import test_util.{BASILTest, CaptureOutput}
 import util.{BASILResult, StaticAnalysisConfig}
 import translating.PrettyPrinter.*
 
 @test_util.tags.UnitTest
-class LiveVarsAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
+class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
   Logger.setLevel(LogLevel.ERROR)
-  private val correctPath = "./src/test/correct/"
+  private val correctPath = System.getenv("MILL_WORKSPACE_ROOT") + "/src/test/correct/"
   def runExample(name: String): BASILResult = {
     val inputFile = correctPath + s"/$name/gcc/$name.adt"
     val relfFile = correctPath + s"/$name/gcc/$name.relf"
@@ -361,7 +347,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILT
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.labelToBlock
 
-    val gotoBlocks = blocks.filterKeys(_.startsWith("lmain_goto_")).toMap
+    val gotoBlocks = blocks.view.filterKeys(_.startsWith("lmain_goto_")).toMap
     assert(gotoBlocks.size == 2)
 
     val blockAfterBranch = gotoBlocks.values.map(_.singleSuccessor.head.singleSuccessor.head).toSet

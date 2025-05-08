@@ -1,31 +1,18 @@
-import analysis.data_structure_analysis.{
-  Global,
-  Heap,
-  DSInterval,
-  IntervalDSA,
-  Par,
-  Ret,
-  Stack,
-  SymBase,
-  generateConstraints,
-  getSymbolicValues,
-  given
-}
+import analysis.data_structure_analysis.{DSInterval, Global, Heap, IntervalDSA, Par, Ret, Stack, SymBase}
 import boogie.SpecGlobal
 import ir.*
-import ir.Endian.{BigEndian, LittleEndian}
+import ir.Endian.LittleEndian
 import ir.dsl.{block, directCall, goto, proc, prog, ret}
 import ir.{BitVecLiteral, Endian, MemoryLoad, Register, SharedMemory}
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
-import test_util.BASILTest.writeToFile
 import util.*
-import analysis.data_structure_analysis.given
-import translating.PrettyPrinter.pp_proc
-import util.DSAConfig.{Checks, Standard}
+import analysis.data_structure_analysis
+import test_util.CaptureOutput
+import util.DSAConfig.Checks
 
 @test_util.tags.UnitTest
-class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
+class IntervalDSATest extends AnyFunSuite with CaptureOutput {
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program)
@@ -36,7 +23,8 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
   }
 
-  def runTest(path: String, config: DSAConfig = Checks): BASILResult = {
+  def runTest(relativePath: String, config: DSAConfig = Checks): BASILResult = {
+    val path = System.getenv("MILL_WORKSPACE_ROOT") + "/" + relativePath
     RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf"),
@@ -45,6 +33,39 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
         dsaConfig = Some(config)
+      )
+    )
+  }
+
+  def runTestGTIRB(relativePath: String, config: DSAConfig = Checks): BASILResult = {
+    val path = System.getenv("MILL_WORKSPACE_ROOT") + "/" + relativePath
+    RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(inputFile = path + ".gts", relfFile = path + ".relf"),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(config)
+      )
+    )
+  }
+
+  def runTestTrim(relativePath: String, mainProcedure: String, config: DSAConfig = Checks): BASILResult = {
+    val path = System.getenv("MILL_WORKSPACE_ROOT") + "/" + relativePath
+    RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = path + ".gts",
+          relfFile = path + ".relf",
+          mainProcedureName = mainProcedure,
+          trimEarly = true
+        ),
+        simplify = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = Some(Checks)
       )
     )
   }
@@ -307,22 +328,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
   test("http_parse_basic") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = path + ".gts",
-          relfFile = path + ".relf",
-          mainProcedureName = "http_parse_basic",
-          trimEarly = true
-//          procedureTrimDepth = 1,
-        ),
-        simplify = true,
-        staticAnalysis = None,
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-        dsaConfig = Some(Checks)
-      )
-    )
+    val res = runTestTrim(path, "http_parse_basic")
 
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
@@ -332,21 +338,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
   test("md5_process_block") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = path + ".gts",
-          relfFile = path + ".relf",
-          mainProcedureName = "md5_process_block",
-          trimEarly = true
-        ),
-        simplify = true,
-        staticAnalysis = None,
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-        dsaConfig = Some(Checks)
-      )
-    )
+    val res = runTestTrim(path, "md5_process_block")
 
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
@@ -355,21 +347,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
   test("acl_check") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = path + ".gts",
-          relfFile = path + ".relf",
-          mainProcedureName = "acl_check",
-          trimEarly = true
-        ),
-        simplify = true,
-        staticAnalysis = None,
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-        dsaConfig = Some(Checks)
-      )
-    )
+    val res = runTestTrim(path, "acl_check")
 
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
@@ -379,21 +357,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
   test("gl_des_makekey") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = path + ".gts",
-          relfFile = path + ".relf",
-          mainProcedureName = "gl_des_makekey",
-          trimEarly = true
-        ),
-        simplify = true,
-        staticAnalysis = None,
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-        dsaConfig = Some(Checks)
-      )
-    )
+    val res = runTestTrim(path, "gl_des_makekey")
 
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
@@ -403,16 +367,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
   test("cntlm local globals") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(inputFile = path + ".gts", relfFile = path + ".relf"),
-        simplify = true,
-        staticAnalysis = None,
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-        dsaConfig = Some(Checks)
-      )
-    )
+    val res = runTestGTIRB(path)
 
     val locals = res.dsa.get.local
     locals.values.foreach(IntervalDSA.checksGlobalMaintained)
@@ -420,21 +375,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
   test("www_authenticate") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = path + ".gts",
-          relfFile = path + ".relf",
-          mainProcedureName = "www_authenticate",
-          trimEarly = true
-        ),
-        simplify = true,
-        staticAnalysis = None,
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-        dsaConfig = Some(Checks)
-      )
-    )
+    val res = runTestTrim(path, "www_authenticate")
 
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
@@ -443,21 +384,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
   test("hmac_md5") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = path + ".gts",
-          relfFile = path + ".relf",
-          mainProcedureName = "hmac_md5",
-          trimEarly = true
-        ),
-        simplify = true,
-        staticAnalysis = None,
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-        dsaConfig = Some(Checks)
-      )
-    )
+    val res = runTestTrim(path, "hmac_md5")
 
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
@@ -466,21 +393,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
   test("ntlm2_calc_resp") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = path + ".gts",
-          relfFile = path + ".relf",
-          mainProcedureName = "ntlm2_calc_resp",
-          trimEarly = true
-        ),
-        simplify = true,
-        staticAnalysis = None,
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-        dsaConfig = Some(Checks)
-      )
-    )
+    val res = runTestTrim(path, "ntlm2_calc_resp")
 
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
@@ -490,21 +403,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
   test("des_key_schedule") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = path + ".gts",
-          relfFile = path + ".relf",
-          mainProcedureName = "des_key_schedule",
-          trimEarly = true
-        ),
-        simplify = true,
-        staticAnalysis = None,
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-        dsaConfig = Some(Checks)
-      )
-    )
+    val res = runTestTrim(path, "des_key_schedule")
 
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
@@ -514,21 +413,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
   test("plist_free") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = path + ".gts",
-          relfFile = path + ".relf",
-          mainProcedureName = "plist_free",
-          trimEarly = true
-        ),
-        simplify = true,
-        staticAnalysis = None,
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-        dsaConfig = Some(Checks)
-      )
-    )
+    val res = runTestTrim(path, "plist_free")
 
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
@@ -538,21 +423,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
   test("direct_request") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = path + ".gts",
-          relfFile = path + ".relf",
-          mainProcedureName = "direct_request",
-          trimEarly = true
-        ),
-        simplify = true,
-        staticAnalysis = None,
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-        dsaConfig = Some(Checks)
-      )
-    )
+    val res = runTestTrim(path, "direct_request")
 
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)

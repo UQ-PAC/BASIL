@@ -1,5 +1,5 @@
 import ir.*
-import ir.eval._
+import ir.eval.*
 import java.io.{BufferedWriter, File, FileWriter}
 import ir.Endian.LittleEndian
 import org.scalatest.*
@@ -21,6 +21,7 @@ import util.{
 }
 import ir.eval.{interpretTrace, interpret, ExecEffect, Stopped}
 import test_util.*
+import test_util.BASILTest.*
 
 import java.io.IOException
 import java.nio.file.*
@@ -30,7 +31,7 @@ import util.RunUtils.loadAndTranslate
 
 import scala.collection.mutable
 
-abstract class DifferentialTest extends AnyFunSuite, test_util.CaptureOutput, TestCustomisation {
+abstract class DifferentialTest extends AnyFunSuite, CaptureOutput, TestCustomisation {
 
   override def customiseTestsByName(name: String) = name match {
     case "analysis_differential:floatingpoint/clang:GTIRB" | "analysis_differential:floatingpoint/gcc:GTIRB" =>
@@ -62,7 +63,7 @@ abstract class DifferentialTest extends AnyFunSuite, test_util.CaptureOutput, Te
       val r = InterpFuns
         .callProcedure(interpreter)(main, InterpFuns.mainDefaultFunctionArguments(main))
         .f(initialState)
-      r._1._1
+      r(0)(0)
     }
 
     val (initialRes, traceInit) = interp(initial)
@@ -144,13 +145,13 @@ class DifferentialAnalysisTest extends DifferentialTest {
 
   def runSystemTests(): Unit = {
 
-    val path = System.getProperty("user.dir") + s"/src/test/correct/"
-    val programs: Array[String] = getSubdirectories(path)
+    val path = System.getenv("MILL_WORKSPACE_ROOT") + s"/src/test/correct/"
+    val programs: Array[String] = BASILTest.getSubdirectories(path)
 
     // get all variations of each program
     for (p <- programs) {
       val programPath = path + "/" + p
-      val variations = getSubdirectories(programPath)
+      val variations = BASILTest.getSubdirectories(programPath)
       variations.foreach(variation => {
         val bapPath = path + "/" + p + "/" + variation + "/" + p + ".adt"
         val gtirbPath = path + "/" + p + "/" + variation + "/" + p + ".gts"
@@ -178,7 +179,7 @@ class DifferentialAnalysisTestSimplification extends DifferentialTest {
 
   def runSystemTests(): Unit = {
 
-    val path = System.getProperty("user.dir") + s"/src/test/correct/"
+    val path = System.getenv("MILL_WORKSPACE_ROOT") + s"/src/test/correct/"
     val programs: Array[String] = getSubdirectories(path)
 
     // get all variations of each program

@@ -1,23 +1,20 @@
 import org.scalatest.funsuite.AnyFunSuite
-import util.{Logger, PerformanceTimer, ILLoadingConfig, RunUtils, IRLoading, LogLevel}
+import util.{ILLoadingConfig, IRLoading, LogLevel, Logger, PerformanceTimer, RunUtils}
 import translating.BAPToIR
 import analysis.LoopDetector
 import analysis.LoopTransform
-
-import ir.{Program, Block, dotBlockGraph}
+import ir.{Block, Program, dotBlockGraph}
 
 import java.io.{BufferedWriter, File, FileWriter}
 import scala.collection.mutable
 import scala.io.Source
 import scala.sys.process.*
 import test_util.BASILTest.writeToFile
+import test_util.CaptureOutput
 
-/** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
-  * directory structure and file-name patterns.
-  */
 @test_util.tags.UnitTest
-class IrreducibleLoop extends AnyFunSuite with test_util.CaptureOutput {
-  val testPath = "./src/test/irreducible_loops"
+class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
+  private val testPath = System.getenv("MILL_WORKSPACE_ROOT") + "/src/test/irreducible_loops"
   Logger.setLevel(LogLevel.ERROR)
 
   def load(conf: ILLoadingConfig): Program = {

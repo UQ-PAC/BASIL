@@ -1,5 +1,4 @@
 import analysis.*
-import boogie.*
 import ir.transforms.{reversePostOrder, worklistSolver}
 import ir.*
 import ir.dsl.*
