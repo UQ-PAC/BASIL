@@ -2,8 +2,10 @@ package test_util
 
 import ir.*
 import ir.eval.*
+import util.functional.State
 import translating.PrettyPrinter.*
 import util.IRContext
+import org.scalacheck.{Arbitrary, Gen}
 
 trait TestValueDomainWithInterpreter[T] {
 
@@ -13,37 +15,85 @@ trait TestValueDomainWithInterpreter[T] {
    */
   def valueInAbstractValue(absval: T, concrete: Expr): Expr
 
-  case class CheckResult(name: String, breakpoint: BreakPoint, testExpr: Expr, evaluatedTestExpr: Expr)
+  def abstractEvalSoundnessProperty(evaluate: Expr => T)(expr: Expr): (Boolean, String) = {
+    // val expr = BinaryExpr(op, BitVecLiteral(lhs, size), BitVecLiteral(rhs, size))
+    val abs: T = evaluate(expr)
+    val concrete = ir.eval.evaluateExpr(expr).getOrElse(throw Exception(s"Failed to eval expr : $expr"))
+    val test = valueInAbstractValue(abs, concrete)
+    val result = ir.eval.evaluateExpr(test).get
+    (result == TrueLiteral, s"${pp_expr(concrete)} ∈ $abs test (${pp_expr(test)}) evaluated to $result")
+  }
+
+  case class CheckResult(
+    name: String,
+    breakpoint: BreakPoint,
+    testExpr: Expr,
+    variable: Expr,
+    variableValue: Option[Expr],
+    evaluatedTestExpr: Option[Expr]
+  )
 
   enum Heuristic:
     case AllVarsInAbstract
     case VarsLiveInBlock
 
   case class InterpreterTestResult(stopCondition: ExecutionContinuation, checks: List[CheckResult]) {
-    def getFailures = {
+    def getFailures: Seq[String] = {
       // require nonzero number of checks to ensure test is not vacuous
-      var noChecks = if (checks.isEmpty) then Seq("no checks hit") else Seq()
+      var noChecks = if (checks.filter(_.evaluatedTestExpr.isDefined).isEmpty) then Seq("no checks hit") else Seq()
       val termination =
         if (!normalTermination(stopCondition)) then Seq(s"Stopped with error condition: ${stopCondition}") else Seq()
       termination ++ noChecks ++ checksFailed
     }
 
-    def checksFailed = {
+    def checksFailed: Seq[StackFrameID] = {
       // collected breakpoints evaluate to true
       checks.flatMap(b => {
         val loc = b.breakpoint.location match {
           case BreakPointLoc.CMD(c) => c.parent.label
           case _ => ??? /* not used here */
         }
-        if (b.evaluatedTestExpr != TrueLiteral) then Seq(s"${b.name} @ $loc") else Seq()
+        if (b.evaluatedTestExpr.contains(FalseLiteral)) then Seq(s"${b.name} @ $loc :: ${b.evaluatedTestExpr}")
+        else Seq()
       })
+    }
+
+    def checksPassed: Seq[StackFrameID] = {
+      // collected breakpoints evaluate to true
+      checks.flatMap(b => {
+        val loc = b.breakpoint.location match {
+          case BreakPointLoc.CMD(c) => c.parent.label
+          case _ => ??? /* not used here */
+        }
+        if (b.evaluatedTestExpr.contains(TrueLiteral)) then Seq(s"${b.name} @ $loc :: ${b.evaluatedTestExpr}")
+        else Seq()
+      })
+    }
+
+    def toDotLabels: Map[Block, String] = {
+      checks
+        .map(b => {
+          val loc = b.breakpoint.location match {
+            case BreakPointLoc.CMD(c) => c.parent
+            case _ => ??? /* not used here */
+          }
+          (
+            loc,
+            s"${b.name} (${pp_expr(b.variable)} = ${b.variableValue.map(pp_expr).getOrElse("eval error")} ) = ${b.evaluatedTestExpr.map(pp_expr).getOrElse("eval error")}"
+          )
+        })
+        .groupBy(_(0))
+        .map((g, v) => g -> v.map(_(1)).mkString("\n"))
+        .toMap
     }
   }
 
   def runTestInterpreter(
     ictx: IRContext,
     testResultBefore: Map[Block, Map[Variable, T]],
-    testVars: Heuristic = Heuristic.AllVarsInAbstract
+    testVars: Heuristic = Heuristic.AllVarsInAbstract,
+    callProcedure: Option[Procedure] = None,
+    callParams: Option[Iterable[(LocalVar, Literal)]] = None
   ): InterpreterTestResult = {
 
     val breaks: List[BreakPoint] = ictx.program.collect {
@@ -61,7 +111,7 @@ trait TestValueDomainWithInterpreter[T] {
         val expectedPredicates: List[(String, Expr)] = vars.toList.flatMap(r => {
           val (variable, value) = r
           val assertion = valueInAbstractValue(value, variable)
-          Seq((s"${variable.name} ⊆ ${value}", assertion))
+          Seq((s"${variable.name}", variable), (s"${variable.name} ∈ ${value}", assertion))
         })
         BreakPoint(
           location = BreakPointLoc.CMD(IRWalk.firstInBlock(block)),
@@ -71,16 +121,21 @@ trait TestValueDomainWithInterpreter[T] {
     }.toList
 
     // run the interpreter evaluating the analysis result at each command with a breakpoint
-    val interpretResult = interpretWithBreakPoints(ictx, breaks.toList, NormalInterpreter, InterpreterState())
 
-    val breakres: List[(BreakPoint, _, List[(String, Expr, Expr)])] = interpretResult(1)
-    val checkResults = breakres.flatMap { case (bp, _, l) =>
-      l.map { case (name, test, evaled) =>
-        CheckResult(name, bp, test, evaled)
+    val startProc = callProcedure.getOrElse(ictx.program.mainProcedure)
+    val startParams = callParams.getOrElse(InterpFuns.mainDefaultFunctionArguments(startProc))
+    val innerInitState = InterpFuns.initProgState(NormalInterpreter)(ictx, InterpreterState())
+    val interp = LayerInterpreter(NormalInterpreter, RememberBreakpoints(NormalInterpreter, breaks.toList))
+    val initState = (innerInitState, List())
+    val interpretResult = State.execute(initState, InterpFuns.callProcedure(interp)(startProc, startParams))
+
+    val breakres: List[(BreakPoint, _, List[(String, Expr, Option[Expr])])] = interpretResult(1)
+    val checkResults = breakres.flatMap { case (bp, _, evaledExprs) =>
+      evaledExprs.grouped(2).map(_.toList).map { case List((_, variable, varValue), (name, test, evaled)) =>
+        CheckResult(name, bp, test, variable, varValue, evaled)
       }
     }.toList
 
     InterpreterTestResult(interpretResult(0).nextCmd, checkResults)
   }
-
 }

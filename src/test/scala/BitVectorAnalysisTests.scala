@@ -208,6 +208,10 @@ class BitVectorAnalysisTests extends AnyFunSuite with CaptureOutput {
     val result = smt_bvlshr(BitVecLiteral(2, 8), BitVecLiteral(1, 8))
     assert(result == BitVecLiteral(1, 8))
   }
+  test("BitVector Shift Right - should zero on overflow") {
+    val result = smt_bvlshr(BitVecLiteral(4104967, 22), BitVecLiteral(3664940, 22))
+    assert(result == BitVecLiteral(0, 22))
+  }
   // isNegative
   test("is Negative - should return true if the most significant bit is 1") {
     val result = isNegative(BitVecLiteral(128, 8))

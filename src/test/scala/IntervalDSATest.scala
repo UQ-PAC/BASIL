@@ -11,7 +11,7 @@ import analysis.data_structure_analysis
 import test_util.CaptureOutput
 import util.DSAConfig.Checks
 
-@test_util.tags.UnitTest
+@test_util.tags.AnalysisSystemTest
 class IntervalDSATest extends AnyFunSuite with CaptureOutput {
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)

@@ -147,7 +147,20 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
     assert(clonedMain.formalInParam == main.formalInParam)
     assert(clonedMain.formalOutParam == main.formalOutParam)
 
-    assertResultWithToString(PrettyPrinter.pp_prog(prog))(PrettyPrinter.pp_prog(cloned))
+    val clonedProcs = cloned.procedures.map(p => p.name -> p).toMap
+    for (p <- prog.procedures) {
+      assert(clonedProcs.contains(p.name))
+      assert(p.formalInParam == clonedProcs(p.name).formalInParam)
+      assert(p.formalOutParam == clonedProcs(p.name).formalOutParam)
+
+      val clonedBlocks = p.blocks.map(b => b.label -> b).toMap
+
+      for (b <- p.blocks) {
+        assert(clonedBlocks.contains(b.label))
+        assert(PrettyPrinter.pp_block(b) == PrettyPrinter.pp_block(clonedBlocks(b.label)))
+      }
+    }
+
     // info(PrettyPrinter.pp_prog(cloned))
   }
 

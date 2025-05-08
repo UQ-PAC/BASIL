@@ -37,7 +37,7 @@ class InterpretTestConstProp
   }
 
   private val testPath = System.getenv("MILL_WORKSPACE_ROOT") + "/src/test/correct"
-  def testInterpretConstProp(testName: String, compiler: String): Assertion = {
+  def testInterpretConstProp(testName: String, compiler: String): Unit = {
     val path = s"$testPath/$testName/$compiler"
     val loading = ILLoadingConfig(
       inputFile = s"$path.adt",
@@ -56,6 +56,7 @@ class InterpretTestConstProp
 
     val result = runTestInterpreter(ictx, analysisres)
     assert(result.getFailures.isEmpty)
+    info(s"${result.checksPassed.size} checks passed")
 
   }
 

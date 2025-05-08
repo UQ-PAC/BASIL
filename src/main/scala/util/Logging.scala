@@ -62,9 +62,13 @@ class GenericLogger(
   def setOutput(stream: PrintStream) = _output = () => stream
   def setOutput(streamProducer: () => PrintStream) = _output = streamProducer
 
-  def writeToFile(file: File, content: => String) = {
+  def writeToFile(file: File, content: => String)(implicit
+    line: sourcecode.Line,
+    filepos: sourcecode.FileName,
+    name: sourcecode.Name
+  ) = {
     if (level.id < LogLevel.OFF.id) {
-      this.debug(s"Writing $file")
+      this.debug(s"Writing $file")(line, filepos, name)
       val l = deriveLogger(file.getName(), file)
       l.print(content)
       l.close()
