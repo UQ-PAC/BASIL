@@ -7,7 +7,20 @@ import ir.Endian.LittleEndian
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import specification.*
-import util.{BASILConfig, BASILResult, ILLoadingConfig, IRContext, IRLoading, IRTransform, LogLevel, Logger, RunUtils, StaticAnalysis, StaticAnalysisConfig, StaticAnalysisContext}
+import util.{
+  BASILConfig,
+  BASILResult,
+  ILLoadingConfig,
+  IRContext,
+  IRLoading,
+  IRTransform,
+  LogLevel,
+  Logger,
+  RunUtils,
+  StaticAnalysis,
+  StaticAnalysisConfig,
+  StaticAnalysisContext
+}
 import ir.eval.{ExecEffect, Stopped, interpret, interpretTrace}
 import ir.dsl
 
@@ -39,11 +52,7 @@ class InterpretTestConstProp
   private val testPath = System.getenv("MILL_WORKSPACE_ROOT") + "/src/test/correct"
   def testInterpretConstProp(testName: String, compiler: String): Unit = {
     val path = s"$testPath/$testName/$compiler/$testName"
-    val loading = ILLoadingConfig(
-      inputFile = s"$path.adt",
-      relfFile = s"$path.relf",
-      dumpIL = None
-    )
+    val loading = ILLoadingConfig(inputFile = s"$path.adt", relfFile = s"$path.relf", dumpIL = None)
 
     var ictx = IRLoading.load(loading)
     ictx = IRTransform.doCleanup(ictx)

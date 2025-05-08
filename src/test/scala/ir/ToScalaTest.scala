@@ -12,11 +12,7 @@ import test_util.CaptureOutput
 import org.scalactic.source.Position
 
 @test_util.tags.UnitTest
-class ToScalaTest
-    extends AnyFunSuite
-    with CaptureOutput
-    with TimeLimitedTests
-    with BeforeAndAfterEachTestData {
+class ToScalaTest extends AnyFunSuite with CaptureOutput with TimeLimitedTests with BeforeAndAfterEachTestData {
 
   override def timeLimit = Span(2, Seconds)
   override val defaultTestSignaler = ThreadSignaler

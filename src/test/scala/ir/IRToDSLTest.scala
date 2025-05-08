@@ -4,13 +4,7 @@ import scala.collection.immutable.*
 import org.scalatest.funsuite.AnyFunSuite
 import ir.dsl.*
 import ir.*
-import util.{
-  BASILConfig,
-  BoogieGeneratorConfig,
-  ILLoadingConfig,
-  Logger,
-  LogLevel
-}
+import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, Logger, LogLevel}
 import translating.PrettyPrinter
 import test_util.CaptureOutput
 
@@ -173,7 +167,7 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
         loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf", specFile = None, dumpIL = None),
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out.bpl",
+        outputPrefix = "boogie_out.bpl"
       )
     )
 

@@ -6,7 +6,17 @@ import specification.{Specification, SymbolTableEntry}
 import translating.ELFSymbol
 import boogie.SpecGlobal
 import test_util.CaptureOutput
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, StaticAnalysisContext, writeToFile}
+import util.{
+  BASILConfig,
+  BASILResult,
+  BoogieGeneratorConfig,
+  ILLoadingConfig,
+  IRContext,
+  RunUtils,
+  StaticAnalysisConfig,
+  StaticAnalysisContext,
+  writeToFile
+}
 import util.{LogLevel, Logger}
 import translating.PrettyPrinter.*
 
