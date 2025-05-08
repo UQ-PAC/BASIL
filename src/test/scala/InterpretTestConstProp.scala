@@ -38,7 +38,7 @@ class InterpretTestConstProp
 
   private val testPath = System.getenv("MILL_WORKSPACE_ROOT") + "/src/test/correct"
   def testInterpretConstProp(testName: String, compiler: String): Unit = {
-    val path = s"$testPath/$testName/$compiler"
+    val path = s"$testPath/$testName/$compiler/$testName"
     val loading = ILLoadingConfig(
       inputFile = s"$path.adt",
       relfFile = s"$path.relf",
