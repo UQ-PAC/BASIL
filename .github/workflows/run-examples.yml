@@ -176,7 +176,5 @@ jobs:
       - run: sudo apt-get install -y z3='4.8.12-*'
       - run: dotnet tool install --global boogie --version '3.4.3'
 
-      - run: echo "All systemtest suites:" && ./mill -j3 test.testOnly '*SystemTests*' -- -z 'xxxx'
-
       - run: ./mill test.compile
       - run: ./mill -j3 test.test -oGD -T 1000000 -n test_util.tags.AnalysisSystemTest -F 2
