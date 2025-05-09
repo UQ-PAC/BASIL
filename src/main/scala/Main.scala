@@ -148,6 +148,8 @@ object Main {
     summariseProcedures: Flag,
     @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (implies --parameter-form)")
     simplify: Flag,
+    @arg(name = "keep-pc", doc = "Keep PC assignments and assertions in loaded BASIL IR (currently GTIRB-only)")
+    keepPC: Flag,
     @arg(
       name = "validate-simplify",
       doc = "Emit SMT2 check for validation of simplification expression rewrites 'rewrites.smt2'"
@@ -282,7 +284,8 @@ object Main {
         mainProcedureName = conf.mainProcedureName,
         procedureTrimDepth = conf.procedureDepth,
         parameterForm = conf.parameterForm.value,
-        trimEarly = conf.trimEarly.value
+        trimEarly = conf.trimEarly.value,
+        keepPC = conf.keepPC.value
       ),
       runInterpret = conf.interpret.value,
       simplify = conf.simplify.value,
@@ -300,18 +303,11 @@ object Main {
       assert(result.boogie.nonEmpty)
       var failed = false
       for (b <- result.boogie) {
-        val fname = b.filename
-        val timer = PerformanceTimer("Verify", LogLevel.INFO)
-        val cmd = Seq("boogie", "/useArrayAxioms", fname)
-        Logger.info(s"Running: ${cmd.mkString(" ")}")
-        val output = cmd.!!
-        val result = util.boogie_interaction.parseOutput(output)
+        val result = b.verifyBoogie(b.filename)
         result.kind match {
           case BoogieResultKind.Verified(c, _) if c > 0 => ()
           case _ => failed = true
         }
-        Logger.info(result.toString)
-        timer.checkPoint("Finish")
       }
       if (failed) {
         throw Exception("Verification failed")
