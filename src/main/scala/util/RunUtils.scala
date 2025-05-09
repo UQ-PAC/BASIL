@@ -711,7 +711,12 @@ object RunUtils {
 
     transforms.liftSVComp(ctx.program)
 
-    DebugDumpIRLogger.writeToFile(File("il-before-simp.il"), pp_prog(program))
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-simp.il"), pp_prog(program))
+      }
+    }
+
     transforms.applyRPO(program)
 
     // example of printing a simple analysis
@@ -721,10 +726,18 @@ object RunUtils {
     transforms.removeEmptyBlocks(program)
 
     // transforms.coalesceBlocksCrossBranchDependency(program)
-    DebugDumpIRLogger.writeToFile(File("blockgraph-before-dsa.dot"), dotBlockGraph(program.mainProcedure))
+    config.foreach {
+      _.analysisDotPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_blockgraph-before-dsa.dot"), dotBlockGraph(program.mainProcedure))
+      }
+    }
 
     Logger.info("[!] Simplify :: DynamicSingleAssignment")
-    DebugDumpIRLogger.writeToFile(File("il-before-dsa.il"), pp_prog(program))
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-dsa.il"), pp_prog(program))
+      }
+    }
 
     transforms.OnePassDSA().applyTransform(program)
 
@@ -732,16 +745,24 @@ object RunUtils {
 
     transforms.removeEmptyBlocks(program)
 
-    AnalysisResultDotLogger.writeToFile(
-      File(s"blockgraph-after-dsa.dot"),
-      dotBlockGraph(
-        program,
-        (program.collect { case b: Block =>
-          b -> pp_block(b)
-        }).toMap
-      )
-    )
-    DebugDumpIRLogger.writeToFile(File("il-after-dsa.il"), pp_prog(program))
+    config.foreach {
+      _.analysisDotPath.foreach { s =>
+        AnalysisResultDotLogger.writeToFile(
+          File(s"${s}_blockgraph-after-dsa.dot"),
+          dotBlockGraph(
+            program,
+            (program.collect { case b: Block =>
+              b -> pp_block(b)
+            }).toMap
+          )
+        )
+      }
+    }
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-dsa.il"), pp_prog(program))
+      }
+    }
 
     if (ir.eval.SimplifyValidation.validate) {
       Logger.info("DSA no uninitialised")
@@ -759,18 +780,35 @@ object RunUtils {
       assert(invariant.blocksUniqueToEachProcedure(program))
     }
 
-    DebugDumpIRLogger.writeToFile(File("il-before-copyprop.il"), pp_prog(program))
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-copyprop.il"), pp_prog(program))
+      }
+    }
 
     // brute force run the analysis twice because it cleans up more stuff
     // assert(program.procedures.forall(transforms.rdDSAProperty))
-    AnalysisResultDotLogger.writeToFile(File("blockgraph-before-copyprop.dot"), dotBlockGraph(program.mainProcedure))
+    config.foreach {
+      _.analysisDotPath.foreach { s =>
+        AnalysisResultDotLogger.writeToFile(
+          File(s"${s}_blockgraph-before-copyprop.dot"),
+          dotBlockGraph(program.mainProcedure)
+        )
+      }
+    }
     Logger.info("Copyprop Start")
     transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
 
     transforms.fixupGuards(program)
     transforms.removeDuplicateGuard(program)
-
-    AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
+    config.foreach {
+      _.analysisDotPath.foreach { s =>
+        AnalysisResultDotLogger.writeToFile(
+          File(s"${s}_blockgraph-after-simp.dot"),
+          dotBlockGraph(program.mainProcedure)
+        )
+      }
+    }
 
     transforms.liftLinuxAssertFail(ctx)
 
@@ -778,7 +816,12 @@ object RunUtils {
 
     assert(invariant.blockUniqueLabels(program))
     Logger.info(s"CopyProp ${timer.checkPoint("Simplify")} ms ")
-    DebugDumpIRLogger.writeToFile(File("il-after-copyprop.il"), pp_prog(program))
+
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-copyprop.il"), pp_prog(program))
+      }
+    }
 
     // val x = program.procedures.forall(transforms.rdDSAProperty)
     // assert(x)
@@ -790,7 +833,11 @@ object RunUtils {
     }
     // run this after cond recovery because sign bit calculations often need high bits
     // which go away in high level conss
-    DebugDumpIRLogger.writeToFile(File("il-after-slices.il"), pp_prog(program))
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-slices.il"), pp_prog(program))
+      }
+    }
 
     // re-apply dsa
     // transforms.OnePassDSA().applyTransform(program)
@@ -1002,6 +1049,7 @@ object RunUtils {
     }
 
     StaticAnalysisLogger.info("[!] Running DSA Analysis")
+
     writeToFile(pp_prog(ctx.program), "testo1.il")
     val symbolTableEntries: Set[SymbolTableEntry] = ctx.globals ++ ctx.funcEntries
     val dsa = DataStructureAnalysis(
