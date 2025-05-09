@@ -19,6 +19,10 @@ class Summary(
       case Right(e) => e
     }
   }
+
+  override def toString: String = {
+    s"Summary(\n\t$entry,\n\t$exit\n)"
+  }
 }
 
 def build(
@@ -54,7 +58,7 @@ def build(
           case blocks => Summary(Right(flatten(blocks)), Right(result ++ criterion))
         }
       }
-      case s: (Assign | MemoryStore | Assume | Assert) => {
+      case s: (SingleAssign | MemoryStore | Assume | Assert) => {
         Summary(
           Right(result),
           s.predecessor match {
@@ -75,9 +79,7 @@ def build(
           }
         )
       }
-      case u: Unreachable => {
-        Summary(Left(() => summary(u.parent).entry), Right(result ++ criterion))
-      }
+      case u: Unreachable => Summary(Left(() => summary(u.parent).entry), Right(result ++ criterion))
     }
   }
 
