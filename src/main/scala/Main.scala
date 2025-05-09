@@ -303,18 +303,11 @@ object Main {
       assert(result.boogie.nonEmpty)
       var failed = false
       for (b <- result.boogie) {
-        val fname = b.filename
-        val timer = PerformanceTimer("Verify", LogLevel.INFO)
-        val cmd = Seq("boogie", "/useArrayAxioms", fname)
-        Logger.info(s"Running: ${cmd.mkString(" ")}")
-        val output = cmd.!!
-        val result = util.boogie_interaction.parseOutput(output)
+        val result = b.verifyBoogie(b.filename)
         result.kind match {
           case BoogieResultKind.Verified(c, _) if c > 0 => ()
           case _ => failed = true
         }
-        Logger.info(result.toString)
-        timer.checkPoint("Finish")
       }
       if (failed) {
         throw Exception("Verification failed")

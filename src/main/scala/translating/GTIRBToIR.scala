@@ -261,9 +261,7 @@ class GTIRBToIR(
         val increment =
           if branchTaken then None
           else
-            Some(
-              LocalAssign(Register("_PC", 64), BinaryExpr(BVADD, Register("_PC", 64), BitVecLiteral(4, 64)), None),
-            )
+            Some(LocalAssign(Register("_PC", 64), BinaryExpr(BVADD, Register("_PC", 64), BitVecLiteral(4, 64)), None))
         increment ++: isnStmts
       }
     }

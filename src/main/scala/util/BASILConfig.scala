@@ -21,7 +21,7 @@ case class ILLoadingConfig(
   procedureTrimDepth: Int = Int.MaxValue,
   parameterForm: Boolean = false,
   trimEarly: Boolean = false,
-  keepPC: Boolean = false,
+  keepPC: Boolean = false
 )
 
 case class StaticAnalysisConfig(

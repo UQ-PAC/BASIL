@@ -691,7 +691,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
       // ignore the following
       case "TRUE" => throw Exception(s"Boolean literal $name in LExpr ${ctx.getText}")
       case "FALSE" => throw Exception(s"Boolean literal $name in LExpr ${ctx.getText}")
-      case "__BranchTaken" => Some(LocalVar("__BranchTaken", BoolType))
+      case "__BranchTaken" => None
       case "BTypeNext" => None
       case "BTypeCompatible" => None
       case "TPIDR_EL0" => Some(Register(name, 64))
