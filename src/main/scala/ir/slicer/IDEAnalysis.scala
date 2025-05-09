@@ -5,8 +5,9 @@ import analysis.*
 
 import analysis.solvers.*
 
-trait SliceAnalysisFunctions(slicingCriterion: Map[CFGPosition, StatementSlice])
-    extends BackwardIDEAnalysis[SlicingParameter, TwoElement, TwoElementLattice] {
+trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice] = Map())
+    extends BackwardIDETransferFunctions[Variable, TwoElement, TwoElementLattice] {
+
   val valuelattice = TwoElementLattice()
   val edgelattice = EdgeFunctionLattice(valuelattice)
   import edgelattice.{IdEdge, ConstEdge}
@@ -78,7 +79,7 @@ trait SliceAnalysisFunctions(slicingCriterion: Map[CFGPosition, StatementSlice])
       }
       case m: MemoryStore => {
         d match {
-          case Left(value) if value == m.index => fold(m.value.variables)
+          case Left(value) if m.index.variables.contains(value) => fold(m.value.variables)
           case _ => Map(d -> IdEdge())
         }
       }
@@ -119,6 +120,9 @@ trait SliceAnalysisFunctions(slicingCriterion: Map[CFGPosition, StatementSlice])
   }
 }
 
-class SliceAnalysis(program: Program, slicingCriterion: Map[CFGPosition, StatementSlice])
-    extends BackwardIDESolver[SlicingParameter, TwoElement, TwoElementLattice](program),
-      SliceAnalysisFunctions(slicingCriterion)
+object SlicerTransferFunctions extends SlicerTransferFunctions()
+
+class SlicerAnalysis(program: Program, slicingCriterion: Map[CFGPosition, StatementSlice])
+    extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program)
+    with BackwardIDEAnalysis[Variable, TwoElement, TwoElementLattice]
+    with SlicerTransferFunctions(slicingCriterion)
