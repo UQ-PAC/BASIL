@@ -916,10 +916,8 @@ object RunUtils {
       }
     }
 
-    // Strip unreachables first. Don't want to slice over them
-    Logger.info("[!] Stripping unreachable")
-    transforms.stripUnreachableFunctions(ctx.program, q.loading.procedureTrimDepth)
-    Slicer(ctx.program, ctx.globals, ctx.globalOffsets).run()
+    Slicer(ctx.program).run()
+
     IRTransform.prepareForTranslation(q, ctx)
 
     q.loading.dumpIL.foreach(s => {
