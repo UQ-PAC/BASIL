@@ -716,7 +716,7 @@ object RunUtils {
         DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-simp.il"), pp_prog(program))
       }
     }
-    
+
     transforms.applyRPO(program)
 
     // example of printing a simple analysis
@@ -790,7 +790,10 @@ object RunUtils {
     // assert(program.procedures.forall(transforms.rdDSAProperty))
     config.foreach {
       _.analysisDotPath.foreach { s =>
-        AnalysisResultDotLogger.writeToFile(File(s"${s}_blockgraph-before-copyprop.dot"), dotBlockGraph(program.mainProcedure))
+        AnalysisResultDotLogger.writeToFile(
+          File(s"${s}_blockgraph-before-copyprop.dot"),
+          dotBlockGraph(program.mainProcedure)
+        )
       }
     }
     Logger.info("Copyprop Start")
@@ -800,7 +803,10 @@ object RunUtils {
     transforms.removeDuplicateGuard(program)
     config.foreach {
       _.analysisDotPath.foreach { s =>
-        AnalysisResultDotLogger.writeToFile(File(s"${s}_blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
+        AnalysisResultDotLogger.writeToFile(
+          File(s"${s}_blockgraph-after-simp.dot"),
+          dotBlockGraph(program.mainProcedure)
+        )
       }
     }
 
@@ -1043,7 +1049,7 @@ object RunUtils {
     }
 
     StaticAnalysisLogger.info("[!] Running DSA Analysis")
-    
+
     writeToFile(pp_prog(ctx.program), "testo1.il")
     val symbolTableEntries: Set[SymbolTableEntry] = ctx.globals ++ ctx.funcEntries
     val dsa = DataStructureAnalysis(
