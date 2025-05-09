@@ -18,6 +18,7 @@ def escape(s: String) = {
 
 private def wrap(_input: String, width: Integer = 20, first: Boolean = true): String =
   var input = _input
+  println("bbbbb")
 
   def cannotSplit(c: Char) = {
     c.isLetterOrDigit || ("_$".contains(c))
