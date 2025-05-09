@@ -26,7 +26,7 @@ import scala.collection.mutable.Queue
   * @param stateLattice: A lattice providing operations over S.
   * @param stateTransfer: A transfer function for deriving reachable states.
   */
-abstract class InterferenceDomain[T, S](
+ trait InterferenceDomain[T, S](
   val stateLattice: InterferenceCompatibleLattice[S],
   val stateTransfer: (S, Command) => S
 ) {
@@ -58,9 +58,9 @@ def get_temp(ty: IRType): LocalVar = LocalVar("rg_tmp_var", ty, 0)
   * This is implemented with a map [v_i -> P_i]. Variables that are never
   * written to are omitted from the map, rather than being mapped to bot.
   */
-case class ConditionalWritesDomain[S](
-  override val stateLattice: InterferenceCompatibleLattice[S],
-  override val stateTransfer: (S, Command) => S
+class ConditionalWritesDomain[S](
+  stateLattice: InterferenceCompatibleLattice[S],
+  stateTransfer: (S, Command) => S
 ) extends InterferenceDomain[Map[Variable, S], S](stateLattice, stateTransfer) {
   // an empty map means no variables have been written to
   def bot: Map[Variable, S] = Map.empty[Variable, S]
@@ -194,9 +194,9 @@ object DirectionLattice extends Lattice[Direction] {
   * This is implemented with a map [v_i -> Direction]. Variables that are never
   * written to are omitted from the map, rather than being mapped to bot.
   */
-case class MonotonicityDomain[S](
-  override val stateLattice: InterferenceCompatibleLattice[S],
-  override val stateTransfer: (S, Command) => S
+class MonotonicityDomain[S](
+  stateLattice: InterferenceCompatibleLattice[S],
+  stateTransfer: (S, Command) => S
 ) extends InterferenceDomain[Map[Variable, Direction], S](stateLattice, stateTransfer) {
 
   // an empty map means no variables have been written to
@@ -302,9 +302,9 @@ case class MonotonicityDomain[S](
   }
 }
 
-case class PreciseDomain[S](
-  override val stateLattice: InterferenceCompatibleLattice[S],
-  override val stateTransfer: (S, Command) => S
+class PreciseDomain[S](
+  stateLattice: InterferenceCompatibleLattice[S],
+  stateTransfer: (S, Command) => S
 ) extends InterferenceDomain[Map[LocalAssign, S], S](stateLattice, stateTransfer) {
 
   def bot: Map[LocalAssign, S] = Map.empty[LocalAssign, S]

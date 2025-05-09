@@ -384,11 +384,11 @@ object IRTransform {
     val relyGuarantees =
       RelyGuaranteeGenerator[InterferenceLatticeElement, StateLatticeElement](intDom).generate(threads)
     for ((p, (rely, guar)) <- relyGuarantees) {
-      println("--- " + p.procName + " " + "-" * 50 + "\n")
-      println("Rely:")
-      println(intDom.toString(rely) + "\n")
-      println("Guarantee:")
-      println(intDom.toString(guar) + "\n")
+      StaticAnalysisLogger.info("--- " + p.procName + " " + "-" * 50 + "\n")
+      StaticAnalysisLogger.info("Rely:")
+      StaticAnalysisLogger.info(intDom.toString(rely) + "\n")
+      StaticAnalysisLogger.info("Guarantee:")
+      StaticAnalysisLogger.info(intDom.toString(guar) + "\n")
     }
   }
 }
