@@ -5,7 +5,7 @@ import ir.dsl.*
 import specification.{Specification, SymbolTableEntry}
 import translating.ELFSymbol
 import boogie.SpecGlobal
-import test_util.CaptureOutput
+import test_util.{BASILTest, CaptureOutput}
 import util.{
   BASILConfig,
   BASILResult,
@@ -42,7 +42,7 @@ class DataStructureAnalysisTest extends AnyFunSuite with CaptureOutput {
   }
 
   def runTest(relativePath: String): BASILResult = {
-    val path = System.getenv("MILL_WORKSPACE_ROOT") + "/" + relativePath
+    val path = s"${BASILTest.rootDirectory}/$relativePath"
 
     val result = RunUtils.loadAndTranslate(
       BASILConfig(

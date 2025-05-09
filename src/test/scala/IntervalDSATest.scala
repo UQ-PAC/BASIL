@@ -8,7 +8,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
 import util.*
 import analysis.data_structure_analysis
-import test_util.CaptureOutput
+import test_util.{BASILTest, CaptureOutput}
 import util.DSAConfig.Checks
 
 @test_util.tags.AnalysisSystemTest
@@ -24,7 +24,7 @@ class IntervalDSATest extends AnyFunSuite with CaptureOutput {
   }
 
   def runTest(relativePath: String, config: DSAConfig = Checks): BASILResult = {
-    val path = System.getenv("MILL_WORKSPACE_ROOT") + "/" + relativePath
+    val path = s"${BASILTest.rootDirectory}/$relativePath"
     RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf"),
@@ -38,7 +38,7 @@ class IntervalDSATest extends AnyFunSuite with CaptureOutput {
   }
 
   def runTestGTIRB(relativePath: String, config: DSAConfig = Checks): BASILResult = {
-    val path = System.getenv("MILL_WORKSPACE_ROOT") + "/" + relativePath
+    val path = s"${BASILTest.rootDirectory}/$relativePath"
     RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(inputFile = path + ".gts", relfFile = path + ".relf"),
@@ -52,7 +52,7 @@ class IntervalDSATest extends AnyFunSuite with CaptureOutput {
   }
 
   def runTestTrim(relativePath: String, mainProcedure: String, config: DSAConfig = Checks): BASILResult = {
-    val path = System.getenv("MILL_WORKSPACE_ROOT") + "/" + relativePath
+    val path = s"${BASILTest.rootDirectory}/$relativePath"
     RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(

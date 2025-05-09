@@ -13,7 +13,7 @@ import translating.BAPToIR
 import util.{LogLevel, Logger}
 import util.IRLoading.{loadBAP, loadReadELF}
 import util.{ILLoadingConfig, IRContext, IRLoading, IRTransform}
-import test_util.CaptureOutput
+import test_util.{BASILTest, CaptureOutput}
 import ir.dsl.given
 import ir.dsl.IfThenBlocks
 
@@ -39,7 +39,7 @@ class InterpreterTests extends AnyFunSuite with CaptureOutput with BeforeAndAfte
   Logger.setLevel(LogLevel.WARN)
 
   def getProgram(name: String, relativePath: String): IRContext = {
-    val path = System.getenv("MILL_WORKSPACE_ROOT") + "/" + relativePath
+    val path = s"${BASILTest.rootDirectory}/$relativePath"
     val compiler = "gcc"
     val loading = ILLoadingConfig(
       inputFile = s"$path/$name/$compiler/$name.adt",

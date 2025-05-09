@@ -6,7 +6,7 @@ import ir.dsl.*
 import ir.*
 import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, Logger, LogLevel}
 import translating.PrettyPrinter
-import test_util.CaptureOutput
+import test_util.{BASILTest, CaptureOutput}
 
 import org.scalactic.*
 
@@ -106,7 +106,7 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
 
   test("equality on loaded ir params") {
     Logger.setLevel(LogLevel.ERROR)
-    val path = System.getenv("MILL_WORKSPACE_ROOT") + "/src/test/correct/function1/gcc/function1"
+    val path = s"${BASILTest.rootDirectory}/src/test/correct/function1/gcc/function1"
 
     val loaded = util.RunUtils.loadAndTranslate(
       BASILConfig(
@@ -160,7 +160,7 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
 
   test("equality on loaded ir no params") {
     Logger.setLevel(LogLevel.ERROR)
-    val path = System.getenv("MILL_WORKSPACE_ROOT") + "/src/test/correct/function1/gcc/function1"
+    val path = s"${BASILTest.rootDirectory}/src/test/correct/function1/gcc/function1"
 
     val loaded = util.RunUtils.loadAndTranslate(
       BASILConfig(

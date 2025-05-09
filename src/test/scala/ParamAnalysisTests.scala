@@ -5,7 +5,7 @@ import util.{BASILResult, StaticAnalysisConfig}
 
 @test_util.tags.UnitTest
 class ParamAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
-  private val correctPath = System.getenv("MILL_WORKSPACE_ROOT") + "/src/test/correct/"
+  private val correctPath = s"${BASILTest.rootDirectory}/src/test/correct/"
 
   def runExample(name: String): BASILResult = {
     val inputFile = correctPath + s"/$name/gcc/$name.adt"

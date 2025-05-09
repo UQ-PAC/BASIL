@@ -28,7 +28,7 @@ import java.io.IOException
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
 import ir.dsl.*
-import test_util.{CaptureOutput, TestValueDomainWithInterpreter}
+import test_util.{BASILTest, CaptureOutput, TestValueDomainWithInterpreter}
 import util.RunUtils.loadAndTranslate
 
 import scala.collection.mutable
@@ -49,7 +49,7 @@ class InterpretTestConstProp
     }
   }
 
-  private val testPath = System.getenv("MILL_WORKSPACE_ROOT") + "/src/test/correct"
+  private val testPath = s"${BASILTest.rootDirectory}/src/test/correct"
   def testInterpretConstProp(testName: String, compiler: String): Unit = {
     val path = s"$testPath/$testName/$compiler/$testName"
     val loading = ILLoadingConfig(inputFile = s"$path.adt", relfFile = s"$path.relf", dumpIL = None)

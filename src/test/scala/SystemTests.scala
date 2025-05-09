@@ -45,7 +45,7 @@ trait SystemTests extends AnyFunSuite, CaptureOutput, BASILTest, TestCustomisati
 
   val testResults: ArrayBuffer[TestResult] = ArrayBuffer()
 
-  private val testPath = System.getenv("MILL_WORKSPACE_ROOT") + "/src/test/"
+  private val testPath = s"${BASILTest.rootDirectory}/src/test/"
 
   override def customiseTestsByName(name: String): Mode = Mode.Normal
 

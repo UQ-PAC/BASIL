@@ -21,7 +21,6 @@ import util.{
 }
 import ir.eval.{interpretTrace, interpret, ExecEffect, Stopped}
 import test_util.*
-import test_util.BASILTest.*
 
 import java.io.IOException
 import java.nio.file.*
@@ -145,7 +144,7 @@ class DifferentialAnalysisTest extends DifferentialTest {
 
   def runSystemTests(): Unit = {
 
-    val path = System.getenv("MILL_WORKSPACE_ROOT") + s"/src/test/correct/"
+    val path = s"${BASILTest.rootDirectory}/src/test/correct/"
     val programs: Array[String] = BASILTest.getSubdirectories(path)
 
     // get all variations of each program
@@ -179,13 +178,13 @@ class DifferentialAnalysisTestSimplification extends DifferentialTest {
 
   def runSystemTests(): Unit = {
 
-    val path = System.getenv("MILL_WORKSPACE_ROOT") + s"/src/test/correct/"
-    val programs: Array[String] = getSubdirectories(path)
+    val path = s"${BASILTest.rootDirectory}/src/test/correct/"
+    val programs: Array[String] = BASILTest.getSubdirectories(path)
 
     // get all variations of each program
     for (p <- programs) {
       val programPath = path + "/" + p
-      val variations = getSubdirectories(programPath)
+      val variations = BASILTest.getSubdirectories(programPath)
       variations.foreach(variation => {
 
         val bapPath = path + "/" + p + "/" + variation + "/" + p + ".adt"

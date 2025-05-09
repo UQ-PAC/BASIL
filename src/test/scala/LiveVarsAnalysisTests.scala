@@ -10,7 +10,7 @@ import translating.PrettyPrinter.*
 @test_util.tags.UnitTest
 class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
   Logger.setLevel(LogLevel.ERROR)
-  private val correctPath = System.getenv("MILL_WORKSPACE_ROOT") + "/src/test/correct/"
+  private val correctPath = s"${BASILTest.rootDirectory}/src/test/correct/"
   def runExample(name: String): BASILResult = {
     val inputFile = correctPath + s"/$name/gcc/$name.adt"
     val relfFile = correctPath + s"/$name/gcc/$name.relf"

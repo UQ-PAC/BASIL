@@ -111,6 +111,15 @@ trait BASILTest {
 }
 
 object BASILTest {
+  lazy val rootDirectory: String = {
+    val millRoot = System.getenv("MILL_WORKSPACE_ROOT")
+    if (millRoot == null) {
+      val userDir = System.getProperty("user.dir")
+    } else {
+      millRoot
+    }
+  }
+
   def writeToFile(text: String, path: String): Unit = {
     val writer = BufferedWriter(FileWriter(path, false))
     writer.write(text)

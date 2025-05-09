@@ -4,7 +4,7 @@ import ir.Endian.LittleEndian
 import ir.dsl.{block, directCall, goto, proc, prog, ret}
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
-import test_util.CaptureOutput
+import test_util.{BASILTest, CaptureOutput}
 import util.*
 import util.DSAConfig.Checks
 
@@ -21,7 +21,7 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
   }
 
   def runTest(relativePath: String): BASILResult = {
-    val path = System.getenv("MILL_WORKSPACE_ROOT") + "/" + relativePath
+    val path = s"${BASILTest.rootDirectory}/$relativePath"
     RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf"),

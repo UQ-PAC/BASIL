@@ -9,12 +9,11 @@ import java.io.{BufferedWriter, File, FileWriter}
 import scala.collection.mutable
 import scala.io.Source
 import scala.sys.process.*
-import test_util.BASILTest.writeToFile
-import test_util.CaptureOutput
+import test_util.{BASILTest, CaptureOutput}
 
 @test_util.tags.UnitTest
 class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
-  private val testPath = System.getenv("MILL_WORKSPACE_ROOT") + "/src/test/irreducible_loops"
+  private val testPath = s"${BASILTest.rootDirectory}/src/test/irreducible_loops"
   Logger.setLevel(LogLevel.ERROR)
 
   def load(conf: ILLoadingConfig): Program = {
@@ -48,7 +47,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
     val foundLoops = LoopDetector.identify_loops(program)
 
-    writeToFile(
+    BASILTest.writeToFile(
       dotBlockGraph(program, program.collect { case b: Block => b -> b.toString }.toMap),
       s"${variationPath}_blockgraph-before-reduce.dot"
     )
@@ -58,7 +57,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     val newLoops = foundLoops.reducibleTransformIR()
     newLoops.identifiedLoops.foreach(l => Logger.debug(s"newloops${System.lineSeparator()}$l"))
 
-    writeToFile(
+    BASILTest.writeToFile(
       dotBlockGraph(program, program.collect { case b: Block => b -> b.toString }.toMap),
       s"${variationPath}_blockgraph-after-reduce.dot"
     )
