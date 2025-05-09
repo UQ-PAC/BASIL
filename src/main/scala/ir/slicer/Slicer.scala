@@ -5,13 +5,46 @@ import ir.eval.evaluateExpr
 
 import boogie.SpecGlobal
 import util.SlicerLogger
-class Slicer(program: Program, globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt]) {
-  private def setsToString(summaries: Map[CFGPosition, Summary]): String = {
+
+import util.PerformanceTimer
+import util.LogLevel
+
+import ir.transforms.{stripUnreachableFunctions, cleanupBlocks, removeDeadInParams}
+
 private type StatementSlice = Set[Variable]
 object StatementSlice {
   def apply(): StatementSlice = Set.empty[Variable]
 }
 
+class Slicer(program: Program) {
+
+  private val performanceTimer = PerformanceTimer("Slicer Timer", LogLevel.INFO)
+  private val initialCriterion = buildInitialCriterion
+
+  private def buildInitialCriterion: Map[CFGPosition, StatementSlice] = {
+    Map()
+  }
+
+  private class Phase1 {
+    def run(): Map[CFGPosition, Set[Variable]] = {
+      SlicerLogger.info("Slicer :: Slicing Criterion Generation - Phase1")
+      val results = SlicerAnalysis(program, initialCriterion)
+        .analyze()
+        .map({ case (k, v) =>
+          (k -> v.keys.toSet)
+        })
+      performanceTimer.checkPoint("Finished IDE Analysis")
+      results
+    }
+  }
+
+  def run(): Unit = {
+    SlicerLogger.info("Slicer :: Slicer Start")
+
+    SlicerLogger.debug("Slicer - Stripping unreachable")
+    stripUnreachableFunctions(program)
+
+    val results = Phase1().run()
     def get(n: CFGPosition, indent: String = ""): String = {
       val summary = summaries(n)
       s"$indent> Entry: ${summary.entry}\n$indent> Exit:  ${summary.exit}"
@@ -35,42 +68,5 @@ object StatementSlice {
       }
     }
     result
-  }
-
-    private def buildLabels(summaries: Map[CFGPosition, Summary]): Map[CFGPosition, String] = {
-    (summaries.keys.toSet)
-      .map(s =>
-        s -> {
-          var data = summaries.getOrElse(s, Summary())
-          s"Entry: ${data.entry}\nExit:  ${data.exit}"
-        }
-      )
-      .toMap
-  }
-
-  def run(): Unit = {
-
-    import util.PerformanceTimer
-    import util.LogLevel
-
-    val timer = PerformanceTimer("Slicer Timer", LogLevel.WARN)
-
-    val slicingCriterion: Map[CFGPosition, StatementSlice] = Map(
-    )
-    // These results are what come INTO the CFGPosition in the IDE
-    val results = SliceAnalysis(program, slicingCriterion)
-      .analyze()
-      .map({ case (k, v) =>
-        (k -> v.keys.toSet)
-      })
-    timer.checkPoint("Finished Slice IDE")
-
-    val built = build(results, slicingCriterion)
-
-    timer.checkPoint("Finished Slice Set Building")
-
-    SlicerLogger.info(setsToString(built))
-
-    println(dotBlockGraph(program))
   }
 }
