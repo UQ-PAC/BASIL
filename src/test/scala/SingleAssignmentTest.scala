@@ -2,7 +2,7 @@ import analysis.ParamAnalysis
 import ir.dsl.*
 import ir.*
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.BASILTest
+import test_util.{BASILTest, CaptureOutput}
 import util.*
 import translating.BasilIRToSMT2
 import ir.dsl.*
@@ -10,7 +10,7 @@ import ir.transforms
 import translating.PrettyPrinter.*
 
 @test_util.tags.UnitTest
-class SingleAssignmentTest extends AnyFunSuite with test_util.CaptureOutput {
+class SingleAssignmentTest extends AnyFunSuite with CaptureOutput {
 
   test("tight loop") {
     val x = LocalVar("x", BitVecType(32))

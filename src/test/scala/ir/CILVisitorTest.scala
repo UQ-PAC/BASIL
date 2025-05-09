@@ -3,9 +3,9 @@ package ir
 import scala.collection.mutable
 import scala.collection.immutable.*
 import org.scalatest.funsuite.AnyFunSuite
-import util.intrusive_list.*
 import ir.dsl.*
 import ir.cilvisitor.*
+import test_util.CaptureOutput
 
 class FindVars extends CILVisitor {
   val vars = mutable.ArrayBuffer[Variable]()
@@ -52,7 +52,7 @@ class AddGammas extends CILVisitor {
 }
 
 @test_util.tags.UnitTest
-class CILVisitorTest extends AnyFunSuite with test_util.CaptureOutput {
+class CILVisitorTest extends AnyFunSuite with CaptureOutput {
 
   def getRegister(name: String) = Register(name, 64)
   test("trace prog") {

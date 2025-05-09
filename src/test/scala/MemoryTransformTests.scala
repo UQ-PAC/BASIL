@@ -1,16 +1,15 @@
-import analysis.data_structure_analysis.{Global, DSInterval}
 import boogie.SpecGlobal
 import ir.*
-import ir.Endian.{BigEndian, LittleEndian}
+import ir.Endian.LittleEndian
 import ir.dsl.{block, directCall, goto, proc, prog, ret}
-import org.scalatest.Ignore
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
+import test_util.{BASILTest, CaptureOutput}
 import util.*
 import util.DSAConfig.Checks
 
 @test_util.tags.UnitTest
-class MemoryTransformTests extends AnyFunSuite with test_util.CaptureOutput {
+class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program)
@@ -21,7 +20,8 @@ class MemoryTransformTests extends AnyFunSuite with test_util.CaptureOutput {
     RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
   }
 
-  def runTest(path: String): BASILResult = {
+  def runTest(relativePath: String): BASILResult = {
+    val path = s"${BASILTest.rootDirectory}/$relativePath"
     RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf"),
@@ -435,7 +435,7 @@ class MemoryTransformTests extends AnyFunSuite with test_util.CaptureOutput {
     val results = runTest(context)
 
     val mainStores = results.ir.program.mainProcedure.collect { case m: MemoryAssign => m }
-    val loads = results.ir.program.collect { case l: LocalAssign if l.rhs.isInstanceOf[Register] => l }
+    val loads = results.ir.program.collect { case l @ LocalAssign(_, r: Register, _) => l }
     assert(mainStores.map(_.lhs).toSet.size == 1)
     assert(loads.map(_.rhs).toSet.size == 1)
     assert(loads.map(_.rhs).toSet.head == mainStores.map(_.lhs).toSet.head)

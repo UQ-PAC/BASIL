@@ -5,7 +5,7 @@ set -o pipefail
 test_dir=src/test
 
 echo '::group::All test suites:'
-tests="$(./mill test.testOnly -- -t '' -oW | tr -d ':' | sort)"
+tests="$(./mill test.testOnly -- -t '' -oW | grep ':$' | tr -d ':' | cut -d' ' -f2 | sort)"
 echo "$tests"
 echo '::endgroup::'
 echo
@@ -20,7 +20,10 @@ find_test_case() {
   t="$1"
   shift
   # NOTE: \> matches the end of a word
-  exec grep 'class\s\+'"$t"'\>' --before-context=2 -R $test_dir "$@"
+  if ! grep 'class\s\+'"$t"'\>' --before-context=2 -R $test_dir "$@"; then
+    echo "find_test_case failed to find '$t'" >&2
+    return 1
+  fi
 }
 
 ok=true

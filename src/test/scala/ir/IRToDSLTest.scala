@@ -1,29 +1,17 @@
 package ir
 
-import scala.collection.mutable
 import scala.collection.immutable.*
 import org.scalatest.funsuite.AnyFunSuite
-import util.intrusive_list.*
-import translating.serialiseIL
 import ir.dsl.*
 import ir.*
-import util.{
-  BASILConfig,
-  BASILResult,
-  BoogieGeneratorConfig,
-  ILLoadingConfig,
-  RunUtils,
-  StaticAnalysisConfig,
-  Logger,
-  LogLevel
-}
+import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, Logger, LogLevel}
 import translating.PrettyPrinter
+import test_util.{BASILTest, CaptureOutput}
 
-import org.scalactic.Prettifier
-import org.scalactic._
+import org.scalactic.*
 
 @test_util.tags.UnitTest
-class IRToDSLTest extends AnyFunSuite with test_util.CaptureOutput {
+class IRToDSLTest extends AnyFunSuite with CaptureOutput {
 
   val mainproc = proc(
     "main",
@@ -118,7 +106,7 @@ class IRToDSLTest extends AnyFunSuite with test_util.CaptureOutput {
 
   test("equality on loaded ir params") {
     Logger.setLevel(LogLevel.ERROR)
-    val path = "src/test/correct/function1/gcc/function1"
+    val path = s"${BASILTest.rootDirectory}/src/test/correct/function1/gcc/function1"
 
     val loaded = util.RunUtils.loadAndTranslate(
       BASILConfig(
@@ -172,15 +160,14 @@ class IRToDSLTest extends AnyFunSuite with test_util.CaptureOutput {
 
   test("equality on loaded ir no params") {
     Logger.setLevel(LogLevel.ERROR)
-    val path = "src/test/correct/function1/gcc/function1"
+    val path = s"${BASILTest.rootDirectory}/src/test/correct/function1/gcc/function1"
 
     val loaded = util.RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf", specFile = None, dumpIL = None),
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out.bpl",
-        simplify = false
+        outputPrefix = "boogie_out.bpl"
       )
     )
 

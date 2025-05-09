@@ -1,10 +1,8 @@
 package test_util
 
-import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.concurrent.ScaledTimeSpans
 import org.scalatest.time.{Span, Seconds}
 
-import ir.{Block, Procedure, Program}
 import util.{
   BASILConfig,
   BASILResult,
@@ -113,6 +111,15 @@ trait BASILTest {
 }
 
 object BASILTest {
+  lazy val rootDirectory: String = {
+    val millRoot = System.getenv("MILL_WORKSPACE_ROOT")
+    if (millRoot == null) {
+      System.getProperty("user.dir")
+    } else {
+      millRoot
+    }
+  }
+
   def writeToFile(text: String, path: String): Unit = {
     val writer = BufferedWriter(FileWriter(path, false))
     writer.write(text)
