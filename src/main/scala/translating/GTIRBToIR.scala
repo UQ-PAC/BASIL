@@ -707,7 +707,7 @@ class GTIRBToIR(
       val target = entranceUUIDtoProcedure(call.targetUuid)
       val resolvedCall = DirectCall(target)
 
-      val assume = Assume(BinaryExpr(BVEQ, targetRegister, BitVecLiteral(target.address.get, 64)))
+      val assume = Assume(BinaryExpr(EQ, targetRegister, BitVecLiteral(target.address.get, 64)))
       val label = block.label + "_" + target.name
       newBlocks.append(Block(label, None, ArrayBuffer(assume, resolvedCall), GoTo(returnTarget)))
     }

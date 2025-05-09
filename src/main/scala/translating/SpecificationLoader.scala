@@ -163,7 +163,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   def visitExpr(ctx: ExprContext, nameToGlobals: Map[String, SpecGlobal], params: Map[String, Expr] = Map()): BExpr = {
     val exprs = ctx.impliesExpr.asScala.map(e => visitImpliesExpr(e, nameToGlobals, params))
     if (exprs.size > 1) {
-      exprs.tail.foldLeft(exprs.head)((opExpr: BExpr, next: BExpr) => BinaryBExpr(BoolEQUIV, opExpr, next))
+      exprs.tail.foldLeft(exprs.head)((opExpr: BExpr, next: BExpr) => BinaryBExpr(EQ, opExpr, next))
     } else {
       exprs.head
     }
@@ -366,9 +366,9 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   }
 
   // may need to make this more sophisticated and check for bool == bool
-  def visitRelOp(ctx: RelOpContext): BVBinOp = ctx.getText match {
-    case "==" => BVEQ
-    case "!=" => BVNEQ
+  def visitRelOp(ctx: RelOpContext): BinOp = ctx.getText match {
+    case "==" => EQ
+    case "!=" => NEQ
     case ">" => BVSGT
     case ">=" => BVSGE
     case "<" => BVSLT
