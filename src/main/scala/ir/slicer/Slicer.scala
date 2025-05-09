@@ -38,6 +38,58 @@ class Slicer(program: Program) {
     }
   }
 
+  private class Phase2(results: Map[CFGPosition, StatementSlice]) {
+    val matcher = TransformCriterionPair(results, initialCriterion)
+
+    def hasCriterionImpact(n: Statement): Boolean = {
+      val transfer = SlicerTransferFunctions.edgesOther(n)
+
+      val criterion = matcher.getPostCriterion(n)
+      val transferred = criterion.flatMap(v => transfer(Left(v))).toMap
+
+      transferred.values.toSet.contains(
+        SlicerTransferFunctions.edgelattice.ConstEdge(SlicerTransferFunctions.valuelattice.top)
+      ) || (transferred.isEmpty && !criterion.isEmpty)
+    }
+
+    def removeStatement(s: Statement): Unit = {
+      s match {
+        case s if hasCriterionImpact(s) => ()
+        case c: Call => {
+          // If a Call statement has Registers in criterion we keep the statement.
+          if !matcher.getPostCriterion(s).exists {
+              case _: Register => true
+              case _ => false
+            }
+          then s.parent.statements.remove(s)
+        }
+        case s => s.parent.statements.remove(s)
+      }
+    }
+
+    def run(): Unit = {
+      SlicerLogger.info("Slicer :: Reductive Slicing Pass - Phase2")
+
+      SlicerLogger.debug("Slicer - Statement Removal")
+      for (procedures <- program.procedures) {
+        for (block <- procedures.blocks) {
+          for (command <- block.statements) {
+            removeStatement(command)
+          }
+        }
+      }
+      performanceTimer.checkPoint("Finished Statement Removal")
+
+      SlicerLogger.debug("Slicer - Cleanup Blocks")
+      cleanupBlocks(program)
+
+      SlicerLogger.debug("Slicer - Remove Dead Parameters")
+      removeDeadInParams(program)
+
+      performanceTimer.checkPoint("Finished IR Cleanup")
+    }
+  }
+
   def run(): Unit = {
     SlicerLogger.info("Slicer :: Slicer Start")
 
@@ -45,28 +97,10 @@ class Slicer(program: Program) {
     stripUnreachableFunctions(program)
 
     val results = Phase1().run()
-    def get(n: CFGPosition, indent: String = ""): String = {
-      val summary = summaries(n)
-      s"$indent> Entry: ${summary.entry}\n$indent> Exit:  ${summary.exit}"
-    }
 
-    var result = ""
-    for (proc <- program.procedures) {
-      result += (s"-------Proc: ${proc.name}-------") + "\n"
-      result += get(proc) + "\n\n"
-      var i = 1;
-      for (block <- proc.blocks) {
-        result += (s"\t------$i Block: ${block.label}-------") + "\n"
-        result += get(block, "\t") + "\n\n"
-        i += 1
-        for (statement <- block.statements) {
-          result += (s"\t\t$statement") + "\n"
-          result += get(statement, "\t\t") + "\n\n"
-        }
-        result += (s"\t\t${block.jump}") + "\n"
-        result += get(block.jump, "\t\t") + "\n\n"
-      }
-    }
-    result
+    Phase2(results).run()
+
+    performanceTimer.checkPoint("Finished Slicer")
   }
+
 }
