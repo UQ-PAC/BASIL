@@ -16,9 +16,8 @@ def escape(s: String) = {
   n
 }
 
-private def wrap(_input: String, width: Integer = 20, first: Boolean = true): String =
+private def wrap(_input: String, width: Integer = 20, first: Boolean = true): String = {
   var input = _input
-  println("bbbbb")
 
   def cannotSplit(c: Char) = {
     c.isLetterOrDigit || ("_$".contains(c))
@@ -26,7 +25,7 @@ private def wrap(_input: String, width: Integer = 20, first: Boolean = true): St
 
   if (input.length() <= width) {
     input.replace("\n", "\\l") + "\\l"
-  } else if ({
+  } else if ( {
     val index = input.indexOf('\n')
     index != -1 && index <= width
   }) {
@@ -46,6 +45,8 @@ private def wrap(_input: String, width: Integer = 20, first: Boolean = true): St
     val (line, rest) = (input.substring(0, splitPoint).replace("\n", "\\l"), input.substring(splitPoint))
     (if (!first) then "    " else "") + line + "\\l" + wrap(rest, width = width, false)
   }
+}
+
 
 /** Super-class for elements of a Graphviz dot file.
   */
