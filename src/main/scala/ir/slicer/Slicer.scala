@@ -7,6 +7,11 @@ import boogie.SpecGlobal
 import util.SlicerLogger
 class Slicer(program: Program, globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt]) {
   private def setsToString(summaries: Map[CFGPosition, Summary]): String = {
+private type StatementSlice = Set[Variable]
+object StatementSlice {
+  def apply(): StatementSlice = Set.empty[Variable]
+}
+
     def get(n: CFGPosition, indent: String = ""): String = {
       val summary = summaries(n)
       s"$indent> Entry: ${summary.entry}\n$indent> Exit:  ${summary.exit}"

@@ -2,13 +2,6 @@ package ir.slicer
 
 import ir.*
 
-type SlicingParameter = Variable
-
-type StatementSlice = Set[SlicingParameter]
-object StatementSlice {
-  def apply(): StatementSlice = Set.empty[SlicingParameter]
-}
-
 class Summary(
   var _entry: Either[() => StatementSlice, StatementSlice] = Right(StatementSlice()),
   var _exit: Either[() => StatementSlice, StatementSlice] = Right(StatementSlice())
