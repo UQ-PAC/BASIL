@@ -252,16 +252,15 @@ class GTIRBToIR(
         isnStmts.init :+ TempIf(x.cond, insertPCIncrement(x.thenStmts), insertPCIncrement(x.elseStmts))
       case Success(_) | Failure(_) => {
         val branchTaken = isnStmts.exists {
-          case LocalAssign(LocalVar("__BranchTaken", BoolType, _), TrueLiteral, _) => true
+          case LocalAssign(Register("_PC", 64), _, _) => true
           case _: TempIf => throw Exception("encountered TempIf not at end of statement list: " + isnStmts)
           case _ => false
         }
         val increment =
-          if branchTaken then Seq()
+          if branchTaken then None
           else
-            Seq(
+            Some(
               LocalAssign(Register("_PC", 64), BinaryExpr(BVADD, Register("_PC", 64), BitVecLiteral(4, 64)), None),
-              LocalAssign(LocalVar("__BranchTaken", BoolType), FalseLiteral)
             )
         increment ++: isnStmts
       }

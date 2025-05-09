@@ -306,7 +306,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
       case "FALSE" => Some(FalseLiteral)
       case "FPCR" => Some(Register("FPCR", 32))
       // ignore the following
-      case "__BranchTaken" => Some(LocalVar("__BranchTaken", BoolType))
+      case "__BranchTaken" => None
       case "BTypeNext" => None
       case "BTypeCompatible" => None
       case "TPIDR_EL0" => Some(Register(name, 64))
