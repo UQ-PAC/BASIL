@@ -874,6 +874,11 @@ object RunUtils {
       )
     }
 
+    if (!q.loading.keepPC) {
+      visit_prog(transforms.RemovePCStatements(), ctx.program)
+      Logger.info(s"[!] Removed PC-related statements")
+    }
+
     if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
