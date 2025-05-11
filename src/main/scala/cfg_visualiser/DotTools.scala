@@ -16,22 +16,20 @@ def escape(s: String) = {
   n
 }
 
-def wrap(_input: String, width: Integer = 20, first: Boolean = true): String =
-  var input = _input
+private def wrap(_input: String, width: Integer = 20, first: Boolean = true): String = {
+  val input = _input
 
   def cannotSplit(c: Char) = {
-    c.isLetterOrDigit || ("_$".contains(c))
+    c.isLetterOrDigit || "_$".contains(c)
   }
 
+  val index = input.indexOf('\n')
   if (input.length() <= width) {
     input.replace("\n", "\\l") + "\\l"
-  } else if ({
-    val index = input.indexOf('\n')
-    index != -1 && index <= width
-  }) {
-    var splitPoint = input.indexOf('\n')
+  } else if (index != -1 && index <= width) {
+    val splitPoint = input.indexOf('\n')
     val (line, rest) = (input.substring(0, splitPoint).replace("\n", "\\l"), input.substring(splitPoint + 1))
-    (if (!first) then "    " else "") + line + "\\l" + wrap(rest, width = width, true)
+    (if !first then "    " else "") + line + "\\l" + wrap(rest, width = width, true)
   } else {
     var splitPoint = width
     while (cannotSplit(input.charAt(splitPoint)) && splitPoint > width / 3) {
@@ -43,8 +41,9 @@ def wrap(_input: String, width: Integer = 20, first: Boolean = true): String =
       splitPoint = width
     }
     val (line, rest) = (input.substring(0, splitPoint).replace("\n", "\\l"), input.substring(splitPoint))
-    (if (!first) then "    " else "") + line + "\\l" + wrap(rest, width = width, false)
+    (if !first then "    " else "") + line + "\\l" + wrap(rest, width = width, false)
   }
+}
 
 /** Super-class for elements of a Graphviz dot file.
   */
@@ -161,8 +160,8 @@ class DotStruct(val id: String, val details: String, val fields: Option[Iterable
     extends DotElement {
   def equals(other: DotStruct): Boolean = toDotString.equals(other.toDotString)
 
-  val label = s"\"{<$id> ${if verbose then wrap(details, 80) else id} ${
-      if fields.isDefined then s" | {${fields.get.map(f => s"<$f> $f").mkString("|")}}" else ""
+  val label = s"\"{<$id> ${if verbose then details else id} ${
+      if fields.isDefined then s" | {${fields.get.mkString("|")}}" else ""
     }}\""
   override def toString: String = toDotString
 

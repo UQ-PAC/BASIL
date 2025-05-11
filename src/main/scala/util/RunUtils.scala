@@ -38,7 +38,7 @@ import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
 import ir.transforms.MemoryTransform
-import util.DSAAnalysis.Norm
+import util.DSAConfig.{Checks, Prereq, Standard}
 import util.LogLevel.INFO
 
 import scala.annotation.tailrec
@@ -82,11 +82,12 @@ case class StaticAnalysisContext(
 )
 
 case class DSAContext(
-  sva: Map[Procedure, SymValues[data_structure_analysis.Interval]],
+  sva: Map[Procedure, SymValues[DSInterval]],
   constraints: Map[Procedure, Set[Constraint]],
   local: Map[Procedure, IntervalGraph],
   bottomUp: Map[Procedure, IntervalGraph],
-  topDown: Map[Procedure, IntervalGraph]
+  topDown: Map[Procedure, IntervalGraph],
+  globals: Map[IntervalNode, IntervalNode]
 )
 
 /** Results of the main program execution.
@@ -728,7 +729,12 @@ object RunUtils {
 
     transforms.liftSVComp(ctx.program)
 
-    DebugDumpIRLogger.writeToFile(File("il-before-simp.il"), pp_prog(program))
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-simp.il"), pp_prog(program))
+      }
+    }
+
     transforms.applyRPO(program)
 
     // example of printing a simple analysis
@@ -738,34 +744,43 @@ object RunUtils {
     transforms.removeEmptyBlocks(program)
 
     // transforms.coalesceBlocksCrossBranchDependency(program)
-    DebugDumpIRLogger.writeToFile(File("blockgraph-before-dsa.dot"), dotBlockGraph(program.mainProcedure))
-
-    Logger.info("[!] Simplify :: DynamicSingleAssignment")
-    DebugDumpIRLogger.writeToFile(File("il-before-dsa.il"), pp_prog(program))
-
-    transforms.OnePassDSA().applyTransform(program)
-    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
-      val dir = File("./graphs/")
-      if (!dir.exists()) then dir.mkdirs()
-      for (p <- ctx.program.procedures) {
-        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-dot-simp.dot"), dotBlockGraph(p))
+    config.foreach {
+      _.analysisDotPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_blockgraph-before-dsa.dot"), dotBlockGraph(program.mainProcedure))
       }
     }
+
+    Logger.info("[!] Simplify :: DynamicSingleAssignment")
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-dsa.il"), pp_prog(program))
+      }
+    }
+
+    transforms.OnePassDSA().applyTransform(program)
 
     transforms.inlinePLTLaunchpad(ctx.program)
 
     transforms.removeEmptyBlocks(program)
 
-    AnalysisResultDotLogger.writeToFile(
-      File(s"blockgraph-after-dsa.dot"),
-      dotBlockGraph(
-        program,
-        (program.collect { case b: Block =>
-          b -> pp_block(b)
-        }).toMap
-      )
-    )
-    DebugDumpIRLogger.writeToFile(File("il-after-dsa.il"), pp_prog(program))
+    config.foreach {
+      _.analysisDotPath.foreach { s =>
+        AnalysisResultDotLogger.writeToFile(
+          File(s"${s}_blockgraph-after-dsa.dot"),
+          dotBlockGraph(
+            program,
+            (program.collect { case b: Block =>
+              b -> pp_block(b)
+            }).toMap
+          )
+        )
+      }
+    }
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-dsa.il"), pp_prog(program))
+      }
+    }
 
     if (ir.eval.SimplifyValidation.validate) {
       Logger.info("DSA no uninitialised")
@@ -783,18 +798,35 @@ object RunUtils {
       assert(invariant.blocksUniqueToEachProcedure(program))
     }
 
-    DebugDumpIRLogger.writeToFile(File("il-before-copyprop.il"), pp_prog(program))
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-copyprop.il"), pp_prog(program))
+      }
+    }
 
     // brute force run the analysis twice because it cleans up more stuff
     // assert(program.procedures.forall(transforms.rdDSAProperty))
-    AnalysisResultDotLogger.writeToFile(File("blockgraph-before-copyprop.dot"), dotBlockGraph(program.mainProcedure))
+    config.foreach {
+      _.analysisDotPath.foreach { s =>
+        AnalysisResultDotLogger.writeToFile(
+          File(s"${s}_blockgraph-before-copyprop.dot"),
+          dotBlockGraph(program.mainProcedure)
+        )
+      }
+    }
     Logger.info("Copyprop Start")
     transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
 
     transforms.fixupGuards(program)
     transforms.removeDuplicateGuard(program)
-
-    AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
+    config.foreach {
+      _.analysisDotPath.foreach { s =>
+        AnalysisResultDotLogger.writeToFile(
+          File(s"${s}_blockgraph-after-simp.dot"),
+          dotBlockGraph(program.mainProcedure)
+        )
+      }
+    }
 
     transforms.liftLinuxAssertFail(ctx)
 
@@ -802,7 +834,12 @@ object RunUtils {
 
     assert(invariant.blockUniqueLabels(program))
     Logger.info(s"CopyProp ${timer.checkPoint("Simplify")} ms ")
-    DebugDumpIRLogger.writeToFile(File("il-after-copyprop.il"), pp_prog(program))
+
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-copyprop.il"), pp_prog(program))
+      }
+    }
 
     // val x = program.procedures.forall(transforms.rdDSAProperty)
     // assert(x)
@@ -814,7 +851,11 @@ object RunUtils {
     }
     // run this after cond recovery because sign bit calculations often need high bits
     // which go away in high level conss
-    DebugDumpIRLogger.writeToFile(File("il-after-slices.il"), pp_prog(program))
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-slices.il"), pp_prog(program))
+      }
+    }
 
     // re-apply dsa
     // transforms.OnePassDSA().applyTransform(program)
@@ -888,75 +929,19 @@ object RunUtils {
       val dir = File("./graphs/")
       if (!dir.exists()) then dir.mkdirs()
       for (p <- ctx.program.procedures) {
-        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-after-simp.dot"), dotBlockGraph(p))
+        DebugDumpIRLogger.writeToFile(File(s"graphs/blockgraph-${p.name}-dot-simp.dot"), dotBlockGraph(p))
       }
     }
 
-    // SVA
     var dsaContext: Option[DSAContext] = None
-    if (conf.dsaConfig.nonEmpty) {
-      val config = conf.dsaConfig.get
-      val DSATimer = PerformanceTimer("DSA Timer", INFO)
+    if (conf.dsaConfig.isDefined) {
+      val dsaResults = IntervalDSA(ctx).dsa(conf.dsaConfig.get)
+      dsaContext = Some(dsaResults)
 
-      val main = ctx.program.mainProcedure
-      var sva: Map[Procedure, SymValues[data_structure_analysis.Interval]] = Map.empty
-      var cons: Map[Procedure, Set[Constraint]] = Map.empty
-      computeDSADomain(ctx.program.mainProcedure, ctx).toSeq
-        .sortBy(_.name)
-        .foreach(proc =>
-          val SVAResults = getSymbolicValues[data_structure_analysis.Interval](proc)
-          val constraints = generateConstraints(proc)
-          sva += (proc -> SVAResults)
-          cons += (proc -> constraints)
-        )
-
-      DSATimer.checkPoint("Finished SVA")
-      dsaContext = Some(DSAContext(sva, cons, Map.empty, Map.empty, Map.empty))
-
-      if config.analyses.contains(Norm) then
-        DSALogger.info("Finished Computing Constraints")
-        val globalGraph =
-          IntervalDSA.getLocal(
-            ctx.program.mainProcedure,
-            ctx,
-            SymValues[data_structure_analysis.Interval](Map.empty),
-            Set[Constraint]()
-          )
-        val DSA = IntervalDSA.getLocals(ctx, sva, cons)
-        IntervalDSA.checkReachable(ctx.program, DSA)
-        DSATimer.checkPoint("Finished DSA Local Phase")
-        DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
-        DSA.values.foreach(_.localCorrectness())
-        DSALogger.info("Performed correctness check")
-        val DSABU = IntervalDSA.solveBUs(DSA)
-        DSATimer.checkPoint("Finished DSA BU Phase")
-        DSABU.values.foreach(_.localCorrectness())
-        DSALogger.info("Performed correctness check")
-        val DSATD = IntervalDSA.solveTDs(DSABU)
-        DSATimer.checkPoint("Finished DSA TD Phase")
-        DSATD.values.foreach(_.localCorrectness())
-        DSALogger.info("Performed correctness check")
-        DSATD.values.foreach(g => globalGraph.globalTransfer(g, globalGraph))
-        val globalMapping = DSATD.values.foldLeft(Map[IntervalNode, IntervalNode]()) { (m, g) =>
-          val oldToNew = globalGraph.globalTransfer(globalGraph, g)
-          m ++ oldToNew.map((common, spec) => (spec, common))
-
-        }
-        DSATimer.checkPoint("Finished DSA global graph")
-        DSATD.values.foreach(_.localCorrectness())
-        DSALogger.info("Performed correctness check")
-
-        IntervalDSA.checkConsistGlobals(DSATD, globalGraph)
-        IntervalDSA.checkReachable(ctx.program, DSATD)
-
-        DSATimer.checkPoint("Finished DSA Invariant Check")
-        dsaContext = Some(dsaContext.get.copy(local = DSA, bottomUp = DSABU, topDown = DSATD))
-
-        if q.memoryTransform then {
-          visit_prog(MemoryTransform(DSATD, globalMapping), ctx.program)
-          DSATimer.checkPoint("Performed Memory Transform")
-          // doSimplify(ctx, None)
-        }
+      if q.memoryTransform && conf.dsaConfig.get != Prereq then // need more than prereq
+        val memTransferTimer = PerformanceTimer("Mem Transfer Timer", INFO)
+        visit_prog(MemoryTransform(dsaResults.topDown, dsaResults.globals), ctx.program)
+        memTransferTimer.checkPoint("Performed Memory Transform")
     }
 
     if (conf.summariseProcedures) {
@@ -1092,6 +1077,7 @@ object RunUtils {
     }
 
     StaticAnalysisLogger.info("[!] Running DSA Analysis")
+
     writeToFile(pp_prog(ctx.program), "testo1.il")
     val symbolTableEntries: Set[SymbolTableEntry] = ctx.globals ++ ctx.funcEntries
     val dsa = DataStructureAnalysis(

@@ -29,6 +29,18 @@ object PrettyPrinter {
     )(p)
   }
 
+  def pp_proc_with_analysis_results[T](
+    before: Map[Block, T],
+    after: Map[Block, T],
+    p: Procedure,
+    resultPrinter: T => String = ((x: T) => x.toString)
+  ) = {
+    BasilIRPrettyPrinter(
+      with_analysis_results_begin = block => before.get(block).map(resultPrinter),
+      block => after.get(block).map(resultPrinter)
+    )(p)
+  }
+
   def pp_block_with_analysis_results[T](
     before: Map[Block, T],
     after: Map[Block, T],
@@ -204,7 +216,10 @@ class BasilIRPrettyPrinter(
     val address = b.address
     val statements = b.statements.toList.map(vstmt)
     val terminator = vjump(b.jump)
-    val entryComent = with_analysis_results_begin(b).map(c => s"${blockIndent}// ${c}")
+    val entryComent = with_analysis_results_begin(b).map(c => {
+      val broken = c.split('\n').mkString("\n" + blockIndent + "// ")
+      s"${blockIndent}// $broken"
+    })
     val exitComment = with_analysis_results_end(b).map(c => s"${blockIndent}// ${c}")
     val addr = address.map(a => s"{address = ${vaddress(a)}}")
     PBlock(label, addr, statements.map(_.toString) ++ Seq(terminator.toString), entryComent, exitComment)

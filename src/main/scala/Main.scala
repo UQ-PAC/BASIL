@@ -4,15 +4,16 @@ import bap.*
 import boogie.*
 import translating.*
 import util.RunUtils
-import scala.sys.process.*
 
+import scala.sys.process.*
 import java.io.File
 import scala.collection.mutable.{ArrayBuffer, Set}
 import scala.collection.{immutable, mutable}
 import scala.language.postfixOps
 import scala.sys.process.*
 import util.*
-import mainargs.{main, arg, ParserForClass, Flag}
+import mainargs.{Flag, ParserForClass, arg, main}
+import util.DSAConfig.{Checks, Prereq, Standard}
 import util.boogie_interaction.BoogieResultKind
 
 object Main {
@@ -195,6 +196,7 @@ object Main {
 
     if (conf.help.value) {
       println(parser.helpText(sorted = false))
+      return
     }
 
     Logger.setLevel(LogLevel.INFO, false)
@@ -248,14 +250,12 @@ object Main {
 
     val dsa: Option[DSAConfig] = if (conf.simplify.value) {
       conf.dsaType match
-        case Some("set") => Some(DSAConfig(immutable.Set(DSAAnalysis.Set)))
-        case Some("field") => Some(DSAConfig(immutable.Set(DSAAnalysis.Field)))
-        case Some("norm") => Some(DSAConfig(immutable.Set(DSAAnalysis.Norm)))
-        case Some("all") => Some(DSAConfig(immutable.Set(DSAAnalysis.Set, DSAAnalysis.Field, DSAAnalysis.Norm)))
-        case Some("none") => Some(DSAConfig(immutable.Set.empty))
-        case None => None
+        case Some("prereq") => Some(Prereq)
+        case Some("checks") => Some(Checks)
+        case Some("standard") => Some(Standard)
+        case None => Some(Standard)
         case Some(_) =>
-          throw new IllegalArgumentException("Illegal option to dsa, allowed are: (none|set|field|norm|all)")
+          throw new IllegalArgumentException("Illegal option to dsa, allowed are: (prereq|standard|checks)")
     } else {
       None
     }

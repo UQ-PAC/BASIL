@@ -32,11 +32,9 @@ case class StaticAnalysisConfig(
   irreducibleLoops: Boolean = true
 )
 
-enum DSAAnalysis {
-  case Norm, Set, Field
+enum DSAConfig {
+  case Prereq, Standard, Checks
 }
-
-case class DSAConfig(analyses: Set[DSAAnalysis])
 
 enum BoogieMemoryAccessMode {
   case SuccessiveStoreSelect, LambdaStoreSelect
