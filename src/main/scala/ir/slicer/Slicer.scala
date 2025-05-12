@@ -54,6 +54,55 @@ class Slicer(program: Program) {
       ) || (transferred.isEmpty && !criterion.isEmpty)
     }
 
+    /**
+     * {@link Simp#removeDeadInParams(Program)}
+     *
+     */
+    def reduceInParams(): Unit = {
+      var modified = false
+      assert(invariant.correctCalls(program))
+
+      for (procedure <- procedures.filter(_.entryBlock.isDefined)) {
+        val unused = procedure.formalInParam.filterNot(matcher.getPreCriterion(procedure).contains(_))
+
+        for (unusedFormalInParam <- unused) {
+          modified = true
+          procedure.formalInParam.remove(unusedFormalInParam)
+
+          for (call <- procedure.incomingCalls()) {
+            call.actualParams = call.actualParams.removed(unusedFormalInParam)
+          }
+        }
+      }
+      if (modified) assert(invariant.correctCalls(program))
+    }
+
+    def reduceOutParams(): Unit = {
+      var modified = false
+      assert(invariant.correctCalls(program))
+
+      for (returnBlock <- procedures.flatMap(_.returnBlock)) {
+        val procedure = returnBlock.parent
+
+        val unused = procedure.formalOutParam.filterNot(matcher.getPostCriterion(returnBlock))
+
+        for (unusedFormalOutParam <- unused) {
+          modified = true
+          procedure.formalOutParam.remove(unusedFormalOutParam)
+
+          returnBlock.jump match {
+            case r: Return => r.outParams = r.outParams.removed(unusedFormalOutParam)
+            case _ => ???
+          }
+
+          for (call <- procedure.incomingCalls()) {
+            call.outParams = call.outParams.removed(unusedFormalOutParam)
+          }
+        }
+      }
+      if (modified) assert(invariant.correctCalls(program))
+    }
+
     def removeStatement(s: Statement): Boolean = {
       s match {
         case s if hasCriterionImpact(s) => false
@@ -92,11 +141,12 @@ class Slicer(program: Program) {
       performanceTimer.checkPoint("Finished Statement Removal")
       SlicerLogger.debug(s"Slicer - Removed $removed statements (${total - removed} remaining)")
 
+      SlicerLogger.debug("Slicer - Remove Dead Parameters")
+      reduceInParams()
+      reduceOutParams()
+
       SlicerLogger.debug("Slicer - Cleanup Blocks")
       cleanupBlocks(program)
-
-      SlicerLogger.debug("Slicer - Remove Dead Parameters")
-      removeDeadInParams(program)
 
       performanceTimer.checkPoint("Finished IR Cleanup")
     }
