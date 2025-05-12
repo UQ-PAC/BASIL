@@ -127,7 +127,9 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
 
 object SlicerTransferFunctions extends SlicerTransferFunctions()
 
-class SlicerAnalysis(program: Program, slicingCriterion: Map[CFGPosition, StatementSlice])
+class SlicerAnalysis(program: Program, startingNode: CFGPosition, slicingCriterion: Map[CFGPosition, StatementSlice])
     extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program)
     with BackwardIDEAnalysis[Variable, TwoElement, TwoElementLattice]
-    with SlicerTransferFunctions(slicingCriterion)
+    with SlicerTransferFunctions(slicingCriterion) {
+      override def start: CFGPosition = startingNode
+}

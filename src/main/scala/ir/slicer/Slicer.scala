@@ -25,10 +25,12 @@ class Slicer(program: Program) {
     Map()
   }
 
+  private val startingNode = IRWalk.lastInProc(program.mainProcedure).getOrElse(program.mainProcedure)
+
   private class Phase1 {
     def run(): Map[CFGPosition, Set[Variable]] = {
       SlicerLogger.info("Slicer :: Slicing Criterion Generation - Phase1")
-      val results = SlicerAnalysis(program, initialCriterion)
+      val results = SlicerAnalysis(program, startingNode, initialCriterion)
         .analyze()
         .map({ case (k, v) =>
           (k -> v.keys.toSet)
