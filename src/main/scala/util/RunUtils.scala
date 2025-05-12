@@ -374,6 +374,24 @@ object IRTransform {
     modified
   }
 
+  def generateRelyGuaranteeConditions(threads: List[Procedure]): Unit = {
+    /* Todo: For the moment we are printing these to stdout, but in future we'd
+    like to add them to the IR. */
+    type StateLatticeElement = LatticeMap[Variable, analysis.Interval]
+    type InterferenceLatticeElement = Map[Variable, StateLatticeElement]
+    val stateLattice = IntervalLatticeExtension()
+    val stateTransfer = SignedIntervalDomain().transfer
+    val intDom = ConditionalWritesDomain[StateLatticeElement](stateLattice, stateTransfer)
+    val relyGuarantees =
+      RelyGuaranteeGenerator[InterferenceLatticeElement, StateLatticeElement](intDom).generate(threads)
+    for ((p, (rely, guar)) <- relyGuarantees) {
+      StaticAnalysisLogger.info("--- " + p.procName + " " + "-" * 50 + "\n")
+      StaticAnalysisLogger.info("Rely:")
+      StaticAnalysisLogger.info(intDom.toString(rely) + "\n")
+      StaticAnalysisLogger.info("Guarantee:")
+      StaticAnalysisLogger.info(intDom.toString(guar) + "\n")
+    }
+  }
 }
 
 /** Methods relating to program static analysis.
@@ -931,6 +949,11 @@ object RunUtils {
       IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify)
     }
 
+    if (conf.summariseProcedures) {
+      StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
+      IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify)
+    }
+
     if (q.runInterpret) {
       Logger.info("Start interpret")
 
@@ -962,6 +985,11 @@ object RunUtils {
     }
 
     IRTransform.prepareForTranslation(q, ctx)
+
+    if (conf.generateRelyGuarantees) {
+      StaticAnalysisLogger.info("[!] Generating Rely-Guarantee Conditions")
+      IRTransform.generateRelyGuaranteeConditions(ctx.program.procedures.toList.filter(p => p.returnBlock != None))
+    }
 
     q.loading.dumpIL.foreach(s => {
       writeToFile(pp_prog(ctx.program), s"$s-output.il")
