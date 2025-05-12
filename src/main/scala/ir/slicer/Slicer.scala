@@ -32,9 +32,7 @@ class Slicer(program: Program) {
       SlicerLogger.info("Slicer :: Slicing Criterion Generation - Phase1")
       val results = SlicerAnalysis(program, startingNode, initialCriterion)
         .analyze()
-        .map({ case (k, v) =>
-          (k -> v.keys.toSet)
-        })
+        .map({ case (n, e) => n -> e.keys.toSet })
       performanceTimer.checkPoint("Finished IDE Analysis")
       results
     }
@@ -42,6 +40,8 @@ class Slicer(program: Program) {
 
   private class Phase2(results: Map[CFGPosition, StatementSlice]) {
     val matcher = TransformCriterionPair(results, initialCriterion)
+
+    def procedures = program.procedures.filterNot(_.isExternal.contains(true))
 
     def hasCriterionImpact(n: Statement): Boolean = {
       val transfer = SlicerTransferFunctions.edgesOther(n)
@@ -54,18 +54,24 @@ class Slicer(program: Program) {
       ) || (transferred.isEmpty && !criterion.isEmpty)
     }
 
-    def removeStatement(s: Statement): Unit = {
+    def removeStatement(s: Statement): Boolean = {
       s match {
-        case s if hasCriterionImpact(s) => ()
+        case s if hasCriterionImpact(s) => false
         case c: Call => {
-          // If a Call statement has Registers in criterion we keep the statement.
+          // If a Call statement has no direct impact but has Registers in criterion we keep the statement.
           if !matcher.getPostCriterion(s).exists {
               case _: Register => true
               case _ => false
             }
-          then s.parent.statements.remove(s)
+          then {
+            s.parent.statements.remove(s)
+            true
+          } else false
         }
-        case s => s.parent.statements.remove(s)
+        case s => {
+          s.parent.statements.remove(s)
+          true
+        }
       }
     }
 
@@ -73,14 +79,18 @@ class Slicer(program: Program) {
       SlicerLogger.info("Slicer :: Reductive Slicing Pass - Phase2")
 
       SlicerLogger.debug("Slicer - Statement Removal")
-      for (procedures <- program.procedures) {
-        for (block <- procedures.blocks) {
-          for (command <- block.statements) {
-            removeStatement(command)
+      var total = 0
+      var removed = 0
+      for (procedure <- procedures) {
+        for (block <- procedure.blocks) {
+          for (statement <- block.statements) {
+            if (removeStatement(statement)) removed += 1
+            total += 1
           }
         }
       }
       performanceTimer.checkPoint("Finished Statement Removal")
+      SlicerLogger.debug(s"Slicer - Removed $removed statements (${total - removed} remaining)")
 
       SlicerLogger.debug("Slicer - Cleanup Blocks")
       cleanupBlocks(program)
