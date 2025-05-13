@@ -1,14 +1,10 @@
+package test_util
+
 import ir.*
 import ir.eval.*
-import org.scalatest.*
-import org.scalatest.funsuite.*
-import specification.*
 import util.functional.State
-import util.{Logger, LogLevel}
-import org.scalatest.funsuite.AnyFunSuite
-import test_util.BASILTest
-import util.{BASILResult, StaticAnalysisConfig, IRContext}
 import translating.PrettyPrinter.*
+import util.IRContext
 import org.scalacheck.{Arbitrary, Gen}
 
 trait TestValueDomainWithInterpreter[T] {
@@ -19,7 +15,7 @@ trait TestValueDomainWithInterpreter[T] {
    */
   def valueInAbstractValue(absval: T, concrete: Expr): Expr
 
-  def abstractEvalSoundnessProperty(evaluate: Expr => T)(expr: Expr) = {
+  def abstractEvalSoundnessProperty(evaluate: Expr => T)(expr: Expr): (Boolean, String) = {
     // val expr = BinaryExpr(op, BitVecLiteral(lhs, size), BitVecLiteral(rhs, size))
     val abs: T = evaluate(expr)
     val concrete = ir.eval.evaluateExpr(expr).getOrElse(throw Exception(s"Failed to eval expr : $expr"))
@@ -42,7 +38,7 @@ trait TestValueDomainWithInterpreter[T] {
     case VarsLiveInBlock
 
   case class InterpreterTestResult(stopCondition: ExecutionContinuation, checks: List[CheckResult]) {
-    def getFailures = {
+    def getFailures: Seq[String] = {
       // require nonzero number of checks to ensure test is not vacuous
       var noChecks = if (checks.filter(_.evaluatedTestExpr.isDefined).isEmpty) then Seq("no checks hit") else Seq()
       val termination =
@@ -50,7 +46,7 @@ trait TestValueDomainWithInterpreter[T] {
       termination ++ noChecks ++ checksFailed
     }
 
-    def checksFailed = {
+    def checksFailed: Seq[StackFrameID] = {
       // collected breakpoints evaluate to true
       checks.flatMap(b => {
         val loc = b.breakpoint.location match {
@@ -62,7 +58,7 @@ trait TestValueDomainWithInterpreter[T] {
       })
     }
 
-    def checksPassed = {
+    def checksPassed: Seq[StackFrameID] = {
       // collected breakpoints evaluate to true
       checks.flatMap(b => {
         val loc = b.breakpoint.location match {
@@ -86,8 +82,8 @@ trait TestValueDomainWithInterpreter[T] {
             s"${b.name} (${pp_expr(b.variable)} = ${b.variableValue.map(pp_expr).getOrElse("eval error")} ) = ${b.evaluatedTestExpr.map(pp_expr).getOrElse("eval error")}"
           )
         })
-        .groupBy(_._1)
-        .map((g, v) => g -> v.map(_._2).mkString("\n"))
+        .groupBy(_(0))
+        .map((g, v) => g -> v.map(_(1)).mkString("\n"))
         .toMap
     }
   }
@@ -133,13 +129,13 @@ trait TestValueDomainWithInterpreter[T] {
     val initState = (innerInitState, List())
     val interpretResult = State.execute(initState, InterpFuns.callProcedure(interp)(startProc, startParams))
 
-    val breakres: List[(BreakPoint, _, List[(String, Expr, Option[Expr])])] = interpretResult._2
+    val breakres: List[(BreakPoint, _, List[(String, Expr, Option[Expr])])] = interpretResult(1)
     val checkResults = breakres.flatMap { case (bp, _, evaledExprs) =>
       evaledExprs.grouped(2).map(_.toList).map { case List((_, variable, varValue), (name, test, evaled)) =>
         CheckResult(name, bp, test, variable, varValue, evaled)
       }
     }.toList
 
-    InterpreterTestResult(interpretResult._1.nextCmd, checkResults)
+    InterpreterTestResult(interpretResult(0).nextCmd, checkResults)
   }
 }
