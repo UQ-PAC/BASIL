@@ -31,10 +31,10 @@ echo '::group::Test suites with no tag annotations:'
 for t in $tests; do
   defn="$(find_test_case "$t")"
 
-  # search for lines which are entirely "@test_util.tags.*Test"
+  # search for lines which are entirely "@test_util.tags.*Test*"
   # leading - is produced by grep to mark prefixes
-  if ! grep -q -- '-@test_util\.tags\..\+Test$' <<< "$defn"; then
-    echo 'test suite' "'$t'" 'has no `@test_util.tags.*Test` annotation:' >&2
+  if ! grep -q -- '-@test_util\.tags\..\+Test.*$' <<< "$defn"; then
+    echo 'test suite' "'$t'" 'has no `@test_util.tags.*Test*` annotation:' >&2
     find_test_case "$t" --color=always || true
     echo
     ok=false
