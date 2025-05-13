@@ -343,7 +343,7 @@ class NoSimplifySystemTests extends SystemTests {
   }
 }
 
-@test_util.tags.AnalysisSystemTest
+@test_util.tags.AnalysisSystemTest2
 class SimplifySystemTests extends SystemTests {
   runTests("correct", TestConfig(simplify = true, useBAPFrontend = true, expectVerify = true, logResults = true))
   runTests("incorrect", TestConfig(simplify = true, useBAPFrontend = true, expectVerify = false, logResults = true))
@@ -354,7 +354,7 @@ class SimplifySystemTests extends SystemTests {
   }
 }
 
-@test_util.tags.AnalysisSystemTest
+@test_util.tags.AnalysisSystemTest4
 class SimplifyMemorySystemTests extends SystemTests {
 
   override def customiseTestsByName(name: String) = super.customiseTestsByName(name).orElse {
@@ -587,7 +587,7 @@ class UnimplementedTests extends SystemTests {
   runTests("unimplemented", TestConfig(useBAPFrontend = true, expectVerify = false))
 }
 
-@test_util.tags.AnalysisSystemTest
+@test_util.tags.AnalysisSystemTest4
 class IntervalDSASystemTests extends SystemTests {
   runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, simplify = true, dsa = Some(Checks)))
 

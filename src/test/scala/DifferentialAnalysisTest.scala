@@ -1,34 +1,11 @@
 import ir.*
 import ir.eval.*
-import java.io.{BufferedWriter, File, FileWriter}
-import ir.Endian.LittleEndian
+import java.io.File
 import org.scalatest.*
 import org.scalatest.funsuite.*
-import specification.*
-import util.{
-  BASILConfig,
-  IRLoading,
-  ILLoadingConfig,
-  IRContext,
-  RunUtils,
-  StaticAnalysis,
-  StaticAnalysisConfig,
-  StaticAnalysisContext,
-  BASILResult,
-  Logger,
-  LogLevel,
-  IRTransform
-}
-import ir.eval.{interpretTrace, interpret, ExecEffect, Stopped}
+import util.{IRLoading, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, Logger, LogLevel, IRTransform}
+import ir.eval.ExecEffect
 import test_util.*
-
-import java.io.IOException
-import java.nio.file.*
-import java.nio.file.attribute.BasicFileAttributes
-import ir.dsl.*
-import util.RunUtils.loadAndTranslate
-
-import scala.collection.mutable
 
 abstract class DifferentialTest extends AnyFunSuite, CaptureOutput, TestCustomisation {
 
@@ -173,7 +150,7 @@ class DifferentialAnalysisTest extends DifferentialTest {
   runSystemTests()
 }
 
-@test_util.tags.AnalysisSystemTest
+@test_util.tags.AnalysisSystemTest2
 class DifferentialAnalysisTestSimplification extends DifferentialTest {
 
   def runSystemTests(): Unit = {
