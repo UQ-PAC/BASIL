@@ -51,7 +51,7 @@ class Slicer(program: Program) {
 
       transferred.values.toSet.contains(
         SlicerTransferFunctions.edgelattice.ConstEdge(SlicerTransferFunctions.valuelattice.top)
-      ) || (transferred.isEmpty && !criterion.isEmpty)
+      ) || (transferred.size != criterion.size)
     }
 
     /**
