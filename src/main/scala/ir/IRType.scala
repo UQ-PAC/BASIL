@@ -21,6 +21,7 @@ case class CustomSort(sortName: String) extends IRType(sortName) {
 
 case class BitVecType(size: Int) extends IRType("bv" + size) {
   override def toBoogie: BType = BitVecBType(size)
+  def maxValue = BigInt(2).pow(size) - 1
 }
 
 case class MapType(param: IRType, result: IRType) extends IRType(s"[$param]$result") {

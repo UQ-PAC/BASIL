@@ -83,7 +83,7 @@ def evalBoolLogBinExpr(b: BoolBinOp, l: Boolean, r: Boolean): Boolean = b match 
   case BoolIMPLIES => l || (!r)
 }
 
-def evalUnOp(op: UnOp, body: Literal): Expr = {
+def evalUnOp(op: UnOp, body: Literal): Literal = {
   (body, op) match {
     case (b: BitVecLiteral, BVNOT) => BitVectorEval.smt_bvnot(b)
     case (b: BitVecLiteral, BVNEG) => BitVectorEval.smt_bvneg(b)
@@ -158,8 +158,14 @@ def evaluateExpr(exp: Expr): Option[Literal] = {
 }
 
 def partialEvaluateExpr(exp: Expr): Expr = {
-  val (e, _) = simpFixedPoint(SimpExpr(fastPartialEvalExprTopLevel).apply)(exp)
-  e
+  try {
+    val (e, _) = simpFixedPoint(SimpExpr(fastPartialEvalExprTopLevel).apply)(exp)
+    e
+  } catch {
+    case exc =>
+      val m = s"Error eval expr: $exp :: ${exc.getStackTrace.mkString("\n")}"
+      throw Exception(m)
+  }
 }
 
 def fastPartialEvalExprTopLevel(exp: Expr): (Expr, Boolean) = {
