@@ -11,12 +11,14 @@ import util.LogLevel
 
 import ir.transforms.{stripUnreachableFunctions, cleanupBlocks, removeDeadInParams}
 
+import util.SlicerConfig
+
 private type StatementSlice = Set[Variable]
 object StatementSlice {
   def apply(): StatementSlice = Set.empty[Variable]
 }
 
-class Slicer(program: Program) {
+class Slicer(program: Program, slicerConfig: SlicerConfig) {
 
   private val performanceTimer = PerformanceTimer("Slicer Timer", LogLevel.INFO)
   private val initialCriterion = buildInitialCriterion

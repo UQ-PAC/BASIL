@@ -12,7 +12,7 @@ import scala.collection.{immutable, mutable}
 import scala.language.postfixOps
 import scala.sys.process.*
 import util.*
-import mainargs.{Flag, ParserForClass, arg, main}
+import mainargs.{Flag, ParserForClass, arg, main, TokensReader}
 import util.DSAConfig.{Checks, Prereq, Standard}
 import util.boogie_interaction.BoogieResultKind
 
@@ -175,8 +175,16 @@ object Main {
     @arg(name = "memory-transform", doc = "Transform memory access to region accesses")
     memoryTransform: Flag,
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
-    noif: Flag
+    noif: Flag,
+    @arg(name = "slice")
+    slice: Option[String],
+    @arg(name = "criterion")
+    criterion: Option[List[String]]
   )
+
+  implicit object ListStringRead extends TokensReader.Simple[List[String]]:
+    def shortName = "list<str>"
+    def read(strs: Seq[String]) = Right(strs.flatMap(_.split(",\\s*")).toList)
 
   def main(args: Array[String]): Unit = {
     val parser = ParserForClass[Config]
@@ -276,6 +284,15 @@ object Main {
       )
     }
 
+    val slicerConfig = (conf.slice, conf.criterion) match {
+      case (Some(blockLabel), Some(criterion)) => {
+        Some(SlicerConfig(blockLabel, criterion.toSet))
+      }
+      case (Some(_), None) => throw IllegalArgumentException("Requires both --slice AND --criterion")
+      case (None, Some(_)) => throw IllegalArgumentException("Requires both --slice AND --criterion")
+      case (None, None) => None
+    }
+
     val q = BASILConfig(
       loading = loadingInputs.copy(
         dumpIL = conf.dumpIL,
@@ -292,7 +309,8 @@ object Main {
       boogieTranslation = boogieGeneratorConfig,
       outputPrefix = conf.outFileName,
       dsaConfig = dsa,
-      memoryTransform = conf.memoryTransform.value
+      memoryTransform = conf.memoryTransform.value,
+      slicerConfig = slicerConfig
     )
 
     val result = RunUtils.run(q)

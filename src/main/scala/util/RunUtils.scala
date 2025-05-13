@@ -963,7 +963,9 @@ object RunUtils {
       }
     }
 
-    Slicer(ctx.program).run()
+    if (conf.slicerConfig.isDefined) {
+      Slicer(ctx.program, conf.slicerConfig.get).run()
+    }
 
     IRTransform.prepareForTranslation(q, ctx)
 
