@@ -226,12 +226,8 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr with Cache
 
   override def toString: String = op match {
     case bOp: BoolBinOp => s"($arg1 $bOp $arg2)"
-    case EQ | NEQ => s"($arg1 $op $arg2)"
-    case bOp: BVBinOp =>
-      bOp match {
-        case _ =>
-          s"bv$bOp$inSize($arg1, $arg2)"
-      }
+    case BVCONCAT | EQ | NEQ => s"($arg1 $op $arg2)"
+    case bOp: BVBinOp => s"bv$bOp$inSize($arg1, $arg2)"
     case bOp: IntBinOp => s"($arg1 $bOp $arg2)"
   }
 
