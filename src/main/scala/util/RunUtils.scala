@@ -894,7 +894,8 @@ object RunUtils {
 
     if (!q.loading.keepPC) {
       visit_prog(transforms.RemovePCStatements(), ctx.program)
-      Logger.info(s"[!] Removed PC-related statements")
+      ctx.program.procedures.foreach(transforms.RemoveUnreachableBlocks.apply)
+      Logger.info(s"[!] Removed PC-related statements and unreachable blocks")
     }
 
     if (q.loading.parameterForm && !q.simplify) {
