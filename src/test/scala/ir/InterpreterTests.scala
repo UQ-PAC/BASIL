@@ -13,7 +13,7 @@ import translating.BAPToIR
 import util.{LogLevel, Logger}
 import util.IRLoading.{loadBAP, loadReadELF}
 import util.{ILLoadingConfig, IRContext, IRLoading, IRTransform}
-import test_util.CaptureOutput
+import test_util.{BASILTest, CaptureOutput}
 import ir.dsl.given
 import ir.dsl.IfThenBlocks
 
@@ -25,9 +25,7 @@ def load(s: InterpreterState, global: SpecGlobal): Option[BitVecLiteral] = {
     Eval.loadBV(f)("mem", Scalar(BitVecLiteral(global.address, 64)), Endian.LittleEndian, global.size)
   ) match {
     case Right(e) => Some(e)
-    case Left(e) => {
-      None
-    }
+    case Left(e) => None
   }
 }
 
@@ -36,11 +34,12 @@ def mems[E, T <: Effects[T, E]](m: MemoryState): Map[BigInt, BitVecLiteral] = {
 }
 
 @test_util.tags.UnitTest
-class InterpreterTests extends AnyFunSuite with test_util.CaptureOutput with BeforeAndAfter {
+class InterpreterTests extends AnyFunSuite with CaptureOutput with BeforeAndAfter {
 
   Logger.setLevel(LogLevel.WARN)
 
-  def getProgram(name: String, path: String): IRContext = {
+  def getProgram(name: String, relativePath: String): IRContext = {
+    val path = s"${BASILTest.rootDirectory}/$relativePath"
     val compiler = "gcc"
     val loading = ILLoadingConfig(
       inputFile = s"$path/$name/$compiler/$name.adt",

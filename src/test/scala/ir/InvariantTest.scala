@@ -1,14 +1,15 @@
 package ir
 
-import ir.dsl._
+import ir.dsl.*
+import test_util.CaptureOutput
 
 import org.scalatest.funsuite.AnyFunSuite
 
 @test_util.tags.UnitTest
-class InvariantTest extends AnyFunSuite with test_util.CaptureOutput {
+class InvariantTest extends AnyFunSuite with CaptureOutput {
 
   test("sat singleCallBlockEnd case") {
-    var program: Program = prog(
+    val program: Program = prog(
       proc(
         "main",
         block("first_call", LocalAssign(R0, bv64(10)), LocalAssign(R1, bv64(10)), directCall("callee1"), ret),
@@ -23,7 +24,7 @@ class InvariantTest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("unsat singleCallBlockEnd 1 (two calls)") {
-    var program: Program = prog(
+    val program: Program = prog(
       proc(
         "main",
         block(
@@ -45,7 +46,7 @@ class InvariantTest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("unsat singleCallBlockEnd 2 (not at end)") {
-    var program: Program = prog(
+    val program: Program = prog(
       proc(
         "main",
         block("first_call", LocalAssign(R0, bv64(10)), LocalAssign(R1, bv64(10)), ret),

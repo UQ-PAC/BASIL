@@ -1,9 +1,10 @@
 package util.intrusive_list
 
 import org.scalatest.funsuite.AnyFunSuite
+import test_util.CaptureOutput
 
 @test_util.tags.UnitTest
-class IntrusiveListTest extends AnyFunSuite with test_util.CaptureOutput {
+class IntrusiveListTest extends AnyFunSuite with CaptureOutput {
   case class Elem(t: Float) extends IntrusiveListElement[Elem]
 
   test("basic") {
