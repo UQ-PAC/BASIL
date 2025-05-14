@@ -19,9 +19,9 @@ def mapMerge[K, V](a: Map[K, V], b: Map[K, V], f: (V, V) => V): Map[K, V] = {
   merged
 }
 
-def getSymbolicValues[T <: Offsets](p: Procedure)(using valSetDomain: SymValSetDomain[T]): SymValues[T] = {
+def getSymbolicValues[T <: Offsets](p: Procedure, globals: Seq[DSInterval])(using valSetDomain: SymValSetDomain[T]): SymValues[T] = {
   Logger.info(s"Generating Symbolic Values for ${p.name}")
-  val symValuesDomain = SymValuesDomain()
+  val symValuesDomain = SymValuesDomain(globals)
   val symValSolver = worklistSolver[SymValues[T], symValuesDomain.type](symValuesDomain)
   symValSolver
     .solveProc(p)
@@ -327,8 +327,9 @@ object SymValues {
     }
   }
 
-  //@tailrec
-  final def exprToSymValSet[T <: Offsets](symValues: SymValues[T])(using
+  @tailrec
+  final def exprToSymValSet[T <: Offsets](symValues: SymValues[T],
+    globals: Seq[DSInterval])(using
     symValSetDomain: SymValSetDomain[T]
   )(
     expr: Expr,
@@ -339,31 +340,37 @@ object SymValues {
     val oDomain = symValSetDomain.offsetDomain
     expr match
       case literal @ BitVecLiteral(value, size) =>
-        symValSetDomain.init(Global, transform(oDomain.init(bv2SignedInt(literal).toInt)))
-      case literal @ IntLiteral(value) => symValSetDomain.init(Global, value.toInt)
-      case Extract(end, start, body) if end - start >= 64 => exprToSymValSet(symValues)(body, transform)
-      case Extract(32, 0, body) =>
-        exprToSymValSet(symValues)(body, transform) // todo incorrectly assuming value is preserved
-      case ZeroExtend(extension, body) => exprToSymValSet(symValues)(body, transform)
+        val updated = transform(oDomain.init(bv2SignedInt(literal).toInt))
+        literalsToSymValSet(updated.toOffsets, globals, symValSetDomain)
+      case literal @ IntLiteral(value) =>
+        val updated = transform(oDomain.init(value.toInt))
+        literalsToSymValSet(updated.toOffsets, globals, symValSetDomain)
+      case Extract(end, start, body) => exprToSymValSet(symValues, globals)(body) // todo incorrectly assuming value is preserved
+      case ZeroExtend(extension, body) => exprToSymValSet(symValues, globals)(body)
       case binExp @ BinaryExpr(BVADD | BVSUB, arg1, arg2: BitVecLiteral) =>
-        val oPlus = toOffsetMove(binExp.op, arg2, oDomain)
-        exprToSymValSet(symValues)(arg1, oPlus)
+        if getGlobal(globals, arg2.value.toInt).nonEmpty then {
+          assert(binExp.op == BVADD)
+          exprToSymValSet(symValues, globals)(BinaryExpr(binExp.op, arg2, arg1))
+        } else {
+          val oPlus = toOffsetMove(binExp.op, arg2, oDomain, transform)
+          exprToSymValSet(symValues, globals)(arg1, oPlus)
+        }
+      case binExp @ BinaryExpr(BVADD | BVSUB, arg1: BitVecLiteral, arg2: Expr) =>
+          val oPlus = toOffsetMove(binExp.op, arg1, oDomain, transform)
+          exprToSymValSet(symValues, globals)(arg2, oPlus)
       case binExp @ BinaryExpr(BVADD | BVSUB, arg1, arg2: Expr)
           if arg2.variables.size == 1 && symValues.state
             .getOrElse(arg2.variables.head.asInstanceOf[LocalVar], symValSetDomain.bot)
             .state
-            .keySet == Set(Global) =>
+            .keySet == Set(Constant) =>
         val oPlus =
-          toOffsetMove(binExp.op, symValues.state(arg2.variables.head.asInstanceOf[LocalVar]).state(Global), oDomain)
-        exprToSymValSet(symValues)(arg1, oPlus)
           toOffsetMove(binExp.op, symValues.state(arg2.variables.head.asInstanceOf[LocalVar]).state(Constant), oDomain, transform)
+        exprToSymValSet(symValues, globals)(arg1, oPlus)
       case variable: LocalVar =>
         symValSetDomain.transform(symValues.state.getOrElse(replace(variable), symValSetDomain.bot), transform)
-      case Extract(end, start, body) if end - start < 64 =>
-        symValSetDomain.init(NonPointer, oDomain.top)
-      case BinaryExpr(BVCOMP, _, _) => symValSetDomain.transform(symValSetDomain.init(NonPointer, Set(0, 1)), transform)
+      case BinaryExpr(BVCOMP, _, _) => symValSetDomain.transform(symValSetDomain.init(Constant, Set(0, 1)), transform)
       case e @ (BinaryExpr(_, _, _) | SignExtend(_, _) | UnaryExpr(_, _)) =>
-        val updated = e.variables
+        var updated = e.variables
           .map(_.asInstanceOf[LocalVar])
           .collect { case locVar: LocalVar if symValues.state.contains(locVar) => symValues.state(locVar) }
           .flatMap(_.state)
@@ -375,6 +382,7 @@ object SymValues {
 }
 
 class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) extends AbstractDomain[SymValues[T]] {
+class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T])(globals: Seq[DSInterval]) extends AbstractDomain[SymValues[T]] {
 
   private val stackPointer = LocalVar("R31_in", BitVecType(64))
   private val linkRegister = LocalVar("R30_in", BitVecType(64)) // Register("R30", 64)
@@ -427,7 +435,7 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) e
     val block = b.parent
     b match
       case LocalAssign(lhs: LocalVar, rhs: Expr, _) =>
-        val update = SymValues(Map(lhs -> SymValues.exprToSymValSet(a)(rhs)))
+        val update = SymValues(Map(lhs -> SymValues.exprToSymValSet(a, globals)(rhs)))
         join(a, update, block)
       case load @ MemoryLoad(lhs: LocalVar, _, rhs, _, size, label) =>
         val update = SymValues(Map(lhs -> symValSetDomain.init(Loaded(load))))
@@ -453,7 +461,7 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) e
             (
               l,
               inParams.collectFirst {
-                case (in, act) if in.name.take(3) == l.name.take(3) => SymValues.exprToSymValSet(a)(act)
+                case (in, act) if in.name.take(3) == l.name.take(3) => SymValues.exprToSymValSet(a, globals)(act)
               }.get
             )
           )
@@ -468,7 +476,7 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) e
       case ind: IndirectCall => a // TODO possibly map every live variable to top
       case ret: Return =>
         val update = SymValues(ret.outParams.map { case (outVar: LocalVar, value: Expr) =>
-          outVar -> SymValues.exprToSymValSet(a)(value)
+          outVar -> SymValues.exprToSymValSet(a, globals)(value)
         })
 
         join(a, update, block)
