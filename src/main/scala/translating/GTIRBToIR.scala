@@ -50,7 +50,9 @@ class TempIf(
   val thenStmts: immutable.Seq[Statement],
   val elseStmts: immutable.Seq[Statement],
   override val label: Option[String] = None
-) extends NOP(label)
+) extends NOP(label) {
+  override def toString = s"TempIf($cond, $thenStmts, $elseStmts)"
+}
 
 /** GTIRBToIR class. Forms an IR as close as possible to the one produced by BAP by using GTIRB instead
   *
@@ -483,6 +485,8 @@ class GTIRBToIR(
     parentLabel: String,
     newBlockCountIn: Int
   ): ArrayBuffer[Block] = {
+    println(s"handleifstatement $i")
+    println(s"... belonging to ${currentBlock.label}")
     var newBlockCount = newBlockCountIn
     val newBlocks = ArrayBuffer[Block]()
 
@@ -798,6 +802,7 @@ class GTIRBToIR(
   }
 
   private def handleConditionalBranch(fallthrough: Edge, branch: Edge, block: Block, procedure: Procedure): GoTo = {
+    println(s"handleconditional $block")
     if (!uuidToBlock.contains(fallthrough.targetUuid)) {
       throw Exception(
         s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block"
@@ -814,21 +819,27 @@ class GTIRBToIR(
       case i: TempIf => i
       case _ => throw Exception(s"last statement of block ${block.label} is not an if statement")
     }
-    // maybe need to actually examine the if statement's contents?
 
-    val trueBlock = newBlockCondition(block, uuidToBlock(branch.targetUuid), tempIf.cond)
-    val falseBlock = newBlockCondition(block, uuidToBlock(fallthrough.targetUuid), UnaryExpr(BoolNOT, tempIf.cond))
+    val trueBlock = newBlockCondition(block, uuidToBlock(branch.targetUuid), tempIf.cond, tempIf.thenStmts)
+    val falseBlock =
+      newBlockCondition(block, uuidToBlock(fallthrough.targetUuid), UnaryExpr(BoolNOT, tempIf.cond), tempIf.elseStmts)
 
     val newBlocks = ArrayBuffer(trueBlock, falseBlock)
     procedure.addBlocks(newBlocks)
-    // block.statements.remove(tempIf)
+    block.statements.remove(tempIf)
 
     GoTo(newBlocks)
   }
 
-  private def newBlockCondition(block: Block, target: Block, condition: Expr): Block = {
+  private def newBlockCondition(
+    block: Block,
+    target: Block,
+    condition: Expr,
+    restStmts: immutable.Seq[Statement] = immutable.Seq()
+  ): Block = {
     val newLabel = s"${block.label}_goto_${target.label}"
     val assume = Assume(condition, checkSecurity = true)
-    Block(newLabel, None, ArrayBuffer(assume), GoTo(ArrayBuffer(target)))
+    val body = ArrayBuffer(assume) :++ restStmts
+    Block(newLabel, None, body, GoTo(ArrayBuffer(target)))
   }
 }
