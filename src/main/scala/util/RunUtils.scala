@@ -894,9 +894,20 @@ object RunUtils {
 
     if (!q.loading.keepPC) {
       visit_prog(transforms.RemovePCStatements(), ctx.program)
-      ctx.program.procedures.foreach(transforms.RemoveUnreachableBlocks.apply)
-      Logger.info(s"[!] Removed PC-related statements and unreachable blocks")
+      Logger.info(s"[!] Removed PC-related statements")
     }
+    ctx.program.procedures.foreach(transforms.RemoveUnreachableBlocks.apply)
+    Logger.info(s"[!] Removed unreachable blocks")
+
+    ctx.program.procedures.foreach(p =>
+      p.blocks.foreach(b => {
+        b.jump match {
+          case GoTo(targs, _) if targs.isEmpty =>
+            Logger.warn(s"block ${b.label} in subroutine ${p.name} has no outgoing edges")
+          case _ => ()
+        }
+      })
+    )
 
     if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)

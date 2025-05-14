@@ -198,12 +198,8 @@ class GTIRBToIR(
           Logger.debug(s"removing block ${block.label}")
           procedure.removeBlocks(block)
         } else {
-          if (!blockOutgoingEdges.contains(blockUUID)) {
-            Logger.warn(s"block ${block.label} in subroutine ${procedure.name} no outgoing edges")
-          } else if (blockOutgoingEdges(blockUUID).isEmpty) {
-            Logger.warn(s"block ${block.label} in subroutine ${procedure.name} has no outgoing edges")
-          } else {
-            val outgoingEdges = blockOutgoingEdges(blockUUID)
+          val outgoingEdges = blockOutgoingEdges.getOrElse(blockUUID, Set())
+          if (outgoingEdges.nonEmpty) {
             val (calls, jump) = if (outgoingEdges.size == 1) {
               val edge = outgoingEdges.head
               handleSingleEdge(block, edge, procedure, procedures)
