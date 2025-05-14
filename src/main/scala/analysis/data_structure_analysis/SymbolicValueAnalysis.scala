@@ -294,27 +294,6 @@ object SymValues {
     s.state.map((lvar, valSet) => s"$lvar: $valSet").mkString("\n")
   }
 
-  def getGlobal(globals: Seq[DSInterval], offset: Int, base: Option[DSInterval] = None): Option[(DSInterval, Int)] = {
-    require(base.isEmpty || base.get.isInstanceOf[DSInterval.Value])
-    if base.nonEmpty && offset < base.get.size.get then Some(base.get, offset)
-    else {
-      val literal = base match {
-        case Some(value) => value.start.get + offset
-        case None => offset
-      }
-      val newBase = globals.filter(_.contains(literal))
-      if newBase.size > 1 then
-        newBase.foreach(_.contains(literal))
-      assert(newBase.size <= 1, s"expected to match at most one global but got, $literal,  $newBase")
-      if newBase.isEmpty then None
-      else {
-        val globalInterval = newBase.head
-        val newOffset = literal - globalInterval.start.get
-        Some(globalInterval, newOffset)
-      }
-    }
-  }
-
   def literalsToSymValSet[T <: Offsets](literals: Set[Int], globals: Seq[DSInterval], domain: SymValSetDomain[T]) = {
     literals.foldLeft(domain.init(Block(""))) {
       (valSet, offset) =>
