@@ -3,7 +3,7 @@ package analysis.data_structure_analysis
 import analysis.data_structure_analysis.DSAPhase.{BU, Local, TD}
 import analysis.data_structure_analysis.OSet.Top
 import analysis.data_structure_analysis.Global
-import analysis.data_structure_analysis.IntervalDSA.{checkUniqueGlobal}
+import analysis.data_structure_analysis.IntervalDSA.{checkUniqueGlobals}
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
 import boogie.SpecGlobal
 import specification.FuncEntry
@@ -861,7 +861,7 @@ class IntervalDSA(irContext: IRContext) {
       val DSA = IntervalDSA.getLocals(irContext, sva, cons, globals)
       DSATimer.checkPoint("Finished DSA Local Phase")
       if checks then
-        DSA.values.foreach(checkUniqueGlobal)
+        DSA.values.foreach(checkUniqueGlobals)
         IntervalDSA.checkReachable(irContext.program, DSA)
         DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
         DSA.values.foreach(_.localCorrectness())
@@ -870,13 +870,13 @@ class IntervalDSA(irContext: IRContext) {
       val DSABU = IntervalDSA.solveBUs(DSA)
       DSATimer.checkPoint("Finished DSA BU Phase")
       if checks then
-        DSABU.values.foreach(checkUniqueGlobal)
+        DSABU.values.foreach(checkUniqueGlobals)
         DSABU.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
       val DSATD = IntervalDSA.solveTDs(DSABU)
       DSATimer.checkPoint("Finished DSA TD Phase")
       if checks then
-        DSATD.values.foreach(checkUniqueGlobal)
+        DSATD.values.foreach(checkUniqueGlobals)
         DSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
 
@@ -889,9 +889,9 @@ class IntervalDSA(irContext: IRContext) {
       DSATimer.checkPoint("Finished DSA global graph")
 
       if checks then
-        DSATD.values.foreach(checkUniqueGlobal)
+        DSATD.values.foreach(checkUniqueGlobals)
         DSATD.values.foreach(_.localCorrectness())
-        IntervalDSA.checkConsistGlobals(DSATD, globalGraph)
+        IntervalDSA.checkConsistantGlobals(DSATD, globalGraph)
         IntervalDSA.checkReachable(irContext.program, DSATD)
         DSALogger.info("Performed correctness check")
         DSATimer.checkPoint("Finished DSA Invariant Check")
@@ -1024,7 +1024,7 @@ object IntervalDSA {
     }
   }
 
-  def checkUniqueGlobal(graph: IntervalGraph): Unit = {
+  def checkUniqueGlobals(graph: IntervalGraph): Unit = {
     var found: Map[SymBase, Option[IntervalNode]] = graph.glIntervals.map(i => (Global(i), None)).toMap
     val seen = mutable.Set[IntervalNode]()
     val entry = graph.nodes.values.map(graph.find)
@@ -1100,7 +1100,7 @@ object IntervalDSA {
    * across all procedures
    * Should hold at the end of DSA
    */
-  def checkConsistGlobals(DSA: Map[Procedure, IntervalGraph], global: IntervalGraph): Unit = {
+  def checkConsistantGlobals(DSA: Map[Procedure, IntervalGraph], global: IntervalGraph): Unit = {
   // collect all the regions  from all the resulting graphs
     val unifiedRegions = global.glIntervals.map(Global.apply).map(base => global.find(global.nodes(base)).bases)
     DSA
