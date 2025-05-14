@@ -57,8 +57,8 @@ case class Stack(proc: Procedure) extends Known {
 }
 
 sealed trait Const extends Known
-case object Global extends Const
-case object NonPointer extends Const
+case class Global(interval: DSInterval) extends Const
+case object Constant extends Const
 
 // placeholder sym bases for loaded and in/out params
 sealed trait Unknown extends SymBase
