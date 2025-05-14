@@ -57,46 +57,53 @@ class IntervalGraph(
     }
   }
 
+  def addGlobal(globals: Map[SymBase, IntervalNode], address: Int, size: Int): IntervalCell = {
+    val (interval, offset) = getGlobal(glIntervals, address).get
+    val base = Global(interval)
+    val node = globals(base)
+    node.flags.global = true
+    node.add(DSInterval(offset, offset + size))
+  }
+  
   def buildGlobals(
     globals: Set[SymbolTableEntry],
     globalOffsets: Map[BigInt, BigInt],
     externalFunctions: Set[ExternalFunction]
-  ): IntervalNode = {
-    val symBase = Global
-    val globalNode = IntervalNode(this, Map(symBase -> Set(0)))
-    globalNode.flags.global = true
+  ): Map[SymBase, IntervalNode] = {
+    val globalNodes = glIntervals.foldLeft(Map[SymBase, IntervalNode]()) {
+      (m, interval) => 
+        val base = Global(interval)
+        val node = IntervalNode(this, Map(base -> Set(0)))
+        m + (base -> node)
+    }
+    
     globals.toSeq.sortBy(_.address).foreach {
-      case FuncEntry(name, size, address) =>
-        globalNode.add(DSInterval(address.toInt, address.toInt + size / 8))
+      case FuncEntry(name, size, address) => 
+        addGlobal(globalNodes, address.toInt, size/8).node.flags.function = true
       case SpecGlobal(name, size, arraySize, address) =>
-        globalNode.add(DSInterval(address.toInt, address.toInt)) // ignore size, could be a composite type
+        addGlobal(globalNodes, address.toInt, size/8)
     }
 
-    globalOffsets.foreach { case (address, relocated) =>
-      globalNode.add(address.toInt)
-      globalNode.add(relocated.toInt)
-    }
-
-    externalFunctions.foreach(e =>
-      val extPointer = globalNode.add(e.offset.toInt)
-      val ext = extPointer.getPointee
-      ext.node.flags.function = true
-      ext.node.flags.foreign = true
+    externalFunctions.foreach (
+      e =>
+        val node = addGlobal(globalNodes, e.offset.toInt, 0).node
+        node.flags.function = true
+        node.flags.foreign = true
     )
 
-    globalOffsets.map(_.swap).foreach { case (address, relocated) =>
-      val pointee = find(globalNode.get(address.toInt))
-      val pointer = find(globalNode).add(DSInterval(relocated.toInt, relocated.toInt + 8))
-      pointer.setPointee(pointee)
+    globalOffsets.foreach {
+      case (address, relocated) =>
+        val pointer = addGlobal(globalNodes, address.toInt, 8)
+        val pointee = addGlobal(globalNodes, relocated.toInt, 0)
     }
 
-    globalNode
+    globalNodes
   }
 
   def buildNodes(): Map[SymBase, IntervalNode] = {
-    val global =
-      globalNode(irContext.globals ++ irContext.funcEntries, irContext.globalOffsets, irContext.externalFunctions)
-    sva.state.foldLeft(Map[SymBase, IntervalNode](Global -> global)) { case (m, (variable, valueSet)) =>
+    val globals =
+      buildGlobals(irContext.globals ++ irContext.funcEntries, irContext.globalOffsets, irContext.externalFunctions)
+    sva.state.foldLeft(globals) { case (m, (variable, valueSet)) =>
       symValToNodes(valueSet, m)
     }
   }
