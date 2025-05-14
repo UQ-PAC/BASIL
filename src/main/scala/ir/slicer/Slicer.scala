@@ -43,16 +43,18 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
   private class Phase2(results: Map[CFGPosition, StatementSlice]) {
     val matcher = TransformCriterionPair(results, initialCriterion)
 
+    val transferFunctions = SlicerTransfers(initialCriterion)
+
     def procedures = program.procedures.filterNot(_.isExternal.contains(true))
 
     def hasCriterionImpact(n: Statement): Boolean = {
-      val transfer = SlicerTransferFunctions.edgesOther(n)
+      val transfer = transferFunctions.edgesOther(n)
 
       val criterion = matcher.getPostCriterion(n)
       val transferred = criterion.flatMap(v => transfer(Left(v))).toMap
 
       transferred.values.toSet.contains(
-        SlicerTransferFunctions.edgelattice.ConstEdge(SlicerTransferFunctions.valuelattice.top)
+        transferFunctions.edgelattice.ConstEdge(transferFunctions.valuelattice.top)
       ) || (transferred.size != criterion.size)
     }
 

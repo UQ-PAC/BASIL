@@ -5,7 +5,8 @@ import analysis.*
 
 import analysis.solvers.*
 
-trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice] = Map())
+
+trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice])
     extends BackwardIDETransferFunctions[Variable, TwoElement, TwoElementLattice] {
 
   val valuelattice = TwoElementLattice()
@@ -125,7 +126,8 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
   }
 }
 
-object SlicerTransferFunctions extends SlicerTransferFunctions()
+class SlicerTransfers(slicingCriterion: Map[CFGPosition, StatementSlice])
+    extends SlicerTransferFunctions(slicingCriterion)
 
 class SlicerAnalysis(program: Program, startingNode: CFGPosition, slicingCriterion: Map[CFGPosition, StatementSlice])
     extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program)
