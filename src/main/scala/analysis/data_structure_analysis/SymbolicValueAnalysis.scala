@@ -131,7 +131,7 @@ enum OSet extends Offsets {
   override def toIntervals: Set[DSInterval] = {
     this match
       case OSet.Top => Set(DSInterval.Top)
-      case OSet.Values(v) => v.map(i => DSInterval(i, i + 1))
+      case OSet.Values(v) => v.map(i => DSInterval(i, i))
   }
   override def toOffsets: Set[Int] = {
     this match
@@ -381,7 +381,32 @@ object SymValues {
   }
 }
 
-class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) extends AbstractDomain[SymValues[T]] {
+def litToInt(lit: Literal): Int = {
+  lit match {
+    case TrueLiteral => 1
+    case FalseLiteral => 0
+    case BitVecLiteral(value, size) => value.toInt
+    case IntLiteral(value) => value.toInt
+  }
+}
+
+def exprToConstants(expr: Expr): Set[Literal] = {
+  expr match {
+    case literal: Literal => Set(literal)
+    case Extract(end, start, body) => exprToConstants(body)
+    case Repeat(repeats, body) => exprToConstants(body)
+    case ZeroExtend(extension, body) => exprToConstants(body)
+    case SignExtend(extension, body) => exprToConstants(body)
+    case UnaryExpr(op, arg) => exprToConstants(arg)
+    case BinaryExpr(op, arg1, arg2) => exprToConstants(arg1) ++ exprToConstants(arg2)
+    case UninterpretedFunction(name, params, returnType) => Set()
+    case variable: Variable => Set()
+    case LambdaExpr(binds, body) => exprToConstants(body)
+    case QuantifierExpr(kind, body) => exprToConstants(body)
+    case OldExpr(body) => exprToConstants(body)
+  }
+}
+
 class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T])(globals: Seq[DSInterval]) extends AbstractDomain[SymValues[T]] {
 
   private val stackPointer = LocalVar("R31_in", BitVecType(64))
