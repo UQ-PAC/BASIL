@@ -71,7 +71,7 @@ case class StaticAnalysisContext(
 )
 
 case class DSAContext(
-  sva: Map[Procedure, SymValues[DSInterval]],
+  sva: Map[Procedure, SymValues[OSet]],
   constraints: Map[Procedure, Set[Constraint]],
   local: Map[Procedure, IntervalGraph],
   bottomUp: Map[Procedure, IntervalGraph],
