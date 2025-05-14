@@ -485,8 +485,6 @@ class GTIRBToIR(
     parentLabel: String,
     newBlockCountIn: Int
   ): ArrayBuffer[Block] = {
-    println(s"handleifstatement $i")
-    println(s"... belonging to ${currentBlock.label}")
     var newBlockCount = newBlockCountIn
     val newBlocks = ArrayBuffer[Block]()
 
@@ -802,7 +800,6 @@ class GTIRBToIR(
   }
 
   private def handleConditionalBranch(fallthrough: Edge, branch: Edge, block: Block, procedure: Procedure): GoTo = {
-    println(s"handleconditional $block")
     if (!uuidToBlock.contains(fallthrough.targetUuid)) {
       throw Exception(
         s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block"
