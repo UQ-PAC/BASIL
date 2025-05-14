@@ -136,6 +136,11 @@ object IRLoading {
 
     val specification = IRLoading.loadSpecification(q.specFile, program, globals)
 
+    if (!q.keepPC) {
+      visit_prog(transforms.RemovePCStatements(), program)
+      Logger.info(s"[!] Removed PC-related statements")
+    }
+
     IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program)
   }
 
@@ -901,13 +906,6 @@ object RunUtils {
         s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
       )
     }
-
-    if (!q.loading.keepPC) {
-      visit_prog(transforms.RemovePCStatements(), ctx.program)
-      Logger.info(s"[!] Removed PC-related statements")
-    }
-    // ctx.program.procedures.foreach(transforms.RemoveUnreachableBlocks.apply)
-    // Logger.info(s"[!] Removed unreachable blocks")
 
     if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)
