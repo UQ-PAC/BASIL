@@ -376,6 +376,15 @@ object SymValues {
           .flatMap(_.state)
           .map((base, _) => (base, oDomain.top))
           .toMap
+        
+        updated = updated ++ exprToConstants(e)
+          .map(litToInt)
+          .map(lit => getGlobal(globals,lit))
+          .filter(_.isDefined)
+          .map(_.get)
+          .map((interval, _) => (Global(interval), oDomain.top))
+          .toMap
+        
         SymValSet(updated)
       case _ => ???
   }
