@@ -85,7 +85,8 @@ class SVATest extends AnyFunSuite with CaptureOutput {
     val context = programToContext(program, globals, globalOffsets)
     val results = runTest(context)
     val mainProc = results.ir.program.mainProcedure
-    val sva = getSymbolicValues(mainProc)
+    val glbs = globalIntervals(context)
+    val sva = getSymbolicValues(mainProc, glbs)
     val r0SVA = SymValues.getSorted(sva, "R0")
     val inParam = r0SVA.firstKey // TODO look into why there is an inParam
     assert(r0SVA(inParam) == domain.init(Par(mainProc, inParam)), "input param not set correctly")
@@ -130,7 +131,8 @@ class SVATest extends AnyFunSuite with CaptureOutput {
     val context = programToContext(program, globals, globalOffsets)
     val results = runTest(context)
     val main = program.mainProcedure
-    val sva = getSymbolicValues[T](main) //  results.dsa.get.sva(mainProc)
+    val glbs = globalIntervals(context)
+    val sva = getSymbolicValues[T](main, glbs) //  results.dsa.get.sva(mainProc)
     val r0SVA = SymValues.getSorted(sva, regName)
 
     val returnedValSet = r0SVA.collectFirst {
@@ -168,8 +170,10 @@ class SVATest extends AnyFunSuite with CaptureOutput {
 
     val context = programToContext(program, globals, globalOffsets)
     val main = program.mainProcedure
+    val glbs = globalIntervals(context)
+
     runTest(context)
-    val sva = getSymbolicValues[T](main) //  results.dsa.get.sva(mainProc)
+    val sva = getSymbolicValues[T](main, glbs) //  results.dsa.get.sva(mainProc)
 
     val R0in = LocalVar("R0_in", bv64)
     val R1in = LocalVar("R1_in", bv64)
@@ -210,8 +214,9 @@ class SVATest extends AnyFunSuite with CaptureOutput {
 
     val context = programToContext(program, globals, globalOffsets)
     val main = program.mainProcedure
+    val glbs = globalIntervals(context)
     runTest(context)
-    val sva = getSymbolicValues[T](main) //  results.dsa.get.sva(mainProc)
+    val sva = getSymbolicValues[T](main, glbs) //  results.dsa.get.sva(mainProc)
 
     val R0in = LocalVar("R0_in", bv64)
 
@@ -264,9 +269,10 @@ class SVATest extends AnyFunSuite with CaptureOutput {
     val R0in = LocalVar("R0_in", bv64)
 
     val context = programToContext(program, globals, globalOffsets)
+    val glbs = globalIntervals(context)
     val main = program.mainProcedure
     runTest(context)
-    val sva = getSymbolicValues[T](main) //  results.dsa.get.sva(mainProc)
+    val sva = getSymbolicValues[T](main, glbs) //  results.dsa.get.sva(mainProc)
 
     val domain = SymValSetDomain[T]()
     val (_, lastValSet) = SymValues.getSorted(sva, "R0").last
@@ -311,9 +317,10 @@ class SVATest extends AnyFunSuite with CaptureOutput {
     val R0in = LocalVar("R0_in", bv64)
 
     val context = programToContext(program, globals, globalOffsets)
+    val glbs = globalIntervals(context)
     val main = context.program.mainProcedure
     runTest(context)
-    val sva = getSymbolicValues[T](main) //  results.dsa.get.sva(mainProc)
+    val sva = getSymbolicValues[T](main, glbs) //  results.dsa.get.sva(mainProc)
     val R0last = SymValues.getSorted(sva, "R0").lastKey
 
     val domain = SymValSetDomain[T]()
@@ -337,10 +344,11 @@ class SVATest extends AnyFunSuite with CaptureOutput {
     val program = prog(proc("main", block("block", load, assign, ret)))
 
     val context = programToContext(program, globals, globalOffsets)
+    val glbs = globalIntervals(context)
 
     val procedure: Procedure = program.mainProcedure
     runTest(context)
-    val sva = getSymbolicValues[T](procedure) //  results.dsa.get.sva(mainProc)
+    val sva = getSymbolicValues[T](procedure, glbs) //  results.dsa.get.sva(mainProc)
     val r0SVA = SymValues.getSorted(sva, regName)
 
     val loadValSet = r0SVA.collectFirst {
