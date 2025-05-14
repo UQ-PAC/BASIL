@@ -57,7 +57,15 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
   }
 
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
-    (n match {
+    val transferEdge = intraTransferFunctions(n)
+    d match {
+      case Left(_) => transferEdge(d)
+      case Right(_) => transferEdge(d) ++ slicingCriterion.getOrElse(n, Set()).flatMap(v => transferEdge(Left(v))).toMap
+    }
+  }
+
+  def intraTransferFunctions(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
+    n match {
       case p: Procedure => Map(d -> IdEdge())
       case b: Block => Map(d -> IdEdge())
       case a: LocalAssign => {
@@ -122,8 +130,9 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
         }
       }
       case u: Unreachable => Map(d -> IdEdge())
-    }) ++ fold(slicingCriterion.getOrElse(n, Set()))
+    }
   }
+
 }
 
 class SlicerTransfers(slicingCriterion: Map[CFGPosition, StatementSlice])
