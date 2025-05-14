@@ -1,7 +1,8 @@
 import org.scalatest.funsuite.AnyFunSuite
+import test_util.CaptureOutput
 
 @test_util.tags.UnitTest
-class LoggingTest extends AnyFunSuite, test_util.CaptureOutput {
+class LoggingTest extends AnyFunSuite, CaptureOutput {
 
   import java.nio.file.Files
   import java.io.File

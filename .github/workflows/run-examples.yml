@@ -43,8 +43,21 @@ jobs:
       - name: Compile BASIL Mill
         run: ./mill compile
 
-  # INFO: Scalatest runner arguments (i.e., arguments to scalatest.sh) can be
+  # INFO: Scalatest runner arguments (i.e., arguments to ./mill -j3 test.test) can be
   # found at: https://www.scalatest.org/user_guide/using_the_runner
+
+  # useful scalatest arguments
+  # --------------------------
+  #
+  # - to include only a specific tag, use -n.
+  # - to exclude a specific tag, use -l.
+  # - these can be combined. for example, to select all StandardSystemTest except Slow ones:
+  #
+  #     ./scripts/scalatest.sh -o -n test_util.tags.StandardSystemTest -l test_util.tags.Slow
+  #
+  # - when passing tags through the command line, the fully-qualified name must be used.
+  # - to print individual test durations, pass D to -o. for example, -oD.
+  # - to print a summary of failing tests at the end of the output, pass I to -o.
 
   StandardSystemTests:
     runs-on: ubuntu-latest
@@ -66,7 +79,7 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill compile
-      - run: ./scripts/scalatest.sh -oGD -PS3 -T 1000000 -n test_util.tags.StandardSystemTest
+      - run: ./mill test.test -oGD -T 1000000 -n test_util.tags.StandardSystemTest
 
       - uses: actions/upload-artifact@v4
         with:
@@ -117,7 +130,7 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
-      - run: ./scripts/scalatest.sh -oGD -PS3 -T 1000000 -n test_util.tags.UnitTest
+      - run: ./mill test.test -oGD -T 1000000 -n test_util.tags.UnitTest
 
   UnitTests:
     runs-on: ubuntu-latest
@@ -139,7 +152,7 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
-      - run: ./scripts/scalatest.sh -oGD -PS3 -T 1000000 -n test_util.tags.UnitTest
+      - run: ./mill test.test -oGD -T 1000000 -n test_util.tags.UnitTest
 
         # every test with package prefix:
         # sbt "show test:definedTests"
@@ -163,7 +176,71 @@ jobs:
       - run: sudo apt-get install -y z3='4.8.12-*'
       - run: dotnet tool install --global boogie --version '3.4.3'
 
-      - run: echo "All systemtest suites:" && ./mill test.testOnly '*SystemTests*' -- -z 'xxxx'
+      - run: ./mill test.compile
+      - run: ./mill test.test -oGD -T 1000000 -n test_util.tags.AnalysisSystemTest -F 2
+
+  AnalysisSystemTests2:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y z3='4.8.12-*'
+      - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
-      - run: ./scripts/scalatest.sh -oGD -PS3 -T 1000000 -n test_util.tags.AnalysisSystemTest -F 2
+      - run: ./mill test.test -oGD -T 1000000 -n test_util.tags.AnalysisSystemTest2 -F 2
+
+  AnalysisSystemTests3:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y z3='4.8.12-*'
+      - run: dotnet tool install --global boogie --version '3.4.3'
+
+      - run: ./mill test.compile
+      - run: ./mill test.test -oGD -T 1000000 -n test_util.tags.AnalysisSystemTest3 -F 2
+
+  AnalysisSystemTests4:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y z3='4.8.12-*'
+      - run: dotnet tool install --global boogie --version '3.4.3'
+
+      - run: ./mill test.compile
+      - run: ./mill test.test -oGD -T 1000000 -n test_util.tags.AnalysisSystemTest4 -F 2

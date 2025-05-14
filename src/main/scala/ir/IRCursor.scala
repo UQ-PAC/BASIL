@@ -9,8 +9,9 @@ import ir.cilvisitor.*
 import collection.mutable
 import scala.annotation.tailrec
 
-/** This file defines functions to get the successor and predecessor of a IR node for control flow.
-  */
+/** 
+ *  This file defines functions to get the successor and predecessor of a IR node for control flow.
+ */
 
 /*
  * Defines a position in the IL / CFG; this becomes the lhs of the state map lattice in a static analysis.

@@ -38,6 +38,8 @@ import org.scalacheck.Properties
 import org.scalacheck.Prop.forAll
 import org.scalacheck.{Arbitrary, Gen}
 
+import test_util.TestValueDomainWithInterpreter
+
 @test_util.tags.UnitTest
 class TestKnownBitsInterpreter
     extends AnyFunSuite

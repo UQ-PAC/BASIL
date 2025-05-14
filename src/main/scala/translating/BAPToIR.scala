@@ -111,6 +111,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
 
   private def handleAtomicSections(procedure: Procedure): Unit = {
     val queue = mutable.Queue[Block](procedure.entryBlock.get)
+    val inQueue = mutable.Set[Block](procedure.entryBlock.get)
     var atomicSectionStart: Option[Block] = None
     var atomicSectionEnd: Option[Block] = None
     val atomicSectionContents: mutable.Set[Block] = mutable.Set()
@@ -118,6 +119,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
 
     while (queue.nonEmpty) {
       val block = queue.dequeue()
+      inQueue.remove(block)
 
       if (atomicSectionStart.isDefined) {
         atomicSectionContents.add(block)
@@ -200,8 +202,9 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
         block.jump match {
           case g: GoTo =>
             g.targets.foreach { target =>
-              if (!visited.contains(target)) {
+              if (!visited.contains(target) && !inQueue.contains(target)) {
                 queue.enqueue(target)
+                inQueue.add(target)
               }
             }
           case _ =>
