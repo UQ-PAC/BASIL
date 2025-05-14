@@ -1,9 +1,7 @@
 import org.scalatest.funsuite.AnyFunSuite
 
-import scala.sys.process.*
-
 import ir.*
-import test_util.CaptureOutput
+import test_util.{BASILTest, CaptureOutput}
 import util.{BASILConfig, IRContext, BoogieGeneratorConfig, ILLoadingConfig, StaticAnalysisConfig}
 
 import java.nio.file.{Path, Files}
@@ -16,8 +14,8 @@ class RemovePCTest extends AnyFunSuite with CaptureOutput {
     util.RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = s"src/test/correct/$name/$variation/$name.gts",
-          relfFile = s"src/test/correct/$name/$variation/$name.relf",
+          inputFile = s"${BASILTest.rootDirectory}/src/test/correct/$name/$variation/$name.gts",
+          relfFile = s"${BASILTest.rootDirectory}/src/test/correct/$name/$variation/$name.relf",
           specFile = None,
           dumpIL = None,
           keepPC = keepPC

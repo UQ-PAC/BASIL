@@ -906,8 +906,8 @@ object RunUtils {
       visit_prog(transforms.RemovePCStatements(), ctx.program)
       Logger.info(s"[!] Removed PC-related statements")
     }
-    ctx.program.procedures.foreach(transforms.RemoveUnreachableBlocks.apply)
-    Logger.info(s"[!] Removed unreachable blocks")
+    // ctx.program.procedures.foreach(transforms.RemoveUnreachableBlocks.apply)
+    // Logger.info(s"[!] Removed unreachable blocks")
 
     if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)
