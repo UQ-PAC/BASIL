@@ -361,7 +361,7 @@ def getRedundantAssignments(procedure: Procedure): Set[Variable] = {
         })
       }
       case m: SimulAssign => {
-        m.assignments.toSeq.foreach { case (lhs, r) =>
+        m.assignments.foreach { case (lhs, r) =>
           assignedNotRead(lhs) = joinVS(assignedNotRead(lhs), VS.Assigned(Set(m)))
         }
         m.assignments.toSeq
@@ -419,7 +419,7 @@ def getRedundantAssignments(procedure: Procedure): Set[Variable] = {
     }
   }
 
-  var toRemove = assignedNotRead
+  var toRemove = assignedNotRead.filter(_._2.isInstanceOf[VS.Assigned])
   var removeOld = toRemove
 
   toRemove.map(_._1).toSet
@@ -442,14 +442,21 @@ class CleanupAssignments() extends CILVisitor {
   override def vstmt(s: Statement) = {
     var didAny = true
     val action: VisitAction[List[Statement]] = s match {
-      case a: SimulAssign if a.assignments.isEmpty => ChangeTo(List())
-      case a: LocalAssign if deadVariables.contains(a.lhs) => ChangeTo(List())
-      case LocalAssign(lhs, rhs, _) if lhs == rhs => ChangeTo(List())
+      case SimulAssign(assignments, _) if assignments.forall { case (lhs, rhs) =>
+            deadVariables.contains(lhs)
+          } =>
+        ChangeTo(List())
       case a: SimulAssign =>
-        a.assignments = a.assignments.filterNot { case (lhs, rhs) =>
+        val ns = a.assignments.filterNot { case (lhs, rhs) =>
           deadVariables.contains(lhs)
         }
-        if a.assignments.isEmpty then ChangeTo(List()) else SkipChildren()
+        if (ns.size != a.assignments.size) {
+          a.assignments = ns
+          if a.assignments.isEmpty then ChangeTo(List()) else SkipChildren()
+        } else {
+          didAny = false
+          SkipChildren()
+        }
       case _ =>
         didAny = false
         SkipChildren()
@@ -459,15 +466,16 @@ class CleanupAssignments() extends CILVisitor {
   }
 
   def transform(p: Procedure): Unit = {
+    modified = true
     while (modified) {
       modified = false
       visit_proc(this, p)
     }
   }
+
   def transform(p: Program): Unit = {
     for (p <- p.procedures) {
-      val v = CleanupAssignments()
-      v.transform(p)
+      transform(p)
     }
   }
 
@@ -688,13 +696,16 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
 
       if (res.size == 1) {
         res.head match {
-          case l @ LocalAssign(lhs, rhs, _) => {
+          case SimulAssign(assignments, _) => {
+            val (lhs, rhs) = assignments.find(_._1 == v).get
             if (validate) {
               assert(propOK(rhs))
             }
             Some(rhs)
           }
-          case _ => None
+          case o => {
+            None
+          }
         }
       } else {
         None
@@ -708,7 +719,8 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
     case a @ Assume(body, b, c, d) if a.body.variables.exists(goodSubst) =>
       Substitute(substitute(s))(a.body) match {
         case Some(cond) => {
-          ChangeTo(List(Assume(cond, b, c, d)))
+          a.body = cond
+          SkipChildren()
         }
         case _ => SkipChildren()
       }
@@ -946,7 +958,6 @@ def validateProcWithSplitsInteractive(validationProg: Program, proc: Procedure, 
         splitQueue.addAll(ns)
         SimplifyLogger.info(s"     Found new split point : queue length ${splitQueue.length}")
       } else {
-        println("failed to find split")
         finalResult = BoogieResultKind.Timeout :: finalResult
         break()
       }
@@ -1050,6 +1061,7 @@ def validatedSimplifyPipeline(p: Program) = {
 
   def deadAssignmentElimination(prog: Program) = {
     CleanupAssignments().transform(prog)
+    visit_prog(CleanupAssignments(), prog)
   }
 
   def sliceCleanup(prog: Program) = {
@@ -1091,6 +1103,7 @@ def validatedSimplifyPipeline(p: Program) = {
       simplifyGuards(p)
       removeDuplicateGuard(p)
       sliceCleanup(p)
+      deadAssignmentElimination(p)
       combineBlocks(p)
     },
     "BranchCleanup"
@@ -1118,12 +1131,12 @@ def copypropTransform(
   OffsetProp.transform(p)
 
   simplifyCFG(p)
-  transforms.fixupGuards(p)
-  transforms.removeDuplicateGuard(p.blocks.toSeq)
 
   val gvis = GuardVisitor(ir.eval.SimplifyValidation.validate)
   visit_proc(gvis, p)
   AssumeConditionSimplifications(p)
+  transforms.fixupGuards(p)
+  transforms.removeDuplicateGuard(p.blocks.toSeq)
 
   val xf = t.checkPoint("transform")
 
@@ -2179,15 +2192,15 @@ class Substitute(val res: Variable => Option[Expr], val recurse: Boolean = true,
           var newChange = changeTo
           var madeNewChange = true
 
-          // while (newChange.isInstanceOf[Variable] && madeNewChange) do {
-          //  res(newChange.asInstanceOf[Variable]) match {
-          //    case Some(v) =>
-          //      newChange = v
-          //      madeNewChange = true
-          //    case _ =>
-          //      madeNewChange = false
-          //  }
-          // }
+          while (newChange.isInstanceOf[Variable] && madeNewChange) do {
+            res(newChange.asInstanceOf[Variable]) match {
+              case Some(v) =>
+                newChange = v
+                madeNewChange = true
+              case _ =>
+                madeNewChange = false
+            }
+          }
 
           ChangeDoChildrenPost(newChange, x => x)
         } else {

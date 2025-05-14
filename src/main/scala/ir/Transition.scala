@@ -25,8 +25,8 @@ def polyEqual(e1: Expr, e2: Expr) = {
     case (BoolType, BoolType) => BinaryExpr(BoolEQ, e1, e2)
     case (IntType, IntType) => BinaryExpr(IntEQ, e1, e2)
     case (BitVecType(sz1), BitVecType(sz2)) if sz1 == sz2 => BinaryExpr(BVEQ, e1, e2)
-    case (BitVecType(sz1), BitVecType(sz2)) if sz1 > sz2 => BinaryExpr(BVEQ, Extract(sz2, 0, e1), e2)
-    case (BitVecType(sz1), BitVecType(sz2)) if sz1 < sz2 => BinaryExpr(BVEQ, e1, Extract(sz1, 0, e2))
+    case (BitVecType(sz1), BitVecType(sz2)) if sz1 > sz2 => BinaryExpr(BVEQ, e1, ZeroExtend(sz1 - sz2, e2))
+    case (BitVecType(sz1), BitVecType(sz2)) if sz1 < sz2 => BinaryExpr(BVEQ, ZeroExtend(sz2 - sz1, e1), e2)
     case (CustomSort(x), CustomSort(y)) if x == y => BinaryExpr(BoolEQ, e1, e2)
     case (a, b) => throw Exception(s"wierd type $a == $b")
   }
@@ -605,23 +605,30 @@ class TranslationValidator {
 
       val returnInv = procs(p.name).returnBlock
         .map(_.jump match {
-          case r: Return => procs(p.name).returnBlock.get.label -> r.outParams.map((formal, actual) => formal).toSet
+          case r: Return =>
+            procs(p.name).returnBlock.get.label -> r.outParams.map((formal: Variable, actual) => formal -> formal).toMap
           case _ => ???
         })
         .toSeq
 
-      val lives = liveVarsSource.collect {
-        case (block, v) if afterCuts(p).exists((_, b) => block.label == b.label) =>
-          block.label -> v.filter(liveVarsTarget(block).contains)
+      // block -> sourcevar -> targetvar
+      val lives: Map[String, Map[Variable, Variable]] = liveVarsSource.collect {
+        case (block, v) if v != transitionSystemPCVar && afterCuts(p).exists((_, b) => block.label == b.label) =>
+          block.label -> v.collect {
+            case sv if liveVarsTarget(block).exists(_.name == sv.name) =>
+              sv -> liveVarsTarget(block).find(_.name == sv.name).get
+          }.toMap
       }.toMap ++ returnInv
 
       val inv = afterCuts(p).map {
         case (label, cutPoint) => {
-          val vars = lives.get(cutPoint.label).toSet.flatten -- Seq(transitionSystemPCVar)
+          val vars = lives.get(cutPoint.label).getOrElse(Map())
 
           val assertion = boolAnd(
             vars
-              .map(v => polyEqual(varInSource(v), varInTarget(v)))
+              .map { case (src, tgt) =>
+                polyEqual(varInSource(src), varInTarget(tgt))
+              }
           )
 
           val guard = BinaryExpr(IntEQ, visit_rvar(afterRenamer, transitionSystemPCVar), PCMan.PCSym(label))
