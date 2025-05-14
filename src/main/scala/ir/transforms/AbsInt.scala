@@ -114,7 +114,15 @@ class DomainWithFunctionSummaries[L, Summary](
 }
 
 trait ProcedureSummaryGenerator[L, LocalDomain] extends ProcAbstractDomain[L] {
+
+  /** 
+   *  Join the summary [[summaryForTarget]] for a call [[p]] into the local abstract state [[l]]
+   */
   def localTransferCall(l: LocalDomain, summaryForTarget: L, p: DirectCall): LocalDomain
+
+  /**
+   * Return the new updated summary for a procedure based on the results of a dataflow analysis of that procedure.
+   */
   def updateSummary(
     prevSummary: L,
     p: Procedure,

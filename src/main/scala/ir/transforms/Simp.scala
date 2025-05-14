@@ -727,15 +727,6 @@ def localExprSimplify(prog: Program) = {
   wrapShapePreservingTransformInValidation(p => visit_prog(CopyProp.BlockyProp(), p))(prog)
 }
 
-def copyPropOnce(prog: Program) = {
-
-  def trans(p: Program) = {
-    visit_prog(CopyProp.BlockyProp(), p)
-    CleanupAssignments().transform(p)
-  }
-  wrapShapePreservingTransformInValidation(trans)(prog)
-}
-
 def wrapShapePreservingTransformInValidation(transform: Program => Unit)(p: Program) = {
   val validator = TranslationValidator()
   validator.setTargetProg(p)
@@ -1071,14 +1062,6 @@ def validatedSimplifyPipeline(p: Program) = {
 
   def combineBlocks(program: Program) = {
     program.procedures.foreach(simplifyCFG)
-  }
-
-  def combined(p: Program) = {
-    // combineBlocks(p)
-    copyProp(p)
-    simplifyGuards(p)
-    deadAssignmentElimination(p)
-    sliceCleanup(p)
   }
 
   def dsa(p: Program) = {
@@ -2275,6 +2258,9 @@ class DefinitelyExits(knownExit: Set[Procedure]) extends ProcedureSummaryGenerat
 
   def transfer(a: ir.transforms.PathExit, b: ir.Procedure): ir.transforms.PathExit = ???
 
+  /** 
+   *  Join the summary [[summaryForTarget]] for a call [[p]] into the local abstract state [[l]]
+   */
   def localTransferCall(
     l: ir.transforms.PathExit,
     summaryForTarget: ir.transforms.PathExit,
@@ -2285,6 +2271,9 @@ class DefinitelyExits(knownExit: Set[Procedure]) extends ProcedureSummaryGenerat
     case (o, _) => o
   }
 
+  /**
+   * Return the new updated summary for a procedure based on the results of a dataflow analysis of that procedure.
+   */
   def updateSummary(
     prevSummary: ir.transforms.PathExit,
     p: ir.Procedure,

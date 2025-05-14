@@ -711,6 +711,9 @@ object RunUtils {
     val program = ctx.program
     simpPreprocess(program)
     transforms.validatedSimplifyPipeline(program)
+
+    ir.transforms.ExtractExtendZeroBits.doTransform(ctx.program)
+
   }
 
   def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]): Unit = {
