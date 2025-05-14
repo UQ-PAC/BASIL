@@ -100,14 +100,14 @@ object DSAVarOrdering extends Ordering[LocalVar] {
   }
 }
 
-def toOffsetMove[T <: Offsets](op: BinOp, arg: BitVecLiteral | T, domain: OffsetDomain[T]): T => T = {
+def toOffsetMove[T <: Offsets](op: BinOp, arg: BitVecLiteral | T, domain: OffsetDomain[T], transform: T => T): T => T = {
   val value = arg match {
     case bv: BitVecLiteral => domain.init(bv2SignedInt(bv).toInt)
     case off: T => off
   }
   op match
-    case BVADD => (i: T) => domain.add(i, value)
-    case BVSUB => (i: T) => domain.add(i, value, neg = true)
+    case BVADD => (i: T) => domain.add(transform(i), value)
+    case BVSUB => (i: T) => domain.add(transform(i), value, neg = true)
     case _ => throw Exception(s"Usupported Binary Op $op")
 }
 
@@ -356,6 +356,7 @@ object SymValues {
         val oPlus =
           toOffsetMove(binExp.op, symValues.state(arg2.variables.head.asInstanceOf[LocalVar]).state(Global), oDomain)
         exprToSymValSet(symValues)(arg1, oPlus)
+          toOffsetMove(binExp.op, symValues.state(arg2.variables.head.asInstanceOf[LocalVar]).state(Constant), oDomain, transform)
       case variable: LocalVar =>
         symValSetDomain.transform(symValues.state.getOrElse(replace(variable), symValSetDomain.bot), transform)
       case Extract(end, start, body) if end - start < 64 =>
