@@ -1025,21 +1025,21 @@ object IntervalDSA {
   }
 
   def checkUniqueGlobal(graph: IntervalGraph): Unit = {
-  /*  var found: Option[IntervalNode] = None
+    var found: Map[SymBase, Option[IntervalNode]] = graph.glIntervals.map(i => (Global(i), None)).toMap
     val seen = mutable.Set[IntervalNode]()
     val entry = graph.nodes.values.map(graph.find)
     val queue = mutable.Queue[IntervalNode]().enqueueAll(entry)
     while queue.nonEmpty do {
       val node = queue.dequeue()
-      node.bases.filter(_._1.isInstanceOf[])
-      if node.bases.contains(Global) then {
-        assert(found.isEmpty || found.get == node)
-        found = Some(node)
-      }
+      node.bases.filter(_._1.isInstanceOf[Global]).foreach(
+        (base, offsets) =>
+          assert(found(base).isEmpty || found(base).get == node)
+          found += (base -> Some(node))
+      )
       seen.add(node)
       val toDo = node.cells.filter(_.hasPointee).map(_.getPointee).map(_.node).filterNot(seen.contains)
       queue.enqueueAll(toDo)
-    }*/
+    }
   }
 
   private def isNonGlobalConstant(expr: Expr, isGlobal: Int => Boolean): Boolean = {
