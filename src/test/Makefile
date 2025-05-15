@@ -49,3 +49,12 @@ extract:
 	{ tail -n1 compiled.url.txt | sha1sum -c - ; } || { rm -v $(TARBALL); exit 1; }
 	tar xf $(TARBALL) --keep-old-files --touch
 	md5sum --quiet -c compiled.md5sum  # check that extracted files match expected checksums
+
+.PHONY: push
+push:
+	tmp=`mktemp -d` && \
+			git clone git@github.com:UQ-PAC/basil-tests.git $$tmp --single-branch --branch basil-src-test && \
+			cd $$tmp && \
+
+			rm -rf $$tmp
+
