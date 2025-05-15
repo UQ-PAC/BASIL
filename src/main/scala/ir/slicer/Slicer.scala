@@ -11,6 +11,8 @@ import util.LogLevel
 
 import ir.transforms.{stripUnreachableFunctions, cleanupBlocks, removeDeadInParams}
 
+import analysis.Lambda
+
 import util.SlicerConfig
 
 private type StatementSlice = Set[Variable]
@@ -41,21 +43,37 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
   }
 
   private class Phase2(results: Map[CFGPosition, StatementSlice]) {
-    val matcher = TransformCriterionPair(results, initialCriterion)
-
     val transferFunctions = SlicerTransfers(initialCriterion)
 
     def procedures = program.procedures.filterNot(_.isExternal.contains(true))
 
+    def criterion(n: CFGPosition): StatementSlice = {
+      (n match {
+        case c: Call => {
+          val transfer = transferFunctions.edgesOther(n)
+          transferFunctions
+            .restructure(criterion(c.successor).flatMap(v => transfer(Left(v))).toMap ++ transfer(Right(Lambda())))
+            .keys
+            .toSet
+        }
+        case _ => results.getOrElse(n, Set())
+      }) ++ initialCriterion.getOrElse(n, Set())
+    }
+
     def hasCriterionImpact(n: Statement): Boolean = {
       val transfer = transferFunctions.edgesOther(n)
+      val crit = criterion(n)
+      val transferred =
+        transferFunctions.restructure(crit.flatMap(v => transfer(Left(v))).toMap ++ transfer(Right(Lambda())))
 
-      val criterion = matcher.getPostCriterion(n)
-      val transferred = criterion.flatMap(v => transfer(Left(v))).toMap
-
-      transferred.values.toSet.contains(
-        transferFunctions.edgelattice.ConstEdge(transferFunctions.valuelattice.top)
-      ) || (transferred.size != criterion.size)
+      n match {
+        case c: Call if !crit.equals(results.getOrElse(n, Set())) => true
+        case _ => {
+          transferred.values.toSet.contains(
+            transferFunctions.edgelattice.ConstEdge(transferFunctions.valuelattice.top)
+          ) || (transferred.size != crit.size)
+        }
+      }
     }
 
     /**
@@ -67,7 +85,7 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       assert(invariant.correctCalls(program))
 
       for (procedure <- procedures.filter(_.entryBlock.isDefined)) {
-        val unused = procedure.formalInParam.filterNot(matcher.getPreCriterion(procedure).contains(_))
+        val unused = procedure.formalInParam.filterNot(criterion(procedure).contains(_))
 
         for (unusedFormalInParam <- unused) {
           modified = true
@@ -88,7 +106,7 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       for (returnBlock <- procedures.flatMap(_.returnBlock)) {
         val procedure = returnBlock.parent
 
-        val unused = procedure.formalOutParam.filterNot(matcher.getPostCriterion(returnBlock))
+        val unused = procedure.formalOutParam.filterNot(criterion(returnBlock.jump))
 
         for (unusedFormalOutParam <- unused) {
           modified = true
@@ -107,27 +125,6 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       if (modified) assert(invariant.correctCalls(program))
     }
 
-    def removeStatement(s: Statement): Boolean = {
-      s match {
-        case s if hasCriterionImpact(s) => false
-        case c: Call => {
-          // If a Call statement has no direct impact but has Registers in criterion we keep the statement.
-          if !matcher.getPostCriterion(s).exists {
-              case _: Register => true
-              case _ => false
-            }
-          then {
-            s.parent.statements.remove(s)
-            true
-          } else false
-        }
-        case s => {
-          s.parent.statements.remove(s)
-          true
-        }
-      }
-    }
-
     def run(): Unit = {
       SlicerLogger.info("Slicer :: Reductive Slicing Pass - Phase2")
 
@@ -137,7 +134,10 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       for (procedure <- procedures) {
         for (block <- procedure.blocks) {
           for (statement <- block.statements) {
-            if (removeStatement(statement)) removed += 1
+            if (!hasCriterionImpact(statement)) {
+              removed += 1
+              statement.parent.statements.remove(statement)
+            }
             total += 1
           }
         }
