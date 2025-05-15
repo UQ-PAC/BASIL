@@ -96,6 +96,7 @@ class IntervalGraph(
       case (address, relocated) =>
         val pointer = addGlobal(globalNodes, address.toInt, 8)
         val pointee = addGlobal(globalNodes, relocated.toInt, 0)
+        pointer.setPointee(pointee)
     }
 
     globalNodes
