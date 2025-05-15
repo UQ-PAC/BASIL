@@ -36,7 +36,6 @@ import java.util.Base64
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
 import ir.transforms.MemoryTransform
-import util.DSAConfig.{Checks, Prereq, Standard}
 import util.LogLevel.INFO
 
 import scala.annotation.tailrec
@@ -911,10 +910,10 @@ object RunUtils {
 
     var dsaContext: Option[DSAContext] = None
     if (conf.dsaConfig.isDefined) {
-      val dsaResults = IntervalDSA(ctx).dsa(conf.dsaConfig.get)
+      val dsaResults = IntervalDSA(ctx, conf.dsaConfig.get).dsa()
       dsaContext = Some(dsaResults)
 
-      if q.memoryTransform && conf.dsaConfig.get != Prereq then // need more than prereq
+      if q.memoryTransform && conf.dsaConfig.get.phase == TD then // need more than prereq
         val memTransferTimer = PerformanceTimer("Mem Transfer Timer", INFO)
         visit_prog(MemoryTransform(dsaResults.topDown, dsaResults.globals), ctx.program)
         memTransferTimer.checkPoint("Performed Memory Transform")
