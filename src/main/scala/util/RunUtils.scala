@@ -136,7 +136,7 @@ object IRLoading {
 
     val specification = IRLoading.loadSpecification(q.specFile, program, globals)
 
-    if (!q.keepPC) {
+    if (q.pcTracking == PCTrackingOption.None) {
       visit_prog(transforms.RemovePCStatements(), program)
       Logger.info(s"[!] Removed PC-related statements")
     }

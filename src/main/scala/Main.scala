@@ -153,8 +153,11 @@ object Main {
     generateRelyGuarantees: Flag,
     @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (implies --parameter-form)")
     simplify: Flag,
-    @arg(name = "keep-pc", doc = "Keep PC assignments and assertions in loaded BASIL IR (currently GTIRB-only)")
-    keepPC: Flag,
+    @arg(
+      name = "pc",
+      doc = "EXPERIMENTAL IN DEVELOPMENT: Program counter mode. (options: none | keep | assert) (default: none)"
+    )
+    pcTracking: Option[String],
     @arg(
       name = "validate-simplify",
       doc = "Emit SMT2 check for validation of simplification expression rewrites 'rewrites.smt2'"
@@ -292,7 +295,7 @@ object Main {
         procedureTrimDepth = conf.procedureDepth,
         parameterForm = conf.parameterForm.value,
         trimEarly = conf.trimEarly.value,
-        keepPC = conf.keepPC.value
+        pcTracking = PCTrackingOption.valueOf(conf.pcTracking.getOrElse("none").capitalize)
       ),
       runInterpret = conf.interpret.value,
       simplify = conf.simplify.value,

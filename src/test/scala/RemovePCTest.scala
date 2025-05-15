@@ -2,7 +2,7 @@ import org.scalatest.funsuite.AnyFunSuite
 
 import ir.*
 import test_util.{BASILTest, CaptureOutput}
-import util.{BASILConfig, IRContext, BoogieGeneratorConfig, ILLoadingConfig, StaticAnalysisConfig}
+import util.{BASILConfig, IRContext, BoogieGeneratorConfig, ILLoadingConfig, StaticAnalysisConfig, PCTrackingOption}
 
 import java.nio.file.{Path, Files}
 import java.io.{BufferedWriter, FileWriter}
@@ -18,7 +18,7 @@ class RemovePCTest extends AnyFunSuite with CaptureOutput {
           relfFile = s"${BASILTest.rootDirectory}/src/test/correct/$name/$variation/$name.relf",
           specFile = None,
           dumpIL = None,
-          keepPC = keepPC
+          pcTracking = if keepPC then PCTrackingOption.Assert else PCTrackingOption.None
         ),
         staticAnalysis = Some(StaticAnalysisConfig(None)),
         boogieTranslation = BoogieGeneratorConfig(),
