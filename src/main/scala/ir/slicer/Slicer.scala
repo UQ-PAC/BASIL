@@ -1,20 +1,9 @@
 package ir.slicer
 
 import ir.*
-import ir.eval.evaluateExpr
-
-import boogie.SpecGlobal
-import util.SlicerLogger
-
-import util.PerformanceTimer
-import util.LogLevel
-
 import ir.transforms.{stripUnreachableFunctions, cleanupBlocks, removeDeadInParams}
-
-import analysis.Lambda
-
-import util.SlicerConfig
-
+import analysis.{Lambda, EdgeFunction, TwoElement}
+import util.{SlicerConfig, SlicerLogger, LogLevel, PerformanceTimer}
 import scala.collection.mutable
 
 private type StatementSlice = Set[Variable]
@@ -23,10 +12,9 @@ object StatementSlice {
 }
 
 class Slicer(program: Program, slicerConfig: SlicerConfig) {
-
   private val performanceTimer = PerformanceTimer("Slicer Timer", LogLevel.INFO)
 
-  private val parsedConfig: Option[(Block, Set[Variable])] = {
+  private val parsedConfig: Option[(Block, StatementSlice)] = {
     def variables(n: Command): Set[Variable] = {
       n match {
         case a: LocalAssign => a.lhs.variables ++ a.rhs.variables
@@ -122,24 +110,21 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
 
     def procedures = program.procedures.filterNot(_.isExternal.contains(true))
 
+    def transfer(n: CFGPosition): Map[Variable, EdgeFunction[TwoElement]] = {
+      val func = transferFunctions.edgesOther(n)
+      transferFunctions.restructure(criterion(n).flatMap(v => func(Left(v))).toMap ++ func(Right(Lambda())))
+    }
+
     def criterion(n: CFGPosition): StatementSlice = {
       (n match {
-        case c: Call => {
-          val transfer = transferFunctions.edgesOther(n)
-          transferFunctions
-            .restructure(criterion(c.successor).flatMap(v => transfer(Left(v))).toMap ++ transfer(Right(Lambda())))
-            .keys
-            .toSet
-        }
+        case c: Call => transfer(c.successor).keys.toSet
         case _ => results.getOrElse(n, Set())
       }) ++ initialCriterion.getOrElse(n, Set())
     }
 
     def hasCriterionImpact(n: Statement): Boolean = {
-      val transfer = transferFunctions.edgesOther(n)
       val crit = criterion(n)
-      val transferred =
-        transferFunctions.restructure(crit.flatMap(v => transfer(Left(v))).toMap ++ transfer(Right(Lambda())))
+      val transferred = transfer(n)
 
       n match {
         case c: Call if !crit.equals(results.getOrElse(n, Set())) => true
