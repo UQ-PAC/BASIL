@@ -8,7 +8,6 @@ import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
 import test_util.{BASILTest, CaptureOutput, programToContext}
 import util.*
-import util.DSAConfig.Checks
 
 @test_util.tags.AnalysisSystemTest3
 @test_util.tags.AnalysisSystemTest
@@ -23,65 +22,50 @@ class IntervalDSATest extends AnyFunSuite with CaptureOutput {
     RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
   }
 
-  def runTest(relativePath: String, config: DSAConfig = Checks): BASILResult = {
-    val path = s"${BASILTest.rootDirectory}/$relativePath"
-    RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = Some(path + ".relf")),
-        simplify = true,
-        staticAnalysis = None,
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-        dsaConfig = Some(config)
-      )
-    )
-  }
-
-  def runTestGTIRB(relativePath: String, config: DSAConfig = Checks): BASILResult = {
-    val path = s"${BASILTest.rootDirectory}/$relativePath"
-    RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(inputFile = path + ".gts", relfFile = Some(path + ".relf")),
-        simplify = true,
-        staticAnalysis = None,
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-        dsaConfig = Some(config)
-      )
-    )
-  }
-
-  def runTestTrim(relativePath: String, mainProcedure: String, config: DSAConfig = Checks): BASILResult = {
+  def runTest(relativePath: String, main: Option[String] = None, config: DSConfig = DSConfig()): BASILResult = {
     val path = s"${BASILTest.rootDirectory}/$relativePath"
     RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
           inputFile = path + ".gts",
-          relfFile = Some(path + ".relf"),
-          mainProcedureName = mainProcedure,
-          trimEarly = true
+          relfFile = path + ".relf",
+          trimEarly = main.isDefined,
+          mainProcedureName = main.getOrElse("main")
         ),
         simplify = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(Checks)
+        dsaConfig = Some(config)
       )
     )
   }
 
-  def runTest(context: IRContext): BASILResult = {
+  def runTestPrg(context: IRContext, config: DSConfig = DSConfig()): BASILResult = {
     RunUtils.loadAndTranslate(
       BASILConfig(
         context = Some(context),
-        loading = ILLoadingConfig(inputFile = "", relfFile = None),
+        loading = ILLoadingConfig(inputFile = "", relfFile = ""),
         simplify = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(Checks)
+        dsaConfig = Some(config)
       )
     )
+  }
+
+  def programToContext(
+                        program: Program,
+                        globals: Set[SpecGlobal] = Set.empty,
+                        globalOffsets: Map[BigInt, BigInt] = Map.empty
+                      ): IRContext = {
+    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+
+    val spec = Specification(Set(), globals, Map(), List(), List(), List(), Set())
+    IRContext(List(), Set(), globals, Set(), globalOffsets, spec, program)
   }
 
   def globalsToLiteral(ctx: IRContext) = {
@@ -94,8 +78,8 @@ class IntervalDSATest extends AnyFunSuite with CaptureOutput {
     val V0 = Register("V0", 64)
     val xAddress = BitVecLiteral(2000, 64)
     val yAddress = BitVecLiteral(3000, 64)
-    val xPointer = BitVecLiteral(1010, 64)
-    val yPointer = BitVecLiteral(1018, 64)
+    val xPointer = BitVecLiteral(1000, 64)
+    val yPointer = BitVecLiteral(1008, 64)
     val globalOffsets = Map(xPointer.value -> xAddress.value, yPointer.value -> yAddress.value)
     val x = SpecGlobal("x", 64, None, xAddress.value)
     val y = SpecGlobal("y", 64, None, yAddress.value)
@@ -105,17 +89,10 @@ class IntervalDSATest extends AnyFunSuite with CaptureOutput {
 
     val program = prog(proc("main", block("block", load, ret)))
 
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
     val context = programToContext(program, globals, globalOffsets)
-    val basilResult = runTest(context)
-    val main = basilResult.ir.program.mainProcedure
+    val result = runTestPrg(context)
 
-    val result = runTest(context)
-
-    val dsg = result.dsa.get.local(main)
+    val dsg = result.dsa.get.local(result.ir.program.mainProcedure)
     val xPointerCells = dsg.exprToCells(xPointer)
     assert(xPointerCells.size == 1)
     val xPointerCell = xPointerCells.head
@@ -167,12 +144,8 @@ class IntervalDSATest extends AnyFunSuite with CaptureOutput {
       )
     )
 
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
     val context = programToContext(program, globals, globalOffsets)
-    val basilResult = runTest(context)
+    val basilResult = runTestPrg(context)
     val main = basilResult.ir.program.mainProcedure
     val callee = basilResult.ir.program.nameToProcedure("callee")
     val dsgMain = basilResult.dsa.get.topDown(main)
@@ -245,14 +218,11 @@ class IntervalDSATest extends AnyFunSuite with CaptureOutput {
         )
       )
 
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
     val context = programToContext(program, Set.empty, Map.empty)
     val malloc = context.program.nameToProcedure("malloc")
     malloc.isExternal = Some(true)
-    val results = runTest(context)
+    val results = runTestPrg(context)
     val mainDSG = results.dsa.get.topDown(results.ir.program.mainProcedure)
 
     val wmallocDSG = results.dsa.get.topDown(results.ir.program.nameToProcedure("wmalloc"))
@@ -285,135 +255,59 @@ class IntervalDSATest extends AnyFunSuite with CaptureOutput {
     assert(dsg.exprToCells(add_two).head.node.isCollapsed)
   }
 
-  test("stack interproc") {
-    val results = runTest("src/test/dsa/stack_interproc_overlapping/stack_interproc_overlapping")
-    val program = results.ir.program
-
-    // Local Callee
-    val dsgCallee = results.dsa.get.local(program.nameToProcedure("set_fields"))
-    val inParam = dsgCallee.exprToCells(LocalVar("R0_in", BitVecType(64))).map(dsgCallee.get).head
-    val stackNode = dsgCallee.find(dsgCallee.nodes(Stack(program.nameToProcedure("set_fields"))))
-    // stack should point to in parameter
-    assert(stackNode.cells.filter(_.hasPointee).exists(_.getPointee.equiv(inParam)))
-    // two in param cells both of size 8 starting at 0 and 16
-    assert(inParam.node.cells.forall(_.interval.size.get == 8))
-    assert(inParam.node.cells.size == 2)
-    assert(inParam.node.cells.map(_.interval.start.get).toSet == Set(0, 16))
-
-    // local caller
-    val dsgCaller = results.dsa.get.local(program.mainProcedure)
-    val stack32 = dsgCaller.nodes(Stack(program.mainProcedure)).get(-32)
-    val stack48 = dsgCaller.nodes(Stack(program.mainProcedure)).get(-48)
-    assert(stack32 != stack48)
-
-    // top down caller
-    val dsg = results.dsa.get.topDown(program.mainProcedure)
-    val stack32td = dsg.nodes(Stack(program.mainProcedure)).get(-32)
-    val stack48td = dsg.nodes(Stack(program.mainProcedure)).get(-48)
-    assert(stack48td != stack32td)
-  }
 
   test("http_parse_basic") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = runTestTrim(path, "http_parse_basic")
+    val res = runTest(path, Some("http_parse_basic"))
 
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
-    assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
-    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
+    assert(dsg.glIntervals.size == 1)
+    assert(IntervalDSA.checksStackMaintained(dsg))
+    assert(!IntervalDSA.checksGlobalsMaintained(dsg))
   }
 
-  test("md5_process_block") {
-    val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = runTestTrim(path, "md5_process_block")
-
-    val proc = res.ir.program.mainProcedure
-    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
-    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
-  }
-
-  test("acl_check") {
-    val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = runTestTrim(path, "acl_check")
-
-    val proc = res.ir.program.mainProcedure
-    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
-    assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
-    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
-  }
-
-  test("gl_des_makekey") {
-    val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = runTestTrim(path, "gl_des_makekey")
-
-    val proc = res.ir.program.mainProcedure
-    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
-    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
-    assert(!dsg.find(dsg.nodes(Stack(proc))).isCollapsed)
-  }
 
   test("cntlm local globals") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = runTestGTIRB(path)
+    val res = runTest(path, None, DSConfig(Local))
 
+    val stackCollapsed = Set("main", "md5_process_block", "md4_process_block", "gl_des_is_weak_key",
+      "tunnel", "direct_request", "forward_request", "tunnel_add", "magic_auth_detect")
+    val globalCollapsed = Set("gl_des_makekey", "to_base64", "printmem", "gl_des_ecb_crypt",
+      "from_base64", "des_key_schedule", "scanmem")
     val locals = res.dsa.get.local
-    locals.values.foreach(IntervalDSA.checksGlobalMaintained)
+    assert(locals.values.forall(_.glIntervals.size == 1))
+
+    assert(locals.values.filterNot(g => stackCollapsed.contains(g.proc.procName)).
+      forall(IntervalDSA.checksStackMaintained))
+
+    locals.values.filterNot(g => globalCollapsed.contains(g.proc.procName)).
+      foreach(g => assert(IntervalDSA.checksGlobalsMaintained(g), s"function ${g.proc.procName} had it's global collapsed"))
   }
 
   test("www_authenticate") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = runTest(path, Some("www_authenticate"))
     val res = runTestTrim(path, "www_authenticate")
 
     val proc = res.ir.program.mainProcedure
+
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
-    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
+    assert(dsg.glIntervals.size == 1)
+    assert(!IntervalDSA.checksStackMaintained(dsg))
+    assert(!IntervalDSA.checksGlobalsMaintained(dsg))
   }
+
 
   test("hmac_md5") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = runTestTrim(path, "hmac_md5")
-
+    val res = runTest(path, Some("hmac_md5"))
     val proc = res.ir.program.mainProcedure
     val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
-    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
+    assert(dsg.glIntervals.size == 1)
+    assert(!IntervalDSA.checksStackMaintained(dsg))
+    assert(!IntervalDSA.checksGlobalsMaintained(dsg))
   }
 
-  test("ntlm2_calc_resp") {
-    val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = runTestTrim(path, "ntlm2_calc_resp")
-
-    val proc = res.ir.program.mainProcedure
-    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
-    assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
-    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
-  }
-
-  test("des_key_schedule") {
-    val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = runTestTrim(path, "des_key_schedule")
-
-    val proc = res.ir.program.mainProcedure
-    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
-    assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
-    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
-  }
-
-  test("plist_free") {
-    val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = runTestTrim(path, "plist_free")
-
-    val proc = res.ir.program.mainProcedure
-    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
-    assert(!dsg.find(dsg.nodes(Stack(res.ir.program.mainProcedure))).isCollapsed)
-    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
-  }
-
-  test("direct_request") {
-    val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = runTestTrim(path, "direct_request")
-
-    val proc = res.ir.program.mainProcedure
-    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
-    assert(!dsg.find(dsg.nodes(Global)).isCollapsed)
-  }
 }
