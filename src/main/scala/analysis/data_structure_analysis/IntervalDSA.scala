@@ -825,8 +825,14 @@ class IntervalCell(val node: IntervalNode, val interval: DSInterval) {
   }
 }
 
-class IntervalDSA(irContext: IRContext) {
-  val globals = globalIntervals(irContext)
+class IntervalDSA(irContext: IRContext, config: DSConfig) {
+  val globals = {
+    val glIntervals = globalIntervals(irContext)
+    if config.splitGlobals then glIntervals
+    else if glIntervals.isEmpty then glIntervals
+    else Seq(glIntervals.head.join(glIntervals.last))
+  }
+
   def pre(): (Map[Procedure, SymValues[OSet]], Map[Procedure, Set[Constraint]]) = {
     var sva: Map[Procedure, SymValues[OSet]] = Map.empty
     var cons: Map[Procedure, Set[Constraint]] = Map.empty
@@ -841,15 +847,46 @@ class IntervalDSA(irContext: IRContext) {
     (sva, cons)
   }
 
-  def dsa(config: DSAConfig): DSAContext = {
+  def dsa(): DSAContext = {
     val DSATimer = PerformanceTimer("DSA Timer", INFO)
     val (sva, cons) = pre()
     DSATimer.checkPoint("Finished SVA")
+    DSALogger.info("Finished Computing Constraints")
 
+    val checks = config.checks
     var dsaContext = DSAContext(sva, cons, Map.empty, Map.empty, Map.empty, Map.empty)
-    if (config == Standard || config == Checks) then
-      val checks = config == Checks
-      DSALogger.info("Finished Computing Constraints")
+    if (config.phase != DSAPhase.Pre) then {
+      val DSA = IntervalDSA.getLocals(irContext, sva, cons, globals)
+      DSATimer.checkPoint("Finished DSA Local Phase")
+      dsaContext = dsaContext.copy(local = DSA)
+      if checks then {
+        DSA.values.foreach(checkUniqueGlobals)
+        IntervalDSA.checkReachable(irContext.program, DSA)
+        DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
+        DSA.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness checks")  
+      }
+    }
+    
+    if config.phase == DSAPhase.BU || config.phase == DSAPhase.TD then {
+      val DSABU = IntervalDSA.solveBUs(dsaContext.local)
+      DSATimer.checkPoint("Finished DSA BU Phase")
+      dsaContext = dsaContext.copy(bottomUp = DSABU)
+      if checks then {
+        DSABU.values.foreach(checkUniqueGlobals)
+        DSABU.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness check") 
+      }
+    }
+
+    if config.phase == DSAPhase.TD then {
+     val DSATD = IntervalDSA.solveTDs(dsaContext.bottomUp)
+      DSATimer.checkPoint("Finished DSA TD Phase")
+      if checks then
+        DSATD.values.foreach(checkUniqueGlobals)
+        DSATD.values.foreach(_.localCorrectness())
+        DSALogger.info("Performed correctness check")
+
       val globalGraph =
         IntervalDSA.getLocal(
           irContext.program.mainProcedure,
@@ -858,36 +895,14 @@ class IntervalDSA(irContext: IRContext) {
           Set[Constraint](),
           globals
         )
-      val DSA = IntervalDSA.getLocals(irContext, sva, cons, globals)
-      DSATimer.checkPoint("Finished DSA Local Phase")
-      if checks then
-        DSA.values.foreach(checkUniqueGlobals)
-        IntervalDSA.checkReachable(irContext.program, DSA)
-        DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
-        DSA.values.foreach(_.localCorrectness())
-        DSALogger.info("Performed correctness checks")
-
-      val DSABU = IntervalDSA.solveBUs(DSA)
-      DSATimer.checkPoint("Finished DSA BU Phase")
-      if checks then
-        DSABU.values.foreach(checkUniqueGlobals)
-        DSABU.values.foreach(_.localCorrectness())
-        DSALogger.info("Performed correctness check")
-      val DSATD = IntervalDSA.solveTDs(DSABU)
-      DSATimer.checkPoint("Finished DSA TD Phase")
-      if checks then
-        DSATD.values.foreach(checkUniqueGlobals)
-        DSATD.values.foreach(_.localCorrectness())
-        DSALogger.info("Performed correctness check")
-
       DSATD.values.foreach(g => IntervalDSA.globalTransfer(g, globalGraph))
       val globalMapping = DSATD.values.foldLeft(Map[IntervalNode, IntervalNode]()) { (m, g) =>
         val oldToNew = IntervalDSA.globalTransfer(globalGraph, g)
         m ++ oldToNew.map((common, spec) => (spec, common))
 
       }
+      dsaContext = dsaContext.copy(topDown = DSATD, globals = globalMapping)
       DSATimer.checkPoint("Finished DSA global graph")
-
       if checks then
         DSATD.values.foreach(checkUniqueGlobals)
         DSATD.values.foreach(_.localCorrectness())
