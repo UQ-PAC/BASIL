@@ -178,10 +178,12 @@ class IntervalGraph(
     pairs.foldLeft(Set[IntervalCell]()) { case (results, (base: SymBase, offsets: OSet)) =>
       val (node, adjustment) = findNode(nodes(base))
       if offsets == Top then results + node.collapse()
-      else
+      else {
         results ++ offsets.toIntervals
+          .filter(i => !base.isInstanceOf[Global] || isGlobal(i.start.get + base.asInstanceOf[Global].interval.start.get))
           .map(_.move(i => i + adjustment))
           .map(node.add)
+      }
     }
   }
 
