@@ -365,6 +365,7 @@ object SymValues {
           .toMap
         
         SymValSet(updated)
+      case unin: UninterpretedFunction => SymValSet(Map(Constant -> oDomain.top))
       case _ => ???
   }
 }
