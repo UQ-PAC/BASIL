@@ -5,7 +5,6 @@ import analysis.*
 
 import analysis.solvers.*
 
-
 trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice])
     extends BackwardIDETransferFunctions[Variable, TwoElement, TwoElementLattice] {
 
@@ -133,6 +132,16 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
     }
   }
 
+  def restructure(result: Map[DL, EdgeFunction[TwoElement]]): Map[Variable, EdgeFunction[TwoElement]] = {
+    result.foldLeft(Map[Variable, EdgeFunction[TwoElement]]()) {
+      case (acc, (d, e)) => {
+        d match {
+          case Left(value) => acc + (value -> e)
+          case Right(_) => acc
+        }
+      }
+    }
+  }
 }
 
 class SlicerTransfers(slicingCriterion: Map[CFGPosition, StatementSlice])
