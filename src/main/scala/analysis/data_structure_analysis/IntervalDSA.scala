@@ -920,9 +920,18 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
 
 object IntervalDSA {
 
-  /*def checksGlobalMaintained(graph: IntervalGraph): Unit = {
-    assert(!graph.find(graph.nodes(Global)).isCollapsed, s"${graph.proc.procName} had it's global node collapsed}")
-  }*/
+
+
+
+  def checksGlobalsMaintained(graph: IntervalGraph): Boolean = {
+    graph.glIntervals.forall(i => !graph.find(graph.nodes(Global(i))).isCollapsed)
+  }
+
+  def checksStackMaintained(graph: IntervalGraph): Boolean = {
+    if graph.nodes.contains(Stack(graph.proc)) then
+      !graph.find(graph.nodes(Stack(graph.proc))).isCollapsed
+    else true
+  }
 
   def globalTransfer(
     source: IntervalGraph,
@@ -997,7 +1006,6 @@ object IntervalDSA {
           if t.node.isCollapsed || cell.node.isCollapsed then target.mergeCells(cell, t)
           else if off.size == 1 then target.mergeCells(node.get(off.head), t)
           else {
-            assert(base != Global)
             DSALogger.warn(
               s"hit this case, $base, $off, source: ${source.proc.procName}, Source Expr: $sourceExpr,  target: ${target.proc.procName}, targetExpr: $targetExpr "
             )
