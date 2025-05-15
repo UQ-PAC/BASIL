@@ -1292,7 +1292,8 @@ def globalIntervals(ctx: IRContext): Seq[DSInterval] = {
   }
 
   ctx.globalOffsets.foreach { case (address, relocated) =>
-    intervals += DSInterval.Value(address.toInt, address.toInt + 8)
+    if !intervals.exists(_.contains(address.toInt)) then
+      intervals += DSInterval.Value(address.toInt, address.toInt + 8)
     if !intervals.exists(_.contains(relocated.toInt)) then
       intervals += DSInterval.Value(relocated.toInt, relocated.toInt)
   }
@@ -1306,7 +1307,11 @@ def globalIntervals(ctx: IRContext): Seq[DSInterval] = {
   if seq.size > 1 then
     {
        seq.sliding(2).foreach(
-        v => assert(!v(0).isOverlapping(v(1)))
+        v =>
+          if (v(0).isOverlapping(v(1))) then
+            v(0).isOverlapping(v(1))
+            print("")
+          assert(!v(0).isOverlapping(v(1)))
       )
     }
 
