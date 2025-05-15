@@ -8,13 +8,6 @@ import util.intrusive_list.*
 import translating.serialiseIL
 import eval.BitVectorEval
 
-<<<<<<< HEAD
-
-/**
-  * Iterator in pre-order of procedures, blocks, and commands. GoTos targets are traversed in an unspecified order.
-  */
-private class ILForwardIterator(private val begin: IterableOnce[CFGPosition], val walk: IRWalk[CFGPosition, CFGPosition]) extends Iterator[CFGPosition] {
-=======
 /** Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are not
   * guaranteed to be in any defined order.
   */
@@ -22,7 +15,6 @@ private class ILForwardIterator(
   private val begin: IterableOnce[CFGPosition],
   val walk: IRWalk[CFGPosition, CFGPosition]
 ) extends Iterator[CFGPosition] {
->>>>>>> origin/main
   val seen = mutable.Set[CFGPosition]()
   private val stack = mutable.Stack[CFGPosition]()
   stack.pushAll(begin)
@@ -43,14 +35,8 @@ private class ILForwardIterator(
   }
 }
 
-<<<<<<< HEAD
-/**
-  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are
-  * not guaranteed to be in any defined order.
-=======
 /** Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are not
   * guaranteed to be in any defined order.
->>>>>>> origin/main
   */
 private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extends Iterator[CFGPosition] {
   private val stack = mutable.Stack[CFGPosition]()
@@ -65,28 +51,18 @@ private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extend
 
     stack.pushAll(n match {
       case p: Procedure => p.blocks
-<<<<<<< HEAD
-      case b: Block => Seq() ++ b.statements.toSeq ++ Seq(b.jump)
-=======
       case b: Block => b.statements ++ Iterator(b.jump)
->>>>>>> origin/main
       case s: Command => Seq()
     })
     n
   }
 }
 
-<<<<<<< HEAD
-class Program(var procedures: ArrayBuffer[Procedure],
-              var mainProcedure: Procedure,
-              val initialMemory: mutable.TreeMap[BigInt, MemorySection]) extends Iterable[CFGPosition] {
-=======
 class Program(
   var procedures: ArrayBuffer[Procedure],
   var mainProcedure: Procedure,
   val initialMemory: mutable.TreeMap[BigInt, MemorySection]
 ) extends Iterable[CFGPosition] {
->>>>>>> origin/main
 
   val threads: ArrayBuffer[ProgramThread] = ArrayBuffer()
   val usedMemory: mutable.Map[BigInt, MemorySection] = mutable.TreeMap()
@@ -354,21 +330,6 @@ class Procedure private (
 
   /** Iterate in cfg pre order.
     */
-  def preOrderIterator: Iterator[CFGPosition] = {
-    ILForwardIterator(Seq(this), IntraProcIRCursor)
-  }
-
-  /**
-   * Get an Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are
-   * not guaranteed to be in any defined order.
-   */
-  def iterator: Iterator[CFGPosition] = {
-    ILLexicalIterator(Seq(this))
-  }
-
-  /**
-   * Iterate in cfg pre order.
-   */
   def preOrderIterator: Iterator[CFGPosition] = {
     ILForwardIterator(Seq(this), IntraProcIRCursor)
   }
@@ -752,8 +713,6 @@ case class MemorySection(
   }
 
 }
-<<<<<<< HEAD
-=======
 
 class AtomicSection(start: Block, end: Block, blocks: mutable.Set[Block]) {
   def isStart(b: Block): Boolean = {
@@ -774,4 +733,3 @@ class AtomicSection(start: Block, end: Block, blocks: mutable.Set[Block]) {
 
   def getBlocks: mutable.Set[Block] = blocks
 }
->>>>>>> origin/main
