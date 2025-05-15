@@ -2,7 +2,7 @@ package ir.transforms
 
 import analysis.data_structure_analysis.*
 import ir.cilvisitor.{CILVisitor, ChangeTo, DoChildren, SkipChildren, VisitAction}
-import ir.*
+import ir.{Global => _, *}
 import util.Counter
 
 import scala.collection.mutable
@@ -26,7 +26,9 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
     proc match
       case Some(value) =>
         s"Stack_${index.interval.move(i => i - index.node.bases(Stack(value)).head)}".replace("-", "n")
-      case None => s"Global_${index.interval.move(i => i - index.node.bases(Global).head)}"
+      case None =>
+        val base = index.node.bases.keys.collectFirst{case g: Global => g}.get
+        s"Global_${index.interval.move(i => i - index.node.bases(base).head + base.interval.start.get)}"
   }
 
   override def vstmt(e: Statement) = {
@@ -40,7 +42,7 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
             val index = indices.head
             val flag = index.node.flags
             val value = index.getPointee
-            if isGlobal(flag) && !index.node.isCollapsed then
+            if isGlobal(flag) && index.node.bases.keys.count(_.isInstanceOf[Global]) == 1 && !index.node.isCollapsed then
               ChangeTo(List(LocalAssign(load.lhs, Register(scalarName(index), load.size), load.label)))
             else if isLocal(flag) && !index.node.isCollapsed && !flag.escapes && index.node.bases.contains(Stack(proc))
             then
@@ -69,7 +71,7 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
             val index = indices.head
             val flag = index.node.flags
             val content = index.getPointee
-            if isGlobal(flag) && !index.node.isCollapsed then
+            if isGlobal(flag) && index.node.bases.keys.count(_.isInstanceOf[Global]) == 1 && !index.node.isCollapsed then
               ChangeTo(List(MemoryAssign(Register(scalarName(index), store.size), store.value, store.label)))
             else if isLocal(flag) && !index.node.isCollapsed && !flag.escapes && index.node.bases.contains(Stack(proc))
             then
