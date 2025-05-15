@@ -49,7 +49,7 @@ versions of these files to make sure results are consistent and comparable.
 
 We use a Docker image (built through Nix) as a static
 environment for compiling and lifting examples.
-The hashes of generated files, as well as the versions of programs within the Docker image, 
+The hashes of generated files, as well as the versions of programs within the Docker image,
 are recorded within this repository.
 This ensures everything stays reproducible and that everybody has identical copies of
 the lifted test cases.
@@ -162,7 +162,7 @@ Now, running make commands should use compilers from Docker.
    (this will be faster, but the make command is more flexible).
 
    If the command exits successfully, all the files are valid.
-   
+
    If it exits with a non-zero code, there will be a message reporting which files have failed
    (the error message may be obscured further up in the output,
    reducing the job count can reduce the noise).

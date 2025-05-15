@@ -4,31 +4,23 @@ import analysis.solvers.{DSAUniTerm, DSAUnionFindSolver, UnionFindSolver, Var}
 import analysis.*
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.*
-import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
+import specification.{ExternalFunction, SymbolTableEntry}
+import boogie.SpecGlobal
 import util.Logger
+import util.Counter
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.Breaks.{break, breakable}
-
-object NodeCounter {
-  private var counter: Int = 0
-
-  def getCounter: Int = {
-    counter = counter + 1
-    counter
-  }
-
-  def reset(): Unit = {
-    counter = 0
-  }
-}
 
 class Flags() {
   var collapsed = false
   var function = false
   var stack = false
   var heap = false
+  var loaded = false
+  var par = false
+  var ret = false
   var global = false
   var unknown = false
   var read = false
@@ -51,10 +43,9 @@ class Flags() {
     function = function || other.function
 }
 
-/**
- * a Data structure Node
- */
-class Node(val graph: Option[Graph], var size: BigInt = 0, val id: Int = NodeCounter.getCounter) {
+/** a Data structure Node
+  */
+class Node(using counter: Counter)(val graph: Option[Graph], var size: BigInt = 0, val id: Int = counter.next().toInt) {
 
   val term: DSAUniTerm = DSAUniTerm(this)
   val children: mutable.Map[Node, BigInt] = mutable.Map()
@@ -94,11 +85,9 @@ class Node(val graph: Option[Graph], var size: BigInt = 0, val id: Int = NodeCou
     }
   }
 
-
   def addCell(offset: BigInt, size: Int): Cell = {
 //    this.updateSize(offset + size)
-    if collapsed then
-      cells(0)
+    if collapsed then cells(0)
     else if !cells.contains(offset) then
       val cell = Cell(Some(this), offset)
       cells.update(offset, cell)
@@ -167,12 +156,13 @@ class Node(val graph: Option[Graph], var size: BigInt = 0, val id: Int = NodeCou
 
 }
 
-/**
- * a cell in DSA
- * @param node the node this cell belongs to
- * @param offset the offset of the cell
- */
-class Cell(val node: Option[Node], val offset: BigInt) {
+/** a cell in DSA
+  * @param node
+  *   the node this cell belongs to
+  * @param offset
+  *   the offset of the cell
+  */
+class Cell(using Counter)(val node: Option[Node], val offset: BigInt) {
   var largestAccessedSize: Int = 0
 
   // the cell's pointee
@@ -205,34 +195,33 @@ class Cell(val node: Option[Node], val offset: BigInt) {
   override def toString: String = s"Cell(${if node.isDefined then node.get.toString else "NONE"}, $offset)"
 }
 
-
-/**
- * a slice made from a cell and an internal offset
- */
+/** a slice made from a cell and an internal offset
+  */
 case class Slice(cell: Cell, internalOffset: BigInt) {
   def node: Node = cell.node.get
   def offset: BigInt = cell.offset
 }
 
-/**
- * represents a direct call in DSA
- * @param call instance of the call
- * @param graph caller's DSG
- */
-class CallSite(val call: DirectCall, val graph: Graph) {
+/** represents a direct call in DSA
+  * @param call
+  *   instance of the call
+  * @param graph
+  *   caller's DSG
+  */
+class CallSite(using Counter)(val call: DirectCall, val graph: Graph) {
   val proc: Procedure = call.target
-  val paramCells: mutable.Map[Variable, Slice] = graph.params(proc).foldLeft(mutable.Map[Variable, Slice]()) {
-    (m, reg) =>
+  val paramCells: mutable.Map[Variable, Slice] =
+    graph.params(proc).foldLeft(mutable.Map[Variable, Slice]()) { (m, reg) =>
       val node = Node(Some(graph))
       node.flags.incomplete = true
       m += (reg -> Slice(node.cells(0), 0))
-  }
-  val returnCells: mutable.Map[Variable, Slice] = graph.writesTo(proc).foldLeft(mutable.Map[Variable, Slice]()) {
-    (m, reg) =>
+    }
+  val returnCells: mutable.Map[Variable, Slice] =
+    graph.writesTo(proc).foldLeft(mutable.Map[Variable, Slice]()) { (m, reg) =>
       val node = Node(Some(graph))
       node.flags.incomplete = true
       m += (reg -> Slice(node.cells(0), 0))
-  }
+    }
 }
 
 case class DSAGlobal(addressRange: AddressRange, field: Field) {
@@ -249,14 +238,19 @@ case class AddressRange(start: BigInt, end: BigInt)
 case class Field(node: Node, offset: BigInt)
 
 // unwraps internal padding and slicing and returns the expression
-def unwrapPaddingAndSlicing(expr: Expr): Expr =
-  expr match
-    case literal: Literal => literal
-    case Repeat(repeats, body) => Repeat(repeats, unwrapPaddingAndSlicing(body))
-    case SignExtend(extension, body) => SignExtend(extension, unwrapPaddingAndSlicing(body))
-    case UnaryExpr(op, arg) => UnaryExpr(op, arg)
-    case BinaryExpr(op, arg1, arg2) => BinaryExpr(op, unwrapPaddingAndSlicing(arg1), unwrapPaddingAndSlicing(arg2))
-    case variable: Variable => variable
-    case Extract(_, _, body) /*if start == 0 && end == 32*/ => unwrapPaddingAndSlicing(body) // this may make it unsound
-    case ZeroExtend(_, body) => unwrapPaddingAndSlicing(body)
-    case _ => expr
+def unwrapPaddingAndSlicing(expr: Expr): Expr = {
+  // TODO: if we really want we can implement a rewriter to coerce
+  // an expression to a 64 bit precision expression in a similar way to
+  // the rewriter that converts bv1 to bool exprs:
+  // Expand inner expressions, wrap in an extract(32, 0) expr to maintain
+  // internal type safety, and push the extract up the until until it is at the
+  // outermost expression.
+  val r = ir.eval.simplifyPaddingAndSlicingExprFixpoint(expr)(0) match {
+    case Extract(_, 0, x) => x
+    case ZeroExtend(_, x) => x
+    case BinaryExpr(BVADD, Extract(hi, 0, x), y: Literal) =>
+      ir.eval.partialEvaluateExpr(BinaryExpr(BVADD, x, SignExtend(size(x).get - size(y).get, y)))
+    case o => o
+  }
+  r
+}

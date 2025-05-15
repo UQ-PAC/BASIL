@@ -2,14 +2,12 @@ package analysis
 
 import analysis.data_structure_analysis.{AddressRange, Cell, Graph, Slice}
 import ir.*
-import util.Logger
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-/**
- * Replaces the region access with the calculated memory region.
- */
+/** Replaces the region access with the calculated memory region.
+  */
 
 trait MergedRegion {
   var name: String = ""
@@ -60,7 +58,7 @@ class RegionInjectorMRA(override val program: Program, mmm: MemoryModelMap) exte
     for (access <- accessToRegion.keys) {
       val regions = accessToRegion(access)
       if (regions.isEmpty) {
-        //throw Exception("no regions found for " + access)
+        // throw Exception("no regions found for " + access)
       } else {
         mergeRegions(regions)
       }
@@ -129,7 +127,7 @@ class RegionInjectorMRA(override val program: Program, mmm: MemoryModelMap) exte
   }
 
   private def statementToRegions(n: Statement): Set[MemoryRegion] = {
-    mmm.getStack(n) ++ mmm.getData(n)
+    mmm.nodeToRegion(n)
   }
 
   private def visitStatement(n: Statement): Unit = n match {
@@ -156,7 +154,14 @@ class RegionInjectorMRA(override val program: Program, mmm: MemoryModelMap) exte
           val size = region.size.toInt
           val bytes = section.getBytes(region.start, size)
           // should probably check that region is entirely contained within section but shouldn't happen in practice?
-          val newSection = MemorySection(region.regionIdentifier, region.start, size, bytes, section.readOnly, Some(mergedRegions(region)))
+          val newSection = MemorySection(
+            region.regionIdentifier,
+            region.start,
+            size,
+            bytes,
+            section.readOnly,
+            Some(mergedRegions(region))
+          )
           program.usedMemory(region.start) = newSection
         case None =>
       }
@@ -165,21 +170,32 @@ class RegionInjectorMRA(override val program: Program, mmm: MemoryModelMap) exte
 
   override def getMergedRegion(address: BigInt, size: Int): Option[MergedRegionMRA] = {
     val region = mmm.findDataObject(address)
-    if (region.isDefined && mergedRegions.contains(region.get)) {
-      Some(mergedRegions(region.get))
+    if (region.isDefined) {
+      if (mergedRegions.contains(region.get)) {
+        Some(mergedRegions(region.get))
+      } else if (region.get.size >= (size / 8)) {
+        val newRegion = MergedRegionMRA(region.get.regionIdentifier, mutable.Set(region.get))
+        mergedRegions(region.get) = newRegion
+        Some(newRegion)
+      } else {
+        throw Exception(
+          s"MMM returned region for $address with size ${region.get.size} bytes which does not match requested size ${size / 8} bytes"
+        )
+      }
     } else {
-      None
+      throw Exception(s"failed to find region with address $address of size ${size / 8} bytes")
     }
   }
 
   override def sharedRegions(): Iterable[MergedRegion] = {
-    mergedRegions.collect {
-      case (_: DataRegion | _: HeapRegion, region: MergedRegion) => region
+    mergedRegions.collect { case (_: DataRegion | _: HeapRegion, region: MergedRegion) =>
+      region
     }
   }
 }
 
-class RegionInjectorDSA(override val program: Program, DSATopDown: mutable.Map[Procedure, Graph]) extends RegionInjector {
+class RegionInjectorDSA(override val program: Program, DSATopDown: mutable.Map[Procedure, Graph])
+    extends RegionInjector {
   private val mergedRegions: mutable.Map[Cell, MergedRegionDSA] = mutable.Map()
 
   private var sharedMemoryCounter = 0
@@ -239,10 +255,10 @@ class RegionInjectorDSA(override val program: Program, DSATopDown: mutable.Map[P
     val stack = cell.node.get.flags.stack
     val name = if (stack) {
       stackCounter += 1
-      s"stack$$${stackCounter}"
+      s"stack_${stackCounter}"
     } else {
       sharedMemoryCounter += 1
-      s"mem$$${sharedMemoryCounter}"
+      s"mem_${sharedMemoryCounter}"
     }
     MergedRegionDSA(name, cell, stack)
   }
@@ -270,7 +286,14 @@ class RegionInjectorDSA(override val program: Program, DSATopDown: mutable.Map[P
             val size = cell.largestAccessedSize
             val bytes = section.getBytes(range.start, size)
             // should probably check that region is entirely contained within section but shouldn't happen in practice?
-            val newSection = MemorySection(mergedRegions(cell).name, range.start, size, bytes, section.readOnly, Some(mergedRegions(cell)))
+            val newSection = MemorySection(
+              mergedRegions(cell).name,
+              range.start,
+              size,
+              bytes,
+              section.readOnly,
+              Some(mergedRegions(cell))
+            )
             program.usedMemory(range.start) = newSection
           case None =>
         }
@@ -293,7 +316,7 @@ class RegionInjectorDSA(override val program: Program, DSATopDown: mutable.Map[P
     }
 
     if (cells.isEmpty || cells.size > 1) {
-      throw Exception("")
+      throw Exception(s"failed to find region with address $address of size ${size / 8} bytes")
     } else if (!mergedRegions.contains(cells.head)) {
       val region = createRegion(cells.head)
       mergedRegions(cells.head) = region

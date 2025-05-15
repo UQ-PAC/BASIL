@@ -25,31 +25,41 @@ import java.nio.ByteBuffer
 import util.intrusive_list.*
 import util.Logger
 
-/**
-  * TempIf class, used to temporarily store information about Jumps so that multiple parse runs are not needed.
-  * Specifically, this is useful in the case that the IF statment has multiple conditions( and elses) and as such many extra blocks
-  * need to be created.
+/** TempIf class, used to temporarily store information about Jumps so that multiple parse runs are not needed.
+  * Specifically, this is useful in the case that the IF statment has multiple conditions( and elses) and as such many
+  * extra blocks need to be created.
   *
-  * @param cond: condition
-  * @param thenStmts: then statements
-  * @param elseStmts: else statements
-  *
+  * @param cond:
+  *   condition
+  * @param thenStmts:
+  *   then statements
+  * @param elseStmts:
+  *   else statements
   */
-class TempIf(val cond: Expr,
-             val thenStmts: mutable.Buffer[Statement],
-             val elseStmts: mutable.Buffer[Statement],
-             override val label: Option[String] = None) extends Assert(cond)
+class TempIf(
+  val cond: Expr,
+  val thenStmts: mutable.Buffer[Statement],
+  val elseStmts: mutable.Buffer[Statement],
+  override val label: Option[String] = None
+) extends NOP(label)
 
-/**
-  * GTIRBToIR class. Forms an IR as close as possible to the one produced by BAP by using GTIRB instead
+/** GTIRBToIR class. Forms an IR as close as possible to the one produced by BAP by using GTIRB instead
   *
-  * @param mods: Modules of the Gtirb file.
-  * @param parserMap: A Map from UUIDs to basic block statements, used for parsing
-  * @param cfg: The cfg provided by gtirb
-  * @param mainAddress: The address of the main function
-  *
+  * @param mods:
+  *   Modules of the Gtirb file.
+  * @param parserMap:
+  *   A Map from UUIDs to basic block statements, used for parsing
+  * @param cfg:
+  *   The cfg provided by gtirb
+  * @param mainAddress:
+  *   The address of the main function
   */
-class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[StmtContext]]], cfg: CFG, mainAddress: BigInt) {
+class GTIRBToIR(
+  mods: Seq[Module],
+  parserMap: immutable.Map[String, List[InsnSemantics]],
+  cfg: CFG,
+  mainAddress: BigInt
+) {
   private val functionNames = MapDecoder.decode_uuid(mods.map(_.auxData("functionNames").data))
   private val functionEntries = MapDecoder.decode_set(mods.map(_.auxData("functionEntries").data))
   private val functionBlocks = MapDecoder.decode_set(mods.map(_.auxData("functionBlocks").data))
@@ -131,17 +141,18 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
   // TODO this is a hack to imitate BAP so that the existing specifications relying on this will work
   // we cannot and should not rely on this at all
-  private def createArguments(name: String): (ArrayBuffer[Parameter], ArrayBuffer[Parameter]) = {
-    val args = ArrayBuffer.newBuilder[Parameter]
-    var regNum = 0
+  private def createArguments(name: String): (mutable.Map[LocalVar, Expr], ArrayBuffer[LocalVar]) = {
 
-    val in = if (name == "main") {
-      ArrayBuffer(Parameter("main_argc", 32, Register("R0", 64)), Parameter("main_argv", 64, Register("R1", 64)))
+    val in: mutable.Map[LocalVar, Expr] = if (name == "main") {
+      mutable.Map(
+        LocalVar("main_argc", BitVecType(32)) -> Extract(32, 0, Register("R0", 64)),
+        LocalVar("main_argv", BitVecType(32)) -> Extract(32, 0, Register("R1", 64))
+      )
     } else {
-      ArrayBuffer()
+      mutable.Map()
     }
 
-    val out = ArrayBuffer(Parameter(name + "_result", 32, Register("R0", 64)))
+    val out = ArrayBuffer[LocalVar]()
 
     (in, out)
   }
@@ -175,24 +186,23 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           procedure.removeBlocks(block)
         } else {
           if (!blockOutgoingEdges.contains(blockUUID)) {
-            throw Exception (s"block ${block.label} in subroutine ${procedure.name} has no outgoing edges")
-          }
-          val outgoingEdges = blockOutgoingEdges(blockUUID)
-          if (outgoingEdges.isEmpty) {
-            throw Exception(s"block ${block.label} in subroutine ${procedure.name} has no outgoing edges")
-          }
-
-          val (calls, jump) = if (outgoingEdges.size == 1) {
-            val edge = outgoingEdges.head
-            handleSingleEdge(block, edge, procedure, procedures)
+            Logger.warn(s"block ${block.label} in subroutine ${procedure.name} no outgoing edges")
+          } else if (blockOutgoingEdges(blockUUID).isEmpty) {
+            Logger.warn(s"block ${block.label} in subroutine ${procedure.name} has no outgoing edges")
           } else {
-            handleMultipleEdges(block, outgoingEdges, procedure)
+            val outgoingEdges = blockOutgoingEdges(blockUUID)
+            val (calls, jump) = if (outgoingEdges.size == 1) {
+              val edge = outgoingEdges.head
+              handleSingleEdge(block, edge, procedure, procedures)
+            } else {
+              handleMultipleEdges(block, outgoingEdges, procedure)
+            }
+            calls.foreach(c => block.statements.append(c))
+            block.replaceJump(jump)
           }
-          calls.foreach(c => block.statements.append(c))
-          block.replaceJump(jump)
 
           if (block.statements.nonEmpty) {
-            cleanUpIfPCAssign(block, procedure)
+            cleanUpTemporary(block, procedure)
           }
         }
       }
@@ -264,7 +274,9 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
     val (in, out) = createArguments(name)
 
-    val procedure = Procedure(name, address, in = in, out = out)
+    val procedure =
+      Procedure(name, address, formalInParam = in.keys, formalOutParam = out, inParamDefaultBinding = in.toMap)
+    procedure.inParamDefaultBinding = immutable.SortedMap.from(in.map((l, r) => l -> LocalVar(l.name, BitVecType(64))))
     uuidToProcedure += (functionUUID -> procedure)
     entranceUUIDtoProcedure += (entranceUUID -> procedure)
 
@@ -281,12 +293,17 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     procedure
   }
 
-  private def createBlock(blockUUID: ByteString, procedure: Procedure, entranceUUID: ByteString, blockCount: Int): Block = {
+  private def createBlock(
+    blockUUID: ByteString,
+    procedure: Procedure,
+    entranceUUID: ByteString,
+    blockCount: Int
+  ): Block = {
     val blockLabel = convertLabel(procedure, blockUUID, blockCount)
 
     val blockAddress = blockUUIDToAddress.get(blockUUID)
     val block = Block(blockLabel, blockAddress)
-    procedure.addBlocks(block)
+    procedure.addBlock(block)
     if (uuidToBlock.contains(blockUUID)) {
       // TODO this is a case that requires special consideration
       throw Exception(s"block ${byteStringToString(blockUUID)} is in multiple functions")
@@ -300,18 +317,26 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
   // makes label boogie friendly
   private def convertLabel(procedure: Procedure, label: ByteString, blockCount: Int): String = {
-    "$" + procedure.name + "$__" + blockCount + "__$" + byteStringToString(label).replace("=", "").replace("-", "~").replace("/", "\'")
+    procedure.name + "__" + blockCount + "__" + byteStringToString(label)
+      .replace("=", "")
+      .replace("-", "~")
+      .replace("/", "\'")
   }
 
-  // handles stray assignments to the program counter (which are indirect calls that DDisasm failed to identify)
-  // also handles if statements that are not related to conditional edges in the GTIRB CFG
-  // both must be transformed to ensure correct control flow in the IR
-  private def cleanUpIfPCAssign(block: Block, procedure: Procedure): Unit = {
+  /**
+   * cleans up temporary artefacts of the lifting process
+   * handles if statements that are not related to conditional edges in the GTIRB CFG
+   * they must be transformed to ensure correct control flow in the IR
+   */
+  private def cleanUpTemporary(block: Block, procedure: Procedure): Unit = {
     var newBlockCount = 0
     var currentBlock = block
     var currentStatement = currentBlock.statements.head
     var breakLoop = false
     val queue = mutable.Queue[Block]()
+    var atomicSectionStart: Option[Block] = None
+    val atomicSectionContents: mutable.Set[Block] = mutable.Set()
+
     while (!breakLoop) {
       currentStatement match {
         // if statement not related to conditional edges - requires creating new blocks for the if statement contents
@@ -323,15 +348,84 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
           if (queue.nonEmpty) {
             currentBlock = queue.dequeue()
+            if (atomicSectionStart.nonEmpty) {
+              atomicSectionContents.add(currentBlock)
+            }
             currentStatement = currentBlock.statements.head
           } else {
             breakLoop = true
           }
+
+        case a: AtomicStart =>
+          if (atomicSectionStart.nonEmpty) {
+            // this should not happen and if there is ever any combination of instructions that causes it to happen
+            // it probably produces undefined behaviour
+            throw Exception("nested atomic sections")
+          }
+
+          // split off new block at this point
+          val afterStatements = currentBlock.statements.splitOn(a)
+          val newBlock = Block(block.label + "$__" + newBlockCount, None, afterStatements)
+          newBlockCount += 1
+          newBlock.replaceJump(currentBlock.jump)
+          currentBlock.replaceJump(GoTo(Seq(newBlock)))
+
+          currentBlock.statements.remove(a)
+          currentBlock.statements.append(Assert(TrueLiteral, Some("next block is atomic start")))
+
+          atomicSectionStart = Some(newBlock)
+          atomicSectionContents.add(newBlock)
+
+          queue.enqueue(newBlock)
+          procedure.addBlock(newBlock)
+
+          if (queue.nonEmpty) {
+            currentBlock = queue.dequeue()
+            currentStatement = currentBlock.statements.head
+          } else {
+            breakLoop = true
+          }
+
+        case a: AtomicEnd =>
+          if (atomicSectionStart.isEmpty) {
+            // this should not happen and if there is ever any combination of instructions that causes it to happen
+            // it probably produces undefined behaviour on the actual hardware
+            throw Exception("nested atomic sections")
+          }
+
+          // split off new block
+          val afterStatements = currentBlock.statements.splitOn(a)
+          val newBlock = Block(block.label + "$__" + newBlockCount, None, afterStatements)
+          newBlockCount += 1
+          newBlock.replaceJump(currentBlock.jump)
+          currentBlock.replaceJump(GoTo(Seq(newBlock)))
+
+          currentBlock.statements.remove(a)
+          currentBlock.statements.append(Assert(TrueLiteral, Some("this block is atomic end")))
+
+          queue.enqueue(newBlock)
+          procedure.addBlock(newBlock)
+
+          val atomicSection = AtomicSection(atomicSectionStart.get, currentBlock, atomicSectionContents.clone())
+          atomicSectionContents.foreach(_.atomicSection = Some(atomicSection))
+          atomicSectionStart = None
+          atomicSectionContents.clear()
+
+          if (queue.nonEmpty) {
+            currentBlock = queue.dequeue()
+            currentStatement = currentBlock.statements.head
+          } else {
+            breakLoop = true
+          }
+
         case _ =>
           if (currentBlock.statements.hasNext(currentStatement)) {
             currentStatement = currentBlock.statements.getNext(currentStatement)
           } else if (queue.nonEmpty) {
             currentBlock = queue.dequeue()
+            if (atomicSectionStart.nonEmpty) {
+              atomicSectionContents.add(currentBlock)
+            }
             currentStatement = currentBlock.statements.head
           } else {
             breakLoop = true
@@ -342,7 +436,12 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
   // handles if statements that are not related to conditional edges in the GTIRB CFG
   // this creates new blocks for the contents of the if statements and removes the TempIfs
-  private def handleIfStatement(i: TempIf, currentBlock: Block, parentLabel: String, newBlockCountIn: Int): ArrayBuffer[Block] = {
+  private def handleIfStatement(
+    i: TempIf,
+    currentBlock: Block,
+    parentLabel: String,
+    newBlockCountIn: Int
+  ): ArrayBuffer[Block] = {
     var newBlockCount = newBlockCountIn
     val newBlocks = ArrayBuffer[Block]()
 
@@ -374,8 +473,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
       val jumpCopy = currentBlock.jump match {
         case GoTo(targets, label) => GoTo(targets, label)
         case Unreachable(label) => Unreachable(label)
-        case Return(label) => Return(label)
-        case _ => throw Exception("this shouldn't be reachable")
+        case Return(label, args) => Return(label, args)
       }
       trueBlock.replaceJump(currentBlock.jump)
       falseBlock.replaceJump(jumpCopy)
@@ -387,7 +485,12 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
   }
 
   // Handles the case where a block has one outgoing edge using gtirb cfg labelling
-  private def handleSingleEdge(block: Block, edge: Edge, procedure: Procedure, procedures: ArrayBuffer[Procedure]): (Option[Call], Jump) = {
+  private def handleSingleEdge(
+    block: Block,
+    edge: Edge,
+    procedure: Procedure,
+    procedures: ArrayBuffer[Procedure]
+  ): (Option[Call], Jump) = {
     edge.getLabel match {
       case EdgeLabel(false, false, Type_Branch, _) =>
         // indirect jump, possibly to external subroutine, possibly to another block in procedure
@@ -398,14 +501,17 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
             // indirect call with no further information
             val target = block.statements.last match {
               case LocalAssign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
-              case _ => throw Exception(s"no assignment to program counter found before indirect call in block ${block.label}")
+              case _ =>
+                throw Exception(s"no assignment to program counter found before indirect call in block ${block.label}")
             }
             val label = block.statements.last.label
             block.statements.remove(block.statements.last) // remove _PC assignment
             (Some(IndirectCall(target, label)), Unreachable())
           } else if (proxySymbols.size > 1) {
             // TODO requires further consideration once encountered
-            throw Exception(s"multiple uuidToSymbol ${proxySymbols.map(_.name).mkString(", ")} associated with proxy block ${byteStringToString(edge.targetUuid)}, target of indirect call from block ${block.label}")
+            throw Exception(
+              s"multiple uuidToSymbol ${proxySymbols.map(_.name).mkString(", ")} associated with proxy block ${byteStringToString(edge.targetUuid)}, target of indirect call from block ${block.label}"
+            )
           } else {
             // indirect call to external procedure with name
             val externalName = proxySymbols.head.name
@@ -427,7 +533,9 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           val label = removePCAssign(block)
           (None, GoTo(mutable.Set(target), label))
         } else {
-          throw Exception(s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known block or proxy block")
+          throw Exception(
+            s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known block or proxy block"
+          )
         }
       case EdgeLabel(false, true, Type_Branch, _) =>
         // direct jump, either goto or tail call
@@ -448,7 +556,9 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           val label = removePCAssign(block)
           (None, GoTo(mutable.Set(target), label))
         } else {
-          throw Exception(s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known block")
+          throw Exception(
+            s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known block"
+          )
         }
       case EdgeLabel(false, _, Type_Return, _) =>
         // return statement, value of 'direct' is just whether DDisasm has resolved the return target
@@ -466,7 +576,9 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           val target = uuidToBlock(edge.targetUuid)
           (None, GoTo(mutable.Set(target)))
         } else {
-          throw Exception(s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known block")
+          throw Exception(
+            s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known block"
+          )
         }
       case EdgeLabel(false, true, Type_Call, _) =>
         // call that will not return according to DDisasm even though R30 may be set
@@ -476,7 +588,9 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           val label = removePCAssign(block)
           (Some(DirectCall(target, label)), Unreachable())
         } else {
-          throw Exception(s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known procedure entrance")
+          throw Exception(
+            s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known procedure entrance"
+          )
         }
 
       // case EdgeLabel(false, false, Type_Call, _) => probably what a blr instruction should be
@@ -485,7 +599,11 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     }
   }
 
-  def handleMultipleEdges(block: Block, outgoingEdges: mutable.Set[Edge], procedure: Procedure): (Option[Call], Jump) = {
+  def handleMultipleEdges(
+    block: Block,
+    outgoingEdges: mutable.Set[Edge],
+    procedure: Procedure
+  ): (Option[Call], Jump) = {
     val edgeLabels = outgoingEdges.map(_.getLabel)
 
     if (edgeLabels.forall { (e: EdgeLabel) => !e.conditional && e.direct && e.`type` == Type_Return }) {
@@ -502,7 +620,9 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           val target = uuidToBlock(edge.targetUuid)
           targets += target
         } else {
-          throw Exception(s"cannot handle ${edge.getLabel} from block ${block.label} as it is an unresolved indirect edge among many resolved indirect edges")
+          throw Exception(
+            s"cannot handle ${edge.getLabel} from block ${block.label} as it is an unresolved indirect edge among many resolved indirect edges"
+          )
         }
       }
       // TODO add assertion that target register is low
@@ -560,9 +680,16 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     }
   }
 
-  private def handleIndirectCallMultipleResolvedTargets(fallthrough: Edge, indirectCallTargets: ArrayBuffer[Edge], block: Block, procedure: Procedure): GoTo = {
+  private def handleIndirectCallMultipleResolvedTargets(
+    fallthrough: Edge,
+    indirectCallTargets: ArrayBuffer[Edge],
+    block: Block,
+    procedure: Procedure
+  ): GoTo = {
     if (!uuidToBlock.contains(fallthrough.targetUuid)) {
-      throw Exception(s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block")
+      throw Exception(
+        s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block"
+      )
     }
     val returnTarget = uuidToBlock(fallthrough.targetUuid)
 
@@ -572,14 +699,16 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     for (call <- indirectCallTargets) {
       // it's odd if an indirect call is only partially resolved, so throw an exception for now because this case will require further investigation
       if (!entranceUUIDtoProcedure.contains(call.targetUuid)) {
-        throw Exception(s"block ${block.label} has resolved indirect call edge to ${byteStringToString(call.targetUuid)} that does not point to a known procedure")
+        throw Exception(
+          s"block ${block.label} has resolved indirect call edge to ${byteStringToString(call.targetUuid)} that does not point to a known procedure"
+        )
       }
 
       val target = entranceUUIDtoProcedure(call.targetUuid)
       val resolvedCall = DirectCall(target)
 
       val assume = Assume(BinaryExpr(BVEQ, targetRegister, BitVecLiteral(target.address.get, 64)))
-      val label = block.label + "$" + target.name
+      val label = block.label + "_" + target.name
       newBlocks.append(Block(label, None, ArrayBuffer(assume, resolvedCall), GoTo(returnTarget)))
     }
     removePCAssign(block)
@@ -589,7 +718,9 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
   private def handleIndirectCallWithReturn(fallthrough: Edge, call: Edge, block: Block): (Option[Call], GoTo) = {
     if (!uuidToBlock.contains(fallthrough.targetUuid)) {
-      throw Exception(s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block")
+      throw Exception(
+        s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block"
+      )
     }
     val returnTarget = uuidToBlock(fallthrough.targetUuid)
 
@@ -598,37 +729,45 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
       val target = getPCTarget(block)
       val label = removePCAssign(block)
 
-      (Some(IndirectCall(target, label)), GoTo(Set(returnTarget)))
+      (Some(IndirectCall(target, label)), GoTo(mutable.Set(returnTarget)))
     } else {
       // resolved indirect call
       val target = entranceUUIDtoProcedure(call.targetUuid)
       val label = removePCAssign(block)
-      (Some(DirectCall(target, label)), GoTo(Set(returnTarget)))
+      (Some(DirectCall(target, label)), GoTo(mutable.Set(returnTarget)))
     }
   }
 
   private def handleDirectCallWithReturn(fallthrough: Edge, call: Edge, block: Block): (Option[Call], GoTo) = {
     if (!entranceUUIDtoProcedure.contains(call.targetUuid)) {
-      throw Exception(s"block ${block.label} has direct call edge to ${byteStringToString(call.targetUuid)} that does not point to a known procedure")
+      throw Exception(
+        s"block ${block.label} has direct call edge to ${byteStringToString(call.targetUuid)} that does not point to a known procedure"
+      )
     }
 
     if (!uuidToBlock.contains(fallthrough.targetUuid)) {
-      throw Exception(s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block")
+      throw Exception(
+        s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block"
+      )
     }
 
     val target = entranceUUIDtoProcedure(call.targetUuid)
     val returnTarget = uuidToBlock(fallthrough.targetUuid)
     removePCAssign(block)
-    (Some(DirectCall(target)), GoTo(Set(returnTarget)))
+    (Some(DirectCall(target)), GoTo(mutable.Set(returnTarget)))
   }
 
   private def handleConditionalBranch(fallthrough: Edge, branch: Edge, block: Block, procedure: Procedure): GoTo = {
     if (!uuidToBlock.contains(fallthrough.targetUuid)) {
-      throw Exception(s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block")
+      throw Exception(
+        s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block"
+      )
     }
 
     if (!uuidToBlock.contains(branch.targetUuid)) {
-      throw Exception(s"block ${block.label} has branch edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block")
+      throw Exception(
+        s"block ${block.label} has branch edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block"
+      )
     }
 
     val tempIf = block.statements.last match {
@@ -652,5 +791,4 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     val assume = Assume(condition, checkSecurity = true)
     Block(newLabel, None, ArrayBuffer(assume), GoTo(ArrayBuffer(target)))
   }
-
 }

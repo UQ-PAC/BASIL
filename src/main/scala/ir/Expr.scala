@@ -1,52 +1,76 @@
 package ir
-
 import boogie._
+import util.CachedHashCode
 import scala.collection.mutable
 
 sealed trait Expr {
   def toBoogie: BExpr
   def getType: IRType
-  def gammas: Set[Variable] = Set() // variables not including those inside a load's index
+
+  /** variables that occur in the expression NOT including those inside a load's index */
+  def gammas: Set[Variable] = Set()
+
+  /** all variables that occur in the expression */
   def variables: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Expr = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
+
+  lazy val variablesCached = variables
+}
+
+def size(e: Expr) = {
+  e.getType match {
+    case BitVecType(s) => Some(s)
+    case _ => None
+  }
 }
 
 sealed trait Literal extends Expr {
   override def acceptVisit(visitor: Visitor): Literal = visitor.visitLiteral(this)
 }
 
-sealed trait BoolLit extends Literal
+sealed trait BoolLit extends Literal {
+  def value: Boolean
+}
 
 case object TrueLiteral extends BoolLit {
   override def toBoogie: BoolBLiteral = TrueBLiteral
   override def getType: IRType = BoolType
   override def toString: String = "true"
+  override def value = true
 }
 
 case object FalseLiteral extends BoolLit {
   override def toBoogie: BoolBLiteral = FalseBLiteral
   override def getType: IRType = BoolType
   override def toString: String = "false"
+  override def value = false
 }
 
-case class BitVecLiteral(value: BigInt, size: Int) extends Literal {
+case class BitVecLiteral(value: BigInt, size: Int) extends Literal with CachedHashCode {
+  require(size >= 0)
+  require(value <= getType.maxValue, s"bad value: $value for width $size")
   override def toBoogie: BitVecBLiteral = BitVecBLiteral(value, size)
-  override def getType: IRType = BitVecType(size)
+  override def getType: BitVecType = BitVecType(size)
   override def toString: String = s"${value}bv$size"
 }
 
-case class IntLiteral(value: BigInt) extends Literal {
+case class IntLiteral(value: BigInt) extends Literal with CachedHashCode {
   override def toBoogie: IntBLiteral = IntBLiteral(value)
   override def getType: IRType = IntType
   override def toString: String = value.toString
 }
 
-/**
-  * @param end : high bit exclusive
-  * @param start : low bit inclusive
+/** Extracts a subsequence of bits (end..start) from body.
+  *
+  * @param end
+  *   : high bit exclusive
+  * @param start
+  *   : low bit inclusive
   * @param body
+  *
+  * Requires end > start
   */
-case class Extract(end: Int, start: Int, body: Expr) extends Expr {
+case class Extract(end: Int, start: Int, body: Expr) extends Expr with CachedHashCode {
   override def toBoogie: BExpr = BVExtract(end, start, body.toBoogie)
   override def gammas: Set[Variable] = body.gammas
   override def variables: Set[Variable] = body.variables
@@ -55,7 +79,11 @@ case class Extract(end: Int, start: Int, body: Expr) extends Expr {
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitExtract(this)
 }
 
-case class Repeat(repeats: Int, body: Expr) extends Expr {
+/** Gives repeats copies of body, concatenated.
+  *
+  * Requires repeats > 0.
+  */
+case class Repeat(repeats: Int, body: Expr) extends Expr with CachedHashCode {
   override def toBoogie: BExpr = BVRepeat(repeats, body.toBoogie)
   override def gammas: Set[Variable] = body.gammas
   override def variables: Set[Variable] = body.variables
@@ -68,7 +96,8 @@ case class Repeat(repeats: Int, body: Expr) extends Expr {
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitRepeat(this)
 }
 
-case class ZeroExtend(extension: Int, body: Expr) extends Expr {
+/** Zero-extends by extension extra bits. */
+case class ZeroExtend(extension: Int, body: Expr) extends Expr with CachedHashCode {
   override def toBoogie: BExpr = BVZeroExtend(extension, body.toBoogie)
   override def gammas: Set[Variable] = body.gammas
   override def variables: Set[Variable] = body.variables
@@ -81,7 +110,8 @@ case class ZeroExtend(extension: Int, body: Expr) extends Expr {
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitZeroExtend(this)
 }
 
-case class SignExtend(extension: Int, body: Expr) extends Expr {
+/** Sign-extends by extension extra bits. */
+case class SignExtend(extension: Int, body: Expr) extends Expr with CachedHashCode {
   override def toBoogie: BExpr = BVSignExtend(extension, body.toBoogie)
   override def gammas: Set[Variable] = body.gammas
   override def variables: Set[Variable] = body.variables
@@ -94,38 +124,41 @@ case class SignExtend(extension: Int, body: Expr) extends Expr {
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitSignExtend(this)
 }
 
-case class UnaryExpr(op: UnOp, arg: Expr) extends Expr {
+case class UnaryExpr(op: UnOp, arg: Expr) extends Expr with CachedHashCode {
   override def toBoogie: BExpr = UnaryBExpr(op, arg.toBoogie)
   override def gammas: Set[Variable] = arg.gammas
   override def variables: Set[Variable] = arg.variables
   override def getType: IRType = (op, arg.getType) match {
-    case (_: BoolUnOp, BoolType)     => BoolType
+    case (BoolToBV1, BoolType) => BitVecType(1)
+    case (_: BoolUnOp, BoolType) => BoolType
     case (_: BVUnOp, bv: BitVecType) => bv
-    case (_: IntUnOp, IntType)       => IntType
+    case (_: IntUnOp, IntType) => IntType
     case _ => throw new Exception("type mismatch, operator " + op + " type doesn't match arg: " + arg)
   }
 
   private def inSize = arg.getType match {
     case bv: BitVecType => bv.size
-    case _              => throw new Exception("type mismatch")
+    case _ => throw new Exception("type mismatch")
   }
 
   override def toString: String = op match {
+    case BoolToBV1 => s"booltobv1($arg)"
     case uOp: BoolUnOp => s"($uOp$arg)"
-    case uOp: BVUnOp   => s"bv$uOp$inSize($arg)"
-    case uOp: IntUnOp  => s"($uOp$arg)"
+    case uOp: BVUnOp => s"bv$uOp$inSize($arg)"
+    case uOp: IntUnOp => s"($uOp$arg)"
   }
 
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitUnaryExpr(this)
 }
 
-trait UnOp
+sealed trait UnOp
 
 sealed trait BoolUnOp(op: String) extends UnOp {
   override def toString: String = op
 }
 
 case object BoolNOT extends BoolUnOp("!")
+case object BoolToBV1 extends BoolUnOp("bool2bv1")
 
 sealed trait IntUnOp(op: String) extends UnOp {
   override def toString: String = op
@@ -134,7 +167,6 @@ sealed trait IntUnOp(op: String) extends UnOp {
 
 case object IntNEG extends IntUnOp("-")
 
-
 sealed trait BVUnOp(op: String) extends UnOp {
   override def toString: String = op
 }
@@ -142,7 +174,7 @@ sealed trait BVUnOp(op: String) extends UnOp {
 case object BVNOT extends BVUnOp("not")
 case object BVNEG extends BVUnOp("neg")
 
-case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
+case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr with CachedHashCode {
   override def toBoogie: BExpr = BinaryBExpr(op, arg1.toBoogie, arg2.toBoogie)
   override def gammas: Set[Variable] = arg1.gammas ++ arg2.gammas
   override def variables: Set[Variable] = arg1.variables ++ arg2.variables
@@ -157,18 +189,20 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
           if (bv1.size == bv2.size) {
             bv1
           } else {
-            throw new Exception("bitvector size mismatch")
+            throw new Exception(s"bitvector size mismatch $bv1 $bv2")
           }
         case BVCOMP =>
           if (bv1.size == bv2.size) {
             BitVecType(1)
           } else {
+            println(this)
             throw new Exception("bitvector size mismatch")
           }
         case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
           if (bv1.size == bv2.size) {
             BoolType
           } else {
+            println(this)
             throw new Exception("bitvector size mismatch")
           }
         case BVEQ | BVNEQ =>
@@ -176,16 +210,18 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
       }
     case (intOp: IntBinOp, IntType, IntType) =>
       intOp match {
-        case IntADD | IntSUB | IntMUL | IntDIV | IntMOD     => IntType
+        case IntADD | IntSUB | IntMUL | IntDIV | IntMOD => IntType
         case IntEQ | IntNEQ | IntLT | IntLE | IntGT | IntGE => BoolType
       }
     case _ =>
-      throw new Exception("type mismatch, operator " + op + " type doesn't match args: (" + arg1 + ", " + arg2 + ")")
+      throw new Exception(
+        "type mismatch, operator " + op.getClass.getSimpleName + s" type doesn't match args: (" + arg1 + ", " + arg2 + ")"
+      )
   }
 
   private def inSize = arg1.getType match {
     case bv: BitVecType => bv.size
-    case _              => throw new Exception("type mismatch")
+    case _ => throw new Exception("type mismatch")
   }
 
   override def toString: String = op match {
@@ -204,22 +240,30 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
 
 }
 
-trait BinOp
+sealed trait BinOp {
+  def opName: String
+}
 
 sealed trait BoolBinOp(op: String) extends BinOp {
   override def toString: String = op
+  def opName = op
 }
 
-case object BoolEQ extends BoolBinOp("==")
+sealed trait BoolCmpOp extends BoolBinOp
+
+case object BoolEQ extends BoolBinOp("==") with BoolCmpOp
 case object BoolNEQ extends BoolBinOp("!=")
 case object BoolAND extends BoolBinOp("&&")
 case object BoolOR extends BoolBinOp("||")
-case object BoolIMPLIES extends BoolBinOp("==>")
+case object BoolIMPLIES extends BoolBinOp("==>") with BoolCmpOp
 case object BoolEQUIV extends BoolBinOp("<==>")
 
 sealed trait BVBinOp(op: String) extends BinOp {
   override def toString: String = op
+  def opName = op
 }
+
+sealed trait BVCmpOp extends BVBinOp
 
 case object BVAND extends BVBinOp("and")
 case object BVOR extends BVBinOp("or")
@@ -229,7 +273,7 @@ case object BVUDIV extends BVBinOp("udiv")
 case object BVUREM extends BVBinOp("urem")
 case object BVSHL extends BVBinOp("shl")
 case object BVLSHR extends BVBinOp("lshr")
-case object BVULT extends BVBinOp("ult")
+case object BVULT extends BVBinOp("ult") with BVCmpOp
 case object BVNAND extends BVBinOp("nand")
 case object BVNOR extends BVBinOp("nor")
 case object BVXOR extends BVBinOp("xor")
@@ -240,31 +284,32 @@ case object BVSDIV extends BVBinOp("sdiv")
 case object BVSREM extends BVBinOp("srem")
 case object BVSMOD extends BVBinOp("smod")
 case object BVASHR extends BVBinOp("ashr")
-case object BVULE extends BVBinOp("ule")
-case object BVUGT extends BVBinOp("ugt")
-case object BVUGE extends BVBinOp("uge")
-case object BVSLT extends BVBinOp("slt")
-case object BVSLE extends BVBinOp("sle")
-case object BVSGT extends BVBinOp("sgt")
-case object BVSGE extends BVBinOp("sge")
-case object BVEQ extends BVBinOp("==")
-case object BVNEQ extends BVBinOp("!=")
+case object BVULE extends BVBinOp("ule") with BVCmpOp
+case object BVUGT extends BVBinOp("ugt") with BVCmpOp
+case object BVUGE extends BVBinOp("uge") with BVCmpOp
+case object BVSLT extends BVBinOp("slt") with BVCmpOp
+case object BVSLE extends BVBinOp("sle") with BVCmpOp
+case object BVSGT extends BVBinOp("sgt") with BVCmpOp
+case object BVSGE extends BVBinOp("sge") with BVCmpOp
+case object BVEQ extends BVBinOp("==") with BVCmpOp
+case object BVNEQ extends BVBinOp("!=") with BVCmpOp
 case object BVCONCAT extends BVBinOp("++")
 
 sealed trait IntBinOp(op: String) extends BinOp {
   override def toString: String = op
+  def opName = op
   def toBV: BVBinOp = this match {
     case IntADD => BVADD
     case IntMUL => BVMUL
     case IntSUB => BVSUB
     case IntDIV => BVSDIV
     case IntMOD => BVSMOD
-    case IntEQ  => BVEQ
+    case IntEQ => BVEQ
     case IntNEQ => BVNEQ
-    case IntLT  => BVSLT
-    case IntLE  => BVSLE
-    case IntGT  => BVSGT
-    case IntGE  => BVSGE
+    case IntLT => BVSLT
+    case IntLE => BVSLE
+    case IntGT => BVSGT
+    case IntGE => BVSGE
   }
 }
 
@@ -285,18 +330,21 @@ enum Endian {
   case BigEndian
 }
 
-case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IRType) extends Expr {
+case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IRType) extends Expr with CachedHashCode {
   override def getType: IRType = returnType
   override def toBoogie: BFunctionCall = BFunctionCall(name, params.map(_.toBoogie).toList, returnType.toBoogie, true)
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitUninterpretedFunction(this)
   override def variables: Set[Variable] = params.flatMap(_.variables).toSet
+  override def toString = s"$name(${params.mkString(", ")})"
 }
 
-// Means something has a global scope from the perspective of the IR and Boogie
-// Not the same as global in the sense of shared memory between threads
+/** Something that has a global scope from the perspective of the IR and Boogie.
+  *
+  * Not the same as global in the sense of shared memory between threads.
+  */
 sealed trait Global
 
-// A variable that is accessible without a memory load/store
+/** A variable that is accessible without a memory load/store. */
 sealed trait Variable extends Expr {
   val name: String
   val irType: IRType
@@ -313,9 +361,16 @@ sealed trait Variable extends Expr {
     throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
-// Variable with global scope (in a 'accessible from any procedure' sense), not related to the concurrent shared memory sense
-// These are all hardware registers
-case class Register(override val name: String, size: Int) extends Variable with Global {
+object Variable {
+  implicit def ordering[V <: Variable]: Ordering[V] = Ordering.by(_.name)
+}
+
+/** Hardware registers.
+  *
+  * These are variables with global scope (in a 'accessible from any procedure' sense), not related to the concurrent
+  * shared memory sense.
+  */
+case class Register(override val name: String, size: Int) extends Variable with Global with CachedHashCode {
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Global)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Global)
   override def toString: String = s"Register(${name}, $irType)"
@@ -323,15 +378,23 @@ case class Register(override val name: String, size: Int) extends Variable with 
   override val irType: BitVecType = BitVecType(size)
 }
 
-// Variable with scope local to the procedure, typically a temporary variable created in the lifting process
-case class LocalVar(override val name: String, override val irType: IRType) extends Variable {
+/** Variable with scope local to the procedure, typically a temporary variable created in the lifting process. */
+case class LocalVar(varName: String, override val irType: IRType, val index: Int = 0)
+    extends Variable
+    with CachedHashCode {
+  override val name = varName + (if (index > 0) then s"_$index" else "")
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
-  override def toString: String = s"LocalVar($name, $irType)"
+  override def toString: String = s"LocalVar(${name}, $irType)"
   override def acceptVisit(visitor: Visitor): Variable = visitor.visitLocalVar(this)
 }
 
-// A memory section
+object LocalVar {
+  def unapply(l: LocalVar): Some[(String, IRType, Int)] = Some((l.name, l.irType, l.index))
+
+}
+
+/** A global memory section (subject to shared-memory concurrent accesses from multiple threads). */
 sealed trait Memory extends Global {
   val name: String
   val addressSize: Int
@@ -345,12 +408,46 @@ sealed trait Memory extends Global {
     throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
-// A stack section of memory, which is local to a thread
-case class StackMemory(override val name: String, override val addressSize: Int, override val valueSize: Int) extends Memory {
+/** A stack area of memory, which is local to a thread. */
+case class StackMemory(override val name: String, override val addressSize: Int, override val valueSize: Int)
+    extends Memory {
   override def acceptVisit(visitor: Visitor): Memory = visitor.visitStackMemory(this)
 }
 
-// A non-stack region of memory, which is shared between threads
-case class SharedMemory(override val name: String, override val addressSize: Int, override val valueSize: Int) extends Memory {
+/** A non-stack region of memory, which may be shared between threads. */
+case class SharedMemory(override val name: String, override val addressSize: Int, override val valueSize: Int)
+    extends Memory {
   override def acceptVisit(visitor: Visitor): Memory = visitor.visitSharedMemory(this)
+}
+
+enum QuantifierSort:
+  case exists
+  case forall
+
+case class LambdaExpr(binds: List[LocalVar], body: Expr) extends Expr {
+  override def getType = uncurryFunctionType(binds.map(_.getType), body.getType)
+  override def toBoogie = Lambda(binds.map(_.toBoogie), body.toBoogie)
+  def returnType = body.getType
+}
+
+case class QuantifierExpr(kind: QuantifierSort, body: LambdaExpr) extends Expr {
+  require(body.returnType == BoolType, "Type error: quantifier with non-boolean body")
+  override def getType: IRType = BoolType
+  def toBoogie: BExpr = {
+    val b = body.binds.map(_.toBoogie)
+    val bdy = body.body.toBoogie
+    kind match {
+      case QuantifierSort.forall => ForAll(b, bdy)
+      case QuantifierSort.exists => Exists(b, bdy)
+    }
+  }
+  override def variables: Set[Variable] = body.variables
+
+}
+
+case class OldExpr(body: Expr) extends Expr {
+  override def acceptVisit(visitor: Visitor): Expr = body.acceptVisit(visitor)
+  override def toString = s"old($body)"
+  def getType = body.getType
+  def toBoogie = Old(body.toBoogie)
 }

@@ -1,23 +1,23 @@
 package ir.transforms
 
-import analysis.{DataRegion, MemoryRegion, RegisterWrapperEqualSets, getDefinition}
+import analysis.{DataRegion, FlatElement, MemoryRegion, RegisterWrapperEqualSets, getSSADefinition}
 import ir.*
 
 import scala.collection.mutable
 
+def splitThreads(
+  program: Program,
+  pointsTo: Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]],
+  reachingDefs: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
+): Unit = {
 
-def splitThreads(program: Program,
-                 pointsTo: Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]],
-                 reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
-                ): Unit = {
-  
   // iterate over all commands - if call is to pthread_create, look up
   program.foreach {
-    case d: DirectCall if d.target.name == "pthread_create" =>
+    case d: DirectCall if d.target.procName == "pthread_create" =>
       // R2 should hold the function pointer of the function that begins the thread
       // look up R2 value using points to results
       val R2 = Register("R2", 64)
-      val R2Wrapper = RegisterWrapperEqualSets(R2, getDefinition(R2, d, reachingDefs))
+      val R2Wrapper = RegisterWrapperEqualSets(R2, getSSADefinition(R2, d, reachingDefs))
       val threadTargets = pointsTo(R2Wrapper)
 
       if (threadTargets.size > 1) {

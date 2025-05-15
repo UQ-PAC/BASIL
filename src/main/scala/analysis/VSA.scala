@@ -7,7 +7,7 @@ import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import scala.collection.immutable
-import util.Logger
+import util.VSALogger
 
 /** ValueSets are PowerSet of possible values */
 trait Value
@@ -20,9 +20,7 @@ case class LiteralValue(expr: BitVecLiteral) extends Value {
   override def toString: String = "Literal(" + expr + ")"
 }
 
-trait ValueSetAnalysis(program: Program,
-                       mmm: MemoryModelMap,
-                       constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) {
+trait ValueSetAnalysis(program: Program, mmm: MemoryModelMap) {
 
   val powersetLattice: PowersetLattice[Value] = PowersetLattice()
 
@@ -30,84 +28,83 @@ trait ValueSetAnalysis(program: Program,
 
   val liftedLattice: LiftLattice[Map[Variable | MemoryRegion, Set[Value]], mapLattice.type] = LiftLattice(mapLattice)
 
-  val lattice: MapLattice[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]], LiftLattice[Map[Variable | MemoryRegion, Set[Value]], mapLattice.type]] = MapLattice(liftedLattice)
+  val lattice: MapLattice[
+    CFGPosition,
+    LiftedElement[Map[Variable | MemoryRegion, Set[Value]]],
+    LiftLattice[Map[Variable | MemoryRegion, Set[Value]], mapLattice.type]
+  ] = MapLattice(liftedLattice)
 
   val first: Set[CFGPosition] = Set(program.mainProcedure)
 
   private val mallocVariable = Register("R0", 64)
 
-  def canCoerceIntoDataRegion(bitVecLiteral: BitVecLiteral, size: Int): Option[DataRegion] = {
-    mmm.findDataObject(bitVecLiteral.value)
+  def findLoadedWithPreDefined(s: Map[Variable | MemoryRegion, Set[Value]], region: MemoryRegion): Set[MemoryRegion] = {
+    // check if relocated
+    region match {
+      case dataRegion: DataRegion =>
+        val relocated = mmm.relocatedDataRegion(dataRegion.start)
+        if (relocated.isDefined) {
+          return Set(relocated.get)
+        }
+        if (mmm.externalFunctions.contains(dataRegion.start)) {
+          return Set(
+            dataRegion
+          ) // TODO: works for syscall:clang_O2 load of external function but it is a memLoad so it should be getting what is loaded?
+        }
+      case _ =>
+    }
+    // get only the address values
+    s(region).collect { case a: AddressValue => a.region }
   }
 
   /** Default implementation of eval.
     */
   def eval(cmd: Command, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = {
     cmd match {
-      case directCall: DirectCall if directCall.target.name == "malloc" =>
+      case directCall: DirectCall if directCall.target.procName == "malloc" =>
         val regions = mmm.nodeToRegion(cmd)
         // malloc variable
         s + (mallocVariable -> regions.map(r => AddressValue(r)))
       case localAssign: LocalAssign =>
-        val regions = mmm.nodeToRegion(cmd)
+        val regions = mmm.nodeToRegion(localAssign)
         if (regions.nonEmpty) {
           s + (localAssign.lhs -> regions.map(r => AddressValue(r)))
         } else {
-          evaluateExpression(localAssign.rhs, constantProp(cmd)) match {
-            case Some(bitVecLiteral: BitVecLiteral) =>
-              val possibleData = canCoerceIntoDataRegion(bitVecLiteral, 1)
-              if (possibleData.isDefined) {
-                s + (localAssign.lhs -> Set(AddressValue(possibleData.get)))
-              } else {
-                s + (localAssign.lhs -> Set(LiteralValue(bitVecLiteral)))
-              }
+          val unwrapValue = unwrapExprToVar(localAssign.rhs)
+          unwrapValue match {
+            case Some(v: Variable) =>
+              s + (localAssign.lhs -> s(v))
             case None =>
-              // TODO this is not at all sound
-              val unwrapValue = unwrapExprToVar(localAssign.rhs)
-              unwrapValue match {
-                case Some(v: Variable) =>
-                  s + (localAssign.lhs -> s(v))
-                case None =>
-                  Logger.debug(s"Too Complex: ${localAssign.rhs}") // do nothing
-                  s
-              }
+              VSALogger.debug(s"Too Complex: $localAssign") // do nothing
+              s
           }
         }
       case load: MemoryLoad =>
-        val regions = mmm.nodeToRegion(cmd)
+        val regions = mmm.nodeToRegion(load)
         if (regions.nonEmpty) {
-          s + (load.lhs -> regions.map(r => AddressValue(r)))
+          s + (load.lhs -> regions.flatMap(r => findLoadedWithPreDefined(s, r)).map(r => AddressValue(r)))
         } else {
-          // TODO this is blatantly incorrect but maintaining current functionality to start
+          // TODO: obviously unsound
           val unwrapValue = unwrapExprToVar(load.index)
           unwrapValue match {
             case Some(v: Variable) =>
-              s + (load.lhs -> s(v))
+              s + (load.lhs -> s(v)
+                .flatMap(r => findLoadedWithPreDefined(s, r.asInstanceOf[AddressValue].region))
+                .map(r => AddressValue(r)))
             case None =>
-              Logger.debug(s"Too Complex: ${load.index}") // do nothing
+              VSALogger.debug(s"Too Complex: $load") // do nothing
               s
           }
         }
       case store: MemoryStore =>
-        val regions = mmm.nodeToRegion(cmd)
-        evaluateExpression(store.value, constantProp(cmd)) match {
-          case Some(bitVecLiteral: BitVecLiteral) =>
-            val possibleData = canCoerceIntoDataRegion(bitVecLiteral, store.size)
-            if (possibleData.isDefined) {
-              s ++ regions.map(r => r -> Set(AddressValue(possibleData.get)))
-            } else {
-              s ++ regions.map(r => r -> Set(LiteralValue(bitVecLiteral)))
-            }
+        val regions = mmm.nodeToRegion(store)
+        val unwrapValue = unwrapExprToVar(store.value)
+        unwrapValue match {
+          case Some(v: Variable) =>
+            s ++ regions.map(r => r -> s(v))
           case None =>
-            // TODO: unsound
-            val unwrapValue = unwrapExprToVar(store.value)
-            unwrapValue match {
-              case Some(v: Variable) =>
-                s ++ regions.map(r => r -> s(v))
-              case None =>
-                Logger.debug(s"Too Complex: $store.value") // do nothing
-                s
-            }
+            VSALogger.debug(s"Too Complex: $store") // do nothing
+            s
         }
       case _ =>
         s
@@ -116,7 +113,10 @@ trait ValueSetAnalysis(program: Program,
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
-  def transferUnlifted(n: CFGPosition, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = {
+  def transferUnlifted(
+    n: CFGPosition,
+    s: Map[Variable | MemoryRegion, Set[Value]]
+  ): Map[Variable | MemoryRegion, Set[Value]] = {
     n match {
       case p: Procedure =>
         mmm.pushContext(p.name)
@@ -132,16 +132,20 @@ trait ValueSetAnalysis(program: Program,
   }
 }
 
-class ValueSetAnalysisSolver(
-    program: Program,
-    mmm: MemoryModelMap,
-    constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-) extends ValueSetAnalysis(program, mmm, constantProp)
+class ValueSetAnalysisSolver(program: Program, mmm: MemoryModelMap)
+    extends ValueSetAnalysis(program, mmm)
     with IRIntraproceduralForwardDependencies
     with Analysis[Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]]
-    with WorklistFixpointSolverWithReachability[CFGPosition, Map[Variable | MemoryRegion, Set[Value]], MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]] {
+    with WorklistFixpointSolverWithReachability[
+      CFGPosition,
+      Map[Variable | MemoryRegion, Set[Value]],
+      MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]
+    ] {
 
-  override def funsub(n: CFGPosition, x: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]): LiftedElement[Map[Variable | MemoryRegion, Set[Value]]] = {
+  override def funsub(
+    n: CFGPosition,
+    x: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
+  ): LiftedElement[Map[Variable | MemoryRegion, Set[Value]]] = {
     n match {
       // function entry nodes are always reachable as this is intraprocedural
       case _: Procedure => liftedLattice.lift(mapLattice.bottom)

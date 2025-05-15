@@ -5,7 +5,7 @@ import collection.mutable
 
 import java.io.Writer
 
-trait BExpr {
+sealed trait BExpr {
   def getType: BType
   def functionOps: Set[FunctionOp] = Set()
   def locals: Set[BVar] = Set()
@@ -13,9 +13,41 @@ trait BExpr {
   def params: Set[BVar] = Set()
   def specGlobals: Set[SpecGlobalOrAccess] = Set()
   def oldSpecGlobals: Set[SpecGlobalOrAccess] = Set()
+  def specGammas: Set[SpecGlobalOrAccess] = Set()
+  def oldSpecGammas: Set[SpecGlobalOrAccess] = Set()
   def loads: Set[BExpr] = Set()
   def serialiseBoogie(w: Writer): Unit = w.append(toString)
   def acceptVisit(visitor: BVisitor): BExpr = this
+
+  var label: Option[String] = None
+
+  def simplify: BExpr =
+    this match {
+      case BinaryBExpr(BoolAND, a, b) =>
+        (a.simplify, b.simplify) match {
+          case (TrueBLiteral, b) => b
+          case (a, TrueBLiteral) => a
+          case (FalseBLiteral, _) => FalseBLiteral
+          case (_, FalseBLiteral) => FalseBLiteral
+          case (a, b) => BinaryBExpr(BoolAND, a, b)
+        }
+      case BinaryBExpr(BoolOR, a, b) =>
+        (a.simplify, b.simplify) match {
+          case (TrueBLiteral, _) => TrueBLiteral
+          case (_, TrueBLiteral) => TrueBLiteral
+          case (FalseBLiteral, b) => b
+          case (a, FalseBLiteral) => a
+          case (a, b) => BinaryBExpr(BoolOR, a, b)
+        }
+      case BinaryBExpr(BoolIMPLIES, a, b) =>
+        (a.simplify, b.simplify) match {
+          case (TrueBLiteral, b) => b
+          case (FalseBLiteral, _) => TrueBLiteral
+          case (_, TrueBLiteral) => TrueBLiteral
+          case (a, b) => BinaryBExpr(BoolIMPLIES, a, b)
+        }
+      case _ => this
+    }
 }
 
 trait BLiteral extends BExpr
@@ -56,6 +88,8 @@ case class BVExtract(end: Int, start: Int, body: BExpr) extends BExpr {
   override def params: Set[BVar] = body.params
   override def specGlobals: Set[SpecGlobalOrAccess] = body.specGlobals
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] = body.oldSpecGlobals
+  override def specGammas: Set[SpecGlobalOrAccess] = body.specGammas
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = body.oldSpecGammas
   override def loads: Set[BExpr] = body.loads
 
   override def serialiseBoogie(w: Writer): Unit = {
@@ -94,6 +128,8 @@ case class BVRepeat(repeats: Int, body: BExpr) extends BExpr {
   override def params: Set[BVar] = body.params
   override def specGlobals: Set[SpecGlobalOrAccess] = body.specGlobals
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] = body.oldSpecGlobals
+  override def specGammas: Set[SpecGlobalOrAccess] = body.specGammas
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = body.oldSpecGammas
   override def loads: Set[BExpr] = body.loads
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitBVRepeat(this)
 }
@@ -126,6 +162,8 @@ case class BVZeroExtend(extension: Int, body: BExpr) extends BExpr {
   override def params: Set[BVar] = body.params
   override def specGlobals: Set[SpecGlobalOrAccess] = body.specGlobals
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] = body.oldSpecGlobals
+  override def specGammas: Set[SpecGlobalOrAccess] = body.specGammas
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = body.oldSpecGammas
   override def loads: Set[BExpr] = body.loads
 
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitBVZeroExtend(this)
@@ -159,6 +197,8 @@ case class BVSignExtend(extension: Int, body: BExpr) extends BExpr {
   override def params: Set[BVar] = body.params
   override def specGlobals: Set[SpecGlobalOrAccess] = body.specGlobals
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] = body.oldSpecGlobals
+  override def specGammas: Set[SpecGlobalOrAccess] = body.specGammas
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = body.oldSpecGammas
   override def loads: Set[BExpr] = body.loads
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitBVSignExtend(this)
 }
@@ -175,11 +215,11 @@ abstract class BVar(val name: String, val bType: BType, val scope: Scope) extend
   }
   override def locals: Set[BVar] = scope match {
     case Scope.Local => Set(this)
-    case _           => Set()
+    case _ => Set()
   }
   override def globals: Set[BVar] = scope match {
     case Scope.Global => Set(this)
-    case _            => Set()
+    case _ => Set()
   }
   override def params: Set[BVar] = scope match {
     case Scope.Parameter => Set(this)
@@ -207,7 +247,8 @@ case class BMapVar(override val name: String, override val bType: MapBType, over
   override val getType: MapBType = bType
 }
 
-case class BFunctionCall(name: String, args: List[BExpr], outType: BType, uninterpreted: Boolean = false) extends BExpr {
+case class BFunctionCall(name: String, args: List[BExpr], outType: BType, uninterpreted: Boolean = false)
+    extends BExpr {
   override val getType: BType = outType
   override def toString: String = s"$name(${args.mkString(", ")})"
   override def functionOps: Set[FunctionOp] = {
@@ -223,31 +264,36 @@ case class BFunctionCall(name: String, args: List[BExpr], outType: BType, uninte
   override def params: Set[BVar] = args.flatMap(a => a.params).toSet
   override def specGlobals: Set[SpecGlobalOrAccess] = args.flatMap(a => a.specGlobals).toSet
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] = args.flatMap(a => a.oldSpecGlobals).toSet
+  override def specGammas: Set[SpecGlobalOrAccess] = args.flatMap(a => a.specGammas).toSet
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = args.flatMap(a => a.oldSpecGammas).toSet
   override def loads: Set[BExpr] = args.flatMap(a => a.loads).toSet
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitBFunctionCall(this)
 }
 
 case class UnaryBExpr(op: UnOp, arg: BExpr) extends BExpr {
   override def getType: BType = (op, arg.getType) match {
-    case (_: BoolUnOp, BoolBType)     => BoolBType
+    case (BoolToBV1, BoolBType) => BitVecBType(1)
+    case (_: BoolUnOp, BoolBType) => BoolBType
     case (_: BVUnOp, bv: BitVecBType) => bv
-    case (_: IntUnOp, IntBType)       => IntBType
+    case (_: IntUnOp, IntBType) => IntBType
     case _ => throw new Exception("type mismatch, operator " + op + " type doesn't match arg: " + arg)
   }
 
   private def inSize = arg.getType match {
     case bv: BitVecBType => bv.size
-    case _               => throw new Exception(s"Expected Bv but got ${arg.getType}")
+    case _ => throw new Exception(s"Expected Bv but got ${arg.getType}")
   }
 
   override def toString: String = op match {
+    case BoolToBV1 => s"$op($arg)"
     case uOp: BoolUnOp => s"($uOp$arg)"
-    case uOp: BVUnOp   => s"bv$uOp$inSize($arg)"
-    case uOp: IntUnOp  => s"($uOp$arg)"
+    case uOp: BVUnOp => s"bv$uOp$inSize($arg)"
+    case uOp: IntUnOp => s"($uOp$arg)"
   }
 
   override def functionOps: Set[FunctionOp] = {
     val thisFn = op match {
+      case b @ BoolToBV1 => Set(BoolToBV1Op(arg))
       case b: BVUnOp =>
         Set(BVFunctionOp(s"bv$b$inSize", s"bv$b", List(BParam(arg.getType)), BParam(getType)))
       case _ => Set()
@@ -260,6 +306,8 @@ case class UnaryBExpr(op: UnOp, arg: BExpr) extends BExpr {
   override def params: Set[BVar] = arg.params
   override def specGlobals: Set[SpecGlobalOrAccess] = arg.specGlobals
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] = arg.oldSpecGlobals
+  override def specGammas: Set[SpecGlobalOrAccess] = arg.specGammas
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = arg.oldSpecGammas
   override def loads: Set[BExpr] = arg.loads
 
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitUnaryBExpr(this)
@@ -296,7 +344,7 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
       }
     case (intOp: IntBinOp, IntBType, IntBType) =>
       intOp match {
-        case IntADD | IntSUB | IntMUL | IntDIV | IntMOD     => IntBType
+        case IntADD | IntSUB | IntMUL | IntDIV | IntMOD => IntBType
         case IntEQ | IntNEQ | IntLT | IntLE | IntGT | IntGE => BoolBType
       }
     case _ =>
@@ -305,7 +353,7 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
 
   private def inSize = arg1.getType match {
     case bv: BitVecBType => bv.size
-    case _               => throw new Exception("type mismatch")
+    case _ => throw new Exception("type mismatch")
   }
 
   override def serialiseBoogie(w: Writer): Unit = {
@@ -316,13 +364,15 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
       val next = traversalQueue.pop()
 
       def infix(b: BinaryBExpr): Unit = traversalQueue.pushAll(Seq("(", b.arg1, s" ${b.op} ", b.arg2, ")").reverse)
-      def prefix(b: BinaryBExpr): Unit = traversalQueue.pushAll(Seq(s"bv${b.op}${b.inSize}(", b.arg1, ",", b.arg2, ")").reverse)
+      def prefix(b: BinaryBExpr): Unit =
+        traversalQueue.pushAll(Seq(s"bv${b.op}${b.inSize}(", b.arg1, ",", b.arg2, ")").reverse)
 
       next match
         case b: BinaryBExpr =>
           b.op match {
             case bOp: BoolBinOp => infix(b)
-            case bOp: BVBinOp => bOp match {
+            case bOp: BVBinOp =>
+              bOp match {
                 case BVEQ | BVNEQ | BVCONCAT => infix(b)
                 case _ => prefix(b)
               }
@@ -366,6 +416,8 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
   override def params: Set[BVar] = arg1.params ++ arg2.params
   override def specGlobals: Set[SpecGlobalOrAccess] = arg1.specGlobals ++ arg2.specGlobals
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] = arg1.oldSpecGlobals ++ arg2.oldSpecGlobals
+  override def specGammas: Set[SpecGlobalOrAccess] = arg1.specGammas ++ arg2.specGammas
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = arg1.oldSpecGammas ++ arg2.oldSpecGammas
   override def loads: Set[BExpr] = arg1.loads ++ arg2.loads
 
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitBinaryBExpr(this)
@@ -388,12 +440,15 @@ case class IfThenElse(guard: BExpr, thenExpr: BExpr, elseExpr: BExpr) extends BE
   override def specGlobals: Set[SpecGlobalOrAccess] = guard.specGlobals ++ thenExpr.specGlobals ++ elseExpr.specGlobals
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] =
     guard.oldSpecGlobals ++ thenExpr.oldSpecGlobals ++ elseExpr.oldSpecGlobals
+  override def specGammas: Set[SpecGlobalOrAccess] = guard.specGammas ++ thenExpr.specGammas ++ elseExpr.specGammas
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] =
+    guard.oldSpecGammas ++ thenExpr.oldSpecGammas ++ elseExpr.oldSpecGammas
   override def loads: Set[BExpr] = guard.loads ++ thenExpr.loads ++ elseExpr.loads
 
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitIfThenElse(this)
 }
 
-trait QuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr) extends BExpr {
+trait BQuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr) extends BExpr {
   override def toString: String = {
     val boundString = bound.map(_.withType).mkString(", ")
     s"($sort $boundString :: ($body))"
@@ -405,6 +460,8 @@ trait QuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr) extends B
   override def params: Set[BVar] = body.params -- bound.toSet
   override def specGlobals: Set[SpecGlobalOrAccess] = body.specGlobals
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] = body.oldSpecGlobals
+  override def specGammas: Set[SpecGlobalOrAccess] = body.specGammas
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = body.oldSpecGammas
   override def loads: Set[BExpr] = body.loads
 }
 
@@ -414,11 +471,11 @@ enum Quantifier {
   case lambda
 }
 
-case class ForAll(bound: List[BVar], body: BExpr) extends QuantifierExpr(Quantifier.forall, bound, body)
+case class ForAll(bound: List[BVar], body: BExpr) extends BQuantifierExpr(Quantifier.forall, bound, body)
 
-case class Exists(bound: List[BVar], body: BExpr) extends QuantifierExpr(Quantifier.exists, bound, body)
+case class Exists(bound: List[BVar], body: BExpr) extends BQuantifierExpr(Quantifier.exists, bound, body)
 
-case class Lambda(bound: List[BVar], body: BExpr) extends QuantifierExpr(Quantifier.lambda, bound, body)
+case class Lambda(bound: List[BVar], body: BExpr) extends BQuantifierExpr(Quantifier.lambda, bound, body)
 
 case class Old(body: BExpr) extends BExpr {
   override def toString: String = s"old($body)"
@@ -428,6 +485,7 @@ case class Old(body: BExpr) extends BExpr {
   override def globals: Set[BVar] = body.globals
   override def params: Set[BVar] = body.params
   override def oldSpecGlobals: Set[SpecGlobalOrAccess] = body.specGlobals
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = body.specGammas
   override def loads: Set[BExpr] = body.loads
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitOld(this)
 }
@@ -460,10 +518,11 @@ case class BVFunctionOp(name: String, bvbuiltin: String, in: List[BVar], out: BV
 
 case class MemoryLoadOp(addressSize: Int, valueSize: Int, endian: Endian, bits: Int) extends FunctionOp {
   val accesses: Int = bits / valueSize
+  assert(accesses > 0)
 
   val fnName: String = endian match {
     case Endian.LittleEndian => s"memory_load${bits}_le"
-    case Endian.BigEndian    => s"memory_load${bits}_be"
+    case Endian.BigEndian => s"memory_load${bits}_be"
   }
 }
 case class MemoryStoreOp(addressSize: Int, valueSize: Int, endian: Endian, bits: Int) extends FunctionOp {
@@ -471,7 +530,7 @@ case class MemoryStoreOp(addressSize: Int, valueSize: Int, endian: Endian, bits:
 
   val fnName: String = endian match {
     case Endian.LittleEndian => s"memory_store${bits}_le"
-    case Endian.BigEndian    => s"memory_store${bits}_be"
+    case Endian.BigEndian => s"memory_store${bits}_be"
   }
 }
 case class GammaLoadOp(addressSize: Int, bits: Int, accesses: Int) extends FunctionOp {
@@ -482,9 +541,8 @@ case class GammaStoreOp(addressSize: Int, bits: Int, accesses: Int) extends Func
 }
 case class LOp(indexType: BType) extends FunctionOp
 
-/**
- * Utility to extract a particular byte from a bitvector.
- */
+/** Utility to extract a particular byte from a bitvector.
+  */
 case class ByteExtract(valueSize: Int, offsetSize: Int) extends FunctionOp {
   val fnName: String = s"byte_extract${valueSize}_${offsetSize}"
 }
@@ -494,12 +552,12 @@ case class BByteExtract(value: BExpr, offset: BExpr) extends BExpr {
 
   val valueSize: Int = value.getType match {
     case b: BitVecBType => b.size
-    case _              => throw new Exception(s"ByteExtract does not have Bitvector type: $this")
+    case _ => throw new Exception(s"ByteExtract does not have Bitvector type: $this")
   }
 
   val offsetSize: Int = offset.getType match {
     case b: BitVecBType => b.size
-    case _              => throw new Exception(s"ByteExtract does not have Bitvector type: $this")
+    case _ => throw new Exception(s"ByteExtract does not have Bitvector type: $this")
   }
 
   val fnName: String = s"byte_extract${valueSize}_${offsetSize}"
@@ -513,17 +571,15 @@ case class BByteExtract(value: BExpr, offset: BExpr) extends BExpr {
   override def loads: Set[BExpr] = value.loads ++ offset.loads
 }
 
-/**
- * Utility to test if a particular value i is within the bounds of a base variable
- * and some length. Factors in the problem of wrap around, given the base + length
- * exceeds the bitvector size.
- *
- * Assumes all inputs are of the same bitvector width.
- */
+/** Utility to test if a particular value i is within the bounds of a base variable and some length. Factors in the
+  * problem of wrap around, given the base + length exceeds the bitvector size.
+  *
+  * Assumes all inputs are of the same bitvector width.
+  */
 case class InBounds(bits: Int, endian: Endian) extends FunctionOp {
   val fnName: String = endian match {
     case Endian.LittleEndian => s"in_bounds${bits}_le"
-    case Endian.BigEndian=> s"in_bounds${bits}_be"
+    case Endian.BigEndian => s"in_bounds${bits}_be"
   }
 }
 
@@ -534,36 +590,42 @@ case class BInBounds(base: BExpr, len: BExpr, endian: Endian, i: BExpr) extends 
 
   val baseSize: Int = base.getType match {
     case b: BitVecBType => b.size
-    case _              => throw new Exception(s"InBounds does not have Bitvector type: $this")
+    case _ => throw new Exception(s"InBounds does not have Bitvector type: $this")
   }
 
-  val fnName: String = s"in_bounds${baseSize}"
+  val fnName: String = s"in_bounds${baseSize}_${if endian == Endian.LittleEndian then "le" else "be"}"
 
   override val getType: BType = BoolBType
   override def functionOps: Set[FunctionOp] =
     base.functionOps ++ len.functionOps ++ i.functionOps + InBounds(baseSize, endian)
-  override def locals: Set[BVar]  = base.locals ++ len.locals ++ i.locals
+  override def locals: Set[BVar] = base.locals ++ len.locals ++ i.locals
   override def globals: Set[BVar] = base.globals ++ len.globals ++ i.globals
   override def params: Set[BVar] = base.params ++ len.params ++ i.params
-  override def loads: Set[BExpr]  = base.loads ++ len.loads ++ i.loads 
+  override def loads: Set[BExpr] = base.loads ++ len.loads ++ i.loads
+}
+
+case class BoolToBV1Op(arg: BExpr) extends FunctionOp {
+  def attribute: BAttribute = BAttribute("inline", None)
+  val fnName: String = "bool2bv1"
 }
 
 case class BMemoryLoad(memory: BMapVar, index: BExpr, endian: Endian, bits: Int) extends BExpr {
   override def toString: String = s"$fnName($memory, $index)"
+  assert(bits >= 8)
 
   val fnName: String = endian match {
     case Endian.LittleEndian => s"memory_load${bits}_le"
-    case Endian.BigEndian    => s"memory_load${bits}_be"
+    case Endian.BigEndian => s"memory_load${bits}_be"
   }
 
   val addressSize: Int = memory.getType.param match {
     case b: BitVecBType => b.size
-    case _              => throw new Exception(s"MemoryStore does not have Bitvector type: $this")
+    case _ => throw new Exception(s"MemoryStore does not have Bitvector type: $this")
   }
 
   val valueSize: Int = memory.getType.result match {
     case b: BitVecBType => b.size
-    case _              => throw new Exception(s"MemoryLoad does not have Bitvector type: $this")
+    case _ => throw new Exception(s"MemoryLoad does not have Bitvector type: $this")
   }
 
   override val getType: BType = BitVecBType(bits)
@@ -580,17 +642,17 @@ case class BMemoryStore(memory: BMapVar, index: BExpr, value: BExpr, endian: End
 
   val fnName: String = endian match {
     case Endian.LittleEndian => s"memory_store${bits}_le"
-    case Endian.BigEndian    => s"memory_store${bits}_be"
+    case Endian.BigEndian => s"memory_store${bits}_be"
   }
 
   val addressSize: Int = memory.getType.param match {
     case b: BitVecBType => b.size
-    case _              => throw new Exception(s"MemoryStore does not have Bitvector type: $this")
+    case _ => throw new Exception(s"MemoryStore does not have Bitvector type: $this")
   }
 
   val valueSize: Int = memory.getType.result match {
     case b: BitVecBType => b.size
-    case _              => throw new Exception(s"MemoryStore does not have Bitvector type: $this")
+    case _ => throw new Exception(s"MemoryStore does not have Bitvector type: $this")
   }
 
   override val getType: BType = memory.getType
@@ -613,7 +675,7 @@ case class GammaLoad(gammaMap: BMapVar, index: BExpr, bits: Int, accesses: Int) 
 
   val addressSize: Int = gammaMap.getType.param match {
     case b: BitVecBType => b.size
-    case _              => throw new Exception(s"GammaLoad does not have Bitvector type: $this")
+    case _ => throw new Exception(s"GammaLoad does not have Bitvector type: $this")
   }
 
   val valueSize: Int = bits / accesses
@@ -633,7 +695,7 @@ case class GammaStore(gammaMap: BMapVar, index: BExpr, value: BExpr, bits: Int, 
 
   val addressSize: Int = gammaMap.getType.param match {
     case b: BitVecBType => b.size
-    case _              => throw new Exception(s"GammaStore does not have Bitvector type: $this")
+    case _ => throw new Exception(s"GammaStore does not have Bitvector type: $this")
   }
 
   val valueSize: Int = bits / accesses
@@ -659,4 +721,55 @@ case class L(memories: List[BMapVar], index: BExpr) extends BExpr {
   override def globals: Set[BVar] = index.globals ++ memories.flatMap(_.globals)
   override def params: Set[BVar] = index.params ++ memories.flatMap(_.params)
   override def loads: Set[BExpr] = index.loads
+}
+
+/** spec * */
+
+trait SpecVar extends BExpr {
+  val address: BigInt
+  override def getType: BType = {
+    throw new Exception("getType called on SpecVar")
+  }
+}
+
+trait SpecGlobalOrAccess extends SpecVar with Ordered[SpecGlobalOrAccess] {
+  val toAddrVar: BExpr
+  val toOldVar: BVar
+  val toOldGamma: BVar
+  val size: Int
+
+  def compare(that: SpecGlobalOrAccess): Int = address.compare(that.address)
+}
+
+case class SpecGlobal(
+  override val name: String,
+  override val size: Int,
+  arraySize: Option[Int],
+  override val address: BigInt
+) extends SymbolTableEntry,
+      SpecGlobalOrAccess {
+  override def specGlobals: Set[SpecGlobalOrAccess] = Set(this)
+  override val toAddrVar: BVar = BVariable("$" + s"${name}_addr", BitVecBType(64), Scope.Const)
+  override val toOldVar: BVar = BVariable(s"${name}_old", BitVecBType(size), Scope.Local)
+  override val toOldGamma: BVar = BVariable(s"Gamma_${name}_old", BoolBType, Scope.Local)
+  val toAxiom: BAxiom = BAxiom(BinaryBExpr(BoolEQ, toAddrVar, BitVecBLiteral(address, 64)), List.empty)
+  override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitSpecGlobal(this)
+}
+
+case class SpecGamma(global: SpecGlobal) extends SpecVar {
+  override val address: BigInt = global.address
+  val size: Int = global.size
+  override def specGammas: Set[SpecGlobalOrAccess] = Set(this.global)
+  override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitSpecGamma(this)
+}
+
+case class ArrayAccess(global: SpecGlobal, index: Int) extends SpecGlobalOrAccess {
+  val offset: Int = index * (global.size / 8)
+  override val address: BigInt = global.address + offset
+  override val size: Int = global.size
+  override val toOldVar: BVar = BVariable(s"${global.name}$$${index}_old", BitVecBType(global.size), Scope.Local)
+  override val toAddrVar: BExpr = BinaryBExpr(BVADD, global.toAddrVar, BitVecBLiteral(offset, 64))
+  override val toOldGamma: BVar = BVariable(s"Gamma_${global.name}$$${index}_old", BoolBType, Scope.Local)
+  override def specGlobals: Set[SpecGlobalOrAccess] = Set(this)
+  override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitArrayAccess(this)
 }

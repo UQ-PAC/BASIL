@@ -32,12 +32,12 @@ trait IRIntraproceduralForwardDependencies extends Dependencies[CFGPosition] {
   override def indep(n: CFGPosition): Set[CFGPosition] = IntraProcIRCursor.pred(n)
 }
 
-trait IRInterproceduralBackwardDependencies extends Dependencies[CFGPosition]  {
+trait IRInterproceduralBackwardDependencies extends Dependencies[CFGPosition] {
   override def outdep(n: CFGPosition): Set[CFGPosition] = InterProcIRCursor.pred(n)
   override def indep(n: CFGPosition): Set[CFGPosition] = InterProcIRCursor.succ(n)
 }
 
-trait IRIntraproceduralBackwardDependencies extends Dependencies[CFGPosition]  {
+trait IRIntraproceduralBackwardDependencies extends Dependencies[CFGPosition] {
   override def outdep(n: CFGPosition): Set[CFGPosition] = IntraProcIRCursor.pred(n)
   override def indep(n: CFGPosition): Set[CFGPosition] = IntraProcIRCursor.succ(n)
 }

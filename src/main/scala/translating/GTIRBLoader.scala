@@ -13,7 +13,12 @@ import scala.collection.mutable.ArrayBuffer
 import com.grammatech.gtirb.proto.Module.ByteOrder.LittleEndian
 import util.Logger
 
-class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
+enum InsnSemantics {
+  case Result(value: Array[StmtContext])
+  case Error(opcode: String, error: String)
+}
+
+class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
 
   private val constMap = mutable.Map[String, IRType]()
   private val varMap = mutable.Map[String, IRType]()
@@ -30,20 +35,36 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
 
     val statements: ArrayBuffer[Statement] = ArrayBuffer()
 
-    for (instruction <- instructions) {
+    for (instsem <- instructions) {
       constMap.clear
       varMap.clear
 
-      for ((s, i) <- instruction.zipWithIndex) {
-        
-        val label = blockAddress.map {(a: BigInt) =>
-          val instructionAddress = a + (opcodeSize * instructionCount)
-          instructionAddress.toString + "$" + i
+      instsem match {
+        case InsnSemantics.Error(op, err) => {
+          val message = s"$op ${err.replace("\n", " :: ")}"
+          Logger.warn(s"Program contains lifter unsupported opcode: $message")
+          statements.append(Assert(FalseLiteral, Some(s"Lifter error: $message")))
+          instructionCount += 1
         }
+        case InsnSemantics.Result(instruction) => {
+          for ((s, i) <- instruction.zipWithIndex) {
+            val label = blockAddress.map { (a: BigInt) =>
+              val instructionAddress = a + (opcodeSize * instructionCount)
+              instructionAddress.toString + "_" + i
+            }
 
-        statements.appendAll(visitStmt(s, label))
+            statements.appendAll(try {
+              visitStmt(s, label)
+            } catch {
+              case e => {
+                Logger.error(s"Failed to load insn: $e\n${e.getStackTrace.mkString("\n")}")
+                Seq(Assert(FalseLiteral, Some(" Failed to load instruction")))
+              }
+            })
+          }
+          instructionCount += 1
+        }
       }
-      instructionCount += 1
     }
     statements
   }
@@ -102,23 +123,41 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
         } else {
           None
         }
-      case "unsupported_opcode.0" => {
+
+      case "AtomicStart.0" =>
+        checkArgs(function, 0, 0, typeArgs.size, args.size, ctx.getText)
+        Some(AtomicStart(label))
+
+      case "AtomicEnd.0" =>
+        checkArgs(function, 0, 0, typeArgs.size, args.size, ctx.getText)
+        Some(AtomicEnd(label))
+
+      case "unsupported_opcode.0" =>
         val op = args.headOption.flatMap(visitExprOnly) match {
           case Some(IntLiteral(s)) => Some("%08x".format(s))
           case c => c.map(_.toString)
         }
         val comment = " unsupported opcode" + op.map(": " + _).getOrElse("")
         Some(Assert(FalseLiteral, Some(comment)))
-      }
+
       case _ =>
         Logger.error(s"Unidentified function call $function: ${ctx.getText}")
-        Some(Assert(FalseLiteral, Some( " unsupported: " + ctx.getText)))
+        Some(Assert(FalseLiteral, Some(" unsupported: " + ctx.getText)))
     }
   }
 
-  private def checkArgs(name: String, typeArgsExpected: Int, argsExpected: Int, typeArgsCount: Int, argsCount: Int, token: String): Unit = {
+  private def checkArgs(
+    name: String,
+    typeArgsExpected: Int,
+    argsExpected: Int,
+    typeArgsCount: Int,
+    argsCount: Int,
+    token: String
+  ): Unit = {
     if (typeArgsExpected != typeArgsCount || argsExpected != argsCount) {
-      throw Exception(s"Unexpected argument counts for $name - expected $typeArgsExpected type argument(s) and $argsExpected argument(s), got $typeArgsCount type arguments and $argsCount arguments: $token")
+      throw Exception(
+        s"Unexpected argument counts for $name - expected $typeArgsExpected type argument(s) and $argsExpected argument(s), got $typeArgsCount type arguments and $argsCount arguments: $token"
+      )
     }
   }
 
@@ -157,8 +196,9 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
     val (expr, load) = visitExpr(ctx.expr)
     if (expr.isDefined) {
       if (load.isDefined) {
-        val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0"))
-        val assign = LocalAssign(LocalVar(name, ty), expr.get, label.map(_ + "$1"))
+        val loadWithLabel =
+          MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "_0"))
+        val assign = LocalAssign(LocalVar(name, ty), expr.get, label.map(_ + "_1"))
         Seq(loadWithLabel, assign)
       } else {
         val assign = LocalAssign(LocalVar(name, ty), expr.get, label)
@@ -174,8 +214,9 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
     val (rhs, load) = visitExpr(ctx.expr)
     if (lhs.isDefined && rhs.isDefined) {
       if (load.isDefined) {
-        val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0"))
-        val assign = LocalAssign(lhs.get, rhs.get, label.map(_ + "$1"))
+        val loadWithLabel =
+          MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "_0"))
+        val assign = LocalAssign(lhs.get, rhs.get, label.map(_ + "_1"))
         Seq(loadWithLabel, assign)
       } else {
         val assign = LocalAssign(lhs.get, rhs.get, label)
@@ -193,11 +234,13 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
     val (expr, load) = visitExpr(ctx.expr)
     if (expr.isDefined) {
       if (load.isDefined) {
-        val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0"))
-        val assign = LocalAssign(LocalVar(name + "$" + blockCount + "$" + instructionCount, ty), expr.get, label.map(_ + "$1"))
+        val loadWithLabel =
+          MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0"))
+        val assign =
+          LocalAssign(LocalVar(name + "_" + blockCount + "_" + instructionCount, ty), expr.get, label.map(_ + "$1"))
         Seq(loadWithLabel, assign)
       } else {
-        val assign = LocalAssign(LocalVar(name + "$" + blockCount + "$" + instructionCount, ty), expr.get, label)
+        val assign = LocalAssign(LocalVar(name + "_" + blockCount + "_" + instructionCount, ty), expr.get, label)
         Seq(assign)
       }
     } else {
@@ -212,11 +255,13 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
         // this is a special register - not the same as a register in the IR
         // ignoring the register's fields for now
         BitVecType(visitInteger(r.size).toInt)
-      case c: TypeConstructorContext => visitIdent(c.str).match {
-        case "FPRounding" => BitVecType(3)
-        case "integer" => BitVecType(64)
-        case _ => throw Exception(s"unknown type ${ctx.getText}")
-      }
+      case c: TypeConstructorContext =>
+        visitIdent(c.str).match {
+          case "FPRounding" => BitVecType(3)
+          case "integer" => BitVecType(64)
+          case "boolean" => BoolType
+          case _ => throw Exception(s"unknown type ${ctx.getText}")
+        }
       case _ => throw Exception(s"unknown type ${ctx.getText}")
     }
   }
@@ -236,7 +281,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
   private def visitExprOnly(ctx: ExprContext): Option[Expr] = {
     val (expr, load) = visitExpr(ctx)
     if (load.isDefined) {
-      throw Exception("")
+      throw Exception(s"found load $expr $load")
     } else {
       expr
     }
@@ -245,7 +290,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
   private def visitExprVar(ctx: ExprVarContext): Option[Expr] = {
     val name = visitIdent(ctx.ident)
     name match {
-      case n if constMap.contains(n) => Some(LocalVar(n + "$" + blockCount + "$" + instructionCount, constMap(n)))
+      case n if constMap.contains(n) => Some(LocalVar(n + "_" + blockCount + "_" + instructionCount, constMap(n)))
       case v if varMap.contains(v) => Some(LocalVar(v, varMap(v)))
       case "SP_EL0" => Some(Register("R31", 64))
       case "_PC" => Some(Register("_PC", 64))
@@ -287,7 +332,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
           throw Exception(s"inconsistent size parameters in Mem.read.0: ${ctx.getText}")
         }
 
-        val temp = LocalVar("$load" + loadCounter, BitVecType(size.toInt))
+        val temp = LocalVar("load" + loadCounter, BitVecType(size.toInt))
         loadCounter += 1
 
         if (index.isDefined) {
@@ -299,39 +344,40 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
 
       case "cvt_bool_bv.0" =>
         checkArgs(function, 0, 1, typeArgs.size, args.size, ctx.getText)
-        val expr = visitExprOnly(args.head)
-        val result = expr.map {
+        val (expr, load) = visitExpr(args.head)
+        val result: Option[Expr] = expr.map {
           case b: BinaryExpr if b.op == BVEQ => BinaryExpr(BVCOMP, b.arg1, b.arg2)
           case FalseLiteral => BitVecLiteral(0, 1)
           case TrueLiteral => BitVecLiteral(1, 1)
-          case _ => throw Exception(s"unhandled conversion from bool to bitvector: ${ctx.getText}")
+          case o => UnaryExpr(BoolToBV1, o)
         }
-        (result, None)
+        (result, load)
 
       case "not_bool.0" => (resolveUnaryOp(BoolNOT, function, 0, typeArgs, args, ctx.getText), None)
-      case "eq_enum.0" => (resolveBinaryOp(BoolEQ, function, 0, typeArgs, args, ctx.getText), None)
-      case "or_bool.0" => (resolveBinaryOp(BoolOR, function, 0, typeArgs, args, ctx.getText), None)
-      case "and_bool.0" => (resolveBinaryOp(BoolAND, function, 0, typeArgs, args, ctx.getText), None)
+      case "eq_enum.0" => resolveBinaryOp(BoolEQ, function, 0, typeArgs, args, ctx.getText)
+      case "or_bool.0" => resolveBinaryOp(BoolOR, function, 0, typeArgs, args, ctx.getText)
+      case "and_bool.0" => resolveBinaryOp(BoolAND, function, 0, typeArgs, args, ctx.getText)
+
+      case "or_bits.0" => resolveBinaryOp(BVOR, function, 1, typeArgs, args, ctx.getText)
+      case "and_bits.0" => resolveBinaryOp(BVAND, function, 1, typeArgs, args, ctx.getText)
+      case "eor_bits.0" => resolveBinaryOp(BVXOR, function, 1, typeArgs, args, ctx.getText)
+      case "eq_bits.0" => resolveBinaryOp(BVEQ, function, 1, typeArgs, args, ctx.getText)
+      case "add_bits.0" => resolveBinaryOp(BVADD, function, 1, typeArgs, args, ctx.getText)
+      case "sub_bits.0" => resolveBinaryOp(BVSUB, function, 1, typeArgs, args, ctx.getText)
+      case "mul_bits.0" => resolveBinaryOp(BVMUL, function, 1, typeArgs, args, ctx.getText)
+      case "sdiv_bits.0" => resolveBinaryOp(BVSDIV, function, 1, typeArgs, args, ctx.getText)
+      case "udiv_bits.0" => resolveBinaryOp(BVUDIV, function, 1, typeArgs, args, ctx.getText)
+      case "slt_bits.0" => resolveBinaryOp(BVSLT, function, 1, typeArgs, args, ctx.getText)
+      case "sle_bits.0" => resolveBinaryOp(BVSLE, function, 1, typeArgs, args, ctx.getText)
 
       case "not_bits.0" => (resolveUnaryOp(BVNOT, function, 1, typeArgs, args, ctx.getText), None)
-      case "or_bits.0" => (resolveBinaryOp(BVOR, function, 1, typeArgs, args, ctx.getText), None)
-      case "and_bits.0" => (resolveBinaryOp(BVAND, function, 1, typeArgs, args, ctx.getText), None)
-      case "eor_bits.0" => (resolveBinaryOp(BVXOR, function, 1, typeArgs, args, ctx.getText), None)
-      case "eq_bits.0" => (resolveBinaryOp(BVEQ, function, 1, typeArgs, args, ctx.getText), None)
-      case "add_bits.0" => (resolveBinaryOp(BVADD, function, 1, typeArgs, args, ctx.getText), None)
-      case "sub_bits.0" => (resolveBinaryOp(BVSUB, function, 1, typeArgs, args, ctx.getText), None)
-      case "mul_bits.0" => (resolveBinaryOp(BVMUL, function, 1, typeArgs, args, ctx.getText), None)
-      case "sdiv_bits.0" => (resolveBinaryOp(BVSDIV, function, 1, typeArgs, args, ctx.getText), None)
-
-      case "slt_bits.0" => (resolveBinaryOp(BVSLT, function, 1, typeArgs, args, ctx.getText), None)
-      case "sle_bits.0" => (resolveBinaryOp(BVSLE, function, 1, typeArgs, args, ctx.getText), None)
 
       case "lsl_bits.0" => (resolveBitShiftOp(BVSHL, function, typeArgs, args, ctx.getText), None)
       case "lsr_bits.0" => (resolveBitShiftOp(BVLSHR, function, typeArgs, args, ctx.getText), None)
       case "asr_bits.0" => (resolveBitShiftOp(BVASHR, function, typeArgs, args, ctx.getText), None)
 
       case "append_bits.0" =>
-        (resolveBinaryOp(BVCONCAT, function, 2, typeArgs, args, ctx.getText), None)
+        (resolveBinaryOp(BVCONCAT, function, 2, typeArgs, args, ctx.getText))
 
       case "replicate_bits.0" =>
         checkArgs(function, 2, 2, typeArgs.size, args.size, ctx.getText)
@@ -385,38 +431,36 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0))
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + size, argsIR, BoolType)), None)
+        (Some(UninterpretedFunction(name + "_" + size, argsIR, BoolType)), None)
 
-      case "FPAdd.0" | "FPMul.0" | "FPDiv.0" | "FPMulX.0" | "FPMax.0" | "FPMin.0" | "FPMaxNum.0" | "FPMinNum.0" | "FPSub.0" =>
+      case "FPAdd.0" | "FPMul.0" | "FPDiv.0" | "FPMulX.0" | "FPMax.0" | "FPMin.0" | "FPMaxNum.0" | "FPMinNum.0" |
+          "FPSub.0" =>
         checkArgs(function, 1, 3, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0)).toInt
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size))), None)
+        (Some(UninterpretedFunction(name + "_" + size, argsIR, BitVecType(size))), None)
 
-      case "FPMulAddH.0" | "FPMulAdd.0" |
-           "FPRoundInt.0" |
-           "FPRoundIntN.0" =>
+      case "FPMulAddH.0" | "FPMulAdd.0" | "FPRoundInt.0" | "FPRoundIntN.0" =>
         checkArgs(function, 1, 4, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0)).toInt
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size))), None)
+        (Some(UninterpretedFunction(name + "_" + size, argsIR, BitVecType(size))), None)
 
-      case "FPRecpX.0" | "FPSqrt.0" | "FPRecipEstimate.0" |
-           "FPRSqrtStepFused.0" | "FPRecipStepFused.0" =>
+      case "FPRecpX.0" | "FPSqrt.0" | "FPRecipEstimate.0" | "FPRSqrtStepFused.0" | "FPRecipStepFused.0" =>
         checkArgs(function, 1, 2, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0)).toInt
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size))), None)
+        (Some(UninterpretedFunction(name + "_" + size, argsIR, BitVecType(size))), None)
 
       case "FPCompare.0" =>
         checkArgs(function, 1, 4, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0))
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(4))), None)
+        (Some(UninterpretedFunction(name + "_" + size, argsIR, BitVecType(4))), None)
 
       case "FPConvert.0" =>
         checkArgs(function, 2, 3, typeArgs.size, args.size, ctx.getText)
@@ -424,7 +468,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
         val outSize = parseInt(typeArgs(0)).toInt
         val inSize = parseInt(typeArgs(1))
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize))), None)
+        (Some(UninterpretedFunction(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "FPToFixed.0" =>
         checkArgs(function, 2, 5, typeArgs.size, args.size, ctx.getText)
@@ -433,7 +477,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
         val inSize = parseInt(typeArgs(1))
         // need to specifically handle the integer parameter
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize))), None)
+        (Some(UninterpretedFunction(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "FixedToFP.0" =>
         checkArgs(function, 2, 5, typeArgs.size, args.size, ctx.getText)
@@ -442,7 +486,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
         val outSize = parseInt(typeArgs(1)).toInt
         // need to specifically handle the integer parameter
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize))), None)
+        (Some(UninterpretedFunction(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "FPConvertBF.0" =>
         checkArgs(function, 0, 3, typeArgs.size, args.size, ctx.getText)
@@ -456,7 +500,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
         val inSize = parseInt(typeArgs(0))
         val outSize = parseInt(typeArgs(1)).toInt
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize))), None)
+        (Some(UninterpretedFunction(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "BFAdd.0" | "BFMul.0" =>
         checkArgs(function, 0, 2, typeArgs.size, args.size, ctx.getText)
@@ -464,44 +508,76 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
         val argsIR = args.flatMap(visitExprOnly).toSeq
         (Some(UninterpretedFunction(name, argsIR, BitVecType(32))), None)
 
+      case "cvt_bits_uint.0" | "cvt_bits_sint.0" =>
+        // ignore conversion between bitvector/integer for now
+        checkArgs(function, 1, 1, typeArgs.size, args.size, ctx.getText)
+        val inSize = parseInt(typeArgs(0)).toInt
+        val argIR = visitExprOnly(args.head)
+        if (argIR.isDefined) {
+          argIR.get.getType match {
+            case BitVecType(size) =>
+              if (inSize == size) {
+                (argIR, None)
+              } else if (inSize > size) {
+                if (function == "cvt_bits_uint.0") {
+                  (Some(ZeroExtend(inSize - size, argIR.get)), None)
+                } else {
+                  // "cvt_bits_sint.0"
+                  (Some(SignExtend(inSize - size, argIR.get)), None)
+                }
+              } else {
+                (Some(Extract(inSize, 0, argIR.get)), None)
+              }
+            case _ =>
+              Logger.error(s"type mismatch: ${ctx.getText}")
+              (None, None)
+          }
+        } else {
+          (None, None)
+        }
+
       case _ =>
         // known ASLp methods not yet handled:
         // FPRoundBase, BFRound - take asl type 'real' as input, need to see this in practice and requires consideration
         // AArch64.MemTag.read, AArch64.MemTag.set - allocation tag operations, can't model as uninterpreted functions
         // and will require some research into their semantics
         // AtomicStart, AtomicEnd - can't model as uninterpreted functions, requires modelling atomic section
-        Logger.debug(s"unidentified call to $function: ${ctx.getText}")
+        Logger.error(s"unidentified call to $function: ${ctx.getText}")
         (None, None)
     }
 
   }
 
-  private def resolveBinaryOp(operator: BinOp,
-                              function: String,
-                              typeArgsExpected: Int,
-                              typeArgs: mutable.Buffer[ExprContext],
-                              args: mutable.Buffer[ExprContext],
-                              token: String
-                             ): Option[BinaryExpr] = {
+  private def resolveBinaryOp(
+    operator: BinOp,
+    function: String,
+    typeArgsExpected: Int,
+    typeArgs: mutable.Buffer[ExprContext],
+    args: mutable.Buffer[ExprContext],
+    token: String
+  ): (Option[BinaryExpr], Option[MemoryLoad]) = {
     checkArgs(function, typeArgsExpected, 2, typeArgs.size, args.size, token)
     // we don't currently check the size for BV ops which is the type arg
     // memory loads shouldn't appear inside binary operations?
-    val arg0 = visitExprOnly(args(0))
-    val arg1 = visitExprOnly(args(1))
+    val (arg0, l0) = visitExpr(args(0))
+    val (arg1, l1) = visitExpr(args(1))
+    val l = l0.orElse(l1)
+    assert(!(l0.isDefined && l1.isDefined), "Multiple loads in expression")
     if (arg0.isDefined && arg1.isDefined) {
-      Some(BinaryExpr(operator, arg0.get, arg1.get))
+      (Some(BinaryExpr(operator, arg0.get, arg1.get)), l)
     } else {
-      None
+      (None, l)
     }
   }
 
-  private def resolveUnaryOp(operator: UnOp,
-                             function: String,
-                             typeArgsExpected: Int,
-                             typeArgs: mutable.Buffer[ExprContext],
-                             args: mutable.Buffer[ExprContext],
-                             token: String
-                            ): Option[UnaryExpr] = {
+  private def resolveUnaryOp(
+    operator: UnOp,
+    function: String,
+    typeArgsExpected: Int,
+    typeArgs: mutable.Buffer[ExprContext],
+    args: mutable.Buffer[ExprContext],
+    token: String
+  ): Option[UnaryExpr] = {
     checkArgs(function, typeArgsExpected, 1, typeArgs.size, args.size, token)
     // we don't currently check the size for BV ops which is the type arg
     // memory loads shouldn't appear inside unary operations?
@@ -513,12 +589,13 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
     }
   }
 
-  private def resolveBitShiftOp(operator: BinOp,
-                                function: String,
-                                typeArgs: mutable.Buffer[ExprContext],
-                                args: mutable.Buffer[ExprContext],
-                                token: String
-                               ): Option[BinaryExpr] = {
+  private def resolveBitShiftOp(
+    operator: BinOp,
+    function: String,
+    typeArgs: mutable.Buffer[ExprContext],
+    args: mutable.Buffer[ExprContext],
+    token: String
+  ): Option[BinaryExpr] = {
     checkArgs(function, 2, 2, typeArgs.size, args.size, token)
     val size0 = parseInt(typeArgs(0))
     val size1 = parseInt(typeArgs(1))
@@ -599,7 +676,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
   private def visitLExprVar(ctx: LExprVarContext): Option[Variable] = {
     val name = visitIdent(ctx.ident)
     name match {
-      case n if constMap.contains(n) => Some(LocalVar(n + "$" + blockCount + "$" + instructionCount, constMap(n)))
+      case n if constMap.contains(n) => Some(LocalVar(n + "_" + blockCount + "_" + instructionCount, constMap(n)))
       case v if varMap.contains(v) => Some(LocalVar(v, varMap(v)))
       case "SP_EL0" => Some(Register("R31", 64))
       case "_PC" => Some(Register("_PC", 64))
@@ -656,7 +733,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
   private def resolveFieldExpr(name: String, field: String): Register = {
     name match {
       case "PSTATE" if field == "V" || field == "C" || field == "Z" || field == "N" =>
-          Register(field + "F", 1)
+        Register(field + "F", 1)
       case _ => throw Exception(s"unidentified Expr_Field ($name, $field)")
     }
   }

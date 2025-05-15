@@ -2,34 +2,42 @@ package analysis.data_structure_analysis
 
 import analysis.*
 import ir.*
-import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
+import util.Counter
+import specification.{ExternalFunction, SymbolTableEntry}
+import boogie.SpecGlobal
 
 import scala.collection.mutable
 
-/**
- * Data Structure Analysis
- * Performs all phases of DSA and stores the results in member variables
- * local, bottom-up, top-down results in member variables locals, bu and td respectively.
- * @param program program to be analysed
- * @param symResults result of symbolic access analysis
- * @param constProp
- * @param globals
- * @param globalOffsets
- * @param externalFunctions
- * @param reachingDefs
- * @param writesTo mapping from procedures to registers they change
- * @param params mapping from procedures to their parameters
- */
-class DataStructureAnalysis(program: Program,
-                            symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
-                            constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-                            globals: Set[SymbolTableEntry],
-                            globalOffsets: Map[BigInt, BigInt],
-                            externalFunctions: Set[ExternalFunction],
-                            reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
-                            writesTo: Map[Procedure, Set[Register]],
-                            params: Map[Procedure, Set[Variable]]
-         ) extends Analysis[Map[Procedure, Graph]] {
+/** Data Structure Analysis Performs all phases of DSA and stores the results in member variables local, bottom-up,
+  * top-down results in member variables locals, bu and td respectively.
+  * @param program
+  *   program to be analysed
+  * @param symResults
+  *   result of symbolic access analysis
+  * @param constProp
+  * @param globals
+  * @param globalOffsets
+  * @param externalFunctions
+  * @param reachingDefs
+  * @param writesTo
+  *   mapping from procedures to registers they change
+  * @param params
+  *   mapping from procedures to their parameters
+  */
+class DataStructureAnalysis(
+  program: Program,
+  symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
+  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+  globals: Set[SymbolTableEntry],
+  globalOffsets: Map[BigInt, BigInt],
+  externalFunctions: Set[ExternalFunction],
+  reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
+  writesTo: Map[Procedure, Set[Register]],
+  params: Map[Procedure, Set[Variable]]
+) extends Analysis[Map[Procedure, Graph]] {
+
+  private val counter = Counter()
+  given Counter = counter
 
   val local: mutable.Map[Procedure, Graph] = mutable.Map()
   val bottomUp: mutable.Map[Procedure, Graph] = mutable.Map()
@@ -54,7 +62,6 @@ class DataStructureAnalysis(program: Program,
   private val queue = mutable.Queue[Procedure]()
 
   override def analyze(): Map[Procedure, Graph] = {
-    NodeCounter.reset()
     var domain: Set[Procedure] = Set(program.mainProcedure)
     val stack: mutable.Stack[Procedure] = mutable.Stack()
     stack.pushAll(program.mainProcedure.calls)
@@ -68,7 +75,17 @@ class DataStructureAnalysis(program: Program,
 
     // perform local analysis on all procs
     domain.foreach { proc =>
-      val dsg = LocalPhase(proc, symResults, constProp, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params).analyze()
+      val dsg = LocalPhase(
+        proc,
+        symResults,
+        constProp,
+        globals,
+        globalOffsets,
+        externalFunctions,
+        reachingDefs,
+        writesTo,
+        params
+      ).analyze()
 
       local.update(proc, dsg)
       bottomUp.update(proc, dsg.cloneSelf())
@@ -79,7 +96,7 @@ class DataStructureAnalysis(program: Program,
     leafNodes.foreach { proc =>
       assert(local(proc).callsites.isEmpty)
       visited += proc
-      //val preds: Set[Procedure] = CallGraph.pred(proc)
+      // val preds: Set[Procedure] = CallGraph.pred(proc)
       queue.enqueueAll(CallGraph.pred(proc).diff(visited).intersect(domain))
     }
 
@@ -94,7 +111,7 @@ class DataStructureAnalysis(program: Program,
 
         buGraph.callsites.foreach { callSite =>
           val callee = callSite.proc
-          val calleeGraph = local(callee) //.cloneSelf()
+          val calleeGraph = local(callee) // .cloneSelf()
           assert(buGraph.globalMapping.keySet.equals(calleeGraph.globalMapping.keySet))
           assert(calleeGraph.formals.keySet.diff(ignoreRegisters).equals(callSite.paramCells.keySet))
           calleeGraph.globalMapping.values.foreach { field =>
@@ -122,14 +139,13 @@ class DataStructureAnalysis(program: Program,
           }
 
           //          assert(calleeGraph.formals.isEmpty || buGraph.varToCell(begin(callee)).equals(calleeGraph.formals))
-          calleeGraph.globalMapping.foreach {
-            case (range: AddressRange, Field(node: Node, offset: BigInt)) =>
-              val field = calleeGraph.find(node)
-              val res = buGraph.mergeCells(
-                buGraph.globalMapping(range).node.getCell(buGraph.globalMapping(range).offset),
-                field.node.getCell(field.offset + offset)
-              )
-              buGraph.handleOverlapping(res)
+          calleeGraph.globalMapping.foreach { case (range: AddressRange, Field(node: Node, offset: BigInt)) =>
+            val field = calleeGraph.find(node)
+            val res = buGraph.mergeCells(
+              buGraph.globalMapping(range).node.getCell(buGraph.globalMapping(range).offset),
+              field.node.getCell(field.offset + offset)
+            )
+            buGraph.handleOverlapping(res)
           }
 
           if (buGraph.varToCell.contains(callee)) {
@@ -200,8 +216,8 @@ class DataStructureAnalysis(program: Program,
 
         callSite.paramCells.keySet.foreach { variable =>
           val paramCells = calleesGraph.getCells(callSite.call, variable) // wrong param offset
-          val res = paramCells.foldLeft(calleesGraph.adjust(calleesGraph.formals(variable))) {
-            (cell, slice) => calleesGraph.mergeCells(calleesGraph.adjust(slice), cell)
+          val res = paramCells.foldLeft(calleesGraph.adjust(calleesGraph.formals(variable))) { (cell, slice) =>
+            calleesGraph.mergeCells(calleesGraph.adjust(slice), cell)
           }
           calleesGraph.handleOverlapping(res)
 
@@ -211,8 +227,8 @@ class DataStructureAnalysis(program: Program,
           calleesGraph.varToCell(callSite.call).foreach { (variable, oldSlice) =>
             val slice = callersGraph.find(oldSlice)
             val returnCells = calleesGraph.getCells(IRWalk.lastInProc(callee).get, variable)
-            val res = returnCells.foldLeft(calleesGraph.adjust(slice)) {
-              (c, retCell) => calleesGraph.mergeCells(c, calleesGraph.adjust(retCell))
+            val res = returnCells.foldLeft(calleesGraph.adjust(slice)) { (c, retCell) =>
+              calleesGraph.mergeCells(c, calleesGraph.adjust(retCell))
             }
 
             calleesGraph.handleOverlapping(res)

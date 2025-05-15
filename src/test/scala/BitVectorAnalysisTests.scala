@@ -1,11 +1,13 @@
-import analysis.BitVectorEval.*
+import ir.eval.BitVectorEval.*
 import ir.*
 import org.scalatest.funsuite.AnyFunSuite
+import test_util.CaptureOutput
 import util.Logger
 
 import scala.runtime.stdLibPatches.Predef.assert
 
-class BitVectorAnalysisTests extends AnyFunSuite {
+@test_util.tags.UnitTest
+class BitVectorAnalysisTests extends AnyFunSuite with CaptureOutput {
 
   test("BitVector to Natural - should convert BitVector to natural number") {
     val result = bv2nat(BitVecLiteral(2, 4))
@@ -181,20 +183,20 @@ class BitVectorAnalysisTests extends AnyFunSuite {
   // smt_bveq
   test("BitVector Equal - should return true if two BitVectors are equal") {
     val result = smt_bveq(BitVecLiteral(255, 8), BitVecLiteral(255, 8))
-    assert(result == TrueLiteral)
+    assert(result)
   }
   test("BitVector Equal - should return false if two BitVectors are not equal") {
     val result = smt_bveq(BitVecLiteral(255, 8), BitVecLiteral(254, 8))
-    assert(result == FalseLiteral)
+    assert(!result)
   }
   // smt_bvneq
   test("BitVector Not Equal - should return false if two BitVectors are equal") {
     val result = smt_bvneq(BitVecLiteral(255, 8), BitVecLiteral(255, 8))
-    assert(result == FalseLiteral)
+    assert(!result)
   }
   test("BitVector Not Equal - should return true if two BitVectors are not equal") {
     val result = smt_bvneq(BitVecLiteral(255, 8), BitVecLiteral(254, 8))
-    assert(result == TrueLiteral)
+    assert(result)
   }
   // smt_bvshl
   test("BitVector Shift Left - should shift bits left") {
@@ -205,6 +207,10 @@ class BitVectorAnalysisTests extends AnyFunSuite {
   test("BitVector Shift Right - should shift bits right") {
     val result = smt_bvlshr(BitVecLiteral(2, 8), BitVecLiteral(1, 8))
     assert(result == BitVecLiteral(1, 8))
+  }
+  test("BitVector Shift Right - should zero on overflow") {
+    val result = smt_bvlshr(BitVecLiteral(4104967, 22), BitVecLiteral(3664940, 22))
+    assert(result == BitVecLiteral(0, 22))
   }
   // isNegative
   test("is Negative - should return true if the most significant bit is 1") {
@@ -239,14 +245,14 @@ class BitVectorAnalysisTests extends AnyFunSuite {
 
   test("BitVector unsigned less then - should return true if first argument is less than second argument") {
     val result = smt_bvult(BitVecLiteral(254, 8), BitVecLiteral(255, 8))
-    assert(result == TrueLiteral)
+    assert(result)
   }
 
   test(
     "BitVector unsigned less then - should return false if first argument is greater than or equal to second argument"
   ) {
     val result = smt_bvult(BitVecLiteral(255, 8), BitVecLiteral(254, 8))
-    assert(result == FalseLiteral)
+    assert(!result)
   }
 
   // smt_bvule
@@ -255,14 +261,14 @@ class BitVectorAnalysisTests extends AnyFunSuite {
     "BitVector unsigned less then or equal to - should return true if first argument is less equal to second argument"
   ) {
     val result = smt_bvule(BitVecLiteral(254, 8), BitVecLiteral(255, 8))
-    assert(result == TrueLiteral)
+    assert(result)
   }
 
   test(
     "BitVector unsigned less then or equal to - should return false if first argument is greater than second argument"
   ) {
     val result = smt_bvule(BitVecLiteral(255, 8), BitVecLiteral(254, 8))
-    assert(result == FalseLiteral)
+    assert(!result)
   }
 
   // smt_bvugt
@@ -270,14 +276,14 @@ class BitVectorAnalysisTests extends AnyFunSuite {
     "BitVector unsinged greater than - should return true if first argument is greater equal to than second argument"
   ) {
     val result = smt_bvugt(BitVecLiteral(255, 8), BitVecLiteral(254, 8))
-    assert(result == TrueLiteral)
+    assert(result)
   }
 
   test(
     "BitVector unsinged greater than - should return false if first argument is less than or equal to second argument"
   ) {
     val result = smt_bvugt(BitVecLiteral(254, 8), BitVecLiteral(255, 8))
-    assert(result == FalseLiteral)
+    assert(!result)
   }
 
   // smt_bvuge
@@ -285,27 +291,27 @@ class BitVectorAnalysisTests extends AnyFunSuite {
     "BitVector unsinged greater than or equal to - should return true if first argument is greater equal or equal to second argument"
   ) {
     val result = smt_bvuge(BitVecLiteral(255, 8), BitVecLiteral(254, 8))
-    assert(result == TrueLiteral)
+    assert(result)
   }
 
   test(
     "BitVector unsinged greater than or equal to - should return false if first argument is less than second argument"
   ) {
     val result = smt_bvuge(BitVecLiteral(254, 8), BitVecLiteral(255, 8))
-    assert(result == FalseLiteral)
+    assert(!result)
   }
 
   // smt_bvslt
   test("BitVector signed less than - should return true if first argument is less than second argument") {
     val result = smt_bvslt(BitVecLiteral(254, 8), BitVecLiteral(255, 8))
-    assert(result == TrueLiteral)
+    assert(result)
   }
 
   test(
     "BitVector signed less than - should return false if first argument is greater than or equal to second argument"
   ) {
     val result = smt_bvslt(BitVecLiteral(254, 8), BitVecLiteral(254, 8))
-    assert(result == FalseLiteral)
+    assert(!result)
   }
 
   // smt_bvsle
@@ -313,25 +319,25 @@ class BitVectorAnalysisTests extends AnyFunSuite {
     "BitVector signed less than or equal to - should return true if first argument is less than or equal to second argument"
   ) {
     val result = smt_bvsle(BitVecLiteral(254, 8), BitVecLiteral(255, 8))
-    assert(result == TrueLiteral)
+    assert(result)
   }
 
   test(
     "BitVector signed less than or equal to - should return false if first argument is greater than second argument"
   ) {
     val result = smt_bvsle(BitVecLiteral(255, 8), BitVecLiteral(254, 8))
-    assert(result == FalseLiteral)
+    assert(!result)
   }
 
   // smt_bvsgt
   test("BitVector signed greater than - should return true if first argument is greater than second argument") {
     val result = smt_bvsgt(BitVecLiteral(255, 8), BitVecLiteral(254, 8))
-    assert(result == TrueLiteral)
+    assert(result)
   }
 
   test("BitVector signed greater than - should return false if first argument is less than second argument") {
     val result = smt_bvsgt(BitVecLiteral(254, 8), BitVecLiteral(255, 8))
-    assert(result == FalseLiteral)
+    assert(!result)
   }
 
   // smt_bvsge
@@ -339,14 +345,14 @@ class BitVectorAnalysisTests extends AnyFunSuite {
     "BitVector signed greater than or equal to - should return true if first argument is greater than or equal to second argument"
   ) {
     val result = smt_bvsge(BitVecLiteral(255, 8), BitVecLiteral(254, 8))
-    assert(result == TrueLiteral)
+    assert(result)
   }
 
   test(
     "BitVector signed greater than or equal to - should return false if first argument is less than second argument"
   ) {
     val result = smt_bvsge(BitVecLiteral(254, 8), BitVecLiteral(255, 8))
-    assert(result == FalseLiteral)
+    assert(!result)
   }
   // smt_bvashr
   test("BitVector Arithmetic shift right - should return shift right a positive number") {

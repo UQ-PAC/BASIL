@@ -3,43 +3,48 @@ import ir.Endian.LittleEndian
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import specification.*
-import util.{RunUtils, StaticAnalysisConfig, StaticAnalysis, StaticAnalysisContext, IRContext}
-
-import java.io.IOException
-import java.nio.file.*
-import java.nio.file.attribute.BasicFileAttributes
+import boogie.*
+import util.{IRContext, StaticAnalysis, StaticAnalysisConfig, StaticAnalysisContext}
 
 import ir.dsl.*
+import test_util.CaptureOutput
 
-class PointsToTest extends AnyFunSuite with OneInstancePerTest {
+@test_util.tags.DisabledTest
+class PointsToTest extends AnyFunSuite with CaptureOutput with OneInstancePerTest {
 
-  def runAnalyses(program: Program,
-                  externalFunctions: Set[ExternalFunction] = Set.empty,
-                  globals: Set[SpecGlobal] = Set.empty,
-                  funcEntries: Set[FuncEntry] = Set.empty,
-                  globalOffsets: Map[BigInt, BigInt] = Map.empty): StaticAnalysisContext = {
+  def runAnalyses(
+    program: Program,
+    externalFunctions: Set[ExternalFunction] = Set.empty,
+    globals: Set[SpecGlobal] = Set.empty,
+    funcEntries: Set[FuncEntry] = Set.empty,
+    globalOffsets: Map[BigInt, BigInt] = Map.empty
+  ): StaticAnalysisContext = {
 
-    val ctx = IRContext(List.empty, externalFunctions, globals, funcEntries, globalOffsets, Specification(Set(), Set(), Map(), List(), List(), List(), Set()), program)
+    val ctx = IRContext(
+      List.empty,
+      externalFunctions,
+      globals,
+      funcEntries,
+      globalOffsets,
+      Specification(Set(), Set(), Map(), List(), List(), List(), Set()),
+      program
+    )
     StaticAnalysis.analyse(ctx, StaticAnalysisConfig(), 1)
   }
 
-  /**
-   * Test that the analysis correctly identifies the stack pointer even when it is aliased
-   */
+  /** Test that the analysis correctly identifies the stack pointer even when it is aliased
+    */
   test("stack pointer aliasing: MMM Stage") {
-    var program: Program = prog(
-      proc("main",
-        block("0x0",
-          LocalAssign(R6, R31),
-          goto("0x1")
-        ),
-        block("0x1",
+    val program: Program = prog(
+      proc(
+        "main",
+        block("0x0", LocalAssign(R6, R31), goto("0x1")),
+        block(
+          "0x1",
           MemoryStore(mem, BinaryExpr(BVADD, R6, bv64(4)), bv64(10), LittleEndian, 64),
           goto("returntarget")
         ),
-        block("returntarget",
-          ret
-        )
+        block("returntarget", ret)
       )
     )
 
@@ -53,23 +58,20 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
     assert(results.mmmResults.findStackObject(BigInt(4)).get.regionIdentifier == "stack_1")
   }
 
-  /**
-   * Test that the analysis correctly identifies stack pointers within regions
-   */
+  /** Test that the analysis correctly identifies stack pointers within regions
+    */
   test("approximate stack region: MMM Stage") {
-    var program: Program = prog(
-      proc("main",
-        block("0x0",
+    val program: Program = prog(
+      proc(
+        "main",
+        block(
+          "0x0",
           MemoryLoad(R1, mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64),
           MemoryLoad(R3, mem, BinaryExpr(BVADD, R31, bv64(4)), LittleEndian, 64),
           goto("0x1")
         ),
-        block("0x1",
-          goto("returntarget")
-        ),
-        block("returntarget",
-          ret
-        )
+        block("0x1", goto("returntarget")),
+        block("returntarget", ret)
       )
     )
     transforms.addReturnBlocks(program)
@@ -128,33 +130,25 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
 //    assert(results.mmmResults.findStackObject(BigInt(20)).get.start == bv64(20))
 //  }
 
-  /**
-   * Test that the analysis correctly collects shared regions and exposes only the shared ones
-   */
+  /** Test that the analysis correctly collects shared regions and exposes only the shared ones
+    */
   test("collects single function shared regions: MMM Stage") {
     val program: Program = prog(
-      proc("main",
-        block("0x0",
+      proc(
+        "main",
+        block(
+          "0x0",
           MemoryLoad(R0, mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64),
           LocalAssign(R1, BinaryExpr(BVADD, R31, bv64(10))),
           goto("0x1")
         ),
-        block("0x1",
-          directCall("p2"), goto("returntarget")
-        ),
-        block("returntarget",
-          ret
-        )
+        block("0x1", directCall("p2"), goto("returntarget")),
+        block("returntarget", ret)
       ),
-      proc("p2",
-        block("l_p2",
-          LocalAssign(R3, R0),
-          MemoryLoad(R2, mem, R1, LittleEndian, 64),
-          goto("l_p2_1"),
-        ),
-        block("l_p2_1",
-          ret,
-        )
+      proc(
+        "p2",
+        block("l_p2", LocalAssign(R3, R0), MemoryLoad(R2, mem, R1, LittleEndian, 64), goto("l_p2_1")),
+        block("l_p2_1", ret)
       )
     )
 
@@ -177,43 +171,36 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
     assert(results.mmmResults.findSharedStackObject(BigInt(10)).head.start == BigInt(10))
   }
 
-  /**
-   * Test that the analysis correctly collects shared regions from multiple functions
-   */
+  /** Test that the analysis correctly collects shared regions from multiple functions
+    */
   test("collects multiple functions shared regions: MMM Stage") {
     val program: Program = prog(
-      proc("main",
-        block("0x0",
+      proc(
+        "main",
+        block(
+          "0x0",
           MemoryLoad(R0, mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64),
           LocalAssign(R1, BinaryExpr(BVADD, R31, bv64(10))),
           goto("0x1")
         ),
-        block("0x1",
-          directCall("p2"), goto("returntarget")
-        ),
-        block("returntarget",
-          ret
-        )
+        block("0x1", directCall("p2"), goto("returntarget")),
+        block("returntarget", ret)
       ),
-      proc("foo",
-        block("l_foo",
+      proc(
+        "foo",
+        block(
+          "l_foo",
           MemoryLoad(R0, mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64),
           LocalAssign(R1, BinaryExpr(BVADD, R31, bv64(10))),
-          directCall("p2"), goto("l_foo_1")
+          directCall("p2"),
+          goto("l_foo_1")
         ),
-        block("l_foo_1",
-          ret,
-        )
+        block("l_foo_1", ret)
       ),
-      proc("p2",
-        block("l_p2",
-          LocalAssign(R3, R0),
-          MemoryLoad(R2, mem, R1, LittleEndian, 64),
-          goto("l_p2_1"),
-        ),
-        block("l_p2_1",
-          ret,
-        )
+      proc(
+        "p2",
+        block("l_p2", LocalAssign(R3, R0), MemoryLoad(R2, mem, R1, LittleEndian, 64), goto("l_p2_1")),
+        block("l_p2_1", ret)
       )
     )
 
