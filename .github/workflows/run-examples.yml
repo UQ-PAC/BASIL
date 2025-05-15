@@ -79,6 +79,7 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill compile
+      - run: make -C src/test extract
       - run: ./mill test.test -oGD -T 1000000 -n test_util.tags.StandardSystemTest
 
       - uses: actions/upload-artifact@v4
@@ -130,6 +131,7 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
+      - run: make -C src/test extract
       - run: ./mill test.test -oGD -T 1000000 -n test_util.tags.UnitTest
 
   UnitTests:
@@ -152,6 +154,7 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
+      - run: make -C src/test extract
       - run: ./mill test.test -oGD -T 1000000 -n test_util.tags.UnitTest
 
         # every test with package prefix:
@@ -177,6 +180,7 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
+      - run: make -C src/test extract
       - run: ./mill test.test -oGD -T 1000000 -n test_util.tags.AnalysisSystemTest -F 2
 
   AnalysisSystemTests2:
@@ -199,6 +203,7 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
+      - run: make -C src/test extract
       - run: ./mill test.test -oGD -T 1000000 -n test_util.tags.AnalysisSystemTest2 -F 2
 
   AnalysisSystemTests3:
@@ -221,6 +226,7 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
+      - run: make -C src/test extract
       - run: ./mill test.test -oGD -T 1000000 -n test_util.tags.AnalysisSystemTest3 -F 2
 
   AnalysisSystemTests4:
@@ -243,4 +249,5 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
+      - run: make -C src/test extract
       - run: ./mill test.test -oGD -T 1000000 -n test_util.tags.AnalysisSystemTest4 -F 2
