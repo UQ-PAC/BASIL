@@ -1,4 +1,4 @@
-https://files.catbox.moe/txirhx.zst
+https://files.catbox.moe/oow6tz.zst
 
 # this file should have a URL as its first line
 # and a sha1sum as its last line. all other
@@ -6,7 +6,7 @@ https://files.catbox.moe/txirhx.zst
 #
 # sha1sum is used here because md5 collisions can be computed,
 # and this file might be placed into a third-party server.
-# 
+#
 # make sure to update both URL and sha1sum simultaneously.
 
-10651502c983e0ea28361d3dd4c8936698827f41  compiled.tar.zst
+e3c89539826d6bb185d2a1ed944a4d4d6394cc85  compiled.tar.zst
