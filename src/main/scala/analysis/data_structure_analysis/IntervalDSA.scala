@@ -3,7 +3,7 @@ package analysis.data_structure_analysis
 import analysis.data_structure_analysis.DSAPhase.{BU, Local, TD}
 import analysis.data_structure_analysis.OSet.Top
 import analysis.data_structure_analysis.Global
-import analysis.data_structure_analysis.IntervalDSA.{checkUniqueGlobals}
+import analysis.data_structure_analysis.IntervalDSA.checkUniqueGlobals
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
 import boogie.SpecGlobal
 import specification.FuncEntry
@@ -11,9 +11,8 @@ import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.*
 import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
 import specification.{ExternalFunction, SymbolTableEntry}
-import util.DSAConfig.{Checks, Standard}
 import util.LogLevel.INFO
-import util.{DSAConfig, DSAContext, DSALogger, IRContext, PerformanceTimer}
+import util.{DSAContext, DSALogger, DSConfig, IRContext, PerformanceTimer}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{SortedSet, mutable}
