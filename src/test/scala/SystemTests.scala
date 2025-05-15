@@ -3,7 +3,7 @@ import test_util.BASILTest.*
 import test_util.{BASILTest, CaptureOutput, Histogram, TestConfig, TestCustomisation}
 import util.DSAConfig.Checks
 import util.boogie_interaction.*
-import util.{DSAConfig, DebugDumpIRLogger, LogLevel, Logger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
+import util.{DSConfig, DebugDumpIRLogger, LogLevel, Logger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
 
 import java.io.File
 import scala.collection.immutable.ListMap
@@ -592,16 +592,16 @@ class UnimplementedTests extends SystemTests {
 @test_util.tags.AnalysisSystemTest4
 @test_util.tags.AnalysisSystemTest
 class IntervalDSASystemTests extends SystemTests {
-  runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, simplify = true, dsa = Some(Checks)))
+  runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig())))
 
-  runTests("incorrect", TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(Checks)))
+  runTests("incorrect", TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSConfig())))
 }
 
 @test_util.tags.DisabledTest
 class MemoryTransformSystemTests extends SystemTests {
   runTests(
     "correct",
-    TestConfig(useBAPFrontend = true, expectVerify = false, simplify = true, dsa = Some(Checks), memoryTransform = true)
+    TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSConfig()), memoryTransform = true)
   )
 
   runTests(
@@ -610,7 +610,7 @@ class MemoryTransformSystemTests extends SystemTests {
       useBAPFrontend = false,
       expectVerify = false,
       simplify = true,
-      dsa = Some(Checks),
+      dsa = Some(DSConfig()),
       memoryTransform = true
     )
   )

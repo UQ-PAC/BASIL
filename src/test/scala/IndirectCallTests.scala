@@ -68,7 +68,7 @@ class IndirectCallTests extends AnyFunSuite, CaptureOutput, BASILTest, TestCusto
       specPath,
       BPLPath,
       staticAnalysisConf,
-      dsa = Some(Checks),
+      dsa = Some(DSConfig()),
       simplify = true,
       postLoad = ctx => { indircalls = getIndirectCalls(ctx.program); }
     )
