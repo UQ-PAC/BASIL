@@ -910,8 +910,7 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
         IntervalDSA.checkReachable(irContext.program, DSATD)
         DSALogger.info("Performed correctness check")
         DSATimer.checkPoint("Finished DSA Invariant Check")
-
-      dsaContext = dsaContext.copy(local = DSA, bottomUp = DSABU, topDown = DSATD, globals = globalMapping)
+    }
 
     dsaContext
   }
