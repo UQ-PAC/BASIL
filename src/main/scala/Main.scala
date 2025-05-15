@@ -283,8 +283,6 @@ object Main {
         case Some(_) =>
           throw new IllegalArgumentException("Illegal option to dsa, allowed are: (pre|local|bu|td)")
 
-      assert(!conf.dsaSplitGlobals.value)
-      assert(conf.dsaChecks.value)
       Some(DSConfig(
         phase,
         conf.dsaSplitGlobals.value,
