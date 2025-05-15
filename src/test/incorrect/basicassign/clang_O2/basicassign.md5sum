@@ -1,5 +1,5 @@
-5a2ff2a355a9ab15e87ad890863e7768  incorrect/basicassign/clang_O2/a.out
-01d7d78680190144b86f8f0110d3874b  incorrect/basicassign/clang_O2/basicassign.adt
-aa8ec0a9fff1afc548c0d939b044335f  incorrect/basicassign/clang_O2/basicassign.bir
-f0058bd52ef749dd16ef29f5a3deff1f  incorrect/basicassign/clang_O2/basicassign.relf
-564d840e498e4dd0b6c1f4609797a287  incorrect/basicassign/clang_O2/basicassign.gts
+ba8987cdfca34b8e40c36f454b6b11be  incorrect/basicassign/clang_O2/a.out
+0bfaa3ac538571e0d2bccff2c0bfd274  incorrect/basicassign/clang_O2/basicassign.adt
+7467eb7683651b521fcf8de9e917ea82  incorrect/basicassign/clang_O2/basicassign.bir
+079047f77e1f0387b868d7a1326dc83f  incorrect/basicassign/clang_O2/basicassign.relf
+54438adae1332f7afc93664a5fd4bd31  incorrect/basicassign/clang_O2/basicassign.gts

@@ -1,4 +1,4 @@
-8ddcf327f34a9a08d802d11ad4662fa4  indirect_calls/jumptable2/gcc_pic/a.out
-6cae7faa1ec96164ee34b07cb82297a8  indirect_calls/jumptable2/gcc_pic/jumptable2.relf
-76bb2cc11e5d83b3dcb3c9cdae069695  indirect_calls/jumptable2/gcc_pic/jumptable2.adt
-882932072c55e58647631354a5fc2db0  indirect_calls/jumptable2/gcc_pic/jumptable2.bir
+a571978d1481691c232e6adcbdd05c29  indirect_calls/jumptable2/gcc_pic/a.out
+d213632d0eb38765741aca7a8c3637dc  indirect_calls/jumptable2/gcc_pic/jumptable2.relf
+2be04de0417c580d4501da592ee7fe66  indirect_calls/jumptable2/gcc_pic/jumptable2.adt
+9a018f900cca5c0be3582450cc714e84  indirect_calls/jumptable2/gcc_pic/jumptable2.bir

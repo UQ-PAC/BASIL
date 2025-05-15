@@ -1,4 +1,4 @@
-db97697fa77dfd2f129a15c06b9aebc7  indirect_calls/syscall/clang_O2/a.out
-a086bac2a1d8e547c1cb5a7eeb69c358  indirect_calls/syscall/clang_O2/syscall.relf
-1d0d20d3ebe7600f619de3032febe92e  indirect_calls/syscall/clang_O2/syscall.adt
-f7bdf574c930ad23d6750de08179986d  indirect_calls/syscall/clang_O2/syscall.bir
+bb04b16d71ceb1f52c42953497156b91  indirect_calls/syscall/clang_O2/a.out
+23f35b0d9ec636b7f283d24d86e43756  indirect_calls/syscall/clang_O2/syscall.relf
+02371ffaa0e159863719114221c3198f  indirect_calls/syscall/clang_O2/syscall.adt
+74a5d13b840ca24ae82c45aebc23ee36  indirect_calls/syscall/clang_O2/syscall.bir

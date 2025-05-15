@@ -1,5 +1,5 @@
-e736c49b2103bce282875c0242f17cda  correct/cjump/clang_pic/a.out
-3d617e878a1ba06a3f7391ae171f1f5e  correct/cjump/clang_pic/cjump.adt
-4451ae96c970fbef4e3e75b62570ba96  correct/cjump/clang_pic/cjump.bir
-faa3e37a89c832e0196811d73eab0aa3  correct/cjump/clang_pic/cjump.relf
-b5fb42b9f09fea9b168582e4158e418a  correct/cjump/clang_pic/cjump.gts
+42e3bc713a163981ee4d9413ba7b0d0a  correct/cjump/clang_pic/a.out
+028eaf4911f3810d8ff96050501644bf  correct/cjump/clang_pic/cjump.adt
+69d90ad5e41c357b98a731490477344a  correct/cjump/clang_pic/cjump.bir
+0d9c8107a80a1dddd40e31a5faf90e87  correct/cjump/clang_pic/cjump.relf
+0bfcef1ecafb7e1128353a65b00847c5  correct/cjump/clang_pic/cjump.gts

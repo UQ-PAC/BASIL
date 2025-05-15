@@ -1,5 +1,5 @@
-823a8c7b9f2d4623c71d2ee543a9cc79  correct/function/clang_pic/a.out
-aab263fb1d07e207a7120d0c84a9eee5  correct/function/clang_pic/function.adt
-33d8e69bfd5f3da5995051d1250cc417  correct/function/clang_pic/function.bir
-d1cfecac699be6f7423e1cfe6d0566dd  correct/function/clang_pic/function.relf
-829436a2b43dd17107907b3c0e6c0c23  correct/function/clang_pic/function.gts
+bc6524f58fb252a46213628383a94a9a  correct/function/clang_pic/a.out
+e8135455f834c4eab23466aac7b411a1  correct/function/clang_pic/function.adt
+ada200848b03a4baf5efd9f0c09ec32d  correct/function/clang_pic/function.bir
+006a981f0fed846e16939fd60144fc16  correct/function/clang_pic/function.relf
+715c946d909d2fd92a4f49f29e31547e  correct/function/clang_pic/function.gts

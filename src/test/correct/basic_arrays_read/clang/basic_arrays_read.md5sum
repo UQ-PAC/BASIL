@@ -1,5 +1,5 @@
-15895b6ffcc4477c1baacc6963a45953  correct/basic_arrays_read/clang/a.out
-c07dc2b4cfdf55dff93ec94d69ea384d  correct/basic_arrays_read/clang/basic_arrays_read.adt
-1653c5fecd7362d6a1802a22b2a34dd7  correct/basic_arrays_read/clang/basic_arrays_read.bir
-5e14d29210dc9d199f7689dfffb31cb4  correct/basic_arrays_read/clang/basic_arrays_read.relf
-3a7a6daf8258de69f672f8ad5d8c94ca  correct/basic_arrays_read/clang/basic_arrays_read.gts
+fc043a071fea8e3aa2ebe611110ed859  correct/basic_arrays_read/clang/a.out
+0b01d1560cf9b869c66dcfee035a9c38  correct/basic_arrays_read/clang/basic_arrays_read.adt
+c4dfbdac4f0cb31d7dbf1268ad6ef0fe  correct/basic_arrays_read/clang/basic_arrays_read.bir
+55f102b2fa11cfd4dfa4febaaaae27b6  correct/basic_arrays_read/clang/basic_arrays_read.relf
+136b47bc9ca25a0b88c85087a7ec5636  correct/basic_arrays_read/clang/basic_arrays_read.gts

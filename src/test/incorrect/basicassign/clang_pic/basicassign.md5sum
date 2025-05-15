@@ -1,5 +1,5 @@
-2ffe85dc22b28590c9589230a916b03f  incorrect/basicassign/clang_pic/a.out
-500bce63c7e282d3bae9a642dcc13c27  incorrect/basicassign/clang_pic/basicassign.adt
-64ac872cef990f6552de22898cd4a36b  incorrect/basicassign/clang_pic/basicassign.bir
-e66487dfe4dcf7b3ca5fb8a4f5f0096c  incorrect/basicassign/clang_pic/basicassign.relf
-95ed461a0593a5e967aec137da79a9ff  incorrect/basicassign/clang_pic/basicassign.gts
+ff1e173d8361422d2ba7321e24376a7a  incorrect/basicassign/clang_pic/a.out
+833f56d05e319f0be67bb420e58fb5d3  incorrect/basicassign/clang_pic/basicassign.adt
+697b5a4cc2d910814fb189e1dee94e04  incorrect/basicassign/clang_pic/basicassign.bir
+f5808e858ffb337a55b704d64f05c521  incorrect/basicassign/clang_pic/basicassign.relf
+c5bfa878e264f0a742c741b1c421e57c  incorrect/basicassign/clang_pic/basicassign.gts

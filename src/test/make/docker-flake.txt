@@ -1,1 +1,1 @@
-github:katrinafyi/pac-nix/ef9c23743bddd6cf8d6b656c460c572426b50c9a#basil-tools-docker
+github:katrinafyi/pac-nix/569afdf78558de82c24d25e12680157c3b0aa3df#basil-tools-docker

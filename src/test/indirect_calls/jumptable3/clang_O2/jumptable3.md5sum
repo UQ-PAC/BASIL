@@ -1,5 +1,5 @@
-f9cce73f6859d2487c2440649404b2d6  indirect_calls/jumptable3/clang_O2/a.out
-a3a02f5655538294e06275d7ce678153  indirect_calls/jumptable3/clang_O2/jumptable3.adt
-93b5c79d4ecbc530f94eea190a83870e  indirect_calls/jumptable3/clang_O2/jumptable3.bir
-f92fd43a4940b80e6e0f15b9ebfbb0be  indirect_calls/jumptable3/clang_O2/jumptable3.relf
-09da4347fa3da4c49838f731b1c1368d  indirect_calls/jumptable3/clang_O2/jumptable3.gts
+2139db7dfeec143aff5002a254b3908e  indirect_calls/jumptable3/clang_O2/a.out
+ae340649227c8f898f6f903dd11b7cf1  indirect_calls/jumptable3/clang_O2/jumptable3.adt
+c4673b2c7d82cf3da4fec0ef4f970ee3  indirect_calls/jumptable3/clang_O2/jumptable3.bir
+411196bcdb8d9154e3bcc0d6c8ac9692  indirect_calls/jumptable3/clang_O2/jumptable3.relf
+c2799ce47612a676e0ff57e02ee1040c  indirect_calls/jumptable3/clang_O2/jumptable3.gts

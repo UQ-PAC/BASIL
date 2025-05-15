@@ -1,5 +1,5 @@
-8012415dd4695c86a115dd008d24de9f  correct/initialisation/gcc/a.out
-7b4cfa8ba948b31bea0b2fa360efe12b  correct/initialisation/gcc/initialisation.adt
-73397bc080a0849a3d61207a43c8f861  correct/initialisation/gcc/initialisation.bir
-4c58b4c109aa7202b9a4138c42f92a01  correct/initialisation/gcc/initialisation.relf
-d6a714f1349c3c406e5897b9459fd289  correct/initialisation/gcc/initialisation.gts
+455d68b35a2a92f10cce0058b57f3165  correct/initialisation/gcc/a.out
+50a3c2fb4c595ff4b387608a1dd2ec82  correct/initialisation/gcc/initialisation.adt
+da6051fd47076de3667937d033c133a9  correct/initialisation/gcc/initialisation.bir
+b36ef51192bdbc0e7e584464502a21a6  correct/initialisation/gcc/initialisation.relf
+a2915010ff5965c811b4ff554ede5b68  correct/initialisation/gcc/initialisation.gts

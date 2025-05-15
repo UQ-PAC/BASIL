@@ -1,5 +1,5 @@
-9d68903be7fc7215b5a88a5504f061bf  correct/basic_loop_assign/clang_pic/a.out
-f456d9979eb6df8c2444177fe03eb127  correct/basic_loop_assign/clang_pic/basic_loop_assign.adt
-f45f491a2a66bb0a3598d5d27e6a09c6  correct/basic_loop_assign/clang_pic/basic_loop_assign.bir
-cfac49df22b966d7f462469c7a3cb0c4  correct/basic_loop_assign/clang_pic/basic_loop_assign.relf
-70bdeb3067875d2b8efef4abae65de65  correct/basic_loop_assign/clang_pic/basic_loop_assign.gts
+b1f1811e3ffe325399df4f15c6fcac3d  correct/basic_loop_assign/clang_pic/a.out
+0cc546201d0dc7ff98ddebf115ea1658  correct/basic_loop_assign/clang_pic/basic_loop_assign.adt
+4fca98964c758fa21321a5137828c0f8  correct/basic_loop_assign/clang_pic/basic_loop_assign.bir
+b94dc044ebf626cbcd9695aae3159334  correct/basic_loop_assign/clang_pic/basic_loop_assign.relf
+8f53703370046c7d21156d3aad461ed5  correct/basic_loop_assign/clang_pic/basic_loop_assign.gts

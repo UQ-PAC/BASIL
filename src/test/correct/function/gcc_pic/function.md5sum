@@ -1,5 +1,5 @@
-94db7817b60ec51fccddf74ad5e1054b  correct/function/gcc_pic/a.out
-066f6c575de557eed4767e86985439e2  correct/function/gcc_pic/function.adt
-ce9873a07a3420f0d51c65b0b9355189  correct/function/gcc_pic/function.bir
-027a940e4289a98cb4888ab4dfb0304a  correct/function/gcc_pic/function.relf
-65e8f84eae2098bd323bd4e20f9d9d96  correct/function/gcc_pic/function.gts
+9d37b44b8f65f056fddbc891fdd23a4f  correct/function/gcc_pic/a.out
+4b8c7984c4dd18217b551d1b2cbd5c3a  correct/function/gcc_pic/function.adt
+78674a74a22a071b6c9c83e3aa36d6d1  correct/function/gcc_pic/function.bir
+5f44bee22c467d5592adbd7801f29ae0  correct/function/gcc_pic/function.relf
+939909df6dd93accb98ad7f3bd9614cf  correct/function/gcc_pic/function.gts

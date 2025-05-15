@@ -1,5 +1,5 @@
-9ec93d0b04a3dbe11aedc9985dbb22c8  correct/ifbranches/clang_O2/a.out
-c3cad031a5dadc2601d8cabb28a1a9f3  correct/ifbranches/clang_O2/ifbranches.adt
-987322a7327ebe69b4852390856eb18e  correct/ifbranches/clang_O2/ifbranches.bir
-e4ce9db2d90026ae007ae454ffa280cc  correct/ifbranches/clang_O2/ifbranches.relf
-2f423fe379c2f30b8f20118d0ff07081  correct/ifbranches/clang_O2/ifbranches.gts
+318707cbb1103ac41644c317b9691da1  correct/ifbranches/clang_O2/a.out
+1cbe874a8d2cae5ad21f0bd70db172c5  correct/ifbranches/clang_O2/ifbranches.adt
+d7e14b9c0d0a369ca4775815e39f298d  correct/ifbranches/clang_O2/ifbranches.bir
+9d14b2634882607f4184b0d2509f068c  correct/ifbranches/clang_O2/ifbranches.relf
+16d8a405c7be212e234b7155d291c514  correct/ifbranches/clang_O2/ifbranches.gts

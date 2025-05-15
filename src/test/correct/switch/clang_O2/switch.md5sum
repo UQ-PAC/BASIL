@@ -1,5 +1,5 @@
-240e6d95f621ee91fe3731b174d0460c  correct/switch/clang_O2/a.out
-27a141bc127cfc284fd62a50edd2b871  correct/switch/clang_O2/switch.adt
-deb655d87967357a586ec65c298b0a3c  correct/switch/clang_O2/switch.bir
-add95b2d3c8dc1cc867d98d7dff7ff61  correct/switch/clang_O2/switch.relf
-5a58c73c41f6f2f487170e4bcaad4291  correct/switch/clang_O2/switch.gts
+0c158d2a54aaa9a49a8e3968ad5cc9c6  correct/switch/clang_O2/a.out
+b28463c86ef5439226bf2b8bd74172e2  correct/switch/clang_O2/switch.adt
+56c9abd9494cbc9dd6e69111f29812ad  correct/switch/clang_O2/switch.bir
+e891cdb3f87d0879b0327263ec3cfb94  correct/switch/clang_O2/switch.relf
+c60da4d0b8944f64a0b65822f9862b3e  correct/switch/clang_O2/switch.gts

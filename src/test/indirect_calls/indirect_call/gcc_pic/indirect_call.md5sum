@@ -1,4 +1,4 @@
-692a0be496e9a1714271968a1e8d0232  indirect_calls/indirect_call/gcc_pic/a.out
-ade7607337aba61321d732de7d89c7f6  indirect_calls/indirect_call/gcc_pic/indirect_call.relf
-2cf7d626149d75fd6f94a782aed84d25  indirect_calls/indirect_call/gcc_pic/indirect_call.adt
-64748e5bcd57ac7d2ae65c7906d8f1b2  indirect_calls/indirect_call/gcc_pic/indirect_call.bir
+52e9dafeff1c2f27a5fcde67978f561d  indirect_calls/indirect_call/gcc_pic/a.out
+f1b7c2382ac5cc0800c9bf3bd80d5287  indirect_calls/indirect_call/gcc_pic/indirect_call.relf
+aada043378532566ea817b385174065f  indirect_calls/indirect_call/gcc_pic/indirect_call.adt
+4deeba4f77b863b3408c47ce72b7e751  indirect_calls/indirect_call/gcc_pic/indirect_call.bir

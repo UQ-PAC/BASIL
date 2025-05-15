@@ -1,5 +1,5 @@
-2893a7abd0d9ef6b7e96c26fc1970647  correct/ifglobal/clang_O2/a.out
-7a0d5012163b4b451ac6c5fa429a5628  correct/ifglobal/clang_O2/ifglobal.adt
-df2e6729212fa06c4626ee44727684b6  correct/ifglobal/clang_O2/ifglobal.bir
-3d35e23f412bb0a81f640845dd1dc630  correct/ifglobal/clang_O2/ifglobal.relf
-4f9f326028041292393237b3b1935ce3  correct/ifglobal/clang_O2/ifglobal.gts
+803bddeccb00867fb52fe6c7750b6e14  correct/ifglobal/clang_O2/a.out
+dc093d156daa837798f85cf3de55cc3c  correct/ifglobal/clang_O2/ifglobal.adt
+dc7dae7232050e8d74e3450aae88a73b  correct/ifglobal/clang_O2/ifglobal.bir
+bd43c19dcc2f7d53a67d7da3eed05c21  correct/ifglobal/clang_O2/ifglobal.relf
+1665e99655a1bf7fc89d953dbac62edf  correct/ifglobal/clang_O2/ifglobal.gts

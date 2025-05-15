@@ -1,5 +1,5 @@
-376f6860dce83d8d849ac49666cad7ba  correct/malloc_with_local/clang/a.out
-a94c906c5f5947805b02fa4105acecee  correct/malloc_with_local/clang/malloc_with_local.adt
-303a3e936ea7b835d3a88ea39be58cce  correct/malloc_with_local/clang/malloc_with_local.bir
-403cfc08391f2b9a156f8283a265bf98  correct/malloc_with_local/clang/malloc_with_local.relf
-0bfb94418f1ac3c0c2b24f1695d362a9  correct/malloc_with_local/clang/malloc_with_local.gts
+af400878f5b7e84c493a13e537455865  correct/malloc_with_local/clang/a.out
+695d2d5cfaa7afbd01a91d6041cfd8d4  correct/malloc_with_local/clang/malloc_with_local.adt
+ee256cab3a08ef4e250eaffc3cdcda38  correct/malloc_with_local/clang/malloc_with_local.bir
+42f39762f34ccb7bc1e862a0c33b5caa  correct/malloc_with_local/clang/malloc_with_local.relf
+0bbe9eb3c35b3552b35ce0d89e19723c  correct/malloc_with_local/clang/malloc_with_local.gts

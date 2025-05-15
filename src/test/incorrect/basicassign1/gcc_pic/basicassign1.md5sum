@@ -1,5 +1,5 @@
-b9324049c8c9ce4b58282907b9da4393  incorrect/basicassign1/gcc_pic/a.out
-e8ef530cb684bec3d976384744996914  incorrect/basicassign1/gcc_pic/basicassign1.adt
-b312bc8df5bc755530b5c43fb82908a8  incorrect/basicassign1/gcc_pic/basicassign1.bir
-c708a6c1a8afb09344a1d4c14d4328c0  incorrect/basicassign1/gcc_pic/basicassign1.relf
-b6f7faae25fe4466d6ecb3a7ddfe372d  incorrect/basicassign1/gcc_pic/basicassign1.gts
+01509a5aae57f1f6ea56d9af06b393fd  incorrect/basicassign1/gcc_pic/a.out
+744e91791f1bed47077ccdde2bd3f8d0  incorrect/basicassign1/gcc_pic/basicassign1.adt
+f3fd913eabe03054524b5b8291fe8cdc  incorrect/basicassign1/gcc_pic/basicassign1.bir
+ad6ef0faf978f21e0dfe364208239bd1  incorrect/basicassign1/gcc_pic/basicassign1.relf
+1eb06c3bf1eb0ea35660cd83328f5046  incorrect/basicassign1/gcc_pic/basicassign1.gts

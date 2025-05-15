@@ -1,3 +1,3 @@
-8aa515ab6c2878e2ddb872cc2d4fb68a  correct/indirect_call/clang/a.out
-2686fc6b5b2ce84a8fa43d98a198ee7b  correct/indirect_call/clang/indirect_call.relf
-15900904642d9aa5774ef2a41552b106  correct/indirect_call/clang/indirect_call.gts
+cf83be26369d10dba380fb84b5269c22  correct/indirect_call/clang/a.out
+139d93f429d8076bafddc3cd8d5cef94  correct/indirect_call/clang/indirect_call.relf
+4e0d4bad5722970924a19f9bb9df2af2  correct/indirect_call/clang/indirect_call.gts

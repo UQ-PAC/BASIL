@@ -1,4 +1,4 @@
-88b5b2666238da7615590e7c3d02e66b  indirect_calls/functionpointer/clang_pic/a.out
-e299e7da5f7e340601033ddfb996cf35  indirect_calls/functionpointer/clang_pic/functionpointer.relf
-d11765657286c693e5264d7a6a9b6e2a  indirect_calls/functionpointer/clang_pic/functionpointer.adt
-66151171ae2b5a71778da32d327ef54a  indirect_calls/functionpointer/clang_pic/functionpointer.bir
+cde0dd1493e74f760c4d3b85fbc38486  indirect_calls/functionpointer/clang_pic/a.out
+14df3f414fecb064a4079ce090044615  indirect_calls/functionpointer/clang_pic/functionpointer.relf
+e2f53148da788ad01910f707b19df54e  indirect_calls/functionpointer/clang_pic/functionpointer.adt
+4509a51c90ec89581f3e9f0cea0ec3c4  indirect_calls/functionpointer/clang_pic/functionpointer.bir

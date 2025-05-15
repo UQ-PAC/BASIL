@@ -1,5 +1,5 @@
-05e565efc44a5f7e10385b1d2188ec8a  correct/cjump/gcc_pic/a.out
-f54e98073b3fc4760a89e0219917e397  correct/cjump/gcc_pic/cjump.adt
-bf3ee8c42559dc9d7df92cf1b647c872  correct/cjump/gcc_pic/cjump.bir
-09543e2c6668be2d96ba76bd03c69dd6  correct/cjump/gcc_pic/cjump.relf
-1bbf00c4c5b884b4b8760edd0b5e34f3  correct/cjump/gcc_pic/cjump.gts
+f426faf51b6581040238c9c1e06f12d6  correct/cjump/gcc_pic/a.out
+2f251182e524286f175187a0cac8aeb1  correct/cjump/gcc_pic/cjump.adt
+2be548c611489a9c1f8e09809c66ab02  correct/cjump/gcc_pic/cjump.bir
+b91e120b0fce2608c5f7e858adc97d6f  correct/cjump/gcc_pic/cjump.relf
+476ff7e97cee009b72329f73f647fecb  correct/cjump/gcc_pic/cjump.gts

@@ -1,3 +1,3 @@
-692a0be496e9a1714271968a1e8d0232  correct/indirect_call/gcc_pic/a.out
-ade7607337aba61321d732de7d89c7f6  correct/indirect_call/gcc_pic/indirect_call.relf
-b35b54f5d395f595fdf666c3f5c7d731  correct/indirect_call/gcc_pic/indirect_call.gts
+52e9dafeff1c2f27a5fcde67978f561d  correct/indirect_call/gcc_pic/a.out
+f1b7c2382ac5cc0800c9bf3bd80d5287  correct/indirect_call/gcc_pic/indirect_call.relf
+956b13f507e66525fd9eb74de47db19b  correct/indirect_call/gcc_pic/indirect_call.gts

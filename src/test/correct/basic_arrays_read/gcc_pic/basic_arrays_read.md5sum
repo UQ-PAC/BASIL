@@ -1,5 +1,5 @@
-c8c0b35d646a60f45eb36bf867512667  correct/basic_arrays_read/gcc_pic/a.out
-2666431583110c7c33e49f12d0d6c819  correct/basic_arrays_read/gcc_pic/basic_arrays_read.adt
-e7e91794300dfb2b9d49a41c2db96225  correct/basic_arrays_read/gcc_pic/basic_arrays_read.bir
-6e74bdc8e3689aec5b93f90febc6a12e  correct/basic_arrays_read/gcc_pic/basic_arrays_read.relf
-8646784b5d1ef1db5f60efe590b59ab6  correct/basic_arrays_read/gcc_pic/basic_arrays_read.gts
+2ec3ea4df676e55fc3672a90a86e73a1  correct/basic_arrays_read/gcc_pic/a.out
+7d47f5a795fc25fd0567f2e477afae9a  correct/basic_arrays_read/gcc_pic/basic_arrays_read.adt
+e9a41fec788800eb7ef843a68290e7fd  correct/basic_arrays_read/gcc_pic/basic_arrays_read.bir
+abab84b9ba2cfc7c3cde55a19e97745e  correct/basic_arrays_read/gcc_pic/basic_arrays_read.relf
+6e01dae302ed9a7e49cdc58f631e080b  correct/basic_arrays_read/gcc_pic/basic_arrays_read.gts

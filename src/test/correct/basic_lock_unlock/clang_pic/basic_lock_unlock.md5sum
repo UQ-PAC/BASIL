@@ -1,5 +1,5 @@
-59ba2287f942abfb04d11b01c3cfdfb1  correct/basic_lock_unlock/clang_pic/a.out
-003c0d10955687c6dcc9f98e82fb86fd  correct/basic_lock_unlock/clang_pic/basic_lock_unlock.adt
-7e393b357c83e4fa13b33e6efe276293  correct/basic_lock_unlock/clang_pic/basic_lock_unlock.bir
-fb060458249021aceabf4b721c9711f5  correct/basic_lock_unlock/clang_pic/basic_lock_unlock.relf
-f7e49592d7fa066f1b88f033ad31f6be  correct/basic_lock_unlock/clang_pic/basic_lock_unlock.gts
+750f81b72bd1458cb07245dd17e5b27b  correct/basic_lock_unlock/clang_pic/a.out
+74b0a119bffe2c98fd623dc66dda4f0d  correct/basic_lock_unlock/clang_pic/basic_lock_unlock.adt
+fd01829bf3f56132990a0c9716154dc7  correct/basic_lock_unlock/clang_pic/basic_lock_unlock.bir
+847e9df64778f02808c1ec010427980e  correct/basic_lock_unlock/clang_pic/basic_lock_unlock.relf
+874387ccc20d00da87a5c10dfcc87133  correct/basic_lock_unlock/clang_pic/basic_lock_unlock.gts
