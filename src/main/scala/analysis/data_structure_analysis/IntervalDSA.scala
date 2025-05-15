@@ -1279,9 +1279,13 @@ def globalIntervals(ctx: IRContext): Seq[DSInterval] = {
   )
 
   val seq = intervals.toSeq.sorted // sorted for easier overlapping check
-  seq.sliding(2).foreach(
-    v => assert(!v(0).isOverlapping(v(1)))
-  )
+  if seq.size > 1 then
+    {
+       seq.sliding(2).foreach(
+        v => assert(!v(0).isOverlapping(v(1)))
+      )
+    }
+
   seq
 }
 
