@@ -15,6 +15,8 @@ import analysis.Lambda
 
 import util.SlicerConfig
 
+import scala.collection.mutable
+
 private type StatementSlice = Set[Variable]
 object StatementSlice {
   def apply(): StatementSlice = Set.empty[Variable]
@@ -23,13 +25,86 @@ object StatementSlice {
 class Slicer(program: Program, slicerConfig: SlicerConfig) {
 
   private val performanceTimer = PerformanceTimer("Slicer Timer", LogLevel.INFO)
-  private val initialCriterion = buildInitialCriterion
 
-  private def buildInitialCriterion: Map[CFGPosition, StatementSlice] = {
-    Map()
+  private val parsedConfig: Option[(Block, Set[Variable])] = {
+    def variables(n: Command): Set[Variable] = {
+      n match {
+        case a: LocalAssign => a.lhs.variables ++ a.rhs.variables
+        case a: MemoryAssign => a.lhs.variables ++ a.rhs.variables
+        case a: MemoryLoad => a.lhs.variables ++ a.index.variables
+        case m: MemoryStore => m.index.variables ++ m.value.variables
+        case a: Assume => a.body.variables
+        case a: Assert => a.body.variables
+        case c: DirectCall => c.outParams.values.toSet[Variable] ++ c.actualParams.values.flatMap(_.variables)
+        case i: IndirectCall => Set(i.target)
+        case r: Return => r.outParams.keys.toSet[Variable] ++ r.outParams.values.flatMap(_.variables)
+        case s: (NOP | GoTo | Unreachable) => Set()
+      }
+    }
+
+    try {
+      val targetedBlock = program.labelToBlock(slicerConfig.blockLabel)
+
+      val visited = mutable.Map[String, Boolean]().withDefaultValue(false)
+
+      val detectedVariables = mutable.Set[Variable]()
+      var remainingNames = mutable.Set() ++ slicerConfig.initialCriterion
+
+      val worklist = mutable.PriorityQueue[Block]()(Ordering.by(b => -b.rpoOrder))
+      worklist.addOne(targetedBlock)
+
+      while (worklist.nonEmpty && remainingNames.nonEmpty) {
+        val b = worklist.dequeue
+
+        if (!visited(b.label)) {
+          visited.put(b.label, true)
+
+          val blockVars = b.statements.flatMap(c => variables(c)).filter(v => remainingNames.contains(v.name))
+          detectedVariables.addAll(blockVars)
+          remainingNames.subtractAll(blockVars.map(_.name))
+
+          worklist.addAll(IntraProcBlockIRCursor.pred(b))
+          worklist.addAll(b.calls.collect { case t if t.returnBlock.isDefined => t.returnBlock.get })
+
+          // Reached entry of program from target without finding variables. Re-loop from main return.
+          if (worklist.isEmpty && remainingNames.nonEmpty) {
+            program.mainProcedure.returnBlock match {
+              case Some(block) => worklist.addOne(block)
+              case None => ()
+            }
+          }
+        }
+      }
+
+      if (remainingNames.isEmpty) {
+        println(detectedVariables)
+        Some((targetedBlock, detectedVariables.toSet))
+      } else {
+        SlicerLogger.error(s"Invalid criterion variables. Could not find variables: ${remainingNames.mkString(", ")}")
+        None
+      }
+
+    } catch {
+      case u: NoSuchElementException => {
+        SlicerLogger.error(s"Invalid criterion block: ${slicerConfig.blockLabel} does not exist")
+        None
+      }
+    }
   }
 
-  private val startingNode = IRWalk.lastInProc(program.mainProcedure).getOrElse(program.mainProcedure)
+  lazy private val initialCriterion: Map[CFGPosition, StatementSlice] = {
+    parsedConfig match {
+      case Some(targetedBlock, variables) => Map(targetedBlock.jump -> variables)
+      case _ => Map()
+    }
+  }
+
+  lazy private val startingNode = {
+    parsedConfig match {
+      case Some(targetedBlock, _) => targetedBlock.jump
+      case _ => IRWalk.lastInProc(program.mainProcedure).getOrElse(program.mainProcedure)
+    }
+  }
 
   private class Phase1 {
     def run(): Map[CFGPosition, Set[Variable]] = {
@@ -158,15 +233,17 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
 
   def run(): Unit = {
     SlicerLogger.info("Slicer :: Slicer Start")
+    if (parsedConfig.isDefined) {
+      SlicerLogger.debug("Slicer - Stripping unreachable")
+      stripUnreachableFunctions(program)
 
-    SlicerLogger.debug("Slicer - Stripping unreachable")
-    stripUnreachableFunctions(program)
+      val results = Phase1().run()
 
-    val results = Phase1().run()
+      Phase2(results).run()
 
-    Phase2(results).run()
-
-    performanceTimer.checkPoint("Finished Slicer")
+      performanceTimer.checkPoint("Finished Slicer")
+    } else {
+      SlicerLogger.error("Skipping Slicer")
+    }
   }
-
 }
