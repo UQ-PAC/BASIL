@@ -1,4 +1,4 @@
-https://files.catbox.moe/oow6tz.zst
+https://files.catbox.moe/9nn6b8.zst
 
 # this file should have a URL as its first line
 # and a sha1sum as its last line. all other
@@ -9,4 +9,4 @@ https://files.catbox.moe/oow6tz.zst
 #
 # make sure to update both URL and sha1sum simultaneously.
 
-e3c89539826d6bb185d2a1ed944a4d4d6394cc85  compiled.tar.zst
+1bbce115cdc97bf06daff1195aedb376e386e719  compiled.tar.zst
