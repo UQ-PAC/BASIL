@@ -253,7 +253,7 @@ object Main {
         case Some("prereq") => Some(Prereq)
         case Some("checks") => Some(Checks)
         case Some("standard") => Some(Standard)
-        case None => Some(Standard)
+        case None => None
         case Some(_) =>
           throw new IllegalArgumentException("Illegal option to dsa, allowed are: (prereq|standard|checks)")
     } else {
