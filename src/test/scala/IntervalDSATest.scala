@@ -282,8 +282,14 @@ class IntervalDSATest extends AnyFunSuite with CaptureOutput {
     assert(locals.values.filterNot(g => stackCollapsed.contains(g.proc.procName)).
       forall(IntervalDSA.checksStackMaintained))
 
-    locals.values.filterNot(g => globalCollapsed.contains(g.proc.procName)).
-      foreach(g => assert(IntervalDSA.checksGlobalsMaintained(g), s"function ${g.proc.procName} had it's global collapsed"))
+    assert(locals.values.filterNot(g => globalCollapsed.contains(g.proc.procName)).
+      forall(IntervalDSA.checksGlobalsMaintained))
+
+    assert(!locals.values.filter(g => stackCollapsed.contains(g.proc.procName)).
+      exists(IntervalDSA.checksStackMaintained))
+
+    assert(!locals.values.filter(g => globalCollapsed.contains(g.proc.procName)).
+      exists(IntervalDSA.checksGlobalsMaintained))
   }
 
   test("www_authenticate") {
