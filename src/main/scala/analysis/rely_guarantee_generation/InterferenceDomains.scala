@@ -242,7 +242,7 @@ class MonotonicityDomain[S](stateLattice: InterferenceCompatibleLattice[S], stat
       // apply assume statement to add constraints to y
       val yConstraints = d match {
         case Direction.Bot =>
-          stateTransfer(postState, Assume(BinaryExpr(IntEQ, y, v)))
+          stateTransfer(postState, Assume(BinaryExpr(EQ, y, v)))
         case Direction.Increasing =>
           stateTransfer(postState, Assume(BinaryExpr(BVSGE, y, v)))
         case Direction.Decreasing =>
