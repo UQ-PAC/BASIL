@@ -136,6 +136,11 @@ object IRLoading {
 
     val specification = IRLoading.loadSpecification(q.specFile, program, globals)
 
+    if (q.pcTracking == PCTrackingOption.None) {
+      visit_prog(transforms.RemovePCStatements(), program)
+      Logger.info(s"[!] Removed PC-related statements")
+    }
+
     IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program)
   }
 
@@ -317,6 +322,16 @@ object IRTransform {
     )
     val dupProcNames = ctx.program.procedures.groupBy(_.name).filter((_, p) => p.size > 1).toList.flatMap(_(1))
     assert(dupProcNames.isEmpty)
+
+    ctx.program.procedures.foreach(p =>
+      p.blocks.foreach(b => {
+        b.jump match {
+          case GoTo(targs, _) if targs.isEmpty =>
+            Logger.warn(s"block ${b.label} in subroutine ${p.name} has no outgoing edges")
+          case _ => ()
+        }
+      })
+    )
 
     if (
       !config.memoryTransform && (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled))
@@ -891,6 +906,9 @@ object RunUtils {
         s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
       )
     }
+
+    ctx.program.procedures.foreach(transforms.RemoveUnreachableBlocks.apply)
+    Logger.info(s"[!] Removed unreachable blocks")
 
     if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)
