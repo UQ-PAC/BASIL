@@ -903,6 +903,7 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
           globals
         )
       DSATD.values.foreach(g => IntervalDSA.globalTransfer(g, globalGraph))
+      if config.splitGlobals then IntervalDSA.resolveGlobalOverlapping(globalGraph)
       val globalMapping = DSATD.values.foldLeft(Map[IntervalNode, IntervalNode]()) { (m, g) =>
         val oldToNew = IntervalDSA.globalTransfer(globalGraph, g)
         m ++ oldToNew.map((common, spec) => (spec, common))
@@ -927,7 +928,26 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
 object IntervalDSA {
 
 
-
+  def resolveGlobalOverlapping(graph: IntervalGraph): Unit = {
+    graph.glIntervals.zipWithIndex.foreach {
+      case (interval, i) if i < graph.glIntervals.size=>
+        val base = Global(interval)
+        val node = graph.find(base)
+        val offsets = node.bases(base)
+        assert(offsets.size == 1)
+        val offset = offsets.head
+        if node.cells.last.interval.end.getOrElse(0) > interval.size.get + offset then {
+          val next = graph.glIntervals(i + 1)
+          val nextOffset = next.start.get - interval.start.get + offset
+          if  nextOffset < node.cells.last.interval.end.get then {
+            val nextCell = graph.find(graph.nodes(Global(next)).get(0))
+            val cell = node.add(nextOffset)
+            graph.mergeCells(nextCell, cell)
+          }
+        }
+      case _ =>
+    }
+  }
 
   def checksGlobalsMaintained(graph: IntervalGraph): Boolean = {
     graph.glIntervals.forall(i => !graph.find(Global(i)).isCollapsed)
