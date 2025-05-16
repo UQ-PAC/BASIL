@@ -1082,7 +1082,8 @@ object IntervalDSA {
       val node = queue.dequeue()
       node.bases.filter(_._1.isInstanceOf[Global]).foreach(
         (base, offsets) =>
-          assert(found(base).isEmpty || found(base).get == node)
+          assert(offsets.size <= 1, s"$base had more than one offset in $node")
+          assert(found(base).isEmpty || found(base).get == node, s"$base was in at least two nodes")
           found += (base -> Some(node))
       )
       seen.add(node)
