@@ -843,7 +843,7 @@ class Graph(using Counter)(
   }
 
   def SSAVar(posLabel: String, varName: String): Slice = {
-    assert(posLabel.matches("%[0-9a-f]{8}?\\$\\d"), s"posLabel not matching BAP format '$posLabel'")
+    assert(posLabel.matches("""%[0-9a-f]{8}?(:\$\d)?"""), s"posLabel not matching BAP format '$posLabel'")
 
     val res = varToCell.keys.filter(pos => pos.toShortString.startsWith(posLabel))
     assert(res.size == 1, s"failed to get SSAVar for '$posLabel' and '$varName'. matched label: ${res}")
