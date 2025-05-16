@@ -1,0 +1,5 @@
+0d579d5f95d5b9ada274b8d277a5274d  correct/basic_sec_policy_write/gcc_pic/a.out
+bdb4e5a39334379f2a320c6e6cbbcd7c  correct/basic_sec_policy_write/gcc_pic/basic_sec_policy_write.adt
+e3593af37d2ad4872f495f2e14a9009d  correct/basic_sec_policy_write/gcc_pic/basic_sec_policy_write.bir
+13288c272806c0a724285c7a07336f2f  correct/basic_sec_policy_write/gcc_pic/basic_sec_policy_write.relf
+084a854a83e4d403a6182e1c435dee72  correct/basic_sec_policy_write/gcc_pic/basic_sec_policy_write.gts

@@ -85,7 +85,7 @@ implementation {:extern} guarantee_reflexive()
   assert (memory_load32_le(mem, $z_addr) == memory_load32_le(mem, $z_addr));
 }
 
-procedure main_1812();
+procedure main();
   modifies CF, Gamma_CF, Gamma_NF, Gamma_R0, Gamma_R31, Gamma_VF, Gamma_ZF, Gamma_mem, Gamma_stack, NF, R0, R31, VF, ZF, mem, stack;
   free requires (memory_load64_le(mem, 69632bv64) == 0bv64);
   free requires (memory_load64_le(mem, 69640bv64) == 69640bv64);
@@ -102,59 +102,59 @@ procedure main_1812();
   free ensures (memory_load64_le(mem, 69616bv64) == 1812bv64);
   free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
 
-implementation main_1812()
+implementation main()
 {
-  var Cse0__5_0_8: bv32;
-  var Gamma_Cse0__5_0_8: bool;
-  var Gamma_load4: bool;
-  var Gamma_load5: bool;
-  var Gamma_load6: bool;
-  var load4: bv32;
-  var load5: bv32;
-  var load6: bv32;
-  main_1812__0__qLy9TrC9QH2pk7NWiim55Q:
-    assume {:captureState "main_1812__0__qLy9TrC9QH2pk7NWiim55Q"} true;
+  var $load4: bv32;
+  var $load5: bv32;
+  var $load6: bv32;
+  var Cse0__5$0$8: bv32;
+  var Gamma_$load4: bool;
+  var Gamma_$load5: bool;
+  var Gamma_$load6: bool;
+  var Gamma_Cse0__5$0$8: bool;
+  $main$__0__$qLy9TrC9QH2pk7NWiim55Q:
+    assume {:captureState "$main$__0__$qLy9TrC9QH2pk7NWiim55Q"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 20bv64), Gamma_R0;
     call rely();
-    load4, Gamma_load4 := memory_load32_le(mem, R0), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
-    R0, Gamma_R0 := zero_extend32_32(load4), Gamma_load4;
+    $load4, Gamma_$load4 := memory_load32_le(mem, R0), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
+    R0, Gamma_R0 := zero_extend32_32($load4), Gamma_$load4;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 12bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 12bv64), Gamma_R0);
-    assume {:captureState "1828_0"} true;
+    assume {:captureState "1828$0"} true;
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 24bv64), Gamma_R0;
     call rely();
-    load5, Gamma_load5 := memory_load32_le(mem, R0), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
-    R0, Gamma_R0 := zero_extend32_32(load5), Gamma_load5;
-    Cse0__5_0_8, Gamma_Cse0__5_0_8 := bvadd32(R0[32:0], 0bv32), Gamma_R0;
-    VF, Gamma_VF := bvnot1(bvcomp32(Cse0__5_0_8, Cse0__5_0_8)), Gamma_Cse0__5_0_8;
-    CF, Gamma_CF := bvnot1(bvcomp33(zero_extend1_32(Cse0__5_0_8), bvadd33(zero_extend1_32(R0[32:0]), 4294967296bv33))), (Gamma_R0 && Gamma_Cse0__5_0_8);
-    ZF, Gamma_ZF := bvcomp32(Cse0__5_0_8, 0bv32), Gamma_Cse0__5_0_8;
-    NF, Gamma_NF := Cse0__5_0_8[32:31], Gamma_Cse0__5_0_8;
+    $load5, Gamma_$load5 := memory_load32_le(mem, R0), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
+    R0, Gamma_R0 := zero_extend32_32($load5), Gamma_$load5;
+    Cse0__5$0$8, Gamma_Cse0__5$0$8 := bvadd32(R0[32:0], 0bv32), Gamma_R0;
+    VF, Gamma_VF := bvnot1(bvcomp32(Cse0__5$0$8, Cse0__5$0$8)), Gamma_Cse0__5$0$8;
+    CF, Gamma_CF := bvnot1(bvcomp33(zero_extend1_32(Cse0__5$0$8), bvadd33(zero_extend1_32(R0[32:0]), 4294967296bv33))), (Gamma_R0 && Gamma_Cse0__5$0$8);
+    ZF, Gamma_ZF := bvcomp32(Cse0__5$0$8, 0bv32), Gamma_Cse0__5$0$8;
+    NF, Gamma_NF := Cse0__5$0$8[32:31], Gamma_Cse0__5$0$8;
     assert Gamma_ZF;
-    goto main_1812__0__qLy9TrC9QH2pk7NWiim55Q_goto_main_1812__2__w_2v0dVvQ2~CbK2pWb20GA, main_1812__0__qLy9TrC9QH2pk7NWiim55Q_goto_main_1812__1___azgQEK1R4ujBoxU5Olnyw;
-  main_1812__0__qLy9TrC9QH2pk7NWiim55Q_goto_main_1812__1___azgQEK1R4ujBoxU5Olnyw:
-    assume {:captureState "main_1812__0__qLy9TrC9QH2pk7NWiim55Q_goto_main_1812__1___azgQEK1R4ujBoxU5Olnyw"} true;
-    assume (!(ZF == 1bv1));
+    goto $main$__0__$qLy9TrC9QH2pk7NWiim55Q_goto_$main$__2__$w_2v0dVvQ2~CbK2pWb20GA, $main$__0__$qLy9TrC9QH2pk7NWiim55Q_goto_$main$__1__$_azgQEK1R4ujBoxU5Olnyw;
+  $main$__1__$_azgQEK1R4ujBoxU5Olnyw:
+    assume {:captureState "$main$__1__$_azgQEK1R4ujBoxU5Olnyw"} true;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 12bv64), 0bv32), gamma_store32(Gamma_stack, bvadd64(R31, 12bv64), true);
-    assume {:captureState "1852_0"} true;
-    goto main_1812__1___azgQEK1R4ujBoxU5Olnyw;
-  main_1812__1___azgQEK1R4ujBoxU5Olnyw:
-    assume {:captureState "main_1812__1___azgQEK1R4ujBoxU5Olnyw"} true;
-    goto main_1812__2__w_2v0dVvQ2~CbK2pWb20GA;
-  main_1812__0__qLy9TrC9QH2pk7NWiim55Q_goto_main_1812__2__w_2v0dVvQ2~CbK2pWb20GA:
-    assume {:captureState "main_1812__0__qLy9TrC9QH2pk7NWiim55Q_goto_main_1812__2__w_2v0dVvQ2~CbK2pWb20GA"} true;
-    assume (ZF == 1bv1);
-    goto main_1812__2__w_2v0dVvQ2~CbK2pWb20GA;
-  main_1812__2__w_2v0dVvQ2~CbK2pWb20GA:
-    assume {:captureState "main_1812__2__w_2v0dVvQ2~CbK2pWb20GA"} true;
-    load6, Gamma_load6 := memory_load32_le(stack, bvadd64(R31, 12bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
-    R0, Gamma_R0 := zero_extend32_32(load6), Gamma_load6;
+    assume {:captureState "1852$0"} true;
+    goto $main$__2__$w_2v0dVvQ2~CbK2pWb20GA;
+  $main$__2__$w_2v0dVvQ2~CbK2pWb20GA:
+    assume {:captureState "$main$__2__$w_2v0dVvQ2~CbK2pWb20GA"} true;
+    $load6, Gamma_$load6 := memory_load32_le(stack, bvadd64(R31, 12bv64)), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
+    R0, Gamma_R0 := zero_extend32_32($load6), Gamma_$load6;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
-    goto main_1812_basil_return;
-  main_1812_basil_return:
-    assume {:captureState "main_1812_basil_return"} true;
+    goto main_basil_return;
+  $main$__0__$qLy9TrC9QH2pk7NWiim55Q_goto_$main$__2__$w_2v0dVvQ2~CbK2pWb20GA:
+    assume {:captureState "$main$__0__$qLy9TrC9QH2pk7NWiim55Q_goto_$main$__2__$w_2v0dVvQ2~CbK2pWb20GA"} true;
+    assume (ZF == 1bv1);
+    goto $main$__2__$w_2v0dVvQ2~CbK2pWb20GA;
+  $main$__0__$qLy9TrC9QH2pk7NWiim55Q_goto_$main$__1__$_azgQEK1R4ujBoxU5Olnyw:
+    assume {:captureState "$main$__0__$qLy9TrC9QH2pk7NWiim55Q_goto_$main$__1__$_azgQEK1R4ujBoxU5Olnyw"} true;
+    assume (!(ZF == 1bv1));
+    goto $main$__1__$_azgQEK1R4ujBoxU5Olnyw;
+  main_basil_return:
+    assume {:captureState "main_basil_return"} true;
     return;
 }
 

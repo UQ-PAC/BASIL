@@ -1,0 +1,5 @@
+750f81b72bd1458cb07245dd17e5b27b  correct/basic_lock_unlock/clang_pic/a.out
+74b0a119bffe2c98fd623dc66dda4f0d  correct/basic_lock_unlock/clang_pic/basic_lock_unlock.adt
+fd01829bf3f56132990a0c9716154dc7  correct/basic_lock_unlock/clang_pic/basic_lock_unlock.bir
+847e9df64778f02808c1ec010427980e  correct/basic_lock_unlock/clang_pic/basic_lock_unlock.relf
+874387ccc20d00da87a5c10dfcc87133  correct/basic_lock_unlock/clang_pic/basic_lock_unlock.gts

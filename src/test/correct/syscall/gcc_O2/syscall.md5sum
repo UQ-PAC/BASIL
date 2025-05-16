@@ -1,0 +1,5 @@
+fc8678ab5c3a650a054f37f078fee94b  correct/syscall/gcc_O2/a.out
+54d3f63ea04f72d43fddb937b71ce408  correct/syscall/gcc_O2/syscall.adt
+505fdedad00805b06ee4df9733e09808  correct/syscall/gcc_O2/syscall.bir
+ef5abedd2b740ce318c81d07d8bf3cc3  correct/syscall/gcc_O2/syscall.relf
+0e6110ec03c611a0a9a3d882424adc3c  correct/syscall/gcc_O2/syscall.gts

@@ -1,0 +1,5 @@
+803bddeccb00867fb52fe6c7750b6e14  correct/ifglobal/clang_O2/a.out
+dc093d156daa837798f85cf3de55cc3c  correct/ifglobal/clang_O2/ifglobal.adt
+dc7dae7232050e8d74e3450aae88a73b  correct/ifglobal/clang_O2/ifglobal.bir
+bd43c19dcc2f7d53a67d7da3eed05c21  correct/ifglobal/clang_O2/ifglobal.relf
+1665e99655a1bf7fc89d953dbac62edf  correct/ifglobal/clang_O2/ifglobal.gts

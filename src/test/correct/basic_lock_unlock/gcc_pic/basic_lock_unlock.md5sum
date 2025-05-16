@@ -1,0 +1,5 @@
+c287ab3102c699d3b0e9c2b209d2c7f4  correct/basic_lock_unlock/gcc_pic/a.out
+2918e3138d9721fce3cda2b1da2f09b9  correct/basic_lock_unlock/gcc_pic/basic_lock_unlock.adt
+463c0a638be73d9487641fea8bf1deeb  correct/basic_lock_unlock/gcc_pic/basic_lock_unlock.bir
+5898cf5818cbc7180268ffb086bf0378  correct/basic_lock_unlock/gcc_pic/basic_lock_unlock.relf
+b79df0ce75ddc4e623a699e9dc7daff3  correct/basic_lock_unlock/gcc_pic/basic_lock_unlock.gts

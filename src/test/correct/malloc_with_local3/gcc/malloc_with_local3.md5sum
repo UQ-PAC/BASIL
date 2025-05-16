@@ -1,0 +1,5 @@
+aaacddb9eebfb8346d7e7c9e632d52a7  correct/malloc_with_local3/gcc/a.out
+40b7d25aed3385621e11e657ddab86eb  correct/malloc_with_local3/gcc/malloc_with_local3.adt
+93a48b93d2272ca660ae06a33166df05  correct/malloc_with_local3/gcc/malloc_with_local3.bir
+534c049bacef690db52f530432a94858  correct/malloc_with_local3/gcc/malloc_with_local3.relf
+66e55208fbefb879f1a6e7688850121f  correct/malloc_with_local3/gcc/malloc_with_local3.gts

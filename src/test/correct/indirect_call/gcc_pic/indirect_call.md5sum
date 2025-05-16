@@ -1,0 +1,3 @@
+52e9dafeff1c2f27a5fcde67978f561d  correct/indirect_call/gcc_pic/a.out
+f1b7c2382ac5cc0800c9bf3bd80d5287  correct/indirect_call/gcc_pic/indirect_call.relf
+956b13f507e66525fd9eb74de47db19b  correct/indirect_call/gcc_pic/indirect_call.gts

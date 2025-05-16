@@ -1,0 +1,3 @@
+bb04b16d71ceb1f52c42953497156b91  correct/syscall/clang_O2/a.out
+23f35b0d9ec636b7f283d24d86e43756  correct/syscall/clang_O2/syscall.relf
+6a049a286775ab4fd703eca208d2a031  correct/syscall/clang_O2/syscall.gts

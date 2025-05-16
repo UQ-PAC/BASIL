@@ -1,0 +1,5 @@
+f2e5c826bf0637441cde0b81aefec19f  correct/ifbranches/gcc_O2/a.out
+91058fd7296852c59156eea3a79c7370  correct/ifbranches/gcc_O2/ifbranches.adt
+18b4bbad1de1ee74bbcd84d4ffd98239  correct/ifbranches/gcc_O2/ifbranches.bir
+b2865a7aab2e24aee5b59f94c3b3de0c  correct/ifbranches/gcc_O2/ifbranches.relf
+9feab04e6f384a560a5165a373de174f  correct/ifbranches/gcc_O2/ifbranches.gts

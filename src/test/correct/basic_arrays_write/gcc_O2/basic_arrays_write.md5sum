@@ -1,0 +1,5 @@
+ab59da2591b9127e5ad7fcf704a42a5e  correct/basic_arrays_write/gcc_O2/a.out
+31bfb523d38a99c0a98adf7509a81594  correct/basic_arrays_write/gcc_O2/basic_arrays_write.adt
+90bf1f6cb7cd67c3c9efb07a104f81d3  correct/basic_arrays_write/gcc_O2/basic_arrays_write.bir
+b0464b80b14ba1000b3ef8960da1fce1  correct/basic_arrays_write/gcc_O2/basic_arrays_write.relf
+83d9d8ce03099e86fa4fe3d1bd9e02c9  correct/basic_arrays_write/gcc_O2/basic_arrays_write.gts

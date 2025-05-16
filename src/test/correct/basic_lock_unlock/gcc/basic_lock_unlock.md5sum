@@ -1,0 +1,5 @@
+6046324efa406c5a76aa9d388ab3ee1e  correct/basic_lock_unlock/gcc/a.out
+22a6374316254db655e242090da34826  correct/basic_lock_unlock/gcc/basic_lock_unlock.adt
+87a9f48f99cb05445aa0118b9e15b6cc  correct/basic_lock_unlock/gcc/basic_lock_unlock.bir
+20a92ed77f4f1e543576b4e0941b4a4d  correct/basic_lock_unlock/gcc/basic_lock_unlock.relf
+53d3d050e6792573b7b570049addf608  correct/basic_lock_unlock/gcc/basic_lock_unlock.gts

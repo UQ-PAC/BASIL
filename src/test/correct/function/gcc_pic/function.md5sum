@@ -1,0 +1,5 @@
+9d37b44b8f65f056fddbc891fdd23a4f  correct/function/gcc_pic/a.out
+4b8c7984c4dd18217b551d1b2cbd5c3a  correct/function/gcc_pic/function.adt
+78674a74a22a071b6c9c83e3aa36d6d1  correct/function/gcc_pic/function.bir
+5f44bee22c467d5592adbd7801f29ae0  correct/function/gcc_pic/function.relf
+939909df6dd93accb98ad7f3bd9614cf  correct/function/gcc_pic/function.gts

@@ -1,0 +1,5 @@
+c32918302a12841090f3fe8bb2e30d63  indirect_calls/functionpointer/clang_O2/a.out
+86ee88d058933c0c5cc1b484803d85ed  indirect_calls/functionpointer/clang_O2/functionpointer.adt
+903b10bf85f7eb3be73abe406158cdea  indirect_calls/functionpointer/clang_O2/functionpointer.bir
+52eeb354c58e4eaed7d2974b40c17f49  indirect_calls/functionpointer/clang_O2/functionpointer.relf
+3cbbed1e14c1876fa29519a1e472785d  indirect_calls/functionpointer/clang_O2/functionpointer.gts

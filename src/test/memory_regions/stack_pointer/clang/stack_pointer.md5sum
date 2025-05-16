@@ -1,0 +1,4 @@
+0e8d64c26eb38f0d8ff005a65a5ef096  memory_regions/stack_pointer/clang/a.out
+9feca1fcb9449d1ca16863d73f63bc48  memory_regions/stack_pointer/clang/stack_pointer.relf
+c5c8699aee3fd78f488339d33d0fd3db  memory_regions/stack_pointer/clang/stack_pointer.adt
+b399d13c16367b748d8f428c8b0f6636  memory_regions/stack_pointer/clang/stack_pointer.bir

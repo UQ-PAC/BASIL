@@ -1,0 +1,5 @@
+92850aaf37864c242e3ca47e6cacecfc  correct/cjump/gcc/a.out
+4f7e35b85f37487e5e988108006ab87d  correct/cjump/gcc/cjump.adt
+020290e3e17149cd9f8c4565766ba1bb  correct/cjump/gcc/cjump.bir
+46f5575a12bec4c01449b493338e9bbb  correct/cjump/gcc/cjump.relf
+d95f3560950edec6deef61f2c3bb6495  correct/cjump/gcc/cjump.gts

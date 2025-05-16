@@ -1,0 +1,5 @@
+f2410f45fc08d7f2b68c5c7074a39399  correct/basic_lock_security_read/gcc/a.out
+1c97c58812498563f85409b9c10b23c1  correct/basic_lock_security_read/gcc/basic_lock_security_read.adt
+cbd0b7e3c2f6cc299ca019bde95ff258  correct/basic_lock_security_read/gcc/basic_lock_security_read.bir
+4123d11b5f1429b57df6bba9699f346b  correct/basic_lock_security_read/gcc/basic_lock_security_read.relf
+acbade8063f908cfd4f5f24006d390c0  correct/basic_lock_security_read/gcc/basic_lock_security_read.gts

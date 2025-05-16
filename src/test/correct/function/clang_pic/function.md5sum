@@ -1,0 +1,5 @@
+bc6524f58fb252a46213628383a94a9a  correct/function/clang_pic/a.out
+e8135455f834c4eab23466aac7b411a1  correct/function/clang_pic/function.adt
+ada200848b03a4baf5efd9f0c09ec32d  correct/function/clang_pic/function.bir
+006a981f0fed846e16939fd60144fc16  correct/function/clang_pic/function.relf
+715c946d909d2fd92a4f49f29e31547e  correct/function/clang_pic/function.gts

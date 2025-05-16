@@ -1,0 +1,5 @@
+b187d8ad4b25c973912deef04a7e34dd  correct/basic_lock_read/clang/a.out
+80a8a80489b033ed8aa98c268f3316b4  correct/basic_lock_read/clang/basic_lock_read.adt
+73476c60ea74844f7658648d0e86985f  correct/basic_lock_read/clang/basic_lock_read.bir
+cb0c86f5f56f442cd79f48b23176c9e3  correct/basic_lock_read/clang/basic_lock_read.relf
+b44743f1c1825b06e455006eaeae827a  correct/basic_lock_read/clang/basic_lock_read.gts

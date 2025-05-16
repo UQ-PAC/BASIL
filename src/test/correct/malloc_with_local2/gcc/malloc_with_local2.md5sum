@@ -1,0 +1,5 @@
+bba221ee77eb3c6a5f6f9263b0410f75  correct/malloc_with_local2/gcc/a.out
+bfafc1ac4253ec13bf95e2176b433e4c  correct/malloc_with_local2/gcc/malloc_with_local2.adt
+c182d4a77f95e8b081ca6849ea23f9b4  correct/malloc_with_local2/gcc/malloc_with_local2.bir
+2c53ee74ebc1821e98952bd471a00afb  correct/malloc_with_local2/gcc/malloc_with_local2.relf
+338aada94474cfe9dc9a60bbef4328a1  correct/malloc_with_local2/gcc/malloc_with_local2.gts

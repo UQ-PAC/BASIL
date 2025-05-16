@@ -1,0 +1,5 @@
+4f8911db0e9008968bbc08860ebf3463  correct/using_gamma_write_z/gcc_O2/a.out
+66a225b6c1b61f30a9ac704bc2b5427c  correct/using_gamma_write_z/gcc_O2/using_gamma_write_z.adt
+59355aca43df0f24dafd3fe145e941e4  correct/using_gamma_write_z/gcc_O2/using_gamma_write_z.bir
+ea7f0daad9fd3f050926ffab3c9dbd30  correct/using_gamma_write_z/gcc_O2/using_gamma_write_z.relf
+683444237dc4355319ede0b4b33e965b  correct/using_gamma_write_z/gcc_O2/using_gamma_write_z.gts

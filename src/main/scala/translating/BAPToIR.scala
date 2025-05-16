@@ -240,10 +240,12 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       val lhs = translateVar(b.lhs)
       val (rhs, load) = translateExpr(b.rhs)
       if (load.isDefined) {
-        val loadWithLabel =
-          MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, Some(b.line + "$0"))
-        val assign = LocalAssign(lhs, rhs, Some(b.line + "$1"))
-        Seq(loadWithLabel, assign)
+        if rhs != load.get.lhs then {
+          Seq(MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, Some(b.line + "$0")),
+          LocalAssign(lhs, rhs, Some(b.line + "$1")))
+        } else {
+          Seq(MemoryLoad(lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, Some(b.line + "$0")))
+        }
       } else {
         val assign = LocalAssign(lhs, rhs, Some(b.line))
         Seq(assign)

@@ -1,0 +1,4 @@
+1b67710a1a01eb1e505a3b9317b4c805  indirect_calls/jumptable2/clang_pic/a.out
+28ef1b32ac18ba5970eeec6b96c55f7e  indirect_calls/jumptable2/clang_pic/jumptable2.relf
+129242ce12574d72d850e27de39cadc6  indirect_calls/jumptable2/clang_pic/jumptable2.adt
+29a13274d6d95607612ac8f10349526e  indirect_calls/jumptable2/clang_pic/jumptable2.bir

@@ -7,7 +7,7 @@ import ir.cilvisitor.*
 import collection.mutable
 import scala.annotation.tailrec
 
-/** 
+/**
  *  This file defines functions to get the successor and predecessor of a IR node for control flow.
  */
 

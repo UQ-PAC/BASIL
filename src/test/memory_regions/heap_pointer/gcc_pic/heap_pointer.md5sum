@@ -1,0 +1,4 @@
+5f1669bdef38a2bf18172804422a2930  memory_regions/heap_pointer/gcc_pic/a.out
+ee378c6538f6495a230a566635703026  memory_regions/heap_pointer/gcc_pic/heap_pointer.relf
+06104ba53742bc2cab2699610587031d  memory_regions/heap_pointer/gcc_pic/heap_pointer.adt
+cbdbe4a2afade5ae15937e9ea2c9a7ed  memory_regions/heap_pointer/gcc_pic/heap_pointer.bir

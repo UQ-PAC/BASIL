@@ -1,0 +1,5 @@
+eedd3c9e41eba7734c5e984846835e7b  correct/malloc_with_local/clang_O2/a.out
+c0892bd8e0bfdd0f1d30a8a21c117871  correct/malloc_with_local/clang_O2/malloc_with_local.adt
+d03c6fd9b89490ef58a9e329c5bcf027  correct/malloc_with_local/clang_O2/malloc_with_local.bir
+398bbca8d68b4a5842ce29d0380f94f3  correct/malloc_with_local/clang_O2/malloc_with_local.relf
+0009e109bdc0375761fcfbae11bf9e82  correct/malloc_with_local/clang_O2/malloc_with_local.gts

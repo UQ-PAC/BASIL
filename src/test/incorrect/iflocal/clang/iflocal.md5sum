@@ -1,0 +1,5 @@
+e7ea8ae290b4385c99f2a5ebe1cb42ef  incorrect/iflocal/clang/a.out
+e2e1565ebb64bd5133c1e3928eb0ea41  incorrect/iflocal/clang/iflocal.adt
+dd50bf2dea71804338962e5badb1aa68  incorrect/iflocal/clang/iflocal.bir
+7df027a8b5dd4a4c9cdaaa41fc3bb90e  incorrect/iflocal/clang/iflocal.relf
+fd023738b9d14f7476ef3f61038aa315  incorrect/iflocal/clang/iflocal.gts

@@ -1,0 +1,5 @@
+a03bff5ed6881c111ecaf96709be4d51  correct/multi_malloc/clang/a.out
+58514e8679921af5760c237c93cdb420  correct/multi_malloc/clang/multi_malloc.adt
+89ba03731a24461b447fa9b5ef1277b8  correct/multi_malloc/clang/multi_malloc.bir
+08726337fe0113be4e6ea0284f9ef095  correct/multi_malloc/clang/multi_malloc.relf
+e4a3345591458535c15006c7c103b84e  correct/multi_malloc/clang/multi_malloc.gts

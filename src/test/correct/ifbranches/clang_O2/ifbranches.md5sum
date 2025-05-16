@@ -1,0 +1,5 @@
+318707cbb1103ac41644c317b9691da1  correct/ifbranches/clang_O2/a.out
+1cbe874a8d2cae5ad21f0bd70db172c5  correct/ifbranches/clang_O2/ifbranches.adt
+d7e14b9c0d0a369ca4775815e39f298d  correct/ifbranches/clang_O2/ifbranches.bir
+9d14b2634882607f4184b0d2509f068c  correct/ifbranches/clang_O2/ifbranches.relf
+16d8a405c7be212e234b7155d291c514  correct/ifbranches/clang_O2/ifbranches.gts

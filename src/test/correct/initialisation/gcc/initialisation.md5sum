@@ -1,0 +1,5 @@
+455d68b35a2a92f10cce0058b57f3165  correct/initialisation/gcc/a.out
+50a3c2fb4c595ff4b387608a1dd2ec82  correct/initialisation/gcc/initialisation.adt
+da6051fd47076de3667937d033c133a9  correct/initialisation/gcc/initialisation.bir
+b36ef51192bdbc0e7e584464502a21a6  correct/initialisation/gcc/initialisation.relf
+a2915010ff5965c811b4ff554ede5b68  correct/initialisation/gcc/initialisation.gts

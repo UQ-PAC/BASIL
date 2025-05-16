@@ -1,0 +1,5 @@
+dfc6042b787d9375e2026c5e29e0a750  incorrect/nestedifglobal/clang/a.out
+9e3841ec297f7b8663b2aa41460e80c8  incorrect/nestedifglobal/clang/nestedifglobal.adt
+3beb30b73b0022fb5718347f71e19072  incorrect/nestedifglobal/clang/nestedifglobal.bir
+08d0147e58c1b38851f1373d42e4640f  incorrect/nestedifglobal/clang/nestedifglobal.relf
+b30a3e45f8576a8a1848eb1b58d99ba0  incorrect/nestedifglobal/clang/nestedifglobal.gts

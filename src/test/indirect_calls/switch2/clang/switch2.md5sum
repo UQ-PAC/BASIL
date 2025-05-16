@@ -1,0 +1,5 @@
+2ad9c46ee9c38b030eac0f9bef5569ac  indirect_calls/switch2/clang/a.out
+2fc3656899fc930f5c1259150b210f67  indirect_calls/switch2/clang/switch2.adt
+c010533e7fd063ea533e55e19c840ac3  indirect_calls/switch2/clang/switch2.bir
+e67aafab534e34eae6a62026e46e2f3f  indirect_calls/switch2/clang/switch2.relf
+3a2b413fa8e37eaa9b75bf2426cae7d9  indirect_calls/switch2/clang/switch2.gts

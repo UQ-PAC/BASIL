@@ -1,0 +1,3 @@
+8ed249d2745623a377d7d4cf48b529d8  correct/jumptable2/clang_O2/a.out
+f3580dbcac41cd338f2f098fc5943cd0  correct/jumptable2/clang_O2/jumptable2.relf
+af0c004f2fcc849b357e162bf59579ff  correct/jumptable2/clang_O2/jumptable2.gts

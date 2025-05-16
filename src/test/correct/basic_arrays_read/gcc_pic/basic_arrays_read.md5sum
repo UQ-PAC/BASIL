@@ -1,0 +1,5 @@
+2ec3ea4df676e55fc3672a90a86e73a1  correct/basic_arrays_read/gcc_pic/a.out
+7d47f5a795fc25fd0567f2e477afae9a  correct/basic_arrays_read/gcc_pic/basic_arrays_read.adt
+e9a41fec788800eb7ef843a68290e7fd  correct/basic_arrays_read/gcc_pic/basic_arrays_read.bir
+abab84b9ba2cfc7c3cde55a19e97745e  correct/basic_arrays_read/gcc_pic/basic_arrays_read.relf
+6e01dae302ed9a7e49cdc58f631e080b  correct/basic_arrays_read/gcc_pic/basic_arrays_read.gts

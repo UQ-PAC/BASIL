@@ -1,0 +1,5 @@
+9d4663e5bcee42194c7450c207b0b21e  correct/basic_assign_increment/gcc_O2/a.out
+d06fd4115a2b280219d9a54d8940c6ad  correct/basic_assign_increment/gcc_O2/basic_assign_increment.adt
+1b93be41cdbc28d35c007c94bd65d541  correct/basic_assign_increment/gcc_O2/basic_assign_increment.bir
+7f0fd5ab8f88873371cceed65eeb096c  correct/basic_assign_increment/gcc_O2/basic_assign_increment.relf
+42e728c007842487f4fa54a669766d7d  correct/basic_assign_increment/gcc_O2/basic_assign_increment.gts

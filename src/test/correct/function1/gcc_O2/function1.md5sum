@@ -1,0 +1,5 @@
+21fbad434cd9ad729fb53c4140b5fe29  correct/function1/gcc_O2/a.out
+1449db9034138e0936b7d86a28cca9f0  correct/function1/gcc_O2/function1.adt
+8504316c14c3288bf195c0fae5f2b2d2  correct/function1/gcc_O2/function1.bir
+2a25b67fa2fc826d34877e34858828ba  correct/function1/gcc_O2/function1.relf
+c0fd926aa7f5a77b0f0c97cdb61d9eb7  correct/function1/gcc_O2/function1.gts

@@ -1,0 +1,5 @@
+b2d31c5837bc1990fdb457c3e969833a  correct/basic_sec_policy_write/clang_pic/a.out
+731145c9e3f3991d0d46fd5bce9dcaca  correct/basic_sec_policy_write/clang_pic/basic_sec_policy_write.adt
+be2269ed66e076fbf865e95ef56d6647  correct/basic_sec_policy_write/clang_pic/basic_sec_policy_write.bir
+2db23a15c997ae99fdf5c16cfa58f4f1  correct/basic_sec_policy_write/clang_pic/basic_sec_policy_write.relf
+23e23191c5f643099292a798fd1a3e62  correct/basic_sec_policy_write/clang_pic/basic_sec_policy_write.gts

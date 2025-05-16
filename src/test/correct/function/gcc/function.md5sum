@@ -1,0 +1,5 @@
+bdbb5306373a441f9f0a2e9ba83d44a2  correct/function/gcc/a.out
+c585005cb66c839a4bd2c5659e8f56de  correct/function/gcc/function.adt
+952c695258b4c1a9a4c5e07546d721a1  correct/function/gcc/function.bir
+500e66d733d1d326136a65b28bc39965  correct/function/gcc/function.relf
+ec5eb3d030d9d0f982188bd5564760f7  correct/function/gcc/function.gts

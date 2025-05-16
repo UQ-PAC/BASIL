@@ -1,0 +1,5 @@
+f12a4bfe6bed3769f898573c89e377ee  correct/basic_lock_unlock/clang/a.out
+9bad9897d0a48abebb2ff3973ea3b263  correct/basic_lock_unlock/clang/basic_lock_unlock.adt
+b56e5fd7e1f98828a1ed2da6726297b1  correct/basic_lock_unlock/clang/basic_lock_unlock.bir
+c4117b6dc09136267fbed87a1ef796c6  correct/basic_lock_unlock/clang/basic_lock_unlock.relf
+c6556cd323c9bef5f817cd5ed1c36a04  correct/basic_lock_unlock/clang/basic_lock_unlock.gts

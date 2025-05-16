@@ -1,0 +1,5 @@
+ece66ec9802b6038d103ac113f8fa0f9  correct/ifglobal/gcc/a.out
+ae2314347ddb94f6a6af63c43189830d  correct/ifglobal/gcc/ifglobal.adt
+fc67c28710dba18998d03fbcbd701d38  correct/ifglobal/gcc/ifglobal.bir
+3f1142aa7257f8da9cd207f74b4e0cd9  correct/ifglobal/gcc/ifglobal.relf
+ca460e97ad906dff6f7355a92a54a208  correct/ifglobal/gcc/ifglobal.gts

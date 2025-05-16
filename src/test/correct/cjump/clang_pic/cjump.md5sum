@@ -1,0 +1,5 @@
+42e3bc713a163981ee4d9413ba7b0d0a  correct/cjump/clang_pic/a.out
+028eaf4911f3810d8ff96050501644bf  correct/cjump/clang_pic/cjump.adt
+69d90ad5e41c357b98a731490477344a  correct/cjump/clang_pic/cjump.bir
+0d9c8107a80a1dddd40e31a5faf90e87  correct/cjump/clang_pic/cjump.relf
+0bfcef1ecafb7e1128353a65b00847c5  correct/cjump/clang_pic/cjump.gts
