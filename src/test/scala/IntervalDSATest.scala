@@ -255,6 +255,23 @@ class IntervalDSATest extends AnyFunSuite with CaptureOutput {
     assert(dsg.exprToCells(add_two).head.node.isCollapsed)
   }
 
+  test("overlapping access split") {
+    val results = runTest("src/test/indirect_calls/jumptable/clang/jumptable", None, DSConfig(DSAPhase.TD, true))
+
+    // the dsg of the main procedure after the local phase
+    val program = results.ir.program
+    val dsg = results.dsa.get.topDown(program.mainProcedure)
+
+    val globals = globalsToLiteral(results.ir)
+    val add_two = globals("add_two")
+    val add_six = globals("add_six")
+    val sub_sev = globals("sub_seven")
+
+    assert(dsg.exprToCells(add_two).map(dsg.get) == dsg.exprToCells(add_six).map(dsg.get))
+    assert(dsg.exprToCells(add_two).size == 1)
+    assert(!dsg.exprToCells(add_two).head.node.isCollapsed)
+  }
+
 
   test("http_parse_basic") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
