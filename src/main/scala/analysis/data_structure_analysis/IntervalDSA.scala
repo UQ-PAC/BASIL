@@ -524,6 +524,11 @@ class IntervalGraph(
     findNode(node)._1
   }
 
+  def find(base: SymBase): IntervalNode = {
+    require(nodes.contains(base))
+    find(nodes(base))
+  }
+
   // find the most uptodate version of cell
   // if the cell was unified changing it's size
   // creates a dummy cell with cell's interval size
@@ -925,12 +930,12 @@ object IntervalDSA {
 
 
   def checksGlobalsMaintained(graph: IntervalGraph): Boolean = {
-    graph.glIntervals.forall(i => !graph.find(graph.nodes(Global(i))).isCollapsed)
+    graph.glIntervals.forall(i => !graph.find(Global(i)).isCollapsed)
   }
 
   def checksStackMaintained(graph: IntervalGraph): Boolean = {
     if graph.nodes.contains(Stack(graph.proc)) then
-      !graph.find(graph.nodes(Stack(graph.proc))).isCollapsed
+      !graph.find(Stack(graph.proc)).isCollapsed
     else true
   }
 
