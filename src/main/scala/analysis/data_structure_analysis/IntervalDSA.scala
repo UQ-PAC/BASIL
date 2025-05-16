@@ -951,7 +951,7 @@ object IntervalDSA {
         var sourceGlobal = source.find(source.nodes(Global(interval)).get(0))
         val globalNode = sourceGlobal.node.clone(target, true, oldToNew)
 
-        sourceGlobal = globalNode.get(sourceGlobal.interval)
+        sourceGlobal = IntervalCell(globalNode, sourceGlobal.interval)
         target.mergeCells(sourceGlobal, targetGlobal)
     }
 
