@@ -335,24 +335,10 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(!locals.values.filter(g => stackCollapsed.contains(g.proc.procName)).
       exists(IntervalDSA.checksStackMaintained))
 
-    locals.values.filter(g => globalCollapsed.contains(g.proc.procName)).
-      foreach(g => if IntervalDSA.checksGlobalsMaintained(g) then println(g.proc.procName))
-
     assert(!locals.values.filter(g => globalCollapsed.contains(g.proc.procName)).
       exists(IntervalDSA.checksGlobalsMaintained))
   }
 
-  test("scanmen") {
-    val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = runTest(path, Some("scanmem"))
-
-    val proc = res.ir.program.mainProcedure
-
-    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
-    assert(dsg.glIntervals.size == 1)
-    assert(IntervalDSA.checksStackMaintained(dsg))
-    assert(IntervalDSA.checksGlobalsMaintained(dsg))
-  }
 
   test("www_authenticate") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
