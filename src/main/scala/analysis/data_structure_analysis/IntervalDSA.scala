@@ -175,11 +175,14 @@ class IntervalGraph(
       val (node, adjustment) = findNode(nodes(base))
       if offsets == Top then results + node.collapse()
       else {
-        results ++ offsets.toIntervals
+        val current = offsets.toIntervals
           .filter(i => !base.isInstanceOf[Global] ||
             isGlobal(i.start.get + base.asInstanceOf[Global].interval.start.get, irContext))
           .map(_.move(i => i + adjustment))
           .map(node.add)
+        val eq = if base.isInstanceOf[Global] then Set.empty else offsets.toOffsets.flatMap(o =>
+          cellToEq(node.get(adjustment)).map(_.interval.move(i => i + o)).map(node.add))
+        results ++ current ++ eq
       }
     }
   }
@@ -209,9 +212,17 @@ class IntervalGraph(
     dcc.target.name == "indirect_call_launchpad"
   }
 
+
+  def cellToEq(cell: IntervalCell): Set[IntervalCell] = {
+    cell.node.eqClasses.collectFirst{case eqc if eqc.contains(cell) => eqc} match {
+      case Some(value) => value
+      case None => Set(cell)
+    }
+  }
+
   // find the corresponding cells for a expr from this graph's procedure
   def exprToCells(expr: Expr): Set[IntervalCell] = {
-    symValToCells(exprToSymVal(expr))
+    symValToCells(exprToSymVal(expr)).map(find).flatMap(cellToEq)
   }
 
   /**
