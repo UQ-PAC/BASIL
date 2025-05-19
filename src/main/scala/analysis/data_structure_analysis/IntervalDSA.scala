@@ -241,22 +241,22 @@ class IntervalGraph(
     constraints.toSeq.sortBy(f => f.label).foreach {
       case constraint: MemoryAccessConstraint[_] =>
         val valueCells = constraintArgToCells(constraint.arg2).map(get)
-        assert(valueCells.size <= 1, s"value cells should be unified instead got $valueCells")
-        var valueCell: Option[IntervalCell] = None
-        if valueCells.size == 1 then valueCell = Some(valueCells.head)
-
+        assert(IntervalDSA.equiv(valueCells), s"value cells should be unified instead got $valueCells")
         val indexCells = constraintArgToCells(constraint.arg1, ignoreContents = true).map(get)
-        var indexCell: Option[IntervalCell] = None
         if indexCells.nonEmpty then
           if indexCells.nonEmpty && valueCells.nonEmpty then
-            indexCells.foreach(indexCell =>
-              assert(indexCell.node.isUptoDate, "outdated cell in local correctness check")
-              assert(indexCell.getPointee.node.isUptoDate, "outdated cell in local correctness check")
-              assert(valueCell.get.node.isUptoDate, "outdated cell in local correctness check")
-              assert(
-                indexCell.hasPointee && indexCell.getPointee.equiv(valueCell.get),
-                s"$constraint, $indexCell doesn't point to ${valueCell.get} instead ${indexCell.getPointee}"
-              )
+            indexCells.foreach(
+              indexCell =>
+                valueCells.foreach(
+                  valueCell =>
+                    assert(indexCell.node.isUptoDate, "outdated cell in local correctness check")
+                    assert(indexCell.getPointee.node.isUptoDate, "outdated cell in local correctness check")
+                    assert(valueCell.node.isUptoDate, "outdated cell in local correctness check")
+                    assert(
+                      indexCell.hasPointee && indexCell.getPointee.equiv(valueCell),
+                      s"$constraint, $indexCell doesn't point to ${valueCell} instead ${indexCell.getPointee}"
+                    )
+                )
             )
       case _ =>
     }
