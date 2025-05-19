@@ -122,6 +122,69 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     )
   }
 
+  test("global branch") {
+    val result = runTestPrg(IntervalDSATestData.globalBranch)
+    val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
+    val globals = globalsToLiteral(result.ir).values.flatMap(dsg.exprToCells).map(dsg.get).toSet
+    assert(globals.size == 1)
+    assert(globals.head.node.isCollapsed)
+    assert(globals.head.getPointee.equiv(globals.head))
+  }
+
+  test("global branch split globals") {
+    val result = runTestPrg(IntervalDSATestData.globalBranch, DSConfig(TD, true) )
+    val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
+    val globals = globalsToLiteral(result.ir)
+    val z = dsg.exprToCells(globals("z")).map(dsg.find).head
+    val x = dsg.exprToCells(globals("x")).map(dsg.find).head
+    val y = dsg.exprToCells(globals("y")).map(dsg.find).head
+    val x8 = dsg.exprToCells(BinaryExpr(BVADD, globals("x"), BitVecLiteral(8, 64))).map(dsg.find).head
+    val y8 = dsg.exprToCells(BinaryExpr(BVADD, globals("y"), BitVecLiteral(8, 64))).map(dsg.find).head
+    assert(!z.equiv(x))
+    assert(z.getPointee.equiv(x))
+    assert(y.equiv(x))
+    assert(!x8.equiv(x))
+    assert(x8.equiv(y8))
+  }
+
+  test("global branch eq classes") {
+    val result = runTestPrg(IntervalDSATestData.globalBranch, DSConfig(TD, false, false) )
+    val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
+    val globals = globalsToLiteral(result.ir)
+    val z = dsg.exprToCells(globals("z")).map(dsg.find).head
+    val x = dsg.exprToCells(globals("x")).map(dsg.find)
+    val y = dsg.exprToCells(globals("y")).map(dsg.find)
+    val x8 = dsg.exprToCells(BinaryExpr(BVADD, globals("x"), BitVecLiteral(8, 64))).map(dsg.find).head
+    val y8 = dsg.exprToCells(BinaryExpr(BVADD, globals("y"), BitVecLiteral(8, 64))).map(dsg.find).head
+    assert(x.forall(c => !c.equiv(z)))
+    assert(x.forall(c => z.getPointee.equiv(c)))
+    assert(x == y)
+    assert(x.size == 2)
+    assert(x.forall(c => !c.equiv(x8)))
+    assert(x.forall(c => !c.equiv(y8)))
+    assert(!x8.equiv(y8)) // don't expect them to be unified
+    val join = dsg.proc.formalOutParam.head
+    assert(dsg.exprToCells(join) == x)
+    assert(dsg.exprToCells(BinaryExpr(BVADD, join, BitVecLiteral(8, 64))) == Set(x8, y8))
+  }
+
+
+  test("global branch split globals and eq classes") {
+    val result = runTestPrg(IntervalDSATestData.globalBranch, DSConfig(TD, true, false))
+    val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
+    val globals = globalsToLiteral(result.ir)
+    val z = dsg.exprToCells(globals("z")).map(dsg.find).head
+    val x = dsg.exprToCells(globals("x")).map(dsg.find).head
+    val y = dsg.exprToCells(globals("y")).map(dsg.find).head
+    val x8 = dsg.exprToCells(BinaryExpr(BVADD, globals("x"), BitVecLiteral(8, 64))).map(dsg.find).head
+    val y8 = dsg.exprToCells(BinaryExpr(BVADD, globals("y"), BitVecLiteral(8, 64))).map(dsg.find).head
+    assert(!z.equiv(x))
+    assert(z.getPointee.equiv(x))
+    assert(y.equiv(x))
+    assert(!x8.equiv(x))
+    assert(x8.equiv(y8))
+  }
+
   test("Global Dereference") {
     val mem = SharedMemory("mem", 64, 8)
     val V0 = Register("V0", 64)
