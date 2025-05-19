@@ -983,7 +983,13 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
 }
 
 object IntervalDSA {
-
+  def equiv(cells: Set[IntervalCell]): Boolean = {
+    if cells.size > 1 then {
+      val head = cells.head
+      val tail = cells.tail
+      tail.forall(head.equiv)
+    } else true
+  }
 
   def resolveGlobalOverlapping(graph: IntervalGraph): Unit = {
     graph.glIntervals.zipWithIndex.foreach {
