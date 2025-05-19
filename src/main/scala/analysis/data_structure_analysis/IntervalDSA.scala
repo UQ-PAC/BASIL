@@ -1387,11 +1387,7 @@ def globalIntervals(ctx: IRContext): Seq[DSInterval] = {
   if seq.size > 1 then
     {
        seq.sliding(2).foreach(
-        v =>
-          if (v(0).isOverlapping(v(1))) then
-            v(0).isOverlapping(v(1))
-            print("")
-          assert(!v(0).isOverlapping(v(1)))
+        v => assert(!v(0).isOverlapping(v(1)))
       )
     }
 
