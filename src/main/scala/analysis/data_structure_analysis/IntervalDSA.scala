@@ -83,7 +83,7 @@ class IntervalGraph(
       case FuncEntry(name, size, address) => 
         addGlobal(globalNodes, address.toInt, size/8).node.flags.function = true
       case SpecGlobal(name, size, arraySize, address) =>
-        addGlobal(globalNodes, address.toInt, size/8)
+        addGlobal(globalNodes, address.toInt, 0)
     }
 
     externalFunctions.foreach (
