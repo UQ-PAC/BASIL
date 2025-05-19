@@ -11,29 +11,48 @@ import util.*
 import analysis.data_structure_analysis
 import test_util.{BASILTest, CaptureOutput}
 
-class IntervalDSATestData {
-  val globalBranch: IRContext = {
-    val mem = SharedMemory("mem", 64, 8)
-    val xAddress = BitVecLiteral(2000, 64)
-    val yAddress = BitVecLiteral(3000, 64)
-    val zAddress = BitVecLiteral(4000, 64)
-    val eight = BitVecLiteral(8, 64)
-    val x = SpecGlobal("x", 128, None, xAddress.value)
-    val y = SpecGlobal("y", 128, None, yAddress.value)
-    val z = SpecGlobal("z", 64, None, yAddress.value)
-    val globals = Set(x, y, z)
+object IntervalDSATestData {
+  val mem = SharedMemory("mem", 64, 8)
+  val xAddress = BitVecLiteral(2000, 64)
+  val yAddress = BitVecLiteral(3000, 64)
+  val zAddress = BitVecLiteral(4000, 64)
+  val kAddress = BitVecLiteral(5000, 64)
+  val eight = BitVecLiteral(8, 64)
+  val x = SpecGlobal("x", 128, None, xAddress.value)
+  val y = SpecGlobal("y", 128, None, yAddress.value)
+  val z = SpecGlobal("z", 64, None, zAddress.value)
+  val k = SpecGlobal("k", 64, None, kAddress.value)
+  val R0 = Register("R0", 64)
+  val R1 = Register("R1", 64)
 
-    val R0 = Register("R0", 64)
-
+  def globalBranch: IRContext = {
+    val globals = Set(x, y, z, k)
     val program =
       prog(
         proc("main",
           block("entry", goto("a", "b")),
           block("a", LocalAssign(R0, xAddress, Some("01")), goto("c")),
           block("b", LocalAssign(R0, yAddress, Some("02")), goto("c")),
-          block("c", MemoryStore(mem,  zAddress, BinaryExpr(BVADD, R0, eight), LittleEndian, 64, Some("03")), ret)
+          block("c", MemoryStore(mem,  zAddress, R0, LittleEndian, 64, Some("03")), ret)
         ))
 
+    programToContext(program, globals)
+  }
+
+  def globalBranchIndirectUse: IRContext = {
+    val globals = Set(x, y, z, k)
+    val program =
+      prog(
+        proc("main",
+          block("entry", goto("a", "b")),
+          block("a", LocalAssign(R0, xAddress, Some("01")), goto("c")),
+          block("b", LocalAssign(R0, yAddress, Some("02")), goto("c")),
+          block("c",
+            MemoryStore(mem,  zAddress, R0, LittleEndian, 64, Some("03")),
+            MemoryLoad(R0, mem, zAddress, LittleEndian, 64, Some("04")),
+            MemoryStore(mem, kAddress, BinaryExpr(BVADD, R0, eight), LittleEndian, 64, Some("05")),
+            ret)
+        ))
     programToContext(program, globals)
   }
 }
