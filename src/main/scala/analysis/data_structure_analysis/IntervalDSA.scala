@@ -916,7 +916,7 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
     val checks = config.checks
     var dsaContext = DSAContext(sva, cons, Map.empty, Map.empty, Map.empty, Map.empty)
     if (config.phase != DSAPhase.Pre) then {
-      val DSA = IntervalDSA.getLocals(irContext, sva, cons, globals)
+      val DSA = IntervalDSA.getLocals(irContext, sva, cons, globals, !config.collapseSelfUnify)
       DSATimer.checkPoint("Finished DSA Local Phase")
       dsaContext = dsaContext.copy(local = DSA)
       if checks then {
@@ -953,7 +953,8 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
           irContext,
           SymValues[OSet](Map.empty),
           Set[Constraint](),
-          globals
+          globals,
+          !config.collapseSelfUnify
         )
       DSATD.values.foreach(g => IntervalDSA.globalTransfer(g, globalGraph))
       if config.splitGlobals then IntervalDSA.resolveGlobalOverlapping(globalGraph)
@@ -1223,7 +1224,7 @@ object IntervalDSA {
     symValues: SymValues[OSet],
     cons: Set[Constraint],
     globals: Seq[DSInterval],
-    eqCells: Boolean = false
+    eqCells: Boolean
   ): IntervalGraph = {
     val graph = IntervalGraph(proc, Local, context, symValues, cons, globals, eqCells, None)
     graph.localPhase()
@@ -1234,13 +1235,14 @@ object IntervalDSA {
     ctx: IRContext,
     svas: Map[Procedure, SymValues[OSet]],
     cons: Map[Procedure, Set[Constraint]],
-    globals: Seq[DSInterval]
+    globals: Seq[DSInterval],
+    eqClasses: Boolean = false
   ): Map[Procedure, IntervalGraph] = {
     DSALogger.info("Performing local DSA")
     computeDSADomain(ctx.program.mainProcedure, ctx).toSeq
       .sortBy(_.name)
       .foldLeft(Map[Procedure, IntervalGraph]())((m, proc) =>
-        m + (proc -> IntervalDSA.getLocal(proc, ctx, svas(proc), cons(proc), globals))
+        m + (proc -> IntervalDSA.getLocal(proc, ctx, svas(proc), cons(proc), globals, eqClasses))
       )
   }
 
