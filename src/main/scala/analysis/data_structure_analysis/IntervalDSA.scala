@@ -843,7 +843,10 @@ class IntervalCell(val node: IntervalNode, val interval: DSInterval) {
   // this checks if two cells correspond to the same unified cell in their node
   // weaker equals
   def equiv(other: IntervalCell): Boolean = {
-    graph.get(this).equals(graph.get(other))
+    val updatedthis = graph.get(this)
+    val updatedOther = graph.get(other)
+    updatedOther.equals(updatedthis) ||
+      updatedthis.node.eqClasses.exists(s => s.contains(updatedthis) && s.contains(updatedOther))
   }
 
   def removePointee: Option[IntervalCell] = {
