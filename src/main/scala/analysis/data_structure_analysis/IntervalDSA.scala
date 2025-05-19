@@ -38,7 +38,7 @@ class IntervalGraph(
   val builder: () => Map[SymBase, IntervalNode] = nodeBuilder.getOrElse(buildNodes)
   var nodes: Map[SymBase, IntervalNode] = builder()
 
-  def exprToSymVal(expr: Expr): SymValSet[OSet] = SymValues.exprToSymValSet(sva, glIntervals)(expr)
+  def exprToSymVal(expr: Expr): SymValSet[OSet] = SymValues.exprToSymValSet(sva, i => isGlobal(i, irContext), glIntervals)(expr)
 
   protected def symValToNodes(
     symVal: SymValSet[OSet],
@@ -144,12 +144,7 @@ class IntervalGraph(
     Set.empty
   }
 
-  def isGlobal(address: Int): Boolean = {
-    (irContext.globals ++ irContext.funcEntries).exists(g =>
-      DSInterval(g.address.toInt, g.address.toInt + g.size / 8).contains(address)
-    ) || irContext.globalOffsets.exists((g1, g2) => g1 == address || g2 == address) || irContext.externalFunctions
-      .exists(g => address == g.offset)
-  }
+
 
   def addParamCells(): Unit = {
     val unchanged = Set("R29", "R30", "R31")
@@ -180,7 +175,8 @@ class IntervalGraph(
       if offsets == Top then results + node.collapse()
       else {
         results ++ offsets.toIntervals
-          .filter(i => !base.isInstanceOf[Global] || isGlobal(i.start.get + base.asInstanceOf[Global].interval.start.get))
+          .filter(i => !base.isInstanceOf[Global] ||
+            isGlobal(i.start.get + base.asInstanceOf[Global].interval.start.get, irContext))
           .map(_.move(i => i + adjustment))
           .map(node.add)
       }
@@ -846,7 +842,7 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
     computeDSADomain(irContext.program.mainProcedure, irContext).toSeq
       .sortBy(_.name)
       .foreach(proc =>
-        val SVAResults = getSymbolicValues[OSet](proc, globals)
+        val SVAResults = getSymbolicValues[OSet](irContext, proc, globals)
         val constraints = generateConstraints(proc)
         sva += (proc -> SVAResults)
         cons += (proc -> constraints)
@@ -1115,7 +1111,7 @@ object IntervalDSA {
           case load: MemoryLoad =>
             val pointers = dsg.exprToCells(load.index).map(dsg.find)
             assert(
-              pointers.nonEmpty || isNonGlobalConstant(load.index, dsg.isGlobal),
+              pointers.nonEmpty || isNonGlobalConstant(load.index, i => isGlobal(i, dsg.irContext)),
               "Expected cells for indices used in reachable memory access to have corresponding DSA cells"
             )
             assert(
@@ -1363,4 +1359,11 @@ def getGlobal(globals: Seq[DSInterval], offset: Int, base: Option[DSInterval] = 
       Some(globalInterval, newOffset)
     }
   }
+}
+
+def isGlobal(address: Int, irContext: IRContext): Boolean = {
+  (irContext.globals ++ irContext.funcEntries).exists(g =>
+    DSInterval(g.address.toInt, g.address.toInt + g.size / 8).contains(address)
+  ) || irContext.globalOffsets.exists((g1, g2) => g1 == address || g2 == address) || irContext.externalFunctions
+    .exists(g => address == g.offset)
 }
