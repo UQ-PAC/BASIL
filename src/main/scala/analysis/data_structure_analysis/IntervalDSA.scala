@@ -614,6 +614,7 @@ class IntervalNode(
         val v = IntervalNode(newGraph, node.bases, node.size)
         v.flags.join(node.flags)
         node.cells.foreach(cell => v.add(cell.interval))
+        v.eqClasses = node.eqClasses.map(eq => eq.map(cell => IntervalCell(v, cell.interval)))
         oldToNew.update(node, v)
         v
       else oldToNew(node)
