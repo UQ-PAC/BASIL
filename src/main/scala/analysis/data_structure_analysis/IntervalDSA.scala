@@ -701,6 +701,7 @@ class IntervalNode(
     assert(isUptoDate)
     flags.collapsed = true
     bases = bases.view.mapValues(_ => Set(0)).toMap
+    eqClasses = Set.empty
     graph.get(add(DSInterval.Top))
   }
 
