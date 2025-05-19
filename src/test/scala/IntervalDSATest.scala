@@ -1,4 +1,5 @@
-import analysis.data_structure_analysis.{DSInterval, Global, Heap, IntervalDSA, Par, Ret, Stack, SymBase}
+import analysis.data_structure_analysis.DSAPhase.Local
+import analysis.data_structure_analysis.{DSAPhase, DSInterval, Global, Heap, IntervalDSA, IntervalGraph, Par, Ret, Stack, SymBase, generateConstraints, getSymbolicValues, given}
 import boogie.SpecGlobal
 import ir.*
 import ir.Endian.LittleEndian
@@ -10,17 +11,64 @@ import util.*
 import analysis.data_structure_analysis
 import test_util.{BASILTest, CaptureOutput}
 
-@test_util.tags.AnalysisSystemTest
-class IntervalDSATest extends AnyFunSuite with CaptureOutput {
-  def runAnalysis(program: Program): StaticAnalysisContext = {
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+class IntervalDSATestData {
+  val globalBranch: IRContext = {
+    val mem = SharedMemory("mem", 64, 8)
+    val xAddress = BitVecLiteral(2000, 64)
+    val yAddress = BitVecLiteral(3000, 64)
+    val zAddress = BitVecLiteral(4000, 64)
+    val eight = BitVecLiteral(8, 64)
+    val x = SpecGlobal("x", 128, None, xAddress.value)
+    val y = SpecGlobal("y", 128, None, yAddress.value)
+    val z = SpecGlobal("z", 64, None, yAddress.value)
+    val globals = Set(x, y, z)
 
-    val emptySpec = Specification(Set(), Set(), Map(), List(), List(), List(), Set())
-    val emptyContext = IRContext(List(), Set(), Set(), Set(), Map(), emptySpec, program)
-    RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
+    val R0 = Register("R0", 64)
+
+    val program =
+      prog(
+        proc("main",
+          block("entry", goto("a", "b")),
+          block("a", LocalAssign(R0, xAddress, Some("01")), goto("c")),
+          block("b", LocalAssign(R0, yAddress, Some("02")), goto("c")),
+          block("c", MemoryStore(mem,  zAddress, BinaryExpr(BVADD, R0, eight), LittleEndian, 64, Some("03")), ret)
+        ))
+
+    programToContext(program, globals)
   }
+}
+
+
+def runAnalysis(program: Program): StaticAnalysisContext = {
+  cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
+  transforms.addReturnBlocks(program)
+  cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+
+  val emptySpec = Specification(Set(), Set(), Map(), List(), List(), List(), Set())
+  val emptyContext = IRContext(List(), Set(), Set(), Set(), Map(), emptySpec, program)
+  RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
+}
+
+def programToContext(
+                      program: Program,
+                      globals: Set[SpecGlobal] = Set.empty,
+                      globalOffsets: Map[BigInt, BigInt] = Map.empty
+                    ): IRContext = {
+  cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
+  transforms.addReturnBlocks(program)
+  cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+
+  val spec = Specification(Set(), globals, Map(), List(), List(), List(), Set())
+  IRContext(List(), Set(), globals, Set(), globalOffsets, spec, program)
+}
+
+def globalsToLiteral(ctx: IRContext) = {
+  ctx.globals.map(g => (g.name, BitVecLiteral(g.address, 64))).toMap
+    ++ (ctx.funcEntries.map(f => (f.name, BitVecLiteral(f.address.toInt, 64))).toMap)
+}
+
+@test_util.tags.AnalysisSystemTest3
+class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
   def runTest(relativePath: String, main: Option[String] = None, config: DSConfig = DSConfig()): BASILResult = {
     val path = s"${BASILTest.rootDirectory}/$relativePath"
@@ -53,24 +101,6 @@ class IntervalDSATest extends AnyFunSuite with CaptureOutput {
         dsaConfig = Some(config)
       )
     )
-  }
-
-  def programToContext(
-                        program: Program,
-                        globals: Set[SpecGlobal] = Set.empty,
-                        globalOffsets: Map[BigInt, BigInt] = Map.empty
-                      ): IRContext = {
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
-    val spec = Specification(Set(), globals, Map(), List(), List(), List(), Set())
-    IRContext(List(), Set(), globals, Set(), globalOffsets, spec, program)
-  }
-
-  def globalsToLiteral(ctx: IRContext) = {
-    ctx.globals.map(g => (g.name, BitVecLiteral(g.address, 64))).toMap
-      ++ (ctx.funcEntries.map(f => (f.name, BitVecLiteral(f.address.toInt, 64))).toMap)
   }
 
   test("Global Dereference") {
@@ -305,14 +335,28 @@ class IntervalDSATest extends AnyFunSuite with CaptureOutput {
     assert(!locals.values.filter(g => stackCollapsed.contains(g.proc.procName)).
       exists(IntervalDSA.checksStackMaintained))
 
+    locals.values.filter(g => globalCollapsed.contains(g.proc.procName)).
+      foreach(g => if IntervalDSA.checksGlobalsMaintained(g) then println(g.proc.procName))
+
     assert(!locals.values.filter(g => globalCollapsed.contains(g.proc.procName)).
       exists(IntervalDSA.checksGlobalsMaintained))
+  }
+
+  test("scanmen") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = runTest(path, Some("scanmem"))
+
+    val proc = res.ir.program.mainProcedure
+
+    val dsg = res.dsa.get.topDown(res.ir.program.mainProcedure)
+    assert(dsg.glIntervals.size == 1)
+    assert(IntervalDSA.checksStackMaintained(dsg))
+    assert(IntervalDSA.checksGlobalsMaintained(dsg))
   }
 
   test("www_authenticate") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
     val res = runTest(path, Some("www_authenticate"))
-    val res = runTestTrim(path, "www_authenticate")
 
     val proc = res.ir.program.mainProcedure
 
