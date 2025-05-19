@@ -31,6 +31,7 @@ class IntervalGraph(
   val sva: SymValues[OSet],
   val constraints: Set[Constraint],
   val glIntervals: Seq[DSInterval],
+  val eqCells: Boolean,
   val nodeBuilder: Option[() => Map[SymBase, IntervalNode]]
 ) {
 
@@ -257,7 +258,7 @@ class IntervalGraph(
    */
   override def clone: IntervalGraph = {
     val oldToNew: mutable.Map[IntervalNode, IntervalNode] = mutable.Map()
-    val copy = IntervalGraph(proc, phase, irContext, sva, constraints, glIntervals, Some(() => Map[SymBase, IntervalNode]()))
+    val copy = IntervalGraph(proc, phase, irContext, sva, constraints, glIntervals, eqCells, Some(() => Map[SymBase, IntervalNode]()))
     this.nodes.foreach { // in addition to current nodes
       case (base, node) => // clone old nodes in base to node map to carry offset info
         val (current, offset) = this.findNode(node)
@@ -363,6 +364,7 @@ class IntervalGraph(
         val values = constraintArgToCells(cons.arg2)
         if pointees.nonEmpty || values.nonEmpty then mergeCells(pointees ++ values)
         else DSALogger.warn(s"$cons had an empty argument")
+        (indices ++ values).map(_.node).map(find).filterNot(_.eqClassProperty()).toSet.foreach(_.maintainEqClasses())
       case _ => // ignore
   }
 
@@ -467,6 +469,7 @@ class IntervalGraph(
     connectSCC(scc1)
     connectSCC(scc2)
 
+    find(stableNode).maintainEqClasses()
     find(stableCell)
   }
 
@@ -481,12 +484,19 @@ class IntervalGraph(
 
     val result =
       if get(cell1) == get(cell2) then cell1
-      else if cell1.node.equals(cell2.node) then cell1.node.collapse()
-      else if cell1.node.isCollapsed || cell2.node.isCollapsed then
+      else if cell1.node.equals(cell2.node) then {
+        if eqCells then {
+          cell1.node.eqClasses += Set(cell1, cell2)
+          cell1.node.maintainEqClasses()
+          assert(find(cell1).node.eqClassProperty())
+          find(cell1)
+        } else cell1.node.collapse()
+      }
+      else if cell1.node.isCollapsed || cell2.node.isCollapsed then {
         cell1.node.collapse()
         find(cell2).node.collapse()
         mergeCellsHelper(find(cell1), find(cell2))
-      else mergeCellsHelper(cell1, cell2)
+      } else mergeCellsHelper(cell1, cell2)
 
     assert(result.equiv(get(cell1)))
     assert(result.equiv(get(cell2)))
@@ -560,6 +570,7 @@ class IntervalNode(
   DSALogger.debug(s"created node with id $id")
 
   val term: NodeTerm = NodeTerm(this)
+  var eqClasses: Set[Set[IntervalCell]] = Set.empty
   val children = mutable.Set[Int]()
 
   val flags: DSFlag = DSFlag()
@@ -734,6 +745,52 @@ class IntervalNode(
       s"Expected exactly one overlapping interval instead got ${exactMatches.size}, ${interval}, with ${cells.map(_.interval)}"
     )
     exactMatches.head
+  }
+
+
+  def maintainEqClasses(): Unit = {
+    assert(this.isUptoDate)
+    eqClasses = eqClasses.map( // map to most updated intervals
+      eqClass => eqClass.map(c => this.get(c.interval))
+    )
+
+    cells.foreach(
+      c =>
+        val common = eqClasses.filter(_.contains(c))
+        eqClasses = (eqClasses -- common)
+        if common.flatten.nonEmpty then eqClasses = eqClasses + common.flatten
+    )
+
+    eqClasses.foreach(
+      eqClass =>
+        assert(eqClass.nonEmpty)
+        graph.mergeCells(eqClass.map(_.getPointee))
+    )
+
+      /*if !eqClassProperty() then {
+        eqClasses.foreach(
+        eqClass =>
+          val size = eqClass.map(_.interval.size.getOrElse(0)).max
+          eqClass.foreach(c => this.add(c.interval.growTo(size)))
+       )
+      }*/
+
+    if !graph.find(this).eqClassProperty() then graph.find(this).maintainEqClasses()
+  }
+
+  def eqClassProperty(): Boolean = {
+    assert(this.isUptoDate)
+    var seen: Set[IntervalCell] = Set.empty
+    eqClasses.foreach(
+      eqClass =>
+        /*!(eqClass.map(_.interval.size).toSet.size == 1) ||*/
+        if !(eqClass.map(_.getPointee).toSet.size == 1) ||
+          eqClass.exists(seen.contains) ||
+          !(eqClass.forall(c => cells.contains(c))) then return false
+        seen ++= eqClass
+    )
+
+    true
   }
 }
 
@@ -1165,9 +1222,10 @@ object IntervalDSA {
     context: IRContext,
     symValues: SymValues[OSet],
     cons: Set[Constraint],
-    globals: Seq[DSInterval]
+    globals: Seq[DSInterval],
+    eqCells: Boolean = false
   ): IntervalGraph = {
-    val graph = IntervalGraph(proc, Local, context, symValues, cons, globals, None)
+    val graph = IntervalGraph(proc, Local, context, symValues, cons, globals, eqCells, None)
     graph.localPhase()
     graph
   }
