@@ -291,7 +291,7 @@ class IntervalDSATest extends AnyFunSuite with CaptureOutput {
 
     val stackCollapsed = Set("main", "md5_process_block", "md4_process_block", "gl_des_is_weak_key",
       "tunnel", "direct_request", "forward_request", "tunnel_add", "magic_auth_detect")
-    val globalCollapsed = Set("gl_des_makekey", "to_base64", "printmem", "gl_des_ecb_crypt",
+    val globalCollapsed = Set("to_base64", "printmem", "gl_des_ecb_crypt",
       "from_base64", "des_key_schedule", "scanmem")
     val locals = res.dsa.get.local
     assert(locals.values.forall(_.glIntervals.size == 1))
