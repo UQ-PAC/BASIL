@@ -334,7 +334,7 @@ object SymValues {
           val oPlus = toOffsetMove(binExp.op, arg2, oDomain, transform)
           exprToSymValSet(symValues, isGlobal, globals)(arg1, oPlus)
         }
-      case binExp @ BinaryExpr(BVADD, arg1: BitVecLiteral, arg2: Expr) if isGlobal(arg1.value.toInt) =>
+      case binExp @ BinaryExpr(BVADD, arg1: BitVecLiteral, arg2: Expr) if !isGlobal(arg1.value.toInt) =>
           val oPlus = toOffsetMove(binExp.op, arg1, oDomain, transform)
           exprToSymValSet(symValues, isGlobal, globals)(arg2, oPlus)
       case binExp @ BinaryExpr(BVADD | BVSUB, arg1, arg2: Expr)
