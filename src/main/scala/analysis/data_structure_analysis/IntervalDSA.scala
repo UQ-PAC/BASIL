@@ -66,7 +66,7 @@ class IntervalGraph(
     node.flags.global = true
     node.add(DSInterval(offset, offset + size))
   }
-  
+
   def buildGlobals(
     globals: Set[SymbolTableEntry],
     globalOffsets: Map[BigInt, BigInt],
@@ -169,7 +169,7 @@ class IntervalGraph(
   }
 
   // returns the cells corresponding to the
-  def symValToCells(symVal: SymValSet[OSet]): Set[IntervalCell] = {
+  def symValToCells(symVal: SymValSet[OSet], newEqv: Boolean = false): Set[IntervalCell] = {
     val pairs = symVal.state.filter((base, _) => base != Constant)
     pairs.foldLeft(Set[IntervalCell]()) { case (results, (base: SymBase, offsets: OSet)) =>
       val (node, adjustment) = findNode(nodes(base))
@@ -180,7 +180,7 @@ class IntervalGraph(
             isGlobal(i.start.get + base.asInstanceOf[Global].interval.start.get, irContext))
           .map(_.move(i => i + adjustment))
           .map(node.add)
-        val eq = if base.isInstanceOf[Global] then Set.empty else offsets.toOffsets.flatMap(o =>
+        val eq = if base.isInstanceOf[Global] || !newEqv then Set.empty else offsets.toOffsets.flatMap(o =>
           cellToEq(node.get(adjustment)).map(_.interval.move(i => i + o)).map(node.add))
         results ++ current ++ eq
       }
@@ -221,8 +221,8 @@ class IntervalGraph(
   }
 
   // find the corresponding cells for a expr from this graph's procedure
-  def exprToCells(expr: Expr): Set[IntervalCell] = {
-    symValToCells(exprToSymVal(expr)).map(find).flatMap(cellToEq)
+  def exprToCells(expr: Expr, newEqv: Boolean = false): Set[IntervalCell] = {
+    symValToCells(exprToSymVal(expr), newEqv).map(find).flatMap(cellToEq)
   }
 
   /**
@@ -339,8 +339,8 @@ class IntervalGraph(
   }
 
   def init(symBase: SymBase, size: Option[Int]): IntervalNode = IntervalNode(this, Map(symBase -> Set(0)), size)
-  def constraintArgToCells(constraintArg: ConstraintArg, ignoreContents: Boolean = false): Set[IntervalCell] = {
-    val cells = symValToCells(exprToSymVal(constraintArg.value))
+  def constraintArgToCells(constraintArg: ConstraintArg, newEqv: Boolean = false,  ignoreContents: Boolean = false): Set[IntervalCell] = {
+    val cells = exprToCells(constraintArg.value, newEqv)
     val exprCells = cells.map(find)
 
     if constraintArg.contents && !ignoreContents then exprCells.map(_.getPointee)
@@ -367,12 +367,12 @@ class IntervalGraph(
     constraint match
       case cons: MemoryAccessConstraint[_] =>
         DSALogger.debug(s"Processing constraint $cons")
-        val indices = constraintArgToCells(cons.arg1, ignoreContents = true)
+        val indices = constraintArgToCells(cons.arg1, true, ignoreContents = true)
         indices.foreach(cell => cell.node.add(cell.interval.growTo(cons.size)))
-        val pointees = constraintArgToCells(cons.arg1)
+        val pointees = constraintArgToCells(cons.arg1, true)
 
         markEscapes(cons, indices, pointees)
-        val values = constraintArgToCells(cons.arg2)
+        val values = constraintArgToCells(cons.arg2, true)
         if pointees.nonEmpty || values.nonEmpty then mergeCells(pointees ++ values)
         else DSALogger.warn(s"$cons had an empty argument")
         (indices ++ values).map(_.node).map(find).filterNot(_.eqClassProperty()).toSet.foreach(_.maintainEqClasses())
