@@ -1,4 +1,4 @@
-import analysis.data_structure_analysis.DSAPhase.Local
+import analysis.data_structure_analysis.DSAPhase.{Local, TD}
 import analysis.data_structure_analysis.{DSAPhase, DSInterval, Global, Heap, IntervalDSA, IntervalGraph, Par, Ret, Stack, SymBase, generateConstraints, getSymbolicValues, given}
 import boogie.SpecGlobal
 import ir.*
@@ -125,7 +125,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   test("global branch") {
     val result = runTestPrg(IntervalDSATestData.globalBranch)
     val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
-    val globals = globalsToLiteral(result.ir).values.flatMap(dsg.exprToCells).map(dsg.get).toSet
+    val globals = globalsToLiteral(result.ir).values.flatMap(i => dsg.exprToCells(i)).map(dsg.get).toSet
     assert(globals.size == 1)
     assert(globals.head.node.isCollapsed)
     assert(globals.head.getPointee.equiv(globals.head))
@@ -166,6 +166,24 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val join = dsg.proc.formalOutParam.head
     assert(dsg.exprToCells(join) == x)
     assert(dsg.exprToCells(BinaryExpr(BVADD, join, BitVecLiteral(8, 64))) == Set(x8, y8))
+  }
+
+  test("global branch Indirect Use eq classes") {
+    val result = runTestPrg(IntervalDSATestData.globalBranchIndirectUse, DSConfig(TD, false, false) )
+    val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
+    val globals = globalsToLiteral(result.ir)
+    val z = dsg.exprToCells(globals("z")).map(dsg.find).head
+    val x = dsg.exprToCells(globals("x")).map(dsg.find)
+    val y = dsg.exprToCells(globals("y")).map(dsg.find)
+    val x8 = dsg.exprToCells(BinaryExpr(BVADD, globals("x"), BitVecLiteral(8, 64))).map(dsg.find).head
+    val y8 = dsg.exprToCells(BinaryExpr(BVADD, globals("y"), BitVecLiteral(8, 64))).map(dsg.find).head
+    assert(x.forall(c => !c.equiv(z)))
+    assert(x.forall(c => z.getPointee.equiv(c)))
+    assert(x == y)
+    assert(x.size == 2)
+    assert(x.forall(c => !c.equiv(x8)))
+    assert(x.forall(c => !c.equiv(y8)))
+    assert(x8.equiv(y8))
   }
 
 
@@ -421,6 +439,15 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
       exists(IntervalDSA.checksGlobalsMaintained))
   }
 
+  test("cntlm split globals") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = runTest(path, None, DSConfig(TD, true))
+  }
+
+  test("cntlm eq cells") {
+    val path = "examples/cntlm-noduk/cntlm-noduk"
+    val res = runTest(path, None, DSConfig(TD, false, false))
+  }
 
   test("www_authenticate") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
