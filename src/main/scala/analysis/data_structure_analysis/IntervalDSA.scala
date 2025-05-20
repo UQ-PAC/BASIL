@@ -28,7 +28,7 @@ class IntervalGraph(
   val proc: Procedure,
   var phase: DSAPhase,
   val irContext: IRContext,
-  val sva: SymValues[OSet],
+  var sva: SymValues[OSet],
   val constraints: Set[Constraint],
   val glIntervals: Seq[DSInterval],
   val eqCells: Boolean,
@@ -944,9 +944,11 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
         DSALogger.info("Performed correctness checks")  
       }
     }
-    
+
+
+    val scc = stronglyConnectedComponents(CallGraph, irContext.program.procedures)
     if config.phase == DSAPhase.BU || config.phase == DSAPhase.TD then {
-      val DSABU = IntervalDSA.solveBUs(dsaContext.local)
+      val DSABU = IntervalDSA.solveBUs(dsaContext.local, scc)
       DSATimer.checkPoint("Finished DSA BU Phase")
       dsaContext = dsaContext.copy(bottomUp = DSABU)
       if checks then {
@@ -957,7 +959,7 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
     }
 
     if config.phase == DSAPhase.TD then {
-     val DSATD = IntervalDSA.solveTDs(dsaContext.bottomUp)
+     val DSATD = IntervalDSA.solveTDs(dsaContext.bottomUp, scc)
       DSATimer.checkPoint("Finished DSA TD Phase")
       if checks then
         DSATD.values.foreach(checkUniqueGlobals)
@@ -997,6 +999,31 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
 }
 
 object IntervalDSA {
+
+
+  def unifyGraphs(source: IntervalGraph, target: IntervalGraph)(using svDomain: SymValSetDomain[OSet]) = {
+    val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
+    source.proc.formalInParam.foreach(
+      p =>
+        val base = Par(target.proc, p)
+        if !target.nodes.contains(base) then {
+          target.nodes += (base -> IntervalNode(target, Map(base -> Set(0))))
+          target.sva = SymValues(target.sva.state + (p -> svDomain.init(base)))
+        }
+        exprTransfer(p, p, source, target, oldToNew)
+    )
+
+    /*source.proc.formalOutParam.foreach(
+      p =>
+        val base = Par(target.proc, p)
+        if !target.nodes.contains(base) then {
+          target.nodes += (base -> IntervalNode(target, Map(base -> Set(0))))
+          target.sva = SymValues(target.sva.state + (p -> svDomain.init(base)))
+        }
+        exprTransfer(p, p, source, target, oldToNew)
+    )*/
+  }
+
   def equiv(cells: Set[IntervalCell]): Boolean = {
     if cells.size > 1 then {
       val head = cells.head
@@ -1269,22 +1296,37 @@ object IntervalDSA {
       )
   }
 
-  def solveBUs(locals: Map[Procedure, IntervalGraph]): Map[Procedure, IntervalGraph] = {
+  def computeSCCGraph(graphs: Map[Procedure, IntervalGraph], scc: Set[Procedure]): Map[Procedure, IntervalGraph] = {
+    require(scc.forall(graphs.keySet.contains))
+    require(scc.size > 1)
+    val sscc = scc.toSeq.sortBy(_.formalInParam.size).reverse
+    val head = graphs(scc.head)
+    sscc.tail.foreach(
+      p => IntervalDSA.unifyGraphs(graphs(p), head)
+    )
+
+    graphs.map {
+      case (p, g) if sscc.contains(p) => (p, head)
+      case x => x
+    }
+  }
+
+  def solveBUs(locals: Map[Procedure, IntervalGraph], scc: List[Set[Procedure]]): Map[Procedure, IntervalGraph] = {
 
     DSALogger.info("Performing DSA BU phase")
-    val bus = locals.view.mapValues(_.clone).toMap
+    var bus = locals.view.mapValues(_.clone).toMap
     DSALogger.info("performed cloning")
     val visited: mutable.Set[Procedure] = mutable.Set.empty
     val queue = mutable.Queue[Procedure]().enqueueAll(bus.keys.toSeq.sortBy(p => p.name))
-
-    // TODO instead of skipping merge the scc and use it directly
-    var skip = Seq.empty
     while queue.nonEmpty do
       val proc = queue.dequeue()
-      if skip.exists(name => proc.name.startsWith(name)) then
-        DSALogger.info(s"skipped ${proc.name} due to scc")
-        visited += proc
-      else if !proc.calls.filter(proc => !proc.isExternal.getOrElse(false)).forall(visited.contains) then
+      val cc = scc.find(_.contains(proc)).get
+      if cc.size > 1 && cc.flatMap(_.calls).filter(p => !p.isExternal.getOrElse(false) && !cc.contains(p)).forall(visited.contains) then {
+        visited ++= cc
+        queue --= cc
+        bus = computeSCCGraph(bus, cc)
+      }
+      if !proc.calls.filter(p => !p.isExternal.getOrElse(false) && proc != p).forall(visited.contains) then
         DSALogger.info(s"BU procedure ${proc.name} was readded")
         queue.enqueue(proc)
       else
@@ -1294,20 +1336,16 @@ object IntervalDSA {
     bus
   }
 
-  def solveTDs(bus: Map[Procedure, IntervalGraph]): Map[Procedure, IntervalGraph] = {
+  def solveTDs(bus: Map[Procedure, IntervalGraph], scc: List[Set[Procedure]]): Map[Procedure, IntervalGraph] = {
     DSALogger.info("Performing DSA TD phase")
     val tds = bus.view.mapValues(_.clone).toMap
     val visited: mutable.Set[Procedure] = mutable.Set.empty
     val queue = mutable.Queue[Procedure]().enqueueAll(tds.keys.toSeq.sortBy(p => p.name))
 
-    // TODO instead of skipping merge the scc and use it directly
-    var skip = Seq.empty
     while queue.nonEmpty do
       val proc = queue.dequeue()
-      if skip.exists(name => proc.name.startsWith(name)) then
-        DSALogger.info(s"skipped ${proc.name} due to scc")
-        visited += proc
-      else if !proc.callers().filter(f => tds.keySet.contains(f)).forall(f => visited.contains(f)) then
+      val cc = scc.find(_.contains(proc)).get
+      if !proc.callers().filter(f => tds.keySet.contains(f) && !cc.contains(f)).forall(f => visited.contains(f)) then
         DSALogger.info(s"TD procedure ${proc.name} was readded")
         queue.enqueue(proc)
       else
