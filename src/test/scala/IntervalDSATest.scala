@@ -24,6 +24,76 @@ object IntervalDSATestData {
   val k = SpecGlobal("k", 64, None, kAddress.value)
   val R0 = Register("R0", 64)
   val R1 = Register("R1", 64)
+  val R2 = Register("R2", 64)
+  val bv64 = BitVecType(64)
+
+  def recursion: IRContext = {
+    val program =
+      prog(
+        proc(
+          "main",
+          Set(("R0", bv64)),
+          Set(("R0", bv64)),
+          block(
+            "en",
+            LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(1, 64)), Some("01")),
+            directCall(Set(("R0", R0)), "main", Set(("R0", R0))),
+            ret(("R0", R0))
+          )
+        )
+      )
+    programToContext(program, Set.empty)
+  }
+
+
+  def recursionWithIndirection: IRContext = {
+    val program =
+      prog(
+        proc(
+          "main",
+          Set(("R0", bv64)),
+          Set(("R0", bv64)),
+          block(
+            "en",
+            MemoryLoad(R1, mem, R0, LittleEndian, 64),
+            LocalAssign(R2, BinaryExpr(BVADD, R1, BitVecLiteral(8, 64)), Some("01")),
+            MemoryStore(mem, R0, R2, LittleEndian, 64),
+            directCall(Set(("R0", R0)), "main", Set(("R0", R0))),
+            ret(("R0", R0))
+          )
+        )
+      )
+    programToContext(program, Set.empty)
+  }
+
+
+  def mutualRecursion: IRContext = {
+    val program = prog(
+      proc(
+        "main",
+        Set(("R0", bv64)),
+        Set(("R0", bv64)),
+        block(
+          "en",
+          LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(1, 64)), Some("01")),
+          directCall(Set(("R0", R0)), "callee", Set(("R0", R0))),
+          ret(("R0", R0))
+        )
+      ),
+      proc(
+        "callee",
+        Set(("R0", bv64)),
+        Set(("R0", bv64)),
+        block(
+          "en",
+          LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(1, 64)), Some("01")),
+          directCall(Set(("R0", R0)), "main", Set(("R0", R0))),
+          ret(("R0", R0))
+        )
+      )
+    )
+    programToContext(program, Set.empty)
+  }
 
   def globalBranch: IRContext = {
     val globals = Set(x, y, z, k)
@@ -120,6 +190,32 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
         dsaConfig = Some(config)
       )
     )
+  }
+
+
+  test("recursion") {
+    val result = runTestPrg(IntervalDSATestData.recursion)
+    val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
+    assert(dsg.exprToCells(dsg.proc.formalInParam.head).forall(_.node.isCollapsed))
+  }
+
+  test("recursion eq cells") {
+    val result = runTestPrg(IntervalDSATestData.recursion, DSConfig(TD, false, false))
+    val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
+    assert(dsg.exprToCells(dsg.proc.formalInParam.head).forall(_.node.isCollapsed))
+  }
+
+  test("recursion with indirection") {
+    val result = runTestPrg(IntervalDSATestData.recursionWithIndirection)
+    val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
+    assert(dsg.exprToCells(dsg.proc.formalInParam.head).forall(_.getPointee.node.isCollapsed))
+  }
+
+  test("recursion with indirection eq cells") {
+    val result = runTestPrg(IntervalDSATestData.recursionWithIndirection, DSConfig(TD, false, false))
+    val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
+    val t = (dsg.exprToCells(dsg.proc.formalInParam.head).flatMap(i => dsg.cellToEq(i.getPointee)))
+    assert(dsg.exprToCells(dsg.proc.formalInParam.head).forall(_.getPointee.node.isCollapsed))
   }
 
   test("global branch") {
