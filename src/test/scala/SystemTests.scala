@@ -1,3 +1,4 @@
+import analysis.data_structure_analysis.DSAPhase.TD
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest.*
 import test_util.{BASILTest, CaptureOutput, Histogram, TestConfig, TestCustomisation}
@@ -593,8 +594,19 @@ class UnimplementedTests extends SystemTests {
 @test_util.tags.AnalysisSystemTest
 class IntervalDSASystemTests extends SystemTests {
   runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig())))
-
   runTests("incorrect", TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSConfig())))
+}
+
+@test_util.tags.AnalysisSystemTest
+class IntervalDSASystemTestsSplitGlobals extends SystemTests {
+  runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig(TD, true))))
+  runTests("incorrect", TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSConfig(TD, true))))
+}
+
+@test_util.tags.AnalysisSystemTest
+class IntervalDSASystemTestsEqClasses extends SystemTests {
+  runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig(TD, false, false))))
+  runTests("incorrect", TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSConfig(TD, false, false))))
 }
 
 @test_util.tags.DisabledTest
