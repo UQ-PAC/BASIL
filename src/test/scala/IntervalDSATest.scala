@@ -205,6 +205,14 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(dsg.exprToCells(dsg.proc.formalInParam.head).forall(_.node.isCollapsed))
   }
 
+  test("mutual recursion") {
+    val result = runTestPrg(IntervalDSATestData.mutualRecursion)
+    val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
+    val dsgCallee = result.dsa.get.topDown(result.ir.program.nameToProcedure("callee"))
+    assert(dsg == dsgCallee)
+    assert(dsg.exprToCells(dsg.proc.formalInParam.head).forall(_.node.isCollapsed))
+  }
+
   test("recursion with indirection") {
     val result = runTestPrg(IntervalDSATestData.recursionWithIndirection)
     val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
