@@ -297,7 +297,18 @@ object Main {
       memoryTransform = conf.memoryTransform.value
     )
 
-    val result = RunUtils.run(q)
+    val result =
+      try {
+        RunUtils.run(q)
+      } catch {
+        case e => {
+          Logger.error(s"Died with $e")
+          Logger.error(e.getStackTrace.mkString("\n"))
+          OnCrash.dumpLog()
+          return
+        }
+      }
+
     if (conf.verify.value) {
       assert(result.boogie.nonEmpty)
       var failed = false

@@ -186,10 +186,6 @@ class LiveVarsDomWatchFlags(defs: Map[Variable, Set[Assign]]) extends IntraLiveV
   }
 }
 
-def removeSlices(p: Program): Unit = {
-  p.procedures.foreach(removeSlices)
-}
-
 case class LVTerm(v: LocalVar) extends analysis.solvers.Var[LVTerm]
 
 def removeSlices(p: Procedure): Unit = {
@@ -743,7 +739,9 @@ def wrapShapePreservingTransformInValidation(transform: Program => Unit)(p: Prog
   transform(p)
   validator.setSourceProg(p)
   validator.setEqualVarsInvariant
-  validator.getValidationProgWPConj
+  val (a, b) = validator.getValidationProgWPConj
+  val c = validator.getValidationSMT
+  (a, b, c)
 }
 
 def validateProgs(
@@ -787,6 +785,15 @@ def validateProg(
 }
 
 var validationProgs = List[String]()
+
+def writeSMTs(q: Map[String, String], passName: String) = {
+  for ((k, v) <- q) {
+    val fname = s"tvsmt/$passName-$k.smt2"
+    util.writeToFile(v, fname)
+    SimplifyLogger.info(s"Wrote TV SMT : $fname")
+  }
+
+}
 
 def writeValidationProg(progs: Iterable[Program], passName: String) = {
   val dir = File("./tv/")
@@ -987,8 +994,9 @@ def validateProcWithSplitsInteractive(validationProg: Program, proc: Procedure, 
 }
 
 def transformAndValidate(transform: Program => Unit, name: String)(p: Program) = {
-  val (progs, splits) = wrapShapePreservingTransformInValidation(transform)(p)
+  val (progs, splits, smt) = wrapShapePreservingTransformInValidation(transform)(p)
   writeValidationProg(progs, name)
+  writeSMTs(smt, name)
 }
 
 def validatedSimplifyPipeline(p: Program) = {
@@ -1057,6 +1065,7 @@ def validatedSimplifyPipeline(p: Program) = {
     val (vprog, splits) = validator.getValidationProgWPConj
 
     writeValidationProg(vprog, "OffsetCopyProp")
+    writeSMTs(validator.getValidationSMT, "OffsetCopyProp")
 
   }
 
@@ -1073,7 +1082,7 @@ def validatedSimplifyPipeline(p: Program) = {
   }
 
   def sliceCleanup(prog: Program) = {
-    removeSlices(prog)
+    // removeSlices(prog)
     for (p <- prog.procedures) {
       ir.eval.cleanupSimplify(p)
       AlgebraicSimplifications(p)
@@ -1105,7 +1114,9 @@ def validatedSimplifyPipeline(p: Program) = {
     validator.setDSAInvariant
 
     val (vprog, splits) = validator.getValidationProgWPConj
+
     writeValidationProg(vprog, "DynamicSingleAssignment")
+    writeSMTs(validator.getValidationSMT, "DynamicSingleAssignment")
     // validateProgs(vprog, "DynamicSingleAssignment", splits)
 
   }
@@ -1161,7 +1172,7 @@ def copypropTransform(
   AlgebraicSimplifications(p)
   val sipm = t.checkPoint("algebraic simp")
 
-  removeSlices(p)
+  // removeSlices(p)
   ir.eval.cleanupSimplify(p)
   AlgebraicSimplifications(p)
 

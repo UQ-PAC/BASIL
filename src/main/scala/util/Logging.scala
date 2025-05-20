@@ -18,6 +18,9 @@ class GenericLogger(
   var ANSIColour: Boolean = true
 ) {
 
+  val logTrace = RingTrace[String](50, "Logger: " + name)
+  OnCrash.register(logTrace)
+
   private var _output = () => defaultOutput
   def output: PrintStream = _output()
 
@@ -123,12 +126,16 @@ class GenericLogger(
         case (DEBUG, _) => false
         case (OFF, _) => ???
 
-      val position = if showPosition then s" [${name.value}@${file.value}:${line.value}]" else ""
+      val positionText = s" [${name.value}@${file.value}:${line.value}]"
+      val position = if showPosition then positionText else ""
 
       val resetColour = if !ANSIColour then "" else AnsiColor.RESET
       val space = "  "
       val prefix = s"[$colour$logLevel${resetColour}]$space"
+      val prefixNoCol = s"[$logLevel]$space"
       val text = arg.toString().replace("\n", "\n " + (" " * (logLevel.toString).length()) + "  " + space)
+
+      logTrace.add(s"$prefixNoCol $text$positionText")
       output.println(s"$prefix $text$position")
     }
   }

@@ -6,6 +6,8 @@ import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
 import ir.cilvisitor.*
 import scala.sys.process.*
 
+import util.{RingTrace, OnCrash}
+
 trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
   // def vstmt(s: Statement) : Repr[Statement]
 
@@ -146,6 +148,7 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
     */
 
   def vexpr(e: Expr): Repr[Expr] = {
+    dumpTrace.add(e)
     e match {
       case n: Literal => vliteral(n)
       case Extract(ed, start, arg) => vextract(ed, start, vexpr(arg))
@@ -155,17 +158,19 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
       case ZeroExtend(bits, arg) => vexpr(BinaryExpr(BVCONCAT, BitVecLiteral(0, bits), arg))
       case SignExtend(bits, arg) =>
         vexpr(BinaryExpr(BVCONCAT, Repeat(bits, Extract(size(arg).get, size(arg).get - 1, arg)), arg))
-      case BinaryExpr(op, arg, arg2) =>
+      case b @ BinaryExpr(op, arg, arg2) =>
         op match {
           case BVNEQ => vunary_expr(BoolNOT, vbinary_expr(BVEQ, vexpr(arg), vexpr(arg2)))
           case IntNEQ => vunary_expr(BoolNOT, vbinary_expr(IntEQ, vexpr(arg), vexpr(arg2)))
           case BoolNEQ => vunary_expr(BoolNOT, vbinary_expr(BoolEQ, vexpr(arg), vexpr(arg2)))
-          case _ => vbinary_expr(op, vexpr(arg), vexpr(arg2))
+          case _ =>
+            vbinary_expr(op, vexpr(arg), vexpr(arg2))
         }
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
       case v: Variable => vrvar(v)
       case f @ UninterpretedFunction(n, params, rt, _) => vuninterp_function(n, params.map(vexpr))
-      case BoolExp(op, args) => vbool_expr(op, args.map(vexpr))
+      case b @ BoolExp(op, args) =>
+        vbool_expr(op, args.map(vexpr))
       case q: QuantifierExpr => ???
       case q: LambdaExpr => ???
       case r: OldExpr => ???
@@ -192,7 +197,11 @@ object Sexp {
 def sym[T](l: String): Sexp[T] = Sexp.Symb[T](l)
 def list[T](l: Sexp[T]*): Sexp[T] = Sexp.Slist(l.toList)
 
+val dumpTrace = RingTrace[Expr](3, "BasilIRToSMT2")
 object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
+
+  OnCrash.register(dumpTrace)
+
   def vload(lhs: Sexp[Variable], mem: String, index: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryLoad] = ???
   def vstore(mem: String, index: Sexp[Expr], value: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryStore] = ???
 
@@ -204,23 +213,26 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   def vbvlit(b: BitVecLiteral): Sexp[BitVecLiteral] = ???
   def vintlit(b: BigInt): Sexp[IntLiteral] = ???
 
-  class Builder()  {
+  class Builder() {
     var exprs = Vector[Sexp[Expr]]()
     var decls = Set[Sexp[Expr]]()
     var typedecls = Set[Sexp[Expr]]()
 
-    def addAssume(e : Expr) = {
-      val (t,d) = BasilIRToSMT2.extractDecls(e)
-      decls = decls ++  d
+    def addAssume(e: Expr) = {
+      val (t, d) = BasilIRToSMT2.extractDecls(e)
+      decls = decls ++ d
       typedecls = typedecls ++ t
       exprs = exprs ++ List(list(sym("assume"), BasilIRToSMT2.vexpr(e)))
     }
 
-    def addAssert(e : Expr) = {
-      val (t,d) = BasilIRToSMT2.extractDecls(e)
-      decls = decls ++  d
+    def addAssert(e: Expr, name: Option[String] = None) = {
+      val (t, d) = BasilIRToSMT2.extractDecls(e)
+      decls = decls ++ d
       typedecls = typedecls ++ t
-      exprs = exprs ++ List(list(sym("assert"), BasilIRToSMT2.vexpr(e)))
+      val expr: Sexp[Expr] = BasilIRToSMT2.vexpr(e)
+      val inner: Sexp[Expr] = name.map(n => list(sym("!"), expr, sym(":named"), sym(n))).getOrElse(expr)
+
+      exprs = exprs ++ List(list(sym("assert"), inner))
     }
 
     def getCheckSat() = {
@@ -366,13 +378,13 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     }
   }
 
-  def extractDecls(e: Expr): (Set[Sexp[Expr]],Set[Sexp[Expr]]) = {
+  def extractDecls(e: Expr): (Set[Sexp[Expr]], Set[Sexp[Expr]]) = {
 
     class ToDecl extends CILVisitor {
       var decled = Set[Sexp[Expr]]()
       var typeDecled = Set[Sexp[Expr]]()
 
-      override def vexpr(e: Expr) = 
+      override def vexpr(e: Expr) =
         e.getType match {
           case CustomSort(b) => {
             typeDecled = typeDecled + list(sym("declare-sort"), sym(b))

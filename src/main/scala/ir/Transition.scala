@@ -1,4 +1,5 @@
 package ir
+import scala.util.boundary, boundary.break
 import ir.dsl.*
 import scala.collection.mutable
 import analysis.Loop
@@ -578,8 +579,6 @@ enum Inv {
 class TranslationValidator {
   import Inv.*
 
-  var validationProcs = Map[String, Procedure]()
-
   var initProg: Option[Program] = None
 
   var beforeProg: Option[Program] = None
@@ -625,51 +624,66 @@ class TranslationValidator {
     LocalVar(b.label + "_done", BoolType)
   }
 
-  def extractProg(begin: Block) = {
+  def extractProg(begin: Block): Iterable[Expr] = {
     val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
     worklist.enqueue(begin)
 
-    var firstAssert = true 
+    var firstAssert = true
     var gotAssert = false
     var assumes = List[Expr]()
     var asserts = List[Expr]()
+    var seen = Set[Block]()
 
-    while (worklist.nonEmpty) {
-      val nb = worklist.dequeue()
-      nb.statements.foreach {
-        case s: Assume => {
-          assumes = s.body :: assumes
+    boundary {
+      while (worklist.nonEmpty) {
+        val nb = {
+          var b = worklist.dequeue()
+          while (seen.contains(b)) {
+            if (worklist.isEmpty) {
+              break()
+            }
+            b = worklist.dequeue()
+          }
+          b
         }
-        case s: Assume if gotAssert => {
-          // throw Exception("Bad structure")
+        if (seen.contains(nb)) {
+          throw Exception(s"cycle detected \n${begin.parent.name}\n${dotBlockGraph(begin.parent)}")
+        } else {
+          seen = seen + nb
         }
-        case s: Assert => {
-          gotAssert = true
-          asserts = s.body :: asserts
+        nb.statements.foreach {
+          case s: Assume => {
+            assumes = s.body :: assumes
+          }
+          case s: Assert => {
+            gotAssert = true
+            asserts = s.body :: asserts
+          }
+          case o => {
+            throw Exception(s"Program has other statements : $o")
+          }
         }
-        case o => {
-          throw Exception(s"Program has other statements : $o")
-        }
+        // assuming no cycles in graph
+        worklist.addAll(nb.nextBlocks.filterNot(seen.contains))
       }
-      // assuming no cycles in graph
-      worklist.addAll(nb.nextBlocks)
     }
 
-    BinaryExpr(BoolIMPLIES, boolAnd(assumes), boolAnd(asserts))
-
+    assumes ++ asserts
   }
 
   def ssaDAG(p: Procedure): ((Block, Command) => Command) = {
+
+    val finalBlock = Block(p.name)
 
     var renameCount = 0
     var stRename = Map[Block, Map[Variable, Variable]]()
     // use for blocks
 
-    var count = Map[Variable, Int]()
+    var count = Map[String, Int]()
 
     def freshName(v: Variable) =
-      renameCount = count.get(v).getOrElse(0) + 1
-      count = count + (v -> renameCount)
+      renameCount = count.get(v.name).getOrElse(0) + 1
+      count = count + (v.name -> renameCount)
       v match {
         case l: LocalVar => l.copy(varName = l.name + "_AT" + renameCount, index = 0)
         case l: GlobalVar => l.copy(name = l.name + "_AT" + renameCount)
@@ -742,15 +756,22 @@ class TranslationValidator {
             // }
 
           val fresh = freshName(v)
+
+          val oneOf = boolOr(defsToJoin.map(blockDone))
           val phicond = defsToJoin.map(b => {
             // val others = UnaryExpr(BoolNOT, boolOr(defsToJoin.filterNot(_ == b).map(blockDone)))
             BinaryExpr(BoolIMPLIES, blockDone(b), polyEqual(stRename(b)(v), fresh))
           })
-          val oneOf = boolOr(defsToJoin.map(blockDone))
-          phis = phis + Assume(
-            boolAnd(phicond),
-            Some(s"${fresh.name} = phi(${defsToJoin.map(stRename(_)(v).name).mkString(",")})")
-          )
+
+          val phiscond = if (phicond.toList.length > 5) then {
+            phicond.map(b => Assume(b))
+          } else Seq(Assume(boolAnd(phicond)))
+          phis = phis ++ phiscond
+          // Assume(
+          //  boolAnd(phicond),
+          //  Some(s"${fresh.name} = phi(${defsToJoin.map(stRename(_)(v).name).mkString(",")})")
+          // )
+
           joinedRenames = joinedRenames + (v -> fresh)
         })
 
@@ -966,30 +987,11 @@ class TranslationValidator {
       }
   }
 
-  private def getUninterps(p: Procedure) =
+  private def getUninterps(p: Procedure) = {
     val v = CollectUninterps()
     visit_proc(v, p)
     v.funcs.map(u => u.name -> u).toMap
-
-
-  //def getValidationSMT = {
-
-  //  val interesting = initProg.get.procedures
-  //    .filterNot(_.isExternal.contains(true))
-  //    .filterNot(_.procName.startsWith("indirect_call_launchpad"))
-
-  //  for (proc <- interesting) {
-  //    val after = afterProg.get.procedures.find(_.name == proc.name).get
-  //    val before = beforeProg.get.procedures.find(_.name == proc.name).get
-  //    val source = after
-  //    val target = before
-
-  //    renamesource = ssaDAG(source)
-  //    renametarget = ssaDAG(target)
-
-  //  }
-
-  //}
+  }
 
   def getValidationProgWPConj = {
 
@@ -998,6 +1000,7 @@ class TranslationValidator {
 
     var splitCandidates = Map[Procedure, ArrayBuffer[GoTo]]()
 
+    var validationProcs = Map[String, Procedure]()
     var progs = List[Program]()
 
     val interesting = initProg.get.procedures
@@ -1071,22 +1074,24 @@ class TranslationValidator {
         )
 
       val combined = IRToDSL.parTransitionSystems(afterProg.get, after, before)
+      ir.transforms.reversePostOrder(combined)
 
+      val ackermannTransforms = Ackermann.doTransform(combined, afterRenamer, beforeRenamer)
       val srce = combined.blocks.find(_.label == after.entryBlock.get.label).get
       val tgte = combined.blocks.find(_.label == before.entryBlock.get.label).get
-      val srcExit = combined.blocks.find(_.label == after.returnBlock.get.label).get
-      val tgtExit = combined.blocks.find(_.label == before.returnBlock.get.label).get
 
+      val ackInv = Ackermann.instantiateAxioms(srce, tgte, ackermannTransforms)
+      // val ackInv = Ackermann.naiveInvariant(ackermannTransforms)
+      visit_proc(Ackermann.ToAssume(ackermannTransforms), combined)
 
       // addInvariant(proc.name, ackInv.map(v => (v, Some("ackermannisation"))))
 
       val prime = NamespaceState("P")
 
       // add inv on transition system
-      // srce.statements.append(Assume(trueFun.makeCall()))
-      // tgte.statements.append(Assume(trueFun.makeCall()))
+      combined.blocks.find(_.label == after.entryBlock.get.label).get.statements.append(Assume(trueFun.makeCall()))
+      combined.blocks.find(_.label == before.entryBlock.get.label).get.statements.append(Assume(trueFun.makeCall()))
       val invVariables = invariants(proc.name).flatMap(_.toAssume.body.variables).toSet
-
       val QSource =
         val sourceInvVariables =
           invVariables.filter(_.name.startsWith(afterRenamer.namespace)) ++ Seq(transitionSystemPCVar, traceVar).map(
@@ -1103,49 +1108,23 @@ class TranslationValidator {
         val vars = targetInvVariables.map(v => polyEqual(visit_expr(prime, v), v))
         boolAnd(vars)
 
-      def exitDone(b: Block) = {}
-
-      //combined.blocks
-      //  .find(_.label == after.returnBlock.get.label)
-      //  .map(b => {
-      //    b.statements.append(Assume(QSource))
-      //    b.statements.append(Assert(FalseLiteral))
-      //  })
-      //combined.blocks
-      //  .find(_.label == before.returnBlock.get.label)
-      //  .map(b => {
-      //    b.statements.append(Assume(QTarget))
-      //    b.statements.append(Assert(FalseLiteral))
-      //  })
-
-
-      srce.statements.prepend(LocalAssign(varInSource(transitionSystemPCVar), varInSource(transitionSystemPCVar)))
-      srce.statements.prepend(LocalAssign(varInSource(traceVar), varInSource(traceVar)))
-      tgte.statements.prepend(LocalAssign(varInTarget(transitionSystemPCVar), varInTarget(transitionSystemPCVar)))
-      tgte.statements.prepend(LocalAssign(varInTarget(traceVar), varInTarget(traceVar)))
-
-
-      val renamer: ((Block, Command) => Command) = ssaDAG(combined)
-
+      combined.blocks
+        .find(_.label == after.returnBlock.get.label)
+        .get
+        .statements
+        .append(Assert(UnaryExpr(BoolNOT, QSource)))
+      combined.blocks
+        .find(_.label == before.returnBlock.get.label)
+        .get
+        .statements
+        .append(Assert(UnaryExpr(BoolNOT, QTarget)))
 
       // add invariant to combined
       val initInv = Seq(Inv.Global(pcInv, Some("PC INVARIANT")), Inv.Global(traceInv, Some("Trace INVARIANT")))
-      val invariant = initInv ++ invariants(proc.name).map {
-        case g: Inv.Global => g
-        case i @ CutPoint(l, b, comment) => {
-          val target = combined.blocks.find(_.label == beforeCuts(before)(l).label).get
-          val source = combined.blocks.find(_.label == afterCuts(after)(l).label).get
-          val inv1 = renamer(target, Assume(b))
-          val inv2 = renamer(source, inv1) match {
-            case a: Assume => a.body
-          }
-          CutPoint(l, inv2, comment)
-        }
-      }
+      val invariant = initInv ++ invariants(proc.name)
       val primedInv = (initInv ++ invariants(proc.name)).map(_.toAssume).map { case Assume(b, c, _, _) =>
         Assert(visit_expr(prime, b), c)
       }
-
       val proof =
         invariant.map(i => i.toAssume)
           ++ List(
@@ -1156,41 +1135,7 @@ class TranslationValidator {
           ++ List(Assume(falseFun.makeCall()))
 
       combined.entryBlock.get.statements.prependAll(proof)
-
-      util.writeToFile(pp_proc(combined), "ssadag.il")
-      val ackermannTransforms = Ackermann.doTransform(combined, afterRenamer, beforeRenamer)
-      util.writeToFile(pp_proc(combined), "ssadagack.il")
-
-      val ackInv = Ackermann.instantiateAxioms(srce, tgte, ackermannTransforms).toSet
-      // val ackInv = Ackermann.naiveInvariant(ackermannTransforms)
-      visit_proc(Ackermann.ToAssume(ackermannTransforms), combined)
       combined.entryBlock.get.statements.prependAll(ackInv.map(a => Assume(a, Some("ackermann"))))
-
-      Ackermann.passify(combined)
-
-      // smt
-
-      val qsrc = renamer(srcExit, Assume(QSource)).asInstanceOf[Assume].body
-      val qtrgt = renamer(tgtExit, Assume(QTarget)).asInstanceOf[Assume].body
-
-      val wpconjsource = UnaryExpr(BoolNOT, BinaryExpr(BoolIMPLIES, extractProg(srce), UnaryExpr(BoolNOT, qsrc)))
-      val wpconjtgt = UnaryExpr(BoolNOT, BinaryExpr(BoolIMPLIES, extractProg(tgte), UnaryExpr(BoolNOT, qtrgt)))
-
-      val b = translating.BasilIRToSMT2.Builder()
-
-      for (i <- invariant) {
-        b.addAssume(i.toAssume.body)
-      }
-      b.addAssume(wpconjsource)
-      b.addAssume(wpconjtgt)
-      for (i <- primedInv) {
-        b.addAssert(UnaryExpr(BoolNOT, i.body))
-      }
-      val s = b.getCheckSat() 
-      println(s)
-
-
-
       validationProcs = validationProcs.updated(proc.name, combined)
 
       val internalLabels = before.blocks.map(_.label).toSet ++ after.blocks.map(_.label)
@@ -1210,7 +1155,129 @@ class TranslationValidator {
     (progs, splitCandidates)
   }
 
+  /**
+   * Generate an SMT query for the product program, 
+   * !! Assume source and taregt in class scope are already renamed
+   *
+   * Returns a map from proceudre -> smt query
+   */
+  def getValidationSMT: Map[String, String] = {
+    // assume already renamed
+
+    var smtQueries = Map[String, String]()
+
+    var splitCandidates = Map[Procedure, ArrayBuffer[GoTo]]()
+
+    var progs = List[Program]()
+
+    val interesting = initProg.get.procedures
+      .filterNot(_.isExternal.contains(true))
+      .filterNot(_.procName.startsWith("indirect_call_launchpad"))
+
+    for (proc <- interesting) {
+      val source = afterProg.get.procedures.find(_.name == proc.name).get
+      val target = beforeProg.get.procedures.find(_.name == proc.name).get
+
+      val combined = IRToDSL.parTransitionSystems(afterProg.get, target, source)
+
+      val srce = combined.blocks.find(_.label == source.entryBlock.get.label).get
+      val tgte = combined.blocks.find(_.label == target.entryBlock.get.label).get
+      val srcExit = combined.blocks.find(_.label == source.returnBlock.get.label).get
+      val tgtExit = combined.blocks.find(_.label == target.returnBlock.get.label).get
+
+      val prime = NamespaceState("P")
+
+      val invVariables = invariants(proc.name).flatMap(_.toAssume.body.variables).toSet
+
+      val QSource =
+        val sourceInvVariables =
+          invVariables.filter(_.name.startsWith(afterRenamer.namespace)) ++ Seq(transitionSystemPCVar, traceVar).map(
+            visit_rvar(afterRenamer, _)
+          )
+        val vars = sourceInvVariables.map(v => polyEqual(visit_expr(prime, v), v))
+        boolAnd(vars)
+
+      val QTarget =
+        val targetInvVariables =
+          invVariables.filter(_.name.startsWith(beforeRenamer.namespace)) ++ Seq(transitionSystemPCVar, traceVar).map(
+            visit_rvar(beforeRenamer, _)
+          )
+        val vars = targetInvVariables.map(v => polyEqual(visit_expr(prime, v), v))
+        boolAnd(vars)
+
+      srce.statements.prepend(LocalAssign(varInSource(transitionSystemPCVar), varInSource(transitionSystemPCVar)))
+      srce.statements.prepend(LocalAssign(varInSource(traceVar), varInSource(traceVar)))
+      tgte.statements.prepend(LocalAssign(varInTarget(transitionSystemPCVar), varInTarget(transitionSystemPCVar)))
+      tgte.statements.prepend(LocalAssign(varInTarget(traceVar), varInTarget(traceVar)))
+
+      val renamer: ((Block, Command) => Command) = ssaDAG(combined)
+
+      // add invariant to combined
+      val initInv = Seq(Inv.Global(pcInv, Some("PC INVARIANT")), Inv.Global(traceInv, Some("Trace INVARIANT")))
+      val invariant = initInv ++ invariants(proc.name).map {
+        case g: Inv.Global => g
+        case i @ CutPoint(l, b, comment) => {
+          val targetBl = combined.blocks.find(_.label == beforeCuts(target)(l).label).get
+          val sourceBl = combined.blocks.find(_.label == afterCuts(source)(l).label).get
+          val inv1 = renamer(targetBl, Assume(b))
+          val inv2 = renamer(sourceBl, inv1) match {
+            case a: Assume => a.body
+            case _ => ???
+          }
+          CutPoint(l, inv2, comment)
+        }
+      }
+      val primedInv = (initInv ++ invariants(proc.name)).map(_.toAssume).map { case Assume(b, c, _, _) =>
+        Assert(visit_expr(prime, b), c)
+      }
+
+      val ackermannTransforms = Ackermann.doTransform(combined, afterRenamer, beforeRenamer)
+
+      val ackInv = Ackermann.instantiateAxioms(srce, tgte, ackermannTransforms).toSet
+      visit_proc(Ackermann.ToAssume(ackermannTransforms), combined)
+      combined.entryBlock.get.statements.prependAll(ackInv.map(a => Assume(a, Some("ackermann"))))
+
+      Ackermann.passify(combined)
+
+      val qsrc = renamer(srcExit, Assume(QSource)).asInstanceOf[Assume].body
+      val qtrgt = renamer(tgtExit, Assume(QTarget)).asInstanceOf[Assume].body
+
+      // build smt query
+      val b = translating.BasilIRToSMT2.Builder()
+      var count = 0
+      for (i <- invariant) {
+        count += 1
+        b.addAssert(i.toAssume.body, Some(s"inv$count"))
+      }
+      count = 0
+      for (i <- ackInv) {
+        count += 1
+        b.addAssert(i, Some(s"ack$count"))
+
+      }
+      count = 0
+      for (i <- extractProg(srce)) {
+        count += 1
+        b.addAssert(i, Some(s"source$count"))
+      }
+      count = 0
+      b.addAssert(qsrc, Some("Qsrc"))
+      for (i <- extractProg(tgte)) {
+        count += 1
+        b.addAssert(i, Some(s"tgt$count"))
+      }
+      b.addAssert(qtrgt, Some("Qtgt"))
+      b.addAssert(UnaryExpr(BoolNOT, BoolExp(BoolAND, primedInv.map(_.body).toList)), Some("InvPrimed"))
+      smtQueries = smtQueries + (proc.name -> b.getCheckSat())
+
+    }
+
+    smtQueries
+  }
+
   def getValidationProg = {
+    var validationProcs = Map[String, Procedure]()
+
     for (proc <- initProg.get.procedures) {
       val after = afterProg.get.procedures.find(_.name == proc.name).get
       val before = beforeProg.get.procedures.find(_.name == proc.name).get
