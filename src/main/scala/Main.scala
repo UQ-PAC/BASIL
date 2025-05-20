@@ -274,7 +274,7 @@ object Main {
       Some(DSConfig(
         phase,
         conf.dsaSplitGlobals.value,
-        conf.dsaEqCells.value,
+        !conf.dsaEqCells.value,
         conf.dsaChecks.value
       ))
     } else {
