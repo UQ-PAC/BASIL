@@ -1338,7 +1338,14 @@ object IntervalDSA {
 
   def solveTDs(bus: Map[Procedure, IntervalGraph], scc: List[Set[Procedure]]): Map[Procedure, IntervalGraph] = {
     DSALogger.info("Performing DSA TD phase")
-    val tds = bus.view.mapValues(_.clone).toMap
+    val oldToNew = mutable.Map[IntervalGraph, IntervalGraph]()
+    val tds = bus.map {
+      case (proc, graph) if oldToNew.contains(graph) => (proc, oldToNew(graph))
+      case (proc, graph) =>
+        val clone = graph.clone()
+        oldToNew.update(graph, clone)
+        (proc, clone)
+    }
     val visited: mutable.Set[Procedure] = mutable.Set.empty
     val queue = mutable.Queue[Procedure]().enqueueAll(tds.keys.toSeq.sortBy(p => p.name))
 
