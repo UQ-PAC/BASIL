@@ -369,6 +369,19 @@ class IntervalGraph(
       case cons: MemoryAccessConstraint[_] =>
         DSALogger.debug(s"Processing constraint $cons")
         val indices = constraintArgToCells(cons.arg1, true, ignoreContents = true)
+        val pos: Statement = cons.source
+        val collapsedGlobals = indices.filter(_.node.isCollapsed).flatMap(_.node.bases.keys.collect { case g: Global => g})
+        if collapsedGlobals.nonEmpty && insertAsserts then {
+          val assertExpr = collapsedGlobals.map(g =>
+              BinaryExpr(BoolAND,
+                BinaryExpr(BVSGE, cons.arg1.value, BitVecLiteral(g.interval.start.get, 64)),
+                BinaryExpr(BVSLT, cons.arg1.value, BitVecLiteral(g.interval.end.get, 64))
+              ))
+            .reduce((e1, e2) => BinaryExpr(BoolOR, e1, e2))
+          val assertSt = Assert(assertExpr)
+          pos.parent.statements.insertBefore(pos, assertSt)
+        }
+
         indices.foreach(cell => cell.node.add(cell.interval.growTo(cons.size)))
         val pointees = constraintArgToCells(cons.arg1, true)
 
