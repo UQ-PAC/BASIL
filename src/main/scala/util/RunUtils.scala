@@ -1169,8 +1169,8 @@ object RunUtils {
         val pcVar = BVariable("_PC", BitVecBType(64), Scope.Global)
         val r30Var = BVariable("R30", BitVecBType(64), Scope.Global)
         val addrVar = BitVecBLiteral(addr, 64)
-        val pcRequires = BinaryBExpr(BVEQ, pcVar, addrVar)
-        val pcEnsures = BinaryBExpr(BVEQ, pcVar, Old(r30Var))
+        val pcRequires = BinaryBExpr(ir.EQ, pcVar, addrVar)
+        val pcEnsures = BinaryBExpr(ir.EQ, pcVar, Old(r30Var))
 
         val name = proc.procName
         (name -> SubroutineSpec(name, requires = List(pcRequires), ensures = List(pcEnsures)))
