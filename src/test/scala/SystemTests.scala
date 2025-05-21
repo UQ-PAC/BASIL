@@ -594,26 +594,52 @@ class UnimplementedTests extends SystemTests {
 @test_util.tags.AnalysisSystemTest
 class IntervalDSASystemTests extends SystemTests {
   runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig())))
-  runTests("incorrect", TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSConfig())))
+  runTests(
+    "incorrect",
+    TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSConfig()))
+  )
 }
 
 @test_util.tags.AnalysisSystemTest
 class IntervalDSASystemTestsSplitGlobals extends SystemTests {
-  runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig(TD, true, true))))
-  runTests("incorrect", TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSConfig(TD, true, true))))
+  runTests(
+    "correct",
+    TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig(TD, true, true)))
+  )
+  runTests(
+    "incorrect",
+    TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSConfig(TD, true, true)))
+  )
 }
 
 @test_util.tags.AnalysisSystemTest
 class IntervalDSASystemTestsEqClasses extends SystemTests {
-  runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig(TD, eqClasses = true))))
-  runTests("incorrect", TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSConfig(TD, eqClasses = true))))
+  runTests(
+    "correct",
+    TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig(TD, eqClasses = true)))
+  )
+  runTests(
+    "incorrect",
+    TestConfig(
+      useBAPFrontend = false,
+      expectVerify = false,
+      simplify = true,
+      dsa = Some(DSConfig(TD, eqClasses = true))
+    )
+  )
 }
 
 @test_util.tags.DisabledTest
 class MemoryTransformSystemTests extends SystemTests {
   runTests(
     "correct",
-    TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSConfig()), memoryTransform = true)
+    TestConfig(
+      useBAPFrontend = false,
+      expectVerify = false,
+      simplify = true,
+      dsa = Some(DSConfig()),
+      memoryTransform = true
+    )
   )
 
   runTests(

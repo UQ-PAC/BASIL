@@ -42,7 +42,6 @@ object IntervalDSATestData {
     programToContext(program, Set.empty)
   }
 
-
   def recursionWithIndirection: IRContext = {
     val program =
       prog(
@@ -62,7 +61,6 @@ object IntervalDSATestData {
       )
     programToContext(program, Set.empty)
   }
-
 
   def mutualRecursion: IRContext = {
     val program = prog(
@@ -96,12 +94,14 @@ object IntervalDSATestData {
     val globals = Set(x, y, z, k)
     val program =
       prog(
-        proc("main",
+        proc(
+          "main",
           block("entry", goto("a", "b")),
           block("a", LocalAssign(R0, xAddress, Some("01")), goto("c")),
           block("b", LocalAssign(R0, yAddress, Some("02")), goto("c")),
-          block("c", MemoryStore(mem,  zAddress, R0, LittleEndian, 64, Some("03")), ret)
-        ))
+          block("c", MemoryStore(mem, zAddress, R0, LittleEndian, 64, Some("03")), ret)
+        )
+      )
 
     programToContext(program, globals)
   }
@@ -110,20 +110,23 @@ object IntervalDSATestData {
     val globals = Set(x, y, z, k)
     val program =
       prog(
-        proc("main",
+        proc(
+          "main",
           block("entry", goto("a", "b")),
           block("a", LocalAssign(R0, xAddress, Some("01")), goto("c")),
           block("b", LocalAssign(R0, yAddress, Some("02")), goto("c")),
-          block("c",
-            MemoryStore(mem,  zAddress, R0, LittleEndian, 64, Some("03")),
+          block(
+            "c",
+            MemoryStore(mem, zAddress, R0, LittleEndian, 64, Some("03")),
             MemoryLoad(R0, mem, zAddress, LittleEndian, 64, Some("04")),
             MemoryStore(mem, kAddress, BinaryExpr(BVADD, R0, eight), LittleEndian, 64, Some("05")),
-            ret)
-        ))
+            ret
+          )
+        )
+      )
     programToContext(program, globals)
   }
 }
-
 
 def runAnalysis(program: Program): StaticAnalysisContext = {
   cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
@@ -136,10 +139,10 @@ def runAnalysis(program: Program): StaticAnalysisContext = {
 }
 
 def programToContext(
-                      program: Program,
-                      globals: Set[SpecGlobal] = Set.empty,
-                      globalOffsets: Map[BigInt, BigInt] = Map.empty
-                    ): IRContext = {
+  program: Program,
+  globals: Set[SpecGlobal] = Set.empty,
+  globalOffsets: Map[BigInt, BigInt] = Map.empty
+): IRContext = {
   cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
   transforms.addReturnBlocks(program)
   cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
@@ -189,7 +192,6 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     )
   }
 
-
   test("recursion") {
     val result = runTestPrg(IntervalDSATestData.recursion)
     val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
@@ -234,7 +236,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("global branch split globals") {
-    val result = runTestPrg(IntervalDSATestData.globalBranch, DSConfig(TD, true, true) )
+    val result = runTestPrg(IntervalDSATestData.globalBranch, DSConfig(TD, true, true))
     val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
     val globals = globalsToLiteral(result.ir)
     val z = dsg.exprToCells(globals("z")).map(dsg.find).head
@@ -250,7 +252,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("global branch eq classes") {
-    val result = runTestPrg(IntervalDSATestData.globalBranch, DSConfig(TD, eqClasses = true) )
+    val result = runTestPrg(IntervalDSATestData.globalBranch, DSConfig(TD, eqClasses = true))
     val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
     val globals = globalsToLiteral(result.ir)
     val z = dsg.exprToCells(globals("z")).map(dsg.find).head
@@ -271,7 +273,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("global branch Indirect Use eq classes") {
-    val result = runTestPrg(IntervalDSATestData.globalBranchIndirectUse, DSConfig(TD, eqClasses = true) )
+    val result = runTestPrg(IntervalDSATestData.globalBranchIndirectUse, DSConfig(TD, eqClasses = true))
     val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
     val globals = globalsToLiteral(result.ir)
     val z = dsg.exprToCells(globals("z")).map(dsg.find).head
@@ -287,7 +289,6 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(x.forall(c => !c.equiv(y8)))
     assert(x8.equiv(y8))
   }
-
 
   test("global branch split globals and eq classes") {
     val result = runTestPrg(IntervalDSATestData.globalBranch, DSConfig(TD, true, true, true))
@@ -450,7 +451,6 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
         )
       )
 
-
     val context = programToContext(program, Set.empty, Map.empty)
     val malloc = context.program.nameToProcedure("malloc")
     malloc.isExternal = Some(true)
@@ -504,7 +504,6 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(!dsg.exprToCells(add_two).head.node.isCollapsed)
   }
 
-
   test("http_parse_basic") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
     val res = runTest(path, Some("http_parse_basic"))
@@ -516,29 +515,42 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(!IntervalDSA.checksGlobalsMaintained(dsg))
   }
 
-
   test("cntlm local globals") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
     val res = runTest(path, None, DSConfig(Local))
 
-    val stackCollapsed = Set("main", "md5_process_block", "md4_process_block", "gl_des_is_weak_key",
-      "tunnel", "direct_request", "forward_request", "tunnel_add", "magic_auth_detect")
-    val globalCollapsed = Set("to_base64", "printmem", "gl_des_ecb_crypt",
-      "from_base64", "des_key_schedule", "scanmem")
+    val stackCollapsed = Set(
+      "main",
+      "md5_process_block",
+      "md4_process_block",
+      "gl_des_is_weak_key",
+      "tunnel",
+      "direct_request",
+      "forward_request",
+      "tunnel_add",
+      "magic_auth_detect"
+    )
+    val globalCollapsed = Set("to_base64", "printmem", "gl_des_ecb_crypt", "from_base64", "des_key_schedule", "scanmem")
     val locals = res.dsa.get.local
     assert(locals.values.forall(_.glIntervals.size == 1))
 
-    assert(locals.values.filterNot(g => stackCollapsed.contains(g.proc.procName)).
-      forall(IntervalDSA.checksStackMaintained))
+    assert(
+      locals.values.filterNot(g => stackCollapsed.contains(g.proc.procName)).forall(IntervalDSA.checksStackMaintained)
+    )
 
-    assert(locals.values.filterNot(g => globalCollapsed.contains(g.proc.procName)).
-      forall(IntervalDSA.checksGlobalsMaintained))
+    assert(
+      locals.values
+        .filterNot(g => globalCollapsed.contains(g.proc.procName))
+        .forall(IntervalDSA.checksGlobalsMaintained)
+    )
 
-    assert(!locals.values.filter(g => stackCollapsed.contains(g.proc.procName)).
-      exists(IntervalDSA.checksStackMaintained))
+    assert(
+      !locals.values.filter(g => stackCollapsed.contains(g.proc.procName)).exists(IntervalDSA.checksStackMaintained)
+    )
 
-    assert(!locals.values.filter(g => globalCollapsed.contains(g.proc.procName)).
-      exists(IntervalDSA.checksGlobalsMaintained))
+    assert(
+      !locals.values.filter(g => globalCollapsed.contains(g.proc.procName)).exists(IntervalDSA.checksGlobalsMaintained)
+    )
   }
 
   test("cntlm split globals") {
@@ -562,7 +574,6 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(!IntervalDSA.checksStackMaintained(dsg))
     assert(!IntervalDSA.checksGlobalsMaintained(dsg))
   }
-
 
   test("hmac_md5") {
     val path = "examples/cntlm-noduk/cntlm-noduk"

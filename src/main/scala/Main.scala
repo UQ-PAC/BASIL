@@ -213,17 +213,16 @@ object Main {
       doc = "Disable producing irreducible loops when --analyse is passed (does nothing without --analyse)"
     )
     noIrreducibleLoops: Flag,
-    @arg(
-      name = "dsa",
-      doc =
-        "Perform Data Structure Analysis (requires --simplify flag) (pre|local|bu|td)"
-    )
+    @arg(name = "dsa", doc = "Perform Data Structure Analysis (requires --simplify flag) (pre|local|bu|td)")
     dsaType: Option[String],
     @arg(name = "dsa-checks", doc = "Perform additional dsa checks (requires --dsa (local|bu|td)")
     dsaChecks: Flag,
     @arg(name = "split-globals", doc = "split the globals for dsa (requires --dsa (pre|local|bu|td)")
     dsaSplitGlobals: Flag,
-    @arg(name = "eq-cells", doc = "allow cells from same node to be merged without collapsing (requires --dsa (local|bu|td)")
+    @arg(
+      name = "eq-cells",
+      doc = "allow cells from same node to be merged without collapsing (requires --dsa (local|bu|td)"
+    )
     dsaEqCells: Flag,
     @arg(name = "dsa-assert", doc = "insert assertions to check globals offset to top fall within global region bounds")
     dsaAssert: Flag,
@@ -308,13 +307,9 @@ object Main {
         case Some(_) =>
           throw new IllegalArgumentException("Illegal option to dsa, allowed are: (pre|local|bu|td)")
 
-      Some(DSConfig(
-        phase,
-        conf.dsaSplitGlobals.value,
-        conf.dsaAssert.value,
-        conf.dsaEqCells.value,
-        conf.dsaChecks.value
-      ))
+      Some(
+        DSConfig(phase, conf.dsaSplitGlobals.value, conf.dsaAssert.value, conf.dsaEqCells.value, conf.dsaChecks.value)
+      )
     } else {
       None
     }
