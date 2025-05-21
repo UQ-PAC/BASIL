@@ -202,6 +202,8 @@ object Main {
     dsaSplitGlobals: Flag,
     @arg(name = "eq-cells", doc = "allow cells from same node to be merged without collapsing (requires --dsa (local|bu|td)")
     dsaEqCells: Flag,
+    @arg(name = "dsa-assert", doc = "insert assertions to check globals offset to top fall within global region bounds")
+    dsaAssert: Flag,
     @arg(name = "memory-transform", doc = "Transform memory access to region accesses")
     memoryTransform: Flag,
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
@@ -286,7 +288,8 @@ object Main {
       Some(DSConfig(
         phase,
         conf.dsaSplitGlobals.value,
-        !conf.dsaEqCells.value,
+        conf.dsaAssert.value,
+        conf.dsaEqCells.value,
         conf.dsaChecks.value
       ))
     } else {
