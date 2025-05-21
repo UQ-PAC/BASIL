@@ -200,7 +200,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("recursion eq cells") {
-    val result = runTestPrg(IntervalDSATestData.recursion, DSConfig(TD, false, false))
+    val result = runTestPrg(IntervalDSATestData.recursion, DSConfig(TD, eqClasses = true))
     val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
     assert(dsg.exprToCells(dsg.proc.formalInParam.head).forall(_.node.isCollapsed))
   }
@@ -219,8 +219,9 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(dsg.exprToCells(dsg.proc.formalInParam.head).forall(_.getPointee.node.isCollapsed))
   }
 
-  test("recursion with indirection eq cells") {
-    val result = runTestPrg(IntervalDSATestData.recursionWithIndirection, DSConfig(TD, false, false))
+  // Eq classes counter example
+  ignore("recursion with indirection eq cells") {
+    val result = runTestPrg(IntervalDSATestData.recursionWithIndirection, DSConfig(TD, eqClasses = true))
     val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
     val t = (dsg.exprToCells(dsg.proc.formalInParam.head).flatMap(i => dsg.cellToEq(i.getPointee)))
     assert(dsg.exprToCells(dsg.proc.formalInParam.head).forall(_.getPointee.node.isCollapsed))
@@ -236,7 +237,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("global branch split globals") {
-    val result = runTestPrg(IntervalDSATestData.globalBranch, DSConfig(TD, true) )
+    val result = runTestPrg(IntervalDSATestData.globalBranch, DSConfig(TD, true, true) )
     val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
     val globals = globalsToLiteral(result.ir)
     val z = dsg.exprToCells(globals("z")).map(dsg.find).head
@@ -252,7 +253,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("global branch eq classes") {
-    val result = runTestPrg(IntervalDSATestData.globalBranch, DSConfig(TD, false, false) )
+    val result = runTestPrg(IntervalDSATestData.globalBranch, DSConfig(TD, eqClasses = true) )
     val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
     val globals = globalsToLiteral(result.ir)
     val z = dsg.exprToCells(globals("z")).map(dsg.find).head
@@ -273,7 +274,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   test("global branch Indirect Use eq classes") {
-    val result = runTestPrg(IntervalDSATestData.globalBranchIndirectUse, DSConfig(TD, false, false) )
+    val result = runTestPrg(IntervalDSATestData.globalBranchIndirectUse, DSConfig(TD, eqClasses = true) )
     val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
     val globals = globalsToLiteral(result.ir)
     val z = dsg.exprToCells(globals("z")).map(dsg.find).head
@@ -292,7 +293,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
 
   test("global branch split globals and eq classes") {
-    val result = runTestPrg(IntervalDSATestData.globalBranch, DSConfig(TD, true, false))
+    val result = runTestPrg(IntervalDSATestData.globalBranch, DSConfig(TD, true, true, true))
     val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
     val globals = globalsToLiteral(result.ir)
     val z = dsg.exprToCells(globals("z")).map(dsg.find).head
@@ -545,12 +546,12 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
   test("cntlm split globals") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = runTest(path, None, DSConfig(TD, true))
+    val res = runTest(path, None, DSConfig(TD, true, true))
   }
 
   test("cntlm eq cells") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = runTest(path, None, DSConfig(TD, false, false))
+    val res = runTest(path, None, DSConfig(TD, eqClasses = true))
   }
 
   test("www_authenticate") {

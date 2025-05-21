@@ -600,14 +600,14 @@ class IntervalDSASystemTests extends SystemTests {
 
 @test_util.tags.AnalysisSystemTest
 class IntervalDSASystemTestsSplitGlobals extends SystemTests {
-  runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig(TD, true))))
-  runTests("incorrect", TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSConfig(TD, true))))
+  runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig(TD, true, true))))
+  runTests("incorrect", TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSConfig(TD, true, true))))
 }
 
 @test_util.tags.AnalysisSystemTest
 class IntervalDSASystemTestsEqClasses extends SystemTests {
-  runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig(TD, false, false))))
-  runTests("incorrect", TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSConfig(TD, false, false))))
+  runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig(TD, eqClasses = true))))
+  runTests("incorrect", TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSConfig(TD, eqClasses = true))))
 }
 
 @test_util.tags.DisabledTest
