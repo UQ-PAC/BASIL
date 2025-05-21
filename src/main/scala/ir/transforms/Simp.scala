@@ -1070,8 +1070,9 @@ def validatedSimplifyPipeline(p: Program) = {
   }
 
   def simplifyGuards(prog: Program) = {
-    val gvis = GuardVisitor()
-    visit_prog(gvis, prog)
+    // needs code motion inv
+    // val gvis = GuardVisitor()
+    // visit_prog(gvis, prog)
     for (p <- prog.procedures) {
       AssumeConditionSimplifications(p)
     }
@@ -1121,6 +1122,7 @@ def validatedSimplifyPipeline(p: Program) = {
 
   }
 
+  transformAndValidate(p => (), "NOP")(p)
   combineBlocks(p)
   applyRPO(p)
   dsa(p)

@@ -192,6 +192,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
     val ty = visitType(ctx.`type`())
     val name = visitIdent(ctx.lvar)
     varMap += (name -> ty)
+    val lvar = LocalVar(name, ty)
 
     val (expr, load) = visitExpr(ctx.expr)
     if (expr.isDefined) {

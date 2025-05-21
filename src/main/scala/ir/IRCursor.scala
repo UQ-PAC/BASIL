@@ -299,6 +299,11 @@ def dotBlockGraph(prog: Program): String = {
   )
 }
 
+def dotFlowGraph(blocks: Iterable[Block], orphaned: Set[Block]): String = {
+  val labels: Map[CFGPosition, String] = Map()
+  toDot[Block](blocks.toSet, IntraProcBlockIRCursor, labels, orphaned)
+}
+
 def dotBlockGraph(blocks: Iterable[Block], orphaned: Set[Block]): String = {
   val printer = translating.BasilIRPrettyPrinter()
   val labels: Map[CFGPosition, String] = (blocks.collect { case b: Block =>

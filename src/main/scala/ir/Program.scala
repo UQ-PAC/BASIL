@@ -523,6 +523,10 @@ class Block private (
     this(label, address, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty)
   }
 
+  def forwardIteratorFrom = {
+    ILForwardIterator(Seq(this), IntraProcIRCursor)
+  }
+
   def isReturn: Boolean = parent.returnBlock.contains(this)
   def isEntry: Boolean = parent.entryBlock.contains(this)
 
@@ -575,7 +579,7 @@ class Block private (
 
   override def toString: String = {
     val statementsString = statements.map(_.toString).mkString("\n")
-    s"Block $label with $statementsString\n$jump"
+    s"block $label"
   }
 
   /** @return
