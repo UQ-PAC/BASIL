@@ -19,7 +19,9 @@ def mapMerge[K, V](a: Map[K, V], b: Map[K, V], f: (V, V) => V): Map[K, V] = {
   merged
 }
 
-def getSymbolicValues[T <: Offsets](ctx: IRContext, p: Procedure, globals: Seq[DSInterval])(using valSetDomain: SymValSetDomain[T]): SymValues[T] = {
+def getSymbolicValues[T <: Offsets](ctx: IRContext, p: Procedure, globals: Seq[DSInterval])(using
+  valSetDomain: SymValSetDomain[T]
+): SymValues[T] = {
   Logger.info(s"Generating Symbolic Values for ${p.name}")
   val symValuesDomain = SymValuesDomain(i => isGlobal(i, ctx), globals)
   val symValSolver = worklistSolver[SymValues[T], symValuesDomain.type](symValuesDomain)
@@ -100,7 +102,12 @@ object DSAVarOrdering extends Ordering[LocalVar] {
   }
 }
 
-def toOffsetMove[T <: Offsets](op: BinOp, arg: BitVecLiteral | T, domain: OffsetDomain[T], transform: T => T): T => T = {
+def toOffsetMove[T <: Offsets](
+  op: BinOp,
+  arg: BitVecLiteral | T,
+  domain: OffsetDomain[T],
+  transform: T => T
+): T => T = {
   val value = arg match {
     case bv: BitVecLiteral => domain.init(bv2SignedInt(bv).toInt)
     case off: T => off
@@ -294,28 +301,29 @@ object SymValues {
     s.state.map((lvar, valSet) => s"$lvar: $valSet").mkString("\n")
   }
 
-  def literalsToSymValSet[T <: Offsets](literals: Set[Int], isGlobal: Int => Boolean, globals: Seq[DSInterval], domain: SymValSetDomain[T]) = {
-    literals.foldLeft(domain.init(Block(""))) {
-      (valSet, offset) =>
-        if isGlobal(offset) then {
-          val (interval, off) = getGlobal(globals, offset).get
-          domain.join(valSet, domain.init(Global(interval), off))
-        } else domain.join(valSet, domain.init(Constant, offset))
+  def literalsToSymValSet[T <: Offsets](
+    literals: Set[Int],
+    isGlobal: Int => Boolean,
+    globals: Seq[DSInterval],
+    domain: SymValSetDomain[T]
+  ) = {
+    literals.foldLeft(domain.init(Block(""))) { (valSet, offset) =>
+      if isGlobal(offset) then {
+        val (interval, off) = getGlobal(globals, offset).get
+        domain.join(valSet, domain.init(Global(interval), off))
+      } else domain.join(valSet, domain.init(Constant, offset))
     }
   }
 
   @tailrec
-  final def exprToSymValSet[T <: Offsets]
-  (
+  final def exprToSymValSet[T <: Offsets](
     symValues: SymValues[T],
     isGlobal: Int => Boolean, // decides whether an integer represents a global address, (useful when globals aren't split)
-    globals: Seq[DSInterval]) // Intervals of disjoint global regions (single interval to represent all globals)
-  (
-    expr: Expr,
-    transform: (T => T) = identity[T],
-    replace: LocalVar => LocalVar = identity,
-    block: Block = Block("")
-  )(using symValSetDomain: SymValSetDomain[T]): SymValSet[T] = {
+    globals: Seq[DSInterval]
+  ) // Intervals of disjoint global regions (single interval to represent all globals)
+  (expr: Expr, transform: (T => T) = identity[T], replace: LocalVar => LocalVar = identity, block: Block = Block(""))(
+    using symValSetDomain: SymValSetDomain[T]
+  ): SymValSet[T] = {
     val oDomain = symValSetDomain.offsetDomain
     expr match
       case literal @ BitVecLiteral(value, size) =>
@@ -324,7 +332,8 @@ object SymValues {
       case literal @ IntLiteral(value) =>
         val updated = transform(oDomain.init(value.toInt))
         literalsToSymValSet(updated.toOffsets, isGlobal, globals, symValSetDomain)
-      case Extract(end, start, body) => exprToSymValSet(symValues, isGlobal, globals)(body) // todo incorrectly assuming value is preserved
+      case Extract(end, start, body) =>
+        exprToSymValSet(symValues, isGlobal, globals)(body) // todo incorrectly assuming value is preserved
       case ZeroExtend(extension, body) => exprToSymValSet(symValues, isGlobal, globals)(body)
       case binExp @ BinaryExpr(BVADD | BVSUB, arg1, arg2: BitVecLiteral) =>
         if isGlobal(arg2.value.toInt) then {
@@ -335,15 +344,20 @@ object SymValues {
           exprToSymValSet(symValues, isGlobal, globals)(arg1, oPlus)
         }
       case binExp @ BinaryExpr(BVADD, arg1: BitVecLiteral, arg2: Expr) if !isGlobal(arg1.value.toInt) =>
-          val oPlus = toOffsetMove(binExp.op, arg1, oDomain, transform)
-          exprToSymValSet(symValues, isGlobal, globals)(arg2, oPlus)
+        val oPlus = toOffsetMove(binExp.op, arg1, oDomain, transform)
+        exprToSymValSet(symValues, isGlobal, globals)(arg2, oPlus)
       case binExp @ BinaryExpr(BVADD | BVSUB, arg1, arg2: Expr)
           if arg2.variables.size == 1 && symValues.state
             .getOrElse(arg2.variables.head.asInstanceOf[LocalVar], symValSetDomain.bot)
             .state
             .keySet == Set(Constant) =>
         val oPlus =
-          toOffsetMove(binExp.op, symValues.state(arg2.variables.head.asInstanceOf[LocalVar]).state(Constant), oDomain, transform)
+          toOffsetMove(
+            binExp.op,
+            symValues.state(arg2.variables.head.asInstanceOf[LocalVar]).state(Constant),
+            oDomain,
+            transform
+          )
         exprToSymValSet(symValues, isGlobal, globals)(arg1, oPlus)
       case variable: LocalVar =>
         symValSetDomain.transform(symValues.state.getOrElse(replace(variable), symValSetDomain.bot), transform)
@@ -355,16 +369,16 @@ object SymValues {
           .flatMap(_.state)
           .map((base, _) => (base, oDomain.top))
           .toMap
-        
+
         updated = updated ++ exprToConstants(e)
           .map(litToInt)
           .filter(isGlobal)
-          .map(lit => getGlobal(globals,lit))
+          .map(lit => getGlobal(globals, lit))
           .filter(_.isDefined)
           .map(_.get)
           .map((interval, _) => (Global(interval), oDomain.top))
           .toMap
-        
+
         SymValSet(updated)
       case unin: UninterpretedFunction => SymValSet(Map(Constant -> oDomain.top))
       case _ => ???
@@ -397,7 +411,10 @@ def exprToConstants(expr: Expr): Set[Literal] = {
   }
 }
 
-class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T])(isGlobal: Int => Boolean, globals: Seq[DSInterval]) extends AbstractDomain[SymValues[T]] {
+class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T])(
+  isGlobal: Int => Boolean,
+  globals: Seq[DSInterval]
+) extends AbstractDomain[SymValues[T]] {
 
   private val stackPointer = LocalVar("R31_in", BitVecType(64))
   private val linkRegister = LocalVar("R30_in", BitVecType(64)) // Register("R30", 64)
@@ -476,7 +493,8 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T])(i
             (
               l,
               inParams.collectFirst {
-                case (in, act) if in.name.take(3) == l.name.take(3) => SymValues.exprToSymValSet(a, isGlobal, globals)(act)
+                case (in, act) if in.name.take(3) == l.name.take(3) =>
+                  SymValues.exprToSymValSet(a, isGlobal, globals)(act)
               }.get
             )
           )

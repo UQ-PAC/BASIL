@@ -27,7 +27,7 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
       case Some(value) =>
         s"Stack_${index.interval.move(i => i - index.node.bases(Stack(value)).head)}".replace("-", "n")
       case None =>
-        val base = index.node.bases.keys.collectFirst{case g: Global => g}.get
+        val base = index.node.bases.keys.collectFirst { case g: Global => g }.get
         s"Global_${index.interval.move(i => i - index.node.bases(base).head + base.interval.start.get)}"
   }
 
@@ -42,8 +42,8 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
             val index = indices.head
             val flag = index.node.flags
             val value = index.getPointee
-            if isGlobal(flag) && index.node.bases.keys.count(_.isInstanceOf[Global]) == 1 && !index.node.isCollapsed then
-              ChangeTo(List(LocalAssign(load.lhs, Register(scalarName(index), load.size), load.label)))
+            if isGlobal(flag) && index.node.bases.keys.count(_.isInstanceOf[Global]) == 1 && !index.node.isCollapsed
+            then ChangeTo(List(LocalAssign(load.lhs, Register(scalarName(index), load.size), load.label)))
             else if isLocal(flag) && !index.node.isCollapsed && !flag.escapes && index.node.bases.contains(Stack(proc))
             then
               ChangeTo(
@@ -71,8 +71,8 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
             val index = indices.head
             val flag = index.node.flags
             val content = index.getPointee
-            if isGlobal(flag) && index.node.bases.keys.count(_.isInstanceOf[Global]) == 1 && !index.node.isCollapsed then
-              ChangeTo(List(MemoryAssign(Register(scalarName(index), store.size), store.value, store.label)))
+            if isGlobal(flag) && index.node.bases.keys.count(_.isInstanceOf[Global]) == 1 && !index.node.isCollapsed
+            then ChangeTo(List(MemoryAssign(Register(scalarName(index), store.size), store.value, store.label)))
             else if isLocal(flag) && !index.node.isCollapsed && !flag.escapes && index.node.bases.contains(Stack(proc))
             then
               ChangeTo(

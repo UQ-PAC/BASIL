@@ -39,7 +39,6 @@ case class StaticAnalysisConfig(
   irreducibleLoops: Boolean = true
 )
 
-
 case class DSConfig(
   phase: DSAPhase = DSAPhase.TD,
   splitGlobals: Boolean = false,
@@ -47,8 +46,6 @@ case class DSConfig(
   eqClasses: Boolean = false,
   checks: Boolean = true
 )
-
-
 
 enum BoogieMemoryAccessMode {
   case SuccessiveStoreSelect, LambdaStoreSelect
