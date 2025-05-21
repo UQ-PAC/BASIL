@@ -18,7 +18,7 @@ import ir.{
 import util.ConstGenLogger
 
 sealed trait Constraint {
-  def source: CFGPosition
+  def source: Statement
   val label: String
   def eval(evaluator: Expr => Any = identity): String
 }
@@ -44,8 +44,8 @@ sealed trait BinaryConstraint extends Constraint {
     s"(${arg1.eval(evaluator)} <==> ${arg2.eval(evaluator)}"
 }
 
-case class AssignmentConstraint(pos: CFGPosition, ar1: Expr, ar2: Expr) extends BinaryConstraint {
-  override def source: CFGPosition = pos
+case class AssignmentConstraint(pos: Statement, ar1: Expr, ar2: Expr) extends BinaryConstraint {
+  override def source: Statement = pos
   override val label: String = labelToPC(Some(pos.toString))
   override val arg1: ConstraintArg = ConstraintArg(ar1)
   override val arg2: ConstraintArg = ConstraintArg(ar2)
