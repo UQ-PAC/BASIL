@@ -134,9 +134,9 @@ object IRLoading {
       throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
     }
 
-    var specification = IRLoading.loadSpecification(q.specFile, program, globals)
+    val specification = IRLoading.loadSpecification(q.specFile, program, globals)
 
-    specification = RunUtils.applyPCTracking(q, program, specification)
+    RunUtils.applyPCTracking(q, program, specification)
 
     IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program)
   }
@@ -1137,7 +1137,7 @@ object RunUtils {
     )
   }
 
-  def applyPCTracking(q: ILLoadingConfig, program: Program, spec: Specification) = {
+  def applyPCTracking(q: ILLoadingConfig, program: Program, spec: Specification): Unit = {
 
     // convenience variable to hold all procedures with defined program counters.
     val proceduresWithPCs = program.procedures.collect {
@@ -1149,6 +1149,10 @@ object RunUtils {
         program.collect {
           case x: Statement if x.label == Some("pc-tracking") =>
             x.parent.statements.remove(x)
+
+          // note: direct jumps are from aslp and so do not have the pc-tracking tag
+          case x @ LocalAssign(Register("_PC", 64), _, _) =>
+            x.parent.statements.remove(x)
         }
         Logger.info(s"[!] Removed all PC-related statements")
 
@@ -1159,32 +1163,20 @@ object RunUtils {
         }
       case PCTrackingOption.Assert =>
         Logger.info(s"[!] Inserting PC-tracking requires/ensures")
+
+        proceduresWithPCs.foreach((proc, addr) => {
+          val pcVar = Register("_PC", 64)
+          val r30Var = Register("R30", 64)
+          val addrVar = BitVecLiteral(addr, 64)
+          val pcRequires = BinaryExpr(ir.EQ, pcVar, addrVar)
+          val pcEnsures = BinaryExpr(ir.EQ, pcVar, OldExpr(r30Var))
+
+          val name = proc.procName
+          proc.requiresExpr = pcRequires +: proc.requiresExpr
+          proc.ensuresExpr = pcEnsures +: proc.ensuresExpr
+          (name -> SubroutineSpec(name, requires = List(), ensures = List()))
+        })
     }
-
-    // extra requires/ensures clauses for maintaining PC, to be merged
-    // with the original spec clauses.
-    val pcSubSpecs = proceduresWithPCs
-      .map((proc, addr) => {
-        // XXX: this does NOT work with parameter form! because the variables are changed
-        val pcVar = Register("_PC", (64))
-        val r30Var = Register("R30", (64))
-        val addrVar = BitVecLiteral(addr, 64)
-        val pcRequires = BinaryExpr(ir.EQ, pcVar, addrVar)
-        val pcEnsures = BinaryExpr(ir.EQ, pcVar, OldExpr(r30Var))
-
-        val name = proc.procName
-        proc.requiresExpr = pcRequires +: proc.requiresExpr
-        proc.ensuresExpr = pcEnsures +: proc.ensuresExpr
-        (name -> SubroutineSpec(name, requires = List(), ensures = List()))
-      })
-      .toMap
-
-    val subSpecs = spec.subroutines.map(x => x.name -> x).toMap
-
-    val newSubroutineSpecs = util.functional.unionWith(pcSubSpecs, subSpecs, _ merge _)
-
-    // spec.copy(subroutines = newSubroutineSpecs.values.toList)
-    spec
   }
 }
 

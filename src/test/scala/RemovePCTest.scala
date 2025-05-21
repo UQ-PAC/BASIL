@@ -30,6 +30,7 @@ class RemovePCTest extends AnyFunSuite with CaptureOutput {
   test("has no pc by default") {
     var p = load("cjump", "gcc", false).ir.program
     assertResult(false) {
+      // println(p.mainProcedure.blocks.toList)
       p.procedures.forall(allVarsPos(_).contains(Register("_PC", 64)))
     }
 
@@ -51,7 +52,7 @@ class RemovePCTest extends AnyFunSuite with CaptureOutput {
             n
           }
         }
-        .toSet
+        .toList
         .size
     }
 
