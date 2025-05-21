@@ -31,7 +31,6 @@ class IntervalGraph(
   var sva: SymValues[OSet],
   val constraints: Set[Constraint],
   val glIntervals: Seq[DSInterval],
-  val insertAsserts: Boolean,
   val eqCells: Boolean,
   val nodeBuilder: Option[() => Map[SymBase, IntervalNode]]
 ) {
@@ -276,7 +275,6 @@ class IntervalGraph(
       sva,
       constraints,
       glIntervals,
-      insertAsserts,
       eqCells,
       Some(() => Map[SymBase, IntervalNode]())
     )
@@ -382,23 +380,6 @@ class IntervalGraph(
       case cons: MemoryAccessConstraint[_] =>
         DSALogger.debug(s"Processing constraint $cons")
         val indices = constraintArgToCells(cons.arg1, true, ignoreContents = true)
-        val pos: Statement = cons.source
-        val collapsedGlobals =
-          indices.filter(_.node.isCollapsed).flatMap(_.node.bases.keys.collect { case g: Global => g })
-        if collapsedGlobals.nonEmpty && insertAsserts then {
-          val assertExpr = collapsedGlobals
-            .map(g =>
-              BinaryExpr(
-                BoolAND,
-                BinaryExpr(BVSGE, cons.arg1.value, BitVecLiteral(g.interval.start.get, 64)),
-                BinaryExpr(BVSLT, cons.arg1.value, BitVecLiteral(g.interval.end.get, 64))
-              )
-            )
-            .reduce((e1, e2) => BinaryExpr(BoolOR, e1, e2))
-          val assertSt = Assert(assertExpr)
-          pos.parent.statements.insertBefore(pos, assertSt)
-        }
-
         indices.foreach(cell => cell.node.add(cell.interval.growTo(cons.size)))
         val pointees = constraintArgToCells(cons.arg1, true)
 
@@ -1023,6 +1004,15 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
         DSATimer.checkPoint("Finished DSA Invariant Check")
     }
 
+    if config.globalAsserts then {
+      val current = config.phase match {
+        case DSAPhase.Pre => Map.empty
+        case DSAPhase.Local => dsaContext.local
+        case DSAPhase.BU => dsaContext.bottomUp
+        case DSAPhase.TD => dsaContext.topDown
+      }
+      current.values.foreach(IntervalDSA.insertGlobalAssertion)
+    }
     dsaContext
   }
 
@@ -1304,7 +1294,7 @@ object IntervalDSA {
     insertAsserts: Boolean,
     eqCells: Boolean
   ): IntervalGraph = {
-    val graph = IntervalGraph(proc, Local, context, symValues, cons, globals, insertAsserts, eqCells, None)
+    val graph = IntervalGraph(proc, Local, context, symValues, cons, globals, eqCells, None)
     graph.localPhase()
     graph
   }
@@ -1391,6 +1381,31 @@ object IntervalDSA {
         tds(proc).contextTransfer(TD, tds)
         visited += proc
     tds
+  }
+
+  def insertGlobalAssertion(graph: IntervalGraph): Unit = {
+    graph.constraints.foreach {
+      case cons: MemoryAccessConstraint[_] =>
+        val pos = cons.source
+        val indices = graph.constraintArgToCells(cons.arg1, true, ignoreContents = true)
+        val collapsedGlobals =
+          indices.filter(_.node.isCollapsed).flatMap(_.node.bases.keys.collect { case g: Global => g })
+        if collapsedGlobals.nonEmpty then {
+          val assertExpr = collapsedGlobals
+            .map(g =>
+              BinaryExpr(
+                BoolAND,
+                BinaryExpr(BVSGE, cons.arg1.value, BitVecLiteral(g.interval.start.get, 64)),
+                BinaryExpr(BVSLT, cons.arg1.value, BitVecLiteral(g.interval.end.get, 64))
+              )
+            )
+            .reduce((e1, e2) => BinaryExpr(BoolOR, e1, e2))
+          val assertSt = Assert(assertExpr)
+          pos.parent.statements.insertBefore(pos, assertSt)
+        }
+
+      case _ => // ignore
+    }
   }
 }
 
