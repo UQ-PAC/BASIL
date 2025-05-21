@@ -1166,14 +1166,16 @@ object RunUtils {
     val pcSubSpecs = proceduresWithPCs
       .map((proc, addr) => {
         // XXX: this does NOT work with parameter form! because the variables are changed
-        val pcVar = BVariable("_PC", BitVecBType(64), Scope.Global)
-        val r30Var = BVariable("R30", BitVecBType(64), Scope.Global)
-        val addrVar = BitVecBLiteral(addr, 64)
-        val pcRequires = BinaryBExpr(ir.EQ, pcVar, addrVar)
-        val pcEnsures = BinaryBExpr(ir.EQ, pcVar, Old(r30Var))
+        val pcVar = Register("_PC", (64))
+        val r30Var = Register("R30", (64))
+        val addrVar = BitVecLiteral(addr, 64)
+        val pcRequires = BinaryExpr(ir.EQ, pcVar, addrVar)
+        val pcEnsures = BinaryExpr(ir.EQ, pcVar, OldExpr(r30Var))
 
         val name = proc.procName
-        (name -> SubroutineSpec(name, requires = List(pcRequires), ensures = List(pcEnsures)))
+        proc.requiresExpr = pcRequires +: proc.requiresExpr
+        proc.ensuresExpr = pcEnsures +: proc.ensuresExpr
+        (name -> SubroutineSpec(name, requires = List(), ensures = List()))
       })
       .toMap
 
@@ -1181,7 +1183,8 @@ object RunUtils {
 
     val newSubroutineSpecs = util.functional.unionWith(pcSubSpecs, subSpecs, _ merge _)
 
-    spec.copy(subroutines = newSubroutineSpecs.values.toList)
+    // spec.copy(subroutines = newSubroutineSpecs.values.toList)
+    spec
   }
 }
 
