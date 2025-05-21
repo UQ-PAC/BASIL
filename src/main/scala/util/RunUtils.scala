@@ -134,36 +134,9 @@ object IRLoading {
       throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
     }
 
-    val specification = IRLoading.loadSpecification(q.specFile, program, globals)
+    var specification = IRLoading.loadSpecification(q.specFile, program, globals)
 
-    q.pcTracking match {
-      case PCTrackingOption.None =>
-        program.collect {
-          case x: Statement if x.label == Some("pc-tracking") =>
-            x.parent.statements.remove(x)
-        }
-        Logger.info(s"[!] Removed PC-related statements")
-
-      case PCTrackingOption.Keep =>
-        program.collect { case x @ Assert(_, Some("pc-tracking"), _) =>
-          x.parent.statements.remove(x)
-        }
-        Logger.info(s"[!] Removed PC-tracking assertion statements")
-
-      case PCTrackingOption.Assert =>
-        program.procedures.foreach(proc =>
-          proc.address.foreach(addr =>
-            val pcVar = BVariable("_PC", BitVecBType(64), Scope.Global)
-            val r30Var = BVariable("R30", BitVecBType(64), Scope.Global)
-            val addrVar = BitVecBLiteral(addr, 64)
-            val pcRequires = BinaryBExpr(BVEQ, pcVar, addrVar)
-            val pcEnsures = BinaryBExpr(BVEQ, pcVar, Old(r30Var))
-            proc.requires = pcRequires +: proc.requires
-            proc.ensures = pcEnsures +: proc.ensures
-          )
-        )
-        Logger.info(s"[!] Inserted PC-tracking requires/ensures")
-    }
+    specification = RunUtils.applyPCTracking(q, program, specification)
 
     IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program)
   }
@@ -1162,6 +1135,54 @@ object RunUtils {
       topDownDSA = dsa.topDown.toMap,
       regionInjector = regionInjector
     )
+  }
+
+  def applyPCTracking(q: ILLoadingConfig, program: Program, spec: Specification) = {
+
+    // convenience variable to hold all procedures with defined program counters.
+    val proceduresWithPCs = program.procedures.collect {
+      case p if p.address.isDefined => (p, p.address.get)
+    }
+
+    q.pcTracking match {
+      case PCTrackingOption.None =>
+        program.collect {
+          case x: Statement if x.label == Some("pc-tracking") =>
+            x.parent.statements.remove(x)
+        }
+        Logger.info(s"[!] Removed all PC-related statements")
+
+      case PCTrackingOption.Keep =>
+        Logger.info(s"[!] Removing PC-tracking assertion statements, keeping PC assignments")
+        program.collect { case x @ Assert(_, _, Some("pc-tracking")) =>
+          x.parent.statements.remove(x)
+        }
+      case PCTrackingOption.Assert =>
+        Logger.info(s"[!] Inserting PC-tracking requires/ensures")
+    }
+
+    // extra requires/ensures clauses for maintaining PC
+    val pcSubSpecs = proceduresWithPCs
+      .map((proc, addr) => {
+        // XXX: this does NOT work with parameter form! because the variables are changed
+        val pcVar = BVariable("_PC", BitVecBType(64), Scope.Global)
+        val r30Var = BVariable("R30", BitVecBType(64), Scope.Global)
+        val addrVar = BitVecBLiteral(addr, 64)
+        val pcRequires = BinaryBExpr(BVEQ, pcVar, addrVar)
+        val pcEnsures = BinaryBExpr(BVEQ, pcVar, Old(r30Var))
+
+        val name = proc.procName
+        (name -> SubroutineSpec(name, requires = List(pcRequires), ensures = List(pcEnsures)))
+      })
+      .toMap
+
+    println(pcSubSpecs)
+
+    val subSpecs = spec.subroutines.map(x => x.name -> x).toMap
+
+    val newSubroutineSpecs = util.functional.unionWith(pcSubSpecs, subSpecs, (x, y) => x.merge(y))
+
+    spec.copy(subroutines = newSubroutineSpecs.values.toList)
   }
 }
 

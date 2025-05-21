@@ -32,7 +32,7 @@ class PCTrackingTest extends AnyFunSuite with CaptureOutput {
     var p = load("ifbranches", "clang", PCTrackingOption.Keep).ir.program
     assertResult(Nil) {
       val asserts = p.collect {
-        case x : Assert if allVarsPos(x).map(_.name).contains("_PC") =>
+        case x: Assert if allVarsPos(x).map(_.name).contains("_PC") =>
           x
       }
       println(asserts)
@@ -46,7 +46,7 @@ class PCTrackingTest extends AnyFunSuite with CaptureOutput {
     val p = loaded.ir.program
     assertResult(5) {
       val asserts = p.collect {
-        case x : Assert if allVarsPos(x).map(_.name).contains("_PC") =>
+        case x: Assert if allVarsPos(x).map(_.name).contains("_PC") =>
           x
       }
       println(asserts)
@@ -70,7 +70,6 @@ class PCTrackingTest extends AnyFunSuite with CaptureOutput {
     val results = loaded.boogie.map(_.verifyBoogie())
 
     // XXX: test broken until .gts files are updated with fixed PC offsets
-    // XXX: also broken until the requires/ensures are fixed.
     pendingUntilFixed {
       assertResult(List(true)) {
         results.map(_.kind.isVerified)
