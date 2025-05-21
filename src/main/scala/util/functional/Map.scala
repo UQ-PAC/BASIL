@@ -5,6 +5,6 @@ package util.functional
  * If both maps have a value for a key, the two values are merged using the given function.
  */
 def unionWith[K, V](a: Iterable[(K, V)], b: Iterable[(K, V)], f: (V, V) => V): Map[K, V] = {
-  (a.toList ++ b.toList).groupMapReduce(_(0))(_(1))(f)
+  Iterable.concat(a, b).groupMapReduce(_(0))(_(1))(f)
   // https://stackoverflow.com/a/54616613
 }

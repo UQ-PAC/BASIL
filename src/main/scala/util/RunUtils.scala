@@ -1161,7 +1161,8 @@ object RunUtils {
         Logger.info(s"[!] Inserting PC-tracking requires/ensures")
     }
 
-    // extra requires/ensures clauses for maintaining PC
+    // extra requires/ensures clauses for maintaining PC, to be merged
+    // with the original spec clauses.
     val pcSubSpecs = proceduresWithPCs
       .map((proc, addr) => {
         // XXX: this does NOT work with parameter form! because the variables are changed
@@ -1178,7 +1179,7 @@ object RunUtils {
 
     val subSpecs = spec.subroutines.map(x => x.name -> x).toMap
 
-    val newSubroutineSpecs = util.functional.unionWith(pcSubSpecs, subSpecs, (x, y) => x.merge(y))
+    val newSubroutineSpecs = util.functional.unionWith(pcSubSpecs, subSpecs, _ merge _)
 
     spec.copy(subroutines = newSubroutineSpecs.values.toList)
   }
