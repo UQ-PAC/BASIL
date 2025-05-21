@@ -38,6 +38,9 @@ private def assigned(x: Statement): immutable.Set[Variable] = x match {
   * Specifically, this is useful in the case that the IF statment has multiple conditions( and elses) and as such many
   * extra blocks need to be created.
   *
+  * WARNING: TempIf class (very sneakily) inherits from NOP, so it is treated by many visitors as a NOP.
+  *          This includes some IR serialisers, which might serialise NOP to an empty string.
+  *
   * @param cond:
   *   condition
   * @param thenStmts:
@@ -259,7 +262,13 @@ class GTIRBToIR(
         val increment =
           if branchTaken then None
           else
-            Some(LocalAssign(Register("_PC", 64), BinaryExpr(BVADD, Register("_PC", 64), BitVecLiteral(4, 64)), None))
+            Some(
+              LocalAssign(
+                Register("_PC", 64),
+                BinaryExpr(BVADD, Register("_PC", 64), BitVecLiteral(4, 64)),
+                Some("pc-tracking")
+              )
+            )
         increment ++: isnStmts
       }
     }
@@ -337,19 +346,16 @@ class GTIRBToIR(
       throw Exception(s"block ${byteStringToString(blockUUID)} is in multiple functions")
     }
     uuidToBlock += (blockUUID -> block)
+
     val isEntrance = blockUUID == entranceUUID
     if (isEntrance) {
       procedure.entryBlock = block
     }
-    val checkPCStmt: Expr => Statement =
-      if isEntrance
-      then Assume(_, None, None, false)
-      else Assert(_, None, None)
-    block.address match {
-      case Some(addr) =>
-        val assertPC = checkPCStmt(BinaryExpr(BVEQ, Register("_PC", 64), BitVecLiteral(addr, 64)))
-        block.statements.append(assertPC)
-      case _ => ()
+
+    block.address.foreach { case addr =>
+      val pcCorrectExpr = BinaryExpr(BVEQ, Register("_PC", 64), BitVecLiteral(addr, 64))
+      val assertPC = Assert(pcCorrectExpr, Some("pc-tracking"), None)
+      block.statements.append(assertPC)
     }
     block
   }

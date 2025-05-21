@@ -155,7 +155,7 @@ object Main {
     simplify: Flag,
     @arg(
       name = "pc",
-      doc = "EXPERIMENTAL IN DEVELOPMENT: Program counter mode. (options: none | keep | assert) (default: none)"
+      doc = "Program counter mode, supports GTIRB only. (options: none | keep | assert) (default: none)"
     )
     pcTracking: Option[String],
     @arg(

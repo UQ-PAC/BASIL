@@ -136,9 +136,30 @@ object IRLoading {
 
     val specification = IRLoading.loadSpecification(q.specFile, program, globals)
 
-    if (q.pcTracking == PCTrackingOption.None) {
-      visit_prog(transforms.RemovePCStatements(), program)
-      Logger.info(s"[!] Removed PC-related statements")
+    q.pcTracking match {
+      case PCTrackingOption.None =>
+        visit_prog(transforms.RemovePCStatements(), program)
+        Logger.info(s"[!] Removed PC-related statements")
+
+      case PCTrackingOption.Keep =>
+        program.collect { case x @ Assert(_, Some("pc-tracking"), _) =>
+          x.parent.statements.remove(x)
+        }
+        Logger.info(s"[!] Removed PC-tracking assertion statements")
+
+      case PCTrackingOption.Assert =>
+        program.procedures.foreach(proc =>
+          proc.address.foreach(addr =>
+            val pcVar = BVariable("_PC", BitVecBType(64), Scope.Global)
+            val r30Var = BVariable("R30", BitVecBType(64), Scope.Global)
+            val addrVar = BitVecBLiteral(addr, 64)
+            val pcRequires = BinaryBExpr(BVEQ, pcVar, addrVar)
+            val pcEnsures = BinaryBExpr(BVEQ, pcVar, Old(r30Var))
+            proc.requires = pcRequires +: proc.requires
+            proc.ensures = pcEnsures +: proc.ensures
+          )
+        )
+        Logger.info(s"[!] Inserted PC-tracking requires/ensures")
     }
 
     IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program)
