@@ -43,7 +43,8 @@ case class StaticAnalysisConfig(
 case class DSConfig(
   phase: DSAPhase = DSAPhase.TD,
   splitGlobals: Boolean = false,
-  collapseSelfUnify: Boolean = true,
+  globalAsserts: Boolean = false,
+  eqClasses: Boolean = false,
   checks: Boolean = true
 )
 
