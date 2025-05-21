@@ -1176,8 +1176,6 @@ object RunUtils {
       })
       .toMap
 
-    println(pcSubSpecs)
-
     val subSpecs = spec.subroutines.map(x => x.name -> x).toMap
 
     val newSubroutineSpecs = util.functional.unionWith(pcSubSpecs, subSpecs, (x, y) => x.merge(y))
