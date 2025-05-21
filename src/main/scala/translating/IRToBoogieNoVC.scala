@@ -149,7 +149,6 @@ object BoogieTranslator {
     val vvis = FindVars()
     visit_prog(vvis, p)
 
-
     val readOnlySections = p.usedMemory.values.filter(_.readOnly)
     val readOnlyMemory = memoryToConditionCoalesced(readOnlySections)
     val initialSections = p.usedMemory.values.filter(!_.readOnly)
@@ -162,7 +161,6 @@ object BoogieTranslator {
       case proc if p.mainProcedure eq proc => translateProc(initialMemory ++ readOnlyMemory)(proc)
       case proc => translateProc(readOnlyMemory)(proc)
     }
-
 
     val functionOpDefinitions = functionOpToDecl(globalVarDecls ++ procs)
     val decls = globalVarDecls.toList ++ functionOpDefinitions ++ procs

@@ -884,7 +884,7 @@ def removeInvariantOutParameters(
     val proc = ret.parent.parent
     val inParams = proc.formalInParam.toSet
 
-    val specDependencies : Set[Variable] = proc.ensuresExpr.flatMap(_.variables).toSet
+    val specDependencies: Set[Variable] = proc.ensuresExpr.flatMap(_.variables).toSet
 
     val doneAlready = alreadyInlined.getOrElse(proc, Set())
     var doneNow = Set[Variable]()

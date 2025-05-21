@@ -161,7 +161,9 @@ def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
   while (removeDeadInParams(ctx.program)) {}
 
   ctx.program.procedures.foreach(SpecFixer.updateInlineSpec(formalParams.mappingInparam, formalParams.mappingOutparam))
-  ctx.copy(specification = SpecFixer.specToProcForm(ctx.specification, formalParams.mappingInparam, formalParams.mappingOutparam))
+  ctx.copy(specification =
+    SpecFixer.specToProcForm(ctx.specification, formalParams.mappingInparam, formalParams.mappingOutparam)
+  )
 }
 
 def clearParams(p: Program) = {
@@ -396,7 +398,6 @@ def inOutParams(
 
   val alwaysReturnParams = (0 to 7).map(i => Register(s"R$i", 64))
 
-
   val pc = Register("_PC", 64)
 
   val inout = readWrites.collect {
@@ -544,25 +545,27 @@ class SetActualParams(
 
 }
 
-
 object SpecFixer {
   import boogie.*
 
-  class ExprToOld(varInPre: Map[String, Variable], varInPost: Map[String, Variable],
-    initIsPost: Boolean = false) extends CILVisitor {
+  class ExprToOld(varInPre: Map[String, Variable], varInPost: Map[String, Variable], initIsPost: Boolean = false)
+      extends CILVisitor {
 
     var isPost = initIsPost
 
-    override def vexpr(e : Expr) = e match {
+    override def vexpr(e: Expr) = e match {
       case OldExpr(inner) if !isPost => {
         throw Exception("nested Old or Old in single-state context")
       }
       case OldExpr(inner) if isPost => {
         isPost = false
-        ChangeDoChildrenPost(inner, e => {
-          isPost = true
-          e
-        })
+        ChangeDoChildrenPost(
+          inner,
+          e => {
+            isPost = true
+            e
+          }
+        )
       }
       case _ => DoChildren()
     }
@@ -582,10 +585,10 @@ object SpecFixer {
   }
 
   def convVarToOldExpr(varInPre: Map[String, Variable], varInPost: Map[String, Variable], isPost: Boolean = false)(
-      b: Expr
-    ) : Expr = {
-      val visitor = ExprToOld(varInPre, varInPost, isPost)
-      visit_expr(visitor, b)
+    b: Expr
+  ): Expr = {
+    val visitor = ExprToOld(varInPre, varInPost, isPost)
+    visit_expr(visitor, b)
   }
 
   def convVarToOld(varInPre: Map[String, String], varInPost: Map[String, String], isPost: Boolean = false)(
@@ -595,7 +598,7 @@ object SpecFixer {
     b match {
       case b: BVariable if isPost && varInPost.contains(b.name) => BVariable(varInPost(b.name), b.getType, b.scope)
       case b: BVariable if !isPost && varInPre.contains(b.name) => BVariable(varInPre(b.name), b.getType, b.scope)
-      case b: BVariable if !isPost  =>
+      case b: BVariable if !isPost =>
         println("sad")
         println(b)
         b
@@ -636,8 +639,8 @@ object SpecFixer {
 
   def updateInlineSpec(
     mappingInparam: Map[Procedure, Map[LocalVar, Variable]],
-    mappingOutparam: Map[Procedure, Map[LocalVar, Variable]])(p: Procedure) = {
-
+    mappingOutparam: Map[Procedure, Map[LocalVar, Variable]]
+  )(p: Procedure) = {
 
     def toNameMapping(v: Map[LocalVar, Variable]): Map[String, String] = {
       v.map(v => (v._2.name, v._1.name)) ++ v.map(v => ("Gamma_" + v._2.name, "Gamma_" + v._1.name))
@@ -653,8 +656,10 @@ object SpecFixer {
       v.map(v => (v._2.name, v._1))
     }
 
-    p.requiresExpr = p.requiresExpr.map(convVarToOldExpr(toVarMapping(mappingInparam(p)), toVarMapping(mappingOutparam(p)), false))
-    p.ensuresExpr = p.ensuresExpr.map(convVarToOldExpr(toVarMapping(mappingInparam(p)), toVarMapping(mappingOutparam(p)), true))
+    p.requiresExpr =
+      p.requiresExpr.map(convVarToOldExpr(toVarMapping(mappingInparam(p)), toVarMapping(mappingOutparam(p)), false))
+    p.ensuresExpr =
+      p.ensuresExpr.map(convVarToOldExpr(toVarMapping(mappingInparam(p)), toVarMapping(mappingOutparam(p)), true))
 
   }
 
@@ -685,4 +690,3 @@ object SpecFixer {
     ns
   }
 }
-
