@@ -138,8 +138,9 @@ object IRLoading {
 
     q.pcTracking match {
       case PCTrackingOption.None =>
-        program.collect { case x : Statement if x.label == Some("pc-tracking") =>
-          x.parent.statements.remove(x)
+        program.collect {
+          case x: Statement if x.label == Some("pc-tracking") =>
+            x.parent.statements.remove(x)
         }
         Logger.info(s"[!] Removed PC-related statements")
 
