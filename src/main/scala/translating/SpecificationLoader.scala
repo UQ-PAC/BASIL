@@ -336,7 +336,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
             }
         }
       }
-      case id if id.startsWith("R") =>
+      case id if id.startsWith("R") || id == "_PC" =>
         BVariable(id, BitVecBType(64), Scope.Global)
       case id =>
         params.get(id) match {
