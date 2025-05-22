@@ -53,6 +53,7 @@ object `package` extends RootModule with ScalaModule with antlr.AntlrModule with
     def sources = Task.Sources {
       Seq(PathRef(this.millSourcePath / "scala"))
     }
+    def testForkGrouping = discoveredTestClasses().grouped(1).toSeq
   }
 
   /** Updates the expected
