@@ -150,7 +150,7 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
         case c: DirectCall
             if c.target.blocks.flatMap(_.modifies.collect { case v: Variable => v }).exists(crit.contains) =>
           true
-        case c: IndirectCall if crit.exists(_.isInstanceOf[Register]) => true
+        case c: IndirectCall if crit.exists(_.isInstanceOf[Global]) => true
         case _ => {
           transferred.values.toSet.contains(
             transferFunctions.edgelattice.ConstEdge(transferFunctions.valuelattice.top)

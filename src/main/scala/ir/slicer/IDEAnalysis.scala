@@ -114,7 +114,7 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
       }
       case i: IndirectCall => {
         d match {
-          case Left(value: Register) => Map(d -> IdEdge(), Left(i.target) -> ConstEdge(TwoElementTop))
+          case Left(value: Global) => Map(d -> IdEdge(), Left(i.target) -> ConstEdge(TwoElementTop))
           case _ => Map(d -> IdEdge())
         }
       }
