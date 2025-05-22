@@ -730,6 +730,7 @@ object RunUtils {
     for (p <- program.procedures) {
       p.normaliseBlockNames()
     }
+    transforms.applyRPO(program)
     transforms.liftSVComp(program)
     program.sortProceduresRPO()
     transforms.removeEmptyBlocks(program)

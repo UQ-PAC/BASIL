@@ -47,6 +47,7 @@ def difftestLiveVars(p: Procedure, compareResult: Map[CFGPosition, Set[Variable]
 }
 
 def basicReachingDefs(p: Procedure): Map[Command, Map[Variable, Set[Assign | DirectCall]]] = {
+  reversePostOrder(p)
   val lives = getLiveVars(p)
   basicReachingDefs(p, lives)
 }
@@ -183,10 +184,6 @@ class LiveVarsDomWatchFlags(defs: Map[Variable, Set[Assign]]) extends IntraLiveV
     }
     case o => super.transfer(s, a)
   }
-}
-
-def removeSlices(p: Program): Unit = {
-  p.procedures.foreach(removeSlices)
 }
 
 case class LVTerm(v: LocalVar) extends analysis.solvers.Var[LVTerm]
@@ -609,6 +606,16 @@ def collectUses(p: Procedure): Map[Variable, Set[Command]] = {
   as.groupBy(_._1).map((v, r) => v -> r.map(_._2).toSet).toMap
 }
 
+def allDefinitions(p: Procedure): Map[Variable, Set[Assign]] = {
+  p.collect { case a: Assign =>
+    a.assignees.map(l => l -> a)
+  }.flatten
+    .groupBy(_._1)
+    .map { case (v, ass) =>
+      v -> ass.map(_._2).toSet
+    }
+}
+
 class GuardVisitor(validate: Boolean = false) extends CILVisitor {
 
   /**
@@ -643,16 +650,6 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
    */
 
   var defs = Map[Variable, Set[Assign]]()
-
-  def allDefinitions(p: Procedure): Map[Variable, Set[Assign]] = {
-    p.collect { case a: Assign =>
-      a.assignees.map(l => l -> a)
-    }.flatten
-      .groupBy(_._1)
-      .map { case (v, ass) =>
-        v -> ass.map(_._2).toSet
-      }
-  }
 
   def goodSubst(v: Variable) = {
     v.name.startsWith("Cse")
@@ -745,7 +742,9 @@ def wrapShapePreservingTransformInValidation(transform: Program => Unit)(p: Prog
   transform(p)
   validator.setSourceProg(p)
   validator.setEqualVarsInvariant
-  validator.getValidationProgWPConj
+  val (a, b) = validator.getValidationProgWPConj
+  val c = validator.getValidationSMT
+  (a, b, c)
 }
 
 def validateProgs(
@@ -791,10 +790,29 @@ def validateProg(
 
 var validationProgs = List[String]()
 
+def writeSMTs(q: Map[String, String], passName: String) = {
+  for ((k, v) <- q) {
+    val fname = s"tvsmt/$passName-$k.smt2"
+    util.writeToFile(v, fname)
+    SimplifyLogger.info(s"Wrote TV SMT : $fname")
+  }
+
+}
+
 def writeValidationProg(progs: Iterable[Program], passName: String) = {
   val dir = File("./tv/")
   if (!dir.exists()) then dir.mkdirs()
   for (p <- progs) {
+
+    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
+      val dir = File("./graphs/")
+      if (!dir.exists()) then dir.mkdirs()
+      for (p <- p.procedures) {
+        val blockGraph = dotBlockGraph(p)
+        DebugDumpIRLogger.writeToFile(File(s"graphs/transition-${p.name}-${passName}.dot"), blockGraph)
+      }
+    }
+
     transforms.stripUnreachableFunctions(p)
     val boogieFileName = s"tv/${passName}_${p.mainProcedure.name}-translation-validate.bpl"
     val boogieFile = translating.BoogieTranslator.translateProg(p).toString
@@ -982,9 +1000,9 @@ def validateProcWithSplitsInteractive(validationProg: Program, proc: Procedure, 
 }
 
 def transformAndValidate(transform: Program => Unit, name: String)(p: Program) = {
-  val (progs, splits) = wrapShapePreservingTransformInValidation(transform)(p)
+  val (progs, splits, smt) = wrapShapePreservingTransformInValidation(transform)(p)
   writeValidationProg(progs, name)
-  validateProgs(progs, name, splits)
+  writeSMTs(smt, name)
 }
 
 def validatedSimplifyPipeline(p: Program) = {
@@ -1027,7 +1045,7 @@ def validatedSimplifyPipeline(p: Program) = {
             }
           }
           if (inv.nonEmpty) {
-            val guard = BinaryExpr(EQ, validator.varInTarget(transitionSystemPCVar), PCMan.PCSym(cutName))
+            // val guard = BinaryExpr(EQ, validator.varInTarget(transitionSystemPCVar), PCMan.PCSym(cutName))
             val condTarget = validator.exprInTarget(inv.reduce((a, b) => BinaryExpr(BoolAND, a, b)))
 
             val propVars = result
@@ -1039,8 +1057,8 @@ def validatedSimplifyPipeline(p: Program) = {
 
             val condSource = validator.exprInSource(inv.reduce((a, b) => BinaryExpr(BoolAND, a, b)))
             val invariantdef = List(
-              (BinaryExpr(BoolIMPLIES, guard, condSource), Some(s"$cutName CopyProp Dom Source")),
-              (BinaryExpr(BoolIMPLIES, guard, eqPropVars), Some(s"$cutName CopyProp vars correspond"))
+              Inv.CutPoint(cutName, condSource, Some(s"$cutName CopyProp Dom Source")),
+              Inv.CutPoint(cutName, eqPropVars, Some(s"$cutName CopyProp vars correspond"))
             )
 
             validator.addInvariant(proc, invariantdef)
@@ -1062,7 +1080,8 @@ def validatedSimplifyPipeline(p: Program) = {
     val (vprog, splits) = validator.getValidationProgWPConj
 
     writeValidationProg(vprog, "OffsetCopyProp")
-    validateProgs(vprog, "OffsetCopyProp", splits)
+    // validateProgs(vprog, "OffsetCopyProp", splits)
+    writeSMTs(validator.getValidationSMT, "OffsetCopyProp")
 
   }
 
@@ -1080,7 +1099,7 @@ def validatedSimplifyPipeline(p: Program) = {
   }
 
   def sliceCleanup(prog: Program) = {
-    removeSlices(prog)
+    // removeSlices(prog)
     for (p <- prog.procedures) {
       ir.eval.cleanupSimplify(p)
       AlgebraicSimplifications(p)
@@ -1104,12 +1123,14 @@ def validatedSimplifyPipeline(p: Program) = {
     validator.setDSAInvariant
 
     val (vprog, splits) = validator.getValidationProgWPConj
+
     writeValidationProg(vprog, "DynamicSingleAssignment")
-    validateProgs(vprog, "DynamicSingleAssignment", splits)
+    // validateProgs(vprog, "DynamicSingleAssignment", splits)
+    writeSMTs(validator.getValidationSMT, "DynamicSingleAssignment")
+    // validateProgs(vprog, "DynamicSingleAssignment", splits)
 
   }
 
-  log("initial")
   combineBlocks(p)
   applyRPO(p)
   dsa(p)
@@ -1182,7 +1203,7 @@ def copypropTransform(
   AlgebraicSimplifications(p)
   val sipm = t.checkPoint("algebraic simp")
 
-  removeSlices(p)
+  // removeSlices(p)
   ir.eval.cleanupSimplify(p)
   AlgebraicSimplifications(p)
 

@@ -26,6 +26,7 @@ import java.nio.ByteBuffer
 import util.intrusive_list.*
 import util.functional.{Snoc}
 import util.Logger
+import ir.cilvisitor.*
 
 private def assigned(x: Statement): immutable.Set[Variable] = x match {
   case x: Assign => x.assignees
