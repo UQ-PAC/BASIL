@@ -17,21 +17,29 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
   }
 
   def edgesCallToEntry(call: Command, entry: Return)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
-    val params = IRWalk.prevCommandInBlock(call) match {
-      case Some(command) => {
-        command match {
-          case c: DirectCall => c.outParams
-          case i: IndirectCall => Map()
-          case s: Statement => ???
-          case j: Jump => ???
-        }
-      }
-      case None => ???
-    }
-
     d match {
-      case Left(value) if params.values.toSet.contains(value) => fold(params.filter(_._2 == value).keys)
-      case _ => Map(d -> IdEdge())
+      case Left(value) => {
+        val params = IRWalk.prevCommandInBlock(call) match {
+          case Some(command) => {
+            command match {
+              case c: DirectCall => c.outParams
+              case i: IndirectCall => Map()
+              case s: Statement => ???
+              case j: Jump => ???
+            }
+          }
+          case None => ???
+        }
+
+        if (params.values.toSet.contains(value))
+        then fold(params.filter(_._2 == value).keys)
+        else
+          value match {
+            case g: Global => Map(d -> IdEdge())
+            case _ => Map()
+          }
+      }
+      case Right(_) => Map(d -> IdEdge())
     }
   }
 
@@ -45,7 +53,7 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
 
   def edgesCallToAfterCall(call: Command, aftercall: DirectCall)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     d match {
-      case Left(_) => Map()
+      case Left(value) if aftercall.outParams.values.toSet.contains(value) => Map()
       case _ => Map(d -> IdEdge())
     }
   }
