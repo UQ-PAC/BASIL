@@ -17,12 +17,7 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
   }
 
   def edgesCallToEntry(call: Command, entry: Return)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
-    val predecessor = call match {
-      case s: Statement => s.predecessor
-      case j: Jump => j.parent.statements.lastOption
-    }
-
-    val params: Map[LocalVar, Variable] = predecessor match {
+    val params = IRWalk.prevCommandInBlock(call) match {
       case Some(command) => {
         command match {
           case c: DirectCall => c.outParams
