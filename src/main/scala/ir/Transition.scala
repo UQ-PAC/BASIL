@@ -709,13 +709,13 @@ class TranslationValidator {
     while (worklist.nonEmpty) {
       val b = worklist.dequeue()
       var blockDoneCond = List[Expr](boolOr(b.prevBlocks.map(blockDone).toList))
-      val onlyOne = boolAnd(for {
-        l <- b.prevBlocks
-        r <- b.prevBlocks.filterNot(_ == l)
-        neq = UnaryExpr(BoolNOT, BinaryExpr(BoolAND, blockDone(l), blockDone(r)))
-      } yield neq)
+      //val onlyOne = boolAnd(for {
+      //  l <- b.prevBlocks
+      //  r <- b.prevBlocks.filterNot(_ == l)
+      //  neq = UnaryExpr(BoolNOT, BinaryExpr(BoolAND, blockDone(l), blockDone(r)))
+      //} yield neq)
 
-      var phis = Vector[Statement](Assume(onlyOne))
+      var phis = Vector[Statement]()
 
       var renaming = if (b.prevBlocks.nonEmpty) then {
         var joinedRenames = Map[Variable, Variable]()
