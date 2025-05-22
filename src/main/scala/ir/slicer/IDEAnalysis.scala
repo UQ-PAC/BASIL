@@ -19,7 +19,7 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
   def edgesCallToEntry(call: Command, entry: Return)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     val predecessor = call match {
       case s: Statement => s.predecessor
-      case j: Jump => j.parent.statements.lastElem
+      case j: Jump => j.parent.statements.lastOption
     }
 
     val params: Map[LocalVar, Variable] = predecessor match {
@@ -151,5 +151,5 @@ class SlicerAnalysis(program: Program, startingNode: CFGPosition, slicingCriteri
     extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program)
     with BackwardIDEAnalysis[Variable, TwoElement, TwoElementLattice]
     with SlicerTransferFunctions(slicingCriterion) {
-      override def start: CFGPosition = startingNode
+  override def start: CFGPosition = startingNode
 }
