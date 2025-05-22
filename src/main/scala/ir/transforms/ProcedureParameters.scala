@@ -598,10 +598,7 @@ object SpecFixer {
     b match {
       case b: BVariable if isPost && varInPost.contains(b.name) => BVariable(varInPost(b.name), b.getType, b.scope)
       case b: BVariable if !isPost && varInPre.contains(b.name) => BVariable(varInPre(b.name), b.getType, b.scope)
-      case b: BVariable if !isPost =>
-        println("sad")
-        println(b)
-        b
+      case b: BVariable if !isPost => b
       // case b : _ => varToOld(b)
       case b: BLiteral => b
       case b: BVExtract => b.copy(body = varToOld(b.body))
@@ -632,7 +629,6 @@ object SpecFixer {
       case b: L => b.copy(index = varToOld(b.index))
       case b: SpecVar => b
       case b: BVar =>
-        println(b)
         ???
     }
   }
