@@ -10,7 +10,9 @@ set -o pipefail
 # inserts on each line.
 
 out=$(mktemp)
-red=$(tput setaf 1)
+red=$(TERM=xterm tput setaf 1)
+
+[[ -n "$red" ]] || exit 1
 
 set -x
 
