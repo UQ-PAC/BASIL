@@ -93,14 +93,14 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
       }
       case a: Assume => {
         d match {
-          case Left(_) => Map(d -> IdEdge())
-          case Right(_) => Map(d -> IdEdge()) ++ fold(a.body.variables)
+          case Left(_) => Map(d -> IdEdge()) ++ fold(a.body.variables)
+          case Right(_) => Map(d -> IdEdge())
         }
       }
       case a: Assert => {
         d match {
-          case Left(_) => Map(d -> IdEdge())
-          case Right(_) => Map(d -> IdEdge()) ++ fold(a.body.variables)
+          case Left(_) => Map(d -> IdEdge()) ++ fold(a.body.variables)
+          case Right(_) => Map(d -> IdEdge())
         }
       }
       case c: DirectCall => {
