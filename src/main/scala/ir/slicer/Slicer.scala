@@ -79,6 +79,27 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
     }
   }
 
+  var nop: Option[NOP] = None
+  def insertNOP: Unit = {
+    startingNode match {
+      case c: Command =>
+        IRWalk.prevCommandInBlock(c) match {
+          case Some(d: DirectCall) if d.target.returnBlock.isDefined =>
+            nop = Some(NOP())
+            c.parent.statements.insertAfter(d, nop.get)
+          case _ => ()
+        }
+      case _ => ()
+    }
+  }
+
+  def removeNOP: Unit = {
+    nop match {
+      case Some(n) => n.parent.statements.remove(n)
+      case _ => ()
+    }
+  }
+
   lazy private val initialCriterion: Map[CFGPosition, StatementSlice] = {
     parsedConfig match {
       case Some(targetedBlock, variables) => Map(targetedBlock.jump -> variables)
@@ -224,7 +245,11 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       SlicerLogger.debug("Slicer - Stripping unreachable")
       stripUnreachableFunctions(program)
 
+      insertNOP
+
       val results = Phase1().run()
+
+      removeNOP
 
       Phase2(results).run()
 
