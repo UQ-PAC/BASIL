@@ -65,7 +65,6 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       }
 
       if (remainingNames.isEmpty) {
-        println(detectedVariables)
         Some((targetedBlock, detectedVariables.toSet))
       } else {
         SlicerLogger.error(s"Invalid criterion variables. Could not find variables: ${remainingNames.mkString(", ")}")
@@ -127,7 +126,10 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       val transferred = transfer(n)
 
       n match {
-        case c: Call if !crit.equals(results.getOrElse(n, Set())) => true
+        case c: DirectCall
+            if c.target.blocks.flatMap(_.modifies.collect { case v: Variable => v }).exists(crit.contains) =>
+          true
+        case c: IndirectCall if crit.exists(_.isInstanceOf[Register]) => true
         case _ => {
           transferred.values.toSet.contains(
             transferFunctions.edgelattice.ConstEdge(transferFunctions.valuelattice.top)
