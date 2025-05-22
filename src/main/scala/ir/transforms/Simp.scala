@@ -567,11 +567,11 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
 
   /**
    *
-   * This takes all variables in guards and substitutes them for their definitions IFF they have 
+   * This takes all variables in guards and substitutes them for their definitions IFF they have
    * exactly one definition (Assuming DSA form).
    *
    * Due to dsa form this heuristic alone should prevent any copies across loop iterations / clobbers etc
-   * because transitively all definitions should dominate the use (the assume statement) we are propagating to. 
+   * because transitively all definitions should dominate the use (the assume statement) we are propagating to.
    *
    * The [[validate]] parameter further checks this is the case by checking the dsa property is preserved
    * by the propagation, by checking the reaching-definitions set at the use site.
@@ -884,11 +884,13 @@ def removeInvariantOutParameters(
     val proc = ret.parent.parent
     val inParams = proc.formalInParam.toSet
 
+    val specDependencies: Set[Variable] = proc.ensuresExpr.flatMap(_.variables).toSet
+
     val doneAlready = alreadyInlined.getOrElse(proc, Set())
     var doneNow = Set[Variable]()
     var toRename = Map[Variable, LocalVar]()
 
-    val invariantParams = ret.outParams.collect {
+    val invariantParams = ret.outParams.filterNot(x => specDependencies.contains(x._1)).collect {
       // we are returning a constant and can inline
       case (formalOut, binding: Literal) => (formalOut, binding)
       // we are returning the input parameter with the same name as the output parameter so can inline at callsite
@@ -1461,7 +1463,7 @@ class ExprComplexity extends CILVisitor {
   * @param complexityThreshold
   *   Stop substituting after the AST node count has increased by this much
   *
-  *  TODO: The recursive substitution here is a broken when res produces substitution loops. 
+  *  TODO: The recursive substitution here is a broken when res produces substitution loops.
   *  I want a substituter that takes a set of replacements to a canonical
   *  closure under substitution, but is more subtle to implement than it initially appears.
   *  One possibility is a union find on the set of rewrites to partition cycles it into canonical representative

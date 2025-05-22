@@ -1,7 +1,7 @@
 import boogie.SpecGlobal
 import ir.*
 import ir.Endian.LittleEndian
-import ir.dsl.{block, directCall, goto, proc, prog, ret}
+import ir.dsl.{block, directCall, goto, proc, prog, ret, indirectCall}
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
 import test_util.{BASILTest, CaptureOutput}
@@ -247,7 +247,9 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
           goto("k")
         ),
         block("h", goto("k")),
-        block("k", ret)
+        block("k", ret),
+        // indirect prevents unreachable blocks from being pruned.
+        block("dummy", indirectCall(R0))
       )
     )
 

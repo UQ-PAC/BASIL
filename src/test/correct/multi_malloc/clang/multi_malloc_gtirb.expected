@@ -161,6 +161,9 @@ implementation main_2068()
   var Gamma_load16: bool;
   var Gamma_load17: bool;
   var Gamma_load18: bool;
+  var Gamma_load28: bool;
+  var Gamma_load31: bool;
+  var Gamma_load33: bool;
   var Gamma_load8: bool;
   var Gamma_load9: bool;
   var load10: bv64;
@@ -172,6 +175,9 @@ implementation main_2068()
   var load16: bv64;
   var load17: bv64;
   var load18: bv32;
+  var load28: bv64;
+  var load31: bv64;
+  var load33: bv64;
   var load8: bv64;
   var load9: bv64;
   main_2068__0__rJrwEHH7Q82yFH8R8ikgag:
@@ -190,7 +196,21 @@ implementation main_2068()
     assume {:captureState "2088_0"} true;
     R0, Gamma_R0 := 1bv64, true;
     R30, Gamma_R30 := 2100bv64, true;
-    call FUN_680_1664();
+    goto FUN_680_1664__0__tdGxah9RStWBBxOs4YOZUA_709;
+  FUN_680_1664__0__tdGxah9RStWBBxOs4YOZUA_709:
+    assume {:captureState "FUN_680_1664__0__tdGxah9RStWBBxOs4YOZUA_709"} true;
+    R16, Gamma_R16 := 69632bv64, true;
+    call rely();
+    load31, Gamma_load31 := memory_load64_le(mem, bvadd64(R16, 16bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 16bv64)) || L(mem, bvadd64(R16, 16bv64)));
+    R17, Gamma_R17 := load31, Gamma_load31;
+    R16, Gamma_R16 := bvadd64(R16, 16bv64), Gamma_R16;
+    call malloc();
+    goto FUN_680_1664_basil_return_710;
+  FUN_680_1664_basil_return_710:
+    assume {:captureState "FUN_680_1664_basil_return_710"} true;
+    goto main_2068__0__rJrwEHH7Q82yFH8R8ikgag_inlineret;
+  main_2068__0__rJrwEHH7Q82yFH8R8ikgag_inlineret:
+    assume {:captureState "main_2068__0__rJrwEHH7Q82yFH8R8ikgag_inlineret"} true;
     goto main_2068__1__tUCvozcRRoOvSNkfyBzGow;
   main_2068__1__tUCvozcRRoOvSNkfyBzGow:
     assume {:captureState "main_2068__1__tUCvozcRRoOvSNkfyBzGow"} true;
@@ -198,7 +218,21 @@ implementation main_2068()
     assume {:captureState "2100_0"} true;
     R0, Gamma_R0 := 4bv64, true;
     R30, Gamma_R30 := 2112bv64, true;
-    call FUN_680_1664();
+    goto FUN_680_1664__0__tdGxah9RStWBBxOs4YOZUA_707;
+  FUN_680_1664__0__tdGxah9RStWBBxOs4YOZUA_707:
+    assume {:captureState "FUN_680_1664__0__tdGxah9RStWBBxOs4YOZUA_707"} true;
+    R16, Gamma_R16 := 69632bv64, true;
+    call rely();
+    load31, Gamma_load31 := memory_load64_le(mem, bvadd64(R16, 16bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 16bv64)) || L(mem, bvadd64(R16, 16bv64)));
+    R17, Gamma_R17 := load31, Gamma_load31;
+    R16, Gamma_R16 := bvadd64(R16, 16bv64), Gamma_R16;
+    call malloc();
+    goto FUN_680_1664_basil_return_708;
+  FUN_680_1664_basil_return_708:
+    assume {:captureState "FUN_680_1664_basil_return_708"} true;
+    goto main_2068__1__tUCvozcRRoOvSNkfyBzGow_inlineret;
+  main_2068__1__tUCvozcRRoOvSNkfyBzGow_inlineret:
+    assume {:captureState "main_2068__1__tUCvozcRRoOvSNkfyBzGow_inlineret"} true;
     goto main_2068__2__~rbIOEybSQ2ZVy7pglbk3Q;
   main_2068__2__~rbIOEybSQ2ZVy7pglbk3Q:
     assume {:captureState "main_2068__2__~rbIOEybSQ2ZVy7pglbk3Q"} true;
@@ -226,7 +260,21 @@ implementation main_2068()
     R0, Gamma_R0 := 0bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 2236bv64), Gamma_R0;
     R30, Gamma_R30 := 2160bv64, true;
-    call FUN_6c0_1728();
+    goto FUN_6c0_1728__0__Buk7BXt9RGSvhsDcbjEctg_713;
+  FUN_6c0_1728__0__Buk7BXt9RGSvhsDcbjEctg_713:
+    assume {:captureState "FUN_6c0_1728__0__Buk7BXt9RGSvhsDcbjEctg_713"} true;
+    R16, Gamma_R16 := 69632bv64, true;
+    call rely();
+    load33, Gamma_load33 := memory_load64_le(mem, bvadd64(R16, 48bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 48bv64)) || L(mem, bvadd64(R16, 48bv64)));
+    R17, Gamma_R17 := load33, Gamma_load33;
+    R16, Gamma_R16 := bvadd64(R16, 48bv64), Gamma_R16;
+    call printf();
+    goto FUN_6c0_1728_basil_return_714;
+  FUN_6c0_1728_basil_return_714:
+    assume {:captureState "FUN_6c0_1728_basil_return_714"} true;
+    goto main_2068__2__~rbIOEybSQ2ZVy7pglbk3Q_inlineret;
+  main_2068__2__~rbIOEybSQ2ZVy7pglbk3Q_inlineret:
+    assume {:captureState "main_2068__2__~rbIOEybSQ2ZVy7pglbk3Q_inlineret"} true;
     goto main_2068__3__ioncN2xEQpKeAoUViDvFEQ;
   main_2068__3__ioncN2xEQpKeAoUViDvFEQ:
     assume {:captureState "main_2068__3__ioncN2xEQpKeAoUViDvFEQ"} true;
@@ -238,21 +286,63 @@ implementation main_2068()
     R0, Gamma_R0 := 0bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 2253bv64), Gamma_R0;
     R30, Gamma_R30 := 2180bv64, true;
-    call FUN_6c0_1728();
+    goto FUN_6c0_1728__0__Buk7BXt9RGSvhsDcbjEctg_711;
+  FUN_6c0_1728__0__Buk7BXt9RGSvhsDcbjEctg_711:
+    assume {:captureState "FUN_6c0_1728__0__Buk7BXt9RGSvhsDcbjEctg_711"} true;
+    R16, Gamma_R16 := 69632bv64, true;
+    call rely();
+    load33, Gamma_load33 := memory_load64_le(mem, bvadd64(R16, 48bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 48bv64)) || L(mem, bvadd64(R16, 48bv64)));
+    R17, Gamma_R17 := load33, Gamma_load33;
+    R16, Gamma_R16 := bvadd64(R16, 48bv64), Gamma_R16;
+    call printf();
+    goto FUN_6c0_1728_basil_return_712;
+  FUN_6c0_1728_basil_return_712:
+    assume {:captureState "FUN_6c0_1728_basil_return_712"} true;
+    goto main_2068__3__ioncN2xEQpKeAoUViDvFEQ_inlineret;
+  main_2068__3__ioncN2xEQpKeAoUViDvFEQ_inlineret:
+    assume {:captureState "main_2068__3__ioncN2xEQpKeAoUViDvFEQ_inlineret"} true;
     goto main_2068__4__RDsizvM6Rs2uP1PoNQRqUw;
   main_2068__4__RDsizvM6Rs2uP1PoNQRqUw:
     assume {:captureState "main_2068__4__RDsizvM6Rs2uP1PoNQRqUw"} true;
     load13, Gamma_load13 := memory_load64_le(stack, bvadd64(R31, 16bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 16bv64));
     R0, Gamma_R0 := load13, Gamma_load13;
     R30, Gamma_R30 := 2188bv64, true;
-    call FUN_6b0_1712();
+    goto FUN_6b0_1712__0__anzTk9j8RqWD4tIwhKfzRQ_703;
+  FUN_6b0_1712__0__anzTk9j8RqWD4tIwhKfzRQ_703:
+    assume {:captureState "FUN_6b0_1712__0__anzTk9j8RqWD4tIwhKfzRQ_703"} true;
+    R16, Gamma_R16 := 69632bv64, true;
+    call rely();
+    load28, Gamma_load28 := memory_load64_le(mem, bvadd64(R16, 40bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 40bv64)) || L(mem, bvadd64(R16, 40bv64)));
+    R17, Gamma_R17 := load28, Gamma_load28;
+    R16, Gamma_R16 := bvadd64(R16, 40bv64), Gamma_R16;
+    call #free();
+    goto FUN_6b0_1712_basil_return_704;
+  FUN_6b0_1712_basil_return_704:
+    assume {:captureState "FUN_6b0_1712_basil_return_704"} true;
+    goto main_2068__4__RDsizvM6Rs2uP1PoNQRqUw_inlineret;
+  main_2068__4__RDsizvM6Rs2uP1PoNQRqUw_inlineret:
+    assume {:captureState "main_2068__4__RDsizvM6Rs2uP1PoNQRqUw_inlineret"} true;
     goto main_2068__5__XLbDejiVSoaQEuwh3~~Wuw;
   main_2068__5__XLbDejiVSoaQEuwh3~~Wuw:
     assume {:captureState "main_2068__5__XLbDejiVSoaQEuwh3~~Wuw"} true;
     load12, Gamma_load12 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
     R0, Gamma_R0 := load12, Gamma_load12;
     R30, Gamma_R30 := 2196bv64, true;
-    call FUN_6b0_1712();
+    goto FUN_6b0_1712__0__anzTk9j8RqWD4tIwhKfzRQ_705;
+  FUN_6b0_1712__0__anzTk9j8RqWD4tIwhKfzRQ_705:
+    assume {:captureState "FUN_6b0_1712__0__anzTk9j8RqWD4tIwhKfzRQ_705"} true;
+    R16, Gamma_R16 := 69632bv64, true;
+    call rely();
+    load28, Gamma_load28 := memory_load64_le(mem, bvadd64(R16, 40bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 40bv64)) || L(mem, bvadd64(R16, 40bv64)));
+    R17, Gamma_R17 := load28, Gamma_load28;
+    R16, Gamma_R16 := bvadd64(R16, 40bv64), Gamma_R16;
+    call #free();
+    goto FUN_6b0_1712_basil_return_706;
+  FUN_6b0_1712_basil_return_706:
+    assume {:captureState "FUN_6b0_1712_basil_return_706"} true;
+    goto main_2068__5__XLbDejiVSoaQEuwh3~~Wuw_inlineret;
+  main_2068__5__XLbDejiVSoaQEuwh3~~Wuw_inlineret:
+    assume {:captureState "main_2068__5__XLbDejiVSoaQEuwh3~~Wuw_inlineret"} true;
     goto main_2068__6___atEl4xoTOCpT5EUBgYVEg;
   main_2068__6___atEl4xoTOCpT5EUBgYVEg:
     assume {:captureState "main_2068__6___atEl4xoTOCpT5EUBgYVEg"} true;
@@ -267,147 +357,6 @@ implementation main_2068()
     goto main_2068_basil_return;
   main_2068_basil_return:
     assume {:captureState "main_2068_basil_return"} true;
-    return;
-}
-
-procedure FUN_6b0_1712();
-  modifies Gamma_R16, Gamma_R17, Gamma_mem, R16, R17, mem;
-  free requires (memory_load64_le(mem, 2232bv64) == 2334386691848142849bv64);
-  free requires (memory_load64_le(mem, 2240bv64) == 4211825664600402019bv64);
-  free requires (memory_load64_le(mem, 2248bv64) == 7307182754559632672bv64);
-  free requires (memory_load64_le(mem, 2256bv64) == 4211825664634808608bv64);
-  free requires (memory_load8_le(mem, 2264bv64) == 32bv8);
-  free requires (memory_load8_le(mem, 2265bv64) == 37bv8);
-  free requires (memory_load8_le(mem, 2266bv64) == 100bv8);
-  free requires (memory_load8_le(mem, 2267bv64) == 10bv8);
-  free requires (memory_load8_le(mem, 2268bv64) == 0bv8);
-  free requires (memory_load64_le(mem, 69064bv64) == 2064bv64);
-  free requires (memory_load64_le(mem, 69072bv64) == 1984bv64);
-  free requires (memory_load64_le(mem, 69592bv64) == 2068bv64);
-  free requires (memory_load64_le(mem, 69696bv64) == 69696bv64);
-  free ensures (memory_load64_le(mem, 2232bv64) == 2334386691848142849bv64);
-  free ensures (memory_load64_le(mem, 2240bv64) == 4211825664600402019bv64);
-  free ensures (memory_load64_le(mem, 2248bv64) == 7307182754559632672bv64);
-  free ensures (memory_load64_le(mem, 2256bv64) == 4211825664634808608bv64);
-  free ensures (memory_load8_le(mem, 2264bv64) == 32bv8);
-  free ensures (memory_load8_le(mem, 2265bv64) == 37bv8);
-  free ensures (memory_load8_le(mem, 2266bv64) == 100bv8);
-  free ensures (memory_load8_le(mem, 2267bv64) == 10bv8);
-  free ensures (memory_load8_le(mem, 2268bv64) == 0bv8);
-  free ensures (memory_load64_le(mem, 69064bv64) == 2064bv64);
-  free ensures (memory_load64_le(mem, 69072bv64) == 1984bv64);
-  free ensures (memory_load64_le(mem, 69592bv64) == 2068bv64);
-  free ensures (memory_load64_le(mem, 69696bv64) == 69696bv64);
-
-implementation FUN_6b0_1712()
-{
-  var Gamma_load28: bool;
-  var load28: bv64;
-  FUN_6b0_1712__0__anzTk9j8RqWD4tIwhKfzRQ:
-    assume {:captureState "FUN_6b0_1712__0__anzTk9j8RqWD4tIwhKfzRQ"} true;
-    R16, Gamma_R16 := 69632bv64, true;
-    call rely();
-    load28, Gamma_load28 := memory_load64_le(mem, bvadd64(R16, 40bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 40bv64)) || L(mem, bvadd64(R16, 40bv64)));
-    R17, Gamma_R17 := load28, Gamma_load28;
-    R16, Gamma_R16 := bvadd64(R16, 40bv64), Gamma_R16;
-    call #free();
-    goto FUN_6b0_1712_basil_return;
-  FUN_6b0_1712_basil_return:
-    assume {:captureState "FUN_6b0_1712_basil_return"} true;
-    return;
-}
-
-procedure FUN_680_1664();
-  modifies Gamma_R16, Gamma_R17, Gamma_mem, R16, R17, mem;
-  free requires (memory_load64_le(mem, 2232bv64) == 2334386691848142849bv64);
-  free requires (memory_load64_le(mem, 2240bv64) == 4211825664600402019bv64);
-  free requires (memory_load64_le(mem, 2248bv64) == 7307182754559632672bv64);
-  free requires (memory_load64_le(mem, 2256bv64) == 4211825664634808608bv64);
-  free requires (memory_load8_le(mem, 2264bv64) == 32bv8);
-  free requires (memory_load8_le(mem, 2265bv64) == 37bv8);
-  free requires (memory_load8_le(mem, 2266bv64) == 100bv8);
-  free requires (memory_load8_le(mem, 2267bv64) == 10bv8);
-  free requires (memory_load8_le(mem, 2268bv64) == 0bv8);
-  free requires (memory_load64_le(mem, 69064bv64) == 2064bv64);
-  free requires (memory_load64_le(mem, 69072bv64) == 1984bv64);
-  free requires (memory_load64_le(mem, 69592bv64) == 2068bv64);
-  free requires (memory_load64_le(mem, 69696bv64) == 69696bv64);
-  free ensures (memory_load64_le(mem, 2232bv64) == 2334386691848142849bv64);
-  free ensures (memory_load64_le(mem, 2240bv64) == 4211825664600402019bv64);
-  free ensures (memory_load64_le(mem, 2248bv64) == 7307182754559632672bv64);
-  free ensures (memory_load64_le(mem, 2256bv64) == 4211825664634808608bv64);
-  free ensures (memory_load8_le(mem, 2264bv64) == 32bv8);
-  free ensures (memory_load8_le(mem, 2265bv64) == 37bv8);
-  free ensures (memory_load8_le(mem, 2266bv64) == 100bv8);
-  free ensures (memory_load8_le(mem, 2267bv64) == 10bv8);
-  free ensures (memory_load8_le(mem, 2268bv64) == 0bv8);
-  free ensures (memory_load64_le(mem, 69064bv64) == 2064bv64);
-  free ensures (memory_load64_le(mem, 69072bv64) == 1984bv64);
-  free ensures (memory_load64_le(mem, 69592bv64) == 2068bv64);
-  free ensures (memory_load64_le(mem, 69696bv64) == 69696bv64);
-
-implementation FUN_680_1664()
-{
-  var Gamma_load31: bool;
-  var load31: bv64;
-  FUN_680_1664__0__tdGxah9RStWBBxOs4YOZUA:
-    assume {:captureState "FUN_680_1664__0__tdGxah9RStWBBxOs4YOZUA"} true;
-    R16, Gamma_R16 := 69632bv64, true;
-    call rely();
-    load31, Gamma_load31 := memory_load64_le(mem, bvadd64(R16, 16bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 16bv64)) || L(mem, bvadd64(R16, 16bv64)));
-    R17, Gamma_R17 := load31, Gamma_load31;
-    R16, Gamma_R16 := bvadd64(R16, 16bv64), Gamma_R16;
-    call malloc();
-    goto FUN_680_1664_basil_return;
-  FUN_680_1664_basil_return:
-    assume {:captureState "FUN_680_1664_basil_return"} true;
-    return;
-}
-
-procedure FUN_6c0_1728();
-  modifies Gamma_R16, Gamma_R17, Gamma_mem, R16, R17, mem;
-  free requires (memory_load64_le(mem, 2232bv64) == 2334386691848142849bv64);
-  free requires (memory_load64_le(mem, 2240bv64) == 4211825664600402019bv64);
-  free requires (memory_load64_le(mem, 2248bv64) == 7307182754559632672bv64);
-  free requires (memory_load64_le(mem, 2256bv64) == 4211825664634808608bv64);
-  free requires (memory_load8_le(mem, 2264bv64) == 32bv8);
-  free requires (memory_load8_le(mem, 2265bv64) == 37bv8);
-  free requires (memory_load8_le(mem, 2266bv64) == 100bv8);
-  free requires (memory_load8_le(mem, 2267bv64) == 10bv8);
-  free requires (memory_load8_le(mem, 2268bv64) == 0bv8);
-  free requires (memory_load64_le(mem, 69064bv64) == 2064bv64);
-  free requires (memory_load64_le(mem, 69072bv64) == 1984bv64);
-  free requires (memory_load64_le(mem, 69592bv64) == 2068bv64);
-  free requires (memory_load64_le(mem, 69696bv64) == 69696bv64);
-  free ensures (memory_load64_le(mem, 2232bv64) == 2334386691848142849bv64);
-  free ensures (memory_load64_le(mem, 2240bv64) == 4211825664600402019bv64);
-  free ensures (memory_load64_le(mem, 2248bv64) == 7307182754559632672bv64);
-  free ensures (memory_load64_le(mem, 2256bv64) == 4211825664634808608bv64);
-  free ensures (memory_load8_le(mem, 2264bv64) == 32bv8);
-  free ensures (memory_load8_le(mem, 2265bv64) == 37bv8);
-  free ensures (memory_load8_le(mem, 2266bv64) == 100bv8);
-  free ensures (memory_load8_le(mem, 2267bv64) == 10bv8);
-  free ensures (memory_load8_le(mem, 2268bv64) == 0bv8);
-  free ensures (memory_load64_le(mem, 69064bv64) == 2064bv64);
-  free ensures (memory_load64_le(mem, 69072bv64) == 1984bv64);
-  free ensures (memory_load64_le(mem, 69592bv64) == 2068bv64);
-  free ensures (memory_load64_le(mem, 69696bv64) == 69696bv64);
-
-implementation FUN_6c0_1728()
-{
-  var Gamma_load33: bool;
-  var load33: bv64;
-  FUN_6c0_1728__0__Buk7BXt9RGSvhsDcbjEctg:
-    assume {:captureState "FUN_6c0_1728__0__Buk7BXt9RGSvhsDcbjEctg"} true;
-    R16, Gamma_R16 := 69632bv64, true;
-    call rely();
-    load33, Gamma_load33 := memory_load64_le(mem, bvadd64(R16, 48bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 48bv64)) || L(mem, bvadd64(R16, 48bv64)));
-    R17, Gamma_R17 := load33, Gamma_load33;
-    R16, Gamma_R16 := bvadd64(R16, 48bv64), Gamma_R16;
-    call printf();
-    goto FUN_6c0_1728_basil_return;
-  FUN_6c0_1728_basil_return:
-    assume {:captureState "FUN_6c0_1728_basil_return"} true;
     return;
 }
 
