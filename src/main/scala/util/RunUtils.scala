@@ -130,6 +130,16 @@ object IRLoading {
       IRTranslator.translate
     } else if (q.inputFile.endsWith(".gts")) {
       loadGTIRB(q.inputFile, mainAddress)
+    } else if (q.inputFile.endsWith(".scala")) {
+
+      val source = scala.io.Source.fromFile(q.inputFile)
+      val lines =
+        try source.mkString
+        finally source.close()
+
+      println(System.getProperty("java.class.path"))
+      println(util.EvalScala.evalDSL(lines))
+      ???
     } else {
       throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
     }

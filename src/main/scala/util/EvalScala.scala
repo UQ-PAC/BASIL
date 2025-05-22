@@ -1,6 +1,7 @@
 package util
 
 import scala.util.{Try, Failure}
+import scala.jdk.CollectionConverters.IterableHasAsScala
 
 /**
  * Implements runtime evaluation of Scala code strings.
@@ -58,7 +59,11 @@ object EvalScala {
     // captures compiler output (e.g. errors and warnings) but not output
     // printed from the user's code.
     val engine = Console.withOut(baos) {
-      manager.getEngineByName("scala")
+      lazy val fallbackEngine =
+        manager.getEngineFactories.asScala.filter(f => f.getEngineName == "Scala REPL").head.getScriptEngine
+
+      // Option(manager.getEngineByName("scala")).getOrElse(fallbackEngine)
+      dotty.tools.repl.ScriptEngine()
     }
 
     val result = Try(engine.eval(s)).filter(_ != null).recoverWith(x => Failure(unwrapScalaEvalException(x)))
