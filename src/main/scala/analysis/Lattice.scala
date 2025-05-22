@@ -312,6 +312,8 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
 
   def applyOp(op: BinOp, lhs: ValueSet[T], rhs: Either[ValueSet[T], BitVecLiteral]): ValueSet[T] = {
     op match
+      case EQ => applyOp(EQ, lhs, rhs)
+      case NEQ => applyOp(NEQ, lhs, rhs)
       case bvOp: BVBinOp =>
         bvOp match
           case BVAND => ???
@@ -346,17 +348,12 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
           case BVSLE => ???
           case BVSGT => ???
           case BVSGE => ???
-          case BVEQ => ???
-          case BVNEQ => ???
           case BVCONCAT => ???
       case boolOp: BoolBinOp =>
         boolOp match
-          case BoolEQ => applyOp(BVEQ, lhs, rhs)
-          case BoolNEQ => applyOp(BVNEQ, lhs, rhs)
           case BoolAND => applyOp(BVAND, lhs, rhs)
           case BoolOR => applyOp(BVOR, lhs, rhs)
           case BoolIMPLIES => ???
-          case BoolEQUIV => ???
       case intOp: IntBinOp =>
         applyOp(intOp.toBV, lhs, rhs)
   }

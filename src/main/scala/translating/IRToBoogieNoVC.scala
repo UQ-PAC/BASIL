@@ -117,8 +117,8 @@ object BoogieTranslator {
       e.name,
       inparams,
       outparams,
-      e.requires ++ e.requiresExpr.map(translateExpr),
       e.ensures ++ e.ensuresExpr.map(translateExpr),
+      e.requires ++ e.requiresExpr.map(translateExpr),
       List(),
       List(),
       freeEnsures.toList,
@@ -167,12 +167,15 @@ object BoogieTranslator {
       .map(BTypeDecl(_))
 
     val globalDecls = p.declarations.map(_.toBoogie)
-    val globalVarDecls = vvis.globals.map(translateGlobal).map(BVarDecl(_))
+
 
     val readOnlySections = p.usedMemory.values.filter(_.readOnly)
     val readOnlyMemory = memoryToConditionCoalesced(readOnlySections)
     val initialSections = p.usedMemory.values.filter(!_.readOnly)
     val initialMemory = memoryToConditionCoalesced(initialSections)
+
+    val memGlobals = (readOnlyMemory ++ initialMemory).flatMap(_.globals).map(BVarDecl(_))
+    val globalVarDecls = vvis.globals.map(translateGlobal).map(BVarDecl(_)) ++ memGlobals
 
     val procs = p.procedures.map {
       case proc if p.mainProcedure eq proc => translateProc(initialMemory ++ readOnlyMemory)(proc)

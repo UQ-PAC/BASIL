@@ -378,16 +378,16 @@ class InterpreterTests extends AnyFunSuite with CaptureOutput with BeforeAndAfte
       proc(
         "begin",
         block("entry", LocalAssign(R8, Register("R31", 64)), LocalAssign(R0, bv64(n)), directCall("fib"), goto("done")),
-        block("done", Assert(BinaryExpr(BVEQ, R0, bv64(fib(n)))), ret)
+        block("done", Assert(BinaryExpr(EQ, R0, bv64(fib(n)))), ret)
       ),
       proc(
         "fib",
         block("base", goto("base1", "base2", "dofib")),
-        block("base1", Assume(BinaryExpr(BVEQ, R0, bv64(0))), ret),
-        block("base2", Assume(BinaryExpr(BVEQ, R0, bv64(1))), ret),
+        block("base1", Assume(BinaryExpr(EQ, R0, bv64(0))), ret),
+        block("base2", Assume(BinaryExpr(EQ, R0, bv64(1))), ret),
         block(
           "dofib",
-          Assume(BinaryExpr(BoolAND, BinaryExpr(BVNEQ, R0, bv64(0)), BinaryExpr(BVNEQ, R0, bv64(1)))),
+          Assume(BinaryExpr(BoolAND, BinaryExpr(NEQ, R0, bv64(0)), BinaryExpr(NEQ, R0, bv64(1)))),
           // R8 stack pointer preserved across calls
           LocalAssign(R7, BinaryExpr(BVADD, R8, bv64(8))),
           MemoryStore(stack, R7, R8, Endian.LittleEndian, 64), // sp
@@ -479,7 +479,7 @@ class InterpreterTests extends AnyFunSuite with CaptureOutput with BeforeAndAfte
     val watch = IRWalk.firstInProc((fib.procedures.find(_.name == "fib")).get).get
     val bp = BreakPoint(
       "Fibentry",
-      BreakPointLoc.CMDCond(watch, BinaryExpr(BVEQ, BitVecLiteral(5, 64), Register("R0", 64))),
+      BreakPointLoc.CMDCond(watch, BinaryExpr(EQ, BitVecLiteral(5, 64), Register("R0", 64))),
       BreakPointAction(true, true, List(("R0", Register("R0", 64))), true)
     )
     val bp2 = BreakPoint(

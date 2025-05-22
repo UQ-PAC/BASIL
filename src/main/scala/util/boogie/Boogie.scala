@@ -23,7 +23,7 @@ case class BoogieResult(kind: BoogieResultKind, errors: Array[BoogieError]) {
 case class BoogieLine(number: Int, text: String, isError: Boolean) {
 
   /**
-   * Print this line in the format: 
+   * Print this line in the format:
    *
    *     line number | line content
    *
@@ -43,7 +43,7 @@ case class BoogieLine(number: Int, text: String, isError: Boolean) {
  *
  * @param fileName
  *  The Boogie file the assertion is from
- * @param line 
+ * @param line
  *  the line number containing the assertion
  * @param errorSnippet
  *  List of surrounding lines in the Boogie file
@@ -106,7 +106,7 @@ def parseOutput(boogieStdout: String): BoogieResult = {
 }
 
 /**
- * Get a list of assertion failures from the boogie output. 
+ * Get a list of assertion failures from the boogie output.
  */
 def parseErrors(boogieStdoutMessage: String, snippetContext: Int = 3): Array[BoogieError] = {
   val lines = boogieStdoutMessage.split('\n')

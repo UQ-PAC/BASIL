@@ -188,8 +188,8 @@ class IntervalDomain(
         else if s.size == 1 then fromPred(s.head)
         else s.tail.foldLeft(fromPred(s.head)) { (i, p) => i.join(fromPred(p)) }
 
-      case BVCmp(BVEQ, BVTerm.Lit(x), BVTerm.Var(v)) => top + (v -> ConcreteInterval(bvto(x), bvto(x), x.size))
-      case BVCmp(BVEQ, BVTerm.Var(v), BVTerm.Lit(x)) => top + (v -> ConcreteInterval(bvto(x), bvto(x), x.size))
+      case BVCmp(EQ, BVTerm.Lit(x), BVTerm.Var(v)) => top + (v -> ConcreteInterval(bvto(x), bvto(x), x.size))
+      case BVCmp(EQ, BVTerm.Var(v), BVTerm.Lit(x)) => top + (v -> ConcreteInterval(bvto(x), bvto(x), x.size))
 
       case BVCmp(BVSLE, BVTerm.Lit(x), BVTerm.Var(v)) if signed =>
         top + (v -> ConcreteInterval(bvto(x), inf(x.size), x.size))

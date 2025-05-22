@@ -22,12 +22,9 @@ def boolAnd(exps: Iterable[Expr]) =
 
 def polyEqual(e1: Expr, e2: Expr) = {
   (e1.getType, e2.getType) match {
-    case (BoolType, BoolType) => BinaryExpr(BoolEQ, e1, e2)
-    case (IntType, IntType) => BinaryExpr(IntEQ, e1, e2)
-    case (BitVecType(sz1), BitVecType(sz2)) if sz1 == sz2 => BinaryExpr(BVEQ, e1, e2)
-    case (BitVecType(sz1), BitVecType(sz2)) if sz1 > sz2 => BinaryExpr(BVEQ, e1, ZeroExtend(sz1 - sz2, e2))
-    case (BitVecType(sz1), BitVecType(sz2)) if sz1 < sz2 => BinaryExpr(BVEQ, ZeroExtend(sz2 - sz1, e1), e2)
-    case (CustomSort(x), CustomSort(y)) if x == y => BinaryExpr(BoolEQ, e1, e2)
+    case (l,r) if l == r => BinaryExpr(EQ, e1, e2)
+    case (BitVecType(sz1), BitVecType(sz2)) if sz1 > sz2 => BinaryExpr(EQ, e1, ZeroExtend(sz1 - sz2, e2))
+    case (BitVecType(sz1), BitVecType(sz2)) if sz1 < sz2 => BinaryExpr(EQ, ZeroExtend(sz2 - sz1, e1), e2)
     case (a, b) => throw Exception(s"wierd type $a == $b")
   }
 }
@@ -322,7 +319,7 @@ object PCMan {
 
   def pcGuard(label: String) = {
     val pcVar = transitionSystemPCVar
-    Assume(BinaryExpr(IntEQ, pcVar, PCSym(label)), Some(s"PC = $label"))
+    Assume(BinaryExpr(EQ, pcVar, PCSym(label)), Some(s"PC = $label"))
   }
 }
 
@@ -580,7 +577,7 @@ class TranslationValidator {
 
           val assertion = boolAnd(vars.map(v => polyEqual(varInSource(v), varInTarget(removeIndex(v)))).toList)
 
-          val guard = BinaryExpr(IntEQ, visit_rvar(afterRenamer, transitionSystemPCVar), PCMan.PCSym(label))
+          val guard = BinaryExpr(EQ, visit_rvar(afterRenamer, transitionSystemPCVar), PCMan.PCSym(label))
 
           (BinaryExpr(BoolIMPLIES, guard, assertion), Some(s"INVARIANT at $label"))
         }
@@ -631,7 +628,7 @@ class TranslationValidator {
               }
           )
 
-          val guard = BinaryExpr(IntEQ, visit_rvar(afterRenamer, transitionSystemPCVar), PCMan.PCSym(label))
+          val guard = BinaryExpr(EQ, visit_rvar(afterRenamer, transitionSystemPCVar), PCMan.PCSym(label))
 
           (BinaryExpr(BoolIMPLIES, guard, assertion), Some(s"INVARIANT at $label"))
         }
@@ -642,9 +639,9 @@ class TranslationValidator {
   }
 
   val pcInv =
-    BinaryExpr(IntEQ, visit_rvar(beforeRenamer, transitionSystemPCVar), visit_rvar(afterRenamer, transitionSystemPCVar))
+    BinaryExpr(EQ, visit_rvar(beforeRenamer, transitionSystemPCVar), visit_rvar(afterRenamer, transitionSystemPCVar))
 
-  val traceInv = BinaryExpr(BoolEQ, visit_rvar(beforeRenamer, traceVar), visit_rvar(afterRenamer, traceVar))
+  val traceInv = BinaryExpr(EQ, visit_rvar(beforeRenamer, traceVar), visit_rvar(afterRenamer, traceVar))
 
   def reachingDefs(p: Procedure) = {
     transforms.reversePostOrder(p)
@@ -701,7 +698,7 @@ class TranslationValidator {
             if (preds.nonEmpty) {
               val pred = preds.reduce((l, r) => BinaryExpr(BoolAND, l, r))
               val guarded =
-                exprInSource(BinaryExpr(BoolIMPLIES, BinaryExpr(IntEQ, transitionSystemPCVar, PCSym(label)), pred))
+                exprInSource(BinaryExpr(BoolIMPLIES, BinaryExpr(EQ, transitionSystemPCVar, PCSym(label)), pred))
               addInvariant(proc.name, List((guarded, Some(s"Reaching Defs $label"))))
             }
           }

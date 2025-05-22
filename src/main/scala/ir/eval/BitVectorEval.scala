@@ -167,15 +167,15 @@ object BitVectorEval {
     if s == t then BitVecLiteral(1, 1)
     else BitVecLiteral(0, 1)
 
-  /** (bvneq (_ BitVec m) (_ BitVec m))
-    *   - not equal too
+  /** (bveq (_ BitVec m) (_ BitVec m))
+    *   - equal to
     */
   def smt_bveq(s: BitVecLiteral, t: BitVecLiteral): Boolean = {
     s == t
   }
 
   /** (bvneq (_ BitVec m) (_ BitVec m))
-    *   - not equal too
+    *   - not equal to
     */
   def smt_bvneq(s: BitVecLiteral, t: BitVecLiteral): Boolean = {
     s != t

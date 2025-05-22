@@ -20,7 +20,7 @@ def genFunctionOpDefinitionAxiomOps(
       ForAll(
         iters,
         BinaryBExpr(
-          BVEQ,
+          EQ,
           BFunctionCall(b.name + "_impl", iters, b.out.getType),
           BFunctionCall(b.name, iters, b.out.getType)
         ),

@@ -182,7 +182,7 @@ trait IndirectCallResolution {
             case None =>
               throw Exception(s"resolved indirect call $indirectCall to procedure which does not have address: $t")
           }
-          val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(address, 64)))
+          val assume = Assume(BinaryExpr(EQ, indirectCall.target, BitVecLiteral(address, 64)))
           val newLabel: String = block.label + t.name
           val directCall = t.makeCall()
 

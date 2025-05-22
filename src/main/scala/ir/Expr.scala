@@ -195,8 +195,9 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr with Cache
   override def gammas: Set[Variable] = arg1.gammas ++ arg2.gammas
   override def variables: Set[Variable] = arg1.variables ++ arg2.variables
   override def getType: IRType = (op, arg1.getType, arg2.getType) match {
-    case (BoolEQ, _, _) => BoolType /* repurpose booleq as polymorphic equality */
     case (_: BoolBinOp, BoolType, BoolType) => BoolType
+    case (EQ, _, _) => BoolType
+    case (NEQ, _, _) => BoolType
     case (binOp: BVBinOp, bv1: BitVecType, bv2: BitVecType) =>
       binOp match {
         case BVCONCAT =>
@@ -222,13 +223,11 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr with Cache
             println(this)
             throw new Exception("bitvector size mismatch")
           }
-        case BVEQ | BVNEQ =>
-          BoolType
       }
     case (intOp: IntBinOp, IntType, IntType) =>
       intOp match {
         case IntADD | IntSUB | IntMUL | IntDIV | IntMOD => IntType
-        case IntEQ | IntNEQ | IntLT | IntLE | IntGT | IntGE => BoolType
+        case IntLT | IntLE | IntGT | IntGE => BoolType
       }
     case _ =>
       throw new Exception(
@@ -243,13 +242,8 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr with Cache
 
   override def toString: String = op match {
     case bOp: BoolBinOp => s"($arg1 $bOp $arg2)"
-    case bOp: BVBinOp =>
-      bOp match {
-        case BVEQ | BVNEQ | BVCONCAT =>
-          s"($arg1 $bOp $arg2)"
-        case _ =>
-          s"bv$bOp$inSize($arg1, $arg2)"
-      }
+    case BVCONCAT | EQ | NEQ => s"($arg1 $op $arg2)"
+    case bOp: BVBinOp => s"bv$bOp$inSize($arg1, $arg2)"
     case bOp: IntBinOp => s"($arg1 $bOp $arg2)"
   }
 
@@ -266,14 +260,22 @@ sealed trait BoolBinOp(op: String) extends BinOp {
   def opName = op
 }
 
-sealed trait BoolCmpOp extends BoolBinOp
+sealed trait PolyCmp extends BinOp
 
-case object BoolEQ extends BoolBinOp("==") with BoolCmpOp
-case object BoolNEQ extends BoolBinOp("!=")
+case object EQ extends PolyCmp {
+  override def opName = "=="
+  override def toString = opName
+}
+
+case object NEQ extends PolyCmp {
+  override def opName = "!="
+  override def toString = opName
+}
+
+sealed trait BoolCmpOp extends BoolBinOp
 case object BoolAND extends BoolBinOp("&&")
 case object BoolOR extends BoolBinOp("||")
 case object BoolIMPLIES extends BoolBinOp("==>") with BoolCmpOp
-case object BoolEQUIV extends BoolBinOp("<==>")
 
 sealed trait BVBinOp(op: String) extends BinOp {
   override def toString: String = op
@@ -308,8 +310,6 @@ case object BVSLT extends BVBinOp("slt") with BVCmpOp
 case object BVSLE extends BVBinOp("sle") with BVCmpOp
 case object BVSGT extends BVBinOp("sgt") with BVCmpOp
 case object BVSGE extends BVBinOp("sge") with BVCmpOp
-case object BVEQ extends BVBinOp("==") with BVCmpOp
-case object BVNEQ extends BVBinOp("!=") with BVCmpOp
 case object BVCONCAT extends BVBinOp("++")
 
 sealed trait IntBinOp(op: String) extends BinOp {
@@ -321,8 +321,6 @@ sealed trait IntBinOp(op: String) extends BinOp {
     case IntSUB => BVSUB
     case IntDIV => BVSDIV
     case IntMOD => BVSMOD
-    case IntEQ => BVEQ
-    case IntNEQ => BVNEQ
     case IntLT => BVSLT
     case IntLE => BVSLE
     case IntGT => BVSGT
@@ -335,8 +333,6 @@ case object IntMUL extends IntBinOp("*")
 case object IntSUB extends IntBinOp("-")
 case object IntDIV extends IntBinOp("div")
 case object IntMOD extends IntBinOp("mod")
-case object IntEQ extends IntBinOp("==")
-case object IntNEQ extends IntBinOp("!=")
 case object IntLT extends IntBinOp("<")
 case object IntLE extends IntBinOp("<=")
 case object IntGT extends IntBinOp(">")

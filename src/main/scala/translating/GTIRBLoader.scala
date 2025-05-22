@@ -26,14 +26,18 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
   private var blockCount = 0
   private var loadCounter = 0
 
-  private val opcodeSize = 4
+  val opcodeSize = 4
 
-  def visitBlock(blockUUID: ByteString, blockCountIn: Int, blockAddress: Option[BigInt]): ArrayBuffer[Statement] = {
+  def visitBlock(
+    blockUUID: ByteString,
+    blockCountIn: Int,
+    blockAddress: Option[BigInt]
+  ): ArrayBuffer[immutable.Seq[Statement]] = {
     blockCount = blockCountIn
     instructionCount = 0
     val instructions = parserMap(Base64.getEncoder.encodeToString(blockUUID.toByteArray))
 
-    val statements: ArrayBuffer[Statement] = ArrayBuffer()
+    val statements: ArrayBuffer[immutable.Seq[Statement]] = ArrayBuffer()
 
     for (instsem <- instructions) {
       constMap.clear
@@ -43,17 +47,19 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         case InsnSemantics.Error(op, err) => {
           val message = s"$op ${err.replace("\n", " :: ")}"
           Logger.warn(s"Program contains lifter unsupported opcode: $message")
-          statements.append(Assert(FalseLiteral, Some(s"Lifter error: $message")))
+          statements.append(immutable.Seq(Assert(FalseLiteral, Some(s"Lifter error: $message"))))
           instructionCount += 1
         }
-        case InsnSemantics.Result(instruction) => {
-          for ((s, i) <- instruction.zipWithIndex) {
+        case InsnSemantics.Result(aslstmts) => {
+          var stmts = immutable.LinearSeq[Statement]()
+
+          for ((s, i) <- aslstmts.zipWithIndex) {
             val label = blockAddress.map { (a: BigInt) =>
               val instructionAddress = a + (opcodeSize * instructionCount)
               instructionAddress.toString + "_" + i
             }
 
-            statements.appendAll(try {
+            stmts = stmts ++ (try {
               visitStmt(s, label)
             } catch {
               case e => {
@@ -62,6 +68,8 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
               }
             })
           }
+
+          statements.append(stmts)
           instructionCount += 1
         }
       }
@@ -176,7 +184,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
     }
 
     if (condition.isDefined) {
-      Some(TempIf(condition.get, thenStmts, elseStmts, label))
+      Some(TempIf(condition.get, thenStmts.to(immutable.LinearSeq), elseStmts.to(immutable.LinearSeq), label))
     } else {
       None
     }
@@ -346,7 +354,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         checkArgs(function, 0, 1, typeArgs.size, args.size, ctx.getText)
         val (expr, load) = visitExpr(args.head)
         val result: Option[Expr] = expr.map {
-          case b: BinaryExpr if b.op == BVEQ => BinaryExpr(BVCOMP, b.arg1, b.arg2)
+          case b: BinaryExpr if b.op == EQ => BinaryExpr(BVCOMP, b.arg1, b.arg2)
           case FalseLiteral => BitVecLiteral(0, 1)
           case TrueLiteral => BitVecLiteral(1, 1)
           case o => UnaryExpr(BoolToBV1, o)
@@ -354,14 +362,14 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         (result, load)
 
       case "not_bool.0" => (resolveUnaryOp(BoolNOT, function, 0, typeArgs, args, ctx.getText), None)
-      case "eq_enum.0" => resolveBinaryOp(BoolEQ, function, 0, typeArgs, args, ctx.getText)
+      case "eq_enum.0" => resolveBinaryOp(EQ, function, 0, typeArgs, args, ctx.getText)
       case "or_bool.0" => resolveBinaryOp(BoolOR, function, 0, typeArgs, args, ctx.getText)
       case "and_bool.0" => resolveBinaryOp(BoolAND, function, 0, typeArgs, args, ctx.getText)
 
       case "or_bits.0" => resolveBinaryOp(BVOR, function, 1, typeArgs, args, ctx.getText)
       case "and_bits.0" => resolveBinaryOp(BVAND, function, 1, typeArgs, args, ctx.getText)
       case "eor_bits.0" => resolveBinaryOp(BVXOR, function, 1, typeArgs, args, ctx.getText)
-      case "eq_bits.0" => resolveBinaryOp(BVEQ, function, 1, typeArgs, args, ctx.getText)
+      case "eq_bits.0" => resolveBinaryOp(EQ, function, 1, typeArgs, args, ctx.getText)
       case "add_bits.0" => resolveBinaryOp(BVADD, function, 1, typeArgs, args, ctx.getText)
       case "sub_bits.0" => resolveBinaryOp(BVSUB, function, 1, typeArgs, args, ctx.getText)
       case "mul_bits.0" => resolveBinaryOp(BVMUL, function, 1, typeArgs, args, ctx.getText)

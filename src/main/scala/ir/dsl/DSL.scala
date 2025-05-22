@@ -87,14 +87,6 @@ val R29: GlobalVar = Register("R29", 64)
 val R30: GlobalVar = Register("R30", 64)
 val R31: GlobalVar = Register("R31", 64)
 
-def exprEq(l: Expr, r: Expr): Expr = (l, r) match {
-  case (l, r) if l.getType != r.getType => FalseLiteral
-  case (l, r) if l.getType == BoolType => BinaryExpr(BoolEQ, l, r)
-  case (l, r) if l.getType.isInstanceOf[BitVecType] => BinaryExpr(BVEQ, l, r)
-  case (l, r) if l.getType == IntType => BinaryExpr(IntEQ, l, r)
-  case _ => FalseLiteral
-}
-
 def R(i: Int): GlobalVar = Register(s"R$i", 64)
 
 def bv_t(i: Int) = BitVecType(i)
