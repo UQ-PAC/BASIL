@@ -730,8 +730,6 @@ object RunUtils {
     simpPreprocess(program)
     transforms.validatedSimplifyPipeline(program)
 
-    ir.transforms.ExtractExtendZeroBits.doTransform(ctx.program)
-
   }
 
   def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]): Unit = {
@@ -909,6 +907,19 @@ object RunUtils {
         s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
       )
     }
+
+    var tot = 0
+    var count = 0
+    for (p <- ctx.program.procedures) {
+      val compl = ir.transforms.ExprComplexity().stmtCount(p)
+      if (compl > 0) {
+        count += 1
+      }
+      tot += compl
+      println(s"stmts $compl")
+    }
+    println(s"Num procs: ${count}")
+    println(s"avg stmt = ${tot / count}}")
 
     if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)

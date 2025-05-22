@@ -331,6 +331,7 @@ class BasilIRPrettyPrinter(
     val inParams = p.formalInParam.toList.map(vparam)
     val outParams = p.formalOutParam.toList.map(vparam)
     val entryBlock = p.entryBlock
+    ir.transforms.reversePostOrder(p)
     val middleBlocks =
       (p.entryBlock.toList ++ (p.blocks.toSet -- p.entryBlock.toSet -- p.returnBlock.toSet).toList.sortBy(x =>
         -x.rpoOrder

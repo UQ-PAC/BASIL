@@ -784,7 +784,8 @@ def validateProg(
 
   for (p <- validationProg.procedures) {
     SimplifyLogger.info(s"Validating $n proc ${p.name}")
-    validateProcWithSplitsInteractive(validationProg, p, n, 8)
+    // validateProcWithSplitsInteractive(validationProg, p, n, 8)
+    validateProcWithSplits(validationProg, p, n, 30, splits(p), 5)
   }
 }
 
@@ -812,7 +813,7 @@ def validate(validationProg: Program, procName: String, name: String, timeout: I
     if (!dir.exists()) then dir.mkdirs()
     for (p <- validationProg.procedures) {
       val blockGraph = dotBlockGraph(p)
-      util.writeToFile(blockGraph, (s"graphs/transition-${p.name}-${name}.dot"))
+      DebugDumpIRLogger.writeToFile(File(s"graphs/transition-${p.name}-${name}.dot"), blockGraph)
     }
   }
 
@@ -898,13 +899,16 @@ def validateProcWithSplits(
         applySplit(s)
         SimplifyLogger.info(s"try split ${splitIndex} of ${splits.length}")
         val r = validate(validationProg, proc.name, name + proc.name + "_split" + splitIndex, timeout).kind
-        if (r.isInstanceOf[BoogieResultKind.Verified]) then r else break(Seq(r))
+        if (r.isInstanceOf[BoogieResultKind.Verified]) then {
+          SimplifyLogger.info(s"Verified ${splitIndex} of ${splits.length}")
+          r
+        } else break(Seq(r))
       )
     }
 
   }
 
-  if (result.forall(_.isInstanceOf[BoogieResultKind.Verified])) {
+  if (result.nonEmpty && result.forall(_.isInstanceOf[BoogieResultKind.Verified])) {
     SimplifyLogger.info(s"TV success for: $name ${proc.name}")
   } else {
     SimplifyLogger.error(s"TV failure for: $name ${proc.name} :: $result")
@@ -980,9 +984,19 @@ def validateProcWithSplitsInteractive(validationProg: Program, proc: Procedure, 
 def transformAndValidate(transform: Program => Unit, name: String)(p: Program) = {
   val (progs, splits) = wrapShapePreservingTransformInValidation(transform)(p)
   writeValidationProg(progs, name)
+  validateProgs(progs, name, splits)
 }
 
 def validatedSimplifyPipeline(p: Program) = {
+
+  var count = 0
+  def log(tname: String) = {
+    count += 1
+    for (pr <- p.procedures) {
+      val fname = File(s"pass_${count}_${pr.name}_$tname.il")
+      DebugDumpIRLogger.writeToFile(fname, pp_proc(pr))
+    }
+  }
 
   def copyProp(prog: Program) = {
 
@@ -993,8 +1007,8 @@ def validatedSimplifyPipeline(p: Program) = {
     val results = prog.procedures.map(p => p.name -> OffsetProp.transform(p)).toMap
 
     // sliceCleanup(p)
-    deadAssignmentElimination(p)
-    combineBlocks(p)
+    // deadAssignmentElimination(p)
+    // combineBlocks(p)
 
     validator.setSourceProg(prog)
     validator.setEqualVarsInvariant
@@ -1048,14 +1062,15 @@ def validatedSimplifyPipeline(p: Program) = {
     val (vprog, splits) = validator.getValidationProgWPConj
 
     writeValidationProg(vprog, "OffsetCopyProp")
+    validateProgs(vprog, "OffsetCopyProp", splits)
 
   }
 
   def simplifyGuards(prog: Program) = {
-    val gvis = GuardVisitor()
-    visit_prog(gvis, prog)
     for (p <- prog.procedures) {
-      AssumeConditionSimplifications(p)
+      transforms.fixupGuards(p)
+      val gvis = GuardVisitor()
+      visit_proc(gvis, p)
     }
   }
 
@@ -1090,21 +1105,38 @@ def validatedSimplifyPipeline(p: Program) = {
 
     val (vprog, splits) = validator.getValidationProgWPConj
     writeValidationProg(vprog, "DynamicSingleAssignment")
-    // validateProgs(vprog, "DynamicSingleAssignment", splits)
+    validateProgs(vprog, "DynamicSingleAssignment", splits)
 
   }
 
+  log("initial")
   combineBlocks(p)
   applyRPO(p)
   dsa(p)
+  log("DSA")
   copyProp(p)
+  log("copyprop")
   transformAndValidate(
     p => {
+      // ExtractExtendZeroBits.doTransform(p)
+      p.procedures.foreach(AlgebraicSimplifications(_))
+      log("ExtractCleanup")
       simplifyGuards(p)
+      log("GuardsCleanup")
+      p.procedures.foreach(p => {
+        AlgebraicSimplifications(p)
+        AssumeConditionSimplifications(p)
+        AlgebraicSimplifications(p)
+        ir.eval.cleanupSimplify(p)
+      })
+      log("GuardsSimplify")
       removeDuplicateGuard(p)
       sliceCleanup(p)
+      log("SliceCleanup")
       deadAssignmentElimination(p)
+      log("DeadCode")
       combineBlocks(p)
+      log("SimpCFG2")
     },
     "BranchCleanup"
   )(p)
@@ -1131,14 +1163,16 @@ def copypropTransform(
   OffsetProp.transform(p)
   // MinCopyProp.transform(p)
 
-
   simplifyCFG(p)
 
+  transforms.fixupGuards(p)
   val gvis = GuardVisitor(ir.eval.SimplifyValidation.validate)
   visit_proc(gvis, p)
+  AlgebraicSimplifications(p)
   AssumeConditionSimplifications(p)
-  transforms.fixupGuards(p)
+  ir.eval.cleanupSimplify(p)
   transforms.removeDuplicateGuard(p.blocks.toSeq)
+  println(pp_proc(p))
 
   val xf = t.checkPoint("transform")
 
@@ -1490,7 +1524,6 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
   visit_prog(CleanupAssignments(), p)
   ExtractExtendZeroBits.doTransform(p)
 
-
   SimplifyLogger.info("[!] Simplify :: Merge empty blocks")
   cleanupBlocks(p)
 
@@ -1672,16 +1705,17 @@ object OffsetProp {
     }
 
     def transfer(s: Statement) = s match {
-      case LocalAssign(l: Variable, r: Variable, _) => joinState(l, r)
-      case LocalAssign(l: Variable, r: Literal, _) => joinState(l, r)
-      case LocalAssign(l: Variable, r @ BinaryExpr(BVADD, _: Variable, _: BitVecLiteral), _) => joinState(l, r)
-      case LocalAssign(l: Variable, _, _) => clob(l)
-      // case s: SimulAssign => s.assignments.flatMap {
-      //   case (l: Variable, r: Variable) => specJoinState(l, r).toSeq
-      //   case (l: Variable, r) => Seq(l -> None)
-      // }.foreach {
-      //   case (l, r) => st(l) = r
-      // }
+      case SimulAssign(assignments, _) =>
+        assignments
+          .flatMap {
+            case (l: Variable, r: Variable) => specJoinState(l, r).toSeq
+            case (l: Variable, r: Literal) => specJoinState(l, r).toSeq
+            case (l: Variable, r @ BinaryExpr(BVADD, _: Variable, _: BitVecLiteral)) => specJoinState(l, r).toSeq
+            case (l: Variable, _) => Seq(l -> (None, None))
+          }
+          .foreach { case (l, r) =>
+            st(l) = r
+          }
       case a: Assign => {
         // memoryload and DirectCall
         a.assignees.foreach(clob)
@@ -2169,8 +2203,14 @@ object CopyProp {
 class ExprComplexity extends CILVisitor {
   // count the nodes in the expression AST
   var count = 0
+  var stmt = 0
   override def vexpr(e: Expr) = {
     count += 1
+    DoChildren()
+  }
+
+  override def vstmt(s: Statement) = {
+    stmt += 1
     DoChildren()
   }
 
@@ -2178,6 +2218,12 @@ class ExprComplexity extends CILVisitor {
     count = 0
     visit_proc(this, e)
     count
+  }
+
+  def stmtCount(p: Procedure) = {
+    stmt = 0
+    visit_proc(this, p)
+    stmt
   }
 
   def apply(e: Expr) = {
