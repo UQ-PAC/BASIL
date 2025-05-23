@@ -143,6 +143,28 @@ object IntervalDSATestData {
       )
     programToContext(program, globals)
   }
+
+
+  def loopIndirection: IRContext = {
+   val program =
+      prog(
+        proc(
+          "main",
+          Set(("R0", bv64)),
+          Set(("R0", bv64)),
+          block(
+            "en",
+            MemoryLoad(R1, mem, R0, LittleEndian, 64),
+            LocalAssign(R2, BinaryExpr(BVADD, R1, BitVecLiteral(8, 64)), Some("01")),
+            MemoryStore(mem, R0, R2, LittleEndian, 64),
+            directCall(Set(("R0", R0)), "main", Set(("R0", R0))),
+            goto("en", "ex")
+          ),
+          block("ex", ret(("R0", R0)))
+        )
+      )
+    programToContext(program, Set.empty)
+  }
 }
 
 def runAnalysis(program: Program): StaticAnalysisContext = {
@@ -207,6 +229,18 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
         dsaConfig = Some(config)
       )
     )
+  }
+
+  test("loop indirection") {
+    val result = runTestPrg(IntervalDSATestData.loopIndirection)
+    val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
+    assert(dsg.exprToCells(dsg.proc.formalInParam.head).forall(_.getPointee.node.isCollapsed))
+  }
+
+  test("loop indirection eq cell") {
+    val result = runTestPrg(IntervalDSATestData.loopIndirection, DSConfig(TD, eqClasses = true))
+    val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
+    assert(dsg.exprToCells(dsg.proc.formalInParam.head).forall(_.getPointee.node.isCollapsed))
   }
 
   test("recursion") {
