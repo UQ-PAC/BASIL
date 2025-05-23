@@ -22,7 +22,11 @@ trait DownloadModule extends Module {
   def remote = Task {
     val p = Task.dest / name
     os.write(p, requests.get(url))
-    os.perms.set(p, mode)
+    try {
+      os.perms.set(p, mode)
+    } catch {
+      case e: UnsupportedOperationException => println(e)
+    }
     p.toString
   }
   def source = Task(PathRef(Path(path())))
