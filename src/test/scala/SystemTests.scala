@@ -607,6 +607,10 @@ class IntervalDSASystemTestsSplitGlobals extends SystemTests {
     "correct",
     TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig(TD, true, true)))
   )
+
+  runTests("dsa/correct",
+    TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig(TD, true, true)))
+  )
   runTests(
     "incorrect",
     TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSConfig(TD, true, true)))
