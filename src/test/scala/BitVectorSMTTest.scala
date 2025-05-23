@@ -41,8 +41,8 @@ class BitVectorEvalTest extends AnyFunSuite {
       BVSLE,
       BVSGT,
       BVSGE,
-      BVEQ,
-      BVNEQ,
+      EQ,
+      NEQ,
       BVCONCAT
     )
 
@@ -53,7 +53,7 @@ class BitVectorEvalTest extends AnyFunSuite {
         val lhs = BitVecLiteral(l, size)
         val rhs = BitVecLiteral(r, size)
         val exprs = ops.map(op => BinaryExpr(op, lhs, rhs))
-        val test = exprs.map(e => (e, BinaryExpr(BVNEQ, e, ir.eval.evaluateExpr(e).get)))
+        val test = exprs.map(e => (e, BinaryExpr(NEQ, e, ir.eval.evaluateExpr(e).get)))
         checks = checks ++ test
       }
     }

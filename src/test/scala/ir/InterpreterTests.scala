@@ -13,7 +13,7 @@ import translating.BAPToIR
 import util.{LogLevel, Logger}
 import util.IRLoading.{loadBAP, loadReadELF}
 import util.{ILLoadingConfig, IRContext, IRLoading, IRTransform}
-import test_util.CaptureOutput
+import test_util.{BASILTest, CaptureOutput}
 import ir.dsl.given
 import ir.dsl.IfThenBlocks
 
@@ -25,9 +25,7 @@ def load(s: InterpreterState, global: SpecGlobal): Option[BitVecLiteral] = {
     Eval.loadBV(f)("mem", Scalar(BitVecLiteral(global.address, 64)), Endian.LittleEndian, global.size)
   ) match {
     case Right(e) => Some(e)
-    case Left(e) => {
-      None
-    }
+    case Left(e) => None
   }
 }
 
@@ -36,11 +34,12 @@ def mems[E, T <: Effects[T, E]](m: MemoryState): Map[BigInt, BitVecLiteral] = {
 }
 
 @test_util.tags.UnitTest
-class InterpreterTests extends AnyFunSuite with test_util.CaptureOutput with BeforeAndAfter {
+class InterpreterTests extends AnyFunSuite with CaptureOutput with BeforeAndAfter {
 
   Logger.setLevel(LogLevel.WARN)
 
-  def getProgram(name: String, path: String): IRContext = {
+  def getProgram(name: String, relativePath: String): IRContext = {
+    val path = s"${BASILTest.rootDirectory}/$relativePath"
     val compiler = "gcc"
     val loading = ILLoadingConfig(
       inputFile = s"$path/$name/$compiler/$name.adt",
@@ -379,16 +378,16 @@ class InterpreterTests extends AnyFunSuite with test_util.CaptureOutput with Bef
       proc(
         "begin",
         block("entry", LocalAssign(R8, Register("R31", 64)), LocalAssign(R0, bv64(n)), directCall("fib"), goto("done")),
-        block("done", Assert(BinaryExpr(BVEQ, R0, bv64(fib(n)))), ret)
+        block("done", Assert(BinaryExpr(EQ, R0, bv64(fib(n)))), ret)
       ),
       proc(
         "fib",
         block("base", goto("base1", "base2", "dofib")),
-        block("base1", Assume(BinaryExpr(BVEQ, R0, bv64(0))), ret),
-        block("base2", Assume(BinaryExpr(BVEQ, R0, bv64(1))), ret),
+        block("base1", Assume(BinaryExpr(EQ, R0, bv64(0))), ret),
+        block("base2", Assume(BinaryExpr(EQ, R0, bv64(1))), ret),
         block(
           "dofib",
-          Assume(BinaryExpr(BoolAND, BinaryExpr(BVNEQ, R0, bv64(0)), BinaryExpr(BVNEQ, R0, bv64(1)))),
+          Assume(BinaryExpr(BoolAND, BinaryExpr(NEQ, R0, bv64(0)), BinaryExpr(NEQ, R0, bv64(1)))),
           // R8 stack pointer preserved across calls
           LocalAssign(R7, BinaryExpr(BVADD, R8, bv64(8))),
           MemoryStore(stack, R7, R8, Endian.LittleEndian, 64), // sp
@@ -480,7 +479,7 @@ class InterpreterTests extends AnyFunSuite with test_util.CaptureOutput with Bef
     val watch = IRWalk.firstInProc((fib.procedures.find(_.name == "fib")).get).get
     val bp = BreakPoint(
       "Fibentry",
-      BreakPointLoc.CMDCond(watch, BinaryExpr(BVEQ, BitVecLiteral(5, 64), Register("R0", 64))),
+      BreakPointLoc.CMDCond(watch, BinaryExpr(EQ, BitVecLiteral(5, 64), Register("R0", 64))),
       BreakPointAction(true, true, List(("R0", Register("R0", 64))), true)
     )
     val bp2 = BreakPoint(

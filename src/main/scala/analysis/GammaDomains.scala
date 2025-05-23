@@ -158,12 +158,12 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
       case m: MemoryStore => b
       case a: Assume => {
         if (a.checkSecurity) {
-          and(b, exprToPredicate(a.body).get, lowExpr(a.body)).simplify
+          and(b, expectPredicate(a.body), lowExpr(a.body)).simplify
         } else {
-          and(b, exprToPredicate(a.body).get).simplify
+          and(b, expectPredicate(a.body)).simplify
         }
       }
-      case a: Assert => and(b, exprToPredicate(a.body).get).simplify
+      case a: Assert => and(b, expectPredicate(a.body)).simplify
       case i: IndirectCall => top
       case c: DirectCall =>
         c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>
@@ -184,6 +184,13 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
 
   def toPred(x: Predicate): Predicate = x
   override def fromPred(p: Predicate): Predicate = p
+}
+
+private def expectPredicate(orig: Expr): Predicate = {
+  exprToPredicate(orig) match {
+    case Some(p) => p
+    case None => throw Exception(s"Expected to be able to construct predicate for: $orig")
+  }
 }
 
 /**
@@ -217,12 +224,12 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
       case m: MemoryStore => b
       case a: Assume => {
         if (a.checkSecurity) {
-          or(and(b, exprToPredicate(a.body).get), not(lowExpr(a.body))).simplify
+          or(and(b, expectPredicate(a.body)), not(lowExpr(a.body))).simplify
         } else {
-          and(b, exprToPredicate(a.body).get).simplify
+          and(b, expectPredicate(a.body)).simplify
         }
       }
-      case a: Assert => or(b, not(exprToPredicate(a.body).get)).simplify
+      case a: Assert => or(b, not(expectPredicate(a.body))).simplify
       case i: IndirectCall => bot
       case c: DirectCall =>
         not(c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>

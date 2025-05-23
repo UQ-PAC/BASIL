@@ -1,17 +1,23 @@
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
-import scala.util.{Try, Failure, Success}
-import java.io.OutputStream
 
+import scala.util.{Failure, Success, Try}
 import ir.*
 import ir.dsl.*
+import util.EvalScala.EvalResult
+import ir.dsl.given
+import test_util.{CaptureOutput, TestCustomisation}
 
 @test_util.tags.UnitTest
-class EvalScalaTest extends AnyFunSuite with test_util.CaptureOutput with Matchers {
+class EvalScalaTest extends AnyFunSuite, CaptureOutput, Matchers, TestCustomisation {
 
-  import util.EvalScala.EvalResult
-
-  import ir.dsl.{given}
+  override def customiseTestsByName(name: String): Mode = {
+    if (System.getProperty("os.name").startsWith("Windows")) {
+      Mode.Disabled("EvalScala currently fails on Windows due to complex issues relating to the Mill build system")
+    } else {
+      Mode.Normal
+    }
+  }
 
   val program: Program = prog(
     proc(

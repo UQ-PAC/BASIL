@@ -147,9 +147,7 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
         vexpr(BinaryExpr(BVCONCAT, Repeat(bits, Extract(size(arg).get, size(arg).get - 1, arg)), arg))
       case BinaryExpr(op, arg, arg2) =>
         op match {
-          case BVNEQ => vunary_expr(BoolNOT, vbinary_expr(BVEQ, vexpr(arg), vexpr(arg2)))
-          case IntNEQ => vunary_expr(BoolNOT, vbinary_expr(IntEQ, vexpr(arg), vexpr(arg2)))
-          case BoolNEQ => vunary_expr(BoolNOT, vbinary_expr(BoolEQ, vexpr(arg), vexpr(arg2)))
+          case NEQ => vunary_expr(BoolNOT, vbinary_expr(EQ, vexpr(arg), vexpr(arg2)))
           case _ => vbinary_expr(op, vexpr(arg), vexpr(arg2))
         }
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
@@ -234,12 +232,8 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
 
   def opnameToFun(b: BinOp) = {
     b match {
-      case IntEQ => "="
-      case BoolEQ => "="
-      case BVEQ => "="
-      case BVNEQ => ???
-      case IntNEQ => ???
-      case BoolNEQ => ???
+      case EQ => "="
+      case NEQ => ???
       case BoolOR => "or"
       case BVCONCAT => "concat"
       case b: BVBinOp => "bv" + b.opName

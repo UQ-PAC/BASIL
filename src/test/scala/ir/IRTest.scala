@@ -1,16 +1,14 @@
 package ir
 
-import scala.collection.mutable
 import scala.collection.immutable.*
 import org.scalatest.funsuite.AnyFunSuite
-import util.intrusive_list.*
-import translating.serialiseIL
 import translating.PrettyPrinter.*
 import ir.dsl.*
 import ir.*
+import test_util.CaptureOutput
 
 @test_util.tags.UnitTest
-class IRTest extends AnyFunSuite with test_util.CaptureOutput {
+class IRTest extends AnyFunSuite with CaptureOutput {
 
   test("blockintralinks") {
     val p = prog(proc("main", block("lmain", goto("lmain1")), block("lmain1", goto("lmain2")), block("lmain2", ret)))
