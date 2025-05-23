@@ -11,7 +11,6 @@ import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
 
-
 private def parse_asl_stmt(line: String): Option[StmtContext] = {
   val lexer = ASLpLexer(CharStreams.fromString(line))
   val tokens = CommonTokenStream(lexer)
@@ -41,7 +40,6 @@ private def parse_asl_stmt(line: String): Option[StmtContext] = {
   }
 }
 
-
 implicit val insnSemanticsJsonRW: ReadWriter[InsnSemantics] =
   readwriter[ujson.Value].bimap[InsnSemantics](
     x => throw Error("serialisation of InsnSemantics is not supported"),
@@ -61,7 +59,7 @@ implicit val insnSemanticsJsonRW: ReadWriter[InsnSemantics] =
         InsnSemantics.Error(m("opcode").str, m("error").str)
       case x =>
         throw Error(s"Bad sem format $x")
-    },
+    }
   )
 
 // implicit object InsnSemanticsFormat extends JsonFormat[InsnSemantics] {

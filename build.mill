@@ -162,12 +162,10 @@ object `package` extends RootModule with ScalaModule with antlr.AntlrModule with
     }
 
     def bnfcLocal = Task.Input {
-      val res = os.proc("bnfc", "--version").call(check = false, mergeErrIntoOut = true)
-      res match {
-        case res @ os.CommandResult(_, 0, _) if res.out.trim() != "" =>
-          Some("bnfc")
-        case _ => None
-      }
+      Try(os.proc("bnfc", "--version").call())
+        .map(_.out.trim())
+        .toEither
+        .left.map(_.toString)
     }
 
     def bnfcBinary = Task {
