@@ -139,21 +139,22 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
 
     def criterion(n: CFGPosition): StatementSlice = {
       (n match {
-        case c: Call => transfer(c.successor).keys.toSet
+        case c: DirectCall => transfer(c.successor).keys.toSet
         case _ => results.getOrElse(n, Set())
       }) ++ initialCriterion.getOrElse(n, Set())
     }
 
     def hasCriterionImpact(n: Statement): Boolean = {
       val crit = criterion(n)
-      val transferred = transfer(n)
 
       n match {
-        case c: DirectCall
-            if c.target.blocks.flatMap(_.modifies.collect { case v: Variable => v }).exists(crit.contains) =>
-          true
-        case c: IndirectCall if crit.exists(_.isInstanceOf[Global]) => true
+        case c: DirectCall =>
+          c.outParams.values.toSet.exists(crit.contains)
+          || c.target.blocks
+            .flatMap(_.modifies.collect { case v: Variable => v })
+            .exists(crit.contains)
         case _ => {
+          val transferred = transfer(n)
           transferred.values.toSet.contains(
             transferFunctions.edgelattice.ConstEdge(transferFunctions.valuelattice.top)
           ) || (transferred.size != crit.size)

@@ -106,12 +106,7 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
           case Right(_) => Map(d -> IdEdge())
         }
       }
-      case c: DirectCall => {
-        d match {
-          case Left(value) if c.outParams.values.toSet.contains(value) => Map()
-          case _ => Map(d -> IdEdge())
-        }
-      }
+      case c: DirectCall => Map(d -> IdEdge())
       case i: IndirectCall => {
         d match {
           case Left(value: Global) => Map(d -> IdEdge(), Left(i.target) -> ConstEdge(TwoElementTop))
