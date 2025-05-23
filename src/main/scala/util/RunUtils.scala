@@ -5,6 +5,7 @@ import java.nio.file.{Files, Path, Paths}
 import com.grammatech.gtirb.proto.IR.IR
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Section.Section
+import spray.json.*
 import ir.eval
 import gtirb.*
 import translating.PrettyPrinter.*
@@ -33,6 +34,7 @@ import translating.*
 import util.{DebugDumpIRLogger, Logger, SimplifyLogger}
 
 import java.util.Base64
+import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
 import ir.transforms.MemoryTransform
@@ -128,15 +130,6 @@ object IRLoading {
       IRTranslator.translate
     } else if (q.inputFile.endsWith(".gts")) {
       loadGTIRB(q.inputFile, mainAddress)
-    } else if (q.inputFile.endsWith(".scala")) {
-
-      val source = scala.io.Source.fromFile(q.inputFile)
-      val lines =
-        try source.mkString
-        finally source.close()
-
-      println(System.getProperty("java.class.path"))
-      ???
     } else {
       throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
     }
@@ -164,10 +157,56 @@ object IRLoading {
     val mods = ir.modules
     val cfg = ir.cfg.get
 
-    // val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, List[InsnSemantics]]])
-    val semanticsJson = mods.map(_.auxData("ast").data.toStringUtf8)
+    def parse_asl_stmt(line: String): Option[StmtContext] = {
+      val lexer = ASLpLexer(CharStreams.fromString(line))
+      val tokens = CommonTokenStream(lexer)
+      val parser = ASLpParser(tokens)
+      parser.setErrorHandler(BailErrorStrategy())
+      parser.setBuildParseTree(true)
 
-    val semantics = semanticsJson.map(upickle.default.read[Map[String, List[InsnSemantics]]](_))
+      try {
+        Some(parser.stmt())
+      } catch {
+        case e: org.antlr.v4.runtime.misc.ParseCancellationException =>
+          val extra = e.getCause match {
+            case mismatch: org.antlr.v4.runtime.InputMismatchException =>
+              val token = mismatch.getOffendingToken
+              s"""
+                exn: $mismatch
+                offending token: $token
+
+              ${line.replace('\n', ' ')}
+              ${" " * token.getStartIndex}^ here!
+              """.stripIndent
+            case o => o.toString
+          }
+          Logger.error(s"""Semantics parse error:\n  line: $line\n$extra""")
+          Logger.error(e.getStackTrace.mkString("\n"))
+          None
+      }
+    }
+
+    implicit object InsnSemanticsFormat extends JsonFormat[InsnSemantics] {
+      def write(m: InsnSemantics): JsValue = ???
+      def read(json: JsValue): InsnSemantics = json match {
+        case JsObject(fields) =>
+          val m: Map[String, JsValue] = fields.get("decode_error") match {
+            case Some(JsObject(m)) => m
+            case _ => deserializationError(s"Bad sem format $json")
+          }
+          InsnSemantics.Error(m("opcode").convertTo[String], m("error").convertTo[String])
+        case array @ JsArray(_) =>
+          val xs = array.convertTo[Array[String]].map(parse_asl_stmt)
+          if (xs.exists(_.isEmpty)) {
+            InsnSemantics.Error("?", "parseError")
+          } else {
+            InsnSemantics.Result(xs.map(_.get))
+          }
+        case s => deserializationError(s"Bad sem format $s")
+      }
+    }
+
+    val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, List[InsnSemantics]]])
 
     val parserMap: Map[String, List[InsnSemantics]] = semantics.flatten.toMap
 
