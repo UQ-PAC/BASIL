@@ -1,0 +1,33 @@
+package build
+import mill._
+
+import os.Path
+import scala.util.control.Exception.{ignoring}
+
+/**
+ * Module to download a file from a URL, with the ability to
+ * prefer a local copy if it exists. The local search behaviour
+ * is user-specified in the `local` method.
+ *
+ * Use `path` to obtain a string pointing to the file, or use
+ * `source` to obtain a PathRef. The PathRef will trigger re-builds
+ * when file /contents/ change. The string will only re-build when
+ * the string itself changes.
+ */
+trait DownloadModule extends Module {
+  def name: String
+  def url: String
+  def local: Target[Either[String, String]]
+
+  def mode = "rwxr-xr-x"
+  def remote = Task {
+    val p = Task.dest / name
+    os.write(p, requests.get(url))
+    ignoring(classOf[UnsupportedOperationException]) {
+      os.perms.set(p, mode)
+    }
+    p.toString
+  }
+  def source = Task(PathRef(Path(path())))
+  def path = Task(local().getOrElse(remote()))
+}
