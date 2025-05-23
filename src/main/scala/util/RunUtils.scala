@@ -136,7 +136,6 @@ object IRLoading {
         finally source.close()
 
       println(System.getProperty("java.class.path"))
-      println(util.EvalScala.evalDSL(lines))
       ???
     } else {
       throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
