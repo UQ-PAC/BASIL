@@ -729,6 +729,8 @@ object RunUtils {
     val timer = PerformanceTimer("Simplify")
     val program = ctx.program
 
+    transforms.CalleePreservedParam.transform(ctx.program)
+
     val foundLoops = LoopDetector.identify_loops(program)
     val newLoops = foundLoops.reducibleTransformIR()
     newLoops.updateIrWithLoops()
