@@ -6,15 +6,15 @@ import analysis.{Lambda, EdgeFunction, TwoElement}
 import util.{SlicerConfig, SlicerLogger, LogLevel, PerformanceTimer}
 import scala.collection.mutable
 
-private type StatementSlice = Set[Variable]
+protected type StatementSlice = Set[Variable]
 object StatementSlice {
   def apply(): StatementSlice = Set.empty[Variable]
 }
 
 class Slicer(program: Program, slicerConfig: SlicerConfig) {
-  private val performanceTimer = PerformanceTimer("Slicer Timer", LogLevel.INFO)
+  protected val performanceTimer = PerformanceTimer("Slicer Timer", LogLevel.INFO)
 
-  private val parsedConfig: Option[(Block, StatementSlice)] = {
+  protected val parsedConfig: Option[(Block, StatementSlice)] = {
     def variables(n: Command): Set[Variable] = {
       n match {
         case a: LocalAssign => a.lhs.variables ++ a.rhs.variables
@@ -79,53 +79,55 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
     }
   }
 
-  var nop: Option[NOP] = None
-  def insertNOP: Unit = {
-    startingNode match {
-      case c: Command =>
-        IRWalk.prevCommandInBlock(c) match {
-          case Some(d: DirectCall) if d.target.returnBlock.isDefined =>
-            nop = Some(NOP())
-            c.parent.statements.insertAfter(d, nop.get)
-          case _ => ()
-        }
-      case _ => ()
-    }
-  }
-
-  def removeNOP: Unit = {
-    nop match {
-      case Some(n) => n.parent.statements.remove(n)
-      case _ => ()
-    }
-  }
-
-  lazy private val initialCriterion: Map[CFGPosition, StatementSlice] = {
+  lazy protected val initialCriterion: Map[CFGPosition, StatementSlice] = {
     parsedConfig match {
       case Some(targetedBlock, variables) => Map(targetedBlock.jump -> variables)
       case _ => Map()
     }
   }
 
-  lazy private val startingNode = {
+  lazy protected val startingNode = {
     parsedConfig match {
       case Some(targetedBlock, _) => targetedBlock.jump
       case _ => IRWalk.lastInProc(program.mainProcedure).getOrElse(program.mainProcedure)
     }
   }
 
-  private class Phase1 {
+  class Phase1 {
+    protected var nop: Option[NOP] = None
+    protected def insertNOP: Unit = {
+      startingNode match {
+        case c: Command =>
+          IRWalk.prevCommandInBlock(c) match {
+            case Some(d: DirectCall) if d.target.returnBlock.isDefined =>
+              nop = Some(NOP())
+              c.parent.statements.insertAfter(d, nop.get)
+            case _ => ()
+          }
+        case _ => ()
+      }
+    }
+
+    protected def removeNOP: Unit = {
+      nop match {
+        case Some(n) => n.parent.statements.remove(n)
+        case _ => ()
+      }
+    }
+
     def run(): Map[CFGPosition, Set[Variable]] = {
       SlicerLogger.info("Slicer :: Slicing Criterion Generation - Phase1")
+      insertNOP
       val results = SlicerAnalysis(program, startingNode, initialCriterion)
         .analyze()
         .map({ case (n, e) => n -> e.keys.toSet })
       performanceTimer.checkPoint("Finished IDE Analysis")
+      removeNOP
       results
     }
   }
 
-  private class Phase2(results: Map[CFGPosition, StatementSlice]) {
+  class Phase2(results: Map[CFGPosition, StatementSlice]) {
     val transferFunctions = SlicerTransfers(initialCriterion)
 
     def procedures = program.procedures.filterNot(_.isExternal.contains(true))
@@ -245,11 +247,8 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       SlicerLogger.debug("Slicer - Stripping unreachable")
       stripUnreachableFunctions(program)
 
-      insertNOP
-
       val results = Phase1().run()
 
-      removeNOP
 
       Phase2(results).run()
 
