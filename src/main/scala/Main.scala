@@ -18,34 +18,6 @@ import util.boogie_interaction.BoogieResultKind
 
 object Main {
 
-  val b = new basil_ir.VisitSkel()
-  val a = new b.BinOpVisitor[Int, Boolean]()
-  println(a)
-
-  class fdsa extends basil_ir.Absyn.BVBinOp.Visitor[Int, String] {
-
-    type A = String
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvand, x$1: A): Int = ???
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvor, x$1: String): Int = ???
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvadd, x$1: String): Int = ???
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvmul, x$1: String): Int = ???
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvudiv, x$1: String): Int = ???
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvurem, x$1: String): Int = ???
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvshl, x$1: String): Int = ???
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvlshr, x$1: String): Int = ???
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvult, x$1: String): Int = ???
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvnand, x$1: String): Int = ???
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvnor, x$1: String): Int = ???
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvxor, x$1: String): Int = ???
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvxnor, x$1: String): Int = ???
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvcomp, x$1: String): Int = ???
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvsub, x$1: String): Int = ???
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvsdiv, x$1: String): Int = ???
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvsrem, x$1: String): Int = ???
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvsmod, x$1: String): Int = ???
-    override def visit(x$0: basil_ir.Absyn.BVBinOp_bvashr, x$1: String): Int = ???
-  }
-
   enum ChooseInput {
     case Gtirb
     case Bap
