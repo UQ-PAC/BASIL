@@ -2,6 +2,7 @@ package build
 import mill._
 
 import os.Path
+import scala.util.control.Exception.{ignoring}
 
 /**
  * Module to download a file from a URL, with the ability to
@@ -22,10 +23,8 @@ trait DownloadModule extends Module {
   def remote = Task {
     val p = Task.dest / name
     os.write(p, requests.get(url))
-    try {
+    ignoring(classOf[UnsupportedOperationException]) {
       os.perms.set(p, mode)
-    } catch {
-      case e: UnsupportedOperationException => println(e)
     }
     p.toString
   }
