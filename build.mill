@@ -126,11 +126,24 @@ object `package` extends RootModule with ScalaModule with antlr.AntlrModule with
 
   def scalafmt = mill.scalalib.scalafmt.ScalafmtModule
 
-  def bnfcSource = Task.Source {
-    this.millSourcePath / "main" / "bnfc" / "BasilIR.cf"
-  }
+  val bnfc = new BNFCModule("basil_ir", basilGrammar.source)
 
-  val bnfc = new BNFCModule("basil_ir", bnfcSource)
+  object basilGrammar extends Module {
+    def name = "BasilIR.cf"
+    def url = "https://raw.githubusercontent.com/ailrst/basls/a637357c485aa2570515baf496b3023d91bbc3ad/BasilIR.cf"
+
+    def envVar = Task.Input {
+      Task.env.get("BASIL_GRAMMAR").map(Path(_))
+    }
+    def remote = Task {
+      val p = Task.dest / name
+      os.write(p, requests.get(url))
+      p
+    }
+    def source = Task {
+      PathRef(envVar().getOrElse(remote()))
+    }
+  }
 
   class BNFCModule(packageName: String, bnfcSource: Task[PathRef], extraArgs: Seq[String] = Nil) extends JavaModule with antlr.AntlrModule {
 
