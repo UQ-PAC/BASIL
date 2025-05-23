@@ -39,6 +39,7 @@ object IntervalDSATestData {
   val R0 = Register("R0", 64)
   val R1 = Register("R1", 64)
   val R2 = Register("R2", 64)
+  val R3 = Register("R3", 64)
   val bv64 = BitVecType(64)
 
   def recursion: IRContext = {
@@ -154,10 +155,11 @@ object IntervalDSATestData {
           Set(("R0", bv64)),
           block(
             "en",
-            MemoryLoad(R1, mem, R0, LittleEndian, 64),
-            LocalAssign(R2, BinaryExpr(BVADD, R1, BitVecLiteral(8, 64)), Some("01")),
-            MemoryStore(mem, R0, R2, LittleEndian, 64),
-            directCall(Set(("R0", R0)), "main", Set(("R0", R0))),
+            MemoryLoad(R1, mem, R0, LittleEndian, 64, Some("00")),
+            MemoryLoad(R2, mem, R1, LittleEndian, 64, Some("01")),
+            LocalAssign(R3, BinaryExpr(BVADD, R2, BitVecLiteral(8, 64)), Some("02")),
+            MemoryStore(mem, R1, R3, LittleEndian, 64, Some("03")),
+            directCall(Set(("R0", R0)), "main", Set(("R0", R0)), Some("04")),
             goto("en", "ex")
           ),
           block("ex", ret(("R0", R0)))
@@ -234,13 +236,13 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   test("loop indirection") {
     val result = runTestPrg(IntervalDSATestData.loopIndirection)
     val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
-    assert(dsg.exprToCells(dsg.proc.formalInParam.head).forall(_.getPointee.node.isCollapsed))
+    assert(dsg.exprToCells(dsg.proc.formalInParam.head).forall(_.getPointee.getPointee.node.isCollapsed))
   }
 
   test("loop indirection eq cell") {
     val result = runTestPrg(IntervalDSATestData.loopIndirection, DSConfig(TD, eqClasses = true))
     val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
-    assert(dsg.exprToCells(dsg.proc.formalInParam.head).forall(_.getPointee.node.isCollapsed))
+    assert(dsg.exprToCells(dsg.proc.formalInParam.head).forall(_.getPointee.getPointee.node.isCollapsed))
   }
 
   test("recursion") {
