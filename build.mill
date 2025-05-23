@@ -126,28 +126,47 @@ object `package` extends RootModule with ScalaModule with antlr.AntlrModule with
 
   def scalafmt = mill.scalalib.scalafmt.ScalafmtModule
 
-  val bnfc = new BNFCModule("basil_ir", basilGrammar.source)
-
-  object basilGrammar extends Module {
-    def name = "BasilIR.cf"
-    def url = "https://raw.githubusercontent.com/ailrst/basls/a637357c485aa2570515baf496b3023d91bbc3ad/BasilIR.cf"
-
-    def envVar = Task.Input {
-      Task.env.get("BASIL_GRAMMAR").map(Path(_))
-    }
-    def remote = Task {
-      val p = Task.dest / name
-      os.write(p, requests.get(url))
-      p
-    }
-    def source = Task {
-      PathRef(envVar().getOrElse(remote()))
-    }
+  object bnfc extends BNFCModule {
+    def bnfcPackageName = "basil_ir"
+    def bnfcSource = basilGrammar.source
   }
 
-  class BNFCModule(packageName: String, bnfcSource: Task[PathRef], extraArgs: Seq[String] = Nil) extends JavaModule with antlr.AntlrModule {
+  object basilGrammar extends DownloadModule {
+    def name = "BasilIR.cf"
+    def url = "https://raw.githubusercontent.com/ailrst/basls/a637357c485aa2570515baf496b3023d91bbc3ad/BasilIR.cf"
+    def local = Task.Input(Task.env.get("BASIL_GRAMMAR").toRight("env var undefined"))
+  }
 
-    override def antlrPackage = Some(packageName)
+  trait BNFCModule extends JavaModule with antlr.AntlrModule {
+    def bnfcPackageName: String
+    def bnfcSource: Task[PathRef]
+    def bnfcExtraArgs: Seq[String] = Nil
+
+    object bnfcBinary extends DownloadModule {
+      def version = "2.9.5"
+      def name = s"bnfc-$version-${System.currentTimeMillis()}$suffix"
+      def url = s"https://github.com/BNFC/bnfc/releases/download/v$version/bnfc-$version$suffix"
+      // https://github.com/BNFC/bnfc/releases
+
+      def local = Task.Input {
+        Try(os.proc("bnfc", "--version").call())
+          .map(Function.const("bnfc"))
+          .toEither
+          .left.map(_.toString)
+      }
+
+      def osName = System.getProperty("os.name")
+
+      def suffix = if (osName.contains("nux")) {
+        "-linux.binary"
+      } else if (osName.contains("Mac")) {
+        "-mac.binary"
+      } else if (osName.startsWith("Windows")) {
+        ".exe"
+      }
+    }
+
+    override def antlrPackage = Some(bnfcPackageName)
 
     override def sources = Task.Sources {
       Seq(bnfcGenerated())
@@ -155,49 +174,35 @@ object `package` extends RootModule with ScalaModule with antlr.AntlrModule with
     def antlrGrammarSources = sources
     def ivyDeps = Agg(antlrRuntime)
 
-    private def bnfcDownload(dest: Path): String = {
-      val osName = System.getProperty("os.name")
-      val suffix = if (osName.contains("nux")) {
-        "-linux.binary"
-      } else if (osName.contains("Mac")) {
-        "-mac.binary"
-      } else if (osName.startsWith("Windows")) {
-        ".exe"
-      }
-
-      // https://github.com/BNFC/bnfc/releases
-      val version = "2.9.5"
-      val url = s"https://github.com/BNFC/bnfc/releases/download/v$version/bnfc-$version$suffix"
-      val p = dest / s"bnfc-binary-${System.currentTimeMillis()}"
-      os.write(p, requests.get(url))
-      os.perms.set(p, "rwxr-xr-x")
-      p.toString
-    }
-
-    def bnfcLocal = Task.Input {
-      Try(os.proc("bnfc", "--version").call())
-        .map(_.out.trim())
-        .toEither
-        .left.map(_.toString)
-    }
-
-    def bnfcBinary = Task {
-      bnfcLocal().getOrElse(bnfcDownload(Task.dest))
-    }
-
     /**
      * Runs the BNFC binary.
      */
     override def run(args: Task[Args] = Task.Anon(Args())) = Task.Command {
-      val res = os.call(bnfcBinary() +: args().value, stdout = os.Inherit, check = false)
+      val res = os.call(bnfcBinary.path() +: args().value, stdout = os.Inherit, check = false)
       Task.ctx().systemExit(res.exitCode)
       ()
     }
 
     def bnfcGenerated = Task {
       val args = Seq("--java-antlr", bnfcSource().path.toString, "-m", "-o", Task.dest.toString)
-      os.call(bnfcBinary() +: (args ++ extraArgs))
+      os.call(bnfcBinary.path() +: (args ++ bnfcExtraArgs))
       PathRef(Task.dest)
     }
+  }
+
+  trait DownloadModule extends Module {
+    def name: String 
+    def url: String 
+    def local: Target[Either[String, String]]
+
+    def mode = "rwxr-xr-x"
+    def remote = Task {
+      val p = Task.dest / name
+      os.write(p, requests.get(url))
+      os.perms.set(p, mode)
+      p.toString
+    }
+    def source = Task(PathRef(Path(path())))
+    def path = Task(local().getOrElse(remote()))
   }
 }
