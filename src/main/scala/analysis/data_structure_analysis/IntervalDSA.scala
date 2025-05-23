@@ -381,11 +381,19 @@ class IntervalGraph(
         DSALogger.debug(s"Processing constraint $cons")
         val indices = constraintArgToCells(cons.arg1, true, ignoreContents = true)
         indices.foreach(cell => cell.node.add(cell.interval.growTo(cons.size)))
-        val pointees = constraintArgToCells(cons.arg1, true)
+        var pointees = constraintArgToCells(cons.arg1, true)
 
         markEscapes(cons, indices, pointees)
-        val values = constraintArgToCells(cons.arg2, true)
-        if pointees.nonEmpty || values.nonEmpty then mergeCells(pointees ++ values)
+        var values = constraintArgToCells(cons.arg2, true)
+        if pointees.nonEmpty || values.nonEmpty then {
+          val cell = mergeCells(pointees ++ values)
+          val eqs = cellToEq(cell)
+          if eqs.size > 1 && cons.source.parent.isLoopParticipant() then
+          pointees = constraintArgToCells(cons.arg1, true)
+          values = constraintArgToCells(cons.arg2, true)
+          val newEqs = cellToEq(mergeCells(pointees ++ values))
+          if newEqs.size > eqs.size then find(cell).node.collapse()
+        }
         else DSALogger.warn(s"$cons had an empty argument")
         (indices ++ values).map(_.node).map(find).filterNot(_.eqClassProperty()).toSet.foreach(_.maintainEqClasses())
       case _ => // ignore
