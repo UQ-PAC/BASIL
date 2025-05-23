@@ -388,11 +388,12 @@ class IntervalGraph(
         if pointees.nonEmpty || values.nonEmpty then {
           val cell = mergeCells(pointees ++ values)
           val eqs = cellToEq(cell)
-          if eqs.size > 1 && cons.source.parent.isLoopParticipant() then
-          pointees = constraintArgToCells(cons.arg1, true)
-          values = constraintArgToCells(cons.arg2, true)
-          val newEqs = cellToEq(mergeCells(pointees ++ values))
-          if newEqs.size > eqs.size then find(cell).node.collapse()
+          if eqs.size > 1 && cons.source.parent.isLoopParticipant() then {
+            pointees = constraintArgToCells(cons.arg1, true)
+            values = constraintArgToCells(cons.arg2, true)
+            val newEqs = cellToEq(mergeCells(pointees ++ values))
+            if newEqs.size > eqs.size then find(cell).node.collapse()
+          }
         }
         else DSALogger.warn(s"$cons had an empty argument")
         (indices ++ values).map(_.node).map(find).filterNot(_.eqClassProperty()).toSet.foreach(_.maintainEqClasses())
