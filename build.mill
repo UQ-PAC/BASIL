@@ -1,6 +1,7 @@
 package build
 import mill._
 import scalalib._
+import scala.util.{Try, Success, Failure}
 
 import os.Path
 import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
@@ -11,6 +12,8 @@ object `package` extends RootModule with ScalaModule with antlr.AntlrModule with
   // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
   def scalaVersion = "3.3.4"
+
+  def moduleDeps = Seq(bnfc)
 
   val ammonite = "3.0.2"
   override def ammoniteVersion = ammonite
@@ -122,4 +125,68 @@ object `package` extends RootModule with ScalaModule with antlr.AntlrModule with
   }
 
   def scalafmt = mill.scalalib.scalafmt.ScalafmtModule
+
+  def bnfcSource = Task.Source {
+    this.millSourcePath / "main" / "bnfc" / "BasilIR.cf"
+  }
+
+  val bnfc = new BNFCModule("basil_ir", bnfcSource)
+
+  class BNFCModule(packageName: String, bnfcSource: Task[PathRef], extraArgs: Seq[String] = Nil) extends JavaModule with antlr.AntlrModule {
+
+    override def antlrPackage = Some(packageName)
+
+    override def sources = Task.Sources {
+      Seq(bnfcGenerated())
+    }
+    def antlrGrammarSources = sources
+    def ivyDeps = Agg(antlrRuntime)
+
+    private def bnfcDownload(dest: Path): String = {
+      val osName = System.getProperty("os.name")
+      val suffix = if (osName.contains("nux")) {
+        "-linux.binary"
+      } else if (osName.contains("Mac")) {
+        "-mac.binary"
+      } else if (osName.startsWith("Windows")) {
+        ".exe"
+      }
+
+      // https://github.com/BNFC/bnfc/releases
+      val version = "2.9.5"
+      val url = s"https://github.com/BNFC/bnfc/releases/download/v$version/bnfc-$version$suffix"
+      val p = dest / s"bnfc-binary-${System.currentTimeMillis()}"
+      os.write(p, requests.get(url))
+      os.perms.set(p, "rwxr-xr-x")
+      p.toString
+    }
+
+    def bnfcLocal = Task.Input {
+      val res = os.proc("bnfc", "--version").call(check = false, mergeErrIntoOut = true)
+      res match {
+        case res @ os.CommandResult(_, 0, _) if res.out.trim() != "" =>
+          Some("bnfc")
+        case _ => None
+      }
+    }
+
+    def bnfcBinary = Task {
+      bnfcLocal().getOrElse(bnfcDownload(Task.dest))
+    }
+
+    /**
+     * Runs the BNFC binary.
+     */
+    override def run(args: Task[Args] = Task.Anon(Args())) = Task.Command {
+      val res = os.call(bnfcBinary() +: args().value, stdout = os.Inherit, check = false)
+      Task.ctx().systemExit(res.exitCode)
+      ()
+    }
+
+    def bnfcGenerated = Task {
+      val args = Seq("--java-antlr", bnfcSource().path.toString, "-m", "-o", Task.dest.toString)
+      os.call(bnfcBinary() +: (args ++ extraArgs))
+      PathRef(Task.dest)
+    }
+  }
 }
