@@ -1,7 +1,7 @@
 package util.functional
 
 import collection.immutable.LinearSeq
-import collection.IterableOps
+import collection.{SeqOps, IterableOps}
 
 /**
  * This unapplier enables pattern matching on the /last/ element of
@@ -23,4 +23,11 @@ object Snoc {
     }
   }
 
+}
+
+def sequence[T](xs: List[Option[T]]): Option[List[T]] = {
+  xs.foldRight[Option[List[T]]](Some(Nil)) {
+    case (Some(x), Some(xs)) => Some(x :: xs)
+    case _ => None
+  }
 }
