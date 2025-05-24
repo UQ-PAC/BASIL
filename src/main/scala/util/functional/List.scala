@@ -33,9 +33,9 @@ object Snoc {
  *
  * Here, "list" may be any Seq type.
  */
-def sequence[T, CC[U] <: SeqOps[U, CC, CC[U]]](xs: CC[Option[T]]): Option[CC[T]] = {
+def sequence[T, CC[U] <: SeqOps[U, CC, CC[U]], DD[V] <: SeqOps[V, DD, DD[V]]](xs: CC[DD[T]]): DD[CC[T]] = {
   def magic(x: Any): Nothing = throw new RuntimeException
-  xs.foldRight[Option[CC[T]]](Some(xs.empty.map(magic))) {
+  xs.foldRight[DD[CC[T]]](Some(xs.empty.map(magic))) {
     case (Some(x), Some(xs)) => Some(x +: xs)
     case _ => None
   }
