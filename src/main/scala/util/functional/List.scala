@@ -25,9 +25,10 @@ object Snoc {
 
 }
 
-def sequence[T](xs: List[Option[T]]): Option[List[T]] = {
-  xs.foldRight[Option[List[T]]](Some(Nil)) {
-    case (Some(x), Some(xs)) => Some(x :: xs)
+def sequence[T, CC[U] <: SeqOps[U, CC, CC[U]], L <: CC[Option[T]]](xs: L): Option[CC[T]] = {
+  def magic(x: Any): Nothing = throw new RuntimeException
+  xs.foldRight[Option[CC[T]]](Some(xs.empty.map(magic))) {
+    case (Some(x), Some(xs)) => Some(x +: xs)
     case _ => None
   }
 }
