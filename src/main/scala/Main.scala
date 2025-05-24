@@ -189,6 +189,10 @@ object Main {
   )
 
   def main(args: Array[String]): Unit = {
+
+    println(util.functional.sequence3(List(Vector(1, 2), Vector(3))) : Vector[List[Int]])
+    // println(util.functional.sequence3(List(Vector(1, 2), Vector(3))))
+    return
     val parser = ParserForClass[Config]
     val parsed = parser.constructEither(args.toSeq)
 
