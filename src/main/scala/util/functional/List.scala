@@ -25,7 +25,15 @@ object Snoc {
 
 }
 
-def sequence[T, CC[U] <: SeqOps[U, CC, CC[U]], L <: CC[Option[T]]](xs: L): Option[CC[T]] = {
+
+/**
+ * Converts a list of options to an option of list. Returns Some if
+ * all the options are Some, and returns None if any of the options
+ * were None. This can be thought of as a notion of "all succeeding".
+ *
+ * Here, "list" may be any Seq type.
+ */
+def sequence[T, CC[U] <: SeqOps[U, CC, CC[U]]](xs: CC[Option[T]]): Option[CC[T]] = {
   def magic(x: Any): Nothing = throw new RuntimeException
   xs.foldRight[Option[CC[T]]](Some(xs.empty.map(magic))) {
     case (Some(x), Some(xs)) => Some(x +: xs)
