@@ -36,9 +36,16 @@ and the scala code that generates the IR and modifies it through transform passe
 The main library used is http4s. It is a type-safe HTTP library for Scala. 
 
 ## API type
-I am using a RestAPI which ....
+I am using a RestAPI which using the standard GET method. So far I am only using this method. 
+There is no need to implement a POST, PUT or GET yet. 
+
+### GET protocol
+There are two version of the Get protocol. They are:
+- GET (api/info) -> retrieve all
+- Get (api/info/{id}) -> retrieve specific
 
 ## Architecture
+
 
 # Jesse Random ideas and Notes
 Here I have a list of a few of my choices and ideas. This will be tidied up later
@@ -48,6 +55,11 @@ I call a html file with code to display the IR atm.
 
 ## I am up to
 I have displayed an IR now. I have not run it through any transform passes yet. This still needs to be done. 
+<br>
+25/05/2025: I have displayed two versions on the IR between a selection of transform passes. 
+I now need to focus on the view of these elements and clean up the code. I also need more IRs
+to select from.
+
 
 ## classes changes
 build.sc - I needed to add dependencies (for imports such as http4)
@@ -57,5 +69,7 @@ ApiServer - Code that will run the API endpoints. I am hoping to refactor this l
 api-information.md - ReadMe for the API changes
 <br>
 index.html - Contains the javascript and future ReactCode
+<br>
+Simp.scala - This contains code to build the IR. I need split up the IR between transform passes here
 
 

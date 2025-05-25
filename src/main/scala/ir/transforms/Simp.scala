@@ -15,6 +15,8 @@ import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
 import ExecutionContext.Implicits.global
 import scala.util.boundary, boundary.break
+import ir.dsl.IRToDSL
+import API.IREpochStore
 
 /** Simplification pass, see also: docs/development/simplification-solvers.md
   */
@@ -1039,6 +1041,10 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
     }
   }
 
+  // Clone before the copypropTransforms take place
+  val clonedBeforeProgram = IRToDSL.convertProgram(p).resolve
+  IREpochStore.beforeTransform = Some(clonedBeforeProgram)
+
   SimplifyLogger.info("[!] Simplify :: Expr/Copy-prop Transform")
   val work = p.procedures
     .filter(_.blocks.size > 0)
@@ -1047,9 +1053,12 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
         {
           SimplifyLogger
             .debug(s"CopyProp Transform ${p.name} (${p.blocks.size} blocks, expr complexity ${ExprComplexity()(p)})")
-          copypropTransform(p, procFrames, addrToProc, read)
+          copypropTransform(p, procFrames, addrToProc, read) // TODO: Possible refactor here. Define a new function that works for each specific TF functionality
         }
     )
+  // Clone after the copyPropTransforms take place here
+  val clonedAfterProgram = IRToDSL.convertProgram(p).resolve
+  IREpochStore.afterTransform = Some(clonedAfterProgram)
 
   work.foreach((p, job) => {
     try {

@@ -1,6 +1,7 @@
 package API
 
 // Importing necessary BASIL classes
+import ir.Program
 import util.RunUtils
 import util.BASILConfig
 import util.ILLoadingConfig
@@ -22,8 +23,14 @@ import scala.io.Source
 import cats.effect.IO
 import org.http4s.Request
 
-// Define the IR response case class for the API
+// Define the IR response case class for the API TODO: This can probably be removed atm.
 private case class IRResponse(code: String, label: String)
+
+object IREpochStore {
+  // TODO: Just two for now, but I will make this into an array most likely to contain them all. With names
+  var beforeTransform: Option[Program] = None
+  var afterTransform: Option[Program] = None
+}
 
 object ApiServer extends IOApp {
 
@@ -57,7 +64,8 @@ object ApiServer extends IOApp {
 
     // Get the IR program from the result
     val programIR = result.ir.program
-    val irText = serialiseIL(programIR) // pretty-print IR as a string
+    val irText = translating.PrettyPrinter.pp_prog(programIR) // Prettier print than the one below
+    // val irText = serialiseIL(programIR) // pretty-print IR as a string
     println(irText)
     
     // This gets the html code. I don't need it here atm
@@ -81,7 +89,21 @@ object ApiServer extends IOApp {
       StaticFile
         .fromResource("index.html", Some(request))
         .getOrElseF(NotFound("index.html not found"))
-      
+
+    case GET -> Root / "ir-before" =>
+      IREpochStore.beforeTransform
+        .map { prog =>
+          val pretty = translating.PrettyPrinter.pp_prog(prog)
+          Ok(s"IR Before Text:\n$pretty")
+      }.getOrElse(NotFound("The ir-before was not found"))
+
+    case GET -> Root / "ir-after" =>
+      IREpochStore.afterTransform
+        .map { prog =>
+          val pretty = translating.PrettyPrinter.pp_prog(prog)
+          Ok(s"IR After Text:\n$pretty")
+        }.getOrElse(NotFound("The ir-after was not found"))
+
     case GET -> Root / "ir-data" =>
       val irText = generateIR() 
       Ok(s"IR Text:\n$irText")
