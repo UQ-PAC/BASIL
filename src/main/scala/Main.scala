@@ -190,7 +190,10 @@ object Main {
 
   def main(args: Array[String]): Unit = {
 
-    println(util.functional.sequence3(List(Vector(1, 2), Vector(3))) : Vector[List[Int]])
+    val x = util.functional.sequence5(Vector)(List(Vector(1, 2), Vector(3)))
+    val x2 = util.functional.sequence5(Option)(List(Some(1), Some(3)))
+    println(x)
+    println(x2)
     // println(util.functional.sequence3(List(Vector(1, 2), Vector(3))))
     return
     val parser = ParserForClass[Config]

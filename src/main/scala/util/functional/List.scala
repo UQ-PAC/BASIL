@@ -1,7 +1,7 @@
 package util.functional
 
 import collection.immutable.LinearSeq
-import collection.{SeqOps, IterableOps, IterableFactory}
+import collection.{SeqOps, IterableOps, Factory}
 
 /**
  * This unapplier enables pattern matching on the /last/ element of
@@ -47,9 +47,8 @@ def sequence2[T](xs: List[Vector[T]]): Vector[List[T]] = {
   }
 }
 
-def sequence3[T, CC[U] <: IterableOps[U, CC, CC[U]], DD[V] <: IterableOps[V, DD, DD[V]]](xs: CC[DD[T]]): DD[CC[T]] = {
-  def magic(x: Any): Nothing = throw new RuntimeException
-  def DD0(): DD[CC[T]] = dd.empty
+def sequence3[T, CC[U] <: IterableOps[U, CC, CC[U]], DD[V] <: IterableOps[V, DD, DD[V]]](ddfactory: Factory[CC[T], DD[CC[T]]])(xs: CC[DD[T]]): DD[CC[T]] = {
+  def DD0(): DD[CC[T]] = ddfactory.newBuilder.result
   def DD(x: CC[T]): DD[CC[T]] = DD0() ++ Iterable(x)
   def CC0(): CC[T] = xs.iterableFactory.empty
   def CC(x: T): CC[T] = CC0() ++ Iterable(x)
@@ -59,3 +58,50 @@ def sequence3[T, CC[U] <: IterableOps[U, CC, CC[U]], DD[V] <: IterableOps[V, DD,
     case (ys, rest) => rest.flatMap((r: CC[T]) => ys.map((y: T) => CC(y) ++ r))
   }
 }
+
+case class sequence4[DD[V] <: IterableOps[V, DD, DD[V]]](ddfactory: Factory[?, DD[Any]]) {
+  private def magic(x: Any): Nothing = throw new RuntimeException
+
+  def apply[T, CC[U] <: IterableOps[U, CC, CC[U]]](xs: CC[DD[T]]): DD[CC[T]] = {
+    def DD0(): DD[CC[T]] = ddfactory.newBuilder.result.map(magic)
+    def DD(x: CC[T]): DD[CC[T]] = DD0() ++ Iterable(x)
+    def CC0(): CC[T] = xs.iterableFactory.empty
+    def CC(x: T): CC[T] = CC0() ++ Iterable(x)
+
+    val base: DD[CC[T]] = DD(CC0())
+    xs.foldRight(base) {
+      case (ys, rest) => rest.flatMap((r: CC[T]) => ys.map((y: T) => CC(y) ++ r))
+    }
+  }
+}
+
+def sequence5[T, CC[U] <: IterableOps[U, CC, CC[U]], DD[V] <: IterableOps[V, DD, DD[V]]](dd0: Factory[Nothing, DD[Nothing]])(xs: CC[DD[T]]): DD[CC[T]] = {
+  def magic[A](x: Nothing): A = throw new RuntimeException
+  def DD0(): DD[CC[T]] = dd0.newBuilder.result.map(magic)
+  def DD(x: CC[T]): DD[CC[T]] = DD0().iterableFactory.newBuilder.addOne(x).result
+  def CC0(): CC[T] = xs.iterableFactory.empty
+  def CC(x: T): CC[T] = CC0().iterableFactory.newBuilder.addOne(x).result
+
+  val base: DD[CC[T]] = DD(CC0())
+  xs.foldRight(base) {
+    case (ys, rest) => rest.flatMap((r: CC[T]) => ys.map((y: T) => CC(y) ++ r))
+  }
+}
+
+def sequence5[T, CC[U] <: IterableOps[U, CC, CC[U]]](dd0: Option.type)(xs: CC[Option[T]]): Option[CC[T]] = {
+  sequence5(List)(xs.map(_.toList)).headOption
+}
+
+
+// def sequence4[T, CC[U] <: Seq[U], DD[V] <: Seq[V]](xs: CC[DD[T]]): DD[CC[T]] = {
+//   def magic(x: Any): Nothing = throw new RuntimeException
+//   def dd(): DD[CC[T]] = DD()
+//   def dd(x: CC[T]): DD[CC[T]] = DD(x)
+//   def cc(): CC[T] = CC()
+//   def cc(x: T): CC[T] = CC(x)
+//
+//   val base: DD[CC[T]] = dd(cc())
+//   xs.foldRight(base) {
+//     case (ys, rest) => rest.flatMap((r: CC[T]) => ys.map((y: T) => y +: r))
+//   }
+// }
