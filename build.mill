@@ -129,13 +129,9 @@ object `package` extends RootModule with ScalaModule with antlr.AntlrModule with
 
   object bnfc extends BNFCModule {
     def bnfcPackageName = "basil_ir"
-    def bnfcSource = basilGrammar.source
+    def bnfcSource = Task.Source {
+      PathRef(build.millSourcePath / "main" / "bnfc" / "BasilIR.cf")
+    }
     def antlrRuntime = build.antlrRuntime
-  }
-
-  object basilGrammar extends DownloadModule {
-    def name = "BasilIR.cf"
-    def url = "https://raw.githubusercontent.com/ailrst/basls/a637357c485aa2570515baf496b3023d91bbc3ad/BasilIR.cf"
-    def local = Task.Input(Task.env.get("BASIL_GRAMMAR").toRight("env var undefined"))
   }
 }

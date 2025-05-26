@@ -1,0 +1,135 @@
+Prog . Program ::= [Declaration] ;
+
+separator Declaration ";";
+
+token BVTYPE ('b' 'v' digit+) ;
+
+position token BIdent ((upper | letter | '_' | '#')(upper | letter | digit | ["_.$#"])*);
+
+position token BeginList '[' ;
+position token EndList ']' ;
+position token BeginRec '{' ;
+position token EndRec '}' ;
+
+token Str '"' ((char - ["\"\\"]) | ('\\' ["\"\\tnrf"]))* '"' ;
+token IntegerHex ('0' 'x' (digit | ["abcdef"])+);
+
+
+separator BIdent "," ;
+
+token BitvectorHex (('0' 'x' (digit | ["abcdef"])+)) ;
+
+comment "//" ;
+comment "/*" "*/" ;
+
+LetDecl . Declaration ::= "let" BIdent "=" MExpr ;
+MemDecl . Declaration ::= "memory" BIdent ":" Type ;
+VarDecl . Declaration ::= "var" BIdent ":" Type  ;
+
+MSym . MExpr ::= BIdent ;
+
+IntT . IntType ::= "int" ;
+BoolT . BoolType ::= "bool" ;
+MapT . MapType ::= "map" Type BeginList Type EndList ;
+BVT . BVType ::= BVTYPE ;
+
+rules Type ::= IntType | BoolType | MapType | BVType ; 
+
+separator Expr "," ;
+
+HexInt . IntVal ::= IntegerHex ;
+DecInt . IntVal ::=  Integer ;
+
+AddrAttrSome . AddrAttr ::= BeginRec "address" "=" IntVal EndRec ;
+AddrAttrNone . AddrAttr ::= ""  ;
+AddrAttrEmpty . AddrAttr ::= BeginRec EndRec ;
+
+LittleEndian . Endian ::= "le" ;
+BigEndian . Endian ::= "be" ;
+
+terminator Statement ";";
+
+Assign . Statement ::= LVar ":=" Expr ;
+
+SLoad . Statement ::= LVar ":=" "load" Endian BIdent Expr IntVal;
+SStore . Statement ::= "store" Endian BIdent Expr Expr IntVal;
+
+NoOutParams . CallLVars ::= "";
+LocalVars . CallLVars ::= "var" "(" [ LVar ] ")" ":=" ;
+ListOutParams . CallLVars ::= "(" [ LVar ] ")" ":=";
+
+DirectCall . Statement ::= CallLVars "call" BIdent "(" [Expr] ")" ;
+IndirectCall . Statement ::= "indirect" "call" Expr ;
+
+Assume . Statement ::= "assume" Expr ;
+Assert . Statement ::= "assert" Expr ;
+
+GoTo . Jump ::= "goto" "(" [BIdent] ")" ;
+Unreachable . Jump ::= "unreachable" ;
+Return . Jump ::= "return" "(" [Expr] ")" ;
+
+LVarDef . LVar ::= "var" BIdent ":" Type;
+GlobalLVar . LVar ::= BIdent ":" Type;
+
+separator nonempty LVar "," ;
+
+separator Block ";" ;
+BlockM . MExpr ::= Block ;
+B . Block ::= "block" BIdent AddrAttr BeginList 
+  [Statement] Jump
+  EndList ;
+
+
+EntrySome . PEntry ::=  "entry_block" "=" Str ";" ;
+EntryNone . PEntry ::= "";
+
+AddrSome . PAddress ::=  "address" "=" IntVal ";" ;
+AddrNone . PAddress ::= "";
+
+BSome . InternalBlocks ::=  "blocks" "=" BeginList [Block] EndList ";";
+BNone . InternalBlocks ::= "";
+
+PD . ProcDef ::= BeginRec 
+  "name" "=" Str ";"
+  PAddress
+  PEntry 
+  InternalBlocks
+EndRec ;
+
+
+Param . Params ::=  BIdent ":" Type ;
+separator Params "," ;
+
+Procedure . Declaration ::= "proc" BIdent "(" [Params] ")" "->" "(" [Params] ")"  ProcDef ;
+
+_ . Expr ::= "(" Expr ")" ;
+
+RVar . Expr ::= BIdent ":" Type;
+
+
+rules BinOp ::= BVBinOp | BVLogicalBinOp | BoolBinOp | IntLogicalBinOp | IntBinOp ;
+BinaryExpr . Expr       ::= BinOp "(" Expr "," Expr ")" ;
+
+rules UnOp ::= BVUnOp | "boolnot" | "intneg" ;
+UnaryExpr . Expr       ::= UnOp "(" Expr ")" ;
+
+ZeroExtend . Expr ::= "zero_extend" "(" IntVal "," Expr ")" ;
+SignExtend . Expr ::= "sign_extend" "(" IntVal "," Expr ")" ;
+Extract    . Expr ::= "extract" "(" IntVal "," IntVal "," Expr ")" ;
+Concat     . Expr ::= "bvconcat"  "(" Expr "," Expr ")" ;
+
+BVLiteral . Expr ::=  IntVal ":" BVType ;
+IntLiteral . Expr ::= IntVal;
+TrueLiteral . Expr ::= "true" ;
+FalseLiteral . Expr ::= "false" ;
+
+rules BVUnOp ::= "bvnot" | "bvneg" ;
+rules BVBinOp ::= "bvand"|"bvor"|"bvadd"|"bvmul"|"bvudiv"|"bvurem"|"bvshl"|"bvlshr"|"bvult"|"bvnand"|"bvnor"
+  |"bvxor"|"bvxnor"|"bvcomp"|"bvsub"|"bvsdiv"|"bvsrem"|"bvsmod"|"bvashr" ;
+rules BVLogicalBinOp ::= "bvule" |  "bvugt" |  "bvuge" |  "bvslt" |  "bvsle" |  "bvsgt" |  "bvsge" |  "bveq"  |  "bvneq" ;
+
+rules IntBinOp ::= "intadd" | "intmul" | "intsub" | "intdiv" | "intmod"  ;
+rules IntLogicalBinOp ::=  "inteq" | "intneq"| "intlt" | "intle" | "intgt" | "intge" ;
+rules BoolBinOp ::=  "booleq" | "boolneq" | "booland" | "boolor" | "boolimplies" | "boolequiv" ;
+
+
