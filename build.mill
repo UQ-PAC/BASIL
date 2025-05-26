@@ -7,7 +7,7 @@ import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
 import $ivy.`net.mlbox::mill-antlr:0.1.0`
 import contrib.scalapblib._
 
-object `package` extends RootModule with ScalaModule with ScalaPBModule {
+object `package` extends RootModule with ScalaModule {
   // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
   def scalaVersion = "3.3.4"
@@ -15,7 +15,7 @@ object `package` extends RootModule with ScalaModule with ScalaPBModule {
   val ammonite = "3.0.2"
   override def ammoniteVersion = ammonite
 
-  def moduleDeps = Seq(basilAntlr)
+  def moduleDeps = Seq(basilAntlr, basilProto)
 
   def scalacOptions: T[Seq[String]] = Seq("-deprecation")
 
@@ -30,15 +30,10 @@ object `package` extends RootModule with ScalaModule with ScalaPBModule {
   val scalaCompiler = ivy"org.scala-lang::scala3-compiler:3.3.4"
   val upickle = ivy"com.lihaoyi::upickle:4.2.1"
 
-  def scalaPBVersion = "0.11.15"
-
   def mainClass = Some("Main")
 
-  override def scalaPBSources = Task.Sources {
-    Seq(PathRef(this.millSourcePath / "main" / "protobuf"))
-  }
   def millSourcePath = super.millSourcePath / "src"
-  def ivyDeps = Agg(scalactic, sourceCode, mainArgs, scalapb, scalaCompiler, upickle)
+  def ivyDeps = Agg(scalactic, sourceCode, mainArgs, scalaCompiler, upickle)
   def sources = Task.Sources {
     Seq(PathRef(this.millSourcePath / "main" / "scala"))
   }
@@ -119,11 +114,22 @@ object `package` extends RootModule with ScalaModule with ScalaPBModule {
   def scalafmt = mill.scalalib.scalafmt.ScalafmtModule
 
   object basilAntlr extends antlr.AntlrModule {
-    def ivyDeps = Agg(build.antlrRuntime)
+    override def ivyDeps = Agg(build.antlrRuntime)
     override def antlrPackage = Some("Parsers")
     override def antlrGenerateVisitor = true
     override def antlrGrammarSources = Task.Sources {
       Seq(PathRef(build.millSourcePath / "main" / "antlr4"))
+    }
+  }
+
+  object basilProto extends ScalaPBModule {
+    override def scalaPBVersion = "0.11.15"
+
+    override def scalaVersion = build.scalaVersion
+    override def ivyDeps = Agg(build.scalapb)
+
+    override def scalaPBSources = Task.Sources {
+      Seq(PathRef(build.millSourcePath / "main" / "protobuf"))
     }
   }
 }
