@@ -25,7 +25,6 @@ object Snoc {
 
 }
 
-
 /**
  * "Sequences" an iterable of iterables. That is, the order of the collections
  * is reversed. Given a CC[DD[T]], returns a DD[CC[T]] subject to certain semantics.
@@ -45,15 +44,17 @@ object Snoc {
  * sequence(Vector)(List(Vector(1, 2), Vector(3, 4))) == Vector(List(1, 3), List(1, 4), List(2, 3), List(2, 4))
  * ```
  */
-def sequence[T, CC[U] <: IterableOps[U, CC, CC[U]], DD[V] <: IterableOps[V, DD, DD[V]]](ddf: Factory[Nothing, DD[Nothing]])(xs: CC[DD[T]]): DD[CC[T]] = {
+def sequence[T, CC[U] <: IterableOps[U, CC, CC[U]], DD[V] <: IterableOps[V, DD, DD[V]]](
+  ddf: Factory[Nothing, DD[Nothing]]
+)(xs: CC[DD[T]]): DD[CC[T]] = {
   def dd0(): DD[Nothing] = ddf.newBuilder.result
   def dd(x: CC[T]): DD[CC[T]] = dd0().iterableFactory.newBuilder.addOne(x).result
   def cc0(): CC[T] = xs.iterableFactory.empty
   def cc(x: T): CC[T] = xs.iterableFactory.newBuilder.addOne(x).result
 
   val base: DD[CC[T]] = dd(cc0())
-  xs.foldRight(base) {
-    case (ys, rest) => ys.flatMap((y: T) => rest.map((r: CC[T]) => cc(y) ++ r))
+  xs.foldRight(base) { case (ys, rest) =>
+    ys.flatMap((y: T) => rest.map((r: CC[T]) => cc(y) ++ r))
   }
 }
 
