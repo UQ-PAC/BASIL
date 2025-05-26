@@ -27,81 +27,49 @@ object Snoc {
 
 
 /**
- * Converts a list of options to an option of list. Returns Some if
- * all the options are Some, and returns None if any of the options
- * were None. This can be thought of as a notion of "all succeeding".
+ * "Sequences" an iterable of iterables. That is, the order of the collections
+ * is reversed. Given a CC[DD[T]], returns a DD[CC[T]] subject to certain semantics.
  *
- * Here, "list" may be any Seq type.
+ * For example, a common use is sequencing a List[Option[T]] into Option[List[T]].
+ * This would returns Some if all the input options are Some, and it returns None
+ * if any of the input options were None. This can be thought of as a notion of
+ * "all succeeding".
+ *
+ * This should be invoked by first passing the companion object of the input's
+ * inner collection type (equivalently, the outer type of the result), then passing
+ * the input collection - as two separate function calls.
+ *
+ * For example,
+ *
+ * ```
+ * sequence(Option)(List(Some(1), None)) == None
+ * sequence(Vector)(List(Vector(1, 2), Vector(3, 4))) == Vector(List(1, 3), List(1, 4), List(2, 3), List(2, 4))
+ * ```
  */
-def sequence[T, CC[U] <: SeqOps[U, CC, CC[U]]](xs: CC[Option[T]]): Option[CC[T]] = {
-  def magic(x: Any): Nothing = throw new RuntimeException
-  xs.foldRight[Option[CC[T]]](Some(xs.empty.map(magic))) {
-    case (Some(x), Some(xs)) => Some(x +: xs)
-    case _ => None
-  }
-}
+def sequence[T, CC[U] <: IterableOps[U, CC, CC[U]], DD[V] <: IterableOps[V, DD, DD[V]]](ddf: Factory[Nothing, DD[Nothing]])(xs: CC[DD[T]]): DD[CC[T]] = {
+  def dd0(): DD[Nothing] = ddf.newBuilder.result
+  def dd(x: CC[T]): DD[CC[T]] = dd0().iterableFactory.newBuilder.addOne(x).result
+  def cc0(): CC[T] = xs.iterableFactory.empty
+  def cc(x: T): CC[T] = xs.iterableFactory.newBuilder.addOne(x).result
 
-def sequence2[T](xs: List[Vector[T]]): Vector[List[T]] = {
-  xs.foldRight[Vector[List[T]]](Vector(Nil)) {
-    case (ys, rest) => rest.flatMap(r => ys.map(_ +: r))
-  }
-}
-
-def sequence3[T, CC[U] <: IterableOps[U, CC, CC[U]], DD[V] <: IterableOps[V, DD, DD[V]]](ddfactory: Factory[CC[T], DD[CC[T]]])(xs: CC[DD[T]]): DD[CC[T]] = {
-  def DD0(): DD[CC[T]] = ddfactory.newBuilder.result
-  def DD(x: CC[T]): DD[CC[T]] = DD0() ++ Iterable(x)
-  def CC0(): CC[T] = xs.iterableFactory.empty
-  def CC(x: T): CC[T] = CC0() ++ Iterable(x)
-
-  val base: DD[CC[T]] = DD(CC0())
+  val base: DD[CC[T]] = dd(cc0())
   xs.foldRight(base) {
-    case (ys, rest) => rest.flatMap((r: CC[T]) => ys.map((y: T) => CC(y) ++ r))
+    case (ys, rest) => ys.flatMap((y: T) => rest.map((r: CC[T]) => cc(y) ++ r))
   }
 }
 
-case class sequence4[DD[V] <: IterableOps[V, DD, DD[V]]](ddfactory: Factory[?, DD[Any]]) {
-  private def magic(x: Any): Nothing = throw new RuntimeException
-
-  def apply[T, CC[U] <: IterableOps[U, CC, CC[U]]](xs: CC[DD[T]]): DD[CC[T]] = {
-    def DD0(): DD[CC[T]] = ddfactory.newBuilder.result.map(magic)
-    def DD(x: CC[T]): DD[CC[T]] = DD0() ++ Iterable(x)
-    def CC0(): CC[T] = xs.iterableFactory.empty
-    def CC(x: T): CC[T] = CC0() ++ Iterable(x)
-
-    val base: DD[CC[T]] = DD(CC0())
-    xs.foldRight(base) {
-      case (ys, rest) => rest.flatMap((r: CC[T]) => ys.map((y: T) => CC(y) ++ r))
-    }
-  }
+def sequence[T, CC[U] <: IterableOps[U, CC, CC[U]]](x: Option.type)(xs: CC[Option[T]]): Option[CC[T]] = {
+  sequence(List)(xs.map(_.toList)).headOption
 }
 
-def sequence5[T, CC[U] <: IterableOps[U, CC, CC[U]], DD[V] <: IterableOps[V, DD, DD[V]]](dd0: Factory[Nothing, DD[Nothing]])(xs: CC[DD[T]]): DD[CC[T]] = {
-  def magic[A](x: Nothing): A = throw new RuntimeException
-  def DD0(): DD[CC[T]] = dd0.newBuilder.result.map(magic)
-  def DD(x: CC[T]): DD[CC[T]] = DD0().iterableFactory.newBuilder.addOne(x).result
-  def CC0(): CC[T] = xs.iterableFactory.empty
-  def CC(x: T): CC[T] = CC0().iterableFactory.newBuilder.addOne(x).result
+def sequence[T, L, CC[U] <: IterableOps[U, CC, CC[U]]](x: Either.type)(xs: CC[Either[L, T]]): Either[CC[L], CC[T]] = {
+  def cc0[A](): CC[A] = xs.iterableFactory.empty
+  def cc[A](x: A): CC[A] = xs.iterableFactory.newBuilder.addOne(x).result
 
-  val base: DD[CC[T]] = DD(CC0())
+  val base: Either[CC[L], CC[T]] = Right(cc0())
   xs.foldRight(base) {
-    case (ys, rest) => rest.flatMap((r: CC[T]) => ys.map((y: T) => CC(y) ++ r))
+    case (Right(y), Right(rest)) => Right(cc(y) ++ rest)
+    case (Right(_), rest @ Left(_)) => rest
+    case (Left(y), rest) => Left(cc(y) ++ rest.left.getOrElse(cc0()))
   }
 }
-
-def sequence5[T, CC[U] <: IterableOps[U, CC, CC[U]]](dd0: Option.type)(xs: CC[Option[T]]): Option[CC[T]] = {
-  sequence5(List)(xs.map(_.toList)).headOption
-}
-
-
-// def sequence4[T, CC[U] <: Seq[U], DD[V] <: Seq[V]](xs: CC[DD[T]]): DD[CC[T]] = {
-//   def magic(x: Any): Nothing = throw new RuntimeException
-//   def dd(): DD[CC[T]] = DD()
-//   def dd(x: CC[T]): DD[CC[T]] = DD(x)
-//   def cc(): CC[T] = CC()
-//   def cc(x: T): CC[T] = CC(x)
-//
-//   val base: DD[CC[T]] = dd(cc())
-//   xs.foldRight(base) {
-//     case (ys, rest) => rest.flatMap((r: CC[T]) => ys.map((y: T) => y +: r))
-//   }
-// }
