@@ -1,9 +1,9 @@
 package gtirb
 
-import upickle.default._
+import util.Logger
 import translating.InsnSemantics
 
-import util.Logger
+import upickle.default._
 
 import Parsers.*
 import Parsers.ASLpParser.*
@@ -15,11 +15,14 @@ private def parse_asl_stmt(line: String): Option[StmtContext] = {
   val lexer = ASLpLexer(CharStreams.fromString(line))
   val tokens = CommonTokenStream(lexer)
   val parser = ASLpParser(tokens)
+  val eof = EOFField.eofValue(parser)
   parser.setErrorHandler(BailErrorStrategy())
   parser.setBuildParseTree(true)
 
   try {
-    Some(parser.stmt())
+    val result = parser.stmt()
+    parser.`match`(eof) // ensure entire line has been matched
+    Some(result)
   } catch {
     case e: org.antlr.v4.runtime.misc.ParseCancellationException =>
       val extra = e.getCause match {
@@ -58,23 +61,3 @@ implicit val insnSemanticsJsonReader: Reader[InsnSemantics] =
     case x =>
       throw Error(s"Bad sem format $x")
   }
-
-// implicit object InsnSemanticsFormat extends JsonFormat[InsnSemantics] {
-//   def write(m: InsnSemantics): JsValue = ???
-//   def read(json: JsValue): InsnSemantics = json match {
-//     case JsObject(fields) =>
-//       val m: Map[String, JsValue] = fields.get("decode_error") match {
-//         case Some(JsObject(m)) => m
-//         case _ => deserializationError(s"Bad sem format $json")
-//       }
-//       InsnSemantics.Error(m("opcode").convertTo[String], m("error").convertTo[String])
-//     case array @ JsArray(_) =>
-//       val xs = array.convertTo[Array[String]].map(parse_asl_stmt)
-//       if (xs.exists(_.isEmpty)) {
-//         InsnSemantics.Error("?", "parseError")
-//       } else {
-//         InsnSemantics.Result(xs.map(_.get))
-//       }
-//     case s => deserializationError(s"Bad sem format $s")
-//   }
-// }
