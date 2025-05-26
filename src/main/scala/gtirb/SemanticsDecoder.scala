@@ -40,27 +40,24 @@ private def parse_asl_stmt(line: String): Option[StmtContext] = {
   }
 }
 
-implicit val insnSemanticsJsonRW: ReadWriter[InsnSemantics] =
-  readwriter[ujson.Value].bimap[InsnSemantics](
-    x => throw Error("serialisation of InsnSemantics is not supported"),
-    {
-      case ujson.Arr(x) =>
-        val sems = x.map(_.str).map(parse_asl_stmt).toList
+implicit val insnSemanticsJsonReader: Reader[InsnSemantics] =
+  reader[ujson.Value].map[InsnSemantics] {
+    case ujson.Arr(x) =>
+      val sems = x.map(_.str).map(parse_asl_stmt).toList
 
-        util.functional.sequence(Option)(sems) match {
-          case None => InsnSemantics.Error("?", "parseError")
-          case Some(xs) => InsnSemantics.Result(xs.toList)
-        }
-      case ujson.Obj(y) =>
-        val m = y.get("decode_error") match {
-          case Some(ujson.Obj(x)) => x
-          case _ => throw Error(s"Bad sem format $y")
-        }
-        InsnSemantics.Error(m("opcode").str, m("error").str)
-      case x =>
-        throw Error(s"Bad sem format $x")
-    }
-  )
+      util.functional.sequence(Option)(sems) match {
+        case None => InsnSemantics.Error("?", "parseError")
+        case Some(xs) => InsnSemantics.Result(xs.toList)
+      }
+    case ujson.Obj(y) =>
+      val m = y.get("decode_error") match {
+        case Some(ujson.Obj(x)) => x
+        case _ => throw Error(s"Bad sem format $y")
+      }
+      InsnSemantics.Error(m("opcode").str, m("error").str)
+    case x =>
+      throw Error(s"Bad sem format $x")
+  }
 
 // implicit object InsnSemanticsFormat extends JsonFormat[InsnSemantics] {
 //   def write(m: InsnSemantics): JsValue = ???
