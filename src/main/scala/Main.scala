@@ -286,10 +286,17 @@ object Main {
 
     val slicerConfig = (conf.slice, conf.criterion) match {
       case (Some(blockLabel), Some(criterion)) => {
+        if !conf.memoryTransform.value then throw IllegalArgumentException("Slicer requires --memory-transform")
+        if !conf.simplify.value then throw IllegalArgumentException("Slicer requires --simplify")
+        dsa match {
+          case None => throw IllegalArgumentException("Slicer requires --dsa checks|standard")
+          case Some(Prereq) => throw IllegalArgumentException("Slicer requires --dsa checks|standard")
+          case _ => ()
+        }
         Some(SlicerConfig(blockLabel, criterion.toSet))
       }
-      case (Some(_), None) => throw IllegalArgumentException("Requires both --slice AND --criterion")
-      case (None, Some(_)) => throw IllegalArgumentException("Requires both --slice AND --criterion")
+      case (Some(_), None) => throw IllegalArgumentException("Slicer requires both --slice AND --criterion")
+      case (None, Some(_)) => throw IllegalArgumentException("Slicer requires both --slice AND --criterion")
       case (None, None) => None
     }
 
