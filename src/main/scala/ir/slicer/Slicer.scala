@@ -47,7 +47,7 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
         if (!visited(b.label)) {
           visited.put(b.label, true)
 
-          val blockVars = b.statements.flatMap(c => variables(c)).filter(v => remainingNames.contains(v.name))
+          val blockVars = b.statements.flatMap(c => variables(c)).filter(v => remainingNames.contains(v.name)) ++ variables(b.jump)
           detectedVariables.addAll(blockVars)
           remainingNames.subtractAll(blockVars.map(_.name))
 
