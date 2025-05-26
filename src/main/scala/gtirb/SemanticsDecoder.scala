@@ -15,14 +15,11 @@ private def parse_asl_stmt(line: String): Option[StmtContext] = {
   val lexer = ASLpLexer(CharStreams.fromString(line))
   val tokens = CommonTokenStream(lexer)
   val parser = ASLpParser(tokens)
-  val eof = EOFField.eofValue(parser)
   parser.setErrorHandler(BailErrorStrategy())
   parser.setBuildParseTree(true)
 
   try {
-    val result = parser.stmt()
-    parser.`match`(eof) // ensure entire line has been matched
-    Some(result)
+    Some(parser.stmteof().stmt)
   } catch {
     case e: org.antlr.v4.runtime.misc.ParseCancellationException =>
       val extra = e.getCause match {
