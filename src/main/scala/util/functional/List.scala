@@ -40,7 +40,6 @@ object Snoc {
  * the input collection - as two separate function calls.
  *
  * For example,
- *
  * ```
  * sequence(Option)(List(Some(1), None)) == None
  * sequence(Vector)(List(Vector(1, 2), Vector(3, 4))) == Vector(List(1, 3), List(1, 4), List(2, 3), List(2, 4))
@@ -58,18 +57,12 @@ def sequence[T, CC[U] <: IterableOps[U, CC, CC[U]], DD[V] <: IterableOps[V, DD, 
   }
 }
 
-def sequence[T, CC[U] <: IterableOps[U, CC, CC[U]]](x: Option.type)(xs: CC[Option[T]]): Option[CC[T]] = {
-  sequence(List)(xs.map(_.toList)).headOption
-}
+def sequence[T, CC[U] <: IterableOps[U, CC, CC[U]]](x: Option.type)(xs: CC[Option[T]]): Option[CC[T]] =
+  sequence(Either)(xs.map(_.toRight(()))).toOption
 
 def sequence[T, L, CC[U] <: IterableOps[U, CC, CC[U]]](x: Either.type)(xs: CC[Either[L, T]]): Either[CC[L], CC[T]] = {
-  def cc0[A](): CC[A] = xs.iterableFactory.empty
-  def cc[A](x: A): CC[A] = xs.iterableFactory.newBuilder.addOne(x).result
-
-  val base: Either[CC[L], CC[T]] = Right(cc0())
-  xs.foldRight(base) {
-    case (Right(y), Right(rest)) => Right(cc(y) ++ rest)
-    case (Right(_), rest @ Left(_)) => rest
-    case (Left(y), rest) => Left(cc(y) ++ rest.left.getOrElse(cc0()))
+  xs.partitionMap(identity) match {
+    case (left, _) if left.nonEmpty => Left(left)
+    case (_, right) => Right(right)
   }
 }

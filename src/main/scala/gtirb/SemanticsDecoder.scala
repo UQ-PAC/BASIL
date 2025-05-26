@@ -47,7 +47,7 @@ implicit val insnSemanticsJsonRW: ReadWriter[InsnSemantics] =
       case ujson.Arr(x) =>
         val sems = x.map(_.str).map(parse_asl_stmt).toList
 
-        util.functional.sequence(sems) match {
+        util.functional.sequence(Option)(sems) match {
           case None => InsnSemantics.Error("?", "parseError")
           case Some(xs) => InsnSemantics.Result(xs.toList)
         }
