@@ -45,16 +45,17 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
 
   def edgesExitToAfterCall(exit: Procedure, aftercall: DirectCall)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     d match {
-      case Left(value: LocalVar) if aftercall.actualParams.contains(value) =>
-        fold(aftercall.actualParams(value).variables)
+      case Left(value: LocalVar) => fold(aftercall.actualParams(value).variables)
       case _ => Map(d -> IdEdge())
     }
   }
 
   def edgesCallToAfterCall(call: Command, aftercall: DirectCall)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     d match {
-      case Left(value) if aftercall.outParams.values.toSet.contains(value) => Map()
-      case _ => Map(d -> IdEdge())
+      case Left(value: LocalVar) if aftercall.outParams.values.toSet.contains(value) => Map()
+      case Left(_: LocalVar) => Map(d -> IdEdge())
+      case Left(_) => Map()
+      case Right(_) => Map(d -> IdEdge())
     }
   }
 
