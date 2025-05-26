@@ -7,13 +7,15 @@ import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
 import $ivy.`net.mlbox::mill-antlr:0.1.0`
 import contrib.scalapblib._
 
-object `package` extends RootModule with ScalaModule with antlr.AntlrModule with ScalaPBModule {
+object `package` extends RootModule with ScalaModule with ScalaPBModule {
   // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
   def scalaVersion = "3.3.4"
 
   val ammonite = "3.0.2"
   override def ammoniteVersion = ammonite
+
+  def moduleDeps = Seq(basilAntlr)
 
   def scalacOptions: T[Seq[String]] = Seq("-deprecation")
 
@@ -36,15 +38,9 @@ object `package` extends RootModule with ScalaModule with antlr.AntlrModule with
     Seq(PathRef(this.millSourcePath / "main" / "protobuf"))
   }
   def millSourcePath = super.millSourcePath / "src"
-  def ivyDeps = Agg(scalactic, antlrRuntime, sourceCode, mainArgs, scalapb, scalaCompiler, upickle)
+  def ivyDeps = Agg(scalactic, sourceCode, mainArgs, scalapb, scalaCompiler, upickle)
   def sources = Task.Sources {
     Seq(PathRef(this.millSourcePath / "main" / "scala"))
-  }
-
-  override def antlrPackage: Option[String] = Some("Parsers")
-  override def antlrGenerateVisitor = true
-  override def antlrGrammarSources = Task.Sources {
-    Seq(PathRef(millSourcePath / "main" / "antlr4"))
   }
 
   object test extends ScalaTests with TestModule.ScalaTest {
@@ -121,4 +117,13 @@ object `package` extends RootModule with ScalaModule with antlr.AntlrModule with
   }
 
   def scalafmt = mill.scalalib.scalafmt.ScalafmtModule
+
+  object basilAntlr extends antlr.AntlrModule {
+    def ivyDeps = Agg(build.antlrRuntime)
+    override def antlrPackage = Some("Parsers")
+    override def antlrGenerateVisitor = true
+    override def antlrGrammarSources = Task.Sources {
+      Seq(PathRef(build.millSourcePath / "main" / "antlr4"))
+    }
+  }
 }
