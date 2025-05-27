@@ -4,28 +4,29 @@ import util.Freeze
 import basil_ir.{Absyn => syntax}
 import scala.jdk.CollectionConverters.*
 
-type BaseParseTypes = ir.Program
+import org.antlr.v4.runtime.{CommonTokenStream, CharStreams}
+
+private type BaseParseTypes = ir.Program
   | ir.dsl.EventuallyProcedure
   | ir.dsl.EventuallyBlock
+  | ir.dsl.EventuallyJump
+  | ir.dsl.EventuallyStatement
   | ir.dsl.NonCallStatement
   | ir.Expr
-  | ir.IRType
   | ir.BinOp
   | ir.UnOp
+  | ir.IRType
   | ir.Endian
   | ir.Variable
   | ir.Memory
-  | ir.dsl.EventuallyStatement
-  | ir.dsl.EventuallyJump
   | String
   | BigInt
 
-type DSLStatement = ir.dsl.NonCallStatement | ir.dsl.EventuallyStatement | ir.dsl.EventuallyJump
+private type DSLStatement = ir.dsl.NonCallStatement | ir.dsl.EventuallyStatement | ir.dsl.EventuallyJump
 
-type ParseTypes = BaseParseTypes
+private type ParseTypes = BaseParseTypes
   | List[BaseParseTypes]
   | Option[BaseParseTypes]
-
 
 case class BasilParseValue(x: ParseTypes) {
   def ty = x.asInstanceOf[ir.IRType]
@@ -70,7 +71,7 @@ trait GlobalDeclVisitor[A]() extends syntax.Declaration.Visitor[BasilParseValue,
   def memories() = tempMemories.get
 
   // Members declared in Declaration.Visitor
-  override def visit(x: syntax.LetDecl, arg: A): BasilParseValue = ???
+  override def visit(x: syntax.LetDecl, arg: A): BasilParseValue = "TODO metadata unimpl"
   override def visit(x: syntax.MemDecl, arg: A): BasilParseValue =
     val ir.MapType(ir.BitVecType(addrwd), ir.BitVecType(valwd)) = x.type_.accept(this, arg).ty : @unchecked
     val mem = x.bident_ match {
@@ -307,10 +308,10 @@ case class BasilIRSyntaxVisitor[A]() extends basil_ir.AllVisitor[BasilParseValue
     x.intval_.accept(this, arg).int32,
   )
   def visit(x: syntax.DirectCall, arg: A): BasilParseValue = ir.dsl.directCall(
-    x.calllvars_.accept(this, arg).list(_.v).map(x => "outvarsoops??" -> x),
+    x.calllvars_.accept(this, arg).list(_.v).map(x => "TODO outvarname" -> x),
     x.bident_,
     // TODO: fix var names. in vars need to be obtained from proc definition??
-    exprs(x.listexpr_, arg).map("invarsoopsie" -> _)
+    exprs(x.listexpr_, arg).map("TODO invarname" -> _)
   )
   def visit(x: syntax.IndirectCall, arg: A): BasilParseValue = ir.dsl.indirectCall(
     x.expr_.accept(this, arg).v
@@ -332,7 +333,7 @@ case class BasilIRSyntaxVisitor[A]() extends basil_ir.AllVisitor[BasilParseValue
   )
   def visit(x: syntax.Unreachable, arg: A): BasilParseValue = ir.dsl.unreachable
   def visit(x: syntax.Return, arg: A): BasilParseValue =
-    ir.dsl.ret(exprs(x.listexpr_, arg).map("fdajs" -> _) : _*)
+    ir.dsl.ret(exprs(x.listexpr_, arg).map("TODO returnvarname" -> _) : _*)
 
   // Members declared in CallLVars.Visitor
   def visit(x: syntax.NoOutParams, arg: A): BasilParseValue = Nil
@@ -383,8 +384,8 @@ case class BasilIRSyntaxVisitor[A]() extends basil_ir.AllVisitor[BasilParseValue
     )
 
   // Members declared in MExpr.Visitor
-  def visit(x: syntax.MSym, arg: A): BasilParseValue = "ASJdio"
-  def visit(x: syntax.BlockM, arg: A): BasilParseValue = "fdjsaio"
+  def visit(x: syntax.MSym, arg: A): BasilParseValue = "TODO msym"
+  def visit(x: syntax.BlockM, arg: A): BasilParseValue = "TODO blockm"
 
   // Members declared in Program.Visitor
   def visit(x: syntax.Prog, arg: A): BasilParseValue =
@@ -393,8 +394,26 @@ case class BasilIRSyntaxVisitor[A]() extends basil_ir.AllVisitor[BasilParseValue
     println(otherdecls.map(_.accept(this, arg)))
     freezeGlobals()
     println(procdecls.map(_.accept(this, arg)))
-    "booped"
+    "TODO constructprogram"
 
 
 }
 
+object Run {
+
+  def parse(path: String) = {
+    val lexer = new basil_ir.BasilIRLexer(CharStreams.fromFileName(path))
+    val parser = new basil_ir.BasilIRParser(new CommonTokenStream(lexer))
+
+    val ctx = parser.start_Program()
+
+    val vis = BasilIRSyntaxVisitor[Unit]()
+    val result = ctx.result.accept(vis, ())
+
+  }
+
+  def main(args: Array[String]): Unit = {
+    parse(args(0))
+  }
+
+}
