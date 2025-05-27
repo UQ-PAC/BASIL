@@ -34,6 +34,8 @@ LetDecl . Declaration ::= "let" BIdent "=" MExpr ;
 MemDecl . Declaration ::= "memory" GlobalIdent ":" Type ;
 VarDecl . Declaration ::= "var" GlobalIdent ":" Type  ;
 
+ThreadDecl . Declaration ::= "thread" AttrDefList ;
+
 MSym . MExpr ::= Str;
 BlockM . MExpr ::= Block ;
 
@@ -86,8 +88,6 @@ B . Block ::= "block" BlockIdent AttrDefList BeginList
   [Statement] Jump
   EndList ;
 
-BSome . InternalBlocks ::=  "blocks" "=" BeginList [Block] EndList ";";
-BNone . InternalBlocks ::= "";
 
 IntAttr . AttributeItem ::= BIdent "="  IntVal;
 BVAttr . AttributeItem ::= BIdent "=" BVVal;
@@ -97,8 +97,6 @@ separator AttributeItem ";";
 
 AttrDefListSome . AttrDefList ::= BeginRec [ AttributeItem ] EndRec ;
 AttrDefListEmpty . AttrDefList ::= "" ;
-
-separator AttrDefList "";
 
 Param . Params ::=  LocalIdent ":" Type ;
 separator Params "," ;
@@ -122,6 +120,4 @@ GRVar . Expr ::= GlobalIdent ":" Type;
 
 
 FunctionOp . Expr       ::= BIdent "(" [Expr] ")" ;
-
 separator Expr ",";
-
