@@ -1,5 +1,6 @@
-import org.scalatest.funsuite.AnyFunSuite
 import org.scalactic.Prettifier
+import org.scalatest.funsuite.AnyFunSuite
+import test_util.CaptureOutput
 
 object ScalatestPrettierTest {
 
@@ -14,7 +15,7 @@ object ScalatestPrettierTest {
 }
 
 @test_util.tags.UnitTest
-class ScalatestPrettierTest extends AnyFunSuite with test_util.CaptureOutput {
+class ScalatestPrettierTest extends AnyFunSuite with CaptureOutput {
 
   import ScalatestPrettierTest.*
 

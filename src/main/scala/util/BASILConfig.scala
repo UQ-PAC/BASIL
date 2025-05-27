@@ -4,6 +4,10 @@ enum ProcRelyVersion {
   case Function, IfCommandContradiction
 }
 
+enum PCTrackingOption {
+  case None, Keep, Assert
+}
+
 case class BoogieGeneratorConfig(
   memoryFunctionType: BoogieMemoryAccessMode = BoogieMemoryAccessMode.SuccessiveStoreSelect,
   coalesceConstantMemory: Boolean = true,
@@ -20,7 +24,8 @@ case class ILLoadingConfig(
   mainProcedureName: String = "main",
   procedureTrimDepth: Int = Int.MaxValue,
   parameterForm: Boolean = false,
-  trimEarly: Boolean = false
+  trimEarly: Boolean = false,
+  pcTracking: PCTrackingOption = PCTrackingOption.None
 )
 
 case class StaticAnalysisConfig(
@@ -53,8 +58,9 @@ case class BASILConfig(
   simplify: Boolean = false,
   validateSimp: Boolean = false,
   dsaConfig: Option[DSAConfig] = None,
-  memoryTransform: Boolean = false,
   summariseProcedures: Boolean = false,
+  generateRelyGuarantees: Boolean = false,
+  memoryTransform: Boolean = false,
   staticAnalysis: Option[StaticAnalysisConfig] = None,
   boogieTranslation: BoogieGeneratorConfig = BoogieGeneratorConfig(),
   outputPrefix: String,

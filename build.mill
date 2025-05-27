@@ -1,16 +1,24 @@
-import mill._, mill.define._, scalalib._
+package build
+import mill._
+import scalalib._
 
-import $file.antlr // https://index.scala-lang.org/ml86/mill-antlr
+import $file.util.DownloadModule
+import $file.bnfc.BNFCModule
 
 import os.Path
+
 import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
 import contrib.scalapblib._
 
-object basil extends RootModule with ScalaModule with antlr.AntlrModule with ScalaPBModule {
+object `package` extends RootModule with ScalaModule with antlr.AntlrModule with ScalaPBModule {
   // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
   def scalaVersion = "3.3.4"
-  override def ammoniteVersion = "3.0.2"
+
+  def moduleDeps = Seq(bnfc)
+
+  val ammonite = "3.0.2"
+  override def ammoniteVersion = ammonite
 
   def scalacOptions: T[Seq[String]] = Seq("-deprecation")
 
@@ -23,34 +31,38 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
   val mainArgs = ivy"com.lihaoyi::mainargs:0.5.1"
   val sprayJson = ivy"io.spray::spray-json:1.3.6"
   val scalapb = ivy"com.thesamet.scalapb::scalapb-runtime:0.11.15"
-  val scalaCompiler = ivy"org.scala-lang::scala3-compiler:3.3.4"
 
   def scalaPBVersion = "0.11.15"
 
   def mainClass = Some("Main")
 
-  override def scalaPBSources = T.sources { Seq(PathRef(this.millSourcePath / "main" / "protobuf")) }
+  override def scalaPBSources = Task.Sources {
+    Seq(PathRef(this.millSourcePath / "main" / "protobuf"))
+  }
   def millSourcePath = super.millSourcePath / "src"
-  def ivyDeps = Agg(scalactic, antlrRuntime, sourceCode, mainArgs, sprayJson, scalapb, scalaCompiler)
-  def sources = T.sources { Seq(PathRef(this.millSourcePath / "main" / "scala")) }
+  def ivyDeps = Agg(scalactic, antlrRuntime, sourceCode, mainArgs, sprayJson, scalapb)
+  def sources = Task.Sources {
+    Seq(PathRef(this.millSourcePath / "main" / "scala"))
+  }
 
   override def antlrPackage: Option[String] = Some("Parsers")
   override def antlrGenerateVisitor = true
-  override def antlrGrammarSources = T.sources {
+  override def antlrGrammarSources = Task.Sources {
     Seq(PathRef(millSourcePath / "main" / "antlr4"))
   }
 
   object test extends ScalaTests with TestModule.ScalaTest {
-    override def ammoniteVersion = basil.ammoniteVersion
-
+    override def ammoniteVersion = ammonite
     def ivyDeps = Agg(scalaTests, scalaCheck, javaTests)
-    def sources = T.sources { Seq(PathRef(this.millSourcePath / "scala")) }
+    def sources = Task.Sources {
+      Seq(PathRef(this.millSourcePath / "scala"))
+    }
   }
 
   /** Updates the expected
     */
 
-  def updateExpectedBAP() = T.command {
+  def updateExpectedBAP() = Task.Command {
     val correctPath = test.millSourcePath / "correct"
     val incorrectPath = test.millSourcePath / "incorrect"
 
@@ -58,7 +70,7 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
     expectedUpdate(incorrectPath, false, true)
   }
 
-  def updateExpectedGTIRB() = T.command {
+  def updateExpectedGTIRB() = Task.Command {
     val correctPath = test.millSourcePath / "correct"
     val incorrectPath = test.millSourcePath / "incorrect"
 
@@ -66,7 +78,7 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
     expectedUpdate(incorrectPath, false, false)
   }
 
-  def updateExpectedExtraSpec() = T.command {
+  def updateExpectedExtraSpec() = Task.Command {
     val correctPath = test.millSourcePath / "extraspec_correct"
     val incorrectPath = test.millSourcePath / "extraspec_incorrect"
     expectedUpdate(correctPath, true, true)
@@ -113,4 +125,12 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
   }
 
   def scalafmt = mill.scalalib.scalafmt.ScalafmtModule
+
+  object bnfc extends BNFCModule {
+    def bnfcPackageName = "basil_ir"
+    def bnfcSource = Task.Source {
+      PathRef(build.millSourcePath / "main" / "bnfc" / "BasilIR.cf")
+    }
+    def antlrRuntime = build.antlrRuntime
+  }
 }

@@ -1,16 +1,14 @@
-import analysis.ParamAnalysis
 import ir.dsl.*
 import ir.*
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.BASILTest
-import util.*
+import test_util.CaptureOutput
 import translating.BasilIRToSMT2
 
 @test_util.tags.UnitTest
-class SATTest extends AnyFunSuite with test_util.CaptureOutput {
+class SATTest extends AnyFunSuite with CaptureOutput {
   test(" basic taut ") {
     // Logger.setLevel(LogLevel.DEBUG)
-    val e = BinaryExpr(BoolEQ, BinaryExpr(BVNEQ, R0, bv64(0)), BinaryExpr(BVEQ, bv64(0), R0))
+    val e = BinaryExpr(EQ, BinaryExpr(NEQ, R0, bv64(0)), BinaryExpr(EQ, bv64(0), R0))
     val r = BasilIRToSMT2.proveExpr(e)
     assert(r == Some(true))
   }

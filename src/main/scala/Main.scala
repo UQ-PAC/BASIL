@@ -146,8 +146,18 @@ object Main {
       doc = "Generates summaries of procedures which are used in pre/post-conditions (requires --analyse flag)"
     )
     summariseProcedures: Flag,
+    @arg(
+      name = "generate-rely-guarantees",
+      doc = "Generates rely-guarantee conditions for each procedure that contains a return node."
+    )
+    generateRelyGuarantees: Flag,
     @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (implies --parameter-form)")
     simplify: Flag,
+    @arg(
+      name = "pc",
+      doc = "Program counter mode, supports GTIRB only. (options: none | keep | assert) (default: none)"
+    )
+    pcTracking: Option[String],
     @arg(
       name = "validate-simplify",
       doc = "Emit SMT2 check for validation of simplification expression rewrites 'rewrites.smt2'"
@@ -206,6 +216,8 @@ object Main {
     if (conf.verbose.value) {
       Logger.setLevel(LogLevel.DEBUG, true)
     }
+    DebugDumpIRLogger.setLevel(LogLevel.OFF)
+    AnalysisResultDotLogger.setLevel(LogLevel.OFF)
     for (v <- conf.verboseLog) {
       Logger.findLoggerByName(v) match {
         case None =>
@@ -254,7 +266,8 @@ object Main {
         case Some("prereq") => Some(Prereq)
         case Some("checks") => Some(Checks)
         case Some("standard") => Some(Standard)
-        case None => Some(Standard)
+        case Some("none") => None
+        case None => None
         case Some(_) =>
           throw new IllegalArgumentException("Illegal option to dsa, allowed are: (prereq|standard|checks)")
     } else {
@@ -306,12 +319,14 @@ object Main {
         mainProcedureName = conf.mainProcedureName,
         procedureTrimDepth = conf.procedureDepth,
         parameterForm = conf.parameterForm.value,
-        trimEarly = conf.trimEarly.value
+        trimEarly = conf.trimEarly.value,
+        pcTracking = PCTrackingOption.valueOf(conf.pcTracking.getOrElse("none").capitalize)
       ),
       runInterpret = conf.interpret.value,
       simplify = conf.simplify.value,
       validateSimp = conf.validateSimplify.value,
       summariseProcedures = conf.summariseProcedures.value,
+      generateRelyGuarantees = conf.generateRelyGuarantees.value,
       staticAnalysis = staticAnalysis,
       boogieTranslation = boogieGeneratorConfig,
       outputPrefix = conf.outFileName,
@@ -325,18 +340,11 @@ object Main {
       assert(result.boogie.nonEmpty)
       var failed = false
       for (b <- result.boogie) {
-        val fname = b.filename
-        val timer = PerformanceTimer("Verify", LogLevel.INFO)
-        val cmd = Seq("boogie", "/useArrayAxioms", fname)
-        Logger.info(s"Running: ${cmd.mkString(" ")}")
-        val output = cmd.!!
-        val result = util.boogie_interaction.parseOutput(output)
+        val result = b.verifyBoogie(b.filename)
         result.kind match {
           case BoogieResultKind.Verified(c, _) if c > 0 => ()
           case _ => failed = true
         }
-        Logger.info(result.toString)
-        timer.checkPoint("Finish")
       }
       if (failed) {
         throw Exception("Verification failed")
