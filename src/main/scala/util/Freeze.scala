@@ -25,7 +25,6 @@ case class Freeze[T](private var x: T) {
     x = f(x)
   }
 
-
   def freeze() = {
     require(!frozen, "attempt to freeze already-frozen value")
     frozen = true
