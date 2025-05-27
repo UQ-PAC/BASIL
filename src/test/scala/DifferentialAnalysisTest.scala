@@ -150,7 +150,7 @@ class DifferentialAnalysisTest extends DifferentialTest {
   runSystemTests()
 }
 
-@test_util.tags.AnalysisSystemTest2
+@test_util.tags.AnalysisSystemTest
 class DifferentialAnalysisTestSimplification extends DifferentialTest {
 
   def runSystemTests(): Unit = {
