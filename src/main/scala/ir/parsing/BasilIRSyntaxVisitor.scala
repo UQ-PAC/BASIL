@@ -2,8 +2,29 @@ package ir.parsing
 
 import util.Freeze
 import basil_ir.{Absyn => syntax}
+import scala.jdk.CollectionConverters.*
 
-type ParseTypes = ir.Program | ir.Procedure | ir.Block | ir.Statement | ir.Expr | ir.IRType | ir.BinOp | ir.UnOp | ir.Endian | ir.Variable | ir.Memory | String | BigInt
+type BaseParseTypes = ir.Program
+  | ir.dsl.EventuallyProcedure
+  | ir.dsl.EventuallyBlock
+  | ir.dsl.NonCallStatement
+  | ir.Expr
+  | ir.IRType
+  | ir.BinOp
+  | ir.UnOp
+  | ir.Endian
+  | ir.Variable
+  | ir.Memory
+  | ir.dsl.EventuallyStatement
+  | ir.dsl.EventuallyJump
+  | String
+  | BigInt
+
+type DSLStatement = ir.dsl.NonCallStatement | ir.dsl.EventuallyStatement | ir.dsl.EventuallyJump
+
+type ParseTypes = BaseParseTypes
+  | List[BaseParseTypes]
+  | Option[BaseParseTypes]
 
 
 case class BasilParseValue(x: ParseTypes) {
@@ -12,14 +33,21 @@ case class BasilParseValue(x: ParseTypes) {
   def binop = x.asInstanceOf[ir.BinOp]
   def unop = x.asInstanceOf[ir.UnOp]
   def expr = x.asInstanceOf[ir.Expr]
+  def str = x.asInstanceOf[String]
   def int = x.asInstanceOf[BigInt]
   def int32 =
     val y = int
-    assert(y.isValidInt)
+    assert(y.isValidInt, "BigInt value is out of range for a 32-bit integer")
     y.toInt
   def v = x.asInstanceOf[ir.Variable]
   def endian = x.asInstanceOf[ir.Endian]
-
+  def list[T](f: BasilParseValue => T) =
+    x.asInstanceOf[List[BaseParseTypes]].map(x => f(BasilParseValue(x)))
+  def opt[T](f: BasilParseValue => T) =
+    x.asInstanceOf[Option[BaseParseTypes]].map(x => f(BasilParseValue(x)))
+  def stmt = x.asInstanceOf[DSLStatement]
+  def block = x.asInstanceOf[ir.dsl.EventuallyBlock]
+  def proc = x.asInstanceOf[ir.dsl.EventuallyProcedure]
 }
 
 object BasilParseValue {
@@ -32,16 +60,14 @@ trait GlobalDeclVisitor[A]() extends syntax.Declaration.Visitor[BasilParseValue,
 
   import scala.language.implicitConversions
 
-  private var globals: Freeze[Map[String, ir.Register]] = Freeze(Map.empty)
-  private var memories: Freeze[[String, ir.Memory]] = Freeze(Map.empty)
+  private var tempGlobals: Freeze[Map[String, ir.Register]] = Freeze(Map.empty)
+  private var tempMemories: Freeze[Map[String, ir.Memory]] = Freeze(Map.empty)
 
-  var globals: Map[String, ir.Register] = null
-  var memories: Map[String, ir.Memory] = null
-  def freezeGlobals() = {
-
-  }
-  lazy val lazyGlobals = _globals
-  lazy val lazyMemories = _memories
+  def freezeGlobals() =
+    tempGlobals.freeze()
+    tempMemories.freeze()
+  def globals() = tempGlobals.get
+  def memories() = tempMemories.get
 
   // Members declared in Declaration.Visitor
   override def visit(x: syntax.LetDecl, arg: A): BasilParseValue = ???
@@ -51,20 +77,38 @@ trait GlobalDeclVisitor[A]() extends syntax.Declaration.Visitor[BasilParseValue,
       case "stack" => ir.StackMemory(x.bident_, addrwd, valwd)
       case _ => ir.SharedMemory(x.bident_, addrwd, valwd)
     }
-    _memories += mem.name -> mem
+    tempMemories.update(_ + (mem.name -> mem))
     mem
   override def visit(x: syntax.VarDecl, arg: A): BasilParseValue =
     val v = ir.Register(
       x.bident_,
       x.type_.accept(this, arg).bvty.size
     )
-    _globals += (v.name -> v)
+    tempGlobals.update(_ + (v.name -> v))
     v
 }
 
 case class BasilIRSyntaxVisitor[A]() extends basil_ir.AllVisitor[BasilParseValue, A] with GlobalDeclVisitor[A] {
 
   import scala.language.implicitConversions
+
+  def exprs(x: syntax.ListExpr, arg: A): List[ir.Expr] =
+    x.asScala.map(_.accept(this, arg).expr).toList
+
+  def stmts(x: syntax.ListStatement, arg: A): List[DSLStatement] =
+    x.asScala.map(_.accept(this, arg).stmt).toList
+
+  def blocks(x: syntax.ListBlock, arg: A): List[ir.dsl.EventuallyBlock] =
+    x.asScala.map(_.accept(this, arg).block).toList
+
+  def lvars(x: syntax.ListLVar, arg: A): List[ir.Variable] =
+    x.asScala.map(_.accept(this, arg).v).toList
+
+  def params(x: syntax.ListParams, arg: A): List[ir.Variable] =
+    x.asScala.map(_.accept(this, arg).v).toList
+
+  def localvar(name: String, x: syntax.Type, arg: A): ir.LocalVar =
+    ir.LocalVar(name, x.accept(this, arg).ty)
 
   // Members declared in Type.Visitor
   def visit(x: syntax.TypeIntType, arg: A): BasilParseValue = x.inttype_.accept(this, arg)
@@ -194,7 +238,7 @@ case class BasilIRSyntaxVisitor[A]() extends basil_ir.AllVisitor[BasilParseValue
     // handle registers which are declared in the global scope. everything else
     // is localvar
     val ty = x.type_.accept(this, arg).ty
-    lazyGlobals.get(x.bident_)
+    globals().get(x.bident_)
       .filter(x => ir.BitVecType(x.size) == ty)
       .getOrElse(ir.LocalVar(x.bident_, ty))
 
@@ -235,13 +279,9 @@ case class BasilIRSyntaxVisitor[A]() extends basil_ir.AllVisitor[BasilParseValue
   def visit(x: syntax.TrueLiteral, arg: A): BasilParseValue = ir.TrueLiteral
   def visit(x: syntax.FalseLiteral, arg: A): BasilParseValue = ir.FalseLiteral
 
-  override def visit(x: syntax.Procedure, arg: A): BasilParseValue = ???
-
   // Members declared in LVar.Visitor
-  def visit(x: syntax.LVarDef, arg: A): BasilParseValue = ir.LocalVar(
-    x.bident_,
-    x.type_.accept(this, arg).ty
-  )
+  def visit(x: syntax.LVarDef, arg: A): BasilParseValue =
+    localvar(x.bident_, x.type_, arg)
   def visit(x: syntax.GlobalLVar, arg: A): BasilParseValue = ir.Register(
     x.bident_,
     x.type_.accept(this, arg).bvty.size
@@ -254,20 +294,27 @@ case class BasilIRSyntaxVisitor[A]() extends basil_ir.AllVisitor[BasilParseValue
   )
   def visit(x: syntax.SLoad, arg: A): BasilParseValue = ir.MemoryLoad(
     x.lvar_.accept(this, arg).v,
-    lazyMemories(x.bident_),
+    memories()(x.bident_),
     x.expr_.accept(this, arg).expr,
     x.endian_.accept(this, arg).endian,
     x.intval_.accept(this, arg).int32,
   )
   def visit(x: syntax.SStore, arg: A): BasilParseValue = ir.MemoryStore(
-    lazyMemories(x.bident_),
+    memories()(x.bident_),
     x.expr_1.accept(this, arg).expr,
     x.expr_2.accept(this, arg).expr,
     x.endian_.accept(this, arg).endian,
     x.intval_.accept(this, arg).int32,
   )
-  def visit(x: syntax.DirectCall, arg: A): BasilParseValue = ???
-  def visit(x: syntax.IndirectCall, arg: A): BasilParseValue = ???
+  def visit(x: syntax.DirectCall, arg: A): BasilParseValue = ir.dsl.directCall(
+    x.calllvars_.accept(this, arg).list(_.v).map(x => "outvarsoops??" -> x),
+    x.bident_,
+    // TODO: fix var names. in vars need to be obtained from proc definition??
+    exprs(x.listexpr_, arg).map("invarsoopsie" -> _)
+  )
+  def visit(x: syntax.IndirectCall, arg: A): BasilParseValue = ir.dsl.indirectCall(
+    x.expr_.accept(this, arg).v
+  )
   def visit(x: syntax.Assume, arg: A): BasilParseValue = ir.Assume(
     x.expr_.accept(this, arg).expr
   )
@@ -275,48 +322,79 @@ case class BasilIRSyntaxVisitor[A]() extends basil_ir.AllVisitor[BasilParseValue
     x.expr_.accept(this, arg).expr
   )
 
-  // Members declared in PEntry.Visitor
-  def visit(x: syntax.EntrySome, arg: A): BasilParseValue = ???
-  def visit(x: syntax.EntryNone, arg: A): BasilParseValue = ???
-
-  // Members declared in ProcDef.Visitor
-  def visit(x: syntax.PD, arg: A): BasilParseValue = ???
-
-  // Members declared in PAddress.Visitor
-  def visit(x: syntax.AddrSome, arg: A): BasilParseValue = ???
-  def visit(x: syntax.AddrNone, arg: A): BasilParseValue = ???
-
   // Members declared in Params.Visitor
-  def visit(x: syntax.Param, arg: A): BasilParseValue = ???
-
-  // Members declared in MExpr.Visitor
-  def visit(x: syntax.MSym, arg: A): BasilParseValue = ???
-  def visit(x: syntax.BlockM, arg: A): BasilParseValue = ???
+  def visit(x: syntax.Param, arg: A): BasilParseValue =
+    localvar(x.bident_, x.type_, arg)
 
   // Members declared in Jump.Visitor
-  def visit(x: syntax.GoTo, arg: A): BasilParseValue = ???
-  def visit(x: syntax.Unreachable, arg: A): BasilParseValue = ???
-  def visit(x: syntax.Return, arg: A): BasilParseValue = ???
+  def visit(x: syntax.GoTo, arg: A): BasilParseValue = ir.dsl.goto(
+    x.listbident_.asScala.toSeq : _*
+  )
+  def visit(x: syntax.Unreachable, arg: A): BasilParseValue = ir.dsl.unreachable
+  def visit(x: syntax.Return, arg: A): BasilParseValue =
+    ir.dsl.ret(exprs(x.listexpr_, arg).map("fdajs" -> _) : _*)
 
   // Members declared in CallLVars.Visitor
-  def visit(x: syntax.NoOutParams, arg: A): BasilParseValue = ???
-  def visit(x: syntax.LocalVars, arg: A): BasilParseValue = ???
-  def visit(x: syntax.ListOutParams, arg: A): BasilParseValue = ???
+  def visit(x: syntax.NoOutParams, arg: A): BasilParseValue = Nil
+  def visit(x: syntax.LocalVars, arg: A): BasilParseValue = lvars(x.listlvar_, arg)
+  def visit(x: syntax.ListOutParams, arg: A): BasilParseValue = lvars(x.listlvar_, arg)
 
   // Members declared in AddrAttr.Visitor
-  def visit(x: syntax.AddrAttrSome, arg: A): BasilParseValue = ???
-  def visit(x: syntax.AddrAttrNone, arg: A): BasilParseValue = ???
-  def visit(x: syntax.AddrAttrEmpty, arg: A): BasilParseValue = ???
-
-  // Members declared in Program.Visitor
-  def visit(x: syntax.Prog, arg: A): BasilParseValue = ???
+  def visit(x: syntax.AddrAttrSome, arg: A): BasilParseValue =
+    Some(x.intval_.accept(this, arg).int)
+  def visit(x: syntax.AddrAttrNone, arg: A): BasilParseValue = None
+  def visit(x: syntax.AddrAttrEmpty, arg: A): BasilParseValue = None
 
   // Members declared in Block.Visitor
-  def visit(x: syntax.B, arg: A): BasilParseValue = ???
+  def visit(x: syntax.B, arg: A): BasilParseValue = ir.dsl.block(
+    x.bident_,
+    stmts(x.liststatement_, arg) : _*
+
+  )
+
+  // Members declared in PAddress.Visitor
+  def visit(x: syntax.AddrSome, arg: A): BasilParseValue =
+    Some(x.intval_.accept(this, arg).int)
+  def visit(x: syntax.AddrNone, arg: A): BasilParseValue = None
+
+  // Members declared in PEntry.Visitor
+  def visit(x: syntax.EntrySome, arg: A): BasilParseValue = Some(x.str_)
+  def visit(x: syntax.EntryNone, arg: A): BasilParseValue = None
 
   // Members declared in InternalBlocks.Visitor
-  def visit(x: syntax.BSome, arg: A): BasilParseValue = ???
-  def visit(x: syntax.BNone, arg: A): BasilParseValue = ???
+  def visit(x: syntax.BSome, arg: A): BasilParseValue = blocks(x.listblock_, arg)
+  def visit(x: syntax.BNone, arg: A): BasilParseValue = Nil
+
+  // Members declared in ProcDef.Visitor
+  def visit(x: syntax.PD, arg: A): BasilParseValue =
+    val p = ir.dsl.proc(x.str_, x.internalblocks_.accept(this, arg).list(_.block) : _*)
+    p.copy(
+      address = x.paddress_.accept(this, arg).opt(_.int),
+      entryBlockLabel = x.pentry_.accept(this, arg).opt(_.str),
+    )
+
+  def visit(x: syntax.Procedure, arg: A): BasilParseValue =
+    val p = x.procdef_.accept(this, arg).proc
+    val inparams = params(x.listparams_1, arg)
+    val outparams = params(x.listparams_2, arg)
+    p.copy(
+      in = inparams.map(x => x.name -> x.getType).toMap,
+      out = outparams.map(x => x.name -> x.getType).toMap,
+    )
+
+  // Members declared in MExpr.Visitor
+  def visit(x: syntax.MSym, arg: A): BasilParseValue = "ASJdio"
+  def visit(x: syntax.BlockM, arg: A): BasilParseValue = "fdjsaio"
+
+  // Members declared in Program.Visitor
+  def visit(x: syntax.Prog, arg: A): BasilParseValue =
+    val (procdecls, otherdecls) = x.listdeclaration_.asScala
+      .partition(_.isInstanceOf[syntax.Procedure])
+    println(otherdecls.map(_.accept(this, arg)))
+    freezeGlobals()
+    println(procdecls.map(_.accept(this, arg)))
+    "booped"
+
 
 }
 
