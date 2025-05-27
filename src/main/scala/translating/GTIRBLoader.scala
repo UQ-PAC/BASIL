@@ -14,7 +14,7 @@ import com.grammatech.gtirb.proto.Module.ByteOrder.LittleEndian
 import util.Logger
 
 enum InsnSemantics {
-  case Result(value: Array[StmtContext])
+  case Result(value: List[StmtContext])
   case Error(opcode: String, error: String)
 }
 
