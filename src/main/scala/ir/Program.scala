@@ -58,6 +58,12 @@ private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extend
   }
 }
 
+
+case class Metadata (
+  originalLabel : Option[String] = None,
+  address: Option[BigInt] = None,
+)
+
 class Program(
   var procedures: ArrayBuffer[Procedure],
   var mainProcedure: Procedure,
@@ -250,7 +256,7 @@ class Procedure private (
   var address: Option[BigInt],
   private var _entryBlock: Option[Block],
   private var _returnBlock: Option[Block],
-  private val _blocks: mutable.LinkedHashSet[Block],
+  private val _blocks: mutable.ArrayBuffer[Block],
   var formalInParam: mutable.SortedSet[LocalVar],
   var formalOutParam: mutable.SortedSet[LocalVar],
   var inParamDefaultBinding: immutable.SortedMap[LocalVar, Expr],
@@ -287,7 +293,7 @@ class Procedure private (
       address,
       entryBlock,
       returnBlock,
-      mutable.LinkedHashSet.from(blocks),
+      mutable.ArrayBuffer.from(blocks),
       mutable.SortedSet.from(formalInParam),
       mutable.SortedSet.from(formalOutParam),
       immutable.SortedMap.from(inParamDefaultBinding),
@@ -299,19 +305,35 @@ class Procedure private (
     )
   }
 
+  val blockCounter = util.Counter()
+
+  def freshBlockId(prefix: String) = {
+    prefix + "_" + blockCounter.next()
+  }
+
   def normaliseBlockNames() = {
     var counter = 0
     var loopCounter = 0
-    ir.transforms.reversePostOrder(this)
-    val bl = Array.from(blocks).sortInPlaceBy(_.rpoOrder)
-    for (b <- bl) {
+    sort()
+    val prefix = procName
+    for (b <- _blocks) {
       counter += 1
-      val loop = if b.isLoopHeader() then {
-        loopCounter += 1
-        "_loop_header_" + loopCounter
-      } else ""
+      val label = b match {
+        case b if b.isEntry => prefix + "_entry"
+        case b if b.isReturn => prefix + "_return"
+        case b => {
+          counter += 1
+          if (b.isLoopHeader()) {
+            loopCounter += 1
+          }
+          val loop = if (b.isLoopParticipant()) {
+            s"_loop${loopCounter}"
+          } else "" 
+          s"${prefix}${loop}_$counter"
+        }
+      }
 
-      b.label = name + "_" + counter
+      b.label = label
 
     }
 
@@ -334,9 +356,7 @@ class Procedure private (
     ILForwardIterator(Seq(this), IntraProcIRCursor)
   }
 
-  override def toString: String = {
-    s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${formalInParam.size} in and ${formalOutParam.size} out parameters"
-  }
+  override def toString: String = name
 
   def calls: Set[Procedure] = blocks.iterator.flatMap(_.calls).toSet
 
@@ -373,7 +393,7 @@ class Procedure private (
   def addBlock(block: Block): Block = {
     if (!_blocks.contains(block)) {
       block.parent = this
-      _blocks.add(block)
+      _blocks.append(block)
     }
     block
   }
@@ -423,7 +443,8 @@ class Procedure private (
     require(_blocks.contains(block))
     require(block.incomingJumps.isEmpty) // don't leave jumps dangling
     block.deParent()
-    _blocks.remove(block)
+    val index = _blocks.indexOf(block)
+    _blocks.remove(index)
     if (_entryBlock.contains(block)) {
       _entryBlock = None
     }
@@ -498,14 +519,26 @@ class Procedure private (
     LocalVar(name, ty, ssaCount)
   }
 
+  def sort() = {
+    ir.transforms.reversePostOrder(this)
+    _blocks.sortInPlaceBy(_.rpoOrder)
+    for (e <- entryBlock) {
+      val i = _blocks.indexOf(e)
+      if (i != 0) {
+        _blocks.remove(i)
+        _blocks.prepend(e)
+      }
+    }
+  }
+
 }
 
 class Block private (
   var label: String,
-  val address: Option[BigInt],
   val statements: IntrusiveList[Statement],
   private var _jump: Jump,
-  private val _incomingJumps: mutable.HashSet[GoTo]
+  private val _incomingJumps: mutable.HashSet[GoTo],
+  var meta : Metadata,
 ) extends HasParent[Procedure] {
   var atomicSection: Option[AtomicSection] = None
   _jump.setParent(this)
@@ -520,9 +553,10 @@ class Block private (
     statements: IterableOnce[Statement] = Set.empty,
     jump: Jump = GoTo(Set.empty)
   ) = {
-    this(label, address, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty)
+    this(label, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty, Metadata(None, address))
   }
 
+  def address = meta.address
   def isReturn: Boolean = parent.returnBlock.contains(this)
   def isEntry: Boolean = parent.entryBlock.contains(this)
 
@@ -573,10 +607,7 @@ class Block private (
     Set.empty
   }
 
-  override def toString: String = {
-    val statementsString = statements.map(_.toString).mkString("\n")
-    s"Block $label with $statementsString\n$jump"
-  }
+  override def toString: String = label
 
   /** @return
     *   The intra-procedural set of successor blocks. If the block ends in a call then the empty set is returned.
@@ -635,17 +666,28 @@ class Block private (
   }
 
   def createBlockAfter(suffix: String): Block = {
-    val nb = Block(label + suffix)
+    val label = parent.freshBlockId(suffix)
+    val nb = Block(label)
+    nb.meta = meta.copy(address = None)
+
     parent.addBlock(nb)
     val ojump = jump
     replaceJump(GoTo(nb))
     nb.replaceJump(ojump)
   }
 
-  def createBlockBetween(b2: Block, label: String = "_goto_"): Block = {
+  def createBlockBetween(b2: Block, suffix: String = "goto"): Block = {
     require(nextBlocks.toSet.contains(b2))
     val b1 = this
-    val nb = Block(b1.label + label + b2.label)
+    val label = parent.freshBlockId(suffix)
+    val origs = (meta.originalLabel.toList ++ b2.meta.originalLabel).flatMap(_.split(",")).toSet.toList.sorted match {
+      case Nil => None
+      case xs => Some(xs.mkString(", "))
+    }
+
+    val nb = Block(label)
+    nb.meta = Metadata(originalLabel = origs)
+
     b1.parent.addBlock(nb)
     b1.jump match {
       case g: GoTo => {
@@ -658,12 +700,12 @@ class Block private (
     nb
   }
 
-  def createBlockOnEdgeWith(b2: Block, label: String = "_goto_"): Block = {
+  def createBlockOnEdgeWith(b2: Block, suffix: String = "_goto"): Block = {
     require((nextBlocks ++ prevBlocks).exists(_ == b2))
     if (nextBlocks.exists(_ == b2)) {
-      createBlockBetween(b2, label)
+      createBlockBetween(b2, suffix)
     } else if (prevBlocks.exists(_ == b2)) {
-      b2.createBlockBetween(this, "_goto_")
+      b2.createBlockBetween(this, suffix)
     } else {
       throw IllegalArgumentException(s"This block does not have edge with ${b2.label}")
     }
