@@ -1,5 +1,6 @@
 package ir.parsing
 
+import util.Freeze
 import basil_ir.{Absyn => syntax}
 
 type ParseTypes = ir.Program | ir.Procedure | ir.Block | ir.Statement | ir.Expr | ir.IRType | ir.BinOp | ir.UnOp | ir.Endian | ir.Variable | ir.Memory | String | BigInt
@@ -31,9 +32,14 @@ trait GlobalDeclVisitor[A]() extends syntax.Declaration.Visitor[BasilParseValue,
 
   import scala.language.implicitConversions
 
-  private var _globals: Map[String, ir.Register] = Map.empty
-  private var _memories: Map[String, ir.Memory] = Map.empty
+  private var globals: Freeze[Map[String, ir.Register]] = Freeze(Map.empty)
+  private var memories: Freeze[[String, ir.Memory]] = Freeze(Map.empty)
 
+  var globals: Map[String, ir.Register] = null
+  var memories: Map[String, ir.Memory] = null
+  def freezeGlobals() = {
+
+  }
   lazy val lazyGlobals = _globals
   lazy val lazyMemories = _memories
 
