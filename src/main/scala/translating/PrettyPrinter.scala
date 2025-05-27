@@ -212,7 +212,7 @@ class BasilIRPrettyPrinter(
   }
 
   override def vblock(b: Block): PPProg[Block] = {
-    val label = Sigil.BASIR.block +  b.label
+    val label = Sigil.BASIR.block + b.label
     val address = b.address
     val statements = b.statements.toList.map(vstmt)
     val terminator = vjump(b.jump)
@@ -330,13 +330,12 @@ class BasilIRPrettyPrinter(
     val addr = p.address.map(l => vaddress(l).toString).map("address = " + _).toList
     val pname = Seq(s"name = \"${p.procName}\"")
 
-
     val requires = if p.requiresExpr.nonEmpty then Some(p.requiresExpr.map(vexpr).mkString(";\n  ")) else None
     val ensures = if p.ensuresExpr.nonEmpty then Some(p.ensuresExpr.map(vexpr).mkString("; \n  ")) else None
 
-    val allattrs = pname ++ addr ++ requires.map("[\n  " + _  + "\n]") ++ ensures.map("[\n  " + _  + "\n]")
+    val allattrs = pname ++ addr ++ requires.map("[\n  " + _ + "\n]") ++ ensures.map("[\n  " + _ + "\n]")
 
-    val attrs = if allattrs.isEmpty then "" else "{\n" + allattrs.map("  " + _).mkString(";\n")  + "\n}"
+    val attrs = if allattrs.isEmpty then "" else "{\n" + allattrs.map("  " + _).mkString(";\n") + "\n}"
 
     val fnl = if p.formalInParam.nonEmpty then "\n    " else " "
 
@@ -360,7 +359,6 @@ class BasilIRPrettyPrinter(
     val localDecls = decls.toList.sorted
 
     // val iblocks = p.entryBlock.map(b => (s"  entry_block = " + '"' + b.label + '"')).toList
-
 
     val mblocks =
       if (middleBlocks.size == 0) then None
@@ -395,7 +393,6 @@ class BasilIRPrettyPrinter(
     size: Int
   ): BST[MemoryStore] = {
     val le = if endian == Endian.LittleEndian then "le" else "be"
-
 
     BST(s"store $le ${Sigil.BASIR.globalVar}${mem} ${index} ${value} ${size}")
   }
@@ -452,14 +449,14 @@ class BasilIRPrettyPrinter(
     case m: MapType => s"map ${vtype(m.result)}[${vtype(m.param)}]"
   }
 
-  override def vrvar(e: Variable): PPProg[Variable] =  e match {
+  override def vrvar(e: Variable): PPProg[Variable] = e match {
     case l: LocalVar => BST(s"${Sigil.BASIR.localVar}${e.name}:${vtype(e.getType)}")
-    case l : Global => BST(s"${Sigil.BASIR.globalVar}${e.name}:${vtype(e.getType)}")
+    case l: Global => BST(s"${Sigil.BASIR.globalVar}${e.name}:${vtype(e.getType)}")
   }
   override def vlvar(e: Variable): PPProg[Variable] = {
     e match {
       case l: LocalVar => BST(s"${Sigil.BASIR.localVar}${e.name}:${vtype(e.getType)}")
-      case l : Global => BST(s"${Sigil.BASIR.globalVar}${e.name}:${vtype(e.getType)}")
+      case l: Global => BST(s"${Sigil.BASIR.globalVar}${e.name}:${vtype(e.getType)}")
     }
   }
 

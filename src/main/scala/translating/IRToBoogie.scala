@@ -611,7 +611,7 @@ class IRToBoogie(
   }
 
   def captureStateStatement(stateName: String): BAssume = {
-    BAssume(TrueBLiteral, None, List(BAttribute("captureState", Some(s"\"$stateName\""))) )
+    BAssume(TrueBLiteral, None, List(BAttribute("captureState", Some(s"\"$stateName\""))))
   }
 
   def translateBlock(b: Block): BBlock = {

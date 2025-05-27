@@ -3,9 +3,6 @@ import boogie._
 import util.CachedHashCode
 import scala.collection.mutable
 
-
-
-
 sealed trait Expr {
   def toBoogie: BExpr
   def getType: IRType
@@ -36,7 +33,7 @@ object Sigil {
   }
 }
 
-def unsigilVar(s: String) : String = s match {
+def unsigilVar(s: String): String = s match {
   case s"#$local" => unsigilVar(local)
   case s"$$$glob" => unsigilVar(glob)
   case o => o
@@ -376,7 +373,6 @@ sealed trait Variable extends Expr {
   override def gammas: Set[Variable] = Set(this)
   override def toBoogie: BVar
   def toGamma: BVar
-
 
   override def acceptVisit(visitor: Visitor): Variable =
     throw new Exception("visitor " + visitor + " unimplemented for: " + this)

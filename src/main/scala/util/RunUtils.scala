@@ -296,11 +296,9 @@ object IRTransform {
       )
     }
 
-
     for (p <- ctx.program.procedures) {
       p.normaliseBlockNames()
     }
-
 
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))

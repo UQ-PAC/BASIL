@@ -200,7 +200,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
   private def visitVarDeclsNoInit(ctx: VarDeclsNoInitContext): Unit = {
     val ty = visitType(ctx.`type`())
     val newVars = ctx.lvars.ident.asScala.map(v => {
-      val vn = visitIdent(v) 
+      val vn = visitIdent(v)
       vn -> freshLocal(vn, ty)
     })
     varMap ++= newVars
@@ -218,8 +218,10 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         if (expr.get == load.get.lhs) {
           Seq(MemoryLoad(lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "_0")))
         } else {
-          Seq(MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "_0")), 
-            LocalAssign(lhs, expr.get, label.map(_ + "_1")))
+          Seq(
+            MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "_0")),
+            LocalAssign(lhs, expr.get, label.map(_ + "_1"))
+          )
         }
       } else {
         val assign = LocalAssign(lhs, expr.get, label)
@@ -261,7 +263,10 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         if (expr.get == load.get.lhs) {
           Seq(MemoryLoad(lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0")))
         } else {
-          Seq(MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0")), LocalAssign(lhs, expr.get, label.map(_ + "$1")))
+          Seq(
+            MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0")),
+            LocalAssign(lhs, expr.get, label.map(_ + "$1"))
+          )
         }
       } else {
         val assign = LocalAssign(lhs, expr.get, label)
@@ -700,8 +705,8 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
   private def visitLExprVar(ctx: LExprVarContext): Option[Variable] = {
     val name = visitIdent(ctx.ident)
     name match {
-      case n  if constMap.contains(n) => constMap.get(n)
-      case v  if varMap.contains(v) => varMap.get(v)
+      case n if constMap.contains(n) => constMap.get(n)
+      case v if varMap.contains(v) => varMap.get(v)
       case "SP_EL0" => Some(Register("R31", 64))
       case "_PC" => Some(Register("_PC", 64))
       // ignore the following

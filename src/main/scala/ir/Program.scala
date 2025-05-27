@@ -58,11 +58,7 @@ private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extend
   }
 }
 
-
-case class Metadata (
-  originalLabel : Option[String] = None,
-  address: Option[BigInt] = None,
-)
+case class Metadata(originalLabel: Option[String] = None, address: Option[BigInt] = None)
 
 class Program(
   var procedures: ArrayBuffer[Procedure],
@@ -328,7 +324,7 @@ class Procedure private (
           }
           val loop = if (b.isLoopParticipant()) {
             s"_loop${loopCounter}"
-          } else "" 
+          } else ""
           s"${prefix}${loop}_$counter"
         }
       }
@@ -538,7 +534,7 @@ class Block private (
   val statements: IntrusiveList[Statement],
   private var _jump: Jump,
   private val _incomingJumps: mutable.HashSet[GoTo],
-  var meta : Metadata,
+  var meta: Metadata
 ) extends HasParent[Procedure] {
   var atomicSection: Option[AtomicSection] = None
   _jump.setParent(this)
