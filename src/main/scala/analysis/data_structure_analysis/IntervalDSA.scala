@@ -819,6 +819,12 @@ class IntervalCell(val node: IntervalNode, val interval: DSInterval) {
 
 class IntervalDSA(irContext: IRContext) {
   def pre(): (Map[Procedure, SymValues[DSInterval]], Map[Procedure, Set[Constraint]]) = {
+    val reachable = computeDomain(IntraProcIRCursor, irContext.program.procedures).toSet
+    val alt = irContext.program.procedures.flatMap(p => computeDomain(IntraProcIRCursor, Set(p))).toSet
+    assert(
+      reachable == alt,
+      s"different reachable sets ${reachable.diff(alt).map(p => (p, IRWalk.procedure(p))).mkString("\n")}"
+    )
     var sva: Map[Procedure, SymValues[DSInterval]] = Map.empty
     var cons: Map[Procedure, Set[Constraint]] = Map.empty
     computeDSADomain(irContext.program.mainProcedure, irContext).toSeq
