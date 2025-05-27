@@ -53,7 +53,19 @@ object `package` extends RootModule with ScalaModule with antlr.AntlrModule with
     def sources = Task.Sources {
       Seq(PathRef(this.millSourcePath / "scala"))
     }
-    def testForkGrouping = discoveredTestClasses().grouped(1).toSeq
+
+    // note: toBoolean accepts precisely "true" or "false"
+    def basilTestParallel = Task.Input {
+      Task.env.get("BASIL_TEST_PARALLEL").fold(false)(_.toBoolean)
+    }
+
+    def testForkGrouping = Task {
+      if (basilTestParallel()) {
+        discoveredTestClasses().grouped(1).toSeq
+      } else {
+        Seq(discoveredTestClasses())
+      }
+    }
   }
 
   /** Updates the expected
