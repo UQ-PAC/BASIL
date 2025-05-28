@@ -729,8 +729,6 @@ object RunUtils {
     val timer = PerformanceTimer("Simplify")
     val program = ctx.program
 
-    transforms.CalleePreservedParam.transform(ctx.program)
-
     val foundLoops = LoopDetector.identify_loops(program)
     val newLoops = foundLoops.reducibleTransformIR()
     newLoops.updateIrWithLoops()
@@ -912,6 +910,9 @@ object RunUtils {
     if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
+      if (conf.assertCalleeSaved) {
+        transforms.CalleePreservedParam.transform(ctx.program)
+      }
     } else {
       ir.transforms.clearParams(ctx.program)
     }
@@ -940,8 +941,13 @@ object RunUtils {
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
       DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
 
+      if (conf.assertCalleeSaved) {
+        transforms.CalleePreservedParam.transform(ctx.program)
+      }
+
       doSimplify(ctx, conf.staticAnalysis)
     }
+
     if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
       val dir = File("./graphs/")
       if (!dir.exists()) then dir.mkdirs()
