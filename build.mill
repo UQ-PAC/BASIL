@@ -15,6 +15,10 @@ object `package` extends RootModule with ScalaModule {
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
   def scalaVersion = "3.3.4"
 
+  def scalaDocOptions = Task {
+    super.scalaDocOptions() ++ Seq("-source-links:github://apache/incubator-nlpcraft/master")
+  }
+
   val ammonite = "3.0.2"
   override def ammoniteVersion = ammonite
 
