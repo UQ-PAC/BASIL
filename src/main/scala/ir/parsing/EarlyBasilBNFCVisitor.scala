@@ -2,6 +2,7 @@ package ir.parsing
 
 import basil_ir.{Absyn => syntax}
 
+import scala.collection.immutable.ListMap
 import scala.jdk.CollectionConverters.*
 
 object Declarations {
@@ -75,7 +76,9 @@ case class EarlyBasilBNFCVisitor[A]()
     ir.LocalVar(x.bident_, x.type_.accept(this, arg))
 
   private def visitParams(x: syntax.ListParams, arg: A): Map[String, ir.IRType] =
-    x.asScala.map(_.accept(this, arg)).map(x => x.name -> x.getType).toMap
+    // XXX: use ListMap instead of SortedMap, because the orders are presumed to
+    // match between calls and param lists within the same file.
+    x.asScala.map(_.accept(this, arg)).map(x => x.name -> x.getType).to(ListMap)
 
   override def visit(x: syntax.Procedure, arg: A) =
     val inparams = visitParams(x.listparams_1, arg)

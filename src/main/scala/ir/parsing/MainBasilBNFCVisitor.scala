@@ -18,6 +18,8 @@ case class MainBasilBNFCVisitor[A](
 ) extends LiteralsBNFCVisitor[A]
     with basil_ir.AllVisitor[BasilParseValue, A] {
 
+  var procName = "none proc name"
+
   import scala.language.implicitConversions
 
   def exprs(x: syntax.ListExpr, arg: A): List[ir.Expr] =
@@ -108,12 +110,16 @@ case class MainBasilBNFCVisitor[A](
     x.endian_.accept(this, arg).endian,
     x.intval_.accept(this, arg).int32
   )
-  override def visit(x: syntax.DirectCall, arg: A): BasilParseValue = ir.dsl.directCall(
-    x.calllvars_.accept(this, arg).list(_.v).map(x => "TODO outvarname" -> x),
-    x.bident_,
-    // TODO: fix var names. in vars need to be obtained from proc definition??
-    exprs(x.listexpr_, arg).map("TODO invarname" -> _)
-  )
+  override def visit(x: syntax.DirectCall, arg: A): BasilParseValue =
+    val outs = x.calllvars_.accept(this, arg).list(_.v)
+    val ins = exprs(x.listexpr_, arg)
+    val proc = decls.procedures(x.bident_)
+    ir.dsl.directCall(
+      proc.out.keys.zip(outs).toList,
+      x.bident_,
+      // TODO: fix var names. in vars need to be obtained from proc definition??
+      proc.in.keys.zip(ins).toList
+    )
   override def visit(x: syntax.IndirectCall, arg: A): BasilParseValue = ir.dsl.indirectCall(x.expr_.accept(this, arg).v)
   override def visit(x: syntax.Assume, arg: A): BasilParseValue = ir.Assume(x.expr_.accept(this, arg).expr)
   override def visit(x: syntax.Assert, arg: A): BasilParseValue = ir.Assert(x.expr_.accept(this, arg).expr)
@@ -126,7 +132,9 @@ case class MainBasilBNFCVisitor[A](
   override def visit(x: syntax.GoTo, arg: A): BasilParseValue = ir.dsl.goto(x.listbident_.asScala.toSeq: _*)
   override def visit(x: syntax.Unreachable, arg: A): BasilParseValue = ir.dsl.unreachable
   override def visit(x: syntax.Return, arg: A): BasilParseValue =
-    ir.dsl.ret(exprs(x.listexpr_, arg).map("TODO returnvarname" -> _): _*)
+    val es = exprs(x.listexpr_, arg)
+    val proc = decls.procedures(procName)
+    ir.dsl.ret(proc.out.keys.zip(es).toList: _*)
 
   // Members declared in CallLVars.Visitor
   override def visit(x: syntax.NoOutParams, arg: A): BasilParseValue = Nil
@@ -140,7 +148,9 @@ case class MainBasilBNFCVisitor[A](
   override def visit(x: syntax.AddrAttrEmpty, arg: A): BasilParseValue = None
 
   // Members declared in Block.Visitor
-  override def visit(x: syntax.B, arg: A): BasilParseValue = ir.dsl.block(x.bident_, stmts(x.liststatement_, arg): _*)
+  override def visit(x: syntax.B, arg: A): BasilParseValue =
+    val ss = stmts(x.liststatement_, arg) :+ x.jump_.accept(this, arg).stmt
+    ir.dsl.block(x.bident_, ss: _*)
 
   // Members declared in PAddress.Visitor
   override def visit(x: syntax.AddrSome, arg: A): BasilParseValue =
@@ -161,6 +171,7 @@ case class MainBasilBNFCVisitor[A](
     p.copy(address = x.paddress_.accept(this, arg).opt(_.int), entryBlockLabel = x.pentry_.accept(this, arg).opt(_.str))
 
   override def visit(x: syntax.Procedure, arg: A): BasilParseValue =
+    procName = x.bident_
     val p = x.procdef_.accept(this, arg).proc
     val inparams = params(x.listparams_1, arg)
     val outparams = params(x.listparams_2, arg)
@@ -204,12 +215,13 @@ object Run {
 
     val vis0 = EarlyBasilBNFCVisitor[Unit]()
     val decls = ctx.result.accept(vis0, ())
+    println(decls)
 
     val vis = MainBasilBNFCVisitor[Unit](decls)
     val result = ctx.result.accept(vis, ()).prog
     println(result)
     val prog = result.resolve
-    println(translating.PrettyPrinter.pp_prog(prog))
+    // println(translating.PrettyPrinter.pp_prog(prog))
 
   }
 
