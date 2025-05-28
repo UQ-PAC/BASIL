@@ -11,10 +11,11 @@ import org.antlr.v4.runtime.{CommonTokenStream, CharStreams}
 
 private type DSLStatement = ir.dsl.NonCallStatement | ir.dsl.EventuallyStatement | ir.dsl.EventuallyJump
 
-private type BaseParseTypes = ir.dsl.EventuallyProgram | ir.dsl.EventuallyProcedure | ir.dsl.EventuallyBlock | DSLStatement
-  | ir.Expr | ir.BinOp | ir.UnOp | ir.IRType | ir.Endian |
-  ir.Variable | ir.Memory | String | BigInt
+private case object UndefinedParseResult
 
+private type BaseParseTypes = ir.dsl.EventuallyProgram | ir.dsl.EventuallyProcedure | ir.dsl.EventuallyBlock |
+  DSLStatement | ir.Expr | ir.BinOp | ir.UnOp | ir.IRType | ir.Endian | ir.Variable | ir.Memory | String | BigInt |
+  UndefinedParseResult.type
 
 private type ParseTypes = BaseParseTypes | List[BaseParseTypes] | Option[BaseParseTypes] | Map[String, BaseParseTypes]
 
@@ -46,18 +47,133 @@ case class BasilParseValue(x: ParseTypes) {
   def register = x.asInstanceOf[ir.Register]
 }
 
-final case class ParseException(private val message: String, private val cause: Throwable = None.orNull) extends Exception(message, cause)
+final case class ParseException(private val message: String, private val cause: Throwable = None.orNull)
+    extends Exception(message, cause)
 
 object BasilParseValue {
   given Conversion[ParseTypes, BasilParseValue] with
     def apply(x: ParseTypes) = BasilParseValue(x)
 }
 
-trait StatelessBasilBNFCVisitor[A] extends basil_ir.AllVisitor[BasilParseValue, A] {
+type BasilTypesVisitorType[A] = syntax.Type.Visitor[ir.IRType, A]
+  with syntax.BoolType.Visitor[ir.IRType, A]
+  with syntax.MapType.Visitor[ir.IRType, A]
+  with syntax.IntType.Visitor[ir.IRType, A]
+  with syntax.BVType.Visitor[ir.IRType, A]
 
-  def globals(): Map[String, ir.Register]
-  def memories(): Map[String, ir.Memory]
-  def procedure(name: String): ir.dsl.EventuallyProcedure
+trait BasilTypesBNFCVisitor[A]
+    extends syntax.Type.Visitor[ir.IRType, A],
+      syntax.BoolType.Visitor[ir.IRType, A],
+      syntax.MapType.Visitor[ir.IRType, A],
+      syntax.IntType.Visitor[ir.IRType, A],
+      syntax.BVType.Visitor[ir.IRType, A] {
+
+  // Members declared in Type.Visitor
+  override def visit(x: syntax.TypeIntType, arg: A) = x.inttype_.accept(this, arg)
+  override def visit(x: syntax.TypeBoolType, arg: A) = x.booltype_.accept(this, arg)
+  override def visit(x: syntax.TypeMapType, arg: A) = x.maptype_.accept(this, arg)
+  override def visit(x: syntax.TypeBVType, arg: A) = x.bvtype_.accept(this, arg)
+
+  // Members declared in BoolType.Visitor
+  override def visit(x: syntax.BoolT, arg: A) = ir.BoolType
+
+  // Members declared in MapType.Visitor
+  override def visit(x: syntax.MapT, arg: A) =
+    ir.MapType(x.type_1.accept(this, arg), x.type_2.accept(this, arg))
+
+  // Members declared in IntType.Visitor
+  override def visit(x: syntax.IntT, arg: A) = ir.IntType
+
+  // Members declared in BVType.Visitor
+  override def visit(x: syntax.BVT, arg: A) = ir.BitVecType(x.bvtype_.stripPrefix("bv").toInt)
+}
+
+object Declarations {
+  lazy val empty = Declarations(Map(), Map(), Map(), Map())
+}
+
+case class Declarations(
+  val globals: Map[String, ir.Register],
+  memories: Map[String, ir.Memory],
+  procedures: Map[String, ir.dsl.EventuallyProcedure],
+  metas: Map[String, String]
+) {
+  private def isDisjoint[T, U](x: Map[T, U], y: Map[T, U]) =
+    x.keySet.intersect(y.keySet).isEmpty
+
+  def merge(other: Declarations) = {
+    assert(isDisjoint(globals, other.globals), "attempt to merge non-disjoint declarations")
+    assert(isDisjoint(memories, other.memories), "attempt to merge non-disjoint declarations")
+    assert(isDisjoint(procedures, other.procedures), "attempt to merge non-disjoint declarations")
+    assert(isDisjoint(metas, other.metas), "attempt to merge non-disjoint declarations")
+    Declarations(
+      globals ++ other.globals,
+      memories ++ other.memories,
+      procedures ++ other.procedures,
+      metas ++ other.metas
+    )
+  }
+
+}
+
+case class EarlyBasilBNFCVisitor[A]()
+    extends syntax.Program.Visitor[Declarations, A],
+      syntax.Declaration.Visitor[Declarations, A],
+      syntax.MExpr.Visitor[String, A],
+      syntax.Params.Visitor[ir.LocalVar, A],
+      BasilTypesBNFCVisitor[A] {
+
+  // Members declared in Program.Visitor
+  override def visit(x: syntax.Prog, arg: A) =
+    x.listdeclaration_.asScala.map(_.accept(this, arg)).foldLeft(Declarations.empty)((x, y) => x.merge(y))
+
+  // Members declared in MExpr.Visitor
+  override def visit(x: syntax.MSym, arg: A) = x.bident_
+  override def visit(x: syntax.BlockM, arg: A) =
+    throw ParseException("block literal as a metadata value is unsupported")
+
+  // Members declared in Declaration.Visitor
+  override def visit(x: syntax.LetDecl, arg: A) =
+    val allowedMetadataKeys = List("entry_procedure")
+    val key = x.bident_ match {
+      case x if allowedMetadataKeys.contains(x) => x
+      case x => throw ParseException("unsupported 'let' metadata key: " + x)
+    }
+    Declarations.empty.copy(metas = Map(key -> x.mexpr_.accept(this, arg)))
+
+  override def visit(x: syntax.MemDecl, arg: A) =
+
+    // TODO: make this narrower in the grammar
+
+    val ir.MapType(ir.BitVecType(addrwd), ir.BitVecType(valwd)) = x.type_.accept(this, arg): @unchecked
+    val mem = x.bident_ match {
+      case "stack" => ir.StackMemory(x.bident_, addrwd, valwd)
+      case _ => ir.SharedMemory(x.bident_, addrwd, valwd)
+    }
+    Declarations.empty.copy(memories = Map(mem.name -> mem))
+
+  override def visit(x: syntax.VarDecl, arg: A) =
+    val v = ir.Register(x.bident_, x.type_.accept(this, arg).asInstanceOf[ir.BitVecType].size)
+    Declarations.empty.copy(globals = Map(v.name -> v))
+
+  override def visit(x: syntax.Param, arg: A): ir.LocalVar =
+    ir.LocalVar(x.bident_, x.type_.accept(this, arg))
+
+  private def visitParams(x: syntax.ListParams, arg: A): Map[String, ir.IRType] =
+    x.asScala.map(_.accept(this, arg)).map(x => x.name -> x.getType).toMap
+
+  override def visit(x: syntax.Procedure, arg: A) =
+    val inparams = visitParams(x.listparams_1, arg)
+    val outparams = visitParams(x.listparams_2, arg)
+
+    val proc = ir.dsl.EventuallyProcedure(x.bident_, inparams, outparams, Nil)
+    Declarations.empty.copy(procedures = Map(proc.label -> proc))
+}
+
+case class MainBasilBNFCVisitor[A](
+  val decls: Declarations,
+  val typesVisitor: BasilTypesVisitorType[A] = new BasilTypesBNFCVisitor[A]() {}
+) extends basil_ir.AllVisitor[BasilParseValue, A] {
 
   import scala.language.implicitConversions
 
@@ -85,23 +201,18 @@ trait StatelessBasilBNFCVisitor[A] extends basil_ir.AllVisitor[BasilParseValue, 
     s.init.tail
 
   // Members declared in Type.Visitor
-  override def visit(x: syntax.TypeIntType, arg: A): BasilParseValue = x.inttype_.accept(this, arg)
-  override def visit(x: syntax.TypeBoolType, arg: A): BasilParseValue = x.booltype_.accept(this, arg)
-  override def visit(x: syntax.TypeMapType, arg: A): BasilParseValue = x.maptype_.accept(this, arg)
-  override def visit(x: syntax.TypeBVType, arg: A): BasilParseValue = x.bvtype_.accept(this, arg)
-
+  override def visit(x: syntax.TypeIntType, arg: A) = x.accept(typesVisitor, arg): ir.IRType
+  override def visit(x: syntax.TypeBoolType, arg: A) = x.accept(typesVisitor, arg): ir.IRType
+  override def visit(x: syntax.TypeMapType, arg: A) = x.accept(typesVisitor, arg): ir.IRType
+  override def visit(x: syntax.TypeBVType, arg: A) = x.accept(typesVisitor, arg): ir.IRType
   // Members declared in BoolType.Visitor
-  override def visit(x: syntax.BoolT, arg: A): BasilParseValue = ir.BoolType
-
+  override def visit(x: syntax.BoolT, arg: A) = x.accept(typesVisitor, arg): ir.IRType
   // Members declared in MapType.Visitor
-  override def visit(x: syntax.MapT, arg: A): BasilParseValue =
-    ir.MapType(x.type_1.accept(this, arg).ty, x.type_2.accept(this, arg).ty)
-
+  override def visit(x: syntax.MapT, arg: A) = x.accept(typesVisitor, arg): ir.IRType
   // Members declared in IntType.Visitor
-  override def visit(x: syntax.IntT, arg: A): BasilParseValue = ir.IntType
-
+  override def visit(x: syntax.IntT, arg: A) = x.accept(typesVisitor, arg): ir.IRType
   // Members declared in BVType.Visitor
-  override def visit(x: syntax.BVT, arg: A): BasilParseValue = ir.BitVecType(x.bvtype_.stripPrefix("bv").toInt)
+  override def visit(x: syntax.BVT, arg: A) = x.accept(typesVisitor, arg): ir.IRType
 
   // Members declared in BinOp.Visitor
   override def visit(x: syntax.BinOpBVBinOp, arg: A): BasilParseValue = x.bvbinop_.accept(this, arg)
@@ -192,7 +303,7 @@ trait StatelessBasilBNFCVisitor[A] extends basil_ir.AllVisitor[BasilParseValue, 
     // handle registers which are declared in the global scope. everything else
     // is localvar
     val ty = x.type_.accept(this, arg).ty
-    globals()
+    decls.globals
       .get(x.bident_)
       .filter(x => ir.BitVecType(x.size) == ty)
       .getOrElse(ir.LocalVar(x.bident_, ty))
@@ -226,13 +337,13 @@ trait StatelessBasilBNFCVisitor[A] extends basil_ir.AllVisitor[BasilParseValue, 
     ir.LocalAssign(x.lvar_.accept(this, arg).v, x.expr_.accept(this, arg).expr)
   override def visit(x: syntax.SLoad, arg: A): BasilParseValue = ir.MemoryLoad(
     x.lvar_.accept(this, arg).v,
-    memories()(x.bident_),
+    decls.memories(x.bident_),
     x.expr_.accept(this, arg).expr,
     x.endian_.accept(this, arg).endian,
     x.intval_.accept(this, arg).int32
   )
   override def visit(x: syntax.SStore, arg: A): BasilParseValue = ir.MemoryStore(
-    memories()(x.bident_),
+    decls.memories(x.bident_),
     x.expr_1.accept(this, arg).expr,
     x.expr_2.accept(this, arg).expr,
     x.endian_.accept(this, arg).endian,
@@ -285,11 +396,6 @@ trait StatelessBasilBNFCVisitor[A] extends basil_ir.AllVisitor[BasilParseValue, 
   override def visit(x: syntax.BSome, arg: A): BasilParseValue = blocks(x.listblock_, arg)
   override def visit(x: syntax.BNone, arg: A): BasilParseValue = Nil
 
-  // Members declared in MExpr.Visitor
-  override def visit(x: syntax.MSym, arg: A): BasilParseValue = x.bident_
-  override def visit(x: syntax.BlockM, arg: A): BasilParseValue =
-    throw ParseException("block literal as a metadata value is unsupported")
-
   // Members declared in ProcDef.Visitor
   override def visit(x: syntax.PD, arg: A): BasilParseValue =
     val p = ir.dsl.proc(unquote(x.str_), x.internalblocks_.accept(this, arg).list(_.block): _*)
@@ -301,74 +407,33 @@ trait StatelessBasilBNFCVisitor[A] extends basil_ir.AllVisitor[BasilParseValue, 
     val outparams = params(x.listparams_2, arg)
     p.copy(in = inparams.map(x => x.name -> x.getType).toMap, out = outparams.map(x => x.name -> x.getType).toMap)
 
+  // Members declared in MExpr.Visitor
+  override def visit(x: syntax.MSym, arg: A) = UndefinedParseResult
+  override def visit(x: syntax.BlockM, arg: A) = UndefinedParseResult
+
   // Members declared in Declaration.Visitor
-  override def visit(x: syntax.LetDecl, arg: A): BasilParseValue =
-    val allowedMetadataKeys = List("entry_procedure")
-    val key = x.bident_ match {
-      case x if allowedMetadataKeys.contains(x) => x
-      case x => throw ParseException("unsupported 'let' metadata key: " + x)
-    }
-    Map(key -> x.mexpr_.accept(this, arg).str)
-  override def visit(x: syntax.MemDecl, arg: A): BasilParseValue =
-    val ir.MapType(ir.BitVecType(addrwd), ir.BitVecType(valwd)) = x.type_.accept(this, arg).ty: @unchecked
-    x.bident_ match {
-      case "stack" => ir.StackMemory(x.bident_, addrwd, valwd)
-      case _ => ir.SharedMemory(x.bident_, addrwd, valwd)
-    }
-  override def visit(x: syntax.VarDecl, arg: A): BasilParseValue =
-    ir.Register(x.bident_, x.type_.accept(this, arg).bvty.size)
-}
-
-
-case class BasilIRSyntaxVisitor[A]() extends StatelessBasilBNFCVisitor[A] {
-
-  import scala.language.implicitConversions
-
-  private val tempGlobals: Freeze[Map[String, ir.Register]] = Freeze(Map.empty)
-  private val tempMemories: Freeze[Map[String, ir.Memory]] = Freeze(Map.empty)
-  private var tempProcedures: Map[String, ir.dsl.EventuallyProcedure] = Map.empty
-
-  def freezeGlobals() =
-    tempGlobals.freeze()
-    tempMemories.freeze()
-
-  override def globals() = tempGlobals.get
-  override def memories() = tempMemories.get
-  override def procedure(name: String) = tempProcedures(name)
-
-  override def visit(x: syntax.MemDecl, arg: A): BasilParseValue =
-    super.visit(x, arg).memory.tap(mem => tempMemories.update(_ + (mem.name -> mem)))
-  override def visit(x: syntax.VarDecl, arg: A): BasilParseValue =
-    super.visit(x, arg).register.tap(v => tempGlobals.update(_ + (v.name -> v)))
+  override def visit(x: syntax.LetDecl, arg: A) = UndefinedParseResult
+  override def visit(x: syntax.MemDecl, arg: A) = UndefinedParseResult
+  override def visit(x: syntax.VarDecl, arg: A) = UndefinedParseResult
 
   // Members declared in Program.Visitor
   override def visit(x: syntax.Prog, arg: A): BasilParseValue = {
-    val decls = x.listdeclaration_.asScala.toList.groupBy(_.getClass).to(mutable.Map)
+    val ds = x.listdeclaration_.asScala.toList.groupBy(_.getClass).to(mutable.Map)
+    val _ = ds.remove(classOf[syntax.LetDecl]).getOrElse(Nil)
+    val _ = ds.remove(classOf[syntax.MemDecl]).getOrElse(Nil)
+    val _ = ds.remove(classOf[syntax.VarDecl]).getOrElse(Nil)
+    val procdecls = ds.remove(classOf[syntax.Procedure]).getOrElse(Nil)
+    assert(ds.isEmpty, "parsed decls contains unhandled type: " + ds.keys)
 
-    val letdecls = decls.remove(classOf[syntax.LetDecl]).getOrElse(Nil)
-    val memdecls = decls.remove(classOf[syntax.MemDecl]).getOrElse(Nil)
-    val vardecls = decls.remove(classOf[syntax.VarDecl]).getOrElse(Nil)
-    val procdecls = decls.remove(classOf[syntax.Procedure]).getOrElse(Nil)
-    assert(decls.isEmpty, "parsed decls contains unhandled type: " + decls.keys)
-
-    val _ = memdecls.map(_.accept(this, arg).memory)
-    val _ = vardecls.map(_.accept(this, arg).v)
-    val metadata = letdecls.map(_.accept(this, arg).map(_.str)).flatten.toMap
-    val entryname = metadata.getOrElse("entry_procedure", throw ParseException("missing entry_procedure key"))
-
-    freezeGlobals()
+    val entryname = decls.metas.getOrElse("entry_procedure", throw ParseException("missing entry_procedure key"))
 
     val procs = procdecls.map(_.accept(this, arg).proc)
 
     val (mainProc, otherProcs) = procs.partition(_.name == entryname)
-    ir.dsl.EventuallyProgram(
-      mainProc.head,
-      otherProcs,
-    )
+    ir.dsl.EventuallyProgram(mainProc.head, otherProcs)
   }
 
 }
-
 
 object Run {
 
@@ -378,11 +443,14 @@ object Run {
 
     val ctx = parser.start_Program()
 
-    val vis = BasilIRSyntaxVisitor[Unit]()
+    val vis0 = EarlyBasilBNFCVisitor[Unit]()
+    val decls = ctx.result.accept(vis0, ())
+
+    val vis = MainBasilBNFCVisitor[Unit](decls)
     val result = ctx.result.accept(vis, ()).prog
+    println(result)
     val prog = result.resolve
     println(translating.PrettyPrinter.pp_prog(prog))
-
 
   }
 
