@@ -94,9 +94,9 @@ object Declarations {
 
 case class Declarations(
   val globals: Map[String, ir.Register],
-  memories: Map[String, ir.Memory],
-  procedures: Map[String, ir.dsl.EventuallyProcedure],
-  metas: Map[String, String]
+  val memories: Map[String, ir.Memory],
+  val procedures: Map[String, ir.dsl.EventuallyProcedure],
+  val metas: Map[String, String]
 ) {
   private def isDisjoint[T, U](x: Map[T, U], y: Map[T, U]) =
     x.keySet.intersect(y.keySet).isEmpty
@@ -195,10 +195,10 @@ case class MainBasilBNFCVisitor[A](
   def localvar(name: String, x: syntax.Type, arg: A): ir.LocalVar =
     ir.LocalVar(name, x.accept(this, arg).ty)
 
-  def unquote(s: String) =
-    assert(s.startsWith("\""))
-    assert(s.endsWith("\""))
-    s.init.tail
+  def unquote(s: String) = s match {
+    case s"\"$x\"" => x
+    case _ => throw ParseException("invalid quoted string")
+  }
 
   // Members declared in Type.Visitor
   override def visit(x: syntax.TypeIntType, arg: A) = x.accept(typesVisitor, arg): ir.IRType
