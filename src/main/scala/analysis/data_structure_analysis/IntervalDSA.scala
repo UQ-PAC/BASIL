@@ -1248,7 +1248,8 @@ object IntervalDSA {
               "Expected cells for indices used in reachable memory access to have corresponding DSA cells"
             )
             assert(pointers.forall(_.hasPointee), "expected all of the pointers to have pointee")
-            assert(pointers.map(_.getPointee).map(dsg.get).size == 1, s"Expected index cells to have unified pointer}")
+            val distinctPointees = pointers.map(_.getPointee).map(dsg.get).toSet
+            assert(distinctPointees.size == 1, s"Expected index cells to have unified pointer ${distinctPointees.size}")
           case store: MemoryStore =>
             val pointers = dsg.exprToCells(store.index).map(dsg.find)
             assert(
@@ -1256,7 +1257,9 @@ object IntervalDSA {
               s"Expected cells for indices used in reachable memory access to have corresponding DSA cells"
             )
             assert(pointers.forall(_.hasPointee), "expected all of the pointers to have pointee")
-            assert(pointers.map(_.getPointee).map(dsg.get).size == 1, s"Expected index cells to have unified pointer")
+            val distinctPointees = pointers.map(_.getPointee).map(dsg.get).toSet
+            assert(distinctPointees.size == 1, s"Expected index cells to have unified pointer ${distinctPointees.size}")
+            
           case _ =>
     }
   }
