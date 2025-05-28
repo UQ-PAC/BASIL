@@ -106,10 +106,9 @@ case class IndirectCallConstraint(call: IndirectCall) extends CallConstraint[Ind
 
 def generateConstraints(proc: Procedure): Set[Constraint] = {
   ConstGenLogger.info(s"Generating Constraints for ${proc.name}")
-  val domain = computeDomain(IntraProcIRCursor, Set(proc))
   var constraints: Set[Constraint] = Set.empty
 
-  domain.foreach {
+  proc.foreach {
     case load: MemoryLoad =>
       constraints += MemoryReadConstraint(load)
     case write: MemoryStore =>
