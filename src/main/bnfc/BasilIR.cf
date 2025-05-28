@@ -4,7 +4,7 @@ separator Declaration ";";
 
 token BVTYPE ('b' 'v' digit+) ;
 
-position token BIdent ((upper | letter | '_' | '#')(upper | letter | digit | ["_.$#"])*);
+position token BIdent ((upper | letter | '_' | '#' | '.')(upper | letter | digit | ["_.$#~"])*);
 
 position token BeginList '[' ;
 position token EndList ']' ;

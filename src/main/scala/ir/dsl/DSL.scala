@@ -279,6 +279,8 @@ case class EventuallyProcedure(
   address: Option[BigInt] = None
 ) {
 
+  def name = label + address.fold("")("_" + _)
+
   def makeResolver: (Procedure, Program => Unit) = {
 
     val (tempBlocks, resolvers) = blocks.map(_.makeResolver).unzip
