@@ -13,6 +13,10 @@ trait AntlrModule extends JavaModule {
   def antlrGenerateVisitor: Boolean = false
   def antlrGenerateListener: Boolean = false
 
+  override def javadocOptions = Task {
+    super.javadocOptions() ++ Seq("-link", "https://www.antlr.org/api/Java")
+  }
+
   def antlrGrammarSourceFiles = Task {
     antlrGrammarSources()
       .flatMap { source =>
