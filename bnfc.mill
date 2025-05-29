@@ -90,6 +90,7 @@ trait JFlexCupModule extends JavaModule {
           "-d",
           Task.dest.toString
         ),
+        stdout = os.Inherit,
         classPath = compileClasspath().map(_.path).toList
       )
       PathRef(Task.dest)
@@ -105,6 +106,7 @@ trait JFlexCupModule extends JavaModule {
           "-locations", "-expect", "100",
           javaCupSource().path.toString
         ),
+        stdout = os.Inherit,
         cwd = Task.dest,
         classPath = compileClasspath().map(_.path).toList
       )
