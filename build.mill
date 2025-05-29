@@ -40,11 +40,6 @@ object `package` extends RootModule with ScalaModule {
     Seq(PathRef(this.millSourcePath / "main" / "scala"))
   }
 
-  def docSources = Task {
-    Seq(compile().classes, bnfc.compile().classes, basilProto.compile().classes) ++ bnfc.allSources()
-    // allSources() ++ bnfc.sources()
-  }
-
   object test extends ScalaTests with TestModule.ScalaTest {
     override def ammoniteVersion = ammonite
     def ivyDeps = Agg(scalaTests, scalaCheck, javaTests)
