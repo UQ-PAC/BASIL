@@ -147,9 +147,15 @@ object `package` extends RootModule with ScalaModule {
     def antlrRuntime = build.antlrRuntime
   }
 
+  def gitCommitHash = Task.Input {
+    // set in github actions
+    // https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/store-information-in-variables#default-environment-variables
+    Task.env.getOrElse("GITHUB_SHA", "main")
+  }
+
   def scalaDocOptions = Task {
     super.scalaDocOptions() ++ scalaDocExternalMappingOptions() ++ Seq(
-      "-source-links:github://UQ-PAC/BASIL/main",
+      s"-source-links:github://UQ-PAC/BASIL/${gitCommitHash()}",
       s"-doc-root-content:$millSourcePath/main/scala/rootdoc.scala"
     )
   }
