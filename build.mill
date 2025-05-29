@@ -16,11 +16,7 @@ object `package` extends RootModule with ScalaModule {
   def scalaVersion = "3.3.4"
 
   def scalaDocOptions = Task {
-    super.scalaDocOptions() ++ Seq("-source-links:github://apache/incubator-nlpcraft/master", 
-    "-external-mappings:.*scala/.*::scaladoc3::https://dotty.epfl.ch/api/,.*basil_ir/.*::javadoc::https://dotty.epfl.ch/api/",
-    "-sourcepath:ASD",
-    "-sourceroot:ASDJIO",
-    )
+    super.scalaDocOptions() ++ Seq("-source-links:github://apache/incubator-nlpcraft/master")
   }
 
   val ammonite = "3.0.2"
