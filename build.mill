@@ -133,6 +133,10 @@ object `package` extends RootModule with ScalaModule {
     override def scalaPBSources = Task.Sources {
       Seq(PathRef(build.millSourcePath / "main" / "protobuf"))
     }
+
+    def scalaDocOptions = Task {
+      super.scalaDocOptions() ++ build.scalaDocExternalMappingsOption()
+    }
   }
 
   object bnfc extends BNFCModule {
@@ -141,5 +145,40 @@ object `package` extends RootModule with ScalaModule {
       PathRef(build.millSourcePath / "main" / "bnfc" / "BasilIR.cf")
     }
     def antlrRuntime = build.antlrRuntime
+  }
+
+  def scalaDocExternalMappingsOption = Task {
+    val externals = Seq(
+      ".*scala/.*::scaladoc3::https://scala-lang.org/api/3.3_LTS/",
+      "java/.*::javadoc::https://docs.oracle.com/en/java/javase/17/docs/api/java.base/",
+      ".*com/google/protobuf.*::javadoc::https://protobuf.dev/reference/java/api-docs/",
+
+      // basil submodules:
+      "basil_ir/.*::javadoc::https://uq-pac.github.io/BASIL/api/bnfc/",
+      ".*Parsers/.*::javadoc::https://uq-pac.github.io/BASIL/api/basil-antlr/",
+      ".*com/grammatech/gtirb.*::scaladoc3::https://uq-pac.github.io/BASIL/api/basil-proto/",
+    )
+    Seq("-external-mappings:" + externals.mkString(","))
+  }
+
+  def scalaDocOptions = Task {
+    super.scalaDocOptions() ++ Seq("-source-links:github://UQ-PAC/BASIL/main") ++ scalaDocExternalMappingsOption()
+  }
+
+  def allDocs = Task {
+    val dest = Task.dest / "api"
+
+    def copyDoc(x: PathRef, name: String) = {
+      val p = x.path
+      println("copying docs from " + p)
+      os.copy(p / ".." / "javadoc", dest / name, createFolders = true)
+    }
+
+    copyDoc(docJar(), "basil")
+    copyDoc(bnfc.docJar(), "bnfc")
+    copyDoc(basilAntlr.docJar(), "basil-antlr")
+    copyDoc(basilProto.docJar(), "basil-proto")
+
+    dest
   }
 }
