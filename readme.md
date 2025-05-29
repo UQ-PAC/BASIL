@@ -1,157 +1,159 @@
 # BASIL (Boogie Analysis for Secure Information-Flow Logics)
 
-## About
+BASIL generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 
+binaries that have been lifted intermediate formats. It takes as input the `.gts` format produced by 
+[gtirb-semantics](https://github.com/UQ-PAC/gtirb-semantics),  which consists of [ddisasm's](https://github.com/grammatech/ddisasm)
+GTIRB  with [ASLp's](https://github.com/UQ-PAC/aslp) instruction semantics annotated as AuxData for each block.
 
-The BASIL tool generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 
-binaries that have been lifted to intermediate formats. Supported input formats are BAP (Binary Analysis Platform) intermediate ADT format, and the `.gts` format produced by [gtirb-semantics](https://github.com/UQ-PAC/gtirb-semantics).
+### Information flow logic
 
-### Example
-
-Example of a direct translation:
+Basil implements a concurrent information-flow logic verifier by encoding this logic in Boogie. 
+This logic is described [here](docs/iflogic-encoding.pdf). Verifying examples can be found in 
+`src/test/correct` and non-verify examples can be found in `src/test/incorrect`.
 
 ```sh
-$ mill run --load-directory-bap src/test/correct/secret_write/gcc -o test.bpl --verify 
-[70/70] run 
-[INFO]   Found src/test/correct/secret_write/gcc/secret_write.adt src/test/correct/secret_write/gcc/secret_write.relf src/test/correct/secret_write/secret_write.spec
-[INFO]   [!] Loading Program
-[INFO]   [!] Removing external function calls
-[INFO]   [!] Stripping unreachable
-[INFO]   [!] Removed 11 functions (1 remaining)
-[INFO]   [!] Translating to Boogie
-[INFO]   Writing output
-[INFO]   Running boogie
-
-Boogie program verifier finished with 4 verified, 0 errors
-[INFO]   PerformanceTimer Verify [Finish]: 816ms
-$ tail test.bpl 
+$ ./mill run --load-directory-gtirb src/test/correct/secret_write/gcc -o test.bpl --verify
+[193/193] run
+[193] [INFO]   Found src/test/correct/secret_write/gcc/secret_write.gts src/test/correct/secret_write/gcc/secret_write.relf src/test/correct/secret_write/secret_write.spec
+[193] [INFO]   [!] Loading Program
+[193] [INFO]   [!] Removed all PC-related statements
+[193] [INFO]   [!] Removing external function calls
+[193] [INFO]   [!] Removed unreachable blocks
+[193] [INFO]   [!] Stripping unreachable
+[193] [INFO]   [!] Removed 17 functions (1 remaining)
+[193] [INFO]   [!] Translating to Boogie
+[193] [INFO]   Writing output
+[193] [INFO]   Running: boogie /useArrayAxioms test.bpl
+[193] [INFO]   Boogie result: Verified(4,0)
+[193]          
+[193] [INFO]   PerformanceTimer Verify [Finish]: 955ms
+[193/193] ============================== run --load-directory-gtirb src/test/correct/secret_write/gcc -o test.bpl --verify ============================== 1s
+$ tail test.bpl
     assert ((R0 == $z_addr) ==> (L(mem, $x_addr) ==> Gamma_x_old));
     assert bvsge32(memory_load32_le(mem, $z_addr), z_old);
-    assume {:captureState "%000003b7"} true;
+    assume {:captureState "1912_0"} true;
     R0, Gamma_R0 := 0bv64, true;
     goto main_1812_basil_return;
   main_1812_basil_return:
     assume {:captureState "main_1812_basil_return"} true;
     return;
 }
+
+$ ./mill run --load-directory-gtirb src/test/incorrect/basicassign/gcc --verify
+[193/193] run
+[193] [INFO]   Found src/test/incorrect/basicassign/gcc/basicassign.gts src/test/incorrect/basicassign/gcc/basicassign.relf src/test/incorrect/basicassign/basicassign.spec
+[193] [INFO]   [!] Loading Program
+[193] [INFO]   [!] Removed all PC-related statements
+[193] [INFO]   [!] Removing external function calls
+[193] [INFO]   [!] Removed unreachable blocks
+[193] [INFO]   [!] Stripping unreachable
+[193] [INFO]   [!] Removed 17 functions (1 remaining)
+[193] [INFO]   [!] Translating to Boogie
+[193] [INFO]   Writing output
+[193] [INFO]   Running: boogie /useArrayAxioms basil-out.bpl
+[193] basil-out.bpl(143,5): Error: this assertion could not be proved
+[193] Execution trace:
+[193]     basil-out.bpl(94,3): main_1812__0__BKOmkvhNSN~7Fh58nX3c2Q
+[193] 
+[193] Boogie program verifier finished with 2 verified, 1 error
+[193] 
+[193] [INFO]   Boogie result: AssertionFailed
+[193]          Failing assertion: basil-out.bpl:143
+[193]              140 |     R0, Gamma_R0 := 69632bv64, true;
+[193]              141 |     R0, Gamma_R0 := bvadd64(R0, 24bv64), Gamma_R0;
+[193]              142 |     call rely();
+[193]           >  143 |     assert (L(mem, R0) ==> Gamma_R1);
+[193]              144 |     mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
+[193]              145 |     assume {:captureState "1916_0"} true;
+[193]              146 |     R0, Gamma_R0 := 0bv64, true;
+[193] [INFO]   PerformanceTimer Verify [Finish]: 839ms
+[193] Exception in thread "main" java.lang.Exception: Verification failed
+[193]   at Main$.main(Main.scala:325)
+[193]   at Main.main(Main.scala)
+[193/193, 1 failed] ============================== run --load-directory-gtirb src/test/incorrect/basicassign/gcc --verify ============================== 1s
+1 tasks failed
 ```
 
-Example using analysis:
+### Usage
 
-- Infer separate stack/memory variables (--analyse)
-- Resolve indirect calls (--memory-regions dsa)
-- Simplify code: (--simplify)
-  - Fold constant expressions
-  - Simplify branch flag calculations to (in)equality conditions
-  - Remove dead code
+BASIL requires a `.gts` file produced by [gtirb-semantics](https://github.com/UQ-PAC/gtirb-semantics), 
+as well as a file containing the output of readelf (here denoted with `.relf`), both created from the same AArch64/ARM64 binary, 
+and outputs a semantically equivalent .bpl Boogie-language source file.
 
-```
-$ mill run --load-directory-gtirb src/test/correct/functionpointer/clang --simplify --analyse --memory-regions mra --verify
-[INFO]   Found src/test/correct/functionpointer/clang/functionpointer.gts src/test/correct/functionpointer/clang/functionpointer.relf src/test/correct/functionpointer/functionpointer.spec
-[INFO]   [!] Loading Program
-[INFO]   [!] Removing external function calls
-[INFO]   [!] Running Static Analysis
-[INFO]   [!] Replacing Indirect Calls
-[INFO]   [!] Generating Procedure Summaries
-[INFO]   [!] Running Static Analysis
-[INFO]   [!] Replacing Indirect Calls
-[INFO]   [!] Generating Procedure Summaries
-[INFO]   [!] Running Writes To
-[INFO]   [!] Running Symbolic Access Analysis
-[INFO]   [!] Running DSA Analysis
-[INFO]   [!] Finished indirect call resolution after 1 iterations
-[INFO]   [!] Running Simplify
-[INFO]   [!] Simplify :: DynamicSingleAssignment
-[INFO]   DSA 29 ms 
-[INFO]   [!] Simplify :: Expr/Copy-prop Transform
-[INFO]   [!] Simplify :: Dead variable elimination
-[INFO]   [!] Simplify :: Merge empty blocks
-[INFO]   CopyProp 72 ms 
-[INFO]   [!] Simplify :: finished
-[INFO]   [!] Stripping unreachable
-[INFO]   [!] Removed 17 functions (4 remaining)
-[INFO]   [!] Translating to Boogie
-[INFO]   Writing output
-[INFO]   Running boogie
-
-Boogie program verifier finished with 5 verified, 0 errors
-[INFO]   PerformanceTimer Verify [Finish]: 622ms
-```
-
-
----
-
-The tool takes as inputs either a BAP ADT file (here denoted with `.adt`) or a `.gts` file produced by [gtirb-semantics](https://github.com/UQ-PAC/gtirb-semantics), as well as a file containing the output of readelf (here denoted with `.relf`), both created from the same AArch64/ARM64 binary, and outputs a semantically equivalent .bpl Boogie-language source file. The default output file is `boogie_out.bpl`, but the output location can be specified.
+Basil also accepts BAP `.adt` files in place of the `.gts` file, however this feature is no longer actively maintained.
 
 To build and run the tool use one of the following commands:
 
-sbt:
-```
-sbt "run --input file.{adt, gts} --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]"
-```
-mill (Mac OS X / Linux):
-```
-./mill run --input file.adt --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]
-```
-mill (Windows): 
-```
-./mill.bat run --input file.adt --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]
-```
-The output filename is optional and specification filenames are optional. The specification filename must end in `.spec`.
+Linux / Mac OS:
 
-#### Usage
+```
+./mill run --load-directory-gtirb example.gts [--output output.bpl] [--simplify] [--interpret]
+```
 
-The `--analyse` flag is optional and enables the static analysis functionality which resolves indirect calls where possible. 
+Windows: 
+
+```
+./mill.bat run --load-directory-gtirb example.gts [--output output.bpl] [--simplify] [--interpret]
+```
+
 
 Other flags are listed below:
 
 ```
-BASIL
-  --load-directory-bap <str>      Load relf, adt, and bir from directory (and spec from parent
-                                  directory)
-  --load-directory-gtirb <str>    Load relf, gts, and bir from directory (and spec from parent
-                                  directory)
-  -i --input <str>                BAP .adt file or GTIRB/ASLi .gts file
-  -r --relf <str>                 Name of the file containing the output of 'readelf -s -r -W'.
-  -s --spec <str>                 BASIL specification file.
-  -o --output <str>               Boogie output destination file.
-  --boogie-use-lambda-stores      Use lambda representation of store operations.
-  --boogie-procedure-rg <str>     Switch version of procedure rely/guarantee checks to emit.
-                                  (function|ifblock)
-  -v --verbose                    Show extra debugging logs (the same as -vl log)
-  --vl <str>                      Show extra debugging logs for a specific logger (log.debugdumpir,
-                                  log.analysis.vsa, log.simplify, log, log.analysis,
-                                  log.analysis.steensgaard, log.analysis.mra).
-  --analyse                       Run static analysis pass.
-  --interpret                     Run BASIL IL interpreter.
-  --dump-il <str>                 Dump the Intermediate Language to text.
-  -m --main-procedure-name <str>  Name of the main procedure to begin analysis at.
-  --procedure-call-depth <int>    Cull procedures beyond this call depth from the main function
-                                  (defaults to Int.MaxValue)
-  --trim-early                    Cull procedures BEFORE running analysis
-  -h --help                       Show this help message.
-  --analysis-results <str>        Log analysis results in files at specified path.
-  --analysis-results-dot <str>    Log analysis results in .dot form at specified path.
-  -t --threads                    Separates threads into multiple .bpl files with given output
-                                  filename as prefix (requires --analyse flag)
-  --parameter-form                Lift registers to local variables passed by parameter
-  --summarise-procedures          Generates summaries of procedures which are used in
-                                  pre/post-conditions (requires --analyse flag)
-  --simplify                      Partial evaluate / simplify BASIL IR before output (implies
-                                  --parameter-form)
-  --validate-simplify             Emit SMT2 check for validation of simplification expression
-                                  rewrites 'rewrites.smt2'
-  --verify                        Run boogie on the resulting file
-  --memory-regions <str>          Performs static analysis to separate memory into discrete regions
-                                  in Boogie output (requires --analyse flag) (mra|dsa)
-  --no-irreducible-loops          Disable producing irreducible loops when --analyse is passed (does
+BASIL                                                                                                
+  --load-directory-bap <str>      Load relf, adt, and bir from directory (and spec from parent       
+                                  directory)                                                         
+  --load-directory-gtirb <str>    Load relf and gts from directory (and spec from parent directory)  
+  -i --input <str>                BAP .adt file or GTIRB/ASLi .gts file                              
+  -r --relf <str>                 Name of the file containing the output of 'readelf -s -r -W'.      
+  -s --spec <str>                 BASIL specification file.                                          
+  -o --output <str>               Boogie output destination file.                                    
+  --boogie-use-lambda-stores      Use lambda representation of store operations.                     
+  --boogie-procedure-rg <str>     Switch version of procedure rely/guarantee checks to emit.         
+                                  (function|ifblock)                                                 
+  -v --verbose                    Show extra debugging logs (the same as -vl log)                    
+  --vl <str>                      Show extra debugging logs for a specific logger (log.DSA, log,     
+                                  log.DSA.Constraint Gen, log.analysis, log.analysis.steensgaard,    
+                                  log.analysis.procedure-summaries, log.debugdumpir,                 
+                                  log.analysis.vsa, log.simplify, log.DSA.SadDSA, log.Stack,         
+                                  log.analysis-results-dot, log.analysis.mra, log.DSA.SVA).          
+  --analyse                       Run static analysis pass.                                          
+  --interpret                     Run BASIL IL interpreter.                                          
+  --dump-il <str>                 Dump the Intermediate Language to text.                            
+  -m --main-procedure-name <str>  Name of the main procedure to begin analysis at.                   
+  --procedure-call-depth <int>    Cull procedures beyond this call depth from the main function      
+                                  (defaults to Int.MaxValue)                                         
+  --trim-early                    Cull procedures BEFORE running analysis                            
+  -h --help                       Show this help message.                                            
+  --analysis-results <str>        Log analysis results in files at specified path.                   
+  --analysis-results-dot <str>    Log analysis results in .dot form at specified path.               
+  -t --threads                    Separates threads into multiple .bpl files with given output       
+                                  filename as prefix (requires --analyse flag)                       
+  --parameter-form                Lift registers to local variables passed by parameter              
+  --summarise-procedures          Generates summaries of procedures which are used in                
+                                  pre/post-conditions (requires --analyse flag)                      
+  --generate-rely-guarantees      Generates rely-guarantee conditions for each procedure that        
+                                  contains a return node.                                            
+  --simplify                      Partial evaluate / simplify BASIL IR before output (implies        
+                                  --parameter-form)                                                  
+  --pc <str>                      Program counter mode, supports GTIRB only. (options: none | keep | 
+                                  assert) (default: none)                                            
+  --validate-simplify             Emit SMT2 check for validation of simplification expression        
+                                  rewrites 'rewrites.smt2'                                           
+  --verify                        Run boogie on the resulting file                                   
+  --memory-regions <str>          Performs static analysis to separate memory into discrete regions  
+                                  in Boogie output (requires --analyse flag) (mra|dsa) (dsa is       
+                                  recommended over mra)                                              
+  --no-irreducible-loops          Disable producing irreducible loops when --analyse is passed (does 
                                   nothing without --analyse)
+  --dsa <str>                     Perform Data Structure Analysis if no version is specified perform 
+                                  constraint generation (requires --simplify flag)                   
+                                  (none|norm|field|set|all)                                          
+  --memory-transform              Transform memory access to region accesses                         
+  --noif                          Disable information flow security transform in Boogie output       
 ```
 
 For more information see [docs/usage](docs/usage.md).
-
-## Introduction
-
-See [docs](docs).
 
 ## Development Setup
 
@@ -159,22 +161,21 @@ See [docs/development](docs/development)
 
 ## Getting started
 
-1. Install [scala](/docs/development/tool-installation.md)
-2. Install [boogie](/docs/development/tool-installation.md)
-3. To a single system test case :
+Basil requires JVM (>=17) and Boogie (and z3) to run its test suite. Install instructions can be found [here](/docs/development/tool-installation.md).
+The `./mill` script should be sufficient to bootstrap Scala.
 
 Mac OS X / Linux: 
 ```
-./mill test.testOnly 'SystemTestsBAP' -- -z correct/secret_write/clang:BAP
+./mill test.testOnly 'SystemTestsBAP' -- -z correct/secret_write/clang:GTIRB
 ```
 Windows:
 ```
-./mill.bat test.testOnly 'SystemTestsBAP' -- -z correct/secret_write/clang:BAP
+./mill.bat test.testOnly 'SystemTestsBAP' -- -z correct/secret_write/clang:GTIRB
 ```
 
 ## Open Source License
 
-Copyright 2022 The University of Queensland
+Copyright 2025 The University of Queensland
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at:
 
