@@ -3,8 +3,8 @@ package ir.parsing
 case object UndefinedParseResult
 
 type BaseParseTypes = ir.dsl.EventuallyProgram | ir.dsl.EventuallyProcedure | ir.dsl.EventuallyBlock |
-  ir.dsl.DSLStatement | ir.Expr | ir.BinOp | ir.UnOp | ir.IRType | ir.Endian | ir.Variable | ir.Memory | String | BigInt |
-  UndefinedParseResult.type
+  ir.dsl.DSLStatement | ir.Expr | ir.BinOp | ir.UnOp | ir.IRType | ir.Endian | ir.Variable | ir.Memory | String |
+  BigInt | UndefinedParseResult.type
 
 type ParseTypes = BaseParseTypes | List[BaseParseTypes] | Option[BaseParseTypes] | Map[String, BaseParseTypes]
 
