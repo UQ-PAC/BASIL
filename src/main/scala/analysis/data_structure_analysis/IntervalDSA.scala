@@ -1,8 +1,9 @@
 package analysis.data_structure_analysis
 
 import analysis.data_structure_analysis.DSAPhase.{BU, Local, TD}
-import analysis.data_structure_analysis.DSInterval.Top
-import analysis.data_structure_analysis.IntervalDSA.{checkUniqueGlobal, checksGlobalMaintained}
+import analysis.data_structure_analysis.OSet.Top
+import analysis.data_structure_analysis.Global
+import analysis.data_structure_analysis.IntervalDSA.checkUniqueGlobals
 import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
 import boogie.SpecGlobal
 import specification.FuncEntry
@@ -10,9 +11,8 @@ import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.*
 import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
 import specification.{ExternalFunction, SymbolTableEntry}
-import util.DSAConfig.{Checks, Standard}
 import util.LogLevel.INFO
-import util.{DSAConfig, DSAContext, DSALogger, IRContext, PerformanceTimer}
+import util.{DSAContext, DSALogger, DSConfig, IRContext, PerformanceTimer}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{SortedSet, mutable}
@@ -28,8 +28,10 @@ class IntervalGraph(
   val proc: Procedure,
   var phase: DSAPhase,
   val irContext: IRContext,
-  val sva: SymValues[DSInterval],
+  var sva: SymValues[OSet],
   val constraints: Set[Constraint],
+  val glIntervals: Seq[DSInterval],
+  val eqCells: Boolean,
   val nodeBuilder: Option[() => Map[SymBase, IntervalNode]]
 ) {
 
@@ -37,20 +39,20 @@ class IntervalGraph(
   val builder: () => Map[SymBase, IntervalNode] = nodeBuilder.getOrElse(buildNodes)
   var nodes: Map[SymBase, IntervalNode] = builder()
 
-  def exprToSymVal(expr: Expr): SymValSet[DSInterval] = SymValues.exprToSymValSet(sva)(expr)
+  def exprToSymVal(expr: Expr): SymValSet[OSet] =
+    SymValues.exprToSymValSet(sva, i => isGlobal(i, irContext), glIntervals)(expr)
 
   protected def symValToNodes(
-    symVal: SymValSet[DSInterval],
+    symVal: SymValSet[OSet],
     current: Map[SymBase, IntervalNode]
   ): Map[SymBase, IntervalNode] = {
-    symVal.state.filter((base, _) => base != NonPointer).foldLeft(current) { case (result, (base, symOffsets)) =>
+    symVal.state.filter((base, _) => base != Constant).foldLeft(current) { case (result, (base, symOffsets)) =>
       val node = find(result.getOrElse(base, init(base, None)))
       base match
         case Heap(call) => node.flags.heap = true
         case Stack(proc) => node.flags.stack = true
-        case Global => node.flags.global = true
-        case NonPointer =>
-          throw new Exception("Attempted to create a node from an Non-pointer symbolic base")
+        case Global(interval) => node.flags.global = true
+        case Constant =>
         case unknown: (Ret | Par | Loaded) =>
           node.flags.unknown = true
           node.flags.incomplete = true
@@ -58,46 +60,51 @@ class IntervalGraph(
     }
   }
 
-  def globalNode(
+  def addGlobal(globals: Map[SymBase, IntervalNode], address: Int, size: Int): IntervalCell = {
+    val (interval, offset) = getGlobal(glIntervals, address).get
+    val base = Global(interval)
+    val node = globals(base)
+    node.flags.global = true
+    node.add(DSInterval(offset, offset + size))
+  }
+
+  def buildGlobals(
     globals: Set[SymbolTableEntry],
     globalOffsets: Map[BigInt, BigInt],
     externalFunctions: Set[ExternalFunction]
-  ): IntervalNode = {
-    val symBase = Global
-    val globalNode = IntervalNode(this, Map(symBase -> Set(0)))
-    globalNode.flags.global = true
-    globals.toSeq.sortBy(_.address).foreach {
-      case FuncEntry(name, size, address) =>
-        globalNode.add(DSInterval(address.toInt, address.toInt + size / 8))
-      case SpecGlobal(name, size, arraySize, address) =>
-        globalNode.add(DSInterval(address.toInt, address.toInt)) // ignore size, could be a composite type
+  ): Map[SymBase, IntervalNode] = {
+    val globalNodes = glIntervals.foldLeft(Map[SymBase, IntervalNode]()) { (m, interval) =>
+      val base = Global(interval)
+      val node = IntervalNode(this, Map(base -> Set(0)))
+      m + (base -> node)
     }
 
-    globalOffsets.foreach { case (address, relocated) =>
-      globalNode.add(address.toInt)
-      globalNode.add(relocated.toInt)
+    globals.toSeq.sortBy(_.address).foreach {
+      case FuncEntry(name, size, address) =>
+        addGlobal(globalNodes, address.toInt, size / 8).node.flags.function = true
+      case SpecGlobal(name, size, arraySize, address) =>
+        addGlobal(globalNodes, address.toInt, 0)
     }
 
     externalFunctions.foreach(e =>
-      val extPointer = globalNode.add(e.offset.toInt)
-      val ext = extPointer.getPointee
-      ext.node.flags.function = true
-      ext.node.flags.foreign = true
+      val node = addGlobal(globalNodes, e.offset.toInt, 0).node
+      node.flags.function = true
+      node.flags.foreign = true
     )
 
-    globalOffsets.map(_.swap).foreach { case (address, relocated) =>
-      val pointee = find(globalNode.get(address.toInt))
-      val pointer = find(globalNode).add(DSInterval(relocated.toInt, relocated.toInt + 8))
+    globalOffsets.foreach { case (address, relocated) =>
+      val pointer = addGlobal(globalNodes, address.toInt, 8)
+      val pointee = addGlobal(globalNodes, relocated.toInt, 0)
       pointer.setPointee(pointee)
     }
 
-    globalNode
+    globalNodes
   }
 
   def buildNodes(): Map[SymBase, IntervalNode] = {
-    val global =
-      globalNode(irContext.globals ++ irContext.funcEntries, irContext.globalOffsets, irContext.externalFunctions)
-    sva.state.foldLeft(Map[SymBase, IntervalNode](Global -> global)) { case (m, (variable, valueSet)) =>
+    val globals =
+      buildGlobals(irContext.globals ++ irContext.funcEntries, irContext.globalOffsets, irContext.externalFunctions)
+    sva.state.foldLeft(globals) { case (m, (variable, valueSet)) =>
       symValToNodes(valueSet, m)
     }
   }
@@ -125,21 +132,15 @@ class IntervalGraph(
   }
 
   def cellToProcs(cell: IntervalCell): Set[Procedure] = {
-    val symBase = Global
+    /*val symBase = Global
     val globalNode = nodes(Global)
     val actual = cell.node.get(cell.interval)
     irContext.funcEntries.foldLeft(Set[Procedure]()) { (s, funEntry) =>
       if actual == get(globalNode.get(funEntry.address.toInt)) then
         s + irContext.program.procedures.filter(p => p.procName == funEntry.name).head
       else s
-    }
-  }
-
-  def isGlobal(address: Int): Boolean = {
-    (irContext.globals ++ irContext.funcEntries).exists(g =>
-      DSInterval(g.address.toInt, g.address.toInt + g.size / 8).contains(address)
-    ) || irContext.globalOffsets.exists((g1, g2) => g1 == address || g2 == address) || irContext.externalFunctions
-      .exists(g => address == g.offset)
+    }*/
+    Set.empty
   }
 
   def addParamCells(): Unit = {
@@ -164,16 +165,27 @@ class IntervalGraph(
   }
 
   // returns the cells corresponding to the
-  def symValToCells(symVal: SymValSet[DSInterval]): Set[IntervalCell] = {
-    val pairs = symVal.state.filter((base, _) => base != NonPointer)
-    pairs.foldLeft(Set[IntervalCell]()) { case (results, (base: SymBase, offsets: DSInterval)) =>
+  def symValToCells(symVal: SymValSet[OSet], newEqv: Boolean = false): Set[IntervalCell] = {
+    val pairs = symVal.state.filter((base, _) => base != Constant)
+    pairs.foldLeft(Set[IntervalCell]()) { case (results, (base: SymBase, offsets: OSet)) =>
       val (node, adjustment) = findNode(nodes(base))
       if offsets == Top then results + node.collapse()
-      else
-        results ++ offsets.toIntervals
-          .filter(i => base != Global || isGlobal(i.start.get))
+      else {
+        val current = offsets.toIntervals
+          .filter(i =>
+            !base.isInstanceOf[Global] ||
+              isGlobal(i.start.get + base.asInstanceOf[Global].interval.start.get, irContext)
+          )
           .map(_.move(i => i + adjustment))
           .map(node.add)
+        val eq =
+          if base.isInstanceOf[Global] || !newEqv then Set.empty
+          else
+            offsets.toOffsets.flatMap(o =>
+              cellToEq(node.get(adjustment)).map(_.interval.move(i => i + o)).map(node.add)
+            )
+        results ++ current ++ eq
+      }
     }
   }
 
@@ -202,9 +214,16 @@ class IntervalGraph(
     dcc.target.name == "indirect_call_launchpad"
   }
 
+  def cellToEq(cell: IntervalCell): Set[IntervalCell] = {
+    cell.node.eqClasses.collectFirst { case eqc if eqc.contains(cell) => eqc } match {
+      case Some(value) => value
+      case None => Set(cell)
+    }
+  }
+
   // find the corresponding cells for a expr from this graph's procedure
-  def exprToCells(expr: Expr): Set[IntervalCell] = {
-    symValToCells(exprToSymVal(expr))
+  def exprToCells(expr: Expr, newEqv: Boolean = false): Set[IntervalCell] = {
+    symValToCells(exprToSymVal(expr), newEqv).map(find).flatMap(cellToEq)
   }
 
   /**
@@ -223,21 +242,19 @@ class IntervalGraph(
     constraints.toSeq.sortBy(f => f.label).foreach {
       case constraint: MemoryAccessConstraint[_] =>
         val valueCells = constraintArgToCells(constraint.arg2).map(get)
-        assert(valueCells.size <= 1, s"value cells should be unified instead got $valueCells")
-        var valueCell: Option[IntervalCell] = None
-        if valueCells.size == 1 then valueCell = Some(valueCells.head)
-
+        assert(IntervalDSA.equiv(valueCells), s"value cells should be unified instead got $valueCells")
         val indexCells = constraintArgToCells(constraint.arg1, ignoreContents = true).map(get)
-        var indexCell: Option[IntervalCell] = None
         if indexCells.nonEmpty then
           if indexCells.nonEmpty && valueCells.nonEmpty then
             indexCells.foreach(indexCell =>
-              assert(indexCell.node.isUptoDate, "outdated cell in local correctness check")
-              assert(indexCell.getPointee.node.isUptoDate, "outdated cell in local correctness check")
-              assert(valueCell.get.node.isUptoDate, "outdated cell in local correctness check")
-              assert(
-                indexCell.hasPointee && indexCell.getPointee.equiv(valueCell.get),
-                s"$constraint, $indexCell doesn't point to ${valueCell.get} instead ${indexCell.getPointee}"
+              valueCells.foreach(valueCell =>
+                assert(indexCell.node.isUptoDate, "outdated cell in local correctness check")
+                assert(indexCell.getPointee.node.isUptoDate, "outdated cell in local correctness check")
+                assert(valueCell.node.isUptoDate, "outdated cell in local correctness check")
+                assert(
+                  indexCell.hasPointee && indexCell.getPointee.equiv(valueCell),
+                  s"$constraint, $indexCell doesn't point to ${valueCell} instead ${indexCell.getPointee}"
+                )
               )
             )
       case _ =>
@@ -251,7 +268,16 @@ class IntervalGraph(
    */
   override def clone: IntervalGraph = {
     val oldToNew: mutable.Map[IntervalNode, IntervalNode] = mutable.Map()
-    val copy = IntervalGraph(proc, phase, irContext, sva, constraints, Some(() => Map[SymBase, IntervalNode]()))
+    val copy = IntervalGraph(
+      proc,
+      phase,
+      irContext,
+      sva,
+      constraints,
+      glIntervals,
+      eqCells,
+      Some(() => Map[SymBase, IntervalNode]())
+    )
     this.nodes.foreach { // in addition to current nodes
       case (base, node) => // clone old nodes in base to node map to carry offset info
         val (current, offset) = this.findNode(node)
@@ -321,8 +347,12 @@ class IntervalGraph(
   }
 
   def init(symBase: SymBase, size: Option[Int]): IntervalNode = IntervalNode(this, Map(symBase -> Set(0)), size)
-  def constraintArgToCells(constraintArg: ConstraintArg, ignoreContents: Boolean = false): Set[IntervalCell] = {
-    val cells = symValToCells(exprToSymVal(constraintArg.value))
+  def constraintArgToCells(
+    constraintArg: ConstraintArg,
+    newEqv: Boolean = false,
+    ignoreContents: Boolean = false
+  ): Set[IntervalCell] = {
+    val cells = exprToCells(constraintArg.value, newEqv)
     val exprCells = cells.map(find)
 
     if constraintArg.contents && !ignoreContents then exprCells.map(_.getPointee)
@@ -349,14 +379,24 @@ class IntervalGraph(
     constraint match
       case cons: MemoryAccessConstraint[_] =>
         DSALogger.debug(s"Processing constraint $cons")
-        val indices = constraintArgToCells(cons.arg1, ignoreContents = true)
+        val indices = constraintArgToCells(cons.arg1, true, ignoreContents = true)
         indices.foreach(cell => cell.node.add(cell.interval.growTo(cons.size)))
-        val pointees = constraintArgToCells(cons.arg1)
+        var pointees = constraintArgToCells(cons.arg1, true)
 
         markEscapes(cons, indices, pointees)
-        val values = constraintArgToCells(cons.arg2)
-        if pointees.nonEmpty || values.nonEmpty then mergeCells(pointees ++ values)
+        var values = constraintArgToCells(cons.arg2, true)
+        if pointees.nonEmpty || values.nonEmpty then {
+          val cell = mergeCells(pointees ++ values)
+          val eqs = cellToEq(cell)
+          if eqs.size > 1 && cons.source.parent.isLoopParticipant() then {
+            pointees = constraintArgToCells(cons.arg1, true)
+            values = constraintArgToCells(cons.arg2, true)
+            val newEqs = cellToEq(mergeCells(pointees ++ values))
+            if newEqs.size > eqs.size then find(cell).node.collapse()
+          }
+        }
         else DSALogger.warn(s"$cons had an empty argument")
+        (indices ++ values).map(_.node).map(find).filterNot(_.eqClassProperty()).toSet.foreach(_.maintainEqClasses())
       case _ => // ignore
   }
 
@@ -431,6 +471,10 @@ class IntervalGraph(
     val nodeToBeMoved = toBeMoved.node
 
     // bookkeeping
+    if delta.nonEmpty then
+      stableNode.eqClasses ++= nodeToBeMoved.eqClasses.map(eq =>
+        eq.map(cell => stableNode.add(cell.interval.move(i => i + delta.get)))
+      )
     stableNode.flags.join(nodeToBeMoved.flags)
     stableNode.bases ++= nodeToBeMoved.bases // compute new region alignments
       .map((base, set) =>
@@ -461,6 +505,7 @@ class IntervalGraph(
     connectSCC(scc1)
     connectSCC(scc2)
 
+    find(stableNode).maintainEqClasses()
     find(stableCell)
   }
 
@@ -475,12 +520,18 @@ class IntervalGraph(
 
     val result =
       if get(cell1) == get(cell2) then cell1
-      else if cell1.node.equals(cell2.node) then cell1.node.collapse()
-      else if cell1.node.isCollapsed || cell2.node.isCollapsed then
+      else if cell1.node.equals(cell2.node) then {
+        if eqCells then {
+          cell1.node.eqClasses += Set(cell1, cell2)
+          cell1.node.maintainEqClasses()
+          assert(find(cell1).node.eqClassProperty())
+          find(cell1)
+        } else cell1.node.collapse()
+      } else if cell1.node.isCollapsed || cell2.node.isCollapsed then {
         cell1.node.collapse()
         find(cell2).node.collapse()
         mergeCellsHelper(find(cell1), find(cell2))
-      else mergeCellsHelper(cell1, cell2)
+      } else mergeCellsHelper(cell1, cell2)
 
     assert(result.equiv(get(cell1)))
     assert(result.equiv(get(cell2)))
@@ -512,6 +563,11 @@ class IntervalGraph(
 
   def find(node: IntervalNode): IntervalNode = {
     findNode(node)._1
+  }
+
+  def find(base: SymBase): IntervalNode = {
+    require(nodes.contains(base))
+    find(nodes(base))
   }
 
   // find the most uptodate version of cell
@@ -549,6 +605,7 @@ class IntervalNode(
   DSALogger.debug(s"created node with id $id")
 
   val term: NodeTerm = NodeTerm(this)
+  var eqClasses: Set[Set[IntervalCell]] = Set.empty
   val children = mutable.Set[Int]()
 
   val flags: DSFlag = DSFlag()
@@ -592,6 +649,7 @@ class IntervalNode(
         val v = IntervalNode(newGraph, node.bases, node.size)
         v.flags.join(node.flags)
         node.cells.foreach(cell => v.add(cell.interval))
+        v.eqClasses = node.eqClasses.map(eq => eq.map(cell => IntervalCell(v, cell.interval)))
         oldToNew.update(node, v)
         v
       else oldToNew(node)
@@ -679,6 +737,7 @@ class IntervalNode(
     assert(isUptoDate)
     flags.collapsed = true
     bases = bases.view.mapValues(_ => Set(0)).toMap
+    eqClasses = Set.empty
     graph.get(add(DSInterval.Top))
   }
 
@@ -723,6 +782,49 @@ class IntervalNode(
       s"Expected exactly one overlapping interval instead got ${exactMatches.size}, ${interval}, with ${cells.map(_.interval)}"
     )
     exactMatches.head
+  }
+
+  def maintainEqClasses(): Unit = {
+    assert(this.isUptoDate)
+    eqClasses = eqClasses.map( // map to most updated intervals
+      eqClass => eqClass.map(c => this.get(c.interval))
+    )
+
+    cells.foreach(c =>
+      val common = eqClasses.filter(_.contains(c))
+      eqClasses = (eqClasses -- common)
+      if common.flatten.nonEmpty then eqClasses = eqClasses + common.flatten
+    )
+
+    eqClasses.foreach(eqClass =>
+      assert(eqClass.nonEmpty)
+      graph.mergeCells(eqClass.map(_.getPointee))
+    )
+
+    /*if !eqClassProperty() then {
+        eqClasses.foreach(
+        eqClass =>
+          val size = eqClass.map(_.interval.size.getOrElse(0)).max
+          eqClass.foreach(c => this.add(c.interval.growTo(size)))
+       )
+      }*/
+
+    if !graph.find(this).eqClassProperty() then graph.find(this).maintainEqClasses()
+  }
+
+  def eqClassProperty(): Boolean = {
+    assert(this.isUptoDate)
+    var seen: Set[IntervalCell] = Set.empty
+    eqClasses.foreach(eqClass =>
+      /*!(eqClass.map(_.interval.size).toSet.size == 1) ||*/
+      if !(eqClass.map(_.getPointee).toSet.size == 1) ||
+        eqClass.exists(seen.contains) ||
+        !(eqClass.forall(c => cells.contains(c)))
+      then return false
+      seen ++= eqClass
+    )
+
+    true
   }
 }
 
@@ -775,7 +877,10 @@ class IntervalCell(val node: IntervalNode, val interval: DSInterval) {
   // this checks if two cells correspond to the same unified cell in their node
   // weaker equals
   def equiv(other: IntervalCell): Boolean = {
-    graph.get(this).equals(graph.get(other))
+    val updatedthis = graph.get(this)
+    val updatedOther = graph.get(other)
+    updatedOther.equals(updatedthis) ||
+    updatedthis.node.eqClasses.exists(s => s.contains(updatedthis) && s.contains(updatedOther))
   }
 
   def removePointee: Option[IntervalCell] = {
@@ -817,14 +922,21 @@ class IntervalCell(val node: IntervalNode, val interval: DSInterval) {
   }
 }
 
-class IntervalDSA(irContext: IRContext) {
-  def pre(): (Map[Procedure, SymValues[DSInterval]], Map[Procedure, Set[Constraint]]) = {
-    var sva: Map[Procedure, SymValues[DSInterval]] = Map.empty
+class IntervalDSA(irContext: IRContext, config: DSConfig) {
+  val globals = {
+    val glIntervals = globalIntervals(irContext)
+    if config.splitGlobals then glIntervals
+    else if glIntervals.isEmpty then glIntervals
+    else Seq(glIntervals.head.join(glIntervals.last))
+  }
+
+  def pre(): (Map[Procedure, SymValues[OSet]], Map[Procedure, Set[Constraint]]) = {
+    var sva: Map[Procedure, SymValues[OSet]] = Map.empty
     var cons: Map[Procedure, Set[Constraint]] = Map.empty
     computeDSADomain(irContext.program.mainProcedure, irContext).toSeq
       .sortBy(_.name)
       .foreach(proc =>
-        val SVAResults = getSymbolicValues[DSInterval](proc)
+        val SVAResults = getSymbolicValues[OSet](irContext, proc, globals)
         val constraints = generateConstraints(proc)
         sva += (proc -> SVAResults)
         cons += (proc -> constraints)
@@ -832,62 +944,84 @@ class IntervalDSA(irContext: IRContext) {
     (sva, cons)
   }
 
-  def dsa(config: DSAConfig): DSAContext = {
+  def dsa(): DSAContext = {
     val DSATimer = PerformanceTimer("DSA Timer", INFO)
     val (sva, cons) = pre()
     DSATimer.checkPoint("Finished SVA")
+    DSALogger.info("Finished Computing Constraints")
 
+    val checks = config.checks
     var dsaContext = DSAContext(sva, cons, Map.empty, Map.empty, Map.empty, Map.empty)
-    if (config == Standard || config == Checks) then
-      val checks = config == Checks
-      DSALogger.info("Finished Computing Constraints")
-      val globalGraph =
-        IntervalDSA.getLocal(
-          irContext.program.mainProcedure,
-          irContext,
-          SymValues[DSInterval](Map.empty),
-          Set[Constraint]()
-        )
-      val DSA = IntervalDSA.getLocals(irContext, sva, cons)
+    if (config.phase != DSAPhase.Pre) then {
+      val DSA = IntervalDSA.getLocals(irContext, sva, cons, globals, config.globalAsserts, config.eqClasses)
       DSATimer.checkPoint("Finished DSA Local Phase")
-      if checks then
-        DSA.values.foreach(checkUniqueGlobal)
+      dsaContext = dsaContext.copy(local = DSA)
+      if checks then {
+        DSA.values.foreach(checkUniqueGlobals)
         IntervalDSA.checkReachable(irContext.program, DSA)
         DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
         DSA.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness checks")
+      }
+    }
 
-      val DSABU = IntervalDSA.solveBUs(DSA)
+    val scc = stronglyConnectedComponents(CallGraph, irContext.program.procedures)
+    if config.phase == DSAPhase.BU || config.phase == DSAPhase.TD then {
+      val DSABU = IntervalDSA.solveBUs(dsaContext.local, scc)
       DSATimer.checkPoint("Finished DSA BU Phase")
-      if checks then
-        DSABU.values.foreach(checkUniqueGlobal)
+      dsaContext = dsaContext.copy(bottomUp = DSABU)
+      if checks then {
+        DSABU.values.foreach(checkUniqueGlobals)
         DSABU.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
-      val DSATD = IntervalDSA.solveTDs(DSABU)
+      }
+    }
+
+    if config.phase == DSAPhase.TD then {
+      val DSATD = IntervalDSA.solveTDs(dsaContext.bottomUp, scc)
       DSATimer.checkPoint("Finished DSA TD Phase")
       if checks then
-        DSATD.values.foreach(checkUniqueGlobal)
+        DSATD.values.foreach(checkUniqueGlobals)
         DSATD.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
 
+      val globalGraph =
+        IntervalDSA.getLocal(
+          irContext.program.mainProcedure,
+          irContext,
+          SymValues[OSet](Map.empty),
+          Set[Constraint](),
+          globals,
+          config.globalAsserts,
+          config.eqClasses
+        )
       DSATD.values.foreach(g => IntervalDSA.globalTransfer(g, globalGraph))
+      if config.splitGlobals then IntervalDSA.resolveGlobalOverlapping(globalGraph)
       val globalMapping = DSATD.values.foldLeft(Map[IntervalNode, IntervalNode]()) { (m, g) =>
         val oldToNew = IntervalDSA.globalTransfer(globalGraph, g)
         m ++ oldToNew.map((common, spec) => (spec, common))
 
       }
+      dsaContext = dsaContext.copy(topDown = DSATD, globals = globalMapping)
       DSATimer.checkPoint("Finished DSA global graph")
-
       if checks then
-        DSATD.values.foreach(checkUniqueGlobal)
+        DSATD.values.foreach(checkUniqueGlobals)
         DSATD.values.foreach(_.localCorrectness())
-        IntervalDSA.checkConsistGlobals(DSATD, globalGraph)
+        IntervalDSA.checkConsistantGlobals(DSATD, globalGraph)
         IntervalDSA.checkReachable(irContext.program, DSATD)
         DSALogger.info("Performed correctness check")
         DSATimer.checkPoint("Finished DSA Invariant Check")
+    }
 
-      dsaContext = dsaContext.copy(local = DSA, bottomUp = DSABU, topDown = DSATD, globals = globalMapping)
-
+    if config.globalAsserts then {
+      val current = config.phase match {
+        case DSAPhase.Pre => Map.empty
+        case DSAPhase.Local => dsaContext.local
+        case DSAPhase.BU => dsaContext.bottomUp
+        case DSAPhase.TD => dsaContext.topDown
+      }
+      current.values.foreach(IntervalDSA.insertGlobalAssertion)
+    }
     dsaContext
   }
 
@@ -895,8 +1029,64 @@ class IntervalDSA(irContext: IRContext) {
 
 object IntervalDSA {
 
-  def checksGlobalMaintained(graph: IntervalGraph): Unit = {
-    assert(!graph.find(graph.nodes(Global)).isCollapsed, s"${graph.proc.procName} had it's global node collapsed}")
+  def unifyGraphs(source: IntervalGraph, target: IntervalGraph)(using svDomain: SymValSetDomain[OSet]) = {
+    val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
+    source.proc.formalInParam.foreach(p =>
+      val base = Par(target.proc, p)
+      if !target.nodes.contains(base) then {
+        target.nodes += (base -> IntervalNode(target, Map(base -> Set(0))))
+        target.sva = SymValues(target.sva.state + (p -> svDomain.init(base)))
+      }
+      exprTransfer(p, p, source, target, oldToNew)
+    )
+
+    /*source.proc.formalOutParam.foreach(
+      p =>
+        val base = Par(target.proc, p)
+        if !target.nodes.contains(base) then {
+          target.nodes += (base -> IntervalNode(target, Map(base -> Set(0))))
+          target.sva = SymValues(target.sva.state + (p -> svDomain.init(base)))
+        }
+        exprTransfer(p, p, source, target, oldToNew)
+    )*/
+  }
+
+  def equiv(cells: Set[IntervalCell]): Boolean = {
+    if cells.size > 1 then {
+      val head = cells.head
+      val tail = cells.tail
+      tail.forall(head.equiv)
+    } else true
+  }
+
+  def resolveGlobalOverlapping(graph: IntervalGraph): Unit = {
+    graph.glIntervals.zipWithIndex.foreach {
+      case (interval, i) if i < graph.glIntervals.size =>
+        val base = Global(interval)
+        val node = graph.find(base)
+        val offsets = node.bases(base)
+        assert(offsets.size == 1)
+        val offset = offsets.head
+        if node.cells.last.interval.end.getOrElse(0) > interval.size.get + offset then {
+          val next = graph.glIntervals(i + 1)
+          val nextOffset = next.start.get - interval.start.get + offset
+          if nextOffset < node.cells.last.interval.end.get then {
+            val nextCell = graph.find(graph.nodes(Global(next)).get(0))
+            val cell = node.add(nextOffset)
+            graph.mergeCells(nextCell, cell)
+          }
+        }
+      case _ =>
+    }
+  }
+
+  def checksGlobalsMaintained(graph: IntervalGraph): Boolean = {
+    graph.glIntervals.forall(i => !graph.find(Global(i)).isCollapsed)
+  }
+
+  def checksStackMaintained(graph: IntervalGraph): Boolean = {
+    if graph.nodes.contains(Stack(graph.proc)) then !graph.find(Stack(graph.proc)).isCollapsed
+    else true
   }
 
   def globalTransfer(
@@ -905,12 +1095,15 @@ object IntervalDSA {
     oldToNew: mutable.Map[IntervalNode, IntervalNode] = mutable.Map.empty
   ): Map[IntervalNode, IntervalNode] = {
     DSALogger.info(s"cloning globalNode from ${source.proc.procName}")
-    val targetGlobal = target.find(target.nodes(Global).get(0))
-    var sourceGlobal = source.find(source.nodes(Global).get(0))
-    val globalNode = sourceGlobal.node.clone(target, true, oldToNew)
+    source.glIntervals.foreach { interval =>
+      val targetGlobal = target.find(target.nodes(Global(interval)).get(0))
+      var sourceGlobal = source.find(source.nodes(Global(interval)).get(0))
+      val globalNode = sourceGlobal.node.clone(target, true, oldToNew)
 
-    sourceGlobal = globalNode.get(sourceGlobal.interval)
-    target.mergeCells(sourceGlobal, targetGlobal)
+      sourceGlobal = IntervalCell(globalNode, sourceGlobal.interval)
+      target.mergeCells(sourceGlobal, targetGlobal)
+    }
+
     oldToNew.map((old, outdatedNew) => (old, target.find(outdatedNew))).toMap
   }
 
@@ -968,7 +1161,6 @@ object IntervalDSA {
           if t.node.isCollapsed || cell.node.isCollapsed then target.mergeCells(cell, t)
           else if off.size == 1 then target.mergeCells(node.get(off.head), t)
           else {
-            assert(base != Global)
             DSALogger.warn(
               s"hit this case, $base, $off, source: ${source.proc.procName}, Source Expr: $sourceExpr,  target: ${target.proc.procName}, targetExpr: $targetExpr "
             )
@@ -1010,17 +1202,20 @@ object IntervalDSA {
     }
   }
 
-  def checkUniqueGlobal(graph: IntervalGraph): Unit = {
-    var found: Option[IntervalNode] = None
+  def checkUniqueGlobals(graph: IntervalGraph): Unit = {
+    var found: Map[SymBase, Option[IntervalNode]] = graph.glIntervals.map(i => (Global(i), None)).toMap
     val seen = mutable.Set[IntervalNode]()
     val entry = graph.nodes.values.map(graph.find)
     val queue = mutable.Queue[IntervalNode]().enqueueAll(entry)
     while queue.nonEmpty do {
       val node = queue.dequeue()
-      if node.bases.contains(Global) then {
-        assert(found.isEmpty || found.get == node)
-        found = Some(node)
-      }
+      node.bases
+        .filter(_._1.isInstanceOf[Global])
+        .foreach((base, offsets) =>
+          assert(offsets.size <= 1, s"$base had more than one offset in $node")
+          assert(found(base).isEmpty || found(base).get == node, s"$base was in at least two nodes")
+          found += (base -> Some(node))
+        )
       seen.add(node)
       val toDo = node.cells.filter(_.hasPointee).map(_.getPointee).map(_.node).filterNot(seen.contains)
       queue.enqueueAll(toDo)
@@ -1050,7 +1245,7 @@ object IntervalDSA {
           case load: MemoryLoad =>
             val pointers = dsg.exprToCells(load.index).map(dsg.find)
             assert(
-              pointers.nonEmpty || isNonGlobalConstant(load.index, dsg.isGlobal),
+              pointers.nonEmpty || isNonGlobalConstant(load.index, i => isGlobal(i, dsg.irContext)),
               "Expected cells for indices used in reachable memory access to have corresponding DSA cells"
             )
             assert(
@@ -1085,13 +1280,13 @@ object IntervalDSA {
    * across all procedures
    * Should hold at the end of DSA
    */
-  def checkConsistGlobals(DSA: Map[Procedure, IntervalGraph], global: IntervalGraph): Unit = {
+  def checkConsistantGlobals(DSA: Map[Procedure, IntervalGraph], global: IntervalGraph): Unit = {
     // collect all the regions  from all the resulting graphs
-    val unifiedRegions = global.find(global.nodes(Global)).bases
+    val unifiedRegions = global.glIntervals.map(Global.apply).map(base => global.find(global.nodes(base)).bases)
     DSA
       .filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
       .foreach((p, graph) =>
-        val graphRegions = graph.find(graph.nodes(Global)).bases
+        val graphRegions = graph.glIntervals.map(Global.apply).map(base => graph.find(graph.nodes(base)).bases)
         assert(
           unifiedRegions == graphRegions,
           s"Procedure ${p.procName} had a differing unified global sets than compared to the global graph"
@@ -1102,43 +1297,66 @@ object IntervalDSA {
   def getLocal(
     proc: Procedure,
     context: IRContext,
-    symValues: SymValues[DSInterval],
-    cons: Set[Constraint]
+    symValues: SymValues[OSet],
+    cons: Set[Constraint],
+    globals: Seq[DSInterval],
+    insertAsserts: Boolean,
+    eqCells: Boolean
   ): IntervalGraph = {
-    val graph = IntervalGraph(proc, Local, context, symValues, cons, None)
+    val graph = IntervalGraph(proc, Local, context, symValues, cons, globals, eqCells, None)
     graph.localPhase()
     graph
   }
 
   def getLocals(
     ctx: IRContext,
-    svas: Map[Procedure, SymValues[DSInterval]],
-    cons: Map[Procedure, Set[Constraint]]
+    svas: Map[Procedure, SymValues[OSet]],
+    cons: Map[Procedure, Set[Constraint]],
+    globals: Seq[DSInterval],
+    insertAsserts: Boolean = false,
+    eqClasses: Boolean = false
   ): Map[Procedure, IntervalGraph] = {
     DSALogger.info("Performing local DSA")
     computeDSADomain(ctx.program.mainProcedure, ctx).toSeq
       .sortBy(_.name)
       .foldLeft(Map[Procedure, IntervalGraph]())((m, proc) =>
-        m + (proc -> IntervalDSA.getLocal(proc, ctx, svas(proc), cons(proc)))
+        m + (proc -> IntervalDSA.getLocal(proc, ctx, svas(proc), cons(proc), globals, insertAsserts, eqClasses))
       )
   }
 
-  def solveBUs(locals: Map[Procedure, IntervalGraph]): Map[Procedure, IntervalGraph] = {
+  def computeSCCGraph(graphs: Map[Procedure, IntervalGraph], scc: Set[Procedure]): Map[Procedure, IntervalGraph] = {
+    require(scc.forall(graphs.keySet.contains))
+    require(scc.size > 1)
+    val sscc = scc.toSeq.sortBy(_.formalInParam.size).reverse
+    val head = graphs(scc.head)
+    sscc.tail.foreach(p => IntervalDSA.unifyGraphs(graphs(p), head))
+
+    graphs.map {
+      case (p, g) if sscc.contains(p) => (p, head)
+      case x => x
+    }
+  }
+
+  def solveBUs(locals: Map[Procedure, IntervalGraph], scc: List[Set[Procedure]]): Map[Procedure, IntervalGraph] = {
 
     DSALogger.info("Performing DSA BU phase")
-    val bus = locals.view.mapValues(_.clone).toMap
+    var bus = locals.view.mapValues(_.clone).toMap
     DSALogger.info("performed cloning")
     val visited: mutable.Set[Procedure] = mutable.Set.empty
     val queue = mutable.Queue[Procedure]().enqueueAll(bus.keys.toSeq.sortBy(p => p.name))
-
-    // TODO instead of skipping merge the scc and use it directly
-    var skip = Seq.empty
     while queue.nonEmpty do
       val proc = queue.dequeue()
-      if skip.exists(name => proc.name.startsWith(name)) then
-        DSALogger.info(s"skipped ${proc.name} due to scc")
-        visited += proc
-      else if !proc.calls.filter(proc => !proc.isExternal.getOrElse(false)).forall(visited.contains) then
+      val cc = scc.find(_.contains(proc)).get
+      if cc.size > 1 && cc
+          .flatMap(_.calls)
+          .filter(p => !p.isExternal.getOrElse(false) && !cc.contains(p))
+          .forall(visited.contains)
+      then {
+        visited ++= cc
+        queue --= cc
+        bus = computeSCCGraph(bus, cc)
+      }
+      if !proc.calls.filter(p => !p.isExternal.getOrElse(false) && proc != p).forall(visited.contains) then
         DSALogger.info(s"BU procedure ${proc.name} was readded")
         queue.enqueue(proc)
       else
@@ -1148,20 +1366,23 @@ object IntervalDSA {
     bus
   }
 
-  def solveTDs(bus: Map[Procedure, IntervalGraph]): Map[Procedure, IntervalGraph] = {
+  def solveTDs(bus: Map[Procedure, IntervalGraph], scc: List[Set[Procedure]]): Map[Procedure, IntervalGraph] = {
     DSALogger.info("Performing DSA TD phase")
-    val tds = bus.view.mapValues(_.clone).toMap
+    val oldToNew = mutable.Map[IntervalGraph, IntervalGraph]()
+    val tds = bus.map {
+      case (proc, graph) if oldToNew.contains(graph) => (proc, oldToNew(graph))
+      case (proc, graph) =>
+        val clone = graph.clone()
+        oldToNew.update(graph, clone)
+        (proc, clone)
+    }
     val visited: mutable.Set[Procedure] = mutable.Set.empty
     val queue = mutable.Queue[Procedure]().enqueueAll(tds.keys.toSeq.sortBy(p => p.name))
 
-    // TODO instead of skipping merge the scc and use it directly
-    var skip = Seq.empty
     while queue.nonEmpty do
       val proc = queue.dequeue()
-      if skip.exists(name => proc.name.startsWith(name)) then
-        DSALogger.info(s"skipped ${proc.name} due to scc")
-        visited += proc
-      else if !proc.callers().filter(f => tds.keySet.contains(f)).forall(f => visited.contains(f)) then
+      val cc = scc.find(_.contains(proc)).get
+      if !proc.callers().filter(f => tds.keySet.contains(f) && !cc.contains(f)).forall(f => visited.contains(f)) then
         DSALogger.info(s"TD procedure ${proc.name} was readded")
         queue.enqueue(proc)
       else
@@ -1169,6 +1390,31 @@ object IntervalDSA {
         tds(proc).contextTransfer(TD, tds)
         visited += proc
     tds
+  }
+
+  def insertGlobalAssertion(graph: IntervalGraph): Unit = {
+    graph.constraints.foreach {
+      case cons: MemoryAccessConstraint[_] =>
+        val pos = cons.source
+        val indices = graph.constraintArgToCells(cons.arg1, true, ignoreContents = true)
+        val collapsedGlobals =
+          indices.filter(_.node.isCollapsed).flatMap(_.node.bases.keys.collect { case g: Global => g })
+        if collapsedGlobals.nonEmpty then {
+          val assertExpr = collapsedGlobals
+            .map(g =>
+              BinaryExpr(
+                BoolAND,
+                BinaryExpr(BVSGE, cons.arg1.value, BitVecLiteral(g.interval.start.get, 64)),
+                BinaryExpr(BVSLT, cons.arg1.value, BitVecLiteral(g.interval.end.get, 64))
+              )
+            )
+            .reduce((e1, e2) => BinaryExpr(BoolOR, e1, e2))
+          val assertSt = Assert(assertExpr)
+          pos.parent.statements.insertBefore(pos, assertSt)
+        }
+
+      case _ => // ignore
+    }
   }
 }
 
@@ -1236,4 +1482,60 @@ def computeDSADomain(proc: Procedure, context: IRContext): Set[Procedure] = {
   }
 
   domain
+}
+
+def globalIntervals(ctx: IRContext): Seq[DSInterval] = {
+  val globals = ctx.globals ++ ctx.funcEntries
+  val intervals = mutable.Set[DSInterval]()
+
+  globals.toSeq.sortBy(_.address).foreach {
+    case FuncEntry(name, size, address) =>
+      intervals += DSInterval(address.toInt, address.toInt + size / 8)
+    case SpecGlobal(name, size, arraySize, address) =>
+      intervals += DSInterval(address.toInt, address.toInt + size / 8) // ignore size, could be a composite type
+  }
+
+  ctx.globalOffsets.foreach { case (address, relocated) =>
+    if !intervals.exists(_.contains(address.toInt)) then intervals += DSInterval.Value(address.toInt, address.toInt + 8)
+    if !intervals.exists(_.contains(relocated.toInt)) then
+      intervals += DSInterval.Value(relocated.toInt, relocated.toInt)
+  }
+
+  ctx.externalFunctions.foreach(e =>
+    if !intervals.exists(_.contains(e.offset.toInt)) then intervals += DSInterval.Value(e.offset.toInt, e.offset.toInt)
+  )
+
+  val seq = intervals.toSeq.sorted // sorted for easier overlapping check
+  if seq.size > 1 then {
+    seq.sliding(2).foreach(v => assert(!v(0).isOverlapping(v(1))))
+  }
+
+  seq
+}
+
+def getGlobal(globals: Seq[DSInterval], offset: Int, base: Option[DSInterval] = None): Option[(DSInterval, Int)] = {
+  require(base.isEmpty || base.get.isInstanceOf[DSInterval.Value])
+  if base.nonEmpty && offset < base.get.size.get then Some(base.get, offset)
+  else {
+    val literal = base match {
+      case Some(value) => value.start.get + offset
+      case None => offset
+    }
+    val newBase = globals.filter(_.contains(literal))
+    if newBase.size > 1 then newBase.foreach(_.contains(literal))
+    assert(newBase.size <= 1, s"expected to match at most one global but got, $literal,  $newBase")
+    if newBase.isEmpty then None
+    else {
+      val globalInterval = newBase.head
+      val newOffset = literal - globalInterval.start.get
+      Some(globalInterval, newOffset)
+    }
+  }
+}
+
+def isGlobal(address: Int, irContext: IRContext): Boolean = {
+  (irContext.globals ++ irContext.funcEntries).exists(g =>
+    DSInterval(g.address.toInt, g.address.toInt + g.size / 8).contains(address)
+  ) || irContext.globalOffsets.exists((g1, g2) => g1 == address || g2 == address) || irContext.externalFunctions
+    .exists(g => address == g.offset)
 }
