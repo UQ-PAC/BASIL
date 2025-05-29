@@ -1,15 +1,23 @@
 package ir.parsing
 
-private type DSLStatement = ir.dsl.NonCallStatement | ir.dsl.EventuallyStatement | ir.dsl.EventuallyJump
+case object UndefinedParseResult
 
-private case object UndefinedParseResult
-
-private type BaseParseTypes = ir.dsl.EventuallyProgram | ir.dsl.EventuallyProcedure | ir.dsl.EventuallyBlock |
-  DSLStatement | ir.Expr | ir.BinOp | ir.UnOp | ir.IRType | ir.Endian | ir.Variable | ir.Memory | String | BigInt |
+type BaseParseTypes = ir.dsl.EventuallyProgram | ir.dsl.EventuallyProcedure | ir.dsl.EventuallyBlock |
+  ir.dsl.DSLStatement | ir.Expr | ir.BinOp | ir.UnOp | ir.IRType | ir.Endian | ir.Variable | ir.Memory | String | BigInt |
   UndefinedParseResult.type
 
-private type ParseTypes = BaseParseTypes | List[BaseParseTypes] | Option[BaseParseTypes] | Map[String, BaseParseTypes]
+type ParseTypes = BaseParseTypes | List[BaseParseTypes] | Option[BaseParseTypes] | Map[String, BaseParseTypes]
 
+/**
+ * A value parsed out of the BNFC [[basil_ir.Absyn]] AST. This can be one of a
+ * number of Basil IR types. The user of the [[ir.parsing.BasilParseValue]] should
+ * use one of the member methods (e.g., [[ir.parsing.BasilParseValue#expr]]) to cast
+ * the value to the expecetd type.
+ *
+ * This implements a kind of *dynamic typing*. This is required so we can implement the
+ * [[basil_ir.AllVisitor]] interface which requires that all AST structures return a
+ * value of a single common type.
+ */
 case class BasilParseValue(x: ParseTypes) {
   def ty = x.asInstanceOf[ir.IRType]
   def bvty = x.asInstanceOf[ir.BitVecType]
@@ -30,7 +38,7 @@ case class BasilParseValue(x: ParseTypes) {
     x.asInstanceOf[Option[BaseParseTypes]].map(x => f(BasilParseValue(x)))
   def map[T](f: BasilParseValue => T) =
     x.asInstanceOf[Map[String, BaseParseTypes]].view.mapValues(x => f(BasilParseValue(x))).toMap
-  def stmt = x.asInstanceOf[DSLStatement]
+  def stmt = x.asInstanceOf[ir.dsl.DSLStatement]
   def block = x.asInstanceOf[ir.dsl.EventuallyBlock]
   def proc = x.asInstanceOf[ir.dsl.EventuallyProcedure]
   def prog = x.asInstanceOf[ir.dsl.EventuallyProgram]

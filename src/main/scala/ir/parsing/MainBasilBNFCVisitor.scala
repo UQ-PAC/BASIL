@@ -1,6 +1,5 @@
 package ir.parsing
 
-import util.Freeze
 import basil_ir.{Absyn => syntax}
 
 import scala.collection.mutable
@@ -25,7 +24,7 @@ case class MainBasilBNFCVisitor[A](
   def exprs(x: syntax.ListExpr, arg: A): List[ir.Expr] =
     x.asScala.map(_.accept(this, arg).expr).toList
 
-  def stmts(x: syntax.ListStatement, arg: A): List[DSLStatement] =
+  def stmts(x: syntax.ListStatement, arg: A): List[ir.dsl.DSLStatement] =
     x.asScala.map(_.accept(this, arg).stmt).toList
 
   def blocks(x: syntax.ListBlock, arg: A): List[ir.dsl.EventuallyBlock] =
@@ -219,14 +218,12 @@ object Run {
 
     val vis = MainBasilBNFCVisitor[Unit](decls)
     val result = ctx.result.accept(vis, ()).prog
-    println(result)
+    // println(result)
     val prog = result.resolve
-    // println(translating.PrettyPrinter.pp_prog(prog))
-
+    println(translating.PrettyPrinter.pp_prog(prog))
   }
 
   def main(args: Array[String]): Unit = {
     parse(args(0))
   }
-
 }
