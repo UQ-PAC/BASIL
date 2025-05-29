@@ -20,14 +20,19 @@ trait DownloadModule extends Module {
   def local: Target[Either[String, String]]
 
   def mode = "rwxr-xr-x"
-  def remote = Task {
-    val p = Task.dest / name
+
+  // this is not a mill Task to prevent it from being eagerly run.
+  def remote(dest: Path) = {
+    val p = dest / name
     os.write(p, requests.get(url))
     ignoring(classOf[UnsupportedOperationException]) {
       os.perms.set(p, mode)
     }
     p.toString
   }
+
   def source = Task(PathRef(Path(path())))
-  def path = Task(local().getOrElse(remote()))
+  def path = Task {
+    local().getOrElse(remote(Task.dest))
+  }
 }
