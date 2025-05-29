@@ -49,7 +49,7 @@ trait BNFCModule extends JavaModule with JFlexCupModule {
   }
 
   override def sources = Task.Sources {
-    Seq(bnfcGenerated())
+    super.sources() ++ Seq(bnfcGenerated())
   }
 
   /**
@@ -73,24 +73,46 @@ trait JFlexCupModule extends JavaModule {
   def javaCupSource: T[PathRef]
 
   def jflexDep = ivy"de.jflex:jflex:1.9.1"
-  def javaCupDep = ivy"java_cup:java_cup:0.9e"
+  def javaCupDep = ivy"com.github.vbmacher:java-cup:11b-20160615-3"
+  def javaCupRuntimeDep = ivy"com.github.vbmacher:java-cup-runtime:11b-20160615-3"
 
-  def compileIvyDeps = Agg(jflexDep, javaCupDep)
-
-  def jflexGenerated = Task {
-    println(compileClasspath().map(_.path).toList)
-    Jvm.callProcess(
-      mainClass = "jflex.Main",
-      mainArgs = Seq(),
-      classPath = compileClasspath().map(_.path).toList
-    )
-    PathRef(Task.dest)
+  def ivyDeps = Task {
+    super.ivyDeps() ++ Agg(javaCupRuntimeDep)
   }
 
+  object jflexGenerator extends JavaModule {
+    def compileIvyDeps = Agg(jflexDep)
+    def generated = Task {
+      Jvm.callProcess(
+        mainClass = "jflex.Main",
+        mainArgs = Seq(
+          jflexSource().path.toString,
+          "-d",
+          Task.dest.toString
+        ),
+        classPath = compileClasspath().map(_.path).toList
+      )
+      PathRef(Task.dest)
+    }
+  }
+
+  object javaCupGenerator extends JavaModule {
+    def compileIvyDeps = Agg(javaCupDep)
+    def generated = Task {
+      Jvm.callProcess(
+        mainClass = "java_cup.Main",
+        mainArgs = Seq(
+          "-locations", "-expect", "100",
+          javaCupSource().path.toString
+        ),
+        cwd = Task.dest,
+        classPath = compileClasspath().map(_.path).toList
+      )
+      PathRef(Task.dest)
+    }
+  }
 
   override def sources = Task.Sources {
-    Seq(jflexGenerated())
+    super.sources() ++ Seq(jflexGenerator.generated(), javaCupGenerator.generated())
   }
-  
-
 }
