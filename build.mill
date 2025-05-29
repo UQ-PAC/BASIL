@@ -135,7 +135,7 @@ object `package` extends RootModule with ScalaModule {
     }
 
     def scalaDocOptions = Task {
-      super.scalaDocOptions() ++ build.scalaDocExternalMappingsOption()
+      super.scalaDocOptions() ++ build.scalaDocExternalMappingOptions()
     }
   }
 
@@ -147,37 +147,63 @@ object `package` extends RootModule with ScalaModule {
     def antlrRuntime = build.antlrRuntime
   }
 
-  def scalaDocExternalMappingsOption = Task {
-    val externals = Seq(
+  def scalaDocOptions = Task {
+    super.scalaDocOptions() ++ scalaDocExternalMappingOptions() ++ Seq(
+      "-source-links:github://UQ-PAC/BASIL/main",
+      s"-doc-root-content:$millSourcePath/main/scala/rootdoc.scala"
+    )
+  }
+
+  def baseUrl = "https://uq-pac.github.io/BASIL"
+  def docsRegexes = Task {
+    // these docs paths are used for inter-project linking.
+    // https://docs.scala-lang.org/scala3/guides/scaladoc/settings.html#-external-mappings
+    Map(
+      "api/bnfc" -> "basil_ir/.*::javadoc",
+      "api/basil-antlr" -> ".*Parsers/.*::javadoc",
+      "api/basil-proto" -> ".*com/grammatech/gtirb.*::scaladoc3",
+    )
+  }
+
+  def docsModules = Task {
+    // these doc paths are copied into the combined docs output.
+    Map(
+      "api/basil" -> docJar(),
+      "api/bnfc" -> bnfc.docJar(),
+      "api/basil-antlr" -> basilAntlr.docJar(),
+      "api/basil-proto" -> basilProto.docJar(),
+    )
+  }
+
+  def scalaDocExternalMappingOptions = Task {
+    val defaultExternals = Seq(
       ".*scala/.*::scaladoc3::https://scala-lang.org/api/3.3_LTS/",
       "java/.*::javadoc::https://docs.oracle.com/en/java/javase/17/docs/api/java.base/",
       ".*com/google/protobuf.*::javadoc::https://protobuf.dev/reference/java/api-docs/",
-
-      // basil submodules:
-      "basil_ir/.*::javadoc::https://uq-pac.github.io/BASIL/api/bnfc/",
-      ".*Parsers/.*::javadoc::https://uq-pac.github.io/BASIL/api/basil-antlr/",
-      ".*com/grammatech/gtirb.*::scaladoc3::https://uq-pac.github.io/BASIL/api/basil-proto/",
     )
+    val externals = defaultExternals ++ docsRegexes().map {
+      case (path, regex) => s"$regex::$baseUrl/$path"
+    }
     Seq("-external-mappings:" + externals.mkString(","))
   }
 
-  def scalaDocOptions = Task {
-    super.scalaDocOptions() ++ Seq("-source-links:github://UQ-PAC/BASIL/main") ++ scalaDocExternalMappingsOption()
+  def docsIndex = Task.Source {
+    PathRef(super.millSourcePath / "docs" / "static" / "index.html")
   }
 
   def allDocs = Task {
-    val dest = Task.dest / "api"
+    val dest = Task.dest
 
     def copyDoc(x: PathRef, name: String) = {
-      val p = x.path
+      val p = x.path / ".." / "javadoc"
       println("copying docs from " + p)
-      os.copy(p / ".." / "javadoc", dest / name, createFolders = true)
+      os.copy(p, dest / os.RelPath(name), createFolders = true)
     }
 
-    copyDoc(docJar(), "basil")
-    copyDoc(bnfc.docJar(), "bnfc")
-    copyDoc(basilAntlr.docJar(), "basil-antlr")
-    copyDoc(basilProto.docJar(), "basil-proto")
+    docsModules().foreach {
+      case (name, src) => copyDoc(src, name)
+    }
+    os.copy.into(docsIndex().path, dest / "api")
 
     dest
   }
