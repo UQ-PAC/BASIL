@@ -80,7 +80,7 @@ trait JFlexCupModule extends JavaModule {
     super.ivyDeps() ++ Agg(javaCupRuntimeDep)
   }
 
-  object jflexGenerator extends JavaModule {
+  object jflex extends JavaModule {
     def compileIvyDeps = Agg(jflexDep)
     def generated = Task {
       Jvm.callProcess(
@@ -96,7 +96,7 @@ trait JFlexCupModule extends JavaModule {
     }
   }
 
-  object javaCupGenerator extends JavaModule {
+  object cup extends JavaModule {
     def compileIvyDeps = Agg(javaCupDep)
     def generated = Task {
       Jvm.callProcess(
@@ -113,6 +113,6 @@ trait JFlexCupModule extends JavaModule {
   }
 
   override def sources = Task.Sources {
-    super.sources() ++ Seq(jflexGenerator.generated(), javaCupGenerator.generated())
+    super.sources() ++ Seq(jflex.generated(), cup.generated())
   }
 }
