@@ -205,6 +205,14 @@ object `package` extends RootModule with ScalaModule {
     }
     os.copy.into(docsIndex().path, dest / "api")
 
+    // HACK: fix mill bug causing incorrect scala source links https://github.com/com-lihaoyi/mill/issues/5221
+    os.walk(dest).foreach {
+      case path if path.ext == "html" =>
+        val out = os.read(path).replace(super.millSourcePath.toString, "")
+        os.write.over(path, out)
+      case _ => ()
+    }
+
     dest
   }
 }
