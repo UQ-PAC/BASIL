@@ -46,14 +46,14 @@ case class EarlyBasilBNFCVisitor[A]()
   // Members declared in MExpr.Visitor
   override def visit(x: syntax.MSym, arg: A) = x.bident_
   override def visit(x: syntax.BlockM, arg: A) =
-    throw ParseException("block literal as a metadata value is unsupported")
+    throw ParseException("block literal as a metadata value is unsupported", x)
 
   // Members declared in Declaration.Visitor
   override def visit(x: syntax.LetDecl, arg: A) =
     val allowedMetadataKeys = List("entry_procedure")
     val key = x.bident_ match {
       case x if allowedMetadataKeys.contains(x) => x
-      case x => throw ParseException("unsupported 'let' metadata key: " + x)
+      case key => throw ParseException("unsupported 'let' metadata key: " + key, x)
     }
     Declarations.empty.copy(metas = Map(key -> x.mexpr_.accept(this, arg)))
 

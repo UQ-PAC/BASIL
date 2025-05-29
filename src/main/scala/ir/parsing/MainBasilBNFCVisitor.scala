@@ -8,8 +8,16 @@ import scala.util.chaining.scalaUtilChainingOps
 
 import org.antlr.v4.runtime.{CommonTokenStream, CharStreams}
 
-final case class ParseException(private val message: String, private val cause: Throwable = None.orNull)
-    extends Exception(message, cause)
+final case class ParseException(private val message: String, val token: Any)
+  extends Exception(message) {
+
+  def line_num: Int =
+    token.getClass.getDeclaredField("line_num").get(token).asInstanceOf[Int]
+  def col_num: Int =
+    token.getClass.getDeclaredField("col_num").get(token).asInstanceOf[Int]
+
+  override def toString = s"ParseException: $message ($line_num:$col_num)"
+}
 
 case class MainBasilBNFCVisitor[A](
   val decls: Declarations,
@@ -39,9 +47,9 @@ case class MainBasilBNFCVisitor[A](
   def localvar(name: String, x: syntax.Type, arg: A): ir.LocalVar =
     ir.LocalVar(name, x.accept(this, arg).ty)
 
-  def unquote(s: String) = s match {
+  def unquote(s: String, x: Any) = s match {
     case s"\"$x\"" => x
-    case _ => throw ParseException("invalid quoted string")
+    case _ => throw ParseException("invalid quoted string", x)
   }
 
   // Members declared in Type.Visitor
@@ -166,7 +174,7 @@ case class MainBasilBNFCVisitor[A](
 
   // Members declared in ProcDef.Visitor
   override def visit(x: syntax.PD, arg: A): BasilParseValue =
-    val p = ir.dsl.proc(unquote(x.str_), x.internalblocks_.accept(this, arg).list(_.block): _*)
+    val p = ir.dsl.proc(unquote(x.str_, x), x.internalblocks_.accept(this, arg).list(_.block): _*)
     p.copy(address = x.paddress_.accept(this, arg).opt(_.int), entryBlockLabel = x.pentry_.accept(this, arg).opt(_.str))
 
   override def visit(x: syntax.Procedure, arg: A): BasilParseValue =
@@ -194,7 +202,7 @@ case class MainBasilBNFCVisitor[A](
     val procdecls = ds.remove(classOf[syntax.Procedure]).getOrElse(Nil)
     assert(ds.isEmpty, "parsed decls contains unhandled type: " + ds.keys)
 
-    val entryname = decls.metas.getOrElse("entry_procedure", throw ParseException("missing entry_procedure key"))
+    val entryname = decls.metas.getOrElse("entry_procedure", throw ParseException("missing entry_procedure key", x))
 
     val procs = procdecls.map(_.accept(this, arg).proc)
 

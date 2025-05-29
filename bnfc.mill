@@ -58,7 +58,7 @@ trait BNFCModule extends JavaModule with antlr.AntlrModule {
   }
 
   def bnfcGenerated = Task {
-    val args = Seq("--java-antlr", bnfcSource().path.toString, "-m", "-o", Task.dest.toString)
+    val args = Seq("--java-antlr", bnfcSource().path.toString, "-m", "-o", Task.dest.toString, "--line-numbers")
     os.call(bnfcBinary.path() +: (args ++ bnfcExtraArgs))
     PathRef(Task.dest)
   }
