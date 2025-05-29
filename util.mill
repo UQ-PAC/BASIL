@@ -31,8 +31,10 @@ trait DownloadModule extends Module {
     p.toString
   }
 
-  def source = Task(PathRef(Path(path())))
+  def pathref = Task(PathRef(Path(path())))
   def path = Task {
     local().getOrElse(remote(Task.dest))
   }
+  // using path() as the originator (instead of pathref()) 
+  // allows us to return values which are not absolute paths
 }

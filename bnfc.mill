@@ -1,27 +1,36 @@
 package build
+
 import mill._
 import mill.util.Jvm
+
+import os.Path
 import scalalib._
+import scala.util.{Try}
 
 import $file.util.DownloadModule
-import scala.util.{Try}
+import $file.jflexcup.JFlexCupModule
 
 /**
  * Module to process a BNFC (https://bnfc.digitalgrammars.com/) grammar
- * through the `bnfc` generator and through Antlr to produce a Java
- * dependency.
+ * through the `bnfc` generator.
+ *
+ * This should be used alongside AntlrModule or JFlexCupModule to process
+ * the resulting parser/lexer files into Java sources. Otherwise, the build
+ * will fail with unresolved references.
  */
-trait BNFCModule extends JavaModule with JFlexCupModule {
+trait BNFCModule extends JavaModule {
   def bnfcPackageName: String
-  def bnfcSource: Task[PathRef]
-  def bnfcExtraArgs: Seq[String] = Nil
-  def antlrRuntime: Dep
+  def bnfcSource: T[PathRef]
+  def bnfcExtraArgs: T[Iterable[String]] = Iterable.empty[String]
 
-  override def jflexSource = Task.Source {
+  def bnfcYylexFile = Task.Source {
     PathRef(bnfcGenerated().path / bnfcPackageName / "Yylex")
   }
-  override def javaCupSource = Task.Source {
+  def bnfcCupFile = Task.Source {
     PathRef(bnfcGenerated().path / bnfcPackageName / "_cup.cup")
+  }
+  def bnfcMakefile = Task.Source {
+    PathRef(bnfcGenerated().path / "Makefile")
   }
 
   object bnfcBinary extends DownloadModule {
@@ -55,66 +64,37 @@ trait BNFCModule extends JavaModule with JFlexCupModule {
   /**
     * Runs the BNFC binary.
     */
-  override def run(args: Task[Args] = Task.Anon(Args())) = Task.Command {
-    val res = os.call(bnfcBinary.path() +: args().value, stdout = os.Inherit, check = false)
+  def runBNFC(args: String*) = Task.Command {
+    val res = os.call(bnfcBinary.path() +: args, stdout = os.Inherit, check = false)
     Task.ctx().systemExit(res.exitCode)
     ()
   }
 
   def bnfcGenerated = Task {
     val args = Seq("--java", "--jflex", bnfcSource().path.toString, "-m", "-o", Task.dest.toString, "-l")
-    os.call(bnfcBinary.path() +: (args ++ bnfcExtraArgs))
+    os.call(bnfcBinary.path() +: (args ++ bnfcExtraArgs()))
     PathRef(Task.dest)
+  }
+
+  private def readMakefileVar(file: Path, key: String) = {
+    os.read.lines(file).collect {
+      case l if l.startsWith(s"$key=") => l.stripPrefix(s"$key=")
+    }.head.split(" ").filter(_.nonEmpty).toList
+  }
+
+  def bnfcParserArgs = Task {
+    readMakefileVar(bnfcMakefile().path, "PARSER_FLAGS")
+  }
+
+  def bnfcLexerArgs = Task {
+    readMakefileVar(bnfcMakefile().path, "LEXER_FLAGS")
   }
 }
 
-trait JFlexCupModule extends JavaModule {
-  def jflexSource: T[PathRef]
-  def javaCupSource: T[PathRef]
+trait BNFCJFlexModule extends BNFCModule with JFlexCupModule {
+  override def javaCupArgs = bnfcParserArgs
+  override def jflexArgs = bnfcLexerArgs
 
-  def jflexDep = ivy"de.jflex:jflex:1.9.1"
-  def javaCupDep = ivy"com.github.vbmacher:java-cup:11b-20160615-3"
-  def javaCupRuntimeDep = ivy"com.github.vbmacher:java-cup-runtime:11b-20160615-3"
-
-  def ivyDeps = Task {
-    super.ivyDeps() ++ Agg(javaCupRuntimeDep)
-  }
-
-  object jflex extends JavaModule {
-    def compileIvyDeps = Agg(jflexDep)
-    def generated = Task {
-      Jvm.callProcess(
-        mainClass = "jflex.Main",
-        mainArgs = Seq(
-          jflexSource().path.toString,
-          "-d",
-          Task.dest.toString
-        ),
-        stdout = os.Inherit,
-        classPath = compileClasspath().map(_.path).toList
-      )
-      PathRef(Task.dest)
-    }
-  }
-
-  object cup extends JavaModule {
-    def compileIvyDeps = Agg(javaCupDep)
-    def generated = Task {
-      Jvm.callProcess(
-        mainClass = "java_cup.Main",
-        mainArgs = Seq(
-          "-locations", "-expect", "100",
-          javaCupSource().path.toString
-        ),
-        stdout = os.Inherit,
-        cwd = Task.dest,
-        classPath = compileClasspath().map(_.path).toList
-      )
-      PathRef(Task.dest)
-    }
-  }
-
-  override def sources = Task.Sources {
-    super.sources() ++ Seq(jflex.generated(), cup.generated())
-  }
+  override def javaCupSource = bnfcCupFile
+  override def jflexSource = bnfcYylexFile
 }
