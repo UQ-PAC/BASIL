@@ -1,3 +1,4 @@
+name: Docs
 on:
   push:
     branches: [$default-branch, gh-pages-api-docs]

@@ -42,6 +42,8 @@ jobs:
 
       - name: Compile BASIL Mill
         run: ./mill compile
+      - name: Compile docs
+        run: ./mill allDocs
 
   # INFO: Scalatest runner arguments (i.e., arguments to ./mill -j3 test.test) can be
   # found at: https://www.scalatest.org/user_guide/using_the_runner
