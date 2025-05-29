@@ -64,3 +64,6 @@ trait BNFCModule extends JavaModule with antlr.AntlrModule {
   }
 }
 
+trait CupJFlex extends JavaModule {
+
+}
