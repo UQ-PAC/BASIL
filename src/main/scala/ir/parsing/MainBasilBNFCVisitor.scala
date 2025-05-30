@@ -7,19 +7,15 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.util.chaining.scalaUtilChainingOps
 
-import scala.reflect.Selectable.reflectiveSelectable
-
-type HasParsePosition = {
-  val line_num: Int
-  val col_num: Int
-  val offset: Int
-}
-
-final case class ParseException(private val message: String, val token: HasParsePosition) extends Exception(message) {
-
-  override def toString = s"ParseException: $message (at line ${token.line_num}, col ${token.col_num})"
-}
-
+/**
+ * Parses structures at the block-level and lower, given
+ * a particular procName (including address) and declarations.
+ *
+ * The given typesVisitor is optional. If unspecified, a default instance
+ * is constructed.
+ *
+ * @group mainvisitor
+ */
 case class InnerBasilBNFCVisitor[A](
   val procName: String,
   val decls: Declarations,
@@ -172,18 +168,28 @@ case class InnerBasilBNFCVisitor[A](
   def visit(x: syntax.PD, arg: A): BasilParseValue = UndefinedParseResult
 }
 
+/**
+ * Entry-point for the main visitor, parsing everything from the procedure
+ * level and lower, given the pre-parsed global declarations.
+ *
+ * The optional makeVisitor param is used to construct the parser for the blocks
+ * and inner structures. If not given, defaults to constructing a
+ * [[ir.parsing.InnerBasilBNFCVisitor]].
+ *
+ * @group mainvisitor
+ */
 case class MainBasilBNFCVisitor[A](
   val decls: Declarations,
-  val makeVisitor: (String, Declarations) => basil_ir.AllVisitor[BasilParseValue, A] = InnerBasilBNFCVisitor[A](_, _),
-  val typesVisitor: TypesVisitorType[A] = new TypesBNFCVisitor[A]() {}
+  val makeVisitor: (String, Declarations) => basil_ir.AllVisitor[BasilParseValue, A] = InnerBasilBNFCVisitor[A](_, _)
 ) extends LiteralsBNFCVisitor[A]
+    with TypesBNFCVisitor[A]
     with syntax.Program.Visitor[ir.dsl.EventuallyProgram, A]
     with syntax.Declaration.Visitor[ir.dsl.EventuallyProcedure, A]
     with syntax.Params.Visitor[ir.LocalVar, A]
     with syntax.ProcDef.Visitor[ir.dsl.EventuallyProcedure, (A, String)] {
 
   def localvar(name: String, x: syntax.Type, arg: A): ir.LocalVar =
-    ir.LocalVar(name, x.accept(typesVisitor, arg))
+    ir.LocalVar(name, x.accept(this, arg))
 
   def params(x: syntax.ListParams, arg: A): List[ir.Variable] =
     x.asScala.map(_.accept(this, arg)).toList
