@@ -250,7 +250,7 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
         }
       }
       performanceTimer.checkPoint("Finished Statement Removal")
-      SlicerLogger.debug(s"Slicer - Removed $removed statements (${total - removed} remaining)")
+      SlicerLogger.info(s"Slicer - Removed $removed statements (${total - removed} remaining)")
 
       SlicerLogger.debug("Slicer - Remove Dead Parameters")
       reduceInParams()
@@ -266,8 +266,9 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
   def run(): Unit = {
     SlicerLogger.info("Slicer :: Slicer Start")
     if (parsedConfig.isDefined) {
-      SlicerLogger.debug("Slicer - Stripping unreachable")
+      val before = program.procedures.size
       stripUnreachableFunctions(program)
+      SlicerLogger.info(s"Slicer - Stripping unreachable | Removed ${before - program.procedures.size} functions (${program.procedures.size} remaining)")
 
       val results = Phase1().run()
 
