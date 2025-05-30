@@ -895,6 +895,16 @@ class IntervalDSA(irContext: IRContext) {
 
 object IntervalDSA {
 
+  type MemoryAccess = MemoryLoad | MemoryStore
+
+  extension (ma: MemoryAccess)
+    def index = {
+      ma match {
+        case load: MemoryLoad => load.index
+        case store: MemoryStore => store.index
+      }
+    }
+
   def checksGlobalMaintained(graph: IntervalGraph): Unit = {
     assert(!graph.find(graph.nodes(Global)).isCollapsed, s"${graph.proc.procName} had it's global node collapsed}")
   }
