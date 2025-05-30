@@ -14,7 +14,7 @@ object StatementSlice {
 class Slicer(program: Program, slicerConfig: SlicerConfig) {
   protected val performanceTimer = PerformanceTimer("Slicer Timer", LogLevel.INFO)
 
-  protected val parsedConfig: Option[(Block, StatementSlice)] = {
+  lazy protected val parsedConfig: Option[(Block, StatementSlice)] = {
     def variables(n: Command): Set[Variable] = {
       n match {
         case a: LocalAssign => a.lhs.variables ++ a.rhs.variables
@@ -47,7 +47,8 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
         if (!visited(b.label)) {
           visited.put(b.label, true)
 
-          val blockVars = b.statements.flatMap(c => variables(c)).filter(v => remainingNames.contains(v.name)) ++ variables(b.jump)
+          val blockVars =
+            b.statements.flatMap(c => variables(c)).filter(v => remainingNames.contains(v.name)) ++ variables(b.jump)
           detectedVariables.addAll(blockVars)
           remainingNames.subtractAll(blockVars.map(_.name))
 
@@ -95,24 +96,20 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
 
   class Phase1 {
     protected var nop: Option[NOP] = None
-    protected def insertNOP: Unit = {
-      startingNode match {
-        case c: Command =>
-          IRWalk.prevCommandInBlock(c) match {
-            case Some(d: DirectCall) if d.target.returnBlock.isDefined =>
-              nop = Some(NOP())
-              c.parent.statements.insertAfter(d, nop.get)
-            case _ => ()
-          }
-        case _ => ()
-      }
+    protected def insertNOP: Unit = startingNode match {
+      case c: Command =>
+        IRWalk.prevCommandInBlock(c) match {
+          case Some(d: DirectCall) if d.target.returnBlock.isDefined =>
+            nop = Some(NOP())
+            c.parent.statements.insertAfter(d, nop.get)
+          case _ => ()
+        }
+      case _ => ()
     }
 
-    protected def removeNOP: Unit = {
-      nop match {
-        case Some(n) => n.parent.statements.remove(n)
-        case _ => ()
-      }
+    protected def removeNOP: Unit = nop match {
+      case Some(n) => n.parent.statements.remove(n)
+      case _ => ()
     }
 
     def run(): Map[CFGPosition, Set[Variable]] = {
