@@ -192,11 +192,14 @@ class BasilIRPrettyPrinter(
   }
 
   override def vprog(p: Program): PPProg[Program] = {
+
+    val threadspec = s"\nprog { !entry = \"${p.mainProcedure.name}\" }"
+
     Prog(
       p.mainProcedure.name,
       memoryRegions(p).toList.sortBy(_.name).map(memdecl) ++
         globals(p).toList.sorted.map(vardecl)
-        ++ List("\nlet $entry_procedure = " + p.mainProcedure.name)
+        ++ List(threadspec)
       // ++ List(initialMemory(p.initialMemory.values))
       ,
       p.procedures.toList.map(vproc).collect {
@@ -221,8 +224,8 @@ class BasilIRPrettyPrinter(
       s"${blockIndent}// $broken"
     })
 
-    val addr = address.map(a => s"address = ${vaddress(a)}")
-    val olabel = b.meta.originalLabel.map(s => "originalLabel = \"" + s + "\"")
+    val addr = address.map(a => s"!address = ${vaddress(a)}")
+    val olabel = b.meta.originalLabel.map(s => "!originalLabel = \"" + s + "\"")
     val allattrs = addr.toSeq ++ olabel
     val attr = if allattrs.nonEmpty then Some("{" + allattrs.mkString("; ") + "}") else None
 
@@ -319,7 +322,7 @@ class BasilIRPrettyPrinter(
 
   def vparam(l: Variable): String = l match {
     case _: Global => Sigil.BASIR.globalVar + s"${l.name}:${vtype { l.getType }}"
-    case _: LocalVar => Sigil.BASIR.localVar + s"${l.name}:${vtype { l.getType }}"
+    case _: LocalVar =>  s"${l.name}:${vtype { l.getType }}"
   }
 
   def pp_proc_sig(p: Procedure) = {
@@ -327,19 +330,19 @@ class BasilIRPrettyPrinter(
     val inParams = p.formalInParam.toList.map(vparam)
     val outParams = p.formalOutParam.toList.map(vparam)
 
-    val addr = p.address.map(l => vaddress(l).toString).map("address = " + _).toList
-    val pname = Seq(s"name = \"${p.procName}\"")
+    val addr = p.address.map(l => vaddress(l).toString).map("!address = " + _).toList
+    val pname = Seq(s"!name = \"${p.procName}\"")
 
-    val requires = if p.requiresExpr.nonEmpty then Some(p.requiresExpr.map(vexpr).mkString(";\n  ")) else None
-    val ensures = if p.ensuresExpr.nonEmpty then Some(p.ensuresExpr.map(vexpr).mkString("; \n  ")) else None
 
-    val allattrs = pname ++ addr ++ requires.map("[\n  " + _ + "\n]") ++ ensures.map("[\n  " + _ + "\n]")
+    val allattrs = pname ++ addr
 
     val attrs = if allattrs.isEmpty then "" else "{\n" + allattrs.map("  " + _).mkString(";\n") + "\n}"
 
-    val fnl = if p.formalInParam.nonEmpty then "\n    " else " "
+    val fnl = if (p.formalInParam.size > 3) then "\n    " else " "
 
-    s"proc $name\n  (${inParams.mkString(", ")})$fnl-> (${outParams.mkString(", ")})\n$attrs"
+    val br = if (inParams.length + outParams.length > 6) then "\n " else ""
+
+    s"proc $name$br (${inParams.mkString(", ")})$fnl-> (${outParams.mkString(", ")})\n $attrs"
   }
 
   override def vproc(p: Procedure): PPProg[Procedure] = {
@@ -358,6 +361,16 @@ class BasilIRPrettyPrinter(
 
     val localDecls = decls.toList.sorted
 
+    val requires = p.requiresExpr.map(e => {
+      s"  require ${vexpr(e)};"
+    })
+    val ensures = p.ensuresExpr.map(e => {
+      s"  ensures ${vexpr(e)};"
+    })
+
+    val spec = (if (requires.nonEmpty) then "\n" + requires.mkString("\n") else "")
+        + (if ensures.nonEmpty then ("\n" + ensures.mkString("\n")) else "")
+
     // val iblocks = p.entryBlock.map(b => (s"  entry_block = " + '"' + b.label + '"')).toList
 
     val mblocks =
@@ -368,7 +381,7 @@ class BasilIRPrettyPrinter(
 
     val blocks = (mblocks.toList).map(_ + ";").mkString("\n")
 
-    val header = pp_proc_sig(p)
+    val header = pp_proc_sig(p)  + spec
 
     Proc(header, localDecls, blocks)
   }
@@ -450,16 +463,19 @@ class BasilIRPrettyPrinter(
   }
 
   override def vrvar(e: Variable): PPProg[Variable] = e match {
-    case l: LocalVar => BST(s"${Sigil.BASIR.localVar}${e.name}:${vtype(e.getType)}")
+    case l: LocalVar => BST(s"${e.name}:${vtype(e.getType)}")
     case l: Global => BST(s"${Sigil.BASIR.globalVar}${e.name}:${vtype(e.getType)}")
   }
   override def vlvar(e: Variable): PPProg[Variable] = {
     e match {
-      case l: LocalVar => BST(s"${Sigil.BASIR.localVar}${e.name}:${vtype(e.getType)}")
+      case l: LocalVar => BST(s"var ${e.name}:${vtype(e.getType)}")
       case l: Global => BST(s"${Sigil.BASIR.globalVar}${e.name}:${vtype(e.getType)}")
     }
   }
 
+  override def vold(e: Expr) = BST(s"old(${vexpr(e)})")
+  override def vlambda(e: LambdaExpr) = ???
+  override def vquantifier(e: QuantifierExpr) = ???
   override def vextract(ed: Int, start: Int, a: PPProg[Expr]): PPProg[Expr] = BST(s"extract($ed, $start, ${a})")
   override def vzeroextend(bits: Int, b: PPProg[Expr]): PPProg[Expr] = BST(s"zero_extend($bits, $b)")
   override def vsignextend(bits: Int, b: PPProg[Expr]): PPProg[Expr] = BST(s"sign_extend($bits, $b)")
