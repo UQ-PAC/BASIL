@@ -21,6 +21,7 @@ import $file.jflexcup.JFlexCupModule
 trait BNFCModule extends JavaModule {
   def bnfcPackageName: String
   def bnfcSource: T[PathRef]
+  def bnfcBackendArg: T[String] // e.g., --jflex, --antlr
   def bnfcExtraArgs: T[Iterable[String]] = Iterable.empty[String]
 
   def bnfcYylexFile = Task.Source {
@@ -71,15 +72,21 @@ trait BNFCModule extends JavaModule {
   }
 
   def bnfcGenerated = Task {
-    val args = Seq("--java", "--jflex", bnfcSource().path.toString, "-m", "-o", Task.dest.toString, "-l")
+    val args = Seq("--java", bnfcBackendArg(), bnfcSource().path.toString, "-m", "-o", Task.dest.toString, "-l")
     os.call(bnfcBinary.path() +: (args ++ bnfcExtraArgs()))
     PathRef(Task.dest)
   }
 
   private def readMakefileVar(file: Path, key: String) = {
-    os.read.lines(file).collect {
+    val value = os.read.lines(file).collect {
       case l if l.startsWith(s"$key=") => l.stripPrefix(s"$key=")
-    }.head.split(" ").filter(_.nonEmpty).toList
+    }.headOption
+
+    value
+      .getOrElse(throw new Exception(s"key '$key' not found in Makefile $file"))
+      .split(" ")
+      .filter(_.nonEmpty)
+      .toList
   }
 
   def bnfcParserArgs = Task {
@@ -92,6 +99,8 @@ trait BNFCModule extends JavaModule {
 }
 
 trait BNFCJFlexModule extends BNFCModule with JFlexCupModule {
+  override def bnfcBackendArg = "--jflex"
+
   override def javaCupArgs = bnfcParserArgs
   override def jflexArgs = bnfcLexerArgs
 
