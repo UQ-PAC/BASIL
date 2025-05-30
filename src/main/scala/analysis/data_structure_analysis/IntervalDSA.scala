@@ -821,6 +821,12 @@ class IntervalDSA(irContext: IRContext) {
   def pre(): (Map[Procedure, SymValues[DSInterval]], Map[Procedure, Set[Constraint]]) = {
     var sva: Map[Procedure, SymValues[DSInterval]] = Map.empty
     var cons: Map[Procedure, Set[Constraint]] = Map.empty
+    assert(
+      irContext.program
+        .filter(_.isInstanceOf[MemoryAccess])
+        .toSet == irContext.program.procedures.flatMap(_.iterator).filter(_.isInstanceOf[MemoryAccess]).toSet,
+      "Inconsistent domain for constraints and invariants"
+    )
     computeDSADomain(irContext.program.mainProcedure, irContext).toSeq
       .sortBy(_.name)
       .foreach(proc =>
@@ -852,7 +858,7 @@ class IntervalDSA(irContext: IRContext) {
       DSATimer.checkPoint("Finished DSA Local Phase")
       if checks then
         DSA.values.foreach(checkUniqueGlobal)
-        IntervalDSA.checkReachable(irContext.program, DSA)
+        IntervalDSA.checkMemoryAccesses(irContext.program, DSA)
         DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
         DSA.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness checks")
@@ -882,7 +888,7 @@ class IntervalDSA(irContext: IRContext) {
         DSATD.values.foreach(checkUniqueGlobal)
         DSATD.values.foreach(_.localCorrectness())
         IntervalDSA.checkConsistGlobals(DSATD, globalGraph)
-        IntervalDSA.checkReachable(irContext.program, DSATD)
+        IntervalDSA.checkMemoryAccesses(irContext.program, DSATD)
         DSALogger.info("Performed correctness check")
         DSATimer.checkPoint("Finished DSA Invariant Check")
 
@@ -892,6 +898,16 @@ class IntervalDSA(irContext: IRContext) {
   }
 
 }
+
+type MemoryAccess = MemoryLoad | MemoryStore
+
+extension (ma: MemoryAccess)
+  def index = {
+    ma match {
+      case load: MemoryLoad => load.index
+      case store: MemoryStore => store.index
+    }
+  }
 
 object IntervalDSA {
 
@@ -970,7 +986,7 @@ object IntervalDSA {
           else {
             assert(base != Global)
             DSALogger.warn(
-              s"hit this case, $base, $off, source: ${source.proc.procName}, Source Expr: $sourceExpr,  target: ${target.proc.procName}, targetExpr: $targetExpr "
+              s"Duplicate offsets for base, $base, $off, source: ${source.proc.procName}, Source Expr: $sourceExpr,  target: ${target.proc.procName}, targetExpr: $targetExpr "
             )
             target.mergeCells(node.collapse(), t)
           }
@@ -1040,42 +1056,24 @@ object IntervalDSA {
    *
    *  additionally checks the index cell(s) have unified pointee or don't have any pointees (skipped constraint)
    */
-  def checkReachable(program: Program, DSA: Map[Procedure, IntervalGraph]): Unit = {
-    val reachable = computeDomain(IntraProcIRCursor, program.procedures)
-    for (pos <- reachable) {
-      val proc = IRWalk.procedure(pos)
-      if DSA.contains(proc) then
-        val dsg = DSA(proc)
-        pos match
-          case load: MemoryLoad =>
-            val pointers = dsg.exprToCells(load.index).map(dsg.find)
-            assert(
-              pointers.nonEmpty || isNonGlobalConstant(load.index, dsg.isGlobal),
-              "Expected cells for indices used in reachable memory access to have corresponding DSA cells"
-            )
-            assert(
-              pointers.filter(_.hasPointee).map(_.getPointee).map(dsg.get).size <= 1,
-              s"Expected index cells to have unified pointer}"
-            )
-            assert(
-              !pointers.exists(_.hasPointee) || pointers.forall(_.hasPointee),
-              "expected all/none of the pointers to have pointer"
-            )
-          case store: MemoryStore =>
-            val pointers = dsg.exprToCells(store.index).map(dsg.find)
-            assert(
-              pointers.nonEmpty,
-              s"Expected cells for indices used in reachable memory access to have corresponding DSA cells"
-            )
-            assert(
-              pointers.filter(_.hasPointee).map(_.getPointee).map(dsg.get).size <= 1,
-              s"Expected index cells to have unified pointer"
-            )
-            assert(
-              !pointers.exists(_.hasPointee) || pointers.forall(_.hasPointee),
-              "expected all/none of the pointers to have pointer"
-            )
-          case _ =>
+  def checkMemoryAccesses(program: Program, DSA: Map[Procedure, IntervalGraph]): Unit = {
+    program.foreach {
+      case access: MemoryAccess if DSA.contains(IRWalk.procedure(access)) =>
+        val dsg = DSA(IRWalk.procedure(access))
+        assert(
+          dsg.constraints.exists(_.source == access),
+          s"Memory Access $access from ${dsg.proc.procName} didn't have a corresponding DSA constraint"
+        )
+        val pointers = dsg.exprToCells(access.index).map(dsg.find)
+        assert(
+          pointers.nonEmpty || isNonGlobalConstant(access.index, dsg.isGlobal),
+          "Expected cells for indices used in reachable memory access to have corresponding DSA cells"
+        )
+        assert(pointers.forall(_.hasPointee), "expected all of the pointers to have pointee")
+        val distinctPointees = pointers.map(_.getPointee).map(dsg.get).toSet
+
+        assert(distinctPointees.size <= 1, s"Expected index cells to have unified pointee ${distinctPointees.size}")
+      case _ =>
     }
   }
 
