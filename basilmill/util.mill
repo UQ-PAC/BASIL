@@ -1,4 +1,4 @@
-package build
+package build.basilmill
 import mill._
 
 import os.Path
@@ -35,6 +35,6 @@ trait DownloadModule extends Module {
   def path = Task {
     local().getOrElse(remote(Task.dest))
   }
-  // using path() as the originator (instead of pathref()) 
+  // using path() as the originator (instead of pathref())
   // allows us to return values which are not absolute paths
 }

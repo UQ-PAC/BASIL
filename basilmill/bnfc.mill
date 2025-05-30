@@ -1,4 +1,4 @@
-package build
+package build.basilmill
 
 import mill._
 import mill.util.Jvm
@@ -7,8 +7,8 @@ import os.Path
 import scalalib._
 import scala.util.{Try}
 
-import $file.util.DownloadModule
-import $file.jflexcup.JFlexCupModule
+import $file.basilmill.util.DownloadModule
+import $file.basilmill.jflexcup.JFlexCupModule
 
 /**
  * Module to process a BNFC (https://bnfc.digitalgrammars.com/) grammar

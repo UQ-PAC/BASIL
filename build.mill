@@ -1,9 +1,11 @@
 package build
+import $packages._
+
 import mill._
 import scalalib._
 
-import $file.util.DownloadModule
-import $file.bnfc.BNFCJFlexModule
+import $file.basilmill.bnfc.BNFCJFlexModule
+import $file.basilmill.antlr.AntlrModule
 
 import os.Path
 
@@ -115,7 +117,7 @@ object `package` extends RootModule with ScalaModule {
 
   def scalafmt = mill.scalalib.scalafmt.ScalafmtModule
 
-  object basilAntlr extends antlr.AntlrModule {
+  object basilAntlr extends AntlrModule {
     override def ivyDeps = Agg(build.antlrRuntime)
     override def antlrPackage = Some("Parsers")
     override def antlrGenerateVisitor = true

@@ -1,4 +1,4 @@
-package build
+package build.basilmill
 
 import mill._
 import mill.util.Jvm

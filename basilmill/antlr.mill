@@ -1,4 +1,4 @@
-package build
+package build.basilmill
 // https://github.com/da-tubi/antlr4-scala-example/blob/master/antlr.sc
 import mill._
 import mill.scalalib._
