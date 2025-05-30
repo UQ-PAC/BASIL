@@ -1163,7 +1163,7 @@ object IntervalDSA {
           else if off.size == 1 then target.mergeCells(node.get(off.head), t)
           else {
             DSALogger.warn(
-              s"hit this case, $base, $off, source: ${source.proc.procName}, Source Expr: $sourceExpr,  target: ${target.proc.procName}, targetExpr: $targetExpr "
+              s"Duplicate offsets for base, $base, $off, source: ${source.proc.procName}, Source Expr: $sourceExpr,  target: ${target.proc.procName}, targetExpr: $targetExpr "
             )
             target.mergeCells(node.collapse(), t)
           }
