@@ -148,24 +148,29 @@ case class InnerBasilBNFCVisitor[A](
   override def visit(x: syntax.BSome, arg: A): BasilParseValue = blocks(x.listblock_, arg)
   override def visit(x: syntax.BNone, arg: A): BasilParseValue = Nil
 
+  private inline def cannotVisitDeclaration(x: HasParsePosition) =
+    throw new Exception(
+      "this declaration visit method cannot be called on this visitor. it should be handled by another visitor."
+    )
+
   // Members declared in MExpr.Visitor
-  override def visit(x: syntax.MSym, arg: A) = UndefinedParseResult
-  override def visit(x: syntax.BlockM, arg: A) = UndefinedParseResult
+  override def visit(x: syntax.MSym, arg: A): Nothing = cannotVisitDeclaration(x)
+  override def visit(x: syntax.BlockM, arg: A): Nothing = cannotVisitDeclaration(x)
 
   // Members declared in Declaration.Visitor
-  def visit(x: syntax.LetDecl, arg: A): BasilParseValue = UndefinedParseResult
-  def visit(x: syntax.MemDecl, arg: A): BasilParseValue = UndefinedParseResult
-  def visit(x: syntax.VarDecl, arg: A): BasilParseValue = UndefinedParseResult
-  def visit(x: syntax.Procedure, arg: A): BasilParseValue = UndefinedParseResult
+  override def visit(x: syntax.LetDecl, arg: A): Nothing = cannotVisitDeclaration(x)
+  override def visit(x: syntax.MemDecl, arg: A): Nothing = cannotVisitDeclaration(x)
+  override def visit(x: syntax.VarDecl, arg: A): Nothing = cannotVisitDeclaration(x)
+  override def visit(x: syntax.Procedure, arg: A): Nothing = cannotVisitDeclaration(x)
 
   // Members declared in Params.Visitor
-  def visit(x: syntax.Param, arg: A): BasilParseValue = UndefinedParseResult
+  override def visit(x: syntax.Param, arg: A): Nothing = cannotVisitDeclaration(x)
 
   // Members declared in Program.Visitor
-  def visit(x: syntax.Prog, arg: A): BasilParseValue = UndefinedParseResult
+  override def visit(x: syntax.Prog, arg: A): Nothing = cannotVisitDeclaration(x)
 
   // Members declared in .ProcDef.Visitor
-  def visit(x: syntax.PD, arg: A): BasilParseValue = UndefinedParseResult
+  override def visit(x: syntax.PD, arg: A): Nothing = cannotVisitDeclaration(x)
 }
 
 /**
@@ -199,9 +204,15 @@ case class MainBasilBNFCVisitor[A](
     localvar(x.bident_, x.type_, arg)
 
   // Members declared in Declaration.Visitor
-  override def visit(x: syntax.LetDecl, arg: A) = throw new Exception("LetDecl should be visited by an earlier visitor")
-  override def visit(x: syntax.MemDecl, arg: A) = throw new Exception("MemDecl should be visited by an earlier visitor")
-  override def visit(x: syntax.VarDecl, arg: A) = throw new Exception("VarDecl should be visited by an earlier visitor")
+  override def visit(x: syntax.LetDecl, arg: A): Nothing = throw new Exception(
+    "LetDecl should be visited by an earlier visitor"
+  )
+  override def visit(x: syntax.MemDecl, arg: A): Nothing = throw new Exception(
+    "MemDecl should be visited by an earlier visitor"
+  )
+  override def visit(x: syntax.VarDecl, arg: A): Nothing = throw new Exception(
+    "VarDecl should be visited by an earlier visitor"
+  )
 
   override def visit(x: syntax.Procedure, arg: A) =
     val p = x.procdef_.accept(this, (arg, x.bident_))

@@ -12,7 +12,7 @@ type ParseTypes = BaseParseTypes | List[BaseParseTypes] | Option[BaseParseTypes]
  * A value parsed out of the BNFC [[basil_ir.Absyn]] AST. This can be one of a
  * number of Basil IR types. The user of the [[ir.parsing.BasilParseValue]] should
  * use one of the member methods (e.g., [[ir.parsing.BasilParseValue#expr]]) to cast
- * the value to the expecetd type.
+ * the value to the required type.
  *
  * This implements a kind of *dynamic typing*. This is required so we can implement the
  * [[basil_ir.AllVisitor]] interface which requires that all AST structures return a
@@ -46,7 +46,7 @@ case class BasilParseValue(x: ParseTypes) {
   def register = x.asInstanceOf[ir.Register]
 }
 
-object BasilParseValue {
+private object BasilParseValue {
   given Conversion[ParseTypes, BasilParseValue] with
     def apply(x: ParseTypes) = BasilParseValue(x)
 }
