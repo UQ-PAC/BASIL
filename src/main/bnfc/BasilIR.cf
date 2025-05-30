@@ -107,7 +107,7 @@ _ . Expr ::= "(" Expr ")" ;
 RVar . Expr ::= BIdent ":" Type;
 
 
-rules BinOp ::= BVBinOp | BVLogicalBinOp | BoolBinOp | IntLogicalBinOp | IntBinOp ;
+rules BinOp ::= BVBinOp | BVLogicalBinOp | BoolBinOp | IntLogicalBinOp | IntBinOp | EqOp;
 BinaryExpr . Expr       ::= BinOp "(" Expr "," Expr ")" ;
 
 rules UnOp ::= BVUnOp | "boolnot" | "intneg" ;
@@ -123,13 +123,14 @@ IntLiteral . Expr ::= IntVal;
 TrueLiteral . Expr ::= "true" ;
 FalseLiteral . Expr ::= "false" ;
 
+rules EqOp ::= "eq" | "neq" ;
 rules BVUnOp ::= "bvnot" | "bvneg" ;
 rules BVBinOp ::= "bvand"|"bvor"|"bvadd"|"bvmul"|"bvudiv"|"bvurem"|"bvshl"|"bvlshr"|"bvult"|"bvnand"|"bvnor"
   |"bvxor"|"bvxnor"|"bvcomp"|"bvsub"|"bvsdiv"|"bvsrem"|"bvsmod"|"bvashr" ;
-rules BVLogicalBinOp ::= "bvule" |  "bvugt" |  "bvuge" |  "bvslt" |  "bvsle" |  "bvsgt" |  "bvsge" |  "bveq"  |  "bvneq" ;
+rules BVLogicalBinOp ::= "bvule" |  "bvugt" |  "bvuge" |  "bvslt" |  "bvsle" |  "bvsgt" |  "bvsge" ;
 
 rules IntBinOp ::= "intadd" | "intmul" | "intsub" | "intdiv" | "intmod"  ;
-rules IntLogicalBinOp ::=  "inteq" | "intneq"| "intlt" | "intle" | "intgt" | "intge" ;
-rules BoolBinOp ::=  "booleq" | "boolneq" | "booland" | "boolor" | "boolimplies" | "boolequiv" ;
+rules IntLogicalBinOp ::=  "intlt" | "intle" | "intgt" | "intge" ;
+rules BoolBinOp ::=  "booland" | "boolor" | "boolimplies" | "boolequiv" ;
 
 

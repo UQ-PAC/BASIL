@@ -11,6 +11,7 @@ class LiteralsBNFCVisitor[A]()
       syntax.BoolBinOp.Visitor[BasilParseValue, A],
       syntax.BVUnOp.Visitor[BasilParseValue, A],
       syntax.UnOp.Visitor[BasilParseValue, A],
+      syntax.EqOp.Visitor[BasilParseValue, A],
       syntax.Endian.Visitor[BasilParseValue, A],
       syntax.IntVal.Visitor[BasilParseValue, A] {
 
@@ -22,6 +23,11 @@ class LiteralsBNFCVisitor[A]()
   override def visit(x: syntax.BinOpBoolBinOp, arg: A): BasilParseValue = x.boolbinop_.accept(this, arg)
   override def visit(x: syntax.BinOpIntLogicalBinOp, arg: A): BasilParseValue = x.intlogicalbinop_.accept(this, arg)
   override def visit(x: syntax.BinOpIntBinOp, arg: A): BasilParseValue = x.intbinop_.accept(this, arg)
+  override def visit(x: syntax.BinOpEqOp, arg: A): BasilParseValue = x.eqop_.accept(this, arg)
+
+  // Members declared in EqOp.Visitor
+  override def visit(x: syntax.EqOp_eq, arg: A): BasilParseValue = ir.EQ
+  override def visit(x: syntax.EqOp_neq, arg: A): BasilParseValue = ir.NEQ
 
   // Members declared in BVLogicalBinOp.Visitor
   override def visit(x: syntax.BVLogicalBinOp_bvule, arg: A): BasilParseValue = ir.BVULE
@@ -31,12 +37,8 @@ class LiteralsBNFCVisitor[A]()
   override def visit(x: syntax.BVLogicalBinOp_bvsle, arg: A): BasilParseValue = ir.BVSLE
   override def visit(x: syntax.BVLogicalBinOp_bvsgt, arg: A): BasilParseValue = ir.BVSGT
   override def visit(x: syntax.BVLogicalBinOp_bvsge, arg: A): BasilParseValue = ir.BVSGE
-  override def visit(x: syntax.BVLogicalBinOp_bveq, arg: A): BasilParseValue = ir.EQ
-  override def visit(x: syntax.BVLogicalBinOp_bvneq, arg: A): BasilParseValue = ir.NEQ
 
   // Members declared in IntLogicalBinOp.Visitor
-  override def visit(x: syntax.IntLogicalBinOp_inteq, arg: A): BasilParseValue = ir.EQ
-  override def visit(x: syntax.IntLogicalBinOp_intneq, arg: A): BasilParseValue = ir.NEQ
   override def visit(x: syntax.IntLogicalBinOp_intlt, arg: A): BasilParseValue = ir.IntLT
   override def visit(x: syntax.IntLogicalBinOp_intle, arg: A): BasilParseValue = ir.IntLE
   override def visit(x: syntax.IntLogicalBinOp_intgt, arg: A): BasilParseValue = ir.IntGE
@@ -75,8 +77,6 @@ class LiteralsBNFCVisitor[A]()
   override def visit(x: syntax.IntBinOp_intmod, arg: A): BasilParseValue = ir.IntMOD
 
   // Members declared in BoolBinOp.Visitor
-  override def visit(x: syntax.BoolBinOp_booleq, arg: A): BasilParseValue = ir.EQ
-  override def visit(x: syntax.BoolBinOp_boolneq, arg: A): BasilParseValue = ir.NEQ
   override def visit(x: syntax.BoolBinOp_booland, arg: A): BasilParseValue = ir.BoolAND
   override def visit(x: syntax.BoolBinOp_boolor, arg: A): BasilParseValue = ir.BoolOR
   override def visit(x: syntax.BoolBinOp_boolimplies, arg: A): BasilParseValue = ir.BoolIMPLIES
