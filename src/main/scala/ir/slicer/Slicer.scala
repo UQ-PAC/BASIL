@@ -153,6 +153,16 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
           || c.target.blocks
             .flatMap(_.modifies.collect { case v: Variable => v })
             .exists(crit.contains)
+          || c.target.blocks
+            .flatMap(
+              _.statements
+                .collect {
+                  case a: MemoryLoad => transferFunctions.convertMemoryIndex(a.index)
+                  case m: MemoryStore => transferFunctions.convertMemoryIndex(m.index)
+                }
+                .flatten
+            )
+            .exists(crit.contains)
         case _ => {
           val transferred = transfer(n)
           transferred.values.toSet.contains(

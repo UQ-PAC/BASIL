@@ -1,8 +1,8 @@
 package ir.slicer
 
 import ir.*
+import ir.eval.evaluateExpr
 import analysis.*
-
 import analysis.solvers.*
 
 trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice])
@@ -85,13 +85,13 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
       }
       case a: MemoryLoad => {
         d match {
-          case Left(value) if value == a.lhs => fold(a.index.variables)
+          case Left(value) if value == a.lhs => fold(convertMemoryIndex(a.index))
           case _ => Map(d -> IdEdge())
         }
       }
       case m: MemoryStore => {
         d match {
-          case Left(value) if m.index.variables.contains(value) => fold(m.value.variables)
+          case Left(value) if convertMemoryIndex(m.index).contains(value) => fold(m.value.variables)
           case _ => Map(d -> IdEdge())
         }
       }
@@ -137,6 +137,27 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
         d match {
           case Left(value) => acc + (value -> e)
           case Right(_) => acc
+        }
+      }
+    }
+  }
+
+  def convertMemoryIndex(index: Expr): Set[Variable] = {
+    def convertLiteral(l: Literal): Set[Variable] = {
+      l match {
+        case bv: BitVecLiteral => Set(Register(bv.toString, bv.size))
+        case i: IntLiteral => Set(Register(i.toString, 0))
+        case _ => Set()
+      }
+    }
+
+    index match {
+      case v: Variable => Set(v)
+      case l: (BitVecLiteral | IntLiteral) => convertLiteral(l)
+      case e => {
+        evaluateExpr(e) match {
+          case Some(l: (BitVecLiteral | IntLiteral)) => convertLiteral(l)
+          case _ => index.variables
         }
       }
     }
