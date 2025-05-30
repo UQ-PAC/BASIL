@@ -2,6 +2,8 @@ package ir.parsing
 
 import basil_ir.{Absyn => syntax}
 
+import scala.jdk.CollectionConverters.*
+
 class LiteralsBNFCVisitor[A]()
     extends syntax.BinOp.Visitor[BasilParseValue, A],
       syntax.BVLogicalBinOp.Visitor[BasilParseValue, A],
@@ -13,9 +15,25 @@ class LiteralsBNFCVisitor[A]()
       syntax.UnOp.Visitor[BasilParseValue, A],
       syntax.EqOp.Visitor[BasilParseValue, A],
       syntax.Endian.Visitor[BasilParseValue, A],
-      syntax.IntVal.Visitor[BasilParseValue, A] {
+      syntax.IntVal.Visitor[BasilParseValue, A],
+      syntax.PAddress.Visitor[BasilParseValue, A],
+      syntax.PEntry.Visitor[BasilParseValue, A] {
+
+  def unquote(s: String, x: Any) = s match {
+    case s"\"$x\"" => x
+    case _ => throw ParseException("invalid quoted string", x)
+  }
 
   import scala.language.implicitConversions
+
+  // Members declared in PAddress.Visitor
+  override def visit(x: syntax.AddrSome, arg: A): BasilParseValue =
+    Some(x.intval_.accept(this, arg).int)
+  override def visit(x: syntax.AddrNone, arg: A): BasilParseValue = None
+
+  // Members declared in PEntry.Visitor
+  override def visit(x: syntax.EntrySome, arg: A): BasilParseValue = Some(x.str_)
+  override def visit(x: syntax.EntryNone, arg: A): BasilParseValue = None
 
   // Members declared in BinOp.Visitor
   override def visit(x: syntax.BinOpBVBinOp, arg: A): BasilParseValue = x.bvbinop_.accept(this, arg)

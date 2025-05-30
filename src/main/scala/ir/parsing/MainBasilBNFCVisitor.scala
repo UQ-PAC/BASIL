@@ -8,8 +8,7 @@ import scala.util.chaining.scalaUtilChainingOps
 
 import org.antlr.v4.runtime.{CommonTokenStream, CharStreams}
 
-final case class ParseException(private val message: String, val token: Any)
-  extends Exception(message) {
+final case class ParseException(private val message: String, val token: Any) extends Exception(message) {
 
   def line_num: Int =
     token.getClass.getDeclaredField("line_num").get(token).asInstanceOf[Int]
@@ -20,14 +19,16 @@ final case class ParseException(private val message: String, val token: Any)
 }
 
 case class MainBasilBNFCVisitor[A](
+  val procName: String,
   val decls: Declarations,
   val typesVisitor: TypesVisitorType[A] = new TypesBNFCVisitor[A]() {}
 ) extends LiteralsBNFCVisitor[A]
     with basil_ir.AllVisitor[BasilParseValue, A] {
 
-  var procName = "none proc name"
-
   import scala.language.implicitConversions
+
+  def blocks(x: syntax.ListBlock, arg: A): List[ir.dsl.EventuallyBlock] =
+    x.asScala.map(_.accept(this, arg).block).toList
 
   def exprs(x: syntax.ListExpr, arg: A): List[ir.Expr] =
     x.asScala.map(_.accept(this, arg).expr).toList
@@ -35,22 +36,11 @@ case class MainBasilBNFCVisitor[A](
   def stmts(x: syntax.ListStatement, arg: A): List[ir.dsl.DSLStatement] =
     x.asScala.map(_.accept(this, arg).stmt).toList
 
-  def blocks(x: syntax.ListBlock, arg: A): List[ir.dsl.EventuallyBlock] =
-    x.asScala.map(_.accept(this, arg).block).toList
-
   def lvars(x: syntax.ListLVar, arg: A): List[ir.Variable] =
-    x.asScala.map(_.accept(this, arg).v).toList
-
-  def params(x: syntax.ListParams, arg: A): List[ir.Variable] =
     x.asScala.map(_.accept(this, arg).v).toList
 
   def localvar(name: String, x: syntax.Type, arg: A): ir.LocalVar =
     ir.LocalVar(name, x.accept(this, arg).ty)
-
-  def unquote(s: String, x: Any) = s match {
-    case s"\"$x\"" => x
-    case _ => throw ParseException("invalid quoted string", x)
-  }
 
   // Members declared in Type.Visitor
   override def visit(x: syntax.TypeIntType, arg: A) = x.accept(typesVisitor, arg): ir.IRType
@@ -131,10 +121,6 @@ case class MainBasilBNFCVisitor[A](
   override def visit(x: syntax.Assume, arg: A): BasilParseValue = ir.Assume(x.expr_.accept(this, arg).expr)
   override def visit(x: syntax.Assert, arg: A): BasilParseValue = ir.Assert(x.expr_.accept(this, arg).expr)
 
-  // Members declared in Params.Visitor
-  override def visit(x: syntax.Param, arg: A): BasilParseValue =
-    localvar(x.bident_, x.type_, arg)
-
   // Members declared in Jump.Visitor
   override def visit(x: syntax.GoTo, arg: A): BasilParseValue = ir.dsl.goto(x.listbident_.asScala.toSeq: _*)
   override def visit(x: syntax.Unreachable, arg: A): BasilParseValue = ir.dsl.unreachable
@@ -160,42 +146,70 @@ case class MainBasilBNFCVisitor[A](
     val addr = x.addrattr_.accept(this, arg).opt(_.int)
     ir.dsl.block(x.bident_, ss: _*).copy(address = addr)
 
-  // Members declared in PAddress.Visitor
-  override def visit(x: syntax.AddrSome, arg: A): BasilParseValue =
-    Some(x.intval_.accept(this, arg).int)
-  override def visit(x: syntax.AddrNone, arg: A): BasilParseValue = None
-
-  // Members declared in PEntry.Visitor
-  override def visit(x: syntax.EntrySome, arg: A): BasilParseValue = Some(x.str_)
-  override def visit(x: syntax.EntryNone, arg: A): BasilParseValue = None
-
   // Members declared in InternalBlocks.Visitor
   override def visit(x: syntax.BSome, arg: A): BasilParseValue = blocks(x.listblock_, arg)
   override def visit(x: syntax.BNone, arg: A): BasilParseValue = Nil
-
-  // Members declared in ProcDef.Visitor
-  override def visit(x: syntax.PD, arg: A): BasilParseValue =
-    val p = ir.dsl.proc(unquote(x.str_, x), x.internalblocks_.accept(this, arg).list(_.block): _*)
-    p.copy(address = x.paddress_.accept(this, arg).opt(_.int), entryBlockLabel = x.pentry_.accept(this, arg).opt(_.str))
-
-  override def visit(x: syntax.Procedure, arg: A): BasilParseValue =
-    procName = x.bident_
-    val p = x.procdef_.accept(this, arg).proc
-    val inparams = params(x.listparams_1, arg)
-    val outparams = params(x.listparams_2, arg)
-    p.copy(in = inparams.map(x => x.name -> x.getType).toMap, out = outparams.map(x => x.name -> x.getType).toMap)
 
   // Members declared in MExpr.Visitor
   override def visit(x: syntax.MSym, arg: A) = UndefinedParseResult
   override def visit(x: syntax.BlockM, arg: A) = UndefinedParseResult
 
   // Members declared in Declaration.Visitor
-  override def visit(x: syntax.LetDecl, arg: A) = UndefinedParseResult
-  override def visit(x: syntax.MemDecl, arg: A) = UndefinedParseResult
-  override def visit(x: syntax.VarDecl, arg: A) = UndefinedParseResult
+  def visit(x: syntax.LetDecl, arg: A): BasilParseValue = UndefinedParseResult
+  def visit(x: syntax.MemDecl, arg: A): BasilParseValue = UndefinedParseResult
+  def visit(x: syntax.VarDecl, arg: A): BasilParseValue = UndefinedParseResult
+  def visit(x: syntax.Procedure, arg: A): BasilParseValue = UndefinedParseResult
+
+  // Members declared in Params.Visitor
+  def visit(x: syntax.Param, arg: A): BasilParseValue = UndefinedParseResult
 
   // Members declared in Program.Visitor
-  override def visit(x: syntax.Prog, arg: A): BasilParseValue = {
+  def visit(x: syntax.Prog, arg: A): BasilParseValue = UndefinedParseResult
+
+  // Members declared in .ProcDef.Visitor
+  def visit(x: syntax.PD, arg: A): BasilParseValue = UndefinedParseResult
+}
+
+case class ProcBasilBNFCVisitor[A](
+  val decls: Declarations,
+  val makeVisitor: (String, Declarations) => basil_ir.AllVisitor[BasilParseValue, A] = MainBasilBNFCVisitor[A](_, _),
+  val typesVisitor: TypesVisitorType[A] = new TypesBNFCVisitor[A]() {}
+) extends LiteralsBNFCVisitor[A]
+    with syntax.Program.Visitor[ir.dsl.EventuallyProgram, A]
+    with syntax.Declaration.Visitor[ir.dsl.EventuallyProcedure, A]
+    with syntax.Params.Visitor[ir.LocalVar, A]
+    with syntax.ProcDef.Visitor[ir.dsl.EventuallyProcedure, (A, basil_ir.AllVisitor[BasilParseValue, A])] {
+
+  def localvar(name: String, x: syntax.Type, arg: A): ir.LocalVar =
+    ir.LocalVar(name, x.accept(typesVisitor, arg))
+
+  def params(x: syntax.ListParams, arg: A): List[ir.Variable] =
+    x.asScala.map(_.accept(this, arg)).toList
+
+  // Members declared in Params.Visitor
+  override def visit(x: syntax.Param, arg: A) =
+    localvar(x.bident_, x.type_, arg)
+
+  // Members declared in Declaration.Visitor
+  override def visit(x: syntax.LetDecl, arg: A) = throw new Exception("LetDecl should be visited by an earlier visitor")
+  override def visit(x: syntax.MemDecl, arg: A) = throw new Exception("MemDecl should be visited by an earlier visitor")
+  override def visit(x: syntax.VarDecl, arg: A) = throw new Exception("VarDecl should be visited by an earlier visitor")
+
+  override def visit(x: syntax.Procedure, arg: A) =
+    val p = x.procdef_.accept(this, (arg, makeVisitor(x.bident_, decls)))
+    val inparams = params(x.listparams_1, arg)
+    val outparams = params(x.listparams_2, arg)
+    p.copy(in = inparams.map(x => x.name -> x.getType).toMap, out = outparams.map(x => x.name -> x.getType).toMap)
+
+  // Members declared in ProcDef.Visitor
+  override def visit(x: syntax.PD, argtuple: (A, basil_ir.AllVisitor[BasilParseValue, A])) =
+    val (arg, innervis) = argtuple
+    val procName = unquote(x.str_, x)
+    val p = ir.dsl.proc(procName, x.internalblocks_.accept(innervis, arg).list(_.block): _*)
+    p.copy(address = x.paddress_.accept(this, arg).opt(_.int), entryBlockLabel = x.pentry_.accept(this, arg).opt(_.str))
+
+  // Members declared in Program.Visitor
+  override def visit(x: syntax.Prog, arg: A) = {
     val ds = x.listdeclaration_.asScala.toList.groupBy(_.getClass).to(mutable.Map)
     val _ = ds.remove(classOf[syntax.LetDecl]).getOrElse(Nil)
     val _ = ds.remove(classOf[syntax.MemDecl]).getOrElse(Nil)
@@ -205,12 +219,11 @@ case class MainBasilBNFCVisitor[A](
 
     val entryname = decls.metas.getOrElse("entry_procedure", throw ParseException("missing entry_procedure key", x))
 
-    val procs = procdecls.map(_.accept(this, arg).proc)
+    val procs = procdecls.map(_.accept(this, arg))
 
     val (mainProc, otherProcs) = procs.partition(_.name == entryname)
     ir.dsl.EventuallyProgram(mainProc.head, otherProcs)
   }
-
 }
 
 object Run {
@@ -225,9 +238,9 @@ object Run {
     val decls = ctx.result.accept(vis0, ())
     println(decls)
 
-    val vis = MainBasilBNFCVisitor[Unit](decls)
-    val result = ctx.result.accept(vis, ()).prog
-    // println(result)
+    val vis = ProcBasilBNFCVisitor[Unit](decls)
+    val result = ctx.result.accept(vis, ())
+    println(result)
     val prog = result.resolve
     println(translating.PrettyPrinter.pp_prog(prog))
   }
