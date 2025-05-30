@@ -615,7 +615,8 @@ class IRToBoogie(
   }
 
   def translateBlock(b: Block): BBlock = {
-    val captureState = captureStateStatement(s"${b.label}")
+    val initLabel = b.meta.originalLabel.map(" (" + _ + ")").getOrElse("")
+    val captureState = captureStateStatement(s"${b.label}${initLabel}")
 
     val statements = if (b.atomicSection.isDefined) {
       val before = if (b.atomicSection.get.isStart(b)) {

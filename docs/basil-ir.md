@@ -3,7 +3,6 @@
 BASIL IR is the intermediate representation used during static analysis. 
 This is on contrast to Boogie IR which is used for specification annotation, and output to textual boogie syntax that can be run through the Boogie verifier. 
 
-
 The grammar is described below, note that the IR is a data-structure, without a concrete textual representation so the below grammar only represents the structure. 
 We omit the full description of the expression language because it is relatively standard.  
 
@@ -55,6 +54,12 @@ Endian ::=&~ BigEndian ~|~ LittleEndian \\
   Conditional structures are represented by these with a guard (an assume statement) beginning each target. 
 - The `Unreachable` jump is used to signify the absence of successors, it has the semantics of `assume false`.
 - The `Return` jump passes control to the calling function, often this is over-approximated to all functions which call the statement's parent procedure.
+
+
+### Identifiers / Sigils
+
+- Block identifiers
+
 
 ### Indirect Calls
 

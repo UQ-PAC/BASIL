@@ -17,6 +17,28 @@ sealed trait Expr {
   lazy val variablesCached = variables
 }
 
+object Sigil {
+  object Boogie {
+    def block = "b#"
+    def proc = "p$"
+    def localVar = "#"
+    def globalVar = "$"
+  }
+
+  object BASIR {
+    def block = "%"
+    def proc = "@"
+    def localVar = "#"
+    def globalVar = "$"
+  }
+}
+
+def unsigilVar(s: String): String = s match {
+  case s"#$local" => unsigilVar(local)
+  case s"$$$glob" => unsigilVar(glob)
+  case o => o
+}
+
 def size(e: Expr) = {
   e.getType match {
     case BitVecType(s) => Some(s)
@@ -352,8 +374,6 @@ sealed trait Variable extends Expr {
   override def toBoogie: BVar
   def toGamma: BVar
 
-  override def toString: String = s"Variable($name, $irType)"
-
   override def acceptVisit(visitor: Visitor): Variable =
     throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
@@ -370,7 +390,7 @@ object Variable {
 case class Register(override val name: String, size: Int) extends Variable with Global with CachedHashCode {
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Global)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Global)
-  override def toString: String = s"Register(${name}, $irType)"
+  override def toString: String = s"${Sigil.BASIR.globalVar}${name}:$irType"
   override def acceptVisit(visitor: Visitor): Variable = visitor.visitRegister(this)
   override val irType: BitVecType = BitVecType(size)
 }
@@ -382,7 +402,7 @@ case class LocalVar(varName: String, override val irType: IRType, val index: Int
   override val name = varName + (if (index > 0) then s"_$index" else "")
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
-  override def toString: String = s"LocalVar(${name}, $irType)"
+  override def toString: String = s"${Sigil.BASIR.localVar}${name}:$irType"
   override def acceptVisit(visitor: Visitor): Variable = visitor.visitLocalVar(this)
 }
 
@@ -399,7 +419,7 @@ sealed trait Memory extends Global {
   def toBoogie: BMapVar = BMapVar(name, MapBType(BitVecBType(addressSize), BitVecBType(valueSize)), Scope.Global)
   def toGamma: BMapVar = BMapVar(s"Gamma_$name", MapBType(BitVecBType(addressSize), BoolBType), Scope.Global)
   val getType: IRType = MapType(BitVecType(addressSize), BitVecType(valueSize))
-  override def toString: String = s"Memory($name, $addressSize, $valueSize)"
+  override def toString: String = s"${Sigil.BASIR.globalVar}${name}:${getType}"
 
   def acceptVisit(visitor: Visitor): Memory =
     throw new Exception("visitor " + visitor + " unimplemented for: " + this)

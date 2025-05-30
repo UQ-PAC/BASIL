@@ -207,11 +207,16 @@ abstract class BVar(val name: String, val bType: BType, val scope: Scope) extend
   def compare(that: BVar): Int = this.name.compare(that.name)
 
   override def getType: BType = bType
-  override def toString: String = name
+  override def toString: String = scope match {
+    case Scope.Local => Sigil.Boogie.localVar + name
+    case Scope.Parameter => Sigil.Boogie.localVar + name
+    case Scope.Const => Sigil.Boogie.globalVar + name
+    case Scope.Global => Sigil.Boogie.globalVar + name
+  }
   def withType: String = if (name.isEmpty) {
     s"$bType"
   } else {
-    s"$name: $bType"
+    s"$this: $bType"
   }
   override def locals: Set[BVar] = scope match {
     case Scope.Local => Set(this)
@@ -752,9 +757,12 @@ case class SpecGlobal(
 ) extends SymbolTableEntry,
       SpecGlobalOrAccess {
   override def specGlobals: Set[SpecGlobalOrAccess] = Set(this)
-  override val toAddrVar: BVar = BVariable("$" + s"${name}_addr", BitVecBType(64), Scope.Const)
-  override val toOldVar: BVar = BVariable(s"${name}_old", BitVecBType(size), Scope.Local)
-  override val toOldGamma: BVar = BVariable(s"Gamma_${name}_old", BoolBType, Scope.Local)
+
+  def sanitisedName = name.replace("@", "_AT_")
+
+  override val toAddrVar: BVar = BVariable("$" + s"${sanitisedName}_addr", BitVecBType(64), Scope.Const)
+  override val toOldVar: BVar = BVariable(s"${sanitisedName}_old", BitVecBType(size), Scope.Local)
+  override val toOldGamma: BVar = BVariable(s"Gamma_${sanitisedName}_old", BoolBType, Scope.Local)
   val toAxiom: BAxiom = BAxiom(BinaryBExpr(EQ, toAddrVar, BitVecBLiteral(address, 64)), List.empty)
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitSpecGlobal(this)
 }
