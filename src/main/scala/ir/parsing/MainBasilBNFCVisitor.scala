@@ -2,23 +2,25 @@ package ir.parsing
 
 import basil_ir.{Absyn => syntax}
 
+import java.io.FileReader
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.util.chaining.scalaUtilChainingOps
 
-import org.antlr.v4.runtime.{CommonTokenStream, CharStreams}
+import scala.reflect.Selectable.reflectiveSelectable
 
-final case class ParseException(private val message: String, val token: Any) extends Exception(message) {
-
-  def line_num: Int =
-    token.getClass.getDeclaredField("line_num").get(token).asInstanceOf[Int]
-  def col_num: Int =
-    token.getClass.getDeclaredField("col_num").get(token).asInstanceOf[Int]
-
-  override def toString = s"ParseException: $message ($line_num:$col_num)"
+type HasParsePosition = {
+  val line_num: Int
+  val col_num: Int
+  val offset: Int
 }
 
-case class MainBasilBNFCVisitor[A](
+final case class ParseException(private val message: String, val token: HasParsePosition) extends Exception(message) {
+
+  override def toString = s"ParseException: $message (at line ${token.line_num}, col ${token.col_num})"
+}
+
+case class InnerBasilBNFCVisitor[A](
   val procName: String,
   val decls: Declarations,
   val typesVisitor: TypesVisitorType[A] = new TypesBNFCVisitor[A]() {}
@@ -170,15 +172,15 @@ case class MainBasilBNFCVisitor[A](
   def visit(x: syntax.PD, arg: A): BasilParseValue = UndefinedParseResult
 }
 
-case class ProcBasilBNFCVisitor[A](
+case class MainBasilBNFCVisitor[A](
   val decls: Declarations,
-  val makeVisitor: (String, Declarations) => basil_ir.AllVisitor[BasilParseValue, A] = MainBasilBNFCVisitor[A](_, _),
+  val makeVisitor: (String, Declarations) => basil_ir.AllVisitor[BasilParseValue, A] = InnerBasilBNFCVisitor[A](_, _),
   val typesVisitor: TypesVisitorType[A] = new TypesBNFCVisitor[A]() {}
 ) extends LiteralsBNFCVisitor[A]
     with syntax.Program.Visitor[ir.dsl.EventuallyProgram, A]
     with syntax.Declaration.Visitor[ir.dsl.EventuallyProcedure, A]
     with syntax.Params.Visitor[ir.LocalVar, A]
-    with syntax.ProcDef.Visitor[ir.dsl.EventuallyProcedure, (A, basil_ir.AllVisitor[BasilParseValue, A])] {
+    with syntax.ProcDef.Visitor[ir.dsl.EventuallyProcedure, (A, String)] {
 
   def localvar(name: String, x: syntax.Type, arg: A): ir.LocalVar =
     ir.LocalVar(name, x.accept(typesVisitor, arg))
@@ -196,16 +198,16 @@ case class ProcBasilBNFCVisitor[A](
   override def visit(x: syntax.VarDecl, arg: A) = throw new Exception("VarDecl should be visited by an earlier visitor")
 
   override def visit(x: syntax.Procedure, arg: A) =
-    val p = x.procdef_.accept(this, (arg, makeVisitor(x.bident_, decls)))
+    val p = x.procdef_.accept(this, (arg, x.bident_))
     val inparams = params(x.listparams_1, arg)
     val outparams = params(x.listparams_2, arg)
     p.copy(in = inparams.map(x => x.name -> x.getType).toMap, out = outparams.map(x => x.name -> x.getType).toMap)
 
   // Members declared in ProcDef.Visitor
-  override def visit(x: syntax.PD, argtuple: (A, basil_ir.AllVisitor[BasilParseValue, A])) =
-    val (arg, innervis) = argtuple
-    val procName = unquote(x.str_, x)
-    val p = ir.dsl.proc(procName, x.internalblocks_.accept(innervis, arg).list(_.block): _*)
+  override def visit(x: syntax.PD, args: (A, String)) =
+    val (arg, procName) = args
+    val innervis = makeVisitor(procName, decls)
+    val p = ir.dsl.proc(unquote(x.str_, x), x.internalblocks_.accept(innervis, arg).list(_.block): _*)
     p.copy(address = x.paddress_.accept(this, arg).opt(_.int), entryBlockLabel = x.pentry_.accept(this, arg).opt(_.str))
 
   // Members declared in Program.Visitor
@@ -229,17 +231,18 @@ case class ProcBasilBNFCVisitor[A](
 object Run {
 
   def parse(path: String) = {
-    val lexer = new basil_ir.BasilIRLexer(CharStreams.fromFileName(path))
-    val parser = new basil_ir.BasilIRParser(new CommonTokenStream(lexer))
+    val reader = new FileReader(path)
+    val lexer = new basil_ir.Yylex(reader);
+    val parser = new basil_ir.parser(lexer, lexer.getSymbolFactory());
 
-    val ctx = parser.start_Program()
+    val ast = parser.pProgram()
 
     val vis0 = EarlyBasilBNFCVisitor[Unit]()
-    val decls = ctx.result.accept(vis0, ())
+    val decls = ast.accept(vis0, ())
     println(decls)
 
-    val vis = ProcBasilBNFCVisitor[Unit](decls)
-    val result = ctx.result.accept(vis, ())
+    val vis = MainBasilBNFCVisitor[Unit](decls)
+    val result = ast.accept(vis, ())
     println(result)
     val prog = result.resolve
     println(translating.PrettyPrinter.pp_prog(prog))

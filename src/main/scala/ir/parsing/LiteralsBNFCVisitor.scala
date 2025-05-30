@@ -19,7 +19,7 @@ class LiteralsBNFCVisitor[A]()
       syntax.PAddress.Visitor[BasilParseValue, A],
       syntax.PEntry.Visitor[BasilParseValue, A] {
 
-  def unquote(s: String, x: Any) = s match {
+  def unquote(s: String, x: HasParsePosition) = s match {
     case s"\"$x\"" => x
     case _ => throw ParseException("invalid quoted string", x)
   }
