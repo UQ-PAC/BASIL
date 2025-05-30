@@ -141,23 +141,37 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       }) ++ initialCriterion.getOrElse(n, Set())
     }
 
+    private val procedureModifies = mutable.Map[Procedure, Set[Variable]]()
+    private val procedureMemoryIndexes = mutable.Map[Procedure, Set[Variable]]()
+
     def hasCriterionImpact(n: Statement): Boolean = {
       val crit = criterion(n)
 
       n match {
         case c: DirectCall =>
           c.outParams.values.toSet.exists(crit.contains)
-          || c.target.blocks
-            .flatMap(_.modifies.collect { case v: Variable => v })
+          || procedureModifies
+            .getOrElseUpdate(
+              c.target,
+              c.target.blocks
+                .flatMap(_.modifies.collect { case v: Variable => v })
+                .toSet
+            )
             .exists(crit.contains)
-          || c.target.blocks
-            .flatMap(
-              _.statements
-                .collect {
-                  case a: MemoryLoad => transferFunctions.convertMemoryIndex(a.index)
-                  case m: MemoryStore => transferFunctions.convertMemoryIndex(m.index)
-                }
-                .flatten
+          ||
+          procedureMemoryIndexes
+            .getOrElseUpdate(
+              c.target,
+              c.target.blocks
+                .flatMap(
+                  _.statements
+                    .collect {
+                      case a: MemoryLoad => transferFunctions.convertMemoryIndex(a.index)
+                      case m: MemoryStore => transferFunctions.convertMemoryIndex(m.index)
+                    }
+                    .flatten
+                )
+                .toSet
             )
             .exists(crit.contains)
         case _ => {
