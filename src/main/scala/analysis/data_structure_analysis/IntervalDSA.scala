@@ -1027,7 +1027,8 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
   }
 
 }
-  type MemoryAccess = MemoryLoad | MemoryStore
+
+type MemoryAccess = MemoryLoad | MemoryStore
 
   extension (ma: MemoryAccess)
     def index = {
