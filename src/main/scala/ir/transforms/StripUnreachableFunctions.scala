@@ -3,10 +3,13 @@ import ir.*
 import collection.mutable
 import util.Logger
 import ir.cilvisitor.*
+import util.BASILConfig
+import util.IRContext
+import analysis.AnalysisManager
 
 // This shouldn't be run before indirect calls are resolved
 class StripUnreachableFunctions(config: BASILConfig) extends Transform("StripUnreachableFunctions") {
-  private val before: Int
+  private var before: Int = 0
 
   private def stripUnreachableFunctions(p: Program, depth: Int = Int.MaxValue): Unit = {
     val procedureCalleeNames = p.procedures.map(f => f -> f.calls).toMap
@@ -52,7 +55,7 @@ class StripUnreachableFunctions(config: BASILConfig) extends Transform("StripUnr
     assert(invariant.cfgCorrect(p))
   }
 
-  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer] = {
+  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
     stripUnreachableFunctions(ctx.program, config.loading.procedureTrimDepth)
     Set.empty
   }

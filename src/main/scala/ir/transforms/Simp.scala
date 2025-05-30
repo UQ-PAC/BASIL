@@ -15,6 +15,7 @@ import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
 import ExecutionContext.Implicits.global
 import scala.util.boundary, boundary.break
+import util.IRContext
 
 /** Simplification pass, see also: docs/development/simplification-solvers.md
   */
@@ -791,78 +792,72 @@ def coalesceBlocksCrossBranchDependency(p: Program): Boolean = {
   candidate.nonEmpty
 }
 
+def coalesceBlocks(proc: Procedure): Boolean = {
+  var didAny = false
 
-
-class CoalesceBlocks extends Transform("CoalesceBlocks") {
-  protected def coalesceBlocks(proc: Procedure): Boolean = {
-    var didAny = false
-
-    val blocks = proc.blocks.toList
-    for (b <- blocks.sortBy(_.rpoOrder)) {
-      if (
-        b.prevBlocks.size == 1 && b.prevBlocks.head.statements.nonEmpty && b.statements.nonEmpty
-        && b.prevBlocks.head.nextBlocks.size == 1
-        && b.prevBlocks.head.statements.lastOption.forall(s => !s.isInstanceOf[Call])
-        && !(b.parent.entryBlock.contains(b) || b.parent.returnBlock.contains(b))
-        && b.atomicSection.isEmpty && b.prevBlocks.forall(_.atomicSection.isEmpty)
-      ) {
-        didAny = true
-        // append topredecessor
-        // we know prevBlock is only jumping to b and has no call at the end
-        val prevBlock = b.prevBlocks.head
-        val stmts = b.statements.map(b.statements.remove).toList
-        prevBlock.statements.appendAll(stmts)
-        // leave empty block b and cleanup with removeEmptyBlocks
-      } else if (
-        b.nextBlocks.size == 1 && b.nextBlocks.head.statements.nonEmpty && b.statements.nonEmpty
-        && b.nextBlocks.head.prevBlocks.size == 1
-        && b.statements.lastOption.forall(s => !s.isInstanceOf[Call])
-        && !(b.parent.entryBlock.contains(b) || b.parent.returnBlock.contains(b))
-        && b.atomicSection.isEmpty && b.nextBlocks.forall(_.atomicSection.isEmpty)
-      ) {
-        didAny = true
-        // append to successor
-        // we know b is only jumping to nextBlock and does not end in a call
-        val nextBlock = b.nextBlocks.head
-        val stmts = b.statements.map(b.statements.remove).toList
-        nextBlock.statements.prependAll(stmts)
-        // leave empty block b and cleanup with removeEmptyBlocks
-      } else if (b.jump.isInstanceOf[Unreachable] && b.statements.isEmpty && b.prevBlocks.size == 1) {
-        b.prevBlocks.head.replaceJump(Unreachable())
-        b.parent.removeBlocks(b)
-      }
+  val blocks = proc.blocks.toList
+  for (b <- blocks.sortBy(_.rpoOrder)) {
+    if (
+      b.prevBlocks.size == 1 && b.prevBlocks.head.statements.nonEmpty && b.statements.nonEmpty
+      && b.prevBlocks.head.nextBlocks.size == 1
+      && b.prevBlocks.head.statements.lastOption.forall(s => !s.isInstanceOf[Call])
+      && !(b.parent.entryBlock.contains(b) || b.parent.returnBlock.contains(b))
+      && b.atomicSection.isEmpty && b.prevBlocks.forall(_.atomicSection.isEmpty)
+    ) {
+      didAny = true
+      // append topredecessor
+      // we know prevBlock is only jumping to b and has no call at the end
+      val prevBlock = b.prevBlocks.head
+      val stmts = b.statements.map(b.statements.remove).toList
+      prevBlock.statements.appendAll(stmts)
+      // leave empty block b and cleanup with removeEmptyBlocks
+    } else if (
+      b.nextBlocks.size == 1 && b.nextBlocks.head.statements.nonEmpty && b.statements.nonEmpty
+      && b.nextBlocks.head.prevBlocks.size == 1
+      && b.statements.lastOption.forall(s => !s.isInstanceOf[Call])
+      && !(b.parent.entryBlock.contains(b) || b.parent.returnBlock.contains(b))
+      && b.atomicSection.isEmpty && b.nextBlocks.forall(_.atomicSection.isEmpty)
+    ) {
+      didAny = true
+      // append to successor
+      // we know b is only jumping to nextBlock and does not end in a call
+      val nextBlock = b.nextBlocks.head
+      val stmts = b.statements.map(b.statements.remove).toList
+      nextBlock.statements.prependAll(stmts)
+      // leave empty block b and cleanup with removeEmptyBlocks
+    } else if (b.jump.isInstanceOf[Unreachable] && b.statements.isEmpty && b.prevBlocks.size == 1) {
+      b.prevBlocks.head.replaceJump(Unreachable())
+      b.parent.removeBlocks(b)
     }
-    didAny
   }
+  didAny
+}
 
-  protected def coalesceBlocks(p: Program): Boolean = {
-    var didAny = false
-    for (proc <- p.procedures) {
-      didAny = didAny || coalesceBlocks(proc)
-    }
-    didAny
+def coalesceBlocks(p: Program): Boolean = {
+  var didAny = false
+  for (proc <- p.procedures) {
+    didAny = didAny || coalesceBlocks(proc)
   }
+  didAny
+}
 
-  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer] = {
+class CoalesceBlocks(name: String = "CoalesceBlocks") extends Transform(name) {
+  // todo: make these protected (?)
+  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
     coalesceBlocks(ctx.program)
     Set.empty
   }
 }
 
-class CoalesceBlocksFixpoint extends CoalesceBlocks {
-  override val name: String = "CoalesceBlocksFixpoint"
+class CoalesceBlocksFixpoint extends CoalesceBlocks("CoalesceBlocksFixpoint") {
 
-  override def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer] = {
+  override def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
     // useful for ReplaceReturns
     // (pushes single block with `Unreachable` into its predecessor)
     while (coalesceBlocks(ctx.program)) {}
     Set.empty
   }
 }
-
-    
-
-
 
 def removeDeadInParams(p: Program): Boolean = {
   var modified = false
@@ -1132,47 +1127,46 @@ def copyPropParamFixedPoint(p: Program, rela: Map[BigInt, BigInt]): Int = {
   iterations
 }
 
+def reversePostOrder(p: Procedure): Unit = {
+  /* Procedures may contain disconnected sets of blocks so we arbitrarily order these with respect to eachother. */
+  for (b <- p.blocks) {
+    b.rpoOrder = -1
+  }
+  var left = p.entryBlock.map(reversePostOrder(_)).getOrElse(0) + 1
+  for (b <- p.blocks.filter(_.rpoOrder == -1)) {
+    left = reversePostOrder(b, true, left) + 1
+  }
+}
+
+def reversePostOrder(startBlock: Block, fixup: Boolean = false, begin: Int = 0): Int = {
+  var count = begin
+  val seen = mutable.HashSet[Block]()
+
+  def walk(b: Block): Unit = {
+    seen += b
+    for (s <- b.nextBlocks) {
+      if (!seen.contains(s)) {
+        walk(s)
+      }
+    }
+    if (!fixup || b.rpoOrder < count) {
+      b.rpoOrder = count
+    }
+    count += 1
+  }
+
+  walk(startBlock)
+  count
+}
+
+def applyRPO(p: Program) = {
+  for (proc <- p.procedures) {
+    reversePostOrder(proc)
+  }
+}
 
 class ApplyRpo extends Transform("ApplyRpo") {
-  def reversePostOrder(p: Procedure): Unit = {
-    /* Procedures may contain disconnected sets of blocks so we arbitrarily order these with respect to eachother. */
-    for (b <- p.blocks) {
-      b.rpoOrder = -1
-    }
-    var left = p.entryBlock.map(reversePostOrder(_)).getOrElse(0) + 1
-    for (b <- p.blocks.filter(_.rpoOrder == -1)) {
-      left = reversePostOrder(b, true, left) + 1
-    }
-  }
-
-  private def reversePostOrder(startBlock: Block, fixup: Boolean = false, begin: Int = 0): Int = {
-    var count = begin
-    val seen = mutable.HashSet[Block]()
-
-    def walk(b: Block): Unit = {
-      seen += b
-      for (s <- b.nextBlocks) {
-        if (!seen.contains(s)) {
-          walk(s)
-        }
-      }
-      if (!fixup || b.rpoOrder < count) {
-        b.rpoOrder = count
-      }
-      count += 1
-    }
-
-    walk(startBlock)
-    count
-  }
-
-  private def applyRPO(p: Program) = {
-    for (proc <- p.procedures) {
-      reversePostOrder(proc)
-    }
-  }
-
-  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer] = {
+  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
     applyRPO(ctx.program)
     Set.empty
   }
@@ -1644,7 +1638,7 @@ def findDefinitelyExits(p: Program): ProcReturnInfo = {
 
 // todo: not sure whether to make 'findDefinitelyExits' a private method of this class
 class ReplaceJumpsInNonReturningProcs extends Transform("ReplaceJumpsInNonReturningProcs") {
-  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer] = {
+  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
     val nonReturning = findDefinitelyExits(ctx.program)
     ctx.program.mainProcedure.foreach {
       case d: DirectCall if nonReturning.nonreturning.contains(d.target) => d.parent.replaceJump(Return())
@@ -1656,7 +1650,7 @@ class ReplaceJumpsInNonReturningProcs extends Transform("ReplaceJumpsInNonReturn
 
 // todo: i have no idea what to do with this
 class ReplaceReturnsTransform(doSimplify: Boolean) extends Transform("ReplaceReturns") {
-  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer] = {
+  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
     // FIXME: Main will often maintain the stack by loading R30 from the caller's stack frame
     //        before returning, which makes the R30 assertin faile. Hence we currently skip this
     //        assertion for main, instead we should precondition the stack layout before main
@@ -1672,7 +1666,7 @@ class ReplaceReturnsTransform(doSimplify: Boolean) extends Transform("ReplaceRet
 }
 
 class RemoveExternalFunctionReferences extends Transform("RemoveExternalFunctionReferences") {
-  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer] = {
+  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
     val externalNames = ctx.externalFunctions.map(_.name)
     val unqualifiedNames = externalNames.filter(_.contains('@')).map(_.split('@')(0))
     ExternalRemover(externalNames ++ unqualifiedNames).visitProgram(ctx.program)
@@ -1908,7 +1902,7 @@ class MakeProcEntriesNonLoops extends Transform("MakeProcEntriesNonLoops") {
     }
   }
 
-  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer] = {
+  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
     ctx.program.procedures.foreach(makeProcEntryNonLoop)
     Set.empty
   }

@@ -1,6 +1,8 @@
 package analysis
 
 import ir.Program
+import util.PerformanceTimer
+
 
 /** Provides a consistent interface for static analyses.
   * Similar to Transform, but returns a result rather than modifying the IR in-place.
@@ -14,7 +16,7 @@ trait StaticAnalysis[ReturnType](val name: String) {
 
   protected def preRun(): Unit = {}
 
-  protected def postRun(): Unit = {}
+  protected def postRun(ret: ReturnType): Unit = {}
 
   protected def implementation: (Program, AnalysisManager) => ReturnType
 

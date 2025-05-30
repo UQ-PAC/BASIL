@@ -1,6 +1,7 @@
 package analysis
 
 import ir.Program
+import scala.collection.mutable
 
 /** Analysis manager for caching and invalidating analysis results.
   * 
@@ -9,10 +10,10 @@ import ir.Program
   * the same program reference. It is then the responsibility of Transforms to clear these results when they are
   * invalidated by a modification to this program.
   */
-class AnalysisManager(program: Program) {
+class AnalysisManager(val program: Program) {
 
   // memoizer to wrap static analyses and cache their results
-  private class Memoizer[ReturnType](analysis: StaticAnalysis[ReturnType]) {
+  class Memoizer[ReturnType](analysis: StaticAnalysis[ReturnType]) {
 
     private var memo: Option[ReturnType] = None
 
@@ -27,42 +28,42 @@ class AnalysisManager(program: Program) {
   }
 
   // keep track of all memoizers to ensure we can invalidate all of them
-  private val memoizers: Set[Memoizer[?]] = Nil
+  private val memoizers: mutable.Set[Memoizer[?]] = mutable.Set.empty
 
   // private helper function for creating and storing memoizers
   private def register[ReturnType](analysis: StaticAnalysis[ReturnType]): Memoizer[ReturnType] = {
     val mem = Memoizer[ReturnType](analysis)
-    memoizers ::= mem
+    memoizers += mem
     return mem
   }
 
   // list of memoizers - these can be directly called via this manager, e.g. val result = manager.exampleAnalysis()
-  val intraProcConstProp = register(IntraProcConstantPropagationAnalysis())
-  val interProcConstProp = register(InterProcConstantPropagationAnalysis())
-  val memoryRegionResult = register(MemoryRegionAnalysisSolverAnalysis())
-  val vsaResult = register(ValueSetAnalysisSolverAnalysis())
-  val interLiveVarsResults = register(/* todo */)
-  val paramResults = register(/* todo */)
-  val steensgaardSolver = register(/* todo */) // fixme: merge these into one analysis result?
-  val steensgaardPointsTo = register(/* todo */)
-  val steensgaardCallSiteSummary = register(/* todo */)
-  val mmmResults = register(/* todo */)
-  val reachingDefs = register(/* todo */)
-  val regionInjector = register(/* todo */)
-  val symbolicAddresses = register(/* todo */)
-  val localDSA = register(/* todo */)
-  val bottomUpDSA = register(/* todo */)
-  val topDownDSA = register(/* todo */)
-  val writesToResult = register(/* todo */)
-  val ssaResults = register(/* todo */)
-  val graResult = register(/* todo */)
-  val intraDomain = register(/* todo */)
-  val interDomain = register(/* todo */)
+//   val intraProcConstProp = register(IntraProcConstantPropagationAnalysis())
+//   val interProcConstProp = register(InterProcConstantPropagationAnalysis())
+//   val memoryRegionResult = register(MemoryRegionAnalysisSolverAnalysis())
+//   val vsaResult = register(ValueSetAnalysisSolverAnalysis())
+//   val interLiveVarsResults = register(/* todo */)
+//   val paramResults = register(/* todo */)
+//   val steensgaardSolver = register(/* todo */) // fixme: merge these into one analysis result?
+//   val steensgaardPointsTo = register(/* todo */)
+//   val steensgaardCallSiteSummary = register(/* todo */)
+//   val mmmResults = register(/* todo */)
+//   val reachingDefs = register(/* todo */)
+//   val regionInjector = register(/* todo */)
+//   val symbolicAddresses = register(/* todo */)
+//   val localDSA = register(/* todo */)
+//   val bottomUpDSA = register(/* todo */)
+//   val topDownDSA = register(/* todo */)
+//   val writesToResult = register(/* todo */)
+//   val ssaResults = register(/* todo */)
+//   val graResult = register(/* todo */)
+//   val intraDomain = register(/* todo */)
+//   val interDomain = register(/* todo */)
 
   // clears the cached results of all analyses except for those in the given set
-  def invalidateAllExcept(exceptions: Set[Memoizer]): Unit =
+  def invalidateAllExcept(exceptions: Set[Memoizer[?]]): Unit =
     memoizers.filterNot(exceptions.contains).foreach(_.invalidate())
 
   // useful to pass to 'invalidateAllExcept' when we want to preserve all or nearly all results after a transform
-  def getAll(): Set[Memoizer[?]] = memoizers // safe to directly return non-mutable set
+  def getAll(): Set[Memoizer[?]] = memoizers.toSet
 }

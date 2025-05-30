@@ -44,6 +44,10 @@ import util.LogLevel.INFO
 import scala.annotation.tailrec
 import scala.collection.mutable
 
+import analysis.StaticAnalysis
+import analysis.AnalysisManager
+import ir.transforms.*
+
 /** This file contains the main program execution. See RunUtils.loadAndTranslate for the high-level process.
   */
 
@@ -257,15 +261,57 @@ object IRTransform {
     ReplaceReturnsTransform(doSimplify),
     RemoveExternalFunctionReferences()
   )) {
-    override protected def preRun(): Unit = {
+    override protected def preRun(ctx: IRContext): Unit = {
       Logger.info("[!] Removing external function calls") // fixme: seems odd?
     }
 
-    override protected def postRun(): Unit = {
+    override protected def postRun(ctx: IRContext): Unit = {
       assert(invariant.singleCallBlockEnd(ctx.program))
       assert(invariant.cfgCorrect(ctx.program))
       assert(invariant.blocksUniqueToEachProcedure(ctx.program))
       assert(invariant.procEntryNoIncoming(ctx.program))
+    }
+  }
+
+  // todo: not sure where to put this
+  class DetermineRelevantMemory(config: BASILConfig) extends Transform("DetermineRelevantMemory") {
+    def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
+      if (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled)) {
+        ctx.program.determineRelevantMemory(ctx.globalOffsets)
+      }
+      Set.empty
+    }
+  }
+
+  // todo: not sure where to put this
+  class StackSubstitution(config: BASILConfig) extends Transform("StackSubstitution") {
+    def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
+      if (!config.memoryTransform &&
+          (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled))) {
+        StackSubstituter().visitProgram(ctx.program)
+      }
+      Set.empty
+    }
+  }
+
+  // todo: not sure where to put this
+  class SetModifies extends Transform("SetModifies") {
+    def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
+      val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
+      ctx.program.setModifies(specModifies)
+      Set.empty
+    }
+  }
+
+  // todo: not sure where to put this
+  class RenameBoogieKeywords extends Transform("RenameBoogieKeywords") {
+    def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
+      Renamer(boogieReserved).visitProgram(ctx.program)
+      Set.empty
+    }
+
+    override protected def postRun(ctx: IRContext): Unit = {
+      assert(invariant.singleCallBlockEnd(ctx.program))
     }
   }
 
@@ -294,54 +340,12 @@ object IRTransform {
         }
       }
     }
-    
-    // todo: not sure where to put this
-    class DetermineRelevantMemory(config: BASILConfig) extends Transform("DetermineRelevantMemory") {
-      def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer] = {
-        if (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled)) {
-          ctx.program.determineRelevantMemory(ctx.globalOffsets)
-        }
-        Set.empty
-      }
-    }
-
-    // todo: not sure where to put this
-    class StackSubstitution(config: BASILConfig) extends Transform("StackSubstitution") {
-      def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer] = {
-        if (!config.memoryTransform &&
-            (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled))) {
-          StackSubstituter().visitProgram(ctx.program)
-        }
-        Set.empty
-      }
-    }
-
-    // todo: not sure where to put this
-    class SetModifies extends Transform("SetModifies") {
-      def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer] = {
-        val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
-        ctx.program.setModifies(specModifies)
-        Set.empty
-      }
-    }
-
-    // todo: not sure where to put this
-    class RenameBoogieKeywords extends Transform("RenameBoogieKeywords") {
-      def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer] = {
-        Renamer(boogieReserved).visitProgram(ctx.program)
-        Set.empty
-      }
-
-      override protected def postRun(ctx: IRContext): Unit = {
-        assert(invariant.singleCallBlockEnd(ctx.program))
-      }
-    }
   }
 
   class GenerateProcedureSummaries(simplified: Boolean = false) extends Transform("GenerateProcedureSummaries") {
     // (?) removed the 'modified' variable that we used to return from this function
     // (?) removed the 'IRProgram' parameter - using ctx.program instead
-    def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer] = {
+    def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
       val prog = ctx.program
       // Need to know modifies clauses to generate summaries, but this is probably out of place (fixme)
       val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
@@ -361,7 +365,7 @@ object IRTransform {
   }
 
   class GenerateRgConditions(threads: List[Procedure]) extends Transform("GenerateRgConditions") {
-    def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer] = {
+    def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
       /* Todo: For the moment we are printing these to stdout, but in future we'd
       like to add them to the IR. */
       type StateLatticeElement = LatticeMap[Variable, analysis.Interval]
@@ -878,11 +882,9 @@ object RunUtils {
     transforms.inlinePLTLaunchpad(ctx.program)
 
     if (q.loading.trimEarly) {
-      val before = ctx.program.procedures.size
-      transforms.stripUnreachableFunctions(ctx.program, q.loading.procedureTrimDepth)
-      Logger.info(
-        s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
-      )
+      StripUnreachableFunctions(q)(ctx, AnalysisManager(ctx.program))
+      // todo: since refactoring, there is some extra code that is run here
+      // namely, the portion of StripUnreachableFunctions.postRun after the logger
     }
 
     ctx.program.procedures.foreach(transforms.RemoveUnreachableBlocks.apply)
@@ -981,7 +983,7 @@ object RunUtils {
     IRTransform.PrepareForTranslation(q)(ctx, AnalysisManager(ctx.program))
 
     if (conf.generateRelyGuarantees) {
-      IRTransform.GenerateRelyGuaranteeConditions(ctx.program.procedures.toList.filter(p => p.returnBlock != None))(ctx, AnalysisManager(ctx.program))
+      IRTransform.GenerateRgConditions(ctx.program.procedures.toList.filter(p => p.returnBlock != None))(ctx, AnalysisManager(ctx.program))
     }
 
     q.loading.dumpIL.foreach(s => {

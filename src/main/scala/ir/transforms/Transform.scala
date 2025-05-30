@@ -3,6 +3,7 @@ package ir.transforms
 import util.IRContext
 import ir.Program
 import analysis.AnalysisManager
+import util.PerformanceTimer
 
 /** Provides a consistent interface for IR transforms.
   * 
@@ -29,7 +30,7 @@ trait Transform(val name: String) {
     * invoked, return Set.empty. (Note that this will negatively impact performance.) To preserve all analyses, return
     * analyses.getAll().
     */
-  protected def implementation: (ctx: IRContext, analyses: AnalysisManager) => Set[analyses.Memoizer]
+  protected def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]]
 
   // instances of transforms can be directly called to invoke this method
   def apply(ctx: IRContext, analyses: AnalysisManager): Unit = {
@@ -53,8 +54,8 @@ trait Transform(val name: String) {
   * @param name The name of this transform batch.
   * @param transforms The sequence of other transforms that comprise this transform.
   */
-trait TransformBatch(name: String, transforms: List[Transform]) extends Transform(name) {
-  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer] = {
+class TransformBatch(name: String, transforms: List[Transform]) extends Transform(name) {
+  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
     // simply apply each transform in-turn
     transforms.foreach(_(ctx, analyses))
     Set.empty

@@ -37,16 +37,16 @@ class DoSimplify(config: BASILConfig) extends TransformBatch("DoSimplify", List(
   LogIrAfterSlices(),
   LogSimplificationValidation()
 ))
-
+*/
 class IdentifyLoops extends Transform("IdentifyLoops") {
-  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer] = {
+  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
     val foundLoops = LoopDetector.identify_loops(ctx.program)
     val newLoops = foundLoops.reducibleTransformIR()
     newLoops.updateIrWithLoops()
     Set.empty
   }
 }
-
+/*
 class NormaliseBlockNames extends Transform("NormaliseBlockNames") {
   def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer] = {
     ctx.program.procedures.foreach(_.normaliseBlockNames())
