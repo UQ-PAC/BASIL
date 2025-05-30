@@ -67,7 +67,8 @@ package ir
  *    This results in a [[ir.parsing.Declarations]].
  * 5. The Basil IR program is obtained by passing the program AST,
  *    along with the global declarations, to [[ir.parsing.BasilMainBNFCVisitor]].
- *    This is returned in the form of an unresolved Basil IR structure.
+ *    This is returned in the form of an unresolved Basil DSL structure, [[ir.dsl.EventuallyProgram]].
+ * 6. The DSL structure is resolved into a real Basil IR [[ir.Program]], ready for use.
  *
  */
 package object parsing {}

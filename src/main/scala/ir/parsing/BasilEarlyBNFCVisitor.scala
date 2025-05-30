@@ -5,10 +5,18 @@ import basil_ir.{Absyn => syntax}
 import scala.collection.immutable.ListMap
 import scala.jdk.CollectionConverters.*
 
-object Declarations {
+private object Declarations {
   lazy val empty = Declarations(Map(), Map(), Map(), Map())
 }
 
+/**
+ * Container for the result of the [[ir.parsing.BasilEarlyBNFCVisitor]].
+ * Stores global variable declarations, memory region declarations, procedure signatures,
+ * and metadata.
+ *
+ * Note that the [[ir.dsl.EventuallyProcedure]] structures stored by this class are
+ * *incomplete*. Only the procedure name and the formalIn/Out parameters should be used.
+ */
 case class Declarations(
   val globals: Map[String, ir.Register],
   val memories: Map[String, ir.Memory],
@@ -32,6 +40,15 @@ case class Declarations(
   }
 }
 
+/**
+ * Performs an initial pass to read global declarations. Importantly, this picks up
+ * procedure declarations and their paramter lists, so a later pass can correctly map a
+ * direct call's actual arguments to their formal parameters.
+ *
+ * Visiting a [[basil_ir.Absyn.Prog]] with this visitor will return the complete declarations
+ * object for the entire program. Using the other visit methods will only return declarations
+ * for that subset of the AST.
+ */
 case class BasilEarlyBNFCVisitor[A]()
     extends syntax.Program.Visitor[Declarations, A],
       syntax.Declaration.Visitor[Declarations, A],
@@ -76,7 +93,7 @@ case class BasilEarlyBNFCVisitor[A]()
     ir.LocalVar(x.bident_, x.type_.accept(this, arg))
 
   private def visitParams(x: syntax.ListParams, arg: A): Map[String, ir.IRType] =
-    // XXX: use ListMap instead of SortedMap, because the orders are presumed to
+    // NOTE: uses ListMap instead of SortedMap, because the orders are presumed to
     // match between calls and param lists within the same file.
     x.asScala.map(_.accept(this, arg)).map(x => x.name -> x.getType).to(ListMap)
 
