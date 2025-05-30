@@ -125,12 +125,12 @@ FalseLiteral . Expr ::= "false" ;
 
 rules EqOp ::= "eq" | "neq" ;
 rules BVUnOp ::= "bvnot" | "bvneg" ;
-rules BVBinOp ::= "bvand"|"bvor"|"bvadd"|"bvmul"|"bvudiv"|"bvurem"|"bvshl"|"bvlshr"|"bvult"|"bvnand"|"bvnor"
+rules BVBinOp ::= "bvand"|"bvor"|"bvadd"|"bvmul"|"bvudiv"|"bvurem"|"bvshl"|"bvlshr"|"bvnand"|"bvnor"
   |"bvxor"|"bvxnor"|"bvcomp"|"bvsub"|"bvsdiv"|"bvsrem"|"bvsmod"|"bvashr" ;
-rules BVLogicalBinOp ::= "bvule" |  "bvugt" |  "bvuge" |  "bvslt" |  "bvsle" |  "bvsgt" |  "bvsge" ;
+rules BVLogicalBinOp ::= "bvule" |  "bvugt" |  "bvuge" | "bvult" | "bvslt" |  "bvsle" |  "bvsgt" |  "bvsge" ;
 
 rules IntBinOp ::= "intadd" | "intmul" | "intsub" | "intdiv" | "intmod"  ;
 rules IntLogicalBinOp ::=  "intlt" | "intle" | "intgt" | "intge" ;
-rules BoolBinOp ::=  "booland" | "boolor" | "boolimplies" | "boolequiv" ;
+rules BoolBinOp ::=  "booland" | "boolor" | "boolimplies" ;
 
 

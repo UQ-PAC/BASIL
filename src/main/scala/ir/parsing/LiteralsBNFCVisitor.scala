@@ -30,6 +30,7 @@ class LiteralsBNFCVisitor[A]()
   override def visit(x: syntax.EqOp_neq, arg: A): BasilParseValue = ir.NEQ
 
   // Members declared in BVLogicalBinOp.Visitor
+  override def visit(x: syntax.BVLogicalBinOp_bvult, arg: A): BasilParseValue = ir.BVULT
   override def visit(x: syntax.BVLogicalBinOp_bvule, arg: A): BasilParseValue = ir.BVULE
   override def visit(x: syntax.BVLogicalBinOp_bvugt, arg: A): BasilParseValue = ir.BVUGT
   override def visit(x: syntax.BVLogicalBinOp_bvuge, arg: A): BasilParseValue = ir.BVUGE
@@ -41,7 +42,7 @@ class LiteralsBNFCVisitor[A]()
   // Members declared in IntLogicalBinOp.Visitor
   override def visit(x: syntax.IntLogicalBinOp_intlt, arg: A): BasilParseValue = ir.IntLT
   override def visit(x: syntax.IntLogicalBinOp_intle, arg: A): BasilParseValue = ir.IntLE
-  override def visit(x: syntax.IntLogicalBinOp_intgt, arg: A): BasilParseValue = ir.IntGE
+  override def visit(x: syntax.IntLogicalBinOp_intgt, arg: A): BasilParseValue = ir.IntGT
   override def visit(x: syntax.IntLogicalBinOp_intge, arg: A): BasilParseValue = ir.IntGE
 
   // Members declared in BVBinOp.Visitor
@@ -53,7 +54,6 @@ class LiteralsBNFCVisitor[A]()
   override def visit(x: syntax.BVBinOp_bvurem, arg: A): BasilParseValue = ir.BVUREM
   override def visit(x: syntax.BVBinOp_bvshl, arg: A): BasilParseValue = ir.BVSHL
   override def visit(x: syntax.BVBinOp_bvlshr, arg: A): BasilParseValue = ir.BVLSHR
-  override def visit(x: syntax.BVBinOp_bvult, arg: A): BasilParseValue = ir.BVULT
   override def visit(x: syntax.BVBinOp_bvnand, arg: A): BasilParseValue = ir.BVNAND
   override def visit(x: syntax.BVBinOp_bvnor, arg: A): BasilParseValue = ir.BVNOR
   override def visit(x: syntax.BVBinOp_bvxor, arg: A): BasilParseValue = ir.BVXOR
@@ -80,7 +80,6 @@ class LiteralsBNFCVisitor[A]()
   override def visit(x: syntax.BoolBinOp_booland, arg: A): BasilParseValue = ir.BoolAND
   override def visit(x: syntax.BoolBinOp_boolor, arg: A): BasilParseValue = ir.BoolOR
   override def visit(x: syntax.BoolBinOp_boolimplies, arg: A): BasilParseValue = ir.BoolIMPLIES
-  override def visit(x: syntax.BoolBinOp_boolequiv, arg: A): BasilParseValue = ??? // XXX: TODO
 
   // Members declared in BVUnOp.Visitor
   override def visit(x: syntax.BVUnOp_bvnot, arg: A): BasilParseValue = ir.BVNOT
