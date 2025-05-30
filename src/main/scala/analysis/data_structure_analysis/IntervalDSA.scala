@@ -821,6 +821,12 @@ class IntervalDSA(irContext: IRContext) {
   def pre(): (Map[Procedure, SymValues[DSInterval]], Map[Procedure, Set[Constraint]]) = {
     var sva: Map[Procedure, SymValues[DSInterval]] = Map.empty
     var cons: Map[Procedure, Set[Constraint]] = Map.empty
+    assert(
+      irContext.program
+        .filter(_.isInstanceOf[MemoryAccess])
+        .toSet == irContext.program.procedures.flatMap(_.iterator).filter(_.isInstanceOf[MemoryAccess]).toSet,
+      "Inconsistent domain for constraints and invariants"
+    )
     computeDSADomain(irContext.program.mainProcedure, irContext).toSeq
       .sortBy(_.name)
       .foreach(proc =>
@@ -892,7 +898,6 @@ class IntervalDSA(irContext: IRContext) {
   }
 
 }
-
 
 type MemoryAccess = MemoryLoad | MemoryStore
 
