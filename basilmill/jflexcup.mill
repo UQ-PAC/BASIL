@@ -1,0 +1,69 @@
+package build.basilmill
+
+import mill._
+import mill.util.Jvm
+import scalalib._
+
+trait JFlexCupModule extends JavaModule {
+  def jflexSource: T[PathRef]
+  def javaCupSource: T[PathRef]
+  def jflexArgs: T[Iterable[String]]
+  def javaCupArgs: T[Iterable[String]]
+
+  def jflexDep = ivy"de.jflex:jflex:1.9.1"
+  def javaCupDep = ivy"com.github.vbmacher:java-cup:11b-20160615-3"
+  def javaCupRuntimeDep = ivy"com.github.vbmacher:java-cup-runtime:11b-20160615-3"
+  def javaCupSourceUrl: T[String] = "http://www2.cs.tum.edu/projects/cup/releases/java-cup-src-11b-20160615.tar.gz"
+
+  def ivyDeps = Task {
+    super.ivyDeps() ++ Agg(javaCupRuntimeDep)
+  }
+
+  object jflex extends JavaModule {
+    def compileIvyDeps = Agg(jflexDep)
+    def generated = Task {
+      Jvm.callProcess(
+        mainClass = "jflex.Main",
+        mainArgs = Seq(
+          jflexSource().path.toString,
+          "-d",
+          Task.dest.toString
+        ) ++ jflexArgs(),
+        stdout = os.Inherit,
+        classPath = compileClasspath().map(_.path).toList
+      )
+      PathRef(Task.dest)
+    }
+  }
+
+  object cup extends JavaModule {
+    def compileIvyDeps = Agg(javaCupDep)
+    def generated = Task {
+      Jvm.callProcess(
+        mainClass = "java_cup.Main",
+        mainArgs = javaCupArgs() ++ Seq(
+          javaCupSource().path.toString
+        ),
+        stdout = os.Inherit,
+        cwd = Task.dest,
+        classPath = compileClasspath().map(_.path).toList
+      )
+      PathRef(Task.dest)
+    }
+    def cupSources = Task {
+      val file = Task.dest / "cup-src.tar.gz"
+      os.write(file, requests.get(javaCupSourceUrl()))
+      os.proc("tar", "xzf", file).call(cwd = Task.dest)
+      os.remove.all(Task.dest / "src" / "java_cup" / "anttask")
+      os.remove(file)
+      PathRef(Task.dest / "src")
+    }
+    def docSources = Task {
+      super.docSources() ++ Seq(cupSources())
+    }
+  }
+
+  override def sources = Task.Sources {
+    super.sources() ++ Seq(jflex.generated(), cup.generated())
+  }
+}
