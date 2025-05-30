@@ -183,7 +183,7 @@ case class InnerBasilBNFCVisitor[A](
  *
  * @group mainvisitor
  */
-case class MainBasilBNFCVisitor[A](
+case class BasilMainBNFCVisitor[A](
   val decls: Declarations,
   val makeVisitor: (String, Declarations) => basil_ir.AllVisitor[BasilParseValue, A] = InnerBasilBNFCVisitor[A](_, _)
 ) extends LiteralsBNFCVisitor[A]
@@ -254,11 +254,11 @@ object Run {
 
     val ast = parser.pProgram()
 
-    val vis0 = EarlyBasilBNFCVisitor[Unit]()
+    val vis0 = BasilEarlyBNFCVisitor[Unit]()
     val decls = ast.accept(vis0, ())
     println(decls)
 
-    val vis = MainBasilBNFCVisitor[Unit](decls)
+    val vis = BasilMainBNFCVisitor[Unit](decls)
     val result = ast.accept(vis, ())
     println(result)
     val prog = result.resolve

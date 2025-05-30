@@ -4,7 +4,7 @@ package ir
  * Welcome to the [[ir.parsing]] package. This package concerns parsing
  * the serialised Basil IR format (specifically, that produced by
  * [[translating.PrettyPrinter]]). Primarily, this contains visitors which
- * traverse a parse tree produced by the BNFC Java-Antlr backend.
+ * traverse a parse tree produced by the BNFC Java backend.
  *
  * # Example
  *
@@ -59,14 +59,14 @@ package ir
  *
  * ## Step-by-step
  *
- * 1. A file or string is read into an [[org.antlr.v4.runtime.CharStream]].
- * 2. This is lexed by [[basil_ir.BasilIRLexer]].
- * 3. This is passed to a [[org.antlr.v4.runtime.CommonTokenStream]] and parsed by [[basil_ir.BasilIRParser]].
- *    BNFC sets up the Antlr visitor to generate an AST. From the parser,  we obtain a [[basil_ir.Absyn.Program]].
- * 4. Global declarations are obtained by passing the program AST to [[ir.parsing.EarlyBasilBNFCVisitor]].
+ * 1. A file or string is read into an [[java.io.FileReader]].
+ * 2. This is lexed by [[basil_ir.Yylex]].
+ * 3. The tokens are parsed by [[basil_ir.parser]].
+ *    BNFC sets up the parser to produce an AST, so we obtain a [[basil_ir.Absyn.Program]] from the parser.
+ * 4. Global declarations are obtained by passing the program AST to [[ir.parsing.BasilEarlyBNFCVisitor]].
  *    This results in a [[ir.parsing.Declarations]].
  * 5. The Basil IR program is obtained by passing the program AST,
- *    along with the global declarations, to [[ir.parsing.MainBasilBNFCVisitor]].
+ *    along with the global declarations, to [[ir.parsing.BasilMainBNFCVisitor]].
  *    This is returned in the form of an unresolved Basil IR structure.
  *
  */

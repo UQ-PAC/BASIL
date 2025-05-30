@@ -32,7 +32,7 @@ case class Declarations(
   }
 }
 
-case class EarlyBasilBNFCVisitor[A]()
+case class BasilEarlyBNFCVisitor[A]()
     extends syntax.Program.Visitor[Declarations, A],
       syntax.Declaration.Visitor[Declarations, A],
       syntax.MExpr.Visitor[String, A],
