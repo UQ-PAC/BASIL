@@ -157,7 +157,8 @@ case class MainBasilBNFCVisitor[A](
   // Members declared in Block.Visitor
   override def visit(x: syntax.B, arg: A): BasilParseValue =
     val ss = stmts(x.liststatement_, arg) :+ x.jump_.accept(this, arg).stmt
-    ir.dsl.block(x.bident_, ss: _*)
+    val addr = x.addrattr_.accept(this, arg).opt(_.int)
+    ir.dsl.block(x.bident_, ss: _*).copy(address = addr)
 
   // Members declared in PAddress.Visitor
   override def visit(x: syntax.AddrSome, arg: A): BasilParseValue =
