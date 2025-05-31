@@ -36,3 +36,5 @@ trait TypesBNFCVisitor[A]
   // Members declared in BVType.Visitor
   override def visit(x: syntax.BVT, arg: A) = ir.BitVecType(x.bvtype_.stripPrefix("bv").toInt)
 }
+
+private def ensureTraitHasNoAbstractMembers[A] = new TypesBNFCVisitor[A] {}

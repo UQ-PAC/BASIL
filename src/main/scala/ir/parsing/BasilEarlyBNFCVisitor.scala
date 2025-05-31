@@ -23,14 +23,20 @@ case class Declarations(
   val procedures: Map[String, ir.dsl.EventuallyProcedure],
   val metas: Map[String, String]
 ) {
-  private def isDisjoint[T, U](x: Map[T, U], y: Map[T, U]) =
-    x.keySet.intersect(y.keySet).isEmpty
+  private def ensureDisjoint[T, U](x: Map[T, U], y: Map[T, U]): Unit =
+    val overlap = x.keySet.intersect(y.keySet)
+    if (!overlap.isEmpty) {
+      throw new IllegalArgumentException(
+        "invalid attempt to merge non-disjoint declarations. repeated names: " + overlap
+      )
+    }
 
+  @throws[IllegalArgumentException]("if the two Declarations have overlapping names")
   def merge(other: Declarations) = {
-    assert(isDisjoint(globals, other.globals), "attempt to merge non-disjoint declarations")
-    assert(isDisjoint(memories, other.memories), "attempt to merge non-disjoint declarations")
-    assert(isDisjoint(procedures, other.procedures), "attempt to merge non-disjoint declarations")
-    assert(isDisjoint(metas, other.metas), "attempt to merge non-disjoint declarations")
+    ensureDisjoint(globals, other.globals)
+    ensureDisjoint(memories, other.memories)
+    ensureDisjoint(procedures, other.procedures)
+    ensureDisjoint(metas, other.metas)
     Declarations(
       globals ++ other.globals,
       memories ++ other.memories,
@@ -58,7 +64,18 @@ case class BasilEarlyBNFCVisitor[A]()
 
   // Members declared in Program.Visitor
   override def visit(x: syntax.Prog, arg: A) =
-    x.listdeclaration_.asScala.map(_.accept(this, arg)).foldLeft(Declarations.empty)((x, y) => x.merge(y))
+    x.listdeclaration_.asScala.foldLeft(Declarations.empty) { case (decls, x) =>
+      try {
+        decls.merge(x.accept(this, arg))
+      } catch {
+        case e: IllegalArgumentException =>
+          throw ParseException(
+            "encountered duplicate declarations with the same name",
+            x.asInstanceOf[HasParsePosition],
+            e
+          )
+      }
+    }
 
   // Members declared in MExpr.Visitor
   override def visit(x: syntax.MSym, arg: A) = x.bident_

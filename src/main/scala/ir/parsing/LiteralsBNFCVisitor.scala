@@ -4,7 +4,7 @@ import basil_ir.{Absyn => syntax}
 
 import scala.jdk.CollectionConverters.*
 
-class LiteralsBNFCVisitor[A]()
+trait LiteralsBNFCVisitor[A]
     extends syntax.BinOp.Visitor[BasilParseValue, A],
       syntax.BVLogicalBinOp.Visitor[BasilParseValue, A],
       syntax.IntLogicalBinOp.Visitor[BasilParseValue, A],
@@ -118,3 +118,5 @@ class LiteralsBNFCVisitor[A]()
   override def visit(x: syntax.DecInt, arg: A): BasilParseValue = BigInt(x.integer_) // XXX: int32
 
 }
+
+private def ensureTraitHasNoAbstractMembers[A] = new LiteralsBNFCVisitor[A] {}
