@@ -2,8 +2,8 @@ package util
 
 import scala.io.Source
 
-object SourceContext {
-  def showWithContext(source: Source, lineNum: Int, colNum: Option[Int], width: Option[Int] = None, contextSize: Int = 2) = {
+object SourcePrinting {
+  def formatSource(source: Source, lineNum: Int, colNum: Option[Int], width: Option[Int] = None, contextSize: Int = 2, showMargin: Boolean = true) = {
     require(lineNum >= 1, "should be strictly positive")
     require(colNum.forall(_ >= 1), "should be strictly positive")
     require(width.forall(_ >= 1), "should be strictly positive")
@@ -35,9 +35,15 @@ object SourceContext {
     val numWidth = (lineNum + contextSize).toString.length
     val fmt = s"%${numWidth}d"
 
+    def leftMargin(thisLine: Int) =
+      if (showMargin) then
+        marginCaret(thisLine) + " " + fmt.format(thisLine) + " | "
+      else
+        ""
+
     val out = lines.flatMap {
       case (line, n) =>
-        val prefix = marginCaret(n) + " " + fmt.format(n) + " | "
+        val prefix = leftMargin(n)
         Seq(prefix + line) ++ underlineAnnotation(n).map(" " * prefix.size + _)
     }
 
@@ -46,7 +52,7 @@ object SourceContext {
 
   def main(args: Array[String]) = {
     val src = Source.fromFile("/home/rina/progs/basil/src/main/scala/util/SourceContext.scala")
-    showWithContext(src, 1, Some(9), Some(4), 2)
+    formatSource(src, 1, Some(9), Some(4), 2, false)
   }
 
 }
