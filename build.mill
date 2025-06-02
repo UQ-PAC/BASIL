@@ -60,7 +60,7 @@ object `package` extends RootModule with ScalaModule with antlr.AntlrModule with
     }
 
     def testForkGrouping = Task {
-      val numGroups = 3
+      val numGroups = 9
       if (basilTestParallel()) {
         discoveredTestClasses().zipWithIndex.groupMap(x => x._2 % numGroups)(_._1).values.toSeq
       } else {
