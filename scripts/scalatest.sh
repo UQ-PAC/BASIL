@@ -21,7 +21,7 @@ set -x
 export BASIL_TEST_PARALLEL=true
 ./mill test.compile
 
-./mill --ticker true test "$@" &> $out
+./mill --ticker true -j 3 test "$@" &> $out
 code=$?
 
 sort --key=1,1 --stable $out
