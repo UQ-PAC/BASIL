@@ -21,7 +21,7 @@ These can be installed through [nix](https://github.com/katrinafyi/pac-nix?tab=r
 
 - `nix profile install nixpkgs#z3 nixpkgs#boogie`
 
-Alternatively, Z3 is usually available in system packages. For manual Boogie install instructions see [Verifying Boogie file](#verifying-the-boogie-file).
+Alternatively, Z3 is usually available in system packages. For manual Boogie install instructions see subheading [Verifying the Boogie file](#verifying-the-boogie-file).
 
 ## Lifting a single binary
 
