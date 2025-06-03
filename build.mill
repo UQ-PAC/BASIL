@@ -48,6 +48,20 @@ object `package` extends RootModule with ScalaModule {
     def sources = Task.Sources {
       Seq(PathRef(this.millSourcePath / "scala"))
     }
+
+    // note: toBoolean accepts precisely "true" or "false"
+    def basilTestParallel = Task.Input {
+      Task.env.get("BASIL_TEST_PARALLEL").fold(false)(_.toBoolean)
+    }
+
+    def testForkGrouping = Task {
+      val numGroups = 13
+      if (basilTestParallel()) {
+        discoveredTestClasses().zipWithIndex.groupMap(x => x._2 % numGroups)(_._1).values.toSeq
+      } else {
+        Seq(discoveredTestClasses())
+      }
+    }
   }
 
   /** Updates the expected
