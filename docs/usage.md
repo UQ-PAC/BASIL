@@ -11,7 +11,7 @@ Basil needs a JVM(>17), recommended JDK-21, which can be installed using system 
 
 - e.g. `sudo apt-get install openjdk-21-jdk`
 
-On first run `./mill` or `./mill.bat` (on Windows) should bootstrap Scala automatically. Otherwise it can be set up through [coursier](https://get-coursier.io/docs/cli-installation).
+On first run `./mill` (on linux/windows) or `./mill.bat` (on Windows) should bootstrap Scala automatically. Otherwise it can be set up through [coursier](https://get-coursier.io/docs/cli-installation).
 
 ### Test Dependencies
 
