@@ -1,7 +1,14 @@
 package ir.parsing
 
+/**
+ * Data used to construct either a [[ir.LocalVar]] or [[ir.Register]].
+ * The boolean value is true if local, or false if global (register).
+ */
+type LVarSpec = (String, ir.IRType, Boolean)
+
 type BaseParseTypes = ir.dsl.EventuallyProgram | ir.dsl.EventuallyProcedure | ir.dsl.EventuallyBlock |
-  ir.dsl.DSLStatement | ir.Expr | ir.BinOp | ir.UnOp | ir.IRType | ir.Endian | ir.Variable | ir.Memory | String | BigInt
+  ir.dsl.DSLStatement | ir.Expr | ir.BinOp | ir.UnOp | ir.IRType | ir.Endian | ir.Variable | ir.Memory | String |
+  BigInt | LVarSpec
 
 type ParseTypes = BaseParseTypes | List[BaseParseTypes] | Option[BaseParseTypes] | Map[String, BaseParseTypes]
 
@@ -28,6 +35,7 @@ case class BasilParseValue(x: ParseTypes) {
     assert(y.isValidInt, "BigInt value is out of range for a 32-bit integer")
     y.toInt
   def v = x.asInstanceOf[ir.Variable]
+  def lvar = x.asInstanceOf[LVarSpec]
   def endian = x.asInstanceOf[ir.Endian]
   def list[T](f: BasilParseValue => T) =
     x.asInstanceOf[List[BaseParseTypes]].map(x => f(BasilParseValue(x)))

@@ -34,11 +34,19 @@ case class InnerBasilBNFCVisitor[A](
   def stmts(x: syntax.ListStatement, arg: A): List[ir.dsl.DSLStatement] =
     x.asScala.map(_.accept(this, arg).stmt).toList
 
-  def lvars(x: syntax.ListLVar, arg: A): List[ir.Variable] =
-    x.asScala.map(_.accept(this, arg).v).toList
+  def lvars(x: syntax.ListLVar, arg: A): List[LVarSpec] =
+    x.asScala.map(_.accept(this, arg).lvar).toList
 
-  def localvar(name: String, x: syntax.Type, arg: A): ir.LocalVar =
-    ir.LocalVar(name, x.accept(this, arg).ty)
+  def variable(x: LVarSpec): ir.Variable =
+    x match {
+      case (name, ty, true) => ir.LocalVar(name, ty)
+      case (name, ty, false) => ir.Register(name, ty.asInstanceOf[ir.BitVecType].size)
+    }
+
+  def localvar(x: LVarSpec): ir.LocalVar =
+    x match {
+      case (name, ty, _) => ir.LocalVar(name, ty)
+    }
 
   // Members declared in Type.Visitor
   override def visit(x: syntax.TypeIntType, arg: A) = x.accept(typesVisitor, arg): ir.IRType
@@ -82,17 +90,11 @@ case class InnerBasilBNFCVisitor[A](
   override def visit(x: syntax.TrueLiteral, arg: A): BasilParseValue = ir.TrueLiteral
   override def visit(x: syntax.FalseLiteral, arg: A): BasilParseValue = ir.FalseLiteral
 
-  // Members declared in LVar.Visitor
-  override def visit(x: syntax.LVarDef, arg: A): BasilParseValue =
-    localvar(x.bident_, x.type_, arg)
-  override def visit(x: syntax.GlobalLVar, arg: A): BasilParseValue =
-    ir.Register(x.bident_, x.type_.accept(this, arg).bvty.size)
-
   // Members declared in Statement.Visitor
   override def visit(x: syntax.Assign, arg: A): BasilParseValue =
-    ir.LocalAssign(x.lvar_.accept(this, arg).v, x.expr_.accept(this, arg).expr)
+    ir.LocalAssign(variable(x.lvar_.accept(this, arg).lvar), x.expr_.accept(this, arg).expr)
   override def visit(x: syntax.SLoad, arg: A): BasilParseValue = ir.MemoryLoad(
-    x.lvar_.accept(this, arg).v,
+    variable(x.lvar_.accept(this, arg).lvar),
     decls.memories(x.bident_),
     x.expr_.accept(this, arg).expr,
     x.endian_.accept(this, arg).endian,
@@ -127,10 +129,26 @@ case class InnerBasilBNFCVisitor[A](
     val proc = decls.procedures(procName)
     ir.dsl.ret(proc.out.keys.zip(es).toList: _*)
 
+  // Members declared in LVar.Visitor
+  override def visit(x: syntax.LVarDef, arg: A): BasilParseValue =
+    (x.bident_, x.type_.accept(this, arg).ty, true)
+  override def visit(x: syntax.GlobalLVar, arg: A): BasilParseValue =
+    (x.bident_, x.type_.accept(this, arg).ty, false)
+
   // Members declared in CallLVars.Visitor
   override def visit(x: syntax.NoOutParams, arg: A): BasilParseValue = Nil
-  override def visit(x: syntax.LocalVars, arg: A): BasilParseValue = lvars(x.listlvar_, arg)
-  override def visit(x: syntax.ListOutParams, arg: A): BasilParseValue = lvars(x.listlvar_, arg)
+  override def visit(x: syntax.LocalVars, arg: A): BasilParseValue =
+    val innerlocals = x.listlvar_.asScala.collect { case x: syntax.LVarDef =>
+      x
+    }.toList
+    if (innerlocals.nonEmpty) {
+      throw ParseException(
+        "`var` declaration used within a `var` out-params list." + " this is redundant and has no effect, the inner var keywords should be removed.",
+        x
+      )
+    }
+    lvars(x.listlvar_, arg).map(localvar)
+  override def visit(x: syntax.ListOutParams, arg: A): BasilParseValue = lvars(x.listlvar_, arg).map(variable)
 
   // Members declared in AddrAttr.Visitor
   override def visit(x: syntax.AddrAttrSome, arg: A): BasilParseValue =
