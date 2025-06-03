@@ -899,16 +899,6 @@ class IntervalDSA(irContext: IRContext) {
 
 }
 
-type MemoryAccess = MemoryLoad | MemoryStore
-
-extension (ma: MemoryAccess)
-  def index = {
-    ma match {
-      case load: MemoryLoad => load.index
-      case store: MemoryStore => store.index
-    }
-  }
-
 object IntervalDSA {
 
   def checksGlobalMaintained(graph: IntervalGraph): Unit = {
