@@ -5,6 +5,30 @@ from the perspective of a user of the tool.
 It may also be useful for BASIL developers as a reference for how to lift
 new binaries for manual testing.
 
+## Running Basil
+
+Basil needs a JVM(>17), recommended JDK-21, which can be installed using system packages.
+
+- e.g. `sudo apt-get install openjdk-21-jdk`
+
+On first run `./mill` or `./mill.bat` (on Windows) should bootstrap Scala automatically. Otherwise it can be set up through [coursier](https://get-coursier.io/docs/cli-installation).
+
+### Test Dependencies
+
+Both unit tests and system tests will require a working installation of the Boogie verifier backend and Z3 SMT solver.
+
+These can be installed through [nix](https://github.com/katrinafyi/pac-nix?tab=readme-ov-file#first-time) (recommended):
+
+- `nix profile install nixpkgs#z3 nixpkgs#boogie`
+
+Or manually,
+
+- Z3 can usually also be found in system packages (`sudo apt-get install z3`)
+- Boogie can be installed through `dotnet`:
+   1. install [dotnet 8](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)
+   2. `dotnet tool install --global Boogie`
+   - Ensure `$PATH` is set correctly to contain the dotnet tool binary folder.
+
 ## Lifting a single binary
 
 Many lifted examples are provided in the [tests directory][tests],
@@ -134,13 +158,14 @@ and [development: building](development/readme.md#building)
 
 ### Using BASIL to generate Boogie
 
+
+
 This generates a Boogie file in out.bpl.
 ```
 basil --input a.gts --relf a.relf -o out.bpl
 ```
 (If using BASIL compiled from source, substitute `./mill run` in place of `basil`.
 Optionally add a specification file with `--spec`.)
-
 
 ### Verifying the Boogie file
 

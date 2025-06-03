@@ -5,7 +5,7 @@ binaries that have been lifted intermediate formats. It takes as input the `.gts
 [gtirb-semantics](https://github.com/UQ-PAC/gtirb-semantics),  which consists of [ddisasm's](https://github.com/grammatech/ddisasm)
 GTIRB  with [ASLp's](https://github.com/UQ-PAC/aslp) instruction semantics annotated as AuxData for each block.
 
-### Information flow logic
+### Information flow logic example
 
 Basil implements a concurrent information-flow logic verifier by encoding this logic in Boogie. 
 This logic is described [here](docs/iflogic-encoding.pdf). Verifying examples can be found in 
@@ -38,7 +38,9 @@ $ tail test.bpl
     assume {:captureState "main_1812_basil_return"} true;
     return;
 }
+```
 
+```sh
 $ ./mill run --load-directory-gtirb src/test/incorrect/basicassign/gcc --verify
 [193/193] run
 [193] [INFO]   Found src/test/incorrect/basicassign/gcc/basicassign.gts src/test/incorrect/basicassign/gcc/basicassign.relf src/test/incorrect/basicassign/basicassign.spec
@@ -76,9 +78,14 @@ $ ./mill run --load-directory-gtirb src/test/incorrect/basicassign/gcc --verify
 
 ### Usage
 
-BASIL requires a `.gts` file produced by [gtirb-semantics](https://github.com/UQ-PAC/gtirb-semantics), 
+The `./mill` script should be sufficient to bootstrap Scala, provided you have a JVM (>17) installed.
+The test suite (and `--verify` flag) additionally require Boogie and Z3.
+
+As input BASIL requires a `.gts` file produced by `gtirb-semantics`,
 as well as a file containing the output of readelf (here denoted with `.relf`), both created from the same AArch64/ARM64 binary, 
 and outputs a semantically equivalent .bpl Boogie-language source file.
+
+Detailed instructions for lifting examples and running BASIL can be found at [docs/usage](/docs/usage.md).
 
 Basil also accepts BAP `.adt` files in place of the `.gts` file, however this feature is no longer actively maintained.
 
@@ -87,15 +94,14 @@ To build and run the tool use one of the following commands:
 Linux / Mac OS:
 
 ```
-./mill run --load-directory-gtirb example.gts [--output output.bpl] [--simplify] [--interpret]
+./mill run --load-directory-gtirb ./example.gts [--output output.bpl] [--simplify] [--interpret]
 ```
 
 Windows: 
 
 ```
-./mill.bat run --load-directory-gtirb example.gts [--output output.bpl] [--simplify] [--interpret]
+./mill.bat run --load-directory-gtirb ./example.gts [--output output.bpl] [--simplify] [--interpret]
 ```
-
 
 Other flags are listed below:
 
@@ -153,25 +159,10 @@ BASIL
   --noif                          Disable information flow security transform in Boogie output       
 ```
 
-For more information see [docs/usage](docs/usage.md).
-
 ## Development Setup
 
 See [docs/development](docs/development)
 
-## Getting started
-
-Basil requires JVM (>=17) and Boogie (and z3) to run its test suite. Install instructions can be found [here](/docs/development/tool-installation.md).
-The `./mill` script should be sufficient to bootstrap Scala.
-
-Mac OS X / Linux: 
-```
-./mill test.testOnly 'SystemTestsBAP' -- -z correct/secret_write/clang:GTIRB
-```
-Windows:
-```
-./mill.bat test.testOnly 'SystemTestsBAP' -- -z correct/secret_write/clang:GTIRB
-```
 
 ## Open Source License
 
