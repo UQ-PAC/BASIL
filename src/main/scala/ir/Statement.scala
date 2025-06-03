@@ -72,6 +72,10 @@ object LocalAssign {
   def unapply(l: LocalAssign): Some[(Variable, Expr, Option[String])] = Some(l.lhs, l.rhs, l.label)
 }
 
+sealed trait MemoryAccess {
+  def index: Expr
+}
+
 class MemoryStore(
   var mem: Memory,
   var index: Expr,
@@ -79,7 +83,8 @@ class MemoryStore(
   var endian: Endian,
   var size: Int,
   override val label: Option[String] = None
-) extends Statement {
+) extends Statement,
+      MemoryAccess {
   override def modifies: Set[Global] = Set(mem)
   override def toString: String = s"$labelStr$mem[$index] := MemoryStore($value, $endian, $size)"
   override def deepEquals(o: Object) = o match {
@@ -100,7 +105,8 @@ class MemoryLoad(
   var endian: Endian,
   var size: Int,
   override val label: Option[String] = None
-) extends SingleAssign {
+) extends SingleAssign,
+      MemoryAccess {
   override def modifies: Set[Global] = lhs match {
     case r: Register => Set(r)
     case _ => Set()

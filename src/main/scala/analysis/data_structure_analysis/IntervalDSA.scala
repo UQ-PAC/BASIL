@@ -1028,16 +1028,6 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
 
 }
 
-type MemoryAccess = MemoryLoad | MemoryStore
-
-  extension (ma: MemoryAccess)
-    def index = {
-      ma match {
-        case load: MemoryLoad => load.index
-        case store: MemoryStore => store.index
-      }
-    }
-
 object IntervalDSA {
 
   def unifyGraphs(source: IntervalGraph, target: IntervalGraph)(using svDomain: SymValSetDomain[OSet]) = {
