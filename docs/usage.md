@@ -21,13 +21,7 @@ These can be installed through [nix](https://github.com/katrinafyi/pac-nix?tab=r
 
 - `nix profile install nixpkgs#z3 nixpkgs#boogie`
 
-Or manually,
-
-- Z3 can usually also be found in system packages (`sudo apt-get install z3`)
-- Boogie can be installed through `dotnet`:
-   1. install [dotnet 8](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)
-   2. `dotnet tool install --global Boogie`
-   - Ensure `$PATH` is set correctly to contain the dotnet tool binary folder.
+Alternatively, Z3 is usually available in system packages. For manual Boogie install instructions see [Verifying Boogie file](#verifying-the-boogie-file).
 
 ## Lifting a single binary
 
@@ -78,8 +72,7 @@ ddisasm may also be installed through its provided Docker images or
 APT repository (as of Aug 2024, only supports Ubuntu 20.04).
 You can also, of course, build any of these tools manually.
 
-See also: [tool-installation](development/tool-installation.md)
-and [development: building](development/readme.md#building)
+See also: [development: building](development/readme.md#building)
 (primarily if you are interested in building BASIL manually).
 
 ### Preparation
@@ -158,8 +151,6 @@ and [development: building](development/readme.md#building)
 
 ### Using BASIL to generate Boogie
 
-
-
 This generates a Boogie file in out.bpl.
 ```
 basil --input a.gts --relf a.relf -o out.bpl
@@ -175,7 +166,6 @@ Once .NET is available, Boogie can be installed with:
 dotnet tool install --global Boogie
 ```
 You may need to add ~/.dotnet/tools to your PATH.
-See also: [tool-installation](development/tool-installation.md).
 
 Boogie can be run on the output .bpl file with the command
 ```bash
