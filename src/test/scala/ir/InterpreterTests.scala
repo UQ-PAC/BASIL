@@ -16,6 +16,7 @@ import util.{ILLoadingConfig, IRContext, IRLoading, IRTransform}
 import test_util.{BASILTest, CaptureOutput}
 import ir.dsl.given
 import ir.dsl.IfThenBlocks
+import analysis.AnalysisManager
 
 def load(s: InterpreterState, global: SpecGlobal): Option[BitVecLiteral] = {
   val f = NormalInterpreter
@@ -48,8 +49,9 @@ class InterpreterTests extends AnyFunSuite with CaptureOutput with BeforeAndAfte
       dumpIL = None
     )
 
-    val p = IRLoading.load(loading)
-    val ctx = IRTransform.doCleanup(p)
+    val ctx = IRLoading.load(loading)
+    IRTransform.DoCleanup()(ctx, AnalysisManager(ctx.program))
+
     ir.transforms.clearParams(ctx.program)
     // val bapProgram = loadBAP(loading.inputFile)
     // val (symbols, externalFunctions, globals, _, mainAddress) = loadReadELF(loading.relfFile, loading)
