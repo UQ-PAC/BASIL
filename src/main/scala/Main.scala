@@ -71,7 +71,9 @@ object Main {
         (input, relf) match {
           case (Some(input), Some(relf)) => {
             Logger.info(s"Found $input $relf ${spec.getOrElse("")}")
-            Seq(ILLoadingConfig(input.normalize().toString, relf.normalize().toString, spec.map(_.normalize().toString)))
+            Seq(
+              ILLoadingConfig(input.normalize().toString, relf.normalize().toString, spec.map(_.normalize().toString))
+            )
           }
           case _ => Seq()
         }
@@ -79,7 +81,7 @@ object Main {
 
     results.toSet.toList match {
       case Nil => throw Exception(s"failed to load directory (tried: ${tryName.mkString(", ")})")
-      case x::Nil => x
+      case x :: Nil => x
       case more => throw Exception(s"found more than one potential input (${more.mkString(", ")})")
     }
   }
