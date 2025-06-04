@@ -168,7 +168,6 @@ object BoogieTranslator {
 
     val globalDecls = p.declarations.map(_.toBoogie)
 
-
     val readOnlySections = p.usedMemory.values.filter(_.readOnly)
     val readOnlyMemory = memoryToConditionCoalesced(readOnlySections)
     val initialSections = p.usedMemory.values.filter(!_.readOnly)

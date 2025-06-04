@@ -733,18 +733,18 @@ def localExprSimplify(prog: Program) = {
     AssumeConditionSimplifications(proc)
   }
 
-  wrapShapePreservingTransformInValidation(p => visit_prog(CopyProp.BlockyProp(), p))(prog)
+  wrapShapePreservingTransformInValidation(p => visit_prog(CopyProp.BlockyProp(), p), "LocalExprSimplify")(prog)
 }
 
-def wrapShapePreservingTransformInValidation(transform: Program => Unit)(p: Program) = {
+def wrapShapePreservingTransformInValidation(transform: Program => Unit, name: String)(p: Program) = {
   val validator = TranslationValidator()
   validator.setTargetProg(p)
   transform(p)
   validator.setSourceProg(p)
   validator.setEqualVarsInvariant
-  val (a, b) = validator.getValidationProgWPConj
-  val c = validator.getValidationSMT
-  (a, b, c)
+  val (prog, splits) = validator.getValidationProgWPConj
+  writeValidationProg(prog, name)
+  validator.getValidationSMT("tvsmt/" + name)
 }
 
 def validateProgs(
@@ -897,7 +897,7 @@ def validateProcWithSplits(
       util.writeToFile(blockGraph, (s"graphs/presplittransition-${p.name}-${name}.dot"))
     }
   }
-  var splitDepth = -1
+  var splitDepth = 5
 
   val splitTargets = isplits.toList.map(g => g -> g.targets)
 
@@ -1000,9 +1000,7 @@ def validateProcWithSplitsInteractive(validationProg: Program, proc: Procedure, 
 }
 
 def transformAndValidate(transform: Program => Unit, name: String)(p: Program) = {
-  val (progs, splits, smt) = wrapShapePreservingTransformInValidation(transform)(p)
-  writeValidationProg(progs, name)
-  writeSMTs(smt, name)
+  wrapShapePreservingTransformInValidation(transform, name)(p)
 }
 
 def validatedSimplifyPipeline(p: Program) = {
@@ -1081,7 +1079,7 @@ def validatedSimplifyPipeline(p: Program) = {
 
     writeValidationProg(vprog, "OffsetCopyProp")
     // validateProgs(vprog, "OffsetCopyProp", splits)
-    writeSMTs(validator.getValidationSMT, "OffsetCopyProp")
+    validator.getValidationSMT("tvsmt/OffsetCopyProp")
 
   }
 
@@ -1111,14 +1109,24 @@ def validatedSimplifyPipeline(p: Program) = {
   }
 
   def dsa(p: Program) = {
+
+    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
+      val dir = File("./graphs/")
+      if (!dir.exists()) then dir.mkdirs()
+      for (p <- p.procedures) {
+        val blockGraph = dotBlockGraph(p)
+        DebugDumpIRLogger.writeToFile(File(s"graphs/beforedsa-${p.name}.dot"), blockGraph)
+      }
+    }
+
     val validator = TranslationValidator()
     validator.setTargetProg(p)
     OnePassDSA().applyTransform(p)
     val x = p.procedures.forall(transforms.rdDSAProperty)
     assert(x)
 
-    transforms.fixupGuards(p)
-    transforms.removeDuplicateGuard(p)
+    // transforms.fixupGuards(p)
+    // transforms.removeDuplicateGuard(p)
     validator.setSourceProg(p)
     validator.setDSAInvariant
 
@@ -1126,12 +1134,21 @@ def validatedSimplifyPipeline(p: Program) = {
 
     writeValidationProg(vprog, "DynamicSingleAssignment")
     // validateProgs(vprog, "DynamicSingleAssignment", splits)
-    writeSMTs(validator.getValidationSMT, "DynamicSingleAssignment")
+    validator.getValidationSMT("tvsmt/DynamicSingleAssignment")
     // validateProgs(vprog, "DynamicSingleAssignment", splits)
 
+    if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
+      val dir = File("./graphs/")
+      if (!dir.exists()) then dir.mkdirs()
+      for (p <- p.procedures) {
+        val blockGraph = dotBlockGraph(p)
+        DebugDumpIRLogger.writeToFile(File(s"graphs/afterdsa-${p.name}.dot"), blockGraph)
+      }
+    }
   }
 
-  combineBlocks(p)
+  // transformAndValidate(x => (), "NOP")(p)
+  // transformAndValidate(combineBlocks, "combineblocks")(p)
   applyRPO(p)
   dsa(p)
   log("DSA")
@@ -1141,7 +1158,7 @@ def validatedSimplifyPipeline(p: Program) = {
     p => {
       // ExtractExtendZeroBits.doTransform(p)
       p.procedures.foreach(AlgebraicSimplifications(_))
-      log("ExtractCleanup")
+      // log("ExtractCleanup")
       simplifyGuards(p)
       log("GuardsCleanup")
       p.procedures.foreach(p => {
@@ -1591,10 +1608,11 @@ def reversePostOrder(p: Procedure): Unit = {
   for (b <- p.blocks) {
     b.rpoOrder = -1
   }
-  var left = p.entryBlock.map(reversePostOrder(_)).getOrElse(0) + 1
+  var left = 0
   for (b <- p.blocks.filter(_.rpoOrder == -1)) {
     left = reversePostOrder(b, true, left) + 1
   }
+  left = p.entryBlock.map(reversePostOrder(_, false, left)).getOrElse(0) + 1
 }
 
 def reversePostOrder(startBlock: Block, fixup: Boolean = false, begin: Int = 0): Int = {

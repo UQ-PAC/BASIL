@@ -646,6 +646,16 @@ class Block private (
     nb.replaceJump(ojump)
   }
 
+  def splitAfterStatement(s: Statement, suffix: String): Block = {
+    val rest = statements.splitOn(s)
+    val thisJump = jump
+    val succ = Block(label + suffix, None, rest, Unreachable())
+    parent.addBlock(succ)
+    replaceJump(GoTo(succ))
+    succ.replaceJump(thisJump)
+    succ
+  }
+
   def createBlockBetween(b2: Block, label: String = "_goto_"): Block = {
     require(nextBlocks.toSet.contains(b2))
     val b1 = this

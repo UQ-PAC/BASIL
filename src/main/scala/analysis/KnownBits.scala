@@ -730,6 +730,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
       case _: GoTo => s
       case _: Return => s
       case _: Unreachable => s
+      case _: MemoryStore => s
     }
     r
   }

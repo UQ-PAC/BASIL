@@ -2,11 +2,11 @@ package translating
 import ir.*
 import boogie.*
 import specification.*
-import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
+import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion, OnCrash, RingTrace}
 import ir.cilvisitor.*
 import scala.sys.process.*
 
-import util.{RingTrace, OnCrash}
+import translating.PrettyPrinter.pp_expr
 
 trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
   // def vstmt(s: Statement) : Repr[Statement]
@@ -148,7 +148,6 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
     */
 
   def vexpr(e: Expr): Repr[Expr] = {
-    dumpTrace.add(e)
     e match {
       case n: Literal => vliteral(n)
       case Extract(ed, start, arg) => vextract(ed, start, vexpr(arg))
@@ -194,7 +193,7 @@ object Sexp {
 def sym[T](l: String): Sexp[T] = Sexp.Symb[T](l)
 def list[T](l: Sexp[T]*): Sexp[T] = Sexp.Slist(l.toList)
 
-val dumpTrace = RingTrace[Expr](3, "BasilIRToSMT2")
+val dumpTrace = RingTrace[String](3, "BasilIRToSMT2")
 object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
 
   OnCrash.register(dumpTrace)
@@ -307,8 +306,12 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
 
   override def vextract(ed: Int, start: Int, a: Sexp[Expr]): Sexp[Expr] =
     list(list(sym("_"), sym("extract"), int2smt(ed - 1), int2smt(start)), a)
-  override def vbinary_expr(e: BinOp, l: Sexp[Expr], r: Sexp[Expr]): Sexp[Expr] = list(sym(opnameToFun(e)), l, r)
+  override def vbinary_expr(e: BinOp, l: Sexp[Expr], r: Sexp[Expr]): Sexp[Expr] = {
+    dumpTrace.add(e.toString + "(" + l + "," + r + ")")
+    list(sym(opnameToFun(e)), l, r)
+  }
   override def vbool_expr(e: BoolBinOp, l: List[Sexp[Expr]]): Sexp[Expr] =
+    dumpTrace.add(e.toString + "(" + l.mkString(",") + ")")
     Sexp.Slist(sym(opnameToFun(e)) :: l)
   override def vunary_expr(e: UnOp, arg: Sexp[Expr]): Sexp[Expr] = list(sym(unaryOpnameToFun(e)), arg)
 
