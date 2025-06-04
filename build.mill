@@ -163,7 +163,7 @@ object `package` extends RootModule with ScalaModule {
     override def javadocOptions = Task {
       super.javadocOptions() ++ Seq(
         "-linkoffline",
-        s"$baseUrl/java-cup",
+        s"$baseUrl/api/java-cup",
         cup.docJar().path / ".." / "javadoc"
       ).map(_.toString)
     }
