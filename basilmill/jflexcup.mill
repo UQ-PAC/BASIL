@@ -58,8 +58,11 @@ trait JFlexCupModule extends JavaModule {
       os.remove(file)
       PathRef(Task.dest / "src")
     }
-    def docSources = Task {
+    override def docSources = Task {
       super.docSources() ++ Seq(cupSources())
+    }
+    override def javadocOptions = Task {
+      super.javadocOptions() ++ Seq("-Xdoclint:none")
     }
   }
 

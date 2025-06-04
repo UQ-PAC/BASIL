@@ -160,6 +160,13 @@ object `package` extends RootModule with ScalaModule {
     def bnfcSource = Task.Source {
       PathRef(build.millSourcePath / "main" / "bnfc" / "BasilIR.cf")
     }
+    override def javadocOptions = Task {
+      super.javadocOptions() ++ Seq(
+        "-linkoffline",
+        s"$baseUrl/java-cup",
+        cup.docJar().path / ".." / "javadoc"
+      ).map(_.toString)
+    }
   }
 
   def gitCommitHash = Task.Input {
@@ -183,6 +190,7 @@ object `package` extends RootModule with ScalaModule {
       "api/bnfc" -> "basil_ir/.*::javadoc",
       "api/basil-antlr" -> ".*Parsers/.*::javadoc",
       "api/basil-proto" -> ".*com/grammatech/gtirb.*::scaladoc3",
+      "api/java-cup" -> ".*java_cup/.*::javadoc",
     )
   }
 
@@ -193,6 +201,7 @@ object `package` extends RootModule with ScalaModule {
       "api/bnfc" -> bnfc.docJar(),
       "api/basil-antlr" -> basilAntlr.docJar(),
       "api/basil-proto" -> basilProto.docJar(),
+      "api/java-cup" -> bnfc.cup.docJar(),
     )
   }
 
