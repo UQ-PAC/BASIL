@@ -10,7 +10,6 @@ To get started on development, see [development](development).
 - [development](development/readme.md) Explanation of common development tasks
     - [project-layout](development/project-layout.md) Organisation of the source code
     - [editor-setup](development/editor-setup.md) Guide to basil development in IDEs 
-    - [tool-installation](development/tool-installation.md) Guide to lifter, etc. tool installation
     - [cfg](development/cfg.md) Explanation of the old CFG datastructure 
     - [interpreter](development/interpreter.md) Explanation of IR interpreter
     - [simplification-solvers](development/simplification-solvers.md) Explanation of ir transforms and simplifications
