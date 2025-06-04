@@ -8,10 +8,10 @@ import util.IRContext
 import analysis.AnalysisManager
 
 // This shouldn't be run before indirect calls are resolved
-class StripUnreachableFunctions(config: BASILConfig) extends Transform("StripUnreachableFunctions") {
+class StripUnreachableFunctions(depth: Int) extends Transform("StripUnreachableFunctions") {
   private var before: Int = 0
 
-  private def stripUnreachableFunctions(p: Program, depth: Int = Int.MaxValue): Unit = {
+  private def stripUnreachableFunctions(p: Program): Unit = {
     val procedureCalleeNames = p.procedures.map(f => f -> f.calls).toMap
 
     val toVisit: mutable.LinkedHashSet[(Int, Procedure)] = mutable.LinkedHashSet((0, p.mainProcedure))
@@ -56,7 +56,7 @@ class StripUnreachableFunctions(config: BASILConfig) extends Transform("StripUnr
   }
 
   def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
-    stripUnreachableFunctions(ctx.program, config.loading.procedureTrimDepth)
+    stripUnreachableFunctions(ctx.program)
     Set.empty
   }
 

@@ -274,9 +274,9 @@ object IRTransform {
   }
 
   // todo: not sure where to put this
-  class DetermineRelevantMemory(config: BASILConfig) extends Transform("DetermineRelevantMemory") {
+  class DetermineRelevantMemory(maybeStaticAnalysisConfig: Option[StaticAnalysisConfig]) extends Transform("DetermineRelevantMemory") {
     def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
-      if (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled)) {
+      if (maybeStaticAnalysisConfig.isEmpty || (maybeStaticAnalysisConfig.get.memoryRegions == MemoryRegionsMode.Disabled)) {
         ctx.program.determineRelevantMemory(ctx.globalOffsets)
       }
       Set.empty
@@ -284,12 +284,9 @@ object IRTransform {
   }
 
   // todo: not sure where to put this
-  class StackSubstitution(config: BASILConfig) extends Transform("StackSubstitution") {
+  class StackSubstitution(override val toggle: Boolean = true) extends Transform("StackSubstitution") {
     def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
-      if (!config.memoryTransform &&
-          (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled))) {
-        StackSubstituter().visitProgram(ctx.program)
-      }
+      StackSubstituter().visitProgram(ctx.program)
       Set.empty
     }
   }
@@ -319,9 +316,11 @@ object IRTransform {
     * add in modifies from the spec.
     */
   class PrepareForTranslation(config: BASILConfig) extends TransformBatch("PrepareForTranslation", List(
-    DetermineRelevantMemory(config),
-    StripUnreachableFunctions(config),
-    StackSubstitution(config),
+    DetermineRelevantMemory(config.staticAnalysis),
+    StripUnreachableFunctions(config.loading.procedureTrimDepth),
+    StackSubstitution(toggle =
+      !config.memoryTransform &&
+      (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled))),
     SetModifies(),
     RenameBoogieKeywords()
   )) {
@@ -882,7 +881,7 @@ object RunUtils {
     transforms.inlinePLTLaunchpad(ctx.program)
 
     if (q.loading.trimEarly) {
-      StripUnreachableFunctions(q)(ctx, AnalysisManager(ctx.program))
+      StripUnreachableFunctions(q.loading.procedureTrimDepth)(ctx, AnalysisManager(ctx.program))
       // todo: since refactoring, there is some extra code that is run here
       // namely, the portion of StripUnreachableFunctions.postRun after the logger
     }

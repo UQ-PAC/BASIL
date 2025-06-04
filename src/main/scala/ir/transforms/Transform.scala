@@ -10,7 +10,9 @@ import util.PerformanceTimer
   * @param name The name of this transform.
   */
 trait Transform(val name: String) {
-  
+
+  // when false, this transform does nothing
+  val toggle: Boolean = true
   // the performance of each transform is implicitly tested
   val t = PerformanceTimer(name)
 
@@ -34,6 +36,7 @@ trait Transform(val name: String) {
 
   // instances of transforms can be directly called to invoke this method
   def apply(ctx: IRContext, analyses: AnalysisManager): Unit = {
+    if (!toggle) return
     if (analyses.program ne ctx.program) {
       // the program we are transforming should be the same one for which the analysis results were produced
       throw new RuntimeException(s"Transform $name was passed an AnalysisManager of an IR Program with a different " +
