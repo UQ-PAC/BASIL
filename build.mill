@@ -1,15 +1,17 @@
+//| mvnDeps:
+//| - com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION
+
 package build
 import $packages._
 
 import mill._
 import scalalib._
 
-import $file.basilmill.bnfc.BNFCJFlexModule
-import $file.basilmill.antlr.AntlrModule
+import build.basilmill.bnfc.BNFCJFlexModule
+import build.basilmill.antlr.AntlrModule
 
 import os.Path
 
-import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
 import contrib.scalapblib._
 
 object `package` extends RootModule with ScalaModule {
