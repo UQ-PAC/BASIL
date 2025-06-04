@@ -1,9 +1,11 @@
 package build
+import $packages._
+
 import mill._
 import scalalib._
 
-import $file.util.DownloadModule
-import $file.bnfc.BNFCModule
+import $file.basilmill.bnfc.BNFCJFlexModule
+import $file.basilmill.antlr.AntlrModule
 
 import os.Path
 
@@ -45,6 +47,20 @@ object `package` extends RootModule with ScalaModule {
     def ivyDeps = Agg(scalaTests, scalaCheck, javaTests)
     def sources = Task.Sources {
       Seq(PathRef(this.millSourcePath / "scala"))
+    }
+
+    // note: toBoolean accepts precisely "true" or "false"
+    def basilTestParallel = Task.Input {
+      Task.env.get("BASIL_TEST_PARALLEL").fold(false)(_.toBoolean)
+    }
+
+    def testForkGrouping = Task {
+      val numGroups = 13
+      if (basilTestParallel()) {
+        discoveredTestClasses().zipWithIndex.groupMap(x => x._2 % numGroups)(_._1).values.toSeq
+      } else {
+        Seq(discoveredTestClasses())
+      }
     }
   }
 
@@ -115,7 +131,7 @@ object `package` extends RootModule with ScalaModule {
 
   def scalafmt = mill.scalalib.scalafmt.ScalafmtModule
 
-  object basilAntlr extends antlr.AntlrModule {
+  object basilAntlr extends AntlrModule {
     override def ivyDeps = Agg(build.antlrRuntime)
     override def antlrPackage = Some("Parsers")
     override def antlrGenerateVisitor = true
@@ -139,12 +155,11 @@ object `package` extends RootModule with ScalaModule {
     }
   }
 
-  object bnfc extends BNFCModule {
+  object bnfc extends BNFCJFlexModule {
     def bnfcPackageName = "basil_ir"
     def bnfcSource = Task.Source {
       PathRef(build.millSourcePath / "main" / "bnfc" / "BasilIR.cf")
     }
-    def antlrRuntime = build.antlrRuntime
   }
 
   def gitCommitHash = Task.Input {
