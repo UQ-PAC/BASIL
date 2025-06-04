@@ -7,8 +7,8 @@ import os.Path
 import scalalib._
 import scala.util.{Try}
 
-import build.basilmill.util.DownloadModule
-import build.basilmill.jflexcup.JFlexCupModule
+import build.basilmill.DownloadModule
+import build.basilmill.JFlexCupModule
 
 /**
  * Module to process a BNFC (https://bnfc.digitalgrammars.com/) grammar
@@ -24,13 +24,13 @@ trait BNFCModule extends JavaModule {
   def bnfcBackendArg: T[String] // e.g., --jflex, --antlr
   def bnfcExtraArgs: T[Iterable[String]] = Iterable.empty[String]
 
-  def bnfcYylexFile = Task.Source {
+  def bnfcYylexFile = Task {
     PathRef(bnfcGenerated().path / bnfcPackageName / "Yylex")
   }
-  def bnfcCupFile = Task.Source {
+  def bnfcCupFile = Task {
     PathRef(bnfcGenerated().path / bnfcPackageName / "_cup.cup")
   }
-  def bnfcMakefile = Task.Source {
+  def bnfcMakefile = Task {
     PathRef(bnfcGenerated().path / "Makefile")
   }
 
@@ -40,8 +40,8 @@ trait BNFCModule extends JavaModule {
     def url = s"https://github.com/BNFC/bnfc/releases/download/v$version/bnfc-$version$suffix"
     // https://github.com/BNFC/bnfc/releases
 
-    def local = Task.Input {
-      Try(os.proc("bnfc", "--version").call())
+    override def local = Task.Input {
+      Try(os.proc("bnfc", "--version").call(destroyOnExit = false))
         .map(Function.const("bnfc"))
         .toEither
         .left.map(_.toString)
@@ -49,16 +49,18 @@ trait BNFCModule extends JavaModule {
 
     def osName = System.getProperty("os.name")
 
-    def suffix = if (osName.contains("nux")) {
+    def suffix: String = if (osName.contains("nux")) {
       "-linux.binary"
     } else if (osName.contains("Mac")) {
       "-mac.binary"
     } else if (osName.startsWith("Windows")) {
       ".exe"
+    } else {
+      throw new Exception("unrecognised os: " + osName)
     }
   }
 
-  override def sources = Task.Sources {
+  override def sources = Task {
     super.sources() ++ Seq(bnfcGenerated())
   }
 
@@ -73,7 +75,7 @@ trait BNFCModule extends JavaModule {
 
   def bnfcGenerated = Task {
     val args = Seq("--java", bnfcBackendArg(), bnfcSource().path.toString, "-m", "-o", Task.dest.toString, "-l")
-    os.call(bnfcBinary.path() +: (args ++ bnfcExtraArgs()))
+    os.call(bnfcBinary.path() +: (args ++ bnfcExtraArgs()), cwd = Task.dest)
     PathRef(Task.dest)
   }
 
