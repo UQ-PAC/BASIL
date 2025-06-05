@@ -322,7 +322,7 @@ class BasilIRPrettyPrinter(
 
   def vparam(l: Variable): String = l match {
     case _: Global => Sigil.BASIR.globalVar + s"${l.name}:${vtype { l.getType }}"
-    case _: LocalVar =>  s"${l.name}:${vtype { l.getType }}"
+    case _: LocalVar => s"${l.name}:${vtype { l.getType }}"
   }
 
   def pp_proc_sig(p: Procedure) = {
@@ -332,7 +332,6 @@ class BasilIRPrettyPrinter(
 
     val addr = p.address.map(l => vaddress(l).toString).map("!address = " + _).toList
     val pname = Seq(s"!name = \"${p.procName}\"")
-
 
     val allattrs = pname ++ addr
 
@@ -369,7 +368,7 @@ class BasilIRPrettyPrinter(
     })
 
     val spec = (if (requires.nonEmpty) then "\n" + requires.mkString("\n") else "")
-        + (if ensures.nonEmpty then ("\n" + ensures.mkString("\n")) else "")
+      + (if ensures.nonEmpty then ("\n" + ensures.mkString("\n")) else "")
 
     // val iblocks = p.entryBlock.map(b => (s"  entry_block = " + '"' + b.label + '"')).toList
 
@@ -381,7 +380,7 @@ class BasilIRPrettyPrinter(
 
     val blocks = (mblocks.toList).map(_ + ";").mkString("\n")
 
-    val header = pp_proc_sig(p)  + spec
+    val header = pp_proc_sig(p) + spec
 
     Proc(header, localDecls, blocks)
   }

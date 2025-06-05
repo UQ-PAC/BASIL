@@ -1001,6 +1001,15 @@ object RunUtils {
 
     IRTransform.prepareForTranslation(q, ctx)
 
+    for (p <- ctx.program.procedures) {
+      println("requires")
+      println(p.requires)
+      println(p.requiresExpr)
+      println("ensures")
+      println(p.ensures)
+      println(p.ensuresExpr)
+    }
+
     if (conf.generateRelyGuarantees) {
       StaticAnalysisLogger.info("[!] Generating Rely-Guarantee Conditions")
       IRTransform.generateRelyGuaranteeConditions(ctx.program.procedures.toList.filter(p => p.returnBlock != None))
