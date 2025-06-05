@@ -119,24 +119,32 @@ object IRLoading {
     */
   def load(q: ILLoadingConfig): IRContext = {
     // TODO: this tuple is large, should be a case class
-    val (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
-      IRLoading.loadReadELF(q.relfFile, q)
 
-    val program: Program = if (q.inputFile.endsWith(".adt")) {
-      val bapProgram = loadBAP(q.inputFile)
-      val IRTranslator = BAPToIR(bapProgram, mainAddress)
-      IRTranslator.translate
-    } else if (q.inputFile.endsWith(".gts")) {
-      loadGTIRB(q.inputFile, mainAddress)
-    } else {
-      throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
+    val withRelf = for {
+      relf <- q.relfFile
+      (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) = IRLoading.loadReadELF(relf, q)
+      program: Program =
+        if (q.inputFile.endsWith(".adt")) {
+          val bapProgram = loadBAP(q.inputFile)
+          val IRTranslator = BAPToIR(bapProgram, mainAddress)
+          IRTranslator.translate
+        } else if (q.inputFile.endsWith(".gts")) {
+          loadGTIRB(q.inputFile, Some(mainAddress), Some(q.mainProcedureName))
+        } else {
+          throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
+        }
+      specification = IRLoading.loadSpecification(q.specFile, program, globals)
+    } yield (IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program))
+
+    val ctx = withRelf.getOrElse {
+      val prog = loadGTIRB(q.inputFile, None, Some(q.mainProcedureName))
+      IRLoading.load(prog)
     }
 
-    val specification = IRLoading.loadSpecification(q.specFile, program, globals)
+    ir.transforms.PCTracking.applyPCTracking(q.pcTracking, ctx.program)
 
-    ir.transforms.PCTracking.applyPCTracking(q.pcTracking, program)
+    ctx
 
-    IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program)
   }
 
   def loadBAP(fileName: String): BAPProgram = {
@@ -149,7 +157,7 @@ object IRLoading {
     BAPLoader.visitProject(parser.project())
   }
 
-  def loadGTIRB(fileName: String, mainAddress: BigInt): Program = {
+  def loadGTIRB(fileName: String, mainAddress: Option[BigInt], mainName: Option[String] = None): Program = {
     val fIn = FileInputStream(fileName)
     val ir = IR.parseFrom(fIn)
     val mods = ir.modules
@@ -161,7 +169,7 @@ object IRLoading {
 
     val parserMap: Map[String, List[InsnSemantics]] = semantics.flatten.toMap
 
-    val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress)
+    val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress, mainName)
     GTIRBConverter.createIR()
   }
 

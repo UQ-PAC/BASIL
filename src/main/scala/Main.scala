@@ -72,7 +72,11 @@ object Main {
           case (Some(input), Some(relf)) => {
             Logger.info(s"Found $input $relf ${spec.getOrElse("")}")
             Seq(
-              ILLoadingConfig(input.normalize().toString, relf.normalize().toString, spec.map(_.normalize().toString))
+              ILLoadingConfig(
+                input.normalize().toString,
+                Some(relf.normalize().toString),
+                spec.map(_.normalize().toString)
+              )
             )
           }
           case _ => Seq()
@@ -281,12 +285,12 @@ object Main {
 
     } else if (conf.gtirbInputDirName.isDefined) then {
       loadDirectory(ChooseInput.Gtirb, conf.gtirbInputDirName.get)
-    } else if (conf.inputFileName.isDefined && conf.relfFileName.isDefined) then {
-      ILLoadingConfig(conf.inputFileName.get, conf.relfFileName.get, conf.specFileName)
+    } else if (conf.inputFileName.isDefined) then {
+      ILLoadingConfig(conf.inputFileName.get, conf.relfFileName, conf.specFileName)
 
     } else {
       throw IllegalArgumentException(
-        "\nRequires --load-directory-bap OR --load-directory-gtirb OR --input and--relf\n\n" + parser
+        "\nRequires --load-directory-gtirb, --load-directory-bap OR --input\n\n" + parser
           .helpText(sorted = false)
       )
     }
