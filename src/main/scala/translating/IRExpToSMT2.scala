@@ -210,18 +210,30 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   def vintlit(b: BigInt): Sexp[IntLiteral] = ???
 
   class Builder() {
+    var before = true
     var exprs = Vector[Sexp[Expr]]()
+    var exprsBefore = Vector[Sexp[Expr]]()
     var decls = Set[Sexp[Expr]]()
     var typedecls = Set[Sexp[Expr]]()
 
     def addAssume(e: Expr) = {
+      before = false
       val (t, d) = BasilIRToSMT2.extractDecls(e)
       decls = decls ++ d
       typedecls = typedecls ++ t
       exprs = exprs ++ List(list(sym("assume"), BasilIRToSMT2.vexpr(e)))
     }
 
+    def addCommand(rawSexp: String*) = {
+      if (before) {
+        exprsBefore = exprsBefore.appended(list(rawSexp.map(sym[Expr](_)): _*))
+      } else {
+        exprs = exprs.appended(list(rawSexp.map(sym[Expr](_)): _*))
+      }
+    }
+
     def addAssert(e: Expr, name: Option[String] = None) = {
+      before = false
       val (t, d) = BasilIRToSMT2.extractDecls(e)
       decls = decls ++ d
       typedecls = typedecls ++ t
@@ -232,7 +244,9 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     }
 
     def getCheckSat() = {
-      (typedecls.toVector ++ decls ++ exprs ++ List(list(sym("check-sat")))).map(Sexp.print).mkString("\n")
+      (exprsBefore.toVector ++ typedecls ++ decls ++ exprs ++ List(list(sym("check-sat"))))
+        .map(Sexp.print)
+        .mkString("\n")
     }
 
   }
@@ -282,6 +296,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   def opnameToFun(b: BinOp) = {
     b match {
       case EQ => "="
+      case BoolAND => "and"
       case BoolIMPLIES => "=>"
       case NEQ => ???
       case BoolOR => "or"

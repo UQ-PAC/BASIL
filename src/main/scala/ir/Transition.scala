@@ -77,21 +77,16 @@ class NamespaceState(val namespace: String) extends CILVisitor {
   }
 }
 
-val traceType = CustomSort("Tr")
-val transitionSystemPCVar = GlobalVar("SYNTH_PC", IntType)
+val traceType = BoolType
+val transitionSystemPCVar = GlobalVar("SYNTH_PC", BitVecType(64))
 
-val traceVar = {
-  GlobalVar("TRACE", traceType)
-}
-
-class AssertsToAssumes() extends CILVisitor {
-  override def vstmt(s: Statement) = s match {
-    case Assert(a, b, c) => ChangeTo(List(Assume(a, b, c, false)))
-    case _ => SkipChildren()
-  }
-}
+val traceVar = GlobalVar("TRACE", traceType)
 
 class AssertsToPC(val exitBl: Block) {
+
+  /**
+   * Convert asserts in program to a jump to exit with a specific PC set.
+   */
 
   var count = 0
 
@@ -403,13 +398,13 @@ class RewriteSideEffects() extends CILVisitor {
 object PCMan {
   val assumptionFailLabel = "ASSUMEFAIL"
 
-  val allocatedPCS = mutable.Map[String, IntLiteral]()
+  val allocatedPCS = mutable.Map[String, BitVecLiteral]()
   var pcCounter = 0
   def PCSym(s: String) = {
     allocatedPCS.getOrElseUpdate(
       s, {
         pcCounter += 1
-        IntLiteral(pcCounter)
+        BitVecLiteral(pcCounter, 64)
       }
     )
   }
@@ -1351,6 +1346,8 @@ class TranslationValidator {
 
       // build smt query
       val b = translating.BasilIRToSMT2.Builder()
+
+      b.addCommand("set-logic", "QF_BV")
 
       var count = 0
       // for ((gt, tgts) <- split) {
