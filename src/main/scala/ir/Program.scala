@@ -229,6 +229,13 @@ class Program(
   def labelToBlock: Map[String, Block] = {
     procedures.view.flatMap(_.blocks.map((b: Block) => b.label -> b)).toMap
   }
+
+  def loadedLabelToBlock: Map[String, Block] = {
+    val x = procedures.view.flatMap(_.loadedLabelToBlock).toMap
+    println(x.mkString("\n"))
+    x
+    // blocks.filter(_.meta.originalLabel.isDefined).map(p => p.meta.originalLabel.get -> p).toMap
+  }
 }
 
 // if creationSite == None then it is the initial thread
@@ -352,7 +359,7 @@ class Procedure private (
     ILForwardIterator(Seq(this), IntraProcIRCursor)
   }
 
-  override def toString: String = name
+  override def toString: String = Sigil.BASIR.proc + name
 
   def calls: Set[Procedure] = blocks.iterator.flatMap(_.calls).toSet
 
@@ -482,6 +489,9 @@ class Procedure private (
   def labelToBlock: Map[String, Block] = {
     blocks.map(p => p.label -> p).toMap
   }
+  def loadedLabelToBlock: Map[String, Block] = {
+    blocks.filter(_.meta.originalLabel.isDefined).map(p => p.meta.originalLabel.get -> p).toMap
+  }
 
   def callers(): Iterable[Procedure] = _callers.map(_.parent.parent).toSet[Procedure]
   def incomingCalls(): Iterator[DirectCall] = _callers.iterator
@@ -603,7 +613,7 @@ class Block private (
     Set.empty
   }
 
-  override def toString: String = label
+  override def toString: String = Sigil.BASIR.block + label
 
   /** @return
     *   The intra-procedural set of successor blocks. If the block ends in a call then the empty set is returned.
