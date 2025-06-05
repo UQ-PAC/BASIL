@@ -760,7 +760,7 @@ case class SpecGlobal(
 
   def sanitisedName = name.replace("@", "_AT_")
 
-  override val toAddrVar: BVar = BVariable("$" + s"${sanitisedName}_addr", BitVecBType(64), Scope.Const)
+  override val toAddrVar: BVar = BVariable(s"${sanitisedName}_addr", BitVecBType(64), Scope.Const)
   override val toOldVar: BVar = BVariable(s"${sanitisedName}_old", BitVecBType(size), Scope.Local)
   override val toOldGamma: BVar = BVariable(s"Gamma_${sanitisedName}_old", BoolBType, Scope.Local)
   val toAxiom: BAxiom = BAxiom(BinaryBExpr(EQ, toAddrVar, BitVecBLiteral(address, 64)), List.empty)
