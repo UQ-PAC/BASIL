@@ -295,6 +295,10 @@ object Main {
       )
     }
 
+    if (conf.specFileName.isDefined && conf.relfFileName.isEmpty) {
+      throw IllegalArgumentException("--spec requires --relf")
+    }
+
     val q = BASILConfig(
       loading = loadingInputs.copy(
         dumpIL = conf.dumpIL,
