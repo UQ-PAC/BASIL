@@ -1,33 +1,31 @@
-#!/bin/bash
+#!/bin/bash -u
 
-# Executes the full Scalatest runner (https://www.scalatest.org/user_guide/using_the_runner).
+set -o pipefail
+
+# Executes the Mill Scalatest runner (https://www.scalatest.org/user_guide/using_the_runner),
+# running tests in parallel collating their output.
 #
-# This is needed to use some more advanced arguments of the runner, since `./mill test.run`
-# silently ignores some arguments (for example, -n and -l).
-
-# NOTE: executing the runner through this script may try to start a GUI.
-#       to avoid this and use the console, pass -o.
-
-# useful commands
-# ---------------
+# When tests are run in parallel, the output would usually be interspersed due to the
+# multiple concurrent processes. This script will re-group each process's output, making
+# use of the "[001]" prefix which Mill inserts on each line.
 #
-# - to include only a specific tag, use -n.
-# - to exclude a specific tag, use -l.
-# - these can be combined. for example, to select all StandardSystemTest except Slow ones:
-#
-#     ./scripts/scalatest.sh -o -n test_util.tags.StandardSystemTest -l test_util.tags.Slow
-#
-# - when passing tags through the command line, the fully-qualified name must be used.
-# - to print individual test durations, pass D to -o. for example, -oD.
-# - to print a summary of failing tests at the end of the output, pass I to -o.
-#
+# NOTE: this script require GNU coreutils, so it may not work on Mac.
 
-classes="$(./mill show test.compile | grep '"classes"' | cut -d'"' -f4 | cut -d: -f4)"
+out=$(mktemp)
+red=$(TERM=xterm tput setaf 1)
 
-if ! [[ -d "$classes" ]]; then
-  echo "unable to determine mill class output directory: $classes" >&2
-  exit 1
-fi
+[[ -n "$red" ]] || exit 1
 
-exec ./mill test.runMain org.scalatest.tools.Runner -R "$classes" "$@"
+set -x
 
+export BASIL_TEST_PARALLEL=true
+./mill test.compile
+
+./mill --ticker true -j 3 test "$@" &> $out
+code=$?
+
+sort --key=1,1 --stable $out
+echo
+grep -F "$red" $out
+
+exit $code

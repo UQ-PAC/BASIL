@@ -160,7 +160,10 @@ def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
 
   while (removeDeadInParams(ctx.program)) {}
 
-  ctx.copy(specification = specToProcForm(ctx.specification, formalParams.mappingInparam, formalParams.mappingOutparam))
+  ctx.program.procedures.foreach(SpecFixer.updateInlineSpec(formalParams.mappingInparam, formalParams.mappingOutparam))
+  ctx.copy(specification =
+    SpecFixer.specToProcForm(ctx.specification, formalParams.mappingInparam, formalParams.mappingOutparam)
+  )
 }
 
 def clearParams(p: Program) = {
@@ -395,6 +398,8 @@ def inOutParams(
 
   val alwaysReturnParams = (0 to 7).map(i => Register(s"R$i", 64))
 
+  val pc = Register("_PC", 64)
+
   val inout = readWrites.collect {
     case (proc, rws) if p.mainProcedure == proc => {
       // no callers of main procedure so keep the whole read/write set
@@ -402,7 +407,7 @@ def inOutParams(
 
       val outParams = (overapprox.intersect(DefinedOnAllPaths.proc(proc)))
       val inParams = lives(proc)._1
-      proc -> (inParams, outParams)
+      proc -> (inParams + pc, outParams + pc)
     }
     case (proc, rws) => {
       val liveStart = lives(proc)._1
@@ -410,7 +415,7 @@ def inOutParams(
 
       val outParams = liveEnd.intersect(rws.writes)
       val inParams = liveStart
-      proc -> (inParams, outParams)
+      proc -> (inParams + pc, outParams + pc)
     }
   }.toMap
 
@@ -540,18 +545,51 @@ class SetActualParams(
 
 }
 
-def specToProcForm(
-  spec: Specification,
-  mappingInparam: Map[Procedure, Map[LocalVar, Variable]],
-  mappingOutparam: Map[Procedure, Map[LocalVar, Variable]]
-): Specification = {
+object SpecFixer {
   import boogie.*
 
-  def toNameMapping(v: Map[LocalVar, Variable]): Map[String, String] = {
-    v.map(v => (v._2.name, v._1.name)) ++ v.map(v => ("Gamma_" + v._2.name, "Gamma_" + v._1.name))
+  class ExprToOld(varInPre: Map[String, Variable], varInPost: Map[String, Variable], initIsPost: Boolean = false)
+      extends CILVisitor {
+
+    var isPost = initIsPost
+
+    override def vexpr(e: Expr) = e match {
+      case OldExpr(inner) if !isPost => {
+        throw Exception("nested Old or Old in single-state context")
+      }
+      case OldExpr(inner) if isPost => {
+        isPost = false
+        ChangeDoChildrenPost(
+          inner,
+          e => {
+            isPost = true
+            e
+          }
+        )
+      }
+      case _ => DoChildren()
+    }
+
+    def changeVar(v: Variable) = {
+      val repl = v match {
+        case l: Variable if isPost && varInPost.contains(l.name) => varInPost(l.name)
+        case l: Variable if varInPre.contains(l.name) => varInPre(l.name)
+        case o => o
+      }
+      ChangeTo(repl)
+    }
+
+    override def vlvar(v: Variable) = changeVar(v)
+    override def vrvar(v: Variable) = changeVar(v)
+
   }
-  val varToInVar: Map[String, Map[String, String]] = mappingInparam.map(p => (p._1.procName -> toNameMapping(p._2)))
-  val varToOutVar: Map[String, Map[String, String]] = mappingOutparam.map(p => (p._1.procName -> toNameMapping(p._2)))
+
+  def convVarToOldExpr(varInPre: Map[String, Variable], varInPost: Map[String, Variable], isPost: Boolean = false)(
+    b: Expr
+  ): Expr = {
+    val visitor = ExprToOld(varInPre, varInPost, isPost)
+    visit_expr(visitor, b)
+  }
 
   def convVarToOld(varInPre: Map[String, String], varInPost: Map[String, String], isPost: Boolean = false)(
     b: BExpr
@@ -560,7 +598,7 @@ def specToProcForm(
     b match {
       case b: BVariable if isPost && varInPost.contains(b.name) => BVariable(varInPost(b.name), b.getType, b.scope)
       case b: BVariable if !isPost && varInPre.contains(b.name) => BVariable(varInPre(b.name), b.getType, b.scope)
-      case b: BVar => b
+      case b: BVariable if !isPost => b
       // case b : _ => varToOld(b)
       case b: BLiteral => b
       case b: BVExtract => b.copy(body = varToOld(b.body))
@@ -590,20 +628,61 @@ def specToProcForm(
       case b: GammaStore => b.copy(index = varToOld(b.index), value = varToOld(b.value))
       case b: L => b.copy(index = varToOld(b.index))
       case b: SpecVar => b
+      case b: BVar =>
+        ???
     }
   }
 
-  val ns = spec.copy(subroutines = spec.subroutines.map(s => {
-    if (s.requires.nonEmpty || s.ensures.nonEmpty) {
-      val in = varToInVar(s.name)
-      val out = varToOutVar(s.name)
-      s.copy(
-        requires = s.requires.map(convVarToOld(in, out, false)),
-        ensures = s.ensures.map(convVarToOld(in, out, true))
-      )
-    } else {
-      s
+  def updateInlineSpec(
+    mappingInparam: Map[Procedure, Map[LocalVar, Variable]],
+    mappingOutparam: Map[Procedure, Map[LocalVar, Variable]]
+  )(p: Procedure) = {
+
+    def toNameMapping(v: Map[LocalVar, Variable]): Map[String, String] = {
+      v.map(v => (v._2.name, v._1.name)) ++ v.map(v => ("Gamma_" + v._2.name, "Gamma_" + v._1.name))
     }
-  }))
-  ns
+
+    val varToInVar = mappingInparam.map(p => (p._1 -> toNameMapping(p._2)))
+    val varToOutVar = mappingOutparam.map(p => (p._1 -> toNameMapping(p._2)))
+
+    p.requires = p.requires.map(convVarToOld(varToInVar(p), varToOutVar(p), false))
+    p.ensures = p.ensures.map(convVarToOld(varToInVar(p), varToOutVar(p), true))
+
+    def toVarMapping(v: Map[LocalVar, Variable]): Map[String, Variable] = {
+      v.map(v => (v._2.name, v._1))
+    }
+
+    p.requiresExpr =
+      p.requiresExpr.map(convVarToOldExpr(toVarMapping(mappingInparam(p)), toVarMapping(mappingOutparam(p)), false))
+    p.ensuresExpr =
+      p.ensuresExpr.map(convVarToOldExpr(toVarMapping(mappingInparam(p)), toVarMapping(mappingOutparam(p)), true))
+
+  }
+
+  def specToProcForm(
+    spec: Specification,
+    mappingInparam: Map[Procedure, Map[LocalVar, Variable]],
+    mappingOutparam: Map[Procedure, Map[LocalVar, Variable]]
+  ): Specification = {
+
+    def toNameMapping(v: Map[LocalVar, Variable]): Map[String, String] = {
+      v.map(v => (v._2.name, v._1.name)) ++ v.map(v => ("Gamma_" + v._2.name, "Gamma_" + v._1.name))
+    }
+    val varToInVar: Map[String, Map[String, String]] = mappingInparam.map(p => (p._1.procName -> toNameMapping(p._2)))
+    val varToOutVar: Map[String, Map[String, String]] = mappingOutparam.map(p => (p._1.procName -> toNameMapping(p._2)))
+
+    val ns = spec.copy(subroutines = spec.subroutines.map(s => {
+      if (s.requires.nonEmpty || s.ensures.nonEmpty) {
+        val in = varToInVar(s.name)
+        val out = varToOutVar(s.name)
+        s.copy(
+          requires = s.requires.map(convVarToOld(in, out, false)),
+          ensures = s.ensures.map(convVarToOld(in, out, true))
+        )
+      } else {
+        s
+      }
+    }))
+    ns
+  }
 }

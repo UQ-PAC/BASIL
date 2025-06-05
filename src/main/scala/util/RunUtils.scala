@@ -5,7 +5,6 @@ import java.nio.file.{Files, Path, Paths}
 import com.grammatech.gtirb.proto.IR.IR
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Section.Section
-import spray.json.*
 import ir.eval
 import gtirb.*
 import translating.PrettyPrinter.*
@@ -34,7 +33,6 @@ import translating.*
 import util.{DebugDumpIRLogger, Logger, SimplifyLogger}
 
 import java.util.Base64
-import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
 import ir.transforms.MemoryTransform
@@ -136,6 +134,8 @@ object IRLoading {
 
     val specification = IRLoading.loadSpecification(q.specFile, program, globals)
 
+    ir.transforms.PCTracking.applyPCTracking(q.pcTracking, program)
+
     IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program)
   }
 
@@ -155,56 +155,9 @@ object IRLoading {
     val mods = ir.modules
     val cfg = ir.cfg.get
 
-    def parse_asl_stmt(line: String): Option[StmtContext] = {
-      val lexer = ASLpLexer(CharStreams.fromString(line))
-      val tokens = CommonTokenStream(lexer)
-      val parser = ASLpParser(tokens)
-      parser.setErrorHandler(BailErrorStrategy())
-      parser.setBuildParseTree(true)
+    val semanticsJson = mods.map(_.auxData("ast").data.toStringUtf8)
 
-      try {
-        Some(parser.stmt())
-      } catch {
-        case e: org.antlr.v4.runtime.misc.ParseCancellationException =>
-          val extra = e.getCause match {
-            case mismatch: org.antlr.v4.runtime.InputMismatchException =>
-              val token = mismatch.getOffendingToken
-              s"""
-                exn: $mismatch
-                offending token: $token
-
-              ${line.replace('\n', ' ')}
-              ${" " * token.getStartIndex}^ here!
-              """.stripIndent
-            case o => o.toString
-          }
-          Logger.error(s"""Semantics parse error:\n  line: $line\n$extra""")
-          Logger.error(e.getStackTrace.mkString("\n"))
-          None
-      }
-    }
-
-    implicit object InsnSemanticsFormat extends JsonFormat[InsnSemantics] {
-      def write(m: InsnSemantics): JsValue = ???
-      def read(json: JsValue): InsnSemantics = json match {
-        case JsObject(fields) =>
-          val m: Map[String, JsValue] = fields.get("decode_error") match {
-            case Some(JsObject(m)) => m
-            case _ => deserializationError(s"Bad sem format $json")
-          }
-          InsnSemantics.Error(m("opcode").convertTo[String], m("error").convertTo[String])
-        case array @ JsArray(_) =>
-          val xs = array.convertTo[Array[String]].map(parse_asl_stmt)
-          if (xs.exists(_.isEmpty)) {
-            InsnSemantics.Error("?", "parseError")
-          } else {
-            InsnSemantics.Result(xs.map(_.get))
-          }
-        case s => deserializationError(s"Bad sem format $s")
-      }
-    }
-
-    val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, List[InsnSemantics]]])
+    val semantics = semanticsJson.map(upickle.default.read[Map[String, List[InsnSemantics]]](_))
 
     val parserMap: Map[String, List[InsnSemantics]] = semantics.flatten.toMap
 
@@ -318,6 +271,16 @@ object IRTransform {
     val dupProcNames = ctx.program.procedures.groupBy(_.name).filter((_, p) => p.size > 1).toList.flatMap(_(1))
     assert(dupProcNames.isEmpty)
 
+    ctx.program.procedures.foreach(p =>
+      p.blocks.foreach(b => {
+        b.jump match {
+          case GoTo(targs, _) if targs.isEmpty =>
+            Logger.warn(s"block ${b.label} in subroutine ${p.name} has no outgoing edges")
+          case _ => ()
+        }
+      })
+    )
+
     if (
       !config.memoryTransform && (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled))
     ) {
@@ -374,6 +337,24 @@ object IRTransform {
     modified
   }
 
+  def generateRelyGuaranteeConditions(threads: List[Procedure]): Unit = {
+    /* Todo: For the moment we are printing these to stdout, but in future we'd
+    like to add them to the IR. */
+    type StateLatticeElement = LatticeMap[Variable, analysis.Interval]
+    type InterferenceLatticeElement = Map[Variable, StateLatticeElement]
+    val stateLattice = IntervalLatticeExtension()
+    val stateTransfer = SignedIntervalDomain().transfer
+    val intDom = ConditionalWritesDomain[StateLatticeElement](stateLattice, stateTransfer)
+    val relyGuarantees =
+      RelyGuaranteeGenerator[InterferenceLatticeElement, StateLatticeElement](intDom).generate(threads)
+    for ((p, (rely, guar)) <- relyGuarantees) {
+      StaticAnalysisLogger.info("--- " + p.procName + " " + "-" * 50 + "\n")
+      StaticAnalysisLogger.info("Rely:")
+      StaticAnalysisLogger.info(intDom.toString(rely) + "\n")
+      StaticAnalysisLogger.info("Guarantee:")
+      StaticAnalysisLogger.info(intDom.toString(guar) + "\n")
+    }
+  }
 }
 
 /** Methods relating to program static analysis.
@@ -711,7 +692,12 @@ object RunUtils {
 
     transforms.liftSVComp(ctx.program)
 
-    DebugDumpIRLogger.writeToFile(File("il-before-simp.il"), pp_prog(program))
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-simp.il"), pp_prog(program))
+      }
+    }
+
     transforms.applyRPO(program)
 
     // example of printing a simple analysis
@@ -721,10 +707,18 @@ object RunUtils {
     transforms.removeEmptyBlocks(program)
 
     // transforms.coalesceBlocksCrossBranchDependency(program)
-    DebugDumpIRLogger.writeToFile(File("blockgraph-before-dsa.dot"), dotBlockGraph(program.mainProcedure))
+    config.foreach {
+      _.analysisDotPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_blockgraph-before-dsa.dot"), dotBlockGraph(program.mainProcedure))
+      }
+    }
 
     Logger.info("[!] Simplify :: DynamicSingleAssignment")
-    DebugDumpIRLogger.writeToFile(File("il-before-dsa.il"), pp_prog(program))
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-dsa.il"), pp_prog(program))
+      }
+    }
 
     transforms.OnePassDSA().applyTransform(program)
 
@@ -732,16 +726,24 @@ object RunUtils {
 
     transforms.removeEmptyBlocks(program)
 
-    AnalysisResultDotLogger.writeToFile(
-      File(s"blockgraph-after-dsa.dot"),
-      dotBlockGraph(
-        program,
-        (program.collect { case b: Block =>
-          b -> pp_block(b)
-        }).toMap
-      )
-    )
-    DebugDumpIRLogger.writeToFile(File("il-after-dsa.il"), pp_prog(program))
+    config.foreach {
+      _.analysisDotPath.foreach { s =>
+        AnalysisResultDotLogger.writeToFile(
+          File(s"${s}_blockgraph-after-dsa.dot"),
+          dotBlockGraph(
+            program,
+            (program.collect { case b: Block =>
+              b -> pp_block(b)
+            }).toMap
+          )
+        )
+      }
+    }
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-dsa.il"), pp_prog(program))
+      }
+    }
 
     if (ir.eval.SimplifyValidation.validate) {
       Logger.info("DSA no uninitialised")
@@ -759,18 +761,35 @@ object RunUtils {
       assert(invariant.blocksUniqueToEachProcedure(program))
     }
 
-    DebugDumpIRLogger.writeToFile(File("il-before-copyprop.il"), pp_prog(program))
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-copyprop.il"), pp_prog(program))
+      }
+    }
 
     // brute force run the analysis twice because it cleans up more stuff
     // assert(program.procedures.forall(transforms.rdDSAProperty))
-    AnalysisResultDotLogger.writeToFile(File("blockgraph-before-copyprop.dot"), dotBlockGraph(program.mainProcedure))
+    config.foreach {
+      _.analysisDotPath.foreach { s =>
+        AnalysisResultDotLogger.writeToFile(
+          File(s"${s}_blockgraph-before-copyprop.dot"),
+          dotBlockGraph(program.mainProcedure)
+        )
+      }
+    }
     Logger.info("Copyprop Start")
     transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
 
     transforms.fixupGuards(program)
     transforms.removeDuplicateGuard(program)
-
-    AnalysisResultDotLogger.writeToFile(File("blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
+    config.foreach {
+      _.analysisDotPath.foreach { s =>
+        AnalysisResultDotLogger.writeToFile(
+          File(s"${s}_blockgraph-after-simp.dot"),
+          dotBlockGraph(program.mainProcedure)
+        )
+      }
+    }
 
     transforms.liftLinuxAssertFail(ctx)
 
@@ -778,7 +797,12 @@ object RunUtils {
 
     assert(invariant.blockUniqueLabels(program))
     Logger.info(s"CopyProp ${timer.checkPoint("Simplify")} ms ")
-    DebugDumpIRLogger.writeToFile(File("il-after-copyprop.il"), pp_prog(program))
+
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-copyprop.il"), pp_prog(program))
+      }
+    }
 
     // val x = program.procedures.forall(transforms.rdDSAProperty)
     // assert(x)
@@ -790,7 +814,11 @@ object RunUtils {
     }
     // run this after cond recovery because sign bit calculations often need high bits
     // which go away in high level conss
-    DebugDumpIRLogger.writeToFile(File("il-after-slices.il"), pp_prog(program))
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-slices.il"), pp_prog(program))
+      }
+    }
 
     // re-apply dsa
     // transforms.OnePassDSA().applyTransform(program)
@@ -826,6 +854,9 @@ object RunUtils {
         s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
       )
     }
+
+    ctx.program.procedures.foreach(transforms.RemoveUnreachableBlocks.apply)
+    Logger.info(s"[!] Removed unreachable blocks")
 
     if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)
@@ -884,6 +915,11 @@ object RunUtils {
       IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify)
     }
 
+    if (conf.summariseProcedures) {
+      StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
+      IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify)
+    }
+
     if (q.runInterpret) {
       Logger.info("Start interpret")
 
@@ -915,6 +951,11 @@ object RunUtils {
     }
 
     IRTransform.prepareForTranslation(q, ctx)
+
+    if (conf.generateRelyGuarantees) {
+      StaticAnalysisLogger.info("[!] Generating Rely-Guarantee Conditions")
+      IRTransform.generateRelyGuaranteeConditions(ctx.program.procedures.toList.filter(p => p.returnBlock != None))
+    }
 
     q.loading.dumpIL.foreach(s => {
       writeToFile(pp_prog(ctx.program), s"$s-output.il")
@@ -1002,6 +1043,7 @@ object RunUtils {
     }
 
     StaticAnalysisLogger.info("[!] Running DSA Analysis")
+
     writeToFile(pp_prog(ctx.program), "testo1.il")
     val symbolTableEntries: Set[SymbolTableEntry] = ctx.globals ++ ctx.funcEntries
     val dsa = DataStructureAnalysis(

@@ -83,7 +83,7 @@ def indentNested(
   head: String,
   elems: Iterable[Twine],
   tail: String,
-  newline: String = "\n",
+  newline: String = System.lineSeparator(),
   sep: String = ",",
   headSep: Boolean = false
 ): Twine =

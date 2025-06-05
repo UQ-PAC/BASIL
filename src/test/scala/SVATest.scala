@@ -7,9 +7,10 @@ import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
 import util.*
 import analysis.data_structure_analysis.given
+import test_util.CaptureOutput
 
 @test_util.tags.UnitTest
-class SVATest extends AnyFunSuite with test_util.CaptureOutput {
+class SVATest extends AnyFunSuite with CaptureOutput {
 
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
@@ -19,19 +20,6 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
     val emptySpec = Specification(Set(), Set(), Map(), List(), List(), List(), Set())
     val emptyContext = IRContext(List(), Set(), Set(), Set(), Map(), emptySpec, program)
     RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
-  }
-
-  def runTest(path: String): BASILResult = {
-    RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf"),
-        simplify = true,
-        staticAnalysis = None,
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-        dsaConfig = None // Some(DSAConfig(Set.empty))
-      )
-    )
   }
 
   def runTest(context: IRContext): BASILResult = {
@@ -107,7 +95,7 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
           if valueSet.state.keys.exists(_.isInstanceOf[Heap]) && valueSet.state.size == 1 =>
         valueSet
     }.get // expect exactly 1 value set matching the case
-    assert(mallocValSet.state.head._2.toOffsets == Set(0), "incorrect offset for malloc symbolic value")
+    assert(mallocValSet.state.head(1).toOffsets == Set(0), "incorrect offset for malloc symbolic value")
 
     val outPram = r0SVA.lastKey
     assert(r0SVA(outPram) == SymValSet.transform(mallocValSet, i => i + 10), "should be malloc symValueSet oplus 10")
@@ -150,7 +138,7 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
           if valueSet.state.keys.exists(_.isInstanceOf[Ret]) && valueSet.state.size == 1 =>
         valueSet
     }.get // expect exactly 1 value set matching the case
-    assert(returnedValSet.state.head._2.toOffsets == Set(0), "incorrect offset for returned symbolic value")
+    assert(returnedValSet.state.head(1).toOffsets == Set(0), "incorrect offset for returned symbolic value")
 
     val outPram = r0SVA.lastKey
     assert(r0SVA(outPram) == SymValSet.transform(returnedValSet, i => i + 10), "should be return symValueSet oplus 10")

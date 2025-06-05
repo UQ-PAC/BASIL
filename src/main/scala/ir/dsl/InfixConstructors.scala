@@ -55,18 +55,8 @@ private def panic(op: String, i: Expr, j: Expr) = throw Exception(s"$op not defi
 
 extension (i: Expr)
 
-  infix def ===(j: Expr): Expr = i.getType match {
-    case IntType => BinaryExpr(IntEQ, i, j)
-    case b: BitVecType => BinaryExpr(BVEQ, i, j)
-    case BoolType => BinaryExpr(BoolEQ, i, j)
-    case _ => panic("Equal", i, j)
-  }
-  infix def !==(j: Expr): Expr = i.getType match {
-    case IntType => BinaryExpr(IntNEQ, i, j)
-    case b: BitVecType => BinaryExpr(BVNEQ, i, j)
-    case BoolType => BinaryExpr(BoolNEQ, i, j)
-    case _ => panic("Not Equal", i, j)
-  }
+  infix def ===(j: Expr): Expr = BinaryExpr(EQ, i, j)
+  infix def !==(j: Expr): Expr = BinaryExpr(NEQ, i, j)
   infix def +(j: Expr): Expr = i.getType match {
     case IntType => BinaryExpr(IntADD, i, j)
     case b: BitVecType => BinaryExpr(BVADD, i, j)

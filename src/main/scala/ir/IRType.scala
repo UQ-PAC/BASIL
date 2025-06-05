@@ -17,6 +17,7 @@ case object IntType extends IRType("int") {
 
 case class BitVecType(size: Int) extends IRType("bv" + size) {
   override def toBoogie: BType = BitVecBType(size)
+  def maxValue = BigInt(2).pow(size) - 1
 }
 
 case class MapType(param: IRType, result: IRType) extends IRType(s"[$param]$result") {
@@ -36,8 +37,8 @@ def curryFunctionType(t: IRType, acc: List[IRType] = List()): (List[IRType], IRT
 
 def coerceToBool(e: Expr): Expr = {
   e.getType match {
-    case BitVecType(s) => BinaryExpr(BVNEQ, e, BitVecLiteral(0, s))
-    case IntType => BinaryExpr(IntNEQ, e, IntLiteral(0))
+    case BitVecType(s) => BinaryExpr(NEQ, e, BitVecLiteral(0, s))
+    case IntType => BinaryExpr(NEQ, e, IntLiteral(0))
     case BoolType => e
     case MapType(_, _) => ???
   }

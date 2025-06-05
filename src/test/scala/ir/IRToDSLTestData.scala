@@ -1,6 +1,5 @@
 package ir
 
-import ir.*
 import ir.dsl.*
 
 // ./mill run --load-directory-bap src/test/correct/function1/gcc --parameter-form --dump-il function1

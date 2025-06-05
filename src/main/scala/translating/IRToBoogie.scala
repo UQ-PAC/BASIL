@@ -31,7 +31,7 @@ def memoryToConditionCoalesced(memorySections: Iterable[MemorySection]): List[BE
         val bits = s.bytes.size * 8
         Seq(
           BinaryBExpr(
-            BVEQ,
+            EQ,
             BMemoryLoad(memory, BitVecBLiteral(s.address, 64), Endian.LittleEndian, bits),
             BitVecBLiteral(combined, bits)
           )
@@ -49,7 +49,7 @@ def memoryToConditionCoalesced(memorySections: Iterable[MemorySection]): List[BE
           val combined: BigInt =
             (0 until 8).foldLeft(BigInt(0))((x, y) => x + (s.bytes(b + y).value * BigInt(2).pow(y * 8)))
           BinaryBExpr(
-            BVEQ,
+            EQ,
             BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 64),
             BitVecBLiteral(combined, 64)
           )
@@ -62,7 +62,7 @@ def memoryToConditionCoalesced(memorySections: Iterable[MemorySection]): List[BE
         } else {
           for (b <- 0 until aligned) yield {
             BinaryBExpr(
-              BVEQ,
+              EQ,
               BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
               s.bytes(b).toBoogie
             )
@@ -80,7 +80,7 @@ def memoryToConditionCoalesced(memorySections: Iterable[MemorySection]): List[BE
         } else {
           for (b <- alignedEnd until s.bytes.size) yield {
             BinaryBExpr(
-              BVEQ,
+              EQ,
               BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
               s.bytes(b).toBoogie
             )
@@ -101,7 +101,7 @@ def memoryToConditionBytes(memorySections: Iterable[MemorySection]): List[BExpr]
     }
     for (b <- s.bytes.indices) yield {
       BinaryBExpr(
-        BVEQ,
+        EQ,
         BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
         s.bytes(b).toBoogie
       )
@@ -274,7 +274,7 @@ class IRToBoogie(
       relies
     } else {
       // default case where no rely is given - rely on no external changes
-      memoriesAndGammas.toList.sorted.map(m => BinaryBExpr(BVEQ, m, Old(m)))
+      memoriesAndGammas.toList.sorted.map(m => BinaryBExpr(EQ, m, Old(m)))
     }
     val relyEnsures = if (relies.nonEmpty) {
       val i = BVariable("i", BitVecBType(64), Scope.Local)
@@ -285,8 +285,8 @@ class IRToBoogie(
           List(i),
           BinaryBExpr(
             BoolIMPLIES,
-            BinaryBExpr(BVEQ, MapAccess(memory, i), Old(MapAccess(memory, i))),
-            BinaryBExpr(BVEQ, MapAccess(gamma, i), Old(MapAccess(gamma, i)))
+            BinaryBExpr(EQ, MapAccess(memory, i), Old(MapAccess(memory, i))),
+            BinaryBExpr(EQ, MapAccess(gamma, i), Old(MapAccess(gamma, i)))
           )
         )
       }
@@ -318,7 +318,7 @@ class IRToBoogie(
       reliesParam
     } else {
       // default case where no rely is given - rely on no external changes
-      List(BinaryBExpr(BVEQ, mem_out, mem_in), BinaryBExpr(BVEQ, Gamma_mem_out, Gamma_mem_in))
+      List(BinaryBExpr(EQ, mem_out, mem_in), BinaryBExpr(EQ, Gamma_mem_out, Gamma_mem_in))
     }
     val relyEnsures = if (reliesParam.nonEmpty) {
       val i = BVariable("i", BitVecBType(64), Scope.Local)
@@ -326,8 +326,8 @@ class IRToBoogie(
         List(i),
         BinaryBExpr(
           BoolIMPLIES,
-          BinaryBExpr(BVEQ, MapAccess(mem_out, i), MapAccess(mem_in, i)),
-          BinaryBExpr(BVEQ, MapAccess(Gamma_mem_out, i), MapAccess(Gamma_mem_in, i))
+          BinaryBExpr(EQ, MapAccess(mem_out, i), MapAccess(mem_in, i)),
+          BinaryBExpr(EQ, MapAccess(Gamma_mem_out, i), MapAccess(Gamma_mem_in, i))
         )
       )
       List(rely2) ++ reliesUsed
@@ -350,7 +350,7 @@ class IRToBoogie(
       reliesParam
     } else {
       // default case where no rely is given - rely on no external changes
-      List(BinaryBExpr(BVEQ, mem_out, mem_in), BinaryBExpr(BVEQ, Gamma_mem_out, Gamma_mem_in))
+      List(BinaryBExpr(EQ, mem_out, mem_in), BinaryBExpr(EQ, Gamma_mem_out, Gamma_mem_in))
     }
     val relyEnsures = if (reliesParam.nonEmpty) {
       val i = BVariable("i", BitVecBType(64), Scope.Local)
@@ -358,8 +358,8 @@ class IRToBoogie(
         List(i),
         BinaryBExpr(
           BoolIMPLIES,
-          BinaryBExpr(BVEQ, MapAccess(mem_out, i), MapAccess(mem_in, i)),
-          BinaryBExpr(BVEQ, MapAccess(Gamma_mem_out, i), MapAccess(Gamma_mem_in, i))
+          BinaryBExpr(EQ, MapAccess(mem_out, i), MapAccess(mem_in, i)),
+          BinaryBExpr(EQ, MapAccess(Gamma_mem_out, i), MapAccess(Gamma_mem_in, i))
         )
       )
       List(rely2) ++ reliesUsed
@@ -512,13 +512,13 @@ class IRToBoogie(
         val body: BExpr = LPreds.keys.foldLeft(FalseBLiteral) { (ite: BExpr, next: SpecGlobal) =>
           val guard = next.arraySize match {
             case Some(size: Int) =>
-              val initial: BExpr = BinaryBExpr(BoolEQ, indexVar, ArrayAccess(next, 0).toAddrVar)
+              val initial: BExpr = BinaryBExpr(EQ, indexVar, ArrayAccess(next, 0).toAddrVar)
               val indices = 1 until size
               indices.foldLeft(initial) { (or: BExpr, i: Int) =>
-                BinaryBExpr(BoolOR, BinaryBExpr(BoolEQ, indexVar, ArrayAccess(next, i).toAddrVar), or)
+                BinaryBExpr(BoolOR, BinaryBExpr(EQ, indexVar, ArrayAccess(next, i).toAddrVar), or)
               }
             case None =>
-              BinaryBExpr(BoolEQ, indexVar, next.toAddrVar)
+              BinaryBExpr(EQ, indexVar, next.toAddrVar)
           }
           val LPred = LPreds(next)
           /*if (controlled.contains(next)) {
@@ -575,10 +575,11 @@ class IRToBoogie(
       .sorted
 
     val modifiedPreserve = modifies.collect { case m: BVar if modifiedCheck.contains(m) => m }
-    val modifiedPreserveEnsures: List[BExpr] = modifiedPreserve.map(m => BinaryBExpr(BoolEQ, m, Old(m))).toList
+    val modifiedPreserveEnsures: List[BExpr] = modifiedPreserve.map(m => BinaryBExpr(EQ, m, Old(m))).toList
 
-    val procRequires: List[BExpr] = p.requires ++ requires.getOrElse(p.procName, List())
-    val procEnsures: List[BExpr] = p.ensures ++ ensures.getOrElse(p.procName, List())
+    val procRequires: List[BExpr] =
+      p.requires ++ requires.getOrElse(p.procName, List()) ++ p.requiresExpr.map(_.toBoogie)
+    val procEnsures: List[BExpr] = p.ensures ++ ensures.getOrElse(p.procName, List()) ++ p.ensuresExpr.map(_.toBoogie)
 
     val procRequiresDirect: List[String] = requiresDirect.getOrElse(p.procName, List())
     val procEnsuresDirect: List[String] = ensuresDirect.getOrElse(p.procName, List())
@@ -985,7 +986,7 @@ class IRToBoogie(
 
     val asserts = indices.flatMap { index =>
       for (c <- controls.keys.view.toList.sorted) yield {
-        val addrCheck = BinaryBExpr(BVEQ, index, c.toAddrVar)
+        val addrCheck = BinaryBExpr(EQ, index, c.toAddrVar)
         val checks = controls(c).toList.sorted.map { v =>
           BinaryBExpr(BoolIMPLIES, L(LArgs, v.toAddrVar), v.toOldGamma)
         }

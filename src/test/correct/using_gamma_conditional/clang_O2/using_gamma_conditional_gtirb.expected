@@ -114,11 +114,14 @@ implementation main_1812()
     assume {:captureState "main_1812__0__Xci9C6~RSgeAKtB8I~m3wg$__1"} true;
     assume (!(!(ZF == 1bv1)));
     R0, Gamma_R0 := 1bv64, true;
-    goto main_1812_basil_return;
+    goto main_1812__0__Xci9C6~RSgeAKtB8I~m3wg$__2;
   main_1812__0__Xci9C6~RSgeAKtB8I~m3wg$__0:
     assume {:captureState "main_1812__0__Xci9C6~RSgeAKtB8I~m3wg$__0"} true;
     assume (!(ZF == 1bv1));
     R0, Gamma_R0 := 0bv64, true;
+    goto main_1812__0__Xci9C6~RSgeAKtB8I~m3wg$__2;
+  main_1812__0__Xci9C6~RSgeAKtB8I~m3wg$__2:
+    assume {:captureState "main_1812__0__Xci9C6~RSgeAKtB8I~m3wg$__2"} true;
     goto main_1812_basil_return;
   main_1812_basil_return:
     assume {:captureState "main_1812_basil_return"} true;

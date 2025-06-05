@@ -1,12 +1,11 @@
-import analysis.ParamAnalysis
 import ir.dsl.{R0, R1, R2}
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.BASILTest
-import util.{BASILResult, StaticAnalysisConfig, Logger, LogLevel}
+import test_util.{BASILTest, CaptureOutput}
+import util.{BASILResult, StaticAnalysisConfig}
 
 @test_util.tags.UnitTest
-class ParamAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
-  private val correctPath = "./src/test/correct/"
+class ParamAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
+  private val correctPath = s"${BASILTest.rootDirectory}/src/test/correct/"
 
   def runExample(name: String): BASILResult = {
     val inputFile = correctPath + s"/$name/gcc/$name.adt"

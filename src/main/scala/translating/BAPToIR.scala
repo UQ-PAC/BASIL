@@ -111,6 +111,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
 
   private def handleAtomicSections(procedure: Procedure): Unit = {
     val queue = mutable.Queue[Block](procedure.entryBlock.get)
+    val inQueue = mutable.Set[Block](procedure.entryBlock.get)
     var atomicSectionStart: Option[Block] = None
     var atomicSectionEnd: Option[Block] = None
     val atomicSectionContents: mutable.Set[Block] = mutable.Set()
@@ -118,6 +119,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
 
     while (queue.nonEmpty) {
       val block = queue.dequeue()
+      inQueue.remove(block)
 
       if (atomicSectionStart.isDefined) {
         atomicSectionContents.add(block)
@@ -200,8 +202,9 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
         block.jump match {
           case g: GoTo =>
             g.targets.foreach { target =>
-              if (!visited.contains(target)) {
+              if (!visited.contains(target) && !inQueue.contains(target)) {
                 queue.enqueue(target)
+                inQueue.add(target)
               }
             }
           case _ =>
@@ -332,8 +335,8 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
         case AND => (BinaryExpr(BVAND, lhsIR, rhsIR), load)
         case OR => (BinaryExpr(BVOR, lhsIR, rhsIR), load)
         case XOR => (BinaryExpr(BVXOR, lhsIR, rhsIR), load)
-        case EQ => (BinaryExpr(BVCOMP, lhsIR, rhsIR), load)
-        case NEQ => (UnaryExpr(BVNOT, BinaryExpr(BVCOMP, lhsIR, rhsIR)), load)
+        case bap.EQ => (BinaryExpr(BVCOMP, lhsIR, rhsIR), load)
+        case bap.NEQ => (UnaryExpr(BVNOT, BinaryExpr(BVCOMP, lhsIR, rhsIR)), load)
         case LT => (BinaryExpr(BVULT, lhsIR, rhsIR), load)
         case LE => (BinaryExpr(BVULE, lhsIR, rhsIR), load)
         case SLT => (BinaryExpr(BVSLT, lhsIR, rhsIR), load)
@@ -532,9 +535,9 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     e.getType match {
       case BitVecType(s) =>
         if (negative) {
-          BinaryExpr(BVEQ, e, BitVecLiteral(0, s))
+          BinaryExpr(ir.EQ, e, BitVecLiteral(0, s))
         } else {
-          BinaryExpr(BVNEQ, e, BitVecLiteral(0, s))
+          BinaryExpr(ir.NEQ, e, BitVecLiteral(0, s))
         }
       case BoolType =>
         if (negative) {

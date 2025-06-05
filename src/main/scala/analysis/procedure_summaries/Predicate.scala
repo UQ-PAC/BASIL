@@ -273,8 +273,8 @@ enum Predicate {
   case Not(p: Atomic & Predicate) extends Predicate with Atomic
   case Conj(s: Set[Predicate])
   case Disj(s: Set[Predicate])
-  case BVCmp(op: BVCmpOp, x: BVTerm, y: BVTerm) extends Predicate with Atomic
-  case GammaCmp(op: BoolCmpOp, x: GammaTerm, y: GammaTerm) extends Predicate with Atomic
+  case BVCmp(op: BVCmpOp | PolyCmp, x: BVTerm, y: BVTerm) extends Predicate with Atomic
+  case GammaCmp(op: BoolCmpOp | PolyCmp, x: GammaTerm, y: GammaTerm) extends Predicate with Atomic
 
   private var simplified: Boolean = false
 
@@ -578,19 +578,19 @@ enum Predicate {
               case Conj(s2) => cur - p ++ s2
               case Not(p) if cur.contains(p) => Set(False)
               case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSLE, b, a)) =>
-                cur - p - BVCmp(BVSLE, b, a) + BVCmp(BVEQ, a, b).simplify
+                cur - p - BVCmp(BVSLE, b, a) + BVCmp(EQ, a, b).simplify
               case BVCmp(BVSLE, a, b) if cur.contains(BVCmp(BVSGE, a, b)) =>
-                cur - p - BVCmp(BVSGE, a, b) + BVCmp(BVEQ, a, b).simplify
+                cur - p - BVCmp(BVSGE, a, b) + BVCmp(EQ, a, b).simplify
               case BVCmp(BVSGE, a, b) if cur.contains(BVCmp(BVSGE, b, a)) =>
-                cur - p - BVCmp(BVSGE, b, a) + BVCmp(BVEQ, a, b).simplify
+                cur - p - BVCmp(BVSGE, b, a) + BVCmp(EQ, a, b).simplify
               case BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVULE, b, a)) =>
-                cur - p - BVCmp(BVULE, b, a) + BVCmp(BVEQ, a, b).simplify
+                cur - p - BVCmp(BVULE, b, a) + BVCmp(EQ, a, b).simplify
               case BVCmp(BVULE, a, b) if cur.contains(BVCmp(BVUGE, a, b)) =>
-                cur - p - BVCmp(BVUGE, a, b) + BVCmp(BVEQ, a, b).simplify
+                cur - p - BVCmp(BVUGE, a, b) + BVCmp(EQ, a, b).simplify
               case BVCmp(BVUGE, a, b) if cur.contains(BVCmp(BVUGE, b, a)) =>
-                cur - p - BVCmp(BVUGE, b, a) + BVCmp(BVEQ, a, b).simplify
+                cur - p - BVCmp(BVUGE, b, a) + BVCmp(EQ, a, b).simplify
               case GammaCmp(BoolIMPLIES, a, b) if cur.contains(GammaCmp(BoolIMPLIES, b, a)) =>
-                cur - p - GammaCmp(BoolIMPLIES, b, a) + GammaCmp(BoolEQ, a, b).simplify
+                cur - p - GammaCmp(BoolIMPLIES, b, a) + GammaCmp(EQ, a, b).simplify
               case Disj(s2) if s.intersect(s2).nonEmpty => cur - p
               case _ => cur
             }
@@ -662,22 +662,22 @@ enum Predicate {
               case BVCmp(BVUGT, a, b) if cur.contains(BVCmp(BVUGE, b, a)) => cur - p - BVCmp(BVUGE, b, a) + True
               case BVCmp(BVUGT, a, b) if cur.contains(BVCmp(BVULE, a, b)) => cur - p - BVCmp(BVULE, a, b) + True
 
-              case BVCmp(BVSLT, a, b) if cur.contains(BVCmp(BVEQ, a, b)) =>
-                cur - p - BVCmp(BVEQ, a, b) + BVCmp(BVSLE, a, b).simplify
-              case BVCmp(BVSLT, a, b) if cur.contains(BVCmp(BVEQ, b, a)) =>
-                cur - p - BVCmp(BVEQ, b, a) + BVCmp(BVSLE, a, b).simplify
-              case BVCmp(BVSGT, a, b) if cur.contains(BVCmp(BVEQ, a, b)) =>
-                cur - p - BVCmp(BVEQ, a, b) + BVCmp(BVSGE, a, b).simplify
-              case BVCmp(BVSGT, a, b) if cur.contains(BVCmp(BVEQ, b, a)) =>
-                cur - p - BVCmp(BVEQ, b, a) + BVCmp(BVSGE, a, b).simplify
-              case BVCmp(BVULT, a, b) if cur.contains(BVCmp(BVEQ, a, b)) =>
-                cur - p - BVCmp(BVEQ, a, b) + BVCmp(BVULE, a, b).simplify
-              case BVCmp(BVULT, a, b) if cur.contains(BVCmp(BVEQ, b, a)) =>
-                cur - p - BVCmp(BVEQ, b, a) + BVCmp(BVULE, a, b).simplify
-              case BVCmp(BVUGT, a, b) if cur.contains(BVCmp(BVEQ, a, b)) =>
-                cur - p - BVCmp(BVEQ, a, b) + BVCmp(BVUGE, a, b).simplify
-              case BVCmp(BVUGT, a, b) if cur.contains(BVCmp(BVEQ, b, a)) =>
-                cur - p - BVCmp(BVEQ, b, a) + BVCmp(BVUGE, a, b).simplify
+              case BVCmp(BVSLT, a, b) if cur.contains(BVCmp(EQ, a, b)) =>
+                cur - p - BVCmp(EQ, a, b) + BVCmp(BVSLE, a, b).simplify
+              case BVCmp(BVSLT, a, b) if cur.contains(BVCmp(EQ, b, a)) =>
+                cur - p - BVCmp(EQ, b, a) + BVCmp(BVSLE, a, b).simplify
+              case BVCmp(BVSGT, a, b) if cur.contains(BVCmp(EQ, a, b)) =>
+                cur - p - BVCmp(EQ, a, b) + BVCmp(BVSGE, a, b).simplify
+              case BVCmp(BVSGT, a, b) if cur.contains(BVCmp(EQ, b, a)) =>
+                cur - p - BVCmp(EQ, b, a) + BVCmp(BVSGE, a, b).simplify
+              case BVCmp(BVULT, a, b) if cur.contains(BVCmp(EQ, a, b)) =>
+                cur - p - BVCmp(EQ, a, b) + BVCmp(BVULE, a, b).simplify
+              case BVCmp(BVULT, a, b) if cur.contains(BVCmp(EQ, b, a)) =>
+                cur - p - BVCmp(EQ, b, a) + BVCmp(BVULE, a, b).simplify
+              case BVCmp(BVUGT, a, b) if cur.contains(BVCmp(EQ, a, b)) =>
+                cur - p - BVCmp(EQ, a, b) + BVCmp(BVUGE, a, b).simplify
+              case BVCmp(BVUGT, a, b) if cur.contains(BVCmp(EQ, b, a)) =>
+                cur - p - BVCmp(EQ, b, a) + BVCmp(BVUGE, a, b).simplify
 
               case Conj(s2) if s.intersect(s2).nonEmpty => cur - p
               case _ => cur
@@ -695,15 +695,15 @@ enum Predicate {
         import BVTerm.*
         (op, a.simplify, b.simplify) match {
           case (op, BVTerm.Lit(a), BVTerm.Lit(b)) => if evalBVLogBinExpr(op, a, b) then True else False
-          case (BVEQ, a, b) if a == b => True
-          case (BVEQ, a, Uop(BVNEG, b)) => BVCmp(BVEQ, Bop(BVADD, a, b), BVTerm.Lit(BitVecLiteral(0, a.size))).simplify
-          case (BVEQ, l: BVTerm.Lit, v: Var) => BVCmp(BVEQ, v, l) // Canonical form-ish (to remove duplicate terms
+          case (EQ, a, b) if a == b => True
+          case (EQ, a, Uop(BVNEG, b)) => BVCmp(EQ, Bop(BVADD, a, b), BVTerm.Lit(BitVecLiteral(0, a.size))).simplify
+          case (EQ, l: BVTerm.Lit, v: Var) => BVCmp(EQ, v, l) // Canonical form-ish (to remove duplicate terms
           case (op, a, b) => BVCmp(op, a, b)
         }
       case GammaCmp(op, a, b) =>
         (op, a.simplify, b.simplify) match {
           case (BoolIMPLIES, a, b) if a == b => True
-          case (BoolEQ, a, b) if a == b => True
+          case (EQ, a, b) if a == b => True
           case (op, a, b) => GammaCmp(op, a, b)
         }
       case _ => this
@@ -748,14 +748,13 @@ object Predicate {
 
   def or(ps: Predicate*): Predicate = Disj(ps.toSet).flatten
 
-  def bop(op: BoolBinOp, a: Predicate, b: Predicate): Predicate = {
+  def bop(op: (BoolBinOp | PolyCmp), a: Predicate, b: Predicate): Predicate = {
     op match {
-      case BoolEQ => or(and(not(a), not(b)), and(a, b))
-      case BoolNEQ => or(and(not(a), b), and(a, not(b)))
+      case EQ => or(and(not(a), not(b)), and(a, b))
+      case NEQ => or(and(not(a), b), and(a, not(b)))
       case BoolAND => and(a, b)
       case BoolOR => or(a, b)
       case BoolIMPLIES => or(not(a), b)
-      case BoolEQUIV => bop(BoolEQ, a, b)
     }
   }
 
@@ -763,7 +762,7 @@ object Predicate {
 
   def gammaLeq(a: GammaTerm, b: GammaTerm) = GammaCmp(BoolIMPLIES, b, a)
   def gammaGeq(a: GammaTerm, b: GammaTerm) = GammaCmp(BoolIMPLIES, a, b)
-  def gammaEq(a: GammaTerm, b: GammaTerm) = GammaCmp(BoolEQ, a, b)
+  def gammaEq(a: GammaTerm, b: GammaTerm) = GammaCmp(EQ, a, b)
 }
 
 /**
@@ -804,10 +803,22 @@ def exprToGammaTerm(e: Expr): Option[GammaTerm] = e match {
 def exprToPredicate(e: Expr): Option[Predicate] = e match {
   case b: BoolLit => Some(Predicate.Lit(b))
   case UnaryExpr(BoolNOT, arg) => exprToPredicate(arg).map(p => Predicate.not(p))
-  case BinaryExpr(op: BoolBinOp, arg1, arg2) =>
-    exprToPredicate(arg1).flatMap(p => exprToPredicate(arg2).map(q => Predicate.bop(op, p, q)))
-  case BinaryExpr(op: BVCmpOp, arg1, arg2) =>
-    exprToBVTerm(arg1).flatMap(p => exprToBVTerm(arg2).map(q => Predicate.BVCmp(op, p, q)))
+  case BinaryExpr(op: (PolyCmp | BVCmpOp | BoolCmpOp), arg1, arg2) =>
+    (
+      List(arg1, arg2).map(e =>
+        e.getType match {
+          case BoolType => exprToPredicate(e)
+          case _: BitVecType => exprToBVTerm(e)
+          case _ => None
+        }
+      ),
+      op
+    ) match {
+      case (Some(l: Predicate) :: Some(r: Predicate) :: Nil, op: (BoolCmpOp | PolyCmp)) => Some(Predicate.bop(op, l, r))
+      case (Some(l: BVTerm) :: Some(r: BVTerm) :: Nil, op: (BVCmpOp | PolyCmp)) => Some(Predicate.BVCmp(op, l, r))
+      case _ => None
+    }
+
   case _ => None
 }
 

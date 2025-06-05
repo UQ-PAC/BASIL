@@ -2,7 +2,6 @@
 
 - [project-layout](project-layout.md) Organisation of the source code
 - [editor-setup](editor-setup.md) Guide to basil development in IDEs 
-- [tool-installation](tool-installation.md) Guide to lifter, etc. tool installation
 - [scala](scala.md) Advice on Scala programming.
 - [cfg](cfg.md) Explanation of the old CFG datastructure 
 - [interpreter](interpreter.md) Explanation of IR interpreter
@@ -48,7 +47,7 @@ We do not have a strict code style however
 
 1. To set up an editor for Scala development see [editor-setup](editor-setup.md).
 2. Become familiar with the [project structure](project-layout.md) to start understanding the code.
-3. Install the neccessary tools [here](tool-installation.md), it may be useful to try
+3. Install the neccessary tools [here](/docs/usage.md), it may be useful to try
    lifting examples, or just looking at existing examples in the 
    [src/test/correct](../../src/test/correct) directory.
 4. Use the below as a guide to common development tasks as they may arise. 

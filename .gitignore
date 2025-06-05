@@ -5,6 +5,7 @@
 .metals/
 .run/
 .vscode/
+.vs/
 gen/
 out/
 target/

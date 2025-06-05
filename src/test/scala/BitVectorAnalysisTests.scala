@@ -1,12 +1,13 @@
-import ir.eval.BitVectorEval._
+import ir.eval.BitVectorEval.*
 import ir.*
 import org.scalatest.funsuite.AnyFunSuite
+import test_util.CaptureOutput
 import util.Logger
 
 import scala.runtime.stdLibPatches.Predef.assert
 
 @test_util.tags.UnitTest
-class BitVectorAnalysisTests extends AnyFunSuite with test_util.CaptureOutput {
+class BitVectorAnalysisTests extends AnyFunSuite with CaptureOutput {
 
   test("BitVector to Natural - should convert BitVector to natural number") {
     val result = bv2nat(BitVecLiteral(2, 4))
@@ -206,6 +207,10 @@ class BitVectorAnalysisTests extends AnyFunSuite with test_util.CaptureOutput {
   test("BitVector Shift Right - should shift bits right") {
     val result = smt_bvlshr(BitVecLiteral(2, 8), BitVecLiteral(1, 8))
     assert(result == BitVecLiteral(1, 8))
+  }
+  test("BitVector Shift Right - should zero on overflow") {
+    val result = smt_bvlshr(BitVecLiteral(4104967, 22), BitVecLiteral(3664940, 22))
+    assert(result == BitVecLiteral(0, 22))
   }
   // isNegative
   test("is Negative - should return true if the most significant bit is 1") {
