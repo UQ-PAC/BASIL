@@ -204,14 +204,18 @@ object IRTransform {
 
   /** Initial cleanup before analysis.
   */
-  class DoCleanup(doSimplify: Boolean = false) extends TransformBatch("DoCleanup", List(
-    MakeProcEntriesNonLoops(),
-    CoalesceBlocksFixpoint(),
-    ApplyRpo(),
-    ReplaceJumpsInNonReturningProcs(),
-    ReplaceReturnsTransform(doSimplify),
-    RemoveExternalFunctionReferences()
-  )) {
+  class DoCleanup(doSimplify: Boolean = false)
+      extends TransformBatch(
+        "DoCleanup",
+        List(
+          MakeProcEntriesNonLoops(),
+          CoalesceBlocksFixpoint(),
+          ApplyRpo(),
+          ReplaceJumpsInNonReturningProcs(),
+          ReplaceReturnsTransform(doSimplify),
+          RemoveExternalFunctionReferences()
+        )
+      ) {
     override protected def preRun(ctx: IRContext): Unit = {
       Logger.info("[!] Removing external function calls") // fixme: seems odd?
     }
@@ -225,9 +229,12 @@ object IRTransform {
   }
 
   // todo: not sure where to put this
-  class DetermineRelevantMemory(maybeStaticAnalysisConfig: Option[StaticAnalysisConfig]) extends Transform("DetermineRelevantMemory") {
+  class DetermineRelevantMemory(maybeStaticAnalysisConfig: Option[StaticAnalysisConfig])
+      extends Transform("DetermineRelevantMemory") {
     def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
-      if (maybeStaticAnalysisConfig.isEmpty || (maybeStaticAnalysisConfig.get.memoryRegions == MemoryRegionsMode.Disabled)) {
+      if (
+        maybeStaticAnalysisConfig.isEmpty || (maybeStaticAnalysisConfig.get.memoryRegions == MemoryRegionsMode.Disabled)
+      ) {
         ctx.program.determineRelevantMemory(ctx.globalOffsets)
       }
       Set.empty
@@ -266,15 +273,20 @@ object IRTransform {
   /** Cull unneccessary information that does not need to be included in the translation, and infer stack regions, and
     * add in modifies from the spec.
     */
-  class PrepareForTranslation(config: BASILConfig) extends TransformBatch("PrepareForTranslation", List(
-    DetermineRelevantMemory(config.staticAnalysis),
-    StripUnreachableFunctions(config.loading.procedureTrimDepth),
-    StackSubstitution(toggle =
-      !config.memoryTransform &&
-      (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled))),
-    SetModifies(),
-    RenameBoogieKeywords()
-  )) {
+  class PrepareForTranslation(config: BASILConfig)
+      extends TransformBatch(
+        "PrepareForTranslation",
+        List(
+          DetermineRelevantMemory(config.staticAnalysis),
+          StripUnreachableFunctions(config.loading.procedureTrimDepth),
+          StackSubstitution(toggle =
+            !config.memoryTransform &&
+              (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled))
+          ),
+          SetModifies(),
+          RenameBoogieKeywords()
+        )
+      ) {
     override protected def postRun(ctx: IRContext): Unit = {
       // check all blocks with an atomic section exist within the same procedure
       val visited = mutable.Set[Block]()
@@ -893,11 +905,13 @@ object RunUtils {
     }
 
     if (conf.summariseProcedures) {
-      IRTransform.GenerateProcedureSummaries(q.loading.parameterForm || conf.simplify)(ctx, AnalysisManager(ctx.program))
+      IRTransform
+        .GenerateProcedureSummaries(q.loading.parameterForm || conf.simplify)(ctx, AnalysisManager(ctx.program))
     }
 
     if (conf.summariseProcedures) {
-      IRTransform.GenerateProcedureSummaries(q.loading.parameterForm || conf.simplify)(ctx, AnalysisManager(ctx.program))
+      IRTransform
+        .GenerateProcedureSummaries(q.loading.parameterForm || conf.simplify)(ctx, AnalysisManager(ctx.program))
     }
 
     if (q.runInterpret) {
@@ -933,7 +947,10 @@ object RunUtils {
     IRTransform.PrepareForTranslation(q)(ctx, AnalysisManager(ctx.program))
 
     if (conf.generateRelyGuarantees) {
-      IRTransform.GenerateRgConditions(ctx.program.procedures.toList.filter(p => p.returnBlock != None))(ctx, AnalysisManager(ctx.program))
+      IRTransform.GenerateRgConditions(ctx.program.procedures.toList.filter(p => p.returnBlock != None))(
+        ctx,
+        AnalysisManager(ctx.program)
+      )
     }
 
     q.loading.dumpIL.foreach(s => {

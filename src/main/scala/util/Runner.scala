@@ -37,7 +37,7 @@ class DoSimplify(config: BASILConfig) extends TransformBatch("DoSimplify", List(
   LogIrAfterSlices(),
   LogSimplificationValidation()
 ))
-*/
+ */
 class IdentifyLoops extends Transform("IdentifyLoops") {
   def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
     val foundLoops = LoopDetector.identify_loops(ctx.program)
@@ -416,4 +416,4 @@ class ssaResults extends StaticAnalysis[
   def implementation(prog: Program, analyses: AnalysisManager) = _(prog).analyze()
 }
 
-*/
+ */

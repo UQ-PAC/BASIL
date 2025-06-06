@@ -39,8 +39,10 @@ trait Transform(val name: String) {
     if (!toggle) return
     if (analyses.program ne ctx.program) {
       // the program we are transforming should be the same one for which the analysis results were produced
-      throw new RuntimeException(s"Transform $name was passed an AnalysisManager of an IR Program with a different " +
-        s"reference value than the program being transformed.")
+      throw new RuntimeException(
+        s"Transform $name was passed an AnalysisManager of an IR Program with a different " +
+          s"reference value than the program being transformed."
+      )
     }
     preRun(ctx)
     t.checkPoint("start")
