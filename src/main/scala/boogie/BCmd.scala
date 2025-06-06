@@ -1,4 +1,5 @@
 package boogie
+import ir.Sigil
 
 sealed trait BCmdOrBlock {
   def toBoogie: List[String]
@@ -9,7 +10,7 @@ sealed trait BCmdOrBlock {
 
 case class BBlock(label: String, body: List[BCmd]) extends BCmdOrBlock {
   override def toBoogie: List[String] = {
-    List(s"$label:") ++ body.flatMap(x => x.toBoogie).map(s => "  " + s)
+    List(s"${Sigil.Boogie.block}$label:") ++ body.flatMap(x => x.toBoogie).map(s => "  " + s)
   }
   override def toString: String = toBoogie.mkString("\n")
   override def functionOps: Set[FunctionOp] = body.flatMap(c => c.functionOps).toSet
@@ -51,9 +52,9 @@ case class BProcedureCall(
 ) extends BCmd {
   override def toString: String = {
     if (lhss.isEmpty) {
-      s"call $attrString$name(${params.mkString(", ")});"
+      s"call $attrString${Sigil.Boogie.proc}$name(${params.mkString(", ")});"
     } else {
-      s"call $attrString${lhss.mkString(", ")} := $name(${params.mkString(", ")});"
+      s"call $attrString${lhss.mkString(", ")} := ${Sigil.Boogie.proc}$name(${params.mkString(", ")});"
     }
   }
   override def functionOps: Set[FunctionOp] = params.flatMap(p => p.functionOps).toSet
@@ -103,7 +104,7 @@ case class IfCmd(guard: BExpr, thenCmds: List[BCmd], comment: Option[String] = N
 }
 
 case class GoToCmd(destinations: Seq[String], comment: Option[String] = None) extends BCmd {
-  override def toString: String = s"goto ${destinations.mkString(", ")};"
+  override def toString: String = s"goto ${destinations.map(Sigil.Boogie.block + _).mkString(", ")};"
 }
 
 case object ReturnCmd extends BCmd {

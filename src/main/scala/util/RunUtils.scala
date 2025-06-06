@@ -136,6 +136,8 @@ object IRLoading {
 
     ir.transforms.PCTracking.applyPCTracking(q.pcTracking, program)
 
+    program.procedures.foreach(_.normaliseBlockNames())
+
     IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program)
   }
 
@@ -146,7 +148,9 @@ object IRLoading {
 
     parser.setBuildParseTree(true)
 
-    BAPLoader.visitProject(parser.project())
+    val bapLoader = BAPLoader()
+
+    bapLoader.visitProject(parser.project())
   }
 
   def loadGTIRB(fileName: String, mainAddress: BigInt): Program = {
@@ -683,10 +687,6 @@ object RunUtils {
     val foundLoops = LoopDetector.identify_loops(program)
     val newLoops = foundLoops.reducibleTransformIR()
     newLoops.updateIrWithLoops()
-
-    for (p <- program.procedures) {
-      p.normaliseBlockNames()
-    }
 
     ctx.program.sortProceduresRPO()
 

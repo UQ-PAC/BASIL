@@ -47,9 +47,9 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
       case v: Variable => vrvar(v)
       case f @ UninterpretedFunction(n, params, rt) => vuninterp_function(n, params.map(vexpr))
-      case q: QuantifierExpr => ???
-      case q: LambdaExpr => ???
-      case r: OldExpr => ???
+      case q: QuantifierExpr => vquantifier(q)
+      case q: LambdaExpr => vlambda(q)
+      case r: OldExpr => vold(r.body)
     }
   }
 
@@ -107,6 +107,9 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
 trait BasilIRExp[Repr[+_]] {
   def vexpr(e: Expr): Repr[Expr]
   def vextract(ed: Int, start: Int, a: Repr[Expr]): Repr[Expr]
+  def vquantifier(q: QuantifierExpr): Repr[Expr]
+  def vlambda(q: LambdaExpr): Repr[Expr]
+  def vold(body: Expr): Repr[Expr]
   def vzeroextend(bits: Int, b: Repr[Expr]): Repr[Expr]
   def vsignextend(bits: Int, b: Repr[Expr]): Repr[Expr]
   def vbinary_expr(e: BinOp, l: Repr[Expr], r: Repr[Expr]): Repr[Expr]
@@ -153,9 +156,9 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
       case v: Variable => vrvar(v)
       case f @ UninterpretedFunction(n, params, rt) => vuninterp_function(n, params.map(vexpr))
-      case q: QuantifierExpr => ???
-      case q: LambdaExpr => ???
-      case r: OldExpr => ???
+      case q: QuantifierExpr => vquantifier(q)
+      case q: LambdaExpr => vlambda(q)
+      case r: OldExpr => vold(r.body)
     }
   }
 
@@ -181,6 +184,9 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   def vload(lhs: Sexp[Variable], mem: String, index: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryLoad] = ???
   def vstore(mem: String, index: Sexp[Expr], value: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryStore] = ???
 
+  def vold(e: Expr) = ???
+  def vquantifier(e: QuantifierExpr) = ???
+  def vlambda(e: LambdaExpr) = ???
   def vprog(mainProc: String, procedures: List[Sexp[Procedure]]): Sexp[Program] = ???
   def vrepeat(reps: Int, value: Sexp[Expr]): Sexp[Expr] = ???
   def vzeroextend(bits: Int, b: Sexp[Expr]): Sexp[Expr] = ???

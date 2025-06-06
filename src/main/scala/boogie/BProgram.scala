@@ -1,6 +1,7 @@
 package boogie
 
 import util.{PerformanceTimer, Logger, LogLevel}
+import ir.Sigil
 
 import scala.sys.process.*
 import scala.collection.immutable.Seq
@@ -76,8 +77,8 @@ case class BProcedure(
     with Ordered[BProcedure] {
   override def compare(that: BProcedure): Int = name.compare(that.name)
   override def toBoogie: List[String] = {
-    val header = s"procedure $attrString$name(${in.map(_.withType).mkString(", ")})"
-    val implHeader = s"implementation $attrString$name(${in.map(_.withType).mkString(", ")})"
+    val header = s"procedure $attrString${Sigil.Boogie.proc}$name(${in.map(_.withType).mkString(", ")})"
+    val implHeader = s"implementation $attrString${Sigil.Boogie.proc}$name(${in.map(_.withType).mkString(", ")})"
     val returns = if (out.nonEmpty) {
       s" returns (${out.map(_.withType).mkString(", ")})"
     } else {
