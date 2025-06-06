@@ -111,7 +111,7 @@ case class PBlock(
     val comment = entryComment.map(c => c + "\n").getOrElse("")
     val excomment = exitComment.map(c => "\n" + c).getOrElse("")
     s"block ${label}${addr} [\n${comment}"
-      ++ commands.map("  " + _).mkString(";\n")
+      ++ commands.map("  " + _ + ";").mkString("\n")
       ++ s"${excomment}\n]"
   }
 }
@@ -350,9 +350,9 @@ class BasilIRPrettyPrinter(
 
     val inParams = p.formalInParam.toList.map(vparam)
     val outParams = p.formalOutParam.toList.map(vparam)
-    val entryBlock = p.entryBlock
-    val middleBlocks = p.blocks.filterNot(p.returnBlock.contains).filterNot(p.entryBlock.contains)
-    val returnBlock = p.returnBlock.map(vblock)
+    val middleBlocks = (p.entryBlock.toList ++ p.blocks
+      .filterNot(p.returnBlock.contains)
+      .filterNot(p.entryBlock.contains) ++ p.returnBlock).map(vblock)
 
     val localDecls = decls.toList.sorted
 
@@ -441,9 +441,9 @@ class BasilIRPrettyPrinter(
       if attrs.nonEmpty then
         " { " + attrs
           .map { case (n, l) =>
-            s"${Sigil.BASIR.attrib}$n = \"$l\""
+            s"${Sigil.BASIR.attrib}$n = \"$l\"; "
           }
-          .mkString("; ") + " }"
+          .mkString("") + " }"
       else ""
 
     BST(s"assert ${vexpr(body.body)}$attrl")
@@ -454,9 +454,9 @@ class BasilIRPrettyPrinter(
       if attrs.nonEmpty then
         "{ " + attrs
           .map { case (n, l) =>
-            s"${Sigil.BASIR.attrib}$n = \"$l\""
+            s"${Sigil.BASIR.attrib}$n = \"$l\"; "
           }
-          .mkString("; ") + " }"
+          .mkString("") + " }"
       else ""
 
     val stmt = if body.checkSecurity then "guard" else "assume"
