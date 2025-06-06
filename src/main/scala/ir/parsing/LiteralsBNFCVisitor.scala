@@ -82,10 +82,6 @@ trait LiteralsBNFCVisitor[A]
   override def visit(x: syntax.BVBinOp_bvsrem, arg: A): BasilParseValue = ir.BVSREM
   override def visit(x: syntax.BVBinOp_bvsmod, arg: A): BasilParseValue = ir.BVSMOD
   override def visit(x: syntax.BVBinOp_bvashr, arg: A): BasilParseValue = ir.BVASHR
-  /*
-   use enum value from name
-   f_��5lywAir.pbv$UBxxxj0
-   */
 
   // Members declared in IntBinOp.Visitor
   override def visit(x: syntax.IntBinOp_intadd, arg: A): BasilParseValue = ir.IntADD
