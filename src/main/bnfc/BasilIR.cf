@@ -6,13 +6,14 @@ terminator Declaration ";";
 
 token BVTYPE ('b' 'v' digit+) ;
 
-position token UserIdent '`' ((upper | letter | '_' | '#')(upper | letter | digit | ["_.$#"])*) '`';
+
+{- position token UserIdent '`' ((upper | letter | '_' | '#')(upper | letter | digit | ["_.$#"])*) '`'; -}
 position token BIdent '!'((upper | letter | '_')(upper | letter | digit | ["_.$#"])*) ;
 
-position token LocalIdent ('#' | upper | letter | '_')((upper | letter | digit | ["_.$#"])*);
+position token LocalIdent ('%' | upper | letter | '_')((upper | letter | digit | ["_.$#"])*);
 position token GlobalIdent '$' ((upper | letter | digit | ["_.$#"])+);
 
-position token BlockIdent '%' ((upper | letter | digit | ["_.$#"])+);
+position token BlockIdent '#' ((upper | letter | digit | ["_.$#"])+);
 
 separator BlockIdent ",";
 
@@ -28,6 +29,9 @@ position token EndRec '}' ;
 token Str '"' ((char - ["\"\\"]) | ('\\' ["\"\\tnrf"]))* '"' ;
 token IntegerHex ('0' 'x' (digit | ["abcdef"])+);
 
+-- gobble extra semicolons 
+EmptyScolon . GobbleScolon ::= "";
+SomeScolon . GobbleScolon ::= GobbleScolon  ";" ;
 
 token BitvectorHex (('0' 'x' (digit | ["abcdef"])+)) ;
 
@@ -38,7 +42,8 @@ comment "/*" "*/" ;
 AxiomDecl . Declaration ::= "axiom" AttrDefList Expr; 
 MemDecl . Declaration ::= "memory" GlobalIdent ":" Type ;
 VarDecl . Declaration ::= "var" GlobalIdent ":" Type  ;
-ProgDecl . Declaration ::= "prog" AttrDefList [ ThrSpecDecl ] ;
+ProgDeclSpec . Declaration ::= "prog" AttrDefList BeginList [ ProgSpecDecl ] EndList ;
+ProgDecl . Declaration ::= "prog" AttrDefList ;
 Procedure . Declaration ::= ProcDef ;
 
 IntT . IntType ::= "int" ;
@@ -80,8 +85,9 @@ ListOutParams . CallLVars ::= "(" [ LVar ] ")" ":=";
 DirectCall . Statement ::= CallLVars "call" ProcIdent "(" [Expr] ")" ;
 IndirectCall . Statement ::= "indirect" "call" Expr ;
 
-Assume . Statement ::= "assume" Expr ;
-Assert . Statement ::= "assert" Expr ;
+Assume . Statement ::= "assume" Expr AttrDefList ;
+Guard . Statement ::= "guard" Expr AttrDefList ;
+Assert . Statement ::= "assert" Expr AttrDefList ;
 
 GoTo . Jump ::= "goto" "(" [BlockIdent] ")" ;
 Unreachable . Jump ::= "unreachable" ;
@@ -95,9 +101,8 @@ separator nonempty LVar "," ;
 separator Block ";" ;
 
 rules Block ::= "block" BlockIdent AttrDefList BeginList 
-  [Statement] Jump
+  [Statement] Jump ";"
   EndList ;
-
 
 IntAttr . AttributeItem ::= BIdent "="  IntVal;
 BVAttr . AttributeItem ::= BIdent "=" BVVal;
@@ -105,19 +110,19 @@ ExprAttr . AttributeItem ::= BIdent "=" Expr;
 StringAttr . AttributeItem ::= BIdent "=" Str ;
 separator AttributeItem ";";
 
-AttrDefListSome . AttrDefList ::= BeginRec [ AttributeItem ] EndRec ;
+AttrDefListSome . AttrDefList ::= BeginRec [ AttributeItem ] GobbleScolon EndRec ;
 AttrDefListEmpty . AttrDefList ::= "" ;
 
 Param . Params ::=  LocalIdent ":" Type ;
 separator Params "," ;
 
 ProcedureSig . ProcSig ::= "proc" ProcIdent "(" [Params] ")" "->" "(" [Params] ")"  ;
-ProcedureDecl . ProcDef ::= ProcSig AttrDefList  ;
-ProcedureDef  . ProcDef ::= ProcSig AttrDefList BeginList [Block] EndList  ;
+ProcedureDecl . ProcDef ::= ProcSig AttrDefList [ FunSpecDecl ] ;
+ProcedureDef  . ProcDef ::= ProcSig AttrDefList [ FunSpecDecl ] BeginList [Block] EndList ;
 
 {- EXPRESSIONS -}
 
-_ . Expr ::= "(" Expr ")" ;
+-- coercions Expr 3 ; 
 
 BVLiteral . Expr ::=  BVVal;
 IntLiteral . Expr ::= IntVal;
@@ -129,9 +134,22 @@ GRVar . Expr ::= GlobalVar;
 
 -- uninterpreted functions
 FunctionOp . Expr       ::= GlobalIdent "(" [Expr] ")" ;
-separator Expr ",";
+
+-- binary expr
+
+rules BinOp ::= BVBinOp | BVLogicalBinOp | BoolBinOp | IntLogicalBinOp | IntBinOp | EqOp ;
+BinaryExpr . Expr       ::= BinOp "(" Expr "," Expr ")" ;
+
+rules UnOp ::= BVUnOp | "boolnot" | "intneg" | "booltobv1";
+UnaryExpr . Expr       ::= UnOp "(" Expr ")" ;
+
+ZeroExtend . Expr ::= "zero_extend" "(" IntVal "," Expr ")" ;
+SignExtend . Expr ::= "sign_extend" "(" IntVal "," Expr ")" ;
+Extract    . Expr ::= "extract" "(" IntVal "," IntVal "," Expr ")" ;
+Concat     . Expr ::= "bvconcat"  "(" Expr "," Expr ")" ;
 
 -- operators
+
 rules EqOp ::= "eq" | "neq" ;
 rules BVUnOp ::= "bvnot" | "bvneg" ;
 rules BVBinOp ::= "bvand"|"bvor"|"bvadd"|"bvmul"|"bvudiv"|"bvurem"|"bvshl"|"bvlshr"|"bvnand"|"bvnor"
@@ -145,15 +163,17 @@ rules BoolBinOp ::=  "booland" | "boolor" | "boolimplies" ;
 
 {- SPECIFICATION -}
 
-Require . FunSpecDecl ::= "require" Expr;
-Ensure . FunSpecDecl ::= "ensure" Expr;
+rules REQUIRE ::= "require" | "requires" ;
+rules ENSURE ::= "ensure" | "ensures" ;
+
+Require . FunSpecDecl ::= REQUIRE Expr;
+Ensure . FunSpecDecl ::= ENSURE Expr;
 LoopInvariant . FunSpecDecl ::= "invariant" BlockIdent Expr;
 
-Rely . ThrSpecDecl ::= "rely" Expr;
-Guarantee . ThrSpecDecl ::= "guarantee" Expr;
+Rely . ProgSpecDecl ::= "rely" Expr;
+Guarantee . ProgSpecDecl ::= "guarantee" Expr;
 
 terminator FunSpecDecl ";";
-
-terminator ThrSpecDecl ";";
+terminator ProgSpecDecl ";";
 
 

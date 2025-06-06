@@ -4,6 +4,8 @@ import ir.cilvisitor.*
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
 
+private val localSigils = false
+
 object PrettyPrinter {
   def pp_expr(e: Expr) = BasilIRPrettyPrinter()(e)
   def pp_stmt(s: Statement) = BasilIRPrettyPrinter()(s)
@@ -322,7 +324,9 @@ class BasilIRPrettyPrinter(
 
   def vparam(l: Variable): String = l match {
     case _: Global => Sigil.BASIR.globalVar + s"${l.name}:${vtype { l.getType }}"
-    case _: LocalVar => s"${l.name}:${vtype { l.getType }}"
+    case _: LocalVar => 
+      val sigil = if localSigils then Sigil.BASIR.localVar else ""
+      s"$sigil${l.name}:${vtype { l.getType }}"
   }
 
   def pp_proc_sig(p: Procedure) = {
@@ -478,12 +482,16 @@ class BasilIRPrettyPrinter(
   }
 
   override def vrvar(e: Variable): PPProg[Variable] = e match {
-    case l: LocalVar => BST(s"${e.name}:${vtype(e.getType)}")
+    case l: LocalVar =>
+      val sigil = if localSigils then Sigil.BASIR.localVar else ""
+      BST(s"${sigil}${e.name}:${vtype(e.getType)}")
     case l: Global => BST(s"${Sigil.BASIR.globalVar}${e.name}:${vtype(e.getType)}")
   }
   override def vlvar(e: Variable): PPProg[Variable] = {
     e match {
-      case l: LocalVar => BST(s"var ${e.name}:${vtype(e.getType)}")
+      case l: LocalVar => 
+        val sigil = if localSigils then Sigil.BASIR.localVar else ""
+        BST(s"var $sigil${e.name}:${vtype(e.getType)}")
       case l: Global => BST(s"${Sigil.BASIR.globalVar}${e.name}:${vtype(e.getType)}")
     }
   }
