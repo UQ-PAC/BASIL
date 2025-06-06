@@ -1,8 +1,9 @@
 package ir.parsing
 
+import util.Logger
 import basil_ir.{Absyn => syntax}
 
-import java.io.FileReader
+import java.io.{FileReader, StringReader, Reader}
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.util.chaining.scalaUtilChainingOps
@@ -265,8 +266,7 @@ case class BasilMainBNFCVisitor[A](
 
 object Run {
 
-  def parse(path: String) = {
-    val reader = new FileReader(path)
+  def loadILReader(reader: Reader) = {
     val lexer = new basil_ir.Yylex(reader);
     val parser = new basil_ir.parser(lexer, lexer.getSymbolFactory());
 
@@ -274,12 +274,27 @@ object Run {
 
     val vis0 = BasilEarlyBNFCVisitor[Unit]()
     val decls = ast.accept(vis0, ())
-    println(decls)
+    Logger.debug(decls)
 
     val vis = BasilMainBNFCVisitor[Unit](decls)
     val result = ast.accept(vis, ())
-    println(result)
+    Logger.debug(result)
     val prog = result.resolve
+    prog
+  }
+
+  def loadILFile(filePath: String): ir.Program = {
+    val reader = new FileReader(filePath)
+    loadILReader(reader)
+  }
+
+  def loadILString(text: String): ir.Program = {
+    val reader = new StringReader(text)
+    loadILReader(reader)
+  }
+
+  def parse(path: String) = {
+    val prog = loadILFile(path)
     println(translating.PrettyPrinter.pp_prog(prog))
   }
 
