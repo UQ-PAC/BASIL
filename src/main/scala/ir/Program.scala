@@ -5,7 +5,6 @@ import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
 import boogie.*
 import analysis.{MergedRegion, Loop}
 import util.intrusive_list.*
-import translating.serialiseIL
 import eval.BitVectorEval
 
 /** Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are not

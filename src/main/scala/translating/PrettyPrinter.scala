@@ -439,12 +439,32 @@ class BasilIRPrettyPrinter(
 
   override def vindirect(target: PPProg[Variable]): PPProg[IndirectCall] = BST(s"indirect call ${target} ")
   override def vassert(body: Assert): PPProg[Assert] = {
-    val comment = body.comment.map(c => s" /* $c */").getOrElse("")
-    BST(s"assert ${vexpr(body.body)}$comment")
+
+    val attrs = body.label.map(l => ("label", l)).toSeq ++ body.comment.map(c => ("comment", c))
+    val attrl =
+      if attrs.nonEmpty then
+        " { " + attrs
+          .map { case (n, l) =>
+            s"${Sigil.BASIR.attrib}$n = \"$l\""
+          }
+          .mkString("; ") + " }"
+      else ""
+
+    BST(s"assert ${vexpr(body.body)}$attrl")
   }
   override def vassume(body: Assume): PPProg[Assume] = {
-    val comment = body.comment.map(c => s" /* $c */").getOrElse("")
-    BST(s"assume ${vexpr(body.body)}$comment")
+    val attrs = body.label.map(l => ("label", l)).toSeq ++ body.comment.map(c => ("comment", c))
+    val attrl =
+      if attrs.nonEmpty then
+        "{ " + attrs
+          .map { case (n, l) =>
+            s"${Sigil.BASIR.attrib}$n = \"$l\""
+          }
+          .mkString("; ") + " }"
+      else ""
+
+    val stmt = if body.checkSecurity then "guard" else "assume"
+    BST(s"$stmt ${vexpr(body.body)}$attrl")
   }
   override def vnop(): PPProg[NOP] = BST("nop")
 
