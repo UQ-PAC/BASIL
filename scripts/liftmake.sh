@@ -36,7 +36,7 @@ GTIRBSEM ?= gtirb_semantics
 BAP ?= bap
 
 .PHONY=all clean 
-all: $(BIN_NAME).adt $(BIN_NAME).relf $(BIN_NAME).gts
+all: $(BIN_NAME).relf $(BIN_NAME).gts
 
 $(BIN_NAME): $(CFILE_NAME)
 	$(CC) $(CFILE_NAME) $(CFLAGS)  -o $(BIN_NAME)

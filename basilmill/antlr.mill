@@ -1,4 +1,4 @@
-package build
+package build.basilmill
 // https://github.com/da-tubi/antlr4-scala-example/blob/master/antlr.sc
 import mill._
 import mill.scalalib._
@@ -12,6 +12,10 @@ trait AntlrModule extends JavaModule {
   def antlrPackage: Option[String] = None
   def antlrGenerateVisitor: Boolean = false
   def antlrGenerateListener: Boolean = false
+
+  override def javadocOptions = Task {
+    super.javadocOptions() ++ Seq("-link", "https://www.antlr.org/api/Java")
+  }
 
   def antlrGrammarSourceFiles = Task {
     antlrGrammarSources()
