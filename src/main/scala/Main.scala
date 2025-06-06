@@ -96,11 +96,11 @@ object Main {
     bapInputDirName: Option[String],
     @arg(name = "load-directory-gtirb", doc = "Load relf and gts from directory (and spec from parent directory)")
     gtirbInputDirName: Option[String],
-    @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file")
+    @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file (requires --relf)")
     inputFileName: Option[String],
     @arg(name = "relf", short = 'r', doc = "Name of the file containing the output of 'readelf -s -r -W'.")
     relfFileName: Option[String],
-    @arg(name = "spec", short = 's', doc = "BASIL specification file.")
+    @arg(name = "spec", short = 's', doc = "BASIL specification file (requires --relf).")
     specFileName: Option[String],
     @arg(name = "output", short = 'o', doc = "Boogie output destination file.")
     outFileName: String = "basil-out.bpl",
