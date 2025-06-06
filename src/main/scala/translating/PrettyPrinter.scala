@@ -324,7 +324,7 @@ class BasilIRPrettyPrinter(
 
   def vparam(l: Variable): String = l match {
     case _: Global => Sigil.BASIR.globalVar + s"${l.name}:${vtype { l.getType }}"
-    case _: LocalVar => 
+    case _: LocalVar =>
       val sigil = if localSigils then Sigil.BASIR.localVar else ""
       s"$sigil${l.name}:${vtype { l.getType }}"
   }
@@ -489,7 +489,7 @@ class BasilIRPrettyPrinter(
   }
   override def vlvar(e: Variable): PPProg[Variable] = {
     e match {
-      case l: LocalVar => 
+      case l: LocalVar =>
         val sigil = if localSigils then Sigil.BASIR.localVar else ""
         BST(s"var $sigil${e.name}:${vtype(e.getType)}")
       case l: Global => BST(s"${Sigil.BASIR.globalVar}${e.name}:${vtype(e.getType)}")

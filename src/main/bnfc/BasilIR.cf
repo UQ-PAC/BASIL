@@ -163,11 +163,11 @@ rules BoolBinOp ::=  "booland" | "boolor" | "boolimplies" ;
 
 {- SPECIFICATION -}
 
-rules REQUIRE ::= "require" | "requires" ;
-rules ENSURE ::= "ensure" | "ensures" ;
+rules RequireTok ::= "require" | "requires" ;
+rules EnsureTok ::= "ensure" | "ensures" ;
 
-Require . FunSpecDecl ::= REQUIRE Expr;
-Ensure . FunSpecDecl ::= ENSURE Expr;
+Require . FunSpecDecl ::= RequireTok Expr;
+Ensure . FunSpecDecl ::= EnsureTok Expr;
 LoopInvariant . FunSpecDecl ::= "invariant" BlockIdent Expr;
 
 Rely . ProgSpecDecl ::= "rely" Expr;
