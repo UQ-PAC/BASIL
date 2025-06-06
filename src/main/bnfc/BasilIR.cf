@@ -8,7 +8,7 @@ token BVTYPE ('b' 'v' digit+) ;
 
 
 {- position token UserIdent '`' ((upper | letter | '_' | '#')(upper | letter | digit | ["_.$#"])*) '`'; -}
-position token BIdent '!'((upper | letter | '_')(upper | letter | digit | ["_.$#"])*) ;
+position token BIdent '.'((upper | letter | '_')(upper | letter | digit | ["_.$#"])*) ;
 
 position token LocalIdent ('%' | upper | letter | '_')((upper | letter | digit | ["_.$#"])*);
 position token GlobalIdent '$' ((upper | letter | digit | ["_.$#"])+);
@@ -48,7 +48,7 @@ Procedure . Declaration ::= ProcDef ;
 
 IntT . IntType ::= "int" ;
 BoolT . BoolType ::= "bool" ;
-MapT . MapType ::= "map" Type BeginList Type EndList ;
+MapT . MapType ::=  "(" Type "->" Type ")";
 BVT . BVType ::= BVTYPE ;
 
 rules Type ::= IntType | BoolType | MapType | BVType ; 

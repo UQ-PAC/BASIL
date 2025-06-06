@@ -195,7 +195,7 @@ class BasilIRPrettyPrinter(
 
   override def vprog(p: Program): PPProg[Program] = {
 
-    val threadspec = s"\nprog { !entry = \"${p.mainProcedure.name}\" }"
+    val threadspec = s"\nprog { ${Sigil.BASIR.attrib}entry = \"${p.mainProcedure.name}\" }"
 
     Prog(
       p.mainProcedure.name,
@@ -226,8 +226,8 @@ class BasilIRPrettyPrinter(
       s"${blockIndent}// $broken"
     })
 
-    val addr = address.map(a => s"!address = ${vaddress(a)}")
-    val olabel = b.meta.originalLabel.map(s => "!originalLabel = \"" + s + "\"")
+    val addr = address.map(a => s"${Sigil.BASIR.attrib}address = ${vaddress(a)}")
+    val olabel = b.meta.originalLabel.map(s => Sigil.BASIR.attrib + "originalLabel = \"" + s + "\"")
     val allattrs = addr.toSeq ++ olabel
     val attr = if allattrs.nonEmpty then Some("{" + allattrs.mkString("; ") + "}") else None
 
@@ -334,18 +334,18 @@ class BasilIRPrettyPrinter(
     val inParams = p.formalInParam.toList.map(vparam)
     val outParams = p.formalOutParam.toList.map(vparam)
 
-    val addr = p.address.map(l => vaddress(l).toString).map("!address = " + _).toList
-    val pname = Seq(s"!name = \"${p.procName}\"")
+    val addr = p.address.map(l => vaddress(l).toString).map(Sigil.BASIR.attrib + "address = " + _).toList
+    val pname = Seq(s"${Sigil.BASIR.attrib}name = \"${p.procName}\"")
 
     val allattrs = pname ++ addr
 
-    val attrs = if allattrs.isEmpty then "" else "{\n" + allattrs.map("  " + _).mkString(";\n") + "\n}"
+    val attrs = if allattrs.isEmpty then "" else "  { " + allattrs.map("" + _).mkString("; ") + " }"
 
     val fnl = if (p.formalInParam.size > 3) then "\n    " else " "
 
     val br = if (inParams.length + outParams.length > 6) then "\n " else ""
 
-    s"proc $name$br (${inParams.mkString(", ")})$fnl-> (${outParams.mkString(", ")})\n $attrs"
+    s"proc $name$br (${inParams.mkString(", ")})$fnl-> (${outParams.mkString(", ")})\n$attrs"
   }
 
   override def vproc(p: Procedure): PPProg[Procedure] = {
@@ -478,7 +478,7 @@ class BasilIRPrettyPrinter(
     case BitVecType(sz) => s"bv$sz"
     case IntType => "nat"
     case BoolType => "bool"
-    case m: MapType => s"map ${vtype(m.result)}[${vtype(m.param)}]"
+    case m: MapType => s"(${vtype(m.param)} -> ${vtype(m.result)})"
   }
 
   override def vrvar(e: Variable): PPProg[Variable] = e match {

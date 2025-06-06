@@ -32,7 +32,7 @@ object Sigil {
     def proc = "@"
     def localVar = "%"
     def globalVar = "$"
-    def attrib = "!"
+    def attrib = "."
   }
 }
 
