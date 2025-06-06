@@ -110,7 +110,7 @@ RVar . Expr ::= BIdent ":" Type;
 rules BinOp ::= BVBinOp | BVLogicalBinOp | BoolBinOp | IntLogicalBinOp | IntBinOp | EqOp;
 BinaryExpr . Expr       ::= BinOp "(" Expr "," Expr ")" ;
 
-rules UnOp ::= BVUnOp | "boolnot" | "intneg" ;
+rules UnOp ::= BVUnOp | "boolnot" | "intneg" |  "booltobv1";
 UnaryExpr . Expr       ::= UnOp "(" Expr ")" ;
 
 ZeroExtend . Expr ::= "zero_extend" "(" IntVal "," Expr ")" ;

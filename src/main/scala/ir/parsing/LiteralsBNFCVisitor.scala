@@ -107,6 +107,7 @@ trait LiteralsBNFCVisitor[A]
   override def visit(x: syntax.UnOpBVUnOp, arg: A): BasilParseValue = x.bvunop_.accept(this, arg)
   override def visit(x: syntax.UnOp_boolnot, arg: A): BasilParseValue = ir.BoolNOT
   override def visit(x: syntax.UnOp_intneg, arg: A): BasilParseValue = ir.IntNEG
+  override def visit(x: syntax.UnOp_booltobv1, arg: A): BasilParseValue = ir.BoolToBV1
 
   // Members declared in Endian.Visitor
   override def visit(x: syntax.LittleEndian, arg: A): BasilParseValue = ir.Endian.LittleEndian
