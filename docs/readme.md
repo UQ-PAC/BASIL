@@ -10,7 +10,6 @@ To get started on development, see [development](development).
 - [development](development/readme.md) Explanation of common development tasks
     - [project-layout](development/project-layout.md) Organisation of the source code
     - [editor-setup](development/editor-setup.md) Guide to basil development in IDEs 
-    - [tool-installation](development/tool-installation.md) Guide to lifter, etc. tool installation
     - [cfg](development/cfg.md) Explanation of the old CFG datastructure 
     - [interpreter](development/interpreter.md) Explanation of IR interpreter
     - [simplification-solvers](development/simplification-solvers.md) Explanation of ir transforms and simplifications
@@ -27,6 +26,8 @@ for verifying information flow on concurrent code.
 
 $wp_{if}^{\cal R G}$ is the program logic BASIL implements for information flow verification. It is described in 
 the paper by [Winter, Coughlin, Smith '21 in CSF](https://github.com/UQ-PAC/wpif_CSF21/blob/main/WinterCoughlinSmith_CSF2021.pdf).
+
+This information-flow logic as implemented in the BASIL tool can found described [here](iflogic-encoding.pdf).
 
 Broadly, we consider information leaks under shared memory communication of parallel processes.
 A "leak", is some secret information being stored somewhere it is not allowed to be.
