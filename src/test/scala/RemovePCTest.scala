@@ -15,7 +15,7 @@ class RemovePCTest extends AnyFunSuite with CaptureOutput {
       BASILConfig(
         loading = ILLoadingConfig(
           inputFile = s"${BASILTest.rootDirectory}/src/test/correct/$name/$variation/$name.gts",
-          relfFile = s"${BASILTest.rootDirectory}/src/test/correct/$name/$variation/$name.relf",
+          relfFile = Some(s"${BASILTest.rootDirectory}/src/test/correct/$name/$variation/$name.relf"),
           specFile = None,
           dumpIL = None,
           pcTracking = if keepPC then PCTrackingOption.Assert else PCTrackingOption.None
