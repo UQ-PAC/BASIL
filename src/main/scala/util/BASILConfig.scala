@@ -59,6 +59,7 @@ case class BASILConfig(
   summariseProcedures: Boolean = false,
   generateRelyGuarantees: Boolean = false,
   memoryTransform: Boolean = false,
+  assertCalleeSaved: Boolean = false,
   staticAnalysis: Option[StaticAnalysisConfig] = None,
   boogieTranslation: BoogieGeneratorConfig = BoogieGeneratorConfig(),
   outputPrefix: String
