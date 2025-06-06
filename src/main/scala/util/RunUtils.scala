@@ -128,6 +128,8 @@ object IRLoading {
       IRTranslator.translate
     } else if (q.inputFile.endsWith(".gts")) {
       loadGTIRB(q.inputFile, mainAddress)
+    } else if (q.inputFile.endsWith(".il")) {
+      ir.parsing.Run.loadILFile(q.inputFile)
     } else {
       throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
     }
