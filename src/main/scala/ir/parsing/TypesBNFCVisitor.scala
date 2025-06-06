@@ -28,7 +28,7 @@ trait TypesBNFCVisitor[A]
 
   // Members declared in MapType.Visitor
   override def visit(x: syntax.MapT, arg: A) =
-    ir.MapType(x.type_1.accept(this, arg), x.type_2.accept(this, arg))
+    ir.MapType(x.type_2.accept(this, arg), x.type_1.accept(this, arg))
 
   // Members declared in IntType.Visitor
   override def visit(x: syntax.IntT, arg: A) = ir.IntType
