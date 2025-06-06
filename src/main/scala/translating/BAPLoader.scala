@@ -125,7 +125,7 @@ class BAPLoader {
   def visitDirectCall(ctx: DirectCallContext): BAPDirectCall = {
     val returnTarget = Option(ctx.returnTarget) match {
       case Some(r: DirectContext) => Some(visitTid(r.tid))
-      case None                   => None
+      case None => None
     }
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")

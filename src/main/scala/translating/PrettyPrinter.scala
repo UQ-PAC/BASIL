@@ -351,11 +351,7 @@ class BasilIRPrettyPrinter(
     val inParams = p.formalInParam.toList.map(vparam)
     val outParams = p.formalOutParam.toList.map(vparam)
     val entryBlock = p.entryBlock
-    val middleBlocks =
-      (p.entryBlock.toList ++ (p.blocks.toSet -- p.entryBlock.toSet -- p.returnBlock.toSet).toList.sortBy(x =>
-        -x.rpoOrder
-      )
-        ++ p.returnBlock).map(vblock)
+    val middleBlocks = p.blocks.filterNot(p.returnBlock.contains).filterNot(p.entryBlock.contains)
     val returnBlock = p.returnBlock.map(vblock)
 
     val localDecls = decls.toList.sorted
