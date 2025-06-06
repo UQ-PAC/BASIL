@@ -281,7 +281,9 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
     )
     assert(analysisResults(blocks("zero_entry")) == Map(R31 -> TwoElementTop))
     assert(analysisResults(laftercall) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block
-    assert(analysisResults(blocks("zero_entry").parent.returnBlock.get) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(
+      analysisResults(blocks("zero_entry").parent.returnBlock.get) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)
+    )
   }
 
   test("function1") {
@@ -323,7 +325,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
     ) // get_two aftercall
     assert(analysisResults(l_printf_aftercall) == Map(R31 -> TwoElementTop)) // printf aftercall
     assert(
-      analysisResults(blocks("get_two_entry")) == main ++ Map(R0 -> TwoElementTop, R1 -> TwoElementTop, R2 -> TwoElementTop)
+      analysisResults(blocks("get_two_entry")) == main ++ Map(
+        R0 -> TwoElementTop,
+        R1 -> TwoElementTop,
+        R2 -> TwoElementTop
+      )
     )
     assert(
       analysisResults(blocks("get_two_entry").parent.returnBlock.get) == main ++ Map(
@@ -339,7 +345,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.labelToBlock
 
-    val gotoBlocks = result.ir.program.procedures.flatMap(_.blocks).filter(_.nextBlocks.size > 1).flatMap(b => b.nextBlocks.map(nb => nb.label -> nb)).toMap
+    val gotoBlocks = result.ir.program.procedures
+      .flatMap(_.blocks)
+      .filter(_.nextBlocks.size > 1)
+      .flatMap(b => b.nextBlocks.map(nb => nb.label -> nb))
+      .toMap
     assert(gotoBlocks.size == 2)
 
     val blockAfterBranch = gotoBlocks.values.map(_.singleSuccessor.head.singleSuccessor.head).toSet

@@ -406,7 +406,7 @@ def inOutParams(
       // of registers
 
       val outParams = (overapprox.intersect(DefinedOnAllPaths.proc(proc)))
-      val inParams = lives(proc)._1
+      val inParams = lives(proc)._1 ++ (if proc.procName == "main" then Set(R(0), R(1)) else Set())
       proc -> (inParams + pc, outParams + pc)
     }
     case (proc, rws) => {
@@ -414,7 +414,7 @@ def inOutParams(
       val liveEnd = lives(proc)._2 ++ alwaysReturnParams
 
       val outParams = liveEnd.intersect(rws.writes)
-      val inParams = liveStart
+      val inParams = liveStart ++ (if proc.procName == "main" then Set(R(0), R(1)) else Set())
       proc -> (inParams + pc, outParams + pc)
     }
   }.toMap

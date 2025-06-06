@@ -120,7 +120,7 @@ class Program(
   }
 
   override def toString(): String = {
-    serialiseIL(this)
+    translating.PrettyPrinter.pp_prog(this)
   }
 
   def setModifies(specModifies: Map[String, List[String]]): Unit = {
@@ -360,6 +360,7 @@ class Procedure private (
   }
 
   override def toString: String = Sigil.BASIR.proc + name
+  def dumpString: String = translating.PrettyPrinter.pp_proc(this)
 
   def calls: Set[Procedure] = blocks.iterator.flatMap(_.calls).toSet
 
@@ -614,6 +615,7 @@ class Block private (
   }
 
   override def toString: String = Sigil.BASIR.block + label
+  def dumpString: String = translating.PrettyPrinter.pp_block(this)
 
   /** @return
     *   The intra-procedural set of successor blocks. If the block ends in a call then the empty set is returned.
