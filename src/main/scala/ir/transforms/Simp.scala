@@ -1147,6 +1147,19 @@ def validatedSimplifyPipeline(p: Program) = {
     }
   }
 
+  def params(p: Program) = {
+    val name = "ProcedureParameters"
+    val validator = TranslationValidator()
+    validator.setTargetProg(p)
+    ir.transforms.liftProcedureCallAbstraction(util.IRLoading.load(p))
+    validator.setSourceProg(p)
+    validator.setEqualVarsInvariant
+    val (prog, splits) = validator.getValidationProgWPConj
+    writeValidationProg(prog, name)
+    validator.getValidationSMT("tvsmt/" + name)
+  }
+
+  params(p)
   // transformAndValidate(x => (), "NOP")(p)
   // transformAndValidate(combineBlocks, "combineblocks")(p)
   applyRPO(p)

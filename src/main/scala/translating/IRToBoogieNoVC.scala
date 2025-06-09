@@ -4,6 +4,7 @@ import boogie.*
 import specification.*
 import scala.collection.mutable
 import ir.cilvisitor.*
+import ir.transforms.*
 
 object BoogieTranslator {
 
@@ -190,6 +191,10 @@ object BoogieTranslator {
 }
 
 class FindVars extends CILVisitor {
+  /*
+   * Collect variables visited by performing performs DFS of call tree.
+   */
+
   val vars = mutable.Set[Variable]()
   val mems = mutable.Set[Memory]()
   var procsSeen = mutable.Set[Procedure]()

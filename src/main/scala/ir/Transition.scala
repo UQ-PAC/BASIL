@@ -5,6 +5,7 @@ import java.io.File
 import ir.dsl.*
 import scala.collection.mutable
 import analysis.Loop
+import analysis.ProcFrames.*
 import ir.dsl.IRToDSL
 import ir.cilvisitor.*
 import translating.PrettyPrinter.*
@@ -332,9 +333,7 @@ object Ackermann {
           }
         }
         case _ => ()
-
       }
-
     }
 
     class RemoveArgCopy extends CILVisitor {
@@ -353,7 +352,13 @@ object Ackermann {
   }
 }
 
-class RewriteSideEffects() extends CILVisitor {
+class RewriteSideEffects(frames: Procedure => Frame) extends CILVisitor {
+
+  /**
+   * Converts side-effecting statements to pure monadic structure of uninterpreted functions over trace variable
+   *
+   * NOTE: Requires modifies be correct on procedures to lift globals into params
+   */
 
   def loadFunc(lhs: Variable, size: Int, addr: Expr) = {
     val loadValue =
@@ -361,7 +366,6 @@ class RewriteSideEffects() extends CILVisitor {
     val trace =
       (traceVar, UninterpretedFunction("trace_load_" + size, Seq(traceVar, addr), traceType))
     List(SimulAssign(Vector(trace, loadValue)))
-
   }
 
   def storeFunc(size: Int, addr: Expr, value: Expr) =
@@ -370,16 +374,30 @@ class RewriteSideEffects() extends CILVisitor {
     ))
 
   def directCallFunc(m: DirectCall) = {
-    val params = traceVar :: m.actualParams.toList.map(_._2)
+    // readMem is captured by trace
+    val globalsCaptured = frames(m.target).readGlobalVars
+      .collect { case e: Expr =>
+        e
+      }
+      .toVector
+      .sortBy(_.toString)
+    val globalsModified = frames(m.target).modifiedGlobalVars
+      .collect { case e: Variable =>
+        e
+      }
+      .toVector
+      .sortBy(_.toString)
+    val params = traceVar :: (m.actualParams.toList.map(_._2) ++ globalsCaptured)
     val trace =
       traceVar ->
         UninterpretedFunction("Call_" + m.target.name, params, traceType)
-    val outParams = m.outParams.toList
-      .map(p =>
-        p._2 ->
-          UninterpretedFunction("Call_" + m.target.name + "_" + p._1.name, params, p._2.getType)
-      )
-      .toList
+    val outParams = (m.outParams.toList.map { case (formal, actual) =>
+      formal.name -> actual
+    } ++ globalsModified.map { case g =>
+      g.name -> g
+    }).map { case (label: String, v: Variable) =>
+      v -> UninterpretedFunction("Call_" + m.target.name + "_" + label, params, v.getType)
+    }
 
     List(SimulAssign((trace :: outParams).toVector))
   }
@@ -422,7 +440,7 @@ object PCMan {
 
 import PCMan.*
 
-def procToTransition(p: Procedure, loops: List[Loop], cutJoins: Boolean = false) = {
+def procToTransition(p: Procedure, loops: List[Loop], frames: Map[Procedure, Frame], cutJoins: Boolean = false) = {
 
   val pcVar = transitionSystemPCVar
   var cutPoints = Map[String, Block]()
@@ -547,7 +565,7 @@ def procToTransition(p: Procedure, loops: List[Loop], cutJoins: Boolean = false)
 
   }
   synthExit.replaceJump(Return())
-  visit_proc(RewriteSideEffects(), p)
+  visit_proc(RewriteSideEffects(g => frames.getOrElse(g, Frame())), p)
   cutPoints
 
 }
@@ -555,7 +573,7 @@ def procToTransition(p: Procedure, loops: List[Loop], cutJoins: Boolean = false)
 /**
  * Converts each procedure to a transition system
  */
-def toTransitionSystem(iprogram: Program) = {
+def toTransitionSystem(iprogram: Program, frames: Map[Procedure, Frame]) = {
 
   val program = IRToDSL.convertProgram(iprogram).resolve
 
@@ -564,7 +582,7 @@ def toTransitionSystem(iprogram: Program) = {
 
   val cutPoints = program.procedures
     .map(p => {
-      p -> procToTransition(p, floops)
+      p -> procToTransition(p, floops, frames)
     })
     .toMap
 
@@ -633,10 +651,12 @@ class TranslationValidator {
 
   var beforeProg: Option[Program] = None
   var liveBefore = Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])]()
+  var beforeFrame = Map[Procedure, Frame]()
   // proc -> block -> absdom
 
   var afterProg: Option[Program] = None
   var liveAfter = Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])]()
+  var afterFrame = Map[Procedure, Frame]()
 
   var beforeCuts: Map[Procedure, Map[String, Block]] = Map()
   var afterCuts: Map[Procedure, Map[String, Block]] = Map()
@@ -661,6 +681,7 @@ class TranslationValidator {
   }
 
   val invariants = mutable.Map[String, List[Inv]]()
+  var asserts = Vector[Assert]()
 
   val beforeRenamer = NamespaceState("target")
   val afterRenamer = NamespaceState("source")
@@ -987,15 +1008,46 @@ class TranslationValidator {
   }
 
   def setTargetProg(p: Program) = {
+    beforeFrame = inferProcFrames(p)
     initProg = Some(p)
-    val (prog, cuts) = toTransitionSystem(p)
+    val (prog, cuts) = toTransitionSystem(p, beforeFrame)
     liveBefore = p.procedures.map(p => p.name -> transforms.getLiveVars(p)).toMap
     beforeProg = Some(prog)
     beforeCuts = cuts
   }
 
+  var paramCall = Map[Procedure, Map[Variable, Variable]]()
+  var paramReturn = Map[Procedure, Map[Variable, Variable]]()
+
+  /**
+   * For parameter analysis: describes an invariant across all call sites
+   * between source and target. 
+   *
+   * Assume call lvalues are invariant across all calls
+   *
+   * e.g.
+   *
+   * (%R0) := call proc (%R0, %R1)
+   * () := call proc()
+   *
+   * inParam
+   *  %R0 -> $R0, %R1 -> $R1
+   *
+   * outParam
+   *  %R0 -> $R0
+   *
+   */
+  def setParamMapping(
+    mapCall: Map[Procedure, Map[Variable, Variable]],
+    mapReturn: Map[Procedure, Map[Variable, Variable]]
+  ) = {
+    paramCall = mapCall
+    paramReturn = mapReturn
+  }
+
   def setSourceProg(p: Program) = {
-    val (prog, cuts) = toTransitionSystem(p)
+    afterFrame = inferProcFrames(p)
+    val (prog, cuts) = toTransitionSystem(p, afterFrame)
     liveAfter = p.procedures.map(p => p.name -> transforms.getLiveVars(p)).toMap
     afterProg = Some(prog)
     afterCuts = cuts
@@ -1009,7 +1061,12 @@ class TranslationValidator {
     invariants(p) = l
   }
 
+  def addAssumedAssertions(a: Iterable[Assert]) = {
+    asserts = asserts ++ a
+  }
+
   def addRDInvariant() = {
+    // WARN: broken
     val defsSource = initProg.get.procedures.map(p => p.name -> reachingDefs(p)).toMap
     beforeCuts
       .filter((proc, _) => defsSource.contains(proc.name))

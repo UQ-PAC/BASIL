@@ -725,6 +725,7 @@ object RunUtils {
   }
 
   def simpPreprocess(program: Program) = {
+    ir.transforms.clearParams(program)
     val foundLoops = LoopDetector.identify_loops(program)
     foundLoops.updateIrWithLoops()
     for (p <- program.procedures) {
@@ -944,34 +945,22 @@ object RunUtils {
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
 
     ir.eval.SimplifyValidation.validate = conf.validateSimp
-    if (conf.simplify || conf.tvSimp) {
 
+    if (conf.simplify) {
       ir.transforms.clearParams(ctx.program)
-
       ir.transforms.liftIndirectCall(ctx.program)
       transforms.liftSVCompNonDetEarlyIR(ctx.program)
 
       DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
       DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
-
-      if (conf.tvSimp) {
-        doSimplifyTV(ctx, conf.staticAnalysis)
-      } else {
-        doSimplify(ctx, conf.staticAnalysis)
-      }
-
-      val (ts, _) = toTransitionSystem(ctx.program)
-
-      if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
-        val dir = File("./graphs/")
-        if (!dir.exists()) then dir.mkdirs()
-        for (p <- ts.procedures) {
-          DebugDumpIRLogger.writeToFile(File(s"graphs/transition-${p.name}-after-simp.dot"), dotBlockGraph(p))
-        }
-      }
-
+      doSimplify(ctx, conf.staticAnalysis)
     }
+
+    if (conf.tvSimp) {
+      doSimplifyTV(ctx, conf.staticAnalysis)
+    }
+
     if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
       val dir = File("./graphs/")
       if (!dir.exists()) then dir.mkdirs()
