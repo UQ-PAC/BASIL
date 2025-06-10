@@ -40,13 +40,13 @@ case class InnerBasilBNFCVisitor[A](
 
   def variable(x: LVarSpec): ir.Variable =
     x match {
-      case (name, ty, true) => ir.LocalVar(name, ty)
+      case (name, ty, true) => ir.LocalVar.ofIndexed(name, ty)
       case (name, ty, false) => ir.Register(name, ty.asInstanceOf[ir.BitVecType].size)
     }
 
   def localvar(x: LVarSpec): ir.LocalVar =
     x match {
-      case (name, ty, _) => ir.LocalVar(name, ty)
+      case (name, ty, _) => ir.LocalVar.ofIndexed(name, ty)
     }
 
   // Members declared in Type.Visitor
@@ -71,7 +71,7 @@ case class InnerBasilBNFCVisitor[A](
     decls.globals
       .get(x.bident_)
       .filter(x => ir.BitVecType(x.size) == ty)
-      .getOrElse(ir.LocalVar(x.bident_, ty))
+      .getOrElse(ir.LocalVar.ofIndexed(x.bident_, ty))
 
   override def visit(x: syntax.BinaryExpr, arg: A): BasilParseValue =
     ir.BinaryExpr(x.binop_.accept(this, arg).binop, x.expr_1.accept(this, arg).expr, x.expr_2.accept(this, arg).expr)
@@ -213,7 +213,7 @@ case class BasilMainBNFCVisitor[A](
     with syntax.ProcDef.Visitor[ir.dsl.EventuallyProcedure, (A, String)] {
 
   def localvar(name: String, x: syntax.Type, arg: A): ir.LocalVar =
-    ir.LocalVar(name, x.accept(this, arg))
+    ir.LocalVar.ofIndexed(name, x.accept(this, arg))
 
   def params(x: syntax.ListParams, arg: A): List[ir.Variable] =
     x.asScala.map(_.accept(this, arg)).toList
@@ -264,7 +264,7 @@ case class BasilMainBNFCVisitor[A](
   }
 }
 
-object Run {
+object ParseBasilIL {
 
   def loadILReader(reader: Reader) = {
     val lexer = new basil_ir.Yylex(reader);

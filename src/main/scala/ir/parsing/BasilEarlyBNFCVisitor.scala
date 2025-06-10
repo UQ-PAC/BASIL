@@ -107,7 +107,7 @@ case class BasilEarlyBNFCVisitor[A]()
     Declarations.empty.copy(globals = Map(v.name -> v))
 
   override def visit(x: syntax.Param, arg: A): ir.LocalVar =
-    ir.LocalVar(x.bident_, x.type_.accept(this, arg))
+    ir.LocalVar.ofIndexed(x.bident_, x.type_.accept(this, arg))
 
   private def visitParams(x: syntax.ListParams, arg: A): Map[String, ir.IRType] =
     // NOTE: uses ListMap instead of SortedMap, because the orders are presumed to

@@ -294,7 +294,7 @@ def removeSlices(p: Procedure): Unit = {
     override def vexpr(v: Expr) = {
       v match {
         case Extract(i, 0, v: LocalVar) if size(v).isDefined && varHighZeroBits.contains(v) => {
-          ChangeTo(LocalVar(v.name, BitVecType(size(v).get - varHighZeroBits(v))))
+          ChangeTo(LocalVar(v.varName, BitVecType(size(v).get - varHighZeroBits(v)), v.index))
         }
         case _ => DoChildren()
       }
@@ -304,7 +304,7 @@ def removeSlices(p: Procedure): Unit = {
         case a @ LocalAssign(lhs: LocalVar, ZeroExtend(sz, rhs), _)
             if size(lhs).isDefined && varHighZeroBits.contains(lhs) => {
           assert(varHighZeroBits(lhs) == sz)
-          a.lhs = LocalVar(lhs.name, BitVecType(size(lhs).get - varHighZeroBits(lhs)))
+          a.lhs = LocalVar(lhs.varName, BitVecType(size(lhs).get - varHighZeroBits(lhs)), lhs.index)
           a.rhs = rhs
           DoChildren()
         }

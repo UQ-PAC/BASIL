@@ -2,8 +2,9 @@ package ir
 import boogie._
 import util.CachedHashCode
 import scala.collection.mutable
+import util.functional.Snoc
 
-sealed trait Expr {
+sealed trait Expr extends DeepEquality {
   def toBoogie: BExpr
   def getType: IRType
 
@@ -13,6 +14,7 @@ sealed trait Expr {
   /** all variables that occur in the expression */
   def variables: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Expr = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
+  override def deepEquals(o: Object) = this.equals(o)
 
   lazy val variablesCached = variables
 }
@@ -379,16 +381,39 @@ case class Register(override val name: String, size: Int) extends Variable with 
 case class LocalVar(varName: String, override val irType: IRType, val index: Int = 0)
     extends Variable
     with CachedHashCode {
+
+  varName match {
+    case s"R0_3" => assert(false)
+    case _ => ()
+  }
+
   override val name = varName + (if (index > 0) then s"_$index" else "")
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
-  override def toString: String = s"LocalVar(${name}, $irType)"
+  override def toString: String = s"LocalVar(${varName}, $index, $irType)"
   override def acceptVisit(visitor: Visitor): Variable = visitor.visitLocalVar(this)
 }
 
 object LocalVar {
   def unapply(l: LocalVar): Some[(String, IRType, Int)] = Some((l.name, l.irType, l.index))
 
+  def ofIndexed(n: String, t: IRType) = n.split("_").toList match {
+    case Snoc(Nil, r) => {
+      LocalVar(n, t, 0)
+    }
+    case Snoc(_, "0") | Snoc(_, "out") | Snoc(_, "in") => {
+      LocalVar(n, t, 0)
+    }
+    case Snoc(r, ind) => {
+      try {
+        LocalVar(r.mkString("_"), t, (ind.toInt))
+      } catch
+        _ => {
+          LocalVar(n, t, 0)
+        }
+    }
+    case _ => LocalVar(n, t, 0)
+  }
 }
 
 /** A global memory section (subject to shared-memory concurrent accesses from multiple threads). */
