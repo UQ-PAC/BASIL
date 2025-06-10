@@ -398,20 +398,14 @@ object LocalVar {
   def unapply(l: LocalVar): Some[(String, IRType, Int)] = Some((l.name, l.irType, l.index))
 
   def ofIndexed(n: String, t: IRType) = n.split("_").toList match {
-    case Snoc(Nil, r) => {
+    case Snoc(Nil, r) =>
       LocalVar(n, t, 0)
-    }
-    case Snoc(_, "0") | Snoc(_, "out") | Snoc(_, "in") => {
+    case Snoc(_, "0") | Snoc(_, "out") | Snoc(_, "in") =>
       LocalVar(n, t, 0)
-    }
-    case Snoc(r, ind) => {
-      try {
-        LocalVar(r.mkString("_"), t, (ind.toInt))
-      } catch
-        _ => {
-          LocalVar(n, t, 0)
-        }
-    }
+    case Snoc(r, ind) =>
+      try LocalVar(r.mkString("_"), t, (ind.toInt))
+      catch
+        _ => LocalVar(n, t, 0)
     case _ => LocalVar(n, t, 0)
   }
 }

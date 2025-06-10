@@ -341,7 +341,6 @@ class Procedure private (
       p.blocksBookended.zip(blocksBookended).forall { case ((l: Block), (r: Block)) =>
         l.deepEqualsDbg(r)
       }
-
     }
   }
 
