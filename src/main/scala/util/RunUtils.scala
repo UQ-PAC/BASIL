@@ -137,6 +137,7 @@ object IRLoading {
     } yield (IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program))
 
     val ctx = withRelf.getOrElse {
+      assert(q.inputFile.endsWith(".gts"), "Only gtirb supports omitting relf")
       val prog = loadGTIRB(q.inputFile, None, Some(q.mainProcedureName))
       IRLoading.load(prog)
     }
