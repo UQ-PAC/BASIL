@@ -9,18 +9,6 @@ import translating.serialiseIL
 import eval.BitVectorEval
 import translating.PrettyPrinter.*
 
-trait DeepEquality {
-  val debug = false
-  def deepEquals(o: Object): Boolean
-  def deepEqualsDbg(o: Object): Boolean = {
-    val r = deepEquals(o)
-    if (debug && !r) {
-      println(s"$this != $o")
-    }
-    r
-  }
-}
-
 /** Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are not
   * guaranteed to be in any defined order.
   */
@@ -87,15 +75,12 @@ class Program(
   }
   private def deepEqualsProg(p: Program): Boolean = {
     def toMap(p: Program) = {
-      p.procedures.filterNot(_ == p.mainProcedure).view.map(p => p.name -> p).toMap
+      p.procedures.view.map(p => p.name -> p).toMap
     }
-
     val t = toMap(this)
     val o = toMap(p)
-
-    mainProcedure.deepEqualsDbg(p.mainProcedure) && (t.keys == o.keys) &&
-    t.zip(o).forall { case ((n1, l), (n2, r)) =>
-      l.deepEqualsDbg(r)
+    (mainProcedure.name == p.mainProcedure.name) && (t.keys == o.keys) && t.keys.forall { case k =>
+      t(k).deepEquals(o(k))
     }
   }
 

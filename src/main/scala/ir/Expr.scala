@@ -4,7 +4,7 @@ import util.CachedHashCode
 import scala.collection.mutable
 import util.functional.Snoc
 
-sealed trait Expr extends DeepEquality {
+sealed trait Expr extends DefaultDeepEquality {
   def toBoogie: BExpr
   def getType: IRType
 
@@ -14,7 +14,6 @@ sealed trait Expr extends DeepEquality {
   /** all variables that occur in the expression */
   def variables: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Expr = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
-  override def deepEquals(o: Object) = this.equals(o)
 
   lazy val variablesCached = variables
 }
@@ -397,16 +396,21 @@ case class LocalVar(varName: String, override val irType: IRType, val index: Int
 object LocalVar {
   def unapply(l: LocalVar): Some[(String, IRType, Int)] = Some((l.name, l.irType, l.index))
 
-  def ofIndexed(n: String, t: IRType) = n.split("_").toList match {
+  /**
+   * Construct a LocalVar by infering its index from the provided name corresponding to [[LocalVar.name]].
+   * It matches the value of [[name]] result, dropping an '_0' suffix or otherwise extracting index [[${name}_${index}]].
+   * Use only when the [[index]] field has been lost/mangled with the name, e.g. due to serialisation & parsing.
+   */
+  def ofIndexed(name: String, ty: IRType) = name.split("_").toList match {
     case Snoc(Nil, r) =>
-      LocalVar(n, t, 0)
+      LocalVar(name, ty, 0)
     case Snoc(_, "0") | Snoc(_, "out") | Snoc(_, "in") =>
-      LocalVar(n, t, 0)
+      LocalVar(name, ty, 0)
     case Snoc(r, ind) =>
-      try LocalVar(r.mkString("_"), t, (ind.toInt))
+      try LocalVar(r.mkString("_"), ty, (ind.toInt))
       catch
-        _ => LocalVar(n, t, 0)
-    case _ => LocalVar(n, t, 0)
+        _ => LocalVar(name, ty, 0)
+    case _ => LocalVar(name, ty, 0)
   }
 }
 

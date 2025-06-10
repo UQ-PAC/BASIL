@@ -49,24 +49,24 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
     assert(expected.pprint == actual.pprint, s"pretty printed equality")
   }
 
+  class StripLabel extends CILVisitor {
+    /* Strip features not preserved by serialiser */
+    override def vstmt(s: Statement) = s match {
+      case LocalAssign(a, b, c) => ChangeTo(List(LocalAssign(a, b, None)))
+      case MemoryAssign(l, r, lbl) => ChangeTo(List(MemoryAssign(l, r, None)))
+      case MemoryStore(m, i, v, e, s, lbl) => ChangeTo(List(MemoryStore(m, i, v, e, s, None)))
+      case MemoryLoad(l, m, i, e, s, lbl) => ChangeTo(List(MemoryLoad(l, m, i, e, s, None)))
+      case DirectCall(t, o, a, lbl) => ChangeTo(List(DirectCall(t, None, SortedMap.from(o), SortedMap.from(a))))
+      case Assert(b, com, lab) => ChangeTo(List(Assert(b)))
+      case Assume(b, com, lab, c) => ChangeTo(List(Assume(b, None, None, c)))
+      case _ => SkipChildren()
+    }
+  }
+
   /**
    * Asserts structural equality on the IR via after a round-trip through the parser
    */
   def assertSerialisedParsedEqual(expected: Program) = {
-
-    class StripLabel extends CILVisitor {
-      /* Strip features not preserved by serialiser */
-      override def vstmt(s: Statement) = s match {
-        case LocalAssign(a, b, c) => ChangeTo(List(LocalAssign(a, b, None)))
-        case MemoryAssign(l, r, lbl) => ChangeTo(List(MemoryAssign(l, r, None)))
-        case MemoryStore(m, i, v, e, s, lbl) => ChangeTo(List(MemoryStore(m, i, v, e, s, None)))
-        case MemoryLoad(l, m, i, e, s, lbl) => ChangeTo(List(MemoryLoad(l, m, i, e, s, None)))
-        case DirectCall(t, o, a, lbl) => ChangeTo(List(DirectCall(t, None, SortedMap.from(o), SortedMap.from(a))))
-        case Assert(b, com, lab) => ChangeTo(List(Assert(b)))
-        case Assume(b, com, lab, c) => ChangeTo(List(Assume(b, None, None, c)))
-        case _ => SkipChildren()
-      }
-    }
 
     visit_prog(StripLabel(), expected)
 
