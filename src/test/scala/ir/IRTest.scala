@@ -46,7 +46,7 @@ class IRTest extends AnyFunSuite with CaptureOutput {
     assert(IntraProcIRCursor.pred(blocks("lmain1")) == Set(blocks("lmain").jump))
     assert(IntraProcIRCursor.pred(blocks("lmain2")) == Set(blocks("lmain1").jump))
 
-    blocks("lmain").replaceJump(goto("lmain2").resolve(p, null))
+    blocks("lmain").replaceJump(goto("lmain2").resolve(p, "main"))
 
     assert(IntraProcIRCursor.succ(blocks("lmain").jump) == Set(blocks("lmain2")))
     // lmain1 is unreachable but still jumps to lmain2
@@ -124,14 +124,14 @@ class IRTest extends AnyFunSuite with CaptureOutput {
       LocalAssign(R0, bv64(22)),
       LocalAssign(R0, bv64(22)),
       goto("lmain2")
-    ).resolve(p, pp)
+    ).resolve(p, pp.name)
     val b1 = block(
       "newblock1",
       LocalAssign(R0, bv64(22)),
       LocalAssign(R0, bv64(22)),
       LocalAssign(R0, bv64(22)),
       goto("lmain2")
-    ).resolve(p, pp)
+    ).resolve(p, pp.name)
 
     p.procedures.head.addBlocks(Seq(b1, b2))
 
@@ -157,9 +157,9 @@ class IRTest extends AnyFunSuite with CaptureOutput {
       LocalAssign(R0, bv64(22)),
       directCall("main"),
       unreachable
-    ).resolve(p, called)
+    ).resolve(p, "called")
     val b2 = block("newblock1", LocalAssign(R0, bv64(22)), LocalAssign(R0, bv64(22)), LocalAssign(R0, bv64(22)), ret)
-      .resolve(p, called)
+      .resolve(p, "called")
 
     assert(p.mainProcedure eq p.procedures.find(_.name == "main").get)
 
@@ -176,7 +176,7 @@ class IRTest extends AnyFunSuite with CaptureOutput {
     val procs = p.nameToProcedure
 
     assert(called.incomingCalls().isEmpty)
-    val b3 = block("newblock3", LocalAssign(R0, bv64(22)), directCall("called"), unreachable).resolve(p, called)
+    val b3 = block("newblock3", LocalAssign(R0, bv64(22)), directCall("called"), unreachable).resolve(p, "called")
 
     blocks = p.labelToBlock
 
@@ -195,11 +195,11 @@ class IRTest extends AnyFunSuite with CaptureOutput {
     p.mainProcedure.replaceBlock(b3, b3)
     assert(called.incomingCalls().toSet == Set(b3.statements.last))
     assert(olds == blocks.size)
-    p.mainProcedure.addBlock(block("test", ret).resolve(p, p.mainProcedure))
+    p.mainProcedure.addBlock(block("test", ret).resolve(p, p.mainProcedure.name))
     blocks = p.labelToBlock
     assert(olds != blocks.size)
 
-    p.mainProcedure.replaceBlocks(Set(block("test", ret).resolve(p, p.mainProcedure)))
+    p.mainProcedure.replaceBlocks(Set(block("test", ret).resolve(p, p.mainProcedure.name)))
     blocks = p.labelToBlock
     assert(blocks.count(_(1).parent.name == "main") == 1)
 
@@ -219,7 +219,7 @@ class IRTest extends AnyFunSuite with CaptureOutput {
 
     assert(blocks.size > 1)
     assert(procs("main").entryBlock.isDefined)
-    procs("main").returnBlock = block("retb", ret).resolve(p, procs("main"))
+    procs("main").returnBlock = block("retb", ret).resolve(p, "main")
     assert(procs("main").returnBlock.isDefined)
     procs("main").clearBlocks()
 
@@ -430,7 +430,7 @@ class IRTest extends AnyFunSuite with CaptureOutput {
 
     // these calls should not throw
     assert(prog(recursiveproc) != null)
-    assert(recursiveproc.addToProg(emptyprog) != null)
+    assert(recursiveproc.addToProg(Resolver(emptyprog)) != null)
   }
 
   test("LambdaTypes") {
