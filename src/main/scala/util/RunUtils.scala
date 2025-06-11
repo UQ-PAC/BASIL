@@ -892,7 +892,7 @@ object RunUtils {
     if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
-    } else {
+    } else if (q.simplify) {
       ir.transforms.clearParams(ctx.program)
     }
     assert(invariant.correctCalls(ctx.program))
