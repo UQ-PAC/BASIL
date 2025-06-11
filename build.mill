@@ -156,8 +156,9 @@ object `package` extends RootModule with ScalaModule {
   }
 
   object bnfc extends BNFCJFlexModule {
-    def bnfcPackageName = "basil_ir"
-    def bnfcSource = Task.Source {
+    override def bnfcPackageName = "basil_ir"
+    override def bnfcExtraArgs = Seq("--line-numbers")
+    override def bnfcSource = Task.Source {
       PathRef(build.millSourcePath / "main" / "bnfc" / "BasilIR.cf")
     }
     override def javadocOptions = Task {
