@@ -11,6 +11,7 @@ import analysis.data_structure_analysis
 import test_util.{BASILTest, CaptureOutput}
 import util.DSAConfig.Checks
 
+@test_util.tags.AnalysisSystemTest3
 @test_util.tags.AnalysisSystemTest
 class IntervalDSATest extends AnyFunSuite with CaptureOutput {
   def runAnalysis(program: Program): StaticAnalysisContext = {
