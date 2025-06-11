@@ -139,6 +139,7 @@ BinaryExpr . Expr       ::= BinOp "(" Expr "," Expr ")" ;
 
 rules UnOp ::= BVUnOp | "boolnot" | "intneg" | "booltobv1";
 UnaryExpr . Expr       ::= UnOp "(" Expr ")" ;
+OldExpr . Expr       ::= "old" "(" Expr ")" ;
 
 ZeroExtend . Expr ::= "zero_extend" "(" IntVal "," Expr ")" ;
 SignExtend . Expr ::= "sign_extend" "(" IntVal "," Expr ")" ;
