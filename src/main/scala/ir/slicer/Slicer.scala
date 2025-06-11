@@ -1,7 +1,7 @@
 package ir.slicer
 
 import ir.*
-import ir.transforms.{stripUnreachableFunctions, cleanupBlocks, removeDeadInParams}
+import ir.transforms.{stripUnreachableFunctions, cleanupBlocks}
 import analysis.{Lambda, EdgeFunction, TwoElement}
 import util.{SlicerConfig, SlicerLogger, LogLevel, PerformanceTimer}
 import scala.collection.mutable
@@ -258,6 +258,12 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
 
       SlicerLogger.debug("Slicer - Cleanup Blocks")
       cleanupBlocks(program)
+
+      SlicerLogger.debug("Slicer - Invariant Checking")
+      assert(invariant.singleCallBlockEnd(program))
+      assert(invariant.cfgCorrect(program))
+      assert(invariant.blocksUniqueToEachProcedure(program))
+      assert(invariant.procEntryNoIncoming(program))
 
       performanceTimer.checkPoint("Finished IR Cleanup")
     }
