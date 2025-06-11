@@ -380,12 +380,6 @@ case class Register(override val name: String, size: Int) extends Variable with 
 case class LocalVar(varName: String, override val irType: IRType, val index: Int = 0)
     extends Variable
     with CachedHashCode {
-
-  varName match {
-    case s"R0_3" => assert(false)
-    case _ => ()
-  }
-
   override val name = varName + (if (index > 0) then s"_$index" else "")
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
