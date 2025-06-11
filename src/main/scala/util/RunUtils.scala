@@ -61,6 +61,7 @@ case class IRContext(
 enum FrontendMode {
   case Bap
   case Gtirb
+  case Basil
 }
 
 /** Stores the results of the static analyses.
@@ -123,18 +124,20 @@ object IRLoading {
   /** Load a program from files using the provided configuration.
     */
   def load(q: ILLoadingConfig): IRContext = {
-    // TODO: this tuple is large, should be a case class
 
     val mode = if q.inputFile.endsWith(".gts") then {
       FrontendMode.Gtirb
     } else if q.inputFile.endsWith(".adt") then {
       FrontendMode.Bap
+    } else if (q.inputFile.endsWith(".il")) {
+      FrontendMode.Basil
     } else {
       throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
     }
 
     val (mainAddress, makeContext) = q.relfFile match {
       case Some(relf) => {
+        // TODO: this tuple is large, should be a case class
         val (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
           IRLoading.loadReadELF(relf, q)
 
@@ -151,6 +154,7 @@ object IRLoading {
 
     val program: Program = (mode, mainAddress) match {
       case (FrontendMode.Gtirb, _) => loadGTIRB(q.inputFile, mainAddress, Some(q.mainProcedureName))
+      case (FrontendMode.Basil, _) => ir.parsing.ParseBasilIL.loadILFile(q.inputFile)
       case (FrontendMode.Bap, None) => throw Exception("relf is required when using BAP input")
       case (FrontendMode.Bap, Some(mainAddress)) => {
         val bapProgram = loadBAP(q.inputFile)
