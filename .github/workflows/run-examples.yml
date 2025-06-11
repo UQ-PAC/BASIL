@@ -173,7 +173,7 @@ jobs:
           AnalysisSystemTest3,
           AnalysisSystemTest4,
         ]
-    fail-fast: false
+      fail-fast: false
 
     steps:
       - uses: actions/checkout@v4
