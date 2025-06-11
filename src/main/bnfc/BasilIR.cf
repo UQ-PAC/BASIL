@@ -1,4 +1,4 @@
-Prog . Program ::= [Declaration] ;
+rules Module ::= [Declaration] ;
 
 terminator Declaration ";";
 
@@ -40,7 +40,7 @@ comment "/*" "*/" ;
 AxiomDecl . Declaration ::= "axiom" AttrDefList Expr; 
 MemDecl . Declaration ::= "memory" GlobalIdent ":" Type ;
 VarDecl . Declaration ::= "var" GlobalIdent ":" Type  ;
-ProgDeclSpec . Declaration ::= "prog" AttrDefList BeginList [ ProgSpecDecl ] EndList ;
+ProgDeclWithSpec . Declaration ::= "prog" AttrDefList BeginList [ ProgSpec ] EndList ;
 ProgDecl . Declaration ::= "prog" AttrDefList ;
 Procedure . Declaration ::= ProcDef ;
 
@@ -102,9 +102,7 @@ rules Block ::= "block" BlockIdent AttrDefList BeginList
   [Statement] Jump ";"
   EndList ;
 
-IntAttr . AttributeItem ::= BIdent "="  IntVal;
-BVAttr . AttributeItem ::= BIdent "=" BVVal;
-ExprAttr . AttributeItem ::= BIdent "=" Expr;
+ValueAttr . AttributeItem ::= BIdent "="  Value ;
 StringAttr . AttributeItem ::= BIdent "=" Str ;
 separator AttributeItem ";";
 
@@ -122,10 +120,11 @@ ProcedureDef  . ProcDef ::= ProcSig AttrDefList [ FunSpecDecl ] BeginList [Block
 
 -- coercions Expr 3 ; 
 
-BVLiteral . Expr ::=  BVVal;
-IntLiteral . Expr ::= IntVal;
-TrueLiteral . Expr ::= "true" ;
-FalseLiteral . Expr ::= "false" ;
+BVLiteral . Value ::=  BVVal;
+IntLiteral . Value ::= IntVal;
+TrueLiteral . Value ::= "true" ;
+FalseLiteral . Value ::= "false" ;
+Literal . Expr ::= Value; 
 
 LRVar . Expr ::= LocalVar;
 GRVar . Expr ::= GlobalVar;
@@ -168,10 +167,10 @@ Require . FunSpecDecl ::= RequireTok Expr;
 Ensure . FunSpecDecl ::= EnsureTok Expr;
 LoopInvariant . FunSpecDecl ::= "invariant" BlockIdent Expr;
 
-Rely . ProgSpecDecl ::= "rely" Expr;
-Guarantee . ProgSpecDecl ::= "guarantee" Expr;
+Rely . ProgSpec ::= "rely" Expr;
+Guarantee . ProgSpec ::= "guarantee" Expr;
 
 terminator FunSpecDecl ";";
-terminator ProgSpecDecl ";";
+terminator ProgSpec ";";
 
 

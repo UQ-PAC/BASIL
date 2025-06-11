@@ -1,4 +1,5 @@
 package ir.parsing
+import ir.Sigil
 
 import basil_ir.{Absyn => syntax}
 
@@ -7,6 +8,11 @@ import scala.jdk.CollectionConverters.*
 
 private object Declarations {
   lazy val empty = Declarations(Map(), Map(), Map(), Map())
+}
+
+enum Attrib {
+  case ValueAttr(name: String, v: ir.Literal)
+  case StringAttr(name: String, v: String)
 }
 
 /**
@@ -46,6 +52,22 @@ case class Declarations(
   }
 }
 
+
+trait AttributeListBNFCVisitor[A]()
+    extends syntax.AttributeItem.Visitor[Attrib, A],
+      syntax.AttrDefList.Visitor[List[Attrib], A],
+      LiteralsBNFCVisitor[A] {
+
+  override def visit(p: syntax.AttrDefListSome, arg: A) = {
+    p.listattributeitem_.asScala.toList.map(_.accept(this, arg)) 
+  }
+
+  override def visit(p: syntax.ValueAttr , arg: A) : Attrib = Attrib.ValueAttr(p.bident_.stripPrefix(Sigil.BASIR.attrib), p.value_.accept(this, arg))
+  override def visit(p: syntax.StringAttr , arg: A) : Attrib = Attrib.StringAttr(p.bident_.stripPrefix(Sigil.BASIR.attrib), unquote(p.str_, p))
+  override def visit(p: syntax.AttrDefListEmpty, arg: A) : List[Attrib] = List()
+
+}
+
 /**
  * Performs an initial pass to read global declarations. Importantly, this picks up
  * procedure declarations and their paramter lists, so a later pass can correctly map a
@@ -56,14 +78,14 @@ case class Declarations(
  * for that subset of the AST.
  */
 case class BasilEarlyBNFCVisitor[A]()
-    extends syntax.Program.Visitor[Declarations, A],
+    extends syntax.Module.Visitor[Declarations, A],
       syntax.Declaration.Visitor[Declarations, A],
-      syntax.MExpr.Visitor[String, A],
-      syntax.Params.Visitor[ir.LocalVar, A],
-      TypesBNFCVisitor[A] {
+      syntax.ProcDef.Visitor[Declarations, A],
+      syntax.ProcSig.Visitor[Declarations, A],
+      syntax.Params.Visitor[ListMap[String, ir.IRType], A],
+      TypesBNFCVisitor[A], AttributeListBNFCVisitor[A] {
 
-  // Members declared in Program.Visitor
-  override def visit(x: syntax.Prog, arg: A) =
+  override def visit(x: syntax.Module1, arg: A) =
     x.listdeclaration_.asScala.foldLeft(Declarations.empty) { case (decls, x) =>
       try {
         decls.merge(x.accept(this, arg))
@@ -77,47 +99,42 @@ case class BasilEarlyBNFCVisitor[A]()
       }
     }
 
-  // Members declared in MExpr.Visitor
-  override def visit(x: syntax.MSym, arg: A) = x.bident_
-  override def visit(x: syntax.BlockM, arg: A) =
-    throw ParseException("block literal as a metadata value is unsupported", x)
 
   // Members declared in Declaration.Visitor
-  override def visit(x: syntax.LetDecl, arg: A) =
-    val allowedMetadataKeys = List("entry_procedure")
-    val key = x.bident_ match {
-      case x if allowedMetadataKeys.contains(x) => x
-      case key => throw ParseException("unsupported 'let' metadata key: " + key, x)
-    }
-    Declarations.empty.copy(metas = Map(key -> x.mexpr_.accept(this, arg)))
+  override def visit(x: syntax.ProgDecl, arg: A) = Declarations.empty
+  override def visit(x: syntax.ProgDeclSpec, arg: A) = Declarations.empty
 
   override def visit(x: syntax.MemDecl, arg: A) =
 
     // TODO: make this narrower in the grammar
 
     val ir.MapType(ir.BitVecType(addrwd), ir.BitVecType(valwd)) = x.type_.accept(this, arg): @unchecked
-    val mem = x.bident_ match {
-      case "stack" => ir.StackMemory(x.bident_, addrwd, valwd)
-      case _ => ir.SharedMemory(x.bident_, addrwd, valwd)
+    val mem = x.globalident_ match {
+      case "stack" => ir.StackMemory(x.globalident_.stripPrefix(Sigil.BASIR.globalVar), addrwd, valwd)
+      case _ => ir.SharedMemory(x.globalident_.stripPrefix(Sigil.BASIR.globalVar), addrwd, valwd)
     }
     Declarations.empty.copy(memories = Map(mem.name -> mem))
 
   override def visit(x: syntax.VarDecl, arg: A) =
-    val v = ir.Register(x.bident_, x.type_.accept(this, arg).asInstanceOf[ir.BitVecType].size)
+    val v = ir.Register(x.globalident_.stripPrefix(Sigil.BASIR.globalVar), x.type_.accept(this, arg).asInstanceOf[ir.BitVecType].size)
     Declarations.empty.copy(globals = Map(v.name -> v))
 
   override def visit(x: syntax.Param, arg: A): ir.LocalVar =
-    ir.LocalVar.ofIndexed(x.bident_, x.type_.accept(this, arg))
+    ir.LocalVar.ofIndexed(x.localident_.stripPrefix(Sigil.BASIR.localVar), x.type_.accept(this, arg))
 
-  private def visitParams(x: syntax.ListParams, arg: A): Map[String, ir.IRType] =
+  private def visitParams(x: syntax.ListParams, arg: A): Map[String, ir.IRType] = {
     // NOTE: uses ListMap instead of SortedMap, because the orders are presumed to
     // match between calls and param lists within the same file.
     x.asScala.map(_.accept(this, arg)).map(x => x.name -> x.getType).to(ListMap)
+  }
 
-  override def visit(x: syntax.Procedure, arg: A) =
+  override def visit(x: syntax.ProcedureSig, arg: A) = {
+    val name = x.procident_.stripPrefix(Sigil.BASIR.proc)
     val inparams = visitParams(x.listparams_1, arg)
     val outparams = visitParams(x.listparams_2, arg)
+    val proc = ir.dsl.EventuallyProcedure(name, inparams, outparams, Nil)
+    Declarations.empty.copy(procedures = Map(name -> proc))
+  }
 
-    val proc = ir.dsl.EventuallyProcedure(x.bident_, inparams, outparams, Nil)
-    Declarations.empty.copy(procedures = Map(proc.label -> proc))
+  override def visit(x: syntax.Procedure, arg: A) = x.accept(this, arg)
 }
