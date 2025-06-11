@@ -5,8 +5,9 @@ import org.scalatest.funsuite.AnyFunSuite
 import ir.dsl.*
 import ir.*
 import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, Logger, LogLevel}
-import translating.PrettyPrinter
+import translating.PrettyPrinter.*
 import test_util.{BASILTest, CaptureOutput}
+import ir.cilvisitor.*
 
 import org.scalactic.*
 
@@ -28,14 +29,52 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
 
   val p = prog(mainproc, proc("p1", block("b1", LocalAssign(R0, bv64(10)), ret)))
 
+  /*
+   * Strongest structural equality on programs (including labels and comments)
+   */
+  inline def assertDeepEquality[T <: DeepEquality](expected: T)(actual: T) = {
+    assert(
+      expected.deepEqualsDbg(actual),
+      s"deep equality ${expected.getClass.getSimpleName} != ${actual.getClass.getSimpleName}"
+    )
+  }
+
   /**
    * Compares expected and actual by first converting both to their
    * string representations.
    *
    * Used as a quick fix to get structural equality.
    */
-  inline def assertResultWithToString[T](expected: T)(actual: T) = {
-    assertResult(expected.toString)(actual.toString)
+  inline def assertPrintedEquality[T <: PrettyPrintable](expected: T)(actual: T) = {
+    assert(expected.pprint == actual.pprint, s"pretty printed equality")
+  }
+
+  class StripLabel extends CILVisitor {
+    /* Strip features not preserved by serialiser */
+    override def vstmt(s: Statement) = s match {
+      case LocalAssign(a, b, c) => ChangeTo(List(LocalAssign(a, b, None)))
+      case MemoryAssign(l, r, lbl) => ChangeTo(List(MemoryAssign(l, r, None)))
+      case MemoryStore(m, i, v, e, s, lbl) => ChangeTo(List(MemoryStore(m, i, v, e, s, None)))
+      case MemoryLoad(l, m, i, e, s, lbl) => ChangeTo(List(MemoryLoad(l, m, i, e, s, None)))
+      case DirectCall(t, o, a, lbl) => ChangeTo(List(DirectCall(t, None, SortedMap.from(o), SortedMap.from(a))))
+      case Assert(b, com, lab) => ChangeTo(List(Assert(b)))
+      case Assume(b, com, lab, c) => ChangeTo(List(Assume(b, None, None, c)))
+      case _ => SkipChildren()
+    }
+  }
+
+  /**
+   * Asserts structural equality on the IR via after a round-trip through the parser
+   */
+  def assertSerialisedParsedEqual(expected: Program) = {
+
+    visit_prog(StripLabel(), expected)
+
+    val actual = ir.parsing.ParseBasilIL.loadILString(expected.pprint)
+    assert(
+      expected.deepEqualsDbg(actual),
+      s"serialise-parse deep equality ${expected.getClass.getSimpleName} != ${actual.getClass.getSimpleName}"
+    )
   }
 
   /**
@@ -48,7 +87,7 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
    */
   test("commands to dsl") {
     val lassign = LocalAssign(R0, bv64(10))
-    assertResultWithToString(CloneableStatement(lassign)) {
+    assertDeepEquality(CloneableStatement(lassign)) {
       IRToDSL.convertStatement(lassign)
     }
 
@@ -75,15 +114,14 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
 
   test("proc to dsl") {
     val procedure = p.nameToProcedure("main")
-    assertResultWithToString(mainproc) {
-      IRToDSL.convertProcedure(procedure)
-    }
+    val n = IRToDSL.convertProcedure(procedure)
+    assertDeepEquality(mainproc)(n)
   }
 
   test("prog to dsl") {
-    assertResultWithToString(p) {
-      IRToDSL.convertProgram(p).resolve
-    }
+    val n = IRToDSL.convertProgram(p).resolve
+    assertDeepEquality(p)(n)
+    assertSerialisedParsedEqual(p)
   }
 
   test("function1 procs to dsl (with params)") {
@@ -93,15 +131,14 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
     // for each procedure, check that the conversion is correct,
     // i.e., is structurally equal to the original dsl procedure
     (dslprog.allProcedures zip irprog.procedures).foreach { case (dslproc, proc) =>
-      assertResultWithToString(dslproc) { IRToDSL.convertProcedure(proc) }
+      assertDeepEquality(dslproc) { IRToDSL.convertProcedure(proc) }
     }
   }
 
   test("function1 prog to dsl (with params)") {
     val p = IRToDSLTestData.function1.resolve
-    assertResultWithToString(p) {
-      IRToDSL.convertProgram(p).resolve
-    }
+    val cloned = IRToDSL.convertProgram(p).resolve
+    assertDeepEquality(p)(cloned)
   }
 
   test("equality on loaded ir params") {
@@ -127,8 +164,8 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
       }
     }
 
-    prog.sortProceduresRPO()
-    cloned.sortProceduresRPO()
+    // prog.sortProceduresRPO()
+    // cloned.sortProceduresRPO()
 
     val main = prog.mainProcedure
     val clonedMain = cloned.mainProcedure
@@ -151,9 +188,12 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
 
       for (b <- p.blocks) {
         assert(clonedBlocks.contains(b.label))
-        assert(PrettyPrinter.pp_block(b) == PrettyPrinter.pp_block(clonedBlocks(b.label)))
+        assert(b.deepEquals(clonedBlocks(b.label)))
       }
     }
+    assertDeepEquality(prog)(cloned)
+    assertPrintedEquality(prog)(cloned)
+    assertSerialisedParsedEqual(prog)
 
     // info(PrettyPrinter.pp_prog(cloned))
   }
@@ -194,8 +234,9 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
     assert(clonedMain.formalInParam == main.formalInParam)
     assert(clonedMain.formalOutParam == main.formalOutParam)
 
-    assertResultWithToString(PrettyPrinter.pp_prog(prog))(PrettyPrinter.pp_prog(cloned))
-    // info(PrettyPrinter.pp_prog(cloned))
+    assertDeepEquality(prog)(cloned)
+    assertPrintedEquality(prog)(cloned)
+    assertSerialisedParsedEqual(prog)
   }
 
 }
