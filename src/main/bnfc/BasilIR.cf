@@ -42,7 +42,9 @@ MemDecl . Declaration ::= "memory" GlobalIdent ":" Type ;
 VarDecl . Declaration ::= "var" GlobalIdent ":" Type  ;
 ProgDeclWithSpec . Declaration ::= "prog" AttrDefList BeginList [ ProgSpec ] EndList ;
 ProgDecl . Declaration ::= "prog" AttrDefList ;
-Procedure . Declaration ::= ProcDef ;
+Procedure . Declaration ::= ProcSig AttrDefList  ProcDef ;
+ProcedureDecl . ProcDef ::= [ FunSpecDecl ] ;
+ProcedureDef  . ProcDef ::= [ FunSpecDecl ] BeginList [Block] EndList ;
 
 IntT . IntType ::= "int" ;
 BoolT . BoolType ::= "bool" ;
@@ -113,8 +115,6 @@ Param . Params ::=  LocalIdent ":" Type ;
 separator Params "," ;
 
 ProcedureSig . ProcSig ::= "proc" ProcIdent "(" [Params] ")" "->" "(" [Params] ")"  ;
-ProcedureDecl . ProcDef ::= ProcSig AttrDefList [ FunSpecDecl ] ;
-ProcedureDef  . ProcDef ::= ProcSig AttrDefList [ FunSpecDecl ] BeginList [Block] EndList ;
 
 {- EXPRESSIONS -}
 
@@ -130,7 +130,7 @@ LRVar . Expr ::= LocalVar;
 GRVar . Expr ::= GlobalVar;
 
 -- uninterpreted functions
-FunctionOp . Expr       ::= GlobalIdent "(" [Expr] ")" ;
+FunctionOp . Expr       ::= GlobalIdent "(" [Expr] ")" "->" Type ;
 
 -- binary expr
 

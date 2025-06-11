@@ -577,7 +577,8 @@ class Block private (
   private var _jump: Jump,
   private val _incomingJumps: mutable.HashSet[GoTo],
   var meta: Metadata
-) extends HasParent[Procedure] with DeepEquality {
+) extends HasParent[Procedure]
+    with DeepEquality {
   var atomicSection: Option[AtomicSection] = None
   _jump.setParent(this)
   statements.foreach(_.setParent(this))

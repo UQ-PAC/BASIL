@@ -16,7 +16,9 @@ trait LiteralsBNFCVisitor[A]
       syntax.UnOp.Visitor[ir.UnOp, A],
       syntax.Endian.Visitor[ir.Endian, A],
       syntax.IntVal.Visitor[BigInt, A],
-      syntax.Value.Visitor[ir.Literal, A] {
+      syntax.BVVal.Visitor[ir.BitVecLiteral, A],
+      syntax.Value.Visitor[ir.Literal, A],
+      TypesBNFCVisitor[A] {
 
   def unquote(s: String, x: HasParsePosition) = s match {
     case s"\"$s\"" => s
@@ -104,9 +106,13 @@ trait LiteralsBNFCVisitor[A]
     BigInt(x.integerhex_.toLowerCase.stripPrefix("0x"), 16)
   override def visit(x: syntax.DecInt, arg: A) = BigInt(x.integer_) // XXX: int32
 
+  override def visit(x: syntax.BV, arg: A): ir.BitVecLiteral =
+    ir.BitVecLiteral(x.intval_.accept(this, arg), x.bvtype_.accept(this, arg).asInstanceOf[ir.BitVecType].size)
+
   override def visit(x: syntax.BVLiteral, arg: A): ir.Literal =
-    ir.BitVecLiteral(x.intval_.accept(this, arg).int, x.bvtype_.accept(this, arg).bvty.size)
-  override def visit(x: syntax.IntLiteral, arg: A): ir.Literal = ir.IntLiteral(x.intval_.accept(this, arg).int)
+    x.bvval_.accept(this, arg)
+
+  override def visit(x: syntax.IntLiteral, arg: A): ir.Literal = ir.IntLiteral(x.intval_.accept(this, arg))
   override def visit(x: syntax.TrueLiteral, arg: A): ir.Literal = ir.TrueLiteral
   override def visit(x: syntax.FalseLiteral, arg: A): ir.Literal = ir.FalseLiteral
 

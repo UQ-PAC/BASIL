@@ -9,6 +9,12 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.util.chaining.scalaUtilChainingOps
 
+def unsigilBlock(x: String) = x.stripPrefix(Sigil.BASIR.block)
+def unsigilProc(x: String) = x.stripPrefix(Sigil.BASIR.proc)
+def unsigilLocal(x: String) = x.stripPrefix(Sigil.BASIR.localVar)
+def unsigilGlobal(x: String) = x.stripPrefix(Sigil.BASIR.globalVar)
+def unsigilBident(x: String) = x.stripPrefix(Sigil.BASIR.attrib)
+
 /**
  * Parses structures at the block-level and lower, given
  * a particular procName (including address) and declarations.
@@ -23,9 +29,8 @@ case class InnerBasilBNFCVisitor[A](
   val decls: Declarations,
   val typesVisitor: TypesVisitorType[A] = new TypesBNFCVisitor[A]() {}
 ) extends LiteralsBNFCVisitor[A]
-    with syntax.Module.Visitor[BasilParseValue, A]
-    with syntax.GobbleScolon.Visitor[Unit, A]
-    with syntax.Declaration.Visitor[Unit, A]
+    with AttributeListBNFCVisitor[A]
+    with syntax.Module.Visitor[Unit, A]
     with syntax.IntType.Visitor[ir.IRType, A]
     with syntax.BoolType.Visitor[ir.IRType, A]
     with syntax.MapType.Visitor[ir.IRType, A]
@@ -40,11 +45,12 @@ case class InnerBasilBNFCVisitor[A](
     with syntax.Jump.Visitor[ir.dsl.EventuallyJump, A]
     with syntax.LVar.Visitor[ir.Variable, A]
     with syntax.Block.Visitor[ir.dsl.EventuallyBlock, A]
+    with syntax.Expr.Visitor[ir.Expr, A]
+    // with syntax.Declaration.Visitor[Unit, A]
     // with syntax.Params.Visitor[R,A]
-    with syntax.ProcSig.Visitor[ir.dsl.EventuallyProcedure,A]
+    // with syntax.ProcSig.Visitor[ir.dsl.EventuallyProcedure,A]
     // with syntax.ProcDef.Visitor[R,A]
     // with syntax.Value.Visitor[R,A]
-    with syntax.Expr.Visitor[ir.Expr, A]
     // with syntax.BinOp.Visitor[ir.BinOP,A]
     // with syntax.UnOp.Visitor[ir.UnOp,A]
     // with syntax.EqOp.Visitor[ir.BinOp,A]
@@ -54,11 +60,10 @@ case class InnerBasilBNFCVisitor[A](
     // with syntax.IntBinOp.Visitor[ir.BinOp,A]
     // with syntax.IntLogicalBinOp.Visitor[ir.BinOp,A]
     // with syntax.BoolBinOp.Visitor[R,A]
-    with syntax.RequireTok.Visitor[Unit, A]
-    with syntax.EnsureTok.Visitor[Unit, A]
-    with syntax.FunSpecDecl.Visitor[Unit, A]
-    with syntax.ProgSpecDecl.Visitor[Unit, A]
-    with AttributeListBNFCVisitor[A]
+    // with syntax.RequireTok.Visitor[Unit, A]
+    // with syntax.EnsureTok.Visitor[Unit, A]
+    // with syntax.FunSpecDecl.Visitor[Unit, A]
+    // with syntax.ProgSpec.Visitor[Unit, A]
     {
 
   import scala.language.implicitConversions
@@ -70,9 +75,6 @@ case class InnerBasilBNFCVisitor[A](
     x.asScala.map(_.accept(this, arg)).toList
 
   def stmts(x: syntax.ListStatement, arg: A): List[ir.dsl.DSLStatement] =
-    x.asScala.map(_.accept(this, arg)).toList
-
-  def lvars(x: syntax.ListLVar, arg: A): List[LVarSpec] =
     x.asScala.map(_.accept(this, arg)).toList
 
   // Members declared in Type.Visitor
@@ -89,9 +91,17 @@ case class InnerBasilBNFCVisitor[A](
   // Members declared in BVType.Visitor
   override def visit(x: syntax.BVT, arg: A) = x.accept(typesVisitor, arg): ir.IRType
 
-  override def visit(x: syntax.LRVar, arg: A) = x.accept(this, arg)
+  override def visit(x: syntax.LRVar, arg: A) = x.localvar_.accept(this, arg)
 
   // Members declared in Expr.Visitor
+  //
+  def visit(x0: basil_ir.Absyn.Literal, x1: A): ir.Expr = x0.value_.accept(this, x1)
+  def visit(x: basil_ir.Absyn.FunctionOp, arg: A): ir.Expr = {
+    val n = unsigilGlobal(x.globalident_)
+    val args = x.listexpr_.asScala.toSeq.map(_.accept(this, arg))
+    val rt = x.type_.accept(typesVisitor, arg)
+    ir.UninterpretedFunction(n, args, rt)
+  }
   override def visit(x: syntax.LocalVar1, arg: A) = {
     // handle registers which are declared in the global scope. everything else
     // is localvar
@@ -104,7 +114,7 @@ case class InnerBasilBNFCVisitor[A](
       case ir.BitVecType(sz) => sz
       case t => throw Exception(s"Unsupported global var type : $t")
     }
-    ir.Register(x.globalident_.stripPrefix(Sigil.BASIR.globalVar), ty)
+    ir.Register(unsigilGlobal(x.globalident_), ty)
   }
 
   override def visit(x: syntax.GRVar, arg: A) = {
@@ -137,37 +147,61 @@ case class InnerBasilBNFCVisitor[A](
   override def visit(x: syntax.Assign, arg: A) =
     val assign = x.assignment_.accept(this, arg)
     ir.LocalAssign(assign._1, assign._2)
+  override def visit(x: basil_ir.Absyn.SimulAssign, arg: A): ir.dsl.DSLStatement = {
+    throw Exception("unsupported")
+  }
 
   override def visit(x: syntax.SLoad, arg: A) = ir.MemoryLoad(
     x.lvar_.accept(this, arg),
-    decls.memories(x.globalident_),
+    decls.memories(unsigilGlobal(x.globalident_)),
     x.expr_.accept(this, arg),
     x.endian_.accept(this, arg),
     x.intval_.accept(this, arg).toInt
   )
   override def visit(x: syntax.SStore, arg: A) = ir.MemoryStore(
-    decls.memories(x.globalident_),
+    decls.memories(unsigilGlobal(x.globalident_)),
     x.expr_1.accept(this, arg),
     x.expr_2.accept(this, arg),
     x.endian_.accept(this, arg),
     x.intval_.accept(this, arg).toInt
   )
   override def visit(x: syntax.DirectCall, arg: A) =
-    val outs = x.calllvars_.accept(this, arg).list(_.v)
+    val outs = x.calllvars_.accept(this, arg)
     val ins = exprs(x.listexpr_, arg)
-    val proc = decls.procedures(x.procident_)
+    val proc = decls.procedures(unsigilProc(x.procident_))
     ir.dsl.directCall(
       proc.out.keys.zip(outs).toList,
-      x.procident_,
+      unsigilProc(x.procident_),
       // TODO: fix var names. in vars need to be obtained from proc definition??
       proc.in.keys.zip(ins).toList
     )
-  override def visit(x: syntax.IndirectCall, arg: A) = ir.dsl.indirectCall(x.expr_.accept(this, arg))
-  override def visit(x: syntax.Assume, arg: A) = ir.Assume(x.expr_.accept(this, arg))
-  override def visit(x: syntax.Assert, arg: A) = ir.Assert(x.expr_.accept(this, arg))
+  override def visit(x: syntax.IndirectCall, arg: A) = {
+    val v = x.expr_.accept(this, arg) match {
+      case v: ir.Variable => v
+      case o => throw Exception("Cannot make indir call target arbitrary expression")
+    }
+    ir.dsl.indirectCall(v)
+  }
+  override def visit(x: syntax.Assume, arg: A) = {
+    val label = getLabelAttr(x.attrdeflist_, arg)
+    val comment = getCommentAttr(x.attrdeflist_, arg)
+    ir.Assume(x.expr_.accept(this, arg), comment, label, false)
+  }
+  override def visit(x: syntax.Guard, arg: A) = {
+    val label = getLabelAttr(x.attrdeflist_, arg)
+    val comment = getCommentAttr(x.attrdeflist_, arg)
+    ir.Assume(x.expr_.accept(this, arg), comment, label, true)
+  }
+  override def visit(x: syntax.Assert, arg: A) = {
+    val label = getLabelAttr(x.attrdeflist_, arg)
+    val comment = getCommentAttr(x.attrdeflist_, arg)
+    ir.Assert(x.expr_.accept(this, arg), comment, label)
+  }
 
   // Members declared in Jump.Visitor
-  override def visit(x: syntax.GoTo, arg: A) = ir.dsl.goto(x.listbident_.asScala.toSeq: _*)
+  override def visit(x: syntax.GoTo, arg: A) =
+    val ids = x.listblockident_.asScala.toSeq.map(unsigilBlock)
+    ir.dsl.goto(ids: _*)
   override def visit(x: syntax.Unreachable, arg: A) = ir.dsl.unreachable
   override def visit(x: syntax.Return, arg: A) =
     val es = exprs(x.listexpr_, arg)
@@ -186,18 +220,13 @@ case class InnerBasilBNFCVisitor[A](
   override def visit(x: syntax.NoOutParams, arg: A) = Nil
   override def visit(x: syntax.LocalVars, arg: A) =
     x.listlocalvar_.asScala.toList.map(_.accept(this, arg))
-  override def visit(x: syntax.ListOutParams, arg: A) = 
+  override def visit(x: syntax.ListOutParams, arg: A) =
     x.listlvar_.asScala.toList.map(_.accept(this, arg))
 
-
   // Members declared in Block.Visitor
-  override def visit(x: syntax.Block1, arg: A) : EventuallyBlock =
+  override def visit(x: syntax.Block1, arg: A): ir.dsl.EventuallyBlock =
     val ss = stmts(x.liststatement_, arg) :+ x.jump_.accept(this, arg)
-    val addr = x.attrdeflist_.accept(this, arg).collect {
-      case Attrib.ValueAttr("address", ir.IntLiteral(x)) => x
-      case Attrib.ValueAttr("address", ir.BitVecLiteral(x, _)) => x
-    }.headOption
-
+    val addr = getAddrAttr(x.attrdeflist_, arg)
     ir.dsl.block(x.blockident_.stripPrefix(Sigil.BASIR.block), ss: _*).copy(address = addr)
 
   private inline def cannotVisitDeclaration(x: HasParsePosition) =
@@ -205,19 +234,12 @@ case class InnerBasilBNFCVisitor[A](
       "this declaration visit method cannot be called on this visitor. it should be handled by another visitor."
     )
 
-  // Members declared in Declaration.Visitor
-  override def visit(x: syntax.MemDecl, arg: A): Nothing = cannotVisitDeclaration(x)
-  override def visit(x: syntax.VarDecl, arg: A): Nothing = cannotVisitDeclaration(x)
-
   // Members declared in Params.Visitor
-  override def visit(x: syntax.Param, arg: A): Nothing = cannotVisitDeclaration(x)
+  // override def visit(x: syntax.Param, arg: A): Nothing = cannotVisitDeclaration(x)
 
   // Members declared in Program.Visitor
   override def visit(x: syntax.Module1, arg: A): Nothing = cannotVisitDeclaration(x)
 
-  // Members declared in .ProcDef.Visitor
-  override def visit(x: syntax.ProcedureDef, arg: A): Nothing = cannotVisitDeclaration(x)
-  override def visit(x: syntax.ProcedureDecl, arg: A): Nothing = cannotVisitDeclaration(x)
 }
 
 /**
@@ -231,20 +253,17 @@ case class InnerBasilBNFCVisitor[A](
  * @group mainvisitor
  */
 
-def x[T]: AllVisitor[Any, T] = InnerBasilBNFCVisitor[T]("beaneroo", Declarations.empty)
-
 case class BasilMainBNFCVisitor[A](
   val decls: Declarations,
-  val makeVisitor: (String, Declarations) => basil_ir.AllVisitor[BasilParseValue, A] = InnerBasilBNFCVisitor[A](_, _)
+  val makeVisitor: (String, Declarations) => InnerBasilBNFCVisitor[A] = InnerBasilBNFCVisitor[A](_, _)
 ) extends LiteralsBNFCVisitor[A]
     with TypesBNFCVisitor[A]
     with syntax.Module.Visitor[ir.dsl.EventuallyProgram, A]
     with syntax.Declaration.Visitor[ir.dsl.EventuallyProcedure, A]
     with syntax.Params.Visitor[ir.LocalVar, A]
     with syntax.ProcSig.Visitor[ir.dsl.EventuallyProcedure, A]
-    with syntax.ProcDef.Visitor[ir.dsl.EventuallyProcedure, (A, String)] 
-    with AttributeListBNFCVisitor
-    {
+    with syntax.ProcDef.Visitor[ir.dsl.EventuallyProcedure, (A, String)]
+    with AttributeListBNFCVisitor[A] {
 
   def params(x: syntax.ListParams, arg: A): List[ir.Variable] =
     x.asScala.map(_.accept(this, arg)).toList
@@ -261,46 +280,69 @@ case class BasilMainBNFCVisitor[A](
     "VarDecl should be visited by an earlier visitor"
   )
 
-
-  override def visit(x: syntax.ProcedureSig, arg: A) : ir.dsl.EventuallyProcedure = {
-    val name = x.procident_.stripPrefix(Sigil.BASIR.proc)
+  override def visit(x: syntax.ProcedureSig, arg: A): ir.dsl.EventuallyProcedure = {
+    val name = unsigilProc(x.procident_)
     decls.procedures(name)
   }
 
-  override def visit(x: syntax.ProcedureDecl, arg: A) =
-    x.procsig_.accept(this, arg)
-
-  override def visit(x: syntax.ProcedureDef, arg: A) =
-    val p = x.procsig_.accept(this, arg)
-    val blocks = x.listblock_.asScala.toSeq.map(_.accept(this, arg))
-    p.copy(blocks = blocks)
-
   // Members declared in ProcDef.Visitor
-  override def visit(x: syntax.ProcedureDecl, args: (A, String)) =
+  override def visit(x: syntax.ProcedureDecl, args: (A, String)) = {
+    val (arg, procName) = args
+    decls.procedures(procName)
+  }
+
+  override def visit(x: syntax.ProcedureDef, args: (A, String)) = {
     val (arg, procName) = args
     val innervis = makeVisitor(procName, decls)
-    val p = ir.dsl.proc(unquote(x.str_, x), x.internalblocks_.accept(innervis, arg).list(_.block): _*)
-    p.copy(address = x.paddress_.accept(this, arg).opt(_.int), entryBlockLabel = x.pentry_.accept(this, arg).opt(_.str))
+    val blocks = x.listblock_.asScala.toSeq.map(_.accept(innervis, arg))
+    decls.procedures(procName).copy(blocks = blocks)
+  }
 
+  def visit(x: basil_ir.Absyn.Procedure, arg: A): ir.dsl.EventuallyProcedure = {
+    val addr = getAddrAttr(x.attrdeflist_, arg)
+    val pname = x.procsig_.accept(this, arg).name
+    val rname = getStrAttr("name")(x.attrdeflist_, arg).getOrElse(pname)
+    val innervis = makeVisitor(rname, decls)
+    val p = x.procdef_.accept(this, (arg, pname))
+    p.copy(address = addr, label = rname)
+  }
+
+  def visit(x: basil_ir.Absyn.AxiomDecl, arg: A): ir.dsl.EventuallyProcedure = ???
+  def visit(x: basil_ir.Absyn.ProgDeclWithSpec, arg: A): ir.dsl.EventuallyProcedure = ???
+  def visit(x: basil_ir.Absyn.ProgDecl, arg: A): ir.dsl.EventuallyProcedure = ???
   // Members declared in Program.Visitor
   override def visit(x: syntax.Module1, arg: A) = {
-    val ds = x.listdeclaration_.filter {
-      case x : syntax.MemDecl => false 
-      case x : syntax.VarDecl => false 
-      case x : syntax.ProcedureDecl => true 
+    val ds = x.listdeclaration_.asScala.filter {
+      case x: syntax.MemDecl => false
+      case x: syntax.VarDecl => false
+      case x: syntax.Procedure => true
+      case x: syntax.ProgDeclWithSpec => true
+      case x: syntax.ProgDecl => true
       case o => throw Exception("parsed decls contains unhandled type: " + o)
     }
 
-    val prog = x.listdeclaration_.collect {
-      case d: ProgDeclSpec => d.attrdeflist_.accept(this, arg)
-      case d: ProgDecl => d.attrdeflist_.accept(this, arg)
+    val prog = ds.collect {
+      case d: syntax.ProgDeclWithSpec => {
+        (getStrAttr("entry")(d.attrdeflist_, arg), None)
+      }
+      case d: syntax.ProgDecl => {
+        (getStrAttr("entry")(d.attrdeflist_, arg), None)
+      }
     }
 
-    val entryname = decls.metas.getOrElse("entry_procedure", throw ParseException("missing entry_procedure key", x))
+    val entryname: String = prog.headOption match {
+      case Some(Some(entr), spec) => entr
+      case _ => throw Exception("No main proc specified")
+    }
 
-    val procs = procdecls.map(_.accept(this, arg))
+    val procs = x.listdeclaration_.asScala.collect { case p: syntax.Procedure =>
+      p.accept(this, arg)
+    }
 
     val (mainProc, otherProcs) = procs.partition(_.name == entryname)
+    if (mainProc.headOption.isEmpty) {
+      throw Exception(s"Entry procedure not found: \"${entryname}\"\n${procs.map(_.name).mkString("\n")}")
+    }
     ir.dsl.EventuallyProgram(mainProc.head, otherProcs)
   }
 }
@@ -311,7 +353,7 @@ object ParseBasilIL {
     val lexer = new basil_ir.Yylex(reader);
     val parser = new basil_ir.parser(lexer, lexer.getSymbolFactory());
 
-    val ast = parser.pProgram()
+    val ast = parser.pModule()
 
     val vis0 = BasilEarlyBNFCVisitor[Unit]()
     val decls = ast.accept(vis0, ())
