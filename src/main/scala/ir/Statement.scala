@@ -305,8 +305,8 @@ class DirectCall(
   }
 
   override def deepEquals(o: Object): Boolean = o match {
-    case dc @ DirectCall(tgt, _, _, l) =>
-      tgt.name == target.name && l == label && dc.outParams.toList == outParams.toList && dc.actualParams.toList == actualParams.toList
+    case dc @ DirectCall(tgt, out, actual, l) =>
+      tgt.name == target.name && l == label && out == outParams && actual == actualParams
     case _ => false
   }
 
