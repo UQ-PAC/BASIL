@@ -163,6 +163,11 @@ jobs:
   AnalysisSystemTests:
     runs-on: ubuntu-latest
 
+
+    strategy:
+      matrix:
+        test: [AnalysisSystemTest1, AnalysisSystemTest2, AnalysisSystemTest3, AnalysisSystemTest4]
+
     steps:
       - uses: actions/checkout@v4
 
@@ -180,4 +185,4 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
-      - run: ./scripts/scalatest.sh -PS3 -oGD -T 1000000 -n test_util.tags.AnalysisSystemTest -F 2
+      - run: "./scripts/scalatest.sh -PS3 -oGD -T 1000000 -n test_util.tags.${{ matrix.test }} -F 2"
