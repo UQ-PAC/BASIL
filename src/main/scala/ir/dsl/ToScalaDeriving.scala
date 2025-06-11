@@ -303,7 +303,7 @@ object ToScalaDeriving {
     x: T
   ): Twine =
     val args: Twine = inline isSingleton match
-      case true => Str("")
+      case true => Concat(List())
       case false =>
         val elems = x.asInstanceOf[Product].productIterator
         val args = (instances.iterator zip elems)

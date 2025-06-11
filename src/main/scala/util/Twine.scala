@@ -2,10 +2,10 @@ package util.twine
 
 sealed trait Twine {
 
-  def mkString: String = mkString()
+  def mkString: String =
+    build(StringBuilder()).result()
 
-  def mkString(indent: String = "  ", newline: String = System.lineSeparator()): String = {
-    val sb = StringBuilder()
+  def build(sb: StringBuilder, indent: String = "  ", newline: String = System.lineSeparator()): StringBuilder = {
 
     // we need to insert newlines /between/ elements of Lines.
     // however, the insertion of newlines should be deferred until the next
@@ -13,8 +13,8 @@ sealed trait Twine {
     // insert multiple newlines.
     var doNewline = false
 
-    def build(tw: Twine, ind: String): Unit = tw match {
-      case Indent(tw) => build(tw, ind + indent)
+    def helper(tw: Twine, ind: String): Unit = tw match {
+      case Indent(tw) => helper(tw, ind + indent)
       case Str(s) =>
         if (doNewline)
           doNewline = false
@@ -28,20 +28,22 @@ sealed trait Twine {
             if (!first)
               doNewline = true
             first = false
-            build(l, ind)
+            helper(l, ind)
         }
-      case Concat(tws) => tws.foreach(build(_, ind))
+      case Concat(tws) => tws.foreach(helper(_, ind))
     }
 
-    build(this, "")
-    sb.result()
+    helper(this, "")
+    sb
   }
 
   def +:(s: String) = Concat(List(Str(s), this))
 }
 
 case class Indent(tw: Twine) extends Twine
-case class Str(s: String) extends Twine
+case class Str(s: String) extends Twine {
+  override def toString = s"Str(${util.StringEscape.quote(s)})"
+}
 case class Lines(ss: Iterable[Twine]) extends Twine
 case class Concat(tws: Iterable[Twine]) extends Twine
 

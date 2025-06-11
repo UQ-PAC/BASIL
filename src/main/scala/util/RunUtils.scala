@@ -961,7 +961,9 @@ object RunUtils {
 
     q.loading.dumpIL.foreach(s => {
       writeToFile(pp_prog(ctx.program), s"$s-output.il")
-      writeToFile(ctx.program.toScala, s"$s-output.scala")
+      val a = ctx.program.toScalaLines
+      writeToFile(a.mkString, s"$s-output.scala")
+      println(a)
     })
     Logger.info("[!] Translating to Boogie")
 
