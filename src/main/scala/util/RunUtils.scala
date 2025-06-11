@@ -127,7 +127,9 @@ object IRLoading {
       val IRTranslator = BAPToIR(bapProgram, mainAddress)
       IRTranslator.translate
     } else if (q.inputFile.endsWith(".gts")) {
-      loadGTIRB(q.inputFile, mainAddress)
+      val program = loadGTIRB(q.inputFile, mainAddress)
+      ir.transforms.PCTracking.applyPCTracking(q.pcTracking, program)
+      program
     } else if (q.inputFile.endsWith(".il")) {
       ir.parsing.ParseBasilIL.loadILFile(q.inputFile)
     } else {
@@ -135,8 +137,6 @@ object IRLoading {
     }
 
     val specification = IRLoading.loadSpecification(q.specFile, program, globals)
-
-    ir.transforms.PCTracking.applyPCTracking(q.pcTracking, program)
 
     program.procedures.foreach(_.normaliseBlockNames())
 
@@ -845,7 +845,9 @@ object RunUtils {
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
 
-    ctx = IRTransform.doCleanup(ctx, conf.simplify)
+    if (!conf.loading.inputFile.endsWith(".il")) {
+      ctx = IRTransform.doCleanup(ctx, conf.simplify)
+    }
 
     transforms.inlinePLTLaunchpad(ctx.program)
 
