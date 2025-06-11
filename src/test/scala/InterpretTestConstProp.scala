@@ -52,7 +52,7 @@ class InterpretTestConstProp
   private val testPath = s"${BASILTest.rootDirectory}/src/test/correct"
   def testInterpretConstProp(testName: String, compiler: String): Unit = {
     val path = s"$testPath/$testName/$compiler/$testName"
-    val loading = ILLoadingConfig(inputFile = s"$path.adt", relfFile = s"$path.relf", dumpIL = None)
+    val loading = ILLoadingConfig(inputFile = s"$path.adt", relfFile = Some(s"$path.relf"), dumpIL = None)
 
     var ictx = IRLoading.load(loading)
     ictx = IRTransform.doCleanup(ictx)

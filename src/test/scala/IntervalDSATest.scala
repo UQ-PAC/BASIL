@@ -27,7 +27,7 @@ class IntervalDSATest extends AnyFunSuite with CaptureOutput {
     val path = s"${BASILTest.rootDirectory}/$relativePath"
     RunUtils.loadAndTranslate(
       BASILConfig(
-        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf"),
+        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = Some(path + ".relf")),
         simplify = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
@@ -41,7 +41,7 @@ class IntervalDSATest extends AnyFunSuite with CaptureOutput {
     val path = s"${BASILTest.rootDirectory}/$relativePath"
     RunUtils.loadAndTranslate(
       BASILConfig(
-        loading = ILLoadingConfig(inputFile = path + ".gts", relfFile = path + ".relf"),
+        loading = ILLoadingConfig(inputFile = path + ".gts", relfFile = Some(path + ".relf")),
         simplify = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
@@ -57,7 +57,7 @@ class IntervalDSATest extends AnyFunSuite with CaptureOutput {
       BASILConfig(
         loading = ILLoadingConfig(
           inputFile = path + ".gts",
-          relfFile = path + ".relf",
+          relfFile = Some(path + ".relf"),
           mainProcedureName = mainProcedure,
           trimEarly = true
         ),
@@ -74,7 +74,7 @@ class IntervalDSATest extends AnyFunSuite with CaptureOutput {
     RunUtils.loadAndTranslate(
       BASILConfig(
         context = Some(context),
-        loading = ILLoadingConfig(inputFile = "", relfFile = ""),
+        loading = ILLoadingConfig(inputFile = "", relfFile = None),
         simplify = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
