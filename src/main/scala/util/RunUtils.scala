@@ -58,6 +58,11 @@ case class IRContext(
   program: Program // internally mutable
 )
 
+enum FrontendMode {
+  case Bap
+  case Gtirb
+}
+
 /** Stores the results of the static analyses.
   */
 case class StaticAnalysisContext(
@@ -120,32 +125,42 @@ object IRLoading {
   def load(q: ILLoadingConfig): IRContext = {
     // TODO: this tuple is large, should be a case class
 
-    val withRelf = for {
-      relf <- q.relfFile
-      (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) = IRLoading.loadReadELF(relf, q)
-      program: Program =
-        if (q.inputFile.endsWith(".adt")) {
-          val bapProgram = loadBAP(q.inputFile)
-          val IRTranslator = BAPToIR(bapProgram, mainAddress)
-          IRTranslator.translate
-        } else if (q.inputFile.endsWith(".gts")) {
-          loadGTIRB(q.inputFile, Some(mainAddress), Some(q.mainProcedureName))
-        } else {
-          throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
-        }
-      specification = IRLoading.loadSpecification(q.specFile, program, globals)
-    } yield (IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program))
-
-    val ctx = withRelf.getOrElse {
-      assert(q.inputFile.endsWith(".gts"), "Only gtirb supports omitting relf")
-      val prog = loadGTIRB(q.inputFile, None, Some(q.mainProcedureName))
-      IRLoading.load(prog)
+    val mode = if q.inputFile.endsWith(".gts") then {
+      FrontendMode.Gtirb
+    } else if q.inputFile.endsWith(".adt") then {
+      FrontendMode.Bap
+    } else {
+      throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
     }
 
+    val (mainAddress, makeContext) = q.relfFile match {
+      case Some(relf) => {
+        val (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
+          IRLoading.loadReadELF(relf, q)
+
+        def continuation(program: Program) =
+          val specification = IRLoading.loadSpecification(q.specFile, program, globals)
+          IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program)
+
+        (Some(mainAddress), continuation)
+      }
+      case None => {
+        (None, IRLoading.load: Program => IRContext)
+      }
+    }
+
+    val program: Program = (mode, mainAddress) match {
+      case (FrontendMode.Gtirb, _) => loadGTIRB(q.inputFile, mainAddress, Some(q.mainProcedureName))
+      case (FrontendMode.Bap, None) => throw Exception("relf is required when using BAP input")
+      case (FrontendMode.Bap, Some(mainAddress)) => {
+        val bapProgram = loadBAP(q.inputFile)
+        BAPToIR(bapProgram, mainAddress).translate
+      }
+    }
+
+    val ctx = makeContext(program)
     ir.transforms.PCTracking.applyPCTracking(q.pcTracking, ctx.program)
-
     ctx
-
   }
 
   def loadBAP(fileName: String): BAPProgram = {
