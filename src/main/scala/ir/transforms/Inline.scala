@@ -131,17 +131,18 @@ def inlineCall(prog: Program, c: DirectCall): Unit = {
   val (returnTemp, resolveReturnBlock) = eventuallyReturnBlock.copy(j = unreachable).makeResolver
   proc.addBlock(returnTemp)
 
+  val reso = Resolver(prog)
   // resolve internal call blocks
   val resolvers = internalBlocks.map(_.makeResolver)
   resolvers.foreach { case (block, _) => proc.addBlock(block) }
-  resolvers.foreach { case (_, resolve) => resolve(prog, proc) }
+  resolvers.foreach { case (_, resolve) => resolve(reso, proc.name) }
 
   // remove original call statement
   block.statements.remove(c)
   // link the inlined blocks to the call block and the aftercall block
-  entryResolver(prog, proc)
+  entryResolver(reso, proc.name)
   block.replaceJump(GoTo(entryTempBlock))
-  resolveReturnBlock(prog, proc)
+  resolveReturnBlock(reso, proc.name)
   returnTemp.replaceJump(GoTo(afterCallBlock))
 
   // assign the actual parameters in the caller to the renamed formal parameters in the entry block

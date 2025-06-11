@@ -92,23 +92,25 @@ def R(i: Int): Register = Register(s"R$i", 64)
 
 def bv_t(i: Int) = BitVecType(i)
 
-case class DelayNameResolve(ident: String) {
-  def resolveProc(prog: Program): Option[Procedure] = prog.collectFirst {
-    case b: Procedure if b.name == ident => b
-  }
+case class Resolver(program: Program) {
+  lazy val procs = program.procedures.map(p => p.name -> p).toMap
+  lazy val blocks = program.procedures.map(p => p.name -> (p.blocks.map(b => b.label -> b)).toMap).toMap
+}
 
-  def resolveBlock(prog: Program): Option[Block] = prog.collectFirst {
-    case b: Block if b.label == ident => b
-  }
+case class DelayNameResolve(ident: String) {
+  def resolveProc(prog: Resolver): Option[Procedure] = prog.procs.get(ident)
+
+  def resolveBlock(resolver: Resolver, parent: String): Option[Block] =
+    resolver.blocks.get(parent).flatMap(_.get(ident))
 }
 
 sealed trait EventuallyStatement extends DeepEquality {
-  def resolve(p: Program): Statement
+  def resolve(p: Resolver): Statement
   def cloneable = this
 }
 
 case class CloneableStatement(s: NonCallStatement) extends EventuallyStatement {
-  override def resolve(p: Program): Statement = cloneStatement(s)
+  override def resolve(p: Resolver): Statement = cloneStatement(s)
   override def deepEquals(o: Object) = o match {
     case CloneableStatement(os) => os.deepEquals(s)
     case _ => false
@@ -116,7 +118,7 @@ case class CloneableStatement(s: NonCallStatement) extends EventuallyStatement {
 }
 case class IdentityStatement(s: NonCallStatement) extends EventuallyStatement {
   var resolved = false
-  override def resolve(p: Program): Statement = {
+  override def resolve(p: Resolver): Statement = {
     assert(
       !resolved,
       s"DSL statement '$s' has already been resolved! to make a DSL statement that can be resolved multiple times, wrap it in clonedStmt() or use .cloneable on its block."
@@ -132,13 +134,14 @@ case class IdentityStatement(s: NonCallStatement) extends EventuallyStatement {
 }
 
 trait EventuallyJump extends DeepEquality {
-  def resolve(p: Program, proc: Procedure): Jump
+  def resolve(p: Resolver, proc: String): Jump
+  def resolve(p: Program, proc: String): Jump = resolve(Resolver(p), proc)
 }
 
 case class EventuallyIndirectCall(target: Variable, label: Option[String] = None)
     extends EventuallyStatement
     with DefaultDeepEquality {
-  override def resolve(p: Program): Statement = {
+  override def resolve(p: Resolver): Statement = {
     IndirectCall(target, label)
   }
 }
@@ -150,7 +153,7 @@ case class EventuallyCall(
   label: Option[String] = None
 ) extends EventuallyStatement
     with DefaultDeepEquality {
-  override def resolve(p: Program): Statement = {
+  override def resolve(p: Resolver): Statement = {
     val t = target.resolveProc(p) match {
       case Some(x) => x
       case None => throw Exception(s"can't resolve target ${target} proc in prog")
@@ -164,21 +167,21 @@ case class EventuallyCall(
 case class EventuallyGoto(targets: Iterable[DelayNameResolve], label: Option[String] = None)
     extends EventuallyJump
     with DefaultDeepEquality {
-  override def resolve(p: Program, proc: Procedure): GoTo = {
-    val tgs = targets.flatMap(tn => tn.resolveBlock(p))
+  override def resolve(p: Resolver, proc: String): GoTo = {
+    val tgs = targets.flatMap(tn => tn.resolveBlock(p, proc))
     GoTo(tgs, label)
   }
 }
 case class EventuallyReturn(params: Iterable[(String, Expr)], label: Option[String] = None)
     extends EventuallyJump
     with DefaultDeepEquality {
-  override def resolve(p: Program, proc: Procedure) = {
-    val r = SortedMap.from(params.map((n, v) => proc.formalOutParam.find(_.name == n).get -> v))
+  override def resolve(p: Resolver, proc: String) = {
+    val r = SortedMap.from(params.map((n, v) => p.procs(proc).formalOutParam.find(_.name == n).get -> v))
     Return(label, r)
   }
 }
 case class EventuallyUnreachable(label: Option[String] = None) extends EventuallyJump with DefaultDeepEquality {
-  override def resolve(p: Program, proc: Procedure) = Unreachable(label)
+  override def resolve(p: Resolver, proc: String) = Unreachable(label)
 }
 
 def clonedStmt(s: NonCallStatement) = CloneableStatement(s)
@@ -247,10 +250,10 @@ case class EventuallyBlock(
 
   }
 
-  def makeResolver: (Block, (Program, Procedure) => Unit) = {
+  def makeResolver: (Block, (Resolver, String) => Unit) = {
     val tempBlock: Block = Block(label, address, List(), GoTo(List.empty))
 
-    def cont(prog: Program, proc: Procedure): Block = {
+    def cont(prog: Resolver, proc: String): Block = {
       assert(tempBlock.statements.isEmpty)
       val resolved = sl.map(_.resolve(prog))
       assert(tempBlock.statements.isEmpty)
@@ -261,7 +264,8 @@ case class EventuallyBlock(
     (tempBlock, cont)
   }
 
-  def resolve(prog: Program, proc: Procedure): Block = {
+  def resolve(prog: Program, proc: String): Block = resolve(Resolver(prog), proc)
+  def resolve(prog: Resolver, proc: String): Block = {
     val (b, resolve) = makeResolver
     resolve(prog, proc)
     b
@@ -318,7 +322,7 @@ case class EventuallyProcedure(
     case _ => false
   }
 
-  def makeResolver: (Procedure, Program => Unit) = {
+  def makeResolver: (Procedure, Resolver => Unit) = {
 
     val (tempBlocks, resolvers) = blocks.map(_.makeResolver).unzip
 
@@ -338,16 +342,17 @@ case class EventuallyProcedure(
     val jumps: Iterable[(Block, EventuallyJump)] =
       (tempBlocks zip blocks).map((temp, b) => temp -> b.j)
 
-    def cont(prog: Program) = {
-      resolvers.foreach(_(prog, tempProc))
-      jumps.foreach((b, j) => b.replaceJump(j.resolve(prog, tempProc)))
+    def cont(prog: Resolver) = {
+      resolvers.foreach(_(prog, tempProc.name))
+      jumps.foreach((b, j) => b.replaceJump(j.resolve(prog, tempProc.name)))
       tempBlocks.headOption.foreach(b => tempProc.entryBlock = b)
     }
 
     (tempProc, cont)
   }
 
-  def resolve(prog: Program): Procedure = {
+  def resolve(p: Program): Procedure = resolve(Resolver(p))
+  def resolve(prog: Resolver): Procedure = {
     val (p, resolver) = makeResolver
     resolver(prog)
     p
@@ -355,9 +360,9 @@ case class EventuallyProcedure(
 
   def toProg() = prog(this)
 
-  def addToProg(p: Program): Procedure = {
+  def addToProg(p: Resolver): Procedure = {
     val (proc, resolver) = makeResolver
-    p.addProcedure(proc)
+    p.program.addProcedure(proc)
     resolver(p)
     proc
   }
@@ -413,8 +418,9 @@ case class EventuallyProgram(
     val procs = ArrayBuffer.from(tempProcs)
 
     val p = Program(procs, procs.head, memory)
+    val reso = Resolver(p)
 
-    resolvers.foreach(_(p))
+    resolvers.foreach(_(reso))
     assert(ir.invariant.correctCalls(p))
     assert(ir.invariant.cfgCorrect(p))
     p
