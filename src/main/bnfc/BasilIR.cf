@@ -17,8 +17,6 @@ token IntegerHex ('0' 'x' (digit | ["abcdef"])+);
 
 separator BIdent "," ;
 
-token BitvectorHex (('0' 'x' (digit | ["abcdef"])+)) ;
-
 comment "//" ;
 comment "/*" "*/" ;
 
