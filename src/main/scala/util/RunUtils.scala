@@ -164,7 +164,7 @@ object IRLoading {
 
     val ctx = makeContext(program)
     mode match {
-      case FrontendMode.Basil => Logger.info("Disabling relf tracking due to IL input")
+      case FrontendMode.Basil => Logger.info(" [!] Disabling PC tracking transforms due to IL input")
       case _ => ir.transforms.PCTracking.applyPCTracking(q.pcTracking, ctx.program)
     }
     ctx
