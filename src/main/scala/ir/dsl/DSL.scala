@@ -63,12 +63,14 @@ import scala.annotation.targetName
 type NonCallStatement =
   LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume | MemoryAssign
 
+type DSLStatement = NonCallStatement | EventuallyStatement | EventuallyJump
+
 def cloneStatement(x: NonCallStatement): NonCallStatement = x match {
   case LocalAssign(a, b, c) => LocalAssign(a, b, c)
   case MemoryAssign(a, b, c) => MemoryAssign(a, b, c)
   case MemoryStore(a, b, c, d, e, f) => MemoryStore(a, b, c, d, e, f)
   case MemoryLoad(a, b, c, d, e, f) => MemoryLoad(a, b, c, d, e, f)
-  case x: NOP => NOP(x.label) // FIXME: no unapply for NOP atm
+  case NOP(l) => NOP(l)
   case Assert(a, b, c) => Assert(a, b, c)
   case Assume(a, b, c, d) => Assume(a, b, c, d)
 }
@@ -100,13 +102,17 @@ case class DelayNameResolve(ident: String) {
   }
 }
 
-sealed trait EventuallyStatement {
+sealed trait EventuallyStatement extends DeepEquality {
   def resolve(p: Program): Statement
   def cloneable = this
 }
 
 case class CloneableStatement(s: NonCallStatement) extends EventuallyStatement {
   override def resolve(p: Program): Statement = cloneStatement(s)
+  override def deepEquals(o: Object) = o match {
+    case CloneableStatement(os) => os.deepEquals(s)
+    case _ => false
+  }
 }
 case class IdentityStatement(s: NonCallStatement) extends EventuallyStatement {
   var resolved = false
@@ -119,13 +125,19 @@ case class IdentityStatement(s: NonCallStatement) extends EventuallyStatement {
     s
   }
   override def cloneable = CloneableStatement(s)
+  override def deepEquals(o: Object) = o match {
+    case CloneableStatement(os) => os.deepEquals(s)
+    case _ => false
+  }
 }
 
-trait EventuallyJump {
+trait EventuallyJump extends DeepEquality {
   def resolve(p: Program, proc: Procedure): Jump
 }
 
-case class EventuallyIndirectCall(target: Variable, label: Option[String] = None) extends EventuallyStatement {
+case class EventuallyIndirectCall(target: Variable, label: Option[String] = None)
+    extends EventuallyStatement
+    with DefaultDeepEquality {
   override def resolve(p: Program): Statement = {
     IndirectCall(target, label)
   }
@@ -136,7 +148,8 @@ case class EventuallyCall(
   lhs: Iterable[(String, Variable)],
   actualParams: Iterable[(String, Expr)],
   label: Option[String] = None
-) extends EventuallyStatement {
+) extends EventuallyStatement
+    with DefaultDeepEquality {
   override def resolve(p: Program): Statement = {
     val t = target.resolveProc(p) match {
       case Some(x) => x
@@ -148,19 +161,23 @@ case class EventuallyCall(
   }
 }
 
-case class EventuallyGoto(targets: Iterable[DelayNameResolve], label: Option[String] = None) extends EventuallyJump {
+case class EventuallyGoto(targets: Iterable[DelayNameResolve], label: Option[String] = None)
+    extends EventuallyJump
+    with DefaultDeepEquality {
   override def resolve(p: Program, proc: Procedure): GoTo = {
     val tgs = targets.flatMap(tn => tn.resolveBlock(p))
     GoTo(tgs, label)
   }
 }
-case class EventuallyReturn(params: Iterable[(String, Expr)], label: Option[String] = None) extends EventuallyJump {
+case class EventuallyReturn(params: Iterable[(String, Expr)], label: Option[String] = None)
+    extends EventuallyJump
+    with DefaultDeepEquality {
   override def resolve(p: Program, proc: Procedure) = {
     val r = SortedMap.from(params.map((n, v) => proc.formalOutParam.find(_.name == n).get -> v))
     Return(label, r)
   }
 }
-case class EventuallyUnreachable(label: Option[String] = None) extends EventuallyJump {
+case class EventuallyUnreachable(label: Option[String] = None) extends EventuallyJump with DefaultDeepEquality {
   override def resolve(p: Program, proc: Procedure) = Unreachable(label)
 }
 
@@ -219,7 +236,16 @@ case class EventuallyBlock(
   sl: Iterable[EventuallyStatement],
   var j: EventuallyJump,
   address: Option[BigInt] = None
-) {
+) extends DeepEquality {
+
+  override def deepEquals(o: Object) = o match {
+    case EventuallyBlock(`label`, osl, oj, `address`) =>
+      j.deepEquals(oj) && sl.size == osl.size && osl.toList.zip(sl).forall { case (l, r) =>
+        l.deepEquals(r)
+      }
+    case _ => false
+
+  }
 
   def makeResolver: (Block, (Program, Procedure) => Unit) = {
     val tempBlock: Block = Block(label, address, List(), GoTo(List.empty))
@@ -277,7 +303,20 @@ case class EventuallyProcedure(
   entryBlockLabel: Option[String] = None,
   returnBlockLabel: Option[String] = None,
   address: Option[BigInt] = None
-) {
+) extends DeepEquality {
+
+  def name = label + address.fold("")("_" + _)
+
+  override def deepEquals(o: Object) = o match {
+    case EventuallyProcedure(`label`, `in`, `out`, b, `entryBlockLabel`, `returnBlockLabel`, `address`) => {
+      b.size == blocks.size && {
+        b.zip(blocks).forall { case (l, r) =>
+          l.deepEquals(r)
+        }
+      }
+    }
+    case _ => false
+  }
 
   def makeResolver: (Procedure, Program => Unit) = {
 
@@ -356,8 +395,16 @@ case class EventuallyProgram(
   mainProcedure: EventuallyProcedure,
   otherProcedures: collection.Iterable[EventuallyProcedure] = Seq(),
   initialMemory: collection.Iterable[MemorySection] = Seq()
-) {
+) extends DeepEquality {
   val allProcedures = Seq(mainProcedure) :++ otherProcedures
+
+  override def deepEquals(o: Object) = o match {
+    case EventuallyProgram(mp, op, im) => {
+      mp.deepEquals(mainProcedure) && op.size == otherProcedures.size && op.zip(otherProcedures).forall { case (l, r) =>
+        l.deepEquals(r)
+      }
+    }
+  }
 
   def resolve: Program = {
     val memory = mutable.TreeMap.from(initialMemory.map(v => (v.address, v)))

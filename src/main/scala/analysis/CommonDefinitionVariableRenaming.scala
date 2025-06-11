@@ -120,7 +120,7 @@ def getCommonDefinitionVariableRenaming(
   //      loc ->        (defining (var -> index)            reaching (var -> index))
 
   def getUseInd(v: Variable, pos: CFGPosition): Int = {
-    val d = getUse(v, pos, reachingDefs).headOption.getOrElse {
+    val d: CFGPosition = getUse(v, pos, reachingDefs).headOption.getOrElse {
       Logger.debug(s"${IRWalk.blockBegin(pos)}")
       IRWalk.procedure(pos)
     }

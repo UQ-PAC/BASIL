@@ -7,6 +7,18 @@ import scala.collection.mutable
 private val localSigils = false
 
 object PrettyPrinter {
+
+  type PrettyPrintable = Program | Procedure | Statement | Jump | Command | Block | Expr
+
+  extension (p: PrettyPrintable)
+    def pprint = p match {
+      case e: Expr => pp_expr(e)
+      case e: Command => pp_cmd(e)
+      case e: Block => pp_block(e)
+      case e: Procedure => pp_proc(e)
+      case e: Program => pp_prog(e)
+    }
+
   def pp_expr(e: Expr) = BasilIRPrettyPrinter()(e)
   def pp_stmt(s: Statement) = BasilIRPrettyPrinter()(s)
   def pp_cmd(c: Command) = c match {
@@ -204,10 +216,12 @@ class BasilIRPrettyPrinter(
         ++ List(threadspec)
       // ++ List(initialMemory(p.initialMemory.values))
       ,
-      p.procedures.toList.map(vproc).collect {
-        case p: Proc => p
-        case _ => ???
-      }
+      ((p.mainProcedure) :: p.procedures.filterNot(_ == p.mainProcedure).toList)
+        .map(vproc)
+        .collect {
+          case p: Proc => p
+          case _ => ???
+        }
     )
   }
 
@@ -354,9 +368,7 @@ class BasilIRPrettyPrinter(
 
     val inParams = p.formalInParam.toList.map(vparam)
     val outParams = p.formalOutParam.toList.map(vparam)
-    val middleBlocks = (p.entryBlock.toList ++ p.blocks
-      .filterNot(p.returnBlock.contains)
-      .filterNot(p.entryBlock.contains) ++ p.returnBlock).map(vblock)
+    val middleBlocks = p.blocksBookended.map(vblock)
 
     val localDecls = decls.toList.sorted
 
@@ -369,8 +381,6 @@ class BasilIRPrettyPrinter(
 
     val spec = (if (requires.nonEmpty) then "\n" + requires.mkString("\n") else "")
       + (if ensures.nonEmpty then ("\n" + ensures.mkString("\n")) else "")
-
-    // val iblocks = p.entryBlock.map(b => (s"  entry_block = " + '"' + b.label + '"')).toList
 
     val mblocks =
       if (middleBlocks.size == 0) then None
