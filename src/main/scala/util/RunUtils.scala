@@ -963,7 +963,6 @@ object RunUtils {
       writeToFile(pp_prog(ctx.program), s"$s-output.il")
       val a = ctx.program.toScalaLines
       writeToFile(a.mkString, s"$s-output.scala")
-      println(a)
     })
     Logger.info("[!] Translating to Boogie")
 
