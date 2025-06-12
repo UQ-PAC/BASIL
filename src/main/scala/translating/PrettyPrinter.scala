@@ -263,7 +263,12 @@ class BasilIRPrettyPrinter(
   }
 
   def memdecl(m: Memory): String = {
-    s"memory ${Sigil.BASIR.globalVar}${m.name} : ${vtype(m.getType)}"
+    val shared = m match {
+      case s: SharedMemory => "shared "
+      case o: StackMemory => ""
+    }
+
+    s"memory ${shared}${Sigil.BASIR.globalVar}${m.name} : ${vtype(m.getType)}"
 
   }
 
@@ -408,7 +413,7 @@ class BasilIRPrettyPrinter(
   override def vmemassign(lhs: PPProg[Variable], rhs: PPProg[Expr]): PPProg[LocalAssign] = BST(s"${lhs} mem:= ${rhs}")
 
   override def vstore(
-    mem: String,
+    mem: Memory,
     index: PPProg[Expr],
     value: PPProg[Expr],
     endian: Endian,
@@ -416,7 +421,7 @@ class BasilIRPrettyPrinter(
   ): BST[MemoryStore] = {
     val le = if endian == Endian.LittleEndian then "le" else "be"
 
-    BST(s"store $le ${Sigil.BASIR.globalVar}${mem} ${index} ${value} ${size}")
+    BST(s"store $le ${Sigil.BASIR.globalVar}${mem.name} ${index} ${value} ${size}")
   }
 
   def vload(lhs: PPProg[Variable], mem: String, index: PPProg[Expr], endian: Endian, size: Int): PPProg[MemoryLoad] = {

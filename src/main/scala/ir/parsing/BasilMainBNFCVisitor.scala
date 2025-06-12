@@ -294,7 +294,10 @@ case class BasilMainBNFCVisitor[A](
     ir.LocalVar.ofIndexed(unsigilLocal(x.localident_), x.type_.accept(this, arg))
 
   // Members declared in Declaration.Visitor
-  override def visit(x: syntax.MemDecl, arg: A): Nothing = throw new Exception(
+  override def visit(x: syntax.SharedMemDecl, arg: A): Nothing = throw new Exception(
+    "MemDecl should be visited by an earlier visitor"
+  )
+  override def visit(x: syntax.UnsharedMemDecl, arg: A): Nothing = throw new Exception(
     "MemDecl should be visited by an earlier visitor"
   )
   override def visit(x: syntax.VarDecl, arg: A): Nothing = throw new Exception(
@@ -361,7 +364,8 @@ case class BasilMainBNFCVisitor[A](
   // Members declared in Program.Visitor
   override def visit(x: syntax.Module1, arg: A) = {
     val ds = x.listdeclaration_.asScala.filter {
-      case x: syntax.MemDecl => false
+      case x: syntax.UnsharedMemDecl => false
+      case x: syntax.SharedMemDecl => false
       case x: syntax.VarDecl => false
       case x: syntax.Procedure => true
       case x: syntax.ProgDeclWithSpec => true

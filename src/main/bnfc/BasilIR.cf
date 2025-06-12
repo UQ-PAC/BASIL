@@ -38,8 +38,10 @@ comment "/*" "*/" ;
 
 {- Top Level Declarations -}
 AxiomDecl . Declaration ::= "axiom" AttrDefList Expr; 
-MemDecl . Declaration ::= "memory" GlobalIdent ":" Type ;
+SharedMemDecl . Declaration ::= "memory" "shared" GlobalIdent ":" Type ;
+UnsharedMemDecl . Declaration ::= "memory" GlobalIdent ":" Type ;
 VarDecl . Declaration ::= "var" GlobalIdent ":" Type  ;
+
 ProgDeclWithSpec . Declaration ::= "prog" AttrDefList BeginList [ ProgSpec ] EndList ;
 ProgDecl . Declaration ::= "prog" AttrDefList ;
 Procedure . Declaration ::= ProcSig AttrDefList  ProcDef ;

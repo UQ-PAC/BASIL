@@ -133,15 +133,14 @@ case class BasilEarlyBNFCVisitor[A]()
   override def visit(x: syntax.ProgDecl, arg: A) = Declarations.empty
   override def visit(x: syntax.ProgDeclWithSpec, arg: A) = Declarations.empty
 
-  override def visit(x: syntax.MemDecl, arg: A) =
-
-    // TODO: make this narrower in the grammar
-
+  override def visit(x: syntax.UnsharedMemDecl, arg: A) =
     val ir.MapType(ir.BitVecType(addrwd), ir.BitVecType(valwd)) = x.type_.accept(this, arg): @unchecked
-    val mem = unsigilGlobal(x.globalident_) match {
-      case "stack" => ir.StackMemory("stack", addrwd, valwd)
-      case n => ir.SharedMemory(n, addrwd, valwd)
-    }
+    val mem = ir.StackMemory(unsigilGlobal(x.globalident_), addrwd, valwd)
+    Declarations.empty.copy(memories = Map(mem.name -> mem))
+
+  override def visit(x: syntax.SharedMemDecl, arg: A) =
+    val ir.MapType(ir.BitVecType(addrwd), ir.BitVecType(valwd)) = x.type_.accept(this, arg): @unchecked
+    val mem = ir.SharedMemory(unsigilGlobal(x.globalident_), addrwd, valwd)
     Declarations.empty.copy(memories = Map(mem.name -> mem))
 
   override def visit(x: syntax.VarDecl, arg: A) =

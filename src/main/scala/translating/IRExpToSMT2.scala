@@ -14,7 +14,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
       case a: LocalAssign => vassign(vlvar(a.lhs), vexpr(a.rhs))
       case m: MemoryAssign => vmemassign(vlvar(m.lhs), vexpr(m.rhs))
       case m: MemoryLoad => vload(vlvar(m.lhs), m.mem.name, vexpr(m.index), m.endian, m.size)
-      case m: MemoryStore => vstore(m.mem.name, vexpr(m.index), vexpr(m.value), m.endian, m.size)
+      case m: MemoryStore => vstore(m.mem, vexpr(m.index), vexpr(m.value), m.endian, m.size)
       case c: DirectCall =>
         vcall(
           c.outParams.toList.map((l, r) => (l, r)),
@@ -85,7 +85,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
   def vassign(lhs: Repr[Variable], rhs: Repr[Expr]): Repr[LocalAssign]
   def vmemassign(lhs: Repr[Variable], rhs: Repr[Expr]): Repr[LocalAssign]
   def vload(lhs: Repr[Variable], mem: String, index: Repr[Expr], endian: Endian, size: Int): Repr[MemoryLoad]
-  def vstore(mem: String, index: Repr[Expr], value: Repr[Expr], endian: Endian, size: Int): Repr[MemoryStore]
+  def vstore(mem: Memory, index: Repr[Expr], value: Repr[Expr], endian: Endian, size: Int): Repr[MemoryStore]
   def vcall(
     outParams: List[(Variable, Variable)],
     procname: String,
@@ -182,7 +182,7 @@ def list[T](l: Sexp[T]*): Sexp[T] = Sexp.Slist(l.toList)
 
 object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   def vload(lhs: Sexp[Variable], mem: String, index: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryLoad] = ???
-  def vstore(mem: String, index: Sexp[Expr], value: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryStore] = ???
+  def vstore(mem: Memory, index: Sexp[Expr], value: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryStore] = ???
 
   def vold(e: Expr) = ???
   def vquantifier(e: QuantifierExpr) = ???
