@@ -2,7 +2,7 @@ package ir.dsl
 
 import ir.*
 import util.twine.Twine
-import util.{StringEscape, indent, indentNested, intersperse}
+import util.{StringEscape, intersperse}
 import translating.{BasilIR, BasilIRExp}
 
 import collection.immutable.{ListMap, SortedMap}
