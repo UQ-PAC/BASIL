@@ -202,18 +202,21 @@ case class InnerBasilBNFCVisitor[A](
     ir.dsl.indirectCall(v)
   }
   override def visit(x: syntax.Assume, arg: A) = {
-    val label = getLabelAttr(x.attrdeflist_, arg)
-    val comment = getCommentAttr(x.attrdeflist_, arg)
+    val attr = parseAttrMap(x.attrdeflist_, arg)
+    val label = getLabelAttr(attr)
+    val comment = getCommentAttr(attr)
     ir.Assume(x.expr_.accept(this, arg), comment, label, false)
   }
   override def visit(x: syntax.Guard, arg: A) = {
-    val label = getLabelAttr(x.attrdeflist_, arg)
-    val comment = getCommentAttr(x.attrdeflist_, arg)
+    val attr = parseAttrMap(x.attrdeflist_, arg)
+    val label = getLabelAttr(attr)
+    val comment = getCommentAttr(attr)
     ir.Assume(x.expr_.accept(this, arg), comment, label, true)
   }
   override def visit(x: syntax.Assert, arg: A) = {
-    val label = getLabelAttr(x.attrdeflist_, arg)
-    val comment = getCommentAttr(x.attrdeflist_, arg)
+    val attr = parseAttrMap(x.attrdeflist_, arg)
+    val label = getLabelAttr(attr)
+    val comment = getCommentAttr(attr)
     ir.Assert(x.expr_.accept(this, arg), comment, label)
   }
 
@@ -245,8 +248,10 @@ case class InnerBasilBNFCVisitor[A](
   // Members declared in Block.Visitor
   override def visit(x: syntax.Block1, arg: A): ir.dsl.EventuallyBlock =
     val ss = stmts(x.liststatement_, arg) :+ x.jump_.accept(this, arg)
-    val addr = getAddrAttr(x.attrdeflist_, arg)
-    val origLbl = getStrAttr("originalLabel")(x.attrdeflist_, arg)
+
+    val attr = parseAttrMap(x.attrdeflist_, arg)
+    val addr = getAddrAttr(attr)
+    val origLbl = getStrAttr("originalLabel")(attr)
     val meta = ir.Metadata(originalLabel = origLbl, address = addr)
     ir.dsl.block(unsigilBlock(x.blockident_), ss: _*).copy(meta = meta)
 
@@ -371,9 +376,10 @@ case class BasilMainBNFCVisitor[A](
   }
 
   def visit(x: syntax.Procedure, arg: A): ir.dsl.EventuallyProcedure = {
-    val addr = getAddrAttr(x.attrdeflist_, arg)
     val pname = x.procsig_.accept(this, arg).name
-    val rname = getStrAttr("name")(x.attrdeflist_, arg).getOrElse(pname)
+    val attr = parseAttrMap(x.attrdeflist_, arg)
+    val addr = getAddrAttr(attr)
+    val rname = getStrAttr("name")(attr).getOrElse(pname)
     val innervis = makeVisitor(rname, decls)
     val p = x.procdef_.accept(this, (arg, pname))
     p.copy(address = addr, label = rname)

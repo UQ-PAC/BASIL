@@ -3,22 +3,121 @@ import ir.*
 import ir.cilvisitor.*
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
+import upickle.default.ReadWriter
+import specification.*
+import boogie.SpecGlobal
 
 private val localSigils = false
 
+case class LightContext(
+  externalFunctions: Set[ExternalFunction],
+  globals: Set[SpecGlobal],
+  funcEntries: Set[FuncEntry],
+  globalOffsets: Map[BigInt, BigInt]
+) {
+
+  import AttrRec.*
+
+  def pprint: String = {
+    import PrettyPrinter.*
+
+    val ef = indent(list(externalFunctions.map(_.pprint)), "  ")
+    val globs = indent(list(globals.toList.map(_.pprint)), "  ")
+    val funcs = indent(list(funcEntries.map(_.pprint)), "  ")
+    val goffs = indent(
+      list(globalOffsets.map { case (k, v) =>
+        s"[${k.pprint}; ${v.pprint}]"
+      }),
+      "  "
+    )
+
+    map(List(("externalFunctions", ef), ("globals", globs), ("funcEntries", funcs), ("globalOffsets", goffs)))
+  }
+}
+
+object LightContext {
+  def from(e: util.IRContext) = {
+    LightContext(e.externalFunctions, e.globals, e.funcEntries, e.globalOffsets)
+  }
+}
+
+object AttrRec {
+  def field(p: String) = {
+    Sigil.BASIR.attrib + p
+  }
+  def list(xs: Iterable[String]) = {
+    "[\n  " + indent(xs.mkString(";\n"), "  ") + "\n]"
+  }
+
+  def map(xs: Iterable[(String, String)]) = {
+    "{\n" +
+      (xs
+        .map { case (f, v) =>
+          "  " + field(f) + " = " + v
+        }
+        .mkString(";\n"))
+      + "\n}"
+  }
+
+  def quote(s: String) = "\"" + s + "\""
+}
+
 object PrettyPrinter {
 
-  type PrettyPrintable = Program | Procedure | Statement | Jump | Command | Block | Expr
+  type PrettyPrintable = Program | Procedure | Statement | Jump | Command | Block | Expr | util.IRContext
+
+// case class FuncEntry(override val name: String, override val size: Int, override val address: BigInt)
+
+  import AttrRec.*
+
+  extension (p: MemoryStatic)
+    def pprint: String = {
+      map(
+        List(
+          (("name"), quote(p.name)),
+          (("address"), p.address.pprint),
+          (("size"), p.size.toString),
+          (("bytes"), quote(p.bytes))
+        )
+      )
+    }
+
+  extension (p: FuncEntry)
+    def pprint: String = {
+      val addr = field("address") + s" = " + p.address.pprint
+      val name = s"${field("name")} = \"${p.name}\""
+      val size = s"${field("size")} = ${p.size}"
+      s"{ $name ; $size ; $addr }"
+    }
+
+  extension (p: SpecGlobal) {
+    def pprint: String = {
+      val arrayS = p.arraySize.map(s => "; " + field("arraySize") + " = " + s.toString).getOrElse("")
+      val addr = field("address") + s" = " + p.address.pprint
+      val name = s"${field("name")} = \"${p.name}\""
+      val size = s"${field("size")} = ${p.size}"
+      s"{ $name; $size ; $addr$arrayS }"
+    }
+  }
+  extension (p: ExternalFunction) {
+    def pprint: String = s"{ ${field("name")}= \"${p.name}\" ; ${field("offset")} = ${p.offset.pprint} }"
+  }
+
+  extension (b: BigInt) {
+    def pprint: String = "0x%x".format(b)
+  }
 
   extension (p: PrettyPrintable)
-    def pprint = p match {
+    def pprint: String = p match {
       case e: Expr => pp_expr(e)
       case e: Command => pp_cmd(e)
       case e: Block => pp_block(e)
       case e: Procedure => pp_proc(e)
       case e: Program => pp_prog(e)
+      case e: util.IRContext => pp_irctx(e)
     }
 
+  def pp_irctx(e: util.IRContext) = BasilIRPrettyPrinter().vcontext(e).toString
   def pp_expr(e: Expr) = BasilIRPrettyPrinter()(e)
   def pp_stmt(s: Statement) = BasilIRPrettyPrinter()(s)
   def pp_cmd(c: Command) = c match {
@@ -222,13 +321,34 @@ class BasilIRPrettyPrinter(
     }.toSet
   }
 
+  def vcontext(i: util.IRContext) = {
+    val prog = vprog(i.program)
+    import PrettyPrinter.*
+
+    val r = LightContext.from(i)
+    val jsonedCtx = indent(r.pprint, "  ")
+
+    val memory = i.program.initialMemory
+      .map { case (k, v) =>
+        MemoryStatic.of(v)
+      }
+      .toList
+      .sortBy(_.address)
+    val jsonedMem = indent(AttrRec.list(memory.map(x => x.pprint)), "  ")
+
+    val decl =
+      s"prog entry ${Sigil.BASIR.proc}${i.program.mainProcedure.name} {\n  .symbols = ${jsonedCtx};\n  .initial_memory = ${jsonedMem}\n} ;"
+
+    prog.toString ++ "\n\n" ++ decl ++ "\n"
+  }
+
   override def vprog(p: Program): PPProg[Program] = {
 
     val threadspec = s"\nprog entry ${Sigil.BASIR.proc}${p.mainProcedure.name}"
 
     val uninterp = getUninterp(p)
     val ufdecls = uninterp.map { case (n, pt, rt) =>
-      s"declare-fun ${Sigil.BASIR.globalVar}$n (${pt.map(vtype).mkString(", ")}) -> ${vtype(rt)}"
+      s"declare-fun ${Sigil.BASIR.globalVar}$n : (${pt.map(vtype).mkString(", ")}) -> ${vtype(rt)}"
     }
 
     Prog(
@@ -529,8 +649,8 @@ class BasilIRPrettyPrinter(
     e match {
       case l: LocalVar =>
         val sigil = if localSigils then Sigil.BASIR.localVar else ""
-        BST(s"var $sigil${e.name}:${vtype(e.getType)}")
-      case l: Global => BST(s"${Sigil.BASIR.globalVar}${e.name}:${vtype(e.getType)}")
+        BST(s"var $sigil${e.name}: ${vtype(e.getType)}")
+      case l: Global => BST(s"${Sigil.BASIR.globalVar}${e.name}: ${vtype(e.getType)}")
     }
   }
 

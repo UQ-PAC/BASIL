@@ -31,6 +31,7 @@ import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
 import translating.*
 import util.{DebugDumpIRLogger, Logger, SimplifyLogger}
+import upickle.default.ReadWriter
 
 import java.util.Base64
 import util.intrusive_list.IntrusiveList
@@ -992,7 +993,7 @@ object RunUtils {
     }
 
     q.loading.dumpIL.foreach(s => {
-      writeToFile(pp_prog(ctx.program), s"$s-output.il")
+      writeToFile(ctx.pprint, s"$s-output.il")
       writeToFile(ctx.program.toScala, s"$s-output.scala")
     })
     Logger.info("[!] Translating to Boogie")

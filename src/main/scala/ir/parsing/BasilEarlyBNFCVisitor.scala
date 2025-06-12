@@ -10,9 +10,16 @@ private object Declarations {
   lazy val empty = Declarations(Map(), Map(), Map(), Map(), Map())
 }
 
+//enum Attrib {
+//  case ValueAttr(name: String, v: ir.Literal)
+//  case StringAttr(name: String, v: String)
+//}
+
 enum Attrib {
-  case ValueAttr(name: String, v: ir.Literal)
-  case StringAttr(name: String, v: String)
+  case List(l: Vector[Attrib])
+  case Map(l: ListMap[String, Attrib])
+  case ValLiteral(l: ir.Literal)
+  case ValString(l: String)
 }
 
 case class FunDecl(irType: ir.IRType, body: Option[ir.LambdaExpr])
@@ -58,42 +65,64 @@ case class Declarations(
 }
 
 trait AttributeListBNFCVisitor[A]()
-    extends syntax.AttributeItem.Visitor[Attrib, A],
-      syntax.AttrDefList.Visitor[List[Attrib], A],
+    extends syntax.AttrDefList.Visitor[Attrib.Map, A],
+      syntax.AttrValue.Visitor[Attrib, A],
+      syntax.AttrKeyValue.Visitor[(String, Attrib), A],
       LiteralsBNFCVisitor[A] {
 
-  override def visit(p: syntax.AttrDefListSome, arg: A): List[Attrib] = {
-    p.listattributeitem_.asScala.toList.map(_.accept(this, arg))
+  // override def visit(p: syntax.ValueAttr, arg: A): Attrib =
+  //  Attrib.ValueAttr(unsigilAttrib(p.bident_), p.value_.accept(this, arg))
+  // override def visit(p: syntax.StringAttr, arg: A): Attrib =
+  //  Attrib.StringAttr(unsigilAttrib(p.bident_), unquote(p.str_, p))
+  // override def visit(p: syntax.JsonAttr, arg: A): Attrib =
+  //  def jsonUnquote(x: String) = x.stripPrefix("json\"\"\"").stripSuffix("\"\"\"")
+  //  Attrib.JsonStringAttr(unsigilAttrib(p.bident_), jsonUnquote(p.jsonstr_))
+
+  def visit(x: syntax.MapAttr, arg: A): ir.parsing.Attrib =
+    parseAttrMap(x.attrdeflist_, arg)
+  def visit(x: syntax.ListAttr, arg: A): ir.parsing.Attrib =
+    Attrib.List(x.listattrvalue_.asScala.toVector.map(_.accept(this, arg)))
+  def visit(x: syntax.LiteralAttr, arg: A): ir.parsing.Attrib =
+    Attrib.ValLiteral(x.value_.accept(this, arg))
+  def visit(x: syntax.StringAttr, arg: A): ir.parsing.Attrib = {
+    Attrib.ValString(unquote(x.str_, x))
   }
 
-  override def visit(p: syntax.ValueAttr, arg: A): Attrib =
-    Attrib.ValueAttr(unsigilAttrib(p.bident_), p.value_.accept(this, arg))
-  override def visit(p: syntax.StringAttr, arg: A): Attrib =
-    Attrib.StringAttr(unsigilAttrib(p.bident_), unquote(p.str_, p))
-  override def visit(p: syntax.AttrDefListEmpty, arg: A): List[Attrib] = List()
-
-  def getIntCompatAttr(n: String)(attrs: syntax.AttrDefList, arg: A): Option[BigInt] = {
-    attrs
-      .accept(this, arg)
-      .collect {
-        case Attrib.ValueAttr(attr, ir.IntLiteral(v)) if attr == n => v
-        case Attrib.ValueAttr(attr, ir.BitVecLiteral(v, _)) if attr == n => v
-      }
-      .lastOption
+  override def visit(p: syntax.AttrDefListEmpty, arg: A): Attrib.Map = Attrib.Map(ListMap())
+  override def visit(p: syntax.AttrKeyValue1, arg: A): (String, Attrib) = {
+    (unsigilAttrib(p.bident_), p.attrvalue_.accept(this, arg))
+  }
+  override def visit(p: syntax.AttrDefListSome, arg: A): Attrib.Map = {
+    Attrib.Map(ListMap.from(p.listattrkeyvalue_.asScala.toList.map(_.accept(this, arg))))
   }
 
-  def attrs(a: syntax.AttrDefList, arg: A): List[Attrib] = {
+  def getIntCompatAttr(n: String)(attrs: Attrib): Option[BigInt] = {
+    attrs match {
+      case Attrib.Map(vs) =>
+        vs.collect {
+          case (attr, Attrib.ValLiteral(ir.IntLiteral(v))) if attr == n => v
+          case (attr, Attrib.ValLiteral(ir.BitVecLiteral(v, _))) if attr == n => v
+        }.lastOption
+    }
+  }
+
+  def parseAttr(a: syntax.AttrValue, arg: A): Attrib = {
     a.accept(this, arg)
   }
 
-  def getAddrAttr(attrs: syntax.AttrDefList, arg: A): Option[BigInt] = getIntCompatAttr("address")(attrs, arg)
-  def getStrAttr(n: String)(attrs: syntax.AttrDefList, arg: A): Option[String] = {
-    attrs
-      .accept(this, arg)
-      .collect {
-        case Attrib.StringAttr(attr, v) if attr == n => v
-      }
-      .lastOption
+  def parseAttrMap(a: syntax.AttrDefList, arg: A): Attrib = {
+    a.accept(this, arg)
+  }
+
+  def getAddrAttr(attrs: Attrib): Option[BigInt] = getIntCompatAttr("address")(attrs)
+
+  def getStrAttr(n: String)(attrs: Attrib): Option[String] = {
+    attrs match {
+      case Attrib.Map(vs) =>
+        vs.collect {
+          case (attr, Attrib.ValString(v)) if attr == n => v
+        }.lastOption
+    }
   }
   val getCommentAttr = getStrAttr("comment")
   val getLabelAttr = getStrAttr("label")

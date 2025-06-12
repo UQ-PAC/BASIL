@@ -29,6 +29,7 @@ token LambdaSep ({"::"} | {"->"}) ;
 
 token Str '"' ((char - ["\"\\"]) | ('\\' ["\"\\tnrf"]))* '"' ;
 token IntegerHex ('0' 'x' (digit | ["abcdef"])+);
+token IntegerDec (digit+);
 
 -- gobble extra semicolons 
 EmptyScolon . GobbleScolon ::= "";
@@ -45,7 +46,7 @@ VarDecl . Declaration ::= "var" GlobalIdent ":" Type  ;
 
 separator Type ",";
 
-UninterpFunDecl . Declaration ::= "declare-fun" AttrDefList GlobalIdent "(" [Type] ")" "->" Type ;
+UninterpFunDecl . Declaration ::= "declare-fun" AttrDefList GlobalIdent ":" "(" [Type] ")" "->" Type ;
 FunDef . Declaration ::= "define-fun" AttrDefList GlobalIdent"(" [Params] ")" "->" Type "=" Expr;
 ProgDeclWithSpec . Declaration ::= "prog" "entry" ProcIdent AttrDefList BeginList [ ProgSpec ] EndList ;
 ProgDecl . Declaration ::= "prog" "entry" ProcIdent AttrDefList ;
@@ -63,7 +64,7 @@ rules Type ::= IntType | BoolType | MapType | BVType ;
 separator Expr "," ;
 
 HexInt . IntVal ::= IntegerHex ;
-DecInt . IntVal ::=  Integer ;
+DecInt . IntVal ::=  IntegerDec ;
 
 BV . BVVal ::=  IntVal ":" BVType ;
 
@@ -111,12 +112,19 @@ rules Block ::= "block" BlockIdent AttrDefList BeginList
   [Statement] Jump ";"
   EndList ;
 
-ValueAttr . AttributeItem ::= BIdent "="  Value ;
-StringAttr . AttributeItem ::= BIdent "=" Str ;
-separator AttributeItem ";";
 
-AttrDefListSome . AttrDefList ::= BeginRec [ AttributeItem ] GobbleScolon EndRec ;
+rules  AttrKeyValue ::= BIdent "=" AttrValue ;
+separator AttrKeyValue ";";
+
+AttrDefListSome . AttrDefList ::= BeginRec [ AttrKeyValue ] GobbleScolon EndRec;
 AttrDefListEmpty . AttrDefList ::= "" ;
+
+separator AttrValue ";" ;
+
+MapAttr . AttrValue ::= AttrDefList; 
+ListAttr . AttrValue ::= BeginList [ AttrValue ] EndList; 
+LiteralAttr . AttrValue ::= Value ; 
+StringAttr . AttrValue ::= Str ; 
 
 Param . Params ::=  LocalIdent ":" Type ;
 separator Params "," ;

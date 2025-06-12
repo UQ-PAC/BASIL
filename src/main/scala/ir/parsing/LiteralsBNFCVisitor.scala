@@ -104,7 +104,7 @@ trait LiteralsBNFCVisitor[A]
   // Members declared in IntVal.Visitor
   override def visit(x: syntax.HexInt, arg: A) =
     BigInt(x.integerhex_.toLowerCase.stripPrefix("0x"), 16)
-  override def visit(x: syntax.DecInt, arg: A) = BigInt(x.integer_) // XXX: int32
+  override def visit(x: syntax.DecInt, arg: A) = BigInt(x.integerdec_)
 
   override def visit(x: syntax.BV, arg: A): ir.BitVecLiteral =
     ir.BitVecLiteral(x.intval_.accept(this, arg), x.bvtype_.accept(this, arg).asInstanceOf[ir.BitVecType].size)

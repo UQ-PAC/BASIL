@@ -1,5 +1,6 @@
 package ir
 
+import java.util.Base64
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
 import boogie.*
@@ -248,7 +249,6 @@ class Program(
 
   def loadedLabelToBlock: Map[String, Block] = {
     val x = procedures.view.flatMap(_.loadedLabelToBlock).toMap
-    println(x.mkString("\n"))
     x
     // blocks.filter(_.meta.originalLabel.isDefined).map(p => p.meta.originalLabel.get -> p).toMap
   }
@@ -766,6 +766,52 @@ object Block {
   def procedureReturn(from: Procedure): Block = {
     Block(from.name + "_basil_return", None, List(), Return())
   }
+}
+
+case class MemoryStatic(name: String, address: BigInt, size: Int, bytes: String)
+case object MemoryStatic {
+
+  val compress = true
+  import java.io._
+  import java.util.zip._
+
+  def of(m: MemorySection) = {
+    val bytes = Array.from(m.bytes.map { case BitVecLiteral(v, 8) =>
+      v.toByte
+    })
+
+    val comprBytes = if (compress) then {
+
+      val f = ByteArrayOutputStream()
+      val x = GZIPOutputStream(f)
+      x.write(bytes)
+      x.close()
+
+      val r = f.toByteArray()
+      r
+    } else {
+      bytes
+    }
+
+    val ec = Base64.getEncoder()
+    val b64bytes = ec.encodeToString(comprBytes)
+
+    val decoded: Array[Byte] = {
+      val dc = Base64.getDecoder()
+      val by = dc.decode(b64bytes)
+
+      if (compress) {
+        val f = ByteArrayInputStream(by)
+        GZIPInputStream(f).readAllBytes()
+      } else {
+        by
+      }
+    }
+    assert(decoded.toList == bytes.toList)
+
+    MemoryStatic(m.name, m.address, m.size, b64bytes)
+  }
+
 }
 
 /** @param name
