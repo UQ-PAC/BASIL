@@ -1,7 +1,7 @@
 package ir.dsl
 
 import ir.*
-import util.twine.*
+import util.twine.Twine
 
 /**
  * ToScala for Statement and Expr
@@ -96,7 +96,7 @@ private object CaseIR {
   private lazy val toScalaOfExcluded = ToScala.Make[Excluded] {
     case Return(label, outs) => {
       if (outs.isEmpty) {
-        Str("ret")
+        Twine("ret")
       } else {
         given ToScala[LocalVar] = ToScala.MakeString(_.name.toScala)
 
@@ -105,7 +105,7 @@ private object CaseIR {
     }
     case DirectCall(tgt, label, outs, actuals) =>
       if (outs.isEmpty && actuals.isEmpty) {
-        Str(s"directCall(${tgt.procName.toScala})")
+        Twine(s"directCall(${tgt.procName.toScala})")
       } else {
         given ToScala[LocalVar] = ToScala.MakeString(_.name.toScala)
 
@@ -115,8 +115,8 @@ private object CaseIR {
           ")"
         )
       }
-    case x: IndirectCall => Str(s"indirectCall(${x.target.toScala})")
-    case x: GoTo => Str(s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})")
+    case x: IndirectCall => Twine(s"indirectCall(${x.target.toScala})")
+    case x: GoTo => Twine(s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})")
   }
 
   given ToScala[Command] = ToScala.deriveWithExclusions[Command, Excluded](toScalaOfExcluded)

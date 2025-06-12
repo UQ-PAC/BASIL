@@ -1,7 +1,7 @@
 package ir.dsl
 
 import util.{intersperse}
-import util.twine.*
+import util.twine.Twine
 import scala.deriving.{Mirror}
 import scala.compiletime.{summonInline, erasedValue, constValue, error}
 
@@ -303,13 +303,13 @@ object ToScalaDeriving {
     x: T
   ): Twine =
     val args: Twine = inline isSingleton match
-      case true => Concat(List())
+      case true => Twine.empty
       case false =>
         val elems = x.asInstanceOf[Product].productIterator
         val args = (instances.iterator zip elems)
           .map((f, x) => f.asInstanceOf[ToScala[Any]].toScalaLines(x))
           .toList
-        Twine("(" :: args.intersperse(Str(", ")) ::: List(Str(")")))
+        Twine("(" :: args.intersperse(", ") ::: List(")"))
 
     Twine(name, args)
 
