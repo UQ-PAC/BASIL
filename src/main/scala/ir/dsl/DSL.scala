@@ -168,7 +168,7 @@ case class EventuallyGoto(targets: Iterable[DelayNameResolve], label: Option[Str
     extends EventuallyJump
     with DefaultDeepEquality {
   override def resolve(p: Resolver, proc: String): GoTo = {
-    val tgs = targets.flatMap(tn => tn.resolveBlock(p, proc))
+    val tgs = targets.map(tn => tn.resolveBlock(p, proc).getOrElse(throw Exception(s"Goto resolution failure $tn")))
     GoTo(tgs, label)
   }
 }

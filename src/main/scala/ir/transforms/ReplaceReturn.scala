@@ -82,16 +82,24 @@ def addReturnBlocks(
   insertR30InvariantAssertion: Procedure => Boolean = _ => false
 ) = {
   p.procedures.foreach(p => {
-    val containsReturn = p.blocks.map(_.jump).find(_.isInstanceOf[Return]).isDefined
-    val returnBlockID = p.freshBlockId(p.procName + "_basil_return")
-    val entryBlockID = p.freshBlockId(p.procName + "_basil_entry")
+    val returningBlocks = p.blocks.filter(_.jump.isInstanceOf[Return]).toList
+    val containsReturn = returningBlocks.nonEmpty
 
-    if (toAll && p.blocks.isEmpty && p.entryBlock.isEmpty && p.returnBlock.isEmpty) {
-      p.returnBlock = (Block(label = returnBlockID, jump = Return()))
-      p.entryBlock = (Block(label = entryBlockID, jump = GoTo(p.returnBlock.get)))
-    } else if (p.returnBlock.isEmpty && (toAll || containsReturn)) {
-      p.returnBlock = p.addBlock(Block(label = returnBlockID, jump = Return()))
+    if (returningBlocks.size == 1 && !p.entryBlock.contains(returningBlocks.head)) {
+      p.returnBlock = returningBlocks.head
+    } else {
+      val returnBlockID = p.freshBlockId(p.procName + "_basil_return")
+      val entryBlockID = p.freshBlockId(p.procName + "_basil_entry")
+
+      if (toAll && p.blocks.isEmpty && p.entryBlock.isEmpty && p.returnBlock.isEmpty) {
+        p.returnBlock = (Block(label = returnBlockID, jump = Return()))
+        p.entryBlock = (Block(label = entryBlockID, jump = GoTo(p.returnBlock.get)))
+      } else if (p.returnBlock.isEmpty && (toAll || containsReturn)) {
+        p.returnBlock = p.addBlock(Block(label = returnBlockID, jump = Return()))
+      }
     }
+
+    // doesnt really belong here does it
     if (insertR30InvariantAssertion(p)) {
       for (eb <- p.entryBlock) {
         val R30Begin = LocalVar("R30_begin", BitVecType(64))

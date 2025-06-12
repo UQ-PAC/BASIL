@@ -295,11 +295,11 @@ case class FunSpec(
  * @group mainvisitor
  */
 case class BasilMainBNFCVisitor[A](
-  val decls: Declarations,
+  var decls: Declarations,
   val makeVisitor: (String, Declarations) => InnerBasilBNFCVisitor[A] = InnerBasilBNFCVisitor[A](_, _)
 ) extends LiteralsBNFCVisitor[A]
     with TypesBNFCVisitor[A]
-    with syntax.Module.Visitor[ir.dsl.EventuallyProgram, A]
+    with syntax.Module.Visitor[util.IRContext, A]
     with syntax.Declaration.Visitor[ir.dsl.EventuallyProcedure, A]
     with syntax.Params.Visitor[ir.LocalVar, A]
     with syntax.ProcSig.Visitor[ir.dsl.EventuallyProcedure, A]
@@ -390,6 +390,7 @@ case class BasilMainBNFCVisitor[A](
   def visit(x: syntax.ProgDecl, arg: A): ir.dsl.EventuallyProcedure = ???
   // Members declared in Program.Visitor
   override def visit(x: syntax.Module1, arg: A) = {
+
     val ds = x.listdeclaration_.asScala.filter {
       case x: syntax.UnsharedMemDecl => false
       case x: syntax.SharedMemDecl => false
@@ -402,30 +403,71 @@ case class BasilMainBNFCVisitor[A](
       case o => throw Exception("parsed decls contains unhandled type: " + o)
     }
 
-    val prog = ds.collect {
-      case d: syntax.ProgDeclWithSpec => {
-        (unsigilProc(d.procident_), None)
+    var initialMemory = Set[ir.MemorySection]()
+
+    def procProgAttrs(attrs: Attrib) = {
+      val attrMap = attrs.Map.get
+      val newInitialMemory = attrMap
+        .get("initial_memory")
+        .flatMap(_.List)
+        .map(_.map(v =>
+          val static = translating
+            .memoryStaticFromAttrib(v)
+            .getOrElse(throw Exception(s"Ill formed memory section ${v.pprint}"))
+          static.toMemorySection
+        ).toSet)
+      val ctx = for {
+        a <- attrMap.get("symbols")
+        nctx <- decls.context.mergeFromAttrib(a)
+      } yield (nctx)
+      for (c <- ctx) {
+        decls = decls.copy(context = c)
       }
-      case d: syntax.ProgDecl => {
-        (unsigilProc(d.procident_), None)
+      for (n <- newInitialMemory) {
+        initialMemory = n
       }
     }
 
-    val entryname: String = prog.headOption match {
-      case Some(entr, spec) => entr
-      case _ => throw Exception("No main proc specified")
+    var mainProc: Option[String] = None
+
+    ds.foreach {
+      case d: syntax.ProgDeclWithSpec => {
+        val attrs = parseAttrMap(d.attrdeflist_, arg)
+        procProgAttrs(attrs)
+        mainProc = Some((unsigilProc(d.procident_)))
+      }
+      case d: syntax.ProgDecl => {
+        val attrs = parseAttrMap(d.attrdeflist_, arg)
+        procProgAttrs(attrs)
+        mainProc = Some((unsigilProc(d.procident_)))
+      }
+      case _ => ()
     }
+
+    val entryname: String = mainProc.getOrElse(throw Exception("No main proc specified"))
 
     val procs = x.listdeclaration_.asScala.collect { case p: syntax.Procedure =>
       p.accept(this, arg)
     }
 
-    val (mainProc, otherProcs) = procs.partition(_.name == entryname)
-    if (mainProc.headOption.isEmpty) {
+    val (mainProcDef, otherProcs) = procs.partition(_.name == entryname)
+    if (mainProcDef.headOption.isEmpty) {
       throw Exception(s"Entry procedure not found: \"${entryname}\"\n${procs.map(_.name).mkString("\n")}")
     }
-    ir.dsl.EventuallyProgram(mainProc.head, otherProcs)
+    val resolvedProg = ir.dsl.EventuallyProgram(mainProcDef.head, otherProcs, initialMemory).resolve
+
+    val ctx = decls.context
+    util.IRContext(
+      List(),
+      ctx.externalFunctions,
+      ctx.globals,
+      ctx.funcEntries,
+      ctx.globalOffsets,
+      util.IRLoading.loadSpecification(None, resolvedProg, Set.empty),
+      resolvedProg
+    )
   }
+
 }
 
 object ParseBasilIL {
@@ -441,28 +483,17 @@ object ParseBasilIL {
     Logger.debug(decls)
 
     val vis = BasilMainBNFCVisitor[Unit](decls)
-    val result = ast.accept(vis, ())
-    Logger.debug(result)
-    val prog = result.resolve
-    prog
+    ast.accept(vis, ())
   }
 
-  def loadILFile(filePath: String): ir.Program = {
+  def loadILFile(filePath: String): util.IRContext = {
     val reader = new FileReader(filePath)
     loadILReader(reader)
   }
 
-  def loadILString(text: String): ir.Program = {
+  def loadILString(text: String): util.IRContext = {
     val reader = new StringReader(text)
     loadILReader(reader)
   }
 
-  def parse(path: String) = {
-    val prog = loadILFile(path)
-    println(translating.PrettyPrinter.pp_prog(prog))
-  }
-
-  def main(args: Array[String]): Unit = {
-    parse(args(0))
-  }
 }

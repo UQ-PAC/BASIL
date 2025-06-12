@@ -121,7 +121,7 @@ AttrDefListEmpty . AttrDefList ::= "" ;
 
 separator AttrValue ";" ;
 
-MapAttr . AttrValue ::= AttrDefList; 
+MapAttr . AttrValue ::= BeginRec [ AttrKeyValue ] EndRec ; 
 ListAttr . AttrValue ::= BeginList [ AttrValue ] EndList; 
 LiteralAttr . AttrValue ::= Value ; 
 StringAttr . AttrValue ::= Str ; 

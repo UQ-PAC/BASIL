@@ -1,5 +1,6 @@
 package ir
 
+import util.functional.Snoc
 import java.util.Base64
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
@@ -337,10 +338,23 @@ class Procedure private (
     }
   }
 
-  val blockCounter = util.Counter()
+  var blockCounter = 0
 
   def freshBlockId(prefix: String) = {
-    prefix + "_" + blockCounter.next()
+    blockCounter += 1
+    prefix + "_" + blockCounter
+  }
+
+  def updateBlockSuffix() = {
+    blocks.foreach(_.label.split("_").toList match {
+      case Snoc(r, ind) =>
+        try
+          val n = ind.toInt
+          blockCounter = Integer.max(blockCounter, n + 1)
+        catch
+          _ => ()
+      case _ => ()
+    })
   }
 
   def normaliseBlockNames() = {
@@ -768,7 +782,25 @@ object Block {
   }
 }
 
-case class MemoryStatic(name: String, address: BigInt, size: Int, bytes: String)
+case class MemoryStatic(name: String, address: BigInt, size: Int, readOnly: Boolean, bytes: String) {
+  def toMemorySection: MemorySection = {
+    import java.io._
+    import java.util.zip._
+    val decoded: Array[Byte] = {
+      val dc = Base64.getDecoder()
+      val by = dc.decode(bytes)
+
+      if (MemoryStatic.compress) {
+        val f = ByteArrayInputStream(by)
+        GZIPInputStream(f).readAllBytes()
+      } else {
+        by
+      }
+    }
+    val bvbytes = decoded.map(b => BitVecLiteral(BigInt(b), 8)).toSeq
+    MemorySection(name, address, size, bvbytes, readOnly, None)
+  }
+}
 case object MemoryStatic {
 
   val compress = true
@@ -809,7 +841,7 @@ case object MemoryStatic {
     }
     assert(decoded.toList == bytes.toList)
 
-    MemoryStatic(m.name, m.address, m.size, b64bytes)
+    MemoryStatic(m.name, m.address, m.size, m.readOnly, b64bytes)
   }
 
 }

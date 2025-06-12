@@ -5,9 +5,10 @@ import basil_ir.{Absyn => syntax}
 
 import scala.collection.immutable.ListMap
 import scala.jdk.CollectionConverters.*
+import translating.LightContext
 
 private object Declarations {
-  lazy val empty = Declarations(Map(), Map(), Map(), Map(), Map())
+  lazy val empty = Declarations(Map(), Map(), Map(), Map(), LightContext.empty, ProgSpec())
 }
 
 //enum Attrib {
@@ -15,14 +16,87 @@ private object Declarations {
 //  case StringAttr(name: String, v: String)
 //}
 
+case object Attrib {
+  def Int(i: BigInt) = Attrib.ValLiteral(ir.IntLiteral(i))
+  def Str(i: String) = Attrib.ValString(i)
+  def Bool(i: Boolean) = Attrib.ValLiteral(if i then ir.TrueLiteral else ir.FalseLiteral)
+}
+
 enum Attrib {
   case List(l: Vector[Attrib])
   case Map(l: ListMap[String, Attrib])
   case ValLiteral(l: ir.Literal)
   case ValString(l: String)
+
+  def Str: Option[String] = this match {
+    case Attrib.ValString(s) => Some(s)
+    case _ => None
+  }
+
+  def Int: Option[BigInt] = this match {
+    case Attrib.ValLiteral(ir.IntLiteral(l)) => Some(l)
+    case Attrib.ValLiteral(ir.BitVecLiteral(l, _)) => Some(l)
+    case _ => None
+  }
+  def Bool: Option[Boolean] = this match {
+    case Attrib.ValLiteral(ir.TrueLiteral) => Some(true)
+    case Attrib.ValLiteral(ir.FalseLiteral) => Some(false)
+    case _ => None
+  }
+
+  def Map: Option[ListMap[String, Attrib]] = this match {
+    case Attrib.Map(l) => Some(l)
+    case _ => None
+  }
+
+  def List: Option[Vector[Attrib]] = this match {
+    case Attrib.List(l) => Some(l)
+    case _ => None
+  }
+
+  import translating.indent
+
+  def field(p: String) = {
+    Sigil.BASIR.attrib + p
+  }
+
+  def quote(s: String) = "\"" + s + "\""
+
+  private val lineLim = 80
+
+  def pprint: String = {
+    this match {
+      case Attrib.List(xs) => {
+        val res = xs.map(_.pprint)
+        val tlength = res.map(_.size).sum
+        if (tlength > lineLim) {
+          "[\n  " + indent(res.mkString(";\n"), "  ") + "\n]"
+        } else {
+          "[ " + res.mkString("; ") + " ]"
+        }
+      }
+      case Attrib.Map(xs) => {
+        val keyvals = xs.map { case (f, v) =>
+          field(f) + " = " + v.pprint
+        }
+        if (keyvals.map(_.size).sum > lineLim) {
+          "{\n  " + indent(keyvals.mkString(";\n"), "  ") + "\n}"
+        } else {
+          "{ " + keyvals.mkString("; ") + " }"
+        }
+      }
+      case Attrib.ValLiteral(l) => translating.PrettyPrinter.pp_expr(l)
+      case Attrib.ValString(l) => quote(l)
+    }
+  }
 }
 
 case class FunDecl(irType: ir.IRType, body: Option[ir.LambdaExpr])
+case class ProgSpec(val rely: List[ir.Expr] = List(), val guar: List[ir.Expr] = List()) {
+  def merge(o: ProgSpec) = {
+    ProgSpec(rely ++ o.rely, guar ++ o.guar)
+  }
+}
 
 /**
  * Container for the result of the [[ir.parsing.BasilEarlyBNFCVisitor]].
@@ -37,7 +111,8 @@ case class Declarations(
   val functions: Map[String, FunDecl],
   val memories: Map[String, ir.Memory],
   val procedures: Map[String, ir.dsl.EventuallyProcedure],
-  val metas: Map[String, String]
+  val context: LightContext,
+  val progSpec: ProgSpec
 ) {
   private def ensureDisjoint[T, U](x: Map[T, U], y: Map[T, U]): Unit =
     val overlap = x.keySet.intersect(y.keySet)
@@ -53,13 +128,13 @@ case class Declarations(
     ensureDisjoint(functions, other.functions)
     ensureDisjoint(memories, other.memories)
     ensureDisjoint(procedures, other.procedures)
-    ensureDisjoint(metas, other.metas)
     Declarations(
       globals ++ other.globals,
       functions ++ other.functions,
       memories ++ other.memories,
       procedures ++ other.procedures,
-      metas ++ other.metas
+      context.merge(other.context),
+      progSpec.merge(other.progSpec)
     )
   }
 }
@@ -79,7 +154,7 @@ trait AttributeListBNFCVisitor[A]()
   //  Attrib.JsonStringAttr(unsigilAttrib(p.bident_), jsonUnquote(p.jsonstr_))
 
   def visit(x: syntax.MapAttr, arg: A): ir.parsing.Attrib =
-    parseAttrMap(x.attrdeflist_, arg)
+    Attrib.Map(ListMap.from(x.listattrkeyvalue_.asScala.toList.map(_.accept(this, arg))))
   def visit(x: syntax.ListAttr, arg: A): ir.parsing.Attrib =
     Attrib.List(x.listattrvalue_.asScala.toVector.map(_.accept(this, arg)))
   def visit(x: syntax.LiteralAttr, arg: A): ir.parsing.Attrib =
@@ -103,6 +178,7 @@ trait AttributeListBNFCVisitor[A]()
           case (attr, Attrib.ValLiteral(ir.IntLiteral(v))) if attr == n => v
           case (attr, Attrib.ValLiteral(ir.BitVecLiteral(v, _))) if attr == n => v
         }.lastOption
+      case _ => None
     }
   }
 
@@ -122,6 +198,7 @@ trait AttributeListBNFCVisitor[A]()
         vs.collect {
           case (attr, Attrib.ValString(v)) if attr == n => v
         }.lastOption
+      case _ => None
     }
   }
   val getCommentAttr = getStrAttr("comment")

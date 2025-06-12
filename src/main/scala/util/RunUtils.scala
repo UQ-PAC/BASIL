@@ -142,30 +142,35 @@ object IRLoading {
         val (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
           IRLoading.loadReadELF(relf, q)
 
-        def continuation(program: Program) =
-          val specification = IRLoading.loadSpecification(q.specFile, program, globals)
-          IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program)
+        def continuation(ctx: IRContext) =
+          val specification = IRLoading.loadSpecification(q.specFile, ctx.program, globals)
+          IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, ctx.program)
 
         (Some(mainAddress), continuation)
       }
       case None => {
-        (None, IRLoading.load: Program => IRContext)
+        (None, (x: IRContext) => x)
       }
     }
 
-    val program: Program = (mode, mainAddress) match {
-      case (FrontendMode.Gtirb, _) => loadGTIRB(q.inputFile, mainAddress, Some(q.mainProcedureName))
-      case (FrontendMode.Basil, _) => ir.parsing.ParseBasilIL.loadILFile(q.inputFile)
+    val program: IRContext = (mode, mainAddress) match {
+      case (FrontendMode.Gtirb, _) => IRLoading.load(loadGTIRB(q.inputFile, mainAddress, Some(q.mainProcedureName)))
+      case (FrontendMode.Basil, _) => {
+        ir.parsing.ParseBasilIL.loadILFile(q.inputFile)
+      }
       case (FrontendMode.Bap, None) => throw Exception("relf is required when using BAP input")
       case (FrontendMode.Bap, Some(mainAddress)) => {
         val bapProgram = loadBAP(q.inputFile)
-        BAPToIR(bapProgram, mainAddress).translate
+        IRLoading.load(BAPToIR(bapProgram, mainAddress).translate)
       }
     }
 
     val ctx = makeContext(program)
     mode match {
-      case FrontendMode.Basil => Logger.info(" [!] Disabling PC tracking transforms due to IL input")
+      case FrontendMode.Basil => {
+        ctx.program.procedures.foreach(_.updateBlockSuffix())
+        Logger.info("[!] Disabling PC tracking transforms due to IL input")
+      }
       case _ => {
         ir.transforms.PCTracking.applyPCTracking(q.pcTracking, ctx.program)
         ctx.program.procedures.foreach(_.normaliseBlockNames())
@@ -876,10 +881,9 @@ object RunUtils {
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
 
-    if (!conf.loading.inputFile.endsWith(".il")) {
-      ctx = IRTransform.doCleanup(ctx, conf.simplify)
-    }
+    ctx = IRTransform.doCleanup(ctx, conf.simplify)
 
+    assert(invariant.blocksUniqueToEachProcedure(ctx.program))
     transforms.inlinePLTLaunchpad(ctx.program)
 
     if (q.loading.trimEarly) {
@@ -897,7 +901,7 @@ object RunUtils {
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
     } else {
-      ir.transforms.clearParams(ctx.program)
+      // ir.transforms.clearParams(ctx.program)
     }
     assert(invariant.correctCalls(ctx.program))
 
@@ -985,18 +989,18 @@ object RunUtils {
       }
     }
 
+    q.loading.dumpIL.foreach(s => {
+      writeToFile(ctx.pprint, s"$s-output.il")
+      writeToFile(ctx.program.toScala, s"$s-output.scala")
+    })
+    Logger.info("[!] Translating to Boogie")
+
     IRTransform.prepareForTranslation(q, ctx)
 
     if (conf.generateRelyGuarantees) {
       StaticAnalysisLogger.info("[!] Generating Rely-Guarantee Conditions")
       IRTransform.generateRelyGuaranteeConditions(ctx.program.procedures.toList.filter(p => p.returnBlock != None))
     }
-
-    q.loading.dumpIL.foreach(s => {
-      writeToFile(ctx.pprint, s"$s-output.il")
-      writeToFile(ctx.program.toScala, s"$s-output.scala")
-    })
-    Logger.info("[!] Translating to Boogie")
 
     val regionInjector = analysis.flatMap(a => a.regionInjector)
 
