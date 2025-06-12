@@ -755,7 +755,7 @@ class IntervalNode(
     val overlapping: Seq[IntervalCell] = cells.filter(_.interval.isOverlapping(interval))
     val newCell = if overlapping.isEmpty then
       val res = init(interval)
-      _cells = _cells.appended(res)
+      _cells = _cells.appended(res).sorted
       res
     else if overlapping.size == 1 && overlapping.head.interval == (interval) then this.get(interval)
     else if overlapping.size == 1 && overlapping.head.interval.contains(interval) then init(interval)
