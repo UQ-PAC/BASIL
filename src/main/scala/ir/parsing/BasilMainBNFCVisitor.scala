@@ -1,6 +1,6 @@
 package ir.parsing
 
-import util.Logger
+import util.{Logger, PerformanceTimer, LogLevel}
 import basil_ir.{Absyn => syntax}
 
 import java.io.{FileReader, StringReader, Reader}
@@ -265,21 +265,36 @@ case class BasilMainBNFCVisitor[A](
 }
 
 object ParseBasilIL {
-
   def loadILReader(reader: Reader) = {
+    val timer = PerformanceTimer("ParseBasilIL", LogLevel.DEBUG)
+
     val lexer = new basil_ir.Yylex(reader);
+    timer.checkPoint("lexed")
     val parser = new basil_ir.parser(lexer, lexer.getSymbolFactory());
 
     val ast = parser.pProgram()
+    timer.checkPoint("parsed")
 
     val vis0 = BasilEarlyBNFCVisitor[Unit]()
     val decls = ast.accept(vis0, ())
-    Logger.debug(decls)
+    timer.checkPoint("early visitor")
+    // Logger.debug(decls)
 
     val vis = BasilMainBNFCVisitor[Unit](decls)
     val result = ast.accept(vis, ())
-    Logger.debug(result)
+    timer.checkPoint("main visitor")
+    // Logger.debug(result)
     val prog = result.resolve
+    timer.checkPoint("dsl resolving")
+
+    import ir.dsl.given
+    val s = prog.toScalaLines
+    timer.checkPoint("toScalaLines")
+    val a = s.mkString
+    timer.checkPoint("mkString")
+    util.writeToFile(a, s"/dev/null")
+    timer.checkPoint("write")
+
     prog
   }
 
@@ -299,6 +314,7 @@ object ParseBasilIL {
   }
 
   def main(args: Array[String]): Unit = {
+    Logger.setLevel(LogLevel.DEBUG)
     parse(args(0))
   }
 }
