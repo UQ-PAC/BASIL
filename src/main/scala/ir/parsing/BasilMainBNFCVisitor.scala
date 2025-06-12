@@ -287,13 +287,13 @@ object ParseBasilIL {
     val prog = result.resolve
     timer.checkPoint("dsl resolving")
 
-    import ir.dsl.given
-    val s = prog.toScalaLines
-    timer.checkPoint("toScalaLines")
-    val a = s.mkString
-    timer.checkPoint("mkString")
-    util.writeToFile(a, s"/dev/null")
-    timer.checkPoint("write")
+    if (Logger.getLevel().id >= LogLevel.DEBUG.id) {
+      import ir.dsl.given
+      val s = prog.toScalaLines
+      timer.checkPoint("toScalaLines")
+      val _ = s.mkString
+      timer.checkPoint("mkString")
+    }
 
     prog
   }
