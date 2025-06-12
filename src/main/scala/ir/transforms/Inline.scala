@@ -131,10 +131,10 @@ def inlineCall(prog: Program, c: DirectCall): Unit = {
   val (returnTemp, resolveReturnBlock) = eventuallyReturnBlock.copy(j = unreachable).makeResolver
   proc.addBlock(returnTemp)
 
-  val reso = Resolver(prog)
   // resolve internal call blocks
   val resolvers = internalBlocks.map(_.makeResolver)
   resolvers.foreach { case (block, _) => proc.addBlock(block) }
+  val reso = CachedLabelResolver(prog)
   resolvers.foreach { case (_, resolve) => resolve(reso, proc.name) }
 
   // remove original call statement
