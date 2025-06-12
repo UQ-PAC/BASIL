@@ -21,7 +21,7 @@ class StringUtilsTests extends AnyFunSuite with CaptureOutput {
   test("tricky indent with lines") {
     assert(indent(indent(Twine.lines(""))).mkString == "")
     assert(indent(indent(Twine.lines("a"))).mkString == "    a")
-    assert(indent(indent(Twine.lines("", ""))).mkString == "\n")
+    assert(indent(indent(Twine.lines("", ""))).mkString == n)
   }
   test("indent two lines") {
     assert(indent(Twine.lines("a", "b")).mkString == s"  a$n  b")
