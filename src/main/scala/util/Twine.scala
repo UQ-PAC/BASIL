@@ -32,13 +32,12 @@ sealed trait Twine {
 
     def helper(tw: Twine, ind: String): Unit = tw match {
       case Indent(tw) => helper(tw, ind + indent)
-      case Str(s) if s.nonEmpty =>
+      case Str(s) =>
         if (doNewline)
           doNewline = false
           sb ++= newline
           sb ++= ind
         sb ++= s
-      case Str(_) => ()
       case Lines(lines) =>
         var first = true
         lines.foreach { case l =>
@@ -186,7 +185,6 @@ object Twine {
   ): Twine = {
     val len = elems.iterator.length
 
-    val sepTwine = Str(sep)
     if (elems.isEmpty) {
       Str(head + tail)
     } else {
@@ -196,7 +194,7 @@ object Twine {
           first,
           Indent(Lines(elems.zipWithIndex.map {
             case (x, i) if i == len - 1 => x
-            case (x, _) => Twine(x, sepTwine)
+            case (x, _) => Twine(x, sep)
           })),
           Str(tail)
         )
