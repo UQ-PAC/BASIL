@@ -25,6 +25,48 @@ object IntervalDSATestData {
   val R3 = Register("R3", 64)
   val bv64 = BitVecType(64)
 
+
+  def write2: IRContext = {
+    val program = prog(
+      proc(
+        "main",
+        Set(("R0", bv64), ("R1", bv64), ("R2", bv64)),
+        Set(),
+        //          Set(("R0", bv64)),
+        block(
+          "en",
+          MemoryStore(mem, R1, BitVecLiteral(1, 32), LittleEndian, 32, Some("01")),
+          MemoryStore(mem, BinaryExpr(BVADD, R1, BitVecLiteral(8, 64)), BitVecLiteral(1, 32), LittleEndian, 32, Some("02")),
+          MemoryStore(mem, R2, BitVecLiteral(2, 64), LittleEndian, 64, Some("03")),
+          MemoryStore(mem, BinaryExpr(BVADD, R2, BitVecLiteral(16, 64)), BitVecLiteral(1, 32), LittleEndian, 64, Some("04")),
+          MemoryStore(mem, R0, R1, LittleEndian, 64, Some("05")),
+          MemoryStore(mem, R0, BinaryExpr(BVADD, R2, BitVecLiteral(8, 64)), LittleEndian, 64, Some("05")),
+          ret)
+      )
+    )
+
+    programToContext(program, Set.empty)
+  }
+
+  def write: IRContext = {
+    val program = prog(
+      proc(
+        "main",
+        Set(("R0", bv64)),
+        Set(),
+        //          Set(("R0", bv64)),
+        block(
+          "en",
+          MemoryStore(mem, R0, BitVecLiteral(1, 32), LittleEndian, 32, Some("01")),
+          MemoryStore(mem, BinaryExpr(BVADD, R0, BitVecLiteral(8, 64)), BitVecLiteral(2, 32), LittleEndian, 32, Some("02")),
+          MemoryStore(mem, BinaryExpr(BVADD, R0, BitVecLiteral(16, 64)), BitVecLiteral(2, 32), LittleEndian, 32, Some("03")),
+          MemoryStore(mem, BinaryExpr(BVADD, R0, BitVecLiteral(10, 64)), BitVecLiteral(3, 64), LittleEndian, 64, Some("04")),
+          ret)
+      )
+    )
+
+    programToContext(program, Set.empty)
+  }
   def recursion: IRContext = {
     val program =
       prog(
@@ -214,6 +256,12 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
         dsaConfig = Some(config)
       )
     )
+  }
+
+  test("write") {
+    val result = runTestPrg(IntervalDSATestData.write2)
+    val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
+    writeToFile(dsg.toDot, "write2_final.dot")
   }
 
   test("loop indirection") {
@@ -538,6 +586,24 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(dsg.exprToCells(add_two).map(dsg.get) == dsg.exprToCells(add_six).map(dsg.get))
     assert(dsg.exprToCells(add_two).size == 1)
     assert(!dsg.exprToCells(add_two).head.node.isCollapsed)
+  }
+
+
+  test("split") {
+    val results = runTest("src/test/dsa/correct/split/clang/split", None, DSConfig(DSAPhase.TD, true, true))
+
+    // the dsg of the main procedure after the local phase
+    val program = results.ir.program
+    val dsg = results.dsa.get.local(program.mainProcedure)
+  }
+
+  test("eq") {
+    val results = runTest("src/test/dsa/eq/eq", None, DSConfig(DSAPhase.Local, eqClasses = true))
+
+    // the dsg of the main procedure after the local phase
+    val program = results.ir.program
+    val dsg = results.dsa.get.local(program.mainProcedure)
+    writeToFile(dsg.toDot, "eq.dot")
   }
 
   test("http_parse_basic") {
