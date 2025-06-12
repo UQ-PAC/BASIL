@@ -111,11 +111,7 @@ private object CaseIR {
 
         Twine.indentNested(
           s"directCall(",
-          List(
-            outs.toSeq.toScalaLines,
-            tgt.name.toScalaLines,
-            actuals.toSeq.toScalaLines
-          ),
+          List(outs.toSeq.toScalaLines, tgt.name.toScalaLines, actuals.toSeq.toScalaLines),
           ")"
         )
       }

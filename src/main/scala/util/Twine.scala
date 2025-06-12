@@ -23,12 +23,11 @@ sealed trait Twine {
         sb ++= s
       case Lines(lines) =>
         var first = true
-        lines.foreach {
-          case l =>
-            if (!first)
-              doNewline = true
-            first = false
-            helper(l, ind)
+        lines.foreach { case l =>
+          if (!first)
+            doNewline = true
+          first = false
+          helper(l, ind)
         }
       case Concat(tws) => tws.foreach(helper(_, ind))
     }
@@ -68,6 +67,11 @@ object Twine {
   @scala.annotation.targetName("applyMany")
   def apply(parts: (String | Twine)*): Twine =
     apply(parts)
+
+  def indent(tw: Twine) = Indent(tw)
+
+  def lines(parts: (String | Twine)*): Twine =
+    Lines(parts.map(Twine(_)))
 
   /**
   * Indents a nested structure, placing the indented `elems` between `head` and `tail`,
@@ -109,17 +113,16 @@ object Twine {
       Str(head + tail)
     } else {
       val first = if headSep then Str(head + sep) else Str(head)
-      Lines(List(
-        first,
-        Indent(Lines(
-          elems.zipWithIndex.map {
+      Lines(
+        List(
+          first,
+          Indent(Lines(elems.zipWithIndex.map {
             case (x, i) if i == len - 1 => x
             case (x, _) => Twine(x, sepTwine)
-          }
-        )),
-        Str(tail)
-      ))
+          })),
+          Str(tail)
+        )
+      )
     }
   }
 }
-

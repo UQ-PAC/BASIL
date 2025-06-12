@@ -1,7 +1,7 @@
 package ir.dsl
 
 import ir.*
-import util.twine.*
+import util.twine.Twine
 import util.{StringEscape, indent, indentNested, intersperse}
 import translating.{BasilIR, BasilIRExp}
 
@@ -51,7 +51,7 @@ trait ToScalaLines[-T] extends ToScala[T]:
 trait ToScalaString[-T] extends ToScala[T]:
   extension (x: T)
     def toScala: String
-    final override def toScalaLines: Twine = Str(x.toScala)
+    final override def toScalaLines: Twine = Twine(x.toScala)
 
 /**
  * Companion object for ToScala, defining functions and classes to help with

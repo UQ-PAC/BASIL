@@ -3,7 +3,7 @@ package ir.dsl
 import ir.*
 import ir.dsl.{ToScala, ToScalaLines}
 import util.{intersperse}
-import util.twine.*
+import util.twine.Twine
 
 import collection.immutable.{ListMap, SortedMap}
 import collection.immutable.{LazyList}
@@ -129,7 +129,12 @@ trait BasilIRToScala {
       LazyList(formalParamsToScala(x.formalInParam), formalParamsToScala(x.formalOutParam))
     }
 
-    Twine.indentNested(s"proc(${x.name.toScala}", params #::: x.blocks.to(LazyList).map(blockToScala), ")", headSep = true)
+    Twine.indentNested(
+      s"proc(${x.name.toScala}",
+      params #::: x.blocks.to(LazyList).map(blockToScala),
+      ")",
+      headSep = true
+    )
   }
 
   def initialMemoryToScala(x: Program): Option[Twine] = None
@@ -254,7 +259,7 @@ trait ToScalaWithSplitting extends BasilIRToScala {
         addDecl(name, Twine.indentNested("Vector(", super.commandListToScala(chunk), ")"))
         name
       })
-      Iterable(Twine.indentNested("Vector(", chunkNames.map(Str.apply), ").flatten : _*"))
+      Iterable(Twine.indentNested("Vector(", chunkNames.map(Twine(_)), ").flatten : _*"))
     }
 
   /**
@@ -267,7 +272,7 @@ trait ToScalaWithSplitting extends BasilIRToScala {
     } else {
       val name = s"`block:${x.parent.name}.${x.label}`"
       addDecl(name, super.blockToScala(x))
-      Str(name)
+      Twine(name)
     }
 
   /**
@@ -279,7 +284,7 @@ trait ToScalaWithSplitting extends BasilIRToScala {
     } else {
       val name = s"`procedure:${x.name}`"
       addDecl(name, super.procedureToScala(x))
-      Str(name)
+      Twine(name)
     }
 
   /**
@@ -293,7 +298,7 @@ trait ToScalaWithSplitting extends BasilIRToScala {
     addDecl(name, f(x))
 
     // NOTE: scala compiler will error on duplicated names
-    Twine.indentNested("{", declsToScala(decls) ++ Iterable(Str(name)), "}", sep = "\n")
+    Twine.indentNested("{", declsToScala(decls) ++ Iterable(Twine(name)), "}", sep = "\n")
 
   def declsToScala(decls: Map[String, Twine]): Iterable[Twine] =
     decls.map((k, v) => s"def $k = " +: v)
@@ -336,7 +341,7 @@ given ToScalaLines[MemorySection] with
         x.bytes
           .map(x => f"${x.value}%#04x")
           .grouped(32)
-          .map(x => Str(x.mkString(",")))
+          .map(x => Twine(x.mkString(",")))
           .toSeq
 
       val byteTwine = Twine.indentNested("Seq(", byteLines, ").map(BitVecLiteral(_, 8)).toSeq")
