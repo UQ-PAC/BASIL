@@ -1,43 +1,43 @@
 package util
 
+import util.twine.{Twine, Indent, Lines}
+import util.twine.Twine.{indent, indentNested}
+
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.CaptureOutput
 
 @test_util.tags.UnitTest
 class StringUtilsTests extends AnyFunSuite with CaptureOutput {
+  val n = System.lineSeparator()
+
   test("indent one line") {
-    assert(indent(LazyList("a")) == LazyList("a"))
-    assert(indent(LazyList("a", " b")) == LazyList("a", " b"))
+    assert(indent(Twine("a")).mkString == "  a")
+    assert(indent(Twine("a", " b")).mkString == "  a b")
+  }
+  test("indent of indent") {
+    assert(indent(indent(Twine("a"))).mkString == "    a")
+    assert(indent(indent(Twine(""))).mkString == "")
+  }
+  test("tricky indent with lines") {
+    assert(indent(indent(Twine.lines(""))).mkString == "")
+    assert(indent(indent(Twine.lines("a"))).mkString == "    a")
+    assert(indent(indent(Twine.lines("", ""))).mkString == n)
   }
   test("indent two lines") {
-    assert(indent(LazyList("a\n", "b")) == LazyList("a\n", "  ", "b"))
+    assert(indent(Twine.lines("a", "b")).mkString == s"  a$n  b")
   }
   test("indent three lines") {
-    assert(indent(LazyList("a\n", "b\n", "c")) == LazyList("a\n", "  ", "b\n", "  ", "c"))
+    assert(indent(Twine.lines("a", "b", "c")).mkString == s"  a$n  b$n  c")
   }
-  test("indent custom prefix") {
-    assert(indent(LazyList("a\n", "b\n", "c"), prefix = "X") == LazyList("a\n", "X", "b\n", "X", "c"))
+  test("indent nested lines") {
+    assert(indent(Twine.lines(Twine.lines("a", "b", "c"))).mkString == s"  a$n  b$n  c")
   }
-  test("indent composes") {
-    val list = LazyList("a\n", "b\n", "c")
-    assert(indent(list, prefix = "      ").mkString == indent(indent(indent(list))).mkString)
+  test("lines with blanks should insert newline but no trailing spaces") {
+    assert(indent(Twine.lines("a", "", "c")).mkString == s"  a$n$n  c")
   }
-  test("indent properties") {
-    val list = LazyList("a\n", "b\n", "c", " a")
-    val indented = indent(list)
-    assert((indented intersect list) == list, "all input strings should occur in the output")
-    assert((indented diff list).distinct == LazyList("  "), "the new strings in the output should only be indentation")
-
-    // all the strings in the input also occur in the output, with reference equality.
-    assert(
-      list.forall(x => indented.exists(_ eq x)),
-      "every input string should be contained in the output (by reference)"
-    )
-  }
-
   test("indentnested") {
 
-    assert(indentNested("head(", List("a", "b", "c").map(LazyList(_)), ")tail").mkString == """
+    assert(indentNested("head(", List("a", "b", "c").map(Twine(_)), ")tail").mkString == """
 head(
   a,
   b,
@@ -45,30 +45,28 @@ head(
 )tail""".trim)
 
     assert(
-      indentNested("<head>", List("a", "b", "c").map(LazyList(_)), "<tail>", sep = "<sep>", newline = "<nl>").mkString
+      indentNested("<head>", List("a", "b", "c").map(Twine(_)), "<tail>", sep = "<sep>").mkString
         ==
-          "<head><nl>a<sep><nl>b<sep><nl>c<nl><tail>",
+          """<head>
+  a<sep>
+  b<sep>
+  c
+<tail>""",
       "usual case"
     )
 
     assert(
-      indentNested("<head>", List(), "<tail>", sep = "<sep>", newline = "<nl>").mkString
+      indentNested("<head>", List(), "<tail>", sep = "<sep>").mkString
         ==
           "<head><tail>",
       "empty elems should insert no newlines"
     )
 
     assert(
-      indentNested(
-        "<head>",
-        List("a", "b", "c").map(LazyList(_)),
-        "<tail>",
-        sep = "<sep>",
-        newline = "<nl>",
-        headSep = true
-      ).mkString
+      indentNested("<head>", List("a", "b", "c").map(Twine(_)), "<tail>", sep = "<sep>", headSep = true).mkString
+        .replace(n, "<nl>")
         ==
-          "<head><sep><nl>a<sep><nl>b<sep><nl>c<nl><tail>",
+          "<head><sep><nl>  a<sep><nl>  b<sep><nl>  c<nl><tail>",
       "usual case with headSep"
     )
   }
