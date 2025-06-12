@@ -48,6 +48,7 @@ case class InnerBasilBNFCVisitor[A](
     with syntax.LVar.Visitor[ir.Variable, A]
     with syntax.Block.Visitor[ir.dsl.EventuallyBlock, A]
     with syntax.Expr.Visitor[ir.Expr, A]
+    with syntax.LambdaDef.Visitor[ir.LambdaExpr, A]
     // with syntax.Declaration.Visitor[Unit, A]
     // with syntax.Params.Visitor[R,A]
     // with syntax.ProcSig.Visitor[ir.dsl.EventuallyProcedure,A]
@@ -93,14 +94,31 @@ case class InnerBasilBNFCVisitor[A](
 
   override def visit(x: syntax.LRVar, arg: A) = x.localvar_.accept(this, arg)
 
-  override def visit(x: basil_ir.Absyn.OldExpr, arg: A) = ir.OldExpr(x.expr_.accept(this, arg))
-  // Members declared in Expr.Visitor
-  //
+  /* Members declared in Expr.Visitor */
+
+  override def visit(x: syntax.LambdaDef1, arg: A): ir.LambdaExpr = {
+    val params = x.listlocalvar_.asScala.toList.map(_.accept(this, arg))
+    val body = x.expr_.accept(this, arg)
+    ir.LambdaExpr(params, body)
+  }
+  override def visit(x: syntax.OldExpr, arg: A) = ir.OldExpr(x.expr_.accept(this, arg))
+  override def visit(x: syntax.Forall, arg: A): ir.Expr = {
+    val ld = x.lambdadef_.accept(this, arg)
+    ir.QuantifierExpr(ir.QuantifierSort.forall, ld)
+  }
+  override def visit(x: syntax.Exists, arg: A): ir.Expr = {
+    val ld = x.lambdadef_.accept(this, arg)
+    ir.QuantifierExpr(ir.QuantifierSort.exists, ld)
+  }
+
   def visit(x0: syntax.Literal, x1: A): ir.Expr = x0.value_.accept(this, x1)
   def visit(x: syntax.FunctionOp, arg: A): ir.Expr = {
     val n = unsigilGlobal(x.globalident_)
+    val rt = decls.functions.get(n) match {
+      case Some(v) => ir.curryFunctionType(v.irType)._2
+      case None => throw Exception(s"Undeclared function: ${x.globalident_}")
+    }
     val args = x.listexpr_.asScala.toSeq.map(_.accept(this, arg))
-    val rt = x.type_.accept(typesVisitor, arg)
     ir.UninterpretedFunction(n, args, rt)
   }
   override def visit(x: syntax.LocalVar1, arg: A) = {
@@ -333,6 +351,9 @@ case class BasilMainBNFCVisitor[A](
     })
   }
 
+  def visit(x: syntax.UninterpFunDecl, arg: A): ir.dsl.EventuallyProcedure = ???
+  def visit(x: syntax.FunDef, arg: A): ir.dsl.EventuallyProcedure = ???
+
   // Members declared in ProcDef.Visitor
   override def visit(x: syntax.ProcedureDecl, args: (A, String)) = {
     val (arg, procName) = args
@@ -370,20 +391,22 @@ case class BasilMainBNFCVisitor[A](
       case x: syntax.Procedure => true
       case x: syntax.ProgDeclWithSpec => true
       case x: syntax.ProgDecl => true
+      case x: syntax.UninterpFunDecl => true
+      case x: syntax.FunDef => true
       case o => throw Exception("parsed decls contains unhandled type: " + o)
     }
 
     val prog = ds.collect {
       case d: syntax.ProgDeclWithSpec => {
-        (getStrAttr("entry")(d.attrdeflist_, arg), None)
+        (unsigilProc(d.procident_), None)
       }
       case d: syntax.ProgDecl => {
-        (getStrAttr("entry")(d.attrdeflist_, arg), None)
+        (unsigilProc(d.procident_), None)
       }
     }
 
     val entryname: String = prog.headOption match {
-      case Some(Some(entr), spec) => entr
+      case Some(entr, spec) => entr
       case _ => throw Exception("No main proc specified")
     }
 

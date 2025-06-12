@@ -143,6 +143,23 @@ class BasilIRPrettyPrinter(
   val statementIndent = "    "
   val seenVars = mutable.HashSet[Variable]()
 
+  class GetUninterp extends CILVisitor {
+    var funs = mutable.LinkedHashSet[(String, List[IRType], IRType)]()
+    override def vexpr(e: Expr) = {
+      e match {
+        case u: UninterpretedFunction => funs.add(u.signature)
+        case _ => ()
+      }
+      DoChildren()
+    }
+  }
+
+  def getUninterp(p: Program) = {
+    val v = GetUninterp()
+    visit_prog(v, p)
+    v.funs.toList
+  }
+
   def apply(x: Block): String = {
     vblock(x).toString
   }
@@ -207,12 +224,18 @@ class BasilIRPrettyPrinter(
 
   override def vprog(p: Program): PPProg[Program] = {
 
-    val threadspec = s"\nprog { ${Sigil.BASIR.attrib}entry = \"${p.mainProcedure.name}\" }"
+    val threadspec = s"\nprog entry ${Sigil.BASIR.proc}${p.mainProcedure.name}"
+
+    val uninterp = getUninterp(p)
+    val ufdecls = uninterp.map { case (n, pt, rt) =>
+      s"declare-fun ${Sigil.BASIR.globalVar}$n (${pt.map(vtype).mkString(", ")}) -> ${vtype(rt)}"
+    }
 
     Prog(
       p.mainProcedure.name,
       memoryRegions(p).toList.sortBy(_.name).map(memdecl) ++
         globals(p).toList.sorted.map(vardecl)
+        ++ ufdecls
         ++ List(threadspec)
       // ++ List(initialMemory(p.initialMemory.values))
       ,
@@ -491,7 +514,7 @@ class BasilIRPrettyPrinter(
 
   def vtype(t: IRType): String = t match {
     case BitVecType(sz) => s"bv$sz"
-    case IntType => "nat"
+    case IntType => "int"
     case BoolType => "bool"
     case m: MapType => s"(${vtype(m.param)} -> ${vtype(m.result)})"
   }
@@ -531,6 +554,6 @@ class BasilIRPrettyPrinter(
   override def vintlit(i: BigInt) = BST("0x%x".format(i))
   override def vbvlit(i: BitVecLiteral) = BST("0x%x".format(i.value) + s":bv${i.size}")
   override def vuninterp_function(name: String, args: Seq[PPProg[Expr]]): PPProg[Expr] = BST(
-    s"$name(${args.mkString(", ")})"
+    s"${Sigil.BASIR.globalVar}$name(${args.mkString(", ")})"
   )
 }

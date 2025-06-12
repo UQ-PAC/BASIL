@@ -330,6 +330,7 @@ case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IR
   override def toBoogie: BFunctionCall = BFunctionCall(name, params.map(_.toBoogie).toList, returnType.toBoogie, true)
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitUninterpretedFunction(this)
   override def variables: Set[Variable] = params.flatMap(_.variables).toSet
+  def signature: (String, List[IRType], IRType) = (name, params.toList.map(_.getType), returnType)
 }
 
 /** Something that has a global scope from the perspective of the IR and Boogie.

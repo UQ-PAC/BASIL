@@ -7,13 +7,15 @@ import scala.collection.immutable.ListMap
 import scala.jdk.CollectionConverters.*
 
 private object Declarations {
-  lazy val empty = Declarations(Map(), Map(), Map(), Map())
+  lazy val empty = Declarations(Map(), Map(), Map(), Map(), Map())
 }
 
 enum Attrib {
   case ValueAttr(name: String, v: ir.Literal)
   case StringAttr(name: String, v: String)
 }
+
+case class FunDecl(irType: ir.IRType, body: Option[ir.LambdaExpr])
 
 /**
  * Container for the result of the [[ir.parsing.BasilEarlyBNFCVisitor]].
@@ -25,6 +27,7 @@ enum Attrib {
  */
 case class Declarations(
   val globals: Map[String, ir.Register],
+  val functions: Map[String, FunDecl],
   val memories: Map[String, ir.Memory],
   val procedures: Map[String, ir.dsl.EventuallyProcedure],
   val metas: Map[String, String]
@@ -40,11 +43,13 @@ case class Declarations(
   @throws[IllegalArgumentException]("if the two Declarations have overlapping names")
   def merge(other: Declarations) = {
     ensureDisjoint(globals, other.globals)
+    ensureDisjoint(functions, other.functions)
     ensureDisjoint(memories, other.memories)
     ensureDisjoint(procedures, other.procedures)
     ensureDisjoint(metas, other.metas)
     Declarations(
       globals ++ other.globals,
+      functions ++ other.functions,
       memories ++ other.memories,
       procedures ++ other.procedures,
       metas ++ other.metas
@@ -142,6 +147,21 @@ case class BasilEarlyBNFCVisitor[A]()
     val ir.MapType(ir.BitVecType(addrwd), ir.BitVecType(valwd)) = x.type_.accept(this, arg): @unchecked
     val mem = ir.SharedMemory(unsigilGlobal(x.globalident_), addrwd, valwd)
     Declarations.empty.copy(memories = Map(mem.name -> mem))
+
+  def visit(x: basil_ir.Absyn.UninterpFunDecl, arg: A): ir.parsing.Declarations = {
+    val n = unsigilGlobal(x.globalident_)
+    val paramTypes = x.listtype_.asScala.toList.map(_.accept(this, arg))
+    val returnType = x.type_.accept(this, arg)
+    val ty = ir.uncurryFunctionType(paramTypes, returnType)
+    Declarations.empty.copy(functions = Map(n -> FunDecl(ty, None)))
+  }
+  def visit(x: basil_ir.Absyn.FunDef, arg: A): ir.parsing.Declarations = {
+    val n = unsigilGlobal(x.globalident_)
+    val paramTypes = visitParams(x.listparams_, arg).toList.map(_._2)
+    val returnType = x.type_.accept(this, arg)
+    val ty = ir.uncurryFunctionType(paramTypes, returnType)
+    Declarations.empty.copy(functions = Map(n -> FunDecl(ty, None)))
+  }
 
   override def visit(x: syntax.VarDecl, arg: A) =
     val v = ir.Register(unsigilGlobal(x.globalident_), x.type_.accept(this, arg).asInstanceOf[ir.BitVecType].size)

@@ -23,6 +23,7 @@ position token BeginList '[' ;
 position token EndList ']' ;
 position token BeginRec '{' ;
 position token EndRec '}' ;
+token LambdaSep ({"::"} | {"->"}) ;
 
 {- Literals -}
 
@@ -42,8 +43,12 @@ SharedMemDecl . Declaration ::= "memory" "shared" GlobalIdent ":" Type ;
 UnsharedMemDecl . Declaration ::= "memory" GlobalIdent ":" Type ;
 VarDecl . Declaration ::= "var" GlobalIdent ":" Type  ;
 
-ProgDeclWithSpec . Declaration ::= "prog" AttrDefList BeginList [ ProgSpec ] EndList ;
-ProgDecl . Declaration ::= "prog" AttrDefList ;
+separator Type ",";
+
+UninterpFunDecl . Declaration ::= "declare-fun" AttrDefList GlobalIdent "(" [Type] ")" "->" Type ;
+FunDef . Declaration ::= "define-fun" AttrDefList GlobalIdent"(" [Params] ")" "->" Type "=" Expr;
+ProgDeclWithSpec . Declaration ::= "prog" "entry" ProcIdent AttrDefList BeginList [ ProgSpec ] EndList ;
+ProgDecl . Declaration ::= "prog" "entry" ProcIdent AttrDefList ;
 Procedure . Declaration ::= ProcSig AttrDefList  ProcDef ;
 ProcedureDecl . ProcDef ::= [ FunSpecDecl ] ;
 ProcedureDef  . ProcDef ::= [ FunSpecDecl ] BeginList [Block] EndList ;
@@ -120,7 +125,6 @@ ProcedureSig . ProcSig ::= "proc" ProcIdent "(" [Params] ")" "->" "(" [Params] "
 
 {- EXPRESSIONS -}
 
--- coercions Expr 3 ; 
 
 BVLiteral . Value ::=  BVVal;
 IntLiteral . Value ::= IntVal;
@@ -131,8 +135,15 @@ Literal . Expr ::= Value;
 LRVar . Expr ::= LocalVar;
 GRVar . Expr ::= GlobalVar;
 
+-- quantifiers
+
+rules LambdaDef ::= "(" [LocalVar] ")" LambdaSep Expr ;
+Forall . Expr ::= "forall" LambdaDef ;
+Exists . Expr ::= "exists" LambdaDef ;
+OldExpr . Expr       ::= "old" "(" Expr ")" ;
+
 -- uninterpreted functions
-FunctionOp . Expr       ::= GlobalIdent "(" [Expr] ")" "->" Type ;
+FunctionOp . Expr       ::= GlobalIdent "(" [Expr] ")";
 
 -- binary expr
 
@@ -141,7 +152,6 @@ BinaryExpr . Expr       ::= BinOp "(" Expr "," Expr ")" ;
 
 rules UnOp ::= BVUnOp | "boolnot" | "intneg" | "booltobv1";
 UnaryExpr . Expr       ::= UnOp "(" Expr ")" ;
-OldExpr . Expr       ::= "old" "(" Expr ")" ;
 
 ZeroExtend . Expr ::= "zero_extend" "(" IntVal "," Expr ")" ;
 SignExtend . Expr ::= "sign_extend" "(" IntVal "," Expr ")" ;
@@ -175,5 +185,6 @@ Guarantee . ProgSpec ::= "guarantee" Expr;
 
 terminator FunSpecDecl ";";
 terminator ProgSpec ";";
+
 
 
