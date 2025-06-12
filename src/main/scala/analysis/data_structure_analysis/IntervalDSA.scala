@@ -310,7 +310,7 @@ class IntervalGraph(
       structs.append(
         DotStruct(
           n.id.toString,
-          s"Node ${n.id}\\n${n.bases.mkString("\\n").replace("->", ":")}",
+          s"Node ${n.id}${if n.eqClasses.nonEmpty then s"\\nEq: ${n.eqClasses.map(_.map(_.interval)).mkString("\\n")}" else ""}\\n${n.bases.mkString("\\n").replace("->", ":")}",
           Some(n.cells.map(o => s"<${o.interval.start.getOrElse(0)}> ${o.interval}")),
           true
         )
