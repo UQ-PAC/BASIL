@@ -11,7 +11,7 @@ import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.*
 import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
 import specification.{ExternalFunction, SymbolTableEntry}
-import util.LogLevel.INFO
+import util.LogLevel.{DEBUG, INFO}
 import util.{DSAContext, DSALogger, DSConfig, IRContext, PerformanceTimer}
 
 import scala.collection.mutable.ArrayBuffer
@@ -958,9 +958,9 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
       dsaContext = dsaContext.copy(local = DSA)
       if checks then {
         DSA.values.foreach(checkUniqueGlobals)
+        DSA.values.foreach(_.localCorrectness())
         IntervalDSA.checkReachable(irContext.program, DSA)
         DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
-        DSA.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness checks")
       }
     }
