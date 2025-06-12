@@ -37,7 +37,7 @@ sealed trait Twine {
     sb
   }
 
-  def +:(s: String) = Concat(List(Str(s), this))
+  def +:(s: String) = Twine(s, this)
 }
 
 case class Indent(tw: Twine) extends Twine
@@ -48,7 +48,53 @@ case class Lines(ss: Iterable[Twine]) extends Twine
 case class Concat(tws: Iterable[Twine]) extends Twine
 
 object Twine {
+  val empty = Concat(Nil)
 
+  def apply(x: String | Twine): Twine = x match {
+    case x: String => Str(x)
+    case x: Twine => x
+  }
+
+  def apply(parts: Seq[String | Twine]): Twine = {
+    if (parts.isEmpty) {
+      empty
+    } else if (parts.length == 1) {
+      Twine(parts.head)
+    } else {
+      Concat(parts.map(Twine(_)))
+    }
+  }
+
+  @scala.annotation.targetName("applyMany")
+  def apply(parts: (String | Twine)*): Twine =
+    apply(parts)
+
+  /**
+  * Indents a nested structure, placing the indented `elems` between `head` and `tail`,
+  * and separating them by `sep` and `newline`.
+  *
+  * The produced string will follow approximately this pattern:
+  *
+  *     head newline INDENT( elem1 sep newline elem2 sep newline elem3 ...) newline tail
+  *
+  * where INDENT(...) indicates that the ... is to be indented. With the default `sep`
+  * and `newline`, this will produce something like this:
+  *
+  *     head
+  *       elem1,
+  *       elem2,
+  *       elem3
+  *     tail
+  *
+  * If `headSep` is set, the function will place a separator after `head`
+  * and before the first newline, i.e.:
+  *
+  *     head sep newline INDENT( elem1 sep newline elem2 ...) newline tail
+  *
+  * In all cases, if `elems` is empty, no newlines will be inserted and the returned twine is simply
+  *
+  *     head tail
+  */
   def indentNested(
     head: String,
     elems: Iterable[Twine],
@@ -68,7 +114,7 @@ object Twine {
         Indent(Lines(
           elems.zipWithIndex.map {
             case (x, i) if i == len - 1 => x
-            case (x, _) => Concat(List(x, sepTwine))
+            case (x, _) => Twine(x, sepTwine)
           }
         )),
         Str(tail)

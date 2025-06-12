@@ -288,7 +288,7 @@ object ToScalaDeriving {
       case _: scala.reflect.Enum => name + "."
       case _ => ""
 
-    Concat(List(Str(prefix), instances(idx).asInstanceOf[ToScala[T]].toScalaLines(x)))
+    Twine(prefix, instances(idx).asInstanceOf[ToScala[T]].toScalaLines(x))
 
   /**
    * Implements ToScala instance for the given value of a product type.
@@ -308,10 +308,10 @@ object ToScalaDeriving {
         val elems = x.asInstanceOf[Product].productIterator
         val args = (instances.iterator zip elems)
           .map((f, x) => f.asInstanceOf[ToScala[Any]].toScalaLines(x))
-          .to(List)
-        Concat(Str("(") :: args.intersperse(Str(", ")) ::: List(Str(")")))
+          .toList
+        Twine("(" :: args.intersperse(Str(", ")) ::: List(Str(")")))
 
-    Concat(List(Str(name), args))
+    Twine(name, args)
 
   /**
    * Helper class for wrapping a lambda function into a ToScala instance,

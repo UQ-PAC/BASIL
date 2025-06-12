@@ -345,7 +345,7 @@ given ToScalaLines[MemorySection] with
       Twine.indentNested(
         "MemorySection(",
         List(
-          Concat(List(x.name.toScala, ", ", x.address.toScala, ", ", x.size.toScala).map(Str(_))),
+          Twine(x.name.toScala, ", ", x.address.toScala, ", ", x.size.toScala),
           byteTwine,
           "readOnly = " +: x.readOnly.toScalaLines,
           "region = " +: None.toScalaLines
