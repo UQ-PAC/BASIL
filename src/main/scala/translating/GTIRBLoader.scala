@@ -29,7 +29,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
 
   def freshLocal(n: String, t: IRType) = {
     localCounter += 1
-    LocalVar(n + "_" + localCounter, t)
+    LocalVar(n, t, localCounter)
   }
 
   val opcodeSize = 4

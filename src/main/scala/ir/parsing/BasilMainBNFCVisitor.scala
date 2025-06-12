@@ -11,9 +11,11 @@ import scala.util.chaining.scalaUtilChainingOps
 
 def unsigilBlock(x: String) = x.stripPrefix(Sigil.BASIR.block)
 def unsigilProc(x: String) = x.stripPrefix(Sigil.BASIR.proc)
-def unsigilLocal(x: String) = x.stripPrefix(Sigil.BASIR.localVar)
+def unsigilLocal(x: String) =
+  /* keep sigil as it is optional, to preserve var name */
+  x
 def unsigilGlobal(x: String) = x.stripPrefix(Sigil.BASIR.globalVar)
-def unsigilBident(x: String) = x.stripPrefix(Sigil.BASIR.attrib)
+def unsigilAttrib(x: String) = x.stripPrefix(Sigil.BASIR.attrib)
 
 /**
  * Parses structures at the block-level and lower, given
@@ -105,7 +107,7 @@ case class InnerBasilBNFCVisitor[A](
     // handle registers which are declared in the global scope. everything else
     // is localvar
     val ty = x.type_.accept(this, arg)
-    ir.LocalVar.ofIndexed(x.localident_.stripPrefix(Sigil.BASIR.localVar), ty)
+    ir.LocalVar.ofIndexed(unsigilLocal(x.localident_), ty)
   }
   override def visit(x: syntax.GlobalVar1, arg: A) = {
     // handle registers which are declared in the global scope. everything else
@@ -228,7 +230,7 @@ case class InnerBasilBNFCVisitor[A](
     val addr = getAddrAttr(x.attrdeflist_, arg)
     val origLbl = getStrAttr("originalLabel")(x.attrdeflist_, arg)
     val meta = ir.Metadata(originalLabel = origLbl, address = addr)
-    ir.dsl.block(x.blockident_.stripPrefix(Sigil.BASIR.block), ss: _*).copy(meta = meta)
+    ir.dsl.block(unsigilBlock(x.blockident_), ss: _*).copy(meta = meta)
 
   private inline def cannotVisitDeclaration(x: HasParsePosition) =
     throw new Exception(
@@ -289,7 +291,7 @@ case class BasilMainBNFCVisitor[A](
 
   // Members declared in Params.Visitor
   override def visit(x: syntax.Param, arg: A) =
-    ir.LocalVar.ofIndexed(x.localident_.stripPrefix(Sigil.BASIR.localVar), x.type_.accept(this, arg))
+    ir.LocalVar.ofIndexed(unsigilLocal(x.localident_), x.type_.accept(this, arg))
 
   // Members declared in Declaration.Visitor
   override def visit(x: syntax.MemDecl, arg: A): Nothing = throw new Exception(

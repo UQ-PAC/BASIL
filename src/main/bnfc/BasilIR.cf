@@ -10,10 +10,10 @@ token BVTYPE ('b' 'v' digit+) ;
 {- position token UserIdent '`' ((upper | letter | '_' | '#')(upper | letter | digit | ["_.$#"])*) '`'; -}
 position token BIdent '.'((upper | letter | '_')(upper | letter | digit | ["_.$#~"])*) ;
 
-position token LocalIdent ('%' | upper | letter | '_')((upper | letter | digit | ["_.$#"])*);
+position token LocalIdent ('#' | upper | letter | '_')((upper | letter | digit | ["_.$#"])*);
 position token GlobalIdent '$' ((upper | letter | digit | ["_.$#"])+);
 
-position token BlockIdent '#' ((upper | letter | digit | ["_.$#"])+);
+position token BlockIdent '%' ((upper | letter | digit | ["_.$#"])+);
 
 separator BlockIdent ",";
 

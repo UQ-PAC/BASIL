@@ -1,11 +1,11 @@
 package ir
 
 trait DeepEquality {
-  val debug = false
+  val debug = true
   def deepEquals(o: Object): Boolean
   def deepEqualsDbg(o: Object): Boolean = {
     val r = deepEquals(o)
-    if (debug && !r) {
+    if (!r) {
       println(s"$this != $o")
     }
     r

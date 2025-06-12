@@ -62,9 +62,9 @@ trait AttributeListBNFCVisitor[A]()
   }
 
   override def visit(p: syntax.ValueAttr, arg: A): Attrib =
-    Attrib.ValueAttr(p.bident_.stripPrefix(Sigil.BASIR.attrib), p.value_.accept(this, arg))
+    Attrib.ValueAttr(unsigilAttrib(p.bident_), p.value_.accept(this, arg))
   override def visit(p: syntax.StringAttr, arg: A): Attrib =
-    Attrib.StringAttr(p.bident_.stripPrefix(Sigil.BASIR.attrib), unquote(p.str_, p))
+    Attrib.StringAttr(unsigilAttrib(p.bident_), unquote(p.str_, p))
   override def visit(p: syntax.AttrDefListEmpty, arg: A): List[Attrib] = List()
 
   def getIntCompatAttr(n: String)(attrs: syntax.AttrDefList, arg: A): Option[BigInt] = {
@@ -139,20 +139,17 @@ case class BasilEarlyBNFCVisitor[A]()
 
     val ir.MapType(ir.BitVecType(addrwd), ir.BitVecType(valwd)) = x.type_.accept(this, arg): @unchecked
     val mem = unsigilGlobal(x.globalident_) match {
-      case "stack" => ir.StackMemory(x.globalident_.stripPrefix(Sigil.BASIR.globalVar), addrwd, valwd)
-      case _ => ir.SharedMemory(x.globalident_.stripPrefix(Sigil.BASIR.globalVar), addrwd, valwd)
+      case "stack" => ir.StackMemory("stack", addrwd, valwd)
+      case n => ir.SharedMemory(n, addrwd, valwd)
     }
     Declarations.empty.copy(memories = Map(mem.name -> mem))
 
   override def visit(x: syntax.VarDecl, arg: A) =
-    val v = ir.Register(
-      x.globalident_.stripPrefix(Sigil.BASIR.globalVar),
-      x.type_.accept(this, arg).asInstanceOf[ir.BitVecType].size
-    )
+    val v = ir.Register(unsigilGlobal(x.globalident_), x.type_.accept(this, arg).asInstanceOf[ir.BitVecType].size)
     Declarations.empty.copy(globals = Map(v.name -> v))
 
   override def visit(x: syntax.Param, arg: A): (String, ir.IRType) =
-    val lv = ir.LocalVar.ofIndexed(x.localident_.stripPrefix(Sigil.BASIR.localVar), x.type_.accept(this, arg))
+    val lv = ir.LocalVar.ofIndexed(unsigilLocal(x.localident_), x.type_.accept(this, arg))
     lv.name -> lv.irType
 
   private def visitParams(x: syntax.ListParams, arg: A): Map[String, ir.IRType] = {

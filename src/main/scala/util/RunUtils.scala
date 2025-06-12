@@ -165,7 +165,10 @@ object IRLoading {
     val ctx = makeContext(program)
     mode match {
       case FrontendMode.Basil => Logger.info(" [!] Disabling PC tracking transforms due to IL input")
-      case _ => ir.transforms.PCTracking.applyPCTracking(q.pcTracking, ctx.program)
+      case _ => {
+        ir.transforms.PCTracking.applyPCTracking(q.pcTracking, ctx.program)
+        ctx.program.procedures.foreach(_.normaliseBlockNames())
+      }
     }
     ctx
   }
@@ -892,7 +895,7 @@ object RunUtils {
     if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
-    } else if (q.simplify) {
+    } else {
       ir.transforms.clearParams(ctx.program)
     }
     assert(invariant.correctCalls(ctx.program))

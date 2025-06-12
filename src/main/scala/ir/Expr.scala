@@ -29,18 +29,12 @@ object Sigil {
   }
 
   object BASIR {
-    def block = "#"
+    def block = "%"
     def proc = "@"
-    def localVar = "%"
+    def localVar = "#"
     def globalVar = "$"
     def attrib = "."
   }
-}
-
-def unsigilVar(s: String): String = s match {
-  case s"#$local" => unsigilVar(local)
-  case s"$$$glob" => unsigilVar(glob)
-  case o => o
 }
 
 def size(e: Expr) = {
@@ -393,17 +387,24 @@ object LocalVar {
    * It matches the value of [[name]] result, dropping an '_0' suffix or otherwise extracting index [[${name}_${index}]].
    * Use only when the [[index]] field has been lost/mangled with the name, e.g. due to serialisation & parsing.
    */
-  def ofIndexed(name: String, ty: IRType) = name.split("_").toList match {
-    case Snoc(Nil, r) =>
-      LocalVar(name, ty, 0)
-    case Snoc(_, "0") | Snoc(_, "out") | Snoc(_, "in") =>
-      LocalVar(name, ty, 0)
-    case Snoc(r, ind) =>
-      try LocalVar(r.mkString("_"), ty, (ind.toInt))
-      catch
-        _ => LocalVar(name, ty, 0)
-    case _ => LocalVar(name, ty, 0)
-  }
+  def ofIndexed(name: String, ty: IRType) =
+    val illegalStart = Set(Sigil.BASIR.proc, Sigil.BASIR.block, Sigil.BASIR.globalVar, Sigil.BASIR.attrib)
+    val rname = name.partition(x => illegalStart.contains(x.toString)) match {
+      case ("", n: String) => n
+      case (prefix: String, n: String) => Sigil.BASIR.localVar + name
+    }
+
+    rname.split("_").toList match {
+      case Snoc(Nil, r) =>
+        LocalVar(rname, ty, 0)
+      case Snoc(_, "0") | Snoc(_, "out") | Snoc(_, "in") =>
+        LocalVar(rname, ty, 0)
+      case Snoc(r, ind) =>
+        try LocalVar(r.mkString("_"), ty, (ind.toInt))
+        catch
+          _ => LocalVar(rname, ty, 0)
+      case _ => LocalVar(rname, ty, 0)
+    }
 }
 
 /** A global memory section (subject to shared-memory concurrent accesses from multiple threads). */
