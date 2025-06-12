@@ -8,15 +8,17 @@ import test_util.CaptureOutput
 
 @test_util.tags.UnitTest
 class StringUtilsTests extends AnyFunSuite with CaptureOutput {
+  val n = System.lineSeparator()
+
   test("indent one line") {
     assert(indent(Twine("a")).mkString == "a")
     assert(indent(Twine("a", " b")).mkString == "a b")
   }
   test("indent two lines") {
-    assert(indent(Twine.lines("a", "b")).mkString == "a\n  b")
+    assert(indent(Twine.lines("a", "b")).mkString == s"a$n  b")
   }
   test("indent three lines") {
-    assert(indent(Twine.lines("a", "b", "c")).mkString == ("a\n  b\n  c"))
+    assert(indent(Twine.lines("a", "b", "c")).mkString == s"a$n  b$n  c")
   }
   test("indentnested") {
 
@@ -47,7 +49,7 @@ head(
 
     assert(
       indentNested("<head>", List("a", "b", "c").map(Twine(_)), "<tail>", sep = "<sep>", headSep = true).mkString
-        .replace("\n", "<nl>")
+        .replace(n, "<nl>")
         ==
           "<head><sep><nl>  a<sep><nl>  b<sep><nl>  c<nl><tail>",
       "usual case with headSep"
