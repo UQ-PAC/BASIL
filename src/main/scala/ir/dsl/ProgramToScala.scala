@@ -298,7 +298,7 @@ trait ToScalaWithSplitting extends BasilIRToScala {
     addDecl(name, f(x))
 
     // NOTE: scala compiler will error on duplicated names
-    Twine.indentNested("{", (declsToScala(decls) ++: List(Twine(name))).intersperse(Twine("")), "}", sep = "")
+    Twine.indentNested("{", (declsToScala(decls) ++: List(Twine(name))).intersperse(Twine.empty), "}", sep = "")
 
   def declsToScala(decls: Map[String, Twine]): Iterable[Twine] =
     decls.map((k, v) => s"def $k = " +: v)

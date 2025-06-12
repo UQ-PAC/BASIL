@@ -24,27 +24,56 @@ sealed trait Twine {
    */
   def build(sb: StringBuilder, indent: String = "  ", newline: String = System.lineSeparator()): StringBuilder = {
 
+    /**
+     * Returns `true` the first time that once() is called,
+     * then returns `false` for every subsequent call.
+     */
+    case class Once(private var first: Boolean = true) {
+      def once() = {
+        val x = first
+        first = false
+        x
+      }
+    }
+
     // we need to insert newlines /between/ elements of Lines.
     // however, the insertion of newlines should be deferred until the next
     // Str. because if we have Lines(Lines(Str("x"))), this should not
     // insert multiple newlines.
-    var doNewline = false
+    var doNewline = Once()
+
+    // indentation should be added on the first line of the full Twine,
+    // but the first line should have no preceding newline. this is important
+    // when the Twine begines with an Indent.
+    val firstLine = Once()
 
     def helper(tw: Twine, ind: String): Unit = tw match {
       case Indent(tw) => helper(tw, ind + indent)
-      case Str(s) =>
-        if (doNewline)
-          doNewline = false
-          sb ++= newline
+      case Str(s) if s.nonEmpty =>
+        if (doNewline.once())
+          if (!firstLine.once())
+            sb ++= newline
           sb ++= ind
         sb ++= s
+      case Str(_) => ()
       case Lines(lines) =>
-        var first = true
+        var first = Once()
+        // a newline is inserted /between/ elements in Lines. we do
+        // this by prefixing all lines with newline aside from the first.
+        //
+        // furthermore, newline and indent should only be inserted upon
+        // reaching a non-empty literal string. multiple Lines nodes placed within
+        // each other should not insert additional newlines or indentation.
         lines.foreach { case l =>
-          if (!first)
-            doNewline = true
-          first = false
+          if (!first.once())
+            doNewline = Once()
           helper(l, ind)
+
+          // if no newline was introduced by this list element, we should manually
+          // add one. this allows blank lines to be produced by placing Twine.empty
+          // within Lines.
+          if (doNewline.once())
+            sb ++= newline
         }
       case Concat(tws) => tws.foreach(helper(_, ind))
     }

@@ -11,14 +11,20 @@ class StringUtilsTests extends AnyFunSuite with CaptureOutput {
   val n = System.lineSeparator()
 
   test("indent one line") {
-    assert(indent(Twine("a")).mkString == "a")
-    assert(indent(Twine("a", " b")).mkString == "a b")
+    assert(indent(Twine("a")).mkString == "  a")
+    assert(indent(Twine("a", " b")).mkString == "  a b")
   }
   test("indent two lines") {
-    assert(indent(Twine.lines("a", "b")).mkString == s"a$n  b")
+    assert(indent(Twine.lines("a", "b")).mkString == s"  a$n  b")
   }
   test("indent three lines") {
-    assert(indent(Twine.lines("a", "b", "c")).mkString == s"a$n  b$n  c")
+    assert(indent(Twine.lines("a", "b", "c")).mkString == s"  a$n  b$n  c")
+  }
+  test("indent nested lines") {
+    assert(indent(Twine.lines(Twine.lines("a", "b", "c"))).mkString == s"  a$n  b$n  c")
+  }
+  test("lines with blanks should insert newline but no trailing spaces") {
+    assert(indent(Twine.lines("a", "", "c")).mkString == s"  a$n$n  c")
   }
   test("indentnested") {
 
