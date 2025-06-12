@@ -45,19 +45,19 @@ sealed trait Twine {
     // indentation should be added on the first line of the full Twine,
     // but the first line should have no preceding newline. this is important
     // when the Twine begines with an Indent.
-    val firstLine = Once()
+    val firstEver = Once()
 
     def helper(tw: Twine, ind: String): Unit = tw match {
       case Indent(tw) => helper(tw, ind + indent)
       case Str(s) if s.nonEmpty =>
         if (doNewline.once())
-          if (!firstLine.once())
+          if (!firstEver.once())
             sb ++= newline
           sb ++= ind
         sb ++= s
       case Str(_) => ()
       case Lines(lines) =>
-        var first = Once()
+        var firstInLine = Once()
         // a newline is inserted /between/ elements in Lines. we do
         // this by prefixing all lines with newline aside from the first.
         //
@@ -65,14 +65,15 @@ sealed trait Twine {
         // reaching a non-empty literal string. multiple Lines nodes placed within
         // each other should not insert additional newlines or indentation.
         lines.foreach { case l =>
-          if (!first.once())
+          val first = firstInLine.once()
+          if (!first)
             doNewline = Once()
           helper(l, ind)
 
           // if no newline was introduced by this list element, we should manually
-          // add one. this allows blank lines to be produced by placing Twine.empty
-          // within Lines.
-          if (doNewline.once())
+          // add one if needed. this allows blank lines to be produced by placing
+          // Twine.empty within Lines.
+          if (!first && doNewline.once())
             sb ++= newline
         }
       case Concat(tws) => tws.foreach(helper(_, ind))
