@@ -97,6 +97,7 @@ case class Concat(tws: Iterable[Twine]) extends Twine
  * them.
  */
 object Twine {
+
   /**
    * The empty twine.
    */
