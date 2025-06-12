@@ -10,7 +10,6 @@ import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.*
 import ir.eval.BitVectorEval.isNegative
 import specification.{ExternalFunction, FuncEntry, SymbolTableEntry}
-import util.DSAConfig.{Checks, Standard}
 import util.LogLevel.INFO
 import util.{DSAContext, DSALogger, DSConfig, IRContext, PerformanceTimer}
 
@@ -958,9 +957,9 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
       dsaContext = dsaContext.copy(local = DSA)
       if checks then {
         DSA.values.foreach(checkUniqueGlobals)
+        DSA.values.foreach(_.localCorrectness())
         IntervalDSA.checkReachable(irContext.program, DSA)
         DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
-        DSA.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness checks")
       }
     }
