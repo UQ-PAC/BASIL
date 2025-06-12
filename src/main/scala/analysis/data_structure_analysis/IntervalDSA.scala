@@ -179,7 +179,7 @@ class IntervalGraph(
           .map(_.move(i => i + adjustment))
           .map(node.add)
         val eq =
-          if base.isInstanceOf[Global] || !newEqv then Set.empty
+          if base.isInstanceOf[Global] || !newEqv || !eqCells then Set.empty
           else
             offsets.toOffsets.flatMap(o =>
               cellToEq(node.get(adjustment)).map(_.interval.move(i => i + o)).map(node.add)
@@ -331,7 +331,7 @@ class IntervalGraph(
   }
 
   def collect(): (Set[IntervalNode], Set[(IntervalCell, IntervalCell)]) = {
-    val nodes: mutable.Set[IntervalNode] = mutable.Set()
+    val nodes: mutable.Set[IntervalNode] = mutable.Set(this.nodes.values.map(find).toSeq: _*)
     val pointsTo: mutable.Set[(IntervalCell, IntervalCell)] = mutable.Set()
     constraints.foreach {
       case constraint: BinaryConstraint =>
