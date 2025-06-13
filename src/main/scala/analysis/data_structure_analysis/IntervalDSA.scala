@@ -884,6 +884,7 @@ class IntervalCell(val node: IntervalNode, val interval: DSInterval) {
   }
 
   def removePointee: Option[IntervalCell] = {
+    assert(this.node.isUptoDate)
     if node.get(this.interval) ne this then node.get(this.interval).removePointee
     else
       val temp = _pointee.map(graph.find)
