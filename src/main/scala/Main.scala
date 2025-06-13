@@ -137,6 +137,8 @@ object Main {
     trimEarly: Flag,
     @arg(name = "help", short = 'h', doc = "Show this help message.")
     help: Flag,
+    @arg(name = "version", doc = "Show version number.")
+    version: Flag,
     @arg(name = "analysis-results", doc = "Log analysis results in files at specified path.")
     analysisResults: Option[String],
     @arg(name = "analysis-results-dot", doc = "Log analysis results in .dot form at specified path.")
@@ -215,6 +217,13 @@ object Main {
 
     if (conf.help.value) {
       println(parser.helpText(sorted = false))
+      return
+    }
+
+    if (conf.version.value) {
+      println("The Basil Pipeline")
+      println("version: " + buildinfo.BuildInfo.fileVersion)
+      println("git tag: " + buildinfo.BuildInfo.gitVersion)
       return
     }
 
