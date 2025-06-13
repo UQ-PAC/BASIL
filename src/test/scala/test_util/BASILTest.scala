@@ -59,7 +59,8 @@ trait BASILTest {
       None
     }
     val config = BASILConfig(
-      loading = ILLoadingConfig(inputFile = inputPath, relfFile = RELFPath, specFile = specFile, parameterForm = false),
+      loading =
+        ILLoadingConfig(inputFile = inputPath, relfFile = Some(RELFPath), specFile = specFile, parameterForm = false),
       simplify = simplify,
       summariseProcedures = summariseProcedures,
       staticAnalysis = staticAnalysisConf,

@@ -72,7 +72,8 @@ class GTIRBToIR(
   mods: Seq[Module],
   parserMap: immutable.Map[String, List[InsnSemantics]],
   cfg: CFG,
-  mainAddress: BigInt
+  mainAddress: Option[BigInt],
+  mainName: Option[String]
 ) {
   private val functionNames = MapDecoder.decode_uuid(mods.map(_.auxData("functionNames").data))
   private val functionEntries = MapDecoder.decode_set(mods.map(_.auxData("functionEntries").data))
@@ -243,7 +244,11 @@ class GTIRBToIR(
       initialMemory += (address -> section)
     }
 
-    val intialProc: Procedure = procedures.find(_.address.get == mainAddress).get
+    val intialProc: Procedure =
+      mainAddress
+        .map(ma => procedures.find(_.address.get == ma).get)
+        .orElse(mainName.map(n => procedures.find(_.procName == n)).get)
+        .getOrElse(procedures.head)
 
     Program(procedures, intialProc, initialMemory)
   }
