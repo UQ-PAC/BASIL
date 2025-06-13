@@ -236,10 +236,21 @@ object `package` extends RootModule with ScalaModule {
     }
     os.copy.into(docsIndex().path, dest / "api")
 
-    // HACK: fix mill bug causing incorrect scala source links https://github.com/com-lihaoyi/mill/issues/5221
     os.walk(dest).foreach {
       case path if path.ext == "html" =>
+        // HACK: fix mill bug causing incorrect scala source links https://github.com/com-lihaoyi/mill/issues/5221
         val out = os.read(path).replace(super.millSourcePath.toString, "")
+        os.write.over(path, out)
+      case path if path.last == "ux.js" =>
+        val old = os.read(path)
+        val oldLen = old.length
+
+        // HACK: disable scaladoc's horrendous link click handler which
+        // introduces a delay and sometimes causes clicking links to fail silently 
+        val out = old.replace("""document.querySelectorAll("a")""", "[]")
+        if (oldLen == out.length)
+          println(s"warning: $path replacement did not match anything")
+
         os.write.over(path, out)
       case _ => ()
     }
