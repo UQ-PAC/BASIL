@@ -37,8 +37,14 @@ object Main {
 
   def loadDirectory(i: ChooseInput = ChooseInput.Gtirb, d: String): ILLoadingConfig = {
 
-    // at this point, `path` is the given directory with file extensions removed (if any).
-    val path = replacePathExtension(java.nio.file.Paths.get(d), "")
+    val path = {
+      val cwd = java.nio.file.Path.of(".")
+      var p = java.nio.file.Paths.get(d)
+      // manually prefix with current directory if given path is not absolute.
+      p = if p.isAbsolute() then p else cwd.resolve(p)
+      // remove file extension from path, if present.
+      replacePathExtension(p, "")
+    }
 
     // name of the parent directory.
     // e.g., in "src/test/correct/TESTCASE/gcc_O2", this would be "TESTCASE".
