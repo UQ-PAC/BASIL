@@ -12,181 +12,9 @@ private val localSigils = false
 
 import ir.parsing.Attrib
 
-extension (p: MemoryStatic)
-  def toAttrib = {
-    Attrib.Map(
-      ListMap(
-        ("name") -> Attrib.Str(p.name),
-        ("address") -> Attrib.Int(p.address),
-        ("size") -> Attrib.Int(p.size),
-        ("readOnly") -> Attrib.Bool(p.readOnly),
-        ("bytes") -> Attrib.Str(p.bytes)
-      )
-    )
-  }
-
-def memoryStaticFromAttrib(a: Attrib) = {
-  for {
-    l <- a.Map
-    name <- l.get("name").flatMap(_.Str)
-    address <- l.get("address").flatMap(_.Int)
-    size <- l.get("size").flatMap(_.Int)
-    readOnly <- l.get("readOnly").flatMap(_.Bool)
-    bytes <- l.get("bytes").flatMap(_.Str)
-  } yield (MemoryStatic(name, address, size.toInt, readOnly, bytes))
-}
-
-extension (p: FuncEntry)
-  def toAttrib =
-    Attrib.Map(ListMap("address" -> Attrib.Int(p.address), "name" -> Attrib.Str(p.name), "size" -> Attrib.Int(p.size)))
-
-extension (p: SpecGlobal) {
-  def toAttrib: Attrib = {
-    Attrib.Map(
-      ListMap(
-        "name" -> Attrib.Str(p.name),
-        "address" -> Attrib.Int(p.address),
-        "size" -> Attrib.Int(p.size)
-      ) ++ p.arraySize.map(s => "arraySize" -> Attrib.Int(s))
-    )
-  }
-
-}
-
-def funcEntryFromAttrib(a: Attrib) = {
-  for {
-    l <- a.Map
-    name <- l.get("name").flatMap(_.Str)
-    address <- l.get("address").flatMap(_.Int)
-    size <- l.get("size").flatMap(_.Int)
-  } yield (FuncEntry(name, size.toInt, address))
-}
-
-def specGlobalFromAttrib(a: Attrib) = {
-  for {
-    l <- a.Map
-    name <- l.get("name").flatMap(_.Str)
-    address <- l.get("address").flatMap(_.Int)
-    size <- l.get("size").flatMap(_.Int)
-    arraySize = l.get("arraySize").flatMap(_.Int).map(_.toInt)
-  } yield (SpecGlobal(name, size.toInt, arraySize, address))
-}
-
-extension (p: ExternalFunction) {
-  def toAttrib: Attrib =
-    Attrib.Map(ListMap("name" -> Attrib.Str(p.name), "offset" -> Attrib.Int(p.offset)))
-}
-
-def externalFunctionFromAttrib(a: Attrib) = {
-  for {
-    l <- a.Map
-    name <- l.get("name").flatMap(_.Str)
-    off <- l.get("offset").flatMap(_.Int)
-  } yield (ExternalFunction(name, off))
-}
-
-case class LightContext(
-  externalFunctions: Set[ExternalFunction] = Set(),
-  globals: Set[SpecGlobal] = Set(),
-  funcEntries: Set[FuncEntry] = Set(),
-  globalOffsets: Map[BigInt, BigInt] = Map()
-) {
-
-  import ir.parsing.Attrib
-
-  def merge(o: LightContext) = {
-    LightContext(
-      externalFunctions ++ o.externalFunctions,
-      globals ++ o.globals,
-      funcEntries ++ o.funcEntries,
-      globalOffsets ++ o.globalOffsets
-    )
-  }
-
-  def toAttrib = {
-
-    val goffs = Attrib.List(globalOffsets.toVector.map { case (l, r) =>
-      Attrib.List(Vector(Attrib.Int(l), Attrib.Int(r)))
-    })
-
-    Attrib.Map(
-      ListMap(
-        "externalFunctions" -> Attrib.List(externalFunctions.toVector.map(_.toAttrib)),
-        "globals" -> Attrib.List(globals.toVector.map(_.toAttrib)),
-        "funcEntries" -> Attrib.List(funcEntries.toVector.map(_.toAttrib)),
-        "globalOffsets" -> goffs
-      )
-    )
-  }
-
-  def mergeFromAttrib(a: Attrib) = {
-    for {
-      l <- a.Map
-      externalFunctionsList <- l.get("externalFunctions").flatMap(_.List)
-      externalFunctions = externalFunctionsList
-        .flatMap(e => {
-          externalFunctionFromAttrib(e) match {
-            case Some(e) => Seq(e)
-            case None =>
-              Logger.error(s"Malformed external funcion: ${e.pprint}")
-              Seq()
-          }
-        })
-        .toSet
-      globalsList <- l.get("globals").flatMap(_.List)
-      globals = globalsList
-        .flatMap(g =>
-          specGlobalFromAttrib(g) match {
-            case Some(e) => Seq(e)
-            case None =>
-              Logger.error(s"Malformed specglobal: ${g.pprint}")
-              Seq()
-          }
-        )
-        .toSet
-      funcEntriesList <- l.get("funcEntries").flatMap(_.List)
-      funcEntries = funcEntriesList
-        .flatMap(g =>
-          funcEntryFromAttrib(g) match {
-            case Some(e) => Seq(e)
-            case None =>
-              Logger.error(s"Malformed FuncEntry: ${g.pprint}")
-              Seq()
-          }
-        )
-        .toSet
-      globalOffsetsList <- l.get("globalOffsets").flatMap(_.List)
-      globalOffsets = globalOffsetsList
-        .map(e =>
-          e.List match {
-            case Some(e) =>
-              e.toList match {
-                case a :: b :: Nil if a.Int.isDefined && b.Int.isDefined => a.Int.get -> b.Int.get
-                case o => throw Exception(s"Malformed global offsets ${globalOffsetsList}")
-              }
-            case None => throw Exception(s"Malformed global offsets ${globalOffsetsList}")
-          }
-        )
-        .toMap
-
-    } yield (this.merge(LightContext(externalFunctions, globals, funcEntries, globalOffsets)))
-  }
-
-}
-
-object LightContext {
-  def from(e: util.IRContext) = {
-    LightContext(e.externalFunctions, e.globals, e.funcEntries, e.globalOffsets)
-  }
-
-  def empty = LightContext(Set(), Set(), Set(), Map())
-}
-
 object PrettyPrinter {
 
   type PrettyPrintable = Program | Procedure | Statement | Jump | Command | Block | Expr | util.IRContext
-
-// case class FuncEntry(override val name: String, override val size: Int, override val address: BigInt)
 
   import ir.parsing.Attrib
 
@@ -411,10 +239,11 @@ class BasilIRPrettyPrinter(
   def vcontext(i: util.IRContext) = {
     val prog = vprog(i.program)
     import PrettyPrinter.*
-
-    val r = LightContext.from(i)
-    val jsonedCtx = indent(r.toAttrib.pprint, "  ")
     import ir.parsing.Attrib
+    import ir.parsing.MemoryStatic
+
+    val r = parsing.SymbolTableInfo.from(i)
+    val jsonedCtx = indent(r.toAttrib.pprint, "  ")
 
     val memory = i.program.initialMemory
       .map { case (k, v) =>

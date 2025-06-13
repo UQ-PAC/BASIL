@@ -5,97 +5,9 @@ import basil_ir.{Absyn => syntax}
 
 import scala.collection.immutable.ListMap
 import scala.jdk.CollectionConverters.*
-import translating.LightContext
 
 private object Declarations {
-  lazy val empty = Declarations(Map(), Map(), Map(), Map(), LightContext.empty, ProgSpec())
-}
-
-//enum Attrib {
-//  case ValueAttr(name: String, v: ir.Literal)
-//  case StringAttr(name: String, v: String)
-//}
-
-case object Attrib {
-  def Int(i: BigInt) = Attrib.ValLiteral(ir.IntLiteral(i))
-  def Str(i: String) = Attrib.ValString(i)
-  def Bool(i: Boolean) = Attrib.ValLiteral(if i then ir.TrueLiteral else ir.FalseLiteral)
-}
-
-enum Attrib {
-  case List(l: Vector[Attrib])
-  case Map(l: ListMap[String, Attrib])
-  case ValLiteral(l: ir.Literal)
-  case ValString(l: String)
-
-  def Str: Option[String] = this match {
-    case Attrib.ValString(s) => Some(s)
-    case _ => None
-  }
-
-  def Int: Option[BigInt] = this match {
-    case Attrib.ValLiteral(ir.IntLiteral(l)) => Some(l)
-    case Attrib.ValLiteral(ir.BitVecLiteral(l, _)) => Some(l)
-    case _ => None
-  }
-  def Bool: Option[Boolean] = this match {
-    case Attrib.ValLiteral(ir.TrueLiteral) => Some(true)
-    case Attrib.ValLiteral(ir.FalseLiteral) => Some(false)
-    case _ => None
-  }
-
-  def Map: Option[ListMap[String, Attrib]] = this match {
-    case Attrib.Map(l) => Some(l)
-    case _ => None
-  }
-
-  def List: Option[Vector[Attrib]] = this match {
-    case Attrib.List(l) => Some(l)
-    case _ => None
-  }
-
-  import translating.indent
-
-  def field(p: String) = {
-    Sigil.BASIR.attrib + p
-  }
-
-  def quote(s: String) = "\"" + s + "\""
-
-  private val lineLim = 80
-
-  def pprint: String = {
-    this match {
-      case Attrib.List(xs) => {
-        val res = xs.map(_.pprint)
-        val tlength = res.map(_.size).sum
-        if (tlength > lineLim) {
-          "[\n  " + indent(res.mkString(";\n"), "  ") + "\n]"
-        } else {
-          "[ " + res.mkString("; ") + " ]"
-        }
-      }
-      case Attrib.Map(xs) => {
-        val keyvals = xs.map { case (f, v) =>
-          field(f) + " = " + v.pprint
-        }
-        if (keyvals.map(_.size).sum > lineLim) {
-          "{\n  " + indent(keyvals.mkString(";\n"), "  ") + "\n}"
-        } else {
-          "{ " + keyvals.mkString("; ") + " }"
-        }
-      }
-      case Attrib.ValLiteral(l) => translating.PrettyPrinter.pp_expr(l)
-      case Attrib.ValString(l) => quote(l)
-    }
-  }
-}
-
-case class FunDecl(irType: ir.IRType, body: Option[ir.LambdaExpr])
-case class ProgSpec(val rely: List[ir.Expr] = List(), val guar: List[ir.Expr] = List()) {
-  def merge(o: ProgSpec) = {
-    ProgSpec(rely ++ o.rely, guar ++ o.guar)
-  }
+  lazy val empty = Declarations(Map(), Map(), Map(), Map(), SymbolTableInfo.empty, ProgSpec())
 }
 
 /**
@@ -111,7 +23,7 @@ case class Declarations(
   val functions: Map[String, FunDecl],
   val memories: Map[String, ir.Memory],
   val procedures: Map[String, ir.dsl.EventuallyProcedure],
-  val context: LightContext,
+  val context: SymbolTableInfo,
   val progSpec: ProgSpec
 ) {
   private def ensureDisjoint[T, U](x: Map[T, U], y: Map[T, U]): Unit =
