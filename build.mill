@@ -13,7 +13,10 @@ import os.Path
 import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
 import contrib.scalapblib._
 
-object `package` extends RootModule with ScalaModule with BasilDocs {
+import $ivy.`com.lihaoyi::mill-contrib-versionfile:`
+import mill.contrib.versionfile.VersionFileModule
+
+object `package` extends RootModule with ScalaModule with BasilDocs with VersionFileModule {
   // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
   def scalaVersion = "3.3.4"
@@ -169,5 +172,9 @@ object `package` extends RootModule with ScalaModule with BasilDocs {
         cup.docJar().path / ".." / "javadoc"
       ).map(_.toString)
     }
+  }
+
+  override def versionFile = Task.Source {
+    millSourcePath / "main" / "resources" / "VERSION.txt"
   }
 }
