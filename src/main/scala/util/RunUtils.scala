@@ -881,7 +881,9 @@ object RunUtils {
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
 
-    ctx = IRTransform.doCleanup(ctx, conf.simplify)
+    if (conf.loading.inputFile.endsWith(".il")) {
+      ctx = IRTransform.doCleanup(ctx, conf.simplify)
+    }
 
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
     transforms.inlinePLTLaunchpad(ctx.program)
@@ -900,7 +902,7 @@ object RunUtils {
     if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
-    } else if (q.simplify) {
+    } else {
       ir.transforms.clearParams(ctx.program)
     }
     assert(invariant.correctCalls(ctx.program))
