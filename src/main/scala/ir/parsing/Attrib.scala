@@ -275,13 +275,14 @@ case class MemoryStatic(name: String, address: BigInt, size: Int, readOnly: Bool
   }
 
   def toAttrib: Attrib = {
+    val byg = Attrib.List(bytes.grouped(MemoryStatic.grouping).map(Attrib.Str(_)).toVector)
     Attrib.Map(
       ListMap(
         ("name") -> Attrib.Str(name),
         ("address") -> Attrib.Int(address),
         ("size") -> Attrib.Int(size),
         ("readOnly") -> Attrib.Bool(readOnly),
-        ("bytes") -> Attrib.Str(bytes)
+        ("bytes") -> byg
       )
     )
   }
@@ -289,6 +290,7 @@ case class MemoryStatic(name: String, address: BigInt, size: Int, readOnly: Bool
 
 case object MemoryStatic {
 
+  val grouping = 96
   val compress = true
 
   def of(m: MemorySection) = {
@@ -335,7 +337,11 @@ case object MemoryStatic {
       address <- l.get("address").flatMap(_.Int)
       size <- l.get("size").flatMap(_.Int)
       readOnly <- l.get("readOnly").flatMap(_.Bool)
-      bytes <- l.get("bytes").flatMap(_.Str)
+      bytes <- for {
+        b <- l.get("bytes")
+        bl <- b.List
+        strs = bl.map(_.Str.get).mkString("")
+      } yield (strs)
     } yield (MemoryStatic(name, address, size.toInt, readOnly, bytes))
   }
 
