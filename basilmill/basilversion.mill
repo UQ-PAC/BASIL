@@ -1,0 +1,40 @@
+package build.basilmill
+
+import mill._
+import mill.scalalib._
+
+import scala.util.Try
+
+import $ivy.`com.lihaoyi::mill-contrib-versionfile:`
+import mill.contrib.versionfile.VersionFileModule
+
+import $ivy.`com.lihaoyi::mill-contrib-buildinfo:`
+import mill.contrib.buildinfo.BuildInfo
+
+trait BasilVersion extends VersionFileModule with BuildInfo {
+
+  this: ScalaModule =>
+
+  override def versionFile = Task.Source {
+    super.millSourcePath / "VERSION"
+  }
+
+  private def missingVersion() =
+    throw new Exception("git unavailable and COMMIT is not defined")
+  def gitVersion = Task.Input {
+
+    Try {
+      os.proc("git", "describe", "--tags", "--dirty").call(cwd = Task.workspace)
+      .out.text().trim()
+    }.getOrElse(
+      Task.env.getOrElse("COMMIT", missingVersion())
+    )
+  }
+
+  override def buildInfoPackageName = "buildinfo"
+  override def buildInfoMembers = Seq(
+    BuildInfo.Value("scalaVersion", scalaVersion()),
+    BuildInfo.Value("fileVersion", currentVersion().toString),
+    BuildInfo.Value("gitVersion", gitVersion()),
+  )
+}
