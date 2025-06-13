@@ -962,7 +962,7 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
       if checks then {
         DSA.values.foreach(checkUniqueGlobals)
         DSA.values.foreach(_.localCorrectness())
-        IntervalDSA.checkMemoryAccesses(irContext.program, DSA)
+        IntervalDSA.checkMemoryAccesses(irContext, DSA)
         DSA.values.foreach(IntervalDSA.checkUniqueNodesPerRegion)
         DSALogger.info("Performed correctness checks")
       }
@@ -1010,8 +1010,8 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
       if checks then
         DSATD.values.foreach(checkUniqueGlobals)
         DSATD.values.foreach(_.localCorrectness())
-        IntervalDSA.checkConsistGlobals(DSATD, globalGraph)
-        IntervalDSA.checkMemoryAccesses(irContext.program, DSATD)
+        IntervalDSA.checkConsistantGlobals(DSATD, globalGraph)
+        IntervalDSA.checkMemoryAccesses(irContext, DSATD)
         DSALogger.info("Performed correctness check")
         DSATimer.checkPoint("Finished DSA Invariant Check")
     }
@@ -1090,9 +1090,6 @@ object IntervalDSA {
   def checksStackMaintained(graph: IntervalGraph): Boolean = {
     if graph.nodes.contains(Stack(graph.proc)) then !graph.find(Stack(graph.proc)).isCollapsed
     else true
-
-  def checksGlobalMaintained(graph: IntervalGraph): Unit = {
-    assert(!graph.find(graph.nodes(Global)).isCollapsed, s"${graph.proc.procName} had it's global node collapsed}")
   }
 
   def globalTransfer(
@@ -1241,8 +1238,9 @@ object IntervalDSA {
    *
    *  additionally checks the index cell(s) have unified pointee or don't have any pointees (skipped constraint)
    */
-  def checkMemoryAccesses(program: Program, DSA: Map[Procedure, IntervalGraph]): Unit = {
-    program.foreach {
+  def checkMemoryAccesses(ctx: IRContext , DSA: Map[Procedure, IntervalGraph]): Unit = {
+    val isglb = (i: Int) => isGlobal(i, ctx)
+    ctx.program.foreach {
       case access: MemoryAccess if DSA.contains(IRWalk.procedure(access)) =>
         val dsg = DSA(IRWalk.procedure(access))
         assert(
@@ -1251,7 +1249,7 @@ object IntervalDSA {
         )
         val pointers = dsg.exprToCells(access.index).map(dsg.find)
         assert(
-          pointers.nonEmpty || isNonGlobalConstant(access.index, dsg.isGlobal),
+          pointers.nonEmpty || isNonGlobalConstant(access.index, isglb),
           "Expected cells for indices used in reachable memory access to have corresponding DSA cells"
         )
         assert(pointers.forall(_.hasPointee), "expected all of the pointers to have pointee")
