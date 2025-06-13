@@ -57,14 +57,6 @@ trait AttributeListBNFCVisitor[A]()
       syntax.AttrKeyValue.Visitor[(String, Attrib), A],
       LiteralsBNFCVisitor[A] {
 
-  // override def visit(p: syntax.ValueAttr, arg: A): Attrib =
-  //  Attrib.ValueAttr(unsigilAttrib(p.bident_), p.value_.accept(this, arg))
-  // override def visit(p: syntax.StringAttr, arg: A): Attrib =
-  //  Attrib.StringAttr(unsigilAttrib(p.bident_), unquote(p.str_, p))
-  // override def visit(p: syntax.JsonAttr, arg: A): Attrib =
-  //  def jsonUnquote(x: String) = x.stripPrefix("json\"\"\"").stripSuffix("\"\"\"")
-  //  Attrib.JsonStringAttr(unsigilAttrib(p.bident_), jsonUnquote(p.jsonstr_))
-
   def visit(x: syntax.MapAttr, arg: A): ir.parsing.Attrib =
     Attrib.Map(ListMap.from(x.listattrkeyvalue_.asScala.toList.map(_.accept(this, arg))))
   def visit(x: syntax.ListAttr, arg: A): ir.parsing.Attrib =
