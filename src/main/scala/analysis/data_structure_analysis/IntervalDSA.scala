@@ -816,7 +816,7 @@ class IntervalNode(
     var seen: Set[IntervalCell] = Set.empty
     eqClasses.foreach(eqClass =>
       /*!(eqClass.map(_.interval.size).toSet.size == 1) ||*/
-      if !(eqClass.map(_.getPointee).toSet.size == 1) ||
+      if !(IntervalDSA.equiv(eqClass.map(_.getPointee))) ||
         eqClass.exists(seen.contains) ||
         !(eqClass.forall(c => cells.contains(c)))
       then return false
