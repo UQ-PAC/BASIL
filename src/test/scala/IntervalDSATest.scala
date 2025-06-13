@@ -1,5 +1,20 @@
 import analysis.data_structure_analysis.DSAPhase.{Local, TD}
-import analysis.data_structure_analysis.{DSAPhase, DSInterval, Global, Heap, IntervalDSA, IntervalGraph, IntervalNode, Par, Ret, Stack, SymBase, generateConstraints, getSymbolicValues, given}
+import analysis.data_structure_analysis.{
+  DSAPhase,
+  DSInterval,
+  Global,
+  Heap,
+  IntervalDSA,
+  IntervalGraph,
+  IntervalNode,
+  Par,
+  Ret,
+  Stack,
+  SymBase,
+  generateConstraints,
+  getSymbolicValues,
+  given
+}
 import boogie.SpecGlobal
 import ir.*
 import ir.Endian.LittleEndian
@@ -29,7 +44,6 @@ object IntervalDSATestData {
   val R3 = Register("R3", 64)
   val bv64 = BitVecType(64)
 
-
   def write2: IRContext = {
     val program = prog(
       proc(
@@ -40,12 +54,27 @@ object IntervalDSATestData {
         block(
           "en",
           MemoryStore(mem, R1, BitVecLiteral(1, 32), LittleEndian, 32, Some("01")),
-          MemoryStore(mem, BinaryExpr(BVADD, R1, BitVecLiteral(8, 64)), BitVecLiteral(1, 32), LittleEndian, 32, Some("02")),
+          MemoryStore(
+            mem,
+            BinaryExpr(BVADD, R1, BitVecLiteral(8, 64)),
+            BitVecLiteral(1, 32),
+            LittleEndian,
+            32,
+            Some("02")
+          ),
           MemoryStore(mem, R2, BitVecLiteral(2, 64), LittleEndian, 64, Some("03")),
-          MemoryStore(mem, BinaryExpr(BVADD, R2, BitVecLiteral(16, 64)), BitVecLiteral(1, 32), LittleEndian, 64, Some("04")),
+          MemoryStore(
+            mem,
+            BinaryExpr(BVADD, R2, BitVecLiteral(16, 64)),
+            BitVecLiteral(1, 32),
+            LittleEndian,
+            64,
+            Some("04")
+          ),
           MemoryStore(mem, R0, R1, LittleEndian, 64, Some("05")),
           MemoryStore(mem, R0, BinaryExpr(BVADD, R2, BitVecLiteral(8, 64)), LittleEndian, 64, Some("05")),
-          ret)
+          ret
+        )
       )
     )
 
@@ -62,10 +91,32 @@ object IntervalDSATestData {
         block(
           "en",
           MemoryStore(mem, R0, BitVecLiteral(1, 32), LittleEndian, 32, Some("01")),
-          MemoryStore(mem, BinaryExpr(BVADD, R0, BitVecLiteral(8, 64)), BitVecLiteral(2, 32), LittleEndian, 32, Some("02")),
-          MemoryStore(mem, BinaryExpr(BVADD, R0, BitVecLiteral(16, 64)), BitVecLiteral(2, 32), LittleEndian, 32, Some("03")),
-          MemoryStore(mem, BinaryExpr(BVADD, R0, BitVecLiteral(10, 64)), BitVecLiteral(3, 64), LittleEndian, 64, Some("04")),
-          ret)
+          MemoryStore(
+            mem,
+            BinaryExpr(BVADD, R0, BitVecLiteral(8, 64)),
+            BitVecLiteral(2, 32),
+            LittleEndian,
+            32,
+            Some("02")
+          ),
+          MemoryStore(
+            mem,
+            BinaryExpr(BVADD, R0, BitVecLiteral(16, 64)),
+            BitVecLiteral(2, 32),
+            LittleEndian,
+            32,
+            Some("03")
+          ),
+          MemoryStore(
+            mem,
+            BinaryExpr(BVADD, R0, BitVecLiteral(10, 64)),
+            BitVecLiteral(3, 64),
+            LittleEndian,
+            64,
+            Some("04")
+          ),
+          ret
+        )
       )
     )
 
@@ -174,9 +225,8 @@ object IntervalDSATestData {
     programToContext(program, globals)
   }
 
-
   def loopIndirection: IRContext = {
-   val program =
+    val program =
       prog(
         proc(
           "main",
@@ -591,7 +641,6 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(dsg.exprToCells(add_two).size == 1)
     assert(!dsg.exprToCells(add_two).head.node.isCollapsed)
   }
-
 
   test("split") {
     val results = runTest("src/test/dsa/correct/split/clang/split", None, DSConfig(DSAPhase.TD, true, true))
