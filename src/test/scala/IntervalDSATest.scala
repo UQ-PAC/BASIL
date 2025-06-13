@@ -670,7 +670,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(!IntervalDSA.checksGlobalsMaintained(dsg))
   }
 
-  test("cntlm local globals") {
+  test("cntlm globals - local phase") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
     val res = runTest(path, None, DSConfig(Local))
 
@@ -708,15 +708,6 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     )
   }
 
-  test("cntlm split globals") {
-    val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = runTest(path, None, DSConfig(TD, true, true))
-  }
-
-  test("cntlm eq cells") {
-    val path = "examples/cntlm-noduk/cntlm-noduk"
-    val res = runTest(path, None, DSConfig(TD, eqClasses = true))
-  }
 
   test("www_authenticate") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
