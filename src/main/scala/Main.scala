@@ -61,8 +61,7 @@ object Main {
 
     // helper function to locate a file adjacent to the given path, with the given extension,
     // and ensure that it exists. returns None if file does not exist, otherwise Some(Path).
-    val findAdjacent = (x: java.nio.file.Path, ext: String) =>
-      Some(addPathExtension(x, ext)).filter(_.toFile.exists)
+    val findAdjacent = (x: java.nio.file.Path, ext: String) => Some(addPathExtension(x, ext)).filter(_.toFile.exists)
 
     val results = tryName
       .flatMap(name => {
