@@ -161,6 +161,12 @@ object Main {
     )
     pcTracking: Option[String],
     @arg(
+      name = "assert-callee-saved",
+      doc =
+        "if in parameter form: force the removal of callee-saved registers from parameter lists, and add assertions they are preserved across calls. (options: auto|always|never) (default: auto)  Auto enables it only in conjunction with DSA."
+    )
+    forceCalleeSaved: String = "auto",
+    @arg(
       name = "validate-simplify",
       doc = "Emit SMT2 check for validation of simplification expression rewrites 'rewrites.smt2'"
     )
@@ -268,6 +274,14 @@ object Main {
       None
     }
 
+    val calleeSaved = conf.forceCalleeSaved match {
+      case "auto" => dsa.isDefined
+      case "always" => true
+      case "never" => false
+      case _ =>
+        throw new IllegalArgumentException("Illegal argument for --assert-callee-saved. allowed: (auto|always|never)")
+    }
+
     val boogieMemoryAccessMode = if (conf.lambdaStores.value) {
       BoogieMemoryAccessMode.LambdaStoreSelect
     } else {
@@ -309,7 +323,8 @@ object Main {
       boogieTranslation = boogieGeneratorConfig,
       outputPrefix = conf.outFileName,
       dsaConfig = dsa,
-      memoryTransform = conf.memoryTransform.value
+      memoryTransform = conf.memoryTransform.value,
+      assertCalleeSaved = calleeSaved
     )
 
     val result = RunUtils.run(q)
