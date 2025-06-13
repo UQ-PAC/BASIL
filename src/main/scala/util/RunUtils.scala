@@ -31,6 +31,7 @@ import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
 import translating.*
 import util.{DebugDumpIRLogger, Logger, SimplifyLogger}
+import upickle.default.ReadWriter
 
 import java.util.Base64
 import util.intrusive_list.IntrusiveList
@@ -57,6 +58,12 @@ case class IRContext(
   specification: Specification,
   program: Program // internally mutable
 )
+
+enum FrontendMode {
+  case Bap
+  case Gtirb
+  case Basil
+}
 
 /** Stores the results of the static analyses.
   */
@@ -118,27 +125,58 @@ object IRLoading {
   /** Load a program from files using the provided configuration.
     */
   def load(q: ILLoadingConfig): IRContext = {
-    // TODO: this tuple is large, should be a case class
-    val (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
-      IRLoading.loadReadELF(q.relfFile, q)
 
-    val program: Program = if (q.inputFile.endsWith(".adt")) {
-      val bapProgram = loadBAP(q.inputFile)
-      val IRTranslator = BAPToIR(bapProgram, mainAddress)
-      IRTranslator.translate
-    } else if (q.inputFile.endsWith(".gts")) {
-      loadGTIRB(q.inputFile, mainAddress)
+    val mode = if q.inputFile.endsWith(".gts") then {
+      FrontendMode.Gtirb
+    } else if q.inputFile.endsWith(".adt") then {
+      FrontendMode.Bap
     } else if (q.inputFile.endsWith(".il")) {
-      ir.parsing.ParseBasilIL.loadILFile(q.inputFile)
+      FrontendMode.Basil
     } else {
       throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
     }
 
-    val specification = IRLoading.loadSpecification(q.specFile, program, globals)
+    val (mainAddress, makeContext) = q.relfFile match {
+      case Some(relf) => {
+        // TODO: this tuple is large, should be a case class
+        val (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
+          IRLoading.loadReadELF(relf, q)
 
-    ir.transforms.PCTracking.applyPCTracking(q.pcTracking, program)
+        def continuation(ctx: IRContext) =
+          val specification = IRLoading.loadSpecification(q.specFile, ctx.program, globals)
+          IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, ctx.program)
 
-    IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program)
+        (Some(mainAddress), continuation)
+      }
+      case None => {
+        (None, (x: IRContext) => x)
+      }
+    }
+
+    val program: IRContext = (mode, mainAddress) match {
+      case (FrontendMode.Gtirb, _) => IRLoading.load(loadGTIRB(q.inputFile, mainAddress, Some(q.mainProcedureName)))
+      case (FrontendMode.Basil, _) => {
+        ir.parsing.ParseBasilIL.loadILFile(q.inputFile)
+      }
+      case (FrontendMode.Bap, None) => throw Exception("relf is required when using BAP input")
+      case (FrontendMode.Bap, Some(mainAddress)) => {
+        val bapProgram = loadBAP(q.inputFile)
+        IRLoading.load(BAPToIR(bapProgram, mainAddress).translate)
+      }
+    }
+
+    val ctx = makeContext(program)
+    mode match {
+      case FrontendMode.Basil => {
+        ctx.program.procedures.foreach(_.updateBlockSuffix())
+        Logger.info("[!] Disabling PC tracking transforms due to IL input")
+      }
+      case _ => {
+        ir.transforms.PCTracking.applyPCTracking(q.pcTracking, ctx.program)
+        ctx.program.procedures.foreach(_.normaliseBlockNames())
+      }
+    }
+    ctx
   }
 
   def loadBAP(fileName: String): BAPProgram = {
@@ -148,10 +186,12 @@ object IRLoading {
 
     parser.setBuildParseTree(true)
 
-    BAPLoader.visitProject(parser.project())
+    val bapLoader = BAPLoader()
+
+    bapLoader.visitProject(parser.project())
   }
 
-  def loadGTIRB(fileName: String, mainAddress: BigInt): Program = {
+  def loadGTIRB(fileName: String, mainAddress: Option[BigInt], mainName: Option[String] = None): Program = {
     val fIn = FileInputStream(fileName)
     val ir = IR.parseFrom(fIn)
     val mods = ir.modules
@@ -163,7 +203,7 @@ object IRLoading {
 
     val parserMap: Map[String, List[InsnSemantics]] = semantics.flatten.toMap
 
-    val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress)
+    val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress, mainName)
     GTIRBConverter.createIR()
   }
 
@@ -686,10 +726,6 @@ object RunUtils {
     val newLoops = foundLoops.reducibleTransformIR()
     newLoops.updateIrWithLoops()
 
-    for (p <- program.procedures) {
-      p.normaliseBlockNames()
-    }
-
     ctx.program.sortProceduresRPO()
 
     transforms.liftSVComp(ctx.program)
@@ -845,8 +881,11 @@ object RunUtils {
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
 
-    ctx = IRTransform.doCleanup(ctx, conf.simplify)
+    if (conf.loading.inputFile.endsWith(".il")) {
+      ctx = IRTransform.doCleanup(ctx, conf.simplify)
+    }
 
+    assert(invariant.blocksUniqueToEachProcedure(ctx.program))
     transforms.inlinePLTLaunchpad(ctx.program)
 
     if (q.loading.trimEarly) {
@@ -952,19 +991,19 @@ object RunUtils {
       }
     }
 
+    q.loading.dumpIL.foreach(s => {
+      writeToFile(ctx.pprint, s"$s-output.il")
+      val a = ctx.program.toScalaLines
+      writeToFile(a.mkString, s"$s-output.scala")
+    })
+    Logger.info("[!] Translating to Boogie")
+
     IRTransform.prepareForTranslation(q, ctx)
 
     if (conf.generateRelyGuarantees) {
       StaticAnalysisLogger.info("[!] Generating Rely-Guarantee Conditions")
       IRTransform.generateRelyGuaranteeConditions(ctx.program.procedures.toList.filter(p => p.returnBlock != None))
     }
-
-    q.loading.dumpIL.foreach(s => {
-      writeToFile(pp_prog(ctx.program), s"$s-output.il")
-      val a = ctx.program.toScalaLines
-      writeToFile(a.mkString, s"$s-output.scala")
-    })
-    Logger.info("[!] Translating to Boogie")
 
     val regionInjector = analysis.flatMap(a => a.regionInjector)
 

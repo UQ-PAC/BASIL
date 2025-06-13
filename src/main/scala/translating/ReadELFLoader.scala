@@ -5,13 +5,14 @@ import Parsers.ReadELFParser.*
 import boogie.*
 import specification.*
 import util.ILLoadingConfig
+import upickle.default.ReadWriter
 
 import scala.jdk.CollectionConverters.*
 
 /** https://refspecs.linuxfoundation.org/elf/elf.pdf
   */
 
-enum ELFSymType:
+enum ELFSymType derives ReadWriter:
   case NOTYPE /* absolute symbol or similar */
   case SECTION /* memory section */
   case FILE
@@ -19,17 +20,17 @@ enum ELFSymType:
   case FUNC /* code function */
   case TLS /* ??? */
 
-enum ELFBind:
+enum ELFBind derives ReadWriter:
   case LOCAL /* local to the translation unit */
   case GLOBAL /* global to the program */
   case WEAK /* multiple versions of symbol may be exposed to the linker, and the last definition is used. */
 
-enum ELFVis:
+enum ELFVis derives ReadWriter:
   case HIDDEN
   case DEFAULT
   case PROTECTED
 
-enum ELFNDX:
+enum ELFNDX derives ReadWriter:
   case Section(num: Int) /* Section containing the symbol */
   case UND /* Undefined */
   case ABS /* Absolute, unaffected by relocation */
@@ -43,7 +44,7 @@ case class ELFSymbol(
   vis: ELFVis,
   ndx: ELFNDX, /* The section containing the symbol */
   name: String
-)
+) derives ReadWriter
 
 object ReadELFLoader {
   def visitSyms(

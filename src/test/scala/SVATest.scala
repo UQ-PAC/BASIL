@@ -26,7 +26,7 @@ class SVATest extends AnyFunSuite with CaptureOutput {
     RunUtils.loadAndTranslate(
       BASILConfig(
         context = Some(context),
-        loading = ILLoadingConfig(inputFile = "", relfFile = ""),
+        loading = ILLoadingConfig(inputFile = "", relfFile = None),
         simplify = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),

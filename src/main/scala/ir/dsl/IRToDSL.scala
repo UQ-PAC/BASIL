@@ -39,7 +39,7 @@ object IRToDSL {
   }
 
   def convertBlock(x: Block) =
-    EventuallyBlock(x.label, x.statements.to(ArraySeq).map(convertStatement), convertJump(x.jump), x.address)
+    EventuallyBlock(x.label, x.statements.to(ArraySeq).map(convertStatement), convertJump(x.jump), x.meta)
 
   def convertProcedure(x: Procedure) =
     EventuallyProcedure(

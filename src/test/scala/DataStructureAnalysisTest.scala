@@ -46,7 +46,8 @@ class DataStructureAnalysisTest extends AnyFunSuite with CaptureOutput {
 
     val result = RunUtils.loadAndTranslate(
       BASILConfig(
-        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf", specFile = None, dumpIL = None),
+        loading =
+          ILLoadingConfig(inputFile = path + ".adt", relfFile = Some(path + ".relf"), specFile = None, dumpIL = None),
         staticAnalysis = Some(StaticAnalysisConfig()),
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out"

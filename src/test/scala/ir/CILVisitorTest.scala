@@ -125,7 +125,7 @@ class CILVisitorTest extends AnyFunSuite with CaptureOutput {
 
     val v = ExprTrace()
     visit_proc(v, program.procedures.head)
-    assert(v.res.toList == List("R31", "R6", "add", "R6", "4bv64", "10bv64"))
+    assert(v.res.toList == List("R31", "R6", "add", "R6", "0x4:bv64", "0xa:bv64"))
   }
 
   test("rewrite exprs") {

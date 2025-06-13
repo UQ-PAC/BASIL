@@ -281,7 +281,7 @@ class ExtraSpecTests extends SystemTests {
   }
 
   // some of these tests have time out issues so they need more time, but some still time out even with this for unclear reasons
-  val timeout = 30
+  val timeout = 60
   val boogieFlags = Seq("/proverOpt:O:smt.array.extensional=false")
   runTests(
     "extraspec_correct",

@@ -72,7 +72,11 @@ object Main {
           case (Some(input), Some(relf)) => {
             Logger.info(s"Found $input $relf ${spec.getOrElse("")}")
             Seq(
-              ILLoadingConfig(input.normalize().toString, relf.normalize().toString, spec.map(_.normalize().toString))
+              ILLoadingConfig(
+                input.normalize().toString,
+                Some(relf.normalize().toString),
+                spec.map(_.normalize().toString)
+              )
             )
           }
           case _ => Seq()
@@ -92,11 +96,15 @@ object Main {
     bapInputDirName: Option[String],
     @arg(name = "load-directory-gtirb", doc = "Load relf and gts from directory (and spec from parent directory)")
     gtirbInputDirName: Option[String],
-    @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file")
+    @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file (.adt requires --relf)")
     inputFileName: Option[String],
-    @arg(name = "relf", short = 'r', doc = "Name of the file containing the output of 'readelf -s -r -W'.")
+    @arg(
+      name = "relf",
+      short = 'r',
+      doc = "Name of the file containing the output of 'readelf -s -r -W'  (required for most uses)"
+    )
     relfFileName: Option[String],
-    @arg(name = "spec", short = 's', doc = "BASIL specification file.")
+    @arg(name = "spec", short = 's', doc = "BASIL specification file (requires --relf).")
     specFileName: Option[String],
     @arg(name = "output", short = 'o', doc = "Boogie output destination file.")
     outFileName: String = "basil-out.bpl",
@@ -181,7 +189,7 @@ object Main {
     @arg(
       name = "dsa",
       doc =
-        "Perform Data Structure Analysis if no version is specified perform constraint generation (requires --simplify flag) (none|norm|field|set|all)"
+        "Perform Data Structure Analysis if no version is specified perform constraint generation (requires --simplify and --relf flags) (none|norm|field|set|all)"
     )
     dsaType: Option[String],
     @arg(name = "memory-transform", doc = "Transform memory access to region accesses")
@@ -281,14 +289,21 @@ object Main {
 
     } else if (conf.gtirbInputDirName.isDefined) then {
       loadDirectory(ChooseInput.Gtirb, conf.gtirbInputDirName.get)
-    } else if (conf.inputFileName.isDefined && conf.relfFileName.isDefined) then {
-      ILLoadingConfig(conf.inputFileName.get, conf.relfFileName.get, conf.specFileName)
+    } else if (conf.inputFileName.isDefined) then {
+      ILLoadingConfig(conf.inputFileName.get, conf.relfFileName, conf.specFileName)
 
     } else {
       throw IllegalArgumentException(
-        "\nRequires --load-directory-bap OR --load-directory-gtirb OR --input and--relf\n\n" + parser
+        "\nRequires --load-directory-gtirb, --load-directory-bap OR --input\n\n" + parser
           .helpText(sorted = false)
       )
+    }
+
+    if (loadingInputs.specFile.isDefined && loadingInputs.relfFile.isEmpty) {
+      throw IllegalArgumentException("--spec requires --relf")
+    }
+    if (loadingInputs.inputFile.endsWith(".adt") && loadingInputs.relfFile.isEmpty) {
+      throw IllegalArgumentException("BAP ADT input requires --relf")
     }
 
     val q = BASILConfig(

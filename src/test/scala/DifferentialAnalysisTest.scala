@@ -83,7 +83,7 @@ abstract class DifferentialTest extends AnyFunSuite, CaptureOutput, TestCustomis
 
     val loading = ILLoadingConfig(
       inputFile = examplePath + testName + suffix,
-      relfFile = examplePath + testName + ".relf",
+      relfFile = Some(examplePath + testName + ".relf"),
       dumpIL = None,
       trimEarly = true /* no instances of indirectcalls in these examples */
     )

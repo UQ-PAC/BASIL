@@ -72,7 +72,8 @@ class GTIRBToIR(
   mods: Seq[Module],
   parserMap: immutable.Map[String, List[InsnSemantics]],
   cfg: CFG,
-  mainAddress: BigInt
+  mainAddress: Option[BigInt],
+  mainName: Option[String]
 ) {
   private val functionNames = MapDecoder.decode_uuid(mods.map(_.auxData("functionNames").data))
   private val functionEntries = MapDecoder.decode_set(mods.map(_.auxData("functionEntries").data))
@@ -158,10 +159,7 @@ class GTIRBToIR(
   private def createArguments(name: String): (mutable.Map[LocalVar, Expr], ArrayBuffer[LocalVar]) = {
 
     val in: mutable.Map[LocalVar, Expr] = if (name == "main") {
-      mutable.Map(
-        LocalVar("main_argc", BitVecType(32)) -> Extract(32, 0, Register("R0", 64)),
-        LocalVar("main_argv", BitVecType(32)) -> Extract(32, 0, Register("R1", 64))
-      )
+      mutable.Map()
     } else {
       mutable.Map()
     }
@@ -243,7 +241,11 @@ class GTIRBToIR(
       initialMemory += (address -> section)
     }
 
-    val intialProc: Procedure = procedures.find(_.address.get == mainAddress).get
+    val intialProc: Procedure =
+      mainAddress
+        .map(ma => procedures.find(_.address.get == ma).get)
+        .orElse(mainName.map(n => procedures.find(_.procName == n)).get)
+        .getOrElse(procedures.head)
 
     Program(procedures, intialProc, initialMemory)
   }
@@ -340,6 +342,7 @@ class GTIRBToIR(
 
     val blockAddress = blockUUIDToAddress.get(blockUUID)
     val block = Block(blockLabel, blockAddress)
+    block.meta = Metadata(Some(byteStringToString(blockUUID)), blockAddress)
     procedure.addBlock(block)
     if (uuidToBlock.contains(blockUUID)) {
       // TODO this is a case that requires special consideration
