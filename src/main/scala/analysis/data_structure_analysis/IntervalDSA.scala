@@ -307,10 +307,13 @@ class IntervalGraph(
     val arrows = ArrayBuffer[StructArrow]()
 
     nodes.foreach { n =>
+      val eqClasses =
+        if n.eqClasses.nonEmpty then s"\\nEq: ${n.eqClasses.map(_.map(_.interval)).mkString("\\n")}" else ""
+      val bases = s"\\n${n.bases.mkString("\\n").replace("->", ":")}"
       structs.append(
         DotStruct(
           n.id.toString,
-          s"Node ${n.id}${if n.eqClasses.nonEmpty then s"\\nEq: ${n.eqClasses.map(_.map(_.interval)).mkString("\\n")}" else ""}\\n${n.bases.mkString("\\n").replace("->", ":")}",
+          s"Node ${n.id}$eqClasses$bases",
           Some(n.cells.map(o => s"<${o.interval.start.getOrElse(0)}> ${o.interval}")),
           true
         )
@@ -394,8 +397,7 @@ class IntervalGraph(
             val newEqs = cellToEq(mergeCells(pointees ++ values))
             if newEqs.size > eqs.size then find(cell).node.collapse()
           }
-        }
-        else DSALogger.warn(s"$cons had an empty argument")
+        } else DSALogger.warn(s"$cons had an empty argument")
         (indices ++ values).map(_.node).map(find).filterNot(_.eqClassProperty()).toSet.foreach(_.maintainEqClasses())
       case _ => // ignore
   }
