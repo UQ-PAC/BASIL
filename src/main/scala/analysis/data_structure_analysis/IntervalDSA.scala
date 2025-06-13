@@ -1237,7 +1237,7 @@ object IntervalDSA {
    *
    *  additionally checks the index cell(s) have unified pointee or don't have any pointees (skipped constraint)
    */
-  def checkMemoryAccesses(ctx: IRContext , DSA: Map[Procedure, IntervalGraph]): Unit = {
+  def checkMemoryAccesses(ctx: IRContext, DSA: Map[Procedure, IntervalGraph]): Unit = {
     val isglb = (i: Int) => isGlobal(i, ctx)
     ctx.program.foreach {
       case access: MemoryAccess if DSA.contains(IRWalk.procedure(access)) =>
