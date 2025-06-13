@@ -188,7 +188,7 @@ object `package` extends RootModule with ScalaModule {
     // these docs paths are used for inter-project linking.
     // https://docs.scala-lang.org/scala3/guides/scaladoc/settings.html#-external-mappings
     Map(
-      "api/bnfc" -> "basil_ir/.*::javadoc",
+      "api/bnfc" -> ".*basil_ir/.*::javadoc",
       "api/basil-antlr" -> ".*Parsers/.*::javadoc",
       "api/basil-proto" -> ".*com/grammatech/gtirb.*::scaladoc3",
       "api/java-cup" -> ".*java_cup/.*::javadoc",
@@ -243,6 +243,8 @@ object `package` extends RootModule with ScalaModule {
         os.write.over(path, out)
       case _ => ()
     }
+
+    println("combined docs at " + dest)
 
     dest
   }

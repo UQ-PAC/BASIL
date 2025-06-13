@@ -1,6 +1,6 @@
 package ir.parsing
 
-import util.Logger
+import util.{Logger, PerformanceTimer, LogLevel}
 import basil_ir.{Absyn => syntax}
 import ir.Sigil
 
@@ -471,19 +471,25 @@ case class BasilMainBNFCVisitor[A](
 }
 
 object ParseBasilIL {
-
   def loadILReader(reader: Reader) = {
+    val timer = PerformanceTimer("ParseBasilIL", LogLevel.DEBUG)
+
     val lexer = new basil_ir.Yylex(reader);
+    timer.checkPoint("lexed")
     val parser = new basil_ir.parser(lexer, lexer.getSymbolFactory());
 
     val ast = parser.pModule()
+    timer.checkPoint("parsed")
 
     val vis0 = BasilEarlyBNFCVisitor[Unit]()
     val decls = ast.accept(vis0, ())
-    Logger.debug(decls)
+    timer.checkPoint("early visitor")
+    // Logger.debug(decls)
 
     val vis = BasilMainBNFCVisitor[Unit](decls)
-    ast.accept(vis, ())
+    val result = ast.accept(vis, ())
+    timer.checkPoint("main visitor & resolve")
+    result
   }
 
   def loadILFile(filePath: String): util.IRContext = {
