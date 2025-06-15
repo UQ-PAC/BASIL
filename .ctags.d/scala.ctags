@@ -20,3 +20,5 @@
 --exclude=*.swp
 --exclude=*.bak
 --exclude=*.tar.*
+--exclude=ToScalaTest.scala
+--exclude=StatementToScala.scala
