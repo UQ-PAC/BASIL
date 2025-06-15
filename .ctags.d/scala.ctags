@@ -23,3 +23,4 @@
 --exclude=*.tar.*
 --exclude=ToScalaTest.scala
 --exclude=StatementToScala.scala
+--fields=+zK
