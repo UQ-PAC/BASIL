@@ -816,16 +816,13 @@ class IntervalNode(
   def eqClassProperty(): Boolean = {
     assert(this.isUptoDate)
     var seen: Set[IntervalCell] = Set.empty
-    eqClasses.foreach(eqClass =>
-      /*!(eqClass.map(_.interval.size).toSet.size == 1) ||*/
-      if !(IntervalDSA.equiv(eqClass.map(_.getPointee))) ||
+    eqClasses.exists(eqClass =>
+      val cond = (!(IntervalDSA.equiv(eqClass.map(_.getPointee))) ||
         eqClass.exists(seen.contains) ||
-        !(eqClass.forall(c => cells.contains(c)))
-      then return false
+        !(eqClass.forall(c => cells.contains(c))))
       seen ++= eqClass
+      cond
     )
-
-    true
   }
 }
 
