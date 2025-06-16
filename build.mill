@@ -246,7 +246,7 @@ object `package` extends RootModule with ScalaModule {
         val oldLen = old.length
 
         // HACK: disable scaladoc's horrendous link click handler which
-        // introduces a delay and sometimes causes clicking links to fail silently 
+        // introduces a delay and sometimes causes clicking links to fail silently
         val out = old.replace("""document.querySelectorAll("a")""", "[]")
         if (oldLen == out.length)
           println(s"warning: $path replacement did not match anything")
@@ -258,5 +258,29 @@ object `package` extends RootModule with ScalaModule {
     println("combined docs at " + dest)
 
     dest
+  }
+
+  def ctagsConfig = Task.Source {
+    Task.workspace / "basilmill" / "scala.ctags"
+  }
+
+  /**
+   * Build the ctags file containing code definition locations.
+   * This can be used with `./mill -w` to watch and re-build on file changes.
+   */
+  def ctags = Task {
+    val src = Task.traverse(Seq(this, test) ++ moduleDeps)(_.allSources)().flatten
+    val srcArgs = src.map(_.path).filter(os.exists(_)).map(_.toString)
+
+    val newFile = Task.workspace / "tags.new"
+    val tagsFile = Task.workspace / "tags"
+
+    val args = Seq(
+      "ctags", "--tag-relative=no", "-R", "-f", newFile.toString,
+      "--options=" + ctagsConfig().path,
+      "--languages=scala,java", "--fields=+zK")
+
+    os.call(args ++ srcArgs, cwd = Task.workspace)
+    os.move(newFile, tagsFile, replaceExisting = true, atomicMove = true)
   }
 }

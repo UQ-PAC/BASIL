@@ -343,6 +343,7 @@ class NoSimplifySystemTests extends SystemTests {
   }
 }
 
+@test_util.tags.AnalysisSystemTest2
 @test_util.tags.AnalysisSystemTest
 class SimplifySystemTests extends SystemTests {
   runTests("correct", TestConfig(simplify = true, useBAPFrontend = true, expectVerify = true, logResults = true))
@@ -354,6 +355,7 @@ class SimplifySystemTests extends SystemTests {
   }
 }
 
+@test_util.tags.AnalysisSystemTest4
 @test_util.tags.AnalysisSystemTest
 class SimplifyMemorySystemTests extends SystemTests {
 
@@ -587,6 +589,7 @@ class UnimplementedTests extends SystemTests {
   runTests("unimplemented", TestConfig(useBAPFrontend = true, expectVerify = false))
 }
 
+@test_util.tags.AnalysisSystemTest4
 @test_util.tags.AnalysisSystemTest
 class IntervalDSASystemTests extends SystemTests {
   runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, simplify = true, dsa = Some(Checks)))
