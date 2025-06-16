@@ -336,46 +336,6 @@ class OnePassDSA(
 
   }
 
-  def applyTransformWithvalidate(p: Program): Program = {
-
-    val validator = TranslationValidator()
-
-    validator.setTargetProg(p)
-    validator.setSourceProg(p)
-    validator.setEqualVarsInvariant
-
-    for (proc <- p.procedures) {
-      applyTransform(proc)
-    }
-
-    // for (proc <- p.procedures) {
-    //  val before = validator.beforeProg.get.procedures.find(_.name == proc.name).get
-    //  val after = validator.afterProg.get.procedures.find(_.name == proc.name).get
-
-    //  val registers = allVarsPos(before).map(v => v.name -> v).toMap
-
-    //  val invariant = allVarsPos(after).flatMap{
-    //    case r : Register if registers.contains(r.name) => {
-    //      val before  = validator.varInTarget(registers(r.name))
-    //      val after = validator.varInSource(r)
-    //      Seq(polyEqual(before, after))
-    //    }
-    //    case r : LocalVar if registers.contains(r.varName) => {
-    //      val before  = validator.varInTarget(registers(r.varName))
-    //      val after = validator.varInSource(r)
-    //      Seq(polyEqual(before, after))
-    //    }
-    //    case _ => Seq()
-    //  }
-    //  validator.setInvariant(proc.name, invariant.toList)
-
-    // }
-
-    val nprog = validator.getValidationProg
-    assert(invariant.blocksUniqueToEachProcedure(nprog))
-
-    nprog
-  }
 
 }
 

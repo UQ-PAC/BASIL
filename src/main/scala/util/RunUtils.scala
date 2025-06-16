@@ -5,7 +5,6 @@ import java.nio.file.{Files, Path, Paths}
 import com.grammatech.gtirb.proto.IR.IR
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Section.Section
-import spray.json.*
 import ir.eval
 import gtirb.*
 import translating.PrettyPrinter.*
@@ -34,7 +33,6 @@ import translating.*
 import util.{DebugDumpIRLogger, Logger, SimplifyLogger}
 
 import java.util.Base64
-import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
 import ir.transforms.MemoryTransform
@@ -59,6 +57,12 @@ case class IRContext(
   specification: Specification,
   program: Program // internally mutable
 )
+
+enum FrontendMode {
+  case Bap
+  case Gtirb
+  case Basil
+}
 
 /** Stores the results of the static analyses.
   */
@@ -96,8 +100,7 @@ case class BASILResult(
   ir: IRContext,
   analysis: Option[StaticAnalysisContext],
   dsa: Option[DSAContext],
-  boogie: ArrayBuffer[BProgram],
-  boogieWritten: List[String]
+  boogie: ArrayBuffer[BProgram]
 )
 
 /** Tools for loading the IR program into an IRContext.
@@ -121,25 +124,53 @@ object IRLoading {
   /** Load a program from files using the provided configuration.
     */
   def load(q: ILLoadingConfig): IRContext = {
-    // TODO: this tuple is large, should be a case class
-    val (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
-      IRLoading.loadReadELF(q.relfFile, q)
 
-    val program: Program = if (q.inputFile.endsWith(".adt")) {
-      val bapProgram = loadBAP(q.inputFile)
-      val IRTranslator = BAPToIR(bapProgram, mainAddress)
-      IRTranslator.translate
-    } else if (q.inputFile.endsWith(".gts")) {
-      loadGTIRB(q.inputFile, mainAddress)
+    val mode = if q.inputFile.endsWith(".gts") then {
+      FrontendMode.Gtirb
+    } else if q.inputFile.endsWith(".adt") then {
+      FrontendMode.Bap
+    } else if (q.inputFile.endsWith(".il")) {
+      FrontendMode.Basil
     } else {
       throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
     }
 
-    val specification = IRLoading.loadSpecification(q.specFile, program, globals)
+    val (mainAddress, makeContext) = q.relfFile match {
+      case Some(relf) => {
+        // TODO: this tuple is large, should be a case class
+        val (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
+          IRLoading.loadReadELF(relf, q)
 
-    ir.transforms.PCTracking.applyPCTracking(q.pcTracking, program)
+        def continuation(program: Program) =
+          val specification = IRLoading.loadSpecification(q.specFile, program, globals)
+          IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program)
 
-    IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program)
+        (Some(mainAddress), continuation)
+      }
+      case None if mode == FrontendMode.Gtirb => {
+        Logger.warn("RELF not provided, recommended for GTIRB input")
+        (None, IRLoading.load: Program => IRContext)
+      }
+      case None => {
+        (None, IRLoading.load: Program => IRContext)
+      }
+    }
+
+    val program: Program = (mode, mainAddress) match {
+      case (FrontendMode.Gtirb, _) => {
+        loadGTIRB(q.inputFile, mainAddress, Some(q.mainProcedureName))
+      }
+      case (FrontendMode.Basil, _) => ir.parsing.ParseBasilIL.loadILFile(q.inputFile)
+      case (FrontendMode.Bap, None) => throw Exception("relf is required when using BAP input")
+      case (FrontendMode.Bap, Some(mainAddress)) => {
+        val bapProgram = loadBAP(q.inputFile)
+        BAPToIR(bapProgram, mainAddress).translate
+      }
+    }
+
+    val ctx = makeContext(program)
+    ir.transforms.PCTracking.applyPCTracking(q.pcTracking, ctx.program)
+    ctx
   }
 
   def loadBAP(fileName: String): BAPProgram = {
@@ -152,66 +183,19 @@ object IRLoading {
     BAPLoader.visitProject(parser.project())
   }
 
-  def loadGTIRB(fileName: String, mainAddress: BigInt): Program = {
+  def loadGTIRB(fileName: String, mainAddress: Option[BigInt], mainName: Option[String] = None): Program = {
     val fIn = FileInputStream(fileName)
     val ir = IR.parseFrom(fIn)
     val mods = ir.modules
     val cfg = ir.cfg.get
 
-    def parse_asl_stmt(line: String): Option[StmtContext] = {
-      val lexer = ASLpLexer(CharStreams.fromString(line))
-      val tokens = CommonTokenStream(lexer)
-      val parser = ASLpParser(tokens)
-      parser.setErrorHandler(BailErrorStrategy())
-      parser.setBuildParseTree(true)
+    val semanticsJson = mods.map(_.auxData("ast").data.toStringUtf8)
 
-      try {
-        Some(parser.stmt())
-      } catch {
-        case e: org.antlr.v4.runtime.misc.ParseCancellationException =>
-          val extra = e.getCause match {
-            case mismatch: org.antlr.v4.runtime.InputMismatchException =>
-              val token = mismatch.getOffendingToken
-              s"""
-                exn: $mismatch
-                offending token: $token
-
-              ${line.replace('\n', ' ')}
-              ${" " * token.getStartIndex}^ here!
-              """.stripIndent
-            case o => o.toString
-          }
-          Logger.error(s"""Semantics parse error:\n  line: $line\n$extra""")
-          Logger.error(e.getStackTrace.mkString("\n"))
-          None
-      }
-    }
-
-    implicit object InsnSemanticsFormat extends JsonFormat[InsnSemantics] {
-      def write(m: InsnSemantics): JsValue = ???
-      def read(json: JsValue): InsnSemantics = json match {
-        case JsObject(fields) =>
-          val m: Map[String, JsValue] = fields.get("decode_error") match {
-            case Some(JsObject(m)) => m
-            case _ => deserializationError(s"Bad sem format $json")
-          }
-          InsnSemantics.Error(m("opcode").convertTo[String], m("error").convertTo[String])
-        case array @ JsArray(_) =>
-          val xs = array.convertTo[Array[String]].map(parse_asl_stmt)
-          if (xs.exists(_.isEmpty)) {
-            InsnSemantics.Error("?", "parseError")
-          } else {
-            InsnSemantics.Result(xs.map(_.get))
-          }
-        case s => deserializationError(s"Bad sem format $s")
-      }
-    }
-
-    val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, List[InsnSemantics]]])
+    val semantics = semanticsJson.map(upickle.default.read[Map[String, List[InsnSemantics]]](_))
 
     val parserMap: Map[String, List[InsnSemantics]] = semantics.flatten.toMap
 
-    val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress)
+    val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress, mainName)
     GTIRBConverter.createIR()
   }
 
@@ -724,28 +708,6 @@ object RunUtils {
     }
   }
 
-  def simpPreprocess(program: Program) = {
-    ir.transforms.clearParams(program)
-    val foundLoops = LoopDetector.identify_loops(program)
-    foundLoops.updateIrWithLoops()
-    for (p <- program.procedures) {
-      p.normaliseBlockNames()
-    }
-    transforms.applyRPO(program)
-    transforms.liftSVComp(program)
-    program.sortProceduresRPO()
-    transforms.removeEmptyBlocks(program)
-    transforms.coalesceBlocks(program)
-    transforms.removeEmptyBlocks(program)
-  }
-
-  def doSimplifyTV(ctx: IRContext, config: Option[StaticAnalysisConfig]): Unit = {
-    val program = ctx.program
-    simpPreprocess(program)
-    transforms.validatedSimplifyPipeline(program)
-
-  }
-
   def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]): Unit = {
     // writeToFile(dotBlockGraph(program, program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
     Logger.info("[!] Running Simplify")
@@ -753,7 +715,8 @@ object RunUtils {
     val program = ctx.program
 
     val foundLoops = LoopDetector.identify_loops(program)
-    foundLoops.updateIrWithLoops()
+    val newLoops = foundLoops.reducibleTransformIR()
+    newLoops.updateIrWithLoops()
 
     for (p <- program.procedures) {
       p.normaliseBlockNames()
@@ -761,11 +724,14 @@ object RunUtils {
 
     ctx.program.sortProceduresRPO()
 
+    transforms.liftSVComp(ctx.program)
+
     config.foreach {
       _.dumpILToPath.foreach { s =>
         DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-simp.il"), pp_prog(program))
       }
     }
+
     transforms.applyRPO(program)
 
     // example of printing a simple analysis
@@ -788,9 +754,9 @@ object RunUtils {
       }
     }
 
-    transforms.inlinePLTLaunchpad(ctx.program)
-
     transforms.OnePassDSA().applyTransform(program)
+
+    transforms.inlinePLTLaunchpad(ctx.program)
 
     transforms.removeEmptyBlocks(program)
 
@@ -862,6 +828,7 @@ object RunUtils {
     transforms.liftLinuxAssertFail(ctx)
 
     // assert(program.procedures.forall(transforms.rdDSAProperty))
+
     assert(invariant.blockUniqueLabels(program))
     Logger.info(s"CopyProp ${timer.checkPoint("Simplify")} ms ")
 
@@ -928,6 +895,9 @@ object RunUtils {
     if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
+      if (conf.assertCalleeSaved) {
+        transforms.CalleePreservedParam.transform(ctx.program)
+      }
     } else {
       ir.transforms.clearParams(ctx.program)
     }
@@ -945,20 +915,22 @@ object RunUtils {
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
 
     ir.eval.SimplifyValidation.validate = conf.validateSimp
-
     if (conf.simplify) {
+
       ir.transforms.clearParams(ctx.program)
+
       ir.transforms.liftIndirectCall(ctx.program)
       transforms.liftSVCompNonDetEarlyIR(ctx.program)
 
       DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
       DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
-      doSimplify(ctx, conf.staticAnalysis)
-    }
 
-    if (conf.tvSimp) {
-      doSimplifyTV(ctx, conf.staticAnalysis)
+      if (conf.assertCalleeSaved) {
+        transforms.CalleePreservedParam.transform(ctx.program)
+      }
+
+      doSimplify(ctx, conf.staticAnalysis)
     }
 
     if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
@@ -1029,7 +1001,8 @@ object RunUtils {
 
     q.loading.dumpIL.foreach(s => {
       writeToFile(pp_prog(ctx.program), s"$s-output.il")
-      writeToFile(ctx.program.toScala, s"$s-output.scala")
+      val a = ctx.program.toScalaLines
+      writeToFile(a.mkString, s"$s-output.scala")
     })
     Logger.info("[!] Translating to Boogie")
 
@@ -1054,7 +1027,7 @@ object RunUtils {
     }
     assert(invariant.singleCallBlockEnd(ctx.program))
 
-    BASILResult(ctx, analysis, dsaContext, boogiePrograms, ir.transforms.validationProgs)
+    BASILResult(ctx, analysis, dsaContext, boogiePrograms)
   }
 
   /** Use static analysis to resolve indirect calls and replace them in the IR until fixed point.

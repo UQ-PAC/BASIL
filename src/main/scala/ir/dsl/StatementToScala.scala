@@ -1,7 +1,7 @@
 package ir.dsl
 
 import ir.*
-import util.{Twine, indentNested}
+import util.twine.Twine
 
 /**
  * ToScala for Statement and Expr
@@ -97,29 +97,27 @@ private object CaseIR {
   private lazy val toScalaOfExcluded = ToScala.Make[Excluded] {
     case Return(label, outs) => {
       if (outs.isEmpty) {
-        LazyList("ret")
+        Twine("ret")
       } else {
         given ToScala[LocalVar] = ToScala.MakeString(_.name.toScala)
 
-        indentNested("ret(", outs.map(_.toScalaLines), ")")
+        Twine.indentNested("ret(", outs.map(_.toScalaLines), ")")
       }
     }
     case DirectCall(tgt, label, outs, actuals) =>
       if (outs.isEmpty && actuals.isEmpty) {
-        LazyList(s"directCall(${tgt.procName.toScala})")
+        Twine(s"directCall(${tgt.procName.toScala})")
       } else {
         given ToScala[LocalVar] = ToScala.MakeString(_.name.toScala)
 
-        indentNested(
+        Twine.indentNested(
           s"directCall(",
-          outs.toSeq.toScalaLines
-            #:: tgt.name.toScalaLines
-            #:: LazyList(actuals.toSeq).map(_.toScalaLines),
+          List(outs.toSeq.toScalaLines, tgt.name.toScalaLines, actuals.toSeq.toScalaLines),
           ")"
         )
       }
-    case x: IndirectCall => LazyList(s"indirectCall(${x.target.toScala})")
-    case x: GoTo => LazyList(s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})")
+    case x: IndirectCall => Twine(s"indirectCall(${x.target.toScala})")
+    case x: GoTo => Twine(s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})")
   }
 
   given ToScala[Command] = ToScala.deriveWithExclusions[Command, Excluded](toScalaOfExcluded)

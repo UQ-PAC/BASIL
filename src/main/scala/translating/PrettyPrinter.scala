@@ -5,6 +5,18 @@ import scala.collection.immutable.ListMap
 import scala.collection.mutable
 
 object PrettyPrinter {
+
+  type PrettyPrintable = Program | Procedure | Statement | Jump | Command | Block | Expr
+
+  extension (p: PrettyPrintable)
+    def pprint = p match {
+      case e: Expr => pp_expr(e)
+      case e: Command => pp_cmd(e)
+      case e: Block => pp_block(e)
+      case e: Procedure => pp_proc(e)
+      case e: Program => pp_prog(e)
+    }
+
   def pp_expr(e: Expr) = BasilIRPrettyPrinter()(e)
   def pp_stmt(s: Statement) = BasilIRPrettyPrinter()(s)
   def pp_cmd(c: Command) = c match {
@@ -199,10 +211,12 @@ class BasilIRPrettyPrinter(
         ++ List("\nlet entry_procedure = " + p.mainProcedure.name)
       // ++ List(initialMemory(p.initialMemory.values))
       ,
-      p.procedures.toList.map(vproc).collect {
-        case p: Proc => p
-        case _ => ???
-      }
+      ((p.mainProcedure) :: p.procedures.filterNot(_ == p.mainProcedure).toList)
+        .map(vproc)
+        .collect {
+          case p: Proc => p
+          case _ => ???
+        }
     )
   }
 
@@ -331,12 +345,7 @@ class BasilIRPrettyPrinter(
     val inParams = p.formalInParam.toList.map(vparam)
     val outParams = p.formalOutParam.toList.map(vparam)
     val entryBlock = p.entryBlock
-    ir.transforms.reversePostOrder(p)
-    val middleBlocks =
-      (p.entryBlock.toList ++ (p.blocks.toSet -- p.entryBlock.toSet -- p.returnBlock.toSet).toList.sortBy(x =>
-        -x.rpoOrder
-      )
-        ++ p.returnBlock).map(vblock)
+    val middleBlocks = p.blocksBookended.map(vblock)
     val returnBlock = p.returnBlock.map(vblock)
 
     val localDecls = decls.toList.sorted

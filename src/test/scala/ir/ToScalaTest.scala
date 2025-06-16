@@ -4,7 +4,7 @@ import org.scalatest.concurrent.{TimeLimitedTests, ThreadSignaler}
 import org.scalatest.time.{Span, Seconds}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.{TestData, BeforeAndAfterEachTestData}
-import util.*
+import util.twine.Twine
 import ir.dsl.*
 import ir.dsl.given
 import test_util.CaptureOutput
@@ -294,7 +294,7 @@ enum EAAA {
   case A
   case B
 }
-given ToScala[EAAA] = ToScala.deriveWithExclusions[EAAA, EAAA.A.type](ToScala.Make(x => LazyList("custom", x.toString)))
+given ToScala[EAAA] = ToScala.deriveWithExclusions[EAAA, EAAA.A.type](ToScala.Make(x => Twine("custom", x.toString)))
       """)
 
     // exclusion type should be a subtype of base type
@@ -398,7 +398,7 @@ case class A39() extends ASD
       case B
     }
     given ToScala[EAAA] =
-      ToScala.deriveWithExclusions[EAAA, EAAA.A.type](ToScala.Make(x => LazyList("custom", x.toString)))
+      ToScala.deriveWithExclusions[EAAA, EAAA.A.type](ToScala.Make(x => Twine("custom", x.toString)))
 
     sealed trait L derives ToScala
     case class N() extends L
@@ -482,7 +482,7 @@ prog(
 )
 """
 
-    checkOutput(expected, new ToScalaWithInitialMemory {}.programToScala(program).mkString(""))
+    checkOutput(expected, new ToScalaWithInitialMemory {}.programToScala(program).mkString)
   }
 
 }

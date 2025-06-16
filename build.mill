@@ -1,24 +1,26 @@
 package build
+import $packages._
+
 import mill._
 import scalalib._
 
-import $file.util.DownloadModule
-import $file.bnfc.BNFCModule
+import $file.basilmill.bnfc.BNFCJFlexModule
+import $file.basilmill.antlr.AntlrModule
 
 import os.Path
 
 import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
 import contrib.scalapblib._
 
-object `package` extends RootModule with ScalaModule with antlr.AntlrModule with ScalaPBModule {
+object `package` extends RootModule with ScalaModule {
   // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
   def scalaVersion = "3.3.4"
 
-  def moduleDeps = Seq(bnfc)
-
   val ammonite = "3.0.2"
   override def ammoniteVersion = ammonite
+
+  def moduleDeps = Seq(basilAntlr, basilProto, bnfc)
 
   def scalacOptions: T[Seq[String]] = Seq("-deprecation")
 
@@ -29,26 +31,15 @@ object `package` extends RootModule with ScalaModule with antlr.AntlrModule with
   val antlrRuntime = ivy"org.antlr:antlr4-runtime:4.9"
   val sourceCode = ivy"com.lihaoyi::sourcecode:0.3.0"
   val mainArgs = ivy"com.lihaoyi::mainargs:0.5.1"
-  val sprayJson = ivy"io.spray::spray-json:1.3.6"
   val scalapb = ivy"com.thesamet.scalapb::scalapb-runtime:0.11.15"
-
-  def scalaPBVersion = "0.11.15"
+  val upickle = ivy"com.lihaoyi::upickle:4.2.1"
 
   def mainClass = Some("Main")
 
-  override def scalaPBSources = Task.Sources {
-    Seq(PathRef(this.millSourcePath / "main" / "protobuf"))
-  }
   def millSourcePath = super.millSourcePath / "src"
-  def ivyDeps = Agg(scalactic, antlrRuntime, sourceCode, mainArgs, sprayJson, scalapb)
+  def ivyDeps = Agg(scalactic, sourceCode, mainArgs, upickle)
   def sources = Task.Sources {
     Seq(PathRef(this.millSourcePath / "main" / "scala"))
-  }
-
-  override def antlrPackage: Option[String] = Some("Parsers")
-  override def antlrGenerateVisitor = true
-  override def antlrGrammarSources = Task.Sources {
-    Seq(PathRef(millSourcePath / "main" / "antlr4"))
   }
 
   object test extends ScalaTests with TestModule.ScalaTest {
@@ -56,6 +47,20 @@ object `package` extends RootModule with ScalaModule with antlr.AntlrModule with
     def ivyDeps = Agg(scalaTests, scalaCheck, javaTests)
     def sources = Task.Sources {
       Seq(PathRef(this.millSourcePath / "scala"))
+    }
+
+    // note: toBoolean accepts precisely "true" or "false"
+    def basilTestParallel = Task.Input {
+      Task.env.get("BASIL_TEST_PARALLEL").fold(false)(_.toBoolean)
+    }
+
+    def testForkGrouping = Task {
+      val numGroups = 13
+      if (basilTestParallel()) {
+        discoveredTestClasses().zipWithIndex.groupMap(x => x._2 % numGroups)(_._1).values.toSeq
+      } else {
+        Seq(discoveredTestClasses())
+      }
     }
   }
 
@@ -126,11 +131,156 @@ object `package` extends RootModule with ScalaModule with antlr.AntlrModule with
 
   def scalafmt = mill.scalalib.scalafmt.ScalafmtModule
 
-  object bnfc extends BNFCModule {
-    def bnfcPackageName = "basil_ir"
-    def bnfcSource = Task.Source {
+  object basilAntlr extends AntlrModule {
+    override def ivyDeps = Agg(build.antlrRuntime)
+    override def antlrPackage = Some("Parsers")
+    override def antlrGenerateVisitor = true
+    override def antlrGrammarSources = Task.Sources {
+      Seq(PathRef(build.millSourcePath / "main" / "antlr4"))
+    }
+  }
+
+  object basilProto extends ScalaPBModule {
+    override def scalaPBVersion = "0.11.15"
+
+    override def scalaVersion = build.scalaVersion
+    override def ivyDeps = Agg(build.scalapb)
+
+    override def scalaPBSources = Task.Sources {
+      Seq(PathRef(build.millSourcePath / "main" / "protobuf"))
+    }
+
+    def scalaDocOptions = Task {
+      super.scalaDocOptions() ++ build.scalaDocExternalMappingOptions()
+    }
+  }
+
+  object bnfc extends BNFCJFlexModule {
+    override def bnfcPackageName = "basil_ir"
+    override def bnfcExtraArgs = Seq("--line-numbers")
+    override def bnfcSource = Task.Source {
       PathRef(build.millSourcePath / "main" / "bnfc" / "BasilIR.cf")
     }
-    def antlrRuntime = build.antlrRuntime
+    override def javadocOptions = Task {
+      super.javadocOptions() ++ Seq(
+        "-linkoffline",
+        s"$baseUrl/api/java-cup",
+        cup.docJar().path / ".." / "javadoc"
+      ).map(_.toString)
+    }
+  }
+
+  def gitCommitHash = Task.Input {
+    // set in github actions
+    // https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/store-information-in-variables#default-environment-variables
+    Task.env.getOrElse("GITHUB_SHA", "main")
+  }
+
+  def scalaDocOptions = Task {
+    super.scalaDocOptions() ++ scalaDocExternalMappingOptions() ++ Seq(
+      s"-source-links:github://UQ-PAC/BASIL/${gitCommitHash()}",
+      s"-doc-root-content:$millSourcePath/main/scala/rootdoc.scala"
+    )
+  }
+
+  def baseUrl = "https://uq-pac.github.io/BASIL"
+  def docsRegexes = Task {
+    // these docs paths are used for inter-project linking.
+    // https://docs.scala-lang.org/scala3/guides/scaladoc/settings.html#-external-mappings
+    Map(
+      "api/bnfc" -> ".*basil_ir/.*::javadoc",
+      "api/basil-antlr" -> ".*Parsers/.*::javadoc",
+      "api/basil-proto" -> ".*com/grammatech/gtirb.*::scaladoc3",
+      "api/java-cup" -> ".*java_cup/.*::javadoc",
+    )
+  }
+
+  def docsModules = Task {
+    // these doc paths are copied into the combined docs output.
+    Map(
+      "api/basil" -> docJar(),
+      "api/bnfc" -> bnfc.docJar(),
+      "api/basil-antlr" -> basilAntlr.docJar(),
+      "api/basil-proto" -> basilProto.docJar(),
+      "api/java-cup" -> bnfc.cup.docJar(),
+    )
+  }
+
+  def scalaDocExternalMappingOptions = Task {
+    val defaultExternals = Seq(
+      ".*scala/.*::scaladoc3::https://scala-lang.org/api/3.3_LTS/",
+      "java/.*::javadoc::https://docs.oracle.com/en/java/javase/17/docs/api/java.base/",
+      ".*com/google/protobuf.*::javadoc::https://protobuf.dev/reference/java/api-docs/",
+    )
+    val externals = defaultExternals ++ docsRegexes().map {
+      case (path, regex) => s"$regex::$baseUrl/$path"
+    }
+    Seq("-external-mappings:" + externals.mkString(","))
+  }
+
+  def docsIndex = Task.Source {
+    PathRef(super.millSourcePath / "docs" / "static" / "index.html")
+  }
+
+  def allDocs = Task {
+    val dest = Task.dest
+
+    def copyDoc(x: PathRef, name: String) = {
+      val p = x.path / ".." / "javadoc"
+      println("copying docs from " + p)
+      os.copy(p, dest / os.RelPath(name), createFolders = true)
+    }
+
+    docsModules().foreach {
+      case (name, src) => copyDoc(src, name)
+    }
+    os.copy.into(docsIndex().path, dest / "api")
+
+    os.walk(dest).foreach {
+      case path if path.ext == "html" =>
+        // HACK: fix mill bug causing incorrect scala source links https://github.com/com-lihaoyi/mill/issues/5221
+        val out = os.read(path).replace(super.millSourcePath.toString, "")
+        os.write.over(path, out)
+      case path if path.last == "ux.js" =>
+        val old = os.read(path)
+        val oldLen = old.length
+
+        // HACK: disable scaladoc's horrendous link click handler which
+        // introduces a delay and sometimes causes clicking links to fail silently
+        val out = old.replace("""document.querySelectorAll("a")""", "[]")
+        if (oldLen == out.length)
+          println(s"warning: $path replacement did not match anything")
+
+        os.write.over(path, out)
+      case _ => ()
+    }
+
+    println("combined docs at " + dest)
+
+    dest
+  }
+
+  def ctagsConfig = Task.Source {
+    Task.workspace / "basilmill" / "scala.ctags"
+  }
+
+  /**
+   * Build the ctags file containing code definition locations.
+   * This can be used with `./mill -w` to watch and re-build on file changes.
+   */
+  def ctags = Task {
+    val src = Task.traverse(Seq(this, test) ++ moduleDeps)(_.allSources)().flatten
+    val srcArgs = src.map(_.path).filter(os.exists(_)).map(_.toString)
+
+    val newFile = Task.workspace / "tags.new"
+    val tagsFile = Task.workspace / "tags"
+
+    val args = Seq(
+      "ctags", "--tag-relative=no", "-R", "-f", newFile.toString,
+      "--options=" + ctagsConfig().path,
+      "--languages=scala,java", "--fields=+zK")
+
+    os.call(args ++ srcArgs, cwd = Task.workspace)
+    os.move(newFile, tagsFile, replaceExisting = true, atomicMove = true)
   }
 }

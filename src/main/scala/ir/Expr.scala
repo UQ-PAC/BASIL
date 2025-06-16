@@ -2,8 +2,9 @@ package ir
 import boogie._
 import util.CachedHashCode
 import scala.collection.mutable
+import util.functional.Snoc
 
-sealed trait Expr {
+sealed trait Expr extends DefaultDeepEquality {
   def toBoogie: BExpr
   def getType: IRType
 
@@ -438,13 +439,29 @@ case class LocalVar(varName: String, override val irType: IRType, val index: Int
   override val name = varName + (if (index > 0) then s"_$index" else "")
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
-  override def toString: String = s"LocalVar(${name}, $irType)"
+  override def toString: String = s"LocalVar(${varName}, $index, $irType)"
   override def acceptVisit(visitor: Visitor): Variable = visitor.visitLocalVar(this)
 }
 
 object LocalVar {
   def unapply(l: LocalVar): Some[(String, IRType, Int)] = Some((l.name, l.irType, l.index))
 
+  /**
+   * Construct a LocalVar by infering its index from the provided name corresponding to [[LocalVar.name]].
+   * It matches the value of [[name]] result, dropping an '_0' suffix or otherwise extracting index [[${name}_${index}]].
+   * Use only when the [[index]] field has been lost/mangled with the name, e.g. due to serialisation & parsing.
+   */
+  def ofIndexed(name: String, ty: IRType) = name.split("_").toList match {
+    case Snoc(Nil, r) =>
+      LocalVar(name, ty, 0)
+    case Snoc(_, "0") | Snoc(_, "out") | Snoc(_, "in") =>
+      LocalVar(name, ty, 0)
+    case Snoc(r, ind) =>
+      try LocalVar(r.mkString("_"), ty, (ind.toInt))
+      catch
+        _ => LocalVar(name, ty, 0)
+    case _ => LocalVar(name, ty, 0)
+  }
 }
 
 /** A global memory section (subject to shared-memory concurrent accesses from multiple threads). */

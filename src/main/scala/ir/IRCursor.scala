@@ -186,14 +186,17 @@ object CallGraph extends CallGraph
   */
 def computeDomain[T <: CFGPosition, O <: T](walker: IRWalk[T, O], initial: IterableOnce[O]): mutable.Set[O] = {
   val domain: mutable.Set[O] = mutable.Set.from(initial)
+  val added: mutable.Set[O] = mutable.Set()
 
   var sizeBefore = 0
   var sizeAfter = domain.size
   while (sizeBefore != sizeAfter) {
     for (i <- domain) {
-      domain.addAll(walker.succ(i))
-      domain.addAll(walker.pred(i))
+      added.addAll(walker.succ(i))
+      added.addAll(walker.pred(i))
     }
+    domain.addAll(added)
+    added.clear()
     sizeBefore = sizeAfter
     sizeAfter = domain.size
   }
