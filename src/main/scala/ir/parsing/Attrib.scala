@@ -4,7 +4,6 @@ import boogie.SpecGlobal
 import specification.{FuncEntry, ExternalFunction}
 import scala.collection.immutable.ListMap
 import util.Logger
-import util.functional.MapOf
 import ir.{Literal, BitVecLiteral, TrueLiteral, FalseLiteral, IntLiteral, MemorySection, Sigil}
 import java.util.Base64
 import java.io._
@@ -96,6 +95,14 @@ object Attrib {
     def apply(i: Boolean) = Attrib.ValLiteral(if i then TrueLiteral else FalseLiteral)
     def unapply(x: Attrib) = x.Bool
   }
+  case class MapOf(keys: String*) {
+    def unapply(x: Attrib): Option[scala.List[Attrib]] = x.Map match {
+      case Some(map) if map.keySet.forall(keys.contains) =>
+        val values = keys.map(map.get(_)).toList
+        util.functional.sequence(values)
+      case _ => None
+    }
+  }
 }
 
 case class FunDecl(irType: ir.IRType, body: Option[ir.LambdaExpr])
@@ -126,38 +133,35 @@ extension (p: SpecGlobal) {
 }
 
 def funcEntryFromAttrib(a: Attrib) =
-  val FuncEntryMap = MapOf("name", "address", "size")
-  a.Map match {
-    case Some(FuncEntryMap(List(Attrib.Str(name), Attrib.Int(address), Attrib.Int(size)))) =>
+  val FuncEntryMap = Attrib.MapOf("name", "address", "size")
+  a match {
+    case FuncEntryMap(List(Attrib.Str(name), Attrib.Int(address), Attrib.Int(size))) =>
       Some(FuncEntry(name, size.toInt, address))
     case _ => None
   }
 
-def specGlobalFromAttrib(a: Attrib) =
-  val SpecGlobalMap = MapOf("name", "address", "size").WithOptional("arraySize")
-  a.Map match {
-    case Some(
-          SpecGlobalMap(
-            List(Attrib.Str(name), Attrib.Int(address), Attrib.Int(size)),
-            List(Some(Attrib.Int(arraySize)))
-          )
-        ) =>
-      Some(SpecGlobal(name, size.toInt, Some(arraySize.toInt), address))
-    case _ => None
-  }
+def specGlobalFromAttrib(a: Attrib) = {
+  for {
+    l <- a.Map
+    name <- l.get("name").flatMap(_.Str)
+    address <- l.get("address").flatMap(_.Int)
+    size <- l.get("size").flatMap(_.Int)
+    arraySize = l.get("arraySize").flatMap(_.Int).map(_.toInt)
+  } yield (SpecGlobal(name, size.toInt, arraySize, address))
+}
 
 extension (p: ExternalFunction) {
   def toAttrib: Attrib =
     Attrib.Map(ListMap("name" -> Attrib.Str(p.name), "offset" -> Attrib.Int(p.offset)))
 }
 
-def externalFunctionFromAttrib(a: Attrib) =
-  val ExternalFunctionMap = MapOf("name", "offset")
-  a.Map match {
-    case Some(ExternalFunctionMap(List(Attrib.Str(name), Attrib.Int(off)))) =>
-      Some(ExternalFunction(name, off))
-    case _ => None
-  }
+def externalFunctionFromAttrib(a: Attrib) = {
+  for {
+    l <- a.Map
+    name <- l.get("name").flatMap(_.Str)
+    off <- l.get("offset").flatMap(_.Int)
+  } yield (ExternalFunction(name, off))
+}
 
 case class SymbolTableInfo(
   externalFunctions: Set[ExternalFunction] = Set(),
