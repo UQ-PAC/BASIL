@@ -6,6 +6,7 @@ import org.scalatest.funsuite.*
 import util.{IRLoading, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, Logger, LogLevel, IRTransform}
 import ir.eval.ExecEffect
 import test_util.*
+import analysis.AnalysisManager
 
 abstract class DifferentialTest extends AnyFunSuite, CaptureOutput, TestCustomisation {
 
@@ -89,10 +90,10 @@ abstract class DifferentialTest extends AnyFunSuite, CaptureOutput, TestCustomis
     )
 
     var ictx = IRLoading.load(loading)
-    ictx = IRTransform.doCleanup(ictx)
+    IRTransform.DoCleanup()(ictx, AnalysisManager(ictx.program))
 
     var comparectx = IRLoading.load(loading)
-    comparectx = IRTransform.doCleanup(comparectx)
+    IRTransform.DoCleanup()(comparectx, AnalysisManager(comparectx.program))
 
     ir.transforms.clearParams(ictx.program)
 
