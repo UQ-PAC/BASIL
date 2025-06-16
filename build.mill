@@ -276,9 +276,9 @@ object `package` extends RootModule with ScalaModule {
     val tagsFile = Task.workspace / "tags"
 
     val args = Seq(
-      "ctags", "--options=" + ctagsConfig().path,
-      "--languages=scala,java", "--tag-relative=never", "--fields=+zK",
-      "-R", "-f", newFile.toString)
+      "ctags", "--tag-relative=no", "-R", "-f", newFile.toString,
+      "--options=" + ctagsConfig().path,
+      "--languages=scala,java", "--fields=+zK")
 
     os.call(args ++ srcArgs, cwd = Task.workspace)
     os.move(newFile, tagsFile, replaceExisting = true, atomicMove = true)
