@@ -816,7 +816,7 @@ class IntervalNode(
   def eqClassProperty(): Boolean = {
     assert(this.isUptoDate)
     var seen: Set[IntervalCell] = Set.empty
-    eqClasses.exists(eqClass =>
+    !eqClasses.exists(eqClass =>
       val cond = (!(IntervalDSA.equiv(eqClass.map(_.getPointee))) ||
         eqClass.exists(seen.contains) ||
         !(eqClass.forall(c => cells.contains(c))))
