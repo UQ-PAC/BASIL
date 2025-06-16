@@ -62,7 +62,7 @@ object ReadELFLoader {
 
     val symbolTable = ctx.symbolTable.asScala.flatMap(s => visitSymbolTable(s)).toList
     val globalVariables = symbolTable.collect {
-      case ELFSymbol(_, value, size, ELFSymType.OBJECT, ELFBind.GLOBAL, ELFVis.DEFAULT, ndx, name)
+      case ELFSymbol(_, value, size, ELFSymType.OBJECT, ELFBind.GLOBAL | ELFBind.LOCAL, ELFVis.DEFAULT, ndx, name)
           if ndx != ELFNDX.UND =>
         SpecGlobal(name, size * 8, None, value)
     }.toSet

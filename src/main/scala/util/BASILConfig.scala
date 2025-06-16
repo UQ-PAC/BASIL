@@ -37,9 +37,17 @@ case class StaticAnalysisConfig(
   irreducibleLoops: Boolean = true
 )
 
-enum DSAConfig {
-  case Prereq, Standard, Checks
+enum DSAPhase {
+  case Pre, Local, BU, TD
 }
+
+case class DSConfig(
+  phase: DSAPhase = DSAPhase.TD,
+  splitGlobals: Boolean = false,
+  globalAsserts: Boolean = false,
+  eqClasses: Boolean = false,
+  checks: Boolean = true
+)
 
 enum BoogieMemoryAccessMode {
   case SuccessiveStoreSelect, LambdaStoreSelect
@@ -55,11 +63,11 @@ case class BASILConfig(
   runInterpret: Boolean = false,
   simplify: Boolean = false,
   validateSimp: Boolean = false,
-  dsaConfig: Option[DSAConfig] = None,
-  summariseProcedures: Boolean = false,
-  generateRelyGuarantees: Boolean = false,
+  dsaConfig: Option[DSConfig] = None,
   memoryTransform: Boolean = false,
   assertCalleeSaved: Boolean = false,
+  summariseProcedures: Boolean = false,
+  generateRelyGuarantees: Boolean = false,
   staticAnalysis: Option[StaticAnalysisConfig] = None,
   boogieTranslation: BoogieGeneratorConfig = BoogieGeneratorConfig(),
   outputPrefix: String
