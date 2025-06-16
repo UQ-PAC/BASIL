@@ -107,7 +107,7 @@ vim.keymap.set("n", "<Leader>lF", function()
 end, opts)
 ```
 
-### Working on the ANTLR4 parser
+## Working on the ANTLR4 parser
 The ANTLR4 plugin should provide syntax highlighting
 for ANTLR4 (.g4) files, as well as code autocompletion and other intellisense features.
 
