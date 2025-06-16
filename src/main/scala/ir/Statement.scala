@@ -75,6 +75,33 @@ class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[S
   }
 }
 
+class SimulAssign(var assignments: Vector[(Variable, Expr)], override val label: Option[String] = None) extends Assign {
+  override def modifies: Set[Global] = assignments.collect { case (r: Global, _) =>
+    r
+  }.toSet
+
+  def assignees = assignments.map(_._1).toSet
+  override def toString: String = s"$labelStr${assignments
+      .map { case (lhs, rhs) =>
+        lhs.toString + " := " + rhs
+      }
+      .mkString(", ")}"
+  override def acceptVisit(visitor: Visitor): Statement = visitor.visitSimulAssign(this)
+
+  override def deepEquals(o: Object): Boolean = o match {
+    case SimulAssign(otherAssings) => otherAssings == assignments
+    case _ => false
+  }
+
+}
+
+object SimulAssign {
+  def unapply(l: SimulAssign | LocalAssign): Some[(Iterable[(Variable, Expr)], Option[String])] = l match {
+    case LocalAssign(lhs, rhs, label) => Some(Seq(lhs -> rhs), label)
+    case s: SimulAssign => Some((s.assignments, s.label))
+  }
+}
+
 object LocalAssign {
   def unapply(l: LocalAssign): Some[(Variable, Expr, Option[String])] = Some(l.lhs, l.rhs, l.label)
 }
@@ -231,6 +258,7 @@ class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override
   def this(target: Block) = this(mutable.Set(target), None)
 
   def targets: Set[Block] = _targets.toSet
+
 
   override def deepEquals(o: Object): Boolean = o match {
     case GoTo(tgts, lbl) => tgts.map(_.label).toSet == targets.map(_.label).toSet && lbl == label

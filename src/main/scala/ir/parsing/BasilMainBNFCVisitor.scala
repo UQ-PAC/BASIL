@@ -70,7 +70,7 @@ case class InnerBasilBNFCVisitor[A](
     val ty = x.type_.accept(this, arg).ty
     decls.globals
       .get(x.bident_)
-      .filter(x => ir.BitVecType(x.size) == ty)
+      .filter(_.irType == ty)
       .getOrElse(ir.LocalVar.ofIndexed(x.bident_, ty))
 
   override def visit(x: syntax.BinaryExpr, arg: A): BasilParseValue =

@@ -1105,7 +1105,6 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
 
   // cleanup
   visit_prog(CleanupAssignments(), p)
-  ExtractExtendZeroBits.doTransform(p)
 
   SimplifyLogger.info("[!] Simplify :: Merge empty blocks")
   cleanupBlocks(p)

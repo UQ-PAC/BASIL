@@ -48,7 +48,7 @@ case class BasilParseValue(x: ParseTypes) {
   def proc = x.asInstanceOf[ir.dsl.EventuallyProcedure]
   def prog = x.asInstanceOf[ir.dsl.EventuallyProgram]
   def memory = x.asInstanceOf[ir.Memory]
-  def register = x.asInstanceOf[ir.Register]
+  def register = x.asInstanceOf[ir.GlobalVar]
 }
 
 private object BasilParseValue {

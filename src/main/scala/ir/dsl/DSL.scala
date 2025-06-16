@@ -65,8 +65,6 @@ type NonCallStatement =
 
 type DSLStatement = NonCallStatement | EventuallyStatement | EventuallyJump
 
-type DSLStatement = NonCallStatement | EventuallyStatement | EventuallyJump
-
 def cloneStatement(x: NonCallStatement): NonCallStatement = x match {
   case LocalAssign(a, b, c) => LocalAssign(a, b, c)
   case MemoryAssign(a, b, c) => MemoryAssign(a, b, c)
