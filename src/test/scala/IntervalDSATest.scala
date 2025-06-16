@@ -1,6 +1,4 @@
-import analysis.data_structure_analysis.DSAPhase.{Local, TD}
 import analysis.data_structure_analysis.{
-  DSAPhase,
   DSInterval,
   Global,
   Heap,
@@ -26,6 +24,7 @@ import util.*
 import analysis.data_structure_analysis
 import test_util.{BASILTest, CaptureOutput}
 import translating.PrettyPrinter.pp_prog
+import util.DSAPhase.{Local, TD}
 
 object IntervalDSATestData {
   val mem = SharedMemory("mem", 64, 8)
@@ -707,7 +706,6 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
       !locals.values.filter(g => globalCollapsed.contains(g.proc.procName)).exists(IntervalDSA.checksGlobalsMaintained)
     )
   }
-
 
   test("www_authenticate") {
     val path = "examples/cntlm-noduk/cntlm-noduk"
