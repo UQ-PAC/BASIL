@@ -22,18 +22,35 @@ sealed trait Expr extends DefaultDeepEquality {
 
 object Sigil {
   object Boogie {
-    def block = "b#"
-    def proc = "p$"
-    def localVar = "#"
-    def globalVar = "$"
+    val block = "b#"
+    val proc = "p$"
+    val localVar = "#"
+    val globalVar = "$"
+
+    def unsigil(name: String) = name match {
+      case s"${sig @ `block`}$s" => Some((sig, s))
+      case s"${sig @ `proc`}$s" => Some((sig, s))
+      case s"${sig @ `localVar`}$s" => Some((sig, s))
+      case s"${sig @ `globalVar`}$s" => Some((sig, s))
+      case _ => None
+    }
   }
 
   object BASIR {
-    def block = "%"
-    def proc = "@"
-    def localVar = "#"
-    def globalVar = "$"
-    def attrib = "."
+    val block = "%"
+    val proc = "@"
+    val localVar = "#"
+    val globalVar = "$"
+    val attrib = "."
+
+    def unsigil(name: String) = name match {
+      case s"${sig @ `block`}$s" => Some((sig, s))
+      case s"${sig @ `proc`}$s" => Some((sig, s))
+      case s"${sig @ `localVar`}$s" => Some((sig, s))
+      case s"${sig @ `globalVar`}$s" => Some((sig, s))
+      case s"${sig @ `attrib`}$s" => Some((sig, s))
+      case _ => None
+    }
   }
 }
 
@@ -389,10 +406,9 @@ object LocalVar {
    * Use only when the [[index]] field has been lost/mangled with the name, e.g. due to serialisation & parsing.
    */
   def ofIndexed(name: String, ty: IRType) =
-    val illegalStart = Set(Sigil.BASIR.proc, Sigil.BASIR.block, Sigil.BASIR.globalVar, Sigil.BASIR.attrib)
-    val rname = name.partition(x => illegalStart.contains(x.toString)) match {
-      case ("", n: String) => n
-      case (prefix: String, n: String) => Sigil.BASIR.localVar + name
+    val rname = Sigil.BASIR.unsigil(name) match {
+      case Some((_, name)) => Sigil.BASIR.localVar + name
+      case None => name
     }
 
     rname.split("_").toList match {

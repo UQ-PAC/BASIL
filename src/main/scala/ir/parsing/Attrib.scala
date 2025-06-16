@@ -50,7 +50,7 @@ enum Attrib {
     Sigil.BASIR.attrib + p
   }
 
-  def quote(s: String) = "\"" + s + "\""
+  import util.StringEscape.quote
 
   private val lineLim = 80
 
@@ -83,9 +83,26 @@ enum Attrib {
 
 /* constructors for attrib values */
 object Attrib {
-  def Int(i: BigInt) = Attrib.ValLiteral(IntLiteral(i))
-  def Str(i: String) = Attrib.ValString(i)
-  def Bool(i: Boolean) = Attrib.ValLiteral(if i then TrueLiteral else FalseLiteral)
+  object Int {
+    def apply(i: BigInt) = Attrib.ValLiteral(IntLiteral(i))
+    def unapply(x: Attrib) = x.Int
+  }
+  object Str {
+    def apply(i: String) = Attrib.ValString(i)
+    def unapply(x: Attrib) = x.Str
+  }
+  object Bool {
+    def apply(i: Boolean) = Attrib.ValLiteral(if i then TrueLiteral else FalseLiteral)
+    def unapply(x: Attrib) = x.Bool
+  }
+  case class MapOf(keys: String*) {
+    def unapply(x: Attrib): Option[scala.List[Attrib]] = x.Map match {
+      case Some(map) if map.keySet.forall(keys.contains) =>
+        val values = keys.map(map.get(_)).toList
+        util.functional.sequence(values)
+      case _ => None
+    }
+  }
 }
 
 case class FunDecl(irType: ir.IRType, body: Option[ir.LambdaExpr])
@@ -115,14 +132,12 @@ extension (p: SpecGlobal) {
   }
 }
 
-def funcEntryFromAttrib(a: Attrib) = {
-  for {
-    l <- a.Map
-    name <- l.get("name").flatMap(_.Str)
-    address <- l.get("address").flatMap(_.Int)
-    size <- l.get("size").flatMap(_.Int)
-  } yield (FuncEntry(name, size.toInt, address))
-}
+def funcEntryFromAttrib(a: Attrib) =
+  val FuncEntryMap = Attrib.MapOf("name", "address", "size")
+  a match {
+    case FuncEntryMap(List(Attrib.Str(name), Attrib.Int(address), Attrib.Int(size))) => Some(FuncEntry(name, size.toInt, address))
+    case _ => None
+  }
 
 def specGlobalFromAttrib(a: Attrib) = {
   for {
@@ -185,51 +200,39 @@ case class SymbolTableInfo(
   }
 
   def mergeFromAttrib(a: Attrib) = {
+
+    import scala.util.chaining.scalaUtilChainingOps
+
+    def logIfNone[T](str: => String)(x: Option[T]) = x match {
+      case Some(x) => x
+      case None =>
+        Logger.error(str)
+        None
+    }
+
     for {
       l <- a.Map
       externalFunctionsList <- l.get("externalFunctions").flatMap(_.List)
       externalFunctions = externalFunctionsList
-        .flatMap(e => {
-          externalFunctionFromAttrib(e) match {
-            case Some(e) => Seq(e)
-            case None =>
-              Logger.error(s"Malformed external funcion: ${e.pprint}")
-              Seq()
-          }
-        })
+        .flatMap(e => externalFunctionFromAttrib(e).tap(logIfNone(s"Malformed external funcion: ${e.pprint}")))
         .toSet
       globalsList <- l.get("globals").flatMap(_.List)
       globals = globalsList
         .flatMap(g =>
-          specGlobalFromAttrib(g) match {
-            case Some(e) => Seq(e)
-            case None =>
-              Logger.error(s"Malformed specglobal: ${g.pprint}")
-              Seq()
-          }
-        )
+          specGlobalFromAttrib(g).tap(logIfNone(s"Malformed specglobal: ${g.pprint}"))        )
         .toSet
       funcEntriesList <- l.get("funcEntries").flatMap(_.List)
       funcEntries = funcEntriesList
         .flatMap(g =>
-          funcEntryFromAttrib(g) match {
-            case Some(e) => Seq(e)
-            case None =>
-              Logger.error(s"Malformed FuncEntry: ${g.pprint}")
-              Seq()
-          }
-        )
+          funcEntryFromAttrib(g).tap(logIfNone(s"Malformed FuncEntry: ${g.pprint}"))
+          )
         .toSet
       globalOffsetsList <- l.get("globalOffsets").flatMap(_.List)
       globalOffsets = globalOffsetsList
         .map(e =>
           e.List match {
-            case Some(e) =>
-              e.toList match {
-                case a :: b :: Nil if a.Int.isDefined && b.Int.isDefined => a.Int.get -> b.Int.get
-                case o => throw Exception(s"Malformed global offsets ${globalOffsetsList}")
-              }
-            case None => throw Exception(s"Malformed global offsets ${globalOffsetsList}")
+            case Some(Seq(Attrib.Int(a), Attrib.Int(b))) => (a, b)
+            case _ => throw Exception(s"Malformed global offsets ${globalOffsetsList}")
           }
         )
         .toMap
@@ -249,7 +252,7 @@ object SymbolTableInfo {
 
 case class MemoryStatic(name: String, address: BigInt, size: Int, readOnly: Boolean, bytes: String) {
 
-  /** 
+  /**
   *  InitialMemory minus the merged regions graph
   *
   *  This stores [[bytes]] as a Base64-encoded gzip-compressed string containing the original bytes.
