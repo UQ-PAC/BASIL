@@ -23,6 +23,9 @@ object Main {
     case Bap
   }
 
+  /** Replaces the extension of the given path with the given new extension, if
+   *  an extension is present. Otherwise, appends the extension.
+   */
   private def replacePathExtension(p: java.nio.file.Path, newExtension: String) = {
     val basename = p.getFileName().toString
 
@@ -33,6 +36,13 @@ object Main {
     }
 
     p.resolveSibling(withoutExtension + newExtension)
+  }
+
+  /** Appends the given extension onto the given path, irrespective of whether
+   *  the path has an existing extension.
+   */
+  private def addPathExtension(p: java.nio.file.Path, newExtension: String) = {
+    p.resolveSibling(p.getFileName().toString + newExtension)
   }
 
   def loadDirectory(i: ChooseInput = ChooseInput.Gtirb, d: String): ILLoadingConfig = {
@@ -57,8 +67,7 @@ object Main {
 
     // helper function to locate a file adjacent to the given path, with the given extension,
     // and ensure that it exists. returns None if file does not exist, otherwise Some(Path).
-    val findAdjacent = (x: java.nio.file.Path, ext: String) =>
-      Some(replacePathExtension(x, ext)).filter(_.toFile.exists)
+    val findAdjacent = (x: java.nio.file.Path, ext: String) => Some(addPathExtension(x, ext)).filter(_.toFile.exists)
 
     val results = tryName
       .flatMap(name => {
