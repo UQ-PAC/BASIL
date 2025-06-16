@@ -1,6 +1,7 @@
 import org.scalatest.funsuite.AnyFunSuite
 import ir.dsl.*
 import ir.{CallSCCWalker, updateWithCallSCC}
+import test_util.programToContext
 
 object CallSCCTestData {
   /*
@@ -44,6 +45,7 @@ object CallSCCTestData {
   }
 }
 
+@test_util.tags.UnitTest
 class CallSCCTest extends AnyFunSuite with test_util.CaptureOutput {
   test("scc") {
     val p = CallSCCTestData.scc.program
