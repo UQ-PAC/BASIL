@@ -321,7 +321,6 @@ class Procedure private (
   // Some(Set(this)) is a scc only containing this procedure which has call edge to itself (self recursion)
   var scc: Option[Set[Procedure]] = None
 
-
   override def deepEquals(o: Object): Boolean = o match {
     case p: Procedure => deepEqualsProc(p)
     case _ => false

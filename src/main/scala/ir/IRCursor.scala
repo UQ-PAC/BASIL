@@ -181,16 +181,18 @@ def updateWithCallSCC(program: Program): Unit = {
   val sccs = stronglyConnectedComponents(CallGraph, program.procedures)
   for (scc <- sccs) {
     if scc.size > 1 || scc.head.calls.contains(scc.head) then {
-       scc.foreach(_.scc = Some(scc))
+      scc.foreach(_.scc = Some(scc))
     }
   }
 }
 
 object CallSCCWalker extends IRWalk[Procedure, Procedure] {
-    def succSCC(b: Procedure): Set[Set[Procedure]] = b.scc.getOrElse(Set(b)).flatMap(a => CallGraph.succ(a)).map(p => p.scc.getOrElse(Set(p))) - b.scc.getOrElse(Set(b))
-    def predSCC(b: Procedure): Set[Set[Procedure]] = b.scc.getOrElse(Set(b)).flatMap(a => CallGraph.pred(a)).map(p => p.scc.getOrElse(Set(p))) - b.scc.getOrElse(Set(b))
-    def succ(b: Procedure) = succSCC(b).flatten
-    def pred(b: Procedure) = predSCC(b).flatten
+  def succSCC(b: Procedure): Set[Set[Procedure]] =
+    b.scc.getOrElse(Set(b)).flatMap(a => CallGraph.succ(a)).map(p => p.scc.getOrElse(Set(p))) - b.scc.getOrElse(Set(b))
+  def predSCC(b: Procedure): Set[Set[Procedure]] =
+    b.scc.getOrElse(Set(b)).flatMap(a => CallGraph.pred(a)).map(p => p.scc.getOrElse(Set(p))) - b.scc.getOrElse(Set(b))
+  def succ(b: Procedure) = succSCC(b).flatten
+  def pred(b: Procedure) = predSCC(b).flatten
 }
 
 // object InterProcBlockIRCursor extends InterProcBlockIRCursor

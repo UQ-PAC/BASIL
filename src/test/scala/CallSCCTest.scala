@@ -13,35 +13,36 @@ object CallSCCTestData {
    */
   def scc = {
     val program = prog(
-      proc("a", block("a0",
-        directCall("b"),
-        ret)),
-      proc("b", block("b0",
-        directCall("c"),
-        ret)),
-      proc("c",
+      proc("a", block("a0", directCall("b"), ret)),
+      proc("b", block("b0", directCall("c"), ret)),
+      proc(
+        "c",
         block("c0", goto("c1", "c2")),
         block("c1", directCall("d"), goto("c3")),
         block("c2", directCall("g"), goto("c3")),
-        block("c3", ret)),
+        block("c3", ret)
+      ),
       proc("g", block("g", ret)),
-      proc("d",
+      proc(
+        "d",
         block("d0", goto("d1", "d2")),
         block("d1", directCall("b"), goto("d3")),
         block("d2", directCall("f"), goto("d3")),
-        block("d3", ret)),
-      proc("f",
+        block("d3", ret)
+      ),
+      proc(
+        "f",
         block("f0", goto("f1", "f2")),
         block("f1", directCall("h"), goto("f3")),
         block("f2", directCall("f"), goto("f3")),
-        block("f3", ret)),
-      proc("h", block("h", ret)),
+        block("f3", ret)
+      ),
+      proc("h", block("h", ret))
     )
 
     programToContext(program)
   }
 }
-
 
 class CallSCCTest extends AnyFunSuite with test_util.CaptureOutput {
   test("scc") {
