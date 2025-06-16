@@ -114,6 +114,8 @@ object DefinedOnAllPaths {
 
 def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
 
+  transforms.clearParams(ctx.program)
+
   val mainNonEmpty = ctx.program.mainProcedure.blocks.nonEmpty
   val mainHasReturn = ctx.program.mainProcedure.returnBlock.isDefined
   val mainHasEntry = ctx.program.mainProcedure.entryBlock.isDefined
@@ -173,6 +175,14 @@ def clearParams(p: Program) = {
       case d: DirectCall =>
         ChangeTo(List(DirectCall(d.target, d.label, immutable.SortedMap.empty, immutable.SortedMap.empty)))
       case _ => SkipChildren()
+    }
+    override def vjump(j: Jump) = {
+      j match {
+        case d: Return =>
+          d.outParams = SortedMap()
+        case _ => ()
+      }
+      SkipChildren()
     }
   }
 

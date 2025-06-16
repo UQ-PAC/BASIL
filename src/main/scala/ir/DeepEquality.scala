@@ -1,7 +1,7 @@
 package ir
 
 trait DeepEquality {
-  val debug = false
+  val debug = true
   def deepEquals(o: Object): Boolean
   def deepEqualsDbg(o: Object): Boolean = {
     val r = deepEquals(o)

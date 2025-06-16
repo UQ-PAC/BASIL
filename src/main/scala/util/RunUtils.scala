@@ -31,7 +31,6 @@ import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
 import translating.*
 import util.{DebugDumpIRLogger, Logger, SimplifyLogger}
-import upickle.default.ReadWriter
 
 import java.util.Base64
 import util.intrusive_list.IntrusiveList
@@ -148,6 +147,10 @@ object IRLoading {
 
         (Some(mainAddress), continuation)
       }
+      case None if mode == FrontendMode.Gtirb => {
+        Logger.warn("RELF not provided, recommended for GTIRB input")
+        (None, (x: IRContext) => x)
+      }
       case None => {
         (None, (x: IRContext) => x)
       }
@@ -155,9 +158,7 @@ object IRLoading {
 
     val program: IRContext = (mode, mainAddress) match {
       case (FrontendMode.Gtirb, _) => IRLoading.load(loadGTIRB(q.inputFile, mainAddress, Some(q.mainProcedureName)))
-      case (FrontendMode.Basil, _) => {
-        ir.parsing.ParseBasilIL.loadILFile(q.inputFile)
-      }
+      case (FrontendMode.Basil, _) => ir.parsing.ParseBasilIL.loadILFile(q.inputFile)
       case (FrontendMode.Bap, None) => throw Exception("relf is required when using BAP input")
       case (FrontendMode.Bap, Some(mainAddress)) => {
         val bapProgram = loadBAP(q.inputFile)
@@ -186,9 +187,7 @@ object IRLoading {
 
     parser.setBuildParseTree(true)
 
-    val bapLoader = BAPLoader()
-
-    bapLoader.visitProject(parser.project())
+    BAPLoader().visitProject(parser.project())
   }
 
   def loadGTIRB(fileName: String, mainAddress: Option[BigInt], mainName: Option[String] = None): Program = {
@@ -726,6 +725,10 @@ object RunUtils {
     val newLoops = foundLoops.reducibleTransformIR()
     newLoops.updateIrWithLoops()
 
+    for (p <- program.procedures) {
+      p.normaliseBlockNames()
+    }
+
     ctx.program.sortProceduresRPO()
 
     transforms.liftSVComp(ctx.program)
@@ -881,11 +884,8 @@ object RunUtils {
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
 
-    if (conf.loading.inputFile.endsWith(".il")) {
-      ctx = IRTransform.doCleanup(ctx, conf.simplify)
-    }
+    ctx = IRTransform.doCleanup(ctx, conf.simplify)
 
-    assert(invariant.blocksUniqueToEachProcedure(ctx.program))
     transforms.inlinePLTLaunchpad(ctx.program)
 
     if (q.loading.trimEarly) {
@@ -907,6 +907,7 @@ object RunUtils {
       }
     } else {
       ir.transforms.clearParams(ctx.program)
+      assert(invariant.correctCalls(ctx.program))
     }
     assert(invariant.correctCalls(ctx.program))
 
@@ -999,19 +1000,19 @@ object RunUtils {
       }
     }
 
-    q.loading.dumpIL.foreach(s => {
-      writeToFile(ctx.pprint, s"$s-output.il")
-      val a = ctx.program.toScalaLines
-      writeToFile(a.mkString, s"$s-output.scala")
-    })
-    Logger.info("[!] Translating to Boogie")
-
     IRTransform.prepareForTranslation(q, ctx)
 
     if (conf.generateRelyGuarantees) {
       StaticAnalysisLogger.info("[!] Generating Rely-Guarantee Conditions")
       IRTransform.generateRelyGuaranteeConditions(ctx.program.procedures.toList.filter(p => p.returnBlock != None))
     }
+
+    q.loading.dumpIL.foreach(s => {
+      writeToFile(pp_prog(ctx.program), s"$s-output.il")
+      val a = ctx.program.toScalaLines
+      writeToFile(a.mkString, s"$s-output.scala")
+    })
+    Logger.info("[!] Translating to Boogie")
 
     val regionInjector = analysis.flatMap(a => a.regionInjector)
 
