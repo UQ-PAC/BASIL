@@ -755,7 +755,7 @@ case class SpecGlobal(
   arraySize: Option[Int],
   override val address: BigInt
 ) extends SymbolTableEntry,
-      SpecGlobalOrAccess derives upickle.default.ReadWriter {
+      SpecGlobalOrAccess {
   override def specGlobals: Set[SpecGlobalOrAccess] = Set(this)
 
   def sanitisedName = name.replace("@", "_AT_")

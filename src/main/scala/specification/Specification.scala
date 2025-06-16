@@ -11,7 +11,7 @@ trait SymbolTableEntry {
 }
 
 case class FuncEntry(override val name: String, override val size: Int, override val address: BigInt)
-    extends SymbolTableEntry derives upickle.default.ReadWriter
+    extends SymbolTableEntry
 
 case class Specification(
   funcs: Set[FuncEntry],
