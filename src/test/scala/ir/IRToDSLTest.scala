@@ -147,7 +147,8 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
 
     val loaded = util.RunUtils.loadAndTranslate(
       BASILConfig(
-        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf", specFile = None, dumpIL = None),
+        loading =
+          ILLoadingConfig(inputFile = path + ".adt", relfFile = Some(path + ".relf"), specFile = None, dumpIL = None),
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out.bpl",
@@ -204,7 +205,8 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
 
     val loaded = util.RunUtils.loadAndTranslate(
       BASILConfig(
-        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf", specFile = None, dumpIL = None),
+        loading =
+          ILLoadingConfig(inputFile = path + ".adt", relfFile = Some(path + ".relf"), specFile = None, dumpIL = None),
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out.bpl"
