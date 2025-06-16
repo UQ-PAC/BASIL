@@ -260,9 +260,13 @@ object `package` extends RootModule with ScalaModule {
     dest
   }
 
+  def ctagsConfig = Task.Source {
+    Task.workspace / "basilmill" / "scala.ctags"
+  }
+
   /**
    * Build the ctags file containing code definition locations.
-   * This can be used with `./mill -w` * to watch and re-build on file changes.
+   * This can be used with `./mill -w` to watch and re-build on file changes.
    */
   def ctags = Task {
     val src = Task.traverse(Seq(this, test) ++ moduleDeps)(_.allSources)().flatten
@@ -271,7 +275,12 @@ object `package` extends RootModule with ScalaModule {
     val newFile = Task.workspace / "tags.new"
     val tagsFile = Task.workspace / "tags"
 
-    os.call(Seq("ctags", "--languages=scala,java", "--tag-relative=never", "-R", "-f", newFile.toString) ++ srcArgs, cwd = Task.workspace)
+    val args = Seq(
+      "ctags", "--options=" + ctagsConfig().path,
+      "--languages=scala,java", "--tag-relative=never", "--fields=+zK",
+      "-R", "-f", newFile.toString)
+
+    os.call(args ++ srcArgs, cwd = Task.workspace)
     os.move(newFile, tagsFile, replaceExisting = true, atomicMove = true)
   }
 }
