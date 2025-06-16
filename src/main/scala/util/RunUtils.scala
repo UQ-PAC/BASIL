@@ -147,13 +147,19 @@ object IRLoading {
 
         (Some(mainAddress), continuation)
       }
+      case None if mode == FrontendMode.Gtirb => {
+        Logger.warn("RELF not provided, recommended for GTIRB input")
+        (None, IRLoading.load: Program => IRContext)
+      }
       case None => {
         (None, IRLoading.load: Program => IRContext)
       }
     }
 
     val program: Program = (mode, mainAddress) match {
-      case (FrontendMode.Gtirb, _) => loadGTIRB(q.inputFile, mainAddress, Some(q.mainProcedureName))
+      case (FrontendMode.Gtirb, _) => {
+        loadGTIRB(q.inputFile, mainAddress, Some(q.mainProcedureName))
+      }
       case (FrontendMode.Basil, _) => ir.parsing.ParseBasilIL.loadILFile(q.inputFile)
       case (FrontendMode.Bap, None) => throw Exception("relf is required when using BAP input")
       case (FrontendMode.Bap, Some(mainAddress)) => {
