@@ -3,7 +3,6 @@ import ir.*
 import ir.cilvisitor.*
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
-import upickle.default.ReadWriter
 import specification.*
 import util.Logger
 import boogie.SpecGlobal
