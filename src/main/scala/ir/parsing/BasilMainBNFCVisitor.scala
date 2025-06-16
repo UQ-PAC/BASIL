@@ -9,13 +9,13 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.util.chaining.scalaUtilChainingOps
 
-def unsigilBlock(x: String) = x.stripPrefix(Sigil.BASIR.block)
-def unsigilProc(x: String) = x.stripPrefix(Sigil.BASIR.proc)
+def unsigilBlock(x: String) = Sigil.unsigil(Sigil.BASIR.block)(x)
+def unsigilProc(x: String) = Sigil.unsigil(Sigil.BASIR.proc)(x)
 def unsigilLocal(x: String) =
   /* keep sigil as it is optional, to preserve var name */
   x
-def unsigilGlobal(x: String) = x.stripPrefix(Sigil.BASIR.globalVar)
-def unsigilAttrib(x: String) = x.stripPrefix(Sigil.BASIR.attrib)
+def unsigilGlobal(x: String) = Sigil.unsigil(Sigil.BASIR.globalVar)(x)
+def unsigilAttrib(x: String) = Sigil.unsigil(Sigil.BASIR.attrib)(x)
 
 /**
  * Parses structures at the block-level and lower, given

@@ -52,6 +52,11 @@ object Sigil {
       case _ => None
     }
   }
+
+  def unsigil(sigil: String)(s: String) = s match {
+    case s"${`sigil`}$x" => x
+    case _ => throw new Exception(s"Identifier '$s' was expected to have a '$sigil' sigil")
+  }
 }
 
 def size(e: Expr) = {
