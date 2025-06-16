@@ -27,13 +27,10 @@ object Sigil {
     val localVar = "#"
     val globalVar = "$"
 
-    def unsigil(name: String) = name match {
-      case s"${sig @ `block`}$s" => Some((sig, s))
-      case s"${sig @ `proc`}$s" => Some((sig, s))
-      case s"${sig @ `localVar`}$s" => Some((sig, s))
-      case s"${sig @ `globalVar`}$s" => Some((sig, s))
-      case _ => None
-    }
+    def unsigil(s: String): Option[(String, String)] =
+      List(block, proc, localVar, globalVar).view.collectFirst {
+        case sigil if (s.startsWith(sigil)) => (sigil, s.substring(sigil.length))
+      }
   }
 
   object BASIR {
@@ -43,20 +40,19 @@ object Sigil {
     val globalVar = "$"
     val attrib = "."
 
-    def unsigil(name: String) = name match {
-      case s"${sig @ `block`}$s" => Some((sig, s))
-      case s"${sig @ `proc`}$s" => Some((sig, s))
-      case s"${sig @ `localVar`}$s" => Some((sig, s))
-      case s"${sig @ `globalVar`}$s" => Some((sig, s))
-      case s"${sig @ `attrib`}$s" => Some((sig, s))
-      case _ => None
-    }
+    def unsigil(s: String): Option[(String, String)] =
+      List(block, proc, localVar, globalVar, attrib).view.collectFirst {
+        case sigil if (s.startsWith(sigil)) => (sigil, s.substring(sigil.length))
+      }
   }
 
-  def unsigil(sigil: String)(s: String) = s match {
-    case s"${`sigil`}$x" => x
-    case _ => throw new Exception(s"Identifier '$s' was expected to have a '$sigil' sigil")
+  def unsigilOption(sigil: String)(s: String) = s match {
+    case s if s.startsWith(sigil) => Some(s.substring(sigil.length))
+    case _ => None
   }
+
+  def unsigil(sigil: String)(s: String) =
+    unsigilOption(sigil)(s).getOrElse(throw new Exception(s"Identifier '$s' was expected to have a '$sigil' sigil"))
 }
 
 def size(e: Expr) = {
