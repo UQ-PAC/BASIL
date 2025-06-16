@@ -1,4 +1,4 @@
-import analysis.data_structure_analysis.DSAPhase.TD
+import util.DSAPhase.TD
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest.*
 import test_util.{BASILTest, CaptureOutput, Histogram, TestConfig, TestCustomisation}
