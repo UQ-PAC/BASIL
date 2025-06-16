@@ -1,4 +1,4 @@
-import analysis.data_structure_analysis.DSAPhase.TD
+import util.DSAPhase.TD
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.Retries
 import util.{DSConfig, DebugDumpIRLogger, LogLevel, Logger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
