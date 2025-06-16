@@ -1,7 +1,6 @@
 package ir
 
 import util.functional.Snoc
-import java.util.Base64
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
 import boogie.*
