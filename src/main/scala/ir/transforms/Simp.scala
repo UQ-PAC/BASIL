@@ -15,6 +15,7 @@ import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
 import ExecutionContext.Implicits.global
 import scala.util.boundary, boundary.break
+import util.IRContext
 
 /** Simplification pass, see also: docs/development/simplification-solvers.md
   */
@@ -840,6 +841,24 @@ def coalesceBlocks(p: Program): Boolean = {
   didAny
 }
 
+class CoalesceBlocks(name: String = "CoalesceBlocks") extends Transform(name) {
+  // todo: make these protected (?)
+  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
+    coalesceBlocks(ctx.program)
+    Set.empty
+  }
+}
+
+class CoalesceBlocksFixpoint extends CoalesceBlocks("CoalesceBlocksFixpoint") {
+
+  override def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
+    // useful for ReplaceReturns
+    // (pushes single block with `Unreachable` into its predecessor)
+    while (coalesceBlocks(ctx.program)) {}
+    Set.empty
+  }
+}
+
 def removeDeadInParams(p: Program): Boolean = {
   var modified = false
   assert(invariant.correctCalls(p))
@@ -1143,6 +1162,13 @@ def reversePostOrder(startBlock: Block, fixup: Boolean = false, begin: Int = 0):
 def applyRPO(p: Program) = {
   for (proc <- p.procedures) {
     reversePostOrder(proc)
+  }
+}
+
+class ApplyRpo extends Transform("ApplyRpo") {
+  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
+    applyRPO(ctx.program)
+    Set.empty
   }
 }
 
@@ -1594,7 +1620,7 @@ class DefinitelyExits(knownExit: Set[Procedure]) extends ProcedureSummaryGenerat
   }
 }
 
-def findDefinitelyExits(p: Program) = {
+def findDefinitelyExits(p: Program): ProcReturnInfo = {
   val exit = p.procedures.filter(p => p.procName == "exit").toSet
   val dom = DefinitelyExits(exit)
   val ldom = ProcExitsDomain(x => false)
@@ -1608,6 +1634,50 @@ def findDefinitelyExits(p: Program) = {
       p
     }.toSet
   )
+}
+
+// todo: not sure whether to make 'findDefinitelyExits' a private method of this class
+class ReplaceJumpsInNonReturningProcs extends Transform("ReplaceJumpsInNonReturningProcs") {
+  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
+    val nonReturning = findDefinitelyExits(ctx.program)
+    ctx.program.mainProcedure.foreach {
+      case d: DirectCall if nonReturning.nonreturning.contains(d.target) => d.parent.replaceJump(Return())
+      case _ =>
+    }
+    Set.empty
+  }
+}
+
+// todo: i have no idea what to do with this
+class ReplaceReturnsTransform(doSimplify: Boolean) extends Transform("ReplaceReturns") {
+  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
+    // FIXME: Main will often maintain the stack by loading R30 from the caller's stack frame
+    //        before returning, which makes the R30 assertin faile. Hence we currently skip this
+    //        assertion for main, instead we should precondition the stack layout before main
+    //        but the interaction between spec and memory regions is nontrivial currently
+    cilvisitor.visit_prog(
+      transforms.ReplaceReturns(proc => doSimplify && ctx.program.mainProcedure != proc),
+      ctx.program
+    )
+    transforms.addReturnBlocks(ctx.program, insertR30InvariantAssertion = _ => doSimplify)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
+    Set.empty
+  }
+}
+
+class RemoveExternalFunctionReferences extends Transform("RemoveExternalFunctionReferences") {
+  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
+    val externalNames = ctx.externalFunctions.map(_.name)
+    val unqualifiedNames = externalNames.filter(_.contains('@')).map(_.split('@')(0))
+    ExternalRemover(externalNames ++ unqualifiedNames).visitProgram(ctx.program)
+    for (p <- ctx.program.procedures) {
+      p.isExternal = Some(
+        ctx.externalFunctions.exists(e => e.name == p.procName || p.address.contains(e.offset)) || p.isExternal
+          .getOrElse(false)
+      )
+    }
+    Set.empty
+  }
 }
 
 class Simplify(val res: Boolean => Variable => Option[Expr], val initialBlock: Block = null) extends CILVisitor {
@@ -1819,14 +1889,21 @@ def removeTriviallyDeadBranches(p: Program, removeAllUnreachableBlocks: Boolean 
   dead.nonEmpty
 }
 
-// ensure procedure entry has no incoming jumps, if it does replace with new
-// block jumping to the old procedure entry
-def makeProcEntryNonLoop(p: Procedure) = {
-  if (p.entryBlock.exists(_.prevBlocks.nonEmpty)) {
-    val nb = Block(p.name + "_entry")
-    p.addBlock(nb)
-    val eb = p.entryBlock.get
-    nb.replaceJump(GoTo(eb))
-    p.entryBlock = nb
+class MakeProcEntriesNonLoops extends Transform("MakeProcEntriesNonLoops") {
+  // ensure procedure entry has no incoming jumps, if it does replace with new
+  // block jumping to the old procedure entry
+  private def makeProcEntryNonLoop(p: Procedure) = {
+    if (p.entryBlock.exists(_.prevBlocks.nonEmpty)) {
+      val nb = Block(p.name + "_entry")
+      p.addBlock(nb)
+      val eb = p.entryBlock.get
+      nb.replaceJump(GoTo(eb))
+      p.entryBlock = nb
+    }
+  }
+
+  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
+    ctx.program.procedures.foreach(makeProcEntryNonLoop)
+    Set.empty
   }
 }
