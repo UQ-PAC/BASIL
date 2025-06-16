@@ -758,7 +758,7 @@ case class SpecGlobal(
       SpecGlobalOrAccess {
   override def specGlobals: Set[SpecGlobalOrAccess] = Set(this)
 
-  def sanitisedName = name.replace("@", "_AT_")
+  def sanitisedName = util.StringEscape.escape(name)
 
   override val toAddrVar: BVar = BVariable(s"${sanitisedName}_addr", BitVecBType(64), Scope.Const)
   override val toOldVar: BVar = BVariable(s"${sanitisedName}_old", BitVecBType(size), Scope.Local)
