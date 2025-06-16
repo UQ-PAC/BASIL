@@ -23,6 +23,9 @@ object Main {
     case Bap
   }
 
+  /** Replaces the extension of the given path with the given new extension, if
+   *  an extension is present. Otherwise, appends the extension.
+   */
   private def replacePathExtension(p: java.nio.file.Path, newExtension: String) = {
     val basename = p.getFileName().toString
 
@@ -35,10 +38,23 @@ object Main {
     p.resolveSibling(withoutExtension + newExtension)
   }
 
+  /** Appends the given extension onto the given path, irrespective of whether
+   *  the path has an existing extension.
+   */
+  private def addPathExtension(p: java.nio.file.Path, newExtension: String) = {
+    p.resolveSibling(p.getFileName().toString + newExtension)
+  }
+
   def loadDirectory(i: ChooseInput = ChooseInput.Gtirb, d: String): ILLoadingConfig = {
 
-    // at this point, `path` is the given directory with file extensions removed (if any).
-    val path = replacePathExtension(java.nio.file.Paths.get(d), "")
+    val path = {
+      val cwd = java.nio.file.Path.of(".")
+      var p = java.nio.file.Paths.get(d)
+      // manually prefix with current directory if given path is not absolute.
+      p = if p.isAbsolute() then p else cwd.resolve(p)
+      // remove file extension from path, if present.
+      replacePathExtension(p, "")
+    }
 
     // name of the parent directory.
     // e.g., in "src/test/correct/TESTCASE/gcc_O2", this would be "TESTCASE".
@@ -51,8 +67,7 @@ object Main {
 
     // helper function to locate a file adjacent to the given path, with the given extension,
     // and ensure that it exists. returns None if file does not exist, otherwise Some(Path).
-    val findAdjacent = (x: java.nio.file.Path, ext: String) =>
-      Some(replacePathExtension(x, ext)).filter(_.toFile.exists)
+    val findAdjacent = (x: java.nio.file.Path, ext: String) => Some(addPathExtension(x, ext)).filter(_.toFile.exists)
 
     val results = tryName
       .flatMap(name => {
@@ -169,6 +184,12 @@ object Main {
     )
     pcTracking: Option[String],
     @arg(
+      name = "assert-callee-saved",
+      doc =
+        "if in parameter form: force the removal of callee-saved registers from parameter lists, and add assertions they are preserved across calls. (options: auto|always|never) (default: auto)  Auto enables it only in conjunction with DSA."
+    )
+    forceCalleeSaved: String = "auto",
+    @arg(
       name = "validate-simplify",
       doc = "Emit SMT2 check for validation of simplification expression rewrites 'rewrites.smt2'"
     )
@@ -276,6 +297,14 @@ object Main {
       None
     }
 
+    val calleeSaved = conf.forceCalleeSaved match {
+      case "auto" => dsa.isDefined
+      case "always" => true
+      case "never" => false
+      case _ =>
+        throw new IllegalArgumentException("Illegal argument for --assert-callee-saved. allowed: (auto|always|never)")
+    }
+
     val boogieMemoryAccessMode = if (conf.lambdaStores.value) {
       BoogieMemoryAccessMode.LambdaStoreSelect
     } else {
@@ -324,7 +353,8 @@ object Main {
       boogieTranslation = boogieGeneratorConfig,
       outputPrefix = conf.outFileName,
       dsaConfig = dsa,
-      memoryTransform = conf.memoryTransform.value
+      memoryTransform = conf.memoryTransform.value,
+      assertCalleeSaved = calleeSaved
     )
 
     val result = RunUtils.run(q)

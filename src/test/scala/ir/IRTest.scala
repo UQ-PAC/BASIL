@@ -75,7 +75,7 @@ class IRTest extends AnyFunSuite with CaptureOutput {
     val p = prog(
       proc(
         "main",
-        block("l_main", LocalAssign(R0, bv64(10)), LocalAssign(R1, bv64(10)), goto("newblock")),
+        block("l_main", LocalAssign(R0, bv64(10)), LocalAssign(R1, bv64(10)), goto("l_main_1")),
         block("l_main_1", LocalAssign(R0, bv64(22)), directCall("p2"), goto("returntarget")),
         block("returntarget", ret)
       ),
@@ -430,7 +430,7 @@ class IRTest extends AnyFunSuite with CaptureOutput {
 
     // these calls should not throw
     assert(prog(recursiveproc) != null)
-    assert(recursiveproc.addToProg(Resolver(emptyprog)) != null)
+    assert(recursiveproc.addToProg(emptyprog) != null)
   }
 
   test("LambdaTypes") {

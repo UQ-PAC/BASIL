@@ -92,25 +92,26 @@ def R(i: Int): Register = Register(s"R$i", 64)
 
 def bv_t(i: Int) = BitVecType(i)
 
-case class Resolver(program: Program) {
-  lazy val procs = program.procedures.map(p => p.name -> p).toMap
-  lazy val blocks = program.procedures.map(p => p.name -> (p.blocks.map(b => b.label -> b)).toMap).toMap
+case class CachedLabelResolver(program: Program) {
+  /* Cache of procedure idents for faster lookup on big program resolves */
+  val procs = program.procedures.map(p => p.name -> p).toMap
+  val blocks = program.procedures.map(p => p.name -> (p.blocks.map(b => b.label -> b)).toMap).toMap
 }
 
 case class DelayNameResolve(ident: String) {
-  def resolveProc(prog: Resolver): Option[Procedure] = prog.procs.get(ident)
+  def resolveProc(prog: CachedLabelResolver): Option[Procedure] = prog.procs.get(ident)
 
-  def resolveBlock(resolver: Resolver, parent: String): Option[Block] =
+  def resolveBlock(resolver: CachedLabelResolver, parent: String): Option[Block] =
     resolver.blocks.get(parent).flatMap(_.get(ident))
 }
 
 sealed trait EventuallyStatement extends DeepEquality {
-  def resolve(p: Resolver): Statement
+  def resolve(p: CachedLabelResolver): Statement
   def cloneable = this
 }
 
 case class CloneableStatement(s: NonCallStatement) extends EventuallyStatement {
-  override def resolve(p: Resolver): Statement = cloneStatement(s)
+  override def resolve(p: CachedLabelResolver): Statement = cloneStatement(s)
   override def deepEquals(o: Object) = o match {
     case CloneableStatement(os) => os.deepEquals(s)
     case _ => false
@@ -118,7 +119,7 @@ case class CloneableStatement(s: NonCallStatement) extends EventuallyStatement {
 }
 case class IdentityStatement(s: NonCallStatement) extends EventuallyStatement {
   var resolved = false
-  override def resolve(p: Resolver): Statement = {
+  override def resolve(p: CachedLabelResolver): Statement = {
     assert(
       !resolved,
       s"DSL statement '$s' has already been resolved! to make a DSL statement that can be resolved multiple times, wrap it in clonedStmt() or use .cloneable on its block."
@@ -134,14 +135,14 @@ case class IdentityStatement(s: NonCallStatement) extends EventuallyStatement {
 }
 
 trait EventuallyJump extends DeepEquality {
-  def resolve(p: Resolver, proc: String): Jump
-  def resolve(p: Program, proc: String): Jump = resolve(Resolver(p), proc)
+  def resolve(p: CachedLabelResolver, proc: String): Jump
+  def resolve(p: Program, proc: String): Jump = resolve(CachedLabelResolver(p), proc)
 }
 
 case class EventuallyIndirectCall(target: Variable, label: Option[String] = None)
     extends EventuallyStatement
     with DefaultDeepEquality {
-  override def resolve(p: Resolver): Statement = {
+  override def resolve(p: CachedLabelResolver): Statement = {
     IndirectCall(target, label)
   }
 }
@@ -153,7 +154,7 @@ case class EventuallyCall(
   label: Option[String] = None
 ) extends EventuallyStatement
     with DefaultDeepEquality {
-  override def resolve(p: Resolver): Statement = {
+  override def resolve(p: CachedLabelResolver): Statement = {
     val t = target.resolveProc(p) match {
       case Some(x) => x
       case None => throw Exception(s"can't resolve target ${target} proc in prog")
@@ -167,21 +168,21 @@ case class EventuallyCall(
 case class EventuallyGoto(targets: Iterable[DelayNameResolve], label: Option[String] = None)
     extends EventuallyJump
     with DefaultDeepEquality {
-  override def resolve(p: Resolver, proc: String): GoTo = {
-    val tgs = targets.map(tn => tn.resolveBlock(p, proc).getOrElse(throw Exception(s"Goto resolution failure $tn")))
+  override def resolve(p: CachedLabelResolver, proc: String): GoTo = {
+    val tgs = targets.map(tn => tn.resolveBlock(p, proc).getOrElse(throw Exception(s"Cannot resolve $tn")))
     GoTo(tgs, label)
   }
 }
 case class EventuallyReturn(params: Iterable[(String, Expr)], label: Option[String] = None)
     extends EventuallyJump
     with DefaultDeepEquality {
-  override def resolve(p: Resolver, proc: String) = {
+  override def resolve(p: CachedLabelResolver, proc: String) = {
     val r = SortedMap.from(params.map((n, v) => p.procs(proc).formalOutParam.find(_.name == n).get -> v))
     Return(label, r)
   }
 }
 case class EventuallyUnreachable(label: Option[String] = None) extends EventuallyJump with DefaultDeepEquality {
-  override def resolve(p: Resolver, proc: String) = Unreachable(label)
+  override def resolve(p: CachedLabelResolver, proc: String) = Unreachable(label)
 }
 
 def clonedStmt(s: NonCallStatement) = CloneableStatement(s)
@@ -250,11 +251,10 @@ case class EventuallyBlock(
 
   }
 
-  def makeResolver: (Block, (Resolver, String) => Unit) = {
+  def makeResolver: (Block, (CachedLabelResolver, String) => Unit) = {
     val tempBlock: Block = Block(label, meta.address, List(), GoTo(List.empty))
-    tempBlock.meta = meta
 
-    def cont(prog: Resolver, proc: String): Block = {
+    def cont(prog: CachedLabelResolver, proc: String): Block = {
       assert(tempBlock.statements.isEmpty)
       val resolved = sl.map(_.resolve(prog))
       assert(tempBlock.statements.isEmpty)
@@ -265,8 +265,8 @@ case class EventuallyBlock(
     (tempBlock, cont)
   }
 
-  def resolve(prog: Program, proc: String): Block = resolve(Resolver(prog), proc)
-  def resolve(prog: Resolver, proc: String): Block = {
+  def resolve(prog: Program, proc: String): Block = resolve(CachedLabelResolver(prog), proc)
+  def resolve(prog: CachedLabelResolver, proc: String): Block = {
     val (b, resolve) = makeResolver
     resolve(prog, proc)
     b
@@ -335,7 +335,7 @@ case class EventuallyProcedure(
     case _ => false
   }
 
-  def makeResolver: (Procedure, Resolver => Unit) = {
+  def makeResolver: (Procedure, CachedLabelResolver => Unit) = {
 
     val (tempBlocks, resolvers) = blocks.map(_.makeResolver).unzip
 
@@ -358,7 +358,7 @@ case class EventuallyProcedure(
     val jumps: Iterable[(Block, EventuallyJump)] =
       (tempBlocks zip blocks).map((temp, b) => temp -> b.j)
 
-    def cont(prog: Resolver) = {
+    def cont(prog: CachedLabelResolver) = {
       resolvers.foreach(_(prog, tempProc.name))
       jumps.foreach((b, j) => b.replaceJump(j.resolve(prog, tempProc.name)))
       tempBlocks.headOption.foreach(b => tempProc.entryBlock = b)
@@ -367,8 +367,8 @@ case class EventuallyProcedure(
     (tempProc, cont)
   }
 
-  def resolve(p: Program): Procedure = resolve(Resolver(p))
-  def resolve(prog: Resolver): Procedure = {
+  def resolve(p: Program): Procedure = resolve(CachedLabelResolver(p))
+  def resolve(prog: CachedLabelResolver): Procedure = {
     val (p, resolver) = makeResolver
     resolver(prog)
     p
@@ -376,10 +376,10 @@ case class EventuallyProcedure(
 
   def toProg() = prog(this)
 
-  def addToProg(p: Resolver): Procedure = {
+  def addToProg(p: Program): Procedure = {
     val (proc, resolver) = makeResolver
-    p.program.addProcedure(proc)
-    resolver(p)
+    p.addProcedure(proc)
+    resolver(CachedLabelResolver(p))
     proc
   }
 
@@ -434,7 +434,7 @@ case class EventuallyProgram(
     val procs = ArrayBuffer.from(tempProcs)
 
     val p = Program(procs, procs.head, memory)
-    val reso = Resolver(p)
+    val reso = CachedLabelResolver(p)
 
     resolvers.foreach(_(reso))
     assert(ir.invariant.correctCalls(p))
