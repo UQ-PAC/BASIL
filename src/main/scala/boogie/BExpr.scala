@@ -313,6 +313,33 @@ case class UnaryBExpr(op: UnOp, arg: BExpr) extends BExpr {
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitUnaryBExpr(this)
 }
 
+case class NaryBinExpr(op: BoolBinOp | EQ.type | NEQ.type | IntADD.type, arg: List[BExpr]) extends BExpr {
+  require(arg.size >= 2)
+  override def getType = BinaryBExpr(op, arg.head, arg.tail.head).getType
+  override def serialiseBoogie(w: Writer): Unit = {
+    w.append("(")
+    arg
+      .dropRight(1)
+      .foreach(a => {
+        a.serialiseBoogie(w)
+        w.append(",")
+      })
+    arg.last.serialiseBoogie(w)
+    w.append(")")
+  }
+
+  override def functionOps: Set[FunctionOp] = arg.flatMap(_.functionOps).toSet
+  override def toString = s"(${arg.mkString(" " + op.toString + " ")})"
+  override def locals: Set[BVar] = arg.flatMap(_.locals).toSet
+  override def globals: Set[BVar] = arg.flatMap(_.globals).toSet
+  override def params: Set[BVar] = arg.flatMap(_.params).toSet
+  override def specGlobals: Set[SpecGlobalOrAccess] = arg.flatMap(_.specGlobals).toSet
+  override def oldSpecGlobals: Set[SpecGlobalOrAccess] = arg.flatMap(_.oldSpecGlobals).toSet
+  override def specGammas: Set[SpecGlobalOrAccess] = arg.flatMap(_.specGammas).toSet
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = arg.flatMap(_.oldSpecGammas).toSet
+  override def loads: Set[BExpr] = arg.flatMap(_.loads).toSet
+}
+
 case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
   override def getType: BType = (op, arg1.getType, arg2.getType) match {
     case (_: BoolBinOp, BoolBType, BoolBType) => BoolBType
@@ -451,10 +478,11 @@ case class IfThenElse(guard: BExpr, thenExpr: BExpr, elseExpr: BExpr) extends BE
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitIfThenElse(this)
 }
 
-trait BQuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr) extends BExpr {
+trait BQuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr, triggers: List[BExpr] = List()) extends BExpr {
   override def toString: String = {
+    val trstr = if triggers.nonEmpty then "{" + triggers.mkString(",") + "} " else ""
     val boundString = bound.map(_.withType).mkString(", ")
-    s"($sort $boundString :: ($body))"
+    s"($sort $boundString::  $trstr($body))"
   }
   override val getType: BType = BoolBType
   override def functionOps: Set[FunctionOp] = body.functionOps
@@ -474,9 +502,11 @@ enum Quantifier {
   case lambda
 }
 
-case class ForAll(bound: List[BVar], body: BExpr) extends BQuantifierExpr(Quantifier.forall, bound, body)
+case class ForAll(bound: List[BVar], body: BExpr, triggers: List[BExpr] = List())
+    extends BQuantifierExpr(Quantifier.forall, bound, body, triggers)
 
-case class Exists(bound: List[BVar], body: BExpr) extends BQuantifierExpr(Quantifier.exists, bound, body)
+case class Exists(bound: List[BVar], body: BExpr, triggers: List[BExpr] = List())
+    extends BQuantifierExpr(Quantifier.exists, bound, body, triggers)
 
 case class Lambda(bound: List[BVar], body: BExpr) extends BQuantifierExpr(Quantifier.lambda, bound, body)
 

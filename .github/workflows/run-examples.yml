@@ -45,7 +45,7 @@ jobs:
       - name: Compile docs
         run: ./mill allDocs
 
-  # INFO: Scalatest runner arguments (i.e., arguments to ./mill -j3 test.test) can be
+  # INFO: Scalatest runner arguments (i.e., arguments to scalatest.sh) can be
   # found at: https://www.scalatest.org/user_guide/using_the_runner
 
   # useful scalatest arguments
@@ -80,8 +80,8 @@ jobs:
       - run: sudo apt-get install -y z3='4.8.12-*'
       - run: dotnet tool install --global boogie --version '3.4.3'
 
-      - run: ./mill compile
-      - run: ./scripts/scalatest.sh -oGD -T 1000000 -n test_util.tags.StandardSystemTest
+      - run: ./mill test.compile
+      - run: ./scripts/scalatest.sh -PS3 -oGD -T 1000000 -n test_util.tags.StandardSystemTest
 
       - uses: actions/upload-artifact@v4
         with:
@@ -132,6 +132,7 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
+        # XXX: scalatest.sh doesn't work on windows
       - run: ./mill test.test -oGD -T 1000000 -n test_util.tags.UnitTest
 
   UnitTests:
@@ -154,13 +155,25 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
-      - run: ./scripts/scalatest.sh -oGD -T 1000000 -n test_util.tags.UnitTest
+      - run: ./scripts/scalatest.sh -PS3 -oGD -T 1000000 -n test_util.tags.UnitTest
 
         # every test with package prefix:
         # sbt "show test:definedTests"
 
   AnalysisSystemTests:
     runs-on: ubuntu-latest
+
+    # run 4 AnalysisSystemTests in 4 parallel github jobs.
+    # the first job captures all AnalysisSystemTest and excludes all tests numbered with a different tag.
+    strategy:
+      matrix:
+        test: [
+          "AnalysisSystemTest -l test_util.tags.AnalysisSystemTest2 -l test_util.tags.AnalysisSystemTest3 -l test_util.tags.AnalysisSystemTest4",
+          AnalysisSystemTest2,
+          AnalysisSystemTest3,
+          AnalysisSystemTest4,
+        ]
+      fail-fast: false
 
     steps:
       - uses: actions/checkout@v4
@@ -179,4 +192,4 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
-      - run: ./scripts/scalatest.sh -oGD -T 1000000 -n test_util.tags.AnalysisSystemTest -F 2
+      - run: "./scripts/scalatest.sh -PS3 -oGD -T 1000000 -n test_util.tags.${{ matrix.test }} -F 2"

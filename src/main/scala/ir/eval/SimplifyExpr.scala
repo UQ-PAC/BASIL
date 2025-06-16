@@ -302,8 +302,8 @@ class VarNameNormalise() extends CILVisitor {
 
   def rename(v: Variable, newName: String) = {
     v match {
+      case l: GlobalVar => GlobalVar(newName, l.irType)
       case l: LocalVar => LocalVar(newName, l.irType)
-      case Register(n, sz) => Register(newName, sz)
     }
   }
 
@@ -979,6 +979,8 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
 
   val res = e match {
     case Extract(ed, 0, body) if size(body).get == ed => logSimp(e, body)
+    case Extract(ed, lo, ZeroExtend(_, body)) if size(body).get >= ed => logSimp(e, Extract(ed, lo, body))
+    case Extract(ed, lo, SignExtend(_, body)) if size(body).get >= ed => logSimp(e, Extract(ed, lo, body))
     case ZeroExtend(0, body) => logSimp(e, body)
     case SignExtend(0, body) => logSimp(e, body)
     case BinaryExpr(BVADD, body, BitVecLiteral(0, _)) => logSimp(e, body)
@@ -1060,6 +1062,15 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
       // extract the part of cval we are testing and remove the shift on the lhs operand
       logSimp(e, BinaryExpr(EQ, body, Extract((hi - lo) + n.toInt, n.toInt, c)))
     }
+
+    case SignExtend(shift, Extract(sz, shift2, body)) if shift == shift2 && sz == size(body).get => {
+      logSimp(e, BinaryExpr(BVASHR, body, BitVecLiteral(shift, sz)))
+    }
+
+    // leads to less readable code when extracting high bits
+    // case ZeroExtend(shift, Extract(sz, shift2, body))  if  shift == shift2 && sz == size(body).get => {
+    //  logSimp(e, BinaryExpr(BVLSHR, body, BitVecLiteral(shift, sz)))
+    // }
 
     // bvnot to bvneg
     // case BinaryExpr(BVADD, UnaryExpr(BVNOT, x), BitVecLiteral(1, _)) => logSimp(e, UnaryExpr(BVNEG, x))

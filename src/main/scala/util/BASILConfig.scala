@@ -18,7 +18,7 @@ case class BoogieGeneratorConfig(
 
 case class ILLoadingConfig(
   inputFile: String,
-  relfFile: String,
+  relfFile: Option[String] = None,
   specFile: Option[String] = None,
   dumpIL: Option[String] = None,
   mainProcedureName: String = "main",
@@ -55,10 +55,12 @@ case class BASILConfig(
   runInterpret: Boolean = false,
   simplify: Boolean = false,
   validateSimp: Boolean = false,
+  tvSimp: Boolean = false,
   dsaConfig: Option[DSAConfig] = None,
   summariseProcedures: Boolean = false,
   generateRelyGuarantees: Boolean = false,
   memoryTransform: Boolean = false,
+  assertCalleeSaved: Boolean = false,
   staticAnalysis: Option[StaticAnalysisConfig] = None,
   boogieTranslation: BoogieGeneratorConfig = BoogieGeneratorConfig(),
   outputPrefix: String

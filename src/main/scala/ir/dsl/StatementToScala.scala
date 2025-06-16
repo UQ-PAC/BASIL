@@ -1,7 +1,7 @@
 package ir.dsl
 
 import ir.*
-import util.{Twine, indentNested}
+import util.twine.Twine
 
 /**
  * ToScala for Statement and Expr
@@ -26,7 +26,6 @@ given ToScala[Expr] = ToScala.derived
 given ToScala[UnOp] = ToScala.derived
 given ToScala[BinOp] = ToScala.derived
 given ToScala[Endian] = ToScala.derived
-given ToScala[Global] = ToScala.derived
 given ToScala[IRType] = ToScala.derived
 
 // NOTE: Unfortunately, for the Command trait, this is not straightforward because the classes are not case classes.
@@ -52,6 +51,7 @@ private object CaseIR {
   sealed trait Jump extends Command
   sealed trait Call extends Statement
 
+  case class SimulAssign(lhs: List[(Variable, Expr)], label: Option[String] = None) extends Assign
   case class LocalAssign(lhs: Variable, rhs: Expr, label: Option[String] = None) extends SingleAssign
   case class MemoryAssign(lhs: Variable, rhs: Expr, label: Option[String] = None) extends SingleAssign
   case class MemoryStore(mem: Memory, index: Expr, value: Expr, endian: Endian, size: Int, label: Option[String] = None) extends Statement
@@ -67,6 +67,7 @@ private object CaseIR {
 
   def fromBasilIR(x: ir.Command): Command = x match {
     case ir.LocalAssign(a,b,c) => LocalAssign(a,b,c)
+    case ir.SimulAssign(a,b) => SimulAssign(a.toList,b)
     case ir.MemoryStore(a,b,c,d,e,f) => MemoryStore(a,b,c,d,e,f)
     case ir.MemoryLoad(a,b,c,d,e,f) => MemoryLoad(a,b,c,d,e,f)
     case ir.NOP(a) => NOP(a)
@@ -96,29 +97,27 @@ private object CaseIR {
   private lazy val toScalaOfExcluded = ToScala.Make[Excluded] {
     case Return(label, outs) => {
       if (outs.isEmpty) {
-        LazyList("ret")
+        Twine("ret")
       } else {
         given ToScala[LocalVar] = ToScala.MakeString(_.name.toScala)
 
-        indentNested("ret(", outs.map(_.toScalaLines), ")")
+        Twine.indentNested("ret(", outs.map(_.toScalaLines), ")")
       }
     }
     case DirectCall(tgt, label, outs, actuals) =>
       if (outs.isEmpty && actuals.isEmpty) {
-        LazyList(s"directCall(${tgt.procName.toScala})")
+        Twine(s"directCall(${tgt.procName.toScala})")
       } else {
         given ToScala[LocalVar] = ToScala.MakeString(_.name.toScala)
 
-        indentNested(
+        Twine.indentNested(
           s"directCall(",
-          outs.toSeq.toScalaLines
-            #:: tgt.name.toScalaLines
-            #:: LazyList(actuals.toSeq).map(_.toScalaLines),
+          List(outs.toSeq.toScalaLines, tgt.name.toScalaLines, actuals.toSeq.toScalaLines),
           ")"
         )
       }
-    case x: IndirectCall => LazyList(s"indirectCall(${x.target.toScala})")
-    case x: GoTo => LazyList(s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})")
+    case x: IndirectCall => Twine(s"indirectCall(${x.target.toScala})")
+    case x: GoTo => Twine(s"goto(${x.targets.map(x => x.label.toScala).mkString(", ")})")
   }
 
   given ToScala[Command] = ToScala.deriveWithExclusions[Command, Excluded](toScalaOfExcluded)

@@ -18,8 +18,8 @@ case "${o}" in
 done
 shift $((OPTIND-1))
 
-if [[ -z "$CFILE_NAME" ]] ; then 
-    echo "Usage: -c cfile.c [-b binaryname] [ -- make args]"
+if [[ -z "$CFILE_NAME" ]] && [[ -z "$BIN_NAME" ]] ; then 
+    echo "Usage: (-c cfile.c |-b binaryname) [ -- make args]"
     echo "Optionally variables CC, CFLAGS, DDISASM, READELF, GTIRBSEM, BAP to change the the binary path to the lifter tools"
     exit 1
 fi
@@ -48,7 +48,7 @@ $(BIN_NAME).relf: $(BIN_NAME)
 	$(READELF) -s -r -W $(BIN_NAME) > $(BIN_NAME).relf
 
 $(BIN_NAME).gts: $(BIN_NAME).gtirb
-	$(GTIRBSEM) $(BIN_NAME).gtirb $(BIN_NAME).gts
+	$(GTIRBSEM) $(GTIRBSEM_FLAGS) $(BIN_NAME).gtirb $(BIN_NAME).gts
 
 $(BIN_NAME).gtirb: $(BIN_NAME)
 	$(DDISASM) $(BIN_NAME) --ir $(BIN_NAME).gtirb

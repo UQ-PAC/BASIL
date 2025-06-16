@@ -58,6 +58,12 @@ case class IRContext(
   program: Program // internally mutable
 )
 
+enum FrontendMode {
+  case Bap
+  case Gtirb
+  case Basil
+}
+
 /** Stores the results of the static analyses.
   */
 case class StaticAnalysisContext(
@@ -75,7 +81,7 @@ case class StaticAnalysisContext(
   localDSA: Map[Procedure, Graph],
   bottomUpDSA: Map[Procedure, Graph],
   topDownDSA: Map[Procedure, Graph],
-  writesToResult: Map[Procedure, Set[Register]],
+  writesToResult: Map[Procedure, Set[GlobalVar]],
   ssaResults: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
 )
 
@@ -118,25 +124,53 @@ object IRLoading {
   /** Load a program from files using the provided configuration.
     */
   def load(q: ILLoadingConfig): IRContext = {
-    // TODO: this tuple is large, should be a case class
-    val (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
-      IRLoading.loadReadELF(q.relfFile, q)
 
-    val program: Program = if (q.inputFile.endsWith(".adt")) {
-      val bapProgram = loadBAP(q.inputFile)
-      val IRTranslator = BAPToIR(bapProgram, mainAddress)
-      IRTranslator.translate
-    } else if (q.inputFile.endsWith(".gts")) {
-      loadGTIRB(q.inputFile, mainAddress)
+    val mode = if q.inputFile.endsWith(".gts") then {
+      FrontendMode.Gtirb
+    } else if q.inputFile.endsWith(".adt") then {
+      FrontendMode.Bap
+    } else if (q.inputFile.endsWith(".il")) {
+      FrontendMode.Basil
     } else {
       throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
     }
 
-    val specification = IRLoading.loadSpecification(q.specFile, program, globals)
+    val (mainAddress, makeContext) = q.relfFile match {
+      case Some(relf) => {
+        // TODO: this tuple is large, should be a case class
+        val (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
+          IRLoading.loadReadELF(relf, q)
 
-    ir.transforms.PCTracking.applyPCTracking(q.pcTracking, program)
+        def continuation(program: Program) =
+          val specification = IRLoading.loadSpecification(q.specFile, program, globals)
+          IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program)
 
-    IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program)
+        (Some(mainAddress), continuation)
+      }
+      case None if mode == FrontendMode.Gtirb => {
+        Logger.warn("RELF not provided, recommended for GTIRB input")
+        (None, IRLoading.load: Program => IRContext)
+      }
+      case None => {
+        (None, IRLoading.load: Program => IRContext)
+      }
+    }
+
+    val program: Program = (mode, mainAddress) match {
+      case (FrontendMode.Gtirb, _) => {
+        loadGTIRB(q.inputFile, mainAddress, Some(q.mainProcedureName))
+      }
+      case (FrontendMode.Basil, _) => ir.parsing.ParseBasilIL.loadILFile(q.inputFile)
+      case (FrontendMode.Bap, None) => throw Exception("relf is required when using BAP input")
+      case (FrontendMode.Bap, Some(mainAddress)) => {
+        val bapProgram = loadBAP(q.inputFile)
+        BAPToIR(bapProgram, mainAddress).translate
+      }
+    }
+
+    val ctx = makeContext(program)
+    ir.transforms.PCTracking.applyPCTracking(q.pcTracking, ctx.program)
+    ctx
   }
 
   def loadBAP(fileName: String): BAPProgram = {
@@ -149,7 +183,7 @@ object IRLoading {
     BAPLoader.visitProject(parser.project())
   }
 
-  def loadGTIRB(fileName: String, mainAddress: BigInt): Program = {
+  def loadGTIRB(fileName: String, mainAddress: Option[BigInt], mainName: Option[String] = None): Program = {
     val fIn = FileInputStream(fileName)
     val ir = IR.parseFrom(fIn)
     val mods = ir.modules
@@ -161,7 +195,7 @@ object IRLoading {
 
     val parserMap: Map[String, List[InsnSemantics]] = semantics.flatten.toMap
 
-    val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress)
+    val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress, mainName)
     GTIRBConverter.createIR()
   }
 
@@ -861,6 +895,9 @@ object RunUtils {
     if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
+      if (conf.assertCalleeSaved) {
+        transforms.CalleePreservedParam.transform(ctx.program)
+      }
     } else {
       ir.transforms.clearParams(ctx.program)
     }
@@ -889,8 +926,13 @@ object RunUtils {
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
       DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
 
+      if (conf.assertCalleeSaved) {
+        transforms.CalleePreservedParam.transform(ctx.program)
+      }
+
       doSimplify(ctx, conf.staticAnalysis)
     }
+
     if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
       val dir = File("./graphs/")
       if (!dir.exists()) then dir.mkdirs()
@@ -959,7 +1001,8 @@ object RunUtils {
 
     q.loading.dumpIL.foreach(s => {
       writeToFile(pp_prog(ctx.program), s"$s-output.il")
-      writeToFile(ctx.program.toScala, s"$s-output.scala")
+      val a = ctx.program.toScalaLines
+      writeToFile(a.mkString, s"$s-output.scala")
     })
     Logger.info("[!] Translating to Boogie")
 

@@ -7,6 +7,7 @@ import analysis.{MergedRegion, Loop}
 import util.intrusive_list.*
 import translating.serialiseIL
 import eval.BitVectorEval
+import translating.PrettyPrinter.*
 
 /** Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are not
   * guaranteed to be in any defined order.
@@ -61,11 +62,28 @@ private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extend
 class Program(
   var procedures: ArrayBuffer[Procedure],
   var mainProcedure: Procedure,
-  val initialMemory: mutable.TreeMap[BigInt, MemorySection]
-) extends Iterable[CFGPosition] {
+  val initialMemory: mutable.TreeMap[BigInt, MemorySection],
+  val declarations: mutable.ArrayBuffer[Decl] = mutable.ArrayBuffer()
+) extends Iterable[CFGPosition]
+    with DeepEquality {
 
   val threads: ArrayBuffer[ProgramThread] = ArrayBuffer()
   val usedMemory: mutable.Map[BigInt, MemorySection] = mutable.TreeMap()
+
+  override def deepEquals(o: Object): Boolean = o match {
+    case p: Program => deepEqualsProg(p)
+    case _ => false
+  }
+  private def deepEqualsProg(p: Program): Boolean = {
+    def toMap(p: Program) = {
+      p.procedures.view.map(p => p.name -> p).toMap
+    }
+    val t = toMap(this)
+    val o = toMap(p)
+    (mainProcedure.name == p.mainProcedure.name) && (t.keys == o.keys) && t.keys.forall { case k =>
+      t(k).deepEquals(o(k))
+    }
+  }
 
   def removeProcedure(i: Int): Unit = {
     val p = procedures(i)
@@ -259,7 +277,8 @@ class Procedure private (
   var ensures: List[BExpr],
   var requiresExpr: List[Expr],
   var ensuresExpr: List[Expr]
-) extends Iterable[CFGPosition] {
+) extends Iterable[CFGPosition]
+    with DeepEquality {
 
   def name = procName + address.map("_" + _).getOrElse("")
 
@@ -297,6 +316,18 @@ class Procedure private (
       List(),
       List()
     )
+  }
+
+  override def deepEquals(o: Object): Boolean = o match {
+    case p: Procedure => deepEqualsProc(p)
+    case _ => false
+  }
+  private def deepEqualsProc(p: Procedure) = {
+    name == p.name && (p.blocks.size == blocks.size) && {
+      p.blocksBookended.zip(blocksBookended).forall { case ((l: Block), (r: Block)) =>
+        l.deepEqualsDbg(r)
+      }
+    }
   }
 
   def normaliseBlockNames() = {
@@ -344,6 +375,8 @@ class Procedure private (
     * entry block and return block are elements of _blocks.
     */
   def blocks: Iterator[Block] = _blocks.iterator
+  def blocksBookended: Iterable[Block] =
+    entryBlock.toSeq ++ _blocks.filterNot(entryBlock.contains).filterNot(returnBlock.contains) ++ returnBlock.toSeq
 
   def addCaller(c: DirectCall): Unit = {
     _callers.add(c)
@@ -357,7 +390,6 @@ class Procedure private (
 
   def returnBlock_=(value: Block): Unit = {
     if (!returnBlock.contains(value)) {
-      _returnBlock.foreach(removeBlocks)
       _returnBlock = Some(addBlock(value))
     }
   }
@@ -489,8 +521,9 @@ class Procedure private (
     reachable.toSet
   }
 
-  /** SSA Form
-    */
+  /** 
+   *  SSA Form
+   */
 
   var ssaCount = 0
   def getFreshSSAVar(name: String, ty: IRType) = {
@@ -506,7 +539,8 @@ class Block private (
   val statements: IntrusiveList[Statement],
   private var _jump: Jump,
   private val _incomingJumps: mutable.HashSet[GoTo]
-) extends HasParent[Procedure] {
+) extends HasParent[Procedure]
+    with DeepEquality {
   var atomicSection: Option[AtomicSection] = None
   _jump.setParent(this)
   statements.foreach(_.setParent(this))
@@ -518,9 +552,23 @@ class Block private (
     label: String,
     address: Option[BigInt] = None,
     statements: IterableOnce[Statement] = Set.empty,
-    jump: Jump = GoTo(Set.empty)
+    jump: Jump = Unreachable()
   ) = {
     this(label, address, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty)
+  }
+
+  def forwardIteratorFrom = {
+    ILForwardIterator(Seq(this), IntraProcIRCursor)
+  }
+
+  override def deepEquals(b: Object): Boolean = b match {
+    case b: Block => deepEqualsBlock(b)
+    case o => false
+  }
+  private def deepEqualsBlock(b: Block): Boolean = {
+    (label == b.label) && statements.zip(b.statements).forall { case (l, r) =>
+      l.deepEqualsDbg(r)
+    }
   }
 
   def isReturn: Boolean = parent.returnBlock.contains(this)
@@ -547,7 +595,7 @@ class Block private (
     if (j.hasParent) {
       val parent = j.parent
       j.deParent()
-      parent.jump = GoTo(Set.empty)
+      parent.jump = Unreachable()
     }
     jump = j
     this
@@ -575,7 +623,7 @@ class Block private (
 
   override def toString: String = {
     val statementsString = statements.map(_.toString).mkString("\n")
-    s"Block $label with $statementsString\n$jump"
+    s"block $label"
   }
 
   /** @return
@@ -640,6 +688,16 @@ class Block private (
     val ojump = jump
     replaceJump(GoTo(nb))
     nb.replaceJump(ojump)
+  }
+
+  def splitAfterStatement(s: Statement, suffix: String): Block = {
+    val rest = statements.splitOn(s)
+    val thisJump = jump
+    val succ = Block(label + suffix, None, rest, Unreachable())
+    parent.addBlock(succ)
+    replaceJump(GoTo(succ))
+    succ.replaceJump(thisJump)
+    succ
   }
 
   def createBlockBetween(b2: Block, label: String = "_goto_"): Block = {

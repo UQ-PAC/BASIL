@@ -103,7 +103,7 @@ object DSAVarOrdering extends Ordering[LocalVar] {
 def toOffsetMove[T <: Offsets](op: BinOp, arg: BitVecLiteral | T, domain: OffsetDomain[T]): T => T = {
   val value = arg match {
     case bv: BitVecLiteral => domain.init(bv2SignedInt(bv).toInt)
-    case off: T => off
+    case off: Offsets /* must be T because of union type */ => off.asInstanceOf[T]
   }
   op match
     case BVADD => (i: T) => domain.add(i, value)

@@ -393,12 +393,15 @@ object InterpFuns {
           n <- f.setNext(Run(s.successor))
         } yield (st)
       }
-      case assign: LocalAssign => {
-        for {
-          rhs <- Eval.evalLiteral(f)(assign.rhs)
-          st <- f.storeVar(assign.lhs.name, assign.lhs.toBoogie.scope, Scalar(rhs))
-          n <- f.setNext(Run(s.successor))
-        } yield (st)
+      case SimulAssign(assigns, _) => {
+        val a = assigns.map((l, r) =>
+          for {
+            rhs <- Eval.evalLiteral(f)(r)
+            st <- f.storeVar(l.name, l.toBoogie.scope, Scalar(rhs))
+            n <- f.setNext(Run(s.successor))
+          } yield (st)
+        )
+        State.sequence(State.pure(()), a)
       }
       case assign: MemoryLoad => {
         for {

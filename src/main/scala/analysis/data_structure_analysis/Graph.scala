@@ -35,7 +35,7 @@ class Graph(using Counter)(
   globalOffsets: Map[BigInt, BigInt],
   externalFunctions: Set[ExternalFunction],
   val reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
-  val writesTo: Map[Procedure, Set[Register]],
+  val writesTo: Map[Procedure, Set[GlobalVar]],
   val params: Map[Procedure, Set[Variable]]
 ) {
 

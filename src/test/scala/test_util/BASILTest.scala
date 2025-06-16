@@ -59,7 +59,8 @@ trait BASILTest {
       None
     }
     val config = BASILConfig(
-      loading = ILLoadingConfig(inputFile = inputPath, relfFile = RELFPath, specFile = specFile, parameterForm = false),
+      loading =
+        ILLoadingConfig(inputFile = inputPath, relfFile = Some(RELFPath), specFile = specFile, parameterForm = false),
       simplify = simplify,
       summariseProcedures = summariseProcedures,
       staticAnalysis = staticAnalysisConf,
@@ -111,14 +112,9 @@ trait BASILTest {
 }
 
 object BASILTest {
-  lazy val rootDirectory: String = {
-    val millRoot = System.getenv("MILL_WORKSPACE_ROOT")
-    if (millRoot == null) {
-      System.getProperty("user.dir")
-    } else {
-      millRoot
-    }
-  }
+  lazy val rootDirectory: String =
+    Option(System.getenv("MILL_WORKSPACE_ROOT"))
+      .getOrElse(System.getProperty("user.dir"))
 
   def writeToFile(text: String, path: String): Unit = {
     val writer = BufferedWriter(FileWriter(path, false))

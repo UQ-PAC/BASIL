@@ -15,6 +15,10 @@ case object IntType extends IRType("int") {
   override def toBoogie: BType = IntBType
 }
 
+case class CustomSort(sortName: String) extends IRType(sortName) {
+  override def toBoogie: BType = CustomBType(name)
+}
+
 case class BitVecType(size: Int) extends IRType("bv" + size) {
   override def toBoogie: BType = BitVecBType(size)
   def maxValue = BigInt(2).pow(size) - 1
@@ -41,5 +45,6 @@ def coerceToBool(e: Expr): Expr = {
     case IntType => BinaryExpr(NEQ, e, IntLiteral(0))
     case BoolType => e
     case MapType(_, _) => ???
+    case _ => ???
   }
 }

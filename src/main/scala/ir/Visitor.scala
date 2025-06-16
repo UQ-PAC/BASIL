@@ -16,6 +16,13 @@ abstract class Visitor {
     node
   }
 
+  def visitSimulAssign(node: SimulAssign): Statement = {
+    node.assignments = node.assignments.map { case (l, r) =>
+      (visitVariable(l), visitExpr(r))
+    }
+    node
+  }
+
   def visitLocalAssign(node: LocalAssign): Statement = {
     node.lhs = visitVariable(node.lhs)
     node.rhs = visitExpr(node.rhs)
@@ -124,7 +131,7 @@ abstract class Visitor {
 
   def visitVariable(node: Variable): Variable = node.acceptVisit(this)
 
-  def visitRegister(node: Register): Register = node
+  def visitGlobalVar(node: GlobalVar): GlobalVar = node
 
   def visitLocalVar(node: LocalVar): LocalVar = node
 
@@ -423,7 +430,7 @@ class ExternalRemover(external: Set[String]) extends Visitor {
 class VariablesWithoutStoresLoads extends ReadOnlyVisitor {
   val variables: mutable.Set[Variable] = mutable.Set()
 
-  override def visitRegister(node: Register): Register = {
+  override def visitGlobalVar(node: GlobalVar): GlobalVar = {
     variables.add(node)
     node
   }
