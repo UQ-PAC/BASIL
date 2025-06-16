@@ -1,6 +1,5 @@
 // package scala
 
-import analysis.data_structure_analysis.DSAPhase
 import bap.*
 import boogie.*
 import translating.*
