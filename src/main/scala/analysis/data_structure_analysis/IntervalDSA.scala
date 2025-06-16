@@ -1,6 +1,6 @@
 package analysis.data_structure_analysis
 
-import analysis.data_structure_analysis.DSAPhase.{BU, Local, TD}
+import util.DSAPhase.*
 import analysis.data_structure_analysis.OSet.Top
 import analysis.data_structure_analysis.Global
 import analysis.data_structure_analysis.IntervalDSA.checkUniqueGlobals
@@ -1401,10 +1401,6 @@ object IntervalDSA {
       case _ => // ignore
     }
   }
-}
-
-enum DSAPhase {
-  case Pre, Local, BU, TD
 }
 
 class DSFlag {

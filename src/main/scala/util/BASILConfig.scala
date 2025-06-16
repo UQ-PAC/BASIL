@@ -37,6 +37,10 @@ case class StaticAnalysisConfig(
   irreducibleLoops: Boolean = true
 )
 
+enum DSAPhase {
+  case Pre, Local, BU, TD
+}
+
 case class DSConfig(
   phase: DSAPhase = DSAPhase.TD,
   splitGlobals: Boolean = false,
@@ -61,6 +65,7 @@ case class BASILConfig(
   validateSimp: Boolean = false,
   dsaConfig: Option[DSConfig] = None,
   memoryTransform: Boolean = false,
+  assertCalleeSaved: Boolean = false,
   summariseProcedures: Boolean = false,
   generateRelyGuarantees: Boolean = false,
   staticAnalysis: Option[StaticAnalysisConfig] = None,
