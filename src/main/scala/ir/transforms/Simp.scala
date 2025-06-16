@@ -715,6 +715,7 @@ def copypropTransform(
 
   visit_proc(CleanupAssignments(), p)
   t.checkPoint("redundant assignments")
+  t.checkPoint("cleanup extract extend zerobits ")
   // SimplifyLogger.info(s"    ${p.name} after dead var cleanup expr complexity ${ExprComplexity()(p)}")
 
   AlgebraicSimplifications(p)
@@ -1068,6 +1069,7 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
 
   // cleanup
   visit_prog(CleanupAssignments(), p)
+  ExtractExtendZeroBits.doTransform(p)
 
   SimplifyLogger.info("[!] Simplify :: Merge empty blocks")
   cleanupBlocks(p)
