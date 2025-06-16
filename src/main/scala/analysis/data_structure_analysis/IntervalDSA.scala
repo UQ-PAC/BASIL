@@ -1,6 +1,6 @@
 package analysis.data_structure_analysis
 
-import analysis.data_structure_analysis.DSAPhase.{BU, Local, TD}
+import util.DSAPhase.*
 import analysis.data_structure_analysis.OSet.Top
 import analysis.data_structure_analysis.Global
 import analysis.data_structure_analysis.IntervalDSA.checkUniqueGlobals
@@ -12,7 +12,7 @@ import ir.*
 import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
 import specification.{ExternalFunction, SymbolTableEntry}
 import util.LogLevel.{DEBUG, INFO}
-import util.{DSAContext, DSALogger, DSConfig, IRContext, PerformanceTimer}
+import util.{DSAContext, DSALogger, DSAPhase, DSConfig, IRContext, PerformanceTimer}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{SortedSet, mutable}
@@ -1402,10 +1402,6 @@ object IntervalDSA {
       case _ => // ignore
     }
   }
-}
-
-enum DSAPhase {
-  case Pre, Local, BU, TD
 }
 
 class DSFlag {
