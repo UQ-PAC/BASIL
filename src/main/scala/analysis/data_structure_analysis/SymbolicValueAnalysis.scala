@@ -102,19 +102,10 @@ object DSAVarOrdering extends Ordering[LocalVar] {
   }
 }
 
-def toOffsetMove[T <: Offsets](
-  op: BinOp,
-  arg: BitVecLiteral | T,
-  domain: OffsetDomain[T],
-  transform: T => T
-): T => T = {
-  val value = arg match {
-    case bv: BitVecLiteral => domain.init(bv2SignedInt(bv).toInt)
-    case off => off.asInstanceOf[T] /* dynamic type proof fails */
-  }
+def toOffsetMove[T <: Offsets](op: BinOp, arg: T, domain: OffsetDomain[T], transform: T => T): T => T = {
   op match
-    case BVADD => (i: T) => domain.add(transform(i), value)
-    case BVSUB => (i: T) => domain.add(transform(i), value, neg = true)
+    case BVADD => (i: T) => domain.add(transform(i), arg)
+    case BVSUB => (i: T) => domain.add(transform(i), arg, neg = true)
     case _ => throw Exception(s"Usupported Binary Op $op")
 }
 
@@ -340,11 +331,11 @@ object SymValues {
           assert(binExp.op == BVADD)
           exprToSymValSet(symValues, isGlobal, globals)(BinaryExpr(binExp.op, arg2, arg1))
         } else {
-          val oPlus = toOffsetMove(binExp.op, arg2, oDomain, transform)
+          val oPlus = toOffsetMove(binExp.op, oDomain.init(bv2SignedInt(arg2).toInt), oDomain, transform)
           exprToSymValSet(symValues, isGlobal, globals)(arg1, oPlus)
         }
       case binExp @ BinaryExpr(BVADD, arg1: BitVecLiteral, arg2: Expr) if !isGlobal(arg1.value.toInt) =>
-        val oPlus = toOffsetMove(binExp.op, arg1, oDomain, transform)
+        val oPlus = toOffsetMove(binExp.op, oDomain.init(bv2SignedInt(arg1).toInt), oDomain, transform)
         exprToSymValSet(symValues, isGlobal, globals)(arg2, oPlus)
       case binExp @ BinaryExpr(BVADD | BVSUB, arg1, arg2: Expr)
           if arg2.variables.size == 1 && symValues.state
