@@ -135,7 +135,8 @@ extension (p: SpecGlobal) {
 def funcEntryFromAttrib(a: Attrib) =
   val FuncEntryMap = Attrib.MapOf("name", "address", "size")
   a match {
-    case FuncEntryMap(List(Attrib.Str(name), Attrib.Int(address), Attrib.Int(size))) => Some(FuncEntry(name, size.toInt, address))
+    case FuncEntryMap(List(Attrib.Str(name), Attrib.Int(address), Attrib.Int(size))) =>
+      Some(FuncEntry(name, size.toInt, address))
     case _ => None
   }
 
@@ -218,14 +219,11 @@ case class SymbolTableInfo(
         .toSet
       globalsList <- l.get("globals").flatMap(_.List)
       globals = globalsList
-        .flatMap(g =>
-          specGlobalFromAttrib(g).tap(logIfNone(s"Malformed specglobal: ${g.pprint}"))        )
+        .flatMap(g => specGlobalFromAttrib(g).tap(logIfNone(s"Malformed specglobal: ${g.pprint}")))
         .toSet
       funcEntriesList <- l.get("funcEntries").flatMap(_.List)
       funcEntries = funcEntriesList
-        .flatMap(g =>
-          funcEntryFromAttrib(g).tap(logIfNone(s"Malformed FuncEntry: ${g.pprint}"))
-          )
+        .flatMap(g => funcEntryFromAttrib(g).tap(logIfNone(s"Malformed FuncEntry: ${g.pprint}")))
         .toSet
       globalOffsetsList <- l.get("globalOffsets").flatMap(_.List)
       globalOffsets = globalOffsetsList
