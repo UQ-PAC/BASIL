@@ -40,19 +40,16 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      - name: Compile BASIL Mill
+        run: ./mill compile
+
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
           packages: latexmk texlive-latex-recommended texlive-latex-extra texlive-lang-japanese
           version: 2
 
-      - name: Compile BASIL Mill
-        run: ./mill compile
-
       - name: Compile docs
         run: ./mill allDocs
-
-      - if: ${{ failure() }}
-        uses: mxschmitt/action-tmate@v3
 
   # INFO: Scalatest runner arguments (i.e., arguments to scalatest.sh) can be
   # found at: https://www.scalatest.org/user_guide/using_the_runner
