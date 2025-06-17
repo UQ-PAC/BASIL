@@ -331,6 +331,21 @@ class StackSubstituter extends IntraproceduralControlFlowVisitor {
     node
   }
 
+  override def visitSimulAssign(node: SimulAssign): Statement = {
+    for ((lhs, rhs) <- node.assignments) {
+      // update stack references
+      val variableVisitor = VariablesWithoutStoresLoads()
+      variableVisitor.visitExpr(rhs)
+
+      if (variableVisitor.variables.exists(isStackPtr)) {
+        stackRefs.add(lhs)
+      } else if (stackRefs.contains(lhs) && lhs.name != stackPointer.name) {
+        stackRefs.remove(lhs)
+      }
+    }
+    node
+  }
+
   override def visitLocalAssign(node: LocalAssign): Statement = {
     // update stack references
     val variableVisitor = VariablesWithoutStoresLoads()

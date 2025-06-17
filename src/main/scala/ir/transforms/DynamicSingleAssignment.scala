@@ -334,6 +334,8 @@ class OnePassDSA(
       }
     }
 
+    reversePostOrder(p)
+
   }
 
 }
