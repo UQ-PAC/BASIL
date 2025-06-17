@@ -38,8 +38,8 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
 
   def mainClass = Some("Main")
 
-  def millSourcePath = super.millSourcePath / "src"
   def ivyDeps = Agg(scalactic, sourceCode, mainArgs, upickle)
+  def millSourcePath = super.millSourcePath / "src"
   def sources = Task.Sources {
     Seq(PathRef(this.millSourcePath / "main" / "scala"))
   }
@@ -172,12 +172,16 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     }
   }
 
+  override def artifactTypes = Task {
+    super.artifactTypes() ++ Set(coursier.core.Type.source, coursier.Type("source"))
+  }
+
   def gtagslist = Task {
     val src = Task.traverse(Seq(this, test) ++ moduleDeps)(_.allSources)().flatten
     val srcArgs = src.map(_.path).filter(os.exists(_))
 
     val allfiles = srcArgs.flatMap {
-      case p if os.isDir(p) => os.walk(p).filter(x => x.last.endsWith(".scala") || x.last.endsWith(".java")).map(_)
+      case p if os.isDir(p) => os.walk(p).filter(x => x.last.endsWith(".scala") || x.last.endsWith(".java"))
       case p => Seq(p)
     }.map(_.toString)
 
@@ -197,5 +201,46 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
 
     os.call(Seq("ctags", "--languages=scala,java", "--tag-relative=never", "-R", "-f", newFile.toString) ++ srcArgs, cwd = Task.workspace)
     os.move(newFile, tagsFile, replaceExisting = true, atomicMove = true)
+  }
+
+  object bigdocs extends ScalaModule {
+
+    val upicklesrc = ivy"com.lihaoyi::upickle:4.2.1;classifier=sources"
+
+    override def scalaVersion = build.scalaVersion
+
+    def f(x: String) = {
+      val parts = x.split("/").init.toList
+
+      parts.init.init.mkString(".") + ":" + parts.init.last + ":" + parts.last
+    }
+
+
+    override def artifactTypes = Task {
+      super.artifactTypes() ++ Set(coursier.core.Type.doc)
+    }
+
+    def boopdeps = Task {
+      build.resolvedIvyDeps().map(_.toString.split("/maven2/")(1)).map(f)
+    }
+
+    override def ivyDeps = Task {
+      println(boopdeps())
+      boopdeps().flatMap(x => Seq(ivy"$x", ivy"${x};classifier=javadoc"))
+    }
+
+    def go = Task {
+      println(resolvedIvyDeps())
+      println(compileClasspath())
+    }
+
+    override def generatedSources = build.generatedSources
+    override def moduleDeps = build.moduleDeps
+
+    override def sources = Task {
+      build.sources() ++ Seq(PathRef(Task.workspace / "big"))
+    }
+
+
   }
 }

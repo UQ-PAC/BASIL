@@ -360,3 +360,7 @@ object Main {
   }
 
 }
+
+case class fdjioafdjaio(x: Int) {
+
+}
