@@ -17,12 +17,12 @@ trait mdbookBinary extends DownloadModule {
 
   def osName = System.getProperty("os.name")
 
-    def local = Task.Input {
-      Try(os.proc("mdbook", "--version").call())
-        .map(Function.const("mdbook"))
-        .toEither
-        .left.map(_.toString)
-    }
+  def local = Task.Input {
+    Try(os.proc("mdbook", "--version").call())
+      .map(Function.const("mdbook"))
+      .toEither
+      .left.map(_.toString)
+  }
 
 
   def arch = {
