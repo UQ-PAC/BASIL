@@ -198,7 +198,7 @@ Below is a rough outline of the transform passes enabled with using `--simplify`
 
 #### Simplification Pass
 
-1. Dynamic single assignment (`OnePassDSA`) form roughly comparable to [@braunSimpleEfficientConstruction2013a]. Establishes the invariant that $\forall v, use(v) \in proc\; \bullet (\forall def(v) \in proc \bullet reaching(use(v), def(v)))$. Blocks are given the labels, filled: they have been given a local variable numbering, completed: they are filled and all their predecessors have been filled. Each block is visited once in reverse-post-order. An intraprocedural live-vars analysis is used to reduce the amount of copies added to outgoing edges. At each block:
+1. Dynamic single assignment (`OnePassDSA`) form roughly comparable to [@braunSimpleEfficientConstruction2013a]. Establishes the invariant that \\(\forall v, use(v) \in proc\; \bullet (\forall def(v) \in proc \bullet reaching(use(v), def(v)))\\). Blocks are given the labels, filled: they have been given a local variable numbering, completed: they are filled and all their predecessors have been filled. Each block is visited once in reverse-post-order. An intraprocedural live-vars analysis is used to reduce the amount of copies added to outgoing edges. At each block:
     1.  All predecessors will be filled, compute their join by adding "back phi" blocks on the incoming edges which contain copies to make the renaming from each predecessor block coincide to a common renaming at the beginning of this block.
     2. Fill the current block and apply renaming starting from the join of the predecssors. Mark all predecessors complete that have been completed by filling this block.
     3. For all successors if they have already been filled add an intermediate block copying our outgoing renaming to the expected renaming of the successor by adding "forward phi" blocks.
@@ -225,7 +225,7 @@ Below is a rough outline of the transform passes enabled with using `--simplify`
 12. Inline procedure return values which are either constant or only depend on the in-parameters by adding assignments after each call to the procedure. 
 13. Remove procedure in-parameters which are unused in the procedure (i.e. they were directly returned)
 
-For (12) and (13) we can take the whole simplification pass to a fixed point to inline $n$ calls deep (requires 12 iterations for cntlm). This proves R31 invariant across most procedures.
+For (12) and (13) we can take the whole simplification pass to a fixed point to inline `n` calls deep (requires 12 iterations for cntlm). This proves R31 invariant across most procedures.
 
 ##### Invariant Checkers
 

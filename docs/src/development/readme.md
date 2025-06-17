@@ -1,10 +1,11 @@
 # BASIL Development
 
-- [project-layout](project-layout.md) Organisation of the source code
-- [editor-setup](editor-setup.md) Guide to basil development in IDEs 
-- [scala](scala.md) Advice on Scala programming.
-- [cfg](cfg.md) Explanation of the old CFG datastructure 
-- [interpreter](interpreter.md) Explanation of IR interpreter
+- [API Documentation](https://uq-pac.github.io/BASIL/api/)
+- [Project Layout](project-layout.md) Organisation of the source code
+- [Editor Setup](editor-setup.md) Guide to basil development in IDEs 
+- [Scala](scala.md) Advice on Scala programming.
+- [CFG](cfg.md) Explanation of the old CFG datastructure 
+- [Interpreter](interpreter.md) Explanation of IR interpreter
 - [simplification-solvers](simplification-solvers.md) Explanation of simplification solvers
 
 
