@@ -5,7 +5,6 @@ import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
 import boogie.*
 import analysis.{MergedRegion, Loop}
 import util.intrusive_list.*
-import translating.serialiseIL
 import eval.BitVectorEval
 import translating.PrettyPrinter.*
 
@@ -136,7 +135,7 @@ class Program(
   }
 
   override def toString(): String = {
-    serialiseIL(this)
+    translating.PrettyPrinter.pp_prog(this)
   }
 
   def setModifies(specModifies: Map[String, List[String]]): Unit = {
@@ -317,6 +316,10 @@ class Procedure private (
       List()
     )
   }
+
+  // None is scc only containing this procedure
+  // Some(Set(this)) is a scc only containing this procedure which has call edge to itself (self recursion)
+  var scc: Option[Set[Procedure]] = None
 
   override def deepEquals(o: Object): Boolean = o match {
     case p: Procedure => deepEqualsProc(p)

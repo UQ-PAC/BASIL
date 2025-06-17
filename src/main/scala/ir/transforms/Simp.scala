@@ -1,5 +1,4 @@
 package ir.transforms
-import translating.serialiseIL
 import translating.PrettyPrinter.*
 import java.io.{BufferedWriter, File, FileInputStream, FileWriter, IOException, PrintWriter}
 import util.LogLevel

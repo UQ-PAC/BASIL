@@ -206,6 +206,13 @@ object `package` extends RootModule with ScalaModule {
     )
   }
 
+
+  def extraDocs = Task {
+    Map(
+      "docs/basil-il" -> bnfc.bnfcHtml(),
+    )
+  }
+
   def scalaDocExternalMappingOptions = Task {
     val defaultExternals = Seq(
       ".*scala/.*::scaladoc3::https://scala-lang.org/api/3.3_LTS/",
@@ -225,14 +232,16 @@ object `package` extends RootModule with ScalaModule {
   def allDocs = Task {
     val dest = Task.dest
 
-    def copyDoc(x: PathRef, name: String) = {
-      val p = x.path / ".." / "javadoc"
-      println("copying docs from " + p)
+    def copyDoc(p: Path, name: String) = {
+      println(s"copying docs into $name from $p")
       os.copy(p, dest / os.RelPath(name), createFolders = true)
     }
 
     docsModules().foreach {
-      case (name, src) => copyDoc(src, name)
+      case (name, src) => copyDoc(src.path / ".." / "javadoc", name)
+    }
+    extraDocs().foreach {
+      case (name, src) => copyDoc(src.path, name)
     }
     os.copy.into(docsIndex().path, dest / "api")
 

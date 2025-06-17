@@ -1,12 +1,10 @@
-name: Docs
+name: Doc
 on:
-  push:
-    branches: [main]
-
   workflow_dispatch:
+  workflow_call:
 
 concurrency:
-  group: "pages"
+  group: "pages-${{ github.ref }}"
   cancel-in-progress: false
 
 permissions:
@@ -23,12 +21,14 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
-      - run: './mill allDocs'
+      - run: sudo apt-get -y install latexmk texlive-latex-recommended texlive-lang-japanese texlive-latex-extra texlive-extra-utils poppler-utils
+      - run: ./mill --no-server allDocs
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out/allDocs.dest
 
   deploy-docs:
+    if: github.ref_name == 'main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

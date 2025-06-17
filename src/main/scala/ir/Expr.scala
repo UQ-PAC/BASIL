@@ -13,7 +13,6 @@ sealed trait Expr extends DefaultDeepEquality {
 
   /** all variables that occur in the expression */
   def variables: Set[Variable] = Set()
-  def acceptVisit(visitor: Visitor): Expr = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 
   lazy val variablesCached = variables
 }
@@ -25,9 +24,7 @@ def size(e: Expr) = {
   }
 }
 
-sealed trait Literal extends Expr {
-  override def acceptVisit(visitor: Visitor): Literal = visitor.visitLiteral(this)
-}
+sealed trait Literal extends Expr {}
 
 sealed trait BoolLit extends Literal {
   def value: Boolean
@@ -77,7 +74,6 @@ case class Extract(end: Int, start: Int, body: Expr) extends Expr with CachedHas
   override def variables: Set[Variable] = body.variables
   override def getType: BitVecType = BitVecType(end - start)
   override def toString: String = s"$body[$end:$start]"
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitExtract(this)
 }
 
 /** Gives repeats copies of body, concatenated.
@@ -94,7 +90,6 @@ case class Repeat(repeats: Int, body: Expr) extends Expr with CachedHashCode {
     case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of repeat: " + this)
   }
   override def toString: String = s"Repeat($repeats, $body)"
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitRepeat(this)
 }
 
 /** Zero-extends by extension extra bits. */
@@ -108,7 +103,6 @@ case class ZeroExtend(extension: Int, body: Expr) extends Expr with CachedHashCo
     case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of zero extend: " + this)
   }
   override def toString: String = s"ZeroExtend($extension, $body)"
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitZeroExtend(this)
 }
 
 /** Sign-extends by extension extra bits. */
@@ -122,7 +116,6 @@ case class SignExtend(extension: Int, body: Expr) extends Expr with CachedHashCo
     case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of sign extend: " + this)
   }
   override def toString: String = s"SignExtend($extension, $body)"
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitSignExtend(this)
 }
 
 case class UnaryExpr(op: UnOp, arg: Expr) extends Expr with CachedHashCode {
@@ -149,7 +142,6 @@ case class UnaryExpr(op: UnOp, arg: Expr) extends Expr with CachedHashCode {
     case uOp: IntUnOp => s"($uOp$arg)"
   }
 
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitUnaryExpr(this)
 }
 
 sealed trait UnOp
@@ -247,8 +239,6 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr with Cache
     case bOp: BVBinOp => s"bv$bOp$inSize($arg1, $arg2)"
     case bOp: IntBinOp => s"($arg1 $bOp $arg2)"
   }
-
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitBinaryExpr(this)
 
 }
 
@@ -350,7 +340,6 @@ case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IR
   override def getType: IRType = returnType
   override def toBoogie: BFunctionCall =
     BFunctionCall(name, params.map(_.toBoogie).toList, returnType.toBoogie, uninterpreted)
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitUninterpretedFunction(this)
   override def variables: Set[Variable] = params.flatMap(_.variables).toSet // suspect
   override def toString = s"$name(${params.mkString(", ")})"
 }
@@ -374,8 +363,6 @@ sealed trait Variable extends Expr {
 
   override def toString: String = s"Variable($name, $irType)"
 
-  override def acceptVisit(visitor: Visitor): Variable =
-    throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
 object Variable {
@@ -397,7 +384,6 @@ case class GlobalVar(override val name: String, override val irType: IRType)
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Global)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Global)
   override def toString: String = s"GlobalVar (${name}, $irType)"
-  override def acceptVisit(visitor: Visitor): Variable = visitor.visitGlobalVar(this)
 }
 
 /** Variable with scope local to the procedure, typically a temporary variable created in the lifting process. */
@@ -408,7 +394,6 @@ case class LocalVar(varName: String, override val irType: IRType, val index: Int
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
   override def toString: String = s"LocalVar(${varName}, $index, $irType)"
-  override def acceptVisit(visitor: Visitor): Variable = visitor.visitLocalVar(this)
 }
 
 object LocalVar {
@@ -441,22 +426,15 @@ sealed trait Memory extends Expr with Global {
   def toGamma: BMapVar = BMapVar(s"Gamma_$name", MapBType(BitVecBType(addressSize), BoolBType), Scope.Global)
   val getType: IRType = MapType(BitVecType(addressSize), BitVecType(valueSize))
   override def toString: String = s"Memory($name, $addressSize, $valueSize)"
-
-  override def acceptVisit(visitor: Visitor): Memory =
-    throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
 /** A stack area of memory, which is local to a thread. */
 case class StackMemory(override val name: String, override val addressSize: Int, override val valueSize: Int)
-    extends Memory {
-  override def acceptVisit(visitor: Visitor): Memory = visitor.visitStackMemory(this)
-}
+    extends Memory {}
 
 /** A non-stack region of memory, which may be shared between threads. */
 case class SharedMemory(override val name: String, override val addressSize: Int, override val valueSize: Int)
-    extends Memory {
-  override def acceptVisit(visitor: Visitor): Memory = visitor.visitSharedMemory(this)
-}
+    extends Memory {}
 
 enum QuantifierSort:
   case exists
@@ -484,7 +462,6 @@ case class QuantifierExpr(kind: QuantifierSort, body: LambdaExpr, triggers: List
 }
 
 case class OldExpr(body: Expr) extends Expr {
-  override def acceptVisit(visitor: Visitor): Expr = body.acceptVisit(visitor)
   override def toString = s"old($body)"
   def getType = body.getType
   def toBoogie = Old(body.toBoogie)

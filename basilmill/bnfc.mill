@@ -77,6 +77,34 @@ trait BNFCModule extends JavaModule {
     PathRef(Task.dest)
   }
 
+  def bnfcLatex = Task {
+    val args = Seq("--latex", bnfcSource().path.toString, "-m", "-o", Task.dest.toString)
+    os.call(bnfcBinary.path() +: args)
+    PathRef(Task.dest / (bnfcSource().path.baseName + ".tex"))
+  }
+
+  def bnfcHtml = Task {
+    // some hacky fixes
+    val lines = os.read.lines(bnfcLatex().path).flatMap {
+      case l @ s"\\documentclass$_" => Seq(l, "\\usepackage[latexmk]{lwarp}")
+      case l @ s"\\usepackage${_}{inputenc}" => Seq(l.replace("[utf8x]", "[utf8]"))
+      case l => Seq(l.replace("{$-$}", "{-}").replace("{$>$}", "{>}").replace(raw"{\texttt {#1}}", raw"``{\texttt {#1}}''"))
+    }
+
+    val tex = Task.dest / bnfcLatex().path.last
+    os.write(tex, lines.mkString("\n"))
+
+    // https://ctan.org/pkg/lwarp?lang=en
+    // https://mirror.aarnet.edu.au/pub/CTAN/macros/latex/contrib/lwarp/lwarp.pdf
+    os.call(Seq("latexmk", "-pdf", tex.toString))
+    os.call(Seq("lwarpmk", "print"), stdout = os.Inherit)
+    os.call(Seq("lwarpmk", "html"), stdout = os.Inherit)
+    os.call(Seq("lwarpmk", "limages"))
+    os.call(Seq("lwarpmk", "clean"))
+
+    PathRef(Task.dest)
+  }
+
   private def readMakefileVar(file: Path, key: String) = {
     val value = os.read.lines(file).collect {
       case l if l.startsWith(s"$key=") => l.stripPrefix(s"$key=")
