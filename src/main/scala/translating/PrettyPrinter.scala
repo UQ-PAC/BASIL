@@ -239,14 +239,14 @@ class BasilIRPrettyPrinter(
     val prog = vprog(i.program)
     import PrettyPrinter.*
     import ir.parsing.Attrib
-    import ir.parsing.MemoryStatic
+    import ir.parsing.MemoryAttribData
 
     val r = parsing.SymbolTableInfo.from(i)
     val jsonedCtx = indent(r.toAttrib.pprint, "  ")
 
     val memory = i.program.initialMemory
       .map { case (k, v) =>
-        MemoryStatic.of(v)
+        MemoryAttribData.of(v)
       }
       .toVector
       .sortBy(_.address)

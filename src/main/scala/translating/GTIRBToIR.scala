@@ -304,7 +304,7 @@ class GTIRBToIR(
   }
 
   private def byteStringToString(byteString: ByteString): String = {
-    Base64.getUrlEncoder.encodeToString(byteString.toByteArray)
+    Base64.getEncoder.encodeToString(byteString.toByteArray)
   }
 
   private def createProcedure(functionUUID: ByteString, symbolUUID: ByteString): Procedure = {

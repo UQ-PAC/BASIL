@@ -248,23 +248,21 @@ object SymbolTableInfo {
   def empty = SymbolTableInfo(Set(), Set(), Set(), Map())
 }
 
-case class MemoryStatic(name: String, address: BigInt, size: Int, readOnly: Boolean, bytes: String) {
-
-  /**
-  *  InitialMemory minus the merged regions graph
-  *
-  *  This stores [[bytes]] as a Base64-encoded gzip-compressed string containing the original bytes.
-  *  The goal of compression is just to redcue the representatino length of large sections of zeros and is more standard than a custom RLE or compression
-  *  algorithm implementation. It conveniently allows all byte strings to be stored the same way.
-  *
-  */
+/**
+ * Memory data loaded from the IL attributes. Basically, InitialMemory minus the merged regions graph
+ *
+ * This stores [[bytes]] as a Base64-encoded gzip-compressed string containing the original bytes.
+ * The goal of compression is just to redcue the representatino length of large sections of zeros and is more standard than a custom RLE or compression
+ * algorithm implementation. It conveniently allows all byte strings to be stored the same way.
+ */
+case class MemoryAttribData(name: String, address: BigInt, size: Int, readOnly: Boolean, bytes: String) {
 
   def toMemorySection: MemorySection = {
     val decoded: Array[Byte] = {
       val dc = Base64.getDecoder()
       val by = dc.decode(bytes)
 
-      if (MemoryStatic.compress) {
+      if (MemoryAttribData.compress) {
         val f = ByteArrayInputStream(by)
         GZIPInputStream(f).readAllBytes()
       } else {
@@ -276,7 +274,7 @@ case class MemoryStatic(name: String, address: BigInt, size: Int, readOnly: Bool
   }
 
   def toAttrib: Attrib = {
-    val byg = Attrib.List(bytes.grouped(MemoryStatic.grouping).map(Attrib.Str(_)).toVector)
+    val byg = Attrib.List(bytes.grouped(MemoryAttribData.groupSize).map(Attrib.Str(_)).toVector)
     Attrib.Map(
       ListMap(
         ("name") -> Attrib.Str(name),
@@ -289,9 +287,9 @@ case class MemoryStatic(name: String, address: BigInt, size: Int, readOnly: Bool
   }
 }
 
-case object MemoryStatic {
+case object MemoryAttribData {
 
-  val grouping = 96
+  val groupSize = 96
   val compress = true
 
   def of(m: MemorySection) = {
@@ -328,7 +326,7 @@ case object MemoryStatic {
     }
     assert(decoded.toList == bytes.toList)
 
-    MemoryStatic(m.name, m.address, m.size, m.readOnly, b64bytes)
+    MemoryAttribData(m.name, m.address, m.size, m.readOnly, b64bytes)
   }
 
   def fromAttrib(a: Attrib) = {
@@ -343,7 +341,7 @@ case object MemoryStatic {
         bl <- b.List
         strs = bl.map(_.Str.get).mkString("")
       } yield (strs)
-    } yield (MemoryStatic(name, address, size.toInt, readOnly, bytes))
+    } yield (MemoryAttribData(name, address, size.toInt, readOnly, bytes))
   }
 
 }

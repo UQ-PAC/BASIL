@@ -411,7 +411,7 @@ case class BasilMainBNFCVisitor[A](
         .get("initial_memory")
         .flatMap(_.List)
         .map(_.map(v =>
-          val static = MemoryStatic
+          val static = MemoryAttribData
             .fromAttrib(v)
             .getOrElse(throw Exception(s"Ill formed memory section ${v.pprint}"))
           static.toMemorySection
