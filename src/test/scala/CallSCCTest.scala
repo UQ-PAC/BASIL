@@ -60,10 +60,15 @@ class CallSCCTest extends AnyFunSuite with test_util.CaptureOutput {
 
     val bcd = Set(b, c, d)
 
-    assert(CallSCCWalker.succSCC(a) == Set(bcd))
-    assert(CallSCCWalker.succSCC(b) == Set(Set(f), Set(g)))
-    assert(CallSCCWalker.succSCC(b) == CallSCCWalker.succSCC(c))
-    assert(CallSCCWalker.succSCC(b) == CallSCCWalker.succSCC(d))
-    assert(CallSCCWalker.succSCC(f) == Set(Set(h)))
+    assert(CallSCCWalker.succ(Set(a)) == Set(bcd))
+    assert(CallSCCWalker.succ(bcd) == Set(Set(f), Set(g)))
+    assert(CallSCCWalker.succ(b) == CallSCCWalker.succ(bcd))
+    assert(CallSCCWalker.succ(c) == CallSCCWalker.succ(bcd))
+    assert(CallSCCWalker.succ(d) == CallSCCWalker.succ(bcd))
+    assert(CallSCCWalker.succ(f) == Set(Set(h)))
+    assert(CallSCCWalker.pred(b) == Set(Set(a)))
+    assert(CallSCCWalker.pred(c) == Set(Set(a)))
+    assert(CallSCCWalker.pred(d) == Set(Set(a)))
+    assert(CallSCCWalker.pred(bcd) == Set(Set(a)))
   }
 }
