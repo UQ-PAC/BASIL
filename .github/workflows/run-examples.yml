@@ -40,6 +40,11 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      - uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: texlive-latex-recommended
+          version: 1.0
+
       - name: Compile BASIL Mill
         run: ./mill compile
 
