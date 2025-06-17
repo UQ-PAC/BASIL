@@ -1,5 +1,4 @@
 package ir.transforms
-import translating.serialiseIL
 import translating.PrettyPrinter.*
 import specification.FuncEntry
 import util.SimplifyLogger
