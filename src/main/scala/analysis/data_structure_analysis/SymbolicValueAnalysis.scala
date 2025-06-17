@@ -392,6 +392,11 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) e
     val proc = b.parent.parent
     val block = b.parent
     b match
+      case SimulAssign(assignments, _) =>
+        val update = assignments.map { case (lhs: LocalVar, rhs) =>
+          lhs -> SymValues.exprToSymValSet(a)(rhs)
+        }.toMap
+        join(a, SymValues(update), block)
       case LocalAssign(lhs: LocalVar, rhs: Expr, _) =>
         val update = SymValues(Map(lhs -> SymValues.exprToSymValSet(a)(rhs)))
         join(a, update, block)

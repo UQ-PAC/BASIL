@@ -297,8 +297,7 @@ class IRTest extends AnyFunSuite with CaptureOutput {
     main.replaceJump(newJump)
 
     assert(newJump.parent == main)
-    assert(block2.jump.isInstanceOf[GoTo])
-    assert(block2.jump.asInstanceOf[GoTo].targets.isEmpty)
+    assert(block2.jump.isInstanceOf[Unreachable])
   }
 
   test("proc iterator") {
