@@ -57,12 +57,12 @@ To get started on development, see [development](development).
 BASIL is a program verification tool that operates on binaries. It implements a specific program logic
 for verifying information flow on concurrent code.
 
-### Program Logic 
+### Concurrent Information Flow Security Logic 
 
 \\(wp_{if}^{\cal R G}\\) is the program logic BASIL implements for information flow verification. It is described in 
 the paper by [Winter, Coughlin, Smith '21 in CSF](https://github.com/UQ-PAC/wpif_CSF21/blob/main/WinterCoughlinSmith_CSF2021.pdf).
 
-This information-flow logic as implemented in the BASIL tool can found described [here](iflogic-encoding.pdf).
+[This information-flow logic as implemented in the BASIL tool is described here](iflogic-encoding.pdf).
 
 Broadly, we consider information leaks under shared memory communication of parallel processes.
 A "leak", is some secret information being stored somewhere it is not allowed to be.

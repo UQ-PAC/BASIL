@@ -8,7 +8,7 @@ command = "mdbook-mermaid"
 smart-punctuation = true
 mathjax-support = true
 copy-fonts = true
-no-section-label = false
+site-url = "/BASIL/"
 git-repository-url = "https://github.com/UQ-PAC/BASIL"
-git-repository-icon = "fa-github"
+edit-url-template = "https://github.com/UQ-PAC/BASIL/edit/main/docs/{path}"
 
