@@ -171,7 +171,11 @@ object `package` extends RootModule with ScalaModule {
     }
   }
 
-  object MdBookBinary extends mdbookBinary {}
+  object mdbook extends mdbookBinary {
+    def mdbookSources = Task.Source {
+      Task.workspace  / "docs" 
+    }
+  }
 
   def gitCommitHash = Task.Input {
     // set in github actions
@@ -247,7 +251,7 @@ object `package` extends RootModule with ScalaModule {
       case (name, src) => copyDoc(src.path, name)
     }
 
-    os.copy(mdbook().path, dest, mergeFolders = true)
+    os.copy(mdbook.build().path, dest, mergeFolders = true)
     os.copy.into(docsIndex().path, dest / "api")
 
     os.walk(dest).foreach {
@@ -296,16 +300,6 @@ object `package` extends RootModule with ScalaModule {
 
     os.call(args ++ srcArgs, cwd = Task.workspace)
     os.move(newFile, tagsFile, replaceExisting = true, atomicMove = true)
-  }
-
-  def mdBookSources = Task.Source(super.millSourcePath / "docs")
-  def mdbook = Task {
-    os.call(Seq(MdBookBinary.path(), "build", "--dest-dir", Task.dest.toString, mdBookSources().path.toString))
-    PathRef(Task.dest)
-  }
-  def mdbookServe = Task {
-    os.call(Seq(MdBookBinary.path(), "serve", "--dest-dir", Task.dest.toString, mdBookSources().path.toString))
-    PathRef(Task.dest)
   }
 
 
