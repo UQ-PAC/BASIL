@@ -389,7 +389,6 @@ class Procedure private (
 
   def returnBlock_=(value: Block): Unit = {
     if (!returnBlock.contains(value)) {
-      _returnBlock.foreach(removeBlocks)
       _returnBlock = Some(addBlock(value))
     }
   }
@@ -552,7 +551,7 @@ class Block private (
     label: String,
     address: Option[BigInt] = None,
     statements: IterableOnce[Statement] = Set.empty,
-    jump: Jump = GoTo(Set.empty)
+    jump: Jump = Unreachable()
   ) = {
     this(label, address, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty)
   }
@@ -591,7 +590,7 @@ class Block private (
     if (j.hasParent) {
       val parent = j.parent
       j.deParent()
-      parent.jump = GoTo(Set.empty)
+      parent.jump = Unreachable()
     }
     jump = j
     this
@@ -619,7 +618,7 @@ class Block private (
 
   override def toString: String = {
     val statementsString = statements.map(_.toString).mkString("\n")
-    s"Block $label with $statementsString\n$jump"
+    s"block $label"
   }
 
   /** @return
@@ -684,6 +683,16 @@ class Block private (
     val ojump = jump
     replaceJump(GoTo(nb))
     nb.replaceJump(ojump)
+  }
+
+  def splitAfterStatement(s: Statement, suffix: String): Block = {
+    val rest = statements.splitOn(s)
+    val thisJump = jump
+    val succ = Block(label + suffix, None, rest, Unreachable())
+    parent.addBlock(succ)
+    replaceJump(GoTo(succ))
+    succ.replaceJump(thisJump)
+    succ
   }
 
   def createBlockBetween(b2: Block, label: String = "_goto_"): Block = {

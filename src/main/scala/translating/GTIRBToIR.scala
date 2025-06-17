@@ -26,6 +26,7 @@ import java.nio.ByteBuffer
 import util.intrusive_list.*
 import util.functional.{Snoc}
 import util.Logger
+import ir.cilvisitor.*
 
 private def assigned(x: Statement): immutable.Set[Variable] = x match {
   case x: Assign => x.assignees
@@ -292,16 +293,16 @@ class GTIRBToIR(
 
   private def handlePCAssign(block: Block): Option[String] = {
     block.statements.last match {
-      case last @ LocalAssign(lhs: Register, _, _) if lhs.name == "_PC" =>
+      case last @ LocalAssign(lhs: GlobalVar, _, _) if lhs.name == "_PC" =>
         val label = last.label
         label
       case _ => throw Exception(s"expected block ${block.label} to have a program counter assignment at its end")
     }
   }
 
-  private def getPCTarget(block: Block): Register = {
+  private def getPCTarget(block: Block): GlobalVar = {
     block.statements.last match {
-      case LocalAssign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
+      case LocalAssign(lhs: GlobalVar, rhs: GlobalVar, _) if lhs.name == "_PC" => rhs
       case _ => throw Exception(s"expected block ${block.label} to have a program counter assignment at its end")
     }
   }
@@ -561,7 +562,7 @@ class GTIRBToIR(
           if (proxySymbols.isEmpty) {
             // indirect call with no further information
             val target = block.statements.last match {
-              case LocalAssign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
+              case LocalAssign(lhs: GlobalVar, rhs: GlobalVar, _) if lhs.name == "_PC" => rhs
               case _ =>
                 throw Exception(s"no assignment to program counter found before indirect call in block ${block.label}")
             }

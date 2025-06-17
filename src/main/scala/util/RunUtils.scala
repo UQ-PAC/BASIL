@@ -81,7 +81,7 @@ case class StaticAnalysisContext(
   localDSA: Map[Procedure, Graph],
   bottomUpDSA: Map[Procedure, Graph],
   topDownDSA: Map[Procedure, Graph],
-  writesToResult: Map[Procedure, Set[Register]],
+  writesToResult: Map[Procedure, Set[GlobalVar]],
   ssaResults: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
 )
 

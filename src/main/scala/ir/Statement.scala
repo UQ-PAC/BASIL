@@ -17,6 +17,8 @@ import collection.mutable
 sealed trait Command extends HasParent[Block] with DeepEquality {
   val label: Option[String]
 
+  var comment: Option[String] = None
+
   def labelStr: String = label match {
     case Some(s) => s"$s: "
     case None => ""
@@ -43,7 +45,7 @@ sealed trait SingleAssign extends Assign {
 
 class MemoryAssign(var lhs: Variable, var rhs: Expr, override val label: Option[String] = None) extends SingleAssign {
   override def modifies: Set[Global] = lhs match
-    case r: Register => Set(r)
+    case r: GlobalVar => Set(r)
     case _ => Set()
 
   override def toString: String = s"$labelStr$lhs := $rhs"
@@ -61,7 +63,7 @@ object MemoryAssign {
 
 class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[String] = None) extends SingleAssign {
   override def modifies: Set[Global] = lhs match {
-    case r: Register => Set(r)
+    case r: GlobalVar => Set(r)
     case _ => Set()
   }
   override def toString: String = s"$labelStr$lhs := $rhs"
@@ -108,7 +110,7 @@ class MemoryLoad(
   override val label: Option[String] = None
 ) extends SingleAssign {
   override def modifies: Set[Global] = lhs match {
-    case r: Register => Set(r)
+    case r: GlobalVar => Set(r)
     case _ => Set()
   }
   override def toString: String = s"$labelStr$lhs := MemoryLoad($mem, $index, $endian, $size)"
@@ -145,8 +147,9 @@ class AtomicEnd(override val label: Option[String] = None) extends NOP(label) {
   override def toString: String = s"AtomicEnd $labelStr"
 }
 
-class Assert(var body: Expr, var comment: Option[String] = None, override val label: Option[String] = None)
+class Assert(var body: Expr, acomment: Option[String] = None, override val label: Option[String] = None)
     extends Statement {
+  comment = acomment
   override def toString: String = s"${labelStr}assert $body" + comment.map(" //" + _)
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssert(this)
   override def deepEquals(o: Object) = o match {
@@ -168,12 +171,13 @@ object Assert {
   */
 class Assume(
   var body: Expr,
-  var comment: Option[String] = None,
+  acomment: Option[String] = None,
   override val label: Option[String] = None,
   var checkSecurity: Boolean = false
 ) extends Statement {
 
-  override def toString: String = s"${labelStr}assume $body" + comment.map(" //" + _)
+  comment = acomment
+  override def toString: String = s"${labelStr}assume $body" + comment.map(" // " + _)
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssume(this)
   override def deepEquals(o: Object) = o match {
     case Assume(b, c, l, sec) => b == body && c == comment && l == label && sec == checkSecurity

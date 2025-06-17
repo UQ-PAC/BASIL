@@ -175,6 +175,22 @@ sealed trait BVUnOp(op: String) extends UnOp {
 case object BVNOT extends BVUnOp("not")
 case object BVNEG extends BVUnOp("neg")
 
+case class BoolExp(op: BoolBinOp, args: List[Expr]) extends Expr with CachedHashCode {
+  require(args.size >= 2)
+  override def getType: IRType = BoolType
+  override def toBoogie: BExpr = NaryBinExpr(op, args.map(_.toBoogie))
+  override def gammas: Set[Variable] = args.flatMap(_.gammas).toSet
+  override def variables = args.toSet.flatMap(_.variables).toSet
+  override def toString() = "(" + args.mkString(op.toString) + ")"
+
+  def toBinaryExpr = {
+    val i = BinaryExpr(op, args.head, args.tail.head)
+    val rest = args.tail.tail
+    rest.foldLeft(i)((acc, n) => BinaryExpr(op, acc, n))
+  }
+
+}
+
 case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr with CachedHashCode {
   override def toBoogie: BExpr = BinaryBExpr(op, arg1.toBoogie, arg2.toBoogie)
   override def gammas: Set[Variable] = arg1.gammas ++ arg2.gammas
@@ -328,12 +344,47 @@ enum Endian {
   case BigEndian
 }
 
-case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IRType) extends Expr with CachedHashCode {
+case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IRType, uninterpreted: Boolean = true)
+    extends Expr
+    with CachedHashCode {
   override def getType: IRType = returnType
-  override def toBoogie: BFunctionCall = BFunctionCall(name, params.map(_.toBoogie).toList, returnType.toBoogie, true)
+  override def toBoogie: BFunctionCall =
+    BFunctionCall(name, params.map(_.toBoogie).toList, returnType.toBoogie, uninterpreted)
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitUninterpretedFunction(this)
-  override def variables: Set[Variable] = params.flatMap(_.variables).toSet
+  override def variables: Set[Variable] = params.flatMap(_.variables).toSet // suspect
   override def toString = s"$name(${params.mkString(", ")})"
+}
+
+sealed trait Decl {
+  def toBoogie: BDeclaration
+}
+case class AxiomDecl(e: Expr) extends Decl {
+  def toBoogie = BAxiom(e.toBoogie, List())
+}
+case class FunctionDecl(
+  name: String,
+  params: List[LocalVar],
+  returnType: IRType,
+  definition: Option[Expr],
+  attribs: List[(String, Option[String])] = List(),
+  inlineDef: Boolean = false
+) extends Decl {
+  def toBoogie =
+
+    val bparams = params.map(p => BParam(p.name, p.getType.toBoogie))
+
+    val body = definition.map(_.toBoogie)
+
+    BFunction(name, bparams, BParam(returnType.toBoogie), body, attribs.map((n, v) => BAttribute(n, v)))
+  def makeCall(actualParams: List[Expr] = List()) = {
+    require(params.map(_.getType) == actualParams.map(_.getType))
+    if (!inlineDef || definition.isEmpty) then {
+      UninterpretedFunction(name, actualParams, returnType, false)
+    } else {
+      val l = LambdaExpr(params, definition.get)
+      ir.eval.evalLambdaApply(l, UninterpretedFunction(name, params, returnType, false))
+    }
+  }
 }
 
 /** Something that has a global scope from the perspective of the IR and Boogie.
@@ -363,17 +414,22 @@ object Variable {
   implicit def ordering[V <: Variable]: Ordering[V] = Ordering.by(_.name)
 }
 
-/** Hardware registers.
-  *
-  * These are variables with global scope (in a 'accessible from any procedure' sense), not related to the concurrent
-  * shared memory sense.
-  */
-case class Register(override val name: String, size: Int) extends Variable with Global with CachedHashCode {
+object Register {
+  def apply(name: String, size: Int) = GlobalVar(name, BitVecType(size))
+  def unapply(l: GlobalVar): Option[(String, Int)] = l.getType match {
+    case BitVecType(sz) => Some(l.name, sz)
+    case _ => None
+  }
+}
+
+case class GlobalVar(override val name: String, override val irType: IRType)
+    extends Variable
+    with CachedHashCode
+    with Global {
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Global)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Global)
-  override def toString: String = s"Register(${name}, $irType)"
-  override def acceptVisit(visitor: Visitor): Variable = visitor.visitRegister(this)
-  override val irType: BitVecType = BitVecType(size)
+  override def toString: String = s"GlobalVar (${name}, $irType)"
+  override def acceptVisit(visitor: Visitor): Variable = this
 }
 
 /** Variable with scope local to the procedure, typically a temporary variable created in the lifting process. */
@@ -409,7 +465,7 @@ object LocalVar {
 }
 
 /** A global memory section (subject to shared-memory concurrent accesses from multiple threads). */
-sealed trait Memory extends Global {
+sealed trait Memory extends Expr with Global {
   val name: String
   val addressSize: Int
   val valueSize: Int
@@ -418,7 +474,7 @@ sealed trait Memory extends Global {
   val getType: IRType = MapType(BitVecType(addressSize), BitVecType(valueSize))
   override def toString: String = s"Memory($name, $addressSize, $valueSize)"
 
-  def acceptVisit(visitor: Visitor): Memory =
+  override def acceptVisit(visitor: Visitor): Memory =
     throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
@@ -444,15 +500,15 @@ case class LambdaExpr(binds: List[LocalVar], body: Expr) extends Expr {
   def returnType = body.getType
 }
 
-case class QuantifierExpr(kind: QuantifierSort, body: LambdaExpr) extends Expr {
+case class QuantifierExpr(kind: QuantifierSort, body: LambdaExpr, triggers: List[Expr] = List()) extends Expr {
   require(body.returnType == BoolType, "Type error: quantifier with non-boolean body")
   override def getType: IRType = BoolType
   def toBoogie: BExpr = {
     val b = body.binds.map(_.toBoogie)
     val bdy = body.body.toBoogie
     kind match {
-      case QuantifierSort.forall => ForAll(b, bdy)
-      case QuantifierSort.exists => Exists(b, bdy)
+      case QuantifierSort.forall => ForAll(b, bdy, triggers.map(_.toBoogie))
+      case QuantifierSort.exists => Exists(b, bdy, triggers.map(_.toBoogie))
     }
   }
   override def variables: Set[Variable] = body.variables

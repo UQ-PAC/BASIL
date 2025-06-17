@@ -380,6 +380,13 @@ class BasilIRPrettyPrinter(
 
   override def vassign(lhs: PPProg[Variable], rhs: PPProg[Expr]): PPProg[LocalAssign] = BST(s"${lhs} := ${rhs}")
   override def vmemassign(lhs: PPProg[Variable], rhs: PPProg[Expr]): PPProg[LocalAssign] = BST(s"${lhs} mem:= ${rhs}")
+  override def vsimulassign(assignments: List[(PPProg[Variable], PPProg[Expr])]): PPProg[SimulAssign] = BST(
+    assignments
+      .map { case (l, r) =>
+        vassign(l, r)
+      }
+      .mkString(", ")
+  )
 
   override def vstore(
     mem: String,
@@ -422,12 +429,17 @@ class BasilIRPrettyPrinter(
 
   override def vindirect(target: PPProg[Variable]): PPProg[IndirectCall] = BST(s"indirect call ${target} ")
   override def vassert(body: Assert): PPProg[Assert] = {
-    val comment = body.comment.map(c => s" /* $c */").getOrElse("")
-    BST(s"assert ${vexpr(body.body)}$comment")
+    BST(s"assert ${vexpr(body.body)}")
   }
+
+  override def vstmt(s: Statement) = {
+    val comment = s.comment.map(c => s" /* $c */").getOrElse("")
+    val res = super.vstmt(s).toString
+    BST(res + comment)
+  }
+
   override def vassume(body: Assume): PPProg[Assume] = {
-    val comment = body.comment.map(c => s" /* $c */").getOrElse("")
-    BST(s"assume ${vexpr(body.body)}$comment")
+    BST(s"assume ${vexpr(body.body)}")
   }
   override def vnop(): PPProg[NOP] = BST("nop")
 
@@ -442,6 +454,7 @@ class BasilIRPrettyPrinter(
     case IntType => "nat"
     case BoolType => "bool"
     case m: MapType => s"map ${vtype(m.result)}[${vtype(m.param)}]"
+    case CustomSort(n) => n
   }
 
   override def vrvar(e: Variable): PPProg[Variable] = BST(s"${e.name}:${vtype(e.getType)}")
@@ -460,6 +473,11 @@ class BasilIRPrettyPrinter(
     val opn = e.getClass.getSimpleName.toLowerCase.stripSuffix("$")
     BST(s"$opn($l, $r)")
   }
+  override def vbool_expr(e: BoolBinOp, l: List[PPProg[Expr]]): PPProg[Expr] = {
+    val opn = e.getClass.getSimpleName.toLowerCase.stripSuffix("$")
+    BST(s"$opn(${l.mkString(",")})")
+  }
+
   override def vunary_expr(e: UnOp, arg: PPProg[Expr]): PPProg[Expr] = {
     val opn = e.getClass.getSimpleName.toLowerCase.stripSuffix("$")
     BST(s"$opn($arg)")
