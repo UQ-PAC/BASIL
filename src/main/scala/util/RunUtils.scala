@@ -1006,9 +1006,13 @@ object RunUtils {
     }
 
     q.loading.dumpIL.foreach(s => {
-      writeToFile(pp_prog(ctx.program), s"$s-output.il")
+      val timer = PerformanceTimer("Dump IL")
+      writeToFile(pp_irctx(ctx), s"$s-output.il")
+      timer.checkPoint(".il written")
       val a = ctx.program.toScalaLines
+      timer.checkPoint("ToScalaLines done")
       writeToFile(a.mkString, s"$s-output.scala")
+      timer.checkPoint("ToScalaLines written")
     })
     Logger.info("[!] Translating to Boogie")
 

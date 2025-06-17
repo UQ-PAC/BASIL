@@ -6,7 +6,7 @@ def procedureDiamondForm(p: Procedure): Boolean = {
 
   val stub = p.blocks.isEmpty || p.isExternal.contains(true)
   val entryOK = p.entryBlock.exists(_.prevBlocks.isEmpty)
-  val retOK = p.returnBlock.exists(_.jump.isInstanceOf[Return])
+  val retOK = p.returnBlock.forall(_.jump.isInstanceOf[Return])
   val returning =
     p.blocks.filterNot(p.entryBlock.contains).filterNot(p.returnBlock.contains).filter(_.jump.isInstanceOf[Return])
 
