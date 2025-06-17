@@ -12,7 +12,7 @@ import ir.dsl.given
 class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureOutput {
 
   /**
-   * Regression test condition lifting using for a difficult example which requires propagating conditions across multiple branches 
+   * Regression test condition lifting using for a difficult example which requires propagating conditions across multiple branches
    *
    * Future simplifications could possibly break this if the branches are simplified further (e.g. more extends/extracts removed)
    */
