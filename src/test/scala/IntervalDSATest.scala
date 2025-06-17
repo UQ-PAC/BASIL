@@ -270,7 +270,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
       BASILConfig(
         loading = ILLoadingConfig(
           inputFile = path + ".gts",
-          relfFile = path + ".relf",
+          relfFile = Some(path + ".relf"),
           trimEarly = main.isDefined,
           mainProcedureName = main.getOrElse("main")
         ),
@@ -287,7 +287,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     RunUtils.loadAndTranslate(
       BASILConfig(
         context = Some(context),
-        loading = ILLoadingConfig(inputFile = "", relfFile = ""),
+        loading = ILLoadingConfig(inputFile = "", relfFile = None),
         simplify = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
