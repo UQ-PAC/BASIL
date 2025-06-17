@@ -1,13 +1,48 @@
-# BASIL Overview
+# BASIL (Boogie Analysis for Secure Information-Flow Logics)
 
+[API Documentation](https://uq-pac.github.io/BASIL/api/)
 
-## Introduction
+BASIL generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 
+binaries that have been lifted intermediate formats. It takes as input the `.gts` format produced by 
+[gtirb-semantics](https://github.com/UQ-PAC/gtirb-semantics),  which consists of [ddisasm's](https://github.com/grammatech/ddisasm)
+GTIRB  with [ASLp's](https://github.com/UQ-PAC/aslp) instruction semantics annotated as AuxData for each block.
+
+Basil implements a concurrent information-flow logic verifier by encoding this logic in Boogie. 
+This logic is described [here](docs/iflogic-encoding.pdf). Verifying examples can be found in 
+`src/test/correct` and non-verify examples can be found in `src/test/incorrect`.
+
+### Basic Usage
+
+The `./mill` script should be sufficient to bootstrap Scala, provided you have a JVM (>17) installed.
+The test suite (and `--verify` flag) additionally require Boogie and Z3.
+
+As input BASIL requires a `.gts` file produced by `gtirb-semantics`,
+as well as a file containing the output of readelf (here denoted with `.relf`), both created from the same AArch64/ARM64 binary, 
+and outputs a semantically equivalent .bpl Boogie-language source file.
+
+Detailed instructions for lifting examples and running BASIL can be found at [/usage](/usage.md).
+
+Basil also accepts BAP `.adt` files in place of the `.gts` file, however this feature is no longer actively maintained.
+
+To build and run the tool use one of the following commands:
+
+Linux / Mac OS:
+
+```
+./mill run --load-directory-gtirb ./example.gts [--output output.bpl] [--simplify] [--interpret]
+```
+
+Windows: 
+
+```
+./mill.bat run --load-directory-gtirb ./example.gts [--output output.bpl] [--simplify] [--interpret]
+```
 
 Below is an overview of the BASIL project and its theoretical background. 
 To get started on development, see [development](development).
 
 - [usage](usage.md) Basil binary lifting & usage guide
-- [development](development/readme.md) Explanation of common development tasks
+- [development](development/) Explanation of common development tasks
     - [project-layout](development/project-layout.md) Organisation of the source code
     - [editor-setup](development/editor-setup.md) Guide to basil development in IDEs 
     - [cfg](development/cfg.md) Explanation of the old CFG datastructure 
@@ -24,7 +59,7 @@ for verifying information flow on concurrent code.
 
 ### Program Logic 
 
-$wp_{if}^{\cal R G}$ is the program logic BASIL implements for information flow verification. It is described in 
+\\(wp_{if}^{\cal R G}\\) is the program logic BASIL implements for information flow verification. It is described in 
 the paper by [Winter, Coughlin, Smith '21 in CSF](https://github.com/UQ-PAC/wpif_CSF21/blob/main/WinterCoughlinSmith_CSF2021.pdf).
 
 This information-flow logic as implemented in the BASIL tool can found described [here](iflogic-encoding.pdf).
@@ -34,8 +69,8 @@ A "leak", is some secret information being stored somewhere it is not allowed to
 
 Therefore for each potentially-shared variable we have 
 
-1. $\cal L(var)$, security classification; the specification of what security levels a variable is allowed to store. A function from variables to a security classification (high or low), which may depend on the values of other program variables.
-2. $\Gamma_v$, security value; a ghost-state variable storing the current security value of a variable, 
+1. \\(\cal L(var)\\), security classification; the specification of what security levels a variable is allowed to store. A function from variables to a security classification (high or low), which may depend on the values of other program variables.
+2. \\(\Gamma_v\\), security value; a ghost-state variable storing the current security value of a variable, 
     that is the security value of whatever was last stored to the variable. Security levels
   flow in accordance with the flow of information in their corresponding program variables.
 
@@ -52,7 +87,7 @@ x := secret    |  x = ?, Gamma_x = high, secret = ?, Gamma_secret = high, L(x) =
 This program would not be secure if the classification was instead `L(x) = low`, since the assignment of 
 secret would be a violation of this classification.
 
-$wp_{if}^{\cal R G}$ checks the invariant that for all variables $v$ and program states ${\cal L}(v) \ge \Gamma_v$. 
+\\(wp_{if}^{\cal R G}\\) checks the invariant that for all variables \\(v\\) and program states \\({\cal L}(v) \ge \Gamma_v\\). 
 The full description of this can be found in a paper available on request.
 
 ---
@@ -92,7 +127,7 @@ flowchart LR
 ```
 
 BASIL works by translating a binary program to the Boogie Intermediate Verification Language. In doing so,
-it additionally inserts assertions and specifications to make Boogie check information-flow security as defined by $wp_{if}^{\cal R G}$.
+it additionally inserts assertions and specifications to make Boogie check information-flow security as defined by \\(wp_{if}^{\cal R G}\\).
 
 ### BASIL Phases of translation
 
@@ -115,7 +150,7 @@ it additionally inserts assertions and specifications to make Boogie check infor
       - Dynamic Single Assignment
       - Simplifications (copyprop & branch condition simplifications)
 4. Translation & Verification condition generation 
-    - Verification conditions implementing the $wp_{if}^{\cal R G}$ logic, based on the function and rely/guarantee specifications 
+    - Verification conditions implementing the \\(wp_{if}^{\cal R G}\\) logic, based on the function and rely/guarantee specifications 
     from the `.spec` file are added to the program when it is translated to the **Boogie IR**.
 5. Verification
     - The Boogie IR program is serialised, and run through the Boogie verifier.
@@ -132,12 +167,12 @@ and hence verification easier.
 This includes data-flow analyses based on the theory of Abstract Interpretation (AbsInt), as well 
 as constraint-based analyses. 
 
-- SPA:  https://cs.au.dk/~amoeller/spa/spa.pdf
+- SPA:  [cs.au.dk/~amoeller/spa/spa.pdf](https://cs.au.dk/~amoeller/spa/spa.pdf)
   - Course textbook for CSSE4630, has a good introduction to lattice theory and dataflow analyses, the later 
     chapters (Distributive and later) are less relevant. 
-- AbsInt tutorial https://www-apr.lip6.fr/~mine/publi/article-mine-FTiPL17.pdf 
-- Lecture series on AbsInt https://www.youtube.com/watch?v=FTcIE7uzehE&list=PLtjm-n_Ts-J-6EU1WfVIWLhl1BUUR-Sqm&index=27
-- Scala tutorial for a toy language https://continuation.passing.style/blog/writing-abstract-interpreter-in-scala.html
+- [Miné AbsInt tutorial](https://www-apr.lip6.fr/~mine/publi/article-mine-FTiPL17.pdf)
+- [Lecture series on AbsInt (Youtube)](https://www.youtube.com/watch?v=FTcIE7uzehE&list=PLtjm-n_Ts-J-6EU1WfVIWLhl1BUUR-Sqm&index=27)
+- [Scala tutorial for a toy language](https://continuation.passing.style/blog/writing-abstract-interpreter-in-scala.html)
 
 ### Internal Representations
 
