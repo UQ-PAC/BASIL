@@ -30,11 +30,15 @@ extension (p: CFGPosition)
       case block: Block => s"Block ${block.label}"
       case command: Command => command.toString
 
-// todo: we could just use the dependencies trait directly instead to avoid the instantiation issue
-trait IRWalk[IN <: CFGPosition, NT <: CFGPosition & IN] {
+trait Walk[IN, NT] {
   def succ(pos: IN): Set[NT]
   def pred(pos: IN): Set[NT]
 }
+
+trait SCCWalk[IN <: CFGPosition, NT <: CFGPosition & IN] extends Walk[Set[IN], Set[NT]]
+
+// todo: we could just use the dependencies trait directly instead to avoid the instantiation issue
+trait IRWalk[IN <: CFGPosition, NT <: CFGPosition & IN] extends Walk[IN, NT]
 
 object IRWalk:
 
@@ -186,13 +190,21 @@ def updateWithCallSCC(program: Program): Unit = {
   }
 }
 
-object CallSCCWalker extends IRWalk[Procedure, Procedure] {
-  def succSCC(b: Procedure): Set[Set[Procedure]] =
-    b.scc.getOrElse(Set(b)).flatMap(a => CallGraph.succ(a)).map(p => p.scc.getOrElse(Set(p))) - b.scc.getOrElse(Set(b))
-  def predSCC(b: Procedure): Set[Set[Procedure]] =
-    b.scc.getOrElse(Set(b)).flatMap(a => CallGraph.pred(a)).map(p => p.scc.getOrElse(Set(p))) - b.scc.getOrElse(Set(b))
-  def succ(b: Procedure) = succSCC(b).flatten
-  def pred(b: Procedure) = predSCC(b).flatten
+// Walker over the Call graph SCCs
+// Ignores any edges from the SCC to itself
+// that is the scc will never be a pred or succ of itself
+object CallSCCWalker extends SCCWalk[Procedure, Procedure] {
+  override def succ(scc: Set[Procedure]): Set[Set[Procedure]] = {
+    // remove the scc corresponding to b from predecessor  list
+    scc.flatMap(a => CallGraph.succ(a)).map(p => p.scc.getOrElse(Set(p))) - scc
+  }
+  override def pred(scc: Set[Procedure]): Set[Set[Procedure]] = {
+    // remove the scc corresponding to b from predecessor  list
+    scc.flatMap(a => CallGraph.pred(a)).map(p => p.scc.getOrElse(Set(p))) - scc
+  }
+
+  def succ(p: Procedure): Set[Set[Procedure]] = succ(p.scc.getOrElse(Set(p)))
+  def pred(p: Procedure): Set[Set[Procedure]] = pred(p.scc.getOrElse(Set(p)))
 }
 
 // object InterProcBlockIRCursor extends InterProcBlockIRCursor
@@ -354,7 +366,7 @@ def dotBlockGraph(program: Program, labels: Map[CFGPosition, String] = Map.empty
 
 def toDot[T <: CFGPosition](
   domain: Set[T],
-  iterator: IRWalk[? >: T, ?],
+  iterator: IRWalk[? >: T, T],
   labels: Map[CFGPosition, String],
   filled: Set[T]
 ): String = {
