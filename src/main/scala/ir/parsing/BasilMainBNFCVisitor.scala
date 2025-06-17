@@ -418,10 +418,10 @@ case class BasilMainBNFCVisitor[A](
         ).toSet)
       val ctx = for {
         a <- attrMap.get("symbols")
-        nctx <- decls.context.mergeFromAttrib(a)
+        nctx <- decls.symtab.mergeFromAttrib(a)
       } yield (nctx)
       for (c <- ctx) {
-        decls = decls.copy(context = c)
+        decls = decls.copy(symtab = c)
       }
       for (n <- newInitialMemory) {
         initialMemory = n
@@ -456,14 +456,13 @@ case class BasilMainBNFCVisitor[A](
     }
     val resolvedProg = ir.dsl.EventuallyProgram(mainProcDef.head, otherProcs, initialMemory).resolve
 
-    val ctx = decls.context
     util.IRContext(
       List(),
-      ctx.externalFunctions,
-      ctx.globals,
-      ctx.funcEntries,
-      ctx.globalOffsets,
-      util.IRLoading.loadSpecification(None, resolvedProg, Set.empty),
+      decls.symtab.externalFunctions,
+      decls.symtab.globals,
+      decls.symtab.funcEntries,
+      decls.symtab.globalOffsets,
+      util.IRLoading.emptySpecification(decls.symtab.globals),
       resolvedProg
     )
   }

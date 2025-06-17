@@ -163,17 +163,15 @@ def externalFunctionFromAttrib(a: Attrib) = {
   } yield (ExternalFunction(name, off))
 }
 
+/*
+ * The subset of IRContext that we preserve through serialisation.
+ */
 case class SymbolTableInfo(
   externalFunctions: Set[ExternalFunction] = Set(),
   globals: Set[SpecGlobal] = Set(),
   funcEntries: Set[FuncEntry] = Set(),
   globalOffsets: Map[BigInt, BigInt] = Map()
 ) {
-  /*
-   * The subset of IRContext that we preserve through serialisation.
-   */
-
-  import ir.parsing.Attrib
 
   def merge(o: SymbolTableInfo) = {
     SymbolTableInfo(

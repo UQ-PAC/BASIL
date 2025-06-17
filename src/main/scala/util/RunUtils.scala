@@ -218,6 +218,9 @@ object IRLoading {
     ReadELFLoader.visitSyms(parser.syms(), config)
   }
 
+  def emptySpecification(globals: Set[SpecGlobal]) =
+    Specification(Set(), globals, Map(), List(), List(), List(), Set())
+
   def loadSpecification(filename: Option[String], program: Program, globals: Set[SpecGlobal]): Specification = {
     filename match {
       case Some(s) =>
@@ -227,7 +230,7 @@ object IRLoading {
         specParser.setBuildParseTree(true)
         val specLoader = SpecificationLoader(globals, program)
         specLoader.visitSpecification(specParser.specification())
-      case None => Specification(Set(), globals, Map(), List(), List(), List(), Set())
+      case None => emptySpecification(globals)
     }
   }
 }

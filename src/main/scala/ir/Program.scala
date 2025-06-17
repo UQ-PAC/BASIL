@@ -563,7 +563,7 @@ class Procedure private (
     reachable.toSet
   }
 
-  /** 
+  /**
    *  SSA Form
    */
 

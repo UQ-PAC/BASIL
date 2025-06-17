@@ -23,7 +23,7 @@ case class Declarations(
   val functions: Map[String, FunDecl],
   val memories: Map[String, ir.Memory],
   val procedures: Map[String, ir.dsl.EventuallyProcedure],
-  val context: SymbolTableInfo,
+  val symtab: SymbolTableInfo,
   val progSpec: ProgSpec
 ) {
   private def ensureDisjoint[T, U](x: Map[T, U], y: Map[T, U]): Unit =
@@ -45,7 +45,7 @@ case class Declarations(
       functions ++ other.functions,
       memories ++ other.memories,
       procedures ++ other.procedures,
-      context.merge(other.context),
+      symtab.merge(other.symtab),
       progSpec.merge(other.progSpec)
     )
   }
