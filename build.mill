@@ -172,6 +172,18 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     }
   }
 
+  def gtagslist = Task {
+    val src = Task.traverse(Seq(this, test) ++ moduleDeps)(_.allSources)().flatten
+    val srcArgs = src.map(_.path).filter(os.exists(_))
+
+    val allfiles = srcArgs.flatMap {
+      case p if os.isDir(p) => os.walk(p).filter(x => x.last.endsWith(".scala") || x.last.endsWith(".java")).map(_)
+      case p => Seq(p)
+    }.map(_.toString)
+
+    os.write(Task.dest / "gtagslist", allfiles.mkString("\n"))
+  }
+
   /**
    * Build the ctags file containing code definition locations.
    * This can be used with `./mill -w` * to watch and re-build on file changes.
