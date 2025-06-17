@@ -406,8 +406,7 @@ def inOutParams(
       // no callers of main procedure so keep the whole read/write set
       // of registers
 
-      // val overapprox = ((0 to 31).toSet -- (19 to 28).toSet).map(i => Register(s"R${i}", 64)).toSet[Variable]
-      val outParams = (overapprox.intersect(DefinedOnAllPaths.proc(proc))).intersect(Set(Register("R0", 64)))
+      val outParams = (overapprox.intersect(DefinedOnAllPaths.proc(proc)))
       val inParams = lives(proc)._1
       proc -> (inParams + pc, outParams + pc)
     }

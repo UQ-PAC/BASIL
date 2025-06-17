@@ -1,7 +1,6 @@
 package ir
 import boogie.*
 
-
 sealed trait Decl {
   def toBoogie: BDeclaration
 }
@@ -35,4 +34,3 @@ case class FunctionDecl(
     }
   }
 }
-
