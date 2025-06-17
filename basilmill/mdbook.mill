@@ -55,8 +55,8 @@ trait mdbookBinary extends DownloadModule {
     ()
   }
 
-  def serve() = Task.Command {
-    val res = os.call(Seq(path().toString, "serve",  mdbookSources().path.toString), stdout = os.Inherit, check = false)
+  def serve(args: String*) = Task.Command {
+    val res = os.call(Seq(path().toString, "serve",  mdbookSources().path.toString) ++ args, stdout = os.Inherit, check = false)
     Task.ctx().systemExit(res.exitCode)
     ()
   }
