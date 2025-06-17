@@ -42,8 +42,8 @@ jobs:
 
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: texlive-latex-recommended
-          version: 1.0
+          packages: latexmk texlive-latex-recommended texlive-latex-extra texlive-lang-japanese
+          version: 2
 
       - name: Compile BASIL Mill
         run: ./mill compile
