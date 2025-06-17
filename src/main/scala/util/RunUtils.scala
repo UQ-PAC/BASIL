@@ -267,17 +267,7 @@ object IRTransform {
       case _ =>
     }
 
-    // FIXME: Main will often maintain the stack by loading R30 from the caller's stack frame
-    //        before returning, which makes the R30 assertin faile. Hence we currently skip this
-    //        assertion for main, instead we should precondition the stack layout before main
-    //        but the interaction between spec and memory regions is nontrivial currently
-    cilvisitor.visit_prog(
-      transforms.ReplaceReturns(proc => doSimplify && ctx.program.mainProcedure != proc),
-      ctx.program
-    )
-
-    transforms.addReturnBlocks(ctx.program, insertR30InvariantAssertion = _ => doSimplify)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
+    transforms.establishProcedureDiamondForm(ctx.program, doSimplify)
 
     val externalRemover = ExternalRemover(externalNamesLibRemoved.toSet)
     externalRemover.visitProgram(ctx.program)
@@ -885,9 +875,11 @@ object RunUtils {
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
 
     ctx = IRTransform.doCleanup(ctx, conf.simplify)
+    assert(ir.invariant.programDiamondForm(ctx.program))
 
     transforms.inlinePLTLaunchpad(ctx.program)
 
+    assert(ir.invariant.programDiamondForm(ctx.program))
     if (q.loading.trimEarly) {
       val before = ctx.program.procedures.size
       transforms.stripUnreachableFunctions(ctx.program, q.loading.procedureTrimDepth)
@@ -896,6 +888,7 @@ object RunUtils {
       )
     }
 
+    assert(ir.invariant.programDiamondForm(ctx.program))
     ctx.program.procedures.foreach(transforms.RemoveUnreachableBlocks.apply)
     Logger.info(s"[!] Removed unreachable blocks")
 
@@ -911,6 +904,7 @@ object RunUtils {
     }
     assert(invariant.correctCalls(ctx.program))
 
+    assert(ir.invariant.programDiamondForm(ctx.program))
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
@@ -922,6 +916,7 @@ object RunUtils {
     }
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
 
+    assert(ir.invariant.programDiamondForm(ctx.program))
     ir.eval.SimplifyValidation.validate = conf.validateSimp
     if (conf.simplify) {
 
@@ -938,9 +933,11 @@ object RunUtils {
         transforms.CalleePreservedParam.transform(ctx.program)
       }
 
+      assert(ir.invariant.programDiamondForm(ctx.program))
       doSimplify(ctx, conf.staticAnalysis)
     }
 
+    assert(ir.invariant.programDiamondForm(ctx.program))
     if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
       val dir = File("./graphs/")
       if (!dir.exists()) then dir.mkdirs()
@@ -949,6 +946,7 @@ object RunUtils {
       }
     }
 
+    assert(ir.invariant.programDiamondForm(ctx.program))
     var dsaContext: Option[DSAContext] = None
     if (conf.dsaConfig.isDefined) {
       val dsaResults = IntervalDSA(ctx).dsa(conf.dsaConfig.get)

@@ -85,7 +85,10 @@ def addReturnBlocks(
     val returningBlocks = p.blocks.filter(_.jump.isInstanceOf[Return]).toList
     val containsReturn = returningBlocks.nonEmpty
 
-    if (returningBlocks.size == 1 && !p.entryBlock.contains(returningBlocks.head)) {
+    if (
+      returningBlocks.size == 1 && !p.entryBlock.contains(returningBlocks.head) && returningBlocks
+        .forall(_.statements.isEmpty)
+    ) {
       p.returnBlock = returningBlocks.head
     } else {
       val returnBlockID = p.freshBlockId(p.procName + "_basil_return")
@@ -120,4 +123,21 @@ class ConvertSingleReturn extends CILVisitor {
   }
 
   override def vstmt(s: Statement) = SkipChildren()
+}
+
+/**
+ * Establish procedure diamond structure with designated entry and return block which contain no statements.
+ *
+ * This is supposed to be idempotent, if it fails please report as a bug.
+ */
+def establishProcedureDiamondForm(program: Program, doSimplify: Boolean = false) = {
+  // FIXME: Main will often maintain the stack by loading R30 from the caller's stack frame
+  //        before returning, which makes the R30 assertin faile. Hence we currently skip this
+  //        assertion for main, instead we should precondition the stack layout before main
+  //        but the interaction between spec and memory regions is nontrivial currently
+  cilvisitor.visit_prog(ReplaceReturns(proc => doSimplify && program.mainProcedure != proc), program)
+
+  addReturnBlocks(program, insertR30InvariantAssertion = _ => doSimplify)
+  cilvisitor.visit_prog(ConvertSingleReturn(), program)
+  assert(ir.invariant.programDiamondForm(program))
 }
