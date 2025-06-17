@@ -20,6 +20,15 @@ jobs:
       - name: Check all test suites have at least one tag
         run: .github/workflows/check-test-tagging.sh
 
+  Docs:
+    uses: ./.github/workflows/docs.yml
+    secrets: inherit
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
   Scalafmt:
     runs-on: ubuntu-latest
     steps:
@@ -42,18 +51,6 @@ jobs:
 
       - name: Compile BASIL Mill
         run: ./mill compile
-
-      - uses: zauguin/install-texlive@v4
-        with:
-          packages: >
-            scheme-basic latexmk lwarp ifptex verifycommand xpatch catchfile newunicodechar upquote comment xstring environ
-
-      - name: Compile docs
-        run: |
-          PATH=~/texlive/bin/x86_64-linux:$PATH ./mill allDocs
-
-      - if: ${{ failure() }}
-        uses: mxschmitt/action-tmate@v3
 
   # INFO: Scalatest runner arguments (i.e., arguments to scalatest.sh) can be
   # found at: https://www.scalatest.org/user_guide/using_the_runner
