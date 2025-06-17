@@ -84,7 +84,6 @@ trait BNFCModule extends JavaModule {
   }
 
   def bnfcHtml = Task {
-
     // some hacky fixes
     val lines = os.read.lines(bnfcLatex().path).flatMap {
       case l @ s"\\documentclass$_" => Seq(l, "\\usepackage[latexmk]{lwarp}")
@@ -97,7 +96,7 @@ trait BNFCModule extends JavaModule {
 
     // https://ctan.org/pkg/lwarp?lang=en
     // https://mirror.aarnet.edu.au/pub/CTAN/macros/latex/contrib/lwarp/lwarp.pdf
-    os.call(Seq("pdflatex", tex.toString))
+    os.call(Seq("latexmk", "-pdf", tex.toString))
     os.call(Seq("lwarpmk", "print"), stdout = os.Inherit)
     os.call(Seq("lwarpmk", "html"), stdout = os.Inherit)
     os.call(Seq("lwarpmk", "limages"))
