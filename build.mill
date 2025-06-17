@@ -171,9 +171,7 @@ object `package` extends RootModule with ScalaModule {
     }
   }
 
-  object MdBookBinary extends mdbookBinary {
-
-  }
+  object MdBookBinary extends mdbookBinary {}
 
   def gitCommitHash = Task.Input {
     // set in github actions

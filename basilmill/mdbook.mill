@@ -18,15 +18,25 @@ trait mdbookBinary extends DownloadModule {
 
     def local = Task.Input {
       Try(os.proc("mdbook", "--version").call())
-        .map(Function.const("mdBook"))
+        .map(Function.const("mdbook"))
         .toEither
         .left.map(_.toString)
     }
 
+
+  def arch = {
+    System.getProperty("os.arch") match {
+      case "amd64" => "x86_64"
+      case o => o
+    }
+  }
+
   def suffix = if (osName.contains("nux")) {
-    "x86_64-unknown-linux-musl.tar.gz"
-  }  else {
-    ""
+    s"${arch}-unknown-linux-musl.tar.gz"
+  } else if (osName.contains("Mac")) {
+    s"${arch}-apple-darwin.tar.gz"
+  } else {
+    throw new Exception(s"unsupported os ${osName}")
   }
 
   override def path = Task {
