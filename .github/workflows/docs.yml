@@ -21,7 +21,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
-      - run: sudo apt-get -y install latexmk texlive-latex-recommended texlive-lang-japanese texlive-latex-extra
+      - run: sudo apt-get -y install latexmk texlive-latex-recommended texlive-lang-japanese texlive-latex-extra texlive-extra-utils poppler-utils
       - run: ./mill --no-server allDocs
       - uses: actions/upload-pages-artifact@v3
         with:
