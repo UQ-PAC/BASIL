@@ -259,7 +259,6 @@ class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override
 
   def targets: Set[Block] = _targets.toSet
 
-
   override def deepEquals(o: Object): Boolean = o match {
     case GoTo(tgts, lbl) => tgts.map(_.label).toSet == targets.map(_.label).toSet && lbl == label
     case _ => false

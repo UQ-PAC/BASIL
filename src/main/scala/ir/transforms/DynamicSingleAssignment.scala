@@ -336,7 +336,6 @@ class OnePassDSA(
 
   }
 
-
 }
 
 class StmtRenamer(renamesL: Map[Variable, Int] = Map(), renames: Map[Variable, Int] = Map()) extends CILVisitor {

@@ -8,7 +8,6 @@ val inlineAttr = BAttribute("inline")
 type BasilIRFunctionOp = BoolToBV1Op | BVFunctionOp | MemoryLoadOp | MemoryStoreOp | ByteExtract | InBounds |
   BUninterpreted
 
-
 def genFunctionOpDefinition(
   f: BasilIRFunctionOp,
   memory: BoogieMemoryAccessMode = BoogieMemoryAccessMode.SuccessiveStoreSelect
