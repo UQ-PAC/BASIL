@@ -1,12 +1,12 @@
 
 # Basil Intermediate Language (IL)
 
-Basil IL is the canonical textual representation of the basil IR datastructure. 
-It can be serialised and laoded back into IR, and aims to be terse and human readable but precise and unambiguous. 
+Basil IL is the canonical textual representation of the basil IR datastructure.
+It can be serialised and laoded back into IR, and aims to be terse and human readable but precise and unambiguous.
 
-Below is an example for a procedure extracted from CNTLM
+Below is an example for a procedure extracted from CNTLM.
 
-There is a grammar available here: [basil-il-grammar.pdf](basil-il-grammar.pdf).
+There is a grammar available here: https://uq-pac.github.io/BASIL/docs/basil-il/BasilIR.html
 
 ```
 memory $mem : (bv64 -> bv8);
@@ -44,9 +44,6 @@ proc @main_1812
     return (zero_extend(32, load20_1:bv32), _PC_in:bv64);
   ]
 ];
-
-
-
 ```
 
 
@@ -56,7 +53,7 @@ Sigils are identifier prefix characters used to disambiguate different types of 
 
 - Procedure identifiers with the sigil `@`
 - Blocks with the sigil `#`
-- Local variables with the _optional_ sigil `%`, no other identifiers may begin with a `#`. 
+- Local variables with the _optional_ sigil `%`, no other identifiers may begin with a `#`.
 - Global variables/registers (and mem, functions, axioms) with the sigil `$`
 - Specification/attribute identifiers with the sigil `.`
 
