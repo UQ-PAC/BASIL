@@ -272,8 +272,7 @@ object IRTransform {
 
     transforms.establishProcedureDiamondForm(ctx.program, doSimplify)
 
-    val externalRemover = ExternalRemover(externalNamesLibRemoved.toSet)
-    externalRemover.visitProgram(ctx.program)
+    ir.transforms.removeBodyOfExternal(externalNamesLibRemoved.toSet)(ctx.program)
     for (p <- ctx.program.procedures) {
       p.isExternal = Some(
         ctx.externalFunctions.exists(e => e.name == p.procName || p.address.contains(e.offset)) || p.isExternal
@@ -318,15 +317,13 @@ object IRTransform {
     if (
       !config.memoryTransform && (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled))
     ) {
-      val stackIdentification = StackSubstituter()
-      stackIdentification.visitProgram(ctx.program)
+      visit_prog(ir.transforms.StackSubstituter(), ctx.program)
     }
 
     val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
     ctx.program.setModifies(specModifies)
 
-    val renamer = Renamer(boogieReserved)
-    renamer.visitProgram(ctx.program)
+    visit_prog(ir.transforms.BoogieReservedRenamer(boogieReserved), ctx.program)
 
     assert(invariant.singleCallBlockEnd(ctx.program))
 

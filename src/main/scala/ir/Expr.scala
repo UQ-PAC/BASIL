@@ -13,7 +13,6 @@ sealed trait Expr extends DefaultDeepEquality {
 
   /** all variables that occur in the expression */
   def variables: Set[Variable] = Set()
-  def acceptVisit(visitor: Visitor): Expr = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 
   override def toString() = translating.PrettyPrinter.pp_expr(this)
 
@@ -62,9 +61,7 @@ def size(e: Expr) = {
   }
 }
 
-sealed trait Literal extends Expr {
-  override def acceptVisit(visitor: Visitor): Literal = visitor.visitLiteral(this)
-}
+sealed trait Literal extends Expr {}
 
 sealed trait BoolLit extends Literal {
   def value: Boolean
@@ -109,7 +106,6 @@ case class Extract(end: Int, start: Int, body: Expr) extends Expr with CachedHas
   override def gammas: Set[Variable] = body.gammas
   override def variables: Set[Variable] = body.variables
   override def getType: BitVecType = BitVecType(end - start)
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitExtract(this)
 }
 
 /** Gives repeats copies of body, concatenated.
@@ -125,7 +121,6 @@ case class Repeat(repeats: Int, body: Expr) extends Expr with CachedHashCode {
     case bv: BitVecType => bv.size
     case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of repeat: " + this)
   }
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitRepeat(this)
 }
 
 /** Zero-extends by extension extra bits. */
@@ -138,7 +133,6 @@ case class ZeroExtend(extension: Int, body: Expr) extends Expr with CachedHashCo
     case bv: BitVecType => bv.size
     case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of zero extend: " + this)
   }
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitZeroExtend(this)
 }
 
 /** Sign-extends by extension extra bits. */
@@ -151,7 +145,6 @@ case class SignExtend(extension: Int, body: Expr) extends Expr with CachedHashCo
     case bv: BitVecType => bv.size
     case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of sign extend: " + this)
   }
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitSignExtend(this)
 }
 
 case class UnaryExpr(op: UnOp, arg: Expr) extends Expr with CachedHashCode {
@@ -170,8 +163,6 @@ case class UnaryExpr(op: UnOp, arg: Expr) extends Expr with CachedHashCode {
     case bv: BitVecType => bv.size
     case _ => throw new Exception("type mismatch")
   }
-
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitUnaryExpr(this)
 }
 
 sealed trait UnOp
@@ -246,9 +237,6 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr with Cache
     case bv: BitVecType => bv.size
     case _ => throw new Exception("type mismatch")
   }
-
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitBinaryExpr(this)
-
 }
 
 sealed trait BinOp {
@@ -346,7 +334,6 @@ enum Endian {
 case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IRType) extends Expr with CachedHashCode {
   override def getType: IRType = returnType
   override def toBoogie: BFunctionCall = BFunctionCall(name, params.map(_.toBoogie).toList, returnType.toBoogie, true)
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitUninterpretedFunction(this)
   override def variables: Set[Variable] = params.flatMap(_.variables).toSet
   def signature: (String, List[IRType], IRType) = (name, params.toList.map(_.getType), returnType)
 }
@@ -367,9 +354,6 @@ sealed trait Variable extends Expr {
   override def gammas: Set[Variable] = Set(this)
   override def toBoogie: BVar
   def toGamma: BVar
-
-  override def acceptVisit(visitor: Visitor): Variable =
-    throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
 object Variable {
@@ -384,7 +368,6 @@ object Variable {
 case class Register(override val name: String, size: Int) extends Variable with Global with CachedHashCode {
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Global)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Global)
-  override def acceptVisit(visitor: Visitor): Variable = visitor.visitRegister(this)
   override val irType: BitVecType = BitVecType(size)
 }
 
@@ -395,7 +378,6 @@ case class LocalVar(varName: String, override val irType: IRType, val index: Int
   override val name = varName + (if (index > 0) then s"_$index" else "")
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
-  override def acceptVisit(visitor: Visitor): Variable = visitor.visitLocalVar(this)
 }
 
 object LocalVar {
@@ -434,21 +416,15 @@ sealed trait Memory extends Global {
   def toGamma: BMapVar = BMapVar(s"Gamma_$name", MapBType(BitVecBType(addressSize), BoolBType), Scope.Global)
   val getType: IRType = MapType(BitVecType(addressSize), BitVecType(valueSize))
 
-  def acceptVisit(visitor: Visitor): Memory =
-    throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
 /** A stack area of memory, which is local to a thread. */
 case class StackMemory(override val name: String, override val addressSize: Int, override val valueSize: Int)
-    extends Memory {
-  override def acceptVisit(visitor: Visitor): Memory = visitor.visitStackMemory(this)
-}
+    extends Memory {}
 
 /** A non-stack region of memory, which may be shared between threads. */
 case class SharedMemory(override val name: String, override val addressSize: Int, override val valueSize: Int)
-    extends Memory {
-  override def acceptVisit(visitor: Visitor): Memory = visitor.visitSharedMemory(this)
-}
+    extends Memory {}
 
 enum QuantifierSort:
   case exists
@@ -476,7 +452,6 @@ case class QuantifierExpr(kind: QuantifierSort, body: LambdaExpr) extends Expr {
 }
 
 case class OldExpr(body: Expr) extends Expr {
-  override def acceptVisit(visitor: Visitor): Expr = body.acceptVisit(visitor)
   def getType = body.getType
   def toBoogie = Old(body.toBoogie)
 }
