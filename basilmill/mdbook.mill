@@ -1,0 +1,40 @@
+package build.basilmill
+
+import mill._
+
+import os.Path
+import scalalib._
+import scala.util.{Try}
+
+import $file.basilmill.util.DownloadModule
+
+
+trait mdbookBinary extends DownloadModule {
+  def version = "0.4.51"
+  def url = s"https://github.com/rust-lang/mdBook/releases/download/v${version}/mdbook-v${version}-${suffix}"
+  def name = s"mdBook-$version-${System.currentTimeMillis()}$suffix"
+
+  def osName = System.getProperty("os.name")
+
+    def local = Task.Input {
+      Try(os.proc("mdbook", "--version").call())
+        .map(Function.const("mdBook"))
+        .toEither
+        .left.map(_.toString)
+    }
+
+  def suffix = if (osName.contains("nux")) {
+    "x86_64-unknown-linux-musl.tar.gz"
+  }  else {
+    ""
+  }
+
+  override def path = Task {
+    local().getOrElse({
+      val l = remote(Task.dest)
+      os.call(Seq("tar", "-xzf", l.toString), cwd=Task.dest)
+      (Task.dest / "mdbook").toString
+    }
+    )
+  }
+}

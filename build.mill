@@ -4,6 +4,7 @@ import $packages._
 import mill._
 import scalalib._
 
+import $file.basilmill.mdbook.mdbookBinary
 import $file.basilmill.bnfc.BNFCJFlexModule
 import $file.basilmill.antlr.AntlrModule
 
@@ -170,6 +171,10 @@ object `package` extends RootModule with ScalaModule {
     }
   }
 
+  object MdBookBinary extends mdbookBinary {
+
+  }
+
   def gitCommitHash = Task.Input {
     // set in github actions
     // https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/store-information-in-variables#default-environment-variables
@@ -243,6 +248,8 @@ object `package` extends RootModule with ScalaModule {
     extraDocs().foreach {
       case (name, src) => copyDoc(src.path, name)
     }
+
+    os.copy(mdbook().path, dest, mergeFolders = true)
     os.copy.into(docsIndex().path, dest / "api")
 
     os.walk(dest).foreach {
@@ -292,4 +299,16 @@ object `package` extends RootModule with ScalaModule {
     os.call(args ++ srcArgs, cwd = Task.workspace)
     os.move(newFile, tagsFile, replaceExisting = true, atomicMove = true)
   }
+
+  def mdBookSources = Task.Source(super.millSourcePath / "docs")
+  def mdbook = Task {
+    os.call(Seq(MdBookBinary.path(), "build", "--dest-dir", Task.dest.toString, mdBookSources().path.toString))
+    PathRef(Task.dest)
+  }
+  def mdbookServe = Task {
+    os.call(Seq(MdBookBinary.path(), "serve", "--dest-dir", Task.dest.toString, mdBookSources().path.toString))
+    PathRef(Task.dest)
+  }
+
+
 }
