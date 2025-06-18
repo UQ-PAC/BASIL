@@ -964,20 +964,21 @@ class IntervalDSA(irContext: IRContext, config: DSConfig) {
       }
     }
 
-    val scc = stronglyConnectedComponents(CallGraph, irContext.program.procedures)
+    var rpo: Seq[Set[Procedure]] = Seq() // reverse postorder over call graph scc
     if config.phase == DSAPhase.BU || config.phase == DSAPhase.TD then {
-      val DSABU = IntervalDSA.solveBUs(dsaContext.local, scc)
+      val (dsaBU, order) = IntervalDSA.solveBUs(irContext.program.mainProcedure, dsaContext.local)
       DSATimer.checkPoint("Finished DSA BU Phase")
-      dsaContext = dsaContext.copy(bottomUp = DSABU)
+      dsaContext = dsaContext.copy(bottomUp = dsaBU)
+      rpo = order.reverse
       if checks then {
-        DSABU.values.foreach(checkUniqueGlobals)
-        DSABU.values.foreach(_.localCorrectness())
+        dsaBU.values.foreach(checkUniqueGlobals)
+        dsaBU.values.foreach(_.localCorrectness())
         DSALogger.info("Performed correctness check")
       }
     }
 
     if config.phase == DSAPhase.TD then {
-      val DSATD = IntervalDSA.solveTDs(dsaContext.bottomUp, scc)
+      val DSATD = IntervalDSA.solveTDs(dsaContext.bottomUp, rpo)
       DSATimer.checkPoint("Finished DSA TD Phase")
       if checks then
         DSATD.values.foreach(checkUniqueGlobals)
@@ -1306,49 +1307,54 @@ object IntervalDSA {
       )
   }
 
-  def computeSCCGraph(graphs: Map[Procedure, IntervalGraph], scc: Set[Procedure]): Map[Procedure, IntervalGraph] = {
+  /**
+   * computes the graph for a scc by merging their context
+   * all in/out parameters of all the graphs are unified
+   * @param graphs mapping from each procedure in the scc to their DSG
+   * @param scc the call graph scc
+   */
+  def computeSCCGraph(graphs: mutable.Map[Procedure, IntervalGraph], scc: Set[Procedure]): Unit = {
     require(scc.forall(graphs.keySet.contains))
     require(scc.size > 1)
     val sscc = scc.toSeq.sortBy(_.formalInParam.size).reverse
     val head = graphs(scc.head)
     sscc.tail.foreach(p => IntervalDSA.unifyGraphs(graphs(p), head))
-
-    graphs.map {
-      case (p, g) if sscc.contains(p) => (p, head)
-      case x => x
-    }
+    scc.foreach(p => graphs.update(p, head))
   }
 
-  def solveBUs(locals: Map[Procedure, IntervalGraph], scc: List[Set[Procedure]]): Map[Procedure, IntervalGraph] = {
-
+  /**
+   * resolves bottom up constraints
+   * @param init root node in call graph (main)
+   * @param locals mapping from procedures to their DSG after the local phase
+   * @return procedures
+   */
+  def solveBUs(
+    init: Procedure,
+    locals: Map[Procedure, IntervalGraph]
+  ): (Map[Procedure, IntervalGraph], Seq[Set[Procedure]]) = {
     DSALogger.info("Performing DSA BU phase")
-    var bus = locals.view.mapValues(_.clone).toMap
+    val bus: mutable.Map[Procedure, IntervalGraph] = mutable.Map(locals.view.mapValues(_.clone).toSeq: _*)
     DSALogger.info("performed cloning")
-    val visited: mutable.Set[Procedure] = mutable.Set.empty
-    val queue = mutable.Queue[Procedure]().enqueueAll(bus.keys.toSeq.sortBy(p => p.name))
-    while queue.nonEmpty do
-      val proc = queue.dequeue()
-      val cc = scc.find(_.contains(proc)).get
-      if cc.size > 1 && cc
-          .flatMap(_.calls)
-          .filter(p => !p.isExternal.getOrElse(false) && !cc.contains(p))
-          .forall(visited.contains)
-      then {
-        visited ++= cc
-        queue --= cc
-        bus = computeSCCGraph(bus, cc)
-      }
-      if !proc.calls.filter(p => !p.isExternal.getOrElse(false) && proc != p).forall(visited.contains) then
-        DSALogger.info(s"BU procedure ${proc.name} was readded")
-        queue.enqueue(proc)
-      else
-        DSALogger.info(s"performing BU for ${proc.name}")
-        bus(proc).contextTransfer(BU, bus)
-        visited += proc
-    bus
+    var order: Seq[Set[Procedure]] = Seq()
+    var visited: Set[Set[Procedure]] = Set()
+    def visitPostOrder(scc: Set[Procedure], bus: mutable.Map[Procedure, IntervalGraph]): Unit = {
+      visited += scc
+      CallSCCWalker.succ(scc).diff(visited).foreach(i => visitPostOrder(i, bus))
+      if scc.size == 1 then bus(scc.head).contextTransfer(BU, bus.toMap)
+      else computeSCCGraph(bus, scc)
+      order = order.appended(scc)
+    }
+    visitPostOrder(init.scc.getOrElse(Set(init)), bus)
+    (bus.toMap, order)
   }
 
-  def solveTDs(bus: Map[Procedure, IntervalGraph], scc: List[Set[Procedure]]): Map[Procedure, IntervalGraph] = {
+  /**
+   * resolves top down constraints
+   * @param bus mapping from procedures to their DSG after the bottom up phase
+   * @param rpo reverse of order in which bottom up phase visited
+   * @return DSG graphs after applying top down phase
+   */
+  def solveTDs(bus: Map[Procedure, IntervalGraph], rpo: Seq[Set[Procedure]]): Map[Procedure, IntervalGraph] = {
     DSALogger.info("Performing DSA TD phase")
     val oldToNew = mutable.Map[IntervalGraph, IntervalGraph]()
     val tds = bus.map {
@@ -1358,19 +1364,10 @@ object IntervalDSA {
         oldToNew.update(graph, clone)
         (proc, clone)
     }
-    val visited: mutable.Set[Procedure] = mutable.Set.empty
-    val queue = mutable.Queue[Procedure]().enqueueAll(tds.keys.toSeq.sortBy(p => p.name))
-
-    while queue.nonEmpty do
-      val proc = queue.dequeue()
-      val cc = scc.find(_.contains(proc)).get
-      if !proc.callers().filter(f => tds.keySet.contains(f) && !cc.contains(f)).forall(f => visited.contains(f)) then
-        DSALogger.info(s"TD procedure ${proc.name} was readded")
-        queue.enqueue(proc)
-      else
-        DSALogger.info(s"performing TD for ${proc.name}")
-        tds(proc).contextTransfer(TD, tds)
-        visited += proc
+    rpo.foreach(scc => // all procedures in a scc have the same graph
+      val proc = scc.head
+      tds(proc).contextTransfer(TD, tds)
+    )
     tds
   }
 
