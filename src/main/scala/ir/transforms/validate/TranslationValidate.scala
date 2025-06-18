@@ -17,6 +17,15 @@ import util.{Logger, PerformanceTimer, LogLevel}
 import ir.transforms.Substitute
 
 
+/**
+ *
+ * Pure structure:
+ *
+ *  (Program, Program', invariants) -> proof
+ *
+ */
+
+
 /*
  * General considerations
  *
@@ -860,8 +869,6 @@ def wrapShapePreservingTransformInValidation(transform: Program => Unit, name: S
   transform(p)
   validator.setSourceProg(p)
   validator.setEqualVarsInvariant
-  val (prog, splits) = validator.getValidationProgWPConj
-  writeValidationProg(prog, name)
   validator.getValidationSMT("tvsmt/" + name)
 }
 
