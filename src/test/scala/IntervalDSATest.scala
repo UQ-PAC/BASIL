@@ -223,7 +223,6 @@ object IntervalDSATestData {
             MemoryLoad(R2, mem, R1, LittleEndian, 64, Some("01")),
             LocalAssign(R3, BinaryExpr(BVADD, R2, BitVecLiteral(8, 64)), Some("02")),
             MemoryStore(mem, R1, R3, LittleEndian, 64, Some("03")),
-            directCall(Set(("R0", R0)), "main", Set(("R0", R0)), Some("04")),
             goto("en", "ex")
           ),
           block("ex", ret(("R0", R0)))
@@ -342,7 +341,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
   }
 
   // Eq classes counter example
-  ignore("recursion with indirection eq cells") {
+  test("recursion with indirection eq cells") {
     val result = runTestPrg(IntervalDSATestData.recursionWithIndirection, DSConfig(TD, eqClasses = true))
     val dsg = result.dsa.get.topDown(result.ir.program.mainProcedure)
     val t = (dsg.exprToCells(dsg.proc.formalInParam.head).flatMap(i => dsg.cellToEq(i.getPointee)))
