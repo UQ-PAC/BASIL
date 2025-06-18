@@ -25,16 +25,20 @@ case class PerformanceTimer(timerName: String = "", logLevel: LogLevel = LogLeve
   private var lastCheckpoint: Long = System.currentTimeMillis()
   private var end: Long = 0
   private val checkpoints: mutable.Map[String, Long] = mutable.HashMap()
+  private var trace = RingTrace[(String, Long)](1000, s"timer:$timerName")
+
+  OnCrash.register(trace)
 
   def checkPoint(name: String): Long = {
     val delta = elapsed()
     lastCheckpoint = System.currentTimeMillis()
     checkpoints.put(name, delta)
+    trace.add((name, delta))
     logLevel match {
-      case LogLevel.DEBUG => Logger.debug(s"PerformanceTimer $timerName [$name]: ${delta}ms")
-      case LogLevel.INFO => Logger.info(s"PerformanceTimer $timerName [$name]: ${delta}ms")
-      case LogLevel.WARN => Logger.warn(s"PerformanceTimer $timerName [$name]: ${delta}ms")
-      case LogLevel.ERROR => Logger.error(s"PerformanceTimer $timerName [$name]: ${delta}ms")
+      case LogLevel.DEBUG => Logger.debug(s"timer:$timerName [$name]: ${delta}ms")
+      case LogLevel.INFO => Logger.info(s"timer:$timerName [$name]: ${delta}ms")
+      case LogLevel.WARN => Logger.warn(s"timer:$timerName [$name]: ${delta}ms")
+      case LogLevel.ERROR => Logger.error(s"timer:$timerName [$name]: ${delta}ms")
       case _ => ???
     }
     delta

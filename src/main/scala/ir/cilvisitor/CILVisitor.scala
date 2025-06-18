@@ -95,6 +95,7 @@ class CILVisitorImpl(val v: CILVisitor) {
 
   def visit_expr(n: Expr): Expr = {
     def continue(n: Expr): Expr = n match {
+      case m: Memory => visit_mem(m)
       case o: OldExpr => {
         val n = visit_expr(o.body)
         if (n ne o.body) then OldExpr(n) else o
@@ -126,14 +127,18 @@ class CILVisitorImpl(val v: CILVisitor) {
         val narg2 = visit_expr(arg2)
         if ((narg1 ne arg) || (narg2 ne arg2)) BinaryExpr(op, narg1, narg2) else n
       }
+      case BoolExp(op, args) => {
+        val nargs = args.map(visit_expr)
+        BoolExp(op, nargs)
+      }
       case UnaryExpr(op, arg) => {
         val narg = visit_expr(arg)
         if (narg ne arg) UnaryExpr(op, narg) else n
       }
       case v: Variable => visit_rvar(v)
-      case UninterpretedFunction(name, params, rt) => {
+      case UninterpretedFunction(name, params, rt, _) => {
         val nparams = params.map(visit_expr)
-        val updated = (params.zip(nparams).map((a, b) => a ne b)).contains(true)
+        val updated = (params.zip(nparams).exists((a, b) => a ne b))
         if (updated) UninterpretedFunction(name, nparams, rt) else n
       }
     }
@@ -169,6 +174,16 @@ class CILVisitorImpl(val v: CILVisitor) {
         m.rhs = visit_expr(m.rhs)
         m.lhs = visit_lvar(m.lhs)
         m
+      case m: SimulAssign => {
+        var changed = false
+        val ns = m.assignments.map { case (lhs, rhs) =>
+          val (nl, nr) = (visit_lvar(lhs), visit_expr(rhs))
+          changed = changed || nl != lhs || nr != rhs
+          (nl, nr)
+        }
+        if changed then m.assignments = ns
+        m
+      }
       case s: Assert =>
         s.body = visit_expr(s.body)
         s
@@ -243,3 +258,4 @@ def visit_stmt(v: CILVisitor, e: Statement): List[Statement] = CILVisitorImpl(v)
 def visit_jump(v: CILVisitor, e: Jump): Jump = CILVisitorImpl(v).visit_jump(e)
 def visit_expr(v: CILVisitor, e: Expr): Expr = CILVisitorImpl(v).visit_expr(e)
 def visit_rvar(v: CILVisitor, e: Variable): Variable = CILVisitorImpl(v).visit_rvar(e)
+def visit_mem(v: CILVisitor, e: Memory): Memory = CILVisitorImpl(v).visit_mem(e)

@@ -11,7 +11,8 @@ abstract class LivenessAnalysis(program: Program, addExternals: Boolean = true) 
     n match {
       case p: Procedure => s
       case b: Block => s
-      case a: LocalAssign => (s - a.lhs) ++ a.rhs.variables
+      case SimulAssign(assignments, _) =>
+        (s -- assignments.map(_._1).toSet) ++ assignments.flatMap(_._2.variables).toSet
       case a: MemoryAssign => (s - a.lhs) ++ a.rhs.variables
       case m: MemoryStore => s ++ m.index.variables ++ m.value.variables
       case m: MemoryLoad => (s - m.lhs) ++ m.index.variables

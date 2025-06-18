@@ -200,6 +200,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
     val ty = visitType(ctx.`type`())
     val name = visitIdent(ctx.lvar)
     varMap += (name -> ty)
+    val lvar = LocalVar(name, ty)
 
     val (expr, load) = visitExpr(ctx.expr)
     if (expr.isDefined) {
@@ -649,7 +650,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
     }
   }
 
-  private def visitExprField(ctx: ExprFieldContext): Register = {
+  private def visitExprField(ctx: ExprFieldContext): GlobalVar = {
     val name = ctx.expr match {
       case e: ExprVarContext => visitIdent(e.ident)
       case _ => throw Exception(s"expected ${ctx.getText} to have an Expr_Var as first parameter")
@@ -659,7 +660,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
     resolveFieldExpr(name, field)
   }
 
-  private def visitExprArray(ctx: ExprArrayContext): Register = {
+  private def visitExprArray(ctx: ExprArrayContext): GlobalVar = {
     val name = ctx.array match {
       case e: ExprVarContext => visitIdent(e.ident)
       case _ => throw Exception(s"expected ${ctx.getText} to have an Expr_Var as first parameter")
@@ -700,7 +701,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
     }
   }
 
-  private def visitLExprField(ctx: LExprFieldContext): Register = {
+  private def visitLExprField(ctx: LExprFieldContext): GlobalVar = {
     val name = ctx.lexpr match {
       case l: LExprVarContext => visitIdent(l.ident)
       case _ => throw Exception(s"expected ${ctx.getText} to have an LExpr_Var as first parameter")
@@ -710,7 +711,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
     resolveFieldExpr(name, field)
   }
 
-  private def visitLExprArray(ctx: LExprArrayContext): Register = {
+  private def visitLExprArray(ctx: LExprArrayContext): GlobalVar = {
     val name = ctx.lexpr match {
       case l: LExprVarContext => visitIdent(l.ident)
       case _ => throw Exception(s"expected ${ctx.getText} to have an LExpr_Var as first parameter")
@@ -738,7 +739,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
     BitVecLiteral(num, width)
   }
 
-  private def resolveFieldExpr(name: String, field: String): Register = {
+  private def resolveFieldExpr(name: String, field: String): GlobalVar = {
     name match {
       case "PSTATE" if field == "V" || field == "C" || field == "Z" || field == "N" =>
         Register(field + "F", 1)
@@ -746,7 +747,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
     }
   }
 
-  private def resolveArrayExpr(name: String, index: Int): Register = {
+  private def resolveArrayExpr(name: String, index: Int): GlobalVar = {
     name match {
       case "_R" => Register(s"R$index", 64)
       case "_Z" => Register(s"V$index", 128)
