@@ -935,6 +935,7 @@ object RunUtils {
     assert(ir.invariant.programDiamondForm(ctx.program))
     var dsaContext: Option[DSAContext] = None
     if (conf.dsaConfig.isDefined) {
+      updateWithCallSCC(ctx.program)
       val dsaResults = IntervalDSA(ctx, conf.dsaConfig.get).dsa()
       dsaContext = Some(dsaResults)
 
