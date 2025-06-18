@@ -38,6 +38,14 @@ class IntervalGraph(
   val builder: () => Map[SymBase, IntervalNode] = nodeBuilder.getOrElse(buildNodes)
   var nodes: Map[SymBase, IntervalNode] = builder()
 
+  val isCalledBySCC = calledBySCC(proc)
+
+  def calledBySCC(p: Procedure): Boolean = {
+    proc.scc.isDefined || {
+      CallGraph.pred(p).exists(calledBySCC)
+    }
+  }
+
   def exprToSymVal(expr: Expr): SymValSet[OSet] =
     SymValues.exprToSymValSet(sva, i => isGlobal(i, irContext), glIntervals)(expr)
 
@@ -154,13 +162,8 @@ class IntervalGraph(
   // Processes all non call constraints
   def localPhase(): Unit = {
     addParamCells()
-    var processed = Set[Constraint]()
-    constraints.toSeq
-      .sortBy(f => f.label)
-      .foreach(c =>
-        processed += c
-        processConstraint(c)
-      )
+    constraints.foreach(processConstraint)
+    if eqCells then constraints.foreach(widenEqClasses)
   }
 
   // returns the cells corresponding to the
@@ -383,22 +386,36 @@ class IntervalGraph(
         DSALogger.debug(s"Processing constraint $cons")
         val indices = constraintArgToCells(cons.arg1, true, ignoreContents = true)
         indices.foreach(cell => cell.node.add(cell.interval.growTo(cons.size)))
-        var pointees = constraintArgToCells(cons.arg1, true)
-
+        val pointees = constraintArgToCells(cons.arg1, true)
         markEscapes(cons, indices, pointees)
-        var values = constraintArgToCells(cons.arg2, true)
-        if pointees.nonEmpty || values.nonEmpty then {
-          val cell = mergeCells(pointees ++ values)
-          val eqs = cellToEq(cell)
-          if eqs.size > 1 && cons.source.parent.isLoopParticipant() then {
-            pointees = constraintArgToCells(cons.arg1, true)
-            values = constraintArgToCells(cons.arg2, true)
-            val newEqs = cellToEq(mergeCells(pointees ++ values))
-            if newEqs.size > eqs.size then find(cell).node.collapse()
-          }
-        } else DSALogger.warn(s"$cons had an empty argument")
+        val values = constraintArgToCells(cons.arg2, true)
+        if pointees.nonEmpty || values.nonEmpty then mergeCells(pointees ++ values)
+        else DSALogger.warn(s"$cons had an empty argument")
         (indices ++ values).map(_.node).map(find).filterNot(_.eqClassProperty()).toSet.foreach(_.maintainEqClasses())
       case _ => // ignore
+  }
+
+  /**
+   * widens any eq classes related to this constraint that aren't fixed
+   * the constraint must have been processed using processConstraint
+   */
+  def widenEqClasses(con: Constraint): Unit = {
+    con match
+      // only concerned with constraints occuring in a cycle
+      case cons: MemoryAccessConstraint[_] =>
+        var pointees = constraintArgToCells(cons.arg1)
+        var values = constraintArgToCells(cons.arg2)
+        if pointees.nonEmpty || values.nonEmpty then {
+          assert(IntervalDSA.equiv(pointees ++ values))
+          val eqs = cellToEq((pointees ++ values).head) // compute eq cells involved in constraint
+          pointees = constraintArgToCells(cons.arg1, true)
+          values = constraintArgToCells(cons.arg2, true)
+          val newEqs = cellToEq(mergeCells(pointees ++ values))
+          // if reprocessing added another cell collapse the node
+          if newEqs.size > eqs.size && (cons.source.parent.isLoopParticipant() || isCalledBySCC) then
+            find(eqs.head).node.collapse()
+        }
+      case _ =>
   }
 
   /**
@@ -1351,7 +1368,7 @@ object IntervalDSA {
   /**
    * resolves top down constraints
    * @param bus mapping from procedures to their DSG after the bottom up phase
-   * @param rpo reverse of order in which bottom up phase visited
+   * @param rpo reverse of order in which bottom up phase visited (reverse postorder)
    * @return DSG graphs after applying top down phase
    */
   def solveTDs(bus: Map[Procedure, IntervalGraph], rpo: Seq[Set[Procedure]]): Map[Procedure, IntervalGraph] = {
