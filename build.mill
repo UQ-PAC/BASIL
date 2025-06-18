@@ -24,6 +24,9 @@ object `package` extends RootModule with ScalaModule {
 
   def scalacOptions: T[Seq[String]] = Seq("-deprecation")
 
+  val cats = ivy"org.typelevel::cats-core:2.9.0"
+  val catsCollections = ivy"org.typelevel::cats-collections-core:0.9.10"
+  val catsKittens = ivy"org.typelevel::kittens:3.5.0" 
   val javaTests = ivy"com.novocode:junit-interface:0.11"
   val scalaTests = ivy"org.scalatest::scalatest:3.2.19"
   val scalaCheck = ivy"org.scalatestplus::scalacheck-1-18:3.2.19.0"
@@ -37,7 +40,7 @@ object `package` extends RootModule with ScalaModule {
   def mainClass = Some("Main")
 
   def millSourcePath = super.millSourcePath / "src"
-  def ivyDeps = Agg(scalactic, sourceCode, mainArgs, upickle)
+  def ivyDeps = Agg(scalactic, sourceCode, mainArgs, upickle, cats, catsCollections, catsKittens)
   def sources = Task.Sources {
     Seq(PathRef(this.millSourcePath / "main" / "scala"))
   }

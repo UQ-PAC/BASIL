@@ -4,6 +4,9 @@ import boogie.*
 import ir.*
 import util.Logger
 
+
+case class LoopInvariant(header: String, inv: List[Expr], comment: Option[String] = None)
+
 trait SymbolTableEntry {
   val name: String
   val size: Int

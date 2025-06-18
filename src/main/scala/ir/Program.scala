@@ -275,7 +275,8 @@ class Procedure private (
   var requires: List[BExpr],
   var ensures: List[BExpr],
   var requiresExpr: List[Expr],
-  var ensuresExpr: List[Expr]
+  var ensuresExpr: List[Expr],
+  var loopInvariants: Map[Block, specification.LoopInvariant]
 ) extends Iterable[CFGPosition]
     with DeepEquality {
 
@@ -313,7 +314,8 @@ class Procedure private (
       List.from(requires),
       List.from(ensures),
       List(),
-      List()
+      List(),
+      Map()
     )
   }
 
@@ -558,6 +560,10 @@ class Block private (
     jump: Jump = Unreachable()
   ) = {
     this(label, address, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty)
+  }
+
+  def forwardIteratorFrom = {
+    ILForwardIterator(Seq(this), IntraProcIRCursor)
   }
 
   override def deepEquals(b: Object): Boolean = b match {
