@@ -12,6 +12,7 @@ import util.{
   IRContext,
   Logger,
   RunUtils,
+  SlicerConfig,
   StaticAnalysisConfig
 }
 import util.boogie_interaction.*
@@ -31,7 +32,8 @@ case class TestConfig(
   simplify: Boolean = false,
   summariseProcedures: Boolean = false,
   dsa: Option[DSAConfig] = None,
-  memoryTransform: Boolean = false
+  memoryTransform: Boolean = false,
+  slicerConfig: Option[SlicerConfig] = None
 ) {
   private val scaledtimespans = new ScaledTimeSpans {}
   def timeoutFlag =
@@ -51,6 +53,7 @@ trait BASILTest {
     summariseProcedures: Boolean = false,
     dsa: Option[DSAConfig] = None,
     memoryTransform: Boolean = false,
+    slicerConfig: Option[SlicerConfig] = None,
     postLoad: IRContext => Unit = s => ()
   ): BASILResult = {
     val specFile = if (specPath.isDefined && File(specPath.get).exists) {
@@ -67,7 +70,8 @@ trait BASILTest {
         util.BoogieGeneratorConfig().copy(memoryFunctionType = util.BoogieMemoryAccessMode.SuccessiveStoreSelect),
       outputPrefix = BPLPath,
       dsaConfig = dsa,
-      memoryTransform = memoryTransform
+      memoryTransform = memoryTransform,
+      slicerConfig = slicerConfig
     )
     val result = RunUtils.loadAndTranslate(config, postLoad = postLoad)
     RunUtils.writeOutput(result)
@@ -106,7 +110,7 @@ trait BASILTest {
       case BoogieResultKind.AssertionFailed if expectVerify => Some("Expected verification success, but got failure.")
       case k: BoogieResultKind.Unknown => Some(k.toString)
     }
-    (failureMsg, boogieResult.kind == BoogieResultKind.Verified, boogieResult.kind == BoogieResultKind.Timeout)
+    (failureMsg, boogieResult.kind.isInstanceOf[BoogieResultKind.Verified], boogieResult.kind == BoogieResultKind.Timeout)
   }
 }
 
