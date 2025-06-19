@@ -105,8 +105,7 @@ class GTIRBToIR(
       .map(i => content.substring(i, i + opcodeBytes))
       .map(b => bytesToi32(b.toByteArray, true))
 
-
-    def toStatements() : Seq[Statement] = {
+    def toStatements(): Seq[Seq[Statement]] = {
       offlineLifter.Lifter.liftBlockBytes(opcodes, address)
     }
 
@@ -163,7 +162,7 @@ class GTIRBToIR(
     blockAddresses
   }
 
-  def createOpcodeBlocks() : immutable.Map[ByteString, BlockPos] = {
+  def createOpcodeBlocks(): immutable.Map[ByteString, BlockPos] = {
     val blocks = mods
       .flatMap(_.sections)
       .flatMap(_.byteIntervals)
@@ -251,7 +250,7 @@ class GTIRBToIR(
         val block = uuidToBlock(blockUUID)
 
         // val statements = semanticsLoader.visitBlock(blockUUID, blockCount, block.address)
-        val statements = Seq(uuidToBlockContent(blockUUID).toStatements())
+        val statements = uuidToBlockContent(blockUUID).toStatements()
         blockCount += 1
         for ((stmts, i) <- statements.zipWithIndex) {
           block.statements.addAll(insertPCIncrement(stmts))
@@ -356,14 +355,16 @@ class GTIRBToIR(
       case last @ LocalAssign(lhs: Register, _, _) if lhs.name == "_PC" =>
         val label = last.label
         label
-      case _ => throw Exception(s"expected block ${block.label} to have a program counter assignment at its end")
+      case l =>
+        throw Exception(s"expected block ${block.label} to have a program counter assignment at its end but got $l")
     }
   }
 
   private def getPCTarget(block: Block): Register = {
     block.statements.last match {
       case LocalAssign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
-      case _ => throw Exception(s"expected block ${block.label} to have a program counter assignment at its end")
+      case _ =>
+        throw Exception(s"expected block ${block.label} to have a program counter assignment at its end\n$block")
     }
   }
 

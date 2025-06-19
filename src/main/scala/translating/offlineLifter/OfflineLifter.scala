@@ -1,4 +1,4 @@
- package translating.offlineLifter
+package translating.offlineLifter
 
 import util.Logger
 import ir.*
@@ -12,27 +12,26 @@ import translating.TempIf
 
 trait Builder[L] {
 
-  def push_stmt(s: Statement) : Unit
+  def push_stmt(s: Statement): Unit
 
-  def gen_branch(arg0: Expr) : L
+  def gen_branch(arg0: Expr): L
   def true_branch(arg0: L): L
   def false_branch(arg0: L): L
   def merge_branch(arg0: L): L
 
   def switch_ctx(arg0: L): Unit
-  def defaultLabel : L
+  def defaultLabel: L
 }
-
 
 class NopBuilder extends Builder[String] {
 
-  def gen_branch(arg0: Expr) : String = ???
-  def push_stmt(s: Statement) : Unit = ???
+  def gen_branch(arg0: Expr): String = ???
+  def push_stmt(s: Statement): Unit = ???
   def true_branch(arg0: String): String = ???
   def false_branch(arg0: String): String = ???
   def merge_branch(arg0: String): String = ???
   def switch_ctx(arg0: String): Unit = ???
-  def defaultLabel : String = "null"
+  def defaultLabel: String = "null"
 
 }
 
@@ -51,7 +50,7 @@ object LoadExpr {
 
 class StmtListBuilder extends Builder[Int] {
 
-  private var writing : Int = 0
+  private var writing: Int = 0
   private val blocks = mutable.ArrayBuffer[mutable.ArrayBuffer[Statement]](mutable.ArrayBuffer.empty)
   private val branches = mutable.ArrayBuffer[Stmt](Block(0))
 
@@ -82,21 +81,21 @@ class StmtListBuilder extends Builder[Int] {
 
   def false_branch(id: Int) = {
     branches(id) match {
-      case b : Branch => b.falseB
+      case b: Branch => b.falseB
       case _ => ???
     }
   }
 
   def true_branch(id: Int) = {
     branches(id) match {
-      case b : Branch => b.trueB
+      case b: Branch => b.trueB
       case _ => ???
     }
   }
 
   def merge_branch(id: Int) = {
     branches(id) match {
-      case b : Branch => b.joinB
+      case b: Branch => b.joinB
       case _ => ???
     }
   }
@@ -112,11 +111,21 @@ class StmtListBuilder extends Builder[Int] {
     }
   }
 
-
 }
 
-
 trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
+
+  def castBV(b: Expr) = b.getType match {
+    case _: BitVecType => b
+    case BoolType => UnaryExpr(BoolToBV1, b)
+    case _ => ???
+  }
+
+  def castBool(b: Expr) = b.getType match {
+    case BoolType => b
+    case BitVecType(1) => BinaryExpr(EQ, b, BitVecLiteral(1, 1))
+    case _ => ???
+  }
 
   def b: Builder[L]
 
@@ -136,7 +145,6 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
     smt_extract((lo + width - 1).toInt, lo.toInt, e)
   }
 
-
   def f_eq_bits(t: BigInt, x: BitVecLiteral, y: BitVecLiteral): Boolean = (smt_bveq(x, y))
   def f_ne_bits(t: BigInt, x: BitVecLiteral, y: BitVecLiteral): Boolean = (!smt_bveq(x, y))
   def f_add_bits(t: BigInt, x: BitVecLiteral, y: BitVecLiteral): BitVecLiteral = (smt_bvadd(x, y))
@@ -150,13 +158,16 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
   def f_sle_bits(t: BigInt, x: BitVecLiteral, y: BitVecLiteral): Boolean = smt_bvsle(x, y)
   def f_zeros_bits(w: BigInt): BitVecLiteral = BitVecLiteral(0, w.toInt)
   def f_ones_bits(w: BigInt): BitVecLiteral = BitVecLiteral(BigInt(2).pow(w.toInt) - 1, w.toInt)
-  def f_ZeroExtend(t0: BigInt, t1: BigInt, n: BitVecLiteral, x: BigInt): BitVecLiteral = smt_zero_extend(x.toInt - n.size, n)
-  def f_SignExtend(t0: BigInt, t1: BigInt, n: BitVecLiteral, x: BigInt): BitVecLiteral = smt_sign_extend(x.toInt - n.size, n)
-  def f_asr_bits(targ0: BigInt, targ1: BigInt, arg0: BitVecLiteral, arg1: BitVecLiteral): BitVecLiteral = smt_bvashr(arg0, arg1)
+  def f_ZeroExtend(t0: BigInt, t1: BigInt, n: BitVecLiteral, x: BigInt): BitVecLiteral =
+    smt_zero_extend(x.toInt - n.size, n)
+  def f_SignExtend(t0: BigInt, t1: BigInt, n: BitVecLiteral, x: BigInt): BitVecLiteral =
+    smt_sign_extend(x.toInt - n.size, n)
+  def f_asr_bits(targ0: BigInt, targ1: BigInt, arg0: BitVecLiteral, arg1: BitVecLiteral): BitVecLiteral =
+    smt_bvashr(arg0, arg1)
   def f_lsl_bits(targ0: BigInt, targ1: BigInt, arg0: BitVecLiteral, arg1: BitVecLiteral): BitVecLiteral =
     smt_bvshl(arg0, BitVecLiteral(arg1.value, arg0.size))
   def f_lsr_bits(targ0: BigInt, targ1: BigInt, arg0: BitVecLiteral, arg1: BitVecLiteral): BitVecLiteral =
-    smt_bvlshr(arg0, BitVecLiteral(arg1.value , arg0.size))
+    smt_bvlshr(arg0, BitVecLiteral(arg1.value, arg0.size))
 
   def f_decl_bool(arg0: String): Expr = LocalVar(arg0, BoolType)
   def f_decl_bv(arg0: String, arg1: BigInt): Expr = LocalVar(arg0, BitVecType(arg1.toInt))
@@ -179,11 +190,12 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
 
   /** Run-time IR program generation */
 
-  def f_gen_BFAdd(arg0: Expr, arg1: Expr): Expr = throw NotImplementedError()
-  def f_gen_BFMul(arg0: Expr, arg1: Expr): Expr = throw NotImplementedError()
-  def f_gen_FPAdd(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr = throw NotImplementedError()
+  def f_gen_BFAdd(arg0: Expr, arg1: Expr): Expr = UninterpretedFunction("BFAdd", Seq(arg0, arg1), arg0.getType)
+  def f_gen_BFMul(arg0: Expr, arg1: Expr): Expr = UninterpretedFunction("BFAMul", Seq(arg0, arg1), arg0.getType)
+  def f_gen_FPAdd(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
+    UninterpretedFunction("FPAdd", Seq(arg0, arg1, arg2), BitVecType(targ0.toInt))
   def f_gen_FPCompare(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr, arg3: Expr): Expr =
-    throw NotImplementedError()
+    UninterpretedFunction("FPCompare", Seq(arg0, arg1, arg2, arg3), BitVecType(targ0.toInt))
   def f_gen_FPCompareEQ(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr = throw NotImplementedError()
   def f_gen_FPCompareGE(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr = throw NotImplementedError()
   def f_gen_FPCompareGT(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr = throw NotImplementedError()
@@ -213,33 +225,20 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
     throw NotImplementedError()
   def f_gen_FPSqrt(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = throw NotImplementedError()
   def f_gen_FPSub(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr = throw NotImplementedError()
-  def f_gen_FPToFixed(
-    targ0: BigInt,
-    targ1: BigInt,
-    arg0: Expr,
-    arg1: Expr,
-    arg2: Expr,
-    arg3: Expr,
-    arg4: Expr
-  ): Expr = throw NotImplementedError()
+  def f_gen_FPToFixed(targ0: BigInt, targ1: BigInt, arg0: Expr, arg1: Expr, arg2: Expr, arg3: Expr, arg4: Expr): Expr =
+    throw NotImplementedError()
   def f_gen_FPToFixedJS_impl(targ0: BigInt, targ1: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
     throw NotImplementedError()
-  def f_gen_FixedToFP(
-    targ0: BigInt,
-    targ1: BigInt,
-    arg0: Expr,
-    arg1: Expr,
-    arg2: Expr,
-    arg3: Expr,
-    arg4: Expr
-  ): Expr = throw NotImplementedError()
+  def f_gen_FixedToFP(targ0: BigInt, targ1: BigInt, arg0: Expr, arg1: Expr, arg2: Expr, arg3: Expr, arg4: Expr): Expr =
+    throw NotImplementedError()
   def f_gen_bit_lit(targ0: BigInt, arg0: BitVecLiteral): Expr = BitVecLiteral(arg0.value, targ0.toInt)
-  def f_gen_bool_lit(arg0: Boolean): Expr = if arg0 then BitVecLiteral(1, 1) else BitVecLiteral(0, 1)
+  def f_gen_bool_lit(arg0: Boolean): Expr = if arg0 then TrueLiteral else FalseLiteral
   def f_gen_branch(arg0: Expr): L = b.gen_branch(arg0)
   def f_cvt_bits_uint(targ0: BigInt, arg0: BitVecLiteral): BigInt = arg0.value
   def f_gen_cvt_bits_uint(targ0: BigInt, arg0: Expr): Expr = arg0
-  def f_gen_cvt_bool_bv(arg0: Expr): Expr = arg0
-  def f_gen_eor_bits(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = BinaryExpr(EQ, arg0, arg1)
+  def f_gen_cvt_bool_bv(arg0: Expr): Expr = UnaryExpr(BoolToBV1, arg0)
+
+  def f_gen_eor_bits(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = BinaryExpr(BVXOR, arg0, arg1)
   def f_gen_eq_bits(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = BinaryExpr(EQ, arg0, arg1)
   def f_gen_eq_enum(arg0: Expr, arg1: Expr): Expr = BinaryExpr(EQ, arg0, arg1)
   def f_gen_int_lit(arg0: BigInt): BitVecLiteral = BitVecLiteral(arg0, 1123)
@@ -249,13 +248,15 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
       val stmt = e match {
         case LoadExpr(addr, size) => {
           MemoryLoad(v, memory, addr, endian, size.toInt)
-        } case _ => {
+        }
+        case _ => {
           LocalAssign(v, e)
         }
       }
       b.push_stmt(stmt)
     }
     case m => throw NotImplementedError(s"fail assign $m")
+
   def f_gen_load(e: Expr): Expr = e
 
   def f_gen_SignExtend(targ0: BigInt, targ1: BigInt, arg0: Expr, arg1: BitVecLiteral): Expr = {
@@ -264,7 +265,7 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
     if (arg1.value != newSize) {
       throw Exception()
     }
-    SignExtend((newSize - oldSize).toInt, arg0)
+    SignExtend((newSize - oldSize).toInt, castBV(arg0))
   }
   def f_gen_ZeroExtend(targ0: BigInt, targ1: BigInt, arg0: Expr, arg1: BitVecLiteral): Expr = {
     val oldSize = (targ0)
@@ -272,12 +273,11 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
     if (arg1.value != newSize) {
       throw Exception()
     }
-    ZeroExtend((newSize - oldSize).toInt, arg0)
+    ZeroExtend((newSize - oldSize).toInt, castBV(arg0))
   }
   def f_gen_add_bits(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = BinaryExpr(BVADD, arg0, arg1)
   def f_gen_and_bits(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = BinaryExpr(BVAND, arg0, arg1)
 
-  def f_gen_and_bool(arg0: Expr, arg1: Expr): Expr = BinaryExpr(BoolAND, arg0, arg1)
   def f_gen_asr_bits(targ0: BigInt, targ1: BigInt, arg0: Expr, arg1: Expr): Expr =
     BinaryExpr(BVASHR, arg0, gen_zero_extend_to(targ0, arg1))
   def f_gen_lsl_bits(targ0: BigInt, targ1: BigInt, arg0: Expr, arg1: Expr): Expr =
@@ -293,6 +293,8 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
     case IntType => throw IllegalArgumentException()
   }
 
+  def f_gen_or_bool(arg0: Expr, arg1: Expr): Expr = BinaryExpr(BoolOR, arg0, arg1)
+  def f_gen_and_bool(arg0: Expr, arg1: Expr): Expr = BinaryExpr(BoolAND, arg0, arg1)
   def f_gen_not_bool(arg0: Expr): Expr = arg0.getType match {
     case BoolType => UnaryExpr(BoolNOT, arg0)
     case BitVecType(sz) => BinaryExpr(NEQ, BitVecLiteral(0, sz), arg0)
@@ -301,7 +303,6 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
   }
 
   def f_gen_or_bits(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = BinaryExpr(BVOR, arg0, arg1)
-  def f_gen_or_bool(arg0: Expr, arg1: Expr): Expr = BinaryExpr(BVOR, arg0, arg1)
   def f_gen_sdiv_bits(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = BinaryExpr(BoolOR, arg0, arg1)
   def f_gen_sle_bits(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = BinaryExpr(BVSLE, arg0, arg1)
   def f_gen_slt_bits(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = BinaryExpr(BVSLT, arg0, arg1)
@@ -323,13 +324,16 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
 
   def f_gen_array_load(arg0: Expr, arg1: BigInt): Expr = arg0 match
     case Register("_R", t) => Register("R" + arg1, 64)
-    case _ => {
-      Logger.warn(s"Unknown array load $arg0")
-      arg0
-    }
-  def f_gen_array_store(arg0: Expr, arg1: BigInt, arg2: Expr): Unit = arg0 match
-    case Register(n, t) if n.contains("R") => b.push_stmt(LocalAssign(Register("R" + arg1, 64), arg2))
-    case _ => Logger.warn(s"Unknown array store $arg0")
+    case Register("_Z", t) => Register("Z" + arg1, 128)
+    case Register("_P", t) => Register("P" + arg1, 256)
+    case _ => throw Exception(s"Unknown array $arg0")
+  def f_gen_array_store(arg0: Expr, arg1: BigInt, arg2: Expr): Unit =
+    val lhs = arg0 match
+      case Register("_R", t) => Register("R" + arg1, 64)
+      case Register("_Z", t) => Register("Z" + arg1, 128)
+      case Register("_P", t) => Register("P" + arg1, 256)
+      case _ => throw Exception(s"Unkown array $arg0")
+    b.push_stmt(LocalAssign(lhs, arg2))
 
   def f_gen_Mem_set(sz: BigInt, ptr: Expr, width: BitVecLiteral, acctype: Expr, value: Expr): Unit =
     assert(width.value == sz)
@@ -348,7 +352,6 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
 
   /** Global variable definitions * */
 
-
   def v_PSTATE_UAO: Mutable[Expr] = throw NotImplementedError()
   def v_PSTATE_PAN: Mutable[Expr] = throw NotImplementedError()
   def v_PSTATE_DIT: Mutable[Expr] = throw NotImplementedError()
@@ -364,8 +367,8 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
   def v_PSTATE_N = Mutable(Register("NF", 1)) // Expr_Field(Expr_Var(Ident "PSTATE"), Ident "N")
 
   def v__PC = Mutable(Register("_PC", 64))
-  def v__R = Mutable(Register("_R", 128))
-  def v__Z = Mutable(Register("_Z", 1))
+  def v__R = Mutable(Register("_R", 64))
+  def v__Z = Mutable(Register("_Z", 128))
   def v_SP_EL0 = Mutable(Register("R31", 64))
   def v_FPSR = Mutable(Register("FPSR", 1))
   def v_FPCR = Mutable(Register("FPCR", (32)))
@@ -379,7 +382,6 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
 }
 
 def extract(x: BigInt, sz: BigInt) = x % (BigInt(2).pow((sz + 1).toInt))
-
 
 def zero_extend_to(s: BigInt, x: BitVecLiteral) = {
   require(s >= x.size, s"$s $x")
@@ -395,36 +397,37 @@ def gen_zero_extend_to(s: BigInt, x: Expr) = {
 
 class StmtListLifter extends LifterIFace[Int] {
   val builder = StmtListBuilder()
-  def b : Builder[Int] = builder
-  def extract : Seq[Statement] = builder.extract
+  def b: Builder[Int] = builder
+  def extract: Seq[Statement] = builder.extract
 }
 
 object Lifter {
 
-  def liftBlockBytes(ops: Iterable[Int], initialSp: BigInt) : Seq[Statement] = {
-    val lift = StmtListLifter()
+  def liftBlockBytes(ops: Iterable[Int], initialSp: BigInt): Seq[Seq[Statement]] = {
     var sp = initialSp
-    ops.foreach { op =>
-      if (op == 0xd503201f.toInt) {
-        // nop
+    ops.map { op =>
+      val ins = if (op == 0xd503201f.toInt) {
+        Seq()
       } else {
         try {
+          val lift = StmtListLifter()
           f_A64_decoder[Expr, Int, BitVecLiteral](lift, BitVecLiteral(BigInt(op), 32), BitVecLiteral(sp, 64))
+          lift.extract.toSeq
         } catch {
           case e => {
             val o = "%x".format(op)
-            println(s"Lift failure $o : $e")
-            println(e.getStackTrace.mkString("\n  "))
-
+            val msg = (s"Lift failure $o : $e")
+            println(msg + "\n" + e.getStackTrace.mkString("\n  "))
+            Seq(Assert(FalseLiteral, Some(msg)))
           }
         }
       }
       sp = sp + 32
-    }
-    lift.extract
+      ins
+    }.toSeq
   }
 
-  def liftOpcode(op: BigInt, sp: BigInt) : Seq[Statement] = {
+  def liftOpcode(op: BigInt, sp: BigInt): Seq[Statement] = {
     val lift = StmtListLifter()
     val dec = f_A64_decoder[Expr, Int, BitVecLiteral](lift, BitVecLiteral(op, 32), BitVecLiteral(sp, 64))
     println(dec)

@@ -196,11 +196,11 @@ object IRLoading {
     val mods = ir.modules
     val cfg = ir.cfg.get
 
-    val semanticsJson = mods.map(_.auxData("ast").data.toStringUtf8)
+    lazy val semanticsJson = mods.map(_.auxData("ast").data.toStringUtf8)
 
-    val semantics = semanticsJson.map(upickle.default.read[Map[String, List[InsnSemantics]]](_))
+    lazy val semantics = semanticsJson.map(upickle.default.read[Map[String, List[InsnSemantics]]](_))
 
-    val parserMap: Map[String, List[InsnSemantics]] = semantics.flatten.toMap
+    val parserMap: Map[String, List[InsnSemantics]] = Map() // semantics.flatten.toMap
 
     val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress, mainName)
     GTIRBConverter.createIR()
