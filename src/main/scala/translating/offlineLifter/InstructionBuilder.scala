@@ -216,7 +216,6 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
   def f_gen_AArch64_MemTag_set(arg0: Expr, arg1: Expr, arg2: Expr): Expr = throw NotImplementedError()
   def f_gen_AArch64_MemTag_read(arg0: Expr, arg1: Expr): Expr = throw NotImplementedError()
   def f_gen_Mem_read(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr = {
-    println(s"$arg0 $arg1 $arg2")
     val size: Int = arg1 match
       case BitVecLiteral(v, s) => v.toInt * 8
       case IntLiteral(v) => v.toInt * 8
