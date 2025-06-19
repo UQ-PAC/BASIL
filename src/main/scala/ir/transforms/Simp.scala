@@ -4,7 +4,6 @@ import java.io.{BufferedWriter, File, FileInputStream, FileWriter, IOException, 
 import util.LogLevel
 
 import util.DebugDumpIRLogger
-import specification.FuncEntry
 import util.{SimplifyLogger, condPropDebugLogger}
 import ir.eval.AlgebraicSimplifications
 import ir.eval.AssumeConditionSimplifications
@@ -734,8 +733,6 @@ def simplifyCFG(p: Procedure) = {
 def copypropTransform(
   p: Procedure,
   procFrames: Map[Procedure, Set[Memory]],
-  funcEntries: Map[BigInt, Procedure],
-  constRead: (BigInt, Int) => Option[BitVecLiteral]
 ) = {
   val t = util.PerformanceTimer(s"simplify ${p.name} (${p.blocks.size} blocks)")
   // SimplifyLogger.info(s"${p.name} ExprComplexity ${ExprComplexity()(p)}")
@@ -1042,7 +1039,7 @@ def cleanupBlocks(p: Program) = {
   }
 }
 
-def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
+def doCopyPropTransform(p: Program) = {
 
   applyRPO(p)
 
@@ -1055,8 +1052,6 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
     }
 
   val procFrames = getProcFrame.solveInterproc(p)
-
-  val addrToProc = p.procedures.toSeq.flatMap(p => p.address.map(addr => addr -> p).toSeq).toMap
 
   def read(addr: BigInt, size: Int): Option[BitVecLiteral] = {
     val rodata = p.initialMemory.filter((_, s) => s.readOnly)
@@ -1085,7 +1080,7 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
         {
           SimplifyLogger
             .debug(s"CopyProp Transform ${p.name} (${p.blocks.size} blocks, expr complexity ${ExprComplexity()(p)})")
-          copypropTransform(p, procFrames, addrToProc, read)
+          copypropTransform(p, procFrames)
         }
     )
 
@@ -1113,9 +1108,9 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
 
 }
 
-def copyPropParamFixedPoint(p: Program, rela: Map[BigInt, BigInt]): Int = {
+def copyPropParamFixedPoint(p: Program): Int = {
   SimplifyLogger.info(s"Simplify:: Copyprop iteration 0")
-  doCopyPropTransform(p, rela)
+  doCopyPropTransform(p)
   var inlinedOutParams: Map[Procedure, Set[Variable]] = removeInvariantOutParameters(p)
   var changed = inlinedOutParams.nonEmpty
   var iterations = 1
@@ -1124,7 +1119,7 @@ def copyPropParamFixedPoint(p: Program, rela: Map[BigInt, BigInt]): Int = {
     changed = false
     SimplifyLogger.info(s"Simplify:: Copyprop iteration $iterations")
     transforms.removeTriviallyDeadBranches(p)
-    doCopyPropTransform(p, rela)
+    doCopyPropTransform(p)
     val extraInlined = removeInvariantOutParameters(p, inlinedOutParams)
     inlinedOutParams = extraInlined.foldLeft(inlinedOutParams)((acc, v) =>
       acc + (v._1 -> (acc.getOrElse(v._1, Set[Variable]()) ++ v._2))
@@ -1643,8 +1638,6 @@ object CopyProp {
   def DSACopyProp(
     p: Procedure,
     procFrames: Map[Procedure, Set[Memory]],
-    funcEntries: Map[BigInt, Procedure],
-    constRead: (BigInt, Int) => Option[BitVecLiteral]
   ) = {
     val updated = false
     val state = mutable.HashMap[Variable, PropState]()
@@ -1729,27 +1722,6 @@ object CopyProp {
           // need a reaching-defs to get inout args (just assume register name matches?)
           // this reduce we have to clobber with the indirect call this round
           poisoned = true
-          val r = for {
-            (addr, deps) <- canPropTo(c, x.target)
-            addr <- addr match {
-              case b: BitVecLiteral => Some(b.value)
-              case _ => None
-            }
-            proc <- funcEntries.get(addr)
-          } yield (proc, deps)
-
-          r match {
-            case Some(target, deps) => {
-              SimplifyLogger.info("Resolved indirect call")
-            }
-            case None => {
-              for ((i, v) <- c) {
-                v.clobbered = true
-              }
-              poisoned = true
-            }
-          }
-
         }
         case _ => ()
       }
