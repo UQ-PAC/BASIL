@@ -118,6 +118,7 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       val results = SlicerAnalysis(program, startingNode, initialCriterion)
         .analyze()
         .map({ case (n, e) => n -> e.keys.toSet })
+      SlicerLogger.debug(s"Slicer - Analysed ${results.size} CFG Nodes")
       performanceTimer.checkPoint("Finished IDE Analysis")
       removeNOP
       results
@@ -150,6 +151,7 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       n match {
         case c: DirectCall =>
           c.outParams.values.toSet.exists(crit.contains)
+          || !crit.equals(results.getOrElse(c, Set()))
           || procedureModifies
             .getOrElseUpdate(
               c.target,
@@ -158,8 +160,7 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
                 .toSet
             )
             .exists(crit.contains)
-          ||
-          procedureMemoryIndexes
+          || procedureMemoryIndexes
             .getOrElseUpdate(
               c.target,
               c.target.blocks
@@ -178,7 +179,7 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
           val transferred = transfer(n)
           transferred.values.toSet.contains(
             transferFunctions.edgelattice.ConstEdge(transferFunctions.valuelattice.top)
-          ) || (transferred.size != crit.size)
+          ) || !crit.equals(transferred.keys)
         }
       }
     }
@@ -189,7 +190,6 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
      */
     def reduceInParams(): Unit = {
       var modified = false
-      assert(invariant.correctCalls(program))
 
       for (procedure <- procedures.filter(_.entryBlock.isDefined)) {
         val unused = procedure.formalInParam.filterNot(criterion(procedure).contains(_))
@@ -208,7 +208,6 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
 
     def reduceOutParams(): Unit = {
       var modified = false
-      assert(invariant.correctCalls(program))
 
       for (returnBlock <- procedures.flatMap(_.returnBlock)) {
         val procedure = returnBlock.parent
@@ -253,6 +252,7 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       SlicerLogger.info(s"Slicer - Removed $removed statements (${total - removed} remaining)")
 
       SlicerLogger.debug("Slicer - Remove Dead Parameters")
+      assert(invariant.correctCalls(program))
       reduceInParams()
       reduceOutParams()
 
@@ -274,7 +274,9 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
     if (parsedConfig.isDefined) {
       val before = program.procedures.size
       stripUnreachableFunctions(program)
-      SlicerLogger.info(s"Slicer - Stripping unreachable | Removed ${before - program.procedures.size} functions (${program.procedures.size} remaining)")
+      SlicerLogger.info(
+        s"Slicer - Stripping unreachable | Removed ${before - program.procedures.size} functions (${program.procedures.size} remaining)"
+      )
 
       val results = Phase1().run()
 
