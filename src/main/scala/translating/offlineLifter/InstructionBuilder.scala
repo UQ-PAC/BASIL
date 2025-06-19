@@ -177,8 +177,10 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
     val stmt = (lval, e) match
       case (v: Variable, LoadExpr(addr, size)) =>
         MemoryLoad(v, memory, addr, endian, size.toInt)
-      case (v: Variable, e) =>
+      case (v: Variable, e) if v.getType.isInstanceOf[BitVecType] =>
         LocalAssign(v, castBV(e))
+      case (v: Variable, e) =>
+        LocalAssign(v, e)
       case m => throw NotImplementedError(s"fail assign $m")
     b.push_stmt(stmt)
 
