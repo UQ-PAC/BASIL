@@ -157,7 +157,8 @@ object IRLoading {
     }
 
     val program: IRContext = (mode, mainAddress) match {
-      case (FrontendMode.Gtirb, _) => IRLoading.load(loadGTIRB(q.inputFile, mainAddress, Some(q.mainProcedureName)))
+      case (FrontendMode.Gtirb, _) => 
+        IRLoading.load(loadGTIRB(q.inputFile, mainAddress, q.gtirbLiftOffline, Some(q.mainProcedureName)))
       case (FrontendMode.Basil, _) => ir.parsing.ParseBasilIL.loadILFile(q.inputFile)
       case (FrontendMode.Bap, None) => throw Exception("relf is required when using BAP input")
       case (FrontendMode.Bap, Some(mainAddress)) => {
@@ -190,17 +191,19 @@ object IRLoading {
     BAPLoader().visitProject(parser.project())
   }
 
-  def loadGTIRB(fileName: String, mainAddress: Option[BigInt], mainName: Option[String] = None): Program = {
+  def loadGTIRB(fileName: String, mainAddress: Option[BigInt], gtirbLiftOffline : Boolean, mainName: Option[String] = None): Program = {
     val fIn = FileInputStream(fileName)
     val ir = IR.parseFrom(fIn)
     val mods = ir.modules
     val cfg = ir.cfg.get
 
-    lazy val semanticsJson = mods.map(_.auxData("ast").data.toStringUtf8)
-
-    lazy val semantics = semanticsJson.map(upickle.default.read[Map[String, List[InsnSemantics]]](_))
-
-    val parserMap: Map[String, List[InsnSemantics]] = Map() // semantics.flatten.toMap
+    val parserMap: Option[Map[String, List[InsnSemantics]]] = if (gtirbLiftOffline) then {
+      None
+    } else {
+      val semanticsJson = mods.map(_.auxData("ast").data.toStringUtf8)
+      val semantics = semanticsJson.map(upickle.default.read[Map[String, List[InsnSemantics]]](_))
+      Some(semantics.flatten.toMap)
+    }
 
     val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress, mainName)
     GTIRBConverter.createIR()

@@ -63,7 +63,8 @@ class TempIf(
   * @param mods:
   *   Modules of the Gtirb file.
   * @param parserMap:
-  *   A Map from UUIDs to basic block statements, used for parsing
+  *   A Map from UUIDs to basic block statements, used for instruction semantics.
+  *   If None is provided then the offline lifter is used to generate instruction semantics.
   * @param cfg:
   *   The cfg provided by gtirb
   * @param mainAddress:
@@ -71,7 +72,7 @@ class TempIf(
   */
 class GTIRBToIR(
   mods: Seq[Module],
-  parserMap: immutable.Map[String, List[InsnSemantics]],
+  parserMap: Option[immutable.Map[String, List[InsnSemantics]]],
   cfg: CFG,
   mainAddress: Option[BigInt],
   mainName: Option[String]
@@ -241,7 +242,13 @@ class GTIRBToIR(
 
     // maybe good to sort blocks by address around here?
 
-    val semanticsLoader = GTIRBLoader(parserMap)
+    val semanticsLoader : (blockUUID: ByteString, blockCountIn: Int, blockAddress: Option[BigInt]) => Seq[Seq[Statement]] = parserMap match {
+      case Some(parserMap) => {
+        val semanticsLoader = GTIRBLoader(parserMap)
+        (uuid, blockCount, addr) => semanticsLoader.visitBlock(uuid, blockCount, addr).toSeq
+      }
+      case None =>  (uuid, _, _) => uuidToBlockContent(uuid).toStatements()
+    }
 
     for ((functionUUID, blockUUIDs) <- functionBlocks) {
       val procedure = uuidToProcedure(functionUUID)
@@ -249,8 +256,7 @@ class GTIRBToIR(
       for (blockUUID <- blockUUIDs) {
         val block = uuidToBlock(blockUUID)
 
-        // val statements = semanticsLoader.visitBlock(blockUUID, blockCount, block.address)
-        val statements = uuidToBlockContent(blockUUID).toStatements()
+        val statements =  semanticsLoader(blockUUID, blockCount, block.address)
         blockCount += 1
         for ((stmts, i) <- statements.zipWithIndex) {
           block.statements.addAll(insertPCIncrement(stmts))
