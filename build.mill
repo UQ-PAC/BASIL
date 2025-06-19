@@ -13,6 +13,7 @@ import os.Path
 import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
 import contrib.scalapblib._
 
+
 object `package` extends RootModule with ScalaModule {
   // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
@@ -21,7 +22,7 @@ object `package` extends RootModule with ScalaModule {
   val ammonite = "3.0.2"
   override def ammoniteVersion = ammonite
 
-  def moduleDeps = Seq(basilAntlr, basilProto, bnfc)
+  def moduleDeps = Seq(basilAntlr, basilProto, bnfc, aslpOffline)
 
   def scalacOptions: T[Seq[String]] = Seq("-deprecation")
 
@@ -131,6 +132,22 @@ object `package` extends RootModule with ScalaModule {
   }
 
   def scalafmt = mill.scalalib.scalafmt.ScalafmtModule
+
+
+  object aslpOffline extends JavaModule {
+    def fileName: String = "aslpOfflineScala-0.3.0.jar"
+    def lifterUrl: String = s"https://github.com/UQ-PAC/aslp/releases/download/0.3.0/${fileName}"
+
+    def unmanagedClasspath = Task {
+      os.write(
+        Task.dest / fileName,
+        requests.get.stream(
+          lifterUrl
+        )
+      )
+      Agg(PathRef(Task.dest / fileName))
+    }
+  }
 
   object basilAntlr extends AntlrModule {
     override def ivyDeps = Agg(build.antlrRuntime)
