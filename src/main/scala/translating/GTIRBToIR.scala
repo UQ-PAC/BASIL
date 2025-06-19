@@ -905,7 +905,7 @@ class GTIRBToIR(
 
     val tempIf = block.statements.last match {
       case i: TempIf => i
-      case _ => throw Exception(s"last statement of block ${block.label} is not an if statement")
+      case i => throw Exception(s"last statement of block ${block.label} is not an if statement: $i")
     }
 
     val trueBlock = newBlockCondition(block, uuidToBlock(branch.targetUuid), tempIf.cond, tempIf.thenStmts)

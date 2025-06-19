@@ -35,32 +35,37 @@ class NopBuilder extends Builder[String] {
 
 class StmtListBuilder extends Builder[Int] {
 
-  private var writing: Int = 0
-  private val blocks = mutable.ArrayBuffer[mutable.ArrayBuffer[Statement]](mutable.ArrayBuffer.empty)
-  private val branches = mutable.ArrayBuffer[Stmt](Block(0))
+  sealed trait Stmt:
+    var next: Option[Int] = None
 
-  sealed trait Stmt
-  case class Block(statements: Int) extends Stmt
+  case class Block(statements: mutable.ArrayBuffer[Statement]) extends Stmt
   case class Branch(cond: Expr, trueB: Int, falseB: Int, joinB: Int) extends Stmt
+
+  private var writing: Int = 0
+  private val branches = mutable.ArrayBuffer[Stmt](Block(mutable.ArrayBuffer.empty))
 
   def defaultLabel = -1
 
   def push_stmt(s: Statement) = {
-    blocks(writing).append(s)
+    branches(writing) match {
+      case Block(x) => x.append(s)
+      case _ => ???
+    }
   }
 
   private def push_block() = {
-    val s = blocks.size
-    blocks.append(mutable.ArrayBuffer.empty)
+    val s = branches.size
+    branches.append(Block(mutable.ArrayBuffer.empty))
     s
   }
 
   def gen_branch(cond: Expr) = {
-    val branchID = branches.size
     val trueB = push_block()
     val falseB = push_block()
     val joinB = push_block()
+    val branchID = branches.size
     branches.append(Branch(cond, trueB, falseB, joinB))
+    branches(writing).next = Some(branchID)
     branchID
   }
 
@@ -89,11 +94,16 @@ class StmtListBuilder extends Builder[Int] {
     writing = id
   }
 
-  def extract: Seq[Statement] = {
-    branches.toSeq.flatMap {
-      case Branch(cond, trueB, falseB, joinB) => Seq(TempIf(cond, blocks(trueB).toSeq, blocks(falseB).toSeq))
-      case Block(id) => blocks(id).toSeq
+  def extract(i: Int): Seq[Statement] = {
+    branches(i) match {
+      case bl @ Block(b) => b.toSeq ++ bl.next.toSeq.flatMap(extract)
+      case bl @ Branch(cond, trueB, falseB, joinB) =>
+        Seq(TempIf(cond, extract(trueB), extract(falseB))) ++ extract(joinB) ++ bl.next.toSeq.flatMap(extract)
     }
+  }
+
+  def extract: Seq[Statement] = {
+    extract(0)
   }
 
 }
@@ -116,7 +126,7 @@ object Lifter {
           case e => {
             val o = "%x".format(op)
             val msg = (s"Lift failure $o : $e")
-            Logger.error(msg /* + "\n" + e.getStackTrace.mkString("\n  ") */ )
+            Logger.error(msg + "\n" + e.getStackTrace.mkString("\n  "))
             Seq(Assert(FalseLiteral, Some(msg)))
           }
         }
