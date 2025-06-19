@@ -105,6 +105,8 @@ object Lifter {
     ops.map { op =>
       val ins = if (op == 0xd503201f.toInt) {
         Seq()
+      } else if (op == 0xd4207d00.toInt) {
+        Seq(Assert(FalseLiteral, Some(s"aarch64_system_exceptions_debug_breakpoint (0x$op)")))
       } else {
         try {
           val lift = StmtListLifter()
