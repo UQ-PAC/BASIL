@@ -36,7 +36,7 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       val visited = mutable.Map[String, Boolean]().withDefaultValue(false)
 
       val detectedVariables = mutable.Set[Variable]()
-      var remainingNames = mutable.Set() ++ slicerConfig.initialCriterion
+      var remainingNames = mutable.Set() ++ slicerConfig.initialCriterion.filter(_.nonEmpty)
 
       val worklist = mutable.PriorityQueue[Block]()(Ordering.by(b => -b.rpoOrder))
       worklist.addOne(targetedBlock)
@@ -48,12 +48,12 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
           visited.put(b.label, true)
 
           val blockVars =
-            b.statements.flatMap(c => variables(c)).filter(v => remainingNames.contains(v.name)) ++ variables(b.jump)
+            (b.statements.flatMap(c => variables(c)) ++ variables(b.jump)).filter(v => remainingNames.contains(v.name))
           detectedVariables.addAll(blockVars)
           remainingNames.subtractAll(blockVars.map(_.name))
 
           worklist.addAll(IntraProcBlockIRCursor.pred(b))
-          worklist.addAll(b.calls.collect { case t if t.returnBlock.isDefined => t.returnBlock.get })
+          worklist.addAll(b.calls.collect { case p if p.returnBlock.isDefined => p.returnBlock.get })
 
           // Reached entry of program from target without finding variables. Re-loop from main return.
           if (worklist.isEmpty && remainingNames.nonEmpty) {
