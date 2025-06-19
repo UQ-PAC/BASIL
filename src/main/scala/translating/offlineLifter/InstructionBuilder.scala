@@ -173,19 +173,14 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
   def f_gen_eq_enum(arg0: Expr, arg1: Expr): Expr = BinaryExpr(EQ, arg0, arg1)
   def f_gen_int_lit(arg0: BigInt): BitVecLiteral = BitVecLiteral(arg0, 1123)
 
-  def f_gen_store(lval: Expr, e: Expr): Unit = lval match
-    case v: Variable => {
-      val stmt = e match {
-        case LoadExpr(addr, size) => {
-          MemoryLoad(v, memory, addr, endian, size.toInt)
-        }
-        case _ => {
-          LocalAssign(v, e)
-        }
-      }
-      b.push_stmt(stmt)
-    }
-    case m => throw NotImplementedError(s"fail assign $m")
+  def f_gen_store(lval: Expr, e: Expr): Unit =
+    val stmt = (lval, e) match
+      case (v: Variable, LoadExpr(addr, size)) =>
+        MemoryLoad(v, memory, addr, endian, size.toInt)
+      case (v: Variable, e) =>
+        LocalAssign(v, castBV(e))
+      case m => throw NotImplementedError(s"fail assign $m")
+    b.push_stmt(stmt)
 
   def f_gen_load(e: Expr): Expr = e
 
@@ -306,7 +301,7 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
   def v_PSTATE_BTYPE = Mutable(Register("PSTATE.BTYPE", 1))
   def v_BTypeCompatible = Mutable(Register("BTypeCompatible", 1))
   def v___BranchTaken = Mutable(Register("__BranchTaken", 1))
-  def v_BTypeNext = Mutable(Register("BTypeNext", 1))
+  def v_BTypeNext = Mutable(Register("BTypeNext", 2))
   def v___ExclusiveLocal = Mutable(Register("__ExclusiveLocal", 1))
 
 }
