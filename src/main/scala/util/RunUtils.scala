@@ -127,6 +127,11 @@ object IRLoading {
 
     val mode = if q.inputFile.endsWith(".gts") then {
       FrontendMode.Gtirb
+    } else if q.inputFile.endsWith(".gtirb") then {
+      if (!q.gtirbLiftOffline) {
+        throw IllegalArgumentException(".gtirb input requires --lifter")
+      }
+      FrontendMode.Gtirb
     } else if q.inputFile.endsWith(".adt") then {
       FrontendMode.Bap
     } else if (q.inputFile.endsWith(".il")) {
@@ -191,8 +196,24 @@ object IRLoading {
     BAPLoader().visitProject(parser.project())
   }
 
-  def loadGTIRB(fileName: String, mainAddress: Option[BigInt], gtirbLiftOffline : Boolean, mainName: Option[String] = None): Program = {
+  def skipGTIRBMagic(fileName: String): FileInputStream = {
     val fIn = FileInputStream(fileName)
+    (0 to 7).map(_ => fIn.read()).toList match {
+      case List('G', 'T', 'I', 'R', 'B', _, _, _) => fIn
+      case _ => {
+        fIn.close()
+        FileInputStream(fileName)
+      }
+    }
+  }
+
+  def loadGTIRB(
+    fileName: String,
+    mainAddress: Option[BigInt],
+    gtirbLiftOffline: Boolean,
+    mainName: Option[String] = None
+  ): Program = {
+    val fIn = skipGTIRBMagic(fileName)
     val ir = IR.parseFrom(fIn)
     val mods = ir.modules
     val cfg = ir.cfg.get

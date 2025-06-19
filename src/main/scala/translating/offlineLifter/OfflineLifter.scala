@@ -33,7 +33,6 @@ class NopBuilder extends Builder[String] {
 
 }
 
-
 class StmtListBuilder extends Builder[Int] {
 
   private var writing: Int = 0
@@ -115,7 +114,7 @@ object Lifter {
           case e => {
             val o = "%x".format(op)
             val msg = (s"Lift failure $o : $e")
-            Logger.error(msg + "\n" + e.getStackTrace.mkString("\n  "))
+            Logger.error(msg /* + "\n" + e.getStackTrace.mkString("\n  ") */ )
             Seq(Assert(FalseLiteral, Some(msg)))
           }
         }

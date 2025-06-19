@@ -5,7 +5,6 @@ import ir.*
 import lifter.*
 import ir.eval.BitVectorEval.*
 
-
 object LoadExpr {
   def apply(addr: Expr, size: Int) = {
     UninterpretedFunction("load", Seq(addr, IntLiteral(size)), BitVecType(size))
@@ -17,7 +16,6 @@ object LoadExpr {
     case _ => None
   }
 }
-
 
 trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
 
@@ -106,7 +104,7 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
   def f_gen_FPCompareGE(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr = throw NotImplementedError()
   def f_gen_FPCompareGT(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr = throw NotImplementedError()
   def f_gen_FPConvert(targ0: BigInt, targ1: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
-    throw NotImplementedError()
+    UninterpretedFunction("FPConvert", Seq(arg0, arg1, arg2), arg0.getType)
   def f_gen_FPConvertBF(arg0: Expr, arg1: Expr, arg2: Expr): Expr = throw NotImplementedError()
   def f_gen_FPDiv(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr = throw NotImplementedError()
   def f_gen_FPMax(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr = throw NotImplementedError()
@@ -306,4 +304,3 @@ class StmtListLifter extends LifterIFace[Int] {
   def b: Builder[Int] = builder
   def extract: Seq[Statement] = builder.extract
 }
-
