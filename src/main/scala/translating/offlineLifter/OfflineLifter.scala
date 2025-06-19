@@ -36,6 +36,18 @@ class NopBuilder extends Builder[String] {
 
 }
 
+object LoadExpr {
+
+  def apply(addr: Expr, size: Int) = {
+    UninterpretedFunction("load", Seq(addr, IntLiteral(size)), BitVecType(size))
+  }
+
+  def unapply(e: Expr) = e match {
+    case UninterpretedFunction("load", Seq(addr, IntLiteral(size)), BitVecType(ts)) =>
+      Some(addr, size)
+    case _ => None
+  }
+}
 
 class StmtListBuilder extends Builder[Int] {
 
@@ -233,7 +245,16 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
   def f_gen_int_lit(arg0: BigInt): BitVecLiteral = BitVecLiteral(arg0, 1123)
 
   def f_gen_store(lval: Expr, e: Expr): Unit = lval match
-    case v: Variable => b.push_stmt(LocalAssign(v, e))
+    case v: Variable => {
+      val stmt = e match {
+        case LoadExpr(addr, size) => {
+          MemoryLoad(v, memory, addr, endian, size.toInt)
+        } case _ => {
+          LocalAssign(v, e)
+        }
+      }
+      b.push_stmt(stmt)
+    }
     case m => throw NotImplementedError(s"fail assign $m")
   def f_gen_load(e: Expr): Expr = e
 
@@ -288,11 +309,11 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
   def f_gen_AArch64_MemTag_set(arg0: Expr, arg1: Expr, arg2: Expr): Expr = throw NotImplementedError()
   def f_gen_AArch64_MemTag_read(arg0: Expr, arg1: Expr): Expr = throw NotImplementedError()
   def f_gen_Mem_read(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr = {
-    val size: Int = arg2 match
-      case BitVecLiteral(v, s) => v.toInt
-      case IntLiteral(v) => v.toInt
+    val size: Int = arg1 match
+      case BitVecLiteral(v, s) => v.toInt * 8
+      case IntLiteral(v) => v.toInt * 8
       case _ => throw NotImplementedError(s"Cannot convert $arg2 to int")
-    UninterpretedFunction("load", Seq(arg1, IntLiteral(size)), BitVecType(size))
+    LoadExpr(arg1, size)
   }
   def f_gen_slice(e: Expr, lo: BigInt, wd: BigInt): Expr = Extract((wd + lo).toInt, lo.toInt, e)
   def f_gen_replicate_bits(targ0: BigInt, targ1: BigInt, arg0: Expr, arg1: BitVecLiteral): Expr =
@@ -312,7 +333,7 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
 
   def f_gen_Mem_set(sz: BigInt, ptr: Expr, width: BitVecLiteral, acctype: Expr, value: Expr): Unit =
     assert(width.value == sz)
-    val stmt = MemoryStore(memory, ptr, value, endian, sz.toInt)
+    val stmt = MemoryStore(memory, ptr, value, endian, sz.toInt * 8)
     b.push_stmt(stmt)
 
   def f_gen_assert(arg0: Expr): Unit = {
@@ -337,10 +358,10 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
   def v_PSTATE_I: Mutable[Expr] = throw NotImplementedError()
   def v_PSTATE_F: Mutable[Expr] = throw NotImplementedError()
   def v_PSTATE_D: Mutable[Expr] = throw NotImplementedError()
-  def v_PSTATE_C = Mutable(Register("PSTATE.C", 1)) // Expr_Field(Expr_Var(Ident "PSTATE"), Ident "C")
-  def v_PSTATE_Z = Mutable(Register("PSTATE.Z", 1)) // Expr_Field(Expr_Var(Ident "PSTATE"), Ident "Z")
-  def v_PSTATE_V = Mutable(Register("PSTATE.V", 1)) // Expr_Field(Expr_Var(Ident "PSTATE"), Ident "V")
-  def v_PSTATE_N = Mutable(Register("PSTATE.N", 1)) // Expr_Field(Expr_Var(Ident "PSTATE"), Ident "N")
+  def v_PSTATE_C = Mutable(Register("CF", 1)) // Expr_Field(Expr_Var(Ident "PSTATE"), Ident "C")
+  def v_PSTATE_Z = Mutable(Register("ZF", 1)) // Expr_Field(Expr_Var(Ident "PSTATE"), Ident "Z")
+  def v_PSTATE_V = Mutable(Register("VF", 1)) // Expr_Field(Expr_Var(Ident "PSTATE"), Ident "V")
+  def v_PSTATE_N = Mutable(Register("NF", 1)) // Expr_Field(Expr_Var(Ident "PSTATE"), Ident "N")
 
   def v__PC = Mutable(Register("_PC", 64))
   def v__R = Mutable(Register("_R", 128))
