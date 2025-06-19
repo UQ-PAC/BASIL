@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "module": "es2022",
+    "esModuleInterop": true,
+    "target": "es2022",
+    "moduleResolution": "node",
+    "sourceMap": true,
+    "outDir": "dist",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+  },
+  "lib": ["es2015"]
+}
