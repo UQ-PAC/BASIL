@@ -24,8 +24,7 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
             command match {
               case c: DirectCall => c.outParams
               case i: IndirectCall => Map()
-              case s: Statement => ???
-              case j: Jump => ???
+              case _ => ???
             }
           }
           case None => ???
@@ -46,6 +45,7 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
   def edgesExitToAfterCall(exit: Procedure, aftercall: DirectCall)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     d match {
       case Left(value: LocalVar) if aftercall.actualParams.contains(value) => fold(aftercall.actualParams(value).variables)
+      case Left(_: LocalVar) => Map()
       case _ => Map(d -> IdEdge())
     }
   }
