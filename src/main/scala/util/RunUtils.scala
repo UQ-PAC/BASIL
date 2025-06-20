@@ -162,7 +162,7 @@ object IRLoading {
     }
 
     val program: IRContext = (mode, mainAddress) match {
-      case (FrontendMode.Gtirb, _) => 
+      case (FrontendMode.Gtirb, _) =>
         IRLoading.load(loadGTIRB(q.inputFile, mainAddress, q.gtirbLiftOffline, Some(q.mainProcedureName)))
       case (FrontendMode.Basil, _) => ir.parsing.ParseBasilIL.loadILFile(q.inputFile)
       case (FrontendMode.Bap, None) => throw Exception("relf is required when using BAP input")
