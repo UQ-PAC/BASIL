@@ -931,7 +931,6 @@ object RunUtils {
     assert(invariant.correctCalls(ctx.program))
     assert(ir.invariant.checkTypeCorrect(ctx.program))
 
-
     assert(ir.invariant.programDiamondForm(ctx.program))
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))

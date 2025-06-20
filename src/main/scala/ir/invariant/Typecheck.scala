@@ -16,12 +16,12 @@ case class StatementEqualityError(
   msg: Option[String] = None
 ) extends TypeError {
 
+  def stmt = ctx
 
   override def toString = {
     val m = msg.map("\n  " + _).getOrElse("")
     s"    Type mismatch: ${t1} != ${t2} in ($lhs, $rhs)$m"
   }
-
 
 }
 case class SubexprViolations(ctx: Statement, viols: List[ExprTypeError]) extends TypeError {
