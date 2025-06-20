@@ -8,7 +8,7 @@ GTIRB  with [ASLp's](https://github.com/UQ-PAC/aslp) instruction semantics annot
 ### Information flow logic example
 
 Basil implements a concurrent information-flow logic verifier by encoding this logic in Boogie. 
-This logic is described [here](docs/iflogic-encoding.pdf). Verifying examples can be found in 
+This logic is described [here](docs/src/iflogic-encoding.pdf). Verifying examples can be found in 
 `src/test/correct` and non-verify examples can be found in `src/test/incorrect`.
 
 ```sh
@@ -85,7 +85,7 @@ As input BASIL requires a `.gts` file produced by `gtirb-semantics`,
 as well as a file containing the output of readelf (here denoted with `.relf`), both created from the same AArch64/ARM64 binary, 
 and outputs a semantically equivalent .bpl Boogie-language source file.
 
-Detailed instructions for lifting examples and running BASIL can be found at [docs/usage](/docs/usage.md).
+Detailed instructions for lifting examples and running BASIL can be found at [docs/src/usage](/docs/src/usage.md).
 
 Basil also accepts BAP `.adt` files in place of the `.gts` file, however this feature is no longer actively maintained.
 
@@ -161,7 +161,7 @@ BASIL
 
 ## Development Setup
 
-See [docs/development](docs/development)
+See [docs/src/development](docs/src/development)
 
 
 ## Open Source License
