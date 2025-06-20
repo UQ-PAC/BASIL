@@ -1931,7 +1931,7 @@ def getDoCleanupTransform(doSimplify: Boolean): Transform = TransformBatch(
     getReplaceReturnsTransform(doSimplify),
     removeExternalFunctionReferences
   ),
-  notice = "Removing external function calls", // fixme: seems odd?
+  notice = "Removing external function calls", // fixme: is this all the cleanup is doing?
   postRunChecks = ctx => {
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))

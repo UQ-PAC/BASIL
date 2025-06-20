@@ -1,7 +1,8 @@
 package ir.transforms
 
 import scala.collection.mutable
-import ir.{StackSubstituter, Renamer, Block}
+import ir.Block
+import ir.cilvisitor.*
 import ir.invariant
 import util.BASILConfig
 import analysis.AnalysisManager
@@ -14,7 +15,7 @@ val determineRelevantMemory = SingleTransform("DetermineRelevantMemory", (ctx, m
 
 // run iff arg
 val stackSubstitution = SingleTransform("StackSubstitution", (ctx, man) => {
-  StackSubstituter().visitProgram(ctx.program)
+  visit_prog(StackSubstituter(), ctx.program)
   man.ClobberAll
 })
 
@@ -26,19 +27,19 @@ val setModifies = SingleTransform("SetModifies", (ctx, man) => {
 
 def getRenameBoogieKeywordsTransform(boogieReserved: Set[String]): Transform =
   SingleTransform("RenameBoogieKeywords", (ctx, man) => {
-    Renamer(boogieReserved).visitProgram(ctx.program)
+    visit_prog(BoogieReservedRenamer(boogieReserved), ctx.program)
     man.ClobberAll
   })
 
 /** Cull unneccessary information that does not need to be included in the translation, and infer stack regions, and
   * add in modifies from the spec.
   */
-def getPrepareForTranslationTransform(config: BASILConfig, boogieReserved: Set[String]): Transform = TransformBatch(
+def getPrepareForTranslationTransform(trimDepth: Int, boogieReserved: Set[String]): Transform = TransformBatch(
   "PrepareForTranslation",
   List(
-    determineRelevantMemory, // run iff config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled)
-    getStripUnreachableFunctionsTransform(config.loading.procedureTrimDepth),
-    stackSubstitution, // run iff !config.memoryTransform && (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled))
+    determineRelevantMemory,
+    getStripUnreachableFunctionsTransform(trimDepth),
+    stackSubstitution,
     setModifies,
     getRenameBoogieKeywordsTransform(boogieReserved: Set[String])
   ),
