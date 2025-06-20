@@ -19,6 +19,15 @@ object LoadExpr {
 
 trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
 
+  def stubUninterp(n: String, args: Seq[Expr]): Expr = {
+    val t = args.headOption.map(_.getType).getOrElse(BoolType)
+    stubUninterp(n, args, t)
+  }
+  def stubUninterp(n: String, args: Seq[Expr], rt: IRType): Expr = {
+    val argTypes = (args.map(_.getType.toString) ++ Seq(rt.toString)).mkString("_")
+    UninterpretedFunction(s"${n}_${argTypes}", args, rt)
+  }
+
   def castBV(b: Expr) = b.getType match {
     case _: BitVecType => b
     case BoolType => UnaryExpr(BoolToBV1, b)
@@ -73,8 +82,9 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
   def f_lsr_bits(targ0: BigInt, targ1: BigInt, arg0: BitVecLiteral, arg1: BitVecLiteral): BitVecLiteral =
     smt_bvlshr(arg0, BitVecLiteral(arg1.value, arg0.size))
 
-  def f_decl_bool(arg0: String): Expr = LocalVar(arg0, BoolType)
-  def f_decl_bv(arg0: String, arg1: BigInt): Expr = LocalVar(arg0, BitVecType(arg1.toInt))
+  def f_decl_bool(arg0: String): Expr = LocalVar(arg0 + "_bool", BoolType)
+  def f_decl_bv(arg0: String, arg1: BigInt): Expr = LocalVar(arg0 + "_bv" + arg1, BitVecType(arg1.toInt))
+
   def f_AtomicEnd(): Expr = LocalVar("ATOMICEND", BoolType)
   def f_AtomicStart(): Expr = LocalVar("ATOMICSTART", BoolType)
 
@@ -94,72 +104,70 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
 
   /** Run-time IR program generation */
 
-  def f_gen_BFAdd(arg0: Expr, arg1: Expr): Expr = UninterpretedFunction("BFAdd", Seq(arg0, arg1), arg0.getType)
-  def f_gen_BFMul(arg0: Expr, arg1: Expr): Expr = UninterpretedFunction("BFAMul", Seq(arg0, arg1), arg0.getType)
+  // uninterpreted stubs
+  def f_gen_BFAdd(arg0: Expr, arg1: Expr): Expr = stubUninterp("BFAdd", Seq(arg0, arg1), arg0.getType)
+  def f_gen_BFMul(arg0: Expr, arg1: Expr): Expr = stubUninterp("BFAMul", Seq(arg0, arg1), arg0.getType)
   def f_gen_FPAdd(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
-    UninterpretedFunction("FPAdd", Seq(arg0, arg1, arg2), BitVecType(targ0.toInt))
+    stubUninterp("FPAdd", Seq(arg0, arg1, arg2), BitVecType(targ0.toInt))
   def f_gen_FPCompare(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr, arg3: Expr): Expr =
-    UninterpretedFunction("FPCompare", Seq(arg0, arg1, arg2, arg3), BitVecType(targ0.toInt))
+    stubUninterp("FPCompare", Seq(arg0, arg1, arg2, arg3), BitVecType(targ0.toInt))
   def f_gen_FPCompareEQ(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
-    UninterpretedFunction("FPCompareEQ", Seq(arg0, arg1, arg2), arg0.getType)
+    stubUninterp("FPCompareEQ", Seq(arg0, arg1, arg2), arg0.getType)
   def f_gen_FPCompareGE(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
-    UninterpretedFunction("FPCompareGE", Seq(arg0, arg1, arg2), arg0.getType)
+    stubUninterp("FPCompareGE", Seq(arg0, arg1, arg2), arg0.getType)
   def f_gen_FPCompareGT(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr = {
-    UninterpretedFunction("FPCompareGT", Seq(arg0, arg1, arg2), arg0.getType)
+    stubUninterp("FPCompareGT", Seq(arg0, arg1, arg2), arg0.getType)
   }
   def f_gen_FPConvert(targ0: BigInt, targ1: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
-    UninterpretedFunction("FPConvert", Seq(arg0, arg1, arg2), arg0.getType)
+    stubUninterp("FPConvert", Seq(arg0, arg1, arg2), BitVecType(targ0.toInt))
   def f_gen_FPConvertBF(arg0: Expr, arg1: Expr, arg2: Expr): Expr =
-    UninterpretedFunction("FPConvertBF", Seq(arg0, arg1, arg2), arg0.getType)
+    stubUninterp("FPConvertBF", Seq(arg0, arg1, arg2), arg0.getType)
   def f_gen_FPDiv(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
-    UninterpretedFunction("FPDiv", Seq(arg0, arg1, arg2), arg0.getType)
+    stubUninterp("FPDiv", Seq(arg0, arg1, arg2), arg0.getType)
   def f_gen_FPMax(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
-    UninterpretedFunction("FPMax", Seq(arg0, arg1, arg2), arg0.getType)
+    stubUninterp("FPMax", Seq(arg0, arg1, arg2), arg0.getType)
   def f_gen_FPMaxNum(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
-    UninterpretedFunction("FPMaxNum", Seq(arg0, arg1, arg2), arg0.getType)
+    stubUninterp("FPMaxNum", Seq(arg0, arg1, arg2), arg0.getType)
   def f_gen_FPMin(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
-    UninterpretedFunction("FPMin", Seq(arg0, arg1, arg2), arg0.getType)
+    stubUninterp("FPMin", Seq(arg0, arg1, arg2), arg0.getType)
   def f_gen_FPMinNum(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
-    UninterpretedFunction("FPMinNum", Seq(arg0, arg1, arg2), arg0.getType)
+    stubUninterp("FPMinNum", Seq(arg0, arg1, arg2), arg0.getType)
   def f_gen_FPMul(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
-    UninterpretedFunction("FPMul", Seq(arg0, arg1, arg2), arg0.getType)
+    stubUninterp("FPMul", Seq(arg0, arg1, arg2), arg0.getType)
   def f_gen_FPMulAdd(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr, arg3: Expr): Expr =
-    UninterpretedFunction("FPMulAdd", Seq(arg0, arg1, arg2, arg3), arg0.getType)
+    stubUninterp("FPMulAdd", Seq(arg0, arg1, arg2, arg3), arg0.getType)
   def f_gen_FPMulAddH(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr, arg3: Expr): Expr =
-    UninterpretedFunction("FPMulAddH", Seq(arg0, arg1, arg2, arg3), arg0.getType)
+    stubUninterp("FPMulAddH", Seq(arg0, arg1, arg2, arg3), arg0.getType)
   def f_gen_FPMulX(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
-    UninterpretedFunction("FPMulAddX", Seq(arg0, arg1, arg2), arg0.getType)
+    stubUninterp("FPMulAddX", Seq(arg0, arg1, arg2), arg0.getType)
   def f_gen_FPRSqrtStepFused(targ0: BigInt, arg0: Expr, arg1: Expr): Expr =
-    UninterpretedFunction("FPSqrtStepFused", Seq(arg0, arg1), arg0.getType)
+    stubUninterp("FPSqrtStepFused", Seq(arg0, arg1), arg0.getType)
   def f_gen_FPRecipEstimate(targ0: BigInt, arg0: Expr, arg1: Expr): Expr =
-    UninterpretedFunction("FPRecipEstimate", Seq(arg0, arg1), arg0.getType)
+    stubUninterp("FPRecipEstimate", Seq(arg0, arg1), arg0.getType)
   def f_gen_UnsignedRSqrtEstimate(targ0: BigInt, arg0: Expr): Expr =
-    UninterpretedFunction("FPRecipEstimate", Seq(arg0), arg0.getType)
+    stubUninterp("FPRecipEstimate", Seq(arg0), arg0.getType)
   def f_gen_FPRSqrtEstimate(targ0: BigInt, arg0: Expr, arg1: Expr): Expr =
-    UninterpretedFunction("FPSqrtEstimate", Seq(arg0, arg1), arg0.getType)
+    stubUninterp("FPSqrtEstimate", Seq(arg0, arg1), arg0.getType)
   def f_gen_FPRecipStepFused(targ0: BigInt, arg0: Expr, arg1: Expr): Expr =
-    UninterpretedFunction("FPRecipStepFused", Seq(arg0, arg1), arg0.getType)
+    stubUninterp("FPRecipStepFused", Seq(arg0, arg1), arg0.getType)
   def f_gen_FPRecpX(targ0: BigInt, arg0: Expr, arg1: Expr): Expr =
-    UninterpretedFunction("FPRecpX", Seq(arg0, arg1), arg0.getType)
-
+    stubUninterp("FPRecpX", Seq(arg0, arg1), arg0.getType)
   def f_gen_FPRoundInt(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr, arg3: Expr): Expr =
-    UninterpretedFunction("FPRoundInt", Seq(arg0, arg1, arg2, arg3), arg0.getType)
-
+    stubUninterp("FPRoundInt", Seq(arg0, arg1, arg2, arg3), arg0.getType)
   def f_gen_FPRoundIntN(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr, arg3: Expr): Expr =
-    UninterpretedFunction("FPRoundIntN", Seq(arg0, arg1, arg2, arg3), arg0.getType)
-
+    stubUninterp("FPRoundIntN", Seq(arg0, arg1, arg2, arg3), arg0.getType)
   def f_gen_FPSqrt(targ0: BigInt, arg0: Expr, arg1: Expr): Expr =
-    UninterpretedFunction("FPSqrt", Seq(arg0, arg1), arg0.getType)
+    stubUninterp("FPSqrt", Seq(arg0, arg1), BitVecType(targ0.toInt))
   def f_gen_FPSub(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
-    UninterpretedFunction("FPSup", Seq(arg0, arg1), arg0.getType)
+    stubUninterp("FPSup", Seq(arg0, arg1), arg0.getType)
   def f_gen_FPToFixed(targ0: BigInt, targ1: BigInt, arg0: Expr, arg1: Expr, arg2: Expr, arg3: Expr, arg4: Expr): Expr =
-    UninterpretedFunction("FPToFixed", Seq(arg0, arg1, arg2, arg3, arg4), arg0.getType)
-
+    stubUninterp("FPToFixed", Seq(arg0, arg1, arg2, arg3, arg4), BitVecType(targ0.toInt))
   def f_gen_FPToFixedJS_impl(targ0: BigInt, targ1: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
-    UninterpretedFunction("FPToFixedJS_impl", Seq(arg0, arg1, arg2), arg0.getType)
-
+    stubUninterp("FPToFixedJS_impl", Seq(arg0, arg1, arg2), BitVecType(targ0.toInt))
   def f_gen_FixedToFP(targ0: BigInt, targ1: BigInt, arg0: Expr, arg1: Expr, arg2: Expr, arg3: Expr, arg4: Expr): Expr =
-    UninterpretedFunction("FPToFixedFP", Seq(arg0, arg1, arg2, arg3, arg4), arg0.getType)
+    stubUninterp("FPToFixedFP", Seq(arg0, arg1, arg2, arg3, arg4), BitVecType(targ0.toInt))
+
+  /* generate expressions */
 
   def f_gen_bit_lit(targ0: BigInt, arg0: BitVecLiteral): Expr = BitVecLiteral(arg0.value, targ0.toInt)
   def f_gen_bool_lit(arg0: Boolean): Expr = if arg0 then TrueLiteral else FalseLiteral
@@ -229,13 +237,16 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
     case IntType => throw IllegalArgumentException()
   }
 
+  def f_gen_sdiv_bits(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = BinaryExpr(BVSDIV, arg0, arg1)
   def f_gen_or_bits(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = BinaryExpr(BVOR, arg0, arg1)
-  def f_gen_sdiv_bits(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = BinaryExpr(BoolOR, arg0, arg1)
   def f_gen_sle_bits(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = BinaryExpr(BVSLE, arg0, arg1)
   def f_gen_slt_bits(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = BinaryExpr(BVSLT, arg0, arg1)
   def f_gen_sub_bits(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = BinaryExpr(BVADD, arg0, UnaryExpr(BVNOT, arg1))
-  def f_gen_AArch64_MemTag_set(arg0: Expr, arg1: Expr, arg2: Expr): Expr = throw NotImplementedError()
+
+  def f_gen_AArch64_MemTag_set(arg0: Expr, arg1: Expr, arg2: Expr): Expr =
+    stubUninterp("MemTag_set", Seq(arg0, arg1, arg2))
   def f_gen_AArch64_MemTag_read(arg0: Expr, arg1: Expr): Expr = throw NotImplementedError()
+
   def f_gen_Mem_read(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr = {
     val size: Int = arg1 match
       case BitVecLiteral(v, s) => v.toInt * 8
