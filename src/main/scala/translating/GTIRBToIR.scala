@@ -179,10 +179,7 @@ class GTIRBToIR(
   private def createArguments(name: String): (mutable.Map[LocalVar, Expr], ArrayBuffer[LocalVar]) = {
 
     val in: mutable.Map[LocalVar, Expr] = if (name == "main") {
-      mutable.Map(
-        LocalVar("main_argc", BitVecType(32)) -> Extract(32, 0, Register("R0", 64)),
-        LocalVar("main_argv", BitVecType(32)) -> Extract(32, 0, Register("R1", 64))
-      )
+      mutable.Map()
     } else {
       mutable.Map()
     }
@@ -367,6 +364,7 @@ class GTIRBToIR(
 
     val blockAddress = blockUUIDToAddress.get(blockUUID)
     val block = Block(blockLabel, blockAddress)
+    block.meta = Metadata(Some(byteStringToString(blockUUID)), blockAddress)
     procedure.addBlock(block)
     if (uuidToBlock.contains(blockUUID)) {
       // TODO this is a case that requires special consideration

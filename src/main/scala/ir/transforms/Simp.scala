@@ -832,7 +832,11 @@ def removeDeadInParams(p: Program): Boolean = {
   var modified = false
   assert(invariant.correctCalls(p))
 
-  for (block <- p.procedures.filterNot(_.isExternal.contains(true)).flatMap(_.entryBlock)) {
+  for (
+    block <- p.procedures.filterNot(_.isExternal.contains(true)).filterNot(p.mainProcedure == _).flatMap(_.entryBlock)
+  ) {
+    // FIXME: .filterNot(p.mainProcedure == _). is a bad hack to fix tests that refer to variabels in requries spec
+    // that are not live in procedure. new spec should let us look at dependencies, or write spec about actual result
     val proc = block.parent
 
     val (liveBefore, _) = getLiveVars(proc)
