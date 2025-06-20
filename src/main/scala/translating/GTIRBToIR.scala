@@ -24,7 +24,7 @@ import scala.util.boundary
 import boundary.break
 import java.nio.ByteBuffer
 import util.intrusive_list.*
-import util.functional.{Snoc, foldLeft1, foldLeft0}
+import util.functional.{Snoc, foldLeft0}
 import util.Logger
 
 private def assigned(x: Statement): immutable.Set[Variable] = x match {
