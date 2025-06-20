@@ -1,68 +1,116 @@
 package ir.transforms
 
-import util.IRContext
-import ir.Program
+import scala.collection.mutable
+import util.{IRContext, Logger, DebugDumpIRLogger, PerformanceTimer}
+import ir.{Program, dotBlockGraph}
 import analysis.AnalysisManager
-import util.PerformanceTimer
+import translating.PrettyPrinter.pp_prog
+import java.io.File
 
-/** Provides a consistent interface for IR transforms.
-  * 
-  * @param name The name of this transform.
+
+// TransformConfig accepts Log instances which specify what kind of logs to dump for particular transforms
+trait Log {
+  def dump(ctx: IRContext, transformName: String): Unit
+}
+
+// dumps a blockgraph log
+case class BlockgraphLog(filenamePrefix: String) extends Log {
+  def dump(ctx: IRContext, transformName: String): Unit =
+    DebugDumpIRLogger.writeToFile(
+      File(s"${filenamePrefix}_blockgraph-${transformName}.dot"),
+      dotBlockGraph(ctx.program.mainProcedure))
+}
+
+// dumps an IR log
+case class IrLog(filenamePrefix: String) extends Log {
+  def dump(ctx: IRContext, transformName: String): Unit =
+    DebugDumpIRLogger.writeToFile(File(s"${filenamePrefix}_il-${transformName}.il"), pp_prog(ctx.program))
+}
+
+/** Allows the behaviour of transforms to be configured at runtime, upon invocation.
+  *
+  * @param disabled Optionally specify a set of transforms to disable.
+  * @param dumpLogs Optionally specify which logs to dump for which transforms, if any.
   */
-trait Transform(val name: String) {
+case class TransformConfig(
+  disabled: Set[Transform] = Set.empty,
+  dumpLogs: Map[Transform, Set[Log]] = Map.empty
+)
 
-  // when false, this transform does nothing
-  val toggle: Boolean = true
-  // the performance of each transform is implicitly tested
-  val t = PerformanceTimer(name)
+// default value for transforms
+val emptyConfig = TransformConfig()
 
-  // code to run before the transform implementation, such as logging information
-  protected def preRun(ctx: IRContext): Unit = {}
+/** Currently, we have two kinds of transforms: SingleTransform, and TransformBatch. This trait provides a common
+  * interface for them to share.
+  * 
+  * Transforms can be directly called to invoke the shared 'apply' method, which applies the transform in the context
+  * of some runtime configuration. They are designed to be read-only to avoid inter-dependencies between their users; if
+  * some configuration is required, it must be provided upon invocation.
+  */
+trait Transform {
+  // human-readable name of the transform; it is used in the names of generated log files
+  val name: String
+  // optional message to log upon invocation of this transform
+  val notice: String
+  // the performance of each transform is implicitly measured
+  val timer: PerformanceTimer = PerformanceTimer(name)
 
-  // code to run after the transform implementation, such as logging information or assertions
-  protected def postRun(ctx: IRContext): Unit = {}
+  // modifies the given IR context in-place, using the analysis results provided by this analysis manager
+  protected def transform(ctx: IRContext, man: AnalysisManager, config: TransformConfig): man.Invalidation
 
-  /** Override this method to implement the logic for your transform.
-    * 
-    * @param ctx The IR to be modified in-place.
-    * @param analyses Use this to access the results of static analyses. Any results not yet generated will be produced
-    * automatically and then cached in the manager for later retrieval.
-    * 
-    * @return The set of analyses that are *preserved* after the transform. To clear all analyses after the transform is
-    * invoked, return Set.empty. (Note that this will negatively impact performance.) To preserve all analyses, return
-    * analyses.getAll().
-    */
-  protected def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]]
+  // optional code to run *after* performance has been measured but *before* any logs are dumped, e.g. post-run checks
+  protected def postRun(ctx: IRContext): Unit
 
-  // instances of transforms can be directly called to invoke this method
-  def apply(ctx: IRContext, analyses: AnalysisManager): Unit = {
-    if (!toggle) return
-    if (analyses.program ne ctx.program) {
+  // executes the transform with any modifications or book-keeping specified by the given config
+  def apply(ctx: IRContext, man: AnalysisManager, config: TransformConfig = emptyConfig): Unit = {
+    if (config.disabled.contains(this)) return
+    if (notice != "") then Logger.info(s"[!] ${notice}")
+    if (man.program ne ctx.program) {
       // the program we are transforming should be the same one for which the analysis results were produced
       throw new RuntimeException(
-        s"Transform $name was passed an AnalysisManager of an IR Program with a different " +
+        s"Transform '$name' was passed an AnalysisManager of an IR Program with a different " +
           s"reference value than the program being transformed."
       )
     }
-    preRun(ctx)
-    t.checkPoint("start")
-    val toPreserve = implementation(ctx, analyses)
-    t.checkPoint("end")
-    postRun(ctx)
-    analyses.invalidateAllExcept(toPreserve)
+    val maybeLogs = config.dumpLogs.get(this)
+    maybeLogs.foreach(_.foreach(_.dump(ctx, s"before-$name")))
+    timer.checkPoint("start")
+    val invalidation = transform(ctx, man, config) // run the actual transform and get the analysis results to clobber
+    timer.checkPoint("end")
+    postRun(ctx) // runs after performance checks, and before logging
+    maybeLogs.foreach(_.foreach(_.dump(ctx, s"after-$name")))
+    man.invalidate(invalidation) // clobber the specified analysis results
   }
 }
 
-/** A transform can be a sequence of other transforms. We prefer using this over constructing transforms in the
-  * implementations of other transforms.
-  * 
-  * @param name The name of this transform batch.
-  * @param transforms The sequence of other transforms that comprise this transform.
+/** A standard transform. Accepts an implementation function which modifies the given IR context in-place.
   */
-class TransformBatch(name: String, transforms: List[Transform]) extends Transform(name) {
-  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
-    // simply apply each transform in-turn
-    transforms.foreach(_(ctx, analyses))
-    Set.empty
+case class SingleTransform(
+  name: String,
+  implementation: (ctx: IRContext, man: AnalysisManager) => man.Invalidation,
+  notice: String = ""
+) extends Transform {
+  // simply calls the given implementation function
+  def transform(ctx: IRContext, man: AnalysisManager, config: TransformConfig): man.Invalidation =
+    implementation(ctx, man)
+  
+  // standard transforms don't need anything here; post-run checks should be handled by the implementation
+  def postRun(ctx: IRContext): Unit = ()
+}
+
+/** A transform batch is a sequence of other transforms, followed by some optional post-run checks on the IR context.
+  */
+case class TransformBatch(
+  name: String,
+  transforms: List[Transform],
+  notice: String = "",
+  postRunChecks: IRContext => Unit = _ => ()
+) extends Transform {
+  // runs each sub-transform in-turn (invalidation is handled by the sub-transforms)
+  def transform(ctx: IRContext, man: AnalysisManager, config: TransformConfig): man.Invalidation = {
+    transforms.foreach(_(ctx, man, config))
+    man.PreserveAll
   }
+
+  def postRun(ctx: IRContext): Unit = postRunChecks(ctx)
 }

@@ -22,10 +22,20 @@ class AnalysisManager(val program: Program) {
     // allows this memoizer to be called like a function
     def apply(): ReturnType = {
       // pass this analysis manager and its associated program to the static analysis
-      if memo.isEmpty then memo = Some(analysis(program, AnalysisManager.this))
+      if memo.isEmpty then memo = Some(analysis(AnalysisManager.this))
       memo.get
     }
   }
+
+  enum Invalidation {
+    case PreserveAll
+    case ClobberAll
+    case PreserveSome(toPreserve: Set[Memoizer[?]])
+    case ClobberSome(toClobber: Set[Memoizer[?]])
+  }
+
+  // todo: not sure if this is the right approach - maybe we should implement convenience methods instead?
+  export Invalidation.*
 
   // keep track of all memoizers to ensure we can invalidate all of them
   private val memoizers: mutable.Set[Memoizer[?]] = mutable.Set.empty
@@ -37,33 +47,13 @@ class AnalysisManager(val program: Program) {
     return mem
   }
 
-  // list of memoizers - these can be directly called via this manager, e.g. val result = manager.exampleAnalysis()
-//   val intraProcConstProp = register(IntraProcConstantPropagationAnalysis())
-//   val interProcConstProp = register(InterProcConstantPropagationAnalysis())
-//   val memoryRegionResult = register(MemoryRegionAnalysisSolverAnalysis())
-//   val vsaResult = register(ValueSetAnalysisSolverAnalysis())
-//   val interLiveVarsResults = register(/* todo */)
-//   val paramResults = register(/* todo */)
-//   val steensgaardSolver = register(/* todo */) // fixme: merge these into one analysis result?
-//   val steensgaardPointsTo = register(/* todo */)
-//   val steensgaardCallSiteSummary = register(/* todo */)
-//   val mmmResults = register(/* todo */)
-//   val reachingDefs = register(/* todo */)
-//   val regionInjector = register(/* todo */)
-//   val symbolicAddresses = register(/* todo */)
-//   val localDSA = register(/* todo */)
-//   val bottomUpDSA = register(/* todo */)
-//   val topDownDSA = register(/* todo */)
-//   val writesToResult = register(/* todo */)
-//   val ssaResults = register(/* todo */)
-//   val graResult = register(/* todo */)
-//   val intraDomain = register(/* todo */)
-//   val interDomain = register(/* todo */)
+  def invalidate(invalidation: Invalidation): Unit = invalidation match {
+    case PreserveAll => ()
+    case ClobberAll => memoizers.foreach(_.invalidate())
+    case PreserveSome(toPreserve) => (memoizers.toSet -- toPreserve).foreach(_.invalidate())
+    case ClobberSome(toClobber) => toClobber.foreach(_.invalidate())
+  }
 
-  // clears the cached results of all analyses except for those in the given set
-  def invalidateAllExcept(exceptions: Set[Memoizer[?]]): Unit =
-    memoizers.filterNot(exceptions.contains).foreach(_.invalidate())
-
-  // useful to pass to 'invalidateAllExcept' when we want to preserve all or nearly all results after a transform
-  def getAll(): Set[Memoizer[?]] = memoizers.toSet
+  // todo: list of memoizers which can be directly called via this manager
+  // val exampleAnalysis = register(ExampleAnalysis())
 }

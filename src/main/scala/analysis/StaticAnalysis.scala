@@ -13,24 +13,12 @@ trait StaticAnalysis[ReturnType](val name: String) {
 
   val t = PerformanceTimer(name)
 
-  protected def preRun(): Unit = {}
+  protected def implementation(man: AnalysisManager): ReturnType
 
-  protected def postRun(ret: ReturnType): Unit = {}
-
-  protected def implementation: (Program, AnalysisManager) => ReturnType
-
-  def apply(prog: Program, analyses: AnalysisManager): ReturnType = {
-    if (analyses.program ne prog) {
-      throw new RuntimeException(
-        s"Analysis $name was passed an AnalysisManager of an IR Program with a different " +
-          s"reference value than the program being transformed."
-      )
-    }
-    preRun()
+  def apply(man: AnalysisManager): ReturnType = {
     t.checkPoint("start")
-    val ret = implementation(prog, analyses)
+    val ret = implementation(man)
     t.checkPoint("end")
-    postRun(ret)
     ret
   }
 }

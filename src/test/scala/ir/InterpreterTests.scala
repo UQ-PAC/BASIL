@@ -12,7 +12,7 @@ import boogie.SpecGlobal
 import translating.BAPToIR
 import util.{LogLevel, Logger}
 import util.IRLoading.{loadBAP, loadReadELF}
-import util.{ILLoadingConfig, IRContext, IRLoading, IRTransform}
+import util.{ILLoadingConfig, IRContext, IRLoading}
 import test_util.{BASILTest, CaptureOutput}
 import ir.dsl.given
 import ir.dsl.IfThenBlocks
@@ -50,7 +50,7 @@ class InterpreterTests extends AnyFunSuite with CaptureOutput with BeforeAndAfte
     )
 
     val ctx = IRLoading.load(loading)
-    IRTransform.DoCleanup()(ctx, AnalysisManager(ctx.program))
+    ir.transforms.doCleanupWithoutSimplify(ctx, AnalysisManager(ctx.program))
 
     ir.transforms.clearParams(ctx.program)
     // val bapProgram = loadBAP(loading.inputFile)

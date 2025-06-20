@@ -1,7 +1,8 @@
 package ir.transforms
 import ir.Program
 
-def inlinePLTLaunchpad(prog: Program) = {
+val inlinePLTLaunchpad = SingleTransform("InlinePLTLaunchpad", (ctx, man) => {
+  val prog = ctx.program
   for (p <- prog.procedures) {
 
     val candidate =
@@ -19,5 +20,5 @@ def inlinePLTLaunchpad(prog: Program) = {
   }
 
   applyRPO(prog)
-
-}
+  man.ClobberAll
+})

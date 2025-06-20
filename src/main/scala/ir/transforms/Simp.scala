@@ -841,23 +841,15 @@ def coalesceBlocks(p: Program): Boolean = {
   didAny
 }
 
-class CoalesceBlocks(name: String = "CoalesceBlocks") extends Transform(name) {
-  // todo: make these protected (?)
-  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
-    coalesceBlocks(ctx.program)
-    Set.empty
-  }
-}
+val coalesceBlocksOnce = SingleTransform("CoalesceBlocksOnce", (ctx, man) => {
+  coalesceBlocks(ctx.program)
+  man.ClobberAll
+})
 
-class CoalesceBlocksFixpoint extends CoalesceBlocks("CoalesceBlocksFixpoint") {
-
-  override def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
-    // useful for ReplaceReturns
-    // (pushes single block with `Unreachable` into its predecessor)
-    while (coalesceBlocks(ctx.program)) {}
-    Set.empty
-  }
-}
+val coalesceBlocksFixpoint = SingleTransform("CoalesceBlocksFixpoint", (ctx, man) => {
+  while (coalesceBlocks(ctx.program)) {}
+  man.ClobberAll
+})
 
 def removeDeadInParams(p: Program): Boolean = {
   var modified = false
@@ -1165,12 +1157,10 @@ def applyRPO(p: Program) = {
   }
 }
 
-class ApplyRpo extends Transform("ApplyRpo") {
-  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
-    applyRPO(ctx.program)
-    Set.empty
-  }
-}
+val applyRpoTransform = SingleTransform("ApplyRPO", (ctx, man) => {
+  applyRPO(man.program)
+  man.ClobberAll
+})
 
 object getProcFrame {
   class GetProcFrame(frames: Procedure => Set[Memory]) extends CILVisitor {
@@ -1636,49 +1626,66 @@ def findDefinitelyExits(p: Program): ProcReturnInfo = {
   )
 }
 
-// todo: not sure whether to make 'findDefinitelyExits' a private method of this class
-class ReplaceJumpsInNonReturningProcs extends Transform("ReplaceJumpsInNonReturningProcs") {
-  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
-    val nonReturning = findDefinitelyExits(ctx.program)
-    ctx.program.mainProcedure.foreach {
-      case d: DirectCall if nonReturning.nonreturning.contains(d.target) => d.parent.replaceJump(Return())
-      case _ =>
-    }
-    Set.empty
+val replaceJumpsInNonReturningProcs = SingleTransform("ReplaceJumpsInNonReturningProcs", (ctx, man) => {
+  val nonReturning = findDefinitelyExits(ctx.program)
+  ctx.program.mainProcedure.foreach {
+    case d: DirectCall if nonReturning.nonreturning.contains(d.target) => d.parent.replaceJump(Return())
+    case _ =>
   }
-}
+  man.ClobberAll
+})
 
-// todo: i have no idea what to do with this
-class ReplaceReturnsTransform(doSimplify: Boolean) extends Transform("ReplaceReturns") {
-  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
+def getReplaceReturnsTransform(doSimplify: Boolean): Transform = SingleTransform("ReplaceReturns", (ctx, man) => {
+  cilvisitor.visit_prog(
+    ReplaceReturns(proc => doSimplify && ctx.program.mainProcedure != proc),
+    ctx.program
+  )
+  transforms.addReturnBlocks(ctx.program, insertR30InvariantAssertion = _ => doSimplify)
+  cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
+  man.ClobberAll
+})
+
+val removeExternalFunctionReferences = SingleTransform("RemoveExternalFunctionReferences", (ctx, man) => {
+  val externalNames = ctx.externalFunctions.map(_.name)
+  val unqualifiedNames = externalNames.filter(_.contains('@')).map(_.split('@')(0))
+  ExternalRemover(externalNames ++ unqualifiedNames).visitProgram(ctx.program)
+  for (p <- ctx.program.procedures) {
+    p.isExternal = Some(
+      ctx.externalFunctions.exists(e => e.name == p.procName || p.address.contains(e.offset)) || p.isExternal
+        .getOrElse(false)
+    )
+  }
+  man.ClobberAll
+})
+
+def getDoCleanupTransform(doSimplify: Boolean): Transform = TransformBatch(
+  "DoCleanup",
+  List(
+    makeProcEntriesNonLoops,
+    // useful for ReplaceReturns
+    // (pushes single block with `Unreachable` into its predecessor)
+    coalesceBlocksFixpoint,
+    applyRpoTransform,
+    replaceJumpsInNonReturningProcs,
     // FIXME: Main will often maintain the stack by loading R30 from the caller's stack frame
     //        before returning, which makes the R30 assertin faile. Hence we currently skip this
     //        assertion for main, instead we should precondition the stack layout before main
     //        but the interaction between spec and memory regions is nontrivial currently
-    cilvisitor.visit_prog(
-      transforms.ReplaceReturns(proc => doSimplify && ctx.program.mainProcedure != proc),
-      ctx.program
-    )
-    transforms.addReturnBlocks(ctx.program, insertR30InvariantAssertion = _ => doSimplify)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
-    Set.empty
+    getReplaceReturnsTransform(doSimplify),
+    removeExternalFunctionReferences
+  ),
+  notice = "Removing external function calls", // fixme: seems odd?
+  postRunChecks = ctx => {
+    assert(invariant.singleCallBlockEnd(ctx.program))
+    assert(invariant.cfgCorrect(ctx.program))
+    assert(invariant.blocksUniqueToEachProcedure(ctx.program))
+    assert(invariant.procEntryNoIncoming(ctx.program))
   }
-}
+)
 
-class RemoveExternalFunctionReferences extends Transform("RemoveExternalFunctionReferences") {
-  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
-    val externalNames = ctx.externalFunctions.map(_.name)
-    val unqualifiedNames = externalNames.filter(_.contains('@')).map(_.split('@')(0))
-    ExternalRemover(externalNames ++ unqualifiedNames).visitProgram(ctx.program)
-    for (p <- ctx.program.procedures) {
-      p.isExternal = Some(
-        ctx.externalFunctions.exists(e => e.name == p.procName || p.address.contains(e.offset)) || p.isExternal
-          .getOrElse(false)
-      )
-    }
-    Set.empty
-  }
-}
+// these are called a lot so it's useful to create them here rather than generating many copies on the fly
+val doCleanupWithSimplify = getDoCleanupTransform(true)
+val doCleanupWithoutSimplify = getDoCleanupTransform(false)
 
 class Simplify(val res: Boolean => Variable => Option[Expr], val initialBlock: Block = null) extends CILVisitor {
 
@@ -1889,21 +1896,20 @@ def removeTriviallyDeadBranches(p: Program, removeAllUnreachableBlocks: Boolean 
   dead.nonEmpty
 }
 
-class MakeProcEntriesNonLoops extends Transform("MakeProcEntriesNonLoops") {
-  // ensure procedure entry has no incoming jumps, if it does replace with new
-  // block jumping to the old procedure entry
-  private def makeProcEntryNonLoop(p: Procedure) = {
-    if (p.entryBlock.exists(_.prevBlocks.nonEmpty)) {
-      val nb = Block(p.name + "_entry")
-      p.addBlock(nb)
-      val eb = p.entryBlock.get
-      nb.replaceJump(GoTo(eb))
-      p.entryBlock = nb
-    }
+val makeProcEntriesNonLoops = SingleTransform(
+  "MakeProcEntriesNonLoops",
+  (ctx, man) => {
+    ctx.program.procedures.foreach(p => {
+      // ensure procedure entry has no incoming jumps, if it does replace with new
+      // block jumping to the old procedure entry
+      if (p.entryBlock.exists(_.prevBlocks.nonEmpty)) {
+        val nb = Block(p.name + "_entry")
+        p.addBlock(nb)
+        val eb = p.entryBlock.get
+        nb.replaceJump(GoTo(eb))
+        p.entryBlock = nb
+      }
+    })
+    man.ClobberAll
   }
-
-  def implementation(ctx: IRContext, analyses: AnalysisManager): Set[analyses.Memoizer[?]] = {
-    ctx.program.procedures.foreach(makeProcEntryNonLoop)
-    Set.empty
-  }
-}
+)

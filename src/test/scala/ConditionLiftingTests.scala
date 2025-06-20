@@ -3,7 +3,6 @@ import org.scalatest.matchers.should.Matchers
 import scala.util.{Try, Failure, Success}
 import java.io.OutputStream
 import translating.PrettyPrinter.*
-import util.IRTransform
 import analysis.AnalysisManager
 
 import ir.*
@@ -825,7 +824,8 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
   test("conds inline test") {
 
     var ctx = util.IRLoading.load(testProgram)
-    IRTransform.DoCleanup(true)(ctx, AnalysisManager(ctx.program))
+
+    ir.transforms.doCleanupWithSimplify(ctx, AnalysisManager(ctx.program))
     ir.transforms.clearParams(ctx.program)
     ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
     util.RunUtils.doSimplify(ctx, None)
