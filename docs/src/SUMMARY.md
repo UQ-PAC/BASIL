@@ -10,7 +10,8 @@
 
 # Basil IR Source Code 
 
-- [Basil IR](development/basil-ir.md) explanation of BASIL's intermediate representation
+- [Basil IL](development/basil-il.md) Basil IR text representation
+- [Basil IR](development/basil-ir.md) Explanation of BASIL's intermediate representation
 - [Interpreter](development/interpreter.md) Explanation of IR interpreter
 - [Transform Passes](development/transforms.md) Explanation of ir transforms and simplifications
 

@@ -72,7 +72,6 @@ Endian ::=&~ BigEndian ~|~ LittleEndian \\
 
 ### Calls
 
-
 - A `DirectCall` calls a procedure and returns to the next command in the block
 -  An `IndirectCall` is a dynamic jump, to either a procedure or a block based on the address of the argument
 
