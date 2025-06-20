@@ -10,6 +10,8 @@ import lifter.*
 
 trait Builder[L] {
 
+  def fresh_local: String
+
   def push_stmt(s: Statement): Unit
 
   def gen_branch(arg0: Expr): L
@@ -21,19 +23,14 @@ trait Builder[L] {
   def defaultLabel: L
 }
 
-class NopBuilder extends Builder[String] {
-
-  def gen_branch(arg0: Expr): String = ???
-  def push_stmt(s: Statement): Unit = ???
-  def true_branch(arg0: String): String = ???
-  def false_branch(arg0: String): String = ???
-  def merge_branch(arg0: String): String = ???
-  def switch_ctx(arg0: String): Unit = ???
-  def defaultLabel: String = "null"
-
-}
-
 class StmtListBuilder extends Builder[Int] {
+
+  var pcValue = BigInt(0)
+
+  private val localCounter = util.Counter()
+  def fresh_local = {
+    s"var${localCounter.next()}_${pcValue}"
+  }
 
   sealed trait Stmt:
     var next: Option[Int] = None
@@ -108,11 +105,18 @@ class StmtListBuilder extends Builder[Int] {
 
 }
 
+class StmtListLifter extends LifterIFace[Int] {
+  val builder = StmtListBuilder()
+  def b: Builder[Int] = builder
+  def extract: Seq[Statement] = builder.extract
+
+}
+
 object Lifter {
 
   def liftBlockBytes(ops: Iterable[Int], initialSp: BigInt): Seq[Seq[Statement]] = {
     var sp = initialSp
-    ops.map { op =>
+    ops.toSeq.map { op =>
       val ins = if (op == 0xd503201f.toInt) {
         Seq()
       } else if (op == 0xd4207d00.toInt) {
@@ -120,6 +124,7 @@ object Lifter {
       } else {
         try {
           val lift = StmtListLifter()
+          lift.builder.pcValue = sp
           f_A64_decoder[Expr, Int, BitVecLiteral](lift, BitVecLiteral(BigInt(op), 32), BitVecLiteral(sp, 64))
           lift.extract.toSeq
         } catch {
@@ -133,7 +138,7 @@ object Lifter {
       }
       sp = sp + 32
       ins
-    }.toSeq
+    }
   }
 
   def liftOpcode(op: BigInt, sp: BigInt): Seq[Statement] = {

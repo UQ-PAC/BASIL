@@ -82,8 +82,8 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
   def f_lsr_bits(targ0: BigInt, targ1: BigInt, arg0: BitVecLiteral, arg1: BitVecLiteral): BitVecLiteral =
     smt_bvlshr(arg0, BitVecLiteral(arg1.value, arg0.size))
 
-  def f_decl_bool(arg0: String): Expr = LocalVar(arg0 + "_bool", BoolType)
-  def f_decl_bv(arg0: String, arg1: BigInt): Expr = LocalVar(arg0 + "_bv" + arg1, BitVecType(arg1.toInt))
+  def f_decl_bool(arg0: String): Expr = LocalVar(b.fresh_local + "_bool", BoolType)
+  def f_decl_bv(arg0: String, arg1: BigInt): Expr = LocalVar(b.fresh_local + "_bv" + arg1, BitVecType(arg1.toInt))
 
   def f_AtomicEnd(): Expr = LocalVar("ATOMICEND", BoolType)
   def f_AtomicStart(): Expr = LocalVar("ATOMICSTART", BoolType)
@@ -332,10 +332,4 @@ def gen_zero_extend_to(s: BigInt, x: Expr) = {
     case BitVecType(sz) => ZeroExtend((s - sz).toInt, x)
     case _ => throw Exception("Type mismatch gen_zero_extend_to")
   }
-}
-
-class StmtListLifter extends LifterIFace[Int] {
-  val builder = StmtListBuilder()
-  def b: Builder[Int] = builder
-  def extract: Seq[Statement] = builder.extract
 }
