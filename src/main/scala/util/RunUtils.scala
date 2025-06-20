@@ -899,6 +899,7 @@ object RunUtils {
       ir.transforms.clearParams(ctx.program)
     }
     assert(invariant.correctCalls(ctx.program))
+    ir.invariant.checkTypeCorrect(ctx.program)
 
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))
@@ -1004,6 +1005,7 @@ object RunUtils {
     Logger.info("[!] Translating to Boogie")
 
     val regionInjector = analysis.flatMap(a => a.regionInjector)
+    assert(ir.invariant.checkTypeCorrect(ctx.program))
 
     val boogiePrograms = if (q.boogieTranslation.directTranslation) {
       Logger.info("Disabling WPIF VCs")
