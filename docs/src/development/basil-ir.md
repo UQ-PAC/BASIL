@@ -17,6 +17,52 @@ The IR has three levels:
 
 The IR has a completely standard simple type system that is enforced at construction.
 
+### Structure
+
+Describes the high-level structure of the in-memory IR ADT
+
+```math
+\begin{align*}
+Program ::=&~ Procedure* \\
+Procedure ::=&~ (name: ProcID) (entryBlock: Block) (returnBlock: Block) (blocks: Block*) \\
+               &~ \text{Where }entryBlock, returnBlock \in blocks \\
+Block_1 ::=&~ BlockID \; Statement*\; Call? \; Jump \; \\
+Block_2 ::=&~ BlockID \; (Statement | Call)*\; Jump \; \\
+\\
+&~ Block = Block_1 \text{ is a structural invariant that holds during all the early analysis/transform stages}
+\\
+Statement ::=&~ MemoryAssign ~|~ LocalAssign ~|~ Assume ~|~ Assert ~|~ NOP \\
+ProcID ::=&~ String \\
+BlockID ::=&~ String \\
+\\
+Jump ::=&~ GoTo ~|~ Unreachable ~|~ Return \\
+GoTo ::=&~ \text{goto } BlockID* \\
+Return::=&! \text{return } (outparams)
+Call ::=&~ DirectCall ~|~ IndirectCall  \\
+DirectCall ::=&~ (outparams) := \text{ call } ProcID \; (inparams) \\
+IndirectCall ::=&~ \text{call } Expr \\
+\\
+          &~ loads(e: Expr) = \{x |  x:MemoryLoad, x \in e \} \\
+\\
+MemoryAssign ::=&~ MemoryAssign (mem: Memory) (addr: Expr) (val: Expr) (Endian) (size: Int) \\
+          &\text {Such that } loads(addr) = loads(val) = \emptyset \\
+\\
+LocalAssign ::=&~ Variable := Expr \\
+Assume ::=&~ \text{assume } body:Expr\\
+          &\text {Such that } loads(body) = \emptyset \\
+Assert ::=&~ \text{assert } body:Expr\\
+          &\text {Such that } loads(body) =  \emptyset \\
+\\
+Expr ::=&~ MemoryLoadExpr ~|~ Variable ~|~ Literal ~|~ Extract ~|~ Repeat \\
+          &~ ~|~ ZeroExtend ~|~ SignExtend ~|~ UnaryExpr ~|~ BinaryExpr \\
+Variable ::=&~ Global ~|~ LocalVar \\
+MemoryLoadExpr ::=&~  MemoryLoad (mem:Memory)  (addr: Expr)  (Endian) (size: Int) \\
+          &\text {Such that } loads(addr) = \emptyset \\
+Memory ::=&~ Stack ~|~ Mem \\
+Endian ::=&~ BigEndian ~|~ LittleEndian \\
+\end{align*}
+```
+
 ### Jumps
 
 - The `GoTo` jump is a multi-target jump reprsenting non-deterministic choice between its targets. 
