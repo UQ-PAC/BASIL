@@ -335,6 +335,11 @@ object Main {
       }
       val relfData = IRLoading.loadReadELF(relfFile, loadingInputs)
       println(relfData.toScala)
+      println()
+
+      val fIn = java.io.FileInputStream(loadingInputs.inputFile)
+      val ir = com.grammatech.gtirb.proto.IR.IR.parseFrom(fIn)
+      println(ir.modules.map(translating.GTIRBReadELF.getExternalFunctions))
       return
     }
 
