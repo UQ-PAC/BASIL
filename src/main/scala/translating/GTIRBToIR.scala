@@ -76,26 +76,22 @@ class GTIRBToIR(
   mainName: Option[String]
 ) {
 
-  object decoders {
+  object auxdata {
     import gtirb.AuxDecoder.*
-    lazy val decodeFunctionNames = readMap(readUuid, readUuid)
-    lazy val decodeFunctionEntries = readMap(readUuid, readSet(readUuid))
-    lazy val decodeFunctionBlocks = readMap(readUuid, readSet(readUuid))
+    val functionNames = mods
+      .map(_.auxData("functionNames").data)
+      .map(decode(readMap(readUuid, readUuid))(_))
+      .foldLeft0(_ ++ _)
+    val functionEntries = mods
+      .map(_.auxData("functionEntries").data)
+      .map(decode(readMap(readUuid, readSet(readUuid)))(_))
+      .foldLeft0(_ ++ _)
+    val functionBlocks = mods
+      .map(_.auxData("functionBlocks").data)
+      .map(decode(readMap(readUuid, readSet(readUuid)))(_))
+      .foldLeft0(_ ++ _)
   }
-  import decoders.*
-
-  private val functionNames = mods
-    .map(_.auxData("functionNames").data)
-    .map(AuxDecoder.decode(decodeFunctionNames)(_))
-    .foldLeft0(_ ++ _)
-  private val functionEntries = mods
-    .map(_.auxData("functionEntries").data)
-    .map(AuxDecoder.decode(decodeFunctionEntries)(_))
-    .foldLeft0(_ ++ _)
-  private val functionBlocks = mods
-    .map(_.auxData("functionBlocks").data)
-    .map(AuxDecoder.decode(decodeFunctionBlocks)(_))
-    .foldLeft0(_ ++ _)
+  import auxdata.*
 
   // maps block UUIDs to their address
   private val blockUUIDToAddress = createAddresses()
