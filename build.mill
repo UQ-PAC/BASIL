@@ -4,7 +4,7 @@ import $packages._
 import mill._
 import scalalib._
 
-import $file.basilmill.mdbook.mdbookBinary
+import $file.basilmill.mdbook.MdBookModule
 import $file.basilmill.bnfc.BNFCJFlexModule
 import $file.basilmill.antlr.AntlrModule
 
@@ -171,9 +171,9 @@ object `package` extends RootModule with ScalaModule {
     }
   }
 
-  object mdbook extends mdbookBinary {
-    def mdbookSources = Task.Source {
-      Task.workspace  / "docs" 
+  object mdbook extends MdBookModule {
+    override def mdbookSources = Task.Source {
+      Task.workspace  / "docs"
     }
   }
 
@@ -202,8 +202,10 @@ object `package` extends RootModule with ScalaModule {
     )
   }
 
+  /**
+   * Java- or Scala-doc docJars to copy into allDocs.
+   */
   def docsModules = Task {
-    // these doc paths are copied into the combined docs output.
     Map(
       "api/basil" -> docJar(),
       "api/bnfc" -> bnfc.docJar(),
@@ -214,10 +216,19 @@ object `package` extends RootModule with ScalaModule {
   }
 
 
+  /**
+   * Other (non Java- or Scala-doc) documentation pages
+   * to copy into allDocs.
+   */
   def extraDocs = Task {
     Map(
       "docs/basil-il" -> bnfc.bnfcHtml(),
+      "." -> mdbook.mdbookDocs(),
     )
+  }
+
+  def docsIndex = Task.Source {
+    PathRef(super.millSourcePath / "docs" / "static" / "index.html")
   }
 
   def scalaDocExternalMappingOptions = Task {
@@ -232,16 +243,12 @@ object `package` extends RootModule with ScalaModule {
     Seq("-external-mappings:" + externals.mkString(","))
   }
 
-  def docsIndex = Task.Source {
-    PathRef(super.millSourcePath / "docs" / "static" / "index.html")
-  }
-
   def allDocs = Task {
     val dest = Task.dest
 
     def copyDoc(p: Path, name: String) = {
       println(s"copying docs into $name from $p")
-      os.copy(p, dest / os.RelPath(name), createFolders = true)
+      os.copy(p, dest / os.RelPath(name), createFolders = true, mergeFolders = true)
     }
 
     docsModules().foreach {
@@ -251,7 +258,6 @@ object `package` extends RootModule with ScalaModule {
       case (name, src) => copyDoc(src.path, name)
     }
 
-    os.copy(mdbook.build().path, dest, mergeFolders = true)
     os.copy.into(docsIndex().path, dest / "api")
 
     os.walk(dest).foreach {

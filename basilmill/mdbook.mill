@@ -9,15 +9,16 @@ import scala.util.{Try}
 import $file.basilmill.util.DownloadModule
 
 
-trait mdbookBinary extends DownloadModule {
-  def version = "0.4.51"
-  def url = s"https://github.com/rust-lang/mdBook/releases/download/v${version}/mdbook-v${version}-${suffix}"
-  def name = s"mdBook-$version-${System.currentTimeMillis()}$suffix"
+trait MdBookModule extends DownloadModule {
   def mdbookSources : T[PathRef]
+
+  def version = "0.4.51"
+  override def url = s"https://github.com/rust-lang/mdBook/releases/download/v${version}/mdbook-v${version}-${suffix}"
+  override def name = s"mdBook-$version-${System.currentTimeMillis()}$suffix"
 
   def osName = System.getProperty("os.name")
 
-  def local = Task.Input {
+  override def local = Task.Input {
     Try(os.proc("mdbook", "--version").call())
       .map(Function.const("mdbook"))
       .toEither
@@ -40,13 +41,11 @@ trait mdbookBinary extends DownloadModule {
     throw new Exception(s"unsupported os ${osName}")
   }
 
-  override def path = Task {
-    local().getOrElse({
-      val l = remote(Task.dest)
-      os.call(Seq("tar", "-xzf", l.toString), cwd=Task.dest)
-      (Task.dest / "mdbook").toString
-    }
-    )
+  override def remote(dest: Path) = {
+    val p = super.remote(dest)
+    os.call(Seq("tar", "-xzf", p.toString), cwd=dest)
+    os.remove(p)
+    (p / ".." / "mdbook")
   }
 
   def run(args: String*) = Task.Command {
@@ -61,7 +60,7 @@ trait mdbookBinary extends DownloadModule {
     ()
   }
 
-  def build = Task {
+  def mdbookDocs = Task {
     os.call(Seq(path(), "build", "--dest-dir", Task.dest.toString, mdbookSources().path.toString))
     PathRef(Task.dest)
   }

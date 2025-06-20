@@ -28,12 +28,12 @@ trait DownloadModule extends Module {
     ignoring(classOf[UnsupportedOperationException]) {
       os.perms.set(p, mode)
     }
-    p.toString
+    p
   }
 
   def pathref = Task(PathRef(Path(path())))
   def path = Task {
-    local().getOrElse(remote(Task.dest))
+    local().getOrElse(remote(Task.dest).toString)
   }
   // using path() as the originator (instead of pathref())
   // allows us to return values which are not absolute paths
