@@ -699,3 +699,109 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
     assert(f.formalOutParam.equals(fOutParam))
   }
 }
+
+/**
+ * Tests that run the slicer against correct system tests to ensure that the resultant Boogie file will still verify.
+ */
+@test_util.tags.DisabledTest
+class SlicerSystemTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
+  Logger.setLevel(LogLevel.OFF)
+
+  private val correctPath = s"${BASILTest.rootDirectory}/src/test/correct/"
+
+  def runExample(name: String, variant: String, slicerConfig: Option[SlicerConfig] = None): (BASILResult, Boolean) = {
+    val inputFile = s"$correctPath/$name/$variant/$name.gts"
+    val relfFile = s"$correctPath/$name/$variant/$name.relf"
+    val staticAnalysisConfig = Some(StaticAnalysisConfig())
+    val outputFile = s"$correctPath/$name/$variant/${name}_slicer.bpl"
+    val result = runBASIL(
+      inputFile,
+      relfFile,
+      None,
+      outputFile,
+      staticAnalysisConfig,
+      simplify = true,
+      dsa = Some(DSAConfig.Checks),
+      slicerConfig = slicerConfig
+    )
+    val boogieOutput = runBoogie(s"$correctPath/$name", outputFile, Seq())
+    val (_, verified, _) = checkVerify(boogieOutput, true)
+    (result, verified)
+  }
+
+  def testSlicerVerification(name: String, variant: String): Unit = {
+    val (initialResult, initialVerified) = runExample(name, variant)
+    assert(initialVerified, s"Unsliced program $name does not verify")
+
+    val slicingConfig: SlicerConfig = initialResult.ir.program.mainProcedure.returnBlock match {
+      case Some(block) => {
+        SlicerConfig(
+          block.label,
+          block.jump match {
+            case r: Return => r.outParams.keys.toSet.map(_.name)
+            case _ => ???
+          }
+        )
+      }
+      case None => {
+        assert(false, s"Program $name does not have main return")
+        ???
+      }
+    }
+
+    val (slicedResult, slicedVerified) = runExample(name, variant, Some(slicingConfig))
+    assert(slicedVerified, s"Sliced program $name does not verify")
+  }
+
+  def runTests(name: String): Unit = {
+    getSubdirectories(s"$correctPath/$name").foreach { v => testSlicerVerification(name, v) }
+  }
+
+  test("arrays_simple") {
+    runTests("arrays_simple")
+  }
+
+  test("basic_arrays_read") {
+    runTests("basic_arrays_read")
+  }
+
+  test("basic_arrays_write") {
+    runTests("basic_arrays_write")
+  }
+
+  test("basic_lock_unlock") {
+    runTests("basic_lock_unlock")
+  }
+
+  test("basic_loop_assign") {
+    runTests("basic_loop_assign")
+  }
+
+  test("basic_function_call_caller") {
+    runTests("basic_function_call_caller")
+  }
+
+  test("cjump") {
+    runTests("cjump")
+  }
+
+  test("function") {
+    runTests("function")
+  }
+
+  test("function1") {
+    runTests("function1")
+  }
+
+  test("functions_with_params") {
+    runTests("functions_with_params")
+  }
+
+  test("jumptable2") {
+    runTests("jumptable2")
+  }
+
+  test("secret_write") {
+    runTests("secret_write")
+  }
+}
