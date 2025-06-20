@@ -364,7 +364,7 @@ class GTIRBToIR(
 
     val blockAddress = blockUUIDToAddress.get(blockUUID)
     val block = Block(blockLabel, blockAddress)
-    block.meta = Metadata(Some(byteStringToString(blockUUID)), blockAddress)
+    block.meta = Metadata(Some(blockUUID), blockAddress)
     procedure.addBlock(block)
     if (uuidToBlock.contains(blockUUID)) {
       // TODO this is a case that requires special consideration
