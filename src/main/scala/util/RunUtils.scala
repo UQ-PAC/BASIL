@@ -181,6 +181,7 @@ object IRLoading {
       case _ => {
         ir.transforms.PCTracking.applyPCTracking(q.pcTracking, ctx.program)
         ctx.program.procedures.foreach(_.normaliseBlockNames())
+        ir.transforms.clearParams(ctx.program)
       }
     }
     ctx
@@ -894,6 +895,7 @@ object RunUtils {
     var ctx = q.context.getOrElse(IRLoading.load(q.loading))
     postLoad(ctx) // allows extracting information from the original loaded program
 
+    assert(ir.invariant.checkTypeCorrect(ctx.program))
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
@@ -927,7 +929,7 @@ object RunUtils {
       assert(invariant.correctCalls(ctx.program))
     }
     assert(invariant.correctCalls(ctx.program))
-    ir.invariant.checkTypeCorrect(ctx.program)
+    assert(ir.invariant.checkTypeCorrect(ctx.program))
 
     assert(ir.invariant.programDiamondForm(ctx.program))
     assert(invariant.singleCallBlockEnd(ctx.program))

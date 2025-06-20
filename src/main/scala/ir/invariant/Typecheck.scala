@@ -16,6 +16,12 @@ case class StatementEqualityError(
   msg: Option[String] = None
 ) extends TypeError {
   def stmt = ctx
+
+  override def toString = {
+    val m = msg.map("\n  " + _).getOrElse("")
+    s"    Type mismatch: ${t1} != ${t2} in ($lhs, $rhs)$m"
+  }
+
 }
 case class SubexprViolations(ctx: Statement, viols: List[ExprTypeError]) extends TypeError {
   def stmt = ctx
@@ -263,7 +269,7 @@ def checkTypeCorrect(p: Procedure) = {
     grouped.foreach {
       case (s, errors) => {
         Logger.error(s"Type errors in $s")
-        Logger.error(errors.mkString("\n"))
+        Logger.error(translating.indent(errors.mkString("\n")))
       }
     }
   }
@@ -276,5 +282,9 @@ def checkTypeCorrect(p: Procedure) = {
   * Type checking of direct calls presumes invariant.correctCalls holds.
   */
 def checkTypeCorrect(p: Program): Boolean = {
-  p.procedures.forall(checkTypeCorrect)
+  val r = p.procedures.map(checkTypeCorrect).toList.forall(x => x)
+  if (r) {
+    Logger.info("[!] Typecheck Passed")
+  }
+  r
 }
