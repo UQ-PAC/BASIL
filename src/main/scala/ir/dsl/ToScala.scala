@@ -1,7 +1,8 @@
 package ir.dsl
 
 import ir.*
-import util.{Twine, StringEscape, indent, indentNested, intersperse}
+import util.twine.Twine
+import util.{StringEscape, intersperse}
 import translating.{BasilIR, BasilIRExp}
 
 import collection.immutable.{ListMap, SortedMap}
@@ -50,7 +51,7 @@ trait ToScalaLines[-T] extends ToScala[T]:
 trait ToScalaString[-T] extends ToScala[T]:
   extension (x: T)
     def toScala: String
-    final override def toScalaLines: Twine = LazyList(x.toScala)
+    final override def toScalaLines: Twine = Twine(x.toScala)
 
 /**
  * Companion object for ToScala, defining functions and classes to help with
@@ -83,7 +84,7 @@ given ToScalaString[BigInt] with
 given [T](using ToScala[T]): ToScalaLines[Seq[T]] with
   extension (x: Seq[T])
     def toScalaLines =
-      indentNested("Seq(", x.map(_.toScala).map(LazyList(_)), ")")
+      Twine.indentNested("Seq(", x.map(_.toScalaLines), ")")
 
 given [T](using ToScala[T]): ToScalaString[Some[T]] with
   extension (x: Some[T])

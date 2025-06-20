@@ -1,0 +1,14 @@
+[book]
+title = "BASIL"
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
+
+[output.html]
+smart-punctuation = true
+mathjax-support = true
+copy-fonts = true
+site-url = "/BASIL/"
+git-repository-url = "https://github.com/UQ-PAC/BASIL"
+edit-url-template = "https://github.com/UQ-PAC/BASIL/edit/main/docs/{path}"
+

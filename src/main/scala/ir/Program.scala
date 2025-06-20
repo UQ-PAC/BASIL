@@ -5,8 +5,8 @@ import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
 import boogie.*
 import analysis.{MergedRegion, Loop}
 import util.intrusive_list.*
-import translating.serialiseIL
 import eval.BitVectorEval
+import translating.PrettyPrinter.*
 
 /** Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are not
   * guaranteed to be in any defined order.
@@ -62,10 +62,26 @@ class Program(
   var procedures: ArrayBuffer[Procedure],
   var mainProcedure: Procedure,
   val initialMemory: mutable.TreeMap[BigInt, MemorySection]
-) extends Iterable[CFGPosition] {
+) extends Iterable[CFGPosition]
+    with DeepEquality {
 
   val threads: ArrayBuffer[ProgramThread] = ArrayBuffer()
   val usedMemory: mutable.Map[BigInt, MemorySection] = mutable.TreeMap()
+
+  override def deepEquals(o: Object): Boolean = o match {
+    case p: Program => deepEqualsProg(p)
+    case _ => false
+  }
+  private def deepEqualsProg(p: Program): Boolean = {
+    def toMap(p: Program) = {
+      p.procedures.view.map(p => p.name -> p).toMap
+    }
+    val t = toMap(this)
+    val o = toMap(p)
+    (mainProcedure.name == p.mainProcedure.name) && (t.keys == o.keys) && t.keys.forall { case k =>
+      t(k).deepEquals(o(k))
+    }
+  }
 
   def removeProcedure(i: Int): Unit = {
     val p = procedures(i)
@@ -118,7 +134,7 @@ class Program(
   }
 
   override def toString(): String = {
-    serialiseIL(this)
+    translating.PrettyPrinter.pp_prog(this)
   }
 
   def setModifies(specModifies: Map[String, List[String]]): Unit = {
@@ -259,7 +275,8 @@ class Procedure private (
   var ensures: List[BExpr],
   var requiresExpr: List[Expr],
   var ensuresExpr: List[Expr]
-) extends Iterable[CFGPosition] {
+) extends Iterable[CFGPosition]
+    with DeepEquality {
 
   def name = procName + address.map("_" + _).getOrElse("")
 
@@ -297,6 +314,22 @@ class Procedure private (
       List(),
       List()
     )
+  }
+
+  // None is scc only containing this procedure
+  // Some(Set(this)) is a scc only containing this procedure which has call edge to itself (self recursion)
+  var scc: Option[Set[Procedure]] = None
+
+  override def deepEquals(o: Object): Boolean = o match {
+    case p: Procedure => deepEqualsProc(p)
+    case _ => false
+  }
+  private def deepEqualsProc(p: Procedure) = {
+    name == p.name && (p.blocks.size == blocks.size) && {
+      p.blocksBookended.zip(blocksBookended).forall { case ((l: Block), (r: Block)) =>
+        l.deepEqualsDbg(r)
+      }
+    }
   }
 
   def normaliseBlockNames() = {
@@ -344,6 +377,8 @@ class Procedure private (
     * entry block and return block are elements of _blocks.
     */
   def blocks: Iterator[Block] = _blocks.iterator
+  def blocksBookended: Iterable[Block] =
+    entryBlock.toSeq ++ _blocks.filterNot(entryBlock.contains).filterNot(returnBlock.contains) ++ returnBlock.toSeq
 
   def addCaller(c: DirectCall): Unit = {
     _callers.add(c)
@@ -489,8 +524,9 @@ class Procedure private (
     reachable.toSet
   }
 
-  /** SSA Form
-    */
+  /** 
+   *  SSA Form
+   */
 
   var ssaCount = 0
   def getFreshSSAVar(name: String, ty: IRType) = {
@@ -506,7 +542,8 @@ class Block private (
   val statements: IntrusiveList[Statement],
   private var _jump: Jump,
   private val _incomingJumps: mutable.HashSet[GoTo]
-) extends HasParent[Procedure] {
+) extends HasParent[Procedure]
+    with DeepEquality {
   var atomicSection: Option[AtomicSection] = None
   _jump.setParent(this)
   statements.foreach(_.setParent(this))
@@ -521,6 +558,16 @@ class Block private (
     jump: Jump = GoTo(Set.empty)
   ) = {
     this(label, address, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty)
+  }
+
+  override def deepEquals(b: Object): Boolean = b match {
+    case b: Block => deepEqualsBlock(b)
+    case o => false
+  }
+  private def deepEqualsBlock(b: Block): Boolean = {
+    (label == b.label) && statements.zip(b.statements).forall { case (l, r) =>
+      l.deepEqualsDbg(r)
+    }
   }
 
   def isReturn: Boolean = parent.returnBlock.contains(this)

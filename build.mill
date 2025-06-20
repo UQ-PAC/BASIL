@@ -4,6 +4,7 @@ import $packages._
 import mill._
 import scalalib._
 
+import $file.basilmill.mdbook.mdbookBinary
 import $file.basilmill.bnfc.BNFCJFlexModule
 import $file.basilmill.antlr.AntlrModule
 
@@ -156,8 +157,9 @@ object `package` extends RootModule with ScalaModule {
   }
 
   object bnfc extends BNFCJFlexModule {
-    def bnfcPackageName = "basil_ir"
-    def bnfcSource = Task.Source {
+    override def bnfcPackageName = "basil_ir"
+    override def bnfcExtraArgs = Seq("--line-numbers")
+    override def bnfcSource = Task.Source {
       PathRef(build.millSourcePath / "main" / "bnfc" / "BasilIR.cf")
     }
     override def javadocOptions = Task {
@@ -166,6 +168,12 @@ object `package` extends RootModule with ScalaModule {
         s"$baseUrl/api/java-cup",
         cup.docJar().path / ".." / "javadoc"
       ).map(_.toString)
+    }
+  }
+
+  object mdbook extends mdbookBinary {
+    def mdbookSources = Task.Source {
+      Task.workspace  / "docs" 
     }
   }
 
@@ -187,7 +195,7 @@ object `package` extends RootModule with ScalaModule {
     // these docs paths are used for inter-project linking.
     // https://docs.scala-lang.org/scala3/guides/scaladoc/settings.html#-external-mappings
     Map(
-      "api/bnfc" -> "basil_ir/.*::javadoc",
+      "api/bnfc" -> ".*basil_ir/.*::javadoc",
       "api/basil-antlr" -> ".*Parsers/.*::javadoc",
       "api/basil-proto" -> ".*com/grammatech/gtirb.*::scaladoc3",
       "api/java-cup" -> ".*java_cup/.*::javadoc",
@@ -202,6 +210,13 @@ object `package` extends RootModule with ScalaModule {
       "api/basil-antlr" -> basilAntlr.docJar(),
       "api/basil-proto" -> basilProto.docJar(),
       "api/java-cup" -> bnfc.cup.docJar(),
+    )
+  }
+
+
+  def extraDocs = Task {
+    Map(
+      "docs/basil-il" -> bnfc.bnfcHtml(),
     )
   }
 
@@ -224,25 +239,68 @@ object `package` extends RootModule with ScalaModule {
   def allDocs = Task {
     val dest = Task.dest
 
-    def copyDoc(x: PathRef, name: String) = {
-      val p = x.path / ".." / "javadoc"
-      println("copying docs from " + p)
+    def copyDoc(p: Path, name: String) = {
+      println(s"copying docs into $name from $p")
       os.copy(p, dest / os.RelPath(name), createFolders = true)
     }
 
     docsModules().foreach {
-      case (name, src) => copyDoc(src, name)
+      case (name, src) => copyDoc(src.path / ".." / "javadoc", name)
     }
+    extraDocs().foreach {
+      case (name, src) => copyDoc(src.path, name)
+    }
+
+    os.copy(mdbook.build().path, dest, mergeFolders = true)
     os.copy.into(docsIndex().path, dest / "api")
 
-    // HACK: fix mill bug causing incorrect scala source links https://github.com/com-lihaoyi/mill/issues/5221
     os.walk(dest).foreach {
       case path if path.ext == "html" =>
+        // HACK: fix mill bug causing incorrect scala source links https://github.com/com-lihaoyi/mill/issues/5221
         val out = os.read(path).replace(super.millSourcePath.toString, "")
+        os.write.over(path, out)
+      case path if path.last == "ux.js" =>
+        val old = os.read(path)
+        val oldLen = old.length
+
+        // HACK: disable scaladoc's horrendous link click handler which
+        // introduces a delay and sometimes causes clicking links to fail silently
+        val out = old.replace("""document.querySelectorAll("a")""", "[]")
+        if (oldLen == out.length)
+          println(s"warning: $path replacement did not match anything")
+
         os.write.over(path, out)
       case _ => ()
     }
 
+    println("combined docs at " + dest)
+
     dest
   }
+
+  def ctagsConfig = Task.Source {
+    Task.workspace / "basilmill" / "scala.ctags"
+  }
+
+  /**
+   * Build the ctags file containing code definition locations.
+   * This can be used with `./mill -w` to watch and re-build on file changes.
+   */
+  def ctags = Task {
+    val src = Task.traverse(Seq(this, test) ++ moduleDeps)(_.allSources)().flatten
+    val srcArgs = src.map(_.path).filter(os.exists(_)).map(_.toString)
+
+    val newFile = Task.workspace / "tags.new"
+    val tagsFile = Task.workspace / "tags"
+
+    val args = Seq(
+      "ctags", "--tag-relative=no", "-R", "-f", newFile.toString,
+      "--options=" + ctagsConfig().path,
+      "--languages=scala,java", "--fields=+zK")
+
+    os.call(args ++ srcArgs, cwd = Task.workspace)
+    os.move(newFile, tagsFile, replaceExisting = true, atomicMove = true)
+  }
+
+
 }

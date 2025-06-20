@@ -84,7 +84,7 @@ abstract class DifferentialTest extends AnyFunSuite, CaptureOutput, TestCustomis
 
     val loading = ILLoadingConfig(
       inputFile = examplePath + testName + suffix,
-      relfFile = examplePath + testName + ".relf",
+      relfFile = Some(examplePath + testName + ".relf"),
       dumpIL = None,
       trimEarly = true /* no instances of indirectcalls in these examples */
     )
@@ -114,7 +114,7 @@ abstract class DifferentialTest extends AnyFunSuite, CaptureOutput, TestCustomis
 }
 
 /**
- * Disable analysis differential test because it makes no 
+ * Disable analysis differential test because it makes no
  * IR transforms, these examples contain no indirect calls.
  */
 @test_util.tags.DisabledTest
@@ -151,6 +151,7 @@ class DifferentialAnalysisTest extends DifferentialTest {
   runSystemTests()
 }
 
+@test_util.tags.AnalysisSystemTest2
 @test_util.tags.AnalysisSystemTest
 class DifferentialAnalysisTestSimplification extends DifferentialTest {
 

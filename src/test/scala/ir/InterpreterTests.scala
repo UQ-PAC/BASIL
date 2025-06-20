@@ -44,7 +44,7 @@ class InterpreterTests extends AnyFunSuite with CaptureOutput with BeforeAndAfte
     val compiler = "gcc"
     val loading = ILLoadingConfig(
       inputFile = s"$path/$name/$compiler/$name.adt",
-      relfFile = s"$path/$name/$compiler/$name.relf",
+      relfFile = Some(s"$path/$name/$compiler/$name.relf"),
       specFile = None,
       dumpIL = None
     )

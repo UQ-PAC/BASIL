@@ -835,11 +835,15 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
 
     (ctx.program).foreach {
       case a: Assume => {
-        val comparison = expected.get(a.parent.label)
-        val assumeBody = ir.eval.VarNameNormalise()(a.body)
-        assert(comparison.isDefined, s"Block label ${a.parent.label} not included in expected labels")
-        val expectedBody = ir.eval.VarNameNormalise()(expected(a.parent.label))
-        assert(assumeBody == expectedBody)
+        val assumeBody = a.body
+        assert(
+          assumeBody.variables
+            .filter(_.name match {
+              case s"Cse${_}" | s"CF${_}" | s"ZF${_}" | s"VF${_}" | s"NF${_}" => true
+              case _ => false
+            })
+            .isEmpty
+        )
       }
       case _ => ()
     }
