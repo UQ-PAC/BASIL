@@ -1,7 +1,7 @@
 package util.functional
 
 import collection.immutable.LinearSeq
-import collection.{SeqOps, IterableOps, Factory}
+import collection.{SeqOps, IterableOps, Factory, IterableOnceOps}
 
 /**
  * This unapplier enables pattern matching on the /last/ element of
@@ -65,3 +65,23 @@ def sequence[T, L, CC[U] <: IterableOps[U, CC, CC[U]]](xs: CC[Either[L, T]]): Ei
     case (_, right) => Right(right)
   }
 }
+
+extension [A, CC[X] <: IterableOps[X, CC, CC[X]], C <: CC[A]](coll: IterableOps[A, CC, C])
+
+  /**
+   * Performs a left fold on the given *non-empty* iterable, using the first element of the iterable
+   * as the base case for the fold.
+   */
+  def foldLeft1(f: (A, A) => A): A =
+    def error = throw IllegalArgumentException("foldLeft1 called with empty iterable")
+
+    val (hd, tl) = coll.splitAt(1)
+    tl.foldLeft[A](hd.headOption.getOrElse(error))(f)
+
+
+  /**
+   * Performs a left fold on the given iterable, using an *empty collection* as the base case for the fold.
+   * The type of the empty collection is inferred from the type of the original iterable.
+   */
+  def foldLeft0(f: (A, A) => A)(implicit factory: Factory[Nothing, A]): A =
+    coll.foldLeft[A](factory.newBuilder.result)(f)
