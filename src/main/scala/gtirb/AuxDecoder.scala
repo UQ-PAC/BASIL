@@ -69,7 +69,6 @@ object AuxDecoder {
     val x3 = r3(bs)
     (x1, x2, x3)
 
-
   def readTuple[T1, T2, T3, T4](r1: Reader[T1], r2: Reader[T2], r3: Reader[T3], r4: Reader[T4])(bs: Input) =
     val x1 = r1(bs)
     val x2 = r2(bs)
@@ -87,9 +86,14 @@ object AuxDecoder {
     val x5 = r5(bs)
     (x1, x2, x3, x4, x5)
 
-  def readTuple[T1, T2, T3, T4, T5, T6](r1: Reader[T1], r2: Reader[T2], r3: Reader[T3], r4: Reader[T4], r5: Reader[T5], r6: Reader[T6])(
-    bs: Input
-  ) =
+  def readTuple[T1, T2, T3, T4, T5, T6](
+    r1: Reader[T1],
+    r2: Reader[T2],
+    r3: Reader[T3],
+    r4: Reader[T4],
+    r5: Reader[T5],
+    r6: Reader[T6]
+  )(bs: Input) =
     val x1 = r1(bs)
     val x2 = r2(bs)
     val x3 = r3(bs)
@@ -98,10 +102,9 @@ object AuxDecoder {
     val x6 = r6(bs)
     (x1, x2, x3, x4, x5, x6)
 
-
   def readUuid(bs: Input) =
-    ByteString.copyFrom(readBytes(16)(bs))
-    // Base64.getEncoder().encodeToString(readBytes(16)(bs))
+    // ByteString.copyFrom(readBytes(16)(bs))
+    Base64.getEncoder().encodeToString(readBytes(16)(bs))
 
   def readOffset(bs: Input) =
     val uuid = readUuid(bs)
