@@ -24,7 +24,7 @@ import scala.util.boundary
 import boundary.break
 import java.nio.ByteBuffer
 import util.intrusive_list.*
-import util.functional.{Snoc}
+import util.functional.{Snoc, foldLeft0}
 import util.Logger
 
 private def assigned(x: Statement): immutable.Set[Variable] = x match {
@@ -75,9 +75,23 @@ class GTIRBToIR(
   mainAddress: Option[BigInt],
   mainName: Option[String]
 ) {
-  private val functionNames = MapDecoder.decode_uuid(mods.map(_.auxData("functionNames").data))
-  private val functionEntries = MapDecoder.decode_set(mods.map(_.auxData("functionEntries").data))
-  private val functionBlocks = MapDecoder.decode_set(mods.map(_.auxData("functionBlocks").data))
+
+  object auxdata {
+    import gtirb.AuxDecoder.*
+    val functionNames = mods
+      .map(_.auxData("functionNames").data)
+      .map(decode(readMap(readUuid, readUuid))(_))
+      .foldLeft0(_ ++ _)
+    val functionEntries = mods
+      .map(_.auxData("functionEntries").data)
+      .map(decode(readMap(readUuid, readSet(readUuid)))(_))
+      .foldLeft0(_ ++ _)
+    val functionBlocks = mods
+      .map(_.auxData("functionBlocks").data)
+      .map(decode(readMap(readUuid, readSet(readUuid)))(_))
+      .foldLeft0(_ ++ _)
+  }
+  import auxdata.*
 
   // maps block UUIDs to their address
   private val blockUUIDToAddress = createAddresses()
