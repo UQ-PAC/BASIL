@@ -173,7 +173,7 @@ object `package` extends RootModule with ScalaModule {
 
   object mdbook extends mdbookBinary {
     def mdbookSources = Task.Source {
-      Task.workspace  / "docs" 
+      Task.workspace  / "docs"
     }
   }
 

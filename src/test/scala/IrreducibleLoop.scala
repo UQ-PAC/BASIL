@@ -1,6 +1,6 @@
 import org.scalatest.funsuite.AnyFunSuite
 import util.{ILLoadingConfig, IRLoading, LogLevel, Logger, PerformanceTimer, RunUtils}
-import translating.BAPToIR
+import translating.{BAPToIR, ReadELFData}
 import analysis.LoopDetector
 import analysis.LoopTransform
 import ir.{Block, Program, dotBlockGraph}
@@ -18,7 +18,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
   def load(conf: ILLoadingConfig): Program = {
     val bapProgram = IRLoading.loadBAP(conf.inputFile)
-    val (_, _, _, _, _, mainAddress) = IRLoading.loadReadELF(conf.relfFile.get, conf)
+    val ReadELFData(_, _, _, _, _, mainAddress) = IRLoading.loadReadELF(conf.relfFile.get, conf)
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
     val IRProgram = IRTranslator.translate
     IRProgram

@@ -1,5 +1,6 @@
 package boogie
 import ir.*
+import ir.dsl.given
 import specification.*
 import collection.mutable
 
@@ -750,7 +751,7 @@ case class SpecGlobal(
   arraySize: Option[Int],
   override val address: BigInt
 ) extends SymbolTableEntry,
-      SpecGlobalOrAccess {
+      SpecGlobalOrAccess derives ir.dsl.ToScala {
   override def specGlobals: Set[SpecGlobalOrAccess] = Set(this)
   override val toAddrVar: BVar = BVariable("$" + s"${name}_addr", BitVecBType(64), Scope.Const)
   override val toOldVar: BVar = BVariable(s"${name}_old", BitVecBType(size), Scope.Local)

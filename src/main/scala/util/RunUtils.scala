@@ -138,7 +138,7 @@ object IRLoading {
     val (mainAddress, makeContext) = q.relfFile match {
       case Some(relf) => {
         // TODO: this tuple is large, should be a case class
-        val (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
+        val ReadELFData(symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
           IRLoading.loadReadELF(relf, q)
 
         def continuation(program: Program) =
@@ -202,7 +202,7 @@ object IRLoading {
   def loadReadELF(
     fileName: String,
     config: ILLoadingConfig
-  ): (List[ELFSymbol], Set[ExternalFunction], Set[SpecGlobal], Set[FuncEntry], Map[BigInt, BigInt], BigInt) = {
+  ): ReadELFData = {
     val lexer = ReadELFLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(lexer)
     val parser = ReadELFParser(tokens)

@@ -86,6 +86,19 @@ given [T](using ToScala[T]): ToScalaLines[Seq[T]] with
     def toScalaLines =
       Twine.indentNested("Seq(", x.map(_.toScalaLines), ")")
 
+given [T](using ToScala[T]): ToScalaLines[Set[T]] with
+  extension (x: Set[T])
+    def toScalaLines =
+      Twine.indentNested("Set(", x.map(_.toScalaLines), ")")
+
+given [K, V](using ToScala[K], ToScala[V]): ToScalaLines[Map[K, V]] with
+  extension (x: Map[K, V])
+    def toScalaLines =
+      val pairs = x.map {
+        case (k,v) => Twine(k.toScalaLines, " -> ", v.toScalaLines)
+      }
+      Twine.indentNested("Map(", pairs, ")")
+
 given [T](using ToScala[T]): ToScalaString[Some[T]] with
   extension (x: Some[T])
     def toScala: String = x match

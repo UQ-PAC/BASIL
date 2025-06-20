@@ -143,6 +143,8 @@ object Main {
     interpret: Flag,
     @arg(name = "dump-il", doc = "Dump the Intermediate Language to text.")
     dumpIL: Option[String],
+    @arg(name = "dump-relf", doc = "Dump Basil's representation of the readelf information to stdout and exit.")
+    dumpRelf: Flag,
     @arg(name = "main-procedure-name", short = 'm', doc = "Name of the main procedure to begin analysis at.")
     mainProcedureName: String = "main",
     @arg(
@@ -325,6 +327,15 @@ object Main {
         "\nRequires --load-directory-gtirb, --load-directory-bap OR --input\n\n" + parser
           .helpText(sorted = false)
       )
+    }
+
+    if (conf.dumpRelf.value) {
+      val relfFile = loadingInputs.relfFile.getOrElse {
+        throw IllegalArgumentException("--dump-relf requires --relf")
+      }
+      val relfData = IRLoading.loadReadELF(relfFile, loadingInputs)
+      println(relfData.toScala)
+      return
     }
 
     if (loadingInputs.specFile.isDefined && loadingInputs.relfFile.isEmpty) {
