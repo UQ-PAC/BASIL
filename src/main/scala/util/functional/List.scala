@@ -78,7 +78,6 @@ extension [A, CC[X] <: IterableOps[X, CC, CC[X]], C <: CC[A]](coll: IterableOps[
     val (hd, tl) = coll.splitAt(1)
     tl.foldLeft[A](hd.headOption.getOrElse(error))(f)
 
-
   /**
    * Performs a left fold on the given iterable, using an *empty collection* as the base case for the fold.
    * The type of the empty collection is inferred from the type of the original iterable.
