@@ -45,7 +45,7 @@ def correctCalls(p: Program): Boolean = {
         c.outParams.forall((k, v) => k.getType == v.getType) && c.outParams.forall((k, v) => k.getType == v.getType)
       if (!outparams) {
         Logger.error(
-          s"Return formal out params do  do not match procedure formal out params: ${c.outParams} != ${t.formalOutParam}"
+          s"Return formal out params do  do not match procedure formal out params: return(${c.outParams}) != (${t.name}) -> ${t.formalOutParam}"
         )
       }
       if (!typecheck) {

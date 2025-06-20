@@ -17,33 +17,28 @@ package ir
  * be global variable declarations for registers.
  *
  * ```
- * memory mem : map bv8[bv64];
+ * memory shared $mem : (bv64 -> bv8);
  *
- * let entry_procedure = main_1924;
+ * prog entry @main_1860;
  *
- * proc get_two_1876(R0_in:bv64, R10_in:bv64, R11_in:bv64, R12_in:bv64, R13_in:bv64, R14_in:bv64, R15_in:bv64, R16_in:bv64, R17_in:bv64, R18_in:bv64, R1_in:bv64, R29_in:bv64, R2_in:bv64, R30_in:bv64, R31_in:bv64, R3_in:bv64, R4_in:bv64, R5_in:bv64, R6_in:bv64, R7_in:bv64, R8_in:bv64, R9_in:bv64) -> (R0_out:bv64, R1_out:bv64, R31_out:bv64)
- * {
- *   name = "get_two";
- *   address = 0x754;
- *   entry_block = "lget_two";
- *   blocks = [
- *     block lget_two {address = 0x754} [
- *       var R0_1: bv64 := R0_in:bv64;
- *       var R10_1: bv64 := R10_in:bv64;
- *       var R11_1: bv64 := R11_in:bv64;
- *       goto(lget_two_phi_get_two_1876_basil_return)
- *     ];
- *     block lget_two_phi_get_two_1876_basil_return [
- *       var R1_4: bv64 := R1_3:bv64;
- *       var R0_6: bv64 := R0_5:bv64;
- *       var R31_4: bv64 := R31_3:bv64;
- *       goto(get_two_1876_basil_return)
- *     ];
- *     block get_two_1876_basil_return [
- *       return (R0_6:bv64, R1_4:bv64, R31_4:bv64)
- *     ]
+ * proc @main_1860
+ *   (R0_in:bv64, R1_in:bv64, R29_in:bv64, R30_in:bv64, R31_in:bv64, R8_in:bv64, _PC_in:bv64)
+ *     -> (R0_out:bv64, R29_out:bv64, R30_out:bv64, R8_out:bv64, _PC_out:bv64)
+ *   { .name = "main"; .address = 0x744 }
+ *   require eq(_PC_in:bv64, 0x744:bv64);
+ *   ensures eq(_PC_out:bv64, R30_in:bv64);
+ * [
+ *   block %main_entry {.address = 0x744; .originalLabel = "rboiQVDCQyC6FKdIfNmCPw=="} [
+ *     assert eq(_PC_in:bv64, 0x744:bv64) { .label = "pc-tracking"; .comment = "pc-tracking";  };
+ *     store le $mem bvadd(R31_in:bv64, 0xfffffffffffffff0:bv64) R29_in:bv64 64;
+ *     store le $mem bvadd(R31_in:bv64, 0xfffffffffffffff8:bv64) R30_in:bv64 64;
+ *     store le $mem bvadd(R31_in:bv64, 0xffffffffffffffec:bv64) 0x0:bv32 32;
+ *     store le $mem bvadd(R31_in:bv64, 0xffffffffffffffe8:bv64) extract(32, 0, R0_in:bv64) 32;
+ *     var load15_1: bv32 := load le $mem bvadd(R31_in:bv64, 0xffffffffffffffe8:bv64) 32;
+ *     store le $mem bvadd(R31_in:bv64, 0xffffffffffffffdc:bv64) load15_1:bv32 32;
+ *     goto(%phi_1, %phi_2);
  *   ];
- * };
+ * ]
  * ```
  *
  * # Overview
@@ -51,7 +46,7 @@ package ir
  * The parsing process is a **two-stage** parser:
  *
  * - The first stage is a lightweight "early" stage to identify global declarations
- * (most importantly, procedure signatures and their in/out parameters).
+ *   (most importantly, procedure signatures and their in/out parameters).
  *
  * - The second stage is the main stage. Given the declarations from the first stage,
  *   this produces a Basil IR DSL program ([[ir.dsl]]), ready to be resolved into

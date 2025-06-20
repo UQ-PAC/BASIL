@@ -344,7 +344,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       }
     case b: BAPVar => (translateVar(b), None)
     case BAPMemAccess(memory, index, endian, size) =>
-      val temp = LocalVar("load" + loadCounter, BitVecType(size))
+      val temp = LocalVar.ofIndexed("load" + loadCounter, BitVecType(size))
       loadCounter += 1
       val load = MemoryLoad(temp, translateMemory(memory), translateExprOnly(index), endian, size, None)
       (temp, Some(load))
@@ -365,7 +365,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
         if (r.size == param.size) {
           translateParam(param)
         } else {
-          LocalVar(param.name, BitVecType(r.size))
+          LocalVar.ofIndexed(param.name, BitVecType(r.size))
         }
       }
       case _ => throw Exception(s"subroutine parameter $this refers to non-register variable ${param.value}")
@@ -408,11 +408,11 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     LocalAssign(paramRegisterLVal(p), paramVariableRVal(p))
   }
 
-  def translateParam(p: BAPParameter): LocalVar = LocalVar(p.name, BitVecType(p.size))
+  def translateParam(p: BAPParameter): LocalVar = LocalVar.ofIndexed(p.name, BitVecType(p.size))
 
   private def translateVar(variable: BAPVar): Variable = variable match {
     case BAPRegister(name, size) => Register(name, size)
-    case BAPLocalVar(name, size) => LocalVar(name, BitVecType(size))
+    case BAPLocalVar(name, size) => LocalVar.ofIndexed(name, BitVecType(size))
   }
 
   private def translateMemory(memory: BAPMemory): Memory = {

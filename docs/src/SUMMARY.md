@@ -5,6 +5,7 @@
 
 - [Usage](usage.md) Basil binary lifting & usage guide
 - [Developer Guides](development/readme.md) Explanation of common development tasks
+    - [Basil IL](development/bsil-il.md) Basil IR text representation
     - [Project layout](development/project-layout.md) Organisation of the source code
     - [Editor setup](development/editor-setup.md) Guide to basil development in IDEs 
     - [Control Flow Graph](development/cfg.md) Explanation of the old CFG datastructure 
