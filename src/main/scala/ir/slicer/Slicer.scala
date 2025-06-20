@@ -6,15 +6,10 @@ import analysis.{Lambda, EdgeFunction, TwoElement}
 import util.{SlicerConfig, SlicerLogger, LogLevel, PerformanceTimer}
 import scala.collection.mutable
 
-protected type StatementSlice = Set[Variable]
-object StatementSlice {
-  def apply(): StatementSlice = Set.empty[Variable]
-}
-
 class Slicer(program: Program, slicerConfig: SlicerConfig) {
   protected val performanceTimer = PerformanceTimer("Slicer Timer", LogLevel.INFO)
 
-  lazy protected val parsedConfig: Option[(Block, StatementSlice)] = {
+  lazy protected val parsedConfig: Option[(Block, Set[Variable])] = {
     def variables(n: Command): Set[Variable] = {
       n match {
         case a: LocalAssign => a.lhs.variables ++ a.rhs.variables
@@ -80,7 +75,7 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
     }
   }
 
-  lazy protected val initialCriterion: Map[CFGPosition, StatementSlice] = {
+  lazy protected val initialCriterion: Map[CFGPosition, Set[Variable]] = {
     parsedConfig match {
       case Some(targetedBlock, variables) => Map(targetedBlock.jump -> variables)
       case _ => Map()
@@ -125,17 +120,17 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
     }
   }
 
-  class Phase2(results: Map[CFGPosition, StatementSlice]) {
+  class Phase2(results: Map[CFGPosition, Set[Variable]]) {
     val transferFunctions = SlicerTransfers(initialCriterion)
 
     def procedures = program.procedures.filterNot(_.isExternal.contains(true))
 
     def transfer(n: CFGPosition): Map[Variable, EdgeFunction[TwoElement]] = {
       val func = transferFunctions.edgesOther(n)
-      transferFunctions.restructure(criterion(n).flatMap(v => func(Left(v))).toMap ++ func(Right(Lambda())))
+      (criterion(n).flatMap(v => func(Left(v))).toMap ++ func(Right(Lambda()))).collect { case (Left(k), v) => k -> v }
     }
 
-    def criterion(n: CFGPosition): StatementSlice = {
+    def criterion(n: CFGPosition): Set[Variable] = {
       (n match {
         case c: DirectCall => transfer(c.successor).keys.toSet
         case _ => results.getOrElse(n, Set())
@@ -185,8 +180,7 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
     }
 
     /**
-     * {@link Simp#removeDeadInParams(Program)}
-     *
+     * [[ir.transforms.removeDeadInParams]]
      */
     def reduceInParams(): Unit = {
       var modified = false

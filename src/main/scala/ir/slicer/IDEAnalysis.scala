@@ -5,7 +5,7 @@ import ir.eval.evaluateExpr
 import analysis.*
 import analysis.solvers.*
 
-trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice])
+trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, Set[Variable]])
     extends BackwardIDETransferFunctions[Variable, TwoElement, TwoElementLattice] {
 
   val valuelattice = TwoElementLattice()
@@ -44,7 +44,8 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
 
   def edgesExitToAfterCall(exit: Procedure, aftercall: DirectCall)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     d match {
-      case Left(value: LocalVar) if aftercall.actualParams.contains(value) => fold(aftercall.actualParams(value).variables)
+      case Left(value: LocalVar) if aftercall.actualParams.contains(value) =>
+        fold(aftercall.actualParams(value).variables)
       case Left(_: LocalVar) => Map()
       case _ => Map(d -> IdEdge())
     }
@@ -131,17 +132,6 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
     }
   }
 
-  def restructure(result: Map[DL, EdgeFunction[TwoElement]]): Map[Variable, EdgeFunction[TwoElement]] = {
-    result.foldLeft(Map[Variable, EdgeFunction[TwoElement]]()) {
-      case (acc, (d, e)) => {
-        d match {
-          case Left(value) => acc + (value -> e)
-          case Right(_) => acc
-        }
-      }
-    }
-  }
-
   def convertMemoryIndex(index: Expr): Set[Variable] = {
     def convertLiteral(l: Literal): Set[Variable] = {
       l match {
@@ -164,10 +154,10 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, StatementSlice]
   }
 }
 
-class SlicerTransfers(slicingCriterion: Map[CFGPosition, StatementSlice])
+class SlicerTransfers(slicingCriterion: Map[CFGPosition, Set[Variable]])
     extends SlicerTransferFunctions(slicingCriterion)
 
-class SlicerAnalysis(program: Program, startingNode: CFGPosition, slicingCriterion: Map[CFGPosition, StatementSlice])
+class SlicerAnalysis(program: Program, startingNode: CFGPosition, slicingCriterion: Map[CFGPosition, Set[Variable]])
     extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program)
     with BackwardIDEAnalysis[Variable, TwoElement, TwoElementLattice]
     with SlicerTransferFunctions(slicingCriterion) {
