@@ -137,7 +137,7 @@ object IRLoading {
     } else if (q.inputFile.endsWith(".il")) {
       FrontendMode.Basil
     } else {
-      throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
+      throw Exception(s"input file name ${q.inputFile} must be an .adt, .gts or .gtirb file")
     }
 
     val (mainAddress, makeContext) = q.relfFile match {
