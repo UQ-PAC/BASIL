@@ -3,12 +3,23 @@
 BASIL IR is the intermediate representation used during static analysis. 
 This is on contrast to Boogie IR which is used for specification annotation, and output to textual boogie syntax that can be run through the Boogie verifier. 
 
-The textual representation of the basil IR is described here [development/basil-il.md].
+The textual representation of basil IR has a grammar describing it [here](https://uq-pac.github.io/BASIL/docs/basil-il/BasilIR.html).
+Names used internally differ slightly.
 
-The grammar is described below, note that the IR is a data-structure, without a concrete textual representation so the below grammar only represents the structure. 
-We omit the full description of the expression language because it is relatively standard.  
+The IR has three levels:
+
+- Procedure / Program / Block, defined in [Program.scala](https://github.com/UQ-PAC/BASIL/blob/main/src/main/scala/ir/Program.scala)
+  - Encodes the program control-flow
+- Commands : Jumps and Statements, defined in [Statement.scala](https://github.com/UQ-PAC/BASIL/blob/main/src/main/scala/ir/Statement.scala)
+  - Encodes atomic program steps
+- Expressions, defined in [Expr.scala](https://github.com/UQ-PAC/BASIL/blob/main/src/main/scala/ir/Expr.scala)
+  - Encodes atomic and pure (sometimes partial) computations. These are components of statements.
 
 The IR has a completely standard simple type system that is enforced at construction.
+
+### Structure
+
+Describes the high-level structure of the in-memory IR ADT
 
 ```math
 \begin{align*}
@@ -52,15 +63,17 @@ Endian ::=&~ BigEndian ~|~ LittleEndian \\
 \end{align*}
 ```
 
+### Jumps
+
 - The `GoTo` jump is a multi-target jump reprsenting non-deterministic choice between its targets. 
   Conditional structures are represented by these with a guard (an assume statement) beginning each target. 
 - The `Unreachable` jump is used to signify the absence of successors, it has the semantics of `assume false`.
 - The `Return` jump passes control to the calling function, often this is over-approximated to all functions which call the statement's parent procedure.
 
+### Calls
 
-### Indirect Calls
-
-An indirect call is a dynamic jump, to either a procedure or a block.
+- A `DirectCall` calls a procedure and returns to the next command in the block
+-  An `IndirectCall` is a dynamic jump, to either a procedure or a block based on the address of the argument
 
 ## Translation Phases
 

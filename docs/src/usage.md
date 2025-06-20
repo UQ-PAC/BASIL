@@ -1,4 +1,4 @@
-# Usage of the BASIL tool
+# Usage
 
 This document covers using the BASIL pipeline to lift and verify binaries,
 from the perspective of a user of the tool.

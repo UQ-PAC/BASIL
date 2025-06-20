@@ -39,8 +39,8 @@ proc @main_1860
 Sigils are identifier prefix characters used to disambiguate different types of identifier. Basil IL has 4 types of identifier:
 
 - Procedure identifiers with the sigil `@`
-- Blocks with the sigil `#`
-- Local variables with the _optional_ sigil `%`, no other identifiers may begin with a `#`.
+- Blocks with the sigil `%`
+- Local variables with the _optional_ sigil `#`, no other identifiers may begin with a `#`.
 - Global variables/registers (and mem, functions, axioms) with the sigil `$`
 - Specification/attribute identifiers with the sigil `.`
 
