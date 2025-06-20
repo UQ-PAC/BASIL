@@ -1941,8 +1941,8 @@ def getDoCleanupTransform(doSimplify: Boolean): Transform = TransformBatch(
 )
 
 // these are called a lot so it's useful to create them here rather than generating many copies on the fly
-val doCleanupWithSimplify = getDoCleanupTransform(true)
-val doCleanupWithoutSimplify = getDoCleanupTransform(false)
+lazy val doCleanupWithSimplify = getDoCleanupTransform(true)
+lazy val doCleanupWithoutSimplify = getDoCleanupTransform(false)
 
 class Simplify(val res: Boolean => Variable => Option[Expr], val initialBlock: Block = null) extends CILVisitor {
 
