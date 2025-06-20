@@ -6,6 +6,7 @@ import com.grammatech.gtirb.proto.CFG.CFG
 import com.grammatech.gtirb.proto.CFG.Edge
 import com.grammatech.gtirb.proto.CFG.EdgeLabel
 import com.grammatech.gtirb.proto.Module.Module
+import com.grammatech.gtirb.proto.ByteInterval
 import com.grammatech.gtirb.proto.Symbol.Symbol
 import Parsers.ASLpParser.*
 import gtirb.*
@@ -62,7 +63,8 @@ class TempIf(
   * @param mods:
   *   Modules of the Gtirb file.
   * @param parserMap:
-  *   A Map from UUIDs to basic block statements, used for parsing
+  *   A Map from UUIDs to basic block statements, used for instruction semantics.
+  *   If None is provided then the offline lifter is used to generate instruction semantics.
   * @param cfg:
   *   The cfg provided by gtirb
   * @param mainAddress:
@@ -70,17 +72,56 @@ class TempIf(
   */
 class GTIRBToIR(
   mods: Seq[Module],
-  parserMap: immutable.Map[String, List[InsnSemantics]],
+  parserMap: Option[immutable.Map[String, List[InsnSemantics]]],
   cfg: CFG,
   mainAddress: Option[BigInt],
   mainName: Option[String]
 ) {
+
+  val opcodeBytes = 4
+
   private val functionNames = MapDecoder.decode_uuid(mods.map(_.auxData("functionNames").data))
   private val functionEntries = MapDecoder.decode_set(mods.map(_.auxData("functionEntries").data))
   private val functionBlocks = MapDecoder.decode_set(mods.map(_.auxData("functionBlocks").data))
 
   // maps block UUIDs to their address
   private val blockUUIDToAddress = createAddresses()
+
+  case class BlockPos(
+    b: ByteInterval.Block,
+    uuid: ByteString,
+    address: Long,
+    offset: Long,
+    size: Long,
+    byteIntervalContent: ByteString
+  ) {
+    assert(blockUUIDToAddress(uuid) == address)
+
+    def content: ByteString = {
+      byteIntervalContent.substring(offset.toInt, (offset + size).toInt)
+    }
+
+    def opcodes: Seq[Int] = Range
+      .Exclusive(0, size.toInt, opcodeBytes)
+      .map(i => content.substring(i, i + opcodeBytes))
+      .map(b => bytesToi32(b.toByteArray, true))
+
+    def toStatements(): Seq[Seq[Statement]] = {
+      offlineLifter.Lifter.liftBlockBytes(opcodes, address)
+    }
+
+    private def bytesToi32(bytes: Array[Byte], littleEndian: Boolean): Int = {
+      val buffer = java.nio.ByteBuffer.wrap(bytes)
+      if (littleEndian) {
+        buffer.order(java.nio.ByteOrder.LITTLE_ENDIAN).getInt
+      } else {
+        buffer.getInt
+      }
+    }
+
+  }
+
+  private lazy val uuidToBlockContent = createOpcodeBlocks()
 
   // mapping from a symbol's UUID to the symbol itself
   private val uuidToSymbol = mods.flatMap(_.symbols).map(s => s.uuid -> s).toMap
@@ -120,6 +161,28 @@ class GTIRBToIR(
     }).toMap
 
     blockAddresses
+  }
+
+  def createOpcodeBlocks(): immutable.Map[ByteString, BlockPos] = {
+    val blocks = mods
+      .flatMap(_.sections)
+      .flatMap(_.byteIntervals)
+      .map(bi => {
+        assert(
+          bi.hasAddress
+        ) // Unsure if this holds for PIC https://grammatech.github.io/gtirb/cpp/classgtirb_1_1_byte_interval.html#aaf13ececea7d2b943402feeb4f1aae35
+        (bi.blocks.toList, bi.contents, bi.address)
+      })
+
+    val codeblocks = blocks.flatMap((bl, cont, bi_addr) =>
+      bl.collect(b =>
+        b.value.code match {
+          case Some(c) =>
+            c.uuid -> BlockPos(b, c.uuid, bi_addr + b.offset, b.offset, c.size, cont)
+        }
+      )
+    )
+    codeblocks.toMap
   }
 
   // maps block UUIDs to their outgoing edges
@@ -179,7 +242,15 @@ class GTIRBToIR(
 
     // maybe good to sort blocks by address around here?
 
-    val semanticsLoader = GTIRBLoader(parserMap)
+    val semanticsLoader
+      : (blockUUID: ByteString, blockCountIn: Int, blockAddress: Option[BigInt]) => Seq[Seq[Statement]] =
+      parserMap match {
+        case Some(parserMap) => {
+          val semanticsLoader = GTIRBLoader(parserMap)
+          (uuid, blockCount, addr) => semanticsLoader.visitBlock(uuid, blockCount, addr).toSeq
+        }
+        case None => (uuid, _, _) => uuidToBlockContent(uuid).toStatements()
+      }
 
     for ((functionUUID, blockUUIDs) <- functionBlocks) {
       val procedure = uuidToProcedure(functionUUID)
@@ -187,7 +258,7 @@ class GTIRBToIR(
       for (blockUUID <- blockUUIDs) {
         val block = uuidToBlock(blockUUID)
 
-        val statements = semanticsLoader.visitBlock(blockUUID, blockCount, block.address)
+        val statements = semanticsLoader(blockUUID, blockCount, block.address)
         blockCount += 1
         for ((stmts, i) <- statements.zipWithIndex) {
           block.statements.addAll(insertPCIncrement(stmts))
@@ -292,14 +363,18 @@ class GTIRBToIR(
       case last @ LocalAssign(lhs: Register, _, _) if lhs.name == "_PC" =>
         val label = last.label
         label
-      case _ => throw Exception(s"expected block ${block.label} to have a program counter assignment at its end")
+      case l =>
+        throw Exception(s"expected block ${block.label} to have a program counter assignment at its end but got $l")
     }
   }
 
-  private def getPCTarget(block: Block): Register = {
+  private def getPCTarget(block: Block): Variable = {
     block.statements.last match {
-      case LocalAssign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
-      case _ => throw Exception(s"expected block ${block.label} to have a program counter assignment at its end")
+      case LocalAssign(Register("_PC", 64), rhs: Variable, _) => rhs
+      case l =>
+        throw Exception(
+          s"expected block ${block.label} to have a program counter assignment at its end but got (${l.getClass.getSimpleName}) $l"
+        )
     }
   }
 
@@ -830,7 +905,7 @@ class GTIRBToIR(
 
     val tempIf = block.statements.last match {
       case i: TempIf => i
-      case _ => throw Exception(s"last statement of block ${block.label} is not an if statement")
+      case i => throw Exception(s"last statement of block ${block.label} is not an if statement: $i")
     }
 
     val trueBlock = newBlockCondition(block, uuidToBlock(branch.targetUuid), tempIf.cond, tempIf.thenStmts)

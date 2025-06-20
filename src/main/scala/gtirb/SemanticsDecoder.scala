@@ -31,7 +31,7 @@ private def parse_asl_stmt(line: String): Option[StmtContext] = {
 
           ${line.replace('\n', ' ')}
           ${" " * token.getStartIndex}^ here!
-          """.stripIndent
+          """.strip
         case o => o.toString
       }
       Logger.error(s"""Semantics parse error:\n  line: $line\n$extra""")

@@ -698,6 +698,7 @@ case class GammaLoad(gammaMap: BMapVar, index: BExpr, bits: Int, accesses: Int) 
 }
 
 case class GammaStore(gammaMap: BMapVar, index: BExpr, value: BExpr, bits: Int, accesses: Int) extends BExpr {
+  require(accesses > 0)
   override def toString: String = s"$fnName($gammaMap, $index, $value)"
   val fnName: String = s"gamma_store$bits"
 
