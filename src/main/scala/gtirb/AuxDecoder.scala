@@ -12,11 +12,11 @@ object AuxDecoder {
 
   enum AuxKind[T](val name: String, val decoder: Reader[T]) {
     case ElfSymbolTabIdxInfo
-        extends AuxKind("elfSymbolTabIdxInfo", readMap(readUuid, readList(readTuple(readString, readUint(64)))))
+        extends AuxKind("elfSymbolTabIdxInfo", readMap(readUuid, readList(readTuple((readString, readUint(64))))))
     case ElfSymbolInfo
         extends AuxKind(
           "elfSymbolInfo",
-          readMap(readUuid, readTuple(readUint(64), readString, readString, readString, readUint(64)))
+          readMap(readUuid, readTuple((readUint(64), readString, readString, readString, readUint(64))))
         )
     case FunctionEntries extends AuxKind("functionEntries", readMap(readUuid, readSet(readUuid)))
     case FunctionBlocks extends AuxKind("functionBlocks", readMap(readUuid, readSet(readUuid)))
@@ -77,49 +77,15 @@ object AuxDecoder {
     val len = readUint(64)(bs)
     (BigInt(0) until len).map(_ => valReader(bs)).toList
 
-  def readTuple[T1, T2](r1: Reader[T1], r2: Reader[T2])(bs: Input) =
-    val x1 = r1(bs)
-    val x2 = r2(bs)
-    (x1, x2)
+  type Return[x] = x match { case Reader[t] => t }
 
-  def readTuple[T1, T2, T3](r1: Reader[T1], r2: Reader[T2], r3: Reader[T3])(bs: Input) =
-    val x1 = r1(bs)
-    val x2 = r2(bs)
-    val x3 = r3(bs)
-    (x1, x2, x3)
+  inline def readTuple[T <: Tuple](xs: T)(bs: Input): Tuple.Map[T, Return] =
+    readTupleInner(xs)(bs).asInstanceOf[Tuple.Map[T, Return]]
 
-  def readTuple[T1, T2, T3, T4](r1: Reader[T1], r2: Reader[T2], r3: Reader[T3], r4: Reader[T4])(bs: Input) =
-    val x1 = r1(bs)
-    val x2 = r2(bs)
-    val x3 = r3(bs)
-    val x4 = r4(bs)
-    (x1, x2, x3, x4)
-
-  def readTuple[T1, T2, T3, T4, T5](r1: Reader[T1], r2: Reader[T2], r3: Reader[T3], r4: Reader[T4], r5: Reader[T5])(
-    bs: Input
-  ) =
-    val x1 = r1(bs)
-    val x2 = r2(bs)
-    val x3 = r3(bs)
-    val x4 = r4(bs)
-    val x5 = r5(bs)
-    (x1, x2, x3, x4, x5)
-
-  def readTuple[T1, T2, T3, T4, T5, T6](
-    r1: Reader[T1],
-    r2: Reader[T2],
-    r3: Reader[T3],
-    r4: Reader[T4],
-    r5: Reader[T5],
-    r6: Reader[T6]
-  )(bs: Input) =
-    val x1 = r1(bs)
-    val x2 = r2(bs)
-    val x3 = r3(bs)
-    val x4 = r4(bs)
-    val x5 = r5(bs)
-    val x6 = r6(bs)
-    (x1, x2, x3, x4, x5, x6)
+  private inline def readTupleInner[T <: Tuple](xs: T)(bs: Input): Tuple =
+    inline xs match
+      case xs: (Reader[_] *: _) => xs.head(bs) *: readTupleInner(xs.tail)(bs)
+      case EmptyTuple => EmptyTuple
 
   def readUuid(bs: Input) =
     ByteString.copyFrom(readBytes(16)(bs))
