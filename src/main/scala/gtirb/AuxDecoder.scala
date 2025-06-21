@@ -12,11 +12,11 @@ object AuxDecoder {
 
   enum AuxKind[T](val name: String, val decoder: Reader[T]) {
     case ElfSymbolTabIdxInfo
-        extends AuxKind("elfSymbolTabIdxInfo", readMap(readUuid, readList(readTuple((readString, readUint(64))))))
+        extends AuxKind("elfSymbolTabIdxInfo", readMap(readUuid, readList(readTuple(readString, readUint(64)))))
     case ElfSymbolInfo
         extends AuxKind(
           "elfSymbolInfo",
-          readMap(readUuid, readTuple((readUint(64), readString, readString, readString, readUint(64))))
+          readMap(readUuid, readTuple(readUint(64), readString, readString, readString, readUint(64)))
         )
     case FunctionEntries extends AuxKind("functionEntries", readMap(readUuid, readSet(readUuid)))
     case FunctionBlocks extends AuxKind("functionBlocks", readMap(readUuid, readSet(readUuid)))

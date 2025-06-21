@@ -23,7 +23,7 @@ object `package` extends RootModule with ScalaModule {
 
   def moduleDeps = Seq(basilAntlr, basilProto, bnfc)
 
-  def scalacOptions: T[Seq[String]] = Seq("-deprecation", "-Xprint:typer")
+  def scalacOptions: T[Seq[String]] = Seq("-deprecation")
 
   val javaTests = ivy"com.novocode:junit-interface:0.11"
   val scalaTests = ivy"org.scalatest::scalatest:3.2.19"
