@@ -34,19 +34,18 @@ object GTIRBReadELF {
     val (r_offset, r_info, r_addend) = readTuple(readUint(64), readUint(64), readUint(64))(bs)
     val r_sym = r_info >> 32
     val r_type = r_info & 0xffffffffL
-    Elf64Rela(r_offset, r_info, r_addend, r_sym.toLong, r_type.toInt)
+    Elf64Rela(r_offset, r_info, r_addend, r_sym.toLong, r_type.toLong)
 
   val readElfSymbolTableIdxInfo =
     import AuxDecoder.*
     readMap(readUuid, readList(readTuple(readString, readUint(64))))
 
-  def parseRelaTab(bstr: ByteString) = {
+  def parseRelaTab(bstr: ByteString) =
     val bs = ByteArrayInputStream(bstr.toByteArray)
-    var relas = mutable.ArrayBuffer[Elf64Rela]()
-    while (bs.available() > 0)
-      relas += readRela(bs)
-    relas.toList
-  }
+    List.unfold(bs) {
+      case bs if bs.available() > 0 => Some(readRela(bs), bs)
+      case _ => None
+    }
 
   // see also:
   // https://www.javadoc.io/doc/net.fornwall/jelf/latest/net/fornwall/jelf/ElfSymbol.html
