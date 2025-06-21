@@ -12,14 +12,7 @@ import com.grammatech.gtirb.proto.CFG.EdgeLabel
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Symbol.Symbol
 
-import io.kaitai.struct.{KaitaiStream, ByteBufferKaitaiStream}
-import elf.Elf.RelocationSection
-
 import scala.collection.mutable
-
-private class DummyElf(stream: KaitaiStream) extends elf.Elf(stream) {
-  override def bits() = elf.Elf.Bits.B64
-}
 
 object GTIRBReadELF {
 
@@ -39,18 +32,12 @@ object GTIRBReadELF {
     readMap(readUuid, readList(readTuple(readString, readUint(64))))
 
   def parseRelaTab(bstr: ByteString) = {
-    val io = ByteBufferKaitaiStream(bstr.toByteArray)
-    val x = elf.Elf.RelocationSection(io, null, DummyElf(null), true, true)
-
     val bs = ByteArrayInputStream(bstr.toByteArray)
     var relas = mutable.ArrayBuffer[Elf64Rela]()
     while (bs.available() > 0)
       relas += readRela(bs)
     relas.toList
   }
-
-
-
 
   // see also:
   // https://www.javadoc.io/doc/net.fornwall/jelf/latest/net/fornwall/jelf/ElfSymbol.html

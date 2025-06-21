@@ -2,7 +2,6 @@ package build
 import $packages._
 
 import mill._
-import mill.util.Jvm
 import scalalib._
 
 import $file.basilmill.mdbook.mdbookBinary
@@ -39,7 +38,7 @@ object `package` extends RootModule with ScalaModule {
   def mainClass = Some("Main")
 
   def millSourcePath = super.millSourcePath / "src"
-  def ivyDeps = Agg(scalactic, sourceCode, mainArgs, upickle, kaitai.kaitaiRuntime)
+  def ivyDeps = Agg(scalactic, sourceCode, mainArgs, upickle)
   def sources = Task.Sources {
     Seq(PathRef(this.millSourcePath / "main" / "scala"))
   }
@@ -304,32 +303,11 @@ object `package` extends RootModule with ScalaModule {
   }
 
   object kaitai extends JavaModule {
-
-    def kaitaiSource = Task {
-      val out = Task.dest / "a.ksy"
-      os.write(out, requests.get("https://github.com/kaitai-io/kaitai_struct_formats/raw/refs/heads/master/executable/elf.ksy"))
-      out
-    }
-
     val ksc = ivy"io.kaitai:kaitai-struct-compiler_2.12:0.10"
-    def kaitaiRuntime = ivy"io.kaitai:kaitai-struct-runtime:0.10"
 
     override def runIvyDeps = Agg(ksc)
     override def mainClass = Some("io.kaitai.struct.JavaMain")
-
-    def kaitaiGenerated = Task {
-      Jvm.callProcess(
-        mainClass = mainClass().get,
-        mainArgs = Seq(kaitaiSource().toString, "--target", "java", "--outdir", Task.dest.toString, "--java-package", "elf", "--no-auto-read"),
-        stdout = os.Inherit,
-        classPath = runClasspath().map(_.path).toList
-      )
-      PathRef(Task.dest)
-    }
   }
 
-  override def generatedSources = Task {
-    super.generatedSources() ++ Seq(kaitai.kaitaiGenerated())
-  }
 
 }
