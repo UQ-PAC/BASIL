@@ -6,11 +6,25 @@ import java.nio.charset.StandardCharsets
 
 import com.google.protobuf.ByteString
 import com.grammatech.gtirb.proto.AuxData.AuxData
+import com.grammatech.gtirb.proto.Module.Module
+
+
 
 object AuxDecoder {
 
+  enum AuxKind[T](val name: String, val decoder: Reader[T]) {
+    case ElfSymbolTabIdxInfo extends AuxKind("elfSymbolTabIdxInfo", readMap(readUuid, readList(readTuple(readString, readUint(64)))))
+    case ElfSymbolInfo extends AuxKind("elfSymbolInfo", readMap(readUuid, readTuple(readUint(64), readString, readString, readString, readUint(64))))
+    case FunctionEntries extends AuxKind("functionEntries", readMap(readUuid, readSet(readUuid)))
+    case FunctionBlocks extends AuxKind("functionBlocks", readMap(readUuid, readSet(readUuid)))
+    case FunctionNames extends AuxKind("functionNames", readMap(readUuid, readUuid))
+  }
+
   type Input = ByteArrayInputStream
   type Reader[T] = Input => T
+
+  def decodeAux[T](known: AuxKind[T])(mod: Module) =
+    decode(known.decoder)(mod.auxData(known.name))
 
   def decode[T](reader: Reader[T])(bytes: ByteString): T =
     reader(ByteArrayInputStream(bytes.toByteArray))

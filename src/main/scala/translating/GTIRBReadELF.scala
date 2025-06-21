@@ -1,6 +1,7 @@
 package translating
 
 import gtirb.AuxDecoder
+import gtirb.AuxDecoder.{AuxKind, decodeAux}
 
 import java.io.ByteArrayInputStream
 
@@ -11,9 +12,13 @@ import com.grammatech.gtirb.proto.CFG.Edge
 import com.grammatech.gtirb.proto.CFG.EdgeLabel
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Symbol.Symbol
+import com.grammatech.gtirb.proto.ByteInterval.Block
+import com.grammatech.gtirb.proto.ByteInterval.ByteInterval
+import com.grammatech.gtirb.proto.Symbol.Symbol.OptionalPayload
 
 import scala.collection.mutable
 import scala.collection.immutable.SortedMap
+
 
 object GTIRBReadELF {
 
@@ -36,10 +41,6 @@ object GTIRBReadELF {
     val r_type = r_info & 0xffffffffL
     Elf64Rela(r_offset, r_info, r_addend, r_sym.toLong, r_type.toLong)
 
-  val readElfSymbolTableIdxInfo =
-    import AuxDecoder.*
-    readMap(readUuid, readList(readTuple(readString, readUint(64))))
-
   def parseRelaTab(bstr: ByteString) =
     val bs = ByteArrayInputStream(bstr.toByteArray)
     List.unfold(bs) {
@@ -58,32 +59,98 @@ object GTIRBReadELF {
 
     val proxyBlockUuids = mod.proxies.map(_.uuid).toSet
     val externalFunctionSymbols = mod.symbols.filter(x => proxyBlockUuids.contains(x.getReferentUuid))
+    val symbolsByUuid = mod.symbols.map(x => x.uuid -> x).toMap
 
-    val externalFunctionsByUuid = externalFunctionSymbols.map(x => x.uuid -> x).toMap
+    val dataBlocksByUuid = (for {
+      sec <- mod.sections.toList
+      interval <- sec.byteIntervals
+      (b, innerb) <- interval.blocks.collect {
+        case b @ Block(_, Block.Value.Data(dat), _) => (b, dat)
+        // case b @ Block(_, Block.Value.Code(cod), _) => (b, cod)
+      }
+    } yield innerb.uuid -> (innerb, b, interval, sec)).toMap
+
+    val codeBlocksByUuid = (for {
+      sec <- mod.sections.toList
+      interval <- sec.byteIntervals
+      (b, innerb) <- interval.blocks.collect {
+        case b @ Block(_, Block.Value.Code(dat), _) => (b, dat)
+      }
+    } yield innerb.uuid -> (innerb, b, interval, sec)).toMap
+
+
 
     val sectionsByName = mod.sections.map(x => x.name -> x).toMap
     val relaDyns = parseRelaTab(sectionsByName(".rela.dyn").byteIntervals.head.contents)
     val relaPlts = parseRelaTab(sectionsByName(".rela.plt").byteIntervals.head.contents)
 
-    val tabidx = AuxDecoder.decode(readElfSymbolTableIdxInfo)(mod.auxData("elfSymbolTabIdxInfo")).flatMap {
+    val symbolTabIdx = AuxDecoder.decodeAux(AuxDecoder.AuxKind.ElfSymbolTabIdxInfo)(mod)
+    val tabidx = symbolTabIdx.flatMap {
       case (sym, idxs) => idxs.map(_ -> sym)
     }.groupMapReduce(kv => kv.head.head)(kv => SortedMap(kv.head.last -> kv.last))(_++_)
+    // println(tabidx)
 
-    println(tabidx)
+    val symbolKinds = decodeAux(AuxKind.ElfSymbolInfo)(mod)
+
+    import scala.math.Ordering.Implicits.seqOrdering
+    val allSymbols = symbolKinds.map {
+      case (k, pos) =>
+        val sym = symbolsByUuid(k)
+        val addr = for {
+          uuid <- sym.optionalPayload.referentUuid
+          (_, block : Block, ival : ByteInterval, _) <- dataBlocksByUuid.get(uuid).orElse(codeBlocksByUuid.get(uuid))
+        } yield (block.offset + ival.address)
+        val value = sym.optionalPayload._value.fold("")("val=" + _.toString)
+        (symbolTabIdx(k), addr, pos) -> s"${sym.name} $value"
+    }.to(SortedMap)
+    println(allSymbols.mkString("\n"))
 
     println()
     println(".rela.dyn")
     relaDyns.foreach {
       case x =>
         val symuuid = tabidx(".dynsym")(x.r_sym.toInt)
-        println(s"$x " + externalFunctionsByUuid.get(symuuid).map(_.name))
+        println(s"$x " + symbolsByUuid.get(symuuid).map(_.name).filter(_.nonEmpty))
     }
     println(".rela.plt")
     relaPlts.foreach {
       case x =>
         val symuuid = tabidx(".dynsym")(x.r_sym.toInt)
-        println(s"$x " + externalFunctionsByUuid.get(symuuid).map(_.name))
+        println(s"$x " + symbolsByUuid.get(symuuid).map(_.name).filter(_.nonEmpty))
     }
+
+    val specGlobals = symbolKinds.toList.collect {
+      case (uuid, (size, "OBJECT", "GLOBAL", "DEFAULT", idx)) =>
+        val sym = symbolsByUuid(uuid)
+        val (data, block, interval, sec) = dataBlocksByUuid(sym.optionalPayload.referentUuid.get)
+        // assert(size == data.size)
+        assert(mod.sections(idx.toInt - 1) == sec)
+        (sym.name, size * 8, None, interval.address + block.offset)
+    }
+    println(specGlobals)
+
+    val funcNames = decodeAux(AuxKind.FunctionNames)(mod)
+    val funcNamesInverse = funcNames.map(_.swap)
+
+    val funcEntries = decodeAux(AuxKind.FunctionEntries)(mod)
+    val funentry = symbolKinds.toList.collect {
+      case (symuuid, (size, "FUNC", "GLOBAL", "DEFAULT", idx)) if idx != 0 =>
+
+        val nameSymbol = symbolsByUuid(symuuid)
+        val funcUuid = funcNamesInverse(symuuid)
+        val entries = funcEntries(funcUuid)
+
+        assert(entries.size == 1, "function with non-singular entry")
+        val entry = entries.head
+        val (_, bl, ival, _) = codeBlocksByUuid(entry)
+        val addr = bl.offset + ival.address
+
+        (nameSymbol.name, size * 8, addr)
+    }
+
+    println(funentry)
+
+
 
   }
 }
