@@ -269,8 +269,9 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
     info("bean1")
     info(
       analysisResults.keySet
-        .collect { case b: Block =>
-          b.label
+        .collect {
+          case b: Block =>
+            b.label
         }
         .mkString("; ")
     )

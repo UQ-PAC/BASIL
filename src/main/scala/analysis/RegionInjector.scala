@@ -188,8 +188,9 @@ class RegionInjectorMRA(override val program: Program, mmm: MemoryModelMap) exte
   }
 
   override def sharedRegions(): Iterable[MergedRegion] = {
-    mergedRegions.collect { case (_: DataRegion | _: HeapRegion, region: MergedRegion) =>
-      region
+    mergedRegions.collect {
+      case (_: DataRegion | _: HeapRegion, region: MergedRegion) =>
+        region
     }
   }
 }

@@ -78,8 +78,9 @@ class Program(
     }
     val t = toMap(this)
     val o = toMap(p)
-    (mainProcedure.name == p.mainProcedure.name) && (t.keys == o.keys) && t.keys.forall { case k =>
-      t(k).deepEquals(o(k))
+    (mainProcedure.name == p.mainProcedure.name) && (t.keys == o.keys) && t.keys.forall {
+      case k =>
+        t(k).deepEquals(o(k))
     }
   }
 
@@ -326,8 +327,9 @@ class Procedure private (
   }
   private def deepEqualsProc(p: Procedure) = {
     name == p.name && (p.blocks.size == blocks.size) && {
-      p.blocksBookended.zip(blocksBookended).forall { case ((l: Block), (r: Block)) =>
-        l.deepEqualsDbg(r)
+      p.blocksBookended.zip(blocksBookended).forall {
+        case ((l: Block), (r: Block)) =>
+          l.deepEqualsDbg(r)
       }
     }
   }
@@ -565,8 +567,9 @@ class Block private (
     case o => false
   }
   private def deepEqualsBlock(b: Block): Boolean = {
-    (label == b.label) && statements.zip(b.statements).forall { case (l, r) =>
-      l.deepEqualsDbg(r)
+    (label == b.label) && statements.zip(b.statements).forall {
+      case (l, r) =>
+        l.deepEqualsDbg(r)
     }
   }
 
@@ -609,8 +612,9 @@ class Block private (
     assert(!incomingJumps.contains(g))
   }
 
-  def calls: Set[Procedure] = statements.toSet.collect { case d: DirectCall =>
-    d.target
+  def calls: Set[Procedure] = statements.toSet.collect {
+    case d: DirectCall =>
+      d.target
   }
 
   def modifies: Set[Global] = statements.flatMap(_.modifies).toSet

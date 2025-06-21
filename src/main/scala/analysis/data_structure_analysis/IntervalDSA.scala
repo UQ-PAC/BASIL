@@ -43,18 +43,19 @@ class IntervalGraph(
     symVal: SymValSet[DSInterval],
     current: Map[SymBase, IntervalNode]
   ): Map[SymBase, IntervalNode] = {
-    symVal.state.filter((base, _) => base != NonPointer).foldLeft(current) { case (result, (base, symOffsets)) =>
-      val node = find(result.getOrElse(base, init(base, None)))
-      base match
-        case Heap(call) => node.flags.heap = true
-        case Stack(proc) => node.flags.stack = true
-        case Global => node.flags.global = true
-        case NonPointer =>
-          throw new Exception("Attempted to create a node from an Non-pointer symbolic base")
-        case unknown: (Ret | Par | Loaded) =>
-          node.flags.unknown = true
-          node.flags.incomplete = true
-      result + (base -> node)
+    symVal.state.filter((base, _) => base != NonPointer).foldLeft(current) {
+      case (result, (base, symOffsets)) =>
+        val node = find(result.getOrElse(base, init(base, None)))
+        base match
+          case Heap(call) => node.flags.heap = true
+          case Stack(proc) => node.flags.stack = true
+          case Global => node.flags.global = true
+          case NonPointer =>
+            throw new Exception("Attempted to create a node from an Non-pointer symbolic base")
+          case unknown: (Ret | Par | Loaded) =>
+            node.flags.unknown = true
+            node.flags.incomplete = true
+        result + (base -> node)
     }
   }
 
@@ -73,9 +74,10 @@ class IntervalGraph(
         globalNode.add(DSInterval(address.toInt, address.toInt)) // ignore size, could be a composite type
     }
 
-    globalOffsets.foreach { case (address, relocated) =>
-      globalNode.add(address.toInt)
-      globalNode.add(relocated.toInt)
+    globalOffsets.foreach {
+      case (address, relocated) =>
+        globalNode.add(address.toInt)
+        globalNode.add(relocated.toInt)
     }
 
     externalFunctions.foreach(e =>
@@ -85,10 +87,11 @@ class IntervalGraph(
       ext.node.flags.foreign = true
     )
 
-    globalOffsets.map(_.swap).foreach { case (address, relocated) =>
-      val pointee = find(globalNode.get(address.toInt))
-      val pointer = find(globalNode).add(DSInterval(relocated.toInt, relocated.toInt + 8))
-      pointer.setPointee(pointee)
+    globalOffsets.map(_.swap).foreach {
+      case (address, relocated) =>
+        val pointee = find(globalNode.get(address.toInt))
+        val pointer = find(globalNode).add(DSInterval(relocated.toInt, relocated.toInt + 8))
+        pointer.setPointee(pointee)
     }
 
     globalNode
@@ -97,8 +100,9 @@ class IntervalGraph(
   def buildNodes(): Map[SymBase, IntervalNode] = {
     val global =
       globalNode(irContext.globals ++ irContext.funcEntries, irContext.globalOffsets, irContext.externalFunctions)
-    sva.state.foldLeft(Map[SymBase, IntervalNode](Global -> global)) { case (m, (variable, valueSet)) =>
-      symValToNodes(valueSet, m)
+    sva.state.foldLeft(Map[SymBase, IntervalNode](Global -> global)) {
+      case (m, (variable, valueSet)) =>
+        symValToNodes(valueSet, m)
     }
   }
 
@@ -166,14 +170,15 @@ class IntervalGraph(
   // returns the cells corresponding to the
   def symValToCells(symVal: SymValSet[DSInterval]): Set[IntervalCell] = {
     val pairs = symVal.state.filter((base, _) => base != NonPointer)
-    pairs.foldLeft(Set[IntervalCell]()) { case (results, (base: SymBase, offsets: DSInterval)) =>
-      val (node, adjustment) = findNode(nodes(base))
-      if offsets == Top then results + node.collapse()
-      else
-        results ++ offsets.toIntervals
-          .filter(i => base != Global || isGlobal(i.start.get))
-          .map(_.move(i => i + adjustment))
-          .map(node.add)
+    pairs.foldLeft(Set[IntervalCell]()) {
+      case (results, (base: SymBase, offsets: DSInterval)) =>
+        val (node, adjustment) = findNode(nodes(base))
+        if offsets == Top then results + node.collapse()
+        else
+          results ++ offsets.toIntervals
+            .filter(i => base != Global || isGlobal(i.start.get))
+            .map(_.move(i => i + adjustment))
+            .map(node.add)
     }
   }
 
@@ -923,17 +928,19 @@ object IntervalDSA {
     cons.inParams
       .filterNot(f => unchanged.exists(i => f._1.name.startsWith(i)))
       .filter(f => cons.target.formalInParam.contains(f._1))
-      .foreach { case (formal, actual) =>
-        val (sourceExpr, targetExpr) = if phase == TD then (actual, formal) else (formal, actual)
-        exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
+      .foreach {
+        case (formal, actual) =>
+          val (sourceExpr, targetExpr) = if phase == TD then (actual, formal) else (formal, actual)
+          exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
       }
 
     cons.outParams
       .filterNot(f => unchanged.exists(i => f._1.name.startsWith(i)))
       .filter(f => cons.target.formalOutParam.contains(f._1))
-      .foreach { case (out, actual) =>
-        val (sourceExpr, targetExpr) = if phase == TD then (actual, out) else (out, actual)
-        exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
+      .foreach {
+        case (out, actual) =>
+          val (sourceExpr, targetExpr) = if phase == TD then (actual, out) else (out, actual)
+          exprTransfer(sourceExpr, targetExpr, source, target, oldToNew)
       }
     // TODO add unification between unused indirect call out params and their corresponding input version
   }

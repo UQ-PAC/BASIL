@@ -51,8 +51,9 @@ def sequence[DD[V] <: IterableOps[V, DD, DD[V]], CC[U] <: IterableOps[U, CC, CC[
   def cc(x: T): CC[T] = xs.iterableFactory.newBuilder.addOne(x).result
 
   val base: DD[CC[T]] = dd(cc0())
-  xs.foldRight(base) { case (ys, rest) =>
-    ys.flatMap((y: T) => rest.map((r: CC[T]) => cc(y) ++ r))
+  xs.foldRight(base) {
+    case (ys, rest) =>
+      ys.flatMap((y: T) => rest.map((r: CC[T]) => cc(y) ++ r))
   }
 }
 

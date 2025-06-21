@@ -188,11 +188,13 @@ class FindVars extends CILVisitor {
     SkipChildren()
   }
 
-  def globals = (vars ++ mems).collect { case g: Global =>
-    g
+  def globals = (vars ++ mems).collect {
+    case g: Global =>
+      g
   }
 
-  def locals = vars.collect { case v: LocalVar =>
-    v
+  def locals = vars.collect {
+    case v: LocalVar =>
+      v
   }
 }

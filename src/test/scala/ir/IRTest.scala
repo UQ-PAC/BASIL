@@ -84,8 +84,9 @@ class IRTest extends AnyFunSuite with CaptureOutput {
 
     val blocks = p.labelToBlock
 
-    val directcalls = p.collect { case c: DirectCall =>
-      c
+    val directcalls = p.collect {
+      case c: DirectCall =>
+        c
     }
 
     assert(p.toSet.contains(blocks("l_main_1").jump))
@@ -313,8 +314,9 @@ class IRTest extends AnyFunSuite with CaptureOutput {
       )
     )
 
-    val blockOrder = p.mainProcedure.preOrderIterator.collect { case b: Block =>
-      b.label
+    val blockOrder = p.mainProcedure.preOrderIterator.collect {
+      case b: Block =>
+        b.label
     }.toList
 
     // assert(blockOrder == List("lmain", "lmain1", "lmainret", "lmain3"))

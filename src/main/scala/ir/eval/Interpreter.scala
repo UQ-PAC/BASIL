@@ -192,8 +192,9 @@ case class MemoryState(
   /** Debug return useful values * */
 
   def getGlobalVals: Map[String, BitVecLiteral] = {
-    stackFrames(globalFrame).collect { case (k, Scalar(b: BitVecLiteral)) =>
-      k -> b
+    stackFrames(globalFrame).collect {
+      case (k, Scalar(b: BitVecLiteral)) =>
+        k -> b
     }
   }
 

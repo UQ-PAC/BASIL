@@ -139,13 +139,14 @@ class DataStructureAnalysis(
           }
 
           //          assert(calleeGraph.formals.isEmpty || buGraph.varToCell(begin(callee)).equals(calleeGraph.formals))
-          calleeGraph.globalMapping.foreach { case (range: AddressRange, Field(node: Node, offset: BigInt)) =>
-            val field = calleeGraph.find(node)
-            val res = buGraph.mergeCells(
-              buGraph.globalMapping(range).node.getCell(buGraph.globalMapping(range).offset),
-              field.node.getCell(field.offset + offset)
-            )
-            buGraph.handleOverlapping(res)
+          calleeGraph.globalMapping.foreach {
+            case (range: AddressRange, Field(node: Node, offset: BigInt)) =>
+              val field = calleeGraph.find(node)
+              val res = buGraph.mergeCells(
+                buGraph.globalMapping(range).node.getCell(buGraph.globalMapping(range).offset),
+                field.node.getCell(field.offset + offset)
+              )
+              buGraph.handleOverlapping(res)
           }
 
           if (buGraph.varToCell.contains(callee)) {
@@ -204,14 +205,15 @@ class DataStructureAnalysis(
           node.cloneNode(callersGraph, calleesGraph)
         }
 
-        callersGraph.globalMapping.foreach { case (range: AddressRange, Field(oldNode, internal)) =>
-          //              val node = callersGraph
-          val field = callersGraph.find(oldNode)
-          val res = calleesGraph.mergeCells(
-            calleesGraph.globalMapping(range).node.getCell(calleesGraph.globalMapping(range).offset),
-            field.node.getCell(field.offset + internal)
-          )
-          calleesGraph.handleOverlapping(res)
+        callersGraph.globalMapping.foreach {
+          case (range: AddressRange, Field(oldNode, internal)) =>
+            //              val node = callersGraph
+            val field = callersGraph.find(oldNode)
+            val res = calleesGraph.mergeCells(
+              calleesGraph.globalMapping(range).node.getCell(calleesGraph.globalMapping(range).offset),
+              field.node.getCell(field.offset + internal)
+            )
+            calleesGraph.handleOverlapping(res)
         }
 
         callSite.paramCells.keySet.foreach { variable =>

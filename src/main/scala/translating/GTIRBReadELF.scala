@@ -63,17 +63,19 @@ object GTIRBReadELF {
     val dataBlocksByUuid = (for {
       sec <- mod.sections.toList
       interval <- sec.byteIntervals
-      (b, innerb) <- interval.blocks.collect { case b @ Block(_, Block.Value.Data(dat), _) =>
-        (b, dat)
-      // case b @ Block(_, Block.Value.Code(cod), _) => (b, cod)
+      (b, innerb) <- interval.blocks.collect {
+        case b @ Block(_, Block.Value.Data(dat), _) =>
+          (b, dat)
+        // case b @ Block(_, Block.Value.Code(cod), _) => (b, cod)
       }
     } yield innerb.uuid -> (innerb, b, interval, sec)).toMap
 
     val codeBlocksByUuid = (for {
       sec <- mod.sections.toList
       interval <- sec.byteIntervals
-      (b, innerb) <- interval.blocks.collect { case b @ Block(_, Block.Value.Code(dat), _) =>
-        (b, dat)
+      (b, innerb) <- interval.blocks.collect {
+        case b @ Block(_, Block.Value.Code(dat), _) =>
+          (b, dat)
       }
     } yield innerb.uuid -> (innerb, b, interval, sec)).toMap
 
@@ -83,8 +85,9 @@ object GTIRBReadELF {
 
     val symbolTabIdx = AuxDecoder.decodeAux(AuxDecoder.AuxKind.ElfSymbolTabIdxInfo)(mod)
     val tabidx = symbolTabIdx
-      .flatMap { case (sym, idxs) =>
-        idxs.map(_ -> sym)
+      .flatMap {
+        case (sym, idxs) =>
+          idxs.map(_ -> sym)
       }
       .groupMapReduce(kv => kv.head.head)(kv => SortedMap(kv.head.last -> kv.last))(_ ++ _)
     // println(tabidx)
@@ -93,36 +96,40 @@ object GTIRBReadELF {
 
     import scala.math.Ordering.Implicits.seqOrdering
     val allSymbols = symbolKinds
-      .map { case (k, pos) =>
-        val sym = symbolsByUuid(k)
-        val addr = for {
-          uuid <- sym.optionalPayload.referentUuid
-          (_, block: Block, ival: ByteInterval, _) <- dataBlocksByUuid.get(uuid).orElse(codeBlocksByUuid.get(uuid))
-        } yield (block.offset + ival.address)
-        val value = sym.optionalPayload._value.fold("")("val=" + _.toString)
-        (symbolTabIdx(k), addr, pos) -> s"${sym.name} $value"
+      .map {
+        case (k, pos) =>
+          val sym = symbolsByUuid(k)
+          val addr = for {
+            uuid <- sym.optionalPayload.referentUuid
+            (_, block: Block, ival: ByteInterval, _) <- dataBlocksByUuid.get(uuid).orElse(codeBlocksByUuid.get(uuid))
+          } yield (block.offset + ival.address)
+          val value = sym.optionalPayload._value.fold("")("val=" + _.toString)
+          (symbolTabIdx(k), addr, pos) -> s"${sym.name} $value"
       }
       .to(SortedMap)
     println(allSymbols.mkString("\n"))
 
     println()
     println(".rela.dyn")
-    relaDyns.foreach { case x =>
-      val symuuid = tabidx(".dynsym")(x.r_sym.toInt)
-      println(s"$x " + symbolsByUuid.get(symuuid).map(_.name).filter(_.nonEmpty))
+    relaDyns.foreach {
+      case x =>
+        val symuuid = tabidx(".dynsym")(x.r_sym.toInt)
+        println(s"$x " + symbolsByUuid.get(symuuid).map(_.name).filter(_.nonEmpty))
     }
     println(".rela.plt")
-    relaPlts.foreach { case x =>
-      val symuuid = tabidx(".dynsym")(x.r_sym.toInt)
-      println(s"$x " + symbolsByUuid.get(symuuid).map(_.name).filter(_.nonEmpty))
+    relaPlts.foreach {
+      case x =>
+        val symuuid = tabidx(".dynsym")(x.r_sym.toInt)
+        println(s"$x " + symbolsByUuid.get(symuuid).map(_.name).filter(_.nonEmpty))
     }
 
-    val specGlobals = symbolKinds.toList.collect { case (uuid, (size, "OBJECT", "GLOBAL", "DEFAULT", idx)) =>
-      val sym = symbolsByUuid(uuid)
-      val (data, block, interval, sec) = dataBlocksByUuid(sym.optionalPayload.referentUuid.get)
-      // assert(size == data.size)
-      assert(mod.sections(idx.toInt - 1) == sec)
-      (sym.name, size * 8, None, interval.address + block.offset)
+    val specGlobals = symbolKinds.toList.collect {
+      case (uuid, (size, "OBJECT", "GLOBAL", "DEFAULT", idx)) =>
+        val sym = symbolsByUuid(uuid)
+        val (data, block, interval, sec) = dataBlocksByUuid(sym.optionalPayload.referentUuid.get)
+        // assert(size == data.size)
+        assert(mod.sections(idx.toInt - 1) == sec)
+        (sym.name, size * 8, None, interval.address + block.offset)
     }
     println(specGlobals)
 

@@ -19,8 +19,9 @@ class FindVars extends CILVisitor {
     SkipChildren()
   }
 
-  def globals = vars.collect { case g: Global =>
-    g
+  def globals = vars.collect {
+    case g: Global =>
+      g
   }
 }
 

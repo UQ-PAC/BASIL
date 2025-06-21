@@ -199,8 +199,9 @@ def removeSlices(p: Procedure): Unit = {
     .flatten
     .groupBy(_._1)
     .map((k, v) => (k, v.map(_._2).toSet))
-    .collect { case (k: LocalVar, v) =>
-      (k, v)
+    .collect {
+      case (k: LocalVar, v) =>
+        (k, v)
     }
   enum HighZeroBits:
     case Bits(n: Int) // (i) and (ii) hold; the n highest bits are redundant
@@ -261,8 +262,9 @@ def removeSlices(p: Procedure): Unit = {
       }
       lhs -> varHighZeroBits.get(rep)
     })
-    .collect { case (l, Some(x)) /* remove anything we have no information on */ =>
-      (l, x)
+    .collect {
+      case (l, Some(x)) /* remove anything we have no information on */ =>
+        (l, x)
     }
   class CheckUsesHaveExtend() extends CILVisitor {
     val result: mutable.HashMap[LocalVar, HighZeroBits] =
@@ -286,8 +288,9 @@ def removeSlices(p: Procedure): Unit = {
       result.toMap
     }
   }
-  val toSmallen = CheckUsesHaveExtend()(varsWithExtend)(p).collect { case (v, HighZeroBits.Bits(x)) =>
-    v -> x
+  val toSmallen = CheckUsesHaveExtend()(varsWithExtend)(p).collect {
+    case (v, HighZeroBits.Bits(x)) =>
+      v -> x
   }.toMap
   class ReplaceAlwaysSlicedVars(varHighZeroBits: Map[LocalVar, Int]) extends CILVisitor {
     override def vexpr(v: Expr) = {
@@ -406,8 +409,9 @@ def getRedundantAssignments(procedure: Procedure): Set[Assign] = {
   var removeOld = toRemove
 
   val r = toRemove
-    .collect { case (v, VS.Assigned(d)) =>
-      d
+    .collect {
+      case (v, VS.Assigned(d)) =>
+        d
     }
     .toSet
     .flatten
@@ -598,12 +602,14 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
   var defs = Map[Variable, Set[Assign]]()
 
   def allDefinitions(p: Procedure): Map[Variable, Set[Assign]] = {
-    p.collect { case a: Assign =>
-      a.assignees.map(l => l -> a)
+    p.collect {
+      case a: Assign =>
+        a.assignees.map(l => l -> a)
     }.flatten
       .groupBy(_._1)
-      .map { case (v, ass) =>
-        v -> ass.map(_._2).toSet
+      .map {
+        case (v, ass) =>
+          v -> ass.map(_._2).toSet
       }
   }
 
@@ -1438,8 +1444,9 @@ object CopyProp {
 
     def replaceVar(lhs: Variable, rhs: Option[Expr] = None) = {
       st = st
-        .filterNot { case (l, r) =>
-          r.variables.contains(lhs) || l == lhs
+        .filterNot {
+          case (l, r) =>
+            r.variables.contains(lhs) || l == lhs
         }
       rhs.foreach(nrhs => st = st.updated(lhs, nrhs))
     }
@@ -1858,11 +1865,13 @@ def findDefinitelyExits(p: Program) = {
   val solve = interprocSummaryFixpointSolver(ldom, dom)
   val res = solve.solveProgInterProc(p, true)
   ProcReturnInfo(
-    res.collect { case (p, PathExit.Return) =>
-      p
+    res.collect {
+      case (p, PathExit.Return) =>
+        p
     }.toSet,
-    res.collect { case (p, PathExit.NoReturn) =>
-      p
+    res.collect {
+      case (p, PathExit.NoReturn) =>
+        p
     }.toSet
   )
 }
@@ -1982,8 +1991,9 @@ def fixupGuards(p: Procedure): Unit = {
 def removeDuplicateGuard(b: Iterable[Block]): Unit = {
   b.foreach {
     case block: Block if IRWalk.firstInBlock(block).isInstanceOf[Assume] => {
-      val assumes = block.statements.collect { case a: Assume =>
-        a
+      val assumes = block.statements.collect {
+        case a: Assume =>
+          a
       }.toList
 
       val chosen = assumes.head.body

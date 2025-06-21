@@ -433,8 +433,9 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) e
         join(a, retInitSymValSet, block)
       case ind: IndirectCall => a // TODO possibly map every live variable to top
       case ret: Return =>
-        val update = SymValues(ret.outParams.map { case (outVar: LocalVar, value: Expr) =>
-          outVar -> SymValues.exprToSymValSet(a)(value)
+        val update = SymValues(ret.outParams.map {
+          case (outVar: LocalVar, value: Expr) =>
+            outVar -> SymValues.exprToSymValSet(a)(value)
         })
 
         join(a, update, block)

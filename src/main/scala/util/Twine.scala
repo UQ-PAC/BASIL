@@ -64,17 +64,18 @@ sealed trait Twine {
         // furthermore, newline and indent should only be inserted upon
         // reaching a non-empty literal string. multiple Lines nodes placed within
         // each other should not insert additional newlines or indentation.
-        lines.foreach { case l =>
-          val first = firstInLine.once()
-          if (!first)
-            doNewline = Once()
-          helper(l, ind)
+        lines.foreach {
+          case l =>
+            val first = firstInLine.once()
+            if (!first)
+              doNewline = Once()
+            helper(l, ind)
 
-          // if no newline was introduced by this list element, we should manually
-          // add one if needed. this allows blank lines to be produced by placing
-          // Twine.empty within Lines.
-          if (!first && doNewline.once())
-            sb ++= newline
+            // if no newline was introduced by this list element, we should manually
+            // add one if needed. this allows blank lines to be produced by placing
+            // Twine.empty within Lines.
+            if (!first && doNewline.once())
+              sb ++= newline
         }
       case Concat(tws) => tws.foreach(helper(_, ind))
     }

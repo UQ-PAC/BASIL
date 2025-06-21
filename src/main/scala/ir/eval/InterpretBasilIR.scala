@@ -329,8 +329,9 @@ object InterpFuns {
         f.setNext(Run(IRWalk.firstInBlock(gt.targets.head)))
       }
       case gt: GoTo =>
-        val assumes = gt.targets.flatMap(_.statements.headOption).collect { case a: Assume =>
-          a
+        val assumes = gt.targets.flatMap(_.statements.headOption).collect {
+          case a: Assume =>
+            a
         }
         for {
           _ <-

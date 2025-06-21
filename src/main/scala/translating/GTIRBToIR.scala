@@ -382,10 +382,11 @@ class GTIRBToIR(
       procedure.entryBlock = block
     }
 
-    block.address.foreach { case addr =>
-      val pcCorrectExpr = BinaryExpr(EQ, Register("_PC", 64), BitVecLiteral(addr, 64))
-      val assertPC = Assert(pcCorrectExpr, Some("pc-tracking"), Some("pc-tracking"))
-      block.statements.append(assertPC)
+    block.address.foreach {
+      case addr =>
+        val pcCorrectExpr = BinaryExpr(EQ, Register("_PC", 64), BitVecLiteral(addr, 64))
+        val assertPC = Assert(pcCorrectExpr, Some("pc-tracking"), Some("pc-tracking"))
+        block.statements.append(assertPC)
     }
     block
   }

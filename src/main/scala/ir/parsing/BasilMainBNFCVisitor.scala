@@ -139,8 +139,9 @@ case class InnerBasilBNFCVisitor[A](
   // Members declared in CallLVars.Visitor
   override def visit(x: syntax.NoOutParams, arg: A): BasilParseValue = Nil
   override def visit(x: syntax.LocalVars, arg: A): BasilParseValue =
-    val innerlocals = x.listlvar_.asScala.collect { case x: syntax.LVarDef =>
-      x
+    val innerlocals = x.listlvar_.asScala.collect {
+      case x: syntax.LVarDef =>
+        x
     }.toList
     if (innerlocals.nonEmpty) {
       throw ParseException(

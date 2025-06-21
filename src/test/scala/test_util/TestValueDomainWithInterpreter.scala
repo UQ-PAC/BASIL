@@ -130,10 +130,12 @@ trait TestValueDomainWithInterpreter[T] {
     val interpretResult = State.execute(initState, InterpFuns.callProcedure(interp)(startProc, startParams))
 
     val breakres: List[(BreakPoint, _, List[(String, Expr, Option[Expr])])] = interpretResult(1)
-    val checkResults = breakres.flatMap { case (bp, _, evaledExprs) =>
-      evaledExprs.grouped(2).map(_.toList).map { case List((_, variable, varValue), (name, test, evaled)) =>
-        CheckResult(name, bp, test, variable, varValue, evaled)
-      }
+    val checkResults = breakres.flatMap {
+      case (bp, _, evaledExprs) =>
+        evaledExprs.grouped(2).map(_.toList).map {
+          case List((_, variable, varValue), (name, test, evaled)) =>
+            CheckResult(name, bp, test, variable, varValue, evaled)
+        }
     }.toList
 
     InterpreterTestResult(interpretResult(0).nextCmd, checkResults)

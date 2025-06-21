@@ -6,14 +6,16 @@ import scala.collection.mutable
 
 def cfgCorrect(p: Program | Procedure) = {
 
-  val forwardsInter = p.collect { case d @ DirectCall(tgt, _, _, _) =>
-    (d.parent.parent, tgt)
+  val forwardsInter = p.collect {
+    case d @ DirectCall(tgt, _, _, _) =>
+      (d.parent.parent, tgt)
   }
   val revForwardsInter = forwardsInter.groupBy(_._2).map((dest, origs) => (dest, origs.map(_._1).toSet)).toMap
   val forwardsInterMap = forwardsInter.groupBy(_._1).map((orig, dests) => (orig, dests.map(_._2).toSet)).toMap
 
-  val forwardsIntra = p.collect { case g @ GoTo(targets, _) =>
-    targets.map((t: Block) => (g.parent, t))
+  val forwardsIntra = p.collect {
+    case g @ GoTo(targets, _) =>
+      targets.map((t: Block) => (g.parent, t))
   }.flatten
 
   val revForwardsIntra = forwardsIntra.groupBy(_._2).map((dest, origs) => (dest, origs.map(_._1).toSet)).toMap

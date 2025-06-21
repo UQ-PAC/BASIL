@@ -60,8 +60,9 @@ def convertJumpRenaming(blockName: String => String, varName: CILVisitor, x: Jum
   case Return(label, out) =>
     EventuallyReturn(
       out.toList
-        .map { case (v: Variable, e: Expr) =>
-          ((v.name, visit_expr(varName, e)))
+        .map {
+          case (v: Variable, e: Expr) =>
+            ((v.name, visit_expr(varName, e)))
         }
         .to(ArraySeq),
       label
@@ -150,11 +151,13 @@ def inlineCall(prog: Program, c: DirectCall): Unit = {
     case r: EventuallyReturn => r.params.toMap
     case _ => throw Exception("returnblock should have a return statement")
   }
-  val outAssignments = c.outParams.map { case (formal: LocalVar, lvar: Variable) =>
-    LocalAssign(lvar, targetReturnValues(formal.name))
+  val outAssignments = c.outParams.map {
+    case (formal: LocalVar, lvar: Variable) =>
+      LocalAssign(lvar, targetReturnValues(formal.name))
   }
-  val inAssignments = c.actualParams.map { case (formal: LocalVar, actual: Expr) =>
-    LocalAssign(visit_rvar(varRenamer, formal), actual)
+  val inAssignments = c.actualParams.map {
+    case (formal: LocalVar, actual: Expr) =>
+      LocalAssign(visit_rvar(varRenamer, formal), actual)
   }
   afterCallBlock.statements.prependAll(outAssignments)
   entryTempBlock.statements.prependAll(inAssignments)
