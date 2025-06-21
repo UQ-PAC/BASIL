@@ -17,7 +17,15 @@ import scala.collection.immutable.SortedMap
 
 object GTIRBReadELF {
 
-  case class Elf64Rela(r_offset: BigInt, r_info: BigInt, r_addend: BigInt, r_sym: Long, r_type: Int)
+  /**
+   * An `Elf64_Rela` structure, as described by the [System V ABI](https://refspecs.linuxfoundation.org/elf/gabi4+/ch4.reloc.html).
+   * The three fields `r_offset`, `r_info`, and `r_addend` are as described in the struct.
+   * The last two fields, `r_sym` and `r_type`, are extracted from the `r_info` value.
+   *
+   * The [ABI supplement for AArch64](https://github.com/ARM-software/abi-aa/blob/main/aaelf64/aaelf64.rst#relocation-types)
+   * provides information about the interpretation of the `r_type` values.
+   */
+  case class Elf64Rela(r_offset: BigInt, r_info: BigInt, r_addend: BigInt, r_sym: Long, r_type: Long)
 
   // https://refspecs.linuxbase.org/elf/gabi4+/ch4.reloc.html
   // https://github.com/ARM-software/abi-aa/blob/main/aaelf64/aaelf64.rst#relocation-types
