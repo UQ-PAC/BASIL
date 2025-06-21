@@ -13,6 +13,7 @@ import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Symbol.Symbol
 
 import scala.collection.mutable
+import scala.collection.immutable.SortedMap
 
 object GTIRBReadELF {
 
@@ -59,19 +60,21 @@ object GTIRBReadELF {
 
     val tabidx = AuxDecoder.decode(readElfSymbolTableIdxInfo)(mod.auxData("elfSymbolTabIdxInfo")).flatMap {
       case (sym, idxs) => idxs.map(_ -> sym)
-    }
+    }.groupMapReduce(kv => kv.head.head)(kv => SortedMap(kv.head.last -> kv.last))(_++_)
+
+    println(tabidx)
 
     println()
     println(".rela.dyn")
     relaDyns.foreach {
       case x =>
-        val symuuid = tabidx((".dynsym", x.r_sym.toInt))
+        val symuuid = tabidx(".dynsym")(x.r_sym.toInt)
         println(s"$x " + externalFunctionsByUuid.get(symuuid).map(_.name))
     }
     println(".rela.plt")
     relaPlts.foreach {
       case x =>
-        val symuuid = tabidx((".dynsym", x.r_sym.toInt))
+        val symuuid = tabidx(".dynsym")(x.r_sym.toInt)
         println(s"$x " + externalFunctionsByUuid.get(symuuid).map(_.name))
     }
 
