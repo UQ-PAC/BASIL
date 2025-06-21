@@ -314,11 +314,7 @@ object ToScalaDeriving {
         .toList
 
     if (args.exists(Twine.shallowIsMultiline)) {
-      Twine.indentNested(
-        name + open,
-        args,
-        close
-      )
+      Twine.indentNested(name + open, args, close)
     } else {
       Twine(name + open, Twine(args.intersperse(", ")), close)
     }

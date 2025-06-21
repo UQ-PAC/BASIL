@@ -8,13 +8,16 @@ import com.google.protobuf.ByteString
 import com.grammatech.gtirb.proto.AuxData.AuxData
 import com.grammatech.gtirb.proto.Module.Module
 
-
-
 object AuxDecoder {
 
   enum AuxKind[T](val name: String, val decoder: Reader[T]) {
-    case ElfSymbolTabIdxInfo extends AuxKind("elfSymbolTabIdxInfo", readMap(readUuid, readList(readTuple(readString, readUint(64)))))
-    case ElfSymbolInfo extends AuxKind("elfSymbolInfo", readMap(readUuid, readTuple(readUint(64), readString, readString, readString, readUint(64))))
+    case ElfSymbolTabIdxInfo
+        extends AuxKind("elfSymbolTabIdxInfo", readMap(readUuid, readList(readTuple(readString, readUint(64)))))
+    case ElfSymbolInfo
+        extends AuxKind(
+          "elfSymbolInfo",
+          readMap(readUuid, readTuple(readUint(64), readString, readString, readString, readUint(64)))
+        )
     case FunctionEntries extends AuxKind("functionEntries", readMap(readUuid, readSet(readUuid)))
     case FunctionBlocks extends AuxKind("functionBlocks", readMap(readUuid, readSet(readUuid)))
     case FunctionNames extends AuxKind("functionNames", readMap(readUuid, readUuid))
@@ -83,7 +86,6 @@ object AuxDecoder {
     val x3 = r3(bs)
     (x1, x2, x3)
 
-
   def readTuple[T1, T2, T3, T4](r1: Reader[T1], r2: Reader[T2], r3: Reader[T3], r4: Reader[T4])(bs: Input) =
     val x1 = r1(bs)
     val x2 = r2(bs)
@@ -101,9 +103,14 @@ object AuxDecoder {
     val x5 = r5(bs)
     (x1, x2, x3, x4, x5)
 
-  def readTuple[T1, T2, T3, T4, T5, T6](r1: Reader[T1], r2: Reader[T2], r3: Reader[T3], r4: Reader[T4], r5: Reader[T5], r6: Reader[T6])(
-    bs: Input
-  ) =
+  def readTuple[T1, T2, T3, T4, T5, T6](
+    r1: Reader[T1],
+    r2: Reader[T2],
+    r3: Reader[T3],
+    r4: Reader[T4],
+    r5: Reader[T5],
+    r6: Reader[T6]
+  )(bs: Input) =
     val x1 = r1(bs)
     val x2 = r2(bs)
     val x3 = r3(bs)
@@ -111,7 +118,6 @@ object AuxDecoder {
     val x5 = r5(bs)
     val x6 = r6(bs)
     (x1, x2, x3, x4, x5, x6)
-
 
   def readUuid(bs: Input) =
     ByteString.copyFrom(readBytes(16)(bs))

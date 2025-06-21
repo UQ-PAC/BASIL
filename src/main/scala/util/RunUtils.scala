@@ -199,10 +199,7 @@ object IRLoading {
     GTIRBConverter.createIR()
   }
 
-  def loadReadELF(
-    fileName: String,
-    config: ILLoadingConfig
-  ): ReadELFData = {
+  def loadReadELF(fileName: String, config: ILLoadingConfig): ReadELFData = {
     val lexer = ReadELFLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(lexer)
     val parser = ReadELFParser(tokens)

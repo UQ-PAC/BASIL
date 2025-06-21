@@ -57,10 +57,7 @@ case class ReadELFData(
 ) derives ir.dsl.ToScala
 
 object ReadELFLoader {
-  def visitSyms(
-    ctx: SymsContext,
-    config: ILLoadingConfig
-  ): ReadELFData = {
+  def visitSyms(ctx: SymsContext, config: ILLoadingConfig): ReadELFData = {
     val externalFunctions = ctx.relocationTable.asScala
       .filter(_.relocationTableHeader != null)
       .flatMap(r => visitRelocationTableExtFunc(r))
