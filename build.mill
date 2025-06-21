@@ -302,12 +302,5 @@ object `package` extends RootModule with ScalaModule {
     os.move(newFile, tagsFile, replaceExisting = true, atomicMove = true)
   }
 
-  object kaitai extends JavaModule {
-    val ksc = ivy"io.kaitai:kaitai-struct-compiler_2.12:0.10"
-
-    override def runIvyDeps = Agg(ksc)
-    override def mainClass = Some("io.kaitai.struct.JavaMain")
-  }
-
 
 }
