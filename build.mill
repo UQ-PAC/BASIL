@@ -39,7 +39,7 @@ object `package` extends RootModule with ScalaModule with ScalafixModule with Co
   val upickle = ivy"com.lihaoyi::upickle:4.2.1"
 
   def mainClass = Some("Main")
-  override def debugMode = true
+  override def debugMode = false
 
   def millSourcePath = super.millSourcePath / "src"
   def ivyDeps = Agg(scalactic, sourceCode, mainArgs, upickle)
