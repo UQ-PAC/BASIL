@@ -21,7 +21,6 @@ inline def debugAssert(inline assertion: Boolean, inline message: String*): Unit
   }
 }
 
-
 /*
  * Like (assert) but with a slightly different message. Shadows's scalas built-in require function..
  */
