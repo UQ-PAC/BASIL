@@ -8,7 +8,8 @@ trait Conf extends ScalaModule {
    * on this value 
    */
   def debugMode: Boolean
-  def generateConf = Task {
+  def generateConf = Task.Input {
+    // re-evaluate every time because debugMode isn't a task
     val text = s"package basil.compileConstants\nfinal val debugMode = $debugMode"
     val p = Task.dest / "debugMode.scala"
     os.write(p, text)

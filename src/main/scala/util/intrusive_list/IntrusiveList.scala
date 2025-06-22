@@ -174,7 +174,6 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     */
   def prepend(newElem: T): T = {
     assert(newElem.unitary)
-    assert(!containsRef(newElem))
     onInsert(newElem)
     if (size > 0) {
       insertBefore(firstElem.get, newElem)
@@ -205,7 +204,6 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     */
   def append(newElem: T): T = {
     assert(newElem.unitary)
-    assert(!containsRef(newElem))
     onInsert(newElem)
     if (size > 0) {
       insertAfter(lastElem.get, newElem)
@@ -226,10 +224,9 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   The added element
     */
   def replace(elem: T, withElem: T): T = {
-    assert(containsRef(elem))
+    assert(containsRef(elem), "elem is not an element of this list, replace() call could mangle start and end")
     if (elem ne withElem) {
       assert(withElem.unitary)
-      assert(!containsRef(withElem))
       val newElem: T = insertAfter(elem, withElem)
       val removed = remove(elem)
       newElem
@@ -248,7 +245,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     */
   def splitOn(n: T): ArrayBuffer[T] = {
     assert(!lastElem.contains(n))
-    assert(containsRef(n))
+    assert(containsRef(n), "Cannot split on element not in this list")
 
     val ne = n.next
 
@@ -273,7 +270,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     */
   def remove(intrusiveListElement: T): T = {
     assert(size >= 0)
-    assert(containsRef(intrusiveListElement))
+    assert(containsRef(intrusiveListElement), "Cannot remove element not in this list")
     numElems -= 1
     if (intrusiveListElement == lastElem.get) {
       lastElem = intrusiveListElement.prev
@@ -295,8 +292,10 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     */
   def insertAfter(intrusiveListElement: T, newElem: T): T = {
     assert(size >= 1)
-    assert(containsRef(intrusiveListElement))
-    assert(!containsRef(newElem))
+    assert(
+      containsRef(intrusiveListElement),
+      "element is not a member of this list, insertAfter could mangle start and end tracking"
+    )
     assert(newElem.unitary)
     numElems += 1
     if (intrusiveListElement == lastElem.get) {
@@ -360,8 +359,10 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     */
   def insertBefore(intrusiveListElement: T, newElem: T): T = {
     assert(size >= 1)
-    assert(containsRef(intrusiveListElement))
-    assert(!containsRef(newElem))
+    assert(
+      containsRef(intrusiveListElement),
+      "Element is not in this list, insert before could mangle start and end tracking."
+    )
     assert(newElem.unitary)
     numElems += 1
     if (intrusiveListElement == firstElem.get) {
