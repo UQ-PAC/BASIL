@@ -25,6 +25,26 @@ trait DownloadModule extends Module {
   case class Zip(extractedName: String) extends Unzip
 
 
+  sealed trait OSName
+  case object Win extends OSName
+  case object Mac extends OSName
+  case object Linux extends OSName
+  case class UnknownOS(n: String) extends OSName
+
+  def hostOS : OSName = {
+    val osName = System.getProperty("os.name")
+    if (osName.contains("nux")) {
+      Linux
+    } else if (osName.contains("Mac")) {
+      Mac
+    } else if (osName.startsWith("Windows")) {
+      Win
+    } else {
+      UnknownOS(osName)
+    }
+  }
+
+
   def mode = "rwxr-xr-x"
 
   // this is not a mill Task to prevent it from being eagerly run.

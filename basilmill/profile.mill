@@ -15,7 +15,7 @@ trait ProfileRun extends ScalaModule with DownloadModule {
   def url = s"https://github.com/async-profiler/async-profiler/releases/download/v${version}/async-profiler-${version}-$zipSuffix"
   def name = "libasyncprofiler.so"
   def version = "4.0"
-  def toUnpack = s"async-profiler-${version}-${folderSuffix}/lib/libasyncProfiler.so"
+  def toUnpack = s"async-profiler-${version}-${folderSuffix}/lib/libasyncProfiler.${libExn}"
 
   def arch = {
     System.getProperty("os.arch") match {
@@ -25,7 +25,6 @@ trait ProfileRun extends ScalaModule with DownloadModule {
     }
   }
 
-  def osName = System.getProperty("os.name")
   def zipSuffix = suffix.mkString(".")
   def folderSuffix = suffix.head
 
@@ -37,15 +36,22 @@ trait ProfileRun extends ScalaModule with DownloadModule {
       .left.map(_.toString)
   }
 
-  def suffix = {
-    if (osName.contains("nux")) {
-      Seq(s"linux-${arch}", "tar.gz")
-    } else if (osName.contains("Mac")) {
-      Seq("macos", "zip")
-    } else {
-      throw new Exception(s"Profiling is only supported on linux, mac. Not : $osName")
-    }
+  def libExn = hostOS match {
+      case Linux =>  ".so"
+      case Mac =>  ".dylib"
+      case osName => throw new Exception(s"Profiling is only supported on linux, mac. Not : $osName")
   }
-  override def unzip = Some(TarGZ(toUnpack))
+
+  def suffix = hostOS match {
+    case Linux => Seq(s"linux-${arch}", "tar.gz")
+    case Mac => Seq("macos", "zip")
+    case osName => throw new Exception(s"Profiling is only supported on linux, mac. Not : $osName")
+  }
+
+  override def unzip = hostOS match {
+    case Linux => Some(TarGZ(toUnpack))
+    case Mac => Some(Zip(toUnpack))
+    case _ => ???
+  }
 
 }
