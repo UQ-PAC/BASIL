@@ -77,15 +77,16 @@ object AuxDecoder {
     val len = readUint(64)(bs)
     (BigInt(0) until len).map(_ => valReader(bs)).toList
 
-  type Return[x] = x match { case Reader[t] => t }
+  type ReadTuple[T <: Tuple] <: Tuple = T match
+    case Reader[out] *: rest => out *: ReadTuple[rest]
+    case EmptyTuple => EmptyTuple
 
-  inline def readTuple[T <: Tuple](xs: T)(bs: Input): Tuple.Map[T, Return] =
-    readTupleInner(xs)(bs).asInstanceOf[Tuple.Map[T, Return]]
-
-  private inline def readTupleInner[T <: Tuple](xs: T)(bs: Input): Tuple =
+  inline def readTuple[T <: Tuple](xs: T)(bs: Input): ReadTuple[T] =
     inline xs match
-      case xs: (Reader[_] *: _) => xs.head(bs) *: readTupleInner(xs.tail)(bs)
-      case EmptyTuple => EmptyTuple
+      case xs: (Reader[o] *: rest) =>
+        xs match
+          case h *: t => h(bs) *: readTuple[rest](t)(bs)
+      case _: EmptyTuple => EmptyTuple
 
   def readUuid(bs: Input) =
     ByteString.copyFrom(readBytes(16)(bs))
