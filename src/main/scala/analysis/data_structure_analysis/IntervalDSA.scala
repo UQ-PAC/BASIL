@@ -11,6 +11,7 @@ import ir.eval.BitVectorEval.isNegative
 import specification.{ExternalFunction, FuncEntry, SymbolTableEntry}
 import util.DSAConfig.{Checks, Standard}
 import util.LogLevel.INFO
+import util.assertion.*
 import util.{DSAConfig, DSAContext, DSALogger, IRContext, PerformanceTimer}
 
 import scala.collection.mutable

@@ -4,6 +4,7 @@ import analysis.solvers.SimpleWorklistFixpointSolver
 import ir.*
 import ir.eval.BitVectorEval.bv2SignedInt
 import util.MRALogger
+import util.assertion.*
 
 import scala.collection.mutable
 

@@ -2,6 +2,7 @@ package ir.transforms
 
 import ir.*
 import util.Logger
+import util.assertion.*
 
 import scala.collection.mutable
 

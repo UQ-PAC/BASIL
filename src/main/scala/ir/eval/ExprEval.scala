@@ -1,5 +1,6 @@
 package ir.eval
 import ir.*
+import util.assertion.*
 import util.functional.State
 
 /** We generalise the expression evaluator to a partial evaluator to simplify evaluating casts.

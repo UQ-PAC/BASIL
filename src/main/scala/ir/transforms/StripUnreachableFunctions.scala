@@ -1,5 +1,6 @@
 package ir.transforms
 import ir.*
+import util.assertion.*
 
 import collection.mutable
 

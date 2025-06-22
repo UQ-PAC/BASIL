@@ -4,6 +4,7 @@ import ir.*
 import ir.cilvisitor.*
 import translating.*
 import util.Logger
+import util.assertion.*
 
 import scala.collection.mutable
 

@@ -7,9 +7,7 @@ trait Conf extends ScalaModule {
   /* generate a final val definition to support macro expansion based
    * on this value 
    */
-  
-  val debugMode = false
-
+  def debugMode: Boolean
   def generateConf = Task {
     val text = s"package basil.compileConstants\nfinal val debugMode = $debugMode"
     val p = Task.dest / "debugMode.scala"

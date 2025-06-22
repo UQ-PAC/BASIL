@@ -5,6 +5,7 @@ import ir.*
 import ir.eval.BitVectorEval.bv2SignedInt
 import ir.transforms.{AbstractDomain, worklistSolver}
 import util.SVALogger as Logger
+import util.assertion.*
 
 import scala.annotation.tailrec
 import scala.collection.{SortedMap, mutable}

@@ -16,6 +16,7 @@ import analysis.{
 }
 import ir.*
 import util.Logger
+import util.assertion.*
 
 import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}

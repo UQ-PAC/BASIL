@@ -3,6 +3,7 @@ package analysis
 import boogie.*
 import ir.*
 import ir.transforms.AbstractDomain
+import util.assertion.*
 
 // TODO DAG predicates (don't represent the same subexpression twice)
 

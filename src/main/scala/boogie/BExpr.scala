@@ -1,6 +1,7 @@
 package boogie
 import ir.*
 import specification.*
+import util.assertion.*
 
 import java.io.Writer
 

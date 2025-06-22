@@ -340,9 +340,6 @@ object Main {
       throw IllegalArgumentException("BAP ADT input requires --relf")
     }
 
-    import util.assertion.*
-    assert(1 == 1)
-
     val q = BASILConfig(
       loading = loadingInputs.copy(
         dumpIL = conf.dumpIL,

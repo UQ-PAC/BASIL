@@ -7,6 +7,7 @@ import cfg_visualiser.*
 import ir.*
 import specification.{ExternalFunction, FuncEntry, SymbolTableEntry}
 import util.Counter
+import util.assertion.*
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer

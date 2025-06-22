@@ -1,6 +1,7 @@
 package ir.dsl
 
 import ir.*
+import util.assertion.*
 import util.intersperse
 import util.twine.Twine
 

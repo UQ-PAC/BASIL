@@ -2,6 +2,7 @@ package analysis
 
 import ir.*
 import ir.transforms.AbstractDomain
+import util.assertion.*
 
 trait MayAnalysis
 trait MustAnalysis

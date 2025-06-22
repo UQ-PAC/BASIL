@@ -5,13 +5,14 @@ import basil.compileConstants.debugMode
 /*
  * Conditionally inlined assertion that should not allocate anything
  */
-inline def assert(inline assertion: Boolean, inline message: Option[String] = None): Unit = {
-  inline if (!debugMode) then ()
+inline def assert(inline assertion: Boolean, inline message: String*): Unit = {
+  inline if (debugMode) then ()
   else {
-    if assertion then
-      throw (message match {
-        case Some(x) => AssertionError(x)
-        case None => AssertionError()
-      })
+    if (!assertion) then
+      if (message.nonEmpty) then {
+        throw AssertionError(message.mkString(""))
+      } else {
+        throw AssertionError()
+      }
   }
 }

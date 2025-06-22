@@ -1,6 +1,6 @@
 package analysis
-
 import ir.{GoTo, Procedure, Program, Register, Return, Unreachable, Variable}
+import util.assertion.*
 
 /** This analysis uses the interprocedural and intraprocedural live variable analyses to find the parameters to
   * procedures in a given program

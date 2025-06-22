@@ -4,6 +4,7 @@ import ir.cilvisitor.*
 import ir.eval.{AlgebraicSimplifications, AssumeConditionSimplifications, simplifyExprFixpoint}
 import translating.PrettyPrinter.*
 import util.SimplifyLogger
+import util.assertion.*
 
 import scala.collection.mutable
 import scala.util.boundary

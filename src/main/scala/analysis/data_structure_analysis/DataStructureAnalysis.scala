@@ -4,6 +4,7 @@ import analysis.*
 import ir.*
 import specification.{ExternalFunction, SymbolTableEntry}
 import util.Counter
+import util.assertion.*
 
 import scala.collection.mutable
 

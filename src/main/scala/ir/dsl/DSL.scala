@@ -1,6 +1,7 @@
 package ir.dsl
 import ir.*
 import translating.PrettyPrinter.*
+import util.assertion.*
 
 import scala.collection.immutable.*
 import scala.collection.mutable

@@ -1,4 +1,6 @@
 package util.intrusive_list
+import util.assertion.*
+
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -245,8 +247,8 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   An ArrayBuffer containing all elements after n.
     */
   def splitOn(n: T): ArrayBuffer[T] = {
-    require(!lastElem.contains(n))
-    require(containsRef(n))
+    assert(!lastElem.contains(n))
+    assert(containsRef(n))
 
     val ne = n.next
 

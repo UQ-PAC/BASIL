@@ -2,6 +2,7 @@ package analysis
 
 import analysis.solvers.SimpleWorklistFixpointSolver
 import ir.*
+import util.assertion.*
 
 import scala.collection.mutable
 

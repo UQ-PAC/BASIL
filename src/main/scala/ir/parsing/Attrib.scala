@@ -4,6 +4,7 @@ import boogie.SpecGlobal
 import ir.{BitVecLiteral, FalseLiteral, IntLiteral, Literal, MemorySection, Sigil, TrueLiteral}
 import specification.{ExternalFunction, FuncEntry}
 import util.Logger
+import util.assertion.*
 
 import java.io.*
 import java.util.Base64

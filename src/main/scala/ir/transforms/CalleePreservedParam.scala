@@ -1,5 +1,6 @@
 package ir
 package transforms
+import util.assertion.*
 
 import cilvisitor.*
 

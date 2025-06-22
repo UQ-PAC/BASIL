@@ -3,6 +3,7 @@ package analysis
 import ir.*
 import ir.eval.BitVectorEval
 import util.StaticAnalysisLogger
+import util.assertion.*
 
 /** Basic lattice
   */

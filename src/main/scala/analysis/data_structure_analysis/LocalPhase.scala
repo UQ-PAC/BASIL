@@ -5,6 +5,7 @@ import ir.*
 import ir.eval.BitVectorEval.isNegative
 import specification.{ExternalFunction, SymbolTableEntry}
 import util.Counter
+import util.assertion.*
 
 import scala.collection.mutable
 

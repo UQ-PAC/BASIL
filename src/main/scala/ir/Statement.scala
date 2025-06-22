@@ -1,4 +1,5 @@
 package ir
+import util.assertion.*
 import util.intrusive_list.IntrusiveListElement
 
 import collection.immutable.SortedMap

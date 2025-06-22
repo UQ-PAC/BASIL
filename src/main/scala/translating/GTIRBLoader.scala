@@ -3,6 +3,7 @@ import Parsers.*
 import Parsers.ASLpParser.*
 import ir.*
 import util.Logger
+import util.assertion.*
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{immutable, mutable}

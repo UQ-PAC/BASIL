@@ -25,6 +25,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 
+import assertion.*
 import cilvisitor.*
 
 /** This file contains the main program execution. See RunUtils.loadAndTranslate for the high-level process.
