@@ -64,7 +64,7 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
       .bv(width))
   }
 
-  assert(wellFormed, s"not well formed $this")
+  debugAssert(wellFormed, s"not well formed $this")
 
   def top() = {
     TNum(0.bv(width), BitVecLiteral(BitVecType(width).maxValue, width))

@@ -27,7 +27,7 @@ enum Interval extends InternalLattice[Interval] {
 
   import ir.eval.BitVectorEval.*
 
-  assert(this match {
+  debugAssert(this match {
     case ConcreteInterval(lower, upper, width) => lower <= upper
     case _ => true
   })

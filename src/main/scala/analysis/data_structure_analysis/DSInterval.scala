@@ -12,7 +12,7 @@ enum DSInterval extends Offsets {
   case Value(s: Int, e: Int)
 
   this match
-    case DSInterval.Value(s, e) => assert(s <= e, "start of interval should be less than its end")
+    case DSInterval.Value(s, e) => debugAssert(s <= e, "start of interval should be less than its end")
     case _ =>
 
   override def toString: String =

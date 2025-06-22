@@ -90,7 +90,7 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
         case load: MemoryLoad =>
           val indices = dsa(proc).exprToCells(load.index).map(dsa(proc).get).toSeq
           if indices.size == 1 then {
-            assert(indices.map(_.getPointee).toSet.size == 1, s"$proc, ${indices.map(_.getPointee).size}, $load")
+            debugAssert(indices.map(_.getPointee).toSet.size == 1, s"$proc, ${indices.map(_.getPointee).size}, $load")
             val index = indices.head
             val flag = index.node.flags
             val value = index.getPointee
@@ -119,7 +119,7 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
         case store: MemoryStore =>
           val indices = dsa(proc).exprToCells(store.index).map(dsa(proc).get).toSeq
           if indices.size == 1 then {
-            assert(indices.map(_.getPointee).toSet.size == 1)
+            debugAssert(indices.map(_.getPointee).toSet.size == 1)
             val index = indices.head
             val flag = index.node.flags
             val content = index.getPointee

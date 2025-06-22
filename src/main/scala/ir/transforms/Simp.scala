@@ -298,7 +298,7 @@ def removeSlices(p: Procedure): Unit = {
       s match {
         case a @ LocalAssign(lhs: LocalVar, ZeroExtend(sz, rhs), _)
             if size(lhs).isDefined && varHighZeroBits.contains(lhs) => {
-          assert(varHighZeroBits(lhs) == sz)
+          debugAssert(varHighZeroBits(lhs) == sz)
           a.lhs = LocalVar(lhs.varName, BitVecType(size(lhs).get - varHighZeroBits(lhs)), lhs.index)
           a.rhs = rhs
           DoChildren()
@@ -647,7 +647,7 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
         res.head match {
           case l @ LocalAssign(lhs, rhs, _) => {
             if (validate) {
-              assert(propOK(rhs))
+              debugAssert(propOK(rhs))
             }
             Some(rhs)
           }
@@ -826,7 +826,7 @@ def coalesceBlocks(p: Program): Boolean = {
 
 def removeDeadInParams(p: Program): Boolean = {
   var modified = false
-  assert(invariant.correctCalls(p))
+  debugAssert(invariant.correctCalls(p))
 
   for (
     block <- p.procedures.filterNot(_.isExternal.contains(true)).filterNot(p.mainProcedure == _).flatMap(_.entryBlock)
@@ -849,7 +849,7 @@ def removeDeadInParams(p: Program): Boolean = {
     }
   }
 
-  if (modified) assert(invariant.correctCalls(p))
+  if (modified) debugAssert(invariant.correctCalls(p))
   modified
 }
 
@@ -862,8 +862,8 @@ def removeInvariantOutParameters(
   p: Program,
   alreadyInlined: Map[Procedure, Set[Variable]] = Map()
 ): Map[Procedure, Set[Variable]] = {
-  assert(invariant.correctCalls(p))
-  assert(invariant.singleCallBlockEnd(p))
+  debugAssert(invariant.correctCalls(p))
+  debugAssert(invariant.singleCallBlockEnd(p))
   var modified = false
   var inlined = Map[Procedure, Set[Variable]]()
 
@@ -977,8 +977,8 @@ def removeInvariantOutParameters(
   }
 
   if (inlined.nonEmpty) {
-    assert(invariant.correctCalls(p))
-    assert(invariant.singleCallBlockEnd(p))
+    debugAssert(invariant.correctCalls(p))
+    debugAssert(invariant.singleCallBlockEnd(p))
     applyRPO(p) /* Because we added blocks */
   }
 

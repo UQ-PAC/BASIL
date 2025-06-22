@@ -7,7 +7,7 @@ var disableAssetions = false
 /*
  * Conditionally inlined assertion that should not allocate anything
  */
-inline def assert(inline assertion: Boolean, inline message: String*): Unit = {
+inline def debugAssert(inline assertion: Boolean, inline message: String*): Unit = {
   inline if (debugMode) then {
     if (!disableAssetions && !assertion) then
       if (message.nonEmpty) then {

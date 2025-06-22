@@ -83,7 +83,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
    */
   def apply(i: Int): T = {
     // TODO: cache?
-    assert(i < size)
+    debugAssert(i < size)
     var elem = firstElem.get
     for (c <- 0 until i) {
       elem = elem.getNext
@@ -124,7 +124,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   The iterator
     */
   def iteratorFrom(elem: T, forward: Boolean = true): Iterator[T] = {
-    assert(elem.first() == firstElem.get)
+    debugAssert(elem.first() == firstElem.get)
     IntrusiveListIterator(Some(elem), forward)
   }
 
@@ -173,7 +173,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   The element
     */
   def prepend(newElem: T): T = {
-    assert(newElem.unitary)
+    debugAssert(newElem.unitary)
     onInsert(newElem)
     if (size > 0) {
       insertBefore(firstElem.get, newElem)
@@ -203,7 +203,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   The element
     */
   def append(newElem: T): T = {
-    assert(newElem.unitary)
+    debugAssert(newElem.unitary)
     onInsert(newElem)
     if (size > 0) {
       insertAfter(lastElem.get, newElem)
@@ -224,9 +224,9 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   The added element
     */
   def replace(elem: T, withElem: T): T = {
-    assert(containsRef(elem), "elem is not an element of this list, replace() call could mangle start and end")
+    debugAssert(containsRef(elem), "elem is not an element of this list, replace() call could mangle start and end")
     if (elem ne withElem) {
-      assert(withElem.unitary)
+      debugAssert(withElem.unitary)
       val newElem: T = insertAfter(elem, withElem)
       val removed = remove(elem)
       newElem
@@ -244,8 +244,8 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   An ArrayBuffer containing all elements after n.
     */
   def splitOn(n: T): ArrayBuffer[T] = {
-    assert(!lastElem.contains(n))
-    assert(containsRef(n), "Cannot split on element not in this list")
+    debugAssert(!lastElem.contains(n))
+    debugAssert(containsRef(n), "Cannot split on element not in this list")
 
     val ne = n.next
 
@@ -269,8 +269,8 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   The removed element
     */
   def remove(intrusiveListElement: T): T = {
-    assert(size >= 0)
-    assert(containsRef(intrusiveListElement), "Cannot remove element not in this list")
+    debugAssert(size >= 0)
+    debugAssert(containsRef(intrusiveListElement), "Cannot remove element not in this list")
     numElems -= 1
     if (intrusiveListElement == lastElem.get) {
       lastElem = intrusiveListElement.prev
@@ -291,12 +291,12 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   the inserted element
     */
   def insertAfter(intrusiveListElement: T, newElem: T): T = {
-    assert(size >= 1)
-    assert(
+    debugAssert(size >= 1)
+    debugAssert(
       containsRef(intrusiveListElement),
       "element is not a member of this list, insertAfter could mangle start and end tracking"
     )
-    assert(newElem.unitary)
+    debugAssert(newElem.unitary)
     numElems += 1
     if (intrusiveListElement == lastElem.get) {
       lastElem = Some(newElem)
@@ -358,12 +358,12 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   the inserted element
     */
   def insertBefore(intrusiveListElement: T, newElem: T): T = {
-    assert(size >= 1)
-    assert(
+    debugAssert(size >= 1)
+    debugAssert(
       containsRef(intrusiveListElement),
       "Element is not in this list, insert before could mangle start and end tracking."
     )
-    assert(newElem.unitary)
+    debugAssert(newElem.unitary)
     numElems += 1
     if (intrusiveListElement == firstElem.get) {
       firstElem = Some(newElem)
@@ -500,11 +500,11 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
   }
 
   private[intrusive_list] final def splice(at: T, insertBegin: T, insertEnd: T): Unit = {
-    assert(insertEnd.last() == insertEnd)
-    assert(insertBegin.last() == insertEnd)
-    assert(insertBegin.first() == insertBegin)
-    assert(insertEnd.first() == insertBegin)
-    assert(!at.contains(insertBegin))
+    debugAssert(insertEnd.last() == insertEnd)
+    debugAssert(insertBegin.last() == insertEnd)
+    debugAssert(insertBegin.first() == insertBegin)
+    debugAssert(insertEnd.first() == insertBegin)
+    debugAssert(!at.contains(insertBegin))
 
     at.next.foreach(_.prev = Some(insertEnd))
     insertBegin.prev = Some(at)

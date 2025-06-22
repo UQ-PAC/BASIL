@@ -295,8 +295,8 @@ class Procedure private (
   private val _callers = mutable.HashSet[DirectCall]()
   _blocks.foreach(_.parent = this)
   // class invariant
-  assert(_returnBlock.forall(b => _blocks.contains(b)) && _entryBlock.forall(b => _blocks.contains(b)))
-  assert(_blocks.isEmpty == _entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
+  debugAssert(_returnBlock.forall(b => _blocks.contains(b)) && _entryBlock.forall(b => _blocks.contains(b)))
+  debugAssert(_blocks.isEmpty == _entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
 
   def this(
     name: String,
@@ -458,7 +458,7 @@ class Procedure private (
   }
 
   def replaceBlock(oldBlock: Block, block: Block): Block = {
-    assert(_blocks.contains(oldBlock))
+    debugAssert(_blocks.contains(oldBlock))
     if (oldBlock ne block) {
       val isEntry: Boolean = entryBlock.contains(oldBlock)
       val isReturn: Boolean = returnBlock.contains(oldBlock)
@@ -493,8 +493,8 @@ class Procedure private (
     *   the removed block
     */
   def removeBlocks(block: Block): Block = {
-    assert(_blocks.contains(block))
-    assert(block.incomingJumps.isEmpty) // don't leave jumps dangling
+    debugAssert(_blocks.contains(block))
+    debugAssert(block.incomingJumps.isEmpty) // don't leave jumps dangling
     block.deParent()
     val index = _blocks.indexOf(block)
     _blocks.remove(index)
@@ -638,7 +638,7 @@ class Block private (
   var rpoOrder: Long = -1
 
   private def jump_=(j: Jump): Unit = {
-    assert(!j.hasParent)
+    debugAssert(!j.hasParent)
     if (j ne _jump) {
       _jump.deParent()
       _jump = j
@@ -662,7 +662,7 @@ class Block private (
 
   def removeIncomingJump(g: GoTo): Unit = {
     _incomingJumps.remove(g)
-    assert(!incomingJumps.contains(g))
+    debugAssert(!incomingJumps.contains(g))
   }
 
   def calls: Set[Procedure] = statements.toSet.collect { case d: DirectCall =>
@@ -746,7 +746,7 @@ class Block private (
   }
 
   def createBlockBetween(b2: Block, suffix: String = "goto"): Block = {
-    assert(nextBlocks.toSet.contains(b2))
+    debugAssert(nextBlocks.toSet.contains(b2))
     val b1 = this
     val label = parent.freshBlockId(suffix)
     val origs = (meta.originalLabel.toList ++ b2.meta.originalLabel).flatMap(_.split(",")).toSet.toList.sorted match {
@@ -770,7 +770,7 @@ class Block private (
   }
 
   def createBlockOnEdgeWith(b2: Block, suffix: String = "_goto"): Block = {
-    assert((nextBlocks ++ prevBlocks).exists(_ == b2))
+    debugAssert((nextBlocks ++ prevBlocks).exists(_ == b2))
     if (nextBlocks.exists(_ == b2)) {
       createBlockBetween(b2, suffix)
     } else if (prevBlocks.exists(_ == b2)) {

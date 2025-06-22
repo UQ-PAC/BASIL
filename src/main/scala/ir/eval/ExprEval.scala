@@ -190,7 +190,7 @@ def fastPartialEvalExprTopLevel(exp: Expr): (Expr, Boolean) = {
     case SignExtend(e, l: BitVecLiteral) => logSimp(exp, BitVectorEval.smt_sign_extend(e, l))
     case Extract(e, b, l: BitVecLiteral) => logSimp(exp, BitVectorEval.boogie_extract(e, b, l))
     case Repeat(reps, b: BitVecLiteral) => {
-      assert(reps > 0)
+      debugAssert(reps > 0)
       if (reps == 1) logSimp(exp, b)
       else {
         logSimp(exp, (2 to reps).foldLeft(b)((acc, r) => BitVectorEval.smt_concat(acc, b)))
@@ -274,7 +274,7 @@ def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S,
         body <- eval(r.body)
       } yield (body match {
         case b: BitVecLiteral => {
-          assert(r.repeats > 0)
+          debugAssert(r.repeats > 0)
           if (r.repeats == 1) b
           else {
             (2 to r.repeats).foldLeft(b)((acc, r) => BitVectorEval.smt_concat(acc, b))

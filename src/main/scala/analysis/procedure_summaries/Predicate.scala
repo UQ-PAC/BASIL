@@ -64,7 +64,7 @@ enum BVTerm {
     case OldVar(v) => ir.size(v).get
     case Uop(op, x) => x.size
     case Bop(op, x, y) =>
-      assert(x.size == y.size)
+      debugAssert(x.size == y.size)
       x.size
     case Extract(end, start, body) => end - start
     case Repeat(repeats, body) => body.size * repeats
@@ -506,13 +506,13 @@ enum Predicate {
       }
       case Disj(s) => Disj(s.map(_.dnf)).flatten
     }
-    assert(ret.inDnf)
+    debugAssert(ret.inDnf)
     ret
 
   def cnf: Predicate =
     val ret = not(not(this).dnf)
     println(ret)
-    assert(ret.inCnf)
+    debugAssert(ret.inCnf)
     ret
 
   /**
@@ -557,7 +557,7 @@ enum Predicate {
             }
           }
           if disjs.size >= 2 then {
-            assert(disjs.size == 2)
+            debugAssert(disjs.size == 2)
 
             val l = disjs.toList
             val a = l(0).s
@@ -625,7 +625,7 @@ enum Predicate {
             }
           }
           if conjs.size >= 2 then {
-            assert(conjs.size == 2)
+            debugAssert(conjs.size == 2)
 
             val l = conjs.toList
             val a = l(0).s

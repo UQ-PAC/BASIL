@@ -126,7 +126,7 @@ class OnePassDSA(
 
     val preds = block.prevBlocks.toList
     val toJoin = preds.filter(state(_).filled)
-    assert(!(toJoin.isEmpty && preds.nonEmpty), s"should always have at least one processed predecessor ${preds}")
+    debugAssert(!(toJoin.isEmpty && preds.nonEmpty), s"should always have at least one processed predecessor ${preds}")
 
     {
       val definedVars = toJoin.flatMap(state(_).renamesAfter.keySet).toSet.intersect(liveBefore(block))
@@ -156,7 +156,7 @@ class OnePassDSA(
 
           for (b <- toJoin) {
             val nb = blocks(b)
-            assert(state(b).filled)
+            debugAssert(state(b).filled)
             state(nb).renamesBefore.addAll(state(b).renamesAfter)
 
             val assign = LocalAssign(v, v, Some("phiback"))
@@ -197,7 +197,7 @@ class OnePassDSA(
     // any next not completed
     val anyNextPrevNotFilled = next.exists(_.prevBlocks.exists(b => !state(b).filled))
     val incompleteSuccessor = next.exists(b => !(state(b).completed))
-    assert(anyNextPrevNotFilled == incompleteSuccessor)
+    debugAssert(anyNextPrevNotFilled == incompleteSuccessor)
     for (b <- next) {
       val definedVars = state(block).renamesAfter.keySet.intersect(liveAfter(block))
 
@@ -264,7 +264,7 @@ class OnePassDSA(
     if (!(state(block).filled)) {
       localProcessBlock(_st, count, block)
       state(block).filled = true
-      assert(state(block).filled)
+      debugAssert(state(block).filled)
       seenBefore = false
     }
 
@@ -303,7 +303,7 @@ class OnePassDSA(
     while (worklist.nonEmpty) {
       while (worklist.nonEmpty) {
         val block = worklist.dequeue
-        assert(worklist.headOption.map(_.rpoOrder < block.rpoOrder).getOrElse(true))
+        debugAssert(worklist.headOption.map(_.rpoOrder < block.rpoOrder).getOrElse(true))
 
         visitBlock(_st, count, liveBefore, liveAfter, block)
       }
@@ -324,7 +324,7 @@ class OnePassDSA(
 class StmtRenamer(renamesL: Map[Variable, Int] = Map(), renames: Map[Variable, Int] = Map()) extends CILVisitor {
 
   private def addIndex(v: Variable, idx: Int) = {
-    assert(idx != -1)
+    debugAssert(idx != -1)
     v match {
       case Register(n, sz) => {
         throw Exception("Should not SSA registers")

@@ -13,7 +13,7 @@ class ReplaceReturns(insertR30InvariantAssertion: Procedure => Boolean = (_ => t
 
     j match {
       case IndirectCall(r30 @ Register("R30", rt), _) => {
-        assert(j.parent.statements.lastOption.contains(j))
+        debugAssert(j.parent.statements.lastOption.contains(j))
         if (j.parent.jump.isInstanceOf[Unreachable | Return]) {
           j.parent.replaceJump(Return())
           val R30Begin = LocalVar("R30_begin", BitVecType(64))
@@ -139,5 +139,5 @@ def establishProcedureDiamondForm(program: Program, doSimplify: Boolean = false)
 
   addReturnBlocks(program, insertR30InvariantAssertion = _ => doSimplify)
   cilvisitor.visit_prog(ConvertSingleReturn(), program)
-  assert(ir.invariant.programDiamondForm(program))
+  debugAssert(ir.invariant.programDiamondForm(program))
 }

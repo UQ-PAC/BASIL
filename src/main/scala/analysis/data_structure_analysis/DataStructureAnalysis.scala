@@ -94,7 +94,7 @@ class DataStructureAnalysis(
     val leafNodes = findLeaf(program.mainProcedure)
 
     leafNodes.foreach { proc =>
-      assert(local(proc).callsites.isEmpty)
+      debugAssert(local(proc).callsites.isEmpty)
       visited += proc
       // val preds: Set[Procedure] = CallGraph.pred(proc)
       queue.enqueueAll(CallGraph.pred(proc).diff(visited).intersect(domain))
@@ -112,8 +112,8 @@ class DataStructureAnalysis(
         buGraph.callsites.foreach { callSite =>
           val callee = callSite.proc
           val calleeGraph = local(callee) // .cloneSelf()
-          assert(buGraph.globalMapping.keySet.equals(calleeGraph.globalMapping.keySet))
-          assert(calleeGraph.formals.keySet.diff(ignoreRegisters).equals(callSite.paramCells.keySet))
+          debugAssert(buGraph.globalMapping.keySet.equals(calleeGraph.globalMapping.keySet))
+          debugAssert(calleeGraph.formals.keySet.diff(ignoreRegisters).equals(callSite.paramCells.keySet))
           calleeGraph.globalMapping.values.foreach { field =>
             val newNode = calleeGraph.find(field.node).node
             newNode.cloneNode(calleeGraph, buGraph)
@@ -121,24 +121,24 @@ class DataStructureAnalysis(
 
           calleeGraph.formals.foreach { (variable, slice) =>
             if (!ignoreRegisters.contains(variable)) {
-              assert(callSite.paramCells.contains(variable))
+              debugAssert(callSite.paramCells.contains(variable))
               val node = calleeGraph.find(slice).node
               node.cloneNode(calleeGraph, buGraph)
             }
           }
 
-          assert(writesTo(callee).equals(callSite.returnCells.keySet))
+          debugAssert(writesTo(callee).equals(callSite.returnCells.keySet))
           writesTo(callee).foreach { reg =>
-            assert(callSite.returnCells.contains(reg))
+            debugAssert(callSite.returnCells.contains(reg))
             val returnCells = calleeGraph.getCells(IRWalk.lastInProc(callee).get, reg).map(calleeGraph.find)
-            assert(returnCells.nonEmpty)
+            debugAssert(returnCells.nonEmpty)
             returnCells.foreach { slice =>
               val node = calleeGraph.find(slice).node
               node.cloneNode(calleeGraph, buGraph)
             }
           }
 
-          //          assert(calleeGraph.formals.isEmpty || buGraph.varToCell(begin(callee)).equals(calleeGraph.formals))
+          //          debugAssert(calleeGraph.formals.isEmpty || buGraph.varToCell(begin(callee)).equals(calleeGraph.formals))
           calleeGraph.globalMapping.foreach { case (range: AddressRange, Field(node: Node, offset: BigInt)) =>
             val field = calleeGraph.find(node)
             val res = buGraph.mergeCells(
@@ -160,7 +160,7 @@ class DataStructureAnalysis(
 
           writesTo(callee).foreach { reg =>
             val returnCells = buGraph.getCells(IRWalk.lastInProc(callee).get, reg)
-            //              assert(returnCells.nonEmpty)
+            //              debugAssert(returnCells.nonEmpty)
             val res = returnCells.foldLeft(buGraph.adjust(callSite.returnCells(reg))) { (c, ret) =>
               buGraph.mergeCells(c, buGraph.adjust(ret))
             }
@@ -186,7 +186,7 @@ class DataStructureAnalysis(
       callersGraph.callsites.foreach { callSite =>
         val callee = callSite.proc
         val calleesGraph = topDown(callee)
-        assert(callersGraph.globalMapping.keySet.equals(calleesGraph.globalMapping.keySet))
+        debugAssert(callersGraph.globalMapping.keySet.equals(calleesGraph.globalMapping.keySet))
 
         callersGraph.globalMapping.values.foreach { field =>
           val oldNode = field.node

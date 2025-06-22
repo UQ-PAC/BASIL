@@ -183,7 +183,7 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
       do {
         // drop rest of blocks with same priority
         val m = worklist.dequeue()
-        assert(
+        debugAssert(
           m == b,
           s"Different nodes with same priority ${m.rpoOrder} ${b.rpoOrder}, violates PriorityQueueWorklist assumption: $b and $m"
         )

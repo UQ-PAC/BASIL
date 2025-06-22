@@ -324,7 +324,7 @@ case object MemoryAttribData {
         by
       }
     }
-    assert(decoded.toList == bytes.toList)
+    debugAssert(decoded.toList == bytes.toList)
 
     MemoryAttribData(m.name, m.address, m.size, m.readOnly, b64bytes)
   }

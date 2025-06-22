@@ -278,7 +278,7 @@ def stronglyConnectedComponents[T <: CFGPosition, O <: T](
       out += component
     }
   }
-  assert(stack.size == 0)
+  debugAssert(stack.size == 0)
 
   out.map(_.toSet).toList
 }

@@ -46,7 +46,7 @@ trait GlobalRegionAnalysis(
   private val dataMap: mutable.HashMap[BigInt, DataRegion] = mutable.HashMap()
 
   private def dataPoolMaster(offset: BigInt, size: BigInt, convertSize: Boolean = true): DataRegion = {
-    assert(size >= 0)
+    debugAssert(size >= 0)
     val givenSize: Int = if (convertSize) (size.toDouble / 8).ceil.toInt else size.toInt
     if (dataMap.contains(offset)) {
       if (dataMap(offset).size < givenSize) {
