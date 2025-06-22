@@ -54,57 +54,22 @@ object GTIRBReadELF {
   //
   // https://www.man7.org/linux/man-pages/man5/elf.5.html
 
-  def getExternalFunctions(mod: Module) = {
+  def getExternalFunctions(gtirb: GTIRBResolver) = {
 
-    val proxyBlockUuids = mod.proxies.map(_.uuid).toSet
-    val externalFunctionSymbols = mod.symbols.filter(x => proxyBlockUuids.contains(x.getReferentUuid))
-    val symbolsByUuid = mod.symbols.map(x => x.uuid -> x).toMap
+    val mod = gtirb.mod
 
-    val dataBlocksByUuid = (for {
-      sec <- mod.sections.toList
-      interval <- sec.byteIntervals
-      (b, innerb) <- interval.blocks.collect {
-        case b @ Block(_, Block.Value.Data(dat), _) =>
-          (b, dat)
-        // case b @ Block(_, Block.Value.Code(cod), _) => (b, cod)
-      }
-    } yield innerb.uuid -> (innerb, b, interval, sec)).toMap
-
-    val codeBlocksByUuid = (for {
-      sec <- mod.sections.toList
-      interval <- sec.byteIntervals
-      (b, innerb) <- interval.blocks.collect {
-        case b @ Block(_, Block.Value.Code(dat), _) =>
-          (b, dat)
-      }
-    } yield innerb.uuid -> (innerb, b, interval, sec)).toMap
-
-    val sectionsByName = mod.sections.map(x => x.name -> x).toMap
-    val relaDyns = parseRelaTab(sectionsByName(".rela.dyn").byteIntervals.head.contents)
-    val relaPlts = parseRelaTab(sectionsByName(".rela.plt").byteIntervals.head.contents)
-
-    val symbolTabIdx = AuxDecoder.decodeAux(AuxDecoder.AuxKind.ElfSymbolTabIdxInfo)(mod)
-    val tabidx = symbolTabIdx
-      .flatMap {
-        case (sym, idxs) =>
-          idxs.map(_ -> sym)
-      }
-      .groupMapReduce(kv => kv.head.head)(kv => SortedMap(kv.head.last -> kv.last))(_ ++ _)
-    // println(tabidx)
-
-    val symbolKinds = decodeAux(AuxKind.ElfSymbolInfo)(mod)
+    val relaDyns = parseRelaTab(gtirb.sectionsByName(".rela.dyn").byteIntervals.head.contents)
+    val relaPlts = parseRelaTab(gtirb.sectionsByName(".rela.plt").byteIntervals.head.contents)
 
     import scala.math.Ordering.Implicits.seqOrdering
-    val allSymbols = symbolKinds
+    val allSymbols = gtirb.symbolKindsByUuid
       .map {
         case (k, pos) =>
-          val sym = symbolsByUuid(k)
-          val addr = for {
-            uuid <- sym.optionalPayload.referentUuid
-            (_, block: Block, ival: ByteInterval, _) <- dataBlocksByUuid.get(uuid).orElse(codeBlocksByUuid.get(uuid))
-          } yield (block.offset + ival.address)
-          val value = sym.optionalPayload._value.fold("")("val=" + _.toString)
-          (symbolTabIdx(k), addr, pos) -> s"${sym.name} $value"
+          val sym = k.get
+          println(k)
+          val addr = k.getReferentBlock.map(_.address)
+          val value = k.getScalarValue.fold("")("val=" + _.toString)
+          (k.symTabIdx, addr, pos) -> s"${sym.name} $value"
       }
       .to(SortedMap)
     println(allSymbols.mkString("\n"))
@@ -113,41 +78,35 @@ object GTIRBReadELF {
     println(".rela.dyn")
     relaDyns.foreach {
       case x =>
-        val symuuid = tabidx(".dynsym")(x.r_sym.toInt)
-        println(s"$x " + symbolsByUuid.get(symuuid).map(_.name).filter(_.nonEmpty))
+        val symid = gtirb.symbolTables(".dynsym")(x.r_sym.toInt)
+        println(s"$x " + symid.get.name)
     }
     println(".rela.plt")
     relaPlts.foreach {
       case x =>
-        val symuuid = tabidx(".dynsym")(x.r_sym.toInt)
-        println(s"$x " + symbolsByUuid.get(symuuid).map(_.name).filter(_.nonEmpty))
+        val symid = gtirb.symbolTables(".dynsym")(x.r_sym.toInt)
+        println(s"$x " + symid.get.name)
     }
 
-    val specGlobals = symbolKinds.toList.collect {
-      case (uuid, (size, "OBJECT", "GLOBAL", "DEFAULT", idx)) =>
-        val sym = symbolsByUuid(uuid)
-        val (data, block, interval, sec) = dataBlocksByUuid(sym.optionalPayload.referentUuid.get)
-        // assert(size == data.size)
+    val specGlobals = gtirb.symbolKindsByUuid.toList.collect {
+      case (symid, (size, "OBJECT", "GLOBAL", "DEFAULT", idx)) =>
+        val blk = symid.getReferentBlock.get
+        val sec = blk.section
         assert(mod.sections(idx.toInt - 1) == sec)
-        (sym.name, size * 8, None, interval.address + block.offset)
+        (symid.get.name, blk.size * 8, None, blk.address)
     }
     println(specGlobals)
 
-    val funcNames = decodeAux(AuxKind.FunctionNames)(mod)
-    val funcNamesInverse = funcNames.map(_.swap)
+    val funentry = gtirb.symbolKindsByUuid.toList.collect {
+      case (symid, (size, "FUNC", "GLOBAL", "DEFAULT", idx)) if idx != 0 =>
 
-    val funcEntries = decodeAux(AuxKind.FunctionEntries)(mod)
-    val funentry = symbolKinds.toList.collect {
-      case (symuuid, (size, "FUNC", "GLOBAL", "DEFAULT", idx)) if idx != 0 =>
-
-        val nameSymbol = symbolsByUuid(symuuid)
-        val funcUuid = funcNamesInverse(symuuid)
-        val entries = funcEntries(funcUuid)
+        val nameSymbol = symid.get
+        val funcUuid = symid.getFunction.get
+        val entries = funcUuid.getEntries
 
         assert(entries.size == 1, "function with non-singular entry")
         val entry = entries.head
-        val (_, bl, ival, _) = codeBlocksByUuid(entry)
-        val addr = bl.offset + ival.address
+        val addr = entry.get.address
 
         (nameSymbol.name, size * 8, addr)
     }

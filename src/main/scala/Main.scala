@@ -339,7 +339,8 @@ object Main {
 
       val fIn = java.io.FileInputStream(loadingInputs.inputFile)
       val ir = com.grammatech.gtirb.proto.IR.IR.parseFrom(fIn)
-      println(ir.modules.map(gtirb.GTIRBReadELF.getExternalFunctions))
+      println(ir.modules.map(x =>
+          gtirb.GTIRBReadELF.getExternalFunctions(gtirb.GTIRBResolver(x))))
       return
     }
 
