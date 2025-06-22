@@ -698,6 +698,67 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
 
     assert(f.formalOutParam.equals(fOutParam))
   }
+
+  /* Tests slicing a method that is not main to ensure it is preserved despite being 'unreachable' */
+  test("sliceNonMain") {
+    val program = prog(
+      proc(
+        "main",
+        block(
+          "main_1",
+          LocalAssign(LocalVar("load0", bv32, 1), bv32(0)),
+          LocalAssign(LocalVar("load1", bv32, 1), bv32(0)),
+          directCall(
+            Seq("R0_out" -> LocalVar("R0", bv32, 1)),
+            "write",
+            Seq("R0_in" -> LocalVar("load0", bv32, 1), "R1_in" -> LocalVar("load1", bv32, 1))
+          ),
+          goto("main_return")
+        ),
+        block("main_return", ret)
+      ),
+      proc(
+        "write",
+        Seq("R0_in" -> bv32, "R1_in" -> bv32),
+        Seq("R0_out" -> bv32),
+        block(
+          "write_1",
+          directCall(
+            Seq("R0_out" -> LocalVar("R0", bv32, 1)),
+            "read",
+            Seq("R0_in" -> BinaryExpr(BVADD, LocalVar("R0_in", bv32, 1), LocalVar("R1_in", bv32, 1)))
+          ),
+          goto("write_return")
+        ),
+        block("write_return", ret("R0_out" -> LocalVar("R0", bv32, 1)))
+      ),
+      proc(
+        "read",
+        Seq("R0_in" -> bv32),
+        Seq("R0_out" -> bv32),
+        block(
+          "read_1",
+          LocalAssign(LocalVar("load2", bv32, 1), LocalVar("R0_in", bv32, 1), SHOULD_REMAIN),
+          LocalAssign(
+            LocalVar("load3", bv32, 1),
+            BinaryExpr(BVADD, LocalVar("load2", bv32, 1), bv32(10)),
+            SHOULD_REMAIN
+          ),
+          goto("read_return")
+        ),
+        block("read_return", ret("R0_out" -> LocalVar("load3", bv32, 1)))
+      )
+    )
+    prepareProgram(program)
+
+    val totalStatements = statements(program).size
+    val toRemain = remainingStatements(program)
+
+    Slicer(program, SlicerConfig("read_return", Set("R0_out"))).run()
+
+    assert(totalStatements > statements(program).size)
+    assert(toRemain.equals(statements(program)))
+  }
 }
 
 /**
