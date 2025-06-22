@@ -18,6 +18,12 @@ trait DownloadModule extends Module {
   def name: String
   def url: String
   def local: Target[Either[String, String]]
+  def unzip: Option[Unzip] = None
+
+  sealed trait Unzip
+  case class TarGZ(extractedName: String) extends Unzip
+  case class Zip(extractedName: String) extends Unzip
+
 
   def mode = "rwxr-xr-x"
 
@@ -31,9 +37,21 @@ trait DownloadModule extends Module {
     p.toString
   }
 
+
   def pathref = Task(PathRef(Path(path())))
   def path = Task {
-    local().getOrElse(remote(Task.dest))
+    local().getOrElse({
+      val l = remote(Task.dest)
+      unzip.map {
+        case TarGZ(extractedName) => 
+          os.call(Seq("tar", "-xzf", l.toString), cwd=Task.dest)
+          PathRef(Task.dest / os.SubPath(extractedName)).path.toString
+        case Zip(extractedName) =>
+          os.call(Seq("unzip", l.toString), cwd=Task.dest)
+          PathRef(Task.dest / os.SubPath(extractedName)).path.toString
+      }.getOrElse(l)
+    })
+    
   }
   // using path() as the originator (instead of pathref())
   // allows us to return values which are not absolute paths

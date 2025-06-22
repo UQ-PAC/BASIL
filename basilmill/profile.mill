@@ -1,0 +1,51 @@
+
+package build.basilmill
+
+import mill._
+
+import os.Path
+import scalalib._
+import scala.util.{Try}
+
+import $file.basilmill.util.DownloadModule
+
+
+trait ProfileRun extends ScalaModule with DownloadModule {
+
+  def url = s"https://github.com/async-profiler/async-profiler/releases/download/v${version}/async-profiler-${version}-$zipSuffix"
+  def name = "libasyncprofiler.so"
+  def version = "4.0"
+  def toUnpack = s"async-profiler-${version}-${folderSuffix}/lib/libasyncProfiler.so"
+
+  def arch = {
+    System.getProperty("os.arch") match {
+      case "amd64" => "x64"
+      case "aarch64" => "arm64"
+      case o => o
+    }
+  }
+
+  def osName = System.getProperty("os.name")
+  def zipSuffix = suffix.mkString(".")
+  def folderSuffix = suffix.head
+
+
+  def local = Task.Input {
+    Try(os.isFile(Task.workspace / toUnpack))
+      .map(Function.const(toUnpack))
+      .toEither
+      .left.map(_.toString)
+  }
+
+  def suffix = {
+    if (osName.contains("nux")) {
+      Seq(s"linux-${arch}", "tar.gz")
+    } else if (osName.contains("Mac")) {
+      Seq("macos", "zip")
+    } else {
+      throw new Exception(s"Profiling is only supported on linux, mac. Not : $osName")
+    }
+  }
+  override def unzip = Some(TarGZ(toUnpack))
+
+}
