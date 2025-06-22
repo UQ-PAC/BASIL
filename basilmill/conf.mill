@@ -1,0 +1,19 @@
+package build.basilmill
+
+import mill._
+import scalalib._
+
+trait Conf extends ScalaModule {
+  /* generate a final val definition to support macro expansion based
+   * on this value 
+   */
+  
+  val debugMode = false
+
+  def generateConf = Task {
+    val text = s"package basil.compileConstants\nfinal val debugMode = $debugMode"
+    val p = Task.dest / "debugMode.scala"
+    os.write(p, text)
+    PathRef (p)
+  }
+}
