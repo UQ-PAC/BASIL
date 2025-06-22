@@ -1,4 +1,4 @@
-package translating
+package gtirb
 
 import gtirb.AuxDecoder
 import gtirb.AuxDecoder.{AuxKind, decodeAux}
