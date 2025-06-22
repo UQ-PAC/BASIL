@@ -313,12 +313,14 @@ object IRTransform {
       ctx.program.determineRelevantMemory(ctx.globalOffsets)
     }
 
-    Logger.info("[!] Stripping unreachable")
-    val before = ctx.program.procedures.size
-    transforms.stripUnreachableFunctions(ctx.program, config.loading.procedureTrimDepth)
-    Logger.info(
-      s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
-    )
+    if (config.slicerConfig.isEmpty) {
+      Logger.info("[!] Stripping unreachable")
+      val before = ctx.program.procedures.size
+      transforms.stripUnreachableFunctions(ctx.program, config.loading.procedureTrimDepth)
+      Logger.info(
+        s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
+      )
+    }
     val dupProcNames = ctx.program.procedures.groupBy(_.name).filter((_, p) => p.size > 1).toList.flatMap(_(1))
     assert(dupProcNames.isEmpty)
 

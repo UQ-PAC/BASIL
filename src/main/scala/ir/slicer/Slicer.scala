@@ -232,13 +232,17 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       var total = 0
       var removed = 0
       for (procedure <- procedures) {
-        for (block <- procedure.blocks) {
-          for (statement <- block.statements) {
-            if (!hasCriterionImpact(statement)) {
-              removed += 1
-              statement.parent.statements.remove(statement)
+        if (!program.mainProcedure.equals(procedure) && !results.contains(procedure)) {
+          program.removeProcedure(procedure)
+        } else {
+          for (block <- procedure.blocks) {
+            for (statement <- block.statements) {
+              if (!hasCriterionImpact(statement)) {
+                removed += 1
+                statement.parent.statements.remove(statement)
+              }
+              total += 1
             }
-            total += 1
           }
         }
       }
