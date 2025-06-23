@@ -24,9 +24,6 @@ import scala.collection.immutable.SortedMap
 
 case class GTIRBResolver(mod: Module) {
 
-  private def b64(bs: ByteString) =
-    java.util.Base64.getEncoder().encodeToString(bs.toByteArray)
-
   sealed trait Uuid(val kind: String, val uuid: String) {
     override def toString = s"$kind:$uuid"
     override def equals(o: Any) = o match {
@@ -35,10 +32,17 @@ case class GTIRBResolver(mod: Module) {
     }
     override def hashCode = (kind, uuid).hashCode
   }
+
   object Uuid {
-    class Block(xs: ByteString) extends Uuid("blok", b64(xs))
-    class Function(xs: ByteString) extends Uuid("func", b64(xs))
-    class Symbol(xs: ByteString) extends Uuid("symb", b64(xs))
+
+    private def b64(bs: String | ByteString) = bs match {
+      case s: String => s
+      case bs: ByteString => java.util.Base64.getEncoder().encodeToString(bs.toByteArray)
+    }
+
+    class Block(xs: String | ByteString) extends Uuid("blok", b64(xs))
+    class Function(xs: String | ByteString) extends Uuid("func", b64(xs))
+    class Symbol(xs: String | ByteString) extends Uuid("symb", b64(xs))
   }
 
   case class BlockData(inner: DataBlock | CodeBlock, block: Block, interval: ByteInterval, section: Section) {
