@@ -182,10 +182,10 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
    * For example, this throws away symbols of type SECTION and symbols beginning with `$`.
    * It also strips the `@GLIBC_XX.X` suffix from symbol names.
    */
-  private def normaliseRelf(relf: ReadELFData) = {
+  def normaliseRelf(relf: ReadELFData) = {
     val exts = relf.externalFunctions.map(x => x.copy(name = atSuffix.replaceFirstIn(x.name, "")))
     val syms = relf.symbolTable.flatMap {
-      case ELFSymbol(_,0,0,ELFSymType.FILE,ELFBind.LOCAL,ELFVis.DEFAULT,ELFNDX.ABS,"crtstuff.c") => None
+      case ELFSymbol(_, 0, 0, ELFSymType.FILE, ELFBind.LOCAL, ELFVis.DEFAULT, ELFNDX.ABS, "crtstuff.c") => None
       case sym if sym.etype != ELFSymType.SECTION && sym.num != -1 && !sym.name.startsWith("$") =>
         Some(sym.copy(name = atSuffix.replaceFirstIn(sym.name, "")))
       case _ => None

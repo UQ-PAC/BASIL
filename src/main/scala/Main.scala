@@ -342,7 +342,6 @@ object Main {
         if (relfOut.trim.isEmpty)
           return
 
-
         import ir.dsl.given
         writeToFile(relf.toScala, relfOut + "-readelf.scala")
         gtirb.foreach(x => writeToFile(x.toScala, relfOut + "-gtsrelf.scala"))
