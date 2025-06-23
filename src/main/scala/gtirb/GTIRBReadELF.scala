@@ -91,15 +91,14 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     gtirb.symbolEntriesByUuid
       .flatMap { case (k, pos) =>
         val sym = k.get
-        val block = k.getReferentUuid.flatMap(_.getOption)
 
         val idx = k.symTabIdx.collectFirst { case (".symtab", i) =>
           i.toInt
         }
 
-        val addr = block.map(x => BigInt(x.address))
-        val value = k.getScalarValue.map(BigInt(_))
-        val combinedValue = addr.orElse(value).getOrElse(BigInt(0))
+        val addr = k.getReferentAddress
+        val value = k.getScalarValue
+        val combinedValue = addr.orElse(value).getOrElse(0L)
 
         val (size, ty, bind, vis, shndx) = k.symEntry
 
@@ -173,12 +172,23 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
     ReadELFData(syms, exts, globs, funs, offs, main)
   }
+
   private val atSuffix = """@[A-Za-z_\d.]+$""".r
+
+  /**
+   * Strips away some information from `readelf`'s [[ReadELFData]]
+   * which is not so important and not produced by the GTIRB ELF loader.
+   *
+   * For example, this throws away symbols of type SECTION and symbols beginning with `$`.
+   * It also strips the `@GLIBC_XX.X` suffix from symbol names.
+   */
   private def normaliseRelf(relf: ReadELFData) = {
     val exts = relf.externalFunctions.map(x => x.copy(name = atSuffix.replaceFirstIn(x.name, "")))
-    val syms = relf.symbolTable.collect {
-      case sym if sym.etype != ELFSymType.SECTION && sym.num != -1 =>
-        sym.copy(name = atSuffix.replaceFirstIn(sym.name, ""))
+    val syms = relf.symbolTable.flatMap {
+      case ELFSymbol(_,0,0,ELFSymType.FILE,ELFBind.LOCAL,ELFVis.DEFAULT,ELFNDX.ABS,"crtstuff.c") => None
+      case sym if sym.etype != ELFSymType.SECTION && sym.num != -1 && !sym.name.startsWith("$") =>
+        Some(sym.copy(name = atSuffix.replaceFirstIn(sym.name, "")))
+      case _ => None
     }
 
     relf.copy(externalFunctions = exts, symbolTable = syms)
@@ -192,17 +202,17 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
   def checkReadELFCompatibility(gtirbRelf: ReadELFData, referenceRelf: ReadELFData): Boolean = {
     var ok = true
 
-    def check(b: Boolean, s: String) = {
+    inline def check(b: Boolean, s: String) = {
       if (!b) {
         Logger.warn("PLEASE REPORT THIS ISSUE! include the gts and relf files. gtirb relf discrepancy, " + s)
         ok = false
       }
     }
 
-    def checkSet[T](x: Set[T], y: Set[T], s: String) =
-      check(x == y, s"$s:\ngtirb - relf = ${x -- y}\nrelf - gtirb = ${y -- x}\n& = ${y & x}")
+    inline def checkSet[T](x: Set[T], y: Set[T], s: String) =
+      check(x == y, s"$s:\ngtirb - relf = ${x -- y}\nrelf - gtirb = ${y -- x}")
 
-    def checkEq(x: Any, y: Any, s: String) =
+    inline def checkEq(x: Any, y: Any, s: String) =
       check(x == y, s"$s: gtirb: $x, readelf: $y}")
 
     val g = normaliseRelf(gtirbRelf)
@@ -214,6 +224,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     checkSet(g.externalFunctions, o.externalFunctions, "external functions differ")
     checkSet(g.symbolTable.toSet, o.symbolTable.toSet, "symbol tables differ")
 
+    Logger.debug("gtirb relf and readelf relf compatible: " + ok)
     ok
   }
 

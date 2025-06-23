@@ -109,6 +109,16 @@ case class GTIRBResolver(val mod: Module) {
     } yield Uuid.Block(uuid)
 
     /**
+     * Gets the address referred to by this symbol, if the referent is a
+     * block. Correctly takes into account the `atEnd` field of [[Symbol]].
+     */
+    def getReferentAddress = for {
+      uuid <- x.getReferentUuid
+      block <- uuid.getOption
+      atEndOffset = if x.get.atEnd then block.size else 0
+    } yield block.address + atEndOffset
+
+    /**
      * Gets the scalar value associated with this symbol.
      * This is mutually-exclusive with [[getReferentUuid]],
      * only one of these can be non-None.

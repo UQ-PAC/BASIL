@@ -335,9 +335,13 @@ object Main {
         val relfFile = loadingInputs.relfFile.getOrElse {
           throw IllegalArgumentException("--dump-relf requires --relf")
         }
+        Logger.setLevel(LogLevel.DEBUG)
         val (relf, gtirb) = IRLoading.loadReadELFWithGTIRB(relfFile, loadingInputs)
 
-        Logger.setLevel(LogLevel.DEBUG)
+        // skip writing files if the given path is an empty string
+        if (relfOut.trim.isEmpty)
+          return
+
 
         import ir.dsl.given
         writeToFile(relf.toScala, relfOut + "-readelf.scala")
