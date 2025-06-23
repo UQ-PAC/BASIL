@@ -143,8 +143,8 @@ object Main {
     interpret: Flag,
     @arg(name = "dump-il", doc = "Dump the Intermediate Language to text.")
     dumpIL: Option[String],
-    @arg(name = "dump-relf", doc = "Dump Basil's representation of the readelf information to stdout and exit.")
-    dumpRelf: Flag,
+    @arg(name = "dump-relf", doc = "Dump Basil's representation of the readelf information to the given file and exit.")
+    dumpRelf: Option[String],
     @arg(name = "main-procedure-name", short = 'm', doc = "Name of the main procedure to begin analysis at.")
     mainProcedureName: String = "main",
     @arg(
@@ -329,15 +329,20 @@ object Main {
       )
     }
 
-      import gtirb.*
-      import ir.dsl.given
-    if (conf.dumpRelf.value) {
-      val relfFile = loadingInputs.relfFile.getOrElse {
-        throw IllegalArgumentException("--dump-relf requires --relf")
-      }
-      val relfData = IRLoading.loadReadELF(relfFile, loadingInputs)
-      println(relfData.toScala)
-      return
+    conf.dumpRelf match {
+      case None => ()
+      case Some(relfOut) =>
+        val relfFile = loadingInputs.relfFile.getOrElse {
+          throw IllegalArgumentException("--dump-relf requires --relf")
+        }
+        val (relf, gtirb) = IRLoading.loadReadELFWithGTIRB(relfFile, loadingInputs)
+
+        Logger.setLevel(LogLevel.DEBUG)
+
+        import ir.dsl.given
+        writeToFile(relf.toScala, relfOut + "-readelf.scala")
+        gtirb.foreach(x => writeToFile(x.toScala, relfOut + "-gtsrelf.scala"))
+        return
     }
 
     if (loadingInputs.specFile.isDefined && loadingInputs.relfFile.isEmpty) {

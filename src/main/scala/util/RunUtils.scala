@@ -205,7 +205,7 @@ object IRLoading {
     GTIRBConverter.createIR()
   }
 
-  def loadReadELF(fileName: String, config: ILLoadingConfig): ReadELFData = {
+  def loadReadELFWithGTIRB(fileName: String, config: ILLoadingConfig): (ReadELFData, Option[ReadELFData]) = {
     val lexer = ReadELFLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(lexer)
     val parser = ReadELFParser(tokens)
@@ -214,7 +214,7 @@ object IRLoading {
 
     val relf = ReadELFLoader.visitSyms(parser.syms(), config)
 
-    if (config.inputFile.endsWith(".gts")) {
+    val gtirbRelf = if (config.inputFile.endsWith(".gts")) {
       val ir = IR.parseFrom(FileInputStream(config.inputFile))
       if (ir.modules.length != 1) {
         Logger.warn(s"GTIRB file ${config.inputFile} unexpectedly has ${ir.modules.length} modules")
@@ -225,10 +225,17 @@ object IRLoading {
       val gtirbRelf = gtirbRelfLoader.getReadELFData(config.mainProcedureName)
 
       gtirbRelfLoader.checkReadELFCompatibility(gtirbRelf, relf)
+      Some(gtirbRelf)
+    } else {
+      None
     }
 
-    relf
+    (relf, gtirbRelf)
   }
+
+
+  def loadReadELF(fileName: String, config: ILLoadingConfig) =
+    loadReadELFWithGTIRB(fileName, config)._1
 
   def emptySpecification(globals: Set[SpecGlobal]) =
     Specification(Set(), globals, Map(), List(), List(), List(), Set())
