@@ -63,29 +63,26 @@ object GTIRBReadELF {
 
     import scala.math.Ordering.Implicits.seqOrdering
     val allSymbols = gtirb.symbolKindsByUuid
-      .map {
-        case (k, pos) =>
-          val sym = k.get
-          println(k)
-          val addr = k.getReferentBlock.map(_.address)
-          val value = k.getScalarValue.fold("")("val=" + _.toString)
-          (k.symTabIdx, addr, pos) -> s"${sym.name} $value"
+      .map { case (k, pos) =>
+        val sym = k.get
+        println(k)
+        val addr = k.getReferentBlock.map(_.address)
+        val value = k.getScalarValue.fold("")("val=" + _.toString)
+        (k.symTabIdx, addr, pos) -> s"${sym.name} $value"
       }
       .to(SortedMap)
     println(allSymbols.mkString("\n"))
 
     println()
     println(".rela.dyn")
-    relaDyns.foreach {
-      case x =>
-        val symid = gtirb.symbolTables(".dynsym")(x.r_sym.toInt)
-        println(s"$x " + symid.get.name)
+    relaDyns.foreach { case x =>
+      val symid = gtirb.symbolTables(".dynsym")(x.r_sym.toInt)
+      println(s"$x " + symid.get.name)
     }
     println(".rela.plt")
-    relaPlts.foreach {
-      case x =>
-        val symid = gtirb.symbolTables(".dynsym")(x.r_sym.toInt)
-        println(s"$x " + symid.get.name)
+    relaPlts.foreach { case x =>
+      val symid = gtirb.symbolTables(".dynsym")(x.r_sym.toInt)
+      println(s"$x " + symid.get.name)
     }
 
     val specGlobals = gtirb.symbolKindsByUuid.toList.collect {
