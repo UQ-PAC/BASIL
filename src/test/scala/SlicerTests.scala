@@ -2,7 +2,7 @@ import ir.*
 import ir.dsl.*
 import ir.transforms.Slicer
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.{BASILTest, getSubdirectories}
+import test_util.BASILTest
 import util.*
 
 /**
@@ -778,7 +778,7 @@ class SlicerSystemTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest 
   }
 
   def runTests(name: String): Unit = {
-    getSubdirectories(s"$correctPath/$name").foreach { v => testSlicerVerification(name, v) }
+    BASILTest.getSubdirectories(s"$correctPath/$name").foreach { v => testSlicerVerification(name, v) }
   }
 
   test("arrays_simple") {
