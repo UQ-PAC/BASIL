@@ -18,9 +18,18 @@ import util.{LogLevel, PerformanceTimer, SlicerConfig, SlicerLogger}
 
 import scala.collection.mutable
 
+/**
+ * 2 phase IR program slicer. Destructively removes statement from program.
+ * Phase 1 - Criterion Generation
+ * Phase 2 - IR Reduction
+ *
+ * @param program IR program to slice.
+ * @param slicerConfig Slicing config to slice wrt.
+ */
 class Slicer(program: Program, slicerConfig: SlicerConfig) {
   protected val performanceTimer: PerformanceTimer = PerformanceTimer("Slicer Timer", LogLevel.INFO)
 
+  /* Parses slicer config into a valid starting criterion and node */
   lazy protected val parsedConfig: Option[(Block, Set[Variable])] = {
     def variables(n: Command): Set[Variable] = {
       n match {
@@ -87,6 +96,7 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
     }
   }
 
+  /* Initial slicing criterion to be transformed by analysis */
   lazy protected val initialCriterion: Map[CFGPosition, Set[Variable]] = {
     parsedConfig match {
       case Some(targetedBlock, variables) => Map(targetedBlock.jump -> variables)
@@ -94,6 +104,7 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
     }
   }
 
+  /* Node to begin analysis from */
   lazy protected val startingNode: CFGPosition = {
     parsedConfig match {
       case Some(targetedBlock, _) => targetedBlock.jump
@@ -101,6 +112,12 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
     }
   }
 
+  /**
+   * Criterion generation phase of slice.
+   *
+   * Transforms initial slicing criterion using IDE Solver transfers.
+   * Each program statement transforms the criterion to build final result.
+   */
   class Phase1 {
     protected var nop: Option[NOP] = None
 
@@ -120,6 +137,11 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       case _ => ()
     }
 
+    /**
+     * Runs phase 1 to generate criterion.
+     *
+     * @return A mapping of CFGPositions to the slicing criterion for said position.
+     */
     def run(): Map[CFGPosition, Set[Variable]] = {
       SlicerLogger.info("Slicer :: Slicing Criterion Generation - Phase1")
       insertNOP()
@@ -133,19 +155,27 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
     }
   }
 
+  /**
+   * IR reduction phase. Strips away IR components that are outside the criterion domain.
+   *
+   * @param results Phase 1 results of CFGPositions to their slicing criterion.
+   */
   class Phase2(results: Map[CFGPosition, Set[Variable]]) {
     val transferFunctions: SlicerTransfers = SlicerTransfers(initialCriterion)
 
+    // Cache of procedure global/memory modifications
     private val procedureModifies = mutable.Map[Procedure, Set[Variable]]()
     private val procedureMemoryIndexes = mutable.Map[Procedure, Set[Variable]]()
 
     private def procedures = program.procedures.filterNot(_.isExternal.contains(true))
 
+    /* Generates transferred criterion for a given position -- transforms initial criterion based on statement. */
     protected def transfer(n: CFGPosition): Map[Variable, EdgeFunction[TwoElement]] = {
       val func = transferFunctions.edgesOther(n)
       (criterion(n).flatMap(v => func(Left(v))).toMap ++ func(Right(Lambda()))).collect { case (Left(k), v) => k -> v }
     }
 
+    /* Slicing criterion for a given position */
     protected def criterion(n: CFGPosition): Set[Variable] = {
       (n match {
         case c: DirectCall => transfer(c.successor).keys.toSet
@@ -153,12 +183,16 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       }) ++ initialCriterion.getOrElse(n, Set())
     }
 
+    /* Determines if a given program statement has an impact on the criterion */
     protected def hasCriterionImpact(n: Statement): Boolean = {
       val crit = criterion(n)
       n match {
         case c: DirectCall =>
+          // Iff all out parameters impact criterion.
           c.outParams.values.toSet.exists(crit.contains)
+          // Iff the criterion was directly modified by call.
           || !crit.equals(results.getOrElse(c, Set()))
+          // Iff call modifies global variables in criterion.
           || procedureModifies
             .getOrElseUpdate(
               c.target,
@@ -167,17 +201,13 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
                 .toSet
             )
             .exists(crit.contains)
+          // Iff call stores to memory index in criterion.
           || procedureMemoryIndexes
             .getOrElseUpdate(
               c.target,
               c.target.blocks
                 .flatMap(
-                  _.statements
-                    .collect {
-                      case a: MemoryLoad => transferFunctions.convertMemoryIndex(a.index)
-                      case m: MemoryStore => transferFunctions.convertMemoryIndex(m.index)
-                    }
-                    .flatten
+                  _.statements.collect { case m: MemoryStore => transferFunctions.convertMemoryIndex(m.index) }.flatten
                 )
                 .toSet
             )
@@ -192,7 +222,9 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
     }
 
     /**
-     * [[ir.transforms.removeDeadInParams]]
+     * Removes procedure in parameters whose value does not modify impact the criterion for all call contexts.
+     *
+     * Based on: [[ir.transforms.removeDeadInParams]]
      */
     def reduceInParams(): Unit = {
       var modified = false
@@ -212,6 +244,7 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       if (modified) assert(invariant.correctCalls(program))
     }
 
+    /* Removes procedure out parameters whose value does not modify impact the criterion for all call contexts. */
     def reduceOutParams(): Unit = {
       var modified = false
 
@@ -237,6 +270,7 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       if (modified) assert(invariant.correctCalls(program))
     }
 
+    /* Runs phase 2 reduction */
     def run(): Unit = {
       SlicerLogger.info("Slicer :: Reductive Slicing Pass - Phase2")
 
@@ -245,11 +279,13 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       var removed = 0
       for (procedure <- procedures) {
         if (!program.mainProcedure.equals(procedure) && !results.contains(procedure)) {
+          // Procedure was not analysed therefore can be removed.
           program.removeProcedure(procedure)
         } else {
           for (block <- procedure.blocks) {
             for (statement <- block.statements) {
               if (!hasCriterionImpact(statement)) {
+                // If statement has no impact on the criterion it can be safely removed.
                 removed += 1
                 statement.parent.statements.remove(statement)
               }
@@ -261,14 +297,17 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
       performanceTimer.checkPoint("Finished Statement Removal")
       SlicerLogger.info(s"Slicer - Removed $removed statements (${total - removed} remaining)")
 
+      // Remove unused in and out parameters.
       SlicerLogger.debug("Slicer - Remove Dead Parameters")
       assert(invariant.correctCalls(program))
       reduceInParams()
       reduceOutParams()
 
+      // Reduce and cleanup empty blocks.
       SlicerLogger.debug("Slicer - Cleanup Blocks")
       cleanupBlocks(program)
 
+      // Ensure new IR structural correctness.
       SlicerLogger.debug("Slicer - Invariant Checking")
       assert(invariant.singleCallBlockEnd(program))
       assert(invariant.cfgCorrect(program))
@@ -279,6 +318,7 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
     }
   }
 
+  /* Run program slicer to reduce program into slice */
   def run(): Unit = {
     SlicerLogger.info("Slicer :: Slicer Start")
     if (parsedConfig.isDefined) {
@@ -298,6 +338,9 @@ class Slicer(program: Program, slicerConfig: SlicerConfig) {
   }
 }
 
+/**
+ * IDE transfer functions outlining criterion modification across IDE edges.
+ */
 trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, Set[Variable]])
     extends BackwardIDETransferFunctions[Variable, TwoElement, TwoElementLattice] {
 
@@ -309,6 +352,11 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, Set[Variable]])
     variables.map(v => Left(v) -> ConstEdge(TwoElementTop)).toMap
   }
 
+  /**
+   * Flow from procedure call point to return of called procedure.
+   * Converts criterion element from actual out -> formal out parameter.
+   * Prevents local variables but allows global flow.
+   */
   def edgesCallToEntry(call: Command, entry: Return)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     d match {
       case Left(value) => {
@@ -335,6 +383,11 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, Set[Variable]])
     }
   }
 
+  /**
+   * Flow from top of procedure back to after call point.
+   * Converts criterion element from formal in -> actual in parameter.
+   * Prevents local variable flow but allows global flow.
+   */
   def edgesExitToAfterCall(exit: Procedure, aftercall: DirectCall)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     d match {
       case Left(value: LocalVar) if aftercall.actualParams.contains(value) =>
@@ -344,6 +397,10 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, Set[Variable]])
     }
   }
 
+  /**
+   * Flow across call point without entering called procedure.
+   * Directly passes all local variables not in out parameters across.
+   */
   def edgesCallToAfterCall(call: Command, aftercall: DirectCall)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     d match {
       case Left(value: LocalVar) if aftercall.outParams.values.toSet.contains(value) => Map()
@@ -353,6 +410,9 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, Set[Variable]])
     }
   }
 
+  /**
+   * Intraprocedural criterion transforms. Adds initial slicing criterion when first visiting position if required.
+   */
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     val transferEdge = intraTransferFunctions(n)
     d match {
@@ -361,7 +421,7 @@ trait SlicerTransferFunctions(slicingCriterion: Map[CFGPosition, Set[Variable]])
     }
   }
 
-  def intraTransferFunctions(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
+  protected def intraTransferFunctions(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     n match {
       case p: Procedure => Map(d -> IdEdge())
       case b: Block => Map(d -> IdEdge())
