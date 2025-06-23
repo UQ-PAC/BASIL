@@ -1,12 +1,13 @@
 package ir
 
+import util.functional.Snoc
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
 import boogie.*
 import analysis.{MergedRegion, Loop}
 import util.intrusive_list.*
-import translating.serialiseIL
 import eval.BitVectorEval
+import translating.PrettyPrinter.*
 
 /** Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are not
   * guaranteed to be in any defined order.
@@ -58,14 +59,32 @@ private class ILLexicalIterator(private val begin: Iterable[CFGPosition]) extend
   }
 }
 
+case class Metadata(originalLabel: Option[String] = None, address: Option[BigInt] = None)
+
 class Program(
   var procedures: ArrayBuffer[Procedure],
   var mainProcedure: Procedure,
   val initialMemory: mutable.TreeMap[BigInt, MemorySection]
-) extends Iterable[CFGPosition] {
+) extends Iterable[CFGPosition]
+    with DeepEquality {
 
   val threads: ArrayBuffer[ProgramThread] = ArrayBuffer()
   val usedMemory: mutable.Map[BigInt, MemorySection] = mutable.TreeMap()
+
+  override def deepEquals(o: Object): Boolean = o match {
+    case p: Program => deepEqualsProg(p)
+    case _ => false
+  }
+  private def deepEqualsProg(p: Program): Boolean = {
+    def toMap(p: Program) = {
+      p.procedures.view.map(p => p.name -> p).toMap
+    }
+    val t = toMap(this)
+    val o = toMap(p)
+    (mainProcedure.name == p.mainProcedure.name) && (t.keys == o.keys) && t.keys.forall { case k =>
+      t(k).deepEquals(o(k))
+    }
+  }
 
   def removeProcedure(i: Int): Unit = {
     val p = procedures(i)
@@ -118,7 +137,7 @@ class Program(
   }
 
   override def toString(): String = {
-    serialiseIL(this)
+    translating.PrettyPrinter.pp_prog(this)
   }
 
   def setModifies(specModifies: Map[String, List[String]]): Unit = {
@@ -227,6 +246,12 @@ class Program(
   def labelToBlock: Map[String, Block] = {
     procedures.view.flatMap(_.blocks.map((b: Block) => b.label -> b)).toMap
   }
+
+  def loadedLabelToBlock: Map[String, Block] = {
+    val x = procedures.view.flatMap(_.loadedLabelToBlock).toMap
+    x
+    // blocks.filter(_.meta.originalLabel.isDefined).map(p => p.meta.originalLabel.get -> p).toMap
+  }
 }
 
 // if creationSite == None then it is the initial thread
@@ -250,7 +275,7 @@ class Procedure private (
   var address: Option[BigInt],
   private var _entryBlock: Option[Block],
   private var _returnBlock: Option[Block],
-  private val _blocks: mutable.LinkedHashSet[Block],
+  private val _blocks: mutable.ArrayBuffer[Block],
   var formalInParam: mutable.SortedSet[LocalVar],
   var formalOutParam: mutable.SortedSet[LocalVar],
   var inParamDefaultBinding: immutable.SortedMap[LocalVar, Expr],
@@ -259,7 +284,8 @@ class Procedure private (
   var ensures: List[BExpr],
   var requiresExpr: List[Expr],
   var ensuresExpr: List[Expr]
-) extends Iterable[CFGPosition] {
+) extends Iterable[CFGPosition]
+    with DeepEquality {
 
   def name = procName + address.map("_" + _).getOrElse("")
 
@@ -287,7 +313,7 @@ class Procedure private (
       address,
       entryBlock,
       returnBlock,
-      mutable.LinkedHashSet.from(blocks),
+      mutable.ArrayBuffer.from(blocks),
       mutable.SortedSet.from(formalInParam),
       mutable.SortedSet.from(formalOutParam),
       immutable.SortedMap.from(inParamDefaultBinding),
@@ -299,22 +325,66 @@ class Procedure private (
     )
   }
 
+  // None is scc only containing this procedure
+  // Some(Set(this)) is a scc only containing this procedure which has call edge to itself (self recursion)
+  var scc: Option[Set[Procedure]] = None
+
+  override def deepEquals(o: Object): Boolean = o match {
+    case p: Procedure => deepEqualsProc(p)
+    case _ => false
+  }
+  private def deepEqualsProc(p: Procedure) = {
+    name == p.name && (p.blocks.size == blocks.size) && {
+      p.blocksBookended.zip(blocksBookended).forall { case ((l: Block), (r: Block)) =>
+        l.deepEqualsDbg(r)
+      }
+    }
+  }
+
+  var blockCounter = 0
+
+  def freshBlockId(prefix: String) = {
+    blockCounter += 1
+    prefix + "_" + blockCounter
+  }
+
+  def updateBlockSuffix() = {
+    blocks.foreach(_.label.split("_").toList match {
+      case Snoc(r, ind) =>
+        try
+          val n = ind.toInt
+          blockCounter = Integer.max(blockCounter, n + 1)
+        catch
+          _ => ()
+      case _ => ()
+    })
+  }
+
   def normaliseBlockNames() = {
     var counter = 0
     var loopCounter = 0
-    ir.transforms.reversePostOrder(this)
-    val bl = Array.from(blocks).sortInPlaceBy(_.rpoOrder)
-    for (b <- bl) {
+    sort()
+    val prefix = procName
+    for (b <- _blocks) {
       counter += 1
-      val loop = if b.isLoopHeader() then {
-        loopCounter += 1
-        "_loop_header_" + loopCounter
-      } else ""
+      val label = b match {
+        case b if b.isEntry => prefix + "_entry"
+        case b if b.isReturn => prefix + "_return"
+        case b => {
+          counter += 1
+          if (b.isLoopHeader()) {
+            loopCounter += 1
+          }
+          val loop = if (b.isLoopParticipant()) {
+            s"_loop${loopCounter}"
+          } else ""
+          s"${prefix}${loop}_$counter"
+        }
+      }
 
-      b.label = name + "_" + counter
+      b.label = label
 
     }
-
   }
 
   def makeCall(label: Option[String] = None) = DirectCall(this, label, outParamDefaultBinding, inParamDefaultBinding)
@@ -334,9 +404,7 @@ class Procedure private (
     ILForwardIterator(Seq(this), IntraProcIRCursor)
   }
 
-  override def toString: String = {
-    s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${formalInParam.size} in and ${formalOutParam.size} out parameters"
-  }
+  override def toString: String = Sigil.BASIR.proc + name
 
   def calls: Set[Procedure] = blocks.iterator.flatMap(_.calls).toSet
 
@@ -344,6 +412,8 @@ class Procedure private (
     * entry block and return block are elements of _blocks.
     */
   def blocks: Iterator[Block] = _blocks.iterator
+  def blocksBookended: Iterable[Block] =
+    entryBlock.toSeq ++ _blocks.filterNot(entryBlock.contains).filterNot(returnBlock.contains) ++ returnBlock.toSeq
 
   def addCaller(c: DirectCall): Unit = {
     _callers.add(c)
@@ -373,7 +443,7 @@ class Procedure private (
   def addBlock(block: Block): Block = {
     if (!_blocks.contains(block)) {
       block.parent = this
-      _blocks.add(block)
+      _blocks.append(block)
     }
     block
   }
@@ -423,7 +493,8 @@ class Procedure private (
     require(_blocks.contains(block))
     require(block.incomingJumps.isEmpty) // don't leave jumps dangling
     block.deParent()
-    _blocks.remove(block)
+    val index = _blocks.indexOf(block)
+    _blocks.remove(index)
     if (_entryBlock.contains(block)) {
       _entryBlock = None
     }
@@ -465,6 +536,9 @@ class Procedure private (
   def labelToBlock: Map[String, Block] = {
     blocks.map(p => p.label -> p).toMap
   }
+  def loadedLabelToBlock: Map[String, Block] = {
+    blocks.filter(_.meta.originalLabel.isDefined).map(p => p.meta.originalLabel.get -> p).toMap
+  }
 
   def callers(): Iterable[Procedure] = _callers.map(_.parent.parent).toSet[Procedure]
   def incomingCalls(): Iterator[DirectCall] = _callers.iterator
@@ -489,8 +563,9 @@ class Procedure private (
     reachable.toSet
   }
 
-  /** SSA Form
-    */
+  /**
+   *  SSA Form
+   */
 
   var ssaCount = 0
   def getFreshSSAVar(name: String, ty: IRType) = {
@@ -498,15 +573,28 @@ class Procedure private (
     LocalVar(name, ty, ssaCount)
   }
 
+  def sort() = {
+    ir.transforms.reversePostOrder(this)
+    _blocks.sortInPlaceBy(_.rpoOrder)
+    for (e <- entryBlock) {
+      val i = _blocks.indexOf(e)
+      if (i != 0) {
+        _blocks.remove(i)
+        _blocks.prepend(e)
+      }
+    }
+  }
+
 }
 
 class Block private (
   var label: String,
-  val address: Option[BigInt],
   val statements: IntrusiveList[Statement],
   private var _jump: Jump,
-  private val _incomingJumps: mutable.HashSet[GoTo]
-) extends HasParent[Procedure] {
+  private val _incomingJumps: mutable.HashSet[GoTo],
+  var meta: Metadata
+) extends HasParent[Procedure]
+    with DeepEquality {
   var atomicSection: Option[AtomicSection] = None
   _jump.setParent(this)
   statements.foreach(_.setParent(this))
@@ -520,7 +608,19 @@ class Block private (
     statements: IterableOnce[Statement] = Set.empty,
     jump: Jump = GoTo(Set.empty)
   ) = {
-    this(label, address, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty)
+    this(label, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty, Metadata(None, address))
+  }
+
+  def address = meta.address
+
+  override def deepEquals(b: Object): Boolean = b match {
+    case b: Block => deepEqualsBlock(b)
+    case o => false
+  }
+  private def deepEqualsBlock(b: Block): Boolean = {
+    (label == b.label) && statements.zip(b.statements).forall { case (l, r) =>
+      l.deepEqualsDbg(r)
+    }
   }
 
   def isReturn: Boolean = parent.returnBlock.contains(this)
@@ -573,10 +673,7 @@ class Block private (
     Set.empty
   }
 
-  override def toString: String = {
-    val statementsString = statements.map(_.toString).mkString("\n")
-    s"Block $label with $statementsString\n$jump"
-  }
+  override def toString: String = Sigil.BASIR.block + label
 
   /** @return
     *   The intra-procedural set of successor blocks. If the block ends in a call then the empty set is returned.
@@ -635,17 +732,28 @@ class Block private (
   }
 
   def createBlockAfter(suffix: String): Block = {
-    val nb = Block(label + suffix)
+    val label = parent.freshBlockId(suffix)
+    val nb = Block(label)
+    nb.meta = meta.copy(address = None)
+
     parent.addBlock(nb)
     val ojump = jump
     replaceJump(GoTo(nb))
     nb.replaceJump(ojump)
   }
 
-  def createBlockBetween(b2: Block, label: String = "_goto_"): Block = {
+  def createBlockBetween(b2: Block, suffix: String = "goto"): Block = {
     require(nextBlocks.toSet.contains(b2))
     val b1 = this
-    val nb = Block(b1.label + label + b2.label)
+    val label = parent.freshBlockId(suffix)
+    val origs = (meta.originalLabel.toList ++ b2.meta.originalLabel).flatMap(_.split(",")).toSet.toList.sorted match {
+      case Nil => None
+      case xs => Some(xs.mkString(", "))
+    }
+
+    val nb = Block(label)
+    nb.meta = Metadata(originalLabel = origs)
+
     b1.parent.addBlock(nb)
     b1.jump match {
       case g: GoTo => {
@@ -658,12 +766,12 @@ class Block private (
     nb
   }
 
-  def createBlockOnEdgeWith(b2: Block, label: String = "_goto_"): Block = {
+  def createBlockOnEdgeWith(b2: Block, suffix: String = "_goto"): Block = {
     require((nextBlocks ++ prevBlocks).exists(_ == b2))
     if (nextBlocks.exists(_ == b2)) {
-      createBlockBetween(b2, label)
+      createBlockBetween(b2, suffix)
     } else if (prevBlocks.exists(_ == b2)) {
-      b2.createBlockBetween(this, "_goto_")
+      b2.createBlockBetween(this, suffix)
     } else {
       throw IllegalArgumentException(s"This block does not have edge with ${b2.label}")
     }

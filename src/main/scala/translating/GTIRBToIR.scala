@@ -72,7 +72,8 @@ class GTIRBToIR(
   mods: Seq[Module],
   parserMap: immutable.Map[String, List[InsnSemantics]],
   cfg: CFG,
-  mainAddress: BigInt
+  mainAddress: Option[BigInt],
+  mainName: Option[String]
 ) {
   private val functionNames = MapDecoder.decode_uuid(mods.map(_.auxData("functionNames").data))
   private val functionEntries = MapDecoder.decode_set(mods.map(_.auxData("functionEntries").data))
@@ -158,10 +159,7 @@ class GTIRBToIR(
   private def createArguments(name: String): (mutable.Map[LocalVar, Expr], ArrayBuffer[LocalVar]) = {
 
     val in: mutable.Map[LocalVar, Expr] = if (name == "main") {
-      mutable.Map(
-        LocalVar("main_argc", BitVecType(32)) -> Extract(32, 0, Register("R0", 64)),
-        LocalVar("main_argv", BitVecType(32)) -> Extract(32, 0, Register("R1", 64))
-      )
+      mutable.Map()
     } else {
       mutable.Map()
     }
@@ -243,33 +241,48 @@ class GTIRBToIR(
       initialMemory += (address -> section)
     }
 
-    val intialProc: Procedure = procedures.find(_.address.get == mainAddress).get
+    val intialProc: Procedure =
+      mainAddress
+        .map(ma => procedures.find(_.address.get == ma).get)
+        .orElse(mainName.map(n => procedures.find(_.procName == n)).get)
+        .getOrElse(procedures.head)
 
     Program(procedures, intialProc, initialMemory)
   }
 
+  /** Determines if all paths through the given isnStmts have the same branching behaviour.
+   *  Returns true if all paths branch, or false if all paths do not branch.
+   *  Throws an error if some paths branch but some do not.
+   */
+  private def findUniqueBranchBehaviour(isnStmts: immutable.Seq[Statement]): Boolean =
+    isnStmts.exists {
+      case stmt @ LocalAssign(Register("_PC", 64), _, _) => true
+      case tempif: TempIf =>
+        val thenbranches = findUniqueBranchBehaviour(tempif.thenStmts)
+        val elsebranches = findUniqueBranchBehaviour(tempif.elseStmts)
+        if (thenbranches != elsebranches)
+          throw Exception("conflicting branch behaviours in non-trailing TempIf: " + tempif)
+        thenbranches
+      case _ => false
+    }
+
   private def insertPCIncrement(isnStmts: immutable.Seq[Statement]): immutable.Seq[Statement] = {
     isnStmts match {
       case Snoc(initial, x: TempIf) =>
-        // we only need to recurse on the last statement in each stmt list.
+        // recurse on the last statement in each stmt list.
+        // this allows for differing branch behaviours within trailing TempIf
+        // statements, as happens in conditional jumps for example.
         initial :+ TempIf(x.cond, insertPCIncrement(x.thenStmts), insertPCIncrement(x.elseStmts))
       case _ => {
-        val branchTaken = isnStmts.exists {
-          case LocalAssign(Register("_PC", 64), _, _) => true
-          case _: TempIf => throw Exception("encountered TempIf not at end of statement list: " + isnStmts)
-          case _ => false
-        }
-        val increment =
-          if branchTaken then None
-          else
-            Some(
-              LocalAssign(
-                Register("_PC", 64),
-                BinaryExpr(BVADD, Register("_PC", 64), BitVecLiteral(4, 64)),
-                Some("pc-tracking")
-              )
-            )
-        increment ++: isnStmts
+        val increment = LocalAssign(
+          Register("_PC", 64),
+          BinaryExpr(BVADD, Register("_PC", 64), BitVecLiteral(4, 64)),
+          Some("pc-tracking")
+        )
+
+        val branchTaken = findUniqueBranchBehaviour(isnStmts)
+        val incrementIfNotBranched = if branchTaken then None else Some(increment)
+        incrementIfNotBranched ++: isnStmts
       }
     }
   }
@@ -291,7 +304,7 @@ class GTIRBToIR(
   }
 
   private def byteStringToString(byteString: ByteString): String = {
-    Base64.getUrlEncoder.encodeToString(byteString.toByteArray)
+    Base64.getEncoder.encodeToString(byteString.toByteArray)
   }
 
   private def createProcedure(functionUUID: ByteString, symbolUUID: ByteString): Procedure = {
@@ -340,6 +353,7 @@ class GTIRBToIR(
 
     val blockAddress = blockUUIDToAddress.get(blockUUID)
     val block = Block(blockLabel, blockAddress)
+    block.meta = Metadata(Some(byteStringToString(blockUUID)), blockAddress)
     procedure.addBlock(block)
     if (uuidToBlock.contains(blockUUID)) {
       // TODO this is a case that requires special consideration

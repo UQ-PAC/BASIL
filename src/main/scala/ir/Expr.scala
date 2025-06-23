@@ -2,8 +2,9 @@ package ir
 import boogie._
 import util.CachedHashCode
 import scala.collection.mutable
+import util.functional.Snoc
 
-sealed trait Expr {
+sealed trait Expr extends DefaultDeepEquality {
   def toBoogie: BExpr
   def getType: IRType
 
@@ -12,9 +13,45 @@ sealed trait Expr {
 
   /** all variables that occur in the expression */
   def variables: Set[Variable] = Set()
-  def acceptVisit(visitor: Visitor): Expr = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
+
+  override def toString() = translating.PrettyPrinter.pp_expr(this)
 
   lazy val variablesCached = variables
+}
+
+object Sigil {
+  object Boogie {
+    val block = "b#"
+    val proc = "p$"
+    val localVar = "#"
+    val globalVar = "$"
+
+    def unsigil(s: String): Option[(String, String)] =
+      List(block, proc, localVar, globalVar).view.collectFirst {
+        case sigil if (s.startsWith(sigil)) => (sigil, s.substring(sigil.length))
+      }
+  }
+
+  object BASIR {
+    val block = "%"
+    val proc = "@"
+    val localVar = "#"
+    val globalVar = "$"
+    val attrib = "."
+
+    def unsigil(s: String): Option[(String, String)] =
+      List(block, proc, localVar, globalVar, attrib).view.collectFirst {
+        case sigil if (s.startsWith(sigil)) => (sigil, s.substring(sigil.length))
+      }
+  }
+
+  def unsigilOption(sigil: String)(s: String) = s match {
+    case s if s.startsWith(sigil) => Some(s.substring(sigil.length))
+    case _ => None
+  }
+
+  def unsigil(sigil: String)(s: String) =
+    unsigilOption(sigil)(s).getOrElse(throw new Exception(s"Identifier '$s' was expected to have a '$sigil' sigil"))
 }
 
 def size(e: Expr) = {
@@ -24,9 +61,7 @@ def size(e: Expr) = {
   }
 }
 
-sealed trait Literal extends Expr {
-  override def acceptVisit(visitor: Visitor): Literal = visitor.visitLiteral(this)
-}
+sealed trait Literal extends Expr {}
 
 sealed trait BoolLit extends Literal {
   def value: Boolean
@@ -35,14 +70,12 @@ sealed trait BoolLit extends Literal {
 case object TrueLiteral extends BoolLit {
   override def toBoogie: BoolBLiteral = TrueBLiteral
   override def getType: IRType = BoolType
-  override def toString: String = "true"
   override def value = true
 }
 
 case object FalseLiteral extends BoolLit {
   override def toBoogie: BoolBLiteral = FalseBLiteral
   override def getType: IRType = BoolType
-  override def toString: String = "false"
   override def value = false
 }
 
@@ -51,13 +84,11 @@ case class BitVecLiteral(value: BigInt, size: Int) extends Literal with CachedHa
   require(value <= getType.maxValue, s"bad value: $value for width $size")
   override def toBoogie: BitVecBLiteral = BitVecBLiteral(value, size)
   override def getType: BitVecType = BitVecType(size)
-  override def toString: String = s"${value}bv$size"
 }
 
 case class IntLiteral(value: BigInt) extends Literal with CachedHashCode {
   override def toBoogie: IntBLiteral = IntBLiteral(value)
   override def getType: IRType = IntType
-  override def toString: String = value.toString
 }
 
 /** Extracts a subsequence of bits (end..start) from body.
@@ -75,8 +106,6 @@ case class Extract(end: Int, start: Int, body: Expr) extends Expr with CachedHas
   override def gammas: Set[Variable] = body.gammas
   override def variables: Set[Variable] = body.variables
   override def getType: BitVecType = BitVecType(end - start)
-  override def toString: String = s"$body[$end:$start]"
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitExtract(this)
 }
 
 /** Gives repeats copies of body, concatenated.
@@ -92,8 +121,6 @@ case class Repeat(repeats: Int, body: Expr) extends Expr with CachedHashCode {
     case bv: BitVecType => bv.size
     case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of repeat: " + this)
   }
-  override def toString: String = s"Repeat($repeats, $body)"
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitRepeat(this)
 }
 
 /** Zero-extends by extension extra bits. */
@@ -106,8 +133,6 @@ case class ZeroExtend(extension: Int, body: Expr) extends Expr with CachedHashCo
     case bv: BitVecType => bv.size
     case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of zero extend: " + this)
   }
-  override def toString: String = s"ZeroExtend($extension, $body)"
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitZeroExtend(this)
 }
 
 /** Sign-extends by extension extra bits. */
@@ -120,8 +145,6 @@ case class SignExtend(extension: Int, body: Expr) extends Expr with CachedHashCo
     case bv: BitVecType => bv.size
     case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of sign extend: " + this)
   }
-  override def toString: String = s"SignExtend($extension, $body)"
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitSignExtend(this)
 }
 
 case class UnaryExpr(op: UnOp, arg: Expr) extends Expr with CachedHashCode {
@@ -140,15 +163,6 @@ case class UnaryExpr(op: UnOp, arg: Expr) extends Expr with CachedHashCode {
     case bv: BitVecType => bv.size
     case _ => throw new Exception("type mismatch")
   }
-
-  override def toString: String = op match {
-    case BoolToBV1 => s"booltobv1($arg)"
-    case uOp: BoolUnOp => s"($uOp$arg)"
-    case uOp: BVUnOp => s"bv$uOp$inSize($arg)"
-    case uOp: IntUnOp => s"($uOp$arg)"
-  }
-
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitUnaryExpr(this)
 }
 
 sealed trait UnOp
@@ -223,16 +237,6 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr with Cache
     case bv: BitVecType => bv.size
     case _ => throw new Exception("type mismatch")
   }
-
-  override def toString: String = op match {
-    case bOp: BoolBinOp => s"($arg1 $bOp $arg2)"
-    case BVCONCAT | EQ | NEQ => s"($arg1 $op $arg2)"
-    case bOp: BVBinOp => s"bv$bOp$inSize($arg1, $arg2)"
-    case bOp: IntBinOp => s"($arg1 $bOp $arg2)"
-  }
-
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitBinaryExpr(this)
-
 }
 
 sealed trait BinOp {
@@ -330,9 +334,8 @@ enum Endian {
 case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IRType) extends Expr with CachedHashCode {
   override def getType: IRType = returnType
   override def toBoogie: BFunctionCall = BFunctionCall(name, params.map(_.toBoogie).toList, returnType.toBoogie, true)
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitUninterpretedFunction(this)
   override def variables: Set[Variable] = params.flatMap(_.variables).toSet
-  override def toString = s"$name(${params.mkString(", ")})"
+  def signature: (String, List[IRType], IRType) = (name, params.toList.map(_.getType), returnType)
 }
 
 /** Something that has a global scope from the perspective of the IR and Boogie.
@@ -351,11 +354,6 @@ sealed trait Variable extends Expr {
   override def gammas: Set[Variable] = Set(this)
   override def toBoogie: BVar
   def toGamma: BVar
-
-  override def toString: String = s"Variable($name, $irType)"
-
-  override def acceptVisit(visitor: Visitor): Variable =
-    throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
 object Variable {
@@ -370,8 +368,6 @@ object Variable {
 case class Register(override val name: String, size: Int) extends Variable with Global with CachedHashCode {
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Global)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Global)
-  override def toString: String = s"Register(${name}, $irType)"
-  override def acceptVisit(visitor: Visitor): Variable = visitor.visitRegister(this)
   override val irType: BitVecType = BitVecType(size)
 }
 
@@ -382,13 +378,33 @@ case class LocalVar(varName: String, override val irType: IRType, val index: Int
   override val name = varName + (if (index > 0) then s"_$index" else "")
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
-  override def toString: String = s"LocalVar(${name}, $irType)"
-  override def acceptVisit(visitor: Visitor): Variable = visitor.visitLocalVar(this)
 }
 
 object LocalVar {
   def unapply(l: LocalVar): Some[(String, IRType, Int)] = Some((l.name, l.irType, l.index))
 
+  /**
+   * Construct a LocalVar by infering its index from the provided name corresponding to [[LocalVar.name]].
+   * It matches the value of [[name]] result, dropping an '_0' suffix or otherwise extracting index [[${name}_${index}]].
+   * Use only when the [[index]] field has been lost/mangled with the name, e.g. due to serialisation & parsing.
+   */
+  def ofIndexed(name: String, ty: IRType) =
+    val rname = Sigil.BASIR.unsigil(name) match {
+      case Some((_, name)) => Sigil.BASIR.localVar + name
+      case None => name
+    }
+
+    rname.split("_").toList match {
+      case Snoc(Nil, r) =>
+        LocalVar(rname, ty, 0)
+      case Snoc(_, "0") | Snoc(_, "out") | Snoc(_, "in") =>
+        LocalVar(rname, ty, 0)
+      case Snoc(r, ind) =>
+        try LocalVar(r.mkString("_"), ty, (ind.toInt))
+        catch
+          _ => LocalVar(rname, ty, 0)
+      case _ => LocalVar(rname, ty, 0)
+    }
 }
 
 /** A global memory section (subject to shared-memory concurrent accesses from multiple threads). */
@@ -399,23 +415,16 @@ sealed trait Memory extends Global {
   def toBoogie: BMapVar = BMapVar(name, MapBType(BitVecBType(addressSize), BitVecBType(valueSize)), Scope.Global)
   def toGamma: BMapVar = BMapVar(s"Gamma_$name", MapBType(BitVecBType(addressSize), BoolBType), Scope.Global)
   val getType: IRType = MapType(BitVecType(addressSize), BitVecType(valueSize))
-  override def toString: String = s"Memory($name, $addressSize, $valueSize)"
 
-  def acceptVisit(visitor: Visitor): Memory =
-    throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
 /** A stack area of memory, which is local to a thread. */
 case class StackMemory(override val name: String, override val addressSize: Int, override val valueSize: Int)
-    extends Memory {
-  override def acceptVisit(visitor: Visitor): Memory = visitor.visitStackMemory(this)
-}
+    extends Memory {}
 
 /** A non-stack region of memory, which may be shared between threads. */
 case class SharedMemory(override val name: String, override val addressSize: Int, override val valueSize: Int)
-    extends Memory {
-  override def acceptVisit(visitor: Visitor): Memory = visitor.visitSharedMemory(this)
-}
+    extends Memory {}
 
 enum QuantifierSort:
   case exists
@@ -443,8 +452,6 @@ case class QuantifierExpr(kind: QuantifierSort, body: LambdaExpr) extends Expr {
 }
 
 case class OldExpr(body: Expr) extends Expr {
-  override def acceptVisit(visitor: Visitor): Expr = body.acceptVisit(visitor)
-  override def toString = s"old($body)"
   def getType = body.getType
   def toBoogie = Old(body.toBoogie)
 }

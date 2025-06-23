@@ -1,9 +1,27 @@
-# Usage of the BASIL tool
+# Usage
 
 This document covers using the BASIL pipeline to lift and verify binaries,
 from the perspective of a user of the tool.
 It may also be useful for BASIL developers as a reference for how to lift
 new binaries for manual testing.
+
+## Running Basil
+
+Basil needs a JVM(>17), recommended JDK-21, which can be installed using system packages.
+
+- e.g. `sudo apt-get install openjdk-21-jdk`
+
+On first run `./mill` (on linux/windows) or `./mill.bat` (on Windows) should bootstrap Scala automatically. Otherwise it can be set up through [coursier](https://get-coursier.io/docs/cli-installation).
+
+### Test Dependencies
+
+Both unit tests and system tests will require a working installation of the Boogie verifier backend and Z3 SMT solver.
+
+These can be installed through [nix](https://github.com/katrinafyi/pac-nix?tab=readme-ov-file#first-time) (recommended):
+
+- `nix profile install nixpkgs#z3 nixpkgs#boogie`
+
+Alternatively, Z3 is usually available in system packages. For manual Boogie install instructions see subheading [Verifying the Boogie file](#verifying-the-boogie-file).
 
 ## Lifting a single binary
 
@@ -54,8 +72,7 @@ ddisasm may also be installed through its provided Docker images or
 APT repository (as of Aug 2024, only supports Ubuntu 20.04).
 You can also, of course, build any of these tools manually.
 
-See also: [tool-installation](development/tool-installation.md)
-and [development: building](development/readme.md#building)
+See also: [development: building](development/readme.md#building)
 (primarily if you are interested in building BASIL manually).
 
 ### Preparation
@@ -141,7 +158,6 @@ basil --input a.gts --relf a.relf -o out.bpl
 (If using BASIL compiled from source, substitute `./mill run` in place of `basil`.
 Optionally add a specification file with `--spec`.)
 
-
 ### Verifying the Boogie file
 
 Boogie requires .NET 6 (best installed through through your system packages).
@@ -150,7 +166,6 @@ Once .NET is available, Boogie can be installed with:
 dotnet tool install --global Boogie
 ```
 You may need to add ~/.dotnet/tools to your PATH.
-See also: [tool-installation](development/tool-installation.md).
 
 Boogie can be run on the output .bpl file with the command
 ```bash

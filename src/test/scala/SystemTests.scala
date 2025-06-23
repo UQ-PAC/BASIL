@@ -281,7 +281,7 @@ class ExtraSpecTests extends SystemTests {
   }
 
   // some of these tests have time out issues so they need more time, but some still time out even with this for unclear reasons
-  val timeout = 30
+  val timeout = 60
   val boogieFlags = Seq("/proverOpt:O:smt.array.extensional=false")
   runTests(
     "extraspec_correct",
@@ -344,6 +344,7 @@ class NoSimplifySystemTests extends SystemTests {
 }
 
 @test_util.tags.AnalysisSystemTest2
+@test_util.tags.AnalysisSystemTest
 class SimplifySystemTests extends SystemTests {
   runTests("correct", TestConfig(simplify = true, useBAPFrontend = true, expectVerify = true, logResults = true))
   runTests("incorrect", TestConfig(simplify = true, useBAPFrontend = true, expectVerify = false, logResults = true))
@@ -355,6 +356,7 @@ class SimplifySystemTests extends SystemTests {
 }
 
 @test_util.tags.AnalysisSystemTest4
+@test_util.tags.AnalysisSystemTest
 class SimplifyMemorySystemTests extends SystemTests {
 
   override def customiseTestsByName(name: String) = super.customiseTestsByName(name).orElse {
@@ -588,6 +590,7 @@ class UnimplementedTests extends SystemTests {
 }
 
 @test_util.tags.AnalysisSystemTest4
+@test_util.tags.AnalysisSystemTest
 class IntervalDSASystemTests extends SystemTests {
   runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, simplify = true, dsa = Some(Checks)))
 

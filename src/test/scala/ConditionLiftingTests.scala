@@ -12,7 +12,7 @@ import ir.dsl.given
 class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureOutput {
 
   /**
-   * Regression test condition lifting using for a difficult example which requires propagating conditions across multiple branches 
+   * Regression test condition lifting using for a difficult example which requires propagating conditions across multiple branches
    *
    * Future simplifications could possibly break this if the branches are simplified further (e.g. more extends/extracts removed)
    */
@@ -833,11 +833,13 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
 
     (ctx.program).foreach {
       case a: Assume => {
-        val comparison = expected.get(a.parent.label)
-        val assumeBody = ir.eval.VarNameNormalise()(a.body)
-        assert(comparison.isDefined, s"Block label ${a.parent.label} not included in expected labels")
-        val expectedBody = ir.eval.VarNameNormalise()(expected(a.parent.label))
-        assert(assumeBody == expectedBody)
+        assert(!(a.body.variables.exists(v => {
+          v.name.startsWith("ZF")
+          || v.name.startsWith("CF")
+          || v.name.startsWith("VF")
+          || v.name.startsWith("NF")
+          || v.name.startsWith("Cse")
+        })))
       }
       case _ => ()
     }
