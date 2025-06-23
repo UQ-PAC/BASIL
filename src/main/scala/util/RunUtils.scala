@@ -233,7 +233,6 @@ object IRLoading {
     (relf, gtirbRelf)
   }
 
-
   def loadReadELF(fileName: String, config: ILLoadingConfig) =
     loadReadELFWithGTIRB(fileName, config)._1
 

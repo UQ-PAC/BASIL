@@ -84,7 +84,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
     rela.r_type match {
       case 1025 | 1026 => Right(ExternalFunction(sym.name, rela.r_offset))
-      case 1027 => Left( (rela.r_offset, rela.r_addend))
+      case 1027 => Left((rela.r_offset, rela.r_addend))
     }
 
   def getAllSymbols() = {
@@ -93,8 +93,8 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
         val sym = k.get
         val block = k.getReferentUuid.flatMap(_.getOption)
 
-        val idx = k.symTabIdx.collectFirst {
-          case (".symtab", i) => i.toInt
+        val idx = k.symTabIdx.collectFirst { case (".symtab", i) =>
+          i.toInt
         }
 
         val addr = block.map(x => BigInt(x.address))
@@ -105,16 +105,23 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
         ty match {
           case "NONE" => None
-          case ty => Some(
-        ELFSymbol(idx.getOrElse(-1), combinedValue, size.toInt, ELFSymType.valueOf(ty),
-          ELFBind.valueOf(bind),
-          ELFVis.valueOf(vis),
-          parseElfNdx(shndx),
-          sym.name
-          )
-        )
+          case ty =>
+            Some(
+              ELFSymbol(
+                idx.getOrElse(-1),
+                combinedValue,
+                size.toInt,
+                ELFSymType.valueOf(ty),
+                ELFBind.valueOf(bind),
+                ELFVis.valueOf(vis),
+                parseElfNdx(shndx),
+                sym.name
+              )
+            )
+        }
       }
-    }.toList.sortBy(x => x.num)
+      .toList
+      .sortBy(x => x.num)
   }
 
   def getRelocations() = {
@@ -127,12 +134,11 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
   }
 
   def getGlobals() = {
-    gtirb.symbolEntriesByUuid.view.collect {
-      case (symid, (size, "OBJECT", "GLOBAL", "DEFAULT", idx)) =>
-        val blk = symid.getReferentUuid.get.get
-        val sec = blk.section
-        assert(gtirb.mod.sections(idx.toInt - 1) == sec)
-        SpecGlobal(symid.get.name, (size * 8).toInt, None, blk.address)
+    gtirb.symbolEntriesByUuid.view.collect { case (symid, (size, "OBJECT", "GLOBAL", "DEFAULT", idx)) =>
+      val blk = symid.getReferentUuid.get.get
+      val sec = blk.section
+      assert(gtirb.mod.sections(idx.toInt - 1) == sec)
+      SpecGlobal(symid.get.name, (size * 8).toInt, None, blk.address)
     }.toSet
   }
 
@@ -175,10 +181,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
         sym.copy(name = atSuffix.replaceFirstIn(sym.name, ""))
     }
 
-    relf.copy(
-      externalFunctions = exts,
-      symbolTable = syms
-    )
+    relf.copy(externalFunctions = exts, symbolTable = syms)
   }
 
   /**
@@ -197,7 +200,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     }
 
     def checkSet[T](x: Set[T], y: Set[T], s: String) =
-      check(x == y, s"$s:\ngtirb - relf = ${x -- y}\nrelf - gtirb = ${y--x}\n& = ${y & x}")
+      check(x == y, s"$s:\ngtirb - relf = ${x -- y}\nrelf - gtirb = ${y -- x}\n& = ${y & x}")
 
     def checkEq(x: Any, y: Any, s: String) =
       check(x == y, s"$s: gtirb: $x, readelf: $y}")
