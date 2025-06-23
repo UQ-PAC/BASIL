@@ -189,3 +189,4 @@ val ConstGenLogger = DSALogger.deriveLogger("Constraint Gen", Console.out).setLe
 val SVALogger = DSALogger.deriveLogger("SVA").setLevel(LogLevel.OFF)
 val IntervalDSALogger = DSALogger.deriveLogger("SadDSA", Console.out).setLevel(LogLevel.OFF)
 val StackLogger = Logger.deriveLogger("Stack").setLevel(LogLevel.OFF)
+val SlicerLogger = Logger.deriveLogger("Slicer").setLevel(LogLevel.INFO)

@@ -215,7 +215,7 @@ def directCall(lhs: Iterable[(String, Variable)], rhs: call): EventuallyCall =
 
 def directCall(tgt: String): EventuallyCall = directCall(Nil, tgt, Nil)
 
-def directCall(tgt: String, label: Option[String]): EventuallyCall = directCall(Nil, tgt, Nil)
+def directCall(tgt: String, label: Option[String]): EventuallyCall = directCall(Nil, tgt, Nil, label)
 
 def indirectCall(tgt: Variable): EventuallyIndirectCall = EventuallyIndirectCall(tgt)
 

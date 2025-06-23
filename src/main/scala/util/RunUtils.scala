@@ -35,7 +35,7 @@ import util.{DebugDumpIRLogger, Logger, SimplifyLogger}
 import java.util.Base64
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
-import ir.transforms.MemoryTransform
+import ir.transforms.{MemoryTransform, Slicer}
 import util.DSAConfig.{Checks, Prereq, Standard}
 import util.LogLevel.INFO
 
@@ -295,12 +295,14 @@ object IRTransform {
       ctx.program.determineRelevantMemory(ctx.globalOffsets)
     }
 
-    Logger.info("[!] Stripping unreachable")
-    val before = ctx.program.procedures.size
-    transforms.stripUnreachableFunctions(ctx.program, config.loading.procedureTrimDepth)
-    Logger.info(
-      s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
-    )
+    if (config.slicerConfig.isEmpty) {
+      Logger.info("[!] Stripping unreachable")
+      val before = ctx.program.procedures.size
+      transforms.stripUnreachableFunctions(ctx.program, config.loading.procedureTrimDepth)
+      Logger.info(
+        s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
+      )
+    }
     val dupProcNames = ctx.program.procedures.groupBy(_.name).filter((_, p) => p.size > 1).toList.flatMap(_(1))
     assert(dupProcNames.isEmpty)
 
@@ -997,6 +999,10 @@ object RunUtils {
       } else {
         Logger.info("Interpreter stopped normally.")
       }
+    }
+
+    if (conf.slicerConfig.isDefined) {
+      Slicer(ctx.program, conf.slicerConfig.get).run()
     }
 
     IRTransform.prepareForTranslation(q, ctx)

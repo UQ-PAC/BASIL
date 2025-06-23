@@ -37,6 +37,8 @@ case class StaticAnalysisConfig(
   irreducibleLoops: Boolean = true
 )
 
+case class SlicerConfig(blockLabel: String, initialCriterion: Set[String])
+
 enum DSAConfig {
   case Prereq, Standard, Checks
 }
@@ -62,5 +64,6 @@ case class BASILConfig(
   assertCalleeSaved: Boolean = false,
   staticAnalysis: Option[StaticAnalysisConfig] = None,
   boogieTranslation: BoogieGeneratorConfig = BoogieGeneratorConfig(),
-  outputPrefix: String
+  outputPrefix: String,
+  slicerConfig: Option[SlicerConfig] = None
 )

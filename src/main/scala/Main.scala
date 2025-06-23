@@ -12,7 +12,7 @@ import scala.collection.{immutable, mutable}
 import scala.language.postfixOps
 import scala.sys.process.*
 import util.*
-import mainargs.{Flag, ParserForClass, arg, main}
+import mainargs.{Flag, ParserForClass, arg, main, TokensReader}
 import util.DSAConfig.{Checks, Prereq, Standard}
 import util.boogie_interaction.BoogieResultKind
 
@@ -216,8 +216,16 @@ object Main {
     @arg(name = "memory-transform", doc = "Transform memory access to region accesses")
     memoryTransform: Flag,
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
-    noif: Flag
+    noif: Flag,
+    @arg(name = "slice", doc = "Block name to begin program slicing from (requires --criterion, --simplify, --dsa, and --memory-transform flags)")
+    slice: Option[String],
+    @arg(name = "criterion", doc = "Collection of comma separated variable names outlining the initial slicing criterion values (requires --slice, --simplify, --dsa, and --memory-transform flags)")
+    criterion: Option[List[String]]
   )
+
+  implicit object ListStringRead extends TokensReader.Simple[List[String]]:
+    def shortName = "list<str>"
+    def read(strs: Seq[String]) = Right(strs.flatMap(_.split(",\\s*")).toList)
 
   def main(args: Array[String]): Unit = {
     val parser = ParserForClass[Config]
@@ -327,6 +335,22 @@ object Main {
       )
     }
 
+    val slicerConfig = (conf.slice, conf.criterion) match {
+      case (Some(blockLabel), Some(criterion)) => {
+        if !conf.memoryTransform.value then throw IllegalArgumentException("Slicer requires --memory-transform")
+        if !conf.simplify.value then throw IllegalArgumentException("Slicer requires --simplify")
+        dsa match {
+          case None => throw IllegalArgumentException("Slicer requires --dsa checks|standard")
+          case Some(Prereq) => throw IllegalArgumentException("Slicer requires --dsa checks|standard")
+          case _ => ()
+        }
+        Some(SlicerConfig(blockLabel, criterion.toSet))
+      }
+      case (Some(_), None) => throw IllegalArgumentException("Slicer requires both --slice AND --criterion")
+      case (None, Some(_)) => throw IllegalArgumentException("Slicer requires both --slice AND --criterion")
+      case (None, None) => None
+    }
+
     if (loadingInputs.specFile.isDefined && loadingInputs.relfFile.isEmpty) {
       throw IllegalArgumentException("--spec requires --relf")
     }
@@ -353,6 +377,7 @@ object Main {
       outputPrefix = conf.outFileName,
       dsaConfig = dsa,
       memoryTransform = conf.memoryTransform.value,
+      slicerConfig = slicerConfig,
       assertCalleeSaved = calleeSaved
     )
 
