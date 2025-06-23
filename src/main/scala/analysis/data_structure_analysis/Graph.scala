@@ -943,19 +943,18 @@ class Graph(using Counter)(
       newGraph.stackMapping.update(offset, idToNode(node.id))
     }
 
-    globalMapping.foreach {
-      case (range: AddressRange, Field(node, offset)) =>
-        assert(newGraph.globalMapping.contains(range))
-        val cell: Cell = find(node.getCell(offset))
-        val finalNode: Node = cell.node.get
-        nodes.add(finalNode)
-        if !idToNode.contains(finalNode.id) then
-          val newNode = finalNode.cloneSelf(newGraph)
-          idToNode.update(finalNode.id, newNode)
-        newGraph.globalMapping.update(
-          range,
-          Field(idToNode(finalNode.id), cell.offset + (offset - finalNode.getCell(offset).offset))
-        )
+    globalMapping.foreach { case (range: AddressRange, Field(node, offset)) =>
+      assert(newGraph.globalMapping.contains(range))
+      val cell: Cell = find(node.getCell(offset))
+      val finalNode: Node = cell.node.get
+      nodes.add(finalNode)
+      if !idToNode.contains(finalNode.id) then
+        val newNode = finalNode.cloneSelf(newGraph)
+        idToNode.update(finalNode.id, newNode)
+      newGraph.globalMapping.update(
+        range,
+        Field(idToNode(finalNode.id), cell.offset + (offset - finalNode.getCell(offset).offset))
+      )
     }
 
     val queue = mutable.Queue[Node]()

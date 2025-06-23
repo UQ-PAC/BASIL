@@ -53,9 +53,8 @@ trait ProcVariableDependencyAnalysisFunctions(
     else
       d match {
         case Left(v) =>
-          call.actualParams.toList.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]]()) {
-            case (m, (inVar, expr)) =>
-              if expr.variables.contains(v) then m + (Left(inVar) -> IdEdge()) else m
+          call.actualParams.toList.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]]()) { case (m, (inVar, expr)) =>
+            if expr.variables.contains(v) then m + (Left(inVar) -> IdEdge()) else m
           }
         case Right(_) =>
           call.actualParams.toList.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
@@ -105,9 +104,8 @@ trait ProcVariableDependencyAnalysisFunctions(
           varDepsSummaries
             .get(call.target)
             .map(summary => {
-              summary.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]]()) {
-                case (m, (outVar, deps)) =>
-                  if deps.contains(v) then m + (Left(outVar) -> IdEdge()) else m
+              summary.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]]()) { case (m, (outVar, deps)) =>
+                if deps.contains(v) then m + (Left(outVar) -> IdEdge()) else m
               }
             })
             .getOrElse(Map())
@@ -129,39 +127,36 @@ trait ProcVariableDependencyAnalysisFunctions(
               val init: Map[DL, EdgeFunction[LatticeSet[Variable]]] =
                 if call.outParams.exists(_._2 == v) then Map() else Map(d -> IdEdge())
 
-              call.actualParams.foldLeft(init) {
-                case (m, (inVar, expr)) =>
-                  if !expr.variables.contains(v) then m
-                  else {
-                    summary.foldLeft(m) {
-                      case (m, (endVar, deps)) =>
-                        endVar match {
-                          case endVar: LocalVar if call.target.formalOutParam.contains(endVar) => {
-                            if deps.contains(inVar) then m + (Left(call.outParams(endVar)) -> IdEdge())
-                            else m
-                          }
-                          case _ => m
-                        }
+              call.actualParams.foldLeft(init) { case (m, (inVar, expr)) =>
+                if !expr.variables.contains(v) then m
+                else {
+                  summary.foldLeft(m) { case (m, (endVar, deps)) =>
+                    endVar match {
+                      case endVar: LocalVar if call.target.formalOutParam.contains(endVar) => {
+                        if deps.contains(inVar) then m + (Left(call.outParams(endVar)) -> IdEdge())
+                        else m
+                      }
+                      case _ => m
                     }
                   }
+                }
               }
             }
             case Right(_) =>
               val initialise = call.outParams.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
                 case (m, (formalVar, resultVar)) => m + (Left(resultVar) -> ConstEdge(FiniteSet(Set())))
               }
-              val ret = summary.foldLeft(initialise) {
-                case (m, (endVar, deps)) =>
-                  endVar match {
-                    case endVar: LocalVar if call.target.formalOutParam.contains(endVar) =>
-                      deps match {
-                        case Top() | DiffSet(_) => m + (Left(call.outParams(endVar)) -> ConstEdge(Top()))
-                        case FiniteSet(s) if s == Set() =>
-                          m + (Left(call.outParams(endVar)) -> ConstEdge(FiniteSet(Set())))
-                        case _ => m
-                      }
-                    case _ => m
-                  }
+              val ret = summary.foldLeft(initialise) { case (m, (endVar, deps)) =>
+                endVar match {
+                  case endVar: LocalVar if call.target.formalOutParam.contains(endVar) =>
+                    deps match {
+                      case Top() | DiffSet(_) => m + (Left(call.outParams(endVar)) -> ConstEdge(Top()))
+                      case FiniteSet(s) if s == Set() =>
+                        m + (Left(call.outParams(endVar)) -> ConstEdge(FiniteSet(Set())))
+                      case _ => m
+                    }
+                  case _ => m
+                }
               }
               ret
           }

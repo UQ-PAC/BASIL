@@ -244,9 +244,8 @@ case class EventuallyBlock(
 
   override def deepEquals(o: Object) = o match {
     case EventuallyBlock(`label`, osl, oj, `address`) =>
-      j.deepEquals(oj) && sl.size == osl.size && osl.toList.zip(sl).forall {
-        case (l, r) =>
-          l.deepEquals(r)
+      j.deepEquals(oj) && sl.size == osl.size && osl.toList.zip(sl).forall { case (l, r) =>
+        l.deepEquals(r)
       }
     case _ => false
 
@@ -316,9 +315,8 @@ case class EventuallyProcedure(
   override def deepEquals(o: Object) = o match {
     case EventuallyProcedure(`label`, `in`, `out`, b, `entryBlockLabel`, `returnBlockLabel`, `address`) => {
       b.size == blocks.size && {
-        b.zip(blocks).forall {
-          case (l, r) =>
-            l.deepEquals(r)
+        b.zip(blocks).forall { case (l, r) =>
+          l.deepEquals(r)
         }
       }
     }
@@ -408,9 +406,8 @@ case class EventuallyProgram(
 
   override def deepEquals(o: Object) = o match {
     case EventuallyProgram(mp, op, im) => {
-      mp.deepEquals(mainProcedure) && op.size == otherProcedures.size && op.zip(otherProcedures).forall {
-        case (l, r) =>
-          l.deepEquals(r)
+      mp.deepEquals(mainProcedure) && op.size == otherProcedures.size && op.zip(otherProcedures).forall { case (l, r) =>
+        l.deepEquals(r)
       }
     }
   }

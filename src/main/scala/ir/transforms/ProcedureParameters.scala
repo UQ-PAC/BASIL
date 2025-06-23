@@ -127,21 +127,18 @@ def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
   transforms.applyRPO(ctx.program)
 
   val liveLab = () =>
-    liveVars.collect {
-      case (b: Block, r) =>
-        b -> {
-          val live = r.toList.collect {
-            case (v, TwoElementTop) =>
-              v
-          }
-          val dead = r.toList.collect {
-            case (v, TwoElementBottom) =>
-              v
-          }
-          val livel = live.map(_.name).toList.sorted.mkString(", ")
-          // val deadl = dead.map(_.name).toList.sorted.mkString(", ")
-          s"Live: $livel"
+    liveVars.collect { case (b: Block, r) =>
+      b -> {
+        val live = r.toList.collect { case (v, TwoElementTop) =>
+          v
         }
+        val dead = r.toList.collect { case (v, TwoElementBottom) =>
+          v
+        }
+        val livel = live.map(_.name).toList.sorted.mkString(", ")
+        // val deadl = dead.map(_.name).toList.sorted.mkString(", ")
+        s"Live: $livel"
+      }
     }.toMap
 
   DebugDumpIRLogger.writeToFile(
@@ -203,9 +200,8 @@ def collectVariables(p: Procedure): (Set[Variable], Set[Variable]) = {
     }
   })) ++ p.blocks
     .map(_.jump)
-    .collect {
-      case r: Return =>
-        r.outParams.toSet.map(_._1)
+    .collect { case r: Return =>
+      r.outParams.toSet.map(_._1)
     }
     .flatten
   val rvars = p.blocks.toSet.flatMap(_.statements.flatMap(s => {
@@ -377,9 +373,8 @@ def inOutParams(
     case (p, Some(x)) => (p, ReadWriteAnalysis.onlyGlobal(x))
   }
 
-  val procEnd = p.procedures.map {
-    case p =>
-      p -> p.returnBlock.getOrElse(p)
+  val procEnd = p.procedures.map { case p =>
+    p -> p.returnBlock.getOrElse(p)
   }.toMap
 
   val lives: Map[Procedure, (Set[Variable], Set[Variable])] = p.procedures
@@ -388,9 +383,8 @@ def inOutParams(
 
       def toLiveSet(p: Option[Map[Variable, TwoElement]]): Set[Variable] = {
         p.map(p => {
-          p.collect {
-            case (v, TwoElementTop) =>
-              v
+          p.collect { case (v, TwoElementTop) =>
+            v
           }.toSet
         }).getOrElse(overapprox)
       }
@@ -451,9 +445,8 @@ def inOutParams(
       val origIn = oldParams(proc)._1
       val origOut = oldParams(proc)._2
 
-      val calls = proc.collect {
-        case c: DirectCall =>
-          c
+      val calls = proc.collect { case c: DirectCall =>
+        c
       }
 
       val modifiedFromCall =

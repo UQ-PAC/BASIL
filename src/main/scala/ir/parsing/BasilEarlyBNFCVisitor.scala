@@ -64,18 +64,17 @@ case class BasilEarlyBNFCVisitor[A]()
 
   // Members declared in Program.Visitor
   override def visit(x: syntax.Prog, arg: A) =
-    x.listdeclaration_.asScala.foldLeft(Declarations.empty) {
-      case (decls, x) =>
-        try {
-          decls.merge(x.accept(this, arg))
-        } catch {
-          case e: IllegalArgumentException =>
-            throw ParseException(
-              "encountered duplicate declarations with the same name",
-              x.asInstanceOf[HasParsePosition],
-              e
-            )
-        }
+    x.listdeclaration_.asScala.foldLeft(Declarations.empty) { case (decls, x) =>
+      try {
+        decls.merge(x.accept(this, arg))
+      } catch {
+        case e: IllegalArgumentException =>
+          throw ParseException(
+            "encountered duplicate declarations with the same name",
+            x.asInstanceOf[HasParsePosition],
+            e
+          )
+      }
     }
 
   // Members declared in MExpr.Visitor

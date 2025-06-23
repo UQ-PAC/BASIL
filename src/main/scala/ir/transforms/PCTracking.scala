@@ -26,9 +26,8 @@ object PCTracking {
 
       case PCTrackingOption.Keep =>
         Logger.info(s"[!] Removing PC-tracking assertion statements, keeping PC assignments")
-        program.collect {
-          case x @ Assert(_, _, Some("pc-tracking")) =>
-            x.parent.statements.remove(x)
+        program.collect { case x @ Assert(_, _, Some("pc-tracking")) =>
+          x.parent.statements.remove(x)
         }
       case PCTrackingOption.Assert =>
         Logger.info(s"[!] Inserting PC-tracking requires/ensures")

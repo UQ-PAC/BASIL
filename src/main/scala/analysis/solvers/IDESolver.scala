@@ -153,18 +153,17 @@ abstract class IDESolver[
       this.analyze()
 
       val res = mutable.Map[Procedure, mutable.Map[DL, mutable.Map[DL, EdgeFunction[T]]]]()
-      x.foreach {
-        case ((n, d1, d2), e) =>
-          if (isExit(n)) {
-            val exit: EE = n.asInstanceOf[EE]
-            val proc = IRWalk.procedure(exit)
-            val m1 = res.getOrElseUpdate(
-              proc,
-              mutable.Map[DL, mutable.Map[DL, EdgeFunction[T]]]().withDefaultValue(mutable.Map[DL, EdgeFunction[T]]())
-            )
-            val m2 = m1.getOrElseUpdate(d1, mutable.Map[DL, EdgeFunction[T]]())
-            m2 += d2 -> e
-          }
+      x.foreach { case ((n, d1, d2), e) =>
+        if (isExit(n)) {
+          val exit: EE = n.asInstanceOf[EE]
+          val proc = IRWalk.procedure(exit)
+          val m1 = res.getOrElseUpdate(
+            proc,
+            mutable.Map[DL, mutable.Map[DL, EdgeFunction[T]]]().withDefaultValue(mutable.Map[DL, EdgeFunction[T]]())
+          )
+          val m2 = m1.getOrElseUpdate(d1, mutable.Map[DL, EdgeFunction[T]]())
+          m2 += d2 -> e
+        }
       }
       Logger.debug(s"Function summaries:\n${res
           .map { (f, s) =>
@@ -239,12 +238,11 @@ abstract class IDESolver[
     /** Restructures the analysis output to match `restructuredlattice`.
       */
     def restructure(y: lattice.Element): restructuredlattice.Element = {
-      y.foldLeft(Map[CFGPosition, Map[D, valuelattice.Element]]()) {
-        case (acc, ((n, dl), e)) =>
-          dl match {
-            case Left(d) => acc + (n -> (acc.getOrElse(n, Map[D, valuelattice.Element]()) + (d -> e)))
-            case _ => acc
-          }
+      y.foldLeft(Map[CFGPosition, Map[D, valuelattice.Element]]()) { case (acc, ((n, dl), e)) =>
+        dl match {
+          case Left(d) => acc + (n -> (acc.getOrElse(n, Map[D, valuelattice.Element]()) + (d -> e)))
+          case _ => acc
+        }
       }
     }
   }

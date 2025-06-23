@@ -293,9 +293,8 @@ def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S,
   }
   State.protect(
     () => ns,
-    {
-      case e =>
-        Errored(e.toString)
+    { case e =>
+      Errored(e.toString)
     }: PartialFunction[Exception, InterpreterError]
   )
 

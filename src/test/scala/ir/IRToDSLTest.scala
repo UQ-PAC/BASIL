@@ -130,9 +130,8 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
 
     // for each procedure, check that the conversion is correct,
     // i.e., is structurally equal to the original dsl procedure
-    (dslprog.allProcedures zip irprog.procedures).foreach {
-      case (dslproc, proc) =>
-        assertDeepEquality(dslproc) { IRToDSL.convertProcedure(proc) }
+    (dslprog.allProcedures zip irprog.procedures).foreach { case (dslproc, proc) =>
+      assertDeepEquality(dslproc) { IRToDSL.convertProcedure(proc) }
     }
   }
 

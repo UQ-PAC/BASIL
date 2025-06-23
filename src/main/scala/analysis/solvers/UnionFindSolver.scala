@@ -37,10 +37,9 @@ class UnionFindSolver[A] {
         mkUnion(v2, t1)
       case (f1: Cons[A], f2: Cons[A]) if f1.doMatch(f2) =>
         mkUnion(f1, f2)
-        f1.args.zip(f2.args).foreach {
-          case (a1, a2) =>
-            Logger.debug(s"Unifying subterms $a1 and $a2")
-            unify(a1, a2)
+        f1.args.zip(f2.args).foreach { case (a1, a2) =>
+          Logger.debug(s"Unifying subterms $a1 and $a2")
+          unify(a1, a2)
         }
       case (x, y) =>
         throw new UnificationFailure(s"Cannot unify $t1 and $t2 (with representatives $x and $y)")

@@ -200,9 +200,8 @@ class SASILattice extends Lattice[StridedWrappedInterval] {
       SIBottom
     } else {
       // create singleton intervals for each value and then join them
-      x.foldLeft(bottom) {
-        case (acc, v) =>
-          lub(acc, singletonSI(v, w))
+      x.foldLeft(bottom) { case (acc, v) =>
+        lub(acc, singletonSI(v, w))
       }
     }
   }
@@ -287,11 +286,10 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
       case (VSTop, _) => VSTop
       case (_, VSTop) => VSTop
       case (VS(m1), VS(m2)) =>
-        VS(m1.keys.foldLeft(m2) {
-          case (acc, k) =>
-            val v1 = m1(k)
-            val v2 = m2(k)
-            acc + (k -> lattice.lub(v1, v2))
+        VS(m1.keys.foldLeft(m2) { case (acc, k) =>
+          val v1 = m1(k)
+          val v2 = m2(k)
+          acc + (k -> lattice.lub(v1, v2))
         })
     }
   }
@@ -381,11 +379,10 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
       case (VSTop, _) => VSTop
       case (_, VSTop) => VSTop
       case (VS(m1), VS(m2)) =>
-        VS(m1.keys.foldLeft(m2) {
-          case (acc, k) =>
-            val v1 = m1(k)
-            val v2 = m2(k)
-            acc + (k -> lattice.add(v1, v2))
+        VS(m1.keys.foldLeft(m2) { case (acc, k) =>
+          val v1 = m1(k)
+          val v2 = m2(k)
+          acc + (k -> lattice.add(v1, v2))
         })
     }
   }
@@ -395,9 +392,8 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
       case VSBottom => VSBottom
       case VSTop => VSTop
       case VS(m) =>
-        VS(m.map {
-          case (k, s) =>
-            k -> lattice.add(s, y.value, y.size) // TODO: is the size correct here?
+        VS(m.map { case (k, s) =>
+          k -> lattice.add(s, y.value, y.size) // TODO: is the size correct here?
         })
     }
   }
@@ -409,11 +405,10 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
       case (VSBottom, t) => VSBottom
       case (t, VSBottom) => t
       case (VS(m1), VS(m2)) =>
-        VS(m1.keys.foldLeft(m2) {
-          case (acc, k) =>
-            val v1 = m1(k)
-            val v2 = m2(k)
-            acc + (k -> lattice.sub(v1, v2))
+        VS(m1.keys.foldLeft(m2) { case (acc, k) =>
+          val v1 = m1(k)
+          val v2 = m2(k)
+          acc + (k -> lattice.sub(v1, v2))
         })
     }
   }
@@ -423,9 +418,8 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
       case VSTop => VSTop
       case VSBottom => VSBottom
       case VS(m) =>
-        VS(m.map {
-          case (k, s) =>
-            k -> lattice.sub(s, y.value, y.size) // TODO: is the size correct here?
+        VS(m.map { case (k, s) =>
+          k -> lattice.sub(s, y.value, y.size) // TODO: is the size correct here?
         })
     }
   }
@@ -451,9 +445,8 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
       case VSBottom => VSBottom
       case VSTop => VSTop
       case VS(m) =>
-        VS(m.map {
-          case (k, SI(s, l, u, w)) =>
-            k -> SI(s, lattice.lowestPossibleValue, u, w)
+        VS(m.map { case (k, SI(s, l, u, w)) =>
+          k -> SI(s, lattice.lowestPossibleValue, u, w)
         })
     }
   }
@@ -463,9 +456,8 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
       case VSBottom => VSBottom
       case VSTop => VSTop
       case VS(m) =>
-        VS(m.map {
-          case (k, SI(s, l, u, w)) =>
-            k -> SI(s, l, lattice.highestPossibleValue, w)
+        VS(m.map { case (k, SI(s, l, u, w)) =>
+          k -> SI(s, l, lattice.highestPossibleValue, w)
         })
     }
   }
@@ -554,11 +546,10 @@ class FlagLattice extends Lattice[Flag] {
       case (BOTTOM_Flag, t) => t
       case (t, BOTTOM_Flag) => t
       case (FlagMap(m1), FlagMap(m2)) =>
-        FlagMap(m1.keys.foldLeft(m2) {
-          case (acc, k) =>
-            val v1 = m1(k)
-            val v2 = m2(k)
-            acc + (k -> lattice.lub(v1, v2))
+        FlagMap(m1.keys.foldLeft(m2) { case (acc, k) =>
+          val v1 = m1(k)
+          val v2 = m2(k)
+          acc + (k -> lattice.lub(v1, v2))
         })
     }
   }

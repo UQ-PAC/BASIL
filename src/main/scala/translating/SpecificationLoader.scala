@@ -389,9 +389,8 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
         r
     }
 
-    val requires = ctx.requires.asScala.collect {
-      case r: ParsedRequiresContext =>
-        visitExpr(r.expr, nameToGlobals, params)
+    val requires = ctx.requires.asScala.collect { case r: ParsedRequiresContext =>
+      visitExpr(r.expr, nameToGlobals, params)
     }.toList
 
     val modifies = Option(ctx.modifies) match {
@@ -399,19 +398,16 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
       case None => List()
     }
 
-    val ensures = ctx.ensures.asScala.collect {
-      case e: ParsedEnsuresContext =>
-        visitExpr(e.expr, nameToGlobals, params)
+    val ensures = ctx.ensures.asScala.collect { case e: ParsedEnsuresContext =>
+      visitExpr(e.expr, nameToGlobals, params)
     }.toList
 
-    val requiresDirect = ctx.requires.asScala.collect {
-      case r: DirectRequiresContext =>
-        r.QUOTESTRING.getText.stripPrefix("\"").stripSuffix("\"")
+    val requiresDirect = ctx.requires.asScala.collect { case r: DirectRequiresContext =>
+      r.QUOTESTRING.getText.stripPrefix("\"").stripSuffix("\"")
     }.toList
 
-    val ensuresDirect = ctx.ensures.asScala.collect {
-      case r: DirectEnsuresContext =>
-        r.QUOTESTRING.getText.stripPrefix("\"").stripSuffix("\"")
+    val ensuresDirect = ctx.ensures.asScala.collect { case r: DirectEnsuresContext =>
+      r.QUOTESTRING.getText.stripPrefix("\"").stripSuffix("\"")
     }.toList
 
     val rely = Option(ctx.relies) match {

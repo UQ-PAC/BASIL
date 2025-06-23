@@ -42,9 +42,8 @@ trait ReachingDefinitionsAnalysis(program: Program) {
     vars: Set[Variable],
     s: (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])
   ): (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]) = {
-    vars.foldLeft((s(0), Map.empty[Variable, Set[Assign]])) {
-      case ((state, acc), v) =>
-        (state, acc + (v -> state(v)))
+    vars.foldLeft((s(0), Map.empty[Variable, Set[Assign]])) { case ((state, acc), v) =>
+      (state, acc + (v -> state(v)))
     }
   }
 
@@ -58,9 +57,8 @@ trait ReachingDefinitionsAnalysis(program: Program) {
       // for lhs, addOrReplace the definition
       val rhs = assign.rhs.variables
       val lhs = assign.lhs
-      val rhsUseDefs: Map[Variable, Set[Assign]] = rhs.foldLeft(Map.empty[Variable, Set[Assign]]) {
-        case (acc, v) =>
-          acc + (v -> s(0)(v))
+      val rhsUseDefs: Map[Variable, Set[Assign]] = rhs.foldLeft(Map.empty[Variable, Set[Assign]]) { case (acc, v) =>
+        acc + (v -> s(0)(v))
       }
       (s(0) + (lhs -> Set(assign)), rhsUseDefs)
     case assert: Assert =>
@@ -70,9 +68,8 @@ trait ReachingDefinitionsAnalysis(program: Program) {
     case memoryLoad: MemoryLoad =>
       val lhs = memoryLoad.lhs
       val rhs = memoryLoad.index.variables
-      val rhsUseDefs: Map[Variable, Set[Assign]] = rhs.foldLeft(Map.empty[Variable, Set[Assign]]) {
-        case (acc, v) =>
-          acc + (v -> s(0)(v))
+      val rhsUseDefs: Map[Variable, Set[Assign]] = rhs.foldLeft(Map.empty[Variable, Set[Assign]]) { case (acc, v) =>
+        acc + (v -> s(0)(v))
       }
       (s(0) + (lhs -> Set(memoryLoad)), rhsUseDefs)
     case assume: Assume =>

@@ -654,9 +654,8 @@ object StaticAnalysis {
       toVisit.pushAll(
         IntraProcBlockIRCursor
           .succ(next)
-          .diff(visited.collect[Block] {
-            case b: Block =>
-              b
+          .diff(visited.collect[Block] { case b: Block =>
+            b
           })
       )
 
@@ -761,9 +760,8 @@ object RunUtils {
           File(s"${s}_blockgraph-after-dsa.dot"),
           dotBlockGraph(
             program,
-            (program.collect {
-              case b: Block =>
-                b -> pp_block(b)
+            (program.collect { case b: Block =>
+              b -> pp_block(b)
             }).toMap
           )
         )

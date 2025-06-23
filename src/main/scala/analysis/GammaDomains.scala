@@ -166,9 +166,8 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
       case a: Assert => and(b, expectPredicate(a.body)).simplify
       case i: IndirectCall => top
       case c: DirectCall =>
-        c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) {
-          case (p, (v, e)) =>
-            p.replace(BVTerm.Var(v), exprToBVTerm(e).get).replace(GammaTerm.Var(v), exprToGammaTerm(e).get).simplify
+        c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>
+          p.replace(BVTerm.Var(v), exprToBVTerm(e).get).replace(GammaTerm.Var(v), exprToGammaTerm(e).get).simplify
         }
       case g: GoTo => b
       case r: Return => b
@@ -233,9 +232,8 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
       case a: Assert => or(b, not(expectPredicate(a.body))).simplify
       case i: IndirectCall => bot
       case c: DirectCall =>
-        not(c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) {
-          case (p, (v, e)) =>
-            p.replace(BVTerm.Var(v), exprToBVTerm(e).get).replace(GammaTerm.Var(v), exprToGammaTerm(e).get).simplify
+        not(c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>
+          p.replace(BVTerm.Var(v), exprToBVTerm(e).get).replace(GammaTerm.Var(v), exprToGammaTerm(e).get).simplify
         })
       case g: GoTo => b
       case r: Return => b

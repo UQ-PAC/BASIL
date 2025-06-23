@@ -54,19 +54,17 @@ object AuxDecoder {
     val numBytes = numBits / 8
     require(numBytes * 8 == numBits, "requires multiple of 8")
 
-    readBytes(numBytes)(bs).foldRight(BigInt(0)) {
-      case (x, acc) =>
-        val n = x.toInt
-        acc * 256 + (if (!signed && n < 0) then n + 256 else n)
+    readBytes(numBytes)(bs).foldRight(BigInt(0)) { case (x, acc) =>
+      val n = x.toInt
+      acc * 256 + (if (!signed && n < 0) then n + 256 else n)
     }
 
   def readMap[K, V](keyReader: Reader[K], valReader: Reader[V])(bs: Input) =
     val len = readUint(64)(bs)
-    (BigInt(0) until len).map {
-      case _ =>
-        val k = keyReader(bs)
-        val v = valReader(bs)
-        k -> v
+    (BigInt(0) until len).map { case _ =>
+      val k = keyReader(bs)
+      val v = valReader(bs)
+      k -> v
     }.toMap
 
   def readSet[K, V](valReader: Reader[V])(bs: Input) =

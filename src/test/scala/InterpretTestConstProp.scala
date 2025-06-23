@@ -59,9 +59,8 @@ class InterpretTestConstProp
     ir.transforms.clearParams(ictx.program)
     val analyses = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), ictx)
 
-    val analysisres = analyses.intraProcConstProp.collect {
-      case (block: Block, v) =>
-        block -> v
+    val analysisres = analyses.intraProcConstProp.collect { case (block: Block, v) =>
+      block -> v
     }
 
     val result = runTestInterpreter(ictx, analysisres)

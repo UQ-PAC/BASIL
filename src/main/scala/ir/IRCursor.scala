@@ -318,9 +318,8 @@ def getDetachedBlocks(p: Procedure) = {
 def dotBlockGraph(proc: Procedure): String = {
   val o = getDetachedBlocks(proc)
   dotBlockGraph(
-    proc.collect {
-      case b: Block =>
-        b
+    proc.collect { case b: Block =>
+      b
     },
     o.reachableFromBlockEmptyPred
   )
@@ -330,9 +329,8 @@ def dotBlockGraph(prog: Program): String = {
   val e = prog.procedures.toSet.flatMap(getDetachedBlocks(_).reachableFromBlockEmptyPred)
 
   dotBlockGraph(
-    prog.collect {
-      case b: Block =>
-        b
+    prog.collect { case b: Block =>
+      b
     },
     e
   )
@@ -340,16 +338,15 @@ def dotBlockGraph(prog: Program): String = {
 
 def dotBlockGraph(blocks: Iterable[Block], orphaned: Set[Block]): String = {
   val printer = translating.BasilIRPrettyPrinter()
-  val labels: Map[CFGPosition, String] = (blocks.collect {
-    case b: Block =>
-      b -> {
-        (b.statements.toList.map(printer.apply(_) + ";") ++ {
-          b.jump match {
-            case g: GoTo => List()
-            case o => List(printer(o) + ";")
-          }
-        }).map("  " + _).mkString("\n")
-      }
+  val labels: Map[CFGPosition, String] = (blocks.collect { case b: Block =>
+    b -> {
+      (b.statements.toList.map(printer.apply(_) + ";") ++ {
+        b.jump match {
+          case g: GoTo => List()
+          case o => List(printer(o) + ";")
+        }
+      }).map("  " + _).mkString("\n")
+    }
   }).toMap
 
   toDot[Block](blocks.toSet, IntraProcBlockIRCursor, labels, orphaned)
