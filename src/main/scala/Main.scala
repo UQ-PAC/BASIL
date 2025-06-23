@@ -217,9 +217,9 @@ object Main {
     memoryTransform: Flag,
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
     noif: Flag,
-    @arg(name = "slice")
+    @arg(name = "slice", doc = "Block name to begin program slicing from (requires --criterion, --simplify, --dsa, and --memory-transform flags)")
     slice: Option[String],
-    @arg(name = "criterion")
+    @arg(name = "criterion", doc = "Collection of comma separated variable names outlining the initial slicing criterion values (requires --slice, --simplify, --dsa, and --memory-transform flags)")
     criterion: Option[List[String]]
   )
 
