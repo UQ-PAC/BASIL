@@ -30,40 +30,32 @@ final case class Lambda()
 trait IDETransferFunctions[E, EE, C, R, D, T, L <: Lattice[T]] {
   type DL = Either[D, Lambda]
 
-  /** 
-   * The value lattice.
+  /** The value lattice.
     */
   val valuelattice: L
 
-  /** 
-   * The edge lattice.
+  /** The edge lattice.
     */
   val edgelattice: EdgeFunctionLattice[T, L]
 
-  /** 
-   * Edges for call-to-entry.
+  /** Edges for call-to-entry.
     */
   def edgesCallToEntry(call: C, entry: E)(d: DL): Map[DL, EdgeFunction[T]]
 
-  /** 
-   * Edges for exit-to-aftercall.
+  /** Edges for exit-to-aftercall.
     */
   def edgesExitToAfterCall(exit: EE, aftercall: R)(d: DL): Map[DL, EdgeFunction[T]]
 
-  /** 
-   * Edges for call-to-aftercall.
+  /** Edges for call-to-aftercall.
     */
   def edgesCallToAfterCall(call: C, aftercall: R)(d: DL): Map[DL, EdgeFunction[T]]
 
-  /** 
-   * Edges for other CFG nodes.
+  /** Edges for other CFG nodes.
     */
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[T]]
 }
 
-/**
-  * Traits for Forward and Backward IDE Transfer Functions
-  */
+/* Traits for Forward and Backward IDE Transfer Functions */
 trait ForwardIDETransferFunctions[D, T, L <: Lattice[T]] extends IDETransferFunctions[Procedure, Return, DirectCall, Command, D, T, L]
 
 trait BackwardIDETransferFunctions[D, T, L <: Lattice[T]] extends IDETransferFunctions[Return, Procedure, Command, DirectCall, D, T, L]
