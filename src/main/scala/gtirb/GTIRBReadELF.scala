@@ -62,11 +62,11 @@ object GTIRBReadELF {
     val relaPlts = parseRelaTab(gtirb.sectionsByName(".rela.plt").byteIntervals.head.contents)
 
     import scala.math.Ordering.Implicits.seqOrdering
-    val allSymbols = gtirb.symbolKindsByUuid
+    val allSymbols = gtirb.symbolEntriesByUuid
       .map { case (k, pos) =>
         val sym = k.get
         println(k)
-        val addr = k.getReferentBlock.map(_.address)
+        val addr = k.getReferentUuid.flatMap(_.getOption).map(_.address)
         val value = k.getScalarValue.fold("")("val=" + _.toString)
         (k.symTabIdx, addr, pos) -> s"${sym.name} $value"
       }
@@ -85,16 +85,16 @@ object GTIRBReadELF {
       println(s"$x " + symid.get.name)
     }
 
-    val specGlobals = gtirb.symbolKindsByUuid.toList.collect {
+    val specGlobals = gtirb.symbolEntriesByUuid.toList.collect {
       case (symid, (size, "OBJECT", "GLOBAL", "DEFAULT", idx)) =>
-        val blk = symid.getReferentBlock.get
+        val blk = symid.getReferentUuid.get.get
         val sec = blk.section
         assert(mod.sections(idx.toInt - 1) == sec)
         (symid.get.name, blk.size * 8, None, blk.address)
     }
     println(specGlobals)
 
-    val funentry = gtirb.symbolKindsByUuid.toList.collect {
+    val funentry = gtirb.symbolEntriesByUuid.toList.collect {
       case (symid, (size, "FUNC", "GLOBAL", "DEFAULT", idx)) if idx != 0 =>
 
         val nameSymbol = symid.get

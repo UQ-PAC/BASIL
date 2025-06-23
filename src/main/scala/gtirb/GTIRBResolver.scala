@@ -22,6 +22,17 @@ import com.grammatech.gtirb.proto.Symbol.Symbol.OptionalPayload
 import scala.collection.mutable
 import scala.collection.immutable.SortedMap
 
+/**
+ * A class for querying the GTIRB IR, abstracting away common operations of
+ * searching for symbols, functions, blocks, and their relations. The inner
+ * type [[Uuid]] wraps a Base64 UUID. A number of UUID subtypes are defined to
+ * distinguish from different kinds of UUID within GTIRB, for example [[Uuid.Block]]
+ * and [Uuid.Function]].
+ *
+ * Each Uuid specialisation defines a number of extension methods for common
+ * query operations. For example, accessing the object itself from its Uuid can be
+ * done via the `.get` methods.
+ */
 case class GTIRBResolver(mod: Module) {
 
   sealed trait Uuid(val kind: String, val uuid: String) {
@@ -45,35 +56,77 @@ case class GTIRBResolver(mod: Module) {
     class Symbol(xs: String | ByteString) extends Uuid("symb", b64(xs))
   }
 
+  /**
+   * Represents a GTIRB code/data block and its parents. In GTIRB, block
+   * occurs within a byte interval which occur within a section. Desirable information,
+   * such as offset and address, is spread across these levels, so it is useful to bundle
+   * them all together.
+   *
+   * See the [GTIRB structure diagram](https://github.com/GrammaTech/gtirb#structure).
+   */
   case class BlockData(inner: DataBlock | CodeBlock, block: Block, interval: ByteInterval, section: Section) {
-    def uuid = inner match {
+    val uuid = inner match {
       case x: DataBlock => x.uuid
       case x: CodeBlock => x.uuid
     }
-    def size = inner match {
+    val size = inner match {
       case x: DataBlock => x.size
       case x: CodeBlock => x.size
     }
-    def address = block.offset + interval.address
+    val address = block.offset + interval.address
   }
 
   extension (x: Uuid.Block)
     def get = blocksByUuid(x)
+    def getOption = blocksByUuid.get(x)
     def isProxyBlock = proxyBlockUuids.contains(x)
 
   extension (x: Uuid.Symbol)
     def get = symbolsByUuid(x)
+
+    /**
+     * Returns the list of symbol table indices where this symbol can be found.
+     * Each index is a tuple of table name and index within that table.
+     */
     def symTabIdx = symbolTabIdxByUuid(x)
-    def symKind = symbolKindsByUuid(x)
-    def getReferentBlock = for {
+
+    /**
+     * Returns the `.symtab` entry for the given symbol.
+     * This is a 5-tuple made up of size, type, binding, visibility, and index.
+     */
+    def symEntry = symbolEntriesByUuid(x)
+
+    /**
+     * Gets the [[Uuid.Block]] referred to by this symbol.
+     * This is mutually-exclusive with [[getScalarValue]],
+     * only one of these can be non-None.
+     */
+    def getReferentUuid = for {
       uuid <- x.get.optionalPayload.referentUuid
-      blok <- blocksByUuid.get(Uuid.Block(uuid))
-    } yield blok
+    } yield Uuid.Block(uuid)
+
+    /**
+     * Gets the scalar value associated with this symbol.
+     * This is mutually-exclusive with [[getReferentUuid]],
+     * only one of these can be non-None.
+     */
     def getScalarValue = x.get.optionalPayload._value
+
+    /**
+     * Gets the [[Uuid.Function]] associated with this symbol,
+     * or None if this is not a function name symbol.
+     */
     def getFunction = funcNamesInverse.get(x)
 
   extension (x: Uuid.Function)
+    /**
+     * Gets the set of entry block UUIDs for the given function.
+     */
     def getEntries = funcEntries(x)
+
+    /**
+     * Gets the [[Uuid.Symbol]] for the given function.
+     */
     def getName = funcNames(x)
 
   private def mapFirst[T, T2, U](f: T => T2)(x: (T, U)) = (f(x._1), x._2)
@@ -88,20 +141,25 @@ case class GTIRBResolver(mod: Module) {
       case b @ Block(_, Block.Value.Data(dat), _) => (dat.uuid, (dat: DataBlock | CodeBlock), b)
       case b @ Block(_, Block.Value.Code(cod), _) => (cod.uuid, (cod: DataBlock | CodeBlock), b)
     }
-    id: Uuid.Block = Uuid.Block(uuid)
+    id = Uuid.Block(uuid)
   } yield id -> BlockData(innerb, outerb, interval, sec)).toMap
 
   val sectionsByName = mod.sections.map(x => x.name -> x).toMap
 
-  val symbolTabIdxByUuid =
+  val symbolTabIdxByUuid: Map[Uuid.Symbol, List[(String, BigInt)]] =
     AuxDecoder.decodeAux(AuxDecoder.AuxKind.ElfSymbolTabIdxInfo)(mod).map(mapFirst(Uuid.Symbol(_)))
+
+  /**
+   * A nested map indexed by section name, then symbol index, and returning a symbol uuid.
+   * For example, `symbolTables(".symtab")(63)`.
+   */
   val symbolTables = symbolTabIdxByUuid
     .flatMap { case (sym, idxs) =>
       idxs.map(_ -> sym)
     }
     .groupMapReduce(kv => kv.head.head)(kv => SortedMap(kv.head.last -> kv.last))(_ ++ _)
 
-  val symbolKindsByUuid = decodeAux(AuxKind.ElfSymbolInfo)(mod)
+  val symbolEntriesByUuid = decodeAux(AuxKind.ElfSymbolInfo)(mod)
     .map(mapFirst(Uuid.Symbol(_)))
 
   val funcNames = decodeAux(AuxKind.FunctionNames)(mod).map { case (fun, sym) =>
