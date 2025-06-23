@@ -172,7 +172,6 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     val main = getMainAddress(mainProcedureName)
 
     val x = SortedSet.from(exts)(Ordering.by(_.toString))
-    println(x)
     ReadELFData(syms, x, SortedSet.from(globs), funs, offs, main)
   }
 
