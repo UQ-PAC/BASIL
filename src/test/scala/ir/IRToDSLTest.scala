@@ -70,7 +70,8 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
 
     visit_prog(StripLabel(), expected)
 
-    val actual = ir.parsing.ParseBasilIL.loadILString(expected.pprint)
+    val actual = ir.parsing.ParseBasilIL.loadILString(expected.pprint).program
+    visit_prog(StripLabel(), actual)
     assert(
       expected.deepEqualsDbg(actual),
       s"serialise-parse deep equality ${expected.getClass.getSimpleName} != ${actual.getClass.getSimpleName}"

@@ -3,20 +3,35 @@ import ir.*
 import ir.cilvisitor.*
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
+import specification.*
+import util.Logger
+import boogie.SpecGlobal
+
+private val localSigils = false
+
+import ir.parsing.Attrib
 
 object PrettyPrinter {
 
-  type PrettyPrintable = Program | Procedure | Statement | Jump | Command | Block | Expr
+  type PrettyPrintable = Program | Procedure | Statement | Jump | Command | Block | Expr | util.IRContext
+
+  import ir.parsing.Attrib
+
+  extension (b: BigInt) {
+    def pprint: String = "0x%x".format(b)
+  }
 
   extension (p: PrettyPrintable)
-    def pprint = p match {
+    def pprint: String = p match {
       case e: Expr => pp_expr(e)
       case e: Command => pp_cmd(e)
       case e: Block => pp_block(e)
       case e: Procedure => pp_proc(e)
       case e: Program => pp_prog(e)
+      case e: util.IRContext => pp_irctx(e)
     }
 
+  def pp_irctx(e: util.IRContext) = BasilIRPrettyPrinter().vcontext(e).toString
   def pp_expr(e: Expr) = BasilIRPrettyPrinter()(e)
   def pp_stmt(s: Statement) = BasilIRPrettyPrinter()(s)
   def pp_cmd(c: Command) = c match {
@@ -97,15 +112,15 @@ case class BST[T <: Expr | Command](v: String) extends PPProg[T] {
 
 case class Prog(mainProc: String, globalDecls: List[String], procedures: List[Proc]) extends PPProg[Program] {
   override def toString =
-    globalDecls.map(_ + ";").mkString("\n") + "\n\n" + procedures.map(_.toString + ";\n").mkString("")
+    globalDecls.map(_ + ";").mkString("\n") + "\n\n" + procedures.map(_.toString + "\n\n").mkString("")
 }
 
-case class Proc(signature: String, localDecls: List[String], blocks: String) extends PPProg[Procedure] {
+case class Proc(header: String, localDecls: List[String], blocks: String) extends PPProg[Procedure] {
   override def toString = {
     if (blocks.size > 0) {
-      signature + "\n{" + "\n" + blocks + "\n}"
+      header + "\n" + blocks + "\n"
     } else {
-      signature + " {}"
+      header + ";\n"
     }
   }
 }
@@ -123,7 +138,7 @@ case class PBlock(
     val comment = entryComment.map(c => c + "\n").getOrElse("")
     val excomment = exitComment.map(c => "\n" + c).getOrElse("")
     s"block ${label}${addr} [\n${comment}"
-      ++ commands.map("  " + _).mkString(";\n")
+      ++ commands.map("  " + _ + ";").mkString("\n")
       ++ s"${excomment}\n]"
   }
 }
@@ -140,6 +155,23 @@ class BasilIRPrettyPrinter(
   val blockIndent = "  "
   val statementIndent = "    "
   val seenVars = mutable.HashSet[Variable]()
+
+  class GetUninterp extends CILVisitor {
+    var funs = mutable.LinkedHashSet[(String, List[IRType], IRType)]()
+    override def vexpr(e: Expr) = {
+      e match {
+        case u: UninterpretedFunction => funs.add(u.signature)
+        case _ => ()
+      }
+      DoChildren()
+    }
+  }
+
+  def getUninterp(p: Program) = {
+    val v = GetUninterp()
+    visit_prog(v, p)
+    v.funs.toList
+  }
 
   def apply(x: Block): String = {
     vblock(x).toString
@@ -203,12 +235,45 @@ class BasilIRPrettyPrinter(
     }.toSet
   }
 
+  def vcontext(i: util.IRContext) = {
+    val prog = vprog(i.program)
+    import PrettyPrinter.*
+    import ir.parsing.Attrib
+    import ir.parsing.MemoryAttribData
+
+    val r = parsing.SymbolTableInfo.from(i)
+    val jsonedCtx = indent(r.toAttrib.pprint, "  ")
+
+    val memory = i.program.initialMemory
+      .map { case (k, v) =>
+        MemoryAttribData.of(v)
+      }
+      .toVector
+      .sortBy(_.address)
+      .map(_.toAttrib)
+    val jsonedMem = Attrib.List(memory).pprint
+
+    val decl =
+      s"prog entry ${Sigil.BASIR.proc}${i.program.mainProcedure.name} {\n  .symbols = ${jsonedCtx};\n  .initial_memory = ${jsonedMem}\n} ;"
+
+    prog.toString ++ "\n\n" ++ decl ++ "\n"
+  }
+
   override def vprog(p: Program): PPProg[Program] = {
+
+    val threadspec = s"\nprog entry ${Sigil.BASIR.proc}${p.mainProcedure.name}"
+
+    val uninterp = getUninterp(p)
+    val ufdecls = uninterp.map { case (n, pt, rt) =>
+      s"declare-fun ${Sigil.BASIR.globalVar}$n : (${pt.map(vtype).mkString(", ")}) -> ${vtype(rt)}"
+    }
+
     Prog(
       p.mainProcedure.name,
       memoryRegions(p).toList.sortBy(_.name).map(memdecl) ++
         globals(p).toList.sorted.map(vardecl)
-        ++ List("\nlet entry_procedure = " + p.mainProcedure.name)
+        ++ ufdecls
+        ++ List(threadspec)
       // ++ List(initialMemory(p.initialMemory.values))
       ,
       ((p.mainProcedure) :: p.procedures.filterNot(_ == p.mainProcedure).toList)
@@ -226,7 +291,7 @@ class BasilIRPrettyPrinter(
   }
 
   override def vblock(b: Block): PPProg[Block] = {
-    val label = b.label
+    val label = Sigil.BASIR.block + b.label
     val address = b.address
     val statements = b.statements.toList.map(vstmt)
     val terminator = vjump(b.jump)
@@ -234,9 +299,14 @@ class BasilIRPrettyPrinter(
       val broken = c.split('\n').mkString("\n" + blockIndent + "// ")
       s"${blockIndent}// $broken"
     })
+
+    val addr = address.map(a => s"${Sigil.BASIR.attrib}address = ${vaddress(a)}")
+    val olabel = b.meta.originalLabel.map(s => Sigil.BASIR.attrib + "originalLabel = \"" + s + "\"")
+    val allattrs = addr.toSeq ++ olabel
+    val attr = if allattrs.nonEmpty then Some("{" + allattrs.mkString("; ") + "}") else None
+
     val exitComment = with_analysis_results_end(b).map(c => s"${blockIndent}// ${c}")
-    val addr = address.map(a => s"{address = ${vaddress(a)}}")
-    PBlock(label, addr, statements.map(_.toString) ++ Seq(terminator.toString), entryComent, exitComment)
+    PBlock(label, attr, statements.map(_.toString) ++ Seq(terminator.toString), entryComent, exitComment)
   }
 
   override def vblock(
@@ -249,11 +319,16 @@ class BasilIRPrettyPrinter(
   }
 
   def vardecl(v: Variable): String = {
-    s"var ${v.name} : ${vtype(v.getType)}"
+    s"var ${vlvar(v)}"
   }
 
   def memdecl(m: Memory): String = {
-    s"memory ${m.name} : ${vtype(m.getType)}"
+    val shared = m match {
+      case s: SharedMemory => "shared "
+      case o: StackMemory => ""
+    }
+
+    s"memory ${shared}${Sigil.BASIR.globalVar}${m.name} : ${vtype(m.getType)}"
 
   }
 
@@ -326,45 +401,61 @@ class BasilIRPrettyPrinter(
 
   def vaddress(a: BigInt) = vintlit(a)
 
-  def vparam(l: Variable): String = {
-    s"${l.name}:${vtype { l.getType }}"
+  def vparam(l: Variable): String = l match {
+    case _: Global => Sigil.BASIR.globalVar + s"${l.name}:${vtype { l.getType }}"
+    case _: LocalVar =>
+      val sigil = if localSigils then Sigil.BASIR.localVar else ""
+      s"$sigil${l.name}:${vtype { l.getType }}"
   }
 
   def pp_proc_sig(p: Procedure) = {
-    val name = p.name
+    val name = Sigil.BASIR.proc + p.name
     val inParams = p.formalInParam.toList.map(vparam)
     val outParams = p.formalOutParam.toList.map(vparam)
-    s"proc $name(${inParams.mkString(", ")}) -> (${outParams.mkString(", ")})"
+
+    val addr = p.address.map(l => vaddress(l).toString).map(Sigil.BASIR.attrib + "address = " + _).toList
+    val pname = Seq(s"${Sigil.BASIR.attrib}name = \"${p.procName}\"")
+
+    val allattrs = pname ++ addr
+
+    val attrs = if allattrs.isEmpty then "" else "  { " + allattrs.map("" + _).mkString("; ") + " }"
+
+    val fnl = if (p.formalInParam.size > 3) then "\n    " else " "
+
+    val br = if (inParams.length + outParams.length > 6) then "\n " else ""
+
+    s"proc $name$br (${inParams.mkString(", ")})$fnl-> (${outParams.mkString(", ")})\n$attrs"
   }
 
   override def vproc(p: Procedure): PPProg[Procedure] = {
     seenVars.clear()
     val decls = locals(p).map(vardecl)
 
-    val name = p.name
     val inParams = p.formalInParam.toList.map(vparam)
     val outParams = p.formalOutParam.toList.map(vparam)
-    val entryBlock = p.entryBlock
     val middleBlocks = p.blocksBookended.map(vblock)
-    val returnBlock = p.returnBlock.map(vblock)
 
     val localDecls = decls.toList.sorted
 
-    val iblocks = p.entryBlock.map(b => (s"  entry_block = " + '"' + b.label + '"')).toList
+    val requires = p.requiresExpr.map(e => {
+      s"  require ${vexpr(e)};"
+    })
+    val ensures = p.ensuresExpr.map(e => {
+      s"  ensures ${vexpr(e)};"
+    })
 
-    val addr = p.address.map(l => vaddress(l).toString).map("  address = " + _).toList
+    val spec = (if (requires.nonEmpty) then "\n" + requires.mkString("\n") else "")
+      + (if ensures.nonEmpty then ("\n" + ensures.mkString("\n")) else "")
 
     val mblocks =
       if (middleBlocks.size == 0) then None
       else {
-        Some(s"  blocks = [\n    " + indent(middleBlocks.mkString(";\n"), "    ") + "\n  ]")
+        Some(s"[\n  " + indent(middleBlocks.mkString(";\n"), "  ") + "\n]")
       }
 
-    val pname = Seq(s"  name = \"${p.procName}\"")
+    val blocks = (mblocks.toList).map(_ + ";").mkString("\n")
 
-    val blocks = (pname ++ addr ++ iblocks ++ mblocks.toList).map(_ + ";").mkString("\n")
-
-    val header = pp_proc_sig(p)
+    val header = pp_proc_sig(p) + spec
 
     Proc(header, localDecls, blocks)
   }
@@ -382,19 +473,20 @@ class BasilIRPrettyPrinter(
   override def vmemassign(lhs: PPProg[Variable], rhs: PPProg[Expr]): PPProg[LocalAssign] = BST(s"${lhs} mem:= ${rhs}")
 
   override def vstore(
-    mem: String,
+    mem: Memory,
     index: PPProg[Expr],
     value: PPProg[Expr],
     endian: Endian,
     size: Int
   ): BST[MemoryStore] = {
     val le = if endian == Endian.LittleEndian then "le" else "be"
-    BST(s"store $le ${mem} ${index} ${value} ${size}")
+
+    BST(s"store $le ${Sigil.BASIR.globalVar}${mem.name} ${index} ${value} ${size}")
   }
 
   def vload(lhs: PPProg[Variable], mem: String, index: PPProg[Expr], endian: Endian, size: Int): PPProg[MemoryLoad] = {
     val le = if endian == Endian.LittleEndian then "le" else "be"
-    BST(s"$lhs := load $le ${mem} ${index} ${size}")
+    BST(s"$lhs := load $le ${Sigil.BASIR.globalVar}${mem} ${index} ${size}")
   }
 
   override def vcall(
@@ -412,26 +504,46 @@ class BasilIRPrettyPrinter(
     }
 
     if (outParams.size > 5) {
-      BST(s"$op\n    := call $procname (${inparams.map((l, r) => r).mkString(", ")})")
+      BST(s"$op\n    := call ${Sigil.BASIR.proc}$procname (${inparams.map((l, r) => r).mkString(", ")})")
     } else if (outParams.size > 0) {
-      BST(s"$op := call $procname (${inparams.map((l, r) => r).mkString(", ")})")
+      BST(s"$op := call ${Sigil.BASIR.proc}$procname (${inparams.map((l, r) => r).mkString(", ")})")
     } else {
-      BST(s"call $procname (${inparams.map((l, r) => r).mkString(", ")})")
+      BST(s"call ${Sigil.BASIR.proc}$procname (${inparams.map((l, r) => r).mkString(", ")})")
     }
   }
 
   override def vindirect(target: PPProg[Variable]): PPProg[IndirectCall] = BST(s"indirect call ${target} ")
   override def vassert(body: Assert): PPProg[Assert] = {
-    val comment = body.comment.map(c => s" /* $c */").getOrElse("")
-    BST(s"assert ${vexpr(body.body)}$comment")
+
+    val attrs = body.label.map(l => ("label", l)).toSeq ++ body.comment.map(c => ("comment", c))
+    val attrl =
+      if attrs.nonEmpty then
+        " { " + attrs
+          .map { case (n, l) =>
+            s"${Sigil.BASIR.attrib}$n = \"$l\"; "
+          }
+          .mkString("") + " }"
+      else ""
+
+    BST(s"assert ${vexpr(body.body)}$attrl")
   }
   override def vassume(body: Assume): PPProg[Assume] = {
-    val comment = body.comment.map(c => s" /* $c */").getOrElse("")
-    BST(s"assume ${vexpr(body.body)}$comment")
+    val attrs = body.label.map(l => ("label", l)).toSeq ++ body.comment.map(c => ("comment", c))
+    val attrl =
+      if attrs.nonEmpty then
+        "{ " + attrs
+          .map { case (n, l) =>
+            s"${Sigil.BASIR.attrib}$n = \"$l\"; "
+          }
+          .mkString("") + " }"
+      else ""
+
+    val stmt = if body.checkSecurity then "guard" else "assume"
+    BST(s"$stmt ${vexpr(body.body)}$attrl")
   }
   override def vnop(): PPProg[NOP] = BST("nop")
 
-  override def vgoto(t: List[String]): PPProg[GoTo] = BST[GoTo](s"goto(${t.mkString(", ")})")
+  override def vgoto(t: List[String]): PPProg[GoTo] = BST[GoTo](s"goto(${t.map(Sigil.BASIR.block + _).mkString(", ")})")
   override def vunreachable(): PPProg[Unreachable] = BST[Unreachable]("unreachable")
   override def vreturn(outs: List[(PPProg[Variable], PPProg[Expr])]) = BST(
     s"return (${outs.map((l, r) => r).mkString(", ")})"
@@ -439,19 +551,29 @@ class BasilIRPrettyPrinter(
 
   def vtype(t: IRType): String = t match {
     case BitVecType(sz) => s"bv$sz"
-    case IntType => "nat"
+    case IntType => "int"
     case BoolType => "bool"
-    case m: MapType => s"map ${vtype(m.result)}[${vtype(m.param)}]"
+    case m: MapType => s"(${vtype(m.param)} -> ${vtype(m.result)})"
   }
 
-  override def vrvar(e: Variable): PPProg[Variable] = BST(s"${e.name}:${vtype(e.getType)}")
+  override def vrvar(e: Variable): PPProg[Variable] = e match {
+    case l: LocalVar =>
+      val sigil = if localSigils then Sigil.BASIR.localVar else ""
+      BST(s"${sigil}${e.name}:${vtype(e.getType)}")
+    case l: Global => BST(s"${Sigil.BASIR.globalVar}${e.name}:${vtype(e.getType)}")
+  }
   override def vlvar(e: Variable): PPProg[Variable] = {
     e match {
-      case l: LocalVar => BST("var " + e.name + s": ${vtype(e.getType)}")
-      case l => BST(e.name + s": ${vtype(e.getType)}")
+      case l: LocalVar =>
+        val sigil = if localSigils then Sigil.BASIR.localVar else ""
+        BST(s"var $sigil${e.name}: ${vtype(e.getType)}")
+      case l: Global => BST(s"${Sigil.BASIR.globalVar}${e.name}: ${vtype(e.getType)}")
     }
   }
 
+  override def vold(e: Expr) = BST(s"old(${vexpr(e)})")
+  override def vlambda(e: LambdaExpr) = ???
+  override def vquantifier(e: QuantifierExpr) = ???
   override def vextract(ed: Int, start: Int, a: PPProg[Expr]): PPProg[Expr] = BST(s"extract($ed, $start, ${a})")
   override def vzeroextend(bits: Int, b: PPProg[Expr]): PPProg[Expr] = BST(s"zero_extend($bits, $b)")
   override def vsignextend(bits: Int, b: PPProg[Expr]): PPProg[Expr] = BST(s"sign_extend($bits, $b)")
@@ -469,6 +591,6 @@ class BasilIRPrettyPrinter(
   override def vintlit(i: BigInt) = BST("0x%x".format(i))
   override def vbvlit(i: BitVecLiteral) = BST("0x%x".format(i.value) + s":bv${i.size}")
   override def vuninterp_function(name: String, args: Seq[PPProg[Expr]]): PPProg[Expr] = BST(
-    s"$name(${args.mkString(", ")})"
+    s"${Sigil.BASIR.globalVar}$name(${args.mkString(", ")})"
   )
 }
