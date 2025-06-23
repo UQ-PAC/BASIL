@@ -22,7 +22,7 @@ import com.grammatech.gtirb.proto.ByteInterval.ByteInterval
 import com.grammatech.gtirb.proto.Symbol.Symbol.OptionalPayload
 
 import scala.collection.mutable
-import scala.collection.immutable.SortedMap
+import scala.collection.immutable.{SortedMap, SortedSet}
 
 class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
@@ -85,6 +85,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     rela.r_type match {
       case 1025 | 1026 => Right(ExternalFunction(sym.name, rela.r_offset))
       case 1027 => Left((rela.r_offset, rela.r_addend))
+      case 1024 => Left((BigInt(0), BigInt(0)))
     }
 
   def getAllSymbols() = {
@@ -134,10 +135,10 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
   def getGlobals() = {
     gtirb.symbolEntriesByUuid.view.collect { case (symid, (size, "OBJECT", "GLOBAL", "DEFAULT", idx)) =>
-      val blk = symid.getReferentUuid.get.get
-      val sec = blk.section
-      assert(gtirb.mod.sections(idx.toInt - 1) == sec)
-      SpecGlobal(symid.get.name, (size * 8).toInt, None, blk.address)
+      val blk = symid.getReferentUuid.get.getOption
+      // val sec = blk.section
+      // assert(gtirb.mod.sections(idx.toInt - 1) == sec)
+      SpecGlobal(symid.get.name, (size * 8).toInt, None, blk.fold(BigInt(-1))(_.address))
     }.toSet
   }
 
@@ -170,7 +171,9 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     val funs = getFunctionEntries()
     val main = getMainAddress(mainProcedureName)
 
-    ReadELFData(syms, exts, globs, funs, offs, main)
+    val x = SortedSet.from(exts)(Ordering.by(_.toString))
+    println(x)
+    ReadELFData(syms, x, SortedSet.from(globs), funs, offs, main)
   }
 
   private val atSuffix = """@[A-Za-z_\d.]+$""".r

@@ -6,6 +6,7 @@ import boogie.*
 import specification.*
 import util.ILLoadingConfig
 
+import scala.collection.immutable.{SortedSet}
 import scala.jdk.CollectionConverters.*
 
 import ir.dsl.given
@@ -83,7 +84,8 @@ object ReadELFLoader {
     if (mainAddress.isEmpty) {
       throw Exception(s"no ${config.mainProcedureName} function in symbol table")
     }
-    ReadELFData(symbolTable, externalFunctions, globalVariables, functionEntries, relocationOffsets, mainAddress.head)
+    ReadELFData(symbolTable, SortedSet.from(externalFunctions)(Ordering.by(_.toString)), SortedSet.from(globalVariables),
+      functionEntries, relocationOffsets, mainAddress.head)
   }
 
   def visitRelocationTableExtFunc(ctx: RelocationTableContext): Set[ExternalFunction] = {

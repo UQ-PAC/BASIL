@@ -92,7 +92,7 @@ case class GTIRBResolver(val mod: Module) {
      * Returns the list of symbol table indices where this symbol can be found.
      * Each index is a tuple of table name and index within that table.
      */
-    def symTabIdx = symbolTabIdxByUuid(x)
+    def symTabIdx = symbolTabIdxByUuid.getOrElse(x, Nil)
 
     /**
      * Returns the `.symtab` entry for the given symbol.
