@@ -35,13 +35,13 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
   val opcodeSize = 4
 
   def visitBlock(
-    blockUUID: ByteString,
+    blockUUID: String,
     blockCountIn: Int,
     blockAddress: Option[BigInt]
   ): ArrayBuffer[immutable.Seq[Statement]] = {
     blockCount = blockCountIn
     instructionCount = 0
-    val instructions = parserMap(Base64.getEncoder.encodeToString(blockUUID.toByteArray))
+    val instructions = parserMap(blockUUID)
 
     val statements: ArrayBuffer[immutable.Seq[Statement]] = ArrayBuffer()
 
