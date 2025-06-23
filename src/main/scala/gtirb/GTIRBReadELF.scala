@@ -1,7 +1,12 @@
 package gtirb
 
+import util.Logger
 import gtirb.AuxDecoder
 import gtirb.AuxDecoder.{AuxKind, decodeAux}
+
+import translating.{ELFSymType, ELFBind, ELFVis, ELFNDX, ELFSymbol, ReadELFData}
+import specification.{ExternalFunction, FuncEntry}
+import boogie.{SpecGlobal}
 
 import java.io.ByteArrayInputStream
 
@@ -19,7 +24,7 @@ import com.grammatech.gtirb.proto.Symbol.Symbol.OptionalPayload
 import scala.collection.mutable
 import scala.collection.immutable.SortedMap
 
-object GTIRBReadELF {
+class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
   /**
    * An `Elf64_Rela` structure, as described by the [System V ABI](https://refspecs.linuxfoundation.org/elf/gabi4+/ch4.reloc.html).
@@ -33,14 +38,14 @@ object GTIRBReadELF {
 
   // https://refspecs.linuxbase.org/elf/gabi4+/ch4.reloc.html
   // https://github.com/ARM-software/abi-aa/blob/main/aaelf64/aaelf64.rst#relocation-types
-  def readRela(bs: AuxDecoder.Input) =
+  protected def readRela(bs: AuxDecoder.Input) =
     import AuxDecoder.*
     val (r_offset, r_info, r_addend) = readTuple(readUint(64), readUint(64), readUint(64))(bs)
     val r_sym = r_info >> 32
     val r_type = r_info & 0xffffffffL
     Elf64Rela(r_offset, r_info, r_addend, r_sym.toLong, r_type.toLong)
 
-  def parseRelaTab(bstr: ByteString) =
+  protected def parseRelaTab(bstr: ByteString) =
     val bs = ByteArrayInputStream(bstr.toByteArray)
     List.unfold(bs) {
       case bs if bs.available() > 0 => Some(readRela(bs), bs)
@@ -54,47 +59,86 @@ object GTIRBReadELF {
   //
   // https://www.man7.org/linux/man-pages/man5/elf.5.html
 
-  def getExternalFunctions(gtirb: GTIRBResolver) = {
+  // Full ELF32 specification: https://refspecs.linuxfoundation.org/elf/elf.pdf
 
-    val mod = gtirb.mod
+  // Full ELF64 specification: https://irix7.com/techpubs/007-4658-001.pdf
 
+  /**
+   * https://refspecs.linuxfoundation.org/elf/elf.pdf
+   * Figure 1-7. Special Section Indexes
+   */
+  protected def parseElfNdx(n: BigInt) = n.toInt match {
+    case 0 => ELFNDX.UND
+    case 0xfff1 => ELFNDX.ABS
+    case i =>
+      if (i >= 0xff00)
+        Logger.warn("unhandled special elf section index: " + i)
+      ELFNDX.Section(i)
+  }
+
+  /**
+   * https://github.com/ARM-software/abi-aa/blob/main/aaelf64/aaelf64.rst#dynamic-relocations
+   */
+  def parseRela(rela: Elf64Rela) =
+    val sym = gtirb.symbolTables(".dynsym")(rela.r_sym.toInt).get
+
+    rela.r_type match {
+      case 1025 | 1026 => Right(ExternalFunction(sym.name, rela.r_offset))
+      case 1027 => Left( (rela.r_offset, rela.r_addend))
+    }
+
+  def getAllSymbols() = {
+    gtirb.symbolEntriesByUuid
+      .flatMap { case (k, pos) =>
+        val sym = k.get
+        val block = k.getReferentUuid.flatMap(_.getOption)
+
+        val idx = k.symTabIdx.collectFirst {
+          case (".symtab", i) => i.toInt
+        }
+
+        val addr = block.map(x => BigInt(x.address))
+        val value = k.getScalarValue.map(BigInt(_))
+        val combinedValue = addr.orElse(value).getOrElse(BigInt(0))
+
+        val (size, ty, bind, vis, shndx) = k.symEntry
+
+        ty match {
+          case "NONE" => None
+          case ty => Some(
+        ELFSymbol(idx.getOrElse(-1), combinedValue, size.toInt, ELFSymType.valueOf(ty),
+          ELFBind.valueOf(bind),
+          ELFVis.valueOf(vis),
+          parseElfNdx(shndx),
+          sym.name
+          )
+        )
+      }
+    }.toList.sortBy(x => x.num)
+  }
+
+  def getRelocations() = {
     val relaDyns = parseRelaTab(gtirb.sectionsByName(".rela.dyn").byteIntervals.head.contents)
     val relaPlts = parseRelaTab(gtirb.sectionsByName(".rela.plt").byteIntervals.head.contents)
 
-    import scala.math.Ordering.Implicits.seqOrdering
-    val allSymbols = gtirb.symbolEntriesByUuid
-      .map { case (k, pos) =>
-        val sym = k.get
-        println(k)
-        val addr = k.getReferentUuid.flatMap(_.getOption).map(_.address)
-        val value = k.getScalarValue.fold("")("val=" + _.toString)
-        (k.symTabIdx, addr, pos) -> s"${sym.name} $value"
-      }
-      .to(SortedMap)
-    println(allSymbols.mkString("\n"))
+    val (offs, exts) = (relaDyns.view ++ relaPlts.view).partitionMap(parseRela)
 
-    println()
-    println(".rela.dyn")
-    relaDyns.foreach { case x =>
-      val symid = gtirb.symbolTables(".dynsym")(x.r_sym.toInt)
-      println(s"$x " + symid.get.name)
-    }
-    println(".rela.plt")
-    relaPlts.foreach { case x =>
-      val symid = gtirb.symbolTables(".dynsym")(x.r_sym.toInt)
-      println(s"$x " + symid.get.name)
-    }
+    (offs.toMap, exts.toSet)
+  }
 
-    val specGlobals = gtirb.symbolEntriesByUuid.toList.collect {
+  def getGlobals() = {
+    gtirb.symbolEntriesByUuid.view.collect {
       case (symid, (size, "OBJECT", "GLOBAL", "DEFAULT", idx)) =>
         val blk = symid.getReferentUuid.get.get
         val sec = blk.section
-        assert(mod.sections(idx.toInt - 1) == sec)
-        (symid.get.name, blk.size * 8, None, blk.address)
-    }
-    println(specGlobals)
+        assert(gtirb.mod.sections(idx.toInt - 1) == sec)
+        SpecGlobal(symid.get.name, (blk.size * 8).toInt, None, blk.address)
+    }.toSet
+  }
 
-    val funentry = gtirb.symbolEntriesByUuid.toList.collect {
+  def getFunctionEntries() = {
+
+    gtirb.symbolEntriesByUuid.view.collect {
       case (symid, (size, "FUNC", "GLOBAL", "DEFAULT", idx)) if idx != 0 =>
 
         val nameSymbol = symid.get
@@ -105,10 +149,23 @@ object GTIRBReadELF {
         val entry = entries.head
         val addr = entry.get.address
 
-        (nameSymbol.name, size * 8, addr)
-    }
-
-    println(funentry)
-
+        FuncEntry(nameSymbol.name, (size * 8).toInt, addr)
+    }.toSet
   }
+
+  def getEntryPoint(mainProcedureName: String) = {
+    gtirb.symbolsByName(mainProcedureName).getReferentUuid.get.get.address
+  }
+
+  def getReadELFData(mainProcedureName: String) = {
+
+    val syms = getAllSymbols()
+    val (offs, exts) = getRelocations()
+    val globs = getGlobals()
+    val funs = getFunctionEntries()
+    val main = getEntryPoint(mainProcedureName)
+
+    ReadELFData(syms, exts, globs, funs, offs, main)
+  }
+
 }

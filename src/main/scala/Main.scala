@@ -329,17 +329,24 @@ object Main {
       )
     }
 
+      import gtirb.*
+      import ir.dsl.given
     if (conf.dumpRelf.value) {
       val relfFile = loadingInputs.relfFile.getOrElse {
         throw IllegalArgumentException("--dump-relf requires --relf")
       }
       val relfData = IRLoading.loadReadELF(relfFile, loadingInputs)
       println(relfData.toScala)
-      println()
 
-      val fIn = java.io.FileInputStream(loadingInputs.inputFile)
-      val ir = com.grammatech.gtirb.proto.IR.IR.parseFrom(fIn)
-      println(ir.modules.map(x => gtirb.GTIRBReadELF.getExternalFunctions(gtirb.GTIRBResolver(x))))
+      import com.grammatech.gtirb.proto.IR.IR
+
+      import java.io.*
+      val ir = IR.parseFrom(FileInputStream(loadingInputs.inputFile))
+
+
+      val gtirb = GTIRBResolver(ir.modules.head)
+      val gtirbRelfLoader = GTIRBReadELF(gtirb)
+      println(gtirbRelfLoader.getReadELFData("main").toScala)
       return
     }
 

@@ -212,7 +212,22 @@ object IRLoading {
     val parser = ReadELFParser(tokens)
     parser.setErrorHandler(BailErrorStrategy())
     parser.setBuildParseTree(true)
-    ReadELFLoader.visitSyms(parser.syms(), config)
+
+    val relf = ReadELFLoader.visitSyms(parser.syms(), config)
+
+    if (config.inputFile.endsWith(".gts")) {
+      val ir = IR.parseFrom(FileInputStream(config.inputFile))
+      if (ir.modules.length != 1) {
+        Logger.warn(s"GTIRB file ${config.inputFile} unexpectedly has ${ir.modules.length} modules")
+      }
+
+      val gtirb = GTIRBResolver(ir.modules.head)
+      val gtirbRelfLoader = GTIRBReadELF(gtirb)
+      val gtirbRelf = gtirbRelfLoader.getAllSymbols()
+
+    }
+
+    relf
   }
 
   def emptySpecification(globals: Set[SpecGlobal]) =

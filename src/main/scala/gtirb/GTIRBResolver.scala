@@ -33,7 +33,7 @@ import scala.collection.immutable.SortedMap
  * query operations. For example, accessing the object itself from its Uuid can be
  * done via the `.get` methods.
  */
-case class GTIRBResolver(mod: Module) {
+case class GTIRBResolver(val mod: Module) {
 
   sealed trait Uuid(val kind: String, val uuid: String) {
     override def toString = s"$kind:$uuid"
@@ -66,8 +66,8 @@ case class GTIRBResolver(mod: Module) {
    */
   case class BlockData(inner: DataBlock | CodeBlock, block: Block, interval: ByteInterval, section: Section) {
     val uuid = inner match {
-      case x: DataBlock => x.uuid
-      case x: CodeBlock => x.uuid
+      case x: DataBlock => Uuid.Block(x.uuid)
+      case x: CodeBlock => Uuid.Block(x.uuid)
     }
     val size = inner match {
       case x: DataBlock => x.size
@@ -92,12 +92,15 @@ case class GTIRBResolver(mod: Module) {
 
     /**
      * Returns the `.symtab` entry for the given symbol.
-     * This is a 5-tuple made up of size, type, binding, visibility, and index.
+     * This is a 5-tuple made up of size, type, binding, visibility, and section index.
+     * Every symbol table entry is in relation to some section. The section index is the
+     * index of the relevant section's section header.
      */
     def symEntry = symbolEntriesByUuid(x)
 
     /**
-     * Gets the [[Uuid.Block]] referred to by this symbol.
+     * Gets the [[Uuid.Block]] referred to by this symbol, for example
+     * a data block or code block.
      * This is mutually-exclusive with [[getScalarValue]],
      * only one of these can be non-None.
      */
@@ -133,6 +136,7 @@ case class GTIRBResolver(mod: Module) {
 
   val proxyBlockUuids = mod.proxies.map(x => Uuid.Block(x.uuid)).toSet
   val symbolsByUuid = mod.symbols.map(x => Uuid.Symbol(x.uuid) -> x).toMap
+  val symbolsByName = mod.symbols.map(x => x.name -> Uuid.Symbol(x.uuid)).toMap
 
   val blocksByUuid = (for {
     sec <- mod.sections.toList
@@ -169,5 +173,7 @@ case class GTIRBResolver(mod: Module) {
   val funcEntries = decodeAux(AuxKind.FunctionEntries)(mod).map { case (a, b) =>
     Uuid.Function(a) -> b.map(Uuid.Block(_))
   }
+
+  val entryPoint = Uuid.Block(mod.entryPoint)
 
 }
