@@ -208,7 +208,12 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
     if (arg1.value != newSize) {
       throw Exception()
     }
-    ZeroExtend((newSize - oldSize).toInt, castBV(arg0))
+    val arg = castBV(arg0)
+    if (newSize != oldSize) {
+      ZeroExtend((newSize - oldSize).toInt, arg)
+    } else {
+      arg
+    }
   }
   def f_gen_add_bits(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = BinaryExpr(BVADD, arg0, arg1)
   def f_gen_and_bits(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = BinaryExpr(BVAND, arg0, arg1)
@@ -313,7 +318,7 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
 
   def v_PSTATE_BTYPE = Mutable(Register("PSTATE.BTYPE", 1))
   def v_BTypeCompatible = Mutable(Register("BTypeCompatible", 1))
-  def v___BranchTaken = Mutable(Register("__BranchTaken", 1))
+  def v___BranchTaken = Mutable(Register("__BranchTaken", 1)) // FIXME: make global boolean when merged
   def v_BTypeNext = Mutable(Register("BTypeNext", 2))
   def v___ExclusiveLocal = Mutable(Register("__ExclusiveLocal", 1))
 
