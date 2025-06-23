@@ -132,7 +132,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
         val blk = symid.getReferentUuid.get.get
         val sec = blk.section
         assert(gtirb.mod.sections(idx.toInt - 1) == sec)
-        SpecGlobal(symid.get.name, (blk.size * 8).toInt, None, blk.address)
+        SpecGlobal(symid.get.name, (size * 8).toInt, None, blk.address)
     }.toSet
   }
 
