@@ -8,6 +8,7 @@ import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Symbol.Symbol
 import Parsers.ASLpParser.*
 import gtirb.*
+import gtirb.AuxDecoder.AuxKind
 import ir.*
 
 import scala.collection.mutable
@@ -75,22 +76,9 @@ class GTIRBToIR(
   mainName: Option[String]
 ) {
 
-  object auxdata {
-    import gtirb.AuxDecoder.*
-    val functionNames = mods
-      .map(_.auxData("functionNames").data)
-      .map(decode(readMap(readUuid, readUuid))(_))
-      .foldLeft0(_ ++ _)
-    val functionEntries = mods
-      .map(_.auxData("functionEntries").data)
-      .map(decode(readMap(readUuid, readSet(readUuid)))(_))
-      .foldLeft0(_ ++ _)
-    val functionBlocks = mods
-      .map(_.auxData("functionBlocks").data)
-      .map(decode(readMap(readUuid, readSet(readUuid)))(_))
-      .foldLeft0(_ ++ _)
-  }
-  import auxdata.*
+  val functionNames = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionNames)(_)).foldLeft0(_ ++ _)
+  val functionEntries = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionEntries)(_)).foldLeft0(_ ++ _)
+  val functionBlocks = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionBlocks)(_)).foldLeft0(_ ++ _)
 
   def b64encode(x: com.google.protobuf.ByteString) =
     Base64.getEncoder().encodeToString(x.toByteArray)

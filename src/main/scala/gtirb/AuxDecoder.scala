@@ -6,11 +6,28 @@ import java.nio.charset.StandardCharsets
 
 import com.google.protobuf.ByteString
 import com.grammatech.gtirb.proto.AuxData.AuxData
+import com.grammatech.gtirb.proto.Module.Module
 
 object AuxDecoder {
 
+  enum AuxKind[T](val name: String, val decoder: Decoder[T]) {
+    case ElfSymbolTabIdxInfo
+        extends AuxKind("elfSymbolTabIdxInfo", readMap(readUuid, readList(readTuple(readString, readUint(64)))))
+    case ElfSymbolInfo
+        extends AuxKind(
+          "elfSymbolInfo",
+          readMap(readUuid, readTuple(readUint(64), readString, readString, readString, readUint(64)))
+        )
+    case FunctionEntries extends AuxKind("functionEntries", readMap(readUuid, readSet(readUuid)))
+    case FunctionBlocks extends AuxKind("functionBlocks", readMap(readUuid, readSet(readUuid)))
+    case FunctionNames extends AuxKind("functionNames", readMap(readUuid, readUuid))
+  }
+
   type Input = ByteArrayInputStream
   type Decoder[T] = Input => T
+
+  def decodeAux[T](known: AuxKind[T])(mod: Module) =
+    decode(known.decoder)(mod.auxData(known.name))
 
   def decode[T](decoder: Decoder[T])(bytes: ByteString): T =
     decoder(ByteArrayInputStream(bytes.toByteArray))
@@ -76,9 +93,13 @@ object AuxDecoder {
     val x4 = r4(bs)
     (x1, x2, x3, x4)
 
-  def readTuple[T1, T2, T3, T4, T5](r1: Decoder[T1], r2: Decoder[T2], r3: Decoder[T3], r4: Decoder[T4], r5: Decoder[T5])(
-    bs: Input
-  ) =
+  def readTuple[T1, T2, T3, T4, T5](
+    r1: Decoder[T1],
+    r2: Decoder[T2],
+    r3: Decoder[T3],
+    r4: Decoder[T4],
+    r5: Decoder[T5]
+  )(bs: Input) =
     val x1 = r1(bs)
     val x2 = r2(bs)
     val x3 = r3(bs)
