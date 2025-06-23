@@ -3,132 +3,208 @@ package ir.transforms.validate
 import ir.*
 import cilvisitor.*
 import scala.collection.mutable
+import analysis.ProcFrames.*
+import util.Logger
+
+case class Field(name: String)
+case class LocalFunctionSig(
+  stmt: Statement,
+  name: String,
+  lhs: List[(Variable | Memory | Field, Variable)],
+  rhs: List[(Variable | Memory | Field, Expr)]
+) {
+  // lhs  := name(rhs)
+  // rhs is mapping formal -> actual
+  //  for globals the formal param is the captured global var or memory
+}
+
+class SideEffectStatement(frames: Map[Procedure, Frame]) {
+
+  def endianHint(e: Endian) = e match {
+    case Endian.LittleEndian => "le"
+    case Endian.BigEndian => "be"
+  }
+
+  def typeHint(t: IRType) = t match {
+    case IntType => "int"
+    case BitVecType(sz) => s"bv$sz"
+    case _ => ???
+  }
+
+  def traceVar(m: Memory) = {
+    GlobalVar(s"TRACE_MEM_${m.name}_${m.addressSize}_${m.valueSize}", BoolType)
+  }
+
+  def globalTraceVar = {
+    GlobalVar(s"TRACE", BoolType)
+  }
+
+  def param(v: Global): (Variable | Memory, Variable) = v match {
+    case g: GlobalVar => (g -> g)
+    case m: Memory => (m -> traceVar(m))
+  }
+
+  // source -> target
+  // variable rewriting applied by parameter analysis
+  //
+  // axiom:
+  //  \land ps: formal param in source, pt : param or global in target st (paramInvariant(ps) = pt)
+  //      renamed(src, p) = renamed(tgt, pt)
+  //
+  //  \forall g: global \in tgt . \exists p or global \in src st. paramInvariant(p) = g
+  //
+  //  paramInvariant(m: Memory) = m \forall m: Memory
+  //
+  //  \land ps: formal param in source, pt : param or global in target st,
+  //      renamed(src, p) = renamed(tgt, pt)
+  //
+  // - based on source, underapproximation leads to incompleteness
+  //
+  // - invariant:
+  //
+  //
+  //
+
+  // need to have already lifted globals to locals
+  val traceOut = LocalVar("trace", BoolType) -> globalTraceVar
+
+  /**
+   * Unified monadic side-effect signature
+   *
+   * (name, lhs named params, rhs named params)
+   */
+  def unapply(e: Statement): Option[LocalFunctionSig] = e match {
+    case DirectCall(tgt, lhs, rhs, _) =>
+      val frame = frames(tgt)
+      val globsLHS = frame.modifiedGlobalVars.toList.map(param) ++ frame.modifiedMem.toList.map(param)
+      val globsRHS = frame.readGlobalVars.toList.map(param) ++ frame.readMem.toList.map(param)
+      Some(LocalFunctionSig(e, s"Call_${tgt.name}", traceOut :: lhs.toList ++ globsLHS, rhs.toList ++ globsRHS))
+    case MemoryLoad(lhs, memory, addr, endian, size, _) =>
+      val args = List(param(memory), Field("addr") -> addr)
+      val rets = List(Field("out") -> lhs, param(memory))
+      Some(
+        LocalFunctionSig(
+          e,
+          s"Load_${endianHint(endian)}_${typeHint(addr.getType)}_${typeHint(lhs.getType)}",
+          rets,
+          args
+        )
+      )
+    case MemoryStore(memory, addr, value, endian, size, _) =>
+      val args = List(param(memory), Field("addr") -> addr)
+      val rets = List(traceOut, param(memory))
+      Some(
+        LocalFunctionSig(
+          e,
+          s"Store_${endianHint(endian)}_${typeHint(addr.getType)}_${typeHint(value.getType)}",
+          rets,
+          args
+        )
+      )
+    case MemoryAssign(lhs, rhs, _) =>
+      Some(
+        LocalFunctionSig(
+          e,
+          s"MemoryAssign_${typeHint(lhs.getType)}_${typeHint(rhs.getType)}",
+          List(traceOut, Field("out") -> lhs),
+          List(Field("arg") -> rhs)
+        )
+      )
+    case IndirectCall(arg, _) =>
+      // kind of want these gone :(
+      // doesn't capture interprocedural effects but we don't resolve indirect calls so it doesn't matter
+      Some(
+        LocalFunctionSig(e, s"IndirectCall_${typeHint(arg.getType)}", List(traceOut, Field("target") -> arg), List())
+      )
+    case _ => None
+  }
+
+}
 
 object Ackermann {
 
-  case class Info(
-    call: String,
-    prefix: String,
-    argAssign: SimulAssign,
-    returnAssign: SimulAssign,
-    // to maintain arg order to correspond with target
-    args: List[Variable],
-    returns: List[Variable]
-  )
+  case class CompatArg(source: Expr, target: Expr)
+  case class AckInv(name: String, lhs: List[CompatArg], rhs: List[CompatArg]) {
+    def toPredicate(renameSource: Expr => Expr, renameTarget: Expr => Expr) = {
+      val antecedent = BoolExp(
+        BoolAND,
+        lhs.map { case CompatArg(s, t) =>
+          BinaryExpr(EQ, renameSource(s), renameTarget(t))
+        }
+      )
+      val implicant = BoolExp(
+        BoolAND,
+        rhs.map { case CompatArg(s, t) =>
+          BinaryExpr(EQ, renameSource(s), renameTarget(t))
+        }
+      )
+      BinaryExpr(BoolIMPLIES, antecedent, implicant)
+    }
+  }
 
+  /**
+   * Check compatibility of two side effects and emit the lists (lhs, rhs) such that 
+   *
+   *  `(\forall (si, ti)  \in lhs si == ti) ==> (\forall (so, to) \in rhs . so == to)`
+   *
+   */
+  def instantiateAxiomInstance(
+    renaming: Variable => Option[Variable]
+  )(source: LocalFunctionSig, target: LocalFunctionSig): Either[String, AckInv] = {
+    // source has higher level, has params, target does not have params
 
-  class ToAssume(axioms: Map[SimulAssign, Info]) extends CILVisitor {
-    override def vstmt(s: Statement) = s match {
-      case s: SimulAssign if axioms.contains(s) => {
-        ChangeTo(s.assignments.map(polyEqual).map(x => Assume(x, Some(axioms(s).call))).toList)
+    def applyRename(a: Variable | Memory | Field): Variable | Memory | Field = a match {
+      case a: Field => (a)
+      case a: Memory => (a)
+      case v: Variable => renaming(v).getOrElse(v)
+    }
+
+    for {
+      name <- (source, target) match {
+        case (l, r) if l.name == r.name => Right(l.name)
+        case (l, r) => Left(s"Name incompat: ${l.name}, ${r.name}")
       }
-      case _ => SkipChildren()
-    }
-  }
-
-  class AckermannTransform(stripNamespace: String => String, traceVars: Set[Variable]) extends CILVisitor {
-    // expected to run on the program with side effects removed,
-    // prior to namespacing
-    //
-
-    var axioms = Map[SimulAssign, Info]()
-
-    var counter = 0
-
-    def isTraceVar(v: Variable) = {
-      stripNamespace(v.name).startsWith("TRACE")
-    }
-
-    override def vstmt(s: Statement) = s match {
-      case s: SimulAssign if s.assignees.exists(isTraceVar) => {
-        counter += 1
-
-        val rg = s.assignments.find(v => isTraceVar(v._1)).get
-
-        val (fname, args) = rg._2 match {
-          case UninterpretedFunction(name, args, rt, _) => (name, args)
-          case _ => ???
-        }
-
-        val newargs = args.zipWithIndex.map { case (rhs, index) =>
-          LocalVar(s"${fname}_ackarg${counter}_${index}", rhs.getType) -> rhs
-        }
-        val newreturns = s.assignments.zipWithIndex.map { case ((lhs, rhs), index) =>
-          lhs -> LocalVar(s"${fname}_ackret_${counter}_${index}", lhs.getType)
-        }
-
-        val (argAssign, returnAssign) = (SimulAssign(newargs.toVector), SimulAssign(newreturns.toVector))
-
-        val argvars = newargs.map(_._1).toList
-        val returnvars = newreturns.map(_._2).toList
-
-        val prefix = fname.stripSuffix(stripNamespace(fname))
-
-        axioms =
-          axioms.updated(argAssign, Info(stripNamespace(fname), prefix, argAssign, returnAssign, argvars, returnvars))
-
-        ChangeTo(List(argAssign, returnAssign))
+      targetArgs = target.rhs.toMap
+      args <- source.rhs.foldLeft(Right(List()): Either[String, List[CompatArg]]) { case (agg, (formal, actual)) =>
+        agg.flatMap(agg => {
+          targetArgs.get(applyRename(formal)) match {
+            case Some(a) => Right(CompatArg(actual, a) :: agg)
+            case None => Left(s"Unable to match source var ${formal} in target list ${target.rhs}")
+          }
+        })
       }
-      case _ => SkipChildren()
-    }
-  }
-
-  def doTransform(p: Procedure, srcNamespace: NamespaceState, tgtNamespace: NamespaceState): Map[SimulAssign, Info] = {
-    def stripNamespace(s: String) = {
-      tgtNamespace.stripNamespace(srcNamespace.stripNamespace(s))
-    }
-
-    val v =
-      AckermannTransform(stripNamespace, Set(visit_rvar(srcNamespace, traceVar), visit_rvar(tgtNamespace, traceVar)))
-    visit_proc(v, p)
-    v.axioms
-  }
-
-  def getVisitor(srcNamespace: NamespaceState, tgtNamespace: NamespaceState) = {
-    def stripNamespace(s: String) = {
-      tgtNamespace.stripNamespace(srcNamespace.stripNamespace(s))
-    }
-
-    AckermannTransform(stripNamespace, Set(visit_rvar(srcNamespace, traceVar), visit_rvar(tgtNamespace, traceVar)))
-  }
-
-  def naiveInvariant(inst: Map[SimulAssign, Info]): List[Expr] = {
-
-    val compat = inst.groupBy(_._2.call)
-
-    compat
-      .flatMap((pref, insts) => {
-        val gs = inst.groupBy(_._2.prefix).toList
-        val fst = gs.head._2
-        val snd = gs.tail.head._2
-        assert(gs.tail.tail.isEmpty)
-
-        for {
-          s <- fst
-          t <- snd
-          argsEqual = s._2.args.zip(t._2.args).map(polyEqual)
-          returnsEqual = s._2.returns.zip(t._2.returns).map(polyEqual)
-        } yield (BinaryExpr(BoolIMPLIES, boolAnd(argsEqual), boolAnd(returnsEqual)))
-      })
-      .toList
-
+      targetLHS = target.lhs.toMap
+      lhs <- source.lhs.foldLeft(Right(List()): Either[String, List[CompatArg]]) { case (agg, (formal, actual)) =>
+        agg.flatMap(agg => {
+          targetLHS.get(applyRename(formal)) match {
+            case Some(a) => Right(CompatArg(actual, a) :: agg)
+            case None => Left(s"Unable to match outparam ${formal} in target list ${target.lhs}")
+          }
+        })
+      }
+    } yield (AckInv(name, lhs, args))
   }
 
   def instantiateAxioms(
     sourceEntry: Block,
     targetEntry: Block,
-    instantiations: Map[SimulAssign, Info],
-    inlineArgs: Boolean = true
-  ) = {
+    frames: Map[Procedure, Frame],
+    renameSourceExpr: Expr => Expr,
+    renameTargetExpr: Expr => Expr
+  ): List[(Expr, String)] = {
+
+    // after axiom is intantiated we delete the assignment
+    var toRemove = List[Statement]()
+    val SF = SideEffectStatement(frames)
 
     val seen = mutable.Set[CFGPosition]()
-    var invariant = List[Expr]()
+    var invariant = List[(Expr, String)]()
 
     def succ(p: CFGPosition) =
       var n = IntraProcIRCursor.succ(p)
       while (
         (n.size == 1) && (n.head match {
-          case s: SimulAssign if instantiations.contains(s) => false
+          case SF(_) => false
           case _ => true
         })
       ) {
@@ -136,14 +212,17 @@ object Ackermann {
         n = IntraProcIRCursor.succ(n.head)
       }
       val r = n.filterNot(seen.contains(_)).map {
-        case s: SimulAssign if instantiations.contains(s) => (Some(s), s)
+        case stmt @ SF(s) => (Some(s), stmt)
         case s => (None, s)
       }
       r
 
-    val q = mutable.Queue[((Option[SimulAssign], CFGPosition), (Option[SimulAssign], CFGPosition))]()
+    val q = mutable.Queue[((Option[LocalFunctionSig], CFGPosition), (Option[LocalFunctionSig], CFGPosition))]()
     val start = ((None, sourceEntry), (None, targetEntry))
-    if (instantiations.nonEmpty) {
+    if (true) {
+      // FIXME:  was previously conditional on there being any side-effects in the function, to fix a nontermination
+      // bug, unclear if this is neccessary
+      //    -> [[instantiations.nonEmpty]]
       q.enqueue(start)
     }
 
@@ -180,41 +259,27 @@ object Ackermann {
         case (None, Some(_)) => advanceSrc()
         case (Some(_), None) => advanceTgt()
         case (Some(src), Some(tgt)) => {
-          seen.add(src)
-          seen.add(tgt)
+          seen.add(src.stmt)
+          seen.add(tgt.stmt)
 
-          def getArgs(i: Info) = if inlineArgs then {
-            i.argAssign.assignments.map(_._2).toList
-          } else {
-            i.args.toList
-          }
-
-          val srcInfo = instantiations(src)
-          val tgtInfo = instantiations(tgt)
-          if (srcInfo.call == tgtInfo.call) {
-            val argsEqual = getArgs(srcInfo).zip(getArgs(tgtInfo)).map(polyEqual)
-            val returnsEqual = srcInfo.returns.toList.zip(tgtInfo.returns).map(polyEqual)
-            invariant = BinaryExpr(BoolIMPLIES, boolAnd(argsEqual), boolAnd(returnsEqual)) :: invariant
-            advanceBoth()
+          instantiateAxiomInstance(_ => None)(src, tgt) match {
+            case Right(inv) => {
+              invariant = (inv.toPredicate(renameSourceExpr, renameTargetExpr), inv.name) :: invariant
+              toRemove = src.stmt :: tgt.stmt :: toRemove
+              advanceBoth()
+            }
+            case Left(err) =>
+              Logger.warn(s"Ackermannisation failure: $err; ${src} ${tgt}")
           }
         }
         case _ => ()
       }
     }
 
-    class RemoveArgCopy extends CILVisitor {
-      override def vstmt(s: Statement) = s match {
-        case s: SimulAssign if instantiations.contains(s) => ChangeTo(List())
-        case _ => SkipChildren()
-      }
-    }
-
-    if (inlineArgs) {
-      visit_proc(RemoveArgCopy(), sourceEntry.parent)
-      visit_proc(RemoveArgCopy(), targetEntry.parent)
+    for (s <- toRemove.toSet) {
+      s.parent.statements.remove(s)
     }
 
     invariant
   }
 }
-

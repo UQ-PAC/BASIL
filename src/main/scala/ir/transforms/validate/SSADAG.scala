@@ -4,7 +4,7 @@ import scala.collection.mutable
 import ir.*
 import cilvisitor.*
 import ir.transforms.Substitute
-
+import analysis.ProcFrames.*
 
 object SSADAG {
 
@@ -14,7 +14,6 @@ object SSADAG {
   * Returns the SSA renaming for each block entry in the CFA.
   */
   def transform(p: Procedure) = {
-    localiseBehaviour(p)
     ssaTransform(p)
   }
 
@@ -31,12 +30,6 @@ object SSADAG {
     visit_proc(Passify(), p)
   }
 
-
-  def localiseBehaviour(p: Procedure) = {
-    // lift globals to local scope
-    // monadic side-effect and call structure
-  }
-
   /**
   * Convert an acyclic CFA to a transition encoding
   *
@@ -47,7 +40,6 @@ object SSADAG {
     var renameCount = 0
     val stRename = mutable.Map[Block, mutable.Map[Variable, Variable]]()
     val renameBefore = mutable.Map[Block, Map[Variable, Variable]]()
-
 
     def blockDone(b: Block) = {
       LocalVar(b.label + "_done", BoolType)
@@ -64,6 +56,7 @@ object SSADAG {
       }
 
     class Subst(rn: Variable => Option[Variable]) extends CILVisitor {
+      override def vrvar(v: Variable) = ChangeTo(rn(v).getOrElse(v))
       override def vexpr(e: Expr) = {
         ChangeTo(Substitute(rn, false)(e).getOrElse(e))
       }

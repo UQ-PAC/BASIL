@@ -16,7 +16,6 @@ import scala.collection.mutable
 import util.{Logger, PerformanceTimer, LogLevel}
 import ir.transforms.Substitute
 
-
 /**
  *
  * Pure structure:
@@ -24,7 +23,6 @@ import ir.transforms.Substitute
  *  (Program, Program', invariants) -> proof
  *
  */
-
 
 /*
  * General considerations
@@ -39,7 +37,6 @@ import ir.transforms.Substitute
  * - ssa transform & passify
  */
 
-
 /*
  * Ackermann and monadic transform for basil ir program
  *
@@ -48,11 +45,9 @@ import ir.transforms.Substitute
  *
  */
 
-
 /*
  * CFA conversion of basil ir programs
  */
-
 
 def boolAnd(exps: Iterable[Expr]) =
   val l = exps.toList
@@ -160,67 +155,6 @@ class AssertsToPC(val exitBl: Block) {
 
       bl.jump.asInstanceOf[GoTo].addTarget(falseBranch)
     }
-  }
-}
-
-class RewriteSideEffects(frames: Procedure => Frame) extends CILVisitor {
-
-  /**
-   * Converts side-effecting statements to pure monadic structure of uninterpreted functions over trace variable
-   *
-   * NOTE: Requires modifies be correct on procedures to lift globals into params
-   */
-
-  def loadFunc(lhs: Variable, size: Int, addr: Expr) = {
-    val loadValue =
-      (lhs, UninterpretedFunction("load_" + size, Seq(traceVar, addr), BitVecType(size)))
-    val trace =
-      (traceVar, UninterpretedFunction("trace_load_" + size, Seq(traceVar, addr), traceType))
-    List(SimulAssign(Vector(trace, loadValue)))
-  }
-
-  def storeFunc(size: Int, addr: Expr, value: Expr) =
-    (SimulAssign(
-      Vector(traceVar -> UninterpretedFunction("store_" + size, Seq(traceVar, addr, value: Expr), traceType))
-    ))
-
-  def directCallFunc(m: DirectCall) = {
-    // readMem is captured by trace
-    val globalsCaptured = frames(m.target).readGlobalVars
-      .collect { case e: Expr =>
-        e
-      }
-      .toVector
-      .sortBy(_.toString)
-    val globalsModified = frames(m.target).modifiedGlobalVars
-      .collect { case e: Variable =>
-        e
-      }
-      .toVector
-      .sortBy(_.toString)
-    val params = traceVar :: (m.actualParams.toList.map(_._2) ++ globalsCaptured)
-    val trace =
-      traceVar ->
-        UninterpretedFunction("Call_" + m.target.name, params, traceType)
-    val outParams = (m.outParams.toList.map { case (formal, actual) =>
-      formal.name -> actual
-    } ++ globalsModified.map { case g =>
-      g.name -> g
-    }).map { case (label: String, v: Variable) =>
-      v -> UninterpretedFunction("Call_" + m.target.name + "_" + label, params, v.getType)
-    }
-
-    List(SimulAssign((trace :: outParams).toVector))
-  }
-
-  override def vstmt(s: Statement) = s match {
-    case m: MemoryLoad => ChangeTo(loadFunc(m.lhs, m.size, m.index))
-    case m: MemoryStore => ChangeTo(List(storeFunc(m.size, m.index, m.value)))
-    case m: IndirectCall =>
-      ChangeTo(List(LocalAssign(traceVar, UninterpretedFunction("indirCall", traceVar :: m.target :: Nil, traceType))))
-    case m: DirectCall => ChangeTo(directCallFunc(m))
-    case _ => SkipChildren()
-
   }
 }
 
@@ -376,7 +310,6 @@ def procToTransition(p: Procedure, loops: List[Loop], frames: Map[Procedure, Fra
 
   }
   synthExit.replaceJump(Return())
-  visit_proc(RewriteSideEffects(g => frames.getOrElse(g, Frame())), p)
   cutPoints
 
 }
@@ -399,7 +332,6 @@ def toTransitionSystem(iprogram: Program, frames: Map[Procedure, Frame]) = {
 
   (program, cutPoints)
 }
-
 
 enum Inv {
   case CutPoint(cutPointPCGuard: String, pred: Expr, comment: Option[String] = None)
@@ -455,7 +387,6 @@ class TranslationValidator {
   def varInSource(v: Variable) = visit_rvar(afterRenamer, v)
   def varInTarget(v: Variable) = visit_rvar(beforeRenamer, v)
 
-
   def extractProg(proc: Procedure): Iterable[Expr] = {
     // this is pretty awful
     var firstAssert = true
@@ -503,7 +434,6 @@ class TranslationValidator {
 
     assumes ++ asserts
   }
-
 
   def setDSAInvariant = {
 
@@ -688,10 +618,8 @@ class TranslationValidator {
     v.funcs.map(u => u.name -> u).toMap
   }
 
-
   /**
    * Generate an SMT query for the product program, 
-   * !! Assume source and taregt in class scope are already renamed
    *
    * Returns a map from proceudre -> smt query
    */
@@ -711,15 +639,32 @@ class TranslationValidator {
       timer.checkPoint(s"TVSMT ${proc.name}")
       val source = afterProg.get.procedures.find(_.name == proc.name).get
       val target = beforeProg.get.procedures.find(_.name == proc.name).get
-      visit_proc(beforeRenamer, target)
-      visit_proc(afterRenamer, source)
+
+      val srcEntry = source.entryBlock.get
+      val tgtEntry = target.entryBlock.get
+      val srcExit = source.returnBlock.get
+      val tgtExit = target.returnBlock.get
+
       AssertsToPC(source.returnBlock.get).transform(source)
       AssertsToPC(target.returnBlock.get).transform(target)
 
-      val srce = source.entryBlock.get
-      val tgte = target.entryBlock.get
-      val srcExit = source.returnBlock.get
-      val tgtExit = target.returnBlock.get
+      // TODO: this renaming is later applied after the renamer; need to fix
+      val srcRename = SSADAG.transform(source)
+      val tgtRename = SSADAG.transform(target)
+
+      assert(beforeFrame.keys.toSet.intersect(afterFrame.keys.toSet).isEmpty)
+
+      val ackInv = Ackermann.instantiateAxioms(
+        source.entryBlock.get,
+        target.entryBlock.get,
+        afterFrame ++ beforeFrame,
+        exprInSource,
+        exprInTarget
+      )
+      timer.checkPoint("ackermann")
+
+      visit_proc(beforeRenamer, target)
+      visit_proc(afterRenamer, source)
 
       val prime = NamespaceState("P")
 
@@ -741,15 +686,11 @@ class TranslationValidator {
         val vars = targetInvVariables.map(v => polyEqual(visit_expr(prime, v), v))
         boolAnd(vars)
 
-      srce.statements.prepend(LocalAssign(varInSource(transitionSystemPCVar), varInSource(transitionSystemPCVar)))
-      srce.statements.prepend(LocalAssign(varInSource(traceVar), varInSource(traceVar)))
-      tgte.statements.prepend(LocalAssign(varInTarget(transitionSystemPCVar), varInTarget(transitionSystemPCVar)))
-      tgte.statements.prepend(LocalAssign(varInTarget(traceVar), varInTarget(traceVar)))
+      srcEntry.statements.prepend(LocalAssign(varInSource(transitionSystemPCVar), varInSource(transitionSystemPCVar)))
+      srcEntry.statements.prepend(LocalAssign(varInSource(traceVar), varInSource(traceVar)))
+      tgtEntry.statements.prepend(LocalAssign(varInTarget(transitionSystemPCVar), varInTarget(transitionSystemPCVar)))
+      tgtEntry.statements.prepend(LocalAssign(varInTarget(traceVar), varInTarget(traceVar)))
 
-      timer.checkPoint(s"${proc.name} $filePrefix setup")
-      val srcRename = SSADAG.transform(source)
-      val tgtRename = SSADAG.transform(target)
-      timer.checkPoint("SSADAG")
 
       // add invariant to combined
       val initInv = Seq(Inv.Global(pcInv, Some("PC INVARIANT")), Inv.Global(traceInv, Some("Trace INVARIANT")))
@@ -770,56 +711,20 @@ class TranslationValidator {
         Assert(visit_expr(prime, b), c)
       }
 
-      val ack = Ackermann.getVisitor(afterRenamer, beforeRenamer)
-      visit_proc(ack, source)
-      visit_proc(ack, target)
-      val ackInv = Ackermann.instantiateAxioms(source.entryBlock.get, target.entryBlock.get, ack.axioms, true).toSet
-      visit_proc(Ackermann.ToAssume(ack.axioms), source)
-      visit_proc(Ackermann.ToAssume(ack.axioms), target)
-      timer.checkPoint("ackermann")
-
       SSADAG.passify(source)
       SSADAG.passify(target)
 
-      timer.checkPoint("passify")
-
       val qsrc = srcRename(srcExit, Assume(QSource)).asInstanceOf[Assume].body
       val qtrgt = tgtRename(tgtExit, Assume(QTarget)).asInstanceOf[Assume].body
-      val otargets = srce.jump.asInstanceOf[GoTo].targets.toList
+      val otargets = srcEntry.jump.asInstanceOf[GoTo].targets.toList
 
-      // case split proof
-
-      // val splits = srce.forwardIteratorFrom.collect {
-      //  case g: GoTo if (!g.targets.exists((b: Block) => b.label.contains("SYNTH_EXIT"))) => g -> g.targets.toList
-      // }.toList ++  tgte.forwardIteratorFrom.collect {
-      //  case g: GoTo if (!g.targets.exists((b: Block) => b.label.contains("SYNTH_EXIT"))) => g -> g.targets.toList
-      // }.toList
-
-      // val splitMap = splits.toMap
-
-      // val splitsToApply = ir.transforms.chooseSplits(splits, 1).zipWithIndex
-
-      // for ((split, splitNo) <- splitsToApply) {
       val splitName = proc.name // + "_split_" + splitNo
-
-      // Logger.writeToFile(
-      //  File(s"graphs/splittv-${splitName}.dot"),
-      //  dotBlockGraph(source.blocks.toList ++ target.blocks.toList, Set())
-      // )
-
       // build smt query
       val b = translating.BasilIRToSMT2.Builder()
 
       b.addCommand("set-logic", "QF_BV")
 
       var count = 0
-      // for ((gt, tgts) <- split) {
-      //  val nd = splitMap(gt).toSet -- tgts.toSet
-      //  if (nd.nonEmpty) {
-      //    count += 1
-      //    b.addAssert(boolAnd(nd.map(b => UnaryExpr(BoolNOT, blockDone(b)))), Some(s"forceSplit${splitNo}Jump${count}"))
-      //  }
-      // }
 
       count = 0
       for (i <- invariant) {
@@ -827,10 +732,9 @@ class TranslationValidator {
         b.addAssert(i.toAssume.body, Some(s"inv$count"))
       }
       count = 0
-      for (i <- ackInv) {
+      for ((ack, ackn) <- ackInv) {
         count += 1
-        b.addAssert(i, Some(s"ack$count"))
-
+        b.addAssert(ack, Some(s"ackermann$ackn$count"))
       }
       count = 0
       for (i <- extractProg(source)) {
@@ -871,5 +775,3 @@ def wrapShapePreservingTransformInValidation(transform: Program => Unit, name: S
   validator.setEqualVarsInvariant
   validator.getValidationSMT("tvsmt/" + name)
 }
-
-

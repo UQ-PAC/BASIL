@@ -730,10 +730,7 @@ def simplifyCFG(p: Procedure) = {
   removeEmptyBlocks(p)
 }
 
-def copypropTransform(
-  p: Procedure,
-  procFrames: Map[Procedure, Set[Memory]],
-) = {
+def copypropTransform(p: Procedure, procFrames: Map[Procedure, Set[Memory]]) = {
   val t = util.PerformanceTimer(s"simplify ${p.name} (${p.blocks.size} blocks)")
   // SimplifyLogger.info(s"${p.name} ExprComplexity ${ExprComplexity()(p)}")
   // val result = solver.solveProc(p, true).withDefaultValue(dom.bot)
@@ -1635,10 +1632,7 @@ object CopyProp {
     c.keys.filter(isMemVar).foreach(v => clobberFull(c, v))
   }
 
-  def DSACopyProp(
-    p: Procedure,
-    procFrames: Map[Procedure, Set[Memory]],
-  ) = {
+  def DSACopyProp(p: Procedure, procFrames: Map[Procedure, Set[Memory]]) = {
     val updated = false
     val state = mutable.HashMap[Variable, PropState]()
     var poisoned = false // we have an indirect call
