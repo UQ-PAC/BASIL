@@ -137,7 +137,6 @@ object IRLoading {
 
     val (mainAddress, makeContext) = q.relfFile match {
       case Some(relf) => {
-        // TODO: this tuple is large, should be a case class
         val ReadELFData(symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
           IRLoading.loadReadELF(relf, q)
 
@@ -223,8 +222,9 @@ object IRLoading {
 
       val gtirb = GTIRBResolver(ir.modules.head)
       val gtirbRelfLoader = GTIRBReadELF(gtirb)
-      val gtirbRelf = gtirbRelfLoader.getAllSymbols()
+      val gtirbRelf = gtirbRelfLoader.getReadELFData(config.mainProcedureName)
 
+      gtirbRelfLoader.checkReadELFCompatibility(gtirbRelf, relf)
     }
 
     relf

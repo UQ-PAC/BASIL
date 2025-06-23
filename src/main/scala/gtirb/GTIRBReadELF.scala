@@ -153,7 +153,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     }.toSet
   }
 
-  def getEntryPoint(mainProcedureName: String) = {
+  def getMainAddress(mainProcedureName: String) = {
     gtirb.symbolsByName(mainProcedureName).getReferentUuid.get.get.address
   }
 
@@ -163,9 +163,55 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     val (offs, exts) = getRelocations()
     val globs = getGlobals()
     val funs = getFunctionEntries()
-    val main = getEntryPoint(mainProcedureName)
+    val main = getMainAddress(mainProcedureName)
 
     ReadELFData(syms, exts, globs, funs, offs, main)
+  }
+  private val atSuffix = """@[A-Za-z_\d.]+$""".r
+  private def normaliseRelf(relf: ReadELFData) = {
+    val exts = relf.externalFunctions.map(x => x.copy(name = atSuffix.replaceFirstIn(x.name, "")))
+    val syms = relf.symbolTable.collect {
+      case sym if sym.etype != ELFSymType.SECTION && sym.num != -1 =>
+        sym.copy(name = atSuffix.replaceFirstIn(sym.name, ""))
+    }
+
+    relf.copy(
+      externalFunctions = exts,
+      symbolTable = syms
+    )
+  }
+
+  /**
+   * Determines whether the current ReadELFData is compatible with
+   * a given reference ReadELFData. That is, whether the The given reference object is
+   * assumed to be the gold standard
+   */
+  def checkReadELFCompatibility(gtirbRelf: ReadELFData, referenceRelf: ReadELFData): Boolean = {
+    var ok = true
+
+    def check(b: Boolean, s: String) = {
+      if (!b) {
+        Logger.warn("PLEASE REPORT THIS ISSUE! include the gts and relf files. gtirb relf discrepancy, " + s)
+        ok = false
+      }
+    }
+
+    def checkSet[T](x: Set[T], y: Set[T], s: String) =
+      check(x == y, s"$s:\ngtirb - relf = ${x -- y}\nrelf - gtirb = ${y--x}\n& = ${y & x}")
+
+    def checkEq(x: Any, y: Any, s: String) =
+      check(x == y, s"$s: gtirb: $x, readelf: $y}")
+
+    val g = normaliseRelf(gtirbRelf)
+    val o = normaliseRelf(referenceRelf)
+    checkEq(g.mainAddress, o.mainAddress, "main address differs")
+    checkEq(g.functionEntries, o.functionEntries, "function entries differ")
+    checkEq(g.relocationOffsets, o.relocationOffsets, "relocations differ")
+    checkEq(g.globalVariables, o.globalVariables, "global variables differ")
+    checkSet(g.externalFunctions, o.externalFunctions, "external functions differ")
+    checkSet(g.symbolTable.toSet, o.symbolTable.toSet, "symbol tables differ")
+
+    ok
   }
 
 }
