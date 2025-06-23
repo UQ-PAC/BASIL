@@ -8,8 +8,28 @@ import com.google.protobuf.ByteString
 import com.grammatech.gtirb.proto.AuxData.AuxData
 import com.grammatech.gtirb.proto.Module.Module
 
+/**
+ * Provides methods for decoding binary data, particularly the binary encoding of
+ * GTIRB's [AuxData](https://grammatech.github.io/gtirb/md__aux_data.html).
+ * The encoding format is inferred by reverse-engineering the
+ * [Python implementation](https://grammatech.github.io/gtirb/python/_modules/gtirb/serialization.html#SetCodec).
+ *
+ * The various `read*` methods have some pre-defined decoders for common types.
+ * For parametrised decoders, their `read*` methods require a decoder for the inner type as an argument.
+ * The read methods return [[Decoder]] values which can be passed to the [[decode]] methods.
+ *
+ * [[AuxKind]] provides pre-defined decoders for some official AuxData fields. An [[AuxKind]] can be
+ * passed to [[decodeAux]] to automatically extract and decode the given AuxData from a GTIRB [[Module]].
+ *
+ * Within a [[Decoder]], the internal state of the [[java.io.ByteArrayInputStream]] is used to keep
+ * track of the current byte position.
+ */
 object AuxDecoder {
 
+  /**
+   * [[AuxKind]] provides pre-defined decoders for some official AuxData fields. An [[AuxKind]] can be
+   * passed to [[decodeAux]] to automatically extract and decode the given AuxData from a GTIRB [[Module]].
+   */
   enum AuxKind[T](val name: String, val decoder: Decoder[T]) {
     case ElfSymbolTabIdxInfo
         extends AuxKind("elfSymbolTabIdxInfo", readMap(readUuid, readList(readTuple(readString, readUint(64)))))
