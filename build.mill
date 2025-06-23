@@ -195,10 +195,10 @@ object `package` extends RootModule with ScalaModule {
     // these docs paths are used for inter-project linking.
     // https://docs.scala-lang.org/scala3/guides/scaladoc/settings.html#-external-mappings
     Map(
-      "api/bnfc" -> ".*basil_ir/.*::javadoc",
-      "api/basil-antlr" -> ".*Parsers/.*::javadoc",
-      "api/basil-proto" -> ".*com/grammatech/gtirb.*::scaladoc3",
-      "api/java-cup" -> ".*java_cup/.*::javadoc",
+      "api/bnfc" -> ".*/basil_ir/.*::javadoc",
+      "api/basil-antlr" -> ".*/Parsers/.*::javadoc",
+      "api/basil-proto" -> ".*/com/grammatech/gtirb.*::scaladoc3",
+      "api/java-cup" -> ".*/java_cup/.*::javadoc",
     )
   }
 
@@ -222,9 +222,9 @@ object `package` extends RootModule with ScalaModule {
 
   def scalaDocExternalMappingOptions = Task {
     val defaultExternals = Seq(
-      ".*scala/.*::scaladoc3::https://scala-lang.org/api/3.3_LTS/",
-      "java/.*::javadoc::https://docs.oracle.com/en/java/javase/17/docs/api/java.base/",
-      ".*com/google/protobuf.*::javadoc::https://protobuf.dev/reference/java/api-docs/",
+      ".*/scala/.*::scaladoc3::https://scala-lang.org/api/3.3_LTS/",
+      ".*/java/.*::javadoc::https://docs.oracle.com/en/java/javase/17/docs/api/java.base/",
+      ".*/com/google/protobuf.*::javadoc::https://protobuf.dev/reference/java/api-docs/",
     )
     val externals = defaultExternals ++ docsRegexes().map {
       case (path, regex) => s"$regex::$baseUrl/$path"

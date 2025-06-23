@@ -26,12 +26,14 @@ import scala.collection.immutable.SortedMap
  * A class for querying the GTIRB IR, abstracting away common operations of
  * searching for symbols, functions, blocks, and their relations. The inner
  * type [[Uuid]] wraps a Base64 UUID. A number of UUID subtypes are defined to
- * distinguish from different kinds of UUID within GTIRB, for example [[Uuid.Block]]
- * and [Uuid.Function]].
+ * distinguish different kinds of GTIRB UUID, for example [[Uuid.Block]]
+ * and [[Uuid.Function]].
  *
  * Each Uuid specialisation defines a number of extension methods for common
- * query operations. For example, accessing the object itself from its Uuid can be
- * done via the `.get` methods.
+ * query operations. For example, given a [[Uuid.Symbol]], you can get the symbol
+ * itself via the `.get` methods, and you can get its symbol table entry with the
+ * [[symEntry]] method. Internally, the [[GTIRBResolver]] is indexing into the GTIRB
+ * protobuf and parsing the AuxData, but this is all neatly hidden away.
  */
 case class GTIRBResolver(val mod: Module) {
 

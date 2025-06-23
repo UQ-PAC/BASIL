@@ -19,7 +19,7 @@ import com.grammatech.gtirb.proto.Module.Module
  * The read methods return [[Decoder]] values which can be passed to the [[decode]] methods.
  *
  * [[AuxKind]] provides pre-defined decoders for some official AuxData fields. An [[AuxKind]] can be
- * passed to [[decodeAux]] to automatically extract and decode the given AuxData from a GTIRB [[Module]].
+ * passed to [[decodeAux]] to automatically extract and decode the given AuxData from a GTIRB [[com.grammatech.gtirb.proto.Module.Module]].
  *
  * Within a [[Decoder]], the internal state of the [[java.io.ByteArrayInputStream]] is used to keep
  * track of the current byte position.
@@ -28,7 +28,9 @@ object AuxDecoder {
 
   /**
    * [[AuxKind]] provides pre-defined decoders for some official AuxData fields. An [[AuxKind]] can be
-   * passed to [[decodeAux]] to automatically extract and decode the given AuxData from a GTIRB [[Module]].
+   * passed to [[decodeAux]] to automatically extract and decode the given AuxData from a GTIRB [[com.grammatech.gtirb.proto.Module.Module]].
+   * See the [Standard AuxData Schemata](https://grammatech.github.io/gtirb/md__aux_data.html) for a list of official AuxData fields
+   * and their types.
    */
   enum AuxKind[T](val name: String, val decoder: Decoder[T]) {
     case ElfSymbolTabIdxInfo
@@ -44,7 +46,7 @@ object AuxDecoder {
   }
 
   type Input = ByteArrayInputStream
-  type Decoder[T] = Input => T
+  type Decoder[T] = ByteArrayInputStream => T
 
   def decodeAux[T](known: AuxKind[T])(mod: Module) =
     decode(known.decoder)(mod.auxData(known.name))

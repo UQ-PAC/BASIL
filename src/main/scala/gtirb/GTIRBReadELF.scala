@@ -176,7 +176,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
   private val atSuffix = """@[A-Za-z_\d.]+$""".r
 
   /**
-   * Strips away some information from `readelf`'s [[ReadELFData]]
+   * Strips away some information from `readelf`'s [[translating.ReadELFData]]
    * which is not so important and not produced by the GTIRB ELF loader.
    *
    * For example, this throws away symbols of type SECTION and symbols beginning with `$`.
