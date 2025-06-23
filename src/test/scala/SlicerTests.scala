@@ -1,10 +1,9 @@
-import ir.dsl.*
 import ir.*
-import ir.slicer.Slicer
-import util.{Logger, LogLevel, BASILResult, StaticAnalysisConfig, SlicerConfig, DSAConfig}
-import util.boogie_interaction.*
-import test_util.{BASILTest, getSubdirectories}
+import ir.dsl.*
+import ir.transforms.Slicer
 import org.scalatest.funsuite.AnyFunSuite
+import test_util.{BASILTest, getSubdirectories}
+import util.*
 
 /**
  * A collection of different scenario case unit tests for the slicer to run against.
@@ -14,8 +13,8 @@ import org.scalatest.funsuite.AnyFunSuite
 class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
   Logger.setLevel(LogLevel.OFF)
 
-  val SHOULD_REMAIN = Some("Should_Remain")
-  val SHOULD_DELETE = Some("Should_Delete")
+  protected val SHOULD_REMAIN: Some[String] = Some("Should_Remain")
+  protected val SHOULD_DELETE: Some[String] = Some("Should_Delete")
 
   def createSimpleProc(name: String, statements: Seq[NonCallStatement]): EventuallyProcedure = {
     proc(name, block(name + "_1", statements.:+(goto(name + "_return")): _*), block(name + "_return", ret))
@@ -50,49 +49,37 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         "main",
         block(
           "main_1",
-          LocalAssign(LocalVar("Stack_x", bv32, 0), bv32(1), SHOULD_DELETE),
-          LocalAssign(LocalVar("Stack_i", bv32, 0), bv32(0)),
+          LocalAssign(LocalVar("Stack_x", bv32), bv32(1), SHOULD_DELETE),
+          LocalAssign(LocalVar("Stack_i", bv32), bv32(0)),
           goto("main_2")
         ),
-        block(
-          "main_2",
-          LocalAssign(LocalVar("load1", bv32, 0), LocalVar("Stack_i", bv32, 0)),
-          goto("main_3", "main_4")
-        ),
-        block(
-          "main_3",
-          Assume(BinaryExpr(BVSGT, LocalVar("load1", bv32, 0), bv32(19)), None, None, true),
-          goto("main_7")
-        ),
+        block("main_2", LocalAssign(LocalVar("load1", bv32), LocalVar("Stack_i", bv32)), goto("main_3", "main_4")),
+        block("main_3", Assume(BinaryExpr(BVSGT, LocalVar("load1", bv32), bv32(19)), None, None, true), goto("main_7")),
         block(
           "main_4",
-          Assume(BinaryExpr(BVSLE, LocalVar("load1", bv32, 0), bv32(19)), None, None, true),
-          LocalAssign(LocalVar("load2", bv32, 0), Register("Global_y", 32), SHOULD_DELETE),
-          LocalAssign(LocalVar("load3", bv32, 0), LocalVar("Stack_x", bv32, 0), SHOULD_DELETE),
+          Assume(BinaryExpr(BVSLE, LocalVar("load1", bv32), bv32(19)), None, None, true),
+          LocalAssign(LocalVar("load2", bv32), Register("Global_y", 32), SHOULD_DELETE),
+          LocalAssign(LocalVar("load3", bv32), LocalVar("Stack_x", bv32), SHOULD_DELETE),
           LocalAssign(
-            LocalVar("R0_7", bv32, 0),
-            BinaryExpr(BVMUL, LocalVar("load3", bv32, 0), LocalVar("load2", bv32, 0)),
+            LocalVar("R0_7", bv32),
+            BinaryExpr(BVMUL, LocalVar("load3", bv32), LocalVar("load2", bv32)),
             SHOULD_DELETE
           ),
-          LocalAssign(LocalVar("Stack_x", bv32, 0), LocalVar("R0_7", bv32, 0), SHOULD_DELETE),
-          LocalAssign(LocalVar("load4", bv32, 0), Register("Global_y", 32)),
+          LocalAssign(LocalVar("Stack_x", bv32), LocalVar("R0_7", bv32), SHOULD_DELETE),
+          LocalAssign(LocalVar("load4", bv32), Register("Global_y", 32)),
           goto("main_5", "main_6")
         ),
-        block(
-          "main_5",
-          Assume(BinaryExpr(BVEQ, LocalVar("load4", bv32, 0), bv32(10)), None, None, true),
-          goto("main_7")
-        ),
+        block("main_5", Assume(BinaryExpr(EQ, LocalVar("load4", bv32), bv32(10)), None, None, true), goto("main_7")),
         block(
           "main_6",
-          Assume(UnaryExpr(BoolNOT, BinaryExpr(BVEQ, LocalVar("load4", bv32, 0), bv32(10))), None, None, true),
-          LocalAssign(LocalVar("load5", bv32, 0), Register("Global_y", 32)),
-          MemoryAssign(Register("Global_y", 32), BinaryExpr(BVADD, LocalVar("load5", bv32, 0), bv32(5))),
-          LocalAssign(LocalVar("load6", bv32, 0), LocalVar("Stack_i", bv32, 0)),
-          LocalAssign(LocalVar("Stack_i", bv32, 0), BinaryExpr(BVADD, LocalVar("load6", bv32, 0), bv32(1))),
+          Assume(UnaryExpr(BoolNOT, BinaryExpr(EQ, LocalVar("load4", bv32), bv32(10))), None, None, true),
+          LocalAssign(LocalVar("load5", bv32), Register("Global_y", 32)),
+          MemoryAssign(Register("Global_y", 32), BinaryExpr(BVADD, LocalVar("load5", bv32), bv32(5))),
+          LocalAssign(LocalVar("load6", bv32), LocalVar("Stack_i", bv32)),
+          LocalAssign(LocalVar("Stack_i", bv32), BinaryExpr(BVADD, LocalVar("load6", bv32), bv32(1))),
           goto("main_2")
         ),
-        block("main_7", LocalAssign(LocalVar("Stack_x", bv32, 0), bv32(4), SHOULD_DELETE), goto("main_return")),
+        block("main_7", LocalAssign(LocalVar("Stack_x", bv32), bv32(4), SHOULD_DELETE), goto("main_return")),
         block("main_return", ret)
       )
     )
@@ -114,27 +101,19 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         "main",
         block(
           "main_1",
-          LocalAssign(LocalVar("Stack_x", bv32, 0), bv32(0)),
-          LocalAssign(LocalVar("Stack_y", bv32, 0), bv32(0), SHOULD_DELETE),
+          LocalAssign(LocalVar("Stack_x", bv32), bv32(0)),
+          LocalAssign(LocalVar("Stack_y", bv32), bv32(0), SHOULD_DELETE),
           goto("main_2")
         ),
-        block(
-          "main_2",
-          LocalAssign(LocalVar("load1", bv32, 0), LocalVar("Stack_x", bv32, 0)),
-          goto("main_3", "main_4")
-        ),
+        block("main_2", LocalAssign(LocalVar("load1", bv32), LocalVar("Stack_x", bv32)), goto("main_3", "main_4")),
         block(
           "main_3",
-          Assume(BinaryExpr(BVSLE, LocalVar("load1", bv32, 0), bv32(99))),
-          LocalAssign(LocalVar("load2", bv32, 0), LocalVar("Stack_y", bv32, 0), SHOULD_DELETE),
-          LocalAssign(
-            LocalVar("Stack_y", bv32, 0),
-            BinaryExpr(BVADD, LocalVar("load2", bv32, 0), bv32(1)),
-            SHOULD_DELETE
-          ),
+          Assume(BinaryExpr(BVSLE, LocalVar("load1", bv32), bv32(99))),
+          LocalAssign(LocalVar("load2", bv32), LocalVar("Stack_y", bv32), SHOULD_DELETE),
+          LocalAssign(LocalVar("Stack_y", bv32), BinaryExpr(BVADD, LocalVar("load2", bv32), bv32(1)), SHOULD_DELETE),
           goto("main_2")
         ),
-        block("main_4", Assume(BinaryExpr(BVSGT, LocalVar("load1", bv32, 0), bv32(99))), goto("main_return")),
+        block("main_4", Assume(BinaryExpr(BVSGT, LocalVar("load1", bv32), bv32(99))), goto("main_return")),
         block("main_return", ret)
       )
     )
@@ -155,12 +134,12 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
       createSimpleProc(
         "main",
         Seq(
-          LocalAssign(LocalVar("load1", bv32, 0), bv32(10)),
-          Assert(BinaryExpr(BVEQ, LocalVar("load1", bv32, 0), bv32(10))),
-          Assume(BinaryExpr(BVEQ, LocalVar("Stack_x", bv32, 0), bv32(10))),
-          LocalAssign(LocalVar("Stack_x", bv32, 0), bv32(0)),
+          LocalAssign(LocalVar("load1", bv32), bv32(10)),
+          Assert(BinaryExpr(EQ, LocalVar("load1", bv32), bv32(10))),
+          Assume(BinaryExpr(EQ, LocalVar("Stack_x", bv32), bv32(10))),
+          LocalAssign(LocalVar("Stack_x", bv32), bv32(0)),
           MemoryAssign(Register("Global_y", 32), bv32(0)),
-          LocalAssign(LocalVar("Stack_x", bv32, 0), bv32(0), SHOULD_REMAIN),
+          LocalAssign(LocalVar("Stack_x", bv32), bv32(0), SHOULD_REMAIN),
           MemoryAssign(Register("Global_y", 32), bv32(0), SHOULD_REMAIN)
         )
       )
@@ -183,12 +162,12 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
       createSimpleProc(
         "main",
         Seq(
-          LocalAssign(LocalVar("load1", bv32, 0), bv32(10)),
-          LocalAssign(LocalVar("load2", bv32, 0), bv32(10)),
-          LocalAssign(LocalVar("load1", bv32, 0), bv32(10), SHOULD_REMAIN),
-          LocalAssign(LocalVar("load2", bv32, 0), bv32(10), SHOULD_REMAIN),
-          Assert(BinaryExpr(BVEQ, LocalVar("load3", bv32, 0), bv32(10)), label = SHOULD_REMAIN),
-          Assume(BinaryExpr(BVEQ, LocalVar("load1", bv32, 0), LocalVar("load2", bv32, 0)), label = SHOULD_REMAIN)
+          LocalAssign(LocalVar("load1", bv32), bv32(10)),
+          LocalAssign(LocalVar("load2", bv32), bv32(10)),
+          LocalAssign(LocalVar("load1", bv32), bv32(10), SHOULD_REMAIN),
+          LocalAssign(LocalVar("load2", bv32), bv32(10), SHOULD_REMAIN),
+          Assert(BinaryExpr(EQ, LocalVar("load3", bv32), bv32(10)), label = SHOULD_REMAIN),
+          Assume(BinaryExpr(EQ, LocalVar("load1", bv32), LocalVar("load2", bv32)), label = SHOULD_REMAIN)
         )
       )
     )
@@ -211,12 +190,12 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         "main",
         block(
           "main_1",
-          LocalAssign(LocalVar("Stack_n4_0", bv32, 0), bv32(0)),
-          LocalAssign(LocalVar("load3", bv32, 0), LocalVar("Stack_n4_0", bv32, 0)),
+          LocalAssign(LocalVar("Stack_n4_0", bv32), bv32(0)),
+          LocalAssign(LocalVar("load3", bv32), LocalVar("Stack_n4_0", bv32)),
           directCall(
             Seq("R0_out" -> LocalVar("R0", bv64, 3)),
             "func",
-            Seq("R0_in" -> ZeroExtend(32, LocalVar("load3", bv32, 0)))
+            Seq("R0_in" -> ZeroExtend(32, LocalVar("load3", bv32)))
           ),
           ret
         )
@@ -228,15 +207,11 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         block(
           "func_2",
           MemoryAssign(Register("Global_x", 32), bv32(2), SHOULD_DELETE),
-          LocalAssign(LocalVar("Stack_n20_n16", bv32, 0), Extract(32, 0, LocalVar("R0_in", bv64, 0))),
-          LocalAssign(LocalVar("load1", bv32, 0), LocalVar("Stack_n20_n16", bv32, 0), SHOULD_DELETE),
-          LocalAssign(
-            LocalVar("Stack_n4_0", bv32, 0),
-            BinaryExpr(BVADD, LocalVar("load1", bv32, 0), bv32(2)),
-            SHOULD_DELETE
-          ),
-          LocalAssign(LocalVar("load2", bv32, 0), LocalVar("Stack_n20_n16", bv32, 0)),
-          ret("R0_out" -> ZeroExtend(32, BinaryExpr(BVADD, LocalVar("load2", bv32, 0), bv32(1))))
+          LocalAssign(LocalVar("Stack_n20_n16", bv32), Extract(32, 0, LocalVar("R0_in", bv64))),
+          LocalAssign(LocalVar("load1", bv32), LocalVar("Stack_n20_n16", bv32), SHOULD_DELETE),
+          LocalAssign(LocalVar("Stack_n4_0", bv32), BinaryExpr(BVADD, LocalVar("load1", bv32), bv32(2)), SHOULD_DELETE),
+          LocalAssign(LocalVar("load2", bv32), LocalVar("Stack_n20_n16", bv32)),
+          ret("R0_out" -> ZeroExtend(32, BinaryExpr(BVADD, LocalVar("load2", bv32), bv32(1))))
         )
       )
     )
@@ -267,13 +242,9 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         "func",
         block(
           "func_2",
-          LocalAssign(LocalVar("load0", bv32, 0), bv32(0)),
-          LocalAssign(LocalVar("load1", bv32, 0), Register("Global_y", 32), SHOULD_REMAIN),
-          MemoryAssign(
-            Register("Global_y", 32),
-            BinaryExpr(BVADD, LocalVar("load1", bv32, 0), bv32(10)),
-            SHOULD_REMAIN
-          ),
+          LocalAssign(LocalVar("load0", bv32), bv32(0)),
+          LocalAssign(LocalVar("load1", bv32), Register("Global_y", 32), SHOULD_REMAIN),
+          MemoryAssign(Register("Global_y", 32), BinaryExpr(BVADD, LocalVar("load1", bv32), bv32(10)), SHOULD_REMAIN),
           ret
         )
       )
@@ -296,9 +267,9 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         "main",
         block(
           "main_1",
-          LocalAssign(LocalVar("load0", bv32, 0), bv32(0), SHOULD_REMAIN),
-          LocalAssign(LocalVar("load1", bv32, 0), bv32(0)),
-          directCall(Seq("R0_out" -> LocalVar("load2", bv32, 0)), "func", Seq("R0_in" -> LocalVar("load1", bv32, 0))),
+          LocalAssign(LocalVar("load0", bv32), bv32(0), SHOULD_REMAIN),
+          LocalAssign(LocalVar("load1", bv32), bv32(0)),
+          directCall(Seq("R0_out" -> LocalVar("load2", bv32)), "func", Seq("R0_in" -> LocalVar("load1", bv32))),
           goto("main_return")
         ),
         block("main_return", ret)
@@ -307,8 +278,8 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         "func",
         Seq("R0_in" -> bv32),
         Seq("R0_out" -> bv32),
-        block("func_1", LocalAssign(LocalVar("load3", bv32, 0), LocalVar("R0_in", bv32, 0)), goto("func_return")),
-        block("func_return", ret("R0_out" -> LocalVar("load3", bv32, 0)))
+        block("func_1", LocalAssign(LocalVar("load3", bv32), LocalVar("R0_in", bv32)), goto("func_return")),
+        block("func_return", ret("R0_out" -> LocalVar("load3", bv32)))
       )
     )
     prepareProgram(program)
@@ -329,8 +300,8 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         "main",
         block(
           "main_1",
-          LocalAssign(LocalVar("load0", bv32, 0), bv32(4), SHOULD_REMAIN),
-          directCall(Seq(), "func", Seq("R0_in" -> LocalVar("load0", bv32, 0)), SHOULD_REMAIN),
+          LocalAssign(LocalVar("load0", bv32), bv32(4), SHOULD_REMAIN),
+          directCall(Seq(), "func", Seq("R0_in" -> LocalVar("load0", bv32)), SHOULD_REMAIN),
           ret
         )
       ),
@@ -340,9 +311,9 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         Seq(),
         block(
           "func_2",
-          LocalAssign(LocalVar("load0", bv32, 0), LocalVar("R0_in", bv32, 0), SHOULD_REMAIN),
-          LocalAssign(LocalVar("load1", bv32, 0), bv32(0)),
-          MemoryAssign(Register("Global_y", 32), LocalVar("load0", bv32, 0), SHOULD_REMAIN),
+          LocalAssign(LocalVar("load0", bv32), LocalVar("R0_in", bv32), SHOULD_REMAIN),
+          LocalAssign(LocalVar("load1", bv32), bv32(0)),
+          MemoryAssign(Register("Global_y", 32), LocalVar("load0", bv32), SHOULD_REMAIN),
           ret
         )
       )
@@ -370,8 +341,8 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         "read",
         block(
           "read_1",
-          LocalAssign(LocalVar("load1", bv32, 0), Register("Global_y", 32)),
-          MemoryAssign(Register("Global_y", 32), BinaryExpr(BVADD, LocalVar("load1", bv32, 0), bv32(1))),
+          LocalAssign(LocalVar("load1", bv32), Register("Global_y", 32)),
+          MemoryAssign(Register("Global_y", 32), BinaryExpr(BVADD, LocalVar("load1", bv32), bv32(1))),
           directCall("write"),
           goto("read_return")
         ),
@@ -381,9 +352,9 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         "write",
         block(
           "write_1",
-          LocalAssign(LocalVar("load1", bv32, 0), bv32(100), SHOULD_DELETE),
-          LocalAssign(LocalVar("load1", bv32, 0), Register("Global_y", 32)),
-          MemoryAssign(Register("Global_y", 32), BinaryExpr(BVSUB, LocalVar("load1", bv32, 0), bv32(1))),
+          LocalAssign(LocalVar("load1", bv32), bv32(100), SHOULD_DELETE),
+          LocalAssign(LocalVar("load1", bv32), Register("Global_y", 32)),
+          MemoryAssign(Register("Global_y", 32), BinaryExpr(BVSUB, LocalVar("load1", bv32), bv32(1))),
           goto("write_return")
         ),
         block("write_2", Assume(BinaryExpr(BVSGT, Register("Global_y", 32), bv32(10))), goto("write_return")),
@@ -415,11 +386,11 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         "main",
         block(
           "main_1",
-          LocalAssign(LocalVar("a", bv32, 0), bv32(0), SHOULD_DELETE),
-          LocalAssign(LocalVar("b", bv32, 0), bv32(0)),
-          LocalAssign(LocalVar("c", bv32, 0), bv32(0)),
+          LocalAssign(LocalVar("a", bv32), bv32(0), SHOULD_DELETE),
+          LocalAssign(LocalVar("b", bv32), bv32(0)),
+          LocalAssign(LocalVar("c", bv32), bv32(0)),
           MemoryAssign(Register("Global_x", 32), bv32(0)),
-          directCall(Seq("R0_out" -> LocalVar("a", bv32, 0)), "func", Seq("R0_in" -> LocalVar("b", bv32, 0))),
+          directCall(Seq("R0_out" -> LocalVar("a", bv32)), "func", Seq("R0_in" -> LocalVar("b", bv32))),
           ret
         )
       ),
@@ -429,11 +400,11 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         Seq("R0_out" -> bv32),
         block(
           "func_1",
-          LocalAssign(LocalVar("c", bv32, 0), bv32(0), SHOULD_DELETE),
-          LocalAssign(LocalVar("load1", bv32, 0), LocalVar("R0_in", bv32, 0)),
+          LocalAssign(LocalVar("c", bv32), bv32(0), SHOULD_DELETE),
+          LocalAssign(LocalVar("load1", bv32), LocalVar("R0_in", bv32)),
           goto("func_return")
         ),
-        block("func_return", ret("R0_out" -> LocalVar("load1", bv32, 0)))
+        block("func_return", ret("R0_out" -> LocalVar("load1", bv32)))
       )
     )
     prepareProgram(program)
@@ -454,10 +425,10 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         "main",
         block(
           "main_1",
-          LocalAssign(LocalVar("a", bv32, 0), bv32(0), SHOULD_DELETE),
-          LocalAssign(LocalVar("b", bv32, 0), bv32(0)),
+          LocalAssign(LocalVar("a", bv32), bv32(0), SHOULD_DELETE),
+          LocalAssign(LocalVar("b", bv32), bv32(0)),
           MemoryAssign(Register("Global_x", 32), bv32(0), SHOULD_DELETE),
-          directCall(Seq("R0_out" -> LocalVar("a", bv32, 0)), "func", Seq("R0_in" -> LocalVar("b", bv32, 0))),
+          directCall(Seq("R0_out" -> LocalVar("a", bv32)), "func", Seq("R0_in" -> LocalVar("b", bv32))),
           ret
         )
       ),
@@ -468,10 +439,10 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         block(
           "func_1",
           MemoryAssign(Register("Global_x", 32), bv32(0)),
-          LocalAssign(LocalVar("load1", bv32, 0), LocalVar("R0_in", bv32, 0)),
+          LocalAssign(LocalVar("load1", bv32), LocalVar("R0_in", bv32)),
           goto("func_return")
         ),
-        block("func_return", ret("R0_out" -> LocalVar("load1", bv32, 0)))
+        block("func_return", ret("R0_out" -> LocalVar("load1", bv32)))
       )
     )
     prepareProgram(program)
@@ -485,7 +456,7 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
     assert(statements(program).size == totalStatements - toBeDeleted.size)
   }
 
-  def createMultiCallSingleImpact = {
+  private def createMultiCallSingleImpact = {
     val program = prog(
       proc(
         "main",
@@ -493,18 +464,18 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
           "main_1",
           MemoryAssign(Register("Global_x", 32), bv32(0)),
           MemoryAssign(Register("Global_y", 32), bv32(0)),
-          LocalAssign(LocalVar("load0", bv32, 0), Register("Global_x", 32)),
+          LocalAssign(LocalVar("load0", bv32), Register("Global_x", 32)),
           directCall(
-            Seq("R0_out" -> LocalVar("R0", bv64, 0)),
+            Seq("R0_out" -> LocalVar("R0", bv64)),
             "f",
-            Seq("R0_in" -> ZeroExtend(32, LocalVar("load0", bv32, 0)))
+            Seq("R0_in" -> ZeroExtend(32, LocalVar("load0", bv32)))
           ),
           goto("main_2")
         ),
         block(
           "main_2",
           MemoryAssign(Register("Global_y", 32), bv32(0), SHOULD_REMAIN),
-          directCall(Seq("R0_out" -> LocalVar("R0", bv64, 1)), "f", Seq("R0_in" -> bv64(5)), SHOULD_REMAIN),
+          directCall(Seq("R0_out" -> LocalVar("R0", bv64)), "f", Seq("R0_in" -> bv64(5)), SHOULD_REMAIN),
           goto("main_return")
         ),
         block("main_return", ret)
@@ -515,29 +486,25 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         Seq("R0_out" -> bv64),
         block(
           "f_1",
-          LocalAssign(LocalVar("Stack_n", bv32, 0), Extract(32, 0, LocalVar("R0_in", bv64, 0))),
-          LocalAssign(LocalVar("load0", bv32, 0), Register("Global_y", 32), SHOULD_REMAIN),
-          MemoryAssign(
-            Register("Global_y", 32),
-            BinaryExpr(BVADD, LocalVar("load0", bv32, 0), bv32(10)),
-            SHOULD_REMAIN
-          ),
-          LocalAssign(LocalVar("load1", bv32, 0), Register("Global_x", 32)),
-          LocalAssign(LocalVar("load2", bv32, 0), LocalVar("Stack_n", bv32, 0)),
+          LocalAssign(LocalVar("Stack_n", bv32), Extract(32, 0, LocalVar("R0_in", bv64))),
+          LocalAssign(LocalVar("load0", bv32), Register("Global_y", 32), SHOULD_REMAIN),
+          MemoryAssign(Register("Global_y", 32), BinaryExpr(BVADD, LocalVar("load0", bv32), bv32(10)), SHOULD_REMAIN),
+          LocalAssign(LocalVar("load1", bv32), Register("Global_x", 32)),
+          LocalAssign(LocalVar("load2", bv32), LocalVar("Stack_n", bv32)),
           LocalAssign(
-            LocalVar("R0", bv64, 0),
-            ZeroExtend(32, BinaryExpr(BVADD, LocalVar("load1", bv32, 0), LocalVar("load2", bv32, 0)))
+            LocalVar("R0", bv64),
+            ZeroExtend(32, BinaryExpr(BVADD, LocalVar("load1", bv32), LocalVar("load2", bv32)))
           ),
           goto("f_return")
         ),
-        block("f_return", ret("R0_out" -> LocalVar("R0", bv64, 0)))
+        block("f_return", ret("R0_out" -> LocalVar("R0", bv64)))
       )
     )
     prepareProgram(program)
     program
   }
 
-  def createMultiCallMultiImpact = {
+  private def createMultiCallMultiImpact = {
     val program = prog(
       proc(
         "main",
@@ -545,18 +512,18 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
           "main_1",
           MemoryAssign(Register("Global_x", 32), bv32(0)),
           MemoryAssign(Register("Global_y", 32), bv32(0), SHOULD_DELETE),
-          LocalAssign(LocalVar("load0", bv32, 0), Register("Global_x", 32)),
+          LocalAssign(LocalVar("load0", bv32), Register("Global_x", 32)),
           directCall(
-            Seq("R0_out" -> LocalVar("R0", bv64, 0)),
+            Seq("R0_out" -> LocalVar("R0", bv64)),
             "f",
-            Seq("R0_in" -> ZeroExtend(32, LocalVar("load0", bv32, 0)))
+            Seq("R0_in" -> ZeroExtend(32, LocalVar("load0", bv32)))
           ),
           goto("main_2")
         ),
         block(
           "main_2",
-          MemoryAssign(Register("Global_y", 32), Extract(32, 0, LocalVar("R0", bv64, 0))),
-          directCall(Seq("R0_out" -> LocalVar("R0", bv64, 1)), "f", Seq("R0_in" -> bv64(5))),
+          MemoryAssign(Register("Global_y", 32), Extract(32, 0, LocalVar("R0", bv64))),
+          directCall(Seq("R0_out" -> LocalVar("R0", bv64)), "f", Seq("R0_in" -> bv64(5))),
           goto("main_return")
         ),
         block("main_return", ret)
@@ -567,32 +534,32 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         Seq("R0_out" -> bv64),
         block(
           "f_1",
-          LocalAssign(LocalVar("Stack_n", bv32, 0), Extract(32, 0, LocalVar("R0_in", bv64, 0))),
-          LocalAssign(LocalVar("load0", bv32, 0), Register("Global_y", 32)),
-          MemoryAssign(Register("Global_y", 32), BinaryExpr(BVADD, LocalVar("load0", bv32, 0), bv32(10))),
-          LocalAssign(LocalVar("load1", bv32, 0), Register("Global_x", 32)),
-          LocalAssign(LocalVar("load2", bv32, 0), LocalVar("Stack_n", bv32, 0)),
+          LocalAssign(LocalVar("Stack_n", bv32), Extract(32, 0, LocalVar("R0_in", bv64))),
+          LocalAssign(LocalVar("load0", bv32), Register("Global_y", 32)),
+          MemoryAssign(Register("Global_y", 32), BinaryExpr(BVADD, LocalVar("load0", bv32), bv32(10))),
+          LocalAssign(LocalVar("load1", bv32), Register("Global_x", 32)),
+          LocalAssign(LocalVar("load2", bv32), LocalVar("Stack_n", bv32)),
           LocalAssign(
-            LocalVar("R0", bv64, 0),
-            ZeroExtend(32, BinaryExpr(BVADD, LocalVar("load1", bv32, 0), LocalVar("load2", bv32, 0)))
+            LocalVar("R0", bv64),
+            ZeroExtend(32, BinaryExpr(BVADD, LocalVar("load1", bv32), LocalVar("load2", bv32)))
           ),
           goto("f_return")
         ),
-        block("f_return", ret("R0_out" -> LocalVar("R0", bv64, 0)))
+        block("f_return", ret("R0_out" -> LocalVar("R0", bv64)))
       )
     )
     prepareProgram(program)
     program
   }
 
-  def createMultiCallPartialReduction = {
+  private def createMultiCallPartialReduction = {
     val program = prog(
       proc(
         "main",
         block(
           "main_1",
           directCall(
-            Seq("R0_out" -> LocalVar("load0", bv64, 0), "R1_out" -> LocalVar("load1", bv32, 0)),
+            Seq("R0_out" -> LocalVar("load0", bv64), "R1_out" -> LocalVar("load1", bv32)),
             "f",
             Seq("R0_in" -> bv64(10), "R1_in" -> bv32(0))
           ),
@@ -606,11 +573,11 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         Seq("R0_out" -> bv64, "R1_out" -> bv32),
         block(
           "f_1",
-          LocalAssign(LocalVar("R0", bv64, 0), ZeroExtend(32, LocalVar("R1_in", bv32, 0))),
-          LocalAssign(LocalVar("R1", bv32, 0), bv32(50)),
+          LocalAssign(LocalVar("R0", bv64), ZeroExtend(32, LocalVar("R1_in", bv32))),
+          LocalAssign(LocalVar("R1", bv32), bv32(50)),
           goto("f_return")
         ),
-        block("f_return", ret("R0_out" -> LocalVar("R0", bv64, 0), "R1_out" -> LocalVar("R1", bv32, 0)))
+        block("f_return", ret("R0_out" -> LocalVar("R0", bv64), "R1_out" -> LocalVar("R1", bv32)))
       )
     )
     prepareProgram(program)
@@ -656,7 +623,7 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
     assert(f.formalOutParam.isEmpty)
   }
 
-  /* Tests parameter reduction when all of the parameters have an impact on the criterion */
+  /* Tests parameter reduction when all the parameters have an impact on the criterion */
   test("fullParameterPreservation") {
     val program = createMultiCallMultiImpact
     val f = program.nameToProcedure("f")
@@ -684,7 +651,7 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
     assert(f.formalOutParam.map(v => v.name).contains("R0_out"))
   }
 
-  /* Tests parameter reduction when some of the in parameters and all of the out parameters have an impact on the criterion */
+  /* Tests parameter reduction when some of the in parameters and all the out parameters have an impact on the criterion */
   test("partialInOnlyParameterReduction") {
     val program = createMultiCallPartialReduction
     val f = program.nameToProcedure("f")
@@ -706,12 +673,12 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         "main",
         block(
           "main_1",
-          LocalAssign(LocalVar("load0", bv32, 1), bv32(0)),
-          LocalAssign(LocalVar("load1", bv32, 1), bv32(0)),
+          LocalAssign(LocalVar("load0", bv32), bv32(0)),
+          LocalAssign(LocalVar("load1", bv32), bv32(0)),
           directCall(
-            Seq("R0_out" -> LocalVar("R0", bv32, 1)),
+            Seq("R0_out" -> LocalVar("R0", bv32)),
             "write",
-            Seq("R0_in" -> LocalVar("load0", bv32, 1), "R1_in" -> LocalVar("load1", bv32, 1))
+            Seq("R0_in" -> LocalVar("load0", bv32), "R1_in" -> LocalVar("load1", bv32))
           ),
           goto("main_return")
         ),
@@ -724,13 +691,13 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         block(
           "write_1",
           directCall(
-            Seq("R0_out" -> LocalVar("R0", bv32, 1)),
+            Seq("R0_out" -> LocalVar("R0", bv32)),
             "read",
-            Seq("R0_in" -> BinaryExpr(BVADD, LocalVar("R0_in", bv32, 1), LocalVar("R1_in", bv32, 1)))
+            Seq("R0_in" -> BinaryExpr(BVADD, LocalVar("R0_in", bv32), LocalVar("R1_in", bv32)))
           ),
           goto("write_return")
         ),
-        block("write_return", ret("R0_out" -> LocalVar("R0", bv32, 1)))
+        block("write_return", ret("R0_out" -> LocalVar("R0", bv32)))
       ),
       proc(
         "read",
@@ -738,15 +705,11 @@ class SlicerTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
         Seq("R0_out" -> bv32),
         block(
           "read_1",
-          LocalAssign(LocalVar("load2", bv32, 1), LocalVar("R0_in", bv32, 1), SHOULD_REMAIN),
-          LocalAssign(
-            LocalVar("load3", bv32, 1),
-            BinaryExpr(BVADD, LocalVar("load2", bv32, 1), bv32(10)),
-            SHOULD_REMAIN
-          ),
+          LocalAssign(LocalVar("load2", bv32), LocalVar("R0_in", bv32), SHOULD_REMAIN),
+          LocalAssign(LocalVar("load3", bv32), BinaryExpr(BVADD, LocalVar("load2", bv32), bv32(10)), SHOULD_REMAIN),
           goto("read_return")
         ),
-        block("read_return", ret("R0_out" -> LocalVar("load3", bv32, 1)))
+        block("read_return", ret("R0_out" -> LocalVar("load3", bv32)))
       )
     )
     prepareProgram(program)

@@ -37,14 +37,12 @@ import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
-import ir.transforms.MemoryTransform
+import ir.transforms.{MemoryTransform, Slicer}
 import util.DSAConfig.{Checks, Prereq, Standard}
 import util.LogLevel.INFO
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-
-import ir.slicer.*
 
 /** This file contains the main program execution. See RunUtils.loadAndTranslate for the high-level process.
   */
