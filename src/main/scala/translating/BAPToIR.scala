@@ -1,11 +1,11 @@
 package translating
 
-import bap.*
-import ir.*
-import ir.cilvisitor.*
+import bap._
+import ir._
+import ir.cilvisitor._
 
-import scala.collection.mutable
 import scala.collection.immutable
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {

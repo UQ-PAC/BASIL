@@ -1,9 +1,13 @@
 package ir.dsl
 
-import util.{intersperse}
+import util.intersperse
 import util.twine.Twine
-import scala.deriving.{Mirror}
-import scala.compiletime.{summonInline, erasedValue, constValue, error}
+
+import scala.compiletime.constValue
+import scala.compiletime.erasedValue
+import scala.compiletime.error
+import scala.compiletime.summonInline
+import scala.deriving.Mirror
 
 /**
  * ToScala deriving

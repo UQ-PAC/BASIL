@@ -1,12 +1,12 @@
 package translating
 
-import Parsers.BAP_ADTParser.*
-import bap.*
+import Parsers.BAP_ADTParser._
+import bap._
 import ir.Endian
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.jdk.CollectionConverters.*
+import scala.jdk.CollectionConverters._
 
 class BAPLoader {
 

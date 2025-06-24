@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.solvers.ForwardIDESolver
-import ir.*
+import ir._
 import util.StaticAnalysisLogger
 
 private def getLiveVars(p: Procedure): Map[CFGPosition, Set[Variable]] = {

@@ -1,21 +1,19 @@
 package analysis
 
 import analysis.solvers.BackwardIDESolver
-import ir.{
-  Assert,
-  LocalAssign,
-  Assume,
-  CFGPosition,
-  Command,
-  DirectCall,
-  IndirectCall,
-  MemoryLoad,
-  MemoryStore,
-  Procedure,
-  Program,
-  Return,
-  Variable
-}
+import ir.Assert
+import ir.Assume
+import ir.CFGPosition
+import ir.Command
+import ir.DirectCall
+import ir.IndirectCall
+import ir.LocalAssign
+import ir.MemoryLoad
+import ir.MemoryStore
+import ir.Procedure
+import ir.Program
+import ir.Return
+import ir.Variable
 
 /** Micro-transfer-functions for LiveVar analysis this analysis works by inlining function calls (instead of just
   * mapping parameters and returns all live variables (registers) are propagated to and from callee functions) The

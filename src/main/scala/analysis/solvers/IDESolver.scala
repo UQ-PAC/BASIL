@@ -1,31 +1,27 @@
 package analysis.solvers
 
-import analysis.{
-  BackwardIDEAnalysis,
-  Dependencies,
-  EdgeFunction,
-  EdgeFunctionLattice,
-  ForwardIDEAnalysis,
-  IDEAnalysis,
-  IRInterproceduralBackwardDependencies,
-  IRInterproceduralForwardDependencies,
-  Lambda,
-  Lattice,
-  MapLattice
-}
-import ir.{
-  CFGPosition,
-  Command,
-  DirectCall,
-  IRWalk,
-  Return,
-  InterProcIRCursor,
-  Procedure,
-  Program,
-  Unreachable,
-  Statement,
-  Jump
-}
+import analysis.BackwardIDEAnalysis
+import analysis.Dependencies
+import analysis.EdgeFunction
+import analysis.EdgeFunctionLattice
+import analysis.ForwardIDEAnalysis
+import analysis.IDEAnalysis
+import analysis.IRInterproceduralBackwardDependencies
+import analysis.IRInterproceduralForwardDependencies
+import analysis.Lambda
+import analysis.Lattice
+import analysis.MapLattice
+import ir.CFGPosition
+import ir.Command
+import ir.DirectCall
+import ir.IRWalk
+import ir.InterProcIRCursor
+import ir.Jump
+import ir.Procedure
+import ir.Program
+import ir.Return
+import ir.Statement
+import ir.Unreachable
 import util.Logger
 
 import scala.collection.immutable.Map

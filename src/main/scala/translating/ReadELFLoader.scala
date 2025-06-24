@@ -1,12 +1,12 @@
 package translating
 
-import util.Logger
-import Parsers.ReadELFParser.*
-import boogie.*
-import specification.*
+import Parsers.ReadELFParser._
+import boogie._
+import specification._
 import util.ILLoadingConfig
+import util.Logger
 
-import scala.jdk.CollectionConverters.*
+import scala.jdk.CollectionConverters._
 
 /** https://refspecs.linuxfoundation.org/elf/elf.pdf
   */

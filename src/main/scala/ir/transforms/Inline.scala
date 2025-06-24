@@ -1,10 +1,10 @@
 package ir.transforms
-import ir.*
-import ir.cilvisitor.*
-import ir.dsl.*
+import ir._
+import ir.cilvisitor._
+import ir.dsl._
 
+import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
-import scala.collection.immutable.{ArraySeq}
 
 private val counter = util.Counter()
 

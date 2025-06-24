@@ -1,10 +1,10 @@
 package analysis
 
-import ir._
 import analysis.solvers._
+import ir._
+import util.VSALogger
 
 import scala.collection.immutable
-import util.VSALogger
 
 /** ValueSets are PowerSet of possible values */
 trait Value

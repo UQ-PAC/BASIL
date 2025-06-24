@@ -1,9 +1,10 @@
 package ir.dsl
-import ir.*
-import translating.PrettyPrinter.*
+import ir._
+import translating.PrettyPrinter._
+
+import scala.collection.immutable._
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.immutable.*
 
 /**
  * IR construction DSL

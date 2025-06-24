@@ -1,5 +1,6 @@
 package ir.transforms
-import ir.{Program, Procedure}
+import ir.Procedure
+import ir.Program
 
 def inlinePLTLaunchpad(prog: Program) = {
   prog.sortProceduresRPO()

@@ -1,5 +1,5 @@
 package ir.invariant
-import ir.*
+import ir._
 
 def singleCallBlockEnd(p: Program): Boolean = {
   p.forall {

@@ -1,7 +1,7 @@
 package ir
 import util.intrusive_list.IntrusiveListElement
-import collection.immutable.SortedMap
 
+import collection.immutable.SortedMap
 import collection.mutable
 
 /*

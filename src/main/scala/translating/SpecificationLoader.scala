@@ -2,8 +2,8 @@ package translating
 
 import Parsers.SpecificationsParser._
 import boogie._
-import specification._
 import ir._
+import specification._
 import util.Logger
 
 import scala.jdk.CollectionConverters._

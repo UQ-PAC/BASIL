@@ -1,6 +1,8 @@
 package ir.invariant
+import ir.Procedure
+import ir.Program
+import ir.Return
 import util.Logger
-import ir.{Program, Procedure, Return}
 
 def procedureDiamondForm(p: Procedure): Boolean = {
 

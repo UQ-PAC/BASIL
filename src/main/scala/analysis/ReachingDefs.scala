@@ -1,18 +1,16 @@
 package analysis
 
 import analysis.solvers.SimplePushDownWorklistFixpointSolver
-import ir.{
-  LocalAssign,
-  CFGPosition,
-  DirectCall,
-  IntraProcIRCursor,
-  MemoryLoad,
-  Procedure,
-  Program,
-  Register,
-  Variable,
-  computeDomain
-}
+import ir.CFGPosition
+import ir.DirectCall
+import ir.IntraProcIRCursor
+import ir.LocalAssign
+import ir.MemoryLoad
+import ir.Procedure
+import ir.Program
+import ir.Register
+import ir.Variable
+import ir.computeDomain
 
 abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[Register]])
     extends Analysis[Map[CFGPosition, Map[Variable, Set[CFGPosition]]]] {

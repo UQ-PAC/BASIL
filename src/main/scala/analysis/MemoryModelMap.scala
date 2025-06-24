@@ -1,7 +1,7 @@
 package analysis
 
-import analysis.*
-import ir.*
+import analysis._
+import ir._
 import util.MRALogger
 
 import scala.collection.mutable

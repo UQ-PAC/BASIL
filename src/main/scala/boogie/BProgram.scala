@@ -1,13 +1,18 @@
 package boogie
 
-import util.{PerformanceTimer, Logger, LogLevel}
 import ir.Sigil
+import util.LogLevel
+import util.Logger
+import util.PerformanceTimer
 
-import scala.sys.process.*
+import java.io.BufferedWriter
+import java.io.FileWriter
+import java.io.StringWriter
+import java.io.Writer
+import java.nio.file.Files
+import java.nio.file.Paths
 import scala.collection.immutable.Seq
-
-import java.io.{StringWriter, Writer, BufferedWriter, FileWriter}
-import java.nio.file.{Files, Paths}
+import scala.sys.process._
 
 case class BProgram(declarations: List[BDeclaration], filename: String) {
   override def toString: String = declarations.flatMap(x => x.toBoogie).mkString(System.lineSeparator())

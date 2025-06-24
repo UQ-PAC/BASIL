@@ -1,7 +1,10 @@
 package analysis
 
-import ir.*
-import ir.eval.BitVectorEval.{bv2SignedInt, bv2nat, nat2bv, smt_bvneg}
+import ir._
+import ir.eval.BitVectorEval.bv2SignedInt
+import ir.eval.BitVectorEval.bv2nat
+import ir.eval.BitVectorEval.nat2bv
+import ir.eval.BitVectorEval.smt_bvneg
 
 // Signed infinity
 private def sInf(size: Int): BigInt = BigInt(2).pow(size - 1) - 1

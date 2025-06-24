@@ -1,6 +1,7 @@
 package ir.transforms
-import ir.*
-import cilvisitor.*
+import ir._
+
+import cilvisitor._
 
 /** Prevents strings in 'reserved' from being used as the name of anything by adding a '#' to the start. Useful for
   * avoiding Boogie's reserved keywords.

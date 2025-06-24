@@ -1,6 +1,6 @@
 package ir.transforms
-import ir.*
-import ir.cilvisitor.*
+import ir._
+import ir.cilvisitor._
 
 val callTargetRegister = Register("indirectCallTarget", 64)
 val indirectCallParams = ((0 to 31).toSet -- (19 to 28).toSet).map(i => R(i)).toList

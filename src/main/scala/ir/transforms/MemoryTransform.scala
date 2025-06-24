@@ -1,8 +1,10 @@
 package ir.transforms
 
-import analysis.data_structure_analysis.*
-import ir.cilvisitor.{CILVisitor, ChangeTo, SkipChildren}
-import ir.*
+import analysis.data_structure_analysis._
+import ir._
+import ir.cilvisitor.CILVisitor
+import ir.cilvisitor.ChangeTo
+import ir.cilvisitor.SkipChildren
 import util.Counter
 
 import scala.collection.mutable

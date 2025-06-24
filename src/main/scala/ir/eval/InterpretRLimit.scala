@@ -1,9 +1,9 @@
 package ir.eval
 
-import ir.*
+import ir._
 import util.IRContext
-import util.functional.*
-import util.functional.State.*
+import util.functional.State._
+import util.functional._
 
 case class EffectsRLimit[T, E, I <: Effects[T, InterpreterError]](val limit: Int)
     extends NopEffects[(T, Int), InterpreterError] {

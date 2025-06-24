@@ -1,7 +1,8 @@
 package ir.transforms
 
-import util.{Logger, PCTrackingOption}
-import ir.*
+import ir._
+import util.Logger
+import util.PCTrackingOption
 
 object PCTracking {
 

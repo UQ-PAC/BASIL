@@ -1,9 +1,10 @@
 package analysis.data_structure_analysis
 
-import analysis.*
-import ir.*
+import analysis._
+import ir._
+import specification.ExternalFunction
+import specification.SymbolTableEntry
 import util.Counter
-import specification.{ExternalFunction, SymbolTableEntry}
 
 import scala.collection.mutable
 

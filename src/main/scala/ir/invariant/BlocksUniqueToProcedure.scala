@@ -1,7 +1,8 @@
 package ir.invariant
-import ir.*
-import ir.cilvisitor.*
+import ir._
+import ir.cilvisitor._
 import util.Logger
+
 import scala.collection.mutable
 
 private class BVis extends CILVisitor {

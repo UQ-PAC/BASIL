@@ -1,8 +1,8 @@
 package analysis
 
-import analysis.solvers.Var
 import analysis.solvers.UnionFindSolver
-import ir.*
+import analysis.solvers.Var
+import ir._
 import util.Logger
 
 private var ssaCount: Int = 0

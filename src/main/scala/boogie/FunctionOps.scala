@@ -1,5 +1,5 @@
 package boogie
-import ir.*
+import ir._
 import util.BoogieMemoryAccessMode
 
 val externAttr = BAttribute("extern")

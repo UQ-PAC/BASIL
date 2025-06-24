@@ -1,6 +1,6 @@
 package analysis
 
-import ir.*
+import ir._
 import ir.transforms.AbstractDomain
 
 import scala.annotation.implicitNotFound

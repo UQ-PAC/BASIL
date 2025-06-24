@@ -1,10 +1,10 @@
 package ir.eval
 
-import ir.*
-import util.Logger
+import ir._
 import util.IRContext
-import util.functional.*
-import util.functional.State.*
+import util.Logger
+import util.functional.State._
+import util.functional._
 
 import scala.collection.immutable
 

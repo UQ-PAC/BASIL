@@ -1,8 +1,8 @@
 package analysis
 
-import ir.eval.BitVectorEval.bv2SignedInt
 import analysis.solvers.SimpleWorklistFixpointSolver
-import ir.*
+import ir._
+import ir.eval.BitVectorEval.bv2SignedInt
 import util.MRALogger
 
 import scala.collection.mutable

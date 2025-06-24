@@ -1,6 +1,7 @@
 package ir.eval
-import ir.*
-import BitVectorEval.*
+import ir._
+
+import BitVectorEval._
 
 object InfixBitVectorEval {
 

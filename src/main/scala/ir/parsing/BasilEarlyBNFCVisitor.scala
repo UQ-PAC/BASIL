@@ -3,7 +3,7 @@ package ir.parsing
 import basil_ir.{Absyn => syntax}
 
 import scala.collection.immutable.ListMap
-import scala.jdk.CollectionConverters.*
+import scala.jdk.CollectionConverters._
 
 private object Declarations {
   lazy val empty = Declarations(Map(), Map(), Map(), Map(), SymbolTableInfo.empty, ProgSpec())

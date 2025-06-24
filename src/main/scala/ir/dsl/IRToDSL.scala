@@ -1,7 +1,9 @@
 package ir.dsl
 
-import scala.collection.immutable.{SortedMap, ArraySeq}
-import ir.*
+import ir._
+
+import scala.collection.immutable.ArraySeq
+import scala.collection.immutable.SortedMap
 
 /**
  * Basil IR to DSL

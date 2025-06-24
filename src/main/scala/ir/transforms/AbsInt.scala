@@ -1,7 +1,8 @@
 package ir.transforms
 
+import ir._
 import util.Logger
-import ir.*
+
 import scala.collection.mutable
 
 /**********************************************************************************

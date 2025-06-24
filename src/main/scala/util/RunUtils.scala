@@ -1,34 +1,40 @@
 package util
 
-import java.io.{BufferedWriter, File, FileInputStream, FileWriter, PrintWriter}
-import java.nio.file.{Files, Paths}
+import Parsers.ASLpParser._
+import Parsers._
+import analysis.data_structure_analysis._
+import analysis.{Interval => _, _}
+import bap._
+import boogie._
 import com.grammatech.gtirb.proto.IR.IR
-import gtirb.*
-import translating.PrettyPrinter.*
+import gtirb._
+import ir._
 import ir.dsl.given
-import ir.eval.*
-
-import scala.collection.mutable.ArrayBuffer
-import scala.jdk.CollectionConverters.*
-import analysis.{Interval as _, *}
-import bap.*
-import ir.*
-import boogie.*
-import specification.*
-import Parsers.*
-import Parsers.ASLpParser.*
-import analysis.data_structure_analysis.*
-import org.antlr.v4.runtime.BailErrorStrategy
-import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
-import translating.*
-import util.{DebugDumpIRLogger, Logger}
-
-import cilvisitor.*
+import ir.eval._
 import ir.transforms.MemoryTransform
-import util.DSAConfig.{Prereq}
+import org.antlr.v4.runtime.BailErrorStrategy
+import org.antlr.v4.runtime.CharStreams
+import org.antlr.v4.runtime.CommonTokenStream
+import specification._
+import translating.PrettyPrinter._
+import translating._
+import util.DSAConfig.Prereq
+import util.DebugDumpIRLogger
 import util.LogLevel.INFO
+import util.Logger
 
+import java.io.BufferedWriter
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileWriter
+import java.io.PrintWriter
+import java.nio.file.Files
+import java.nio.file.Paths
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
+import scala.jdk.CollectionConverters._
+
+import cilvisitor._
 
 /** This file contains the main program execution. See RunUtils.loadAndTranslate for the high-level process.
   */

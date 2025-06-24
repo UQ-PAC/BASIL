@@ -1,13 +1,16 @@
 package analysis.data_structure_analysis
 
-import analysis.data_structure_analysis.OSet.{Top, Values}
+import analysis.data_structure_analysis.OSet.Top
+import analysis.data_structure_analysis.OSet.Values
+import ir._
 import ir.eval.BitVectorEval.bv2SignedInt
-import ir.*
-import ir.transforms.{AbstractDomain, worklistSolver}
-import util.SVALogger as Logger
+import ir.transforms.AbstractDomain
+import ir.transforms.worklistSolver
+import util.{SVALogger => Logger}
 
 import scala.annotation.tailrec
-import scala.collection.{SortedMap, mutable}
+import scala.collection.SortedMap
+import scala.collection.mutable
 
 def mapMerge[K, V](a: Map[K, V], b: Map[K, V], f: (V, V) => V): Map[K, V] = {
   var merged = a

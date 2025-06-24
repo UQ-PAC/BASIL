@@ -1,6 +1,7 @@
 package ir.cilvisitor
 
-import ir.*
+import ir._
+
 import scala.collection.mutable
 
 /** A new visitor based off CIL.

@@ -1,5 +1,5 @@
 package ir.eval
-import ir.*
+import ir._
 
 object BitVectorEval {
 

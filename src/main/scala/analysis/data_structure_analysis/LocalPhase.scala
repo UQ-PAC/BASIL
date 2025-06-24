@@ -1,10 +1,11 @@
 package analysis.data_structure_analysis
 
+import analysis._
+import ir._
 import ir.eval.BitVectorEval.isNegative
-import analysis.*
-import ir.*
+import specification.ExternalFunction
+import specification.SymbolTableEntry
 import util.Counter
-import specification.{ExternalFunction, SymbolTableEntry}
 
 import scala.collection.mutable
 

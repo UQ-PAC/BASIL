@@ -1,10 +1,10 @@
 package ir.eval
 
-import ir.*
-import util.IRContext
-import util.functional.*
-import util.functional.State.*
 import boogie.Scope
+import ir._
+import util.IRContext
+import util.functional.State._
+import util.functional._
 
 import scala.collection.immutable
 

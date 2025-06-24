@@ -1,8 +1,14 @@
 package ir
 
-import collection.mutable
+import cfg_visualiser.DotArrow
+import cfg_visualiser.DotGraph
+import cfg_visualiser.DotInterArrow
+import cfg_visualiser.DotNode
+import cfg_visualiser.DotRegularArrow
+
 import scala.annotation.tailrec
-import cfg_visualiser.{DotArrow, DotGraph, DotInterArrow, DotNode, DotRegularArrow}
+
+import collection.mutable
 
 /** 
  *  This file defines functions to get the successor and predecessor of a IR node for control flow.

@@ -1,8 +1,12 @@
 package analysis
 
-import analysis.solvers.{Cons, Term, UnionFindSolver, Var}
-import ir.*
+import analysis.solvers.Cons
+import analysis.solvers.Term
+import analysis.solvers.UnionFindSolver
+import analysis.solvers.Var
+import ir._
 import util.SteensLogger
+
 import scala.collection.mutable
 
 /** Wrapper for variables so we can have ConstantPropegation-specific equals method indirectly Relies on SSA integers

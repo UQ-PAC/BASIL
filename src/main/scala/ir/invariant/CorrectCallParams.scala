@@ -1,5 +1,5 @@
 package ir.invariant
-import ir.*
+import ir._
 import util.Logger
 
 /*

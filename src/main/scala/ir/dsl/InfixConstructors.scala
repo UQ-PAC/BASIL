@@ -1,9 +1,10 @@
 package ir.dsl
-import ir.*
-import translating.PrettyPrinter.*
-import scala.collection.immutable.*
+import ir._
+import ir.dsl._
+import translating.PrettyPrinter._
+
 import scala.annotation.targetName
-import ir.dsl.*
+import scala.collection.immutable._
 
 /**
  * Expr and statement construction; this defined infix operators which construct

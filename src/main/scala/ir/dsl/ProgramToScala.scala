@@ -1,7 +1,7 @@
 package ir.dsl
 
-import ir.*
-import util.{intersperse}
+import ir._
+import util.intersperse
 import util.twine.Twine
 
 import collection.immutable.{ListMap, LazyList}

@@ -8,10 +8,11 @@ package analysis
  *
  */
 
-import ir.*
+import ir._
+
+import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.collection.mutable
-import scala.annotation.tailrec
 
 /**
  * Dominator analysis using the "improved iterative" algorithm (figure 3)

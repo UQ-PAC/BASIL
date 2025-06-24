@@ -1,17 +1,20 @@
 package analysis.data_structure_analysis
 
 import analysis.FlatElement
-import analysis.solvers.DSAUnionFindSolver
 import analysis.evaluateExpression
-import cfg_visualiser.*
-import ir.*
-import util.Counter
-import specification.{ExternalFunction, FuncEntry, SymbolTableEntry}
+import analysis.solvers.DSAUnionFindSolver
 import boogie.SpecGlobal
+import cfg_visualiser._
+import ir._
+import specification.ExternalFunction
+import specification.FuncEntry
+import specification.SymbolTableEntry
+import util.Counter
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.util.control.Breaks.{break, breakable}
+import scala.util.control.Breaks.break
+import scala.util.control.Breaks.breakable
 
 /** Data Structure Graph for DSA
   *

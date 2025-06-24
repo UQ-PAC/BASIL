@@ -1,9 +1,10 @@
 package boogie
-import ir.*
-import specification.*
-import collection.mutable
+import ir._
+import specification._
 
 import java.io.Writer
+
+import collection.mutable
 
 sealed trait BExpr {
   def getType: BType

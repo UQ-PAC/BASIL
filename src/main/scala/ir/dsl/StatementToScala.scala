@@ -1,6 +1,6 @@
 package ir.dsl
 
-import ir.*
+import ir._
 import util.twine.Twine
 
 /**

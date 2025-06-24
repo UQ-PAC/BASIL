@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.solvers.SimpleWorklistFixpointSolver
-import ir.*
+import ir._
 
 abstract class LivenessAnalysis(program: Program, addExternals: Boolean = true) extends Analysis[Any] {
   val lattice: MapLattice[CFGPosition, Set[Variable], PowersetLattice[Variable]] = MapLattice(PowersetLattice())

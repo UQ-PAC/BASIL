@@ -1,8 +1,13 @@
 package util
-import sourcecode.Line, sourcecode.FileName, sourcecode.Name
+import sourcecode.FileName
+import sourcecode.Line
+import sourcecode.Name
+
+import java.io.File
+import java.io.PrintStream
 import scala.io.AnsiColor
+
 import collection.mutable.HashSet
-import java.io.{File, PrintStream}
 
 enum LogLevel(val id: Int):
   case DEBUG extends LogLevel(0)

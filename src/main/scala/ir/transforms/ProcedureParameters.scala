@@ -1,14 +1,20 @@
 package ir.transforms
-import ir.cilvisitor.*
-import java.io.File
-import ir.*
-import translating.PrettyPrinter
-import scala.collection.{mutable, immutable}
-import collection.immutable.SortedMap
-import specification.Specification
-import analysis.{TwoElement, TwoElementTop, TwoElementBottom}
+import analysis.TwoElement
+import analysis.TwoElementBottom
+import analysis.TwoElementTop
 import ir.CallGraph
-import util.{Logger, DebugDumpIRLogger}
+import ir._
+import ir.cilvisitor._
+import specification.Specification
+import translating.PrettyPrinter
+import util.DebugDumpIRLogger
+import util.Logger
+
+import java.io.File
+import scala.collection.immutable
+import scala.collection.mutable
+
+import collection.immutable.SortedMap
 
 case class FunSig(inArgs: List[Register], outArgs: List[Register])
 

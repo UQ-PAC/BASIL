@@ -1,5 +1,6 @@
 package ir.transforms
-import ir.*
+import ir._
+
 import collection.mutable
 
 // This shouldn't be run before indirect calls are resolved

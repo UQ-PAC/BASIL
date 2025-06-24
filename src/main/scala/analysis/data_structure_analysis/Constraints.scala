@@ -1,19 +1,17 @@
 package analysis.data_structure_analysis
 
-import ir.{
-  CFGPosition,
-  Call,
-  DirectCall,
-  Expr,
-  IndirectCall,
-  IntraProcIRCursor,
-  LocalVar,
-  MemoryLoad,
-  MemoryStore,
-  Procedure,
-  Variable,
-  computeDomain
-}
+import ir.CFGPosition
+import ir.Call
+import ir.DirectCall
+import ir.Expr
+import ir.IndirectCall
+import ir.IntraProcIRCursor
+import ir.LocalVar
+import ir.MemoryLoad
+import ir.MemoryStore
+import ir.Procedure
+import ir.Variable
+import ir.computeDomain
 import util.ConstGenLogger
 
 sealed trait Constraint {
