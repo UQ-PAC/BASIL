@@ -37,8 +37,8 @@ trait ProfileRun extends ScalaModule with DownloadModule {
   }
 
   def libExn = hostOS match {
-      case Linux =>  ".so"
-      case Mac =>  ".dylib"
+      case Linux =>  "so"
+      case Mac =>  "dylib"
       case osName => throw new Exception(s"Profiling is only supported on linux, mac. Not : $osName")
   }
 
