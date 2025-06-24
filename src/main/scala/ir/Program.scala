@@ -1,6 +1,6 @@
 package ir
 
-import analysis.{Loop, MergedRegion}
+import analysis.{Loop, MergedRegion, Predicate}
 import boogie.*
 import translating.PrettyPrinter.*
 import util.functional.Snoc
@@ -603,6 +603,9 @@ class Block private (
 
   statements.onInsert = x => x.setParent(this)
   statements.onRemove = x => x.deParent()
+
+  var preconditions: mutable.ArrayBuffer[Predicate] = mutable.ArrayBuffer()
+  var postconditions: mutable.ArrayBuffer[Predicate] = mutable.ArrayBuffer()
 
   def this(
     label: String,

@@ -57,6 +57,7 @@ case class BASILConfig(
   validateSimp: Boolean = false,
   dsaConfig: Option[DSAConfig] = None,
   summariseProcedures: Boolean = false,
+  generateLoopInvariants: Boolean = false,
   generateRelyGuarantees: Boolean = false,
   memoryTransform: Boolean = false,
   assertCalleeSaved: Boolean = false,
