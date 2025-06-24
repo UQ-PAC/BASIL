@@ -195,9 +195,14 @@ object Main {
     parameterForm: Flag,
     @arg(
       name = "summarise-procedures",
-      doc = "Generates summaries of procedures which are used in pre/post-conditions (requires --analyse flag)"
+      doc = "Generates summaries of procedures which are used in pre/post-conditions"
     )
     summariseProcedures: Flag,
+    @arg(
+      name = "generate-loop-invariants",
+      doc = "Generates loop invariants on loop headers (requires --analyse flag)"
+    )
+    generateLoopInvariants: Flag,
     @arg(
       name = "generate-rely-guarantees",
       doc = "Generates rely-guarantee conditions for each procedure that contains a return node."
@@ -463,6 +468,7 @@ object Main {
       simplify = conf.simplify.value,
       validateSimp = conf.validateSimplify.value,
       summariseProcedures = conf.summariseProcedures.value,
+      generateLoopInvariants = conf.generateLoopInvariants.value,
       generateRelyGuarantees = conf.generateRelyGuarantees.value,
       staticAnalysis = staticAnalysis,
       boogieTranslation = boogieGeneratorConfig,

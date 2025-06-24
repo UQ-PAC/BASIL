@@ -617,6 +617,8 @@ class IRToBoogie(
   def translateBlock(b: Block): BBlock = {
     val initLabel = b.meta.originalLabel.map(" (" + _ + ")").getOrElse("")
     val captureState = captureStateStatement(s"${b.label}${initLabel}")
+    val preconditions = b.preconditions.map(p => BAssert(p.toBoogie))
+    val postconditions = b.postconditions.map(p => BAssert(p.toBoogie))
 
     val statements = if (b.atomicSection.isDefined) {
       val before = if (b.atomicSection.get.isStart(b)) {
@@ -634,7 +636,7 @@ class IRToBoogie(
       b.statements.flatMap(s => translate(s, false))
     }
 
-    val cmds = List(captureState) ++ statements ++ translate(b.jump)
+    val cmds = List(captureState) ++ preconditions ++ statements ++ postconditions ++ translate(b.jump)
 
     BBlock(b.label, cmds)
   }

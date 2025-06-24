@@ -405,6 +405,10 @@ object IRTransform {
     modified
   }
 
+  def generateLoopInvariants(IRProgram: Program) = {
+    FullLoopInvariantGenerator(IRProgram).addInvariants()
+  }
+
   def generateRelyGuaranteeConditions(threads: List[Procedure]): Unit = {
     /* Todo: For the moment we are printing these to stdout, but in future we'd
     like to add them to the IR. */
@@ -1003,9 +1007,9 @@ object RunUtils {
       IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify)
     }
 
-    if (conf.summariseProcedures) {
-      StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
-      IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify)
+    if (conf.staticAnalysis.nonEmpty && conf.generateLoopInvariants) {
+      StaticAnalysisLogger.info("[!] Generating Loop Invariants")
+      IRTransform.generateLoopInvariants(ctx.program)
     }
 
     if (q.runInterpret) {
