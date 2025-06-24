@@ -93,7 +93,7 @@ abstract class DifferentialTest extends AnyFunSuite, CaptureOutput, TestCustomis
     ir.transforms.doCleanupWithoutSimplify(ictx, AnalysisManager(ictx.program))
 
     var comparectx = IRLoading.load(loading)
-    ir.transforms.doCleanupWithoutSimplify(comparectx,  AnalysisManager(comparectx.program))
+    ir.transforms.doCleanupWithoutSimplify(comparectx, AnalysisManager(comparectx.program))
 
     ir.transforms.clearParams(ictx.program)
 

@@ -734,10 +734,12 @@ object RunUtils {
     if (!q.staticAnalysis.isEmpty && q.staticAnalysis.get.memoryRegions != MemoryRegionsMode.Disabled) {
       disabledTransforms += determineRelevantMemory
     }
-    if (q.memoryTransform || (!q.staticAnalysis.isEmpty && q.staticAnalysis.get.memoryRegions != MemoryRegionsMode.Disabled)) {
+    if (
+      q.memoryTransform || (!q.staticAnalysis.isEmpty && q.staticAnalysis.get.memoryRegions != MemoryRegionsMode.Disabled)
+    ) {
       disabledTransforms += stackSubstitution
     }
-    
+
     // note: we might not necessarily want the same config for all transforms
     val transformConfig = TransformConfig(disabled = disabledTransforms.toSet, dumpLogs = transformsToLog.toMap)
 

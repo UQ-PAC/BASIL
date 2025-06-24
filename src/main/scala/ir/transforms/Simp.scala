@@ -829,15 +829,21 @@ def coalesceBlocks(p: Program): Boolean = {
   didAny
 }
 
-val coalesceBlocksOnce = SingleTransform("CoalesceBlocksOnce", (ctx, man) => {
-  coalesceBlocks(ctx.program)
-  man.ClobberAll
-})
+val coalesceBlocksOnce = SingleTransform(
+  "CoalesceBlocksOnce",
+  (ctx, man) => {
+    coalesceBlocks(ctx.program)
+    man.ClobberAll
+  }
+)
 
-val coalesceBlocksFixpoint = SingleTransform("CoalesceBlocksFixpoint", (ctx, man) => {
-  while (coalesceBlocks(ctx.program)) {}
-  man.ClobberAll
-})
+val coalesceBlocksFixpoint = SingleTransform(
+  "CoalesceBlocksFixpoint",
+  (ctx, man) => {
+    while (coalesceBlocks(ctx.program)) {}
+    man.ClobberAll
+  }
+)
 
 def removeDeadInParams(p: Program): Boolean = {
   var modified = false
@@ -1149,10 +1155,13 @@ def applyRPO(p: Program) = {
   }
 }
 
-val applyRpoTransform = SingleTransform("ApplyRPO", (ctx, man) => {
-  applyRPO(man.program)
-  man.ClobberAll
-})
+val applyRpoTransform = SingleTransform(
+  "ApplyRPO",
+  (ctx, man) => {
+    applyRPO(man.program)
+    man.ClobberAll
+  }
+)
 
 object getProcFrame {
   class GetProcFrame(frames: Procedure => Set[Memory]) extends CILVisitor {
@@ -1887,27 +1896,33 @@ def findDefinitelyExits(p: Program): ProcReturnInfo = {
   )
 }
 
-val replaceJumpsInNonReturningProcs = SingleTransform("ReplaceJumpsInNonReturningProcs", (ctx, man) => {
-  val nonReturning = findDefinitelyExits(ctx.program)
-  ctx.program.mainProcedure.foreach {
-    case d: DirectCall if nonReturning.nonreturning.contains(d.target) => d.parent.replaceJump(Return())
-    case _ =>
+val replaceJumpsInNonReturningProcs = SingleTransform(
+  "ReplaceJumpsInNonReturningProcs",
+  (ctx, man) => {
+    val nonReturning = findDefinitelyExits(ctx.program)
+    ctx.program.mainProcedure.foreach {
+      case d: DirectCall if nonReturning.nonreturning.contains(d.target) => d.parent.replaceJump(Return())
+      case _ =>
+    }
+    man.ClobberAll
   }
-  man.ClobberAll
-})
+)
 
-val removeExternalFunctionReferences = SingleTransform("RemoveExternalFunctionReferences", (ctx, man) => {
-  val externalNames = ctx.externalFunctions.map(_.name)
-  val unqualifiedNames = externalNames.filter(_.contains('@')).map(_.split('@')(0))
-  removeBodyOfExternal(externalNames ++ unqualifiedNames)(ctx.program)
-  for (p <- ctx.program.procedures) {
-    p.isExternal = Some(
-      ctx.externalFunctions.exists(e => e.name == p.procName || p.address.contains(e.offset)) || p.isExternal
-        .getOrElse(false)
-    )
+val removeExternalFunctionReferences = SingleTransform(
+  "RemoveExternalFunctionReferences",
+  (ctx, man) => {
+    val externalNames = ctx.externalFunctions.map(_.name)
+    val unqualifiedNames = externalNames.filter(_.contains('@')).map(_.split('@')(0))
+    removeBodyOfExternal(externalNames ++ unqualifiedNames)(ctx.program)
+    for (p <- ctx.program.procedures) {
+      p.isExternal = Some(
+        ctx.externalFunctions.exists(e => e.name == p.procName || p.address.contains(e.offset)) || p.isExternal
+          .getOrElse(false)
+      )
+    }
+    man.ClobberAll
   }
-  man.ClobberAll
-})
+)
 
 def getDoCleanupTransform(doSimplify: Boolean): Transform = TransformBatch(
   "DoCleanup",

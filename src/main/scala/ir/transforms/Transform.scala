@@ -7,7 +7,6 @@ import analysis.AnalysisManager
 import translating.PrettyPrinter.pp_prog
 import java.io.File
 
-
 // TransformConfig accepts Log instances which specify what kind of logs to dump for particular transforms
 trait Log {
   def dump(ctx: IRContext, transformName: String): Unit
@@ -18,7 +17,8 @@ case class BlockgraphLog(filenamePrefix: String) extends Log {
   def dump(ctx: IRContext, transformName: String): Unit =
     DebugDumpIRLogger.writeToFile(
       File(s"${filenamePrefix}_blockgraph-${transformName}.dot"),
-      dotBlockGraph(ctx.program.mainProcedure))
+      dotBlockGraph(ctx.program.mainProcedure)
+    )
 }
 
 // dumps an IR log
@@ -32,10 +32,7 @@ case class IrLog(filenamePrefix: String) extends Log {
   * @param disabled Optionally specify a set of transforms to disable.
   * @param dumpLogs Optionally specify which logs to dump for which transforms, if any.
   */
-case class TransformConfig(
-  disabled: Set[Transform] = Set.empty,
-  dumpLogs: Map[Transform, Set[Log]] = Map.empty
-)
+case class TransformConfig(disabled: Set[Transform] = Set.empty, dumpLogs: Map[Transform, Set[Log]] = Map.empty)
 
 // default value for transforms
 val emptyConfig = TransformConfig()
@@ -93,7 +90,7 @@ case class SingleTransform(
   // simply calls the given implementation function
   def transform(ctx: IRContext, man: AnalysisManager, config: TransformConfig): man.Invalidation =
     implementation(ctx, man)
-  
+
   // standard transforms don't need anything here; post-run checks should be handled by the implementation
   def postRun(ctx: IRContext): Unit = ()
 }
