@@ -5,6 +5,7 @@ import ir.eval.BitVectorEval
 import ir.eval.InfixBitVectorEval.*
 import ir.eval.InfixBitVectorEval.given
 import ir.transforms.{applyRPO, AbstractDomain}
+import scala.language.implicitConversions
 
 /**
  *

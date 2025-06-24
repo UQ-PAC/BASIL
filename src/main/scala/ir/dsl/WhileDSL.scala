@@ -3,6 +3,7 @@ import ir.*
 import translating.PrettyPrinter.*
 import scala.collection.immutable.*
 import scala.annotation.targetName
+import scala.language.implicitConversions
 
 /**
  * Construction of basil IR programs from a simple high level while langauge. 
