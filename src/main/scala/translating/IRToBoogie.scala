@@ -2,7 +2,6 @@ package translating
 import analysis.MergedRegion
 import analysis.RegionInjector
 import boogie._
-import ir.BoolOR
 import ir._
 import specification._
 import util.BoogieGeneratorConfig

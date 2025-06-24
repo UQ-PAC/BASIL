@@ -1,6 +1,5 @@
 package util
 
-import Parsers.ASLpParser._
 import Parsers._
 import analysis.data_structure_analysis._
 import analysis.{Interval => _, _}

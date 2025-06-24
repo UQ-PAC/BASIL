@@ -2,7 +2,6 @@ package ir.transforms
 import analysis.TwoElement
 import analysis.TwoElementBottom
 import analysis.TwoElementTop
-import ir.CallGraph
 import ir._
 import ir.cilvisitor._
 import specification.Specification
