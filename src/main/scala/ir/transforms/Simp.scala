@@ -2280,7 +2280,6 @@ val logSimplificationValidation = SingleTransform(
   }
 )
 
-
 val copyPropParamFixedPointTransform = SingleTransform(
   "CopyPropParamFixedPoint",
   (ctx, man) => {
@@ -2327,14 +2326,14 @@ def getDoSimplifyTransform(validate: Boolean) = TransformBatch(
         DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-simp.il"), pp_prog(program))
       }
     }
-    */
+     */
     applyRpoTransform, // (this transform was already defined in this file)
     // example of printing a simple analysis
     removeEmptyBlocksTransform,
     coalesceBlocksOnce,
     removeEmptyBlocksTransform,
     // transforms.coalesceBlocksCrossBranchDependency(program)
-    /* 
+    /*
     config.foreach {
       _.analysisDotPath.foreach { s =>
         DebugDumpIRLogger.writeToFile(File(s"${s}_blockgraph-before-dsa.dot"), dotBlockGraph(program.mainProcedure))
@@ -2346,7 +2345,7 @@ def getDoSimplifyTransform(validate: Boolean) = TransformBatch(
         DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-dsa.il"), pp_prog(program))
       }
     }
-    */
+     */
     onePassDsaTransform,
     inlinePLTLaunchpad,
     removeEmptyBlocksTransform,
@@ -2369,7 +2368,7 @@ def getDoSimplifyTransform(validate: Boolean) = TransformBatch(
         DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-dsa.il"), pp_prog(program))
       }
     }
-    */
+     */
     // todo: only run iff ir.eval.SimplifyValidation.validate (that is: iff conf.validateSimp)
     dsaCheck,
     // todo:
@@ -2387,7 +2386,7 @@ def getDoSimplifyTransform(validate: Boolean) = TransformBatch(
         )
       }
     }
-    */
+     */
     liftLinuxAssertFailTransform,
     // assert(program.procedures.forall(transforms.rdDSAProperty))
     // todo: transforms should have the ability to log their performance as soon as they finish
@@ -2400,7 +2399,7 @@ def getDoSimplifyTransform(validate: Boolean) = TransformBatch(
         DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-copyprop.il"), pp_prog(program))
       }
     }
-    */
+     */
     // val x = program.procedures.forall(transforms.rdDSAProperty)
     // assert(x)
     dsaCheckAfterTransform, // todo: only run iff conf.validateSimp
@@ -2412,7 +2411,7 @@ def getDoSimplifyTransform(validate: Boolean) = TransformBatch(
         DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-slices.il"), pp_prog(program))
       }
     }
-    */
+     */
     // re-apply dsa
     // transforms.OnePassDSA().applyTransform(program)
     logSimplificationValidation // todo: only run iff conf.validateSimp
