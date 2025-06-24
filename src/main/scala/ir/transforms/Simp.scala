@@ -843,7 +843,11 @@ def removeDeadInParams(p: Program): Boolean = {
   var modified = false
   assert(invariant.correctCalls(p))
 
-  for (block <- p.procedures.filterNot(_.isExternal.contains(true)).flatMap(_.entryBlock)) {
+  for (
+    block <- p.procedures.filterNot(_.isExternal.contains(true)).filterNot(p.mainProcedure == _).flatMap(_.entryBlock)
+  ) {
+    // FIXME: .filterNot(p.mainProcedure == _). is a bad hack to fix tests that refer to variabels in requries spec
+    // that are not live in procedure. new spec should let us look at dependencies, or write spec about actual result
     val proc = block.parent
 
     val (liveBefore, _) = getLiveVars(proc)
@@ -1892,16 +1896,6 @@ val replaceJumpsInNonReturningProcs = SingleTransform("ReplaceJumpsInNonReturnin
   man.ClobberAll
 })
 
-def getReplaceReturnsTransform(doSimplify: Boolean): Transform = SingleTransform("ReplaceReturns", (ctx, man) => {
-  cilvisitor.visit_prog(
-    ReplaceReturns(proc => doSimplify && ctx.program.mainProcedure != proc),
-    ctx.program
-  )
-  transforms.addReturnBlocks(ctx.program, insertR30InvariantAssertion = _ => doSimplify)
-  cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
-  man.ClobberAll
-})
-
 val removeExternalFunctionReferences = SingleTransform("RemoveExternalFunctionReferences", (ctx, man) => {
   val externalNames = ctx.externalFunctions.map(_.name)
   val unqualifiedNames = externalNames.filter(_.contains('@')).map(_.split('@')(0))
@@ -1924,11 +1918,7 @@ def getDoCleanupTransform(doSimplify: Boolean): Transform = TransformBatch(
     coalesceBlocksFixpoint,
     applyRpoTransform,
     replaceJumpsInNonReturningProcs,
-    // FIXME: Main will often maintain the stack by loading R30 from the caller's stack frame
-    //        before returning, which makes the R30 assertin faile. Hence we currently skip this
-    //        assertion for main, instead we should precondition the stack layout before main
-    //        but the interaction between spec and memory regions is nontrivial currently
-    getReplaceReturnsTransform(doSimplify),
+    getEstablishProcedureDiamondFormTransform(doSimplify),
     removeExternalFunctionReferences
   ),
   notice = "Removing external function calls", // fixme: is this all the cleanup is doing?

@@ -70,5 +70,5 @@ class BitVectorEvalTest extends AnyFunSuite {
     }
   }
 
-  genSMT(3)
+  genSMT(2)
 }

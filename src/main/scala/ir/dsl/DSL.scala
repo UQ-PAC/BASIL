@@ -239,11 +239,11 @@ case class EventuallyBlock(
   label: String,
   sl: Iterable[EventuallyStatement],
   var j: EventuallyJump,
-  address: Option[BigInt] = None
+  meta: Metadata = Metadata()
 ) extends DeepEquality {
 
   override def deepEquals(o: Object) = o match {
-    case EventuallyBlock(`label`, osl, oj, `address`) =>
+    case EventuallyBlock(`label`, osl, oj, `meta`) =>
       j.deepEquals(oj) && sl.size == osl.size && osl.toList.zip(sl).forall { case (l, r) =>
         l.deepEquals(r)
       }
@@ -252,7 +252,7 @@ case class EventuallyBlock(
   }
 
   def makeResolver: (Block, (CachedLabelResolver, String) => Unit) = {
-    val tempBlock: Block = Block(label, address, List(), GoTo(List.empty))
+    val tempBlock: Block = Block(label, meta.address, List(), GoTo(List.empty))
 
     def cont(prog: CachedLabelResolver, proc: String): Block = {
       assert(tempBlock.statements.isEmpty)
@@ -307,13 +307,25 @@ case class EventuallyProcedure(
   blocks: Seq[EventuallyBlock],
   entryBlockLabel: Option[String] = None,
   returnBlockLabel: Option[String] = None,
-  address: Option[BigInt] = None
+  address: Option[BigInt] = None,
+  requires: List[Expr] = List(),
+  ensures: List[Expr] = List()
 ) extends DeepEquality {
 
   def name = label + address.fold("")("_" + _)
 
   override def deepEquals(o: Object) = o match {
-    case EventuallyProcedure(`label`, `in`, `out`, b, `entryBlockLabel`, `returnBlockLabel`, `address`) => {
+    case EventuallyProcedure(
+          `label`,
+          `in`,
+          `out`,
+          b,
+          `entryBlockLabel`,
+          `returnBlockLabel`,
+          `address`,
+          `requires`,
+          `ensures`
+        ) => {
       b.size == blocks.size && {
         b.zip(blocks).forall { case (l, r) =>
           l.deepEquals(r)
@@ -339,6 +351,9 @@ case class EventuallyProcedure(
       in.map((n, t) => LocalVar(n, t)),
       out.map((n, t) => LocalVar(n, t))
     )
+
+    tempProc.requiresExpr = requires
+    tempProc.ensuresExpr = ensures
 
     val jumps: Iterable[(Block, EventuallyJump)] =
       (tempBlocks zip blocks).map((temp, b) => temp -> b.j)

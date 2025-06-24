@@ -145,35 +145,42 @@ object IRLoading {
         val (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
           IRLoading.loadReadELF(relf, q)
 
-        def continuation(program: Program) =
-          val specification = IRLoading.loadSpecification(q.specFile, program, globals)
-          IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program)
+        def continuation(ctx: IRContext) =
+          val specification = IRLoading.loadSpecification(q.specFile, ctx.program, globals)
+          IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, ctx.program)
 
         (Some(mainAddress), continuation)
       }
       case None if mode == FrontendMode.Gtirb => {
         Logger.warn("RELF not provided, recommended for GTIRB input")
-        (None, IRLoading.load: Program => IRContext)
+        (None, (x: IRContext) => x)
       }
       case None => {
-        (None, IRLoading.load: Program => IRContext)
+        (None, (x: IRContext) => x)
       }
     }
 
-    val program: Program = (mode, mainAddress) match {
-      case (FrontendMode.Gtirb, _) => {
-        loadGTIRB(q.inputFile, mainAddress, Some(q.mainProcedureName))
-      }
+    val program: IRContext = (mode, mainAddress) match {
+      case (FrontendMode.Gtirb, _) => IRLoading.load(loadGTIRB(q.inputFile, mainAddress, Some(q.mainProcedureName)))
       case (FrontendMode.Basil, _) => ir.parsing.ParseBasilIL.loadILFile(q.inputFile)
       case (FrontendMode.Bap, None) => throw Exception("relf is required when using BAP input")
       case (FrontendMode.Bap, Some(mainAddress)) => {
         val bapProgram = loadBAP(q.inputFile)
-        BAPToIR(bapProgram, mainAddress).translate
+        IRLoading.load(BAPToIR(bapProgram, mainAddress).translate)
       }
     }
 
     val ctx = makeContext(program)
-    ir.transforms.PCTracking.applyPCTracking(q.pcTracking, ctx.program)
+    mode match {
+      case FrontendMode.Basil => {
+        ctx.program.procedures.foreach(_.updateBlockSuffix())
+        Logger.info("[!] Disabling PC tracking transforms due to IL input")
+      }
+      case _ => {
+        ir.transforms.PCTracking.applyPCTracking(q.pcTracking, ctx.program)
+        ctx.program.procedures.foreach(_.normaliseBlockNames())
+      }
+    }
     ctx
   }
 
@@ -184,7 +191,7 @@ object IRLoading {
 
     parser.setBuildParseTree(true)
 
-    BAPLoader.visitProject(parser.project())
+    BAPLoader().visitProject(parser.project())
   }
 
   def loadGTIRB(fileName: String, mainAddress: Option[BigInt], mainName: Option[String] = None): Program = {
@@ -215,6 +222,9 @@ object IRLoading {
     ReadELFLoader.visitSyms(parser.syms(), config)
   }
 
+  def emptySpecification(globals: Set[SpecGlobal]) =
+    Specification(Set(), globals, Map(), List(), List(), List(), Set())
+
   def loadSpecification(filename: Option[String], program: Program, globals: Set[SpecGlobal]): Specification = {
     filename match {
       case Some(s) =>
@@ -224,7 +234,7 @@ object IRLoading {
         specParser.setBuildParseTree(true)
         val specLoader = SpecificationLoader(globals, program)
         specLoader.visitSpecification(specParser.specification())
-      case None => Specification(Set(), globals, Map(), List(), List(), List(), Set())
+      case None => emptySpecification(globals)
     }
   }
 }
@@ -740,12 +750,17 @@ object RunUtils {
     if conf.simplify then doCleanupWithSimplify(ctx, analysisManager, transformConfig)
     else doCleanupWithoutSimplify(ctx, analysisManager, transformConfig)
 
+    assert(ir.invariant.programDiamondForm(ctx.program))
+
     transforms.inlinePLTLaunchpad(ctx, analysisManager, transformConfig)
+
+    assert(ir.invariant.programDiamondForm(ctx.program))
 
     if (q.loading.trimEarly) then stripUnreachableFunctions(ctx, analysisManager, transformConfig)
     // todo: since refactoring, there is some extra code that is run here
     // see StripUnreachableFunctions.getStripUnreachableFunctionsTransform
 
+    assert(ir.invariant.programDiamondForm(ctx.program))
     ctx.program.procedures.foreach(transforms.RemoveUnreachableBlocks.apply)
     Logger.info(s"[!] Removed unreachable blocks")
 
@@ -757,9 +772,12 @@ object RunUtils {
       }
     } else {
       ir.transforms.clearParams(ctx.program)
+      assert(invariant.correctCalls(ctx.program))
     }
     assert(invariant.correctCalls(ctx.program))
+    ir.invariant.checkTypeCorrect(ctx.program)
 
+    assert(ir.invariant.programDiamondForm(ctx.program))
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
@@ -771,6 +789,7 @@ object RunUtils {
     }
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
 
+    assert(ir.invariant.programDiamondForm(ctx.program))
     ir.eval.SimplifyValidation.validate = conf.validateSimp
     if (conf.simplify) {
 
@@ -787,9 +806,11 @@ object RunUtils {
         transforms.CalleePreservedParam.transform(ctx.program)
       }
 
+      assert(ir.invariant.programDiamondForm(ctx.program))
       doSimplify(ctx, conf.staticAnalysis)
     }
 
+    assert(ir.invariant.programDiamondForm(ctx.program))
     if (DebugDumpIRLogger.getLevel().id < LogLevel.OFF.id) {
       val dir = File("./graphs/")
       if (!dir.exists()) then dir.mkdirs()
@@ -798,6 +819,7 @@ object RunUtils {
       }
     }
 
+    assert(ir.invariant.programDiamondForm(ctx.program))
     var dsaContext: Option[DSAContext] = None
     if (conf.dsaConfig.isDefined) {
       val dsaResults = IntervalDSA(ctx).dsa(conf.dsaConfig.get)
@@ -846,13 +868,18 @@ object RunUtils {
     if (conf.generateRelyGuarantees) then genRgConditions(ctx, analysisManager)
 
     q.loading.dumpIL.foreach(s => {
-      writeToFile(pp_prog(ctx.program), s"$s-output.il")
+      val timer = PerformanceTimer("Dump IL")
+      writeToFile(pp_irctx(ctx), s"$s-output.il")
+      timer.checkPoint(".il written")
       val a = ctx.program.toScalaLines
+      timer.checkPoint("ToScalaLines done")
       writeToFile(a.mkString, s"$s-output.scala")
+      timer.checkPoint("ToScalaLines written")
     })
     Logger.info("[!] Translating to Boogie")
 
     val regionInjector = analysis.flatMap(a => a.regionInjector)
+    assert(ir.invariant.checkTypeCorrect(ctx.program))
 
     val boogiePrograms = if (q.boogieTranslation.directTranslation) {
       Logger.info("Disabling WPIF VCs")
