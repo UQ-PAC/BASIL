@@ -1,17 +1,8 @@
 package ir.transforms
 
 import util.Logger
-import ir.eval.AlgebraicSimplifications
-import ir.eval.AssumeConditionSimplifications
-import ir.eval.simplifyExprFixpoint
-import ir.cilvisitor.*
 import ir.*
 import scala.collection.mutable
-import analysis._
-import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.concurrent.duration.*
-import scala.util.{Failure, Success}
-import ExecutionContext.Implicits.global
 
 /**********************************************************************************
  * Block-level abstract interpreter framework.

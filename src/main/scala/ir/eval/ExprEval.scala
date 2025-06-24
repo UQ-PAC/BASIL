@@ -1,6 +1,4 @@
 package ir.eval
-import ir.eval.BitVectorEval
-import ir.cilvisitor.*
 import util.functional.State
 import ir._
 

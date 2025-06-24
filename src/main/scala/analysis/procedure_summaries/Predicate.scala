@@ -1,6 +1,5 @@
 package analysis
 
-import util.StaticAnalysisLogger
 import ir.*
 import boogie.*
 import ir.transforms.AbstractDomain

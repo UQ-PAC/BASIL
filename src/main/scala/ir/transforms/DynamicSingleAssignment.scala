@@ -5,7 +5,6 @@ import ir.cilvisitor.*
 import translating.*
 import ir.*
 import scala.collection.mutable
-import analysis._
 
 val phiAssignLabel = Some("phi")
 

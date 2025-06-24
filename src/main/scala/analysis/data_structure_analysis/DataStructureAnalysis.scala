@@ -4,7 +4,6 @@ import analysis.*
 import ir.*
 import util.Counter
 import specification.{ExternalFunction, SymbolTableEntry}
-import boogie.SpecGlobal
 
 import scala.collection.mutable
 

@@ -1,23 +1,16 @@
 package util
 
-import java.io.{BufferedWriter, File, FileInputStream, FileWriter, IOException, PrintWriter}
-import java.nio.file.{Files, Path, Paths}
+import java.io.{BufferedWriter, File, FileInputStream, FileWriter, PrintWriter}
+import java.nio.file.{Files, Paths}
 import com.grammatech.gtirb.proto.IR.IR
-import com.grammatech.gtirb.proto.Module.Module
-import com.grammatech.gtirb.proto.Section.Section
-import ir.eval
 import gtirb.*
 import translating.PrettyPrinter.*
-import ir.dsl.*
 import ir.dsl.given
 import ir.eval.*
 
-import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
-import analysis.solvers.*
 import analysis.{Interval as _, *}
-import analysis.data_structure_analysis.DSAPhase.{BU, TD}
 import bap.*
 import ir.*
 import boogie.*
@@ -25,21 +18,16 @@ import specification.*
 import Parsers.*
 import Parsers.ASLpParser.*
 import analysis.data_structure_analysis.*
-import analysis.data_structure_analysis.given
-import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
-import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
+import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.*
-import util.{DebugDumpIRLogger, Logger, SimplifyLogger}
+import util.{DebugDumpIRLogger, Logger}
 
-import java.util.Base64
-import util.intrusive_list.IntrusiveList
 import cilvisitor.*
 import ir.transforms.MemoryTransform
-import util.DSAConfig.{Checks, Prereq, Standard}
+import util.DSAConfig.{Prereq}
 import util.LogLevel.INFO
 
-import scala.annotation.tailrec
 import scala.collection.mutable
 
 /** This file contains the main program execution. See RunUtils.loadAndTranslate for the high-level process.

@@ -5,8 +5,6 @@ import analysis.solvers.ForwardIDESolver
 import analysis.*
 import ir.*
 
-import java.math.BigInteger
-
 case class SymbolicAddress(accessor: Variable, symbolicBase: MemoryLocation, offset: BigInt) {
   override def toString: String = s"SymbolicAddress($accessor, $symbolicBase, $offset)"
 }

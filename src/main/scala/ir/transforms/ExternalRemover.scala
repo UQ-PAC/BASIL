@@ -1,6 +1,5 @@
 package ir.transforms
 import ir.*
-import cilvisitor.*
 
 def removeBodyOfExternal(external: Set[String])(prog: Program) = {
   prog.procedures.foreach { case p =>

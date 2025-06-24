@@ -3,7 +3,6 @@ package analysis
 import analysis.solvers.{Cons, Term, UnionFindSolver, Var}
 import ir.*
 import util.SteensLogger
-import scala.collection.immutable.{AbstractMap, SeqMap, SortedMap}
 import scala.collection.mutable
 
 /** Wrapper for variables so we can have ConstantPropegation-specific equals method indirectly Relies on SSA integers

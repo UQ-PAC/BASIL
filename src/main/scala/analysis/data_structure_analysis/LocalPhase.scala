@@ -1,16 +1,12 @@
 package analysis.data_structure_analysis
 
-import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
+import ir.eval.BitVectorEval.isNegative
 import analysis.*
 import ir.*
 import util.Counter
-import boogie.SpecGlobal
 import specification.{ExternalFunction, SymbolTableEntry}
-import util.writeToFile
 
-import java.math.BigInteger
 import scala.collection.mutable
-import scala.util.control.Breaks.{break, breakable}
 
 /** The local phase of Data Structure Analysis
   * @param proc

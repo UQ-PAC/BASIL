@@ -1,7 +1,6 @@
 package ir
 import boogie._
 import util.CachedHashCode
-import scala.collection.mutable
 import util.functional.Snoc
 
 sealed trait Expr extends DefaultDeepEquality {

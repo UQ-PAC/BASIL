@@ -3,14 +3,12 @@ import ir.cilvisitor.*
 import java.io.File
 import ir.*
 import translating.PrettyPrinter
-import scala.collection.mutable.ArrayBuffer
 import scala.collection.{mutable, immutable}
 import collection.immutable.SortedMap
 import specification.Specification
 import analysis.{TwoElement, TwoElementTop, TwoElementBottom}
 import ir.CallGraph
 import util.{Logger, DebugDumpIRLogger}
-import analysis.{LatticeMap, MapDomain, InternalLattice}
 
 case class FunSig(inArgs: List[Register], outArgs: List[Register])
 

@@ -1,8 +1,6 @@
 package ir.dsl
 import ir.*
 import translating.PrettyPrinter.*
-import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 import scala.collection.immutable.*
 import scala.annotation.targetName
 

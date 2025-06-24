@@ -1,5 +1,4 @@
 package ir.parsing
-import ir.Sigil
 
 import basil_ir.{Absyn => syntax}
 

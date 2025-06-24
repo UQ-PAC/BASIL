@@ -1,8 +1,6 @@
 package ir.transforms
 import ir.*
-import util.Logger
 import ir.cilvisitor.*
-import ir.dsl.IRToDSL.*
 import ir.dsl.*
 
 import scala.collection.mutable

@@ -1,6 +1,5 @@
 package ir.transforms
 
-import util.Logger
 import ir.cilvisitor.*
 import ir.*
 

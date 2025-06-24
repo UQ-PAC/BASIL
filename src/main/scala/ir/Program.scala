@@ -2,7 +2,7 @@ package ir
 
 import util.functional.Snoc
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
+import scala.collection.{immutable, mutable}
 import boogie.*
 import analysis.{MergedRegion, Loop}
 import util.intrusive_list.*

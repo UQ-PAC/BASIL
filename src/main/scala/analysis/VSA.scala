@@ -3,9 +3,6 @@ package analysis
 import ir._
 import analysis.solvers._
 
-import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
-import java.io.{File, PrintWriter}
-import scala.collection.mutable
 import scala.collection.immutable
 import util.VSALogger
 

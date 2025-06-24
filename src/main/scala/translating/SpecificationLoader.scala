@@ -6,7 +6,6 @@ import specification._
 import ir._
 import util.Logger
 
-import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
 
 // take symbol table entries as input

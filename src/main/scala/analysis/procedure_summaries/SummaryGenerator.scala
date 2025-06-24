@@ -2,18 +2,9 @@ package analysis
 
 import util.ProcedureSummariesLogger as Logger
 
-import analysis.*
 import ir.*
-import boogie.*
-import boogie.SpecGlobal
-import ir.transforms.{
-  AbstractDomain,
-  BottomUpCallgraphWorklistSolver,
-  ProcAbstractDomain,
-  SCCCallgraphWorklistSolver,
-  reversePostOrder,
-  worklistSolver
-}
+import boogie.{TrueBLiteral, BExpr}
+import ir.transforms.{SCCCallgraphWorklistSolver, reversePostOrder, worklistSolver}
 
 case class Condition(pred: Predicate, label: Option[String] = None)
 

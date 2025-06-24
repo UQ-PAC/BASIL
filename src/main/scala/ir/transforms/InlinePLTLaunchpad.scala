@@ -1,6 +1,5 @@
 package ir.transforms
 import ir.{Program, Procedure}
-import ir.cilvisitor.visit_prog
 
 def inlinePLTLaunchpad(prog: Program) = {
   prog.sortProceduresRPO()

@@ -1,17 +1,11 @@
 package analysis.data_structure_analysis
 
-import analysis.solvers.{DSAUniTerm, DSAUnionFindSolver, UnionFindSolver, Var}
+import analysis.solvers.{DSAUniTerm}
 import analysis.*
-import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.*
-import specification.{ExternalFunction, SymbolTableEntry}
-import boogie.SpecGlobal
-import util.Logger
 import util.Counter
 
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
-import scala.util.control.Breaks.{break, breakable}
 
 class Flags() {
   var collapsed = false

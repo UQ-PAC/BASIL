@@ -1,7 +1,5 @@
 package ir
-import util.Logger
 import util.intrusive_list.IntrusiveListElement
-import boogie.{BMapVar, GammaStore}
 import collection.immutable.SortedMap
 
 import collection.mutable

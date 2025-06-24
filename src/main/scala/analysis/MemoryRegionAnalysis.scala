@@ -6,7 +6,6 @@ import ir.*
 import util.MRALogger
 
 import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
 
 /** Identifies stack and heap regions.
   *

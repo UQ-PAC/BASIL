@@ -1,7 +1,6 @@
 package ir.cilvisitor
 
 import ir.*
-import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable
 
 /** A new visitor based off CIL.
