@@ -106,7 +106,7 @@ def toOffsetMove[T <: Offsets](op: BinOp, arg: T, domain: OffsetDomain[T], trans
   op match
     case BVADD => (i: T) => domain.add(transform(i), arg)
     case BVSUB => (i: T) => domain.add(transform(i), arg, neg = true)
-    case _ => throw Exception(s"Usupported Binary Op $op")
+    case _ => throw Exception(s"Unsupported Binary Op $op")
 }
 
 trait Offsets {
