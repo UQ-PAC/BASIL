@@ -1,6 +1,6 @@
 package analysis.solvers
 
-import analysis._
+import analysis.*
 
 import scala.collection.mutable
 

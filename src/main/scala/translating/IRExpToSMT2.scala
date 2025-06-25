@@ -1,10 +1,7 @@
 package translating
+
 import ir.*
-import boogie.*
-import specification.*
-import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
 import ir.cilvisitor.*
-import scala.sys.process.*
 
 trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
   // def vstmt(s: Statement) : Repr[Statement]

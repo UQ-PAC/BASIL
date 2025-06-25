@@ -1,20 +1,26 @@
 // package scala
 
-import bap.*
-import boogie.*
-import translating.*
-import util.RunUtils
-
-import scala.sys.process.*
-import java.io.File
-import scala.collection.mutable.{ArrayBuffer, Set}
-import scala.collection.{immutable, mutable}
-import scala.language.postfixOps
-import scala.sys.process.*
-import util.*
 import mainargs.{Flag, ParserForClass, arg, main}
 import util.DSAConfig.{Checks, Prereq, Standard}
 import util.boogie_interaction.BoogieResultKind
+import util.{
+  AnalysisResultDotLogger,
+  BASILConfig,
+  BoogieGeneratorConfig,
+  BoogieMemoryAccessMode,
+  DSAConfig,
+  DebugDumpIRLogger,
+  ILLoadingConfig,
+  LogLevel,
+  Logger,
+  MemoryRegionsMode,
+  PCTrackingOption,
+  ProcRelyVersion,
+  RunUtils,
+  StaticAnalysisConfig
+}
+
+import scala.language.postfixOps
 
 object Main {
 

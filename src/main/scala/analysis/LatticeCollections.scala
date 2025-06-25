@@ -121,7 +121,7 @@ enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
 }
 
 class LatticeSetLattice[T] extends Lattice[LatticeSet[T]] {
-  import LatticeSet.{Top, Bottom, FiniteSet, DiffSet}
+  import LatticeSet.{Top, Bottom}
 
   type Element = LatticeSet[T];
 
@@ -282,7 +282,7 @@ def latticeMapApply[D, L, LA <: Lattice[L]](m: LatticeMap[D, L], d: D, l: LA): L
 }
 
 class LatticeMapLattice[D, L, LA <: Lattice[L]](l: LA) extends Lattice[LatticeMap[D, L]] {
-  import LatticeMap.{Top, Bottom, TopMap, BottomMap}
+  import LatticeMap.{Top, Bottom}
 
   type Element = LatticeMap[D, L];
 

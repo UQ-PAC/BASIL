@@ -1,8 +1,6 @@
 package ir.parsing
 
-import basil_ir.{Absyn => syntax}
-
-import scala.jdk.CollectionConverters.*
+import basil_ir.Absyn as syntax
 
 trait LiteralsBNFCVisitor[A]
     extends syntax.BinOp.Visitor[ir.BinOp, A],

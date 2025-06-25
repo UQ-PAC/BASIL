@@ -1,17 +1,11 @@
 package translating
 
 import bap.*
-import boogie.UnaryBExpr
 import ir.*
-import specification.*
 import ir.cilvisitor.*
 
-import scala.collection.mutable
-import scala.collection.immutable
-import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.TreeMap
-import util.intrusive_list.*
+import scala.collection.{immutable, mutable}
 
 class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
 

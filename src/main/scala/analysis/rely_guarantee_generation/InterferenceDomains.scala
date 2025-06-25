@@ -1,9 +1,6 @@
 package analysis
 
 import ir.*
-import ir.transforms.*
-import analysis.*
-import scala.collection.mutable.Queue
 
 /** An interference domain is similar to an abstract domain, except that it
   * represents sets of state transitions rather than sets of states. These sets

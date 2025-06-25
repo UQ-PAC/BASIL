@@ -1,13 +1,11 @@
 package ir.parsing
 
-import util.{Logger, PerformanceTimer, LogLevel}
-import basil_ir.{Absyn => syntax}
+import basil_ir.Absyn as syntax
 import ir.Sigil
+import util.{LogLevel, PerformanceTimer}
 
-import java.io.{FileReader, StringReader, Reader}
-import scala.collection.mutable
+import java.io.{FileReader, Reader, StringReader}
 import scala.jdk.CollectionConverters.*
-import scala.util.chaining.scalaUtilChainingOps
 
 def unsigilBlock(x: String) = Sigil.unsigil(Sigil.BASIR.block)(x)
 def unsigilProc(x: String) = Sigil.unsigil(Sigil.BASIR.proc)(x)

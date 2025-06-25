@@ -1,13 +1,15 @@
 package ir
 
-import util.functional.Snoc
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
+import analysis.{Loop, MergedRegion}
 import boogie.*
-import analysis.{MergedRegion, Loop}
-import util.intrusive_list.*
-import eval.BitVectorEval
 import translating.PrettyPrinter.*
+import util.functional.Snoc
+import util.intrusive_list.*
+
+import scala.collection.mutable.ArrayBuffer
+import scala.collection.{immutable, mutable}
+
+import eval.BitVectorEval
 
 /** Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are not
   * guaranteed to be in any defined order.
