@@ -15,9 +15,8 @@ import org.antlr.v4.runtime.{BailErrorStrategy, CharStreams, CommonTokenStream}
 import specification.*
 import translating.*
 import translating.PrettyPrinter.*
-import util.DSAConfig.Prereq
 import util.LogLevel.INFO
-import util.{DebugDumpIRLogger, Logger}
+import util.{DebugDumpIRLogger, Logger, DSAPhase}
 
 import java.io.{BufferedWriter, File, FileInputStream, FileWriter, PrintWriter}
 import java.nio.file.{Files, Paths}
@@ -939,7 +938,7 @@ object RunUtils {
       val dsaResults = IntervalDSA(ctx, conf.dsaConfig.get).dsa()
       dsaContext = Some(dsaResults)
 
-      if q.memoryTransform && conf.dsaConfig.get.phase == TD then // need more than prereq
+      if q.memoryTransform && conf.dsaConfig.get.phase == DSAPhase.TD then // need more than prereq
         val memTransferTimer = PerformanceTimer("Mem Transfer Timer", INFO)
         visit_prog(MemoryTransform(dsaResults.topDown, dsaResults.globals), ctx.program)
         memTransferTimer.checkPoint("Performed Memory Transform")

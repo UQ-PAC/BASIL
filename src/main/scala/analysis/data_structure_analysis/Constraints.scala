@@ -12,7 +12,8 @@ import ir.{
   MemoryStore,
   Procedure,
   Variable,
-  computeDomain
+  computeDomain,
+  Statement
 }
 import util.ConstGenLogger
 

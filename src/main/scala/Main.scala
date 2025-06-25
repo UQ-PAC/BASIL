@@ -2,14 +2,14 @@
 
 import mainargs.{Flag, ParserForClass, arg, main}
 import util.boogie_interaction.BoogieResultKind
-import analysis.data_structure_analysis.DSAPhase
 import util.{
   AnalysisResultDotLogger,
   BASILConfig,
   BoogieGeneratorConfig,
   BoogieMemoryAccessMode,
-  DSAConfig,
   DebugDumpIRLogger,
+  DSAPhase,
+  DSConfig,
   ILLoadingConfig,
   LogLevel,
   Logger,
