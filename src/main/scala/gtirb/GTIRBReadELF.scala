@@ -171,8 +171,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     val funs = getFunctionEntries()
     val main = getMainAddress(mainProcedureName)
 
-    val x = SortedSet.from(exts)(Ordering.by(_.toString))
-    ReadELFData(syms, x, SortedSet.from(globs), funs, offs, main)
+    ReadELFData(syms, exts, globs, funs, offs, main)
   }
 
   private val atSuffix = """@[A-Za-z_\d.]+$""".r

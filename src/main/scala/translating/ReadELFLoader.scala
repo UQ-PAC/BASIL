@@ -6,7 +6,7 @@ import boogie.*
 import specification.*
 import util.ILLoadingConfig
 
-import scala.collection.immutable.{SortedSet}
+import scala.collection.immutable.{SortedSet, SortedMap}
 import scala.jdk.CollectionConverters.*
 
 import ir.dsl.given
@@ -55,7 +55,18 @@ case class ReadELFData(
   functionEntries: Set[FuncEntry],
   relocationOffsets: Map[BigInt, BigInt],
   mainAddress: BigInt
-) derives ir.dsl.ToScala
+) derives ir.dsl.ToScala {
+
+  def sorted = ReadELFData(
+    symbolTable,
+    SortedSet.from(externalFunctions)(Ordering.by(Tuple.fromProductTyped(_))),
+    SortedSet.from(globalVariables)(Ordering.by(Tuple.fromProductTyped(_))),
+    SortedSet.from(functionEntries)(Ordering.by(Tuple.fromProductTyped(_))),
+    SortedMap.from(relocationOffsets),
+    mainAddress
+  )
+
+}
 
 object ReadELFLoader {
   def visitSyms(ctx: SymsContext, config: ILLoadingConfig): ReadELFData = {
@@ -84,14 +95,7 @@ object ReadELFLoader {
     if (mainAddress.isEmpty) {
       throw Exception(s"no ${config.mainProcedureName} function in symbol table")
     }
-    ReadELFData(
-      symbolTable,
-      SortedSet.from(externalFunctions)(Ordering.by(_.toString)),
-      SortedSet.from(globalVariables),
-      functionEntries,
-      relocationOffsets,
-      mainAddress.head
-    )
+    ReadELFData(symbolTable, externalFunctions, globalVariables, functionEntries, relocationOffsets, mainAddress.head)
   }
 
   def visitRelocationTableExtFunc(ctx: RelocationTableContext): Set[ExternalFunction] = {
