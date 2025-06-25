@@ -84,8 +84,14 @@ object ReadELFLoader {
     if (mainAddress.isEmpty) {
       throw Exception(s"no ${config.mainProcedureName} function in symbol table")
     }
-    ReadELFData(symbolTable, SortedSet.from(externalFunctions)(Ordering.by(_.toString)), SortedSet.from(globalVariables),
-      functionEntries, relocationOffsets, mainAddress.head)
+    ReadELFData(
+      symbolTable,
+      SortedSet.from(externalFunctions)(Ordering.by(_.toString)),
+      SortedSet.from(globalVariables),
+      functionEntries,
+      relocationOffsets,
+      mainAddress.head
+    )
   }
 
   def visitRelocationTableExtFunc(ctx: RelocationTableContext): Set[ExternalFunction] = {
