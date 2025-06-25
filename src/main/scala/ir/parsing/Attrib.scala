@@ -1,15 +1,8 @@
 package ir.parsing
 
 import boogie.SpecGlobal
-import ir.BitVecLiteral
-import ir.FalseLiteral
-import ir.IntLiteral
-import ir.Literal
-import ir.MemorySection
-import ir.Sigil
-import ir.TrueLiteral
-import specification.ExternalFunction
-import specification.FuncEntry
+import ir.{BitVecLiteral, FalseLiteral, IntLiteral, Literal, MemorySection, Sigil, TrueLiteral}
+import specification.{ExternalFunction, FuncEntry}
 import util.Logger
 
 import java.io._

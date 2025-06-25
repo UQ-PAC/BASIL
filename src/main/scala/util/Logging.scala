@@ -1,10 +1,7 @@
 package util
-import sourcecode.FileName
-import sourcecode.Line
-import sourcecode.Name
+import sourcecode.{FileName, Line, Name}
 
-import java.io.File
-import java.io.PrintStream
+import java.io.{File, PrintStream}
 import scala.io.AnsiColor
 
 import collection.mutable.HashSet

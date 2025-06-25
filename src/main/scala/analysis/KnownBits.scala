@@ -3,8 +3,7 @@ import ir._
 import ir.eval.BitVectorEval
 import ir.eval.InfixBitVectorEval._
 import ir.eval.InfixBitVectorEval.given
-import ir.transforms.AbstractDomain
-import ir.transforms.applyRPO
+import ir.transforms.{AbstractDomain, applyRPO}
 import util.writeToFile
 
 import scala.language.implicitConversions

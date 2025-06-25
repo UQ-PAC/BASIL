@@ -3,10 +3,7 @@ package ir.dsl
 import util.intersperse
 import util.twine.Twine
 
-import scala.compiletime.constValue
-import scala.compiletime.erasedValue
-import scala.compiletime.error
-import scala.compiletime.summonInline
+import scala.compiletime.{constValue, erasedValue, error, summonInline}
 import scala.deriving.Mirror
 
 /**

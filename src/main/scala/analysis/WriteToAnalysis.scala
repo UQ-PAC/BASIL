@@ -1,11 +1,6 @@
 package analysis
 
-import ir.DirectCall
-import ir.LocalAssign
-import ir.MemoryLoad
-import ir.Procedure
-import ir.Program
-import ir.Register
+import ir.{DirectCall, LocalAssign, MemoryLoad, Procedure, Program, Register}
 
 import scala.collection.mutable
 

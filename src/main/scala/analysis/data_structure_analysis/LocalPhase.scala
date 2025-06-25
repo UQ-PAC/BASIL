@@ -3,8 +3,7 @@ package analysis.data_structure_analysis
 import analysis._
 import ir._
 import ir.eval.BitVectorEval.isNegative
-import specification.ExternalFunction
-import specification.SymbolTableEntry
+import specification.{ExternalFunction, SymbolTableEntry}
 import util.Counter
 
 import scala.collection.mutable

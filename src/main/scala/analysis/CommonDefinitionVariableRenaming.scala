@@ -1,7 +1,6 @@
 package analysis
 
-import analysis.solvers.UnionFindSolver
-import analysis.solvers.Var
+import analysis.solvers.{UnionFindSolver, Var}
 import ir._
 import util.Logger
 

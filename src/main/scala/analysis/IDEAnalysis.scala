@@ -1,11 +1,6 @@
 package analysis
 
-import ir.CFGPosition
-import ir.Command
-import ir.DirectCall
-import ir.Procedure
-import ir.Program
-import ir.Return
+import ir.{CFGPosition, Command, DirectCall, Procedure, Program, Return}
 
 final case class Lambda()
 

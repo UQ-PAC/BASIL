@@ -1,24 +1,18 @@
 package translating
 
-import com.grammatech.gtirb.proto.CFG.CFG
-import com.grammatech.gtirb.proto.CFG.Edge
-import com.grammatech.gtirb.proto.CFG.EdgeLabel
 import com.grammatech.gtirb.proto.CFG.EdgeType._
+import com.grammatech.gtirb.proto.CFG.{CFG, Edge, EdgeLabel}
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Symbol.Symbol
 import gtirb.AuxDecoder.AuxKind
 import gtirb._
 import ir._
 import util.Logger
-import util.functional.Snoc
-import util.functional.foldLeft0
+import util.functional.{Snoc, foldLeft0}
 
 import java.util.Base64
-import scala.collection.immutable
-import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.Map
-import scala.collection.mutable.Set
+import scala.collection.mutable.{ArrayBuffer, Map, Set}
+import scala.collection.{immutable, mutable}
 
 private def assigned(x: Statement): immutable.Set[Variable] = x match {
   case x: Assign => x.assignees

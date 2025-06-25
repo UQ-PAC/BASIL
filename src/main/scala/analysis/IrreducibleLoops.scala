@@ -1,17 +1,6 @@
 package analysis
 
-import ir.Assume
-import ir.BinaryExpr
-import ir.Block
-import ir.BoolOR
-import ir.EQ
-import ir.GoTo
-import ir.IRWalk
-import ir.IntLiteral
-import ir.IntType
-import ir.LocalAssign
-import ir.LocalVar
-import ir.Program
+import ir.{Assume, BinaryExpr, Block, BoolOR, EQ, GoTo, IRWalk, IntLiteral, IntType, LocalAssign, LocalVar, Program}
 
 import scala.collection.mutable
 

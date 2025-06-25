@@ -3,8 +3,7 @@ package analysis.data_structure_analysis
 import analysis._
 import analysis.solvers.ForwardIDESolver
 import ir._
-import ir.eval.BitVectorEval.bv2SignedInt
-import ir.eval.BitVectorEval.isNegative
+import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
 
 case class SymbolicAddress(accessor: Variable, symbolicBase: MemoryLocation, offset: BigInt) {
   override def toString: String = s"SymbolicAddress($accessor, $symbolicBase, $offset)"

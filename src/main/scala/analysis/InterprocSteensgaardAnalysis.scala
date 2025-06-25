@@ -1,9 +1,6 @@
 package analysis
 
-import analysis.solvers.Cons
-import analysis.solvers.Term
-import analysis.solvers.UnionFindSolver
-import analysis.solvers.Var
+import analysis.solvers.{Cons, Term, UnionFindSolver, Var}
 import ir._
 import util.SteensLogger
 

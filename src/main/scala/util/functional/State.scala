@@ -1,8 +1,6 @@
 package util.functional
-import sourcecode.FileName
-import sourcecode.Line
-import util.GenericLogger
-import util.LogLevel
+import sourcecode.{FileName, Line}
+import util.{GenericLogger, LogLevel}
 
 val monlog = GenericLogger("monad", LogLevel.ERROR, System.out, System.console() != null)
 

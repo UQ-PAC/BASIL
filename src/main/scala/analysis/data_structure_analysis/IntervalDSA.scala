@@ -1,29 +1,17 @@
 package analysis.data_structure_analysis
 
-import analysis.data_structure_analysis.DSAPhase.BU
-import analysis.data_structure_analysis.DSAPhase.Local
-import analysis.data_structure_analysis.DSAPhase.TD
+import analysis.data_structure_analysis.DSAPhase.{BU, Local, TD}
 import analysis.data_structure_analysis.DSInterval.Top
 import analysis.data_structure_analysis.IntervalDSA.checkUniqueGlobal
 import analysis.solvers.OffsetUnionFindSolver
 import boogie.SpecGlobal
-import cfg_visualiser.DotStruct
-import cfg_visualiser.DotStructElement
-import cfg_visualiser.StructArrow
-import cfg_visualiser.StructDotGraph
+import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir._
 import ir.eval.BitVectorEval.isNegative
-import specification.ExternalFunction
-import specification.FuncEntry
-import specification.SymbolTableEntry
-import util.DSAConfig
-import util.DSAConfig.Checks
-import util.DSAConfig.Standard
-import util.DSAContext
-import util.DSALogger
-import util.IRContext
+import specification.{ExternalFunction, FuncEntry, SymbolTableEntry}
+import util.DSAConfig.{Checks, Standard}
 import util.LogLevel.INFO
-import util.PerformanceTimer
+import util.{DSAConfig, DSAContext, DSALogger, IRContext, PerformanceTimer}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer

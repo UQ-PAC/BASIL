@@ -1,9 +1,7 @@
 package boogie
 
 import analysis.RegionInjector
-import ir.Endian
-import ir.IntBinOp
-import ir.IntUnOp
+import ir.{Endian, IntBinOp, IntUnOp}
 
 trait BVisitor {
   def visitBExpr(node: BExpr): BExpr = node.acceptVisit(this)

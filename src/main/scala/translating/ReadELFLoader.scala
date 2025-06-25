@@ -3,8 +3,7 @@ package translating
 import Parsers.ReadELFParser._
 import boogie._
 import specification._
-import util.ILLoadingConfig
-import util.Logger
+import util.{ILLoadingConfig, Logger}
 
 import scala.jdk.CollectionConverters._
 

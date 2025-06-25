@@ -4,9 +4,8 @@ import bap._
 import ir._
 import ir.cilvisitor._
 
-import scala.collection.immutable
-import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.{immutable, mutable}
 
 class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
 

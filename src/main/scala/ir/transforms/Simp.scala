@@ -1,9 +1,7 @@
 package ir.transforms
 import ir._
 import ir.cilvisitor._
-import ir.eval.AlgebraicSimplifications
-import ir.eval.AssumeConditionSimplifications
-import ir.eval.simplifyExprFixpoint
+import ir.eval.{AlgebraicSimplifications, AssumeConditionSimplifications, simplifyExprFixpoint}
 import translating.PrettyPrinter._
 import util.SimplifyLogger
 

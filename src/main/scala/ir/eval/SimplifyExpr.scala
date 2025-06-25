@@ -1,8 +1,7 @@
 package ir.eval
 import ir._
 import ir.cilvisitor._
-import sourcecode.FileName
-import sourcecode.Line
+import sourcecode.{FileName, Line}
 import util.Logger
 
 import java.io.BufferedWriter

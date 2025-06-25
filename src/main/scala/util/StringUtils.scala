@@ -1,9 +1,7 @@
 package util
 
-import scala.collection.AbstractIterator
-import scala.collection.AbstractView
-import scala.collection.BuildFrom
 import scala.collection.generic.IsSeq
+import scala.collection.{AbstractIterator, AbstractView, BuildFrom}
 import scala.reflect.NameTransformer
 import scala.util.matching.Regex
 

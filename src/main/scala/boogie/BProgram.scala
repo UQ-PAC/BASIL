@@ -1,16 +1,10 @@
 package boogie
 
 import ir.Sigil
-import util.LogLevel
-import util.Logger
-import util.PerformanceTimer
+import util.{LogLevel, Logger, PerformanceTimer}
 
-import java.io.BufferedWriter
-import java.io.FileWriter
-import java.io.StringWriter
-import java.io.Writer
-import java.nio.file.Files
-import java.nio.file.Paths
+import java.io.{BufferedWriter, FileWriter, StringWriter, Writer}
+import java.nio.file.{Files, Paths}
 import scala.collection.immutable.Seq
 import scala.sys.process._
 

@@ -1,12 +1,6 @@
 package analysis
 
-import ir.GoTo
-import ir.Procedure
-import ir.Program
-import ir.Register
-import ir.Return
-import ir.Unreachable
-import ir.Variable
+import ir.{GoTo, Procedure, Program, Register, Return, Unreachable, Variable}
 
 /** This analysis uses the interprocedural and intraprocedural live variable analyses to find the parameters to
   * procedures in a given program

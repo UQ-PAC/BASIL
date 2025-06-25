@@ -11,24 +11,16 @@ import ir._
 import ir.dsl.given
 import ir.eval._
 import ir.transforms.MemoryTransform
-import org.antlr.v4.runtime.BailErrorStrategy
-import org.antlr.v4.runtime.CharStreams
-import org.antlr.v4.runtime.CommonTokenStream
+import org.antlr.v4.runtime.{BailErrorStrategy, CharStreams, CommonTokenStream}
 import specification._
 import translating.PrettyPrinter._
 import translating._
 import util.DSAConfig.Prereq
-import util.DebugDumpIRLogger
 import util.LogLevel.INFO
-import util.Logger
+import util.{DebugDumpIRLogger, Logger}
 
-import java.io.BufferedWriter
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileWriter
-import java.io.PrintWriter
-import java.nio.file.Files
-import java.nio.file.Paths
+import java.io.{BufferedWriter, File, FileInputStream, FileWriter, PrintWriter}
+import java.nio.file.{Files, Paths}
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._

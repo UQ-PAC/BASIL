@@ -1,11 +1,8 @@
 package analysis
 
-import boogie.BExpr
-import boogie.TrueBLiteral
+import boogie.{BExpr, TrueBLiteral}
 import ir._
-import ir.transforms.SCCCallgraphWorklistSolver
-import ir.transforms.reversePostOrder
-import ir.transforms.worklistSolver
+import ir.transforms.{SCCCallgraphWorklistSolver, reversePostOrder, worklistSolver}
 import util.{ProcedureSummariesLogger => Logger}
 
 case class Condition(pred: Predicate, label: Option[String] = None)

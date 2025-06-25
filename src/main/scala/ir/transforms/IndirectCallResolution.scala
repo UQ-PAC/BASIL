@@ -1,23 +1,24 @@
 package ir.transforms
 
-import analysis.AddressValue
-import analysis.DataRegion
-import analysis.FlatElement
-import analysis.Lift
-import analysis.LiftedElement
-import analysis.LiteralValue
-import analysis.MemoryModelMap
-import analysis.MemoryRegion
-import analysis.RegisterWrapperEqualSets
-import analysis.StackRegion
-import analysis.Value
-import analysis.getSSAUse
+import analysis.{
+  AddressValue,
+  DataRegion,
+  FlatElement,
+  Lift,
+  LiftedElement,
+  LiteralValue,
+  MemoryModelMap,
+  MemoryRegion,
+  RegisterWrapperEqualSets,
+  StackRegion,
+  Value,
+  getSSAUse
+}
 import ir._
 import util.Logger
 
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 
 class SteensgaardIndirectCallResolution(
   override val program: Program,

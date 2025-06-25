@@ -1,10 +1,6 @@
 package ir
 
-import cfg_visualiser.DotArrow
-import cfg_visualiser.DotGraph
-import cfg_visualiser.DotInterArrow
-import cfg_visualiser.DotNode
-import cfg_visualiser.DotRegularArrow
+import cfg_visualiser.{DotArrow, DotGraph, DotInterArrow, DotNode, DotRegularArrow}
 
 import scala.annotation.tailrec
 

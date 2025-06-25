@@ -1,17 +1,13 @@
 package ir.transforms
-import analysis.TwoElement
-import analysis.TwoElementBottom
-import analysis.TwoElementTop
+import analysis.{TwoElement, TwoElementBottom, TwoElementTop}
 import ir._
 import ir.cilvisitor._
 import specification.Specification
 import translating.PrettyPrinter
-import util.DebugDumpIRLogger
-import util.Logger
+import util.{DebugDumpIRLogger, Logger}
 
 import java.io.File
-import scala.collection.immutable
-import scala.collection.mutable
+import scala.collection.{immutable, mutable}
 
 import collection.immutable.SortedMap
 

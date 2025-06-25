@@ -4,9 +4,8 @@ import Parsers._
 import ir._
 import util.Logger
 
-import scala.collection.immutable
-import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.{immutable, mutable}
 import scala.jdk.CollectionConverters._
 
 enum InsnSemantics {

@@ -1,15 +1,13 @@
 package ir
 
-import analysis.Loop
-import analysis.MergedRegion
+import analysis.{Loop, MergedRegion}
 import boogie._
 import translating.PrettyPrinter._
 import util.functional.Snoc
 import util.intrusive_list._
 
-import scala.collection.immutable
-import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.{immutable, mutable}
 
 import eval.BitVectorEval
 

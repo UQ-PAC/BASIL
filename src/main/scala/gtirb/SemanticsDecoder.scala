@@ -2,9 +2,7 @@ package gtirb
 
 import Parsers.ASLpParser._
 import Parsers._
-import org.antlr.v4.runtime.BailErrorStrategy
-import org.antlr.v4.runtime.CharStreams
-import org.antlr.v4.runtime.CommonTokenStream
+import org.antlr.v4.runtime.{BailErrorStrategy, CharStreams, CommonTokenStream}
 import translating.InsnSemantics
 import upickle.default._
 import util.Logger

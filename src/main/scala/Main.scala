@@ -1,27 +1,24 @@
 // package scala
 
-import mainargs.Flag
-import mainargs.ParserForClass
-import mainargs.arg
-import mainargs.main
-import util.AnalysisResultDotLogger
-import util.BASILConfig
-import util.BoogieGeneratorConfig
-import util.BoogieMemoryAccessMode
-import util.DSAConfig
-import util.DSAConfig.Checks
-import util.DSAConfig.Prereq
-import util.DSAConfig.Standard
-import util.DebugDumpIRLogger
-import util.ILLoadingConfig
-import util.LogLevel
-import util.Logger
-import util.MemoryRegionsMode
-import util.PCTrackingOption
-import util.ProcRelyVersion
-import util.RunUtils
-import util.StaticAnalysisConfig
+import mainargs.{Flag, ParserForClass, arg, main}
+import util.DSAConfig.{Checks, Prereq, Standard}
 import util.boogie_interaction.BoogieResultKind
+import util.{
+  AnalysisResultDotLogger,
+  BASILConfig,
+  BoogieGeneratorConfig,
+  BoogieMemoryAccessMode,
+  DSAConfig,
+  DebugDumpIRLogger,
+  ILLoadingConfig,
+  LogLevel,
+  Logger,
+  MemoryRegionsMode,
+  PCTrackingOption,
+  ProcRelyVersion,
+  RunUtils,
+  StaticAnalysisConfig
+}
 
 import scala.language.postfixOps
 
