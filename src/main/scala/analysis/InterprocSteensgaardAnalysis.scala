@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.solvers.{Cons, Term, UnionFindSolver, Var}
-import ir._
+import ir.*
 import util.SteensLogger
 
 import scala.collection.mutable

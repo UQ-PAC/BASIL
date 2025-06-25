@@ -1,10 +1,10 @@
 package analysis.data_structure_analysis
 
 import analysis.data_structure_analysis.OSet.{Top, Values}
-import ir._
+import ir.*
 import ir.eval.BitVectorEval.bv2SignedInt
 import ir.transforms.{AbstractDomain, worklistSolver}
-import util.{SVALogger => Logger}
+import util.SVALogger as Logger
 
 import scala.annotation.tailrec
 import scala.collection.{SortedMap, mutable}

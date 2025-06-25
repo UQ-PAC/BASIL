@@ -1,7 +1,7 @@
 package analysis.data_structure_analysis
 
-import analysis._
-import ir._
+import analysis.*
+import ir.*
 import ir.eval.BitVectorEval.isNegative
 import specification.{ExternalFunction, SymbolTableEntry}
 import util.Counter

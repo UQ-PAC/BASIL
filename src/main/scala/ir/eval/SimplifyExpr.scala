@@ -1,6 +1,6 @@
 package ir.eval
-import ir._
-import ir.cilvisitor._
+import ir.*
+import ir.cilvisitor.*
 import sourcecode.{FileName, Line}
 import util.Logger
 

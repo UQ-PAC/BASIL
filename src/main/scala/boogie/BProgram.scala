@@ -6,7 +6,7 @@ import util.{LogLevel, Logger, PerformanceTimer}
 import java.io.{BufferedWriter, FileWriter, StringWriter, Writer}
 import java.nio.file.{Files, Paths}
 import scala.collection.immutable.Seq
-import scala.sys.process._
+import scala.sys.process.*
 
 case class BProgram(declarations: List[BDeclaration], filename: String) {
   override def toString: String = declarations.flatMap(x => x.toBoogie).mkString(System.lineSeparator())

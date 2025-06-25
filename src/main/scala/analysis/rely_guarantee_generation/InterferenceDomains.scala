@@ -1,6 +1,6 @@
 package analysis
 
-import ir._
+import ir.*
 
 /** An interference domain is similar to an abstract domain, except that it
   * represents sets of state transitions rather than sets of states. These sets

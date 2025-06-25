@@ -1,8 +1,8 @@
 package translating
 import analysis.{MergedRegion, RegionInjector}
-import boogie._
-import ir._
-import specification._
+import boogie.*
+import ir.*
+import specification.*
 import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
 
 import scala.collection.mutable

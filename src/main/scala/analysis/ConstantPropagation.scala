@@ -1,6 +1,6 @@
 package analysis
-import analysis.solvers._
-import ir._
+import analysis.solvers.*
+import ir.*
 
 trait ConstantPropagation {
   val valuelattice: ConstantPropagationLattice = ConstantPropagationLattice()

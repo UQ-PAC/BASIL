@@ -1,10 +1,10 @@
 package ir.eval
 import boogie.Scope
-import ir._
-import translating.PrettyPrinter._
+import ir.*
+import translating.PrettyPrinter.*
 import util.RegionTimer
-import util.functional.State._
-import util.functional._
+import util.functional.*
+import util.functional.State.*
 
 import scala.annotation.tailrec
 import scala.collection.immutable

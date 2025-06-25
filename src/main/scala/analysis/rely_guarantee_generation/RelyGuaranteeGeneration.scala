@@ -1,7 +1,7 @@
 package analysis
 
-import ir._
-import ir.transforms._
+import ir.*
+import ir.transforms.*
 
 import scala.collection.mutable.Queue
 

@@ -1,5 +1,5 @@
 package analysis
-import ir._
+import ir.*
 
 import scala.annotation.tailrec
 

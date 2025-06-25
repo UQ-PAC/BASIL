@@ -1,7 +1,7 @@
 package ir.transforms
 
-import analysis.data_structure_analysis._
-import ir._
+import analysis.data_structure_analysis.*
+import ir.*
 import ir.cilvisitor.{CILVisitor, ChangeTo, SkipChildren}
 import util.Counter
 

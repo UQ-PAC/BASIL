@@ -1,10 +1,10 @@
 package gtirb
 
-import Parsers.ASLpParser._
-import Parsers._
+import Parsers.*
+import Parsers.ASLpParser.*
 import org.antlr.v4.runtime.{BailErrorStrategy, CharStreams, CommonTokenStream}
 import translating.InsnSemantics
-import upickle.default._
+import upickle.default.*
 import util.Logger
 
 private def parse_asl_stmt(line: String): Option[StmtContext] = {

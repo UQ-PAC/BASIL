@@ -1,7 +1,7 @@
 package analysis
-import ir._
+import ir.*
 import ir.eval.BitVectorEval
-import ir.eval.InfixBitVectorEval._
+import ir.eval.InfixBitVectorEval.*
 import ir.eval.InfixBitVectorEval.given
 import ir.transforms.{AbstractDomain, applyRPO}
 import util.writeToFile

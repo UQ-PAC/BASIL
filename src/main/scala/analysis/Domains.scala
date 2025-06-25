@@ -1,6 +1,6 @@
 package analysis
 
-import ir._
+import ir.*
 import ir.transforms.AbstractDomain
 
 trait MayAnalysis

@@ -1,7 +1,7 @@
 package ir.transforms
 
-import ir._
-import ir.cilvisitor._
+import ir.*
+import ir.cilvisitor.*
 
 class RemovePCStatements extends CILVisitor {
   override def vstmt(s: Statement) = {

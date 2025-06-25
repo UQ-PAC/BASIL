@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.data_structure_analysis.{Cell, Graph}
-import ir._
+import ir.*
 
 import scala.collection.mutable
 

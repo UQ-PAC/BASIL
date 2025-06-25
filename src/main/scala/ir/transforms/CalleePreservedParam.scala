@@ -1,7 +1,7 @@
 package ir
 package transforms
 
-import cilvisitor._
+import cilvisitor.*
 
 object CalleePreservedParam {
 

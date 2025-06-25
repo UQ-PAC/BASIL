@@ -1,6 +1,6 @@
 package ir.dsl
 
-import ir._
+import ir.*
 
 import scala.collection.immutable.{ArraySeq, SortedMap}
 

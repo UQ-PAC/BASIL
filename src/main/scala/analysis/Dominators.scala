@@ -8,7 +8,7 @@ package analysis
  *
  */
 
-import ir._
+import ir.*
 
 import scala.annotation.tailrec
 import scala.collection.{immutable, mutable}

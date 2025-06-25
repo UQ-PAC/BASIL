@@ -1,5 +1,5 @@
 package ir.eval
-import ir._
+import ir.*
 import util.functional.State
 
 /** We generalise the expression evaluator to a partial evaluator to simplify evaluating casts.

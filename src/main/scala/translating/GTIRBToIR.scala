@@ -1,12 +1,12 @@
 package translating
 
-import com.grammatech.gtirb.proto.CFG.EdgeType._
+import com.grammatech.gtirb.proto.CFG.EdgeType.*
 import com.grammatech.gtirb.proto.CFG.{CFG, Edge, EdgeLabel}
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Symbol.Symbol
+import gtirb.*
 import gtirb.AuxDecoder.AuxKind
-import gtirb._
-import ir._
+import ir.*
 import util.Logger
 import util.functional.{Snoc, foldLeft0}
 

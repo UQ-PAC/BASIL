@@ -3,8 +3,8 @@ package analysis.data_structure_analysis
 import analysis.solvers.DSAUnionFindSolver
 import analysis.{FlatElement, evaluateExpression}
 import boogie.SpecGlobal
-import cfg_visualiser._
-import ir._
+import cfg_visualiser.*
+import ir.*
 import specification.{ExternalFunction, FuncEntry, SymbolTableEntry}
 import util.Counter
 

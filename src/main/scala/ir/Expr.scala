@@ -1,5 +1,5 @@
 package ir
-import boogie._
+import boogie.*
 import util.CachedHashCode
 import util.functional.Snoc
 

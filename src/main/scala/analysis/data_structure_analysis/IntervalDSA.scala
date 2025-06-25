@@ -6,7 +6,7 @@ import analysis.data_structure_analysis.IntervalDSA.checkUniqueGlobal
 import analysis.solvers.OffsetUnionFindSolver
 import boogie.SpecGlobal
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
-import ir._
+import ir.*
 import ir.eval.BitVectorEval.isNegative
 import specification.{ExternalFunction, FuncEntry, SymbolTableEntry}
 import util.DSAConfig.{Checks, Standard}

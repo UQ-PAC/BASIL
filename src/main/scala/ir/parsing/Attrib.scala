@@ -5,9 +5,9 @@ import ir.{BitVecLiteral, FalseLiteral, IntLiteral, Literal, MemorySection, Sigi
 import specification.{ExternalFunction, FuncEntry}
 import util.Logger
 
-import java.io._
+import java.io.*
 import java.util.Base64
-import java.util.zip._
+import java.util.zip.*
 import scala.collection.immutable.ListMap
 
 enum Attrib {

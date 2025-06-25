@@ -1,7 +1,7 @@
 package analysis
 
-import analysis.solvers._
-import ir._
+import analysis.solvers.*
+import ir.*
 
 import scala.collection.immutable
 

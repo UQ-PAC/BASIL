@@ -14,7 +14,7 @@ import analysis.{
   Value,
   getSSAUse
 }
-import ir._
+import ir.*
 import util.Logger
 
 import scala.collection.mutable

@@ -1,6 +1,6 @@
 package ir.invariant
-import ir._
-import ir.cilvisitor._
+import ir.*
+import ir.cilvisitor.*
 import util.Logger
 
 import scala.collection.mutable

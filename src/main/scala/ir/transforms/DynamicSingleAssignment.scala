@@ -1,8 +1,8 @@
 package ir.transforms
 
-import ir._
-import ir.cilvisitor._
-import translating._
+import ir.*
+import ir.cilvisitor.*
+import translating.*
 import util.Logger
 
 import scala.collection.mutable

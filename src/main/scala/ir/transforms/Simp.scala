@@ -1,8 +1,8 @@
 package ir.transforms
-import ir._
-import ir.cilvisitor._
+import ir.*
+import ir.cilvisitor.*
 import ir.eval.{AlgebraicSimplifications, AssumeConditionSimplifications, simplifyExprFixpoint}
-import translating.PrettyPrinter._
+import translating.PrettyPrinter.*
 import util.SimplifyLogger
 
 import scala.collection.mutable

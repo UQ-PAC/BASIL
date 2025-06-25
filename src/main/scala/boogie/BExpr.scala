@@ -1,6 +1,6 @@
 package boogie
-import ir._
-import specification._
+import ir.*
+import specification.*
 
 import java.io.Writer
 

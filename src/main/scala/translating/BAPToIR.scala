@@ -1,8 +1,8 @@
 package translating
 
-import bap._
-import ir._
-import ir.cilvisitor._
+import bap.*
+import ir.*
+import ir.cilvisitor.*
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{immutable, mutable}

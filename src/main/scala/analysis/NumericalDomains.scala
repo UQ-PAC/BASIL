@@ -1,6 +1,6 @@
 package analysis
 
-import ir._
+import ir.*
 import ir.eval.BitVectorEval.{bv2SignedInt, bv2nat, nat2bv, smt_bvneg}
 
 // Signed infinity

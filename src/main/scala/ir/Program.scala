@@ -1,10 +1,10 @@
 package ir
 
 import analysis.{Loop, MergedRegion}
-import boogie._
-import translating.PrettyPrinter._
+import boogie.*
+import translating.PrettyPrinter.*
 import util.functional.Snoc
-import util.intrusive_list._
+import util.intrusive_list.*
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{immutable, mutable}

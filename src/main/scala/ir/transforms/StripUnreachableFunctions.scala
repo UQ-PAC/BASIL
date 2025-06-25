@@ -1,5 +1,5 @@
 package ir.transforms
-import ir._
+import ir.*
 
 import collection.mutable
 

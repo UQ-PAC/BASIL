@@ -1,7 +1,7 @@
 package ir.transforms
 import analysis.{TwoElement, TwoElementBottom, TwoElementTop}
-import ir._
-import ir.cilvisitor._
+import ir.*
+import ir.cilvisitor.*
 import specification.Specification
 import translating.PrettyPrinter
 import util.{DebugDumpIRLogger, Logger}

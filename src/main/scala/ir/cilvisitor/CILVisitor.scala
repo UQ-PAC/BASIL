@@ -1,6 +1,6 @@
 package ir.cilvisitor
 
-import ir._
+import ir.*
 
 import scala.collection.mutable
 

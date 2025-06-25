@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.solvers.SimpleWorklistFixpointSolver
-import ir._
+import ir.*
 import ir.eval.BitVectorEval.bv2SignedInt
 import util.MRALogger
 

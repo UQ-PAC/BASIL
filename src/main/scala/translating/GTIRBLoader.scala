@@ -1,12 +1,12 @@
 package translating
-import Parsers.ASLpParser._
-import Parsers._
-import ir._
+import Parsers.*
+import Parsers.ASLpParser.*
+import ir.*
 import util.Logger
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{immutable, mutable}
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 enum InsnSemantics {
   case Result(value: List[StmtContext])

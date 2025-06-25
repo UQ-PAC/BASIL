@@ -1,7 +1,7 @@
 package translating
 
-import ir._
-import ir.cilvisitor._
+import ir.*
+import ir.cilvisitor.*
 
 trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
   // def vstmt(s: Statement) : Repr[Statement]

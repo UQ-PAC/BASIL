@@ -1,8 +1,8 @@
 package analysis.data_structure_analysis
 
-import analysis._
+import analysis.*
 import analysis.solvers.DSAUniTerm
-import ir._
+import ir.*
 import util.Counter
 
 import scala.collection.mutable

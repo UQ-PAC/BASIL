@@ -1,5 +1,5 @@
 package ir.transforms
-import ir._
+import ir.*
 
 def removeBodyOfExternal(external: Set[String])(prog: Program) = {
   prog.procedures.foreach { case p =>

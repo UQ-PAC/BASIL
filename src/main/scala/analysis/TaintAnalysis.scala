@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.solvers.ForwardIDESolver
-import ir._
+import ir.*
 
 trait TaintAnalysisFunctions(tainted: Map[CFGPosition, Set[Variable]])
     extends ForwardIDEAnalysis[Variable, TwoElement, TwoElementLattice] {

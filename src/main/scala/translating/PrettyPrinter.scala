@@ -1,6 +1,6 @@
 package translating
-import ir._
-import ir.cilvisitor._
+import ir.*
+import ir.cilvisitor.*
 
 import scala.collection.immutable.ListMap
 import scala.collection.mutable

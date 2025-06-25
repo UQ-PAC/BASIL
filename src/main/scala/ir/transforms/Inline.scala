@@ -1,7 +1,7 @@
 package ir.transforms
-import ir._
-import ir.cilvisitor._
-import ir.dsl._
+import ir.*
+import ir.cilvisitor.*
+import ir.dsl.*
 
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable

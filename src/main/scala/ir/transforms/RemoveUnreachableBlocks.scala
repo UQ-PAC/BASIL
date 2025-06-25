@@ -1,8 +1,8 @@
 package ir.transforms
 
 import analysis.LatticeSet
-import ir._
-import ir.cilvisitor._
+import ir.*
+import ir.cilvisitor.*
 
 /**
  * Find blocks which are mentioned syntactically within a given procedure.

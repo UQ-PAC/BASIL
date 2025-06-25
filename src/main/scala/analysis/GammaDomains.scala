@@ -1,6 +1,6 @@
 package analysis
 
-import ir._
+import ir.*
 
 type VarGammaMap = LatticeMap[Variable, LatticeSet[Variable]]
 

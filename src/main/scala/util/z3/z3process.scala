@@ -1,6 +1,6 @@
 package util.z3
 import java.io.ByteArrayInputStream
-import scala.sys.process._
+import scala.sys.process.*
 
 enum SatResult {
   case SAT

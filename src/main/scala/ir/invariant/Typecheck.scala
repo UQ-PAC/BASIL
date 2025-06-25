@@ -1,9 +1,9 @@
 package ir.invariant
 
-import ir._
+import ir.*
 import util.Logger
 
-import cilvisitor._
+import cilvisitor.*
 
 sealed trait TypeError {
   def stmt: Statement

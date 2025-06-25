@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.solvers.SimpleWorklistFixpointSolver
-import ir._
+import ir.*
 
 import scala.collection.mutable
 

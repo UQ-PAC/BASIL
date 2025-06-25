@@ -1,7 +1,7 @@
 package ir.transforms
 
 import analysis.{DataRegion, FlatElement, MemoryRegion, RegisterWrapperEqualSets, getSSADefinition}
-import ir._
+import ir.*
 
 import scala.collection.mutable
 
