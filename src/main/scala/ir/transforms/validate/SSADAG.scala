@@ -35,7 +35,8 @@ object SSADAG {
   *
   * Returns the SSA renaming for each block entry in the CFA.
   */
-  def ssaTransform(p: Procedure): ((Block, Command) => Command) = {
+  def ssaTransform(p: Procedure): ((Block, Expr) => Expr) = {
+    // FIXME:  apply transform to global variables
 
     var renameCount = 0
     val stRename = mutable.Map[Block, mutable.Map[Variable, Variable]]()
@@ -175,6 +176,6 @@ object SSADAG {
       }
     }
 
-    (b, c) => renameRHS(renameBefore(b).get)(c)
+    (b, c) => visit_expr(Subst(renameBefore(b).get), c)
   }
 }

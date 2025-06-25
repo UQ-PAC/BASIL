@@ -334,7 +334,7 @@ def toTransitionSystem(iprogram: Program, frames: Map[Procedure, Frame]) = {
 }
 
 enum Inv {
-  case CutPoint(cutPointPCGuard: String, pred: Expr, comment: Option[String] = None)
+  case CutPoint(cutPointPCGuard: String, pred: List[CompatArg], comment: Option[String] = None)
   case Global(pred: Expr, comment: Option[String] = None)
 }
 
@@ -361,7 +361,8 @@ class TranslationValidator {
 
   extension (i: Inv) {
     def toAssume = i match {
-      case CutPoint(label, pred, c) => {
+      case CutPoint(label, preds, c) => {
+        val pred = boolAnd(preds.map(_.toPred(exprInSource, exprInTarget)))
         val guarded =
           BinaryExpr(BoolIMPLIES, exprInSource(BinaryExpr(EQ, transitionSystemPCVar, PCSym(label))), pred)
         Assume(guarded, c)
@@ -466,7 +467,7 @@ class TranslationValidator {
         case (label, cutPoint) => {
           val vars = lives.get(cutPoint.label).toSet.flatten -- Seq(transitionSystemPCVar)
 
-          val assertion = boolAnd(vars.map(v => polyEqual(varInSource(v), varInTarget(removeIndex(v)))).toList)
+          val assertion = vars.toList.map(v => CompatArg(v, removeIndex(v)))
 
           Inv.CutPoint(label, assertion, Some(s"INVARIANT at $label"))
         }
@@ -510,12 +511,9 @@ class TranslationValidator {
         case (label, cutPoint) => {
           val vars = lives.get(cutPoint.label).getOrElse(Map())
 
-          val assertion = boolAnd(
-            vars
-              .map { case (src, tgt) =>
-                polyEqual(varInSource(src), varInTarget(tgt))
+          val assertion =  vars.toList.map { case (src, tgt) =>
+                CompatArg(src, tgt)
               }
-          )
 
           // val guard = BinaryExpr(EQ, visit_rvar(afterRenamer, transitionSystemPCVar), PCMan.PCSym(label))
 
@@ -634,12 +632,17 @@ class TranslationValidator {
     val interesting = initProg.get.procedures
       .filterNot(_.isExternal.contains(true))
       .filterNot(_.procName.startsWith("indirect_call_launchpad"))
+      .filter(beforeFrame.contains(_))
+      .filter(afterFrame.contains(_))
 
     for (proc <- interesting) {
       timer.checkPoint(s"TVSMT ${proc.name}")
       val source = afterProg.get.procedures.find(_.name == proc.name).get
       val target = beforeProg.get.procedures.find(_.name == proc.name).get
+      def targetCutPointToBlock(l: String) = beforeCuts(target)(l)
+      def sourceCutPointToBlock(l: String) = afterCuts(source)(l)
 
+      // FIXME: Q does not get renamed for the end of the transition
       val srcEntry = source.entryBlock.get
       val tgtEntry = target.entryBlock.get
       val srcExit = source.returnBlock.get
@@ -648,11 +651,8 @@ class TranslationValidator {
       AssertsToPC(source.returnBlock.get).transform(source)
       AssertsToPC(target.returnBlock.get).transform(target)
 
-      // TODO: this renaming is later applied after the renamer; need to fix
-      val srcRename = SSADAG.transform(source)
-      val tgtRename = SSADAG.transform(target)
-
-      assert(beforeFrame.keys.toSet.intersect(afterFrame.keys.toSet).isEmpty)
+      val srcRenameSSA = SSADAG.transform(source)
+      val tgtRenameSSA = SSADAG.transform(target)
 
       val ackInv = Ackermann.instantiateAxioms(
         source.entryBlock.get,
@@ -667,6 +667,29 @@ class TranslationValidator {
       visit_proc(afterRenamer, source)
 
       val prime = NamespaceState("P")
+
+      srcEntry.statements.prepend(LocalAssign(varInSource(transitionSystemPCVar), varInSource(transitionSystemPCVar)))
+      srcEntry.statements.prepend(LocalAssign(varInSource(traceVar), varInSource(traceVar)))
+      tgtEntry.statements.prepend(LocalAssign(varInTarget(transitionSystemPCVar), varInTarget(transitionSystemPCVar)))
+      tgtEntry.statements.prepend(LocalAssign(varInTarget(traceVar), varInTarget(traceVar)))
+
+      // add invariant to combined
+      val initInv = Seq(Inv.Global(pcInv, Some("PC INVARIANT")), Inv.Global(traceInv, Some("Trace INVARIANT")))
+
+      val invariantRenamed = invariants(proc.name).map {
+        case g: Inv.Global => g
+        case i @ CutPoint(l, b, comment) => {
+          val targetBl = beforeCuts(target)(l)
+          val sourceBl = afterCuts(source)(l)
+          val nb = b.map(_.map(srcRenameSSA(sourceBl, _), tgtRenameSSA(targetBl, _)))
+          CutPoint(l, nb, comment)
+        }
+      }
+
+      val invariant = initInv ++ invariantRenamed
+      val primedInv = invariant.map(_.toAssume).map { case Assume(b, c, _, _) =>
+        Assert(visit_expr(prime, b), c)
+      }
 
       val invVariables = invariants(proc.name).flatMap(_.toAssume.body.variables).toSet
 
@@ -686,36 +709,11 @@ class TranslationValidator {
         val vars = targetInvVariables.map(v => polyEqual(visit_expr(prime, v), v))
         boolAnd(vars)
 
-      srcEntry.statements.prepend(LocalAssign(varInSource(transitionSystemPCVar), varInSource(transitionSystemPCVar)))
-      srcEntry.statements.prepend(LocalAssign(varInSource(traceVar), varInSource(traceVar)))
-      tgtEntry.statements.prepend(LocalAssign(varInTarget(transitionSystemPCVar), varInTarget(transitionSystemPCVar)))
-      tgtEntry.statements.prepend(LocalAssign(varInTarget(traceVar), varInTarget(traceVar)))
-
-
-      // add invariant to combined
-      val initInv = Seq(Inv.Global(pcInv, Some("PC INVARIANT")), Inv.Global(traceInv, Some("Trace INVARIANT")))
-      val invariant = initInv ++ invariants(proc.name).map {
-        case g: Inv.Global => g
-        case i @ CutPoint(l, b, comment) => {
-          val targetBl = beforeCuts(target)(l)
-          val sourceBl = afterCuts(source)(l)
-          val inv1 = tgtRename(targetBl, Assume(b))
-          val inv2 = srcRename(sourceBl, inv1) match {
-            case a: Assume => a.body
-            case _ => ???
-          }
-          CutPoint(l, inv2, comment)
-        }
-      }
-      val primedInv = (initInv ++ invariants(proc.name)).map(_.toAssume).map { case Assume(b, c, _, _) =>
-        Assert(visit_expr(prime, b), c)
-      }
-
       SSADAG.passify(source)
       SSADAG.passify(target)
 
-      val qsrc = srcRename(srcExit, Assume(QSource)).asInstanceOf[Assume].body
-      val qtrgt = tgtRename(tgtExit, Assume(QTarget)).asInstanceOf[Assume].body
+      val qsrc = srcRenameSSA(srcExit, QSource)
+      val qtrgt = tgtRenameSSA(tgtExit, QTarget)
       val otargets = srcEntry.jump.asInstanceOf[GoTo].targets.toList
 
       val splitName = proc.name // + "_split_" + splitNo

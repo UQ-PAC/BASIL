@@ -6,6 +6,25 @@ import scala.collection.mutable
 import analysis.ProcFrames.*
 import util.Logger
 
+/**
+ * Encodes the equality of source with target expression for a translation validation
+ * invariant
+ *
+ * Expected to refer to source and target variables prior to renaming being applied.
+ */
+case class CompatArg(source: Expr, target: Expr) {
+
+  /*
+   * Generate source == target expression renamed
+   */
+  def toPred(renameSource: Expr => Expr, renameTarget : Expr => Expr) = 
+    BinaryExpr(EQ, renameSource(source), renameTarget(target))
+
+  def map(srcFunc: Expr => Expr, tgtFunc: Expr => Expr) = {
+    CompatArg(srcFunc(source), tgtFunc(target))
+  }
+}
+
 case class Field(name: String)
 case class LocalFunctionSig(
   stmt: Statement,
@@ -18,7 +37,7 @@ case class LocalFunctionSig(
   //  for globals the formal param is the captured global var or memory
 }
 
-class SideEffectStatement(frames: Map[Procedure, Frame]) {
+class SideEffectStatement(frames: Map[String, Frame]) {
 
   def endianHint(e: Endian) = e match {
     case Endian.LittleEndian => "le"
@@ -62,8 +81,6 @@ class SideEffectStatement(frames: Map[Procedure, Frame]) {
   //
   // - invariant:
   //
-  //
-  //
 
   // need to have already lifted globals to locals
   val traceOut = LocalVar("trace", BoolType) -> globalTraceVar
@@ -75,7 +92,7 @@ class SideEffectStatement(frames: Map[Procedure, Frame]) {
    */
   def unapply(e: Statement): Option[LocalFunctionSig] = e match {
     case DirectCall(tgt, lhs, rhs, _) =>
-      val frame = frames(tgt)
+      val frame = frames.get(tgt.name).getOrElse(Frame())
       val globsLHS = frame.modifiedGlobalVars.toList.map(param) ++ frame.modifiedMem.toList.map(param)
       val globsRHS = frame.readGlobalVars.toList.map(param) ++ frame.readMem.toList.map(param)
       Some(LocalFunctionSig(e, s"Call_${tgt.name}", traceOut :: lhs.toList ++ globsLHS, rhs.toList ++ globsRHS))
@@ -123,17 +140,14 @@ class SideEffectStatement(frames: Map[Procedure, Frame]) {
 
 object Ackermann {
 
-  case class CompatArg(source: Expr, target: Expr)
   case class AckInv(name: String, lhs: List[CompatArg], rhs: List[CompatArg]) {
     def toPredicate(renameSource: Expr => Expr, renameTarget: Expr => Expr) = {
-      val antecedent = BoolExp(
-        BoolAND,
+      val antecedent = boolAnd(
         lhs.map { case CompatArg(s, t) =>
           BinaryExpr(EQ, renameSource(s), renameTarget(t))
         }
       )
-      val implicant = BoolExp(
-        BoolAND,
+      val implicant = boolAnd(
         rhs.map { case CompatArg(s, t) =>
           BinaryExpr(EQ, renameSource(s), renameTarget(t))
         }
@@ -195,7 +209,7 @@ object Ackermann {
 
     // after axiom is intantiated we delete the assignment
     var toRemove = List[Statement]()
-    val SF = SideEffectStatement(frames)
+    val SF = SideEffectStatement(frames.map((l,r) => l.name -> r).toMap)
 
     val seen = mutable.Set[CFGPosition]()
     var invariant = List[(Expr, String)]()
@@ -220,9 +234,8 @@ object Ackermann {
     val q = mutable.Queue[((Option[LocalFunctionSig], CFGPosition), (Option[LocalFunctionSig], CFGPosition))]()
     val start = ((None, sourceEntry), (None, targetEntry))
     if (true) {
-      // FIXME:  was previously conditional on there being any side-effects in the function, to fix a nontermination
+      // FIXME: -> [[instantiations.nonEmpty]] ; was previously conditional on there being any side-effects in the function, to fix a nontermination
       // bug, unclear if this is neccessary
-      //    -> [[instantiations.nonEmpty]]
       q.enqueue(start)
     }
 

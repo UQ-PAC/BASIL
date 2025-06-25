@@ -912,6 +912,10 @@ object RunUtils {
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
 
     ir.eval.SimplifyValidation.validate = conf.validateSimp
+
+    ir.transforms.validate.wrapShapePreservingTransformInValidation(p => (), "NOP")(ctx.program)
+
+
     if (conf.simplify) {
 
       ir.transforms.clearParams(ctx.program)
