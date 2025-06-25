@@ -2179,8 +2179,15 @@ val makeProcEntriesNonLoops = SingleTransform(
 
 // --- DoSimplify ------------------------------------------------------------------------------------------------------
 
-/* For the doSimplify transform, I've put all the relevant sub-transforms here. We might want to move these in
-future, or merge them with the functions they call. */
+/*
+For the doSimplify transform, I've put all the relevant sub-transforms here. We might want to move these in
+future, or merge them with the functions they call.
+
+To finish the implementation of this transform, we need to:
+[ ] Figure out when to dump files (we currently have random ir dumps commented out everywhere).
+[ ] Add a TransformConfig option for performance logging and have copyprop log its timer.
+[ ] Remove the non-transforms like dsaCheck and replace with some other logic.
+*/
 
 val reduceLoops = SingleTransform(
   "ReduceLoops",
@@ -2372,8 +2379,9 @@ def getDoSimplifyTransform(validate: Boolean) = TransformBatch(
     // todo: only run iff ir.eval.SimplifyValidation.validate (that is: iff conf.validateSimp)
     dsaCheck,
     // todo:
-    // if config is set and config.dumpILToPath is set then dump il
-    // if config is set and config.analysisDotPath is set then dump blockgraph
+    // - if config is set and config.dumpILToPath is set then dump il
+    // - if config is set and config.analysisDotPath is set then dump blockgraph
+    // - always log performance for this transform
     copyPropParamFixedPointTransform,
     fixupGuardsTransform,
     removeDuplicateGuardsTransform,

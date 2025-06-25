@@ -32,7 +32,11 @@ case class IrLog(filenamePrefix: String) extends Log {
   * @param disabled Optionally specify a set of transforms to disable.
   * @param dumpLogs Optionally specify which logs to dump for which transforms, if any.
   */
-case class TransformConfig(disabled: Set[Transform] = Set.empty, dumpLogs: Map[Transform, Set[Log]] = Map.empty)
+case class TransformConfig(
+  disabled: Set[Transform] = Set.empty, 
+  dumpLogs: Map[Transform, Set[Log]] = Map.empty,
+  logPerformance: Set[Transform] = Set.empty
+)
 
 // default value for transforms
 val emptyConfig = TransformConfig()
@@ -49,8 +53,6 @@ trait Transform {
   val name: String
   // optional message to log upon invocation of this transform
   val notice: String
-  // the performance of each transform is implicitly measured
-  val timer: PerformanceTimer = PerformanceTimer(name)
 
   // modifies the given IR context in-place, using the analysis results provided by this analysis manager
   protected def transform(ctx: IRContext, man: AnalysisManager, config: TransformConfig): man.Invalidation
@@ -71,9 +73,10 @@ trait Transform {
     }
     val maybeLogs = config.dumpLogs.get(this)
     maybeLogs.foreach(_.foreach(_.dump(ctx, s"before-$name")))
-    timer.checkPoint("start")
+    val logPerformance: Boolean = config.logPerformance.contains(this)
+    val timer: PerformanceTimer = if (logPerformance) then PerformanceTimer(name) else null
     val invalidation = transform(ctx, man, config) // run the actual transform and get the analysis results to clobber
-    timer.checkPoint("end")
+    if (logPerformance) then timer.checkPoint("delta")
     postRun(ctx) // runs after performance checks, and before logging
     maybeLogs.foreach(_.foreach(_.dump(ctx, s"after-$name")))
     man.invalidate(invalidation) // clobber the specified analysis results
