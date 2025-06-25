@@ -180,7 +180,7 @@ trait CallGraph extends IRWalk[Procedure, Procedure] {
 
 object CallGraph extends CallGraph
 
-/** Updates each procedure with it's corresponding call graph scc
+/** Updates each procedure with its corresponding call graph scc
  *  if a procedure is the only member in the scc only
  *  update procedure if there is a self cycle in the procedure
  */
