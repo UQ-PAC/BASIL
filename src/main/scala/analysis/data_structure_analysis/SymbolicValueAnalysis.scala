@@ -59,7 +59,7 @@ case class Stack(proc: Procedure) extends Known {
 }
 
 sealed trait Const extends Known
-case class Global(interval: DSInterval) extends Const
+case class GlobSym(interval: DSInterval) extends Const
 case object Constant extends Const
 
 // placeholder sym bases for loaded and in/out params
@@ -301,7 +301,7 @@ object SymValues {
     literals.foldLeft(domain.init(Block(""))) { (valSet, offset) =>
       if isGlobal(offset) then {
         val (interval, off) = getGlobal(globals, offset).get
-        domain.join(valSet, domain.init(Global(interval), off))
+        domain.join(valSet, domain.init(GlobSym(interval), off))
       } else domain.join(valSet, domain.init(Constant, offset))
     }
   }
@@ -367,7 +367,7 @@ object SymValues {
           .map(lit => getGlobal(globals, lit))
           .filter(_.isDefined)
           .map(_.get)
-          .map((interval, _) => (Global(interval), oDomain.top))
+          .map((interval, _) => (GlobSym(interval), oDomain.top))
           .toMap
 
         SymValSet(updated)

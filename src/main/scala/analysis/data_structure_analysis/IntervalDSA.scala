@@ -58,7 +58,7 @@ class IntervalGraph(
       base match
         case Heap(call) => node.flags.heap = true
         case Stack(proc) => node.flags.stack = true
-        case Global(interval) => node.flags.global = true
+        case GlobSym(interval) => node.flags.global = true
         case Constant =>
         case unknown: (Ret | Par | Loaded) =>
           node.flags.unknown = true
@@ -69,7 +69,7 @@ class IntervalGraph(
 
   def addGlobal(globals: Map[SymBase, IntervalNode], address: Int, size: Int): IntervalCell = {
     val (interval, offset) = getGlobal(glIntervals, address).get
-    val base = Global(interval)
+    val base = GlobSym(interval)
     val node = globals(base)
     node.flags.global = true
     node.add(DSInterval(offset, offset + size))
@@ -81,7 +81,7 @@ class IntervalGraph(
     externalFunctions: Set[ExternalFunction]
   ): Map[SymBase, IntervalNode] = {
     val globalNodes = glIntervals.foldLeft(Map[SymBase, IntervalNode]()) { (m, interval) =>
-      val base = Global(interval)
+      val base = GlobSym(interval)
       val node = IntervalNode(this, Map(base -> Set(0)))
       m + (base -> node)
     }
@@ -175,13 +175,13 @@ class IntervalGraph(
       else {
         val current = offsets.toIntervals
           .filter(i =>
-            !base.isInstanceOf[Global] ||
-              isGlobal(i.start.get + base.asInstanceOf[Global].interval.start.get, irContext)
+            !base.isInstanceOf[GlobSym] ||
+              isGlobal(i.start.get + base.asInstanceOf[GlobSym].interval.start.get, irContext)
           )
           .map(_.move(i => i + adjustment))
           .map(node.add)
         val eq =
-          if base.isInstanceOf[Global] || !newEqv || !eqCells then Set.empty
+          if base.isInstanceOf[GlobSym] || !newEqv || !eqCells then Set.empty
           else
             offsets.toOffsets.flatMap(o =>
               cellToEq(node.get(adjustment)).map(_.interval.move(i => i + o)).map(node.add)
@@ -1079,7 +1079,7 @@ object IntervalDSA {
   def resolveGlobalOverlapping(graph: IntervalGraph): Unit = {
     graph.glIntervals.zipWithIndex.foreach {
       case (interval, i) if i < graph.glIntervals.size =>
-        val base = Global(interval)
+        val base = GlobSym(interval)
         val node = graph.find(base)
         val offsets = node.bases(base)
         assert(offsets.size == 1)
@@ -1088,7 +1088,7 @@ object IntervalDSA {
           val next = graph.glIntervals(i + 1)
           val nextOffset = next.start.get - interval.start.get + offset
           if nextOffset < node.cells.last.interval.end.get then {
-            val nextCell = graph.find(graph.nodes(Global(next)).get(0))
+            val nextCell = graph.find(graph.nodes(GlobSym(next)).get(0))
             val cell = node.add(nextOffset)
             graph.mergeCells(nextCell, cell)
           }
@@ -1098,7 +1098,7 @@ object IntervalDSA {
   }
 
   def checksGlobalsMaintained(graph: IntervalGraph): Boolean = {
-    graph.glIntervals.forall(i => !graph.find(Global(i)).isCollapsed)
+    graph.glIntervals.forall(i => !graph.find(GlobSym(i)).isCollapsed)
   }
 
   def checksStackMaintained(graph: IntervalGraph): Boolean = {
@@ -1113,8 +1113,8 @@ object IntervalDSA {
   ): Map[IntervalNode, IntervalNode] = {
     DSALogger.info(s"cloning globalNode from ${source.proc.procName}")
     source.glIntervals.foreach { interval =>
-      val targetGlobal = target.find(target.nodes(Global(interval)).get(0))
-      var sourceGlobal = source.find(source.nodes(Global(interval)).get(0))
+      val targetGlobal = target.find(target.nodes(GlobSym(interval)).get(0))
+      var sourceGlobal = source.find(source.nodes(GlobSym(interval)).get(0))
       val globalNode = sourceGlobal.node.clone(target, true, oldToNew)
 
       sourceGlobal = IntervalCell(globalNode, sourceGlobal.interval)
@@ -1220,14 +1220,14 @@ object IntervalDSA {
   }
 
   def checkUniqueGlobals(graph: IntervalGraph): Unit = {
-    var found: Map[SymBase, Option[IntervalNode]] = graph.glIntervals.map(i => (Global(i), None)).toMap
+    var found: Map[SymBase, Option[IntervalNode]] = graph.glIntervals.map(i => (GlobSym(i), None)).toMap
     val seen = mutable.Set[IntervalNode]()
     val entry = graph.nodes.values.map(graph.find)
     val queue = mutable.Queue[IntervalNode]().enqueueAll(entry)
     while queue.nonEmpty do {
       val node = queue.dequeue()
       node.bases
-        .filter(_._1.isInstanceOf[Global])
+        .filter(_._1.isInstanceOf[GlobSym])
         .foreach((base, offsets) =>
           assert(offsets.size <= 1, s"$base had more than one offset in $node")
           assert(found(base).isEmpty || found(base).get == node, s"$base was in at least two nodes")
@@ -1282,11 +1282,11 @@ object IntervalDSA {
    */
   def checkConsistantGlobals(DSA: Map[Procedure, IntervalGraph], global: IntervalGraph): Unit = {
     // collect all the regions  from all the resulting graphs
-    val unifiedRegions = global.glIntervals.map(Global.apply).map(base => global.find(global.nodes(base)).bases)
+    val unifiedRegions = global.glIntervals.map(GlobSym.apply).map(base => global.find(global.nodes(base)).bases)
     DSA
       .filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
       .foreach((p, graph) =>
-        val graphRegions = graph.glIntervals.map(Global.apply).map(base => graph.find(graph.nodes(base)).bases)
+        val graphRegions = graph.glIntervals.map(GlobSym.apply).map(base => graph.find(graph.nodes(base)).bases)
         assert(
           unifiedRegions == graphRegions,
           s"Procedure ${p.procName} had a differing unified global sets than compared to the global graph"
@@ -1394,7 +1394,7 @@ object IntervalDSA {
         val pos = cons.source
         val indices = graph.constraintArgToCells(cons.arg1, true, ignoreContents = true)
         val collapsedGlobals =
-          indices.filter(_.node.isCollapsed).flatMap(_.node.bases.keys.collect { case g: Global => g })
+          indices.filter(_.node.isCollapsed).flatMap(_.node.bases.keys.collect { case g: GlobSym => g })
         if collapsedGlobals.nonEmpty then {
           val assertExpr = collapsedGlobals
             .map(g =>

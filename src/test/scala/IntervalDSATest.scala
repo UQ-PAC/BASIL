@@ -51,7 +51,7 @@ object IntervalDSATestData {
           MemoryStore(
             mem,
             BinaryExpr(BVADD, R2, BitVecLiteral(16, 64)),
-            BitVecLiteral(1, 32),
+            BitVecLiteral(1, 64),
             LittleEndian,
             64,
             Some("04")
