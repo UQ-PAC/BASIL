@@ -1,13 +1,13 @@
 import org.scalatest.funsuite.AnyFunSuite
+import test_util.BASILTest.*
+import test_util.{BASILTest, CaptureOutput, Histogram, TestConfig, TestCustomisation}
+import util.DSAConfig.Checks
+import util.boogie_interaction.*
 import util.{DSAConfig, DebugDumpIRLogger, LogLevel, Logger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
 
 import java.io.File
 import scala.collection.immutable.ListMap
 import scala.collection.mutable.ArrayBuffer
-import test_util.{BASILTest, CaptureOutput, Histogram, TestConfig, TestCustomisation}
-import test_util.BASILTest.*
-import util.DSAConfig.Checks
-import util.boogie_interaction.*
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.

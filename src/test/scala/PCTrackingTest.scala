@@ -1,11 +1,7 @@
-import org.scalatest.funsuite.AnyFunSuite
-
 import ir.*
+import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
-import util.{BASILConfig, IRContext, BoogieGeneratorConfig, ILLoadingConfig, StaticAnalysisConfig, PCTrackingOption}
-
-import java.nio.file.{Path, Files}
-import java.io.{BufferedWriter, FileWriter}
+import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, IRContext, PCTrackingOption, StaticAnalysisConfig}
 
 @test_util.tags.UnitTest
 class PCTrackingTest extends AnyFunSuite with CaptureOutput {
