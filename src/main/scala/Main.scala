@@ -350,7 +350,6 @@ object Main {
         if (relfOut.trim.isEmpty)
           return
 
-        import ir.dsl.given
         writeToFile(
           relf.sorted.toScala
             .replace("@GLIBC_2.17", "")

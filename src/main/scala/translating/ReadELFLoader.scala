@@ -2,13 +2,12 @@ package translating
 
 import Parsers.ReadELFParser.*
 import boogie.*
+import ir.dsl.given
 import specification.*
 import util.{ILLoadingConfig, Logger}
 
-import scala.collection.immutable.{SortedSet, SortedMap}
+import scala.collection.immutable.{SortedMap, SortedSet}
 import scala.jdk.CollectionConverters.*
-
-import ir.dsl.given
 
 /** https://refspecs.linuxfoundation.org/elf/elf.pdf
   */

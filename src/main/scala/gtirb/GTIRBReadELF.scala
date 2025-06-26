@@ -1,28 +1,13 @@
 package gtirb
 
-import util.Logger
-import gtirb.AuxDecoder
-import gtirb.AuxDecoder.{AuxKind, decodeAux}
-
-import translating.{ELFSymType, ELFBind, ELFVis, ELFNDX, ELFSymbol, ReadELFData}
-import specification.{ExternalFunction, FuncEntry}
-import boogie.{SpecGlobal}
-
-import java.io.ByteArrayInputStream
-
+import boogie.SpecGlobal
 import com.google.protobuf.ByteString
 import com.grammatech.gtirb.proto.CFG.EdgeType.*
-import com.grammatech.gtirb.proto.CFG.CFG
-import com.grammatech.gtirb.proto.CFG.Edge
-import com.grammatech.gtirb.proto.CFG.EdgeLabel
-import com.grammatech.gtirb.proto.Module.Module
-import com.grammatech.gtirb.proto.Symbol.Symbol
-import com.grammatech.gtirb.proto.ByteInterval.Block
-import com.grammatech.gtirb.proto.ByteInterval.ByteInterval
-import com.grammatech.gtirb.proto.Symbol.Symbol.OptionalPayload
+import specification.{ExternalFunction, FuncEntry}
+import translating.{ELFBind, ELFNDX, ELFSymType, ELFSymbol, ELFVis, ReadELFData}
+import util.Logger
 
-import scala.collection.mutable
-import scala.collection.immutable.{SortedMap, SortedSet}
+import java.io.ByteArrayInputStream
 import scala.util.chaining.scalaUtilChainingOps
 
 /**

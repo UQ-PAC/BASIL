@@ -3,7 +3,6 @@ package specification
 import boogie.*
 import ir.*
 import ir.dsl.given
-import util.Logger
 
 trait SymbolTableEntry {
   val name: String
