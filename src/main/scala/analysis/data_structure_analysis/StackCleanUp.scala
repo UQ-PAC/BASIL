@@ -1,13 +1,5 @@
 package analysis.data_structure_analysis
 
-import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
-import ir.*
-import ir.transforms.{AbstractDomain, PowerSetDomain, ProcedureSummaryGenerator}
-import util.StackLogger as Logger
-
-import scala.annotation.tailrec
-import scala.collection.mutable
-
 enum StackMaintained {
   case unsure
   case maintained

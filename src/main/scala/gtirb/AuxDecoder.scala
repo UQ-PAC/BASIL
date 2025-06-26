@@ -1,12 +1,12 @@
 package gtirb
 
-import java.util.Base64
-import java.io.ByteArrayInputStream
-import java.nio.charset.StandardCharsets
-
 import com.google.protobuf.ByteString
 import com.grammatech.gtirb.proto.AuxData.AuxData
 import com.grammatech.gtirb.proto.Module.Module
+
+import java.io.ByteArrayInputStream
+import java.nio.charset.StandardCharsets
+import java.util.Base64
 
 /**
  * Provides methods for decoding binary data, particularly the binary encoding of

@@ -1,6 +1,6 @@
 package ir
 
-import boogie._
+import boogie.*
 
 sealed trait IRType(val name: String) {
   override def toString: String = name

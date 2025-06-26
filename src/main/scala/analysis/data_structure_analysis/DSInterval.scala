@@ -1,14 +1,5 @@
 package analysis.data_structure_analysis
 
-import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver, UnionFindSolver}
-import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
-import ir.{BVADD, BinaryExpr, BitVecLiteral, Expr, LocalAssign, Procedure, Program, Register}
-import specification.{ExternalFunction, SymbolTableEntry}
-import util.{DSALogger, IRContext}
-
-import java.io.File
-import scala.collection.{SortedSet, mutable}
-
 /**
  * Integer Interval with top and bottom
  * start (s) <= end (e)

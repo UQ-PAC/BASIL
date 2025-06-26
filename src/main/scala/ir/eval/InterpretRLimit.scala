@@ -1,18 +1,9 @@
 package ir.eval
-import ir._
-import ir.eval.BitVectorEval.*
+
 import ir.*
 import util.IRContext
-import util.Logger
 import util.functional.*
 import util.functional.State.*
-import boogie.Scope
-import scala.collection.WithFilter
-
-import scala.annotation.tailrec
-import scala.collection.mutable
-import scala.collection.immutable
-import scala.util.control.Breaks.{break, breakable}
 
 case class EffectsRLimit[T, E, I <: Effects[T, InterpreterError]](val limit: Int)
     extends NopEffects[(T, Int), InterpreterError] {

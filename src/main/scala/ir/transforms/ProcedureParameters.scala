@@ -1,16 +1,15 @@
 package ir.transforms
-import ir.cilvisitor.*
-import java.io.File
+import analysis.{TwoElement, TwoElementBottom, TwoElementTop}
 import ir.*
-import translating.PrettyPrinter
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.{mutable, immutable}
-import collection.immutable.SortedMap
+import ir.cilvisitor.*
 import specification.Specification
-import analysis.{TwoElement, TwoElementTop, TwoElementBottom}
-import ir.CallGraph
-import util.{Logger, DebugDumpIRLogger}
-import analysis.{LatticeMap, MapDomain, InternalLattice}
+import translating.PrettyPrinter
+import util.{DebugDumpIRLogger, Logger}
+
+import java.io.File
+import scala.collection.{immutable, mutable}
+
+import collection.immutable.SortedMap
 
 case class FunSig(inArgs: List[Register], outArgs: List[Register])
 

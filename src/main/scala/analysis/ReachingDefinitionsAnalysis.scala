@@ -1,7 +1,7 @@
 package analysis
 
-import ir.*
 import analysis.solvers.SimpleWorklistFixpointSolver
+import ir.*
 
 type ReachingDefTuple =
   TupleLattice[MapLattice[Variable, Set[Assign], PowersetLattice[Assign]], MapLattice[Variable, Set[

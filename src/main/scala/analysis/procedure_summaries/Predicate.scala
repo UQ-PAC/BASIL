@@ -1,8 +1,7 @@
 package analysis
 
-import util.StaticAnalysisLogger
-import ir.*
 import boogie.*
+import ir.*
 import ir.transforms.AbstractDomain
 
 // TODO DAG predicates (don't represent the same subexpression twice)

@@ -11,7 +11,6 @@ import ir.{
   MemoryLoad,
   MemoryStore,
   Procedure,
-  Statement,
   Variable,
   computeDomain
 }

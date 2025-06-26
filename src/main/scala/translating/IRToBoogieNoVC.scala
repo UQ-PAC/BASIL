@@ -1,9 +1,9 @@
 package translating
-import ir.*
 import boogie.*
-import specification.*
-import scala.collection.mutable
+import ir.*
 import ir.cilvisitor.*
+
+import scala.collection.mutable
 
 object BoogieTranslator {
 

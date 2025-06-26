@@ -1,19 +1,14 @@
 package ir.transforms
-import translating.PrettyPrinter.*
-import specification.FuncEntry
-import util.SimplifyLogger
-import ir.eval.AlgebraicSimplifications
-import ir.eval.AssumeConditionSimplifications
-import ir.eval.simplifyExprFixpoint
-import ir.cilvisitor.*
 import ir.*
+import ir.cilvisitor.*
+import ir.eval.{AlgebraicSimplifications, AssumeConditionSimplifications, simplifyExprFixpoint}
+import translating.PrettyPrinter.*
+import util.SimplifyLogger
+
 import scala.collection.mutable
-import analysis._
-import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.concurrent.duration.*
-import scala.util.{Failure, Success}
-import ExecutionContext.Implicits.global
-import scala.util.boundary, boundary.break
+import scala.util.boundary
+
+import boundary.break
 
 /** Simplification pass, see also: docs/development/simplification-solvers.md
   */

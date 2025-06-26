@@ -1,10 +1,9 @@
 package translating
 
-import util.Logger
 import Parsers.ReadELFParser.*
 import boogie.*
 import specification.*
-import util.ILLoadingConfig
+import util.{ILLoadingConfig, Logger}
 
 import scala.collection.immutable.{SortedSet, SortedMap}
 import scala.jdk.CollectionConverters.*

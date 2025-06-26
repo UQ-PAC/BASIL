@@ -10,10 +10,12 @@ import $file.basilmill.antlr.AntlrModule
 
 import os.Path
 
+import $ivy.`com.goyeau::mill-scalafix::0.4.2`
 import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
 import contrib.scalapblib._
+import com.goyeau.mill.scalafix.ScalafixModule
 
-object `package` extends RootModule with ScalaModule {
+object `package` extends RootModule with ScalaModule with ScalafixModule {
   // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
   def scalaVersion = "3.3.4"
@@ -23,7 +25,7 @@ object `package` extends RootModule with ScalaModule {
 
   def moduleDeps = Seq(basilAntlr, basilProto, bnfc)
 
-  def scalacOptions: T[Seq[String]] = Seq("-deprecation")
+  def scalacOptions: T[Seq[String]] = Seq("-deprecation", "-Wunused:imports", "-feature")
 
   val javaTests = ivy"com.novocode:junit-interface:0.11"
   val scalaTests = ivy"org.scalatest::scalatest:3.2.19"

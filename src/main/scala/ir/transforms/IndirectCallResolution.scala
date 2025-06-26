@@ -20,23 +20,6 @@ import util.Logger
 import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 
-import analysis.{
-  AddressValue,
-  DataRegion,
-  Lift,
-  LiftedElement,
-  LiteralValue,
-  MemoryModelMap,
-  MemoryRegion,
-  RegisterWrapperEqualSets,
-  StackRegion,
-  Value,
-  getUse
-}
-import ir.*
-import util.Logger
-import cilvisitor.*
-
 class SteensgaardIndirectCallResolution(
   override val program: Program,
   val pointsTos: Map[RegisterWrapperEqualSets | MemoryRegion, Set[RegisterWrapperEqualSets | MemoryRegion]],

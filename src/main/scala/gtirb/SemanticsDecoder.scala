@@ -1,15 +1,11 @@
 package gtirb
 
-import util.Logger
-import translating.InsnSemantics
-
-import upickle.default._
-
 import Parsers.*
 import Parsers.ASLpParser.*
-import org.antlr.v4.runtime.tree.ParseTreeWalker
-import org.antlr.v4.runtime.BailErrorStrategy
-import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
+import org.antlr.v4.runtime.{BailErrorStrategy, CharStreams, CommonTokenStream}
+import translating.InsnSemantics
+import upickle.default.*
+import util.Logger
 
 private def parse_asl_stmt(line: String): Option[StmtContext] = {
   val lexer = ASLpLexer(CharStreams.fromString(line))

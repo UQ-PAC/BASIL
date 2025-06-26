@@ -1,8 +1,9 @@
 package ir.invariant
 
 import ir.*
-import cilvisitor.*
 import util.Logger
+
+import cilvisitor.*
 
 sealed trait TypeError {
   def stmt: Statement
@@ -51,7 +52,6 @@ case class ExprEqualityError(ctx: Expr, subExprA: Expr, subexprB: Expr, msg: Opt
 
 class TypeChecker extends CILVisitor {
 
-  var stmt: Statement = null
   var violations = List[TypeError]()
   var exprViolations = List[ExprTypeError]()
 
@@ -118,7 +118,6 @@ class TypeChecker extends CILVisitor {
   }
 
   override def vstmt(s: Statement) =
-    stmt = s
     val newViolations = s match {
       case n: NOP => Seq()
       case LocalAssign(lhs, rhs, _) =>

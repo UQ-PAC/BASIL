@@ -38,6 +38,9 @@ jobs:
       - name: Check Source Formatting
         run: ./mill scalafmt.checkFormat
 
+      - name: Lint 
+        run: ./mill fix --check
+
   Compile:
     runs-on: ubuntu-latest
     steps:

@@ -1,7 +1,5 @@
 package bap
 
-import ir._
-
 case class BAPProgram(subroutines: List[BAPSubroutine], memorySections: List[BAPMemorySection]) {
   override def toString: String = subroutines.mkString("\n")
 
