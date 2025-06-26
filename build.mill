@@ -45,12 +45,18 @@ object `package` extends RootModule with ScalaModule with ScalafixModule {
     Seq(PathRef(this.millSourcePath / "main" / "scala"))
   }
 
-  object test extends ScalaTests with TestModule.ScalaTest {
+  override def scalafixConfig = Task {
+    Some(Task.workspace / ".scalafix.conf")
+  }
+
+  object test extends ScalaTests with TestModule.ScalaTest with ScalafixModule {
     override def ammoniteVersion = ammonite
     def ivyDeps = Agg(scalaTests, scalaCheck, javaTests)
     def sources = Task.Sources {
       Seq(PathRef(this.millSourcePath / "scala"))
     }
+
+    override def scalafixConfig = build.scalafixConfig
 
     // note: toBoolean accepts precisely "true" or "false"
     def basilTestParallel = Task.Input {
@@ -132,7 +138,20 @@ object `package` extends RootModule with ScalaModule with ScalafixModule {
     os.read.lines(path1) == os.read.lines(path2)
   }
 
-  def scalafmt = mill.scalalib.scalafmt.ScalafmtModule
+  val scalafmt = mill.scalalib.scalafmt.ScalafmtModule
+
+
+  /**
+   * Haoyi: "currently there isn't a terribly easy way to run things sequentially,
+   *         but a command taking Evaluator could do that
+   *         e.g. https://github.com/com-lihaoyi/mill/discussions/5360"
+   */
+  def fmt(ev: mill.eval.Evaluator): Command[Unit] = Task.Command(exclusive = true) {
+    mill.main.RunScript.evaluateNamed(ev, Agg(fix()))
+    mill.main.RunScript.evaluateNamed(ev, Agg(test.fix()))
+    mill.main.RunScript.evaluateNamed(ev, Agg(scalafmt.reformat()))
+    ()
+  }
 
   object basilAntlr extends AntlrModule {
     override def ivyDeps = Agg(build.antlrRuntime)
@@ -175,7 +194,7 @@ object `package` extends RootModule with ScalaModule with ScalafixModule {
 
   object mdbook extends mdbookBinary {
     def mdbookSources = Task.Source {
-      Task.workspace  / "docs" 
+      Task.workspace  / "docs"
     }
   }
 
