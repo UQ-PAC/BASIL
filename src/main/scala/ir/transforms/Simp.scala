@@ -2187,7 +2187,7 @@ To finish the implementation of this transform, we need to:
 [ ] Figure out when to dump files (we currently have random ir dumps commented out everywhere).
 [ ] Add a TransformConfig option for performance logging and have copyprop log its timer.
 [ ] Remove the non-transforms like dsaCheck and replace with some other logic.
-*/
+ */
 
 val reduceLoops = Transform(
   "ReduceLoops",

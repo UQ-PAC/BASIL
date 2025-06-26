@@ -50,11 +50,13 @@ def getPrepareForTranslationTransform(config: BASILConfig, boogieReserved: Set[S
   "PrepareForTranslation",
   List(
     determineRelevantMemory.when(
-      config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled)),
+      config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled)
+    ),
     getStripUnreachableFunctionsTransform(config.loading.procedureTrimDepth),
     stackSubstitution.when(
       !config.memoryTransform &&
-      (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled))),
+        (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled))
+    ),
     setModifies,
     getRenameBoogieKeywordsTransform(boogieReserved: Set[String])
   ),
