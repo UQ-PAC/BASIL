@@ -1,7 +1,6 @@
 package analysis
-import translating.PrettyPrinter.*
 
-import ir.{BitVecType, Procedure, Program, Register, Variable, Block, Return, Unreachable, GoTo}
+import ir.{GoTo, Procedure, Program, Register, Return, Unreachable, Variable}
 
 /** This analysis uses the interprocedural and intraprocedural live variable analyses to find the parameters to
   * procedures in a given program

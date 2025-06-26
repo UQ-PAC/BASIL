@@ -1,17 +1,12 @@
 package translating
-import Parsers.ASLpParser.*
-import com.google.protobuf.ByteString
 import Parsers.*
-
-import java.util.Base64
-import scala.jdk.CollectionConverters.*
+import Parsers.ASLpParser.*
 import ir.*
-
-import scala.collection.{immutable, mutable}
-import scala.collection.mutable.Map
-import scala.collection.mutable.ArrayBuffer
-import com.grammatech.gtirb.proto.Module.ByteOrder.LittleEndian
 import util.Logger
+
+import scala.collection.mutable.ArrayBuffer
+import scala.collection.{immutable, mutable}
+import scala.jdk.CollectionConverters.*
 
 enum InsnSemantics {
   case Result(value: List[StmtContext])

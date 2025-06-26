@@ -1,6 +1,5 @@
 package analysis
 
-import ir.Program
 import util.PerformanceTimer
 
 /** Provides a consistent interface for static analyses.

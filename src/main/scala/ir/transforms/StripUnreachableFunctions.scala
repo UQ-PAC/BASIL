@@ -1,11 +1,9 @@
 package ir.transforms
+
 import ir.*
-import collection.mutable
 import util.Logger
-import ir.cilvisitor.*
-import util.BASILConfig
-import util.IRContext
-import analysis.AnalysisManager
+
+import collection.mutable
 
 // This shouldn't be run before indirect calls are resolved
 def stripUnreachableFunctions(p: Program, depth: Int): Unit = {

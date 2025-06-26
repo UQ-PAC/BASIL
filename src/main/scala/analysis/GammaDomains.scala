@@ -1,8 +1,6 @@
 package analysis
 
-import boogie.*
 import ir.*
-import ir.transforms.{AbstractDomain, worklistSolver}
 
 type VarGammaMap = LatticeMap[Variable, LatticeSet[Variable]]
 
@@ -22,7 +20,6 @@ implicit val variableLatticeSetTerm: LatticeSet[Variable] = LatticeSet.Bottom()
  * underapproximation, we have the invariants that Gamma_x <= Join(S_o) and Join(S_u) <= Gamma_x.
  */
 trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[Variable, LatticeSet[Variable]] {
-  import LatticeMap.{Top, Bottom, TopMap, BottomMap}
 
   def transfer(m: VarGammaMap, c: Command): VarGammaMap = {
     c match {

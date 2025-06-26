@@ -1,21 +1,15 @@
 package translating
 import ir.*
 import ir.cilvisitor.*
+
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
-import specification.*
-import util.Logger
-import boogie.SpecGlobal
 
 private val localSigils = false
-
-import ir.parsing.Attrib
 
 object PrettyPrinter {
 
   type PrettyPrintable = Program | Procedure | Statement | Jump | Command | Block | Expr | util.IRContext
-
-  import ir.parsing.Attrib
 
   extension (b: BigInt) {
     def pprint: String = "0x%x".format(b)
@@ -237,7 +231,6 @@ class BasilIRPrettyPrinter(
 
   def vcontext(i: util.IRContext) = {
     val prog = vprog(i.program)
-    import PrettyPrinter.*
     import ir.parsing.Attrib
     import ir.parsing.MemoryAttribData
 

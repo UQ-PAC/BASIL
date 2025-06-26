@@ -1,6 +1,5 @@
 package ir.transforms
-import ir.{Program, Procedure}
-import ir.cilvisitor.visit_prog
+import ir.Procedure
 
 val inlinePLTLaunchpad = Transform(
   "InlinePLTLaunchpad",

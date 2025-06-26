@@ -1,10 +1,12 @@
 package analysis
 import ir.*
-import util.writeToFile
 import ir.eval.BitVectorEval
 import ir.eval.InfixBitVectorEval.*
 import ir.eval.InfixBitVectorEval.given
-import ir.transforms.{applyRPO, AbstractDomain}
+import ir.transforms.{AbstractDomain, applyRPO}
+import util.writeToFile
+
+import scala.language.implicitConversions
 
 /**
  *

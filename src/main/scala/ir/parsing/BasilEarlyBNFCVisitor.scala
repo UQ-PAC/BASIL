@@ -1,7 +1,6 @@
 package ir.parsing
-import ir.Sigil
 
-import basil_ir.{Absyn => syntax}
+import basil_ir.Absyn as syntax
 
 import scala.collection.immutable.ListMap
 import scala.jdk.CollectionConverters.*

@@ -1,11 +1,11 @@
 package ir.transforms
 
-import util.Logger
+import ir.*
 import ir.cilvisitor.*
 import translating.*
-import ir.*
+import util.Logger
+
 import scala.collection.mutable
-import analysis._
 
 val phiAssignLabel = Some("phi")
 

@@ -1,20 +1,11 @@
 package ir.eval
-import ir.transforms.Substitute
-import ir._
-import ir.eval.BitVectorEval.*
+import boogie.Scope
 import ir.*
-import util.IRContext
-import util.Logger
 import util.functional.*
 import util.functional.State.*
-import boogie.Scope
-import collection.mutable.ArrayBuffer
+import util.{IRContext, Logger}
 
-import scala.annotation.tailrec
-import scala.collection.mutable
 import scala.collection.immutable
-import scala.util.control.Breaks.{break, breakable}
-import translating.ELFSymbol
 
 /** Abstraction for memload and variable lookup used by the expression evaluator.
   */

@@ -1,6 +1,7 @@
 package analysis
 
 import ir.Program
+
 import scala.collection.mutable
 
 /** Analysis manager for caching and invalidating analysis results.

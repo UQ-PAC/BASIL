@@ -1,13 +1,14 @@
 package ir.parsing
 
 import boogie.SpecGlobal
-import specification.{FuncEntry, ExternalFunction}
-import scala.collection.immutable.ListMap
+import ir.{BitVecLiteral, FalseLiteral, IntLiteral, Literal, MemorySection, Sigil, TrueLiteral}
+import specification.{ExternalFunction, FuncEntry}
 import util.Logger
-import ir.{Literal, BitVecLiteral, TrueLiteral, FalseLiteral, IntLiteral, MemorySection, Sigil}
+
+import java.io.*
 import java.util.Base64
-import java.io._
-import java.util.zip._
+import java.util.zip.*
+import scala.collection.immutable.ListMap
 
 enum Attrib {
   /*

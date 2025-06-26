@@ -1,10 +1,10 @@
 package ir.transforms
 
-import scala.collection.mutable
-import util.{IRContext, Logger, DebugDumpIRLogger, PerformanceTimer}
-import ir.{Program, dotBlockGraph}
 import analysis.AnalysisManager
+import ir.dotBlockGraph
 import translating.PrettyPrinter.pp_prog
+import util.{DebugDumpIRLogger, IRContext, Logger, PerformanceTimer}
+
 import java.io.File
 
 // transforms accept Log instances which specify what kind of logs to dump

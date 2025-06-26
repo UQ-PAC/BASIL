@@ -4,8 +4,6 @@ import analysis.solvers.ForwardIDESolver
 import ir.*
 import util.StaticAnalysisLogger
 
-import scala.collection.mutable
-
 private def getLiveVars(p: Procedure): Map[CFGPosition, Set[Variable]] = {
   transforms.reversePostOrder(p)
   val liveVarsDom = transforms.IntraLiveVarsDomain()
@@ -41,7 +39,7 @@ trait ProcVariableDependencyAnalysisFunctions(
 ) extends ForwardIDEAnalysis[Variable, LatticeSet[Variable], LatticeSetLattice[Variable]] {
   val valuelattice = LatticeSetLattice()
   val edgelattice = EdgeFunctionLattice(valuelattice)
-  import edgelattice.{IdEdge, ConstEdge, JoinEdge}
+  import edgelattice.{IdEdge, ConstEdge}
   import LatticeSet.*
 
   private val reachable = procedure.reachableFrom

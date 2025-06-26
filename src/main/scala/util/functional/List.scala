@@ -1,7 +1,6 @@
 package util.functional
 
-import collection.immutable.LinearSeq
-import collection.{SeqOps, IterableOps, Factory, IterableOnceOps}
+import collection.{IterableOps, Factory}
 
 /**
  * This unapplier enables pattern matching on the /last/ element of

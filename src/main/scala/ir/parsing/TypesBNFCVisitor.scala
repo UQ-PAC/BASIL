@@ -1,6 +1,6 @@
 package ir.parsing
 
-import basil_ir.{Absyn => syntax}
+import basil_ir.Absyn as syntax
 
 type TypesVisitorType[A] = syntax.Type.Visitor[ir.IRType, A] & syntax.BoolType.Visitor[ir.IRType, A] &
   syntax.MapType.Visitor[ir.IRType, A] & syntax.IntType.Visitor[ir.IRType, A] & syntax.BVType.Visitor[ir.IRType, A]

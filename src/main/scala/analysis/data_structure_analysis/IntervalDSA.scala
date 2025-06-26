@@ -2,20 +2,19 @@ package analysis.data_structure_analysis
 
 import analysis.data_structure_analysis.DSAPhase.{BU, Local, TD}
 import analysis.data_structure_analysis.DSInterval.Top
-import analysis.data_structure_analysis.IntervalDSA.{checkUniqueGlobal, checksGlobalMaintained}
-import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
+import analysis.data_structure_analysis.IntervalDSA.checkUniqueGlobal
+import analysis.solvers.OffsetUnionFindSolver
 import boogie.SpecGlobal
-import specification.FuncEntry
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.*
-import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
-import specification.{ExternalFunction, SymbolTableEntry}
+import ir.eval.BitVectorEval.isNegative
+import specification.{ExternalFunction, FuncEntry, SymbolTableEntry}
 import util.DSAConfig.{Checks, Standard}
 import util.LogLevel.INFO
 import util.{DSAConfig, DSAContext, DSALogger, IRContext, PerformanceTimer}
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.{SortedSet, mutable}
 
 private val intervalNodeCounter = util.Counter()
 
@@ -1215,7 +1214,7 @@ def estimateStackSize(program: Program): Map[Procedure, Option[Int]] = {
   program.procedures.foldLeft(Map[Procedure, Option[Int]]()) { (m, proc) =>
     val size = proc.collectFirst {
       case LocalAssign(_, BinaryExpr(BVADD, Register("R31", 64), arg2: BitVecLiteral), _) if isNegative(arg2) =>
-        bv2SignedInt(arg2).toInt * -1
+        ir.eval.BitVectorEval.bv2SignedInt(arg2).toInt * -1
     }
     m + (proc -> size)
   }

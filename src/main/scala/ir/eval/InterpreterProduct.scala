@@ -1,17 +1,11 @@
 package ir.eval
-import ir._
-import ir.eval.BitVectorEval.*
+
+import boogie.Scope
 import ir.*
-import util.Logger
 import util.functional.*
 import util.functional.State.*
-import boogie.Scope
-import scala.collection.WithFilter
 
-import scala.annotation.tailrec
-import scala.collection.mutable
 import scala.collection.immutable
-import scala.util.control.Breaks.{break, breakable}
 
 def doLeft[L, T, V, E](f: State[L, V, E]): State[(L, T), V, E] = for {
   n <- State[(L, T), V, E]((s: (L, T)) => {

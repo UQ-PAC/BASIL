@@ -1,8 +1,7 @@
 package ir.transforms
 
-import util.Logger
-import ir.cilvisitor.*
 import ir.*
+import ir.cilvisitor.*
 
 class ReplaceReturns(insertR30InvariantAssertion: Procedure => Boolean = (_ => true)) extends CILVisitor {
 

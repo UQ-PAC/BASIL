@@ -2,9 +2,9 @@ package analysis
 
 import ir.*
 import ir.transforms.*
-import analysis.*
-import scala.collection.mutable.Queue
 import util.StaticAnalysisLogger
+
+import scala.collection.mutable.Queue
 
 /** To generate guarantee conditions, we need to:
   * 1. Generate the set of reachable states using the state domain.

@@ -1,11 +1,10 @@
 package ir.transforms
 
-import scala.collection.mutable
-import ir.Block
 import ir.cilvisitor.*
-import ir.invariant
+import ir.{Block, invariant}
 import util.{BASILConfig, MemoryRegionsMode}
-import analysis.AnalysisManager
+
+import scala.collection.mutable
 
 // run iff arg.isEmpty || (arg.get.memoryRegions == MemoryRegionsMode.Disabled)
 val determineRelevantMemory = Transform(

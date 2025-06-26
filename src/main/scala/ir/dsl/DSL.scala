@@ -1,10 +1,10 @@
 package ir.dsl
 import ir.*
 import translating.PrettyPrinter.*
+
+import scala.collection.immutable.*
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.immutable.*
-import scala.annotation.targetName
 
 /**
  * IR construction DSL
@@ -211,7 +211,7 @@ def directCall(lhs: Iterable[(String, Variable)], tgt: String, actualParams: (St
   EventuallyCall(DelayNameResolve(tgt), lhs.to(ArraySeq), actualParams)
 
 def directCall(lhs: Iterable[(String, Variable)], rhs: call): EventuallyCall =
-  EventuallyCall(DelayNameResolve(rhs.target), lhs.toArray, rhs.actualParams)
+  EventuallyCall(DelayNameResolve(rhs.target), lhs.toSeq, rhs.actualParams)
 
 def directCall(tgt: String): EventuallyCall = directCall(Nil, tgt, Nil)
 
