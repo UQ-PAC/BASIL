@@ -87,7 +87,18 @@ case class GTIRBResolver(val mod: Module) {
     def isProxyBlock = proxyBlockUuids.contains(x)
 
   extension (x: SymbolRef)
-    def get = symbolsByUuid(x)
+    def get: Symbol = {
+      val sym = symbolsByUuid(x)
+
+      // XXX: forwarded object symbols correspond to R_AARCH64_COPY relocations.
+      // for these, ddisasm produces a `*_copy` symbol. get the original symbol
+      // name by following the forwarding.
+      (getForwardingTarget, symEntry) match {
+        case (Some(fwd), (_, "OBJECT", "GLOBAL", "DEFAULT", _)) =>
+          sym.copy(name = fwd.get.name)
+        case _ => sym
+      }
+    }
 
     /**
      * Returns the list of symbol table indices where this symbol can be found.
@@ -135,6 +146,8 @@ case class GTIRBResolver(val mod: Module) {
      * or None if this is not a function name symbol.
      */
     def getFunction = funcNamesInverse.get(x)
+
+    def getForwardingTarget = symbolForwarding.get(x)
 
   extension (x: FunctionRef)
     /**

@@ -122,11 +122,11 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
         (ty, idx) match {
           case ("NONE", _) => None
-          case (_, None) => None
-          case (ty, Some(idx)) =>
+          // case (_, None) => None
+          case (ty, idx) =>
             Some(
               ELFSymbol(
-                idx,
+                idx.getOrElse(-100),
                 combinedValue,
                 size.toInt,
                 ELFSymType.valueOf(ty),
@@ -146,8 +146,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
       ELFSymbol(num, addr, 0, ELFSymType.SECTION, ELFBind.LOCAL, ELFVis.DEFAULT, ELFNDX.Section(num), sec.name)
     }
 
-    (normalsyms ++ sectionsyms)
-      .toList
+    (normalsyms ++ sectionsyms).toList
       .sortBy(x => x.num)
   }
 
@@ -172,20 +171,11 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     gtirb.symbolEntriesByUuid.view.flatMap {
       case (symid, (size, "OBJECT", "GLOBAL", "DEFAULT", idx)) =>
 
-        // forwarded object symbols correspond to R_AARCH64_COPY relocations.
-        // for these, ddisasm produces a `*_copy` symbol. get the original symbol
-        // name by following the forwarding.
-        val fwdtarget: Option[gtirb.SymbolRef] = gtirb.symbolForwarding.get(symid)
-        val name = fwdtarget match {
-          case Some(fwdid) => fwdid.get.name
-          case None => symid.get.name
-        }
-
         val referentid = symid.getReferentUuid.get
         val referent: Option[gtirb.BlockData] = referentid.getOption
         referent match {
           case Some(blk) =>
-            Some(SpecGlobal(name, (size * 8).toInt, None, blk.address))
+            Some(SpecGlobal(symid.get.name, (size * 8).toInt, None, blk.address))
 
           // if the referent is not a real block, then this is a
           // forwarding target symbol. discard, because we generate
@@ -200,8 +190,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
       case _ => None
     }.toSet
 
-  def getFunctionEntries() = {
-
+  def getFunctionEntries() =
     gtirb.symbolEntriesByUuid.view.collect {
       case (symid, (size, "FUNC", "GLOBAL", "DEFAULT", idx)) if idx != 0 =>
 
@@ -215,11 +204,9 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
         FuncEntry(nameSymbol.name, (size * 8).toInt, addr)
     }.toSet
-  }
 
-  def getMainAddress(mainProcedureName: String) = {
+  def getMainAddress(mainProcedureName: String) =
     gtirb.symbolsByName(mainProcedureName).getReferentUuid.get.get.address
-  }
 
   def getReadELFData(mainProcedureName: String) = {
 
