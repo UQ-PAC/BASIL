@@ -122,11 +122,11 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
         (ty, idx) match {
           case ("NONE", _) => None
-          // case (_, None) => None
-          case (ty, idx) =>
+          case (_, None) => None
+          case (ty, Some(idx)) =>
             Some(
               ELFSymbol(
-                idx.getOrElse(-100),
+                idx,
                 combinedValue,
                 size.toInt,
                 ELFSymType.valueOf(ty),
@@ -236,8 +236,11 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
         Some(sym.copy(name = atSuffix.replaceFirstIn(sym.name, "")))
       case _ => None
     }
+    val globs = relf.globalVariables.map { x =>
+      x.copy(name = atSuffix.replaceFirstIn(x.name, ""))
+    }
 
-    relf.copy(externalFunctions = exts, symbolTable = syms)
+    relf.copy(externalFunctions = exts, symbolTable = syms, globalVariables = globs)
   }
 
   /**
@@ -266,7 +269,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     checkEq(g.mainAddress, o.mainAddress, "main address differs")
     checkEq(g.functionEntries, o.functionEntries, "function entries differ")
     checkEq(g.relocationOffsets, o.relocationOffsets, "relocations differ")
-    checkEq(g.globalVariables, o.globalVariables, "global variables differ")
+    checkSet(g.globalVariables, o.globalVariables, "global variables differ")
     checkSet(g.externalFunctions, o.externalFunctions, "external functions differ")
     checkSet(g.symbolTable.toSet, o.symbolTable.toSet, "symbol tables differ")
 
