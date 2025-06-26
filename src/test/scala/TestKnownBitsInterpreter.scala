@@ -19,8 +19,7 @@ import util.{
   StaticAnalysisContext,
   BASILResult,
   Logger,
-  LogLevel,
-  IRTransform
+  LogLevel
 }
 import ir.eval.{interpretTrace, interpret, ExecEffect, Stopped}
 import ir.dsl

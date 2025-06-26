@@ -1,22 +1,25 @@
 package ir.transforms
-import ir.{Procedure, Program}
+import ir.Procedure
 
-def inlinePLTLaunchpad(prog: Program) = {
-  prog.sortProceduresRPO()
+val inlinePLTLaunchpad = Transform(
+  "InlinePLTLaunchpad",
+  (ctx, man) => {
+    ctx.program.sortProceduresRPO()
 
-  def candidate(p: Procedure): Boolean =
-    (p.blocks.size <= 4)
-      && p.calls.size == 1
-      && p.calls.forall(_.isExternal.contains(true))
-      && p.procName.startsWith("FUN")
-      && !p.calls.contains(p)
+    def candidate(p: Procedure): Boolean =
+      (p.blocks.size <= 4)
+        && p.calls.size == 1
+        && p.calls.forall(_.isExternal.contains(true))
+        && p.procName.startsWith("FUN")
+        && !p.calls.contains(p)
 
-  for (p <- prog.procedures.reverse.filter(candidate)) {
-    p.incomingCalls().foreach { call =>
-      inlineCall(prog, call)
+    for (p <- ctx.program.procedures.reverse.filter(candidate)) {
+      p.incomingCalls().foreach { call =>
+        inlineCall(ctx.program, call)
+      }
     }
+
+    applyRPO(ctx.program)
+    man.ClobberAll
   }
-
-  applyRPO(prog)
-
-}
+)

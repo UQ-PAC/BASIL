@@ -2,7 +2,7 @@ package util
 
 import Parsers.*
 import analysis.data_structure_analysis.*
-import analysis.{Interval as _, *}
+import analysis.{AnalysisManager, Interval as _, *}
 import bap.*
 import boogie.*
 import com.grammatech.gtirb.proto.IR.IR
@@ -10,7 +10,7 @@ import gtirb.*
 import ir.*
 import ir.dsl.given
 import ir.eval.*
-import ir.transforms.MemoryTransform
+import ir.transforms.*
 import org.antlr.v4.runtime.{BailErrorStrategy, CharStreams, CommonTokenStream}
 import specification.*
 import translating.*
@@ -216,159 +216,6 @@ object IRLoading {
         val specLoader = SpecificationLoader(globals, program)
         specLoader.visitSpecification(specParser.specification())
       case None => emptySpecification(globals)
-    }
-  }
-}
-
-/** Methods related to transforming the IR `Program` in-place.
-  *
-  * These operate over the IRContext, and possibly use static analysis results.
-  */
-object IRTransform {
-  val boogieReserved: Set[String] = Set("free")
-
-  /** Initial cleanup before analysis.
-    */
-  def doCleanup(ctx: IRContext, doSimplify: Boolean = false): IRContext = {
-    Logger.info("[!] Removing external function calls")
-    // Remove external function references (e.g. @printf)
-    val externalNames = ctx.externalFunctions.map(e => e.name)
-    val externalNamesLibRemoved = mutable.Set[String]()
-    externalNamesLibRemoved.addAll(externalNames)
-
-    for (e <- externalNames) {
-      if (e.contains('@')) {
-        externalNamesLibRemoved.add(e.split('@')(0))
-      }
-    }
-
-    ctx.program.procedures.foreach(ir.transforms.makeProcEntryNonLoop)
-
-    // useful for ReplaceReturns
-    // (pushes single block with `Unreachable` into its predecessor)
-    while (transforms.coalesceBlocks(ctx.program)) {}
-
-    transforms.applyRPO(ctx.program)
-    val nonReturning = transforms.findDefinitelyExits(ctx.program)
-    ctx.program.mainProcedure.foreach {
-      case d: DirectCall if nonReturning.nonreturning.contains(d.target) => d.parent.replaceJump(Return())
-      case _ =>
-    }
-
-    transforms.establishProcedureDiamondForm(ctx.program, doSimplify)
-
-    ir.transforms.removeBodyOfExternal(externalNamesLibRemoved.toSet)(ctx.program)
-    for (p <- ctx.program.procedures) {
-      p.isExternal = Some(
-        ctx.externalFunctions.exists(e => e.name == p.procName || p.address.contains(e.offset)) || p.isExternal
-          .getOrElse(false)
-      )
-    }
-
-    assert(invariant.singleCallBlockEnd(ctx.program))
-    assert(invariant.cfgCorrect(ctx.program))
-    assert(invariant.blocksUniqueToEachProcedure(ctx.program))
-    assert(invariant.procEntryNoIncoming(ctx.program))
-    ctx
-  }
-
-  /** Cull unneccessary information that does not need to be included in the translation, and infer stack regions, and
-    * add in modifies from the spec.
-    */
-  def prepareForTranslation(config: BASILConfig, ctx: IRContext): Unit = {
-    if (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled)) {
-      ctx.program.determineRelevantMemory(ctx.globalOffsets)
-    }
-
-    Logger.info("[!] Stripping unreachable")
-    val before = ctx.program.procedures.size
-    transforms.stripUnreachableFunctions(ctx.program, config.loading.procedureTrimDepth)
-    Logger.info(
-      s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
-    )
-    val dupProcNames = ctx.program.procedures.groupBy(_.name).filter((_, p) => p.size > 1).toList.flatMap(_(1))
-    assert(dupProcNames.isEmpty)
-
-    ctx.program.procedures.foreach(p =>
-      p.blocks.foreach(b => {
-        b.jump match {
-          case GoTo(targs, _) if targs.isEmpty =>
-            Logger.warn(s"block ${b.label} in subroutine ${p.name} has no outgoing edges")
-          case _ => ()
-        }
-      })
-    )
-
-    if (
-      !config.memoryTransform && (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled))
-    ) {
-      visit_prog(ir.transforms.StackSubstituter(), ctx.program)
-    }
-
-    val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
-    ctx.program.setModifies(specModifies)
-
-    visit_prog(ir.transforms.BoogieReservedRenamer(boogieReserved), ctx.program)
-
-    assert(invariant.singleCallBlockEnd(ctx.program))
-
-    // check all blocks with an atomic section exist within the same procedure
-    val visited = mutable.Set[Block]()
-    for (p <- ctx.program.procedures) {
-      for (b <- p.blocks) {
-        if (!visited.contains(b)) {
-          if (b.atomicSection.isDefined) {
-            b.atomicSection.get.getBlocks.foreach { a => assert(a.parent == p) }
-            visited.addAll(b.atomicSection.get.getBlocks)
-          }
-          visited.addOne(b)
-        }
-      }
-    }
-  }
-
-  def generateProcedureSummaries(ctx: IRContext, IRProgram: Program, simplified: Boolean = false): Boolean = {
-    var modified = false
-    // Need to know modifies clauses to generate summaries, but this is probably out of place
-    val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
-    ctx.program.setModifies(specModifies)
-
-    val summaryGenerator = SummaryGenerator(IRProgram, simplified)
-    IRProgram.procedures
-      .filter { p =>
-        p != IRProgram.mainProcedure
-      }
-      .foreach { procedure =>
-        {
-          val req = summaryGenerator.generateRequires(procedure)
-          modified = modified | procedure.requires != req
-          procedure.requires = req
-
-          val ens = summaryGenerator.generateEnsures(procedure)
-          modified = modified | procedure.ensures != ens
-          procedure.ensures = ens
-        }
-      }
-
-    modified
-  }
-
-  def generateRelyGuaranteeConditions(threads: List[Procedure]): Unit = {
-    /* Todo: For the moment we are printing these to stdout, but in future we'd
-    like to add them to the IR. */
-    type StateLatticeElement = LatticeMap[Variable, analysis.Interval]
-    type InterferenceLatticeElement = Map[Variable, StateLatticeElement]
-    val stateLattice = IntervalLatticeExtension()
-    val stateTransfer = SignedIntervalDomain().transfer
-    val intDom = ConditionalWritesDomain[StateLatticeElement](stateLattice, stateTransfer)
-    val relyGuarantees =
-      RelyGuaranteeGenerator[InterferenceLatticeElement, StateLatticeElement](intDom).generate(threads)
-    for ((p, (rely, guar)) <- relyGuarantees) {
-      StaticAnalysisLogger.info("--- " + p.procName + " " + "-" * 50 + "\n")
-      StaticAnalysisLogger.info("Rely:")
-      StaticAnalysisLogger.info(intDom.toString(rely) + "\n")
-      StaticAnalysisLogger.info("Guarantee:")
-      StaticAnalysisLogger.info(intDom.toString(guar) + "\n")
     }
   }
 }
@@ -738,7 +585,8 @@ object RunUtils {
 
     transforms.OnePassDSA().applyTransform(program)
 
-    transforms.inlinePLTLaunchpad(ctx.program)
+    // fixme: this used to be a plain function but now we have to supply an analysis manager!
+    transforms.inlinePLTLaunchpad(ctx, AnalysisManager(ctx.program))
 
     transforms.removeEmptyBlocks(program)
 
@@ -859,19 +707,25 @@ object RunUtils {
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
 
-    ctx = IRTransform.doCleanup(ctx, conf.simplify)
+    val analysisManager = AnalysisManager(ctx.program)
+    // these transforms depend on basil config parameters and thus need to be constructed here
+    val prepareForTranslation = getPrepareForTranslationTransform(q, Set("free"))
+    val genProcSummaries = getGenerateProcedureSummariesTransform(q.loading.parameterForm || q.simplify)
+    val genRgConditions = getGenerateRgConditionsTransform(ctx.program.procedures.toList.filter(_.returnBlock != None))
+    val stripUnreachableFunctions = getStripUnreachableFunctionsTransform(q.loading.procedureTrimDepth)
+
+    if conf.simplify then doCleanupWithSimplify(ctx, analysisManager)
+    else doCleanupWithoutSimplify(ctx, analysisManager)
+
     assert(ir.invariant.programDiamondForm(ctx.program))
 
-    transforms.inlinePLTLaunchpad(ctx.program)
+    transforms.inlinePLTLaunchpad(ctx, analysisManager)
 
     assert(ir.invariant.programDiamondForm(ctx.program))
-    if (q.loading.trimEarly) {
-      val before = ctx.program.procedures.size
-      transforms.stripUnreachableFunctions(ctx.program, q.loading.procedureTrimDepth)
-      Logger.info(
-        s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
-      )
-    }
+
+    if q.loading.trimEarly then stripUnreachableFunctions(ctx, analysisManager)
+    // todo: since refactoring, there is some extra code that is run here
+    // see StripUnreachableFunctions.getStripUnreachableFunctionsTransform
 
     assert(ir.invariant.programDiamondForm(ctx.program))
     ctx.program.procedures.foreach(transforms.RemoveUnreachableBlocks.apply)
@@ -944,15 +798,7 @@ object RunUtils {
         memTransferTimer.checkPoint("Performed Memory Transform")
     }
 
-    if (conf.summariseProcedures) {
-      StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
-      IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify)
-    }
-
-    if (conf.summariseProcedures) {
-      StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
-      IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify)
-    }
+    if q.summariseProcedures then genProcSummaries(ctx, analysisManager)
 
     if (q.runInterpret) {
       Logger.info("Start interpret")
@@ -984,12 +830,9 @@ object RunUtils {
       }
     }
 
-    IRTransform.prepareForTranslation(q, ctx)
+    prepareForTranslation(ctx, analysisManager)
 
-    if (conf.generateRelyGuarantees) {
-      StaticAnalysisLogger.info("[!] Generating Rely-Guarantee Conditions")
-      IRTransform.generateRelyGuaranteeConditions(ctx.program.procedures.toList.filter(p => p.returnBlock != None))
-    }
+    if conf.generateRelyGuarantees then genRgConditions(ctx, analysisManager)
 
     q.loading.dumpIL.foreach(s => {
       val timer = PerformanceTimer("Dump IL")

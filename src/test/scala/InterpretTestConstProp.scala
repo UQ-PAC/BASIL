@@ -13,7 +13,6 @@ import util.{
   ILLoadingConfig,
   IRContext,
   IRLoading,
-  IRTransform,
   LogLevel,
   Logger,
   RunUtils,
@@ -54,8 +53,8 @@ class InterpretTestConstProp
     val path = s"$testPath/$testName/$compiler/$testName"
     val loading = ILLoadingConfig(inputFile = s"$path.adt", relfFile = Some(s"$path.relf"), dumpIL = None)
 
-    var ictx = IRLoading.load(loading)
-    ictx = IRTransform.doCleanup(ictx)
+    val ictx = IRLoading.load(loading)
+    ir.transforms.doCleanupWithoutSimplify(ictx, AnalysisManager(ictx.program))
     ir.transforms.clearParams(ictx.program)
     val analyses = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), ictx)
 
