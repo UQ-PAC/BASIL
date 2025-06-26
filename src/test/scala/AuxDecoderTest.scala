@@ -1,8 +1,7 @@
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.{CaptureOutput}
+import test_util.CaptureOutput
 
 import java.util.Base64
-import com.google.protobuf.ByteString
 
 @test_util.tags.UnitTest
 class AuxDecoderTest extends AnyFunSuite, CaptureOutput {

@@ -35,11 +35,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check Source Formatting
-        run: ./mill scalafmt.checkFormat
+      - run: ./mill fmt
 
-      - name: Lint 
-        run: ./mill fix --check
+      - name: Check source formatting and imports
+        run: git diff --exit-code
 
   Compile:
     runs-on: ubuntu-latest

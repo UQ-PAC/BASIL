@@ -1,37 +1,9 @@
-import ir.*
-import ir.eval.*
 import analysis.*
-
-import java.io.{BufferedWriter, File, FileWriter}
-import ir.Endian.LittleEndian
+import ir.*
 import org.scalatest.*
 import org.scalatest.funsuite.*
-import specification.*
-import util.{
-  BASILConfig,
-  BASILResult,
-  ILLoadingConfig,
-  IRContext,
-  IRLoading,
-  IRTransform,
-  LogLevel,
-  Logger,
-  RunUtils,
-  StaticAnalysis,
-  StaticAnalysisConfig,
-  StaticAnalysisContext
-}
-import ir.eval.{ExecEffect, Stopped, interpret, interpretTrace}
-import ir.dsl
-
-import java.io.IOException
-import java.nio.file.*
-import java.nio.file.attribute.BasicFileAttributes
-import ir.dsl.*
 import test_util.{BASILTest, CaptureOutput, TestValueDomainWithInterpreter}
-import util.RunUtils.loadAndTranslate
-
-import scala.collection.mutable
+import util.{ILLoadingConfig, IRLoading, IRTransform, LogLevel, Logger, RunUtils, StaticAnalysisConfig}
 
 @test_util.tags.StandardSystemTest
 class InterpretTestConstProp
