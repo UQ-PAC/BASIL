@@ -23,6 +23,7 @@ import com.grammatech.gtirb.proto.Symbol.Symbol.OptionalPayload
 
 import scala.collection.mutable
 import scala.collection.immutable.{SortedMap, SortedSet}
+import scala.util.chaining.scalaUtilChainingOps
 
 class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
@@ -35,6 +36,15 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
    * provides information about the interpretation of the `r_type` values.
    */
   case class Elf64Rela(r_offset: BigInt, r_info: BigInt, r_addend: BigInt, r_sym: Long, r_type: Long)
+
+  /**
+   * https://github.com/ARM-software/abi-aa/blob/main/aaelf64/aaelf64.rst#relocation-types
+   */
+  sealed trait Elf64RelaType(val value: Long)
+  case object R_AARCH64_COPY extends Elf64RelaType(1024)
+  case object R_AARCH64_GLOB_DAT extends Elf64RelaType(1025)
+  case object R_AARCH64_JUMP_SLOT extends Elf64RelaType(1026)
+  case object R_AARCH64_RELATIVE extends Elf64RelaType(1027)
 
   // https://refspecs.linuxbase.org/elf/gabi4+/ch4.reloc.html
   // https://github.com/ARM-software/abi-aa/blob/main/aaelf64/aaelf64.rst#relocation-types
@@ -51,6 +61,13 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
       case bs if bs.available() > 0 => Some(readRela(bs), bs)
       case _ => None
     }
+
+  protected def parseAarch64RelaType(x: Long) = x match {
+    case R_AARCH64_COPY.value => R_AARCH64_COPY
+    case R_AARCH64_GLOB_DAT.value => R_AARCH64_GLOB_DAT
+    case R_AARCH64_JUMP_SLOT.value => R_AARCH64_JUMP_SLOT
+    case R_AARCH64_RELATIVE.value => R_AARCH64_RELATIVE
+  }
 
   // see also:
   // https://www.javadoc.io/doc/net.fornwall/jelf/latest/net/fornwall/jelf/ElfSymbol.html
@@ -76,20 +93,18 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
       ELFNDX.Section(i)
   }
 
-  /**
-   * https://github.com/ARM-software/abi-aa/blob/main/aaelf64/aaelf64.rst#dynamic-relocations
-   */
-  def parseRela(rela: Elf64Rela) =
-    val sym = gtirb.symbolTables(".dynsym")(rela.r_sym.toInt).get
+  def parseRela(kind: R_AARCH64_JUMP_SLOT.type | R_AARCH64_GLOB_DAT.type, rela: Elf64Rela): ExternalFunction =
+    val sym = gtirb.getDynSym(rela.r_sym.toInt).get
+    ExternalFunction(sym.name, rela.r_offset)
 
-    rela.r_type match {
-      case 1025 | 1026 => Right(ExternalFunction(sym.name, rela.r_offset))
-      case 1027 => Left((rela.r_offset, rela.r_addend))
-      case 1024 => Left((BigInt(0), BigInt(0)))
-    }
+  def parseRela(kind: R_AARCH64_RELATIVE.type, rela: Elf64Rela): (BigInt, BigInt) =
+    (rela.r_offset, rela.r_addend)
+
+  def parseRela(kind: R_AARCH64_COPY.type, rela: Elf64Rela): gtirb.SymbolRef =
+    gtirb.getDynSym(rela.r_sym.toInt)
 
   def getAllSymbols() = {
-    gtirb.symbolEntriesByUuid
+    val normalsyms = gtirb.symbolEntriesByUuid.view
       .flatMap { case (k, pos) =>
         val sym = k.get
 
@@ -103,44 +118,87 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
         val (size, ty, bind, vis, shndx) = k.symEntry
 
-        ty match {
-          case "NONE" => None
-          case ty =>
+        val name = sym.name
+
+        (ty, idx) match {
+          case ("NONE", _) => None
+          case (_, None) => None
+          case (ty, Some(idx)) =>
             Some(
               ELFSymbol(
-                idx.getOrElse(-1),
+                idx,
                 combinedValue,
                 size.toInt,
                 ELFSymType.valueOf(ty),
                 ELFBind.valueOf(bind),
                 ELFVis.valueOf(vis),
                 parseElfNdx(shndx),
-                sym.name
+                name
               )
             )
         }
       }
+
+    val sectionsyms = gtirb.mod.sections.view.zipWithIndex.map { case (sec, i) =>
+      val addr = sec.byteIntervals.head.address
+      val num = i + 1
+
+      ELFSymbol(num, addr, 0, ELFSymType.SECTION, ELFBind.LOCAL, ELFVis.DEFAULT, ELFNDX.Section(num), sec.name)
+    }
+
+    (normalsyms ++ sectionsyms)
       .toList
       .sortBy(x => x.num)
   }
 
   def getRelocations() = {
-    val relaDyns = parseRelaTab(gtirb.sectionsByName(".rela.dyn").byteIntervals.head.contents)
-    val relaPlts = parseRelaTab(gtirb.sectionsByName(".rela.plt").byteIntervals.head.contents)
+    def getSectionBytes(sectionName: String) =
+      gtirb.sectionsByName(sectionName).byteIntervals.head.contents
 
-    val (offs, exts) = (relaDyns.view ++ relaPlts.view).partitionMap(parseRela)
+    val relaDyns = getSectionBytes(".rela.dyn").pipe(parseRelaTab)
+    val relaPlts = getSectionBytes(".rela.plt").pipe(parseRelaTab)
+
+    val relas = (relaDyns ++ relaPlts)
+      .groupBy(x => parseAarch64RelaType(x.r_type))
+      .withDefaultValue(Nil)
+
+    val offs = relas(R_AARCH64_RELATIVE).map(parseRela(R_AARCH64_RELATIVE, _))
+    val exts = (relas(R_AARCH64_GLOB_DAT) ++ relas(R_AARCH64_JUMP_SLOT)).map(parseRela(R_AARCH64_JUMP_SLOT, _))
 
     (offs.toMap, exts.toSet)
   }
 
-  def getGlobals() = {
-    gtirb.symbolEntriesByUuid.view.collect { case (symid, (size, "OBJECT", "GLOBAL", "DEFAULT", idx)) =>
-      val blk = symid.getReferentUuid.get.getOption
-      // val sec = blk.section
-      // assert(gtirb.mod.sections(idx.toInt - 1) == sec)
-      SpecGlobal(symid.get.name, (size * 8).toInt, None, blk.fold(BigInt(-1))(_.address))
+  def getGlobals() =
+    gtirb.symbolEntriesByUuid.view.flatMap {
+      case (symid, (size, "OBJECT", "GLOBAL", "DEFAULT", idx)) =>
+
+        // forwarded object symbols correspond to R_AARCH64_COPY relocations.
+        // for these, ddisasm produces a `*_copy` symbol. get the original symbol
+        // name by following the forwarding.
+        val fwdtarget: Option[gtirb.SymbolRef] = gtirb.symbolForwarding.get(symid)
+        val name = fwdtarget match {
+          case Some(fwdid) => fwdid.get.name
+          case None => symid.get.name
+        }
+
+        val referentid = symid.getReferentUuid.get
+        val referent: Option[gtirb.BlockData] = referentid.getOption
+        referent match {
+          case Some(blk) =>
+            Some(SpecGlobal(name, (size * 8).toInt, None, blk.address))
+
+          // if the referent is not a real block, then this is a
+          // forwarding target symbol. discard, because we generate
+          // the SpecGlobal from the forwarding source symbol.
+          case None =>
+            assert(
+              gtirb.symbolForwardingInverse.contains(symid),
+              "a symbol with a referent that has no data block should be a forwarding target"
+            )
+            None
+        }
+      case _ => None
     }.toSet
-  }
 
   def getFunctionEntries() = {
 
@@ -165,8 +223,8 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
   def getReadELFData(mainProcedureName: String) = {
 
-    val syms = getAllSymbols()
     val (offs, exts) = getRelocations()
+    val syms = getAllSymbols()
     val globs = getGlobals()
     val funs = getFunctionEntries()
     val main = getMainAddress(mainProcedureName)

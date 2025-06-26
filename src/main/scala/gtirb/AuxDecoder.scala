@@ -40,9 +40,11 @@ object AuxDecoder {
           "elfSymbolInfo",
           readMap(readUuid, readTuple(readUint(64), readString, readString, readString, readUint(64)))
         )
+    case SectionProperties extends AuxKind("sectionProperties", readMap(readUuid, readTuple(readUint(64), readUint(64))))
     case FunctionEntries extends AuxKind("functionEntries", readMap(readUuid, readSet(readUuid)))
     case FunctionBlocks extends AuxKind("functionBlocks", readMap(readUuid, readSet(readUuid)))
     case FunctionNames extends AuxKind("functionNames", readMap(readUuid, readUuid))
+    case SymbolForwarding extends AuxKind("symbolForwarding", readMap(readUuid, readUuid))
   }
 
   type Input = ByteArrayInputStream

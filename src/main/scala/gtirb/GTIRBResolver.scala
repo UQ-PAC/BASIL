@@ -56,9 +56,10 @@ case class GTIRBResolver(val mod: Module) {
     class BlockRef(xs: String | ByteString) extends GTIRBRef("blok", b64(xs))
     class FunctionRef(xs: String | ByteString) extends GTIRBRef("func", b64(xs))
     class SymbolRef(xs: String | ByteString) extends GTIRBRef("symb", b64(xs))
+    class SectionRef(xs: String | ByteString) extends GTIRBRef("sect", b64(xs))
   }
 
-  import GTIRBRef.*
+  export GTIRBRef.*
 
   /**
    * Represents a GTIRB code/data block and its parents. In GTIRB, block
@@ -165,7 +166,7 @@ case class GTIRBResolver(val mod: Module) {
   val sectionsByName = mod.sections.map(x => x.name -> x).toMap
 
   val symbolTabIdxByUuid: Map[SymbolRef, List[(String, BigInt)]] =
-    AuxDecoder.decodeAux(AuxDecoder.AuxKind.ElfSymbolTabIdxInfo)(mod).map(mapFirst(SymbolRef(_)))
+    decodeAux(AuxKind.ElfSymbolTabIdxInfo)(mod).map(mapFirst(SymbolRef(_)))
 
   /**
    * A nested map indexed by section name, then symbol index, and returning a symbol uuid.
@@ -189,5 +190,22 @@ case class GTIRBResolver(val mod: Module) {
   }
 
   val entryPoint = BlockRef(mod.entryPoint)
+
+  def getDynSym(i: Int) =
+    symbolTables(".dynsym")(i)
+
+  /**
+   * Symbol forwarding. Keys are "forwarding" symbols which are dynamically-bound to their associated value symbol.
+   */
+  val symbolForwarding =
+    decodeAux(AuxKind.SymbolForwarding)(mod).map(SymbolRef(_) -> SymbolRef(_))
+
+  /**
+   * Inverse symbol forwarding.
+   * Keys are "target" symbols.
+   * At runtime, a target's associated symbols will point to the key symbol.
+   */
+  val symbolForwardingInverse =
+    symbolForwarding.map(_.swap)
 
 }
