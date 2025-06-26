@@ -25,6 +25,20 @@ import scala.collection.mutable
 import scala.collection.immutable.{SortedMap, SortedSet}
 import scala.util.chaining.scalaUtilChainingOps
 
+/**
+ * Responsible for interpreting the GTIRB's symbol information
+ * and producing ELF information in a format matching [[translating.ReadELFLoader]].
+ *
+ * **Useful links:**
+ *
+ * - Full ELF64 specification, useful for symbol kinds/visibility/binding: https://irix7.com/techpubs/007-4658-001.pdf
+ * - Full ELF32 specification: https://refspecs.linuxfoundation.org/elf/elf.pdf
+ * - ELF relocation specification, for relocation struct definition: https://refspecs.linuxbase.org/elf/gabi4+/ch4.reloc.html
+ * - Aarch64 ELF supplement, for relocation types: https://github.com/ARM-software/abi-aa/blob/main/aaelf64/aaelf64.rst#relocation-types
+ * - An ELF cheatsheet: https://gist.github.com/x0nu11byt3/bcb35c3de461e5fb66173071a2379779
+ * - elf man page, extra details: https://www.man7.org/linux/man-pages/man5/elf.5.html
+ *
+ */
 class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
   /**
@@ -38,6 +52,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
   case class Elf64Rela(r_offset: BigInt, r_info: BigInt, r_addend: BigInt, r_sym: Long, r_type: Long)
 
   /**
+   * An Aarch64 relocation type, with constants from:
    * https://github.com/ARM-software/abi-aa/blob/main/aaelf64/aaelf64.rst#relocation-types
    */
   sealed trait Elf64RelaType(val value: Long)
@@ -46,8 +61,6 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
   case object R_AARCH64_JUMP_SLOT extends Elf64RelaType(1026)
   case object R_AARCH64_RELATIVE extends Elf64RelaType(1027)
 
-  // https://refspecs.linuxbase.org/elf/gabi4+/ch4.reloc.html
-  // https://github.com/ARM-software/abi-aa/blob/main/aaelf64/aaelf64.rst#relocation-types
   protected def readRela(bs: AuxDecoder.Input) =
     import AuxDecoder.*
     val (r_offset, r_info, r_addend) = readTuple(readUint(64), readUint(64), readUint(64))(bs)
@@ -62,6 +75,9 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
       case _ => None
     }
 
+  /**
+   * Parsers an Aarch64 relocation type integer. See [[Elf64RelaType]] for constants.
+   */
   protected def parseAarch64RelaType(x: Long) = x match {
     case R_AARCH64_COPY.value => R_AARCH64_COPY
     case R_AARCH64_GLOB_DAT.value => R_AARCH64_GLOB_DAT
@@ -69,19 +85,8 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     case R_AARCH64_RELATIVE.value => R_AARCH64_RELATIVE
   }
 
-  // see also:
-  // https://www.javadoc.io/doc/net.fornwall/jelf/latest/net/fornwall/jelf/ElfSymbol.html
-  //
-  // https://gist.github.com/x0nu11byt3/bcb35c3de461e5fb66173071a2379779
-  //
-  // https://www.man7.org/linux/man-pages/man5/elf.5.html
-
-  // Full ELF32 specification: https://refspecs.linuxfoundation.org/elf/elf.pdf
-
-  // Full ELF64 specification: https://irix7.com/techpubs/007-4658-001.pdf
-
   /**
-   * https://refspecs.linuxfoundation.org/elf/elf.pdf
+   * https://refspecs.linuxfoundation.org/elf/elf.pdf.
    * Figure 1-7. Special Section Indexes
    */
   protected def parseElfNdx(n: BigInt) = n.toInt match {
@@ -222,8 +227,9 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
   private val atSuffix = """@[A-Za-z_\d.]+$""".r
 
   /**
-   * Strips away some information from `readelf`'s [[translating.ReadELFData]]
-   * which is not so important and not produced by the GTIRB ELF loader.
+   * Strips away some information from [[translating.ReadELFData]]
+   * which is not so important and causes spurious mismatches between the two
+   * ELF loaders.
    *
    * For example, this throws away symbols of type SECTION and symbols beginning with `$`.
    * It also strips the `@GLIBC_XX.X` suffix from symbol names.
@@ -245,8 +251,8 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
   /**
    * Determines whether the current ReadELFData is compatible with
-   * a given reference ReadELFData. That is, whether the The given reference object is
-   * assumed to be the gold standard
+   * a given reference ReadELFData. That is, whether the two ELF datas are
+   * equivalent when normalised ([[normalisedRelf]]).
    */
   def checkReadELFCompatibility(gtirbRelf: ReadELFData, referenceRelf: ReadELFData): Boolean = {
     var ok = true
@@ -267,8 +273,8 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     val g = normaliseRelf(gtirbRelf)
     val o = normaliseRelf(referenceRelf)
     checkEq(g.mainAddress, o.mainAddress, "main address differs")
-    checkEq(g.functionEntries, o.functionEntries, "function entries differ")
-    checkEq(g.relocationOffsets, o.relocationOffsets, "relocations differ")
+    checkSet(g.functionEntries, o.functionEntries, "function entries differ")
+    checkSet(g.relocationOffsets.toSet, o.relocationOffsets.toSet, "relocations differ")
     checkSet(g.globalVariables, o.globalVariables, "global variables differ")
     checkSet(g.externalFunctions, o.externalFunctions, "external functions differ")
     checkSet(g.symbolTable.toSet, o.symbolTable.toSet, "symbol tables differ")
