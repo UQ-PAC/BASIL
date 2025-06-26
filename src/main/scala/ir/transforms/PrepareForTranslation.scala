@@ -4,11 +4,11 @@ import scala.collection.mutable
 import ir.Block
 import ir.cilvisitor.*
 import ir.invariant
-import util.BASILConfig
+import util.{BASILConfig, MemoryRegionsMode}
 import analysis.AnalysisManager
 
 // run iff arg.isEmpty || (arg.get.memoryRegions == MemoryRegionsMode.Disabled)
-val determineRelevantMemory = SingleTransform(
+val determineRelevantMemory = Transform(
   "DetermineRelevantMemory",
   (ctx, man) => {
     ctx.program.determineRelevantMemory(ctx.globalOffsets)
@@ -17,7 +17,7 @@ val determineRelevantMemory = SingleTransform(
 )
 
 // run iff arg
-val stackSubstitution = SingleTransform(
+val stackSubstitution = Transform(
   "StackSubstitution",
   (ctx, man) => {
     visit_prog(StackSubstituter(), ctx.program)
@@ -25,7 +25,7 @@ val stackSubstitution = SingleTransform(
   }
 )
 
-val setModifies = SingleTransform(
+val setModifies = Transform(
   "SetModifies",
   (ctx, man) => {
     val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
@@ -35,7 +35,7 @@ val setModifies = SingleTransform(
 )
 
 def getRenameBoogieKeywordsTransform(boogieReserved: Set[String]): Transform =
-  SingleTransform(
+  Transform(
     "RenameBoogieKeywords",
     (ctx, man) => {
       visit_prog(BoogieReservedRenamer(boogieReserved), ctx.program)
@@ -46,12 +46,15 @@ def getRenameBoogieKeywordsTransform(boogieReserved: Set[String]): Transform =
 /** Cull unneccessary information that does not need to be included in the translation, and infer stack regions, and
   * add in modifies from the spec.
   */
-def getPrepareForTranslationTransform(trimDepth: Int, boogieReserved: Set[String]): Transform = TransformBatch(
+def getPrepareForTranslationTransform(config: BASILConfig, boogieReserved: Set[String]): Transform = TransformBatch(
   "PrepareForTranslation",
   List(
-    determineRelevantMemory,
-    getStripUnreachableFunctionsTransform(trimDepth),
-    stackSubstitution,
+    determineRelevantMemory.when(
+      config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled)),
+    getStripUnreachableFunctionsTransform(config.loading.procedureTrimDepth),
+    stackSubstitution.when(
+      !config.memoryTransform &&
+      (config.staticAnalysis.isEmpty || (config.staticAnalysis.get.memoryRegions == MemoryRegionsMode.Disabled))),
     setModifies,
     getRenameBoogieKeywordsTransform(boogieReserved: Set[String])
   ),

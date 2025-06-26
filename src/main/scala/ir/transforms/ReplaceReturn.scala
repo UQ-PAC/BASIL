@@ -143,7 +143,7 @@ def establishProcedureDiamondForm(program: Program, doSimplify: Boolean = false)
 }
 
 def getEstablishProcedureDiamondFormTransform(doSimplify: Boolean): Transform =
-  SingleTransform(
+  Transform(
     "EstablishProcedureDiamondForm",
     (ctx, man) => {
       establishProcedureDiamondForm(ctx.program, doSimplify)

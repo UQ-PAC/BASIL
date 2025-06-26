@@ -152,7 +152,7 @@ class GuarGenSummaryGenerator[T, S](dom: InterferenceProductDomain[T, S])
 }
 
 def getGenerateRgConditionsTransform(threads: List[Procedure]): Transform =
-  SingleTransform(
+  Transform(
     "GenerateRgConditions",
     (ctx, man) => {
       type StateLatticeElement = LatticeMap[Variable, analysis.Interval]

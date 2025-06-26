@@ -13,8 +13,7 @@ import ir.transforms.{
   SCCCallgraphWorklistSolver,
   reversePostOrder,
   worklistSolver,
-  Transform,
-  SingleTransform
+  Transform
 }
 
 case class Condition(pred: Predicate, label: Option[String] = None)
@@ -223,7 +222,7 @@ class SummaryGenerator(program: Program, parameterForm: Boolean = false) {
 }
 
 def getGenerateProcedureSummariesTransform(simplified: Boolean): Transform =
-  SingleTransform(
+  Transform(
     "GenerateProcedureSummaries",
     (ctx, man) => {
       val prog = ctx.program

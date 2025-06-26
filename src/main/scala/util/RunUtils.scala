@@ -726,39 +726,23 @@ object RunUtils {
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
 
-    // derive transform configuration from basil config
     val analysisManager = AnalysisManager(ctx.program)
-    val disabledTransforms: mutable.Set[Transform] = mutable.Set.empty
-    val transformsToLog: mutable.Map[Transform, Set[Log]] = mutable.Map.empty
-
-    if (!q.staticAnalysis.isEmpty && q.staticAnalysis.get.memoryRegions != MemoryRegionsMode.Disabled) {
-      disabledTransforms += determineRelevantMemory
-    }
-    if (
-      q.memoryTransform || (!q.staticAnalysis.isEmpty && q.staticAnalysis.get.memoryRegions != MemoryRegionsMode.Disabled)
-    ) {
-      disabledTransforms += stackSubstitution
-    }
-
-    // note: we might not necessarily want the same config for all transforms
-    val transformConfig = TransformConfig(disabled = disabledTransforms.toSet, dumpLogs = transformsToLog.toMap)
-
     // these transforms depend on basil config parameters and thus need to be constructed here
-    val prepareForTranslation = getPrepareForTranslationTransform(q.loading.procedureTrimDepth, Set("free"))
-    val genProcSummaries = getGenerateProcedureSummariesTransform(q.loading.parameterForm || conf.simplify)
+    val prepareForTranslation = getPrepareForTranslationTransform(q, Set("free"))
+    val genProcSummaries = getGenerateProcedureSummariesTransform(q.loading.parameterForm || q.simplify)
     val genRgConditions = getGenerateRgConditionsTransform(ctx.program.procedures.toList.filter(_.returnBlock != None))
     val stripUnreachableFunctions = getStripUnreachableFunctionsTransform(q.loading.procedureTrimDepth)
 
-    if conf.simplify then doCleanupWithSimplify(ctx, analysisManager, transformConfig)
-    else doCleanupWithoutSimplify(ctx, analysisManager, transformConfig)
+    if conf.simplify then doCleanupWithSimplify(ctx, analysisManager)
+    else doCleanupWithoutSimplify(ctx, analysisManager)
 
     assert(ir.invariant.programDiamondForm(ctx.program))
 
-    transforms.inlinePLTLaunchpad(ctx, analysisManager, transformConfig)
+    transforms.inlinePLTLaunchpad(ctx, analysisManager)
 
     assert(ir.invariant.programDiamondForm(ctx.program))
 
-    if (q.loading.trimEarly) then stripUnreachableFunctions(ctx, analysisManager, transformConfig)
+    if q.loading.trimEarly then stripUnreachableFunctions(ctx, analysisManager)
     // todo: since refactoring, there is some extra code that is run here
     // see StripUnreachableFunctions.getStripUnreachableFunctionsTransform
 
@@ -865,9 +849,9 @@ object RunUtils {
       }
     }
 
-    prepareForTranslation(ctx, analysisManager, transformConfig)
+    prepareForTranslation(ctx, analysisManager)
 
-    if (conf.generateRelyGuarantees) then genRgConditions(ctx, analysisManager)
+    if conf.generateRelyGuarantees then genRgConditions(ctx, analysisManager)
 
     q.loading.dumpIL.foreach(s => {
       val timer = PerformanceTimer("Dump IL")

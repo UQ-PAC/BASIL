@@ -53,7 +53,7 @@ def stripUnreachableFunctions(p: Program, depth: Int): Unit = {
 }
 
 def getStripUnreachableFunctionsTransform(depth: Int): Transform =
-  SingleTransform(
+  Transform(
     "StripUnreachableFunctions",
     (ctx, man) => {
       val before = ctx.program.procedures.size

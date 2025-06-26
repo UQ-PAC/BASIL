@@ -2,7 +2,7 @@ package ir.transforms
 import ir.{Program, Procedure}
 import ir.cilvisitor.visit_prog
 
-val inlinePLTLaunchpad = SingleTransform(
+val inlinePLTLaunchpad = Transform(
   "InlinePLTLaunchpad",
   (ctx, man) => {
     ctx.program.sortProceduresRPO()

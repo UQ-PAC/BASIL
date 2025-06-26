@@ -32,33 +32,51 @@ case class IrLog(filenamePrefix: String) extends Log {
   * instance. To configure the behaviour of a transform (e.g. based on arguments to the basil program), we supply
   * a set of methods that each return a copy of the transform with a particular behaviour tweaked, such as which logs
   * to dump before and after the transform runs, whether to log performance, or whether to disable the transform.
+  * 
+  * @param name Human-readable name of the transform; it is used in the names of generated log files.
+  * @param implementation The function to invoke when this transform is called.
+  * @param notice Optional message to log upon invocation of this transform (for important transforms).
+  * @param postRunChecks Optional code to run after performance has been measured but before any logs are dumped.
   */
 case class Transform(
-  // human-readable name of the transform; it is used in the names of generated log files
   name: String,
-  // the function to invoke when this transform is called
   implementation: (ctx: IRContext, man: AnalysisManager) => man.Invalidation,
-  // optional message to log upon invocation of this transform
   notice: String = "",
-  // optional code to run after performance has been measured but before any logs are dumped; should not modify the ir
   postRunChecks: IRContext => Unit = _ => ()
 ) {
+  /* The following fields are configurable via the below methods, which return copies of the transform.
+  Every transform can be assumed to have these defaults unless it was created via one of these methods. */
+
   // set to false to make the apply method do nothing
-  val enabled: Boolean = true
+  private var enabled: Boolean = true
   // set to true to have the performance of this transform be measured and dumped with a PerformanceTimer
-  val logPerformance: Boolean = false
+  private var logPerformance: Boolean = false
   // a set of log types to dump before and after running the transform
-  val logsToDump: Set[Log] = Set.empty
+  private var logsToDump: Set[Log] = Set.empty
 
-  // the following methods return a copy of this transform with particular behaviours tweaked
+  def when(cond: Boolean): Transform = {
+    val cp = copy()
+    cp.enabled = cond
+    return cp
+  }
 
-  def when(cond: Boolean): Transform = copy(enabled = cond)
+  def unless(cond: Boolean): Transform = {
+    val cp = copy()
+    cp.enabled = !cond
+    return cp
+  }
 
-  def unless(cond: Boolean): Transform = copy(enabled = !cond)
+  def timeIf(cond: Boolean): Transform = {
+    val cp = copy()
+    cp.logPerformance = cond
+    return cp
+  }
 
-  def timeIf(cond: Boolean): Transform = copy(logPerformance = cond)
-
-  def withLogs(logs: Set[Log]): Transform = copy(logsToDump = logs)
+  def withLogs(logs: Set[Log]): Transform = {
+    val cp = copy()
+    cp.logsToDump = logs
+    return cp
+  }
 
   /** Applies this transform to the given ir context. This is effectively a wrapper for the `implementation` function
     * that handles all of our configurable behaviour and the invalidation of analysis results.

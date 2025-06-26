@@ -830,7 +830,7 @@ def coalesceBlocks(p: Program): Boolean = {
   didAny
 }
 
-val coalesceBlocksOnce = SingleTransform(
+val coalesceBlocksOnce = Transform(
   "CoalesceBlocksOnce",
   (ctx, man) => {
     coalesceBlocks(ctx.program)
@@ -838,7 +838,7 @@ val coalesceBlocksOnce = SingleTransform(
   }
 )
 
-val coalesceBlocksFixpoint = SingleTransform(
+val coalesceBlocksFixpoint = Transform(
   "CoalesceBlocksFixpoint",
   (ctx, man) => {
     while (coalesceBlocks(ctx.program)) {}
@@ -1156,7 +1156,7 @@ def applyRPO(p: Program) = {
   }
 }
 
-val applyRpoTransform = SingleTransform(
+val applyRpoTransform = Transform(
   "ApplyRPO",
   (ctx, man) => {
     applyRPO(man.program)
@@ -1897,7 +1897,7 @@ def findDefinitelyExits(p: Program): ProcReturnInfo = {
   )
 }
 
-val replaceJumpsInNonReturningProcs = SingleTransform(
+val replaceJumpsInNonReturningProcs = Transform(
   "ReplaceJumpsInNonReturningProcs",
   (ctx, man) => {
     val nonReturning = findDefinitelyExits(ctx.program)
@@ -1909,7 +1909,7 @@ val replaceJumpsInNonReturningProcs = SingleTransform(
   }
 )
 
-val removeExternalFunctionReferences = SingleTransform(
+val removeExternalFunctionReferences = Transform(
   "RemoveExternalFunctionReferences",
   (ctx, man) => {
     val externalNames = ctx.externalFunctions.map(_.name)
@@ -2159,7 +2159,7 @@ def removeTriviallyDeadBranches(p: Program, removeAllUnreachableBlocks: Boolean 
   dead.nonEmpty
 }
 
-val makeProcEntriesNonLoops = SingleTransform(
+val makeProcEntriesNonLoops = Transform(
   "MakeProcEntriesNonLoops",
   (ctx, man) => {
     ctx.program.procedures.foreach(p => {
@@ -2189,7 +2189,7 @@ To finish the implementation of this transform, we need to:
 [ ] Remove the non-transforms like dsaCheck and replace with some other logic.
 */
 
-val reduceLoops = SingleTransform(
+val reduceLoops = Transform(
   "ReduceLoops",
   (ctx, man) => {
     val foundLoops = LoopDetector.identify_loops(ctx.program)
@@ -2199,7 +2199,7 @@ val reduceLoops = SingleTransform(
   }
 )
 
-val normaliseBlockNamesTransform = SingleTransform(
+val normaliseBlockNamesTransform = Transform(
   "NormaliseBlockNames",
   (ctx, man) => {
     for (p <- ctx.program.procedures) {
@@ -2209,7 +2209,7 @@ val normaliseBlockNamesTransform = SingleTransform(
   }
 )
 
-val sortProceduresRpoTransform = SingleTransform(
+val sortProceduresRpoTransform = Transform(
   "NormaliseBlockNames",
   (ctx, man) => {
     ctx.program.sortProceduresRPO()
@@ -2217,7 +2217,7 @@ val sortProceduresRpoTransform = SingleTransform(
   }
 )
 
-val liftSvCompTransform = SingleTransform(
+val liftSvCompTransform = Transform(
   "LiftSvComp",
   (ctx, man) => {
     liftSVComp(ctx.program)
@@ -2225,7 +2225,7 @@ val liftSvCompTransform = SingleTransform(
   }
 )
 
-val removeEmptyBlocksTransform = SingleTransform(
+val removeEmptyBlocksTransform = Transform(
   "RemoveEmptyBlocks",
   (ctx, man) => {
     removeEmptyBlocks(ctx.program)
@@ -2233,7 +2233,7 @@ val removeEmptyBlocksTransform = SingleTransform(
   }
 )
 
-val onePassDsaTransform = SingleTransform(
+val onePassDsaTransform = Transform(
   "OnePassDsa",
   (ctx, man) => {
     OnePassDSA().applyTransform(ctx.program)
@@ -2242,7 +2242,7 @@ val onePassDsaTransform = SingleTransform(
 )
 
 // fixme: this is not really a transform, but a check on the ir
-val dsaCheck = SingleTransform(
+val dsaCheck = Transform(
   "DsaCheck",
   (ctx, man) => {
     Logger.info("DSA no uninitialised")
@@ -2263,7 +2263,7 @@ val dsaCheck = SingleTransform(
 )
 
 // fixme: similar issues to the above transform
-val dsaCheckAfterTransform = SingleTransform(
+val dsaCheckAfterTransform = Transform(
   "DsaCheckAfterTransform",
   (ctx, man) => {
     Logger.info("DSA Check (after transform)")
@@ -2276,7 +2276,7 @@ val dsaCheckAfterTransform = SingleTransform(
 
 // fixme: similar issues to the above
 // we might want to move this out of the transform, to the callsite
-val logSimplificationValidation = SingleTransform(
+val logSimplificationValidation = Transform(
   "LogSimplificationValidation",
   (ctx, man) => {
     Logger.info("[!] Simplify :: Writing simplification validation")
@@ -2287,7 +2287,7 @@ val logSimplificationValidation = SingleTransform(
   }
 )
 
-val copyPropParamFixedPointTransform = SingleTransform(
+val copyPropParamFixedPointTransform = Transform(
   "CopyPropParamFixedPoint",
   (ctx, man) => {
     copyPropParamFixedPoint(ctx.program, ctx.globalOffsets)
@@ -2296,7 +2296,7 @@ val copyPropParamFixedPointTransform = SingleTransform(
   notice = "Copyprop Start"
 )
 
-val fixupGuardsTransform = SingleTransform(
+val fixupGuardsTransform = Transform(
   "FixUpGuards",
   (ctx, man) => {
     fixupGuards(ctx.program)
@@ -2304,7 +2304,7 @@ val fixupGuardsTransform = SingleTransform(
   }
 )
 
-val removeDuplicateGuardsTransform = SingleTransform(
+val removeDuplicateGuardsTransform = Transform(
   "RemoveDuplicateGuards",
   (ctx, man) => {
     removeDuplicateGuard(ctx.program)
@@ -2312,7 +2312,7 @@ val removeDuplicateGuardsTransform = SingleTransform(
   }
 )
 
-val liftLinuxAssertFailTransform = SingleTransform(
+val liftLinuxAssertFailTransform = Transform(
   "LiftLinuxAssertFail",
   (ctx, man) => {
     liftLinuxAssertFail(ctx)
