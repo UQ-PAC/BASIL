@@ -108,7 +108,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
   def parseRela(kind: R_AARCH64_COPY.type, rela: Elf64Rela): gtirb.SymbolRef =
     gtirb.getDynSym(rela.r_sym.toInt)
 
-  def getAllSymbols() = {
+  def getAllSymbols(): List[ELFSymbol] = {
     val normalsyms = gtirb.symbolEntriesByUuid.view
       .flatMap { case (k, pos) =>
         val sym = k.get
@@ -155,7 +155,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
       .sortBy(x => x.num)
   }
 
-  def getRelocations() = {
+  def getRelocations(): (Map[BigInt, BigInt], Set[ExternalFunction]) = {
     def getSectionBytes(sectionName: String) =
       gtirb.sectionsByName(sectionName).byteIntervals.head.contents
 
@@ -172,7 +172,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     (offs.toMap, exts.toSet)
   }
 
-  def getGlobals() =
+  def getGlobals(): Set[SpecGlobal] =
     gtirb.symbolEntriesByUuid.view.flatMap {
       case (symid, (size, "OBJECT", "GLOBAL", "DEFAULT", idx)) =>
 
@@ -195,7 +195,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
       case _ => None
     }.toSet
 
-  def getFunctionEntries() =
+  def getFunctionEntries(): Set[FuncEntry] =
     gtirb.symbolEntriesByUuid.view.collect {
       case (symid, (size, "FUNC", "GLOBAL", "DEFAULT", idx)) if idx != 0 =>
 
@@ -210,10 +210,10 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
         FuncEntry(nameSymbol.name, (size * 8).toInt, addr)
     }.toSet
 
-  def getMainAddress(mainProcedureName: String) =
+  def getMainAddress(mainProcedureName: String): BigInt =
     gtirb.symbolsByName(mainProcedureName).getReferentUuid.get.get.address
 
-  def getReadELFData(mainProcedureName: String) = {
+  def getReadELFData(mainProcedureName: String): ReadELFData = {
 
     val (offs, exts) = getRelocations()
     val syms = getAllSymbols()
