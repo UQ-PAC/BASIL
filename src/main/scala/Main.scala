@@ -343,7 +343,13 @@ object Main {
           return
 
         import ir.dsl.given
-        writeToFile(relf.sorted.toScala, relfOut + "-readelf.scala")
+        writeToFile(
+          relf.sorted.toScala
+            .replace("@GLIBC_2.17", "")
+            .replace("@GLIBC_2.38", "")
+            .replace("@GLIBC_2.34", ""),
+          relfOut + "-readelf.scala"
+        )
         gtirb.foreach(x => writeToFile(x.sorted.toScala, relfOut + "-gtsrelf.scala"))
         return
     }
