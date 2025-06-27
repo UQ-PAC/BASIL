@@ -200,7 +200,7 @@ object Main {
     summariseProcedures: Flag,
     @arg(
       name = "generate-loop-invariants",
-      doc = "Generates loop invariants on loop headers (requires --analyse flag)"
+      doc = "Generates loop invariants on loop headers (requires --analyse flag without --no-irreducible-loops)"
     )
     generateLoopInvariants: Flag,
     @arg(

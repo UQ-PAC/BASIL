@@ -1007,7 +1007,7 @@ object RunUtils {
       IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify)
     }
 
-    if (conf.staticAnalysis.nonEmpty && conf.generateLoopInvariants) {
+    if (conf.staticAnalysis.exists(_.irreducibleLoops) && conf.generateLoopInvariants) {
       StaticAnalysisLogger.info("[!] Generating Loop Invariants")
       IRTransform.generateLoopInvariants(ctx.program)
     }
