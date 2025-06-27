@@ -913,6 +913,9 @@ object RunUtils {
 
     ir.eval.SimplifyValidation.validate = conf.validateSimp
 
+    for (p <- ctx.program.procedures) {
+      p.normaliseBlockNames()
+    }
     ir.transforms.validate.wrapShapePreservingTransformInValidation(p => (), "NOP")(ctx.program)
 
     if (conf.simplify) {

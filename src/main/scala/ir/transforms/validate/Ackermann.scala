@@ -39,19 +39,7 @@ case class SideEffectStatement(
   //  for globals the formal param is the captured global var or memory
 }
 
-class SideEffectStatementOfStatement(frames: Map[String, Frame]) {
-
-  def endianHint(e: Endian) = e match {
-    case Endian.LittleEndian => "le"
-    case Endian.BigEndian => "be"
-  }
-
-  def typeHint(t: IRType) = t match {
-    case IntType => "int"
-    case BitVecType(sz) => s"bv$sz"
-    case _ => ???
-  }
-
+object SideEffectStatementOfStatement {
   def traceVar(m: Memory) = {
     GlobalVar(s"TRACE_MEM_${m.name}_${m.addressSize}_${m.valueSize}", BoolType)
   }
@@ -63,6 +51,21 @@ class SideEffectStatementOfStatement(frames: Map[String, Frame]) {
   def param(v: Global): (Variable | Memory, Variable) = v match {
     case g: GlobalVar => (g -> g)
     case m: Memory => (m -> traceVar(m))
+  }
+}
+
+class SideEffectStatementOfStatement(frames: Map[String, Frame]) {
+  import SideEffectStatementOfStatement.*
+
+  def endianHint(e: Endian) = e match {
+    case Endian.LittleEndian => "le"
+    case Endian.BigEndian => "be"
+  }
+
+  def typeHint(t: IRType) = t match {
+    case IntType => "int"
+    case BitVecType(sz) => s"bv$sz"
+    case _ => ???
   }
 
   // source -> target
@@ -273,12 +276,13 @@ object Ackermann {
         case s: Command => s.getClass.getSimpleName
       }
       (srcCall, tgtCall) match {
-        case (None, None) => advanceBoth()
+        case (None, None) =>
+          advanceBoth()
         case (None, Some(_)) => advanceSrc()
         case (Some(_), None) => advanceTgt()
         case (Some(src), Some(tgt)) => {
-          seen.add(src.stmt)
-          seen.add(tgt.stmt)
+          seen.add(src)
+          seen.add(tgt)
 
           instantiateAxiomInstance(_ => None)(src, tgt) match {
             case Right(inv) => {
@@ -293,6 +297,6 @@ object Ackermann {
       }
     }
 
-    invariant.toSet.toList
+    invariant.toList
   }
 }

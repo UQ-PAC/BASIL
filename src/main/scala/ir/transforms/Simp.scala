@@ -135,7 +135,8 @@ class DefUseEntryDomain() extends AbstractDomain[Map[Variable, Set[Def]]] {
   }
 }
 
-class IntraLiveVarsDomain(frames: Option[Map[Procedure, Frame]] = None) extends PowerSetDomain[Variable] {
+class IntraLiveVarsDomain(extraLiveAtCall: Procedure => Iterable[Variable] = x => Seq())
+    extends PowerSetDomain[Variable] {
   // expected backwards
 
   def transfer(s: Set[Variable], a: Command): Set[Variable] = {
@@ -148,15 +149,10 @@ class IntraLiveVarsDomain(frames: Option[Map[Procedure, Frame]] = None) extends 
       case a: Assume => s ++ a.body.variables
       case a: Assert => s ++ a.body.variables
       case i: IndirectCall => s + i.target
-      case c: DirectCall =>
-        val read = for {
-          fr <- frames
-          frame <- fr.get(c.target)
-          read = frame.readGlobalVars.collect { case v: Variable =>
-            v
-          }
-        } yield (read)
-        s -- c.outParams.map(_._2) ++ c.actualParams.flatMap(_._2.variables) ++ (read.toSeq.flatten)
+      case c: DirectCall => {
+        val read = extraLiveAtCall(c.target)
+        s -- c.outParams.map(_._2) ++ c.actualParams.flatMap(_._2.variables) ++ (read)
+      }
       case g: GoTo => s
       case r: Return => s ++ r.outParams.flatMap(_._2.variables)
       case r: Unreachable => s

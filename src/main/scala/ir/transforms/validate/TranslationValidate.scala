@@ -347,12 +347,12 @@ class TranslationValidator {
 
   var beforeProg: Option[Program] = None
   var liveBefore = Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])]()
-  var beforeFrame = Map[Procedure, Frame]()
+  var beforeFrame = Map[String, Frame]()
   // proc -> block -> absdom
 
   var afterProg: Option[Program] = None
   var liveAfter = Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])]()
-  var afterFrame = Map[Procedure, Frame]()
+  var afterFrame = Map[String, Frame]()
 
   var beforeCuts: Map[Procedure, Map[String, Block]] = Map()
   var afterCuts: Map[Procedure, Map[String, Block]] = Map()
@@ -361,7 +361,19 @@ class TranslationValidator {
     p: Procedure,
     frames: Map[Procedure, Frame]
   ): (Map[Block, Set[Variable]], Map[Block, Set[Variable]]) = {
-    val liveVarsDom = transforms.IntraLiveVarsDomain(Some(frames))
+
+    def extraLive(p: Procedure): Iterable[Variable] =
+      val read =
+        for {
+          frame <- frames.get(p)
+          read = frame.readGlobalVars.collect { case v: Variable =>
+            v
+          }
+          globs = frame.readMem.map(SideEffectStatementOfStatement.param).map(_._2)
+        } yield (read ++ globs)
+      read.toSeq.flatten
+
+    val liveVarsDom = transforms.IntraLiveVarsDomain(extraLive)
     val liveVarsSolver = transforms.worklistSolver(liveVarsDom)
     liveVarsSolver.solveProc(p, backwards = true)
   }
@@ -503,9 +515,25 @@ class TranslationValidator {
 
   }
 
+  def globalsForProc(p: Procedure) : Iterable[Variable] = {
+    val globs = for {
+      bf <- beforeFrame.get(p.name)
+      af <- afterFrame.get(p.name)
+      globs = (bf.readGlobalVars ++ bf.readMem ++ bf.modifiedGlobalVars ++ bf.modifiedMem
+        ++ af.readGlobalVars ++ af.readMem ++ af.modifiedGlobalVars ++ af.modifiedMem).map(SideEffectStatementOfStatement.param)
+    } yield (globs.map(_._2))
+    globs.getOrElse(Seq())
+  }
+
+
   def setEqualVarsInvariant = {
 
     // call this after running transform so initProg corresponds to the source / after program.
+
+
+    def memToVar(m: Iterable[Memory]) = {
+      m.map(SideEffectStatementOfStatement.param).map(_._2)
+    }
 
     val procs = initProg.get.procedures.view.map(p => p.name -> p).toMap
 
@@ -515,10 +543,13 @@ class TranslationValidator {
 
       // intersect of live of source and target
 
+      val globals = globalsForProc(p).map(x => (x: Variable, x: Variable))
+
       val returnInv = procs(p.name).returnBlock
         .map(_.jump match {
           case r: Return =>
-            procs(p.name).returnBlock.get.label -> r.outParams.map((formal: Variable, actual) => formal -> formal).toMap
+            procs(p.name).returnBlock.get.label -> (r.outParams
+              .map((formal: Variable, actual) => formal -> formal) ++ globals).toMap
           case _ => ???
         })
         .toSeq
@@ -550,20 +581,14 @@ class TranslationValidator {
     }
   }
 
-  def reachingDefs(p: Procedure) = {
-    transforms.reversePostOrder(p)
-    val (beforeLive, afterLive) = transforms.getLiveVars(p)
-    val dom = transforms.DefUseDomain(beforeLive)
-    val solver = transforms.worklistSolver(dom)
-    val (beforeRes, afterRes) = solver.solveProc(p)
-    beforeRes.map((k, v) => k.label -> v)
-  }
 
   def setTargetProg(p: Program) = {
-    beforeFrame = inferProcFrames(p)
+    val f = inferProcFrames(p)
+
+    beforeFrame = f.map((k, v) => (k.name, v)).toMap
     initProg = Some(p)
-    val (prog, cuts) = toTransitionSystem(p, beforeFrame)
-    liveBefore = p.procedures.map(p => p.name -> getLiveVars(p, beforeFrame)).toMap
+    val (prog, cuts) = toTransitionSystem(p, f)
+    liveBefore = p.procedures.map(p => p.name -> getLiveVars(p, f)).toMap
     beforeProg = Some(prog)
     beforeCuts = cuts
   }
@@ -598,9 +623,10 @@ class TranslationValidator {
   }
 
   def setSourceProg(p: Program) = {
-    afterFrame = inferProcFrames(p)
-    val (prog, cuts) = toTransitionSystem(p, afterFrame)
-    liveAfter = p.procedures.map(p => p.name -> getLiveVars(p, afterFrame)).toMap
+    val f = inferProcFrames(p)
+    afterFrame = f.map((k, v) => (k.name, v)).toMap
+    val (prog, cuts) = toTransitionSystem(p, f)
+    liveAfter = p.procedures.map(p => p.name -> getLiveVars(p, f)).toMap
     afterProg = Some(prog)
     afterCuts = cuts
   }
@@ -652,8 +678,8 @@ class TranslationValidator {
     val interesting = initProg.get.procedures
       .filterNot(_.isExternal.contains(true))
       .filterNot(_.procName.startsWith("indirect_call_launchpad"))
-      .filter(beforeFrame.contains(_))
-      .filter(afterFrame.contains(_))
+      .filter(n => beforeFrame.contains(n.name))
+      .filter(n => afterFrame.contains(n.name))
 
     for (proc <- interesting) {
       timer.checkPoint(s"TVSMT ${proc.name}")
@@ -670,12 +696,19 @@ class TranslationValidator {
       AssertsToPC(source.returnBlock.get).transform(source)
       AssertsToPC(target.returnBlock.get).transform(target)
 
+      /* Begin AWFUL HACK to initialise SSA for the global variables only set on one path */
       srcEntry.statements.prepend(LocalAssign((transitionSystemPCVar), (transitionSystemPCVar)))
       srcEntry.statements.prepend(LocalAssign((traceVar), (traceVar)))
       tgtEntry.statements.prepend(LocalAssign((transitionSystemPCVar), (transitionSystemPCVar)))
       tgtEntry.statements.prepend(LocalAssign((traceVar), (traceVar)))
 
-      val frames = (afterFrame ++ beforeFrame).map((k, v) => (k.name, v)).toMap
+      globalsForProc(proc).foreach(g => {
+        srcEntry.statements.prepend(LocalAssign(g, g))
+        tgtEntry.statements.prepend(LocalAssign(g, g))
+      })
+      /* end AWFUL HACK */
+
+      val frames = (afterFrame ++ beforeFrame)
 
       val (srcRenameSSA, srcLiveMemory) = SSADAG.transform(frames, source)
       val (tgtRenameSSA, tgtLiveMemory) = SSADAG.transform(frames, target)
@@ -703,14 +736,14 @@ class TranslationValidator {
           g.toAssume(proc, Some(srcExit.label))(srcRenameSSA, tgtRenameSSA).body
         case i @ CutPoint(l, b, comment) => {
           // rename for end state of ssa
-          val targetBl = beforeCuts(target)(l).label
-          val sourceBl = afterCuts(source)(l).label
+          //val targetBl = beforeCuts(target)(l).label
+          //val sourceBl = afterCuts(source)(l).label
 
-          val nb = b.map(_.map(srcRenameSSA(sourceBl, _), tgtRenameSSA(targetBl, _)))
-          val rned = nb.map(_.map(srcRenameSSA(srcExit.label, _), tgtRenameSSA(tgtExit.label, _)))
+          //val nb = b.map(_.map(srcRenameSSA(sourceBl, _), tgtRenameSSA(targetBl, _)))
+          //val rned = nb.map(_.map(srcRenameSSA(srcExit.label, _), tgtRenameSSA(tgtExit.label, _)))
 
-          val nc = CutPoint(l, rned, comment)
-          nc.toAssume(proc)(srcRenameSSA, tgtRenameSSA) match {
+          //val nc = CutPoint(l, rned, comment)
+          i.toAssume(proc)(srcRenameSSA, tgtRenameSSA) match {
             case Assume(b, c, _, _) => b
           }
         }
