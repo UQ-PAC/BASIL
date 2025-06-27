@@ -2,7 +2,7 @@ package analysis
 
 import util.StaticAnalysisLogger as Logger
 
-import ir.transforms.worklistSolver
+import ir.transforms.{reversePostOrder, worklistSolver}
 import ir.*
 
 /** Performs a single analysis to generate loop invariants.
@@ -32,6 +32,7 @@ class FullLoopInvariantGenerator(program: Program) {
 
   def addInvariantsToProc(procedure: Procedure) = {
     Logger.debug(procedure)
+    reversePostOrder(procedure)
     val intervalInvariantGenerator = ForwardLoopInvariantGenerator(DoubleIntervalDomain(Some(procedure)))
     intervalInvariantGenerator.generateInvariants(procedure).foreach {
       (block, pred) => {

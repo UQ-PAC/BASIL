@@ -92,7 +92,11 @@ class IntervalDomain(
         throw Exception("Widening intervals of mismatching bitvector sizes")
       case (ConcreteInterval(l1, u1, w1), ConcreteInterval(l2, u2, w2)) if w1 == w2 =>
         ConcreteInterval(if l1 <= l2 then l1 else negInf(w1), if u1 >= u2 then u1 else inf(w1), w1)
-      case (a, b) => joinTerm(a, b, pos) // TODO?
+      case (Bottom, ConcreteInterval(l2, u2, w2)) =>
+        ???
+      case (ConcreteInterval(l1, u1, w1), Bottom) =>
+        ???
+      case (a, b) => joinTerm(a, b, pos)
     }
 
   def transfer(b: LatticeMap[Variable, Interval], c: Command): LatticeMap[Variable, Interval] = {
