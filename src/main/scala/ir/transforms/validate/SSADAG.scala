@@ -13,12 +13,33 @@ object SSADAG {
   *
   * Returns the SSA renaming for each block entry in the CFA.
   */
-  def transform(p: Procedure) = {
-    ssaTransform(p)
+  def transform(frames: Map[String, Frame], p: Procedure) = {
+    convertToMonadicSideEffect(frames, p)
+
+    val liveMemory = getReadMemory(p)
+
+    (ssaTransform(p), liveMemory)
   }
 
-  class Passify extends CILVisitor {
+  def getReadMemory(p: Procedure) : Map[Memory, Variable] = {
+    val r = p.collect {
+      case SideEffectStatement(_, _, lhs, rhs) => {
+        rhs.collect{ 
+        case (formal: Memory, actual: Variable) => (formal, actual)
+        case (formal: Memory, actual) => ???
+        }
+      }
+    }.flatten
+    r.toMap
+
+  }
+
+  private class Passify extends CILVisitor {
     override def vstmt(s: Statement) = s match {
+      case l @ SideEffectStatement(s, n, lhs, rhs) => {
+        // assume ackermann
+        ChangeTo(List())
+      }
       case SimulAssign(assignments, _) => {
         ChangeTo(List(Assume(boolAnd(assignments.map(polyEqual)))))
       }
@@ -30,13 +51,26 @@ object SSADAG {
     visit_proc(Passify(), p)
   }
 
+  def convertToMonadicSideEffect(frames: Map[String, Frame], p: Procedure) = {
+
+    class MonadicConverter(frames: Map[String, Frame]) extends CILVisitor {
+      val SF = SideEffectStatementOfStatement(frames)
+      override def vstmt(s: Statement) = s match {
+        case SF(s) => ChangeTo(List(s))
+        case _ => SkipChildren()
+      }
+    }
+
+    visit_proc(MonadicConverter(frames), p)
+
+  }
+
   /**
   * Convert an acyclic CFA to a transition encoding
   *
   * Returns the SSA renaming for each block entry in the CFA.
   */
-  def ssaTransform(p: Procedure): ((Block, Expr) => Expr) = {
-    // FIXME:  apply transform to global variables
+  def ssaTransform(p: Procedure): ((String, Expr) => Expr) = {
 
     var renameCount = 0
     val stRename = mutable.Map[Block, mutable.Map[Variable, Variable]]()
@@ -56,17 +90,24 @@ object SSADAG {
         case l: GlobalVar => l.copy(name = l.name + "_AT" + renameCount)
       }
 
-    class Subst(rn: Variable => Option[Variable]) extends CILVisitor {
+    class RenameRHS(rn: Variable => Option[Variable]) extends CILVisitor {
       override def vrvar(v: Variable) = ChangeTo(rn(v).getOrElse(v))
       override def vexpr(e: Expr) = {
         ChangeTo(Substitute(rn, false)(e).getOrElse(e))
+      }
+      override def vstmt(s: Statement) = s match {
+        case se @ SideEffectStatement(s, n, lhs, rhs) =>
+          se.rhs = rhs.map((f, e) => (f, visit_expr(this, e)))
+          SkipChildren()
+        case _ => DoChildren()
+
       }
     }
 
     def renameRHS(rename: Variable => Option[Variable])(c: Command): Command = c match {
       // rename all rvars
-      case s: Statement => visit_stmt(Subst(rename), s).head
-      case s: Jump => visit_jump(Subst(rename), s)
+      case s: Statement => visit_stmt(RenameRHS(rename), s).head
+      case s: Jump => visit_jump(RenameRHS(rename), s)
     }
 
     ir.transforms.reversePostOrder(p)
@@ -74,14 +115,23 @@ object SSADAG {
     worklist.addAll(p.blocks)
 
     class RenameLHS(subst: Variable => Option[Variable]) extends CILVisitor {
+
+      override def vstmt(s: Statement) = s match {
+        case s @ SideEffectStatement(_, _, lhs, _) =>
+          s.lhs = lhs.map((f, e) => (f, visit_lvar(this, e)))
+          SkipChildren()
+        case _ => DoChildren()
+
+      }
+
       override def vlvar(v: Variable) = subst(v) match {
         case Some(vn) => ChangeTo(vn)
         case none => SkipChildren()
       }
     }
 
-    def renameLHS(substs: Map[Variable, Variable], s: Statement) = {
-      visit_stmt(RenameLHS(substs.get), s)
+    def renameLHS(substs: Map[Variable, Variable], s: Statement) = s match {
+      case s: Statement => visit_stmt(RenameLHS(substs.get), s)
     }
 
     while (worklist.nonEmpty) {
@@ -149,6 +199,15 @@ object SSADAG {
       for (s <- b.statements.toList) {
         val c = renameRHS(renaming.get)(s) // also modifies in-place
         c match {
+          case a @ SideEffectStatement(s, n, lhs, rhs) => {
+            val rn = lhs.map((formal, v) => {
+              val freshDef = freshName(v)
+              renaming(v) = freshDef
+              v -> freshDef
+            }).toMap
+
+            renameLHS(rn, a)
+          }
           case a @ Assume(cond, _, _, _) if !phis.contains(a) =>
             blockDoneCond = cond :: blockDoneCond
             b.statements.remove(a)
@@ -176,6 +235,11 @@ object SSADAG {
       }
     }
 
-    (b, c) => visit_expr(Subst(renameBefore(b).get), c)
+
+    val renameBeforeLabels = renameBefore.map((b, r) => b.label -> r)
+
+    println(renameBeforeLabels.keys.mkString(", "))
+
+    (b, c) => visit_expr(RenameRHS(renameBeforeLabels(b).get), c)
   }
 }

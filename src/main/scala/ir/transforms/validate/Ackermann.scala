@@ -6,6 +6,8 @@ import scala.collection.mutable
 import analysis.ProcFrames.*
 import util.Logger
 
+type EffCallFormalParam = Variable | Memory | Field
+
 /**
  * Encodes the equality of source with target expression for a translation validation
  * invariant
@@ -13,7 +15,6 @@ import util.Logger
  * Expected to refer to source and target variables prior to renaming being applied.
  */
 case class CompatArg(source: Expr, target: Expr) {
-
   /*
    * Generate source == target expression renamed
    */
@@ -26,18 +27,19 @@ case class CompatArg(source: Expr, target: Expr) {
 }
 
 case class Field(name: String)
-case class LocalFunctionSig(
+case class SideEffectStatement(
   stmt: Statement,
   name: String,
-  lhs: List[(Variable | Memory | Field, Variable)],
-  rhs: List[(Variable | Memory | Field, Expr)]
-) {
+  var lhs: List[(EffCallFormalParam, Variable)],
+  var rhs: List[(EffCallFormalParam, Expr)]
+) extends NOP {
+  override def toString = s"SideEffectStatement($name, $lhs, $rhs)"
   // lhs  := name(rhs)
   // rhs is mapping formal -> actual
   //  for globals the formal param is the captured global var or memory
 }
 
-class SideEffectStatement(frames: Map[String, Frame]) {
+class SideEffectStatementOfStatement(frames: Map[String, Frame]) {
 
   def endianHint(e: Endian) = e match {
     case Endian.LittleEndian => "le"
@@ -90,17 +92,17 @@ class SideEffectStatement(frames: Map[String, Frame]) {
    *
    * (name, lhs named params, rhs named params)
    */
-  def unapply(e: Statement): Option[LocalFunctionSig] = e match {
+  def unapply(e: Statement): Option[SideEffectStatement] = e match {
     case DirectCall(tgt, lhs, rhs, _) =>
       val frame = frames.get(tgt.name).getOrElse(Frame())
       val globsLHS = frame.modifiedGlobalVars.toList.map(param) ++ frame.modifiedMem.toList.map(param)
       val globsRHS = frame.readGlobalVars.toList.map(param) ++ frame.readMem.toList.map(param)
-      Some(LocalFunctionSig(e, s"Call_${tgt.name}", traceOut :: lhs.toList ++ globsLHS, rhs.toList ++ globsRHS))
+      Some(SideEffectStatement(e, s"Call_${tgt.name}", traceOut :: lhs.toList ++ globsLHS, traceOut :: rhs.toList ++ globsRHS))
     case MemoryLoad(lhs, memory, addr, endian, size, _) =>
       val args = List(param(memory), Field("addr") -> addr)
       val rets = List(Field("out") -> lhs, param(memory))
       Some(
-        LocalFunctionSig(
+        SideEffectStatement(
           e,
           s"Load_${endianHint(endian)}_${typeHint(addr.getType)}_${typeHint(lhs.getType)}",
           rets,
@@ -108,10 +110,10 @@ class SideEffectStatement(frames: Map[String, Frame]) {
         )
       )
     case MemoryStore(memory, addr, value, endian, size, _) =>
-      val args = List(param(memory), Field("addr") -> addr)
+      val args = List(traceOut, param(memory), Field("addr") -> addr)
       val rets = List(traceOut, param(memory))
       Some(
-        LocalFunctionSig(
+        SideEffectStatement(
           e,
           s"Store_${endianHint(endian)}_${typeHint(addr.getType)}_${typeHint(value.getType)}",
           rets,
@@ -120,18 +122,18 @@ class SideEffectStatement(frames: Map[String, Frame]) {
       )
     case MemoryAssign(lhs, rhs, _) =>
       Some(
-        LocalFunctionSig(
+        SideEffectStatement(
           e,
           s"MemoryAssign_${typeHint(lhs.getType)}_${typeHint(rhs.getType)}",
           List(traceOut, Field("out") -> lhs),
-          List(Field("arg") -> rhs)
+          List(traceOut, Field("arg") -> rhs)
         )
       )
     case IndirectCall(arg, _) =>
       // kind of want these gone :(
       // doesn't capture interprocedural effects but we don't resolve indirect calls so it doesn't matter
       Some(
-        LocalFunctionSig(e, s"IndirectCall_${typeHint(arg.getType)}", List(traceOut, Field("target") -> arg), List())
+        SideEffectStatement(e, s"IndirectCall_${typeHint(arg.getType)}", List(traceOut, Field("target") -> arg), List(traceOut))
       )
     case _ => None
   }
@@ -142,17 +144,17 @@ object Ackermann {
 
   case class AckInv(name: String, lhs: List[CompatArg], rhs: List[CompatArg]) {
     def toPredicate(renameSource: Expr => Expr, renameTarget: Expr => Expr) = {
-      val antecedent = boolAnd(
-        lhs.map { case CompatArg(s, t) =>
-          BinaryExpr(EQ, renameSource(s), renameTarget(t))
-        }
-      )
-      val implicant = boolAnd(
+      val args = boolAnd(
         rhs.map { case CompatArg(s, t) =>
           BinaryExpr(EQ, renameSource(s), renameTarget(t))
         }
       )
-      BinaryExpr(BoolIMPLIES, antecedent, implicant)
+      val implicant = boolAnd(
+        lhs.map { case CompatArg(s, t) =>
+          BinaryExpr(EQ, renameSource(s), renameTarget(t))
+        }
+      )
+      BinaryExpr(BoolIMPLIES, args, implicant)
     }
   }
 
@@ -163,11 +165,11 @@ object Ackermann {
    *
    */
   def instantiateAxiomInstance(
-    renaming: Variable => Option[Variable]
-  )(source: LocalFunctionSig, target: LocalFunctionSig): Either[String, AckInv] = {
+    renaming: Variable => Option[Variable] /* to support param analysis */
+  )(source: SideEffectStatement, target: SideEffectStatement): Either[String, AckInv] = {
     // source has higher level, has params, target does not have params
 
-    def applyRename(a: Variable | Memory | Field): Variable | Memory | Field = a match {
+    def applyRename(a: EffCallFormalParam): EffCallFormalParam = a match {
       case a: Field => (a)
       case a: Memory => (a)
       case v: Variable => renaming(v).getOrElse(v)
@@ -202,15 +204,10 @@ object Ackermann {
   def instantiateAxioms(
     sourceEntry: Block,
     targetEntry: Block,
-    frames: Map[Procedure, Frame],
+    frames: Map[String, Frame],
     renameSourceExpr: Expr => Expr,
     renameTargetExpr: Expr => Expr
   ): List[(Expr, String)] = {
-
-    // after axiom is intantiated we delete the assignment
-    var toRemove = List[Statement]()
-    val SF = SideEffectStatement(frames.map((l,r) => l.name -> r).toMap)
-
     val seen = mutable.Set[CFGPosition]()
     var invariant = List[(Expr, String)]()
 
@@ -218,7 +215,7 @@ object Ackermann {
       var n = IntraProcIRCursor.succ(p)
       while (
         (n.size == 1) && (n.head match {
-          case SF(_) => false
+          case s: SideEffectStatement => false
           case _ => true
         })
       ) {
@@ -226,12 +223,12 @@ object Ackermann {
         n = IntraProcIRCursor.succ(n.head)
       }
       val r = n.filterNot(seen.contains(_)).map {
-        case stmt @ SF(s) => (Some(s), stmt)
+        case stmt : SideEffectStatement => (Some(stmt), stmt)
         case s => (None, s)
       }
       r
 
-    val q = mutable.Queue[((Option[LocalFunctionSig], CFGPosition), (Option[LocalFunctionSig], CFGPosition))]()
+    val q = mutable.Queue[((Option[SideEffectStatement], CFGPosition), (Option[SideEffectStatement], CFGPosition))]()
     val start = ((None, sourceEntry), (None, targetEntry))
     if (true) {
       // FIXME: -> [[instantiations.nonEmpty]] ; was previously conditional on there being any side-effects in the function, to fix a nontermination
@@ -278,21 +275,16 @@ object Ackermann {
           instantiateAxiomInstance(_ => None)(src, tgt) match {
             case Right(inv) => {
               invariant = (inv.toPredicate(renameSourceExpr, renameTargetExpr), inv.name) :: invariant
-              toRemove = src.stmt :: tgt.stmt :: toRemove
               advanceBoth()
             }
             case Left(err) =>
-              Logger.warn(s"Ackermannisation failure: $err; ${src} ${tgt}")
+              // Logger.warn(s"Ackermannisation failure: $err; ${src} ${tgt}")
           }
         }
         case _ => ()
       }
     }
 
-    for (s <- toRemove.toSet) {
-      s.parent.statements.remove(s)
-    }
-
-    invariant
+    invariant.toSet.toList
   }
 }

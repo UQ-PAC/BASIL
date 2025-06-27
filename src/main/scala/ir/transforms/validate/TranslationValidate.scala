@@ -335,7 +335,7 @@ def toTransitionSystem(iprogram: Program, frames: Map[Procedure, Frame]) = {
 
 enum Inv {
   case CutPoint(cutPointPCGuard: String, pred: List[CompatArg], comment: Option[String] = None)
-  case Global(pred: Expr, comment: Option[String] = None)
+  case Global(pred: CompatArg, comment: Option[String] = None)
 }
 
 class TranslationValidator {
@@ -360,15 +360,22 @@ class TranslationValidator {
   // proc -> List (pred, comment)
 
   extension (i: Inv) {
-    def toAssume = i match {
-      case CutPoint(label, preds, c) => {
-        val pred = boolAnd(preds.map(_.toPred(exprInSource, exprInTarget)))
+
+
+    def toAssume(proc: Procedure, label: Option[String] = None)(renameSrcSSA: (String, Expr) => Expr, renameTgtSSA: (String, Expr) => Expr) = i match {
+      case CutPoint(cutLabel, preds, c) => {
+        val blockLabel = beforeRenamer.stripNamespace((beforeCuts.find((p, _) => p.name == proc.name).get._2)(cutLabel).label)
+        val pred = boolAnd(preds.map(_.toPred(x => (exprInSource(renameSrcSSA(blockLabel, x))), x => exprInTarget(renameTgtSSA(blockLabel, x)))))
         val guarded =
-          BinaryExpr(BoolIMPLIES, exprInSource(BinaryExpr(EQ, transitionSystemPCVar, PCSym(label))), pred)
+          BinaryExpr(BoolIMPLIES, exprInSource(renameSrcSSA(blockLabel, (BinaryExpr(EQ, transitionSystemPCVar, PCSym(cutLabel))))), pred)
+        println("GUARD")
+        println(guarded)
         Assume(guarded, c)
       }
       case Global(pred, c) => {
-        Assume(pred, c)
+        val ssaRenamed =  label.map(label => pred.map(renameSrcSSA(label, _), renameTgtSSA(label, _))).getOrElse(pred)
+        val pr = ssaRenamed.toPred(exprInSource, exprInTarget)
+        Assume(pr, c)
       }
     }
 
@@ -525,10 +532,6 @@ class TranslationValidator {
     }
   }
 
-  val pcInv =
-    BinaryExpr(EQ, visit_rvar(beforeRenamer, transitionSystemPCVar), visit_rvar(afterRenamer, transitionSystemPCVar))
-
-  val traceInv = BinaryExpr(EQ, visit_rvar(beforeRenamer, traceVar), visit_rvar(afterRenamer, traceVar))
 
   def reachingDefs(p: Procedure) = {
     transforms.reversePostOrder(p)
@@ -642,7 +645,6 @@ class TranslationValidator {
       def targetCutPointToBlock(l: String) = beforeCuts(target)(l)
       def sourceCutPointToBlock(l: String) = afterCuts(source)(l)
 
-      // FIXME: Q does not get renamed for the end of the transition
       val srcEntry = source.entryBlock.get
       val tgtEntry = target.entryBlock.get
       val srcExit = source.returnBlock.get
@@ -651,69 +653,69 @@ class TranslationValidator {
       AssertsToPC(source.returnBlock.get).transform(source)
       AssertsToPC(target.returnBlock.get).transform(target)
 
-      val srcRenameSSA = SSADAG.transform(source)
-      val tgtRenameSSA = SSADAG.transform(target)
+      srcEntry.statements.prepend(LocalAssign((transitionSystemPCVar), (transitionSystemPCVar)))
+      srcEntry.statements.prepend(LocalAssign((traceVar), (traceVar)))
+      tgtEntry.statements.prepend(LocalAssign((transitionSystemPCVar), (transitionSystemPCVar)))
+      tgtEntry.statements.prepend(LocalAssign((traceVar), (traceVar)))
+
+      val frames = (afterFrame ++ beforeFrame).map((k,v) => (k.name, v)).toMap
+
+      val (srcRenameSSA, srcLiveMemory) = SSADAG.transform(frames, source)
+      val (tgtRenameSSA, tgtLiveMemory) = SSADAG.transform(frames, target)
+
+      val dir = File("./graphs/")
+      if (!dir.exists()) then dir.mkdirs()
+      Logger.writeToFile(File(s"graphs/NOPblockgraph-${proc.name}.dot"), dotBlockGraph(source))
+
 
       val ackInv = Ackermann.instantiateAxioms(
         source.entryBlock.get,
         target.entryBlock.get,
-        afterFrame ++ beforeFrame,
+        frames,
         exprInSource,
         exprInTarget
       )
       timer.checkPoint("ackermann")
 
-      visit_proc(beforeRenamer, target)
-      visit_proc(afterRenamer, source)
 
-      val prime = NamespaceState("P")
-
-      srcEntry.statements.prepend(LocalAssign(varInSource(transitionSystemPCVar), varInSource(transitionSystemPCVar)))
-      srcEntry.statements.prepend(LocalAssign(varInSource(traceVar), varInSource(traceVar)))
-      tgtEntry.statements.prepend(LocalAssign(varInTarget(transitionSystemPCVar), varInTarget(transitionSystemPCVar)))
-      tgtEntry.statements.prepend(LocalAssign(varInTarget(traceVar), varInTarget(traceVar)))
-
+      val pcInv = CompatArg(transitionSystemPCVar, transitionSystemPCVar)
+      val traceInv = CompatArg(traceVar, traceVar)
       // add invariant to combined
       val initInv = Seq(Inv.Global(pcInv, Some("PC INVARIANT")), Inv.Global(traceInv, Some("Trace INVARIANT")))
+      val memoryInit = (srcLiveMemory.keys.toSet ++ tgtLiveMemory.keys).toList.map (k => Inv.Global(CompatArg(srcLiveMemory(k), tgtLiveMemory(k)), Some(s"Memory$k")))
+      
+      val invariant = initInv ++ invariants(proc.name) ++ memoryInit
 
-      val invariantRenamed = invariants(proc.name).map {
-        case g: Inv.Global => g
+      println(allocatedPCS.mkString("\n"))
+
+      val primedInv = invariant.map {
+        case g: Inv.Global => 
+          g.toAssume(proc, Some(srcExit.label))(srcRenameSSA, tgtRenameSSA).body
         case i @ CutPoint(l, b, comment) => {
-          val targetBl = beforeCuts(target)(l)
-          val sourceBl = afterCuts(source)(l)
+          // rename for end state of ssa
+          val targetBl = beforeCuts(target)(l).label
+          val sourceBl = afterCuts(source)(l).label
+
           val nb = b.map(_.map(srcRenameSSA(sourceBl, _), tgtRenameSSA(targetBl, _)))
-          CutPoint(l, nb, comment)
+          val rned = nb.map(_.map(srcRenameSSA(srcExit.label, _), tgtRenameSSA(tgtExit.label, _)))
+
+          val nc = CutPoint(l, rned, comment)
+          nc.toAssume(proc)(srcRenameSSA, tgtRenameSSA) match {
+            case Assume(b , c, _, _) => b
+          }
         }
       }
 
-      val invariant = initInv ++ invariantRenamed
-      val primedInv = invariant.map(_.toAssume).map { case Assume(b, c, _, _) =>
-        Assert(visit_expr(prime, b), c)
-      }
 
-      val invVariables = invariants(proc.name).flatMap(_.toAssume.body.variables).toSet
+      val invVariables = invariants(proc.name).flatMap(_.toAssume(proc, Some(srcEntry.label))(srcRenameSSA, tgtRenameSSA).body.variables).toSet
 
-      val QSource =
-        val sourceInvVariables =
-          invVariables.filter(_.name.startsWith(afterRenamer.namespace)) ++ Seq(transitionSystemPCVar, traceVar).map(
-            visit_rvar(afterRenamer, _)
-          )
-        val vars = sourceInvVariables.map(v => polyEqual(visit_expr(prime, v), v))
-        boolAnd(vars)
 
-      val QTarget =
-        val targetInvVariables =
-          invVariables.filter(_.name.startsWith(beforeRenamer.namespace)) ++ Seq(transitionSystemPCVar, traceVar).map(
-            visit_rvar(beforeRenamer, _)
-          )
-        val vars = targetInvVariables.map(v => polyEqual(visit_expr(prime, v), v))
-        boolAnd(vars)
+      visit_proc(afterRenamer, source)
+      visit_proc(beforeRenamer, target)
 
       SSADAG.passify(source)
       SSADAG.passify(target)
 
-      val qsrc = srcRenameSSA(srcExit, QSource)
-      val qtrgt = tgtRenameSSA(tgtExit, QTarget)
       val otargets = srcEntry.jump.asInstanceOf[GoTo].targets.toList
 
       val splitName = proc.name // + "_split_" + splitNo
@@ -727,7 +729,7 @@ class TranslationValidator {
       count = 0
       for (i <- invariant) {
         count += 1
-        b.addAssert(i.toAssume.body, Some(s"inv$count"))
+        b.addAssert(i.toAssume(proc)(srcRenameSSA, tgtRenameSSA).body, Some(s"inv$count"))
       }
       count = 0
       for ((ack, ackn) <- ackInv) {
@@ -740,13 +742,13 @@ class TranslationValidator {
         b.addAssert(i, Some(s"source$count"))
       }
       count = 0
-      b.addAssert(qsrc, Some("Qsrc"))
+      // b.addAssert(QSource, Some("Qsrc"))
       for (i <- extractProg(target)) {
         count += 1
         b.addAssert(i, Some(s"tgt$count"))
       }
-      b.addAssert(qtrgt, Some("Qtgt"))
-      b.addAssert(UnaryExpr(BoolNOT, BoolExp(BoolAND, primedInv.map(_.body).toList)), Some("InvPrimed"))
+      // b.addAssert(QTarget, Some("Qtgt"))
+      b.addAssert(UnaryExpr(BoolNOT, BoolExp(BoolAND, primedInv.toList)), Some("InvPrimed"))
 
       timer.checkPoint("extract")
 

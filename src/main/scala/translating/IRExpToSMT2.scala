@@ -413,7 +413,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
             DoChildren()
           }
           case v: Variable => {
-            val decl = list(sym("declare-const"), sym(fixVname(v.name)), basilTypeToSMTType(v.getType))
+            val decl = list(sym("declare-fun"), sym(fixVname(v.name)), list(), basilTypeToSMTType(v.getType))
             decled = decled + decl
             SkipChildren()
           }

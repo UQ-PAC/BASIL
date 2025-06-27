@@ -434,7 +434,10 @@ class BasilIRPrettyPrinter(
 
   override def vstmt(s: Statement) = {
     val comment = s.comment.map(c => s" /* $c */").getOrElse("")
-    val res = super.vstmt(s).toString
+    val res = s match {
+      case n: NOP => n.toString
+      case s => super.vstmt(s).toString
+    }
     BST(res + comment)
   }
 
