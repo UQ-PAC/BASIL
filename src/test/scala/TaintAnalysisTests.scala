@@ -1,9 +1,9 @@
 import analysis.*
-import boogie.*
 import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.CaptureOutput
+
 import LatticeSet.*
 
 @test_util.tags.UnitTest

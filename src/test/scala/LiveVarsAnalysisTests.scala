@@ -1,11 +1,10 @@
 import analysis.{InterLiveVarsAnalysis, TwoElementTop}
 import ir.dsl.*
 import ir.{BitVecLiteral, Block, LocalAssign, Program, Register, Variable, cilvisitor, dsl, transforms}
-import util.{LogLevel, Logger}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
-import util.{BASILResult, StaticAnalysisConfig}
 import translating.PrettyPrinter.*
+import util.{BASILResult, LogLevel, Logger, StaticAnalysisConfig}
 
 @test_util.tags.UnitTest
 class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {

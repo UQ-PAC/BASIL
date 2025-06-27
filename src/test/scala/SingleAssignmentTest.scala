@@ -1,12 +1,7 @@
-import analysis.ParamAnalysis
 import ir.dsl.*
-import ir.*
+import ir.{transforms, *}
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.{BASILTest, CaptureOutput}
-import util.*
-import translating.BasilIRToSMT2
-import ir.dsl.*
-import ir.transforms
+import test_util.CaptureOutput
 import translating.PrettyPrinter.*
 
 @test_util.tags.UnitTest

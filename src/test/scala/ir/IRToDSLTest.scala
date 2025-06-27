@@ -1,15 +1,15 @@
 package ir
 
-import scala.collection.immutable.*
-import org.scalatest.funsuite.AnyFunSuite
-import ir.dsl.*
 import ir.*
-import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, Logger, LogLevel}
-import translating.PrettyPrinter.*
-import test_util.{BASILTest, CaptureOutput}
 import ir.cilvisitor.*
-
+import ir.dsl.*
 import org.scalactic.*
+import org.scalatest.funsuite.AnyFunSuite
+import test_util.{BASILTest, CaptureOutput}
+import translating.PrettyPrinter.*
+import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, LogLevel, Logger}
+
+import scala.collection.immutable.*
 
 @test_util.tags.UnitTest
 class IRToDSLTest extends AnyFunSuite with CaptureOutput {
