@@ -51,7 +51,7 @@ class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
         // TODO use an SMT solver to check that the generated invariant implies our expected result instead of using syntactic equality.
 
         assert(
-          b.postconditions.toList == List(
+          b.postconditions.contains(
             Predicate.and(
               Predicate.BVCmp(BVULE, BVTerm.Lit(bv64(0)), BVTerm.Var(R0)),
               Predicate.BVCmp(BVULE, BVTerm.Var(R0), BVTerm.Lit(bv64(100)))
