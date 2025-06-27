@@ -30,7 +30,7 @@ class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
         block("entry", LocalAssign(R0, bv64(0)), goto("loop_head")),
         block("loop_head", goto("loop_body", "loop_exit")),
         block("loop_body", Assume(BinaryExpr(BVULT, R0, bv64(100))), LocalAssign(R0, BinaryExpr(BVADD, R0, bv64(1))), goto("loop_head")),
-        block("loop_exit", Assume(BinaryExpr(BVUGE, R0, bv64(100))), Assert(BinaryExpr(BVEQ, R0, bv64(100))), ret),
+        block("loop_exit", Assume(BinaryExpr(BVUGE, R0, bv64(100))), Assert(BinaryExpr(EQ, R0, bv64(100))), ret),
       )
     )
 
@@ -44,7 +44,7 @@ class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
 
         // TODO use an SMT solver to check that the generated invariant implies our expected result instead of using syntactic equality.
 
-        assert(List(b.postconditions) == List(
+        assert(b.postconditions.toList == List(
           Predicate.and(
             Predicate.BVCmp(BVULE, BVTerm.Lit(bv64(0)), BVTerm.Var(R0)),
             Predicate.BVCmp(BVULE, BVTerm.Var(R0), BVTerm.Lit(bv64(100)))
@@ -55,9 +55,6 @@ class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
       }
     })
 
-    print(program)
-
     // TODO assert x == 100 with boogie
-    assert(false)
   }
 }

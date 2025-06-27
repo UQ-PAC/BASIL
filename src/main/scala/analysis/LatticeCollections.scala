@@ -306,6 +306,8 @@ trait MapDomain[D, L] extends AbstractDomain[LatticeMap[D, L]] {
 
   def widenTerm(a: L, b: L, pos: Block): L = joinTerm(a, b, pos)
 
+  def narrowTerm(a: L, b: L): L = a
+
   def botTerm: L
   def topTerm: L
 
@@ -320,19 +322,43 @@ trait MapDomain[D, L] extends AbstractDomain[LatticeMap[D, L]] {
       case (_, Top()) => Top()
       case (BottomMap(a), BottomMap(b)) =>
         BottomMap(a.foldLeft(b) { case (m, (b, v)) =>
-          m + (b -> widenTerm(m.getOrElse(b, botTerm), v, pos))
+          m + (b -> widenTerm(v, m.getOrElse(b, botTerm), pos))
         })
       case (BottomMap(a), TopMap(b)) =>
         TopMap(a.foldLeft(b) { case (m, (b, v)) =>
-          m + (b -> widenTerm(m.getOrElse(b, botTerm), v, pos))
+          m + (b -> widenTerm(v, m.getOrElse(b, botTerm), pos))
         })
       case (TopMap(a), BottomMap(b)) =>
         TopMap(b.foldLeft(a) { case (m, (a, v)) =>
-          m + (a -> widenTerm(v, m.getOrElse(a, botTerm), pos))
+          m + (a -> widenTerm(m.getOrElse(a, botTerm), v, pos))
         })
       case (TopMap(a), TopMap(b)) =>
         TopMap(a.foldLeft(b) { case (m, (b, v)) =>
-          m + (b -> widenTerm(m.getOrElse(b, botTerm), v, pos))
+          m + (b -> widenTerm(v, m.getOrElse(b, botTerm), pos))
+        })
+    }
+
+  override def narrow(a: LatticeMap[D, L], b: LatticeMap[D, L]): LatticeMap[D, L] =
+    (a, b) match {
+      case (Bottom(), b) => b
+      case (a, Bottom()) => a
+      case (Top(), _) => Top()
+      case (_, Top()) => Top()
+      case (BottomMap(a), BottomMap(b)) =>
+        BottomMap(a.foldLeft(b) { case (m, (b, v)) =>
+          m + (b -> narrowTerm(v, m.getOrElse(b, botTerm)))
+        })
+      case (BottomMap(a), TopMap(b)) =>
+        TopMap(a.foldLeft(b) { case (m, (b, v)) =>
+          m + (b -> narrowTerm(v, m.getOrElse(b, botTerm)))
+        })
+      case (TopMap(a), BottomMap(b)) =>
+        TopMap(b.foldLeft(a) { case (m, (a, v)) =>
+          m + (a -> narrowTerm(m.getOrElse(a, botTerm), v))
+        })
+      case (TopMap(a), TopMap(b)) =>
+        TopMap(a.foldLeft(b) { case (m, (b, v)) =>
+          m + (b -> narrowTerm(v, m.getOrElse(b, botTerm)))
         })
     }
 

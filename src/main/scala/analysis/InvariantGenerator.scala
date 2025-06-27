@@ -2,14 +2,14 @@ package analysis
 
 import util.StaticAnalysisLogger as Logger
 
-import ir.transforms.{reversePostOrder, worklistSolver}
+import ir.transforms.{reversePostOrder, IntraproceduralWorklistSolver, NarrowingWorklistSolver}
 import ir.*
 
 /** Performs a single analysis to generate loop invariants.
  */
-class SingleLoopInvariantGenerator[L](domain: PredicateEncodingDomain[L], backwards: Boolean) {
+class SingleLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](domain: A, solver: IntraproceduralWorklistSolver[L, A], backwards: Boolean) {
   def generateInvariants(procedure: Procedure): Map[Block, Predicate] = {
-    val (startResults, endResults) = worklistSolver(domain).solveProc(procedure, backwards)
+    val (startResults, endResults) = solver.solveProc(procedure, backwards)
 
     Logger.debug(endResults)
 
@@ -20,8 +20,8 @@ class SingleLoopInvariantGenerator[L](domain: PredicateEncodingDomain[L], backwa
   }
 }
 
-class ForwardLoopInvariantGenerator[L](domain: PredicateEncodingDomain[L]) extends SingleLoopInvariantGenerator[L](domain, false)
-class BackwardLoopInvariantGenerator[L](domain: PredicateEncodingDomain[L]) extends SingleLoopInvariantGenerator[L](domain, true)
+class ForwardLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](domain: A, solver: IntraproceduralWorklistSolver[L, A]) extends SingleLoopInvariantGenerator(domain, solver, false)
+class BackwardLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](domain: A, solver: IntraproceduralWorklistSolver[L, A]) extends SingleLoopInvariantGenerator(domain, solver, true)
 
 /** Runs a collection of analyses to produce loop invariants, then inserts them into the IR.
  */
@@ -33,7 +33,8 @@ class FullLoopInvariantGenerator(program: Program) {
   def addInvariantsToProc(procedure: Procedure) = {
     Logger.debug(procedure)
     reversePostOrder(procedure)
-    val intervalInvariantGenerator = ForwardLoopInvariantGenerator(DoubleIntervalDomain(Some(procedure)))
+    val intervalDomain = DoubleIntervalDomain(Some(procedure))
+    val intervalInvariantGenerator = ForwardLoopInvariantGenerator(intervalDomain, NarrowingWorklistSolver(intervalDomain))
     intervalInvariantGenerator.generateInvariants(procedure).foreach {
       (block, pred) => {
         Logger.debug(block)
