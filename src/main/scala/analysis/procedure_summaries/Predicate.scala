@@ -21,6 +21,8 @@ enum BVTerm {
   case ZeroExtend(extension: Int, body: BVTerm)
   case SignExtend(extension: Int, body: BVTerm)
 
+  // TODO width correctness
+
   private var simplified: Boolean = false
 
   override def toString(): String = this.toBoogie.toString()

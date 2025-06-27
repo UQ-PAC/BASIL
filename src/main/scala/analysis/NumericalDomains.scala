@@ -81,9 +81,7 @@ class IntervalDomain(
     b: LatticeMap[Variable, Interval],
     pos: Block
   ): LatticeMap[Variable, Interval] =
-    if pos.isLoopHeader()
-    then widen(super.join(a, b, pos).filter((v, i) => liveBefore.exists(_(pos).contains(v))), b, pos)
-    else super.join(a, b, pos).filter((v, i) => liveBefore.exists(_(pos).contains(v)))
+    super.join(a, b, pos).filter((v, i) => liveBefore.exists(_(pos).contains(v)))
 
 
   override def widenTerm(a: Interval, b: Interval, pos: Block): Interval =
@@ -92,11 +90,18 @@ class IntervalDomain(
         throw Exception("Widening intervals of mismatching bitvector sizes")
       case (ConcreteInterval(l1, u1, w1), ConcreteInterval(l2, u2, w2)) if w1 == w2 =>
         ConcreteInterval(if l1 <= l2 then l1 else negInf(w1), if u1 >= u2 then u1 else inf(w1), w1)
-      case (Bottom, ConcreteInterval(l2, u2, w2)) =>
-        ???
-      case (ConcreteInterval(l1, u1, w1), Bottom) =>
-        ???
       case (a, b) => joinTerm(a, b, pos)
+    }
+
+  override def narrowTerm(a: Interval, b: Interval): Interval =
+    (a, b) match {
+      case (ConcreteInterval(l1, u1, w1), ConcreteInterval(l2, u2, w2)) if w1 != w2 =>
+        throw Exception("Widening intervals of mismatching bitvector sizes")
+      case (ConcreteInterval(l1, u1, w1), ConcreteInterval(l2, u2, w2)) if w1 == w2 =>
+        ConcreteInterval(if l1 == negInf(w1) then l2 else l1, if u1 == inf(w1) then u2 else u1, w1)
+      case (Bottom, ConcreteInterval(l2, u2, w2)) => Bottom
+      case (ConcreteInterval(l1, u1, w1), Bottom) => Bottom
+      case (a, b) => a
     }
 
   def transfer(b: LatticeMap[Variable, Interval], c: Command): LatticeMap[Variable, Interval] = {
