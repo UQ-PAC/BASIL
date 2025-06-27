@@ -1,11 +1,8 @@
-import org.scalatest.funsuite.AnyFunSuite
-import util.{ILLoadingConfig, IRLoading, LogLevel, Logger, PerformanceTimer, RunUtils}
-import translating.{BAPToIR, ReadELFData}
 import analysis.LoopDetector
 import ir.{Block, Program, dotBlockGraph}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
-import translating.BAPToIR
+import translating.{BAPToIR, ReadELFData}
 import util.{ILLoadingConfig, IRLoading, LogLevel, Logger}
 
 import scala.sys.process.*
