@@ -148,12 +148,12 @@ class IntraLiveVarsDomain(frames: Option[Map[Procedure, Frame]] = None) extends 
       case a: Assume => s ++ a.body.variables
       case a: Assert => s ++ a.body.variables
       case i: IndirectCall => s + i.target
-      case c: DirectCall => 
+      case c: DirectCall =>
         val read = for {
           fr <- frames
           frame <- fr.get(c.target)
-          read = frame.readGlobalVars.collect {
-            case v: Variable => v
+          read = frame.readGlobalVars.collect { case v: Variable =>
+            v
           }
         } yield (read)
         s -- c.outParams.map(_._2) ++ c.actualParams.flatMap(_._2.variables) ++ (read.toSeq.flatten)

@@ -18,7 +18,7 @@ case class CompatArg(source: Expr, target: Expr) {
   /*
    * Generate source == target expression renamed
    */
-  def toPred(renameSource: Expr => Expr, renameTarget : Expr => Expr) = 
+  def toPred(renameSource: Expr => Expr, renameTarget: Expr => Expr) =
     BinaryExpr(EQ, renameSource(source), renameTarget(target))
 
   def map(srcFunc: Expr => Expr, tgtFunc: Expr => Expr) = {
@@ -97,7 +97,14 @@ class SideEffectStatementOfStatement(frames: Map[String, Frame]) {
       val frame = frames.get(tgt.name).getOrElse(Frame())
       val globsLHS = frame.modifiedGlobalVars.toList.map(param) ++ frame.modifiedMem.toList.map(param)
       val globsRHS = frame.readGlobalVars.toList.map(param) ++ frame.readMem.toList.map(param)
-      Some(SideEffectStatement(e, s"Call_${tgt.name}", traceOut :: lhs.toList ++ globsLHS, traceOut :: rhs.toList ++ globsRHS))
+      Some(
+        SideEffectStatement(
+          e,
+          s"Call_${tgt.name}",
+          traceOut :: lhs.toList ++ globsLHS,
+          traceOut :: rhs.toList ++ globsRHS
+        )
+      )
     case MemoryLoad(lhs, memory, addr, endian, size, _) =>
       val args = List(param(memory), Field("addr") -> addr)
       val rets = List(Field("out") -> lhs, param(memory))
@@ -133,7 +140,12 @@ class SideEffectStatementOfStatement(frames: Map[String, Frame]) {
       // kind of want these gone :(
       // doesn't capture interprocedural effects but we don't resolve indirect calls so it doesn't matter
       Some(
-        SideEffectStatement(e, s"IndirectCall_${typeHint(arg.getType)}", List(traceOut, Field("target") -> arg), List(traceOut))
+        SideEffectStatement(
+          e,
+          s"IndirectCall_${typeHint(arg.getType)}",
+          List(traceOut, Field("target") -> arg),
+          List(traceOut)
+        )
       )
     case _ => None
   }
@@ -144,16 +156,12 @@ object Ackermann {
 
   case class AckInv(name: String, lhs: List[CompatArg], rhs: List[CompatArg]) {
     def toPredicate(renameSource: Expr => Expr, renameTarget: Expr => Expr) = {
-      val args = boolAnd(
-        rhs.map { case CompatArg(s, t) =>
-          BinaryExpr(EQ, renameSource(s), renameTarget(t))
-        }
-      )
-      val implicant = boolAnd(
-        lhs.map { case CompatArg(s, t) =>
-          BinaryExpr(EQ, renameSource(s), renameTarget(t))
-        }
-      )
+      val args = boolAnd(rhs.map { case CompatArg(s, t) =>
+        BinaryExpr(EQ, renameSource(s), renameTarget(t))
+      })
+      val implicant = boolAnd(lhs.map { case CompatArg(s, t) =>
+        BinaryExpr(EQ, renameSource(s), renameTarget(t))
+      })
       BinaryExpr(BoolIMPLIES, args, implicant)
     }
   }
@@ -223,7 +231,7 @@ object Ackermann {
         n = IntraProcIRCursor.succ(n.head)
       }
       val r = n.filterNot(seen.contains(_)).map {
-        case stmt : SideEffectStatement => (Some(stmt), stmt)
+        case stmt: SideEffectStatement => (Some(stmt), stmt)
         case s => (None, s)
       }
       r
@@ -278,7 +286,7 @@ object Ackermann {
               advanceBoth()
             }
             case Left(err) =>
-              // Logger.warn(s"Ackermannisation failure: $err; ${src} ${tgt}")
+            // Logger.warn(s"Ackermannisation failure: $err; ${src} ${tgt}")
           }
         }
         case _ => ()

@@ -357,31 +357,41 @@ class TranslationValidator {
   var beforeCuts: Map[Procedure, Map[String, Block]] = Map()
   var afterCuts: Map[Procedure, Map[String, Block]] = Map()
 
-  def getLiveVars(p: Procedure, frames: Map[Procedure, Frame]): (Map[Block, Set[Variable]], Map[Block, Set[Variable]]) = {
+  def getLiveVars(
+    p: Procedure,
+    frames: Map[Procedure, Frame]
+  ): (Map[Block, Set[Variable]], Map[Block, Set[Variable]]) = {
     val liveVarsDom = transforms.IntraLiveVarsDomain(Some(frames))
     val liveVarsSolver = transforms.worklistSolver(liveVarsDom)
     liveVarsSolver.solveProc(p, backwards = true)
   }
 
-
-
   // proc -> List (pred, comment)
 
   extension (i: Inv) {
 
-
-    def toAssume(proc: Procedure, label: Option[String] = None)(renameSrcSSA: (String, Expr) => Expr, renameTgtSSA: (String, Expr) => Expr) = i match {
+    def toAssume(
+      proc: Procedure,
+      label: Option[String] = None
+    )(renameSrcSSA: (String, Expr) => Expr, renameTgtSSA: (String, Expr) => Expr) = i match {
       case CutPoint(cutLabel, preds, c) => {
-        val blockLabel = beforeRenamer.stripNamespace((beforeCuts.find((p, _) => p.name == proc.name).get._2)(cutLabel).label)
-        val pred = boolAnd(preds.map(_.toPred(x => (exprInSource(renameSrcSSA(blockLabel, x))), x => exprInTarget(renameTgtSSA(blockLabel, x)))))
+        val blockLabel =
+          beforeRenamer.stripNamespace((beforeCuts.find((p, _) => p.name == proc.name).get._2)(cutLabel).label)
+        val pred = boolAnd(
+          preds.map(
+            _.toPred(x => (exprInSource(renameSrcSSA(blockLabel, x))), x => exprInTarget(renameTgtSSA(blockLabel, x)))
+          )
+        )
         val guarded =
-          BinaryExpr(BoolIMPLIES, exprInSource(renameSrcSSA(blockLabel, (BinaryExpr(EQ, transitionSystemPCVar, PCSym(cutLabel))))), pred)
-        println("GUARD")
-        println(guarded)
+          BinaryExpr(
+            BoolIMPLIES,
+            exprInSource(renameSrcSSA(blockLabel, (BinaryExpr(EQ, transitionSystemPCVar, PCSym(cutLabel))))),
+            pred
+          )
         Assume(guarded, c)
       }
       case Global(pred, c) => {
-        val ssaRenamed =  label.map(label => pred.map(renameSrcSSA(label, _), renameTgtSSA(label, _))).getOrElse(pred)
+        val ssaRenamed = label.map(label => pred.map(renameSrcSSA(label, _), renameTgtSSA(label, _))).getOrElse(pred)
         val pr = ssaRenamed.toPred(exprInSource, exprInTarget)
         Assume(pr, c)
       }
@@ -526,9 +536,9 @@ class TranslationValidator {
         case (label, cutPoint) => {
           val vars = lives.get(cutPoint.label).getOrElse(Map())
 
-          val assertion =  vars.toList.map { case (src, tgt) =>
-                CompatArg(src, tgt)
-              }
+          val assertion = vars.toList.map { case (src, tgt) =>
+            CompatArg(src, tgt)
+          }
 
           // val guard = BinaryExpr(EQ, visit_rvar(afterRenamer, transitionSystemPCVar), PCMan.PCSym(label))
 
@@ -539,7 +549,6 @@ class TranslationValidator {
       setInvariant(p.name, inv.toList)
     }
   }
-
 
   def reachingDefs(p: Procedure) = {
     transforms.reversePostOrder(p)
@@ -666,7 +675,7 @@ class TranslationValidator {
       tgtEntry.statements.prepend(LocalAssign((transitionSystemPCVar), (transitionSystemPCVar)))
       tgtEntry.statements.prepend(LocalAssign((traceVar), (traceVar)))
 
-      val frames = (afterFrame ++ beforeFrame).map((k,v) => (k.name, v)).toMap
+      val frames = (afterFrame ++ beforeFrame).map((k, v) => (k.name, v)).toMap
 
       val (srcRenameSSA, srcLiveMemory) = SSADAG.transform(frames, source)
       val (tgtRenameSSA, tgtLiveMemory) = SSADAG.transform(frames, target)
@@ -675,29 +684,22 @@ class TranslationValidator {
       if (!dir.exists()) then dir.mkdirs()
       Logger.writeToFile(File(s"graphs/NOPblockgraph-${proc.name}.dot"), dotBlockGraph(source))
 
-
-      val ackInv = Ackermann.instantiateAxioms(
-        source.entryBlock.get,
-        target.entryBlock.get,
-        frames,
-        exprInSource,
-        exprInTarget
-      )
+      val ackInv =
+        Ackermann.instantiateAxioms(source.entryBlock.get, target.entryBlock.get, frames, exprInSource, exprInTarget)
       timer.checkPoint("ackermann")
-
 
       val pcInv = CompatArg(transitionSystemPCVar, transitionSystemPCVar)
       val traceInv = CompatArg(traceVar, traceVar)
       // add invariant to combined
       val initInv = Seq(Inv.Global(pcInv, Some("PC INVARIANT")), Inv.Global(traceInv, Some("Trace INVARIANT")))
-      val memoryInit = (srcLiveMemory.keys.toSet ++ tgtLiveMemory.keys).toList.map (k => Inv.Global(CompatArg(srcLiveMemory(k), tgtLiveMemory(k)), Some(s"Memory$k")))
-      
+      val memoryInit = (srcLiveMemory.keys.toSet ++ tgtLiveMemory.keys).toList.map(k =>
+        Inv.Global(CompatArg(srcLiveMemory(k), tgtLiveMemory(k)), Some(s"Memory$k"))
+      )
+
       val invariant = initInv ++ invariants(proc.name) ++ memoryInit
 
-      println(allocatedPCS.mkString("\n"))
-
       val primedInv = invariant.map {
-        case g: Inv.Global => 
+        case g: Inv.Global =>
           g.toAssume(proc, Some(srcExit.label))(srcRenameSSA, tgtRenameSSA).body
         case i @ CutPoint(l, b, comment) => {
           // rename for end state of ssa
@@ -709,14 +711,14 @@ class TranslationValidator {
 
           val nc = CutPoint(l, rned, comment)
           nc.toAssume(proc)(srcRenameSSA, tgtRenameSSA) match {
-            case Assume(b , c, _, _) => b
+            case Assume(b, c, _, _) => b
           }
         }
       }
 
-
-      val invVariables = invariants(proc.name).flatMap(_.toAssume(proc, Some(srcEntry.label))(srcRenameSSA, tgtRenameSSA).body.variables).toSet
-
+      val invVariables = invariants(proc.name)
+        .flatMap(_.toAssume(proc, Some(srcEntry.label))(srcRenameSSA, tgtRenameSSA).body.variables)
+        .toSet
 
       visit_proc(afterRenamer, source)
       visit_proc(beforeRenamer, target)

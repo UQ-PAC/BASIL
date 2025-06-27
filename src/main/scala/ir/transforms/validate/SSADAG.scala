@@ -21,12 +21,12 @@ object SSADAG {
     (ssaTransform(p), liveMemory)
   }
 
-  def getReadMemory(p: Procedure) : Map[Memory, Variable] = {
+  def getReadMemory(p: Procedure): Map[Memory, Variable] = {
     val r = p.collect {
       case SideEffectStatement(_, _, lhs, rhs) => {
-        rhs.collect{ 
-        case (formal: Memory, actual: Variable) => (formal, actual)
-        case (formal: Memory, actual) => ???
+        rhs.collect {
+          case (formal: Memory, actual: Variable) => (formal, actual)
+          case (formal: Memory, actual) => ???
         }
       }
     }.flatten
@@ -200,11 +200,13 @@ object SSADAG {
         val c = renameRHS(renaming.get)(s) // also modifies in-place
         c match {
           case a @ SideEffectStatement(s, n, lhs, rhs) => {
-            val rn = lhs.map((formal, v) => {
-              val freshDef = freshName(v)
-              renaming(v) = freshDef
-              v -> freshDef
-            }).toMap
+            val rn = lhs
+              .map((formal, v) => {
+                val freshDef = freshName(v)
+                renaming(v) = freshDef
+                v -> freshDef
+              })
+              .toMap
 
             renameLHS(rn, a)
           }
@@ -235,10 +237,7 @@ object SSADAG {
       }
     }
 
-
     val renameBeforeLabels = renameBefore.map((b, r) => b.label -> r)
-
-    println(renameBeforeLabels.keys.mkString(", "))
 
     (b, c) => visit_expr(RenameRHS(renameBeforeLabels(b).get), c)
   }

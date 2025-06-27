@@ -915,7 +915,6 @@ object RunUtils {
 
     ir.transforms.validate.wrapShapePreservingTransformInValidation(p => (), "NOP")(ctx.program)
 
-
     if (conf.simplify) {
 
       ir.transforms.clearParams(ctx.program)
