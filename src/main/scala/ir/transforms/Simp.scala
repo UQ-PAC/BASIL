@@ -3,6 +3,7 @@ import translating.PrettyPrinter.*
 import java.io.{BufferedWriter, File, FileInputStream, FileWriter, IOException, PrintWriter}
 import util.LogLevel
 
+import analysis.ProcFrames.Frame
 import util.DebugDumpIRLogger
 import util.{SimplifyLogger, condPropDebugLogger}
 import ir.eval.AlgebraicSimplifications
@@ -134,7 +135,7 @@ class DefUseEntryDomain() extends AbstractDomain[Map[Variable, Set[Def]]] {
   }
 }
 
-class IntraLiveVarsDomain extends PowerSetDomain[Variable] {
+class IntraLiveVarsDomain(frames: Option[Map[Procedure, Frame]] = None) extends PowerSetDomain[Variable] {
   // expected backwards
 
   def transfer(s: Set[Variable], a: Command): Set[Variable] = {
@@ -147,7 +148,15 @@ class IntraLiveVarsDomain extends PowerSetDomain[Variable] {
       case a: Assume => s ++ a.body.variables
       case a: Assert => s ++ a.body.variables
       case i: IndirectCall => s + i.target
-      case c: DirectCall => (s -- c.outParams.map(_._2)) ++ c.actualParams.flatMap(_._2.variables)
+      case c: DirectCall => 
+        val read = for {
+          fr <- frames
+          frame <- fr.get(c.target)
+          read = frame.readGlobalVars.collect {
+            case v: Variable => v
+          }
+        } yield (read)
+        s -- c.outParams.map(_._2) ++ c.actualParams.flatMap(_._2.variables) ++ (read.toSeq.flatten)
       case g: GoTo => s
       case r: Return => s ++ r.outParams.flatMap(_._2.variables)
       case r: Unreachable => s

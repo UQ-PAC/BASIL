@@ -357,6 +357,14 @@ class TranslationValidator {
   var beforeCuts: Map[Procedure, Map[String, Block]] = Map()
   var afterCuts: Map[Procedure, Map[String, Block]] = Map()
 
+  def getLiveVars(p: Procedure, frames: Map[Procedure, Frame]): (Map[Block, Set[Variable]], Map[Block, Set[Variable]]) = {
+    val liveVarsDom = transforms.IntraLiveVarsDomain(Some(frames))
+    val liveVarsSolver = transforms.worklistSolver(liveVarsDom)
+    liveVarsSolver.solveProc(p, backwards = true)
+  }
+
+
+
   // proc -> List (pred, comment)
 
   extension (i: Inv) {
@@ -546,7 +554,7 @@ class TranslationValidator {
     beforeFrame = inferProcFrames(p)
     initProg = Some(p)
     val (prog, cuts) = toTransitionSystem(p, beforeFrame)
-    liveBefore = p.procedures.map(p => p.name -> transforms.getLiveVars(p)).toMap
+    liveBefore = p.procedures.map(p => p.name -> getLiveVars(p, beforeFrame)).toMap
     beforeProg = Some(prog)
     beforeCuts = cuts
   }
@@ -583,7 +591,7 @@ class TranslationValidator {
   def setSourceProg(p: Program) = {
     afterFrame = inferProcFrames(p)
     val (prog, cuts) = toTransitionSystem(p, afterFrame)
-    liveAfter = p.procedures.map(p => p.name -> transforms.getLiveVars(p)).toMap
+    liveAfter = p.procedures.map(p => p.name -> getLiveVars(p, afterFrame)).toMap
     afterProg = Some(prog)
     afterCuts = cuts
   }
