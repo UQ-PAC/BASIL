@@ -135,6 +135,7 @@ trait ProcedureSummaryGenerator[L, LocalDomain] extends ProcAbstractDomain[L] {
   *   The abstract domain implementing the analysis
   */
 trait IntraproceduralWorklistSolver[L, A <: AbstractDomain[L]](domain: A, widen: Boolean, narrow: Boolean) {
+
   /** Perform the analysis on a procedure and return the resulting lattice values for each block.
     *
     * @param p
@@ -270,7 +271,8 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) extends Intraprocedur
   * @param domain:
   *   The abstract domain implementing the analysis
   */
-class WideningWorklistSolver[L, A <: AbstractDomain[L]](domain: A) extends IntraproceduralWorklistSolver(domain, true, false)
+class WideningWorklistSolver[L, A <: AbstractDomain[L]](domain: A)
+    extends IntraproceduralWorklistSolver(domain, true, false)
 
 /** Intraprocedural worklist solver that widens and narrows on loop heads.
   *
@@ -283,7 +285,8 @@ class WideningWorklistSolver[L, A <: AbstractDomain[L]](domain: A) extends Intra
   * @param domain:
   *   The abstract domain implementing the analysis
   */
-class NarrowingWorklistSolver[L, A <: AbstractDomain[L]](domain: A) extends IntraproceduralWorklistSolver(domain, true, true)
+class NarrowingWorklistSolver[L, A <: AbstractDomain[L]](domain: A)
+    extends IntraproceduralWorklistSolver(domain, true, true)
 
 /** Perform an interprocedural analysis by running an intraprocedural analysis on each procedure, computing a summary
   * based on the result, and computing the fixed point of summaries over the call graph.

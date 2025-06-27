@@ -193,10 +193,7 @@ object Main {
     threadSplit: Flag,
     @arg(name = "parameter-form", doc = "Lift registers to local variables passed by parameter")
     parameterForm: Flag,
-    @arg(
-      name = "summarise-procedures",
-      doc = "Generates summaries of procedures which are used in pre/post-conditions"
-    )
+    @arg(name = "summarise-procedures", doc = "Generates summaries of procedures which are used in pre/post-conditions")
     summariseProcedures: Flag,
     @arg(
       name = "generate-loop-invariants",

@@ -83,7 +83,6 @@ class IntervalDomain(
   ): LatticeMap[Variable, Interval] =
     super.join(a, b, pos).filter((v, i) => liveBefore.exists(_(pos).contains(v)))
 
-
   override def widenTerm(a: Interval, b: Interval, pos: Block): Interval =
     (a, b) match {
       case (ConcreteInterval(l1, u1, w1), ConcreteInterval(l2, u2, w2)) if w1 != w2 =>
