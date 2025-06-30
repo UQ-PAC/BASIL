@@ -32,7 +32,7 @@ class PredProductDomain[L1, L2](d1: PredicateEncodingDomain[L1], d2: PredicateEn
     extends ProductDomain[L1, L2](d1, d2)
     with PredicateEncodingDomain[(L1, L2)] {
 
-  def toPred(x: (L1, L2)): Predicate = Predicate.and(d1.toPred(x._1), d2.toPred(x._2))
+  def toPred(x: (L1, L2)): Predicate = Predicate.and(d1.toPred(x._1), d2.toPred(x._2)).simplify
 
   override def fromPred(p: Predicate): (L1, L2) = (d1.fromPred(p), d2.fromPred(p))
 }
