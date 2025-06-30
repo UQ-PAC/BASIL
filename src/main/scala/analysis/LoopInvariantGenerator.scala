@@ -100,11 +100,12 @@ class FullLoopInvariantGenerator(program: Program) {
     ForwardLoopInvariantGenerator(intervals, NarrowingWorklistSolver(intervals)).genAndAddInvariants(procedure)
 
     // Gamma domains ensure that relations of the gammas of variables are maintained throughout loop iterations.
-    val gammas = MayGammaDomain(
-      LatticeMap.TopMap(procedure.formalInParam.unsorted.map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
-    )
-    ForwardLoopInvariantGenerator(gammas, worklistSolver(gammas)).genAndAddInvariants(procedure)
-    // TODO consider whether the must gamma domain is also worthwhile using
+    val gammaMap =
+      LatticeMap.TopMap(procedure.formalInParam.unsorted.map((v: Variable) => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+    val mayGammas = MayGammaDomain(gammaMap)
+    val mustGammas = MustGammaDomain(gammaMap)
+    ForwardLoopInvariantGenerator(mayGammas, worklistSolver(mayGammas)).genAndAddInvariants(procedure)
+    BackwardLoopInvariantGenerator(mustGammas, worklistSolver(mustGammas)).genAndAddInvariants(procedure)
 
     // Add more domains here
   }
