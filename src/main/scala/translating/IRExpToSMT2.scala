@@ -31,6 +31,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
     }
   }
 
+
   def vjump(j: Jump): Repr[Jump] = {
     j match {
       case g: GoTo => vgoto(g.targets.toList.map(_.label))
@@ -54,8 +55,8 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
       case q: QuantifierExpr => vquantifier(q)
       case q: LambdaExpr => vlambda(q)
       case r: OldExpr => vold(r.body)
-      case r: SharedMemory => ???
-      case r: StackMemory => ???
+      case r: SharedMemory => vmemory(r)
+      case r: StackMemory => vmemory(r)
     }
   }
 
@@ -88,6 +89,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
     returnBlock: Option[Repr[Block]]
   ): Repr[Procedure]
 
+  def vmemory(m: Memory) : Repr[Memory]
   def vassign(lhs: Repr[Variable], rhs: Repr[Expr]): Repr[LocalAssign]
   def vmemassign(lhs: Repr[Variable], rhs: Repr[Expr]): Repr[LocalAssign]
   def vsimulassign(assignments: List[(Repr[Variable], Repr[Expr])]): Repr[SimulAssign]

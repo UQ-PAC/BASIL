@@ -579,6 +579,7 @@ class BasilIRPrettyPrinter(
     }
   }
 
+  override def vmemory(m: Memory) = BST(Sigil.BASIR.globalVar + m.name)
   override def vold(e: Expr) = BST(s"old(${vexpr(e)})")
   override def vlambda(e: LambdaExpr) = ???
   override def vquantifier(e: QuantifierExpr) = ???
