@@ -21,6 +21,10 @@
 - [Project layout](development/project-layout.md) Organisation of the source code
 - [Common Development Tasks](development/readme.md) Explanation of common development tasks
 - [Profiling](development/profiling.md)
+
+# Devleopment Guidelines
+
+- [Assertions](development/assertions.md)
 - [Scala](development/scala.md)
 
 # Design Docs

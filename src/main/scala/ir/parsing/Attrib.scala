@@ -4,6 +4,7 @@ import boogie.SpecGlobal
 import ir.{BitVecLiteral, FalseLiteral, IntLiteral, Literal, MemorySection, Sigil, TrueLiteral}
 import specification.{ExternalFunction, FuncEntry}
 import util.Logger
+import util.assertion.*
 
 import java.io.*
 import java.util.Base64
@@ -323,7 +324,7 @@ case object MemoryAttribData {
         by
       }
     }
-    assert(decoded.toList == bytes.toList)
+    debugAssert(decoded.toList == bytes.toList)
 
     MemoryAttribData(m.name, m.address, m.size, m.readOnly, b64bytes)
   }

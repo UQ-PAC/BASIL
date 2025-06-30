@@ -1,4 +1,5 @@
 package ir
+import util.assertion.*
 import util.intrusive_list.IntrusiveListElement
 
 import collection.immutable.SortedMap
@@ -242,8 +243,8 @@ class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override
     if (_targets.remove(t)) {
       t.removeIncomingJump(this)
     }
-    assert(!_targets.contains(t))
-    assert(!t.incomingJumps.contains(this))
+    debugAssert(!_targets.contains(t))
+    debugAssert(!t.incomingJumps.contains(this))
   }
 
   override def toString: String = s"${labelStr}GoTo(${targets.map(_.label).mkString(", ")})"
