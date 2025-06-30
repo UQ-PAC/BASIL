@@ -10,10 +10,10 @@ import scala.util.{Try}
 import $file.basilmill.util.DownloadModule
 
 
-trait ProfileRun extends ScalaModule with DownloadModule {
+trait ProfileModule extends ScalaModule with DownloadModule {
 
-  def url = s"https://github.com/async-profiler/async-profiler/releases/download/v${version}/async-profiler-${version}-$zipSuffix"
-  def name = "libasyncprofiler.so"
+  def name = s"async-profiler-${version}-$zipSuffix"
+  def url = s"https://github.com/async-profiler/async-profiler/releases/download/v${version}/$name"
   def version = "4.0"
   def toUnpack = s"async-profiler-${version}-${folderSuffix}/lib/libasyncProfiler.${libExn}"
 

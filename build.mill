@@ -7,7 +7,7 @@ import scalalib._
 import $file.basilmill.mdbook.mdbookBinary
 import $file.basilmill.bnfc.BNFCJFlexModule
 import $file.basilmill.antlr.AntlrModule
-import $file.basilmill.profile.ProfileRun
+import $file.basilmill.profile.ProfileModule
 
 import os.Path
 
@@ -303,7 +303,7 @@ object `package` extends RootModule with ScalaModule {
     os.move(newFile, tagsFile, replaceExisting = true, atomicMove = true)
   }
 
-  object asyncProf extends ProfileRun {
+  object asyncProf extends ProfileModule {
     override def scalaVersion = build.scalaVersion
   }
 

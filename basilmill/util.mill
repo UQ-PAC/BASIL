@@ -54,22 +54,21 @@ trait DownloadModule extends Module {
     ignoring(classOf[UnsupportedOperationException]) {
       os.perms.set(p, mode)
     }
-    p.toString
+    unzip.map {
+      case TarGZ(extractedName) => 
+        os.call(Seq("tar", "-xzf", p.toString), cwd=dest)
+        PathRef(dest / os.SubPath(extractedName)).path.toString
+      case Zip(extractedName) =>
+        os.call(Seq("unzip", p.toString), cwd=dest)
+        PathRef(dest / os.SubPath(extractedName)).path.toString
+    }.getOrElse(p.toString)
   }
 
 
   def pathref = Task(PathRef(Path(path())))
   def path = Task {
     local().getOrElse({
-      val l = remote(Task.dest)
-      unzip.map {
-        case TarGZ(extractedName) => 
-          os.call(Seq("tar", "-xzf", l.toString), cwd=Task.dest)
-          PathRef(Task.dest / os.SubPath(extractedName)).path.toString
-        case Zip(extractedName) =>
-          os.call(Seq("unzip", l.toString), cwd=Task.dest)
-          PathRef(Task.dest / os.SubPath(extractedName)).path.toString
-      }.getOrElse(l)
+      remote(Task.dest)
     })
     
   }
