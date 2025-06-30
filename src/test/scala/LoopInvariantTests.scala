@@ -1,9 +1,10 @@
 import analysis.*
+import boogie.SpecGlobal
 import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.CaptureOutput
-import util.IRTransform
+import test_util.{CaptureOutput, programToContext}
+import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, IRTransform, RunUtils}
 
 @test_util.tags.UnitTest
 class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
@@ -13,6 +14,27 @@ class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
     foundLoops.updateIrWithLoops()
 
     IRTransform.generateLoopInvariants(program)
+  }
+
+  def runTest(
+    program: Program,
+    globals: Set[SpecGlobal] = Set.empty,
+    globalOffsets: Map[BigInt, BigInt] = Map.empty
+  ): BASILResult = {
+    val context = programToContext(program, globals, globalOffsets)
+    // Don't simplify as we would have generated invariants before simplification. The simplifier will rename variables
+    // among other things, breaking these invariants.
+    RunUtils.loadAndTranslate(
+      BASILConfig(
+        context = Some(context),
+        loading = ILLoadingConfig(inputFile = "", relfFile = None),
+        simplify = false,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = None // Some(DSAConfig(Set.empty))
+      )
+    )
   }
 
   test("boundedLoop") {
@@ -63,6 +85,10 @@ class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
       }
     })
 
-    // TODO assert x == 100 with boogie
+    val basilOut = runTest(program)
+    val results = basilOut.boogie.map(_.verifyBoogie())
+    assertResult(true) {
+      results.forall(_.kind.isVerified)
+    }
   }
 }
