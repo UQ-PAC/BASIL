@@ -22,8 +22,6 @@ sealed trait Command extends HasParent[Block] with DeepEquality {
     case Some(s) => s"$s: "
     case None => ""
   }
-
-  override def toString = translating.PrettyPrinter.pp_cmd(this)
 }
 
 sealed trait Statement extends Command, IntrusiveListElement[Statement] {
@@ -46,6 +44,8 @@ class MemoryAssign(var lhs: Variable, var rhs: Expr, override val label: Option[
     case r: GlobalVar => Set(r)
     case _ => Set()
 
+  override def toString: String = s"$labelStr$lhs := $rhs"
+
   def deepEquals(o: Object): Boolean = o match {
     case MemoryAssign(l, r, lbl) if l == lhs && r == rhs && lbl == label => true
     case _ => false
@@ -61,6 +61,7 @@ class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[S
     case r: GlobalVar => Set(r)
     case _ => Set()
   }
+  override def toString: String = s"$labelStr$lhs := $rhs"
 
   def deepEquals(o: Object) = o match {
     case LocalAssign(l, r, lbl) if l == lhs && r == rhs && lbl == label => true
@@ -74,6 +75,11 @@ class SimulAssign(var assignments: Vector[(Variable, Expr)], override val label:
   }.toSet
 
   def assignees = assignments.map(_._1).toSet
+  override def toString: String = s"$labelStr${assignments
+      .map { case (lhs, rhs) =>
+        lhs.toString + " := " + rhs
+      }
+      .mkString(", ")}"
 
   override def deepEquals(o: Object): Boolean = o match {
     case SimulAssign(otherAssings) => otherAssings == assignments
@@ -102,6 +108,7 @@ class MemoryStore(
   override val label: Option[String] = None
 ) extends Statement {
   override def modifies: Set[Global] = Set(mem)
+  override def toString: String = s"$labelStr$mem[$index] := MemoryStore($value, $endian, $size)"
   override def deepEquals(o: Object) = o match {
     case MemoryStore(m, i, v, e, s, l) => m == mem && i == index && v == value && e == endian && s == size && l == label
     case _ => false
@@ -125,6 +132,7 @@ class MemoryLoad(
     case r: GlobalVar => Set(r)
     case _ => Set()
   }
+  override def toString: String = s"$labelStr$lhs := MemoryLoad($mem, $index, $endian, $size)"
   override def deepEquals(o: Object) = o match {
     case MemoryLoad(l, m, ind, en, sz, lbl) =>
       l == lhs && m == mem && ind == index && en == endian && sz == size && lbl == label
@@ -138,6 +146,7 @@ object MemoryLoad {
 }
 
 class NOP(override val label: Option[String] = None) extends Statement {
+  override def toString: String = s"NOP $labelStr"
   override def deepEquals(o: Object) = o match {
     case NOP(x) => x == label
     case _ => false
@@ -147,13 +156,18 @@ object NOP {
   def unapply(x: NOP) = Some(x.label)
 }
 
-class AtomicStart(override val label: Option[String] = None) extends NOP(label) {}
+class AtomicStart(override val label: Option[String] = None) extends NOP(label) {
+  override def toString: String = s"AtomicStart $labelStr"
+}
 
-class AtomicEnd(override val label: Option[String] = None) extends NOP(label) {}
+class AtomicEnd(override val label: Option[String] = None) extends NOP(label) {
+  override def toString: String = s"AtomicEnd $labelStr"
+}
 
 class Assert(var body: Expr, acomment: Option[String] = None, override val label: Option[String] = None)
     extends Statement {
   comment = acomment
+  override def toString: String = s"${labelStr}assert $body" + comment.map(" //" + _)
   override def deepEquals(o: Object) = o match {
     case Assert(b, c, l) => b == body && c == comment && l == label
   }
@@ -179,6 +193,7 @@ class Assume(
 ) extends Statement {
 
   comment = acomment
+  override def toString: String = s"${labelStr}assume $body" + comment.map(" // " + _)
   override def deepEquals(o: Object) = o match {
     case Assume(b, c, l, sec) => b == body && c == comment && l == label && sec == checkSecurity
     case _ => false
@@ -205,6 +220,7 @@ class Unreachable(override val label: Option[String] = None) extends Jump {
 
 class Return(override val label: Option[String] = None, var outParams: SortedMap[LocalVar, Expr] = SortedMap())
     extends Jump {
+  override def toString = s"Return(${outParams.mkString(",")})"
   override def deepEquals(o: Object): Boolean = o match {
     case Return(lbl, param) => lbl == label && param.toList == outParams.toList
     case _ => false
@@ -261,6 +277,7 @@ class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override
     debugAssert(!t.incomingJumps.contains(this))
   }
 
+  override def toString: String = s"${labelStr}GoTo(${targets.map(_.label).mkString(", ")})"
 }
 
 object GoTo {
@@ -286,6 +303,8 @@ class DirectCall(
     case None => Set()
   } */
   def calls: Set[Procedure] = Set(target)
+  override def toString: String =
+    s"${labelStr}${outParams.values.map(_.name).mkString(",")} := DirectCall(${target.name})(${actualParams.values.mkString(",")})"
 
   def assignees: Set[Variable] = outParams.values.toSet
 
@@ -317,6 +336,7 @@ class IndirectCall(var target: Variable, override val label: Option[String] = No
     case Some(c) => c.locals + target
     case None => Set(target)
   } */
+  override def toString: String = s"${labelStr}IndirectCall($target)"
   override def deepEquals(o: Object): Boolean = o match {
     case IndirectCall(t, l) => t == target && l == label
     case _ => false
