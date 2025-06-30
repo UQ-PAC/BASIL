@@ -2,7 +2,7 @@ import analysis.data_structure_analysis.*
 import ir.*
 import org.scalatest.funsuite.*
 import test_util.{BASILTest, CaptureOutput, TestConfig, TestCustomisation}
-import util.{BASILResult, DSConfig, DSAContext, LogLevel, Logger, StaticAnalysisConfig}
+import util.{BASILResult, DSAContext, DSConfig, LogLevel, Logger, StaticAnalysisConfig}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer

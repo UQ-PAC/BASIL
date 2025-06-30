@@ -1,15 +1,13 @@
-import analysis.data_structure_analysis.{DSInterval, Global, Heap, IntervalDSA, Par, Ret, Stack, SymBase}
+import analysis.data_structure_analysis
+import analysis.data_structure_analysis.{DSInterval, Heap, IntervalDSA, Par, Ret, SymBase}
 import boogie.SpecGlobal
 import ir.Endian.LittleEndian
 import ir.dsl.{block, directCall, goto, proc, prog, ret}
 import ir.{BitVecLiteral, Endian, MemoryLoad, Register, SharedMemory, *}
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
-import test_util.{BASILTest, CaptureOutput, programToContext}
+import test_util.BASILTest
 import util.*
-import analysis.data_structure_analysis
-import test_util.{BASILTest, CaptureOutput}
-import translating.PrettyPrinter.pp_prog
 import util.DSAPhase.{Local, TD}
 
 object IntervalDSATestData {

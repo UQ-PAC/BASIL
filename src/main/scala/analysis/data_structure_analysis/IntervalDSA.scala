@@ -1,15 +1,14 @@
 package analysis.data_structure_analysis
 
-import util.DSAPhase.*
-import analysis.data_structure_analysis.OSet.Top
-import analysis.data_structure_analysis.GlobSym
 import analysis.data_structure_analysis.IntervalDSA.checkUniqueGlobals
-import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver}
+import analysis.data_structure_analysis.OSet.Top
+import analysis.solvers.OffsetUnionFindSolver
 import boogie.SpecGlobal
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.*
 import ir.eval.BitVectorEval.isNegative
 import specification.{ExternalFunction, FuncEntry, SymbolTableEntry}
+import util.DSAPhase.*
 import util.LogLevel.INFO
 import util.{DSAContext, DSALogger, DSAPhase, DSConfig, IRContext, PerformanceTimer}
 

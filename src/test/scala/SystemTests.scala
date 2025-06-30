@@ -1,8 +1,7 @@
-import util.DSAPhase.TD
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest.*
 import test_util.{BASILTest, CaptureOutput, Histogram, TestConfig, TestCustomisation}
-import util.DSAConfig.Checks
+import util.DSAPhase.TD
 import util.boogie_interaction.*
 import util.{DSConfig, DebugDumpIRLogger, LogLevel, Logger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
 

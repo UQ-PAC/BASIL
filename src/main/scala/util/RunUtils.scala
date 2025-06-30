@@ -16,7 +16,7 @@ import specification.*
 import translating.*
 import translating.PrettyPrinter.*
 import util.LogLevel.INFO
-import util.{DebugDumpIRLogger, Logger, DSAPhase}
+import util.{DebugDumpIRLogger, Logger}
 
 import java.io.{BufferedWriter, File, FileInputStream, FileWriter, PrintWriter}
 import java.nio.file.{Files, Paths}
