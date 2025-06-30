@@ -1,18 +1,12 @@
-import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.matchers.should.Matchers
-import scala.util.{Try, Failure, Success}
-import java.io.OutputStream
-import translating.PrettyPrinter.*
-
 import ir.*
 import ir.dsl.*
-import ir.dsl.given
+import org.scalatest.funsuite.AnyFunSuite
 
 @test_util.tags.UnitTest
 class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureOutput {
 
   /**
-   * Regression test condition lifting using for a difficult example which requires propagating conditions across multiple branches 
+   * Regression test condition lifting using for a difficult example which requires propagating conditions across multiple branches
    *
    * Future simplifications could possibly break this if the branches are simplified further (e.g. more extends/extracts removed)
    */
@@ -833,15 +827,13 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
 
     (ctx.program).foreach {
       case a: Assume => {
-        val assumeBody = a.body
-        assert(
-          assumeBody.variables
-            .filter(_.name match {
-              case s"Cse${_}" | s"CF${_}" | s"ZF${_}" | s"VF${_}" | s"NF${_}" => true
-              case _ => false
-            })
-            .isEmpty
-        )
+        assert(!(a.body.variables.exists(v => {
+          v.name.startsWith("ZF")
+          || v.name.startsWith("CF")
+          || v.name.startsWith("VF")
+          || v.name.startsWith("NF")
+          || v.name.startsWith("Cse")
+        })))
       }
       case _ => ()
     }

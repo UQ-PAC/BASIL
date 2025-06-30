@@ -1,6 +1,7 @@
 package analysis.solvers
 
 import analysis.data_structure_analysis.Node
+
 import scala.collection.mutable
 
 class DSAUnionFindSolver extends UnionFindSolver[UniTerm] {

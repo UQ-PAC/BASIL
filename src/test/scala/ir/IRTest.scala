@@ -1,11 +1,12 @@
 package ir
 
-import scala.collection.immutable.*
-import org.scalatest.funsuite.AnyFunSuite
-import translating.PrettyPrinter.*
-import ir.dsl.*
 import ir.*
+import ir.dsl.*
+import org.scalatest.funsuite.AnyFunSuite
 import test_util.CaptureOutput
+import translating.PrettyPrinter.*
+
+import scala.collection.immutable.*
 
 @test_util.tags.UnitTest
 class IRTest extends AnyFunSuite with CaptureOutput {

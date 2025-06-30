@@ -1,13 +1,11 @@
 package ir
-import util.Logger
-import cfg_visualiser.DotElement
-import cfg_visualiser.{DotArrow, DotGraph, DotInlineArrow, DotInterArrow, DotIntraArrow, DotNode, DotRegularArrow}
+import cfg_visualiser.{DotArrow, DotGraph, DotInterArrow, DotNode, DotRegularArrow}
 import translating.BasilIRPrettyPrinter
-
 import translating.PrettyPrinter.*
-import ir.cilvisitor.*
-import collection.mutable
+
 import scala.annotation.tailrec
+
+import collection.mutable
 
 /** 
  *  This file defines functions to get the successor and predecessor of a IR node for control flow.

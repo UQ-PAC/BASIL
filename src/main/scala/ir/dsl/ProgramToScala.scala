@@ -1,14 +1,11 @@
 package ir.dsl
 
 import ir.*
-import ir.dsl.{ToScala, ToScalaLines}
-import util.{intersperse}
+import util.intersperse
 import util.twine.Twine
 
-import collection.immutable.{ListMap, SortedMap}
-import collection.immutable.{LazyList}
+import collection.immutable.{ListMap, LazyList}
 import collection.mutable
-import collection.mutable.{LinkedHashSet}
 
 /**
  * ToScala instances for Program, Procedure, and Block

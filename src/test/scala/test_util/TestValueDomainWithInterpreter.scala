@@ -2,10 +2,9 @@ package test_util
 
 import ir.*
 import ir.eval.*
-import util.functional.State
 import translating.PrettyPrinter.*
 import util.IRContext
-import org.scalacheck.{Arbitrary, Gen}
+import util.functional.State
 
 trait TestValueDomainWithInterpreter[T] {
 

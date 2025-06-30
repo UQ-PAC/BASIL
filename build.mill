@@ -4,15 +4,18 @@ import $packages._
 import mill._
 import scalalib._
 
+import $file.basilmill.mdbook.mdbookBinary
 import $file.basilmill.bnfc.BNFCJFlexModule
 import $file.basilmill.antlr.AntlrModule
 
 import os.Path
 
+import $ivy.`com.goyeau::mill-scalafix::0.4.2`
 import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
 import contrib.scalapblib._
+import com.goyeau.mill.scalafix.ScalafixModule
 
-object `package` extends RootModule with ScalaModule {
+object `package` extends RootModule with ScalaModule with ScalafixModule {
   // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
   def scalaVersion = "3.3.4"
@@ -22,15 +25,15 @@ object `package` extends RootModule with ScalaModule {
 
   def moduleDeps = Seq(basilAntlr, basilProto, bnfc)
 
-  def scalacOptions: T[Seq[String]] = Seq("-deprecation")
+  def scalacOptions: T[Seq[String]] = Seq("-deprecation", "-Wunused:imports", "-feature")
 
   val javaTests = ivy"com.novocode:junit-interface:0.11"
   val scalaTests = ivy"org.scalatest::scalatest:3.2.19"
   val scalaCheck = ivy"org.scalatestplus::scalacheck-1-18:3.2.19.0"
   val scalactic = ivy"org.scalactic::scalactic:3.2.19"
   val antlrRuntime = ivy"org.antlr:antlr4-runtime:4.9"
-  val sourceCode = ivy"com.lihaoyi::sourcecode:0.3.0"
-  val mainArgs = ivy"com.lihaoyi::mainargs:0.5.1"
+  val sourceCode = ivy"com.lihaoyi::sourcecode:0.4.2"
+  val mainArgs = ivy"com.lihaoyi::mainargs:0.7.6"
   val scalapb = ivy"com.thesamet.scalapb::scalapb-runtime:0.11.15"
   val upickle = ivy"com.lihaoyi::upickle:4.2.1"
 
@@ -42,12 +45,18 @@ object `package` extends RootModule with ScalaModule {
     Seq(PathRef(this.millSourcePath / "main" / "scala"))
   }
 
-  object test extends ScalaTests with TestModule.ScalaTest {
+  override def scalafixConfig = Task {
+    Some(Task.workspace / ".scalafix.conf")
+  }
+
+  object test extends ScalaTests with TestModule.ScalaTest with ScalafixModule {
     override def ammoniteVersion = ammonite
     def ivyDeps = Agg(scalaTests, scalaCheck, javaTests)
     def sources = Task.Sources {
       Seq(PathRef(this.millSourcePath / "scala"))
     }
+
+    override def scalafixConfig = build.scalafixConfig
 
     // note: toBoolean accepts precisely "true" or "false"
     def basilTestParallel = Task.Input {
@@ -129,7 +138,20 @@ object `package` extends RootModule with ScalaModule {
     os.read.lines(path1) == os.read.lines(path2)
   }
 
-  def scalafmt = mill.scalalib.scalafmt.ScalafmtModule
+  val scalafmt = mill.scalalib.scalafmt.ScalafmtModule
+
+
+  /**
+   * Haoyi: "currently there isn't a terribly easy way to run things sequentially,
+   *         but a command taking Evaluator could do that
+   *         e.g. https://github.com/com-lihaoyi/mill/discussions/5360"
+   */
+  def fmt(ev: mill.eval.Evaluator): Command[Unit] = Task.Command(exclusive = true) {
+    mill.main.RunScript.evaluateNamed(ev, Agg(fix()))
+    mill.main.RunScript.evaluateNamed(ev, Agg(test.fix()))
+    mill.main.RunScript.evaluateNamed(ev, Agg(scalafmt.reformat()))
+    ()
+  }
 
   object basilAntlr extends AntlrModule {
     override def ivyDeps = Agg(build.antlrRuntime)
@@ -167,6 +189,12 @@ object `package` extends RootModule with ScalaModule {
         s"$baseUrl/api/java-cup",
         cup.docJar().path / ".." / "javadoc"
       ).map(_.toString)
+    }
+  }
+
+  object mdbook extends mdbookBinary {
+    def mdbookSources = Task.Source {
+      Task.workspace  / "docs"
     }
   }
 
@@ -243,6 +271,8 @@ object `package` extends RootModule with ScalaModule {
     extraDocs().foreach {
       case (name, src) => copyDoc(src.path, name)
     }
+
+    os.copy(mdbook.build().path, dest, mergeFolders = true)
     os.copy.into(docsIndex().path, dest / "api")
 
     os.walk(dest).foreach {
@@ -292,4 +322,6 @@ object `package` extends RootModule with ScalaModule {
     os.call(args ++ srcArgs, cwd = Task.workspace)
     os.move(newFile, tagsFile, replaceExisting = true, atomicMove = true)
   }
+
+
 }

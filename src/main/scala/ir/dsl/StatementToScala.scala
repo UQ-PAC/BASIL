@@ -36,7 +36,6 @@ given ToScala[IRType] = ToScala.derived
 private object CaseIR {
 
   import collection.immutable.{Map, SortedMap}
-  import collection.mutable
 
   // format: off
 

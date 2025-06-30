@@ -1,15 +1,11 @@
-import org.scalatest.funsuite.AnyFunSuite
-import util.{ILLoadingConfig, IRLoading, LogLevel, Logger, PerformanceTimer, RunUtils}
-import translating.BAPToIR
 import analysis.LoopDetector
-import analysis.LoopTransform
 import ir.{Block, Program, dotBlockGraph}
-
-import java.io.{BufferedWriter, File, FileWriter}
-import scala.collection.mutable
-import scala.io.Source
-import scala.sys.process.*
+import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
+import translating.BAPToIR
+import util.{ILLoadingConfig, IRLoading, LogLevel, Logger}
+
+import scala.sys.process.*
 
 @test_util.tags.UnitTest
 class IrreducibleLoop extends AnyFunSuite with CaptureOutput {

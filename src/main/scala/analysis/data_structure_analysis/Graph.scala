@@ -1,13 +1,12 @@
 package analysis.data_structure_analysis
 
-import analysis.FlatElement
 import analysis.solvers.DSAUnionFindSolver
-import analysis.evaluateExpression
+import analysis.{FlatElement, evaluateExpression}
+import boogie.SpecGlobal
 import cfg_visualiser.*
 import ir.*
-import util.Counter
 import specification.{ExternalFunction, FuncEntry, SymbolTableEntry}
-import boogie.SpecGlobal
+import util.Counter
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer

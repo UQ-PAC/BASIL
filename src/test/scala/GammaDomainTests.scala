@@ -1,9 +1,9 @@
 import analysis.*
-import ir.transforms.{reversePostOrder, worklistSolver}
 import ir.*
 import ir.dsl.*
+import ir.transforms.{reversePostOrder, worklistSolver}
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.{BASILTest, CaptureOutput}
+import test_util.CaptureOutput
 
 // TODO more tests + system tests
 

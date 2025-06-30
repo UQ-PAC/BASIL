@@ -1,12 +1,11 @@
 package analysis
 
-import ir.eval.BitVectorEval.bv2SignedInt
 import analysis.solvers.SimpleWorklistFixpointSolver
 import ir.*
+import ir.eval.BitVectorEval.bv2SignedInt
 import util.MRALogger
 
 import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
 
 /** Identifies stack and heap regions.
   *

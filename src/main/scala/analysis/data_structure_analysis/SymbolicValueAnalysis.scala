@@ -1,8 +1,8 @@
 package analysis.data_structure_analysis
 
 import analysis.data_structure_analysis.OSet.{Top, Values}
-import ir.eval.BitVectorEval.bv2SignedInt
 import ir.*
+import ir.eval.BitVectorEval.bv2SignedInt
 import ir.transforms.{AbstractDomain, worklistSolver}
 import util.SVALogger as Logger
 

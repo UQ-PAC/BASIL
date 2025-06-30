@@ -1,8 +1,7 @@
 package util.boogie_interaction
-import scala.sys.process.*
-import util.z3
-import util.z3.SatResult
 import util.Logger
+
+import scala.sys.process.*
 
 enum BoogieResultKind {
   case Verified(count: Int = -1, errors: Int = -1)

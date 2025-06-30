@@ -1,24 +1,14 @@
 package ir.transforms
-import translating.PrettyPrinter.*
-import java.io.{BufferedWriter, File, FileInputStream, FileWriter, IOException, PrintWriter}
-import util.LogLevel
-
-import util.DebugDumpIRLogger
-import specification.FuncEntry
-import util.{SimplifyLogger, condPropDebugLogger}
-import ir.eval.AlgebraicSimplifications
-import ir.eval.AssumeConditionSimplifications
-import ir.eval.simplifyExprFixpoint
-import ir.cilvisitor.*
 import ir.*
+import ir.cilvisitor.*
+import ir.eval.{AlgebraicSimplifications, AssumeConditionSimplifications, simplifyExprFixpoint}
+import translating.PrettyPrinter.*
+import util.{SimplifyLogger, condPropDebugLogger}
+
 import scala.collection.mutable
-import analysis._
-import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.concurrent.duration.*
-import scala.util.{Failure, Success}
-import ExecutionContext.Implicits.global
-import scala.util.boundary, boundary.break
-import util.boogie_interaction.{BoogieResultKind, BoogieResult}
+import scala.util.boundary
+
+import boundary.break
 
 /** Simplification pass, see also: docs/development/simplification-solvers.md
   */
@@ -880,7 +870,11 @@ def removeDeadInParams(p: Program): Boolean = {
   var modified = false
   assert(invariant.correctCalls(p))
 
-  for (block <- p.procedures.filterNot(_.isExternal.contains(true)).flatMap(_.entryBlock)) {
+  for (
+    block <- p.procedures.filterNot(_.isExternal.contains(true)).filterNot(p.mainProcedure == _).flatMap(_.entryBlock)
+  ) {
+    // FIXME: .filterNot(p.mainProcedure == _). is a bad hack to fix tests that refer to variabels in requries spec
+    // that are not live in procedure. new spec should let us look at dependencies, or write spec about actual result
     val proc = block.parent
 
     val (liveBefore, _) = getLiveVars(proc)

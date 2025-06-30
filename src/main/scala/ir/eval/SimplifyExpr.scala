@@ -1,11 +1,11 @@
 package ir.eval
 import ir.*
-import util.Logger
-import sourcecode.Line, sourcecode.FileName
-import scala.collection.mutable
-
-import java.io.{BufferedWriter}
 import ir.cilvisitor.*
+import sourcecode.{FileName, Line}
+import util.Logger
+
+import java.io.BufferedWriter
+import scala.collection.mutable
 
 /** ******************************************************************************** Combination of Simplifiers
   */

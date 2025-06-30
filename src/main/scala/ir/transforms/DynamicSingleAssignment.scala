@@ -1,14 +1,12 @@
 package ir.transforms
 
-import ir.invariant.*
-import translating.PrettyPrinter.*
-import util.Logger
-import java.io.File
+import ir.*
 import ir.cilvisitor.*
 import translating.*
-import ir.*
+import translating.PrettyPrinter.*
+import util.Logger
+
 import scala.collection.mutable
-import analysis._
 
 val phiAssignLabel = Some("phi")
 
@@ -114,7 +112,7 @@ class OnePassDSA(
     }
   }
 
-  def createBlockBetween(b1: Block, b2: Block, label: String = "_phi_"): Block = {
+  def createBlockBetween(b1: Block, b2: Block, label: String = "phi"): Block = {
     b1.createBlockBetween(b2, label)
   }
 
@@ -151,7 +149,7 @@ class OnePassDSA(
         })
 
       if (toUnify.nonEmpty) {
-        val blocks = toJoin.map(b => b -> createBlockBetween(b, block, "_phi_back_")).toMap
+        val blocks = toJoin.map(b => b -> createBlockBetween(b, block, "phi_back")).toMap
         for (v <- toUnify.map(_._1)) {
           count(v) = count(v) + 1
           // new index for new copy of v (definition added to all incoming edges)
@@ -204,7 +202,7 @@ class OnePassDSA(
       val definedVars = state(block).renamesAfter.keySet.intersect(liveAfter(block))
 
       if (definedVars.size > 0) {
-        val nb = createBlockBetween(block, b, "_phi_")
+        val nb = createBlockBetween(block, b, "phi")
 
         state(nb).renamesBefore.addAll(state(block).renamesAfter)
         if (state(b).filled) {

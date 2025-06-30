@@ -17,17 +17,14 @@ import ir.{
   CFGPosition,
   Command,
   DirectCall,
-  GoTo,
   IRWalk,
-  IndirectCall,
-  Return,
   InterProcIRCursor,
+  Jump,
   Procedure,
   Program,
-  isAfterCall,
-  Unreachable,
+  Return,
   Statement,
-  Jump
+  Unreachable
 }
 import util.Logger
 

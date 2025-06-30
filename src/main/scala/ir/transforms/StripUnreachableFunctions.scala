@@ -1,8 +1,7 @@
 package ir.transforms
 import ir.*
+
 import collection.mutable
-import util.Logger
-import ir.cilvisitor.*
 
 // This shouldn't be run before indirect calls are resolved
 def stripUnreachableFunctions(p: Program, depth: Int = Int.MaxValue): Unit = {

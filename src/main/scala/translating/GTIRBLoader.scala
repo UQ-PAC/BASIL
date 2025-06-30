@@ -1,17 +1,12 @@
 package translating
-import Parsers.ASLpParser.*
-import com.google.protobuf.ByteString
 import Parsers.*
-
-import java.util.Base64
-import scala.jdk.CollectionConverters.*
+import Parsers.ASLpParser.*
 import ir.*
-
-import scala.collection.{immutable, mutable}
-import scala.collection.mutable.Map
-import scala.collection.mutable.ArrayBuffer
-import com.grammatech.gtirb.proto.Module.ByteOrder.LittleEndian
 import util.Logger
+
+import scala.collection.mutable.ArrayBuffer
+import scala.collection.{immutable, mutable}
+import scala.jdk.CollectionConverters.*
 
 enum InsnSemantics {
   case Result(value: List[StmtContext])
@@ -20,28 +15,35 @@ enum InsnSemantics {
 
 class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
 
-  private val constMap = mutable.Map[String, IRType]()
-  private val varMap = mutable.Map[String, IRType]()
+  private val constMap = mutable.Map[String, Variable]()
+  private val varMap = mutable.Map[String, Variable]()
+  private var localCounter = 0
   private var instructionCount = 0
   private var blockCount = 0
   private var loadCounter = 0
 
+  def freshLocal(n: String, t: IRType) = {
+    localCounter += 1
+    LocalVar(n, t, localCounter)
+  }
+
   val opcodeSize = 4
 
   def visitBlock(
-    blockUUID: ByteString,
+    blockUUID: String,
     blockCountIn: Int,
     blockAddress: Option[BigInt]
   ): ArrayBuffer[immutable.Seq[Statement]] = {
     blockCount = blockCountIn
     instructionCount = 0
-    val instructions = parserMap(Base64.getEncoder.encodeToString(blockUUID.toByteArray))
+    val instructions = parserMap(blockUUID)
 
     val statements: ArrayBuffer[immutable.Seq[Statement]] = ArrayBuffer()
 
+    constMap.clear
+    varMap.clear
+
     for (instsem <- instructions) {
-      constMap.clear
-      varMap.clear
 
       instsem match {
         case InsnSemantics.Error(op, err) => {
@@ -192,25 +194,32 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
 
   private def visitVarDeclsNoInit(ctx: VarDeclsNoInitContext): Unit = {
     val ty = visitType(ctx.`type`())
-    val newVars = ctx.lvars.ident.asScala.map(visitIdent(_) -> ty)
+    val newVars = ctx.lvars.ident.asScala.map(v => {
+      val vn = visitIdent(v)
+      vn -> freshLocal(vn, ty)
+    })
     varMap ++= newVars
   }
 
   private def visitVarDecl(ctx: VarDeclContext, label: Option[String] = None): Seq[Statement] = {
     val ty = visitType(ctx.`type`())
     val name = visitIdent(ctx.lvar)
-    varMap += (name -> ty)
-    val lvar = LocalVar(name, ty)
+    val lhs = freshLocal(name, ty)
+    varMap += (name -> lhs)
 
     val (expr, load) = visitExpr(ctx.expr)
     if (expr.isDefined) {
       if (load.isDefined) {
-        val loadWithLabel =
-          MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "_0"))
-        val assign = LocalAssign(LocalVar(name, ty), expr.get, label.map(_ + "_1"))
-        Seq(loadWithLabel, assign)
+        if (expr.get == load.get.lhs) {
+          Seq(MemoryLoad(lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "_0")))
+        } else {
+          Seq(
+            MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "_0")),
+            LocalAssign(lhs, expr.get, label.map(_ + "_1"))
+          )
+        }
       } else {
-        val assign = LocalAssign(LocalVar(name, ty), expr.get, label)
+        val assign = LocalAssign(lhs, expr.get, label)
         Seq(assign)
       }
     } else {
@@ -239,17 +248,23 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
   private def visitConstDecl(ctx: ConstDeclContext, label: Option[String] = None): Seq[Statement] = {
     val ty = visitType(ctx.`type`())
     val name = visitIdent(ctx.lvar)
-    constMap += (name -> ty)
+    val lhs = freshLocal(name, ty)
+    constMap += (name -> lhs)
     val (expr, load) = visitExpr(ctx.expr)
     if (expr.isDefined) {
       if (load.isDefined) {
         val loadWithLabel =
           MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0"))
-        val assign =
-          LocalAssign(LocalVar(name + "_" + blockCount + "_" + instructionCount, ty), expr.get, label.map(_ + "$1"))
-        Seq(loadWithLabel, assign)
+        if (expr.get == load.get.lhs) {
+          Seq(MemoryLoad(lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0")))
+        } else {
+          Seq(
+            MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0")),
+            LocalAssign(lhs, expr.get, label.map(_ + "$1"))
+          )
+        }
       } else {
-        val assign = LocalAssign(LocalVar(name + "_" + blockCount + "_" + instructionCount, ty), expr.get, label)
+        val assign = LocalAssign(lhs, expr.get, label)
         Seq(assign)
       }
     } else {
@@ -299,8 +314,8 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
   private def visitExprVar(ctx: ExprVarContext): Option[Expr] = {
     val name = visitIdent(ctx.ident)
     name match {
-      case n if constMap.contains(n) => Some(LocalVar(n + "_" + blockCount + "_" + instructionCount, constMap(n)))
-      case v if varMap.contains(v) => Some(LocalVar(v, varMap(v)))
+      case n if constMap.contains(n) => Some(constMap(n))
+      case v if varMap.contains(v) => Some(varMap(v))
       case "SP_EL0" => Some(Register("R31", 64))
       case "_PC" => Some(Register("_PC", 64))
       case "TRUE" => Some(TrueLiteral)
@@ -685,8 +700,8 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
   private def visitLExprVar(ctx: LExprVarContext): Option[Variable] = {
     val name = visitIdent(ctx.ident)
     name match {
-      case n if constMap.contains(n) => Some(LocalVar(n + "_" + blockCount + "_" + instructionCount, constMap(n)))
-      case v if varMap.contains(v) => Some(LocalVar(v, varMap(v)))
+      case n if constMap.contains(n) => constMap.get(n)
+      case v if varMap.contains(v) => varMap.get(v)
       case "SP_EL0" => Some(Register("R31", 64))
       case "_PC" => Some(Register("_PC", 64))
       // ignore the following

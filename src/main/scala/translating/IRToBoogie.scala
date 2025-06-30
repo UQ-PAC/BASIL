@@ -1,9 +1,9 @@
 package translating
-import analysis.{RegionInjector, DataRegion, HeapRegion, MergedRegion}
-import ir.{BoolOR, *}
+import analysis.{MergedRegion, RegionInjector}
 import boogie.*
+import ir.*
 import specification.*
-import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion, Logger}
+import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -615,7 +615,8 @@ class IRToBoogie(
   }
 
   def translateBlock(b: Block): BBlock = {
-    val captureState = captureStateStatement(s"${b.label}")
+    val initLabel = b.meta.originalLabel.map(" (" + _ + ")").getOrElse("")
+    val captureState = captureStateStatement(s"${b.label}${initLabel}")
 
     val statements = if (b.atomicSection.isDefined) {
       val before = if (b.atomicSection.get.isStart(b)) {
