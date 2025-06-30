@@ -1,15 +1,15 @@
 package analysis
 
-import ir.{DirectCall, LocalAssign, MemoryLoad, Procedure, Program, Register}
+import ir.{DirectCall, GlobalVar, LocalAssign, MemoryLoad, Procedure, Program, Register}
 
 import scala.collection.mutable
 
-class WriteToAnalysis(program: Program) extends Analysis[Map[Procedure, Set[Register]]] {
+class WriteToAnalysis(program: Program) extends Analysis[Map[Procedure, Set[GlobalVar]]] {
 
-  val writesTo: mutable.Map[Procedure, Set[Register]] = mutable.Map()
-  val mallocRegister = Register("R0", 64)
-  val paramRegisters: Set[Register] = Set(
-    mallocRegister,
+  val writesTo: mutable.Map[Procedure, Set[GlobalVar]] = mutable.Map()
+  val mallocGlobalVar = Register("R0", 64)
+  val paramGlobalVars: Set[GlobalVar] = Set(
+    mallocGlobalVar,
     Register("R1", 64),
     Register("R2", 64),
     Register("R3", 64),
@@ -19,18 +19,18 @@ class WriteToAnalysis(program: Program) extends Analysis[Map[Procedure, Set[Regi
     Register("R7", 64)
   )
 
-  def getWritesTos(proc: Procedure): Set[Register] = {
+  def getWritesTos(proc: Procedure): Set[GlobalVar] = {
     if writesTo.contains(proc) then writesTo(proc)
     else
-      val writtenTo: mutable.Set[Register] = mutable.Set()
+      val writtenTo: mutable.Set[GlobalVar] = mutable.Set()
       proc.blocks.foreach { block =>
         block.statements.foreach {
-          case LocalAssign(variable: Register, _, _) if paramRegisters.contains(variable) =>
+          case LocalAssign(variable: GlobalVar, _, _) if paramGlobalVars.contains(variable) =>
             writtenTo.add(variable)
-          case MemoryLoad(lhs: Register, _, _, _, _, _) if paramRegisters.contains(lhs) =>
+          case MemoryLoad(lhs: GlobalVar, _, _, _, _, _) if paramGlobalVars.contains(lhs) =>
             writtenTo.add(lhs)
           case DirectCall(target, _, _, _) if target.procName == "malloc" =>
-            writtenTo.add(mallocRegister)
+            writtenTo.add(mallocGlobalVar)
           case d: DirectCall if program.procedures.contains(d.target) =>
             writtenTo.addAll(getWritesTos(d.target))
           case _ =>
@@ -41,7 +41,7 @@ class WriteToAnalysis(program: Program) extends Analysis[Map[Procedure, Set[Regi
       writesTo(proc)
   }
 
-  def analyze(): Map[Procedure, Set[Register]] =
+  def analyze(): Map[Procedure, Set[GlobalVar]] =
     program.procedures.foreach(getWritesTos)
     writesTo.toMap
 }

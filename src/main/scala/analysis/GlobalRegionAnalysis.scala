@@ -86,7 +86,7 @@ trait GlobalRegionAnalysis(
           } else {
             Set()
           }
-        case _: UninterpretedFunction => Set.empty
+        case _: FApplyExpr => Set.empty
         case variable: Variable =>
           if (noLoad) {
             Set()

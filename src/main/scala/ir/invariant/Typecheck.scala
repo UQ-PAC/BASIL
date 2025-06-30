@@ -56,61 +56,65 @@ class TypeChecker extends CILVisitor {
   var exprViolations = List[ExprTypeError]()
 
   override def vexpr(e: Expr) = {
-    val error: Option[ExprTypeError] = e match {
-      case _: Literal | _: Variable | _: LambdaExpr | _: OldExpr | _: UninterpretedFunction =>
+    val error: Seq[ExprTypeError] = e match {
+      case _: Literal | _: Variable | _: LambdaExpr | _: OldExpr | _: FApplyExpr | _: Memory =>
         /* terminals that have no sensible local type constraints */
-        None
-      case QuantifierExpr(_, b) =>
-        if (b.getType != BoolType) then Some(ExprContextError(e, b, BoolType, b.getType)) else None
+        Seq()
+      case QuantifierExpr(_, b, _) =>
+        if (b.getType != BoolType) then Seq(ExprContextError(e, b, BoolType, b.getType)) else Seq()
       case Repeat(_, b) =>
-        if (!b.getType.isInstanceOf[BitVecType]) then Some(ExprContextError(e, b, BitVecType(0), b.getType))
-        else None
+        if (!b.getType.isInstanceOf[BitVecType]) then Seq(ExprContextError(e, b, BitVecType(0), b.getType))
+        else Seq()
       case ZeroExtend(_, b) =>
         if !b.getType.isInstanceOf[BitVecType]
-        then Some(ExprContextError(e, b, BitVecType(0), b.getType, Some("Expected BitVector")))
-        else None
+        then Seq(ExprContextError(e, b, BitVecType(0), b.getType, Some("Expected BitVector")))
+        else Seq()
       case SignExtend(_, b) =>
-        if !b.getType.isInstanceOf[BitVecType] then Some(ExprContextError(e, b, BitVecType(0), b.getType)) else None
+        if !b.getType.isInstanceOf[BitVecType] then Seq(ExprContextError(e, b, BitVecType(0), b.getType)) else Seq()
       case Extract(hi, lo, b) => {
         b.getType match {
-          case BitVecType(sz) if sz >= hi => None
+          case BitVecType(sz) if sz >= hi => Seq()
           case BitVecType(sz) if sz < hi =>
-            Some(ExprContextError(e, b, BitVecType(hi), b.getType, Some(s"Expected bitvector of at least $hi")))
-          case _ => Some(ExprContextError(e, b, BitVecType(hi), b.getType))
+            Seq(ExprContextError(e, b, BitVecType(hi), b.getType, Some(s"Expected bitvector of at least $hi")))
+          case _ => Seq(ExprContextError(e, b, BitVecType(hi), b.getType))
         }
       }
       case UnaryExpr(b: BVUnOp, arg) =>
-        if !arg.getType.isInstanceOf[BitVecType] then Some(ExprContextError(e, arg, BitVecType(0), arg.getType))
-        else None
+        if !arg.getType.isInstanceOf[BitVecType] then Seq(ExprContextError(e, arg, BitVecType(0), arg.getType))
+        else Seq()
       case UnaryExpr(BoolToBV1, arg) =>
-        if arg.getType != BoolType then Some(ExprContextError(e, arg, BoolType, arg.getType)) else None
+        if arg.getType != BoolType then Seq(ExprContextError(e, arg, BoolType, arg.getType)) else Seq()
       case UnaryExpr(b: BoolUnOp, arg) =>
-        if arg.getType != BoolType then Some(ExprContextError(e, arg, BoolType, arg.getType)) else None
+        if arg.getType != BoolType then Seq(ExprContextError(e, arg, BoolType, arg.getType)) else Seq()
       case UnaryExpr(b: IntUnOp, arg) =>
-        if arg.getType != BoolType then Some(ExprContextError(e, arg, IntType, arg.getType)) else None
+        if arg.getType != BoolType then Seq(ExprContextError(e, arg, IntType, arg.getType)) else Seq()
       case BinaryExpr(BVCONCAT, a, b) =>
-        if (!a.getType.isInstanceOf[BitVecType]) then Some(ExprContextError(e, a, BitVecType(0), a.getType))
-        else if (!b.getType.isInstanceOf[BitVecType]) then Some(ExprContextError(e, b, BitVecType(0), b.getType))
-        else None
+        if (!a.getType.isInstanceOf[BitVecType]) then Seq(ExprContextError(e, a, BitVecType(0), a.getType))
+        else if (!b.getType.isInstanceOf[BitVecType]) then Seq(ExprContextError(e, b, BitVecType(0), b.getType))
+        else Seq()
       case BinaryExpr(o: BVBinOp, a, b) =>
-        if (a.getType != b.getType) then Some(ExprEqualityError(e, a, b))
-        else if (!a.getType.isInstanceOf[BitVecType]) then Some(ExprContextError(e, a, BitVecType(0), a.getType))
-        else if (!b.getType.isInstanceOf[BitVecType]) then Some(ExprContextError(e, b, BitVecType(0), b.getType))
-        else None
+        if (a.getType != b.getType) then Seq(ExprEqualityError(e, a, b))
+        else if (!a.getType.isInstanceOf[BitVecType]) then Seq(ExprContextError(e, a, BitVecType(0), a.getType))
+        else if (!b.getType.isInstanceOf[BitVecType]) then Seq(ExprContextError(e, b, BitVecType(0), b.getType))
+        else Seq()
+      case AssocExpr(o: BoolBinOp, args) =>
+        args.collect {
+          case a if a.getType != BoolType => ExprContextError(e, a, BoolType, a.getType)
+        }.toSeq
       case BinaryExpr(o: BoolBinOp, a, b) =>
-        if (a.getType != BoolType) then Some(ExprContextError(e, a, BoolType, a.getType))
-        else if (b.getType != BoolType) then (Some(ExprContextError(e, b, BoolType, b.getType)))
-        else None
+        if (a.getType != BoolType) then Seq(ExprContextError(e, a, BoolType, a.getType))
+        else if (b.getType != BoolType) then (Seq(ExprContextError(e, b, BoolType, b.getType)))
+        else Seq()
       case BinaryExpr(EQ, a, b) =>
-        if (a.getType != b.getType) then Some(ExprEqualityError(e, a, b, Some("equality between different types")))
-        else None
+        if (a.getType != b.getType) then Seq(ExprEqualityError(e, a, b, Some("equality between different types")))
+        else Seq()
       case BinaryExpr(NEQ, a, b) =>
-        if (a.getType != b.getType) then Some(ExprEqualityError(e, a, b, Some("ineq between different types")))
-        else None
+        if (a.getType != b.getType) then Seq(ExprEqualityError(e, a, b, Some("ineq between different types")))
+        else Seq()
       case BinaryExpr(o: IntBinOp, a, b) =>
-        if (a.getType != IntType) then Some(ExprContextError(e, a, IntType, a.getType))
-        else if (b.getType != IntType) then Some(ExprContextError(e, b, IntType, b.getType))
-        else None
+        if (a.getType != IntType) then Seq(ExprContextError(e, a, IntType, a.getType))
+        else if (b.getType != IntType) then Seq(ExprContextError(e, b, IntType, b.getType))
+        else Seq()
     }
     exprViolations = exprViolations ++ error
 
@@ -120,6 +124,11 @@ class TypeChecker extends CILVisitor {
   override def vstmt(s: Statement) =
     val newViolations = s match {
       case n: NOP => Seq()
+      case SimulAssign(assignments, _) =>
+        assignments.collect {
+          case (lhs, rhs) if lhs.getType != rhs.getType =>
+            StatementEqualityError(s, Some(lhs), Some(rhs), lhs.getType, rhs.getType)
+        }.toSeq
       case LocalAssign(lhs, rhs, _) =>
         if (lhs.getType != rhs.getType) then
           Seq(StatementEqualityError(s, Some(lhs), Some(rhs), lhs.getType, rhs.getType))

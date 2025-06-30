@@ -88,7 +88,7 @@ def liftSVCompNonDetEarlyIR(p: Program) = {
    * Run after parameter form
    */
 
-  def nonDetFunc(name: String, size: Int) = UninterpretedFunction(name, Seq(), BitVecType(size))
+  def nonDetFunc(name: String, size: Int) = FApplyExpr(name, Seq(), BitVecType(size))
 
   /*
    * Officially possible:

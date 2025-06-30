@@ -62,7 +62,7 @@ import scala.collection.mutable.ArrayBuffer
  *  Together, NonCallStatement and Call should partition Statement.
  */
 type NonCallStatement =
-  LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume | MemoryAssign
+  LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume | MemoryAssign | SimulAssign
 
 type DSLStatement = NonCallStatement | EventuallyStatement | EventuallyJump
 
@@ -74,22 +74,23 @@ def cloneStatement(x: NonCallStatement): NonCallStatement = x match {
   case NOP(l) => NOP(l)
   case Assert(a, b, c) => Assert(a, b, c)
   case Assume(a, b, c, d) => Assume(a, b, c, d)
+  case a: SimulAssign => SimulAssign(a.assignments, a.label)
 }
 
-val R0: Register = Register("R0", 64)
-val R1: Register = Register("R1", 64)
-val R2: Register = Register("R2", 64)
-val R3: Register = Register("R3", 64)
-val R4: Register = Register("R4", 64)
-val R5: Register = Register("R5", 64)
-val R6: Register = Register("R6", 64)
-val R7: Register = Register("R7", 64)
-val R8: Register = Register("R8", 64)
-val R29: Register = Register("R29", 64)
-val R30: Register = Register("R30", 64)
-val R31: Register = Register("R31", 64)
+val R0: GlobalVar = Register("R0", 64)
+val R1: GlobalVar = Register("R1", 64)
+val R2: GlobalVar = Register("R2", 64)
+val R3: GlobalVar = Register("R3", 64)
+val R4: GlobalVar = Register("R4", 64)
+val R5: GlobalVar = Register("R5", 64)
+val R6: GlobalVar = Register("R6", 64)
+val R7: GlobalVar = Register("R7", 64)
+val R8: GlobalVar = Register("R8", 64)
+val R29: GlobalVar = Register("R29", 64)
+val R30: GlobalVar = Register("R30", 64)
+val R31: GlobalVar = Register("R31", 64)
 
-def R(i: Int): Register = Register(s"R$i", 64)
+def R(i: Int): GlobalVar = Register(s"R$i", 64)
 
 def bv_t(i: Int) = BitVecType(i)
 

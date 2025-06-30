@@ -41,7 +41,7 @@ def genFunctionOpDefinition(
       BFunction(b.fnName, in, out, Some(body), List(inlineAttr))
     case b: InBounds => genInBoundsFunction(b)
     case u: BUninterpreted =>
-      BFunction(u.name, u.in.map(BParam(_)), BParam(u.out), None)
+      BFunction(u.name, u.in.map(BParam(_)), BParam(u.out), None, List(externAttr))
   }
 }
 

@@ -35,7 +35,7 @@ class Graph(using Counter)(
   globalOffsets: Map[BigInt, BigInt],
   externalFunctions: Set[ExternalFunction],
   val reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
-  val writesTo: Map[Procedure, Set[Register]],
+  val writesTo: Map[Procedure, Set[GlobalVar]],
   val params: Map[Procedure, Set[Variable]]
 ) {
 
@@ -845,7 +845,9 @@ class Graph(using Counter)(
   def SSAVar(posLabel: String, varName: String): Slice = {
     debugAssert(posLabel.matches("%[0-9a-f]{8}?\\$\\d"), s"posLabel not matching BAP format '$posLabel'")
 
-    val res = varToCell.keys.filter(pos => pos.toShortString.startsWith(posLabel))
+    val res = varToCell.keys.collect {
+      case pos: Command if pos.labelStr.startsWith(posLabel) => pos
+    }
     debugAssert(res.size == 1, s"failed to get SSAVar for '$posLabel' and '$varName'. matched label: ${res}")
     val key = res.head
 

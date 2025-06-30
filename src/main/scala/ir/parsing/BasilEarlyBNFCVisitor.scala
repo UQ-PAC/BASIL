@@ -18,7 +18,7 @@ private object Declarations {
  * *incomplete*. Only the procedure name and the formalIn/Out parameters should be used.
  */
 case class Declarations(
-  val globals: Map[String, ir.Register],
+  val globals: Map[String, ir.GlobalVar],
   val functions: Map[String, FunDecl],
   val memories: Map[String, ir.Memory],
   val procedures: Map[String, ir.dsl.EventuallyProcedure],
@@ -173,7 +173,7 @@ case class BasilEarlyBNFCVisitor[A]()
   }
 
   override def visit(x: syntax.VarDecl, arg: A) =
-    val v = ir.Register(unsigilGlobal(x.globalident_), x.type_.accept(this, arg).asInstanceOf[ir.BitVecType].size)
+    val v = ir.GlobalVar(unsigilGlobal(x.globalident_), x.type_.accept(this, arg))
     Declarations.empty.copy(globals = Map(v.name -> v))
 
   override def visit(x: syntax.Param, arg: A): (String, ir.IRType) =

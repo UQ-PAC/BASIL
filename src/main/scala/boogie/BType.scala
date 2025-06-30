@@ -12,4 +12,6 @@ case class BitVecBType(size: Int) extends BType("bv" + size)
 
 case class MapBType(param: BType, result: BType) extends BType(s"[$param]$result")
 
+case class CustomBType(typeName: String) extends BType(typeName)
+
 case object SpecType extends BType("spec")

@@ -186,6 +186,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
   }
 
   def prependAll(elems: Iterable[T]) = {
+    require(elems.toSet.size == elems.size)
     // first == None ==> empty list
     insertAllBefore(firstElem, elems)
   }
@@ -244,10 +245,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   An ArrayBuffer containing all elements after n.
     */
   def splitOn(n: T): ArrayBuffer[T] = {
-    debugAssert(!lastElem.contains(n))
     debugAssert(containsRef(n), "Cannot split on element not in this list")
-
-    val ne = n.next
 
     val newlist = ArrayBuffer[T]()
     var next = n.next
@@ -338,7 +336,8 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
   def insertAllBefore(intrusiveListElement: Option[T], newElems: Iterable[T]): Option[T] = {
     intrusiveListElement match {
       case None =>
-        newElems.map(append).lastOption.orElse(intrusiveListElement)
+        appendAll(newElems)
+        lastElem
       case Some(n) =>
         var p = n
         for (i <- newElems.toList.reverse) {
@@ -417,6 +416,7 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
   private[intrusive_list] var next: Option[T] = None
   private[intrusive_list] var prev: Option[T] = None
   private[intrusive_list] final def insertBefore(elem: T): T = {
+    require(elem != this)
     elem.prev = prev
     if (prev.isDefined) {
       prev.get.next = Some(elem)
@@ -429,6 +429,7 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
   private[intrusive_list] final def unitary: Boolean = next.isEmpty && prev.isEmpty
 
   private[intrusive_list] final def insertAfter(elem: T): T = {
+    require(elem != this)
     if (next.isDefined) {
       next.get.prev = Some(elem)
     }
@@ -487,6 +488,7 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
 
   private[intrusive_list] final def last(): T = {
     next match {
+      case Some(n) if n == next => throw Exception(s"IntrusiveList self loop $this")
       case Some(n) => n.last()
       case None => this.asInstanceOf[T]
     }
@@ -494,6 +496,7 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
 
   private[intrusive_list] final def first(): T = {
     prev match {
+      case Some(n) if n == prev => throw Exception(s"IntrusiveList self loop $this")
       case Some(n) => n.first()
       case None => this.asInstanceOf[T]
     }
