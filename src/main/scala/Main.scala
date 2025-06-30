@@ -223,7 +223,7 @@ object Main {
     memoryTransform: Flag,
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
     noif: Flag,
-    @arg(name = "nodebug", doc = "Disable debug runtume assertions")
+    @arg(name = "nodebug", doc = "Disable runtume debug assertions")
     nodebug: Flag
   )
 
@@ -343,9 +343,6 @@ object Main {
     }
 
     if (conf.nodebug.value) {
-      if (!basil.compileConstants.debugMode) {
-        Logger.info("--nodebug: assertions already disabled at compile-time")
-      }
       util.assertion.disableAssertions == true
     }
 

@@ -7,7 +7,6 @@ import scalalib._
 import $file.basilmill.mdbook.mdbookBinary
 import $file.basilmill.bnfc.BNFCJFlexModule
 import $file.basilmill.antlr.AntlrModule
-import $file.basilmill.conf.Conf
 
 import os.Path
 
@@ -16,7 +15,7 @@ import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
 import contrib.scalapblib._
 import com.goyeau.mill.scalafix.ScalafixModule
 
-object `package` extends RootModule with ScalaModule with ScalafixModule with Conf{
+object `package` extends RootModule with ScalaModule with ScalafixModule {
   // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
   def scalaVersion = "3.3.4"
@@ -39,20 +38,18 @@ object `package` extends RootModule with ScalaModule with ScalafixModule with Co
   val upickle = ivy"com.lihaoyi::upickle:4.2.1"
 
   def mainClass = Some("Main")
-  override def debugMode = true
 
   def millSourcePath = super.millSourcePath / "src"
   def ivyDeps = Agg(scalactic, sourceCode, mainArgs, upickle)
   def sources = Task.Sources {
-    Seq(PathRef(this.millSourcePath / "main" / "scala"), PathRef(generateConf().path))
+    Seq(PathRef(this.millSourcePath / "main" / "scala"))
   }
 
   override def scalafixConfig = Task {
     Some(Task.workspace / ".scalafix.conf")
   }
 
-  object test extends ScalaTests with TestModule.ScalaTest with ScalafixModule with Conf {
-    override def debugMode = true
+  object test extends ScalaTests with TestModule.ScalaTest with ScalafixModule {
 
     override def ammoniteVersion = ammonite
     def ivyDeps = Agg(scalaTests, scalaCheck, javaTests)
