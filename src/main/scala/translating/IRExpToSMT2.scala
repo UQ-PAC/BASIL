@@ -210,7 +210,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   def vbvlit(b: BitVecLiteral): Sexp[BitVecLiteral] = ???
   def vintlit(b: BigInt): Sexp[IntLiteral] = ???
 
-  class Builder() {
+  class SMTBuilder() {
     var before = true
     var exprs = Vector[Sexp[Expr]]()
     var exprsBefore = Vector[Sexp[Expr]]()
