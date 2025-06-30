@@ -99,7 +99,7 @@ class TypeChecker extends CILVisitor {
         else Seq()
       case AssocExpr(o: BoolBinOp, args) =>
         args.collect {
-          case a if a.getType != BoolType =>  ExprContextError(e, a, BoolType, a.getType)
+          case a if a.getType != BoolType => ExprContextError(e, a, BoolType, a.getType)
         }.toSeq
       case BinaryExpr(o: BoolBinOp, a, b) =>
         if (a.getType != BoolType) then Seq(ExprContextError(e, a, BoolType, a.getType))
@@ -126,7 +126,8 @@ class TypeChecker extends CILVisitor {
       case n: NOP => Seq()
       case SimulAssign(assignments, _) =>
         assignments.collect {
-          case (lhs, rhs) if lhs.getType != rhs.getType => StatementEqualityError(s, Some(lhs), Some(rhs), lhs.getType, rhs.getType)
+          case (lhs, rhs) if lhs.getType != rhs.getType =>
+            StatementEqualityError(s, Some(lhs), Some(rhs), lhs.getType, rhs.getType)
         }.toSeq
       case LocalAssign(lhs, rhs, _) =>
         if (lhs.getType != rhs.getType) then
