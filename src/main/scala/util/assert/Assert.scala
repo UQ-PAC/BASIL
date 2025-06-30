@@ -1,6 +1,5 @@
 package util.assertion
 
-
 var disableAssertions = false
 
 /*

@@ -1,6 +1,7 @@
 package analysis.data_structure_analysis
 
 import util.assertion.*
+
 /**
  * Integer Interval with top and bottom
  * start (s) <= end (e)
