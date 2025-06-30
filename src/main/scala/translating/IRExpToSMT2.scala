@@ -31,7 +31,6 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
     }
   }
 
-
   def vjump(j: Jump): Repr[Jump] = {
     j match {
       case g: GoTo => vgoto(g.targets.toList.map(_.label))
@@ -51,7 +50,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
       case b @ AssocExpr(op, arg) => vexpr(b.toBinaryExpr)
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
       case v: Variable => vrvar(v)
-      case f @ FApplyExpr(n, params, rt, _) => vuninterp_function(n, params.map(vexpr))
+      case f @ FApplyExpr(n, params, rt, _) => vfapply_expr(n, params.map(vexpr))
       case q: QuantifierExpr => vquantifier(q)
       case q: LambdaExpr => vlambda(q)
       case r: OldExpr => vold(r.body)
@@ -89,7 +88,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
     returnBlock: Option[Repr[Block]]
   ): Repr[Procedure]
 
-  def vmemory(m: Memory) : Repr[Memory]
+  def vmemory(m: Memory): Repr[Memory]
   def vassign(lhs: Repr[Variable], rhs: Repr[Expr]): Repr[LocalAssign]
   def vmemassign(lhs: Repr[Variable], rhs: Repr[Expr]): Repr[LocalAssign]
   def vsimulassign(assignments: List[(Repr[Variable], Repr[Expr])]): Repr[SimulAssign]
@@ -138,7 +137,7 @@ trait BasilIRExp[Repr[+_]] {
   def vintlit(b: BigInt): Repr[IntLiteral]
   def vrepeat(reps: Int, value: Repr[Expr]): Repr[Expr]
 
-  def vuninterp_function(name: String, args: Seq[Repr[Expr]]): Repr[Expr]
+  def vfapply_expr(name: String, args: Seq[Repr[Expr]]): Repr[Expr]
 
   def vrvar(e: Variable): Repr[Variable]
 }
@@ -168,7 +167,7 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
       case b @ AssocExpr(op, args) => vbool_expr(op, args.map(vexpr))
       case r: SharedMemory => ???
       case r: StackMemory => ???
-      case f @ FApplyExpr(n, params, rt, _) => vuninterp_function(n, params.map(vexpr))
+      case f @ FApplyExpr(n, params, rt, _) => vfapply_expr(n, params.map(vexpr))
       case q: QuantifierExpr => vquantifier(q)
       case q: LambdaExpr => vlambda(q)
       case r: OldExpr => vold(r.body)
@@ -342,7 +341,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   def endianToBool(endian: Endian): Sexp[Expr] = {
     if endian == Endian.LittleEndian then vexpr(FalseLiteral) else vexpr(TrueLiteral)
   }
-  override def vuninterp_function(name: String, args: Seq[Sexp[Expr]]): Sexp[Expr] = {
+  override def vfapply_expr(name: String, args: Seq[Sexp[Expr]]): Sexp[Expr] = {
     if (args.size == 1) {
       list(sym(name), args.head)
     } else {

@@ -127,12 +127,11 @@ case class PBlock(
   exitComment: Option[String] = None
 ) extends PPProg[Block] {
   override def toString = {
-    val indent = "  "
     val addr = address.map(" " + _).getOrElse("")
     val comment = entryComment.map(c => c + "\n").getOrElse("")
     val excomment = exitComment.map(c => "\n" + c).getOrElse("")
     s"block ${label}${addr} [\n${comment}"
-      ++ commands.map("  " + _ + ";").mkString("\n")
+      ++ ("  " + indent(commands.map(_ + ";").mkString("\n"), "  "))
       ++ s"${excomment}\n]"
   }
 }
@@ -464,13 +463,15 @@ class BasilIRPrettyPrinter(
 
   override def vassign(lhs: PPProg[Variable], rhs: PPProg[Expr]): PPProg[LocalAssign] = BST(s"${lhs} := ${rhs}")
   override def vmemassign(lhs: PPProg[Variable], rhs: PPProg[Expr]): PPProg[LocalAssign] = BST(s"${lhs} mem:= ${rhs}")
-  override def vsimulassign(assignments: List[(PPProg[Variable], PPProg[Expr])]): PPProg[SimulAssign] = BST(
-    assignments
-      .map { case (l, r) =>
-        vassign(l, r)
+  override def vsimulassign(assignments: List[(PPProg[Variable], PPProg[Expr])]): PPProg[SimulAssign] =
+    val pref = "( "
+    val suffix = " )"
+    val str = assignments
+      .map { case (lhs, rhs) =>
+        lhs.toString + " := " + rhs
       }
-      .mkString(", ")
-  )
+      .mkString(",\n")
+    BST(pref + indent(str, "  ") + suffix)
 
   override def vstore(
     mem: Memory,
@@ -604,7 +605,7 @@ class BasilIRPrettyPrinter(
   override def vboollit(b: Boolean) = BST(b.toString)
   override def vintlit(i: BigInt) = BST("0x%x".format(i))
   override def vbvlit(i: BitVecLiteral) = BST("0x%x".format(i.value) + s":bv${i.size}")
-  override def vuninterp_function(name: String, args: Seq[PPProg[Expr]]): PPProg[Expr] = BST(
+  override def vfapply_expr(name: String, args: Seq[PPProg[Expr]]): PPProg[Expr] = BST(
     s"${Sigil.BASIR.globalVar}$name(${args.mkString(", ")})"
   )
 }
