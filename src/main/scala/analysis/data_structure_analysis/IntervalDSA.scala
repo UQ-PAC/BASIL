@@ -245,7 +245,7 @@ class IntervalGraph(
       case constraint: MemoryAccessConstraint[_] =>
         val valueCells = constraintArgToCells(constraint.arg2).map(get)
         debugAssert(IntervalDSA.equiv(valueCells), s"value cells should be unified instead got $valueCells")
-      
+
         val indexCells = constraintArgToCells(constraint.arg1, ignoreContents = true).map(get)
         if indexCells.nonEmpty then
           if indexCells.nonEmpty && valueCells.nonEmpty then
@@ -1270,7 +1270,10 @@ object IntervalDSA {
         debugAssert(pointers.forall(_.hasPointee), "expected all of the pointers to have pointee")
         val distinctPointees = pointers.map(_.getPointee).map(dsg.get).toSet
 
-        debugAssert(distinctPointees.size <= 1, s"Expected index cells to have unified pointee ${distinctPointees.size}")
+        debugAssert(
+          distinctPointees.size <= 1,
+          s"Expected index cells to have unified pointee ${distinctPointees.size}"
+        )
       case _ =>
     }
   }
