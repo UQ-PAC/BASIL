@@ -3,7 +3,24 @@ package analysis
 import ir.*
 import ir.transforms.{IntraproceduralWorklistSolver, NarrowingWorklistSolver, reversePostOrder, worklistSolver}
 
-/** Performs a single analysis to generate loop invariants.
+// TODO allow for interprocedural analysis
+
+/** Performs a single analysis to generate loop invariants. Loop invariants are encoded as assertions, and will only be
+ *  generated on loop heads. This means that loop head detection must be run. See `ForwardLoopInvariantGenerator` and
+ *  `BackwardLoopInvariantGenerator`.
+ *
+ * @tparam L
+ *   : Domain value type
+ * @tparam A
+ *   : The type of abstract domain being used
+ *
+ * @param domain
+ *   : The concrete abstract domain being used
+ * @param solver
+ *   : A type of worklist solver which may or may not support widening or narrowing
+ * @param backwards
+ *   : Distinguishes between backwards and forwards analyses, see `ForwardLoopInvariantGenerator` and
+ *     `BackwardLoopInvariantGenerator`.
  */
 class SingleLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
   domain: A,
@@ -20,6 +37,20 @@ class SingleLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
   }
 }
 
+/** Performs a single forwards analysis to generate loop invariants that hold at the end of a block. This will be
+ *  encoded as an assertion at the end of a block. Invariants will only be generated on loop heads, and so loop head
+ *  detection must be run.
+ *
+ * @tparam L
+ *   : Domain value type
+ * @tparam A
+ *   : The type of abstract domain being used
+ *
+ * @param domain
+ *   : The concrete abstract domain being used
+ * @param solver
+ *   : A type of worklist solver which may or may not support widening or narrowing
+ */
 class ForwardLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
   domain: A,
   solver: IntraproceduralWorklistSolver[L, A]
@@ -28,6 +59,20 @@ class ForwardLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
     generateInvariants(procedure).foreach { (block, pred) => if pred != Predicate.True then block.postconditions += pred }
 }
 
+/** Performs a single backwards analysis to generate loop invariants that hold at the start of a block. This will be
+ *  encoded as an assertion at the start of a block. Invariants will only be generated on loop heads, and so loop head
+ *  detection must be run.
+ *
+ * @tparam L
+ *   : Domain value type
+ * @tparam A
+ *   : The type of abstract domain being used
+ *
+ * @param domain
+ *   : The concrete abstract domain being used
+ * @param solver
+ *   : A type of worklist solver which may or may not support widening or narrowing
+ */
 class BackwardLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
   domain: A,
   solver: IntraproceduralWorklistSolver[L, A]
@@ -46,13 +91,16 @@ class FullLoopInvariantGenerator(program: Program) {
   def addInvariantsToProc(procedure: Procedure) = {
     reversePostOrder(procedure)
 
+    // Intervals give us constant bounds on variables, for example an iteration variable in a loop guard.
     val intervals = DoubleIntervalDomain(Some(procedure))
     ForwardLoopInvariantGenerator(intervals, NarrowingWorklistSolver(intervals)).genAndAddInvariants(procedure)
 
+    // Gamma domains ensure that relations of the gammas of variables are maintained throughout loop iterations.
     val gammas = MayGammaDomain(
       LatticeMap.TopMap(procedure.formalInParam.unsorted.map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
     )
     ForwardLoopInvariantGenerator(gammas, worklistSolver(gammas)).genAndAddInvariants(procedure)
+    // TODO consider whether the must gamma domain is also worthwhile using
 
     // Add more domains here
   }
