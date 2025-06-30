@@ -188,7 +188,7 @@ case object BVNOT extends BVUnOp("not")
 case object BVNEG extends BVUnOp("neg")
 
 case class AssocExpr(op: BoolBinOp, args: List[Expr]) extends Expr with CachedHashCode {
-  require(args.size >= 2)
+  require(args.size >= 2, "AssocExpr requires at least two operands")
   override def getType: IRType = BoolType
   override def toBoogie: BExpr = AssocBExpr(op, args.map(_.toBoogie))
   override def gammas: Set[Variable] = args.flatMap(_.gammas).toSet
@@ -196,9 +196,14 @@ case class AssocExpr(op: BoolBinOp, args: List[Expr]) extends Expr with CachedHa
   override def toString() = "(" + args.mkString(op.toString) + ")"
 
   def toBinaryExpr = {
-    val i = BinaryExpr(op, args.head, args.tail.head)
-    val rest = args.tail.tail
-    rest.foldLeft(i)((acc, n) => BinaryExpr(op, acc, n))
+
+    args match {
+      case first :: second :: rest =>
+        val i = BinaryExpr(op, first, second)
+        rest.foldLeft(i)((acc, n) => BinaryExpr(op, acc, n))
+      case _ => throw IllegalArgumentException("Invalid AssocExpr: requries at least two operands")
+    }
+
   }
 
 }

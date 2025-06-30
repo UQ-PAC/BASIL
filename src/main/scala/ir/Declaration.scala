@@ -17,13 +17,13 @@ case class FunctionDecl(
   attribs: List[(String, Option[String])] = List(),
   inlineDef: Boolean = false
 ) extends Decl {
-  def toBoogie =
 
+  def toBoogie = {
     val bparams = params.map(p => BParam(p.name, p.getType.toBoogie))
-
     val body = definition.map(_.toBoogie)
-
     BFunction(name, bparams, BParam(returnType.toBoogie), body, attribs.map((n, v) => BAttribute(n, v)))
+  }
+
   def makeCall(actualParams: List[Expr] = List()) = {
     require(params.map(_.getType) == actualParams.map(_.getType))
     if (!inlineDef || definition.isEmpty) then {
