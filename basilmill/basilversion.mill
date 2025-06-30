@@ -5,22 +5,15 @@ import mill.scalalib._
 
 import scala.util.Try
 
-import $ivy.`com.lihaoyi::mill-contrib-versionfile:`
-import mill.contrib.versionfile.VersionFileModule
-
 import $ivy.`com.lihaoyi::mill-contrib-buildinfo:`
 import mill.contrib.buildinfo.BuildInfo
 
-trait BasilVersion extends VersionFileModule with BuildInfo {
-
+trait BasilVersion extends BuildInfo {
   this: ScalaModule =>
-
-  override def versionFile = Task.Source {
-    super.millSourcePath / "VERSION"
-  }
 
   private def missingVersion() =
     throw new Exception("git unavailable and COMMIT is not defined")
+
   def gitVersion = Task.Input {
 
     Try {
@@ -34,21 +27,6 @@ trait BasilVersion extends VersionFileModule with BuildInfo {
   override def buildInfoPackageName = "buildinfo"
   override def buildInfoMembers = Seq(
     BuildInfo.Value("scalaVersion", scalaVersion()),
-    BuildInfo.Value("fileVersion", currentVersion().toString),
     BuildInfo.Value("gitVersion", gitVersion()),
   )
-
-  def release(args: String*) = Task.Command {
-    os.proc("git", "stash").call(cwd = Task.workspace)
-    try {
-      // XXX: this is being run too early by the dependency resolution
-      setReleaseVersion()()
-      os.proc("git", "commiat", "-am", generateCommitMessage(currentVersion())).call(cwd = Task.workspace)
-    } finally {
-      os.proc("git", "checkout", "./VERSION").call(cwd = Task.workspace)
-      os.proc("git", "stash", "pop").call(cwd = Task.workspace)
-    }
-
-    ()
-  }
 }

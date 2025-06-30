@@ -160,7 +160,7 @@ object Main {
     trimEarly: Flag,
     @arg(name = "help", short = 'h', doc = "Show this help message.")
     help: Flag,
-    @arg(name = "version", doc = "Show version number.")
+    @arg(name = "version", doc = "Show version number and exit.")
     version: Flag,
     @arg(name = "analysis-results", doc = "Log analysis results in files at specified path.")
     analysisResults: Option[String],
@@ -247,8 +247,7 @@ object Main {
 
     if (conf.version.value) {
       println("The Basil Pipeline")
-      println("version: " + buildinfo.BuildInfo.fileVersion)
-      println("git tag: " + buildinfo.BuildInfo.gitVersion)
+      println("Version: " + buildinfo.BuildInfo.gitVersion)
       return
     }
 
