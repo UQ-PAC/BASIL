@@ -2,6 +2,7 @@ package ir
 import cfg_visualiser.{DotArrow, DotGraph, DotInterArrow, DotNode, DotRegularArrow}
 import translating.BasilIRPrettyPrinter
 import translating.PrettyPrinter.*
+import util.assertion.*
 
 import scala.annotation.tailrec
 
@@ -278,7 +279,7 @@ def stronglyConnectedComponents[T <: CFGPosition, O <: T](
       out += component
     }
   }
-  assert(stack.size == 0)
+  debugAssert(stack.size == 0)
 
   out.map(_.toSet).toList
 }

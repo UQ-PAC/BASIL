@@ -2,6 +2,7 @@ package analysis
 
 import ir.*
 import ir.transforms.AbstractDomain
+import util.assertion.*
 
 trait MayAnalysis
 trait MustAnalysis
@@ -90,7 +91,7 @@ class PredDisjunctiveCompletion[L](d: PredicateEncodingDomain[L])
  * If the set's size exceeds the bound, join all elements into a single term using the underlying domain's join operator.
  */
 class BoundedDisjunctiveCompletion[L](d: AbstractDomain[L], bound: Int) extends AbstractDomain[Set[L]] {
-  assert(bound > 0)
+  debugAssert(bound > 0)
 
   def collapse(a: Set[L], pos: Block): Set[L] = Set(a.foldLeft(d.bot) { (a, b) => d.join(a, b, pos) })
 

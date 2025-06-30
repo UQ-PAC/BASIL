@@ -11,6 +11,8 @@ import translating.PrettyPrinter.*
 import util.functional.*
 import util.{ILLoadingConfig, IRContext, IRLoading, IRTransform, LogLevel, Logger, PerformanceTimer}
 
+import scala.language.implicitConversions
+
 def load(s: InterpreterState, global: SpecGlobal): Option[BitVecLiteral] = {
   val f = NormalInterpreter
 

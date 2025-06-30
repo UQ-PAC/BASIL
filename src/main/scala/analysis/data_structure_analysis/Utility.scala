@@ -103,7 +103,7 @@ class Node(using counter: Counter)(val graph: Option[Graph], var size: BigInt = 
   }
 
   def cloneNode(from: Graph, to: Graph): Unit = {
-//    assert(from.nodes.contains(this)) TODO update nodes after each phase for to check this assertion
+//    debugAssert(from.nodes.contains(this)) TODO update nodes after each phase for to check this assertion
     if (!to.nodes.contains(this)) {
       to.nodes.add(this)
 
