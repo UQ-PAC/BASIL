@@ -154,7 +154,7 @@ class BasilIRPrettyPrinter(
     var funs = mutable.LinkedHashSet[(String, List[IRType], IRType)]()
     override def vexpr(e: Expr) = {
       e match {
-        case u: UninterpretedFunction => funs.add(u.signature)
+        case u: FApplyExpr => funs.add(u.signature)
         case _ => ()
       }
       DoChildren()

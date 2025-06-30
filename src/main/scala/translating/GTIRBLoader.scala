@@ -455,7 +455,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0))
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "_" + size, argsIR, BoolType)), None)
+        (Some(FApplyExpr(name + "_" + size, argsIR, BoolType)), None)
 
       case "FPAdd.0" | "FPMul.0" | "FPDiv.0" | "FPMulX.0" | "FPMax.0" | "FPMin.0" | "FPMaxNum.0" | "FPMinNum.0" |
           "FPSub.0" =>
@@ -463,28 +463,28 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0)).toInt
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "_" + size, argsIR, BitVecType(size))), None)
+        (Some(FApplyExpr(name + "_" + size, argsIR, BitVecType(size))), None)
 
       case "FPMulAddH.0" | "FPMulAdd.0" | "FPRoundInt.0" | "FPRoundIntN.0" =>
         checkArgs(function, 1, 4, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0)).toInt
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "_" + size, argsIR, BitVecType(size))), None)
+        (Some(FApplyExpr(name + "_" + size, argsIR, BitVecType(size))), None)
 
       case "FPRecpX.0" | "FPSqrt.0" | "FPRecipEstimate.0" | "FPRSqrtStepFused.0" | "FPRecipStepFused.0" =>
         checkArgs(function, 1, 2, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0)).toInt
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "_" + size, argsIR, BitVecType(size))), None)
+        (Some(FApplyExpr(name + "_" + size, argsIR, BitVecType(size))), None)
 
       case "FPCompare.0" =>
         checkArgs(function, 1, 4, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0))
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "_" + size, argsIR, BitVecType(4))), None)
+        (Some(FApplyExpr(name + "_" + size, argsIR, BitVecType(4))), None)
 
       case "FPConvert.0" =>
         checkArgs(function, 2, 3, typeArgs.size, args.size, ctx.getText)
@@ -492,7 +492,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val outSize = parseInt(typeArgs(0)).toInt
         val inSize = parseInt(typeArgs(1))
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
+        (Some(FApplyExpr(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "FPToFixed.0" =>
         checkArgs(function, 2, 5, typeArgs.size, args.size, ctx.getText)
@@ -501,7 +501,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val inSize = parseInt(typeArgs(1))
         // need to specifically handle the integer parameter
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
+        (Some(FApplyExpr(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "FixedToFP.0" =>
         checkArgs(function, 2, 5, typeArgs.size, args.size, ctx.getText)
@@ -510,13 +510,13 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val outSize = parseInt(typeArgs(1)).toInt
         // need to specifically handle the integer parameter
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
+        (Some(FApplyExpr(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "FPConvertBF.0" =>
         checkArgs(function, 0, 3, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name, argsIR, BitVecType(32))), None)
+        (Some(FApplyExpr(name, argsIR, BitVecType(32))), None)
 
       case "FPToFixedJS_impl.0" =>
         checkArgs(function, 2, 3, typeArgs.size, args.size, ctx.getText)
@@ -524,13 +524,13 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
         val inSize = parseInt(typeArgs(0))
         val outSize = parseInt(typeArgs(1)).toInt
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
+        (Some(FApplyExpr(name + "_" + outSize + "_" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "BFAdd.0" | "BFMul.0" =>
         checkArgs(function, 0, 2, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val argsIR = args.flatMap(visitExprOnly).toSeq
-        (Some(UninterpretedFunction(name, argsIR, BitVecType(32))), None)
+        (Some(FApplyExpr(name, argsIR, BitVecType(32))), None)
 
       case "cvt_bits_uint.0" | "cvt_bits_sint.0" =>
         // ignore conversion between bitvector/integer for now

@@ -57,7 +57,7 @@ class TypeChecker extends CILVisitor {
 
   override def vexpr(e: Expr) = {
     val error: Option[ExprTypeError] = e match {
-      case _: Literal | _: Variable | _: LambdaExpr | _: OldExpr | _: UninterpretedFunction =>
+      case _: Literal | _: Variable | _: LambdaExpr | _: OldExpr | _: FApplyExpr =>
         /* terminals that have no sensible local type constraints */
         None
       case QuantifierExpr(_, b, _) =>

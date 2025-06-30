@@ -351,7 +351,7 @@ enum Endian {
   case BigEndian
 }
 
-case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IRType, uninterpreted: Boolean = true)
+case class FApplyExpr(name: String, params: Seq[Expr], returnType: IRType, uninterpreted: Boolean = true)
     extends Expr
     with CachedHashCode {
   override def getType: IRType = returnType

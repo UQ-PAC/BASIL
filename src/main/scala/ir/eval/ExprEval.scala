@@ -214,7 +214,7 @@ def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S,
     case f: OldExpr => State.pure(f)
     case f: QuantifierExpr => State.pure(f)
     case e: LambdaExpr => State.pure(e)
-    case f: UninterpretedFunction => State.pure(f)
+    case f: FApplyExpr => State.pure(f)
     case unOp: UnaryExpr =>
       for {
         body <- eval(unOp.arg)
@@ -325,7 +325,7 @@ def partialEvalExpr(
   }
 }
 
-def evalLambdaApply(definition: LambdaExpr, apply: UninterpretedFunction): Expr = {
+def evalLambdaApply(definition: LambdaExpr, apply: FApplyExpr): Expr = {
   require(apply.params.toList.map(_.getType) == definition.binds.toList.map(_.getType))
   val params = definition.binds.toList.zip(apply.params).toMap[Variable, Expr].get
   visit_expr(SubstOnce(params), definition.body)

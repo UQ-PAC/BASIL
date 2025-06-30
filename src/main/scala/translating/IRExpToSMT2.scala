@@ -50,7 +50,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
       case b @ AssocExpr(op, arg) => vexpr(b.toBinaryExpr)
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
       case v: Variable => vrvar(v)
-      case f @ UninterpretedFunction(n, params, rt, _) => vuninterp_function(n, params.map(vexpr))
+      case f @ FApplyExpr(n, params, rt, _) => vuninterp_function(n, params.map(vexpr))
       case q: QuantifierExpr => vquantifier(q)
       case q: LambdaExpr => vlambda(q)
       case r: OldExpr => vold(r.body)
@@ -166,7 +166,7 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
       case b @ AssocExpr(op, args) => vbool_expr(op, args.map(vexpr))
       case r: SharedMemory => ???
       case r: StackMemory => ???
-      case f @ UninterpretedFunction(n, params, rt, _) => vuninterp_function(n, params.map(vexpr))
+      case f @ FApplyExpr(n, params, rt, _) => vuninterp_function(n, params.map(vexpr))
       case q: QuantifierExpr => vquantifier(q)
       case q: LambdaExpr => vlambda(q)
       case r: OldExpr => vold(r.body)
@@ -370,7 +370,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     )
   }
 
-  def interpretFun(x: UninterpretedFunction): Option[Sexp[Expr]] = {
+  def interpretFun(x: FApplyExpr): Option[Sexp[Expr]] = {
     x.name match {
       case "bool2bv1" => {
         Some(booltoBVDef)
@@ -403,7 +403,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
           case _ => ()
         }
         e match {
-          case f: UninterpretedFunction => {
+          case f: FApplyExpr => {
             val decl = interpretFun(f)
             decled = decled ++ decl.toSet
             DoChildren() // get variables out of args

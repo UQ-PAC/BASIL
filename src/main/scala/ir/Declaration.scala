@@ -27,10 +27,10 @@ case class FunctionDecl(
   def makeCall(actualParams: List[Expr] = List()) = {
     require(params.map(_.getType) == actualParams.map(_.getType))
     if (!inlineDef || definition.isEmpty) then {
-      UninterpretedFunction(name, actualParams, returnType, false)
+      FApplyExpr(name, actualParams, returnType, false)
     } else {
       val l = LambdaExpr(params, definition.get)
-      ir.eval.evalLambdaApply(l, UninterpretedFunction(name, params, returnType, false))
+      ir.eval.evalLambdaApply(l, FApplyExpr(name, params, returnType, false))
     }
   }
 }

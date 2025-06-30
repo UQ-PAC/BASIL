@@ -657,7 +657,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
   def evaluateExprToTNum(s: Map[Variable, TNum], expr: Expr): TNum =
     val r = expr match {
       case b: AssocExpr => evaluateExprToTNum(s, b.toBinaryExpr)
-      case u: UninterpretedFunction => TNum.top(sizeBits(u.getType))
+      case u: FApplyExpr => TNum.top(sizeBits(u.getType))
       case u: LambdaExpr => TNum.top(sizeBits(u.getType))
       case u: QuantifierExpr => TNum.top(sizeBits(u.getType))
       case u: OldExpr => TNum.top(sizeBits(u.getType))

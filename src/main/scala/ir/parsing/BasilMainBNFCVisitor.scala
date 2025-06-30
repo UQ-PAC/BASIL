@@ -117,7 +117,7 @@ case class InnerBasilBNFCVisitor[A](
       case None => throw Exception(s"Undeclared function: ${x.globalident_}")
     }
     val args = x.listexpr_.asScala.toSeq.map(_.accept(this, arg))
-    ir.UninterpretedFunction(n, args, rt)
+    ir.FApplyExpr(n, args, rt)
   }
   override def visit(x: syntax.LocalVar1, arg: A) = {
     // handle registers which are declared in the global scope. everything else

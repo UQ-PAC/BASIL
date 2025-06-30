@@ -136,10 +136,10 @@ class CILVisitorImpl(val v: CILVisitor) {
         if (narg ne arg) UnaryExpr(op, narg) else n
       }
       case v: Variable => visit_rvar(v)
-      case UninterpretedFunction(name, params, rt, _) => {
+      case FApplyExpr(name, params, rt, _) => {
         val nparams = params.map(visit_expr)
         val updated = (params.zip(nparams).exists((a, b) => a ne b))
-        if (updated) UninterpretedFunction(name, nparams, rt) else n
+        if (updated) FApplyExpr(name, nparams, rt) else n
       }
     }
     doVisit(v, v.vexpr(n), n, continue)
