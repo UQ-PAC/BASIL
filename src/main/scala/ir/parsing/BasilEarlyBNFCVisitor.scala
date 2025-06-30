@@ -1,12 +1,12 @@
 package ir.parsing
 
-import basil_ir.{Absyn => syntax}
+import basil_ir.Absyn as syntax
 
 import scala.collection.immutable.ListMap
 import scala.jdk.CollectionConverters.*
 
 private object Declarations {
-  lazy val empty = Declarations(Map(), Map(), Map(), Map())
+  lazy val empty = Declarations(Map(), Map(), Map(), Map(), SymbolTableInfo.empty, ProgSpec())
 }
 
 /**
@@ -19,9 +19,11 @@ private object Declarations {
  */
 case class Declarations(
   val globals: Map[String, ir.Register],
+  val functions: Map[String, FunDecl],
   val memories: Map[String, ir.Memory],
   val procedures: Map[String, ir.dsl.EventuallyProcedure],
-  val metas: Map[String, String]
+  val symtab: SymbolTableInfo,
+  val progSpec: ProgSpec
 ) {
   private def ensureDisjoint[T, U](x: Map[T, U], y: Map[T, U]): Unit =
     val overlap = x.keySet.intersect(y.keySet)
@@ -34,16 +36,77 @@ case class Declarations(
   @throws[IllegalArgumentException]("if the two Declarations have overlapping names")
   def merge(other: Declarations) = {
     ensureDisjoint(globals, other.globals)
+    ensureDisjoint(functions, other.functions)
     ensureDisjoint(memories, other.memories)
     ensureDisjoint(procedures, other.procedures)
-    ensureDisjoint(metas, other.metas)
     Declarations(
       globals ++ other.globals,
+      functions ++ other.functions,
       memories ++ other.memories,
       procedures ++ other.procedures,
-      metas ++ other.metas
+      symtab.merge(other.symtab),
+      progSpec.merge(other.progSpec)
     )
   }
+}
+
+trait AttributeListBNFCVisitor[A]()
+    extends syntax.AttrDefList.Visitor[Attrib.Map, A],
+      syntax.AttrValue.Visitor[Attrib, A],
+      syntax.AttrKeyValue.Visitor[(String, Attrib), A],
+      LiteralsBNFCVisitor[A] {
+
+  def visit(x: syntax.MapAttr, arg: A): ir.parsing.Attrib =
+    Attrib.Map(ListMap.from(x.listattrkeyvalue_.asScala.toList.map(_.accept(this, arg))))
+  def visit(x: syntax.ListAttr, arg: A): ir.parsing.Attrib =
+    Attrib.List(x.listattrvalue_.asScala.toVector.map(_.accept(this, arg)))
+  def visit(x: syntax.LiteralAttr, arg: A): ir.parsing.Attrib =
+    Attrib.ValLiteral(x.value_.accept(this, arg))
+  def visit(x: syntax.StringAttr, arg: A): ir.parsing.Attrib = {
+    Attrib.ValString(unquote(x.str_, x))
+  }
+
+  override def visit(p: syntax.AttrDefListEmpty, arg: A): Attrib.Map = Attrib.Map(ListMap())
+  override def visit(p: syntax.AttrKeyValue1, arg: A): (String, Attrib) = {
+    (unsigilAttrib(p.bident_), p.attrvalue_.accept(this, arg))
+  }
+  override def visit(p: syntax.AttrDefListSome, arg: A): Attrib.Map = {
+    Attrib.Map(ListMap.from(p.listattrkeyvalue_.asScala.toList.map(_.accept(this, arg))))
+  }
+
+  def getIntCompatAttr(n: String)(attrs: Attrib): Option[BigInt] = {
+    attrs match {
+      case Attrib.Map(vs) =>
+        vs.collect {
+          case (attr, Attrib.ValLiteral(ir.IntLiteral(v))) if attr == n => v
+          case (attr, Attrib.ValLiteral(ir.BitVecLiteral(v, _))) if attr == n => v
+        }.lastOption
+      case _ => None
+    }
+  }
+
+  def parseAttr(a: syntax.AttrValue, arg: A): Attrib = {
+    a.accept(this, arg)
+  }
+
+  def parseAttrMap(a: syntax.AttrDefList, arg: A): Attrib = {
+    a.accept(this, arg)
+  }
+
+  def getAddrAttr(attrs: Attrib): Option[BigInt] = getIntCompatAttr("address")(attrs)
+
+  def getStrAttr(n: String)(attrs: Attrib): Option[String] = {
+    attrs match {
+      case Attrib.Map(vs) =>
+        vs.collect {
+          case (attr, Attrib.ValString(v)) if attr == n => v
+        }.lastOption
+      case _ => None
+    }
+  }
+  val getCommentAttr = getStrAttr("comment")
+  val getLabelAttr = getStrAttr("label")
+
 }
 
 /**
@@ -56,14 +119,17 @@ case class Declarations(
  * for that subset of the AST.
  */
 case class BasilEarlyBNFCVisitor[A]()
-    extends syntax.Program.Visitor[Declarations, A],
+    extends syntax.Module.Visitor[Declarations, A],
       syntax.Declaration.Visitor[Declarations, A],
-      syntax.MExpr.Visitor[String, A],
-      syntax.Params.Visitor[ir.LocalVar, A],
-      TypesBNFCVisitor[A] {
+      syntax.ProcSig.Visitor[Declarations, A],
+      syntax.Params.Visitor[(String, ir.IRType), A],
+      TypesBNFCVisitor[A],
+      LiteralsBNFCVisitor[A],
+      AttributeListBNFCVisitor[A] {
 
-  // Members declared in Program.Visitor
-  override def visit(x: syntax.Prog, arg: A) =
+  override def visit(x: syntax.AxiomDecl, arg: A) = ???
+
+  override def visit(x: syntax.Module1, arg: A) =
     x.listdeclaration_.asScala.foldLeft(Declarations.empty) { case (decls, x) =>
       try {
         decls.merge(x.accept(this, arg))
@@ -77,47 +143,56 @@ case class BasilEarlyBNFCVisitor[A]()
       }
     }
 
-  // Members declared in MExpr.Visitor
-  override def visit(x: syntax.MSym, arg: A) = x.bident_
-  override def visit(x: syntax.BlockM, arg: A) =
-    throw ParseException("block literal as a metadata value is unsupported", x)
-
   // Members declared in Declaration.Visitor
-  override def visit(x: syntax.LetDecl, arg: A) =
-    val allowedMetadataKeys = List("entry_procedure")
-    val key = x.bident_ match {
-      case x if allowedMetadataKeys.contains(x) => x
-      case key => throw ParseException("unsupported 'let' metadata key: " + key, x)
-    }
-    Declarations.empty.copy(metas = Map(key -> x.mexpr_.accept(this, arg)))
+  override def visit(x: syntax.ProgDecl, arg: A) = Declarations.empty
+  override def visit(x: syntax.ProgDeclWithSpec, arg: A) = Declarations.empty
 
-  override def visit(x: syntax.MemDecl, arg: A) =
-
-    // TODO: make this narrower in the grammar
-
+  override def visit(x: syntax.UnsharedMemDecl, arg: A) =
     val ir.MapType(ir.BitVecType(addrwd), ir.BitVecType(valwd)) = x.type_.accept(this, arg): @unchecked
-    val mem = x.bident_ match {
-      case "stack" => ir.StackMemory(x.bident_, addrwd, valwd)
-      case _ => ir.SharedMemory(x.bident_, addrwd, valwd)
-    }
+    val mem = ir.StackMemory(unsigilGlobal(x.globalident_), addrwd, valwd)
     Declarations.empty.copy(memories = Map(mem.name -> mem))
 
+  override def visit(x: syntax.SharedMemDecl, arg: A) =
+    val ir.MapType(ir.BitVecType(addrwd), ir.BitVecType(valwd)) = x.type_.accept(this, arg): @unchecked
+    val mem = ir.SharedMemory(unsigilGlobal(x.globalident_), addrwd, valwd)
+    Declarations.empty.copy(memories = Map(mem.name -> mem))
+
+  def visit(x: basil_ir.Absyn.UninterpFunDecl, arg: A): ir.parsing.Declarations = {
+    val n = unsigilGlobal(x.globalident_)
+    val paramTypes = x.listtype_.asScala.toList.map(_.accept(this, arg))
+    val returnType = x.type_.accept(this, arg)
+    val ty = ir.uncurryFunctionType(paramTypes, returnType)
+    Declarations.empty.copy(functions = Map(n -> FunDecl(ty, None)))
+  }
+  def visit(x: basil_ir.Absyn.FunDef, arg: A): ir.parsing.Declarations = {
+    val n = unsigilGlobal(x.globalident_)
+    val paramTypes = visitParams(x.listparams_, arg).toList.map(_._2)
+    val returnType = x.type_.accept(this, arg)
+    val ty = ir.uncurryFunctionType(paramTypes, returnType)
+    Declarations.empty.copy(functions = Map(n -> FunDecl(ty, None)))
+  }
+
   override def visit(x: syntax.VarDecl, arg: A) =
-    val v = ir.Register(x.bident_, x.type_.accept(this, arg).asInstanceOf[ir.BitVecType].size)
+    val v = ir.Register(unsigilGlobal(x.globalident_), x.type_.accept(this, arg).asInstanceOf[ir.BitVecType].size)
     Declarations.empty.copy(globals = Map(v.name -> v))
 
-  override def visit(x: syntax.Param, arg: A): ir.LocalVar =
-    ir.LocalVar.ofIndexed(x.bident_, x.type_.accept(this, arg))
+  override def visit(x: syntax.Param, arg: A): (String, ir.IRType) =
+    val lv = ir.LocalVar.ofIndexed(unsigilLocal(x.localident_), x.type_.accept(this, arg))
+    lv.name -> lv.irType
 
-  private def visitParams(x: syntax.ListParams, arg: A): Map[String, ir.IRType] =
+  private def visitParams(x: syntax.ListParams, arg: A): Map[String, ir.IRType] = {
     // NOTE: uses ListMap instead of SortedMap, because the orders are presumed to
     // match between calls and param lists within the same file.
-    x.asScala.map(_.accept(this, arg)).map(x => x.name -> x.getType).to(ListMap)
+    x.asScala.toSeq.map(_.accept(this, arg)).to(ListMap)
+  }
 
-  override def visit(x: syntax.Procedure, arg: A) =
+  override def visit(x: syntax.ProcedureSig, arg: A) = {
+    val name = unsigilProc(x.procident_)
     val inparams = visitParams(x.listparams_1, arg)
     val outparams = visitParams(x.listparams_2, arg)
+    val proc = ir.dsl.EventuallyProcedure(name, inparams, outparams, Nil)
+    Declarations.empty.copy(procedures = Map(name -> proc))
+  }
 
-    val proc = ir.dsl.EventuallyProcedure(x.bident_, inparams, outparams, Nil)
-    Declarations.empty.copy(procedures = Map(proc.label -> proc))
+  override def visit(x: syntax.Procedure, arg: A) = x.procsig_.accept(this, arg)
 }

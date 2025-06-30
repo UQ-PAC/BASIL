@@ -1,10 +1,13 @@
 package analysis
 import ir.*
-import util.writeToFile
 import ir.eval.BitVectorEval
 import ir.eval.InfixBitVectorEval.*
 import ir.eval.InfixBitVectorEval.given
-import ir.transforms.{applyRPO, AbstractDomain}
+import ir.transforms.{AbstractDomain, applyRPO}
+import util.assertion.*
+import util.writeToFile
+
+import scala.language.implicitConversions
 
 /**
  *
@@ -61,7 +64,7 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
       .bv(width))
   }
 
-  assert(wellFormed, s"not well formed $this")
+  debugAssert(wellFormed, s"not well formed $this")
 
   def top() = {
     TNum(0.bv(width), BitVecLiteral(BitVecType(width).maxValue, width))

@@ -1,6 +1,6 @@
 package boogie
 import ir.*
-import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion, Logger}
+import util.BoogieMemoryAccessMode
 
 val externAttr = BAttribute("extern")
 val inlineAttr = BAttribute("inline")

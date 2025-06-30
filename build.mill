@@ -4,6 +4,7 @@ import $packages._
 import mill._
 import scalalib._
 
+import $file.basilmill.mdbook.mdbookBinary
 import $file.basilmill.bnfc.BNFCJFlexModule
 import $file.basilmill.antlr.AntlrModule
 import $file.basilmill.basildocs.BasilDocs
@@ -11,10 +12,12 @@ import $file.basilmill.basilversion.BasilVersion
 
 import os.Path
 
+import $ivy.`com.goyeau::mill-scalafix::0.4.2`
 import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
 import contrib.scalapblib._
+import com.goyeau.mill.scalafix.ScalafixModule
 
-object `package` extends RootModule with ScalaModule with BasilDocs with BasilVersion {
+object `package` extends RootModule with ScalaModule with BasilDocs with BasilVersion with ScalafixModule {
   // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
   def scalaVersion = "3.3.4"
@@ -24,15 +27,15 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
 
   def moduleDeps = Seq(basilAntlr, basilProto, bnfc)
 
-  def scalacOptions: T[Seq[String]] = Seq("-deprecation")
+  def scalacOptions: T[Seq[String]] = Seq("-deprecation", "-Wunused:imports", "-feature")
 
   val javaTests = ivy"com.novocode:junit-interface:0.11"
   val scalaTests = ivy"org.scalatest::scalatest:3.2.19"
   val scalaCheck = ivy"org.scalatestplus::scalacheck-1-18:3.2.19.0"
   val scalactic = ivy"org.scalactic::scalactic:3.2.19"
   val antlrRuntime = ivy"org.antlr:antlr4-runtime:4.9"
-  val sourceCode = ivy"com.lihaoyi::sourcecode:0.3.0"
-  val mainArgs = ivy"com.lihaoyi::mainargs:0.5.1"
+  val sourceCode = ivy"com.lihaoyi::sourcecode:0.4.2"
+  val mainArgs = ivy"com.lihaoyi::mainargs:0.7.6"
   val scalapb = ivy"com.thesamet.scalapb::scalapb-runtime:0.11.15"
   val upickle = ivy"com.lihaoyi::upickle:4.2.1"
 
@@ -44,12 +47,19 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     Seq(PathRef(this.millSourcePath / "main" / "scala"))
   }
 
-  object test extends ScalaTests with TestModule.ScalaTest {
+  override def scalafixConfig = Task {
+    Some(Task.workspace / ".scalafix.conf")
+  }
+
+  object test extends ScalaTests with TestModule.ScalaTest with ScalafixModule {
+
     override def ammoniteVersion = ammonite
     def ivyDeps = Agg(scalaTests, scalaCheck, javaTests)
     def sources = Task.Sources {
       Seq(PathRef(this.millSourcePath / "scala"))
     }
+
+    override def scalafixConfig = build.scalafixConfig
 
     // note: toBoolean accepts precisely "true" or "false"
     def basilTestParallel = Task.Input {
@@ -131,7 +141,20 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     os.read.lines(path1) == os.read.lines(path2)
   }
 
-  def scalafmt = mill.scalalib.scalafmt.ScalafmtModule
+  val scalafmt = mill.scalalib.scalafmt.ScalafmtModule
+
+
+  /**
+   * Haoyi: "currently there isn't a terribly easy way to run things sequentially,
+   *         but a command taking Evaluator could do that
+   *         e.g. https://github.com/com-lihaoyi/mill/discussions/5360"
+   */
+  def fmt(ev: mill.eval.Evaluator): Command[Unit] = Task.Command(exclusive = true) {
+    mill.main.RunScript.evaluateNamed(ev, Agg(fix()))
+    mill.main.RunScript.evaluateNamed(ev, Agg(test.fix()))
+    mill.main.RunScript.evaluateNamed(ev, Agg(scalafmt.reformat()))
+    ()
+  }
 
   object basilAntlr extends AntlrModule {
     override def ivyDeps = Agg(build.antlrRuntime)
@@ -172,93 +195,35 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     }
   }
 
-  def gitCommitHash = Task.Input {
-    // set in github actions
-    // https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/store-information-in-variables#default-environment-variables
-    Task.env.getOrElse("GITHUB_SHA", "main")
-  }
-
-  def scalaDocOptions = Task {
-    super.scalaDocOptions() ++ scalaDocExternalMappingOptions() ++ Seq(
-      s"-source-links:github://UQ-PAC/BASIL/${gitCommitHash()}",
-      s"-doc-root-content:$millSourcePath/main/scala/rootdoc.scala"
-    )
-  }
-
-  def baseUrl = "https://uq-pac.github.io/BASIL"
-  def docsRegexes = Task {
-    // these docs paths are used for inter-project linking.
-    // https://docs.scala-lang.org/scala3/guides/scaladoc/settings.html#-external-mappings
-    Map(
-      "api/bnfc" -> ".*basil_ir/.*::javadoc",
-      "api/basil-antlr" -> ".*Parsers/.*::javadoc",
-      "api/basil-proto" -> ".*com/grammatech/gtirb.*::scaladoc3",
-      "api/java-cup" -> ".*java_cup/.*::javadoc",
-    )
-  }
-
-  def docsModules = Task {
-    // these doc paths are copied into the combined docs output.
-    Map(
-      "api/basil" -> docJar(),
-      "api/bnfc" -> build.bnfc.docJar(),
-      "api/basil-antlr" -> build.basilAntlr.docJar(),
-      "api/basil-proto" -> build.basilProto.docJar(),
-      "api/java-cup" -> build.bnfc.cup.docJar(),
-    )
-  }
-
-  def scalaDocExternalMappingOptions = Task {
-    val defaultExternals = Seq(
-      ".*scala/.*::scaladoc3::https://scala-lang.org/api/3.3_LTS/",
-      "java/.*::javadoc::https://docs.oracle.com/en/java/javase/17/docs/api/java.base/",
-      ".*com/google/protobuf.*::javadoc::https://protobuf.dev/reference/java/api-docs/",
-    )
-    val externals = defaultExternals ++ docsRegexes().map {
-      case (path, regex) => s"$regex::$baseUrl/$path"
+  object mdbook extends mdbookBinary {
+    def mdbookSources = Task.Source {
+      Task.workspace  / "docs"
     }
-    Seq("-external-mappings:" + externals.mkString(","))
   }
 
-  def docsIndex = Task.Source {
-    PathRef(super.millSourcePath / "docs" / "static" / "index.html")
+  def ctagsConfig = Task.Source {
+    Task.workspace / "basilmill" / "scala.ctags"
   }
 
-  def allDocs = Task {
-    val dest = Task.dest
+  /**
+   * Build the ctags file containing code definition locations.
+   * This can be used with `./mill -w` to watch and re-build on file changes.
+   */
+  def ctags = Task {
+    val src = Task.traverse(Seq(this, test) ++ moduleDeps)(_.allSources)().flatten
+    val srcArgs = src.map(_.path).filter(os.exists(_)).map(_.toString)
 
-    def copyDoc(x: PathRef, name: String) = {
-      val p = x.path / ".." / "javadoc"
-      println("copying docs from " + p)
-      os.copy(p, dest / os.RelPath(name), createFolders = true)
-    }
+    val newFile = Task.workspace / "tags.new"
+    val tagsFile = Task.workspace / "tags"
 
-    docsModules().foreach {
-      case (name, src) => copyDoc(src, name)
-    }
-    os.copy.into(docsIndex().path, dest / "api")
+    val args = Seq(
+      "ctags", "--tag-relative=no", "-R", "-f", newFile.toString,
+      "--options=" + ctagsConfig().path,
+      "--languages=scala,java", "--fields=+zK")
 
-    os.walk(dest).foreach {
-      case path if path.ext == "html" =>
-        // HACK: fix mill bug causing incorrect scala source links https://github.com/com-lihaoyi/mill/issues/5221
-        val out = os.read(path).replace(super.millSourcePath.toString, "")
-        os.write.over(path, out)
-      case path if path.last == "ux.js" =>
-        val old = os.read(path)
-        val oldLen = old.length
-
-        // HACK: disable scaladoc's horrendous link click handler which
-        // introduces a delay and sometimes causes clicking links to fail silently
-        val out = old.replace("""document.querySelectorAll("a")""", "[]")
-        if (oldLen == out.length)
-          println(s"warning: $path replacement did not match anything")
-
-        os.write.over(path, out)
-      case _ => ()
-    }
-
-    println("combined docs at " + dest)
-
-    dest
+    os.call(args ++ srcArgs, cwd = Task.workspace)
+    os.move(newFile, tagsFile, replaceExisting = true, atomicMove = true)
   }
+
+
 }

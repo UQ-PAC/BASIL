@@ -1,8 +1,6 @@
 package specification
 
 import boogie.*
-import ir.*
-import util.Logger
 
 trait SymbolTableEntry {
   val name: String

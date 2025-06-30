@@ -1,15 +1,11 @@
-import org.scalatest.funsuite.AnyFunSuite
-import util.{ILLoadingConfig, IRLoading, LogLevel, Logger, PerformanceTimer, RunUtils}
-import translating.BAPToIR
 import analysis.LoopDetector
-import analysis.LoopTransform
 import ir.{Block, Program, dotBlockGraph}
-
-import java.io.{BufferedWriter, File, FileWriter}
-import scala.collection.mutable
-import scala.io.Source
-import scala.sys.process.*
+import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
+import translating.BAPToIR
+import util.{ILLoadingConfig, IRLoading, LogLevel, Logger}
+
+import scala.sys.process.*
 
 @test_util.tags.UnitTest
 class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
@@ -18,7 +14,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
   def load(conf: ILLoadingConfig): Program = {
     val bapProgram = IRLoading.loadBAP(conf.inputFile)
-    val (_, _, _, _, _, mainAddress) = IRLoading.loadReadELF(conf.relfFile, conf)
+    val (_, _, _, _, _, mainAddress) = IRLoading.loadReadELF(conf.relfFile.get, conf)
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
     val IRProgram = IRTranslator.translate
     IRProgram
@@ -43,7 +39,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     val RELFPath = variationPath + ".relf"
     Logger.debug(variationPath)
 
-    val program: Program = load(ILLoadingConfig(ADTPath, RELFPath))
+    val program: Program = load(ILLoadingConfig(ADTPath, Some(RELFPath)))
 
     val foundLoops = LoopDetector.identify_loops(program)
 

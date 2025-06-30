@@ -1,12 +1,10 @@
 package ir.transforms
 import ir.*
-import util.Logger
 import ir.cilvisitor.*
-import ir.dsl.IRToDSL.*
 import ir.dsl.*
 
+import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
-import scala.collection.immutable.{ArraySeq}
 
 private val counter = util.Counter()
 
@@ -89,7 +87,7 @@ def convertBlockRenaming(varRenamer: CILVisitor, blockName: String => String)(x:
     blockName(x.label),
     x.statements.to(ArraySeq).map(convertStatementRenaming(varRenamer)),
     convertJumpRenaming(blockName, varRenamer, x.jump),
-    x.address
+    x.meta
   )
 }
 

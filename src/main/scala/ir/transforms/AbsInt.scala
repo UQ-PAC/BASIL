@@ -1,18 +1,10 @@
 package ir.transforms
-import translating.serialiseIL
 
-import util.Logger
-import ir.eval.AlgebraicSimplifications
-import ir.eval.AssumeConditionSimplifications
-import ir.eval.simplifyExprFixpoint
-import ir.cilvisitor.*
 import ir.*
+import util.Logger
+import util.assertion.*
+
 import scala.collection.mutable
-import analysis._
-import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.concurrent.duration.*
-import scala.util.{Failure, Success}
-import ExecutionContext.Implicits.global
 
 /**********************************************************************************
  * Block-level abstract interpreter framework.
@@ -191,7 +183,7 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
       do {
         // drop rest of blocks with same priority
         val m = worklist.dequeue()
-        assert(
+        debugAssert(
           m == b,
           s"Different nodes with same priority ${m.rpoOrder} ${b.rpoOrder}, violates PriorityQueueWorklist assumption: $b and $m"
         )

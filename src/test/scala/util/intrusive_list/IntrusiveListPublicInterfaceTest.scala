@@ -1,7 +1,8 @@
 package util.intrusive_list
 import org.scalatest.funsuite.AnyFunSuite
-import scala.collection.mutable
 import test_util.CaptureOutput
+
+import scala.collection.mutable
 
 @test_util.tags.UnitTest
 class IntrusiveListPublicInterfaceTest extends AnyFunSuite with CaptureOutput {

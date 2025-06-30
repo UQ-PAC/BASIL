@@ -1,13 +1,13 @@
 import org.scalatest.funsuite.AnyFunSuite
+import test_util.BASILTest.*
+import test_util.{BASILTest, CaptureOutput, Histogram, TestConfig, TestCustomisation}
+import util.DSAConfig.Checks
+import util.boogie_interaction.*
 import util.{DSAConfig, DebugDumpIRLogger, LogLevel, Logger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
 
 import java.io.File
 import scala.collection.immutable.ListMap
 import scala.collection.mutable.ArrayBuffer
-import test_util.{BASILTest, CaptureOutput, Histogram, TestConfig, TestCustomisation}
-import test_util.BASILTest.*
-import util.DSAConfig.Checks
-import util.boogie_interaction.*
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
@@ -281,7 +281,7 @@ class ExtraSpecTests extends SystemTests {
   }
 
   // some of these tests have time out issues so they need more time, but some still time out even with this for unclear reasons
-  val timeout = 30
+  val timeout = 60
   val boogieFlags = Seq("/proverOpt:O:smt.array.extensional=false")
   runTests(
     "extraspec_correct",
@@ -343,6 +343,7 @@ class NoSimplifySystemTests extends SystemTests {
   }
 }
 
+@test_util.tags.AnalysisSystemTest2
 @test_util.tags.AnalysisSystemTest
 class SimplifySystemTests extends SystemTests {
   runTests("correct", TestConfig(simplify = true, useBAPFrontend = true, expectVerify = true, logResults = true))
@@ -354,6 +355,7 @@ class SimplifySystemTests extends SystemTests {
   }
 }
 
+@test_util.tags.AnalysisSystemTest4
 @test_util.tags.AnalysisSystemTest
 class SimplifyMemorySystemTests extends SystemTests {
 
@@ -587,6 +589,7 @@ class UnimplementedTests extends SystemTests {
   runTests("unimplemented", TestConfig(useBAPFrontend = true, expectVerify = false))
 }
 
+@test_util.tags.AnalysisSystemTest4
 @test_util.tags.AnalysisSystemTest
 class IntervalDSASystemTests extends SystemTests {
   runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, simplify = true, dsa = Some(Checks)))

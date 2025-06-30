@@ -1,8 +1,8 @@
 package test_util
 
 import org.scalatest.concurrent.ScaledTimeSpans
-import org.scalatest.time.{Span, Seconds}
-
+import org.scalatest.time.{Seconds, Span}
+import util.boogie_interaction.*
 import util.{
   BASILConfig,
   BASILResult,
@@ -14,11 +14,10 @@ import util.{
   RunUtils,
   StaticAnalysisConfig
 }
-import util.boogie_interaction.*
 
-import scala.sys.process.*
-import scala.io.Source
 import java.io.{BufferedWriter, File, FileWriter}
+import scala.io.Source
+import scala.sys.process.*
 
 case class TestConfig(
   timeout: Int = 10,
@@ -59,7 +58,8 @@ trait BASILTest {
       None
     }
     val config = BASILConfig(
-      loading = ILLoadingConfig(inputFile = inputPath, relfFile = RELFPath, specFile = specFile, parameterForm = false),
+      loading =
+        ILLoadingConfig(inputFile = inputPath, relfFile = Some(RELFPath), specFile = specFile, parameterForm = false),
       simplify = simplify,
       summariseProcedures = summariseProcedures,
       staticAnalysis = staticAnalysisConf,
@@ -111,14 +111,9 @@ trait BASILTest {
 }
 
 object BASILTest {
-  lazy val rootDirectory: String = {
-    val millRoot = System.getenv("MILL_WORKSPACE_ROOT")
-    if (millRoot == null) {
-      System.getProperty("user.dir")
-    } else {
-      millRoot
-    }
-  }
+  lazy val rootDirectory: String =
+    Option(System.getenv("MILL_WORKSPACE_ROOT"))
+      .getOrElse(System.getProperty("user.dir"))
 
   def writeToFile(text: String, path: String): Unit = {
     val writer = BufferedWriter(FileWriter(path, false))

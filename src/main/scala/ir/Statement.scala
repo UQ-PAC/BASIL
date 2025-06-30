@@ -1,9 +1,8 @@
 package ir
-import util.Logger
+import util.assertion.*
 import util.intrusive_list.IntrusiveListElement
-import boogie.{BMapVar, GammaStore}
-import collection.immutable.SortedMap
 
+import collection.immutable.SortedMap
 import collection.mutable
 
 /*
@@ -25,9 +24,6 @@ sealed trait Command extends HasParent[Block] with DeepEquality {
 
 sealed trait Statement extends Command, IntrusiveListElement[Statement] {
   def modifies: Set[Global] = Set()
-  def acceptVisit(visitor: Visitor): Statement = throw new Exception(
-    "visitor " + visitor + " unimplemented for: " + this
-  )
   def predecessor: Option[Command] = parent.statements.prevOption(this)
   def successor: Command = parent.statements.nextOption(this).getOrElse(parent.jump)
 }
@@ -47,7 +43,6 @@ class MemoryAssign(var lhs: Variable, var rhs: Expr, override val label: Option[
     case _ => Set()
 
   override def toString: String = s"$labelStr$lhs := $rhs"
-  override def acceptVisit(visitor: Visitor): Statement = visitor.visitMemoryAssign(this)
 
   def deepEquals(o: Object): Boolean = o match {
     case MemoryAssign(l, r, lbl) if l == lhs && r == rhs && lbl == label => true
@@ -65,7 +60,6 @@ class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[S
     case _ => Set()
   }
   override def toString: String = s"$labelStr$lhs := $rhs"
-  override def acceptVisit(visitor: Visitor): Statement = visitor.visitLocalAssign(this)
 
   def deepEquals(o: Object) = o match {
     case LocalAssign(l, r, lbl) if l == lhs && r == rhs && lbl == label => true
@@ -87,7 +81,6 @@ class MemoryStore(
 ) extends Statement {
   override def modifies: Set[Global] = Set(mem)
   override def toString: String = s"$labelStr$mem[$index] := MemoryStore($value, $endian, $size)"
-  override def acceptVisit(visitor: Visitor): Statement = visitor.visitMemoryStore(this)
   override def deepEquals(o: Object) = o match {
     case MemoryStore(m, i, v, e, s, l) => m == mem && i == index && v == value && e == endian && s == size && l == label
     case _ => false
@@ -112,7 +105,6 @@ class MemoryLoad(
     case _ => Set()
   }
   override def toString: String = s"$labelStr$lhs := MemoryLoad($mem, $index, $endian, $size)"
-  override def acceptVisit(visitor: Visitor): Statement = visitor.visitMemoryLoad(this)
   override def deepEquals(o: Object) = o match {
     case MemoryLoad(l, m, ind, en, sz, lbl) =>
       l == lhs && m == mem && ind == index && en == endian && sz == size && lbl == label
@@ -127,7 +119,6 @@ object MemoryLoad {
 
 class NOP(override val label: Option[String] = None) extends Statement {
   override def toString: String = s"NOP $labelStr"
-  override def acceptVisit(visitor: Visitor): Statement = this
   override def deepEquals(o: Object) = o match {
     case NOP(x) => x == label
     case _ => false
@@ -148,7 +139,6 @@ class AtomicEnd(override val label: Option[String] = None) extends NOP(label) {
 class Assert(var body: Expr, var comment: Option[String] = None, override val label: Option[String] = None)
     extends Statement {
   override def toString: String = s"${labelStr}assert $body" + comment.map(" //" + _)
-  override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssert(this)
   override def deepEquals(o: Object) = o match {
     case Assert(b, c, l) => b == body && c == comment && l == label
   }
@@ -174,7 +164,6 @@ class Assume(
 ) extends Statement {
 
   override def toString: String = s"${labelStr}assume $body" + comment.map(" //" + _)
-  override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssume(this)
   override def deepEquals(o: Object) = o match {
     case Assume(b, c, l, sec) => b == body && c == comment && l == label && sec == checkSecurity
     case _ => false
@@ -188,12 +177,10 @@ object Assume {
 
 sealed trait Jump extends Command {
   def modifies: Set[Global] = Set()
-  def acceptVisit(visitor: Visitor): Jump = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
 class Unreachable(override val label: Option[String] = None) extends Jump {
   /* Terminate / No successors / assume false */
-  override def acceptVisit(visitor: Visitor): Jump = this
 
   override def deepEquals(o: Object) = o match {
     case Unreachable(l) => label == l
@@ -203,7 +190,6 @@ class Unreachable(override val label: Option[String] = None) extends Jump {
 
 class Return(override val label: Option[String] = None, var outParams: SortedMap[LocalVar, Expr] = SortedMap())
     extends Jump {
-  override def acceptVisit(visitor: Visitor): Jump = this
   override def toString = s"Return(${outParams.mkString(",")})"
   override def deepEquals(o: Object): Boolean = o match {
     case Return(lbl, param) => lbl == label && param.toList == outParams.toList
@@ -257,12 +243,11 @@ class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override
     if (_targets.remove(t)) {
       t.removeIncomingJump(this)
     }
-    assert(!_targets.contains(t))
-    assert(!t.incomingJumps.contains(this))
+    debugAssert(!_targets.contains(t))
+    debugAssert(!t.incomingJumps.contains(this))
   }
 
   override def toString: String = s"${labelStr}GoTo(${targets.map(_.label).mkString(", ")})"
-  override def acceptVisit(visitor: Visitor): Jump = visitor.visitGoTo(this)
 }
 
 object GoTo {
@@ -290,7 +275,6 @@ class DirectCall(
   def calls: Set[Procedure] = Set(target)
   override def toString: String =
     s"${labelStr}${outParams.values.map(_.name).mkString(",")} := DirectCall(${target.name})(${actualParams.values.mkString(",")})"
-  override def acceptVisit(visitor: Visitor): Statement = visitor.visitDirectCall(this)
 
   def assignees: Set[Variable] = outParams.values.toSet
 
@@ -323,7 +307,6 @@ class IndirectCall(var target: Variable, override val label: Option[String] = No
     case None => Set(target)
   } */
   override def toString: String = s"${labelStr}IndirectCall($target)"
-  override def acceptVisit(visitor: Visitor): Statement = visitor.visitIndirectCall(this)
   override def deepEquals(o: Object): Boolean = o match {
     case IndirectCall(t, l) => t == target && l == label
     case _ => false

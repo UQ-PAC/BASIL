@@ -1,10 +1,6 @@
 package analysis
 
-import scala.annotation.tailrec
-import ir.{Block, Command, IntraProcIRCursor, Program, Procedure, GoTo, IRWalk}
-import ir.{LocalAssign, Assume, IntLiteral, IntType, EQ, BoolOR, LocalVar, BinaryExpr}
-import util.intrusive_list.IntrusiveList
-import util.StaticAnalysisLogger
+import ir.{Assume, BinaryExpr, Block, BoolOR, EQ, GoTo, IRWalk, IntLiteral, IntType, LocalAssign, LocalVar, Program}
 
 import scala.collection.mutable
 

@@ -1,10 +1,7 @@
 package translating
+
 import ir.*
-import boogie.*
-import specification.*
-import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
 import ir.cilvisitor.*
-import scala.sys.process.*
 
 trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
   // def vstmt(s: Statement) : Repr[Statement]
@@ -14,7 +11,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
       case a: LocalAssign => vassign(vlvar(a.lhs), vexpr(a.rhs))
       case m: MemoryAssign => vmemassign(vlvar(m.lhs), vexpr(m.rhs))
       case m: MemoryLoad => vload(vlvar(m.lhs), m.mem.name, vexpr(m.index), m.endian, m.size)
-      case m: MemoryStore => vstore(m.mem.name, vexpr(m.index), vexpr(m.value), m.endian, m.size)
+      case m: MemoryStore => vstore(m.mem, vexpr(m.index), vexpr(m.value), m.endian, m.size)
       case c: DirectCall =>
         vcall(
           c.outParams.toList.map((l, r) => (l, r)),
@@ -47,9 +44,9 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
       case v: Variable => vrvar(v)
       case f @ UninterpretedFunction(n, params, rt) => vuninterp_function(n, params.map(vexpr))
-      case q: QuantifierExpr => ???
-      case q: LambdaExpr => ???
-      case r: OldExpr => ???
+      case q: QuantifierExpr => vquantifier(q)
+      case q: LambdaExpr => vlambda(q)
+      case r: OldExpr => vold(r.body)
     }
   }
 
@@ -85,7 +82,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
   def vassign(lhs: Repr[Variable], rhs: Repr[Expr]): Repr[LocalAssign]
   def vmemassign(lhs: Repr[Variable], rhs: Repr[Expr]): Repr[LocalAssign]
   def vload(lhs: Repr[Variable], mem: String, index: Repr[Expr], endian: Endian, size: Int): Repr[MemoryLoad]
-  def vstore(mem: String, index: Repr[Expr], value: Repr[Expr], endian: Endian, size: Int): Repr[MemoryStore]
+  def vstore(mem: Memory, index: Repr[Expr], value: Repr[Expr], endian: Endian, size: Int): Repr[MemoryStore]
   def vcall(
     outParams: List[(Variable, Variable)],
     procname: String,
@@ -107,6 +104,9 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
 trait BasilIRExp[Repr[+_]] {
   def vexpr(e: Expr): Repr[Expr]
   def vextract(ed: Int, start: Int, a: Repr[Expr]): Repr[Expr]
+  def vquantifier(q: QuantifierExpr): Repr[Expr]
+  def vlambda(q: LambdaExpr): Repr[Expr]
+  def vold(body: Expr): Repr[Expr]
   def vzeroextend(bits: Int, b: Repr[Expr]): Repr[Expr]
   def vsignextend(bits: Int, b: Repr[Expr]): Repr[Expr]
   def vbinary_expr(e: BinOp, l: Repr[Expr], r: Repr[Expr]): Repr[Expr]
@@ -153,9 +153,9 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
       case v: Variable => vrvar(v)
       case f @ UninterpretedFunction(n, params, rt) => vuninterp_function(n, params.map(vexpr))
-      case q: QuantifierExpr => ???
-      case q: LambdaExpr => ???
-      case r: OldExpr => ???
+      case q: QuantifierExpr => vquantifier(q)
+      case q: LambdaExpr => vlambda(q)
+      case r: OldExpr => vold(r.body)
     }
   }
 
@@ -179,8 +179,11 @@ def list[T](l: Sexp[T]*): Sexp[T] = Sexp.Slist(l.toList)
 
 object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   def vload(lhs: Sexp[Variable], mem: String, index: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryLoad] = ???
-  def vstore(mem: String, index: Sexp[Expr], value: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryStore] = ???
+  def vstore(mem: Memory, index: Sexp[Expr], value: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryStore] = ???
 
+  def vold(e: Expr) = ???
+  def vquantifier(e: QuantifierExpr) = ???
+  def vlambda(e: LambdaExpr) = ???
   def vprog(mainProc: String, procedures: List[Sexp[Procedure]]): Sexp[Program] = ???
   def vrepeat(reps: Int, value: Sexp[Expr]): Sexp[Expr] = ???
   def vzeroextend(bits: Int, b: Sexp[Expr]): Sexp[Expr] = ???

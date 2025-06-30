@@ -1,13 +1,13 @@
 package analysis.data_structure_analysis
 
-import analysis.FlatElement
 import analysis.solvers.DSAUnionFindSolver
-import analysis.evaluateExpression
+import analysis.{FlatElement, evaluateExpression}
+import boogie.SpecGlobal
 import cfg_visualiser.*
 import ir.*
-import util.Counter
 import specification.{ExternalFunction, FuncEntry, SymbolTableEntry}
-import boogie.SpecGlobal
+import util.Counter
+import util.assertion.*
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -82,7 +82,7 @@ class Graph(using Counter)(
   private case class StackAccess(offset: BigInt, size: Int)
 
   private def visitStackAccess(pos: CFGPosition, index: Expr, size: Int): Set[StackAccess] = {
-    assert(size % 8 == 0)
+    debugAssert(size % 8 == 0)
     val byteSize = size / 8
     index match
       case BinaryExpr(_, arg1: Variable, arg2)
@@ -156,7 +156,7 @@ class Graph(using Counter)(
         }
         val diff = offset - last
         headNodeOffset = last
-        assert(stackMapping.contains(last))
+        debugAssert(stackMapping.contains(last))
         stackMapping(last).getCell(diff)
 
     // DSA grows cell size with size
@@ -189,7 +189,7 @@ class Graph(using Counter)(
     */
   def getGlobal(name: String, size: Int = 0, relocated: Int = 0): Option[AddressRange] = {
     val matchedName = globals.filter(_.name == name)
-    assert(matchedName.size <= 1)
+    debugAssert(matchedName.size <= 1)
     if matchedName.isEmpty then None
     else
       val global = matchedName.head
@@ -312,7 +312,7 @@ class Graph(using Counter)(
         val offset: BigInt = if address > range.start then address - range.start + internal else internal
         node.addCell(offset, 0)
         selfCollapse(node)
-        assert(range.start >= address)
+        debugAssert(range.start >= address)
         mergeCells(find(headNode.addCell(range.start - address, 0)), find(node.getCell(offset)))
       }
       selfCollapse(find(headCell).node.get)
@@ -362,7 +362,7 @@ class Graph(using Counter)(
           if !nodes.contains(node) then
             nodes.add(node)
             queue.enqueue(node)
-          assert(!pointsto.contains(cell))
+          debugAssert(!pointsto.contains(cell))
           pointsto.update(cell, find(cell.getPointee))
         }
       }
@@ -499,7 +499,7 @@ class Graph(using Counter)(
 
       collapsedCell.pointee = Some(Slice(collapsedCell, 0))
 
-      assert(collapsedNode.cells.size == 1)
+      debugAssert(collapsedNode.cells.size == 1)
 
       collapsedNode.children.addAll(node.children)
       collapsedNode.children += (node -> 0)
@@ -510,7 +510,7 @@ class Graph(using Counter)(
 
       collapsedNode
     } else {
-      assert(find(n).node.collapsed)
+      debugAssert(find(n).node.collapsed)
       find(n).node
     }
   }
@@ -625,7 +625,7 @@ class Graph(using Counter)(
       var node1 = cell1.node.get
       var node2 = cell2.node.get
 
-      assert(node1.collapsed || node2.collapsed)
+      debugAssert(node1.collapsed || node2.collapsed)
 
       node1 = collapseNode(node1) // collapse the other node
       node2 = collapseNode(node2)
@@ -751,7 +751,7 @@ class Graph(using Counter)(
     val offset = cell.offset
     selfCollapse(node)
     val newCell = node.getCell(offset)
-    assert(offset >= newCell.offset)
+    debugAssert(offset >= newCell.offset)
     Slice(newCell, offset - newCell.offset)
   }
 
@@ -843,16 +843,16 @@ class Graph(using Counter)(
   }
 
   def SSAVar(posLabel: String, varName: String): Slice = {
-    assert(posLabel.matches("%[0-9a-f]{8}?\\$\\d"), s"posLabel not matching BAP format '$posLabel'")
+    debugAssert(posLabel.matches("%[0-9a-f]{8}?\\$\\d"), s"posLabel not matching BAP format '$posLabel'")
 
     val res = varToCell.keys.filter(pos => pos.toShortString.startsWith(posLabel))
-    assert(res.size == 1, s"failed to get SSAVar for '$posLabel' and '$varName'. matched label: ${res}")
+    debugAssert(res.size == 1, s"failed to get SSAVar for '$posLabel' and '$varName'. matched label: ${res}")
     val key = res.head
 
     val map = varToCell(key).toMap
 
     val temp = map.keys.filter(variable => variable.name == varName)
-    assert(temp.size == 1, s"failed to get SSAVar for '$posLabel' and '$varName'. matched name: ${temp}")
+    debugAssert(temp.size == 1, s"failed to get SSAVar for '$posLabel' and '$varName'. matched name: ${temp}")
     val variable = temp.head
     map(variable)
   }
@@ -877,11 +877,11 @@ class Graph(using Counter)(
   def cloneSelf(): Graph = {
     val newGraph =
       Graph(proc, constProp, varToSym, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params)
-    assert(formals.size == newGraph.formals.size)
+    debugAssert(formals.size == newGraph.formals.size)
     val nodes = mutable.Set[Node]()
     val idToNode: mutable.Map[Int, Node] = mutable.Map()
     formals.foreach { (variable, s) =>
-      //        assert(newGraph.formals.contains(variable))
+      //        debugAssert(newGraph.formals.contains(variable))
       val slice = find(s)
       val node = slice.node
       nodes.add(node)
@@ -892,12 +892,12 @@ class Graph(using Counter)(
     }
 
     varToCell.foreach { (position, values) =>
-      //        assert(newGraph.varToCell.contains(position))
+      //        debugAssert(newGraph.varToCell.contains(position))
       if (!newGraph.varToCell.contains(position)) {
         newGraph.varToCell.update(position, mutable.Map[Variable, Slice]())
       }
       values.foreach { (variable, s) =>
-        //            assert(newGraph.varToCell(position).contains(variable))
+        //            debugAssert(newGraph.varToCell(position).contains(variable))
         val slice = find(s)
         val node = slice.node
         nodes.add(node)
@@ -936,7 +936,7 @@ class Graph(using Counter)(
     stackMapping.foreach { (offset, oldNode) =>
       val node = find(oldNode).node
       nodes.add(node)
-      assert(newGraph.stackMapping.contains(offset))
+      debugAssert(newGraph.stackMapping.contains(offset))
       if !idToNode.contains(node.id) then
         val newNode = node.cloneSelf(newGraph)
         idToNode.update(node.id, newNode)
@@ -944,7 +944,7 @@ class Graph(using Counter)(
     }
 
     globalMapping.foreach { case (range: AddressRange, Field(node, offset)) =>
-      assert(newGraph.globalMapping.contains(range))
+      debugAssert(newGraph.globalMapping.contains(range))
       val cell: Cell = find(node.getCell(offset))
       val finalNode: Node = cell.node.get
       nodes.add(finalNode)
@@ -980,17 +980,17 @@ class Graph(using Counter)(
     callsites.foreach { callSite =>
       val cs = CallSite(callSite.call, newGraph)
       newGraph.callsites.add(cs)
-      assert(cs.paramCells.keySet.equals(callSite.paramCells.keySet))
+      debugAssert(cs.paramCells.keySet.equals(callSite.paramCells.keySet))
       callSite.paramCells.foreach { (variable, oldSlice) =>
         val slice = find(oldSlice)
-        assert(cs.paramCells.contains(variable))
+        debugAssert(cs.paramCells.contains(variable))
         val id = slice.node.id
         cs.paramCells.update(variable, Slice(idToNode(id).cells(slice.offset), slice.internalOffset))
       }
 
       callSite.returnCells.foreach { (variable, oldSlice) =>
         val slice = find(oldSlice)
-        assert(cs.returnCells.contains(variable))
+        debugAssert(cs.returnCells.contains(variable))
         val id = slice.node.id
         cs.returnCells.update(variable, Slice(idToNode(id).cells(slice.offset), slice.internalOffset))
       }

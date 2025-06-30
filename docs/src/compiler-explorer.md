@@ -1,12 +1,10 @@
 # Compiler-Explorer
 
+(Note this has not been supported for a while)
+
 Point of contact: @ailrst
 
 This includes explanation of the [Godbolt / compiler-explorer](compiler-explorer.com) wrapper for the basil tool.
-
-The tool is available at [https://nationally-usable-bull.ngrok-free.app/](https://nationally-usable-bull.ngrok-free.app/). The strange url is since its 
-the free randomly generated url from ngrok, the service I used to reverse proxy the website from a spare laptop. 
-You must be a member of this Github org in order to be gain access to it.
 
 The tool roughly keeps track with the version of BASIL on the main branch, but updating is a manual process.
 

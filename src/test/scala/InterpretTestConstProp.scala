@@ -1,37 +1,9 @@
-import ir.*
-import ir.eval.*
 import analysis.*
-
-import java.io.{BufferedWriter, File, FileWriter}
-import ir.Endian.LittleEndian
+import ir.*
 import org.scalatest.*
 import org.scalatest.funsuite.*
-import specification.*
-import util.{
-  BASILConfig,
-  BASILResult,
-  ILLoadingConfig,
-  IRContext,
-  IRLoading,
-  IRTransform,
-  LogLevel,
-  Logger,
-  RunUtils,
-  StaticAnalysis,
-  StaticAnalysisConfig,
-  StaticAnalysisContext
-}
-import ir.eval.{ExecEffect, Stopped, interpret, interpretTrace}
-import ir.dsl
-
-import java.io.IOException
-import java.nio.file.*
-import java.nio.file.attribute.BasicFileAttributes
-import ir.dsl.*
 import test_util.{BASILTest, CaptureOutput, TestValueDomainWithInterpreter}
-import util.RunUtils.loadAndTranslate
-
-import scala.collection.mutable
+import util.{ILLoadingConfig, IRLoading, IRTransform, LogLevel, Logger, RunUtils, StaticAnalysisConfig}
 
 @test_util.tags.StandardSystemTest
 class InterpretTestConstProp
@@ -52,7 +24,7 @@ class InterpretTestConstProp
   private val testPath = s"${BASILTest.rootDirectory}/src/test/correct"
   def testInterpretConstProp(testName: String, compiler: String): Unit = {
     val path = s"$testPath/$testName/$compiler/$testName"
-    val loading = ILLoadingConfig(inputFile = s"$path.adt", relfFile = s"$path.relf", dumpIL = None)
+    val loading = ILLoadingConfig(inputFile = s"$path.adt", relfFile = Some(s"$path.relf"), dumpIL = None)
 
     var ictx = IRLoading.load(loading)
     ictx = IRTransform.doCleanup(ictx)

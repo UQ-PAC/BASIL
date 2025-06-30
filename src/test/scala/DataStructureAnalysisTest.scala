@@ -1,11 +1,11 @@
 import analysis.data_structure_analysis.*
-import ir.*
-import org.scalatest.funsuite.AnyFunSuite
-import ir.dsl.*
-import specification.{Specification, SymbolTableEntry}
-import translating.ELFSymbol
 import boogie.SpecGlobal
+import ir.*
+import ir.dsl.*
+import org.scalatest.funsuite.AnyFunSuite
+import specification.Specification
 import test_util.{BASILTest, CaptureOutput}
+import translating.PrettyPrinter.*
 import util.{
   BASILConfig,
   BASILResult,
@@ -14,11 +14,8 @@ import util.{
   IRContext,
   RunUtils,
   StaticAnalysisConfig,
-  StaticAnalysisContext,
-  writeToFile
+  StaticAnalysisContext
 }
-import util.{LogLevel, Logger}
-import translating.PrettyPrinter.*
 
 /** This is the test suite for testing DSA functionality The tests follow a general pattern of running BASIL analyses on
   * a test program and then asserting properties about the Data Structure Graph (DSG) of the function produced at
@@ -46,7 +43,8 @@ class DataStructureAnalysisTest extends AnyFunSuite with CaptureOutput {
 
     val result = RunUtils.loadAndTranslate(
       BASILConfig(
-        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf", specFile = None, dumpIL = None),
+        loading =
+          ILLoadingConfig(inputFile = path + ".adt", relfFile = Some(path + ".relf"), specFile = None, dumpIL = None),
         staticAnalysis = Some(StaticAnalysisConfig()),
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out"

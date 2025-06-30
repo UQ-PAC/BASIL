@@ -1,16 +1,15 @@
 package ir.transforms
+import analysis.{TwoElement, TwoElementBottom, TwoElementTop}
 import ir.cilvisitor.*
-import java.io.File
-import ir.*
-import translating.PrettyPrinter
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.{mutable, immutable}
-import collection.immutable.SortedMap
+import ir.{CallGraph, *}
 import specification.Specification
-import analysis.{TwoElement, TwoElementTop, TwoElementBottom}
-import ir.CallGraph
-import util.{Logger, DebugDumpIRLogger}
-import analysis.{LatticeMap, MapDomain, InternalLattice}
+import translating.PrettyPrinter
+import util.{DebugDumpIRLogger, Logger}
+
+import java.io.File
+import scala.collection.{immutable, mutable}
+
+import collection.immutable.SortedMap
 
 case class FunSig(inArgs: List[Register], outArgs: List[Register])
 
@@ -114,6 +113,8 @@ object DefinedOnAllPaths {
 
 def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
 
+  transforms.clearParams(ctx.program)
+
   val mainNonEmpty = ctx.program.mainProcedure.blocks.nonEmpty
   val mainHasReturn = ctx.program.mainProcedure.returnBlock.isDefined
   val mainHasEntry = ctx.program.mainProcedure.entryBlock.isDefined
@@ -173,6 +174,14 @@ def clearParams(p: Program) = {
       case d: DirectCall =>
         ChangeTo(List(DirectCall(d.target, d.label, immutable.SortedMap.empty, immutable.SortedMap.empty)))
       case _ => SkipChildren()
+    }
+    override def vjump(j: Jump) = {
+      j match {
+        case d: Return =>
+          d.outParams = SortedMap()
+        case _ => ()
+      }
+      SkipChildren()
     }
   }
 
@@ -406,7 +415,7 @@ def inOutParams(
       // of registers
 
       val outParams = (overapprox.intersect(DefinedOnAllPaths.proc(proc)))
-      val inParams = lives(proc)._1
+      val inParams = lives(proc)._1 ++ (if proc.procName == "main" then Set(R(0), R(1)) else Set())
       proc -> (inParams + pc, outParams + pc)
     }
     case (proc, rws) => {
@@ -414,7 +423,7 @@ def inOutParams(
       val liveEnd = lives(proc)._2 ++ alwaysReturnParams
 
       val outParams = liveEnd.intersect(rws.writes)
-      val inParams = liveStart
+      val inParams = liveStart ++ (if proc.procName == "main" then Set(R(0), R(1)) else Set())
       proc -> (inParams + pc, outParams + pc)
     }
   }.toMap
@@ -591,13 +600,18 @@ object SpecFixer {
     visit_expr(visitor, b)
   }
 
-  def convVarToOld(varInPre: Map[String, String], varInPost: Map[String, String], isPost: Boolean = false)(
-    b: BExpr
-  ): BExpr = {
-    val varToOld = convVarToOld(varInPre, varInPost, isPost)
+  def convVarToOld(
+    varInPre: Map[String, String],
+    varInPost: Map[String, String],
+    isPost: Boolean = false,
+    makeLocal: Boolean = false
+  )(b: BExpr): BExpr = {
+    val varToOld = convVarToOld(varInPre, varInPost, isPost, makeLocal)
     b match {
-      case b: BVariable if isPost && varInPost.contains(b.name) => BVariable(varInPost(b.name), b.getType, b.scope)
-      case b: BVariable if !isPost && varInPre.contains(b.name) => BVariable(varInPre(b.name), b.getType, b.scope)
+      case b: BVariable if isPost && varInPost.contains(b.name) =>
+        BVariable(varInPost(b.name), b.getType, if makeLocal then Scope.Local else b.scope)
+      case b: BVariable if !isPost && varInPre.contains(b.name) =>
+        BVariable(varInPre(b.name), b.getType, if makeLocal then Scope.Local else b.scope)
       case b: BVariable if !isPost => b
       // case b : _ => varToOld(b)
       case b: BLiteral => b
@@ -612,7 +626,7 @@ object SpecFixer {
       case b: BQuantifierExpr => b
       case b: Old => {
         if (isPost) {
-          Old(convVarToOld(varInPre, varInPost, false)(b.body))
+          Old(convVarToOld(varInPre, varInPost, false, makeLocal)(b.body))
         } else {
           throw Exception("Illegal nested or non-relation Old()")
         }
@@ -645,8 +659,8 @@ object SpecFixer {
     val varToInVar = mappingInparam.map(p => (p._1 -> toNameMapping(p._2)))
     val varToOutVar = mappingOutparam.map(p => (p._1 -> toNameMapping(p._2)))
 
-    p.requires = p.requires.map(convVarToOld(varToInVar(p), varToOutVar(p), false))
-    p.ensures = p.ensures.map(convVarToOld(varToInVar(p), varToOutVar(p), true))
+    p.requires = p.requires.map(convVarToOld(varToInVar(p), varToOutVar(p), isPost = false, makeLocal = true))
+    p.ensures = p.ensures.map(convVarToOld(varToInVar(p), varToOutVar(p), isPost = true, makeLocal = true))
 
     def toVarMapping(v: Map[LocalVar, Variable]): Map[String, Variable] = {
       v.map(v => (v._2.name, v._1))
@@ -676,8 +690,8 @@ object SpecFixer {
         val in = varToInVar(s.name)
         val out = varToOutVar(s.name)
         s.copy(
-          requires = s.requires.map(convVarToOld(in, out, false)),
-          ensures = s.ensures.map(convVarToOld(in, out, true))
+          requires = s.requires.map(convVarToOld(in, out, false, true)),
+          ensures = s.ensures.map(convVarToOld(in, out, true, true))
         )
       } else {
         s

@@ -1,5 +1,6 @@
 package ir
 package transforms
+import util.assertion.*
 
 import cilvisitor.*
 
@@ -26,7 +27,7 @@ object CalleePreservedParam {
   def transform(p: Program) = {
     val v = MakePreserved()
     visit_prog(v, p)
-    assert(invariant.correctCalls(p))
+    debugAssert(invariant.correctCalls(p))
   }
 
   class MakePreserved extends CILVisitor {

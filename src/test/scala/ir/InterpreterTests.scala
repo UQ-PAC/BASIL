@@ -1,21 +1,17 @@
 package ir
 
-import util.PerformanceTimer
-import util.functional.*
-import translating.PrettyPrinter.*
-import ir.eval.*
-import boogie.Scope
-import ir.dsl.*
-import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.BeforeAndAfter
-import boogie.SpecGlobal
-import translating.BAPToIR
-import util.{LogLevel, Logger}
-import util.IRLoading.{loadBAP, loadReadELF}
-import util.{ILLoadingConfig, IRContext, IRLoading, IRTransform}
-import test_util.{BASILTest, CaptureOutput}
+import boogie.{Scope, SpecGlobal}
 import ir.dsl.given
-import ir.dsl.IfThenBlocks
+import ir.dsl.{IfThenBlocks, *}
+import ir.eval.*
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
+import test_util.{BASILTest, CaptureOutput}
+import translating.PrettyPrinter.*
+import util.functional.*
+import util.{ILLoadingConfig, IRContext, IRLoading, IRTransform, LogLevel, Logger, PerformanceTimer}
+
+import scala.language.implicitConversions
 
 def load(s: InterpreterState, global: SpecGlobal): Option[BitVecLiteral] = {
   val f = NormalInterpreter
@@ -43,7 +39,7 @@ class InterpreterTests extends AnyFunSuite with CaptureOutput with BeforeAndAfte
     val compiler = "gcc"
     val loading = ILLoadingConfig(
       inputFile = s"$path/$name/$compiler/$name.adt",
-      relfFile = s"$path/$name/$compiler/$name.relf",
+      relfFile = Some(s"$path/$name/$compiler/$name.relf"),
       specFile = None,
       dumpIL = None
     )

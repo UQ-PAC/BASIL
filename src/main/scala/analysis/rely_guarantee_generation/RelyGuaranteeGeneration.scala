@@ -2,7 +2,7 @@ package analysis
 
 import ir.*
 import ir.transforms.*
-import analysis.*
+
 import scala.collection.mutable.Queue
 
 /** To generate guarantee conditions, we need to:

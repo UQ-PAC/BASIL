@@ -1,20 +1,26 @@
 // package scala
 
-import bap.*
-import boogie.*
-import translating.*
-import util.RunUtils
-
-import scala.sys.process.*
-import java.io.File
-import scala.collection.mutable.{ArrayBuffer, Set}
-import scala.collection.{immutable, mutable}
-import scala.language.postfixOps
-import scala.sys.process.*
-import util.*
 import mainargs.{Flag, ParserForClass, arg, main}
 import util.DSAConfig.{Checks, Prereq, Standard}
 import util.boogie_interaction.BoogieResultKind
+import util.{
+  AnalysisResultDotLogger,
+  BASILConfig,
+  BoogieGeneratorConfig,
+  BoogieMemoryAccessMode,
+  DSAConfig,
+  DebugDumpIRLogger,
+  ILLoadingConfig,
+  LogLevel,
+  Logger,
+  MemoryRegionsMode,
+  PCTrackingOption,
+  ProcRelyVersion,
+  RunUtils,
+  StaticAnalysisConfig
+}
+
+import scala.language.postfixOps
 
 object Main {
 
@@ -23,6 +29,9 @@ object Main {
     case Bap
   }
 
+  /** Replaces the extension of the given path with the given new extension, if
+   *  an extension is present. Otherwise, appends the extension.
+   */
   private def replacePathExtension(p: java.nio.file.Path, newExtension: String) = {
     val basename = p.getFileName().toString
 
@@ -33,6 +42,13 @@ object Main {
     }
 
     p.resolveSibling(withoutExtension + newExtension)
+  }
+
+  /** Appends the given extension onto the given path, irrespective of whether
+   *  the path has an existing extension.
+   */
+  private def addPathExtension(p: java.nio.file.Path, newExtension: String) = {
+    p.resolveSibling(p.getFileName().toString + newExtension)
   }
 
   def loadDirectory(i: ChooseInput = ChooseInput.Gtirb, d: String): ILLoadingConfig = {
@@ -57,8 +73,7 @@ object Main {
 
     // helper function to locate a file adjacent to the given path, with the given extension,
     // and ensure that it exists. returns None if file does not exist, otherwise Some(Path).
-    val findAdjacent = (x: java.nio.file.Path, ext: String) =>
-      Some(replacePathExtension(x, ext)).filter(_.toFile.exists)
+    val findAdjacent = (x: java.nio.file.Path, ext: String) => Some(addPathExtension(x, ext)).filter(_.toFile.exists)
 
     val results = tryName
       .flatMap(name => {
@@ -78,7 +93,11 @@ object Main {
           case (Some(input), Some(relf)) => {
             Logger.info(s"Found $input $relf ${spec.getOrElse("")}")
             Seq(
-              ILLoadingConfig(input.normalize().toString, relf.normalize().toString, spec.map(_.normalize().toString))
+              ILLoadingConfig(
+                input.normalize().toString,
+                Some(relf.normalize().toString),
+                spec.map(_.normalize().toString)
+              )
             )
           }
           case _ => Seq()
@@ -98,11 +117,15 @@ object Main {
     bapInputDirName: Option[String],
     @arg(name = "load-directory-gtirb", doc = "Load relf and gts from directory (and spec from parent directory)")
     gtirbInputDirName: Option[String],
-    @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file")
+    @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file (.adt requires --relf)")
     inputFileName: Option[String],
-    @arg(name = "relf", short = 'r', doc = "Name of the file containing the output of 'readelf -s -r -W'.")
+    @arg(
+      name = "relf",
+      short = 'r',
+      doc = "Name of the file containing the output of 'readelf -s -r -W'  (required for most uses)"
+    )
     relfFileName: Option[String],
-    @arg(name = "spec", short = 's', doc = "BASIL specification file.")
+    @arg(name = "spec", short = 's', doc = "BASIL specification file (requires --relf).")
     specFileName: Option[String],
     @arg(name = "output", short = 'o', doc = "Boogie output destination file.")
     outFileName: String = "basil-out.bpl",
@@ -195,13 +218,15 @@ object Main {
     @arg(
       name = "dsa",
       doc =
-        "Perform Data Structure Analysis if no version is specified perform constraint generation (requires --simplify flag) (none|norm|field|set|all)"
+        "Perform Data Structure Analysis if no version is specified perform constraint generation (requires --simplify and --relf flags) (none|norm|field|set|all)"
     )
     dsaType: Option[String],
     @arg(name = "memory-transform", doc = "Transform memory access to region accesses")
     memoryTransform: Flag,
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
-    noif: Flag
+    noif: Flag,
+    @arg(name = "nodebug", doc = "Disable runtume debug assertions")
+    nodebug: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -281,7 +306,6 @@ object Main {
         case Some("prereq") => Some(Prereq)
         case Some("checks") => Some(Checks)
         case Some("standard") => Some(Standard)
-        case Some("none") => None
         case None => None
         case Some(_) =>
           throw new IllegalArgumentException("Illegal option to dsa, allowed are: (prereq|standard|checks)")
@@ -310,14 +334,25 @@ object Main {
 
     } else if (conf.gtirbInputDirName.isDefined) then {
       loadDirectory(ChooseInput.Gtirb, conf.gtirbInputDirName.get)
-    } else if (conf.inputFileName.isDefined && conf.relfFileName.isDefined) then {
-      ILLoadingConfig(conf.inputFileName.get, conf.relfFileName.get, conf.specFileName)
+    } else if (conf.inputFileName.isDefined) then {
+      ILLoadingConfig(conf.inputFileName.get, conf.relfFileName, conf.specFileName)
 
     } else {
       throw IllegalArgumentException(
-        "\nRequires --load-directory-bap OR --load-directory-gtirb OR --input and--relf\n\n" + parser
+        "\nRequires --load-directory-gtirb, --load-directory-bap OR --input\n\n" + parser
           .helpText(sorted = false)
       )
+    }
+
+    if (loadingInputs.specFile.isDefined && loadingInputs.relfFile.isEmpty) {
+      throw IllegalArgumentException("--spec requires --relf")
+    }
+    if (loadingInputs.inputFile.endsWith(".adt") && loadingInputs.relfFile.isEmpty) {
+      throw IllegalArgumentException("BAP ADT input requires --relf")
+    }
+
+    if (conf.nodebug.value) {
+      util.assertion.disableAssertions == true
     }
 
     val q = BASILConfig(

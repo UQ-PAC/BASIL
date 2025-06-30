@@ -1,11 +1,12 @@
 package ir
 
-import scala.collection.mutable
-import scala.collection.immutable.*
-import org.scalatest.funsuite.AnyFunSuite
-import ir.dsl.*
 import ir.cilvisitor.*
+import ir.dsl.*
+import org.scalatest.funsuite.AnyFunSuite
 import test_util.CaptureOutput
+
+import scala.collection.immutable.*
+import scala.collection.mutable
 
 class FindVars extends CILVisitor {
   val vars = mutable.ArrayBuffer[Variable]()
@@ -125,7 +126,7 @@ class CILVisitorTest extends AnyFunSuite with CaptureOutput {
 
     val v = ExprTrace()
     visit_proc(v, program.procedures.head)
-    assert(v.res.toList == List("R31", "R6", "add", "R6", "4bv64", "10bv64"))
+    assert(v.res.toList == List("R31", "R6", "add", "R6", "0x4:bv64", "0xa:bv64"))
   }
 
   test("rewrite exprs") {

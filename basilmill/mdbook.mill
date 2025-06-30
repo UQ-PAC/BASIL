@@ -1,0 +1,69 @@
+package build.basilmill
+
+import mill._
+
+import os.Path
+import scalalib._
+import scala.util.{Try}
+
+import $file.basilmill.util.DownloadModule
+
+
+trait mdbookBinary extends DownloadModule {
+  def version = "0.4.51"
+  def url = s"https://github.com/rust-lang/mdBook/releases/download/v${version}/mdbook-v${version}-${suffix}"
+  def name = s"mdBook-$version-${System.currentTimeMillis()}$suffix"
+  def mdbookSources : T[PathRef]
+
+  def osName = System.getProperty("os.name")
+
+  def local = Task.Input {
+    Try(os.proc("mdbook", "--version").call())
+      .map(Function.const("mdbook"))
+      .toEither
+      .left.map(_.toString)
+  }
+
+
+  def arch = {
+    System.getProperty("os.arch") match {
+      case "amd64" => "x86_64"
+      case o => o
+    }
+  }
+
+  def suffix = if (osName.contains("nux")) {
+    s"${arch}-unknown-linux-musl.tar.gz"
+  } else if (osName.contains("Mac")) {
+    s"${arch}-apple-darwin.tar.gz"
+  } else {
+    throw new Exception(s"unsupported os ${osName}")
+  }
+
+  override def path = Task {
+    local().getOrElse({
+      val l = remote(Task.dest)
+      os.call(Seq("tar", "-xzf", l.toString), cwd=Task.dest)
+      (Task.dest / "mdbook").toString
+    }
+    )
+  }
+
+  def run(args: String*) = Task.Command {
+    val res = os.call(path() +: args, stdout = os.Inherit, check = false)
+    Task.ctx().systemExit(res.exitCode)
+    ()
+  }
+
+  def serve(args: String*) = Task.Command {
+    val res = os.call(Seq(path().toString, "serve",  mdbookSources().path.toString) ++ args, stdout = os.Inherit, check = false)
+    Task.ctx().systemExit(res.exitCode)
+    ()
+  }
+
+  def build = Task {
+    os.call(Seq(path(), "build", "--dest-dir", Task.dest.toString, mdbookSources().path.toString))
+    PathRef(Task.dest)
+  }
+
+}

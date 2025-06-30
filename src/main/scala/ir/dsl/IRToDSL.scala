@@ -1,7 +1,8 @@
 package ir.dsl
 
-import scala.collection.immutable.{SortedMap, ArraySeq}
 import ir.*
+
+import scala.collection.immutable.{ArraySeq, SortedMap}
 
 /**
  * Basil IR to DSL
@@ -39,7 +40,7 @@ object IRToDSL {
   }
 
   def convertBlock(x: Block) =
-    EventuallyBlock(x.label, x.statements.to(ArraySeq).map(convertStatement), convertJump(x.jump), x.address)
+    EventuallyBlock(x.label, x.statements.to(ArraySeq).map(convertStatement), convertJump(x.jump), x.meta)
 
   def convertProcedure(x: Procedure) =
     EventuallyProcedure(

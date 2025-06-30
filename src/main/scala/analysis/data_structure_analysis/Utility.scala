@@ -1,17 +1,11 @@
 package analysis.data_structure_analysis
 
-import analysis.solvers.{DSAUniTerm, DSAUnionFindSolver, UnionFindSolver, Var}
 import analysis.*
-import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
+import analysis.solvers.DSAUniTerm
 import ir.*
-import specification.{ExternalFunction, SymbolTableEntry}
-import boogie.SpecGlobal
-import util.Logger
 import util.Counter
 
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
-import scala.util.control.Breaks.{break, breakable}
 
 class Flags() {
   var collapsed = false
@@ -109,7 +103,7 @@ class Node(using counter: Counter)(val graph: Option[Graph], var size: BigInt = 
   }
 
   def cloneNode(from: Graph, to: Graph): Unit = {
-//    assert(from.nodes.contains(this)) TODO update nodes after each phase for to check this assertion
+//    debugAssert(from.nodes.contains(this)) TODO update nodes after each phase for to check this assertion
     if (!to.nodes.contains(this)) {
       to.nodes.add(this)
 
