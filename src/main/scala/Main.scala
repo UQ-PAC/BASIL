@@ -1,14 +1,14 @@
 // package scala
 
 import mainargs.{Flag, ParserForClass, arg, main}
-import util.DSAConfig.{Checks, Prereq, Standard}
 import util.boogie_interaction.BoogieResultKind
 import util.{
   AnalysisResultDotLogger,
   BASILConfig,
   BoogieGeneratorConfig,
   BoogieMemoryAccessMode,
-  DSAConfig,
+  DSAPhase,
+  DSConfig,
   DebugDumpIRLogger,
   ILLoadingConfig,
   LogLevel,
@@ -213,12 +213,19 @@ object Main {
       doc = "Disable producing irreducible loops when --analyse is passed (does nothing without --analyse)"
     )
     noIrreducibleLoops: Flag,
-    @arg(
-      name = "dsa",
-      doc =
-        "Perform Data Structure Analysis if no version is specified perform constraint generation (requires --simplify and --relf flags) (none|norm|field|set|all)"
-    )
+    @arg(name = "dsa", doc = "Perform Data Structure Analysis (requires --simplify flag) (pre|local|bu|td)")
     dsaType: Option[String],
+    @arg(name = "dsa-checks", doc = "Perform additional dsa checks (requires --dsa (local|bu|td)")
+    dsaChecks: Flag,
+    @arg(name = "split-globals", doc = "split the globals for dsa (requires --dsa (pre|local|bu|td)")
+    dsaSplitGlobals: Flag,
+    @arg(
+      name = "eq-cells",
+      doc = "allow cells from same node to be merged without collapsing (requires --dsa (local|bu|td)"
+    )
+    dsaEqCells: Flag,
+    @arg(name = "dsa-assert", doc = "insert assertions to check globals offset to top fall within global region bounds")
+    dsaAssert: Flag,
     @arg(name = "memory-transform", doc = "Transform memory access to region accesses")
     memoryTransform: Flag,
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
@@ -292,14 +299,19 @@ object Main {
       None
     }
 
-    val dsa: Option[DSAConfig] = if (conf.simplify.value) {
-      conf.dsaType match
-        case Some("prereq") => Some(Prereq)
-        case Some("checks") => Some(Checks)
-        case Some("standard") => Some(Standard)
-        case None => None
+    val dsa: Option[DSConfig] = if (conf.simplify.value) {
+      val phase = conf.dsaType match
+        case Some("pre") => DSAPhase.Pre
+        case Some("local") => DSAPhase.Local
+        case Some("bu") => DSAPhase.BU
+        case Some("td") => DSAPhase.TD
+        case None => DSAPhase.TD
         case Some(_) =>
-          throw new IllegalArgumentException("Illegal option to dsa, allowed are: (prereq|standard|checks)")
+          throw new IllegalArgumentException("Illegal option to dsa, allowed are: (pre|local|bu|td)")
+
+      Some(
+        DSConfig(phase, conf.dsaSplitGlobals.value, conf.dsaAssert.value, conf.dsaEqCells.value, conf.dsaChecks.value)
+      )
     } else {
       None
     }
