@@ -248,6 +248,7 @@ object Main {
     if (conf.version.value) {
       println("The Basil Pipeline")
       println("Version: " + buildinfo.BuildInfo.gitVersion)
+      println("Commit:  " + buildinfo.BuildInfo.gitCommit)
       return
     }
 
