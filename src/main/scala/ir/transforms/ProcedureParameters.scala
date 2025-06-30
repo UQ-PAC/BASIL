@@ -642,7 +642,7 @@ object SpecFixer {
       case b: GammaLoad => b.copy(index = varToOld(b.index))
       case b: GammaStore => b.copy(index = varToOld(b.index), value = varToOld(b.value))
       case b: L => b.copy(index = varToOld(b.index))
-      case b: NaryBinExpr => b.copy(arg = b.arg.map(varToOld))
+      case b: AssocBExpr => b.copy(arg = b.arg.map(varToOld))
       case b: SpecVar => b
       case b: BVar =>
         ???

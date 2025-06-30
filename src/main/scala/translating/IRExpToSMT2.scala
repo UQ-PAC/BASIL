@@ -47,7 +47,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
       case ZeroExtend(bits, arg) => vzeroextend(bits, vexpr(arg))
       case SignExtend(bits, arg) => vsignextend(bits, vexpr(arg))
       case BinaryExpr(op, arg, arg2) => vbinary_expr(op, vexpr(arg), vexpr(arg2))
-      case b @ BoolExp(op, arg) => vexpr(b.toBinaryExpr)
+      case b @ AssocExpr(op, arg) => vexpr(b.toBinaryExpr)
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
       case v: Variable => vrvar(v)
       case f @ UninterpretedFunction(n, params, rt, _) => vuninterp_function(n, params.map(vexpr))
@@ -163,7 +163,7 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
         }
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
       case v: Variable => vrvar(v)
-      case b @ BoolExp(op, args) => vbool_expr(op, args.map(vexpr))
+      case b @ AssocExpr(op, args) => vbool_expr(op, args.map(vexpr))
       case r: SharedMemory => ???
       case r: StackMemory => ???
       case f @ UninterpretedFunction(n, params, rt, _) => vuninterp_function(n, params.map(vexpr))

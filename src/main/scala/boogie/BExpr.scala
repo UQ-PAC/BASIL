@@ -320,7 +320,7 @@ case class UnaryBExpr(op: UnOp, arg: BExpr) extends BExpr {
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitUnaryBExpr(this)
 }
 
-case class NaryBinExpr(op: BoolBinOp | EQ.type | NEQ.type | IntADD.type, arg: List[BExpr]) extends BExpr {
+case class AssocBExpr(op: BoolBinOp | EQ.type | NEQ.type | IntADD.type, arg: List[BExpr]) extends BExpr {
   require(arg.size >= 2)
   override def getType = BinaryBExpr(op, arg.head, arg.tail.head).getType
   override def serialiseBoogie(w: Writer): Unit = {

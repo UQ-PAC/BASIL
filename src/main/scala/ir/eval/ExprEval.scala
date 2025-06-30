@@ -210,7 +210,7 @@ def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S,
   val ns = exp match {
     case m: SharedMemory => State.pure(m)
     case m: StackMemory => State.pure(m)
-    case b: BoolExp => eval(b.toBinaryExpr)
+    case b: AssocExpr => eval(b.toBinaryExpr)
     case f: OldExpr => State.pure(f)
     case f: QuantifierExpr => State.pure(f)
     case e: LambdaExpr => State.pure(e)

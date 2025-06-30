@@ -127,9 +127,9 @@ class CILVisitorImpl(val v: CILVisitor) {
         val narg2 = visit_expr(arg2)
         if ((narg1 ne arg) || (narg2 ne arg2)) BinaryExpr(op, narg1, narg2) else n
       }
-      case BoolExp(op, args) => {
+      case AssocExpr(op, args) => {
         val nargs = args.map(visit_expr)
-        BoolExp(op, nargs)
+        AssocExpr(op, nargs)
       }
       case UnaryExpr(op, arg) => {
         val narg = visit_expr(arg)

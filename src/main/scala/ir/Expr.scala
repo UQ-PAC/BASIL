@@ -187,10 +187,10 @@ sealed trait BVUnOp(op: String) extends UnOp {
 case object BVNOT extends BVUnOp("not")
 case object BVNEG extends BVUnOp("neg")
 
-case class BoolExp(op: BoolBinOp, args: List[Expr]) extends Expr with CachedHashCode {
+case class AssocExpr(op: BoolBinOp, args: List[Expr]) extends Expr with CachedHashCode {
   require(args.size >= 2)
   override def getType: IRType = BoolType
-  override def toBoogie: BExpr = NaryBinExpr(op, args.map(_.toBoogie))
+  override def toBoogie: BExpr = AssocBExpr(op, args.map(_.toBoogie))
   override def gammas: Set[Variable] = args.flatMap(_.gammas).toSet
   override def variables = args.toSet.flatMap(_.variables).toSet
   override def toString() = "(" + args.mkString(op.toString) + ")"
