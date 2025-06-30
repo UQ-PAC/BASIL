@@ -1,5 +1,6 @@
 package build.basilmill
 
+import os.Path
 import mill._
 import mill.scalalib._
 
@@ -44,7 +45,7 @@ trait BasilDocs extends ScalaModule {
 
   def extraDocs = Task {
     Map(
-      "docs/basil-il" -> bnfc.bnfcHtml(),
+      "docs/basil-il" -> build.bnfc.bnfcHtml(),
     )
   }
 
@@ -79,7 +80,7 @@ trait BasilDocs extends ScalaModule {
       case (name, src) => copyDoc(src.path, name)
     }
 
-    os.copy(mdbook.build().path, dest, mergeFolders = true)
+    os.copy(build.mdbook.build().path, dest, mergeFolders = true)
     os.copy.into(docsIndex().path, dest / "api")
 
     os.walk(dest).foreach {
