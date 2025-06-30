@@ -81,7 +81,7 @@ trait BasilDocs extends ScalaModule {
         val oldLen = old.length
 
         // HACK: disable scaladoc's horrendous link click handler which
-        // introduces a delay and sometimes causes clicking links to fail silently 
+        // introduces a delay and sometimes causes clicking links to fail silently
         val out = old.replace("""document.querySelectorAll("a")""", "[]")
         if (oldLen == out.length)
           println(s"warning: $path replacement did not match anything")
