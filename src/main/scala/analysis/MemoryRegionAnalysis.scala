@@ -4,6 +4,7 @@ import analysis.solvers.SimpleWorklistFixpointSolver
 import ir.*
 import ir.eval.BitVectorEval.bv2SignedInt
 import util.MRALogger
+import util.assertion.*
 
 import scala.collection.mutable
 
@@ -62,7 +63,7 @@ trait MemoryRegionAnalysis(
     *   the stack region corresponding to the offset
     */
   private def poolMaster(base: BigInt, stackBase: Procedure, subAccess: BigInt): StackRegion = {
-    assert(subAccess >= 0)
+    debugAssert(subAccess >= 0)
     val stackPool = stackMap.getOrElseUpdate(stackBase, mutable.HashMap())
     val region = if (stackPool.contains(base)) {
       stackPool(base)

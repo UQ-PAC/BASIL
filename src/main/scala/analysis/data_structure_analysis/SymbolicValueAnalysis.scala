@@ -4,7 +4,8 @@ import analysis.data_structure_analysis.OSet.{Top, Values}
 import ir.*
 import ir.eval.BitVectorEval.bv2SignedInt
 import ir.transforms.{AbstractDomain, worklistSolver}
-import util.{IRContext, SVALogger as Logger}
+import util.SVALogger as Logger
+import util.assertion.*
 
 import scala.annotation.tailrec
 import scala.collection.{SortedMap, mutable}
@@ -45,7 +46,7 @@ sealed trait SymBase
 sealed trait Known extends SymBase
 
 case class Heap(call: DirectCall) extends Known {
-  assert(
+  debugAssert(
     call.target.name.startsWith("malloc") || call.target.name.startsWith("calloc"),
     "Expected a call to malloc-like function"
   )
@@ -83,7 +84,7 @@ case class Loaded(load: MemoryLoad) extends Unknown {
 }
 
 def labelToPC(label: Option[String]): String = {
-  //  assert(label.nonEmpty)
+  //  debugAssert(label.nonEmpty)
   label.getOrElse("no_label").takeWhile(_ != ':')
 }
 
@@ -468,7 +469,7 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T])(
         val (malloc, others) = outParams.values
           .map(_.asInstanceOf[LocalVar])
           .partition(outParam => outParam.name.startsWith("R0")) // malloc ret R0
-        assert(malloc.size == 1, s"SVA expected only one R0 returned from $mal")
+        debugAssert(malloc.size == 1, s"SVA expected only one R0 returned from $mal")
         val update = SymValues( // assume call to malloc only changes the value of R0
           Map(malloc.head -> symValSetDomain.init(Heap(mal)))
         )

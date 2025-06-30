@@ -10,6 +10,7 @@ import ir.eval.BitVectorEval.isNegative
 import specification.{ExternalFunction, FuncEntry, SymbolTableEntry}
 import util.DSAPhase.*
 import util.LogLevel.INFO
+import util.assertion.*
 import util.{DSAContext, DSALogger, DSAPhase, DSConfig, IRContext, PerformanceTimer}
 
 import scala.collection.mutable
@@ -243,16 +244,17 @@ class IntervalGraph(
     constraints.toSeq.sortBy(f => f.label).foreach {
       case constraint: MemoryAccessConstraint[_] =>
         val valueCells = constraintArgToCells(constraint.arg2).map(get)
-        assert(IntervalDSA.equiv(valueCells), s"value cells should be unified instead got $valueCells")
+        debugAssert(IntervalDSA.equiv(valueCells), s"value cells should be unified instead got $valueCells")
+      
         val indexCells = constraintArgToCells(constraint.arg1, ignoreContents = true).map(get)
         if indexCells.nonEmpty then
           if indexCells.nonEmpty && valueCells.nonEmpty then
             indexCells.foreach(indexCell =>
               valueCells.foreach(valueCell =>
-                assert(indexCell.node.isUptoDate, "outdated cell in local correctness check")
-                assert(indexCell.getPointee.node.isUptoDate, "outdated cell in local correctness check")
-                assert(valueCell.node.isUptoDate, "outdated cell in local correctness check")
-                assert(
+                debugAssert(indexCell.node.isUptoDate, "outdated cell in local correctness check")
+                debugAssert(indexCell.getPointee.node.isUptoDate, "outdated cell in local correctness check")
+                debugAssert(valueCell.node.isUptoDate, "outdated cell in local correctness check")
+                debugAssert(
                   indexCell.hasPointee && indexCell.getPointee.equiv(valueCell),
                   s"$constraint, $indexCell doesn't point to ${valueCell} instead ${indexCell.getPointee}"
                 )
@@ -289,13 +291,13 @@ class IntervalGraph(
         else current.clone(copy, true, oldToNew)
     }
 
-    assert(
+    debugAssert(
       copy.solver.size <= this.solver.size,
       s"size of copy's solver ${copy.solver.size}," +
         s"size of this's solver ${this.solver.size}"
     )
     copy.nodes = this.nodes.view.mapValues(oldToNew.apply).toMap
-    assert(copy.nodes.keys == this.nodes.keys)
+    debugAssert(copy.nodes.keys == this.nodes.keys)
     copy
   }
 
@@ -467,13 +469,13 @@ class IntervalGraph(
 
   def checkEdgesAreMaintained(edges: Map[IntervalCell, IntervalCell]): Unit = {
     edges.foreach((pointer, pointee) =>
-      assert(pointee.equiv(get(pointer).getPointee), s"$pointer doesn't point to updated version of its pointee")
+      debugAssert(pointee.equiv(get(pointer).getPointee), s"$pointer doesn't point to updated version of its pointee")
     )
   }
 
   protected def mergeCellsHelper(cell1: IntervalCell, cell2: IntervalCell): IntervalCell = {
-    assert(cell1.node.isUptoDate)
-    assert(cell2.node.isUptoDate)
+    debugAssert(cell1.node.isUptoDate)
+    debugAssert(cell2.node.isUptoDate)
 
     // determine which node is to be moved and by how much
     val (stableCell, toBeMoved) =
@@ -550,12 +552,12 @@ class IntervalGraph(
         mergeCellsHelper(find(cell1), find(cell2))
       } else mergeCellsHelper(cell1, cell2)
 
-    assert(result.equiv(get(cell1)))
-    assert(result.equiv(get(cell2)))
+    debugAssert(result.equiv(get(cell1)))
+    debugAssert(result.equiv(get(cell2)))
     checkEdgesAreMaintained(node1Pointees)
     checkEdgesAreMaintained(node2Pointees)
 
-    assert(result.node.isUptoDate)
+    debugAssert(result.node.isUptoDate)
     result
   }
 
@@ -574,7 +576,7 @@ class IntervalGraph(
 
   def findNode(node: IntervalNode): (IntervalNode, Int) = {
     val (term, offset) = solver.findWithOffset(node.term)
-    assert(solver.findWithOffset(term)._1 == term, "find doesnt' get the most up-to-date node")
+    debugAssert(solver.findWithOffset(term)._1 == term, "find doesnt' get the most up-to-date node")
     (term.asInstanceOf[NodeTerm].v, offset)
   }
 
@@ -593,7 +595,7 @@ class IntervalGraph(
   def find(cell: IntervalCell): IntervalCell = {
     val (newNode, newInterval) = findExact(cell)
     val res = newNode.add(newInterval)
-    assert(findNode(res.node)._1 == res.node)
+    debugAssert(findNode(res.node)._1 == res.node)
     res
   }
 
@@ -603,7 +605,7 @@ class IntervalGraph(
   def get(cell: IntervalCell): IntervalCell = {
     val (newNode, newInterval) = findExact(cell)
     val res = newNode.get(newInterval)
-    assert(findNode(res.node)._1 == res.node)
+    debugAssert(findNode(res.node)._1 == res.node)
     res
   }
 
@@ -659,7 +661,7 @@ class IntervalNode(
     recurse: Boolean = false,
     oldToNew: mutable.Map[IntervalNode, IntervalNode] = mutable.Map()
   ): IntervalNode = {
-    if recurse then assert(isUptoDate)
+    if recurse then debugAssert(isUptoDate)
     val node = this
     val newNode =
       if !oldToNew.contains(node) then
@@ -675,32 +677,32 @@ class IntervalNode(
       val queue = mutable.Queue[IntervalNode](node)
       while queue.nonEmpty do
         val old = queue.dequeue()
-        assert(old.isUptoDate)
-        assert(oldToNew.contains(old))
+        debugAssert(old.isUptoDate)
+        debugAssert(oldToNew.contains(old))
         old.cells.foreach {
           case cell: IntervalCell if cell.hasPointee =>
             val (newNode, off) = newGraph.findNode(oldToNew(old))
-            assert(
+            debugAssert(
               newNode.cells.exists(c => c.interval.contains(cell.interval.move(i => i + off))),
               s"expected cloned cell to include same intervals"
             )
-            assert(newGraph.find(newNode) == newNode)
+            debugAssert(newGraph.find(newNode) == newNode)
             val pointee = cell.getPointee
-            assert(pointee.node.isUptoDate, s"expected updated pointee")
+            debugAssert(pointee.node.isUptoDate, s"expected updated pointee")
             if !oldToNew.contains(pointee.node) then queue.enqueue(pointee.node)
             val (clonedPointee, pointeeOff) =
               if !oldToNew.contains(pointee.node) then (pointee.node.clone(newGraph, false, oldToNew), 0)
               else newGraph.findNode(oldToNew(pointee.node))
 
-            assert(newGraph.find(clonedPointee) == clonedPointee, s"expected cloned pointee to remain uptodate")
+            debugAssert(newGraph.find(clonedPointee) == clonedPointee, s"expected cloned pointee to remain uptodate")
             val newPointee = clonedPointee.add(pointee.interval.move(i => i + pointeeOff))
-            assert(
+            debugAssert(
               pointee.interval.move(i => i + pointeeOff) == newPointee.interval,
               s"pointee interval: ${pointee.interval}, moved by $pointeeOff, cloned Pointee interval: ${newPointee.interval}"
             )
             val pointer = newNode.get(cell.interval.move(i => i + off))
-            assert(pointer.interval.contains(cell.interval.move(i => i + off)))
-            assert(!pointer.hasPointee || pointer.getPointee.equiv(newPointee))
+            debugAssert(pointer.interval.contains(cell.interval.move(i => i + off)))
+            debugAssert(!pointer.hasPointee || pointer.getPointee.equiv(newPointee))
             if !pointer.hasPointee then pointer.setPointee(newPointee)
           case _ =>
         }
@@ -727,7 +729,7 @@ class IntervalNode(
   def add(cell: IntervalCell): Unit = {
     require(cell.node == this, "added cell must have a reference to this node")
     _cells = _cells.appended(cell).sorted
-    assert(nonOverlappingProperty, "expected non overlapping cells")
+    debugAssert(nonOverlappingProperty, "expected non overlapping cells")
   }
 
   /**
@@ -751,7 +753,7 @@ class IntervalNode(
   }
 
   def collapse(): IntervalCell = {
-    assert(isUptoDate)
+    debugAssert(isUptoDate)
     flags.collapsed = true
     bases = bases.view.mapValues(_ => Set(0)).toMap
     eqClasses = Set.empty
@@ -768,7 +770,7 @@ class IntervalNode(
    * @return a cell with this node and the provided interval
    */
   def add(interval: DSInterval): IntervalCell = {
-    assert(isUptoDate)
+    debugAssert(isUptoDate)
     val overlapping: Seq[IntervalCell] = cells.filter(_.interval.isOverlapping(interval))
     val newCell = if overlapping.isEmpty then
       val res = init(interval)
@@ -786,7 +788,7 @@ class IntervalNode(
       if pointees.nonEmpty then graph.find(res).setPointee(pointee.get)
       init(interval)
 
-    assert(nonOverlappingProperty, "expected non overlapping cells")
+    debugAssert(nonOverlappingProperty, "expected non overlapping cells")
     newCell
   }
 
@@ -794,7 +796,7 @@ class IntervalNode(
   // expects exactly 1 corresponding cell since they are non-overlapping
   def get(interval: DSInterval): IntervalCell = {
     val exactMatches = cells.filter(_.interval.contains(interval))
-    assert(
+    debugAssert(
       exactMatches.size == 1,
       s"Expected exactly one overlapping interval instead got ${exactMatches.size}, ${interval}, with ${cells.map(_.interval)}"
     )
@@ -917,7 +919,7 @@ class IntervalCell(val node: IntervalNode, val interval: DSInterval) {
     if node.get(this.interval) ne this then node.get(this.interval).getPointee
     else if _pointee.isEmpty then
 //      throw Exception("expected a pointee")
-      assert(this.node.isUptoDate)
+      debugAssert(this.node.isUptoDate)
       _pointee = Some(IntervalNode(graph, Map.empty).add(0))
       graph.find(_pointee.get)
     else graph.find(_pointee.get)
@@ -926,11 +928,11 @@ class IntervalCell(val node: IntervalNode, val interval: DSInterval) {
   def hasPointee: Boolean = node.get(this.interval)._pointee.nonEmpty
 
   def setPointee(cell: IntervalCell): IntervalCell = {
-    assert(this.node.isUptoDate)
-    assert(cell.node.isUptoDate)
+    debugAssert(this.node.isUptoDate)
+    debugAssert(cell.node.isUptoDate)
     if node.get(this.interval) ne this then node.get(this.interval).setPointee(cell)
     else if _pointee.isEmpty then
-      assert(node.cells.contains(this))
+      debugAssert(node.cells.contains(this))
       _pointee = Some(cell)
       cell
     else graph.mergeCells(cell, this.getPointee)
@@ -1158,7 +1160,7 @@ object IntervalDSA {
       .exprToCells(sourceExpr)
       .map(source.find)
       .map(cell =>
-        assert(cell.node.isUptoDate)
+        debugAssert(cell.node.isUptoDate)
         val (node, offset) =
           target.findNode(cell.node.clone(target, true, oldToNew))
         node.get(cell.interval.move(i => i + offset))
@@ -1209,7 +1211,7 @@ object IntervalDSA {
     while queue.nonEmpty do {
       val node = queue.dequeue()
       node.bases.keys.foreach(base =>
-        assert(!found.contains(base) || found(base) == node, s"$base was in $node and ${found(base)}")
+        debugAssert(!found.contains(base) || found(base) == node, s"$base was in $node and ${found(base)}")
       )
       node.bases.keys.foreach(found.update(_, node))
       seen.add(node)
@@ -1228,8 +1230,8 @@ object IntervalDSA {
       node.bases
         .filter(_._1.isInstanceOf[GlobSym])
         .foreach((base, offsets) =>
-          assert(offsets.size <= 1, s"$base had more than one offset in $node")
-          assert(found(base).isEmpty || found(base).get == node, s"$base was in at least two nodes")
+          debugAssert(offsets.size <= 1, s"$base had more than one offset in $node")
+          debugAssert(found(base).isEmpty || found(base).get == node, s"$base was in at least two nodes")
           found += (base -> Some(node))
         )
       seen.add(node)
@@ -1256,19 +1258,19 @@ object IntervalDSA {
     ctx.program.foreach {
       case access: MemoryAccess if DSA.contains(IRWalk.procedure(access)) =>
         val dsg = DSA(IRWalk.procedure(access))
-        assert(
+        debugAssert(
           dsg.constraints.exists(_.source == access),
           s"Memory Access $access from ${dsg.proc.procName} didn't have a corresponding DSA constraint"
         )
         val pointers = dsg.exprToCells(access.index).map(dsg.find)
-        assert(
+        debugAssert(
           pointers.nonEmpty || isNonGlobalConstant(access.index, isglb),
           "Expected cells for indices used in reachable memory access to have corresponding DSA cells"
         )
-        assert(pointers.forall(_.hasPointee), "expected all of the pointers to have pointee")
+        debugAssert(pointers.forall(_.hasPointee), "expected all of the pointers to have pointee")
         val distinctPointees = pointers.map(_.getPointee).map(dsg.get).toSet
 
-        assert(distinctPointees.size <= 1, s"Expected index cells to have unified pointee ${distinctPointees.size}")
+        debugAssert(distinctPointees.size <= 1, s"Expected index cells to have unified pointee ${distinctPointees.size}")
       case _ =>
     }
   }
@@ -1286,7 +1288,7 @@ object IntervalDSA {
       .filterNot((proc, _) => proc.procName == "indirect_call_launchpad")
       .foreach((p, graph) =>
         val graphRegions = graph.glIntervals.map(GlobSym.apply).map(base => graph.find(graph.nodes(base)).bases)
-        assert(
+        debugAssert(
           unifiedRegions == graphRegions,
           s"Procedure ${p.procName} had a differing unified global sets than compared to the global graph"
         )

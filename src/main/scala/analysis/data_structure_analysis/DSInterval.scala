@@ -1,5 +1,7 @@
 package analysis.data_structure_analysis
 
+import util.assertion.*
+
 /**
  * Integer Interval with top and bottom
  * start (s) <= end (e)
@@ -11,7 +13,7 @@ enum DSInterval extends Offsets {
   case Value(s: Int, e: Int)
 
   this match
-    case DSInterval.Value(s, e) => assert(s <= e, "start of interval should be less than its end")
+    case DSInterval.Value(s, e) => debugAssert(s <= e, "start of interval should be less than its end")
     case _ =>
 
   override def toString: String =

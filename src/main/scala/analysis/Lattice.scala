@@ -3,6 +3,7 @@ package analysis
 import ir.*
 import ir.eval.BitVectorEval
 import util.StaticAnalysisLogger
+import util.assertion.*
 
 /** Basic lattice
   */
@@ -130,7 +131,7 @@ class SASILattice extends Lattice[StridedWrappedInterval] {
       case (SITop, _) => SITop
       case (_, SITop) => SITop
       case (SI(sr, a, b, w1), SI(st, c, d, w2)) =>
-        assert(w1 == w2)
+        debugAssert(w1 == w2)
         val w = w1 // TODO: should this be the largest?
         if (orderingOperator(r, t)) {
           return t
@@ -216,7 +217,7 @@ class SASILattice extends Lattice[StridedWrappedInterval] {
       case (_, SIBottom) => SIBottom // TODO: is this correct?
       case (SI(ss, a, b, w1), SI(st, c, d, w2))
           if (cardinalityFunction(s, w1) + cardinalityFunction(t, w2)) <= BigInt(2).pow(w1.toInt) =>
-        assert(w1 == w2)
+        debugAssert(w1 == w2)
         return SI(ss.gcd(st), modularPlus(a, c, w1), modularPlus(b, d, w1), w1)
       case _ => SITop
     }
@@ -237,7 +238,7 @@ class SASILattice extends Lattice[StridedWrappedInterval] {
       case (_, SIBottom) => SIBottom // TODO: is this correct?
       case (SI(ss, a, b, w1), SI(st, c, d, w2))
           if (cardinalityFunction(s, w1) + cardinalityFunction(t, w2)) <= BigInt(2).pow(w1.toInt) =>
-        assert(w1 == w2)
+        debugAssert(w1 == w2)
         return SI(ss.gcd(st), modularMinus(a, d, w1), modularMinus(b, c, w1), w1)
       case _ => SITop
     }

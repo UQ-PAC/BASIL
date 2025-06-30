@@ -229,7 +229,9 @@ object Main {
     @arg(name = "memory-transform", doc = "Transform memory access to region accesses")
     memoryTransform: Flag,
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
-    noif: Flag
+    noif: Flag,
+    @arg(name = "nodebug", doc = "Disable runtume debug assertions")
+    nodebug: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -350,6 +352,10 @@ object Main {
     }
     if (loadingInputs.inputFile.endsWith(".adt") && loadingInputs.relfFile.isEmpty) {
       throw IllegalArgumentException("BAP ADT input requires --relf")
+    }
+
+    if (conf.nodebug.value) {
+      util.assertion.disableAssertions == true
     }
 
     val q = BASILConfig(

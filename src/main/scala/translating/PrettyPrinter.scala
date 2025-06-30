@@ -280,7 +280,7 @@ class BasilIRPrettyPrinter(
 
   def vprog(mainProc: String, procedures: List[PPProg[Procedure]]): PPProg[Program] = {
     // shouldn't be used
-    assert(false)
+    ???
   }
 
   override def vblock(b: Block): PPProg[Block] = {
@@ -308,7 +308,7 @@ class BasilIRPrettyPrinter(
     statements: List[PPProg[Statement]],
     terminator: PPProg[Jump]
   ): PPProg[Block] = {
-    assert(false)
+    ???
   }
 
   def vardecl(v: Variable): String = {

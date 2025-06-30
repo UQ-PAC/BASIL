@@ -1,6 +1,7 @@
 package ir.dsl
 import ir.*
 import translating.PrettyPrinter.*
+import util.assertion.*
 
 import scala.collection.immutable.*
 import scala.collection.mutable
@@ -120,7 +121,7 @@ case class CloneableStatement(s: NonCallStatement) extends EventuallyStatement {
 case class IdentityStatement(s: NonCallStatement) extends EventuallyStatement {
   var resolved = false
   override def resolve(p: CachedLabelResolver): Statement = {
-    assert(
+    debugAssert(
       !resolved,
       s"DSL statement '$s' has already been resolved! to make a DSL statement that can be resolved multiple times, wrap it in clonedStmt() or use .cloneable on its block."
     )
@@ -255,9 +256,9 @@ case class EventuallyBlock(
     val tempBlock: Block = Block(label, meta.address, List(), GoTo(List.empty))
 
     def cont(prog: CachedLabelResolver, proc: String): Block = {
-      assert(tempBlock.statements.isEmpty)
+      debugAssert(tempBlock.statements.isEmpty)
       val resolved = sl.map(_.resolve(prog))
-      assert(tempBlock.statements.isEmpty)
+      debugAssert(tempBlock.statements.isEmpty)
       tempBlock.statements.addAll(resolved)
       tempBlock.replaceJump(j.resolve(prog, proc))
     }
@@ -437,8 +438,8 @@ case class EventuallyProgram(
     val reso = CachedLabelResolver(p)
 
     resolvers.foreach(_(reso))
-    assert(ir.invariant.correctCalls(p))
-    assert(ir.invariant.cfgCorrect(p))
+    debugAssert(ir.invariant.correctCalls(p))
+    debugAssert(ir.invariant.cfgCorrect(p))
     p
   }
 
