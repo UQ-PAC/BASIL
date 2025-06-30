@@ -56,7 +56,9 @@ class ForwardLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
   solver: IntraproceduralWorklistSolver[L, A]
 ) extends SingleLoopInvariantGenerator(domain, solver, false) {
   def genAndAddInvariants(procedure: Procedure) =
-    generateInvariants(procedure).foreach { (block, pred) => if pred != Predicate.True then block.postconditions += pred }
+    generateInvariants(procedure).foreach { (block, pred) =>
+      if pred != Predicate.True then block.postconditions += pred
+    }
 }
 
 /** Performs a single backwards analysis to generate loop invariants that hold at the start of a block. This will be
@@ -78,7 +80,9 @@ class BackwardLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
   solver: IntraproceduralWorklistSolver[L, A]
 ) extends SingleLoopInvariantGenerator(domain, solver, true) {
   def genAndAddInvariants(procedure: Procedure) =
-    generateInvariants(procedure).foreach { (block, pred) => if pred != Predicate.True then block.preconditions += pred }
+    generateInvariants(procedure).foreach { (block, pred) =>
+      if pred != Predicate.True then block.preconditions += pred
+    }
 }
 
 /** Runs a collection of analyses to produce loop invariants, then inserts them into the IR.
