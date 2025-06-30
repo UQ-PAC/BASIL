@@ -474,7 +474,7 @@ def inOutParams(
       val writes = readWrites(proc).writes
 
       val newOut = origOut ++ (if (proc == p.mainProcedure) then Seq() else lives(proc)._2.intersect(writes))
-      val liveFromReturn = newOut.filter(reachesEntry(_, proc.returnBlock.get.jump))
+      val liveFromReturn = newOut.filter(i => proc.returnBlock.map(b => reachesEntry(i, b.jump)).getOrElse(true))
 
       // filtering by reaching entry does not seem to have much effect
       val extraLive = (liveFromReturn ++ liveFromCall)
