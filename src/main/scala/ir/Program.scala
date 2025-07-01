@@ -605,9 +605,6 @@ class Block private (
   statements.onInsert = x => x.setParent(this)
   statements.onRemove = x => x.deParent()
 
-  var preconditions: mutable.ArrayBuffer[Predicate] = mutable.ArrayBuffer()
-  var postconditions: mutable.ArrayBuffer[Predicate] = mutable.ArrayBuffer()
-
   def this(
     label: String,
     address: Option[BigInt] = None,

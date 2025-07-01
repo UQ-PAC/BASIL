@@ -4,16 +4,16 @@ import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{CaptureOutput, programToContext}
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, IRTransform, RunUtils}
+import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, IRTransform, StaticAnalysisConfig, RunUtils}
 
 @test_util.tags.UnitTest
 class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
-  def genInvariants(program: Program) = {
+  def genProcedureInvariants(program: Program, procedure: Procedure): (Map[Block, List[Predicate]], Map[Block, List[Predicate]]) = {
     val foundLoops = LoopDetector.identify_loops(program)
     val newLoops = foundLoops.reducibleTransformIR().identifiedLoops
     foundLoops.updateIrWithLoops()
 
-    IRTransform.generateLoopInvariants(program)
+    FullLoopInvariantGenerator(program).genInvariants(procedure)
   }
 
   def runTest(
@@ -28,8 +28,9 @@ class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
       BASILConfig(
         context = Some(context),
         loading = ILLoadingConfig(inputFile = "", relfFile = None),
-        simplify = false,
-        staticAnalysis = None,
+        simplify = true,
+        generateLoopInvariants = true,
+        staticAnalysis = Some(StaticAnalysisConfig()),
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
         dsaConfig = None // Some(DSAConfig(Set.empty))
@@ -62,9 +63,9 @@ class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
       )
     )
 
-    genInvariants(program)
-
     val main = program.nameToProcedure("main")
+
+    val (preconditions, postconditions) = genProcedureInvariants(program, main)
 
     main.blocks.foreach(b => {
       if (b.label == "loop_head") {
@@ -73,7 +74,7 @@ class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
         // TODO use an SMT solver to check that the generated invariant implies our expected result instead of using syntactic equality.
 
         assert(
-          b.postconditions.contains(
+          postconditions(b).contains(
             Predicate.and(
               Predicate.BVCmp(BVULE, BVTerm.Lit(bv64(0)), BVTerm.Var(R0)),
               Predicate.BVCmp(BVULE, BVTerm.Var(R0), BVTerm.Lit(bv64(100)))

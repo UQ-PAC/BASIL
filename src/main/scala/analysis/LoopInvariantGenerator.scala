@@ -2,6 +2,8 @@ package analysis
 
 import ir.*
 import ir.transforms.{IntraproceduralWorklistSolver, NarrowingWorklistSolver, reversePostOrder}
+import util.functional.unionWith
+import collection.mutable
 
 // TODO allow for interprocedural analysis
 
@@ -54,12 +56,7 @@ class SingleLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
 class ForwardLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
   domain: A,
   solver: IntraproceduralWorklistSolver[L, A]
-) extends SingleLoopInvariantGenerator(domain, solver, false) {
-  def genAndAddInvariants(procedure: Procedure) =
-    generateInvariants(procedure).foreach { (block, pred) =>
-      if pred != Predicate.True then block.postconditions += pred
-    }
-}
+) extends SingleLoopInvariantGenerator(domain, solver, false)
 
 /** Performs a single backwards analysis to generate loop invariants that hold at the start of a block. This will be
  *  encoded as an assertion at the start of a block. Invariants will only be generated on loop heads, and so loop head
@@ -78,26 +75,20 @@ class ForwardLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
 class BackwardLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
   domain: A,
   solver: IntraproceduralWorklistSolver[L, A]
-) extends SingleLoopInvariantGenerator(domain, solver, true) {
-  def genAndAddInvariants(procedure: Procedure) =
-    generateInvariants(procedure).foreach { (block, pred) =>
-      if pred != Predicate.True then block.preconditions += pred
-    }
-}
+) extends SingleLoopInvariantGenerator(domain, solver, true)
 
 /** Runs a collection of analyses to produce loop invariants, then inserts them into the IR.
  */
 class FullLoopInvariantGenerator(program: Program) {
-  def addInvariants() = {
-    program.procedures.foreach(addInvariantsToProc(_))
-  }
-
-  def addInvariantsToProc(procedure: Procedure) = {
+  def genInvariants(procedure: Procedure): (Map[Block, List[Predicate]], Map[Block, List[Predicate]]) = {
     reversePostOrder(procedure)
+
+    var pre = mutable.ListBuffer[Map[Block, Predicate]]()
+    var post = mutable.ListBuffer[Map[Block, Predicate]]()
 
     // Intervals give us constant bounds on variables, for example an iteration variable in a loop guard.
     val intervals = DoubleIntervalDomain(Some(procedure))
-    ForwardLoopInvariantGenerator(intervals, NarrowingWorklistSolver(intervals)).genAndAddInvariants(procedure)
+    post += ForwardLoopInvariantGenerator(intervals, NarrowingWorklistSolver(intervals)).generateInvariants(procedure)
 
     // Gamma domains ensure that relations of the gammas of variables are maintained throughout loop iterations.
     // Currently broken! The gamma domains don't produce predicates correctly it seems
@@ -105,9 +96,40 @@ class FullLoopInvariantGenerator(program: Program) {
     // LatticeMap.BottomMap(procedure.formalInParam.unsorted.map((v: Variable) => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
     // val mayGammas = MayGammaDomain(gammaMap)
     // val mustGammas = MustGammaDomain(gammaMap)
-    // ForwardLoopInvariantGenerator(mayGammas, worklistSolver(mayGammas)).genAndAddInvariants(procedure)
-    // ForwardLoopInvariantGenerator(mustGammas, worklistSolver(mustGammas)).genAndAddInvariants(procedure)
+    // res += ForwardLoopInvariantGenerator(mayGammas, worklistSolver(mayGammas)).genAndAddInvariants(procedure)
+    // res += ForwardLoopInvariantGenerator(mustGammas, worklistSolver(mustGammas)).genAndAddInvariants(procedure)
 
     // Add more domains here
+
+    print(post)
+
+    (
+    pre.foldLeft(Map[Block, List[Predicate]]()) {
+      (m, m2) => unionWith(m, m2.map((b, p) => (b, List(p))), ((a, b) => a ++ b))
+    },
+    post.foldLeft(Map[Block, List[Predicate]]()) {
+      (m, m2) => unionWith(m, m2.map((b, p) => (b, List(p))), ((a, b) => a ++ b))
+    }
+    )
+  }
+
+  def addInvariants() = {
+    program.procedures.foreach(proc => {
+      val (preconditions, postconditions) = genInvariants(proc)
+      addPreInvariantsToProc(proc, preconditions)
+      addPostInvariantsToProc(proc, postconditions)
+    })
+  }
+
+  def addPreInvariantsToProc(procedure: Procedure, invariants: Map[Block, List[Predicate]]) = {
+    invariants.foreach{(block, preds) =>
+      block.statements.prependAll(preds.filter(_ != Predicate.True).map(p => Assert(p.toBasil)))
+    }
+  }
+
+  def addPostInvariantsToProc(procedure: Procedure, invariants: Map[Block, List[Predicate]]) = {
+    invariants.foreach{(block, preds) =>
+      block.statements.appendAll(preds.filter(_ != Predicate.True).map(p => Assert(p.toBasil)))
+    }
   }
 }
