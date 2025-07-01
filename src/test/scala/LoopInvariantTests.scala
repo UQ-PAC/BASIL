@@ -91,4 +91,34 @@ class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
       results.forall(_.kind.isVerified)
     }
   }
+
+  // TODO fix gamma domains
+//  test("gammaTest") {
+//    /* while (x < y)
+//     * {
+//     *   x += y;
+//     * }
+//     */
+//
+//    val program = prog(
+//      proc(
+//        "main",
+//        block("entry", goto("loop_head")),
+//        block("loop_head", goto("loop_body", "loop_exit")),
+//        block(
+//          "loop_body",
+//          Assume(BinaryExpr(BVULT, R0, R1)),
+//          LocalAssign(R0, BinaryExpr(BVADD, R0, R1)),
+//          goto("loop_head")
+//        ),
+//        block("loop_exit", Assume(BinaryExpr(BVUGE, R0, R1)), ret)
+//      )
+//    )
+//
+//    genInvariants(program)
+//
+//    val main = program.nameToProcedure("main")
+//    val head = main.labelToBlock("loop_head")
+//    assert(head.postconditions.contains(Predicate.True))
+//  }
 }
