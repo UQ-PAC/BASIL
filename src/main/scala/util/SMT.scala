@@ -13,6 +13,38 @@ enum SatResult {
   case Unknown(s: String)
 }
 
+/** Make sure to close the solver when you are done!
+ */
+class SMTSolver {
+  val solverContext = SolverContextFactory.createSolverContext(SolverContextFactory.Solvers.PRINCESS)
+  val formulaConverter = FormulaConverter(solverContext.getFormulaManager())
+
+  def satisfiable(f: BooleanFormula): SatResult = {
+    try {
+      val env = solverContext.newProverEnvironment()
+      env.addConstraint(f)
+      if env.isUnsat() then SatResult.UNSAT else SatResult.SAT
+    } catch { _ =>
+      SatResult.Unknown("")
+    }
+  }
+
+  def satisfiable(p: Predicate): SatResult = {
+    satisfiable(formulaConverter.convertPredicate(p))
+  }
+
+  /** Run the solver on a predicate given as an SMTLIB string
+   */
+  def satisfiable(s: String): SatResult = {
+    satisfiable(solverContext.getFormulaManager().parse(s))
+  }
+
+  def close() = {
+    solverContext.close()
+  }
+
+}
+
 class FormulaConverter(formulaManager: FormulaManager) {
   val bitvectorFormulaManager = formulaManager.getBitvectorFormulaManager()
   val booleanFormulaManager = formulaManager.getBooleanFormulaManager()
@@ -68,6 +100,54 @@ class FormulaConverter(formulaManager: FormulaManager) {
       case BVSGE => bitvectorFormulaManager.greaterOrEquals(a, b, true)
       case EQ => bitvectorFormulaManager.equal(a, b)
       case NEQ => booleanFormulaManager.not(bitvectorFormulaManager.equal(a, b))
+    }
+  }
+
+  // Convert IR expressions
+
+  def convertBoolExpr(e: Expr): BooleanFormula = {
+    assert(e.getType == BoolType)
+    e match {
+      case TrueLiteral => booleanFormulaManager.makeTrue()
+      case FalseLiteral => booleanFormulaManager.makeFalse()
+      case BinaryExpr(op, arg, arg2) => op match {
+        case op: BoolBinOp => ???
+        case op: PolyCmp => ???
+        case op: BVCmpOp => convertBVCmpOp(op, convertBVExpr(arg), convertBVExpr(arg2))
+        case _ => ???
+      }
+      case UnaryExpr(op, arg) => op match {
+        case op: BoolUnOp => ???
+        case _ => ???
+      }
+      case v: Variable => ???
+      case r: OldExpr => ???
+      case _ => throw Exception("Non boolean expression was attempted to be converted")
+    }
+  }
+
+  def convertBVExpr(e: Expr): BitvectorFormula = {
+    assert(e.getType.isInstanceOf[BitVecType])
+    e match {
+      case BitVecLiteral(value, size) => bitvectorFormulaManager.makeBitvector(size, value.bigInteger)
+      case Extract(end, start, arg) => bitvectorFormulaManager.extract(convertBVExpr(arg), end, start)
+      case Repeat(repeats, arg) => ???
+      case ZeroExtend(bits, arg) => bitvectorFormulaManager.extend(convertBVExpr(arg), bits, false)
+      case SignExtend(bits, arg) => bitvectorFormulaManager.extend(convertBVExpr(arg), bits, true)
+      case BinaryExpr(op, arg, arg2) =>
+        op match {
+          case op: BVBinOp => convertBVBinOp(op, convertBVExpr(arg), convertBVExpr(arg2))
+          case _ => throw Exception("Non bitvector operation was attempted to be converted")
+        }
+      case UnaryExpr(op, arg) =>
+        op match {
+          case op: BVUnOp => convertBVUnOp(op, convertBVExpr(arg))
+          case op: BoolToBV1 => ???
+          case _ => throw Exception("Non bitvector operation was attempted to be converted")
+        }
+      case v: Variable => convertBVVar(v.irType, v.name)
+      case r: OldExpr => ???
+      case _ => throw Exception("Non bitvector expression was attempted to be converted")
     }
   }
 
@@ -127,27 +207,4 @@ class FormulaConverter(formulaManager: FormulaManager) {
         }
     }
   }
-}
-
-/** Make sure to close the solver when you are done!
- */
-class SMTSolver {
-  val solverContext = SolverContextFactory.createSolverContext(SolverContextFactory.Solvers.PRINCESS)
-  val formulaConverter = FormulaConverter(solverContext.getFormulaManager())
-
-  def satisfiable(p: Predicate): SatResult = {
-    val f = formulaConverter.convertPredicate(p)
-    try {
-      val env = solverContext.newProverEnvironment()
-      env.addConstraint(f)
-      if env.isUnsat() then SatResult.UNSAT else SatResult.SAT
-    } catch { _ =>
-      SatResult.Unknown("")
-    }
-  }
-
-  def close() = {
-    solverContext.close()
-  }
-
 }
