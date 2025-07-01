@@ -75,11 +75,14 @@ class SimulAssign(var assignments: Vector[(Variable, Expr)], override val label:
   }.toSet
 
   def assignees = assignments.map(_._1).toSet
-  override def toString: String = s"$labelStr${assignments
+  override def toString: String = {
+    val assignList = assignments
       .map { case (lhs, rhs) =>
         lhs.toString + " := " + rhs
       }
-      .mkString(", ")}"
+      .mkString(", ")
+    labelStr + assignList
+  }
 
   override def deepEquals(o: Object): Boolean = o match {
     case SimulAssign(otherAssings) => otherAssings == assignments
