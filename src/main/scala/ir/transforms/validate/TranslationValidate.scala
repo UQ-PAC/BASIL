@@ -696,17 +696,6 @@ class TranslationValidator {
       AssertsToPC(source.returnBlock.get).transform(source)
       AssertsToPC(target.returnBlock.get).transform(target)
 
-      /* Begin AWFUL HACK to initialise SSA for the global variables only set on one path */
-      //srcEntry.statements.prepend(LocalAssign((transitionSystemPCVar), (transitionSystemPCVar)))
-      //srcEntry.statements.prepend(LocalAssign((traceVar), (traceVar)))
-      //tgtEntry.statements.prepend(LocalAssign((transitionSystemPCVar), (transitionSystemPCVar)))
-      //tgtEntry.statements.prepend(LocalAssign((traceVar), (traceVar)))
-
-      //globalsForProc(proc).foreach(g => {
-      //  srcEntry.statements.prepend(LocalAssign(g, g))
-      //  tgtEntry.statements.prepend(LocalAssign(g, g))
-      //})
-      /* end AWFUL HACK */
 
      val inputs = transitionSystemPCVar :: traceVar :: (globalsForProc(proc).toList)
 
@@ -714,11 +703,6 @@ class TranslationValidator {
 
       val (srcRenameSSA, srcLiveMemory) = SSADAG.transform(frames, source, inputs)
       val (tgtRenameSSA, tgtLiveMemory) = SSADAG.transform(frames, target, inputs)
-
-      //val dir = File("./graphs/")
-      // if (!dir.exists()) then dir.mkdirs()
-
-
 
       val ackInv =
         Ackermann.instantiateAxioms(source.entryBlock.get, target.entryBlock.get, frames, exprInSource, exprInTarget)
