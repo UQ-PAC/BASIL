@@ -2,10 +2,9 @@ package test_util
 
 import ir.*
 import ir.eval.*
-import util.functional.State
 import translating.PrettyPrinter.*
 import util.IRContext
-import org.scalacheck.{Arbitrary, Gen}
+import util.functional.State
 
 trait TestValueDomainWithInterpreter[T] {
 
@@ -131,8 +130,10 @@ trait TestValueDomainWithInterpreter[T] {
 
     val breakres: List[(BreakPoint, _, List[(String, Expr, Option[Expr])])] = interpretResult(1)
     val checkResults = breakres.flatMap { case (bp, _, evaledExprs) =>
-      evaledExprs.grouped(2).map(_.toList).map { case List((_, variable, varValue), (name, test, evaled)) =>
-        CheckResult(name, bp, test, variable, varValue, evaled)
+      evaledExprs.grouped(2).map(_.toList).map {
+        case List((_, variable, varValue), (name, test, evaled)) =>
+          CheckResult(name, bp, test, variable, varValue, evaled)
+        case _ => ???
       }
     }.toList
 

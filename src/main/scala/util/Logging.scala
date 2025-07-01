@@ -1,8 +1,10 @@
 package util
-import sourcecode.Line, sourcecode.FileName
-import scala.io.AnsiColor
-import collection.mutable.HashSet
+import sourcecode.{FileName, Line, Name}
+
 import java.io.{File, PrintStream}
+import scala.io.AnsiColor
+
+import collection.mutable.HashSet
 
 enum LogLevel(val id: Int):
   case DEBUG extends LogLevel(0)
@@ -65,11 +67,7 @@ class GenericLogger(
   def setOutput(stream: PrintStream) = _output = () => stream
   def setOutput(streamProducer: () => PrintStream) = _output = streamProducer
 
-  def writeToFile(file: File, content: => String)(implicit
-    line: sourcecode.Line,
-    filepos: sourcecode.FileName,
-    name: sourcecode.Name
-  ) = {
+  def writeToFile(file: File, content: => String)(implicit line: Line, filepos: FileName, name: Name) = {
     if (level.id < LogLevel.OFF.id) {
       this.debug(s"Writing $file")(line, filepos, name)
       val l = deriveLogger(file.getName(), file)
@@ -99,13 +97,7 @@ class GenericLogger(
     output.flush()
   }
 
-  private def writeLog(
-    logLevel: LogLevel,
-    arg: => Any,
-    line: sourcecode.Line,
-    file: sourcecode.FileName,
-    name: sourcecode.Name
-  ): Unit = {
+  private def writeLog(logLevel: LogLevel, arg: => Any, line: Line, file: FileName, name: Name): Unit = {
 
     if (level.id <= logLevel.id) {
       val colour =
@@ -140,19 +132,19 @@ class GenericLogger(
     }
   }
 
-  def warn(arg: => Any)(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): Unit = {
+  def warn(arg: => Any)(implicit line: Line, file: FileName, name: Name): Unit = {
     writeLog(LogLevel.WARN, arg, line, file, name)
   }
 
-  def error(arg: => Any)(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): Unit = {
+  def error(arg: => Any)(implicit line: Line, file: FileName, name: Name): Unit = {
     writeLog(LogLevel.ERROR, arg, line, file, name)
   }
 
-  def debug(arg: => Any)(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): Unit = {
+  def debug(arg: => Any)(implicit line: Line, file: FileName, name: Name): Unit = {
     writeLog(LogLevel.DEBUG, arg, line, file, name)
   }
 
-  def info(arg: => Any)(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): Unit = {
+  def info(arg: => Any)(implicit line: Line, file: FileName, name: Name): Unit = {
     writeLog(LogLevel.INFO, arg, line, file, name)
   }
 

@@ -1,7 +1,6 @@
 package analysis
 
-import ir.*
-import analysis.*
+import ir.Variable
 
 /** To be compatible for use in interference domains, state lattices must define
   * these additional functions.

@@ -1,12 +1,9 @@
 package ir.parsing
 
-import basil_ir.{Absyn => syntax}
+import basil_ir.Absyn as syntax
 
-type TypesVisitorType[A] = syntax.Type.Visitor[ir.IRType, A]
-  with syntax.BoolType.Visitor[ir.IRType, A]
-  with syntax.MapType.Visitor[ir.IRType, A]
-  with syntax.IntType.Visitor[ir.IRType, A]
-  with syntax.BVType.Visitor[ir.IRType, A]
+type TypesVisitorType[A] = syntax.Type.Visitor[ir.IRType, A] & syntax.BoolType.Visitor[ir.IRType, A] &
+  syntax.MapType.Visitor[ir.IRType, A] & syntax.IntType.Visitor[ir.IRType, A] & syntax.BVType.Visitor[ir.IRType, A]
 
 trait TypesBNFCVisitor[A]
     extends syntax.Type.Visitor[ir.IRType, A],
@@ -28,7 +25,7 @@ trait TypesBNFCVisitor[A]
 
   // Members declared in MapType.Visitor
   override def visit(x: syntax.MapT, arg: A) =
-    ir.MapType(x.type_2.accept(this, arg), x.type_1.accept(this, arg))
+    ir.MapType(x.type_1.accept(this, arg), x.type_2.accept(this, arg))
 
   // Members declared in IntType.Visitor
   override def visit(x: syntax.IntT, arg: A) = ir.IntType

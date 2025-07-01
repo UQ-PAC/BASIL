@@ -1,9 +1,11 @@
 package boogie
 import ir.*
 import specification.*
-import collection.mutable
+import util.assertion.*
 
 import java.io.Writer
+
+import collection.mutable
 
 sealed trait BExpr {
   def getType: BType
@@ -207,11 +209,16 @@ abstract class BVar(val name: String, val bType: BType, val scope: Scope) extend
   def compare(that: BVar): Int = this.name.compare(that.name)
 
   override def getType: BType = bType
-  override def toString: String = name
+  override def toString: String = scope match {
+    case Scope.Local => Sigil.Boogie.localVar + name
+    case Scope.Parameter => Sigil.Boogie.localVar + name
+    case Scope.Const => Sigil.Boogie.globalVar + name
+    case Scope.Global => Sigil.Boogie.globalVar + name
+  }
   def withType: String = if (name.isEmpty) {
     s"$bType"
   } else {
-    s"$name: $bType"
+    s"$this: $bType"
   }
   override def locals: Set[BVar] = scope match {
     case Scope.Local => Set(this)
@@ -313,8 +320,8 @@ case class UnaryBExpr(op: UnOp, arg: BExpr) extends BExpr {
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitUnaryBExpr(this)
 }
 
-case class NaryBinExpr(op: BoolBinOp | EQ.type | NEQ.type | IntADD.type, arg: List[BExpr]) extends BExpr {
-  require(arg.size >= 2)
+case class AssocBExpr(op: BoolBinOp | EQ.type | NEQ.type | IntADD.type, arg: List[BExpr]) extends BExpr {
+  require(arg.size >= 2, "AssocBExpr requires at least two operands")
   override def getType = BinaryBExpr(op, arg.head, arg.tail.head).getType
   override def serialiseBoogie(w: Writer): Unit = {
     w.append("(")
@@ -551,7 +558,7 @@ case class BVFunctionOp(name: String, bvbuiltin: String, in: List[BVar], out: BV
 
 case class MemoryLoadOp(addressSize: Int, valueSize: Int, endian: Endian, bits: Int) extends FunctionOp {
   val accesses: Int = bits / valueSize
-  assert(accesses > 0)
+  debugAssert(accesses > 0)
 
   val fnName: String = endian match {
     case Endian.LittleEndian => s"memory_load${bits}_le"
@@ -644,7 +651,7 @@ case class BoolToBV1Op(arg: BExpr) extends FunctionOp {
 
 case class BMemoryLoad(memory: BMapVar, index: BExpr, endian: Endian, bits: Int) extends BExpr {
   override def toString: String = s"$fnName($memory, $index)"
-  assert(bits >= 8)
+  debugAssert(bits >= 8)
 
   val fnName: String = endian match {
     case Endian.LittleEndian => s"memory_load${bits}_le"
@@ -782,9 +789,12 @@ case class SpecGlobal(
 ) extends SymbolTableEntry,
       SpecGlobalOrAccess {
   override def specGlobals: Set[SpecGlobalOrAccess] = Set(this)
-  override val toAddrVar: BVar = BVariable("$" + s"${name}_addr", BitVecBType(64), Scope.Const)
-  override val toOldVar: BVar = BVariable(s"${name}_old", BitVecBType(size), Scope.Local)
-  override val toOldGamma: BVar = BVariable(s"Gamma_${name}_old", BoolBType, Scope.Local)
+
+  def sanitisedName = util.StringEscape.escape(name)
+
+  override val toAddrVar: BVar = BVariable(s"${sanitisedName}_addr", BitVecBType(64), Scope.Const)
+  override val toOldVar: BVar = BVariable(s"${sanitisedName}_old", BitVecBType(size), Scope.Local)
+  override val toOldGamma: BVar = BVariable(s"Gamma_${sanitisedName}_old", BoolBType, Scope.Local)
   val toAxiom: BAxiom = BAxiom(BinaryBExpr(EQ, toAddrVar, BitVecBLiteral(address, 64)), List.empty)
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitSpecGlobal(this)
 }

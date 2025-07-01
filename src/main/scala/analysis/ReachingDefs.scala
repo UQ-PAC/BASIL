@@ -2,10 +2,10 @@ package analysis
 
 import analysis.solvers.SimplePushDownWorklistFixpointSolver
 import ir.{
-  LocalAssign,
   CFGPosition,
   DirectCall,
   IntraProcIRCursor,
+  LocalAssign,
   MemoryLoad,
   Procedure,
   Program,

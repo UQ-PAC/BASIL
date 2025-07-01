@@ -1,13 +1,6 @@
 package analysis.data_structure_analysis
 
-import analysis.solvers.{DSAUnionFindSolver, OffsetUnionFindSolver, UnionFindSolver}
-import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
-import ir.{BVADD, BinaryExpr, BitVecLiteral, Expr, LocalAssign, Procedure, Program, Register}
-import specification.{ExternalFunction, SymbolTableEntry}
-import util.{DSALogger, IRContext}
-
-import java.io.File
-import scala.collection.{SortedSet, mutable}
+import util.assertion.*
 
 /**
  * Integer Interval with top and bottom
@@ -20,7 +13,7 @@ enum DSInterval extends Offsets {
   case Value(s: Int, e: Int)
 
   this match
-    case DSInterval.Value(s, e) => assert(s <= e, "start of interval should be less than its end")
+    case DSInterval.Value(s, e) => debugAssert(s <= e, "start of interval should be less than its end")
     case _ =>
 
   override def toString: String =

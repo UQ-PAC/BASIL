@@ -30,3 +30,5 @@ src/test/analysis/dump/
 src/test/*.svg
 src/test/*.md.part
 src/test/summary-*.md
+docs/book/**
+docs/book

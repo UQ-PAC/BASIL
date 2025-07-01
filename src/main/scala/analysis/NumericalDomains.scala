@@ -1,7 +1,8 @@
 package analysis
 
 import ir.*
-import ir.eval.BitVectorEval.*
+import ir.eval.BitVectorEval.{bv2SignedInt, bv2nat, nat2bv, smt_bvneg}
+import util.assertion.*
 
 // Signed infinity
 private def sInf(size: Int): BigInt = BigInt(2).pow(size - 1) - 1
@@ -26,7 +27,7 @@ enum Interval extends InternalLattice[Interval] {
 
   import ir.eval.BitVectorEval.*
 
-  assert(this match {
+  debugAssert(this match {
     case ConcreteInterval(lower, upper, width) => lower <= upper
     case _ => true
   })
@@ -70,7 +71,6 @@ class IntervalDomain(
   tobv: (Int, BigInt) => BitVecLiteral
 ) extends MayPredMapDomain[Variable, Interval] {
   import Interval.*
-  import ir.eval.BitVectorEval.*
 
   private val (liveBefore, liveAfter) = procedure.map(transforms.getLiveVars(_)).unzip
 

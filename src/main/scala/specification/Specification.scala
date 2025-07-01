@@ -1,8 +1,7 @@
 package specification
 
 import boogie.*
-import ir.*
-import util.Logger
+import ir.Expr
 
 case class LoopInvariant(header: String, inv: List[Expr], comment: Option[String] = None)
 

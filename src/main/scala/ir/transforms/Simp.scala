@@ -1,24 +1,15 @@
 package ir.transforms
-import translating.PrettyPrinter.*
-import java.io.{BufferedWriter, File, FileInputStream, FileWriter, IOException, PrintWriter}
-import util.LogLevel
-
-import analysis.ProcFrames.Frame
-import util.DebugDumpIRLogger
-import util.{SimplifyLogger, condPropDebugLogger}
-import ir.eval.AlgebraicSimplifications
-import ir.eval.AssumeConditionSimplifications
-import ir.eval.simplifyExprFixpoint
-import ir.cilvisitor.*
 import ir.*
+import ir.cilvisitor.*
+import ir.eval.{AlgebraicSimplifications, AssumeConditionSimplifications, simplifyExprFixpoint}
+import translating.PrettyPrinter.*
+import util.assertion.*
+import util.{SimplifyLogger, condPropDebugLogger}
+
 import scala.collection.mutable
-import analysis._
-import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.concurrent.duration.*
-import scala.util.{Failure, Success}
-import ExecutionContext.Implicits.global
-import scala.util.boundary, boundary.break
-import util.boogie_interaction.{BoogieResultKind, BoogieResult}
+import scala.util.boundary
+
+import boundary.break
 
 /** Simplification pass, see also: docs/development/simplification-solvers.md
   */
@@ -309,7 +300,7 @@ def removeSlices(p: Procedure): Unit = {
       s match {
         case a @ LocalAssign(lhs: LocalVar, ZeroExtend(sz, rhs), _)
             if size(lhs).isDefined && varHighZeroBits.contains(lhs) => {
-          assert(varHighZeroBits(lhs) == sz)
+          debugAssert(varHighZeroBits(lhs) == sz)
           a.lhs = LocalVar(lhs.varName, BitVecType(size(lhs).get - varHighZeroBits(lhs)), lhs.index)
           a.rhs = rhs
           DoChildren()
@@ -699,7 +690,7 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
           case SimulAssign(assignments, _) => {
             val (lhs, rhs) = assignments.find(_._1 == v).get
             if (validate) {
-              assert(propOK(rhs))
+              debugAssert(propOK(rhs))
             }
             Some(rhs)
           }
@@ -877,9 +868,13 @@ def coalesceBlocks(p: Program): Boolean = {
 
 def removeDeadInParams(p: Program): Boolean = {
   var modified = false
-  assert(invariant.correctCalls(p))
+  debugAssert(invariant.correctCalls(p))
 
-  for (block <- p.procedures.filterNot(_.isExternal.contains(true)).flatMap(_.entryBlock)) {
+  for (
+    block <- p.procedures.filterNot(_.isExternal.contains(true)).filterNot(p.mainProcedure == _).flatMap(_.entryBlock)
+  ) {
+    // FIXME: .filterNot(p.mainProcedure == _). is a bad hack to fix tests that refer to variabels in requries spec
+    // that are not live in procedure. new spec should let us look at dependencies, or write spec about actual result
     val proc = block.parent
 
     val (liveBefore, _) = getLiveVars(proc)
@@ -896,7 +891,7 @@ def removeDeadInParams(p: Program): Boolean = {
     }
   }
 
-  if (modified) assert(invariant.correctCalls(p))
+  if (modified) debugAssert(invariant.correctCalls(p))
   modified
 }
 
@@ -909,8 +904,8 @@ def removeInvariantOutParameters(
   p: Program,
   alreadyInlined: Map[Procedure, Set[Variable]] = Map()
 ): Map[Procedure, Set[Variable]] = {
-  assert(invariant.correctCalls(p))
-  assert(invariant.singleCallBlockEnd(p))
+  debugAssert(invariant.correctCalls(p))
+  debugAssert(invariant.singleCallBlockEnd(p))
   var modified = false
   var inlined = Map[Procedure, Set[Variable]]()
 
@@ -1024,8 +1019,8 @@ def removeInvariantOutParameters(
   }
 
   if (inlined.nonEmpty) {
-    assert(invariant.correctCalls(p))
-    assert(invariant.singleCallBlockEnd(p))
+    debugAssert(invariant.correctCalls(p))
+    debugAssert(invariant.singleCallBlockEnd(p))
     applyRPO(p) /* Because we added blocks */
   }
 

@@ -1,12 +1,9 @@
 package util
 
-import scala.collection.immutable.{LazyList, Seq}
-import scala.collection.{IterableOps, Factory}
-import scala.collection.{AbstractIterator, AbstractView, BuildFrom}
 import scala.collection.generic.IsSeq
-
-import scala.util.matching.Regex
+import scala.collection.{AbstractIterator, AbstractView, BuildFrom}
 import scala.reflect.NameTransformer
+import scala.util.matching.Regex
 
 object StringEscape {
 

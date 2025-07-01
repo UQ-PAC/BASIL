@@ -4,7 +4,6 @@ import analysis.*
 import ir.*
 import util.MRALogger
 
-import scala.collection.immutable.TreeMap
 import scala.collection.mutable
 
 // Define a case class to represent a range

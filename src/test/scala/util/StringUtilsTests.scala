@@ -1,10 +1,9 @@
 package util
 
-import util.twine.{Twine, Indent, Lines}
-import util.twine.Twine.{indent, indentNested}
-
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.CaptureOutput
+import util.twine.Twine
+import util.twine.Twine.{indent, indentNested}
 
 @test_util.tags.UnitTest
 class StringUtilsTests extends AnyFunSuite with CaptureOutput {

@@ -58,8 +58,8 @@ trait BNFCModule extends JavaModule {
     }
   }
 
-  override def sources = Task.Sources {
-    super.sources() ++ Seq(bnfcGenerated())
+  override def generatedSources = Task.Sources {
+    super.generatedSources() ++ Seq(bnfcGenerated())
   }
 
   /**

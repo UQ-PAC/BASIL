@@ -1,18 +1,11 @@
 package ir.eval
-import ir._
-import ir.eval.BitVectorEval.*
+
 import ir.*
-import util.Logger
-import util.IRContext
 import util.functional.*
 import util.functional.State.*
-import boogie.Scope
-import scala.collection.WithFilter
+import util.{IRContext, Logger}
 
-import scala.annotation.tailrec
-import scala.collection.mutable
 import scala.collection.immutable
-import scala.util.control.Breaks.{break, breakable}
 
 enum BreakPointLoc:
   case CMD(c: Command)

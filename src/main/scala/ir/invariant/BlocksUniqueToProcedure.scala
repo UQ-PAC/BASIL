@@ -2,22 +2,21 @@ package ir.invariant
 import ir.*
 import ir.cilvisitor.*
 import util.Logger
+
 import scala.collection.mutable
 
 private class BVis extends CILVisitor {
-  var proc: Procedure = null
-  var block: Block = null
+  var proc: Option[Procedure] = None
   val gotoViolations = mutable.Set[GoTo]()
   val blockMultiProcViolations = mutable.Set[Block]()
 
   override def vproc(p: Procedure) = {
-    proc = p
+    proc = Some(p)
     DoChildren()
   }
 
   override def vblock(b: Block) = {
-    block = b
-    if (b.parent != proc) {
+    if (!proc.contains(b.parent)) {
       blockMultiProcViolations.add(b)
     }
     DoChildren()
@@ -29,7 +28,7 @@ private class BVis extends CILVisitor {
 
   override def vjump(j: Jump) = {
     j match {
-      case g @ GoTo(targets, _) if !(targets.forall(t => t.parent == proc)) => gotoViolations.add(g)
+      case g @ GoTo(targets, _) if !(targets.forall(t => proc.contains(t.parent))) => gotoViolations.add(g)
       case _ => ()
     }
 

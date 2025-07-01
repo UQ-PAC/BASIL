@@ -1,10 +1,10 @@
 package translating
-import ir.*
 import boogie.*
-import specification.*
-import scala.collection.mutable
+import ir.*
 import ir.cilvisitor.*
 import ir.transforms.*
+
+import scala.collection.mutable
 
 object BoogieTranslator {
 

@@ -1,15 +1,14 @@
 package ir
 
-import org.scalatest.concurrent.{TimeLimitedTests, ThreadSignaler}
-import org.scalatest.time.{Span, Seconds}
-import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.{TestData, BeforeAndAfterEachTestData}
-import util.twine.Twine
 import ir.dsl.*
 import ir.dsl.given
-import test_util.CaptureOutput
-
 import org.scalactic.source.Position
+import org.scalatest.concurrent.{ThreadSignaler, TimeLimitedTests}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.time.{Seconds, Span}
+import org.scalatest.{BeforeAndAfterEachTestData, TestData}
+import test_util.CaptureOutput
+import util.twine.Twine
 
 @test_util.tags.UnitTest
 class ToScalaTest extends AnyFunSuite with CaptureOutput with TimeLimitedTests with BeforeAndAfterEachTestData {

@@ -1,7 +1,7 @@
 package ir.cilvisitor
 
 import ir.*
-import scala.collection.mutable.ArrayBuffer
+
 import scala.collection.mutable
 
 /** A new visitor based off CIL.
@@ -127,19 +127,19 @@ class CILVisitorImpl(val v: CILVisitor) {
         val narg2 = visit_expr(arg2)
         if ((narg1 ne arg) || (narg2 ne arg2)) BinaryExpr(op, narg1, narg2) else n
       }
-      case BoolExp(op, args) => {
+      case AssocExpr(op, args) => {
         val nargs = args.map(visit_expr)
-        BoolExp(op, nargs)
+        AssocExpr(op, nargs)
       }
       case UnaryExpr(op, arg) => {
         val narg = visit_expr(arg)
         if (narg ne arg) UnaryExpr(op, narg) else n
       }
       case v: Variable => visit_rvar(v)
-      case UninterpretedFunction(name, params, rt, _) => {
+      case FApplyExpr(name, params, rt, _) => {
         val nparams = params.map(visit_expr)
         val updated = (params.zip(nparams).exists((a, b) => a ne b))
-        if (updated) UninterpretedFunction(name, nparams, rt) else n
+        if (updated) FApplyExpr(name, nparams, rt) else n
       }
     }
     doVisit(v, v.vexpr(n), n, continue)

@@ -1,12 +1,9 @@
 import ir.*
-import ir.eval.*
-import util.z3.*
-import analysis.*
-import translating.BasilIRToSMT2
 import org.scalatest.*
 import org.scalatest.funsuite.*
+import translating.BasilIRToSMT2
 import translating.PrettyPrinter.*
-import specification.*
+import util.z3.*
 
 @test_util.tags.UnitTest
 class BitVectorEvalTest extends AnyFunSuite {

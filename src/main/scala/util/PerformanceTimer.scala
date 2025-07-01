@@ -1,7 +1,7 @@
 package util
-import scala.collection.mutable
-import scala.collection
 import java.util.concurrent.atomic.AtomicLong
+import scala.collection
+import scala.collection.mutable
 
 case class RegionTimer(name: String) {
   private val total: AtomicLong = AtomicLong(0)

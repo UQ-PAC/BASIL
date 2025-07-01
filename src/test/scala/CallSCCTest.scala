@@ -1,6 +1,6 @@
-import org.scalatest.funsuite.AnyFunSuite
 import ir.dsl.*
 import ir.{CallSCCWalker, updateWithCallSCC}
+import org.scalatest.funsuite.AnyFunSuite
 import test_util.programToContext
 
 object CallSCCTestData {

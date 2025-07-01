@@ -1,9 +1,8 @@
 package ir
-import util.Logger
+import util.assertion.*
 import util.intrusive_list.IntrusiveListElement
-import boogie.{BMapVar, GammaStore}
-import collection.immutable.SortedMap
 
+import collection.immutable.SortedMap
 import collection.mutable
 
 /*
@@ -76,11 +75,14 @@ class SimulAssign(var assignments: Vector[(Variable, Expr)], override val label:
   }.toSet
 
   def assignees = assignments.map(_._1).toSet
-  override def toString: String = s"$labelStr${assignments
+  override def toString: String = {
+    val assignList = assignments
       .map { case (lhs, rhs) =>
         lhs.toString + " := " + rhs
       }
-      .mkString(", ")}"
+      .mkString(", ")
+    labelStr + assignList
+  }
 
   override def deepEquals(o: Object): Boolean = o match {
     case SimulAssign(otherAssings) => otherAssings == assignments
@@ -274,8 +276,8 @@ class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override
     if (_targets.remove(t)) {
       t.removeIncomingJump(this)
     }
-    assert(!_targets.contains(t))
-    assert(!t.incomingJumps.contains(this))
+    debugAssert(!_targets.contains(t))
+    debugAssert(!t.incomingJumps.contains(this))
   }
 
   override def toString: String = s"${labelStr}GoTo(${targets.map(_.label).mkString(", ")})"

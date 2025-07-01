@@ -1,12 +1,12 @@
+import analysis.data_structure_analysis.*
 import ir.*
 import org.scalatest.funsuite.*
-import util.{BASILResult, DSAConfig, DSAContext, LogLevel, Logger, StaticAnalysisConfig}
-import analysis.data_structure_analysis.*
-
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable
 import test_util.{BASILTest, CaptureOutput, TestConfig, TestCustomisation}
 import util.DSAConfig.Checks
+import util.{BASILResult, DSAConfig, DSAContext, LogLevel, Logger, StaticAnalysisConfig}
+
+import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 @test_util.tags.AnalysisSystemTest
 class IndirectCallTests extends AnyFunSuite, CaptureOutput, BASILTest, TestCustomisation {

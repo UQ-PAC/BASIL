@@ -163,7 +163,7 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
     assert(lassigns.size == 2)
     println(lassigns)
     val read = lassigns.collectFirst {
-      case read @ LocalAssign(lhs, rhs, label) if lhs.name.startsWith("R0") => read
+      case read @ LocalAssign(lhs, rhs, label) if lhs.name.contains("R0") => read
     }.get
     val write = lassigns.filterNot(_ == read).head
     assert(read.rhs == write.lhs)

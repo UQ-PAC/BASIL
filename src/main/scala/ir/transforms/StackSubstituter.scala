@@ -1,8 +1,10 @@
 package ir.transforms
 
 import ir.*
-import cilvisitor.*
+
 import scala.collection.mutable
+
+import cilvisitor.*
 
 class StackSubstituter extends CILVisitor {
 // FIXME: does this break for programs with loops? need to calculate a fixed-point?

@@ -1,7 +1,6 @@
 package ir
-import util.Logger
 
-import scala.io.AnsiColor
+import util.Logger
 
 trait HasParent[T]:
   /*

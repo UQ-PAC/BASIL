@@ -1,7 +1,7 @@
-import org.scalatest.*
-import org.scalatest.funsuite.*
 import ir.*
 import ir.dsl.*
+import org.scalatest.*
+import org.scalatest.funsuite.*
 import test_util.CaptureOutput
 
 import scala.collection.immutable

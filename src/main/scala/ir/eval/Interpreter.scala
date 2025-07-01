@@ -1,18 +1,13 @@
 package ir.eval
-import ir.eval.BitVectorEval.*
-import ir.*
-import util.Logger
-import util.functional.*
-import util.functional.State.*
 import boogie.Scope
-import scala.collection.WithFilter
+import ir.*
 import translating.PrettyPrinter.*
 import util.RegionTimer
+import util.functional.*
+import util.functional.State.*
 
 import scala.annotation.tailrec
-import scala.collection.mutable
 import scala.collection.immutable
-import scala.util.control.Breaks.{break, breakable}
 
 /**
  * Procedure signature used when returning from procedures and intrinsics.

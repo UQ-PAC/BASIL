@@ -1,10 +1,9 @@
 package analysis
 
-import analysis.data_structure_analysis.{AddressRange, Cell, Graph, Slice}
+import analysis.data_structure_analysis.{Cell, Graph}
 import ir.*
 
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 
 /** Replaces the region access with the calculated memory region.
   */

@@ -1,5 +1,5 @@
-import ir.eval.BitVectorEval.*
 import ir.*
+import ir.eval.BitVectorEval.*
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.CaptureOutput
 import util.Logger

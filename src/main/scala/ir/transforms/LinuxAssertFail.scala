@@ -1,10 +1,10 @@
 package ir.transforms
 
 import ir.*
-import ir.eval.*
-import util.functional.*
-import util.IRContext
 import ir.cilvisitor.*
+import ir.eval.*
+import util.IRContext
+import util.functional.*
 
 def liftLinuxAssertFail(ctx: IRContext) = {
 
@@ -88,7 +88,7 @@ def liftSVCompNonDetEarlyIR(p: Program) = {
    * Run after parameter form
    */
 
-  def nonDetFunc(name: String, size: Int) = UninterpretedFunction(name, Seq(), BitVecType(size))
+  def nonDetFunc(name: String, size: Int) = FApplyExpr(name, Seq(), BitVecType(size))
 
   /*
    * Officially possible:

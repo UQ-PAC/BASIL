@@ -1,16 +1,13 @@
 package analysis.data_structure_analysis
 
-import ir.eval.BitVectorEval.{bv2SignedInt, isNegative}
 import analysis.*
 import ir.*
-import util.Counter
-import boogie.SpecGlobal
+import ir.eval.BitVectorEval.isNegative
 import specification.{ExternalFunction, SymbolTableEntry}
-import util.writeToFile
+import util.Counter
+import util.assertion.*
 
-import java.math.BigInteger
 import scala.collection.mutable
-import scala.util.control.Breaks.{break, breakable}
 
 /** The local phase of Data Structure Analysis
   * @param proc
@@ -166,7 +163,7 @@ class LocalPhase(using Counter)(
         val cell = graph.find(node.getCell(offset + internalOffset))
         if cell.pointee.isDefined && graph.find(cell.getPointee.cell).equals(result) then
           graph.selfCollapse(node)
-          //            assert(graph.pointTo.contains(node.getCell(offset))) TODO
+          //            debugAssert(graph.pointTo.contains(node.getCell(offset))) TODO
           result = graph.find(graph.find(node.getCell(offset)).getPointee.cell)
         else graph.selfCollapse(node)
       }
@@ -286,13 +283,13 @@ class LocalPhase(using Counter)(
       case load @ MemoryLoad(lhs, _, index, _, size, _) => // Rx = Mem[Ry], merge Rx and pointee of Ry (E(Ry))
         val indexUnwrapped = unwrapPaddingAndSlicing(index)
         val lhsCell = graph.adjust(graph.varToCell(n)(lhs))
-        assert(size % 8 == 0)
+        debugAssert(size % 8 == 0)
         val byteSize = size / 8
         lhsCell.node.get.flags.read = true
         val global = isGlobal(indexUnwrapped, n, byteSize)
         val stack = isStack(indexUnwrapped, n, byteSize)
         val indexCell = graph.adjust(graph.accessIndexToSlice(load))
-        assert(!indexCell.node.get.flags.merged) // check index cell is a placeholder
+        debugAssert(!indexCell.node.get.flags.merged) // check index cell is a placeholder
         if global.isDefined then
           graph.mergeCells(graph.find(global.get), indexCell)
           multiAccess(lhsCell, graph.find(global.get), byteSize)
@@ -304,28 +301,28 @@ class LocalPhase(using Counter)(
             case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) =>
               evaluateExpression(arg2, constProp(n)) match
                 case Some(v) =>
-                  //                        assert(varToSym(n).contains(arg1))
+                  //                        debugAssert(varToSym(n).contains(arg1))
                   val offset = v.value
                   visitPointerArithmeticOperation(n, indexCell, arg1, byteSize, false, offset)
                   visitPointerArithmeticOperation(n, lhsCell, arg1, byteSize, true, offset)
                 case None =>
-                  //                        assert(varToSym(n).contains(arg1))
+                  //                        debugAssert(varToSym(n).contains(arg1))
                   // collapse the result
                   //                        visitPointerArithmeticOperation(n, lhsCell, arg1, byteSize, true, 0, true)
                   unsupportedPointerArithmeticOperation(n, indexUnwrapped, Node(Some(graph)).cells(0))
             case arg: Variable =>
-              //                    assert(varToSym(n).contains(arg))
+              //                    debugAssert(varToSym(n).contains(arg))
               visitPointerArithmeticOperation(n, indexCell, arg, byteSize)
               visitPointerArithmeticOperation(n, lhsCell, arg, byteSize, true)
             case _ => ???
       case store @ MemoryStore(_, ind, expr, _, size, _) =>
         val index: Expr = unwrapPaddingAndSlicing(ind)
-        assert(size % 8 == 0)
+        debugAssert(size % 8 == 0)
         val byteSize = size / 8
         val global = isGlobal(index, n, byteSize)
         val stack = isStack(index, n)
         val indexCell = graph.adjust(graph.accessIndexToSlice(store))
-        assert(!indexCell.node.get.flags.merged) // check index cell is a placeholder
+        debugAssert(!indexCell.node.get.flags.merged) // check index cell is a placeholder
         val addressPointee: Cell = if (global.isDefined) {
           graph.mergeCells(graph.find(global.get), indexCell)
         } else if (stack.isDefined) {
@@ -335,18 +332,18 @@ class LocalPhase(using Counter)(
             case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) =>
               evaluateExpression(arg2, constProp(n)) match {
                 case Some(v) =>
-                  //                    assert(varToSym(n).contains(arg1))
+                  //                    debugAssert(varToSym(n).contains(arg1))
                   val offset = v.value
                   visitPointerArithmeticOperation(n, indexCell, arg1, byteSize, false, offset)
                   visitPointerArithmeticOperation(n, Node(Some(graph)).cells(0), arg1, byteSize, true, offset)
                 case None =>
-                  //                    assert(varToSym(n).contains(arg1))
+                  //                    debugAssert(varToSym(n).contains(arg1))
                   // collapse the results
                   // visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg1, byteSize, true, 0, true)
                   unsupportedPointerArithmeticOperation(n, index, Node(Some(graph)).cells(0))
               }
             case arg: Variable =>
-              //                assert(varToSym(n).contains(arg))
+              //                debugAssert(varToSym(n).contains(arg))
               visitPointerArithmeticOperation(n, indexCell, arg, byteSize, false)
               visitPointerArithmeticOperation(n, Node(Some(graph)).cells(0), arg, byteSize, true)
             case _ =>
@@ -382,8 +379,8 @@ class LocalPhase(using Counter)(
     //    graph.nodes.foreach(node =>
     //      node.children.foreach(
     //        child =>
-    //          assert(graph.solver.find(child._1.term).equals(graph.solver.find(node.term)))
-    //          assert(graph.solver.find(child._1.term)._2.equals(child._2))
+    //          debugAssert(graph.solver.find(child._1.term).equals(graph.solver.find(node.term)))
+    //          debugAssert(graph.solver.find(child._1.term)._2.equals(child._2))
     //
     //      )
     //    )

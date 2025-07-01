@@ -54,7 +54,7 @@ def boolAnd(exps: Iterable[Expr]) =
   l.size match {
     case 0 => TrueLiteral
     case 1 => l.head
-    case _ => BoolExp(BoolAND, l)
+    case _ => AssocExpr(BoolAND, l)
   }
 
 def boolOr(exps: Iterable[Expr]) =
@@ -62,7 +62,7 @@ def boolOr(exps: Iterable[Expr]) =
   l.size match {
     case 0 => FalseLiteral
     case 1 => l.head
-    case _ => BoolExp(BoolOR, l)
+    case _ => AssocExpr(BoolOR, l)
   }
 
 def polyEqual(e1: Expr, e2: Expr) = {
@@ -84,13 +84,13 @@ class NamespaceState(val namespace: String) extends CILVisitor {
   }
 
   override def vexpr(e: Expr) = e match {
-    case f @ UninterpretedFunction(n, p, r, _) =>
+    case f @ FApplyExpr(n, p, r, _) =>
       ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
-    // case f @ UninterpretedFunction(n, p, r, _) if n.startsWith("load") =>
+    // case f @ FApplyExpr(n, p, r, _) if n.startsWith("load") =>
     //  ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
-    // case f @ UninterpretedFunction(n, p, r, _) if n.startsWith("trace_load") =>
+    // case f @ FApplyExpr(n, p, r, _) if n.startsWith("trace_load") =>
     //  ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
-    // case f @ UninterpretedFunction(n, p, r, _) if n.startsWith("store") =>
+    // case f @ FApplyExpr(n, p, r, _) if n.startsWith("store") =>
     //  ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
     case _ => DoChildren()
   }
@@ -645,11 +645,11 @@ class TranslationValidator {
 
   private class CollectUninterps extends CILVisitor {
 
-    var funcs = List[UninterpretedFunction]()
+    var funcs = List[FApplyExpr]()
 
     override def vexpr(e: Expr) =
       e match {
-        case u: UninterpretedFunction =>
+        case u: FApplyExpr =>
           funcs = u :: funcs
           DoChildren()
         case _ => DoChildren()
@@ -763,7 +763,7 @@ class TranslationValidator {
 
       val splitName = proc.name // + "_split_" + splitNo
       // build smt query
-      val b = translating.BasilIRToSMT2.Builder()
+      val b = translating.BasilIRToSMT2.SMTBuilder()
 
       b.addCommand("set-logic", "QF_BV")
 
@@ -791,7 +791,7 @@ class TranslationValidator {
         b.addAssert(i, Some(s"tgt$count"))
       }
       // b.addAssert(QTarget, Some("Qtgt"))
-      b.addAssert(UnaryExpr(BoolNOT, BoolExp(BoolAND, primedInv.toList)), Some("InvPrimed"))
+      b.addAssert(UnaryExpr(BoolNOT, AssocExpr(BoolAND, primedInv.toList)), Some("InvPrimed"))
 
       timer.checkPoint("extract")
 

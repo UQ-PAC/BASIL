@@ -1,13 +1,12 @@
 import analysis.data_structure_analysis.*
+import analysis.data_structure_analysis.given
 import boogie.SpecGlobal
-import ir.Endian.LittleEndian
-import ir.dsl.*
 import ir.*
+import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
-import util.*
-import analysis.data_structure_analysis.given
 import test_util.{CaptureOutput, programToContext}
+import util.*
 
 @test_util.tags.UnitTest
 class SVATest extends AnyFunSuite with CaptureOutput {

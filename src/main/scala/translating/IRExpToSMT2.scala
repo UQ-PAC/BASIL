@@ -1,10 +1,8 @@
 package translating
+
 import ir.*
-import boogie.*
-import specification.*
-import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion, OnCrash, RingTrace}
 import ir.cilvisitor.*
-import scala.sys.process.*
+import util.{OnCrash, RingTrace}
 
 import translating.PrettyPrinter.pp_expr
 
@@ -21,7 +19,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
         })
 
       case m: MemoryLoad => vload(vlvar(m.lhs), m.mem.name, vexpr(m.index), m.endian, m.size)
-      case m: MemoryStore => vstore(m.mem.name, vexpr(m.index), vexpr(m.value), m.endian, m.size)
+      case m: MemoryStore => vstore(m.mem, vexpr(m.index), vexpr(m.value), m.endian, m.size)
       case c: DirectCall =>
         vcall(
           c.outParams.toList.map((l, r) => (l, r)),
@@ -51,15 +49,15 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
       case ZeroExtend(bits, arg) => vzeroextend(bits, vexpr(arg))
       case SignExtend(bits, arg) => vsignextend(bits, vexpr(arg))
       case BinaryExpr(op, arg, arg2) => vbinary_expr(op, vexpr(arg), vexpr(arg2))
-      case b @ BoolExp(op, arg) => vexpr(b.toBinaryExpr)
+      case b @ AssocExpr(op, arg) => vexpr(b.toBinaryExpr)
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
       case v: Variable => vrvar(v)
-      case f @ UninterpretedFunction(n, params, rt, _) => vuninterp_function(n, params.map(vexpr))
-      case q: QuantifierExpr => ???
-      case q: LambdaExpr => ???
-      case r: OldExpr => ???
-      case r: SharedMemory => ???
-      case r: StackMemory => ???
+      case f @ FApplyExpr(n, params, rt, _) => vfapply_expr(n, params.map(vexpr))
+      case q: QuantifierExpr => vquantifier(q)
+      case q: LambdaExpr => vlambda(q)
+      case r: OldExpr => vold(r.body)
+      case r: SharedMemory => vmemory(r)
+      case r: StackMemory => vmemory(r)
     }
   }
 
@@ -92,11 +90,12 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
     returnBlock: Option[Repr[Block]]
   ): Repr[Procedure]
 
+  def vmemory(m: Memory): Repr[Memory]
   def vassign(lhs: Repr[Variable], rhs: Repr[Expr]): Repr[LocalAssign]
   def vmemassign(lhs: Repr[Variable], rhs: Repr[Expr]): Repr[LocalAssign]
   def vsimulassign(assignments: List[(Repr[Variable], Repr[Expr])]): Repr[SimulAssign]
   def vload(lhs: Repr[Variable], mem: String, index: Repr[Expr], endian: Endian, size: Int): Repr[MemoryLoad]
-  def vstore(mem: String, index: Repr[Expr], value: Repr[Expr], endian: Endian, size: Int): Repr[MemoryStore]
+  def vstore(mem: Memory, index: Repr[Expr], value: Repr[Expr], endian: Endian, size: Int): Repr[MemoryStore]
   def vcall(
     outParams: List[(Variable, Variable)],
     procname: String,
@@ -118,6 +117,9 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
 trait BasilIRExp[Repr[+_]] {
   def vexpr(e: Expr): Repr[Expr]
   def vextract(ed: Int, start: Int, a: Repr[Expr]): Repr[Expr]
+  def vquantifier(q: QuantifierExpr): Repr[Expr]
+  def vlambda(q: LambdaExpr): Repr[Expr]
+  def vold(body: Expr): Repr[Expr]
   def vzeroextend(bits: Int, b: Repr[Expr]): Repr[Expr]
   def vsignextend(bits: Int, b: Repr[Expr]): Repr[Expr]
   def vbinary_expr(e: BinOp, l: Repr[Expr], r: Repr[Expr]): Repr[Expr]
@@ -137,7 +139,7 @@ trait BasilIRExp[Repr[+_]] {
   def vintlit(b: BigInt): Repr[IntLiteral]
   def vrepeat(reps: Int, value: Repr[Expr]): Repr[Expr]
 
-  def vuninterp_function(name: String, args: Seq[Repr[Expr]]): Repr[Expr]
+  def vfapply_expr(name: String, args: Seq[Repr[Expr]]): Repr[Expr]
 
   def vrvar(e: Variable): Repr[Variable]
 }
@@ -164,14 +166,13 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
         }
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
       case v: Variable => vrvar(v)
-      case f @ UninterpretedFunction(n, params, rt, _) => vuninterp_function(n, params.map(vexpr))
-      case b @ BoolExp(op, args) =>
-        vbool_expr(op, args.map(vexpr))
-      case q: QuantifierExpr => ???
-      case q: LambdaExpr => ???
-      case r: OldExpr => ???
+      case b @ AssocExpr(op, args) => vbool_expr(op, args.map(vexpr))
       case r: SharedMemory => ???
       case r: StackMemory => ???
+      case f @ FApplyExpr(n, params, rt, _) => vfapply_expr(n, params.map(vexpr))
+      case q: QuantifierExpr => vquantifier(q)
+      case q: LambdaExpr => vlambda(q)
+      case r: OldExpr => vold(r.body)
     }
   }
 
@@ -199,8 +200,11 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   OnCrash.register(dumpTrace)
 
   def vload(lhs: Sexp[Variable], mem: String, index: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryLoad] = ???
-  def vstore(mem: String, index: Sexp[Expr], value: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryStore] = ???
+  def vstore(mem: Memory, index: Sexp[Expr], value: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryStore] = ???
 
+  def vold(e: Expr) = ???
+  def vquantifier(e: QuantifierExpr) = ???
+  def vlambda(e: LambdaExpr) = ???
   def vprog(mainProc: String, procedures: List[Sexp[Procedure]]): Sexp[Program] = ???
   def vrepeat(reps: Int, value: Sexp[Expr]): Sexp[Expr] = ???
   def vzeroextend(bits: Int, b: Sexp[Expr]): Sexp[Expr] = ???
@@ -209,7 +213,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   def vbvlit(b: BitVecLiteral): Sexp[BitVecLiteral] = ???
   def vintlit(b: BigInt): Sexp[IntLiteral] = ???
 
-  class Builder() {
+  class SMTBuilder() {
     var before = true
     var exprs = Vector[Sexp[Expr]]()
     var exprsBefore = Vector[Sexp[Expr]]()
@@ -302,7 +306,6 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       case BoolOR => "or"
       case BVCONCAT => "concat"
       case b: BVBinOp => "bv" + b.opName
-      case b: BoolBinOp => b.opName
       case b: IntBinOp => b.opName
     }
   }
@@ -340,7 +343,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   def endianToBool(endian: Endian): Sexp[Expr] = {
     if endian == Endian.LittleEndian then vexpr(FalseLiteral) else vexpr(TrueLiteral)
   }
-  override def vuninterp_function(name: String, args: Seq[Sexp[Expr]]): Sexp[Expr] = {
+  override def vfapply_expr(name: String, args: Seq[Sexp[Expr]]): Sexp[Expr] = {
     if (args.size == 1) {
       list(sym(name), args.head)
     } else {
@@ -370,7 +373,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     )
   }
 
-  def interpretFun(x: UninterpretedFunction): Option[Sexp[Expr]] = {
+  def interpretFun(x: FApplyExpr): Option[Sexp[Expr]] = {
     x.name match {
       case "bool2bv1" => {
         Some(booltoBVDef)
@@ -403,7 +406,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
           case _ => ()
         }
         e match {
-          case f: UninterpretedFunction => {
+          case f: FApplyExpr => {
             val decl = interpretFun(f)
             decled = decled ++ decl.toSet
             DoChildren() // get variables out of args
@@ -413,7 +416,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
             DoChildren()
           }
           case v: Variable => {
-            val decl = list(sym("declare-fun"), sym(fixVname(v.name)), list(), basilTypeToSMTType(v.getType))
+            val decl = list(sym("declare-const"), sym(fixVname(v.name)), basilTypeToSMTType(v.getType))
             decled = decled + decl
             SkipChildren()
           }
