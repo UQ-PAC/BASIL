@@ -67,7 +67,8 @@ case class Metadata(originalLabel: Option[String] = None, address: Option[BigInt
 class Program(
   var procedures: ArrayBuffer[Procedure],
   var mainProcedure: Procedure,
-  val initialMemory: mutable.TreeMap[BigInt, MemorySection]
+  val initialMemory: mutable.TreeMap[BigInt, MemorySection],
+  val declarations: mutable.ArrayBuffer[Decl] = mutable.ArrayBuffer()
 ) extends Iterable[CFGPosition]
     with DeepEquality {
 
@@ -430,7 +431,6 @@ class Procedure private (
 
   def returnBlock_=(value: Block): Unit = {
     if (!returnBlock.contains(value)) {
-      _returnBlock.foreach(removeBlocks)
       _returnBlock = Some(addBlock(value))
     }
   }
@@ -609,7 +609,7 @@ class Block private (
     label: String,
     address: Option[BigInt] = None,
     statements: IterableOnce[Statement] = Set.empty,
-    jump: Jump = GoTo(Set.empty)
+    jump: Jump = Unreachable()
   ) = {
     this(label, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty, Metadata(None, address))
   }
@@ -650,7 +650,7 @@ class Block private (
     if (j.hasParent) {
       val parent = j.parent
       j.deParent()
-      parent.jump = GoTo(Set.empty)
+      parent.jump = Unreachable()
     }
     jump = j
     this
@@ -743,6 +743,16 @@ class Block private (
     val ojump = jump
     replaceJump(GoTo(nb))
     nb.replaceJump(ojump)
+  }
+
+  def splitAfterStatement(s: Statement, suffix: String): Block = {
+    val rest = statements.splitOn(s)
+    val thisJump = jump
+    val succ = Block(label + suffix, None, rest, Unreachable())
+    parent.addBlock(succ)
+    replaceJump(GoTo(succ))
+    succ.replaceJump(thisJump)
+    succ
   }
 
   def createBlockBetween(b2: Block, suffix: String = "goto"): Block = {

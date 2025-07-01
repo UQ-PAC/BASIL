@@ -4,6 +4,7 @@ import analysis.solvers.SimplePushDownWorklistFixpointSolver
 import ir.{
   CFGPosition,
   DirectCall,
+  GlobalVar,
   IntraProcIRCursor,
   LocalAssign,
   MemoryLoad,
@@ -14,7 +15,7 @@ import ir.{
   computeDomain
 }
 
-abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[Register]])
+abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[GlobalVar]])
     extends Analysis[Map[CFGPosition, Map[Variable, Set[CFGPosition]]]] {
 
   val mallocRegister = Register("R0", 64)
@@ -43,7 +44,7 @@ abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[Regis
 
 }
 
-class ReachingDefsAnalysis(program: Program, writesTo: Map[Procedure, Set[Register]])
+class ReachingDefsAnalysis(program: Program, writesTo: Map[Procedure, Set[GlobalVar]])
     extends ReachingDefs(program, writesTo),
       IRIntraproceduralForwardDependencies,
       SimplePushDownWorklistFixpointSolver[CFGPosition, Map[Variable, Set[CFGPosition]], MapLattice[Variable, Set[

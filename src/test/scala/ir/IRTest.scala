@@ -298,8 +298,7 @@ class IRTest extends AnyFunSuite with CaptureOutput {
     main.replaceJump(newJump)
 
     assert(newJump.parent == main)
-    assert(block2.jump.isInstanceOf[GoTo])
-    assert(block2.jump.asInstanceOf[GoTo].targets.isEmpty)
+    assert(block2.jump.isInstanceOf[Unreachable])
   }
 
   test("proc iterator") {
@@ -445,6 +444,22 @@ class IRTest extends AnyFunSuite with CaptureOutput {
     val (pt, rt) = curryFunctionType(l.getType)
     assert(rt == l.returnType)
     assert(pt == List(x.getType, y.getType))
+  }
+
+  test("AssocExpr") {
+    val x = AssocExpr(BoolAND, List(LocalVar("x", BoolType), LocalVar("y", BoolType), LocalVar("y", BoolType)))
+    assert(x.variables.map(_.name).toSet == Set("x", "y"))
+
+    val s = Assert(x)
+
+    val n = prog(proc("x", block("xin", s, ret)))
+
+    val v = translating.FindVars()
+    cilvisitor.visit_prog(v, n)
+    assert(v.vars.map(_.name) == Set("x", "y"))
+    assert(v.locals.map(_.name) == Set("x", "y"))
+    assert(v.globals == Set())
+
   }
 
 }

@@ -56,7 +56,10 @@ trait BDeclaration extends HasAttributes {
       w.append(System.lineSeparator())
     }
   }
+}
 
+case class BTypeDecl(t: CustomBType) extends BDeclaration {
+  override def toString() = s"type $t;"
 }
 
 case class BProcedure(

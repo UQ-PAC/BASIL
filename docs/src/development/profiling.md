@@ -12,11 +12,18 @@ Alternatively, [async-profiler](https://github.com/async-profiler/async-profiler
 [flame graph](https://brendangregg.com/flamegraphs.html) showing the hot-spots in the program. Download the library from 
 the [releases tab](https://github.com/async-profiler/async-profiler/releases), compile a basil .jar with `mill assembly` and run the jar with the following arguments.
 
-Instructions for Linux and Mac:
+We have a mill task which works on Linux and Mac to download and run the assembly with async-profiler.
+
+```
+$ ./mill runProfile --profileDest profile.html -i examples/cntlm-noduk/cntlm-noduk.gts
+```
+
+Manual instructions for Linux and Mac:
+
 
 ```sh
 mill assembly
-java -agentpath:$YOUR_PATH/async-profiler-2.9-linux-x64/build/libasyncProfiler.so=start,event=cpu,file=profile.html -Xmx8G -jar out/assembly.dest/out.jar -i examples/cntlm-new/cntlm-new.adt -r examples/cntlm-new/cntlm-new.relf --analyse;
+java -agentpath:$YOUR_PATH/async-profiler-2.9-linux-x64/build/libasyncProfiler.so=start,event=cpu,file=profile.html -Xmx8G -jar out/assembly.dest/out.jar -i examples/cntlm-new/cntlm-noduk.gts -r examples/cntlm-noduk/cntlm-noduk.relf;
 firefox profile.html
 ```
 
