@@ -40,8 +40,8 @@ comment "/*" "*/" ;
 
 {- Top Level Declarations -}
 Decl_Axiom . Decl ::= "axiom" AttribSet Expr; 
-Decl_SharedMemory . Decl ::= "memory" "shared" GlobalIdent ":" Type ;
-Decl_UnsharedMemory . Decl ::= "memory" GlobalIdent ":" Type ;
+Decl_SharedMem . Decl ::= "memory" "shared" GlobalIdent ":" Type ;
+Decl_UnsharedMem . Decl ::= "memory" GlobalIdent ":" Type ;
 Decl_Var . Decl ::= "var" GlobalIdent ":" Type  ;
 
 separator Type ",";
@@ -50,15 +50,15 @@ Decl_UninterpFun . Decl ::= "declare-fun" AttribSet GlobalIdent ":" "(" [Type] "
 Decl_Fun . Decl ::= "define-fun" AttribSet GlobalIdent"(" [Params] ")" "->" Type "=" Expr;
 Decl_ProgEmpty . Decl ::= "prog" "entry" ProcIdent AttribSet ;
 Decl_ProgWithSpec . Decl ::= "prog" "entry" ProcIdent AttribSet BeginList [ ProgSpec ] EndList ;
-Decl_Proc . Decl ::= "proc" ProcIdent "(" [Params] ")" "->" "(" [Params] ")" AttribSet ProcDef ;
+Decl_Proc . Decl ::= "proc" ProcIdent "(" [Params] ")" "->" "(" [Params] ")" AttribSet [ FunSpec ] ProcDef ;
 
-ProcDef_Empty . ProcDef ::= [ FunSpec ] ;
-ProcDef_WithBlocks  . ProcDef ::= [ FunSpec ] BeginList [Block] EndList ;
+ProcDef_Empty . ProcDef ::= "";
+ProcDef_Some  . ProcDef ::= BeginList [Block] EndList ;
 
-rules IntType ::= "int" ;
-rules BoolType ::= "bool" ;
-rules MapType ::=  "(" Type "->" Type ")";
-rules BVType ::= BVTYPE ;
+IntType1 . IntType ::= "int" ;
+BoolType1. BoolType ::= "bool" ;
+MapType1 . MapType ::=  "(" Type "->" Type ")";
+BVType1 . BVType ::= BVTYPE ;
 
 rules Type ::= IntType | BoolType | MapType | BVType ; 
 
@@ -115,18 +115,18 @@ rules Block ::= "block" BlockIdent AttribSet BeginList
   EndList ;
 
 
-rules AttrKeyValue ::= BIdent "=" Attrib ;
+rules AttrKeyValue ::= BIdent "=" Attr ;
 separator AttrKeyValue ";";
 
 AttribSet_Some . AttribSet ::= BeginRec [ AttrKeyValue ] Semicolons EndRec;
 AttribSet_Empty . AttribSet ::= "" ;
 
-separator Attrib ";" ;
+separator Attr ";" ;
 
-Attrib_Map . Attrib ::= BeginRec [ AttrKeyValue ] Semicolons EndRec ; 
-Attrib_List . Attrib ::= BeginList [ Attrib ] EndList; 
-Attrib_Literal . Attrib ::= Value ; 
-Attrib_Str . Attrib ::= Str ; 
+Attr_Map . Attr ::= BeginRec [ AttrKeyValue ] Semicolons EndRec ; 
+Attr_List . Attr ::= BeginList [ Attr ] EndList; 
+Attr_Lit . Attr ::= Value ; 
+Attr_Str . Attr ::= Str ; 
 
 rules Params ::=  LocalIdent ":" Type ;
 separator Params "," ;
@@ -138,7 +138,7 @@ Value_Int . Value ::= IntVal;
 Value_True . Value ::= "true" ;
 Value_False . Value ::= "false" ;
 
-Expr_Lit . Expr ::= Value; 
+Expr_Literal . Expr ::= Value; 
 
 Expr_Local . Expr ::= LocalVar;
 Expr_Global . Expr ::= GlobalVar;
