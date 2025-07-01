@@ -1,7 +1,7 @@
 import analysis.Predicate
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.CaptureOutput
-import util.SMT.{SatResult, SMTSolver}
+import util.SMT.{SMTSolver, SatResult}
 
 @test_util.tags.UnitTest
 class SMTTest extends AnyFunSuite with CaptureOutput {
