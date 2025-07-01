@@ -109,13 +109,6 @@ object Attrib {
   }
 }
 
-case class FunDecl(irType: ir.IRType, body: Option[ir.LambdaExpr])
-case class ProgSpec(val rely: List[ir.Expr] = List(), val guar: List[ir.Expr] = List()) {
-  def merge(o: ProgSpec) = {
-    ProgSpec(rely ++ o.rely, guar ++ o.guar)
-  }
-}
-
 /*
  * Translation of IRContext / Spec structures to and from Attrib
  */
@@ -204,6 +197,19 @@ case class SymbolTableInfo(
 
   def mergeFromAttrib(a: Attrib) = {
 
+    } yield (this.merge(SymbolTableInfo(externalFunctions, globals, funcEntries, globalOffsets)))
+  }
+
+}
+
+object SymbolTableInfo {
+  def from(e: util.IRContext) = {
+    SymbolTableInfo(e.externalFunctions, e.globals, e.funcEntries, e.globalOffsets)
+  }
+
+  def empty = SymbolTableInfo(Set(), Set(), Set(), Map())
+
+  def fromAttrib(a: Attrib) = {
     import scala.util.chaining.scalaUtilChainingOps
 
     def logIfNone[T](str: => String)(x: Option[T]) = x match {
@@ -236,18 +242,8 @@ case class SymbolTableInfo(
           }
         )
         .toMap
-
-    } yield (this.merge(SymbolTableInfo(externalFunctions, globals, funcEntries, globalOffsets)))
+    } yield SymbolTableInfo(externalFunctions, globals, funcEntries, globalOffsets)
   }
-
-}
-
-object SymbolTableInfo {
-  def from(e: util.IRContext) = {
-    SymbolTableInfo(e.externalFunctions, e.globals, e.funcEntries, e.globalOffsets)
-  }
-
-  def empty = SymbolTableInfo(Set(), Set(), Set(), Map())
 }
 
 /**

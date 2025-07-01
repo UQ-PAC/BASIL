@@ -270,10 +270,8 @@ case class InnerBasilBNFCVisitor[A](
       "this declaration visit method cannot be called on this visitor. it should be handled by another visitor."
     )
 
-  // Members declared in Params.Visitor
-  // override def visit(x: syntax.Param, arg: A): Nothing = cannotVisitDeclaration(x)
-
 }
+
 
 case class FunSpec(
   val require: List[ir.Expr] = List(),
@@ -290,6 +288,20 @@ case class FunSpec(
   }
 
 }
+
+case class FunDecl(irType: ir.IRType, body: Option[ir.LambdaExpr])
+
+case class ProgSpec(
+  val rely: List[ir.Expr] = List(),
+  val guar: List[ir.Expr] = List(),
+  val initialMemory: Option[MemoryAttribData] = None,
+  val mainProc: Option[String] = None,
+) {
+  def merge(o: ProgSpec) = {
+    ProgSpec(rely ++ o.rely, guar ++ o.guar, o.initialMemory.orElse(initialMemory), o.mainProc.orElse(mainProc))
+  }
+}
+
 
 /**
  * Entry-point for the main visitor, parsing everything from the procedure
@@ -310,7 +322,6 @@ case class BasilMainBNFCVisitor[A](
     with syntax.Decl.Visitor[ir.dsl.EventuallyProcedure, A]
     with syntax.Params.Visitor[ir.LocalVar, A]
     with AttributeListBNFCVisitor[A]
-    // with syntax.ProgSpec.Visitor[Unit, A]
     {
 
   def params(x: syntax.ListParams, arg: A): List[ir.Variable] =
