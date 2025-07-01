@@ -13,12 +13,12 @@ object SSADAG {
   *
   * Returns the SSA renaming for each block entry in the CFA.
   */
-  def transform(frames: Map[String, Frame], p: Procedure) = {
+  def transform(frames: Map[String, Frame], p: Procedure, inputs: List[Variable]) = {
     convertToMonadicSideEffect(frames, p)
 
     val liveMemory = getReadMemory(p)
 
-    (ssaTransform(p), liveMemory)
+    (ssaTransform(p, inputs), liveMemory)
   }
 
   def getReadMemory(p: Procedure): Map[Memory, Variable] = {
@@ -70,7 +70,7 @@ object SSADAG {
   *
   * Returns the SSA renaming for each block entry in the CFA.
   */
-  def ssaTransform(p: Procedure): ((String, Expr) => Expr) = {
+  def ssaTransform(p: Procedure, inputs: List[Variable]): ((String, Expr) => Expr) = {
 
     var renameCount = 0
     val stRename = mutable.Map[Block, mutable.Map[Variable, Variable]]()
@@ -89,6 +89,10 @@ object SSADAG {
         case l: LocalVar => l.copy(varName = l.name + "_AT" + renameCount, index = 0)
         case l: GlobalVar => l.copy(name = l.name + "_AT" + renameCount)
       }
+
+    for (eb <- p.entryBlock) {
+      renameBefore(eb) = inputs.map(i => i -> freshName(i)).toMap
+    }
 
     class RenameRHS(rn: Variable => Option[Variable]) extends CILVisitor {
       override def vrvar(v: Variable) = ChangeTo(rn(v).getOrElse(v))
@@ -192,9 +196,11 @@ object SSADAG {
         b.statements.prependAll(phis)
         stRename(b)
       } else {
-        stRename.get(b).getOrElse(mutable.Map())
+        mutable.Map.from(renameBefore.getOrElse(b, Map()))
       }
-      renameBefore(b) = stRename.getOrElse(b, mutable.Map()).toMap
+      if (!b.parent.entryBlock.contains(b)) {
+        renameBefore(b) = stRename.getOrElse(b, mutable.Map()).toMap
+      }
 
       for (s <- b.statements.toList) {
         val c = renameRHS(renaming.get)(s) // also modifies in-place

@@ -202,6 +202,7 @@ def procToTransition(p: Procedure, loops: List[Loop], frames: Map[Procedure, Fra
     cutPoints = cutPoints.updated("ENTRY", e)
   })
 
+  var returnEdgeCount = 0
   p.returnBlock.foreach(e => {
     e.jump match {
       case r: Return => {
@@ -210,9 +211,13 @@ def procToTransition(p: Procedure, loops: List[Loop], frames: Map[Procedure, Fra
           l.comment = Some("synth return param")
           l
         })
-        r.parent.statements.appendAll(outAssigns)
-        r.parent.statements.append(setPCLabel("RETURN"))
-        r.parent.replaceJump(GoTo(synthExit))
+
+        for (pb <- e.prevBlocks) {
+          pb.statements.append(setPCLabel("RETURN"))
+        }
+
+        e.statements.appendAll(outAssigns)
+        e.replaceJump(GoTo(synthExit))
       }
       case _ => ???
     }
@@ -543,16 +548,13 @@ class TranslationValidator {
 
       // intersect of live of source and target
 
-      val globals = globalsForProc(p).map(x => (x: Variable, x: Variable))
+      val globals = globalsForProc(p).map(x => CompatArg(x: Variable, x: Variable))
 
-      val returnInv = procs(p.name).returnBlock
-        .map(_.jump match {
-          case r: Return =>
-            procs(p.name).returnBlock.get.label -> (r.outParams
-              .map((formal: Variable, actual) => formal -> formal) ++ globals).toMap
-          case _ => ???
-        })
-        .toSeq
+      val inparams = p.formalInParam.toList.map(p => CompatArg(p, p))
+      val outparams = p.formalOutParam.toList.map(p => CompatArg(p, p))
+
+      val entryInv : Inv = Inv.CutPoint("ENTRY", globals.toList ++ inparams, Some("globalsEntry"))
+      val returnInv : Inv = Inv.CutPoint("RETURN", globals.toList ++ outparams)
 
       // block -> sourcevar -> targetvar
       val lives: Map[String, Map[Variable, Variable]] = liveVarsSource.collect {
@@ -561,9 +563,9 @@ class TranslationValidator {
             case sv if liveVarsTarget(block).exists(_.name == sv.name) =>
               sv -> liveVarsTarget(block).find(_.name == sv.name).get
           }.toMap
-      }.toMap ++ returnInv
+      }.toMap
 
-      val inv = afterCuts(p).map {
+      val inv = entryInv :: returnInv :: (afterCuts(p).map {
         case (label, cutPoint) => {
           val vars = lives.get(cutPoint.label).getOrElse(Map())
 
@@ -571,13 +573,11 @@ class TranslationValidator {
             CompatArg(src, tgt)
           }
 
-          // val guard = BinaryExpr(EQ, visit_rvar(afterRenamer, transitionSystemPCVar), PCMan.PCSym(label))
-
           Inv.CutPoint(label, assertion, Some(s"INVARIANT at $label"))
         }
-      }
+      }).toList
 
-      setInvariant(p.name, inv.toList)
+      setInvariant(p.name, inv)
     }
   }
 
@@ -697,25 +697,28 @@ class TranslationValidator {
       AssertsToPC(target.returnBlock.get).transform(target)
 
       /* Begin AWFUL HACK to initialise SSA for the global variables only set on one path */
-      srcEntry.statements.prepend(LocalAssign((transitionSystemPCVar), (transitionSystemPCVar)))
-      srcEntry.statements.prepend(LocalAssign((traceVar), (traceVar)))
-      tgtEntry.statements.prepend(LocalAssign((transitionSystemPCVar), (transitionSystemPCVar)))
-      tgtEntry.statements.prepend(LocalAssign((traceVar), (traceVar)))
+      //srcEntry.statements.prepend(LocalAssign((transitionSystemPCVar), (transitionSystemPCVar)))
+      //srcEntry.statements.prepend(LocalAssign((traceVar), (traceVar)))
+      //tgtEntry.statements.prepend(LocalAssign((transitionSystemPCVar), (transitionSystemPCVar)))
+      //tgtEntry.statements.prepend(LocalAssign((traceVar), (traceVar)))
 
-      globalsForProc(proc).foreach(g => {
-        srcEntry.statements.prepend(LocalAssign(g, g))
-        tgtEntry.statements.prepend(LocalAssign(g, g))
-      })
+      //globalsForProc(proc).foreach(g => {
+      //  srcEntry.statements.prepend(LocalAssign(g, g))
+      //  tgtEntry.statements.prepend(LocalAssign(g, g))
+      //})
       /* end AWFUL HACK */
+
+     val inputs = transitionSystemPCVar :: traceVar :: (globalsForProc(proc).toList)
 
       val frames = (afterFrame ++ beforeFrame)
 
-      val (srcRenameSSA, srcLiveMemory) = SSADAG.transform(frames, source)
-      val (tgtRenameSSA, tgtLiveMemory) = SSADAG.transform(frames, target)
+      val (srcRenameSSA, srcLiveMemory) = SSADAG.transform(frames, source, inputs)
+      val (tgtRenameSSA, tgtLiveMemory) = SSADAG.transform(frames, target, inputs)
 
-      val dir = File("./graphs/")
-      if (!dir.exists()) then dir.mkdirs()
-      Logger.writeToFile(File(s"graphs/NOPblockgraph-${proc.name}.dot"), dotBlockGraph(source))
+      //val dir = File("./graphs/")
+      // if (!dir.exists()) then dir.mkdirs()
+
+
 
       val ackInv =
         Ackermann.instantiateAxioms(source.entryBlock.get, target.entryBlock.get, frames, exprInSource, exprInTarget)
@@ -724,34 +727,26 @@ class TranslationValidator {
       val pcInv = CompatArg(transitionSystemPCVar, transitionSystemPCVar)
       val traceInv = CompatArg(traceVar, traceVar)
       // add invariant to combined
-      val initInv = Seq(Inv.Global(pcInv, Some("PC INVARIANT")), Inv.Global(traceInv, Some("Trace INVARIANT")))
+      val initInv = Seq(Inv.CutPoint("ENTRY", List(pcInv), Some("PC INVARIANT")), Inv.CutPoint("ENTRY", List(traceInv), Some("Trace INVARIANT")))
+
+      // TODO: Expclitly construct cutpoint for negated post condition invariant
+
       val memoryInit = (srcLiveMemory.keys.toSet ++ tgtLiveMemory.keys).toList.map(k =>
-        Inv.Global(CompatArg(srcLiveMemory(k), tgtLiveMemory(k)), Some(s"Memory$k"))
+        Inv.CutPoint("ENTRY", List(CompatArg(srcLiveMemory(k), tgtLiveMemory(k))), Some(s"Memory$k"))
       )
 
       val invariant = initInv ++ invariants(proc.name) ++ memoryInit
 
-      val primedInv = invariant.map {
-        case g: Inv.Global =>
-          g.toAssume(proc, Some(srcExit.label))(srcRenameSSA, tgtRenameSSA).body
-        case i @ CutPoint(l, b, comment) => {
-          // rename for end state of ssa
-          //val targetBl = beforeCuts(target)(l).label
-          //val sourceBl = afterCuts(source)(l).label
-
-          //val nb = b.map(_.map(srcRenameSSA(sourceBl, _), tgtRenameSSA(targetBl, _)))
-          //val rned = nb.map(_.map(srcRenameSSA(srcExit.label, _), tgtRenameSSA(tgtExit.label, _)))
-
-          //val nc = CutPoint(l, rned, comment)
-          i.toAssume(proc)(srcRenameSSA, tgtRenameSSA) match {
-            case Assume(b, c, _, _) => b
-          }
-        }
+      val preInv = invariant.filter {
+        case i @ CutPoint("RETURN", b, comment) => false
+        case _ => true
       }
 
-      val invVariables = invariants(proc.name)
-        .flatMap(_.toAssume(proc, Some(srcEntry.label))(srcRenameSSA, tgtRenameSSA).body.variables)
-        .toSet
+      val primedInv = invariant.collect {
+        case i @ CutPoint("RETURN", b, comment) => {
+          i.toAssume(proc)(srcRenameSSA, tgtRenameSSA).body
+        }
+      }
 
       visit_proc(afterRenamer, source)
       visit_proc(beforeRenamer, target)
@@ -770,7 +765,7 @@ class TranslationValidator {
       var count = 0
 
       count = 0
-      for (i <- invariant) {
+      for (i <- preInv) {
         count += 1
         b.addAssert(i.toAssume(proc)(srcRenameSSA, tgtRenameSSA).body, Some(s"inv$count"))
       }
@@ -804,6 +799,7 @@ class TranslationValidator {
 
     // }
 
+    Logger.writeToFile(File(s"NOP-transform-after.il"), translating.PrettyPrinter.pp_prog(afterProg.get))
     timer.checkPoint("Finishehd tv pass")
     smtQueries
   }

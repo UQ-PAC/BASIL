@@ -282,7 +282,7 @@ object IRTransform {
 
     Logger.info("[!] Stripping unreachable")
     val before = ctx.program.procedures.size
-    transforms.stripUnreachableFunctions(ctx.program, config.loading.procedureTrimDepth)
+    // transforms.stripUnreachableFunctions(ctx.program, config.loading.procedureTrimDepth)
     Logger.info(
       s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
     )
@@ -908,6 +908,8 @@ object RunUtils {
     for (p <- ctx.program.procedures) {
       p.normaliseBlockNames()
     }
+
+    writeToFile(pp_prog(ctx.program), "test.il")
     ir.transforms.validate.wrapShapePreservingTransformInValidation(p => (), "NOP")(ctx.program)
 
     if (conf.simplify) {
@@ -1090,7 +1092,6 @@ object RunUtils {
 
     StaticAnalysisLogger.info("[!] Running DSA Analysis")
 
-    writeToFile(pp_prog(ctx.program), "testo1.il")
     val symbolTableEntries: Set[SymbolTableEntry] = ctx.globals ++ ctx.funcEntries
     val dsa = DataStructureAnalysis(
       ctx.program,
