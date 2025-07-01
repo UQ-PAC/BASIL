@@ -6,7 +6,7 @@ import util.SMT.{SMTSolver, SatResult}
 @test_util.tags.UnitTest
 class SMTTest extends AnyFunSuite with CaptureOutput {
   def checkPredicate(p: Predicate): SatResult = {
-    val solver = SMTSolver()
+    val solver = SMTSolver(Some(50))
     val res = solver.satisfiable(p)
     solver.close()
     res

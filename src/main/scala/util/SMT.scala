@@ -4,6 +4,9 @@ import analysis.{BVTerm, GammaTerm, Predicate}
 import ir.*
 import org.sosy_lab.java_smt.SolverContextFactory
 import org.sosy_lab.java_smt.api.{BitvectorFormula, BooleanFormula, FormulaManager}
+import org.sosy_lab.common.configuration.Configuration
+import org.sosy_lab.common.log.LogManager
+import org.sosy_lab.common.ShutdownNotifier
 
 import scala.jdk.CollectionConverters.SetHasAsJava
 
@@ -15,8 +18,21 @@ enum SatResult {
 
 /** Make sure to close the solver when you are done!
  */
-class SMTSolver {
-  val solverContext = SolverContextFactory.createSolverContext(SolverContextFactory.Solvers.PRINCESS)
+class SMTSolver(timeoutMillis: Option[Int] = None) {
+  val solverContext = {
+    val configBuilder = Configuration.builder()
+
+    timeoutMillis match {
+      case Some(t) => configBuilder.setOption("timeout", s"$t")
+      case _ => {}
+    }
+    val config = configBuilder.build()
+    print(config)
+
+    val logger = LogManager.createNullLogManager()
+    val shutdown = ShutdownNotifier.createDummy()
+    SolverContextFactory.createSolverContext(config, logger, shutdown, SolverContextFactory.Solvers.PRINCESS)
+  }
   val formulaConverter = FormulaConverter(solverContext.getFormulaManager())
 
   def satisfiable(f: BooleanFormula): SatResult = {
@@ -142,7 +158,7 @@ class FormulaConverter(formulaManager: FormulaManager) {
       case UnaryExpr(op, arg) =>
         op match {
           case op: BVUnOp => convertBVUnOp(op, convertBVExpr(arg))
-          case op: BoolToBV1 => ???
+          case BoolToBV1 => ???
           case _ => throw Exception("Non bitvector operation was attempted to be converted")
         }
       case v: Variable => convertBVVar(v.irType, v.name)
