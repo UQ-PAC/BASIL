@@ -11,13 +11,15 @@ import util.{
   DSAConfig,
   DebugDumpIRLogger,
   ILLoadingConfig,
+  IRLoading,
   LogLevel,
   Logger,
   MemoryRegionsMode,
   PCTrackingOption,
   ProcRelyVersion,
   RunUtils,
-  StaticAnalysisConfig
+  StaticAnalysisConfig,
+  writeToFile
 }
 
 import scala.language.postfixOps
@@ -149,6 +151,8 @@ object Main {
     interpret: Flag,
     @arg(name = "dump-il", doc = "Dump the Intermediate Language to text.")
     dumpIL: Option[String],
+    @arg(name = "dump-relf", doc = "Dump Basil's representation of the readelf information to the given file and exit.")
+    dumpRelf: Option[String],
     @arg(name = "main-procedure-name", short = 'm', doc = "Name of the main procedure to begin analysis at.")
     mainProcedureName: String = "main",
     @arg(
@@ -333,6 +337,30 @@ object Main {
         "\nRequires --load-directory-gtirb, --load-directory-bap OR --input\n\n" + parser
           .helpText(sorted = false)
       )
+    }
+
+    conf.dumpRelf match {
+      case None => ()
+      case Some(relfOut) =>
+        val relfFile = loadingInputs.relfFile.getOrElse {
+          throw IllegalArgumentException("--dump-relf requires --relf")
+        }
+        Logger.setLevel(LogLevel.DEBUG)
+        val (relf, gtirb) = IRLoading.loadReadELFWithGTIRB(relfFile, loadingInputs)
+
+        // skip writing files if the given path is an empty string
+        if (relfOut.trim.isEmpty)
+          return
+
+        writeToFile(
+          relf.sorted.toScala
+            .replace("@GLIBC_2.17", "")
+            .replace("@GLIBC_2.38", "")
+            .replace("@GLIBC_2.34", ""),
+          relfOut + "-readelf.scala"
+        )
+        gtirb.foreach(x => writeToFile(x.sorted.toScala, relfOut + "-gtsrelf.scala"))
+        return
     }
 
     if (loadingInputs.specFile.isDefined && loadingInputs.relfFile.isEmpty) {

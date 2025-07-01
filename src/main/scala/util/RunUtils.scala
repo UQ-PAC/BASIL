@@ -122,8 +122,7 @@ object IRLoading {
 
     val (mainAddress, makeContext) = q.relfFile match {
       case Some(relf) => {
-        // TODO: this tuple is large, should be a case class
-        val (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
+        val ReadELFData(symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
           IRLoading.loadReadELF(relf, q)
 
         def continuation(ctx: IRContext) =
@@ -191,17 +190,36 @@ object IRLoading {
     GTIRBConverter.createIR()
   }
 
-  def loadReadELF(
-    fileName: String,
-    config: ILLoadingConfig
-  ): (List[ELFSymbol], Set[ExternalFunction], Set[SpecGlobal], Set[FuncEntry], Map[BigInt, BigInt], BigInt) = {
+  def loadReadELFWithGTIRB(fileName: String, config: ILLoadingConfig): (ReadELFData, Option[ReadELFData]) = {
     val lexer = ReadELFLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(lexer)
     val parser = ReadELFParser(tokens)
     parser.setErrorHandler(BailErrorStrategy())
     parser.setBuildParseTree(true)
-    ReadELFLoader.visitSyms(parser.syms(), config)
+
+    val relf = ReadELFLoader.visitSyms(parser.syms(), config)
+
+    val gtirbRelf = if (config.inputFile.endsWith(".gts")) {
+      val ir = IR.parseFrom(FileInputStream(config.inputFile))
+      if (ir.modules.length != 1) {
+        Logger.warn(s"GTIRB file ${config.inputFile} unexpectedly has ${ir.modules.length} modules")
+      }
+
+      val gtirb = GTIRBResolver(ir.modules.head)
+      val gtirbRelfLoader = GTIRBReadELF(gtirb)
+      val gtirbRelf = gtirbRelfLoader.getReadELFData(config.mainProcedureName)
+
+      gtirbRelfLoader.checkReadELFCompatibility(gtirbRelf, relf)
+      Some(gtirbRelf)
+    } else {
+      None
+    }
+
+    (relf, gtirbRelf)
   }
+
+  def loadReadELF(fileName: String, config: ILLoadingConfig) =
+    loadReadELFWithGTIRB(fileName, config)._1
 
   def emptySpecification(globals: Set[SpecGlobal]) =
     Specification(Set(), globals, Map(), List(), List(), List(), Set())
