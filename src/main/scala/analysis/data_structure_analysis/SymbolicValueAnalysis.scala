@@ -104,7 +104,7 @@ object DSAVarOrdering extends Ordering[LocalVar] {
 def toOffsetMove[T <: Offsets](op: BinOp, arg: BitVecLiteral | T, domain: OffsetDomain[T]): T => T = {
   val value = arg match {
     case bv: BitVecLiteral => domain.init(bv2SignedInt(bv).toInt)
-    case off => off.asInstanceOf[T] /* dynamic type proof fails */
+    case off: Offsets /* must be T because of union type */ => off.asInstanceOf[T]
   }
   op match
     case BVADD => (i: T) => domain.add(i, value)
@@ -393,6 +393,12 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T]) e
     val proc = b.parent.parent
     val block = b.parent
     b match
+      case SimulAssign(assignments, _) =>
+        val update = assignments.map {
+          case (lhs: LocalVar, rhs) => lhs -> SymValues.exprToSymValSet(a)(rhs)
+          case (lhs: GlobalVar, _) => throw Exception("GlobalVar on lhs of SimulAssign not expected")
+        }.toMap
+        join(a, SymValues(update), block)
       case LocalAssign(lhs: LocalVar, rhs: Expr, _) =>
         val update = SymValues(Map(lhs -> SymValues.exprToSymValSet(a)(rhs)))
         join(a, update, block)
