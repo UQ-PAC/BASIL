@@ -190,35 +190,9 @@ case class BasilEarlyBNFCVisitor[A]()
     Declarations.empty.copy(procedures = Map(name -> proc))
   }
 
-  private def parseProgDecl(ident: String, attribs: syntax.AttribSet, arg: A) =
-    val attrs = attribs.accept(this, arg)
-    val attrMap = attrs.Map.get
-    val newInitialMemory = attrMap
-      .get("initial_memory")
-      .map(_.List.getOrElse(throw Exception("invalid initial_memory type")))
-      .map(_.map(v =>
-        MemoryAttribData
-          .fromAttrib(v)
-          .getOrElse(throw Exception(s"Ill formed memory section ${v.pprint}"))
-      ).toSet)
-    val ctx = for {
-      a <- attrMap.get("symbols")
-      nctx <- decls.symtab.mergeFromAttrib(a)
-    } yield (nctx)
-    for (c <- ctx) {
-      decls = decls.copy(symtab = c)
-    }
-    for (n <- newInitialMemory) {
-      initialMemory = n
-    }
+  override def visit(x: syntax.Decl_ProgEmpty, arg: A) = Declarations.empty
 
-  override def visit(x: syntax.Decl_ProgEmpty, arg: A) =
-    val name = unsigilProc(x.procident_)
-    Declarations.empty.copy(progSpec = ProgSpec(mainProc = Some(name)))
+  override def visit(x: syntax.Decl_ProgWithSpec, arg: A) = Declarations.empty
 
-  override def visit(x: syntax.Decl_ProgWithSpec, arg: A) =
-    val name = unsigilProc(x.procident_)
-    val spec = ProgSpec(mainProc = Some(name))
-    Declarations.empty
 
 }

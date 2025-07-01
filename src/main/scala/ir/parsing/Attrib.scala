@@ -195,10 +195,8 @@ case class SymbolTableInfo(
     )
   }
 
-  def mergeFromAttrib(a: Attrib) = {
-
-    } yield (this.merge(SymbolTableInfo(externalFunctions, globals, funcEntries, globalOffsets)))
-  }
+  def mergeFromAttrib(a: Attrib) =
+    SymbolTableInfo.fromAttrib(a).map(this.merge(_))
 
 }
 

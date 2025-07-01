@@ -48,6 +48,7 @@ case class InnerBasilBNFCVisitor[A](
     with syntax.Block.Visitor[ir.dsl.EventuallyBlock, A]
     with syntax.ProcDef.Visitor[List[ir.dsl.EventuallyBlock], A]
     with syntax.FunSpec.Visitor[FunSpec, A]
+    with syntax.ProgSpec.Visitor[ProgSpec, A]
     // with syntax.Declaration.Visitor[Unit, A]
     // with syntax.Params.Visitor[R,A]
     // with syntax.ProcSig.Visitor[ir.dsl.EventuallyProcedure,A]
@@ -265,6 +266,12 @@ case class InnerBasilBNFCVisitor[A](
   override def visit(x: syntax.ProcDef_Some, arg: A) =
     x.listblock_.asScala.map(_.accept(this, arg)).toList
 
+  override def visit(x: syntax.ProgSpec_Rely, arg: A) =
+    ProgSpec(rely = List(x.expr_.accept(this, arg)))
+  override def visit(x: syntax.ProgSpec_Guarantee, arg: A) =
+    ProgSpec(guar = List(x.expr_.accept(this, arg)))
+
+
   private inline def cannotVisitDeclaration(x: HasParsePosition) =
     throw new Exception(
       "this declaration visit method cannot be called on this visitor. it should be handled by another visitor."
@@ -294,11 +301,11 @@ case class FunDecl(irType: ir.IRType, body: Option[ir.LambdaExpr])
 case class ProgSpec(
   val rely: List[ir.Expr] = List(),
   val guar: List[ir.Expr] = List(),
-  val initialMemory: Option[MemoryAttribData] = None,
+  val initialMemory: Set[MemoryAttribData] = Set(),
   val mainProc: Option[String] = None,
 ) {
   def merge(o: ProgSpec) = {
-    ProgSpec(rely ++ o.rely, guar ++ o.guar, o.initialMemory.orElse(initialMemory), o.mainProc.orElse(mainProc))
+    ProgSpec(rely ++ o.rely, guar ++ o.guar, initialMemory ++ o.initialMemory, o.mainProc.orElse(mainProc))
   }
 }
 
@@ -364,8 +371,40 @@ case class BasilMainBNFCVisitor[A](
   }
 
   def visit(x: syntax.Decl_Axiom, arg: A): ir.dsl.EventuallyProcedure = ???
-  def visit(x: syntax.Decl_ProgWithSpec, arg: A): ir.dsl.EventuallyProcedure = ???
-  def visit(x: syntax.Decl_ProgEmpty, arg: A): ir.dsl.EventuallyProcedure = ???
+
+  private def parseProgDecl(sigilIdent: String, attribs: syntax.AttribSet, arg: A) = {
+    val attrs = attribs.accept(this, arg)
+    val attrMap = attrs.Map.get
+
+    val initialMemory = attrMap
+      .get("initial_memory")
+      .map(_.List.getOrElse(throw Exception("initial_memory must be a list")))
+      .map(_.map(v =>
+        MemoryAttribData
+          .fromAttrib(v)
+          .getOrElse(throw Exception(s"Ill formed memory section ${v.pprint}"))
+      ).toSet)
+
+    val symtab = attrMap.get("symbols").map(
+      SymbolTableInfo.fromAttrib(_).getOrElse {
+        throw Exception("invalid symbols format")
+      }
+    )
+
+    val mainProc = unsigilProc(sigilIdent)
+
+    Declarations.empty.copy(
+      progSpec = ProgSpec(mainProc = Some(mainProc), initialMemory = initialMemory.getOrElse(Set())),
+      symtab = symtab.getOrElse(SymbolTableInfo()),
+    )
+  }
+
+  override def visit(x: syntax.Decl_ProgEmpty, arg: A) =
+    parseProgDecl(x.procident_, x.attribset_, arg)
+
+  override def visit(x: syntax.Decl_ProgWithSpec, arg: A) =
+    parseProgDecl(x.procident_, x.attribset_, arg)
+
 
   // Members declared in Program.Visitor
   override def visit(x: syntax.Module1, arg: A) = {
