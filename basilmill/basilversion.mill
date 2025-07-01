@@ -14,24 +14,25 @@ trait BasilVersion extends BuildInfo {
   def gitCommit = Task.Input {
     // GITHUB_SHA is set in github actions
     // https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/store-information-in-variables#default-environment-variables
-    Task.env.getOrElse("GITHUB_SHA",
-      Try(os.proc("git", "rev-parse", "HEAD").call(cwd = Task.workspace).out.text().trim())
-      .getOrElse("main"))
+    Task.env.get("GITHUB_SHA").orElse {
+      Try {
+        os.proc("git", "rev-parse", "HEAD").call(cwd = Task.workspace).out.text().trim()
+      }.toOption
+    }
   }
 
   def gitVersion = Task.Input {
     Try {
-      os.proc("git", "describe", "--tags", "--dirty").call(cwd = Task.workspace)
-      .out.text().trim()
-    }.getOrElse(
-      Task.env.getOrElse("COMMIT", "(unknown version)")
-    )
+      os.proc("git", "describe", "--tags", "--dirty").call(cwd = Task.workspace).out.text().trim()
+    }.toOption.orElse {
+      Task.env.get("COMMIT")
+    }
   }
 
   override def buildInfoPackageName = "buildinfo"
   override def buildInfoMembers = Seq(
     BuildInfo.Value("scalaVersion", scalaVersion()),
-    BuildInfo.Value("gitVersion", gitVersion()),
-    BuildInfo.Value("gitCommit", gitCommit()),
+    BuildInfo.Value("gitVersion", gitVersion().getOrElse("(unknown version)")),
+    BuildInfo.Value("gitCommit", gitCommit().getOrElse("(unknown commit)")),
   )
 }

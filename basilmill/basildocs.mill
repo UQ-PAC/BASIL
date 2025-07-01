@@ -11,7 +11,7 @@ trait BasilDocs extends ScalaModule {
 
   def scalaDocOptions = Task {
     super.scalaDocOptions() ++ scalaDocExternalMappingOptions() ++ Seq(
-      s"-source-links:github://UQ-PAC/BASIL/${gitCommit()}",
+      s"-source-links:github://UQ-PAC/BASIL/${gitCommit().getOrElse("main")}",
       s"-doc-root-content:$millSourcePath/main/scala/rootdoc.scala"
     )
   }
