@@ -3,6 +3,7 @@ package analysis
 import ir.*
 import ir.transforms.{IntraproceduralWorklistSolver, NarrowingWorklistSolver, reversePostOrder}
 import util.functional.unionWith
+
 import collection.mutable
 
 // TODO allow for interprocedural analysis
@@ -104,12 +105,12 @@ class FullLoopInvariantGenerator(program: Program) {
     print(post)
 
     (
-    pre.foldLeft(Map[Block, List[Predicate]]()) {
-      (m, m2) => unionWith(m, m2.map((b, p) => (b, List(p))), ((a, b) => a ++ b))
-    },
-    post.foldLeft(Map[Block, List[Predicate]]()) {
-      (m, m2) => unionWith(m, m2.map((b, p) => (b, List(p))), ((a, b) => a ++ b))
-    }
+      pre.foldLeft(Map[Block, List[Predicate]]()) { (m, m2) =>
+        unionWith(m, m2.map((b, p) => (b, List(p))), ((a, b) => a ++ b))
+      },
+      post.foldLeft(Map[Block, List[Predicate]]()) { (m, m2) =>
+        unionWith(m, m2.map((b, p) => (b, List(p))), ((a, b) => a ++ b))
+      }
     )
   }
 
@@ -122,13 +123,13 @@ class FullLoopInvariantGenerator(program: Program) {
   }
 
   def addPreInvariantsToProc(procedure: Procedure, invariants: Map[Block, List[Predicate]]) = {
-    invariants.foreach{(block, preds) =>
+    invariants.foreach { (block, preds) =>
       block.statements.prependAll(preds.filter(_ != Predicate.True).map(p => Assert(p.toBasil)))
     }
   }
 
   def addPostInvariantsToProc(procedure: Procedure, invariants: Map[Block, List[Predicate]]) = {
-    invariants.foreach{(block, preds) =>
+    invariants.foreach { (block, preds) =>
       block.statements.appendAll(preds.filter(_ != Predicate.True).map(p => Assert(p.toBasil)))
     }
   }

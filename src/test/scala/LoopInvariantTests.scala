@@ -4,11 +4,22 @@ import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{CaptureOutput, programToContext}
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, IRTransform, StaticAnalysisConfig, RunUtils}
+import util.{
+  BASILConfig,
+  BASILResult,
+  BoogieGeneratorConfig,
+  ILLoadingConfig,
+  IRContext,
+  RunUtils,
+  StaticAnalysisConfig
+}
 
 @test_util.tags.UnitTest
 class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
-  def genProcedureInvariants(program: Program, procedure: Procedure): (Map[Block, List[Predicate]], Map[Block, List[Predicate]]) = {
+  def genProcedureInvariants(
+    program: Program,
+    procedure: Procedure
+  ): (Map[Block, List[Predicate]], Map[Block, List[Predicate]]) = {
     val foundLoops = LoopDetector.identify_loops(program)
     val newLoops = foundLoops.reducibleTransformIR().identifiedLoops
     foundLoops.updateIrWithLoops()
