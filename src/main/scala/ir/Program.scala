@@ -1,6 +1,6 @@
 package ir
 
-import analysis.{Loop, MergedRegion, Predicate}
+import analysis.{Loop, MergedRegion}
 import boogie.*
 import translating.PrettyPrinter.*
 import util.assertion.*
