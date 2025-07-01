@@ -7,6 +7,12 @@ import org.sosy_lab.java_smt.api.{BitvectorFormula, BooleanFormula, FormulaManag
 
 import scala.jdk.CollectionConverters.SetHasAsJava
 
+enum SatResult {
+  case SAT
+  case UNSAT
+  case Unknown(s: String)
+}
+
 class FormulaConverter(formulaManager: FormulaManager) {
   val bitvectorFormulaManager = formulaManager.getBitvectorFormulaManager()
   val booleanFormulaManager = formulaManager.getBooleanFormulaManager()
@@ -50,7 +56,7 @@ class FormulaConverter(formulaManager: FormulaManager) {
     }
   }
 
-  def convertBVCmpOp(op: BVCmpOp, a: BitvectorFormula, b: BitvectorFormula): BOoleanFormula = {
+  def convertBVCmpOp(op: BVCmpOp | PolyCmp, a: BitvectorFormula, b: BitvectorFormula): BooleanFormula = {
     op match {
       case BVULT => bitvectorFormulaManager.lessThan(a, b, false)
       case BVULE => bitvectorFormulaManager.lessOrEquals(a, b, false)
@@ -129,14 +135,14 @@ class SMTSolver {
   val solverContext = SolverContextFactory.createSolverContext(SolverContextFactory.Solvers.PRINCESS)
   val formulaConverter = FormulaConverter(solverContext.getFormulaManager())
 
-  def satisfiable(p: Predicate): Option[Boolean] = {
+  def satisfiable(p: Predicate): SatResult = {
     val f = formulaConverter.convertPredicate(p)
     try {
       val env = solverContext.newProverEnvironment()
       env.addConstraint(f)
-      Some(!env.isUnsat())
+      if env.isUnsat() then SatResult.UNSAT else SatResult.SAT
     } catch { _ =>
-      None
+      SatResult.Unknown("")
     }
   }
 
