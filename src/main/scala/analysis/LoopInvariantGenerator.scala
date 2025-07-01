@@ -1,7 +1,7 @@
 package analysis
 
 import ir.*
-import ir.transforms.{IntraproceduralWorklistSolver, NarrowingWorklistSolver, reversePostOrder, worklistSolver}
+import ir.transforms.{IntraproceduralWorklistSolver, NarrowingWorklistSolver, reversePostOrder}
 
 // TODO allow for interprocedural analysis
 
@@ -100,12 +100,13 @@ class FullLoopInvariantGenerator(program: Program) {
     ForwardLoopInvariantGenerator(intervals, NarrowingWorklistSolver(intervals)).genAndAddInvariants(procedure)
 
     // Gamma domains ensure that relations of the gammas of variables are maintained throughout loop iterations.
-    val gammaMap =
-      LatticeMap.TopMap(procedure.formalInParam.unsorted.map((v: Variable) => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
-    val mayGammas = MayGammaDomain(gammaMap)
-    val mustGammas = MustGammaDomain(gammaMap)
-    ForwardLoopInvariantGenerator(mayGammas, worklistSolver(mayGammas)).genAndAddInvariants(procedure)
-    BackwardLoopInvariantGenerator(mustGammas, worklistSolver(mustGammas)).genAndAddInvariants(procedure)
+    // Currently broken! The gamma domains don't produce predicates correctly it seems
+    // val gammaMap =
+    // LatticeMap.BottomMap(procedure.formalInParam.unsorted.map((v: Variable) => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+    // val mayGammas = MayGammaDomain(gammaMap)
+    // val mustGammas = MustGammaDomain(gammaMap)
+    // ForwardLoopInvariantGenerator(mayGammas, worklistSolver(mayGammas)).genAndAddInvariants(procedure)
+    // ForwardLoopInvariantGenerator(mustGammas, worklistSolver(mustGammas)).genAndAddInvariants(procedure)
 
     // Add more domains here
   }
