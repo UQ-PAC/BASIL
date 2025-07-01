@@ -24,6 +24,12 @@ import scala.language.postfixOps
 
 object Main {
 
+  val programName = {
+    "The Basil Pipeline" + System.lineSeparator()
+      + "Version: " + buildinfo.BuildInfo.gitVersion + System.lineSeparator()
+      + "Commit:  " + buildinfo.BuildInfo.gitCommit
+  }
+
   enum ChooseInput {
     case Gtirb
     case Bap
@@ -111,7 +117,7 @@ object Main {
     }
   }
 
-  @main(name = "BASIL")
+  @main(name = programName + System.lineSeparator())
   case class Config(
     @arg(name = "load-directory-bap", doc = "Load relf, adt, and bir from directory (and spec from parent directory)")
     bapInputDirName: Option[String],
@@ -246,9 +252,7 @@ object Main {
     }
 
     if (conf.version.value) {
-      println("The Basil Pipeline")
-      println("Version: " + buildinfo.BuildInfo.gitVersion)
-      println("Commit:  " + buildinfo.BuildInfo.gitCommit)
+      println(programName)
       return
     }
 
@@ -376,6 +380,8 @@ object Main {
       memoryTransform = conf.memoryTransform.value,
       assertCalleeSaved = calleeSaved
     )
+
+    Logger.info(programName)
 
     val result = RunUtils.run(q)
     if (conf.verify.value) {
