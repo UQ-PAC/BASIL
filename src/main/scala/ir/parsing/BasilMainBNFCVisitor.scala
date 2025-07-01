@@ -331,7 +331,6 @@ case class BasilMainBNFCVisitor[A](
     "VarDecl should be visited by an earlier visitor"
   )
 
-
   def visit(x: syntax.Decl_UninterpFun, arg: A): ir.dsl.EventuallyProcedure = ???
   def visit(x: syntax.Decl_Fun, arg: A): ir.dsl.EventuallyProcedure = ???
 
@@ -341,8 +340,8 @@ case class BasilMainBNFCVisitor[A](
     val innervis = makeVisitor(procName, decls)
     val blocks = x.procdef_.accept(innervis, arg)
 
-    val spec = x.listfunspec_.asScala.foldLeft(FunSpec()) {
-      case (acc, sp) => acc.merge(sp.accept(innervis, arg))
+    val spec = x.listfunspec_.asScala.foldLeft(FunSpec()) { case (acc, sp) =>
+      acc.merge(sp.accept(innervis, arg))
     }
 
     val attr = parseAttrMap(x.attribset_, arg)

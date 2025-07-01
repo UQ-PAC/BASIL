@@ -107,7 +107,6 @@ trait LiteralsBNFCVisitor[A]
   override def visit(x: syntax.BVVal1, arg: A): ir.BitVecLiteral =
     ir.BitVecLiteral(x.intval_.accept(this, arg), x.bvtype_.accept(this, arg).asInstanceOf[ir.BitVecType].size)
 
-
   override def visit(x: syntax.Value_BV, arg: A): ir.Literal = x.bvval_.accept(this, arg)
   override def visit(x: syntax.Value_Int, arg: A): ir.Literal = ir.IntLiteral(x.intval_.accept(this, arg))
   override def visit(x: syntax.Value_True, arg: A): ir.Literal = ir.TrueLiteral
