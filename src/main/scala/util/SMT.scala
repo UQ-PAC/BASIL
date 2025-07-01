@@ -6,7 +6,7 @@ import org.sosy_lab.java_smt.SolverContextFactory
 import org.sosy_lab.java_smt.api.{BitvectorFormula, BooleanFormula, FormulaManager}
 import org.sosy_lab.common.configuration.Configuration
 import org.sosy_lab.common.log.LogManager
-import org.sosy_lab.common.ShutdownNotifier
+import org.sosy_lab.common.ShutdownManager
 
 import scala.jdk.CollectionConverters.SetHasAsJava
 
@@ -18,31 +18,54 @@ enum SatResult {
 
 /** Make sure to close the solver when you are done!
  */
-class SMTSolver(timeoutMillis: Option[Int] = None) {
+class SMTSolver(var timeoutMillis: Option[Int] = None) {
+  val shutdownManager = ShutdownManager.create()
+
   val solverContext = {
-    val configBuilder = Configuration.builder()
-
-    timeoutMillis match {
-      case Some(t) => configBuilder.setOption("timeout", s"$t")
-      case _ => {}
-    }
-    val config = configBuilder.build()
-
+    val config = Configuration.defaultConfiguration()
     val logger = LogManager.createNullLogManager()
-    val shutdown = ShutdownNotifier.createDummy()
+    val shutdown = shutdownManager.getNotifier()
     SolverContextFactory.createSolverContext(config, logger, shutdown, SolverContextFactory.Solvers.PRINCESS)
   }
+
   val formulaConverter = FormulaConverter(solverContext.getFormulaManager())
 
   def satisfiable(f: BooleanFormula): SatResult = {
+    // To handle timeouts, we must create a thread that sends a shutdown request after an amount of milliseconds
+    val thread = timeoutMillis.map(m => {
+      new Thread(new Runnable() {
+        def run() = {
+          try {
+            Thread.sleep(m)
+            shutdownManager.requestShutdown("Timeout")
+            print("Timeout request made!")
+          } catch { _ =>
+            {
+              print("Interrupted!")
+            }
+          }
+        }
+      })
+    })
+
+    // shutdownManager.requestShutdown("a")
+    // print(shutdownManager.getNotifier().shouldShutdown())
+
     try {
       val env = solverContext.newProverEnvironment()
-      env.addConstraint(f)
+      env.push(f)
+      thread.map(_.start)
       val res = if env.isUnsat() then SatResult.UNSAT else SatResult.SAT
       env.close()
       res
     } catch { _ =>
+      print("a")
       SatResult.Unknown("")
+    } finally {
+      thread.map(t => {
+        t.interrupt()
+        t.join()
+      })
     }
   }
 
@@ -50,9 +73,9 @@ class SMTSolver(timeoutMillis: Option[Int] = None) {
     satisfiable(formulaConverter.convertPredicate(p))
   }
 
-  /** Run the solver on a predicate given as an SMTLIB string
+  /** Run the solver on a predicate given as an SMT2 string
    */
-  def satisfiable(s: String): SatResult = {
+  def smt2Satisfiable(s: String): SatResult = {
     satisfiable(solverContext.getFormulaManager().parse(s))
   }
 
@@ -127,16 +150,18 @@ class FormulaConverter(formulaManager: FormulaManager) {
     e match {
       case TrueLiteral => booleanFormulaManager.makeTrue()
       case FalseLiteral => booleanFormulaManager.makeFalse()
-      case BinaryExpr(op, arg, arg2) => op match {
-        case op: BoolBinOp => ???
-        case op: PolyCmp => ???
-        case op: BVCmpOp => convertBVCmpOp(op, convertBVExpr(arg), convertBVExpr(arg2))
-        case _ => ???
-      }
-      case UnaryExpr(op, arg) => op match {
-        case op: BoolUnOp => ???
-        case _ => ???
-      }
+      case BinaryExpr(op, arg, arg2) =>
+        op match {
+          case op: BoolBinOp => ???
+          case op: PolyCmp => ???
+          case op: BVCmpOp => convertBVCmpOp(op, convertBVExpr(arg), convertBVExpr(arg2))
+          case _ => ???
+        }
+      case UnaryExpr(op, arg) =>
+        op match {
+          case op: BoolUnOp => ???
+          case _ => ???
+        }
       case v: Variable => ???
       case r: OldExpr => ???
       case _ => throw Exception("Non boolean expression was attempted to be converted")
