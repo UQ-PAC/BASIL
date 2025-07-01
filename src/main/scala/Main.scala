@@ -24,8 +24,8 @@ import scala.language.postfixOps
 
 object Main {
 
-  val programName = {
-    "The Basil Pipeline" + System.lineSeparator()
+  val programNameVersionHeader = {
+    "Basil" + System.lineSeparator()
       + "Version: " + buildinfo.BuildInfo.gitVersion + System.lineSeparator()
       + "Commit:  " + buildinfo.BuildInfo.gitCommit
   }
@@ -117,7 +117,7 @@ object Main {
     }
   }
 
-  @main(name = programName + System.lineSeparator())
+  @main(name = programNameVersionHeader + System.lineSeparator())
   case class Config(
     @arg(name = "load-directory-bap", doc = "Load relf, adt, and bir from directory (and spec from parent directory)")
     bapInputDirName: Option[String],
@@ -252,7 +252,7 @@ object Main {
     }
 
     if (conf.version.value) {
-      println(programName)
+      println(programNameVersionHeader)
       return
     }
 
@@ -381,7 +381,7 @@ object Main {
       assertCalleeSaved = calleeSaved
     )
 
-    Logger.info(programName)
+    Logger.info(programNameVersionHeader)
 
     val result = RunUtils.run(q)
     if (conf.verify.value) {
