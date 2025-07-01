@@ -1,11 +1,11 @@
 import analysis.Predicate
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.CaptureOutput
-import util.SMT.SMTSolver
+import util.SMT.{SatResult, SMTSolver}
 
 @test_util.tags.UnitTest
 class SMTTest extends AnyFunSuite with CaptureOutput {
-  def evaluatePredicate(p: Predicate): Option[Boolean] = {
+  def checkPredicate(p: Predicate): SatResult = {
     val solver = SMTSolver()
     val res = solver.satisfiable(p)
     solver.close()
@@ -14,11 +14,11 @@ class SMTTest extends AnyFunSuite with CaptureOutput {
 
   test("true") {
     val p = Predicate.True
-    assert(evaluatePredicate(p) == Some(true))
+    assert(checkPredicate(p) == SatResult.SAT)
   }
 
   test("false") {
     val p = Predicate.False
-    assert(evaluatePredicate(p) == Some(false))
+    assert(checkPredicate(p) == SatResult.UNSAT)
   }
 }
