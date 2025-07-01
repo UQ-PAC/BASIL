@@ -27,7 +27,6 @@ class SMTSolver(timeoutMillis: Option[Int] = None) {
       case _ => {}
     }
     val config = configBuilder.build()
-    print(config)
 
     val logger = LogManager.createNullLogManager()
     val shutdown = ShutdownNotifier.createDummy()
@@ -39,7 +38,9 @@ class SMTSolver(timeoutMillis: Option[Int] = None) {
     try {
       val env = solverContext.newProverEnvironment()
       env.addConstraint(f)
-      if env.isUnsat() then SatResult.UNSAT else SatResult.SAT
+      val res = if env.isUnsat() then SatResult.UNSAT else SatResult.SAT
+      env.close()
+      res
     } catch { _ =>
       SatResult.Unknown("")
     }
