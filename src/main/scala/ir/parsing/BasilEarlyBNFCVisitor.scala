@@ -77,18 +77,16 @@ case class BasilEarlyBNFCVisitor[A]()
     extends syntax.Module.Visitor[Declarations, A],
       syntax.Decl.Visitor[Declarations, A],
       syntax.Params.Visitor[(String, ir.IRType), A],
-      TypesBNFCVisitor[A],
-      LiteralsBNFCVisitor[A],
       AttributeListBNFCVisitor[A] {
-
-  override def visit(x: syntax.Decl_Axiom, arg: A) = ???
 
   override def visit(x: syntax.Module1, arg: A) =
     val listdecl = x.listdecl_.asScala
 
-    val decls = listdecl.foldLeft(Declarations.empty) { case (decls, x) =>
+    // initial parse of declarations
+    var initialDecls = listdecl.foldLeft(Declarations.empty) { case (decls, x) =>
+      val newdecls = x.accept(this, arg)
       try {
-        decls.merge(x.accept(this, arg))
+        decls.merge(newdecls)
       } catch {
         case e: IllegalArgumentException =>
           throw ParseException(
@@ -99,12 +97,28 @@ case class BasilEarlyBNFCVisitor[A]()
       }
     }
 
-    val newProgSpecs = listdecl.collect {
-      case x: syntax.Decl_ProgWithSpec => visitProgSpec(decls, x, arg)
-    }
+    val decls = listdecl.foldLeft(initialDecls)((decls, x) => x match {
+      // parse program specifications (rely / guarantee) and update decls.
+      case x: syntax.Decl_ProgWithSpec =>
+        val spec = visitProgSpec(decls, x, arg)
+        decls.merge(Declarations.empty.copy(progSpec = spec))
+
+      // parse function definition bodies and update decls.
+      case x: syntax.Decl_Fun =>
+        val (nm, defn) = visitFunDef(decls, x, arg)
+        decls.updateFunctionDefinition(nm, Some(defn))
+
+      case x: syntax.Decl_Axiom =>
+        val ax = visitAxiom(decls, x, arg)
+        decls.copy(axioms = ax +: decls.axioms)
+
+      case _: syntax.Decl_UnsharedMem | _: syntax.Decl_SharedMem | _: syntax.Decl_Var | _: syntax.Decl_Proc | _: syntax.Decl_ProgEmpty =>
+        decls
+
+    })
 
     decls.copy(
-      progSpec = newProgSpecs.foldLeft(decls.progSpec)(_ merge _)
+      axioms = decls.axioms.reverse
     )
 
   // Members declared in Declaration.Visitor
@@ -117,21 +131,6 @@ case class BasilEarlyBNFCVisitor[A]()
     val ir.MapType(ir.BitVecType(addrwd), ir.BitVecType(valwd)) = x.type_.accept(this, arg): @unchecked
     val mem = ir.SharedMemory(unsigilGlobal(x.globalident_), addrwd, valwd)
     Declarations.empty.copy(memories = Map(mem.name -> mem))
-
-  def visit(x: syntax.Decl_UninterpFun, arg: A): ir.parsing.Declarations = {
-    val n = unsigilGlobal(x.globalident_)
-    val paramTypes = x.listtype_.asScala.toList.map(_.accept(this, arg))
-    val returnType = x.type_.accept(this, arg)
-    val ty = ir.uncurryFunctionType(paramTypes, returnType)
-    Declarations.empty.copy(functions = Map(n -> FunDecl(ty, None)))
-  }
-  def visit(x: syntax.Decl_Fun, arg: A): ir.parsing.Declarations = {
-    val n = unsigilGlobal(x.globalident_)
-    val paramTypes = visitParams(x.listparams_, arg).toList.map(_._2)
-    val returnType = x.type_.accept(this, arg)
-    val ty = ir.uncurryFunctionType(paramTypes, returnType)
-    Declarations.empty.copy(functions = Map(n -> FunDecl(ty, None)))
-  }
 
   override def visit(x: syntax.Decl_Var, arg: A) =
     val v = ir.GlobalVar(unsigilGlobal(x.globalident_), x.type_.accept(this, arg))
@@ -154,7 +153,6 @@ case class BasilEarlyBNFCVisitor[A]()
     val proc = ir.dsl.EventuallyProcedure(name, inparams, outparams, Nil)
     Declarations.empty.copy(procedures = Map(name -> proc))
   }
-
 
   override def visit(x: syntax.Decl_ProgEmpty, arg: A) =
     parseProgDecl(x.procident_, x.attribset_, arg)
@@ -192,18 +190,63 @@ case class BasilEarlyBNFCVisitor[A]()
     )
   }
 
+  override def visit(x: syntax.Decl_UninterpFun, arg: A): ir.parsing.Declarations = {
+    val n = unsigilGlobal(x.globalident_)
+    val params = x.listtype_.asScala.view
+      .map(_.accept(this, arg))
+      .zipWithIndex
+      .map { (ty, i) => ir.LocalVar(s"x$i", ty) }
+      .toList
 
-  protected def makeSpecVisitor(decls: Declarations): syntax.ProgSpec.Visitor[ProgSpec, A] =
+    val returnType = x.type_.accept(this, arg)
+
+    val fun = ir.FunctionDecl(n, params, returnType, None)
+    Declarations.empty.copy(functions = Map(n -> fun))
+  }
+
+  override def visit(x: syntax.Decl_Fun, arg: A): ir.parsing.Declarations = {
+    val n = unsigilGlobal(x.globalident_)
+    val params = visitParams(x.listparams_, arg)
+      .map { (n, ty) => ir.LocalVar(n, ty) }
+      .toList
+    val returnType = x.type_.accept(this, arg)
+
+    val fun = ir.FunctionDecl(n, params, returnType, None)
+    Declarations.empty.copy(functions = Map(n -> fun))
+  }
+
+  override def visit(x: syntax.Decl_Axiom, arg: A) =
+    Declarations.empty
+
+  protected def makeExprVisitor(decls: Declarations):
+      syntax.Expr.Visitor[ir.Expr, A]  & syntax.ProgSpec.Visitor[ProgSpec, A] =
     ExprBNFCVisitor[A](decls)
+
+
+  def visitAxiom(decls: Declarations, x: syntax.Decl_Axiom, arg: A) = {
+    val exprvis = makeExprVisitor(decls)
+
+    // TODO: use attribset for axiom declarations
+    val _ = x.attribset_
+
+    ir.AxiomDecl(x.expr_.accept(exprvis, arg))
+  }
+
+  def visitFunDef(decls: Declarations, x: syntax.Decl_Fun, arg: A) = {
+    val exprvis = makeExprVisitor(decls)
+
+    val n = unsigilGlobal(x.globalident_)
+    n -> x.expr_.accept(exprvis, arg)
+  }
 
   /**
    * This method is called after the rest of the declarations have been parsed
    * and it produces the [[ProgSpec]] (rely/guarantee) for the program.
    * Because visitng the specification needs to visit expressions, this method
-   * calls [[makeSpecVisitor]] to construct the inner-visitor.
+   * calls [[makeProgSpecVisitor]] to construct the inner-visitor.
    */
   def visitProgSpec(decls: Declarations, x: syntax.Decl_ProgWithSpec, arg: A) =
-    val specvis = makeSpecVisitor(decls)
+    val specvis = makeExprVisitor(decls)
     x.listprogspec_.asScala.foldLeft(ProgSpec()) { case (spec, x) =>
       spec.merge(x.accept(specvis, arg))
     }
