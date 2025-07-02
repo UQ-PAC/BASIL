@@ -126,9 +126,8 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
     with syntax.Block.Visitor[ir.dsl.EventuallyBlock, A]
     with syntax.ProcDef.Visitor[Seq[ir.dsl.EventuallyBlock], A] {
 
-  val formalIns = decls.formalIns(procName)
-  val formalOuts = decls.formalOuts(procName)
   val procSpec = decls.procSpecs(procName)
+  val formalOuts = decls.formalOuts(procName)
 
   def blocks(x: syntax.ListBlock, arg: A): List[ir.dsl.EventuallyBlock] =
     x.asScala.map(_.accept(this, arg)).toList
@@ -168,12 +167,15 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
     val outs = x.lvars_.accept(this, arg)
     val ins = exprs(x.listexpr_, arg)
 
-    val procName = unsigilProc(x.procident_)
+    val callName = unsigilProc(x.procident_)
+
+    val formalIns = decls.formalIns(callName)
+    val formalOuts = decls.formalOuts(callName)
+
     ir.dsl.directCall(
-      formalOuts.keys.zip(outs).toList,
+      formalOuts.keys.zip(outs),
       unsigilProc(x.procident_),
-      // TODO: fix var names. in vars need to be obtained from proc definition??
-      formalIns.keys.zip(ins).toList
+      formalIns.keys.zip(ins)
     )
 
   override def visit(x: syntax.Stmt_IndirectCall, arg: A) = {

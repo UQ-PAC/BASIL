@@ -148,7 +148,7 @@ case class BasilEarlyBNFCVisitor[A]()
     lv.name -> lv.irType
 
   private def visitParams(x: syntax.ListParams, arg: A): ListMap[String, ir.IRType] = {
-    x.asScala.map(_.accept(this, arg)).to(ListMap)
+    x.asScala.toList.map(_.accept(this, arg)).to(ListMap)
   }
 
   override def visit(x: syntax.Decl_Proc, arg: A) = {
