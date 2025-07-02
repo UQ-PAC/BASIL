@@ -290,18 +290,18 @@ class BasilMainBNFCVisitor[A](var decls: Declarations)
   // Members declared in Program.Visitor
   override def visit(x: syntax.Module1, arg: A) = {
 
+    // TODO: hashmap?
     val procs = x.listdecl_.asScala.flatMap {
       case x => x.accept(this, arg).map(p => p.name -> p)
     }.to(ListMap)
 
     val progSpec = decls.progSpec
-    val mainProcName = progSpec.mainProc.getOrElse(procs.head._1)
+    val mainProc = progSpec.mainProc.fold(procs.head)(procs(_))
     val initialMemory = progSpec.initialMemory.map(_.toMemorySection)
 
-    val mainProcDef = procs(mainProcName)
-    val otherProcs = procs.filter { (k,_) => k != mainProcName }
+    val otherProcs = procs.filter { (_,p) => p ne mainProc }
 
-    ir.dsl.EventuallyProgram(mainProcDef, otherProcs.values, initialMemory)
+    ir.dsl.EventuallyProgram(mainProc, otherProcs.values, initialMemory)
   }
 
 
