@@ -267,7 +267,7 @@ case class BasilMainBNFCVisitor[A](
 ) extends LiteralsBNFCVisitor[A]
     with TypesBNFCVisitor[A]
     with syntax.Module.Visitor[util.IRContext, A]
-    with syntax.Decl.Visitor[ir.dsl.EventuallyProcedure, A]
+    with syntax.Decl.Visitor[Option[ir.dsl.EventuallyProcedure], A]
     with syntax.Params.Visitor[ir.LocalVar, A]
     with AttributeListBNFCVisitor[A]
     {
@@ -283,18 +283,12 @@ case class BasilMainBNFCVisitor[A](
     ir.LocalVar.ofIndexed(unsigilLocal(x.localident_), x.type_.accept(this, arg))
 
   // Members declared in Declaration.Visitor
-  override def visit(x: syntax.Decl_SharedMem, arg: A): Nothing = throw new Exception(
-    "MemDecl should be visited by an earlier visitor"
-  )
-  override def visit(x: syntax.Decl_UnsharedMem, arg: A): Nothing = throw new Exception(
-    "MemDecl should be visited by an earlier visitor"
-  )
-  override def visit(x: syntax.Decl_Var, arg: A): Nothing = throw new Exception(
-    "VarDecl should be visited by an earlier visitor"
-  )
+  override def visit(x: syntax.Decl_SharedMem, arg: A) = None
+  override def visit(x: syntax.Decl_UnsharedMem, arg: A) = None
+  override def visit(x: syntax.Decl_Var, arg: A) = None
 
-  override def visit(x: syntax.Decl_UninterpFun, arg: A): ir.dsl.EventuallyProcedure = ???
-  override def visit(x: syntax.Decl_Fun, arg: A): ir.dsl.EventuallyProcedure = ???
+  override def visit(x: syntax.Decl_UninterpFun, arg: A) = None
+  override def visit(x: syntax.Decl_Fun, arg: A) = None
 
   // Members declared in ProcDef.Visitor
   override def visit(x: syntax.Decl_Proc, arg: A) = {
@@ -311,47 +305,13 @@ case class BasilMainBNFCVisitor[A](
     val rname = getStrAttr("name")(attr).getOrElse(procName)
 
     val p = decls.procedures(procName).copy(blocks = blocks, requires = spec.require, ensures = spec.ensure)
-    p.copy(address = addr, label = rname)
+    Some(p.copy(address = addr, label = rname))
   }
 
-  override def visit(x: syntax.Decl_Axiom, arg: A): ir.dsl.EventuallyProcedure = ???
+  override def visit(x: syntax.Decl_Axiom, arg: A) = None
 
-  private def parseProgDecl(sigilIdent: String, attribs: syntax.AttribSet, arg: A) = {
-    val attrs = attribs.accept(this, arg)
-    val attrMap = attrs.Map.get
-
-    val initialMemory = attrMap
-      .get("initial_memory")
-      .map(_.List.getOrElse(throw Exception("initial_memory must be a list")))
-      .map(_.map(v =>
-        MemoryAttribData
-          .fromAttrib(v)
-          .getOrElse(throw Exception(s"Ill formed memory section ${v.pprint}"))
-      ).toSet)
-
-    val symtab = attrMap.get("symbols").map(
-      SymbolTableInfo.fromAttrib(_).getOrElse {
-        throw Exception("invalid symbols format")
-      }
-    )
-
-    val mainProc = unsigilProc(sigilIdent)
-
-    Declarations.empty.copy(
-      progSpec = ProgSpec(mainProc = Some(mainProc), initialMemory = initialMemory.getOrElse(Set())),
-      symtab = symtab.getOrElse(SymbolTableInfo()),
-    )
-  }
-
-  override def visit(x: syntax.Decl_ProgEmpty, arg: A) =
-    parseProgDecl(x.procident_, x.attribset_, arg)
-    ???
-
-  override def visit(x: syntax.Decl_ProgWithSpec, arg: A) =
-    parseProgDecl(x.procident_, x.attribset_, arg)
-    x.listprogspec_.asScala.map(_.accept(makeBlockVisitor("", decls), arg))
-
-    ???
+  override def visit(x: syntax.Decl_ProgEmpty, arg: A) = None
+  override def visit(x: syntax.Decl_ProgWithSpec, arg: A) = None
 
 
   // Members declared in Program.Visitor
@@ -412,9 +372,7 @@ case class BasilMainBNFCVisitor[A](
 
     val entryname: String = mainProc.getOrElse(throw Exception("No main proc specified"))
 
-    val procs = x.listdecl_.asScala.collect { case p: syntax.Decl_Proc =>
-      p.accept(this, arg)
-    }
+    val procs = x.listdecl_.asScala.flatMap(_.accept(this, arg))
 
     val (mainProcDef, otherProcs) = procs.partition(_.name == entryname)
     if (mainProcDef.headOption.isEmpty) {
