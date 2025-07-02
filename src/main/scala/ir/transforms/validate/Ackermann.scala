@@ -1,10 +1,9 @@
 package ir.transforms.validate
 
-import ir.*
-import cilvisitor.*
-import scala.collection.mutable
 import analysis.ProcFrames.*
-import util.Logger
+import ir.*
+
+import scala.collection.mutable
 
 type EffCallFormalParam = Variable | Memory | Field
 

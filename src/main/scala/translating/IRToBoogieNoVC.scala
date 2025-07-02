@@ -2,7 +2,6 @@ package translating
 import boogie.*
 import ir.*
 import ir.cilvisitor.*
-import ir.transforms.*
 
 import scala.collection.mutable
 

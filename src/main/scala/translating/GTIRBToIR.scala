@@ -8,7 +8,6 @@ import gtirb.*
 import gtirb.AuxDecoder.AuxKind
 import ir.*
 import util.Logger
-import ir.cilvisitor.*
 import util.functional.{Snoc, foldLeft0}
 
 import java.util.Base64

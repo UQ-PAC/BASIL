@@ -4,8 +4,6 @@ import ir.*
 import ir.cilvisitor.*
 import util.{OnCrash, RingTrace}
 
-import translating.PrettyPrinter.pp_expr
-
 trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
   // def vstmt(s: Statement) : Repr[Statement]
 

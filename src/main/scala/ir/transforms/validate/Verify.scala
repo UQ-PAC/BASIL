@@ -1,7 +1,7 @@
 package ir.transforms.validate
 
-import specification.LoopInvariant
 import ir.*
+import specification.LoopInvariant
 
 object Verify {
 

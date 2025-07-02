@@ -1,20 +1,15 @@
 package ir.transforms.validate
 
-import ir.*
-import util.functional.unionWith
-import scala.util.boundary, boundary.break
-import java.io.File
-import ir.dsl.*
-import scala.collection.mutable
 import analysis.Loop
 import analysis.ProcFrames.*
-import ir.dsl.IRToDSL
+import ir.*
 import ir.cilvisitor.*
-import translating.PrettyPrinter.*
-import scala.collection.mutable.ArrayBuffer
+import ir.dsl.IRToDSL
+import util.{LogLevel, Logger, PerformanceTimer}
+
+import java.io.File
 import scala.collection.mutable
-import util.{Logger, PerformanceTimer, LogLevel}
-import ir.transforms.Substitute
+import scala.collection.mutable.ArrayBuffer
 
 /**
  *
@@ -194,6 +189,8 @@ def procToTransition(p: Procedure, loops: List[Loop], frames: Map[Procedure, Fra
   val synthEntry = Block(s"${p.name}_SYNTH_ENTRY", None, Seq(), synthEntryJump)
   val synthExit = Block(s"${p.name}_SYNTH_EXIT", None, Seq())
 
+  cutPoints = cutPoints.updated("EXIT", synthExit)
+
   p.addBlocks(Seq(synthEntry, synthExit))
 
   p.entryBlock.foreach(e => {
@@ -212,17 +209,17 @@ def procToTransition(p: Procedure, loops: List[Loop], frames: Map[Procedure, Fra
           l
         })
 
-        for (pb <- e.prevBlocks) {
-          pb.statements.append(setPCLabel("RETURN"))
-        }
-
-        e.statements.appendAll(outAssigns)
         e.replaceJump(GoTo(synthExit))
+        e.statements.append(setPCLabel("RETURN"))
+        e.statements.appendAll(outAssigns)
+
+        val nb = e.createBlockBetween(synthExit, "returnblocknew")
+        cutPoints = cutPoints.updated("RETURN", nb)
+
       }
       case _ => ???
     }
 
-    cutPoints = cutPoints.updated("RETURN", e)
   })
 
   p.entryBlock = synthEntry
@@ -245,7 +242,7 @@ def procToTransition(p: Procedure, loops: List[Loop], frames: Map[Procedure, Fra
     val nb = synthEntry.createBlockBetween(l.header, "cut_join_to_" + label)
     nb.statements.prepend(pcGuard(label))
 
-    cutPoints = cutPoints.updated(label, l.header)
+    cutPoints = cutPoints.updated(label, nb)
     for (backedge <- backedges) {
       assert(l.header == backedge.to)
       backedge.from.statements.append(LocalAssign(pcVar, PCSym(label), Some(label)))
@@ -520,21 +517,20 @@ class TranslationValidator {
 
   }
 
-  def globalsForProc(p: Procedure) : Iterable[Variable] = {
+  def globalsForProc(p: Procedure): Iterable[Variable] = {
     val globs = for {
       bf <- beforeFrame.get(p.name)
       af <- afterFrame.get(p.name)
       globs = (bf.readGlobalVars ++ bf.readMem ++ bf.modifiedGlobalVars ++ bf.modifiedMem
-        ++ af.readGlobalVars ++ af.readMem ++ af.modifiedGlobalVars ++ af.modifiedMem).map(SideEffectStatementOfStatement.param)
+        ++ af.readGlobalVars ++ af.readMem ++ af.modifiedGlobalVars ++ af.modifiedMem)
+        .map(SideEffectStatementOfStatement.param)
     } yield (globs.map(_._2))
     globs.getOrElse(Seq())
   }
 
-
   def setEqualVarsInvariant = {
 
     // call this after running transform so initProg corresponds to the source / after program.
-
 
     def memToVar(m: Iterable[Memory]) = {
       m.map(SideEffectStatementOfStatement.param).map(_._2)
@@ -553,8 +549,10 @@ class TranslationValidator {
       val inparams = p.formalInParam.toList.map(p => CompatArg(p, p))
       val outparams = p.formalOutParam.toList.map(p => CompatArg(p, p))
 
-      val entryInv : Inv = Inv.CutPoint("ENTRY", globals.toList ++ inparams, Some("globalsEntry"))
-      val returnInv : Inv = Inv.CutPoint("RETURN", globals.toList ++ outparams)
+      val globalsInvEverywhere = afterCuts(p).keys.map(c => Inv.CutPoint(c, globals.toList)).toList
+
+      val entryInv: Inv = Inv.CutPoint("ENTRY", inparams)
+      val returnInv: Inv = Inv.CutPoint("RETURN", outparams)
 
       // block -> sourcevar -> targetvar
       val lives: Map[String, Map[Variable, Variable]] = liveVarsSource.collect {
@@ -565,7 +563,7 @@ class TranslationValidator {
           }.toMap
       }.toMap
 
-      val inv = entryInv :: returnInv :: (afterCuts(p).map {
+      val inv = entryInv :: returnInv :: globalsInvEverywhere ++ (afterCuts(p).map {
         case (label, cutPoint) => {
           val vars = lives.get(cutPoint.label).getOrElse(Map())
 
@@ -573,14 +571,14 @@ class TranslationValidator {
             CompatArg(src, tgt)
           }
 
-          Inv.CutPoint(label, assertion, Some(s"INVARIANT at $label"))
+          val i = Inv.CutPoint(label, assertion, Some(s"INVARIANT at $label"))
+          i
         }
       }).toList
 
       setInvariant(p.name, inv)
     }
   }
-
 
   def setTargetProg(p: Program) = {
     val f = inferProcFrames(p)
@@ -696,8 +694,7 @@ class TranslationValidator {
       AssertsToPC(source.returnBlock.get).transform(source)
       AssertsToPC(target.returnBlock.get).transform(target)
 
-
-     val inputs = transitionSystemPCVar :: traceVar :: (globalsForProc(proc).toList)
+      val inputs = transitionSystemPCVar :: traceVar :: (globalsForProc(proc).toList)
 
       val frames = (afterFrame ++ beforeFrame)
 
@@ -711,7 +708,14 @@ class TranslationValidator {
       val pcInv = CompatArg(transitionSystemPCVar, transitionSystemPCVar)
       val traceInv = CompatArg(traceVar, traceVar)
       // add invariant to combined
-      val initInv = Seq(Inv.CutPoint("ENTRY", List(pcInv), Some("PC INVARIANT")), Inv.CutPoint("ENTRY", List(traceInv), Some("Trace INVARIANT")))
+      val initInv = Seq(
+        Inv.CutPoint("ENTRY", List(pcInv), Some("PC INVARIANT")),
+        Inv.CutPoint("ENTRY", List(traceInv), Some("Trace INVARIANT"))
+      )
+
+      val alwaysInv = ((beforeCuts(target).keys ++ afterCuts(source).keys).toSet).map(c =>
+        Inv.CutPoint(c, List(CompatArg(transitionSystemPCVar, transitionSystemPCVar), CompatArg(traceVar, traceVar)))
+      )
 
       // TODO: Expclitly construct cutpoint for negated post condition invariant
 
@@ -719,16 +723,16 @@ class TranslationValidator {
         Inv.CutPoint("ENTRY", List(CompatArg(srcLiveMemory(k), tgtLiveMemory(k))), Some(s"Memory$k"))
       )
 
-      val invariant = initInv ++ invariants(proc.name) ++ memoryInit
+      val invariant = initInv ++ invariants(proc.name) ++ memoryInit ++ alwaysInv
 
-      val preInv = invariant.filter {
-        case i @ CutPoint("RETURN", b, comment) => false
-        case _ => true
-      }
+      val preInv = invariant
 
       val primedInv = invariant.collect {
-        case i @ CutPoint("RETURN", b, comment) => {
-          i.toAssume(proc)(srcRenameSSA, tgtRenameSSA).body
+        case i: CutPoint => {
+          i.toAssume(proc)(
+            (l, e) => srcRenameSSA(afterCuts(source)("EXIT").label, e),
+            (l, e) => tgtRenameSSA(beforeCuts(target)("EXIT").label, e)
+          ).body
         }
       }
 

@@ -1,10 +1,12 @@
 package ir.transforms.validate
 
-import scala.collection.mutable
-import ir.*
-import cilvisitor.*
-import ir.transforms.Substitute
 import analysis.ProcFrames.*
+import ir.*
+import ir.transforms.Substitute
+
+import scala.collection.mutable
+
+import cilvisitor.*
 
 object SSADAG {
 
@@ -196,7 +198,9 @@ object SSADAG {
         b.statements.prependAll(phis)
         stRename(b)
       } else {
-        mutable.Map.from(renameBefore.getOrElse(b, Map()))
+        val rn = mutable.Map.from(renameBefore.getOrElse(b, Map()))
+        rn
+
       }
       if (!b.parent.entryBlock.contains(b)) {
         renameBefore(b) = stRename.getOrElse(b, mutable.Map()).toMap

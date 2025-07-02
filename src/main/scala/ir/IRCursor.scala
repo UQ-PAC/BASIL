@@ -4,9 +4,6 @@ import translating.BasilIRPrettyPrinter
 import translating.PrettyPrinter.*
 import util.assertion.*
 
-import translating.PrettyPrinter.*
-import ir.cilvisitor.*
-import collection.mutable
 import scala.annotation.tailrec
 
 import collection.mutable
