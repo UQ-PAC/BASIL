@@ -19,17 +19,14 @@ def unsigilAttrib(x: String) = Sigil.unsigil(Sigil.BASIR.attrib)(x)
  * Parses structures at the block-level and lower, given
  * a particular procName (including address) and declarations.
  *
- * The given typesVisitor is optional. If unspecified, a default instance
- * is constructed.
- *
  * @group mainvisitor
  */
 case class InnerBasilBNFCVisitor[A](
   val procName: String,
-  val decls: Declarations,
-  val typesVisitor: TypesVisitorType[A] = new TypesBNFCVisitor[A]() {}
+  val decls: Declarations
 ) extends LiteralsBNFCVisitor[A]
     with AttributeListBNFCVisitor[A]
+    with TypesBNFCVisitor[A]
     with syntax.IntType.Visitor[ir.IRType, A]
     with syntax.BoolType.Visitor[ir.IRType, A]
     with syntax.MapType.Visitor[ir.IRType, A]
@@ -77,20 +74,6 @@ case class InnerBasilBNFCVisitor[A](
 
   def stmts(x: syntax.ListStmt, arg: A): List[ir.dsl.DSLStatement] =
     x.asScala.map(_.accept(this, arg)).toList
-
-  // Members declared in Type.Visitor
-  override def visit(x: syntax.TypeIntType, arg: A) = x.accept(typesVisitor, arg): ir.IRType
-  override def visit(x: syntax.TypeBoolType, arg: A) = x.accept(typesVisitor, arg): ir.IRType
-  override def visit(x: syntax.TypeMapType, arg: A) = x.accept(typesVisitor, arg): ir.IRType
-  override def visit(x: syntax.TypeBVType, arg: A) = x.accept(typesVisitor, arg): ir.IRType
-  // Members declared in BoolType.Visitor
-  override def visit(x: syntax.BoolType1, arg: A) = x.accept(typesVisitor, arg): ir.IRType
-  // Members declared in MapType.Visitor
-  override def visit(x: syntax.MapType1, arg: A) = x.accept(typesVisitor, arg): ir.IRType
-  // Members declared in IntType.Visitor
-  override def visit(x: syntax.IntType1, arg: A) = x.accept(typesVisitor, arg): ir.IRType
-  // Members declared in BVType.Visitor
-  override def visit(x: syntax.BVType1, arg: A) = x.accept(typesVisitor, arg): ir.IRType
 
   override def visit(x: syntax.Expr_Local, arg: A) = x.localvar_.accept(this, arg)
 
@@ -401,9 +384,13 @@ case class BasilMainBNFCVisitor[A](
 
   override def visit(x: syntax.Decl_ProgEmpty, arg: A) =
     parseProgDecl(x.procident_, x.attribset_, arg)
+    ???
 
   override def visit(x: syntax.Decl_ProgWithSpec, arg: A) =
     parseProgDecl(x.procident_, x.attribset_, arg)
+    x.listprogspec_.asScala.map(_.accept(makeVisitor("", decls), arg))
+
+    ???
 
 
   // Members declared in Program.Visitor
