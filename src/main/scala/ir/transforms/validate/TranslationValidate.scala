@@ -1,10 +1,8 @@
 package ir.transforms.validate
 
-import analysis.Loop
 import analysis.ProcFrames.*
 import ir.*
 import ir.cilvisitor.*
-import ir.dsl.IRToDSL
 import util.{LogLevel, Logger, PerformanceTimer}
 
 import java.io.File
@@ -69,6 +67,9 @@ def polyEqual(e1: Expr, e2: Expr) = {
   }
 }
 
+/**
+ * For a monadic transition sytem, renaming to partition variables and functions.
+ */
 class NamespaceState(val namespace: String) extends CILVisitor {
 
   def stripNamespace(n: String) = n.stripPrefix(namespace + "__")
@@ -81,12 +82,6 @@ class NamespaceState(val namespace: String) extends CILVisitor {
   override def vexpr(e: Expr) = e match {
     case f @ FApplyExpr(n, p, r, _) =>
       ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
-    // case f @ FApplyExpr(n, p, r, _) if n.startsWith("load") =>
-    //  ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
-    // case f @ FApplyExpr(n, p, r, _) if n.startsWith("trace_load") =>
-    //  ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
-    // case f @ FApplyExpr(n, p, r, _) if n.startsWith("store") =>
-    //  ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
     case _ => DoChildren()
   }
 
@@ -105,236 +100,9 @@ class NamespaceState(val namespace: String) extends CILVisitor {
   }
 }
 
-val traceType = BoolType
-val transitionSystemPCVar = GlobalVar("SYNTH_PC", BitVecType(64))
-
-val traceVar = GlobalVar("TRACE", traceType)
-
-class AssertsToPC(val exitBl: Block) {
-
-  /**
-   * Convert asserts in program to a jump to exit with a specific PC set.
-   */
-
-  var count = 0
-
-  def transform(p: Procedure): Unit = {
-    val asserts = p.collect { case a: Assert =>
-      a
-    }
-
-    transform(asserts)
-  }
-
-  def transform(s: Iterable[Assert]): Unit = {
-    for (stmt <- s) {
-      count += 1
-      val label = s"assert$count"
-
-      val bl = stmt.parent
-      val successor = bl.splitAfterStatement(stmt, label + "Pass")
-      // bl ends in Assert
-      // successor is rest of block
-
-      bl.statements.remove(stmt)
-      successor.statements.prepend(Assume(stmt.body, Some("assertpass")))
-
-      val falseBranch = Block(
-        bl.label + label + "Fail",
-        None,
-        Seq(Assume(UnaryExpr(BoolNOT, stmt.body)), PCMan.setPCLabel(PCMan.assumptionFailLabel)),
-        GoTo(Seq(exitBl))
-      )
-
-      bl.parent.addBlock(falseBranch)
-
-      bl.jump.asInstanceOf[GoTo].addTarget(falseBranch)
-    }
-  }
-}
-
-object PCMan {
-  val assumptionFailLabel = "ASSUMEFAIL"
-
-  val allocatedPCS = mutable.Map[String, BitVecLiteral]()
-  var pcCounter = 0
-  def PCSym(s: String) = {
-    allocatedPCS.getOrElseUpdate(
-      s, {
-        pcCounter += 1
-        BitVecLiteral(pcCounter, 64)
-      }
-    )
-  }
-
-  def setPCLabel(label: String) = {
-    val pcVar = transitionSystemPCVar
-    LocalAssign(pcVar, PCSym(label), Some(label))
-  }
-
-  def pcGuard(label: String) = {
-    val pcVar = transitionSystemPCVar
-    Assume(BinaryExpr(EQ, pcVar, PCSym(label)), Some(s"PC = $label"))
-  }
-}
-
-import PCMan.*
-
-def procToTransition(p: Procedure, loops: List[Loop], frames: Map[Procedure, Frame], cutJoins: Boolean = false) = {
-
-  val pcVar = transitionSystemPCVar
-  var cutPoints = Map[String, Block]()
-
-  val synthEntryJump = GoTo(Seq())
-  val synthEntry = Block(s"${p.name}_SYNTH_ENTRY", None, Seq(), synthEntryJump)
-  val synthExit = Block(s"${p.name}_SYNTH_EXIT", None, Seq())
-
-  cutPoints = cutPoints.updated("EXIT", synthExit)
-
-  p.addBlocks(Seq(synthEntry, synthExit))
-
-  p.entryBlock.foreach(e => {
-    e.statements.prepend(pcGuard("ENTRY"))
-    synthEntryJump.addTarget(e)
-    cutPoints = cutPoints.updated("ENTRY", e)
-  })
-
-  var returnEdgeCount = 0
-  p.returnBlock.foreach(e => {
-    e.jump match {
-      case r: Return => {
-        val outAssigns = r.outParams.map((formal, actual) => {
-          val l = LocalAssign(formal, actual)
-          l.comment = Some("synth return param")
-          l
-        })
-
-        e.replaceJump(GoTo(synthExit))
-        e.statements.append(setPCLabel("RETURN"))
-        e.statements.appendAll(outAssigns)
-
-        val nb = e.createBlockBetween(synthExit, "returnblocknew")
-        cutPoints = cutPoints.updated("RETURN", nb)
-
-      }
-      case _ => ???
-    }
-
-  })
-
-  p.entryBlock = synthEntry
-  p.returnBlock = synthExit
-
-  var loopCount = 0
-
-  for (l <- loops.filter(l => p.blocks.contains(l.header))) {
-    var loopBECount = 0
-    loopCount += 1
-    // synthEntryJump.addTarget(l.header)
-    // val loopEntry = Block(s"${p.name}LoopEntry$loopCount", None, Seq(pcGuard(s"Loop${loopCount}")), GoTo(l.header))
-    // p.addBlock(loopEntry)
-    // synthEntryJump.addTarget(loopEntry)
-
-    val backedges = l.backEdges.toList.sortBy(e => s"${e.from.label}_${e.to.label}")
-    val label = s"Loop${loopCount}"
-    synthEntryJump.addTarget(l.header)
-
-    val nb = synthEntry.createBlockBetween(l.header, "cut_join_to_" + label)
-    nb.statements.prepend(pcGuard(label))
-
-    cutPoints = cutPoints.updated(label, nb)
-    for (backedge <- backedges) {
-      assert(l.header == backedge.to)
-      backedge.from.statements.append(LocalAssign(pcVar, PCSym(label), Some(label)))
-      backedge.from.replaceJump(GoTo(synthExit))
-    }
-  }
-
-  var joinCount = 0
-  if (cutJoins) {
-
-    val cuts = p.blocks
-      .filter(c =>
-        c.prevBlocks.size > 1
-          && c.prevBlocks.flatMap(_.nextBlocks).forall(_ == c)
-          && !p.returnBlock.contains(c)
-          && !p.entryBlock.contains(c)
-      )
-      .toList
-      .sortBy(_.label)
-
-    for (c <- cuts) {
-      var incCount = 1
-      joinCount = joinCount + 1
-      val label = s"Join${joinCount}"
-      cutPoints = cutPoints.updated(label, c)
-
-      for (incoming <- c.prevBlocks) {
-        incoming.statements.append(LocalAssign(pcVar, PCSym(label), Some(label)))
-        incoming.replaceJump(GoTo(synthExit))
-      }
-
-      synthEntryJump.addTarget(c)
-      val nb = synthEntry.createBlockBetween(c, "cut_join_to_" + label)
-      nb.statements.prepend(pcGuard(label))
-
-    }
-  }
-
-  var once = true
-  for (s <- p) {
-    s match {
-      // case r: Return => {
-      //  assert(once, "expect proc in single return form")
-      // }
-      case u: Unreachable if u.parent != synthExit => {
-        u.parent.statements.append(PCMan.setPCLabel(PCMan.assumptionFailLabel))
-        u.parent.replaceJump(GoTo(synthExit))
-      }
-      case g: GoTo if g.targets.isEmpty => {
-        g.parent.statements.append(PCMan.setPCLabel(PCMan.assumptionFailLabel))
-        g.parent.replaceJump(GoTo(synthExit))
-      }
-      // case a: Assert => {
-      //  val start = a.parent
-      //  val stmts = a.parent.statements.splitOn(a)
-      //  val succ = a.parent.createBlockAfter("splitAssert")
-      //  succ.statements.addAll(stmts)
-      //  val trueBranch = start.createBlockBetween(succ)
-      //  val falseBranch = start.createBlockBetween(succ)
-      //  trueBranch.statements.prepend(Assume(a.body, Some(s"assert ${a.body}")))
-      //  falseBranch.statements.prepend(Assume(UnaryExpr(BoolNOT,a.body), Some(s"assert failed ${a.body}" )))
-      //  falseBranch.replaceJump(GoTo(synthAbort))
-      //  start.statements.remove(a)
-      // }
-      case _ => ()
-    }
-
-  }
-  synthExit.replaceJump(Return())
-  cutPoints
-
-}
-
 /**
- * Converts each procedure to a transition system
+ * Structure of an invariant relating two programs
  */
-def toTransitionSystem(iprogram: Program, frames: Map[Procedure, Frame]) = {
-
-  val program = IRToDSL.convertProgram(iprogram).resolve
-
-  val loops = analysis.LoopDetector.identify_loops(program)
-  val floops = loops.identifiedLoops.toList.sortBy(_.header.label)
-
-  val cutPoints = program.procedures
-    .map(p => {
-      p -> procToTransition(p, floops, frames)
-    })
-    .toMap
-
-  (program, cutPoints)
-}
-
 enum Inv {
   case CutPoint(cutPointPCGuard: String, pred: List[CompatArg], comment: Option[String] = None)
   case Global(pred: CompatArg, comment: Option[String] = None)
@@ -399,7 +167,9 @@ class TranslationValidator {
         val guarded =
           BinaryExpr(
             BoolIMPLIES,
-            exprInSource(renameSrcSSA(blockLabel, (BinaryExpr(EQ, transitionSystemPCVar, PCSym(cutLabel))))),
+            exprInSource(
+              renameSrcSSA(blockLabel, (BinaryExpr(EQ, TransitionSystem.programCounterVar, PCMan.PCSym(cutLabel))))
+            ),
             pred
           )
         Assume(guarded, c)
@@ -428,51 +198,24 @@ class TranslationValidator {
   def varInTarget(v: Variable) = visit_rvar(beforeRenamer, v)
 
   def extractProg(proc: Procedure): Iterable[Expr] = {
-    // this is pretty awful
-    var firstAssert = true
-    var gotAssert = false
     var assumes = List[Expr]()
-    var asserts = List[Expr]()
-    var toSee = proc.blocks.toSet
-
     val begin = proc.entryBlock.get
-
     for (nb <- begin.forwardIteratorFrom) {
       nb match {
-        case s: Assume => {
-          assumes = s.body :: assumes
+        case Assume(b, _, c, _) => {
+          assumes = b :: assumes
         }
-        case s: Assert => {
-          assumes = s.body :: assumes
+        case Assert(b, _, c) => {
+          assumes = b :: assumes
         }
         case o: Jump => ()
-        case o: Block => {
-          toSee = toSee - o
-        }
-        case o => {
-          throw Exception(s"Program has other statements : $o")
-        }
-      }
-      // assuming no cycles in graph
-    }
-
-    for (b <- toSee) {
-      b.statements.foreach {
-        case s: Assume => {
-          assumes = s.body :: assumes
-        }
-        case s: Assert => {
-          assumes = s.body :: assumes
-        }
+        case o: Block => {}
         case o => {
           throw Exception(s"Program has other statements : $o")
         }
       }
     }
-
-    val rest = {}
-
-    assumes ++ asserts
+    assumes.reverse
   }
 
   def setDSAInvariant = {
@@ -504,7 +247,7 @@ class TranslationValidator {
 
       val inv = afterCuts(p).map {
         case (label, cutPoint) => {
-          val vars = lives.get(cutPoint.label).toSet.flatten -- Seq(transitionSystemPCVar)
+          val vars = lives.get(cutPoint.label).toSet.flatten -- Seq(TransitionSystem.programCounterVar)
 
           val assertion = vars.toList.map(v => CompatArg(v, removeIndex(v)))
 
@@ -549,6 +292,7 @@ class TranslationValidator {
       val inparams = p.formalInParam.toList.map(p => CompatArg(p, p))
       val outparams = p.formalOutParam.toList.map(p => CompatArg(p, p))
 
+      // TODO: can probably just set at entry and let the liveness sort the rest out?
       val globalsInvEverywhere = afterCuts(p).keys.map(c => Inv.CutPoint(c, globals.toList)).toList
 
       val entryInv: Inv = Inv.CutPoint("ENTRY", inparams)
@@ -556,7 +300,8 @@ class TranslationValidator {
 
       // block -> sourcevar -> targetvar
       val lives: Map[String, Map[Variable, Variable]] = liveVarsSource.collect {
-        case (block, v) if v != transitionSystemPCVar && afterCuts(p).exists((_, b) => block.label == b.label) =>
+        case (block, v)
+            if v != TransitionSystem.programCounterVar && afterCuts(p).exists((_, b) => block.label == b.label) =>
           block.label -> v.collect {
             case sv if liveVarsTarget(block).exists(_.name == sv.name) =>
               sv -> liveVarsTarget(block).find(_.name == sv.name).get
@@ -585,7 +330,7 @@ class TranslationValidator {
 
     beforeFrame = f.map((k, v) => (k.name, v)).toMap
     initProg = Some(p)
-    val (prog, cuts) = toTransitionSystem(p, f)
+    val (prog, cuts) = TransitionSystem.toTransitionSystem(p, f)
     liveBefore = p.procedures.map(p => p.name -> getLiveVars(p, f)).toMap
     beforeProg = Some(prog)
     beforeCuts = cuts
@@ -623,7 +368,7 @@ class TranslationValidator {
   def setSourceProg(p: Program) = {
     val f = inferProcFrames(p)
     afterFrame = f.map((k, v) => (k.name, v)).toMap
-    val (prog, cuts) = toTransitionSystem(p, f)
+    val (prog, cuts) = TransitionSystem.toTransitionSystem(p, f)
     liveAfter = p.procedures.map(p => p.name -> getLiveVars(p, f)).toMap
     afterProg = Some(prog)
     afterCuts = cuts
@@ -639,25 +384,6 @@ class TranslationValidator {
 
   def addAssumedAssertions(a: Iterable[Assert]) = {
     asserts = asserts ++ a
-  }
-
-  private class CollectUninterps extends CILVisitor {
-
-    var funcs = List[FApplyExpr]()
-
-    override def vexpr(e: Expr) =
-      e match {
-        case u: FApplyExpr =>
-          funcs = u :: funcs
-          DoChildren()
-        case _ => DoChildren()
-      }
-  }
-
-  private def getUninterps(p: Procedure) = {
-    val v = CollectUninterps()
-    visit_proc(v, p)
-    v.funcs.map(u => u.name -> u).toMap
   }
 
   /**
@@ -691,22 +417,22 @@ class TranslationValidator {
       val srcExit = source.returnBlock.get
       val tgtExit = target.returnBlock.get
 
-      AssertsToPC(source.returnBlock.get).transform(source)
-      AssertsToPC(target.returnBlock.get).transform(target)
+      TransitionSystem.totaliseAsserts(source)
+      TransitionSystem.totaliseAsserts(target)
 
-      val inputs = transitionSystemPCVar :: traceVar :: (globalsForProc(proc).toList)
-
+      val inputs = TransitionSystem.programCounterVar :: TransitionSystem.traceVar :: (globalsForProc(proc).toList)
       val frames = (afterFrame ++ beforeFrame)
 
       val (srcRenameSSA, srcLiveMemory) = SSADAG.transform(frames, source, inputs)
       val (tgtRenameSSA, tgtLiveMemory) = SSADAG.transform(frames, target, inputs)
+      timer.checkPoint("SSA")
 
       val ackInv =
         Ackermann.instantiateAxioms(source.entryBlock.get, target.entryBlock.get, frames, exprInSource, exprInTarget)
       timer.checkPoint("ackermann")
 
-      val pcInv = CompatArg(transitionSystemPCVar, transitionSystemPCVar)
-      val traceInv = CompatArg(traceVar, traceVar)
+      val pcInv = CompatArg(TransitionSystem.programCounterVar, TransitionSystem.programCounterVar)
+      val traceInv = CompatArg(TransitionSystem.traceVar, TransitionSystem.traceVar)
       // add invariant to combined
       val initInv = Seq(
         Inv.CutPoint("ENTRY", List(pcInv), Some("PC INVARIANT")),
@@ -714,7 +440,13 @@ class TranslationValidator {
       )
 
       val alwaysInv = ((beforeCuts(target).keys ++ afterCuts(source).keys).toSet).map(c =>
-        Inv.CutPoint(c, List(CompatArg(transitionSystemPCVar, transitionSystemPCVar), CompatArg(traceVar, traceVar)))
+        Inv.CutPoint(
+          c,
+          List(
+            CompatArg(TransitionSystem.programCounterVar, TransitionSystem.programCounterVar),
+            CompatArg(TransitionSystem.traceVar, TransitionSystem.traceVar)
+          )
+        )
       )
 
       // TODO: Expclitly construct cutpoint for negated post condition invariant
@@ -741,6 +473,7 @@ class TranslationValidator {
 
       SSADAG.passify(source)
       SSADAG.passify(target)
+      timer.checkPoint("passify")
 
       val otargets = srcEntry.jump.asInstanceOf[GoTo].targets.toList
 
@@ -775,12 +508,10 @@ class TranslationValidator {
       }
       // b.addAssert(QTarget, Some("Qtgt"))
       b.addAssert(UnaryExpr(BoolNOT, AssocExpr(BoolAND, primedInv.toList)), Some("InvPrimed"))
-
-      timer.checkPoint("extract")
+      timer.checkPoint("extract prog")
 
       val fname = s"$filePrefix${splitName}.smt2"
       util.writeToFile(b.getCheckSat(), fname)
-      // smtQueries = smtQueries + (splitName -> b.getCheckSat())
 
       timer.checkPoint("write out " + fname)
     }
