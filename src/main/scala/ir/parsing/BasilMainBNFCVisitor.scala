@@ -21,7 +21,7 @@ def unsigilAttrib(x: String) = Sigil.unsigil(Sigil.BASIR.attrib)(x)
  * [[basil_ir.Absyn.FunSpec]] which are predicate expressions.
  */
 class ExprBNFCVisitor[A](val decls: Declarations)
-  extends LiteralsBNFCVisitor[A]
+    extends LiteralsBNFCVisitor[A]
     with TypesBNFCVisitor[A]
     with syntax.LocalVar.Visitor[ir.LocalVar, A]
     with syntax.GlobalVar.Visitor[ir.GlobalVar, A]
@@ -114,10 +114,8 @@ class ExprBNFCVisitor[A](val decls: Declarations)
  *
  * @group mainvisitor
  */
-class BlockBNFCVisitor[A](
-  val procName: String,
-  private val _decls: Declarations
-) extends ExprBNFCVisitor[A](_decls)
+class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations)
+    extends ExprBNFCVisitor[A](_decls)
     with AttributeListBNFCVisitor[A]
     with syntax.Assignment.Visitor[(ir.Variable, ir.Expr), A]
     with syntax.LVar.Visitor[ir.Variable, A]
@@ -259,19 +257,20 @@ class BlockBNFCVisitor[A](
  *
  * @group mainvisitor
  */
-case class BasilMainBNFCVisitor[A](
-  var decls: Declarations,
-) extends LiteralsBNFCVisitor[A]
+case class BasilMainBNFCVisitor[A](var decls: Declarations)
+    extends LiteralsBNFCVisitor[A]
     with TypesBNFCVisitor[A]
     with syntax.Module.Visitor[util.IRContext, A]
     with syntax.Decl.Visitor[Option[ir.dsl.EventuallyProcedure], A]
-    with AttributeListBNFCVisitor[A]
-    {
+    with AttributeListBNFCVisitor[A] {
 
   protected def makeFunSpecVisitor(decls: Declarations): syntax.FunSpec.Visitor[FunSpec, A] =
     ExprBNFCVisitor[A](decls)
 
-  protected def makeBlockVisitor(s: String, decls: Declarations): syntax.ProcDef.Visitor[Seq[ir.dsl.EventuallyBlock], A] =
+  protected def makeBlockVisitor(
+    s: String,
+    decls: Declarations
+  ): syntax.ProcDef.Visitor[Seq[ir.dsl.EventuallyBlock], A] =
     BlockBNFCVisitor[A](s, decls)
 
   // Members declared in Declaration.Visitor
@@ -279,7 +278,6 @@ case class BasilMainBNFCVisitor[A](
     val procName = unsigilProc(x.procident_)
     val blockvis = makeBlockVisitor(procName, decls)
     val blocks = x.procdef_.accept(blockvis, arg)
-
 
     val specvis = makeFunSpecVisitor(decls)
     val spec = x.listfunspec_.asScala.foldLeft(FunSpec()) { case (acc, sp) =>
@@ -291,12 +289,7 @@ case class BasilMainBNFCVisitor[A](
     val rname = getStrAttr("name")(attr).getOrElse(procName)
 
     val p = decls.procedures(procName)
-    Some(p.copy(
-      blocks = blocks,
-      requires = spec.require,
-      ensures = spec.ensure,
-      address = addr, label = rname
-    ))
+    Some(p.copy(blocks = blocks, requires = spec.require, ensures = spec.ensure, address = addr, label = rname))
   }
 
   override def visit(x: syntax.Decl_SharedMem, arg: A): None.type = None
@@ -310,7 +303,6 @@ case class BasilMainBNFCVisitor[A](
 
   override def visit(x: syntax.Decl_ProgEmpty, arg: A): None.type = None
   override def visit(x: syntax.Decl_ProgWithSpec, arg: A): None.type = None
-
 
   // Members declared in Program.Visitor
   override def visit(x: syntax.Module1, arg: A) = {

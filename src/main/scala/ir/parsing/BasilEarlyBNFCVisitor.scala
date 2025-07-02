@@ -97,29 +97,30 @@ case class BasilEarlyBNFCVisitor[A]()
       }
     }
 
-    val decls = listdecl.foldLeft(initialDecls)((decls, x) => x match {
-      // parse program specifications (rely / guarantee) and update decls.
-      case x: syntax.Decl_ProgWithSpec =>
-        val spec = visitProgSpec(decls, x, arg)
-        decls.merge(Declarations.empty.copy(progSpec = spec))
+    val decls = listdecl.foldLeft(initialDecls)((decls, x) =>
+      x match {
+        // parse program specifications (rely / guarantee) and update decls.
+        case x: syntax.Decl_ProgWithSpec =>
+          val spec = visitProgSpec(decls, x, arg)
+          decls.merge(Declarations.empty.copy(progSpec = spec))
 
-      // parse function definition bodies and update decls.
-      case x: syntax.Decl_Fun =>
-        val (nm, defn) = visitFunDef(decls, x, arg)
-        decls.updateFunctionDefinition(nm, Some(defn))
+        // parse function definition bodies and update decls.
+        case x: syntax.Decl_Fun =>
+          val (nm, defn) = visitFunDef(decls, x, arg)
+          decls.updateFunctionDefinition(nm, Some(defn))
 
-      case x: syntax.Decl_Axiom =>
-        val ax = visitAxiom(decls, x, arg)
-        decls.copy(axioms = ax +: decls.axioms)
+        case x: syntax.Decl_Axiom =>
+          val ax = visitAxiom(decls, x, arg)
+          decls.copy(axioms = ax +: decls.axioms)
 
-      case _: syntax.Decl_UnsharedMem | _: syntax.Decl_SharedMem | _: syntax.Decl_Var | _: syntax.Decl_Proc | _: syntax.Decl_ProgEmpty =>
-        decls
+        case _: syntax.Decl_UnsharedMem | _: syntax.Decl_SharedMem | _: syntax.Decl_Var | _: syntax.Decl_Proc |
+            _: syntax.Decl_ProgEmpty =>
+          decls
 
-    })
-
-    decls.copy(
-      axioms = decls.axioms.reverse
+      }
     )
+
+    decls.copy(axioms = decls.axioms.reverse)
 
   // Members declared in Declaration.Visitor
   override def visit(x: syntax.Decl_UnsharedMem, arg: A) =
@@ -167,26 +168,25 @@ case class BasilEarlyBNFCVisitor[A]()
     val initialMemory = attrMap
       .get("initial_memory")
       .map(_.List.getOrElse(throw Exception("initial_memory must be a list")))
-      .map(_.map(v =>
-        MemoryAttribData
-          .fromAttrib(v)
-          .getOrElse(throw Exception(s"Ill formed memory section ${v.pprint}"))
-      ).toSet)
+      .map(
+        _.map(v =>
+          MemoryAttribData
+            .fromAttrib(v)
+            .getOrElse(throw Exception(s"Ill formed memory section ${v.pprint}"))
+        ).toSet
+      )
 
-    val symtab = attrMap.get("symbols").map(
-      SymbolTableInfo.fromAttrib(_).getOrElse {
+    val symtab = attrMap
+      .get("symbols")
+      .map(SymbolTableInfo.fromAttrib(_).getOrElse {
         throw Exception("invalid symbols format")
-      }
-    )
+      })
 
     val mainProc = unsigilProc(sigilIdent)
 
     Declarations.empty.copy(
-      progSpec = ProgSpec(
-        mainProc = Some(mainProc),
-        initialMemory = initialMemory.getOrElse(Set())
-      ),
-      symtab = symtab.getOrElse(SymbolTableInfo()),
+      progSpec = ProgSpec(mainProc = Some(mainProc), initialMemory = initialMemory.getOrElse(Set())),
+      symtab = symtab.getOrElse(SymbolTableInfo())
     )
   }
 
@@ -206,9 +206,7 @@ case class BasilEarlyBNFCVisitor[A]()
 
   override def visit(x: syntax.Decl_Fun, arg: A): ir.parsing.Declarations = {
     val n = unsigilGlobal(x.globalident_)
-    val params = visitParams(x.listparams_, arg)
-      .map { (n, ty) => ir.LocalVar(n, ty) }
-      .toList
+    val params = visitParams(x.listparams_, arg).map { (n, ty) => ir.LocalVar(n, ty) }.toList
     val returnType = x.type_.accept(this, arg)
 
     val fun = ir.FunctionDecl(n, params, returnType, None)
@@ -218,10 +216,10 @@ case class BasilEarlyBNFCVisitor[A]()
   override def visit(x: syntax.Decl_Axiom, arg: A) =
     Declarations.empty
 
-  protected def makeExprVisitor(decls: Declarations):
-      syntax.Expr.Visitor[ir.Expr, A]  & syntax.ProgSpec.Visitor[ProgSpec, A] =
+  protected def makeExprVisitor(
+    decls: Declarations
+  ): syntax.Expr.Visitor[ir.Expr, A] & syntax.ProgSpec.Visitor[ProgSpec, A] =
     ExprBNFCVisitor[A](decls)
-
 
   def visitAxiom(decls: Declarations, x: syntax.Decl_Axiom, arg: A) = {
     val exprvis = makeExprVisitor(decls)
