@@ -89,6 +89,7 @@ class NamespaceState(val namespace: String) extends CILVisitor {
     case l: LocalVar => ChangeTo(l.copy(varName = namespace + "__" + l.varName))
     case l: GlobalVar => ChangeTo(l.copy(name = namespace + "__" + l.name))
   }
+
   override def vrvar(v: Variable) = v match {
     case l: LocalVar => ChangeTo(l.copy(varName = namespace + "__" + l.varName))
     case l: GlobalVar => ChangeTo(l.copy(name = namespace + "__" + l.name))
@@ -271,7 +272,14 @@ class TranslationValidator {
     globs.getOrElse(Seq())
   }
 
-  def setEqualVarsInvariant = {
+  /**
+   * Set invariant defining a correspondence between variables in the source and target programs. 
+   *
+   * @param renaming provides an optional corresponding source-program expression for a target porgam
+   *    variable. E.g. representing a substitution performed by a transform.
+   *
+   */
+  def setEqualVarsInvariant(renaming: Variable => Option[Expr] = e => None) = {
 
     // call this after running transform so initProg corresponds to the source / after program.
 
@@ -501,12 +509,10 @@ class TranslationValidator {
         b.addAssert(i, Some(s"source$count"))
       }
       count = 0
-      // b.addAssert(QSource, Some("Qsrc"))
       for (i <- extractProg(target)) {
         count += 1
         b.addAssert(i, Some(s"tgt$count"))
       }
-      // b.addAssert(QTarget, Some("Qtgt"))
       b.addAssert(UnaryExpr(BoolNOT, AssocExpr(BoolAND, primedInv.toList)), Some("InvPrimed"))
       timer.checkPoint("extract prog")
 
