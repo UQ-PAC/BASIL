@@ -5,52 +5,7 @@ import basil_ir.Absyn as syntax
 import scala.collection.immutable.ListMap
 import scala.jdk.CollectionConverters.*
 
-private object Declarations {
-  lazy val empty = Declarations(Map(), Map(), Map(), Map(), SymbolTableInfo.empty, ProgSpec())
-}
-
-/**
- * Container for the result of the [[ir.parsing.BasilEarlyBNFCVisitor]].
- * Stores global variable declarations, memory region declarations, procedure signatures,
- * and metadata.
- *
- * Note that the [[ir.dsl.EventuallyProcedure]] structures stored by this class are
- * *incomplete*. Only the procedure name and the formalIn/Out parameters should be used.
- */
-case class Declarations(
-  val globals: Map[String, ir.GlobalVar],
-  val functions: Map[String, FunDecl],
-  val memories: Map[String, ir.Memory],
-  val procedures: Map[String, ir.dsl.EventuallyProcedure],
-  val symtab: SymbolTableInfo,
-  val progSpec: ProgSpec
-) {
-  private def ensureDisjoint[T, U](x: Map[T, U], y: Map[T, U]): Unit =
-    val overlap = x.keySet.intersect(y.keySet)
-    if (!overlap.isEmpty) {
-      throw new IllegalArgumentException(
-        "invalid attempt to merge non-disjoint declarations. repeated names: " + overlap
-      )
-    }
-
-  @throws[IllegalArgumentException]("if the two Declarations have overlapping names")
-  def merge(other: Declarations) = {
-    ensureDisjoint(globals, other.globals)
-    ensureDisjoint(functions, other.functions)
-    ensureDisjoint(memories, other.memories)
-    ensureDisjoint(procedures, other.procedures)
-    Declarations(
-      globals ++ other.globals,
-      functions ++ other.functions,
-      memories ++ other.memories,
-      procedures ++ other.procedures,
-      symtab.merge(other.symtab),
-      progSpec.merge(other.progSpec)
-    )
-  }
-}
-
-trait AttributeListBNFCVisitor[A]()
+trait AttributeListBNFCVisitor[A]
     extends syntax.AttribSet.Visitor[Attrib.Map, A],
       syntax.Attr.Visitor[Attrib, A],
       syntax.AttrKeyValue.Visitor[(String, Attrib), A],
