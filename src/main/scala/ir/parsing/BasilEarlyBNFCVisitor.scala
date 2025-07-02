@@ -79,7 +79,7 @@ trait AttributeListBNFCVisitor[A]
  * parses all expressions occuring within declarations. This allows for forward declarations
  * to work correctly. The second phase is implemented by the inner class [[DeclsExprVisitor]].
  */
-case class BasilEarlyBNFCVisitor[A]()
+class BasilEarlyBNFCVisitor[A]()
     extends syntax.Module.Visitor[Declarations, A],
       syntax.Decl.Visitor[Declarations, A],
       syntax.Params.Visitor[(String, ir.IRType), A],

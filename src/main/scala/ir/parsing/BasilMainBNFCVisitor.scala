@@ -18,16 +18,15 @@ def unsigilAttrib(x: String) = Sigil.unsigil(Sigil.BASIR.attrib)(x)
 
 /**
  * Visits items at the expression-level and smaller which are
- * *not* procedure-dependent. This includes [[basil_ir.Absyn.ProgSpec]] and
- * [[basil_ir.Absyn.FunSpec]] which are predicate expressions.
+ * *not* procedure-dependent.
  */
 class ExprBNFCVisitor[A](val decls: Declarations)
-    extends LiteralsBNFCVisitor[A]
-    with TypesBNFCVisitor[A]
+    extends syntax.Expr.Visitor[ir.Expr, A]
     with syntax.LocalVar.Visitor[ir.LocalVar, A]
     with syntax.GlobalVar.Visitor[ir.GlobalVar, A]
-    with syntax.Expr.Visitor[ir.Expr, A]
-    with syntax.LambdaDef.Visitor[ir.LambdaExpr, A] {
+    with syntax.LambdaDef.Visitor[ir.LambdaExpr, A]
+    with LiteralsBNFCVisitor[A]
+    with TypesBNFCVisitor[A] {
 
   def exprs(x: syntax.ListExpr, arg: A): List[ir.Expr] =
     x.asScala.map(_.accept(this, arg)).toList
@@ -49,8 +48,8 @@ class ExprBNFCVisitor[A](val decls: Declarations)
     ir.QuantifierExpr(ir.QuantifierSort.exists, ld)
   }
 
-  def visit(x0: syntax.Expr_Literal, x1: A): ir.Expr = x0.value_.accept(this, x1)
-  def visit(x: syntax.Expr_FunctionOp, arg: A): ir.Expr = {
+  override def visit(x: syntax.Expr_Literal, arg: A): ir.Expr = x.value_.accept(this, arg)
+  override def visit(x: syntax.Expr_FunctionOp, arg: A): ir.Expr = {
     val n = unsigilGlobal(x.globalident_)
     val rt = decls.functions.get(n) match {
       case Some(v) => v.returnType
@@ -95,20 +94,25 @@ class ExprBNFCVisitor[A](val decls: Declarations)
 
 /**
  * Parses structures at the block-level and lower, given
- * a particular procName (including address) and declarations.
+ * the current procedure name and the parsed global declarations.
+ * The procedure name is used to look up out parameters for the return
+ * statement, and other declarations are used to look up parameters
+ * for call statements.
+ *
+ * See also: [[ExprBNFCVisitor]] for the expressions visitor.
  *
  * @group mainvisitor
  */
 class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations)
     extends ExprBNFCVisitor[A](_decls)
-    with AttributeListBNFCVisitor[A]
-    with syntax.Assignment.Visitor[(ir.Variable, ir.Expr), A]
-    with syntax.LVar.Visitor[ir.Variable, A]
-    with syntax.LVars.Visitor[List[ir.Variable], A]
-    with syntax.Jump.Visitor[ir.dsl.EventuallyJump, A]
-    with syntax.Stmt.Visitor[ir.dsl.DSLStatement, A]
     with syntax.Block.Visitor[ir.dsl.EventuallyBlock, A]
-    with syntax.ProcDef.Visitor[Seq[ir.dsl.EventuallyBlock], A] {
+    with syntax.ProcDef.Visitor[Seq[ir.dsl.EventuallyBlock], A]
+    with syntax.Stmt.Visitor[ir.dsl.DSLStatement, A]
+    with syntax.Jump.Visitor[ir.dsl.EventuallyJump, A]
+    with syntax.Assignment.Visitor[(ir.Variable, ir.Expr), A]
+    with syntax.LVars.Visitor[List[ir.Variable], A]
+    with syntax.LVar.Visitor[ir.Variable, A]
+    with AttributeListBNFCVisitor[A] {
 
   val procSpec = decls.procSpecs(procName)
   val formalOuts = decls.formalOuts(procName)
@@ -118,6 +122,19 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
 
   def stmts(x: syntax.ListStmt, arg: A): List[ir.dsl.DSLStatement] =
     x.asScala.map(_.accept(this, arg)).toList
+
+  // Members declared in Block.Visitor
+  override def visit(x: syntax.Block1, arg: A): ir.dsl.EventuallyBlock =
+    val ss = stmts(x.liststmt_, arg) :+ x.jump_.accept(this, arg)
+
+    val attr = parseAttrMap(x.attribset_, arg)
+    val addr = getAddrAttr(attr)
+    val origLbl = getStrAttr("originalLabel")(attr)
+    val meta = ir.Metadata(originalLabel = origLbl, address = addr)
+    ir.dsl.block(unsigilBlock(x.blockident_), ss: _*).copy(meta = meta)
+
+  override def visit(x: syntax.ProcDef_Empty, arg: A) = Nil
+  override def visit(x: syntax.ProcDef_Some, arg: A) = blocks(x.listblock_, arg)
 
   // Members declared in Statement.Visitor
   override def visit(x: syntax.Assignment1, arg: A): (ir.Variable, ir.Expr) =
@@ -215,54 +232,35 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
   override def visit(x: syntax.LVars_List, arg: A) =
     x.listlvar_.asScala.toList.map(_.accept(this, arg))
 
-  // Members declared in Block.Visitor
-  override def visit(x: syntax.Block1, arg: A): ir.dsl.EventuallyBlock =
-    val ss = stmts(x.liststmt_, arg) :+ x.jump_.accept(this, arg)
-
-    val attr = parseAttrMap(x.attribset_, arg)
-    val addr = getAddrAttr(attr)
-    val origLbl = getStrAttr("originalLabel")(attr)
-    val meta = ir.Metadata(originalLabel = origLbl, address = addr)
-    ir.dsl.block(unsigilBlock(x.blockident_), ss: _*).copy(meta = meta)
-
-  override def visit(x: syntax.ProcDef_Empty, arg: A) = Nil
-  override def visit(x: syntax.ProcDef_Some, arg: A) =
-    x.listblock_.asScala.map(_.accept(this, arg)).toList
-
-  private inline def cannotVisitDeclaration(x: HasParsePosition) =
-    throw new Exception(
-      "this declaration visit method cannot be called on this visitor. it should be handled by another visitor."
-    )
-
 }
 
 /**
  * Entry-point for the main visitor, parsing everything from the procedure
  * level and lower, given the pre-parsed global declarations.
  *
- * The method makeBlockVisitor param is used to construct the parser for the blocks
- * and inner structures. The default implementation constructs a
- * [[ir.parsing.InnerBasilBNFCVisitor]].
+ * The [[makeBlockVisitor]] method is called to construct a procesure-specific
+ * [[BlockBNFCVisitor]] for each visited procedure. This block visitor is used
+ * to parse the blocks and statements.
  *
  * @group mainvisitor
  */
-case class BasilMainBNFCVisitor[A](var decls: Declarations)
-    extends LiteralsBNFCVisitor[A]
-    with TypesBNFCVisitor[A]
-    with syntax.Module.Visitor[util.IRContext, A]
+class BasilMainBNFCVisitor[A](var decls: Declarations)
+    extends syntax.Module.Visitor[ir.dsl.EventuallyProgram, A]
     with syntax.Decl.Visitor[Option[ir.dsl.EventuallyProcedure], A]
+    with LiteralsBNFCVisitor[A]
+    with TypesBNFCVisitor[A]
     with AttributeListBNFCVisitor[A] {
 
-  protected def makeBlockVisitor(
-    s: String,
-    decls: Declarations
-  ): syntax.ProcDef.Visitor[Seq[ir.dsl.EventuallyBlock], A] =
+  def makeBlockVisitor(s: String): syntax.ProcDef.Visitor[Seq[ir.dsl.EventuallyBlock], A] =
     BlockBNFCVisitor[A](s, decls)
 
-  // Members declared in Declaration.Visitor
-  override def visit(x: syntax.Decl_Proc, arg: A) = {
+  /**
+   * Parses a procedure declaration, delegating to a procedure-specific [[BlockBNFCVisitor]]
+   * to parse the statements within the procedure.
+   */
+  override def visit(x: syntax.Decl_Proc, arg: A): Some[ir.dsl.EventuallyProcedure] = {
     val procName = unsigilProc(x.procident_)
-    val blockvis = makeBlockVisitor(procName, decls)
+    val blockvis = makeBlockVisitor(procName)
     val blocks = x.procdef_.accept(blockvis, arg)
 
     val attr = parseAttrMap(x.attribset_, arg)
@@ -289,18 +287,6 @@ case class BasilMainBNFCVisitor[A](var decls: Declarations)
     ))
   }
 
-  override def visit(x: syntax.Decl_SharedMem, arg: A): None.type = None
-  override def visit(x: syntax.Decl_UnsharedMem, arg: A): None.type = None
-  override def visit(x: syntax.Decl_Var, arg: A): None.type = None
-
-  override def visit(x: syntax.Decl_UninterpFun, arg: A): None.type = None
-  override def visit(x: syntax.Decl_Fun, arg: A): None.type = None
-
-  override def visit(x: syntax.Decl_Axiom, arg: A): None.type = None
-
-  override def visit(x: syntax.Decl_ProgEmpty, arg: A): None.type = None
-  override def visit(x: syntax.Decl_ProgWithSpec, arg: A): None.type = None
-
   // Members declared in Program.Visitor
   override def visit(x: syntax.Module1, arg: A) = {
 
@@ -315,8 +301,30 @@ case class BasilMainBNFCVisitor[A](var decls: Declarations)
     val mainProcDef = procs(mainProcName)
     val otherProcs = procs.filter { (k,_) => k != mainProcName }
 
-    val prog = ir.dsl.EventuallyProgram(mainProcDef, otherProcs.values, initialMemory)
+    ir.dsl.EventuallyProgram(mainProcDef, otherProcs.values, initialMemory)
+  }
 
+
+  override def visit(x: syntax.Decl_SharedMem, arg: A): None.type = None
+  override def visit(x: syntax.Decl_UnsharedMem, arg: A): None.type = None
+  override def visit(x: syntax.Decl_Var, arg: A): None.type = None
+
+  override def visit(x: syntax.Decl_UninterpFun, arg: A): None.type = None
+  override def visit(x: syntax.Decl_Fun, arg: A): None.type = None
+
+  override def visit(x: syntax.Decl_Axiom, arg: A): None.type = None
+
+  override def visit(x: syntax.Decl_ProgEmpty, arg: A): None.type = None
+  override def visit(x: syntax.Decl_ProgWithSpec, arg: A): None.type = None
+}
+
+object ParseBasilIL {
+
+  /**
+   * Combines the parsed declarations and the parsed DSL program into a [[util.IRContext]],
+   * including resolving the DSL program into a Basil IR program.
+   */
+  def makeBasilIRContext(decls: Declarations, prog: ir.dsl.EventuallyProgram) = {
     util.IRContext(
       List(),
       decls.symtab.externalFunctions,
@@ -326,12 +334,8 @@ case class BasilMainBNFCVisitor[A](var decls: Declarations)
       util.IRLoading.emptySpecification(decls.symtab.globals),
       prog.resolve
     )
-
   }
 
-}
-
-object ParseBasilIL {
   def loadILReader(reader: Reader) = {
     val timer = PerformanceTimer("ParseBasilIL", LogLevel.DEBUG)
 
@@ -348,8 +352,11 @@ object ParseBasilIL {
     // Logger.debug(decls)
 
     val vis = BasilMainBNFCVisitor[Unit](decls)
-    val result = ast.accept(vis, ())
-    timer.checkPoint("main visitor & resolve")
+    val prog = ast.accept(vis, ())
+    timer.checkPoint("main visitor")
+
+    val result = makeBasilIRContext(decls, prog)
+    timer.checkPoint("resolved and built ircontext")
     result
   }
 

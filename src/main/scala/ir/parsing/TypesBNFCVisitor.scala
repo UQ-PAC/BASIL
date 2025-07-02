@@ -2,6 +2,9 @@ package ir.parsing
 
 import basil_ir.Absyn as syntax
 
+/**
+ * Parses types into Basil IR types.
+ */
 trait TypesBNFCVisitor[A]
     extends syntax.Type.Visitor[ir.IRType, A],
       syntax.BoolType.Visitor[ir.IRType, A],
