@@ -5,6 +5,7 @@ import ir.*
 import ir.cilvisitor.*
 import util.{LogLevel, Logger, PerformanceTimer}
 
+import util.assertion.*
 import java.io.File
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -272,19 +273,102 @@ class TranslationValidator {
     globs.getOrElse(Seq())
   }
 
+  def globalsForTargetProc(p: Procedure)(renaming: Variable | Global => Option[Global | Expr]): Iterable[Variable] = {
+    val globs = for {
+      bf <- beforeFrame.get(p.name)
+      globs = (bf.readGlobalVars ++ bf.readMem ++ bf.modifiedGlobalVars ++ bf.modifiedMem)
+        .map(x => (x, renaming(x)))
+        .map((t, s) => (SideEffectStatementOfStatement.param(t)._2, SideEffectStatementOfStatement.param(s)._2))
+        .map((t, s) => CompatArg(t, s))
+    } yield (globs)
+    globs.getOrElse(Seq())
+  }
+  
+  def globalsForSourceProc(p: Procedure)(renaming: Variable | Global => Option[Global | Expr]): Iterable[Variable] = {
+    val globs = for {
+      af <- afterFrame.get(p.name)
+      globs = (af.readGlobalVars ++ af.readMem ++ af.modifiedGlobalVars ++ af.modifiedMem)
+        .map(x => (x, renaming(x)))
+        .map((t, s) => (SideEffectStatementOfStatement.param(t)._2, SideEffectStatementOfStatement.param(s)._2))
+        .map((t, s) => CompatArg(t, s))
+    } yield (globs)
+    globs.getOrElse(Seq())
+  }
+
+
+
+  /**
+   * join two lists of compat vars requiring them to be disjoint ish
+   */
+  def mergeCompat(l: List[CompatArg], l2: List[CompatArg], intersect : Boolean = false) : List[CompatArg] = {
+    val srcsrc = l.map {
+      case CompatArg(l, r) => (l, r)
+    }.toMap
+
+    val srctgt = l.map {
+      case CompatArg(l, r) => (r, l)
+    }.toMap
+
+    val tgtsrc  = l2.map {
+      case CompatArg(l, r) => (l, r)
+    }.toMap
+
+    val tgttgt = l2.map {
+      case CompatArg(l, r) => (r, l)
+    }.toMap
+
+    val srcDom = (srcsrc.keys ++ tgtsrc.keys).toSet
+    val tgtDom = (srctgt.keys ++ tgttgt.keys).toSet
+
+    val srcImg = srcDom.map(k => (srcsrc.get(k), tgtsrc.get(k)) match {
+        case (Some(v) , None) => k -> v
+        case (None, Some(v)) => k -> v
+        case (Some(v1), Some(v2)) if v1 == v2 => k -> v1
+        case (Some(v1), Some(v2)) => throw Exception("provided src -> target and target -> src renamings disagree")
+        case (None, None) => ???
+    })
+
+    val tgtImg = tgtDom.map(k => (srctgt.get(k), tgttgt.get(k)) match {
+        case (Some(v) , None) => (v -> k)
+        case (None, Some(v)) => (v -> k)
+        case (Some(v1), Some(v2)) if v1 == v2 => (v1 -> k)
+        case (Some(v1), Some(v2)) => throw Exception("provided src -> target and target -> src renamings disagree")
+        case (None, None) => ???
+    })
+
+    //val merged = if intersect then srcImg.filter(st => tgtDom.contains(st._2)).intersect(tgtDom) ++ tgtImg.filter(st => srcDom.contains(st._1))
+    //    else Set(srcImg) ++ tgtImg
+
+    (Set(srcImg) ++ tgtImg).map((s, t) => CompatArg(s, t))
+  }
+
   /**
    * Set invariant defining a correspondence between variables in the source and target programs. 
    *
-   * @param renaming provides an optional corresponding source-program expression for a target porgam
-   *    variable. E.g. representing a substitution performed by a transform.
+   * @param renamingTgtSrc provides an optional corresponding source-program expression for a target porgam
+   *    variable. E.g. representing a substitution performed by a transform at a given block label.
    *
+   *
+   *  In this case if there is no v such that renamingTgtSrc(tv) -> v \in s and 
+   *    renamingSrcTgt(v) = tv \in t then it means there is no correspondence. 
+   *  In isolation None means there is no information.
+   *
+   *
+   * The idea is that you can provide the rewriting in either direction, as a src -> target (e.g. drop ssa indexes)
+   * or target -> source, e.g. copyprop.
    */
-  def setEqualVarsInvariant(renaming: Variable => Option[Expr] = e => None) = {
+  def setEqualVarsInvariantTargetToSource(
+    renamingTgtSrc: Option[String] => (Variable | Global) => Option[Global | Expr] = e => None,
+    renamingSrcTgt: Option[String] => (Variable | Global) => Option[Global | Expr] = e => None
+    ) = {
 
-    // call this after running transform so initProg corresponds to the source / after program.
-
-    def memToVar(m: Iterable[Memory]) = {
-      m.map(SideEffectStatementOfStatement.param).map(_._2)
+    def totalRenamingSrcTgt(r: Variable | Global, s: Option[String]) : Global | Expr = renamingSrcTgt(s)(r) match {
+      case Some(v) => v
+      case None => r
+    }
+    def totalRenamingTgtSrc(r: Variable | Global, s: Option[String]) : Global | Expr = renamingTgtSrc(s)(r) match {
+      case Some(v) => v
+      case None => r
     }
 
     val procs = initProg.get.procedures.view.map(p => p.name -> p).toMap
@@ -293,18 +377,19 @@ class TranslationValidator {
       val (liveVarsTarget, _) = liveAfter(p.name)
       val (liveVarsSource, _) = liveBefore(p.name)
 
-      // intersect of live of source and target
+      val globalsSrc = globalsForTargetProc(renamingTgtSrc(None))(p)
+      val globalsTgt = globalsForSourceProc(renamingSrcTgt(None))(p)
+      val globals = mergeCompat(globalsSrc, globalsTgt)
 
-      val globals = globalsForProc(p).map(x => CompatArg(x: Variable, x: Variable))
-
-      val inparams = p.formalInParam.toList.map(p => CompatArg(p, p))
-      val outparams = p.formalOutParam.toList.map(p => CompatArg(p, p))
+      // skipping because should be live at entry and return resp.
+      //val inparams = p.formalInParam.toList.map(p => CompatArg(p, p))
+      //val outparams = p.formalOutParam.toList.map(p => CompatArg(p, p))
 
       // TODO: can probably just set at entry and let the liveness sort the rest out?
       val globalsInvEverywhere = afterCuts(p).keys.map(c => Inv.CutPoint(c, globals.toList)).toList
 
-      val entryInv: Inv = Inv.CutPoint("ENTRY", inparams)
-      val returnInv: Inv = Inv.CutPoint("RETURN", outparams)
+      //val entryInv: Inv = Inv.CutPoint("ENTRY", inparams)
+      //val returnInv: Inv = Inv.CutPoint("RETURN", outparams)
 
       // block -> sourcevar -> targetvar
       val lives: Map[String, Map[Variable, Variable]] = liveVarsSource.collect {
@@ -316,19 +401,43 @@ class TranslationValidator {
           }.toMap
       }.toMap
 
-      val inv = entryInv :: returnInv :: globalsInvEverywhere ++ (afterCuts(p).map {
-        case (label, cutPoint) => {
-          val vars = lives.get(cutPoint.label).getOrElse(Map())
 
-          val assertion = vars.toList.map { case (src, tgt) =>
-            CompatArg(src, tgt)
+      debugAssert(afterCuts(p).map(_.label).toSet == beforeCuts(p).map(_.label).toSet)
+
+      val beforeCutsBls = beforeCuts(p).map {
+          case (cl, b) => cl -> b.label
+      }
+      val afterCutsBls = beforeCuts(p).map {
+          case (cl, b) => cl -> b.label
+      }
+
+      debugAssert(beforeCuts.keys.toSet == afterCutsBls.kess.toSet)
+
+      val invs = (beforeCuts.keys.map {
+        case (label) => {
+          val tgtCut = beforeCutsBls(label)
+          val srcCut = afterCutsBls(label)
+
+          val srcLives = liveVarsSource.getOrElse(srcCut, Map())
+          val tgtLives = liveVarsSource.getOrElse(tgtCut, Map())
+
+          val invSrc = srcLives.collect {
+            case s if renamingSrcTgt(label)(s).isDefined => CompatArg(s, renamingSrcTgt(label)(s).get)
+          }
+          val invTgt = tgtLives.collect {
+            case t if renamingTgtSrc(label)(t).isDefined => CompatArg(renamingTgtSrc(label)(t).get, t)
           }
 
-          val i = Inv.CutPoint(label, assertion, Some(s"INVARIANT at $label"))
-          i
+          // TODO: intersect live in source and target for dead code.
+
+          val assertion = mergeCompat(invSrc, invTgt)
+
+          Inv.CutPoint(label, assertion, Some(s"INVARIANT at $label"))
         }
       }).toList
 
+
+      val inv =  globalsInvEverywhere ++ invs
       setInvariant(p.name, inv)
     }
   }
