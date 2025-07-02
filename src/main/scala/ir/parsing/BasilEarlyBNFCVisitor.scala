@@ -82,7 +82,7 @@ case class BasilEarlyBNFCVisitor[A]()
   override def visit(x: syntax.Module1, arg: A) =
     val listdecl = x.listdecl_.asScala
 
-    // initial parse of declarations
+    // phase 1: initial parse of declarations
     var initialDecls = listdecl.foldLeft(Declarations.empty) { case (decls, x) =>
       val newdecls = x.accept(this, arg)
       try {
@@ -97,12 +97,14 @@ case class BasilEarlyBNFCVisitor[A]()
       }
     }
 
-    val decls = listdecl.foldLeft(initialDecls)((decls, x) =>
+    // phase 2: visit expressions appearing in declarations
+    // XXX: be aware of foldRight and merge order.
+    listdecl.foldRight(initialDecls)((x, decls) =>
       x match {
         // parse program specifications (rely / guarantee) and update decls.
         case x: syntax.Decl_ProgWithSpec =>
           val spec = visitProgSpec(decls, x, arg)
-          decls.merge(Declarations.empty.copy(progSpec = spec))
+          Declarations.empty.copy(progSpec = spec).merge(decls)
 
         // parse function definition bodies and update decls.
         case x: syntax.Decl_Fun =>
@@ -116,11 +118,8 @@ case class BasilEarlyBNFCVisitor[A]()
         case _: syntax.Decl_UnsharedMem | _: syntax.Decl_SharedMem | _: syntax.Decl_Var | _: syntax.Decl_Proc |
             _: syntax.Decl_ProgEmpty =>
           decls
-
       }
     )
-
-    decls.copy(axioms = decls.axioms.reverse)
 
   // Members declared in Declaration.Visitor
   override def visit(x: syntax.Decl_UnsharedMem, arg: A) =
