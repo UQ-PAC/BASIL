@@ -147,18 +147,18 @@ case class BasilEarlyBNFCVisitor[A]()
     val lv = ir.LocalVar.ofIndexed(unsigilLocal(x.localident_), x.type_.accept(this, arg))
     lv.name -> lv.irType
 
-  private def visitParams(x: syntax.ListParams, arg: A): Map[String, ir.IRType] = {
-    // NOTE: uses ListMap instead of SortedMap, because the orders are presumed to
-    // match between calls and param lists within the same file.
-    x.asScala.toSeq.map(_.accept(this, arg)).to(ListMap)
+  private def visitParams(x: syntax.ListParams, arg: A): ListMap[String, ir.IRType] = {
+    x.asScala.map(_.accept(this, arg)).to(ListMap)
   }
 
   override def visit(x: syntax.Decl_Proc, arg: A) = {
     val name = unsigilProc(x.procident_)
     val inparams = visitParams(x.listparams_1, arg)
     val outparams = visitParams(x.listparams_2, arg)
-    val proc = ir.dsl.EventuallyProcedure(name, inparams, outparams, Nil)
-    Declarations.empty.copy(procedures = Map(name -> proc))
+    Declarations.empty.copy(
+      formalIns = Map(name -> inparams),
+      formalOuts = Map(name -> outparams)
+    )
   }
 
   override def visit(x: syntax.Decl_ProgEmpty, arg: A) =

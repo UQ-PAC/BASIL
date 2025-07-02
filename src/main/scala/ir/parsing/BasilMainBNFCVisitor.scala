@@ -6,6 +6,7 @@ import util.{LogLevel, PerformanceTimer}
 
 import java.io.{FileReader, Reader, StringReader}
 import scala.jdk.CollectionConverters.*
+import scala.collection.immutable.ListMap
 
 def unsigilBlock(x: String) = Sigil.unsigil(Sigil.BASIR.block)(x)
 def unsigilProc(x: String) = Sigil.unsigil(Sigil.BASIR.proc)(x)
@@ -125,7 +126,9 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
     with syntax.Block.Visitor[ir.dsl.EventuallyBlock, A]
     with syntax.ProcDef.Visitor[Seq[ir.dsl.EventuallyBlock], A] {
 
-  val proc = decls.procedures(procName)
+  val formalIns = decls.formalIns(procName)
+  val formalOuts = decls.formalOuts(procName)
+  val procSpec = decls.procSpecs(procName)
 
   def blocks(x: syntax.ListBlock, arg: A): List[ir.dsl.EventuallyBlock] =
     x.asScala.map(_.accept(this, arg)).toList
@@ -165,12 +168,12 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
     val outs = x.lvars_.accept(this, arg)
     val ins = exprs(x.listexpr_, arg)
 
-    val calledproc = decls.procedures(unsigilProc(x.procident_))
+    val procName = unsigilProc(x.procident_)
     ir.dsl.directCall(
-      calledproc.out.keys.zip(outs).toList,
+      formalOuts.keys.zip(outs).toList,
       unsigilProc(x.procident_),
       // TODO: fix var names. in vars need to be obtained from proc definition??
-      calledproc.in.keys.zip(ins).toList
+      formalIns.keys.zip(ins).toList
     )
 
   override def visit(x: syntax.Stmt_IndirectCall, arg: A) = {
@@ -209,7 +212,7 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
   override def visit(x: syntax.Jump_Unreachable, arg: A) = ir.dsl.unreachable
   override def visit(x: syntax.Jump_Return, arg: A) =
     val es = exprs(x.listexpr_, arg)
-    ir.dsl.ret(proc.out.keys.zip(es).toList: _*)
+    ir.dsl.ret(formalOuts.keys.zip(es).toList: _*)
 
   // Members declared in LVar.Visitor
   override def visit(x: syntax.LVar_Local, arg: A) =
@@ -279,17 +282,28 @@ case class BasilMainBNFCVisitor[A](var decls: Declarations)
     val blockvis = makeBlockVisitor(procName, decls)
     val blocks = x.procdef_.accept(blockvis, arg)
 
-    val specvis = makeFunSpecVisitor(decls)
-    val spec = x.listfunspec_.asScala.foldLeft(FunSpec()) { case (acc, sp) =>
-      acc.merge(sp.accept(specvis, arg))
-    }
-
     val attr = parseAttrMap(x.attribset_, arg)
     val addr = getAddrAttr(attr)
     val rname = getStrAttr("name")(attr).getOrElse(procName)
 
-    val p = decls.procedures(procName)
-    Some(p.copy(blocks = blocks, requires = spec.require, ensures = spec.ensure, address = addr, label = rname))
+    val formalIns = decls.formalIns(procName)
+    val formalOuts = decls.formalOuts(procName)
+    val procSpec = decls.procSpecs(procName)
+
+    // TODO: use invariants
+    val _ = procSpec.invariant
+
+    Some(ir.dsl.EventuallyProcedure(
+      label = rname,
+      in = formalIns,
+      out = formalOuts,
+      blocks = blocks,
+      entryBlockLabel = None,
+      returnBlockLabel = None,
+      address = addr,
+      requires = procSpec.require,
+      ensures = procSpec.ensure
+    ))
   }
 
   override def visit(x: syntax.Decl_SharedMem, arg: A): None.type = None
@@ -307,68 +321,18 @@ case class BasilMainBNFCVisitor[A](var decls: Declarations)
   // Members declared in Program.Visitor
   override def visit(x: syntax.Module1, arg: A) = {
 
-    val ds = x.listdecl_.asScala.filter {
-      case x: syntax.Decl_UnsharedMem => false
-      case x: syntax.Decl_SharedMem => false
-      case x: syntax.Decl_Var => false
-      case x: syntax.Decl_Proc => true
-      case x: syntax.Decl_ProgWithSpec => true
-      case x: syntax.Decl_ProgEmpty => true
-      case x: syntax.Decl_UninterpFun => true
-      case x: syntax.Decl_Fun => true
-      case o => throw Exception("parsed decls contains unhandled type: " + o)
-    }
+    val procs = x.listdecl_.asScala.flatMap {
+      case x => x.accept(this, arg).map(p => p.name -> p)
+    }.to(ListMap)
 
-    var initialMemory = Set[ir.MemorySection]()
+    val progSpec = decls.progSpec
+    val mainProcName = progSpec.mainProc.getOrElse(procs.head._1)
+    val initialMemory = progSpec.initialMemory.map(_.toMemorySection)
 
-    def procProgAttrs(attrs: Attrib) = {
-      val attrMap = attrs.Map.get
-      val newInitialMemory = attrMap
-        .get("initial_memory")
-        .flatMap(_.List)
-        .map(_.map(v =>
-          val static = MemoryAttribData
-            .fromAttrib(v)
-            .getOrElse(throw Exception(s"Ill formed memory section ${v.pprint}"))
-          static.toMemorySection
-        ).toSet)
-      val ctx = for {
-        a <- attrMap.get("symbols")
-        nctx <- decls.symtab.mergeFromAttrib(a)
-      } yield (nctx)
-      for (c <- ctx) {
-        decls = decls.copy(symtab = c)
-      }
-      for (n <- newInitialMemory) {
-        initialMemory = n
-      }
-    }
+    val mainProcDef = procs(mainProcName)
+    val otherProcs = procs.filter { (k,_) => k != mainProcName }
 
-    var mainProc: Option[String] = None
-
-    ds.foreach {
-      case d: syntax.Decl_ProgWithSpec => {
-        val attrs = parseAttrMap(d.attribset_, arg)
-        procProgAttrs(attrs)
-        mainProc = Some((unsigilProc(d.procident_)))
-      }
-      case d: syntax.Decl_ProgEmpty => {
-        val attrs = parseAttrMap(d.attribset_, arg)
-        procProgAttrs(attrs)
-        mainProc = Some((unsigilProc(d.procident_)))
-      }
-      case _ => ()
-    }
-
-    val entryname: String = mainProc.getOrElse(throw Exception("No main proc specified"))
-
-    val procs = x.listdecl_.asScala.flatMap(_.accept(this, arg))
-
-    val (mainProcDef, otherProcs) = procs.partition(_.name == entryname)
-    if (mainProcDef.headOption.isEmpty) {
-      throw Exception(s"Entry procedure not found: \"${entryname}\"\n${procs.map(_.name).mkString("\n")}")
-    }
-    val resolvedProg = ir.dsl.EventuallyProgram(mainProcDef.head, otherProcs, initialMemory).resolve
+    val prog = ir.dsl.EventuallyProgram(mainProcDef, otherProcs.values, initialMemory)
 
     util.IRContext(
       List(),
@@ -377,8 +341,9 @@ case class BasilMainBNFCVisitor[A](var decls: Declarations)
       decls.symtab.funcEntries,
       decls.symtab.globalOffsets,
       util.IRLoading.emptySpecification(decls.symtab.globals),
-      resolvedProg
+      prog.resolve
     )
+
   }
 
 }
