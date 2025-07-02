@@ -161,7 +161,10 @@ case class EventuallyCall(
       case Some(x) => x
       case None => throw Exception(s"can't resolve target ${target} proc in prog")
     }
-    val actual = SortedMap.from(actualParams.map((name, value) => t.formalInParam.find(_.name == name).get -> value))
+    val actual = SortedMap.from(actualParams.map((name, value) =>
+        println(name)
+        println(t.formalInParam)
+        t.formalInParam.find(_.name == name).get -> value))
     val callLhs = SortedMap.from(lhs.map((name, value) => t.formalOutParam.find(_.name == name).get -> value))
     DirectCall(t, label, callLhs, actual)
   }
