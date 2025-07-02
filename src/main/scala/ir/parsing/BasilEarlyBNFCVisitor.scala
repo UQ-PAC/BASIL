@@ -98,7 +98,9 @@ case class BasilEarlyBNFCVisitor[A]()
     }
 
     // phase 2: visit expressions appearing in declarations
-    // XXX: be aware of foldRight and merge order.
+
+    // XXX: be aware of foldRight and merge order. foldRight means that to keep the original order,
+    // the folding function should /prepend/ to the accumulator.
     listdecl.foldRight(initialDecls)((x, decls) =>
       x match {
         // parse program specifications (rely / guarantee) and update decls.
@@ -115,7 +117,12 @@ case class BasilEarlyBNFCVisitor[A]()
           val ax = visitAxiom(decls, x, arg)
           decls.copy(axioms = ax +: decls.axioms)
 
-        case _: syntax.Decl_UnsharedMem | _: syntax.Decl_SharedMem | _: syntax.Decl_Var | _: syntax.Decl_Proc |
+        case x: syntax.Decl_Proc =>
+          val spec = visitProcSpec(decls, x, arg)
+          decls.merge(Declarations.empty.copy(procSpecs = Map(spec)))
+
+        // declarations which do not contain expressions
+        case _: syntax.Decl_UnsharedMem | _: syntax.Decl_SharedMem | _: syntax.Decl_Var |
             _: syntax.Decl_ProgEmpty =>
           decls
       }
@@ -217,7 +224,7 @@ case class BasilEarlyBNFCVisitor[A]()
 
   protected def makeExprVisitor(
     decls: Declarations
-  ): syntax.Expr.Visitor[ir.Expr, A] & syntax.ProgSpec.Visitor[ProgSpec, A] =
+  ): syntax.Expr.Visitor[ir.Expr, A] & syntax.ProgSpec.Visitor[ProgSpec, A] & syntax.FunSpec.Visitor[FunSpec, A] =
     ExprBNFCVisitor[A](decls)
 
   def visitAxiom(decls: Declarations, x: syntax.Decl_Axiom, arg: A) = {
@@ -234,6 +241,14 @@ case class BasilEarlyBNFCVisitor[A]()
 
     val n = unsigilGlobal(x.globalident_)
     n -> x.expr_.accept(exprvis, arg)
+  }
+
+  def visitProcSpec(decls: Declarations, x: syntax.Decl_Proc, arg: A) = {
+    val exprvis = makeExprVisitor(decls)
+    val specs = x.listfunspec_.asScala.map(_.accept(exprvis, arg))
+
+    val name = unsigilProc(x.procident_)
+    name -> specs.foldRight(FunSpec())(_ merge _)
   }
 
   /**
