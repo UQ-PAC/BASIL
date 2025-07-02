@@ -69,9 +69,15 @@ trait AttributeListBNFCVisitor[A]
  * procedure declarations and their paramter lists, so a later pass can correctly map a
  * direct call's actual arguments to their formal parameters.
  *
- * Visiting a [[basil_ir.Absyn.Prog]] with this visitor will return the complete declarations
+ * The entry point for this visitor is the [[basil_ir.Absyn.Module]] method. When visiting
+ * a [[basil_ir.Absyn.Module]] with this visitor, this will return the complete declarations
  * object for the entire program. Using the other visit methods will only return declarations
  * for that subset of the AST.
+ *
+ * Within this visitor, there are two phases. The first phase parses all declarations,
+ * but skips expressions which might refer to other declarations. The second phase then
+ * parses all expressions occuring within declarations. This allows for forward declarations
+ * to work correctly. The second phase is implemented by the inner class [[DeclsExprVisitor]].
  */
 case class BasilEarlyBNFCVisitor[A]()
     extends syntax.Module.Visitor[Declarations, A],
@@ -79,6 +85,11 @@ case class BasilEarlyBNFCVisitor[A]()
       syntax.Params.Visitor[(String, ir.IRType), A],
       AttributeListBNFCVisitor[A] {
 
+  /**
+   * Primary entry point for [[BasilEarlyBNFCVisitor]].
+   * This will correctly invoke the two phases as described in this class's documentation
+   * The returned declarations will be correctly populated, including expression predicates.
+   */
   override def visit(x: syntax.Module1, arg: A) =
     val listdecl = x.listdecl_.asScala
 
@@ -98,6 +109,7 @@ case class BasilEarlyBNFCVisitor[A]()
     }
 
     // phase 2: visit expressions appearing in declarations
+    val exprvis = makeExprVisitor(initialDecls)
 
     // XXX: be aware of foldRight and merge order. foldRight means that to keep the original order,
     // the folding function should /prepend/ to the accumulator.
@@ -105,20 +117,20 @@ case class BasilEarlyBNFCVisitor[A]()
       x match {
         // parse program specifications (rely / guarantee) and update decls.
         case x: syntax.Decl_ProgWithSpec =>
-          val spec = visitProgSpec(decls, x, arg)
+          val spec = exprvis.visitProgSpec(x, arg)
           Declarations.empty.copy(progSpec = spec).merge(decls)
 
         // parse function definition bodies and update decls.
         case x: syntax.Decl_Fun =>
-          val (nm, defn) = visitFunDef(decls, x, arg)
+          val (nm, defn) = exprvis.visitFunDef(x, arg)
           decls.updateFunctionDefinition(nm, Some(defn))
 
         case x: syntax.Decl_Axiom =>
-          val ax = visitAxiom(decls, x, arg)
+          val ax = exprvis.visitAxiom(x, arg)
           decls.copy(axioms = ax +: decls.axioms)
 
         case x: syntax.Decl_Proc =>
-          val spec = visitProcSpec(decls, x, arg)
+          val spec = exprvis.visitProcSpec(x, arg)
           decls.merge(Declarations.empty.copy(procSpecs = Map(spec)))
 
         // declarations which do not contain expressions
@@ -147,14 +159,14 @@ case class BasilEarlyBNFCVisitor[A]()
     val lv = ir.LocalVar.ofIndexed(unsigilLocal(x.localident_), x.type_.accept(this, arg))
     lv.name -> lv.irType
 
-  private def visitParams(x: syntax.ListParams, arg: A): ListMap[String, ir.IRType] = {
+  private def visitParamsList(x: syntax.ListParams, arg: A): ListMap[String, ir.IRType] = {
     x.asScala.toList.map(_.accept(this, arg)).to(ListMap)
   }
 
   override def visit(x: syntax.Decl_Proc, arg: A) = {
     val name = unsigilProc(x.procident_)
-    val inparams = visitParams(x.listparams_1, arg)
-    val outparams = visitParams(x.listparams_2, arg)
+    val inparams = visitParamsList(x.listparams_1, arg)
+    val outparams = visitParamsList(x.listparams_2, arg)
     Declarations.empty.copy(
       formalIns = Map(name -> inparams),
       formalOuts = Map(name -> outparams)
@@ -212,7 +224,7 @@ case class BasilEarlyBNFCVisitor[A]()
 
   override def visit(x: syntax.Decl_Fun, arg: A): ir.parsing.Declarations = {
     val n = unsigilGlobal(x.globalident_)
-    val params = visitParams(x.listparams_, arg).map { (n, ty) => ir.LocalVar(n, ty) }.toList
+    val params = visitParamsList(x.listparams_, arg).map { (n, ty) => ir.LocalVar(n, ty) }.toList
     val returnType = x.type_.accept(this, arg)
 
     val fun = ir.FunctionDecl(n, params, returnType, None)
@@ -222,45 +234,72 @@ case class BasilEarlyBNFCVisitor[A]()
   override def visit(x: syntax.Decl_Axiom, arg: A) =
     Declarations.empty
 
-  protected def makeExprVisitor(
-    decls: Declarations
-  ): syntax.Expr.Visitor[ir.Expr, A] & syntax.ProgSpec.Visitor[ProgSpec, A] & syntax.FunSpec.Visitor[FunSpec, A] =
-    ExprBNFCVisitor[A](decls)
-
-  def visitAxiom(decls: Declarations, x: syntax.Decl_Axiom, arg: A) = {
-    val exprvis = makeExprVisitor(decls)
-
-    // TODO: use attribset for axiom declarations
-    val _ = x.attribset_
-
-    ir.AxiomDecl(x.expr_.accept(exprvis, arg))
-  }
-
-  def visitFunDef(decls: Declarations, x: syntax.Decl_Fun, arg: A) = {
-    val exprvis = makeExprVisitor(decls)
-
-    val n = unsigilGlobal(x.globalident_)
-    n -> x.expr_.accept(exprvis, arg)
-  }
-
-  def visitProcSpec(decls: Declarations, x: syntax.Decl_Proc, arg: A) = {
-    val exprvis = makeExprVisitor(decls)
-    val specs = x.listfunspec_.asScala.map(_.accept(exprvis, arg))
-
-    val name = unsigilProc(x.procident_)
-    name -> specs.foldRight(FunSpec())(_ merge _)
-  }
+  def makeExprVisitor(decls: Declarations): DeclsExprVisitor =
+    DeclsExprVisitor(decls)
 
   /**
-   * This method is called after the rest of the declarations have been parsed
-   * and it produces the [[ProgSpec]] (rely/guarantee) for the program.
-   * Because visitng the specification needs to visit expressions, this method
-   * calls [[makeProgSpecVisitor]] to construct the inner-visitor.
+   * A small second phase within the declarations visitor. This parses
+   * declarations which contain *expressions*. Generally, expressions in declarations
+   * can reference other declarations, so this visitor has to be run *after*
+   * the initial enumeration of declarations.
    */
-  def visitProgSpec(decls: Declarations, x: syntax.Decl_ProgWithSpec, arg: A) =
-    val specvis = makeExprVisitor(decls)
-    x.listprogspec_.asScala.foldLeft(ProgSpec()) { case (spec, x) =>
-      spec.merge(x.accept(specvis, arg))
+  class DeclsExprVisitor(val decls: Declarations)
+    extends syntax.FunSpec.Visitor[FunSpec, A]
+    with syntax.ProgSpec.Visitor[ProgSpec, A] {
+
+    val exprvis: syntax.Expr.Visitor[ir.Expr, A] = ExprBNFCVisitor[A](decls)
+
+    /**
+     * Parses an axiom definition.
+     */
+    def visitAxiom(x: syntax.Decl_Axiom, arg: A) = {
+
+      // TODO: use attribset for axiom declarations
+      val _ = x.attribset_
+
+      ir.AxiomDecl(x.expr_.accept(exprvis, arg))
+    }
+
+    /**
+     * Parses the expression definition for a function with a body (not uninterpreted).
+     */
+    def visitFunDef(x: syntax.Decl_Fun, arg: A) = {
+      val n = unsigilGlobal(x.globalident_)
+      n -> x.expr_.accept(exprvis, arg)
+    }
+
+    /**
+     * Parses the [[FunSpec]] (require/ensures) for a procedure.
+     */
+    def visitProcSpec(x: syntax.Decl_Proc, arg: A) = {
+      val specs = x.listfunspec_.asScala.map(_.accept(this, arg))
+
+      val name = unsigilProc(x.procident_)
+      name -> specs.foldRight(FunSpec())(_ merge _)
+    }
+
+    // Members declared in FunSpec.Visitor
+    override def visit(x: syntax.FunSpec_Require, arg: A): FunSpec =
+      FunSpec(require = List(x.expr_.accept(exprvis, arg)))
+    override def visit(x: syntax.FunSpec_Ensure, arg: A): FunSpec =
+      FunSpec(ensure = List(x.expr_.accept(exprvis, arg)))
+    override def visit(x: syntax.FunSpec_Invariant, arg: A): FunSpec =
+      val bl = unsigilBlock(x.blockident_)
+      val e = x.expr_.accept(exprvis, arg)
+      FunSpec(invariant = Map(bl -> List(e)))
+
+    /**
+     * Parses the [[ProgSpec]] (rely/guarantee) for the program.
+     */
+    def visitProgSpec(x: syntax.Decl_ProgWithSpec, arg: A) =
+      x.listprogspec_.asScala.foldLeft(ProgSpec()) { case (spec, x) =>
+        spec.merge(x.accept(this, arg))
+      }
+
+    override def visit(x: syntax.ProgSpec_Rely, arg: A) =
+      ProgSpec(rely = List(x.expr_.accept(exprvis, arg)))
+    override def visit(x: syntax.ProgSpec_Guarantee, arg: A) =
+      ProgSpec(guar = List(x.expr_.accept(exprvis, arg)))
     }
 
 }

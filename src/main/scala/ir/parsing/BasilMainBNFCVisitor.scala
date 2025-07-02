@@ -26,8 +26,6 @@ class ExprBNFCVisitor[A](val decls: Declarations)
     with TypesBNFCVisitor[A]
     with syntax.LocalVar.Visitor[ir.LocalVar, A]
     with syntax.GlobalVar.Visitor[ir.GlobalVar, A]
-    with syntax.FunSpec.Visitor[FunSpec, A]
-    with syntax.ProgSpec.Visitor[ProgSpec, A]
     with syntax.Expr.Visitor[ir.Expr, A]
     with syntax.LambdaDef.Visitor[ir.LambdaExpr, A] {
 
@@ -93,20 +91,6 @@ class ExprBNFCVisitor[A](val decls: Declarations)
   override def visit(x: syntax.Expr_Concat, arg: A) =
     ir.BinaryExpr(ir.BVCONCAT, x.expr_1.accept(this, arg), x.expr_2.accept(this, arg))
 
-  // Members declared in FunSpec.Visitor
-  override def visit(x: syntax.FunSpec_Require, arg: A): FunSpec =
-    FunSpec(require = List(x.expr_.accept(this, arg)))
-  override def visit(x: syntax.FunSpec_Ensure, arg: A): FunSpec =
-    FunSpec(ensure = List(x.expr_.accept(this, arg)))
-  override def visit(x: syntax.FunSpec_Invariant, arg: A): FunSpec =
-    val bl = unsigilBlock(x.blockident_)
-    val e = x.expr_.accept(this, arg)
-    FunSpec(invariant = Map(bl -> List(e)))
-
-  override def visit(x: syntax.ProgSpec_Rely, arg: A) =
-    ProgSpec(rely = List(x.expr_.accept(this, arg)))
-  override def visit(x: syntax.ProgSpec_Guarantee, arg: A) =
-    ProgSpec(guar = List(x.expr_.accept(this, arg)))
 }
 
 /**
@@ -268,9 +252,6 @@ case class BasilMainBNFCVisitor[A](var decls: Declarations)
     with syntax.Module.Visitor[util.IRContext, A]
     with syntax.Decl.Visitor[Option[ir.dsl.EventuallyProcedure], A]
     with AttributeListBNFCVisitor[A] {
-
-  protected def makeFunSpecVisitor(decls: Declarations): syntax.FunSpec.Visitor[FunSpec, A] =
-    ExprBNFCVisitor[A](decls)
 
   protected def makeBlockVisitor(
     s: String,

@@ -9,8 +9,6 @@ trait TypesBNFCVisitor[A]
       syntax.IntType.Visitor[ir.IRType, A],
       syntax.BVType.Visitor[ir.IRType, A] {
 
-  import scala.language.implicitConversions
-
   // Members declared in Type.Visitor
   override def visit(x: syntax.TypeIntType, arg: A) = x.inttype_.accept(this, arg)
   override def visit(x: syntax.TypeBoolType, arg: A) = x.booltype_.accept(this, arg)
