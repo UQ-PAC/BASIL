@@ -2,6 +2,7 @@ package ir.transforms
 
 import ir.*
 import util.Logger
+import util.assertion.*
 
 import collection.mutable
 
@@ -30,7 +31,7 @@ def stripUnreachableFunctions(p: Program, depth: Int): Unit = {
       callees.foreach(c => addName(next._1 + 1, c))
     }
   }
-  assert(invariant.cfgCorrect(p))
+  debugAssert(invariant.cfgCorrect(p))
   val removed = p.procedures.filterNot(f => reachableNames.keySet.contains(f)).toSet
   // p.procedures = p.procedures.filter(f => reachableNames.keySet.contains(f.name))
   for (proc <- removed) {
@@ -42,12 +43,13 @@ def stripUnreachableFunctions(p: Program, depth: Int): Unit = {
     // a function we have removed
 
     elem.clearBlocks()
-    assert(elem.entryBlock.isEmpty)
-    assert(elem.returnBlock.isEmpty)
+    debugAssert(elem.entryBlock.isEmpty)
+    debugAssert(elem.returnBlock.isEmpty)
 
   }
-  assert(invariant.blocksUniqueToEachProcedure(p))
-  assert(invariant.cfgCorrect(p))
+  debugAssert(invariant.blocksUniqueToEachProcedure(p))
+  debugAssert(invariant.cfgCorrect(p))
+
 }
 
 def getStripUnreachableFunctionsTransform(depth: Int): Transform =

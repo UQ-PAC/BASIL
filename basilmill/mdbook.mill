@@ -14,6 +14,7 @@ trait mdbookBinary extends DownloadModule {
   def url = s"https://github.com/rust-lang/mdBook/releases/download/v${version}/mdbook-v${version}-${suffix}"
   def name = s"mdBook-$version-${System.currentTimeMillis()}$suffix"
   def mdbookSources : T[PathRef]
+  override def unzip = Some(TarGZ("mdbook"))
 
   def osName = System.getProperty("os.name")
 
@@ -38,15 +39,6 @@ trait mdbookBinary extends DownloadModule {
     s"${arch}-apple-darwin.tar.gz"
   } else {
     throw new Exception(s"unsupported os ${osName}")
-  }
-
-  override def path = Task {
-    local().getOrElse({
-      val l = remote(Task.dest)
-      os.call(Seq("tar", "-xzf", l.toString), cwd=Task.dest)
-      (Task.dest / "mdbook").toString
-    }
-    )
   }
 
   def run(args: String*) = Task.Command {

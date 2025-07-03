@@ -1,8 +1,8 @@
 package test_util
 
 import org.scalatest.concurrent.ScaledTimeSpans
-import org.scalatest.time.{Span, Seconds}
-
+import org.scalatest.time.{Seconds, Span}
+import util.boogie_interaction.*
 import util.{
   BASILConfig,
   BASILResult,
@@ -14,11 +14,10 @@ import util.{
   RunUtils,
   StaticAnalysisConfig
 }
-import util.boogie_interaction.*
 
-import scala.sys.process.*
-import scala.io.Source
 import java.io.{BufferedWriter, File, FileWriter}
+import scala.io.Source
+import scala.sys.process.*
 
 case class TestConfig(
   timeout: Int = 10,

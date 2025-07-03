@@ -24,6 +24,12 @@ import scala.language.postfixOps
 
 object Main {
 
+  val programNameVersionHeader = {
+    "Basil" + System.lineSeparator()
+      + "Version: " + buildinfo.BuildInfo.gitVersion + System.lineSeparator()
+      + "Commit:  " + buildinfo.BuildInfo.gitCommit
+  }
+
   enum ChooseInput {
     case Gtirb
     case Bap
@@ -111,7 +117,7 @@ object Main {
     }
   }
 
-  @main(name = "BASIL")
+  @main(name = programNameVersionHeader + System.lineSeparator())
   case class Config(
     @arg(name = "load-directory-bap", doc = "Load relf, adt, and bir from directory (and spec from parent directory)")
     bapInputDirName: Option[String],
@@ -160,6 +166,8 @@ object Main {
     trimEarly: Flag,
     @arg(name = "help", short = 'h', doc = "Show this help message.")
     help: Flag,
+    @arg(name = "version", doc = "Show version number and exit.")
+    version: Flag,
     @arg(name = "analysis-results", doc = "Log analysis results in files at specified path.")
     analysisResults: Option[String],
     @arg(name = "analysis-results-dot", doc = "Log analysis results in .dot form at specified path.")
@@ -222,7 +230,9 @@ object Main {
     @arg(name = "memory-transform", doc = "Transform memory access to region accesses")
     memoryTransform: Flag,
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
-    noif: Flag
+    noif: Flag,
+    @arg(name = "nodebug", doc = "Disable runtume debug assertions")
+    nodebug: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -238,6 +248,11 @@ object Main {
 
     if (conf.help.value) {
       println(parser.helpText(sorted = false))
+      return
+    }
+
+    if (conf.version.value) {
+      println(programNameVersionHeader)
       return
     }
 
@@ -340,6 +355,10 @@ object Main {
       throw IllegalArgumentException("BAP ADT input requires --relf")
     }
 
+    if (conf.nodebug.value) {
+      util.assertion.disableAssertions == true
+    }
+
     val q = BASILConfig(
       loading = loadingInputs.copy(
         dumpIL = conf.dumpIL,
@@ -361,6 +380,8 @@ object Main {
       memoryTransform = conf.memoryTransform.value,
       assertCalleeSaved = calleeSaved
     )
+
+    Logger.info(programNameVersionHeader)
 
     val result = RunUtils.run(q)
     if (conf.verify.value) {

@@ -1,12 +1,12 @@
+import analysis.AnalysisManager
 import ir.*
-import ir.eval.*
-import java.io.File
+import ir.eval.{ExecEffect, *}
 import org.scalatest.*
 import org.scalatest.funsuite.*
-import util.{IRLoading, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, Logger, LogLevel}
-import ir.eval.ExecEffect
 import test_util.*
-import analysis.AnalysisManager
+import util.{ILLoadingConfig, IRContext, IRLoading, LogLevel, Logger, RunUtils, StaticAnalysisConfig}
+
+import java.io.File
 
 abstract class DifferentialTest extends AnyFunSuite, CaptureOutput, TestCustomisation {
 

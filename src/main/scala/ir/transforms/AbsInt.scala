@@ -2,6 +2,7 @@ package ir.transforms
 
 import ir.*
 import util.Logger
+import util.assertion.*
 
 import scala.collection.mutable
 
@@ -105,7 +106,15 @@ class DomainWithFunctionSummaries[L, Summary](
 }
 
 trait ProcedureSummaryGenerator[L, LocalDomain] extends ProcAbstractDomain[L] {
+
+  /** 
+   *  Join the summary [[summaryForTarget]] for a call [[p]] into the local abstract state [[l]]
+   */
   def localTransferCall(l: LocalDomain, summaryForTarget: L, p: DirectCall): LocalDomain
+
+  /**
+   * Return the new updated summary for a procedure based on the results of a dataflow analysis of that procedure.
+   */
   def updateSummary(
     prevSummary: L,
     p: Procedure,
@@ -182,7 +191,7 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
       do {
         // drop rest of blocks with same priority
         val m = worklist.dequeue()
-        assert(
+        debugAssert(
           m == b,
           s"Different nodes with same priority ${m.rpoOrder} ${b.rpoOrder}, violates PriorityQueueWorklist assumption: $b and $m"
         )

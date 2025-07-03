@@ -1,22 +1,18 @@
 package ir
 
-import util.PerformanceTimer
-import util.functional.*
-import translating.PrettyPrinter.*
-import ir.eval.*
-import boogie.Scope
-import ir.dsl.*
-import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.BeforeAndAfter
-import boogie.SpecGlobal
-import translating.BAPToIR
-import util.{LogLevel, Logger}
-import util.IRLoading.{loadBAP, loadReadELF}
-import util.{ILLoadingConfig, IRContext, IRLoading}
-import test_util.{BASILTest, CaptureOutput}
-import ir.dsl.given
-import ir.dsl.IfThenBlocks
 import analysis.AnalysisManager
+import boogie.{Scope, SpecGlobal}
+import ir.dsl.given
+import ir.dsl.{IfThenBlocks, *}
+import ir.eval.*
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
+import test_util.{BASILTest, CaptureOutput}
+import translating.PrettyPrinter.*
+import util.functional.*
+import util.{ILLoadingConfig, IRContext, IRLoading, LogLevel, Logger, PerformanceTimer}
+
+import scala.language.implicitConversions
 
 def load(s: InterpreterState, global: SpecGlobal): Option[BitVecLiteral] = {
   val f = NormalInterpreter

@@ -1,6 +1,6 @@
 package test_util
 
-import org.scalatest.{TestSuite, Informing, Retries, Failed, Exceptional, Pending, Canceled, Succeeded}
+import org.scalatest.{Canceled, Exceptional, Failed, Informing, Pending, Retries, Succeeded, TestSuite}
 
 /**
  * A mixin for TestSuite (including AnyFunSuite) which allows

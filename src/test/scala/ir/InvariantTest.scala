@@ -1,9 +1,8 @@
 package ir
 
 import ir.dsl.*
-import test_util.CaptureOutput
-
 import org.scalatest.funsuite.AnyFunSuite
+import test_util.CaptureOutput
 
 @test_util.tags.UnitTest
 class InvariantTest extends AnyFunSuite with CaptureOutput {

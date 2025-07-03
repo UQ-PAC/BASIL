@@ -35,11 +35,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check Source Formatting
-        run: ./mill scalafmt.checkFormat
+      - run: ./mill fmt
 
-      - name: Lint 
-        run: ./mill fix --check
+      - name: Check source formatting and imports
+        run: git diff --exit-code
 
   Compile:
     runs-on: ubuntu-latest
@@ -54,6 +53,8 @@ jobs:
 
       - name: Compile BASIL Mill
         run: ./mill compile
+      - if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3
 
   # INFO: Scalatest runner arguments (i.e., arguments to scalatest.sh) can be
   # found at: https://www.scalatest.org/user_guide/using_the_runner

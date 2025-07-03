@@ -1,15 +1,14 @@
 package ir
 
-import org.scalatest.concurrent.{TimeLimitedTests, ThreadSignaler}
-import org.scalatest.time.{Span, Seconds}
-import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.{TestData, BeforeAndAfterEachTestData}
-import util.twine.Twine
 import ir.dsl.*
 import ir.dsl.given
-import test_util.CaptureOutput
-
 import org.scalactic.source.Position
+import org.scalatest.concurrent.{ThreadSignaler, TimeLimitedTests}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.time.{Seconds, Span}
+import org.scalatest.{BeforeAndAfterEachTestData, TestData}
+import test_util.CaptureOutput
+import util.twine.Twine
 
 @test_util.tags.UnitTest
 class ToScalaTest extends AnyFunSuite with CaptureOutput with TimeLimitedTests with BeforeAndAfterEachTestData {
@@ -46,8 +45,8 @@ class ToScalaTest extends AnyFunSuite with CaptureOutput with TimeLimitedTests w
 prog(
   proc("main",
     block("first_call",
-      LocalAssign(Register("R0", 64), BitVecLiteral(BigInt("1"), 64), None),
-      LocalAssign(Register("R1", 64), BitVecLiteral(BigInt("1"), 64), None),
+      LocalAssign(GlobalVar("R0", BitVecType(64)), BitVecLiteral(BigInt("1"), 64), None),
+      LocalAssign(GlobalVar("R1", BitVecType(64)), BitVecLiteral(BigInt("1"), 64), None),
       directCall("callee1"),
       goto("second_call")
     ),
@@ -76,8 +75,8 @@ prog(
   val expectedWithSplitting = """
 {
   def `block:main.first_call` = block("first_call",
-    LocalAssign(Register("R0", 64), BitVecLiteral(BigInt("1"), 64), None),
-    LocalAssign(Register("R1", 64), BitVecLiteral(BigInt("1"), 64), None),
+    LocalAssign(GlobalVar("R0", BitVecType(64)), BitVecLiteral(BigInt("1"), 64), None),
+    LocalAssign(GlobalVar("R1", BitVecType(64)), BitVecLiteral(BigInt("1"), 64), None),
     directCall("callee1"),
     goto("second_call")
   )
@@ -188,11 +187,11 @@ prog(
 
   test("toscala statements") {
     val expected =
-      """MemoryStore(StackMemory("stack", 64, 8), BinaryExpr(BVADD, Register("R31", 64), BitVecLiteral(BigInt("15"), 64)), Extract(8, 0, Register("R0", 64)), Endian.LittleEndian, 8, Some("%0000034e"))"""
+      """MemoryStore(StackMemory("stack", 64, 8), BinaryExpr(BVADD, GlobalVar("R31", BitVecType(64)), BitVecLiteral(BigInt("15"), 64)), Extract(8, 0, GlobalVar("R0", BitVecType(64))), Endian.LittleEndian, 8, Some("%0000034e"))"""
     val stmt = MemoryStore(
       StackMemory("stack", 64, 8),
-      BinaryExpr(BVADD, Register("R31", 64), BitVecLiteral(BigInt("15"), 64)),
-      Extract(8, 0, Register("R0", 64)),
+      BinaryExpr(BVADD, GlobalVar("R31", BitVecType(64)), BitVecLiteral(BigInt("15"), 64)),
+      Extract(8, 0, GlobalVar("R0", BitVecType(64))),
       Endian.LittleEndian,
       8,
       Some("%0000034e")
@@ -259,7 +258,7 @@ prog(
     block("get_two_1876_basil_return",
       directCall(
         Seq(
-          "out" -> Register("R0", 64)
+          "out" -> GlobalVar("R0", BitVecType(64))
         ),
         "printf",
         Seq(

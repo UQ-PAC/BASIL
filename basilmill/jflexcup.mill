@@ -66,7 +66,7 @@ trait JFlexCupModule extends JavaModule {
     }
   }
 
-  override def sources = Task.Sources {
-    super.sources() ++ Seq(jflex.generated(), cup.generated())
+  override def generatedSources = Task.Sources {
+    super.generatedSources() ++ Seq(jflex.generated(), cup.generated())
   }
 }

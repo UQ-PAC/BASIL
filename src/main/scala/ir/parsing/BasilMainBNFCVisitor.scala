@@ -40,7 +40,7 @@ case class InnerBasilBNFCVisitor[A](
     with syntax.Assignment.Visitor[(ir.Variable, ir.Expr), A]
     with syntax.Statement.Visitor[ir.dsl.DSLStatement, A]
     with syntax.LocalVar.Visitor[ir.LocalVar, A]
-    with syntax.GlobalVar.Visitor[ir.Register, A]
+    with syntax.GlobalVar.Visitor[ir.GlobalVar, A]
     with syntax.CallLVars.Visitor[List[ir.Variable], A]
     with syntax.Jump.Visitor[ir.dsl.EventuallyJump, A]
     with syntax.LVar.Visitor[ir.Variable, A]
@@ -117,7 +117,7 @@ case class InnerBasilBNFCVisitor[A](
       case None => throw Exception(s"Undeclared function: ${x.globalident_}")
     }
     val args = x.listexpr_.asScala.toSeq.map(_.accept(this, arg))
-    ir.UninterpretedFunction(n, args, rt)
+    ir.FApplyExpr(n, args, rt)
   }
   override def visit(x: syntax.LocalVar1, arg: A) = {
     // handle registers which are declared in the global scope. everything else
@@ -127,16 +127,13 @@ case class InnerBasilBNFCVisitor[A](
   }
   override def visit(x: syntax.GlobalVar1, arg: A) = {
     // handle registers which are declared in the global scope. everything else
-    val ty = x.type_.accept(this, arg) match {
-      case ir.BitVecType(sz) => sz
-      case t => throw Exception(s"Unsupported global var type : $t")
-    }
-    ir.Register(unsigilGlobal(x.globalident_), ty)
+    val ty = x.type_.accept(this, arg)
+    ir.GlobalVar(unsigilGlobal(x.globalident_), ty)
   }
 
   override def visit(x: syntax.GRVar, arg: A) = {
     // check register is declared in global scope
-    val rvar = x.globalvar_.accept(this, arg).asInstanceOf[ir.Register]
+    val rvar = x.globalvar_.accept(this, arg)
     decls.globals.get(rvar.name) match {
       case None => throw Exception(s"Reference to undefined global variable: $rvar")
       case Some(v) if rvar.irType != v.irType => throw Exception(s"Type mismatch $rvar declared ${v.irType}")

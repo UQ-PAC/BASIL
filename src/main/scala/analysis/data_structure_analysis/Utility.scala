@@ -103,7 +103,7 @@ class Node(using counter: Counter)(val graph: Option[Graph], var size: BigInt = 
   }
 
   def cloneNode(from: Graph, to: Graph): Unit = {
-//    assert(from.nodes.contains(this)) TODO update nodes after each phase for to check this assertion
+//    debugAssert(from.nodes.contains(this)) TODO update nodes after each phase for to check this assertion
     if (!to.nodes.contains(this)) {
       to.nodes.add(this)
 
@@ -111,7 +111,11 @@ class Node(using counter: Counter)(val graph: Option[Graph], var size: BigInt = 
         varMap.foreach { (variable, slice) =>
           if (from.find(slice).node.equals(this)) {
             if (to.varToCell.contains(pos)) {
-              to.varToCell(pos)(variable) = from.find(slice)
+              if to.varToCell(pos).contains(variable) then {
+                // ensures corresponding cell in the caller (cloned from the callee during the BU phase)
+                // is unified with itself during the top-down phase
+                to.mergeCells(to.adjust(to.varToCell(pos)(variable)), from.adjust(slice))
+              } else to.varToCell(pos)(variable) = from.find(slice)
             } else {
               to.varToCell(pos) = mutable.Map(variable -> from.find(slice))
             }
@@ -121,7 +125,9 @@ class Node(using counter: Counter)(val graph: Option[Graph], var size: BigInt = 
       from.formals.foreach { (variable, slice) =>
         if (from.find(slice).node.equals(this)) {
           if (to.varToCell.contains(from.proc)) {
-            to.varToCell(from.proc)(variable) = from.find(slice)
+            if to.varToCell(from.proc).contains(variable) then {
+              to.mergeCells(to.adjust(to.varToCell(from.proc)(variable)), from.adjust(slice))
+            } else to.varToCell(from.proc)(variable) = from.find(slice)
           } else {
             to.varToCell(from.proc) = mutable.Map(variable -> from.find(slice))
           }

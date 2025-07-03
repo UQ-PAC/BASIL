@@ -1,7 +1,7 @@
 package ir.transforms
 import analysis.{TwoElement, TwoElementBottom, TwoElementTop}
-import ir.*
 import ir.cilvisitor.*
+import ir.{CallGraph, *}
 import specification.Specification
 import translating.PrettyPrinter
 import util.{DebugDumpIRLogger, Logger}
@@ -11,7 +11,7 @@ import scala.collection.{immutable, mutable}
 
 import collection.immutable.SortedMap
 
-case class FunSig(inArgs: List[Register], outArgs: List[Register])
+case class FunSig(inArgs: List[GlobalVar], outArgs: List[GlobalVar])
 
 def R(n: Int) = {
   Register(s"R$n", 64)
@@ -71,14 +71,14 @@ def externalOut(name: String): Map[LocalVar, Variable] = {
 def externalCallReads(name: String) = {
   externalIn(name).map(_._2).map {
     case (l: LocalVar) => Register(l.name, 64)
-    case r: Register => r
+    case r: GlobalVar => r
   }
 }
 
 def externalCallWrites(name: String) = {
   externalIn(name).map(_._2).map {
     case (l: LocalVar) => Register(l.name, 64)
-    case r: Register => r
+    case r: GlobalVar => r
   }
 }
 
@@ -312,9 +312,10 @@ object ReadWriteAnalysis {
   def processProc(state: st, p: Procedure): RW = {
     p.foldLeft(state(p))((ir, s) => {
       s match {
-        case s: LocalAssign => {
-          ir.map(addWrites(Seq(s.lhs)))
-            .map(addReads(s.rhs.variables))
+        case SimulAssign(assigns, _) => {
+          val lhs = assigns.map(_._1)
+          val rhs = assigns.flatMap(_._2.variables)
+          ir.map(addWrites(lhs)).map(addReads(rhs))
         }
         case s: MemoryAssign => {
           ir.map(addWrites(Seq(s.lhs)))
@@ -641,6 +642,7 @@ object SpecFixer {
       case b: GammaLoad => b.copy(index = varToOld(b.index))
       case b: GammaStore => b.copy(index = varToOld(b.index), value = varToOld(b.value))
       case b: L => b.copy(index = varToOld(b.index))
+      case b: AssocBExpr => b.copy(arg = b.arg.map(varToOld))
       case b: SpecVar => b
       case b: BVar =>
         ???

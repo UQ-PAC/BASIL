@@ -1,13 +1,7 @@
-import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.matchers.should.Matchers
-import scala.util.{Try, Failure, Success}
-import java.io.OutputStream
-import translating.PrettyPrinter.*
 import analysis.AnalysisManager
-
 import ir.*
 import ir.dsl.*
-import ir.dsl.given
+import org.scalatest.funsuite.AnyFunSuite
 
 @test_util.tags.UnitTest
 class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureOutput {

@@ -3,7 +3,9 @@ package ir.transforms
 import ir.*
 import ir.cilvisitor.*
 import translating.*
+import translating.PrettyPrinter.*
 import util.Logger
+import util.assertion.*
 
 import scala.collection.mutable
 
@@ -125,7 +127,7 @@ class OnePassDSA(
 
     val preds = block.prevBlocks.toList
     val toJoin = preds.filter(state(_).filled)
-    assert(!(toJoin.isEmpty && preds.nonEmpty), s"should always have at least one processed predecessor ${preds}")
+    debugAssert(!(toJoin.isEmpty && preds.nonEmpty), s"should always have at least one processed predecessor ${preds}")
 
     {
       val definedVars = toJoin.flatMap(state(_).renamesAfter.keySet).toSet.intersect(liveBefore(block))
@@ -155,7 +157,7 @@ class OnePassDSA(
 
           for (b <- toJoin) {
             val nb = blocks(b)
-            assert(state(b).filled)
+            debugAssert(state(b).filled)
             state(nb).renamesBefore.addAll(state(b).renamesAfter)
 
             val assign = LocalAssign(v, v, Some("phiback"))
@@ -196,7 +198,7 @@ class OnePassDSA(
     // any next not completed
     val anyNextPrevNotFilled = next.exists(_.prevBlocks.exists(b => !state(b).filled))
     val incompleteSuccessor = next.exists(b => !(state(b).completed))
-    assert(anyNextPrevNotFilled == incompleteSuccessor)
+    debugAssert(anyNextPrevNotFilled == incompleteSuccessor)
     for (b <- next) {
       val definedVars = state(block).renamesAfter.keySet.intersect(liveAfter(block))
 
@@ -263,7 +265,7 @@ class OnePassDSA(
     if (!(state(block).filled)) {
       localProcessBlock(_st, count, block)
       state(block).filled = true
-      assert(state(block).filled)
+      debugAssert(state(block).filled)
       seenBefore = false
     }
 
@@ -281,7 +283,7 @@ class OnePassDSA(
   def applyTransform(p: Procedure): Unit = {
     val _st = mutable.Map[Block, BlockState]()
     // ensure order is defined
-    reversePostOrder(p)
+    ir.transforms.reversePostOrder(p)
 
     val (liveBeforeIn, liveAfterIn) = liveVarsSolver.solveProc(p, backwards = true)
     val liveBefore = mutable.Map.from(liveBeforeIn)
@@ -302,19 +304,36 @@ class OnePassDSA(
     while (worklist.nonEmpty) {
       while (worklist.nonEmpty) {
         val block = worklist.dequeue
-        assert(worklist.headOption.map(_.rpoOrder < block.rpoOrder).getOrElse(true))
+        debugAssert(worklist.headOption.map(_.rpoOrder < block.rpoOrder).getOrElse(true))
 
         visitBlock(_st, count, liveBefore, liveAfter, block)
       }
     }
 
     // fix up rpo index of added phi blocks
-    reversePostOrder(p)
 
     val maxIndex = (Seq(0) ++ freeVarsPos(p).collect {
       case l: LocalVar if l.index != 0 => l.index
     }).max
     p.ssaCount = maxIndex + 1
+
+    // combine phis
+
+    for (b <- p.blocks) {
+      if (_st(b).isPhi) {
+        val assignments = {
+          val ns = SimulAssign(b.statements.map {
+            case l: LocalAssign => (l.lhs, l.rhs)
+            case _ => throw Exception("Expect phi block to only contain assignments")
+          }.toVector)
+          b.statements.clear()
+          b.statements.prepend(ns)
+        }
+
+      }
+    }
+
+    reversePostOrder(p)
 
   }
 
@@ -323,11 +342,15 @@ class OnePassDSA(
 class StmtRenamer(renamesL: Map[Variable, Int] = Map(), renames: Map[Variable, Int] = Map()) extends CILVisitor {
 
   private def addIndex(v: Variable, idx: Int) = {
-    assert(idx != -1)
+    debugAssert(idx != -1)
     v match {
       case Register(n, sz) => {
         throw Exception("Should not SSA registers")
         Register(n + "_" + idx, sz)
+      }
+      case GlobalVar(n, t) => {
+        throw Exception("Should not SSA globals")
+        GlobalVar(n + "_" + idx, t)
       }
       case v: LocalVar => LocalVar(v.varName, v.irType, idx)
     }
@@ -352,8 +375,8 @@ def rdDSAProperty(p: Procedure): Boolean = {
    */
   val defs: Map[Variable, Set[Assign]] = p
     .flatMap {
-      case a: SingleAssign => Seq((a.lhs, (a: Assign)))
-      case a: DirectCall => a.outParams.map(_._2).map((l: Variable) => (l, (a: Assign))).toSeq
+      // case a: SingleAssign => Seq((a.lhs, (a: Assign)))
+      case a: Assign => a.assignees.map((l: Variable) => (l, a)).toSeq
       case _ => Seq()
     }
     .groupBy(_._1)

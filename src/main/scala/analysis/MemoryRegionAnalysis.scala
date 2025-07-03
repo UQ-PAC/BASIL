@@ -4,6 +4,7 @@ import analysis.solvers.SimpleWorklistFixpointSolver
 import ir.*
 import ir.eval.BitVectorEval.bv2SignedInt
 import util.MRALogger
+import util.assertion.*
 
 import scala.collection.mutable
 
@@ -62,7 +63,7 @@ trait MemoryRegionAnalysis(
     *   the stack region corresponding to the offset
     */
   private def poolMaster(base: BigInt, stackBase: Procedure, subAccess: BigInt): StackRegion = {
-    assert(subAccess >= 0)
+    debugAssert(subAccess >= 0)
     val stackPool = stackMap.getOrElseUpdate(stackBase, mutable.HashMap())
     val region = if (stackPool.contains(base)) {
       stackPool(base)
@@ -143,7 +144,8 @@ trait MemoryRegionAnalysis(
           case Some(b: BitVecLiteral) =>
             val ctx = getUse(variable, n, reachingDefs)
             val stackRegions = ctx.flatMap {
-              case l: LocalAssign => eval(l.rhs, stackPointerVariables, l, subAccess)
+              case l @ SimulAssign(assigns, _) =>
+                assigns.flatMap((lhs, rhs) => eval(rhs, stackPointerVariables, l, subAccess)).toSet
               case l: MemoryAssign => eval(l.rhs, stackPointerVariables, l, subAccess)
               case _: MemoryLoad => Set()
               case unhandled: DirectCall =>
@@ -182,7 +184,8 @@ trait MemoryRegionAnalysis(
       if (i != n) {
         i match {
           case l: MemoryAssign => eval(l.rhs, stackPointerVariables, l, subAccess)
-          case l: LocalAssign => eval(l.rhs, stackPointerVariables, l, subAccess)
+          case l @ SimulAssign(assigns, _) =>
+            assigns.flatMap((lhs, rhs) => eval(rhs, stackPointerVariables, l, subAccess)).toSet
           case m: MemoryLoad => eval(m.index, stackPointerVariables, m, m.size)
           case d: DirectCall =>
             throw Exception(s"attempted to reduce variables from direct call, unssupported: $d")
@@ -212,7 +215,7 @@ trait MemoryRegionAnalysis(
           } else {
             Set.empty
           }
-        case reg: Register if stackPointerVariables.contains(reg) => // TODO: this is a hack because stackPointerVariables is not comprehensive it needs to be a standalone analysis
+        case reg @ Register(_, _) if stackPointerVariables.contains(reg) => // TODO: this is a hack because stackPointerVariables is not comprehensive it needs to be a standalone analysis
           if (getDefinition(reg, n, reachingDefs).isEmpty) {
             Set(poolMaster(Long.MaxValue, IRWalk.procedure(n), subAccess))
           } else {

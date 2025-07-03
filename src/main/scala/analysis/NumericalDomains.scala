@@ -2,6 +2,7 @@ package analysis
 
 import ir.*
 import ir.eval.BitVectorEval.{bv2SignedInt, bv2nat, nat2bv, smt_bvneg}
+import util.assertion.*
 
 // Signed infinity
 private def sInf(size: Int): BigInt = BigInt(2).pow(size - 1) - 1
@@ -26,7 +27,7 @@ enum Interval extends InternalLattice[Interval] {
 
   import ir.eval.BitVectorEval.*
 
-  assert(this match {
+  debugAssert(this match {
     case ConcreteInterval(lower, upper, width) => lower <= upper
     case _ => true
   })
@@ -94,6 +95,10 @@ class IntervalDomain(
   def transfer(b: LatticeMap[Variable, Interval], c: Command): LatticeMap[Variable, Interval] = {
     c match {
       case c: LocalAssign => b + (c.lhs -> eval(c.rhs, b))
+      case c: SimulAssign =>
+        b ++ (c.assignments.map { case (lhs, rhs) =>
+          (lhs -> eval(rhs, b))
+        }).toMap
       case c: MemoryAssign => b + (c.lhs -> eval(c.rhs, b))
       case c: MemoryLoad => b + (c.lhs -> Top)
       case c: MemoryStore => b

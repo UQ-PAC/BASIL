@@ -1,6 +1,7 @@
 package test_util
 
 import org.scalatest.{Informing, TestSuite}
+
 import java.io.PrintStream
 
 /**

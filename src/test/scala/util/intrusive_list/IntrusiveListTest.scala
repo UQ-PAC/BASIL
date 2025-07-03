@@ -68,5 +68,22 @@ class IntrusiveListTest extends AnyFunSuite with CaptureOutput {
     assert(p0.last() == p3)
   }
 
+  test("ListElem prepend") {
+    val p0 = Elem(10)
+    val p1 = Elem(9)
+
+    val (x, y, z) = (Elem(1), Elem(2), Elem(3))
+
+    val ps = List(x, y, z)
+    val lst = IntrusiveList[Elem]()
+
+    lst.append(p0)
+    lst.append(p1)
+    lst.prependAll(ps)
+
+    assert(lst.toList == List(x, y, z, p0, p1))
+
+  }
+
   // test("IntrusiveList insertRemove")
 }

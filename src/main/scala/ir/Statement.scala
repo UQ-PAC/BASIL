@@ -1,4 +1,5 @@
 package ir
+import util.assertion.*
 import util.intrusive_list.IntrusiveListElement
 
 import collection.immutable.SortedMap
@@ -14,6 +15,8 @@ import collection.mutable
   */
 sealed trait Command extends HasParent[Block] with DeepEquality {
   val label: Option[String]
+
+  var comment: Option[String] = None
 
   def labelStr: String = label match {
     case Some(s) => s"$s: "
@@ -38,7 +41,7 @@ sealed trait SingleAssign extends Assign {
 
 class MemoryAssign(var lhs: Variable, var rhs: Expr, override val label: Option[String] = None) extends SingleAssign {
   override def modifies: Set[Global] = lhs match
-    case r: Register => Set(r)
+    case r: GlobalVar => Set(r)
     case _ => Set()
 
   override def toString: String = s"$labelStr$lhs := $rhs"
@@ -55,7 +58,7 @@ object MemoryAssign {
 
 class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[String] = None) extends SingleAssign {
   override def modifies: Set[Global] = lhs match {
-    case r: Register => Set(r)
+    case r: GlobalVar => Set(r)
     case _ => Set()
   }
   override def toString: String = s"$labelStr$lhs := $rhs"
@@ -63,6 +66,35 @@ class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[S
   def deepEquals(o: Object) = o match {
     case LocalAssign(l, r, lbl) if l == lhs && r == rhs && lbl == label => true
     case _ => false
+  }
+}
+
+class SimulAssign(var assignments: Vector[(Variable, Expr)], override val label: Option[String] = None) extends Assign {
+  override def modifies: Set[Global] = assignments.collect { case (r: Global, _) =>
+    r
+  }.toSet
+
+  def assignees = assignments.map(_._1).toSet
+  override def toString: String = {
+    val assignList = assignments
+      .map { case (lhs, rhs) =>
+        lhs.toString + " := " + rhs
+      }
+      .mkString(", ")
+    labelStr + assignList
+  }
+
+  override def deepEquals(o: Object): Boolean = o match {
+    case SimulAssign(otherAssings) => otherAssings == assignments
+    case _ => false
+  }
+
+}
+
+object SimulAssign {
+  def unapply(l: SimulAssign | LocalAssign): Some[(Iterable[(Variable, Expr)], Option[String])] = l match {
+    case LocalAssign(lhs, rhs, label) => Some(Seq(lhs -> rhs), label)
+    case s: SimulAssign => Some((s.assignments, s.label))
   }
 }
 
@@ -100,7 +132,7 @@ class MemoryLoad(
   override val label: Option[String] = None
 ) extends SingleAssign {
   override def modifies: Set[Global] = lhs match {
-    case r: Register => Set(r)
+    case r: GlobalVar => Set(r)
     case _ => Set()
   }
   override def toString: String = s"$labelStr$lhs := MemoryLoad($mem, $index, $endian, $size)"
@@ -135,8 +167,9 @@ class AtomicEnd(override val label: Option[String] = None) extends NOP(label) {
   override def toString: String = s"AtomicEnd $labelStr"
 }
 
-class Assert(var body: Expr, var comment: Option[String] = None, override val label: Option[String] = None)
+class Assert(var body: Expr, acomment: Option[String] = None, override val label: Option[String] = None)
     extends Statement {
+  comment = acomment
   override def toString: String = s"${labelStr}assert $body" + comment.map(" //" + _)
   override def deepEquals(o: Object) = o match {
     case Assert(b, c, l) => b == body && c == comment && l == label
@@ -157,12 +190,13 @@ object Assert {
   */
 class Assume(
   var body: Expr,
-  var comment: Option[String] = None,
+  acomment: Option[String] = None,
   override val label: Option[String] = None,
   var checkSecurity: Boolean = false
 ) extends Statement {
 
-  override def toString: String = s"${labelStr}assume $body" + comment.map(" //" + _)
+  comment = acomment
+  override def toString: String = s"${labelStr}assume $body" + comment.map(" // " + _)
   override def deepEquals(o: Object) = o match {
     case Assume(b, c, l, sec) => b == body && c == comment && l == label && sec == checkSecurity
     case _ => false
@@ -242,8 +276,8 @@ class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override
     if (_targets.remove(t)) {
       t.removeIncomingJump(this)
     }
-    assert(!_targets.contains(t))
-    assert(!t.incomingJumps.contains(this))
+    debugAssert(!_targets.contains(t))
+    debugAssert(!t.incomingJumps.contains(this))
   }
 
   override def toString: String = s"${labelStr}GoTo(${targets.map(_.label).mkString(", ")})"
