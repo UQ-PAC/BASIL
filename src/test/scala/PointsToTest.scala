@@ -6,7 +6,7 @@ import org.scalatest.*
 import org.scalatest.funsuite.*
 import specification.*
 import test_util.CaptureOutput
-import util.{IRContext, StaticAnalysis, StaticAnalysisConfig, StaticAnalysisContext}
+import util.{IRContext, StaticAnalysisConfig, StaticAnalysisContext}
 
 @test_util.tags.DisabledTest
 class PointsToTest extends AnyFunSuite with CaptureOutput with OneInstancePerTest {
@@ -28,7 +28,7 @@ class PointsToTest extends AnyFunSuite with CaptureOutput with OneInstancePerTes
       Specification(Set(), Set(), Map(), List(), List(), List(), Set()),
       program
     )
-    StaticAnalysis.analyse(ctx, StaticAnalysisConfig(), 1)
+    analysis.AnalysisPipelineMRA.analyse(ctx, StaticAnalysisConfig(), 1)
   }
 
   /** Test that the analysis correctly identifies the stack pointer even when it is aliased
