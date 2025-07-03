@@ -1,13 +1,16 @@
 package analysis
 
+import analysis.data_structure_analysis.{DataStructureAnalysis, SymbolicAddress, SymbolicAddressAnalysis}
 import analysis.{Interval as _, *}
 import boogie.*
 import ir.*
 import specification.*
+import translating.PrettyPrinter.pp_prog
 import util.{
   AnalysisResultDotLogger,
   DebugDumpIRLogger,
   Logger,
+  MemoryRegionsMode,
   StaticAnalysisConfig,
   StaticAnalysisLogger,
   writeToFile
@@ -313,4 +316,106 @@ object AnalysisPipelineMRA {
     }
     results.mkString(System.lineSeparator())
   }
+
+  /** Use static analysis to resolve indirect calls and replace them in the IR until fixed point.
+    */
+  def runToFixpoint(config: StaticAnalysisConfig, ctx: IRContext): StaticAnalysisContext = {
+    var iteration = 1
+    var modified: Boolean = true
+    val analysisResult = mutable.ArrayBuffer[StaticAnalysisContext]()
+    while (modified) {
+      Logger.debug("[!] Running Static Analysis")
+      val result = analysis.AnalysisPipelineMRA.analyse(ctx, config, iteration, analysisResult.lastOption)
+      val previousResult = analysisResult.lastOption
+      analysisResult.append(result)
+      StaticAnalysisLogger.info("[!] Replacing Indirect Calls")
+
+      /*
+      modified = transforms.SteensgaardIndirectCallResolution(
+        ctx.program,
+        result.steensgaardResults,
+        result.reachingDefs
+      ).resolveIndirectCalls()
+       */
+
+      if (
+        config.memoryRegions == MemoryRegionsMode.MRA && (previousResult.isEmpty || result.vsaResult != previousResult.get.vsaResult)
+      ) {
+        modified = true
+      } else {
+        modified =
+          transforms.VSAIndirectCallResolution(ctx.program, result.vsaResult, result.mmmResults).resolveIndirectCalls()
+      }
+
+      if (modified) {
+        iteration += 1
+        StaticAnalysisLogger.info(s"[!] Analysing again (iter $iteration)")
+      }
+    }
+
+    // should later move this to be inside while (modified) loop and have splitting threads cause further iterations
+
+    if (config.threadSplit) {
+      transforms.splitThreads(ctx.program, analysisResult.last.steensgaardResults, analysisResult.last.ssaResults)
+    }
+
+    val reachingDefs = ReachingDefsAnalysis(ctx.program, analysisResult.last.writesToResult).analyze()
+    config.analysisDotPath.foreach { s =>
+      AnalysisResultDotLogger.writeToFile(File(s"${s}_ct.dot"), toDot(ctx.program))
+    }
+
+    StaticAnalysisLogger.info("[!] Running Symbolic Access Analysis")
+    val symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]] =
+      SymbolicAddressAnalysis(ctx.program, analysisResult.last.interProcConstProp).analyze()
+    config.analysisDotPath.foreach { s =>
+      val labels = symResults.map { (k, v) => k -> v.toString }
+      AnalysisResultDotLogger.writeToFile(File(s"${s}_saa.dot"), toDot(ctx.program, labels))
+    }
+
+    StaticAnalysisLogger.info("[!] Running DSA Analysis")
+
+    writeToFile(pp_prog(ctx.program), "testo1.il")
+    val symbolTableEntries: Set[SymbolTableEntry] = ctx.globals ++ ctx.funcEntries
+    val dsa = DataStructureAnalysis(
+      ctx.program,
+      symResults,
+      analysisResult.last.interProcConstProp,
+      symbolTableEntries,
+      ctx.globalOffsets,
+      ctx.externalFunctions,
+      reachingDefs,
+      analysisResult.last.writesToResult,
+      analysisResult.last.paramResults
+    )
+    dsa.analyze()
+
+    config.analysisDotPath.foreach { s =>
+      dsa.topDown(ctx.program.mainProcedure).toDot
+      DebugDumpIRLogger.writeToFile(File(s"${s}_main_dsg.dot"), dsa.topDown(ctx.program.mainProcedure).toDot)
+    }
+
+    Logger.debug("[!] Injecting regions")
+    val regionInjector = if (config.memoryRegions == MemoryRegionsMode.MRA) {
+      val injector = RegionInjectorMRA(ctx.program, analysisResult.last.mmmResults)
+      injector.injectRegions()
+      Some(injector)
+    } else if (config.memoryRegions == MemoryRegionsMode.DSA) {
+      val injector = RegionInjectorDSA(ctx.program, dsa.topDown)
+      injector.injectRegions()
+      Some(injector)
+    } else {
+      None
+    }
+
+    assert(invariant.singleCallBlockEnd(ctx.program))
+    StaticAnalysisLogger.info(s"[!] Finished indirect call resolution after $iteration iterations")
+    analysisResult.last.copy(
+      symbolicAddresses = symResults,
+      localDSA = dsa.local.toMap,
+      bottomUpDSA = dsa.bottomUp.toMap,
+      topDownDSA = dsa.topDown.toMap,
+      regionInjector = regionInjector
+    )
+  }
+
 }

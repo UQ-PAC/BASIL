@@ -1,9 +1,9 @@
-import analysis.*
+import analysis.{AnalysisPipelineMRA, *}
 import ir.{IRLoading, *}
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import test_util.{BASILTest, CaptureOutput, TestValueDomainWithInterpreter}
-import util.{ILLoadingConfig, LogLevel, Logger, RunUtils, StaticAnalysisConfig}
+import util.{ILLoadingConfig, LogLevel, Logger, StaticAnalysisConfig}
 
 @test_util.tags.StandardSystemTest
 class InterpretTestConstProp
@@ -29,7 +29,7 @@ class InterpretTestConstProp
     val ictx = IRLoading.load(loading)
     ir.transforms.doCleanupWithoutSimplify(ictx, AnalysisManager(ictx.program))
     ir.transforms.clearParams(ictx.program)
-    val analyses = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), ictx)
+    val analyses = AnalysisPipelineMRA.runToFixpoint(StaticAnalysisConfig(None, None, None), ictx)
 
     val analysisres = analyses.intraProcConstProp.collect { case (block: Block, v) =>
       block -> v

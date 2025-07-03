@@ -1,5 +1,5 @@
-import analysis.StaticAnalysisContext
 import analysis.data_structure_analysis.*
+import analysis.{AnalysisPipelineMRA, StaticAnalysisContext}
 import boogie.SpecGlobal
 import ir.*
 import ir.dsl.*
@@ -27,7 +27,7 @@ class DataStructureAnalysisTest extends AnyFunSuite with CaptureOutput {
 
     val emptySpec = Specification(Set(), Set(), Map(), List(), List(), List(), Set())
     val emptyContext = IRContext(List(), Set(), Set(), Set(), Map(), emptySpec, program)
-    RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
+    AnalysisPipelineMRA.runToFixpoint(StaticAnalysisConfig(), emptyContext)
   }
 
   def runTest(relativePath: String): BASILResult = {
@@ -754,7 +754,7 @@ class DataStructureAnalysisTest extends AnyFunSuite with CaptureOutput {
 
     val spec = Specification(Set(), globals, Map(), List(), List(), List(), Set())
     val context = IRContext(List(), Set(), globals, Set(), globalOffsets, spec, program)
-    val staticAnalysisResult = RunUtils.staticAnalysis(StaticAnalysisConfig(), context)
+    val staticAnalysisResult = AnalysisPipelineMRA.runToFixpoint(StaticAnalysisConfig(), context)
 
     val dsg = staticAnalysisResult.topDownDSA(program.mainProcedure)
 
