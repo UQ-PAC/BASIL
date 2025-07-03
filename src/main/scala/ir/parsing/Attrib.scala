@@ -46,7 +46,9 @@ enum Attrib {
     case _ => None
   }
 
+  def get(k: String) = this.Map.flatMap(_.get(k))
   def getInt(k: String) = this.Map.flatMap(_.get(k)).flatMap(_.Int)
+  def getString(k: String) = this.Map.flatMap(_.get(k)).flatMap(_.Str)
 
   import translating.indent
 

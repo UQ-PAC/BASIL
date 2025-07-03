@@ -39,7 +39,7 @@ class TempIf(
   val cond: Expr,
   val thenStmts: immutable.Seq[Statement],
   val elseStmts: immutable.Seq[Statement],
-  override val label: Option[String] = None
+  label: Option[String] = None
 ) extends NOP(label) {
   override def toString = s"TempIf($cond, $thenStmts, $elseStmts)"
 }
