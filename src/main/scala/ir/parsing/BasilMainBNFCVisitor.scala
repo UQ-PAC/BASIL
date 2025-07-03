@@ -6,7 +6,7 @@ import util.{LogLevel, PerformanceTimer}
 
 import java.io.{FileReader, Reader, StringReader}
 import scala.jdk.CollectionConverters.*
-import scala.collection.immutable.ListMap
+import scala.collection.immutable.TreeSeqMap
 
 def unsigilBlock(x: String) = Sigil.unsigil(Sigil.BASIR.block)(x)
 def unsigilProc(x: String) = Sigil.unsigil(Sigil.BASIR.proc)(x)
@@ -218,15 +218,11 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
     ir.dsl.ret(formalOuts.keys.zip(es).toList: _*)
 
   // Members declared in LVar.Visitor
-  override def visit(x: syntax.LVar_Local, arg: A) =
-    x.localvar_.accept(this, arg)
-
-  override def visit(x: syntax.LVar_Global, arg: A) =
-    x.globalvar_.accept(this, arg)
-    // (x.bident_, x.type_.accept(this, arg), false)
+  override def visit(x: syntax.LVar_Local, arg: A) = x.localvar_.accept(this, arg)
+  override def visit(x: syntax.LVar_Global, arg: A) = x.globalvar_.accept(this, arg)
 
   // Members declared in CallLVars.Visitor
-  override def visit(x: syntax.LVars_Empty, arg: A) = Nil
+  override def visit(x: syntax.LVars_Empty, arg: A): Nil.type = Nil
   override def visit(x: syntax.LVars_LocalList, arg: A) =
     x.listlocalvar_.asScala.toList.map(_.accept(this, arg))
   override def visit(x: syntax.LVars_List, arg: A) =
@@ -290,18 +286,18 @@ class BasilMainBNFCVisitor[A](var decls: Declarations)
   // Members declared in Program.Visitor
   override def visit(x: syntax.Module1, arg: A) = {
 
-    // TODO: hashmap?
     val procs = x.listdecl_.asScala.flatMap {
       case x => x.accept(this, arg).map(p => p.name -> p)
-    }.to(ListMap)
+    }.to(TreeSeqMap)
 
     val progSpec = decls.progSpec
-    val mainProc = progSpec.mainProc.fold(procs.head)(procs(_))
+
+    val mainProc = progSpec.mainProc.fold(procs.values.head)(procs(_))
+    val otherProcs = procs.view.values.filter(_ ne mainProc)
+
     val initialMemory = progSpec.initialMemory.map(_.toMemorySection)
 
-    val otherProcs = procs.filter { (_,p) => p ne mainProc }
-
-    ir.dsl.EventuallyProgram(mainProc, otherProcs.values, initialMemory)
+    ir.dsl.EventuallyProgram(mainProc, otherProcs, initialMemory)
   }
 
 
