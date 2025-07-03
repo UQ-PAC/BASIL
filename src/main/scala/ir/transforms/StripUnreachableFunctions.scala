@@ -1,11 +1,13 @@
 package ir.transforms
+
 import ir.*
+import util.Logger
 import util.assertion.*
 
 import collection.mutable
 
 // This shouldn't be run before indirect calls are resolved
-def stripUnreachableFunctions(p: Program, depth: Int = Int.MaxValue): Unit = {
+def stripUnreachableFunctions(p: Program, depth: Int): Unit = {
   val procedureCalleeNames = p.procedures.map(f => f -> f.calls).toMap
 
   val toVisit: mutable.LinkedHashSet[(Int, Procedure)] = mutable.LinkedHashSet((0, p.mainProcedure))
@@ -49,3 +51,33 @@ def stripUnreachableFunctions(p: Program, depth: Int = Int.MaxValue): Unit = {
   debugAssert(invariant.cfgCorrect(p))
 
 }
+
+def getStripUnreachableFunctionsTransform(depth: Int): Transform =
+  Transform(
+    "StripUnreachableFunctions",
+    (ctx, man) => {
+      val before = ctx.program.procedures.size
+      stripUnreachableFunctions(ctx.program, depth)
+      Logger.info(
+        s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
+      )
+
+      /* Fixme: Since refactoring RunUtils, the following code runs when this transform is invoked by the
+      loadAndTranslate function, whereas it used to only run when invoked by the prepareForTranslation function. I don't
+      know if this is problematic. */
+      val dupProcNames = ctx.program.procedures.groupBy(_.name).filter((_, p) => p.size > 1).toList.flatMap(_(1))
+      assert(dupProcNames.isEmpty)
+
+      ctx.program.procedures.foreach(p =>
+        p.blocks.foreach(b => {
+          b.jump match {
+            case GoTo(targs, _) if targs.isEmpty =>
+              Logger.warn(s"block ${b.label} in subroutine ${p.name} has no outgoing edges")
+            case _ => ()
+          }
+        })
+      )
+      man.ClobberAll
+    },
+    notice = "Stripping Unreachable"
+  )

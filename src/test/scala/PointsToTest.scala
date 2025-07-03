@@ -1,12 +1,13 @@
+import analysis.StaticAnalysisContext
 import boogie.*
-import ir.*
 import ir.Endian.LittleEndian
 import ir.dsl.*
+import ir.{IRContext, *}
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import specification.*
 import test_util.CaptureOutput
-import util.{IRContext, StaticAnalysis, StaticAnalysisConfig, StaticAnalysisContext}
+import util.StaticAnalysisConfig
 
 @test_util.tags.DisabledTest
 class PointsToTest extends AnyFunSuite with CaptureOutput with OneInstancePerTest {
@@ -28,7 +29,7 @@ class PointsToTest extends AnyFunSuite with CaptureOutput with OneInstancePerTes
       Specification(Set(), Set(), Map(), List(), List(), List(), Set()),
       program
     )
-    StaticAnalysis.analyse(ctx, StaticAnalysisConfig(), 1)
+    analysis.AnalysisPipelineMRA.analyse(ctx, StaticAnalysisConfig(), 1)
   }
 
   /** Test that the analysis correctly identifies the stack pointer even when it is aliased

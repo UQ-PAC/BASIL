@@ -1,3 +1,4 @@
+import analysis.AnalysisManager
 import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
@@ -816,11 +817,12 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
 
   test("conds inline test") {
 
-    var ctx = util.IRLoading.load(testProgram)
-    util.IRTransform.doCleanup(ctx, true)
+    var ctx = ir.IRLoading.load(testProgram)
+
+    ir.transforms.doCleanupWithSimplify(ctx, AnalysisManager(ctx.program))
     ir.transforms.clearParams(ctx.program)
     ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
-    util.RunUtils.doSimplify(ctx, None)
+    ir.transforms.doSimplify(ctx, None)
     for (p <- ctx.program.procedures) {
       p.normaliseBlockNames()
     }

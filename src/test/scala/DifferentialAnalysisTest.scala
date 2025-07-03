@@ -1,9 +1,10 @@
-import ir.*
+import analysis.{AnalysisManager, AnalysisPipelineMRA}
 import ir.eval.{ExecEffect, *}
+import ir.{IRContext, IRLoading, *}
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import test_util.*
-import util.{ILLoadingConfig, IRContext, IRLoading, IRTransform, LogLevel, Logger, RunUtils, StaticAnalysisConfig}
+import util.{ILLoadingConfig, LogLevel, Logger, StaticAnalysisConfig}
 
 import java.io.File
 
@@ -89,23 +90,23 @@ abstract class DifferentialTest extends AnyFunSuite, CaptureOutput, TestCustomis
     )
 
     var ictx = IRLoading.load(loading)
-    ictx = IRTransform.doCleanup(ictx)
+    ir.transforms.doCleanupWithoutSimplify(ictx, AnalysisManager(ictx.program))
 
     var comparectx = IRLoading.load(loading)
-    comparectx = IRTransform.doCleanup(comparectx)
+    ir.transforms.doCleanupWithoutSimplify(comparectx, AnalysisManager(comparectx.program))
 
     ir.transforms.clearParams(ictx.program)
 
     ir.transforms.clearParams(comparectx.program)
 
     for (analysis <- staticAnalysisConfig) {
-      RunUtils.staticAnalysis(analysis, comparectx)
+      AnalysisPipelineMRA.runToFixpoint(analysis, comparectx)
     }
 
     if (simplify) {
       ictx = ir.transforms.liftProcedureCallAbstraction(ictx)
       comparectx = ir.transforms.liftProcedureCallAbstraction(comparectx)
-      RunUtils.doSimplify(ictx, staticAnalysisConfig)
+      ir.transforms.doSimplify(ictx, staticAnalysisConfig)
     }
 
     diffTest(ictx, comparectx)

@@ -111,7 +111,7 @@ object DefinedOnAllPaths {
   }
 }
 
-def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
+def liftProcedureCallAbstraction(ctx: ir.IRContext): ir.IRContext = {
 
   transforms.clearParams(ctx.program)
 
