@@ -49,7 +49,7 @@ sealed trait SingleAssign extends Assign {
   override def assignees = Set(lhs)
 }
 
-class MemoryAssign(var lhs: Variable, var rhs: Expr, private val _label: Option[String] = None) extends SingleAssign with Command(_label, None) {
+class MemoryAssign(var lhs: Variable, var rhs: Expr, _label: Option[String] = None) extends SingleAssign with Command(_label, None) {
 
   override def modifies: Set[Global] = lhs match
     case r: GlobalVar => Set(r)
@@ -67,7 +67,7 @@ object MemoryAssign {
   def unapply(l: MemoryAssign): Some[(Variable, Expr, Option[String])] = Some(l.lhs, l.rhs, l.label)
 }
 
-class LocalAssign(var lhs: Variable, var rhs: Expr, private val _label: Option[String] = None) extends SingleAssign with Command(_label, None) {
+class LocalAssign(var lhs: Variable, var rhs: Expr, _label: Option[String] = None) extends SingleAssign with Command(_label, None) {
   override def modifies: Set[Global] = lhs match {
     case r: GlobalVar => Set(r)
     case _ => Set()
@@ -88,7 +88,7 @@ class LocalAssign(var lhs: Variable, var rhs: Expr, private val _label: Option[S
   }
 }
 
-class SimulAssign(var assignments: Vector[(Variable, Expr)], private val _label: Option[String] = None) extends Assign with Command(_label, None)  {
+class SimulAssign(var assignments: Vector[(Variable, Expr)], _label: Option[String] = None) extends Assign with Command(_label, None)  {
   override def modifies: Set[Global] = assignments.collect { case (r: Global, _) =>
     r
   }.toSet
@@ -127,7 +127,7 @@ class MemoryStore(
   var value: Expr,
   var endian: Endian,
   var size: Int,
-  private val _label: Option[String] = None
+  _label: Option[String] = None
 ) extends Statement with Command(_label, None) {
   override def modifies: Set[Global] = Set(mem)
   override def toString: String = s"$labelStr$mem[$index] := MemoryStore($value, $endian, $size)"
@@ -148,7 +148,7 @@ class MemoryLoad(
   var index: Expr,
   var endian: Endian,
   var size: Int,
-  private val _label: Option[String] = None
+  _label: Option[String] = None
 ) extends SingleAssign with Command(_label, None) {
   override def modifies: Set[Global] = lhs match {
     case r: GlobalVar => Set(r)
@@ -167,7 +167,7 @@ object MemoryLoad {
     Some(m.lhs, m.mem, m.index, m.endian, m.size, m.label)
 }
 
-class NOP(private val _label: Option[String] = None) extends Statement with Command(_label, None) {
+class NOP(_label: Option[String] = None) extends Statement with Command(_label, None) {
   override def toString: String = s"NOP $labelStr"
   override def deepEquals(o: Object) = o match {
     case NOP(x) => x == label
@@ -178,15 +178,15 @@ object NOP {
   def unapply(x: NOP) = Some(x.label)
 }
 
-class AtomicStart(private val _label: Option[String] = None) extends NOP(_label) {
+class AtomicStart(_label: Option[String] = None) extends NOP(_label) {
   override def toString: String = s"AtomicStart $labelStr"
 }
 
-class AtomicEnd(private val _label: Option[String] = None) extends NOP(_label) {
+class AtomicEnd(_label: Option[String] = None) extends NOP(_label) {
   override def toString: String = s"AtomicEnd $labelStr"
 }
 
-class Assert(var body: Expr, _comment: Option[String] = None, private val _label: Option[String] = None)
+class Assert(var body: Expr, _comment: Option[String] = None, _label: Option[String] = None)
     extends Statement with Command(_label, _comment) {
   override def toString: String = s"${labelStr}assert $body" + comment.map(" //" + _)
   override def deepEquals(o: Object) = o match {
@@ -208,8 +208,8 @@ object Assert {
   */
 class Assume(
   var body: Expr,
-  private val _comment: Option[String] = None,
-  private val _label: Option[String] = None,
+  _comment: Option[String] = None,
+  _label: Option[String] = None,
   var checkSecurity: Boolean = false
 ) extends Statement with Command(_label, _comment) {
   override def toString: String = s"${labelStr}assume $body" + comment.map(" // " + _)
@@ -228,7 +228,7 @@ sealed trait Jump extends Command {
   def modifies: Set[Global] = Set()
 }
 
-class Unreachable(private val _label: Option[String] = None) extends Jump with Command(_label, None) {
+class Unreachable(label: Option[String] = None) extends Jump with Command(label, None) {
   /* Terminate / No successors / assume false */
 
   override def deepEquals(o: Object) = o match {
@@ -237,7 +237,7 @@ class Unreachable(private val _label: Option[String] = None) extends Jump with C
   }
 }
 
-class Return(private val _label: Option[String] = None, var outParams: SortedMap[LocalVar, Expr] = SortedMap())
+class Return(_label: Option[String] = None, var outParams: SortedMap[LocalVar, Expr] = SortedMap())
     extends Jump with Command(_label, None) {
   override def toString = s"Return(${outParams.mkString(",")})"
   override def deepEquals(o: Object): Boolean = o match {
@@ -254,7 +254,7 @@ object Return {
   def unapply(r: Return): Some[(Option[String], SortedMap[LocalVar, Expr])] = Some((r.label, r.outParams))
 }
 
-class GoTo private (private val _targets: mutable.LinkedHashSet[Block], private val _label: Option[String])
+class GoTo private (_targets: mutable.LinkedHashSet[Block], _label: Option[String])
     extends Jump with Command(_label, None) {
 
   def this(targets: Iterable[Block], _label: Option[String] = None) = this(mutable.LinkedHashSet.from(targets), _label)
@@ -312,7 +312,7 @@ sealed trait Call extends Statement {
 
 class DirectCall(
   val target: Procedure,
-  private val _label: Option[String] = None,
+  _label: Option[String] = None,
   var outParams: SortedMap[LocalVar, Variable] = SortedMap(), // out := formal
   var actualParams: SortedMap[LocalVar, Expr] = SortedMap() // formal := actual
 ) extends Call
@@ -350,7 +350,7 @@ object DirectCall {
     Some(i.target, i.outParams, i.actualParams, i.label)
 }
 
-class IndirectCall(var target: Variable, private val _label: Option[String] = None) extends Call with Command(_label, None) {
+class IndirectCall(var target: Variable, _label: Option[String] = None) extends Call with Command(_label, None) {
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals + target
     case None => Set(target)
@@ -364,4 +364,25 @@ class IndirectCall(var target: Variable, private val _label: Option[String] = No
 
 object IndirectCall {
   def unapply(i: IndirectCall): Some[(Variable, Option[String])] = Some(i.target, i.label)
+}
+
+object boom {
+
+  trait Comment(var comment: String) {
+    def setComment(x: String) = comment = x
+  }
+
+  class Y(comment: String) extends Comment(comment) {
+    override def toString = s"Y($comment)"
+  }
+
+  def main(args: Array[String]) =
+    val y = Y("initial value")
+    println("y.comment = " + y.comment)
+    println("y.toString = " + y)
+    println()
+    println("after setting comment")
+    y.setComment("new comment")
+    println("y.comment = " + y.comment)
+    println("y.toString = " + y)
 }
