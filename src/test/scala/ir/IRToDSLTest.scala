@@ -58,7 +58,10 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
    * Asserts structural equality on the IR via after a round-trip through the parser
    */
   inline def assertSerialisedParsedEqual(expected: Program) = {
-    val actual = ir.parsing.ParseBasilIL.loadILString(expected.pprint).program
+    val expectedStr = expected.pprint
+    val actual = ir.parsing.ParseBasilIL.loadILString(expectedStr).program
+    val actualStr = actual.pprint
+    assert(expectedStr == actualStr, "serialise-parse serialisation not equal")
     assert(
       expected.deepEqualsDbg(actual),
       s"serialise-parse deep equality ${expected.getClass.getSimpleName} != ${actual.getClass.getSimpleName}"
