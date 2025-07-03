@@ -134,8 +134,7 @@ class BasilEarlyBNFCVisitor[A]()
           decls.merge(Declarations.empty.copy(procSpecs = Map(spec)))
 
         // declarations which do not contain expressions
-        case _: syntax.Decl_UnsharedMem | _: syntax.Decl_SharedMem | _: syntax.Decl_Var |
-            _: syntax.Decl_ProgEmpty =>
+        case _: syntax.Decl_UnsharedMem | _: syntax.Decl_SharedMem | _: syntax.Decl_Var | _: syntax.Decl_ProgEmpty =>
           decls
       }
     )
@@ -167,10 +166,7 @@ class BasilEarlyBNFCVisitor[A]()
     val name = unsigilProc(x.procident_)
     val inparams = visitParamsList(x.listparams_1, arg)
     val outparams = visitParamsList(x.listparams_2, arg)
-    Declarations.empty.copy(
-      formalIns = Map(name -> inparams),
-      formalOuts = Map(name -> outparams)
-    )
+    Declarations.empty.copy(formalIns = Map(name -> inparams), formalOuts = Map(name -> outparams))
   }
 
   override def visit(x: syntax.Decl_ProgEmpty, arg: A) =
@@ -244,8 +240,8 @@ class BasilEarlyBNFCVisitor[A]()
    * the initial enumeration of declarations.
    */
   class DeclsExprVisitor(val decls: Declarations)
-    extends syntax.FunSpec.Visitor[FunSpec, A]
-    with syntax.ProgSpec.Visitor[ProgSpec, A] {
+      extends syntax.FunSpec.Visitor[FunSpec, A]
+      with syntax.ProgSpec.Visitor[ProgSpec, A] {
 
     val exprvis: syntax.Expr.Visitor[ir.Expr, A] = ExprBNFCVisitor[A](decls)
 
@@ -300,6 +296,6 @@ class BasilEarlyBNFCVisitor[A]()
       ProgSpec(rely = List(x.expr_.accept(exprvis, arg)))
     override def visit(x: syntax.ProgSpec_Guarantee, arg: A) =
       ProgSpec(guar = List(x.expr_.accept(exprvis, arg)))
-    }
+  }
 
 }

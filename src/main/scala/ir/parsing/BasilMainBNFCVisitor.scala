@@ -5,8 +5,8 @@ import ir.Sigil
 import util.{LogLevel, PerformanceTimer}
 
 import java.io.{FileReader, Reader, StringReader}
-import scala.jdk.CollectionConverters.*
 import scala.collection.immutable.TreeSeqMap
+import scala.jdk.CollectionConverters.*
 
 def unsigilBlock(x: String) = Sigil.unsigil(Sigil.BASIR.block)(x)
 def unsigilProc(x: String) = Sigil.unsigil(Sigil.BASIR.proc)(x)
@@ -173,11 +173,7 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
     val formalIns = decls.formalIns(callName)
     val formalOuts = decls.formalOuts(callName)
 
-    ir.dsl.directCall(
-      formalOuts.keys.zip(outs),
-      unsigilProc(x.procident_),
-      formalIns.keys.zip(ins)
-    )
+    ir.dsl.directCall(formalOuts.keys.zip(outs), unsigilProc(x.procident_), formalIns.keys.zip(ins))
 
   override def visit(x: syntax.Stmt_IndirectCall, arg: A) = {
     val v = x.expr_.accept(this, arg) match {
@@ -270,25 +266,29 @@ class BasilMainBNFCVisitor[A](var decls: Declarations)
     // TODO: use invariants
     val _ = procSpec.invariant
 
-    Some(ir.dsl.EventuallyProcedure(
-      label = rname,
-      in = formalIns,
-      out = formalOuts,
-      blocks = blocks,
-      entryBlockLabel = None,
-      returnBlockLabel = None,
-      address = addr,
-      requires = procSpec.require,
-      ensures = procSpec.ensure
-    ))
+    Some(
+      ir.dsl.EventuallyProcedure(
+        label = rname,
+        in = formalIns,
+        out = formalOuts,
+        blocks = blocks,
+        entryBlockLabel = None,
+        returnBlockLabel = None,
+        address = addr,
+        requires = procSpec.require,
+        ensures = procSpec.ensure
+      )
+    )
   }
 
   // Members declared in Program.Visitor
   override def visit(x: syntax.Module1, arg: A) = {
 
-    val procs = x.listdecl_.asScala.flatMap {
-      case x => x.accept(this, arg).map(p => p.name -> p)
-    }.to(TreeSeqMap)
+    val procs = x.listdecl_.asScala
+      .flatMap { case x =>
+        x.accept(this, arg).map(p => p.name -> p)
+      }
+      .to(TreeSeqMap)
 
     val progSpec = decls.progSpec
 
@@ -299,7 +299,6 @@ class BasilMainBNFCVisitor[A](var decls: Declarations)
 
     ir.dsl.EventuallyProgram(mainProc, otherProcs, initialMemory)
   }
-
 
   override def visit(x: syntax.Decl_SharedMem, arg: A): None.type = None
   override def visit(x: syntax.Decl_UnsharedMem, arg: A): None.type = None
