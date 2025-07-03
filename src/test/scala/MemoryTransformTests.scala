@@ -1,3 +1,4 @@
+import analysis.StaticAnalysisContext
 import boogie.SpecGlobal
 import ir.*
 import ir.Endian.LittleEndian

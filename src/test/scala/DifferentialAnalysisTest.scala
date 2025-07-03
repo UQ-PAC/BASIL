@@ -1,10 +1,10 @@
 import analysis.AnalysisManager
-import ir.*
 import ir.eval.{ExecEffect, *}
+import ir.{IRContext, IRLoading, *}
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import test_util.*
-import util.{ILLoadingConfig, IRContext, IRLoading, LogLevel, Logger, RunUtils, StaticAnalysisConfig}
+import util.{ILLoadingConfig, LogLevel, Logger, RunUtils, StaticAnalysisConfig}
 
 import java.io.File
 

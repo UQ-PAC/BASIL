@@ -1,3 +1,4 @@
+import analysis.StaticAnalysisContext
 import analysis.data_structure_analysis.*
 import boogie.SpecGlobal
 import ir.*
@@ -6,16 +7,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
 import test_util.{BASILTest, CaptureOutput}
 import translating.PrettyPrinter.*
-import util.{
-  BASILConfig,
-  BASILResult,
-  BoogieGeneratorConfig,
-  ILLoadingConfig,
-  IRContext,
-  RunUtils,
-  StaticAnalysisConfig,
-  StaticAnalysisContext
-}
+import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, StaticAnalysisConfig}
 
 /** This is the test suite for testing DSA functionality The tests follow a general pattern of running BASIL analyses on
   * a test program and then asserting properties about the Data Structure Graph (DSG) of the function produced at

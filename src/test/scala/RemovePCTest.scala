@@ -1,7 +1,7 @@
 import ir.*
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
-import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, IRContext, PCTrackingOption, StaticAnalysisConfig}
+import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, PCTrackingOption, StaticAnalysisConfig}
 
 @test_util.tags.UnitTest
 class RemovePCTest extends AnyFunSuite with CaptureOutput {

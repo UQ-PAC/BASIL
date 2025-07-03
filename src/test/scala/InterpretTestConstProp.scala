@@ -1,9 +1,9 @@
 import analysis.*
-import ir.*
+import ir.{IRLoading, *}
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import test_util.{BASILTest, CaptureOutput, TestValueDomainWithInterpreter}
-import util.{ILLoadingConfig, IRLoading, LogLevel, Logger, RunUtils, StaticAnalysisConfig}
+import util.{ILLoadingConfig, LogLevel, Logger, RunUtils, StaticAnalysisConfig}
 
 @test_util.tags.StandardSystemTest
 class InterpretTestConstProp

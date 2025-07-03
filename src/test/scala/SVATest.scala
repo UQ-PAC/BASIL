@@ -1,3 +1,4 @@
+import analysis.StaticAnalysisContext
 import analysis.data_structure_analysis.*
 import analysis.data_structure_analysis.given
 import boogie.SpecGlobal

@@ -1,9 +1,8 @@
 package test_util
 
-import ir.*
 import ir.eval.*
+import ir.{IRContext, *}
 import translating.PrettyPrinter.*
-import util.IRContext
 import util.functional.State
 
 trait TestValueDomainWithInterpreter[T] {

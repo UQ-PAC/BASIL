@@ -294,7 +294,7 @@ case class BasilMainBNFCVisitor[A](
   val makeVisitor: (String, Declarations) => InnerBasilBNFCVisitor[A] = InnerBasilBNFCVisitor[A](_, _)
 ) extends LiteralsBNFCVisitor[A]
     with TypesBNFCVisitor[A]
-    with syntax.Module.Visitor[util.IRContext, A]
+    with syntax.Module.Visitor[ir.IRContext, A]
     with syntax.Declaration.Visitor[ir.dsl.EventuallyProcedure, A]
     with syntax.Params.Visitor[ir.LocalVar, A]
     with syntax.ProcSig.Visitor[ir.dsl.EventuallyProcedure, A]
@@ -451,13 +451,13 @@ case class BasilMainBNFCVisitor[A](
     }
     val resolvedProg = ir.dsl.EventuallyProgram(mainProcDef.head, otherProcs, initialMemory).resolve
 
-    util.IRContext(
+    ir.IRContext(
       List(),
       decls.symtab.externalFunctions,
       decls.symtab.globals,
       decls.symtab.funcEntries,
       decls.symtab.globalOffsets,
-      util.IRLoading.emptySpecification(decls.symtab.globals),
+      ir.IRLoading.emptySpecification(decls.symtab.globals),
       resolvedProg
     )
   }
@@ -486,12 +486,12 @@ object ParseBasilIL {
     result
   }
 
-  def loadILFile(filePath: String): util.IRContext = {
+  def loadILFile(filePath: String): ir.IRContext = {
     val reader = new FileReader(filePath)
     loadILReader(reader)
   }
 
-  def loadILString(text: String): util.IRContext = {
+  def loadILString(text: String): ir.IRContext = {
     val reader = new StringReader(text)
     loadILReader(reader)
   }

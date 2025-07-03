@@ -241,7 +241,7 @@ case class SymbolTableInfo(
 }
 
 object SymbolTableInfo {
-  def from(e: util.IRContext) = {
+  def from(e: ir.IRContext) = {
     SymbolTableInfo(e.externalFunctions, e.globals, e.funcEntries, e.globalOffsets)
   }
 

@@ -1,5 +1,7 @@
 package util
 
+import ir.IRContext
+
 enum ProcRelyVersion {
   case Function, IfCommandContradiction
 }

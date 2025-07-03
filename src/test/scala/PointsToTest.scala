@@ -1,12 +1,13 @@
+import analysis.StaticAnalysisContext
 import boogie.*
-import ir.*
 import ir.Endian.LittleEndian
 import ir.dsl.*
+import ir.{IRContext, *}
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import specification.*
 import test_util.CaptureOutput
-import util.{IRContext, StaticAnalysisConfig, StaticAnalysisContext}
+import util.StaticAnalysisConfig
 
 @test_util.tags.DisabledTest
 class PointsToTest extends AnyFunSuite with CaptureOutput with OneInstancePerTest {

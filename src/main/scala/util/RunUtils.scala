@@ -1,17 +1,12 @@
 package util
 
-import Parsers.*
 import analysis.data_structure_analysis.*
 import analysis.{AnalysisManager, Interval as _, *}
-import bap.*
 import boogie.*
-import com.grammatech.gtirb.proto.IR.IR
-import gtirb.*
 import ir.*
 import ir.dsl.given
 import ir.eval.*
 import ir.transforms.*
-import org.antlr.v4.runtime.{BailErrorStrategy, CharStreams, CommonTokenStream}
 import specification.*
 import translating.*
 import translating.PrettyPrinter.*
@@ -19,7 +14,7 @@ import util.DSAConfig.Prereq
 import util.LogLevel.INFO
 import util.{DebugDumpIRLogger, Logger}
 
-import java.io.{BufferedWriter, File, FileInputStream, FileWriter, PrintWriter}
+import java.io.{BufferedWriter, File, FileWriter, PrintWriter}
 import java.nio.file.{Files, Paths}
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -30,55 +25,8 @@ import cilvisitor.*
 /** This file contains the main program execution. See RunUtils.loadAndTranslate for the high-level process.
   */
 
-/** Stores the IR Program loaded from the binary and ELF tables, which is modified during analysis and program
-  * transformation.
-  */
-case class IRContext(
-  symbols: List[ELFSymbol],
-  externalFunctions: Set[ExternalFunction],
-  globals: Set[SpecGlobal],
-  funcEntries: Set[FuncEntry],
-  globalOffsets: Map[BigInt, BigInt],
-  specification: Specification,
-  program: Program // internally mutable
-)
-
-enum FrontendMode {
-  case Bap
-  case Gtirb
-  case Basil
-}
-
 /** Stores the results of the static analyses.
   */
-case class StaticAnalysisContext(
-  intraProcConstProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-  interProcConstProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-  memoryRegionResult: Map[CFGPosition, ((Set[StackRegion], Set[Variable]), Set[HeapRegion])],
-  vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
-  interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]],
-  paramResults: Map[Procedure, Set[Variable]],
-  steensgaardResults: Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]],
-  mmmResults: MemoryModelMap,
-  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-  regionInjector: Option[RegionInjector],
-  symbolicAddresses: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
-  localDSA: Map[Procedure, Graph],
-  bottomUpDSA: Map[Procedure, Graph],
-  topDownDSA: Map[Procedure, Graph],
-  writesToResult: Map[Procedure, Set[GlobalVar]],
-  ssaResults: Map[CFGPosition, (Map[Variable, FlatElement[Int]], Map[Variable, FlatElement[Int]])]
-)
-
-case class DSAContext(
-  sva: Map[Procedure, SymValues[DSInterval]],
-  constraints: Map[Procedure, Set[Constraint]],
-  local: Map[Procedure, IntervalGraph],
-  bottomUp: Map[Procedure, IntervalGraph],
-  topDown: Map[Procedure, IntervalGraph],
-  globals: Map[IntervalNode, IntervalNode]
-)
-
 /** Results of the main program execution.
   */
 case class BASILResult(
@@ -90,135 +38,6 @@ case class BASILResult(
 
 /** Tools for loading the IR program into an IRContext.
   */
-object IRLoading {
-
-  /** Create a context from just an IR program.
-    */
-  def load(p: Program): IRContext = {
-    IRContext(
-      List.empty,
-      Set.empty,
-      Set.empty,
-      Set.empty,
-      Map.empty,
-      IRLoading.loadSpecification(None, p, Set.empty),
-      p
-    )
-  }
-
-  /** Load a program from files using the provided configuration.
-    */
-  def load(q: ILLoadingConfig): IRContext = {
-
-    val mode = if q.inputFile.endsWith(".gts") then {
-      FrontendMode.Gtirb
-    } else if q.inputFile.endsWith(".adt") then {
-      FrontendMode.Bap
-    } else if (q.inputFile.endsWith(".il")) {
-      FrontendMode.Basil
-    } else {
-      throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
-    }
-
-    val (mainAddress, makeContext) = q.relfFile match {
-      case Some(relf) => {
-        // TODO: this tuple is large, should be a case class
-        val (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
-          IRLoading.loadReadELF(relf, q)
-
-        def continuation(ctx: IRContext) =
-          val specification = IRLoading.loadSpecification(q.specFile, ctx.program, globals)
-          IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, ctx.program)
-
-        (Some(mainAddress), continuation)
-      }
-      case None if mode == FrontendMode.Gtirb => {
-        Logger.warn("RELF not provided, recommended for GTIRB input")
-        (None, (x: IRContext) => x)
-      }
-      case None => {
-        (None, (x: IRContext) => x)
-      }
-    }
-
-    val program: IRContext = (mode, mainAddress) match {
-      case (FrontendMode.Gtirb, _) => IRLoading.load(loadGTIRB(q.inputFile, mainAddress, Some(q.mainProcedureName)))
-      case (FrontendMode.Basil, _) => ir.parsing.ParseBasilIL.loadILFile(q.inputFile)
-      case (FrontendMode.Bap, None) => throw Exception("relf is required when using BAP input")
-      case (FrontendMode.Bap, Some(mainAddress)) => {
-        val bapProgram = loadBAP(q.inputFile)
-        IRLoading.load(BAPToIR(bapProgram, mainAddress).translate)
-      }
-    }
-
-    val ctx = makeContext(program)
-    mode match {
-      case FrontendMode.Basil => {
-        ctx.program.procedures.foreach(_.updateBlockSuffix())
-        Logger.info("[!] Disabling PC tracking transforms due to IL input")
-      }
-      case _ => {
-        ir.transforms.PCTracking.applyPCTracking(q.pcTracking, ctx.program)
-        ctx.program.procedures.foreach(_.normaliseBlockNames())
-      }
-    }
-    ctx
-  }
-
-  def loadBAP(fileName: String): BAPProgram = {
-    val ADTLexer = BAP_ADTLexer(CharStreams.fromFileName(fileName))
-    val tokens = CommonTokenStream(ADTLexer)
-    val parser = BAP_ADTParser(tokens)
-
-    parser.setBuildParseTree(true)
-
-    BAPLoader().visitProject(parser.project())
-  }
-
-  def loadGTIRB(fileName: String, mainAddress: Option[BigInt], mainName: Option[String] = None): Program = {
-    val fIn = FileInputStream(fileName)
-    val ir = IR.parseFrom(fIn)
-    val mods = ir.modules
-    val cfg = ir.cfg.get
-
-    val semanticsJson = mods.map(_.auxData("ast").data.toStringUtf8)
-
-    val semantics = semanticsJson.map(upickle.default.read[Map[String, List[InsnSemantics]]](_))
-
-    val parserMap: Map[String, List[InsnSemantics]] = semantics.flatten.toMap
-
-    val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress, mainName)
-    GTIRBConverter.createIR()
-  }
-
-  def loadReadELF(
-    fileName: String,
-    config: ILLoadingConfig
-  ): (List[ELFSymbol], Set[ExternalFunction], Set[SpecGlobal], Set[FuncEntry], Map[BigInt, BigInt], BigInt) = {
-    val lexer = ReadELFLexer(CharStreams.fromFileName(fileName))
-    val tokens = CommonTokenStream(lexer)
-    val parser = ReadELFParser(tokens)
-    parser.setErrorHandler(BailErrorStrategy())
-    parser.setBuildParseTree(true)
-    ReadELFLoader.visitSyms(parser.syms(), config)
-  }
-
-  def emptySpecification(globals: Set[SpecGlobal]) =
-    Specification(Set(), globals, Map(), List(), List(), List(), Set())
-
-  def loadSpecification(filename: Option[String], program: Program, globals: Set[SpecGlobal]): Specification = {
-    filename match {
-      case Some(s) =>
-        val specLexer = SpecificationsLexer(CharStreams.fromFileName(s))
-        val specTokens = CommonTokenStream(specLexer)
-        val specParser = SpecificationsParser(specTokens)
-        specParser.setBuildParseTree(true)
-        val specLoader = SpecificationLoader(globals, program)
-        specLoader.visitSpecification(specParser.specification())
-      case None => emptySpecification(globals)
-    }
-  }
-}
 
 object RunUtils {
 

@@ -7,10 +7,8 @@ import specification.*
 import util.{
   AnalysisResultDotLogger,
   DebugDumpIRLogger,
-  IRContext,
   Logger,
   StaticAnalysisConfig,
-  StaticAnalysisContext,
   StaticAnalysisLogger,
   writeToFile
 }

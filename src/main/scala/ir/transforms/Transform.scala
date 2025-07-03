@@ -1,9 +1,9 @@
 package ir.transforms
 
 import analysis.AnalysisManager
-import ir.dotBlockGraph
+import ir.{IRContext, dotBlockGraph}
 import translating.PrettyPrinter.pp_prog
-import util.{DebugDumpIRLogger, IRContext, Logger, PerformanceTimer}
+import util.{DebugDumpIRLogger, Logger, PerformanceTimer}
 
 import java.io.File
 

@@ -10,7 +10,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
 import translating.PrettyPrinter.*
 import util.functional.*
-import util.{ILLoadingConfig, IRContext, IRLoading, LogLevel, Logger, PerformanceTimer}
+import util.{ILLoadingConfig, LogLevel, Logger, PerformanceTimer}
 
 import scala.language.implicitConversions
 
