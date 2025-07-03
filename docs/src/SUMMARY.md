@@ -6,6 +6,7 @@
 
 - [Information Flow Logic](infoflow-logic.md)
 - [Usage](usage.md) Basil binary lifting & usage guide
+  - [Quickly lifting a new example](quick-lifting.md)
 - [Compiler Explorer](compiler-explorer.md) guide to the compiler explorer basil interface
 
 # Basil IR Source Code
