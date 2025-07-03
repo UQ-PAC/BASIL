@@ -9,10 +9,7 @@ private object Declarations {
 /**
  * Container for the result of the [[ir.parsing.BasilEarlyBNFCVisitor]].
  * Stores global variable declarations, memory region declarations, procedure signatures,
- * and metadata.
- *
- * Note that the [[ir.dsl.EventuallyProcedure]] structures stored by this class are
- * *incomplete*. Only the procedure name and the formalIn/Out parameters should be used.
+ * and other metadata and specification-level expressions.
  */
 case class Declarations(
   val globals: Map[String, ir.GlobalVar],
