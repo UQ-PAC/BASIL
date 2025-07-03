@@ -7,7 +7,7 @@ fetches the required tools from the [pac-nix](https://github.com/katrinafyi/pac-
 repository.
 
 `nix-cc.sh` requires a directory of C source file(s), and it produce:
-- a compiled aarch64-linux ELF binary,
+- a cross-compiled aarch64-linux ELF binary,
 - a readelf output,
 - an objdump output,
 - a GTIRB and gtirb-semantics output, and
@@ -15,6 +15,11 @@ repository.
 
 This includes all the files needed for Basil (namely, the gtirb-semantics and readelf outputs),
 along with some extra files which might be useful for inspecting the compiled program.
+
+Compared to other methods, nix-cc.sh is
+- self-contained and isolated in a sandbox, which should ensure consistency across platforms,
+- correctly configured with the aarch64 C libraries, and
+- it runs natively on your computer, so it should be faster than emulation or virtual machines.
 
 ## Introduction
 
@@ -79,11 +84,9 @@ Processing module: a.out
     function inference       load [   0ms]    compute [   0ms]  transform [   0ms]
 +++ gtirb-semantics a.gtirb a.gts
 Lifting
-Successfully lifted 107 instructions in 2.776012 sec (2.774692 user time) (0 failure: 0 unique opcodes) (0.00
-0000 cache hit rate)
+Successfully lifted 107 instructions in 2.776012 sec (2.774692 user time) (0 failure: 0 unique opcodes) (0.00 0000 cache hit rate)
 +++ proto-json.py --auxdata yes a.gts a.json
-+++ cp -r a.out a.relf a.gtirb a.gts a.json a.objdump /nix/store/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee-basil-test-
-files
++++ cp -r a.out a.relf a.gtirb a.gts a.json a.objdump /nix/store/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee-basil-test-files
 'a.gtirb' -> '/tmp/basil-out/a.gtirb'
 'a.gts' -> '/tmp/basil-out/a.gts'
 'a.json' -> '/tmp/basil-out/a.json'
