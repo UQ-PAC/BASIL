@@ -106,7 +106,7 @@ abstract class DifferentialTest extends AnyFunSuite, CaptureOutput, TestCustomis
     if (simplify) {
       ictx = ir.transforms.liftProcedureCallAbstraction(ictx)
       comparectx = ir.transforms.liftProcedureCallAbstraction(comparectx)
-      RunUtils.doSimplify(ictx, staticAnalysisConfig)
+      ir.transforms.doSimplify(ictx, staticAnalysisConfig)
     }
 
     diffTest(ictx, comparectx)
