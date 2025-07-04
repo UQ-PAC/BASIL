@@ -381,9 +381,7 @@ object IRTransform {
   */
 object StaticAnalysis {
 
-  def reducibleLoops(
-    IRProgram: Program
-  ) = {
+  def reducibleLoops(IRProgram: Program) = {
     StaticAnalysisLogger.debug("reducible loops")
     val foundLoops = LoopDetector.identify_loops(IRProgram)
     foundLoops.irreducibleLoops.foreach(l => StaticAnalysisLogger.debug(s"Irreducible loop found: ${l.name}"))
