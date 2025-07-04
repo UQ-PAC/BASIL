@@ -178,7 +178,8 @@ trait SystemTests extends AnyFunSuite, CaptureOutput, BASILTest, TestCustomisati
       conf.simplify,
       conf.summariseProcedures,
       dsa = conf.dsa,
-      memoryTransform = conf.memoryTransform
+      memoryTransform = conf.memoryTransform,
+      useOfflineLifterForGtirbFrontend = conf.useOfflineLifterForGtirbFrontend
     )
     val translateTime = timer.checkPoint("translate-boogie")
     Logger.info(s"$name/$variation$testSuffix DONE")
@@ -267,6 +268,34 @@ class SystemTestsGTIRB extends SystemTests {
   )
   test("summary-GTIRB") {
     summary("testresult-GTIRB")
+  }
+}
+
+@test_util.tags.StandardSystemTest
+class SystemTestsGTIRBOfflineLifter extends SystemTests {
+  override def testSuiteSuffix = ""
+  runTests(
+    "correct",
+    TestConfig(
+      useBAPFrontend = false,
+      expectVerify = true,
+      checkExpected = true,
+      logResults = true,
+      useOfflineLifterForGtirbFrontend = true
+    )
+  )
+  runTests(
+    "incorrect",
+    TestConfig(
+      useBAPFrontend = false,
+      expectVerify = false,
+      checkExpected = true,
+      logResults = true,
+      useOfflineLifterForGtirbFrontend = true
+    )
+  )
+  test("summary-GTIRB") {
+    summary("testresult-GTIRBOfflineLifter")
   }
 }
 

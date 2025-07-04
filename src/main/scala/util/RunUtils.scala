@@ -6,7 +6,6 @@ import analysis.{Interval as _, *}
 import bap.*
 import boogie.*
 import com.grammatech.gtirb.proto.IR.IR
-import gtirb.*
 import ir.*
 import ir.dsl.given
 import ir.eval.*
@@ -112,12 +111,17 @@ object IRLoading {
 
     val mode = if q.inputFile.endsWith(".gts") then {
       FrontendMode.Gtirb
+    } else if q.inputFile.endsWith(".gtirb") then {
+      if (!q.gtirbLiftOffline) {
+        throw IllegalArgumentException(".gtirb input requires --lifter")
+      }
+      FrontendMode.Gtirb
     } else if q.inputFile.endsWith(".adt") then {
       FrontendMode.Bap
     } else if (q.inputFile.endsWith(".il")) {
       FrontendMode.Basil
     } else {
-      throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
+      throw Exception(s"input file name ${q.inputFile} must be an .adt, .gts or .gtirb file")
     }
 
     val (mainAddress, makeContext) = q.relfFile match {
@@ -142,7 +146,8 @@ object IRLoading {
     }
 
     val program: IRContext = (mode, mainAddress) match {
-      case (FrontendMode.Gtirb, _) => IRLoading.load(loadGTIRB(q.inputFile, mainAddress, Some(q.mainProcedureName)))
+      case (FrontendMode.Gtirb, _) =>
+        IRLoading.load(loadGTIRB(q.inputFile, mainAddress, q.gtirbLiftOffline, Some(q.mainProcedureName)))
       case (FrontendMode.Basil, _) => ir.parsing.ParseBasilIL.loadILFile(q.inputFile)
       case (FrontendMode.Bap, None) => throw Exception("relf is required when using BAP input")
       case (FrontendMode.Bap, Some(mainAddress)) => {
@@ -160,6 +165,7 @@ object IRLoading {
       case _ => {
         ir.transforms.PCTracking.applyPCTracking(q.pcTracking, ctx.program)
         ctx.program.procedures.foreach(_.normaliseBlockNames())
+        ir.transforms.clearParams(ctx.program)
       }
     }
     ctx
@@ -175,19 +181,35 @@ object IRLoading {
     BAPLoader().visitProject(parser.project())
   }
 
-  def loadGTIRB(fileName: String, mainAddress: Option[BigInt], mainName: Option[String] = None): Program = {
+  def skipGTIRBMagic(fileName: String): FileInputStream = {
     val fIn = FileInputStream(fileName)
+    (0 to 7).map(_ => fIn.read()).toList match {
+      case List('G', 'T', 'I', 'R', 'B', _, _, _) => fIn
+      case _ => {
+        fIn.close()
+        FileInputStream(fileName)
+      }
+    }
+  }
+
+  def loadGTIRB(
+    fileName: String,
+    mainAddress: Option[BigInt],
+    gtirbLiftOffline: Boolean,
+    mainName: Option[String] = None
+  ): Program = {
+    val fIn = skipGTIRBMagic(fileName)
     val ir = IR.parseFrom(fIn)
     val mods = ir.modules
     val cfg = ir.cfg.get
 
-    val semanticsJson = mods.map(_.auxData("ast").data.toStringUtf8)
+    val lifter =
+      if (gtirbLiftOffline) then OfflineLifterInsnLoader(mods)
+      else {
+        ParserMapInsnLoader(mods)
+      }
 
-    val semantics = semanticsJson.map(upickle.default.read[Map[String, List[InsnSemantics]]](_))
-
-    val parserMap: Map[String, List[InsnSemantics]] = semantics.flatten.toMap
-
-    val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress, mainName)
+    val GTIRBConverter = GTIRBToIR(mods, lifter, cfg, mainAddress, mainName)
     GTIRBConverter.createIR()
   }
 
@@ -855,6 +877,7 @@ object RunUtils {
     var ctx = q.context.getOrElse(IRLoading.load(q.loading))
     postLoad(ctx) // allows extracting information from the original loaded program
 
+    assert(ir.invariant.checkTypeCorrect(ctx.program))
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
@@ -888,7 +911,7 @@ object RunUtils {
       assert(invariant.correctCalls(ctx.program))
     }
     assert(invariant.correctCalls(ctx.program))
-    ir.invariant.checkTypeCorrect(ctx.program)
+    assert(ir.invariant.checkTypeCorrect(ctx.program))
 
     assert(ir.invariant.programDiamondForm(ctx.program))
     assert(invariant.singleCallBlockEnd(ctx.program))

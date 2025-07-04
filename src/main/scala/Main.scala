@@ -125,6 +125,8 @@ object Main {
     gtirbInputDirName: Option[String],
     @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file (.adt requires --relf)")
     inputFileName: Option[String],
+    @arg(name = "lifter", doc = "Use builtin aslp lifter (only supports gtirb input)")
+    liftOffline: Flag,
     @arg(
       name = "relf",
       short = 'r',
@@ -366,7 +368,8 @@ object Main {
         procedureTrimDepth = conf.procedureDepth,
         parameterForm = conf.parameterForm.value,
         trimEarly = conf.trimEarly.value,
-        pcTracking = PCTrackingOption.valueOf(conf.pcTracking.getOrElse("none").capitalize)
+        pcTracking = PCTrackingOption.valueOf(conf.pcTracking.getOrElse("none").capitalize),
+        gtirbLiftOffline = conf.liftOffline.value
       ),
       runInterpret = conf.interpret.value,
       simplify = conf.simplify.value,

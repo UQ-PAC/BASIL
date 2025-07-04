@@ -26,7 +26,7 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
   val ammonite = "3.0.2"
   override def ammoniteVersion = ammonite
 
-  def moduleDeps = Seq(basilAntlr, basilProto, bnfc)
+  def moduleDeps = Seq(basilAntlr, basilProto, bnfc, aslpOffline)
 
   def scalacOptions: T[Seq[String]] = Seq("-deprecation", "-Wunused:imports", "-feature")
 
@@ -155,6 +155,22 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     mill.main.RunScript.evaluateNamed(ev, Agg(test.fix()))
     mill.main.RunScript.evaluateNamed(ev, Agg(scalafmt.reformat()))
     ()
+  }
+
+
+  object aslpOffline extends JavaModule {
+    def fileName: String = "aslpOfflineScala-0.3.0.jar"
+    def lifterUrl: String = s"https://github.com/UQ-PAC/aslp/releases/download/0.3.0/${fileName}"
+
+    def unmanagedClasspath = Task {
+      os.write(
+        Task.dest / fileName,
+        requests.get.stream(
+          lifterUrl
+        )
+      )
+      Agg(PathRef(Task.dest / fileName))
+    }
   }
 
   object basilAntlr extends AntlrModule {
