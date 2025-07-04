@@ -84,7 +84,7 @@ nix-build --extra-experimental-features "nix-command flakes" --no-out-link - <<E
         aarch64-unknown-linux-gnu-objdump -d a.out > a.objdump
         ddisasm a.out --ir a.gtirb
         gtirb-semantics a.gtirb a.gts
-        proto-json.py --auxdata yes a.gts a.json
+        proto-json.py --auxdata a.gts a.json
         cp -r a.out a.relf a.gtirb a.gts a.json a.objdump \$out
       )
     ''
