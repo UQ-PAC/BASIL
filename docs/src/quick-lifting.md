@@ -27,7 +27,7 @@ The script lives inside the scripts/ folder of the Basil repository.
 It is a Bash script which should work on both Linux and Mac OS.
 
 First, make sure that pac-nix is set up. This can be done by following
-[the "first time" instructions for pac-nix](https://github.com/katrinafyi/pac-nix).
+[the "first time" instructions for pac-nix](https://github.com/katrinafyi/pac-nix?tab=readme-ov-file#first-time).
 Make sure to follow all the numbered steps, including checking that the cache is working.
 
 Then, to use the script, simply pass a directory of C files and an output directory:
