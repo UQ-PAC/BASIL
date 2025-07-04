@@ -206,19 +206,20 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     }
   }
 
-  def exprUnsat(e: Expr, name: Option[String] = None, getModel: Boolean = true): String = {
+  def exprUnsat(e: Expr, name: Option[String] = None, getModel: Boolean = true, genQuery: Boolean = true): String = {
     val assert = if (name.isDefined) {
       list(sym("assert"), list(sym("!"), BasilIRToSMT2.vexpr(e), sym(":named"), sym(name.get)))
     } else {
       list(sym("assert"), BasilIRToSMT2.vexpr(e))
     }
 
-    val terms = list(sym("push")) :: BasilIRToSMT2.extractDecls(e)
+    val terms = if genQuery then list(sym("push")) :: BasilIRToSMT2.extractDecls(e)
       ++ List(assert, list(sym("check-sat")))
       ++ (if (getModel) then
             List(list(sym("echo"), sym("\"" + name.getOrElse("") + "  ::  " + e + "\"")), list(sym("get-model")))
           else List())
       ++ List(list(sym("pop")))
+     else BasilIRToSMT2.extractDecls(e) :+ assert
 
     (terms.map(Sexp.print)).mkString("\n")
   }
