@@ -288,10 +288,11 @@ class GTIRBToIR(
     }
   }
 
-  private def getPCTarget(block: Block): GlobalVar = {
+  private def getPCTarget(block: Block): Variable = {
     block.statements.last match {
-      case LocalAssign(lhs: GlobalVar, rhs: GlobalVar, _) if lhs.name == "_PC" => rhs
-      case _ => throw Exception(s"expected block ${block.label} to have a program counter assignment at its end")
+      case LocalAssign(lhs: GlobalVar, rhs: Variable, _) if lhs.name == "_PC" => rhs
+      case l =>
+        throw Exception(s"expected block ${block.label} to have a program counter assignment at its end but got $l")
     }
   }
 
