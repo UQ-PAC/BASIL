@@ -6,7 +6,6 @@ import analysis.{Interval as _, *}
 import bap.*
 import boogie.*
 import com.grammatech.gtirb.proto.IR.IR
-import gtirb.*
 import ir.*
 import ir.dsl.given
 import ir.eval.*

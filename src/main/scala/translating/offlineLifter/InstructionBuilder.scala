@@ -1,9 +1,8 @@
 package translating.offlineLifter
 
-import util.Logger
 import ir.*
-import lifter.*
 import ir.eval.BitVectorEval.*
+import lifter.*
 
 object LoadExpr {
   def apply(addr: Expr, size: Int) = {

@@ -3,7 +3,6 @@ package translating
 import com.grammatech.gtirb.proto.CFG.EdgeType.*
 import com.grammatech.gtirb.proto.CFG.{CFG, Edge, EdgeLabel}
 import com.grammatech.gtirb.proto.Module.Module
-import com.grammatech.gtirb.proto.ByteInterval
 import com.grammatech.gtirb.proto.Symbol.Symbol
 import gtirb.*
 import gtirb.AuxDecoder.AuxKind
@@ -15,10 +14,8 @@ import java.util.Base64
 import scala.collection.mutable.{ArrayBuffer, Map, Set}
 import scala.collection.{immutable, mutable}
 
-
 def b64encode(x: com.google.protobuf.ByteString) =
   Base64.getEncoder().encodeToString(x.toByteArray)
-
 
 private def assigned(x: Statement): immutable.Set[Variable] = x match {
   case x: Assign => x.assignees

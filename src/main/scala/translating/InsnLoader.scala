@@ -1,32 +1,14 @@
 package translating
 
 import com.google.protobuf.ByteString
-import com.grammatech.gtirb.proto.CFG.EdgeType.*
-import com.grammatech.gtirb.proto.CFG.CFG
-import com.grammatech.gtirb.proto.CFG.Edge
-import com.grammatech.gtirb.proto.CFG.EdgeLabel
-import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.ByteInterval
-import com.grammatech.gtirb.proto.Symbol.Symbol
-import Parsers.ASLpParser.*
+import com.grammatech.gtirb.proto.Module.Module
 import gtirb.*
 import ir.*
 
-import scala.collection.mutable
-import scala.collection.mutable.Set
-import scala.collection.mutable.Map
-import scala.collection.mutable.ArrayBuffer
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
-import scala.util.{Try, Success, Failure}
-import java.util.Base64
-import java.nio.charset.*
 import scala.util.boundary
-import boundary.break
-import java.nio.ByteBuffer
-import util.intrusive_list.*
-import util.functional.{Snoc}
-import util.Logger
 
 trait InsnLoader {
   def decodeBlock(blockUUID: String, blockCountIn: Int, blockAddress: Option[BigInt]): Seq[Seq[Statement]]

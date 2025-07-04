@@ -1,12 +1,13 @@
 package translating.offlineLifter
 
-import util.Logger
 import ir.*
 import ir.eval.BitVectorEval.*
+import lifter.*
 import translating.TempIf
+import util.Logger
+
 import collection.mutable.ArrayBuffer
 import collection.mutable
-import lifter.*
 
 trait Builder[L] {
 
