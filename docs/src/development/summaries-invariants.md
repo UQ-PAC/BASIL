@@ -93,5 +93,4 @@ The `FullLoopInvariantGenerator` class performs a sequence of analyses and adds 
 To add to this list, create either a `ForwardLoopInvariantGenerator` or `BackwardLoopInvariantGenerator` object and call its `genAndAddInvariants` method.
 These singular generators take a domain as input, along with a solver to allow for using a solver which does not require either widening or narrowing.
 
-To run the loop invariant generator, run basil with `--analyse --generate-loop-invariants` and without `--no-irreducibleloops`.
-The `--analyse` flag is necessary at the moment for loop header detection.
+To run the loop invariant generator, run basil with `--generate-loop-invariants` and without `--no-irreducibleloops`.

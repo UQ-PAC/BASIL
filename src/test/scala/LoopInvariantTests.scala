@@ -11,7 +11,6 @@ import util.{
   ILLoadingConfig,
   IRContext,
   RunUtils,
-  StaticAnalysisConfig
 }
 
 @test_util.tags.UnitTest
@@ -41,7 +40,7 @@ class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
         loading = ILLoadingConfig(inputFile = "", relfFile = None),
         simplify = true,
         generateLoopInvariants = true,
-        staticAnalysis = Some(StaticAnalysisConfig()),
+        staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
         dsaConfig = None // Some(DSAConfig(Set.empty))
