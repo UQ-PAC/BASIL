@@ -176,12 +176,10 @@ class GTIRBToIR(
 
     for ((functionUUID, blockUUIDs) <- functionBlocks) {
       val procedure = uuidToProcedure(functionUUID)
-      var blockCount = 0
       for (blockUUID <- blockUUIDs) {
         val block = uuidToBlock(blockUUID)
 
-        val statements = lifter.decodeBlock(blockUUID, blockCount, block.address)
-        blockCount += 1
+        val statements = lifter.decodeBlock(blockUUID, block.address)
         for ((stmts, i) <- statements.zipWithIndex) {
           block.statements.addAll(insertPCIncrement(stmts))
         }

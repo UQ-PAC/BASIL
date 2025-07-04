@@ -8,10 +8,9 @@ import ir.*
 
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
-import scala.util.boundary
 
 trait InsnLoader {
-  def decodeBlock(blockUUID: String, blockCountIn: Int, blockAddress: Option[BigInt]): Seq[Seq[Statement]]
+  def decodeBlock(blockUUID: String, blockAddress: Option[BigInt]): Seq[Seq[Statement]]
 }
 
 class ParserMapInsnLoader(mods: Seq[Module]) extends InsnLoader {
@@ -21,9 +20,14 @@ class ParserMapInsnLoader(mods: Seq[Module]) extends InsnLoader {
     semantics.flatten.toMap
   }
 
+  var blockCount = 0
+
   val semanticsLoader = GTIRBLoader(parserMap)
-  def decodeBlock(uuid: String, blockCount: Int, addr: Option[BigInt]): Seq[Seq[Statement]] =
-    semanticsLoader.visitBlock(uuid, blockCount, addr).toSeq
+  def decodeBlock(uuid: String, addr: Option[BigInt]): Seq[Seq[Statement]] = {
+    var s = semanticsLoader.visitBlock(uuid, blockCount, addr).toSeq
+    blockCount += 1
+    s
+  }
 }
 
 class OfflineLifterInsnLoader(mods: Seq[Module]) extends InsnLoader {
@@ -87,7 +91,7 @@ class OfflineLifterInsnLoader(mods: Seq[Module]) extends InsnLoader {
 
   private lazy val uuidToBlockContent: immutable.Map[String, BlockPos] = createOpcodeBlocks()
 
-  def decodeBlock(blockUUID: String, blockCountIn: Int, blockAddress: Option[BigInt]) =
+  def decodeBlock(blockUUID: String, blockAddress: Option[BigInt]) =
     uuidToBlockContent(blockUUID).toStatements()
 
 }
