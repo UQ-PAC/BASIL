@@ -299,22 +299,37 @@ object Main {
       None
     }
 
-    val dsa: Option[DSConfig] = if (conf.simplify.value) {
-      val phase = conf.dsaType match
-        case Some("pre") => DSAPhase.Pre
-        case Some("local") => DSAPhase.Local
-        case Some("bu") => DSAPhase.BU
-        case Some("td") => DSAPhase.TD
-        case None => DSAPhase.TD
-        case Some(_) =>
-          throw new IllegalArgumentException("Illegal option to dsa, allowed are: (pre|local|bu|td)")
+    val phase = conf.dsaType match
+      case Some("pre") => Some(DSAPhase.Pre)
+      case Some("local") => Some(DSAPhase.Local)
+      case Some("bu") => Some(DSAPhase.BU)
+      case Some("td") => Some(DSAPhase.TD)
+      case Some("") => Some(DSAPhase.TD)
+      case None => None
+      case Some(_) =>
+        throw new IllegalArgumentException("Illegal option to dsa, allowed are: (pre|local|bu|td)")
 
-      Some(
-        DSConfig(phase, conf.dsaSplitGlobals.value, conf.dsaAssert.value, conf.dsaEqCells.value, conf.dsaChecks.value)
-      )
-    } else {
-      None
+    if (conf.dsaChecks.value || conf.dsaEqCells.value || conf.dsaSplitGlobals.value || conf.dsaAssert.value) &&
+      (phase.isEmpty || phase.get == DSAPhase.Pre)
+    then {
+      throw new IllegalArgumentException(s"--dsa (local|bu|td) required for the provided flag options")
     }
+    val dsa: Option[DSConfig] =
+      phase match {
+        case Some(value) =>
+          if conf.simplify.value then
+            Some(
+              DSConfig(
+                value,
+                conf.dsaSplitGlobals.value,
+                conf.dsaAssert.value,
+                conf.dsaEqCells.value,
+                conf.dsaChecks.value
+              )
+            )
+          else throw new IllegalArgumentException(s"enabling --dsa requires --simplify")
+        case _ => None
+      }
 
     val calleeSaved = conf.forceCalleeSaved match {
       case "auto" => dsa.isDefined
