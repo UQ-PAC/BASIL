@@ -25,6 +25,7 @@ case class ILLoadingConfig(
   procedureTrimDepth: Int = Int.MaxValue,
   parameterForm: Boolean = false,
   trimEarly: Boolean = false,
+  gtirbLiftOffline: Boolean = false,
   pcTracking: PCTrackingOption = PCTrackingOption.None
 )
 

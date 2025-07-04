@@ -30,7 +30,8 @@ case class TestConfig(
   simplify: Boolean = false,
   summariseProcedures: Boolean = false,
   dsa: Option[DSConfig] = None,
-  memoryTransform: Boolean = false
+  memoryTransform: Boolean = false,
+  useOfflineLifterForGtirbFrontend: Boolean = false
 ) {
   private val scaledtimespans = new ScaledTimeSpans {}
   def timeoutFlag =
@@ -50,7 +51,8 @@ trait BASILTest {
     summariseProcedures: Boolean = false,
     dsa: Option[DSConfig] = None,
     memoryTransform: Boolean = false,
-    postLoad: IRContext => Unit = s => ()
+    postLoad: IRContext => Unit = s => (),
+    useOfflineLifterForGtirbFrontend: Boolean = false
   ): BASILResult = {
     val specFile = if (specPath.isDefined && File(specPath.get).exists) {
       specPath
@@ -58,8 +60,13 @@ trait BASILTest {
       None
     }
     val config = BASILConfig(
-      loading =
-        ILLoadingConfig(inputFile = inputPath, relfFile = Some(RELFPath), specFile = specFile, parameterForm = false),
+      loading = ILLoadingConfig(
+        inputFile = inputPath,
+        relfFile = Some(RELFPath),
+        specFile = specFile,
+        parameterForm = false,
+        gtirbLiftOffline = useOfflineLifterForGtirbFrontend
+      ),
       simplify = simplify,
       summariseProcedures = summariseProcedures,
       staticAnalysis = staticAnalysisConf,
