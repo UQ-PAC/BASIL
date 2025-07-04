@@ -7,11 +7,11 @@ import ir.eval.BitVectorEval.*
 
 object LoadExpr {
   def apply(addr: Expr, size: Int) = {
-    UninterpretedFunction("load", Seq(addr, IntLiteral(size)), BitVecType(size))
+    FApplyExpr("load", Seq(addr, IntLiteral(size)), BitVecType(size))
   }
 
   def unapply(e: Expr) = e match {
-    case UninterpretedFunction("load", Seq(addr, IntLiteral(size)), BitVecType(ts)) =>
+    case FApplyExpr("load", Seq(addr, IntLiteral(size)), BitVecType(ts), _) =>
       Some(addr, size)
     case _ => None
   }
@@ -25,7 +25,7 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
   }
   def stubUninterp(n: String, args: Seq[Expr], rt: IRType): Expr = {
     val argTypes = (args.map(_.getType.toString) ++ Seq(rt.toString)).mkString("_")
-    UninterpretedFunction(s"${n}_${argTypes}", args, rt)
+    FApplyExpr(s"${n}_${argTypes}", args, rt)
   }
 
   def castBV(b: Expr) = b.getType match {
@@ -229,8 +229,7 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
   def f_gen_not_bits(targ0: BigInt, arg0: Expr): Expr = arg0.getType match {
     case BoolType => UnaryExpr(BoolNOT, arg0)
     case BitVecType(_) => UnaryExpr(BVNOT, arg0)
-    case _: MapType => throw IllegalArgumentException()
-    case IntType => throw IllegalArgumentException()
+    case _ => throw IllegalArgumentException()
   }
 
   def f_gen_or_bool(arg0: Expr, arg1: Expr): Expr = BinaryExpr(BoolOR, arg0, arg1)
@@ -238,8 +237,7 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
   def f_gen_not_bool(arg0: Expr): Expr = arg0.getType match {
     case BoolType => UnaryExpr(BoolNOT, arg0)
     case BitVecType(sz) => BinaryExpr(NEQ, BitVecLiteral(0, sz), arg0)
-    case _: MapType => throw IllegalArgumentException()
-    case IntType => throw IllegalArgumentException()
+    case _ => throw IllegalArgumentException()
   }
 
   def f_gen_sdiv_bits(targ0: BigInt, arg0: Expr, arg1: Expr): Expr = BinaryExpr(BVSDIV, arg0, arg1)

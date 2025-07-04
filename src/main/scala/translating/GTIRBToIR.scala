@@ -15,6 +15,11 @@ import java.util.Base64
 import scala.collection.mutable.{ArrayBuffer, Map, Set}
 import scala.collection.{immutable, mutable}
 
+
+def b64encode(x: com.google.protobuf.ByteString) =
+  Base64.getEncoder().encodeToString(x.toByteArray)
+
+
 private def assigned(x: Statement): immutable.Set[Variable] = x match {
   case x: Assign => x.assignees
   case x: TempIf =>
@@ -69,12 +74,8 @@ class GTIRBToIR(
   val functionEntries = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionEntries)(_)).foldLeft0(_ ++ _)
   val functionBlocks = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionBlocks)(_)).foldLeft0(_ ++ _)
 
-  def b64encode(x: com.google.protobuf.ByteString) =
-    Base64.getEncoder().encodeToString(x.toByteArray)
-
-  given scala.Conversion[com.google.protobuf.ByteString, String] = b64encode
-
   import scala.language.implicitConversions
+  given scala.Conversion[com.google.protobuf.ByteString, String] = b64encode
 
   // maps block UUIDs to their address
   private val blockUUIDToAddress = createAddresses()

@@ -29,7 +29,7 @@ import util.functional.{Snoc}
 import util.Logger
 
 trait InsnLoader {
-  def decodeBlock(blockUUID: ByteString, blockCountIn: Int, blockAddress: Option[BigInt]): Seq[Seq[Statement]]
+  def decodeBlock(blockUUID: String, blockCountIn: Int, blockAddress: Option[BigInt]): Seq[Seq[Statement]]
 }
 
 class ParserMapInsnLoader(mods: Seq[Module]) extends InsnLoader {
@@ -40,7 +40,7 @@ class ParserMapInsnLoader(mods: Seq[Module]) extends InsnLoader {
   }
 
   val semanticsLoader = GTIRBLoader(parserMap)
-  def decodeBlock(uuid: ByteString, blockCount: Int, addr: Option[BigInt]): Seq[Seq[Statement]] =
+  def decodeBlock(uuid: String, blockCount: Int, addr: Option[BigInt]): Seq[Seq[Statement]] =
     semanticsLoader.visitBlock(uuid, blockCount, addr).toSeq
 }
 
@@ -50,7 +50,7 @@ class OfflineLifterInsnLoader(mods: Seq[Module]) extends InsnLoader {
 
   case class BlockPos(
     b: ByteInterval.Block,
-    uuid: ByteString,
+    uuid: String,
     address: Long,
     offset: Long,
     size: Long,
@@ -81,7 +81,7 @@ class OfflineLifterInsnLoader(mods: Seq[Module]) extends InsnLoader {
 
   }
 
-  def createOpcodeBlocks(): immutable.Map[ByteString, BlockPos] = {
+  def createOpcodeBlocks(): immutable.Map[String, BlockPos] = {
     val blocks = mods
       .flatMap(_.sections)
       .flatMap(_.byteIntervals)
@@ -96,16 +96,16 @@ class OfflineLifterInsnLoader(mods: Seq[Module]) extends InsnLoader {
       bl.collect(b =>
         b.value.code match {
           case Some(c) =>
-            c.uuid -> BlockPos(b, c.uuid, bi_addr + b.offset, b.offset, c.size, cont)
+            b64encode(c.uuid) -> BlockPos(b, (b64encode(c.uuid)), bi_addr + b.offset, b.offset, c.size, cont)
         }
       )
     )
     codeblocks.toMap
   }
 
-  private lazy val uuidToBlockContent: immutable.Map[ByteString, BlockPos] = createOpcodeBlocks()
+  private lazy val uuidToBlockContent: immutable.Map[String, BlockPos] = createOpcodeBlocks()
 
-  def decodeBlock(blockUUID: ByteString, blockCountIn: Int, blockAddress: Option[BigInt]) =
+  def decodeBlock(blockUUID: String, blockCountIn: Int, blockAddress: Option[BigInt]) =
     uuidToBlockContent(blockUUID).toStatements()
 
 }
