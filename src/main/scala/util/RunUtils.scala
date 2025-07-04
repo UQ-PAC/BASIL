@@ -14,7 +14,6 @@ import org.antlr.v4.runtime.{BailErrorStrategy, CharStreams, CommonTokenStream}
 import specification.*
 import translating.*
 import translating.PrettyPrinter.*
-import util.DSAConfig.Prereq
 import util.LogLevel.INFO
 import util.{DebugDumpIRLogger, Logger}
 
@@ -70,7 +69,7 @@ case class StaticAnalysisContext(
 )
 
 case class DSAContext(
-  sva: Map[Procedure, SymValues[DSInterval]],
+  sva: Map[Procedure, SymValues[OSet]],
   constraints: Map[Procedure, Set[Constraint]],
   local: Map[Procedure, IntervalGraph],
   bottomUp: Map[Procedure, IntervalGraph],
@@ -958,10 +957,11 @@ object RunUtils {
     assert(ir.invariant.programDiamondForm(ctx.program))
     var dsaContext: Option[DSAContext] = None
     if (conf.dsaConfig.isDefined) {
-      val dsaResults = IntervalDSA(ctx).dsa(conf.dsaConfig.get)
+      updateWithCallSCC(ctx.program)
+      val dsaResults = IntervalDSA(ctx, conf.dsaConfig.get).dsa()
       dsaContext = Some(dsaResults)
 
-      if q.memoryTransform && conf.dsaConfig.get != Prereq then // need more than prereq
+      if q.memoryTransform && conf.dsaConfig.get.phase == DSAPhase.TD then // need more than prereq
         val memTransferTimer = PerformanceTimer("Mem Transfer Timer", INFO)
         visit_prog(MemoryTransform(dsaResults.topDown, dsaResults.globals), ctx.program)
         memTransferTimer.checkPoint("Performed Memory Transform")

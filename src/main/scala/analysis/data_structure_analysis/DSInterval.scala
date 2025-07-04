@@ -53,7 +53,7 @@ enum DSInterval extends Offsets {
   def contains(offset: Int): Boolean =
     this match
       case DSInterval.Top => true
-      case DSInterval.Value(start, end) => start <= offset && (end > offset || end == start)
+      case DSInterval.Value(start, end) => start <= offset && (end > offset || (end == start && offset == end))
       case _ => false
 
   def contains(interval: DSInterval): Boolean =
