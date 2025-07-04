@@ -80,7 +80,7 @@ to write new analyses for.
 
 The new framework in `src/main/scala/transforms/Absint.scala` is both simpler to use and more performant.
 
-A good example of usning this framework is the simple live variables analysis. The abstract domain must 
+A good example of using this framework is the simple live variables analysis. The abstract domain must 
 define a join, a bottom value, and a transfer function. 
 
 This similar analyses using a powerset can use the same root domain: 
