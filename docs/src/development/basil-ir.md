@@ -119,7 +119,7 @@ as possibly assigning to everything, even though this is not explicitly represen
 
 The 'DSL' is a set of convenience functions for constructing correct IR programs in Scala source files. 
 This provides a simple way to construct IR programs for use in unit tests.
-Its source code can be [found here](../src/main/scala/ir/dsl/DSL.scala).
+Its source code can be [found here](https://github.com/UQ-PAC/BASIL/tree/main/src/main/scala/ir/dsl/DSL.scala).
 
 An example can be seen below:
 
@@ -161,7 +161,7 @@ blocklabel  ::= String
 If a block or procedure name is referenced in a target position, but a block or procedure is not defined with that 
 label, the dsl constructor will likely throw a match error. 
 
-Some additional constants are defined for convenience, Eg. `R0 = Register(R0, 64)`, see [the source file](../src/main/scala/ir/dsl/DSL.scala) for the full list.
+Some additional constants are defined for convenience, Eg. `R0 = Register(R0, 64)`, see [the source file](https://github.com/UQ-PAC/BASIL/tree/main/src/main/scala/ir/dsl/DSL.scala) for the full list.
 
 
 ### Pretty printing
@@ -185,5 +185,5 @@ ir.dotBlockGraph(proc: Procedure) : String
 - See [development/simplification-solvers.md](development/simplification-solvers.md)
 - For static analysis the Il-CFG-Iterator is the current well-supported way to iterate the IR.
   This currently uses the TIP framework, so you do not need to interact with the IR visitor directly. 
-  See [BasicIRConstProp.scala](../src/main/scala/analysis/BasicIRConstProp.scala) for an example on its useage.
+  See [BasicIRConstProp.scala](https://github.com/UQ-PAC/BASIL/tree/main/src/main/scala/analysis/BasicIRConstProp.scala) for an example on its useage.
 - This visits all procedures, blocks and statements in the IR program.

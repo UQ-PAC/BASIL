@@ -6,7 +6,7 @@ It can be serialised and laoded back into IR, and aims to be terse and human rea
 
 Below is an example for a procedure extracted from CNTLM.
 
-There is a grammar available here: https://uq-pac.github.io/BASIL/docs/basil-il/BasilIR.html
+[There is a grammar available here](https://uq-pac.github.io/BASIL/docs/basil-il/BasilIR.html).
 
 ```
 memory shared $mem : (bv64 -> bv8);
