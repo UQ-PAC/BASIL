@@ -1,17 +1,11 @@
 package translating
 
 import bap.*
-import boogie.UnaryBExpr
 import ir.*
-import specification.*
 import ir.cilvisitor.*
 
-import scala.collection.mutable
-import scala.collection.immutable
-import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.TreeMap
-import util.intrusive_list.*
+import scala.collection.{immutable, mutable}
 
 class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
 
@@ -361,11 +355,11 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
   private def paramRegisterLVal(param: BAPParameter): Variable = translateVar(param.value)
   private def toIROutParam(param: BAPParameter) = {
     paramRegisterLVal(param) match {
-      case r: Register => {
-        if (r.size == param.size) {
+      case r @ Register(_, size) => {
+        if (size == param.size) {
           translateParam(param)
         } else {
-          LocalVar.ofIndexed(param.name, BitVecType(r.size))
+          LocalVar.ofIndexed(param.name, BitVecType(size))
         }
       }
       case _ => throw Exception(s"subroutine parameter $this refers to non-register variable ${param.value}")
@@ -375,13 +369,13 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
 
   private def paramRegisterRVal(p: BAPParameter): Expr = {
     paramRegisterLVal(p) match {
-      case r: Register => {
-        if (r.size == p.size) {
+      case r @ Register(n, size) => {
+        if (size == p.size) {
           r
-        } else if (r.size > p.size) {
+        } else if (size > p.size) {
           Extract(p.size, 0, r)
         } else {
-          ZeroExtend(p.size - r.size, r)
+          ZeroExtend(p.size - size, r)
         }
       }
       case _ => throw Exception(s"subroutine parameter $this refers to non-register variable ${p.value}")
@@ -389,11 +383,11 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
   }
   def paramVariableRVal(p: BAPParameter): Expr = {
     paramRegisterLVal(p) match {
-      case r: Register => {
-        if (r.size == p.size) {
+      case r @ Register(_, size) => {
+        if (size == p.size) {
           translateParam(p)
         } else {
-          ZeroExtend(r.size - p.size, translateParam(p))
+          ZeroExtend(size - p.size, translateParam(p))
         }
       }
       case _ => throw Exception(s"subroutine parameter $this refers to non-register variable ${p.value}")

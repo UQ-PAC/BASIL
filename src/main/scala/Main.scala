@@ -1,22 +1,34 @@
 // package scala
 
-import bap.*
-import boogie.*
-import translating.*
-import util.RunUtils
-
-import scala.sys.process.*
-import java.io.File
-import scala.collection.mutable.{ArrayBuffer, Set}
-import scala.collection.{immutable, mutable}
-import scala.language.postfixOps
-import scala.sys.process.*
-import util.*
 import mainargs.{Flag, ParserForClass, arg, main}
 import util.DSAConfig.{Checks, Prereq, Standard}
 import util.boogie_interaction.BoogieResultKind
+import util.{
+  AnalysisResultDotLogger,
+  BASILConfig,
+  BoogieGeneratorConfig,
+  BoogieMemoryAccessMode,
+  DSAConfig,
+  DebugDumpIRLogger,
+  ILLoadingConfig,
+  LogLevel,
+  Logger,
+  MemoryRegionsMode,
+  PCTrackingOption,
+  ProcRelyVersion,
+  RunUtils,
+  StaticAnalysisConfig
+}
+
+import scala.language.postfixOps
 
 object Main {
+
+  val programNameVersionHeader = {
+    "Basil" + System.lineSeparator()
+      + "Version: " + buildinfo.BuildInfo.gitVersion + System.lineSeparator()
+      + "Commit:  " + buildinfo.BuildInfo.gitCommit
+  }
 
   enum ChooseInput {
     case Gtirb
@@ -105,7 +117,7 @@ object Main {
     }
   }
 
-  @main(name = "BASIL")
+  @main(name = programNameVersionHeader + System.lineSeparator())
   case class Config(
     @arg(name = "load-directory-bap", doc = "Load relf, adt, and bir from directory (and spec from parent directory)")
     bapInputDirName: Option[String],
@@ -156,6 +168,8 @@ object Main {
     trimEarly: Flag,
     @arg(name = "help", short = 'h', doc = "Show this help message.")
     help: Flag,
+    @arg(name = "version", doc = "Show version number and exit.")
+    version: Flag,
     @arg(name = "analysis-results", doc = "Log analysis results in files at specified path.")
     analysisResults: Option[String],
     @arg(name = "analysis-results-dot", doc = "Log analysis results in .dot form at specified path.")
@@ -218,7 +232,9 @@ object Main {
     @arg(name = "memory-transform", doc = "Transform memory access to region accesses")
     memoryTransform: Flag,
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
-    noif: Flag
+    noif: Flag,
+    @arg(name = "nodebug", doc = "Disable runtume debug assertions")
+    nodebug: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -234,6 +250,11 @@ object Main {
 
     if (conf.help.value) {
       println(parser.helpText(sorted = false))
+      return
+    }
+
+    if (conf.version.value) {
+      println(programNameVersionHeader)
       return
     }
 
@@ -336,6 +357,10 @@ object Main {
       throw IllegalArgumentException("BAP ADT input requires --relf")
     }
 
+    if (conf.nodebug.value) {
+      util.assertion.disableAssertions == true
+    }
+
     val q = BASILConfig(
       loading = loadingInputs.copy(
         dumpIL = conf.dumpIL,
@@ -358,6 +383,8 @@ object Main {
       memoryTransform = conf.memoryTransform.value,
       assertCalleeSaved = calleeSaved
     )
+
+    Logger.info(programNameVersionHeader)
 
     val result = RunUtils.run(q)
     if (conf.verify.value) {

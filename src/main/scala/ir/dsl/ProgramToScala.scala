@@ -1,14 +1,12 @@
 package ir.dsl
 
 import ir.*
-import ir.dsl.{ToScala, ToScalaLines}
-import util.{intersperse}
+import util.assertion.*
+import util.intersperse
 import util.twine.Twine
 
-import collection.immutable.{ListMap, SortedMap}
-import collection.immutable.{LazyList}
+import collection.immutable.{ListMap, LazyList}
 import collection.mutable
-import collection.mutable.{LinkedHashSet}
 
 /**
  * ToScala instances for Program, Procedure, and Block
@@ -293,7 +291,7 @@ trait ToScalaWithSplitting extends BasilIRToScala {
    * by subexpressions.
    */
   protected def toScalaAndDeclsWith[T](f: T => Twine)(name: String, x: T): Twine =
-    assert(decls.isEmpty, "repeated use of the same ToScalaWithSplitting instance is not allowed")
+    debugAssert(decls.isEmpty, "repeated use of the same ToScalaWithSplitting instance is not allowed")
 
     addDecl(name, f(x))
 

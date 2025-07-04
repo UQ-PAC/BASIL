@@ -1,12 +1,7 @@
-import analysis.ParamAnalysis
 import ir.dsl.*
-import ir.*
+import ir.{transforms, *}
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.{BASILTest, CaptureOutput}
-import util.*
-import translating.BasilIRToSMT2
-import ir.dsl.*
-import ir.transforms
+import test_util.CaptureOutput
 import translating.PrettyPrinter.*
 
 @test_util.tags.UnitTest
@@ -39,7 +34,9 @@ class SingleAssignmentTest extends AnyFunSuite with CaptureOutput {
     )
     assert(
       pp_stmt(tightLoop.mainProcedure.blocks.find(_.label == "loop").get.statements.tail.head)
-        == pp_stmt(LocalAssign(LocalVar("x", BitVecType(32), 3), LocalVar("x", BitVecType(32), 4), Some("phi")))
+        == pp_stmt(
+          SimulAssign(Vector(LocalVar("x", BitVecType(32), 3) -> LocalVar("x", BitVecType(32), 4)), Some("phi"))
+        )
     )
   }
 
@@ -72,7 +69,9 @@ class SingleAssignmentTest extends AnyFunSuite with CaptureOutput {
     )
     assert(
       pp_stmt(tightLoop.mainProcedure.blocks.find(_.label == "loop").get.statements.tail.head)
-        == pp_stmt(LocalAssign(LocalVar("x", BitVecType(32), 0), LocalVar("x", BitVecType(32), 1), Some("phi")))
+        == pp_stmt(
+          SimulAssign(Vector(LocalVar("x", BitVecType(32), 0) -> LocalVar("x", BitVecType(32), 1)), Some("phi"))
+        )
     )
 
     assert(transforms.rdDSAProperty(tightLoop.mainProcedure))
@@ -105,7 +104,9 @@ class SingleAssignmentTest extends AnyFunSuite with CaptureOutput {
     )
     assert(
       pp_stmt(tightLoop.mainProcedure.blocks.find(_.label == "loop").get.statements.tail.head)
-        == pp_stmt(LocalAssign(LocalVar("x", BitVecType(32), 1), LocalVar("x", BitVecType(32), 2), Some("phi")))
+        == pp_stmt(
+          SimulAssign(Vector(LocalVar("x", BitVecType(32), 1) -> LocalVar("x", BitVecType(32), 2)), Some("phi"))
+        )
     )
 
     assert(transforms.rdDSAProperty(tightLoop.mainProcedure))

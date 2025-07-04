@@ -1,10 +1,11 @@
 package ir.dsl
 import ir.*
 import translating.PrettyPrinter.*
+import util.assertion.*
+
+import scala.collection.immutable.*
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.immutable.*
-import scala.annotation.targetName
 
 /**
  * IR construction DSL
@@ -61,7 +62,7 @@ import scala.annotation.targetName
  *  Together, NonCallStatement and Call should partition Statement.
  */
 type NonCallStatement =
-  LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume | MemoryAssign
+  LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume | MemoryAssign | SimulAssign
 
 type DSLStatement = NonCallStatement | EventuallyStatement | EventuallyJump
 
@@ -73,22 +74,23 @@ def cloneStatement(x: NonCallStatement): NonCallStatement = x match {
   case NOP(l) => NOP(l)
   case Assert(a, b, c) => Assert(a, b, c)
   case Assume(a, b, c, d) => Assume(a, b, c, d)
+  case a: SimulAssign => SimulAssign(a.assignments, a.label)
 }
 
-val R0: Register = Register("R0", 64)
-val R1: Register = Register("R1", 64)
-val R2: Register = Register("R2", 64)
-val R3: Register = Register("R3", 64)
-val R4: Register = Register("R4", 64)
-val R5: Register = Register("R5", 64)
-val R6: Register = Register("R6", 64)
-val R7: Register = Register("R7", 64)
-val R8: Register = Register("R8", 64)
-val R29: Register = Register("R29", 64)
-val R30: Register = Register("R30", 64)
-val R31: Register = Register("R31", 64)
+val R0: GlobalVar = Register("R0", 64)
+val R1: GlobalVar = Register("R1", 64)
+val R2: GlobalVar = Register("R2", 64)
+val R3: GlobalVar = Register("R3", 64)
+val R4: GlobalVar = Register("R4", 64)
+val R5: GlobalVar = Register("R5", 64)
+val R6: GlobalVar = Register("R6", 64)
+val R7: GlobalVar = Register("R7", 64)
+val R8: GlobalVar = Register("R8", 64)
+val R29: GlobalVar = Register("R29", 64)
+val R30: GlobalVar = Register("R30", 64)
+val R31: GlobalVar = Register("R31", 64)
 
-def R(i: Int): Register = Register(s"R$i", 64)
+def R(i: Int): GlobalVar = Register(s"R$i", 64)
 
 def bv_t(i: Int) = BitVecType(i)
 
@@ -120,7 +122,7 @@ case class CloneableStatement(s: NonCallStatement) extends EventuallyStatement {
 case class IdentityStatement(s: NonCallStatement) extends EventuallyStatement {
   var resolved = false
   override def resolve(p: CachedLabelResolver): Statement = {
-    assert(
+    debugAssert(
       !resolved,
       s"DSL statement '$s' has already been resolved! to make a DSL statement that can be resolved multiple times, wrap it in clonedStmt() or use .cloneable on its block."
     )
@@ -211,7 +213,7 @@ def directCall(lhs: Iterable[(String, Variable)], tgt: String, actualParams: (St
   EventuallyCall(DelayNameResolve(tgt), lhs.to(ArraySeq), actualParams)
 
 def directCall(lhs: Iterable[(String, Variable)], rhs: call): EventuallyCall =
-  EventuallyCall(DelayNameResolve(rhs.target), lhs.toArray, rhs.actualParams)
+  EventuallyCall(DelayNameResolve(rhs.target), lhs.toSeq, rhs.actualParams)
 
 def directCall(tgt: String): EventuallyCall = directCall(Nil, tgt, Nil)
 
@@ -255,9 +257,9 @@ case class EventuallyBlock(
     val tempBlock: Block = Block(label, meta.address, List(), GoTo(List.empty))
 
     def cont(prog: CachedLabelResolver, proc: String): Block = {
-      assert(tempBlock.statements.isEmpty)
+      debugAssert(tempBlock.statements.isEmpty)
       val resolved = sl.map(_.resolve(prog))
-      assert(tempBlock.statements.isEmpty)
+      debugAssert(tempBlock.statements.isEmpty)
       tempBlock.statements.addAll(resolved)
       tempBlock.replaceJump(j.resolve(prog, proc))
     }
@@ -437,8 +439,8 @@ case class EventuallyProgram(
     val reso = CachedLabelResolver(p)
 
     resolvers.foreach(_(reso))
-    assert(ir.invariant.correctCalls(p))
-    assert(ir.invariant.cfgCorrect(p))
+    debugAssert(ir.invariant.correctCalls(p))
+    debugAssert(ir.invariant.cfgCorrect(p))
     p
   }
 

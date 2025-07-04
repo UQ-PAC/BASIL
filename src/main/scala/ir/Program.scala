@@ -1,13 +1,16 @@
 package ir
 
-import util.functional.Snoc
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
+import analysis.{Loop, MergedRegion}
 import boogie.*
-import analysis.{MergedRegion, Loop}
-import util.intrusive_list.*
-import eval.BitVectorEval
 import translating.PrettyPrinter.*
+import util.assertion.*
+import util.functional.Snoc
+import util.intrusive_list.*
+
+import scala.collection.mutable.ArrayBuffer
+import scala.collection.{immutable, mutable}
+
+import eval.BitVectorEval
 
 /** Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are not
   * guaranteed to be in any defined order.
@@ -64,7 +67,8 @@ case class Metadata(originalLabel: Option[String] = None, address: Option[BigInt
 class Program(
   var procedures: ArrayBuffer[Procedure],
   var mainProcedure: Procedure,
-  val initialMemory: mutable.TreeMap[BigInt, MemorySection]
+  val initialMemory: mutable.TreeMap[BigInt, MemorySection],
+  val declarations: mutable.ArrayBuffer[Decl] = mutable.ArrayBuffer()
 ) extends Iterable[CFGPosition]
     with DeepEquality {
 
@@ -292,8 +296,8 @@ class Procedure private (
   private val _callers = mutable.HashSet[DirectCall]()
   _blocks.foreach(_.parent = this)
   // class invariant
-  require(_returnBlock.forall(b => _blocks.contains(b)) && _entryBlock.forall(b => _blocks.contains(b)))
-  require(_blocks.isEmpty == _entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
+  debugAssert(_returnBlock.forall(b => _blocks.contains(b)) && _entryBlock.forall(b => _blocks.contains(b)))
+  debugAssert(_blocks.isEmpty == _entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
 
   def this(
     name: String,
@@ -427,7 +431,6 @@ class Procedure private (
 
   def returnBlock_=(value: Block): Unit = {
     if (!returnBlock.contains(value)) {
-      _returnBlock.foreach(removeBlocks)
       _returnBlock = Some(addBlock(value))
     }
   }
@@ -455,7 +458,7 @@ class Procedure private (
   }
 
   def replaceBlock(oldBlock: Block, block: Block): Block = {
-    require(_blocks.contains(oldBlock))
+    debugAssert(_blocks.contains(oldBlock))
     if (oldBlock ne block) {
       val isEntry: Boolean = entryBlock.contains(oldBlock)
       val isReturn: Boolean = returnBlock.contains(oldBlock)
@@ -490,8 +493,8 @@ class Procedure private (
     *   the removed block
     */
   def removeBlocks(block: Block): Block = {
-    require(_blocks.contains(block))
-    require(block.incomingJumps.isEmpty) // don't leave jumps dangling
+    debugAssert(_blocks.contains(block))
+    debugAssert(block.incomingJumps.isEmpty) // don't leave jumps dangling
     block.deParent()
     val index = _blocks.indexOf(block)
     _blocks.remove(index)
@@ -606,7 +609,7 @@ class Block private (
     label: String,
     address: Option[BigInt] = None,
     statements: IterableOnce[Statement] = Set.empty,
-    jump: Jump = GoTo(Set.empty)
+    jump: Jump = Unreachable()
   ) = {
     this(label, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty, Metadata(None, address))
   }
@@ -635,7 +638,7 @@ class Block private (
   var rpoOrder: Long = -1
 
   private def jump_=(j: Jump): Unit = {
-    require(!j.hasParent)
+    debugAssert(!j.hasParent)
     if (j ne _jump) {
       _jump.deParent()
       _jump = j
@@ -647,7 +650,7 @@ class Block private (
     if (j.hasParent) {
       val parent = j.parent
       j.deParent()
-      parent.jump = GoTo(Set.empty)
+      parent.jump = Unreachable()
     }
     jump = j
     this
@@ -659,7 +662,7 @@ class Block private (
 
   def removeIncomingJump(g: GoTo): Unit = {
     _incomingJumps.remove(g)
-    assert(!incomingJumps.contains(g))
+    debugAssert(!incomingJumps.contains(g))
   }
 
   def calls: Set[Procedure] = statements.toSet.collect { case d: DirectCall =>
@@ -689,7 +692,7 @@ class Block private (
     *   The intra-procedural set of predecessor blocks.
     */
   def prevBlocks: Iterable[Block] = {
-    incomingJumps.map(_.parent)
+    _incomingJumps.toSeq.map(_.parent)
   }
 
   /** If the block has a single block successor then this returns that block, otherwise None.
@@ -742,8 +745,18 @@ class Block private (
     nb.replaceJump(ojump)
   }
 
+  def splitAfterStatement(s: Statement, suffix: String): Block = {
+    val rest = statements.splitOn(s)
+    val thisJump = jump
+    val succ = Block(label + suffix, None, rest, Unreachable())
+    parent.addBlock(succ)
+    replaceJump(GoTo(succ))
+    succ.replaceJump(thisJump)
+    succ
+  }
+
   def createBlockBetween(b2: Block, suffix: String = "goto"): Block = {
-    require(nextBlocks.toSet.contains(b2))
+    debugAssert(nextBlocks.toSet.contains(b2))
     val b1 = this
     val label = parent.freshBlockId(suffix)
     val origs = (meta.originalLabel.toList ++ b2.meta.originalLabel).flatMap(_.split(",")).toSet.toList.sorted match {
@@ -767,7 +780,7 @@ class Block private (
   }
 
   def createBlockOnEdgeWith(b2: Block, suffix: String = "_goto"): Block = {
-    require((nextBlocks ++ prevBlocks).exists(_ == b2))
+    debugAssert((nextBlocks ++ prevBlocks).exists(_ == b2))
     if (nextBlocks.exists(_ == b2)) {
       createBlockBetween(b2, suffix)
     } else if (prevBlocks.exists(_ == b2)) {

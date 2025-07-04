@@ -1,8 +1,6 @@
 package ir.invariant
 import ir.*
-import ir.cilvisitor.*
 import util.Logger
-import scala.collection.mutable
 
 def cfgCorrect(p: Program | Procedure) = {
 
@@ -21,8 +19,8 @@ def cfgCorrect(p: Program | Procedure) = {
 
   p.forall {
     case b: Block => {
-      val backwards = (b.prevBlocks.toSet == revForwardsIntra.get(b).getOrElse(Set()))
-      val forwards = b.nextBlocks.toSet == forwardsIntraMap.get(b).getOrElse(Set())
+      val backwards = (b.prevBlocks.toSet == revForwardsIntra.get(b).getOrElse(Set()).toSet)
+      val forwards = b.nextBlocks.toSet == forwardsIntraMap.get(b).getOrElse(Set().toSet)
       val c = forwards && backwards
       if (!forwards) {
         Logger.error(s"Forwards block cfg does not match : ${b.nextBlocks.toSet
@@ -31,6 +29,9 @@ def cfgCorrect(p: Program | Procedure) = {
       if (!backwards) {
         Logger.error(s"Backward block cfg does not match : ${b.prevBlocks.toSet
             .map(_.label)} == ${revForwardsIntra.get(b).getOrElse(Set()).map(_.label)}")
+        Logger.error(
+          s"Backward block cfg does not match : ${b.prevBlocks.toSet} == ${revForwardsIntra.get(b).getOrElse(Set())}"
+        )
       }
       c
     }

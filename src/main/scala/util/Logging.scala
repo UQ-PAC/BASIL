@@ -1,8 +1,10 @@
 package util
-import sourcecode.Line, sourcecode.FileName
-import scala.io.AnsiColor
-import collection.mutable.HashSet
+import sourcecode.{FileName, Line, Name}
+
 import java.io.{File, PrintStream}
+import scala.io.AnsiColor
+
+import collection.mutable.HashSet
 
 enum LogLevel(val id: Int):
   case DEBUG extends LogLevel(0)
@@ -17,6 +19,9 @@ class GenericLogger(
   defaultOutput: => PrintStream = Console.out,
   var ANSIColour: Boolean = true
 ) {
+
+  val logTrace = RingTrace[String](50, "Logger: " + name)
+  OnCrash.register(logTrace)
 
   private var _output = () => defaultOutput
   def output: PrintStream = _output()
@@ -62,11 +67,7 @@ class GenericLogger(
   def setOutput(stream: PrintStream) = _output = () => stream
   def setOutput(streamProducer: () => PrintStream) = _output = streamProducer
 
-  def writeToFile(file: File, content: => String)(implicit
-    line: sourcecode.Line,
-    filepos: sourcecode.FileName,
-    name: sourcecode.Name
-  ) = {
+  def writeToFile(file: File, content: => String)(implicit line: Line, filepos: FileName, name: Name) = {
     if (level.id < LogLevel.OFF.id) {
       this.debug(s"Writing $file")(line, filepos, name)
       val l = deriveLogger(file.getName(), file)
@@ -96,13 +97,7 @@ class GenericLogger(
     output.flush()
   }
 
-  private def writeLog(
-    logLevel: LogLevel,
-    arg: => Any,
-    line: sourcecode.Line,
-    file: sourcecode.FileName,
-    name: sourcecode.Name
-  ): Unit = {
+  private def writeLog(logLevel: LogLevel, arg: => Any, line: Line, file: FileName, name: Name): Unit = {
 
     if (level.id <= logLevel.id) {
       val colour =
@@ -123,29 +118,33 @@ class GenericLogger(
         case (DEBUG, _) => false
         case (OFF, _) => ???
 
-      val position = if showPosition then s" [${name.value}@${file.value}:${line.value}]" else ""
+      val positionText = s" [${name.value}@${file.value}:${line.value}]"
+      val position = if showPosition then positionText else ""
 
       val resetColour = if !ANSIColour then "" else AnsiColor.RESET
       val space = "  "
       val prefix = s"[$colour$logLevel${resetColour}]$space"
+      val prefixNoCol = s"[$logLevel]$space"
       val text = arg.toString().replace("\n", "\n " + (" " * (logLevel.toString).length()) + "  " + space)
+
+      logTrace.add(s"$prefixNoCol $text$positionText")
       output.println(s"$prefix $text$position")
     }
   }
 
-  def warn(arg: => Any)(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): Unit = {
+  def warn(arg: => Any)(implicit line: Line, file: FileName, name: Name): Unit = {
     writeLog(LogLevel.WARN, arg, line, file, name)
   }
 
-  def error(arg: => Any)(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): Unit = {
+  def error(arg: => Any)(implicit line: Line, file: FileName, name: Name): Unit = {
     writeLog(LogLevel.ERROR, arg, line, file, name)
   }
 
-  def debug(arg: => Any)(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): Unit = {
+  def debug(arg: => Any)(implicit line: Line, file: FileName, name: Name): Unit = {
     writeLog(LogLevel.DEBUG, arg, line, file, name)
   }
 
-  def info(arg: => Any)(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): Unit = {
+  def info(arg: => Any)(implicit line: Line, file: FileName, name: Name): Unit = {
     writeLog(LogLevel.INFO, arg, line, file, name)
   }
 
@@ -188,4 +187,5 @@ val DSALogger = Logger.deriveLogger("DSA").setLevel(LogLevel.WARN)
 val ConstGenLogger = DSALogger.deriveLogger("Constraint Gen", Console.out).setLevel(LogLevel.OFF)
 val SVALogger = DSALogger.deriveLogger("SVA").setLevel(LogLevel.OFF)
 val IntervalDSALogger = DSALogger.deriveLogger("SadDSA", Console.out).setLevel(LogLevel.OFF)
+val condPropDebugLogger = SimplifyLogger.deriveLogger("inlineCond")
 val StackLogger = Logger.deriveLogger("Stack").setLevel(LogLevel.OFF)

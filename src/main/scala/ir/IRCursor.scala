@@ -1,11 +1,12 @@
 package ir
-import util.Logger
-import cfg_visualiser.DotElement
-import cfg_visualiser.{DotArrow, DotGraph, DotInlineArrow, DotInterArrow, DotIntraArrow, DotNode, DotRegularArrow}
+import cfg_visualiser.{DotArrow, DotGraph, DotInterArrow, DotNode, DotRegularArrow}
+import translating.BasilIRPrettyPrinter
+import translating.PrettyPrinter.*
+import util.assertion.*
 
-import ir.cilvisitor.*
-import collection.mutable
 import scala.annotation.tailrec
+
+import collection.mutable
 
 /** 
  *  This file defines functions to get the successor and predecessor of a IR node for control flow.
@@ -278,7 +279,7 @@ def stronglyConnectedComponents[T <: CFGPosition, O <: T](
       out += component
     }
   }
-  assert(stack.size == 0)
+  debugAssert(stack.size == 0)
 
   out.map(_.toSet).toList
 }
@@ -317,12 +318,7 @@ def getDetachedBlocks(p: Procedure) = {
 
 def dotBlockGraph(proc: Procedure): String = {
   val o = getDetachedBlocks(proc)
-  dotBlockGraph(
-    proc.collect { case b: Block =>
-      b
-    },
-    o.reachableFromBlockEmptyPred
-  )
+  dotBlockGraph(proc.blocks.toList, o.reachableFromBlockEmptyPred)
 }
 
 def dotBlockGraph(prog: Program): String = {
@@ -334,6 +330,11 @@ def dotBlockGraph(prog: Program): String = {
     },
     e
   )
+}
+
+def dotFlowGraph(blocks: Iterable[Block], orphaned: Set[Block]): String = {
+  val labels: Map[CFGPosition, String] = Map()
+  toDot[Block](blocks.toSet, IntraProcBlockIRCursor, labels, orphaned)
 }
 
 def dotBlockGraph(blocks: Iterable[Block], orphaned: Set[Block]): String = {
@@ -405,6 +406,16 @@ def toDot[T <: CFGPosition](
   }
 
   def getArrow(s: CFGPosition, n: CFGPosition) = {
+
+    if (!dotNodes.contains(n)) {
+      val r = n match {
+        case p: Block => (BasilIRPrettyPrinter()(p))
+        case p: Statement => (BasilIRPrettyPrinter()(p))
+        case _ => s"UNK: $n"
+      }
+      dotNodes(n) = DotNode(n.toString, r, true)
+
+    }
     if (IRWalk.procedure(n) eq IRWalk.procedure(s)) {
       DotRegularArrow(dotNodes(s), dotNodes(n))
     } else {
@@ -415,6 +426,7 @@ def toDot[T <: CFGPosition](
   for (node <- domain) {
     node match {
       case s =>
+        assert(dotNodes.contains(s))
         iterator.succ(s).foreach(n => dotArrows.addOne(getArrow(s, n)))
       //       iterator.pred(s).foreach(n => dotArrows.addOne(getArrow(s,n)))
     }
@@ -428,7 +440,7 @@ def toDot[T <: CFGPosition](
  * This doesn't implement free vars for block or proc, it just returns the rvars.
  */
 def freeVarsPos(s: CFGPosition): Set[Variable] = s match {
-  case a: LocalAssign => a.rhs.variables
+  case SimulAssign(assigns, _) => assigns.toSet.flatMap(_._2.variables)
   case a: MemoryAssign => a.rhs.variables
   case l: MemoryLoad => l.index.variables
   case a: MemoryStore => a.index.variables ++ a.value.variables

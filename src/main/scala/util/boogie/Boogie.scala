@@ -1,4 +1,7 @@
 package util.boogie_interaction
+import util.Logger
+
+import scala.sys.process.*
 
 enum BoogieResultKind {
   case Verified(count: Int = -1, errors: Int = -1)
@@ -70,7 +73,7 @@ def parseVerifyMessage(m: String) = {
         ) =>
       Some(BoogieResultKind.Verified(verif.toInt, errors.toInt))
     case _ if m.trim == "Boogie program verifier finished with 0 errors" => Some(BoogieResultKind.Verified(-1, 0))
-    case _ => println(m); None
+    case _ => None
   }
 }
 
@@ -141,4 +144,80 @@ def parseErrors(boogieStdoutMessage: String, snippetContext: Int = 3): Array[Boo
       BoogieError(fname, line, Some(boogieLines.toList))
     }
   }
+}
+
+def boogieBatchQuery(
+  boogieFileNames: Iterable[String],
+  proc: Option[String] = None,
+  timeout: Int = 30,
+  solver2Timeout: Option[Int] = None
+) = {
+  val procSelect = proc.toSeq.flatMap(p => Seq("/proc", p))
+  val x = solver2Timeout.map(s => s"/proverOpt:C:combined_solver.solver2_timeout=$s").toSeq
+  val boogieCmd =
+    Seq("boogie", "/timeLimit", timeout.toString) ++ x ++ boogieFileNames ++ procSelect
+  Logger.debug(s"Batch proving ${boogieCmd.mkString(" ")}")
+  val output = boogieCmd.!!
+
+  val res = parseOutput(output)
+  Logger.debug(res)
+  res
+}
+
+def getSMTSplitsFromFile(fname: String) = {
+  val loadFile = util.readFromFile(fname)
+
+  var queryStack = List[String]()
+  var queryList = List[String]()
+  var currentQuery = ""
+
+  var first = true
+  var depth = 0
+  var initialSetup = ""
+  var check_sat = false
+
+  for (l <- loadFile) {
+    val ln = l.trim.stripPrefix("(").stripSuffix(")").split(" ").toList
+    ln match {
+      case "check-sat" :: Nil => {
+        currentQuery = currentQuery + "\n" + l
+
+        check_sat = true
+      }
+      case "push" :: n :: Nil if (n.toInt != 1) => {
+        throw Exception("Sequential push")
+      }
+      case "push" :: n :: Nil if (n.toInt == 1) => {
+        if (depth > 0) {
+          throw Exception("Sequential push")
+        }
+        if (first) {
+          first = false
+          initialSetup = currentQuery + "\n"
+          currentQuery = initialSetup
+        }
+        depth += 1
+      }
+      case "pop" :: n :: Nil if (n.toInt != 1) => {
+        throw Exception("Sequential pop")
+      }
+      case "pop" :: n :: Nil if (n.toInt == 1) => {
+        check_sat = false
+        depth -= 1
+        if (depth != 0) {
+          throw Exception("Sequential pop")
+        }
+        queryList = currentQuery :: queryList
+        currentQuery = initialSetup
+      }
+      case _ => {
+        currentQuery = currentQuery + "\n" + l
+      }
+    }
+  }
+
+  // if (check_sat) {
+  //   queryList = currentQuery :: queryList
+  // }
+  queryList.reverse
 }

@@ -26,7 +26,6 @@ given ToScala[Expr] = ToScala.derived
 given ToScala[UnOp] = ToScala.derived
 given ToScala[BinOp] = ToScala.derived
 given ToScala[Endian] = ToScala.derived
-given ToScala[Global] = ToScala.derived
 given ToScala[IRType] = ToScala.derived
 
 // NOTE: Unfortunately, for the Command trait, this is not straightforward because the classes are not case classes.
@@ -37,7 +36,6 @@ given ToScala[IRType] = ToScala.derived
 private object CaseIR {
 
   import collection.immutable.{Map, SortedMap}
-  import collection.mutable
 
   // format: off
 
@@ -52,6 +50,7 @@ private object CaseIR {
   sealed trait Jump extends Command
   sealed trait Call extends Statement
 
+  case class SimulAssign(lhs: List[(Variable, Expr)], label: Option[String] = None) extends Assign
   case class LocalAssign(lhs: Variable, rhs: Expr, label: Option[String] = None) extends SingleAssign
   case class MemoryAssign(lhs: Variable, rhs: Expr, label: Option[String] = None) extends SingleAssign
   case class MemoryStore(mem: Memory, index: Expr, value: Expr, endian: Endian, size: Int, label: Option[String] = None) extends Statement
@@ -67,6 +66,7 @@ private object CaseIR {
 
   def fromBasilIR(x: ir.Command): Command = x match {
     case ir.LocalAssign(a,b,c) => LocalAssign(a,b,c)
+    case ir.SimulAssign(a,b) => SimulAssign(a.toList,b)
     case ir.MemoryStore(a,b,c,d,e,f) => MemoryStore(a,b,c,d,e,f)
     case ir.MemoryLoad(a,b,c,d,e,f) => MemoryLoad(a,b,c,d,e,f)
     case ir.NOP(a) => NOP(a)

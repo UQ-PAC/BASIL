@@ -1,14 +1,13 @@
+import analysis.data_structure_analysis
 import analysis.data_structure_analysis.{DSInterval, Global, Heap, IntervalDSA, Par, Ret, Stack, SymBase}
 import boogie.SpecGlobal
-import ir.*
 import ir.Endian.LittleEndian
 import ir.dsl.{block, directCall, goto, proc, prog, ret}
-import ir.{BitVecLiteral, Endian, MemoryLoad, Register, SharedMemory}
+import ir.{BitVecLiteral, Endian, MemoryLoad, Register, SharedMemory, *}
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
-import util.*
-import analysis.data_structure_analysis
 import test_util.{BASILTest, CaptureOutput, programToContext}
+import util.*
 import util.DSAConfig.Checks
 
 @test_util.tags.AnalysisSystemTest3

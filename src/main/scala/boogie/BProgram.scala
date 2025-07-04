@@ -1,13 +1,12 @@
 package boogie
 
-import util.{PerformanceTimer, Logger, LogLevel}
 import ir.Sigil
+import util.{LogLevel, Logger, PerformanceTimer}
 
-import scala.sys.process.*
-import scala.collection.immutable.Seq
-
-import java.io.{StringWriter, Writer, BufferedWriter, FileWriter}
+import java.io.{BufferedWriter, FileWriter, StringWriter, Writer}
 import java.nio.file.{Files, Paths}
+import scala.collection.immutable.Seq
+import scala.sys.process.*
 
 case class BProgram(declarations: List[BDeclaration], filename: String) {
   override def toString: String = declarations.flatMap(x => x.toBoogie).mkString(System.lineSeparator())
@@ -57,7 +56,10 @@ trait BDeclaration extends HasAttributes {
       w.append(System.lineSeparator())
     }
   }
+}
 
+case class BTypeDecl(t: CustomBType) extends BDeclaration {
+  override def toString() = s"type $t;"
 }
 
 case class BProcedure(

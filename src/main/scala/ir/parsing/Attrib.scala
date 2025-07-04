@@ -1,13 +1,15 @@
 package ir.parsing
 
 import boogie.SpecGlobal
-import specification.{FuncEntry, ExternalFunction}
-import scala.collection.immutable.ListMap
+import ir.{BitVecLiteral, FalseLiteral, IntLiteral, Literal, MemorySection, Sigil, TrueLiteral}
+import specification.{ExternalFunction, FuncEntry}
 import util.Logger
-import ir.{Literal, BitVecLiteral, TrueLiteral, FalseLiteral, IntLiteral, MemorySection, Sigil}
+import util.assertion.*
+
+import java.io.*
 import java.util.Base64
-import java.io._
-import java.util.zip._
+import java.util.zip.*
+import scala.collection.immutable.ListMap
 
 enum Attrib {
   /*
@@ -43,6 +45,8 @@ enum Attrib {
     case Attrib.List(l) => Some(l)
     case _ => None
   }
+
+  def getInt(k: String) = this.Map.flatMap(_.get(k)).flatMap(_.Int)
 
   import translating.indent
 
@@ -102,13 +106,6 @@ object Attrib {
         util.functional.sequence(values)
       case _ => None
     }
-  }
-}
-
-case class FunDecl(irType: ir.IRType, body: Option[ir.LambdaExpr])
-case class ProgSpec(val rely: List[ir.Expr] = List(), val guar: List[ir.Expr] = List()) {
-  def merge(o: ProgSpec) = {
-    ProgSpec(rely ++ o.rely, guar ++ o.guar)
   }
 }
 
@@ -198,8 +195,19 @@ case class SymbolTableInfo(
     )
   }
 
-  def mergeFromAttrib(a: Attrib) = {
+  def mergeFromAttrib(a: Attrib) =
+    SymbolTableInfo.fromAttrib(a).map(this.merge(_))
 
+}
+
+object SymbolTableInfo {
+  def from(e: util.IRContext) = {
+    SymbolTableInfo(e.externalFunctions, e.globals, e.funcEntries, e.globalOffsets)
+  }
+
+  def empty = SymbolTableInfo(Set(), Set(), Set(), Map())
+
+  def fromAttrib(a: Attrib) = {
     import scala.util.chaining.scalaUtilChainingOps
 
     def logIfNone[T](str: => String)(x: Option[T]) = x match {
@@ -232,18 +240,8 @@ case class SymbolTableInfo(
           }
         )
         .toMap
-
-    } yield (this.merge(SymbolTableInfo(externalFunctions, globals, funcEntries, globalOffsets)))
+    } yield SymbolTableInfo(externalFunctions, globals, funcEntries, globalOffsets)
   }
-
-}
-
-object SymbolTableInfo {
-  def from(e: util.IRContext) = {
-    SymbolTableInfo(e.externalFunctions, e.globals, e.funcEntries, e.globalOffsets)
-  }
-
-  def empty = SymbolTableInfo(Set(), Set(), Set(), Map())
 }
 
 /**
@@ -322,7 +320,7 @@ case object MemoryAttribData {
         by
       }
     }
-    assert(decoded.toList == bytes.toList)
+    debugAssert(decoded.toList == bytes.toList)
 
     MemoryAttribData(m.name, m.address, m.size, m.readOnly, b64bytes)
   }

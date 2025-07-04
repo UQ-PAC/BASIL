@@ -1,7 +1,5 @@
 package ir.eval
 import ir.*
-import scala.annotation.tailrec
-import scala.math.pow
 
 object BitVectorEval {
 

@@ -1,7 +1,8 @@
 package analysis.solvers
 
-import scala.collection.mutable
 import util.Logger
+
+import scala.collection.mutable
 
 /** Unification solver based on union-find.
   * @tparam A

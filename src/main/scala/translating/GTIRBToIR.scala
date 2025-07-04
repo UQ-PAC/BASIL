@@ -1,32 +1,19 @@
 package translating
 
-import com.google.protobuf.ByteString
 import com.grammatech.gtirb.proto.CFG.EdgeType.*
-import com.grammatech.gtirb.proto.CFG.CFG
-import com.grammatech.gtirb.proto.CFG.Edge
-import com.grammatech.gtirb.proto.CFG.EdgeLabel
+import com.grammatech.gtirb.proto.CFG.{CFG, Edge, EdgeLabel}
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.ByteInterval
 import com.grammatech.gtirb.proto.Symbol.Symbol
-import Parsers.ASLpParser.*
 import gtirb.*
+import gtirb.AuxDecoder.AuxKind
 import ir.*
-
-import scala.collection.mutable
-import scala.collection.mutable.Set
-import scala.collection.mutable.Map
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.immutable
-import scala.jdk.CollectionConverters.*
-import scala.util.{Try, Success, Failure}
-import java.util.Base64
-import java.nio.charset.*
-import scala.util.boundary
-import boundary.break
-import java.nio.ByteBuffer
-import util.intrusive_list.*
-import util.functional.{Snoc}
 import util.Logger
+import util.functional.{Snoc, foldLeft0}
+
+import java.util.Base64
+import scala.collection.mutable.{ArrayBuffer, Map, Set}
+import scala.collection.{immutable, mutable}
 
 private def assigned(x: Statement): immutable.Set[Variable] = x match {
   case x: Assign => x.assignees
@@ -78,62 +65,69 @@ class GTIRBToIR(
   mainName: Option[String]
 ) {
 
-  private val functionNames = MapDecoder.decode_uuid(mods.map(_.auxData("functionNames").data))
-  private val functionEntries = MapDecoder.decode_set(mods.map(_.auxData("functionEntries").data))
-  private val functionBlocks = MapDecoder.decode_set(mods.map(_.auxData("functionBlocks").data))
+  val functionNames = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionNames)(_)).foldLeft0(_ ++ _)
+  val functionEntries = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionEntries)(_)).foldLeft0(_ ++ _)
+  val functionBlocks = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionBlocks)(_)).foldLeft0(_ ++ _)
+
+  def b64encode(x: com.google.protobuf.ByteString) =
+    Base64.getEncoder().encodeToString(x.toByteArray)
+
+  given scala.Conversion[com.google.protobuf.ByteString, String] = b64encode
+
+  import scala.language.implicitConversions
 
   // maps block UUIDs to their address
   private val blockUUIDToAddress = createAddresses()
 
   // mapping from a symbol's UUID to the symbol itself
-  private val uuidToSymbol = mods.flatMap(_.symbols).map(s => s.uuid -> s).toMap
+  private val uuidToSymbol = mods.flatMap(_.symbols).map(s => b64encode(s.uuid) -> s).toMap
 
   // mapping from a node's UUID to the symbols associated with that node
   // can be used to get the names of external functions associated with proxy blocks
   private val nodeUUIDToSymbols = createSymbolMap()
 
   // mapping from a proxy block's UUID to the proxy block
-  private val proxies = mods.flatMap(_.proxies.map(p => p.uuid -> p)).toMap
+  private val proxies = mods.flatMap(_.proxies.map(p => b64encode(p.uuid) -> p)).toMap
 
   // mapping from a block's UUID to the outgoing edges from that block
   private val blockOutgoingEdges = createCFGMap()
 
   // mapping from a procedure's identifier UUID to the IR procedure
-  private val uuidToProcedure: mutable.Map[ByteString, Procedure] = mutable.Map()
+  private val uuidToProcedure: mutable.Map[String, Procedure] = mutable.Map()
 
   // mapping from the UUID of a procedure's entrance block to the IR procedure
-  private val entranceUUIDtoProcedure: mutable.Map[ByteString, Procedure] = mutable.Map()
+  private val entranceUUIDtoProcedure: mutable.Map[String, Procedure] = mutable.Map()
 
   // mapping from a block's UUID to the IR block
-  private val uuidToBlock: mutable.Map[ByteString, Block] = mutable.Map()
+  private val uuidToBlock: mutable.Map[String, Block] = mutable.Map()
 
   // mapping from an external procedure's name to the IR procedure
   private val externalProcedures = mutable.Map[String, Procedure]()
 
   // maps block UUIDs to their address
-  private def createAddresses(): immutable.Map[ByteString, BigInt] = {
-    val blockAddresses: immutable.Map[ByteString, BigInt] = (for {
+  private def createAddresses(): immutable.Map[String, BigInt] = {
+    val blockAddresses: immutable.Map[String, BigInt] = (for {
       mod <- mods
       section <- mod.sections
       byteInterval <- section.byteIntervals
       block <- byteInterval.blocks
       if !block.getCode.uuid.isEmpty
     } yield {
-      block.getCode.uuid -> BigInt(byteInterval.address + block.offset)
+      b64encode(block.getCode.uuid) -> BigInt(byteInterval.address + block.offset)
     }).toMap
 
     blockAddresses
   }
 
   // maps block UUIDs to their outgoing edges
-  private def createCFGMap(): mutable.Map[ByteString, mutable.Set[Edge]] = {
-    val edgeMap: mutable.Map[ByteString, mutable.Set[Edge]] = mutable.Map.empty
+  private def createCFGMap(): mutable.Map[String, mutable.Set[Edge]] = {
+    val edgeMap: mutable.Map[String, mutable.Set[Edge]] = mutable.Map.empty
 
     for (edge <- cfg.edges) {
       if (edgeMap.contains(edge.sourceUuid)) {
         edgeMap(edge.sourceUuid) += edge
       } else {
-        edgeMap += (edge.sourceUuid -> mutable.Set(edge))
+        edgeMap += (edge.sourceUuid: String) -> mutable.Set(edge)
       }
     }
     edgeMap
@@ -141,15 +135,15 @@ class GTIRBToIR(
 
   // maps UUIDs of blocks, etc. to the uuidToSymbol they are associated with
   // can be used to get names of external calls from proxy blocks, may have other uses
-  private def createSymbolMap(): mutable.Map[ByteString, mutable.Set[Symbol]] = {
-    val symMap = mutable.Map[ByteString, mutable.Set[Symbol]]()
+  private def createSymbolMap(): mutable.Map[String, mutable.Set[Symbol]] = {
+    val symMap = mutable.Map[String, mutable.Set[Symbol]]()
     for (sym <- uuidToSymbol.values) {
       if (sym.optionalPayload.isReferentUuid) {
         val ruuid = sym.optionalPayload.referentUuid.get
         if (symMap.contains(ruuid)) {
           symMap(ruuid) += sym
         } else {
-          symMap += (ruuid -> mutable.Set(sym))
+          symMap += (ruuid: String) -> mutable.Set(sym)
         }
       }
     }
@@ -290,7 +284,7 @@ class GTIRBToIR(
 
   private def handlePCAssign(block: Block): Option[String] = {
     block.statements.last match {
-      case last @ LocalAssign(lhs: Register, _, _) if lhs.name == "_PC" =>
+      case last @ LocalAssign(lhs: GlobalVar, _, _) if lhs.name == "_PC" =>
         val label = last.label
         label
       case l =>
@@ -298,21 +292,14 @@ class GTIRBToIR(
     }
   }
 
-  private def getPCTarget(block: Block): Variable = {
+  private def getPCTarget(block: Block): GlobalVar = {
     block.statements.last match {
-      case LocalAssign(Register("_PC", 64), rhs: Variable, _) => rhs
-      case l =>
-        throw Exception(
-          s"expected block ${block.label} to have a program counter assignment at its end but got (${l.getClass.getSimpleName}) $l"
-        )
+      case LocalAssign(lhs: GlobalVar, rhs: GlobalVar, _) if lhs.name == "_PC" => rhs
+      case _ => throw Exception(s"expected block ${block.label} to have a program counter assignment at its end")
     }
   }
 
-  private def byteStringToString(byteString: ByteString): String = {
-    Base64.getEncoder.encodeToString(byteString.toByteArray)
-  }
-
-  private def createProcedure(functionUUID: ByteString, symbolUUID: ByteString): Procedure = {
+  private def createProcedure(functionUUID: String, symbolUUID: String): Procedure = {
     val name = uuidToSymbol(symbolUUID).name
 
     val entrances = functionEntries(functionUUID)
@@ -348,21 +335,16 @@ class GTIRBToIR(
     procedure
   }
 
-  private def createBlock(
-    blockUUID: ByteString,
-    procedure: Procedure,
-    entranceUUID: ByteString,
-    blockCount: Int
-  ): Block = {
+  private def createBlock(blockUUID: String, procedure: Procedure, entranceUUID: String, blockCount: Int): Block = {
     val blockLabel = convertLabel(procedure, blockUUID, blockCount)
 
     val blockAddress = blockUUIDToAddress.get(blockUUID)
     val block = Block(blockLabel, blockAddress)
-    block.meta = Metadata(Some(byteStringToString(blockUUID)), blockAddress)
+    block.meta = Metadata(Some(blockUUID), blockAddress)
     procedure.addBlock(block)
     if (uuidToBlock.contains(blockUUID)) {
       // TODO this is a case that requires special consideration
-      throw Exception(s"block ${byteStringToString(blockUUID)} is in multiple functions")
+      throw Exception(s"block ${(blockUUID)} is in multiple functions")
     }
     uuidToBlock += (blockUUID -> block)
 
@@ -380,8 +362,8 @@ class GTIRBToIR(
   }
 
   // makes label boogie friendly
-  private def convertLabel(procedure: Procedure, label: ByteString, blockCount: Int): String = {
-    procedure.name + "__" + blockCount + "__" + byteStringToString(label)
+  private def convertLabel(procedure: Procedure, label: String, blockCount: Int): String = {
+    procedure.name + "__" + blockCount + "__" + (label)
       .replace("=", "")
       .replace("-", "~")
       .replace("/", "\'")
@@ -564,7 +546,7 @@ class GTIRBToIR(
           if (proxySymbols.isEmpty) {
             // indirect call with no further information
             val target = block.statements.last match {
-              case LocalAssign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
+              case LocalAssign(lhs: GlobalVar, rhs: GlobalVar, _) if lhs.name == "_PC" => rhs
               case _ =>
                 throw Exception(s"no assignment to program counter found before indirect call in block ${block.label}")
             }
@@ -573,7 +555,7 @@ class GTIRBToIR(
           } else if (proxySymbols.size > 1) {
             // TODO requires further consideration once encountered
             throw Exception(
-              s"multiple uuidToSymbol ${proxySymbols.map(_.name).mkString(", ")} associated with proxy block ${byteStringToString(edge.targetUuid)}, target of indirect call from block ${block.label}"
+              s"multiple uuidToSymbol ${proxySymbols.map(_.name).mkString(", ")} associated with proxy block ${(edge.targetUuid)}, target of indirect call from block ${block.label}"
             )
           } else {
             // indirect call to external procedure with name
@@ -597,7 +579,7 @@ class GTIRBToIR(
           (None, GoTo(mutable.Set(target), label))
         } else {
           throw Exception(
-            s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known block or proxy block"
+            s"edge from ${block.label} to ${(edge.targetUuid)} does not point to a known block or proxy block"
           )
         }
       case EdgeLabel(false, true, Type_Branch, _) =>
@@ -619,9 +601,7 @@ class GTIRBToIR(
           val label = handlePCAssign(block)
           (None, GoTo(mutable.Set(target), label))
         } else {
-          throw Exception(
-            s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known block"
-          )
+          throw Exception(s"edge from ${block.label} to ${(edge.targetUuid)} does not point to a known block")
         }
       case EdgeLabel(false, _, Type_Return, _) =>
         // return statement, value of 'direct' is just whether DDisasm has resolved the return target
@@ -639,9 +619,7 @@ class GTIRBToIR(
           val target = uuidToBlock(edge.targetUuid)
           (None, GoTo(mutable.Set(target)))
         } else {
-          throw Exception(
-            s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known block"
-          )
+          throw Exception(s"edge from ${block.label} to ${(edge.targetUuid)} does not point to a known block")
         }
       case EdgeLabel(false, true, Type_Call, _) =>
         // call that will not return according to DDisasm even though R30 may be set
@@ -652,7 +630,7 @@ class GTIRBToIR(
           (Some(DirectCall(target, label)), Unreachable())
         } else {
           throw Exception(
-            s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known procedure entrance"
+            s"edge from ${block.label} to ${(edge.targetUuid)} does not point to a known procedure entrance"
           )
         }
 
@@ -751,7 +729,7 @@ class GTIRBToIR(
   ): GoTo = {
     if (!uuidToBlock.contains(fallthrough.targetUuid)) {
       throw Exception(
-        s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block"
+        s"block ${block.label} has fallthrough edge to ${(fallthrough.targetUuid)} that does not point to a known block"
       )
     }
     val returnTarget = uuidToBlock(fallthrough.targetUuid)
@@ -763,7 +741,7 @@ class GTIRBToIR(
       // it's odd if an indirect call is only partially resolved, so throw an exception for now because this case will require further investigation
       if (!entranceUUIDtoProcedure.contains(call.targetUuid)) {
         throw Exception(
-          s"block ${block.label} has resolved indirect call edge to ${byteStringToString(call.targetUuid)} that does not point to a known procedure"
+          s"block ${block.label} has resolved indirect call edge to ${(call.targetUuid)} that does not point to a known procedure"
         )
       }
 
@@ -782,7 +760,7 @@ class GTIRBToIR(
   private def handleIndirectCallWithReturn(fallthrough: Edge, call: Edge, block: Block): (Option[Call], GoTo) = {
     if (!uuidToBlock.contains(fallthrough.targetUuid)) {
       throw Exception(
-        s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block"
+        s"block ${block.label} has fallthrough edge to ${(fallthrough.targetUuid)} that does not point to a known block"
       )
     }
     val returnTarget = uuidToBlock(fallthrough.targetUuid)
@@ -804,13 +782,13 @@ class GTIRBToIR(
   private def handleDirectCallWithReturn(fallthrough: Edge, call: Edge, block: Block): (Option[Call], GoTo) = {
     if (!entranceUUIDtoProcedure.contains(call.targetUuid)) {
       throw Exception(
-        s"block ${block.label} has direct call edge to ${byteStringToString(call.targetUuid)} that does not point to a known procedure"
+        s"block ${block.label} has direct call edge to ${(call.targetUuid)} that does not point to a known procedure"
       )
     }
 
     if (!uuidToBlock.contains(fallthrough.targetUuid)) {
       throw Exception(
-        s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block"
+        s"block ${block.label} has fallthrough edge to ${(fallthrough.targetUuid)} that does not point to a known block"
       )
     }
 
@@ -823,13 +801,13 @@ class GTIRBToIR(
   private def handleConditionalBranch(fallthrough: Edge, branch: Edge, block: Block, procedure: Procedure): GoTo = {
     if (!uuidToBlock.contains(fallthrough.targetUuid)) {
       throw Exception(
-        s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block"
+        s"block ${block.label} has fallthrough edge to ${(fallthrough.targetUuid)} that does not point to a known block"
       )
     }
 
     if (!uuidToBlock.contains(branch.targetUuid)) {
       throw Exception(
-        s"block ${block.label} has branch edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block"
+        s"block ${block.label} has branch edge to ${(fallthrough.targetUuid)} that does not point to a known block"
       )
     }
 

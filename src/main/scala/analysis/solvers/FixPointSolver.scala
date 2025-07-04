@@ -1,7 +1,7 @@
 package analysis.solvers
 
 import analysis.*
-import ir.*
+
 import scala.collection.immutable.ListSet
 import scala.collection.mutable.LinkedHashSet
 

@@ -1,0 +1,106 @@
+package build.basilmill
+
+import os.Path
+import mill._
+import mill.scalalib._
+
+import $file.basilmill.basilversion.BasilVersion
+
+trait BasilDocs extends ScalaModule {
+  this: BasilVersion =>
+
+  def scalaDocOptions = Task {
+    super.scalaDocOptions() ++ scalaDocExternalMappingOptions() ++ Seq(
+      s"-source-links:github://UQ-PAC/BASIL/${gitCommit().getOrElse("main")}",
+      s"-doc-root-content:$millSourcePath/main/scala/rootdoc.scala"
+    )
+  }
+
+  def baseUrl = "https://uq-pac.github.io/BASIL"
+  def docsRegexes = Task {
+    // these docs paths are used for inter-project linking.
+    // https://docs.scala-lang.org/scala3/guides/scaladoc/settings.html#-external-mappings
+    Map(
+      "api/bnfc" -> ".*basil_ir/.*::javadoc",
+      "api/basil-antlr" -> ".*Parsers/.*::javadoc",
+      "api/basil-proto" -> ".*com/grammatech/gtirb.*::scaladoc3",
+      "api/java-cup" -> ".*java_cup/.*::javadoc",
+    )
+  }
+
+  def docsModules = Task {
+    // these doc paths are copied into the combined docs output.
+    Map(
+      "api/basil" -> docJar(),
+      "api/bnfc" -> build.bnfc.docJar(),
+      "api/basil-antlr" -> build.basilAntlr.docJar(),
+      "api/basil-proto" -> build.basilProto.docJar(),
+      "api/java-cup" -> build.bnfc.cup.docJar(),
+    )
+  }
+
+
+  def extraDocs = Task {
+    Map(
+      "docs/basil-il" -> build.bnfc.bnfcHtml(),
+    )
+  }
+
+  def scalaDocExternalMappingOptions = Task {
+    val defaultExternals = Seq(
+      ".*scala/.*::scaladoc3::https://scala-lang.org/api/3.3_LTS/",
+      "java/.*::javadoc::https://docs.oracle.com/en/java/javase/17/docs/api/java.base/",
+      ".*com/google/protobuf.*::javadoc::https://protobuf.dev/reference/java/api-docs/",
+    )
+    val externals = defaultExternals ++ docsRegexes().map {
+      case (path, regex) => s"$regex::$baseUrl/$path"
+    }
+    Seq("-external-mappings:" + externals.mkString(","))
+  }
+
+  def docsIndex = Task.Source {
+    PathRef(super.millSourcePath / "docs" / "static" / "index.html")
+  }
+
+  def allDocs = Task {
+    val dest = Task.dest
+
+    def copyDoc(p: Path, name: String) = {
+      println(s"copying docs into $name from $p")
+      os.copy(p, dest / os.RelPath(name), createFolders = true)
+    }
+
+    docsModules().foreach {
+      case (name, src) => copyDoc(src.path / ".." / "javadoc", name)
+    }
+    extraDocs().foreach {
+      case (name, src) => copyDoc(src.path, name)
+    }
+
+    os.copy(build.mdbook.build().path, dest, mergeFolders = true)
+    os.copy.into(docsIndex().path, dest / "api")
+
+    os.walk(dest).foreach {
+      case path if path.ext == "html" =>
+        // HACK: fix mill bug causing incorrect scala source links https://github.com/com-lihaoyi/mill/issues/5221
+        val out = os.read(path).replace(super.millSourcePath.toString, "")
+        os.write.over(path, out)
+      case path if path.last == "ux.js" =>
+        val old = os.read(path)
+        val oldLen = old.length
+
+        // HACK: disable scaladoc's horrendous link click handler which
+        // introduces a delay and sometimes causes clicking links to fail silently
+        val out = old.replace("""document.querySelectorAll("a")""", "[]")
+        if (oldLen == out.length)
+          println(s"warning: $path replacement did not match anything")
+
+        os.write.over(path, out)
+      case _ => ()
+    }
+
+    println("combined docs at " + dest)
+
+    dest
+  }
+}
