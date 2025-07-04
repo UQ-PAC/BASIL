@@ -10,6 +10,7 @@ import $file.basilmill.antlr.AntlrModule
 import $file.basilmill.basildocs.BasilDocs
 import $file.basilmill.basilversion.BasilVersion
 import $file.basilmill.profile.ProfileModule
+import $file.basilmill.z3.Z3Module
 
 import os.Path
 
@@ -40,13 +41,23 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
   val scalapb = ivy"com.thesamet.scalapb::scalapb-runtime:0.11.15"
   val upickle = ivy"com.lihaoyi::upickle:4.2.1"
   val javaSmt = ivy"org.sosy-lab:java-smt:5.0.0"
+  val javaSmtZ3 = ivy"org.sosy-lab:javasmt-solver-z3:4.14.0"
+  val javaSmtZ3_2 = ivy"org.sosy-lab:javasmt-solver-z3:4.14.0;classifier=libz3-x64;type=so"
+  val javaSmtZ3_3 = ivy"org.sosy-lab:javasmt-solver-z3:4.14.0;classifier=libz3java-x64;type=so"
 
   def mainClass = Some("Main")
 
   def millSourcePath = super.millSourcePath / "src"
-  def ivyDeps = Agg(scalactic, sourceCode, mainArgs, upickle, javaSmt)
+  def ivyDeps = Agg(scalactic, sourceCode, mainArgs, upickle, javaSmt, javaSmtZ3, javaSmtZ3_2, javaSmtZ3_3)
   def sources = Task.Sources {
     Seq(PathRef(this.millSourcePath / "main" / "scala"))
+  }
+  def artifactTypes = Task {
+    super.artifactTypes() ++ Set(coursier.core.Type("so"))
+  }
+
+  def forkArgs = Task {
+    super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}")
   }
 
   override def scalafixConfig = Task {
@@ -62,6 +73,11 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     }
 
     override def scalafixConfig = build.scalafixConfig
+
+    def forkArgs = Task {
+      // This shouldn't be overwritten!!!
+      super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}")
+    }
 
     // note: toBoolean accepts precisely "true" or "false"
     def basilTestParallel = Task.Input {
@@ -217,6 +233,10 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     def mdbookSources = Task.Source {
       Task.workspace  / "docs"
     }
+  }
+
+  object z3 extends Z3Module {
+    //
   }
 
   def ctagsConfig = Task.Source {

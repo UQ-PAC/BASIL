@@ -1,0 +1,40 @@
+package build.basilmill
+
+import mill._
+import javalib._
+
+trait Z3Module extends CoursierModule {
+  val arch = System.getProperty("os.arch") match {
+    case "amd64" => "x64"
+    case _ => ???
+  }
+
+  val soType = System.getProperty("os.name") match {
+    case "Linux" => "so"
+    case _ => ???
+  }
+
+  val sources = List("libz3", "libz3java")
+
+  def artifactTypes = Task {
+    Set(coursier.core.Type("so"), coursier.core.Type("dll"), coursier.core.Type("dylib"))
+  }
+
+  def install: T[String] = Task {
+    val resolver = millResolver()
+
+    sources.map(source => {
+      val dep = Dep.parse(s"org.sosy-lab:javasmt-solver-z3:4.14.0;classifier=$source-$arch;type=$soType")
+
+      val path = resolver.classpath(Seq(dep), artifactTypes = Some(artifactTypes())).head.path
+      val dir = path / ".."
+      val newPath = dir / s"$source.$soType"
+
+      if (!os.exists(newPath)) {
+        os.copy(path, newPath)
+      }
+
+      dir.toString
+    }).distinct.mkString(":")
+  }
+}
