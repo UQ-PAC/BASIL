@@ -275,13 +275,15 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     }
 
     val (typedecls, decls) = BasilIRToSMT2.extractDecls(e)
-    val terms = if genQuery then list(sym("push")) :: (typedecls.toVector ++ decls).toList
-      ++ List(assert, list(sym("check-sat")))
-      ++ (if (getModel) then
-            List(list(sym("echo"), sym("\"" + name.getOrElse("") + "  ::  " + e + "\"")), list(sym("get-model")))
-          else List())
-      ++ List(list(sym("pop")))
-     else (typedecls.toVector ++ decls).toList :+ assert
+    val terms =
+      if genQuery then
+        list(sym("push")) :: (typedecls.toVector ++ decls).toList
+          ++ List(assert, list(sym("check-sat")))
+          ++ (if (getModel) then
+                List(list(sym("echo"), sym("\"" + name.getOrElse("") + "  ::  " + e + "\"")), list(sym("get-model")))
+              else List())
+          ++ List(list(sym("pop")))
+      else (typedecls.toVector ++ decls).toList :+ assert
 
     (terms.map(Sexp.print)).mkString("\n")
   }

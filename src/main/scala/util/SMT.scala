@@ -64,6 +64,10 @@ class SMTSolver(var timeoutMillis: Option[Int] = None) {
     satisfiable(formulaConverter.convertPredicate(p))
   }
 
+  def satisfiable(p: Expr): SatResult = {
+    satisfiable(formulaConverter.convertBoolExpr(p))
+  }
+
   /** Run the solver on a predicate given as an SMT2 string
    */
   def smt2Satisfiable(s: String): SatResult = {
@@ -84,6 +88,14 @@ class FormulaConverter(formulaManager: FormulaManager) {
     lit match {
       case FalseLiteral => booleanFormulaManager.makeFalse()
       case TrueLiteral => booleanFormulaManager.makeTrue()
+    }
+  }
+
+  def convertBoolBinOp(op: BoolBinOp, a: BooleanFormula, b: BooleanFormula): BooleanFormula = {
+    op match {
+      case BoolAND => booleanFormulaManager.and(a, b)
+      case BoolOR => booleanFormulaManager.or(a, b)
+      case BoolIMPLIES => booleanFormulaManager.implication(a, b)
     }
   }
 
@@ -143,17 +155,33 @@ class FormulaConverter(formulaManager: FormulaManager) {
       case FalseLiteral => booleanFormulaManager.makeFalse()
       case BinaryExpr(op, arg, arg2) =>
         op match {
-          case op: BoolBinOp => ???
-          case op: PolyCmp => ???
+          case op: BoolBinOp => convertBoolBinOp(op, convertBoolExpr(arg), convertBoolExpr(arg2))
+          case op: PolyCmp =>
+            arg.getType match {
+              case _: BitVecType => convertBVCmpOp(op, convertBVExpr(arg), convertBVExpr(arg2))
+              case BoolType =>
+                op match {
+                  case EQ => booleanFormulaManager.equivalence(convertBoolExpr(arg), convertBoolExpr(arg2))
+                  case NEQ =>
+                    booleanFormulaManager.not(
+                      booleanFormulaManager.equivalence(convertBoolExpr(arg), convertBoolExpr(arg2))
+                    )
+                }
+              case _ => ???
+            }
           case op: BVCmpOp => convertBVCmpOp(op, convertBVExpr(arg), convertBVExpr(arg2))
           case _ => ???
         }
       case UnaryExpr(op, arg) =>
         op match {
-          case op: BoolUnOp => ???
+          case op: BoolUnOp =>
+            op match {
+              case BoolNOT => booleanFormulaManager.not(convertBoolExpr(arg))
+              case BoolToBV1 => ???
+            }
           case _ => ???
         }
-      case v: Variable => ???
+      case v: Variable => booleanFormulaManager.makeVariable(v.name)
       case r: OldExpr => ???
       case _ => throw Exception("Non boolean expression was attempted to be converted")
     }
