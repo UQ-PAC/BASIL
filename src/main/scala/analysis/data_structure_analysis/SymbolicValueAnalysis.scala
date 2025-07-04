@@ -372,7 +372,6 @@ object SymValues {
           .toMap
 
         SymValSet(updated)
-      case unin: UninterpretedFunction => SymValSet(Map(Constant -> oDomain.top))
       case _ => ???
   }
 }
@@ -394,11 +393,12 @@ def exprToConstants(expr: Expr): Set[Literal] = {
     case ZeroExtend(extension, body) => exprToConstants(body)
     case SignExtend(extension, body) => exprToConstants(body)
     case UnaryExpr(op, arg) => exprToConstants(arg)
+    case AssocExpr(op, args) => args.flatMap(exprToConstants).toSet
     case BinaryExpr(op, arg1, arg2) => exprToConstants(arg1) ++ exprToConstants(arg2)
-    case UninterpretedFunction(name, params, returnType) => Set()
+    case FApplyExpr(name, params, returnType, uninterpreted) => ???
     case variable: Variable => Set()
     case LambdaExpr(binds, body) => exprToConstants(body)
-    case QuantifierExpr(kind, body) => exprToConstants(body)
+    case QuantifierExpr(kind, body, triggers) => exprToConstants(body)
     case OldExpr(body) => exprToConstants(body)
   }
 }
@@ -460,7 +460,7 @@ class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T])(
     b match
       case SimulAssign(assignments, _) =>
         val update = assignments.map {
-          case (lhs: LocalVar, rhs) => lhs -> SymValues.exprToSymValSet(a)(rhs)
+          case (lhs: LocalVar, rhs) => lhs -> SymValues.exprToSymValSet(a, isGlobal, globals)(rhs)
           case (lhs: GlobalVar, _) => throw Exception("GlobalVar on lhs of SimulAssign not expected")
         }.toMap
         join(a, SymValues(update), block)
