@@ -219,15 +219,13 @@ object IRLoading {
     val mods = ir.modules
     val cfg = ir.cfg.get
 
-    val parserMap: Option[Map[String, List[InsnSemantics]]] = if (gtirbLiftOffline) then {
-      None
-    } else {
-      val semanticsJson = mods.map(_.auxData("ast").data.toStringUtf8)
-      val semantics = semanticsJson.map(upickle.default.read[Map[String, List[InsnSemantics]]](_))
-      Some(semantics.flatten.toMap)
-    }
+    val lifter =
+      if (gtirbLiftOffline) then OfflineLifterInsnLoader(mods)
+      else {
+        ParserMapInsnLoader(mods)
+      }
 
-    val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress, mainName)
+    val GTIRBConverter = GTIRBToIR(mods, lifter, cfg, mainAddress, mainName)
     GTIRBConverter.createIR()
   }
 
