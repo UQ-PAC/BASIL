@@ -25,9 +25,12 @@ Compared to other methods, nix-cc.sh is
 
 The script lives inside the scripts/ folder of the Basil repository.
 It is a Bash script which should work on both Linux and Mac OS.
-**Nix is required**.
 
-To use the script, simply pass a directory of C files and an output directory:
+First, make sure that pac-nix is set up. This can be done by following
+[the "first time" instructions for pac-nix](https://github.com/katrinafyi/pac-nix).
+Make sure to follow all the numbered steps, including checking that the cache is working.
+
+Then, to use the script, simply pass a directory of C files and an output directory:
 ```bash
 scripts/nix-cc.sh src/test/correct/arrays_simple /tmp/basil-out
 ```
