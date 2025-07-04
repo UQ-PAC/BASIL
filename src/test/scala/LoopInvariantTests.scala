@@ -4,14 +4,7 @@ import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{CaptureOutput, programToContext}
-import util.{
-  BASILConfig,
-  BASILResult,
-  BoogieGeneratorConfig,
-  ILLoadingConfig,
-  IRContext,
-  RunUtils,
-}
+import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils}
 
 @test_util.tags.UnitTest
 class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
