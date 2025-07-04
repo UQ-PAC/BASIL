@@ -148,6 +148,7 @@ resulting in the collapse of the global node since fields corresponding to x and
 With `eq-classes` enabled the DSG is as follows:
 
 ![](../img/dsa/eq.png)
+
 Note that in the figure above the fields are replaced by their corresponding variable names
 for ease of demonstration. 
 
