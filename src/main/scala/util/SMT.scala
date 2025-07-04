@@ -2,11 +2,11 @@ package util.SMT
 
 import analysis.{BVTerm, GammaTerm, Predicate}
 import ir.*
-import org.sosy_lab.java_smt.SolverContextFactory
-import org.sosy_lab.java_smt.api.{BitvectorFormula, BooleanFormula, FormulaManager}
+import org.sosy_lab.common.ShutdownManager
 import org.sosy_lab.common.configuration.Configuration
 import org.sosy_lab.common.log.LogManager
-import org.sosy_lab.common.ShutdownManager
+import org.sosy_lab.java_smt.SolverContextFactory
+import org.sosy_lab.java_smt.api.{BitvectorFormula, BooleanFormula, FormulaManager}
 
 import scala.jdk.CollectionConverters.SetHasAsJava
 
@@ -25,7 +25,7 @@ class SMTSolver(var timeoutMillis: Option[Int] = None) {
     val config = Configuration.defaultConfiguration()
     val logger = LogManager.createNullLogManager()
     val shutdown = shutdownManager.getNotifier()
-    SolverContextFactory.createSolverContext(config, logger, shutdown, SolverContextFactory.Solvers.PRINCESS)
+    SolverContextFactory.createSolverContext(config, logger, shutdown, SolverContextFactory.Solvers.Z3)
   }
 
   val formulaConverter = FormulaConverter(solverContext.getFormulaManager())
@@ -38,18 +38,10 @@ class SMTSolver(var timeoutMillis: Option[Int] = None) {
           try {
             Thread.sleep(m)
             shutdownManager.requestShutdown("Timeout")
-            print("Timeout request made!")
-          } catch { _ =>
-            {
-              print("Interrupted!")
-            }
-          }
+          } catch { _ => {} }
         }
       })
     })
-
-    // shutdownManager.requestShutdown("a")
-    // print(shutdownManager.getNotifier().shouldShutdown())
 
     try {
       val env = solverContext.newProverEnvironment()
@@ -59,7 +51,6 @@ class SMTSolver(var timeoutMillis: Option[Int] = None) {
       env.close()
       res
     } catch { _ =>
-      print("a")
       SatResult.Unknown("")
     } finally {
       thread.map(t => {
@@ -86,8 +77,8 @@ class SMTSolver(var timeoutMillis: Option[Int] = None) {
 }
 
 class FormulaConverter(formulaManager: FormulaManager) {
-  val bitvectorFormulaManager = formulaManager.getBitvectorFormulaManager()
-  val booleanFormulaManager = formulaManager.getBooleanFormulaManager()
+  lazy val bitvectorFormulaManager = formulaManager.getBitvectorFormulaManager()
+  lazy val booleanFormulaManager = formulaManager.getBooleanFormulaManager()
 
   def convertBoolLit(lit: BoolLit): BooleanFormula = {
     lit match {
