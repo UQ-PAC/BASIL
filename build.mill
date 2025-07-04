@@ -42,18 +42,13 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
   val upickle = ivy"com.lihaoyi::upickle:4.2.1"
   val javaSmt = ivy"org.sosy-lab:java-smt:5.0.0"
   val javaSmtZ3 = ivy"org.sosy-lab:javasmt-solver-z3:4.14.0"
-  val javaSmtZ3_2 = ivy"org.sosy-lab:javasmt-solver-z3:4.14.0;classifier=libz3-x64;type=so"
-  val javaSmtZ3_3 = ivy"org.sosy-lab:javasmt-solver-z3:4.14.0;classifier=libz3java-x64;type=so"
 
   def mainClass = Some("Main")
 
   def millSourcePath = super.millSourcePath / "src"
-  def ivyDeps = Agg(scalactic, sourceCode, mainArgs, upickle, javaSmt, javaSmtZ3, javaSmtZ3_2, javaSmtZ3_3)
+  def ivyDeps = Agg(scalactic, sourceCode, mainArgs, upickle, javaSmt, javaSmtZ3)
   def sources = Task.Sources {
     Seq(PathRef(this.millSourcePath / "main" / "scala"))
-  }
-  def artifactTypes = Task {
-    super.artifactTypes() ++ Set(coursier.core.Type("so"))
   }
 
   def forkArgs = Task {
