@@ -13,7 +13,7 @@ and maintaining test cases.
 Writing test cases
 ------------------
 
-We use the [ScalaTest](https://www.scalatest.org/) unit testing framework. Example unit tests can be found in [src/test/scala](../src/test/scala/).
+We use the [ScalaTest](https://www.scalatest.org/) unit testing framework. Example unit tests can be found in [/src/test/scala](https://github.com/UQ-PAC/BASIL/tree/main/src/test/scala).
 
 Test cases are written in Scalatest using its
 [`AnyFunSuite`](https://www.scalatest.org/scaladoc/3.1.2/org/scalatest/funsuite/AnyFunSuite.html) style.
@@ -21,7 +21,7 @@ See the AnyFunSuite documentation or existing test cases for syntax and examples
 
 ### Exporting IR structures into test cases
 
-The [dsl](../basil-ir.md#constructing-programs-in-code) can be used to construct simple example BASIL IR programs, which can then be fed through into the whole pipeline via `IRLoading.load()` in
+The [dsl](/BASIL/development/basil-ir.html#constructing-programs-in-code) can be used to construct simple example BASIL IR programs, which can then be fed through into the whole pipeline via `IRLoading.load()` in
 
 Often, you might have found a particular Basil IR program which demonstrates some bug in the code.
 It is good practice to extract this into a test case, both to validate the fix and ensure the bug doesn't reoccur.
@@ -177,7 +177,7 @@ make
 ```
 
 The `config.mk` file in the test directory can be used to exclude unnecessary compilers, and change compilation flags. 
-Full details can be found [here](../src/test/readme.md).
+Full details can be found [here](https://github.com/UQ-PAC/BASIL/tree/main/src/test/readme.md).
 
 
 To update the expected BASIL output files from the SystemTests results run:

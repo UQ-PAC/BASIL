@@ -20,7 +20,7 @@ As input BASIL requires a `.gts` file produced by `gtirb-semantics`,
 as well as a file containing the output of readelf (here denoted with `.relf`), both created from the same AArch64/ARM64 binary, 
 and outputs a semantically equivalent .bpl Boogie-language source file.
 
-Detailed instructions for lifting examples and running BASIL can be found at [/usage](/usage.md).
+Detailed instructions for lifting examples and running BASIL can be found at [/usage](/BASIL/usage.html).
 
 Basil also accepts BAP `.adt` files in place of the `.gts` file, however this feature is no longer actively maintained.
 

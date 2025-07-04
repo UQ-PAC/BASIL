@@ -41,8 +41,6 @@ and run BASIL.
 
 **See also:** [Quickly lifting a new example](quick-lifting.md)
 
-<!-- These instructions are automated in [lift.sh](../../scripts/lift.sh). -->
-
 [tests]: /src/test/correct
 [spec]: /src/test/correct/secret_write/secret_write.spec
 
