@@ -19,7 +19,8 @@ import java.util.Base64
  * The read methods return [[Decoder]] values which can be passed to the [[decode]] methods.
  *
  * [[AuxKind]] provides pre-defined decoders for some official AuxData fields. An [[AuxKind]] can be
- * passed to [[decodeAux]] to automatically extract and decode the given AuxData from a GTIRB [[Module]].
+ * passed to [[decodeAux]] to automatically extract and decode the given AuxData from a GTIRB
+ * [[com.grammatech.gtirb.proto.Module.Module]].
  *
  * Within a [[Decoder]], the internal state of the [[java.io.ByteArrayInputStream]] is used to keep
  * track of the current byte position.
@@ -28,7 +29,8 @@ object AuxDecoder {
 
   /**
    * [[AuxKind]] provides pre-defined decoders for some official AuxData fields. An [[AuxKind]] can be
-   * passed to [[decodeAux]] to automatically extract and decode the given AuxData from a GTIRB [[Module]].
+   * passed to [[decodeAux]] to automatically extract and decode the given AuxData from a GTIRB
+   * [[com.grammatech.gtirb.proto.Module.Module]].
    */
   enum AuxKind[T](val name: String, val decoder: Decoder[T]) {
     case ElfSymbolTabIdxInfo
