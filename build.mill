@@ -3,6 +3,8 @@ import $packages._
 
 import mill._
 import scalalib._
+import coursier.core.Authentication
+import coursier.maven.MavenRepository
 
 import $file.basilmill.mdbook.mdbookBinary
 import $file.basilmill.bnfc.BNFCJFlexModule
@@ -26,7 +28,7 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
   val ammonite = "3.0.2"
   override def ammoniteVersion = ammonite
 
-  def moduleDeps = Seq(basilAntlr, basilProto, bnfc, aslpOffline)
+  def moduleDeps = Seq(basilAntlr, basilProto, bnfc)
 
   def scalacOptions: T[Seq[String]] = Seq("-deprecation", "-Wunused:imports", "-feature")
 
@@ -39,11 +41,22 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
   val mainArgs = ivy"com.lihaoyi::mainargs:0.7.6"
   val scalapb = ivy"com.thesamet.scalapb::scalapb-runtime:0.11.15"
   val upickle = ivy"com.lihaoyi::upickle:4.2.1"
+  val aslpOffline = ivy"io.github.uq-pac::lifter:0.1.0"
+
+  override def ivyDeps = Agg(scalactic, sourceCode, mainArgs, upickle, aslpOffline)
+
+  override def repositoriesTask = Task.Anon {
+    super.repositoriesTask() :+ MavenRepository(
+      "https://maven.pkg.github.com/UQ-PAC/aslp",
+      // this token will expire in one year. if downloading the lifter dependency fails,
+      // re-generate a read:packages token.
+      authentication = Some(Authentication("rina-bot1", "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"))
+    )
+  }
 
   def mainClass = Some("Main")
 
   def millSourcePath = super.millSourcePath / "src"
-  def ivyDeps = Agg(scalactic, sourceCode, mainArgs, upickle)
   def sources = Task.Sources {
     Seq(PathRef(this.millSourcePath / "main" / "scala"))
   }
@@ -157,21 +170,6 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     ()
   }
 
-
-  object aslpOffline extends JavaModule {
-    def fileName: String = "aslpOfflineScala-0.3.0.jar"
-    def lifterUrl: String = s"https://github.com/UQ-PAC/aslp/releases/download/0.3.0/${fileName}"
-
-    def unmanagedClasspath = Task {
-      os.write(
-        Task.dest / fileName,
-        requests.get.stream(
-          lifterUrl
-        )
-      )
-      Agg(PathRef(Task.dest / fileName))
-    }
-  }
 
   object basilAntlr extends AntlrModule {
     override def ivyDeps = Agg(build.antlrRuntime)
