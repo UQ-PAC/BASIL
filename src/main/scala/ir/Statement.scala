@@ -111,7 +111,7 @@ class SimulAssign(var assignments: Vector[(Variable, Expr)], _label: Option[Stri
 }
 
 object SimulAssign {
-  def unapply(l: SimulAssign | LocalAssign): Some[(Iterable[(Variable, Expr)], Option[String])] = l match {
+  def unapply(l: SimulAssign | LocalAssign): Some[(Seq[(Variable, Expr)], Option[String])] = l match {
     case LocalAssign(lhs, rhs, label) => Some(Seq(lhs -> rhs), label)
     case s: SimulAssign => Some((s.assignments, s.label))
   }
