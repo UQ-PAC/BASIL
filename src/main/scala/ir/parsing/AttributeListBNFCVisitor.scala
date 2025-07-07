@@ -11,13 +11,13 @@ trait AttributeListBNFCVisitor[A]
       syntax.AttrKeyValue.Visitor[(String, Attrib), A],
       LiteralsBNFCVisitor[A] {
 
-  def visit(x: syntax.Attr_Map, arg: A): ir.parsing.Attrib =
+  override def visit(x: syntax.Attr_Map, arg: A): ir.parsing.Attrib =
     Attrib.Map(ListMap.from(x.listattrkeyvalue_.asScala.toList.map(_.accept(this, arg))))
-  def visit(x: syntax.Attr_List, arg: A): ir.parsing.Attrib =
+  override def visit(x: syntax.Attr_List, arg: A): ir.parsing.Attrib =
     Attrib.List(x.listattr_.asScala.toVector.map(_.accept(this, arg)))
-  def visit(x: syntax.Attr_Lit, arg: A): ir.parsing.Attrib =
+  override def visit(x: syntax.Attr_Lit, arg: A): ir.parsing.Attrib =
     Attrib.ValLiteral(x.value_.accept(this, arg))
-  def visit(x: syntax.Attr_Str, arg: A): ir.parsing.Attrib = {
+  override def visit(x: syntax.Attr_Str, arg: A): ir.parsing.Attrib = {
     Attrib.ValString(unquote(x.str_, x))
   }
 
