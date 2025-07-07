@@ -50,7 +50,7 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
       "https://maven.pkg.github.com/UQ-PAC/aslp",
       // this token will expire in one year. if downloading the lifter dependency fails,
       // re-generate a read:packages token.
-      authentication = Some(Authentication("rina-bot1", "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"))
+      authentication = Some(Authentication("rina-bot1", "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"))
     )
   }
 
