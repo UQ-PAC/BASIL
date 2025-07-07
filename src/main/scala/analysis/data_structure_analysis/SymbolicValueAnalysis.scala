@@ -372,6 +372,7 @@ object SymValues {
           .toMap
 
         SymValSet(updated)
+      case FApplyExpr(name, params, returnType, uninterpreted) => SymValSet(Map(Constant -> oDomain.top))
       case _ => ???
   }
 }
@@ -395,7 +396,7 @@ def exprToConstants(expr: Expr): Set[Literal] = {
     case UnaryExpr(op, arg) => exprToConstants(arg)
     case AssocExpr(op, args) => args.flatMap(exprToConstants).toSet
     case BinaryExpr(op, arg1, arg2) => exprToConstants(arg1) ++ exprToConstants(arg2)
-    case FApplyExpr(name, params, returnType, uninterpreted) => ???
+    case FApplyExpr(name, params, returnType, uninterpreted) => params.flatMap(exprToConstants).toSet
     case variable: Variable => Set()
     case LambdaExpr(binds, body) => exprToConstants(body)
     case QuantifierExpr(kind, body, triggers) => exprToConstants(body)
