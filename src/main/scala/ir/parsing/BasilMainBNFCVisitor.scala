@@ -133,9 +133,9 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
     val jump = x.jumpwithattrib_.accept(this, arg)
     val body = ss :+ jump
 
-    val attr = parseAttrMap(x.attribset_, arg)
-    val addr = getAddrAttr(attr)
-    val origLbl = getStrAttr("originalLabel")(attr)
+    val attr = x.attribset_.accept(this, arg)
+    val addr = attr.getInt("address")
+    val origLbl = attr.getString("originalLabel")
     val meta = ir.Metadata(originalLabel = origLbl, address = addr)
 
     ir.dsl.block(unsigilBlock(x.blockident_), body: _*).copy(meta = meta)
@@ -270,9 +270,9 @@ class BasilMainBNFCVisitor[A](var decls: Declarations)
     val blockvis = makeBlockVisitor(procName)
     val blocks = x.procdef_.accept(blockvis, arg)
 
-    val attr = parseAttrMap(x.attribset_, arg)
-    val addr = getAddrAttr(attr)
-    val rname = getStrAttr("name")(attr).getOrElse(procName)
+    val attr = x.attribset_.accept(this, arg)
+    val addr = attr.getInt("address")
+    val rname = attr.getString("name").getOrElse(procName)
 
     val formalIns = decls.formalIns(procName)
     val formalOuts = decls.formalOuts(procName)

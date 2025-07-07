@@ -28,40 +28,6 @@ trait AttributeListBNFCVisitor[A]
   override def visit(p: syntax.AttribSet_Some, arg: A): Attrib.Map = {
     Attrib.Map(ListMap.from(p.listattrkeyvalue_.asScala.map(_.accept(this, arg))))
   }
-
-  def getIntCompatAttr(n: String)(attrs: Attrib): Option[BigInt] = {
-    attrs match {
-      case Attrib.Map(vs) =>
-        vs.collect {
-          case (attr, Attrib.ValLiteral(ir.IntLiteral(v))) if attr == n => v
-          case (attr, Attrib.ValLiteral(ir.BitVecLiteral(v, _))) if attr == n => v
-        }.lastOption
-      case _ => None
-    }
-  }
-
-  def parseAttr(a: syntax.Attr, arg: A): Attrib = {
-    a.accept(this, arg)
-  }
-
-  def parseAttrMap(a: syntax.AttribSet, arg: A): Attrib = {
-    a.accept(this, arg)
-  }
-
-  def getAddrAttr(attrs: Attrib): Option[BigInt] = getIntCompatAttr("address")(attrs)
-
-  def getStrAttr(n: String)(attrs: Attrib): Option[String] = {
-    attrs match {
-      case Attrib.Map(vs) =>
-        vs.collect {
-          case (attr, Attrib.ValString(v)) if attr == n => v
-        }.lastOption
-      case _ => None
-    }
-  }
-  val getCommentAttr = getStrAttr("comment")
-  val getLabelAttr = getStrAttr("label")
-
 }
 
 /**
