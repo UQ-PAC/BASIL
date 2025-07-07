@@ -19,7 +19,7 @@ as constraint-based analyses.
 
 ## DSA Form
 
-- see [src/main/scala/ir/transforms/DynamicSingleAssignment.scala](../../src/main/scala/ir/transforms/DynamicSingleAssignment.scala)
+- see [src/main/scala/ir/transforms/DynamicSingleAssignment.scala](https://github.com/UQ-PAC/BASIL/tree/main/src/main/scala/ir/transforms/DynamicSingleAssignment.scala)
 
 We have a transform that establishes a dynamic single assignment form.
 The DSA form makes it possible to perform a flow-insensitive analysis with some flow-sensitive precision,
@@ -71,7 +71,7 @@ debugging.
 
 See also : abstract interpretation
 
-- see [src/main/scala/ir/transforms/AbsInt.scala](../../src/main/scala/ir/transforms/AbsInt.scala)
+- see [src/main/scala/ir/transforms/AbsInt.scala](https://github.com/UQ-PAC/BASIL/tree/main/src/main/scala/ir/transforms/AbsInt.scala)
 
 Most of the dataflow analyses in BASIL---those under `/src/main/scala/analysis`---use the 
 TIP frameork.
@@ -267,7 +267,7 @@ Further validation of the simplification pass is enabled by the `--validate-simp
 
 ## Known Bits Representation and Simplification
 
-- see [src/main/scala/ir/transforms/SimplifyKnownBits.scala](../../src/main/scala/ir/transforms/SimplifyKnownBits.scala)
+- see [src/main/scala/ir/transforms/SimplifyKnownBits.scala](https://github.com/UQ-PAC/BASIL/tree/main/src/main/scala/ir/transforms/SimplifyKnownBits.scala)
 
 ### Representation ###
 
@@ -350,7 +350,7 @@ we can deduce beforehand that index 0 of *x*, `x[0]`, will always be 1, and the 
 
 #### Simplification Testing ####
 
-- see [scripts/tnum_test_z3.py](../../scripts/tnum_test_z3.py)
+- see [scripts/tnum_test_z3.py](https://github.com/UQ-PAC/BASIL/tree/main/scripts/tnum_test_z3.py)
 
 Within the provided Z3 Python script, the supported operator methods have been translated to Python/Z3-equivalent methods that utilise the same logic but with varying syntax. The Z3 solver is then able to deduce whether the TNumValue returned after the operation adequately represents the full range of possible results and correctly propagates any uncertainty. The logic of each method is deemed "correct" if it satisfies three different criteria: ***soundness***, ***wellformedness***, and ***precision***.
 
