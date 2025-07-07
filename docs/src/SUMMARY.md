@@ -16,6 +16,10 @@
 - [Interpreter](development/interpreter.md) Explanation of IR interpreter
 - [Transform Passes](development/transforms.md) Explanation of ir transforms and simplifications
 
+# Analyses
+
+- [Data Structure Analysis](development/dsa.md) Basil Memory Analysis 
+
 # Development
 
 - [Development Environment](development/editor-setup.md) Guide to basil development in IDEs
