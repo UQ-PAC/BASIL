@@ -50,12 +50,16 @@ enum Attrib {
   // from unacceptable ones (e.g., wrong type for a certain known key like address)
 
   def get(k: String) = this.Map.flatMap(_.get(k))
-  def getInt(k: String) = this.Map.flatMap(_.get(k)).map(_.Int.getOrElse {
-    throw Exception(s"integer-like attribute value required for '$k'")
-  })
-  def getString(k: String) = this.Map.flatMap(_.get(k)).map(_.Str.getOrElse {
-    throw Exception(s"string attribute value required for '$k'")
-  })
+  def getInt(k: String) = this.Map
+    .flatMap(_.get(k))
+    .map(_.Int.getOrElse {
+      throw Exception(s"integer-like attribute value required for '$k'")
+    })
+  def getString(k: String) = this.Map
+    .flatMap(_.get(k))
+    .map(_.Str.getOrElse {
+      throw Exception(s"string attribute value required for '$k'")
+    })
 
   import translating.indent
 
