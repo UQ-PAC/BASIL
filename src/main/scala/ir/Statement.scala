@@ -16,7 +16,7 @@ import collection.mutable
   * **Important:** When implementing this trait, the subclass must implement `label`
   * (i.e. it should declare a `var label` with no override keyword), and the subclass *may*
   * override `comment`. If overriding `comment`, an override keyword is required and the
-  * getter and setter should be overriden simultaneously.
+  * getter and setter should be overriden simultaneously (e.g., with an `override var`).
   */
 sealed trait Command extends HasParent[Block] with DeepEquality {
   var label: Option[String]
