@@ -366,23 +366,3 @@ object IndirectCall {
   def unapply(i: IndirectCall): Some[(Variable, Option[String])] = Some(i.target, i.label)
 }
 
-object boom {
-
-  trait Comment(var comment: String) {
-    def setComment(x: String) = comment = x
-  }
-
-  class Y(comment: String) extends Comment(comment) {
-    override def toString = s"Y($comment)"
-  }
-
-  def main(args: Array[String]) =
-    val y = Y("initial value")
-    println("y.comment = " + y.comment)
-    println("y.toString = " + y)
-    println()
-    println("after setting comment")
-    y.setComment("new comment")
-    println("y.comment = " + y.comment)
-    println("y.toString = " + y)
-}
