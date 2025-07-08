@@ -4,7 +4,9 @@ terminator Decl ";";
 
 {- TOKENS -}
 
-token BVTYPE ('b' 'v' digit+) ;
+position token BVTYPE ('b' 'v' digit+) ;
+position token INTTYPE {"int"} ;
+position token BOOLTYPE {"bool"} ;
 
 
 {- position token UserIdent '`' ((upper | letter | '_' | '#')(upper | letter | digit | ["_.$#"])*) '`'; -}
@@ -28,8 +30,8 @@ token LambdaSep ({"::"} | {"->"}) ;
 {- Literals -}
 
 token Str '"' ((char - ["\"\\"]) | ('\\' ["\"\\tnrf"]))* '"' ;
-token IntegerHex ('0' 'x' (digit | ["abcdef"])+);
-token IntegerDec (digit+);
+position token IntegerHex ('0' 'x' (digit | ["abcdef"])+);
+position token IntegerDec (digit+);
 
 -- gobble extra semicolons 
 Semicolons_Empty . Semicolons ::= "";
@@ -55,8 +57,8 @@ Decl_Proc . Decl ::= "proc" ProcIdent "(" [Params] ")" "->" "(" [Params] ")" Att
 ProcDef_Empty . ProcDef ::= "";
 ProcDef_Some  . ProcDef ::= BeginList [Block] EndList ;
 
-IntType1 . IntType ::= "int" ;
-BoolType1. BoolType ::= "bool" ;
+IntType1 . IntType ::= INTTYPE ;
+BoolType1. BoolType ::= BOOLTYPE ;
 MapType1 . MapType ::=  "(" Type "->" Type ")";
 BVType1 . BVType ::= BVTYPE ;
 
