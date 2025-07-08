@@ -14,6 +14,9 @@ type EffCallFormalParam = Variable | Memory | Field
  * Expected to refer to source and target variables prior to renaming being applied.
  */
 case class CompatArg(source: Expr, target: Expr) {
+
+  require(!source.isInstanceOf[Memory] && !target.isInstanceOf[Memory])
+
   /*
    * Generate source == target expression renamed
    */

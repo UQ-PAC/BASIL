@@ -301,9 +301,9 @@ class TranslationValidator {
 
     def apply(v: ir.Global | Expr | Variable | Memory) = {
       v match {
-        case e: Expr => visit_expr(SES(), e)
         case v: Variable => visit_rvar(SES(), v)
         case v: Memory => SideEffectStatementOfStatement.param(v)._2
+        case e: Expr => visit_expr(SES(), e)
       }
     }
   }
@@ -349,7 +349,8 @@ class TranslationValidator {
         case (Some(v), None) => k -> v
         case (None, Some(v)) => k -> v
         case (Some(v1), Some(v2)) if v1 == v2 => k -> v1
-        case (Some(v1), Some(v2)) => throw Exception("provided src -> target and target -> src renamings disagree")
+        case (Some(v1), Some(v2)) =>
+          throw Exception(s"provided src -> target and target -> src renamings disagree ${v1} != $v2")
         case (None, None) => ???
       }
     )
@@ -359,16 +360,17 @@ class TranslationValidator {
         case (Some(v), None) => v -> k
         case (None, Some(v)) => v -> k
         case (Some(v1), Some(v2)) if v1 == v2 => v1 -> k
-        case (Some(v1), Some(v2)) => throw Exception("provided src -> target and target -> src renamings disagree")
+        case (Some(v1), Some(v2)) =>
+          throw Exception(s"provided src -> target and target -> src renamings disagree $v1 != $v2")
         case (None, None) => ???
       }
     )
 
-    // val merged = if intersect then srcImg.filter(st => tgtDom.contains(st._2)).intersect(tgtDom) ++ tgtImg.filter(st => srcDom.contains(st._1))
-    //    else Set(srcImg) ++ tgtImg
+    val merged =
+      if intersect then srcImg.filter(st => tgtDom.contains(st._2)) ++ tgtImg.filter(st => srcDom.contains(st._1))
+      else srcImg.toSet ++ tgtImg
 
-    val s: Set[(Expr, Expr)] = (srcImg.toSet ++ tgtImg)
-    s.map { case (s, t) => CompatArg(s, t) }.toList
+    merged.map { case (s, t) => CompatArg(s, t) }.toList
   }
 
   def setEqualVarsInvariant() = {
@@ -441,18 +443,10 @@ class TranslationValidator {
    * or target -> source, e.g. copyprop.
    */
   def setEqualVarsInvariantRenaming(
+    // block label -> variable -> renamed variable
     renamingTgtSrc: Option[String] => (Variable | ir.Global) => Option[ir.Global | Expr] = _ => e => Some(e),
     renamingSrcTgt: Option[String] => (Variable | ir.Global) => Option[ir.Global | Expr] = _ => e => None
   ) = {
-
-    def totalRenamingSrcTgt(r: Variable | ir.Global, s: Option[String]): ir.Global | Expr = renamingSrcTgt(s)(r) match {
-      case Some(v) => v
-      case None => r
-    }
-    def totalRenamingTgtSrc(r: Variable | ir.Global, s: Option[String]): ir.Global | Expr = renamingTgtSrc(s)(r) match {
-      case Some(v) => v
-      case None => r
-    }
 
     val procs = initProg.get.procedures.view.map(p => p.name -> p).toMap
 
@@ -482,7 +476,7 @@ class TranslationValidator {
 
       val cuts = (beforeCutsBls.keys ++ afterCutsBls.keys).toSet.toList
 
-      val invs = (beforeCuts(p).keys.map {
+      val invs = (cuts.map {
         case (label) => {
           val tgtCut = beforeCutsBls(label)
           val srcCut = afterCutsBls(label)
@@ -501,7 +495,7 @@ class TranslationValidator {
 
           // TODO: intersect live in source and target for dead code.
 
-          val assertion = mergeCompat(invSrc, invTgt)
+          val assertion = mergeCompat(invSrc, invTgt, true)
 
           Inv.CutPoint(label, assertion, Some(s"INVARIANT at $label"))
         }
@@ -664,7 +658,7 @@ class TranslationValidator {
 
       val otargets = srcEntry.jump.asInstanceOf[GoTo].targets.toList
 
-      val splitName = proc.name // + "_split_" + splitNo
+      val splitName = "-" + proc.name // + "_split_" + splitNo
       // build smt query
       val b = translating.BasilIRToSMT2.SMTBuilder()
 
@@ -675,7 +669,13 @@ class TranslationValidator {
       count = 0
       for (i <- preInv) {
         count += 1
-        b.addAssert(i.toAssume(proc)(srcRenameSSA, tgtRenameSSA).body, Some(s"inv$count"))
+        val e = i.toAssume(proc)(srcRenameSSA, tgtRenameSSA).body
+        try {
+          b.addAssert(e, Some(s"inv$count"))
+        } catch
+          ex => {
+            throw Exception(s"Failed to gen smt for $b:\n  $e :: \n $e")
+          }
       }
       count = 0
       for ((ack, ackn) <- ackInv) {
@@ -703,7 +703,8 @@ class TranslationValidator {
 
     // }
 
-    Logger.writeToFile(File(s"NOP-transform-after.il"), translating.PrettyPrinter.pp_prog(afterProg.get))
+    Logger.writeToFile(File(s"${filePrefix}transform-source.il"), translating.PrettyPrinter.pp_prog(afterProg.get))
+    Logger.writeToFile(File(s"${filePrefix}transform-target.il"), translating.PrettyPrinter.pp_prog(beforeProg.get))
     timer.checkPoint("Finishehd tv pass")
     smtQueries
   }

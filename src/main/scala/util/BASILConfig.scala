@@ -53,6 +53,7 @@ case class BASILConfig(
   context: Option[IRContext] = None,
   loading: ILLoadingConfig,
   runInterpret: Boolean = false,
+  validateSimplify: Boolean = false,
   simplify: Boolean = false,
   validateSimp: Boolean = false,
   tvSimp: Boolean = false,
