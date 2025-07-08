@@ -6,18 +6,16 @@ import org.sosy_lab.common.ShutdownManager
 import org.sosy_lab.common.configuration.Configuration
 import org.sosy_lab.common.log.LogManager
 import org.sosy_lab.java_smt.SolverContextFactory
-import org.sosy_lab.java_smt.api.{BitvectorFormula, BooleanFormula, FormulaManager}
+import org.sosy_lab.java_smt.api.{BitvectorFormula, BooleanFormula, FormulaManager, Model, SolverContext}
 
 import scala.jdk.CollectionConverters.SetHasAsJava
 
 // TODO
-// support giving models
 // support moving up and down a proof context stack
-// consider having query local timeouts?!
 
 /** The result of an SMT query */
 enum SatResult {
-  case SAT
+  case SAT(model: Option[Model])
   case UNSAT
   case Unknown(s: String)
 }
@@ -31,7 +29,9 @@ enum SatResult {
  *  pass a string representation of an SMT2 query using [[smt2Sat]].
  *
  *  A solver wide default timeout can optionally be given with the [[defaultTimeoutMillis]] variable, but this can be
- *  overwritten by calling [[sat]] with an additional parameter.
+ *  overwritten by calling sat methods with an additional parameter.
+ *
+ *  Models can be obtained by requesting for them in smt query method calls.
  */
 class SMTSolver(var defaultTimeoutMillis: Option[Int] = None) {
 
@@ -52,7 +52,7 @@ class SMTSolver(var defaultTimeoutMillis: Option[Int] = None) {
 
   val formulaConverter = FormulaConverter(solverContext.getFormulaManager())
 
-  private def sat(f: BooleanFormula, timeoutMillis: Option[Int]): SatResult = {
+  private def sat(f: BooleanFormula, timeoutMillis: Option[Int], obtainModel: Boolean = false): SatResult = {
     // To handle timeouts, we must create a thread that sends a shutdown request after an amount of milliseconds
     val thread = timeoutMillis.map(m => {
       new Thread(new Runnable() {
@@ -65,14 +65,24 @@ class SMTSolver(var defaultTimeoutMillis: Option[Int] = None) {
       })
     })
 
-    val env = solverContext.newProverEnvironment()
+    val env =
+      if obtainModel
+      then solverContext.newProverEnvironment(SolverContext.ProverOptions.GENERATE_MODELS)
+      else solverContext.newProverEnvironment()
+
     try {
       env.push(f)
       thread.map(_.start)
-      val res = if env.isUnsat() then SatResult.UNSAT else SatResult.SAT
+      val res =
+        if env.isUnsat() then SatResult.UNSAT
+        else
+          SatResult.SAT(obtainModel match {
+            case true => Some(env.getModel)
+            case false => None
+          })
       res
-    } catch { _ =>
-      SatResult.Unknown("")
+    } catch { e =>
+      SatResult.Unknown(e.toString())
     } finally {
       env.close()
       thread.map(t => {
@@ -83,33 +93,18 @@ class SMTSolver(var defaultTimeoutMillis: Option[Int] = None) {
   }
 
   /** Run solver on a [[Predicate]] */
-  def sat(p: Predicate): SatResult = {
-    sat(formulaConverter.convertPredicate(p), defaultTimeoutMillis)
-  }
-
-  /** Run solver on a [[Predicate]] with a custom timeout */
-  def sat(p: Predicate, timeoutMillis: Int): SatResult = {
-    sat(formulaConverter.convertPredicate(p), Some(timeoutMillis))
+  def predSat(p: Predicate, timeoutMillis: Option[Int] = None, obtainModel: Boolean = false): SatResult = {
+    sat(formulaConverter.convertPredicate(p), timeoutMillis.orElse(defaultTimeoutMillis), obtainModel)
   }
 
   /** Run solver on a boolean typed BASIL [[Expr]] */
-  def sat(p: Expr): SatResult = {
-    sat(formulaConverter.convertBoolExpr(p), defaultTimeoutMillis)
-  }
-
-  /** Run solver on a boolean typed BASIL [[Expr]] with a custom timeout */
-  def sat(p: Expr, timeoutMillis: Int): SatResult = {
-    sat(formulaConverter.convertBoolExpr(p), Some(timeoutMillis))
+  def exprSat(p: Expr, timeoutMillis: Option[Int] = None, obtainModel: Boolean = false): SatResult = {
+    sat(formulaConverter.convertBoolExpr(p), timeoutMillis.orElse(defaultTimeoutMillis), obtainModel)
   }
 
   /** Run solver on a predicate given as an SMT2 string */
-  def smt2Sat(s: String): SatResult = {
-    sat(solverContext.getFormulaManager().parse(s), defaultTimeoutMillis)
-  }
-
-  /** Run solver on a predicate given as an SMT2 string with a custom timeout */
-  def smt2Sat(s: String, timeoutMillis: Int): SatResult = {
-    sat(solverContext.getFormulaManager().parse(s), Some(timeoutMillis))
+  def smt2Sat(s: String, timeoutMillis: Option[Int] = None, obtainModel: Boolean = false): SatResult = {
+    sat(solverContext.getFormulaManager().parse(s), timeoutMillis.orElse(defaultTimeoutMillis), obtainModel)
   }
 
   /** Close the solver to prevent a memory leak when done. */
@@ -235,7 +230,7 @@ class FormulaConverter(formulaManager: FormulaManager) {
     assert(e.getType.isInstanceOf[BitVecType])
     e match {
       case BitVecLiteral(value, size) => bitvectorFormulaManager.makeBitvector(size, value.bigInteger)
-      case Extract(end, start, arg) => bitvectorFormulaManager.extract(convertBVExpr(arg), end-1, start)
+      case Extract(end, start, arg) => bitvectorFormulaManager.extract(convertBVExpr(arg), end - 1, start)
       case Repeat(repeats, arg) => {
         val x = convertBVExpr(arg)
         (1 until repeats).foldLeft(x)((f, _) => bitvectorFormulaManager.concat(f, x))
@@ -250,7 +245,12 @@ class FormulaConverter(formulaManager: FormulaManager) {
       case UnaryExpr(op, arg) =>
         op match {
           case op: BVUnOp => convertBVUnOp(op, convertBVExpr(arg))
-          case BoolToBV1 => booleanFormulaManager.ifThenElse(convertBoolExpr(arg), bitvectorFormulaManager.makeBitvector(1, 1), bitvectorFormulaManager.makeBitvector(1, 0))
+          case BoolToBV1 =>
+            booleanFormulaManager.ifThenElse(
+              convertBoolExpr(arg),
+              bitvectorFormulaManager.makeBitvector(1, 1),
+              bitvectorFormulaManager.makeBitvector(1, 0)
+            )
           case _ => throw Exception("Non bitvector operation was attempted to be converted")
         }
       case v: Variable => convertBVVar(v.irType, v.name)
@@ -276,7 +276,7 @@ class FormulaConverter(formulaManager: FormulaManager) {
       case OldVar(v) => convertBVVar(v.irType, s"old(${v.name})")
       case Uop(op, x) => convertBVUnOp(op, convertBVTerm(x))
       case Bop(op, x, y) => convertBVBinOp(op, convertBVTerm(x), convertBVTerm(y))
-      case Extract(end, start, body) => bitvectorFormulaManager.extract(convertBVTerm(body), end-1, start)
+      case Extract(end, start, body) => bitvectorFormulaManager.extract(convertBVTerm(body), end - 1, start)
       case Repeat(repeats, body) => {
         val x = convertBVTerm(body)
         (1 until repeats).foldLeft(x)((f, _) => bitvectorFormulaManager.concat(f, x))
