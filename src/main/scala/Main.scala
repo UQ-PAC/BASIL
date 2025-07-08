@@ -10,6 +10,7 @@ import util.{
   BoogieMemoryAccessMode,
   DSAConfig,
   DebugDumpIRLogger,
+  FrontendMode,
   ILLoadingConfig,
   IRLoading,
   LogLevel,
@@ -146,6 +147,12 @@ object Main {
       doc = "Switch version of procedure rely/guarantee checks to emit. (function|ifblock)"
     )
     procedureRG: Option[String],
+    @arg(
+      name = "gts-relf",
+      doc =
+        "Use .gts file for obtaining ELF symbol information (overrides --relf) (defaults to true if using GTIRB input and no --relf)"
+    )
+    useGTIRBReadELF: Flag,
     @arg(name = "verbose", short = 'v', doc = "Show extra debugging logs (the same as -vl log)")
     verbose: Flag,
     @arg(
@@ -339,7 +346,7 @@ object Main {
     val boogieGeneratorConfig =
       BoogieGeneratorConfig(boogieMemoryAccessMode, true, rely, conf.threadSplit.value, conf.noif.value)
 
-    val loadingInputs = if (conf.bapInputDirName.isDefined) then {
+    var loadingInputs = if (conf.bapInputDirName.isDefined) then {
       loadDirectory(ChooseInput.Bap, conf.bapInputDirName.get)
 
     } else if (conf.gtirbInputDirName.isDefined) then {
@@ -354,28 +361,54 @@ object Main {
       )
     }
 
+    val isGTIRB = loadingInputs.frontendMode == FrontendMode.Gtirb
+
+    // NOTE: --dump-relf ignores --gts-relf, to ensure that the output ELF files are correctly named
     conf.dumpRelf match {
       case None => ()
       case Some(relfOut) =>
-        val relfFile = loadingInputs.relfFile.getOrElse {
-          throw IllegalArgumentException("--dump-relf requires --relf")
-        }
-        Logger.setLevel(LogLevel.DEBUG)
-        val (relf, gtirb) = IRLoading.loadReadELFWithGTIRB(relfFile, loadingInputs)
 
-        // skip writing files if the given path is an empty string
+        val gtirbRelfFile = Some(loadingInputs.inputFile).filter(_ => isGTIRB)
+        val realRelfFile = loadingInputs.relfFile
+
+        Logger.setLevel(LogLevel.DEBUG)
+        val (relf, gtirb) = (realRelfFile, gtirbRelfFile) match {
+          case (Some(relfFile), _) =>
+            val (a, b) = IRLoading.loadReadELFWithGTIRB(relfFile, loadingInputs)
+            (Some(a), b)
+          case (None, Some(_)) => (None, Some(IRLoading.loadGTIRBReadELF(loadingInputs)))
+          case _ => throw IllegalArgumentException("--dump-relf requires either --relf or a GTIRB input")
+        }
+
+        // skip writing files if the given path is an empty string. this checks compatibility and exits.
         if (relfOut.trim.isEmpty)
           return
 
-        writeToFile(
-          relf.sorted.toScala
-            .replace("@GLIBC_2.17", "")
-            .replace("@GLIBC_2.38", "")
-            .replace("@GLIBC_2.34", ""),
-          relfOut + "-readelf.scala"
-        )
-        gtirb.foreach(x => writeToFile(x.sorted.toScala, relfOut + "-gtsrelf.scala"))
+        relf match {
+          case Some(relf) =>
+            writeToFile(
+              relf.sorted.toScala
+                .replace("@GLIBC_2.17", "")
+                .replace("@GLIBC_2.38", "")
+                .replace("@GLIBC_2.34", ""),
+              relfOut + "-readelf.scala"
+            )
+          case None => Logger.warn(s"Failed to load .relf information, $relfOut-readelf.scala not written")
+        }
+        gtirb match {
+          case Some(relf) => writeToFile(relf.sorted.toScala, relfOut + "-gtsrelf.scala")
+          case None => Logger.warn(s"Failed to load GTIRB information, $relfOut-gtsrelf.scala not written")
+        }
         return
+    }
+
+    // patch in gtirb-as-relf if directed or if relf is omitted but we are using gtirb.
+    // NOTE: this must be done early, because lots of later places make checks about loadingInputs.relfFile.
+    if (conf.useGTIRBReadELF.value || (isGTIRB && loadingInputs.relfFile.isEmpty)) {
+      if (!isGTIRB) {
+        throw IllegalArgumentException("--gts-relf requires a GTIRB input")
+      }
+      loadingInputs = loadingInputs.copy(relfFile = Some(loadingInputs.inputFile))
     }
 
     if (loadingInputs.specFile.isDefined && loadingInputs.relfFile.isEmpty) {

@@ -209,6 +209,10 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     ReadELFData(syms, exts, globs, funs, offs, main)
   }
 
+}
+
+object GTIRBReadELF {
+
   private val atSuffix = """@[A-Za-z_\d.]+$""".r
 
   /**
