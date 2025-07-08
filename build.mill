@@ -51,6 +51,8 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
       // this token will expire in one year. if downloading the lifter dependency fails,
       // re-generate a read:packages token.
       authentication = Some(Authentication("rina-bot1", "iH2Yg4xigOuRtBRoTrQWS85I26vgDuZ29Mgt_phg".reverse))
+      // XXX: .reverse is used to subvert Github's secret detection, which will invalidate the
+      // token if it sees it being committed....
     )
   }
 
