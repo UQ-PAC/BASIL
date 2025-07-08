@@ -5,16 +5,16 @@ import util.SMT.{SMTSolver, SatResult}
 
 @test_util.tags.UnitTest
 class SMTTest extends AnyFunSuite with CaptureOutput {
-  def checkPredicate(p: Predicate, timeoutMillis: Integer = 50): SatResult = {
-    val solver = SMTSolver(Some(timeoutMillis))
-    val res = solver.satisfiable(p)
+  def checkPredicate(p: Predicate, timeoutMillis: Int = 50): SatResult = {
+    val solver = SMTSolver(timeoutMillis)
+    val res = solver.sat(p)
     solver.close()
     res
   }
 
-  def checkSMT2(p: String, timeoutMillis: Integer = 50): SatResult = {
-    val solver = SMTSolver(Some(timeoutMillis))
-    val res = solver.smt2Satisfiable(p)
+  def checkSMT2(p: String, timeoutMillis: Int = 50): SatResult = {
+    val solver = SMTSolver(timeoutMillis)
+    val res = solver.smt2Sat(p)
     solver.close()
     res
   }

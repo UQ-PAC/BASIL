@@ -19,6 +19,8 @@ enum SatResult {
 /** Make sure to close the solver when you are done!
  */
 class SMTSolver(var timeoutMillis: Option[Int] = None) {
+  def this(timeoutMillis: Int) = this(Some(timeoutMillis))
+
   val shutdownManager = ShutdownManager.create()
 
   val solverContext = {
@@ -30,7 +32,7 @@ class SMTSolver(var timeoutMillis: Option[Int] = None) {
 
   val formulaConverter = FormulaConverter(solverContext.getFormulaManager())
 
-  def satisfiable(f: BooleanFormula): SatResult = {
+  def sat(f: BooleanFormula): SatResult = {
     // To handle timeouts, we must create a thread that sends a shutdown request after an amount of milliseconds
     val thread = timeoutMillis.map(m => {
       new Thread(new Runnable() {
@@ -60,18 +62,18 @@ class SMTSolver(var timeoutMillis: Option[Int] = None) {
     }
   }
 
-  def satisfiable(p: Predicate): SatResult = {
-    satisfiable(formulaConverter.convertPredicate(p))
+  def sat(p: Predicate): SatResult = {
+    sat(formulaConverter.convertPredicate(p))
   }
 
-  def satisfiable(p: Expr): SatResult = {
-    satisfiable(formulaConverter.convertBoolExpr(p))
+  def sat(p: Expr): SatResult = {
+    sat(formulaConverter.convertBoolExpr(p))
   }
 
   /** Run the solver on a predicate given as an SMT2 string
    */
-  def smt2Satisfiable(s: String): SatResult = {
-    satisfiable(solverContext.getFormulaManager().parse(s))
+  def smt2Sat(s: String): SatResult = {
+    sat(solverContext.getFormulaManager().parse(s))
   }
 
   def close() = {
