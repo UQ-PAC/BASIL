@@ -4,7 +4,9 @@ terminator Decl ";";
 
 {- TOKENS -}
 
-token BVTYPE ('b' 'v' digit+) ;
+position token BVTYPE ('b' 'v' digit+) ;
+position token INTTYPE {"int"} ;
+position token BOOLTYPE {"bool"} ;
 
 
 {- position token UserIdent '`' ((upper | letter | '_' | '#')(upper | letter | digit | ["_.$#"])*) '`'; -}
@@ -28,8 +30,8 @@ token LambdaSep ({"::"} | {"->"}) ;
 {- Literals -}
 
 token Str '"' ((char - ["\"\\"]) | ('\\' ["\"\\tnrf"]))* '"' ;
-token IntegerHex ('0' 'x' (digit | ["abcdef"])+);
-token IntegerDec (digit+);
+position token IntegerHex ('0' 'x' (digit | ["abcdef"])+);
+position token IntegerDec (digit+);
 
 -- gobble extra semicolons 
 Semicolons_Empty . Semicolons ::= "";
