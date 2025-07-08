@@ -102,8 +102,6 @@ class FullLoopInvariantGenerator(program: Program) {
 
     // Add more domains here
 
-    print(post)
-
     (
       pre.foldLeft(Map[Block, List[Predicate]]()) { (m, m2) =>
         unionWith(m, m2.map((b, p) => (b, List(p))), ((a, b) => a ++ b))
