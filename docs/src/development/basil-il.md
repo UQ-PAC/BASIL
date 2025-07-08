@@ -6,30 +6,50 @@ It can be serialised and laoded back into IR, and aims to be terse and human rea
 
 Below is an example for a procedure extracted from CNTLM.
 
-There is a grammar available here: https://uq-pac.github.io/BASIL/docs/basil-il/BasilIR.html
+[There is a grammar available here](https://uq-pac.github.io/BASIL/docs/basil-il/BasilIR.html).
 
 ```
 memory shared $mem : (bv64 -> bv8);
+memory $stack : (bv64 -> bv8);
+var $R0: bv64;
+var $R29: bv64;
+var $R30: bv64;
+var $R31: bv64;
+var $R8: bv64;
+var $R9: bv64;
 
-prog entry @main_1860;
+prog entry @main_1812;
 
-proc @main_1860
-  (R0_in:bv64, R1_in:bv64, R29_in:bv64, R30_in:bv64, R31_in:bv64, R8_in:bv64, _PC_in:bv64)
-    -> (R0_out:bv64, R29_out:bv64, R30_out:bv64, R8_out:bv64, _PC_out:bv64)
-  { .name = "main"; .address = 0x744 }
-  require eq(_PC_in:bv64, 0x744:bv64);
-  ensures eq(_PC_out:bv64, R30_in:bv64);
+proc @main_1812 () -> ()
+  { .name = "main"; .address = 0x714 }
 [
-  block %main_entry {.address = 0x744; .originalLabel = "rboiQVDCQyC6FKdIfNmCPw=="} [
-    assert eq(_PC_in:bv64, 0x744:bv64) { .label = "pc-tracking"; .comment = "pc-tracking";  };
-    store le $mem bvadd(R31_in:bv64, 0xfffffffffffffff0:bv64) R29_in:bv64 64;
-    store le $mem bvadd(R31_in:bv64, 0xfffffffffffffff8:bv64) R30_in:bv64 64;
-    store le $mem bvadd(R31_in:bv64, 0xffffffffffffffec:bv64) 0x0:bv32 32;
-    store le $mem bvadd(R31_in:bv64, 0xffffffffffffffe8:bv64) extract(32, 0, R0_in:bv64) 32;
-    var load15_1: bv32 := load le $mem bvadd(R31_in:bv64, 0xffffffffffffffe8:bv64) 32;
-    store le $mem bvadd(R31_in:bv64, 0xffffffffffffffdc:bv64) load15_1:bv32 32;
-    goto(%phi_1, %phi_2);
+  block %main_entry {.address = 0x714; .originalLabel = "EOZN5uSLQQqIXnLhnZHeWA=="} [
+    var Cse0__5_7: bv64 := bvadd($R31:bv64, 0xfffffffffffffff0:bv64) { .label = "1812_0" };
+    store le $stack Cse0__5_7:bv64 $R29:bv64 64 { .label = "1812_1" };
+    store le $stack bvadd(Cse0__5_7:bv64, 0x8:bv64) $R30:bv64 64 { .label = "1812_2" };
+    $R31: bv64 := Cse0__5_7:bv64 { .label = "1812_3" };
+    $R29: bv64 := $R31:bv64 { .label = "1816_0" };
+    $R9: bv64 := 0x11000:bv64 { .label = "1820_0" };
+    $R8: bv64 := 0x1:bv64 { .label = "1824_0" };
+    store le $mem bvadd($R9:bv64, 0x34:bv64) extract(32, 0, $R8:bv64) 32 { .label = "1828_0" };
+    $R30: bv64 := 0x72c:bv64 { .label = "1832_0" };
+    call @get_two_1856 ();
+    goto(%main_3);
   ];
+  block %main_3 {.address = 0x72c; .originalLabel = "Q55zdQssRl+zLCCVlSDCuw=="} [
+    $R8: bv64 := 0x11000:bv64 { .label = "1836_0" };
+    store le $mem bvadd($R8:bv64, 0x38:bv64) extract(32, 0, $R0:bv64) 32 { .label = "1840_0" };
+    $R0: bv64 := 0x0:bv64 { .label = "1844_0" };
+    var load19: bv64 := load le $stack $R31:bv64 64 { .label = "1848_0_0" };
+    $R29: bv64 := load19:bv64 { .label = "1848_0_1" };
+    var load20: bv64 := load le $stack bvadd($R31:bv64, 0x8:bv64) 64 { .label = "1848_1_0" };
+    $R30: bv64 := load20:bv64 { .label = "1848_1_1" };
+    $R31: bv64 := bvadd($R31:bv64, 0x10:bv64) { .label = "1848_2" };
+    goto(%main_basil_return_1);
+  ];
+  block %main_basil_return_1 [
+    return ();
+  ]
 ];
 ```
 

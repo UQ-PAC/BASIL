@@ -1,6 +1,8 @@
 package translating
 import ir.*
 import ir.cilvisitor.*
+import util.StringEscape.quote
+import util.functional.optionToMap
 
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
@@ -127,12 +129,11 @@ case class PBlock(
   exitComment: Option[String] = None
 ) extends PPProg[Block] {
   override def toString = {
-    val indent = "  "
     val addr = address.map(" " + _).getOrElse("")
     val comment = entryComment.map(c => c + "\n").getOrElse("")
     val excomment = exitComment.map(c => "\n" + c).getOrElse("")
     s"block ${label}${addr} [\n${comment}"
-      ++ commands.map("  " + _ + ";").mkString("\n")
+      ++ ("  " + indent(commands.map(_ + ";").mkString("\n"), "  "))
       ++ s"${excomment}\n]"
   }
 }
@@ -154,7 +155,7 @@ class BasilIRPrettyPrinter(
     var funs = mutable.LinkedHashSet[(String, List[IRType], IRType)]()
     override def vexpr(e: Expr) = {
       e match {
-        case u: UninterpretedFunction => funs.add(u.signature)
+        case u: FApplyExpr => funs.add(u.signature)
         case _ => ()
       }
       DoChildren()
@@ -280,7 +281,7 @@ class BasilIRPrettyPrinter(
 
   def vprog(mainProc: String, procedures: List[PPProg[Procedure]]): PPProg[Program] = {
     // shouldn't be used
-    assert(false)
+    ???
   }
 
   override def vblock(b: Block): PPProg[Block] = {
@@ -308,7 +309,7 @@ class BasilIRPrettyPrinter(
     statements: List[PPProg[Statement]],
     terminator: PPProg[Jump]
   ): PPProg[Block] = {
-    assert(false)
+    ???
   }
 
   def vardecl(v: Variable): String = {
@@ -462,8 +463,41 @@ class BasilIRPrettyPrinter(
     returnBlock: Option[PPProg[Block]]
   ): PPProg[Procedure] = ???
 
+  private def getStatementAttribs(x: Statement): Iterable[(String, String)] = {
+    (optionToMap("label")(x.label)
+      ++ optionToMap("comment")(x.comment)).toList.sorted
+  }
+
+  override def vstmt(x: Statement) = {
+    val orig = super.vstmt(x)
+
+    val bst = orig.asInstanceOf[BST[?]]
+
+    val attribs = getStatementAttribs(x)
+    val attribsString = if attribs.isEmpty then {
+      ""
+    } else {
+      attribs
+        .map { (k, v) =>
+          s"${Sigil.BASIR.attrib}$k = ${quote(v)}"
+        }
+        .mkString(" { ", "; ", " }")
+    }
+
+    BST(bst.v + attribsString)
+  }
+
   override def vassign(lhs: PPProg[Variable], rhs: PPProg[Expr]): PPProg[LocalAssign] = BST(s"${lhs} := ${rhs}")
   override def vmemassign(lhs: PPProg[Variable], rhs: PPProg[Expr]): PPProg[LocalAssign] = BST(s"${lhs} mem:= ${rhs}")
+  override def vsimulassign(assignments: List[(PPProg[Variable], PPProg[Expr])]): PPProg[SimulAssign] =
+    val pref = "( "
+    val suffix = " )"
+    val str = assignments
+      .map { case (lhs, rhs) =>
+        lhs.toString + " := " + rhs
+      }
+      .mkString(",\n")
+    BST(pref + indent(str, "  ") + suffix)
 
   override def vstore(
     mem: Memory,
@@ -507,32 +541,12 @@ class BasilIRPrettyPrinter(
 
   override def vindirect(target: PPProg[Variable]): PPProg[IndirectCall] = BST(s"indirect call ${target} ")
   override def vassert(body: Assert): PPProg[Assert] = {
-
-    val attrs = body.label.map(l => ("label", l)).toSeq ++ body.comment.map(c => ("comment", c))
-    val attrl =
-      if attrs.nonEmpty then
-        " { " + attrs
-          .map { case (n, l) =>
-            s"${Sigil.BASIR.attrib}$n = \"$l\"; "
-          }
-          .mkString("") + " }"
-      else ""
-
-    BST(s"assert ${vexpr(body.body)}$attrl")
+    BST(s"assert ${vexpr(body.body)}")
   }
-  override def vassume(body: Assume): PPProg[Assume] = {
-    val attrs = body.label.map(l => ("label", l)).toSeq ++ body.comment.map(c => ("comment", c))
-    val attrl =
-      if attrs.nonEmpty then
-        "{ " + attrs
-          .map { case (n, l) =>
-            s"${Sigil.BASIR.attrib}$n = \"$l\"; "
-          }
-          .mkString("") + " }"
-      else ""
 
+  override def vassume(body: Assume): PPProg[Assume] = {
     val stmt = if body.checkSecurity then "guard" else "assume"
-    BST(s"$stmt ${vexpr(body.body)}$attrl")
+    BST(s"$stmt ${vexpr(body.body)}")
   }
   override def vnop(): PPProg[NOP] = BST("nop")
 
@@ -546,6 +560,7 @@ class BasilIRPrettyPrinter(
     case BitVecType(sz) => s"bv$sz"
     case IntType => "int"
     case BoolType => "bool"
+    case CustomSort(n) => n
     case m: MapType => s"(${vtype(m.param)} -> ${vtype(m.result)})"
   }
 
@@ -564,6 +579,7 @@ class BasilIRPrettyPrinter(
     }
   }
 
+  override def vmemory(m: Memory) = BST(Sigil.BASIR.globalVar + m.name)
   override def vold(e: Expr) = BST(s"old(${vexpr(e)})")
   override def vlambda(e: LambdaExpr) = ???
   override def vquantifier(e: QuantifierExpr) = ???
@@ -575,6 +591,11 @@ class BasilIRPrettyPrinter(
     val opn = e.getClass.getSimpleName.toLowerCase.stripSuffix("$")
     BST(s"$opn($l, $r)")
   }
+  override def vbool_expr(e: BoolBinOp, l: List[PPProg[Expr]]): PPProg[Expr] = {
+    val opn = e.getClass.getSimpleName.toLowerCase.stripSuffix("$")
+    BST(s"$opn(${l.mkString(",")})")
+  }
+
   override def vunary_expr(e: UnOp, arg: PPProg[Expr]): PPProg[Expr] = {
     val opn = e.getClass.getSimpleName.toLowerCase.stripSuffix("$")
     BST(s"$opn($arg)")
@@ -583,7 +604,7 @@ class BasilIRPrettyPrinter(
   override def vboollit(b: Boolean) = BST(b.toString)
   override def vintlit(i: BigInt) = BST("0x%x".format(i))
   override def vbvlit(i: BitVecLiteral) = BST("0x%x".format(i.value) + s":bv${i.size}")
-  override def vuninterp_function(name: String, args: Seq[PPProg[Expr]]): PPProg[Expr] = BST(
+  override def vfapply_expr(name: String, args: Seq[PPProg[Expr]]): PPProg[Expr] = BST(
     s"${Sigil.BASIR.globalVar}$name(${args.mkString(", ")})"
   )
 }

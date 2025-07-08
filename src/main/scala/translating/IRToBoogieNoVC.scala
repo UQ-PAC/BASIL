@@ -12,11 +12,13 @@ object BoogieTranslator {
     case IntType => IntBType
     case BitVecType(s) => BitVecBType(s)
     case MapType(p, r) => MapBType(translateType(p), translateType(r))
+    case CustomSort(s) => CustomBType(s)
   }
 
   def translateVar(e: Variable): BVar = e match {
     case Register(n, s) => BVariable(n, translateType(e.getType), Scope.Global)
     case v: LocalVar => BVariable(v.name, translateType(v.getType), Scope.Local)
+    case v: GlobalVar => BVariable(v.name, translateType(v.getType), Scope.Global)
   }
 
   def translateMem(e: Memory): BMapVar =
@@ -31,46 +33,54 @@ object BoogieTranslator {
 
   def translateExpr(e: Expr): BExpr = e.toBoogie
 
-  def slToBoogie(e: List[Statement]) = e.map(translateStatement)
+  def slToBoogie(e: List[Statement]) = e.flatMap(translateStatement)
 
   def captureStateStatement(stateName: String): BAssume = {
     BAssume(TrueBLiteral, None, List(BAttribute("captureState", Some(s"\"$stateName\""))))
   }
 
-  def translateStatement(s: Statement): BCmd = s match {
-    case m: NOP => BAssume(TrueBLiteral, Some("NOP"))
+  def translateStatement(s: Statement): Iterable[BCmd] = s match {
+    case m: NOP => Seq()
+    case m: SimulAssign if m.assignments.isEmpty => Seq()
+    case m: SimulAssign =>
+      val a = m.assignments
+      val lhs = a.map(_._1).map(translateVar).toList
+      val rhs = a.map(_._2).map(translateExpr).toList
+      Seq(AssignCmd(lhs, rhs))
     case l: LocalAssign =>
       val lhs: BVar = translateVar(l.lhs)
       val rhs = translateExpr(l.rhs)
-      AssignCmd(List(lhs), List(rhs))
+      Seq(AssignCmd(List(lhs), List(rhs)))
     case l: MemoryAssign =>
       val lhs: BVar = translateVar(l.lhs)
       val rhs = translateExpr(l.rhs)
-      AssignCmd(List(lhs), List(rhs))
+      Seq(AssignCmd(List(lhs), List(rhs)))
     case a: Assert =>
       val body = translateExpr(a.body)
-      BAssert(body, a.comment)
+      Seq(BAssert(body, a.comment))
     case a: Assume =>
       val body = translateExpr(a.body)
-      BAssume(body, a.comment)
+      Seq(BAssume(body, a.comment))
     case m: MemoryStore =>
       val lhs = m.mem.toBoogie
       val rhs = BMemoryStore(m.mem.toBoogie, m.index.toBoogie, m.value.toBoogie, m.endian, m.size)
       val store = AssignCmd(List(lhs), List(rhs))
-      store
+      Seq(store)
     case m: MemoryLoad =>
       val lhs = m.lhs.toBoogie
       val rhs = BMemoryLoad(m.mem.toBoogie, m.index.toBoogie, m.endian, m.size)
       val assign = AssignCmd(List(lhs), List(rhs))
       // add rely call if is a non-stack load
-      assign
+      Seq(assign)
     case d: DirectCall =>
-      BProcedureCall(
-        d.target.name,
-        d.outParams.values.toSeq.map(_.toBoogie),
-        d.actualParams.values.toSeq.map(_.toBoogie)
+      Seq(
+        BProcedureCall(
+          d.target.name,
+          d.outParams.values.toSeq.map(_.toBoogie),
+          d.actualParams.values.toSeq.map(_.toBoogie)
+        )
       )
-    case f: IndirectCall => BAssert(FalseBLiteral, Some("IndirectCall" + f.target.toString))
+    case f: IndirectCall => Seq(BAssert(FalseBLiteral, Some("IndirectCall" + f.target.toString)))
   }
 
   def translateJump(j: Jump): List[BCmd] = {
@@ -97,12 +107,6 @@ object BoogieTranslator {
     e: Procedure
   ): BProcedure = {
 
-    val locals = {
-      val vars = FindVars()
-      cilvisitor.visit_proc(vars, e)
-      vars.locals
-    }
-
     val body: List[BCmdOrBlock] =
       (e.entryBlock.view ++ e.blocks.filterNot(x => e.entryBlock.contains(x))).map(x => translateBlock(x)).toList
 
@@ -125,15 +129,15 @@ object BoogieTranslator {
 
   }
 
-  private def functionOpToDecl(functionOps: Iterable[BDeclaration]): Iterable[BFunction] = {
-    var decls = Set[BFunction]()
+  private def functionOpToDecl(functionOps: Iterable[BDeclaration]): Iterable[BDeclaration] = {
+    var decls = Set[BDeclaration]()
     var oldFops = Set[FunctionOp]()
     var fops: Set[FunctionOp] = functionOps.flatMap(_.functionOps).toSet
 
     while (oldFops != fops) {
       oldFops = fops
-      decls = fops.map {
-        case f: BasilIRFunctionOp => genFunctionOpDefinition(f)
+      decls = fops.flatMap {
+        case f: BasilIRFunctionOp => Seq(genFunctionOpDefinition(f))
         case f => throw Exception(s"function op not supported on direct translation mode : $f")
       }
       val newOps = decls.flatMap(_.functionOps)
@@ -149,6 +153,21 @@ object BoogieTranslator {
     val vvis = FindVars()
     visit_prog(vvis, p)
 
+    for (proc <- p.procedures) {
+      val vvis = FindVars()
+      visit_proc(vvis, proc)
+      proc.modifies.addAll(vvis.globals)
+    }
+
+    val typeDecls = vvis.typeDecls
+      .map(_.toBoogie)
+      .collect { case b @ CustomBType(_) =>
+        b
+      }
+      .map(BTypeDecl(_))
+
+    val globalDecls = p.declarations.map(_.toBoogie)
+
     val readOnlySections = p.usedMemory.values.filter(_.readOnly)
     val readOnlyMemory = memoryToConditionCoalesced(readOnlySections)
     val initialSections = p.usedMemory.values.filter(!_.readOnly)
@@ -162,17 +181,23 @@ object BoogieTranslator {
       case proc => translateProc(readOnlyMemory)(proc)
     }
 
-    val functionOpDefinitions = functionOpToDecl(globalVarDecls ++ procs)
-    val decls = globalVarDecls.toList ++ functionOpDefinitions ++ procs
+    val functionOpDefinitions = functionOpToDecl(globalDecls ++ globalVarDecls ++ procs)
+    val decls = globalVarDecls.toList ++ globalDecls ++ functionOpDefinitions ++ procs
 
-    BProgram(decls, fname)
+    BProgram(typeDecls.toList ++ decls, fname)
   }
 
 }
 
 class FindVars extends CILVisitor {
+  /*
+   * Collect variables visited by performing performs DFS of call tree.
+   */
+
   val vars = mutable.Set[Variable]()
   val mems = mutable.Set[Memory]()
+  var procsSeen = mutable.Set[Procedure]()
+  val typeDecls = mutable.Set[CustomSort]()
 
   override def vmem(m: Memory) = {
     mems += m
@@ -183,9 +208,31 @@ class FindVars extends CILVisitor {
     vars += v
     SkipChildren()
   }
+
+  override def vproc(p: Procedure) = {
+    procsSeen.add(p)
+    DoChildren()
+  }
+
   override def vlvar(v: Variable) = {
     vars += v
     SkipChildren()
+  }
+
+  override def vexpr(e: Expr) = {
+    e.getType match {
+      case s @ CustomSort(_) => typeDecls.add(s)
+      case _ => ()
+    }
+    DoChildren()
+  }
+
+  override def vstmt(s: Statement) = {
+    s match {
+      case s: DirectCall if !procsSeen.contains(s.target) => visit_proc(this, s.target)
+      case _ => ()
+    }
+    DoChildren()
   }
 
   def globals = (vars ++ mems).collect { case g: Global =>

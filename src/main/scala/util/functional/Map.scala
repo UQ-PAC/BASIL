@@ -10,6 +10,13 @@ def unionWith[K, V](a: Iterable[(K, V)], b: Iterable[(K, V)], f: (V, V) => V): M
 }
 
 /**
+ * Converts an option to a Map with the given key, if the option is Some.
+ * Otherwise, returns the empty map.
+ */
+def optionToMap[K, V](key: K)(x: Option[V]): Map[K, V] =
+  x.map(key -> _).toMap
+
+/**
  * Unapply matcher for [[scala.collection.immutable.Map]].
  * The match succeeds if the given map has exactly the keys specified.
  * If successful, the values corresponding to the keys will be returned as a list

@@ -1,6 +1,7 @@
 package ir.dsl
 import ir.*
 import translating.PrettyPrinter.*
+import util.assertion.*
 
 import scala.collection.immutable.*
 import scala.collection.mutable
@@ -61,34 +62,37 @@ import scala.collection.mutable.ArrayBuffer
  *  Together, NonCallStatement and Call should partition Statement.
  */
 type NonCallStatement =
-  LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume | MemoryAssign
+  LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume | MemoryAssign | SimulAssign
 
 type DSLStatement = NonCallStatement | EventuallyStatement | EventuallyJump
 
-def cloneStatement(x: NonCallStatement): NonCallStatement = x match {
-  case LocalAssign(a, b, c) => LocalAssign(a, b, c)
-  case MemoryAssign(a, b, c) => MemoryAssign(a, b, c)
-  case MemoryStore(a, b, c, d, e, f) => MemoryStore(a, b, c, d, e, f)
-  case MemoryLoad(a, b, c, d, e, f) => MemoryLoad(a, b, c, d, e, f)
-  case NOP(l) => NOP(l)
-  case Assert(a, b, c) => Assert(a, b, c)
-  case Assume(a, b, c, d) => Assume(a, b, c, d)
-}
+def cloneStatement(x: NonCallStatement): NonCallStatement =
+  val newstmt: NonCallStatement = x match {
+    case LocalAssign(a, b, c) => LocalAssign(a, b, c)
+    case MemoryAssign(a, b, c) => MemoryAssign(a, b, c)
+    case MemoryStore(a, b, c, d, e, f) => MemoryStore(a, b, c, d, e, f)
+    case MemoryLoad(a, b, c, d, e, f) => MemoryLoad(a, b, c, d, e, f)
+    case NOP(l) => NOP(l)
+    case Assert(a, b, c) => Assert(a, b, c)
+    case Assume(a, b, c, d) => Assume(a, b, c, d)
+    case a: SimulAssign => SimulAssign(a.assignments, a.label)
+  }
+  newstmt.setComment(x.comment)
 
-val R0: Register = Register("R0", 64)
-val R1: Register = Register("R1", 64)
-val R2: Register = Register("R2", 64)
-val R3: Register = Register("R3", 64)
-val R4: Register = Register("R4", 64)
-val R5: Register = Register("R5", 64)
-val R6: Register = Register("R6", 64)
-val R7: Register = Register("R7", 64)
-val R8: Register = Register("R8", 64)
-val R29: Register = Register("R29", 64)
-val R30: Register = Register("R30", 64)
-val R31: Register = Register("R31", 64)
+val R0: GlobalVar = Register("R0", 64)
+val R1: GlobalVar = Register("R1", 64)
+val R2: GlobalVar = Register("R2", 64)
+val R3: GlobalVar = Register("R3", 64)
+val R4: GlobalVar = Register("R4", 64)
+val R5: GlobalVar = Register("R5", 64)
+val R6: GlobalVar = Register("R6", 64)
+val R7: GlobalVar = Register("R7", 64)
+val R8: GlobalVar = Register("R8", 64)
+val R29: GlobalVar = Register("R29", 64)
+val R30: GlobalVar = Register("R30", 64)
+val R31: GlobalVar = Register("R31", 64)
 
-def R(i: Int): Register = Register(s"R$i", 64)
+def R(i: Int): GlobalVar = Register(s"R$i", 64)
 
 def bv_t(i: Int) = BitVecType(i)
 
@@ -120,7 +124,7 @@ case class CloneableStatement(s: NonCallStatement) extends EventuallyStatement {
 case class IdentityStatement(s: NonCallStatement) extends EventuallyStatement {
   var resolved = false
   override def resolve(p: CachedLabelResolver): Statement = {
-    assert(
+    debugAssert(
       !resolved,
       s"DSL statement '$s' has already been resolved! to make a DSL statement that can be resolved multiple times, wrap it in clonedStmt() or use .cloneable on its block."
     )
@@ -139,11 +143,11 @@ trait EventuallyJump extends DeepEquality {
   def resolve(p: Program, proc: String): Jump = resolve(CachedLabelResolver(p), proc)
 }
 
-case class EventuallyIndirectCall(target: Variable, label: Option[String] = None)
+case class EventuallyIndirectCall(target: Variable, label: Option[String] = None, comment: Option[String] = None)
     extends EventuallyStatement
     with DefaultDeepEquality {
   override def resolve(p: CachedLabelResolver): Statement = {
-    IndirectCall(target, label)
+    IndirectCall(target, label).setComment(comment)
   }
 }
 
@@ -151,7 +155,8 @@ case class EventuallyCall(
   target: DelayNameResolve,
   lhs: Iterable[(String, Variable)],
   actualParams: Iterable[(String, Expr)],
-  label: Option[String] = None
+  label: Option[String] = None,
+  comment: Option[String] = None
 ) extends EventuallyStatement
     with DefaultDeepEquality {
   override def resolve(p: CachedLabelResolver): Statement = {
@@ -161,28 +166,36 @@ case class EventuallyCall(
     }
     val actual = SortedMap.from(actualParams.map((name, value) => t.formalInParam.find(_.name == name).get -> value))
     val callLhs = SortedMap.from(lhs.map((name, value) => t.formalOutParam.find(_.name == name).get -> value))
-    DirectCall(t, label, callLhs, actual)
+    DirectCall(t, label, callLhs, actual).setComment(comment)
   }
 }
 
-case class EventuallyGoto(targets: Iterable[DelayNameResolve], label: Option[String] = None)
-    extends EventuallyJump
+case class EventuallyGoto(
+  targets: Iterable[DelayNameResolve],
+  label: Option[String] = None,
+  comment: Option[String] = None
+) extends EventuallyJump
     with DefaultDeepEquality {
   override def resolve(p: CachedLabelResolver, proc: String): GoTo = {
     val tgs = targets.map(tn => tn.resolveBlock(p, proc).getOrElse(throw Exception(s"Cannot resolve $tn")))
-    GoTo(tgs, label)
+    GoTo(tgs, label).setComment(comment)
   }
 }
-case class EventuallyReturn(params: Iterable[(String, Expr)], label: Option[String] = None)
-    extends EventuallyJump
+case class EventuallyReturn(
+  params: Iterable[(String, Expr)],
+  label: Option[String] = None,
+  comment: Option[String] = None
+) extends EventuallyJump
     with DefaultDeepEquality {
   override def resolve(p: CachedLabelResolver, proc: String) = {
     val r = SortedMap.from(params.map((n, v) => p.procs(proc).formalOutParam.find(_.name == n).get -> v))
-    Return(label, r)
+    Return(label, r).setComment(comment)
   }
 }
-case class EventuallyUnreachable(label: Option[String] = None) extends EventuallyJump with DefaultDeepEquality {
-  override def resolve(p: CachedLabelResolver, proc: String) = Unreachable(label)
+case class EventuallyUnreachable(label: Option[String] = None, comment: Option[String] = None)
+    extends EventuallyJump
+    with DefaultDeepEquality {
+  override def resolve(p: CachedLabelResolver, proc: String) = Unreachable(label).setComment(comment)
 }
 
 def clonedStmt(s: NonCallStatement) = CloneableStatement(s)
@@ -255,9 +268,9 @@ case class EventuallyBlock(
     val tempBlock: Block = Block(label, meta.address, List(), GoTo(List.empty))
 
     def cont(prog: CachedLabelResolver, proc: String): Block = {
-      assert(tempBlock.statements.isEmpty)
+      debugAssert(tempBlock.statements.isEmpty)
       val resolved = sl.map(_.resolve(prog))
-      assert(tempBlock.statements.isEmpty)
+      debugAssert(tempBlock.statements.isEmpty)
       tempBlock.statements.addAll(resolved)
       tempBlock.replaceJump(j.resolve(prog, proc))
     }
@@ -437,8 +450,8 @@ case class EventuallyProgram(
     val reso = CachedLabelResolver(p)
 
     resolvers.foreach(_(reso))
-    assert(ir.invariant.correctCalls(p))
-    assert(ir.invariant.cfgCorrect(p))
+    debugAssert(ir.invariant.correctCalls(p))
+    debugAssert(ir.invariant.cfgCorrect(p))
     p
   }
 

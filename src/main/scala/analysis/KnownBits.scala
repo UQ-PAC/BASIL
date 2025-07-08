@@ -4,6 +4,7 @@ import ir.eval.BitVectorEval
 import ir.eval.InfixBitVectorEval.*
 import ir.eval.InfixBitVectorEval.given
 import ir.transforms.{AbstractDomain, applyRPO}
+import util.assertion.*
 import util.writeToFile
 
 import scala.language.implicitConversions
@@ -63,7 +64,7 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
       .bv(width))
   }
 
-  assert(wellFormed, s"not well formed $this")
+  debugAssert(wellFormed, s"not well formed $this")
 
   def top() = {
     TNum(0.bv(width), BitVecLiteral(BitVecType(width).maxValue, width))
@@ -469,10 +470,10 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
   }
 
   // Get smallest possible unsigned value of the TNum (e.g. Min value of TT0 is 000)
-  def minUnsigned = (this.value & ~this.mask).value
+  def minUnsigned = mustBits.value
 
   // Get largest possible unsigned value of the TNum (e.g. Max value of TT0 is 110)
-  def maxUnsigned = (this.value | this.mask).value
+  def maxUnsigned = mayBits.value
 
   def mustBits = (this.value & ~this.mask)
   def mustNotBits = ((~this.value) & ~this.mask)
@@ -655,7 +656,8 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
   // Recursively evaluates nested or non-nested expression
   def evaluateExprToTNum(s: Map[Variable, TNum], expr: Expr): TNum =
     val r = expr match {
-      case u: UninterpretedFunction => TNum.top(sizeBits(u.getType))
+      case b: AssocExpr => evaluateExprToTNum(s, b.toBinaryExpr)
+      case u: FApplyExpr => TNum.top(sizeBits(u.getType))
       case u: LambdaExpr => TNum.top(sizeBits(u.getType))
       case u: QuantifierExpr => TNum.top(sizeBits(u.getType))
       case u: OldExpr => TNum.top(sizeBits(u.getType))
@@ -703,13 +705,20 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
       case SignExtend(ex: Int, body: Expr) =>
         val tnum = evaluateExprToTNum(s, body)
         TNum(sign_extend(ex, tnum.value), sign_extend(ex, tnum.mask))
+      case _: StackMemory => ???
+      case _: SharedMemory => ???
     }
     r
 
   // s is the abstract state from previous command/block
   override def transfer(s: Map[Variable, TNum], b: Command): Map[Variable, TNum] = {
-    b match {
+    val r = b match {
       // Assign variable to variable (e.g. x = y)
+      case SimulAssign(assignments, _) => {
+        s ++ assignments.map { case (lhs, rhs) =>
+          lhs -> evaluateExprToTNum(s, rhs)
+        }
+      }
       case LocalAssign(lhs: Variable, rhs: Expr, _) =>
         s.updated(lhs, evaluateExprToTNum(s, rhs))
 
@@ -718,9 +727,22 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
         // Overapproxiate memory values with Top
         s.updated(lhs, TNum.top(size))
 
+      case i: IndirectCall => Map()
+      case a: Assign => s ++ a.assignees.map(l => l -> TNum.top(sizeBits(l.irType)))
       // Default case
-      case _ => s
+      case _: NOP => s
+      case _: Assert => s
+      case _: Assume => s
+      case _: GoTo => s
+      case _: Return => s
+      case _: Unreachable => s
+      case _: MemoryStore => s
     }
+    r
+  }
+
+  override def join(left: Map[Variable, TNum], right: Map[Variable, TNum], pos: Block): Map[Variable, TNum] = {
+    join(left, right)
   }
 
   /**
@@ -731,7 +753,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
    *   x = 1111 => value = 1111, mask = 0000
    *   Joined x = 1111 => value = 1111, mask = 0000
    */
-  override def join(left: Map[Variable, TNum], right: Map[Variable, TNum], pos: Block): Map[Variable, TNum] = {
+  def join(left: Map[Variable, TNum], right: Map[Variable, TNum]): Map[Variable, TNum] = {
     (left.keySet ++ right.keySet).map { key =>
       val width = sizeBits(key.getType)
       val leftTNum = left.getOrElse(key, TNum.top(width))

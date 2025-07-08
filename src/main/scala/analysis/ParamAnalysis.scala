@@ -1,6 +1,6 @@
 package analysis
-
 import ir.{GoTo, Procedure, Program, Register, Return, Unreachable, Variable}
+import util.assertion.*
 
 /** This analysis uses the interprocedural and intraprocedural live variable analyses to find the parameters to
   * procedures in a given program
@@ -29,7 +29,7 @@ class ParamAnalysis(val program: Program) extends Analysis[Any] {
 
   private def getProcParams(proc: Procedure): Set[Variable] = {
     if completeProcs.contains(proc) then // already know the parameters for this procedure
-      assert(visitedProcs.contains(proc))
+      debugAssert(visitedProcs.contains(proc))
       results(proc)
     else if visitedProcs.contains(proc) && !completeProcs.contains(proc) then // most likely caused by mutual recursion
       throw new Exception("Unresolvable Recursive Cycle at: " + proc)
@@ -38,7 +38,7 @@ class ParamAnalysis(val program: Program) extends Analysis[Any] {
       if proc.calls.isEmpty || proc.calls.equals(Set(proc)) then // no call to other functions
         intraLivenessResults(proc)
           .diff(ignoreRegisters)
-          .foreach(v => assert(interLivenessResults(proc).keys.toSet.contains(v)))
+          .foreach(v => debugAssert(interLivenessResults(proc).keys.toSet.contains(v)))
         results += (proc -> intraLivenessResults(proc).diff(ignoreRegisters))
       else
         val exit = proc.returnBlock.get.jump
@@ -54,14 +54,16 @@ class ParamAnalysis(val program: Program) extends Analysis[Any] {
           .diff(intraLivenessResults(proc).union(calleeParams))
         nonParams.foreach(v => {
           if (interLivenessResults.contains(exit)) {
-            assert(interLivenessResults(exit).keys.toSet.contains(v))
+            debugAssert(interLivenessResults(exit).keys.toSet.contains(v))
           } else {
             // exit should be the nominated main procedure
             exit match {
               case _: Unreachable => ()
               case r: Return =>
-                assert(r.parent.statements.isEmpty && r.outParams.isEmpty && r.parent.parent.incomingCalls().isEmpty)
-              case g: GoTo => assert(false)
+                debugAssert(
+                  r.parent.statements.isEmpty && r.outParams.isEmpty && r.parent.parent.incomingCalls().isEmpty
+                )
+              case g: GoTo => debugAssert(false)
             }
           }
         })

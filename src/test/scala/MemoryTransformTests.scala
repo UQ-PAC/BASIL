@@ -424,7 +424,7 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
     val results = runTest(context)
 
     val mainStores = results.ir.program.mainProcedure.collect { case m: MemoryAssign => m }
-    val loads = results.ir.program.collect { case l @ LocalAssign(_, r: Register, _) => l }
+    val loads = results.ir.program.collect { case l @ LocalAssign(_, r: GlobalVar, _) => l }
     assert(mainStores.map(_.lhs).toSet.size == 1)
     assert(loads.map(_.rhs).toSet.size == 1)
     assert(loads.map(_.rhs).toSet.head == mainStores.map(_.lhs).toSet.head)

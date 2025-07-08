@@ -1,4 +1,6 @@
 package util.intrusive_list
+import util.assertion.*
+
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -81,7 +83,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
    */
   def apply(i: Int): T = {
     // TODO: cache?
-    assert(i < size)
+    debugAssert(i < size)
     var elem = firstElem.get
     for (c <- 0 until i) {
       elem = elem.getNext
@@ -122,7 +124,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   The iterator
     */
   def iteratorFrom(elem: T, forward: Boolean = true): Iterator[T] = {
-    assert(elem.first() == firstElem.get)
+    debugAssert(elem.first() == firstElem.get)
     IntrusiveListIterator(Some(elem), forward)
   }
 
@@ -171,8 +173,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   The element
     */
   def prepend(newElem: T): T = {
-    assert(newElem.unitary)
-    assert(!containsRef(newElem))
+    debugAssert(newElem.unitary)
     onInsert(newElem)
     if (size > 0) {
       insertBefore(firstElem.get, newElem)
@@ -185,6 +186,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
   }
 
   def prependAll(elems: Iterable[T]) = {
+    require(elems.toSet.size == elems.size)
     // first == None ==> empty list
     insertAllBefore(firstElem, elems)
   }
@@ -202,8 +204,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   The element
     */
   def append(newElem: T): T = {
-    assert(newElem.unitary)
-    assert(!containsRef(newElem))
+    debugAssert(newElem.unitary)
     onInsert(newElem)
     if (size > 0) {
       insertAfter(lastElem.get, newElem)
@@ -224,10 +225,9 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   The added element
     */
   def replace(elem: T, withElem: T): T = {
-    assert(containsRef(elem))
+    debugAssert(containsRef(elem), "elem is not an element of this list, replace() call could mangle start and end")
     if (elem ne withElem) {
-      assert(withElem.unitary)
-      assert(!containsRef(withElem))
+      debugAssert(withElem.unitary)
       val newElem: T = insertAfter(elem, withElem)
       val removed = remove(elem)
       newElem
@@ -245,10 +245,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   An ArrayBuffer containing all elements after n.
     */
   def splitOn(n: T): ArrayBuffer[T] = {
-    require(!lastElem.contains(n))
-    require(containsRef(n))
-
-    val ne = n.next
+    debugAssert(containsRef(n), "Cannot split on element not in this list")
 
     val newlist = ArrayBuffer[T]()
     var next = n.next
@@ -270,8 +267,8 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   The removed element
     */
   def remove(intrusiveListElement: T): T = {
-    assert(size >= 0)
-    assert(containsRef(intrusiveListElement))
+    debugAssert(size >= 0)
+    debugAssert(containsRef(intrusiveListElement), "Cannot remove element not in this list")
     numElems -= 1
     if (intrusiveListElement == lastElem.get) {
       lastElem = intrusiveListElement.prev
@@ -292,10 +289,12 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   the inserted element
     */
   def insertAfter(intrusiveListElement: T, newElem: T): T = {
-    assert(size >= 1)
-    assert(containsRef(intrusiveListElement))
-    assert(!containsRef(newElem))
-    assert(newElem.unitary)
+    debugAssert(size >= 1)
+    debugAssert(
+      containsRef(intrusiveListElement),
+      "element is not a member of this list, insertAfter could mangle start and end tracking"
+    )
+    debugAssert(newElem.unitary)
     numElems += 1
     if (intrusiveListElement == lastElem.get) {
       lastElem = Some(newElem)
@@ -337,7 +336,8 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
   def insertAllBefore(intrusiveListElement: Option[T], newElems: Iterable[T]): Option[T] = {
     intrusiveListElement match {
       case None =>
-        newElems.map(append).lastOption.orElse(intrusiveListElement)
+        appendAll(newElems)
+        lastElem
       case Some(n) =>
         var p = n
         for (i <- newElems.toList.reverse) {
@@ -357,10 +357,12 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     *   the inserted element
     */
   def insertBefore(intrusiveListElement: T, newElem: T): T = {
-    assert(size >= 1)
-    assert(containsRef(intrusiveListElement))
-    assert(!containsRef(newElem))
-    assert(newElem.unitary)
+    debugAssert(size >= 1)
+    debugAssert(
+      containsRef(intrusiveListElement),
+      "Element is not in this list, insert before could mangle start and end tracking."
+    )
+    debugAssert(newElem.unitary)
     numElems += 1
     if (intrusiveListElement == firstElem.get) {
       firstElem = Some(newElem)
@@ -414,6 +416,7 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
   private[intrusive_list] var next: Option[T] = None
   private[intrusive_list] var prev: Option[T] = None
   private[intrusive_list] final def insertBefore(elem: T): T = {
+    require(elem != this)
     elem.prev = prev
     if (prev.isDefined) {
       prev.get.next = Some(elem)
@@ -426,6 +429,7 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
   private[intrusive_list] final def unitary: Boolean = next.isEmpty && prev.isEmpty
 
   private[intrusive_list] final def insertAfter(elem: T): T = {
+    require(elem != this)
     if (next.isDefined) {
       next.get.prev = Some(elem)
     }
@@ -484,6 +488,7 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
 
   private[intrusive_list] final def last(): T = {
     next match {
+      case Some(n) if n == next => throw Exception(s"IntrusiveList self loop $this")
       case Some(n) => n.last()
       case None => this.asInstanceOf[T]
     }
@@ -491,17 +496,18 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
 
   private[intrusive_list] final def first(): T = {
     prev match {
+      case Some(n) if n == prev => throw Exception(s"IntrusiveList self loop $this")
       case Some(n) => n.first()
       case None => this.asInstanceOf[T]
     }
   }
 
   private[intrusive_list] final def splice(at: T, insertBegin: T, insertEnd: T): Unit = {
-    assert(insertEnd.last() == insertEnd)
-    assert(insertBegin.last() == insertEnd)
-    assert(insertBegin.first() == insertBegin)
-    assert(insertEnd.first() == insertBegin)
-    assert(!at.contains(insertBegin))
+    debugAssert(insertEnd.last() == insertEnd)
+    debugAssert(insertBegin.last() == insertEnd)
+    debugAssert(insertBegin.first() == insertBegin)
+    debugAssert(insertEnd.first() == insertBegin)
+    debugAssert(!at.contains(insertBegin))
 
     at.next.foreach(_.prev = Some(insertEnd))
     insertBegin.prev = Some(at)

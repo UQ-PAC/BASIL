@@ -2,6 +2,7 @@ package boogie
 import ir.*
 import ir.dsl.given
 import specification.*
+import util.assertion.*
 
 import java.io.Writer
 
@@ -320,6 +321,33 @@ case class UnaryBExpr(op: UnOp, arg: BExpr) extends BExpr {
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitUnaryBExpr(this)
 }
 
+case class AssocBExpr(op: BoolBinOp | EQ.type | NEQ.type | IntADD.type, arg: List[BExpr]) extends BExpr {
+  require(arg.size >= 2, "AssocBExpr requires at least two operands")
+  override def getType = BinaryBExpr(op, arg.head, arg.tail.head).getType
+  override def serialiseBoogie(w: Writer): Unit = {
+    w.append("(")
+    arg
+      .dropRight(1)
+      .foreach(a => {
+        a.serialiseBoogie(w)
+        w.append(",")
+      })
+    arg.last.serialiseBoogie(w)
+    w.append(")")
+  }
+
+  override def functionOps: Set[FunctionOp] = arg.flatMap(_.functionOps).toSet
+  override def toString = s"(${arg.mkString(" " + op.toString + " ")})"
+  override def locals: Set[BVar] = arg.flatMap(_.locals).toSet
+  override def globals: Set[BVar] = arg.flatMap(_.globals).toSet
+  override def params: Set[BVar] = arg.flatMap(_.params).toSet
+  override def specGlobals: Set[SpecGlobalOrAccess] = arg.flatMap(_.specGlobals).toSet
+  override def oldSpecGlobals: Set[SpecGlobalOrAccess] = arg.flatMap(_.oldSpecGlobals).toSet
+  override def specGammas: Set[SpecGlobalOrAccess] = arg.flatMap(_.specGammas).toSet
+  override def oldSpecGammas: Set[SpecGlobalOrAccess] = arg.flatMap(_.oldSpecGammas).toSet
+  override def loads: Set[BExpr] = arg.flatMap(_.loads).toSet
+}
+
 case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
   override def getType: BType = (op, arg1.getType, arg2.getType) match {
     case (_: BoolBinOp, BoolBType, BoolBType) => BoolBType
@@ -458,10 +486,11 @@ case class IfThenElse(guard: BExpr, thenExpr: BExpr, elseExpr: BExpr) extends BE
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitIfThenElse(this)
 }
 
-trait BQuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr) extends BExpr {
+trait BQuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr, triggers: List[BExpr] = List()) extends BExpr {
   override def toString: String = {
+    val trstr = if triggers.nonEmpty then "{" + triggers.mkString(",") + "} " else ""
     val boundString = bound.map(_.withType).mkString(", ")
-    s"($sort $boundString :: ($body))"
+    s"($sort $boundString::  $trstr($body))"
   }
   override val getType: BType = BoolBType
   override def functionOps: Set[FunctionOp] = body.functionOps
@@ -481,9 +510,11 @@ enum Quantifier {
   case lambda
 }
 
-case class ForAll(bound: List[BVar], body: BExpr) extends BQuantifierExpr(Quantifier.forall, bound, body)
+case class ForAll(bound: List[BVar], body: BExpr, triggers: List[BExpr] = List())
+    extends BQuantifierExpr(Quantifier.forall, bound, body, triggers)
 
-case class Exists(bound: List[BVar], body: BExpr) extends BQuantifierExpr(Quantifier.exists, bound, body)
+case class Exists(bound: List[BVar], body: BExpr, triggers: List[BExpr] = List())
+    extends BQuantifierExpr(Quantifier.exists, bound, body, triggers)
 
 case class Lambda(bound: List[BVar], body: BExpr) extends BQuantifierExpr(Quantifier.lambda, bound, body)
 
@@ -528,7 +559,7 @@ case class BVFunctionOp(name: String, bvbuiltin: String, in: List[BVar], out: BV
 
 case class MemoryLoadOp(addressSize: Int, valueSize: Int, endian: Endian, bits: Int) extends FunctionOp {
   val accesses: Int = bits / valueSize
-  assert(accesses > 0)
+  debugAssert(accesses > 0)
 
   val fnName: String = endian match {
     case Endian.LittleEndian => s"memory_load${bits}_le"
@@ -621,7 +652,7 @@ case class BoolToBV1Op(arg: BExpr) extends FunctionOp {
 
 case class BMemoryLoad(memory: BMapVar, index: BExpr, endian: Endian, bits: Int) extends BExpr {
   override def toString: String = s"$fnName($memory, $index)"
-  assert(bits >= 8)
+  debugAssert(bits >= 8)
 
   val fnName: String = endian match {
     case Endian.LittleEndian => s"memory_load${bits}_le"
@@ -700,6 +731,7 @@ case class GammaLoad(gammaMap: BMapVar, index: BExpr, bits: Int, accesses: Int) 
 }
 
 case class GammaStore(gammaMap: BMapVar, index: BExpr, value: BExpr, bits: Int, accesses: Int) extends BExpr {
+  require(accesses > 0)
   override def toString: String = s"$fnName($gammaMap, $index, $value)"
   val fnName: String = s"gamma_store$bits"
 
