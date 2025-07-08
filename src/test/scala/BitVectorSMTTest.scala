@@ -57,7 +57,7 @@ class BitVectorEvalTest extends AnyFunSuite {
 
     // val query = checks.map(e => BasilIRToSMT2.exprUnsat(e, None, false))
 
-    val solver = SMTSolver(timeoutMillis = Some(50))
+    val solver = SMTSolver(50)
 
     checks.foreach {
       case (l, exp) => {

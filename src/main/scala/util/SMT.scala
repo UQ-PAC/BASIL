@@ -10,16 +10,36 @@ import org.sosy_lab.java_smt.api.{BitvectorFormula, BooleanFormula, FormulaManag
 
 import scala.jdk.CollectionConverters.SetHasAsJava
 
+// TODO
+// support giving models
+// support moving up and down a proof context stack
+// consider having query local timeouts?!
+
+/** The result of an SMT query */
 enum SatResult {
   case SAT
   case UNSAT
   case Unknown(s: String)
 }
 
-/** Make sure to close the solver when you are done!
+/** A wrapper around an SMT solver.
+ *
+ *  (!!) It is very important (!!) to close the solver with [[close]] once you are done with it to prevent memory leaks!
+ *
+ *  This class contains an SMT solver context. This means that ideally, you should create a single solver, and make many
+ *  queries to it. Queries can be either BASIL [[Expr]]s of type [[BoolType]] or [[Predicate]]s. Alternatively one can
+ *  pass a string representation of an SMT2 query using [[smt2Sat]].
+ *
+ *  A solver wide default timeout can optionally be given with the [[defaultTimeoutMillis]] variable, but this can be
+ *  overwritten by calling [[sat]] with an additional parameter.
  */
-class SMTSolver(var timeoutMillis: Option[Int] = None) {
-  def this(timeoutMillis: Int) = this(Some(timeoutMillis))
+class SMTSolver(var defaultTimeoutMillis: Option[Int] = None) {
+
+  /** Create solver with timeout
+   *
+   *  @param defaultTimeoutMillis milliseconds of timeout
+   */
+  def this(defaultTimeoutMillis: Int) = this(Some(defaultTimeoutMillis))
 
   val shutdownManager = ShutdownManager.create()
 
@@ -32,7 +52,7 @@ class SMTSolver(var timeoutMillis: Option[Int] = None) {
 
   val formulaConverter = FormulaConverter(solverContext.getFormulaManager())
 
-  def sat(f: BooleanFormula): SatResult = {
+  private def sat(f: BooleanFormula, timeoutMillis: Option[Int]): SatResult = {
     // To handle timeouts, we must create a thread that sends a shutdown request after an amount of milliseconds
     val thread = timeoutMillis.map(m => {
       new Thread(new Runnable() {
@@ -62,20 +82,37 @@ class SMTSolver(var timeoutMillis: Option[Int] = None) {
     }
   }
 
+  /** Run solver on a [[Predicate]] */
   def sat(p: Predicate): SatResult = {
-    sat(formulaConverter.convertPredicate(p))
+    sat(formulaConverter.convertPredicate(p), defaultTimeoutMillis)
   }
 
+  /** Run solver on a [[Predicate]] with a custom timeout */
+  def sat(p: Predicate, timeoutMillis: Int): SatResult = {
+    sat(formulaConverter.convertPredicate(p), Some(timeoutMillis))
+  }
+
+  /** Run solver on a boolean typed BASIL [[Expr]] */
   def sat(p: Expr): SatResult = {
-    sat(formulaConverter.convertBoolExpr(p))
+    sat(formulaConverter.convertBoolExpr(p), defaultTimeoutMillis)
   }
 
-  /** Run the solver on a predicate given as an SMT2 string
-   */
+  /** Run solver on a boolean typed BASIL [[Expr]] with a custom timeout */
+  def sat(p: Expr, timeoutMillis: Int): SatResult = {
+    sat(formulaConverter.convertBoolExpr(p), Some(timeoutMillis))
+  }
+
+  /** Run solver on a predicate given as an SMT2 string */
   def smt2Sat(s: String): SatResult = {
-    sat(solverContext.getFormulaManager().parse(s))
+    sat(solverContext.getFormulaManager().parse(s), defaultTimeoutMillis)
   }
 
+  /** Run solver on a predicate given as an SMT2 string with a custom timeout */
+  def smt2Sat(s: String, timeoutMillis: Int): SatResult = {
+    sat(solverContext.getFormulaManager().parse(s), Some(timeoutMillis))
+  }
+
+  /** Close the solver to prevent a memory leak when done. */
   def close() = {
     solverContext.close()
   }
@@ -198,7 +235,7 @@ class FormulaConverter(formulaManager: FormulaManager) {
     assert(e.getType.isInstanceOf[BitVecType])
     e match {
       case BitVecLiteral(value, size) => bitvectorFormulaManager.makeBitvector(size, value.bigInteger)
-      case Extract(end, start, arg) => bitvectorFormulaManager.extract(convertBVExpr(arg), end, start)
+      case Extract(end, start, arg) => bitvectorFormulaManager.extract(convertBVExpr(arg), end-1, start)
       case Repeat(repeats, arg) => {
         val x = convertBVExpr(arg)
         (1 until repeats).foldLeft(x)((f, _) => bitvectorFormulaManager.concat(f, x))
@@ -239,7 +276,7 @@ class FormulaConverter(formulaManager: FormulaManager) {
       case OldVar(v) => convertBVVar(v.irType, s"old(${v.name})")
       case Uop(op, x) => convertBVUnOp(op, convertBVTerm(x))
       case Bop(op, x, y) => convertBVBinOp(op, convertBVTerm(x), convertBVTerm(y))
-      case Extract(end, start, body) => bitvectorFormulaManager.extract(convertBVTerm(body), end, start)
+      case Extract(end, start, body) => bitvectorFormulaManager.extract(convertBVTerm(body), end-1, start)
       case Repeat(repeats, body) => {
         val x = convertBVTerm(body)
         (1 until repeats).foldLeft(x)((f, _) => bitvectorFormulaManager.concat(f, x))
