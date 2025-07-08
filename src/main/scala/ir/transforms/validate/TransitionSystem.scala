@@ -1,0 +1,223 @@
+package ir.transforms.validate
+import analysis.Loop
+import analysis.ProcFrames.*
+import ir.*
+import ir.dsl.IRToDSL
+
+import scala.collection.mutable
+
+object PCMan {
+  val assumptionFailLabel = "ASSUMEFAIL"
+
+  val allocatedPCS = mutable.Map[String, BitVecLiteral]()
+  var pcCounter = 0
+  def PCSym(s: String) = {
+    allocatedPCS.getOrElseUpdate(
+      s, {
+        pcCounter += 1
+        BitVecLiteral(pcCounter, 64)
+      }
+    )
+  }
+
+  def setPCLabel(label: String) = {
+    val pcVar = TransitionSystem.programCounterVar
+    LocalAssign(pcVar, PCSym(label), Some(label))
+  }
+
+  def pcGuard(label: String) = {
+    val pcVar = TransitionSystem.programCounterVar
+    Assume(BinaryExpr(EQ, pcVar, PCSym(label)), Some(s"PC = $label"))
+  }
+}
+
+object TransitionSystem {
+
+  import PCMan.*
+
+  val traceType = BoolType
+  val programCounterVar = GlobalVar("SYNTH_PC", BitVecType(64))
+  val traceVar = GlobalVar("TRACE", traceType)
+
+  def procToTransition(p: Procedure, loops: List[Loop], frames: Map[Procedure, Frame], cutJoins: Boolean = false) = {
+
+    val pcVar = programCounterVar
+    var cutPoints = Map[String, Block]()
+
+    val synthEntryJump = GoTo(Seq())
+    val synthEntry = Block(s"${p.name}_SYNTH_ENTRY", None, Seq(), synthEntryJump)
+    val synthExit = Block(s"${p.name}_SYNTH_EXIT", None, Seq())
+
+    cutPoints = cutPoints.updated("EXIT", synthExit)
+
+    p.addBlocks(Seq(synthEntry, synthExit))
+
+    p.entryBlock.foreach(e => {
+      e.statements.prepend(pcGuard("ENTRY"))
+      synthEntryJump.addTarget(e)
+      cutPoints = cutPoints.updated("ENTRY", e)
+    })
+
+    var returnEdgeCount = 0
+    p.returnBlock.foreach(e => {
+      e.jump match {
+        case r: Return => {
+          val outAssigns = r.outParams.map((formal, actual) => {
+            val l = LocalAssign(formal, actual)
+            l.comment = Some("synth return param")
+            l
+          })
+
+          e.replaceJump(GoTo(synthExit))
+          e.statements.append(setPCLabel("RETURN"))
+          e.statements.appendAll(outAssigns)
+
+          val nb = e.createBlockBetween(synthExit, "returnblocknew")
+          cutPoints = cutPoints.updated("RETURN", nb)
+
+        }
+        case _ => ???
+      }
+
+    })
+
+    p.entryBlock = synthEntry
+    p.returnBlock = synthExit
+
+    var loopCount = 0
+
+    for (l <- loops.filter(l => p.blocks.contains(l.header))) {
+      var loopBECount = 0
+      loopCount += 1
+
+      val backedges = l.backEdges.toList.sortBy(e => s"${e.from.label}_${e.to.label}")
+      val label = s"Loop${loopCount}"
+      synthEntryJump.addTarget(l.header)
+
+      val nb = synthEntry.createBlockBetween(l.header, "cut_join_to_" + label)
+      nb.statements.prepend(pcGuard(label))
+
+      cutPoints = cutPoints.updated(label, nb)
+      for (backedge <- backedges) {
+        assert(l.header == backedge.to)
+        backedge.from.statements.append(LocalAssign(pcVar, PCSym(label), Some(label)))
+        backedge.from.replaceJump(GoTo(synthExit))
+      }
+    }
+
+    var joinCount = 0
+    if (cutJoins) {
+
+      val cuts = p.blocks
+        .filter(c =>
+          c.prevBlocks.size > 1
+            && c.prevBlocks.flatMap(_.nextBlocks).forall(_ == c)
+            && !p.returnBlock.contains(c)
+            && !p.entryBlock.contains(c)
+        )
+        .toList
+        .sortBy(_.label)
+
+      for (c <- cuts) {
+        var incCount = 1
+        joinCount = joinCount + 1
+        val label = s"Join${joinCount}"
+        cutPoints = cutPoints.updated(label, c)
+
+        for (incoming <- c.prevBlocks) {
+          incoming.statements.append(LocalAssign(pcVar, PCSym(label), Some(label)))
+          incoming.replaceJump(GoTo(synthExit))
+        }
+
+        synthEntryJump.addTarget(c)
+        val nb = synthEntry.createBlockBetween(c, "cut_join_to_" + label)
+        nb.statements.prepend(pcGuard(label))
+
+      }
+    }
+
+    var once = true
+    for (s <- p) {
+      s match {
+        case u: Unreachable if u.parent != synthExit => {
+          u.parent.statements.append(PCMan.setPCLabel(PCMan.assumptionFailLabel))
+          u.parent.replaceJump(GoTo(synthExit))
+        }
+        case g: GoTo if g.targets.isEmpty => {
+          g.parent.statements.append(PCMan.setPCLabel(PCMan.assumptionFailLabel))
+          g.parent.replaceJump(GoTo(synthExit))
+        }
+        case _ => ()
+      }
+
+    }
+    synthExit.replaceJump(Return())
+    cutPoints
+
+  }
+
+  /**
+  * Converts each procedure to a transition system
+  */
+  def toTransitionSystem(iprogram: Program, frames: Map[Procedure, Frame]) = {
+
+    val program = IRToDSL.convertProgram(iprogram).resolve
+
+    val loops = analysis.LoopDetector.identify_loops(program)
+    val floops = loops.identifiedLoops.toList.sortBy(_.header.label)
+
+    val cutPoints = program.procedures
+      .map(p => {
+        p -> procToTransition(p, floops, frames)
+      })
+      .toMap
+
+    (program, cutPoints)
+  }
+
+  /**
+  * Convert asserts in program to a jump to exit with a specific PC set.
+  */
+  def totaliseAsserts(proc: Procedure) = {
+    AssertsToPC(proc.returnBlock.get).transform(proc)
+  }
+
+  private class AssertsToPC(val exitBl: Block) {
+
+    var count = 0
+
+    def transform(p: Procedure): Unit = {
+      val asserts = p.collect { case a: Assert =>
+        a
+      }
+
+      transform(asserts)
+    }
+
+    def transform(s: Iterable[Assert]): Unit = {
+      for (stmt <- s) {
+        count += 1
+        val label = s"assert$count"
+
+        val bl = stmt.parent
+        val successor = bl.splitAfterStatement(stmt, label + "Pass")
+        // bl ends in Assert
+        // successor is rest of block
+
+        bl.statements.remove(stmt)
+        successor.statements.prepend(Assume(stmt.body, Some("assertpass")))
+
+        val falseBranch = Block(
+          bl.label + label + "Fail",
+          None,
+          Seq(Assume(UnaryExpr(BoolNOT, stmt.body)), PCMan.setPCLabel(PCMan.assumptionFailLabel)),
+          GoTo(Seq(exitBl))
+        )
+
+        bl.parent.addBlock(falseBranch)
+
+        bl.jump.asInstanceOf[GoTo].addTarget(falseBranch)
+      }
+    }
+  }
+}
