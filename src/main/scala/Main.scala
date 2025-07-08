@@ -233,8 +233,8 @@ object Main {
     memoryTransform: Flag,
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
     noif: Flag,
-    @arg(name = "nodebug", doc = "Disable runtume debug assertions")
-    nodebug: Flag
+    @arg(name = "nodebug", doc = "Disable runtime debug assertions")
+    noDebug: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -357,8 +357,8 @@ object Main {
       throw IllegalArgumentException("BAP ADT input requires --relf")
     }
 
-    if (conf.nodebug.value) {
-      util.assertion.disableAssertions == true
+    if (conf.noDebug.value) {
+      util.assertion.disableAssertions = true
     }
 
     val q = BASILConfig(
