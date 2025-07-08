@@ -57,8 +57,8 @@ Decl_Proc . Decl ::= "proc" ProcIdent "(" [Params] ")" "->" "(" [Params] ")" Att
 ProcDef_Empty . ProcDef ::= "";
 ProcDef_Some  . ProcDef ::= BeginList [Block] EndList ;
 
-IntType1 . IntType ::= "int" ;
-BoolType1. BoolType ::= "bool" ;
+IntType1 . IntType ::= INTTYPE ;
+BoolType1. BoolType ::= BOOLTYPE ;
 MapType1 . MapType ::=  "(" Type "->" Type ")";
 BVType1 . BVType ::= BVTYPE ;
 
