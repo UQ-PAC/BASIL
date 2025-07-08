@@ -43,16 +43,16 @@ class SMTSolver(var timeoutMillis: Option[Int] = None) {
       })
     })
 
+    val env = solverContext.newProverEnvironment()
     try {
-      val env = solverContext.newProverEnvironment()
       env.push(f)
       thread.map(_.start)
       val res = if env.isUnsat() then SatResult.UNSAT else SatResult.SAT
-      env.close()
       res
     } catch { _ =>
       SatResult.Unknown("")
     } finally {
+      env.close()
       thread.map(t => {
         t.interrupt()
         t.join()
