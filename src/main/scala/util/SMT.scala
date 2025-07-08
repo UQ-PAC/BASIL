@@ -120,7 +120,12 @@ class FormulaConverter(formulaManager: FormulaManager) {
       case BVNOR => bitvectorFormulaManager.not(bitvectorFormulaManager.or(a, b))
       case BVXOR => bitvectorFormulaManager.xor(a, b)
       case BVXNOR => bitvectorFormulaManager.not(bitvectorFormulaManager.xor(a, b))
-      case BVCOMP => ???
+      case BVCOMP =>
+        booleanFormulaManager.ifThenElse(
+          bitvectorFormulaManager.equal(a, b),
+          bitvectorFormulaManager.makeBitvector(1, 1),
+          bitvectorFormulaManager.makeBitvector(1, 0)
+        )
       case BVSUB => bitvectorFormulaManager.subtract(a, b)
       case BVSDIV => bitvectorFormulaManager.divide(a, b, true)
       case BVSREM => bitvectorFormulaManager.remainder(a, b, true)
@@ -177,7 +182,7 @@ class FormulaConverter(formulaManager: FormulaManager) {
           case op: BoolUnOp =>
             op match {
               case BoolNOT => booleanFormulaManager.not(convertBoolExpr(arg))
-              case BoolToBV1 => ???
+              case BoolToBV1 => throw Exception("Attempt to convert a bitvector expression to a bool formula")
             }
           case _ => ???
         }
@@ -192,7 +197,10 @@ class FormulaConverter(formulaManager: FormulaManager) {
     e match {
       case BitVecLiteral(value, size) => bitvectorFormulaManager.makeBitvector(size, value.bigInteger)
       case Extract(end, start, arg) => bitvectorFormulaManager.extract(convertBVExpr(arg), end, start)
-      case Repeat(repeats, arg) => ???
+      case Repeat(repeats, arg) => {
+        val x = convertBVExpr(arg)
+        (1 until repeats).foldLeft(x)((f, _) => bitvectorFormulaManager.concat(f, x))
+      }
       case ZeroExtend(bits, arg) => bitvectorFormulaManager.extend(convertBVExpr(arg), bits, false)
       case SignExtend(bits, arg) => bitvectorFormulaManager.extend(convertBVExpr(arg), bits, true)
       case BinaryExpr(op, arg, arg2) =>
@@ -203,7 +211,7 @@ class FormulaConverter(formulaManager: FormulaManager) {
       case UnaryExpr(op, arg) =>
         op match {
           case op: BVUnOp => convertBVUnOp(op, convertBVExpr(arg))
-          case BoolToBV1 => ???
+          case BoolToBV1 => booleanFormulaManager.ifThenElse(convertBoolExpr(arg), bitvectorFormulaManager.makeBitvector(1, 1), bitvectorFormulaManager.makeBitvector(1, 0))
           case _ => throw Exception("Non bitvector operation was attempted to be converted")
         }
       case v: Variable => convertBVVar(v.irType, v.name)
@@ -230,7 +238,10 @@ class FormulaConverter(formulaManager: FormulaManager) {
       case Uop(op, x) => convertBVUnOp(op, convertBVTerm(x))
       case Bop(op, x, y) => convertBVBinOp(op, convertBVTerm(x), convertBVTerm(y))
       case Extract(end, start, body) => bitvectorFormulaManager.extract(convertBVTerm(body), end, start)
-      case Repeat(repeats, body) => ???
+      case Repeat(repeats, body) => {
+        val x = convertBVTerm(body)
+        (1 until repeats).foldLeft(x)((f, _) => bitvectorFormulaManager.concat(f, x))
+      }
       case ZeroExtend(extension, body) => bitvectorFormulaManager.extend(convertBVTerm(body), extension, false)
       case SignExtend(extension, body) => bitvectorFormulaManager.extend(convertBVTerm(body), extension, true)
     }
@@ -245,7 +256,7 @@ class FormulaConverter(formulaManager: FormulaManager) {
       case Uop(op, x) =>
         op match {
           case BoolNOT => booleanFormulaManager.not(convertGammaTerm(x))
-          case BoolToBV1 => ???
+          case BoolToBV1 => throw Exception("Attempt to convert a bitvector expression to a bool formula")
         }
       case Join(s) => booleanFormulaManager.and(s.map(convertGammaTerm(_)).asJava)
     }

@@ -62,8 +62,9 @@ class BitVectorEvalTest extends AnyFunSuite {
     checks.foreach {
       case (l, exp) => {
         test("" + pp_expr(l)) {
-          val q = BasilIRToSMT2.exprUnsat(exp, None, false, false)
-          assert(solver.smt2Satisfiable(q) == SatResult.UNSAT)
+          //val q = BasilIRToSMT2.exprUnsat(exp, None, false, false)
+          //assert(solver.smt2Satisfiable(q) == SatResult.UNSAT)
+          assert(solver.satisfiable(exp) == SatResult.UNSAT)
         }
       }
     }
