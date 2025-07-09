@@ -80,6 +80,7 @@ case object FalseLiteral extends BoolLit {
 
 case class BitVecLiteral(value: BigInt, size: Int) extends Literal with CachedHashCode {
   require(size >= 0)
+  require(value >= 0, "bitvector [[value]] must be positive, negatives are represented by twos-complement interpretation of [[value]]")
   require(value <= getType.maxValue, s"bad value: $value for width $size")
   override def toBoogie: BitVecBLiteral = BitVecBLiteral(value, size)
   override def getType: BitVecType = BitVecType(size)
