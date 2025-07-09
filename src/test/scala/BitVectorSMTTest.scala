@@ -84,7 +84,6 @@ class BitVectorEvalTest
       val q = BasilIRToSMT2.exprUnsat(test, None, false)
       Logger.info("assert: " + test)
       assert(util.z3.checkSATSMT2(q, None, Some(5)) == SatResult.UNSAT)
-      false
     }
   }
 

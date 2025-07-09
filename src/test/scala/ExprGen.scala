@@ -95,10 +95,10 @@ object ExprGen {
   }
 
   def genExpr(size: Option[Int] = None, depthLimit: Int = 10): Gen[Expr] =
-    if (size.exists(_ <= 1) || depthLimit <= 0) then genValue(size) else Gen.oneOf(genBinExp(size, depthLimit - 1), genUnExp(size), genValue(size))
+    if (size.exists(_ <= 1) || depthLimit <= 0) then genValue(size)
+    else Gen.oneOf(genBinExp(size, depthLimit - 1), genUnExp(size), genValue(size))
 
-  def genNonLiteralExpr(size: Option[Int] = None, depthLimit : Int = 3): Gen[Expr] =
+  def genNonLiteralExpr(size: Option[Int] = None, depthLimit: Int = 3): Gen[Expr] =
     if (size.exists(_ <= 1)) then genValue(size) else Gen.oneOf(genBinExp(size, depthLimit), genUnExp(size))
-
 
 }
