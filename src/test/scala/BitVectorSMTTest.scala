@@ -75,7 +75,7 @@ class BitVectorEvalTest
 
   implicit lazy val arbExpr: Arbitrary[Expr] = Arbitrary(for {
     sz <- Gen.oneOf(List(30, 31, 32, 33, 60, 63, 64, 65, 66, 70, 90, 128, 126))
-    e <- ExprGen.genExpr(Some(sz))
+    e <- ExprGen.genNonLiteralExpr(Some(sz))
   } yield (e))
 
   test("interp exprs smt") {
@@ -83,7 +83,8 @@ class BitVectorEvalTest
       val test = BinaryExpr(NEQ, exp, ir.eval.evaluateExpr(exp).get)
       val q = BasilIRToSMT2.exprUnsat(test, None, false)
       Logger.info("assert: " + test)
-      util.z3.checkSATSMT2(q, Some(30000)) == SatResult.UNSAT
+      assert(util.z3.checkSATSMT2(q, None, Some(5)) == SatResult.UNSAT)
+      false
     }
   }
 

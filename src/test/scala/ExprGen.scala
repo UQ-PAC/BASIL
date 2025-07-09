@@ -53,14 +53,14 @@ object ExprGen {
         op <- Gen.oneOf(ZeroExtend(amount, v), SignExtend(amount, v), BinaryExpr(BVCONCAT, v, vv))
       } yield (op)
 
-  def genBinComp() = for {
+  def genBinComp(depthLimit: Int) = for {
     op <- arbBinComp
     genSize <- Gen.chooseNum(1, 70)
-    l <- genExpr(Some(genSize))
-    r <- genExpr(Some(genSize))
+    l <- genExpr(Some(genSize), depthLimit)
+    r <- genExpr(Some(genSize), depthLimit)
   } yield (BinaryExpr(op, l, r))
 
-  def genBinExp(givenSize: Option[Int] = None): Gen[Expr] = {
+  def genBinExp(givenSize: Option[Int] = None, depthLimit: Int): Gen[Expr] = {
     def genBV(min: BigInt, max: BigInt, size: Int) = for {
       v <- Gen.chooseNum(min, max)
     } yield BitVecLiteral(v, size)
@@ -78,9 +78,9 @@ object ExprGen {
         case BVSHL => genBV(BigInt(0), smallMax, size)
         case BVLSHR => genBV(BigInt(0), smallMax, size)
         case BVASHR => genBV(BigInt(0), smallMax, size)
-        case _ => genExpr(Some(size))
+        case _ => genExpr(Some(size), depthLimit)
       }
-      lhs <- genExpr(Some(size))
+      lhs <- genExpr(Some(size), depthLimit)
       expr = BinaryExpr(op, lhs, rhs)
       nexpr <- expr.getType match {
         case BoolType if size != 1 =>
@@ -94,7 +94,11 @@ object ExprGen {
     } yield nexpr
   }
 
-  def genExpr(size: Option[Int] = None): Gen[Expr] =
-    if (size.exists(_ <= 1)) then genValue(size) else Gen.oneOf(genBinExp(size), genUnExp(size), genValue(size))
+  def genExpr(size: Option[Int] = None, depthLimit: Int = 10): Gen[Expr] =
+    if (size.exists(_ <= 1) || depthLimit <= 0) then genValue(size) else Gen.oneOf(genBinExp(size, depthLimit - 1), genUnExp(size), genValue(size))
+
+  def genNonLiteralExpr(size: Option[Int] = None, depthLimit : Int = 3): Gen[Expr] =
+    if (size.exists(_ <= 1)) then genValue(size) else Gen.oneOf(genBinExp(size, depthLimit), genUnExp(size))
+
 
 }

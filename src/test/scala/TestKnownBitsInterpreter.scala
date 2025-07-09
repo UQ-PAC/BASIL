@@ -168,7 +168,7 @@ class TestKnownBitsInterpreter
 
   implicit lazy val arbExpr: Arbitrary[Expr] = Arbitrary(for {
     sz <- Gen.chooseNum(0, 70)
-    e <- ExprGen.genExpr(Some(sz))
+    e <- ExprGen.genNonLiteralExpr(Some(sz))
   } yield (e))
 
   def evaluateAbstract(e: Expr): TNum = TNumDomain().evaluateExprToTNum(Map(), e)
