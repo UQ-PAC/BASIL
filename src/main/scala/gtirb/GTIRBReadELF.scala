@@ -83,7 +83,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
       ELFNDX.Section(i)
   }
 
-  def parseRela(kind: R_AARCH64_JUMP_SLOT.type | R_AARCH64_GLOB_DAT.type, rela: Elf64Rela): ExternalFunction =
+  def parseRelaExtFunc(rela: Elf64Rela): ExternalFunction =
     val sym = gtirb.getDynSym(rela.r_sym.toInt).get
     ExternalFunction(sym.name, rela.r_offset)
 
@@ -152,7 +152,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
       .withDefaultValue(Nil)
 
     val offs = relas(R_AARCH64_RELATIVE).map(parseRela(R_AARCH64_RELATIVE, _))
-    val exts = (relas(R_AARCH64_GLOB_DAT) ++ relas(R_AARCH64_JUMP_SLOT)).map(parseRela(R_AARCH64_JUMP_SLOT, _))
+    val exts = (relas(R_AARCH64_GLOB_DAT) ++ relas(R_AARCH64_JUMP_SLOT)).map(parseRelaExtFunc(_))
 
     (offs.toMap, exts.toSet)
   }
