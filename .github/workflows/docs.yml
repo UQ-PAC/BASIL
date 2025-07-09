@@ -22,10 +22,36 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
       - run: sudo apt-get -y install latexmk texlive-latex-recommended texlive-lang-japanese texlive-latex-extra texlive-extra-utils poppler-utils
-      - run: ./mill --no-server allDocs
+      - run: |
+          ./mill --no-server allDocs
+          echo "dir=$(realpath out/allDocs.dest)" >> "$GITHUB_OUTPUT"
+        id: allDocs
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: out/allDocs.dest
+          path: ${{ steps.allDocs.outputs.dir }}
+
+      - run: npm i http-server
+      - run: node_modules/.bin/http-server . -d false & # -d false means no directory listing
+        working-directory: ${{ steps.allDocs.outputs.dir }}
+
+      - uses: lycheeverse/lychee-action@v2
+        working-directory: ${{ steps.allDocs.outputs.dir }}
+        with:
+          args: >
+            api --fallback-extensions html,htm --remap "file://${{ steps.allDocs.outputs.dir }} http://127.0.0.1:8080" --remap 'https://uq-pac.github.io/BASIL http://127.0.0.1:8080'
+          fail: true
+          failIfEmpty: true
+          jobSummary: true
+
+      - uses: lycheeverse/lychee-action@v2
+        working-directory: ${{ steps.allDocs.outputs.dir }}
+        with:
+          args: >
+            . --fallback-extensions html,htm --remap "file://${{ steps.allDocs.outputs.dir }} http://127.0.0.1:8080" --remap 'https://uq-pac.github.io/BASIL http://127.0.0.1:8080'
+          fail: false
+          failIfEmpty: true
+          jobSummary: true
 
   deploy-docs:
     if: github.ref_name == 'main'
