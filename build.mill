@@ -70,7 +70,6 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     override def scalafixConfig = build.scalafixConfig
 
     def forkArgs = Task {
-      // This shouldn't be overwritten!!!
       super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}")
     }
 
@@ -230,9 +229,7 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     }
   }
 
-  object z3 extends Z3Module {
-    //
-  }
+  object z3 extends Z3Module
 
   def ctagsConfig = Task.Source {
     Task.workspace / "basilmill" / "scala.ctags"
