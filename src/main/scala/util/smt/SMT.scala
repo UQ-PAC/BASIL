@@ -12,6 +12,7 @@ import scala.jdk.CollectionConverters.SetHasAsJava
 
 // TODO
 // support moving up and down a proof context stack
+// support other solvers
 
 /** The result of an SMT query */
 enum SatResult {

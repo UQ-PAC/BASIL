@@ -6,12 +6,16 @@ import javalib._
 trait Z3Module extends CoursierModule {
   val arch = System.getProperty("os.arch") match {
     case "amd64" => "x64"
-    case _ => ???
+    case "x86" => "x64"
+    case "aarch64" => "arm64"
+    case _ => "unknown"
   }
 
   val soType = System.getProperty("os.name") match {
     case "Linux" => "so"
-    case _ => ???
+    case m if w.startsWith("Mac OS") => "dylib"
+    case w if w.startsWith("Windows") => "dll"
+    case _ => "unknown"
   }
 
   val sources = List("libz3", "libz3java")
@@ -23,18 +27,23 @@ trait Z3Module extends CoursierModule {
   def install: T[String] = Task {
     val resolver = millResolver()
 
-    sources.map(source => {
-      val dep = Dep.parse(s"org.sosy-lab:javasmt-solver-z3:4.14.0;classifier=$source-$arch;type=$soType")
+    sources.flatMap(source => {
+      try {
+        val dep = Dep.parse(s"org.sosy-lab:javasmt-solver-z3:4.14.0;classifier=$source-$arch;type=$soType")
 
-      val path = resolver.classpath(Seq(dep), artifactTypes = Some(artifactTypes())).head.path
-      val dir = path / ".."
-      val newPath = dir / s"$source.$soType"
+        val path = resolver.classpath(Seq(dep), artifactTypes = Some(artifactTypes())).head.path
+        val dir = path / ".."
+        val newPath = dir / s"$source.$soType"
 
-      if (!os.exists(newPath)) {
-        os.copy(path, newPath)
-      }
+        if (!os.exists(newPath)) {
+          os.copy(path, newPath)
+        }
 
-      dir.toString
+        Some(dir.toString)
+      } catch { e => {
+        println(s"Failed to obtain source $source (arch=$arch, soType=$soType)")
+        None
+      }}
     }).distinct.mkString(":")
   }
 }
