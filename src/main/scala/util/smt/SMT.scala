@@ -6,7 +6,7 @@ import org.sosy_lab.common.ShutdownManager
 import org.sosy_lab.common.configuration.Configuration
 import org.sosy_lab.common.log.LogManager
 import org.sosy_lab.java_smt.SolverContextFactory
-import org.sosy_lab.java_smt.api.{BitvectorFormula, BooleanFormula, FormulaManager, Model, SolverContext}
+import org.sosy_lab.java_smt.api.{BitvectorFormula, BooleanFormula, FormulaManager, SolverContext}
 
 import scala.jdk.CollectionConverters.SetHasAsJava
 
@@ -77,7 +77,7 @@ class SMTSolver(var defaultTimeoutMillis: Option[Int] = None) {
         if env.isUnsat() then SatResult.UNSAT
         else
           SatResult.SAT(obtainModel match {
-            case true => Some(env.getModel)
+            case true => Some(Model(env.getModel))
             case false => None
           })
       res
