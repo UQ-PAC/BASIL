@@ -36,19 +36,17 @@ jobs:
         working-directory: ${{ steps.allDocs.outputs.dir }}
 
       - uses: lycheeverse/lychee-action@v2
-        working-directory: ${{ steps.allDocs.outputs.dir }}
         with:
           args: >
-            api --fallback-extensions html,htm --remap "file://${{ steps.allDocs.outputs.dir }} http://127.0.0.1:8080" --remap 'https://uq-pac.github.io/BASIL http://127.0.0.1:8080'
+            ${{ steps.allDocs.outputs.dir }}/api --fallback-extensions html,htm --remap "file://${{ steps.allDocs.outputs.dir }} http://127.0.0.1:8080" --remap 'https://uq-pac.github.io/BASIL http://127.0.0.1:8080'
           fail: true
           failIfEmpty: true
           jobSummary: true
 
       - uses: lycheeverse/lychee-action@v2
-        working-directory: ${{ steps.allDocs.outputs.dir }}
         with:
           args: >
-            . --fallback-extensions html,htm --remap "file://${{ steps.allDocs.outputs.dir }} http://127.0.0.1:8080" --remap 'https://uq-pac.github.io/BASIL http://127.0.0.1:8080'
+            ${{ steps.allDocs.outputs.dir }} --fallback-extensions html,htm --remap "file://${{ steps.allDocs.outputs.dir }} http://127.0.0.1:8080" --remap 'https://uq-pac.github.io/BASIL http://127.0.0.1:8080'
           fail: false
           failIfEmpty: true
           jobSummary: true
