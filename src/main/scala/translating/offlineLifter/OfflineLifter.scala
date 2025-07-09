@@ -126,7 +126,7 @@ object Lifter {
         try {
           val lift = StmtListLifter()
           lift.builder.pcValue = sp
-          f_A64_decoder[Expr, Int, BitVecLiteral](lift, BitVecLiteral(BigInt(op), 32), BitVecLiteral(sp, 64))
+          f_A64_decoder[Expr, Int, BitVecLiteral](lift, BitVecLiteral(op), BitVecLiteral(sp, 64))
           lift.extract.toSeq
         } catch {
           case e => {

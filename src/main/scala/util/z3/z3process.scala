@@ -8,9 +8,17 @@ enum SatResult {
   case Unknown(s: String, errors: List[String])
 }
 
-def checkSATSMT2(smt: String, softTimeoutMillis: Option[Int] = None): SatResult = {
+def checkSATSMT2(smt: String, softTimeoutMillis: Option[Int] = None, timeoutSec: Option[Int] = None): SatResult = {
+  val t = timeoutSec match {
+    case Some(n) => Seq(s"-T:$n")
+    case _ => Seq()
+  }
+  val softT = softTimeoutMillis match {
+    case Some(n) => Seq(s"-t:$n")
+    case None => Seq()
+  }
   val cmd =
-    Seq("z3", "-smt2", "-in") ++ (if softTimeoutMillis.isDefined then Seq(s"-t:${softTimeoutMillis.get}") else Seq())
+    Seq("z3", "-smt2", "-in") ++ t ++ softT
   val output = (cmd #< ByteArrayInputStream(smt.getBytes("UTF-8"))).!!
   val errors = output.split("\n").filter(_.trim.startsWith("(error")).toList
   val outputStripped = output.stripLineEnd
