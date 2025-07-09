@@ -13,7 +13,7 @@ trait Z3Module extends CoursierModule {
 
   val soType = System.getProperty("os.name") match {
     case "Linux" => "so"
-    case m if w.startsWith("Mac OS") => "dylib"
+    case m if m.startsWith("Mac OS") => "dylib"
     case w if w.startsWith("Windows") => "dll"
     case _ => "unknown"
   }
