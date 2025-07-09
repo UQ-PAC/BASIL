@@ -1,6 +1,8 @@
 package specification
 
 import boogie.*
+import ir.*
+import ir.dsl.given
 
 trait SymbolTableEntry {
   val name: String
@@ -9,7 +11,7 @@ trait SymbolTableEntry {
 }
 
 case class FuncEntry(override val name: String, override val size: Int, override val address: BigInt)
-    extends SymbolTableEntry
+    extends SymbolTableEntry derives ir.dsl.ToScala
 
 case class Specification(
   funcs: Set[FuncEntry],
@@ -52,4 +54,4 @@ case class SubroutineSpec(
   }
 }
 
-case class ExternalFunction(name: String, offset: BigInt)
+case class ExternalFunction(name: String, offset: BigInt) derives ir.dsl.ToScala
