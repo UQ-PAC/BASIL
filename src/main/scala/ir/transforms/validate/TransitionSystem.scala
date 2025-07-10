@@ -31,6 +31,8 @@ object PCMan {
   }
 }
 
+case class CutPointMap(cutLabelBlockInTr: Map[String, Block], cutLabelBlockInProcedure: Map[String, Block])
+
 object TransitionSystem {
 
   import PCMan.*
@@ -42,7 +44,12 @@ object TransitionSystem {
   def procToTransition(p: Procedure, loops: List[Loop], frames: Map[Procedure, Frame], cutJoins: Boolean = false) = {
 
     val pcVar = programCounterVar
+
+    // cut point in transition system program
     var cutPoints = Map[String, Block]()
+
+    // cut point block in original program
+    var cutPointRealBlockBegin = Map[String, Block]()
 
     val synthEntryJump = GoTo(Seq())
     val synthEntry = Block(s"${p.name}_SYNTH_ENTRY", None, Seq(), synthEntryJump)
@@ -56,6 +63,7 @@ object TransitionSystem {
       e.statements.prepend(pcGuard("ENTRY"))
       synthEntryJump.addTarget(e)
       cutPoints = cutPoints.updated("ENTRY", e)
+      cutPointRealBlockBegin = cutPointRealBlockBegin.updated("ENTRY", e)
     })
 
     var returnEdgeCount = 0
@@ -74,6 +82,7 @@ object TransitionSystem {
 
           val nb = e.createBlockBetween(synthExit, "returnblocknew")
           cutPoints = cutPoints.updated("RETURN", nb)
+          cutPointRealBlockBegin = cutPointRealBlockBegin.updated("RETURN", nb)
 
         }
         case _ => ???
@@ -98,6 +107,7 @@ object TransitionSystem {
       nb.statements.prepend(pcGuard(label))
 
       cutPoints = cutPoints.updated(label, nb)
+      cutPointRealBlockBegin = cutPointRealBlockBegin.updated(label, l.header)
       for (backedge <- backedges) {
         assert(l.header == backedge.to)
         backedge.from.statements.append(LocalAssign(pcVar, PCSym(label), Some(label)))
@@ -152,7 +162,7 @@ object TransitionSystem {
 
     }
     synthExit.replaceJump(Return())
-    cutPoints
+    CutPointMap(cutPoints, cutPointRealBlockBegin)
 
   }
 

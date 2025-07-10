@@ -29,7 +29,10 @@ def dynamicSingleAssignment(p: Program) = {
     case g => Some(g)
   }
 
-  def targetToSource(b: Option[String])(v: Variable | Global): Option[Expr | Global] = None
+  def targetToSource(b: Option[String])(v: Variable | Global): Option[Expr | Global] = v match {
+    case g: GlobalVar => Some(g)
+    case o => None
+  }
 
   validator.setEqualVarsInvariantRenaming(renamingTgtSrc = targetToSource, renamingSrcTgt = sourceToTarget)
 
@@ -124,13 +127,13 @@ def nop(p: Program) = {
 
 def validatedSimplifyPipeline(p: Program) = {
   transforms.applyRPO(p)
-  nop(p)
-  transforms.applyRPO(p)
   parameters(p)
   transforms.applyRPO(p)
-  simplifyCFG(p)
-  transforms.applyRPO(p)
+  // simplifyCFG(p)
+  // transforms.applyRPO(p)
   dynamicSingleAssignment(p)
+  transforms.applyRPO(p)
+  nop(p)
   transforms.applyRPO(p)
   copyProp(p)
   transforms.applyRPO(p)
