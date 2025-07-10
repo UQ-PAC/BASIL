@@ -12,8 +12,6 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
   val counter: Counter = Counter()
   val memVals = mutable.Map[IntervalCell, String]()
   val revEdges: Map[Procedure, Map[IntervalCell, Set[IntervalCell]]] = Map.empty
-//    dsa.map((proc, graph) => (proc, IntervalDSA.getPointers(graph)))
-  val interProcCells: Map[IntervalCell, Set[IntervalCell]] = Map.empty // computeRelations()
 
   def isGlobal(flag: DSFlag): Boolean = {
     flag.global && !flag.stack && !flag.heap
