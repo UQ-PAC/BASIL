@@ -47,8 +47,10 @@ jobs:
             --no-progress
           fail: false
           failIfEmpty: true
-          jobSummary: true
+          jobSummary: false
       - run: cat lychee/out.md
+      - run: |
+          sed 's|${{ steps.allDocs.outputs.dir }}||g' lychee/out.md > "$GITHUB_STEP_SUMMARY"
 
   deploy-docs:
     if: github.ref_name == 'main'
