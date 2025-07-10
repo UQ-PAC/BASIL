@@ -45,7 +45,6 @@ jobs:
             --exclude '/scala-lang\.org/api/'
             --exclude '#L\d+$'
             --no-progress
-            --verbose
           fail: false
           failIfEmpty: true
           jobSummary: true
