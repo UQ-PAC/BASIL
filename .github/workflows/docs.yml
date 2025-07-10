@@ -31,23 +31,22 @@ jobs:
         with:
           path: ${{ steps.allDocs.outputs.dir }}
 
-      - run: npm i node-static
-      - run: node_modules/.bin/static ${{ steps.allDocs.outputs.dir }} &
-
       - uses: lycheeverse/lychee-action@v2
         with:
-          args: >
-            ${{ steps.allDocs.outputs.dir }}/api --fallback-extensions html,htm --remap "file://${{ steps.allDocs.outputs.dir }} http://127.0.0.1:8080" --remap 'https://uq-pac.github.io/BASIL http://127.0.0.1:8080'
-          fail: true
-          failIfEmpty: true
-          jobSummary: true
-
-      - uses: lycheeverse/lychee-action@v2
-        with:
-          args: >
-            ${{ steps.allDocs.outputs.dir }} --fallback-extensions html,htm --remap "file://${{ steps.allDocs.outputs.dir }} http://127.0.0.1:8080" --remap 'https://uq-pac.github.io/BASIL http://127.0.0.1:8080'
+          # last two --remap arguments will append index.html onto URLs with no extension
+          # NOTE: --remap only actions the /first/ matching regex
+          args: >-
+            ${{ steps.allDocs.outputs.dir }}
+            --fallback-extensions html,htm
+            --root-dir ${{ steps.allDocs.outputs.dir }}
+            --remap 'https://uq-pac.github.io/BASIL file://${{ steps.allDocs.outputs.dir }}'
+            --remap '(\.[a-zA-Z]+)$ $1'
+            --remap '$ $1/index.html'
+            --exclude '/scala-lang\.org/api/'
+            --exclude '#L\d+$'
           fail: false
           failIfEmpty: true
+          jobSummary: true
 
   deploy-docs:
     if: github.ref_name == 'main'
