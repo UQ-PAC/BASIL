@@ -17,10 +17,12 @@ of memory constraints concerning a memory object which can later be completed
 as more information about the context (calling/global context) is discovered.
 This partial processing is done in phases.
 
+The recommended way to use dsa is with flags `--simplify --dsa= --dsa-split --dsa-checks`
+
 ### Symbolic Value Analysis
 The pre-pass for dsa is made up of two components.
 1. `SymbolicValueAnalysis` which is an
-   intraprocedural value analysis where DSA (Dynamic Single Assign) variable corresponds to a value that is represented using a
+   intraprocedural value analysis where a DSA (Dynamic Single Assign) variable corresponds to a value that is represented using a
    symbolic base and some offset.
 
 2. `data_structue_analysis.generateConstraints` which generates
@@ -61,6 +63,9 @@ the top-down phase. Other options include `pre|local|bu` where `pre` only perfor
 constraint generation. And `local` and `bu` perform only the corresponding phases in the dsa
 (e.g `bu` will do prepass, local and bottom-up phase but not the top-down phase).
 
+The flag `--dsa-checks` can be used to enable additional runtime checks for DSA. These checks include 
+checking that all `MemoryConstraints` have been maintained after each phase and that all expressions 
+have a unique corresponding Node/Cell in each data structure graph. 
 
 DSA includes the ability to use the symbol table entries to split the global memory.
 By default, all global variables are represented using a single data structure node. That is if the program
@@ -73,10 +78,10 @@ The analysis won't be able to determine which field is accessed and hence has to
 and treat them as one. This loss of field-sensitivity is extra costly if all global variables are fields of a node
 and hence lose sensitivity when it is collapsed.
 Instead, DSA could be configured to use the symbol table entries to split the globals into many nodes.
-This can be enabled via the `--split-globals` flag.
+This can be enabled via the `--dsa-split` flag.
 
 
-Below is an example program to demonstrate the effects of `--split-globals`
+Below is an example program to demonstrate the effects of `--dsa-split`
 
 ```C
 static int array[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
@@ -89,16 +94,16 @@ int main(int r) {
 }
 ```
 
-The DSG for procedure main **without** `--split-globals`:
+The DSG for procedure main **without** `--dsa-split`:
 ![](../img/dsa/nosplit.png)
 The globals array, x and y are all represented via the same node (Node 236) and because r is indeterminable 
 the node loses field sensitivity and collapses. 
-With `--split-globals` enabled the DSG would be:
+With `--dsa-split` enabled the DSG would be:
 ![](../img/dsa/split.png)
 Now only the node corresponding to array (node 935) is collapsed in the globals. 
 Nodes for x and y (nodes 584 and 585 respectively) maintain field-sensitivity.
 
-Further `dsa-asserts` could be used to insert asserts checking that the index of a memory 
+Further `--dsa-asserts` could be used to insert asserts checking that the index of a memory 
 access falls within the bounds of a node. In the example above, we expect the value of r to fall within 
 0 and 9 inclusive. An accesses beyond this range could access another part of memory (e.g. access variable x)
 and render the result of the analysis unsound. As such, there is the option to insert assertions 
@@ -106,17 +111,17 @@ to bound check the value of r. The appropriate bounds for the globals are
 determined from the symbol table. 
 
 BASIL's dsa also allows for unifying two distinct fields in the same node while maintaining 
-field sensitivity. This option can be enabled by including the flag `--eq-classes`. 
+field sensitivity. This option can be enabled by including the flag `--dsa-eqv`. 
 By default, DSA loses field-sensitivity for nodes which have two distinct fields unified. 
-With `--eq-classes` enabled, DSA allows fields of a node to form equivalence classes. 
+With `--dsa-eqv` enabled, DSA allows fields of a node to form equivalence classes. 
 Fields which belong to an equivalence class can only have a single outgoing edge (single pointee). 
 And any incoming edge to a member of the equivalence classes is treated as an incoming edge to all the members. 
 This can be viewed 
 as a partial loss of field-sensitivity.
 That is a subset of fields in a node may be unified while maintaining field-sensitivity else where in the node.
 
-Below is an example program which demonstrates the effects of `--eq-classes`. Note that 
-the example blow doesn't have `--split-globals` enabled and hence all global variables 
+Below is an example program which demonstrates the effects of `--dsa-eqv`. Note that 
+the example blow doesn't have `--dsa-split` enabled and hence all global variables 
 are represented as fields of a single node.
 
 ```C
@@ -145,7 +150,7 @@ The default DSG for the above program is as follows:
 
 Addresses of x and y are assigned to z in the different branches of the if statement 
 resulting in the collapse of the global node since fields corresponding to x and y are unified. 
-With `eq-classes` enabled the DSG is as follows:
+With `--dsa-eqv` enabled the DSG is as follows:
 
 ![](../img/dsa/eq.png)
 

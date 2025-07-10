@@ -227,10 +227,10 @@ object Main {
     dsaType: Option[String],
     @arg(name = "dsa-checks", doc = "Perform additional dsa checks (requires --dsa (local|bu|td)")
     dsaChecks: Flag,
-    @arg(name = "split-globals", doc = "split the globals for dsa (requires --dsa (pre|local|bu|td)")
+    @arg(name = "dsa-split", doc = "split the globals for dsa (requires --dsa (pre|local|bu|td)")
     dsaSplitGlobals: Flag,
     @arg(
-      name = "eq-cells",
+      name = "dsa-eqv",
       doc = "allow cells from same node to be merged without collapsing (requires --dsa (local|bu|td)"
     )
     dsaEqCells: Flag,
