@@ -1,6 +1,7 @@
 package ir.parsing
 
 import basil_ir.Absyn as syntax
+import ir.Sigil
 
 trait LiteralsBNFCVisitor[A]
     extends syntax.BinOp.Visitor[ir.BinOp, A],
@@ -18,12 +19,22 @@ trait LiteralsBNFCVisitor[A]
       syntax.Value.Visitor[ir.Literal, A],
       TypesBNFCVisitor[A] {
 
+  def unsigilBlock(x: String) = Sigil.unsigil(Sigil.BASIR.block)(x)
+  def unsigilProc(x: String) = Sigil.unsigil(Sigil.BASIR.proc)(x)
+  def unsigilLocal(x: String) =
+    /* keep sigil as it is optional, to preserve var name */
+    x
+  def unsigilGlobal(x: String) = Sigil.unsigil(Sigil.BASIR.globalVar)(x)
+  def unsigilAttrib(x: String) = Sigil.unsigil(Sigil.BASIR.attrib)(x)
+
+  /**
+   * Naive unquoting of double-quoted string. Does not do any
+   * interpretation of escape sequences.
+   */
   def unquote(s: String, x: HasParsePosition) = s match {
     case s"\"$s\"" => s
     case _ => throw ParseException("invalid quoted string", x)
   }
-
-  import scala.language.implicitConversions
 
   // Members declared in BinOp.Visitor
   override def visit(x: syntax.BinOpBVBinOp, arg: A) = x.bvbinop_.accept(this, arg)

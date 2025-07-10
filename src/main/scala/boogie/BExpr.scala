@@ -1,5 +1,6 @@
 package boogie
 import ir.*
+import ir.dsl.given
 import specification.*
 import util.assertion.*
 
@@ -788,7 +789,7 @@ case class SpecGlobal(
   arraySize: Option[Int],
   override val address: BigInt
 ) extends SymbolTableEntry,
-      SpecGlobalOrAccess {
+      SpecGlobalOrAccess derives ir.dsl.ToScala {
   override def specGlobals: Set[SpecGlobalOrAccess] = Set(this)
 
   def sanitisedName = util.StringEscape.escape(name)

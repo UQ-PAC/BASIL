@@ -27,7 +27,20 @@ case class ILLoadingConfig(
   trimEarly: Boolean = false,
   gtirbLiftOffline: Boolean = false,
   pcTracking: PCTrackingOption = PCTrackingOption.None
-)
+) {
+  lazy val frontendMode =
+    if inputFile.endsWith(".gts") then {
+      FrontendMode.Gtirb
+    } else if inputFile.endsWith(".gtirb") then {
+      FrontendMode.Gtirb
+    } else if inputFile.endsWith(".adt") then {
+      FrontendMode.Bap
+    } else if (inputFile.endsWith(".il")) {
+      FrontendMode.Basil
+    } else {
+      throw Exception(s"input file name ${inputFile} must be an .adt, .gts or .gtirb file")
+    }
+}
 
 case class StaticAnalysisConfig(
   dumpILToPath: Option[String] = None,

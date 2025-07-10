@@ -303,16 +303,22 @@ object ToScalaDeriving {
     inline isSingleton: Boolean,
     x: T
   ): Twine =
-    val args: Twine = inline isSingleton match
-      case true => Twine.empty
-      case false =>
-        val elems = x.asInstanceOf[Product].productIterator
-        val args = (instances.iterator zip elems)
-          .map((f, x) => f.asInstanceOf[ToScala[Any]].toScalaLines(x))
-          .toList
-        Twine("(" :: args.intersperse(", ") ::: List(")"))
 
-    Twine(name, args)
+    val (open, close) = inline isSingleton match
+      case true => ("", "")
+      case false => ("(", ")")
+
+    val args =
+      val elems = x.asInstanceOf[Product].productIterator
+      (instances.iterator zip elems)
+        .map((f, x) => f.asInstanceOf[ToScala[Any]].toScalaLines(x))
+        .toList
+
+    if (args.exists(Twine.shallowIsMultiline)) {
+      Twine.indentNested(name + open, args, close)
+    } else {
+      Twine(name + open, Twine(args.intersperse(", ")), close)
+    }
 
   /**
    * Helper class for wrapping a lambda function into a ToScala instance,
