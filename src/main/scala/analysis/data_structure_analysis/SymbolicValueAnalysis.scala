@@ -2,6 +2,7 @@ package analysis.data_structure_analysis
 
 import analysis.data_structure_analysis.OSet.{Top, Values}
 import ir.*
+import ir.cilvisitor.{CILVisitor, DoChildren, SkipChildren, visit_expr}
 import ir.eval.BitVectorEval.bv2SignedInt
 import ir.transforms.{AbstractDomain, worklistSolver}
 import util.assertion.*
@@ -362,7 +363,7 @@ object SymValues {
           .map((base, _) => (base, oDomain.top))
           .toMap
 
-        updated = updated ++ exprToConstants(e)
+        updated = updated ++ getConstants(e)
           .map(litToInt)
           .filter(isGlobal)
           .map(lit => getGlobal(globals, lit))
@@ -386,22 +387,20 @@ def litToInt(lit: Literal): Int = {
   }
 }
 
-def exprToConstants(expr: Expr): Set[Literal] = {
-  expr match {
-    case literal: Literal => Set(literal)
-    case Extract(end, start, body) => exprToConstants(body)
-    case Repeat(repeats, body) => exprToConstants(body)
-    case ZeroExtend(extension, body) => exprToConstants(body)
-    case SignExtend(extension, body) => exprToConstants(body)
-    case UnaryExpr(op, arg) => exprToConstants(arg)
-    case AssocExpr(op, args) => args.flatMap(exprToConstants).toSet
-    case BinaryExpr(op, arg1, arg2) => exprToConstants(arg1) ++ exprToConstants(arg2)
-    case FApplyExpr(name, params, returnType, uninterpreted) => params.flatMap(exprToConstants).toSet
-    case variable: Variable => Set()
-    case LambdaExpr(binds, body) => exprToConstants(body)
-    case QuantifierExpr(kind, body, triggers) => exprToConstants(body)
-    case OldExpr(body) => exprToConstants(body)
+def getConstants(expr: Expr): Set[Literal] = {
+  class GetConstants extends CILVisitor {
+    var constants = Set[Literal]()
+
+    override def vexpr(e: Expr) = e match {
+      case l: Literal =>
+        constants = constants + l
+        SkipChildren()
+      case _ => DoChildren()
+    }
   }
+  val v = GetConstants()
+  visit_expr(v, expr)
+  v.constants
 }
 
 class SymValuesDomain[T <: Offsets](using symValSetDomain: SymValSetDomain[T])(
