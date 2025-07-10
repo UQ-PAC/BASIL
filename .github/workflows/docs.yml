@@ -44,9 +44,12 @@ jobs:
             --remap '$ $1/index.html'
             --exclude '/scala-lang\.org/api/'
             --exclude '#L\d+$'
+            --no-progress
+            --verbose
           fail: false
           failIfEmpty: true
           jobSummary: true
+      - run: cat lychee/out.md
 
   deploy-docs:
     if: github.ref_name == 'main'
