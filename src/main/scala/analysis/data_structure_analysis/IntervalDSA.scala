@@ -1419,10 +1419,10 @@ object IntervalDSA {
 }
 
 object MemoryAccess {
-    def unapply(m: MemoryLoad | MemoryStore) : Some[Expr] = m match { 
-        case m: MemoryLoad => Some(m.index)
-        case m: MemoryStore => Some(m.index)
-    }
+  def unapply(m: MemoryLoad | MemoryStore): Some[Expr] = m match {
+    case m: MemoryLoad => Some(m.index)
+    case m: MemoryStore => Some(m.index)
+  }
 }
 
 class DSFlag {
