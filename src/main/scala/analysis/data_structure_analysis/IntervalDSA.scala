@@ -1256,15 +1256,15 @@ object IntervalDSA {
   def checkMemoryAccesses(ctx: IRContext, DSA: Map[Procedure, IntervalGraph]): Unit = {
     val isglb = (i: Int) => isGlobal(i, ctx)
     ctx.program.foreach {
-      case access: MemoryAccess if DSA.contains(IRWalk.procedure(access)) =>
+      case access @ MemoryAccess(index) if DSA.contains(IRWalk.procedure(access)) =>
         val dsg = DSA(IRWalk.procedure(access))
         debugAssert(
           dsg.constraints.exists(_.source == access),
           s"Memory Access $access from ${dsg.proc.procName} didn't have a corresponding DSA constraint"
         )
-        val pointers = dsg.exprToCells(access.index).map(dsg.find)
+        val pointers = dsg.exprToCells(index).map(dsg.find)
         debugAssert(
-          pointers.nonEmpty || isNonGlobalConstant(access.index, isglb),
+          pointers.nonEmpty || isNonGlobalConstant(index, isglb),
           "Expected cells for indices used in reachable memory access to have corresponding DSA cells"
         )
         debugAssert(pointers.forall(_.hasPointee), "expected all of the pointers to have pointee")
@@ -1416,6 +1416,13 @@ object IntervalDSA {
       case _ => // ignore
     }
   }
+}
+
+object MemoryAccess {
+    def unapply(m: MemoryLoad | MemoryStore) : Some[Expr] = m match { 
+        case m: MemoryLoad => Some(m.index)
+        case m: MemoryStore => Some(m.index)
+    }
 }
 
 class DSFlag {
