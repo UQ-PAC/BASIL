@@ -172,6 +172,11 @@ object Twine {
   def lines(parts: (String | Twine)*) =
     Lines(parts.map(Twine(_)))
 
+  def shallowIsMultiline(tw: Twine) = tw match {
+    case _: Lines | _: Indent => true
+    case _ => false
+  }
+
   /**
   * Indents a nested structure, placing the indented `elems` between `head` and `tail`,
   * and separating them by `sep` and `newline`.

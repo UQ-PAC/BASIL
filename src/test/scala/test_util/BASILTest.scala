@@ -7,7 +7,7 @@ import util.{
   BASILConfig,
   BASILResult,
   BoogieGeneratorConfig,
-  DSAConfig,
+  DSConfig,
   ILLoadingConfig,
   IRContext,
   Logger,
@@ -29,7 +29,7 @@ case class TestConfig(
   logResults: Boolean = false,
   simplify: Boolean = false,
   summariseProcedures: Boolean = false,
-  dsa: Option[DSAConfig] = None,
+  dsa: Option[DSConfig] = None,
   memoryTransform: Boolean = false,
   useOfflineLifterForGtirbFrontend: Boolean = false
 ) {
@@ -49,7 +49,7 @@ trait BASILTest {
     staticAnalysisConf: Option[StaticAnalysisConfig],
     simplify: Boolean = false,
     summariseProcedures: Boolean = false,
-    dsa: Option[DSAConfig] = None,
+    dsa: Option[DSConfig] = None,
     memoryTransform: Boolean = false,
     postLoad: IRContext => Unit = s => (),
     useOfflineLifterForGtirbFrontend: Boolean = false
