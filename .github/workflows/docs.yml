@@ -34,7 +34,7 @@ jobs:
       - uses: lycheeverse/lychee-action@v2
         with:
           # last two --remap arguments will append index.html onto URLs with no extension
-          # NOTE: --remap only actions the /first/ matching regex
+          # NOTE: this relies on --remap only actioning the /first/ matching regex
           args: >-
             ${{ steps.allDocs.outputs.dir }}
             --fallback-extensions html,htm
