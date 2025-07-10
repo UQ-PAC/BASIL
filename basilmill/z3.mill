@@ -40,7 +40,7 @@ trait Z3Module extends CoursierModule {
         }
 
         Some(dir.toString)
-      } catch { e => {
+      } catch { case e => {
         println(s"Failed to obtain source $source (arch=$arch, soType=$soType)")
         None
       }}
