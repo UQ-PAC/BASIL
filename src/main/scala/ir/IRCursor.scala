@@ -182,6 +182,10 @@ trait CallGraph extends IRWalk[Procedure, Procedure] {
 
 object CallGraph extends CallGraph
 
+/** Updates each procedure with its corresponding call graph scc
+ *  if a procedure is the only member in the scc only
+ *  update procedure if there is a self cycle in the procedure
+ */
 def updateWithCallSCC(program: Program): Unit = {
   val sccs = stronglyConnectedComponents(CallGraph, program.procedures)
   for (scc <- sccs) {
@@ -191,9 +195,10 @@ def updateWithCallSCC(program: Program): Unit = {
   }
 }
 
-// Walker over the Call graph SCCs
-// Ignores any edges from the SCC to itself
-// that is the scc will never be a pred or succ of itself
+/** Walker over the Call graph SCCs
+  * Ignores any edges from the SCC to itself
+  * that is the scc will never be a pred or succ of itself
+  */
 object CallSCCWalker extends SCCWalk[Procedure, Procedure] {
   override def succ(scc: Set[Procedure]): Set[Set[Procedure]] = {
     // remove the scc corresponding to b from predecessor  list
