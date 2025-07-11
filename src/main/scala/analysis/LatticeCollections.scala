@@ -2,6 +2,7 @@ package analysis
 
 import ir.*
 import ir.transforms.AbstractDomain
+import util.assertion.*
 
 import scala.annotation.implicitNotFound
 
@@ -28,11 +29,18 @@ class InternalLatticeLattice[L <: InternalLattice[L]](term: L) extends Lattice[L
   override def top: L = term.top
 }
 
+object LatticeSet {
+  def finiteSet[T](s: Set[T]): LatticeSet[T] = if s.isEmpty then LatticeSet.Bottom() else LatticeSet.FiniteSet(s)
+  def diffSet[T](s: Set[T]): LatticeSet[T] = if s.isEmpty then LatticeSet.Top() else LatticeSet.DiffSet(s)
+}
+
 /**
  * An element of a powerset lattice. This type represents Top and Bottom and finite sets, and is closed under
  * unions, intersections, and set difference.
  */
 enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
+  import LatticeSet.{finiteSet, diffSet}
+
   /* The set of all terms of type T */
   case Top[T1]() extends LatticeSet[T1]
   /* The empty set */
@@ -41,6 +49,13 @@ enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
   case FiniteSet[T1](s: Set[T1]) extends LatticeSet[T1]
   /* Represents Top() minus some finite set. */
   case DiffSet[T1](s: Set[T1]) extends LatticeSet[T1]
+
+  // We don't ever want to make empty FiniteSets or DiffSets, they should just be Top or Bottom
+  this match {
+    case FiniteSet(s) => require(s.nonEmpty)
+    case DiffSet(s) => require(s.nonEmpty)
+    case _ => {}
+  }
 
   def contains(v: T): Boolean = {
     this match {
@@ -55,9 +70,9 @@ enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
     (this, other) match {
       case (Top(), _) => Top()
       case (Bottom(), b) => b
-      case (FiniteSet(a), FiniteSet(b)) => FiniteSet(a.union(b))
-      case (FiniteSet(a), DiffSet(b)) => if (b -- a).isEmpty then Bottom() else DiffSet(b -- a)
-      case (DiffSet(a), DiffSet(b)) => DiffSet(a.intersect(b))
+      case (FiniteSet(a), FiniteSet(b)) => finiteSet(a.union(b))
+      case (FiniteSet(a), DiffSet(b)) => diffSet(b -- a)
+      case (DiffSet(a), DiffSet(b)) => diffSet(a.intersect(b))
       case (a, b) => b.join(a)
     }
   }
@@ -66,9 +81,9 @@ enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
     (this, other) match {
       case (Top(), b) => b
       case (Bottom(), _) => Bottom()
-      case (FiniteSet(a), FiniteSet(b)) => FiniteSet(a.intersect(b))
-      case (FiniteSet(a), DiffSet(b)) => FiniteSet(a.filter(x => !b.contains(x)))
-      case (DiffSet(a), DiffSet(b)) => if a.union(b).isEmpty then Bottom() else DiffSet(a.union(b))
+      case (FiniteSet(a), FiniteSet(b)) => finiteSet(a.intersect(b))
+      case (FiniteSet(a), DiffSet(b)) => finiteSet(a.filter(x => !b.contains(x)))
+      case (DiffSet(a), DiffSet(b)) => diffSet(a.union(b))
       case (a, b) => b.meet(a)
     }
   }
@@ -79,11 +94,11 @@ enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
       case (a, Bottom()) => a
       case (Bottom(), _) => Bottom()
       case (Top(), FiniteSet(b)) => DiffSet(b)
-      case (FiniteSet(a), FiniteSet(b)) => FiniteSet(a.diff(b))
-      case (DiffSet(a), FiniteSet(b)) => DiffSet(a.union(b))
+      case (FiniteSet(a), FiniteSet(b)) => finiteSet(a.diff(b))
+      case (DiffSet(a), FiniteSet(b)) => diffSet(a.union(b))
       case (Top(), DiffSet(b)) => FiniteSet(b)
-      case (FiniteSet(a), DiffSet(b)) => FiniteSet(a.intersect(b))
-      case (DiffSet(a), DiffSet(b)) => FiniteSet(b.diff(a))
+      case (FiniteSet(a), DiffSet(b)) => finiteSet(a.intersect(b))
+      case (DiffSet(a), DiffSet(b)) => finiteSet(b.diff(a))
     }
   }
 
@@ -133,6 +148,12 @@ class LatticeSetLattice[T] extends Lattice[LatticeSet[T]] {
   val bottom: LatticeSet[T] = Bottom()
 }
 
+object LatticeMap {
+  def topMap[D, L](m: Map[D, L]): LatticeMap[D, L] = if m.isEmpty then LatticeMap.Top() else LatticeMap.TopMap(m)
+  def bottomMap[D, L](m: Map[D, L]): LatticeMap[D, L] =
+    if m.isEmpty then LatticeMap.Bottom() else LatticeMap.BottomMap(m)
+}
+
 /** A map which defaults to either the top or bottom element of a lattice. This is more efficient to use in static
   * analyses as it is common to default most values in a map to either top or bottom.
   *
@@ -155,6 +176,14 @@ enum LatticeMap[D, L] {
   case TopMap[D1, L1](m: Map[D1, L1]) extends LatticeMap[D1, L1]
   /* A Map which defaults to bottom and is else specified by the internal map */
   case BottomMap[D1, L1](m: Map[D1, L1]) extends LatticeMap[D1, L1]
+
+  // We don't want to have empty TopMaps or BottomMaps. We also don't want to store top in and TopMaps or bottom in any
+  // BottomMaps, but we don't have access to an implicit here.
+  this match {
+    case TopMap(m) => require(m.nonEmpty)
+    case BottomMap(m) => require(m.nonEmpty)
+    case _ => {}
+  }
 
   /** Update this map so that `from` now maps to `to`
     */
@@ -228,26 +257,17 @@ private def latticeMapJoin[D, L](
   top: => L,
   bottom: => L
 ): LatticeMap[D, L] = {
-  import LatticeMap.{Top, Bottom, TopMap, BottomMap}
+  import LatticeMap.*
 
   (a, b) match {
     case (Top(), _) => Top()
     case (Bottom(), b) => b
-    case (TopMap(a), TopMap(b)) =>
-      TopMap(a.foldLeft(b) { case (m, (k, v)) =>
-        val x = join(m.getOrElse(k, top), v)
-        if x == top then m - k else m + (k -> x)
-      })
-    case (TopMap(a), BottomMap(b)) =>
-      TopMap(b.foldLeft(a) { case (m, (k, v)) =>
-        val x = join(m.getOrElse(k, top), v)
-        if x == top then m - k else m + (k -> x)
-      })
-    case (BottomMap(a), BottomMap(b)) =>
-      BottomMap(a.foldLeft(b) { case (m, (k, v)) =>
-        val x = join(m.getOrElse(k, bottom), v)
-        if x == bottom then m - k else m + (k -> x)
-      })
+    case (TopMap(m1), TopMap(m2)) =>
+      TopMap((m1.keys ++ m2.keys).map(x => (x -> join(m1.getOrElse(x, top), m2.getOrElse(x, top)))).toMap)
+    case (TopMap(m1), BottomMap(m2)) =>
+      TopMap((m1.keys ++ m2.keys).map(x => (x -> join(m1.getOrElse(x, top), m2.getOrElse(x, bottom)))).toMap)
+    case (BottomMap(m1), BottomMap(m2)) =>
+      BottomMap((m1.keys ++ m2.keys).map(x => (x -> join(m1.getOrElse(x, bottom), m2.getOrElse(x, bottom)))).toMap)
     case (a, b) => latticeMapJoin(b, a, join, top, bottom)
   }
 }
@@ -259,26 +279,17 @@ private def latticeMapMeet[D, L](
   top: => L,
   bottom: => L
 ): LatticeMap[D, L] = {
-  import LatticeMap.{Top, Bottom, TopMap, BottomMap}
+  import LatticeMap.*
 
   (a, b) match {
     case (Top(), b) => b
     case (Bottom(), _) => Bottom()
-    case (TopMap(a), TopMap(b)) =>
-      TopMap(a.foldLeft(b) { case (m, (k, v)) =>
-        val x = meet(m.getOrElse(k, top), v)
-        if x == top then m - k else m + (k -> x)
-      })
-    case (TopMap(a), BottomMap(b)) =>
-      BottomMap(a.foldLeft(b) { case (m, (k, v)) =>
-        val x = meet(m.getOrElse(k, bottom), v)
-        if x == bottom then m - k else m + (k -> x)
-      })
-    case (BottomMap(a), BottomMap(b)) =>
-      BottomMap(a.foldLeft(b) { case (m, (k, v)) =>
-        val x = meet(m.getOrElse(k, bottom), v)
-        if x == bottom then m - k else m + (k -> x)
-      })
+    case (TopMap(m1), TopMap(m2)) =>
+      TopMap((m1.keys ++ m2.keys).map(x => (x -> meet(m1.getOrElse(x, top), m2.getOrElse(x, top)))).toMap)
+    case (TopMap(m1), BottomMap(m2)) =>
+      BottomMap((m1.keys ++ m2.keys).map(x => (x -> meet(m1.getOrElse(x, top), m2.getOrElse(x, bottom)))).toMap)
+    case (BottomMap(m1), BottomMap(m2)) =>
+      BottomMap((m1.keys ++ m2.keys).map(x => (x -> meet(m1.getOrElse(x, bottom), m2.getOrElse(x, bottom)))).toMap)
     case (a, b) => latticeMapMeet(b, a, meet, top, bottom)
   }
 }
@@ -315,7 +326,7 @@ class LatticeMapLattice[D, L, LA <: Lattice[L]](l: LA) extends Lattice[LatticeMa
   * codomain of the map (along with the transfer function).
   */
 trait MapDomain[D, L] extends AbstractDomain[LatticeMap[D, L]] {
-  import LatticeMap.{Top, Bottom, TopMap, BottomMap}
+  import LatticeMap.*
 
   def joinTerm(a: L, b: L, pos: Block): L
 
@@ -334,22 +345,22 @@ trait MapDomain[D, L] extends AbstractDomain[LatticeMap[D, L]] {
       case (Top(), _) => Top()
       case (_, Top()) => Top()
       case (BottomMap(a), BottomMap(b)) =>
-        BottomMap(a.foldLeft(b) { case (m, (b, v)) =>
+        bottomMap(a.foldLeft(b) { case (m, (b, v)) =>
           val x = widenTerm(m.getOrElse(b, botTerm), v, pos)
           if x == botTerm then m - b else m + (b -> x)
         })
       case (BottomMap(a), TopMap(b)) =>
-        TopMap(a.foldLeft(b) { case (m, (b, v)) =>
+        topMap(a.foldLeft(b) { case (m, (b, v)) =>
           val x = widenTerm(m.getOrElse(b, topTerm), v, pos)
           if x == topTerm then m - b else m + (b -> x)
         })
       case (TopMap(a), BottomMap(b)) =>
-        TopMap(b.foldLeft(a) { case (m, (a, v)) =>
+        topMap(b.foldLeft(a) { case (m, (a, v)) =>
           val x = widenTerm(v, m.getOrElse(a, botTerm), pos)
           if x == topTerm then m - a else m + (a -> x)
         })
       case (TopMap(a), TopMap(b)) =>
-        TopMap(a.foldLeft(b) { case (m, (b, v)) =>
+        topMap(a.foldLeft(b) { case (m, (b, v)) =>
           val x = widenTerm(m.getOrElse(b, topTerm), v, pos)
           if x == topTerm then m - b else m + (b -> x)
         })
