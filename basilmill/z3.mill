@@ -38,10 +38,8 @@ trait Z3Module extends CoursierModule {
         if (!os.exists(newPath)) {
           os.copy(path, newPath)
         }
-        System.getProperty("os.name") match {
-          case w if w.startsWith("Windows") => Some(dir.toString + "\\")
-          case _ => Some(dir.toString)
-        }
+
+        Some(dir.toString)
       } catch { case e: Throwable => {
         println(s"Failed to obtain source $source (arch=$arch, soType=$soType)")
         println(e)
