@@ -85,9 +85,8 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     override def scalafixConfig = build.scalafixConfig
 
     def forkArgs = Task {
-      val args = super.forkArgs() :+ (s"-Djava.library.path=\"${z3.install()}\"")
-      println(args)
-      args
+      // super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}")
+      super.forkArgs() :+ "-h"
     }
 
     // note: toBoolean accepts precisely "true" or "false"
