@@ -24,13 +24,13 @@ def dynamicSingleAssignment(p: Program) = {
   transforms.OnePassDSA().applyTransform(p)
   validator.setSourceProg(p)
 
-  def sourceToTarget(b: Option[String])(v: Variable | Global): Option[Expr | Global] = v match {
+  def sourceToTarget(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
     case LocalVar(n, t, i) => Some(LocalVar(n, t, 0))
     case g => Some(g)
   }
 
-  def targetToSource(b: Option[String])(v: Variable | Global): Option[Expr | Global] = v match {
-    case g: GlobalVar => Some(g)
+  def targetToSource(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
+    case g: GlobalVar => None
     case o => None
   }
 
@@ -51,14 +51,14 @@ def copyProp(p: Program) = {
   // end transform
   validator.setSourceProg(p)
 
-  def nopRenaming(b: Option[String])(v: Variable | Global): Option[Expr | Global] = None
+  def nopRenaming(b: Option[String])(v: Variable | Memory): Option[Expr] = None
 
-  def targetSourceRenaming(b: Option[String])(v: Variable | Global): Option[Expr | Global] = v match {
+  def renaming(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
     case v: Variable if b.isDefined && results.contains(b.get) => results(b.get).get(v).orElse(Some(v))
     case g => Some(g)
   }
 
-  validator.setEqualVarsInvariantRenaming(renamingTgtSrc = targetSourceRenaming, renamingSrcTgt = nopRenaming)
+  validator.setEqualVarsInvariantRenaming(renamingTgtSrc = nopRenaming, renamingSrcTgt = renaming)
 
   validator.getValidationSMT("tvsmt/" + "CopyProp")
 }
@@ -69,17 +69,14 @@ def parameters(p: Program) = {
   transforms.liftProcedureCallAbstraction(p, None)
   validator.setSourceProg(p)
 
-  def sourceToTarget(b: Option[String])(v: Variable | Global): Option[Expr | Global] = v match {
+  def sourceToTarget(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
     case LocalVar(s"R${i}_in", t, 0) => Some(GlobalVar(s"R$i", t))
     case LocalVar(s"R${i}_out", t, 0) => Some(GlobalVar(s"R$i", t))
-    case LocalVar(n, t, 0) if (!n.startsWith("TRACE")) => Some(GlobalVar(n, t))
+    // case LocalVar(n, t, 0) if (!n.startsWith("TRACE")) => Some(GlobalVar(n, t))
     case g => Some(g)
   }
 
-  def targetToSource(b: Option[String])(v: Variable | Global): Option[Expr | Global] = v match {
-    case GlobalVar(n, t) if (!n.startsWith("TRACE")) => Some(LocalVar(n, t, 0))
-    case o => Some(o)
-  }
+  def targetToSource(b: Option[String])(v: Variable | Memory): Option[Expr] = None
 
   validator.setEqualVarsInvariantRenaming(renamingTgtSrc = targetToSource, renamingSrcTgt = sourceToTarget)
   validator.getValidationSMT("tvsmt/" + "Parameters")
@@ -133,6 +130,7 @@ def validatedSimplifyPipeline(p: Program) = {
   // transforms.applyRPO(p)
   dynamicSingleAssignment(p)
   transforms.applyRPO(p)
+  println("NOP TX")
   nop(p)
   transforms.applyRPO(p)
   copyProp(p)

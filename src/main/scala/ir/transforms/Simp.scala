@@ -126,8 +126,7 @@ class DefUseEntryDomain() extends AbstractDomain[Map[Variable, Set[Def]]] {
   }
 }
 
-class IntraLiveVarsDomain(extraLiveAtCall: Procedure => Iterable[Variable] = x => Seq())
-    extends PowerSetDomain[Variable] {
+class IntraLiveVarsDomain extends PowerSetDomain[Variable] {
   // expected backwards
 
   def transfer(s: Set[Variable], a: Command): Set[Variable] = {
@@ -141,8 +140,7 @@ class IntraLiveVarsDomain(extraLiveAtCall: Procedure => Iterable[Variable] = x =
       case a: Assert => s ++ a.body.variables
       case i: IndirectCall => s + i.target
       case c: DirectCall => {
-        val read = extraLiveAtCall(c.target)
-        s -- c.outParams.map(_._2) ++ c.actualParams.flatMap(_._2.variables) ++ (read)
+        s -- c.outParams.map(_._2) ++ c.actualParams.flatMap(_._2.variables)
       }
       case g: GoTo => s
       case r: Return => s ++ r.outParams.flatMap(_._2.variables)

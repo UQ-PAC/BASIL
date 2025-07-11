@@ -7,9 +7,9 @@ import transforms.*
 object ProcFrames {
 
   case class Frame(
-    modifiedGlobalVars: Set[Global] = Set(),
+    modifiedGlobalVars: Set[GlobalVar] = Set(),
     modifiedMem: Set[Memory] = Set(),
-    readGlobalVars: Set[Global] = Set(),
+    readGlobalVars: Set[GlobalVar] = Set(),
     readMem: Set[Memory] = Set()
   ) {
     /* coarse variable-level frame for procedures
@@ -36,7 +36,7 @@ object ProcFrames {
     }
 
     override def vrvar(v: Variable) = v match {
-      case v: Global =>
+      case v: GlobalVar =>
         summary = summary.copy(readGlobalVars = summary.readGlobalVars + v)
         SkipChildren()
       case _ =>
@@ -44,7 +44,7 @@ object ProcFrames {
     }
 
     override def vlvar(v: Variable) = v match {
-      case v: Global =>
+      case v: GlobalVar =>
         summary = summary.copy(modifiedGlobalVars = summary.modifiedGlobalVars + v)
         SkipChildren()
       case _ =>
@@ -56,7 +56,7 @@ object ProcFrames {
         case MemoryStore(m, _, _, _, _, _) => {
           summary = summary.copy(modifiedMem = summary.modifiedMem + m)
         }
-        case MemoryAssign(m: Global, _, _) => {
+        case MemoryAssign(m: GlobalVar, _, _) => {
           summary = summary.copy(modifiedGlobalVars = summary.modifiedGlobalVars + m)
         }
         case d: DirectCall => {

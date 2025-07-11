@@ -106,7 +106,7 @@ object TransitionSystem {
       val nb = synthEntry.createBlockBetween(l.header, "cut_join_to_" + label)
       nb.statements.prepend(pcGuard(label))
 
-      cutPoints = cutPoints.updated(label, nb)
+      cutPoints = cutPoints.updated(label, l.header)
       cutPointRealBlockBegin = cutPointRealBlockBegin.updated(label, l.header)
       for (backedge <- backedges) {
         assert(l.header == backedge.to)
