@@ -72,7 +72,9 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
 
   // Windows for some reason wants the install path in PATH and ignores java.library.path, I cannot figure out why
   def forkEnv = Task {
-    super.forkEnv() + ("PATH" -> (sys.env("PATH") + s":${z3.install()}"))
+    if (System.getProperty("os.name").startsWith("Windows")) {
+      super.forkEnv() + ("PATH" -> (sys.env("PATH") + s";${z3.install()}"))
+    } else { super.forkEnv() }
   }
 
   override def scalafixConfig = Task {
@@ -94,7 +96,9 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     }
 
     def forkEnv = Task {
-      super.forkEnv() + ("PATH" -> (sys.env("PATH") + s":${z3.install()}"))
+      if (System.getProperty("os.name").startsWith("Windows")) {
+        super.forkEnv() + ("PATH" -> (sys.env("PATH") + s";${z3.install()}"))
+      } else { super.forkEnv() }
     }
 
     // note: toBoolean accepts precisely "true" or "false"
