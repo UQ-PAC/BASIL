@@ -34,27 +34,21 @@ class LatticeCollectionTests extends AnyFunSuite with org.scalatestplus.scalache
   val genLatticeMap: Gen[LatticeMap[D, L]] = Gen.frequency(
     (1, LatticeMap.Top()),
     (1, LatticeMap.Bottom()),
-    (
-      20,
-      for { m <- (genNoTopFinMap suchThat (!_.values.toSet.contains(LatticeSet.Top()))) } yield LatticeMap.TopMap(m)
-    ),
-    (
-      20,
-      for { m <- (genNoBotFinMap suchThat (!_.values.toSet.contains(LatticeSet.Bottom()))) } yield LatticeMap.BottomMap(
-        m
-      )
-    )
+    (20, for { m <- (genNoTopFinMap) } yield LatticeMap.TopMap(m)),
+    (20, for { m <- (genNoBotFinMap) } yield LatticeMap.BottomMap(m))
   )
   implicit lazy val arbLatticeMap: Arbitrary[LatticeMap[D, L]] = Arbitrary(genLatticeMap)
 
-  @annotation.nowarn implicit def shrinkLatticeSet[T]: Shrink[LatticeSet[T]] = Shrink {
+  @annotation.nowarn
+  implicit def shrinkLatticeSet[T]: Shrink[LatticeSet[T]] = Shrink {
     case LatticeSet.Top() => Stream()
     case LatticeSet.Bottom() => Stream()
     case LatticeSet.FiniteSet(s) => (for (s2 <- Shrink.shrink(s)) yield LatticeSet.finiteSet(s2))
     case LatticeSet.DiffSet(s) => (for (s2 <- Shrink.shrink(s)) yield LatticeSet.diffSet(s2))
   }
 
-  @annotation.nowarn implicit def shrinkLatticeMap[D, L](implicit s: Shrink[L]): Shrink[LatticeMap[D, L]] = Shrink {
+  @annotation.nowarn
+  implicit def shrinkLatticeMap[D, L](implicit s: Shrink[L]): Shrink[LatticeMap[D, L]] = Shrink {
     case LatticeMap.Top() => Stream()
     case LatticeMap.Bottom() => Stream()
     case LatticeMap.TopMap(m) => (for (m2 <- Shrink.shrink(m)) yield LatticeMap.topMap(m2))
@@ -73,7 +67,7 @@ class LatticeCollectionTests extends AnyFunSuite with org.scalatestplus.scalache
   }
 
   test("pointwise props") {
-    forAll { (m1: LatticeMap[D, L], m2: LatticeMap[D, L]) =>
+    forAll(minSuccessful(1000)) { (m1: LatticeMap[D, L], m2: LatticeMap[D, L]) =>
       val join = m1.join(m2)
       val meet = m1.meet(m2)
 

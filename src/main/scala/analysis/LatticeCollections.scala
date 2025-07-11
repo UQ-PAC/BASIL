@@ -157,15 +157,17 @@ object LatticeMap {
 /** A map which defaults to either the top or bottom element of a lattice. This is more efficient to use in static
   * analyses as it is common to default most values in a map to either top or bottom.
   *
-  * In order to call `apply`, `join` or `meet`, an implicit term of type L must be declared, and L must implement the `InternalLattice` trait.
-  * For example, to declare an implicit interval, we write (outside the scope of any classes that we are implementing)
+  * In order to call `apply`, `join` or `meet`, an implicit term of type L must be declared, and L must implement the
+  * `InternalLattice` trait. For example, to declare an implicit interval, we write (outside the scope of any classes
+  * that we are implementing)
   * ```scala
   * private implicit val intervalTerm: Interval = Interval.Bottom
   * ```
   */
 enum LatticeMap[D, L] {
   /* PERFORMANCE:
-   * Something like an AVL tree could be more efficient, see section 4.1.4 of Antoine Miné's abstract interpretation tutorial.
+   * Something like an AVL tree could be more efficient, see section 4.1.4 of Antoine Miné's abstract interpretation
+   * tutorial.
    */
 
   /* A map that is top everywhere */
@@ -259,15 +261,18 @@ private def latticeMapJoin[D, L](
 ): LatticeMap[D, L] = {
   import LatticeMap.*
 
+  def joinMaps(m1: Map[D, L], m2: Map[D, L], d1: L, d2: L) =
+    (m1.keys ++ m2.keys).map(x => (x -> join(m1.getOrElse(x, d1), m2.getOrElse(x, d2))))
+
   (a, b) match {
     case (Top(), _) => Top()
     case (Bottom(), b) => b
     case (TopMap(m1), TopMap(m2)) =>
-      TopMap((m1.keys ++ m2.keys).map(x => (x -> join(m1.getOrElse(x, top), m2.getOrElse(x, top)))).toMap)
+      topMap(joinMaps(m1, m2, top, top).filter(_._2 != top).toMap)
     case (TopMap(m1), BottomMap(m2)) =>
-      TopMap((m1.keys ++ m2.keys).map(x => (x -> join(m1.getOrElse(x, top), m2.getOrElse(x, bottom)))).toMap)
+      topMap(joinMaps(m1, m2, top, bottom).filter(_._2 != top).toMap)
     case (BottomMap(m1), BottomMap(m2)) =>
-      BottomMap((m1.keys ++ m2.keys).map(x => (x -> join(m1.getOrElse(x, bottom), m2.getOrElse(x, bottom)))).toMap)
+      bottomMap(joinMaps(m1, m2, bottom, bottom).filter(_._2 != bottom).toMap)
     case (a, b) => latticeMapJoin(b, a, join, top, bottom)
   }
 }
@@ -281,15 +286,18 @@ private def latticeMapMeet[D, L](
 ): LatticeMap[D, L] = {
   import LatticeMap.*
 
+  def meetMaps(m1: Map[D, L], m2: Map[D, L], d1: L, d2: L) =
+    (m1.keys ++ m2.keys).map(x => (x -> meet(m1.getOrElse(x, d1), m2.getOrElse(x, d2))))
+
   (a, b) match {
     case (Top(), b) => b
     case (Bottom(), _) => Bottom()
     case (TopMap(m1), TopMap(m2)) =>
-      TopMap((m1.keys ++ m2.keys).map(x => (x -> meet(m1.getOrElse(x, top), m2.getOrElse(x, top)))).toMap)
+      topMap(meetMaps(m1, m2, top, top).filter(_._2 != top).toMap)
     case (TopMap(m1), BottomMap(m2)) =>
-      BottomMap((m1.keys ++ m2.keys).map(x => (x -> meet(m1.getOrElse(x, top), m2.getOrElse(x, bottom)))).toMap)
+      bottomMap(meetMaps(m1, m2, top, bottom).filter(_._2 != bottom).toMap)
     case (BottomMap(m1), BottomMap(m2)) =>
-      BottomMap((m1.keys ++ m2.keys).map(x => (x -> meet(m1.getOrElse(x, bottom), m2.getOrElse(x, bottom)))).toMap)
+      bottomMap(meetMaps(m1, m2, bottom, bottom).filter(_._2 != bottom).toMap)
     case (a, b) => latticeMapMeet(b, a, meet, top, bottom)
   }
 }
