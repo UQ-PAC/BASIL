@@ -12,6 +12,7 @@ import $file.basilmill.antlr.AntlrModule
 import $file.basilmill.basildocs.BasilDocs
 import $file.basilmill.basilversion.BasilVersion
 import $file.basilmill.profile.ProfileModule
+import $file.basilmill.z3.Z3Module
 
 import os.Path
 
@@ -42,8 +43,10 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
   val scalapb = ivy"com.thesamet.scalapb::scalapb-runtime:0.11.15"
   val upickle = ivy"com.lihaoyi::upickle:4.2.1"
   val aslpOffline = ivy"io.github.uq-pac::lifter:0.1.0"
+  val javaSmt = ivy"org.sosy-lab:java-smt:5.0.0"
+  val javaSmtZ3 = ivy"org.sosy-lab:javasmt-solver-z3:4.14.0"
 
-  override def ivyDeps = Agg(scalactic, sourceCode, mainArgs, upickle, aslpOffline)
+  override def ivyDeps = Agg(scalactic, sourceCode, mainArgs, upickle, aslpOffline, javaSmt, javaSmtZ3)
 
   override def repositoriesTask = Task.Anon {
     super.repositoriesTask() :+ MavenRepository(
@@ -63,6 +66,17 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     Seq(PathRef(this.millSourcePath / "main" / "scala"))
   }
 
+  def forkArgs = Task {
+    super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}")
+  }
+
+  // Windows for some reason wants the install path in PATH and ignores java.library.path, I cannot figure out why
+  def forkEnv = Task {
+    if (System.getProperty("os.name").startsWith("Windows")) {
+      super.forkEnv() + ("PATH" -> (sys.env("PATH") + s";${z3.install()}"))
+    } else { super.forkEnv() }
+  }
+
   override def scalafixConfig = Task {
     Some(Task.workspace / ".scalafix.conf")
   }
@@ -76,6 +90,16 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     }
 
     override def scalafixConfig = build.scalafixConfig
+
+    def forkArgs = Task {
+      super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}")
+    }
+
+    def forkEnv = Task {
+      if (System.getProperty("os.name").startsWith("Windows")) {
+        super.forkEnv() + ("PATH" -> (sys.env("PATH") + s";${z3.install()}"))
+      } else { super.forkEnv() }
+    }
 
     // note: toBoolean accepts precisely "true" or "false"
     def basilTestParallel = Task.Input {
@@ -217,6 +241,8 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
       Task.workspace  / "docs"
     }
   }
+
+  object z3 extends Z3Module
 
   def ctagsConfig = Task.Source {
     Task.workspace / "basilmill" / "scala.ctags"
