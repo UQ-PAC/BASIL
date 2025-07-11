@@ -38,9 +38,9 @@ enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
   /* The empty set */
   case Bottom[T1]() extends LatticeSet[T1]
   /* A finite set. Note that an empty set encodes the same information as Bottom(). */
-  case FiniteSet[T1](s: Set[T1]) extends LatticeSet[T1]
+  case FiniteSet[T1](private val s: Set[T1]) extends LatticeSet[T1]
   /* Represents Top() minus some finite set. */
-  case DiffSet[T1](s: Set[T1]) extends LatticeSet[T1]
+  case DiffSet[T1](private val s: Set[T1]) extends LatticeSet[T1]
 
   def contains(v: T): Boolean = {
     this match {
@@ -152,9 +152,9 @@ enum LatticeMap[D, L] {
   /* A map that is bottom everywhere */
   case Bottom[D1, L1]() extends LatticeMap[D1, L1]
   /* A Map which defaults to top and is else specified by the internal map */
-  case TopMap[D1, L1](m: Map[D1, L1]) extends LatticeMap[D1, L1]
+  case TopMap[D1, L1](private val m: Map[D1, L1]) extends LatticeMap[D1, L1]
   /* A Map which defaults to bottom and is else specified by the internal map */
-  case BottomMap[D1, L1](m: Map[D1, L1]) extends LatticeMap[D1, L1]
+  case BottomMap[D1, L1](private val m: Map[D1, L1]) extends LatticeMap[D1, L1]
 
   /** Update this map so that `from` now maps to `to`
     */
