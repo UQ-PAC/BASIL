@@ -64,9 +64,17 @@ object ApiServer extends IOApp {
 
     // Get the IR program from the result
     val programIR = result.ir.program
-    val irText = translating.PrettyPrinter.pp_prog(programIR) // Prettier print than the one below
+    val sb = new StringBuilder
+    sb.append(translating.PrettyPrinter.pp_prog(programIR)) // Prettier print than the one below
+    sb.append("\n ---------------------- The before Transform ----------------------\n") 
+    sb.append(translating.PrettyPrinter.pp_prog(IREpochStore.beforeTransform.get)) 
+    sb.append("\n ---------------------- The after Transform ----------------------\n")
+    sb.append(translating.PrettyPrinter.pp_prog(IREpochStore.afterTransform.get))
+
+
+    // Prettier print than the one below
     // val irText = serialiseIL(programIR) // pretty-print IR as a string
-    println(irText)
+//    println(irText)
     
     // This gets the html code. I don't need it here atm
 //    val source = Source.fromResource("index.html")
@@ -78,17 +86,17 @@ object ApiServer extends IOApp {
 //
 //    Files.write(outputHtmlPath, finalHtml.getBytes(StandardCharsets.UTF_8))
 
-    irText
+    sb.toString()
   }
 
   private val irService = HttpRoutes.of[IO] {
     case GET -> Root / "ir" / name =>
       Ok(IRResponse(code = "// example IR code", label = name))
       
-    case request @ GET -> Root =>
-      StaticFile
-        .fromResource("index.html", Some(request))
-        .getOrElseF(NotFound("index.html not found"))
+//    case request @ GET -> Root => // TODO: to be changed to the VITE frontend folder additions.
+//      StaticFile
+//        .fromResource("diff2htmlTest.html", Some(request)) // Change fileName here 'index.html' OR 'diff2htmlTest.html'
+//        .getOrElseF(NotFound("index.html not found"))
 
     case GET -> Root / "ir-before" =>
       IREpochStore.beforeTransform
@@ -103,16 +111,14 @@ object ApiServer extends IOApp {
           val pretty = translating.PrettyPrinter.pp_prog(prog)
           Ok(s"IR After Text:\n$pretty")
         }.getOrElse(NotFound("The ir-after was not found"))
-
-    case GET -> Root / "ir-data" =>
-      val irText = generateIR() 
-      Ok(s"IR Text:\n$irText")
   }.orNotFound
   
   
 
   override def run(args: List[String]): IO[ExitCode] = {
     println("********** Starting up the API **********")
+    
+    generateIR()
 
     BlazeServerBuilder[IO]
       .bindHttp(8080, "localhost")
