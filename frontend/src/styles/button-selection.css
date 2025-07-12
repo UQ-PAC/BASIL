@@ -1,0 +1,95 @@
+
+.d2h-file-collapse {
+    display: none !important;
+}
+
+.d2h-file-name-wrapper {
+    display: none !important;
+}
+
+#diff { /* TODO: Move this into better named file at some point */
+    flex: 1;
+    max-width: 100%;
+    min-width: 0;
+    padding-right: 1rem;
+    box-sizing: border-box;
+}
+
+.d2h-wrapper {
+    /*max-width: 100% !important;*/
+    /*overflow-x: visible;*/
+}
+
+.d2h-code-side-line,
+.d2h-code-line {
+    /*white-space: pre-wrap; !* Wrap long lines *!*/
+    /*word-break: break-word; !* Break inside long tokens *!*/
+}
+
+.d2h-file-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0.5em 1em;
+}
+
+.custom-controls { /* TODO: This should also be moved to a different file */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+ /*Context group*/
+.context-wrapper { /* TODO: Make this a custom button that looks a lit cleaner. Think of a nice approach */
+    position: absolute;
+    right: 1em;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+}
+
+.context-dropdown:hover {
+    border-color: #888;
+}
+
+/* Toggle group */
+.toggle-group {
+    display: flex;
+    gap: 2px;
+    align-items: flex-start;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.toggle-button {
+    padding: 2px 8px;
+    font-size: 0.9em;
+    line-height: 1.2;
+    cursor: pointer;
+    background-color: #f5f5f5;
+    color: #333;
+    border: none;
+    transition: background-color 0.2s ease;
+    position: relative;
+}
+
+.toggle-button .tick {
+    display: inline-block;
+    width: 16px;
+    text-align: center;
+    margin-right: 6px;
+    color: inherit;
+}
+
+.toggle-button:hover {
+    background-color: #e0e0e0;
+}
+
+.toggle-button.active {
+    background-color: #1976d2;
+    color: #fff;
+}

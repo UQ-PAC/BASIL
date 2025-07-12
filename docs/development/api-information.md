@@ -12,6 +12,11 @@ In order to change th test file, navigate to ApiServer
 located at (src/main/scala/API/ApiServer.scala) and change the 
 inputFile and relfFile. 
 
+Note: At the moment I need to additionally run the following code to display the Vite component:
+```shell
+npm run dev
+```
+
 ## Documentation
 This outlines briefly some documentation standards I have followed
 
@@ -52,6 +57,8 @@ Here I have a list of a few of my choices and ideas. This will be tidied up late
 
 ## Code Architecture
 I call a html file with code to display the IR atm. 
+
+- I am now using react + TypeScript. 
 
 ## I am up to
 I have displayed an IR now. I have not run it through any transform passes yet. This still needs to be done. 
