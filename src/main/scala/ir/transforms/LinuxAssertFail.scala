@@ -1,10 +1,10 @@
 package ir.transforms
 
 import ir.*
-import ir.eval.*
-import util.functional.*
-import util.IRContext
 import ir.cilvisitor.*
+import ir.eval.*
+import util.IRContext
+import util.functional.*
 
 def liftLinuxAssertFail(ctx: IRContext) = {
 
@@ -88,7 +88,7 @@ def liftSVCompNonDetEarlyIR(p: Program) = {
    * Run after parameter form
    */
 
-  def nonDetFunc(name: String, size: Int) = UninterpretedFunction(name, Seq(), BitVecType(size))
+  def nonDetFunc(name: String, size: Int) = FApplyExpr(name, Seq(), BitVecType(size))
 
   /*
    * Officially possible:
@@ -140,15 +140,11 @@ def liftSVComp(p: Program) = {
       }
       case d: DirectCall if d.target.procName == "__VERIFIER_assert" => {
         val arg = d.actualParams(LocalVar("R0_in", BitVecType(64)))
-        ChangeTo(
-          List(Assert(UnaryExpr(BoolNOT, BinaryExpr(BVEQ, arg, BitVecLiteral(0, 64))), Some("__VERIFIER_assert")))
-        )
+        ChangeTo(List(Assert(UnaryExpr(BoolNOT, BinaryExpr(EQ, arg, BitVecLiteral(0, 64))), Some("__VERIFIER_assert"))))
       }
       case d: DirectCall if d.target.procName == "__VERIFIER_assume" => {
         val arg = d.actualParams(LocalVar("R0_in", BitVecType(64)))
-        ChangeTo(
-          List(Assume(UnaryExpr(BoolNOT, BinaryExpr(BVEQ, arg, BitVecLiteral(0, 64))), Some("__VERIFIER_assume")))
-        )
+        ChangeTo(List(Assume(UnaryExpr(BoolNOT, BinaryExpr(EQ, arg, BitVecLiteral(0, 64))), Some("__VERIFIER_assume"))))
       }
       case _ => SkipChildren()
     }

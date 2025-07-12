@@ -4,7 +4,7 @@ import test_util.BASILTest.{mean, stdDev}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
-import scala.util.{Try, Using}
+import scala.util.Using
 
 case class Histogram(bins: List[Int], numBins: Int, minBin: Double, maxBin: Double) {
 

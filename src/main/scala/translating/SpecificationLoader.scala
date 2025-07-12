@@ -1,13 +1,12 @@
 package translating
 
-import Parsers.SpecificationsParser._
-import boogie._
-import specification._
-import ir._
+import Parsers.SpecificationsParser.*
+import boogie.*
+import ir.*
+import specification.*
 import util.Logger
 
-import scala.collection.mutable.ArrayBuffer
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 // take symbol table entries as input
 // parse all global defs and check sizes
@@ -163,7 +162,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   def visitExpr(ctx: ExprContext, nameToGlobals: Map[String, SpecGlobal], params: Map[String, Expr] = Map()): BExpr = {
     val exprs = ctx.impliesExpr.asScala.map(e => visitImpliesExpr(e, nameToGlobals, params))
     if (exprs.size > 1) {
-      exprs.tail.foldLeft(exprs.head)((opExpr: BExpr, next: BExpr) => BinaryBExpr(BoolEQUIV, opExpr, next))
+      exprs.tail.foldLeft(exprs.head)((opExpr: BExpr, next: BExpr) => BinaryBExpr(EQ, opExpr, next))
     } else {
       exprs.head
     }
@@ -336,7 +335,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
             }
         }
       }
-      case id if id.startsWith("R") =>
+      case id if id.startsWith("R") || id == "_PC" =>
         BVariable(id, BitVecBType(64), Scope.Global)
       case id =>
         params.get(id) match {
@@ -366,9 +365,9 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   }
 
   // may need to make this more sophisticated and check for bool == bool
-  def visitRelOp(ctx: RelOpContext): BVBinOp = ctx.getText match {
-    case "==" => BVEQ
-    case "!=" => BVNEQ
+  def visitRelOp(ctx: RelOpContext): BinOp = ctx.getText match {
+    case "==" => EQ
+    case "!=" => NEQ
     case ">" => BVSGT
     case ">=" => BVSGE
     case "<" => BVSLT

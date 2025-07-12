@@ -1,0 +1,137 @@
+package build.basilmill
+
+import mill._
+import mill.util.Jvm
+
+import os.Path
+import scalalib._
+import scala.util.{Try}
+
+import $file.basilmill.util.DownloadModule
+import $file.basilmill.jflexcup.JFlexCupModule
+
+/**
+ * Module to process a BNFC (https://bnfc.digitalgrammars.com/) grammar
+ * through the `bnfc` generator.
+ *
+ * This should be used alongside AntlrModule or JFlexCupModule to process
+ * the resulting parser/lexer files into Java sources. Otherwise, the build
+ * will fail with unresolved references.
+ */
+trait BNFCModule extends JavaModule {
+  def bnfcPackageName: String
+  def bnfcSource: T[PathRef]
+  def bnfcBackendArg: T[String] // e.g., --jflex, --antlr
+  def bnfcExtraArgs: T[Iterable[String]] = Iterable.empty[String]
+
+  def bnfcYylexFile = Task.Source {
+    PathRef(bnfcGenerated().path / bnfcPackageName / "Yylex")
+  }
+  def bnfcCupFile = Task.Source {
+    PathRef(bnfcGenerated().path / bnfcPackageName / "_cup.cup")
+  }
+  def bnfcMakefile = Task.Source {
+    PathRef(bnfcGenerated().path / "Makefile")
+  }
+
+  object bnfcBinary extends DownloadModule {
+    def version = "2.9.5"
+    def name = s"bnfc-$version-${System.currentTimeMillis()}$suffix"
+    def url = s"https://github.com/BNFC/bnfc/releases/download/v$version/bnfc-$version$suffix"
+    // https://github.com/BNFC/bnfc/releases
+
+    def local = Task.Input {
+      Try(os.proc("bnfc", "--version").call())
+        .map(Function.const("bnfc"))
+        .toEither
+        .left.map(_.toString)
+    }
+
+    def osName = System.getProperty("os.name")
+
+    def suffix = if (osName.contains("nux")) {
+      "-linux.binary"
+    } else if (osName.contains("Mac")) {
+      "-mac.binary"
+    } else if (osName.startsWith("Windows")) {
+      ".exe"
+    }
+  }
+
+  override def generatedSources = Task.Sources {
+    super.generatedSources() ++ Seq(bnfcGenerated())
+  }
+
+  /**
+    * Runs the BNFC binary.
+    */
+  def runBNFC(args: String*) = Task.Command {
+    val res = os.call(bnfcBinary.path() +: args, stdout = os.Inherit, check = false)
+    Task.ctx().systemExit(res.exitCode)
+    ()
+  }
+
+  def bnfcGenerated = Task {
+    val args = Seq("--java", bnfcBackendArg(), bnfcSource().path.toString, "-m", "-o", Task.dest.toString, "-l")
+    os.call(bnfcBinary.path() +: (args ++ bnfcExtraArgs()))
+    PathRef(Task.dest)
+  }
+
+  def bnfcLatex = Task {
+    val args = Seq("--latex", bnfcSource().path.toString, "-m", "-o", Task.dest.toString)
+    os.call(bnfcBinary.path() +: args)
+    PathRef(Task.dest / (bnfcSource().path.baseName + ".tex"))
+  }
+
+  def bnfcHtml = Task {
+    // some hacky fixes
+    val lines = os.read.lines(bnfcLatex().path).flatMap {
+      case l @ s"\\documentclass$_" => Seq(l, "\\usepackage[latexmk]{lwarp}")
+      case l @ s"\\usepackage${_}{inputenc}" => Seq(l.replace("[utf8x]", "[utf8]"))
+      case l => Seq(l.replace("{$-$}", "{-}").replace("{$>$}", "{>}").replace(raw"{\texttt {#1}}", raw"``{\texttt {#1}}''"))
+    }
+
+    val tex = Task.dest / bnfcLatex().path.last
+    os.write(tex, lines.mkString("\n"))
+
+    // https://ctan.org/pkg/lwarp?lang=en
+    // https://mirror.aarnet.edu.au/pub/CTAN/macros/latex/contrib/lwarp/lwarp.pdf
+    os.call(Seq("latexmk", "-pdf", tex.toString))
+    os.call(Seq("lwarpmk", "print"), stdout = os.Inherit)
+    os.call(Seq("lwarpmk", "html"), stdout = os.Inherit)
+    os.call(Seq("lwarpmk", "limages"))
+    os.call(Seq("lwarpmk", "clean"))
+
+    PathRef(Task.dest)
+  }
+
+  private def readMakefileVar(file: Path, key: String) = {
+    val value = os.read.lines(file).collect {
+      case l if l.startsWith(s"$key=") => l.stripPrefix(s"$key=")
+    }.headOption
+
+    value
+      .getOrElse(throw new Exception(s"key '$key' not found in Makefile $file"))
+      .split(" ")
+      .filter(_.nonEmpty)
+      .toList
+  }
+
+  def bnfcParserArgs = Task {
+    readMakefileVar(bnfcMakefile().path, "PARSER_FLAGS")
+  }
+
+  def bnfcLexerArgs = Task {
+    readMakefileVar(bnfcMakefile().path, "LEXER_FLAGS")
+  }
+}
+
+trait BNFCJFlexModule extends BNFCModule with JFlexCupModule {
+  override def bnfcBackendArg = "--jflex"
+
+  override def javaCupArgs = bnfcParserArgs
+  override def jflexArgs = bnfcLexerArgs
+
+  override def javaCupSource = bnfcCupFile
+  override def jflexSource = bnfcYylexFile
+}

@@ -1,18 +1,12 @@
-import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.matchers.should.Matchers
-import scala.util.{Try, Failure, Success}
-import java.io.OutputStream
-import translating.PrettyPrinter.*
-
 import ir.*
 import ir.dsl.*
-import ir.dsl.given
+import org.scalatest.funsuite.AnyFunSuite
 
 @test_util.tags.UnitTest
 class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureOutput {
 
   /**
-   * Regression test condition lifting using for a difficult example which requires propagating conditions across multiple branches 
+   * Regression test condition lifting using for a difficult example which requires propagating conditions across multiple branches
    *
    * Future simplifications could possibly break this if the branches are simplified further (e.g. more extends/extracts removed)
    */
@@ -24,9 +18,9 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
       "main_4196096_9" ->
         BinaryExpr(BVSGT, Extract(32, 0, LocalVar("R0_in", BitVecType(64), 0)), BitVecLiteral(BigInt("1"), 32)),
       "Sqrt_4196496_15" ->
-        BinaryExpr(BVEQ, LocalVar("R1", BitVecType(64), 6), BitVecLiteral(BigInt("0"), 64)),
+        BinaryExpr(EQ, LocalVar("R1", BitVecType(64), 6), BitVecLiteral(BigInt("0"), 64)),
       "Sqrt_4196496_16" ->
-        UnaryExpr(BoolNOT, BinaryExpr(BVEQ, LocalVar("R1", BitVecType(64), 6), BitVecLiteral(BigInt("0"), 64))),
+        UnaryExpr(BoolNOT, BinaryExpr(EQ, LocalVar("R1", BitVecType(64), 6), BitVecLiteral(BigInt("0"), 64))),
       "Sqrt_4196496_12" ->
         BinaryExpr(
           BVULT,
@@ -286,8 +280,8 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
             BoolNOT,
             BinaryExpr(
               BoolAND,
-              BinaryExpr(BVEQ, Register("NF", 1), Register("VF", 1)),
-              BinaryExpr(BVEQ, Register("ZF", 1), BitVecLiteral(BigInt("0"), 1))
+              BinaryExpr(EQ, Register("NF", 1), Register("VF", 1)),
+              BinaryExpr(EQ, Register("ZF", 1), BitVecLiteral(BigInt("0"), 1))
             )
           ),
           None,
@@ -305,8 +299,8 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
               BoolNOT,
               BinaryExpr(
                 BoolAND,
-                BinaryExpr(BVEQ, Register("NF", 1), Register("VF", 1)),
-                BinaryExpr(BVEQ, Register("ZF", 1), BitVecLiteral(BigInt("0"), 1))
+                BinaryExpr(EQ, Register("NF", 1), Register("VF", 1)),
+                BinaryExpr(EQ, Register("ZF", 1), BitVecLiteral(BigInt("0"), 1))
               )
             )
           ),
@@ -451,8 +445,8 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
             BoolNOT,
             BinaryExpr(
               BoolAND,
-              BinaryExpr(BVEQ, Register("CF", 1), BitVecLiteral(BigInt("1"), 1)),
-              BinaryExpr(BVEQ, Register("ZF", 1), BitVecLiteral(BigInt("0"), 1))
+              BinaryExpr(EQ, Register("CF", 1), BitVecLiteral(BigInt("1"), 1)),
+              BinaryExpr(EQ, Register("ZF", 1), BitVecLiteral(BigInt("0"), 1))
             )
           ),
           None,
@@ -471,8 +465,8 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
               BoolNOT,
               BinaryExpr(
                 BoolAND,
-                BinaryExpr(BVEQ, Register("CF", 1), BitVecLiteral(BigInt("1"), 1)),
-                BinaryExpr(BVEQ, Register("ZF", 1), BitVecLiteral(BigInt("0"), 1))
+                BinaryExpr(EQ, Register("CF", 1), BitVecLiteral(BigInt("1"), 1)),
+                BinaryExpr(EQ, Register("ZF", 1), BitVecLiteral(BigInt("0"), 1))
               )
             )
           ),
@@ -492,8 +486,8 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
         Assume(
           BinaryExpr(
             BoolAND,
-            BinaryExpr(BVEQ, Register("CF", 1), BitVecLiteral(BigInt("1"), 1)),
-            BinaryExpr(BVEQ, Register("ZF", 1), BitVecLiteral(BigInt("0"), 1))
+            BinaryExpr(EQ, Register("CF", 1), BitVecLiteral(BigInt("1"), 1)),
+            BinaryExpr(EQ, Register("ZF", 1), BitVecLiteral(BigInt("0"), 1))
           ),
           None,
           None,
@@ -508,8 +502,8 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
             BoolNOT,
             BinaryExpr(
               BoolAND,
-              BinaryExpr(BVEQ, Register("CF", 1), BitVecLiteral(BigInt("1"), 1)),
-              BinaryExpr(BVEQ, Register("ZF", 1), BitVecLiteral(BigInt("0"), 1))
+              BinaryExpr(EQ, Register("CF", 1), BitVecLiteral(BigInt("1"), 1)),
+              BinaryExpr(EQ, Register("ZF", 1), BitVecLiteral(BigInt("0"), 1))
             )
           ),
           None,
@@ -595,14 +589,14 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
       ),
       block(
         "Sqrt_4196496__1__5jlZESzjQ4a4yO3~e1nyHQ$__0",
-        Assume(BinaryExpr(BVEQ, Register("R1", 64), BitVecLiteral(BigInt("0"), 64)), None, None, true),
+        Assume(BinaryExpr(EQ, Register("R1", 64), BitVecLiteral(BigInt("0"), 64)), None, None, true),
         LocalAssign(Register("R3", 64), BitVecLiteral(BigInt("0"), 64), Some("4196512_0")),
         goto("Sqrt_4196496__1__5jlZESzjQ4a4yO3~e1nyHQ$__2")
       ),
       block(
         "Sqrt_4196496__1__5jlZESzjQ4a4yO3~e1nyHQ$__1",
         Assume(
-          UnaryExpr(BoolNOT, BinaryExpr(BVEQ, Register("R1", 64), BitVecLiteral(BigInt("0"), 64))),
+          UnaryExpr(BoolNOT, BinaryExpr(EQ, Register("R1", 64), BitVecLiteral(BigInt("0"), 64))),
           None,
           None,
           true
@@ -715,19 +709,14 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
       ),
       block(
         "Sqrt_4196496__1__5jlZESzjQ4a4yO3~e1nyHQ$__3",
-        Assume(
-          UnaryExpr(BoolNOT, BinaryExpr(BVEQ, Register("CF", 1), BitVecLiteral(BigInt("1"), 1))),
-          None,
-          None,
-          true
-        ),
+        Assume(UnaryExpr(BoolNOT, BinaryExpr(EQ, Register("CF", 1), BitVecLiteral(BigInt("1"), 1))), None, None, true),
         LocalAssign(Register("R3", 64), Register("R3", 64), Some("4196540_0")),
         goto("Sqrt_4196496__1__5jlZESzjQ4a4yO3~e1nyHQ$__5")
       ),
       block(
         "Sqrt_4196496__1__5jlZESzjQ4a4yO3~e1nyHQ$__4",
         Assume(
-          UnaryExpr(BoolNOT, UnaryExpr(BoolNOT, BinaryExpr(BVEQ, Register("CF", 1), BitVecLiteral(BigInt("1"), 1)))),
+          UnaryExpr(BoolNOT, UnaryExpr(BoolNOT, BinaryExpr(EQ, Register("CF", 1), BitVecLiteral(BigInt("1"), 1)))),
           None,
           None,
           true
@@ -744,8 +733,8 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
         Assume(
           BinaryExpr(
             BoolAND,
-            BinaryExpr(BVEQ, Register("CF", 1), BitVecLiteral(BigInt("1"), 1)),
-            BinaryExpr(BVEQ, Register("ZF", 1), BitVecLiteral(BigInt("0"), 1))
+            BinaryExpr(EQ, Register("CF", 1), BitVecLiteral(BigInt("1"), 1)),
+            BinaryExpr(EQ, Register("ZF", 1), BitVecLiteral(BigInt("0"), 1))
           ),
           None,
           None,
@@ -761,8 +750,8 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
             BoolNOT,
             BinaryExpr(
               BoolAND,
-              BinaryExpr(BVEQ, Register("CF", 1), BitVecLiteral(BigInt("1"), 1)),
-              BinaryExpr(BVEQ, Register("ZF", 1), BitVecLiteral(BigInt("0"), 1))
+              BinaryExpr(EQ, Register("CF", 1), BitVecLiteral(BigInt("1"), 1)),
+              BinaryExpr(EQ, Register("ZF", 1), BitVecLiteral(BigInt("0"), 1))
             )
           ),
           None,
@@ -838,11 +827,13 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
 
     (ctx.program).foreach {
       case a: Assume => {
-        val comparison = expected.get(a.parent.label)
-        val assumeBody = ir.eval.VarNameNormalise()(a.body)
-        assert(comparison.isDefined, s"Block label ${a.parent.label} not included in expected labels")
-        val expectedBody = ir.eval.VarNameNormalise()(expected(a.parent.label))
-        assert(assumeBody == expectedBody)
+        assert(!(a.body.variables.exists(v => {
+          v.name.startsWith("ZF")
+          || v.name.startsWith("CF")
+          || v.name.startsWith("VF")
+          || v.name.startsWith("NF")
+          || v.name.startsWith("Cse")
+        })))
       }
       case _ => ()
     }

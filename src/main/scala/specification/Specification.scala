@@ -2,7 +2,7 @@ package specification
 
 import boogie.*
 import ir.*
-import util.Logger
+import ir.dsl.given
 
 trait SymbolTableEntry {
   val name: String
@@ -11,7 +11,7 @@ trait SymbolTableEntry {
 }
 
 case class FuncEntry(override val name: String, override val size: Int, override val address: BigInt)
-    extends SymbolTableEntry
+    extends SymbolTableEntry derives ir.dsl.ToScala
 
 case class Specification(
   funcs: Set[FuncEntry],
@@ -31,13 +31,27 @@ case class Specification(
 
 case class SubroutineSpec(
   name: String,
-  requires: List[BExpr],
-  requiresDirect: List[String],
-  ensures: List[BExpr],
-  ensuresDirect: List[String],
-  modifies: List[String],
-  rely: List[BExpr],
-  guarantee: List[BExpr]
-)
+  requires: List[BExpr] = Nil,
+  requiresDirect: List[String] = Nil,
+  ensures: List[BExpr] = Nil,
+  ensuresDirect: List[String] = Nil,
+  modifies: List[String] = Nil,
+  rely: List[BExpr] = Nil,
+  guarantee: List[BExpr] = Nil
+) {
+  def merge(other: SubroutineSpec) = {
+    require(other.name == name, "attempt to merge SubroutineSpec with differing names")
+    SubroutineSpec(
+      name = name,
+      requires = requires ++ other.requires,
+      requiresDirect = requiresDirect ++ other.requiresDirect,
+      ensures = ensures ++ other.ensures,
+      ensuresDirect = ensuresDirect ++ other.ensuresDirect,
+      modifies = modifies ++ other.modifies,
+      rely = rely ++ other.rely,
+      guarantee = guarantee ++ other.guarantee
+    )
+  }
+}
 
-case class ExternalFunction(name: String, offset: BigInt)
+case class ExternalFunction(name: String, offset: BigInt) derives ir.dsl.ToScala

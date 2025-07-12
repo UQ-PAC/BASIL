@@ -3,12 +3,12 @@ package analysis
 import analysis.solvers.BackwardIDESolver
 import ir.{
   Assert,
-  LocalAssign,
   Assume,
   CFGPosition,
   Command,
   DirectCall,
   IndirectCall,
+  LocalAssign,
   MemoryLoad,
   MemoryStore,
   Procedure,

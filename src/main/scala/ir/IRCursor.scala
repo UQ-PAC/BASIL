@@ -1,14 +1,16 @@
 package ir
-import util.Logger
-import cfg_visualiser.DotElement
-import cfg_visualiser.{DotArrow, DotGraph, DotInlineArrow, DotInterArrow, DotIntraArrow, DotNode, DotRegularArrow}
+import cfg_visualiser.{DotArrow, DotGraph, DotInterArrow, DotNode, DotRegularArrow}
+import translating.BasilIRPrettyPrinter
+import translating.PrettyPrinter.*
+import util.assertion.*
 
-import ir.cilvisitor.*
-import collection.mutable
 import scala.annotation.tailrec
 
-/** This file defines functions to get the successor and predecessor of a IR node for control flow.
-  */
+import collection.mutable
+
+/** 
+ *  This file defines functions to get the successor and predecessor of a IR node for control flow.
+ */
 
 /*
  * Defines a position in the IL / CFG; this becomes the lhs of the state map lattice in a static analysis.
@@ -29,11 +31,15 @@ extension (p: CFGPosition)
       case block: Block => s"Block ${block.label}"
       case command: Command => command.toString
 
-// todo: we could just use the dependencies trait directly instead to avoid the instantiation issue
-trait IRWalk[IN <: CFGPosition, NT <: CFGPosition & IN] {
+trait Walk[IN, NT] {
   def succ(pos: IN): Set[NT]
   def pred(pos: IN): Set[NT]
 }
+
+trait SCCWalk[IN <: CFGPosition, NT <: CFGPosition & IN] extends Walk[Set[IN], Set[NT]]
+
+// todo: we could just use the dependencies trait directly instead to avoid the instantiation issue
+trait IRWalk[IN <: CFGPosition, NT <: CFGPosition & IN] extends Walk[IN, NT]
 
 object IRWalk:
 
@@ -176,6 +182,37 @@ trait CallGraph extends IRWalk[Procedure, Procedure] {
 
 object CallGraph extends CallGraph
 
+/** Updates each procedure with its corresponding call graph scc
+ *  if a procedure is the only member in the scc only
+ *  update procedure if there is a self cycle in the procedure
+ */
+def updateWithCallSCC(program: Program): Unit = {
+  val sccs = stronglyConnectedComponents(CallGraph, program.procedures)
+  for (scc <- sccs) {
+    if scc.size > 1 || scc.head.calls.contains(scc.head) then {
+      scc.foreach(_.scc = Some(scc))
+    }
+  }
+}
+
+/** Walker over the Call graph SCCs
+  * Ignores any edges from the SCC to itself
+  * that is the scc will never be a pred or succ of itself
+  */
+object CallSCCWalker extends SCCWalk[Procedure, Procedure] {
+  override def succ(scc: Set[Procedure]): Set[Set[Procedure]] = {
+    // remove the scc corresponding to b from predecessor  list
+    scc.flatMap(a => CallGraph.succ(a)).map(p => p.scc.getOrElse(Set(p))) - scc
+  }
+  override def pred(scc: Set[Procedure]): Set[Set[Procedure]] = {
+    // remove the scc corresponding to b from predecessor  list
+    scc.flatMap(a => CallGraph.pred(a)).map(p => p.scc.getOrElse(Set(p))) - scc
+  }
+
+  def succ(p: Procedure): Set[Set[Procedure]] = succ(p.scc.getOrElse(Set(p)))
+  def pred(p: Procedure): Set[Set[Procedure]] = pred(p.scc.getOrElse(Set(p)))
+}
+
 // object InterProcBlockIRCursor extends InterProcBlockIRCursor
 
 /** Computes the reachability transitive closure of the CFGPositions in initial under the successor relation defined by
@@ -183,14 +220,17 @@ object CallGraph extends CallGraph
   */
 def computeDomain[T <: CFGPosition, O <: T](walker: IRWalk[T, O], initial: IterableOnce[O]): mutable.Set[O] = {
   val domain: mutable.Set[O] = mutable.Set.from(initial)
+  val added: mutable.Set[O] = mutable.Set()
 
   var sizeBefore = 0
   var sizeAfter = domain.size
   while (sizeBefore != sizeAfter) {
     for (i <- domain) {
-      domain.addAll(walker.succ(i))
-      domain.addAll(walker.pred(i))
+      added.addAll(walker.succ(i))
+      added.addAll(walker.pred(i))
     }
+    domain.addAll(added)
+    added.clear()
     sizeBefore = sizeAfter
     sizeAfter = domain.size
   }
@@ -244,7 +284,7 @@ def stronglyConnectedComponents[T <: CFGPosition, O <: T](
       out += component
     }
   }
-  assert(stack.size == 0)
+  debugAssert(stack.size == 0)
 
   out.map(_.toSet).toList
 }
@@ -283,12 +323,7 @@ def getDetachedBlocks(p: Procedure) = {
 
 def dotBlockGraph(proc: Procedure): String = {
   val o = getDetachedBlocks(proc)
-  dotBlockGraph(
-    proc.collect { case b: Block =>
-      b
-    },
-    o.reachableFromBlockEmptyPred
-  )
+  dotBlockGraph(proc.blocks.toList, o.reachableFromBlockEmptyPred)
 }
 
 def dotBlockGraph(prog: Program): String = {
@@ -300,6 +335,11 @@ def dotBlockGraph(prog: Program): String = {
     },
     e
   )
+}
+
+def dotFlowGraph(blocks: Iterable[Block], orphaned: Set[Block]): String = {
+  val labels: Map[CFGPosition, String] = Map()
+  toDot[Block](blocks.toSet, IntraProcBlockIRCursor, labels, orphaned)
 }
 
 def dotBlockGraph(blocks: Iterable[Block], orphaned: Set[Block]): String = {
@@ -332,7 +372,7 @@ def dotBlockGraph(program: Program, labels: Map[CFGPosition, String] = Map.empty
 
 def toDot[T <: CFGPosition](
   domain: Set[T],
-  iterator: IRWalk[? >: T, ?],
+  iterator: IRWalk[? >: T, T],
   labels: Map[CFGPosition, String],
   filled: Set[T]
 ): String = {
@@ -371,6 +411,16 @@ def toDot[T <: CFGPosition](
   }
 
   def getArrow(s: CFGPosition, n: CFGPosition) = {
+
+    if (!dotNodes.contains(n)) {
+      val r = n match {
+        case p: Block => (BasilIRPrettyPrinter()(p))
+        case p: Statement => (BasilIRPrettyPrinter()(p))
+        case _ => s"UNK: $n"
+      }
+      dotNodes(n) = DotNode(n.toString, r, true)
+
+    }
     if (IRWalk.procedure(n) eq IRWalk.procedure(s)) {
       DotRegularArrow(dotNodes(s), dotNodes(n))
     } else {
@@ -381,6 +431,7 @@ def toDot[T <: CFGPosition](
   for (node <- domain) {
     node match {
       case s =>
+        assert(dotNodes.contains(s))
         iterator.succ(s).foreach(n => dotArrows.addOne(getArrow(s, n)))
       //       iterator.pred(s).foreach(n => dotArrows.addOne(getArrow(s,n)))
     }
@@ -394,7 +445,7 @@ def toDot[T <: CFGPosition](
  * This doesn't implement free vars for block or proc, it just returns the rvars.
  */
 def freeVarsPos(s: CFGPosition): Set[Variable] = s match {
-  case a: LocalAssign => a.rhs.variables
+  case SimulAssign(assigns, _) => assigns.toSet.flatMap(_._2.variables)
   case a: MemoryAssign => a.rhs.variables
   case l: MemoryLoad => l.index.variables
   case a: MemoryStore => a.index.variables ++ a.value.variables

@@ -16,26 +16,10 @@ import analysis.{
 }
 import ir.*
 import util.Logger
+import util.assertion.*
 
 import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
-
-import analysis.{
-  AddressValue,
-  DataRegion,
-  Lift,
-  LiftedElement,
-  LiteralValue,
-  MemoryModelMap,
-  MemoryRegion,
-  RegisterWrapperEqualSets,
-  StackRegion,
-  Value,
-  getUse
-}
-import ir.*
-import util.Logger
-import cilvisitor.*
 
 class SteensgaardIndirectCallResolution(
   override val program: Program,
@@ -152,7 +136,7 @@ trait IndirectCallResolution {
   def process(n: CFGPosition): Boolean = n match {
     case indirectCall: IndirectCall if indirectCall.target != Register("R30", 64) && indirectCall.hasParent =>
       // we need the single-call-at-end-of-block invariant
-      assert(indirectCall.parent.statements.lastOption.contains(indirectCall))
+      debugAssert(indirectCall.parent.statements.lastOption.contains(indirectCall))
 
       val block = indirectCall.parent
       val procedure = block.parent
@@ -182,7 +166,7 @@ trait IndirectCallResolution {
             case None =>
               throw Exception(s"resolved indirect call $indirectCall to procedure which does not have address: $t")
           }
-          val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(address, 64)))
+          val assume = Assume(BinaryExpr(EQ, indirectCall.target, BitVecLiteral(address, 64)))
           val newLabel: String = block.label + t.name
           val directCall = t.makeCall()
 

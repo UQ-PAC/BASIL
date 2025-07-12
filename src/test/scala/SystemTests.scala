@@ -1,37 +1,24 @@
 import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.Retries
-import util.{DSAConfig, DebugDumpIRLogger, LogLevel, Logger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
+import test_util.BASILTest.*
+import test_util.{BASILTest, CaptureOutput, Histogram, TestConfig, TestCustomisation}
+import util.DSAPhase.TD
+import util.boogie_interaction.*
+import util.{DSConfig, DebugDumpIRLogger, LogLevel, Logger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
 
-import Numeric.Implicits.*
-import java.io.{BufferedWriter, File, FileWriter}
+import java.io.File
 import scala.collection.immutable.ListMap
 import scala.collection.mutable.ArrayBuffer
-import scala.sys.process.*
-import test_util.BASILTest
-import test_util.BASILTest.*
-import test_util.Histogram
-import test_util.TestConfig
-import test_util.LockManager
-import test_util.TestCustomisation
-import util.DSAConfig.Checks
-import util.boogie_interaction.*
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
   */
 
-object SystemTests {
-
-  /** Locks are shared by all SystemTests instances. */
-  val locks = LockManager[String]()
-}
-
-trait SystemTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest, TestCustomisation {
+trait SystemTests extends AnyFunSuite, CaptureOutput, BASILTest, TestCustomisation {
 
   /**
    * A suffix appended to output file names, in order to avoid clashes between test suites.
    */
-  def testSuiteSuffix = "_" + this.getClass.getSimpleName
+  def testSuiteSuffix: String = "_" + this.getClass.getSimpleName
 
   case class TestResult(
     name: String,
@@ -58,9 +45,9 @@ trait SystemTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest, TestC
 
   val testResults: ArrayBuffer[TestResult] = ArrayBuffer()
 
-  private val testPath = "./src/test/"
+  private val testPath = s"${BASILTest.rootDirectory}/src/test/"
 
-  override def customiseTestsByName(name: String) = Mode.Normal
+  override def customiseTestsByName(name: String): Mode = Mode.Normal
 
   def runTests(folder: String, conf: TestConfig): Unit = {
     val path = testPath + folder
@@ -191,7 +178,8 @@ trait SystemTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest, TestC
       conf.simplify,
       conf.summariseProcedures,
       dsa = conf.dsa,
-      memoryTransform = conf.memoryTransform
+      memoryTransform = conf.memoryTransform,
+      useOfflineLifterForGtirbFrontend = conf.useOfflineLifterForGtirbFrontend
     )
     val translateTime = timer.checkPoint("translate-boogie")
     Logger.info(s"$name/$variation$testSuffix DONE")
@@ -283,6 +271,34 @@ class SystemTestsGTIRB extends SystemTests {
   }
 }
 
+@test_util.tags.StandardSystemTest
+class SystemTestsGTIRBOfflineLifter extends SystemTests {
+  override def testSuiteSuffix = ""
+  runTests(
+    "correct",
+    TestConfig(
+      useBAPFrontend = false,
+      expectVerify = true,
+      checkExpected = true,
+      logResults = true,
+      useOfflineLifterForGtirbFrontend = true
+    )
+  )
+  runTests(
+    "incorrect",
+    TestConfig(
+      useBAPFrontend = false,
+      expectVerify = false,
+      checkExpected = true,
+      logResults = true,
+      useOfflineLifterForGtirbFrontend = true
+    )
+  )
+  test("summary-GTIRB") {
+    summary("testresult-GTIRBOfflineLifter")
+  }
+}
+
 @test_util.tags.Slow
 @test_util.tags.StandardSystemTest
 class ExtraSpecTests extends SystemTests {
@@ -294,7 +310,7 @@ class ExtraSpecTests extends SystemTests {
   }
 
   // some of these tests have time out issues so they need more time, but some still time out even with this for unclear reasons
-  val timeout = 30
+  val timeout = 60
   val boogieFlags = Seq("/proverOpt:O:smt.array.extensional=false")
   runTests(
     "extraspec_correct",
@@ -356,6 +372,7 @@ class NoSimplifySystemTests extends SystemTests {
   }
 }
 
+@test_util.tags.AnalysisSystemTest2
 @test_util.tags.AnalysisSystemTest
 class SimplifySystemTests extends SystemTests {
   runTests("correct", TestConfig(simplify = true, useBAPFrontend = true, expectVerify = true, logResults = true))
@@ -367,6 +384,7 @@ class SimplifySystemTests extends SystemTests {
   }
 }
 
+@test_util.tags.AnalysisSystemTest4
 @test_util.tags.AnalysisSystemTest
 class SimplifyMemorySystemTests extends SystemTests {
 
@@ -600,18 +618,61 @@ class UnimplementedTests extends SystemTests {
   runTests("unimplemented", TestConfig(useBAPFrontend = true, expectVerify = false))
 }
 
+@test_util.tags.AnalysisSystemTest4
 @test_util.tags.AnalysisSystemTest
 class IntervalDSASystemTests extends SystemTests {
-  runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, simplify = true, dsa = Some(Checks)))
+  runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig())))
+  runTests(
+    "incorrect",
+    TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSConfig()))
+  )
+}
 
-  runTests("incorrect", TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(Checks)))
+@test_util.tags.AnalysisSystemTest
+class IntervalDSASystemTestsSplitGlobals extends SystemTests {
+  runTests(
+    "correct",
+    TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig(TD, true, true)))
+  )
+
+  runTests(
+    "dsa/correct",
+    TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig(TD, true, true)))
+  )
+  runTests(
+    "incorrect",
+    TestConfig(useBAPFrontend = false, expectVerify = false, simplify = true, dsa = Some(DSConfig(TD, true, true)))
+  )
+}
+
+@test_util.tags.AnalysisSystemTest
+class IntervalDSASystemTestsEqClasses extends SystemTests {
+  runTests(
+    "correct",
+    TestConfig(useBAPFrontend = false, expectVerify = true, simplify = true, dsa = Some(DSConfig(TD, eqClasses = true)))
+  )
+  runTests(
+    "incorrect",
+    TestConfig(
+      useBAPFrontend = false,
+      expectVerify = false,
+      simplify = true,
+      dsa = Some(DSConfig(TD, eqClasses = true))
+    )
+  )
 }
 
 @test_util.tags.DisabledTest
 class MemoryTransformSystemTests extends SystemTests {
   runTests(
     "correct",
-    TestConfig(useBAPFrontend = true, expectVerify = false, simplify = true, dsa = Some(Checks), memoryTransform = true)
+    TestConfig(
+      useBAPFrontend = false,
+      expectVerify = false,
+      simplify = true,
+      dsa = Some(DSConfig()),
+      memoryTransform = true
+    )
   )
 
   runTests(
@@ -620,7 +681,7 @@ class MemoryTransformSystemTests extends SystemTests {
       useBAPFrontend = false,
       expectVerify = false,
       simplify = true,
-      dsa = Some(Checks),
+      dsa = Some(DSConfig()),
       memoryTransform = true
     )
   )

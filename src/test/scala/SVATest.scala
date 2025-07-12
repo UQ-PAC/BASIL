@@ -1,15 +1,15 @@
 import analysis.data_structure_analysis.*
+import analysis.data_structure_analysis.given
 import boogie.SpecGlobal
-import ir.Endian.LittleEndian
-import ir.dsl.*
 import ir.*
+import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
+import test_util.{CaptureOutput, programToContext}
 import util.*
-import analysis.data_structure_analysis.given
 
 @test_util.tags.UnitTest
-class SVATest extends AnyFunSuite with test_util.CaptureOutput {
+class SVATest extends AnyFunSuite with CaptureOutput {
 
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
@@ -21,24 +21,11 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
     RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
   }
 
-  def runTest(path: String): BASILResult = {
-    RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf"),
-        simplify = true,
-        staticAnalysis = None,
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-        dsaConfig = None // Some(DSAConfig(Set.empty))
-      )
-    )
-  }
-
   def runTest(context: IRContext): BASILResult = {
     RunUtils.loadAndTranslate(
       BASILConfig(
         context = Some(context),
-        loading = ILLoadingConfig(inputFile = "", relfFile = ""),
+        loading = ILLoadingConfig(inputFile = "", relfFile = None),
         simplify = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
@@ -46,19 +33,6 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
         dsaConfig = None // Some(DSAConfig(Set.empty))
       )
     )
-  }
-
-  def programToContext(
-    program: Program,
-    globals: Set[SpecGlobal] = Set.empty,
-    globalOffsets: Map[BigInt, BigInt] = Map.empty
-  ): IRContext = {
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
-    val spec = Specification(Set(), globals, Map(), List(), List(), List(), Set())
-    IRContext(List(), Set(), globals, Set(), globalOffsets, spec, program)
   }
 
   test("malloc-OSet") {
@@ -97,7 +71,8 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
     val context = programToContext(program, globals, globalOffsets)
     val results = runTest(context)
     val mainProc = results.ir.program.mainProcedure
-    val sva = getSymbolicValues(mainProc)
+    val glbs = globalIntervals(context)
+    val sva = getSymbolicValues(context, mainProc, glbs)
     val r0SVA = SymValues.getSorted(sva, "R0")
     val inParam = r0SVA.firstKey // TODO look into why there is an inParam
     assert(r0SVA(inParam) == domain.init(Par(mainProc, inParam)), "input param not set correctly")
@@ -107,7 +82,7 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
           if valueSet.state.keys.exists(_.isInstanceOf[Heap]) && valueSet.state.size == 1 =>
         valueSet
     }.get // expect exactly 1 value set matching the case
-    assert(mallocValSet.state.head._2.toOffsets == Set(0), "incorrect offset for malloc symbolic value")
+    assert(mallocValSet.state.head(1).toOffsets == Set(0), "incorrect offset for malloc symbolic value")
 
     val outPram = r0SVA.lastKey
     assert(r0SVA(outPram) == SymValSet.transform(mallocValSet, i => i + 10), "should be malloc symValueSet oplus 10")
@@ -142,7 +117,8 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
     val context = programToContext(program, globals, globalOffsets)
     val results = runTest(context)
     val main = program.mainProcedure
-    val sva = getSymbolicValues[T](main) //  results.dsa.get.sva(mainProc)
+    val glbs = globalIntervals(context)
+    val sva = getSymbolicValues[T](context, main, glbs) //  results.dsa.get.sva(mainProc)
     val r0SVA = SymValues.getSorted(sva, regName)
 
     val returnedValSet = r0SVA.collectFirst {
@@ -150,7 +126,7 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
           if valueSet.state.keys.exists(_.isInstanceOf[Ret]) && valueSet.state.size == 1 =>
         valueSet
     }.get // expect exactly 1 value set matching the case
-    assert(returnedValSet.state.head._2.toOffsets == Set(0), "incorrect offset for returned symbolic value")
+    assert(returnedValSet.state.head(1).toOffsets == Set(0), "incorrect offset for returned symbolic value")
 
     val outPram = r0SVA.lastKey
     assert(r0SVA(outPram) == SymValSet.transform(returnedValSet, i => i + 10), "should be return symValueSet oplus 10")
@@ -180,8 +156,10 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
 
     val context = programToContext(program, globals, globalOffsets)
     val main = program.mainProcedure
+    val glbs = globalIntervals(context)
+
     runTest(context)
-    val sva = getSymbolicValues[T](main) //  results.dsa.get.sva(mainProc)
+    val sva = getSymbolicValues[T](context, main, glbs) //  results.dsa.get.sva(mainProc)
 
     val R0in = LocalVar("R0_in", bv64)
     val R1in = LocalVar("R1_in", bv64)
@@ -222,8 +200,9 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
 
     val context = programToContext(program, globals, globalOffsets)
     val main = program.mainProcedure
+    val glbs = globalIntervals(context)
     runTest(context)
-    val sva = getSymbolicValues[T](main) //  results.dsa.get.sva(mainProc)
+    val sva = getSymbolicValues[T](context, main, glbs) //  results.dsa.get.sva(mainProc)
 
     val R0in = LocalVar("R0_in", bv64)
 
@@ -276,9 +255,10 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
     val R0in = LocalVar("R0_in", bv64)
 
     val context = programToContext(program, globals, globalOffsets)
+    val glbs = globalIntervals(context)
     val main = program.mainProcedure
     runTest(context)
-    val sva = getSymbolicValues[T](main) //  results.dsa.get.sva(mainProc)
+    val sva = getSymbolicValues[T](context, main, glbs) //  results.dsa.get.sva(mainProc)
 
     val domain = SymValSetDomain[T]()
     val (_, lastValSet) = SymValues.getSorted(sva, "R0").last
@@ -323,9 +303,10 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
     val R0in = LocalVar("R0_in", bv64)
 
     val context = programToContext(program, globals, globalOffsets)
+    val glbs = globalIntervals(context)
     val main = context.program.mainProcedure
     runTest(context)
-    val sva = getSymbolicValues[T](main) //  results.dsa.get.sva(mainProc)
+    val sva = getSymbolicValues[T](context, main, glbs) //  results.dsa.get.sva(mainProc)
     val R0last = SymValues.getSorted(sva, "R0").lastKey
 
     val domain = SymValSetDomain[T]()
@@ -349,10 +330,11 @@ class SVATest extends AnyFunSuite with test_util.CaptureOutput {
     val program = prog(proc("main", block("block", load, assign, ret)))
 
     val context = programToContext(program, globals, globalOffsets)
+    val glbs = globalIntervals(context)
 
     val procedure: Procedure = program.mainProcedure
     runTest(context)
-    val sva = getSymbolicValues[T](procedure) //  results.dsa.get.sva(mainProc)
+    val sva = getSymbolicValues[T](context, procedure, glbs) //  results.dsa.get.sva(mainProc)
     val r0SVA = SymValues.getSorted(sva, regName)
 
     val loadValSet = r0SVA.collectFirst {

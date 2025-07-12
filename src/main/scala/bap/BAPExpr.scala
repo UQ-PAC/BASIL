@@ -1,6 +1,6 @@
 package bap
 
-import ir._
+import ir.*
 
 /** Expression
   */

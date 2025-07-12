@@ -1,16 +1,14 @@
-import analysis.data_structure_analysis.{Global, DSInterval}
 import boogie.SpecGlobal
 import ir.*
-import ir.Endian.{BigEndian, LittleEndian}
-import ir.dsl.{block, directCall, goto, proc, prog, ret}
-import org.scalatest.Ignore
+import ir.Endian.LittleEndian
+import ir.dsl.{block, directCall, goto, indirectCall, proc, prog, ret}
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
+import test_util.{BASILTest, CaptureOutput, programToContext}
 import util.*
-import util.DSAConfig.Checks
 
 @test_util.tags.UnitTest
-class MemoryTransformTests extends AnyFunSuite with test_util.CaptureOutput {
+class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
     transforms.addReturnBlocks(program)
@@ -21,15 +19,16 @@ class MemoryTransformTests extends AnyFunSuite with test_util.CaptureOutput {
     RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
   }
 
-  def runTest(path: String): BASILResult = {
+  def runTest(relativePath: String): BASILResult = {
+    val path = s"${BASILTest.rootDirectory}/$relativePath"
     RunUtils.loadAndTranslate(
       BASILConfig(
-        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf"),
+        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = Some(path + ".relf")),
         simplify = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(Checks),
+        dsaConfig = Some(DSConfig()),
         memoryTransform = true
       )
     )
@@ -39,28 +38,15 @@ class MemoryTransformTests extends AnyFunSuite with test_util.CaptureOutput {
     RunUtils.loadAndTranslate(
       BASILConfig(
         context = Some(context),
-        loading = ILLoadingConfig(inputFile = "", relfFile = ""),
+        loading = ILLoadingConfig(inputFile = "", relfFile = None),
         simplify = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        dsaConfig = Some(Checks),
+        dsaConfig = Some(DSConfig()),
         memoryTransform = true
       )
     )
-  }
-
-  def programToContext(
-    program: Program,
-    globals: Set[SpecGlobal] = Set.empty,
-    globalOffsets: Map[BigInt, BigInt] = Map.empty
-  ): IRContext = {
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
-    val spec = Specification(Set(), globals, Map(), List(), List(), List(), Set())
-    IRContext(List(), Set(), globals, Set(), globalOffsets, spec, program)
   }
 
   test("global assignment") {
@@ -176,7 +162,7 @@ class MemoryTransformTests extends AnyFunSuite with test_util.CaptureOutput {
     assert(lassigns.size == 2)
     println(lassigns)
     val read = lassigns.collectFirst {
-      case read @ LocalAssign(lhs, rhs, label) if lhs.name.startsWith("R0") => read
+      case read @ LocalAssign(lhs, rhs, label) if lhs.name.contains("R0") => read
     }.get
     val write = lassigns.filterNot(_ == read).head
     assert(read.rhs == write.lhs)
@@ -247,7 +233,9 @@ class MemoryTransformTests extends AnyFunSuite with test_util.CaptureOutput {
           goto("k")
         ),
         block("h", goto("k")),
-        block("k", ret)
+        block("k", ret),
+        // indirect prevents unreachable blocks from being pruned.
+        block("dummy", indirectCall(R0))
       )
     )
 
@@ -435,7 +423,7 @@ class MemoryTransformTests extends AnyFunSuite with test_util.CaptureOutput {
     val results = runTest(context)
 
     val mainStores = results.ir.program.mainProcedure.collect { case m: MemoryAssign => m }
-    val loads = results.ir.program.collect { case l: LocalAssign if l.rhs.isInstanceOf[Register] => l }
+    val loads = results.ir.program.collect { case l @ LocalAssign(_, r: GlobalVar, _) => l }
     assert(mainStores.map(_.lhs).toSet.size == 1)
     assert(loads.map(_.rhs).toSet.size == 1)
     assert(loads.map(_.rhs).toSet.head == mainStores.map(_.lhs).toSet.head)

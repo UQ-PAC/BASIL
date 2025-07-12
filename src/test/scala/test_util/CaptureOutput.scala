@@ -1,7 +1,8 @@
 package test_util
 
 import org.scalatest.{Informing, TestSuite}
-import java.io.PrintStream;
+
+import java.io.PrintStream
 
 /**
  * A mixin which redirects stdout/stderr of test cases to the scalatest

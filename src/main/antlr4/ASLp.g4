@@ -13,6 +13,8 @@ stmt: 'Stmt_Assign' OPEN_PAREN lexpr COMMA expr CLOSE_PAREN # Assign
     | 'Stmt_Throw' OPEN_PAREN str=ident* CLOSE_PAREN # Throw
     ;
 
+stmteof: stmt EOF;
+
 statements: QUOTE stmt QUOTE (COMMA QUOTE stmt QUOTE)*;
 
 lvars: ident (SCOLON ident)*;

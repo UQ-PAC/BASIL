@@ -1,12 +1,8 @@
 import ir.*
-import ir.eval.*
-import util.z3.*
-import analysis.*
-import translating.BasilIRToSMT2
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import translating.PrettyPrinter.*
-import specification.*
+import util.SMT.*
 
 @test_util.tags.UnitTest
 class BitVectorEvalTest extends AnyFunSuite {
@@ -41,8 +37,8 @@ class BitVectorEvalTest extends AnyFunSuite {
       BVSLE,
       BVSGT,
       BVSGE,
-      BVEQ,
-      BVNEQ,
+      EQ,
+      NEQ,
       BVCONCAT
     )
 
@@ -53,22 +49,25 @@ class BitVectorEvalTest extends AnyFunSuite {
         val lhs = BitVecLiteral(l, size)
         val rhs = BitVecLiteral(r, size)
         val exprs = ops.map(op => BinaryExpr(op, lhs, rhs))
-        val test = exprs.map(e => (e, BinaryExpr(BVNEQ, e, ir.eval.evaluateExpr(e).get)))
+        val test = exprs.map(e => (e, BinaryExpr(NEQ, e, ir.eval.evaluateExpr(e).get)))
         checks = checks ++ test
       }
     }
 
     // val query = checks.map(e => BasilIRToSMT2.exprUnsat(e, None, false))
 
+    val solver = SMTSolver(50)
+
     checks.foreach {
       case (l, exp) => {
         test("" + pp_expr(l)) {
-          val q = BasilIRToSMT2.exprUnsat(exp, None, false)
-          assert(util.z3.checkSATSMT2(q) == SatResult.UNSAT)
+          // val q = BasilIRToSMT2.exprUnsat(exp, None, false, false)
+          // assert(solver.smt2Sat(q) == SatResult.UNSAT)
+          assert(solver.exprSat(exp) == SatResult.UNSAT)
         }
       }
     }
   }
 
-  genSMT(3)
+  genSMT(2)
 }

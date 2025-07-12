@@ -1,11 +1,46 @@
 package boogie
-import java.io.{StringWriter, Writer}
+
+import ir.Sigil
+import util.{LogLevel, Logger, PerformanceTimer}
+
+import java.io.{BufferedWriter, FileWriter, StringWriter, Writer}
+import java.nio.file.{Files, Paths}
+import scala.collection.immutable.Seq
+import scala.sys.process.*
 
 case class BProgram(declarations: List[BDeclaration], filename: String) {
   override def toString: String = declarations.flatMap(x => x.toBoogie).mkString(System.lineSeparator())
 
   def writeToString(w: Writer): Unit = {
     declarations.foreach(x => x.writeToString(w))
+  }
+
+  /**
+   * Invokes Boogie to verify the current BProgram.
+   */
+  def verifyBoogie(fname: String = "") = {
+    val temp =
+      if !fname.isEmpty then Paths.get(fname)
+      else Files.createTempFile("basil-boogie-temp", ".bpl")
+
+    val wr = BufferedWriter(FileWriter(temp.toFile))
+    try {
+      writeToString(wr)
+    } finally {
+      wr.close()
+    }
+
+    val timer = PerformanceTimer("Verify", LogLevel.INFO)
+    val cmd = Seq("boogie", "/useArrayAxioms", temp.toString)
+    Logger.info(s"Running: ${cmd.mkString(" ")}")
+
+    val output = cmd.!!
+    val result = util.boogie_interaction.parseOutput(output)
+
+    Logger.info(result.toString)
+    timer.checkPoint("Finish")
+
+    result
   }
 }
 
@@ -21,7 +56,10 @@ trait BDeclaration extends HasAttributes {
       w.append(System.lineSeparator())
     }
   }
+}
 
+case class BTypeDecl(t: CustomBType) extends BDeclaration {
+  override def toString() = s"type $t;"
 }
 
 case class BProcedure(
@@ -41,8 +79,8 @@ case class BProcedure(
     with Ordered[BProcedure] {
   override def compare(that: BProcedure): Int = name.compare(that.name)
   override def toBoogie: List[String] = {
-    val header = s"procedure $attrString$name(${in.map(_.withType).mkString(", ")})"
-    val implHeader = s"implementation $attrString$name(${in.map(_.withType).mkString(", ")})"
+    val header = s"procedure $attrString${Sigil.Boogie.proc}$name(${in.map(_.withType).mkString(", ")})"
+    val implHeader = s"implementation $attrString${Sigil.Boogie.proc}$name(${in.map(_.withType).mkString(", ")})"
     val returns = if (out.nonEmpty) {
       s" returns (${out.map(_.withType).mkString(", ")})"
     } else {

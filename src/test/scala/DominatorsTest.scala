@@ -1,12 +1,13 @@
-import org.scalatest.*
-import org.scalatest.funsuite.*
-
 import ir.*
 import ir.dsl.*
+import org.scalatest.*
+import org.scalatest.funsuite.*
+import test_util.CaptureOutput
+
 import scala.collection.immutable
 
 @test_util.tags.UnitTest
-class DominatorsTest extends AnyFunSuite with test_util.CaptureOutput {
+class DominatorsTest extends AnyFunSuite with CaptureOutput {
   import analysis.Dominators.*
 
   def domsToStringMap(doms: Result) =

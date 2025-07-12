@@ -1,19 +1,15 @@
+import boogie.*
 import ir.*
 import ir.Endian.LittleEndian
+import ir.dsl.*
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import specification.*
-import boogie.*
-import util.{RunUtils, StaticAnalysisConfig, StaticAnalysis, StaticAnalysisContext, IRContext}
-
-import java.io.IOException
-import java.nio.file.*
-import java.nio.file.attribute.BasicFileAttributes
-
-import ir.dsl.*
+import test_util.CaptureOutput
+import util.{IRContext, StaticAnalysis, StaticAnalysisConfig, StaticAnalysisContext}
 
 @test_util.tags.DisabledTest
-class PointsToTest extends AnyFunSuite with test_util.CaptureOutput with OneInstancePerTest {
+class PointsToTest extends AnyFunSuite with CaptureOutput with OneInstancePerTest {
 
   def runAnalyses(
     program: Program,
@@ -38,7 +34,7 @@ class PointsToTest extends AnyFunSuite with test_util.CaptureOutput with OneInst
   /** Test that the analysis correctly identifies the stack pointer even when it is aliased
     */
   test("stack pointer aliasing: MMM Stage") {
-    var program: Program = prog(
+    val program: Program = prog(
       proc(
         "main",
         block("0x0", LocalAssign(R6, R31), goto("0x1")),
@@ -64,7 +60,7 @@ class PointsToTest extends AnyFunSuite with test_util.CaptureOutput with OneInst
   /** Test that the analysis correctly identifies stack pointers within regions
     */
   test("approximate stack region: MMM Stage") {
-    var program: Program = prog(
+    val program: Program = prog(
       proc(
         "main",
         block(

@@ -1,36 +1,13 @@
 import ir.*
-import ir.eval._
-import java.io.{BufferedWriter, File, FileWriter}
-import ir.Endian.LittleEndian
+import ir.eval.{ExecEffect, *}
 import org.scalatest.*
 import org.scalatest.funsuite.*
-import specification.*
-import util.{
-  BASILConfig,
-  IRLoading,
-  ILLoadingConfig,
-  IRContext,
-  RunUtils,
-  StaticAnalysis,
-  StaticAnalysisConfig,
-  StaticAnalysisContext,
-  BASILResult,
-  Logger,
-  LogLevel,
-  IRTransform
-}
-import ir.eval.{interpretTrace, interpret, ExecEffect, Stopped}
 import test_util.*
+import util.{ILLoadingConfig, IRContext, IRLoading, IRTransform, LogLevel, Logger, RunUtils, StaticAnalysisConfig}
 
-import java.io.IOException
-import java.nio.file.*
-import java.nio.file.attribute.BasicFileAttributes
-import ir.dsl.*
-import util.RunUtils.loadAndTranslate
+import java.io.File
 
-import scala.collection.mutable
-
-abstract class DifferentialTest extends AnyFunSuite, test_util.CaptureOutput, TestCustomisation {
+abstract class DifferentialTest extends AnyFunSuite, CaptureOutput, TestCustomisation {
 
   override def customiseTestsByName(name: String) = name match {
     case "analysis_differential:floatingpoint/clang:GTIRB" | "analysis_differential:floatingpoint/gcc:GTIRB" =>
@@ -62,7 +39,7 @@ abstract class DifferentialTest extends AnyFunSuite, test_util.CaptureOutput, Te
       val r = InterpFuns
         .callProcedure(interpreter)(main, InterpFuns.mainDefaultFunctionArguments(main))
         .f(initialState)
-      r._1._1
+      r(0)(0)
     }
 
     val (initialRes, traceInit) = interp(initial)
@@ -106,7 +83,7 @@ abstract class DifferentialTest extends AnyFunSuite, test_util.CaptureOutput, Te
 
     val loading = ILLoadingConfig(
       inputFile = examplePath + testName + suffix,
-      relfFile = examplePath + testName + ".relf",
+      relfFile = Some(examplePath + testName + ".relf"),
       dumpIL = None,
       trimEarly = true /* no instances of indirectcalls in these examples */
     )
@@ -136,7 +113,7 @@ abstract class DifferentialTest extends AnyFunSuite, test_util.CaptureOutput, Te
 }
 
 /**
- * Disable analysis differential test because it makes no 
+ * Disable analysis differential test because it makes no
  * IR transforms, these examples contain no indirect calls.
  */
 @test_util.tags.DisabledTest
@@ -144,13 +121,13 @@ class DifferentialAnalysisTest extends DifferentialTest {
 
   def runSystemTests(): Unit = {
 
-    val path = System.getProperty("user.dir") + s"/src/test/correct/"
-    val programs: Array[String] = getSubdirectories(path)
+    val path = s"${BASILTest.rootDirectory}/src/test/correct/"
+    val programs: Array[String] = BASILTest.getSubdirectories(path)
 
     // get all variations of each program
     for (p <- programs) {
       val programPath = path + "/" + p
-      val variations = getSubdirectories(programPath)
+      val variations = BASILTest.getSubdirectories(programPath)
       variations.foreach(variation => {
         val bapPath = path + "/" + p + "/" + variation + "/" + p + ".adt"
         val gtirbPath = path + "/" + p + "/" + variation + "/" + p + ".gts"
@@ -173,18 +150,19 @@ class DifferentialAnalysisTest extends DifferentialTest {
   runSystemTests()
 }
 
+@test_util.tags.AnalysisSystemTest2
 @test_util.tags.AnalysisSystemTest
 class DifferentialAnalysisTestSimplification extends DifferentialTest {
 
   def runSystemTests(): Unit = {
 
-    val path = System.getProperty("user.dir") + s"/src/test/correct/"
-    val programs: Array[String] = getSubdirectories(path)
+    val path = s"${BASILTest.rootDirectory}/src/test/correct/"
+    val programs: Array[String] = BASILTest.getSubdirectories(path)
 
     // get all variations of each program
     for (p <- programs) {
       val programPath = path + "/" + p
-      val variations = getSubdirectories(programPath)
+      val variations = BASILTest.getSubdirectories(programPath)
       variations.foreach(variation => {
 
         val bapPath = path + "/" + p + "/" + variation + "/" + p + ".adt"

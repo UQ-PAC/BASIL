@@ -1,10 +1,6 @@
 package analysis
 
-import scala.annotation.tailrec
-import ir.{Block, Command, IntraProcIRCursor, Program, Procedure, GoTo, IRWalk}
-import ir.{LocalAssign, Assume, IntLiteral, IntType, IntEQ, BoolOR, LocalVar, BinaryExpr}
-import util.intrusive_list.IntrusiveList
-import util.StaticAnalysisLogger
+import ir.{Assume, BinaryExpr, Block, BoolOR, EQ, GoTo, IRWalk, IntLiteral, IntType, LocalAssign, LocalVar, Program}
 
 import scala.collection.mutable
 
@@ -376,7 +372,7 @@ object LoopTransform {
 
     P_e.groupBy(_.to).map { (destBlock, origins) =>
       val idexs = origins.map { b =>
-        BinaryExpr(IntEQ, LocalVar("FromEntryIdx", IntType), IntLiteral(BigInt(entryids(b.from))))
+        BinaryExpr(EQ, LocalVar("FromEntryIdx", IntType), IntLiteral(BigInt(entryids(b.from))))
       }
       idexs.toList match {
         case Nil => ()

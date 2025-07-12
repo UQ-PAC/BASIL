@@ -40,7 +40,7 @@ object ApiServer extends IOApp {
     
     val ilConfig = ILLoadingConfig(
       inputFile = "src/test/correct/secret_write/gcc/secret_write.adt",
-      relfFile = "src/test/correct/secret_write/gcc/secret_write.relf",
+      relfFile = Some("src/test/correct/secret_write/gcc/secret_write.relf"),
       //specFile = Some("path/to/spec"), // for a potential spec file
       dumpIL = None
     )

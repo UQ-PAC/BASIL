@@ -1,9 +1,10 @@
 package util.intrusive_list
 
 import org.scalatest.funsuite.AnyFunSuite
+import test_util.CaptureOutput
 
 @test_util.tags.UnitTest
-class IntrusiveListTest extends AnyFunSuite with test_util.CaptureOutput {
+class IntrusiveListTest extends AnyFunSuite with CaptureOutput {
   case class Elem(t: Float) extends IntrusiveListElement[Elem]
 
   test("basic") {
@@ -65,6 +66,23 @@ class IntrusiveListTest extends AnyFunSuite with test_util.CaptureOutput {
     p2.remove()
     assert(p3.first() == p0)
     assert(p0.last() == p3)
+  }
+
+  test("ListElem prepend") {
+    val p0 = Elem(10)
+    val p1 = Elem(9)
+
+    val (x, y, z) = (Elem(1), Elem(2), Elem(3))
+
+    val ps = List(x, y, z)
+    val lst = IntrusiveList[Elem]()
+
+    lst.append(p0)
+    lst.append(p1)
+    lst.prependAll(ps)
+
+    assert(lst.toList == List(x, y, z, p0, p1))
+
   }
 
   // test("IntrusiveList insertRemove")

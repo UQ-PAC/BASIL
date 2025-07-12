@@ -1,8 +1,6 @@
 package analysis
 
-import boogie.*
 import ir.*
-import ir.transforms.{AbstractDomain, worklistSolver}
 
 type VarGammaMap = LatticeMap[Variable, LatticeSet[Variable]]
 
@@ -22,12 +20,15 @@ implicit val variableLatticeSetTerm: LatticeSet[Variable] = LatticeSet.Bottom()
  * underapproximation, we have the invariants that Gamma_x <= Join(S_o) and Join(S_u) <= Gamma_x.
  */
 trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[Variable, LatticeSet[Variable]] {
-  import LatticeMap.{Top, Bottom, TopMap, BottomMap}
 
   def transfer(m: VarGammaMap, c: Command): VarGammaMap = {
     c match {
       case c: LocalAssign =>
         m + (c.lhs -> c.rhs.variables.foldLeft(LatticeSet.Bottom[Variable]())((s, v) => s.union(m(v))))
+      case c: SimulAssign =>
+        m ++ c.assignments
+          .map((lhs, rhs) => lhs -> rhs.variables.foldLeft(LatticeSet.Bottom[Variable]())((s, v) => s.union(m(v))))
+          .toMap
       case c: MemoryAssign =>
         m + (c.lhs -> c.rhs.variables.foldLeft(LatticeSet.Bottom[Variable]())((s, v) => s.union(m(v))))
       case c: MemoryLoad => m + (c.lhs -> topTerm)
@@ -108,6 +109,7 @@ class ReachabilityConditions extends PredicateEncodingDomain[Predicate] {
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
       case a: LocalAssign => b
+      case a: SimulAssign => b
       case c: MemoryAssign => b
       case a: MemoryLoad => b
       case m: MemoryStore => b
@@ -146,10 +148,15 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
 
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
-      case a: LocalAssign =>
-        b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get)
-          .replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get)
-          .simplify
+      case SimulAssign(assignments, label) =>
+        val vs = assignments.map((lhs, rhs) => BVTerm.Var(lhs) -> exprToBVTerm(rhs).get)
+        val gamms = assignments.map((lhs, rhs) => GammaTerm.Var(lhs) -> exprToGammaTerm(rhs).get)
+        val nb = vs.foldLeft(b) { case (a, (l, r)) =>
+          a.replace(l, r)
+        }
+        gamms.foldLeft(nb) { case (a, (l, r)) =>
+          a.replace(l, r)
+        }
       case a: MemoryAssign =>
         b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get)
           .replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get)
@@ -158,12 +165,12 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
       case m: MemoryStore => b
       case a: Assume => {
         if (a.checkSecurity) {
-          and(b, exprToPredicate(a.body).get, lowExpr(a.body)).simplify
+          and(b, expectPredicate(a.body), lowExpr(a.body)).simplify
         } else {
-          and(b, exprToPredicate(a.body).get).simplify
+          and(b, expectPredicate(a.body)).simplify
         }
       }
-      case a: Assert => and(b, exprToPredicate(a.body).get).simplify
+      case a: Assert => and(b, expectPredicate(a.body)).simplify
       case i: IndirectCall => top
       case c: DirectCall =>
         c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>
@@ -186,6 +193,13 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
   override def fromPred(p: Predicate): Predicate = p
 }
 
+private def expectPredicate(orig: Expr): Predicate = {
+  exprToPredicate(orig) match {
+    case Some(p) => p
+    case None => throw Exception(s"Expected to be able to construct predicate for: $orig")
+  }
+}
+
 /**
  * An abstract domain which computes conditions (as predicates) for assertions (including the check that gammas are low on branches) to be violated.
  *
@@ -205,10 +219,16 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
 
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
-      case a: LocalAssign =>
-        b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get)
-          .replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get)
-          .simplify
+      case SimulAssign(assigns, _) => {
+        val terms = assigns.map((l, r) => (BVTerm.Var(l), exprToBVTerm(r).get))
+        val gammas = assigns.map((l, r) => (GammaTerm.Var(l), exprToGammaTerm(r).get))
+        val nb = terms.foldLeft(b) { case (acc, (l, r)) =>
+          acc.replace(l, r)
+        }
+        gammas.foldLeft(nb) { case (acc, (l, r)) =>
+          acc.replace(l, r)
+        }
+      }
       case a: MemoryAssign =>
         b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get)
           .replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get)
@@ -217,12 +237,12 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
       case m: MemoryStore => b
       case a: Assume => {
         if (a.checkSecurity) {
-          or(and(b, exprToPredicate(a.body).get), not(lowExpr(a.body))).simplify
+          or(and(b, expectPredicate(a.body)), not(lowExpr(a.body))).simplify
         } else {
-          and(b, exprToPredicate(a.body).get).simplify
+          and(b, expectPredicate(a.body)).simplify
         }
       }
-      case a: Assert => or(b, not(exprToPredicate(a.body).get)).simplify
+      case a: Assert => or(b, not(expectPredicate(a.body))).simplify
       case i: IndirectCall => bot
       case c: DirectCall =>
         not(c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>

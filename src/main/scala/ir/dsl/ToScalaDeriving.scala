@@ -1,8 +1,10 @@
 package ir.dsl
 
-import util.{Twine, intersperse}
-import scala.deriving.{Mirror}
-import scala.compiletime.{summonInline, erasedValue, constValue, error}
+import util.intersperse
+import util.twine.Twine
+
+import scala.compiletime.{constValue, erasedValue, error, summonInline}
+import scala.deriving.Mirror
 
 /**
  * ToScala deriving
@@ -287,7 +289,7 @@ object ToScalaDeriving {
       case _: scala.reflect.Enum => name + "."
       case _ => ""
 
-    prefix #:: instances(idx).asInstanceOf[ToScala[T]].toScalaLines(x)
+    Twine(prefix, instances(idx).asInstanceOf[ToScala[T]].toScalaLines(x))
 
   /**
    * Implements ToScala instance for the given value of a product type.
@@ -301,16 +303,22 @@ object ToScalaDeriving {
     inline isSingleton: Boolean,
     x: T
   ): Twine =
-    val args = inline isSingleton match
-      case true => LazyList()
-      case false =>
-        val elems = x.asInstanceOf[Product].productIterator
-        val args = (instances.iterator zip elems)
-          .map((f, x) => f.asInstanceOf[ToScala[Any]].toScalaLines(x))
-          .to(LazyList)
-        "(" #:: (args.intersperse(LazyList(", ")).flatten ++: LazyList(")"))
 
-    name #:: args
+    val (open, close) = inline isSingleton match
+      case true => ("", "")
+      case false => ("(", ")")
+
+    val args =
+      val elems = x.asInstanceOf[Product].productIterator
+      (instances.iterator zip elems)
+        .map((f, x) => f.asInstanceOf[ToScala[Any]].toScalaLines(x))
+        .toList
+
+    if (args.exists(Twine.shallowIsMultiline)) {
+      Twine.indentNested(name + open, args, close)
+    } else {
+      Twine(name + open, Twine(args.intersperse(", ")), close)
+    }
 
   /**
    * Helper class for wrapping a lambda function into a ToScala instance,

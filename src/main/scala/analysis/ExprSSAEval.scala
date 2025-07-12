@@ -1,7 +1,5 @@
 package analysis
 import ir.*
-import util.Logger
-import ir.eval.BitVectorEval
 
 import scala.annotation.tailrec
 

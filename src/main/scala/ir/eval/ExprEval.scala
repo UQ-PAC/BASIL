@@ -1,8 +1,8 @@
 package ir.eval
-import ir.eval.BitVectorEval
+import ir.*
 import ir.cilvisitor.*
+import util.assertion.*
 import util.functional.State
-import ir._
 
 /** We generalise the expression evaluator to a partial evaluator to simplify evaluating casts.
   *
@@ -34,12 +34,12 @@ def evalBVBinExpr(b: BVBinOp, l: BitVecLiteral, r: BitVecLiteral): BitVecLiteral
     case BVASHR => BitVectorEval.smt_bvashr(l, r)
     case BVCOMP => BitVectorEval.smt_bvcomp(l, r)
     case BVCONCAT => BitVectorEval.smt_concat(l, r)
-    case BVULE | BVULT | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE | BVEQ | BVNEQ =>
+    case BVULE | BVULT | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
       throw IllegalArgumentException("Did not expect logical op")
   }
 }
 
-def evalBVLogBinExpr(b: BVBinOp, l: BitVecLiteral, r: BitVecLiteral): Boolean = b match {
+def evalBVLogBinExpr(b: BVBinOp | PolyCmp, l: BitVecLiteral, r: BitVecLiteral): Boolean = b match {
   case BVULE => BitVectorEval.smt_bvule(l, r)
   case BVUGT => BitVectorEval.smt_bvugt(l, r)
   case BVUGE => BitVectorEval.smt_bvuge(l, r)
@@ -48,16 +48,16 @@ def evalBVLogBinExpr(b: BVBinOp, l: BitVecLiteral, r: BitVecLiteral): Boolean = 
   case BVSLE => BitVectorEval.smt_bvsle(l, r)
   case BVSGT => BitVectorEval.smt_bvsgt(l, r)
   case BVSGE => BitVectorEval.smt_bvsge(l, r)
-  case BVEQ => BitVectorEval.smt_bveq(l, r)
-  case BVNEQ => BitVectorEval.smt_bvneq(l, r)
+  case EQ => BitVectorEval.smt_bveq(l, r)
+  case NEQ => BitVectorEval.smt_bvneq(l, r)
   case BVADD | BVSUB | BVMUL | BVUDIV | BVSDIV | BVSREM | BVUREM | BVSMOD | BVAND | BVOR | BVXOR | BVNAND | BVNOR |
       BVXNOR | BVSHL | BVLSHR | BVASHR | BVCOMP | BVCONCAT =>
     throw IllegalArgumentException("Did not expect non-logical op")
 }
 
-def evalIntLogBinExpr(b: IntBinOp, l: BigInt, r: BigInt): Boolean = b match {
-  case IntEQ => l == r
-  case IntNEQ => l != r
+def evalIntLogBinExpr(b: IntBinOp | PolyCmp, l: BigInt, r: BigInt): Boolean = b match {
+  case EQ => l == r
+  case NEQ => l != r
   case IntLT => l < r
   case IntLE => l <= r
   case IntGT => l > r
@@ -71,16 +71,15 @@ def evalIntBinExpr(b: IntBinOp, l: BigInt, r: BigInt): BigInt = b match {
   case IntMUL => l * r
   case IntDIV => l / r
   case IntMOD => l % r
-  case IntEQ | IntNEQ | IntLT | IntLE | IntGT | IntGE => throw IllegalArgumentException("Did not expect logical op")
+  case IntLT | IntLE | IntGT | IntGE => throw IllegalArgumentException("Did not expect logical op")
 }
 
-def evalBoolLogBinExpr(b: BoolBinOp, l: Boolean, r: Boolean): Boolean = b match {
-  case BoolEQ => l == r
-  case BoolEQUIV => l == r
-  case BoolNEQ => l != r
+def evalBoolLogBinExpr(b: BoolBinOp | PolyCmp, l: Boolean, r: Boolean): Boolean = b match {
   case BoolAND => l && r
   case BoolOR => l || r
   case BoolIMPLIES => l || (!r)
+  case EQ => l == r
+  case NEQ => l != r
 }
 
 def evalUnOp(op: UnOp, body: Literal): Literal = {
@@ -176,6 +175,8 @@ def fastPartialEvalExprTopLevel(exp: Expr): (Expr, Boolean) = {
   var didAnything = true
   val r = exp match {
     case UnaryExpr(op, l: Literal) => logSimp(exp, evalUnOp(op, l))
+    case BinaryExpr(EQ, l: Literal, r: Literal) => if (l == r) then TrueLiteral else FalseLiteral
+    case BinaryExpr(NEQ, l: Literal, r: Literal) => if (l != r) then TrueLiteral else FalseLiteral
     case BinaryExpr(op: BVBinOp, l: BitVecLiteral, r: BitVecLiteral) if exp.getType.isInstanceOf[BitVecType] =>
       logSimp(exp, evalBVBinExpr(op, l, r))
     case BinaryExpr(op: IntBinOp, l: IntLiteral, r: IntLiteral) if exp.getType == IntType =>
@@ -190,7 +191,7 @@ def fastPartialEvalExprTopLevel(exp: Expr): (Expr, Boolean) = {
     case SignExtend(e, l: BitVecLiteral) => logSimp(exp, BitVectorEval.smt_sign_extend(e, l))
     case Extract(e, b, l: BitVecLiteral) => logSimp(exp, BitVectorEval.boogie_extract(e, b, l))
     case Repeat(reps, b: BitVecLiteral) => {
-      assert(reps > 0)
+      debugAssert(reps > 0)
       if (reps == 1) logSimp(exp, b)
       else {
         logSimp(exp, (2 to reps).foldLeft(b)((acc, r) => BitVectorEval.smt_concat(acc, b)))
@@ -207,10 +208,13 @@ def fastPartialEvalExprTopLevel(exp: Expr): (Expr, Boolean) = {
 def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S, Expr, InterpreterError] = {
   val eval = statePartialEvalExpr(l)
   val ns = exp match {
+    case m: SharedMemory => State.pure(m)
+    case m: StackMemory => State.pure(m)
+    case b: AssocExpr => eval(b.toBinaryExpr)
     case f: OldExpr => State.pure(f)
     case f: QuantifierExpr => State.pure(f)
     case e: LambdaExpr => State.pure(e)
-    case f: UninterpretedFunction => State.pure(f)
+    case f: FApplyExpr => State.pure(f)
     case unOp: UnaryExpr =>
       for {
         body <- eval(unOp.arg)
@@ -224,6 +228,7 @@ def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S,
         rhs <- eval(binOp.arg2)
       } yield (binOp.getType match {
         case m: MapType => binOp
+        case m: CustomSort => binOp
         case b: BitVecType => {
           (binOp.op, lhs, rhs) match {
             case (o: BVBinOp, l: BitVecLiteral, r: BitVecLiteral) => evalBVBinExpr(o, l, r)
@@ -233,6 +238,8 @@ def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S,
         case BoolType => {
           def bool2lit(b: Boolean) = if b then TrueLiteral else FalseLiteral
           (binOp.op, lhs, rhs) match {
+            case (EQ, l: Literal, r: Literal) => bool2lit(l == r)
+            case (NEQ, l: Literal, r: Literal) => bool2lit(l != r)
             case (o: BVBinOp, l: BitVecLiteral, r: BitVecLiteral) => bool2lit(evalBVLogBinExpr(o, l, r))
             case (o: IntBinOp, l: IntLiteral, r: IntLiteral) => bool2lit(evalIntLogBinExpr(o, l.value, r.value))
             case (o: BoolBinOp, l: BoolLit, r: BoolLit) => bool2lit(evalBoolLogBinExpr(o, l.value, r.value))
@@ -272,7 +279,7 @@ def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S,
         body <- eval(r.body)
       } yield (body match {
         case b: BitVecLiteral => {
-          assert(r.repeats > 0)
+          debugAssert(r.repeats > 0)
           if (r.repeats == 1) b
           else {
             (2 to r.repeats).foldLeft(b)((acc, r) => BitVectorEval.smt_concat(acc, b))
@@ -316,4 +323,34 @@ def partialEvalExpr(
     case Right(e) => e
     case Left(e) => throw Exception(s"Unable to evaluate expr  $exp :" + e.toString)
   }
+}
+
+def evalLambdaApply(definition: LambdaExpr, apply: FApplyExpr): Expr = {
+  require(apply.params.toList.map(_.getType) == definition.binds.toList.map(_.getType))
+  val params = definition.binds.toList.zip(apply.params).toMap[Variable, Expr].get
+  visit_expr(SubstOnce(params), definition.body)
+}
+
+class SubstOnce(s: Variable => Option[Expr]) extends CILVisitor {
+
+  var scopeStack = List[Set[Variable]]()
+
+  override def enter_scope(bound: Iterable[Variable]): Unit = {
+    scopeStack = bound.toSet :: scopeStack
+  }
+  override def leave_scope(): Unit =
+    scopeStack = scopeStack match {
+      case h :: tl => tl
+      case Nil => Nil
+    }
+
+  def isBound(v: Variable) = {
+    scopeStack.exists(_.contains(v))
+  }
+
+  override def vexpr(e: Expr) = e match {
+    case v: Variable if (!isBound(v)) => ChangeTo(s(v).getOrElse(v))
+    case _ => DoChildren()
+  }
+
 }

@@ -1,30 +1,15 @@
 import analysis.{InterLiveVarsAnalysis, TwoElementTop}
 import ir.dsl.*
-import ir.{
-  BitVecLiteral,
-  Block,
-  BitVecType,
-  dsl,
-  LocalAssign,
-  LocalVar,
-  Program,
-  Register,
-  Statement,
-  Variable,
-  transforms,
-  cilvisitor,
-  Procedure
-}
-import util.{Logger, LogLevel}
+import ir.{BitVecLiteral, Block, LocalAssign, Program, Register, Variable, cilvisitor, dsl, transforms}
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.BASILTest
-import util.{BASILResult, StaticAnalysisConfig}
+import test_util.{BASILTest, CaptureOutput}
 import translating.PrettyPrinter.*
+import util.{BASILResult, LogLevel, Logger, StaticAnalysisConfig}
 
 @test_util.tags.UnitTest
-class LiveVarsAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILTest {
+class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
   Logger.setLevel(LogLevel.ERROR)
-  private val correctPath = "./src/test/correct/"
+  private val correctPath = s"${BASILTest.rootDirectory}/src/test/correct/"
   def runExample(name: String): BASILResult = {
     val inputFile = correctPath + s"/$name/gcc/$name.adt"
     val relfFile = correctPath + s"/$name/gcc/$name.relf"
@@ -258,9 +243,10 @@ class LiveVarsAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILT
     val result: BASILResult = runExample("basic_arrays_write")
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.labelToBlock
+    println(blocks)
 
     // main has a parameter, R0 should be alive
-    assert(analysisResults(blocks("lmain")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(analysisResults(blocks("main_entry")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop))
   }
 
   test("function") {
@@ -268,11 +254,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILT
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.labelToBlock
 
-    val lmain = blocks("lmain")
+    val lmain = blocks("main_entry")
     val laftercall = lmain.singleSuccessor.head
     // checks function call blocks
     assert(analysisResults(lmain) == Map(R29 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
-    assert(analysisResults(blocks("lget_two")) == Map(R31 -> TwoElementTop))
+    assert(analysisResults(blocks("get_two_entry")) == Map(R31 -> TwoElementTop))
     assert(analysisResults(laftercall) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block
   }
 
@@ -280,17 +266,8 @@ class LiveVarsAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILT
     val result: BASILResult = runExample("basic_function_call_caller")
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.labelToBlock
-    info("bean1")
-    info(
-      analysisResults.keySet
-        .collect { case b: Block =>
-          b.label
-        }
-        .mkString("; ")
-    )
-    info("bean2")
 
-    val lmain = blocks("lmain")
+    val lmain = blocks("main_entry")
     val laftercall = lmain.singleSuccessor.head
     // main has parameter, callee (zero) has return and no parameter
     assert(
@@ -301,9 +278,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILT
         R31 -> TwoElementTop
       )
     )
-    assert(analysisResults(blocks("lzero")) == Map(R31 -> TwoElementTop))
+    assert(analysisResults(blocks("zero_entry")) == Map(R31 -> TwoElementTop))
     assert(analysisResults(laftercall) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block
-    assert(analysisResults(blocks("lzero").parent.returnBlock.get) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(
+      analysisResults(blocks("zero_entry").parent.returnBlock.get) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)
+    )
   }
 
   test("function1") {
@@ -311,7 +290,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILT
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.labelToBlock
 
-    val lmain = blocks("lmain")
+    val lmain = blocks("main_entry")
     val l_get_two_aftercall = lmain.singleSuccessor.head
     val l_printf_aftercall = l_get_two_aftercall.singleSuccessor.head
     // main has no parameters, get_two has three and a return
@@ -345,10 +324,14 @@ class LiveVarsAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILT
     ) // get_two aftercall
     assert(analysisResults(l_printf_aftercall) == Map(R31 -> TwoElementTop)) // printf aftercall
     assert(
-      analysisResults(blocks("lget_two")) == main ++ Map(R0 -> TwoElementTop, R1 -> TwoElementTop, R2 -> TwoElementTop)
+      analysisResults(blocks("get_two_entry")) == main ++ Map(
+        R0 -> TwoElementTop,
+        R1 -> TwoElementTop,
+        R2 -> TwoElementTop
+      )
     )
     assert(
-      analysisResults(blocks("lget_two").parent.returnBlock.get) == main ++ Map(
+      analysisResults(blocks("get_two_entry").parent.returnBlock.get) == main ++ Map(
         R0 -> TwoElementTop,
         R2 -> TwoElementTop,
         R31 -> TwoElementTop
@@ -361,7 +344,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite, test_util.CaptureOutput, BASILT
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.labelToBlock
 
-    val gotoBlocks = blocks.filterKeys(_.startsWith("lmain_goto_")).toMap
+    val gotoBlocks = result.ir.program.procedures
+      .flatMap(_.blocks)
+      .filter(_.nextBlocks.size > 1)
+      .flatMap(b => b.nextBlocks.map(nb => nb.label -> nb))
+      .toMap
     assert(gotoBlocks.size == 2)
 
     val blockAfterBranch = gotoBlocks.values.map(_.singleSuccessor.head.singleSuccessor.head).toSet

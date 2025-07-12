@@ -1,12 +1,13 @@
-import ir.eval.BitVectorEval._
 import ir.*
+import ir.eval.BitVectorEval.*
 import org.scalatest.funsuite.AnyFunSuite
+import test_util.CaptureOutput
 import util.Logger
 
 import scala.runtime.stdLibPatches.Predef.assert
 
 @test_util.tags.UnitTest
-class BitVectorAnalysisTests extends AnyFunSuite with test_util.CaptureOutput {
+class BitVectorAnalysisTests extends AnyFunSuite with CaptureOutput {
 
   test("BitVector to Natural - should convert BitVector to natural number") {
     val result = bv2nat(BitVecLiteral(2, 4))

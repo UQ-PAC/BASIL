@@ -1,6 +1,6 @@
 package ir
 
-import boogie._
+import boogie.*
 
 sealed trait IRType(val name: String) {
   override def toString: String = name
@@ -13,6 +13,10 @@ case object BoolType extends IRType("bool") {
 
 case object IntType extends IRType("int") {
   override def toBoogie: BType = IntBType
+}
+
+case class CustomSort(sortName: String) extends IRType(sortName) {
+  override def toBoogie: BType = CustomBType(name)
 }
 
 case class BitVecType(size: Int) extends IRType("bv" + size) {
@@ -37,9 +41,10 @@ def curryFunctionType(t: IRType, acc: List[IRType] = List()): (List[IRType], IRT
 
 def coerceToBool(e: Expr): Expr = {
   e.getType match {
-    case BitVecType(s) => BinaryExpr(BVNEQ, e, BitVecLiteral(0, s))
-    case IntType => BinaryExpr(IntNEQ, e, IntLiteral(0))
+    case BitVecType(s) => BinaryExpr(NEQ, e, BitVecLiteral(0, s))
+    case IntType => BinaryExpr(NEQ, e, IntLiteral(0))
     case BoolType => e
     case MapType(_, _) => ???
+    case _ => ???
   }
 }

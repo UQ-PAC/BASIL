@@ -1,44 +1,48 @@
 package ir
 
-import scala.collection.mutable
-import scala.collection.immutable.*
-import org.scalatest.funsuite.AnyFunSuite
-import util.intrusive_list.*
-import translating.serialiseIL
-import ir.dsl.*
 import ir.*
-import util.{
-  BASILConfig,
-  BASILResult,
-  BoogieGeneratorConfig,
-  ILLoadingConfig,
-  RunUtils,
-  StaticAnalysisConfig,
-  Logger,
-  LogLevel
-}
-import translating.PrettyPrinter
+import ir.dsl.*
+import org.scalactic.*
+import org.scalatest.funsuite.AnyFunSuite
+import test_util.{BASILTest, CaptureOutput}
+import translating.PrettyPrinter.*
+import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, LogLevel, Logger}
 
-import org.scalactic.Prettifier
-import org.scalactic._
+import scala.collection.immutable.*
 
 @test_util.tags.UnitTest
-class IRToDSLTest extends AnyFunSuite with test_util.CaptureOutput {
+class IRToDSLTest extends AnyFunSuite with CaptureOutput {
+
+  override def withFixture(test: NoArgTest) = {
+    DeepEquality.debug.withValue(true) {
+      super.withFixture(test)
+    }
+  }
 
   val mainproc = proc(
     "main",
     block(
       "l_main",
       LocalAssign(R0, bv64(10)),
-      LocalAssign(R1, bv64(10)),
-      directCall("p1"),
-      indirectCall(R0),
-      goto("returntarget")
+      LocalAssign(R1, bv64(10)).setComment(Some("comm:assign")),
+      directCall("p1").copy(comment = Some("comm:direct")),
+      indirectCall(R0).copy(comment = Some("comm:indirect")),
+      goto("returntarget").copy(comment = Some("comm:return~"))
     ),
     block("returntarget", ret)
   ).cloneable
 
   val p = prog(mainproc, proc("p1", block("b1", LocalAssign(R0, bv64(10)), ret)))
+
+  /*
+   * Strongest structural equality on programs (including labels and comments)
+   */
+  inline def assertDeepEquality[T <: DeepEquality](expected: T)(actual: T) = {
+    assert(
+      expected.deepEqualsDbg(actual),
+      s"deep equality ${expected.getClass.getSimpleName} != ${actual.getClass.getSimpleName}"
+    )
+  }
 
   /**
    * Compares expected and actual by first converting both to their
@@ -46,8 +50,22 @@ class IRToDSLTest extends AnyFunSuite with test_util.CaptureOutput {
    *
    * Used as a quick fix to get structural equality.
    */
-  inline def assertResultWithToString[T](expected: T)(actual: T) = {
-    assertResult(expected.toString)(actual.toString)
+  inline def assertPrintedEquality[T <: PrettyPrintable](expected: T)(actual: T) = {
+    assert(expected.pprint == actual.pprint, s"pretty printed equality")
+  }
+
+  /**
+   * Asserts structural equality on the IR via after a round-trip through the parser
+   */
+  inline def assertSerialisedParsedEqual(expected: Program) = {
+    val expectedStr = expected.pprint
+    val actual = ir.parsing.ParseBasilIL.loadILString(expectedStr).program
+    val actualStr = actual.pprint
+    assert(expectedStr == actualStr, "serialise-parse serialisation not equal")
+    assert(
+      expected.deepEqualsDbg(actual),
+      s"serialise-parse deep equality ${expected.getClass.getSimpleName} != ${actual.getClass.getSimpleName}"
+    )
   }
 
   /**
@@ -60,17 +78,17 @@ class IRToDSLTest extends AnyFunSuite with test_util.CaptureOutput {
    */
   test("commands to dsl") {
     val lassign = LocalAssign(R0, bv64(10))
-    assertResultWithToString(CloneableStatement(lassign)) {
+    assertDeepEquality(CloneableStatement(lassign)) {
       IRToDSL.convertStatement(lassign)
     }
 
     val directcallstmt = p.preOrderIterator.collectFirst { case x: DirectCall => x }.head
-    assertResult(directCall("p1")) {
+    assertResult(directCall("p1").copy(comment = Some("comm:direct"))) {
       IRToDSL.convertStatement(directcallstmt)
     }
 
     val gotostmt = p.preOrderIterator.collectFirst { case x: GoTo => x }.head
-    assertResult(goto("returntarget")) {
+    assertResult(goto("returntarget").copy(comment = Some("comm:return~"))) {
       IRToDSL.convertJump(gotostmt)
     }
 
@@ -80,22 +98,21 @@ class IRToDSLTest extends AnyFunSuite with test_util.CaptureOutput {
     }
 
     val indircall = p.preOrderIterator.collectFirst { case x: IndirectCall => x }.head
-    assertResult(indirectCall(R0)) {
+    assertResult(indirectCall(R0).copy(comment = Some("comm:indirect"))) {
       IRToDSL.convertStatement(indircall)
     }
   }
 
   test("proc to dsl") {
     val procedure = p.nameToProcedure("main")
-    assertResultWithToString(mainproc) {
-      IRToDSL.convertProcedure(procedure)
-    }
+    val n = IRToDSL.convertProcedure(procedure)
+    assertDeepEquality(mainproc)(n)
   }
 
   test("prog to dsl") {
-    assertResultWithToString(p) {
-      IRToDSL.convertProgram(p).resolve
-    }
+    val n = IRToDSL.convertProgram(p).resolve
+    assertDeepEquality(p)(n)
+    assertSerialisedParsedEqual(p)
   }
 
   test("function1 procs to dsl (with params)") {
@@ -105,24 +122,24 @@ class IRToDSLTest extends AnyFunSuite with test_util.CaptureOutput {
     // for each procedure, check that the conversion is correct,
     // i.e., is structurally equal to the original dsl procedure
     (dslprog.allProcedures zip irprog.procedures).foreach { case (dslproc, proc) =>
-      assertResultWithToString(dslproc) { IRToDSL.convertProcedure(proc) }
+      assertDeepEquality(dslproc) { IRToDSL.convertProcedure(proc) }
     }
   }
 
   test("function1 prog to dsl (with params)") {
     val p = IRToDSLTestData.function1.resolve
-    assertResultWithToString(p) {
-      IRToDSL.convertProgram(p).resolve
-    }
+    val cloned = IRToDSL.convertProgram(p).resolve
+    assertDeepEquality(p)(cloned)
   }
 
   test("equality on loaded ir params") {
     Logger.setLevel(LogLevel.ERROR)
-    val path = "src/test/correct/function1/gcc/function1"
+    val path = s"${BASILTest.rootDirectory}/src/test/correct/function1/gcc/function1"
 
     val loaded = util.RunUtils.loadAndTranslate(
       BASILConfig(
-        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf", specFile = None, dumpIL = None),
+        loading =
+          ILLoadingConfig(inputFile = path + ".adt", relfFile = Some(path + ".relf"), specFile = None, dumpIL = None),
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out.bpl",
@@ -139,8 +156,8 @@ class IRToDSLTest extends AnyFunSuite with test_util.CaptureOutput {
       }
     }
 
-    prog.sortProceduresRPO()
-    cloned.sortProceduresRPO()
+    // prog.sortProceduresRPO()
+    // cloned.sortProceduresRPO()
 
     val main = prog.mainProcedure
     val clonedMain = cloned.mainProcedure
@@ -163,24 +180,27 @@ class IRToDSLTest extends AnyFunSuite with test_util.CaptureOutput {
 
       for (b <- p.blocks) {
         assert(clonedBlocks.contains(b.label))
-        assert(PrettyPrinter.pp_block(b) == PrettyPrinter.pp_block(clonedBlocks(b.label)))
+        assert(b.deepEquals(clonedBlocks(b.label)))
       }
     }
+    assertDeepEquality(prog)(cloned)
+    assertPrintedEquality(prog)(cloned)
+    assertSerialisedParsedEqual(prog)
 
     // info(PrettyPrinter.pp_prog(cloned))
   }
 
   test("equality on loaded ir no params") {
     Logger.setLevel(LogLevel.ERROR)
-    val path = "src/test/correct/function1/gcc/function1"
+    val path = s"${BASILTest.rootDirectory}/src/test/correct/function1/gcc/function1"
 
     val loaded = util.RunUtils.loadAndTranslate(
       BASILConfig(
-        loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = path + ".relf", specFile = None, dumpIL = None),
+        loading =
+          ILLoadingConfig(inputFile = path + ".adt", relfFile = Some(path + ".relf"), specFile = None, dumpIL = None),
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out.bpl",
-        simplify = false
+        outputPrefix = "boogie_out.bpl"
       )
     )
 
@@ -207,8 +227,9 @@ class IRToDSLTest extends AnyFunSuite with test_util.CaptureOutput {
     assert(clonedMain.formalInParam == main.formalInParam)
     assert(clonedMain.formalOutParam == main.formalOutParam)
 
-    assertResultWithToString(PrettyPrinter.pp_prog(prog))(PrettyPrinter.pp_prog(cloned))
-    // info(PrettyPrinter.pp_prog(cloned))
+    assertDeepEquality(prog)(cloned)
+    assertPrintedEquality(prog)(cloned)
+    assertSerialisedParsedEqual(prog)
   }
 
 }

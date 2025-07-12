@@ -1,26 +1,23 @@
 package test_util
 
-import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.concurrent.ScaledTimeSpans
-import org.scalatest.time.{Span, Seconds}
-
-import ir.{Block, Procedure, Program}
+import org.scalatest.time.{Seconds, Span}
+import util.boogie_interaction.*
 import util.{
   BASILConfig,
   BASILResult,
   BoogieGeneratorConfig,
-  DSAConfig,
+  DSConfig,
   ILLoadingConfig,
   IRContext,
   Logger,
   RunUtils,
   StaticAnalysisConfig
 }
-import util.boogie_interaction.*
 
-import scala.sys.process.*
-import scala.io.Source
 import java.io.{BufferedWriter, File, FileWriter}
+import scala.io.Source
+import scala.sys.process.*
 
 case class TestConfig(
   timeout: Int = 10,
@@ -32,8 +29,9 @@ case class TestConfig(
   logResults: Boolean = false,
   simplify: Boolean = false,
   summariseProcedures: Boolean = false,
-  dsa: Option[DSAConfig] = None,
-  memoryTransform: Boolean = false
+  dsa: Option[DSConfig] = None,
+  memoryTransform: Boolean = false,
+  useOfflineLifterForGtirbFrontend: Boolean = false
 ) {
   private val scaledtimespans = new ScaledTimeSpans {}
   def timeoutFlag =
@@ -51,9 +49,10 @@ trait BASILTest {
     staticAnalysisConf: Option[StaticAnalysisConfig],
     simplify: Boolean = false,
     summariseProcedures: Boolean = false,
-    dsa: Option[DSAConfig] = None,
+    dsa: Option[DSConfig] = None,
     memoryTransform: Boolean = false,
-    postLoad: IRContext => Unit = s => ()
+    postLoad: IRContext => Unit = s => (),
+    useOfflineLifterForGtirbFrontend: Boolean = false
   ): BASILResult = {
     val specFile = if (specPath.isDefined && File(specPath.get).exists) {
       specPath
@@ -61,7 +60,13 @@ trait BASILTest {
       None
     }
     val config = BASILConfig(
-      loading = ILLoadingConfig(inputFile = inputPath, relfFile = RELFPath, specFile = specFile, parameterForm = false),
+      loading = ILLoadingConfig(
+        inputFile = inputPath,
+        relfFile = Some(RELFPath),
+        specFile = specFile,
+        parameterForm = false,
+        gtirbLiftOffline = useOfflineLifterForGtirbFrontend
+      ),
       simplify = simplify,
       summariseProcedures = summariseProcedures,
       staticAnalysis = staticAnalysisConf,
@@ -113,6 +118,10 @@ trait BASILTest {
 }
 
 object BASILTest {
+  lazy val rootDirectory: String =
+    Option(System.getenv("MILL_WORKSPACE_ROOT"))
+      .getOrElse(System.getProperty("user.dir"))
+
   def writeToFile(text: String, path: String): Unit = {
     val writer = BufferedWriter(FileWriter(path, false))
     writer.write(text)

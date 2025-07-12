@@ -1,14 +1,14 @@
 import analysis.*
-import boogie.*
-import ir.transforms.{reversePostOrder, worklistSolver}
 import ir.*
 import ir.dsl.*
+import ir.transforms.{reversePostOrder, worklistSolver}
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.BASILTest
+import test_util.CaptureOutput
 
 // TODO more tests + system tests
 
-class GammaDomainTests extends AnyFunSuite, BASILTest {
+@test_util.tags.UnitTest
+class GammaDomainTests extends AnyFunSuite, CaptureOutput {
   private val registers = 0.to(28).map { n => Register(s"R$n", 64): Variable }.toSet
   private val baseRegisterMap = registers.map { r => (r, Set(r)) }.toMap
 

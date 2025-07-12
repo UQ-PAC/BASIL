@@ -1,0 +1,77 @@
+package build.basilmill
+import mill._
+
+import os.Path
+import scala.util.control.Exception.{ignoring}
+
+/**
+ * Module to download a file from a URL, with the ability to
+ * prefer a local copy if it exists. The local search behaviour
+ * is user-specified in the `local` method.
+ *
+ * Use `path` to obtain a string pointing to the file, or use
+ * `source` to obtain a PathRef. The PathRef will trigger re-builds
+ * when file /contents/ change. The string will only re-build when
+ * the string itself changes.
+ */
+trait DownloadModule extends Module {
+  def name: String
+  def url: String
+  def local: Target[Either[String, String]]
+  def unzip: Option[Unzip] = None
+
+  sealed trait Unzip
+  case class TarGZ(extractedName: String) extends Unzip
+  case class Zip(extractedName: String) extends Unzip
+
+
+  sealed trait OSName
+  case object Win extends OSName
+  case object Mac extends OSName
+  case object Linux extends OSName
+  case class UnknownOS(n: String) extends OSName
+
+  def hostOS : OSName = {
+    val osName = System.getProperty("os.name")
+    if (osName.contains("nux")) {
+      Linux
+    } else if (osName.contains("Mac")) {
+      Mac
+    } else if (osName.startsWith("Windows")) {
+      Win
+    } else {
+      UnknownOS(osName)
+    }
+  }
+
+
+  def mode = "rwxr-xr-x"
+
+  // this is not a mill Task to prevent it from being eagerly run.
+  def remote(dest: Path) = {
+    val p = dest / name
+    os.write(p, requests.get(url))
+    ignoring(classOf[UnsupportedOperationException]) {
+      os.perms.set(p, mode)
+    }
+    unzip.map {
+      case TarGZ(extractedName) => 
+        os.call(Seq("tar", "-xzf", p.toString), cwd=dest)
+        PathRef(dest / os.SubPath(extractedName)).path.toString
+      case Zip(extractedName) =>
+        os.call(Seq("unzip", p.toString), cwd=dest)
+        PathRef(dest / os.SubPath(extractedName)).path.toString
+    }.getOrElse(p.toString)
+  }
+
+
+  def pathref = Task(PathRef(Path(path())))
+  def path = Task {
+    local().getOrElse({
+      remote(Task.dest)
+    })
+    
+  }
+  // using path() as the originator (instead of pathref())
+  // allows us to return values which are not absolute paths
+}

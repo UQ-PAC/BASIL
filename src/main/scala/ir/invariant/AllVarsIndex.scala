@@ -1,8 +1,6 @@
 package ir.invariant
 import ir.*
-import ir.cilvisitor.*
 import util.Logger
-import scala.collection.mutable
 
 def reachableEntry(p: Program) = {
 

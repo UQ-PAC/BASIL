@@ -1,0 +1,202 @@
+rules Module ::= [Decl] ;
+
+terminator Decl ";";
+
+{- TOKENS -}
+
+position token BVTYPE ('b' 'v' digit+) ;
+position token INTTYPE {"int"} ;
+position token BOOLTYPE {"bool"} ;
+
+
+{- position token UserIdent '`' ((upper | letter | '_' | '#')(upper | letter | digit | ["_.$#"])*) '`'; -}
+position token BIdent '.'((upper | letter | '_')(upper | letter | digit | ["_.$#~"])*) ;
+
+position token LocalIdent ('#' | upper | letter | '_')((upper | letter | digit | ["_.$#"])*);
+position token GlobalIdent '$' ((upper | letter | digit | ["_.$#"])+);
+
+position token BlockIdent '%' ((upper | letter | digit | ["_.$#"])+);
+
+separator BlockIdent ",";
+
+position token ProcIdent '@' ((upper | letter | digit | ["_.$#"])+);
+
+position token BeginList '[' ;
+position token EndList ']' ;
+position token BeginRec '{' ;
+position token EndRec '}' ;
+token LambdaSep ({"::"} | {"->"}) ;
+
+{- Literals -}
+
+token Str '"' ((char - ["\"\\"]) | ('\\' ["\"\\tnrf"]))* '"' ;
+position token IntegerHex ('0' 'x' (digit | ["abcdef"])+);
+position token IntegerDec (digit+);
+
+-- gobble extra semicolons 
+Semicolons_Empty . Semicolons ::= "";
+Semicolons_Some . Semicolons ::= Semicolons  ";" ;
+
+comment "//" ;
+comment "/*" "*/" ;
+
+{- Top Level Declarations -}
+Decl_Axiom . Decl ::= "axiom" AttribSet Expr; 
+Decl_SharedMem . Decl ::= "memory" "shared" GlobalIdent ":" Type ;
+Decl_UnsharedMem . Decl ::= "memory" GlobalIdent ":" Type ;
+Decl_Var . Decl ::= "var" GlobalIdent ":" Type  ;
+
+separator Type ",";
+
+Decl_UninterpFun . Decl ::= "declare-fun" AttribSet GlobalIdent ":" "(" [Type] ")" "->" Type ;
+Decl_Fun . Decl ::= "define-fun" AttribSet GlobalIdent"(" [Params] ")" "->" Type "=" Expr;
+Decl_ProgEmpty . Decl ::= "prog" "entry" ProcIdent AttribSet ;
+Decl_ProgWithSpec . Decl ::= "prog" "entry" ProcIdent AttribSet BeginList [ ProgSpec ] EndList ;
+Decl_Proc . Decl ::= "proc" ProcIdent "(" [Params] ")" "->" "(" [Params] ")" AttribSet [ FunSpec ] ProcDef ;
+
+ProcDef_Empty . ProcDef ::= "";
+ProcDef_Some  . ProcDef ::= BeginList [Block] EndList ;
+
+IntType1 . IntType ::= INTTYPE ;
+BoolType1. BoolType ::= BOOLTYPE ;
+MapType1 . MapType ::=  "(" Type "->" Type ")";
+BVType1 . BVType ::= BVTYPE ;
+
+rules Type ::= IntType | BoolType | MapType | BVType ; 
+
+separator Expr "," ;
+
+IntVal_Hex . IntVal ::= IntegerHex ;
+IntVal_Dec . IntVal ::=  IntegerDec ;
+
+rules BVVal ::=  IntVal ":" BVType ;
+
+Endian_Little . Endian ::= "le" ;
+Endian_Big . Endian ::= "be" ;
+
+rules Assignment ::= LVar ":=" Expr ;
+
+Stmt_SingleAssign . Stmt ::= Assignment ;
+
+separator nonempty Assignment ",";
+Stmt_MultiAssign . Stmt ::= "(" [Assignment]  ")" ;
+
+Stmt_Load . Stmt ::= LVar ":=" "load" Endian GlobalIdent Expr IntVal;
+Stmt_Store . Stmt ::= "store" Endian GlobalIdent Expr Expr IntVal;
+
+rules LocalVar ::= LocalIdent ":" Type ;
+rules GlobalVar ::= GlobalIdent ":" Type ;
+separator nonempty LocalVar ",";
+
+LVars_Empty . LVars ::= "";
+LVars_LocalList . LVars ::= "var" "(" [ LocalVar ] ")" ":=" ;
+LVars_List . LVars ::= "(" [ LVar ] ")" ":=";
+
+Stmt_DirectCall . Stmt ::= LVars "call" ProcIdent "(" [Expr] ")" ;
+Stmt_IndirectCall . Stmt ::= "indirect" "call" Expr ;
+
+Stmt_Assume . Stmt ::= "assume" Expr ;
+Stmt_Guard . Stmt ::= "guard" Expr ;
+Stmt_Assert . Stmt ::= "assert" Expr ;
+
+Jump_GoTo . Jump ::= "goto" "(" [BlockIdent] ")" ;
+Jump_Unreachable . Jump ::= "unreachable" ;
+Jump_Return . Jump ::= "return" "(" [Expr] ")" ;
+
+LVar_Local . LVar ::= "var" LocalVar;
+LVar_Global . LVar ::= GlobalVar;
+
+separator nonempty LVar "," ;
+
+separator Block ";" ;
+
+rules StmtWithAttrib ::= Stmt AttribSet ;
+terminator StmtWithAttrib ";";
+
+rules JumpWithAttrib ::= Jump AttribSet ;
+
+rules Block ::= "block" BlockIdent AttribSet BeginList 
+  [StmtWithAttrib] JumpWithAttrib ";"
+  EndList ;
+
+rules AttrKeyValue ::= BIdent "=" Attr ;
+separator AttrKeyValue ";";
+
+AttribSet_Some . AttribSet ::= BeginRec [ AttrKeyValue ] Semicolons EndRec;
+AttribSet_Empty . AttribSet ::= "" ;
+
+separator Attr ";" ;
+
+Attr_Map . Attr ::= BeginRec [ AttrKeyValue ] Semicolons EndRec ; 
+Attr_List . Attr ::= BeginList [ Attr ] EndList; 
+Attr_Lit . Attr ::= Value ; 
+Attr_Str . Attr ::= Str ; 
+
+rules Params ::=  LocalIdent ":" Type ;
+separator Params "," ;
+
+{- EXPRESSIONS -}
+
+Value_BV . Value ::=  BVVal;
+Value_Int . Value ::= IntVal;
+Value_True . Value ::= "true" ;
+Value_False . Value ::= "false" ;
+
+Expr_Literal . Expr ::= Value; 
+
+Expr_Local . Expr ::= LocalVar;
+Expr_Global . Expr ::= GlobalVar;
+
+-- quantifiers
+
+rules LambdaDef ::= "(" [LocalVar] ")" LambdaSep Expr ;
+Expr_Forall . Expr ::= "forall" LambdaDef ;
+Expr_Exists . Expr ::= "exists" LambdaDef ;
+Expr_Old . Expr       ::= "old" "(" Expr ")" ;
+
+-- uninterpreted functions
+Expr_FunctionOp . Expr       ::= GlobalIdent "(" [Expr] ")";
+
+-- binary expr
+
+rules BinOp ::= BVBinOp | BVLogicalBinOp | BoolBinOp | IntLogicalBinOp | IntBinOp | EqOp ;
+Expr_Binary . Expr       ::= BinOp "(" Expr "," Expr ")" ;
+
+rules UnOp ::= BVUnOp | "boolnot" | "intneg" | "booltobv1";
+Expr_Unary . Expr       ::= UnOp "(" Expr ")" ;
+
+Expr_ZeroExtend . Expr ::= "zero_extend" "(" IntVal "," Expr ")" ;
+Expr_SignExtend . Expr ::= "sign_extend" "(" IntVal "," Expr ")" ;
+Expr_Extract    . Expr ::= "extract" "(" IntVal "," IntVal "," Expr ")" ;
+Expr_Concat     . Expr ::= "bvconcat"  "(" Expr "," Expr ")" ;
+
+-- operators
+
+rules EqOp ::= "eq" | "neq" ;
+rules BVUnOp ::= "bvnot" | "bvneg" ;
+rules BVBinOp ::= "bvand"|"bvor"|"bvadd"|"bvmul"|"bvudiv"|"bvurem"|"bvshl"|"bvlshr"|"bvnand"|"bvnor"
+  |"bvxor"|"bvxnor"|"bvcomp"|"bvsub"|"bvsdiv"|"bvsrem"|"bvsmod"|"bvashr" ;
+rules BVLogicalBinOp ::= "bvule" |  "bvugt" |  "bvuge" | "bvult" | "bvslt" |  "bvsle" |  "bvsgt" |  "bvsge" ;
+
+rules IntBinOp ::= "intadd" | "intmul" | "intsub" | "intdiv" | "intmod"  ;
+rules IntLogicalBinOp ::=  "intlt" | "intle" | "intgt" | "intge" ;
+rules BoolBinOp ::=  "booland" | "boolor" | "boolimplies" ;
+
+
+{- SPECIFICATION -}
+
+rules RequireTok ::= "require" | "requires" ;
+rules EnsureTok ::= "ensure" | "ensures" ;
+
+FunSpec_Require . FunSpec ::= RequireTok Expr;
+FunSpec_Ensure . FunSpec ::= EnsureTok Expr;
+FunSpec_Invariant . FunSpec ::= "invariant" BlockIdent Expr;
+
+ProgSpec_Rely . ProgSpec ::= "rely" Expr;
+ProgSpec_Guarantee . ProgSpec ::= "guarantee" Expr;
+
+terminator FunSpec ";";
+terminator ProgSpec ";";
+
+
+

@@ -1,10 +1,11 @@
 package ir.dsl
 import ir.*
 import translating.PrettyPrinter.*
+import util.assertion.*
+
+import scala.collection.immutable.*
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.immutable.*
-import scala.annotation.targetName
 
 /**
  * IR construction DSL
@@ -61,65 +62,69 @@ import scala.annotation.targetName
  *  Together, NonCallStatement and Call should partition Statement.
  */
 type NonCallStatement =
-  LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume | MemoryAssign
+  LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume | MemoryAssign | SimulAssign
 
-def cloneStatement(x: NonCallStatement): NonCallStatement = x match {
-  case LocalAssign(a, b, c) => LocalAssign(a, b, c)
-  case MemoryAssign(a, b, c) => MemoryAssign(a, b, c)
-  case MemoryStore(a, b, c, d, e, f) => MemoryStore(a, b, c, d, e, f)
-  case MemoryLoad(a, b, c, d, e, f) => MemoryLoad(a, b, c, d, e, f)
-  case x: NOP => NOP(x.label) // FIXME: no unapply for NOP atm
-  case Assert(a, b, c) => Assert(a, b, c)
-  case Assume(a, b, c, d) => Assume(a, b, c, d)
-}
+type DSLStatement = NonCallStatement | EventuallyStatement | EventuallyJump
 
-val R0: Register = Register("R0", 64)
-val R1: Register = Register("R1", 64)
-val R2: Register = Register("R2", 64)
-val R3: Register = Register("R3", 64)
-val R4: Register = Register("R4", 64)
-val R5: Register = Register("R5", 64)
-val R6: Register = Register("R6", 64)
-val R7: Register = Register("R7", 64)
-val R8: Register = Register("R8", 64)
-val R29: Register = Register("R29", 64)
-val R30: Register = Register("R30", 64)
-val R31: Register = Register("R31", 64)
+def cloneStatement(x: NonCallStatement): NonCallStatement =
+  val newstmt: NonCallStatement = x match {
+    case LocalAssign(a, b, c) => LocalAssign(a, b, c)
+    case MemoryAssign(a, b, c) => MemoryAssign(a, b, c)
+    case MemoryStore(a, b, c, d, e, f) => MemoryStore(a, b, c, d, e, f)
+    case MemoryLoad(a, b, c, d, e, f) => MemoryLoad(a, b, c, d, e, f)
+    case NOP(l) => NOP(l)
+    case Assert(a, b, c) => Assert(a, b, c)
+    case Assume(a, b, c, d) => Assume(a, b, c, d)
+    case a: SimulAssign => SimulAssign(a.assignments, a.label)
+  }
+  newstmt.setComment(x.comment)
 
-def exprEq(l: Expr, r: Expr): Expr = (l, r) match {
-  case (l, r) if l.getType != r.getType => FalseLiteral
-  case (l, r) if l.getType == BoolType => BinaryExpr(BoolEQ, l, r)
-  case (l, r) if l.getType.isInstanceOf[BitVecType] => BinaryExpr(BVEQ, l, r)
-  case (l, r) if l.getType == IntType => BinaryExpr(IntEQ, l, r)
-  case _ => FalseLiteral
-}
+val R0: GlobalVar = Register("R0", 64)
+val R1: GlobalVar = Register("R1", 64)
+val R2: GlobalVar = Register("R2", 64)
+val R3: GlobalVar = Register("R3", 64)
+val R4: GlobalVar = Register("R4", 64)
+val R5: GlobalVar = Register("R5", 64)
+val R6: GlobalVar = Register("R6", 64)
+val R7: GlobalVar = Register("R7", 64)
+val R8: GlobalVar = Register("R8", 64)
+val R29: GlobalVar = Register("R29", 64)
+val R30: GlobalVar = Register("R30", 64)
+val R31: GlobalVar = Register("R31", 64)
 
-def R(i: Int): Register = Register(s"R$i", 64)
+def R(i: Int): GlobalVar = Register(s"R$i", 64)
 
 def bv_t(i: Int) = BitVecType(i)
 
-case class DelayNameResolve(ident: String) {
-  def resolveProc(prog: Program): Option[Procedure] = prog.collectFirst {
-    case b: Procedure if b.name == ident => b
-  }
-
-  def resolveBlock(prog: Program): Option[Block] = prog.collectFirst {
-    case b: Block if b.label == ident => b
-  }
+case class CachedLabelResolver(program: Program) {
+  /* Cache of procedure idents for faster lookup on big program resolves */
+  val procs = program.procedures.map(p => p.name -> p).toMap
+  val blocks = program.procedures.map(p => p.name -> (p.blocks.map(b => b.label -> b)).toMap).toMap
 }
 
-sealed trait EventuallyStatement {
-  def resolve(p: Program): Statement
+case class DelayNameResolve(ident: String) {
+  def resolveProc(prog: CachedLabelResolver): Option[Procedure] = prog.procs.get(ident)
+
+  def resolveBlock(resolver: CachedLabelResolver, parent: String): Option[Block] =
+    resolver.blocks.get(parent).flatMap(_.get(ident))
+}
+
+sealed trait EventuallyStatement extends DeepEquality {
+  def resolve(p: CachedLabelResolver): Statement
   def cloneable = this
 }
 
 case class CloneableStatement(s: NonCallStatement) extends EventuallyStatement {
-  override def resolve(p: Program): Statement = cloneStatement(s)
+  override def resolve(p: CachedLabelResolver): Statement = cloneStatement(s)
+  override def deepEquals(o: Object) = o match {
+    case CloneableStatement(os) => os.deepEquals(s)
+    case _ => false
+  }
 }
 case class IdentityStatement(s: NonCallStatement) extends EventuallyStatement {
   var resolved = false
-  override def resolve(p: Program): Statement = {
-    assert(
+  override def resolve(p: CachedLabelResolver): Statement = {
+    debugAssert(
       !resolved,
       s"DSL statement '$s' has already been resolved! to make a DSL statement that can be resolved multiple times, wrap it in clonedStmt() or use .cloneable on its block."
     )
@@ -127,15 +132,22 @@ case class IdentityStatement(s: NonCallStatement) extends EventuallyStatement {
     s
   }
   override def cloneable = CloneableStatement(s)
+  override def deepEquals(o: Object) = o match {
+    case CloneableStatement(os) => os.deepEquals(s)
+    case _ => false
+  }
 }
 
-trait EventuallyJump {
-  def resolve(p: Program, proc: Procedure): Jump
+trait EventuallyJump extends DeepEquality {
+  def resolve(p: CachedLabelResolver, proc: String): Jump
+  def resolve(p: Program, proc: String): Jump = resolve(CachedLabelResolver(p), proc)
 }
 
-case class EventuallyIndirectCall(target: Variable, label: Option[String] = None) extends EventuallyStatement {
-  override def resolve(p: Program): Statement = {
-    IndirectCall(target, label)
+case class EventuallyIndirectCall(target: Variable, label: Option[String] = None, comment: Option[String] = None)
+    extends EventuallyStatement
+    with DefaultDeepEquality {
+  override def resolve(p: CachedLabelResolver): Statement = {
+    IndirectCall(target, label).setComment(comment)
   }
 }
 
@@ -143,33 +155,47 @@ case class EventuallyCall(
   target: DelayNameResolve,
   lhs: Iterable[(String, Variable)],
   actualParams: Iterable[(String, Expr)],
-  label: Option[String] = None
-) extends EventuallyStatement {
-  override def resolve(p: Program): Statement = {
+  label: Option[String] = None,
+  comment: Option[String] = None
+) extends EventuallyStatement
+    with DefaultDeepEquality {
+  override def resolve(p: CachedLabelResolver): Statement = {
     val t = target.resolveProc(p) match {
       case Some(x) => x
       case None => throw Exception(s"can't resolve target ${target} proc in prog")
     }
     val actual = SortedMap.from(actualParams.map((name, value) => t.formalInParam.find(_.name == name).get -> value))
     val callLhs = SortedMap.from(lhs.map((name, value) => t.formalOutParam.find(_.name == name).get -> value))
-    DirectCall(t, label, callLhs, actual)
+    DirectCall(t, label, callLhs, actual).setComment(comment)
   }
 }
 
-case class EventuallyGoto(targets: Iterable[DelayNameResolve], label: Option[String] = None) extends EventuallyJump {
-  override def resolve(p: Program, proc: Procedure): GoTo = {
-    val tgs = targets.flatMap(tn => tn.resolveBlock(p))
-    GoTo(tgs, label)
+case class EventuallyGoto(
+  targets: Iterable[DelayNameResolve],
+  label: Option[String] = None,
+  comment: Option[String] = None
+) extends EventuallyJump
+    with DefaultDeepEquality {
+  override def resolve(p: CachedLabelResolver, proc: String): GoTo = {
+    val tgs = targets.map(tn => tn.resolveBlock(p, proc).getOrElse(throw Exception(s"Cannot resolve $tn")))
+    GoTo(tgs, label).setComment(comment)
   }
 }
-case class EventuallyReturn(params: Iterable[(String, Expr)], label: Option[String] = None) extends EventuallyJump {
-  override def resolve(p: Program, proc: Procedure) = {
-    val r = SortedMap.from(params.map((n, v) => proc.formalOutParam.find(_.name == n).get -> v))
-    Return(label, r)
+case class EventuallyReturn(
+  params: Iterable[(String, Expr)],
+  label: Option[String] = None,
+  comment: Option[String] = None
+) extends EventuallyJump
+    with DefaultDeepEquality {
+  override def resolve(p: CachedLabelResolver, proc: String) = {
+    val r = SortedMap.from(params.map((n, v) => p.procs(proc).formalOutParam.find(_.name == n).get -> v))
+    Return(label, r).setComment(comment)
   }
 }
-case class EventuallyUnreachable(label: Option[String] = None) extends EventuallyJump {
-  override def resolve(p: Program, proc: Procedure) = Unreachable(label)
+case class EventuallyUnreachable(label: Option[String] = None, comment: Option[String] = None)
+    extends EventuallyJump
+    with DefaultDeepEquality {
+  override def resolve(p: CachedLabelResolver, proc: String) = Unreachable(label).setComment(comment)
 }
 
 def clonedStmt(s: NonCallStatement) = CloneableStatement(s)
@@ -198,7 +224,7 @@ def directCall(lhs: Iterable[(String, Variable)], tgt: String, actualParams: (St
   EventuallyCall(DelayNameResolve(tgt), lhs.to(ArraySeq), actualParams)
 
 def directCall(lhs: Iterable[(String, Variable)], rhs: call): EventuallyCall =
-  EventuallyCall(DelayNameResolve(rhs.target), lhs.toArray, rhs.actualParams)
+  EventuallyCall(DelayNameResolve(rhs.target), lhs.toSeq, rhs.actualParams)
 
 def directCall(tgt: String): EventuallyCall = directCall(Nil, tgt, Nil)
 
@@ -226,16 +252,25 @@ case class EventuallyBlock(
   label: String,
   sl: Iterable[EventuallyStatement],
   var j: EventuallyJump,
-  address: Option[BigInt] = None
-) {
+  meta: Metadata = Metadata()
+) extends DeepEquality {
 
-  def makeResolver: (Block, (Program, Procedure) => Unit) = {
-    val tempBlock: Block = Block(label, address, List(), GoTo(List.empty))
+  override def deepEquals(o: Object) = o match {
+    case EventuallyBlock(`label`, osl, oj, `meta`) =>
+      j.deepEquals(oj) && sl.size == osl.size && osl.toList.zip(sl).forall { case (l, r) =>
+        l.deepEquals(r)
+      }
+    case _ => false
 
-    def cont(prog: Program, proc: Procedure): Block = {
-      assert(tempBlock.statements.isEmpty)
+  }
+
+  def makeResolver: (Block, (CachedLabelResolver, String) => Unit) = {
+    val tempBlock: Block = Block(label, meta.address, List(), GoTo(List.empty))
+
+    def cont(prog: CachedLabelResolver, proc: String): Block = {
+      debugAssert(tempBlock.statements.isEmpty)
       val resolved = sl.map(_.resolve(prog))
-      assert(tempBlock.statements.isEmpty)
+      debugAssert(tempBlock.statements.isEmpty)
       tempBlock.statements.addAll(resolved)
       tempBlock.replaceJump(j.resolve(prog, proc))
     }
@@ -243,7 +278,8 @@ case class EventuallyBlock(
     (tempBlock, cont)
   }
 
-  def resolve(prog: Program, proc: Procedure): Block = {
+  def resolve(prog: Program, proc: String): Block = resolve(CachedLabelResolver(prog), proc)
+  def resolve(prog: CachedLabelResolver, proc: String): Block = {
     val (b, resolve) = makeResolver
     resolve(prog, proc)
     b
@@ -284,10 +320,35 @@ case class EventuallyProcedure(
   blocks: Seq[EventuallyBlock],
   entryBlockLabel: Option[String] = None,
   returnBlockLabel: Option[String] = None,
-  address: Option[BigInt] = None
-) {
+  address: Option[BigInt] = None,
+  requires: List[Expr] = List(),
+  ensures: List[Expr] = List()
+) extends DeepEquality {
 
-  def makeResolver: (Procedure, Program => Unit) = {
+  def name = label + address.fold("")("_" + _)
+
+  override def deepEquals(o: Object) = o match {
+    case EventuallyProcedure(
+          `label`,
+          `in`,
+          `out`,
+          b,
+          `entryBlockLabel`,
+          `returnBlockLabel`,
+          `address`,
+          `requires`,
+          `ensures`
+        ) => {
+      b.size == blocks.size && {
+        b.zip(blocks).forall { case (l, r) =>
+          l.deepEquals(r)
+        }
+      }
+    }
+    case _ => false
+  }
+
+  def makeResolver: (Procedure, CachedLabelResolver => Unit) = {
 
     val (tempBlocks, resolvers) = blocks.map(_.makeResolver).unzip
 
@@ -304,19 +365,23 @@ case class EventuallyProcedure(
       out.map((n, t) => LocalVar(n, t))
     )
 
+    tempProc.requiresExpr = requires
+    tempProc.ensuresExpr = ensures
+
     val jumps: Iterable[(Block, EventuallyJump)] =
       (tempBlocks zip blocks).map((temp, b) => temp -> b.j)
 
-    def cont(prog: Program) = {
-      resolvers.foreach(_(prog, tempProc))
-      jumps.foreach((b, j) => b.replaceJump(j.resolve(prog, tempProc)))
+    def cont(prog: CachedLabelResolver) = {
+      resolvers.foreach(_(prog, tempProc.name))
+      jumps.foreach((b, j) => b.replaceJump(j.resolve(prog, tempProc.name)))
       tempBlocks.headOption.foreach(b => tempProc.entryBlock = b)
     }
 
     (tempProc, cont)
   }
 
-  def resolve(prog: Program): Procedure = {
+  def resolve(p: Program): Procedure = resolve(CachedLabelResolver(p))
+  def resolve(prog: CachedLabelResolver): Procedure = {
     val (p, resolver) = makeResolver
     resolver(prog)
     p
@@ -327,7 +392,7 @@ case class EventuallyProcedure(
   def addToProg(p: Program): Procedure = {
     val (proc, resolver) = makeResolver
     p.addProcedure(proc)
-    resolver(p)
+    resolver(CachedLabelResolver(p))
     proc
   }
 
@@ -364,8 +429,16 @@ case class EventuallyProgram(
   mainProcedure: EventuallyProcedure,
   otherProcedures: collection.Iterable[EventuallyProcedure] = Seq(),
   initialMemory: collection.Iterable[MemorySection] = Seq()
-) {
+) extends DeepEquality {
   val allProcedures = Seq(mainProcedure) :++ otherProcedures
+
+  override def deepEquals(o: Object) = o match {
+    case EventuallyProgram(mp, op, im) => {
+      mp.deepEquals(mainProcedure) && op.size == otherProcedures.size && op.zip(otherProcedures).forall { case (l, r) =>
+        l.deepEquals(r)
+      }
+    }
+  }
 
   def resolve: Program = {
     val memory = mutable.TreeMap.from(initialMemory.map(v => (v.address, v)))
@@ -374,10 +447,11 @@ case class EventuallyProgram(
     val procs = ArrayBuffer.from(tempProcs)
 
     val p = Program(procs, procs.head, memory)
+    val reso = CachedLabelResolver(p)
 
-    resolvers.foreach(_(p))
-    assert(ir.invariant.correctCalls(p))
-    assert(ir.invariant.cfgCorrect(p))
+    resolvers.foreach(_(reso))
+    debugAssert(ir.invariant.correctCalls(p))
+    debugAssert(ir.invariant.cfgCorrect(p))
     p
   }
 

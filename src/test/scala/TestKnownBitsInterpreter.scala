@@ -1,42 +1,13 @@
-import ir.*
-import ir.eval.*
 import analysis.*
-import ir.transforms.*
-import java.io.{BufferedWriter, File, FileWriter}
-import ir.Endian.LittleEndian
+import ir.dsl.*
+import ir.eval.*
+import ir.{dsl, *}
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.*
 import org.scalatest.funsuite.*
-import translating.PrettyPrinter.*
-import specification.*
-import util.{
-  BASILConfig,
-  IRLoading,
-  ILLoadingConfig,
-  IRContext,
-  RunUtils,
-  StaticAnalysis,
-  StaticAnalysisConfig,
-  StaticAnalysisContext,
-  BASILResult,
-  Logger,
-  LogLevel,
-  IRTransform
-}
-import ir.eval.{interpretTrace, interpret, ExecEffect, Stopped}
-import ir.dsl
-
-import java.io.IOException
-import java.nio.file.*
-import java.nio.file.attribute.BasicFileAttributes
-import ir.dsl.*
-import util.RunUtils.loadAndTranslate
-
-import scala.collection.mutable
 import org.scalatestplus.scalacheck.*
-import org.scalacheck.Arbitrary
-import org.scalacheck.Properties
-import org.scalacheck.Prop.forAll
-import org.scalacheck.{Arbitrary, Gen}
+import test_util.TestValueDomainWithInterpreter
+import translating.PrettyPrinter.*
 
 @test_util.tags.UnitTest
 class TestKnownBitsInterpreter
@@ -47,9 +18,9 @@ class TestKnownBitsInterpreter
   def valueInAbstractValue(absVal: TNum, concrete: Expr) = {
     (absVal, concrete.getType) match {
       case (TNum(v, m), _: BitVecType) =>
-        BinaryExpr(BVEQ, v, BinaryExpr(BVAND, concrete, UnaryExpr(BVNOT, m)))
+        BinaryExpr(EQ, v, BinaryExpr(BVAND, concrete, UnaryExpr(BVNOT, m)))
       case (TNum(v, m), BoolType) =>
-        BinaryExpr(BVEQ, v, BinaryExpr(BVAND, UnaryExpr(BoolToBV1, concrete), UnaryExpr(BVNOT, m)))
+        BinaryExpr(EQ, v, BinaryExpr(BVAND, UnaryExpr(BoolToBV1, concrete), UnaryExpr(BVNOT, m)))
       case _ => ???
     }
   }
@@ -109,19 +80,14 @@ class TestKnownBitsInterpreter
       ),
       block(
         "lknownBitsExample_goto_l0000026d",
-        Assume(
-          BinaryExpr(BVEQ, LocalVar("R1_in", BitVecType(64), 0), BitVecLiteral(BigInt("0"), 64)),
-          None,
-          None,
-          true
-        ),
+        Assume(BinaryExpr(EQ, LocalVar("R1_in", BitVecType(64), 0), BitVecLiteral(BigInt("0"), 64)), None, None, true),
         LocalAssign(LocalVar("R2", BitVecType(64), 9), LocalVar("R0", BitVecType(64), 3), Some("phiback")),
         goto("l00000274")
       ),
       block(
         "l00000274_goto_l0000029d",
         Assume(
-          BinaryExpr(BVEQ, Extract(16, 0, LocalVar("R2", BitVecType(64), 9)), BitVecLiteral(BigInt("0"), 16)),
+          BinaryExpr(EQ, Extract(16, 0, LocalVar("R2", BitVecType(64), 9)), BitVecLiteral(BigInt("0"), 16)),
           None,
           None,
           true
@@ -140,7 +106,7 @@ class TestKnownBitsInterpreter
       block(
         "lknownBitsExample_phi_lknownBitsExample_goto_l00000271",
         Assume(
-          UnaryExpr(BoolNOT, BinaryExpr(BVEQ, LocalVar("R1_in", BitVecType(64), 0), BitVecLiteral(BigInt("0"), 64))),
+          UnaryExpr(BoolNOT, BinaryExpr(EQ, LocalVar("R1_in", BitVecType(64), 0), BitVecLiteral(BigInt("0"), 64))),
           None,
           None,
           true
@@ -153,7 +119,7 @@ class TestKnownBitsInterpreter
         Assume(
           UnaryExpr(
             BoolNOT,
-            BinaryExpr(BVEQ, Extract(16, 0, LocalVar("R2", BitVecType(64), 9)), BitVecLiteral(BigInt("0"), 16))
+            BinaryExpr(EQ, Extract(16, 0, LocalVar("R2", BitVecType(64), 9)), BitVecLiteral(BigInt("0"), 16))
           ),
           None,
           None,
@@ -221,7 +187,7 @@ class TestKnownBitsInterpreter
       BVSDIV // broken
     )
 
-  def arbBinComp = Gen.oneOf(BVULE, BVUGT, BVULT, BVUGE, BVSLT, BVSLE, BVSGT, BVSGE, BVEQ, BVNEQ, BVCOMP)
+  def arbBinComp = Gen.oneOf(BVULE, BVUGT, BVULT, BVUGE, BVSLT, BVSLE, BVSGT, BVSGE, EQ, NEQ, BVCOMP)
 
   def genValue(givenSize: Option[Int] = None) = for {
     genSize <- Gen.chooseNum(1, 70)

@@ -1,12 +1,10 @@
 package ir.transforms
 import ir.*
-import util.Logger
 import ir.cilvisitor.*
-import ir.dsl.IRToDSL.*
 import ir.dsl.*
 
+import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
-import scala.collection.immutable.{ArraySeq}
 
 private val counter = util.Counter()
 
@@ -89,7 +87,7 @@ def convertBlockRenaming(varRenamer: CILVisitor, blockName: String => String)(x:
     blockName(x.label),
     x.statements.to(ArraySeq).map(convertStatementRenaming(varRenamer)),
     convertJumpRenaming(blockName, varRenamer, x.jump),
-    x.address
+    x.meta
   )
 }
 
@@ -134,14 +132,15 @@ def inlineCall(prog: Program, c: DirectCall): Unit = {
   // resolve internal call blocks
   val resolvers = internalBlocks.map(_.makeResolver)
   resolvers.foreach { case (block, _) => proc.addBlock(block) }
-  resolvers.foreach { case (_, resolve) => resolve(prog, proc) }
+  val reso = CachedLabelResolver(prog)
+  resolvers.foreach { case (_, resolve) => resolve(reso, proc.name) }
 
   // remove original call statement
   block.statements.remove(c)
   // link the inlined blocks to the call block and the aftercall block
-  entryResolver(prog, proc)
+  entryResolver(reso, proc.name)
   block.replaceJump(GoTo(entryTempBlock))
-  resolveReturnBlock(prog, proc)
+  resolveReturnBlock(reso, proc.name)
   returnTemp.replaceJump(GoTo(afterCallBlock))
 
   // assign the actual parameters in the caller to the renamed formal parameters in the entry block
