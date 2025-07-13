@@ -26,7 +26,7 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
   override def scalaVersion = "3.3.4"
 
-  override def ammoniteVersion = ammonite
+  override def ammoniteVersion = "3.0.2"
 
   override def moduleDeps = Seq(basilAntlr, basilProto, bnfc)
 
