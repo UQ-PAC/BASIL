@@ -41,7 +41,7 @@ trait BNFCModule extends JavaModule {
     // https://github.com/BNFC/bnfc/releases
 
     def local = Task.Input {
-      Try(os.proc("bnfc", "--version").call())
+      Try(os.proc("bnfc", "--version").call(destroyOnExit = false))
         .map(Function.const("bnfc"))
         .toEither
         .left.map(_.toString)
