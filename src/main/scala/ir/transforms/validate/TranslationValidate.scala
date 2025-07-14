@@ -3,6 +3,7 @@ package ir.transforms.validate
 import analysis.ProcFrames.*
 import ir.*
 import ir.cilvisitor.*
+import util.SMT.*
 import util.{LogLevel, Logger, PerformanceTimer}
 
 import java.io.File
@@ -528,7 +529,7 @@ class TranslationValidator {
 
     beforeFrame = f.map((k, v) => (k.name, v)).toMap
     liveBefore = p.procedures.map(p => p.name -> getLiveVars(p, f)).toMap
-    println(translating.PrettyPrinter.pp_prog(p))
+    // println(translating.PrettyPrinter.pp_prog(p))
     initProg = Some(p)
     val (prog, cuts) = TransitionSystem.toTransitionSystem(p, f)
     beforeProg = Some(prog)
@@ -680,6 +681,8 @@ class TranslationValidator {
       val splitName = "-" + proc.name // + "_split_" + splitNo
       // build smt query
       val b = translating.BasilIRToSMT2.SMTBuilder()
+      val solver = util.SMT.SMTSolver(Some(10000))
+      val prover = solver.getProver()
 
       b.addCommand("set-logic", "QF_BV")
 
@@ -695,10 +698,11 @@ class TranslationValidator {
         try {
           val l = Some(s"inv$count")
           b.addAssert(e, l)
+          prover.addConstraint(e)
           npe.statements.append(Assert(e, l))
         } catch
           ex => {
-            throw Exception(s"Failed to gen smt for $b:\n  $e :: \n $e")
+            throw Exception(s"$ex Failed to gen smt for $b:\n  $e :: \n $e")
           }
       }
 
@@ -707,27 +711,49 @@ class TranslationValidator {
         count += 1
         val l = Some(s"ackermann$ackn$count")
         npe.statements.append(Assert(ack, l))
+        prover.addConstraint(ack)
         b.addAssert(ack, l)
       }
       count = 0
       for (i <- extractProg(source)) {
         count += 1
         b.addAssert(i, Some(s"source$count"))
+        prover.addConstraint(i)
       }
       count = 0
       for (i <- extractProg(target)) {
         count += 1
+        prover.addConstraint(i)
         b.addAssert(i, Some(s"tgt$count"))
       }
-      npe.statements.append(Assert(UnaryExpr(BoolNOT, AssocExpr(BoolAND, primedInv.toList)), Some("InvPrimed")))
-      b.addAssert(UnaryExpr(BoolNOT, AssocExpr(BoolAND, primedInv.toList)), Some("InvPrimed"))
+      val pinv = UnaryExpr(BoolNOT, AssocExpr(BoolAND, primedInv.toList))
+      npe.statements.append(Assert(pinv, Some("InvPrimed")))
+      b.addAssert(pinv, Some("InvPrimed"))
       timer.checkPoint("extract prog")
+      prover.addConstraint(pinv)
 
       val fname = s"$filePrefix${splitName}.smt2"
-      util.writeToFile(b.getCheckSat(), fname)
+      val query = b.getCheckSat()
+      util.writeToFile(query, fname)
+
+
 
       timer.checkPoint("write out " + fname)
       Logger.writeToFile(File(s"${filePrefix}combined-${proc.name}.il"), translating.PrettyPrinter.pp_prog(newProg))
+      Logger.info("checksat")
+
+      val res = prover.checkSat()
+      res match {
+        case SatResult.UNSAT => Logger.info("unsat")
+        case SatResult.SAT(m) => {
+          Logger.error(s"sat ${filePrefix} ${proc.name}")
+          // extract model
+        }
+        case SatResult.Unknown(m) => println(s"unknown: $m")
+      }
+
+      timer.checkPoint("checksat")
+
     }
 
     // }
