@@ -586,7 +586,12 @@ class TranslationValidator {
     asserts = asserts ++ a
   }
 
-  def processModel(combinedProc: Procedure, prover: SMTProver) = {
+  def processModel(
+    combinedProc: Procedure,
+    prover: SMTProver,
+    invariant: Seq[Expr],
+    blockTraceVars: Map[String, Expr]
+  ) = {
     val eval = prover.getEvaluator()
 
     val done: Set[Block] = combinedProc.blocks
@@ -595,9 +600,95 @@ class TranslationValidator {
           case Some(TrueLiteral) => Seq(b)
           case _ => Seq()
         }
+
       })
       .flatten
       .toSet
+
+    for (b <- combinedProc.blocks) {
+      blockTraceVars.get(b.label).flatMap(eval.evalExpr) match {
+        case Some(FalseLiteral) => Logger.error(s"TRACE UNEQUAL ${b.label} : ${blockTraceVars(b.label)}")
+        case _ => ()
+      }
+    }
+
+    for (i <- invariant) {
+      eval.evalExpr(i) match {
+        case Some(FalseLiteral) => Logger.error(s"Part of invariant failed: $i")
+        case _ => ()
+      }
+    }
+
+    for (b <- combinedProc.blocks.toSeq.flatMap(_.statements)) {
+      b match {
+        case a => {
+          val v = ir.freeVarsPos(a).filter(_.name.startsWith("source__TRACE"))
+          for (sourceT <- v) {
+            val targetT = GlobalVar("target" + sourceT.name.stripPrefix("source"), sourceT.getType)
+            eval.evalExpr(BinaryExpr(EQ, sourceT, targetT)) match {
+              case Some(FalseLiteral) => {
+                a.comment = Some(a.comment.getOrElse("") + s"(trace unequal $sourceT != $targetT)")
+                Logger.error(s"trace unequal at ${a.parent.label} : $sourceT, $targetT")
+              }
+              case _ => ()
+            }
+          }
+        }
+        case _ => ()
+      }
+    }
+
+    case object Conj {
+      def unapply(e: Expr): Option[List[Expr]] = e match {
+        case BinaryExpr(BoolAND, a, b) => Some(List(a, b))
+        case AssocExpr(BoolAND, a) => Some(a.toList)
+        case n if n.getType == BoolType => Some(List(n))
+        case _ => None
+      }
+    }
+
+    class Simp extends CILVisitor {
+      override def vstmt(s: Statement) = s match {
+        case a => {
+          val vars = freeVarsPos(a).filter(_.name.startsWith("source"))
+          a.comment = Some(
+            vars
+              .map(b =>
+                val ob = b match {
+                  case GlobalVar(v, t) => GlobalVar("target" + v.stripPrefix("source"), t)
+                  case LocalVar(v, t, i) => LocalVar("target" + v.stripPrefix("source"), t, i)
+                }
+                val eq = eval.evalExpr(BinaryExpr(EQ, b, ob))
+                val (s, t) = (eval.evalExpr(b), eval.evalExpr(ob))
+                eq match {
+                  case Some(TrueLiteral) => s"(${b.name.stripPrefix("source__")} matches)"
+                  case Some(FalseLiteral) => s"(${b.name.stripPrefix("source__")} NOT MATCHING)"
+                  case None => s"(${b.name.stripPrefix("source__")} $s $t)"
+                }
+              )
+              .mkString(", ")
+          )
+          SkipChildren()
+        }
+        // case ass @ Assert(Conj(xs), _, _) => {
+        //  val n = xs.toSeq.flatMap {
+        //    case bdy @ BinaryExpr(BoolIMPLIES, bld, rhs) => {
+        //      eval.evalExpr(bld) match {
+        //        case Some(FalseLiteral) => Seq()
+        //        case Some(TrueLiteral) => Seq(rhs)
+        //        case None => Seq(bdy)
+        //      }
+        //    }
+        //    case x => Seq(x)
+        //  }
+
+        //  ass.body = boolAnd(n)
+        //  SkipChildren()
+        // }
+        case _ => SkipChildren()
+      }
+    }
+    visit_proc(Simp(), combinedProc)
 
     ir.dotBlockGraph(combinedProc.blocks.toList, done)
 
@@ -762,7 +853,21 @@ class TranslationValidator {
         case SatResult.UNSAT => Logger.info("unsat")
         case SatResult.SAT(m) => {
           Logger.error(s"sat ${filePrefix} ${proc.name}")
-          val g = processModel(newProg.mainProcedure, prover)
+
+          val traces = source.blocks
+            .flatMap(b =>
+              try {
+                val s = srcRenameSSA(afterRenamer.stripNamespace(b.label), TransitionSystem.traceVar)
+                val t = tgtRenameSSA(afterRenamer.stripNamespace(b.label), TransitionSystem.traceVar)
+                Seq(b.label -> BinaryExpr(EQ, s, t))
+              } catch {
+                case _ => Seq()
+              }
+            )
+            .toMap
+
+          val g = processModel(newProg.mainProcedure, prover, primedInv.toList, traces)
+
           Logger.writeToFile(File(s"${filePrefix}counterexample-combined-${proc.name}.dot"), g)
           // extract model
         }
