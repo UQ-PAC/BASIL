@@ -1,7 +1,7 @@
 # BASIL IR
 
-BASIL IR is the intermediate representation used during static analysis. 
-This is on contrast to Boogie IR which is used for specification annotation, and output to textual boogie syntax that can be run through the Boogie verifier. 
+BASIL IR is the intermediate representation used during static analysis.
+This is on contrast to Boogie IR which is used for specification annotation, and output to textual boogie syntax that can be run through the Boogie verifier.
 
 The textual representation of basil IR has a grammar describing it [here](https://uq-pac.github.io/BASIL/docs/basil-il/BasilIR.html).
 Names used internally differ slightly.
@@ -65,8 +65,8 @@ Endian ::=&~ BigEndian ~|~ LittleEndian \\
 
 ### Jumps
 
-- The `GoTo` jump is a multi-target jump reprsenting non-deterministic choice between its targets. 
-  Conditional structures are represented by these with a guard (an assume statement) beginning each target. 
+- The `GoTo` jump is a multi-target jump reprsenting non-deterministic choice between its targets.
+  Conditional structures are represented by these with a guard (an assume statement) beginning each target.
 - The `Unreachable` jump is used to signify the absence of successors, it has the semantics of `assume false`.
 - The `Return` jump passes control to the calling function, often this is over-approximated to all functions which call the statement's parent procedure.
 
@@ -84,10 +84,10 @@ We have invariant checkers to validate the structure of the IR's bidirectional C
 
 #### IR With Returns
 
-- Immediately after loading the IR return statements may appear in any block, or may be represented by indirect calls. 
-  The transform pass below replaces all calls to the link register (R30) with return statements. 
+- Immediately after loading the IR return statements may appear in any block, or may be represented by indirect calls.
+  The transform pass below replaces all calls to the link register (R30) with return statements.
   In the future, more proof is required to implement this soundly.
-  
+
 ```
 cilvisitor.visit_prog(transforms.ReplaceReturns(), ctx.program)
 transforms.addReturnBlocks(ctx.program, true) // add return to all blocks because IDE solver expects it
@@ -96,17 +96,17 @@ cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
 
 This ensures that all returning, non-stub procedures have exactly one return statement residing in their `returnBlock`.
 
-#### Calls appear only as the last statement in a block 
+#### Calls appear only as the last statement in a block
 
 - Checked by `invariant/SingleCallBlockEnd.scala`
-- The structure of the IR allows a call may appear anywhere in the block but for all the analysis passes we hold the invariant that it 
+- The structure of the IR allows a call may appear anywhere in the block but for all the analysis passes we hold the invariant that it
   only appears as the last statement. This is checked with the function `singleCallBlockEnd(p: Program)`.
   And it means for any call statement `c` we may `assert(c.parent.statements.lastOption.contains(c))`.
 
 ## IR With Parameters
 
 The higher level IR containing parameters is established by `ir.transforms.liftProcedureCallAbstraction(ctx)`.
-This makes registers local variables, which are passed into procedures through prameters, and then returned from 
+This makes registers local variables, which are passed into procedures through prameters, and then returned from
 procedures. Calls to these procedure must provide as input parameters the local variables corresponding to the
 values passed, and assign the output parameters to local variables also. Note now we must consider indirect calls
 as possibly assigning to everything, even though this is not explicitly represented syntactically.
@@ -117,13 +117,13 @@ as possibly assigning to everything, even though this is not explicitly represen
 
 ### Constructing Programs in Code
 
-The 'DSL' is a set of convenience functions for constructing correct IR programs in Scala source files. 
+The 'DSL' is a set of convenience functions for constructing correct IR programs in Scala source files.
 This provides a simple way to construct IR programs for use in unit tests.
 Its source code can be [found here](https://github.com/UQ-PAC/BASIL/tree/main/src/main/scala/ir/dsl/DSL.scala).
 
 An example can be seen below:
 
-```scala 
+```scala
 var program: Program = prog(
   proc("main",
     block("first_call",
@@ -152,14 +152,14 @@ procedure   ::= proc (procname, block+)
 block       ::= block(blocklabel, statement+, jump)
 statement   ::= <BASIL IR Statement>
 jump        ::= goto_s | ret | unreachable
-call_s      ::= directCall (procedurename, None | Some(blocklabel))  // target, fallthrough 
+call_s      ::= directCall (procedurename, None | Some(blocklabel))  // target, fallthrough
 goto_s      ::= goto(blocklabel+)                              // targets
 procname    ::= String
 blocklabel  ::= String
 ```
 
-If a block or procedure name is referenced in a target position, but a block or procedure is not defined with that 
-label, the dsl constructor will likely throw a match error. 
+If a block or procedure name is referenced in a target position, but a block or procedure is not defined with that
+label, the dsl constructor will likely throw a match error.
 
 Some additional constants are defined for convenience, Eg. `R0 = Register(R0, 64)`, see [the source file](https://github.com/UQ-PAC/BASIL/tree/main/src/main/scala/ir/dsl/DSL.scala) for the full list.
 
@@ -182,8 +182,8 @@ ir.dotBlockGraph(proc: Procedure) : String
 
 ### Static Analysis / Abstract Interpretation / IR Rewriting and modification
 
-- See [development/simplification-solvers.md](development/simplification-solvers.md)
-- For static analysis the Il-CFG-Iterator is the current well-supported way to iterate the IR.
-  This currently uses the TIP framework, so you do not need to interact with the IR visitor directly. 
-  See [BasicIRConstProp.scala](https://github.com/UQ-PAC/BASIL/tree/main/src/main/scala/analysis/BasicIRConstProp.scala) for an example on its useage.
+- See [transforms.md](transforms.md)
+- For static analysis, the IL-CFG-Iterator is the current well-supported way to iterate the IR.
+  This currently uses the TIP framework, so you do not need to interact with the IR visitor directly.
+  See [ConstantPropagation.scala](https://github.com/UQ-PAC/BASIL/blob/main/src/main/scala/analysis/ConstantPropagation.scala) for an example on its useage.
 - This visits all procedures, blocks and statements in the IR program.

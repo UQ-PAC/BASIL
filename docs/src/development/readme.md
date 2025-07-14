@@ -1,6 +1,6 @@
 # BASIL Development
 
-[API Documentation](https://uq-pac.github.io/BASIL/api/)
+[API Documentation](../api/)
 
 ## Scala
 
@@ -41,7 +41,7 @@ We do not have a strict code style however
 
 1. To set up an editor for Scala development see [editor-setup](editor-setup.md).
 2. Become familiar with the [project structure](project-layout.md) to start understanding the code.
-3. Install the neccessary tools [here](/usage.md), it may be useful to try
+3. Install the neccessary tools [here](../usage.md), it may be useful to try
    lifting examples, or just looking at existing examples in the
    [src/test/correct](https://github.com/UQ-PAC/BASIL/tree/main/src/test/correct) directory.
 4. Use the below as a guide to common development tasks as they may arise.
@@ -62,7 +62,7 @@ To build a standalone `.jar` file, use `./mill assembly`. This can be found at `
 Printing an analysis result
 
 Run basil with the `--analysis-result <filepath>` flag to print the results of the analyses to files.
-The `--analysis-result-dot <filepath>` does the same, but outputs a graphviz digraph, which can be viewed by pasting it into [edotor.net](edotor.net), or compiling with `dot`.
+The `--analysis-result-dot <filepath>` does the same, but outputs a graphviz digraph, which can be viewed by pasting it into [edotor.net](https://edotor.net), or compiling with `dot`.
 
 This prints the program with the abstract-domain lattice value at each program point following the `::`.
 

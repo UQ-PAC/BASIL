@@ -1,10 +1,10 @@
-This page is outdated, it discusses an older version of the IR, and the deprecated CFG implementation for static analysis. 
+This page is outdated, it discusses an older version of the IR, and the deprecated CFG implementation for static analysis.
 
 # BASIL IR
 
 Analysis is performed over the tool's own internal IR, [BASIL IR](#basil-ir). To do so, we need a way to take a program (assumed: binary), and transform it into this IR. To do this we use a tool to lift the Binary into an ADT (Abstract Data Type) - BAP lifts the ARM binary into its own IR, which it can then output as an [ADT](https://github.com/BinaryAnalysisPlatform/bap/wiki/ADT). We parse this ADT into an internal representation of what BAP lifted, and then translate this into our IR. This is then what is used to perform analysis on, and later translate into Boogie. An overview of the translating processes is given here.
 
-![](images/parser.png)
+![](https://raw.githubusercontent.com/wiki/UQ-PAC/BASIL/images/parser.png)
 
 ## Parsing Phase
 
@@ -53,7 +53,7 @@ For example, `exp` and `term` are subclasses of `ADT`, and thus in the grammar w
 
 The internal IR is designed such that it will translate easily to Boogie's IVL. The structure of the IR is given:
 
-![](images/basil_ir.png)
+![](https://raw.githubusercontent.com/wiki/UQ-PAC/BASIL/images/basil_ir.png)
 
 ## [Program](https://github.com/UQ-PAC/bil-to-boogie-translator/blob/171c67d3765a2fbd810440a3f5ee7617f63f9b0b/src/main/scala/ir/Program.scala#L7)
 
@@ -96,7 +96,7 @@ An expression (`rhs`) which is evaluated and stored into a register (`lhs`). For
 
 ## [LocalAssign](https://github.com/UQ-PAC/bil-to-boogie-translator/blob/171c67d3765a2fbd810440a3f5ee7617f63f9b0b/src/main/scala/ir/Statement.scala#L11)
 
-Assigning a value to a local variable. Local in this context means local to the procedure scope. 
+Assigning a value to a local variable. Local in this context means local to the procedure scope.
 
 - `lhs`         : variable (local) which stores the evaluation of the `rhs` is stored in
 - `rhs`         : expression to be evaluated and stored in `lhs`

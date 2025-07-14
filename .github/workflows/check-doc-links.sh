@@ -2,7 +2,7 @@
 
 set -eu
 
-dir="$(./mill show allDocs | cut -d'"' -f2)"
+dir="$(git rev-parse --show-toplevel)/out/allDocs.dest"
 mode="${1:-run}"
 
 if ! [[ -d "$dir" ]]; then
@@ -16,19 +16,18 @@ args=(
   "$dir"
   --fallback-extensions html,htm
   --root-dir "$dir"
-  --remap "https://uq-pac.github.io/BASIL file://$dir"
+  --remap "https://uq-pac.github.io/BASIL file://$dir/BASIL"
   --remap '(\.[a-z]+(#.*)?)$ $1'
   --remap '^file:///.* $0/index.html'
   --exclude '/scala-lang\.org/api/'
   --exclude '#L\d+$'
   --no-progress
-  --format markdown
 )
 
 if [[ "$mode" == export ]]; then
-  printf '%q ' "${args[@]}"
+  printf '%q ' "${args[@]}" --format markdown
 else
-  lychee "${args[@]}"
+  lychee "${args[@]}" --cache
 fi
 
 
