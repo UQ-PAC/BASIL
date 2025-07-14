@@ -60,7 +60,9 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
 
   override def mainClass = Some("Main")
 
-  override def sources = Task.Sources("src/main/scala")
+  override def millSourcePath = super.millSourcePath / "src"
+
+  override def sources = Task.Sources("main/scala")
 
   override def forkArgs = Task {
     super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}")
@@ -81,8 +83,9 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
 
     override def ammoniteVersion = build.ammoniteVersion
     override def ivyDeps = Agg(scalaTests, scalaCheck, javaTests)
-    override def sources = Task.Sources(Task.workspace / "src/test/scala")
-    def basilTestDir = Task(Task.workspace / "src/test")
+
+    def basilTestDir = build.moduleDir / "test"
+    override def sources = Task.Sources(basilTestDir / "test/scala")
 
     override def scalafixConfig = build.scalafixConfig
 
@@ -115,24 +118,24 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     */
 
   def updateExpectedBAP() = Task.Command {
-    val correctPath = test.basilTestDir() / "correct"
-    val incorrectPath = test.basilTestDir() / "incorrect"
+    val correctPath = test.basilTestDir / "correct"
+    val incorrectPath = test.basilTestDir / "incorrect"
 
     expectedUpdate(correctPath, true, true)
     expectedUpdate(incorrectPath, false, true)
   }
 
   def updateExpectedGTIRB() = Task.Command {
-    val correctPath = test.basilTestDir() / "correct"
-    val incorrectPath = test.basilTestDir() / "incorrect"
+    val correctPath = test.basilTestDir / "correct"
+    val incorrectPath = test.basilTestDir / "incorrect"
 
     expectedUpdate(correctPath, true, false)
     expectedUpdate(incorrectPath, false, false)
   }
 
   def updateExpectedExtraSpec() = Task.Command {
-    val correctPath = test.basilTestDir() / "extraspec_correct"
-    val incorrectPath = test.basilTestDir() / "extraspec_incorrect"
+    val correctPath = test.basilTestDir / "extraspec_correct"
+    val incorrectPath = test.basilTestDir / "extraspec_incorrect"
     expectedUpdate(correctPath, true, true)
     expectedUpdate(incorrectPath, false, true)
     expectedUpdate(correctPath, true, false)
@@ -196,7 +199,7 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     override def ivyDeps = Agg(build.antlrRuntime)
     override def antlrPackage = Some("Parsers")
     override def antlrGenerateVisitor = true
-    override def antlrGrammarSources = Task.Sources(Task.workspace / "src/main/antlr4")
+    override def antlrGrammarSources = Task.Sources(build.moduleDir / "main/antlr4")
   }
 
   object basilProto extends ScalaPBModule {
@@ -205,7 +208,7 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     override def scalaVersion = build.scalaVersion
     override def ivyDeps = Agg(build.scalapb)
 
-    override def scalaPBSources = Task.Sources(Task.workspace / "src/main/protobuf")
+    override def scalaPBSources = Task.Sources(build.moduleDir / "main/protobuf")
 
     override def scalaDocOptions = Task {
       super.scalaDocOptions() ++ build.scalaDocExternalMappingOptions()
@@ -215,7 +218,7 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
   object bnfc extends BNFCJFlexModule {
     override def bnfcPackageName = "basil_ir"
     override def bnfcExtraArgs = Seq("--line-numbers")
-    override def bnfcSource = Task.Source(Task.workspace / "src/main/bnfc/BasilIR.cf")
+    override def bnfcSource = Task.Source(build.moduleDir / "main/bnfc/BasilIR.cf")
     override def javadocOptions = Task {
       super.javadocOptions() ++ Seq(
         "-linkoffline",
