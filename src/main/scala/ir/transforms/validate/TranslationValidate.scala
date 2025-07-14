@@ -619,24 +619,24 @@ class TranslationValidator {
       }
     }
 
-    for (b <- combinedProc.blocks.toSeq.flatMap(_.statements)) {
-      b match {
-        case a => {
-          val v = ir.freeVarsPos(a).filter(_.name.startsWith("source__TRACE"))
-          for (sourceT <- v) {
-            val targetT = GlobalVar("target" + sourceT.name.stripPrefix("source"), sourceT.getType)
-            eval.evalExpr(BinaryExpr(EQ, sourceT, targetT)) match {
-              case Some(FalseLiteral) => {
-                a.comment = Some(a.comment.getOrElse("") + s"(trace unequal $sourceT != $targetT)")
-                Logger.error(s"trace unequal at ${a.parent.label} : $sourceT, $targetT")
-              }
-              case _ => ()
-            }
-          }
-        }
-        case _ => ()
-      }
-    }
+    // for (b <- combinedProc.blocks.toSeq.flatMap(_.statements)) {
+    //  b match {
+    //    case a => {
+    //      val v = ir.freeVarsPos(a).filter(_.name.startsWith("source__TRACE"))
+    //      for (sourceT <- v) {
+    //        val targetT = GlobalVar("target" + sourceT.name.stripPrefix("source"), sourceT.getType)
+    //        eval.evalExpr(BinaryExpr(EQ, sourceT, targetT)) match {
+    //          case Some(FalseLiteral) => {
+    //            a.comment = Some(a.comment.getOrElse("") + s"(trace unequal $sourceT != $targetT)")
+    //            Logger.error(s"trace unequal at ${a.parent.label} : $sourceT, $targetT")
+    //          }
+    //          case _ => ()
+    //        }
+    //      }
+    //    }
+    //    case _ => ()
+    //  }
+    // }
 
     case object Conj {
       def unapply(e: Expr): Option[List[Expr]] = e match {
@@ -651,23 +651,23 @@ class TranslationValidator {
       override def vstmt(s: Statement) = s match {
         case a => {
           val vars = freeVarsPos(a).filter(_.name.startsWith("source"))
-          a.comment = Some(
-            vars
-              .map(b =>
-                val ob = b match {
-                  case GlobalVar(v, t) => GlobalVar("target" + v.stripPrefix("source"), t)
-                  case LocalVar(v, t, i) => LocalVar("target" + v.stripPrefix("source"), t, i)
-                }
-                val eq = eval.evalExpr(BinaryExpr(EQ, b, ob))
-                val (s, t) = (eval.evalExpr(b), eval.evalExpr(ob))
-                eq match {
-                  case Some(TrueLiteral) => s"(${b.name.stripPrefix("source__")} matches)"
-                  case Some(FalseLiteral) => s"(${b.name.stripPrefix("source__")} NOT MATCHING)"
-                  case None => s"(${b.name.stripPrefix("source__")} $s $t)"
-                }
-              )
-              .mkString(", ")
-          )
+          val pcomment = a.comment.getOrElse("")
+          val compar = vars
+            .map(b =>
+              val ob = b match {
+                case GlobalVar(v, t) => GlobalVar("target" + v.stripPrefix("source"), t)
+                case LocalVar(v, t, i) => LocalVar("target" + v.stripPrefix("source"), t, i)
+              }
+              val eq = eval.evalExpr(BinaryExpr(EQ, b, ob))
+              val (s, t) = (eval.evalExpr(b), eval.evalExpr(ob))
+              eq match {
+                case Some(TrueLiteral) => s"(${b.name.stripPrefix("source__")} matches)"
+                case Some(FalseLiteral) => s"(${b.name.stripPrefix("source__")} NOT MATCHING)"
+                case None => s"(${b.name.stripPrefix("source__")} $s $t)"
+              }
+            )
+            .mkString(", ")
+          a.comment = Some(pcomment + " " + compar)
           SkipChildren()
         }
         // case ass @ Assert(Conj(xs), _, _) => {
