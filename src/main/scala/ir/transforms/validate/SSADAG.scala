@@ -67,6 +67,10 @@ object SSADAG {
 
   }
 
+  def blockDoneVar(b: Block) = {
+    LocalVar(b.label + "_done", BoolType)
+  }
+
   /**
   * Convert an acyclic CFA to a transition encoding
   *
@@ -78,9 +82,7 @@ object SSADAG {
     val stRename = mutable.Map[Block, mutable.Map[Variable, Variable]]()
     val renameBefore = mutable.Map[Block, Map[Variable, Variable]]()
 
-    def blockDone(b: Block) = {
-      LocalVar(b.label + "_done", BoolType)
-    }
+    def blockDone(b: Block) = blockDoneVar(b)
 
     var count = Map[String, Int]()
 

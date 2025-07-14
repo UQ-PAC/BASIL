@@ -586,6 +586,23 @@ class TranslationValidator {
     asserts = asserts ++ a
   }
 
+  def processModel(combinedProc: Procedure, prover: SMTProver) = {
+    val eval = prover.getEvaluator()
+
+    val done: Set[Block] = combinedProc.blocks
+      .map(b => {
+        eval.evalExpr(SSADAG.blockDoneVar(b)) match {
+          case Some(TrueLiteral) => Seq(b)
+          case _ => Seq()
+        }
+      })
+      .flatten
+      .toSet
+
+    ir.dotBlockGraph(combinedProc.blocks.toList, done)
+
+  }
+
   /**
    * Generate an SMT query for the product program, 
    *
@@ -682,7 +699,7 @@ class TranslationValidator {
       // build smt query
       val b = translating.BasilIRToSMT2.SMTBuilder()
       val solver = util.SMT.SMTSolver(Some(10000))
-      val prover = solver.getProver()
+      val prover = solver.getProver(true)
 
       b.addCommand("set-logic", "QF_BV")
 
@@ -736,8 +753,6 @@ class TranslationValidator {
       val query = b.getCheckSat()
       util.writeToFile(query, fname)
 
-
-
       timer.checkPoint("write out " + fname)
       Logger.writeToFile(File(s"${filePrefix}combined-${proc.name}.il"), translating.PrettyPrinter.pp_prog(newProg))
       Logger.info("checksat")
@@ -747,6 +762,8 @@ class TranslationValidator {
         case SatResult.UNSAT => Logger.info("unsat")
         case SatResult.SAT(m) => {
           Logger.error(s"sat ${filePrefix} ${proc.name}")
+          val g = processModel(newProg.mainProcedure, prover)
+          Logger.writeToFile(File(s"${filePrefix}counterexample-combined-${proc.name}.dot"), g)
           // extract model
         }
         case SatResult.Unknown(m) => println(s"unknown: $m")

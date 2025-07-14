@@ -6,11 +6,16 @@ import org.sosy_lab.common.ShutdownManager
 import org.sosy_lab.common.configuration.Configuration
 import org.sosy_lab.common.log.LogManager
 import org.sosy_lab.java_smt.SolverContextFactory
-import org.sosy_lab.java_smt.api.{BitvectorFormula, BooleanFormula, FormulaManager, ProverEnvironment, SolverContext}
+import org.sosy_lab.java_smt.api.{
+  BitvectorFormula,
+  BooleanFormula,
+  Evaluator,
+  FormulaManager,
+  ProverEnvironment,
+  SolverContext
+}
 
-
-import scala.jdk.CollectionConverters.SeqHasAsJava
-import scala.jdk.CollectionConverters.SetHasAsJava
+import scala.jdk.CollectionConverters.{SeqHasAsJava, SetHasAsJava}
 
 // TODO
 // support moving up and down a proof context stack
@@ -94,6 +99,34 @@ class SMTSolver(var defaultTimeoutMillis: Option[Int] = None) {
 
 }
 
+class SMTEvaluator(formulaConverter: FormulaConverter, eval: Evaluator) {
+
+  def evalExpr(e: Expr): Option[Literal] = {
+    e.getType match {
+      case BoolType =>
+        evalBoolExpr(e).map {
+          case true => TrueLiteral
+          case false => FalseLiteral
+        }
+      case _: BitVecType => evalBVExpr(e)
+      case _ => throw Exception(s"Model eval not supported for expr : ${e.getType}")
+    }
+  }
+
+  def evalBoolExpr(e: Expr): Option[Boolean] = {
+    Option(eval.evaluate(formulaConverter.convertBoolExpr(e)))
+  }
+
+  def evalBVExpr(e: Expr): Option[BitVecLiteral] = {
+    val width = e.getType match {
+      case BitVecType(s) => s
+      case _ => throw Exception("not a bv formula")
+    }
+    Option(eval.evaluate(formulaConverter.convertBVExpr(e))).map(v => BitVecLiteral(v, width))
+  }
+
+}
+
 class SMTProver(
   val solverContext: SolverContext,
   val shutdownManager: ShutdownManager,
@@ -148,6 +181,10 @@ class SMTProver(
         t.join()
       })
     }
+  }
+
+  def getEvaluator() = {
+    SMTEvaluator(formulaConverter, prover.getEvaluator())
   }
 
 }
