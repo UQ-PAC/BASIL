@@ -55,6 +55,13 @@ class LatticeCollectionTests extends AnyFunSuite with org.scalatestplus.scalache
     case LatticeMap.BottomMap(m) => (for (m2 <- Shrink.shrink(m)) yield LatticeMap.bottomMap(m2))
   }
 
+  def terms(s: LatticeSet[V]): List[V] = s match {
+    case LatticeSet.Top() => List()
+    case LatticeSet.Bottom() => List()
+    case LatticeSet.FiniteSet(s) => s.toList
+    case LatticeSet.DiffSet(s) => s.toList
+  }
+
   test("idempotence") {
     forAll { (s: LatticeSet[V]) =>
       assert(s.join(s).join(s) == s.join(s))
@@ -67,10 +74,11 @@ class LatticeCollectionTests extends AnyFunSuite with org.scalatestplus.scalache
   }
 
   test("set laws") {
-    forAll { (s1: LatticeSet[V], s2: LatticeSet[V]) =>
-      forAll { (v: V) =>
-        assert(s1.union(s2).contains(v) == (s1.contains(v) || s2.contains(v)))
-        assert(s1.intersect(s2).contains(v) == (s1.contains(v) && s2.contains(v)))
+    forAll(minSuccessful(1000)) { (s1: LatticeSet[V], s2: LatticeSet[V]) =>
+      forAll(Gen.oneOf(terms(s1) ++ terms(s2) ++ List(0))) { (v: V) =>
+        assert((s1 union s2).contains(v) == (s1.contains(v) || s2.contains(v)))
+        assert((s1 intersect s2).contains(v) == (s1.contains(v) && s2.contains(v)))
+        assert((s1 diff s2).contains(v) == (s1.contains(v) && !s2.contains(v)))
       }
     }
   }
@@ -85,6 +93,15 @@ class LatticeCollectionTests extends AnyFunSuite with org.scalatestplus.scalache
       forAll(Gen.oneOf(m1.toMap.keys ++ m2.toMap.keys ++ List(0))) { (d: D) =>
         assert(join(d) == m1(d).join(m2(d)), join)
         assert(meet(d) == m1(d).meet(m2(d)), meet)
+      }
+    }
+    forAll(minSuccessful(1000)) { (m: LatticeMap[D, L], d: D, l: L) =>
+      val m2 = m.update(d -> l)
+      assert(m2(d) == l)
+      forAll(Gen.oneOf(m.toMap.keys ++ List(0))) { (d2: D) =>
+        if (d != d2) {
+          assert(m2(d2) == m(d2))
+        }
       }
     }
   }

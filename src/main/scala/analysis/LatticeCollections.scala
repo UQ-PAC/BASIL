@@ -180,6 +180,12 @@ enum LatticeMap[D, L] {
   case BottomMap[D1, L1](m: Map[D1, L1]) extends LatticeMap[D1, L1]
 
   /** Update this map so that `from` now maps to `to` */
+  def update[L1 <: InternalLattice[L1]](pair: (D, L))(implicit
+    s: L <:< L1,
+    @implicitNotFound("No implicit of type ${L1} was found. See LatticeMap docs for more info.") l: L1
+  ): LatticeMap[D, L] = this.update(pair(0), pair(1))
+
+  /** Update this map so that `from` now maps to `to` */
   def update[L1 <: InternalLattice[L1]](from: D, to: L)(implicit
     s: L <:< L1,
     @implicitNotFound("No implicit of type ${L1} was found. See LatticeMap docs for more info.") l: L1
