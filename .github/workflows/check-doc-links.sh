@@ -22,7 +22,7 @@ args=(
   --exclude '#L\d+$'
   --insecure
   --no-progress
-  --max-concurrency 4
+  --max-concurrency 16
   "$@"
 )
 
