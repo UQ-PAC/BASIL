@@ -1,11 +1,11 @@
 name: Test
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
+    # running tests can be skipped for docs-only changes
+    paths: ['src/**', 'basilmill/**', '**.mill', '.?mill*', '*.conf', '.github/workflows/run-examples.yml']
   workflow_dispatch:
 jobs:
   CheckTestTagging:
