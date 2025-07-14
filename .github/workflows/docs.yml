@@ -1,16 +1,17 @@
-name: Doc
+name: Docs
 on:
   workflow_dispatch:
   workflow_call:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 concurrency:
   group: "pages-${{ github.ref }}"
   cancel-in-progress: false
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
 
 jobs:
   build-docs:
@@ -57,6 +58,10 @@ jobs:
 
   deploy-docs:
     if: github.ref_name == 'main'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

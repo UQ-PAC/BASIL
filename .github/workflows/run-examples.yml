@@ -20,15 +20,6 @@ jobs:
       - name: Check all test suites have at least one tag
         run: .github/workflows/check-test-tagging.sh
 
-  Docs:
-    uses: ./.github/workflows/docs.yml
-    secrets: inherit
-
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-
   Scalafmt:
     runs-on: ubuntu-latest
     steps:
