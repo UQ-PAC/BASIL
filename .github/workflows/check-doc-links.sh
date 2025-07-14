@@ -2,8 +2,13 @@
 
 set -eu
 
-dir="$(git rev-parse --show-toplevel)"
+dir="$(./mill show allDocs | cut -d'"' -f2)"
 mode="${1:-run}"
+
+if ! [[ -d "$dir" ]]; then
+  echo "allDocs dir '$dir' does not exist" >&2
+  exit 2
+fi
 
 # last two --remap arguments will append index.html onto URLs with no extension (and allowing for # fragments)
 # NOTE: this relies on --remap only actioning the /first/ matching regex
