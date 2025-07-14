@@ -37,7 +37,7 @@ xmktemp() {
   mktemp -t tmp.XXXXXXXXXX
 }
 
-command -v nix >/dev/null|| die 1 "nix is required"
+command -v nix >/dev/null || die 1 "nix is required"
 
 if [[ "$@" == *'--help'* ]]; then
   usage 0
@@ -55,13 +55,23 @@ outputdir="$(xrealpath $2)"
 shift
 shift
 command="${@:-gcc *.c}"
-
 outfile=$(xmktemp)
+tmpdir="$(dirname "$outfile")"
+
+tmpinputdir="$(echo "$inputdir" | sha1sum | tr -d ' -')"
+[[ -n "$tmpinputdir" ]] || die 3 "failed to create temp dir: $tmpinputdir"
+
+tmpinputdir="$(dirname "$outfile")/$tmpinputdir"
+rm -rf "$tmpinputdir"
+cp -r "$inputdir" "$tmpinputdir"
+inputdir="$tmpinputdir"
 
 nix-build --extra-experimental-features "nix-command flakes" --no-out-link - <<EOF > $outfile
   let
-    pkgs = (builtins.getFlake "github:katrinafyi/pac-nix").lib.nixpkgs;
-    aarch64pkgs = pkgs.pkgsCross.aarch64-multiplatform;
+    system = builtins.currentSystem;
+    pac-nix = builtins.getFlake "github:katrinafyi/pac-nix";
+    pkgs = pac-nix.legacyPackages.\${system};
+    aarch64pkgs = pac-nix.inputs.nixpkgs.legacyPackages.\${system}.pkgsCross.aarch64-multiplatform;
   in aarch64pkgs.runCommand "basil-test-files" {
       nativeBuildInputs = [
         aarch64pkgs.buildPackages.gcc
