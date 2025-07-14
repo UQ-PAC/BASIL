@@ -2,7 +2,6 @@ package analysis
 
 import ir.*
 import ir.transforms.AbstractDomain
-import util.assertion.*
 
 import scala.annotation.implicitNotFound
 
@@ -332,31 +331,22 @@ trait MapDomain[D, L] extends AbstractDomain[LatticeMap[D, L]] {
     latticeMapJoin(a, b, (x, y) => joinTerm(x, y, pos), topTerm, botTerm)
 
   override def widen(a: LatticeMap[D, L], b: LatticeMap[D, L], pos: Block): LatticeMap[D, L] =
+    def widenMaps(m1: Map[D, L], m2: Map[D, L], d1: L, d2: L) =
+      (m1.keys ++ m2.keys).map(x => (x -> widenTerm(m1.getOrElse(x, d1), m2.getOrElse(x, d2), pos)))
+
     (a, b) match {
       case (Bottom(), b) => b
       case (a, Bottom()) => a
       case (Top(), _) => Top()
       case (_, Top()) => Top()
-      case (BottomMap(a), BottomMap(b)) =>
-        bottomMap(a.foldLeft(b) { case (m, (b, v)) =>
-          val x = widenTerm(m.getOrElse(b, botTerm), v, pos)
-          if x == botTerm then m - b else m + (b -> x)
-        })
-      case (BottomMap(a), TopMap(b)) =>
-        topMap(a.foldLeft(b) { case (m, (b, v)) =>
-          val x = widenTerm(m.getOrElse(b, topTerm), v, pos)
-          if x == topTerm then m - b else m + (b -> x)
-        })
-      case (TopMap(a), BottomMap(b)) =>
-        topMap(b.foldLeft(a) { case (m, (a, v)) =>
-          val x = widenTerm(v, m.getOrElse(a, botTerm), pos)
-          if x == topTerm then m - a else m + (a -> x)
-        })
-      case (TopMap(a), TopMap(b)) =>
-        topMap(a.foldLeft(b) { case (m, (b, v)) =>
-          val x = widenTerm(m.getOrElse(b, topTerm), v, pos)
-          if x == topTerm then m - b else m + (b -> x)
-        })
+      case (BottomMap(m1), BottomMap(m2)) =>
+        bottomMap(widenMaps(m1, m2, botTerm, botTerm).filter(_._2 != botTerm).toMap)
+      case (BottomMap(m1), TopMap(m2)) =>
+        topMap(widenMaps(m1, m2, botTerm, topTerm).filter(_._2 != topTerm).toMap)
+      case (TopMap(m1), BottomMap(m2)) =>
+        topMap(widenMaps(m1, m2, topTerm, botTerm).filter(_._2 != topTerm).toMap)
+      case (TopMap(m1), TopMap(m2)) =>
+        topMap(widenMaps(m1, m2, topTerm, topTerm).filter(_._2 != topTerm).toMap)
     }
 
   def bot: LatticeMap[D, L] = Bottom()
