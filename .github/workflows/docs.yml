@@ -31,7 +31,7 @@ jobs:
           path: ${{ steps.allDocs.outputs.dir }}
 
       - id: docArgs
-        run: echo "args=$(.github/workflows/check-doc-links.sh export)" >> "$GITHUB_OUTPUT"
+        run: echo "args=$(.github/workflows/check-doc-links.sh)" >> "$GITHUB_OUTPUT"
         env:
           LYCHEE_EXPORT_ARGS: "true"
 
