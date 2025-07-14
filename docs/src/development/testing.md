@@ -21,7 +21,7 @@ See the AnyFunSuite documentation or existing test cases for syntax and examples
 
 ### Exporting IR structures into test cases
 
-The [dsl](/BASIL/development/basil-ir.html#constructing-programs-in-code) can be used to construct simple example BASIL IR programs, which can then be fed through into the whole pipeline via `IRLoading.load()` in
+The [dsl](basil-ir.md#constructing-programs-in-code) can be used to construct simple example BASIL IR programs, which can then be fed through into the whole pipeline via `IRLoading.load()` in
 
 Often, you might have found a particular Basil IR program which demonstrates some bug in the code.
 It is good practice to extract this into a test case, both to validate the fix and ensure the bug doesn't reoccur.

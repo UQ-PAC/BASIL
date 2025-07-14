@@ -21,6 +21,7 @@ args=(
   --remap '^file:///.* $0/index.html'
   --exclude '/scala-lang\.org/api/'
   --exclude '#L\d+$'
+  --insecure
   --no-progress
 )
 
