@@ -647,48 +647,58 @@ class TranslationValidator {
       }
     }
 
-    class Simp extends CILVisitor {
+    class CollapsePhi extends CILVisitor {
+
+      override def vstmt(s: Statement) = s match {
+        case ass @ Assume(Conj(xs), _, _, _) => {
+         val n = xs.toSeq.flatMap {
+           case bdy @ BinaryExpr(BoolIMPLIES, bld, rhs) => {
+             eval.evalExpr(bld) match {
+               case Some(FalseLiteral) => Seq()
+               case Some(TrueLiteral) => Seq(rhs)
+               case None => Seq(bdy)
+             }
+           }
+           case x => Seq(x)
+         }
+
+         ass.body = boolAnd(n)
+         SkipChildren()
+        }
+        case _ => SkipChildren()
+      }
+    }
+
+    class ComparVals extends CILVisitor {
       override def vstmt(s: Statement) = s match {
         case a => {
-          val vars = freeVarsPos(a).filter(_.name.startsWith("source"))
+          val vars = freeVarsPos(a).filter(v => v.name.startsWith("source__") || v.name.startsWith("target__"))
           val pcomment = a.comment.getOrElse("")
           val compar = vars
             .map(b =>
-              val ob = b match {
-                case GlobalVar(v, t) => GlobalVar("target" + v.stripPrefix("source"), t)
-                case LocalVar(v, t, i) => LocalVar("target" + v.stripPrefix("source"), t, i)
+              val name = b.name.stripPrefix("source__").stripPrefix("target__")
+              val (sv, tv) = b match {
+                case GlobalVar(v, t) => (GlobalVar("source__" + name, t), GlobalVar("target__" + name, t))
+                case LocalVar(v, t, i) => (LocalVar("source__" + name, t, i), LocalVar("target__" + name, t, i))
               }
-              val eq = eval.evalExpr(BinaryExpr(EQ, b, ob))
-              val (s, t) = (eval.evalExpr(b), eval.evalExpr(ob))
+              val eq = eval.evalExpr(BinaryExpr(EQ, sv, tv))
+              val (s, t) = (eval.evalExpr(sv), eval.evalExpr(tv))
               eq match {
-                case Some(TrueLiteral) => s"(${b.name.stripPrefix("source__")} matches)"
-                case Some(FalseLiteral) => s"(${b.name.stripPrefix("source__")} NOT MATCHING)"
-                case None => s"(${b.name.stripPrefix("source__")} $s $t)"
+                case Some(TrueLiteral) => s"($name matches)"
+                case Some(FalseLiteral) => s"($name NOT MATCHING $s != $t)"
+                case None => s"($name $s != $t)"
               }
             )
             .mkString(", ")
           a.comment = Some(pcomment + " " + compar)
           SkipChildren()
         }
-        // case ass @ Assert(Conj(xs), _, _) => {
-        //  val n = xs.toSeq.flatMap {
-        //    case bdy @ BinaryExpr(BoolIMPLIES, bld, rhs) => {
-        //      eval.evalExpr(bld) match {
-        //        case Some(FalseLiteral) => Seq()
-        //        case Some(TrueLiteral) => Seq(rhs)
-        //        case None => Seq(bdy)
-        //      }
-        //    }
-        //    case x => Seq(x)
-        //  }
-
-        //  ass.body = boolAnd(n)
-        //  SkipChildren()
-        // }
         case _ => SkipChildren()
       }
     }
-    visit_proc(Simp(), combinedProc)
+
+    visit_proc(CollapsePhi(), combinedProc)
+    visit_proc(ComparVals(), combinedProc)
 
     ir.dotBlockGraph(combinedProc.blocks.toList, done)
 
