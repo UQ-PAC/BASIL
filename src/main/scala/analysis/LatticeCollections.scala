@@ -50,13 +50,6 @@ enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
   /* Represents Top() minus some finite set. */
   case DiffSet[T1](s: Set[T1]) extends LatticeSet[T1]
 
-  // We don't ever want to make empty FiniteSets or DiffSets, they should just be Top or Bottom
-  this match {
-    case FiniteSet(s) => require(s.nonEmpty)
-    case DiffSet(s) => require(s.nonEmpty)
-    case _ => {}
-  }
-
   def contains(v: T): Boolean = {
     this match {
       case Top() => true
@@ -178,14 +171,6 @@ enum LatticeMap[D, L] {
   case TopMap[D1, L1](m: Map[D1, L1]) extends LatticeMap[D1, L1]
   /* A Map which defaults to bottom and is else specified by the internal map */
   case BottomMap[D1, L1](m: Map[D1, L1]) extends LatticeMap[D1, L1]
-
-  // We don't want to have empty TopMaps or BottomMaps. We also don't want to store top in and TopMaps or bottom in any
-  // BottomMaps, but we don't have access to an implicit here.
-  this match {
-    case TopMap(m) => require(m.nonEmpty)
-    case BottomMap(m) => require(m.nonEmpty)
-    case _ => {}
-  }
 
   /** Update this map so that `from` now maps to `to`
     */
