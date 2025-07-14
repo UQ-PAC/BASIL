@@ -29,7 +29,11 @@ class InternalLatticeLattice[L <: InternalLattice[L]](term: L) extends Lattice[L
 }
 
 object LatticeSet {
+
+  /** Create a FiniteSet only if `s` is non-empty, else make Bottom. */
   def finiteSet[T](s: Set[T]): LatticeSet[T] = if s.isEmpty then LatticeSet.Bottom() else LatticeSet.FiniteSet(s)
+
+  /** Create a DiffSet only if `s` is non-empty, else make Top. */
   def diffSet[T](s: Set[T]): LatticeSet[T] = if s.isEmpty then LatticeSet.Top() else LatticeSet.DiffSet(s)
 }
 
@@ -141,7 +145,11 @@ class LatticeSetLattice[T] extends Lattice[LatticeSet[T]] {
 }
 
 object LatticeMap {
+
+  /** Create a TopMap only if `m` is non-empty, else make Top. */
   def topMap[D, L](m: Map[D, L]): LatticeMap[D, L] = if m.isEmpty then LatticeMap.Top() else LatticeMap.TopMap(m)
+
+  /** Create a BottomMap only if `m` is non-empty, else make Bottom. */
   def bottomMap[D, L](m: Map[D, L]): LatticeMap[D, L] =
     if m.isEmpty then LatticeMap.Bottom() else LatticeMap.BottomMap(m)
 }
@@ -171,8 +179,7 @@ enum LatticeMap[D, L] {
   /* A Map which defaults to bottom and is else specified by the internal map */
   case BottomMap[D1, L1](m: Map[D1, L1]) extends LatticeMap[D1, L1]
 
-  /** Update this map so that `from` now maps to `to`
-    */
+  /** Update this map so that `from` now maps to `to` */
   def update[L1 <: InternalLattice[L1]](from: D, to: L)(implicit
     s: L <:< L1,
     @implicitNotFound("No implicit of type ${L1} was found. See LatticeMap docs for more info.") l: L1
