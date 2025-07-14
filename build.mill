@@ -85,7 +85,7 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     override def ivyDeps = Agg(scalaTests, scalaCheck, javaTests)
 
     def basilTestDir = build.moduleDir / "test"
-    override def sources = Task.Sources(basilTestDir / "test/scala")
+    override def sources = Task.Sources(basilTestDir / "scala")
 
     override def scalafixConfig = build.scalafixConfig
 
