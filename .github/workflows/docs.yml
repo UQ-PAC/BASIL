@@ -31,20 +31,29 @@ jobs:
         with:
           path: ${{ steps.allDocs.outputs.dir }}
 
-      - id: lychee
+      - id: docArgs
         run: echo "args=$(.github/workflows/check-doc-links.sh export)" >> "$GITHUB_OUTPUT"
         env:
           LYCHEE_EXPORT_ARGS: "true"
 
       - uses: lycheeverse/lychee-action@v2
+        id: lychee
         with:
-          args: ${{ steps.lychee.outputs.args}}
+          args: ${{ steps.docArgs.outputs.args}}
           fail: false
           failIfEmpty: true
           jobSummary: false
-      - run: cat lychee/out.md
-      - run: |
-          sed 's|${{ steps.allDocs.outputs.dir }}||g' lychee/out.md > "$GITHUB_STEP_SUMMARY"
+      - name: >-
+          $lychee_exit_code == 0
+        run: |
+          sed -i.bak 's|${{ steps.allDocs.outputs.dir }}||g' lychee/out.md
+          cat lychee/out.md
+          if ! [[ "$lychee_exit_code" == 0 ]]; then
+            cat lychee/out.md >> "$GITHUB_STEP_SUMMARY"
+            exit "$lychee_exit_code"
+          fi
+        env:
+          lychee_exit_code: ${{ steps.lychee.outputs.exit_code }}
 
   deploy-docs:
     if: github.ref_name == 'main'
