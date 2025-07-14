@@ -1,11 +1,11 @@
 name: Test
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
+    # running tests can be skipped for docs-only changes
+    paths: ['src/**', 'basilmill/**', '**.mill', '.?mill*', '*.conf', '.github/workflows/run-examples.yml']
   workflow_dispatch:
 jobs:
   CheckTestTagging:
@@ -19,15 +19,6 @@ jobs:
       - run: './mill test.compile'
       - name: Check all test suites have at least one tag
         run: .github/workflows/check-test-tagging.sh
-
-  Docs:
-    uses: ./.github/workflows/docs.yml
-    secrets: inherit
-
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
 
   Scalafmt:
     runs-on: ubuntu-latest

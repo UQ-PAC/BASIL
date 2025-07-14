@@ -63,7 +63,7 @@ trait BasilDocs extends ScalaModule {
   }
 
   def allDocs = Task {
-    val dest = Task.dest
+    val dest = Task.dest / "BASIL"
 
     def copyDoc(p: Path, name: String) = {
       println(s"copying docs into $name from $p")

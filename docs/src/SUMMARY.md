@@ -18,7 +18,7 @@
 
 # Analyses
 
-- [Data Structure Analysis](development/dsa.md) Basil Memory Analysis 
+- [Data Structure Analysis](development/dsa.md) Basil Memory Analysis
 
 # Development
 
@@ -30,6 +30,7 @@
 
 # Devleopment Guidelines
 
+- [Testing](development/testing.md)
 - [Assertions](development/assertions.md)
 - [Scala](development/scala.md)
 
