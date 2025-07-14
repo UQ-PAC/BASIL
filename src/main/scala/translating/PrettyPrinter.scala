@@ -1,6 +1,8 @@
 package translating
 import ir.*
 import ir.cilvisitor.*
+import util.StringEscape.quote
+import util.functional.optionToMap
 
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
@@ -461,6 +463,30 @@ class BasilIRPrettyPrinter(
     returnBlock: Option[PPProg[Block]]
   ): PPProg[Procedure] = ???
 
+  private def getStatementAttribs(x: Statement): Iterable[(String, String)] = {
+    (optionToMap("label")(x.label)
+      ++ optionToMap("comment")(x.comment)).toList.sorted
+  }
+
+  override def vstmt(x: Statement) = {
+    val orig = super.vstmt(x)
+
+    val bst = orig.asInstanceOf[BST[?]]
+
+    val attribs = getStatementAttribs(x)
+    val attribsString = if attribs.isEmpty then {
+      ""
+    } else {
+      attribs
+        .map { (k, v) =>
+          s"${Sigil.BASIR.attrib}$k = ${quote(v)}"
+        }
+        .mkString(" { ", "; ", " }")
+    }
+
+    BST(bst.v + attribsString)
+  }
+
   override def vassign(lhs: PPProg[Variable], rhs: PPProg[Expr]): PPProg[LocalAssign] = BST(s"${lhs} := ${rhs}")
   override def vmemassign(lhs: PPProg[Variable], rhs: PPProg[Expr]): PPProg[LocalAssign] = BST(s"${lhs} mem:= ${rhs}")
   override def vsimulassign(assignments: List[(PPProg[Variable], PPProg[Expr])]): PPProg[SimulAssign] =
@@ -516,41 +542,12 @@ class BasilIRPrettyPrinter(
   override def vindirect(target: PPProg[Variable]): PPProg[IndirectCall] = BST(s"indirect call ${target} ")
   override def vassert(body: Assert): PPProg[Assert] = {
 
-    val attrs = body.label.map(l => ("label", l)).toSeq ++ body.comment.map(c => ("comment", c))
-    val attrl =
-      if attrs.nonEmpty then
-        " { " + attrs
-          .map { case (n, l) =>
-            s"${Sigil.BASIR.attrib}$n = \"$l\"; "
-          }
-          .mkString("") + " }"
-      else ""
-
-    BST(s"assert ${vexpr(body.body)}$attrl")
-  }
-
-  override def vstmt(s: Statement) = {
-    val comment = s.comment.map(c => s" /* $c */").getOrElse("")
-    val res = s match {
-      case n: NOP => "nop /* " + n.toString + " */"
-      case s => super.vstmt(s).toString
-    }
-    BST(res + comment)
+    BST(s"assert ${vexpr(body.body)}")
   }
 
   override def vassume(body: Assume): PPProg[Assume] = {
-    val attrs = body.label.map(l => ("label", l)).toSeq ++ body.comment.map(c => ("comment", c))
-    val attrl =
-      if attrs.nonEmpty then
-        "{ " + attrs
-          .map { case (n, l) =>
-            s"${Sigil.BASIR.attrib}$n = \"$l\"; "
-          }
-          .mkString("") + " }"
-      else ""
-
     val stmt = if body.checkSecurity then "guard" else "assume"
-    BST(s"$stmt ${vexpr(body.body)}$attrl")
+    BST(s"$stmt ${vexpr(body.body)}")
   }
   override def vnop(): PPProg[NOP] = BST("nop")
 

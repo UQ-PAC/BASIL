@@ -14,6 +14,9 @@ import java.util.Base64
 import scala.collection.mutable.{ArrayBuffer, Map, Set}
 import scala.collection.{immutable, mutable}
 
+def b64encode(x: com.google.protobuf.ByteString) =
+  Base64.getEncoder().encodeToString(x.toByteArray)
+
 private def assigned(x: Statement): immutable.Set[Variable] = x match {
   case x: Assign => x.assignees
   case x: TempIf =>
@@ -39,7 +42,7 @@ class TempIf(
   val cond: Expr,
   val thenStmts: immutable.Seq[Statement],
   val elseStmts: immutable.Seq[Statement],
-  override val label: Option[String] = None
+  label: Option[String] = None
 ) extends NOP(label) {
   override def toString = s"TempIf($cond, $thenStmts, $elseStmts)"
 }
@@ -49,7 +52,8 @@ class TempIf(
   * @param mods:
   *   Modules of the Gtirb file.
   * @param parserMap:
-  *   A Map from UUIDs to basic block statements, used for parsing
+  *   A Map from UUIDs to basic block statements, used for instruction semantics.
+  *   If None is provided then the offline lifter is used to generate instruction semantics.
   * @param cfg:
   *   The cfg provided by gtirb
   * @param mainAddress:
@@ -57,7 +61,7 @@ class TempIf(
   */
 class GTIRBToIR(
   mods: Seq[Module],
-  parserMap: immutable.Map[String, List[InsnSemantics]],
+  lifter: InsnLoader,
   cfg: CFG,
   mainAddress: Option[BigInt],
   mainName: Option[String]
@@ -67,12 +71,8 @@ class GTIRBToIR(
   val functionEntries = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionEntries)(_)).foldLeft0(_ ++ _)
   val functionBlocks = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionBlocks)(_)).foldLeft0(_ ++ _)
 
-  def b64encode(x: com.google.protobuf.ByteString) =
-    Base64.getEncoder().encodeToString(x.toByteArray)
-
-  given scala.Conversion[com.google.protobuf.ByteString, String] = b64encode
-
   import scala.language.implicitConversions
+  given scala.Conversion[com.google.protobuf.ByteString, String] = b64encode
 
   // maps block UUIDs to their address
   private val blockUUIDToAddress = createAddresses()
@@ -174,16 +174,12 @@ class GTIRBToIR(
 
     // maybe good to sort blocks by address around here?
 
-    val semanticsLoader = GTIRBLoader(parserMap)
-
     for ((functionUUID, blockUUIDs) <- functionBlocks) {
       val procedure = uuidToProcedure(functionUUID)
-      var blockCount = 0
       for (blockUUID <- blockUUIDs) {
         val block = uuidToBlock(blockUUID)
 
-        val statements = semanticsLoader.visitBlock(blockUUID, blockCount, block.address)
-        blockCount += 1
+        val statements = lifter.decodeBlock(blockUUID, block.address)
         for ((stmts, i) <- statements.zipWithIndex) {
           block.statements.addAll(insertPCIncrement(stmts))
         }
@@ -287,14 +283,16 @@ class GTIRBToIR(
       case last @ LocalAssign(lhs: GlobalVar, _, _) if lhs.name == "_PC" =>
         val label = last.label
         label
-      case _ => throw Exception(s"expected block ${block.label} to have a program counter assignment at its end")
+      case l =>
+        throw Exception(s"expected block ${block.label} to have a program counter assignment at its end but got $l")
     }
   }
 
-  private def getPCTarget(block: Block): GlobalVar = {
+  private def getPCTarget(block: Block): Variable = {
     block.statements.last match {
-      case LocalAssign(lhs: GlobalVar, rhs: GlobalVar, _) if lhs.name == "_PC" => rhs
-      case _ => throw Exception(s"expected block ${block.label} to have a program counter assignment at its end")
+      case LocalAssign(lhs: GlobalVar, rhs: Variable, _) if lhs.name == "_PC" => rhs
+      case l =>
+        throw Exception(s"expected block ${block.label} to have a program counter assignment at its end but got $l")
     }
   }
 
@@ -812,7 +810,7 @@ class GTIRBToIR(
 
     val tempIf = block.statements.last match {
       case i: TempIf => i
-      case _ => throw Exception(s"last statement of block ${block.label} is not an if statement")
+      case i => throw Exception(s"last statement of block ${block.label} is not an if statement: $i")
     }
 
     val trueBlock = newBlockCondition(block, uuidToBlock(branch.targetUuid), tempIf.cond, tempIf.thenStmts)

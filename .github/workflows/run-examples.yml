@@ -15,7 +15,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '17'
       - run: './mill test.compile'
       - name: Check all test suites have at least one tag
         run: .github/workflows/check-test-tagging.sh
@@ -49,12 +49,10 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '17'
 
       - name: Compile BASIL Mill
         run: ./mill compile
-      - if: ${{ failure() }}
-        uses: mxschmitt/action-tmate@v3
 
   # INFO: Scalatest runner arguments (i.e., arguments to scalatest.sh) can be
   # found at: https://www.scalatest.org/user_guide/using_the_runner
@@ -81,7 +79,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '17'
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -133,7 +131,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '17'
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -155,7 +153,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '17'
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -192,7 +190,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '17'
 
       - uses: actions/setup-dotnet@v4
         with:

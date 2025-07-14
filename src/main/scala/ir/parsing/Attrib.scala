@@ -46,6 +46,21 @@ enum Attrib {
     case _ => None
   }
 
+  // TODO: distinguish allowable failures (e.g., missing optional key)
+  // from unacceptable ones (e.g., wrong type for a certain known key like address)
+
+  def get(k: String) = this.Map.flatMap(_.get(k))
+  def getInt(k: String) = this.Map
+    .flatMap(_.get(k))
+    .map(_.Int.getOrElse {
+      throw Exception(s"integer-like attribute value required for '$k'")
+    })
+  def getString(k: String) = this.Map
+    .flatMap(_.get(k))
+    .map(_.Str.getOrElse {
+      throw Exception(s"string attribute value required for '$k'")
+    })
+
   import translating.indent
 
   def field(p: String) = {
@@ -104,13 +119,6 @@ object Attrib {
         util.functional.sequence(values)
       case _ => None
     }
-  }
-}
-
-case class FunDecl(irType: ir.IRType, body: Option[ir.LambdaExpr])
-case class ProgSpec(val rely: List[ir.Expr] = List(), val guar: List[ir.Expr] = List()) {
-  def merge(o: ProgSpec) = {
-    ProgSpec(rely ++ o.rely, guar ++ o.guar)
   }
 }
 
@@ -200,8 +208,19 @@ case class SymbolTableInfo(
     )
   }
 
-  def mergeFromAttrib(a: Attrib) = {
+  def mergeFromAttrib(a: Attrib) =
+    SymbolTableInfo.fromAttrib(a).map(this.merge(_))
 
+}
+
+object SymbolTableInfo {
+  def from(e: util.IRContext) = {
+    SymbolTableInfo(e.externalFunctions, e.globals, e.funcEntries, e.globalOffsets)
+  }
+
+  def empty = SymbolTableInfo(Set(), Set(), Set(), Map())
+
+  def fromAttrib(a: Attrib) = {
     import scala.util.chaining.scalaUtilChainingOps
 
     def logIfNone[T](str: => String)(x: Option[T]) = x match {
@@ -234,18 +253,8 @@ case class SymbolTableInfo(
           }
         )
         .toMap
-
-    } yield (this.merge(SymbolTableInfo(externalFunctions, globals, funcEntries, globalOffsets)))
+    } yield SymbolTableInfo(externalFunctions, globals, funcEntries, globalOffsets)
   }
-
-}
-
-object SymbolTableInfo {
-  def from(e: util.IRContext) = {
-    SymbolTableInfo(e.externalFunctions, e.globals, e.funcEntries, e.globalOffsets)
-  }
-
-  def empty = SymbolTableInfo(Set(), Set(), Set(), Map())
 }
 
 /**

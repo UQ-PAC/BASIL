@@ -437,6 +437,8 @@ object LocalVar {
 
 /** A global memory section (subject to shared-memory concurrent accesses from multiple threads). */
 sealed trait Memory extends Expr with Global {
+  require(valueSize >= 8)
+  require(addressSize >= 8)
   val name: String
   val addressSize: Int
   val valueSize: Int

@@ -1,6 +1,7 @@
 package ir.parsing
 
 import basil_ir.Absyn as syntax
+import ir.Sigil
 
 trait LiteralsBNFCVisitor[A]
     extends syntax.BinOp.Visitor[ir.BinOp, A],
@@ -18,12 +19,22 @@ trait LiteralsBNFCVisitor[A]
       syntax.Value.Visitor[ir.Literal, A],
       TypesBNFCVisitor[A] {
 
+  def unsigilBlock(x: String) = Sigil.unsigil(Sigil.BASIR.block)(x)
+  def unsigilProc(x: String) = Sigil.unsigil(Sigil.BASIR.proc)(x)
+  def unsigilLocal(x: String) =
+    /* keep sigil as it is optional, to preserve var name */
+    x
+  def unsigilGlobal(x: String) = Sigil.unsigil(Sigil.BASIR.globalVar)(x)
+  def unsigilAttrib(x: String) = Sigil.unsigil(Sigil.BASIR.attrib)(x)
+
+  /**
+   * Naive unquoting of double-quoted string. Does not do any
+   * interpretation of escape sequences.
+   */
   def unquote(s: String, x: HasParsePosition) = s match {
     case s"\"$s\"" => s
     case _ => throw ParseException("invalid quoted string", x)
   }
-
-  import scala.language.implicitConversions
 
   // Members declared in BinOp.Visitor
   override def visit(x: syntax.BinOpBVBinOp, arg: A) = x.bvbinop_.accept(this, arg)
@@ -96,23 +107,21 @@ trait LiteralsBNFCVisitor[A]
   override def visit(x: syntax.UnOp_booltobv1, arg: A) = ir.BoolToBV1
 
   // Members declared in Endian.Visitor
-  override def visit(x: syntax.LittleEndian, arg: A) = ir.Endian.LittleEndian
-  override def visit(x: syntax.BigEndian, arg: A) = ir.Endian.BigEndian
+  override def visit(x: syntax.Endian_Little, arg: A) = ir.Endian.LittleEndian
+  override def visit(x: syntax.Endian_Big, arg: A) = ir.Endian.BigEndian
 
   // Members declared in IntVal.Visitor
-  override def visit(x: syntax.HexInt, arg: A) =
+  override def visit(x: syntax.IntVal_Hex, arg: A) =
     BigInt(x.integerhex_.toLowerCase.stripPrefix("0x"), 16)
-  override def visit(x: syntax.DecInt, arg: A) = BigInt(x.integerdec_)
+  override def visit(x: syntax.IntVal_Dec, arg: A) = BigInt(x.integerdec_)
 
-  override def visit(x: syntax.BV, arg: A): ir.BitVecLiteral =
+  override def visit(x: syntax.BVVal1, arg: A): ir.BitVecLiteral =
     ir.BitVecLiteral(x.intval_.accept(this, arg), x.bvtype_.accept(this, arg).asInstanceOf[ir.BitVecType].size)
 
-  override def visit(x: syntax.BVLiteral, arg: A): ir.Literal =
-    x.bvval_.accept(this, arg)
-
-  override def visit(x: syntax.IntLiteral, arg: A): ir.Literal = ir.IntLiteral(x.intval_.accept(this, arg))
-  override def visit(x: syntax.TrueLiteral, arg: A): ir.Literal = ir.TrueLiteral
-  override def visit(x: syntax.FalseLiteral, arg: A): ir.Literal = ir.FalseLiteral
+  override def visit(x: syntax.Value_BV, arg: A): ir.Literal = x.bvval_.accept(this, arg)
+  override def visit(x: syntax.Value_Int, arg: A): ir.Literal = ir.IntLiteral(x.intval_.accept(this, arg))
+  override def visit(x: syntax.Value_True, arg: A): ir.Literal = ir.TrueLiteral
+  override def visit(x: syntax.Value_False, arg: A): ir.Literal = ir.FalseLiteral
 
 }
 

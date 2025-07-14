@@ -2,15 +2,17 @@ package translating
 
 import Parsers.ReadELFParser.*
 import boogie.*
+import ir.dsl.given
 import specification.*
 import util.{ILLoadingConfig, Logger}
 
+import scala.collection.immutable.{SortedMap, SortedSet}
 import scala.jdk.CollectionConverters.*
 
 /** https://refspecs.linuxfoundation.org/elf/elf.pdf
   */
 
-enum ELFSymType:
+enum ELFSymType derives ir.dsl.ToScala:
   case NOTYPE /* absolute symbol or similar */
   case SECTION /* memory section */
   case FILE
@@ -18,17 +20,17 @@ enum ELFSymType:
   case FUNC /* code function */
   case TLS /* ??? */
 
-enum ELFBind:
+enum ELFBind derives ir.dsl.ToScala:
   case LOCAL /* local to the translation unit */
   case GLOBAL /* global to the program */
   case WEAK /* multiple versions of symbol may be exposed to the linker, and the last definition is used. */
 
-enum ELFVis:
+enum ELFVis derives ir.dsl.ToScala:
   case HIDDEN
   case DEFAULT
   case PROTECTED
 
-enum ELFNDX:
+enum ELFNDX derives ir.dsl.ToScala:
   case Section(num: Int) /* Section containing the symbol */
   case UND /* Undefined */
   case ABS /* Absolute, unaffected by relocation */
@@ -42,13 +44,30 @@ case class ELFSymbol(
   vis: ELFVis,
   ndx: ELFNDX, /* The section containing the symbol */
   name: String
-)
+) derives ir.dsl.ToScala
+
+case class ReadELFData(
+  symbolTable: List[ELFSymbol],
+  externalFunctions: Set[ExternalFunction],
+  globalVariables: Set[SpecGlobal],
+  functionEntries: Set[FuncEntry],
+  relocationOffsets: Map[BigInt, BigInt],
+  mainAddress: BigInt
+) derives ir.dsl.ToScala {
+
+  def sorted = ReadELFData(
+    symbolTable,
+    SortedSet.from(externalFunctions)(Ordering.by(Tuple.fromProductTyped(_))),
+    SortedSet.from(globalVariables)(Ordering.by(Tuple.fromProductTyped(_))),
+    SortedSet.from(functionEntries)(Ordering.by(Tuple.fromProductTyped(_))),
+    SortedMap.from(relocationOffsets),
+    mainAddress
+  )
+
+}
 
 object ReadELFLoader {
-  def visitSyms(
-    ctx: SymsContext,
-    config: ILLoadingConfig
-  ): (List[ELFSymbol], Set[ExternalFunction], Set[SpecGlobal], Set[FuncEntry], Map[BigInt, BigInt], BigInt) = {
+  def visitSyms(ctx: SymsContext, config: ILLoadingConfig): ReadELFData = {
     val externalFunctions = ctx.relocationTable.asScala
       .filter(_.relocationTableHeader != null)
       .flatMap(r => visitRelocationTableExtFunc(r))
@@ -61,7 +80,7 @@ object ReadELFLoader {
 
     val symbolTable = ctx.symbolTable.asScala.flatMap(s => visitSymbolTable(s)).toList
     val globalVariables = symbolTable.collect {
-      case ELFSymbol(_, value, size, ELFSymType.OBJECT, ELFBind.GLOBAL, ELFVis.DEFAULT, ndx, name)
+      case ELFSymbol(_, value, size, ELFSymType.OBJECT, ELFBind.GLOBAL | ELFBind.LOCAL, ELFVis.DEFAULT, ndx, name)
           if ndx != ELFNDX.UND =>
         SpecGlobal(name, size * 8, None, value)
     }.toSet
@@ -74,7 +93,7 @@ object ReadELFLoader {
     if (mainAddress.isEmpty) {
       throw Exception(s"no ${config.mainProcedureName} function in symbol table")
     }
-    (symbolTable, externalFunctions, globalVariables, functionEntries, relocationOffsets, mainAddress.head)
+    ReadELFData(symbolTable, externalFunctions, globalVariables, functionEntries, relocationOffsets, mainAddress.head)
   }
 
   def visitRelocationTableExtFunc(ctx: RelocationTableContext): Set[ExternalFunction] = {
