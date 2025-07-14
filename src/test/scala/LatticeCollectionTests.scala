@@ -66,6 +66,15 @@ class LatticeCollectionTests extends AnyFunSuite with org.scalatestplus.scalache
     }
   }
 
+  test("set laws") {
+    forAll { (s1: LatticeSet[V], s2: LatticeSet[V]) =>
+      forAll { (v: V) =>
+        assert(s1.union(s2).contains(v) == (s1.contains(v) || s2.contains(v)))
+        assert(s1.intersect(s2).contains(v) == (s1.contains(v) && s2.contains(v)))
+      }
+    }
+  }
+
   test("pointwise props") {
     forAll(minSuccessful(1000)) { (m1: LatticeMap[D, L], m2: LatticeMap[D, L]) =>
       val join = m1.join(m2)
