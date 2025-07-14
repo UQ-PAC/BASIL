@@ -1,1 +1,3 @@
 *.mill linguist-language=Scala
+mill linguist-generated
+mill.bat linguist-generated
