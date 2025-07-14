@@ -3,7 +3,6 @@
 set -eu
 
 dir="$(git rev-parse --show-toplevel)/out/allDocs.dest"
-mode="${1:-run}"
 
 if ! [[ -d "$dir" ]]; then
   echo "allDocs dir '$dir' does not exist" >&2
@@ -23,9 +22,10 @@ args=(
   --exclude '#L\d+$'
   --insecure
   --no-progress
+  "$@"
 )
 
-if [[ "$mode" == export ]]; then
+if "${LYCHEE_EXPORT_ARGS:-false}"; then
   printf '%q ' "${args[@]}" --format markdown
 else
   lychee "${args[@]}" --cache

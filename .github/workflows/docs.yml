@@ -33,6 +33,8 @@ jobs:
 
       - id: lychee
         run: echo "args=$(.github/workflows/check-doc-links.sh export)" >> "$GITHUB_OUTPUT"
+        env:
+          LYCHEE_EXPORT_ARGS: "true"
 
       - uses: lycheeverse/lychee-action@v2
         with:
