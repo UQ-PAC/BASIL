@@ -31,20 +31,12 @@ jobs:
         with:
           path: ${{ steps.allDocs.outputs.dir }}
 
+      - id: lychee
+        run: echo "args=$(.github/workflows/check-doc-links.sh export)" >> "$GITHUB_OUTPUT"
+
       - uses: lycheeverse/lychee-action@v2
         with:
-          # last two --remap arguments will append index.html onto URLs with no extension (and allowing for # fragments)
-          # NOTE: this relies on --remap only actioning the /first/ matching regex
-          args: >-
-            ${{ steps.allDocs.outputs.dir }}
-            --fallback-extensions html,htm
-            --root-dir ${{ steps.allDocs.outputs.dir }}
-            --remap 'https://uq-pac.github.io/BASIL file://${{ steps.allDocs.outputs.dir }}'
-            --remap '(\.[a-z]+(#.*)?)$ $1'
-            --remap '^file:///.* $0/index.html'
-            --exclude '/scala-lang\.org/api/'
-            --exclude '#L\d+$'
-            --no-progress
+          args: ${{ steps.lychee.outputs.args}}
           fail: false
           failIfEmpty: true
           jobSummary: false
