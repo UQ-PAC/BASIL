@@ -22,13 +22,14 @@ args=(
   --exclude '#L\d+$'
   --insecure
   --no-progress
+  --max-concurrency 4
   "$@"
 )
 
 if "${LYCHEE_EXPORT_ARGS:-false}"; then
   printf '%q ' "${args[@]}" --format markdown
 else
-  lychee "${args[@]}" --cache
+  exec lychee "${args[@]}" --cache
 fi
 
 
