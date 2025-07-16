@@ -375,7 +375,49 @@ class TranslationValidator {
     merged.map { case (s, t) => CompatArg(toVariable(s), toVariable(t)) }.toList
   }
 
-  def setEqualVarsInvariant() = {
+  def setDSAInvariant = {
+
+    val procs = initProg.get.procedures.view.map(p => p.name -> p).toMap
+
+    for (p <- afterProg.get.procedures) {
+      val (liveVarsTarget, _) = liveBefore(p.name)
+      val (liveVarsSource, _) = liveAfter(p.name)
+
+      /** has index **/
+
+      def removeIndex(v: Variable) = v match {
+        case l: LocalVar => l.copy(index = 0)
+        case g => g
+      }
+
+      val returnInv = procs(p.name).returnBlock
+        .map(_.jump match {
+          case r: Return => procs(p.name).returnBlock.get.label -> r.outParams.map((formal, actual) => formal).toSet
+          case _ => ???
+        })
+        .toSeq
+
+      val lives = liveVarsSource.collect {
+        case (block, v) if afterCuts(p).cutLabelBlockInProcedure.exists((_, b) => block.label == b.label) =>
+          block.label -> v.filter(v => liveVarsTarget(block).contains(removeIndex(v)))
+      }.toMap ++ returnInv
+
+      val inv = afterCuts(p).cutLabelBlockInProcedure.map {
+        case (label, cutPoint) => {
+          val vars = lives.get(cutPoint.label).toSet.flatten -- Seq(TransitionSystem.programCounterVar)
+
+          val assertion = vars.map(v => CompatArg((v), (removeIndex(v)))).toList
+
+          Inv.CutPoint(label, assertion, Some(s"INVARIANT at $label"))
+        }
+      }
+
+      setInvariant(p.name, inv.toList)
+    }
+
+  }
+
+  def setEqualVarsInvariantX() = {
 
     // call this after running transform so initProg corresponds to the source / after program.
 
@@ -448,7 +490,6 @@ class TranslationValidator {
    */
   def setEqualVarsInvariantRenaming(
     // block label -> variable -> renamed variable
-    renamingTgtSrc: Option[String] => (Variable | Memory) => Option[Expr] = _ => e => Some(e),
     renamingSrcTgt: Option[String] => (Variable | Memory) => Option[Expr] = _ => e => Some(e)
   ) = {
 
@@ -458,21 +499,15 @@ class TranslationValidator {
       val liveVarsTarget: Map[String, Set[Variable]] = liveBefore(p.name)._1.map((k, v) => (k.label, v)).toMap
       val liveVarsSource: Map[String, Set[Variable]] = liveAfter(p.name)._1.map((k, v) => (k.label, v)).toMap
 
-      val globalsSrc = globalsForTargetProc(p)(renamingTgtSrc(None)).toList
+      // val globalsSrc = globalsForTargetProc(p)(renamingTgtSrc(None))
       val globalsTgt = globalsForSourceProc(p)(renamingSrcTgt(None)).toList
-      val globals = mergeCompat(globalsSrc, globalsTgt)
+      val globals = globalsTgt.collect { case (a, Some(b)) => CompatArg(toVariable(a), toVariable(b)) }.toList
 
       val inparams = Seq(
-        Inv.CutPoint(
-          "ENTRY",
-          p.formalInParam.toList.map(p => CompatArg(p, renamingSrcTgt(None)(p).getOrElse(p).asInstanceOf[Expr]))
-        )
+        Inv.CutPoint("ENTRY", p.formalInParam.toList.map(p => CompatArg(p, renamingSrcTgt(None)(p).getOrElse(p))))
       )
       val outparams = Seq(
-        Inv.CutPoint(
-          "RETURN",
-          p.formalOutParam.toList.map(p => CompatArg(p, renamingSrcTgt(None)(p).getOrElse(p).asInstanceOf[Expr]))
-        )
+        Inv.CutPoint("RETURN", p.formalOutParam.toList.map(p => CompatArg(p, renamingSrcTgt(None)(p).getOrElse(p))))
       )
 
       // skipping because should be live at entry and return resp.
@@ -499,14 +534,10 @@ class TranslationValidator {
           val srcCut = afterCutsBls(label)
 
           val srcLives = liveVarsSource.get(srcCut).toList.flatten
-          // val tgtLives = liveVarsTarget.get(tgtCut).toList.flatten
+          val tgtLives = liveVarsTarget.get(tgtCut).toList.flatten
 
-          println(s"$label, $tgtCut, $srcCut")
-          println(srcLives)
-
-          val invSrc = srcLives.collect {
-            case s if renamingSrcTgt(Some(srcCut))(s).isDefined =>
-              CompatArg(toVariable(s), toVariable(renamingSrcTgt(Some(srcCut))(s).get))
+          val invSrc = srcLives.map(s => s -> renamingSrcTgt(Some(srcCut))(s)).collect { case (l, Some(r)) =>
+            CompatArg(toVariable(l), toVariable(r))
           }
           // val invTgt = tgtLives.collect {
           //  case t if renamingTgtSrc(Some(tgtCut))(t).isDefined =>
@@ -614,7 +645,20 @@ class TranslationValidator {
 
     for (i <- invariant) {
       eval.evalExpr(i) match {
-        case Some(FalseLiteral) => Logger.error(s"Part of invariant failed: $i")
+        case Some(FalseLiteral) =>
+          Logger.error(s"Part of invariant failed: $i")
+          i match {
+            case BinaryExpr(BoolIMPLIES, e, Conj(conjuncts)) => {
+              println(" Specifically:")
+              for (c <- conjuncts) {
+                eval.evalExpr(c) match {
+                  case Some(FalseLiteral) => println(s"  $c is false")
+                  case _ => ()
+                }
+              }
+            }
+            case _ => ()
+          }
         case _ => ()
       }
     }
@@ -651,19 +695,19 @@ class TranslationValidator {
 
       override def vstmt(s: Statement) = s match {
         case ass @ Assume(Conj(xs), _, _, _) => {
-         val n = xs.toSeq.flatMap {
-           case bdy @ BinaryExpr(BoolIMPLIES, bld, rhs) => {
-             eval.evalExpr(bld) match {
-               case Some(FalseLiteral) => Seq()
-               case Some(TrueLiteral) => Seq(rhs)
-               case None => Seq(bdy)
-             }
-           }
-           case x => Seq(x)
-         }
+          val n = xs.toSeq.flatMap {
+            case bdy @ BinaryExpr(BoolIMPLIES, bld, rhs) => {
+              eval.evalExpr(bld) match {
+                case Some(FalseLiteral) => Seq()
+                case Some(TrueLiteral) => Seq(rhs)
+                case None => Seq(bdy)
+              }
+            }
+            case x => Seq(x)
+          }
 
-         ass.body = boolAnd(n)
-         SkipChildren()
+          ass.body = boolAnd(n)
+          SkipChildren()
         }
         case _ => SkipChildren()
       }
@@ -774,7 +818,7 @@ class TranslationValidator {
         Inv.CutPoint("ENTRY", List(CompatArg(srcLiveMemory(k), tgtLiveMemory(k))), Some(s"Memory$k"))
       )
 
-      val invariant = initInv ++ invariants(proc.name) ++ memoryInit ++ alwaysInv
+      val invariant = initInv ++ invariants.getOrElse(proc.name, List()) ++ memoryInit ++ alwaysInv
 
       val preInv = invariant
 
@@ -901,6 +945,6 @@ def wrapShapePreservingTransformInValidation(transform: Program => Unit, name: S
   validator.setTargetProg(p)
   transform(p)
   validator.setSourceProg(p)
-  validator.setEqualVarsInvariant()
+  // validator.setEqualVarsInvariant()
   validator.getValidationSMT("tvsmt/" + name)
 }

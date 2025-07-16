@@ -25,8 +25,9 @@ def dynamicSingleAssignment(p: Program) = {
   validator.setSourceProg(p)
 
   def sourceToTarget(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
-    case LocalVar(n, t, i) => Some(LocalVar(n, t, 0))
-    case g => Some(g)
+    case l @ LocalVar(n, t, i) => Some(LocalVar(l.varName, t))
+    case g =>
+      Some(g)
   }
 
   def targetToSource(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
@@ -34,7 +35,7 @@ def dynamicSingleAssignment(p: Program) = {
     case o => None
   }
 
-  validator.setEqualVarsInvariantRenaming(renamingTgtSrc = targetToSource, renamingSrcTgt = sourceToTarget)
+  validator.setEqualVarsInvariantRenaming(renamingSrcTgt = sourceToTarget)
 
   validator.getValidationSMT("tvsmt/" + "DSA")
 }
@@ -58,7 +59,7 @@ def copyProp(p: Program) = {
     case g => Some(g)
   }
 
-  validator.setEqualVarsInvariantRenaming(renamingTgtSrc = nopRenaming, renamingSrcTgt = renaming)
+  validator.setEqualVarsInvariantRenaming(renamingSrcTgt = renaming)
 
   validator.getValidationSMT("tvsmt/" + "CopyProp")
 }
@@ -70,15 +71,13 @@ def parameters(p: Program) = {
   validator.setSourceProg(p)
 
   def sourceToTarget(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
-    case LocalVar(s"R${i}_in", t, 0) => Some(GlobalVar(s"R$i", t))
-    case LocalVar(s"R${i}_out", t, 0) => Some(GlobalVar(s"R$i", t))
-    // case LocalVar(n, t, 0) if (!n.startsWith("TRACE")) => Some(GlobalVar(n, t))
+    case LocalVar(s"${i}_in", t, 0) => Some(GlobalVar(s"$i", t))
+    case LocalVar(s"${i}_out", t, 0) => Some(GlobalVar(s"$i", t))
+    case LocalVar(n, t, 0) if (!n.startsWith("TRACE")) => Some(GlobalVar(n, t))
     case g => Some(g)
   }
 
-  def targetToSource(b: Option[String])(v: Variable | Memory): Option[Expr] = None
-
-  validator.setEqualVarsInvariantRenaming(renamingTgtSrc = targetToSource, renamingSrcTgt = sourceToTarget)
+  validator.setEqualVarsInvariantRenaming(renamingSrcTgt = sourceToTarget)
   validator.getValidationSMT("tvsmt/" + "Parameters")
 
 }
@@ -125,12 +124,12 @@ def nop(p: Program) = {
 def validatedSimplifyPipeline(p: Program) = {
   transforms.applyRPO(p)
   parameters(p)
+  // transforms.liftProcedureCallAbstraction(p, None)
   transforms.applyRPO(p)
-  // simplifyCFG(p)
-  // transforms.applyRPO(p)
+  simplifyCFG(p)
+  transforms.applyRPO(p)
   dynamicSingleAssignment(p)
   transforms.applyRPO(p)
-  println("NOP TX")
   nop(p)
   transforms.applyRPO(p)
   copyProp(p)
