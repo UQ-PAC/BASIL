@@ -2,6 +2,7 @@ package ir.transforms.validate
 
 import analysis.ProcFrames.*
 import ir.*
+import util.Logger
 
 import scala.collection.mutable
 
@@ -171,6 +172,11 @@ object Ackermann {
     }
   }
 
+  enum InstFailureReason {
+    case NameMismatch(msg: String)
+    case ParamMismatch(msg: String)
+  }
+
   /**
    * Check compatibility of two side effects and emit the lists (lhs, rhs) such that 
    *
@@ -179,8 +185,10 @@ object Ackermann {
    */
   def instantiateAxiomInstance(
     renaming: Variable => Option[Variable] /* to support param analysis */
-  )(source: SideEffectStatement, target: SideEffectStatement): Either[String, AckInv] = {
+  )(source: SideEffectStatement, target: SideEffectStatement): Either[InstFailureReason, AckInv] = {
     // source has higher level, has params, target does not have params
+
+    import InstFailureReason.*
 
     def applyRename(a: EffCallFormalParam): EffCallFormalParam = a match {
       case a: Field => (a)
@@ -191,25 +199,27 @@ object Ackermann {
     for {
       name <- (source, target) match {
         case (l, r) if l.name == r.name => Right(l.name)
-        case (l, r) => Left(s"Name incompat: ${l.name}, ${r.name}")
+        case (l, r) => Left(NameMismatch(s"Name incompat: ${l.name}, ${r.name}"))
       }
       targetArgs = target.rhs.toMap
-      args <- source.rhs.foldLeft(Right(List()): Either[String, List[CompatArg]]) { case (agg, (formal, actual)) =>
-        agg.flatMap(agg => {
-          targetArgs.get(applyRename(formal)) match {
-            case Some(a) => Right(CompatArg(actual, a) :: agg)
-            case None => Left(s"Unable to match source var ${formal} in target list ${target.rhs}")
-          }
-        })
+      args <- source.rhs.foldLeft(Right(List()): Either[InstFailureReason, List[CompatArg]]) {
+        case (agg, (formal, actual)) =>
+          agg.flatMap(agg => {
+            targetArgs.get(applyRename(formal)) match {
+              case Some(a) => Right(CompatArg(actual, a) :: agg)
+              case None => Left(ParamMismatch(s"Unable to match source var ${formal} in target list ${target.rhs}"))
+            }
+          })
       }
       targetLHS = target.lhs.toMap
-      lhs <- source.lhs.foldLeft(Right(List()): Either[String, List[CompatArg]]) { case (agg, (formal, actual)) =>
-        agg.flatMap(agg => {
-          targetLHS.get(applyRename(formal)) match {
-            case Some(a) => Right(CompatArg(actual, a) :: agg)
-            case None => Left(s"Unable to match outparam ${formal} in target list ${target.lhs}")
-          }
-        })
+      lhs <- source.lhs.foldLeft(Right(List()): Either[InstFailureReason, List[CompatArg]]) {
+        case (agg, (formal, actual)) =>
+          agg.flatMap(agg => {
+            targetLHS.get(applyRename(formal)) match {
+              case Some(a) => Right(CompatArg(actual, a) :: agg)
+              case None => Left(ParamMismatch(s"Unable to match outparam ${formal} in target list ${target.lhs}"))
+            }
+          })
       }
     } yield (AckInv(name, lhs, args))
   }
@@ -291,8 +301,9 @@ object Ackermann {
               invariant = (inv.toPredicate(renameSourceExpr, renameTargetExpr), inv.name) :: invariant
               advanceBoth()
             }
-            case Left(err) =>
-            // Logger.warn(s"Ackermannisation failure: $err; ${src} ${tgt}")
+            case Left(InstFailureReason.ParamMismatch(err)) =>
+              Logger.warn(s"Ackermannisation failure (side effect func params): $err; ${src} ${tgt}")
+            case Left(_) => ()
           }
         }
         case _ => ()

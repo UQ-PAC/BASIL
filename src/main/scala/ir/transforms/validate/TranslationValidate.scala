@@ -132,7 +132,7 @@ enum Inv {
 
 class TranslationValidator {
 
-  val timer = PerformanceTimer("translationValidator", LogLevel.INFO)
+  val timer = PerformanceTimer("translationValidator", LogLevel.DEBUG)
 
   var initProg: Option[Program] = None
 
@@ -536,8 +536,9 @@ class TranslationValidator {
           val srcLives = liveVarsSource.get(srcCut).toList.flatten
           val tgtLives = liveVarsTarget.get(tgtCut).toList.flatten
 
-          val invSrc = srcLives.map(s => s -> renamingSrcTgt(Some(srcCut))(s)).collect { case (l, Some(r)) =>
-            CompatArg(toVariable(l), toVariable(r))
+          val invSrc = srcLives.map(s => s -> renamingSrcTgt(Some(srcCut))(s)).collect {
+            case (l, Some(r)) if r.variables.forall(tgtLives.contains) =>
+              CompatArg(toVariable(l), toVariable(r))
           }
           // val invTgt = tgtLives.collect {
           //  case t if renamingTgtSrc(Some(tgtCut))(t).isDefined =>
@@ -768,7 +769,7 @@ class TranslationValidator {
       .filter(n => afterFrame.contains(n.name))
 
     for (proc <- interesting) {
-      timer.checkPoint(s"TVSMT ${proc.name}")
+      timer.checkPoint(s"TVSMT $filePrefix ${proc.name}")
       val source = afterProg.get.procedures.find(_.name == proc.name).get
       val target = beforeProg.get.procedures.find(_.name == proc.name).get
       // def targetCutPointToBlock(l: String) = beforeCuts(target)(l)
@@ -818,7 +819,7 @@ class TranslationValidator {
         Inv.CutPoint("ENTRY", List(CompatArg(srcLiveMemory(k), tgtLiveMemory(k))), Some(s"Memory$k"))
       )
 
-      val invariant = initInv ++ invariants.getOrElse(proc.name, List()) ++ memoryInit ++ alwaysInv
+      val invariant = initInv ++ invariants.getOrElse(proc.name, List()) ++ memoryInit
 
       val preInv = invariant
 
@@ -900,7 +901,7 @@ class TranslationValidator {
 
       timer.checkPoint("write out " + fname)
       Logger.writeToFile(File(s"${filePrefix}combined-${proc.name}.il"), translating.PrettyPrinter.pp_prog(newProg))
-      Logger.info("checksat")
+      Logger.info(s"checksat $fname")
 
       val res = prover.checkSat()
       res match {
