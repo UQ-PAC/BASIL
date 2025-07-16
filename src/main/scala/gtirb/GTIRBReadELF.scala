@@ -8,8 +8,8 @@ import translating.{ELFBind, ELFNDX, ELFSymType, ELFSymbol, ELFVis, ReadELFData}
 import util.Logger
 
 import java.io.ByteArrayInputStream
-import scala.util.chaining.scalaUtilChainingOps
 import scala.util.DynamicVariable
+import scala.util.chaining.scalaUtilChainingOps
 
 /**
  * Responsible for interpreting the GTIRB's symbol information
@@ -259,7 +259,9 @@ object GTIRBReadELF {
 
     inline def check(b: Boolean, s: String) = {
       if (!b) {
-        Logger.warn("PLEASE REPORT THIS ISSUE! (https://github.com/UQ-PAC/BASIL/issues/509) include the gts and relf files.\ngtirb relf discrepancy, " + s)
+        Logger.warn(
+          "PLEASE REPORT THIS ISSUE! (https://github.com/UQ-PAC/BASIL/issues/509) include the gts and relf files.\ngtirb relf discrepancy, " + s
+        )
         ok = false
       }
     }
