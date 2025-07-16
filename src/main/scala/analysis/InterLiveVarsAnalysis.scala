@@ -32,14 +32,13 @@ trait LiveVarsAnalysisFunctions(inline: Boolean, addExternals: Boolean = true)
 
   def edgesCallToEntry(call: Command, entry: Return)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     d match {
-      case Left(l) if inline => {
-        Map(d -> IdEdge())
-      }
-      case Left(l) => Map()
-      case Right(_) =>
-        entry.outParams.flatMap(_._2.variables).foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
-          (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
+      case Left(l) if inline => Map(d -> IdEdge())
+      case Left(l) => {
+        entry.outParams.flatMap(_._2.variables).foldLeft(Map[DL, EdgeFunction[TwoElement]]()) {
+          (mp, expVar) => mp + (Left(expVar) -> IdEdge())
         }
+      }
+      case Right(_) => Map(d -> IdEdge())
     }
   }
 
@@ -59,30 +58,36 @@ trait LiveVarsAnalysisFunctions(inline: Boolean, addExternals: Boolean = true)
       case LocalAssign(variable, expr, _) => // (s - variable) ++ expr.variables
         d match {
           case Left(value) =>
-            if value == variable then Map()
-            else Map(d -> IdEdge())
-          case Right(_) =>
-            expr.variables.foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) { (mp, expVar) =>
-              mp + (Left(expVar) -> ConstEdge(TwoElementTop))
+            if value == variable then {
+              expr.variables.foldLeft(Map[DL, EdgeFunction[TwoElement]]()) { (mp, expVar) =>
+                mp + (Left(expVar) -> IdEdge())
+              }
             }
+            else Map(d -> IdEdge())
+          case Right(_) => Map(d -> IdEdge())
         }
       case MemoryLoad(lhs, _, index, _, _, _) =>
         d match {
           case Left(value) =>
-            if value == lhs then Map()
-            else Map(d -> IdEdge())
-          case Right(_) =>
-            index.variables.foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) { (mp, expVar) =>
-              mp + (Left(expVar) -> ConstEdge(TwoElementTop))
+            if value == lhs then {
+              index.variables.foldLeft(Map[DL, EdgeFunction[TwoElement]]()) { (mp, expVar) =>
+                mp + (Left(expVar) -> IdEdge())
+              }
             }
+            else Map(d -> IdEdge())
+          case Right(_) => Map(d -> IdEdge())
+
         }
-      case MemoryStore(_, index, value, _, _, _) => // s ++ store.index.variables ++ store.value.variables
+      case st @ MemoryStore(_, index, value, _, _, _) => // s ++ store.index.variables ++ store.value.variables
         d match {
           case Left(_) => Map(d -> IdEdge())
           case Right(_) =>
-            (index.variables ++ value.variables).foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
+            if st.parent == program.mainProcedure.labelToBlock("main_3") then
+              print("")
+            val res = (index.variables ++ value.variables).foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
               (mp, storVar) => mp + (Left(storVar) -> ConstEdge(TwoElementTop))
             }
+            res
         }
       case Assume(expr, _, _, _) => // s ++ expr.variables
         d match {
@@ -108,19 +113,6 @@ trait LiveVarsAnalysisFunctions(inline: Boolean, addExternals: Boolean = true)
       case c: DirectCall if addExternals && (c.target.isExternal.contains(true) || c.target.blocks.isEmpty) => {
         val writes = ir.transforms.externalCallWrites(c.target.procName).toSet[Variable]
         val reads = ir.transforms.externalCallReads(c.target.procName).toSet[Variable]
-        d match {
-          case Left(value) =>
-            if writes.contains(value) then Map()
-            else Map(d -> IdEdge())
-          case Right(_) =>
-            reads.foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) { (mp, expVar) =>
-              mp + (Left(expVar) -> ConstEdge(TwoElementTop))
-            }
-        }
-      }
-      case c: DirectCall => {
-        val writes = c.outParams.map(_._2).toSet
-        val reads = c.actualParams.flatMap(_._2.variables).toSet
         d match {
           case Left(value) =>
             if writes.contains(value) then Map()
