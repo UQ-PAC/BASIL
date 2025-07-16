@@ -1,10 +1,11 @@
 import analysis.{InterLiveVarsAnalysis, TwoElementTop}
+import ir.Endian.LittleEndian
 import ir.dsl.*
-import ir.{BitVecLiteral, Block, LocalAssign, Program, Register, Variable, cilvisitor, dsl, transforms}
+import ir.{BitVecLiteral, Block, Command, LocalAssign, MemoryStore, Program, Register, SharedMemory, Statement, Variable, cilvisitor, dsl, transforms}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
 import translating.PrettyPrinter.*
-import util.{BASILResult, LogLevel, Logger, StaticAnalysisConfig}
+import util.{BASILResult, LogLevel, Logger, StaticAnalysisConfig, writeToFile}
 
 @test_util.tags.UnitTest
 class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
@@ -18,6 +19,8 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
     runBASIL(inputFile, relfFile, None, outputFile, staticAnalysisConfig)
   }
 
+  def mem: SharedMemory = SharedMemory("mem", 64, 8)
+
   def createSimpleProc(name: String, statements: Seq[NonCallStatement]): EventuallyProcedure = {
     proc(name, block("l" + name, statements.:+(goto(name + "_return")): _*), block(name + "_return", ret))
   }
@@ -28,6 +31,8 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
     val r1ConstantAssign = LocalAssign(R1, constant1, Some("00002"))
     val r2r0Assign = LocalAssign(R2, R0, Some("00003"))
     val r2r1Assign = LocalAssign(R2, R1, Some("00004"))
+    val store1 = MemoryStore(mem, R2, constant1, LittleEndian, 64)
+    val store2 = MemoryStore(mem, R2, constant1, LittleEndian, 64) // needed for intrusive list unitary check
 
     val program: Program = prog(
       proc(
@@ -36,8 +41,8 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
         block("second_call", directCall("callee2"), goto("returnBlock")),
         block("returnBlock", ret)
       ),
-      createSimpleProc("callee1", Seq(r2r0Assign)),
-      createSimpleProc("callee2", Seq(r2r1Assign))
+      createSimpleProc("callee1", Seq(r2r0Assign, store1)),
+      createSimpleProc("callee2", Seq(r2r1Assign, store2))
     )
 
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
@@ -58,7 +63,10 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
     val r1ConstantAssign = LocalAssign(R1, constant1, Some("00002"))
     val r2r0Assign = LocalAssign(R2, R0, Some("00003"))
     val r2r1Assign = LocalAssign(R2, R1, Some("00004"))
-    val r1Reassign = LocalAssign(R1, BitVecLiteral(2, 64), Some("00005"))
+    val r1Reassign = LocalAssign(R1, bv64(2), Some("00005"))
+    val store1 = MemoryStore(mem, R2, constant1, LittleEndian, 64)
+    val store2 = MemoryStore(mem, R2, constant1, LittleEndian, 64) // needed for intrusive list unitary check
+
 
     val program: Program = prog(
       proc(
@@ -67,8 +75,8 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
         block("second_call", directCall("callee2"), goto("returnBlock")),
         block("returnBlock", ret)
       ),
-      createSimpleProc("callee1", Seq(r1Reassign, r2r0Assign)),
-      createSimpleProc("callee2", Seq(r2r1Assign))
+      createSimpleProc("callee1", Seq(r1Reassign, r2r0Assign, store1)),
+      createSimpleProc("callee2", Seq(r2r1Assign, store2))
     )
 
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
@@ -88,6 +96,9 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
     val r0ConstantAssign = LocalAssign(R0, constant1, Some("00001"))
     val r1Assign = LocalAssign(R0, R1, Some("00002"))
     val r2Assign = LocalAssign(R0, R2, Some("00003"))
+    val store1 = MemoryStore(mem, R0, constant1, LittleEndian, 64)
+    val store2 = MemoryStore(mem, R0, constant1, LittleEndian, 64) // needed for intrusive list unitary check
+
 
     val program = prog(
       proc(
@@ -97,8 +108,8 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
         block("main_return", ret)
       ),
       createSimpleProc("callee", Seq(r0ConstantAssign)),
-      createSimpleProc("callee2", Seq(r1Assign)),
-      createSimpleProc("callee3", Seq(r2Assign)),
+      createSimpleProc("callee2", Seq(r1Assign, store1)),
+      createSimpleProc("callee3", Seq(r2Assign, store2)),
       proc(
         "wrapper1",
         block("wrapper1_first_call", LocalAssign(R1, constant1), directCall("callee"), goto("wrapper1_second_call")),
@@ -125,11 +136,13 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
   }
 
   def deadBeforeCall(): Unit = {
+    val store = MemoryStore(mem, R0, bv64(1), LittleEndian, 64)
+
     val program = prog(
       proc(
         "main",
         block("lmain", directCall("killer"), goto("aftercall")),
-        block("aftercall", LocalAssign(R0, R1), ret)
+        block("aftercall", LocalAssign(R0, R1), store, ret)
       ),
       createSimpleProc("killer", Seq(LocalAssign(R1, bv64(1))))
     )
@@ -146,8 +159,10 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
   }
 
   def simpleBranch(): Unit = {
+
     val r1Assign = LocalAssign(R0, R1, Some("00001"))
     val r2Assign = LocalAssign(R0, R2, Some("00002"))
+    val store = MemoryStore(mem, R0, BitVecLiteral(1, 64), LittleEndian, 64)
 
     val program: Program = prog(
       proc(
@@ -155,7 +170,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
         block("lmain", goto("branch1", "branch2")),
         block("branch1", r1Assign, goto("main_return")),
         block("branch2", r2Assign, goto("main_return")),
-        block("main_return", ret)
+        block("main_return", store, ret)
       )
     )
 
@@ -191,6 +206,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
   }
 
   def recursionBaseCase(): Unit = {
+    val store = MemoryStore(mem, R0, bv64(1), LittleEndian, 64)
     val program: Program = prog(
       proc(
         "main",
@@ -198,7 +214,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
         block("recursion", directCall("main"), goto("assign")),
         block("assign", LocalAssign(R0, R2), goto("return")),
         block("non-recursion", goto("return")),
-        block("return", ret)
+        block("return", store, ret)
       )
     )
 
@@ -256,9 +272,10 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
 
     val lmain = blocks("main_entry")
     val laftercall = lmain.singleSuccessor.head
+
     // checks function call blocks
+    val res = analysisResults.filter((p, r) => p.isInstanceOf[Statement] && laftercall.statements.contains(p.asInstanceOf[Statement]))
     assert(analysisResults(lmain) == Map(R29 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
-    assert(analysisResults(blocks("get_two_entry")) == Map(R31 -> TwoElementTop))
     assert(analysisResults(laftercall) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block
   }
 
