@@ -9,8 +9,11 @@ trait MustAnalysis
 
 /** A domain that performs two analyses in parallel.
   */
-class ProductDomain[L1, L2](d1: AbstractDomain[L1], d2: AbstractDomain[L2]) extends AbstractDomain[(L1, L2)] {
+trait ProductDomain[L1, L2] extends AbstractDomain[(L1, L2)] {
   def join(a: (L1, L2), b: (L1, L2), pos: Block): (L1, L2) = (d1.join(a._1, b._1, pos), d2.join(a._2, b._2, pos))
+
+  def d1: AbstractDomain[L1]
+  def d2: AbstractDomain[L2]
 
   override def widen(a: (L1, L2), b: (L1, L2), pos: Block): (L1, L2) =
     (d1.widen(a._1, b._1, pos), d2.widen(a._2, b._2, pos))
@@ -25,11 +28,26 @@ class ProductDomain[L1, L2](d1: AbstractDomain[L1], d2: AbstractDomain[L2]) exte
   def bot: (L1, L2) = (d1.bot, d2.bot)
 }
 
+/** A domain that is the reduced product of two other domains.
+ *  */
+trait ReducedProductDomain[L1, L2] extends  ProductDomain[L1, L2] {
+  def reduce(a: L1, b: L2): (L1, L2)
+}
+
+class TNumIntervalReducedProduct extends ReducedProductDomain[Map[Variable, TNum], LatticeMap[Variable, Interval]] {
+  override val d1 : AbstractDomain[Map[Variable, TNum]] = TNumDomain()
+  override val d2: AbstractDomain[LatticeMap[Variable, Interval]] = UnsignedIntervalDomain()
+
+
+  override def reduce(a: Map[Variable, TNum], b: LatticeMap[Variable, Interval]): (Map[Variable, TNum], LatticeMap[Variable, Interval]) = ???
+}
+
 /**
  * Encodes the conjunction of two domain predicates.
  */
-class PredProductDomain[L1, L2](d1: PredicateEncodingDomain[L1], d2: PredicateEncodingDomain[L2])
-    extends ProductDomain[L1, L2](d1, d2)
+class PredProductDomain[L1, L2](override val d1: PredicateEncodingDomain[L1],
+                                override val d2: PredicateEncodingDomain[L2])
+    extends ProductDomain[L1, L2]
     with PredicateEncodingDomain[(L1, L2)] {
 
   def toPred(x: (L1, L2)): Predicate = Predicate.and(d1.toPred(x._1), d2.toPred(x._2))
