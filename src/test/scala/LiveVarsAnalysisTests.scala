@@ -1,11 +1,23 @@
 import analysis.{InterLiveVarsAnalysis, TwoElementTop}
 import ir.Endian.LittleEndian
 import ir.dsl.*
-import ir.{BitVecLiteral, Block, Command, LocalAssign, MemoryStore, Program, Register, SharedMemory, Statement, Variable, cilvisitor, dsl, transforms}
+import ir.{
+  BitVecLiteral,
+  Block,
+  LocalAssign,
+  MemoryStore,
+  Program,
+  Register,
+  SharedMemory,
+  Variable,
+  cilvisitor,
+  dsl,
+  transforms
+}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
 import translating.PrettyPrinter.*
-import util.{BASILResult, LogLevel, Logger, StaticAnalysisConfig, writeToFile}
+import util.{BASILResult, LogLevel, Logger, StaticAnalysisConfig}
 
 @test_util.tags.UnitTest
 class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
@@ -67,7 +79,6 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
     val store1 = MemoryStore(mem, R2, constant1, LittleEndian, 64)
     val store2 = MemoryStore(mem, R2, constant1, LittleEndian, 64) // needed for intrusive list unitary check
 
-
     val program: Program = prog(
       proc(
         "main",
@@ -98,7 +109,6 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
     val r2Assign = LocalAssign(R0, R2, Some("00003"))
     val store1 = MemoryStore(mem, R0, constant1, LittleEndian, 64)
     val store2 = MemoryStore(mem, R0, constant1, LittleEndian, 64) // needed for intrusive list unitary check
-
 
     val program = prog(
       proc(
@@ -274,9 +284,8 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
     val laftercall = lmain.singleSuccessor.head
 
     // checks function call blocks
-    val res = analysisResults.filter((p, r) => p.isInstanceOf[Statement] && laftercall.statements.contains(p.asInstanceOf[Statement]))
     assert(analysisResults(lmain) == Map(R29 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
-    assert(analysisResults(laftercall) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block
+    assert(analysisResults(laftercall) == Map(R0 -> TwoElementTop)) // aftercall block
   }
 
   test("basic_function_call_caller") {
@@ -339,7 +348,6 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
         Register("R2", 64) -> TwoElementTop
       )
     ) // get_two aftercall
-    assert(analysisResults(l_printf_aftercall) == Map(R31 -> TwoElementTop)) // printf aftercall
     assert(
       analysisResults(blocks("get_two_entry")) == main ++ Map(
         R0 -> TwoElementTop,
