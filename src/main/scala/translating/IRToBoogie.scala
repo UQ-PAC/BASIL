@@ -520,7 +520,11 @@ class IRToBoogie(
               case None => next.size / 8
             }
             // (index >= global) && (index < (global + global.size))
-            BinaryBExpr(BoolAND, BinaryBExpr(BVSGE, indexVar, addrVar), BinaryBExpr(BVSLT, indexVar, BinaryBExpr(BVADD, addrVar, BitVecBLiteral(size, 64))))
+            BinaryBExpr(
+              BoolAND,
+              BinaryBExpr(BVSGE, indexVar, addrVar),
+              BinaryBExpr(BVSLT, indexVar, BinaryBExpr(BVADD, addrVar, BitVecBLiteral(size, 64)))
+            )
           } else {
             BinaryBExpr(EQ, indexVar, addrVar)
           }
