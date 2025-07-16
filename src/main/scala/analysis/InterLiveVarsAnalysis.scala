@@ -34,8 +34,8 @@ trait LiveVarsAnalysisFunctions(inline: Boolean, addExternals: Boolean = true)
     d match {
       case Left(l) if inline => Map(d -> IdEdge())
       case Left(l) => {
-        entry.outParams.flatMap(_._2.variables).foldLeft(Map[DL, EdgeFunction[TwoElement]]()) {
-          (mp, expVar) => mp + (Left(expVar) -> IdEdge())
+        entry.outParams.flatMap(_._2.variables).foldLeft(Map[DL, EdgeFunction[TwoElement]]()) { (mp, expVar) =>
+          mp + (Left(expVar) -> IdEdge())
         }
       }
       case Right(_) => Map(d -> IdEdge())
@@ -62,8 +62,7 @@ trait LiveVarsAnalysisFunctions(inline: Boolean, addExternals: Boolean = true)
               expr.variables.foldLeft(Map[DL, EdgeFunction[TwoElement]]()) { (mp, expVar) =>
                 mp + (Left(expVar) -> IdEdge())
               }
-            }
-            else Map(d -> IdEdge())
+            } else Map(d -> IdEdge())
           case Right(_) => Map(d -> IdEdge())
         }
       case MemoryLoad(lhs, _, index, _, _, _) =>
@@ -73,21 +72,18 @@ trait LiveVarsAnalysisFunctions(inline: Boolean, addExternals: Boolean = true)
               index.variables.foldLeft(Map[DL, EdgeFunction[TwoElement]]()) { (mp, expVar) =>
                 mp + (Left(expVar) -> IdEdge())
               }
-            }
-            else Map(d -> IdEdge())
+            } else Map(d -> IdEdge())
           case Right(_) => Map(d -> IdEdge())
 
         }
       case st @ MemoryStore(_, index, value, _, _, _) => // s ++ store.index.variables ++ store.value.variables
         d match {
+          case Left(v) if (index.variables ++ value.variables).contains(v) => Map()
           case Left(_) => Map(d -> IdEdge())
           case Right(_) =>
-            if st.parent == program.mainProcedure.labelToBlock("main_3") then
-              print("")
-            val res = (index.variables ++ value.variables).foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
+            (index.variables ++ value.variables).foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
               (mp, storVar) => mp + (Left(storVar) -> ConstEdge(TwoElementTop))
             }
-            res
         }
       case Assume(expr, _, _, _) => // s ++ expr.variables
         d match {
