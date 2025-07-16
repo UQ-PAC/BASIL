@@ -9,6 +9,7 @@ import util.Logger
 
 import java.io.ByteArrayInputStream
 import scala.util.chaining.scalaUtilChainingOps
+import scala.util.DynamicVariable
 
 /**
  * Responsible for interpreting the GTIRB's symbol information
@@ -162,10 +163,10 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
       case (symid, (size, "OBJECT", "GLOBAL" | "LOCAL", "DEFAULT", idx)) =>
 
         val referentid = symid.getReferentUuid.get
-        val referent: Option[gtirb.BlockData] = referentid.getOption
-        referent match {
-          case Some(blk) =>
-            Some(SpecGlobal(symid.get.name, (size * 8).toInt, None, symid.getReferentAddress))
+        val addr = symid.getReferentAddress
+        addr match {
+          case Some(addr) =>
+            Some(SpecGlobal(symid.get.name, (size * 8).toInt, None, addr))
 
           // if the referent is not a real block, then this is a
           // forwarding target symbol. discard, because we generate
@@ -213,6 +214,14 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
 object GTIRBReadELF {
 
+  /**
+   * If set, the [[checkReadELFCompatibility]] function will raise an exception
+   * upon finding mismatched [[translating.ReadELFData]].
+   * Otherwise, a warning is printed and execution continues.
+   */
+  final val enableRelfCompatibilityAssertion = DynamicVariable(true)
+  // TODO: collect into centralised flag system
+
   private val atSuffix = """@[A-Za-z_\d.]+$""".r
 
   /**
@@ -241,14 +250,16 @@ object GTIRBReadELF {
   /**
    * Determines whether the current ReadELFData is compatible with
    * a given reference ReadELFData. That is, whether the two ELF datas are
-   * equivalent when normalised ([[normalisedRelf]]).
+   * equivalent when normalised with [[normaliseRelf]]. If mismatching, prints
+   * warning-level messages to the log and exhorts the user to report the issue.
+   * This may throw, depending on the value of [[enableRelfCompatibilityAssertion]].
    */
   def checkReadELFCompatibility(gtirbRelf: ReadELFData, referenceRelf: ReadELFData): Boolean = {
     var ok = true
 
     inline def check(b: Boolean, s: String) = {
       if (!b) {
-        Logger.warn("PLEASE REPORT THIS ISSUE! include the gts and relf files. gtirb relf discrepancy, " + s)
+        Logger.warn("PLEASE REPORT THIS ISSUE! (https://github.com/UQ-PAC/BASIL/issues/509) include the gts and relf files.\ngtirb relf discrepancy, " + s)
         ok = false
       }
     }
@@ -268,7 +279,10 @@ object GTIRBReadELF {
     checkSet(g.externalFunctions, o.externalFunctions, "external functions differ")
     checkSet(g.symbolTable.toSet, o.symbolTable.toSet, "symbol tables differ")
 
-    Logger.debug("gtirb relf and readelf relf compatible: " + ok)
+    Logger.debug("gtirb relf and readelf relf compatibility result: " + ok)
+    if (enableRelfCompatibilityAssertion.value) {
+      assert(ok, "gtirb/relf incompatibility")
+    }
     ok
   }
 
