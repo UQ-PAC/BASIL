@@ -67,14 +67,11 @@ trait LiveVarsAnalysisFunctions(inline: Boolean, addExternals: Boolean = true)
         }
       case MemoryLoad(lhs, _, index, _, _, _) =>
         d match {
-          case Left(value) =>
-            if value == lhs then {
-              index.variables.foldLeft(Map[DL, EdgeFunction[TwoElement]]()) { (mp, expVar) =>
-                mp + (Left(expVar) -> IdEdge())
-              }
-            } else Map(d -> IdEdge())
-          case Right(_) => Map(d -> IdEdge())
-
+          case Left(value) => if value == lhs then Map() else Map(d -> IdEdge())
+          case Right(_) =>
+            index.variables.foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) { (mp, expVar) =>
+              mp + (Left(expVar) -> IdEdge())
+            }
         }
       case st @ MemoryStore(_, index, value, _, _, _) => // s ++ store.index.variables ++ store.value.variables
         d match {

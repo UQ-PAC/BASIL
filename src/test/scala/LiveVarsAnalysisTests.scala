@@ -285,7 +285,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
 
     // checks function call blocks
     assert(analysisResults(lmain) == Map(R29 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
-    assert(analysisResults(laftercall) == Map(R0 -> TwoElementTop)) // aftercall block
+    assert(analysisResults(laftercall) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block
   }
 
   test("basic_function_call_caller") {
@@ -348,6 +348,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
         Register("R2", 64) -> TwoElementTop
       )
     ) // get_two aftercall
+    assert(analysisResults(l_printf_aftercall) == Map(R31 -> TwoElementTop))
     assert(
       analysisResults(blocks("get_two_entry")) == main ++ Map(
         R0 -> TwoElementTop,
