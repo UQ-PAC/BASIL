@@ -19,7 +19,7 @@ axiom ($x_addr == 69688bv64);
 const {:extern} $z_addr: bv64;
 axiom ($z_addr == 69684bv64);
 function {:extern} L(#mem$in: [bv64]bv8, #index: bv64) returns (bool) {
-  (if (#index == $x_addr) then (memory_load32_le(#mem$in, $z_addr) == 0bv32) else (if (#index == $z_addr) then true else false))
+  (if (bvsge64(#index, $x_addr) && bvslt64(#index, bvadd64($x_addr, 4bv64))) then (memory_load32_le(#mem$in, $z_addr) == 0bv32) else (if (bvsge64(#index, $z_addr) && bvslt64(#index, bvadd64($z_addr, 4bv64))) then true else false))
 }
 
 function {:extern} {:bvbuiltin "bvadd"} bvadd32(bv32, bv32) returns (bv32);
@@ -28,6 +28,8 @@ function {:extern} {:bvbuiltin "bvadd"} bvadd64(bv64, bv64) returns (bv64);
 function {:extern} {:bvbuiltin "bvcomp"} bvcomp32(bv32, bv32) returns (bv1);
 function {:extern} {:bvbuiltin "bvcomp"} bvcomp33(bv33, bv33) returns (bv1);
 function {:extern} {:bvbuiltin "bvnot"} bvnot1(bv1) returns (bv1);
+function {:extern} {:bvbuiltin "bvsge"} bvsge64(bv64, bv64) returns (bool);
+function {:extern} {:bvbuiltin "bvslt"} bvslt64(bv64, bv64) returns (bool);
 function {:extern} gamma_load32(#gammaMap: [bv64]bool, #index: bv64) returns (bool) {
   (#gammaMap[bvadd64(#index, 3bv64)] && (#gammaMap[bvadd64(#index, 2bv64)] && (#gammaMap[bvadd64(#index, 1bv64)] && #gammaMap[#index])))
 }

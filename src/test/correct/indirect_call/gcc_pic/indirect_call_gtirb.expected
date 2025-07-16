@@ -182,18 +182,18 @@ implementation p$greet_1940()
     $R0, $Gamma_R0 := 0bv64, true;
     $R0, $Gamma_R0 := bvadd64($R0, 2056bv64), $Gamma_R0;
     $R30, $Gamma_R30 := 1960bv64, true;
-    goto b#FUN_650_entry_499;
-  b#FUN_650_entry_499:
-    assume {:captureState "FUN_650_entry_499"} true;
+    goto b#FUN_650_entry_497;
+  b#FUN_650_entry_497:
+    assume {:captureState "FUN_650_entry_497"} true;
     $R16, $Gamma_R16 := 65536bv64, true;
     call p$rely();
     #load10, #Gamma_load10 := memory_load64_le($mem, bvadd64($R16, 4032bv64)), (gamma_load64($Gamma_mem, bvadd64($R16, 4032bv64)) || L($mem, bvadd64($R16, 4032bv64)));
     $R17, $Gamma_R17 := #load10, #Gamma_load10;
     $R16, $Gamma_R16 := bvadd64($R16, 4032bv64), $Gamma_R16;
     call p$puts();
-    goto b#FUN_650_basil_return_1_500;
-  b#FUN_650_basil_return_1_500:
-    assume {:captureState "FUN_650_basil_return_1_500"} true;
+    goto b#FUN_650_basil_return_1_498;
+  b#FUN_650_basil_return_1_498:
+    assume {:captureState "FUN_650_basil_return_1_498"} true;
     goto b#_inlineret_3;
   b#_inlineret_3:
     assume {:captureState "_inlineret_3 (ya12BsraQDyb0PY+D2lGYQ==)"} true;
@@ -282,18 +282,18 @@ implementation p$main_1972()
     $R0, $Gamma_R0 := 0bv64, true;
     $R0, $Gamma_R0 := bvadd64($R0, 2072bv64), $Gamma_R0;
     $R30, $Gamma_R30 := 2004bv64, true;
-    goto b#FUN_650_entry_497;
-  b#FUN_650_entry_497:
-    assume {:captureState "FUN_650_entry_497"} true;
+    goto b#FUN_650_entry_499;
+  b#FUN_650_entry_499:
+    assume {:captureState "FUN_650_entry_499"} true;
     $R16, $Gamma_R16 := 65536bv64, true;
     call p$rely();
     #load10, #Gamma_load10 := memory_load64_le($mem, bvadd64($R16, 4032bv64)), (gamma_load64($Gamma_mem, bvadd64($R16, 4032bv64)) || L($mem, bvadd64($R16, 4032bv64)));
     $R17, $Gamma_R17 := #load10, #Gamma_load10;
     $R16, $Gamma_R16 := bvadd64($R16, 4032bv64), $Gamma_R16;
     call p$puts();
-    goto b#FUN_650_basil_return_1_498;
-  b#FUN_650_basil_return_1_498:
-    assume {:captureState "FUN_650_basil_return_1_498"} true;
+    goto b#FUN_650_basil_return_1_500;
+  b#FUN_650_basil_return_1_500:
+    assume {:captureState "FUN_650_basil_return_1_500"} true;
     goto b#_inlineret_3;
   b#_inlineret_3:
     assume {:captureState "_inlineret_3 (BoFgJ28hRESLWeRUGTZ6AQ==)"} true;

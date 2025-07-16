@@ -13,10 +13,12 @@ axiom ($x_addr == 69684bv64);
 const {:extern} $y_addr: bv64;
 axiom ($y_addr == 69688bv64);
 function {:extern} L(#mem$in: [bv64]bv8, #index: bv64) returns (bool) {
-  (if (#index == $y_addr) then (memory_load32_le(#mem$in, $x_addr) == 1bv32) else (if (#index == $x_addr) then true else false))
+  (if (bvsge64(#index, $y_addr) && bvslt64(#index, bvadd64($y_addr, 4bv64))) then (memory_load32_le(#mem$in, $x_addr) == 1bv32) else (if (bvsge64(#index, $x_addr) && bvslt64(#index, bvadd64($x_addr, 4bv64))) then true else false))
 }
 
 function {:extern} {:bvbuiltin "bvadd"} bvadd64(bv64, bv64) returns (bv64);
+function {:extern} {:bvbuiltin "bvsge"} bvsge64(bv64, bv64) returns (bool);
+function {:extern} {:bvbuiltin "bvslt"} bvslt64(bv64, bv64) returns (bool);
 function {:extern} gamma_load32(#gammaMap: [bv64]bool, #index: bv64) returns (bool) {
   (#gammaMap[bvadd64(#index, 3bv64)] && (#gammaMap[bvadd64(#index, 2bv64)] && (#gammaMap[bvadd64(#index, 1bv64)] && #gammaMap[#index])))
 }

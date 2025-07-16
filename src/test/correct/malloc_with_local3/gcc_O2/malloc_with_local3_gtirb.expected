@@ -273,18 +273,18 @@ implementation p$printCharValue_2208()
     assert (L($mem, $R3) ==> $Gamma_R2);
     $mem, $Gamma_mem := memory_store8_le($mem, $R3, $R2[8:0]), gamma_store8($Gamma_mem, $R3, $Gamma_R2);
     assume {:captureState "2236_0"} true;
-    goto b#FUN_6a0_entry_689;
-  b#FUN_6a0_entry_689:
-    assume {:captureState "FUN_6a0_entry_689"} true;
+    goto b#FUN_6a0_entry_691;
+  b#FUN_6a0_entry_691:
+    assume {:captureState "FUN_6a0_entry_691"} true;
     $R16, $Gamma_R16 := 65536bv64, true;
     call p$rely();
     #load2, #Gamma_load2 := memory_load64_le($mem, bvadd64($R16, 4016bv64)), (gamma_load64($Gamma_mem, bvadd64($R16, 4016bv64)) || L($mem, bvadd64($R16, 4016bv64)));
     $R17, $Gamma_R17 := #load2, #Gamma_load2;
     $R16, $Gamma_R16 := bvadd64($R16, 4016bv64), $Gamma_R16;
     call p$__printf_chk();
-    goto b#FUN_6a0_basil_return_1_690;
-  b#FUN_6a0_basil_return_1_690:
-    assume {:captureState "FUN_6a0_basil_return_1_690"} true;
+    goto b#FUN_6a0_basil_return_1_692;
+  b#FUN_6a0_basil_return_1_692:
+    assume {:captureState "FUN_6a0_basil_return_1_692"} true;
     goto b#_inlineret_3;
   b#_inlineret_3:
     assume {:captureState "_inlineret_3 (PI+q8/8oRjGuRvGwgENEcw==)"} true;
@@ -400,6 +400,29 @@ implementation p$main_1792()
     $R0, $Gamma_R0 := 1bv64, true;
     $R1, $Gamma_R1 := bvadd64($R1, 2296bv64), $Gamma_R1;
     $R30, $Gamma_R30 := 1848bv64, true;
+    goto b#FUN_6a0_entry_689;
+  b#FUN_6a0_entry_689:
+    assume {:captureState "FUN_6a0_entry_689"} true;
+    $R16, $Gamma_R16 := 65536bv64, true;
+    call p$rely();
+    #load2, #Gamma_load2 := memory_load64_le($mem, bvadd64($R16, 4016bv64)), (gamma_load64($Gamma_mem, bvadd64($R16, 4016bv64)) || L($mem, bvadd64($R16, 4016bv64)));
+    $R17, $Gamma_R17 := #load2, #Gamma_load2;
+    $R16, $Gamma_R16 := bvadd64($R16, 4016bv64), $Gamma_R16;
+    call p$__printf_chk();
+    goto b#FUN_6a0_basil_return_1_690;
+  b#FUN_6a0_basil_return_1_690:
+    assume {:captureState "FUN_6a0_basil_return_1_690"} true;
+    goto b#_inlineret_3;
+  b#_inlineret_3:
+    assume {:captureState "_inlineret_3 (rV0qH7AUTYCipfKaroPpAw==)"} true;
+    goto b#main_9;
+  b#main_9:
+    assume {:captureState "main_9 (IxBBXD6FTfupEp7ajNK8uA==)"} true;
+    $R1, $Gamma_R1 := 0bv64, true;
+    $R1, $Gamma_R1 := bvadd64($R1, 2312bv64), $Gamma_R1;
+    $R2, $Gamma_R2 := 10bv64, true;
+    $R0, $Gamma_R0 := 1bv64, true;
+    $R30, $Gamma_R30 := 1868bv64, true;
     goto b#FUN_6a0_entry_693;
   b#FUN_6a0_entry_693:
     assume {:captureState "FUN_6a0_entry_693"} true;
@@ -414,30 +437,7 @@ implementation p$main_1792()
     assume {:captureState "FUN_6a0_basil_return_1_694"} true;
     goto b#_inlineret_4;
   b#_inlineret_4:
-    assume {:captureState "_inlineret_4 (rV0qH7AUTYCipfKaroPpAw==)"} true;
-    goto b#main_9;
-  b#main_9:
-    assume {:captureState "main_9 (IxBBXD6FTfupEp7ajNK8uA==)"} true;
-    $R1, $Gamma_R1 := 0bv64, true;
-    $R1, $Gamma_R1 := bvadd64($R1, 2312bv64), $Gamma_R1;
-    $R2, $Gamma_R2 := 10bv64, true;
-    $R0, $Gamma_R0 := 1bv64, true;
-    $R30, $Gamma_R30 := 1868bv64, true;
-    goto b#FUN_6a0_entry_691;
-  b#FUN_6a0_entry_691:
-    assume {:captureState "FUN_6a0_entry_691"} true;
-    $R16, $Gamma_R16 := 65536bv64, true;
-    call p$rely();
-    #load2, #Gamma_load2 := memory_load64_le($mem, bvadd64($R16, 4016bv64)), (gamma_load64($Gamma_mem, bvadd64($R16, 4016bv64)) || L($mem, bvadd64($R16, 4016bv64)));
-    $R17, $Gamma_R17 := #load2, #Gamma_load2;
-    $R16, $Gamma_R16 := bvadd64($R16, 4016bv64), $Gamma_R16;
-    call p$__printf_chk();
-    goto b#FUN_6a0_basil_return_1_692;
-  b#FUN_6a0_basil_return_1_692:
-    assume {:captureState "FUN_6a0_basil_return_1_692"} true;
-    goto b#_inlineret_3;
-  b#_inlineret_3:
-    assume {:captureState "_inlineret_3 (IxBBXD6FTfupEp7ajNK8uA==)"} true;
+    assume {:captureState "_inlineret_4 (IxBBXD6FTfupEp7ajNK8uA==)"} true;
     goto b#main_7;
   b#main_7:
     assume {:captureState "main_7 (aEiQ/BI9RcCTTmScF+6KKw==)"} true;
