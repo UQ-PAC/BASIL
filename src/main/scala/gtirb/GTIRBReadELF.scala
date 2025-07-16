@@ -159,13 +159,13 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
   def getGlobals(): Set[SpecGlobal] =
     gtirb.symbolEntriesByUuid.view.flatMap {
-      case (symid, (size, "OBJECT", "GLOBAL", "DEFAULT", idx)) =>
+      case (symid, (size, "OBJECT", "GLOBAL" | "LOCAL", "DEFAULT", idx)) =>
 
         val referentid = symid.getReferentUuid.get
         val referent: Option[gtirb.BlockData] = referentid.getOption
         referent match {
           case Some(blk) =>
-            Some(SpecGlobal(symid.get.name, (size * 8).toInt, None, blk.address))
+            Some(SpecGlobal(symid.get.name, (size * 8).toInt, None, symid.getReferentAddress))
 
           // if the referent is not a real block, then this is a
           // forwarding target symbol. discard, because we generate
