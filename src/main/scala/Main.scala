@@ -1,7 +1,7 @@
 // package scala
 
-import mainargs.{Flag, ParserForClass, arg, main}
 import gtirb.GTIRBReadELF
+import mainargs.{Flag, ParserForClass, arg, main}
 import util.boogie_interaction.BoogieResultKind
 import util.{
   AnalysisResultDotLogger,
