@@ -200,9 +200,12 @@ class IRToBoogie(
     }
   }
 
-  def memoryToCondition(memorySections: Iterable[MemorySection]) = {
-    if (config.coalesceConstantMemory) then memoryToConditionCoalesced(memorySections)
-    else memoryToConditionBytes(memorySections)
+  def memoryToCondition(memorySections: Iterable[MemorySection]): List[BExpr] = {
+    if (config.coalesceConstantMemory) {
+      memoryToConditionCoalesced(memorySections)
+    } else {
+      memoryToConditionBytes(memorySections)
+    }
   }
 
   def translate: BProgram = {
@@ -510,15 +513,20 @@ class IRToBoogie(
       case l: LOp =>
         val indexVar: BVar = BParam("index", l.indexType)
         val body: BExpr = LPreds.keys.foldLeft(FalseBLiteral) { (ite: BExpr, next: SpecGlobal) =>
-          val guard = next.arraySize match {
-            case Some(size: Int) =>
-              val initial: BExpr = BinaryBExpr(EQ, indexVar, ArrayAccess(next, 0).toAddrVar)
-              val indices = 1 until size
-              indices.foldLeft(initial) { (or: BExpr, i: Int) =>
-                BinaryBExpr(BoolOR, BinaryBExpr(EQ, indexVar, ArrayAccess(next, i).toAddrVar), or)
-              }
-            case None =>
-              BinaryBExpr(EQ, indexVar, next.toAddrVar)
+          val addrVar = next.toAddrVar
+          val guard = if (next.size > 8 || next.arraySize.isDefined) {
+            val size = next.arraySize match {
+              case Some(arraySize: Int) => arraySize * next.size / 8
+              case None => next.size / 8
+            }
+            // (index >= global) && (index < (global + global.size))
+            BinaryBExpr(
+              BoolAND,
+              BinaryBExpr(BVSGE, indexVar, addrVar),
+              BinaryBExpr(BVSLT, indexVar, BinaryBExpr(BVADD, addrVar, BitVecBLiteral(size, 64)))
+            )
+          } else {
+            BinaryBExpr(EQ, indexVar, addrVar)
           }
           val LPred = LPreds(next)
           /*if (controlled.contains(next)) {
@@ -616,7 +624,7 @@ class IRToBoogie(
 
   def translateBlock(b: Block): BBlock = {
     val initLabel = b.meta.originalLabel.map(" (" + _ + ")").getOrElse("")
-    val captureState = captureStateStatement(s"${b.label}${initLabel}")
+    val captureState = captureStateStatement(s"${b.label}$initLabel")
 
     val statements = if (b.atomicSection.isDefined) {
       val before = if (b.atomicSection.get.isStart(b)) {
@@ -682,7 +690,7 @@ class IRToBoogie(
 
     /** Generate proof obligations for the library procedure rely/guarantee check.
       *
-      *   1. \forall v' . Rc \/ Rv => (\forall v'' . (Rc => Rf) [(v, v')\ (v', v")) 2. Rc \/ Rv transitive 3. Gf => Gc
+      *   1. \forall v' . Rc \/ Rv => (\forall v" . (Rc => Rf) [(v, v')\ (v', v")) 2. Rc \/ Rv transitive 3. Gf => Gc
       *
       * (1.) is checked by an inline if block which c
       *
