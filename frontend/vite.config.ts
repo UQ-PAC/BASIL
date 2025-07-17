@@ -5,9 +5,13 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
+    port: 5173,
     proxy: {
-      '/ir-before': 'http://localhost:8080',
-      '/ir-after': 'http://localhost:8080' // TODO: Add more endpoints for procedures and CFG code
+      '/api': { // Catch all requests starting with /api
+        target: 'http://localhost:8080', // Your Scala backend server
+        changeOrigin: true, // Changes the origin of the host header to the target URL
+        rewrite: (path) => path.replace(/^\/api/, ''), // Remove the /api prefix when forwarding
+      },
     }
   }
 })

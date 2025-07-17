@@ -15,6 +15,14 @@
     box-sizing: border-box;
 }
 
+.d2h-code-line-ctn,
+.d2h-code-line-ctn * { /* TODO: What does the * mean and do */
+    display: inline;
+    line-height: 1 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
 .d2h-wrapper {
     /*max-width: 100% !important;*/
     /*overflow-x: visible;*/
@@ -92,4 +100,42 @@
 .toggle-button.active {
     background-color: #1976d2;
     color: #fff;
+}
+
+/* Drop down group */
+.procedure-select-wrapper {
+    position: absolute;
+    right: 1em;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+}
+
+.procedure-label {
+    font-size: 0.9em;
+    color: #1a1a1a;
+    white-space: nowrap;
+}
+
+/* Styles for dark mode */
+@media (prefers-color-scheme: dark) {
+    .procedure-label {
+        color: #e0e0e0; /* Light text for dark mode (e.g., a light grey) */
+    }
+}
+
+.procedure-dropdown:hover {
+    border-color: #888;
+    background-color: #555;
+}
+
+.procedure-dropdown option {
+    background-color: #999; /* Option background */
+    color: #ddd; /* Option text color */
+}
+
+.procedure-dropdown option[value=""][disabled] {
+    color: #bbb; /* Lighter color for disabled placeholder option */
 }

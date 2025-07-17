@@ -18,6 +18,8 @@ import ExecutionContext.Implicits.global
 import scala.util.boundary, boundary.break
 import ir.dsl.IRToDSL
 import API.IREpochStore
+import API.IREpoch
+import cats.effect.unsafe.implicits.global
 
 /** Simplification pass, see also: docs/development/simplification-solvers.md
   */
@@ -1097,7 +1099,9 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
     )
   // Clone after the copyPropTransforms take place here
   val clonedAfterProgram = IRToDSL.convertProgram(p).resolve
-  IREpochStore.afterTransform = Some(clonedAfterProgram)
+  val epochName = "test_epoch_name"
+  val epochTester = IREpoch(epochName, clonedBeforeProgram, clonedAfterProgram) // Sets up the very first epoch for testing
+  IREpochStore.addEpoch(epochTester).unsafeRunSync() // testing as line for pipeline
 
   work.foreach((p, job) => {
     try {
