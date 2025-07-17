@@ -1,6 +1,5 @@
 package API
 
-// Importing necessary BASIL classes
 import ir.Program
 import ir.dotBlockGraph
 import util.RunUtils
@@ -32,7 +31,6 @@ import scala.collection.mutable
 import scala.reflect.Selectable.reflectiveSelectable
 import ir.Procedure
 
-// Define a case class to hold the before, after, and name for each analysis epoch
 case class IREpoch(name: String, beforeTransform: ir.Program, afterTransform: ir.Program)
 
 object IREpochStore {
@@ -61,13 +59,8 @@ object IREpochStore {
   }
 }
 
-case class ProcedureTextLocation(
-                                  name: String,
-                                  startLine: Int,
-                                  approxEndLine: Int
-                                )
+case class ProcedureTextLocation(name: String, startLine: Int, approxEndLine: Int)
 
-// Add your AfterTransformFormatter object here
 object AfterTransformFormatter {
   def formatAfterTransform(afterTransform: Any): String = {
     val sb = new StringBuilder()
@@ -79,11 +72,10 @@ object AfterTransformFormatter {
   }
 }
 
-// Add your LineCounter object here
 object LineCounter {
   def countLines(text: String, endIndex: Int): Int = {
     val safeEndIndex = endIndex.min(text.length).max(0)
-    text.substring(0, safeEndIndex).count(_ == '\n') + 1
+    text.substring(0, safeEndIndex).count(_ == '\n') + 1 // TODO: This isn't giving me the result I want...?
   }
 }
 
@@ -208,7 +200,7 @@ object ApiServer extends IOApp {
               if (startIndex != -1) {
                 val startLine = LineCounter.countLines(fullAfterTransformText, startIndex)
                 // Calculate endLine based on the content of procPrettyPrint
-                val endLine = startLine + LineCounter.countLines(procPrettyPrint, procPrettyPrint.length) - 1
+                val endLine = startLine + LineCounter.countLines(procPrettyPrint, procPrettyPrint.length) - 1 // TODO: Here something fishy is going on
 
                 procedureLocations.append(ProcedureTextLocation(procName, startLine, endLine))
                 currentOffset = startIndex + procPrettyPrint.length
