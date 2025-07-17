@@ -5,6 +5,7 @@ import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{CaptureOutput, programToContext}
 import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils}
+import util.SMT.{SatResult, SMTSolver}
 
 @test_util.tags.UnitTest
 class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
@@ -17,6 +18,16 @@ class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
     foundLoops.updateIrWithLoops()
 
     FullLoopInvariantGenerator(program).genInvariants(procedure)
+  }
+
+  def implies(a: Predicate, b: Predicate): Boolean = {
+    val solver = SMTSolver(50)
+    val res = solver.predSat(Predicate.implies(a, b))
+    solver.close()
+    res match {
+      case SatResult.UNSAT => true
+      case _ => false
+    }
   }
 
   def runTest(
@@ -70,20 +81,18 @@ class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
 
     val (preconditions, postconditions) = genProcedureInvariants(program, main)
 
+    val expected_invariant = Predicate.and(
+      Predicate.BVCmp(BVULE, BVTerm.Lit(bv64(0)), BVTerm.Var(R0)),
+      Predicate.BVCmp(BVULE, BVTerm.Var(R0), BVTerm.Lit(bv64(100)))
+    )
+
     main.blocks.foreach(b => {
       if (b.label == "loop_head") {
         assert(b.isLoopHeader())
 
-        // TODO use an SMT solver to check that the generated invariant implies our expected result instead of using syntactic equality.
+        val post = Predicate.Conj(postconditions(b).toSet)
 
-        assert(
-          postconditions(b).contains(
-            Predicate.and(
-              Predicate.BVCmp(BVULE, BVTerm.Lit(bv64(0)), BVTerm.Var(R0)),
-              Predicate.BVCmp(BVULE, BVTerm.Var(R0), BVTerm.Lit(bv64(100)))
-            )
-          )
-        )
+        assert(implies(post, expected_invariant))
       } else {
         assert(!b.isLoopHeader())
       }
