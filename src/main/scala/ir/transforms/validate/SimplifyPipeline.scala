@@ -35,9 +35,9 @@ def dynamicSingleAssignment(p: Program) = {
     case o => None
   }
 
-  validator.setEqualVarsInvariantRenaming(renamingSrcTgt = sourceToTarget)
+  // validator.setEqualVarsInvariantRenaming(renamingSrcTgt = sourceToTarget)
 
-  validator.getValidationSMT("tvsmt/" + "DSA")
+  validator.getValidationSMT(sourceToTarget, "tvsmt/" + "DSA")
 }
 
 def copyProp(p: Program) = {
@@ -59,9 +59,7 @@ def copyProp(p: Program) = {
     case g => Some(g)
   }
 
-  validator.setEqualVarsInvariantRenaming(renamingSrcTgt = renaming)
-
-  validator.getValidationSMT("tvsmt/" + "CopyProp")
+  validator.getValidationSMT(renaming, "tvsmt/" + "CopyProp")
 }
 
 def parameters(p: Program) = {
@@ -77,8 +75,8 @@ def parameters(p: Program) = {
     case g => Some(g)
   }
 
-  validator.setEqualVarsInvariantRenaming(renamingSrcTgt = sourceToTarget)
-  validator.getValidationSMT("tvsmt/" + "Parameters")
+  // validator.setEqualVarsInvariantRenaming(renamingSrcTgt = sourceToTarget)
+  validator.getValidationSMT(sourceToTarget, "tvsmt/" + "Parameters")
 
 }
 
@@ -117,8 +115,7 @@ def nop(p: Program) = {
   val validator = TranslationValidator()
   validator.setTargetProg(p)
   validator.setSourceProg(p)
-  validator.setEqualVarsInvariantRenaming()
-  validator.getValidationSMT("tvsmt/" + "NOP")
+  validator.getValidationSMT(b => v => Some(v), "tvsmt/" + "NOP")
 }
 
 def validatedSimplifyPipeline(p: Program) = {
