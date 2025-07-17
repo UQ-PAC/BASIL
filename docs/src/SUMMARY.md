@@ -15,6 +15,7 @@
 - [Basil IR](development/basil-ir.md) Explanation of BASIL's intermediate representation
 - [Interpreter](development/interpreter.md) Explanation of IR interpreter
 - [Transform Passes](development/transforms.md) Explanation of ir transforms and simplifications
+- [Program annotations](development/summaries-invariants.md) Explanation of loop invariant and function summary generators
 
 # Analyses
 
