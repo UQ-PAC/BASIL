@@ -141,6 +141,9 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
       .sortBy(x => x.num)
   }
 
+  /**
+   * Returns relocations as a tuple of relocation offsets and external functions.
+   */
   def getRelocations(): (Map[BigInt, BigInt], Set[ExternalFunction]) = {
     def getSectionBytes(sectionName: String) =
       gtirb.sectionsByName(sectionName).byteIntervals.head.contents
@@ -244,7 +247,12 @@ object GTIRBReadELF {
       x.copy(name = atSuffix.replaceFirstIn(x.name, ""))
     }
 
-    relf.copy(externalFunctions = exts, symbolTable = syms, globalVariables = globs)
+    // oldrelf will generate both SpecGlobal and ExternalFunction entries for external global variables
+    // (e.g., errno, optind). subtract these from the ExternalFunctions, as the SpecGlobal entry
+    // is more correct and contains strictly more information.
+    val externalGlobalVariables = globs.view.map { glo => ExternalFunction(glo.name, glo.address) }
+
+    relf.copy(externalFunctions = exts -- externalGlobalVariables, symbolTable = syms, globalVariables = globs)
   }
 
   /**
