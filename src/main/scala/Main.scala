@@ -400,7 +400,7 @@ object Main {
         val realRelfFile = loadingInputs.relfFile
 
         Logger.setLevel(LogLevel.DEBUG)
-        val (relf, gtirb) = GTIRBReadELF.enableRelfCompatibilityAssertion.withValue(false) {
+        val (relf, gtirb) = GTIRBReadELF.withWarnings {
           (realRelfFile, gtirbRelfFile) match {
             case (Some(relfFile), _) =>
               val (a, b) = IRLoading.loadReadELFWithGTIRB(relfFile, loadingInputs)
@@ -477,7 +477,7 @@ object Main {
 
     Logger.info(programNameVersionHeader)
 
-    val result = gtirb.GTIRBReadELF.enableRelfCompatibilityAssertion.withValue(false) {
+    val result = GTIRBReadELF.withWarnings {
       RunUtils.run(q)
     }
     if (conf.verify.value) {

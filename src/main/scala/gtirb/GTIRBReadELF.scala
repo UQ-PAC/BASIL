@@ -217,13 +217,32 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
 object GTIRBReadELF {
 
+  enum RelfCompatibilityLevel { outer =>
+    case Silent, Warning, Exception
+
+    /** Returns true iff the current [[RelfCompatibilityLevel]] is equal to or
+     *  stricter than the given [[RelfCompatibilityLevel]].
+     */
+    def isAtLeast(baseline: RelfCompatibilityLevel) =
+      this.ordinal - baseline.ordinal >= 0
+
+    def isAtLeastWarning() = this.isAtLeast(RelfCompatibilityLevel.Warning)
+    def isAtLeastException() = this.isAtLeast(RelfCompatibilityLevel.Exception)
+  }
+
   /**
-   * If set, the [[checkReadELFCompatibility]] function will raise an exception
-   * upon finding mismatched [[translating.ReadELFData]].
-   * Otherwise, a warning is printed and execution continues.
+   * This affects the behaviour of [[checkReadELFCompatibility]] when finding
+   * mismatched [[translating.ReadELFData]]. The default is [[RelfCompatibilityLevel.Exception]],
+   * but this is overridden by the main entry point of the Basil tool and certain test cases.
    */
-  final val enableRelfCompatibilityAssertion = DynamicVariable(true)
+  final val relfCompatibilityLevel = DynamicVariable(RelfCompatibilityLevel.Exception)
   // TODO: collect into centralised flag system
+
+  /** Sets [[relfCompatibilityLevel]] to warning within the given block. */
+  def withWarnings[T](f: => T) = relfCompatibilityLevel.withValue(RelfCompatibilityLevel.Warning)(f)
+
+  /** Sets [[relfCompatibilityLevel]] to silent within the given block. */
+  def withSilent[T](f: => T) = relfCompatibilityLevel.withValue(RelfCompatibilityLevel.Silent)(f)
 
   private val atSuffix = """@[A-Za-z_\d.]+$""".r
 
@@ -260,16 +279,21 @@ object GTIRBReadELF {
    * a given reference ReadELFData. That is, whether the two ELF datas are
    * equivalent when normalised with [[normaliseRelf]]. If mismatching, prints
    * warning-level messages to the log and exhorts the user to report the issue.
-   * This may throw, depending on the value of [[enableRelfCompatibilityAssertion]].
+   * This may throw, depending on the value of [[relfCompatibilityLevel]].
    */
   def checkReadELFCompatibility(gtirbRelf: ReadELFData, referenceRelf: ReadELFData): Boolean = {
     var ok = true
 
+    val level = relfCompatibilityLevel.value
+
     inline def check(b: Boolean, s: String) = {
       if (!b) {
-        Logger.warn(
-          "PLEASE REPORT THIS ISSUE! (https://github.com/UQ-PAC/BASIL/issues/509) include the gts and relf files.\ngtirb relf discrepancy, " + s
-        )
+        val exhortation = if (level.isAtLeastWarning()) {
+          "PLEASE REPORT THIS ISSUE (https://github.com/UQ-PAC/BASIL/issues/509)! include the gts and relf files.\n"
+        } else {
+          "(suppressed) "
+        }
+        Logger.warn(exhortation + "gtirb relf discrepancy, " + s)
         ok = false
       }
     }
@@ -290,7 +314,7 @@ object GTIRBReadELF {
     checkSet(g.symbolTable.toSet, o.symbolTable.toSet, "symbol tables differ")
 
     Logger.debug("gtirb relf and readelf relf compatibility result: " + ok)
-    if (enableRelfCompatibilityAssertion.value) {
+    if (level.isAtLeastException()) {
       assert(ok, "gtirb/relf incompatibility")
     }
     ok

@@ -50,16 +50,18 @@ trait SystemTests extends AnyFunSuite, CaptureOutput, BASILTest, TestCustomisati
   override def customiseTestsByName(name: String): Mode = Mode.Normal
 
   override def withFixture(test: NoArgTest) = {
+    import gtirb.GTIRBReadELF.RelfCompatibilityLevel.*
+
     val checkRelf = test.name match {
       // XXX: these test cases have mismatching .relf and .gts files, so incompatibilies are expected
       // until they are updated and fixed.
-      case s"incorrect/nestedifglobal/${_}" => false
+      case s"incorrect/nestedifglobal/${_}" => Silent
       // XXX: mismatches in bss_start symbols
-      case s"extraspec_correct/malloc_memcpy_strlen_memset_free/${_}" => false
-      case s"extraspec_incorrect/malloc_memcpy_strlen_memset_free/${_}" => false
-      case _ => true
+      case s"extraspec_correct/malloc_memcpy_strlen_memset_free/${_}" => Silent
+      case s"extraspec_incorrect/malloc_memcpy_strlen_memset_free/${_}" => Silent
+      case _ => Exception
     }
-    gtirb.GTIRBReadELF.enableRelfCompatibilityAssertion.withValue(checkRelf) {
+    gtirb.GTIRBReadELF.relfCompatibilityLevel.withValue(checkRelf) {
       super.withFixture(test)
     }
   }
