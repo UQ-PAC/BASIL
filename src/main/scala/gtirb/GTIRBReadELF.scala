@@ -165,7 +165,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     gtirb.symbolEntriesByUuid.view.flatMap {
       case (symid, (size, "OBJECT", "GLOBAL" | "LOCAL", "DEFAULT", idx)) =>
 
-        val referentid = symid.getReferentUuid.get
+        // val addr = symid.getReferentUuid.map(_.get.address)
         val addr = symid.getReferentAddress
         addr match {
           case Some(addr) =>
@@ -200,7 +200,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     }.toSet
 
   def getMainAddress(mainProcedureName: String): BigInt =
-    gtirb.symbolsByName(mainProcedureName).getReferentUuid.get.get.address
+    gtirb.symbolsByName(mainProcedureName).getReferentAddress.get
 
   def getReadELFData(mainProcedureName: String): ReadELFData = {
 
