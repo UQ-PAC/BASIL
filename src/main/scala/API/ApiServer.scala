@@ -209,9 +209,8 @@ object ApiServer extends IOApp {
                 procedureLocations.append(ProcedureTextLocation(procName, -1, -1))
               }
             }
-            // Note: If you're using Circe for JSON, you might need to import io.circe.syntax._
-            // and then use procedureLocations.toList.asJson
-            Ok(procedureLocations.toList.asJson) // Assuming Spray JSON .asJson works directly on List
+     
+            Ok(procedureLocations.toList.asJson)
           case None => NotFound(s"Epoch '$epochName' not found.")
         }
 
