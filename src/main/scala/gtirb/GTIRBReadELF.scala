@@ -258,9 +258,10 @@ object GTIRBReadELF {
     val exts = relf.externalFunctions.map(x => x.copy(name = atSuffix.replaceFirstIn(x.name, "")))
     val syms = relf.symbolTable.flatMap {
       case ELFSymbol(_, 0, 0, ELFSymType.FILE, ELFBind.LOCAL, ELFVis.DEFAULT, ELFNDX.ABS, "crtstuff.c") => None
-      case sym if sym.etype != ELFSymType.SECTION && sym.num != -1 && !sym.name.startsWith("$") =>
-        Some(sym.copy(name = atSuffix.replaceFirstIn(sym.name, "")))
-      case _ => None
+      case ELFSymbol(_, 0, 0, ELFSymType.SECTION, ELFBind.LOCAL, ELFVis.DEFAULT, ELFNDX.Section(_), ".comment") => None
+      case sym if sym.name.startsWith("$") => None
+
+      case sym => Some(sym.copy(name = atSuffix.replaceFirstIn(sym.name, "")))
     }
     val globs = relf.globalVariables.map { x =>
       x.copy(name = atSuffix.replaceFirstIn(x.name, ""))
@@ -304,8 +305,33 @@ object GTIRBReadELF {
     inline def checkEq(x: Any, y: Any, s: String) =
       check(x == y, s"$s: gtirb: $x, readelf: $y}")
 
-    val g = normaliseRelf(gtirbRelf)
-    val o = normaliseRelf(referenceRelf)
+    var g = normaliseRelf(gtirbRelf)
+    var o = normaliseRelf(referenceRelf)
+
+    // XXX: account for gtsrelf moving the bss_start symbols to .bss in certain binaries on certain compilers.
+    {
+      val gs = g.symbolTable.toSet
+      val os = o.symbolTable.toSet
+      val bss = g.symbolTable.collectFirst {
+        case ELFSymbol(_, addr, 0, ELFSymType.SECTION, ELFBind.LOCAL, ELFVis.DEFAULT, ELFNDX.Section(_), ".bss") => addr
+      }
+      val diffSymbols = (gs -- os) | (os -- gs) // symmetric difference
+      val diffNames = diffSymbols.map(x => x.name)
+      val bssNames = Set("__bss_start", "__bss_start__")
+
+      bss match {
+        // if the gtsrelf incorrectly has bss_start pointing to .bss, rewrites the oldrelf to have the same,
+        // effectively ignoring this mismatch
+        case Some(bss) if (diffSymbols & gs).filter(bssNames contains _.name).forall(_.value == bss) =>
+          o = o.copy(symbolTable = o.symbolTable.map {
+            case sym if bssNames.contains(sym.name) => sym.copy(value = bss)
+            case x => x
+          })
+          Logger.warn("ignoring bss_start quirk in gtsrelf data")
+        case _ => ()
+      }
+    }
+
     checkEq(g.mainAddress, o.mainAddress, "main address differs")
     checkSet(g.functionEntries, o.functionEntries, "function entries differ")
     checkSet(g.relocationOffsets.toSet, o.relocationOffsets.toSet, "relocations differ")

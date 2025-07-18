@@ -56,9 +56,6 @@ trait SystemTests extends AnyFunSuite, CaptureOutput, BASILTest, TestCustomisati
       // XXX: these test cases have mismatching .relf and .gts files, so incompatibilies are expected
       // until they are updated and fixed.
       case s"incorrect/nestedifglobal/${_}" => Silent
-      // XXX: mismatches in bss_start symbols
-      case s"extraspec_correct/malloc_memcpy_strlen_memset_free/${_}" => Silent
-      case s"extraspec_incorrect/malloc_memcpy_strlen_memset_free/${_}" => Silent
       case _ => Exception
     }
     gtirb.GTIRBReadELF.relfCompatibilityLevel.withValue(checkRelf) {
