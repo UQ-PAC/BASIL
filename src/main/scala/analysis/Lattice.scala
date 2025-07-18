@@ -821,3 +821,26 @@ class ConstantPropagationLatticeWithSSA extends PowersetLattice[BitVecLiteral] {
 
   def concat(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_concat, a, b)
 }
+
+class FlatIntLattice(minimum: FlatElement[BigInt] = Bottom, maximum: FlatElement[BigInt] = Top)
+  extends FlatLattice[BigInt] {
+  override val bottom: FlatElement[BigInt] = minimum
+
+  override val top: FlatElement[BigInt] = maximum
+
+  def lub(x: FlatElement[BigInt], y: FlatElement[BigInt]): FlatElement[BigInt] = (x, y) match {
+    case (a, bottom) => a
+    case (bottom, b) => b
+    case (FlatEl(a), FlatEl(b)) if a >= b => FlatEl(a) else FlatEl(b)
+    case (top, _) => top
+    case (_, top) => top
+  }
+
+  def glb(x: FlatElement[BigInt], y: FlatElement[BigInt]): FlatElement[BigInt] = (x, y) match {
+    case (_, bottom) => bottom
+    case (bottom, _) => bottom
+    case (FlatEl(a), FlatEl(b)) if a <= b => FlatEl(a) else FlatEl(b)
+    case (a, top) => a
+    case (top, b) => b
+  }
+}
