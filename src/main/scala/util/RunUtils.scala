@@ -21,10 +21,11 @@ import util.{DebugDumpIRLogger, Logger}
 import java.io.{BufferedWriter, File, FileInputStream, FileWriter, PrintWriter}
 import java.nio.file.{Files, Paths}
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
-
 import cilvisitor.*
+import API.IREpoch
+import ir.dsl.IRToDSL
+import scala.collection.mutable.ArrayBuffer
 
 /** This file contains the main program execution. See RunUtils.loadAndTranslate for the high-level process.
   */
@@ -726,8 +727,8 @@ object StaticAnalysis {
 
 object RunUtils {
 
-  def run(q: BASILConfig): BASILResult = {
-    val result = loadAndTranslate(q)
+  def run(q: BASILConfig, collectedEpochsOpt: Option[ArrayBuffer[IREpoch]] = None): BASILResult = {
+    val result = loadAndTranslate(q, collectedEpochs = collectedEpochsOpt)
     Logger.info("Writing output")
     writeOutput(result)
     result
@@ -742,7 +743,7 @@ object RunUtils {
     }
   }
 
-  def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]): Unit = {
+  def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig], collectedEpochs: Option[ArrayBuffer[IREpoch]] = None): Unit = {
     // writeToFile(dotBlockGraph(program, program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
     Logger.info("[!] Running Simplify")
     val timer = PerformanceTimer("Simplify")
@@ -848,6 +849,10 @@ object RunUtils {
     Logger.info("Copyprop Start")
     transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
 
+    // --- START OF NEW EPOCH SECTION: BEFORE GUARD OPTIMIZATIONS ---
+    val beforeGuardOptimizationsProgram = IRToDSL.convertProgram(program).resolve // Capture BEFORE state
+    // --- END OF BEFORE EPOCH SECTION ---
+
     transforms.fixupGuards(program)
     transforms.removeDuplicateGuard(program)
     config.foreach {
@@ -858,6 +863,13 @@ object RunUtils {
         )
       }
     }
+
+    // --- START OF NEW EPOCH SECTION: AFTER GUARD OPTIMIZATIONS ---
+    collectedEpochs.foreach { buffer =>
+      val afterGuardOptimizationsProgram = IRToDSL.convertProgram(program).resolve // Capture AFTER state
+      buffer += IREpoch("guard_optimisations", beforeGuardOptimizationsProgram, afterGuardOptimizationsProgram)
+    }
+    // --- END OF AFTER EPOCH SECTION ---
 
     transforms.liftLinuxAssertFail(ctx)
 
@@ -901,7 +913,7 @@ object RunUtils {
     Logger.info("[!] Simplify :: finished")
   }
 
-  def loadAndTranslate(conf: BASILConfig, postLoad: IRContext => Unit = s => ()): BASILResult = {
+  def loadAndTranslate(conf: BASILConfig, postLoad: IRContext => Unit = s => (), collectedEpochs: Option[ArrayBuffer[IREpoch]] = None): BASILResult = {
     Logger.info("[!] Loading Program")
     val q = conf
     var ctx = q.context.getOrElse(IRLoading.load(q.loading))
@@ -973,7 +985,7 @@ object RunUtils {
       }
 
       assert(ir.invariant.programDiamondForm(ctx.program))
-      doSimplify(ctx, conf.staticAnalysis)
+      doSimplify(ctx, conf.staticAnalysis, collectedEpochs)
     }
 
     assert(ir.invariant.programDiamondForm(ctx.program))

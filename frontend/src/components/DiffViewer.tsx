@@ -11,7 +11,7 @@ import {ColorSchemeType} from "diff2html/lib/types";
 import {DiffControls} from "./DiffControls.tsx";
 import {API_BASE_URL} from '../api';
 
-interface ProcedureLocation { // TODO: I might need this...
+interface ProcedureLocation {
     name: string;
     startLine: number;
     approxEndLine: number;
@@ -65,16 +65,20 @@ export function DiffViewer() {
                 const [beforeResponse, afterResponse, proceduresResponse] = await Promise.all([
                     fetch(`${API_BASE_URL}/ir/${firstEpoch}/before`),
                     fetch(`${API_BASE_URL}/ir/${firstEpoch}/after`),
-                    fetch(`${API_BASE_URL}/ir/${firstEpoch}/procedures-with-lines`) // Fetch procedure data // TODO: Maybe: procedureTextLines
+                    fetch(`${API_BASE_URL}/ir/${firstEpoch}/procedures_with_lines`)
                 ]);
 
                 if (!beforeResponse.ok) throw new Error(`HTTP error fetching before IR for ${firstEpoch}! status: ${beforeResponse.status}`);
                 if (!afterResponse.ok) throw new Error(`HTTP error fetching after IR for ${firstEpoch}! status: ${afterResponse.status}`);
                 if (!proceduresResponse.ok) throw new Error(`HTTP error fetching procedures! status: ${proceduresResponse.status}`);
 
-                const beforeText: string = await beforeResponse.json();
-                const afterText: string = await afterResponse.json();
+                const beforeText: string = await beforeResponse.text();
+                const afterText: string = await afterResponse.text();
                 const proceduresData: ProcedureLocation[] = await proceduresResponse.json();
+
+                console.log("Before IR:", beforeText);
+                console.log("After IR:", afterText);
+                console.log("Procedures Data:", proceduresData);
 
                 const beforeTextSerialised = normalizeText(beforeText);
                 const afterTextSerialised = normalizeText(afterText);
@@ -101,10 +105,17 @@ export function DiffViewer() {
         });
     }, []);
 
-    // New function to scroll to a specific line
+    useEffect(() => {
+        console.log(`Context lines changed to: ${contextLines}`);
+    }, [contextLines]);
+
+    useEffect(() => {
+        console.log(`Output format switched to: ${outputFormat}`);
+    }, [outputFormat]);
+
+
     const scrollToLine = (lineNumber: number) => {
-        // TODO: I need to make this work. I want it to find the line if it exists in the lhs bar, otherwise go to the line above it that exisits and go there
-        // TODO: Maybe with a follow up notifications saying it is hidden???
+
         if (diffContainerRef.current) {
             const lineNumbers = diffContainerRef.current.querySelectorAll('.d2h-code-side-linenumber');
             let targetLineElement = null;
@@ -203,39 +214,48 @@ export function DiffViewer() {
             colorScheme: ColorSchemeType.AUTO, // TODO: End result I want auto
         });
 
-        ui.draw();
-
-        // Grab header for portal
-        const currentHeader = diffContainer.querySelector('.d2h-file-header');
-        if (currentHeader instanceof HTMLElement && currentHeader !== headerElement) {
-            setHeaderElement(currentHeader);
-        } else if (!currentHeader && headerElement) { // If header disappears, set to null
-            setHeaderElement(null);
-        }
-
-        // Prism syntax custom highlighting
         requestAnimationFrame(() => {
-            const lines = diffContainer.querySelectorAll('.d2h-code-line-ctn');
-            lines.forEach(line => {
-                const ins = line.querySelector('ins');
-                const del = line.querySelector('del');
+            try {
 
-                const applyHighlight = (el: HTMLElement | null) => {
-                    if (!el) return;
-                    const raw = el.textContent ?? '';
-                    // Highlight raw text and replace content inline
-                    el.innerHTML = Prism.highlight(raw, Prism.languages.ir, 'ir');
-                };
+                ui.draw();
+                console.log("useLayoutEffect: Diff2HtmlUI.draw() executed.");
 
-                if (ins || del) {
-                    applyHighlight(ins as HTMLElement);
-                    applyHighlight(del as HTMLElement);
-                } else {
-                    applyHighlight(line as HTMLElement);
+                // Grab header for portal
+                const currentHeader = diffContainer.querySelector('.d2h-file-header');
+                if (currentHeader instanceof HTMLElement && currentHeader !== headerElement) {
+                    setHeaderElement(currentHeader);
+                    console.log("useLayoutEffect: Header element found and set.");
+                } else if (!currentHeader && headerElement) { // If header disappears, set to null
+                    setHeaderElement(null);
+                    console.log("useLayoutEffect: Header element cleared.");
                 }
-            });
-        });
 
+                // Prism syntax custom highlighting
+                requestAnimationFrame(() => { // TODO: Nested good?
+                    const lines = diffContainer.querySelectorAll('.d2h-code-line-ctn');
+                    lines.forEach(line => {
+                        const ins = line.querySelector('ins');
+                        const del = line.querySelector('del');
+
+                        const applyHighlight = (el: HTMLElement | null) => {
+                            if (!el) return;
+                            const raw = el.textContent ?? '';
+                            // Highlight raw text and replace content inline
+                            el.innerHTML = Prism.highlight(raw, Prism.languages.ir, 'ir');
+                        };
+
+                        if (ins || del) {
+                            applyHighlight(ins as HTMLElement);
+                            applyHighlight(del as HTMLElement);
+                        } else {
+                            applyHighlight(line as HTMLElement);
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error("Error during diff rendering or highlighting:", error);
+            }
+        });
     }, [irBefore, irAfter, contextLines, outputFormat, currentEpochName]); // TODO: Header can't be here??? Why?
 
     // --- Conditional rendering: these checks must come AFTER all hooks ---

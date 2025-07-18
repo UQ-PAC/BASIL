@@ -1084,7 +1084,6 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
 
   // Clone before the copypropTransforms take place
   val clonedBeforeProgram = IRToDSL.convertProgram(p).resolve
-  IREpochStore.beforeTransform = Some(clonedBeforeProgram)
 
   SimplifyLogger.info("[!] Simplify :: Expr/Copy-prop Transform")
   val work = p.procedures
@@ -1098,10 +1097,10 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
         }
     )
   // Clone after the copyPropTransforms take place here
-  val clonedAfterProgram = IRToDSL.convertProgram(p).resolve
+  val clonedAfterProgram = IRToDSL.convertProgram(p).resolve // TODO: Tries to read this while still cloning leading to race condition
   val epochName = "test_epoch_name"
   val epochTester = IREpoch(epochName, clonedBeforeProgram, clonedAfterProgram) // Sets up the very first epoch for testing
-  IREpochStore.addEpoch(epochTester).unsafeRunSync() // testing as line for pipeline
+//  IREpochStore.addEpoch(epochTester).unsafeRunSync() // testing as line for pipeline
 
   work.foreach((p, job) => {
     try {

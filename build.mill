@@ -46,16 +46,18 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
   val javaSmt = ivy"org.sosy-lab:java-smt:5.0.0"
   val javaSmtZ3 = ivy"org.sosy-lab:javasmt-solver-z3:4.14.0"
   val catsEffect = ivy"org.typelevel::cats-effect:3.5.4"
-  val apiDsl = ivy"org.http4s::http4s-dsl:0.23.23"
-  val apiBlaze = ivy"org.http4s::http4s-blaze-server:0.23.17"
-  val apiCircle = ivy"org.http4s::http4s-circe:0.23.23"
-  val apiGeneric = ivy"io.circe::circe-generic:0.14.6"
+  val http4sVersion = "1.0.0-M40"
+  val http4Dsl = ivy"org.http4s::http4s-dsl::$http4sVersion"
+  val http4Circe = ivy"org.http4s::http4s-circe::$http4sVersion"
+  val circleGeneric = ivy"io.circe::circe-generic:0.14.6"
   val slf4j = ivy"org.slf4j:slf4j-simple:2.0.12"
   val scalaXml = ivy"org.scala-lang.modules::scala-xml:2.1.0"
+  val emberServer = ivy"org.http4s::http4s-ember-server::$http4sVersion"
+  val log4cats = ivy"org.typelevel::log4cats-slf4j:2.6.0"
 
   override def ivyDeps = Agg(
-    scalactic, sourceCode, mainArgs, upickle, aslpOffline, javaSmt, javaSmtZ3, catsEffect, apiDsl,
-    apiBlaze, apiCircle, apiGeneric, slf4j, scalaXml)
+    scalactic, sourceCode, mainArgs, upickle, aslpOffline, javaSmt, javaSmtZ3, catsEffect, http4Dsl,
+    http4Circe, circleGeneric, slf4j, scalaXml, emberServer, log4cats)
 
   override def repositoriesTask = Task.Anon {
     super.repositoriesTask() :+ MavenRepository(
