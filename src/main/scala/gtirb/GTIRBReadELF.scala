@@ -315,16 +315,15 @@ object GTIRBReadELF {
       val bss = g.symbolTable.collectFirst {
         case ELFSymbol(_, addr, 0, ELFSymType.SECTION, ELFBind.LOCAL, ELFVis.DEFAULT, ELFNDX.Section(_), ".bss") => addr
       }
-      val diffSymbols = (gs -- os) | (os -- gs) // symmetric difference
-      val diffNames = diffSymbols.map(x => x.name)
-      val bssNames = Set("__bss_start", "__bss_start__")
+      val bssNames = Seq("__bss_start", "__bss_start__")
+      val bssGtirb = (gs -- os).filter(bssNames contains _.name)
 
       bss match {
         // if the gtsrelf incorrectly has bss_start pointing to .bss, rewrites the oldrelf to have the same,
         // effectively ignoring this mismatch
-        case Some(bss) if (diffSymbols & gs).filter(bssNames contains _.name).forall(_.value == bss) =>
+        case Some(bss) if bssGtirb.nonEmpty && bssGtirb.forall(_.value == bss) =>
           o = o.copy(symbolTable = o.symbolTable.map {
-            case sym if bssNames.contains(sym.name) => sym.copy(value = bss)
+            case sym if bssNames contains sym.name => sym.copy(value = bss)
             case x => x
           })
           Logger.warn("ignoring bss_start quirk in gtsrelf data")
