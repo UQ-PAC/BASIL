@@ -16,7 +16,7 @@ trait mdbookBinary extends DownloadModule {
   def osName = System.getProperty("os.name")
 
   def local = Task.Input {
-    Try(os.proc("mdbook", "--version").call())
+    Try(os.proc("mdbook", "--version").call(destroyOnExit = false))
       .map(Function.const("mdbook"))
       .toEither
       .left.map(_.toString)
