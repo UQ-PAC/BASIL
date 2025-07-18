@@ -104,6 +104,6 @@ class EdgeFunctionLattice[T, L <: Lattice[T]](val valuelattice: L) extends Latti
         case MeetEdge(d) => MeetEdge(valuelattice.glb(c, d))
       }
 
-    override def toString(): String = s"MeetEdge($c)"
+    override def toString = s"MeetEdge($c)"
   }
 }
