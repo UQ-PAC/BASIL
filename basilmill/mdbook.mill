@@ -6,9 +6,6 @@ import os.Path
 import scalalib._
 import scala.util.{Try}
 
-import $file.basilmill.util.DownloadModule
-
-
 trait mdbookBinary extends DownloadModule {
   def version = "0.4.51"
   def url = s"https://github.com/rust-lang/mdBook/releases/download/v${version}/mdbook-v${version}-${suffix}"
