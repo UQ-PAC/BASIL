@@ -78,9 +78,32 @@ class EdgeFunctionLattice[T, L <: Lattice[T]](val valuelattice: L) extends Latti
         case IdEdge() => this
         case ConstEdge(d) => JoinEdge(valuelattice.lub(c, d))
         case JoinEdge(d) => JoinEdge(valuelattice.lub(c, d))
+        case _ => e.joinWith(this)
       }
 
     override def toString = s"JoinEdge($c)"
   }
 
+  /** Edge that is the meet of an IdEdge and ConstEdge. `\l . gub(l, c)` as a lambda expression. */
+  case class MeetEdge(c: T) extends EdgeFunction[T] {
+    def apply(x: T): T = valuelattice.glb(x, c)
+
+    def composeWith(e: EdgeFunction[T]): EdgeFunction[T] =
+      e match {
+        case IdEdge() => this
+        case ConstEdge(d) => ConstEdge(valuelattice.glb(c, d))
+        case JoinEdge(d) => ??? // The JoinEdge case for composition is ignored for now
+        case MeetEdge(d) => MeetEdge(valuelattice.glb(c, d))
+      }
+
+    def joinWith(e: EdgeFunction[T]): EdgeFunction[T] =
+      e match {
+        case IdEdge() => this
+        case ConstEdge(d) => MeetEdge(valuelattice.glb(c,d))
+        case JoinEdge(d) => JoinEdge(d)
+        case MeetEdge(d) => MeetEdge(valuelattice.glb(c, d))
+      }
+
+    override def toString(): String = s"MeetEdge($c)"
+  }
 }
