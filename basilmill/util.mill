@@ -1,5 +1,6 @@
 package build.basilmill
 import mill._
+import mill.api.Task
 
 import os.Path
 import scala.util.control.Exception.{ignoring}
@@ -17,7 +18,7 @@ import scala.util.control.Exception.{ignoring}
 trait DownloadModule extends Module {
   def name: String
   def url: String
-  def local: Target[Either[String, String]]
+  def local: Task[Either[String, String]]
   def unzip: Option[Unzip] = None
 
   sealed trait Unzip

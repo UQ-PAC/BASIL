@@ -2,12 +2,11 @@
 package build.basilmill
 
 import mill._
+import mill.api.BuildCtx
 
 import os.Path
 import scalalib._
 import scala.util.{Try}
-
-import $file.basilmill.util.DownloadModule
 
 
 trait ProfileModule extends ScalaModule with DownloadModule {
@@ -30,7 +29,7 @@ trait ProfileModule extends ScalaModule with DownloadModule {
 
 
   def local = Task.Input {
-    Try(os.isFile(Task.workspace / toUnpack))
+    Try(os.isFile(BuildCtx.workspaceRoot / toUnpack))
       .map(Function.const(toUnpack))
       .toEither
       .left.map(_.toString)

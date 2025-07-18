@@ -2,13 +2,13 @@ package build.basilmill
 // https://github.com/da-tubi/antlr4-scala-example/blob/master/antlr.sc
 import mill._
 import mill.scalalib._
-import $ivy.`org.antlr:antlr4:4.9.3`
+import mill.api.Task
 import org.antlr.v4.tool.{ANTLRMessage, ANTLRToolListener}
 
 import scala.collection.mutable
 
 trait AntlrModule extends JavaModule {
-  def antlrGrammarSources: mill.define.Target[Seq[mill.api.PathRef]]
+  def antlrGrammarSources: Task[Seq[mill.api.PathRef]]
   def antlrPackage: Option[String] = None
   def antlrGenerateVisitor: Boolean = false
   def antlrGenerateListener: Boolean = false

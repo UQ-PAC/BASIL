@@ -2,10 +2,10 @@ package build.basilmill
 
 import mill._
 import mill.scalalib._
+import mill.api.BuildCtx
 
 import scala.util.Try
 
-import $ivy.`com.lihaoyi::mill-contrib-buildinfo:`
 import mill.contrib.buildinfo.BuildInfo
 
 trait BasilVersion extends BuildInfo {
@@ -16,14 +16,14 @@ trait BasilVersion extends BuildInfo {
     // https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/store-information-in-variables#default-environment-variables
     Task.env.get("GITHUB_SHA").orElse {
       Try {
-        os.proc("git", "rev-parse", "HEAD").call(cwd = Task.workspace).out.text().trim()
+        os.proc("git", "rev-parse", "HEAD").call(cwd = BuildCtx.workspaceRoot).out.text().trim()
       }.toOption
     }
   }
 
   def gitVersion = Task.Input {
     Try {
-      os.proc("git", "describe", "--tags", "--dirty").call(cwd = Task.workspace).out.text().trim()
+      os.proc("git", "describe", "--tags", "--dirty").call(cwd = BuildCtx.workspaceRoot).out.text().trim()
     }.toOption.orElse {
       Task.env.get("COMMIT")
     }

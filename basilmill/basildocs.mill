@@ -3,8 +3,7 @@ package build.basilmill
 import os.Path
 import mill._
 import mill.scalalib._
-
-import $file.basilmill.basilversion.BasilVersion
+import mill.api.BuildCtx
 
 trait BasilDocs extends ScalaModule {
   this: BasilVersion =>
@@ -59,7 +58,7 @@ trait BasilDocs extends ScalaModule {
   }
 
   def docsIndex = Task {
-    PathRef(Task.workspace / "docs" / "static" / "index.html")
+    PathRef(BuildCtx.workspaceRoot / "docs" / "static" / "index.html")
   }
 
   def allDocs = Task {
@@ -83,7 +82,7 @@ trait BasilDocs extends ScalaModule {
     os.walk(dest).foreach {
       case path if path.ext == "html" =>
         // HACK: fix mill bug causing incorrect scala source links https://github.com/com-lihaoyi/mill/issues/5221
-        val out = os.read(path).replace(Task.workspace.toString, "")
+        val out = os.read(path).replace(BuildCtx.workspaceRoot.toString, "")
         os.write.over(path, out)
       case path if path.last == "ux.js" =>
         val old = os.read(path)

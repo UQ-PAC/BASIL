@@ -10,17 +10,17 @@ trait JFlexCupModule extends JavaModule {
   def jflexArgs: T[Iterable[String]]
   def javaCupArgs: T[Iterable[String]]
 
-  def jflexDep = ivy"de.jflex:jflex:1.9.1"
-  def javaCupDep = ivy"com.github.vbmacher:java-cup:11b-20160615-3"
-  def javaCupRuntimeDep = ivy"com.github.vbmacher:java-cup-runtime:11b-20160615-3"
+  def jflexDep = mvn"de.jflex:jflex:1.9.1"
+  def javaCupDep = mvn"com.github.vbmacher:java-cup:11b-20160615-3"
+  def javaCupRuntimeDep = mvn"com.github.vbmacher:java-cup-runtime:11b-20160615-3"
   def javaCupSourceUrl: T[String] = "http://www2.cs.tum.edu/projects/cup/releases/java-cup-src-11b-20160615.tar.gz"
 
-  def ivyDeps = Task {
-    super.ivyDeps() ++ Agg(javaCupRuntimeDep)
+  def mvnDeps = Task {
+    super.mvnDeps() ++ Seq(javaCupRuntimeDep)
   }
 
   object jflex extends JavaModule {
-    def compileIvyDeps = Agg(jflexDep)
+    def compileMvnDeps = Seq(jflexDep)
     def generated = Task {
       Jvm.callProcess(
         mainClass = "jflex.Main",
@@ -37,7 +37,7 @@ trait JFlexCupModule extends JavaModule {
   }
 
   object cup extends JavaModule {
-    def compileIvyDeps = Agg(javaCupDep)
+    def compileMvnDeps = Seq(javaCupDep)
     def generated = Task {
       Jvm.callProcess(
         mainClass = "java_cup.Main",
@@ -66,7 +66,7 @@ trait JFlexCupModule extends JavaModule {
     }
   }
 
-  override def generatedSources = Task.Sources {
+  override def generatedSources = Task {
     super.generatedSources() ++ Seq(jflex.generated(), cup.generated())
   }
 }
