@@ -70,7 +70,11 @@ trait BasilDocs extends ScalaModule {
     }
 
     docsModules().foreach {
-      case (name, src) => copyDoc(src.path / ".." / "javadoc", name)
+      case (name, src) =>
+        BuildCtx.withFilesystemCheckerDisabled {
+          // XXX: sandbox doesn't like us navigating to parent of src.path
+          copyDoc(src.path / ".." / "javadoc", name)
+        }
     }
     extraDocs().foreach {
       case (name, src) => copyDoc(src.path, name)
