@@ -51,8 +51,9 @@ object SideEffectStatementOfStatement {
     GlobalVar(s"TRACE", BoolType)
   }
 
-  def param(v: Global): (Variable | Memory, Variable) = v match {
+  def param(v: Variable | Memory): (Variable | Memory, Variable) = v match {
     case g: GlobalVar => (g -> g)
+    case g: LocalVar => (g -> g)
     case m: Memory => (m -> traceVar(m))
   }
 }

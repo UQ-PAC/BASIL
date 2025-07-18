@@ -43,6 +43,17 @@ import scala.collection.mutable.ArrayBuffer
  * CFA conversion of basil ir programs
  */
 
+
+
+type CutLabel = String
+type BlockID = String
+
+/**
+ * Describes the mapping from source variable to target expression at a given Block ID in the source program.
+ */
+type TransformDataRelationFun = Option[BlockID] => (Variable | Memory) => Option[Expr]
+
+
 def boolAnd(exps: Iterable[Expr]) =
   val l = exps.toList
   l.size match {
@@ -134,6 +145,7 @@ class TranslationValidator {
 
   val timer = PerformanceTimer("translationValidator", LogLevel.DEBUG)
 
+  var initProgBefore: Option[Program] = None
   var initProg: Option[Program] = None
 
   var beforeProg: Option[Program] = None
@@ -476,6 +488,147 @@ class TranslationValidator {
   }
   */
 
+
+ /**
+  *
+  * Maps a input or output dependnecy of a call to a variable representing it in the TV
+  */
+  case class CallParamMapping(lhs: List[(Variable | Memory, Variable)], rhs: List[(Variable | Memory, Variable)])
+
+
+  /**
+   *
+   * Match the actual signature of a call to the expected signature based on renaming, basically reorders the parameters
+   * so that [target] corresponds with [renamed(source)] so that congruence rule can be applied i.e. 
+   *
+   * target.actualparams.zip(source.actualparams).forall(equal) ==> f_t(target.actual) == f_s(source.actual)
+   *
+   * This is awful and convoluted and im tired
+   *
+   */
+  def matchTargetCallInSource(expected: (CallParamMapping, CallParamMapping))(callLHS: List[(Variable | Memory, Variable)], callRHS: List[(Variable | Memory, Expr)]) = {
+
+    val (expSource, expTgt) = expected
+    println(callRHS)
+
+    val rhs = callRHS.map {
+      case (formal, actual) => {
+        val x = expSource.rhs.zip(expTgt.rhs)
+
+        x.collect {
+          case ((origS, mapS), (origT, mapT)) if origT == formal => ((origS, origT), actual)
+        }.toList match {
+          case h::Nil => Seq(h)
+          case h::tl  => {
+            Logger.warn("multiple guys")
+            Seq(h)
+          }
+          case Nil => {
+            Logger.error("No matching Thingo found, ack gna fail")
+            None
+          }
+        }
+      }
+    }
+
+    val lhs = callLHS.map {
+      case (formal, actual) => {
+        val x = expSource.lhs.zip(expTgt.lhs)
+
+        x.collect {
+          case ((origS, mapS), (origT, mapT)) if origT == formal => (origS, actual)
+        }.toList match {
+          case h::Nil => Seq(h)
+          case h::tl  => {
+            Logger.warn("multiple guys")
+            Seq(h)
+          }
+          case Nil => {
+            Logger.error("No matching Thingo found, ack gna fail")
+            None
+          }
+        }
+      }
+    }
+
+    (lhs, rhs)
+
+
+  }
+
+
+ /**
+  * We re-infer the function signature of all target program procedures based on the transform
+  * described by [[renaming]], and the [[Frame]] of the source. 
+  *
+  * Then at aver call we take the signature (traceVar @ procedureParams @ globalModSet) and map it
+  * to the signature we infer here.
+  *
+  * We use this to describe the entry and exit invariant for every procedure, so if it is too weak
+  * then the verification of the procedure will fail. 
+  *
+  * If it is too strong the ackermann instantiation of the call will fail; and verification should
+  * fail at the call-site. 
+  *
+  * This means it is possible to drop parameters (read-global-variables or actual parameters)
+  * as long as they aren't needed in the verification of the procedure.
+  *
+  * Because we at minimum make the global trace variable part of the function signature, a malicious
+  * transform should only be able to verify by deleting all functionality if it was origionally a
+  * pure function. Assuming we ensure invariants are not valid or false. 
+  *
+  */
+  def getFunctionSigsRenaming(renaming: TransformDataRelationFun) : Map[String, (CallParamMapping, CallParamMapping)]= {
+    import SideEffectStatementOfStatement.*
+
+    val traceOut = LocalVar("trace", BoolType) -> globalTraceVar
+
+    def getParams(p: Procedure, frame: Frame) = {
+
+      def paramTgt(v: Variable | Memory) = {
+        renaming(p.entryBlock.map(_.label))(v) match {
+          case Some(n: (Variable | Memory)) => param(n)
+          case _ => param(v)
+        }
+      }
+
+      // val frame = beforeFrame(p.name)
+
+      val lhs : List[Variable | Memory] = p.formalOutParam.toList ++ frame.modifiedGlobalVars.toList ++ frame.modifiedMem.toList
+      val rhs : List[Variable | Memory] =  p.formalInParam.toList ++ frame.readGlobalVars.toList ++ frame.readMem.toList
+
+      val lhsSrc = lhs.map(param)
+      val rhsSrc = rhs.map(param)
+
+      val lhsTgt = lhs.map(paramTgt)
+      val rhsTgt = rhs.map(paramTgt)
+
+      (CallParamMapping(lhsSrc, rhsSrc), CallParamMapping(lhsTgt, rhsTgt))
+    }
+
+
+    val params = initProg.get.procedures.map(p => p.name -> getParams(p, afterFrame.getOrElse(p.name, Frame()))).toMap
+    val paramsBef = initProgBefore.get.procedures.map(p => p.name -> getParams(p, afterFrame.getOrElse(p.name, Frame()))._1).toMap
+
+
+    for ((pname, targetParams) <- paramsBef) {
+      val afterParams = params(pname)
+
+      val r = matchTargetCallInSource(afterParams)(targetParams.lhs.map((o, a) => (o, LocalVar("no", BoolType))), targetParams.rhs.map((o, a) => (o, FalseLiteral)))
+
+
+
+      println(s"expect PARAMS: $pname" + params(pname))
+      println(s"zipped params $pname: " + r)
+
+    }
+
+
+    println(params)
+
+    params
+  }
+
   /**
    * Set invariant defining a correspondence between variables in the source and target programs. 
    *
@@ -494,7 +647,7 @@ class TranslationValidator {
   def getEqualVarsInvariantRenaming(
     // block label -> variable -> renamed variable
     afterProc: Procedure,
-    renamingSrcTgt: Option[String] => (Variable | Memory) => Option[Expr] = _ => e => Some(e)
+    renamingSrcTgt: TransformDataRelationFun = _ => e => Some(e)
   ) = {
     val p = afterProc
 
@@ -564,6 +717,7 @@ class TranslationValidator {
     liveBefore = p.procedures.map(p => p.name -> getLiveVars(p, f)).toMap
     // println(translating.PrettyPrinter.pp_prog(p))
     initProg = Some(p)
+    initProgBefore = Some(ir.dsl.IRToDSL.convertProgram(p).resolve)
     val (prog, cuts) = TransitionSystem.toTransitionSystem(p, f)
     beforeProg = Some(prog)
     beforeCuts = cuts
@@ -611,12 +765,16 @@ class TranslationValidator {
     asserts = asserts ++ a
   }
 
-  def processModel(
+  /**
+   * Dump some debug logs comparing source and target programs from the model retuned when [sat], to get an idea
+   * of what when wrong in the validation.
+   */
+  private def processModel(
     combinedProc: Procedure,
     prover: SMTProver,
     invariant: Seq[Expr],
     blockTraceVars: Map[String, Expr],
-    renaming: Option[String] => (Variable | Memory) => Option[Expr] = _ => e => Some(e),
+    renaming: TransformDataRelationFun = _ => e => Some(e),
     sourceEntry: String,
     targetEntry: String,
   ) = {
@@ -653,24 +811,6 @@ class TranslationValidator {
       }
     }
 
-    // for (b <- combinedProc.blocks.toSeq.flatMap(_.statements)) {
-    //  b match {
-    //    case a => {
-    //      val v = ir.freeVarsPos(a).filter(_.name.startsWith("source__TRACE"))
-    //      for (sourceT <- v) {
-    //        val targetT = GlobalVar("target" + sourceT.name.stripPrefix("source"), sourceT.getType)
-    //        eval.evalExpr(BinaryExpr(EQ, sourceT, targetT)) match {
-    //          case Some(FalseLiteral) => {
-    //            a.comment = Some(a.comment.getOrElse("") + s"(trace unequal $sourceT != $targetT)")
-    //            Logger.error(s"trace unequal at ${a.parent.label} : $sourceT, $targetT")
-    //          }
-    //          case _ => ()
-    //        }
-    //      }
-    //    }
-    //    case _ => ()
-    //  }
-    // }
 
     case object Conj {
       def unapply(e: Expr): Option[List[Expr]] = e match {
@@ -818,6 +958,8 @@ class TranslationValidator {
       .filter(n => beforeFrame.contains(n.name))
       .filter(n => afterFrame.contains(n.name))
 
+
+    val paramMapping = getFunctionSigsRenaming(invariantRenamingSrcTgt)
 
     for (proc <- interesting) {
 
