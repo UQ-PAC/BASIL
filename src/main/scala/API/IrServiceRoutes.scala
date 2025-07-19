@@ -57,15 +57,15 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean]) {
               logger.debug(s"Found epoch '$epochName'. Attempting to pretty print 'beforeTransform'.")
 
               IO.delay {
-                PrettyPrinter.pp_prog(epoch.afterTransform)
+                PrettyPrinter.pp_prog(epoch.beforeTransform)
               }.flatMap { pretty =>
                 logger.info(s"Successfully pretty-printed 'beforeTransform' for epoch '$epochName'. Length: ${pretty.length}")
                 Ok(s"$pretty")
               }.handleErrorWith { e =>
                 logger.error(s"CRITICAL ERROR: Failed to pretty-print 'beforeTransform' for epoch '$epochName': ${e.getMessage}", e)
-                InternalServerError(s"Internal Server Error processing 'after' IR for '$epochName': ${e.getMessage}")
+                InternalServerError(s"Internal Server Error processing 'before' IR for '$epochName': ${e.getMessage}")
               }
-            case None => NotFound(s"Epoch '$epochName' not found or after IR not available.")
+            case None => NotFound(s"Epoch '$epochName' not found or before IR not available.")
           }
       }
 
