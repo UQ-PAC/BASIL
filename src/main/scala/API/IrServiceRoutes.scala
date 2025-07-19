@@ -14,7 +14,11 @@ import translating.PrettyPrinter
 
 import scala.collection.mutable.ArrayBuffer
 
-class IrServiceRoutes(epochStore: IREpochStore) {
+import org.slf4j.LoggerFactory
+
+class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean]) {
+  private val logger = LoggerFactory.getLogger(getClass)
+
   /**
    * Defines the HTTP routes for the IR API.
    * This service handles requests related to retrieving IR program states and Control Flow Graphs (CFGs).
@@ -30,7 +34,9 @@ class IrServiceRoutes(epochStore: IREpochStore) {
        * On success: Responds with 200 OK.
        */
       case GET -> Root / "epochs" =>
-        epochStore.epochsRef.get.map(_.map(_.name).asJson).flatMap(Ok(_))
+        ensureReady {
+          epochStore.epochsRef.get.map(_.map(_.name).asJson).flatMap(Ok(_))
+        }
 
       /**
        * GET /ir/{epochName}/before
@@ -43,13 +49,17 @@ class IrServiceRoutes(epochStore: IREpochStore) {
        * On failure: Responds with 404 Not Found if the specified `epochName` does not exist or its "before" IR is unavailable.
        */
       case GET -> Root / "ir" / epochName / "before" =>
-        epochStore.getEpoch(epochName)
-          .flatMap {
-            case Some(epoch) =>
-              val pretty = PrettyPrinter.pp_prog(epoch.beforeTransform)
-              Ok(s"$pretty")
-            case None => NotFound(s"Epoch '$epochName' not found or before IR not available.")
-          }
+        ensureReady {
+          logger.info(s"Received GET /ir/$epochName/before request.")
+
+          epochStore.getEpoch(epochName)
+            .flatMap {
+              case Some(epoch) =>
+                val pretty = PrettyPrinter.pp_prog(epoch.beforeTransform)
+                Ok(s"$pretty")
+              case None => NotFound(s"Epoch '$epochName' not found or before IR not available.")
+            }
+        }
 
       /**
        * GET /ir/{epochName}/after
@@ -62,13 +72,26 @@ class IrServiceRoutes(epochStore: IREpochStore) {
        * On failure: Responds with 404 Not Found if the specified `epochName` does not exist or its "after" IR is unavailable.
        */
       case GET -> Root / "ir" / epochName / "after" =>
-        epochStore.getEpoch(epochName)
-          .flatMap {
-            case Some(epoch) =>
-              val pretty = PrettyPrinter.pp_prog(epoch.afterTransform)
-              Ok(s"$pretty")
-            case None => NotFound(s"Epoch '$epochName' not found or after IR not available.")
-          }
+        ensureReady {
+          logger.info(s"Received GET /ir/$epochName/after request.")
+
+          epochStore.getEpoch(epochName)
+            .flatMap {
+              case Some(epoch) =>
+                logger.debug(s"Found epoch '$epochName'. Attempting to pretty print 'afterTransform'.")
+
+                IO.delay {
+                  PrettyPrinter.pp_prog(epoch.afterTransform)
+                }.flatMap { pretty => // TODO: What is flatmap
+                  logger.info(s"Successfully pretty-printed 'afterTransform' for epoch '$epochName'. Length: ${pretty.length}")
+                  Ok(s"$pretty")
+                }.handleErrorWith { e =>
+                  logger.error(s"CRITICAL ERROR: Failed to pretty-print 'afterTransform' for epoch '$epochName': ${e.getMessage}", e)
+                  InternalServerError(s"Internal Server Error processing 'after' IR for '$epochName': ${e.getMessage}")
+                }
+              case None => NotFound(s"Epoch '$epochName' not found or after IR not available.")
+            }
+        }
 
       /**
        * GET /ir/{epochName}/pretty-print
@@ -187,4 +210,10 @@ class IrServiceRoutes(epochStore: IREpochStore) {
       proc.name -> dotOutput
     }.toMap
   }
+
+  private def ensureReady(action: IO[Response[IO]]): IO[Response[IO]] =
+    isReady.get.flatMap {
+      case true => action
+      case false => ServiceUnavailable("IR data is still initializing. Please try again shortly.")
+    }
 }

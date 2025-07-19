@@ -15,13 +15,13 @@
     box-sizing: border-box;
 }
 
-.d2h-code-line-ctn,
-.d2h-code-line-ctn * { /* TODO: What does the * mean and do */
-    display: inline;
-    line-height: 1 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-}
+/*.d2h-code-line-ctn,*/
+/*.d2h-code-line-ctn * { !* TODO: What does the * mean and do Maybe just delete this *!*/
+/*    display: inline;*/
+/*    line-height: 1 !important;*/
+/*    margin: 0 !important;*/
+/*    padding: 0 !important;*/
+/*}*/
 
 .d2h-wrapper {
     /*max-width: 100% !important;*/

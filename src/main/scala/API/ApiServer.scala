@@ -17,7 +17,9 @@ import cats.implicits._
 import cats.effect._
 import cats.effect.IO
 import cats.effect.Ref
+import cats.effect.std.Console
 import cats.effect.kernel.Resource
+import cats.effect.std.Semaphore
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.collection.mutable
@@ -26,7 +28,6 @@ import scala.reflect.Selectable.reflectiveSelectable
 import ir.Procedure
 import org.http4s.server.Router
 import org.http4s.ember.server.EmberServerBuilder
-
 
 /**
  * Represents a snapshot of the Intermediate Representation (IR) at a specific point in the analysis pipeline.
@@ -107,8 +108,8 @@ object LineCounter {
  * Extends `IOApp` from Cats Effect for managing the application lifecycle.
  */
 object ApiServer extends IOApp {
-
-  implicit val asyncIO: Async[IO] = IO.asyncForIO // Provide the Async instance for IO
+  implicit val asyncIO: Async[IO] = IO.asyncForIO
+  implicit val consoleIO: Console[IO] = Console.make[IO]
   implicit val loggerFactory: LoggerFactory[IO] = Slf4jFactory.create[IO]
 
   /**
@@ -120,74 +121,82 @@ object ApiServer extends IOApp {
   private val blockingEcResource: Resource[IO, ExecutionContext] = // TODO: Understand this
     Resource.make(IO.delay(ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(4))))(ec => IO.delay(ec.shutdown()))
 
-  override def run(args: List[String]): IO[ExitCode] = { // Corrected type for args
-    // Create the IREpochStore instance here
-    IREpochStore.of.flatMap { epochStore => // This 'epochStore' is your instance!
-      // Pass 'epochStore' to anything that needs to interact with the epoch data
+  override def run(args: List[String]): IO[ExitCode] = {
+    // The main program logic, wrapped in a for-comprehension
+    val program = for {
+      isReady <- Ref[IO].of(false)
+      semaphoreInstance <- Semaphore[IO](1)
+      epochStore <- IREpochStore.of
+      irServiceRoutes = new IrServiceRoutes(epochStore, isReady).routes
+      httpApp = Router("/" -> irServiceRoutes).orNotFound
+    } yield (httpApp, epochStore, semaphoreInstance, isReady)
 
-      // 1. Create IrServiceRoutes, passing the epochStore instance
-      val httpApp = {
-        val irServiceRoutes = new IrServiceRoutes(epochStore).routes // <-- Pass epochStore here
-        Router("/" -> irServiceRoutes).orNotFound
-      }
-
-      // 2. Start the server
+    program.flatMap { case (httpApp, epochStore, semaphoreInstance, isReady) =>
       EmberServerBuilder.default[IO]
         .withHost(ipv4"0.0.0.0")
         .withPort(port"8080")
         .withHttpApp(httpApp)
         .build
         .use { server =>
-          IO.println(s"Server started at ${server.baseUri}") *>
-            // Start background IR generation, passing the epochStore instance
-            generateIRAsync(epochStore).start *> // <-- Pass epochStore here
-            IO.never // Keep server running indefinitely
+          Console[IO].println(s"Server started at ${server.baseUri}") *>
+            generateIRAsync(epochStore, semaphoreInstance, isReady).start *>
+            IO.never
         }
     }.as(ExitCode.Success)
   }
 
   /**
-   * Asynchronously generates the initial Intermediate Representation (IR)
-   * by running the BASIL analysis tool. The results are stored in the [[IREpochStore]].
+   * Asynchronously generates the Intermediate Representation (IR)
+   * by running the BASIL analysis tool. This process is protected by the provided `irProcessingSemaphore`.
+   * The results (epochs) are stored in the [[IREpochStore]].
    *
+   * @param epochStore            The store to save generated IR epochs.
+   * @param irProcessingSemaphore The semaphore to synchronize access to shared IR state.
    * @return An `IO[Unit]` representing the completion of the IR generation and storage.
-   * @note This method hardcodes the input file paths and BASIL configuration.
-   * @todo The result `programIR` is currently just for testing; it should be integrated cleanly
-   *       with `IREpochStore.addEpoch` to store the generated epochs.
-   * @todo The `before` and `after` IR traces are implicitly handled by the underlying
-   *       `RunUtils.run` method. This interaction could be made more explicit and clean.
    */
-  private def generateIRAsync(epochStore: IREpochStore): IO[Unit] = {
-    val collectedEpochsBuffer = ArrayBuffer.empty[IREpoch]
+  private def generateIRAsync(
+                               epochStore: IREpochStore,
+                               irProcessingSemaphore: Semaphore[IO],
+                               isReady: Ref[IO, Boolean] // readiness flag
+                             ): IO[Unit] = {
+    irProcessingSemaphore.permit.use { _ =>
+      for {
+        _ <- IO.println("Starting BASIL analysis...")
+        // Run BASIL and collect epochs
+        collectedEpochs <- IO.blocking {
+          val buffer = ArrayBuffer.empty[IREpoch]
 
-    blockingEcResource.use { blockingEc =>
-      IO.blocking {
-        val ilConfig = ILLoadingConfig(
-          inputFile = "src/test/correct/secret_write/gcc/secret_write.adt",
-          relfFile = Some("src/test/correct/secret_write/gcc/secret_write.relf"),
-          dumpIL = None
-        )
+          val ilConfig = ILLoadingConfig(
+            inputFile = "src/test/correct/secret_write/gcc/secret_write.adt",
+            relfFile = Some("src/test/correct/secret_write/gcc/secret_write.relf"),
+            dumpIL = None
+          )
 
-        val basilConfig = BASILConfig(
-          context = None,
-          loading = ilConfig,
-          simplify = true,
-          dsaConfig = None,
-          memoryTransform = true,
-          summariseProcedures = true,
-          staticAnalysis = None,
-          outputPrefix = "out/test_output"
-        )
+          val basilConfig = BASILConfig(
+            context = None,
+            loading = ilConfig,
+            simplify = true,
+            dsaConfig = None,
+            memoryTransform = true,
+            summariseProcedures = true,
+            staticAnalysis = None,
+            outputPrefix = "out/test_output"
+          )
 
         val finalBasilResult = RunUtils.run(basilConfig, Some(collectedEpochsBuffer))
+          val finalBasilResult = RunUtils.run(basilConfig, Some(buffer))
 
-        val addEpochsIO = collectedEpochsBuffer.toList.traverse_(epochStore.addEpoch)
+          RunUtils.writeOutput(finalBasilResult)
 
-        RunUtils.writeOutput(finalBasilResult) // TODO: Do I want/need this?
+          buffer.toList
+        }
 
-        addEpochsIO
-      }.flatten
-    } *>
-      IO.println(s"BASIL analysis completed and ${collectedEpochsBuffer.size} epochs stored.")
+        _ <- collectedEpochs.traverse_(epochStore.addEpoch)
+        _ <- Console[IO].println(s"All ${collectedEpochs.size} epochs stored.")
+
+        _ <- isReady.set(true)
+
+      } yield ()
+    }
   }
 }

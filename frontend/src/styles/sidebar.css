@@ -1,0 +1,65 @@
+.sidebar {
+    width: 250px;
+    background-color: #f0f0f0;
+    padding: 1rem;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.sidebar-header {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    color: #333;
+    text-align: center;
+}
+
+.sidebar-loading,
+.sidebar-message {
+    font-style: italic;
+    color: #666;
+    text-align: center;
+}
+
+.sidebar-error {
+    color: #dc3545;
+    font-weight: bold;
+    text-align: center;
+}
+
+.epoch-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem; /* Space between buttons */
+}
+
+.epoch-button {
+    background-color: #e0e0e0;
+    border: 1px solid #ccc;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    white-space: nowrap; /* Prevent text wrapping */
+    overflow: hidden;    /* Hide overflow text */
+    text-overflow: ellipsis; /* Show ellipsis for overflowed text */
+}
+
+.epoch-button:hover:not(:disabled) {
+    background-color: #d0d0d0;
+}
+
+.epoch-button.selected {
+    background-color: #007bff; /* Primary color for selected button */
+    color: white;
+    border-color: #007bff;
+    font-weight: bold;
+}
+
+.epoch-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}

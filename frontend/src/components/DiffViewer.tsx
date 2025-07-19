@@ -17,117 +17,87 @@ interface ProcedureLocation {
     approxEndLine: number;
 }
 
-export function DiffViewer() {
-    const [irBefore, setIrBefore] = useState('');
-    const [irAfter, setIrAfter] = useState('');
+interface IREpochData {
+    before: string;
+    after: string;
+    procedures: ProcedureLocation[];
+    epochName: string;
+}
+
+interface DiffViewerProps {
+    selectedEpochName: string | null; // Now received as a prop
+}
+
+export function DiffViewer({ selectedEpochName }: DiffViewerProps) {
+    const [irData, setIrData] = useState<IREpochData | null>(null);
     const [contextLines, setContextLines] = useState(5);
     const [outputFormat, setOutputFormat] = useState<'side-by-side' | 'line-by-line'>('side-by-side');
     const [headerElement, setHeaderElement] = useState<HTMLElement | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [currentEpochName, setCurrentEpochName] = useState<string | null>(null);
-    const [procedureList, setProcedureList] = useState<ProcedureLocation[]>([]);
     const diffContainerRef = useRef<HTMLDivElement>(null);
 
-    // TODO: Maybe move elsewhere
-    const normalizeText = (text: string) => {
-        let normalized = text;
-        normalized = normalized.replace(/\r\n|\r/g, '\n');
-        normalized = normalized.split('\n').map(line => line.trimEnd()).join('\n');
-        return normalized;
-    };
-
-    // --- EFFECT 1: Fetch all epoch names on initial mount ---
     useEffect(() => {
-        const fetchIRData = async () => {
+        if (!selectedEpochName) {
+            setIrData(null);
+            setLoading(false);
+            setError(null);
+            return;
+        }
+
+        const fetchIRDataForEpoch = async (epochName: string) => {
             try {
                 setLoading(true);
                 setError(null);
-                setIrBefore(''); // Clear previous state
-                setIrAfter('');
-                setCurrentEpochName(null);
-
-                // step 1: Fetch all epoch names
-                const namesResponse = await fetch(`${API_BASE_URL}/epochs`); // TODO: Do I need these checks? Or should I remove
-                if (!namesResponse.ok) throw new Error(`HTTP error fetching epoch names! status: ${namesResponse.status}`);
-                const names: string[] = await namesResponse.json();
-
-                if (names.length === 0) {
-                    setError("No analysis epochs found.");
-                    setLoading(false);
-                    return; // Exit if no epochs
-                }
-
-                // Step 2: Set the first epoch name and fetch its IR data
-                const firstEpoch = names[0]; // TODO: to be changed to just epoch name...
-                setCurrentEpochName(firstEpoch); // This will trigger the useLayoutEffect later
 
                 const [beforeResponse, afterResponse, proceduresResponse] = await Promise.all([
-                    fetch(`${API_BASE_URL}/ir/${firstEpoch}/before`),
-                    fetch(`${API_BASE_URL}/ir/${firstEpoch}/after`),
-                    fetch(`${API_BASE_URL}/ir/${firstEpoch}/procedures_with_lines`)
+                    fetch(`${API_BASE_URL}/ir/${epochName}/before`),
+                    fetch(`${API_BASE_URL}/ir/${epochName}/after`),
+                    fetch(`${API_BASE_URL}/ir/${epochName}/procedures_with_lines`)
                 ]);
 
-                if (!beforeResponse.ok) throw new Error(`HTTP error fetching before IR for ${firstEpoch}! status: ${beforeResponse.status}`);
-                if (!afterResponse.ok) throw new Error(`HTTP error fetching after IR for ${firstEpoch}! status: ${afterResponse.status}`);
+                if (!beforeResponse.ok) throw new Error(`HTTP error fetching before IR for ${epochName}! status: ${beforeResponse.status}`);
+                if (!afterResponse.ok) throw new Error(`HTTP error fetching after IR for ${epochName}! status: ${afterResponse.status}`);
                 if (!proceduresResponse.ok) throw new Error(`HTTP error fetching procedures! status: ${proceduresResponse.status}`);
 
                 const beforeText: string = await beforeResponse.text();
                 const afterText: string = await afterResponse.text();
                 const proceduresData: ProcedureLocation[] = await proceduresResponse.json();
 
-                console.log("Before IR:", beforeText);
-                console.log("After IR:", afterText);
-                console.log("Procedures Data:", proceduresData);
+                console.log(`Fetched data for epoch: ${epochName}`);
 
-                const beforeTextSerialised = normalizeText(beforeText);
-                const afterTextSerialised = normalizeText(afterText);
+                setIrData({
+                    before: beforeText,
+                    after: afterText,
+                    procedures: proceduresData,
+                    epochName: epochName
+                });
 
-                // TODO: Could I just call the Diff code right here, make it cleaner...?
-
-                setIrBefore(beforeTextSerialised);
-                setIrAfter(afterTextSerialised);
-                setProcedureList(proceduresData)
-
-            } catch (err: any) { // Type 'any' for simpler error handling, refine as needed
-                console.error("Error fetching analysis data:", err);
-                setError(`Error fetching data: ${err.message}`);
-                setIrBefore('');
-                setIrAfter('');
-                setCurrentEpochName(null);
+            } catch (err: any) {
+                console.error(`Error fetching analysis data for ${epochName}:`, err);
+                setError(`Error fetching data for ${epochName}: ${err.message}`);
+                setIrData(null);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchIRData().catch(err => { // TODO: Maybe I don't need this - Should chaneg this later
-            console.error("Unhandled promise rejection in fetchIRData:", err);
-        });
-    }, []);
-
-    useEffect(() => {
-        console.log(`Context lines changed to: ${contextLines}`);
-    }, [contextLines]);
-
-    useEffect(() => {
-        console.log(`Output format switched to: ${outputFormat}`);
-    }, [outputFormat]);
+        fetchIRDataForEpoch(selectedEpochName); // Call the fetch function
+    }, [selectedEpochName]);
 
 
     const scrollToLine = (lineNumber: number) => {
 
         if (diffContainerRef.current) {
-            const lineNumbers = diffContainerRef.current.querySelectorAll('.d2h-code-side-linenumber');
+            const lineNumbers = diffContainerRef.current.querySelectorAll(
+                '.d2h-code-side-linenumber, .d2h-code-linenumber .line-num2'
+            );
             let targetLineElement = null;
             lineNumbers.forEach(td => {
-                // Trim to remove leading/trailing spaces from the text content
                 // @ts-ignore --> // TODO: Might be null
                 if (td.textContent.trim() === String(lineNumber)) {
                     targetLineElement = td;
-                    // You might need more logic here if line numbers can repeat or if
-                    // you need to distinguish between left/right side or added/deleted
-                    // based on other classes.
-                } // TODO: This works, below doesn't
+                }
             });
 
             if (targetLineElement) {
@@ -177,17 +147,23 @@ export function DiffViewer() {
                 } else {
                     console.warn(`No suitable line found to scroll to, neither exact nor a previous one.`);
                 }
-                // --- End of logic for "go to the line above it that exists" ---
             }
         }
     };
 
-    // --- useLayoutEffect for rendering the diff ---
+    useEffect(() => {
+        console.log(`Context lines changed to: ${contextLines}`);
+    }, [contextLines]);
+
+    useEffect(() => {
+        console.log(`Output format switched to: ${outputFormat}`);
+    }, [outputFormat]);
+
     useLayoutEffect(() => {
         const diffContainer = diffContainerRef.current; // Use the ref directly
 
         // Only render diff if data is available and not in loading/error state
-        if (!currentEpochName || !irBefore || !irAfter || !diffContainer) {
+        if (!irData || !irData.before || !irData.after || !diffContainer) {
             const targetElement = document.getElementById('diff-container');
             if (targetElement) targetElement.innerHTML = '';
             return;
@@ -196,14 +172,15 @@ export function DiffViewer() {
         const diffText = Diff.createTwoFilesPatch(
             'IR-Before',
             'IR-After',
-            irBefore,
-            irAfter,
-            `IR Before Transform (${currentEpochName || 'N/A'})`, // Use currentEpochName here
-            `IR After Transform (${currentEpochName || 'N/A'})`,
+            irData?.before,
+            irData?.after,
+            `IR Before Transform (${irData?.epochName || 'N/A'})`,
+            `IR After Transform (${irData?.epochName || 'N/A'})`,
             {
                 context: contextLines,
             }
         );
+        // console.log("Generated diffText:", diffText);
 
         diffContainer.innerHTML = '';
         const ui = new Diff2HtmlUI(diffContainer, diffText, {
@@ -230,7 +207,6 @@ export function DiffViewer() {
                     console.log("useLayoutEffect: Header element cleared.");
                 }
 
-                // Prism syntax custom highlighting
                 requestAnimationFrame(() => { // TODO: Nested good?
                     const lines = diffContainer.querySelectorAll('.d2h-code-line-ctn');
                     lines.forEach(line => {
@@ -256,7 +232,7 @@ export function DiffViewer() {
                 console.error("Error during diff rendering or highlighting:", error);
             }
         });
-    }, [irBefore, irAfter, contextLines, outputFormat, currentEpochName]); // TODO: Header can't be here??? Why?
+    }, [irData, contextLines, outputFormat]);
 
     // --- Conditional rendering: these checks must come AFTER all hooks ---
     if (loading) {
@@ -265,6 +241,10 @@ export function DiffViewer() {
 
     if (error) {
         return <div className="p-4 text-center text-red-500">Error: {error}</div>;
+    }
+
+    if (!selectedEpochName) {
+        return <div className="flex-1 p-4 text-center">Please select an epoch from the sidebar.</div>;
     }
 
     return (
@@ -276,8 +256,8 @@ export function DiffViewer() {
                 setOutputFormat={setOutputFormat}
                 contextLines={contextLines}
                 setContextLines={setContextLines}
-                procedureList={procedureList} // Pass procedure list to controls
-                onSelectProcedure={scrollToLine} // Pass the scroll function
+                procedureList={irData?.procedures || []}
+                onSelectProcedure={scrollToLine}
             />
         </>
     );

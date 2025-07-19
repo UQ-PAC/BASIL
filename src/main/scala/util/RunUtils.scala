@@ -753,9 +753,20 @@ object RunUtils {
     val newLoops = foundLoops.reducibleTransformIR()
     newLoops.updateIrWithLoops()
 
+    // --- START OF NEW EPOCH SECTION: AFTER GUARD OPTIMIZATIONS ---
+    val beforeNormaliseBlockNamesProg = IRToDSL.convertProgram(program).resolve
+    // --- END OF AFTER EPOCH SECTION ---
+    
     for (p <- program.procedures) {
       p.normaliseBlockNames()
     }
+
+    // --- START OF NEW EPOCH SECTION: AFTER GUARD OPTIMIZATIONS ---
+    collectedEpochs.foreach { buffer =>
+      val afterNormaliseBlockNamesProg = IRToDSL.convertProgram(program).resolve
+      buffer += IREpoch("normalise_block_names", beforeNormaliseBlockNamesProg, afterNormaliseBlockNamesProg)
+    }
+    // --- END OF AFTER EPOCH SECTION ---
 
     ctx.program.sortProceduresRPO()
 
@@ -771,10 +782,21 @@ object RunUtils {
 
     // example of printing a simple analysis
 
+    // --- START OF NEW EPOCH SECTION: BEFORE GUARD OPTIMIZATIONS ---
+    val beforeBlockCleaningProgram = IRToDSL.convertProgram(program).resolve // Capture BEFORE state
+    // --- END OF AFTER EPOCH SECTION ---
+
     transforms.removeEmptyBlocks(program)
     transforms.coalesceBlocks(program)
     transforms.removeEmptyBlocks(program)
 
+    // --- START OF NEW EPOCH SECTION: AFTER GUARD OPTIMIZATIONS ---
+    collectedEpochs.foreach { buffer =>
+      val afterBlockCleaningProgram = IRToDSL.convertProgram(program).resolve // Capture AFTER state
+      buffer += IREpoch("block_cleaning", beforeBlockCleaningProgram, afterBlockCleaningProgram)
+    }
+    // --- END OF AFTER EPOCH SECTION ---
+    
     // transforms.coalesceBlocksCrossBranchDependency(program)
     config.foreach {
       _.analysisDotPath.foreach { s =>
@@ -960,12 +982,23 @@ object RunUtils {
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
     assert(invariant.correctCalls(ctx.program))
-
+    
+    // --- START OF NEW EPOCH SECTION: AFTER GUARD OPTIMIZATIONS ---
+    val beforeStaticAnalysisProg = IRToDSL.convertProgram(ctx.program).resolve
+    // --- END OF AFTER EPOCH SECTION ---
+    
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-before-analysis.il"), pp_prog(ctx.program)))
     val analysis = q.staticAnalysis.map { conf =>
       staticAnalysis(conf, ctx)
     }
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
+
+    // --- START OF NEW EPOCH SECTION: AFTER GUARD OPTIMIZATIONS ---
+    val afterStaticAnalysisProg = IRToDSL.convertProgram(ctx.program).resolve
+    collectedEpochs.foreach { buffer =>
+      buffer += IREpoch("static_analysis", beforeStaticAnalysisProg, afterStaticAnalysisProg)
+    }
+    // --- END OF AFTER EPOCH SECTION ---
 
     assert(ir.invariant.programDiamondForm(ctx.program))
     ir.eval.SimplifyValidation.validate = conf.validateSimp
