@@ -12,6 +12,7 @@ function App() {
     const [selectedEpochName, setSelectedEpochName] = useState<string | null>(null);
     const [loadingEpochs, setLoadingEpochs] = useState(true);
     const [epochError, setEpochError] = useState<string | null>(null);
+    const [selectedProcedureName, setSelectedProcedureName] = useState<string | null>(null); // New state
 
     useEffect(() => {
         const fetchEpochNames = async () => {
@@ -51,6 +52,21 @@ function App() {
         }
     }, [selectedEpochName]);
 
+    useEffect(() => {
+        const fetchProcedureNames = async () => {
+            if (!selectedEpochName) {
+                setSelectedProcedureName(null);
+                return;
+            }
+            // TODO: I have my specific code here to do that. Ensure there is a button to select them here. Or maybe do this on CfgViewer
+            // setSelectedProcedureName("SimpleCfg")
+            setSelectedProcedureName("register_tm_clones_1664")
+            // ... fetch procedure names for selectedEpochName ...
+            // And then set selectedProcedureName, e.g., to the first one
+        };
+        fetchProcedureNames();
+    }, [selectedEpochName]);
+
     return (
         <div className="app-layout">
             <Header setViewMode={setViewMode} viewMode={viewMode} />
@@ -65,7 +81,10 @@ function App() {
               {viewMode === 'IR' ? (
                   <DiffViewer selectedEpochName={selectedEpochName} />
               ) : (
-                  <CfgViewer /> // Pass the selected Epoch here as well later on...
+                  <CfgViewer
+                      selectedEpochName={selectedEpochName}
+                      selectedProcedureName={selectedProcedureName || ''}
+                  />
               )}
             </main>
         </div>

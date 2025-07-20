@@ -12,6 +12,9 @@ import ir.Program
 import ir.dotBlockGraph
 import translating.PrettyPrinter
 
+import java.util.regex.Pattern
+import java.lang.StringBuilder
+
 import scala.collection.mutable.ArrayBuffer
 
 import org.slf4j.LoggerFactory
@@ -189,7 +192,7 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean]) {
     case GET -> Root / "ir" / epochName / "procedures_with_lines" =>
       ensureReady {
         logger.info(s"Received GET /ir/$epochName/procedures_with_lines request.")
-        
+
         epochStore.getEpoch(epochName)
           .flatMap {
             case Some(epoch) =>
@@ -230,9 +233,48 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean]) {
    */
   private def generateDotGraphs(program: Program): Map[String, String] = {
     program.procedures.map { proc =>
-      val dotOutput = dotBlockGraph(proc)
-      proc.name -> dotOutput
+      val originalDotOutput = dotBlockGraph(proc)
+      val cleanedDotOutput = removeFontAttributes(originalDotOutput)
+      proc.name -> cleanedDotOutput
     }.toMap
+  }
+
+  /**
+   * Removes 'fontname' and 'fontsize' attributes from node definitions in a DOT graph string.
+   * This is a post-processing step if the graph generation function cannot be modified directly.
+   *
+   * @param dotString The input DOT graph string.
+   * @return The DOT graph string with font attributes removed.
+   */
+  private def removeFontAttributes(dotString: String): String = {
+    // Regex to find fontname="...", fontsize="..." or similar attributes inside node definitions.
+    // It looks for any attribute that starts with 'fontname=' or 'fontsize='
+    // within square brackets [] of a node definition.
+    // The '?:' makes the group non-capturing.
+    val fontAttributePattern = Pattern.compile(
+      """\s*(?:fontname="[^"]+"|fontsize="\d+(?:\.\d+)?"|fontname=[a-zA-Z0-9_]+|fontsize=\d+(?:\.\d+)?)\s*""",
+      Pattern.CASE_INSENSITIVE
+    )
+
+    val matcher = fontAttributePattern.matcher(dotString)
+    val sb = new StringBuilder()
+
+    while (matcher.find()) {
+      val matchedGroup = matcher.group()
+      matcher.appendReplacement(sb, "") // Replace the found attribute with an empty string
+    }
+    matcher.appendTail(sb) 
+
+    var cleanedString = sb.toString()
+
+    // Post-clean up: Remove any resulting double commas or leading/trailing commas inside attributes lists
+    cleanedString = cleanedString.replaceAll(",\\s*,", ",") // Replace ", ," with ","
+    cleanedString = cleanedString.replaceAll("\\[\\s*,", "[") // Replace "[ ," with "["
+    cleanedString = cleanedString.replaceAll(",\\s*\\]", "]") // Replace ", ]" with "]"
+    cleanedString = cleanedString.replaceAll("[\t ]+\\]", "]") // Remove leading space before ] if it resulted from a removed attribute
+    cleanedString = cleanedString.replaceAll("\\[[\t ]+", "[") // Remove trailing space after [ if it resulted from a removed attribute
+
+    cleanedString
   }
 
   private def ensureReady(action: IO[Response[IO]]): IO[Response[IO]] =
