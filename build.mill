@@ -24,7 +24,7 @@ import com.goyeau.mill.scalafix.ScalafixModule
 object `package` extends RootModule with ScalaModule with BasilDocs with BasilVersion with ScalafixModule {
   // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
-  override def scalaVersion = "3.3.6"
+  override def scalaVersion = "3.3.5"
 
   override def ammoniteVersion = "3.0.2"
 
