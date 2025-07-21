@@ -1,5 +1,6 @@
 // package scala
 
+import gtirb.GTIRBReadELF
 import mainargs.{Flag, ParserForClass, arg, main}
 import util.boogie_interaction.BoogieResultKind
 import util.{
@@ -399,12 +400,14 @@ object Main {
         val realRelfFile = loadingInputs.relfFile
 
         Logger.setLevel(LogLevel.DEBUG)
-        val (relf, gtirb) = (realRelfFile, gtirbRelfFile) match {
-          case (Some(relfFile), _) =>
-            val (a, b) = IRLoading.loadReadELFWithGTIRB(relfFile, loadingInputs)
-            (Some(a), b)
-          case (None, Some(_)) => (None, Some(IRLoading.loadGTIRBReadELF(loadingInputs)))
-          case _ => throw IllegalArgumentException("--dump-relf requires either --relf or a GTIRB input")
+        val (relf, gtirb) = GTIRBReadELF.withWarnings {
+          (realRelfFile, gtirbRelfFile) match {
+            case (Some(relfFile), _) =>
+              val (a, b) = IRLoading.loadReadELFWithGTIRB(relfFile, loadingInputs)
+              (Some(a), b)
+            case (None, Some(_)) => (None, Some(IRLoading.loadGTIRBReadELF(loadingInputs)))
+            case _ => throw IllegalArgumentException("--dump-relf requires either --relf or a GTIRB input")
+          }
         }
 
         // skip writing files if the given path is an empty string. this checks compatibility and exits.
@@ -474,7 +477,9 @@ object Main {
 
     Logger.info(programNameVersionHeader)
 
-    val result = RunUtils.run(q)
+    val result = GTIRBReadELF.withWarnings {
+      RunUtils.run(q)
+    }
     if (conf.verify.value) {
       assert(result.boogie.nonEmpty)
       var failed = false
