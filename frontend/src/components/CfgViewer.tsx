@@ -18,6 +18,9 @@ import { API_BASE_URL } from '../api';
 import { Graphviz } from "@hpcc-js/wasm-graphviz";
 import { getLayoutedElements } from '../utils/GraphLayout';
 
+import CustomNode from './CustomNode';
+import { type CustomNodeData } from './CustomNode';
+
 const FIT_VIEW_OPTIONS: FitViewOptions = {
     padding: 0.2,
 };
@@ -41,10 +44,12 @@ interface CfgViewerProps {
     selectedProcedureName: string | null;
 }
 
+const nodeTypes = { customNode: CustomNode };
+
 const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName, selectedProcedureName }) => {
-    const [beforeNodes, setBeforeNodes, onBeforeNodesChange] = useNodesState<Node>([]);
+    const [beforeNodes, setBeforeNodes, onBeforeNodesChange] = useNodesState<Node<CustomNodeData>>([]);
     const [beforeEdges, setBeforeEdges, onBeforeEdgesChange] = useEdgesState<Edge>([]);
-    const [afterNodes, setAfterNodes, onAfterNodesChange] = useNodesState<Node>([]);
+    const [afterNodes, setAfterNodes, onAfterNodesChange] = useNodesState<Node<CustomNodeData>>([]);
     const [afterEdges, setAfterEdges, onAfterEdgesChange] = useEdgesState<Edge>([]);
 
     const [loading, setLoading] = useState(false);
@@ -180,6 +185,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName, selectedProced
                                 proOptions={{ hideAttribution: true }}
                                 minZoom={0.3} // TODO: Convert to const
                                 maxZoom={3}
+                                nodeTypes={nodeTypes}
                             >
                                 <MiniMap />
                                 <Controls />
@@ -206,6 +212,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName, selectedProced
                                 proOptions={{ hideAttribution: true }}
                                 minZoom={0.3} // TODO: Convert to const
                                 maxZoom={3}
+                                nodeTypes={nodeTypes}
                             >
                                 <MiniMap />
                                 <Controls />

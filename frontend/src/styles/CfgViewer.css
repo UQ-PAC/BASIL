@@ -73,100 +73,13 @@
     align-items: center;
     justify-content: center;
     text-align: left;
-    white-space: pre-wrap;
+    white-space: nowrap;
     word-break: break-all;
     color: black;
     box-sizing: border-box; /* Keep this, it's crucial */
-
 }
 
 /* Specific styling for selected nodes */
 .react-flow__node.selected {
     border: 2px solid #007bff; /* This border change is often the trigger */
 }
-
-/* --- IMPORTANT: Add rules for React Flow's internal pan/zoom elements --- */
-/* These are the elements React Flow transforms for panning/zooming. */
-/* Ensure no other CSS is interfering with them. */
-/*.react-flow__pane,*/
-/*.react-flow__viewport {*/
-/*    transform: unset !important; !* Extremely important: React Flow sets this inline *!*/
-/*    left: auto !important;       !* Prevent absolute positioning conflicts *!*/
-/*    top: auto !important;        !* Prevent absolute positioning conflicts *!*/
-/*    margin: 0 !important;        !* Prevent margin pushing the content *!*/
-/*    width: auto !important;      !* Prevent fixed widths from conflicting with scaling *!*/
-/*    height: auto !important;     !* Prevent fixed heights from conflicting with scaling *!*/
-/*}*/
-/* Specific styling for the 'box' shape if you use a custom node type for it */
-/* If you use 'default' type for all, then the general .react-flow__node will apply.
-   You could add a class to the node's data if you wanted different styles for 'box'
-   without a custom node type.
-.react-flow__node.box-shape {
-  border-color: #007bff;
-  background-color: #e6f2ff;
-}
-*/
-
-/*!* --- React Flow Edge Styling --- *!*/
-/*!* You can style different edge types if you have them *!*/
-/*.react-flow__edge {*/
-/*    stroke-width: 1.5px;*/
-/*    stroke: #5a5a5a;*/
-/*}*/
-
-/*!* --- Diffing Styles (Future Use) --- *!*/
-/*!**/
-/*  These are placeholder styles for when you implement the diffing logic.*/
-/*  You would add classes like 'node-added', 'node-removed', 'node-changed'*/
-/*  directly to your React Flow Node objects based on your comparison.*/
-/**!*/
-/*.react-flow__node.node-added {*/
-/*    background-color: #e6ffe6; !* Light green *!*/
-/*    border-color: #4CAF50; !* Green border *!*/
-/*    box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);*/
-/*}*/
-
-/*.react-flow__node.node-removed {*/
-/*    background-color: #ffe6e6; !* Light red *!*/
-/*    border-color: #f44336; !* Red border *!*/
-/*    box-shadow: 0 0 8px rgba(244, 67, 54, 0.5);*/
-/*}*/
-
-/*.react-flow__node.node-changed {*/
-/*    background-color: #fffbe6; !* Light yellow *!*/
-/*    border-color: #ffc107; !* Yellow border *!*/
-/*    box-shadow: 0 0 8px rgba(255, 193, 7, 0.5);*/
-/*}*/
-
-/*.react-flow__edge.edge-added {*/
-/*    stroke: #4CAF50;*/
-/*    stroke-dasharray: 5 5; !* Dashed line for added edges *!*/
-/*}*/
-
-/*.react-flow__edge.edge-removed {*/
-/*    stroke: #f44336;*/
-/*    stroke-dasharray: 2 2; !* Dotted line for removed edges *!*/
-/*}*/
-
-/*.react-flow__edge.edge-changed {*/
-/*    stroke: #ffc107;*/
-/*    stroke-dasharray: 8 2; !* Custom dash for changed edges *!*/
-/*}*/
-
-/*!* Additional styling for controls, minimap etc. (optional) *!*/
-/*.react-flow__controls {*/
-/*    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);*/
-/*}*/
-
-/*.react-flow__minimap {*/
-/*    background-color: #f0f0f0;*/
-/*}*/
-
-/*!* Ensure body and html are full height for the viewport height calculation to work *!*/
-/*html, body, #root {*/
-/*    margin: 0;*/
-/*    padding: 0;*/
-/*    height: 100%;*/
-/*    font-family: Arial, sans-serif;*/
-/*    overflow: hidden; !* Hide scrollbars on main body if React Flow handles them *!*/
-/*}*/
