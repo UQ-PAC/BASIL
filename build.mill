@@ -104,18 +104,9 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
       } else { super.forkEnv() }
     }
 
-    // note: toBoolean accepts precisely "true" or "false"
-    def basilTestParallel = Task.Input {
-      Task.env.get("BASIL_TEST_PARALLEL").fold(false)(_.toBoolean)
-    }
-
+    override def testParallelism = false
     override def testForkGrouping = Task {
-      val numGroups = 13
-      if (basilTestParallel()) {
-        discoveredTestClasses().zipWithIndex.groupMap(x => x._2 % numGroups)(_._1).values.toSeq
-      } else {
-        Seq(discoveredTestClasses())
-      }
+      Seq(discoveredTestClasses())
     }
   }
 
