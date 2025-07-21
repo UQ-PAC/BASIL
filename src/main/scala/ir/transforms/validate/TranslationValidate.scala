@@ -43,8 +43,6 @@ import scala.collection.mutable.ArrayBuffer
  * CFA conversion of basil ir programs
  */
 
-
-
 type CutLabel = String
 type BlockID = String
 
@@ -52,7 +50,6 @@ type BlockID = String
  * Describes the mapping from source variable to target expression at a given Block ID in the source program.
  */
 type TransformDataRelationFun = Option[BlockID] => (Variable | Memory) => Option[Expr]
-
 
 def boolAnd(exps: Iterable[Expr]) =
   val l = exps.toList
@@ -428,9 +425,9 @@ class TranslationValidator {
     }
 
   }
-  */
+   */
 
- /*
+  /*
   def setEqualVarsInvariantX() = {
 
     // call this after running transform so initProg corresponds to the source / after program.
@@ -486,15 +483,13 @@ class TranslationValidator {
       addInvariant(p.name, inv)
     }
   }
-  */
+   */
 
-
- /**
+  /**
   *
   * Maps a input or output dependnecy of a call to a variable representing it in the TV
   */
   case class CallParamMapping(lhs: List[(Variable | Memory, Variable)], rhs: List[(Variable | Memory, Variable)])
-
 
   /**
    *
@@ -506,7 +501,9 @@ class TranslationValidator {
    * This is awful and convoluted and im tired
    *
    */
-  def matchTargetCallInSource(expected: (CallParamMapping, CallParamMapping))(callLHS: List[(Variable | Memory, Variable)], callRHS: List[(Variable | Memory, Expr)]) = {
+  def matchTargetCallInSource(
+    expected: (CallParamMapping, CallParamMapping)
+  )(callLHS: List[(Variable | Memory, Variable)], callRHS: List[(Variable | Memory, Expr)]) = {
 
     val (expSource, expTgt) = expected
     println(callRHS)
@@ -518,8 +515,8 @@ class TranslationValidator {
         x.collect {
           case ((origS, mapS), (origT, mapT)) if origT == formal => ((origS, origT), actual)
         }.toList match {
-          case h::Nil => Seq(h)
-          case h::tl  => {
+          case h :: Nil => Seq(h)
+          case h :: tl => {
             Logger.warn("multiple guys")
             Seq(h)
           }
@@ -538,8 +535,8 @@ class TranslationValidator {
         x.collect {
           case ((origS, mapS), (origT, mapT)) if origT == formal => (origS, actual)
         }.toList match {
-          case h::Nil => Seq(h)
-          case h::tl  => {
+          case h :: Nil => Seq(h)
+          case h :: tl => {
             Logger.warn("multiple guys")
             Seq(h)
           }
@@ -553,11 +550,9 @@ class TranslationValidator {
 
     (lhs, rhs)
 
-
   }
 
-
- /**
+  /**
   * We re-infer the function signature of all target program procedures based on the transform
   * described by [[renaming]], and the [[Frame]] of the source. 
   *
@@ -578,7 +573,7 @@ class TranslationValidator {
   * pure function. Assuming we ensure invariants are not valid or false. 
   *
   */
-  def getFunctionSigsRenaming(renaming: TransformDataRelationFun) : Map[String, (CallParamMapping, CallParamMapping)]= {
+  def getFunctionSigsRenaming(renaming: TransformDataRelationFun): Map[String, (CallParamMapping, CallParamMapping)] = {
     import SideEffectStatementOfStatement.*
 
     val traceOut = LocalVar("trace", BoolType) -> globalTraceVar
@@ -594,8 +589,9 @@ class TranslationValidator {
 
       // val frame = beforeFrame(p.name)
 
-      val lhs : List[Variable | Memory] = p.formalOutParam.toList ++ frame.modifiedGlobalVars.toList ++ frame.modifiedMem.toList
-      val rhs : List[Variable | Memory] =  p.formalInParam.toList ++ frame.readGlobalVars.toList ++ frame.readMem.toList
+      val lhs: List[Variable | Memory] =
+        p.formalOutParam.toList ++ frame.modifiedGlobalVars.toList ++ frame.modifiedMem.toList
+      val rhs: List[Variable | Memory] = p.formalInParam.toList ++ frame.readGlobalVars.toList ++ frame.readMem.toList
 
       val lhsSrc = lhs.map(param)
       val rhsSrc = rhs.map(param)
@@ -606,23 +602,22 @@ class TranslationValidator {
       (CallParamMapping(lhsSrc, rhsSrc), CallParamMapping(lhsTgt, rhsTgt))
     }
 
-
     val params = initProg.get.procedures.map(p => p.name -> getParams(p, afterFrame.getOrElse(p.name, Frame()))).toMap
-    val paramsBef = initProgBefore.get.procedures.map(p => p.name -> getParams(p, afterFrame.getOrElse(p.name, Frame()))._1).toMap
-
+    val paramsBef =
+      initProgBefore.get.procedures.map(p => p.name -> getParams(p, afterFrame.getOrElse(p.name, Frame()))._1).toMap
 
     for ((pname, targetParams) <- paramsBef) {
       val afterParams = params(pname)
 
-      val r = matchTargetCallInSource(afterParams)(targetParams.lhs.map((o, a) => (o, LocalVar("no", BoolType))), targetParams.rhs.map((o, a) => (o, FalseLiteral)))
-
-
+      val r = matchTargetCallInSource(afterParams)(
+        targetParams.lhs.map((o, a) => (o, LocalVar("no", BoolType))),
+        targetParams.rhs.map((o, a) => (o, FalseLiteral))
+      )
 
       println(s"expect PARAMS: $pname" + params(pname))
       println(s"zipped params $pname: " + r)
 
     }
-
 
     println(params)
 
@@ -670,7 +665,14 @@ class TranslationValidator {
     // val outparams = p.formalOutParam.toList.map(p => CompatArg(p, p))
     // TODO: can probably just set at entry and let the liveness sort the rest out?
     val globalsInvEverywhere =
-      afterCuts.find(_._1.name == p.name).get._2.cutLabelBlockInProcedure.keys.map(c => Inv.CutPoint(c, globals.toList)).toList
+      afterCuts
+        .find(_._1.name == p.name)
+        .get
+        ._2
+        .cutLabelBlockInProcedure
+        .keys
+        .map(c => Inv.CutPoint(c, globals.toList))
+        .toList
 
     val source = afterCuts.find((k, v) => k.name == p.name).get._1
     val target = beforeCuts.find((k, v) => k.name == p.name).get._1
@@ -776,7 +778,7 @@ class TranslationValidator {
     blockTraceVars: Map[String, Expr],
     renaming: TransformDataRelationFun = _ => e => Some(e),
     sourceEntry: String,
-    targetEntry: String,
+    targetEntry: String
   ) = {
     val eval = prover.getEvaluator()
 
@@ -811,7 +813,6 @@ class TranslationValidator {
       }
     }
 
-
     case object Conj {
       def unapply(e: Expr): Option[List[Expr]] = e match {
         case BinaryExpr(BoolAND, a, b) => Some(List(a, b))
@@ -843,7 +844,7 @@ class TranslationValidator {
       }
     }
 
-    def getTrace(starting: String) : Unit = {
+    def getTrace(starting: String): Unit = {
 
       var b = combinedProc.blocks.find(_.label == starting).get
 
@@ -860,8 +861,7 @@ class TranslationValidator {
 
       var indent = 0
 
-
-      def pt(b: Block, indent: Int = 0) : Unit = {
+      def pt(b: Block, indent: Int = 0): Unit = {
         if (isReached(b)) {
           println(" ".repeat(indent * 2) + b.label)
         }
@@ -888,12 +888,13 @@ class TranslationValidator {
           val vars = freeVarsPos(a).filter(v => v.name.startsWith("source__") || v.name.startsWith("target__"))
           val pcomment = a.comment.getOrElse("")
           val blockLabel = Some(afterRenamer.stripNamespace(s.parent.label))
-          val compar = vars.filter(_.name.startsWith("source__"))
+          val compar = vars
+            .filter(_.name.startsWith("source__"))
             .map(b =>
               val name = b.name.stripPrefix("source__").stripPrefix("target__")
               val (sv, tv) = b match {
-                case GlobalVar(v, ty) =>  {
-                  val s = GlobalVar(name, ty) 
+                case GlobalVar(v, ty) => {
+                  val s = GlobalVar(name, ty)
                   val t = (renaming(blockLabel)(s)).getOrElse(s)
                   (exprInSource(s), exprInTarget(t))
                 }
@@ -946,7 +947,8 @@ class TranslationValidator {
    */
   def getValidationSMT(
     invariantRenamingSrcTgt: Option[String] => (Variable | Memory) => Option[Expr] = _ => e => Some(e),
-    filePrefix: String = "tvsmt/"): Unit = {
+    filePrefix: String = "tvsmt/"
+  ): Unit = {
 
     var splitCandidates = Map[Procedure, ArrayBuffer[GoTo]]()
 
@@ -958,11 +960,9 @@ class TranslationValidator {
       .filter(n => beforeFrame.contains(n.name))
       .filter(n => afterFrame.contains(n.name))
 
-
     val paramMapping = getFunctionSigsRenaming(invariantRenamingSrcTgt)
 
     for (proc <- interesting) {
-
 
       timer.checkPoint(s"TVSMT $filePrefix ${proc.name}")
       val source = afterProg.get.procedures.find(_.name == proc.name).get
@@ -1117,7 +1117,15 @@ class TranslationValidator {
             )
             .toMap
 
-          val g = processModel(newProg.mainProcedure, prover, primedInv.toList, traces, invariantRenamingSrcTgt, source.entryBlock.get.label, target.entryBlock.get.label)
+          val g = processModel(
+            newProg.mainProcedure,
+            prover,
+            primedInv.toList,
+            traces,
+            invariantRenamingSrcTgt,
+            source.entryBlock.get.label,
+            target.entryBlock.get.label
+          )
 
           Logger.writeToFile(File(s"${filePrefix}counterexample-combined-${proc.name}.dot"), g)
           // extract model
@@ -1132,7 +1140,7 @@ class TranslationValidator {
     // }
 
     timer.checkPoint("Finishehd tv pass")
-   //  smtQueries
+    //  smtQueries
   }
 
 }
