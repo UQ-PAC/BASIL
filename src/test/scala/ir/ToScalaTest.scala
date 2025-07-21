@@ -23,6 +23,13 @@ class ToScalaTest extends AnyFunSuite with CaptureOutput with TimeLimitedTests w
     super.beforeEach(testData)
   }
 
+  // XXX: work around https://github.com/scala/scala3/issues/23578 / https://github.com/scala/scala3/issues/22968
+  // until 3.3.7
+  inline def inlineAssertCompiles(s: String) =
+    assertCompiles(s)
+  inline def inlineAssertTypeError(s: String) =
+    assertTypeError(s)
+
   val program: Program = prog(
     proc(
       "main",
@@ -288,7 +295,7 @@ prog(
 
   test("toscala macro compilation") {
     // derive with exclusions
-    assertCompiles("""
+    inlineAssertCompiles("""
 enum EAAA {
   case A
   case B
@@ -297,7 +304,7 @@ given ToScala[EAAA] = ToScala.deriveWithExclusions[EAAA, EAAA.A.type](ToScala.Ma
       """)
 
     // exclusion type should be a subtype of base type
-    assertTypeError("""
+    inlineAssertTypeError("""
 enum EAAA {
   case A
   case B
@@ -306,7 +313,7 @@ given ToScala[EAAA] = ToScala.deriveWithExclusions[EAAA, Any](???)
       """)
 
     // recursive
-    assertCompiles("""
+    inlineAssertCompiles("""
 given ToScala[Int] = ToScala.MakeString(_.toString)
 
 sealed trait Y derives ToScala
@@ -319,7 +326,7 @@ case class X3() extends X
 """)
 
     // missing instance for Double
-    assertTypeError("""
+    inlineAssertTypeError("""
 given ToScala[Int] = ToScala.MakeString(_.toString)
 
 sealed trait L derives ToScala
@@ -328,7 +335,7 @@ case class C(x: Int, l: L, d: Double) extends L
       """)
 
     // as above but with Double present
-    assertCompiles("""
+    inlineAssertCompiles("""
 given ToScala[Int] = ToScala.MakeString(_.toString)
 given ToScala[Double] = ToScala.MakeString(_.toString)
 
@@ -338,13 +345,13 @@ case class C(x: Int, l: L, d: Double) extends L
       """)
 
     // type that appears in its own constructor
-    assertTypeError("""
+    inlineAssertTypeError("""
 sealed trait T derives ToScala
 case class A(a: A) extends T
       """)
 
     // large number of cases
-    assertCompiles("""
+    inlineAssertCompiles("""
 sealed trait ASD derives ToScala
 case class A() extends ASD
 case class A1() extends ASD

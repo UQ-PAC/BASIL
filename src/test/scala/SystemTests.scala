@@ -273,7 +273,6 @@ class SystemTestsGTIRB extends SystemTests {
 
 @test_util.tags.StandardSystemTest
 class SystemTestsGTIRBOfflineLifter extends SystemTests {
-  override def testSuiteSuffix = ""
   runTests(
     "correct",
     TestConfig(

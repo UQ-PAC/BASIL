@@ -608,13 +608,23 @@ object SpecFixer {
     makeLocal: Boolean = false
   )(b: BExpr): BExpr = {
     val varToOld = convVarToOld(varInPre, varInPost, isPost, makeLocal)
+    val preVars = varInPre.values.toSet
+    val postVars = varInPost.values.toSet
     b match {
-      case b: BVariable if isPost && varInPost.contains(b.name) =>
-        BVariable(varInPost(b.name), b.getType, if makeLocal then Scope.Local else b.scope)
-      case b: BVariable if !isPost && varInPre.contains(b.name) =>
-        BVariable(varInPre(b.name), b.getType, if makeLocal then Scope.Local else b.scope)
-      case b: BVariable if !isPost => b
-      // case b : _ => varToOld(b)
+      case b: BVariable => {
+        if isPost && varInPost.contains(b.name) then
+          BVariable(varInPost(b.name), b.getType, if makeLocal then Scope.Local else b.scope)
+        else if !isPost && varInPre.contains(b.name) then
+          BVariable(varInPre(b.name), b.getType, if makeLocal then Scope.Local else b.scope)
+        else if !isPost && preVars.contains(b.name) then b
+        else if isPost && postVars.contains(b.name) then b
+        else {
+          val st = if isPost then "post" else "pre"
+          val ps = if isPost then "out" else "in"
+          val m = if isPost then varInPost else varInPre
+          throw Exception(s"$b var in $st state context but not in ${ps}-param set: $m")
+        }
+      }
       case b: BLiteral => b
       case b: BVExtract => b.copy(body = varToOld(b.body))
       case b: BVRepeat => b.copy(body = varToOld(b.body))
@@ -645,7 +655,8 @@ object SpecFixer {
       case b: AssocBExpr => b.copy(arg = b.arg.map(varToOld))
       case b: SpecVar => b
       case b: BVar =>
-        ???
+        // because BVar is unsealed
+        throw Exception(s"unexpected var: $b ${b.getClass.getSimpleName}")
     }
   }
 

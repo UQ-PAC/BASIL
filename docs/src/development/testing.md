@@ -21,7 +21,7 @@ See the AnyFunSuite documentation or existing test cases for syntax and examples
 
 ### Exporting IR structures into test cases
 
-The [dsl](/BASIL/development/basil-ir.html#constructing-programs-in-code) can be used to construct simple example BASIL IR programs, which can then be fed through into the whole pipeline via `IRLoading.load()` in
+The [dsl](basil-ir.md#constructing-programs-in-code) can be used to construct simple example BASIL IR programs, which can then be fed through into the whole pipeline via `IRLoading.load()` in
 
 Often, you might have found a particular Basil IR program which demonstrates some bug in the code.
 It is good practice to extract this into a test case, both to validate the fix and ensure the bug doesn't reoccur.
@@ -56,7 +56,7 @@ for more options.
 Note that the `test("test name")` method can be written anywhere within a AnyFunSuite body, including
 within loops or conditionals.
 This allows you to dynamically generate test cases, as in
-Basil's [`SystemTests`](/src/test/scala/SystemTests.scala).
+Basil's [`SystemTests`](https://github.com/UQ-PAC/BASIL/blob/main/src/test/scala/SystemTests.scala).
 This should be used sparingly.
 
 
@@ -100,7 +100,7 @@ into the test body.
 For these cases, there is a `trait TestCustomisation` to help with customising dynamically-generated tests
 based on their test case name (for system tests, this includes the file path and compiler/lifter options).
 
-To use this, the test suite class should be made to extend [TestCustomisation](/src/test/scala/test_util/TestCustomisation.scala).
+To use this, the test suite class should be made to extend [TestCustomisation](https://github.com/UQ-PAC/BASIL/blob/main/src/test/scala/test_util/TestCustomisation.scala).
 This defines an abstract method customiseTestsByName which controls the mode of each test case.
 ```scala
 @test_util.tags.UnitTest
@@ -154,7 +154,7 @@ Both of these will be output in yellow text if your console is using colour.
 
 ## Running Individual suites
 
-From git root directory run `mill test.testOnly`, tests suite names are glob matched against its argument, 
+From git root directory run `mill test.testOnly`, tests suite names are glob matched against its argument,
 for example to run all the SystemTest variants use:
 
 ```
@@ -164,21 +164,19 @@ $ ./mill test.testOnly 'SystemTests*'
 
 ### Compiling the Integration test binaries
 
-These are checked in to the respository, but can be recompiled (and new tests compiled) with the following instructions: 
+These are checked in to the respository, but can be recompiled (and new tests compiled) with the following instructions:
 
 These are the `SystemTests.scala` test case with the files present in `src/test/correct` for examples that should verify and `src/test/incorrect`
-for examples that should not verify. 
+for examples that should not verify.
 
-These are lifted via the Makefiles, to add another test simply add a directory, c source file, and optionally specification file and run 
+These are lifted via the Makefiles, to add another test simply add a directory, C source file, and optionally specification file and run
 
 ```sh
 cd src/test/
 make
 ```
 
-The `config.mk` file in the test directory can be used to exclude unnecessary compilers, and change compilation flags. 
-Full details can be found [here](https://github.com/UQ-PAC/BASIL/tree/main/src/test/readme.md).
-
+The `config.mk` file in each test directory can be used to exclude unnecessary compilers and change compilation flags.
 
 To update the expected BASIL output files from the SystemTests results run:
 

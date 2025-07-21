@@ -26,7 +26,7 @@ Alternatively, Z3 is usually available in system packages. For manual Boogie ins
 ## Lifting a single binary
 
 Many lifted examples are provided in the [tests directory][tests],
-instructions are given [here](development/readme.md) as to how to add new tests.
+instructions are given [here](development/) as to how to add new tests.
 The instructions below are for if you want to use the BASIL tool with new binary files.
 
 BASIL takes as input:
@@ -41,8 +41,8 @@ and run BASIL.
 
 **See also:** [Quickly lifting a new example](quick-lifting.md)
 
-[tests]: /src/test/correct
-[spec]: /src/test/correct/secret_write/secret_write.spec
+[tests]: https://github.com/UQ-PAC/BASIL/tree/main/src/test/correct
+[spec]: https://github.com/UQ-PAC/BASIL/blob/main/src/test/correct/secret_write/secret_write.spec
 
 ### Requirements
 
@@ -72,7 +72,7 @@ ddisasm may also be installed through its provided Docker images or
 APT repository (as of Aug 2024, only supports Ubuntu 20.04).
 You can also, of course, build any of these tools manually.
 
-See also: [development: building](development/readme.md#building)
+See also: [development: building](development/#building)
 (primarily if you are interested in building BASIL manually).
 
 ### Preparation
