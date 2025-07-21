@@ -1,26 +1,48 @@
 package API
 
+import java.lang.StringBuilder
+import java.util.regex.Pattern
+
 import cats.effect._
+import cats.implicits._
+import cats.syntax.all._
+
 import org.http4s._
 import org.http4s.dsl.io._
+import org.http4s.circe._
 
 import io.circe.generic.auto._
 import io.circe.syntax._
-import org.http4s.circe._
+
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.LoggerFactory
+import org.typelevel.log4cats.LoggerName
+//import org.typelevel.log4cats.slf4j.Slf4jFactory
 
 import ir.Program
 import ir.dotBlockGraph
 import translating.PrettyPrinter
 
-import java.util.regex.Pattern
-import java.lang.StringBuilder
+class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean])(
+  implicit asyncIO: Async[IO],
+    loggerFactory: LoggerFactory[IO]
+) {
 
-import scala.collection.mutable.ArrayBuffer
+  private val logger: Logger[IO] = loggerFactory.getLogger(LoggerName(getClass.getName))
 
-import org.slf4j.LoggerFactory
-
-class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean]) {
-  private val logger = LoggerFactory.getLogger(getClass)
+  /**
+   * Helper to ensure the server is ready before processing requests.
+   * Returns an IO[Response[IO]] for consistent error handling.
+   *
+   * *** FIX 2: Moved this method definition OUTSIDE the 'routes' method's block ***
+   */
+  private def ensureReady(action: IO[Response[IO]]): IO[Response[IO]] =
+    isReady.get.flatMap {
+      case true => action
+      case false =>
+        logger.warn("IR data is still initializing. Please try again shortly.") *>
+          ServiceUnavailable("IR data is still initializing. Please try again shortly.")
+    }
 
   /**
    * Defines the HTTP routes for the IR API.
@@ -52,24 +74,22 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean]) {
      */
     case GET -> Root / "ir" / epochName / "before" =>
       ensureReady {
-        logger.info(s"Received GET /ir/$epochName/before request.")
-
-        epochStore.getEpoch(epochName)
-          .flatMap {
-            case Some(epoch) =>
-              logger.debug(s"Found epoch '$epochName'. Attempting to pretty print 'beforeTransform'.")
-
-              IO.delay {
-                PrettyPrinter.pp_prog(epoch.beforeTransform)
-              }.flatMap { pretty =>
-                logger.info(s"Successfully pretty-printed 'beforeTransform' for epoch '$epochName'. Length: ${pretty.length}")
-                Ok(s"$pretty")
-              }.handleErrorWith { e =>
-                logger.error(s"CRITICAL ERROR: Failed to pretty-print 'beforeTransform' for epoch '$epochName': ${e.getMessage}", e)
-                InternalServerError(s"Internal Server Error processing 'before' IR for '$epochName': ${e.getMessage}")
-              }
-            case None => NotFound(s"Epoch '$epochName' not found or before IR not available.")
-          }
+        logger.info(s"Received GET /ir/$epochName/before request.") *>
+          epochStore.getEpoch(epochName)
+            .flatMap {
+              case Some(epoch) =>
+                logger.debug(s"Found epoch '$epochName'. Attempting to pretty print 'beforeTransform'.") *>
+                  IO.delay {
+                    PrettyPrinter.pp_prog(epoch.beforeTransform)
+                  }.flatMap { pretty =>
+                    logger.info(s"Successfully pretty-printed 'beforeTransform' for epoch '$epochName'. Length: ${pretty.length}") *>
+                      Ok(s"$pretty")
+                  }.handleErrorWith { e =>
+                    logger.error(e)(s"CRITICAL ERROR: Failed to pretty-print 'beforeTransform' for epoch '$epochName': ${e.getMessage}") *>
+                      InternalServerError(s"Internal Server Error processing 'before' IR for '$epochName': ${e.getMessage}")
+                  }
+              case None => NotFound(s"Epoch '$epochName' not found or before IR not available.")
+            }
       }
 
     /**
@@ -84,24 +104,22 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean]) {
      */
     case GET -> Root / "ir" / epochName / "after" =>
       ensureReady {
-        logger.info(s"Received GET /ir/$epochName/after request.")
-
-        epochStore.getEpoch(epochName)
-          .flatMap {
-            case Some(epoch) =>
-              logger.debug(s"Found epoch '$epochName'. Attempting to pretty print 'afterTransform'.")
-
-              IO.delay {
-                PrettyPrinter.pp_prog(epoch.afterTransform) // TODO: This sometimes fails?
-              }.flatMap { pretty =>
-                logger.info(s"Successfully pretty-printed 'afterTransform' for epoch '$epochName'. Length: ${pretty.length}")
-                Ok(s"$pretty")
-              }.handleErrorWith { e =>
-                logger.error(s"CRITICAL ERROR: Failed to pretty-print 'afterTransform' for epoch '$epochName': ${e.getMessage}", e)
-                InternalServerError(s"Internal Server Error processing 'after' IR for '$epochName': ${e.getMessage}")
-              }
-            case None => NotFound(s"Epoch '$epochName' not found or after IR not available.")
-          }
+        logger.info(s"Received GET /ir/$epochName/after request.") *>
+          epochStore.getEpoch(epochName)
+            .flatMap {
+              case Some(epoch) =>
+                logger.debug(s"Found epoch '$epochName'. Attempting to pretty print 'afterTransform'.") *>
+                  IO.delay {
+                    PrettyPrinter.pp_prog(epoch.afterTransform) // TODO: This sometimes fails?
+                  }.flatMap { pretty =>
+                    logger.info(s"Successfully pretty-printed 'afterTransform' for epoch '$epochName'. Length: ${pretty.length}") *>
+                      Ok(s"$pretty")
+                  }.handleErrorWith { e =>
+                    logger.error(e)(s"CRITICAL ERROR: Failed to pretty-print 'afterTransform' for epoch '$epochName': ${e.getMessage}") *>
+                      InternalServerError(s"Internal Server Error processing 'after' IR for '$epochName': ${e.getMessage}")
+                  }
+              case None => NotFound(s"Epoch '$epochName' not found or after IR not available.")
+            }
       }
 
     /**
@@ -119,19 +137,22 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean]) {
      */
     case GET -> Root / "ir" / epochName / "pretty_print" =>
       ensureReady {
-        logger.info(s"Received GET /ir/$epochName/pretty_print request.")
-
-        epochStore.getEpoch(epochName) // TODO: Add ensure ready for all of them
-          .flatMap {
-            case Some(epoch) =>
-              val sb = new StringBuilder
-              sb.append(s"---------------------- The before Transform for ${epochName} ----------------------\n")
-              sb.append(PrettyPrinter.pp_proc(epoch.beforeTransform.procedures(1)))
-              sb.append(s"\n---------------------- The after Transform for ${epochName} ----------------------\n")
-              sb.append(PrettyPrinter.pp_proc(epoch.afterTransform.procedures(1)))
-              Ok(sb.toString())
-            case None => NotFound(s"Epoch '$epochName' not found.")
-          }
+        logger.info(s"Received GET /ir/$epochName/pretty_print request.") *>
+          epochStore.getEpoch(epochName)
+            .flatMap {
+              case Some(epoch) =>
+                IO.delay {
+                  val sb = new StringBuilder
+                  sb.append(s"---------------------- The before Transform for ${epochName} ----------------------\n")
+                  sb.append(PrettyPrinter.pp_proc(epoch.beforeTransform.procedures(1)))
+                  sb.append(s"\n---------------------- The after Transform for ${epochName} ----------------------\n")
+                  sb.append(PrettyPrinter.pp_proc(epoch.afterTransform.procedures(1)))
+                  sb.toString()
+                }.flatMap { combinedText =>
+                  Ok(combinedText)
+                }
+              case None => NotFound(s"Epoch '$epochName' not found.")
+            }
       }
 
     /**
@@ -146,13 +167,23 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean]) {
      */
     case GET -> Root / "cfg" / epochName / "before" =>
       ensureReady {
-        logger.info(s"Received GET /cfg/$epochName/before request.")
-
-        epochStore.getEpoch(epochName) // TODO: Add more logging here
-          .flatMap {
-            case Some(epoch) => Ok(generateDotGraphs(epoch.beforeTransform).asJson)
-            case None => NotFound(s"Epoch '$epochName' not found or before CFG not available.")
-          }
+        logger.info(s"Received GET /cfg/$epochName/before request.") *>
+          epochStore.getEpoch(epochName)
+            .flatMap {
+              case Some(epoch) =>
+                logger.info(s"Attempting to generate 'before' CFG dot graph for epoch: $epochName.") *>
+                  IO.delay(generateDotGraphs(epoch.beforeTransform)).flatMap { dotGraph =>
+                    logger.info(s"Successfully generated 'before' CFG dot graph for epoch '$epochName'. Responding with JSON.") *>
+                      Ok(dotGraph.asJson)
+                  }
+              case None =>
+                logger.warn(s"Epoch '$epochName' not found in store for 'before' CFG request. Sending 404.") *>
+                  NotFound(s"Epoch '$epochName' not found or before CFG not available.")
+            }
+            .handleErrorWith { e =>
+              logger.error(e)(s"An error occurred while processing GET /cfg/$epochName/before request: ${e.getMessage}") *>
+                InternalServerError("An internal server error occurred during CFG generation.")
+            }
       }
 
     /**
@@ -167,13 +198,22 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean]) {
      */
     case GET -> Root / "cfg" / epochName / "after" =>
       ensureReady {
-        logger.info(s"Received GET /cfg/$epochName/after request.")
-
-        epochStore.getEpoch(epochName)
-          .flatMap {
-            case Some(epoch) => Ok(generateDotGraphs(epoch.afterTransform).asJson)
-            case None => NotFound(s"Epoch '$epochName' not found or after CFG not available.")
-          }
+        logger.info(s"Received GET /cfg/$epochName/after request.") *>
+          epochStore.getEpoch(epochName)
+            .flatMap {
+              case Some(epoch) =>
+                logger.info(s"Attempting to generate 'after' CFG dot graph for epoch: $epochName.") *>
+                  IO.delay(generateDotGraphs(epoch.afterTransform)).flatMap { dotGraph =>
+                    logger.info(s"Successfully generated 'after' CFG dot graph for epoch '$epochName'. Responding with JSON.") *>
+                      Ok(dotGraph.asJson)
+                  }
+              case None =>
+                logger.warn(s"Epoch '$epochName' not found in store for 'after' CFG request. Sending 404.") *>
+                  NotFound(s"Epoch '$epochName' not found or after CFG not available.")
+            }.handleErrorWith { e =>
+              logger.error(e)(s"An error occurred while processing GET /cfg/$epochName/after request: ${e.getMessage}") *>
+                InternalServerError("An internal server error occurred during CFG generation.")
+            }
       }
 
     /**
@@ -191,37 +231,35 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean]) {
      */
     case GET -> Root / "ir" / epochName / "procedures_with_lines" =>
       ensureReady {
-        logger.info(s"Received GET /ir/$epochName/procedures_with_lines request.")
+        logger.info(s"Received GET /ir/$epochName/procedures_with_lines request.") *>
+          epochStore.getEpoch(epochName)
+            .flatMap {
+              case Some(epoch) =>
+                val fullAfterTransformText = PrettyPrinter.pp_prog(epoch.afterTransform)
+                var currentOffset = 0
 
-        epochStore.getEpoch(epochName)
-          .flatMap {
-            case Some(epoch) =>
-              val fullAfterTransformText = PrettyPrinter.pp_prog(epoch.afterTransform)
+                epoch.afterTransform.procedures.toList.traverse { proc =>
+                  val procName = proc.procName
+                  val procPrettyPrint = PrettyPrinter.pp_proc(proc)
 
-              val procedureLocations = ArrayBuffer[ProcedureTextLocation]()
-              var currentOffset = 0
+                  val startIndex = fullAfterTransformText.indexOf(procPrettyPrint, currentOffset)
 
-              epoch.afterTransform.procedures.foreach { proc =>
-                val procName = proc.procName
-                val procPrettyPrint = PrettyPrinter.pp_proc(proc)
+                  if (startIndex != -1) {
+                    val startLine = LineCounter.countLines(fullAfterTransformText, startIndex)
+                    val endLine = startLine + LineCounter.countLines(procPrettyPrint, procPrettyPrint.length) - 1
+                    currentOffset = startIndex + procPrettyPrint.length
 
-                val startIndex = fullAfterTransformText.indexOf(procPrettyPrint, currentOffset)
-
-                if (startIndex != -1) {
-                  val startLine = LineCounter.countLines(fullAfterTransformText, startIndex)
-                  val endLine = startLine + LineCounter.countLines(procPrettyPrint, procPrettyPrint.length) - 1
-
-                  procedureLocations.append(ProcedureTextLocation(procName, startLine, endLine))
-                  currentOffset = startIndex + procPrettyPrint.length
-                } else {
-                  println(s"Warning: Could not find text for procedure '$procName' " +
-                    s"in the full afterTransform output. Is PrettyPrinter consistent or procedure text unique?")
-                  procedureLocations.append(ProcedureTextLocation(procName, -1, -1))
+                    IO.pure(ProcedureTextLocation(procName, startLine, endLine))
+                  } else {
+                    logger.warn(s"Warning: Could not find text for procedure '$procName' " +
+                      s"in the full afterTransform output. Is PrettyPrinter consistent or procedure text unique?") *>
+                      IO.pure(ProcedureTextLocation(procName, -1, -1))
+                  }
+                }.flatMap { locationsList =>
+                  Ok(locationsList.asJson)
                 }
-              }
-              Ok(procedureLocations.toList.asJson)
-            case None => NotFound(s"Epoch '$epochName' not found.")
-          }
+              case None => NotFound(s"Epoch '$epochName' not found.")
+            }
       }
   }
 
@@ -247,10 +285,6 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean]) {
    * @return The DOT graph string with font attributes removed.
    */
   private def removeFontAttributes(dotString: String): String = {
-    // Regex to find fontname="...", fontsize="..." or similar attributes inside node definitions.
-    // It looks for any attribute that starts with 'fontname=' or 'fontsize='
-    // within square brackets [] of a node definition.
-    // The '?:' makes the group non-capturing.
     val fontAttributePattern = Pattern.compile(
       """\s*(?:fontname="[^"]+"|fontsize="\d+(?:\.\d+)?"|fontname=[a-zA-Z0-9_]+|fontsize=\d+(?:\.\d+)?)\s*""",
       Pattern.CASE_INSENSITIVE
@@ -261,25 +295,18 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean]) {
 
     while (matcher.find()) {
       val matchedGroup = matcher.group()
-      matcher.appendReplacement(sb, "") // Replace the found attribute with an empty string
+      matcher.appendReplacement(sb, "")
     }
-    matcher.appendTail(sb) 
+    matcher.appendTail(sb)
 
     var cleanedString = sb.toString()
 
-    // Post-clean up: Remove any resulting double commas or leading/trailing commas inside attributes lists
-    cleanedString = cleanedString.replaceAll(",\\s*,", ",") // Replace ", ," with ","
-    cleanedString = cleanedString.replaceAll("\\[\\s*,", "[") // Replace "[ ," with "["
-    cleanedString = cleanedString.replaceAll(",\\s*\\]", "]") // Replace ", ]" with "]"
-    cleanedString = cleanedString.replaceAll("[\t ]+\\]", "]") // Remove leading space before ] if it resulted from a removed attribute
-    cleanedString = cleanedString.replaceAll("\\[[\t ]+", "[") // Remove trailing space after [ if it resulted from a removed attribute
+    cleanedString = cleanedString.replaceAll(",\\s*,", ",")
+    cleanedString = cleanedString.replaceAll("\\[\\s*,", "[")
+    cleanedString = cleanedString.replaceAll(",\\s*\\]", "]")
+    cleanedString = cleanedString.replaceAll("[\t ]+\\]", "]")
+    cleanedString = cleanedString.replaceAll("\\[[\t ]+", "[")
 
     cleanedString
   }
-
-  private def ensureReady(action: IO[Response[IO]]): IO[Response[IO]] =
-    isReady.get.flatMap {
-      case true => action
-      case false => ServiceUnavailable("IR data is still initializing. Please try again shortly.")
-    }
 }

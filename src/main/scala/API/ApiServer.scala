@@ -4,9 +4,10 @@ import ir.Program
 import util.RunUtils
 import util.BASILConfig
 import util.ILLoadingConfig
-import util.BASILResult
 
 import org.typelevel.log4cats.slf4j.Slf4jFactory
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.LoggerName
 import org.typelevel.log4cats.LoggerFactory
 import org.http4s._
 import org.http4s.implicits._
@@ -110,7 +111,9 @@ object LineCounter {
 object ApiServer extends IOApp {
   implicit val asyncIO: Async[IO] = IO.asyncForIO
   implicit val consoleIO: Console[IO] = Console.make[IO]
+
   implicit val loggerFactory: LoggerFactory[IO] = Slf4jFactory.create[IO]
+  private val logger: Logger[IO] = loggerFactory.getLogger(LoggerName(getClass.getName))
 
   /**
    * A resource that provides an `ExecutionContext` for blocking operations.
@@ -159,10 +162,11 @@ object ApiServer extends IOApp {
                                irProcessingSemaphore: Semaphore[IO],
                                isReady: Ref[IO, Boolean] // readiness flag
                              ): IO[Unit] = {
+    
     irProcessingSemaphore.permit.use { _ =>
       for {
-        _ <- IO.println("Starting BASIL analysis...")
-        // Run BASIL and collect epochs
+        _ <- logger.info("Starting BASIL analysis...")
+        startTime <- IO.monotonic
         collectedEpochs <- IO.blocking {
           val buffer = ArrayBuffer.empty[IREpoch]
 
@@ -183,16 +187,19 @@ object ApiServer extends IOApp {
             outputPrefix = "out/test_output"
           )
 
-        val finalBasilResult = RunUtils.run(basilConfig, Some(collectedEpochsBuffer))
+          logger.info("Starting BASIL analysis (inside locked section)...")
           val finalBasilResult = RunUtils.run(basilConfig, Some(buffer))
+          logger.info("BASIL analysis completed.")
 
           RunUtils.writeOutput(finalBasilResult)
 
           buffer.toList
         }
-
+        endTime <- IO.monotonic
+        _ <- logger.info(s"BASIL analysis (inside locked section) completed in ${(endTime - startTime).toMillis}ms.")
+        
         _ <- collectedEpochs.traverse_(epochStore.addEpoch)
-        _ <- Console[IO].println(s"All ${collectedEpochs.size} epochs stored.")
+        _ <- logger.info(s"All ${collectedEpochs.size} epochs stored.")
 
         _ <- isReady.set(true)
 

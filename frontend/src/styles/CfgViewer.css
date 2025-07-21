@@ -6,7 +6,8 @@
     justify-content: space-around; /* Distributes space evenly */
     gap: 20px; /* Space between the two graph wrappers */
     width: 100%;
-    padding: 10px;
+    padding-bottom: 20px;
+    padding-right: 20px;
     /*box-sizing: border-box; !* Include padding in the element's total width and height *!*/
 }
 
