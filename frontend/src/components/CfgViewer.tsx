@@ -25,15 +25,10 @@ const FIT_VIEW_OPTIONS: FitViewOptions = {
     padding: 0.2,
 };
 
-const SIMPLE_MOCK_DOT_STRING = `
-digraph SimpleCFG {
-    nodeA [label="Start Node"];
-    nodeB [label="Middle Node"];
-    nodeC [label="End Node"];
-    nodeA -> nodeB;
-    nodeB -> nodeC;
-}
-`;
+const ZOOM_CONFIGS = {
+    min: 0.3,
+    max: 3,
+};
 
 interface DotGraphResponse {
     [procedureName: string]: string;
@@ -55,7 +50,6 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName, selectedProced
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isGraphvizWasmReady, setIsGraphvizWasmReady] = useState(false);
-    const [useMockData] = useState(false); // TODO: Remove this now
 
     const [graphRenderKey, setGraphRenderKey] = useState(0);
 
@@ -73,13 +67,13 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName, selectedProced
 
     useEffect(() => {
         const fetchAndRenderCfgs = async () => {
-            if (!isGraphvizWasmReady && !useMockData) {
+            if (!isGraphvizWasmReady) { // TODO: Clean up this
                 setError("Graphviz WebAssembly is still loading or failed to initialize.");
                 setLoading(false);
                 return;
             }
 
-            if (!useMockData && (!selectedEpochName || !selectedProcedureName)) {
+            if (!selectedEpochName || !selectedProcedureName) {
                 setBeforeNodes([]);
                 setBeforeEdges([]);
                 setAfterNodes([]);
@@ -100,23 +94,18 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName, selectedProced
                 let beforeDotString: string | undefined;
                 let afterDotString: string | undefined;
 
-                if (useMockData) {
-                    console.log("Using mock data for CFG viewer.");
-                    beforeDotString = SIMPLE_MOCK_DOT_STRING;
-                    afterDotString = SIMPLE_MOCK_DOT_STRING;
-                } else {
-                    const fetchDotString = async (epoch: string, type: 'before' | 'after') => {
-                        const response = await fetch(`${API_BASE_URL}/cfg/${epoch}/${type}`);
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status} for ${type} CFG`);
-                        }
-                        const data: DotGraphResponse = await response.json();
-                        return selectedProcedureName ? data[selectedProcedureName] : undefined;
-                    };
 
-                    beforeDotString = await fetchDotString(selectedEpochName!, 'before');
-                    afterDotString = await fetchDotString(selectedEpochName!, 'after');
-                }
+                const fetchDotString = async (epoch: string, type: 'before' | 'after') => {
+                    const response = await fetch(`${API_BASE_URL}/cfg/${epoch}/${type}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status} for ${type} CFG`);
+                    }
+                    const data: DotGraphResponse = await response.json();
+                    return selectedProcedureName ? data[selectedProcedureName] : undefined;
+                };
+
+                beforeDotString = await fetchDotString(selectedEpochName!, 'before');
+                afterDotString = await fetchDotString(selectedEpochName!, 'after');
 
                 if (beforeDotString) {
                     const { nodes, edges } = await getLayoutedElements(beforeDotString, 'before-');
@@ -145,10 +134,10 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName, selectedProced
             }
         };
 
-        if (isGraphvizWasmReady || useMockData) {
+        if (isGraphvizWasmReady) {
             fetchAndRenderCfgs();
         }
-    }, [selectedEpochName, selectedProcedureName, useMockData, isGraphvizWasmReady]); // Dependencies for re-running effect
+    }, [selectedEpochName, selectedProcedureName, isGraphvizWasmReady]); // Dependencies for re-running effect
 
 
     if (loading) {
@@ -159,7 +148,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName, selectedProced
         return <div className="cfg-viewer-error">Error: {error}</div>;
     }
 
-    if (!useMockData && (!selectedEpochName || !selectedProcedureName)) {
+    if (!selectedEpochName || !selectedProcedureName) {
         return <div className="cfg-viewer-message">Please select an epoch and a procedure from the sidebar to view CFGs.</div>;
     }
 
@@ -172,7 +161,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName, selectedProced
             {/* Render 'Before' Graph */}
             {graphRenderKey > 0 && (
                 <div key={`before-graph-${graphRenderKey}`} className="graph-wrapper">
-                    <h3>Before Transform: {useMockData ? "Mock Data (ELK Layout)" : selectedProcedureName}</h3>
+                    <h3>Before Transform: {selectedProcedureName}</h3>
                     <div className="react-flow-instance">
                         <ReactFlowProvider>
                             <ReactFlow
@@ -183,8 +172,8 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName, selectedProced
                                 fitView
                                 fitViewOptions={FIT_VIEW_OPTIONS}
                                 proOptions={{ hideAttribution: true }}
-                                minZoom={0.3} // TODO: Convert to const
-                                maxZoom={3}
+                                minZoom={ZOOM_CONFIGS.min} // TODO: Convert to const
+                                maxZoom={ZOOM_CONFIGS.max}
                                 nodeTypes={nodeTypes}
                             >
                                 <MiniMap />
@@ -199,7 +188,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName, selectedProced
             {/* Render 'After' Graph */}
             {graphRenderKey > 0 && (
                 <div key={`after-graph-${graphRenderKey}`} className="graph-wrapper">
-                    <h3>After Transform: {useMockData ? "Mock Data (ELK Layout)" : selectedProcedureName}</h3>
+                    <h3>After Transform: {selectedProcedureName}</h3>
                     <div className="react-flow-instance">
                         <ReactFlowProvider>
                             <ReactFlow
@@ -210,8 +199,8 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName, selectedProced
                                 fitView
                                 fitViewOptions={FIT_VIEW_OPTIONS}
                                 proOptions={{ hideAttribution: true }}
-                                minZoom={0.3} // TODO: Convert to const
-                                maxZoom={3}
+                                minZoom={ZOOM_CONFIGS.min} // TODO: Convert to const
+                                maxZoom={ZOOM_CONFIGS.max}
                                 nodeTypes={nodeTypes}
                             >
                                 <MiniMap />
