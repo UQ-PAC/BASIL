@@ -485,11 +485,6 @@ class TranslationValidator {
   }
    */
 
-  /**
-  *
-  * Maps a input or output dependnecy of a call to a variable representing it in the TV
-  */
-  case class CallParamMapping(lhs: List[(Variable | Memory, Variable)], rhs: List[(Variable | Memory, Variable)])
 
   /**
    *
@@ -605,21 +600,6 @@ class TranslationValidator {
     val params = initProg.get.procedures.map(p => p.name -> getParams(p, afterFrame.getOrElse(p.name, Frame()))).toMap
     val paramsBef =
       initProgBefore.get.procedures.map(p => p.name -> getParams(p, afterFrame.getOrElse(p.name, Frame()))._1).toMap
-
-    for ((pname, targetParams) <- paramsBef) {
-      val afterParams = params(pname)
-
-      val r = matchTargetCallInSource(afterParams)(
-        targetParams.lhs.map((o, a) => (o, LocalVar("no", BoolType))),
-        targetParams.rhs.map((o, a) => (o, FalseLiteral))
-      )
-
-      println(s"expect PARAMS: $pname" + params(pname))
-      println(s"zipped params $pname: " + r)
-
-    }
-
-    println(params)
 
     params
   }
@@ -986,7 +966,7 @@ class TranslationValidator {
       timer.checkPoint("SSA")
 
       val ackInv =
-        Ackermann.instantiateAxioms(source.entryBlock.get, target.entryBlock.get, frames, exprInSource, exprInTarget)
+        Ackermann.instantiateAxioms(source.entryBlock.get, target.entryBlock.get, frames, exprInSource, exprInTarget, paramMapping)
       timer.checkPoint("ackermann")
 
       val pcInv = CompatArg(TransitionSystem.programCounterVar, TransitionSystem.programCounterVar)
