@@ -16,16 +16,19 @@ const elkLayoutOptions = {
     'org.eclipse.elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
 };
 
-/**
- * Parses a DOT string, applies ELK layout, and returns React Flow nodes and edges.
- * @param dotString The DOT graph representation.
- * @param prefix A unique prefix to apply to all node and edge IDs.
- */
 export async function getLayoutedElements(dotString: string, prefix: string): Promise<{ nodes: Node<CustomNodeData>[]; edges: Edge[] }> {
     console.log(`DEBUG: Input DOT String for ELK layout (prefix: ${prefix}):`, dotString);
 
-    const rawNodesMap = new Map<string, { id: string, fullLabelContent: string, width: number, height: number, shape: string }>();
-    const rawEdgesDataForELK: { id: string, source: string, target: string, label?: string }[] = [];
+    const rawNodesMap = new Map<string, {
+        id: string,
+        fullLabelContent: string,
+        headerWidth: number,
+        headerHeight: number,
+        fullContentWidth: number,
+        fullContentHeight: number,
+        nodeBackgroundColor?: string;
+        shape: string
+    }>();    const rawEdgesDataForELK: { id: string, source: string, target: string, label?: string }[] = [];
 
     try {
         const nodeRegex = /(?:\"([^"]+)\"|(\w+))\s*\[label="((?:[^"\\]|\\.)*?)"(?:, ([^\]]*))?\]/g;
@@ -40,7 +43,7 @@ export async function getLayoutedElements(dotString: string, prefix: string): Pr
                 continue;
             }
 
-            const fullLabelContent = match[3].replace(/\\"/g, '"').replace(/\\l/g, '\n');
+            const fullLabelContent = match[3].replace(/\\"/g, '"').replace(/\\l/g, '\n').trim();
             const attributes = match[4] || '';
             const shape = attributes.includes('shape="box"') ? 'box' : 'default';
 
@@ -48,26 +51,29 @@ export async function getLayoutedElements(dotString: string, prefix: string): Pr
 
             const ASSUMED_FONT_SIZE_PX = 14;
             const ASSUMED_LINE_HEIGHT_MULTIPLIER = 1.5;
-            const HORIZONTAL_PADDING_PX = 10; // px
+            const HORIZONTAL_PADDING_PX = 5; // px
             const VERTICAL_PADDING_PX = 5; // px
 
-            // const lines = fullLabelContent.split('\n'); TODO: Use later on when attaching data
-            // const longestLineLength = Math.max(...lines.map(line => line.length)); TODO: Use later on when attaching data
+            const headerTextWidth = headerLine.length * (ASSUMED_FONT_SIZE_PX * 0.65);
+            const headerWidth = Math.max(120, headerTextWidth + HORIZONTAL_PADDING_PX);
+            const headerHeight = Math.max(40, (ASSUMED_FONT_SIZE_PX * ASSUMED_LINE_HEIGHT_MULTIPLIER) + VERTICAL_PADDING_PX);
 
-            const estimatedTextWidth = headerLine.length * (ASSUMED_FONT_SIZE_PX * 0.65);
-            const estimatedWidth = Math.max(
-                120, // Minimum width for a node
-                estimatedTextWidth + HORIZONTAL_PADDING_PX
-            );
+            const fullContentLines = fullLabelContent.split('\n');
+            const longestFullContentLineLength = Math.max(...fullContentLines.map(line => line.length));
 
-            const effectiveLineHeight = ASSUMED_FONT_SIZE_PX * ASSUMED_LINE_HEIGHT_MULTIPLIER;
-            // const estimatedTextHeight = lines.length * effectiveLineHeight; TODO: Use later on when attaching data
-            const estimatedHeight = Math.max(
-                40, // Minimum height for a node
-                effectiveLineHeight + VERTICAL_PADDING_PX
-            );
+            const fullContentTextWidth = longestFullContentLineLength * (ASSUMED_FONT_SIZE_PX * 0.65);
+            const fullContentWidth = Math.max(120, fullContentTextWidth + HORIZONTAL_PADDING_PX);
+            const fullContentHeight = Math.max(40, (fullContentLines.length * ASSUMED_FONT_SIZE_PX * ASSUMED_LINE_HEIGHT_MULTIPLIER) + VERTICAL_PADDING_PX);
 
-            rawNodesMap.set(id, { id, fullLabelContent, width: estimatedWidth, height: estimatedHeight, shape });
+            rawNodesMap.set(id, {
+                id,
+                fullLabelContent,
+                headerWidth,
+                headerHeight,
+                fullContentWidth,
+                fullContentHeight,
+                shape
+            });
             uniqueNodeCount++;
         }
         const rawNodesData = Array.from(rawNodesMap.values());
@@ -94,11 +100,10 @@ export async function getLayoutedElements(dotString: string, prefix: string): Pr
         }
         console.log(`DEBUG: Parsed ${edgeCount} raw edges for ELK.`);
 
-
         const elkNodes = rawNodesData.map(node => ({
             id: node.id,
-            width: node.width,
-            height: node.height,
+            width: node.headerWidth,
+            height: node.headerHeight,
         }));
 
         const elkEdges = rawEdgesDataForELK.map(edge => ({
@@ -123,18 +128,21 @@ export async function getLayoutedElements(dotString: string, prefix: string): Pr
                 .filter(elkNode => rawNodesData.some(n => n.id === elkNode.id))
                 .map(elkNode => {
                     const originalNodeData = rawNodesMap.get(elkNode.id)!;
-                    const headerLine = originalNodeData.fullLabelContent.split('\n')[0] || '';
+                    // TODO: Do I need this, if so, make it earlier so it doesn't affect padding
+                    const headerLine = originalNodeData.fullLabelContent.split('\n')[0].replace(/ -1$/, '') || '';
 
                     return {
                         id: elkNode.id,
                         position: { x: elkNode.x || 0, y: elkNode.y || 0 },
-                        // data: { label: originalNodeData.label },
                         data: {
                             header: headerLine,
                             fullContent: originalNodeData.fullLabelContent,
+                            headerWidth: originalNodeData.headerWidth,
+                            headerHeight: originalNodeData.headerHeight,
+                            fullContentWidth: originalNodeData.fullContentWidth,
+                            fullContentHeight: originalNodeData.fullContentHeight,
                         },
-                        style: { width: originalNodeData.width, height: originalNodeData.height },
-                        // type: originalNodeData.shape === 'box' ? 'default' : 'default',
+                        style: { width: originalNodeData.headerWidth, height: originalNodeData.headerHeight },
                         type: 'customNode',
                     };
                 })

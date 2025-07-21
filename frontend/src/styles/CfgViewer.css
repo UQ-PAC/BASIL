@@ -55,31 +55,21 @@
     font-weight: bold;
 }
 
-/* --- React Flow Node Styling (Default) --- */
-/*
-  These styles will apply to your 'default' type nodes.
-  React Flow automatically applies a .react-flow__node class.
-  You can also create custom node types and style them separately.
-*/
-.react-flow__node {
+.custom-flow-node {
     padding: 10px 15px;
     border: 2px solid #5a5a5a;
     border-radius: 5px;
-    background-color: #ffffff;
     font-family: 'Mono', monospace;
     font-size: 0.8em;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
     display: flex;
     align-items: center;
-    justify-content: center;
     text-align: left;
-    white-space: nowrap;
-    word-break: break-all;
     color: black;
-    box-sizing: border-box; /* Keep this, it's crucial */
+    box-sizing: border-box;
 }
 
 /* Specific styling for selected nodes */
-.react-flow__node.selected {
-    border: 2px solid #007bff; /* This border change is often the trigger */
+.custom-flow-node.selected {
+    border: 2px solid #007bff;
 }

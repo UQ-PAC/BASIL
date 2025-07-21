@@ -1,15 +1,11 @@
 // src/components/CfgViewer.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-    ReactFlow,
-    Controls,
-    Background,
-    MiniMap,
     useNodesState,
     useEdgesState,
     ReactFlowProvider,
 } from '@xyflow/react';
-import type { Node, Edge, FitViewOptions, BackgroundVariant } from '@xyflow/react';
+import type { Node, Edge, FitViewOptions } from '@xyflow/react';
 
 import '@xyflow/react/dist/style.css';
 import '../styles/CfgViewer.css';
@@ -18,8 +14,8 @@ import { API_BASE_URL } from '../api';
 import { Graphviz } from "@hpcc-js/wasm-graphviz";
 import { getLayoutedElements } from '../utils/GraphLayout';
 
-import CustomNode from './CustomNode';
 import { type CustomNodeData } from './CustomNode';
+import GraphPanel from './GraphPanel';
 
 const FIT_VIEW_OPTIONS: FitViewOptions = {
     padding: 0.2,
@@ -30,6 +26,14 @@ const ZOOM_CONFIGS = {
     max: 3,
 };
 
+const NODE_COLORS = {
+    RED: '#FF4D4D',
+    LIGHT_RED: '#FFCCCC',
+    GREEN: '#90EE90',
+    LIGHT_GREEN: '#b9f4b9',
+    DEFAULT: '#FFFFFF',
+};
+
 interface DotGraphResponse {
     [procedureName: string]: string;
 }
@@ -38,8 +42,6 @@ interface CfgViewerProps {
     selectedEpochName: string | null;
     selectedProcedureName: string | null;
 }
-
-const nodeTypes = { customNode: CustomNode };
 
 const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName, selectedProcedureName }) => {
     const [beforeNodes, setBeforeNodes, onBeforeNodesChange] = useNodesState<Node<CustomNodeData>>([]);
@@ -64,10 +66,76 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName, selectedProced
         });
     }, []);
 
+    const compareAndColorNodes = useCallback((
+        beforeGraphNodes: Node<CustomNodeData>[],
+        afterGraphNodes: Node<CustomNodeData>[]
+    ): { coloredBeforeNodes: Node<CustomNodeData>[], coloredAfterNodes: Node<CustomNodeData>[] } => {
+        const coloredBeforeNodes: Node<CustomNodeData>[] = [];
+        const coloredAfterNodes: Node<CustomNodeData>[] = [];
+
+        const beforeMap = new Map<string, Node<CustomNodeData>>();
+        beforeGraphNodes.forEach(node => {
+            const originalId = node.id.replace('before-', '');
+            beforeMap.set(originalId, node);
+        });
+
+        const afterMap = new Map<string, Node<CustomNodeData>>();
+        afterGraphNodes.forEach(node => {
+            const originalId = node.id.replace('after-', '');
+            afterMap.set(originalId, node);
+        });
+
+        const allOriginalIds = new Set([...beforeMap.keys(), ...afterMap.keys()]);
+
+        allOriginalIds.forEach(originalId => {
+            const beforeNode = beforeMap.get(originalId);
+            const afterNode = afterMap.get(originalId);
+
+            let beforeColor = NODE_COLORS.DEFAULT;
+            let afterColor = NODE_COLORS.DEFAULT;
+
+            if (beforeNode && afterNode) {
+                const headerEquivalent = beforeNode.data.header === afterNode.data.header;
+                const fullContentEquivalent = beforeNode.data.fullContent === afterNode.data.fullContent;
+
+                if (!headerEquivalent) {
+                    beforeColor = NODE_COLORS.LIGHT_RED;
+                    afterColor = NODE_COLORS.LIGHT_GREEN;
+                } else if (!fullContentEquivalent) {
+                    beforeColor = NODE_COLORS.LIGHT_RED;
+                    afterColor = NODE_COLORS.LIGHT_GREEN;
+                } else {
+                    beforeColor = NODE_COLORS.DEFAULT; // Both headers and full content equivalent
+                    afterColor = NODE_COLORS.DEFAULT;
+                }
+            } else if (beforeNode) {
+                // Node exists only in 'before' graph
+                beforeColor = NODE_COLORS.RED;
+            } else if (afterNode) {
+                // Node exists only in 'after' graph
+                afterColor = NODE_COLORS.GREEN
+            }
+
+            if (beforeNode) {
+                coloredBeforeNodes.push({
+                    ...beforeNode,
+                    data: { ...beforeNode.data, nodeBackgroundColor: beforeColor },
+                });
+            }
+            if (afterNode) {
+                coloredAfterNodes.push({
+                    ...afterNode,
+                    data: { ...afterNode.data, nodeBackgroundColor: afterColor },
+                });
+            }
+        });
+
+        return { coloredBeforeNodes, coloredAfterNodes };
+    }, []);
 
     useEffect(() => {
         const fetchAndRenderCfgs = async () => {
-            if (!isGraphvizWasmReady) { // TODO: Clean up this
+            if (!isGraphvizWasmReady) {
                 setError("Graphviz WebAssembly is still loading or failed to initialize.");
                 setLoading(false);
                 return;
@@ -107,10 +175,16 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName, selectedProced
                 beforeDotString = await fetchDotString(selectedEpochName!, 'before');
                 afterDotString = await fetchDotString(selectedEpochName!, 'after');
 
+                let processedBeforeNodes: Node<CustomNodeData>[] = [];
+                let processedBeforeEdges: Edge[] = [];
+                let processedAfterNodes: Node<CustomNodeData>[] = [];
+                let processedAfterEdges: Edge[] = [];
+
                 if (beforeDotString) {
                     const { nodes, edges } = await getLayoutedElements(beforeDotString, 'before-');
-                    setBeforeNodes(nodes);
-                    setBeforeEdges(edges);
+                    processedBeforeNodes = nodes;
+                    processedBeforeEdges = edges;
+                    console.log('Final Before Nodes Count:', nodes.length);
                 } else {
                     console.warn(`No 'before' CFG data (DOT) for procedure '${selectedProcedureName}' in epoch '${selectedEpochName}'.`);
                     setError((prev) => (prev ? prev + "\n" : "") + `No 'before' CFG data for '${selectedProcedureName}'.`);
@@ -118,12 +192,20 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName, selectedProced
 
                 if (afterDotString) {
                     const { nodes, edges } = await getLayoutedElements(afterDotString, 'after-');
-                    setAfterNodes(nodes);
-                    setAfterEdges(edges);
+                    processedAfterNodes = nodes;
+                    processedAfterEdges = edges;
+                    console.log('Final After Nodes Count:', nodes.length);
                 } else {
                     console.warn(`No 'after' CFG data (DOT) for procedure '${selectedProcedureName}' in epoch '${selectedEpochName}'.`);
                     setError((prev) => (prev ? prev + "\n" : "") + `No 'after' CFG data for '${selectedProcedureName}'.`);
                 }
+
+                const { coloredBeforeNodes, coloredAfterNodes } = compareAndColorNodes(processedBeforeNodes, processedAfterNodes);
+
+                setBeforeNodes(coloredBeforeNodes);
+                setBeforeEdges(processedBeforeEdges);
+                setAfterNodes(coloredAfterNodes);
+                setAfterEdges(processedAfterEdges);
 
             } catch (e: any) {
                 console.error("Error fetching or processing CFG data:", e);
@@ -160,56 +242,36 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName, selectedProced
         <div className="cfg-comparison-container">
             {/* Render 'Before' Graph */}
             {graphRenderKey > 0 && (
-                <div key={`before-graph-${graphRenderKey}`} className="graph-wrapper">
-                    <h3>Before Transform: {selectedProcedureName}</h3>
-                    <div className="react-flow-instance">
                         <ReactFlowProvider>
-                            <ReactFlow
+                            <GraphPanel
                                 nodes={beforeNodes}
                                 edges={beforeEdges}
                                 onNodesChange={onBeforeNodesChange}
                                 onEdgesChange={onBeforeEdgesChange}
-                                fitView
+                                title={`Before Transform: ${selectedProcedureName}`}
                                 fitViewOptions={FIT_VIEW_OPTIONS}
-                                proOptions={{ hideAttribution: true }}
-                                minZoom={ZOOM_CONFIGS.min} // TODO: Convert to const
+                                minZoom={ZOOM_CONFIGS.min}
                                 maxZoom={ZOOM_CONFIGS.max}
-                                nodeTypes={nodeTypes}
-                            >
-                                <MiniMap />
-                                <Controls />
-                                <Background variant={"dots" as BackgroundVariant} gap={12} size={1} />
-                            </ReactFlow>
+                                graphRenderKey={graphRenderKey}
+                            />
                         </ReactFlowProvider>
-                    </div>
-                </div>
             )}
 
             {/* Render 'After' Graph */}
             {graphRenderKey > 0 && (
-                <div key={`after-graph-${graphRenderKey}`} className="graph-wrapper">
-                    <h3>After Transform: {selectedProcedureName}</h3>
-                    <div className="react-flow-instance">
                         <ReactFlowProvider>
-                            <ReactFlow
+                            <GraphPanel
                                 nodes={afterNodes}
                                 edges={afterEdges}
                                 onNodesChange={onAfterNodesChange}
                                 onEdgesChange={onAfterEdgesChange}
-                                fitView
+                                title={`After Transform: ${selectedProcedureName}`}
                                 fitViewOptions={FIT_VIEW_OPTIONS}
-                                proOptions={{ hideAttribution: true }}
-                                minZoom={ZOOM_CONFIGS.min} // TODO: Convert to const
+                                minZoom={ZOOM_CONFIGS.min}
                                 maxZoom={ZOOM_CONFIGS.max}
-                                nodeTypes={nodeTypes}
-                            >
-                                <MiniMap />
-                                <Controls />
-                                <Background variant={"dots" as BackgroundVariant} gap={12} size={1} />
-                            </ReactFlow>
+                                graphRenderKey={graphRenderKey}
+                            />
                         </ReactFlowProvider>
-                    </div>
-                </div>
             )}
         </div>
     );

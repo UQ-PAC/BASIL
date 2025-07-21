@@ -202,7 +202,7 @@ export function DiffViewer({ selectedEpochName }: DiffViewerProps) {
                 if (currentHeader instanceof HTMLElement && currentHeader !== headerElement) {
                     setHeaderElement(currentHeader);
                     console.log("useLayoutEffect: Header element found and set.");
-                } else if (!currentHeader && headerElement) { // If header disappears, set to null
+                } else if (!currentHeader && headerElement) {
                     setHeaderElement(null);
                     console.log("useLayoutEffect: Header element cleared.");
                 }
