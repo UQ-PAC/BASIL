@@ -646,7 +646,9 @@ class TranslationValidator {
     afterProc: Procedure,
     renamingSrcTgt: TransformDataRelationFun = _ => e => Some(e),
     liveBefore: Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])],
-    liveAfter: Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])]
+    liveAfter: Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])],
+    srcParams: CallParamMapping,
+    tgtParams: CallParamMapping
   ) = {
     val p = afterProc
 
@@ -657,12 +659,56 @@ class TranslationValidator {
     val globalsTgt = globalsForSourceProc(p)(renamingSrcTgt(None)).toList
     val globals = globalsTgt.collect { case (a, Some(b)) => CompatArg(toVariable(a), toVariable(b)) }.toList
 
-    val inparams = Seq(
-      Inv.CutPoint("ENTRY", p.formalInParam.toList.map(p => CompatArg(p, renamingSrcTgt(None)(p).getOrElse(p))))
+    val pcInv = CompatArg(TransitionSystem.programCounterVar, TransitionSystem.programCounterVar)
+    val traceInv = CompatArg(TransitionSystem.traceVar, TransitionSystem.traceVar)
+
+    // add invariant to combined
+    val initRetInv = Seq(
+      Inv.CutPoint("ENTRY", List(pcInv), Some("PC INVARIANT")),
+      Inv.CutPoint("ENTRY", List(traceInv), Some("Trace INVARIANT"))
     )
-    val outparams = Seq(
-      Inv.CutPoint("RETURN", p.formalOutParam.toList.map(p => CompatArg(p, renamingSrcTgt(None)(p).getOrElse(p))))
+
+    /*
+    // TODO: Expclitly construct cutpoint for negated post condition invariant
+
+    val memoryInit = (srcReadMemory.keys.toSet ++ tgtReadMemory.keys).toList.map(k =>
+      Inv.CutPoint("ENTRY", List(CompatArg(srcLiveMemory(k), tgtLiveMemory(k))), Some(s"Memory$k"))
     )
+     */
+
+    def paramRepr(p: Variable | Memory): Variable = {
+      SideEffectStatementOfStatement.param(p) match {
+        case (l, r) => r
+      }
+    }
+
+    val inparams =
+      Inv.CutPoint(
+        "ENTRY",
+        srcParams.rhs.toSeq.zip(tgtParams.rhs).flatMap {
+          case ((srcFormal: (Variable | Memory), Some(srcActual)), (tgtFormal: (Variable | Memory), Some(tgtActual))) =>
+            Seq(CompatArg(paramRepr(srcFormal), paramRepr(tgtFormal)), CompatArg(srcActual, tgtActual))
+          case ((srcFormal: (Variable | Memory), _), (tgtFormal: (Variable | Memory), _)) =>
+            Seq(CompatArg(paramRepr(srcFormal), paramRepr(tgtFormal)))
+          case ((_, Some(srcActual)), (_, Some(tgtActual))) =>
+            Seq(CompatArg(srcActual, tgtActual))
+          case _ => Seq()
+        }
+      )
+
+    val outparams =
+      Inv.CutPoint(
+        "RETURN",
+        srcParams.lhs.toSeq.zip(tgtParams.lhs).flatMap {
+          case ((srcFormal: (Variable | Memory), Some(srcActual)), (tgtFormal: (Variable | Memory), Some(tgtActual))) =>
+            Seq(CompatArg(paramRepr(srcFormal), paramRepr(tgtFormal)), CompatArg(srcActual, tgtActual))
+          case ((srcFormal: (Variable | Memory), _), (tgtFormal: (Variable | Memory), _)) =>
+            Seq(CompatArg(paramRepr(srcFormal), paramRepr(tgtFormal)))
+          case ((_, Some(srcActual)), (_, Some(tgtActual))) =>
+            Seq(CompatArg(srcActual, tgtActual))
+          case _ => Seq()
+        }
+      )
 
     // skipping because should be live at entry and return resp.
     // val inparams = p.formalInParam.toList.map(p => CompatArg(p, p))
@@ -694,6 +740,11 @@ class TranslationValidator {
         val tgtCut = beforeCutsBls(label)
         val srcCut = afterCutsBls(label)
 
+        val alwaysInv = List(
+          CompatArg(TransitionSystem.programCounterVar, TransitionSystem.programCounterVar),
+          CompatArg(TransitionSystem.traceVar, TransitionSystem.traceVar)
+        )
+
         val srcLives = liveVarsSource.get(srcCut).toList.flatten
         val tgtLives = liveVarsTarget.get(tgtCut).toList.flatten
 
@@ -708,11 +759,11 @@ class TranslationValidator {
 
         // TODO: intersect live in source and target for dead code.
 
-        Inv.CutPoint(label, invSrc, Some(s"INVARIANT at $label"))
+        Inv.CutPoint(label, invSrc ++ alwaysInv, Some(s"INVARIANT at $label"))
       }
     }).toList
 
-    val inv = globalsInvEverywhere ++ invs ++ inparams ++ outparams
+    val inv = globalsInvEverywhere ++ invs ++ Seq(inparams) ++ Seq(outparams)
     inv
   }
 
@@ -992,8 +1043,8 @@ class TranslationValidator {
       val inputs = TransitionSystem.programCounterVar :: TransitionSystem.traceVar :: (globalsForProc(proc).toList)
       val frames = (afterFrame ++ beforeFrame)
 
-      val (srcRenameSSA, srcLiveMemory) = SSADAG.transform(sourceParams, source, inputs)
-      val (tgtRenameSSA, tgtLiveMemory) = SSADAG.transform(targetParams, target, inputs)
+      val srcRenameSSA = SSADAG.transform(sourceParams, source, inputs)
+      val tgtRenameSSA = SSADAG.transform(targetParams, target, inputs)
       timer.checkPoint("SSA")
 
       val ackInv =
@@ -1007,33 +1058,14 @@ class TranslationValidator {
         )
       timer.checkPoint("ackermann")
 
-      val pcInv = CompatArg(TransitionSystem.programCounterVar, TransitionSystem.programCounterVar)
-      val traceInv = CompatArg(TransitionSystem.traceVar, TransitionSystem.traceVar)
-      // add invariant to combined
-      val initInv = Seq(
-        Inv.CutPoint("ENTRY", List(pcInv), Some("PC INVARIANT")),
-        Inv.CutPoint("ENTRY", List(traceInv), Some("Trace INVARIANT"))
+      val invariant = getEqualVarsInvariantRenaming(
+        proc,
+        invariantRenamingSrcTgt,
+        liveBefore,
+        liveAfter,
+        sourceParams(proc.name),
+        targetParams(proc.name)
       )
-
-      val alwaysInv =
-        ((beforeCuts(target).cutLabelBlockInTr.keys ++ afterCuts(source).cutLabelBlockInTr.keys).toSet).map(c =>
-          Inv.CutPoint(
-            c,
-            List(
-              CompatArg(TransitionSystem.programCounterVar, TransitionSystem.programCounterVar),
-              CompatArg(TransitionSystem.traceVar, TransitionSystem.traceVar)
-            )
-          )
-        )
-
-      // TODO: Expclitly construct cutpoint for negated post condition invariant
-
-      val memoryInit = (srcLiveMemory.keys.toSet ++ tgtLiveMemory.keys).toList.map(k =>
-        Inv.CutPoint("ENTRY", List(CompatArg(srcLiveMemory(k), tgtLiveMemory(k))), Some(s"Memory$k"))
-      )
-
-      val userInvariant = getEqualVarsInvariantRenaming(proc, invariantRenamingSrcTgt, liveBefore, liveAfter)
-      val invariant = initInv ++ userInvariant ++ memoryInit ++ alwaysInv
 
       val preInv = invariant
 
@@ -1058,7 +1090,7 @@ class TranslationValidator {
       val splitName = "-" + proc.name // + "_split_" + splitNo
       // build smt query
       val b = translating.BasilIRToSMT2.SMTBuilder()
-      val solver = util.SMT.SMTSolver(Some(10000))
+      val solver = util.SMT.SMTSolver(Some(5000))
       val prover = solver.getProver(true)
 
       b.addCommand("set-logic", "QF_BV")
