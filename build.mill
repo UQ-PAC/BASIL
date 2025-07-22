@@ -13,6 +13,7 @@ import $file.basilmill.basildocs.BasilDocs
 import $file.basilmill.basilversion.BasilVersion
 import $file.basilmill.profile.ProfileModule
 import $file.basilmill.z3.Z3Module
+import $file.basilmill.cvc5.CVC5Module
 
 import os.Path
 
@@ -45,8 +46,9 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
   val aslpOffline = ivy"io.github.uq-pac::lifter:0.1.0"
   val javaSmt = ivy"org.sosy-lab:java-smt:5.0.0"
   val javaSmtZ3 = ivy"org.sosy-lab:javasmt-solver-z3:4.14.0"
+  val javaSmtCVC5 = ivy"org.sosy-lab:javasmt-solver-cvc5:1.2.1-g8594a8e4dc"
 
-  override def ivyDeps = Agg(scalactic, sourceCode, mainArgs, upickle, aslpOffline, javaSmt, javaSmtZ3)
+  override def ivyDeps = Agg(scalactic, sourceCode, mainArgs, upickle, aslpOffline, javaSmt, javaSmtZ3, javaSmtCVC5)
 
   override def repositoriesTask = Task.Anon {
     super.repositoriesTask() :+ MavenRepository(
@@ -67,13 +69,13 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
   }
 
   def forkArgs = Task {
-    super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}")
+    super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}:${cvc5.install()}")
   }
 
   // Windows for some reason wants the install path in PATH and ignores java.library.path, I cannot figure out why
   def forkEnv = Task {
     if (System.getProperty("os.name").startsWith("Windows")) {
-      super.forkEnv() + ("PATH" -> (sys.env("PATH") + s";${z3.install()}"))
+      super.forkEnv() + ("PATH" -> (sys.env("PATH") + s";${z3.install()};${cvc5.install()}"))
     } else { super.forkEnv() }
   }
 
@@ -92,12 +94,12 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     override def scalafixConfig = build.scalafixConfig
 
     def forkArgs = Task {
-      super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}")
+      super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}:${cvc5.install()}")
     }
 
     def forkEnv = Task {
       if (System.getProperty("os.name").startsWith("Windows")) {
-        super.forkEnv() + ("PATH" -> (sys.env("PATH") + s";${z3.install()}"))
+        super.forkEnv() + ("PATH" -> (sys.env("PATH") + s";${z3.install()};${cvc5.install()}"))
       } else { super.forkEnv() }
     }
 
@@ -243,6 +245,7 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
   }
 
   object z3 extends Z3Module
+  object cvc5 extends CVC5Module
 
   def ctagsConfig = Task.Source {
     Task.workspace / "basilmill" / "scala.ctags"
