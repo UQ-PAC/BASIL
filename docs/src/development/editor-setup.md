@@ -1,6 +1,6 @@
 # Development Environment
 
-This is a Scala 3 project built using the [mill](mill-build.com) build system, it can be run with `./mill run`.
+This is a Scala 3 project built using the [mill](https://mill-build.org) build system, it can be run with `./mill run`.
 
 ### Local Development
 

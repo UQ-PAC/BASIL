@@ -1,16 +1,15 @@
-name: Doc
+name: Docs
 on:
   workflow_dispatch:
   workflow_call:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 concurrency:
   group: "pages-${{ github.ref }}"
   cancel-in-progress: false
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
 
 jobs:
   build-docs:
@@ -24,36 +23,43 @@ jobs:
       - run: sudo apt-get -y install latexmk texlive-latex-recommended texlive-lang-japanese texlive-latex-extra texlive-extra-utils poppler-utils
       - run: |
           ./mill --no-server allDocs
-          echo "dir=$(realpath out/allDocs.dest)" >> "$GITHUB_OUTPUT"
+          echo "dir=$(realpath out/allDocs.dest/BASIL)" >> "$GITHUB_OUTPUT"
         id: allDocs
 
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ${{ steps.allDocs.outputs.dir }}
 
+      - id: docArgs
+        run: echo "args=$(.github/workflows/check-doc-links.sh)" >> "$GITHUB_OUTPUT"
+        env:
+          LYCHEE_EXPORT_ARGS: "true"
+
       - uses: lycheeverse/lychee-action@v2
+        id: lychee
         with:
-          # last two --remap arguments will append index.html onto URLs with no extension (and allowing for # fragments)
-          # NOTE: this relies on --remap only actioning the /first/ matching regex
-          args: >-
-            ${{ steps.allDocs.outputs.dir }}
-            --fallback-extensions html,htm
-            --root-dir ${{ steps.allDocs.outputs.dir }}
-            --remap 'https://uq-pac.github.io/BASIL file://${{ steps.allDocs.outputs.dir }}'
-            --remap '(\.[a-z]+(#.*)?)$ $1'
-            --remap '^file:///.* $0/index.html'
-            --exclude '/scala-lang\.org/api/'
-            --exclude '#L\d+$'
-            --no-progress
+          args: ${{ steps.docArgs.outputs.args}}
           fail: false
           failIfEmpty: true
           jobSummary: false
-      - run: cat lychee/out.md
-      - run: |
-          sed 's|${{ steps.allDocs.outputs.dir }}||g' lychee/out.md > "$GITHUB_STEP_SUMMARY"
+      - name: >-
+          $lychee_exit_code == 0
+        run: |
+          sed -i.bak 's|${{ steps.allDocs.outputs.dir }}||g' lychee/out.md
+          cat lychee/out.md
+          if ! [[ "$lychee_exit_code" == 0 ]]; then
+            cat lychee/out.md >> "$GITHUB_STEP_SUMMARY"
+            exit "$lychee_exit_code"
+          fi
+        env:
+          lychee_exit_code: ${{ steps.lychee.outputs.exit_code }}
 
   deploy-docs:
     if: github.ref_name == 'main'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

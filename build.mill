@@ -25,14 +25,13 @@ import com.goyeau.mill.scalafix.ScalafixModule
 object `package` extends RootModule with ScalaModule with BasilDocs with BasilVersion with ScalafixModule {
   // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
-  def scalaVersion = "3.3.4"
+  override def scalaVersion = "3.3.6"
 
-  val ammonite = "3.0.2"
-  override def ammoniteVersion = ammonite
+  override def ammoniteVersion = "3.0.2"
 
-  def moduleDeps = Seq(basilAntlr, basilProto, bnfc)
+  override def moduleDeps = Seq(basilAntlr, basilProto, bnfc)
 
-  def scalacOptions: T[Seq[String]] = Seq("-deprecation", "-Wunused:imports", "-feature")
+  override def scalacOptions: T[Seq[String]] = Seq("-deprecation", "-Wunused:imports", "-feature")
 
   val javaTests = ivy"com.novocode:junit-interface:0.11"
   val scalaTests = ivy"org.scalatest::scalatest:3.2.19"
@@ -61,19 +60,17 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     )
   }
 
-  def mainClass = Some("Main")
+  override def mainClass = Some("Main")
 
-  def millSourcePath = super.millSourcePath / "src"
-  def sources = Task.Sources {
-    Seq(PathRef(this.millSourcePath / "main" / "scala"))
-  }
+  override def millSourcePath = super.millSourcePath / "src"
 
-  def forkArgs = Task {
+  override def forkArgs = Task {
     super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}:${cvc5.install()}")
+  override def sources = Task.Sources("main/scala")
   }
 
   // Windows for some reason wants the install path in PATH and ignores java.library.path, I cannot figure out why
-  def forkEnv = Task {
+  override def forkEnv = Task {
     if (System.getProperty("os.name").startsWith("Windows")) {
       super.forkEnv() + ("PATH" -> (sys.env("PATH") + s";${z3.install()};${cvc5.install()}"))
     } else { super.forkEnv() }
@@ -85,19 +82,19 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
 
   object test extends ScalaTests with TestModule.ScalaTest with ScalafixModule {
 
-    override def ammoniteVersion = ammonite
-    def ivyDeps = Agg(scalaTests, scalaCheck, javaTests)
-    def sources = Task.Sources {
-      Seq(PathRef(this.millSourcePath / "scala"))
-    }
+    override def ammoniteVersion = build.ammoniteVersion
+    override def ivyDeps = Agg(scalaTests, scalaCheck, javaTests)
+
+    def basilTestDir = build.moduleDir / "test"
+    override def sources = Task.Sources(basilTestDir / "scala")
 
     override def scalafixConfig = build.scalafixConfig
 
-    def forkArgs = Task {
+    override def forkArgs = Task {
       super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}:${cvc5.install()}")
     }
 
-    def forkEnv = Task {
+    override def forkEnv = Task {
       if (System.getProperty("os.name").startsWith("Windows")) {
         super.forkEnv() + ("PATH" -> (sys.env("PATH") + s";${z3.install()};${cvc5.install()}"))
       } else { super.forkEnv() }
@@ -108,7 +105,7 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
       Task.env.get("BASIL_TEST_PARALLEL").fold(false)(_.toBoolean)
     }
 
-    def testForkGrouping = Task {
+    override def testForkGrouping = Task {
       val numGroups = 13
       if (basilTestParallel()) {
         discoveredTestClasses().zipWithIndex.groupMap(x => x._2 % numGroups)(_._1).values.toSeq
@@ -122,24 +119,24 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     */
 
   def updateExpectedBAP() = Task.Command {
-    val correctPath = test.millSourcePath / "correct"
-    val incorrectPath = test.millSourcePath / "incorrect"
+    val correctPath = test.basilTestDir / "correct"
+    val incorrectPath = test.basilTestDir / "incorrect"
 
     expectedUpdate(correctPath, true, true)
     expectedUpdate(incorrectPath, false, true)
   }
 
   def updateExpectedGTIRB() = Task.Command {
-    val correctPath = test.millSourcePath / "correct"
-    val incorrectPath = test.millSourcePath / "incorrect"
+    val correctPath = test.basilTestDir / "correct"
+    val incorrectPath = test.basilTestDir / "incorrect"
 
     expectedUpdate(correctPath, true, false)
     expectedUpdate(incorrectPath, false, false)
   }
 
   def updateExpectedExtraSpec() = Task.Command {
-    val correctPath = test.millSourcePath / "extraspec_correct"
-    val incorrectPath = test.millSourcePath / "extraspec_incorrect"
+    val correctPath = test.basilTestDir / "extraspec_correct"
+    val incorrectPath = test.basilTestDir / "extraspec_incorrect"
     expectedUpdate(correctPath, true, true)
     expectedUpdate(incorrectPath, false, true)
     expectedUpdate(correctPath, true, false)
@@ -203,9 +200,7 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     override def ivyDeps = Agg(build.antlrRuntime)
     override def antlrPackage = Some("Parsers")
     override def antlrGenerateVisitor = true
-    override def antlrGrammarSources = Task.Sources {
-      Seq(PathRef(build.millSourcePath / "main" / "antlr4"))
-    }
+    override def antlrGrammarSources = Task.Sources(build.moduleDir / "main/antlr4")
   }
 
   object basilProto extends ScalaPBModule {
@@ -214,11 +209,9 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     override def scalaVersion = build.scalaVersion
     override def ivyDeps = Agg(build.scalapb)
 
-    override def scalaPBSources = Task.Sources {
-      Seq(PathRef(build.millSourcePath / "main" / "protobuf"))
-    }
+    override def scalaPBSources = Task.Sources(build.moduleDir / "main/protobuf")
 
-    def scalaDocOptions = Task {
+    override def scalaDocOptions = Task {
       super.scalaDocOptions() ++ build.scalaDocExternalMappingOptions()
     }
   }
@@ -226,9 +219,7 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
   object bnfc extends BNFCJFlexModule {
     override def bnfcPackageName = "basil_ir"
     override def bnfcExtraArgs = Seq("--line-numbers")
-    override def bnfcSource = Task.Source {
-      PathRef(build.millSourcePath / "main" / "bnfc" / "BasilIR.cf")
-    }
+    override def bnfcSource = Task.Source(build.moduleDir / "main/bnfc/BasilIR.cf")
     override def javadocOptions = Task {
       super.javadocOptions() ++ Seq(
         "-linkoffline",
@@ -239,7 +230,7 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
   }
 
   object mdbook extends mdbookBinary {
-    def mdbookSources = Task.Source {
+    override def mdbookSources = Task.Source {
       Task.workspace  / "docs"
     }
   }

@@ -12,7 +12,7 @@ trait BasilDocs extends ScalaModule {
   def scalaDocOptions = Task {
     super.scalaDocOptions() ++ scalaDocExternalMappingOptions() ++ Seq(
       s"-source-links:github://UQ-PAC/BASIL/${gitCommit().getOrElse("main")}",
-      s"-doc-root-content:$millSourcePath/main/scala/rootdoc.scala"
+      s"-doc-root-content:$moduleDir/main/scala/rootdoc.scala"
     )
   }
 
@@ -58,12 +58,12 @@ trait BasilDocs extends ScalaModule {
     Seq("-external-mappings:" + externals.mkString(","))
   }
 
-  def docsIndex = Task.Source {
-    PathRef(super.millSourcePath / "docs" / "static" / "index.html")
+  def docsIndex = Task {
+    PathRef(Task.workspace / "docs" / "static" / "index.html")
   }
 
   def allDocs = Task {
-    val dest = Task.dest
+    val dest = Task.dest / "BASIL"
 
     def copyDoc(p: Path, name: String) = {
       println(s"copying docs into $name from $p")
@@ -83,7 +83,7 @@ trait BasilDocs extends ScalaModule {
     os.walk(dest).foreach {
       case path if path.ext == "html" =>
         // HACK: fix mill bug causing incorrect scala source links https://github.com/com-lihaoyi/mill/issues/5221
-        val out = os.read(path).replace(super.millSourcePath.toString, "")
+        val out = os.read(path).replace(Task.workspace.toString, "")
         os.write.over(path, out)
       case path if path.last == "ux.js" =>
         val old = os.read(path)

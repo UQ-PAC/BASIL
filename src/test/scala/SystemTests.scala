@@ -49,6 +49,20 @@ trait SystemTests extends AnyFunSuite, CaptureOutput, BASILTest, TestCustomisati
 
   override def customiseTestsByName(name: String): Mode = Mode.Normal
 
+  override def withFixture(test: NoArgTest) = {
+    import gtirb.GTIRBReadELF.RelfCompatibilityLevel.*
+
+    val checkRelf = test.name match {
+      // XXX: these test cases have mismatching .relf and .gts files, so incompatibilies are expected
+      // until they are updated and fixed.
+      case s"incorrect/nestedifglobal/${_}" => Silent
+      case _ => Exception
+    }
+    gtirb.GTIRBReadELF.relfCompatibilityLevel.withValue(checkRelf) {
+      super.withFixture(test)
+    }
+  }
+
   def runTests(folder: String, conf: TestConfig): Unit = {
     val path = testPath + folder
     val programs = getSubdirectories(path)
@@ -273,7 +287,6 @@ class SystemTestsGTIRB extends SystemTests {
 
 @test_util.tags.StandardSystemTest
 class SystemTestsGTIRBOfflineLifter extends SystemTests {
-  override def testSuiteSuffix = ""
   runTests(
     "correct",
     TestConfig(
