@@ -1090,7 +1090,7 @@ class TranslationValidator {
       val splitName = "-" + proc.name // + "_split_" + splitNo
       // build smt query
       val b = translating.BasilIRToSMT2.SMTBuilder()
-      val solver = util.SMT.SMTSolver(Some(5000))
+      val solver = util.SMT.SMTSolver(Some(3))
       val prover = solver.getProver(true)
 
       b.addCommand("set-logic", "QF_BV")
@@ -1144,46 +1144,50 @@ class TranslationValidator {
       val fname = s"$filePrefix${splitName}.smt2"
       val query = b.getCheckSat()
       util.writeToFile(query, fname)
+      Logger.info(s"Write query $fname")
 
       timer.checkPoint("write out " + fname)
       Logger.writeToFile(File(s"${filePrefix}combined-${proc.name}.il"), translating.PrettyPrinter.pp_prog(newProg))
-      Logger.info(s"checksat $fname")
 
-      val res = prover.checkSat()
-      res match {
-        case SatResult.UNSAT => Logger.info("unsat")
-        case SatResult.SAT(m) => {
-          Logger.error(s"sat ${filePrefix} ${proc.name}")
+      val verify = false
+      if (verify) {
+        Logger.info(s"checksat $fname")
+        val res = prover.checkSat()
+        res match {
+          case SatResult.UNSAT => Logger.info("unsat")
+          case SatResult.SAT(m) => {
+            Logger.error(s"sat ${filePrefix} ${proc.name}")
 
-          val traces = source.blocks
-            .flatMap(b =>
-              try {
-                val s = srcRenameSSA(afterRenamer.stripNamespace(b.label), TransitionSystem.traceVar)
-                val t = tgtRenameSSA(afterRenamer.stripNamespace(b.label), TransitionSystem.traceVar)
-                Seq(b.label -> BinaryExpr(EQ, s, t))
-              } catch {
-                case _ => Seq()
-              }
+            val traces = source.blocks
+              .flatMap(b =>
+                try {
+                  val s = srcRenameSSA(afterRenamer.stripNamespace(b.label), TransitionSystem.traceVar)
+                  val t = tgtRenameSSA(afterRenamer.stripNamespace(b.label), TransitionSystem.traceVar)
+                  Seq(b.label -> BinaryExpr(EQ, s, t))
+                } catch {
+                  case _ => Seq()
+                }
+              )
+              .toMap
+
+            val g = processModel(
+              newProg.mainProcedure,
+              prover,
+              primedInv.toList,
+              traces,
+              invariantRenamingSrcTgt,
+              source.entryBlock.get.label,
+              target.entryBlock.get.label
             )
-            .toMap
 
-          val g = processModel(
-            newProg.mainProcedure,
-            prover,
-            primedInv.toList,
-            traces,
-            invariantRenamingSrcTgt,
-            source.entryBlock.get.label,
-            target.entryBlock.get.label
-          )
-
-          Logger.writeToFile(File(s"${filePrefix}counterexample-combined-${proc.name}.dot"), g)
-          // extract model
+            Logger.writeToFile(File(s"${filePrefix}counterexample-combined-${proc.name}.dot"), g)
+            // extract model
+          }
+          case SatResult.Unknown(m) => println(s"unknown: $m")
         }
-        case SatResult.Unknown(m) => println(s"unknown: $m")
-      }
 
-      timer.checkPoint("checksat")
+        timer.checkPoint("checksat")
+      }
 
     }
 

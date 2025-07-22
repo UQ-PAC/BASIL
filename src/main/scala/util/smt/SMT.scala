@@ -158,7 +158,7 @@ class SMTProver(
           try {
             Thread.sleep(m)
             shutdownManager.requestShutdown("Timeout")
-          } catch { _ => {} }
+          } catch { e => { println(s"$e") } }
         }
       })
     })
