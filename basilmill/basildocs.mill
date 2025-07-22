@@ -30,11 +30,11 @@ trait BasilDocs extends ScalaModule {
   def docsModules = Task {
     // these doc paths are copied into the combined docs output.
     Map(
-      "api/basil" -> docJar(),
-      "api/bnfc" -> build.bnfc.docJar(),
-      "api/basil-antlr" -> build.basilAntlr.docJar(),
-      "api/basil-proto" -> build.basilProto.docJar(),
-      "api/java-cup" -> build.bnfc.cup.docJar(),
+      "api/basil" -> scalaDocGenerated(),
+      "api/bnfc" -> build.bnfc.javadocGenerated(),
+      "api/basil-antlr" -> build.basilAntlr.javadocGenerated(),
+      "api/basil-proto" -> build.basilProto.scalaDocGenerated(),
+      "api/java-cup" -> build.bnfc.cup.javadocGenerated(),
     )
   }
 
@@ -70,11 +70,7 @@ trait BasilDocs extends ScalaModule {
     }
 
     docsModules().foreach {
-      case (name, src) =>
-        BuildCtx.withFilesystemCheckerDisabled {
-          // XXX: sandbox doesn't like us navigating to parent of src.path
-          copyDoc(src.path / ".." / "javadoc", name)
-        }
+      case (name, src) => copyDoc(src.path, name)
     }
     extraDocs().foreach {
       case (name, src) => copyDoc(src.path, name)

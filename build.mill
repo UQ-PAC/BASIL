@@ -218,7 +218,7 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
       super.javadocOptions() ++ Seq(
         "-linkoffline",
         s"$baseUrl/api/java-cup",
-        cup.docJar().path / ".." / "javadoc"
+        cup.javadocGenerated().path
       ).map(_.toString)
     }
   }
