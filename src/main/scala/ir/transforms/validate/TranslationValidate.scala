@@ -48,8 +48,22 @@ type BlockID = String
 
 /**
  * Describes the mapping from source variable to target expression at a given Block ID in the source program.
+ *
+ * FIXME: block ids are not required globally unique (althoguh they still are in practice I think),
+ *  so this signature isn't precise enough to capture all possible transforms 
  */
 type TransformDataRelationFun = Option[BlockID] => (Variable | Memory) => Option[Expr]
+
+enum FormalParam {
+  case Global(v: Memory | GlobalVar)
+  case FormalParam(n: String, t: IRType)
+}
+
+/**
+ * Describe renaming for a function call parameter list, map from variable to the (formal, actual) pair, 
+ * if actual is Some() it is invariant at any call site.
+ */
+type ParameterRenamingFun = (Variable | Memory) => (Variable, Option[Expr])
 
 def boolAnd(exps: Iterable[Expr]) =
   val l = exps.toList
@@ -146,7 +160,7 @@ class TranslationValidator {
   var initProg: Option[Program] = None
 
   var beforeProg: Option[Program] = None
-  var liveBefore = Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])]()
+  // var liveBefore = Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])]()
   var beforeFrame = Map[String, Frame]()
   // proc -> block -> absdom
 
@@ -157,7 +171,8 @@ class TranslationValidator {
   var beforeCuts: Map[Procedure, CutPointMap] = Map()
   var afterCuts: Map[Procedure, CutPointMap] = Map()
 
-  class IntraLiveVarsDomainSideEffect(frames: Map[String, Frame]) extends transforms.PowerSetDomain[Variable] {
+  class IntraLiveVarsDomainSideEffect(frames: Map[String, CallParamMapping])
+      extends transforms.PowerSetDomain[Variable] {
     // expected backwards
 
     val SideEffect = SideEffectStatementOfStatement(frames)
@@ -188,9 +203,10 @@ class TranslationValidator {
 
   def getLiveVars(
     p: Procedure,
-    frames: Map[Procedure, Frame]
+    frames: Map[String, CallParamMapping]
   ): (Map[Block, Set[Variable]], Map[Block, Set[Variable]]) = {
-    val liveVarsDom = IntraLiveVarsDomainSideEffect(frames.map((k, v) => k.name -> v).toMap)
+    transforms.reversePostOrder(p)
+    val liveVarsDom = IntraLiveVarsDomainSideEffect(frames)
     val liveVarsSolver = transforms.worklistSolver(liveVarsDom)
     liveVarsSolver.solveProc(p, backwards = true)
   }
@@ -485,7 +501,6 @@ class TranslationValidator {
   }
    */
 
-
   /**
    *
    * Match the actual signature of a call to the expected signature based on renaming, basically reorders the parameters
@@ -551,6 +566,8 @@ class TranslationValidator {
   * We re-infer the function signature of all target program procedures based on the transform
   * described by [[renaming]], and the [[Frame]] of the source. 
   *
+  *   **this describes all the observable effects of a procedure and forms invariant we validate**
+  *
   * Then at aver call we take the signature (traceVar @ procedureParams @ globalModSet) and map it
   * to the signature we infer here.
   *
@@ -569,11 +586,16 @@ class TranslationValidator {
   *
   */
   def getFunctionSigsRenaming(renaming: TransformDataRelationFun): Map[String, (CallParamMapping, CallParamMapping)] = {
-    import SideEffectStatementOfStatement.*
 
-    val traceOut = LocalVar("trace", BoolType) -> globalTraceVar
+    def param(v: Variable | Memory): (Variable | Memory, Option[Variable]) = v match {
+      case g: GlobalVar => (g -> Some(g))
+      case g: LocalVar => (g -> None)
+      case m: Memory => (m -> Some(SideEffectStatementOfStatement.traceVar(m)))
+    }
 
     def getParams(p: Procedure, frame: Frame) = {
+
+      val external = p.isExternal.contains(true) || (!(p.isExternal.contains(false)) || p.blocks.isEmpty)
 
       def paramTgt(v: Variable | Memory) = {
         renaming(p.entryBlock.map(_.label))(v) match {
@@ -622,7 +644,9 @@ class TranslationValidator {
   def getEqualVarsInvariantRenaming(
     // block label -> variable -> renamed variable
     afterProc: Procedure,
-    renamingSrcTgt: TransformDataRelationFun = _ => e => Some(e)
+    renamingSrcTgt: TransformDataRelationFun = _ => e => Some(e),
+    liveBefore: Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])],
+    liveAfter: Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])]
   ) = {
     val p = afterProc
 
@@ -696,7 +720,6 @@ class TranslationValidator {
     val f = inferProcFrames(p)
 
     beforeFrame = f.map((k, v) => (k.name, v)).toMap
-    liveBefore = p.procedures.map(p => p.name -> getLiveVars(p, f)).toMap
     // println(translating.PrettyPrinter.pp_prog(p))
     initProg = Some(p)
     initProgBefore = Some(ir.dsl.IRToDSL.convertProgram(p).resolve)
@@ -737,7 +760,6 @@ class TranslationValidator {
   def setSourceProg(p: Program) = {
     val f = inferProcFrames(p)
     afterFrame = f.map((k, v) => (k.name, v)).toMap
-    liveAfter = p.procedures.map(p => p.name -> getLiveVars(p, f)).toMap
     val (prog, cuts) = TransitionSystem.toTransitionSystem(p, f)
     afterProg = Some(prog)
     afterCuts = cuts
@@ -926,7 +948,7 @@ class TranslationValidator {
    * Returns a map from proceudre -> smt query
    */
   def getValidationSMT(
-    invariantRenamingSrcTgt: Option[String] => (Variable | Memory) => Option[Expr] = _ => e => Some(e),
+    invariantRenamingSrcTgt: TransformDataRelationFun = _ => e => Some(e),
     filePrefix: String = "tvsmt/"
   ): Unit = {
 
@@ -940,7 +962,16 @@ class TranslationValidator {
       .filter(n => beforeFrame.contains(n.name))
       .filter(n => afterFrame.contains(n.name))
 
-    val paramMapping = getFunctionSigsRenaming(invariantRenamingSrcTgt)
+    // TODO: only use this for procedure precondition, postcondition:
+    //    should encompass all observable effects of procedure
+    val paramMapping: Map[String, (CallParamMapping, CallParamMapping)] = getFunctionSigsRenaming(
+      invariantRenamingSrcTgt
+    )
+    val sourceParams = paramMapping.toSeq.map { case (pn, (source, target)) => (pn, source) }.toMap
+    val targetParams = paramMapping.toSeq.map { case (pn, (source, target)) => (pn, target) }.toMap
+
+    val liveBefore = initProgBefore.get.procedures.map(p => p.name -> getLiveVars(p, targetParams)).toMap
+    val liveAfter = initProg.get.procedures.map(p => p.name -> getLiveVars(p, sourceParams)).toMap
 
     for (proc <- interesting) {
 
@@ -961,12 +992,19 @@ class TranslationValidator {
       val inputs = TransitionSystem.programCounterVar :: TransitionSystem.traceVar :: (globalsForProc(proc).toList)
       val frames = (afterFrame ++ beforeFrame)
 
-      val (srcRenameSSA, srcLiveMemory) = SSADAG.transform(frames, source, inputs)
-      val (tgtRenameSSA, tgtLiveMemory) = SSADAG.transform(frames, target, inputs)
+      val (srcRenameSSA, srcLiveMemory) = SSADAG.transform(sourceParams, source, inputs)
+      val (tgtRenameSSA, tgtLiveMemory) = SSADAG.transform(targetParams, target, inputs)
       timer.checkPoint("SSA")
 
       val ackInv =
-        Ackermann.instantiateAxioms(source.entryBlock.get, target.entryBlock.get, frames, exprInSource, exprInTarget, paramMapping)
+        Ackermann.instantiateAxioms(
+          source.entryBlock.get,
+          target.entryBlock.get,
+          frames,
+          exprInSource,
+          exprInTarget,
+          invariantRenamingSrcTgt
+        )
       timer.checkPoint("ackermann")
 
       val pcInv = CompatArg(TransitionSystem.programCounterVar, TransitionSystem.programCounterVar)
@@ -994,7 +1032,7 @@ class TranslationValidator {
         Inv.CutPoint("ENTRY", List(CompatArg(srcLiveMemory(k), tgtLiveMemory(k))), Some(s"Memory$k"))
       )
 
-      val userInvariant = getEqualVarsInvariantRenaming(proc, invariantRenamingSrcTgt)
+      val userInvariant = getEqualVarsInvariantRenaming(proc, invariantRenamingSrcTgt, liveBefore, liveAfter)
       val invariant = initInv ++ userInvariant ++ memoryInit ++ alwaysInv
 
       val preInv = invariant

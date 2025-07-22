@@ -1,6 +1,5 @@
 package ir.transforms.validate
 
-import analysis.ProcFrames.*
 import ir.*
 import ir.transforms.Substitute
 
@@ -15,7 +14,7 @@ object SSADAG {
   *
   * Returns the SSA renaming for each block entry in the CFA.
   */
-  def transform(frames: Map[String, Frame], p: Procedure, inputs: List[Variable]) = {
+  def transform(frames: Map[String, CallParamMapping], p: Procedure, inputs: List[Variable]) = {
     convertToMonadicSideEffect(frames, p)
 
     val liveMemory = getReadMemory(p)
@@ -53,9 +52,9 @@ object SSADAG {
     visit_proc(Passify(), p)
   }
 
-  def convertToMonadicSideEffect(frames: Map[String, Frame], p: Procedure) = {
+  def convertToMonadicSideEffect(frames: Map[String, CallParamMapping], p: Procedure) = {
 
-    class MonadicConverter(frames: Map[String, Frame]) extends CILVisitor {
+    class MonadicConverter(frames: Map[String, CallParamMapping]) extends CILVisitor {
       val SF = SideEffectStatementOfStatement(frames)
       override def vstmt(s: Statement) = s match {
         case SF(s) => ChangeTo(List(s))

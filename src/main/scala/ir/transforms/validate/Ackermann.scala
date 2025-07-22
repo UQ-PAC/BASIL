@@ -6,14 +6,21 @@ import util.Logger
 
 import scala.collection.mutable
 
+case class Field(name: String)
 type EffCallFormalParam = Variable | Memory | Field
 
-
 /**
-*
 * Maps a input or output dependnecy of a call to a variable representing it in the TV
+*
+*  formal -> actual option
+*
+*  Allow providing an actual parameter that is always used
+*
 */
-case class CallParamMapping(lhs: List[(Variable | Memory, Variable)], rhs: List[(Variable | Memory, Variable)])
+case class CallParamMapping(
+  lhs: List[(EffCallFormalParam, Option[Variable])],
+  rhs: List[(EffCallFormalParam, Option[Expr])]
+)
 
 /**
  * Encodes the equality of source with target expression for a translation validation
@@ -36,7 +43,6 @@ case class CompatArg(source: Expr, target: Expr) {
   }
 }
 
-case class Field(name: String)
 case class SideEffectStatement(
   stmt: Statement,
   name: String,
@@ -65,7 +71,7 @@ object SideEffectStatementOfStatement {
   }
 }
 
-class SideEffectStatementOfStatement(frames: Map[String, Frame]) {
+class SideEffectStatementOfStatement(callParams: Map[String, CallParamMapping]) {
   import SideEffectStatementOfStatement.*
 
   def endianHint(e: Endian) = e match {
@@ -99,7 +105,7 @@ class SideEffectStatementOfStatement(frames: Map[String, Frame]) {
   //
 
   // need to have already lifted globals to locals
-  val traceOut = LocalVar("trace", BoolType) -> globalTraceVar
+  val traceOut = Field("trace") -> globalTraceVar
 
   /**
    * Unified monadic side-effect signature
@@ -107,18 +113,30 @@ class SideEffectStatementOfStatement(frames: Map[String, Frame]) {
    * (name, lhs named params, rhs named params)
    */
   def unapply(e: Statement): Option[SideEffectStatement] = e match {
-    case DirectCall(tgt, lhs, rhs, _) =>
-      val frame = frames.get(tgt.name).getOrElse(Frame())
-      val globsLHS = frame.modifiedGlobalVars.toList.map(param) ++ frame.modifiedMem.toList.map(param)
-      val globsRHS = frame.readGlobalVars.toList.map(param) ++ frame.readMem.toList.map(param)
-      Some(
-        SideEffectStatement(
-          e,
-          s"Call_${tgt.name}",
-          traceOut :: lhs.toList ++ globsLHS,
-          traceOut :: rhs.toList ++ globsRHS
-        )
-      )
+    case call @ DirectCall(tgt, lhs, rhs, _) =>
+      val params = callParams(tgt.name)
+
+      val realLHS = lhs.toMap
+      val realRHS = rhs.toMap
+
+      val external = tgt.isExternal.contains(true) || tgt.blocks.isEmpty
+
+      val lhsParams = params.lhs.map {
+        case (formal, Some(actual)) => formal -> actual
+        case (formal: LocalVar, None) =>
+          formal -> realLHS
+            .get(formal)
+            .getOrElse(throw Exception(s"Unable to instantiate call: $formal :: $call :: $params"))
+      }
+      val rhsParams = params.rhs.map {
+        case (formal, Some(actual)) => formal -> actual
+        case (formal: LocalVar, None) =>
+          formal -> realRHS
+            .get(formal)
+            .getOrElse(throw Exception(s"Unable to instantiate call: $formal :: $call :: $params"))
+      }
+
+      Some(SideEffectStatement(e, s"Call_${tgt.name}", lhsParams, rhsParams))
     case MemoryLoad(lhs, memory, addr, endian, size, _) =>
       val args = List(param(memory), Field("addr") -> addr)
       val rets = List(Field("out") -> lhs, param(memory))
@@ -185,59 +203,6 @@ object Ackermann {
     case ParamMismatch(msg: String)
   }
 
-
-  /**
-   * The transform describes the mappiung from source variables to target variables, 
-   * use this to map the parameter list of the source program into the target program
-   * and instantiate the call compatibility axiom if this holds. 
-   *
-   * This allows the source to introduce parameters to calls that preserve behaviour
-   * IFF enough is preserved for the called program to verify.
-   *
-   *
-   */
-  def instantiateAxiomInstanceFromSourceOnly(
-    paramMapping: Map[String, (CallParamMapping, CallParamMapping)],
-  )(source: SideEffectStatement, target: SideEffectStatement): Either[InstFailureReason, AckInv] = {
-    // source has higher level, has params, target does not have params
-
-    import InstFailureReason.*
-
-    def applyRename(a: EffCallFormalParam): EffCallFormalParam = a match {
-      case a: Field => a
-      case a: Memory => a
-      case v: Variable => v
-    }
-
-    for {
-      name <- (source, target) match {
-        case (l, r) if l.name == r.name => Right(l.name)
-        case (l, r) => Left(NameMismatch(s"Name incompat: ${l.name}, ${r.name}"))
-      }
-      targetArgs = target.rhs.toMap
-      args <- source.rhs.foldLeft(Right(List()): Either[InstFailureReason, List[CompatArg]]) {
-        case (agg, (formal, actual)) =>
-          agg.flatMap(agg => {
-            targetArgs.get(applyRename(formal)) match {
-              case Some(a) => Right(CompatArg(actual, a) :: agg)
-              case None => Left(ParamMismatch(s"Unable to match source var ${formal} in target list ${target.rhs}"))
-            }
-          })
-      }
-      targetLHS = target.lhs.toMap
-      lhs <- source.lhs.foldLeft(Right(List()): Either[InstFailureReason, List[CompatArg]]) {
-        case (agg, (formal, actual)) =>
-          agg.flatMap(agg => {
-            targetLHS.get(applyRename(formal)) match {
-              case Some(a) => Right(CompatArg(actual, a) :: agg)
-              case None => Left(ParamMismatch(s"Unable to match outparam ${formal} in target list ${target.lhs}"))
-            }
-          })
-      }
-    } yield (AckInv(name, lhs, args))
-  }
-
-
   /**
    * Check compatibility of two side effects and emit the lists (lhs, rhs) such that 
    *
@@ -245,7 +210,7 @@ object Ackermann {
    *
    */
   def instantiateAxiomInstance(
-    paramMapping: Map[String, (CallParamMapping, CallParamMapping)],
+    renaming: TransformDataRelationFun
   )(source: SideEffectStatement, target: SideEffectStatement): Either[InstFailureReason, AckInv] = {
     // source has higher level, has params, target does not have params
 
@@ -253,8 +218,16 @@ object Ackermann {
 
     def applyRename(a: EffCallFormalParam): EffCallFormalParam = a match {
       case a: Field => a
-      case a: Memory => a
-      case v: Variable => v
+      case a: (Memory | Variable) =>
+        renaming(None)(a) match {
+          case Some(n: EffCallFormalParam) => n
+          case Some(n) =>
+            Logger.warn(
+              s"Transform description fun rewrite formal parameter $a to $n, which I can't fit back into the formal parameter type Variable | Memory | Field, ignoring"
+            )
+            a
+          case None => a
+        }
     }
 
     for {
@@ -268,7 +241,12 @@ object Ackermann {
           agg.flatMap(agg => {
             targetArgs.get(applyRename(formal)) match {
               case Some(a) => Right(CompatArg(actual, a) :: agg)
-              case None => Left(ParamMismatch(s"Unable to match source var ${formal} in target list ${target.rhs}"))
+              case None =>
+                Left(
+                  ParamMismatch(
+                    s"Unable to match source var $formal to ${applyRename(formal)} in target list ${targetArgs.keys.toList}"
+                  )
+                )
             }
           })
       }
@@ -278,7 +256,12 @@ object Ackermann {
           agg.flatMap(agg => {
             targetLHS.get(applyRename(formal)) match {
               case Some(a) => Right(CompatArg(actual, a) :: agg)
-              case None => Left(ParamMismatch(s"Unable to match outparam ${formal} in target list ${target.lhs}"))
+              case None =>
+                Left(
+                  ParamMismatch(
+                    s"Unable to match outparam $formal to ${applyRename(formal)} in target list ${target.lhs}"
+                  )
+                )
             }
           })
       }
@@ -291,7 +274,7 @@ object Ackermann {
     frames: Map[String, Frame],
     renameSourceExpr: Expr => Expr,
     renameTargetExpr: Expr => Expr,
-    paramMapping: Map[String, (CallParamMapping, CallParamMapping)],
+    paramMapping: TransformDataRelationFun
   ): List[(Expr, String)] = {
     val seen = mutable.Set[CFGPosition]()
     var invariant = List[(Expr, String)]()
