@@ -1090,7 +1090,7 @@ class TranslationValidator {
       val splitName = "-" + proc.name // + "_split_" + splitNo
       // build smt query
       val b = translating.BasilIRToSMT2.SMTBuilder()
-      val solver = util.SMT.SMTSolver(Some(3))
+      val solver = util.SMT.SMTSolver(Some(3), util.SMT.Solver.CVC5)
       val prover = solver.getProver(true)
 
       b.addCommand("set-logic", "QF_BV")
@@ -1149,7 +1149,7 @@ class TranslationValidator {
       timer.checkPoint("write out " + fname)
       Logger.writeToFile(File(s"${filePrefix}combined-${proc.name}.il"), translating.PrettyPrinter.pp_prog(newProg))
 
-      val verify = false
+      val verify = true
       if (verify) {
         Logger.info(s"checksat $fname")
         val res = prover.checkSat()

@@ -28,6 +28,12 @@ enum SatResult {
   case Unknown(s: String)
 }
 
+
+enum Solver {
+  case Z3
+  case CVC5
+}
+
 /** A wrapper around an SMT solver.
  *
  *  (!!) It is very important (!!) to close the solver with [[close]] once you are done with it to prevent memory leaks!
@@ -41,7 +47,7 @@ enum SatResult {
  *
  *  Models can be obtained by requesting for them in smt query method calls.
  */
-class SMTSolver(var defaultTimeoutMillis: Option[Int] = None) {
+class SMTSolver(var defaultTimeoutMillis: Option[Int] = None, solver: Solver = Solver.Z3) {
 
   /** Create solver with timeout
    *
@@ -55,7 +61,10 @@ class SMTSolver(var defaultTimeoutMillis: Option[Int] = None) {
     val config = Configuration.defaultConfiguration()
     val logger = LogManager.createNullLogManager()
     val shutdown = shutdownManager.getNotifier()
-    SolverContextFactory.createSolverContext(config, logger, shutdown, SolverContextFactory.Solvers.Z3)
+    SolverContextFactory.createSolverContext(config, logger, shutdown, solver match {
+      case Solver.Z3 => SolverContextFactory.Solvers.Z3
+      case Solver.CVC5 => SolverContextFactory.Solvers.CVC5
+    })
   }
 
   val formulaConverter = FormulaConverter(solverContext.getFormulaManager())
