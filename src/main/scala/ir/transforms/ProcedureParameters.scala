@@ -53,7 +53,7 @@ def externalIn(name: String): Map[LocalVar, Variable] = {
   (builtinSigs.get(name)).map(fnsigToBinding).map(_._1) match {
     case Some(x) => x.toMap
     case None =>
-      ((0 to 30).toSet -- (19 to 28).toSet)
+      ((0 to 31).toSet -- (19 to 28).toSet)
         .map(i => LocalVar(s"R${i}_in", BitVecType(64)) -> LocalVar(s"R$i", BitVecType(64)))
         .toMap
   }
@@ -62,7 +62,7 @@ def externalOut(name: String): Map[LocalVar, Variable] = {
   (builtinSigs.get(name)).map(fnsigToBinding).map(_._2) match {
     case Some(x) => x.toMap
     case None =>
-      ((0 to 30).toSet -- (19 to 28).toSet)
+      ((0 to 31).toSet -- (19 to 28).toSet)
         .map(i => LocalVar(s"R${i}_out", BitVecType(64)) -> LocalVar(s"R$i", BitVecType(64)))
         .toMap
   }
