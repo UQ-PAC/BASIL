@@ -682,27 +682,21 @@ class TranslationValidator {
       }
     }
 
-    def getVars(v: (((EffCallFormalParam), Option[Expr]), ((EffCallFormalParam), Option[Expr]))) =  v match {
-        case ((_, Some(srcActual)), (_, Some(tgtActual))) =>
-          Seq(CompatArg(srcActual, tgtActual))
-        case ((srcFormal: (Variable | Memory), _), (tgtFormal: (Variable | Memory), _)) =>
-          Seq(CompatArg(paramRepr(srcFormal), paramRepr(tgtFormal)))
-        //case ((srcFormal: (Variable | Memory), Some(srcActual)), (tgtFormal: (Variable | Memory), Some(tgtActual))) =>
-        //  Seq(CompatArg(paramRepr(srcFormal), paramRepr(tgtFormal)), CompatArg(srcActual, tgtActual))
-        case _ => Seq()
+    def getVars(v: (((EffCallFormalParam), Option[Expr]), ((EffCallFormalParam), Option[Expr]))) = v match {
+      case ((_, Some(srcActual)), (_, Some(tgtActual))) =>
+        Seq(CompatArg(srcActual, tgtActual))
+      case ((srcFormal: (Variable | Memory), _), (tgtFormal: (Variable | Memory), _)) =>
+        Seq(CompatArg(paramRepr(srcFormal), paramRepr(tgtFormal)))
+      // case ((srcFormal: (Variable | Memory), Some(srcActual)), (tgtFormal: (Variable | Memory), Some(tgtActual))) =>
+      //  Seq(CompatArg(paramRepr(srcFormal), paramRepr(tgtFormal)), CompatArg(srcActual, tgtActual))
+      case _ => Seq()
     }
 
     val inparams =
-      Inv.CutPoint(
-        "ENTRY",
-        srcParams.rhs.toSeq.zip(tgtParams.rhs).flatMap(getVars) 
-      )
+      Inv.CutPoint("ENTRY", srcParams.rhs.toSeq.zip(tgtParams.rhs).flatMap(getVars))
 
     val outparams =
-      Inv.CutPoint(
-        "RETURN",
-        srcParams.lhs.toSeq.zip(tgtParams.lhs).flatMap(getVars)
-      )
+      Inv.CutPoint("RETURN", srcParams.lhs.toSeq.zip(tgtParams.lhs).flatMap(getVars))
 
     // skipping because should be live at entry and return resp.
     // val inparams = p.formalInParam.toList.map(p => CompatArg(p, p))
@@ -1034,8 +1028,7 @@ class TranslationValidator {
       TransitionSystem.totaliseAsserts(source)
       TransitionSystem.totaliseAsserts(target)
 
-
-      def inputs(c : CallParamMapping) = {
+      def inputs(c: CallParamMapping) = {
         c.rhs.collect {
           case (l, Some(r: Variable)) => r
           case (l: (Variable | Memory), _) => SideEffectStatementOfStatement.param(l)._2
@@ -1043,7 +1036,7 @@ class TranslationValidator {
         }
       }
 
-      //val inputs = TransitionSystem.programCounterVar :: TransitionSystem.traceVar :: (globalsForProc(proc).toList)
+      // val inputs = TransitionSystem.programCounterVar :: TransitionSystem.traceVar :: (globalsForProc(proc).toList)
       val frames = (afterFrame ++ beforeFrame)
 
       val srcRenameSSA = SSADAG.transform(sourceParams, source, inputs(sourceParams(proc.name)))
