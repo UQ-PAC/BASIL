@@ -66,8 +66,8 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
 
   override def forkArgs = Task {
     super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}:${cvc5.install()}")
-  override def sources = Task.Sources("main/scala")
   }
+  override def sources = Task.Sources("main/scala")
 
   // Windows for some reason wants the install path in PATH and ignores java.library.path, I cannot figure out why
   override def forkEnv = Task {
