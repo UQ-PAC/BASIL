@@ -682,32 +682,26 @@ class TranslationValidator {
       }
     }
 
+    def getVars(v: (((EffCallFormalParam), Option[Expr]), ((EffCallFormalParam), Option[Expr]))) =  v match {
+        case ((_, Some(srcActual)), (_, Some(tgtActual))) =>
+          Seq(CompatArg(srcActual, tgtActual))
+        case ((srcFormal: (Variable | Memory), _), (tgtFormal: (Variable | Memory), _)) =>
+          Seq(CompatArg(paramRepr(srcFormal), paramRepr(tgtFormal)))
+        //case ((srcFormal: (Variable | Memory), Some(srcActual)), (tgtFormal: (Variable | Memory), Some(tgtActual))) =>
+        //  Seq(CompatArg(paramRepr(srcFormal), paramRepr(tgtFormal)), CompatArg(srcActual, tgtActual))
+        case _ => Seq()
+    }
+
     val inparams =
       Inv.CutPoint(
         "ENTRY",
-        srcParams.rhs.toSeq.zip(tgtParams.rhs).flatMap {
-          case ((srcFormal: (Variable | Memory), Some(srcActual)), (tgtFormal: (Variable | Memory), Some(tgtActual))) =>
-            Seq(CompatArg(paramRepr(srcFormal), paramRepr(tgtFormal)), CompatArg(srcActual, tgtActual))
-          case ((srcFormal: (Variable | Memory), _), (tgtFormal: (Variable | Memory), _)) =>
-            Seq(CompatArg(paramRepr(srcFormal), paramRepr(tgtFormal)))
-          case ((_, Some(srcActual)), (_, Some(tgtActual))) =>
-            Seq(CompatArg(srcActual, tgtActual))
-          case _ => Seq()
-        }
+        srcParams.rhs.toSeq.zip(tgtParams.rhs).flatMap(getVars) 
       )
 
     val outparams =
       Inv.CutPoint(
         "RETURN",
-        srcParams.lhs.toSeq.zip(tgtParams.lhs).flatMap {
-          case ((srcFormal: (Variable | Memory), Some(srcActual)), (tgtFormal: (Variable | Memory), Some(tgtActual))) =>
-            Seq(CompatArg(paramRepr(srcFormal), paramRepr(tgtFormal)), CompatArg(srcActual, tgtActual))
-          case ((srcFormal: (Variable | Memory), _), (tgtFormal: (Variable | Memory), _)) =>
-            Seq(CompatArg(paramRepr(srcFormal), paramRepr(tgtFormal)))
-          case ((_, Some(srcActual)), (_, Some(tgtActual))) =>
-            Seq(CompatArg(srcActual, tgtActual))
-          case _ => Seq()
-        }
+        srcParams.lhs.toSeq.zip(tgtParams.lhs).flatMap(getVars)
       )
 
     // skipping because should be live at entry and return resp.
@@ -1040,11 +1034,20 @@ class TranslationValidator {
       TransitionSystem.totaliseAsserts(source)
       TransitionSystem.totaliseAsserts(target)
 
-      val inputs = TransitionSystem.programCounterVar :: TransitionSystem.traceVar :: (globalsForProc(proc).toList)
+
+      def inputs(c : CallParamMapping) = {
+        c.rhs.collect {
+          case (l, Some(r: Variable)) => r
+          case (l: (Variable | Memory), _) => SideEffectStatementOfStatement.param(l)._2
+          case _ => ???
+        }
+      }
+
+      //val inputs = TransitionSystem.programCounterVar :: TransitionSystem.traceVar :: (globalsForProc(proc).toList)
       val frames = (afterFrame ++ beforeFrame)
 
-      val srcRenameSSA = SSADAG.transform(sourceParams, source, inputs)
-      val tgtRenameSSA = SSADAG.transform(targetParams, target, inputs)
+      val srcRenameSSA = SSADAG.transform(sourceParams, source, inputs(sourceParams(proc.name)))
+      val tgtRenameSSA = SSADAG.transform(targetParams, target, inputs(targetParams(proc.name)))
       timer.checkPoint("SSA")
 
       val ackInv =
