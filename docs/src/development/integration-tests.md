@@ -1,11 +1,25 @@
-# Writing and Running Tests
+# Integration (system) tests
 
-See [docs/development/readme.md](../../docs/development/readme.md) for context.
+Basil's integration tests are made up of a number of C source code examples and stored under the src/test directory.
+These tests exercise the entire Basil pipeline, from
+loading the GTIRB/BAP data and transforming the Basil IR, to
+emitting and verifying a Boogie file.
 
-This tests in this repository are a number of source code files which must be
-compiled (through gcc and clang) and lifted (by BAP or ddisasm + ASLp)
-before they can be processed.
-This lifting is done deterministically in a Docker container.
+These test cases are also called "system tests" and are tagged under
+the `AnalysisSystemTest*` and `StandardSystemTest` tags.
+
+The tests must compiled (through gcc and clang) and
+lifted (by BAP or ddisasm + ASLp) before they can be processed.
+This lifting is done deterministically in a Docker container,
+and the lifted files are committed into the repository.
+
+Most test files are organised into either `src/test/correct` for examples that should verify and `src/test/incorrect`
+for examples that should not verify.
+A small number of test cases for specific test suites are stored
+in other subfolders of `src/test`.
+
+<!-- See [docs/development/readme.md](../../docs/development/readme.md) for context. -->
+
 
 <!--
 
@@ -22,8 +36,6 @@ so `make clean` is suggested beforehand.
 
 -->
 
-For much more detail about the lifting process, including how to add or edit
-test cases, keep reading.
 
 ## Introduction
 
@@ -242,6 +254,19 @@ You can use these steps to do so.
    If you are only changing a subset of tests, you can limit this using the DIRS or SUBDIRS arguments
    as shown above.
 
+5. After changing or re-lifting the the test files,
+   you should update the expected BASIL output files.
+   These `.expected` files store the Boogie output from
+   a past run of Basil and are used to detect changes in Basil's
+   output.
+
+   First, run the system test suites, then run:
+   ```bash
+   ./mill updateExpectedBAP
+   ./mill updateExpectedGTIRB
+   ./mill updateExpectedExtraSpec
+   ```
+
 <!--
 
 5. Run `make md5sum-update -j6` to generate new hashes.
@@ -261,7 +286,7 @@ You can use these steps to do so.
    ```
 
 -->
-12. Commit and PR your changes.
+6. Commit and PR your changes.
 
 <!--
 
