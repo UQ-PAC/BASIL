@@ -11,7 +11,7 @@ trait SymbolTableEntry {
 }
 
 case class FuncEntry(override val name: String, override val size: Int, override val address: BigInt)
-    extends SymbolTableEntry derives ir.dsl.ToScala
+    extends SymbolTableEntry with util.ProductOrdered[FuncEntry] derives ir.dsl.ToScala
 
 case class Specification(
   funcs: Set[FuncEntry],
@@ -54,4 +54,4 @@ case class SubroutineSpec(
   }
 }
 
-case class ExternalFunction(name: String, offset: BigInt) derives ir.dsl.ToScala
+case class ExternalFunction(name: String, offset: BigInt) extends util.ProductOrdered[ExternalFunction] derives ir.dsl.ToScala
