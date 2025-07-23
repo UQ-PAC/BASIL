@@ -788,8 +788,7 @@ case class SpecGlobal(
   override val address: BigInt
 ) extends SymbolTableEntry,
       SpecGlobalOrAccess,
-      util.ProductOrdered[SpecGlobal]
-      derives ir.dsl.ToScala {
+      util.ProductOrdered[SpecGlobal] derives ir.dsl.ToScala {
   override def specGlobals: Set[SpecGlobalOrAccess] = Set(this)
 
   def sanitisedName = util.StringEscape.escape(name)
