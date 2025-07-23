@@ -53,9 +53,7 @@ trait SystemTests extends AnyFunSuite, CaptureOutput, BASILTest, TestCustomisati
     import gtirb.GTIRBReadELF.RelfCompatibilityLevel.*
 
     val checkRelf = test.name match {
-      // XXX: these test cases have mismatching .relf and .gts files, so incompatibilies are expected
-      // until they are updated and fixed.
-      case s"incorrect/nestedifglobal/${_}" => Silent
+      // Throw by default for gtsrelf/oldrelf mismatches
       case _ => Exception
     }
     gtirb.GTIRBReadELF.relfCompatibilityLevel.withValue(checkRelf) {
