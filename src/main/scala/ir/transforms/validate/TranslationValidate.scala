@@ -53,6 +53,7 @@ type BlockID = String
  *  so this signature isn't precise enough to capture all possible transforms 
  */
 type TransformDataRelationFun = Option[BlockID] => (Variable | Memory) => Option[Expr]
+type TransformTargetTargetFlowFact = BlockID => Map[Variable, Expr]
 
 enum FormalParam {
   case Global(v: Memory | GlobalVar)
@@ -154,7 +155,7 @@ enum Inv {
 
 class TranslationValidator {
 
-  val timer = PerformanceTimer("translationValidator", LogLevel.DEBUG)
+  val timer = PerformanceTimer("translationValidator", LogLevel.INFO)
 
   var initProgBefore: Option[Program] = None
   var initProg: Option[Program] = None
@@ -988,7 +989,8 @@ class TranslationValidator {
    */
   def getValidationSMT(
     invariantRenamingSrcTgt: TransformDataRelationFun = _ => e => Some(e),
-    filePrefix: String = "tvsmt/"
+    filePrefix: String = "tvsmt/",
+    flowFacts: TransformTargetTargetFlowFact = _ => Map(), 
   ): Unit = {
 
     var splitCandidates = Map[Procedure, ArrayBuffer[GoTo]]()
@@ -1145,7 +1147,7 @@ class TranslationValidator {
       timer.checkPoint("write out " + fname)
       Logger.writeToFile(File(s"${filePrefix}combined-${proc.name}.il"), translating.PrettyPrinter.pp_prog(newProg))
 
-      val verify = true
+      val verify = false
       if (verify) {
         Logger.info(s"checksat $fname")
         val res = prover.checkSat()
@@ -1185,6 +1187,9 @@ class TranslationValidator {
         timer.checkPoint("checksat")
       }
 
+      prover.close()
+      solver.close()
+      io.github.cvc5.Context.deletePointers()
     }
 
     // }

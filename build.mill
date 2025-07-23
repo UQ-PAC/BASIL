@@ -269,7 +269,9 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
   def runProfile(profileDest: String, args: String*) = Task.Command {
     println(s"Profiling: you may want to set\n  sudo sysctl kernel.perf_event_paranoid=1\n  sudo sysctl kernel.kptr_restrict=0\n")
     val prof = asyncProf.path()
-    os.call(("java", s"-agentpath:${prof}=start,event=cpu,file=${profileDest}",  "-jar", assembly().path.toString, args), stdout = os.Inherit, cwd = Task.workspace)
+    val oargs : Seq[String] = forkArgs() 
+    val realArgs : Seq[String] = oargs ++ Seq(s"-agentpath:${prof}=start,event=cpu,file=${profileDest}")
+    os.call(Seq("java") ++ realArgs ++ Seq( "-jar", assembly().path.toString) ++ args, stdout = os.Inherit, cwd = Task.workspace)
   }
 
 }
