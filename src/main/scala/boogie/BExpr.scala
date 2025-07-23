@@ -774,13 +774,11 @@ trait SpecVar extends BExpr {
   }
 }
 
-trait SpecGlobalOrAccess extends SpecVar with Ordered[SpecGlobalOrAccess] {
+trait SpecGlobalOrAccess extends SpecVar {
   val toAddrVar: BExpr
   val toOldVar: BVar
   val toOldGamma: BVar
   val size: Int
-
-  def compare(that: SpecGlobalOrAccess): Int = address.compare(that.address)
 }
 
 case class SpecGlobal(
@@ -789,7 +787,9 @@ case class SpecGlobal(
   arraySize: Option[Int],
   override val address: BigInt
 ) extends SymbolTableEntry,
-      SpecGlobalOrAccess derives ir.dsl.ToScala {
+      SpecGlobalOrAccess,
+      util.ProductOrdered[SpecGlobal]
+      derives ir.dsl.ToScala {
   override def specGlobals: Set[SpecGlobalOrAccess] = Set(this)
 
   def sanitisedName = util.StringEscape.escape(name)
