@@ -258,7 +258,7 @@ def globalsToLiteral(ctx: IRContext) = {
     ++ (ctx.funcEntries.map(f => (f.name, BitVecLiteral(f.address.toInt, 64))).toMap)
 }
 
-@test_util.tags.AnalysisSystemTest
+@test_util.tags.AnalysisSystemTest3
 class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
 
   def runTest(relativePath: String, main: Option[String] = None, config: DSConfig = DSConfig()): BASILResult = {
