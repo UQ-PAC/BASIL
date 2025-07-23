@@ -1,46 +1,68 @@
 /* src/styles/CfgViewer.css */
 
-/* General container for the entire CFG viewer */
-.cfg-comparison-container {
-    display: flex; /* Arranges the 'before' and 'after' graphs side-by-side */
-    justify-content: space-around; /* Distributes space evenly */
-    gap: 20px; /* Space between the two graph wrappers */
+.cfg-comparison-container-wrapper {
+    display: flex;
+    flex-direction: column; /* Stack header and graphs vertically */
     width: 100%;
-    padding-bottom: 20px;
+    height: 100%; /* Now correctly takes 100% of html/body/root height */
     padding-right: 20px;
-    /*box-sizing: border-box; !* Include padding in the element's total width and height *!*/
+    padding-bottom: 20px;
+    box-sizing: border-box;
 }
 
-/* Individual graph wrapper (for "Before" and "After" sections) */
-.graph-wrapper {
-    flex: 1; /* Allows each graph to grow and shrink to fill available space */
+.cfg-viewer-header {
+    text-align: center;
+    border: 1px solid #000;
+    background-color: #E0E0E0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    flex-shrink: 0; /* Prevent header from shrinking */
+    border-radius: 8px;
+}
+
+.cfg-viewer-header h2 {
+    margin-top: 0;
+    color: #333;
+    font-size: 1.8em;
+}
+
+.cfg-comparison-container {
     display: flex;
-    flex-direction: column; /* Stack heading and React Flow instance vertically */
+    justify-content: space-around;
+    gap: 10px;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+}
+
+.graph-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     border: 1px solid #ddd;
     border-radius: 8px;
-    overflow: hidden; /* Ensures nothing spills out */
+    overflow: hidden;
     background-color: #f9f9f9;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    min-height: 0;
 }
 
 .graph-wrapper h3 {
     text-align: center;
-    padding: 10px 0;
+    padding: 5px 0;
     margin: 0; /* Remove default margin from h3 */
     background-color: #e0e0e0;
     border-bottom: 1px solid #ccc;
     color: #333;
     font-size: 1.2em;
+    flex-shrink: 0; /* Prevent title from shrinking */
 }
 
-/* React Flow instance container */
 .react-flow-instance {
-    flex-grow: 1; /* Makes the ReactFlow component fill the remaining space in its wrapper */
-    height: 100%; /* Important: React Flow needs a defined height from its parent */
+    flex-grow: 1;
+    height: 100%;
     width: 100%;
 }
 
-/* Messages when loading or no data */
 .cfg-viewer-message,
 .cfg-viewer-error {
     text-align: center;

@@ -5,7 +5,6 @@ import java.util.regex.Pattern
 
 import cats.effect._
 import cats.implicits._
-import cats.syntax.all._
 
 import org.http4s._
 import org.http4s.dsl.io._
@@ -258,6 +257,30 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean])(
                 }.flatMap { locationsList =>
                   Ok(locationsList.asJson)
                 }
+              case None => NotFound(s"Epoch '$epochName' not found.")
+            }
+      }
+
+    /**
+     * GET /procedures/{epochName}
+     *
+     * Endpoint to retrieve a list of all procedure names within a given epoch.
+     * This can be used to populate a dropdown menu for selecting specific procedures.
+     *
+     * @param epochName The name of the epoch.
+     * Returns: A JSON array of strings, where each string is a procedure name.
+     * On success: Responds with 200 OK.
+     * On failure: Responds with 404 Not Found if the specified `epochName` does not exist.
+     */
+    case GET -> Root / "procedures" / epochName =>
+      ensureReady {
+        logger.info(s"Received GET /procedures/$epochName request.") *>
+          epochStore.getEpoch(epochName)
+            .flatMap {
+              case Some(epoch) =>
+                val allProcedureNames = epoch.afterTransform.procedures.toList.map(_.procName)
+                val filteredProcedureNames = allProcedureNames.filter(_ != "main") // TODO: WHy not all
+                Ok(filteredProcedureNames.asJson)
               case None => NotFound(s"Epoch '$epochName' not found.")
             }
       }

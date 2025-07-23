@@ -113,6 +113,12 @@
     gap: 0.4em;
 }
 
+.procedure-select {
+    font-size: 0.9em;
+    color: #000;
+    white-space: nowrap;
+}
+
 .procedure-label {
     font-size: 0.9em;
     color: #1a1a1a;
@@ -125,6 +131,12 @@
         color: #e0e0e0; /* Light text for dark mode (e.g., a light grey) */
     }
 }
+
+/*@media (prefers-color-scheme: dark) {*/
+/*    .procedure-select {*/
+/*        color: #e0e0e0; !* Light text for dark mode (e.g., a light grey) *!*/
+/*    }*/
+/*}*/
 
 .procedure-dropdown:hover {
     border-color: #888;

@@ -16,8 +16,6 @@ import com.comcast.ip4s.port
 
 import cats.implicits._
 import cats.effect._
-import cats.effect.IO
-import cats.effect.Ref
 import cats.effect.std.Console
 import cats.effect.kernel.Resource
 import cats.effect.std.Semaphore
