@@ -10,6 +10,42 @@ not working.
 This page will describe some tools in the codebase which help with developing
 and maintaining test cases.
 
+## Running test suites
+
+`mill test.testOnly` can be used to run a particular test suite.
+Test suite names are glob matched against its argument.
+
+For example, to run all the SystemTest variants use:
+```bash
+./mill test.testOnly 'SystemTest*'
+```
+
+`./mill -w test.testOnly ...` can be used to re-run
+a test suite on every Scala change.
+This is useful for test-driven development.
+
+The list of test suites can be found using
+```bash
+./mill show test.discoveredTestClasses
+```
+
+To run only tests from a specific tag, you can use
+```bash
+./scripts/scalatest.sh -o -n test_utils.tags.UnitTest
+```
+Note that the tag name must be fully-qualified (i.e., including the package name).
+See [the Scalatest runner docs](https://www.scalatest.org/user_guide/using_the_runner) or the `scalatest.sh` file
+for more options.
+
+To run all non-disabled tests (i.e., all tests which CI will run),
+you can use
+```bash
+./scripts/scalatest.sh -o -l test_utils.tags.DisabledTest
+```
+
+Finally, `./mill test` will run _all_ tests, including disabled ones.
+This is generally less useful, as some test suites are known to be broken.
+
 Writing test cases
 ------------------
 
@@ -42,14 +78,6 @@ Each test suite should be tagged with one of the
 [`@test_util.tags.*Test`](https://github.com/UQ-PAC/BASIL/tree/main/src/test/scala/test_util/tags) tags,
 placed on the line before the AnyFunSuite class declaration.
 A test suite may, additionally, be tagged with one or more of the supplementary tags (those not ending in Test).
-
-To run only tests from a specific tag, you can use
-```bash
-./scripts/scalatest.sh -o -n test_utils.tags.TagName
-```
-Note that the tag name must be fully-qualified (i.e., including the package name).
-See [the Scalatest runner docs](https://www.scalatest.org/user_guide/using_the_runner) or the `scalatest.sh` file
-for more options.
 
 ### Dynamic tests
 
@@ -151,41 +179,3 @@ executing scalatest.
 The disabled mode will show as "cancelled".
 Both of these will be output in yellow text if your console is using colour.
 
-
-## Running Individual suites
-
-From git root directory run `mill test.testOnly`, tests suite names are glob matched against its argument,
-for example to run all the SystemTest variants use:
-
-```
-$ ./mill test.testOnly 'SystemTests*'
-```
-
-
-### Compiling the Integration test binaries
-
-These are checked in to the respository, but can be recompiled (and new tests compiled) with the following instructions:
-
-These are the `SystemTests.scala` test case with the files present in `src/test/correct` for examples that should verify and `src/test/incorrect`
-for examples that should not verify.
-
-These are lifted via the Makefiles, to add another test simply add a directory, C source file, and optionally specification file and run
-
-```sh
-cd src/test/
-make
-```
-
-The `config.mk` file in each test directory can be used to exclude unnecessary compilers and change compilation flags.
-
-To update the expected BASIL output files from the SystemTests results run:
-
-```
-$ ./mill updateExpected
-```
-
-To list all test suites:
-
-```
-$ ./mill test.testOnly '*' -- -t ''
-```

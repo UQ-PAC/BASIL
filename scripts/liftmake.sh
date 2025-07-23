@@ -10,7 +10,7 @@ case "${o}" in
     c)
         CFILE_NAME="$CFILE_NAME ${OPTARG}"
         ;;
-    *) 
+    *)
         if ${OPTARG} == "--" ; then
         	break;
         fi
@@ -18,7 +18,7 @@ case "${o}" in
 done
 shift $((OPTIND-1))
 
-if [[ -z "$CFILE_NAME" ]] && [[ -z "$BIN_NAME" ]] ; then 
+if [[ -z "$CFILE_NAME" ]] && [[ -z "$BIN_NAME" ]] ; then
     echo "Usage: (-c cfile.c |-b binaryname) [ -- make args]"
     echo "Optionally variables CC, CFLAGS, DDISASM, READELF, GTIRBSEM, BAP to change the the binary path to the lifter tools"
     exit 1
@@ -28,6 +28,10 @@ BIN_NAME=${BIN_NAME:=$(echo "$CFILE_NAME" | sed -s 's/.c$//' | tr -d ' ')}
 export BIN_NAME
 export CFILE_NAME
 
+# use $CC variable if set, falling back to $GCC if set, then
+# finally falling back to a hardcoded gcc.
+export CC="${CC:-${GCC:-aarch64-linux-gnu-gcc}}"
+
 make "$@" -f - << 'EOF'
 CC ?= aarch64-linux-gnu-gcc
 DDISASM ?= ddisasm
@@ -35,7 +39,7 @@ READELF ?= readelf
 GTIRBSEM ?= gtirb_semantics
 BAP ?= bap
 
-.PHONY=all clean 
+.PHONY=all clean
 all: $(BIN_NAME).relf $(BIN_NAME).gts
 
 $(BIN_NAME): $(CFILE_NAME)
