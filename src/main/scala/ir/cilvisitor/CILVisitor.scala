@@ -206,7 +206,8 @@ class CILVisitorImpl(val v: CILVisitor) {
             b.statements.insertAllAfter(Some(n), tl)
         }
       }
-      b.replaceJump(visit_jump(b.jump))
+      val newjump = visit_jump(b.jump)
+      b.replaceJump(newjump)
       b
     }
 
@@ -217,7 +218,8 @@ class CILVisitorImpl(val v: CILVisitor) {
     def continue(p: Procedure) = {
       v.enter_scope(p.formalInParam)
       for (b <- p.blocks) {
-        p.replaceBlock(b, visit_block(b))
+        val b2 = visit_block(b)
+        p.replaceBlock(b, b2)
       }
       v.leave_scope()
       p
