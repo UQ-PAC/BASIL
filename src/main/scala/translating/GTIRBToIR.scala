@@ -4,11 +4,11 @@ import com.grammatech.gtirb.proto.CFG.EdgeType.*
 import com.grammatech.gtirb.proto.CFG.{CFG, Edge, EdgeLabel}
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Symbol.Symbol
-import gtirb.*
+import gtirb.AuxDecoder
 import gtirb.AuxDecoder.AuxKind
 import ir.*
 import util.Logger
-import util.functional.{Snoc, foldLeft0}
+import util.functional.{Snoc}
 
 import java.util.Base64
 import scala.collection.mutable.{ArrayBuffer, Map, Set}
@@ -50,7 +50,7 @@ class TempIf(
 /** GTIRBToIR class. Forms an IR as close as possible to the one produced by BAP by using GTIRB instead
   *
   * @param mods:
-  *   Modules of the Gtirb file.
+  *   Module from the Gtirb file.
   * @param parserMap:
   *   A Map from UUIDs to basic block statements, used for instruction semantics.
   *   If None is provided then the offline lifter is used to generate instruction semantics.
@@ -60,16 +60,18 @@ class TempIf(
   *   The address of the main function
   */
 class GTIRBToIR(
-  mods: Seq[Module],
+  mod: Module,
   lifter: InsnLoader,
   cfg: CFG,
   mainAddress: Option[BigInt],
   mainName: Option[String]
 ) {
 
-  val functionNames = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionNames)(_)).foldLeft0(_ ++ _)
-  val functionEntries = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionEntries)(_)).foldLeft0(_ ++ _)
-  val functionBlocks = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionBlocks)(_)).foldLeft0(_ ++ _)
+  protected val gtirbResolver = gtirb.GTIRBResolver(mod)
+
+  val functionNames = AuxDecoder.decodeAux(AuxKind.FunctionNames)(mod)
+  val functionEntries = AuxDecoder.decodeAux(AuxKind.FunctionEntries)(mod)
+  val functionBlocks = AuxDecoder.decodeAux(AuxKind.FunctionBlocks)(mod)
 
   import scala.language.implicitConversions
   given scala.Conversion[com.google.protobuf.ByteString, String] = b64encode
@@ -78,14 +80,14 @@ class GTIRBToIR(
   private val blockUUIDToAddress = createAddresses()
 
   // mapping from a symbol's UUID to the symbol itself
-  private val uuidToSymbol = mods.flatMap(_.symbols).map(s => b64encode(s.uuid) -> s).toMap
+  private val uuidToSymbol = mod.symbols.map(s => b64encode(s.uuid) -> s).toMap
 
   // mapping from a node's UUID to the symbols associated with that node
   // can be used to get the names of external functions associated with proxy blocks
   private val nodeUUIDToSymbols = createSymbolMap()
 
   // mapping from a proxy block's UUID to the proxy block
-  private val proxies = mods.flatMap(_.proxies.map(p => b64encode(p.uuid) -> p)).toMap
+  private val proxies = mod.proxies.map(p => b64encode(p.uuid) -> p).toMap
 
   // mapping from a block's UUID to the outgoing edges from that block
   private val blockOutgoingEdges = createCFGMap()
@@ -105,7 +107,6 @@ class GTIRBToIR(
   // maps block UUIDs to their address
   private def createAddresses(): immutable.Map[String, BigInt] = {
     val blockAddresses: immutable.Map[String, BigInt] = (for {
-      mod <- mods
       section <- mod.sections
       byteInterval <- section.byteIntervals
       block <- byteInterval.blocks
@@ -167,16 +168,16 @@ class GTIRBToIR(
   def createIR(): Program = {
     val procedures: ArrayBuffer[Procedure] = ArrayBuffer()
 
-    for ((functionUUID, symbolUUID) <- functionNames) {
-      val procedure = createProcedure(functionUUID, symbolUUID)
+    val gtirbFuncNames = functionNames.toList.map((p, s) => (p, uuidToSymbol(s))).sortBy(_._2.name)
+    for ((functionUUID, sym) <- gtirbFuncNames) {
+      val procedure = createProcedure(functionUUID, sym.name)
       procedures += procedure
     }
 
-    // maybe good to sort blocks by address around here?
+    val gtirbFuncBlocks = functionBlocks.toList.map((p, bs) => (uuidToProcedure(p), bs)).sortBy(_._1.address)
+    for ((procedure, blockUUIDs) <- gtirbFuncBlocks) {
 
-    for ((functionUUID, blockUUIDs) <- functionBlocks) {
-      val procedure = uuidToProcedure(functionUUID)
-      for (blockUUID <- blockUUIDs) {
+      for (blockUUID <- blockUUIDs.toList.sorted) {
         val block = uuidToBlock(blockUUID)
 
         val statements = lifter.decodeBlock(blockUUID, block.address)
@@ -209,7 +210,7 @@ class GTIRBToIR(
       }
     }
 
-    val sections = mods.flatMap(_.sections)
+    val sections = mod.sections
 
     val initialMemory: mutable.TreeMap[BigInt, MemorySection] = mutable.TreeMap()
     sections.map { elem =>
@@ -296,9 +297,7 @@ class GTIRBToIR(
     }
   }
 
-  private def createProcedure(functionUUID: String, symbolUUID: String): Procedure = {
-    val name = uuidToSymbol(symbolUUID).name
-
+  private def createProcedure(functionUUID: String, name: String): Procedure = {
     val entrances = functionEntries(functionUUID)
     if (entrances.size > 1) {
       // TODO this is a case that requires special consideration
@@ -651,7 +650,7 @@ class GTIRBToIR(
 
     } else if (edgeLabels.forall { (e: EdgeLabel) => !e.conditional && !e.direct && e.`type` == Type_Branch }) {
       // resolved indirect call with multiple blocks as targets
-      val targets = mutable.Set[Block]()
+      val targets = mutable.SortedSet[Block]()(Ordering.by(b => (b.address, b.label)))
       for (edge <- outgoingEdges) {
         if (uuidToBlock.contains(edge.targetUuid)) {
           // TODO consider possibility edge goes to another procedure?

@@ -104,8 +104,8 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
         }
 
         val addr = k.getReferentAddress
-        val value = k.getScalarValue
-        val combinedValue = addr.orElse(value).getOrElse(0L)
+        val value = k.getScalarValue.map(BigInt(_))
+        val combinedValue = (addr orElse value).getOrElse(BigInt(0))
 
         val (size, ty, bind, vis, shndx) = k.symEntry
 
@@ -118,7 +118,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
             Some(
               ELFSymbol(
                 idx,
-                combinedValue,
+                combinedValue.toLong,
                 size.toInt,
                 ELFSymType.valueOf(ty),
                 ELFBind.valueOf(bind),

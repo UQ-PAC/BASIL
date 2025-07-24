@@ -69,7 +69,7 @@ case class GTIRBResolver(val mod: Module) {
       case x: DataBlock => x.size
       case x: CodeBlock => x.size
     }
-    val address = block.offset + interval.address
+    val address = BigInt(block.offset) + BigInt(interval.address)
   }
 
   extension (x: BlockRef)
@@ -142,7 +142,7 @@ case class GTIRBResolver(val mod: Module) {
 
   extension (x: FunctionRef)
     /**
-     * Gets the set of entry block UUIDs for the given function.
+     * Gets the entry block(s) for the given function.
      */
     def getEntries = funcEntries(x)
 
@@ -150,6 +150,11 @@ case class GTIRBResolver(val mod: Module) {
      * Gets the [[GTIRBRef.SymbolRef]] for the given function.
      */
     def getName = funcNames(x)
+
+    /**
+     * Gets the constituent block(s) for the given function.
+     */
+    def getBlocks = funcBlocks(x)
 
   private def mapFirst[T, T2, U](f: T => T2)(x: (T, U)) = (f(x._1), x._2)
 
@@ -190,6 +195,9 @@ case class GTIRBResolver(val mod: Module) {
   }
   val funcNamesInverse = funcNames.map(_.swap)
   val funcEntries = decodeAux(AuxKind.FunctionEntries)(mod).map { case (a, b) =>
+    FunctionRef(a) -> b.map(BlockRef(_))
+  }
+  val funcBlocks = decodeAux(AuxKind.FunctionBlocks)(mod).map { case (a, b) =>
     FunctionRef(a) -> b.map(BlockRef(_))
   }
 

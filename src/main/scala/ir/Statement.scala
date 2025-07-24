@@ -288,9 +288,9 @@ class GoTo private (_targets: mutable.LinkedHashSet[Block], var label: Option[St
 
   def this(targets: Iterable[Block], label: Option[String] = None) = this(mutable.LinkedHashSet.from(targets), label)
 
-  def this(target: Block) = this(mutable.Set(target), None)
+  def this(target: Block) = this(Seq(target), None)
 
-  def targets: Set[Block] = _targets.toSet
+  def targets: collection.Set[Block] = _targets.to(mutable.LinkedHashSet)
 
   override def deepEquals(o: Object): Boolean = o match {
     case GoTo(tgts, lbl) => tgts.map(_.label).toSet == targets.map(_.label).toSet && lbl == label
@@ -329,7 +329,7 @@ class GoTo private (_targets: mutable.LinkedHashSet[Block], var label: Option[St
 }
 
 object GoTo {
-  def unapply(g: GoTo): Some[(Set[Block], Option[String])] = Some(g.targets, g.label)
+  def unapply(g: GoTo): Some[(collection.Set[Block], Option[String])] = Some(g.targets, g.label)
 }
 
 sealed trait Call extends Statement {

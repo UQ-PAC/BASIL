@@ -60,7 +60,7 @@ private object CaseIR {
   case class Assume(body: Expr, comment: Option[String] = None, label: Option[String] = None, checkSecurity: Boolean = false) extends Statement
   case class Unreachable(label: Option[String] = None) extends Jump
   case class Return(label: Option[String] = None, outParams : Map[LocalVar, Expr] = SortedMap()) extends Jump
-  case class GoTo (targets: Set[Block], label: Option[String]) extends Jump
+  case class GoTo (targets: collection.Set[Block], label: Option[String]) extends Jump
   case class DirectCall(target: Procedure, label: Option[String] = None, outParams: Map[LocalVar, Variable] = SortedMap(), actualParams: Map[LocalVar, Expr] = SortedMap()) extends Call with Assign
   case class IndirectCall(target: Variable, label: Option[String] = None) extends Call
 

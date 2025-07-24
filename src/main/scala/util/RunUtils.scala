@@ -163,6 +163,7 @@ object IRLoading {
         Logger.info("[!] Disabling PC tracking transforms due to IL input")
       }
       case _ => {
+        q.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-00-before-pc-tracking.il"), pp_irctx(ctx)))
         ir.transforms.PCTracking.applyPCTracking(q.pcTracking, ctx.program)
         ctx.program.procedures.foreach(_.normaliseBlockNames())
         ir.transforms.clearParams(ctx.program)
@@ -209,7 +210,10 @@ object IRLoading {
         ParserMapInsnLoader(mods)
       }
 
-    val GTIRBConverter = GTIRBToIR(mods, lifter, cfg, mainAddress, mainName)
+    if (mods.size != 1)
+      Logger.warn(s"Using first GTIRB module out of ${mods.size} detected")
+
+    val GTIRBConverter = GTIRBToIR(mods.head, lifter, cfg, mainAddress, mainName)
     GTIRBConverter.createIR()
   }
 
