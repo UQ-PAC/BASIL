@@ -905,6 +905,8 @@ object RunUtils {
     Logger.info("[!] Loading Program")
     val q = conf
     var ctx = q.context.getOrElse(IRLoading.load(q.loading))
+    q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-00-loaded.il"), pp_irctx(ctx)))
+    // throw Exception("fdsa")
     postLoad(ctx) // allows extracting information from the original loaded program
 
     assert(ir.invariant.checkTypeCorrect(ctx.program))
@@ -913,9 +915,11 @@ object RunUtils {
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
 
     ctx = IRTransform.doCleanup(ctx, conf.simplify)
+    q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-01-cleaned.il"), pp_irctx(ctx)))
     assert(ir.invariant.programDiamondForm(ctx.program))
 
     transforms.inlinePLTLaunchpad(ctx.program)
+    q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-02-inlined-plt.il"), pp_irctx(ctx)))
 
     assert(ir.invariant.programDiamondForm(ctx.program))
     if (q.loading.trimEarly) {
@@ -929,6 +933,7 @@ object RunUtils {
     assert(ir.invariant.programDiamondForm(ctx.program))
     ctx.program.procedures.foreach(transforms.RemoveUnreachableBlocks.apply)
     Logger.info(s"[!] Removed unreachable blocks")
+    q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-03-removed-unreachable.il"), pp_irctx(ctx)))
 
     if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)
@@ -1039,6 +1044,7 @@ object RunUtils {
     }
 
     IRTransform.prepareForTranslation(q, ctx)
+    q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-04-prepared-for-translation.il"), pp_irctx(ctx)))
 
     if (conf.generateRelyGuarantees) {
       StaticAnalysisLogger.info("[!] Generating Rely-Guarantee Conditions")
@@ -1059,6 +1065,7 @@ object RunUtils {
     val regionInjector = analysis.flatMap(a => a.regionInjector)
     assert(ir.invariant.checkTypeCorrect(ctx.program))
 
+    q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-05-before-boogie.il"), pp_irctx(ctx)))
     val boogiePrograms = if (q.boogieTranslation.directTranslation) {
       Logger.info("Disabling WPIF VCs")
       ArrayBuffer(translating.BoogieTranslator.translateProg(ctx.program, q.outputPrefix))
