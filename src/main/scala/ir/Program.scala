@@ -117,7 +117,7 @@ class Program(
 
     def walk(p: Procedure): Unit = {
       seen += p
-      for (n <- p.calls) {
+      for (n <- p.calls.toList.sortBy(_.name)) {
         if (!seen.contains(n)) {
           walk(n)
         }

@@ -1157,7 +1157,7 @@ def reversePostOrder(startBlock: Block, fixup: Boolean = false, begin: Int = 0):
 
   def walk(b: Block): Unit = {
     seen += b
-    for (s <- b.nextBlocks) {
+    for (s <- b.nextBlocks.toList.sortBy(_.address)) {
       if (!seen.contains(s)) {
         walk(s)
       }
@@ -1926,7 +1926,7 @@ class DefinitelyExits(knownExit: Set[Procedure]) extends ProcedureSummaryGenerat
 
   def transfer(a: ir.transforms.PathExit, b: ir.Procedure): ir.transforms.PathExit = ???
 
-  /** 
+  /**
    *  Join the summary [[summaryForTarget]] for a call [[p]] into the local abstract state [[l]]
    */
   def localTransferCall(
