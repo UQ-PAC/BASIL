@@ -21,6 +21,8 @@ enum BVTerm {
   case ZeroExtend(extension: Int, body: BVTerm)
   case SignExtend(extension: Int, body: BVTerm)
 
+  // TODO width correctness
+
   private var simplified: Boolean = false
 
   override def toString(): String = this.toBoogie.toString()
@@ -826,13 +828,13 @@ def exprToPredicate(e: Expr): Option[Predicate] = e match {
  * A domain with a conversion between abstract states and predicates.
  *
  * Abstractly, we can define a concretisation function from the set of predicates to the concrete domain, giving the set of states that satisfy the predicate.
- * For soundness, ensure that
+ * For soundness, ensure that (TODO? this may be wrong, maybe this should be written in terms of wp and sp)
  * - for may analyses, gamma_p (toPred(l)) \supset gamma_a(l) for all l of type L
  *                 and gamma_a (fromPred(p)) \supset gamma_p(p) for all predicates p
  * - for must analyses, gamma_p (toPred(l)) \subset gamma_a(l) for all l of type L
  *                 and gamma_a (fromPred(p)) \subset gamma_p(p) for all predicates p
  * where gamma_p is the predicate concretisation function and gamma_a is the domain concretisation function.
- * Intuitively, the predicate should be an approximation of the abstract state, cannot soundly be more precise than the domain itself.
+ * Intuitively, the predicate should be an approximation of the abstract state, and cannot soundly be more precise than the domain itself.
  */
 trait PredicateEncodingDomain[L] extends AbstractDomain[L] {
 
