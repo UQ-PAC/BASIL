@@ -565,55 +565,78 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends ValueLattice[
     TNum(v, mu)
   }
 
-  def booland(other: TNum): TNum = ???
-  def boolnot(): TNum = ???
-  def boolor(other: TNum): TNum = ???
-  def booltobv1(): TNum = ???
-  def bottom: TNum = ???
-  def bvadd(other: TNum): TNum = ???
-  def bvand(other: TNum): TNum = ???
-  def bvashr(other: TNum): TNum = ???
-  def bvcomp(other: TNum): TNum = ???
-  def bvconcat(other: TNum): TNum = ???
-  def bvlshr(other: TNum): TNum = ???
-  def bvmul(other: TNum): TNum = ???
-  def bvneg(): TNum = ???
-  def bvnot(): TNum = ???
-  def bvor(other: TNum): TNum = ???
-  def bvsdiv(other: TNum): TNum = ???
-  def bvsge(other: TNum): TNum = ???
-  def bvsgt(other: TNum): TNum = ???
-  def bvshl(other: TNum): TNum = ???
-  def bvshr(other: TNum): TNum = ???
-  def bvsle(other: TNum): TNum = ???
-  def bvslt(other: TNum): TNum = ???
-  def bvsmod(other: TNum): TNum = ???
-  def bvsrem(other: TNum): TNum = ???
-  def bvsub(other: TNum): TNum = ???
-  def bvudiv(other: TNum): TNum = ???
-  def bvuge(other: TNum): TNum = ???
-  def bvugt(other: TNum): TNum = ???
-  def bvule(other: TNum): TNum = ???
-  def bvult(other: TNum): TNum = ???
-  def bvurem(other: TNum): TNum = ???
-  def bvxor(other: TNum): TNum = ???
-  def constant(v: ir.Literal): TNum = ???
-  def equal(other: TNum): TNum = ???
-  def extract(hi: Int, lo: Int): TNum = ???
-  def intadd(other: TNum): TNum = ???
-  def intdiv(other: TNum): TNum = ???
-  def intge(other: TNum): TNum = ???
-  def intgt(other: TNum): TNum = ???
-  def intle(other: TNum): TNum = ???
-  def intlt(other: TNum): TNum = ???
-  def intmod(other: TNum): TNum = ???
-  def intmul(other: TNum): TNum = ???
-  def intneg(): TNum = ???
-  def intsub(other: TNum): TNum = ???
-  def meet(x: TNum): TNum = ???
-  def repeat(repeats: Int): TNum = ???
-  def sign_extend(extend: Int): TNum = ???
-  def zero_extend(extend: Int): TNum = ???
+  private inline def mapBoth(f: BitVecLiteral => BitVecLiteral) =
+    TNum(f(value), f(mask))
+
+  /**
+   * Hack to define a certain "big enough" width to represent
+   * arbitrary-precision integers within the lattice values.
+   */
+  val INTEGER_WIDTH = 100
+
+  // XXX: the reference defines "bottom" as having at least one
+  // position which is simultaneously set in the mask and value.
+  // it is not clear if this is something that we can do without
+  // adding special cases for all the operations to detect and
+  // propagate this.
+  def bottom: TNum = throw Exception("TNum.bottom not defined")
+  def meet(x: TNum): TNum = intersect(x)
+
+  def booland(other: TNum): TNum = bvand(other)
+  def boolnot(): TNum = bvnot()
+  def boolor(other: TNum): TNum = bvor(other)
+  def booltobv1(): TNum = this // bools are already bv1
+  def bvadd(other: TNum): TNum = TADD(other)
+  def bvand(other: TNum): TNum = TAND(other)
+  def bvashr(other: TNum): TNum = TASHR(other)
+  def bvcomp(other: TNum): TNum = TCOMP(other)
+  def bvconcat(other: TNum): TNum = TCONCAT(other)
+  def bvlshr(other: TNum): TNum = TLSHR(other)
+  def bvmul(other: TNum): TNum = TMUL(other)
+  def bvneg(): TNum = TNEG()
+  def bvnot(): TNum = TNOT()
+  def bvor(other: TNum): TNum = TOR(other)
+  def bvsdiv(other: TNum): TNum = TSDIV(other)
+  def bvsge(other: TNum): TNum = TSGE(other)
+  def bvsgt(other: TNum): TNum = TSGT(other)
+  def bvshl(other: TNum): TNum = TSHL(other)
+  def bvsle(other: TNum): TNum = TSLE(other)
+  def bvslt(other: TNum): TNum = TSLT(other)
+  def bvsmod(other: TNum): TNum = TSMOD(other)
+  def bvsrem(other: TNum): TNum = TSREM(other)
+  def bvsub(other: TNum): TNum = TSUB(other)
+  def bvudiv(other: TNum): TNum = TUDIV(other)
+  def bvuge(other: TNum): TNum = TUGE(other)
+  def bvugt(other: TNum): TNum = TUGT(other)
+  def bvule(other: TNum): TNum = TULE(other)
+  def bvult(other: TNum): TNum = TULT(other)
+  def bvurem(other: TNum): TNum = TUREM(other)
+  def bvxor(other: TNum): TNum = TXOR(other)
+  def constant(v: ir.Literal): TNum = v match {
+    case x: BitVecLiteral => constant(x)
+    case TrueLiteral => trueBool
+    case FalseLiteral => falseBool
+    case IntLiteral(x) => constant(BitVectorEval.signedInt2BV(INTEGER_WIDTH, x))
+  }
+  def equal(other: TNum): TNum = TEQ(other)
+  def extract(hi: Int, lo: Int): TNum = TNum(value(hi, lo), mask(hi, lo))
+
+  def intadd(other: TNum): TNum = bvadd(other)
+  def intdiv(other: TNum): TNum = bvsdiv(other)
+  def intge(other: TNum): TNum = bvsge(other)
+  def intgt(other: TNum): TNum = bvsgt(other)
+  def intle(other: TNum): TNum = bvsle(other)
+  def intlt(other: TNum): TNum = bvslt(other)
+  def intmod(other: TNum): TNum = bvsmod(other)
+  def intmul(other: TNum): TNum = bvmul(other)
+  def intneg(): TNum = bvneg()
+  def intsub(other: TNum): TNum = bvsub(other)
+  def repeat(repeats: Int): TNum =
+    mapBoth(BitVectorEval.repeat_bits(repeats, _))
+  def sign_extend(extend: Int): TNum =
+    mapBoth(InfixBitVectorEval.sign_extend(extend, _))
+  def zero_extend(extend: Int): TNum =
+    mapBoth(InfixBitVectorEval.zero_extend(extend, _))
 
 }
 

@@ -23,11 +23,10 @@ trait ValueLattice[ValueType <: ValueLattice[ValueType]] extends InternalLattice
   def bvand(other: ValueType): ValueType
   def bvor(other: ValueType): ValueType
   def bvadd(other: ValueType): ValueType
-  def bvmul(other: ValueType): ValueType
+  def bvmul(other: ValueType): ValueType // XXX: two's complement multiply depends on signedness ?
   def bvshl(other: ValueType): ValueType
   def bvlshr(other: ValueType): ValueType
   def bvashr(other: ValueType): ValueType
-  def bvshr(other: ValueType): ValueType
   def bvult(other: ValueType): ValueType
   def bvxor(other: ValueType): ValueType
   def bvsub(other: ValueType): ValueType
