@@ -4,52 +4,90 @@ import ir.*
 import ir.cilvisitor.*
 import analysis.*
 
+import scala.collection.immutable.SortedMap
+
+
+/**
+ * Transforms program by modifying assignments to local variables and procedure calls to constants if possible, as
+ * determined by copy-constant analysis (using the IDE framework). Procedure calls are modified to remove redundant
+ * out parameters if they always return a constant value.
+ */
 class ConstCopyPropTransform(p: Program) extends CILVisitor{
   val results: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] = InterCopyConst(p, true).analyze()
+  private var removedFormalOutParams: Set[LocalVar] = Set()
 
   override def vstmt(e: Statement): VisitAction[List[Statement]] = {
 
 
     e match {
       case l: LocalAssign  =>
-        val absState: FlatElement[BitVecLiteral] = results.get(e.successor).get(l.lhs)
+        val absState: FlatElement[BitVecLiteral] = results(e.successor)(l.lhs)
 
         l.rhs match {
           case LocalVar(_,_,_) | Register(_,_) if absState != Top | absState != Bottom =>
-            ChangeTo(List(LocalAssign(l.lhs, get_bv(absState))))
+            ChangeTo(List(LocalAssign(l.lhs, get_bv(absState).get))) //replace rhs with constant
 
           case _ => SkipChildren()
         }
 
-      case d: DirectCall if d.outParams.nonEmpty => // change so chekc if there are any acc outparams
-        print(d)
 
-        val vars: List[Variable] = d.outParams.values.toList
+      case d: DirectCall if d.outParams.nonEmpty =>
+
+        val vars: List[LocalVar] = d.outParams.keys.toList
         val changed: List[Statement] = vars.foldLeft(List[Statement]()) {
-          case (l, lhs) =>
-            val absState: FlatElement[BitVecLiteral] = results.get(e.successor).get(lhs)
-            if absState != Top | absState != Bottom then l ++ List(LocalAssign(lhs, get_bv(absState)))
-            else l 
-            // need t ohandle when some top some not!! <-- unchanged and changed list!!
+          case (l, formalOutParam) =>
+            val actualOutParam = d.outParams.getOrElse(formalOutParam, LocalVar("placeholder", BitVecType(64)))
+            val absState: FlatElement[BitVecLiteral] = results(d.successor)(actualOutParam)
+
+
+
+            if results(d.target.returnBlock.get.jump)(formalOutParam) != Top then //outParam from procedure always constant
+
+              d.outParams = d.outParams.removed(formalOutParam)
+              d.target.formalOutParam.remove(formalOutParam) //remove from called procedure
+              removedFormalOutParams = removedFormalOutParams + formalOutParam
+              l ++ List(LocalAssign(actualOutParam, get_bv(absState).get)) // add assignment
+
+            else if absState != Top & absState != Bottom then //outParam from procedure constant for this call
+
+              d.outParams = d.outParams.removed(formalOutParam) //remove assignment of x = f(y) --> f(y) alone
+              l ++ List(LocalAssign(actualOutParam, get_bv(absState).get)) // add assignment without changing function
+
+            else l
+
         }
-        
-        //val untransformedParams = d.outParams.values.toList.foldLeft(List[])
 
-        //val transformed = changed ++ List(d)
+        val transformed = changed ++ List(d)
 
-        ChangeTo(changed) // need better name than cchangfed LMAO
+        ChangeTo(transformed)
 
       case _ => SkipChildren()
     }
   }
+
+  override def vjump(j: Jump): VisitAction[Jump] =  {
+    j match {
+      case r: Return =>
+        r.outParams = r.outParams.foldLeft(SortedMap[LocalVar, Expr]()) {
+          case (m, (l, e)) =>
+          if removedFormalOutParams.contains(l) then m else m ++ Map(l->e)
+          // remove return params which are no longer needed
+        }
+      case _ =>
+
+    }
+    SkipChildren()
+  }
 }
 
-
-
-def get_bv(a: FlatElement[BitVecLiteral]): BitVecLiteral =
+/**
+ * Extract actual BitVecLiteral from given FlatElement of lattice. Do not use unless it is known that the FlatElement
+ * contains a BitVecLiteral and not Top/Bottom
+ */
+def get_bv(a: FlatElement[BitVecLiteral]): Option[BitVecLiteral] =
   a match
-    case FlatEl(x) => x
-    case _ => BitVecLiteral(0,0) // shldnt get here, idk what default to iuse
+    case FlatEl(x) => Some(x)
+    case _ => None // SHOULD BE UNREACHABLE
 
 
 
