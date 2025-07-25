@@ -9,6 +9,7 @@ import util.intrusive_list.*
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{immutable, mutable}
+import scala.collection.immutable.SortedSet
 
 import eval.BitVectorEval
 
@@ -290,11 +291,14 @@ class Procedure private (
   var requiresExpr: List[Expr],
   var ensuresExpr: List[Expr]
 ) extends Iterable[CFGPosition]
-    with DeepEquality {
+    with DeepEquality with Ordered[Procedure] {
+
+  private val ord = Ordering.by((p: Procedure) => (p.address, p.procName))
+  def compare(other: Procedure) = ord.compare(this, other)
 
   def name = procName + address.map("_" + _).getOrElse("")
 
-  private val _callers = mutable.HashSet[DirectCall]()
+  private val _callers = mutable.TreeSet[DirectCall]()(Ordering.by(c => (c.label, c.target.name)))
   _blocks.foreach(_.parent = this)
   // class invariant
   debugAssert(_returnBlock.forall(b => _blocks.contains(b)) && _entryBlock.forall(b => _blocks.contains(b)))
@@ -411,7 +415,7 @@ class Procedure private (
 
   override def toString: String = Sigil.BASIR.proc + name
 
-  def calls: Set[Procedure] = blocks.iterator.flatMap(_.calls).toSet
+  def calls: Set[Procedure] = blocks.iterator.flatMap(_.calls).to(SortedSet)
 
   /** Block iteration order is defined such that that the entryBlock is first, and no order is defined beyond that. Both
     * entry block and return block are elements of _blocks.
@@ -544,7 +548,7 @@ class Procedure private (
     blocks.filter(_.meta.originalLabel.isDefined).map(p => p.meta.originalLabel.get -> p).toMap
   }
 
-  def callers(): Iterable[Procedure] = _callers.map(_.parent.parent).toSet[Procedure]
+  def callers(): Iterable[Procedure] = _callers.map(_.parent.parent).to(SortedSet)
   def incomingCalls(): Iterator[DirectCall] = _callers.iterator
 
   var modifies: mutable.Set[Global] = mutable.Set()
@@ -598,7 +602,8 @@ class Block private (
   private val _incomingJumps: mutable.HashSet[GoTo],
   var meta: Metadata
 ) extends HasParent[Procedure]
-    with DeepEquality {
+    with DeepEquality
+    with Ordered[Block] {
   var atomicSection: Option[AtomicSection] = None
   _jump.setParent(this)
   statements.foreach(_.setParent(this))
@@ -614,6 +619,9 @@ class Block private (
   ) = {
     this(label, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty, Metadata(None, address))
   }
+
+  private val ord = Ordering.by((b: Block) => (b.meta.address, b.meta.originalLabel, b.label))
+  def compare(other: Block) = ord.compare(this, other)
 
   def address = meta.address
 

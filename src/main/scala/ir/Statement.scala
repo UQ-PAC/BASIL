@@ -3,6 +3,7 @@ import util.assertion.*
 import util.intrusive_list.IntrusiveListElement
 
 import collection.immutable.SortedMap
+import collection.immutable.SortedSet
 import collection.mutable
 
 /*
@@ -290,7 +291,7 @@ class GoTo private (_targets: mutable.LinkedHashSet[Block], var label: Option[St
 
   def this(target: Block) = this(Seq(target), None)
 
-  def targets: collection.Set[Block] = _targets.to(mutable.LinkedHashSet)
+  def targets: Set[Block] = _targets.to(SortedSet)
 
   override def deepEquals(o: Object): Boolean = o match {
     case GoTo(tgts, lbl) => tgts.map(_.label).toSet == targets.map(_.label).toSet && lbl == label
