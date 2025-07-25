@@ -36,7 +36,8 @@ trait TestValueDomainWithInterpreter[T] {
     case AllVarsInAbstract
     case VarsLiveInBlock
 
-  case class InterpreterTestResult(stopCondition: ExecutionContinuation, checks: List[CheckResult]) {
+  case class InterpreterTestResult(stopCondition: ExecutionContinuation, beforeChecks: List[CheckResult], afterChecks: List[CheckResult]) {
+    val checks = beforeChecks ++ afterChecks
     def getFailures: Seq[String] = {
       // require nonzero number of checks to ensure test is not vacuous
       var noChecks = if (checks.filter(_.evaluatedTestExpr.isDefined).isEmpty) then Seq("no checks hit") else Seq()
@@ -69,8 +70,25 @@ trait TestValueDomainWithInterpreter[T] {
       })
     }
 
-    def toDotLabels: Map[Block, String] = {
-      checks
+    def beforeToDotLabels: Map[Block, String] = {
+      beforeChecks
+        .map(b => {
+          val loc = b.breakpoint.location match {
+            case BreakPointLoc.CMD(c) => c.parent
+            case _ => ??? /* not used here */
+          }
+          (
+            loc,
+            s"${b.name} (${pp_expr(b.variable)} = ${b.variableValue.map(pp_expr).getOrElse("eval error")} ) = ${b.evaluatedTestExpr.map(pp_expr).getOrElse("eval error")}"
+          )
+        })
+        .groupBy(_(0))
+        .map((g, v) => g -> v.map(_(1)).mkString("\n"))
+        .toMap
+    }
+
+    def afterToDotLabels: Map[Block, String] = {
+      afterChecks
         .map(b => {
           val loc = b.breakpoint.location match {
             case BreakPointLoc.CMD(c) => c.parent
@@ -117,36 +135,49 @@ trait TestValueDomainWithInterpreter[T] {
 
     // convert analysis result to a list of breakpoints, each which evaluates an expression describing
     // the invariant inferred by the analysis (the assignment of registers) at a corresponding program point
-    val breaks: List[BreakPoint] = ictx.program.collect {
+    val beforeBreaks: List[BreakPoint] = ictx.program.collect {
       case (block: Block) if (testResultBefore.contains(block)) => {
         val result = testResultBefore(block)
         makeBreakpoint(result, block, BreakPointLoc.CMD(IRWalk.firstInBlock(block)))
       }
-    }.toList ++ ictx.program.collect {
+    }.toList
+    val afterBreaks = ictx.program.collect {
       case (block: Block) if (testResultAfter.contains(block)) => {
         val result = testResultAfter(block)
         makeBreakpoint(result, block, BreakPointLoc.CMD(IRWalk.lastInBlock(block)))
       }
-    }
+    }.toList
 
     // run the interpreter evaluating the analysis result at each command with a breakpoint
 
     val startProc = callProcedure.getOrElse(ictx.program.mainProcedure)
     val startParams = callParams.getOrElse(InterpFuns.mainDefaultFunctionArguments(startProc))
     val innerInitState = InterpFuns.initProgState(NormalInterpreter)(ictx, InterpreterState())
-    val interp = LayerInterpreter(NormalInterpreter, RememberBreakpoints(NormalInterpreter, breaks.toList))
+    val interp = LayerInterpreter(NormalInterpreter, RememberBreakpoints(NormalInterpreter, beforeBreaks ++ afterBreaks))
     val initState = (innerInitState, List())
     val interpretResult = State.execute(initState, InterpFuns.callProcedure(interp)(startProc, startParams))
 
+    val beforeBreaksSet = beforeBreaks.toSet
+    val afterBreaksSet = afterBreaks.toSet
+
     val breakres: List[(BreakPoint, _, List[(String, Expr, Option[Expr])])] = interpretResult(1)
-    val checkResults = breakres.flatMap { case (bp, _, evaledExprs) =>
+    val beforeCheckResults = breakres.flatMap { case (bp, _, evaledExprs) if (beforeBreaksSet.contains(bp)) =>
       evaledExprs.grouped(2).map(_.toList).map {
         case List((_, variable, varValue), (name, test, evaled)) =>
           CheckResult(name, bp, test, variable, varValue, evaled)
         case _ => ???
       }
+        case _ => List()
+    }.toList
+    val afterCheckResults = breakres.flatMap { case (bp, _, evaledExprs) if (afterBreaksSet.contains(bp)) =>
+      evaledExprs.grouped(2).map(_.toList).map {
+        case List((_, variable, varValue), (name, test, evaled)) =>
+          CheckResult(name, bp, test, variable, varValue, evaled)
+        case _ => ???
+      }
+      case _ => List()
     }.toList
 
-    InterpreterTestResult(interpretResult(0).nextCmd, checkResults)
+    InterpreterTestResult(interpretResult(0).nextCmd, beforeCheckResults, afterCheckResults)
   }
 }

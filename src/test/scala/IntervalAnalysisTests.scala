@@ -39,10 +39,10 @@ trait InterpretIntervalAnalysisTests(signed: Boolean)
   def toMap(m: Map[Block, LatticeMap[Variable, Interval]]): Map[Block, Map[Variable, Interval]] =
     m.map((b, lm) => {
       b -> (lm match {
-        case LatticeMap.Top() => Map().withDefault(_ => Interval.Top): Map[Variable, Interval]
-        case LatticeMap.TopMap(m) => m.withDefault(_ => Interval.Top): Map[Variable, Interval]
-        case LatticeMap.Bottom() => Map().withDefault(_ => Interval.Bottom): Map[Variable, Interval]
-        case LatticeMap.BottomMap(m) => m.withDefault(_ => Interval.Bottom): Map[Variable, Interval]
+        case LatticeMap.Top() => Map().withDefaultValue(Interval.Top): Map[Variable, Interval]
+        case LatticeMap.TopMap(m) => m.withDefaultValue(Interval.Top): Map[Variable, Interval]
+        case LatticeMap.Bottom() => Map().withDefaultValue(Interval.Bottom): Map[Variable, Interval]
+        case LatticeMap.BottomMap(m) => m.withDefaultValue(Interval.Bottom): Map[Variable, Interval]
       })
     })
 
@@ -56,7 +56,7 @@ trait InterpretIntervalAnalysisTests(signed: Boolean)
     assert(res.checksPassed.nonEmpty)
     assert(
       res.checksFailed.isEmpty,
-      "\n\n" + pp_prog_with_analysis_results(res.toDotLabels, Map(), context.program, x => x.toString) + "\n\n"
+      "\n\n" + pp_prog_with_analysis_results(res.beforeToDotLabels, res.afterToDotLabels, context.program, x => x.toString) + "\n\n"
     )
 
   }
@@ -79,18 +79,18 @@ trait InterpretIntervalAnalysisTests(signed: Boolean)
           LocalAssign(LocalVar("Stack_n24_n16", BitVecType(64), 0), LocalVar("R2_in", BitVecType(64), 0), Some("1904_0")),
           LocalAssign(LocalVar("Stack_n8_0", BitVecType(64), 0), BitVecLiteral(BigInt("0"), 64), Some("1908_0")),
           LocalAssign(LocalVar("Stack_n16_n8", BitVecType(64), 0), BitVecLiteral(BigInt("18446744073709551606"), 64), Some("1916_0")),
-          LocalAssign(LocalVar("load15", BitVecType(64), 1), LocalVar("Stack_n8_0", BitVecType(64), 0), Some("1920_0_0")),
-          LocalAssign(LocalVar("load16", BitVecType(64), 1), LocalVar("Stack_n24_n16", BitVecType(64), 0), Some("1924_0_0")),
-          LocalAssign(LocalVar("R0", BitVecType(64), 4), BinaryExpr(BVADD, LocalVar("load15", BitVecType(64), 1), LocalVar("load16", BitVecType(64), 1)), Some("1928_0")),
+          LocalAssign(LocalVar("load1", BitVecType(64), 1), LocalVar("Stack_n16_n8", BitVecType(64), 0), Some("1920_0_0")),
+          LocalAssign(LocalVar("load2", BitVecType(64), 1), LocalVar("Stack_n8_0", BitVecType(64), 0), Some("1924_0_0")),
+          LocalAssign(LocalVar("R0", BitVecType(64), 4), BinaryExpr(BVADD, LocalVar("load1", BitVecType(64), 1), LocalVar("load2", BitVecType(64), 1)), Some("1928_0")),
           LocalAssign(LocalVar("Stack_n16_n8", BitVecType(64), 0), LocalVar("R0", BitVecType(64), 4), Some("1932_0")),
-          LocalAssign(LocalVar("load17", BitVecType(64), 1), LocalVar("Stack_n24_n16", BitVecType(64), 0), Some("1936_0_0")),
+          LocalAssign(LocalVar("load3", BitVecType(64), 1), LocalVar("Stack_n24_n16", BitVecType(64), 0), Some("1936_0_0")),
           goto("phi_3", "phi_4")
         ),
         block("f_return",
-          LocalAssign(LocalVar("load18", BitVecType(64), 1), LocalVar("Stack_n16_n8", BitVecType(64), 0), Some("1980_0_0")),
+          LocalAssign(LocalVar("load8", BitVecType(64), 1), LocalVar("Stack_n16_n8", BitVecType(64), 0), Some("1980_0_0")),
           Assert(TrueLiteral, Some("R31 preserved across calls"), None),
           ret(
-            "R0_out" -> LocalVar("load18", BitVecType(64), 1),
+            "R0_out" -> LocalVar("load8", BitVecType(64), 1),
             "R1_out" -> LocalVar("R1", BitVecType(64), 9)
           )
         ),
@@ -98,21 +98,21 @@ trait InterpretIntervalAnalysisTests(signed: Boolean)
           goto("f_return")
         ),
         block("phi_3",
-          Assume(BinaryExpr(BVSLE, LocalVar("load17", BitVecType(64), 1), BitVecLiteral(BigInt("0"), 64)), None, None, true),
-          LocalAssign(LocalVar("R1", BitVecType(64), 9), LocalVar("load15", BitVecType(64), 1), Some("phiback")),
+          Assume(BinaryExpr(BVSLE, LocalVar("load3", BitVecType(64), 1), BitVecLiteral(BigInt("0"), 64)), None, None, true),
+          LocalAssign(LocalVar("R1", BitVecType(64), 9), LocalVar("load1", BitVecType(64), 1), Some("phiback")),
           goto("f_4")
         ),
         block("phi_4",
-          Assume(BinaryExpr(BVSGT, LocalVar("load17", BitVecType(64), 1), BitVecLiteral(BigInt("0"), 64)), None, None, true),
-          LocalAssign(LocalVar("load11", BitVecType(64), 1), LocalVar("Stack_n16_n8", BitVecType(64), 0), Some("1948_0_0")),
-          LocalAssign(LocalVar("load12", BitVecType(64), 1), LocalVar("Stack_n8_0", BitVecType(64), 0), Some("1952_0_0")),
-          LocalAssign(LocalVar("R0", BitVecType(64), 7), BinaryExpr(BVADD, LocalVar("load11", BitVecType(64), 1), LocalVar("load12", BitVecType(64), 1)), Some("1956_0")),
+          Assume(BinaryExpr(BVSGT, LocalVar("load3", BitVecType(64), 1), BitVecLiteral(BigInt("0"), 64)), None, None, true),
+          LocalAssign(LocalVar("load4", BitVecType(64), 1), LocalVar("Stack_n16_n8", BitVecType(64), 0), Some("1948_0_0")),
+          LocalAssign(LocalVar("load5", BitVecType(64), 1), LocalVar("Stack_n8_0", BitVecType(64), 0), Some("1952_0_0")),
+          LocalAssign(LocalVar("R0", BitVecType(64), 7), BinaryExpr(BVADD, LocalVar("load4", BitVecType(64), 1), LocalVar("load5", BitVecType(64), 1)), Some("1956_0")),
           LocalAssign(LocalVar("Stack_n24_n16", BitVecType(64), 0), LocalVar("R0", BitVecType(64), 7), Some("1960_0")),
-          LocalAssign(LocalVar("load13", BitVecType(64), 1), LocalVar("Stack_n16_n8", BitVecType(64), 0), Some("1964_0_0")),
-          LocalAssign(LocalVar("load14", BitVecType(64), 1), LocalVar("Stack_n8_0", BitVecType(64), 0), Some("1968_0_0")),
-          LocalAssign(LocalVar("R0", BitVecType(64), 9), BinaryExpr(BVADD, LocalVar("load13", BitVecType(64), 1), LocalVar("load14", BitVecType(64), 1)), Some("1972_0")),
+          LocalAssign(LocalVar("load6", BitVecType(64), 1), LocalVar("Stack_n16_n8", BitVecType(64), 0), Some("1964_0_0")),
+          LocalAssign(LocalVar("load7", BitVecType(64), 1), LocalVar("Stack_n8_0", BitVecType(64), 0), Some("1968_0_0")),
+          LocalAssign(LocalVar("R0", BitVecType(64), 9), BinaryExpr(BVADD, LocalVar("load6", BitVecType(64), 1), UnaryExpr(BVNEG, LocalVar("load7", BitVecType(64), 1))), Some("1972_0")),
           LocalAssign(LocalVar("Stack_n16_n8", BitVecType(64), 0), LocalVar("R0", BitVecType(64), 9), Some("1976_0")),
-          LocalAssign(LocalVar("R1", BitVecType(64), 9), LocalVar("load13", BitVecType(64), 1), Some("phiback")),
+          LocalAssign(LocalVar("R1", BitVecType(64), 9), LocalVar("load6", BitVecType(64), 1), Some("phiback")),
           goto("f_4")
         )
       )
@@ -124,7 +124,7 @@ trait InterpretIntervalAnalysisTests(signed: Boolean)
         LocalVar("R2_in", BitVecType(64), 0) -> BitVecLiteral(r2, 64),
       ))
 
-    testProgram(program, params(0, 0, 0))
+    testProgram(program, params(0, 0, 1))
   }
 }
 

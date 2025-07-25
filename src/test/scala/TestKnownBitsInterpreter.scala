@@ -146,7 +146,7 @@ class TestKnownBitsInterpreter
     assert(res.checksPassed.nonEmpty)
     assert(
       res.checksFailed.isEmpty,
-      "\n\n" + pp_prog_with_analysis_results(res.toDotLabels, Map(), kbitsCtx.program, x => x.toString) + "\n\n"
+      "\n\n" + pp_prog_with_analysis_results(res.beforeToDotLabels, Map(), kbitsCtx.program, x => x.toString) + "\n\n"
     )
   }
 

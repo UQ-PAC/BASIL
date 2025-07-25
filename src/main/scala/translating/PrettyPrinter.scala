@@ -48,7 +48,7 @@ object PrettyPrinter {
   ) = {
     BasilIRPrettyPrinter(
       with_analysis_results_begin = block => before.get(block).map(resultPrinter),
-      block => after.get(block).map(resultPrinter)
+      with_analysis_results_end = block => after.get(block).map(resultPrinter)
     )(p)
   }
 
@@ -299,7 +299,10 @@ class BasilIRPrettyPrinter(
     val allattrs = addr.toSeq ++ olabel
     val attr = if allattrs.nonEmpty then Some("{" + allattrs.mkString("; ") + "}") else None
 
-    val exitComment = with_analysis_results_end(b).map(c => s"${blockIndent}// ${c}")
+    val exitComment = with_analysis_results_end(b).map(c => {
+      val broken = c.split('\n').mkString("\n" + blockIndent + "// ")
+      s"${blockIndent}// $broken"
+    })
     PBlock(label, attr, statements.map(_.toString) ++ Seq(terminator.toString), entryComent, exitComment)
   }
 
