@@ -45,8 +45,8 @@ const CustomNode: React.FC<NodeProps<MyNodeType>> = memo(({ id, data, selected }
     const nodeStyle: React.CSSProperties = {
         width: currentWidth,
         height: currentHeight,
-        border: `1px solid ${selected ? '#007bff' : '#777'}`,
-        backgroundColor: (data.nodeBackgroundColor || '#FFFFFF') as string,
+        border: `2px solid ${data.nodeBackgroundColor || '#777'}`,
+        backgroundColor: selected ? '#e3e3e3' : '#FFF',
         whiteSpace: isExpanded ? 'pre-wrap' : 'nowrap',
         flexGrow: 1,
         overflow: isExpanded ? 'auto' : 'hidden',

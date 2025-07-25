@@ -95,3 +95,9 @@
 .custom-flow-node.selected {
     border: 2px solid #007bff;
 }
+
+.react-flow__handle {
+    width: 1px;
+    height: 1px;
+    cursor: default !important;
+}

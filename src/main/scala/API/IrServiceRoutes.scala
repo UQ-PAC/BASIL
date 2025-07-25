@@ -51,14 +51,25 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean])(
     /**
      * GET /epochs
      *
-     * Endpoint to list all available epoch names stored in the API server.
-     *
+     * Endpoint to retrieve a list of all epoch names in the store.
      * Returns: A JSON array of strings, where each string is an epoch name.
      * On success: Responds with 200 OK.
+     * On failure: Responds with 500 Internal Server Error if an unexpected error occurs.
      */
     case GET -> Root / "epochs" =>
       ensureReady {
-        epochStore.epochsRef.get.map(_.map(_.name).asJson).flatMap(Ok(_))
+        logger.info(s"Received GET /epochs request.") *> 
+          epochStore.epochsRef.get
+            .flatMap { epochs =>
+              val epochNames = epochs.map(_.name).toList
+              val reversedEpochNames = epochNames.reverse // Sets to order of decompilation (Bin -> Boogieish)
+              logger.info(s"Successfully retrieved and reversed epoch names. Count: ${reversedEpochNames.size}") *>
+                Ok(reversedEpochNames.asJson)
+            }
+            .handleErrorWith { e =>
+              logger.error(e)(s"An error occurred while processing GET /epochs request: ${e.getMessage}") *>
+                InternalServerError("An internal server error occurred while fetching epochs.")
+            }
       }
 
     /**

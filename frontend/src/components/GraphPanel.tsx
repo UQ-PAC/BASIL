@@ -1,13 +1,14 @@
 // src/components/GraphPanel.tsx
-import React, { useEffect, useRef } from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
     ReactFlow,
     Controls,
     Background,
     MiniMap,
-    useReactFlow,
     type NodeChange,
     type EdgeChange,
+    type Node as ReactFlowNode,
+    type ReactFlowInstance, useReactFlow,
 } from '@xyflow/react';
 import type { Node, Edge, FitViewOptions, BackgroundVariant } from '@xyflow/react';
 
@@ -40,17 +41,33 @@ const GraphPanel: React.FC<GraphPanelProps> = ({
                                                    graphRenderKey,
                                                }) => {
     const { fitView } = useReactFlow();
+    const [reactFlowInstanceReady, setReactFlowInstanceReady] = useState(false);
     const fitViewExecutedRef = useRef<number | null>(null);
 
+    const onReactFlowInit = useCallback((instance: ReactFlowInstance<Node<CustomNodeData>, Edge>) => {
+        console.log(`ReactFlow instance for "${title}" initialized.`);
+        setReactFlowInstanceReady(true);
+        instance.fitView(fitViewOptions as FitViewOptions<Node<CustomNodeData>>);
+    }, [fitViewOptions, title]);
+
     useEffect(() => {
-        if (nodes.length > 0 && graphRenderKey > 0 && fitViewExecutedRef.current !== graphRenderKey) {
+        setReactFlowInstanceReady(false);
+    }, [graphRenderKey]);
+
+    useEffect(() => {
+        if (nodes.length > 0 && reactFlowInstanceReady && graphRenderKey > 0 && fitViewExecutedRef.current !== graphRenderKey) {
             const timeoutId = setTimeout(() => {
-                fitView(fitViewOptions);
+                fitView(fitViewOptions as FitViewOptions<Node<CustomNodeData>>);
                 fitViewExecutedRef.current = graphRenderKey;
+                console.log(`fitView executed for "${title}" (key: ${graphRenderKey}).`);
             }, 50);
             return () => clearTimeout(timeoutId);
         }
-    }, [nodes, fitView, fitViewOptions, graphRenderKey]);
+    }, [nodes.length, fitView, fitViewOptions, graphRenderKey, reactFlowInstanceReady, title]);
+
+    const getMiniMapNodeColor = (node: ReactFlowNode<CustomNodeData>): string => {
+        return node.data.nodeBackgroundColor || '#E0E0E0';
+    };
 
     return (
         <div key={`graph-panel-${graphRenderKey}`} className="graph-wrapper">
@@ -66,9 +83,20 @@ const GraphPanel: React.FC<GraphPanelProps> = ({
                     minZoom={minZoom}
                     maxZoom={maxZoom}
                     nodeTypes={nodeTypes}
+                    nodesConnectable={false}
+                    onInit={onReactFlowInit}
                 >
-                    <MiniMap />
-                    <Controls />
+                    {reactFlowInstanceReady && (
+                        <>
+                            <MiniMap
+                                nodeColor={getMiniMapNodeColor}
+                                nodeStrokeWidth={1}
+                                nodeBorderRadius={2}
+                                pannable={true}
+                            />
+                            <Controls />
+                        </>
+                    )}
                     <Background variant={"dots" as BackgroundVariant} gap={12} size={1} />
                 </ReactFlow>
             </div>

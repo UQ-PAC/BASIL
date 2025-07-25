@@ -22,17 +22,17 @@ const FIT_VIEW_OPTIONS: FitViewOptions = {
     padding: 0.2,
 };
 
-const ZOOM_CONFIGS = {
+const ZOOM_CONFIGS = { // TODO: Work on these
     min: 0.3,
     max: 3,
 };
 
 const NODE_COLORS = {
     RED: '#FF4D4D',
-    LIGHT_RED: '#FFCCCC',
+    LIGHT_RED: '#FFCCCC', // TODO: Maybe make it yellow?
     GREEN: '#90EE90',
     LIGHT_GREEN: '#b9f4b9',
-    DEFAULT: '#FFFFFF',
+    DEFAULT: '#777',
 };
 
 const EDGE_COLORS = {
@@ -50,6 +50,9 @@ interface CfgViewerProps {
     selectedProcedureName: string | null;
 }
 
+// TODO: Do something similar for other info as well
+const LOCAL_STORAGE_PROCEDURE_KEY = 'cfgViewerSelectedProcedure';
+
 const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
     const [beforeNodes, setBeforeNodes, onBeforeNodesChange] = useNodesState<Node<CustomNodeData>>([]);
     const [beforeEdges, setBeforeEdges, onBeforeEdgesChange] = useEdgesState<Edge>([]);
@@ -63,7 +66,15 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
     const [graphRenderKey, setGraphRenderKey] = useState(0);
 
     const [procedureNames, setProcedureNames] = useState<string[]>([]);
-    const [selectedProcedureFromDropdown, setSelectedProcedureFromDropdown] = useState<string | null>(null);
+    const [selectedProcedureFromDropdown, setSelectedProcedureFromDropdown] = useState<string | null>(() => {
+        try {
+            const storedProcedure = localStorage.getItem(LOCAL_STORAGE_PROCEDURE_KEY);
+            return storedProcedure ? storedProcedure : null;
+        } catch (e) {
+            console.error("Failed to read from localStorage:", e);
+            return null;
+        }
+    });
 
     // --- Graphviz WASM Initialization ---
     useEffect(() => {
@@ -99,12 +110,17 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
                     return;                }
                 const names: string[] = await response.json();
                 setProcedureNames(names);
-                // Automatically select the first procedure if available TODO: Make this be a saved value to select later on
-                if (names.length > 0) {
-                    console.log("The procedure names are: " + names.toString())
-                    setSelectedProcedureFromDropdown(names[0]);
+
+                if (selectedProcedureFromDropdown === null || !names.includes(selectedProcedureFromDropdown)) {
+                    // Automatically select the first procedure if available
+                    if (names.length > 0) {
+                        console.log("The procedure names are: " + names.toString())
+                        setSelectedProcedureFromDropdown(names[0]);
+                    } else {
+                        setSelectedProcedureFromDropdown(null);
+                    }
                 } else {
-                    setSelectedProcedureFromDropdown(null);
+                    console.log("Retaining previously selected procedure: " + selectedProcedureFromDropdown);
                 }
             } catch (e: any) {
                 console.error("Error fetching procedure names:", e);
