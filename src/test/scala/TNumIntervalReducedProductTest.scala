@@ -1,9 +1,8 @@
 import analysis.Interval.ConcreteInterval
 import analysis.{TNum, TNumIntervalReducedProduct}
-import ir.dsl.*
 import ir.*
-import ir.transforms.{worklistSolver, reversePostOrder}
-
+import ir.dsl.*
+import ir.transforms.{reversePostOrder, worklistSolver}
 import org.scalatest.funsuite.AnyFunSuiteLike
 
 @test_util.tags.UnitTest
