@@ -10,7 +10,8 @@ import scala.collection.immutable.SortedMap
 /**
  * Transforms program by modifying assignments to local variables and procedure calls to constants if possible, as
  * determined by copy-constant analysis (using the IDE framework). Procedure calls are modified to remove redundant
- * out parameters if they always return a constant value.
+ * out parameters if they always return a constant value. This could be extended to integrate removal of empty blocks
+ * and dead input variables.
  */
 class ConstCopyPropTransform(p: Program) extends CILVisitor{
   val results: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] = InterCopyConst(p, true).analyze()
@@ -21,14 +22,17 @@ class ConstCopyPropTransform(p: Program) extends CILVisitor{
 
     e match {
       case l: LocalAssign  =>
-        val absState: FlatElement[BitVecLiteral] = results(e.successor)(l.lhs)
+        if results.contains(e.successor) then {
+          val absState: FlatElement[BitVecLiteral] = results(e.successor)(l.lhs)
+            
+            l.rhs match {
+            case LocalVar(_, _, _) | Register(_, _) if absState != Top & absState != Bottom =>
+              ChangeTo(List(LocalAssign(l.lhs, get_bv(absState).get))) //replace rhs with constant
 
-        l.rhs match {
-          case LocalVar(_,_,_) | Register(_,_) if absState != Top | absState != Bottom =>
-            ChangeTo(List(LocalAssign(l.lhs, get_bv(absState).get))) //replace rhs with constant
-
-          case _ => SkipChildren()
+            case _ => SkipChildren()
+          }
         }
+        else SkipChildren()
 
 
       case d: DirectCall if d.outParams.nonEmpty =>
@@ -79,6 +83,7 @@ class ConstCopyPropTransform(p: Program) extends CILVisitor{
     SkipChildren()
   }
 }
+
 
 /**
  * Extract actual BitVecLiteral from given FlatElement of lattice. Do not use unless it is known that the FlatElement

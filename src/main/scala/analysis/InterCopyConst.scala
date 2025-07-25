@@ -57,7 +57,7 @@ trait CopyConstAnalysisFunctions(parameterForm: Boolean) extends ForwardIDEAnaly
           exit.outParams.toList.foldLeft(Map[DL, EdgeFunction[FlatElement[BitVecLiteral]]]()) {
             case (m, (retVar, expression)) => expression match
               case LocalVar(_, _, _) | Register(_, _) if expression == a => m ++ Map(Left(call.outParams(retVar)) -> IdEdge())
-              case _ => m ++ Map() //ignore other kind of expr, including local vars / in params of the procedure
+              case _ => m ++ Map()  //ignore other kind of expr, including local vars / in params of the procedure
 
           }
         case Right(a) =>
