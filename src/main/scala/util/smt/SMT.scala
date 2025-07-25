@@ -57,11 +57,17 @@ class SMTSolver(var defaultTimeoutMillis: Option[Int] = None, solver: Solver = S
   val shutdownManager = ShutdownManager.create()
 
   val solverContext: SolverContext = {
-    val config = Configuration.defaultConfiguration()
+    val builder = Configuration.builder()
+    builder.copyFrom(Configuration.defaultConfiguration())
+    (solver, defaultTimeoutMillis) match {
+      case (Solver.CVC5, Some(tl)) =>
+        builder.setOption("solver.cvc5.furtherOptions", s"tlimit-per=${tl}")
+      case _ => ()
+    }
     val logger = LogManager.createNullLogManager()
     val shutdown = shutdownManager.getNotifier()
     SolverContextFactory.createSolverContext(
-      config,
+      builder.build(),
       logger,
       shutdown,
       solver match {

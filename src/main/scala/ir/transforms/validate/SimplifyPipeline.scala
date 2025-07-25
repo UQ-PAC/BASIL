@@ -1,5 +1,8 @@
 package ir.transforms.validate
 import ir.*
+import util.Logger
+
+import java.io.File
 
 import cilvisitor.{visit_proc, visit_prog}
 
@@ -118,10 +121,21 @@ def nop(p: Program) = {
   validator.getValidationSMT(b => v => Some(v), "tvsmt/" + "NOP")
 }
 
+def assumePreservedParams(p: Program) = {
+  val validator = TranslationValidator()
+  validator.setTargetProg(p)
+  val asserts = transforms.CalleePreservedParam.transform(p)
+  validator.setSourceProg(p)
+  validator.getValidationSMT(b => v => Some(v), "tvsmt/" + "AssumeCallPreserved", introducedAsserts = asserts.toSet)
+}
+
 def validatedSimplifyPipeline(p: Program) = {
   transforms.applyRPO(p)
   parameters(p)
+  Logger.writeToFile(File(s"afterParam.il"), translating.PrettyPrinter.pp_prog(p))
   // transforms.liftProcedureCallAbstraction(p, None)
+  assumePreservedParams(p)
+  Logger.writeToFile(File(s"afterAsssumePreserved.il"), translating.PrettyPrinter.pp_prog(p))
   transforms.applyRPO(p)
   simplifyCFG(p)
   transforms.applyRPO(p)

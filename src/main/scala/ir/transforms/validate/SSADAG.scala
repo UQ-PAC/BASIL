@@ -14,10 +14,15 @@ object SSADAG {
   *
   * Returns the SSA renaming for each block entry in the CFA.
   */
-  def transform(frames: Map[String, CallParamMapping], p: Procedure, inputs: List[Variable]) = {
+  def transform(
+    frames: Map[String, CallParamMapping],
+    p: Procedure,
+    inputs: List[Variable],
+    liveVarsBefore: Map[String, Set[Variable]]
+  ) = {
     convertToMonadicSideEffect(frames, p)
 
-    ssaTransform(p, inputs)
+    ssaTransform(p, inputs, liveVarsBefore)
   }
 
   private class Passify extends CILVisitor {
@@ -60,7 +65,11 @@ object SSADAG {
   *
   * Returns the SSA renaming for each block entry in the CFA.
   */
-  def ssaTransform(p: Procedure, inputs: List[Variable]): ((String, Expr) => Expr) = {
+  def ssaTransform(
+    p: Procedure,
+    inputs: List[Variable],
+    liveVarsBefore: Map[String, Set[Variable]]
+  ): ((String, Expr) => Expr) = {
 
     var renameCount = 0
     val stRename = mutable.Map[Block, mutable.Map[Variable, Variable]]()
@@ -132,9 +141,13 @@ object SSADAG {
 
       var phis = Vector[Statement]()
 
+      def live(v: Variable) =
+        liveVarsBefore.get(b.label).forall(_.contains(v))
+
       var renaming = if (b.prevBlocks.nonEmpty) then {
         var joinedRenames = Map[Variable, Variable]()
-        val defines = b.prevBlocks.flatMap(b => stRename.get(b).map(b -> _).toSeq)
+        val defines: Iterable[(Block, Seq[(Variable, Variable)])] =
+          b.prevBlocks.flatMap(b => stRename.get(b).map(renames => b -> renames.toSeq.filter((k, v) => live(k))))
         var varToRenamings: Map[Variable, Iterable[(Block, Variable, Variable)]] =
           defines
             .flatMap { case (b, rns) =>

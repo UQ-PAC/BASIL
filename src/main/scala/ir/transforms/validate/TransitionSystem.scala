@@ -8,6 +8,7 @@ import scala.collection.mutable
 
 object PCMan {
   val assumptionFailLabel = "ASSUMEFAIL"
+  val assertionFailLabel = "ASSERTFAIL"
 
   val allocatedPCS = mutable.Map[String, BitVecLiteral]()
   var pcCounter = 0
@@ -187,12 +188,16 @@ object TransitionSystem {
 
   /**
   * Convert asserts in program to a jump to exit with a specific PC set.
+  *
+  * @param [[introdAsserts]] specifies which assertions set the pc to the [[assumptionFailLabel]]
+  * rather than the [[assertionFailLabel]].
+  *
   */
-  def totaliseAsserts(proc: Procedure) = {
-    AssertsToPC(proc.returnBlock.get).transform(proc)
+  def totaliseAsserts(proc: Procedure, introdAsserts: Set[String] = Set()) = {
+    AssertsToPC(proc.returnBlock.get, introdAsserts).transform(proc)
   }
 
-  private class AssertsToPC(val exitBl: Block) {
+  private class AssertsToPC(val exitBl: Block, introdAsserts: Set[String] = Set()) {
 
     var count = 0
 
@@ -217,10 +222,14 @@ object TransitionSystem {
         bl.statements.remove(stmt)
         successor.statements.prepend(Assume(stmt.body, Some("assertpass")))
 
+        val failureLabel =
+          if (stmt.label.isDefined && (introdAsserts.contains(stmt.label.get))) then PCMan.assumptionFailLabel
+          else PCMan.assertionFailLabel
+
         val falseBranch = Block(
           bl.label + label + "Fail",
           None,
-          Seq(Assume(UnaryExpr(BoolNOT, stmt.body)), PCMan.setPCLabel(PCMan.assumptionFailLabel)),
+          Seq(Assume(UnaryExpr(BoolNOT, stmt.body)), PCMan.setPCLabel(failureLabel)),
           GoTo(Seq(exitBl))
         )
 

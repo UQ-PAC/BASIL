@@ -151,7 +151,20 @@ class NamespaceState(val namespace: String) extends CILVisitor {
  * Structure of an invariant relating two programs
  */
 enum Inv {
+  /* A constraint guarded by the PC value for a specific cut point */
   case CutPoint(cutPointPCGuard: String, pred: List[InvTerm], comment: Option[String] = None)
+
+  /* a constraint on the variables defined at a specific cut-point, not guarded by the PC value for that cut */
+  case GlobalConstraint(cutPointPCGuard: String, pred: List[InvTerm], comment: Option[String] = None)
+
+  /* a constraint conditional on a predicate in the source program */
+  case SourceConditionalConstraint(
+    cutPointPCGuard: String,
+    sourceCond: Expr,
+    pred: List[InvTerm],
+    comment: Option[String] = None
+  )
+
 }
 
 class TranslationValidator {
@@ -221,6 +234,32 @@ class TranslationValidator {
       proc: Procedure,
       label: Option[String] = None
     )(renameSrcSSA: (String, Expr) => Expr, renameTgtSSA: (String, Expr) => Expr) = i match {
+      case Inv.GlobalConstraint(cutLabel, preds, c) => {
+        val blockLabel =
+          beforeRenamer.stripNamespace(
+            (beforeCuts.find((p, _) => p.name == proc.name).get._2).cutLabelBlockInTr(cutLabel).label
+          )
+        val pred = boolAnd(
+          preds.map(
+            _.toPred(x => (exprInSource(renameSrcSSA(blockLabel, x))), x => exprInTarget(renameTgtSSA(blockLabel, x)))
+          )
+        )
+        Assume(pred, c)
+      }
+      case Inv.SourceConditionalConstraint(cutLabel, cond, preds, c) => {
+        val blockLabel =
+          beforeRenamer.stripNamespace(
+            (beforeCuts.find((p, _) => p.name == proc.name).get._2).cutLabelBlockInTr(cutLabel).label
+          )
+        val pred = boolAnd(
+          preds.map(
+            _.toPred(x => (exprInSource(renameSrcSSA(blockLabel, x))), x => exprInTarget(renameTgtSSA(blockLabel, x)))
+          )
+        )
+        val guarded =
+          BinaryExpr(BoolIMPLIES, exprInSource(renameSrcSSA(blockLabel, cond)), pred)
+        Assume(guarded, c)
+      }
       case Inv.CutPoint(cutLabel, preds, c) => {
         val blockLabel =
           beforeRenamer.stripNamespace(
@@ -401,108 +440,6 @@ class TranslationValidator {
     merged.map { case (s, t) => CompatArg(toVariable(s), toVariable(t)) }.toList
   }
 
-  /*
-  def setDSAInvariant = {
-
-    val procs = initProg.get.procedures.view.map(p => p.name -> p).toMap
-
-    for (p <- afterProg.get.procedures) {
-      val (liveVarsTarget, _) = liveBefore(p.name)
-      val (liveVarsSource, _) = liveAfter(p.name)
-
-      /** has index **/
-
-      def removeIndex(v: Variable) = v match {
-        case l: LocalVar => l.copy(index = 0)
-        case g => g
-      }
-
-      val returnInv = procs(p.name).returnBlock
-        .map(_.jump match {
-          case r: Return => procs(p.name).returnBlock.get.label -> r.outParams.map((formal, actual) => formal).toSet
-          case _ => ???
-        })
-        .toSeq
-
-      val lives = liveVarsSource.collect {
-        case (block, v) if afterCuts(p).cutLabelBlockInProcedure.exists((_, b) => block.label == b.label) =>
-          block.label -> v.filter(v => liveVarsTarget(block).contains(removeIndex(v)))
-      }.toMap ++ returnInv
-
-      val inv = afterCuts(p).cutLabelBlockInProcedure.map {
-        case (label, cutPoint) => {
-          val vars = lives.get(cutPoint.label).toSet.flatten -- Seq(TransitionSystem.programCounterVar)
-
-          val assertion = vars.map(v => CompatArg((v), (removeIndex(v)))).toList
-
-          Inv.CutPoint(label, assertion, Some(s"INVARIANT at $label"))
-        }
-      }
-
-      setInvariant(p.name, inv.toList)
-    }
-
-  }
-   */
-
-  /*
-  def setEqualVarsInvariantX() = {
-
-    // call this after running transform so initProg corresponds to the source / after program.
-
-    def memToVar(m: Iterable[Memory]) = {
-      m.map(SideEffectStatementOfStatement.param).map(_._2)
-    }
-
-    val procs = initProg.get.procedures.view.map(p => p.name -> p).toMap
-
-    for (p <- afterProg.get.procedures) {
-      val (liveVarsTarget, _) = liveAfter(p.name)
-      val (liveVarsSource, _) = liveBefore(p.name)
-
-      // intersect of live of source and target
-
-      val globals = globalsForProc(p).map(x => CompatArg(x: Variable, x: Variable))
-
-      val inparams = p.formalInParam.toList.map(p => CompatArg(p, p))
-      val outparams = p.formalOutParam.toList.map(p => CompatArg(p, p))
-
-      // TODO: can probably just set at entry and let the liveness sort the rest out?
-      val globalsInvEverywhere =
-        afterCuts(p).cutLabelBlockInProcedure.keys.map(c => Inv.CutPoint(c, globals.toList)).toList
-
-      val entryInv: Inv = Inv.CutPoint("ENTRY", inparams)
-      val returnInv: Inv = Inv.CutPoint("RETURN", outparams)
-
-      // block -> sourcevar -> targetvar
-      val lives: Map[String, Map[Variable, Variable]] = liveVarsSource.collect {
-        case (block, v)
-            if v != TransitionSystem.programCounterVar && afterCuts(p).cutLabelBlockInProcedure
-              .exists((_, b) => block.label == b.label) =>
-          block.label -> v.collect {
-            case sv if liveVarsTarget(block).exists(_.name == sv.name) =>
-              sv -> liveVarsTarget(block).find(_.name == sv.name).get
-          }.toMap
-      }.toMap
-
-      val inv = entryInv :: returnInv :: globalsInvEverywhere ++ (afterCuts(p).cutLabelBlockInProcedure.map {
-        case (label, cutPoint) => {
-          val vars = lives.get(cutPoint.label).getOrElse(Map())
-
-          val assertion = vars.toList.map { case (src, tgt) =>
-            CompatArg(src, tgt)
-          }
-
-          val i = Inv.CutPoint(label, assertion, Some(s"INVARIANT at $label"))
-          i
-        }
-      }).toList
-
-      addInvariant(p.name, inv)
-    }
-  }
-   */
-
   /**
    *
    * Match the actual signature of a call to the expected signature based on renaming, basically reorders the parameters
@@ -647,15 +584,12 @@ class TranslationValidator {
     // block label -> variable -> renamed variable
     afterProc: Procedure,
     renamingSrcTgt: TransformDataRelationFun = _ => e => Some(e),
-    liveBefore: Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])],
-    liveAfter: Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])],
+    liveVarsSourceBeforeBlock: Map[String, Set[Variable]],
+    liveVarsTargetBeforeBlock: Map[String, Set[Variable]],
     srcParams: CallParamMapping,
     tgtParams: CallParamMapping
   ) = {
     val p = afterProc
-
-    val liveVarsTarget: Map[String, Set[Variable]] = liveBefore(p.name)._1.map((k, v) => (k.label, v)).toMap
-    val liveVarsSource: Map[String, Set[Variable]] = liveAfter(p.name)._1.map((k, v) => (k.label, v)).toMap
 
     // val globalsSrc = globalsForTargetProc(p)(renamingTgtSrc(None))
     val globalsTgt = globalsForSourceProc(p)(renamingSrcTgt(None)).toList
@@ -663,12 +597,6 @@ class TranslationValidator {
 
     val pcInv = CompatArg(TransitionSystem.programCounterVar, TransitionSystem.programCounterVar)
     val traceInv = CompatArg(TransitionSystem.traceVar, TransitionSystem.traceVar)
-
-    // add invariant to combined
-    val initRetInv = Seq(
-      Inv.CutPoint("ENTRY", List(pcInv), Some("PC INVARIANT")),
-      Inv.CutPoint("ENTRY", List(traceInv), Some("Trace INVARIANT"))
-    )
 
     /*
     // TODO: Expclitly construct cutpoint for negated post condition invariant
@@ -725,18 +653,18 @@ class TranslationValidator {
 
     val cuts = (beforeCutsBls.keys ++ afterCutsBls.keys).toSet.toList
 
+    val alwaysInv = List(
+      CompatArg(TransitionSystem.programCounterVar, TransitionSystem.programCounterVar),
+      CompatArg(TransitionSystem.traceVar, TransitionSystem.traceVar)
+    )
+
     val invs = (cuts.map {
       case (label) => {
         val tgtCut = beforeCutsBls(label)
         val srcCut = afterCutsBls(label)
 
-        val alwaysInv = List(
-          CompatArg(TransitionSystem.programCounterVar, TransitionSystem.programCounterVar),
-          CompatArg(TransitionSystem.traceVar, TransitionSystem.traceVar)
-        )
-
-        val srcLives = liveVarsSource.get(srcCut).toList.flatten
-        val tgtLives = liveVarsTarget.get(tgtCut).toList.flatten
+        val srcLives = liveVarsSourceBeforeBlock.get(srcCut).toList.flatten
+        val tgtLives = liveVarsTargetBeforeBlock.get(tgtCut).toList.flatten
 
         val invSrc = srcLives.map(s => s -> renamingSrcTgt(Some(srcCut))(s)).collect {
           case (l, Some(r)) if r.variables.forall(tgtLives.contains) =>
@@ -749,7 +677,7 @@ class TranslationValidator {
 
         // TODO: intersect live in source and target for dead code.
 
-        Inv.CutPoint(label, invSrc ++ alwaysInv, Some(s"INVARIANT at $label"))
+        Inv.CutPoint(label, invSrc, Some(s"INVARIANT at $label"))
       }
     }).toList
 
@@ -1031,7 +959,8 @@ class TranslationValidator {
   def getValidationSMT(
     invariantRenamingSrcTgt: TransformDataRelationFun = _ => e => Some(e),
     filePrefix: String = "tvsmt/",
-    flowFacts: TransformTargetTargetFlowFact = _ => Map()
+    flowFacts: TransformTargetTargetFlowFact = _ => Map(),
+    introducedAsserts: Set[String] = Set()
   ): Unit = {
 
     var splitCandidates = Map[Procedure, ArrayBuffer[GoTo]]()
@@ -1060,15 +989,13 @@ class TranslationValidator {
       timer.checkPoint(s"TVSMT $filePrefix ${proc.name}")
       val source = afterProg.get.procedures.find(_.name == proc.name).get
       val target = beforeProg.get.procedures.find(_.name == proc.name).get
-      // def targetCutPointToBlock(l: String) = beforeCuts(target)(l)
-      // def sourceCutPointToBlock(l: String) = afterCuts(source)(l)
 
       val srcEntry = source.entryBlock.get
       val tgtEntry = target.entryBlock.get
       val srcExit = source.returnBlock.get
       val tgtExit = target.returnBlock.get
 
-      TransitionSystem.totaliseAsserts(source)
+      TransitionSystem.totaliseAsserts(source, introducedAsserts)
       TransitionSystem.totaliseAsserts(target)
 
       def inputs(c: CallParamMapping) = {
@@ -1082,8 +1009,11 @@ class TranslationValidator {
       // val inputs = TransitionSystem.programCounterVar :: TransitionSystem.traceVar :: (globalsForProc(proc).toList)
       val frames = (afterFrame ++ beforeFrame)
 
-      val srcRenameSSA = SSADAG.transform(sourceParams, source, inputs(sourceParams(proc.name)))
-      val tgtRenameSSA = SSADAG.transform(targetParams, target, inputs(targetParams(proc.name)))
+      val liveVarsTarget: Map[String, Set[Variable]] = liveBefore(proc.name)._1.map((k, v) => (k.label, v)).toMap
+      val liveVarsSource: Map[String, Set[Variable]] = liveAfter(proc.name)._1.map((k, v) => (k.label, v)).toMap
+
+      val srcRenameSSA = SSADAG.transform(sourceParams, source, inputs(sourceParams(proc.name)), liveVarsSource)
+      val tgtRenameSSA = SSADAG.transform(targetParams, target, inputs(targetParams(proc.name)), liveVarsTarget)
       timer.checkPoint("SSA")
 
       val ackInv =
@@ -1100,19 +1030,48 @@ class TranslationValidator {
       val equalVarsInvariant = getEqualVarsInvariantRenaming(
         proc,
         invariantRenamingSrcTgt,
-        liveBefore,
-        liveAfter,
+        liveVarsSource,
+        liveVarsTarget,
         sourceParams(proc.name),
         targetParams(proc.name)
       )
 
+      val cuts =
+        beforeCuts(target).cutLabelBlockInProcedure.map(_._1) ++ afterCuts(source).cutLabelBlockInProcedure.map(_._1)
+
+      val alwaysInv = List(
+        CompatArg(TransitionSystem.programCounterVar, TransitionSystem.programCounterVar),
+        CompatArg(TransitionSystem.traceVar, TransitionSystem.traceVar)
+      )
+
+      val invEverywhere = cuts.toList.map(label =>
+        Inv.SourceConditionalConstraint(
+          label,
+          BinaryExpr(NEQ, TransitionSystem.programCounterVar, PCMan.PCSym(PCMan.assumptionFailLabel)),
+          alwaysInv,
+          Some(s"GlobalConstraint$label")
+        )
+      )
+
       val factsInvariant = getFlowFactsInvariant(proc, liveBefore, flowFacts(proc.name))
 
-      val invariant = equalVarsInvariant ++ factsInvariant
+      val invariant = equalVarsInvariant ++ factsInvariant ++ invEverywhere
 
       val preInv = invariant
 
-      val primedInv = invariant.collect {
+      val primedInv = invariant.map {
+        case i: Inv.GlobalConstraint => {
+          i.toAssume(proc)(
+            (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("EXIT").label, e),
+            (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("EXIT").label, e)
+          ).body
+        }
+        case i: Inv.SourceConditionalConstraint => {
+          i.toAssume(proc)(
+            (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("EXIT").label, e),
+            (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("EXIT").label, e)
+          ).body
+        }
         case i: Inv.CutPoint => {
           i.toAssume(proc)(
             (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("EXIT").label, e),
@@ -1132,11 +1091,11 @@ class TranslationValidator {
 
       val splitName = "-" + proc.name // + "_split_" + splitNo
       // build smt query
-      val b = translating.BasilIRToSMT2.SMTBuilder()
-      val solver = util.SMT.SMTSolver(Some(3), util.SMT.Solver.CVC5)
+      // val b = translating.BasilIRToSMT2.SMTBuilder()
+      val solver = util.SMT.SMTSolver(Some(1000), util.SMT.Solver.CVC5)
       val prover = solver.getProver(true)
 
-      b.addCommand("set-logic", "QF_BV")
+      // b.addCommand("set-logic", "QF_BV")
 
       var count = 0
 
@@ -1149,12 +1108,12 @@ class TranslationValidator {
         val e = i.toAssume(proc)(srcRenameSSA, tgtRenameSSA).body
         try {
           val l = Some(s"inv$count")
-          b.addAssert(e, l)
+          // b.addAssert(e, l)
           prover.addConstraint(e)
           npe.statements.append(Assert(e, l))
         } catch
           ex => {
-            throw Exception(s"$ex Failed to gen smt for $b:\n  $e :: \n $e")
+            throw Exception(s"$ex Failed to gen smt for ?\n  $e :: \n $e")
           }
       }
 
@@ -1164,33 +1123,32 @@ class TranslationValidator {
         val l = Some(s"ackermann$ackn$count")
         npe.statements.append(Assert(ack, l))
         prover.addConstraint(ack)
-        b.addAssert(ack, l)
+        // b.addAssert(ack, l)
       }
       count = 0
       for (i <- extractProg(source)) {
         count += 1
-        b.addAssert(i, Some(s"source$count"))
+        // b.addAssert(i, Some(s"source$count"))
         prover.addConstraint(i)
       }
       count = 0
       for (i <- extractProg(target)) {
         count += 1
         prover.addConstraint(i)
-        b.addAssert(i, Some(s"tgt$count"))
+        // b.addAssert(i, Some(s"tgt$count"))
       }
       val pinv = UnaryExpr(BoolNOT, AssocExpr(BoolAND, primedInv.toList))
       npe.statements.append(Assert(pinv, Some("InvPrimed")))
-      b.addAssert(pinv, Some("InvPrimed"))
+      // b.addAssert(pinv, Some("InvPrimed"))
       timer.checkPoint("extract prog")
       prover.addConstraint(pinv)
 
       val fname = s"$filePrefix${splitName}.smt2"
-      val query = b.getCheckSat()
-      util.writeToFile(query, fname)
+      // val query = b.getCheckSat()
+      // util.writeToFile(query, fname)
       Logger.info(s"Write query $fname")
 
       timer.checkPoint("write out " + fname)
-      Logger.writeToFile(File(s"${filePrefix}combined-${proc.name}.il"), translating.PrettyPrinter.pp_prog(newProg))
 
       val verify = true
       if (verify) {
@@ -1223,6 +1181,10 @@ class TranslationValidator {
               target.entryBlock.get.label
             )
 
+            Logger.writeToFile(
+              File(s"${filePrefix}combined-${proc.name}.il"),
+              translating.PrettyPrinter.pp_prog(newProg)
+            )
             Logger.writeToFile(File(s"${filePrefix}counterexample-combined-${proc.name}.dot"), g)
             // extract model
           }
@@ -1237,10 +1199,7 @@ class TranslationValidator {
       io.github.cvc5.Context.deletePointers()
     }
 
-    // }
-
     timer.checkPoint("Finishehd tv pass")
-    //  smtQueries
   }
 
 }
