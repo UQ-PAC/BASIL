@@ -1,0 +1,50 @@
+package build.basilmill
+
+import mill._
+import javalib._
+
+trait CVC5Module extends CoursierModule {
+  val arch = System.getProperty("os.arch") match {
+    case "amd64" => "x64"
+    case "x86" => "x64"
+    case "aarch64" => "arm64"
+    case _ => "unknown"
+  }
+
+  val soType = System.getProperty("os.name") match {
+    case "Linux" => "so"
+    case m if m.startsWith("Mac OS") => "dylib"
+    case w if w.startsWith("Windows") => "dll"
+    case _ => "unknown"
+  }
+
+  val sources = List("libcvc5jni")
+
+  def artifactTypes = Task {
+    Set(coursier.core.Type("so"), coursier.core.Type("dll"), coursier.core.Type("dylib"))
+  }
+
+  def install: T[String] = Task {
+    val resolver = millResolver()
+
+    sources.flatMap(source => {
+      try {
+        val dep = Dep.parse(s"org.sosy-lab:javasmt-solver-cvc5:1.2.1-g8594a8e4dc;classifier=$source-$arch;type=$soType")
+
+        val path = resolver.classpath(Seq(dep), artifactTypes = Some(artifactTypes())).head.path
+        val dir = path / ".."
+        val newPath = dir / s"$source.$soType"
+
+        if (!os.exists(newPath)) {
+          os.copy(path, newPath)
+        }
+
+        Some(dir.toString)
+      } catch { case e: Throwable => {
+        println(s"Failed to obtain source $source (arch=$arch, soType=$soType)")
+        println(e)
+        None
+      }}
+    }).distinct.mkString(":")
+  }
+}

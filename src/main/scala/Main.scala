@@ -206,6 +206,8 @@ object Main {
     generateRelyGuarantees: Flag,
     @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (implies --parameter-form)")
     simplify: Flag,
+    @arg(name = "simplify-tv", doc = "Simplify with translation validation")
+    tvSimp: Flag,
     @arg(
       name = "pc",
       doc = "Program counter mode, supports GTIRB only. (options: none | keep | assert) (default: none)"
@@ -464,6 +466,7 @@ object Main {
       ),
       runInterpret = conf.interpret.value,
       simplify = conf.simplify.value,
+      validateSimplify = conf.tvSimp.value,
       validateSimp = conf.validateSimplify.value,
       summariseProcedures = conf.summariseProcedures.value,
       generateRelyGuarantees = conf.generateRelyGuarantees.value,

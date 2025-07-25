@@ -284,15 +284,10 @@ object IRTransform {
   def doCleanup(ctx: IRContext, doSimplify: Boolean = false): IRContext = {
     Logger.info("[!] Removing external function calls")
     // Remove external function references (e.g. @printf)
-    val externalNames = ctx.externalFunctions.map(e => e.name)
-    val externalNamesLibRemoved = mutable.Set[String]()
-    externalNamesLibRemoved.addAll(externalNames)
-
-    for (e <- externalNames) {
-      if (e.contains('@')) {
-        externalNamesLibRemoved.add(e.split('@')(0))
+    val external = ctx.externalFunctions.map(e => e.name -> e.offset).toMap
+      ++ ctx.externalFunctions.collect {
+        case ExternalFunction(n, addr) if n.contains('@') => n.split('@')(0) -> addr
       }
-    }
 
     ctx.program.procedures.foreach(ir.transforms.makeProcEntryNonLoop)
 
@@ -309,12 +304,22 @@ object IRTransform {
 
     transforms.establishProcedureDiamondForm(ctx.program, doSimplify)
 
-    ir.transforms.removeBodyOfExternal(externalNamesLibRemoved.toSet)(ctx.program)
+    ir.transforms.removeBodyOfExternal(external.keys.toSet)(ctx.program)
     for (p <- ctx.program.procedures) {
       p.isExternal = Some(
         ctx.externalFunctions.exists(e => e.name == p.procName || p.address.contains(e.offset)) || p.isExternal
           .getOrElse(false)
       )
+    }
+
+    // add external procedures to program
+    for (ef <- ctx.externalFunctions) {
+      val p = ctx.program.procedures.find(proc => proc.procName == ef.name || proc.address.contains(ef.offset))
+      if (p.isEmpty) {
+        val np = Procedure(ef.name, Some(ef.offset))
+        np.isExternal = Some(true)
+        ctx.program.addProcedure(np)
+      }
     }
 
     assert(invariant.singleCallBlockEnd(ctx.program))
@@ -334,7 +339,7 @@ object IRTransform {
 
     Logger.info("[!] Stripping unreachable")
     val before = ctx.program.procedures.size
-    transforms.stripUnreachableFunctions(ctx.program, config.loading.procedureTrimDepth)
+    // transforms.stripUnreachableFunctions(ctx.program, config.loading.procedureTrimDepth)
     Logger.info(
       s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
     )
@@ -846,7 +851,7 @@ object RunUtils {
       }
     }
     Logger.info("Copyprop Start")
-    transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
+    transforms.copyPropParamFixedPoint(program)
 
     transforms.fixupGuards(program)
     transforms.removeDuplicateGuard(program)
@@ -957,7 +962,17 @@ object RunUtils {
 
     assert(ir.invariant.programDiamondForm(ctx.program))
     ir.eval.SimplifyValidation.validate = conf.validateSimp
-    if (conf.simplify) {
+
+    for (p <- ctx.program.procedures) {
+      p.normaliseBlockNames()
+    }
+
+    if (conf.validateSimplify) {
+      ir.transforms.clearParams(ctx.program)
+      ir.transforms.liftIndirectCall(ctx.program)
+      DebugDumpIRLogger.writeToFile(File("il-beforetvsimp.il"), pp_prog(ctx.program))
+      transforms.validate.validatedSimplifyPipeline(ctx.program)
+    } else if (conf.simplify) {
 
       ir.transforms.clearParams(ctx.program)
 
@@ -1138,7 +1153,6 @@ object RunUtils {
 
     StaticAnalysisLogger.info("[!] Running DSA Analysis")
 
-    writeToFile(pp_prog(ctx.program), "testo1.il")
     val symbolTableEntries: Set[SymbolTableEntry] = ctx.globals ++ ctx.funcEntries
     val dsa = DataStructureAnalysis(
       ctx.program,

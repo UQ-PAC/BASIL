@@ -6,9 +6,16 @@ import org.sosy_lab.common.ShutdownManager
 import org.sosy_lab.common.configuration.Configuration
 import org.sosy_lab.common.log.LogManager
 import org.sosy_lab.java_smt.SolverContextFactory
-import org.sosy_lab.java_smt.api.{BitvectorFormula, BooleanFormula, FormulaManager, SolverContext}
+import org.sosy_lab.java_smt.api.{
+  BitvectorFormula,
+  BooleanFormula,
+  Evaluator,
+  FormulaManager,
+  ProverEnvironment,
+  SolverContext
+}
 
-import scala.jdk.CollectionConverters.SetHasAsJava
+import scala.jdk.CollectionConverters.{SeqHasAsJava, SetHasAsJava}
 
 // TODO
 // support moving up and down a proof context stack
@@ -19,6 +26,11 @@ enum SatResult {
   case SAT(model: Option[Model])
   case UNSAT
   case Unknown(s: String)
+}
+
+enum Solver {
+  case Z3
+  case CVC5
 }
 
 /** A wrapper around an SMT solver.
@@ -34,7 +46,7 @@ enum SatResult {
  *
  *  Models can be obtained by requesting for them in smt query method calls.
  */
-class SMTSolver(var defaultTimeoutMillis: Option[Int] = None) {
+class SMTSolver(var defaultTimeoutMillis: Option[Int] = None, solver: Solver = Solver.Z3) {
 
   /** Create solver with timeout
    *
@@ -44,53 +56,38 @@ class SMTSolver(var defaultTimeoutMillis: Option[Int] = None) {
 
   val shutdownManager = ShutdownManager.create()
 
-  val solverContext = {
+  val solverContext: SolverContext = {
     val config = Configuration.defaultConfiguration()
     val logger = LogManager.createNullLogManager()
     val shutdown = shutdownManager.getNotifier()
-    SolverContextFactory.createSolverContext(config, logger, shutdown, SolverContextFactory.Solvers.Z3)
+    SolverContextFactory.createSolverContext(
+      config,
+      logger,
+      shutdown,
+      solver match {
+        case Solver.Z3 => SolverContextFactory.Solvers.Z3
+        case Solver.CVC5 => SolverContextFactory.Solvers.CVC5
+      }
+    )
   }
 
   val formulaConverter = FormulaConverter(solverContext.getFormulaManager())
 
-  private def sat(f: BooleanFormula, timeoutMillis: Option[Int], obtainModel: Boolean = false): SatResult = {
-    // To handle timeouts, we must create a thread that sends a shutdown request after an amount of milliseconds
-    val thread = timeoutMillis.map(m => {
-      new Thread(new Runnable() {
-        def run() = {
-          try {
-            Thread.sleep(m)
-            shutdownManager.requestShutdown("Timeout")
-          } catch { _ => {} }
-        }
-      })
-    })
-
-    val env =
+  def getProver(obtainModel: Boolean = false): SMTProver = {
+    val prover =
       if obtainModel
       then solverContext.newProverEnvironment(SolverContext.ProverOptions.GENERATE_MODELS)
       else solverContext.newProverEnvironment()
 
-    try {
-      env.push(f)
-      thread.map(_.start)
-      val res =
-        if env.isUnsat() then SatResult.UNSAT
-        else
-          SatResult.SAT(obtainModel match {
-            case true => Some(Model(env.getModel))
-            case false => None
-          })
-      res
-    } catch { e =>
-      SatResult.Unknown(e.toString())
-    } finally {
-      env.close()
-      thread.map(t => {
-        t.interrupt()
-        t.join()
-      })
-    }
+    SMTProver(solverContext, shutdownManager, formulaConverter, prover)
+  }
+
+  private def sat(f: BooleanFormula, timeoutMillis: Option[Int], obtainModel: Boolean = false): SatResult = {
+    val env = getProver(obtainModel)
+    env.addConstraint(f)
+    val r = env.checkSat(timeoutMillis.orElse(defaultTimeoutMillis), obtainModel)
+    env.close()
+    r
   }
 
   /** Run solver on a [[Predicate]] */
@@ -111,6 +108,96 @@ class SMTSolver(var defaultTimeoutMillis: Option[Int] = None) {
   /** Close the solver to prevent a memory leak when done. */
   def close() = {
     solverContext.close()
+  }
+
+}
+
+class SMTEvaluator(formulaConverter: FormulaConverter, eval: Evaluator) {
+
+  def evalExpr(e: Expr): Option[Literal] = {
+    e.getType match {
+      case BoolType =>
+        evalBoolExpr(e).map {
+          case true => TrueLiteral
+          case false => FalseLiteral
+        }
+      case _: BitVecType => evalBVExpr(e)
+      case _ => throw Exception(s"Model eval not supported for expr : ${e.getType}")
+    }
+  }
+
+  def evalBoolExpr(e: Expr): Option[Boolean] = {
+    Option(eval.evaluate(formulaConverter.convertBoolExpr(e)))
+  }
+
+  def evalBVExpr(e: Expr): Option[BitVecLiteral] = {
+    val width = e.getType match {
+      case BitVecType(s) => s
+      case _ => throw Exception("not a bv formula")
+    }
+    Option(eval.evaluate(formulaConverter.convertBVExpr(e))).map(v => BitVecLiteral(v, width))
+  }
+
+}
+
+class SMTProver(
+  val solverContext: SolverContext,
+  val shutdownManager: ShutdownManager,
+  val formulaConverter: FormulaConverter,
+  val prover: ProverEnvironment
+) {
+
+  def addConstraint(e: BooleanFormula) = {
+    prover.addConstraint(e)
+  }
+
+  def addConstraint(e: Expr) = {
+    prover.addConstraint(formulaConverter.convertBoolExpr(e))
+  }
+
+  def addConstraint(e: Predicate) = {
+    prover.addConstraint(formulaConverter.convertPredicate(e))
+  }
+
+  def close() = {
+    prover.close()
+  }
+
+  def checkSat(timeoutMillis: Option[Int] = None, obtainModel: Boolean = false): SatResult = {
+    // To handle timeouts, we must create a thread that sends a shutdown request after an amount of milliseconds
+    val thread = timeoutMillis.map(m => {
+      new Thread(new Runnable() {
+        def run() = {
+          try {
+            Thread.sleep(m)
+            shutdownManager.requestShutdown("Timeout")
+          } catch { e => { println(s"$e") } }
+        }
+      })
+    })
+
+    try {
+      thread.map(_.start)
+      val res =
+        if prover.isUnsat() then SatResult.UNSAT
+        else
+          SatResult.SAT(obtainModel match {
+            case true => Some(Model(prover.getModel))
+            case false => None
+          })
+      res
+    } catch { e =>
+      SatResult.Unknown(e.toString())
+    } finally {
+      thread.map(t => {
+        t.interrupt()
+        t.join()
+      })
+    }
+  }
+
+  def getEvaluator() = {
+    SMTEvaluator(formulaConverter, prover.getEvaluator())
   }
 
 }
@@ -193,6 +280,8 @@ class FormulaConverter(formulaManager: FormulaManager) {
     e match {
       case TrueLiteral => booleanFormulaManager.makeTrue()
       case FalseLiteral => booleanFormulaManager.makeFalse()
+      case AssocExpr(BoolAND, args) => booleanFormulaManager.and(args.map(convertBoolExpr).asJava)
+      case AssocExpr(BoolOR, args) => booleanFormulaManager.or(args.map(convertBoolExpr).asJava)
       case BinaryExpr(op, arg, arg2) =>
         op match {
           case op: BoolBinOp => convertBoolBinOp(op, convertBoolExpr(arg), convertBoolExpr(arg2))
@@ -223,7 +312,7 @@ class FormulaConverter(formulaManager: FormulaManager) {
         }
       case v: Variable => booleanFormulaManager.makeVariable(v.name)
       case r: OldExpr => ???
-      case _ => throw Exception("Non boolean expression was attempted to be converted")
+      case e => throw Exception(s"Non boolean expression was attempted to be converted: ${e.getClass.getSimpleName()}")
     }
   }
 

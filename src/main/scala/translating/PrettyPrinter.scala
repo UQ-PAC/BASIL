@@ -541,6 +541,7 @@ class BasilIRPrettyPrinter(
 
   override def vindirect(target: PPProg[Variable]): PPProg[IndirectCall] = BST(s"indirect call ${target} ")
   override def vassert(body: Assert): PPProg[Assert] = {
+
     BST(s"assert ${vexpr(body.body)}")
   }
 
