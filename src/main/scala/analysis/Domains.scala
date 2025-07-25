@@ -57,7 +57,6 @@ class TNumIntervalReducedProduct extends ReducedProductDomain[LatticeMap[Variabl
   ): (LatticeMap[Variable, Interval], Map[Variable, TNum]) = {
     def reduceSingle(int: Interval, x: TNum): (Interval, TNum) = {
 
-
       int match {
         case int: ConcreteInterval =>
           val interval =
@@ -100,20 +99,20 @@ class TNumIntervalReducedProduct extends ReducedProductDomain[LatticeMap[Variabl
   def refineLowerBound(a: BigInt, x: TNum): BigInt = {
     var newBound = x.maxUnsignedValue().value
     for i <- x.width to 0 by -1
-      do
-        if 0 != (x.mask.value & (1 << i)) then
-          newBound = newBound & (~(1 << i)) // Unset the ith bit
-          if newBound < a then newBound = newBound | (1 << i) // Re-set the ith bit
+    do
+      if 0 != (x.mask.value & (1 << i)) then
+        newBound = newBound & (~(1 << i)) // Unset the ith bit
+        if newBound < a then newBound = newBound | (1 << i) // Re-set the ith bit
     newBound
   }
 
   def refineUpperBound(a: BigInt, x: TNum): BigInt = {
     var newBound = x.minUnsignedValue().value
     for i <- x.width to 0 by -1
-      do
-        if 0 != (x.mask.value & (1 << i)) then
-          newBound = newBound | (1 << i) // Set the ith bit
-          if newBound > a then newBound = newBound & (~(1 << i)) // Unset the ith bit
+    do
+      if 0 != (x.mask.value & (1 << i)) then
+        newBound = newBound | (1 << i) // Set the ith bit
+        if newBound > a then newBound = newBound & (~(1 << i)) // Unset the ith bit
     newBound
   }
 

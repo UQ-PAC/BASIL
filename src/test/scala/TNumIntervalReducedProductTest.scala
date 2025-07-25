@@ -3,11 +3,12 @@ import analysis.{TNum, TNumIntervalReducedProduct}
 import ir.BitVecLiteral
 import org.scalatest.funsuite.AnyFunSuiteLike
 
+@test_util.tags.UnitTest
 class TNumIntervalReducedProductTest extends AnyFunSuiteLike {
 
   val domain = TNumIntervalReducedProduct()
   val interval = ConcreteInterval(6, 10, 4)
-  val tnum = TNum(BitVecLiteral(0,4), BitVecLiteral(9, 4))
+  val tnum = TNum(BitVecLiteral(0, 4), BitVecLiteral(9, 4))
 
   test("Refine lower bound - simple example") {
     val expected = 8
