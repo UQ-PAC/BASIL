@@ -90,16 +90,13 @@ trait TestValueDomainWithInterpreter[T] {
   def runTestInterpreter(
     ictx: IRContext,
     testResultBefore: Map[Block, Map[Variable, T]],
+    testResultAfter: Map[Block, Map[Variable, T]] = Map(),
     testVars: Heuristic = Heuristic.AllVarsInAbstract,
     callProcedure: Option[Procedure] = None,
     callParams: Option[Iterable[(LocalVar, Literal)]] = None
   ): InterpreterTestResult = {
 
-    val breaks: List[BreakPoint] = ictx.program.collect {
-      // convert analysis result to a list of breakpoints, each which evaluates an expression describing
-      // the invariant inferred by the analysis (the assignment of registers) at a corresponding program point
-      case (block: Block) if (testResultBefore.contains(block)) => {
-        val result = testResultBefore(block)
+    def makeBreakpoint(result: Map[Variable, T], block: Block, location: BreakPointLoc) = {
         // only create assertion for variables relevant to the block and defined in the abstract state,
         // on the assumption they are likely to be defined in the concrete state
         val vars = (testVars match {
@@ -113,11 +110,24 @@ trait TestValueDomainWithInterpreter[T] {
           Seq((s"${variable.name}", variable), (s"${variable.name} ∈ ${value}", assertion))
         })
         BreakPoint(
-          location = BreakPointLoc.CMD(IRWalk.firstInBlock(block)),
+          location = location,
           BreakPointAction(saveState = false, evalExprs = expectedPredicates)
         )
+    }
+
+    // convert analysis result to a list of breakpoints, each which evaluates an expression describing
+    // the invariant inferred by the analysis (the assignment of registers) at a corresponding program point
+    val breaks: List[BreakPoint] = ictx.program.collect {
+      case (block: Block) if (testResultBefore.contains(block)) => {
+        val result = testResultBefore(block)
+        makeBreakpoint(result, block, BreakPointLoc.CMD(IRWalk.firstInBlock(block)))
       }
-    }.toList
+    }.toList ++ ictx.program.collect {
+      case (block: Block) if (testResultAfter.contains(block)) => {
+        val result = testResultAfter(block)
+        makeBreakpoint(result, block, BreakPointLoc.CMD(IRWalk.lastInBlock(block)))
+      }
+    }
 
     // run the interpreter evaluating the analysis result at each command with a breakpoint
 

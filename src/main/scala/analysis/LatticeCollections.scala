@@ -190,8 +190,8 @@ enum LatticeMap[D, L] {
     s: L <:< L1,
     @implicitNotFound("No implicit of type ${L1} was found. See LatticeMap docs for more info.") l: L1
   ): LatticeMap[D, L] = this match {
-    case Top() => TopMap(Map(from -> to))
-    case Bottom() => BottomMap(Map(from -> to))
+    case Top() => if to == to.top then Top() else TopMap(Map(from -> to))
+    case Bottom() => if to == to.bottom then Bottom() else BottomMap(Map(from -> to))
     case TopMap(m) => if to == l.top then TopMap(m - from) else TopMap(m + (from -> to))
     case BottomMap(m) => if to == l.bottom then BottomMap(m - from) else BottomMap(m + (from -> to))
   }
