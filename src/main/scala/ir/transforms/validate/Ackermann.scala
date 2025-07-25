@@ -22,13 +22,22 @@ case class CallParamMapping(
   rhs: List[(EffCallFormalParam, Option[Expr])]
 )
 
+sealed trait InvTerm {
+  def toPred(renameSource: Expr => Expr, renameTarget: Expr => Expr) : Expr
+}
+
+case class TargetTerm(e: Expr) extends InvTerm {
+  def toPred(renameSource: Expr => Expr, renameTarget: Expr => Expr) =
+    renameTarget(e)
+}
+
 /**
  * Encodes the equality of source with target expression for a translation validation
  * invariant
  *
  * Expected to refer to source and target variables prior to renaming being applied.
  */
-case class CompatArg(source: Expr, target: Expr) {
+case class CompatArg(source: Expr, target: Expr) extends InvTerm {
 
   require(!source.isInstanceOf[Memory] && !target.isInstanceOf[Memory])
 

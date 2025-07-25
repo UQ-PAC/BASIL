@@ -45,6 +45,7 @@ import scala.collection.mutable.ArrayBuffer
 
 type CutLabel = String
 type BlockID = String
+type ProcID = String
 
 /**
  * Describes the mapping from source variable to target expression at a given Block ID in the source program.
@@ -53,7 +54,7 @@ type BlockID = String
  *  so this signature isn't precise enough to capture all possible transforms 
  */
 type TransformDataRelationFun = Option[BlockID] => (Variable | Memory) => Option[Expr]
-type TransformTargetTargetFlowFact = BlockID => Map[Variable, Expr]
+type TransformTargetTargetFlowFact = ProcID => Map[Variable, Expr]
 
 enum FormalParam {
   case Global(v: Memory | GlobalVar)
@@ -150,7 +151,7 @@ class NamespaceState(val namespace: String) extends CILVisitor {
  * Structure of an invariant relating two programs
  */
 enum Inv {
-  case CutPoint(cutPointPCGuard: String, pred: List[CompatArg], comment: Option[String] = None)
+  case CutPoint(cutPointPCGuard: String, pred: List[InvTerm], comment: Option[String] = None)
 }
 
 class TranslationValidator {
@@ -756,6 +757,44 @@ class TranslationValidator {
     inv
   }
 
+  def getFlowFactsInvariant(
+    // block label -> variable -> renamed variable
+    afterProc: Procedure,
+    liveBefore: Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])],
+    flowFactTgtTgt: Map[Variable, Expr],
+  ) = {
+    val p = afterProc
+
+    val source = afterCuts.find((k, v) => k.name == p.name).get._1
+    val target = beforeCuts.find((k, v) => k.name == p.name).get._1
+
+    val liveVarsTarget: Map[String, Set[Variable]] = liveBefore(p.name)._1.map((k, v) => (k.label, v)).toMap
+
+    val beforeCutsBls = beforeCuts(target).cutLabelBlockInProcedure.map { case (cl, b) =>
+      cl -> b.label
+    }
+    val afterCutsBls = afterCuts(source).cutLabelBlockInProcedure.map { case (cl, b) =>
+      cl -> b.label
+    }
+
+    val cuts = (beforeCutsBls.keys ++ afterCutsBls.keys).toSet.toList
+
+    val invs = (cuts.map {
+      case (label) => {
+        val tgtCut = beforeCutsBls(label)
+        val tgtLives = liveVarsTarget.get(tgtCut).toList.flatten
+        val m = flowFactTgtTgt.collect{case (v, e) if tgtLives.contains(v) => 
+        List(TargetTerm(BinaryExpr(EQ, v, e)),
+        CompatArg(e, v))
+        }.toList.flatten
+        Inv.CutPoint(label, m, Some(s"FLOWFACT at $label"))
+      }
+    }).toList
+
+    invs
+  }
+
+
   def setTargetProg(p: Program) = {
     val f = inferProcFrames(p)
 
@@ -1056,7 +1095,7 @@ class TranslationValidator {
         )
       timer.checkPoint("ackermann")
 
-      val invariant = getEqualVarsInvariantRenaming(
+      val equalVarsInvariant = getEqualVarsInvariantRenaming(
         proc,
         invariantRenamingSrcTgt,
         liveBefore,
@@ -1064,6 +1103,10 @@ class TranslationValidator {
         sourceParams(proc.name),
         targetParams(proc.name)
       )
+
+      val factsInvariant = getFlowFactsInvariant(proc, liveBefore, flowFacts(proc.name))
+
+      val invariant = equalVarsInvariant ++ factsInvariant
 
       val preInv = invariant
 
@@ -1147,7 +1190,7 @@ class TranslationValidator {
       timer.checkPoint("write out " + fname)
       Logger.writeToFile(File(s"${filePrefix}combined-${proc.name}.il"), translating.PrettyPrinter.pp_prog(newProg))
 
-      val verify = false
+      val verify = true
       if (verify) {
         Logger.info(s"checksat $fname")
         val res = prover.checkSat()

@@ -29,7 +29,7 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
 
   override def ammoniteVersion = "3.0.2"
 
-  override def moduleDeps = Seq(basilAntlr, basilProto, bnfc)
+  override def moduleDeps = Seq(basilAntlr, basilProto, bnfc, cvc5Jar)
 
   override def scalacOptions: T[Seq[String]] = Seq("-deprecation", "-Wunused:imports", "-feature")
 
@@ -64,6 +64,19 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
 
   override def millSourcePath = super.millSourcePath / "src"
 
+
+  def cvc5Lib = Task {
+    PathRef(Path("/home/am/Documents/programming/2025/cvc5/cvc5/build/src/api/java/libcvc5jni.so"))
+  }
+
+  object cvc5Jar extends JavaModule {
+    def unmanagedClasspath = Task {
+      Agg(PathRef(Path("/home/am/Documents/programming/2025/cvc5/cvc5/build/src/api/java/cvc5-1.3.1-dev.jar")))
+    }
+  }
+
+
+
   override def forkArgs = Task {
     super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}:${cvc5.install()}")
   }
@@ -72,7 +85,7 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
   // Windows for some reason wants the install path in PATH and ignores java.library.path, I cannot figure out why
   override def forkEnv = Task {
     if (System.getProperty("os.name").startsWith("Windows")) {
-      super.forkEnv() + ("PATH" -> (sys.env("PATH") + s";${z3.install()};${cvc5.install()}"))
+      super.forkEnv() + ("PATH" -> (sys.env("PATH") + s";${z3.install()};${cvc5Lib().path}"))
     } else { super.forkEnv() }
   }
 
