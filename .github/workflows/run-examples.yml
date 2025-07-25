@@ -133,7 +133,7 @@ jobs:
 
       - run: ./mill test.compile
         # XXX: scalatest.sh doesn't work on windows
-      - run: ./mill test.test -oGD -T 1000000 -n test_util.tags.UnitTest
+      - run: ./mill test.testForked -oGD -T 1000000 -n test_util.tags.UnitTest
 
   UnitTests:
     runs-on: ubuntu-latest
