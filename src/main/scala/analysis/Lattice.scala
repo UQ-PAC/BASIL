@@ -822,25 +822,24 @@ class ConstantPropagationLatticeWithSSA extends PowersetLattice[BitVecLiteral] {
   def concat(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_concat, a, b)
 }
 
-class FlatIntLattice(minimum: FlatElement[BigInt] = Bottom, maximum: FlatElement[BigInt] = Top)
-  extends FlatLattice[BigInt] {
-  override val bottom: FlatElement[BigInt] = minimum
+class StronglyLiveBitsLattice extends MapLattice[Int, TwoElement, TwoElementLattice](TwoElementLattice()) {
 
-  override val top: FlatElement[BigInt] = maximum
+  override def top: Map[Int, TwoElement] = Map().withDefaultValue(sublattice.top)
+  def shift(value: Int, originalMap: Map[Int, TwoElement]): Map[Int, TwoElement] = originalMap.map({
+    case (x, d) =>
+      x + value -> d
+  }).withDefaultValue(sublattice.bottom)
 
-  def lub(x: FlatElement[BigInt], y: FlatElement[BigInt]): FlatElement[BigInt] = (x, y) match {
-    case (a, bottom) => a
-    case (bottom, b) => b
-    case (FlatEl(a), FlatEl(b)) if a >= b => FlatEl(a) else FlatEl(b)
-    case (top, _) => top
-    case (_, top) => top
+  def shiftMap(values: Set[Int], originalMap: Map[Int, TwoElement]): Map[Int, TwoElement] = {
+    values.foldLeft(Map(): Map[Int, TwoElement]){
+      (x, y) => x ++ originalMap.map({
+        case (m, n) =>
+          m + y -> n
+      })
+    }.withDefaultValue(sublattice.bottom)
   }
 
-  def glb(x: FlatElement[BigInt], y: FlatElement[BigInt]): FlatElement[BigInt] = (x, y) match {
-    case (_, bottom) => bottom
-    case (bottom, _) => bottom
-    case (FlatEl(a), FlatEl(b)) if a <= b => FlatEl(a) else FlatEl(b)
-    case (a, top) => a
-    case (top, b) => b
-  }
+  def cartesianAdd(as: Set[Int], bs: Set[Int]): Set[Int] =
+    for {a <- as; b <- bs} yield a + b
+
 }
