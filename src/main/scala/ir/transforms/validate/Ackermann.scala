@@ -23,7 +23,7 @@ case class CallParamMapping(
 )
 
 sealed trait InvTerm {
-  def toPred(renameSource: Expr => Expr, renameTarget: Expr => Expr) : Expr
+  def toPred(renameSource: Expr => Expr, renameTarget: Expr => Expr): Expr
 }
 
 case class TargetTerm(e: Expr) extends InvTerm {
@@ -108,9 +108,6 @@ class SideEffectStatementOfStatement(callParams: Map[String, CallParamMapping]) 
   //  \land ps: formal param in source, pt : param or global in target st,
   //      renamed(src, p) = renamed(tgt, pt)
   //
-  // - based on source, underapproximation leads to incompleteness
-  //
-  // - invariant:
   //
 
   // need to have already lifted globals to locals

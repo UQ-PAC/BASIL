@@ -761,7 +761,7 @@ class TranslationValidator {
     // block label -> variable -> renamed variable
     afterProc: Procedure,
     liveBefore: Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])],
-    flowFactTgtTgt: Map[Variable, Expr],
+    flowFactTgtTgt: Map[Variable, Expr]
   ) = {
     val p = afterProc
 
@@ -783,17 +783,19 @@ class TranslationValidator {
       case (label) => {
         val tgtCut = beforeCutsBls(label)
         val tgtLives = liveVarsTarget.get(tgtCut).toList.flatten
-        val m = flowFactTgtTgt.collect{case (v, e) if tgtLives.contains(v) => 
-        List(TargetTerm(BinaryExpr(EQ, v, e)),
-        CompatArg(e, v))
-        }.toList.flatten
+        val m = flowFactTgtTgt
+          .collect {
+            case (v, e) if tgtLives.contains(v) =>
+              List(TargetTerm(BinaryExpr(EQ, v, e)), CompatArg(e, v))
+          }
+          .toList
+          .flatten
         Inv.CutPoint(label, m, Some(s"FLOWFACT at $label"))
       }
     }).toList
 
     invs
   }
-
 
   def setTargetProg(p: Program) = {
     val f = inferProcFrames(p)
@@ -1029,7 +1031,7 @@ class TranslationValidator {
   def getValidationSMT(
     invariantRenamingSrcTgt: TransformDataRelationFun = _ => e => Some(e),
     filePrefix: String = "tvsmt/",
-    flowFacts: TransformTargetTargetFlowFact = _ => Map(), 
+    flowFacts: TransformTargetTargetFlowFact = _ => Map()
   ): Unit = {
 
     var splitCandidates = Map[Procedure, ArrayBuffer[GoTo]]()

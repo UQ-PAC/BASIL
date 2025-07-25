@@ -35,8 +35,6 @@ def dynamicSingleAssignment(p: Program) = {
     case o => None
   }
 
-  // validator.setEqualVarsInvariantRenaming(renamingSrcTgt = sourceToTarget)
-
   validator.getValidationSMT(sourceToTarget, "tvsmt/" + "DSA")
 }
 
@@ -54,13 +52,11 @@ def copyProp(p: Program) = {
 
   def nopRenaming(b: Option[String])(v: Variable | Memory): Option[Expr] = None
 
-  def flowFacts(b: String) : Map[Variable, Expr] = {
+  def flowFacts(b: String): Map[Variable, Expr] = {
     results.getOrElse(b, Map())
   }
 
-
   def renaming(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
-    // case v: Variable if b.isDefined && results.contains(b.get) => results(b.get).get(v).orElse(Some(v))
     case g => Some(g)
   }
 
@@ -80,7 +76,6 @@ def parameters(p: Program) = {
     case g => Some(g)
   }
 
-  // validator.setEqualVarsInvariantRenaming(renamingSrcTgt = sourceToTarget)
   validator.getValidationSMT(sourceToTarget, "tvsmt/" + "Parameters")
 
 }

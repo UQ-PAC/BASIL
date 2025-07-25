@@ -17,23 +17,8 @@ object SSADAG {
   def transform(frames: Map[String, CallParamMapping], p: Procedure, inputs: List[Variable]) = {
     convertToMonadicSideEffect(frames, p)
 
-    // val liveMemory = getReadMemory(p)
-
     ssaTransform(p, inputs)
   }
-
-  // def getReadMemory(p: Procedure): Map[Memory, Variable] = {
-  //   val r = p.collect {
-  //     case SideEffectStatement(_, _, lhs, rhs) => {
-  //       rhs.collect {
-  //         case (formal: Memory, actual: Variable) => (formal, actual)
-  //         case (formal: Memory, actual) => ???
-  //       }
-  //     }
-  //   }.flatten
-  //   r.toMap
-
-  // }
 
   private class Passify extends CILVisitor {
     override def vstmt(s: Statement) = s match {
@@ -144,11 +129,6 @@ object SSADAG {
     while (worklist.nonEmpty) {
       val b = worklist.dequeue()
       var blockDoneCond = List[Expr](boolOr(b.prevBlocks.map(blockDone).toList))
-      // val onlyOne = boolAnd(for {
-      //  l <- b.prevBlocks
-      //  r <- b.prevBlocks.filterNot(_ == l)
-      //  neq = UnaryExpr(BoolNOT, BinaryExpr(BoolAND, blockDone(l), blockDone(r)))
-      // } yield neq)
 
       var phis = Vector[Statement]()
 
