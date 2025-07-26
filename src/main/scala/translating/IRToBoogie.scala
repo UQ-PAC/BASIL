@@ -958,7 +958,7 @@ class IRToBoogie(
         Set()
       }
     }
-    val assigns = oldVars.toList.sorted.map { g =>
+    val assigns = oldVars.toList.sortBy(_.address).map { g =>
       val memory = if (regionInjector.isDefined) {
         regionInjector.get.getMergedRegion(g.address, g.size) match {
           case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
@@ -1006,9 +1006,9 @@ class IRToBoogie(
     val indices = stores.map(_.index.toBoogie)
 
     val asserts = indices.flatMap { index =>
-      for (c <- controls.keys.view.toList.sorted) yield {
+      for (c <- controls.keys.view.toList.sortBy(_.address)) yield {
         val addrCheck = BinaryBExpr(EQ, index, c.toAddrVar)
-        val checks = controls(c).toList.sorted.map { v =>
+        val checks = controls(c).toList.sortBy(_.address).map { v =>
           BinaryBExpr(BoolIMPLIES, L(LArgs, v.toAddrVar), v.toOldGamma)
         }
         val checksAnd = if (checks.size > 1) {
