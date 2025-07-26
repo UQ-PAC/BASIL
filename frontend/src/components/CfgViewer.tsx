@@ -47,7 +47,7 @@ interface DotGraphResponse {
 
 interface CfgViewerProps {
     selectedEpochName: string | null;
-    selectedProcedureName: string | null;
+    // selectedProcedureName: string | null;
 }
 
 // TODO: Do something similar for other info as well
