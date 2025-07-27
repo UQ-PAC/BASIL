@@ -56,7 +56,6 @@ export function DiffControls({
                 </button>
             </div>
 
-            {/* New Procedure Dropdown */}
             <div className="display-type-container">
                 <div className="procedure-select-wrapper">
                     <label htmlFor="procedure-select" className="procedure-label">

@@ -11,7 +11,7 @@ export interface CustomNodeData {
     headerHeight: number;
     fullContentWidth: number;
     fullContentHeight: number;
-    nodeBackgroundColor?: string;
+    nodeBorderColor?: string;
     [key: string]: unknown; // Index signature to satisfy Record<string, unknown> constraint
 }
 
@@ -45,7 +45,7 @@ const CustomNode: React.FC<NodeProps<MyNodeType>> = memo(({ id, data, selected }
     const nodeStyle: React.CSSProperties = {
         width: currentWidth,
         height: currentHeight,
-        border: `2px solid ${data.nodeBackgroundColor || '#777'}`,
+        border: `2px solid ${data.nodeBorderColor || '#777'}`,
         backgroundColor: selected ? '#e3e3e3' : '#FFF',
         whiteSpace: isExpanded ? 'pre-wrap' : 'nowrap',
         flexGrow: 1,

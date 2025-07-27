@@ -4,10 +4,11 @@ import { DiffViewer } from './components/DiffViewer';
 import { Header } from './components/Header';
 import { Sidebar } from './components/SideBar';
 import CfgViewer from './components/CfgViewer';
+import CombinedViewer from './components/CombinedViewer';
 import { API_BASE_URL } from './api';
 
 function App() {
-    const [viewMode, setViewMode] = useState<'IR' | 'CFG' | 'IR/CFG'>('IR'); { /* TODO: Add the IR/CFG later */}
+    const [viewMode, setViewMode] = useState<'IR' | 'CFG' | 'IR/CFG'>('IR');
     const [allEpochNames, setAllEpochNames] = useState<string[]>([]);
     const [selectedEpochName, setSelectedEpochName] = useState<string | null>(null);
     const [loadingEpochs, setLoadingEpochs] = useState(true);
@@ -42,11 +43,10 @@ function App() {
         };
 
         fetchEpochNames();
-    }, []); // Empty dependency array: runs only once on mount
+    }, []);
 
-    // --- Callback for when an epoch is selected from the sidebar ---
     const handleEpochSelect = useCallback((epochName: string) => {
-        if (selectedEpochName !== epochName) { // Only update if it's a different epoch
+        if (selectedEpochName !== epochName) {
             setSelectedEpochName(epochName);
         }
     }, [selectedEpochName]);
@@ -62,10 +62,12 @@ function App() {
                   loading={loadingEpochs}
                   error={epochError}
               />
-              {viewMode === 'IR' ? (
+              {viewMode === 'IR' ? ( // TODO: Change to enums and a switch
                   <DiffViewer selectedEpochName={selectedEpochName} />
-              ) : (
-                  <CfgViewer
+              ) : viewMode === 'CFG' ? (
+                  <CfgViewer selectedEpochName={selectedEpochName} />
+              ) : ( // 'IR/CFG'
+                  <CombinedViewer
                       selectedEpochName={selectedEpochName}
                   />
               )}

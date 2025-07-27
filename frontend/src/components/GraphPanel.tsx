@@ -66,7 +66,7 @@ const GraphPanel: React.FC<GraphPanelProps> = ({
     }, [nodes.length, fitView, fitViewOptions, graphRenderKey, reactFlowInstanceReady, title]);
 
     const getMiniMapNodeColor = (node: ReactFlowNode<CustomNodeData>): string => {
-        return node.data.nodeBackgroundColor || '#E0E0E0';
+        return node.data.nodeBorderColor || '#E0E0E0';
     };
 
     return (

@@ -1,0 +1,142 @@
+/* src/styles/CombinedViewer.css */
+.combined-viewer-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    padding-right: 20px;
+    padding-bottom: 20px;
+    box-sizing: border-box;
+    overflow: visible;
+}
+
+.combined-viewer-header {
+    text-align: justify;
+    background-color: #f0f0f0;
+    border: 1px solid #000;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* TODO: Do I want this? */
+    flex-shrink: 0;
+    border-radius: 8px;
+    padding-right: 10px;
+    padding-left: 10px;
+    /*position: sticky;  TODO: Potentially make each header also sticky to use buttons?*/
+    /*top: 0;*/
+    /*z-index: 10;*/
+}
+
+.combined-viewer-header h2 {
+    margin-top: 0;
+    color: #333;
+    font-size: 1.8em;
+}
+
+.combined-viewer-header .header-controls {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.flex-spacer {
+    flex-grow: 1;
+}
+
+.combined-content-area {
+    display: flex;
+    flex: 1;
+    gap: 10px;
+    /*min-height: 0;*/
+    /*position: relative;*/
+    /*overflow: hidden;*/
+    min-height: 0;
+}
+
+.ir-code-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: #282c34;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    min-height: 0;
+}
+
+.ir-code-panel h3 {
+    text-align: center;
+    padding: 10px 0;
+    margin: 0;
+    background-color: #3a404a;
+    border-bottom: 1px solid #555;
+    color: #f8f8f2;
+    font-size: 1.2em;
+    flex-shrink: 0;
+}
+
+.ir-code-display {
+    flex: 1;
+    margin: 0;
+    padding: 15px;
+    overflow: auto;
+    font-family: 'Fira Code', 'JetBrains Mono', monospace; /* TODO: Is this consistent with the others??? */
+    font-size: 0.9em;
+    line-height: 1.4;
+    color: #abb2bf;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.ir-code-display code {
+    display: block;
+}
+
+.ir-code-message {
+    padding: 20px;
+    text-align: center;
+    color: #abb2bf;
+    font-style: italic;
+}
+
+
+.cfg-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: auto;
+    background-color: #f9f9f9;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    min-height: 0;
+    max-height: calc(100vh - 115px); /* TODO: Make it based on the headers size... */
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+.cfg-panel-message {
+    padding: 20px;
+    text-align: center;
+    color: #555;
+    font-style: italic;
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.combined-viewer-message,
+.combined-viewer-error {
+    text-align: center;
+    padding: 20px;
+    font-size: 1.1em;
+    color: #555;
+    margin-top: 50px;
+}
+
+.combined-viewer-error {
+    color: #d9534f;
+    font-weight: bold;
+}

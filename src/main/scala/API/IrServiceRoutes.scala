@@ -295,6 +295,51 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean])(
               case None => NotFound(s"Epoch '$epochName' not found.")
             }
       }
+      
+    case GET -> Root / "ir" / epochName / procedureName / "before" => // TODO: Add javadocs
+      ensureReady {
+        logger.info(s"Received GET /ir/$epochName/$procedureName/before request.") *>
+          epochStore.getEpoch(epochName)
+            .flatMap {
+              case Some(epoch) => 
+                logger.info(s"Attempting to generate 'before' code for procedure: `$procedureName` and for epoch: `$epochName`") *>
+                  epoch.beforeTransform.procedures
+                   .find(_.procName == procedureName)
+                    .map { proc =>
+                      val procPrettyPrint = PrettyPrinter.pp_proc(proc)
+                      Ok(procPrettyPrint)
+                    }
+                    .getOrElse(NotFound(s"Procedure '$procedureName' not found in beforeTransform for epoch '$epochName'."))
+              case None =>
+                logger.warn(s"Epoch '$epochName' not found in store for 'before' CFG request. Sending 404.") *>
+                  NotFound(s"Epoch '$epochName' not found or before CFG not available.")
+            }
+            .handleErrorWith { e =>
+              logger.error(e)(s"Error fetching before IR for $procedureName in $epochName: ${e.getMessage}") *>
+                InternalServerError("An internal server error occurred.")
+            }
+      }
+
+    case GET -> Root / "ir" / epochName / procedureName / "after" =>
+      ensureReady {
+        logger.info(s"Received GET /ir/$epochName/$procedureName/after request.") *>
+          epochStore.getEpoch(epochName)
+            .flatMap {
+              case Some(epoch) =>
+                epoch.afterTransform.procedures
+                  .find(_.procName == procedureName)
+                  .map { proc =>
+                    val procPrettyPrint = PrettyPrinter.pp_proc(proc) // Use PrettyPrinter
+                    Ok(procPrettyPrint)
+                  }
+                  .getOrElse(NotFound(s"Procedure '$procedureName' not found in afterTransform for epoch '$epochName'."))
+              case None => NotFound(s"Epoch '$epochName' not found.")
+            }
+            .handleErrorWith { e =>
+              logger.error(e)(s"Error fetching after IR for $procedureName in $epochName: ${e.getMessage}") *>
+                InternalServerError("An internal server error occurred.")
+            }
+      }
   }
 
   /**

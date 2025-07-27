@@ -6,7 +6,7 @@ import {
     ReactFlowProvider,
     MarkerType
 } from '@xyflow/react';
-import type { Node, Edge, FitViewOptions } from '@xyflow/react';
+import type { Node, Edge } from '@xyflow/react';
 
 import '@xyflow/react/dist/style.css';
 import '../styles/CfgViewer.css';
@@ -17,15 +17,7 @@ import { getLayoutedElements } from '../utils/GraphLayout';
 
 import { type CustomNodeData } from './CustomNode';
 import GraphPanel from './GraphPanel';
-
-const FIT_VIEW_OPTIONS: FitViewOptions = {
-    padding: 0.2,
-};
-
-const ZOOM_CONFIGS = { // TODO: Work on these
-    min: 0.3,
-    max: 3,
-};
+import { FIT_VIEW_OPTIONS, ZOOM_CONFIGS } from '../constants';
 
 const NODE_COLORS = {
     RED: '#FF4D4D',
@@ -196,13 +188,13 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
             if (beforeNode) {
                 coloredBeforeNodes.push({
                     ...beforeNode,
-                    data: { ...beforeNode.data, nodeBackgroundColor: beforeColor },
+                    data: { ...beforeNode.data, nodeBorderColor: beforeColor },
                 });
             }
             if (afterNode) {
                 coloredAfterNodes.push({
                     ...afterNode,
-                    data: { ...afterNode.data, nodeBackgroundColor: afterColor },
+                    data: { ...afterNode.data, nodeBorderColor: afterColor },
                 });
             }
         });
@@ -387,10 +379,10 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
     // } // TODO: Maybe here just have a pop up notification instead...
 
     return (
-        <div className="cfg-comparison-container-wrapper"> {/* New wrapper for header + graphs */}
+        <div className="cfg-comparison-container-wrapper">
             <div className="cfg-viewer-header">
                 {selectedEpochName && procedureNames.length > 0 && (
-                    <div className="procedure-selector">
+                    <>
                         <label className="procedure-select">Select Procedure: </label>
                         <select
                             id="procedure-select"
@@ -405,7 +397,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
                                 </option>
                             ))}
                         </select>
-                    </div>
+                    </>
                 )}
                 {selectedEpochName && procedureNames.length === 0 && !loading && !error && (
                     <p className="no-procedures-message">No procedures found for epoch: {selectedEpochName}</p>
