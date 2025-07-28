@@ -2,6 +2,8 @@
 import React, {memo, useEffect, useState, useRef} from 'react';
 import { Handle, Position, useUpdateNodeInternals, type Node, type NodeProps } from '@xyflow/react';
 
+import '../styles/custom-node.css';
+
 declare const Prism: any;
 
 export interface CustomNodeData {
@@ -27,11 +29,20 @@ const CustomNode: React.FC<NodeProps<MyNodeType>> = memo(({ id, data, selected }
     }, [isExpanded, id, updateNodeInternals]);
 
     useEffect(() => {
-        if (isExpanded && contentRef.current && Prism) {
-            const highlightedHtml = Prism.highlight(data.fullContent, Prism.languages.ir, 'ir');
-            contentRef.current.innerHTML = highlightedHtml;
-        } else if (contentRef.current && !isExpanded) {
-            contentRef.current.textContent = data.header;
+        if (!contentRef.current) return;
+
+        contentRef.current.textContent = isExpanded ? data.fullContent : data.header;
+
+        if (isExpanded && data.fullContent && typeof Prism !== 'undefined' && Prism.languages && Prism.languages.ir) {
+            try {
+                requestAnimationFrame(() => {
+                    const highlightedHtml = Prism.highlight(data.fullContent, Prism.languages.ir, 'ir');
+                    contentRef.current!.innerHTML = highlightedHtml;
+                })
+            } catch (e) {
+                console.error("Prism.highlight failed in CustomNode: ", e);
+                contentRef.current.textContent = data.fullContent;
+            }
         }
     }, [isExpanded, data.fullContent, data.header]);
 
@@ -46,19 +57,22 @@ const CustomNode: React.FC<NodeProps<MyNodeType>> = memo(({ id, data, selected }
         width: currentWidth,
         height: currentHeight,
         border: `2px solid ${data.nodeBorderColor || '#777'}`,
-        backgroundColor: selected ? '#e3e3e3' : '#FFF',
+        backgroundColor: selected ? '#fbfbfb' : '#FFF',
+        boxShadow: selected ? '0 0 0 3px rgba(0, 123, 255, 0.4)' : '0 2px 5px rgba(0,0,0,0.1)', // TODO: Maybe just use this as selected
         whiteSpace: isExpanded ? 'pre-wrap' : 'nowrap',
-        flexGrow: 1,
         overflow: isExpanded ? 'auto' : 'hidden',
         textOverflow: isExpanded ? 'clip' : 'ellipsis',
     };
 
-    const nodeClassName = `custom-flow-node ${isExpanded ? 'custom-flow-node--expanded' : ''}`;
+    const textDivStyle: React.CSSProperties = {
+        textAlign: isExpanded ? 'left' : 'center',
+    };
+
 
     return (
-        <div className={nodeClassName} style={nodeStyle} onDoubleClick={handleDoubleClick}>
+        <div className="custom-flow-node" style={nodeStyle} onDoubleClick={handleDoubleClick}>
             <Handle type="target" position={Position.Top} />
-            <div className="custom-node-header-text" ref={contentRef}>
+            <div className="custom-node-header-text" ref={contentRef} style={textDivStyle} >
                 {data.header}
             </div>
             <Handle type="source" position={Position.Bottom} />

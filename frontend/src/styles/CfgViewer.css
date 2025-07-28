@@ -78,25 +78,6 @@
     font-weight: bold;
 }
 
-.custom-flow-node {
-    padding: 10px 15px;
-    border: 2px solid #5a5a5a;
-    border-radius: 5px;
-    font-family: 'Mono', monospace;
-    font-size: 0.8em;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    display: flex;
-    align-items: center;
-    text-align: left;
-    color: black;
-    box-sizing: border-box;
-}
-
-/* Specific styling for selected nodes */
-.custom-flow-node.selected {
-    border: 2px solid #007bff;
-}
-
 .react-flow__handle {
     width: 1px;
     height: 1px;
