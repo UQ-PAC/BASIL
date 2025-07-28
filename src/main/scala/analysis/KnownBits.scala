@@ -1,7 +1,8 @@
 package analysis
 import ir.*
 import ir.eval.BitVectorEval
-import ir.eval.InfixBitVectorEval.*
+import ir.eval.InfixBitVectorEval
+import ir.eval.InfixBitVectorEval.{zero_extend => _, sign_extend => _, bvult => _, bvugt => _, bvule => _, bvuge => _, *}
 import ir.eval.InfixBitVectorEval.given
 import ir.transforms.{AbstractDomain, applyRPO}
 import util.assertion.*
@@ -51,7 +52,7 @@ object TNum {
   def top(width: Int) = TNum(0.bv(width), BitVecLiteral(BitVecType(width).maxValue, width))
 }
 
-case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
+case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends ValueLattice[TNum] {
   import TNum.*
 
   def width: Int = {
@@ -66,7 +67,7 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
 
   debugAssert(wellFormed, s"not well formed $this")
 
-  def top() = {
+  def top = {
     TNum(0.bv(width), BitVecLiteral(BitVecType(width).maxValue, width))
   }
 
@@ -300,7 +301,7 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
     val divisorH = that.value | that.mask
 
     if (divisorL == 0.bv(width) || divisorH == 0.bv(width)) {
-      return top()
+      return top
     }
 
     val q1 = dividendL / divisorL
@@ -331,7 +332,7 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
     val divisorH = that.value | that.mask
 
     if (divisorL == 0.bv(width) || divisorH == 0.bv(width)) {
-      return top()
+      return top
     }
 
     val q1 = dividendL / divisorL
@@ -356,7 +357,7 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
     val divisorH = that.value | that.mask
 
     if (divisorL == 0.bv(width) || divisorH == 0.bv(width)) {
-      return top()
+      return top
     }
 
     val r1 = dividendL % divisorL
@@ -381,7 +382,7 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
     val divisorH = that.value | that.mask
 
     if (divisorL == 0.bv(width) || divisorH == 0.bv(width)) {
-      return top()
+      return top
     }
 
     // Sign extend both dividend and divisor and convert to signed representation before division
@@ -420,7 +421,7 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
     val divisorH = that.value | that.mask
 
     if (divisorL == 0.bv(width) || divisorH == 0.bv(width)) {
-      return top()
+      return top
     }
 
     // Determine maximum bit length for sign extension
@@ -484,7 +485,7 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
       // must be negative
       None
     } else {
-      Some(zero_extend(1, mayBits(width, width - 1)))
+      Some(InfixBitVectorEval.zero_extend(1, mayBits(width, width - 1)))
     }
   }
 
@@ -563,6 +564,80 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
     val mu = this.mask ++ that.mask
     TNum(v, mu)
   }
+
+  private inline def mapBoth(f: BitVecLiteral => BitVecLiteral) =
+    TNum(f(value), f(mask))
+
+  /**
+   * Hack to define a certain "big enough" width to represent
+   * arbitrary-precision integers within the lattice values.
+   */
+  val INTEGER_WIDTH = 100
+
+  // XXX: the reference defines "bottom" as having at least one
+  // position which is simultaneously set in the mask and value.
+  // it is not clear if this is something that we can do without
+  // adding special cases for all the operations to detect and
+  // propagate this.
+  def bottom: TNum = throw Exception("TNum.bottom not defined")
+  def meet(x: TNum): TNum = intersect(x)
+
+  def booland(other: TNum): TNum = bvand(other)
+  def boolnot(): TNum = bvnot()
+  def boolor(other: TNum): TNum = bvor(other)
+  def booltobv1(): TNum = this // bools are already bv1
+  def bvadd(other: TNum): TNum = TADD(other)
+  def bvand(other: TNum): TNum = TAND(other)
+  def bvashr(other: TNum): TNum = TASHR(other)
+  def bvcomp(other: TNum): TNum = TCOMP(other)
+  def bvconcat(other: TNum): TNum = TCONCAT(other)
+  def bvlshr(other: TNum): TNum = TLSHR(other)
+  def bvmul(other: TNum): TNum = TMUL(other)
+  def bvneg(): TNum = TNEG()
+  def bvnot(): TNum = TNOT()
+  def bvor(other: TNum): TNum = TOR(other)
+  def bvsdiv(other: TNum): TNum = TSDIV(other)
+  def bvsge(other: TNum): TNum = TSGE(other)
+  def bvsgt(other: TNum): TNum = TSGT(other)
+  def bvshl(other: TNum): TNum = TSHL(other)
+  def bvsle(other: TNum): TNum = TSLE(other)
+  def bvslt(other: TNum): TNum = TSLT(other)
+  def bvsmod(other: TNum): TNum = TSMOD(other)
+  def bvsrem(other: TNum): TNum = TSREM(other)
+  def bvsub(other: TNum): TNum = TSUB(other)
+  def bvudiv(other: TNum): TNum = TUDIV(other)
+  def bvuge(other: TNum): TNum = TUGE(other)
+  def bvugt(other: TNum): TNum = TUGT(other)
+  def bvule(other: TNum): TNum = TULE(other)
+  def bvult(other: TNum): TNum = TULT(other)
+  def bvurem(other: TNum): TNum = TUREM(other)
+  def bvxor(other: TNum): TNum = TXOR(other)
+  def constant(v: ir.Literal): TNum = v match {
+    case x: BitVecLiteral => constant(x)
+    case TrueLiteral => trueBool
+    case FalseLiteral => falseBool
+    case IntLiteral(x) => constant(BitVectorEval.signedInt2BV(INTEGER_WIDTH, x))
+  }
+  def equal(other: TNum): TNum = TEQ(other)
+  def extract(hi: Int, lo: Int): TNum = TNum(value(hi, lo), mask(hi, lo))
+
+  def intadd(other: TNum): TNum = bvadd(other)
+  def intdiv(other: TNum): TNum = bvsdiv(other)
+  def intge(other: TNum): TNum = bvsge(other)
+  def intgt(other: TNum): TNum = bvsgt(other)
+  def intle(other: TNum): TNum = bvsle(other)
+  def intlt(other: TNum): TNum = bvslt(other)
+  def intmod(other: TNum): TNum = bvsmod(other)
+  def intmul(other: TNum): TNum = bvmul(other)
+  def intneg(): TNum = bvneg()
+  def intsub(other: TNum): TNum = bvsub(other)
+  def repeat(repeats: Int): TNum =
+    mapBoth(BitVectorEval.repeat_bits(repeats, _))
+  def sign_extend(extend: Int): TNum =
+    mapBoth(InfixBitVectorEval.sign_extend(extend, _))
+  def zero_extend(extend: Int): TNum =
+    mapBoth(InfixBitVectorEval.zero_extend(extend, _))
+
 }
 
 class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
@@ -598,11 +673,11 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
       case BVNAND => tn1.TNAND(tn2)
       case BVADD => tn1.TADD(tn2)
       case BVMUL => tn1.TMUL(tn2)
-      case BVUDIV => tn1.top() // broken // tn1.TUDIV(tn2)
-      case BVUREM => tn1.top() // broekn tn1.TUREM(tn2)
-      case BVSDIV => tn1.top() // tn1.TSDIV(tn2) // broken
-      case BVSREM => tn1.top() // tn1.TSREM(tn2) // broken
-      case BVSMOD => tn1.top() // tn1.TSMOD(tn2) // broken
+      case BVUDIV => tn1.top // broken // tn1.TUDIV(tn2)
+      case BVUREM => tn1.top // broekn tn1.TUREM(tn2)
+      case BVSDIV => tn1.top // tn1.TSDIV(tn2) // broken
+      case BVSREM => tn1.top // tn1.TSREM(tn2) // broken
+      case BVSMOD => tn1.top // tn1.TSMOD(tn2) // broken
       case BVSHL => tn1.TSHL(tn2)
       case BVLSHR => tn1.TLSHR(tn2)
       case BVULT => tn1.TULT(tn2)
@@ -700,11 +775,11 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
 
       case ZeroExtend(ex: Int, body: Expr) =>
         val b = evaluateExprToTNum(s, body)
-        TNum(zero_extend(ex, b.value), zero_extend(ex, b.mask))
+        TNum(InfixBitVectorEval.zero_extend(ex, b.value), InfixBitVectorEval.zero_extend(ex, b.mask))
 
       case SignExtend(ex: Int, body: Expr) =>
         val tnum = evaluateExprToTNum(s, body)
-        TNum(sign_extend(ex, tnum.value), sign_extend(ex, tnum.mask))
+        TNum(InfixBitVectorEval.sign_extend(ex, tnum.value), InfixBitVectorEval.sign_extend(ex, tnum.mask))
       case _: StackMemory => ???
       case _: SharedMemory => ???
     }
