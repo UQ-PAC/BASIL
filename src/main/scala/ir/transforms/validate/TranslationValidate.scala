@@ -1039,6 +1039,7 @@ class TranslationValidator {
     )
 
     val invEverywhere = cuts.toList.map(label =>
+      // FIXME: this is wrong; it is way too strong and is making vacuously unsat
       Inv.SourceConditionalConstraint(
         label,
         BinaryExpr(NEQ, TransitionSystem.programCounterVar, PCMan.PCSym(PCMan.assumptionFailLabel)),
@@ -1049,7 +1050,7 @@ class TranslationValidator {
 
     val factsInvariant = getFlowFactsInvariant(proc, liveVarsTarget, flowFacts(proc.name))
 
-    val invariant = equalVarsInvariant ++ factsInvariant ++ invEverywhere
+    val invariant = equalVarsInvariant ++ factsInvariant // ++ invEverywhere
 
     val preInv = invariant
 

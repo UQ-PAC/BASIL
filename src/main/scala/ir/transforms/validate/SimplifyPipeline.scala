@@ -95,9 +95,9 @@ def guardCleanupTransforms(p: Program) = {
     ir.eval.AlgebraicSimplifications(p)
     ir.eval.cleanupSimplify(p)
   })
-  transforms.removeDuplicateGuard(p)
   deadAssignmentElimination(p)
   simplifyCFG(p)
+  transforms.removeDuplicateGuard(p)
 }
 
 def guardCleanup(config: TVJob, p: Program) = {
@@ -146,7 +146,7 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
     // Logger.error(s"Failing cases: $fnames")
     throw Exception(s"TranslationValidationFailed: $fnames")
   } else if (config.verify.isDefined) {
-    Logger.info("Translation validation passed")
+    Logger.info("[!] Translation validation passed")
   }
 
   (config, nctx)
