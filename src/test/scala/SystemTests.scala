@@ -53,9 +53,7 @@ trait SystemTests extends AnyFunSuite, CaptureOutput, BASILTest, TestCustomisati
     import gtirb.GTIRBReadELF.RelfCompatibilityLevel.*
 
     val checkRelf = test.name match {
-      // XXX: these test cases have mismatching .relf and .gts files, so incompatibilies are expected
-      // until they are updated and fixed.
-      case s"incorrect/nestedifglobal/${_}" => Silent
+      // Throw by default for gtsrelf/oldrelf mismatches
       case _ => Exception
     }
     gtirb.GTIRBReadELF.relfCompatibilityLevel.withValue(checkRelf) {
@@ -315,16 +313,17 @@ class SystemTestsGTIRBOfflineLifter extends SystemTests {
 @test_util.tags.Slow
 @test_util.tags.StandardSystemTest
 class ExtraSpecTests extends SystemTests {
+  override def testSuiteSuffix = ""
 
-  override def customiseTestsByName(name: String) = super.customiseTestsByName(name).orElse {
+  override def customiseTestsByName(name: String): Mode = super.customiseTestsByName(name).orElse {
     name match {
       case _ => Mode.Retry("timeout issues")
     }
   }
 
   // some of these tests have time out issues so they need more time, but some still time out even with this for unclear reasons
-  val timeout = 60
-  val boogieFlags = Seq("/proverOpt:O:smt.array.extensional=false")
+  private val timeout = 60
+  private val boogieFlags: Seq[String] = Seq("/proverOpt:O:smt.array.extensional=false")
   runTests(
     "extraspec_correct",
     TestConfig(

@@ -3,8 +3,7 @@ package build.basilmill
 import os.Path
 import mill._
 import mill.scalalib._
-
-import $file.basilmill.basilversion.BasilVersion
+import mill.api.BuildCtx
 
 trait BasilDocs extends ScalaModule {
   this: BasilVersion =>
@@ -31,11 +30,11 @@ trait BasilDocs extends ScalaModule {
   def docsModules = Task {
     // these doc paths are copied into the combined docs output.
     Map(
-      "api/basil" -> docJar(),
-      "api/bnfc" -> build.bnfc.docJar(),
-      "api/basil-antlr" -> build.basilAntlr.docJar(),
-      "api/basil-proto" -> build.basilProto.docJar(),
-      "api/java-cup" -> build.bnfc.cup.docJar(),
+      "api/basil" -> scalaDocGenerated(),
+      "api/bnfc" -> build.bnfc.javadocGenerated(),
+      "api/basil-antlr" -> build.basilAntlr.javadocGenerated(),
+      "api/basil-proto" -> build.basilProto.scalaDocGenerated(),
+      "api/java-cup" -> build.bnfc.cup.javadocGenerated(),
     )
   }
 
@@ -58,8 +57,8 @@ trait BasilDocs extends ScalaModule {
     Seq("-external-mappings:" + externals.mkString(","))
   }
 
-  def docsIndex = Task {
-    PathRef(Task.workspace / "docs" / "static" / "index.html")
+  def docsIndex = Task.Source {
+    BuildCtx.workspaceRoot / "docs" / "static" / "index.html"
   }
 
   def allDocs = Task {
@@ -71,7 +70,7 @@ trait BasilDocs extends ScalaModule {
     }
 
     docsModules().foreach {
-      case (name, src) => copyDoc(src.path / ".." / "javadoc", name)
+      case (name, src) => copyDoc(src.path, name)
     }
     extraDocs().foreach {
       case (name, src) => copyDoc(src.path, name)
@@ -83,7 +82,7 @@ trait BasilDocs extends ScalaModule {
     os.walk(dest).foreach {
       case path if path.ext == "html" =>
         // HACK: fix mill bug causing incorrect scala source links https://github.com/com-lihaoyi/mill/issues/5221
-        val out = os.read(path).replace(Task.workspace.toString, "")
+        val out = os.read(path).replace(BuildCtx.workspaceRoot.toString, "")
         os.write.over(path, out)
       case path if path.last == "ux.js" =>
         val old = os.read(path)
