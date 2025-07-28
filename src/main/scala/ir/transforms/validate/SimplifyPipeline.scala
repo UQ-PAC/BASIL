@@ -2,6 +2,7 @@ package ir.transforms.validate
 import ir.*
 import util.SMT.SatResult
 import util.SimplifyMode
+import util.Logger
 
 import cilvisitor.{visit_proc, visit_prog}
 
@@ -139,6 +140,8 @@ def validatedSimplifyPipeline(p: Program, mode: util.SimplifyMode): TVJob = {
     val fnames = failed.map(f => s"  ${f.runName}::${f.proc} ${f.smtFile}").mkString("\n")
     // Logger.error(s"Failing cases: $fnames")
     throw Exception(s"TranslationValidationFailed: $fnames")
+  } else if (config.verify.isDefined) {
+    Logger.info("Translation validation passed")
   }
 
   config

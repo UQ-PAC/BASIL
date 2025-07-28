@@ -141,8 +141,8 @@ object SSADAG {
 
       var phis = Vector[Statement]()
 
-      def live(v: Variable) =
-        liveVarsBefore.get(b.label).forall(_.contains(v))
+      def live(v: Variable) = true
+        // liveVarsBefore.get(b.label).forall(_.contains(v))
 
       var renaming = if (b.prevBlocks.nonEmpty) then {
         var joinedRenames = Map[Variable, Variable]()
