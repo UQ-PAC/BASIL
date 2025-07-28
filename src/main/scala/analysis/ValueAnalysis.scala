@@ -27,7 +27,6 @@ trait ValueLattice[ValueType <: ValueLattice[ValueType]] extends InternalLattice
   def bvshl(other: ValueType): ValueType
   def bvlshr(other: ValueType): ValueType
   def bvashr(other: ValueType): ValueType
-  def bvshr(other: ValueType): ValueType
   def bvult(other: ValueType): ValueType
   def bvxor(other: ValueType): ValueType
   def bvsub(other: ValueType): ValueType
