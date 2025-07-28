@@ -27,7 +27,7 @@ case class TestConfig(
   expectVerify: Boolean,
   checkExpected: Boolean = false,
   logResults: Boolean = false,
-  simplify: Boolean = false,
+  simplify: SimplifyMode = SimplifyMode.Disabled,
   summariseProcedures: Boolean = false,
   dsa: Option[DSConfig] = None,
   memoryTransform: Boolean = false,
@@ -47,7 +47,7 @@ trait BASILTest {
     specPath: Option[String],
     BPLPath: String,
     staticAnalysisConf: Option[StaticAnalysisConfig],
-    simplify: Boolean = false,
+    simplify: SimplifyMode = SimplifyMode.Disabled,
     summariseProcedures: Boolean = false,
     dsa: Option[DSConfig] = None,
     memoryTransform: Boolean = false,
@@ -67,7 +67,7 @@ trait BASILTest {
         parameterForm = false,
         gtirbLiftOffline = useOfflineLifterForGtirbFrontend
       ),
-      simplify = simplify,
+      simplify = simplify == SimplifyMode.Simplify,
       summariseProcedures = summariseProcedures,
       staticAnalysis = staticAnalysisConf,
       boogieTranslation =

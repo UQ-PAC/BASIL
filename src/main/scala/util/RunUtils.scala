@@ -917,7 +917,7 @@ object RunUtils {
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
 
-    ctx = IRTransform.doCleanup(ctx, conf.simplify)
+    ctx = IRTransform.doCleanup(ctx, conf.simplify != SimplifyMode.Disabled)
     assert(ir.invariant.programDiamondForm(ctx.program))
 
     transforms.inlinePLTLaunchpad(ctx.program)
@@ -935,7 +935,7 @@ object RunUtils {
     ctx.program.procedures.foreach(transforms.RemoveUnreachableBlocks.apply)
     Logger.info(s"[!] Removed unreachable blocks")
 
-    if (q.loading.parameterForm && !q.simplify) {
+    if (q.loading.parameterForm && !(q.simplify != SimplifyMode.Disabled)) {
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
       if (conf.assertCalleeSaved) {
@@ -967,12 +967,12 @@ object RunUtils {
       p.normaliseBlockNames()
     }
 
-    if (conf.validateSimplify) {
+    if (conf.simplify == SimplifyMode.ValidatedSimplify || conf.simplify == SimplifyMode.ValidatedSimplifyRunVerify) {
       ir.transforms.clearParams(ctx.program)
       ir.transforms.liftIndirectCall(ctx.program)
       DebugDumpIRLogger.writeToFile(File("il-beforetvsimp.il"), pp_prog(ctx.program))
-      transforms.validate.validatedSimplifyPipeline(ctx.program)
-    } else if (conf.simplify) {
+      transforms.validate.validatedSimplifyPipeline(ctx.program, conf.simplify)
+    } else if (conf.simplify != SimplifyMode.Disabled) {
 
       ir.transforms.clearParams(ctx.program)
 
@@ -1015,12 +1015,12 @@ object RunUtils {
 
     if (conf.summariseProcedures) {
       StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
-      IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify)
+      IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify != SimplifyMode.Disabled)
     }
 
     if (conf.summariseProcedures) {
       StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
-      IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify)
+      IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify != SimplifyMode.Disabled)
     }
 
     if (q.runInterpret) {

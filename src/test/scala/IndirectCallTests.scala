@@ -1,7 +1,7 @@
 import analysis.data_structure_analysis.*
 import ir.*
 import org.scalatest.funsuite.*
-import test_util.{BASILTest, CaptureOutput, TestConfig, TestCustomisation}
+import test_util.{BASILTest, CaptureOutput, TestConfig, TestCustomisation, SimplifyMode}
 import util.{BASILResult, DSAContext, DSConfig, LogLevel, Logger, StaticAnalysisConfig}
 
 import scala.collection.mutable
@@ -68,7 +68,7 @@ class IndirectCallTests extends AnyFunSuite, CaptureOutput, BASILTest, TestCusto
       BPLPath,
       staticAnalysisConf,
       dsa = Some(DSConfig()),
-      simplify = true,
+      simplify = SimplifyMode.Simplify,
       postLoad = ctx => { indircalls = getIndirectCalls(ctx.program); }
     )
     (basilresult, indircalls.map(_.label.get))

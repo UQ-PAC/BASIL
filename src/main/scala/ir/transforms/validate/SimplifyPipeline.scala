@@ -115,7 +115,7 @@ def assumePreservedParams(config: TVJob, p: Program) = {
   validator.getValidationSMT(config, "AssumeCallPreserved", introducedAsserts = asserts.toSet)
 }
 
-def validatedSimplifyPipeline(p: Program) = {
+def validatedSimplifyPipeline(p: Program, mode: util.SimplifyMode) : TVJob = {
   var config = TVJob(Some("tvsmt"), Some(util.SMT.Solver.CVC5))
   transforms.applyRPO(p)
   config = parameters(config, p)

@@ -4,6 +4,7 @@ import gtirb.GTIRBReadELF
 import mainargs.{Flag, ParserForClass, arg, main}
 import util.boogie_interaction.BoogieResultKind
 import util.{
+  SimplifyMode,
   AnalysisResultDotLogger,
   BASILConfig,
   BoogieGeneratorConfig,
@@ -454,6 +455,12 @@ object Main {
       util.assertion.disableAssertions = true
     }
 
+    val simplifyMode = (conf.simplify.value, conf.tvSimp.value) match {
+      case (_, true) => SimplifyMode.ValidatedSimplify
+      case (true, _) => SimplifyMode.Simplify
+      case _ => SimplifyMode.Disabled
+    }
+
     val q = BASILConfig(
       loading = loadingInputs.copy(
         dumpIL = conf.dumpIL,
@@ -465,8 +472,7 @@ object Main {
         gtirbLiftOffline = conf.liftOffline.value
       ),
       runInterpret = conf.interpret.value,
-      simplify = conf.simplify.value,
-      validateSimplify = conf.tvSimp.value,
+      simplify = simplifyMode,
       validateSimp = conf.validateSimplify.value,
       summariseProcedures = conf.summariseProcedures.value,
       generateRelyGuarantees = conf.generateRelyGuarantees.value,

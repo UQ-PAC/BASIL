@@ -21,7 +21,12 @@ case class TVJob(
   verify: Option[util.SMT.Solver] = None,
   results: List[TVResult] = List(),
   debugDumpAlways: Boolean = false
-)
+) {
+
+  lazy val noneFailed = {
+    !(results.exists(_.verified.exists(_.isInstanceOf[SatResult.SAT])))
+  }
+}
 
 /**
  *
