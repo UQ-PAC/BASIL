@@ -1,8 +1,7 @@
 package ir.transforms.validate
 import ir.*
 import util.Logger
-
-import java.io.File
+import util.SMT.SatResult
 
 import cilvisitor.{visit_proc, visit_prog}
 
@@ -17,11 +16,11 @@ def simplifyCFG(p: Program) = {
   }
 }
 
-def simplifyCFGValidated(p: Program) = {
-  wrapShapePreservingTransformInValidation(simplifyCFG, "simplifyCFG")(p)
+def simplifyCFGValidated(config: TVJob, p: Program): TVJob = {
+  wrapShapePreservingTransformInValidation(config, simplifyCFG, "simplifyCFG")(p)
 }
 
-def dynamicSingleAssignment(p: Program) = {
+def dynamicSingleAssignment(config: TVJob, p: Program) = {
   val validator = TranslationValidator()
   validator.setTargetProg(p)
   transforms.OnePassDSA().applyTransform(p)
@@ -38,39 +37,29 @@ def dynamicSingleAssignment(p: Program) = {
     case o => None
   }
 
-  validator.getValidationSMT(sourceToTarget, "tvsmt/" + "DSA")
+  validator.getValidationSMT(config, "DSA", sourceToTarget)
 }
 
-def copyProp(p: Program) = {
-  val validator = TranslationValidator()
-  validator.setTargetProg(p)
-  // transform
-
-  p.procedures.foreach(ir.eval.AlgebraicSimplifications(_))
-  val results: Map[String, Map[Variable, Expr]] =
+def copyProp(config: TVJob, p: Program) = {
+  def transform(p: Program) = {
+    p.procedures.foreach(ir.eval.AlgebraicSimplifications(_))
     p.procedures.map(p => p.name -> transforms.OffsetProp.transform(p)).toMap
+  }
 
-  // end transform
-  validator.setSourceProg(p)
-
-  def nopRenaming(b: Option[String])(v: Variable | Memory): Option[Expr] = None
+  val (validator, results) = validatorForTransform(transform)(p)
 
   def flowFacts(b: String): Map[Variable, Expr] = {
     results.getOrElse(b, Map())
   }
-
   def renaming(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
     case g => Some(g)
   }
 
-  validator.getValidationSMT(renaming, "tvsmt/" + "CopyProp", flowFacts)
+  validator.getValidationSMT(config, "CopyProp", renaming, flowFacts)
 }
 
-def parameters(p: Program) = {
-  val validator = TranslationValidator()
-  validator.setTargetProg(p)
-  transforms.liftProcedureCallAbstraction(p, None)
-  validator.setSourceProg(p)
+def parameters(config: TVJob, p: Program) = {
+  val (validator, _) = validatorForTransform(p => transforms.liftProcedureCallAbstraction(p, None))(p)
 
   def sourceToTarget(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
     case LocalVar(s"${i}_in", t, 0) => Some(GlobalVar(s"$i", t))
@@ -79,7 +68,7 @@ def parameters(p: Program) = {
     case g => Some(g)
   }
 
-  validator.getValidationSMT(sourceToTarget, "tvsmt/" + "Parameters")
+  validator.getValidationSMT(config, "Parameters", sourceToTarget)
 
 }
 
@@ -110,41 +99,43 @@ def guardCleanupTransforms(p: Program) = {
   simplifyCFG(p)
 }
 
-def guardCleanup(p: Program) = {
-  wrapShapePreservingTransformInValidation(guardCleanupTransforms, "GuardCleanup")(p)
+def guardCleanup(config: TVJob, p: Program) = {
+  wrapShapePreservingTransformInValidation(config, guardCleanupTransforms, "GuardCleanup")(p)
 }
 
-def nop(p: Program) = {
+def nop(config: TVJob, p: Program) = {
   val validator = TranslationValidator()
   validator.setTargetProg(p)
   validator.setSourceProg(p)
-  validator.getValidationSMT(b => v => Some(v), "tvsmt/" + "NOP")
+  validator.getValidationSMT(config, "NOP", b => v => Some(v))
 }
 
-def assumePreservedParams(p: Program) = {
-  val validator = TranslationValidator()
-  validator.setTargetProg(p)
-  val asserts = transforms.CalleePreservedParam.transform(p)
-  validator.setSourceProg(p)
-  validator.getValidationSMT(b => v => Some(v), "tvsmt/" + "AssumeCallPreserved", introducedAsserts = asserts.toSet)
+def assumePreservedParams(config: TVJob, p: Program) = {
+  val (validator, asserts) = validatorForTransform(transforms.CalleePreservedParam.transform)(p)
+  validator.getValidationSMT(config, "AssumeCallPreserved", introducedAsserts = asserts.toSet)
 }
 
 def validatedSimplifyPipeline(p: Program) = {
+  var config = TVJob(Some("tvsmt"), Some(util.SMT.Solver.CVC5))
   transforms.applyRPO(p)
-  parameters(p)
-  Logger.writeToFile(File(s"afterParam.il"), translating.PrettyPrinter.pp_prog(p))
-  // transforms.liftProcedureCallAbstraction(p, None)
-  assumePreservedParams(p)
-  Logger.writeToFile(File(s"afterAsssumePreserved.il"), translating.PrettyPrinter.pp_prog(p))
+  config = parameters(config, p)
+  config = assumePreservedParams(config, p)
   transforms.applyRPO(p)
-  simplifyCFG(p)
+  config = simplifyCFGValidated(config, p)
   transforms.applyRPO(p)
-  dynamicSingleAssignment(p)
+  config = dynamicSingleAssignment(config, p)
   transforms.applyRPO(p)
-  nop(p)
+  config = copyProp(config, p)
   transforms.applyRPO(p)
-  copyProp(p)
-  transforms.applyRPO(p)
-  guardCleanup(p)
-  ()
+  config = guardCleanup(config, p)
+
+  val failed = config.results.filter(_.verified.exists(_.isInstanceOf[SatResult.SAT]))
+
+  if (failed.nonEmpty) {
+    Logger.error(s"Validation failed")
+    val fnames = failed.map(f => s"  ${f.runName}::${f.proc} ${f.smtFile}").mkString("\n")
+    Logger.error(s"Failing cases: $fnames")
+  }
+
+  config
 }

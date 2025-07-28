@@ -186,6 +186,12 @@ object TransitionSystem {
     (program, cutPoints)
   }
 
+  def removeUnreachableBlocks(p: Procedure) = {
+    val reachable = p.entryBlock.get.forwardIteratorFrom.toSet
+    val unreachable = p.blocks.filterNot(reachable.contains).toList
+    p.removeBlocksDisconnect(unreachable)
+  }
+
   /**
   * Convert asserts in program to a jump to exit with a specific PC set.
   *

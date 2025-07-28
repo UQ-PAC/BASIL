@@ -7,8 +7,21 @@ import util.SMT.*
 import util.{LogLevel, Logger, PerformanceTimer}
 
 import java.io.File
-import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
+
+case class TVResult(
+  runName: String,
+  proc: String,
+  verified: Option[SatResult],
+  smtFile: Option[String],
+  verifyTime: Map[String, Long]
+)
+
+case class TVJob(
+  outputPath: Option[String],
+  verify: Option[util.SMT.Solver] = None,
+  results: List[TVResult] = List(),
+  debugDumpAlways: Boolean = false
+)
 
 /**
  *
@@ -169,8 +182,6 @@ enum Inv {
 
 class TranslationValidator {
 
-  val timer = PerformanceTimer("translationValidator", LogLevel.INFO)
-
   var initProgBefore: Option[Program] = None
   var initProg: Option[Program] = None
 
@@ -304,6 +315,16 @@ class TranslationValidator {
 
   def extractProg(proc: Procedure): Iterable[Expr] = {
     var assumes = List[Expr]()
+    //
+    // val begins = proc.entryBLock.get :: proc.blocks.toList.collect {
+    //  case p if p.prevBlocks.isEmpty => p
+    // }.filterNot(proc.entryBlock.contains)
+
+    // val seen = Set[Block]()
+    // for (begin <- begins) {
+
+    // }
+
     val begin = proc.entryBlock.get
     for (nb <- begin.forwardIteratorFrom) {
       nb match {
@@ -688,15 +709,13 @@ class TranslationValidator {
   def getFlowFactsInvariant(
     // block label -> variable -> renamed variable
     afterProc: Procedure,
-    liveBefore: Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])],
+    liveVarsTarget: Map[BlockID, Set[Variable]],
     flowFactTgtTgt: Map[Variable, Expr]
   ) = {
     val p = afterProc
 
     val source = afterCuts.find((k, v) => k.name == p.name).get._1
     val target = beforeCuts.find((k, v) => k.name == p.name).get._1
-
-    val liveVarsTarget: Map[String, Set[Variable]] = liveBefore(p.name)._1.map((k, v) => (k.label, v)).toMap
 
     val beforeCutsBls = beforeCuts(target).cutLabelBlockInProcedure.map { case (cl, b) =>
       cl -> b.label
@@ -727,7 +746,6 @@ class TranslationValidator {
 
   def setTargetProg(p: Program) = {
     val f = inferProcFrames(p)
-
     beforeFrame = f.map((k, v) => (k.name, v)).toMap
     // println(translating.PrettyPrinter.pp_prog(p))
     initProg = Some(p)
@@ -943,6 +961,259 @@ class TranslationValidator {
 
   }
 
+  private def validateSMTSingleProc(
+    config: TVJob,
+    runName: String,
+    procTransformed: Procedure,
+    invariantRenamingSrcTgt: TransformDataRelationFun,
+    flowFacts: TransformTargetTargetFlowFact,
+    introducedAsserts: Set[String],
+    sourceParams: Map[BlockID, CallParamMapping],
+    targetParams: Map[BlockID, CallParamMapping],
+    liveVarsSource: Map[BlockID, Set[Variable]],
+    liveVarsTarget: Map[BlockID, Set[Variable]]
+  ): TVResult = {
+    val runNamePrefix = runName + "-" + procTransformed.name
+    val proc = procTransformed
+
+    val timer = PerformanceTimer(s"TV$runNamePrefix", LogLevel.DEBUG)
+
+    val source = afterProg.get.procedures.find(_.name == proc.name).get
+    val target = beforeProg.get.procedures.find(_.name == proc.name).get
+
+    val srcEntry = source.entryBlock.get
+    val tgtEntry = target.entryBlock.get
+    val srcExit = source.returnBlock.get
+    val tgtExit = target.returnBlock.get
+
+    TransitionSystem.totaliseAsserts(source, introducedAsserts)
+    TransitionSystem.totaliseAsserts(target)
+
+    TransitionSystem.removeUnreachableBlocks(source)
+    TransitionSystem.removeUnreachableBlocks(target)
+
+    def inputs(c: CallParamMapping) = {
+      c.rhs.collect {
+        case (l, Some(r: Variable)) => r
+        case (l: (Variable | Memory), _) => SideEffectStatementOfStatement.param(l)._2
+        case _ => ???
+      }
+    }
+
+    // val inputs = TransitionSystem.programCounterVar :: TransitionSystem.traceVar :: (globalsForProc(proc).toList)
+    val frames = (afterFrame ++ beforeFrame)
+
+    val srcRenameSSA = SSADAG.transform(sourceParams, source, inputs(sourceParams(proc.name)), liveVarsSource)
+    val tgtRenameSSA = SSADAG.transform(targetParams, target, inputs(targetParams(proc.name)), liveVarsTarget)
+    timer.checkPoint("SSA")
+
+    val ackInv =
+      Ackermann.instantiateAxioms(
+        source.entryBlock.get,
+        target.entryBlock.get,
+        frames,
+        exprInSource,
+        exprInTarget,
+        invariantRenamingSrcTgt
+      )
+    timer.checkPoint("ackermann")
+
+    val equalVarsInvariant = getEqualVarsInvariantRenaming(
+      proc,
+      invariantRenamingSrcTgt,
+      liveVarsSource,
+      liveVarsTarget,
+      sourceParams(proc.name),
+      targetParams(proc.name)
+    )
+
+    val cuts =
+      beforeCuts(target).cutLabelBlockInProcedure.map(_._1) ++ afterCuts(source).cutLabelBlockInProcedure.map(_._1)
+
+    val alwaysInv = List(
+      CompatArg(TransitionSystem.programCounterVar, TransitionSystem.programCounterVar),
+      CompatArg(TransitionSystem.traceVar, TransitionSystem.traceVar)
+    )
+
+    val invEverywhere = cuts.toList.map(label =>
+      Inv.SourceConditionalConstraint(
+        label,
+        BinaryExpr(NEQ, TransitionSystem.programCounterVar, PCMan.PCSym(PCMan.assumptionFailLabel)),
+        alwaysInv,
+        Some(s"GlobalConstraint$label")
+      )
+    )
+
+    val factsInvariant = getFlowFactsInvariant(proc, liveVarsTarget, flowFacts(proc.name))
+
+    val invariant = equalVarsInvariant ++ factsInvariant ++ invEverywhere
+
+    val preInv = invariant
+
+    val primedInv = invariant.map {
+      case i: Inv.GlobalConstraint => {
+        i.toAssume(proc)(
+          (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("EXIT").label, e),
+          (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("EXIT").label, e)
+        ).body
+      }
+      case i: Inv.SourceConditionalConstraint => {
+        i.toAssume(proc)(
+          (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("EXIT").label, e),
+          (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("EXIT").label, e)
+        ).body
+      }
+      case i: Inv.CutPoint => {
+        i.toAssume(proc)(
+          (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("EXIT").label, e),
+          (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("EXIT").label, e)
+        ).body
+      }
+    }
+
+    visit_proc(afterRenamer, source)
+    visit_proc(beforeRenamer, target)
+
+    SSADAG.passify(source)
+    SSADAG.passify(target)
+    timer.checkPoint("passify")
+
+    val otargets = srcEntry.jump.asInstanceOf[GoTo].targets.toList
+
+    val splitName = "-" + proc.name // + "_split_" + splitNo
+    // build smt query
+    val b = translating.BasilIRToSMT2.SMTBuilder()
+    val solver = config.verify.map(solver => util.SMT.SMTSolver(Some(1000), solver))
+    val prover = solver.map(_.getProver(true))
+
+    b.addCommand("set-logic", "QF_BV")
+
+    var count = 0
+
+    val newProg = combineProcs(source, target)
+    val npe = newProg.mainProcedure.entryBlock.get
+
+    count = 0
+    for (i <- preInv) {
+      count += 1
+      val e = i.toAssume(proc)(srcRenameSSA, tgtRenameSSA).body
+      try {
+        val l = Some(s"inv$count")
+        b.addAssert(e, l)
+        prover.map(_.addConstraint(e))
+        npe.statements.append(Assert(e, l))
+      } catch
+        ex => {
+          throw Exception(s"$ex Failed to gen smt for ?\n  $e :: \n $e")
+        }
+    }
+
+    count = 0
+    for ((ack, ackn) <- ackInv) {
+      count += 1
+      val l = Some(s"ackermann$ackn$count")
+      npe.statements.append(Assert(ack, l))
+      prover.map(_.addConstraint(ack))
+      b.addAssert(ack, l)
+    }
+    count = 0
+    for (i <- extractProg(source)) {
+      count += 1
+      b.addAssert(i, Some(s"source$count"))
+      prover.map(_.addConstraint(i))
+    }
+    count = 0
+    for (i <- extractProg(target)) {
+      count += 1
+      prover.map(_.addConstraint(i))
+      b.addAssert(i, Some(s"tgt$count"))
+    }
+    val pinv = UnaryExpr(BoolNOT, AssocExpr(BoolAND, primedInv.toList))
+    npe.statements.append(Assert(pinv, Some("InvPrimed")))
+    b.addAssert(pinv, Some("InvPrimed"))
+    timer.checkPoint("extract prog")
+    prover.map(_.addConstraint(pinv))
+
+    val smtPath = config.outputPath.map(f => s"$f/${runNamePrefix}.smt2")
+
+    smtPath.foreach(fname => {
+      val query = b.getCheckSat()
+      Logger.writeToFile(File(fname), query)
+      Logger.info(s"Write query $fname")
+      timer.checkPoint("write out " + fname)
+    })
+
+    val verified = prover.map(prover => {
+      val r = prover.checkSat()
+      timer.checkPoint("checksat")
+      (prover, solver.get, r)
+    })
+
+    if (config.debugDumpAlways) {
+      config.outputPath.foreach(path => {
+        Logger.writeToFile(
+          File(s"${path}/${runNamePrefix}-combined-${proc.name}.il"),
+          translating.PrettyPrinter.pp_prog(newProg)
+        )
+      })
+    }
+
+    verified.foreach((prover, solver, res) => {
+      val res = prover.checkSat()
+      res match {
+        case SatResult.UNSAT => Logger.info("unsat")
+        case SatResult.SAT(m) => {
+          Logger.error(s"sat ${runNamePrefix} (verify failed)")
+
+          val traces = source.blocks
+            .flatMap(b =>
+              try {
+                val s = srcRenameSSA(afterRenamer.stripNamespace(b.label), TransitionSystem.traceVar)
+                val t = tgtRenameSSA(afterRenamer.stripNamespace(b.label), TransitionSystem.traceVar)
+                Seq(b.label -> BinaryExpr(EQ, s, t))
+              } catch {
+                case _ => Seq()
+              }
+            )
+            .toMap
+
+          val g = processModel(
+            newProg.mainProcedure,
+            prover,
+            primedInv.toList,
+            traces,
+            invariantRenamingSrcTgt,
+            source.entryBlock.get.label,
+            target.entryBlock.get.label
+          )
+
+          config.outputPath.foreach(path => {
+            Logger.writeToFile(File(s"${path}/${runNamePrefix}-counterexample-combined-${proc.name}.dot"), g)
+            if (!config.debugDumpAlways) {
+              Logger.writeToFile(
+                File(s"${path}/${runNamePrefix}-combined-${proc.name}.il"),
+                translating.PrettyPrinter.pp_prog(newProg)
+              )
+            }
+          })
+        }
+        case SatResult.Unknown(m) => println(s"unknown: $m")
+      }
+      timer.checkPoint("model-extract-debug")
+    })
+
+    prover.foreach(prover => {
+      prover.close()
+      solver.get.close()
+    })
+
+    if (config.verify.contains(Solver.CVC5)) {
+      io.github.cvc5.Context.deletePointers()
+    }
+
+    TVResult(runName, proc.name, verified.map(_._3), smtPath, timer.checkPoints().toMap)
+  }
+
   /**
    * Generate an SMT query for the product program, 
    *
@@ -957,15 +1228,12 @@ class TranslationValidator {
    * Returns a map from proceudre -> smt query
    */
   def getValidationSMT(
+    config: TVJob,
+    runName: String,
     invariantRenamingSrcTgt: TransformDataRelationFun = _ => e => Some(e),
-    filePrefix: String = "tvsmt/",
     flowFacts: TransformTargetTargetFlowFact = _ => Map(),
     introducedAsserts: Set[String] = Set()
-  ): Unit = {
-
-    var splitCandidates = Map[Procedure, ArrayBuffer[GoTo]]()
-
-    var progs = List[Program]()
+  ): TVJob = {
 
     val interesting = initProg.get.procedures
       .filterNot(_.isExternal.contains(true))
@@ -973,8 +1241,6 @@ class TranslationValidator {
       .filter(n => beforeFrame.contains(n.name))
       .filter(n => afterFrame.contains(n.name))
 
-    // TODO: only use this for procedure precondition, postcondition:
-    //    should encompass all observable effects of procedure
     val paramMapping: Map[String, (CallParamMapping, CallParamMapping)] = getFunctionSigsRenaming(
       invariantRenamingSrcTgt
     )
@@ -984,230 +1250,42 @@ class TranslationValidator {
     val liveBefore = initProgBefore.get.procedures.map(p => p.name -> getLiveVars(p, targetParams)).toMap
     val liveAfter = initProg.get.procedures.map(p => p.name -> getLiveVars(p, sourceParams)).toMap
 
-    for (proc <- interesting) {
-
-      timer.checkPoint(s"TVSMT $filePrefix ${proc.name}")
-      val source = afterProg.get.procedures.find(_.name == proc.name).get
-      val target = beforeProg.get.procedures.find(_.name == proc.name).get
-
-      val srcEntry = source.entryBlock.get
-      val tgtEntry = target.entryBlock.get
-      val srcExit = source.returnBlock.get
-      val tgtExit = target.returnBlock.get
-
-      TransitionSystem.totaliseAsserts(source, introducedAsserts)
-      TransitionSystem.totaliseAsserts(target)
-
-      def inputs(c: CallParamMapping) = {
-        c.rhs.collect {
-          case (l, Some(r: Variable)) => r
-          case (l: (Variable | Memory), _) => SideEffectStatementOfStatement.param(l)._2
-          case _ => ???
-        }
-      }
-
-      // val inputs = TransitionSystem.programCounterVar :: TransitionSystem.traceVar :: (globalsForProc(proc).toList)
-      val frames = (afterFrame ++ beforeFrame)
-
+    val result = interesting.foldLeft(config)((accRes, proc) => {
       val liveVarsTarget: Map[String, Set[Variable]] = liveBefore(proc.name)._1.map((k, v) => (k.label, v)).toMap
       val liveVarsSource: Map[String, Set[Variable]] = liveAfter(proc.name)._1.map((k, v) => (k.label, v)).toMap
 
-      val srcRenameSSA = SSADAG.transform(sourceParams, source, inputs(sourceParams(proc.name)), liveVarsSource)
-      val tgtRenameSSA = SSADAG.transform(targetParams, target, inputs(targetParams(proc.name)), liveVarsTarget)
-      timer.checkPoint("SSA")
-
-      val ackInv =
-        Ackermann.instantiateAxioms(
-          source.entryBlock.get,
-          target.entryBlock.get,
-          frames,
-          exprInSource,
-          exprInTarget,
-          invariantRenamingSrcTgt
-        )
-      timer.checkPoint("ackermann")
-
-      val equalVarsInvariant = getEqualVarsInvariantRenaming(
+      val res = validateSMTSingleProc(
+        accRes,
+        runName,
         proc,
         invariantRenamingSrcTgt,
+        flowFacts,
+        introducedAsserts,
+        sourceParams,
+        targetParams,
         liveVarsSource,
-        liveVarsTarget,
-        sourceParams(proc.name),
-        targetParams(proc.name)
+        liveVarsTarget
       )
 
-      val cuts =
-        beforeCuts(target).cutLabelBlockInProcedure.map(_._1) ++ afterCuts(source).cutLabelBlockInProcedure.map(_._1)
+      accRes.copy(results = res :: accRes.results)
+    })
 
-      val alwaysInv = List(
-        CompatArg(TransitionSystem.programCounterVar, TransitionSystem.programCounterVar),
-        CompatArg(TransitionSystem.traceVar, TransitionSystem.traceVar)
-      )
-
-      val invEverywhere = cuts.toList.map(label =>
-        Inv.SourceConditionalConstraint(
-          label,
-          BinaryExpr(NEQ, TransitionSystem.programCounterVar, PCMan.PCSym(PCMan.assumptionFailLabel)),
-          alwaysInv,
-          Some(s"GlobalConstraint$label")
-        )
-      )
-
-      val factsInvariant = getFlowFactsInvariant(proc, liveBefore, flowFacts(proc.name))
-
-      val invariant = equalVarsInvariant ++ factsInvariant ++ invEverywhere
-
-      val preInv = invariant
-
-      val primedInv = invariant.map {
-        case i: Inv.GlobalConstraint => {
-          i.toAssume(proc)(
-            (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("EXIT").label, e),
-            (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("EXIT").label, e)
-          ).body
-        }
-        case i: Inv.SourceConditionalConstraint => {
-          i.toAssume(proc)(
-            (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("EXIT").label, e),
-            (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("EXIT").label, e)
-          ).body
-        }
-        case i: Inv.CutPoint => {
-          i.toAssume(proc)(
-            (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("EXIT").label, e),
-            (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("EXIT").label, e)
-          ).body
-        }
-      }
-
-      visit_proc(afterRenamer, source)
-      visit_proc(beforeRenamer, target)
-
-      SSADAG.passify(source)
-      SSADAG.passify(target)
-      timer.checkPoint("passify")
-
-      val otargets = srcEntry.jump.asInstanceOf[GoTo].targets.toList
-
-      val splitName = "-" + proc.name // + "_split_" + splitNo
-      // build smt query
-      // val b = translating.BasilIRToSMT2.SMTBuilder()
-      val solver = util.SMT.SMTSolver(Some(1000), util.SMT.Solver.CVC5)
-      val prover = solver.getProver(true)
-
-      // b.addCommand("set-logic", "QF_BV")
-
-      var count = 0
-
-      val newProg = combineProcs(source, target)
-      val npe = newProg.mainProcedure.entryBlock.get
-
-      count = 0
-      for (i <- preInv) {
-        count += 1
-        val e = i.toAssume(proc)(srcRenameSSA, tgtRenameSSA).body
-        try {
-          val l = Some(s"inv$count")
-          // b.addAssert(e, l)
-          prover.addConstraint(e)
-          npe.statements.append(Assert(e, l))
-        } catch
-          ex => {
-            throw Exception(s"$ex Failed to gen smt for ?\n  $e :: \n $e")
-          }
-      }
-
-      count = 0
-      for ((ack, ackn) <- ackInv) {
-        count += 1
-        val l = Some(s"ackermann$ackn$count")
-        npe.statements.append(Assert(ack, l))
-        prover.addConstraint(ack)
-        // b.addAssert(ack, l)
-      }
-      count = 0
-      for (i <- extractProg(source)) {
-        count += 1
-        // b.addAssert(i, Some(s"source$count"))
-        prover.addConstraint(i)
-      }
-      count = 0
-      for (i <- extractProg(target)) {
-        count += 1
-        prover.addConstraint(i)
-        // b.addAssert(i, Some(s"tgt$count"))
-      }
-      val pinv = UnaryExpr(BoolNOT, AssocExpr(BoolAND, primedInv.toList))
-      npe.statements.append(Assert(pinv, Some("InvPrimed")))
-      // b.addAssert(pinv, Some("InvPrimed"))
-      timer.checkPoint("extract prog")
-      prover.addConstraint(pinv)
-
-      val fname = s"$filePrefix${splitName}.smt2"
-      // val query = b.getCheckSat()
-      // util.writeToFile(query, fname)
-      Logger.info(s"Write query $fname")
-
-      timer.checkPoint("write out " + fname)
-
-      val verify = true
-      if (verify) {
-        Logger.info(s"checksat $fname")
-        val res = prover.checkSat()
-        res match {
-          case SatResult.UNSAT => Logger.info("unsat")
-          case SatResult.SAT(m) => {
-            Logger.error(s"sat ${filePrefix} ${proc.name}")
-
-            val traces = source.blocks
-              .flatMap(b =>
-                try {
-                  val s = srcRenameSSA(afterRenamer.stripNamespace(b.label), TransitionSystem.traceVar)
-                  val t = tgtRenameSSA(afterRenamer.stripNamespace(b.label), TransitionSystem.traceVar)
-                  Seq(b.label -> BinaryExpr(EQ, s, t))
-                } catch {
-                  case _ => Seq()
-                }
-              )
-              .toMap
-
-            val g = processModel(
-              newProg.mainProcedure,
-              prover,
-              primedInv.toList,
-              traces,
-              invariantRenamingSrcTgt,
-              source.entryBlock.get.label,
-              target.entryBlock.get.label
-            )
-
-            Logger.writeToFile(
-              File(s"${filePrefix}combined-${proc.name}.il"),
-              translating.PrettyPrinter.pp_prog(newProg)
-            )
-            Logger.writeToFile(File(s"${filePrefix}counterexample-combined-${proc.name}.dot"), g)
-            // extract model
-          }
-          case SatResult.Unknown(m) => println(s"unknown: $m")
-        }
-
-        timer.checkPoint("checksat")
-      }
-
-      prover.close()
-      solver.close()
-      io.github.cvc5.Context.deletePointers()
-    }
-
-    timer.checkPoint("Finishehd tv pass")
+    result
   }
 
 }
 
-def wrapShapePreservingTransformInValidation(transform: Program => Unit, name: String)(p: Program) = {
-  val validator = TranslationValidator()
-  validator.setTargetProg(p)
-  transform(p)
-  validator.setSourceProg(p)
-  validator.getValidationSMT(b => v => Some(v), "tvsmt/" + name)
+def validatorForTransform[T](transform: Program => T)(p: Program): (TranslationValidator, T) = {
+  val v = TranslationValidator()
+  v.setTargetProg(p)
+  val r = transform(p)
+  v.setSourceProg(p)
+  (v, r)
+}
+
+def wrapShapePreservingTransformInValidation(tvJob: TVJob, transform: Program => Unit, name: String)(
+  p: Program
+): TVJob = {
+  val (validator, _) = validatorForTransform(transform)(p)
+  validator.getValidationSMT(tvJob, name)
 }
