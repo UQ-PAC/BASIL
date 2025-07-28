@@ -316,7 +316,7 @@ object IRTransform {
     for (ef <- ctx.externalFunctions) {
       val p = ctx.program.procedures.find(proc => proc.procName == ef.name || proc.address.contains(ef.offset))
       if (p.isEmpty) {
-        val np = Procedure(ef.name, Some(ef.offset))
+        val np = Procedure(ef.name.split('@')(0), Some(ef.offset))
         np.isExternal = Some(true)
         ctx.program.addProcedure(np)
       }
@@ -339,7 +339,7 @@ object IRTransform {
 
     Logger.info("[!] Stripping unreachable")
     val before = ctx.program.procedures.size
-    // transforms.stripUnreachableFunctions(ctx.program, config.loading.procedureTrimDepth)
+    transforms.stripUnreachableFunctions(ctx.program, config.loading.procedureTrimDepth)
     Logger.info(
       s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
     )
