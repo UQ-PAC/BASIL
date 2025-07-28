@@ -1015,12 +1015,20 @@ object RunUtils {
 
     if (conf.summariseProcedures) {
       StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
-      IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify != SimplifyMode.Disabled)
+      IRTransform.generateProcedureSummaries(
+        ctx,
+        ctx.program,
+        q.loading.parameterForm || conf.simplify != SimplifyMode.Disabled
+      )
     }
 
     if (conf.summariseProcedures) {
       StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
-      IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify != SimplifyMode.Disabled)
+      IRTransform.generateProcedureSummaries(
+        ctx,
+        ctx.program,
+        q.loading.parameterForm || conf.simplify != SimplifyMode.Disabled
+      )
     }
 
     if (q.runInterpret) {

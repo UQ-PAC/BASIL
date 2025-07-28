@@ -1,9 +1,18 @@
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest.*
-import test_util.{BASILTest, CaptureOutput, Histogram, TestConfig, TestCustomisation, SimplifyMode}
+import test_util.{BASILTest, CaptureOutput, Histogram, TestConfig, TestCustomisation}
 import util.DSAPhase.TD
 import util.boogie_interaction.*
-import util.{DSConfig, DebugDumpIRLogger, LogLevel, Logger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
+import util.{
+  DSConfig,
+  DebugDumpIRLogger,
+  LogLevel,
+  Logger,
+  MemoryRegionsMode,
+  PerformanceTimer,
+  SimplifyMode,
+  StaticAnalysisConfig
+}
 
 import java.io.File
 import scala.collection.immutable.ListMap
@@ -375,10 +384,22 @@ class ExtraSpecTests extends SystemTests {
 
 @test_util.tags.DisabledTest
 class NoSimplifySystemTests extends SystemTests {
-  runTests("correct", TestConfig(simplify = SimplifyMode.Disabled, useBAPFrontend = true, expectVerify = true, logResults = true))
-  runTests("incorrect", TestConfig(simplify = SimplifyMode.Disabled, useBAPFrontend = true, expectVerify = false, logResults = true))
-  runTests("correct", TestConfig(simplify = SimplifyMode.Disabled, useBAPFrontend = false, expectVerify = true, logResults = true))
-  runTests("incorrect", TestConfig(simplify = SimplifyMode.Disabled, useBAPFrontend = false, expectVerify = false, logResults = true))
+  runTests(
+    "correct",
+    TestConfig(simplify = SimplifyMode.Disabled, useBAPFrontend = true, expectVerify = true, logResults = true)
+  )
+  runTests(
+    "incorrect",
+    TestConfig(simplify = SimplifyMode.Disabled, useBAPFrontend = true, expectVerify = false, logResults = true)
+  )
+  runTests(
+    "correct",
+    TestConfig(simplify = SimplifyMode.Disabled, useBAPFrontend = false, expectVerify = true, logResults = true)
+  )
+  runTests(
+    "incorrect",
+    TestConfig(simplify = SimplifyMode.Disabled, useBAPFrontend = false, expectVerify = false, logResults = true)
+  )
   test("summary-nosimplify") {
     summary("nosimplify")
   }
@@ -387,10 +408,22 @@ class NoSimplifySystemTests extends SystemTests {
 @test_util.tags.AnalysisSystemTest2
 @test_util.tags.AnalysisSystemTest
 class SimplifySystemTests extends SystemTests {
-  runTests("correct", TestConfig(simplify = SimplifyMode.Simplify, useBAPFrontend = true, expectVerify = true, logResults = true))
-  runTests("incorrect", TestConfig(simplify = SimplifyMode.Simplify, useBAPFrontend = true, expectVerify = false, logResults = true))
-  runTests("correct", TestConfig(simplify = SimplifyMode.Simplify, useBAPFrontend = false, expectVerify = true, logResults = true))
-  runTests("incorrect", TestConfig(simplify = SimplifyMode.Simplify, useBAPFrontend = false, expectVerify = false, logResults = true))
+  runTests(
+    "correct",
+    TestConfig(simplify = SimplifyMode.Simplify, useBAPFrontend = true, expectVerify = true, logResults = true)
+  )
+  runTests(
+    "incorrect",
+    TestConfig(simplify = SimplifyMode.Simplify, useBAPFrontend = true, expectVerify = false, logResults = true)
+  )
+  runTests(
+    "correct",
+    TestConfig(simplify = SimplifyMode.Simplify, useBAPFrontend = false, expectVerify = true, logResults = true)
+  )
+  runTests(
+    "incorrect",
+    TestConfig(simplify = SimplifyMode.Simplify, useBAPFrontend = false, expectVerify = false, logResults = true)
+  )
   test("summary-simplify") {
     summary("simplify")
   }
@@ -619,7 +652,12 @@ class ProcedureSummaryTests extends SystemTests {
   )
   runTests(
     "procedure_summaries",
-    TestConfig(summariseProcedures = true, simplify = SimplifyMode.Simplify, useBAPFrontend = false, expectVerify = true)
+    TestConfig(
+      summariseProcedures = true,
+      simplify = SimplifyMode.Simplify,
+      useBAPFrontend = false,
+      expectVerify = true
+    )
   )
 }
 
@@ -633,7 +671,10 @@ class UnimplementedTests extends SystemTests {
 @test_util.tags.AnalysisSystemTest4
 @test_util.tags.AnalysisSystemTest
 class IntervalDSASystemTests extends SystemTests {
-  runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, simplify = SimplifyMode.Simplify, dsa = Some(DSConfig())))
+  runTests(
+    "correct",
+    TestConfig(useBAPFrontend = false, expectVerify = true, simplify = SimplifyMode.Simplify, dsa = Some(DSConfig()))
+  )
   runTests(
     "incorrect",
     TestConfig(useBAPFrontend = false, expectVerify = false, simplify = SimplifyMode.Simplify, dsa = Some(DSConfig()))
@@ -644,16 +685,31 @@ class IntervalDSASystemTests extends SystemTests {
 class IntervalDSASystemTestsSplitGlobals extends SystemTests {
   runTests(
     "correct",
-    TestConfig(useBAPFrontend = false, expectVerify = true, simplify = SimplifyMode.Simplify, dsa = Some(DSConfig(TD, true, true)))
+    TestConfig(
+      useBAPFrontend = false,
+      expectVerify = true,
+      simplify = SimplifyMode.Simplify,
+      dsa = Some(DSConfig(TD, true, true))
+    )
   )
 
   runTests(
     "dsa/correct",
-    TestConfig(useBAPFrontend = false, expectVerify = true, simplify = SimplifyMode.Simplify, dsa = Some(DSConfig(TD, true, true)))
+    TestConfig(
+      useBAPFrontend = false,
+      expectVerify = true,
+      simplify = SimplifyMode.Simplify,
+      dsa = Some(DSConfig(TD, true, true))
+    )
   )
   runTests(
     "incorrect",
-    TestConfig(useBAPFrontend = false, expectVerify = false, simplify = SimplifyMode.Simplify, dsa = Some(DSConfig(TD, true, true)))
+    TestConfig(
+      useBAPFrontend = false,
+      expectVerify = false,
+      simplify = SimplifyMode.Simplify,
+      dsa = Some(DSConfig(TD, true, true))
+    )
   )
 }
 
@@ -661,7 +717,12 @@ class IntervalDSASystemTestsSplitGlobals extends SystemTests {
 class IntervalDSASystemTestsEqClasses extends SystemTests {
   runTests(
     "correct",
-    TestConfig(useBAPFrontend = false, expectVerify = true, simplify = SimplifyMode.Simplify, dsa = Some(DSConfig(TD, eqClasses = true)))
+    TestConfig(
+      useBAPFrontend = false,
+      expectVerify = true,
+      simplify = SimplifyMode.Simplify,
+      dsa = Some(DSConfig(TD, eqClasses = true))
+    )
   )
   runTests(
     "incorrect",

@@ -1,7 +1,15 @@
 import ir.*
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
-import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, IRContext, PCTrackingOption, StaticAnalysisConfig}
+import util.{
+  BASILConfig,
+  BoogieGeneratorConfig,
+  ILLoadingConfig,
+  IRContext,
+  PCTrackingOption,
+  SimplifyMode,
+  StaticAnalysisConfig
+}
 
 @test_util.tags.UnitTest
 class PCTrackingTest extends AnyFunSuite with CaptureOutput {
@@ -19,7 +27,7 @@ class PCTrackingTest extends AnyFunSuite with CaptureOutput {
         staticAnalysis = Some(StaticAnalysisConfig(None)),
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        simplify = simplify
+        simplify = if simplify then SimplifyMode.Simplify else SimplifyMode.Disabled
       )
     )
   }

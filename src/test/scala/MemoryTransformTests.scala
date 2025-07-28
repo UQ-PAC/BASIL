@@ -24,7 +24,7 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
     RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(inputFile = path + ".adt", relfFile = Some(path + ".relf")),
-        simplify = true,
+        simplify = SimplifyMode.Simplify,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
@@ -39,7 +39,7 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
       BASILConfig(
         context = Some(context),
         loading = ILLoadingConfig(inputFile = "", relfFile = None),
-        simplify = true,
+        simplify = SimplifyMode.Simplify,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",

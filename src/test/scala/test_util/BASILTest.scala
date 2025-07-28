@@ -12,6 +12,7 @@ import util.{
   IRContext,
   Logger,
   RunUtils,
+  SimplifyMode,
   StaticAnalysisConfig
 }
 
@@ -67,7 +68,7 @@ trait BASILTest {
         parameterForm = false,
         gtirbLiftOffline = useOfflineLifterForGtirbFrontend
       ),
-      simplify = simplify == SimplifyMode.Simplify,
+      simplify = simplify,
       summariseProcedures = summariseProcedures,
       staticAnalysis = staticAnalysisConf,
       boogieTranslation =

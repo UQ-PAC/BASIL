@@ -8,7 +8,6 @@ enum PCTrackingOption {
   case None, Keep, Assert
 }
 
-
 enum SimplifyMode {
   case Disabled, Simplify, ValidatedSimplify, ValidatedSimplifyRunVerify
 }

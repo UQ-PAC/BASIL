@@ -26,7 +26,7 @@ class SVATest extends AnyFunSuite with CaptureOutput {
       BASILConfig(
         context = Some(context),
         loading = ILLoadingConfig(inputFile = "", relfFile = None),
-        simplify = true,
+        simplify = SimplifyMode.Simplify,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
