@@ -1,6 +1,7 @@
 import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
+import util.SimplifyMode
 
 @test_util.tags.UnitTest
 class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureOutput {
@@ -813,6 +814,31 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
     proc("printf"),
     proc("strtoul")
   )
+
+  test("conds inline test tvsimp") {
+
+    var ctx = util.IRLoading.load(testProgram)
+    util.IRTransform.doCleanup(ctx, true)
+    ir.transforms.clearParams(ctx.program)
+
+    ir.transforms.validate.validatedSimplifyPipeline(ctx.program, SimplifyMode.Simplify)
+    for (p <- ctx.program.procedures) {
+      p.normaliseBlockNames()
+    }
+
+    (ctx.program).foreach {
+      case a: Assume => {
+        assert(!(a.body.variables.exists(v => {
+          v.name.startsWith("ZF")
+          || v.name.startsWith("CF")
+          || v.name.startsWith("VF")
+          || v.name.startsWith("NF")
+          || v.name.startsWith("Cse")
+        })))
+      }
+      case _ => ()
+    }
+  }
 
   test("conds inline test") {
 

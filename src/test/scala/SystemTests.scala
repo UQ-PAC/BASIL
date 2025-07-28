@@ -292,6 +292,31 @@ class SystemTestsGTIRB extends SystemTests {
   }
 }
 
+@test_util.tags.DisabledTest
+class SystemTestsGTIRBSimplifyTV extends SystemTests {
+  val simplify = SimplifyMode.ValidatedSimplify(Some(util.SMT.Solver.Z3), None)
+  runTests(
+    "correct",
+    TestConfig(
+      useBAPFrontend = false,
+      expectVerify = true,
+      checkExpected = true,
+      logResults = true,
+      simplify = simplify
+    )
+  )
+  runTests(
+    "incorrect",
+    TestConfig(
+      useBAPFrontend = false,
+      expectVerify = false,
+      checkExpected = true,
+      logResults = true,
+      simplify = simplify
+    )
+  )
+}
+
 @test_util.tags.StandardSystemTest
 class SystemTestsGTIRBOfflineLifter extends SystemTests {
   runTests(

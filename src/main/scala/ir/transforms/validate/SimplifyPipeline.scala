@@ -1,7 +1,7 @@
 package ir.transforms.validate
 import ir.*
-import util.Logger
 import util.SMT.SatResult
+import util.SimplifyMode
 
 import cilvisitor.{visit_proc, visit_prog}
 
@@ -116,7 +116,11 @@ def assumePreservedParams(config: TVJob, p: Program) = {
 }
 
 def validatedSimplifyPipeline(p: Program, mode: util.SimplifyMode): TVJob = {
-  var config = TVJob(Some("tvsmt"), Some(util.SMT.Solver.CVC5))
+  var config = mode match {
+    case SimplifyMode.ValidatedSimplify(verifyMode, filePrefix) =>
+      TVJob(outputPath = filePrefix, verify = verifyMode)
+    case _ => TVJob(None, None)
+  }
   transforms.applyRPO(p)
   config = parameters(config, p)
   config = assumePreservedParams(config, p)
@@ -132,9 +136,9 @@ def validatedSimplifyPipeline(p: Program, mode: util.SimplifyMode): TVJob = {
   val failed = config.results.filter(_.verified.exists(_.isInstanceOf[SatResult.SAT]))
 
   if (failed.nonEmpty) {
-    Logger.error(s"Validation failed")
     val fnames = failed.map(f => s"  ${f.runName}::${f.proc} ${f.smtFile}").mkString("\n")
-    Logger.error(s"Failing cases: $fnames")
+    // Logger.error(s"Failing cases: $fnames")
+    throw Exception(s"TranslationValidationFailed: $fnames")
   }
 
   config

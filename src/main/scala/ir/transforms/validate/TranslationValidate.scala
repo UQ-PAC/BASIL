@@ -4,7 +4,7 @@ import analysis.ProcFrames.*
 import ir.*
 import ir.cilvisitor.*
 import util.SMT.*
-import util.{LogLevel, Logger, PerformanceTimer}
+import util.{LogLevel, PerformanceTimer, tvLogger}
 
 import java.io.File
 
@@ -481,7 +481,6 @@ class TranslationValidator {
   )(callLHS: List[(Variable | Memory, Variable)], callRHS: List[(Variable | Memory, Expr)]) = {
 
     val (expSource, expTgt) = expected
-    println(callRHS)
 
     val rhs = callRHS.map {
       case (formal, actual) => {
@@ -492,11 +491,11 @@ class TranslationValidator {
         }.toList match {
           case h :: Nil => Seq(h)
           case h :: tl => {
-            Logger.warn("multiple guys")
+            tvLogger.warn("multiple guys")
             Seq(h)
           }
           case Nil => {
-            Logger.error("No matching Thingo found, ack gna fail")
+            tvLogger.error("No matching Thingo found, ack gna fail")
             None
           }
         }
@@ -512,11 +511,11 @@ class TranslationValidator {
         }.toList match {
           case h :: Nil => Seq(h)
           case h :: tl => {
-            Logger.warn("multiple guys")
+            tvLogger.warn("multiple guys")
             Seq(h)
           }
           case Nil => {
-            Logger.error("No matching Thingo found, ack gna fail")
+            tvLogger.error("No matching Thingo found, ack gna fail")
             None
           }
         }
@@ -752,7 +751,6 @@ class TranslationValidator {
   def setTargetProg(p: Program) = {
     val f = inferProcFrames(p)
     beforeFrame = f.map((k, v) => (k.name, v)).toMap
-    // println(translating.PrettyPrinter.pp_prog(p))
     initProg = Some(p)
     initProgBefore = Some(ir.dsl.IRToDSL.convertProgram(p).resolve)
     val (prog, cuts) = TransitionSystem.toTransitionSystem(p, f)
@@ -830,13 +828,13 @@ class TranslationValidator {
     for (i <- invariant) {
       eval.evalExpr(i) match {
         case Some(FalseLiteral) =>
-          Logger.error(s"Part of invariant failed: $i")
+          tvLogger.error(s"Part of invariant failed: $i")
           i match {
             case BinaryExpr(BoolIMPLIES, e, Conj(conjuncts)) => {
-              println(" Specifically:")
+              tvLogger.error(" Specifically:")
               for (c <- conjuncts) {
                 eval.evalExpr(c) match {
-                  case Some(FalseLiteral) => println(s"  $c is false")
+                  case Some(FalseLiteral) => tvLogger.error(s"  $c is false")
                   case _ => ()
                 }
               }
@@ -897,13 +895,13 @@ class TranslationValidator {
 
       def pt(b: Block, indent: Int = 0): Unit = {
         if (isReached(b)) {
-          println(" ".repeat(indent * 2) + b.label)
+          tvLogger.info(" ".repeat(indent * 2) + b.label)
         }
 
         var n = b.nextBlocks.filter(isReached)
 
         while (n.size == 1) {
-          println(" ".repeat(indent * 2) + n.head.label)
+          tvLogger.info(" ".repeat(indent * 2) + n.head.label)
           n = n.head.nextBlocks.filter(isReached)
         }
 
@@ -954,9 +952,9 @@ class TranslationValidator {
       }
     }
 
-    Logger.info("Trace source:")
+    tvLogger.info("Trace source:")
     getTrace(sourceEntry)
-    Logger.info("Trace target:")
+    tvLogger.info("Trace target:")
     getTrace(targetEntry)
 
     visit_proc(CollapsePhi(), combinedProc)
@@ -1143,8 +1141,8 @@ class TranslationValidator {
 
     smtPath.foreach(fname => {
       val query = b.getCheckSat()
-      Logger.writeToFile(File(fname), query)
-      Logger.info(s"Write query $fname")
+      tvLogger.writeToFile(File(fname), query)
+      tvLogger.info(s"Write query $fname")
       timer.checkPoint("write out " + fname)
     })
 
@@ -1156,7 +1154,7 @@ class TranslationValidator {
 
     if (config.debugDumpAlways) {
       config.outputPath.foreach(path => {
-        Logger.writeToFile(
+        tvLogger.writeToFile(
           File(s"${path}/${runNamePrefix}-combined-${proc.name}.il"),
           translating.PrettyPrinter.pp_prog(newProg)
         )
@@ -1166,9 +1164,9 @@ class TranslationValidator {
     verified.foreach((prover, solver, res) => {
       val res = prover.checkSat()
       res match {
-        case SatResult.UNSAT => Logger.info("unsat")
+        case SatResult.UNSAT => tvLogger.info("unsat")
         case SatResult.SAT(m) => {
-          Logger.error(s"sat ${runNamePrefix} (verify failed)")
+          tvLogger.error(s"sat ${runNamePrefix} (verify failed)")
 
           val traces = source.blocks
             .flatMap(b =>
@@ -1193,16 +1191,16 @@ class TranslationValidator {
           )
 
           config.outputPath.foreach(path => {
-            Logger.writeToFile(File(s"${path}/${runNamePrefix}-counterexample-combined-${proc.name}.dot"), g)
+            tvLogger.writeToFile(File(s"${path}/${runNamePrefix}-counterexample-combined-${proc.name}.dot"), g)
             if (!config.debugDumpAlways) {
-              Logger.writeToFile(
+              tvLogger.writeToFile(
                 File(s"${path}/${runNamePrefix}-combined-${proc.name}.il"),
                 translating.PrettyPrinter.pp_prog(newProg)
               )
             }
           })
         }
-        case SatResult.Unknown(m) => println(s"unknown: $m")
+        case SatResult.Unknown(m) => tvLogger.info(s"unknown: $m")
       }
       timer.checkPoint("model-extract-debug")
     })

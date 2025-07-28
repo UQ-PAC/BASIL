@@ -967,28 +967,31 @@ object RunUtils {
       p.normaliseBlockNames()
     }
 
-    if (conf.simplify == SimplifyMode.ValidatedSimplify || conf.simplify == SimplifyMode.ValidatedSimplifyRunVerify) {
-      ir.transforms.clearParams(ctx.program)
-      ir.transforms.liftIndirectCall(ctx.program)
-      DebugDumpIRLogger.writeToFile(File("il-beforetvsimp.il"), pp_prog(ctx.program))
-      transforms.validate.validatedSimplifyPipeline(ctx.program, conf.simplify)
-    } else if (conf.simplify != SimplifyMode.Disabled) {
-
-      ir.transforms.clearParams(ctx.program)
-
-      ir.transforms.liftIndirectCall(ctx.program)
-      transforms.liftSVCompNonDetEarlyIR(ctx.program)
-
-      DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
-      ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
-      DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
-
-      if (conf.assertCalleeSaved) {
-        transforms.CalleePreservedParam.transform(ctx.program)
+    conf.simplify match {
+      case c: SimplifyMode.ValidatedSimplify => {
+        ir.transforms.clearParams(ctx.program)
+        ir.transforms.liftIndirectCall(ctx.program)
+        DebugDumpIRLogger.writeToFile(File("il-beforetvsimp.il"), pp_prog(ctx.program))
+        transforms.validate.validatedSimplifyPipeline(ctx.program, conf.simplify)
       }
+      case SimplifyMode.Simplify => {
+        ir.transforms.clearParams(ctx.program)
 
-      assert(ir.invariant.programDiamondForm(ctx.program))
-      doSimplify(ctx, conf.staticAnalysis)
+        ir.transforms.liftIndirectCall(ctx.program)
+        transforms.liftSVCompNonDetEarlyIR(ctx.program)
+
+        DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
+        ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
+        DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
+
+        if (conf.assertCalleeSaved) {
+          transforms.CalleePreservedParam.transform(ctx.program)
+        }
+
+        assert(ir.invariant.programDiamondForm(ctx.program))
+        doSimplify(ctx, conf.staticAnalysis)
+      }
+      case SimplifyMode.Disabled => ()
     }
 
     assert(ir.invariant.programDiamondForm(ctx.program))
