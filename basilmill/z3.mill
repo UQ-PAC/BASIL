@@ -1,50 +1,59 @@
 package build.basilmill
 
 import mill._
+import api._
 import javalib._
+import mainargs._
+import os.Path
 
-trait Z3Module extends CoursierModule {
-  val arch = System.getProperty("os.arch") match {
-    case "amd64" => "x64"
-    case "x86" => "x64"
-    case "aarch64" => "arm64"
-    case _ => "unknown"
+trait Z3Module extends OfflineSupportModule, CoursierModule, JavaModule {
+
+  val z3LibNames = List("libz3", "libz3java")
+  val z3ArtifactTypes = Set(coursier.core.Type("so"), coursier.core.Type("dll"), coursier.core.Type("dylib"))
+
+  /**
+   * Fetches the required libraries for the given platform into the given destination directory.
+   *
+   * Returns the given destination directory path.
+   */
+  def fetchLibraries(resolver: CoursierModule.Resolver, ctx: TaskCtx)(dest: Path, platform: Platform) = {
+
+    val soType = platform.os.libExtension
+    val arch = platform.arch match {
+      case Platform.X86_64 => "x64"
+      case Platform.Aarch64 => "arm64"
+    }
+
+    z3LibNames.foreach(source => {
+      val dep = Dep.parse(s"org.sosy-lab:javasmt-solver-z3:4.14.0;classifier=$source-$arch;type=$soType")
+
+      val path =
+        resolver.classpath(Seq(dep), artifactTypes = Some(z3ArtifactTypes))(using implicitly, ctx).head.path
+      val newPath = dest / s"$source.$soType"
+
+      os.copy(path, newPath)
+    })
+
+    dest
   }
 
-  val soType = System.getProperty("os.name") match {
-    case "Linux" => "so"
-    case m if m.startsWith("Mac OS") => "dylib"
-    case w if w.startsWith("Windows") => "dll"
-    case _ => "unknown"
+  /** Installs the appropriate Z3 libraries for the current platform. */
+  def install = Task {
+    Platform.detect() match {
+      case Right(x) => fetchLibraries(millResolver(), implicitly)(Task.dest, x)
+      case Left(e) => Task.fail(e)
+    }
   }
 
-  val sources = List("libz3", "libz3java")
+  override def prepareOffline(all: Flag) = Task.Command[Seq[PathRef]] {
+    import Platform.*
 
-  def artifactTypes = Task {
-    Set(coursier.core.Type("so"), coursier.core.Type("dll"), coursier.core.Type("dylib"))
+    val supportedPlatforms = Set(Platform(X86_64, Linux), Platform(Aarch64, Mac))
+
+    val doFetch = fetchLibraries(millResolver(), implicitly)
+    val libDirs = supportedPlatforms.map(doFetch(Task.dest, _))
+
+    libDirs.toSeq.map(PathRef(_))
   }
 
-  def install: T[String] = Task {
-    val resolver = millResolver()
-
-    sources.flatMap(source => {
-      try {
-        val dep = Dep.parse(s"org.sosy-lab:javasmt-solver-z3:4.14.0;classifier=$source-$arch;type=$soType")
-
-        val path = resolver.classpath(Seq(dep), artifactTypes = Some(artifactTypes())).head.path
-        val dir = path / ".."
-        val newPath = dir / s"$source.$soType"
-
-        if (!os.exists(newPath)) {
-          os.copy(path, newPath)
-        }
-
-        Some(dir.toString)
-      } catch { case e: Throwable => {
-        println(s"Failed to obtain source $source (arch=$arch, soType=$soType)")
-        println(e)
-        None
-      }}
-    }).distinct.mkString(":")
-  }
 }

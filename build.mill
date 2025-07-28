@@ -33,7 +33,7 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
 
   override def ammoniteVersion = "3.0.2"
 
-  override def moduleDeps = Seq(basilAntlr, basilProto, bnfc)
+  override def moduleDeps = Seq(basilAntlr, basilProto, bnfc, z3)
 
   override def scalacOptions: T[Seq[String]] = Seq("-deprecation", "-Wunused:imports", "-feature")
 
