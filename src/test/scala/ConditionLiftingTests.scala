@@ -821,7 +821,7 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
     util.IRTransform.doCleanup(ctx, true)
     ir.transforms.clearParams(ctx.program)
 
-    ir.transforms.validate.validatedSimplifyPipeline(ctx.program, SimplifyMode.Simplify)
+    ir.transforms.validate.validatedSimplifyPipeline(ctx, SimplifyMode.Simplify)
     for (p <- ctx.program.procedures) {
       p.normaliseBlockNames()
     }

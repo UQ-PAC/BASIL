@@ -1,8 +1,7 @@
 package ir.transforms.validate
 import ir.*
 import util.SMT.SatResult
-import util.SimplifyMode
-import util.Logger
+import util.{IRContext, Logger, SimplifyMode}
 
 import cilvisitor.{visit_proc, visit_prog}
 
@@ -59,8 +58,9 @@ def copyProp(config: TVJob, p: Program) = {
   validator.getValidationSMT(config, "CopyProp", renaming, flowFacts)
 }
 
-def parameters(config: TVJob, p: Program) = {
-  val (validator, _) = validatorForTransform(p => transforms.liftProcedureCallAbstraction(p, None))(p)
+def parameters(config: TVJob, ctx: IRContext) = {
+  val (validator, res) =
+    validatorForTransform(p => transforms.liftProcedureCallAbstraction(p, Some(ctx.specification)))(ctx.program)
 
   def sourceToTarget(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
     case LocalVar(s"${i}_in", t, 0) => Some(GlobalVar(s"$i", t))
@@ -69,7 +69,7 @@ def parameters(config: TVJob, p: Program) = {
     case g => Some(g)
   }
 
-  validator.getValidationSMT(config, "Parameters", sourceToTarget)
+  (validator.getValidationSMT(config, "Parameters", sourceToTarget), ctx.copy(specification = res.get))
 
 }
 
@@ -116,14 +116,19 @@ def assumePreservedParams(config: TVJob, p: Program) = {
   validator.getValidationSMT(config, "AssumeCallPreserved", introducedAsserts = asserts.toSet)
 }
 
-def validatedSimplifyPipeline(p: Program, mode: util.SimplifyMode): TVJob = {
+def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, IRContext) = {
+  // passing through ircontext like this just for spec transform is horrible
+  // also the translation validation doesn't really consider spec at all
+  // maybe it should; in ackermann phase and observable variables...
+  val p = ctx.program
   var config = mode match {
     case SimplifyMode.ValidatedSimplify(verifyMode, filePrefix) =>
       TVJob(outputPath = filePrefix, verify = verifyMode)
     case _ => TVJob(None, None)
   }
   transforms.applyRPO(p)
-  config = parameters(config, p)
+  val (res, nctx) = parameters(config, ctx)
+  config = res
   config = assumePreservedParams(config, p)
   transforms.applyRPO(p)
   config = simplifyCFGValidated(config, p)
@@ -144,5 +149,5 @@ def validatedSimplifyPipeline(p: Program, mode: util.SimplifyMode): TVJob = {
     Logger.info("Translation validation passed")
   }
 
-  config
+  (config, nctx)
 }

@@ -972,7 +972,8 @@ object RunUtils {
         ir.transforms.clearParams(ctx.program)
         ir.transforms.liftIndirectCall(ctx.program)
         DebugDumpIRLogger.writeToFile(File("il-beforetvsimp.il"), pp_prog(ctx.program))
-        transforms.validate.validatedSimplifyPipeline(ctx.program, conf.simplify)
+        val (tvres, nctx) = transforms.validate.validatedSimplifyPipeline(ctx, conf.simplify)
+        ctx = nctx
       }
       case SimplifyMode.Simplify => {
         ir.transforms.clearParams(ctx.program)
