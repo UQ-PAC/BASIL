@@ -2,6 +2,9 @@ package build.basilmill
 
 import upickle.default.ReadWriter
 
+
+case class Platform(val arch: Platform.Arch, val os: Platform.Os) derives ReadWriter
+
 object Platform {
   enum Arch(val mavenName: String, val gnuName: String) derives ReadWriter {
     case X86_64 extends Arch("x64", "x86_64")
@@ -37,6 +40,6 @@ object Platform {
     os <- detectOs()
   } yield Platform(arch, os)
 
+  def detectExn() = detect().fold(x => throw Exception(x), identity)
 }
 
-case class Platform(val arch: Platform.Arch, val os: Platform.Os) derives ReadWriter

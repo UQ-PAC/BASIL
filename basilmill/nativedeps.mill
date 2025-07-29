@@ -29,6 +29,8 @@ trait NativeDepsModule extends JavaModule {
     // deduplicate only if name and dep are both identical
     val (names, deps) = nativeMvnDeps(plat).toSet.unzip
 
+    // resolve individually to maintain order of deps for
+    // zipping after.
     val libs = deps.map(dep =>
       resolver.classpath(
         Seq(dep),
@@ -38,7 +40,7 @@ trait NativeDepsModule extends JavaModule {
 
     (names zip libs).map((name, lib) => {
       val newPath = Task.dest / s"$name.${plat.os.libExtension}"
-      println(s"copying to $newPath from ${lib.path}")
+      println(s"copying to $newPath")
       os.copy(lib.path, newPath)
     })
 
