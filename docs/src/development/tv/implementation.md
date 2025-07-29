@@ -6,7 +6,9 @@ and verifies this program satisfies the invariant.
 
 We initially describe the translation pipeline and structures used throughout this process.
 
-## Cut-Transition System
+## Phases
+
+### Cut-Transition System
 
 - `TransitionSystem.scala`
 - Transforms a Basil IR program to an equivalent acyclic Basil IR program
@@ -24,7 +26,7 @@ to the original program.
   2. Identify each loop header as a cut, set `PC := Loop$i` and redirect through exit, add edge 
      from entry to header guarded by a pc value `Loop$i`
 
-## Monadic Local Side-Effect Form
+### Monadic Local Side-Effect Form
 
 - `SSADAG.scala` and `Ackermann.scala`
 
@@ -49,7 +51,7 @@ A frame analysis is used to identify the interprocedural effects of calls. This 
 pulls these side effects (memory access, global variable access) into the parameter list
 of the side-effect statement.
 
-## SSA Form
+### SSA Form
 
 This performs a naive SSA transform (not considering loops) on the Monadic program.
 
@@ -82,7 +84,7 @@ block l3  [
 This transform returns a function which renames an un-indexed expression 
 to one in terms of the ssa-indexed variables defined at a given block.
 
-## Ackermannisation
+### Ackermannisation
 
 - This is an invariant inference pass perfomed on the SSA-form program
 
@@ -122,20 +124,39 @@ body of the axiom as an assertion to the verification condition.
 
 - After this is performed all `SideEffectStatement` are removed from the program.
 
-## Passified Form
+### Passified Form
 
 Since we have SSA form the semantics of assignment are unneccessary, we replace
 every assignment with an `Assume` stating the equality of assignees.
 
 We now have a program consisting only of `Assume` statements.
 
-## SMT
+### SMT
 
 - `TranslationValidate.scala`
 
 - Infer invariant component at each cut and rename for the SSA renaming at the corresponding cut
-- Rename invariant to the exit block SSA renaming
+  - Rename free variables for ssa indexes for synth entry precondition and emit assertion
+  - Rename free variables for ssa indexes for synth exit and emit negated assertion
 - Add every assume from the passified program to the SMT query
 - Add the initial invariant to the SMT query, add the negated exit-invariant to the SMT query.
 
 This is built with `JavaSMT` and Basil's internal SMT builder.
+
+
+## Debugging
+
+### Validation Failure
+
+When immediate verification is enabled, and `sat` is returned, the validator emits an `.il` file and a 
+CFG for a containing a fake representation of the passified product
+program. It attempts to annotate the CFG with the model, however note that it often
+incorrectly relates source variables to target variables (due to mis-alignment of blocks, assigns, SSA-indexing), 
+so this cannot be taken as given.
+
+### Unsoundness
+
+A litmus-test for the soundness of the verification is to generate the unsat core for the dumped SMT query.
+If the verification is substantive, the unsat core should contain the entire transition system:
+assertions named `source$number` and `tgt$number`.
+
