@@ -81,7 +81,7 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
-      - run: ./scripts/scalatest.sh -PS3 -oGD -T 1000000 -n test_util.tags.StandardSystemTest
+      - run: ./scripts/scalatest.sh -PS3 -oTD -T 1000000 -n test_util.tags.StandardSystemTest
 
       - uses: actions/upload-artifact@v4
         with:
@@ -133,7 +133,7 @@ jobs:
 
       - run: ./mill test.compile
         # XXX: scalatest.sh doesn't work on windows
-      - run: ./mill test.testForked -oGD -T 1000000 -n test_util.tags.UnitTest
+      - run: ./mill test.testForked -oTD -T 1000000 -n test_util.tags.UnitTest
 
   UnitTests:
     runs-on: ubuntu-latest
@@ -155,7 +155,7 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
-      - run: ./scripts/scalatest.sh -PS3 -oGD -T 1000000 -n test_util.tags.UnitTest
+      - run: ./scripts/scalatest.sh -PS3 -oTD -T 1000000 -n test_util.tags.UnitTest
 
         # every test with package prefix:
         # sbt "show test:definedTests"
@@ -193,4 +193,4 @@ jobs:
       - run: dotnet tool install --global boogie --version '3.4.3'
 
       - run: ./mill test.compile
-      - run: "./scripts/scalatest.sh -PS3 -oGD -T 1000000 -n test_util.tags.${{ matrix.test }} -F 2"
+      - run: "./scripts/scalatest.sh -PS3 -oTD -T 1000000 -n test_util.tags.${{ matrix.test }} -F 2"
