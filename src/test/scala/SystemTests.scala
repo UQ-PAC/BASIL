@@ -292,7 +292,7 @@ class SystemTestsGTIRB extends SystemTests {
   }
 }
 
-@test_util.tags.AnalysisSystemTest
+@test_util.tags.TVSystemTest
 class SystemTestsGTIRBSimplifyTV extends SystemTests {
   val simplify = SimplifyMode.ValidatedSimplify(Some(util.SMT.Solver.Z3), None)
   runTests(
