@@ -2,14 +2,14 @@ package ir.transforms
 import ir.*
 
 /*
- * Generate specification to ensure the caller's stack is preserved.
+ * Generate specification to that ensures the caller's stack is preserved.
  *
  * Assume fully simplified IR as we coarsely attempt to infer the maximum size of a stack
  * allocation syntactically.
  *
- * Only consider local stack allocations; calls handled interprocedurally.
- * Verifiaction will fail for recursive calls as it won't be possible to show
- * the stack allocation is bounded.
+ * Attempts to interprocedurally compute a bound on the stack allocation for each procedure.
+ * We impose a tight stack limit to widen on recursive calls, and give up on emitting
+ * a spec in this case.
  *
  */
 
@@ -103,16 +103,13 @@ def genStackAllocationSpec(p: Program) = {
       val ensures = BinaryExpr(EQ, stack, OldExpr(stack))
       proc.ensuresExpr = ensures :: proc.ensuresExpr
     } else {
-      // no overflow on allocation
-
       if (maxStack.value > 0) {
+        // no integer overflow on allocation
         val requires1 = BinaryExpr(BVSGE, SP, BinaryExpr(BVSUB, SP, maxStack))
-        val requires2 = BinaryExpr(BVSGT, BinaryExpr(BVSUB, SP, maxStack), BitVecLiteral(0, 64))
-        val requires3 = BinaryExpr(BVSGE, SP, BitVecLiteral(0, 64))
+        //val requires2 = BinaryExpr(BVSGT, BinaryExpr(BVSUB, SP, maxStack), BitVecLiteral(0, 64))
+        //val requires3 = BinaryExpr(BVSGE, SP, BitVecLiteral(0, 64))
         proc.requiresExpr = requires1 :: proc.requiresExpr
       }
-      // ensures (forall  i : bv64  :: { $stack[i] }  bvsgt64(i, #R31_in) ==> $stack[i] == old($stack[i])) ;
-      // val ensures = QuantifierExpr(QuantifierSort.forall, LambdaExpr(List(i), BinaryExpr(BoolIMPLIES, BinaryExpr(BVSGT, i SP),  ) ))
 
       val ensures = {
         import boogie.*
@@ -134,22 +131,3 @@ def genStackAllocationSpec(p: Program) = {
 
   }
 }
-
-/*
-def postCleanupReadability(e: Expr): (Expr, Boolean) = {
-
-  var changedAnything = true
-
-  val res = e match {
-    case BinaryExpr(BVADD, x, b: BitVecLiteral) if ir.eval.BitVectorEval.isNegative(b) =>
-      logSimp(e, BinaryExpr(BVSUB, x, ir.eval.BitVectorEval.smt_bvneg(b)))
-    }
-    case _ =>  {
-      changedAnything = false
-      e
-    }
-
-    (res, changedAnything)
-  }
-
- */

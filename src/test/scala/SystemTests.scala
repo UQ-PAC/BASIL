@@ -294,10 +294,12 @@ class SystemTestsGTIRB extends SystemTests {
 
 @test_util.tags.TVSystemTest
 class SystemTestsGTIRBSimplifyTV extends SystemTests {
+  // array theory solver seems to do bettwe with these difficult specs
   val simplify = SimplifyMode.ValidatedSimplify(Some(util.SMT.Solver.Z3), None)
   runTests(
     "correct",
     TestConfig(
+      baseBoogieFlags = Seq("/proverOpt:O:smt.array.extensional=false"),
       useBAPFrontend = false,
       expectVerify = true,
       checkExpected = true,
@@ -308,6 +310,7 @@ class SystemTestsGTIRBSimplifyTV extends SystemTests {
   runTests(
     "incorrect",
     TestConfig(
+      baseBoogieFlags = Seq("/proverOpt:O:smt.array.extensional=false"),
       useBAPFrontend = false,
       expectVerify = false,
       checkExpected = true,

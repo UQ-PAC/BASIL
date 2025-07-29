@@ -18,11 +18,12 @@ object SSADAG {
     frames: Map[String, CallParamMapping],
     p: Procedure,
     inputs: List[Variable],
+    outputs: List[Variable],
     liveVarsBefore: Map[String, Set[Variable]]
   ) = {
     convertToMonadicSideEffect(frames, p)
 
-    ssaTransform(p, inputs, liveVarsBefore)
+    ssaTransform(p, inputs, outputs, liveVarsBefore)
   }
 
   private class Passify extends CILVisitor {
@@ -68,6 +69,7 @@ object SSADAG {
   def ssaTransform(
     p: Procedure,
     inputs: List[Variable],
+    outputs: List[Variable],
     liveVarsBefore: Map[String, Set[Variable]]
   ): ((String, Expr) => Expr) = {
 
@@ -141,8 +143,8 @@ object SSADAG {
 
       var phis = Vector[Statement]()
 
-      def live(v: Variable) = true
-      // liveVarsBefore.get(b.label).forall(_.contains(v))
+      def live(v: Variable) = 
+        v.name.startsWith("SYNTH") || v.name.startsWith("TRACE") || outputs.contains(v) || inputs.contains(v) || liveVarsBefore.get(b.label).forall(_.contains(v))
 
       var renaming = if (b.prevBlocks.nonEmpty) then {
         var joinedRenames = Map[Variable, Variable]()
