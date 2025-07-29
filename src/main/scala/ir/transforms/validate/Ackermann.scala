@@ -137,6 +137,7 @@ class SideEffectStatementOfStatement(callParams: Map[String, CallParamMapping]) 
           formal -> realLHS
             .get(formal)
             .getOrElse(throw Exception(s"Unable to instantiate call: $formal :: $call :: $params"))
+        case e => throw Exception(s"Unexpected param arrangement $e")
       }
       val rhsParams = params.rhs.map {
         case (formal, Some(actual)) => formal -> actual
@@ -144,6 +145,7 @@ class SideEffectStatementOfStatement(callParams: Map[String, CallParamMapping]) 
           formal -> realRHS
             .get(formal)
             .getOrElse(throw Exception(s"Unable to instantiate call: $formal :: $call :: $params"))
+        case e => throw Exception(s"Unexpected param arrangement $e")
       }
 
       Some(SideEffectStatement(e, s"Call_${tgt.name}", lhsParams, rhsParams))

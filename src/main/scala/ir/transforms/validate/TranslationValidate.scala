@@ -1033,7 +1033,7 @@ class TranslationValidator {
 
     val factsInvariant = getFlowFactsInvariant(proc, liveVarsTarget, flowFacts(proc.name))
 
-    val invariant = equalVarsInvariant ++ factsInvariant // ++ invEverywhere
+    val invariant = equalVarsInvariant ++ factsInvariant ++ invEverywhere
 
     val preInv = invariant
 

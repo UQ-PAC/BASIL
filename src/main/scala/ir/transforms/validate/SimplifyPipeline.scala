@@ -32,11 +32,6 @@ def dynamicSingleAssignment(config: TVJob, p: Program) = {
       Some(g)
   }
 
-  def targetToSource(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
-    case g: GlobalVar => None
-    case o => None
-  }
-
   validator.getValidationSMT(config, "DSA", sourceToTarget)
 }
 
