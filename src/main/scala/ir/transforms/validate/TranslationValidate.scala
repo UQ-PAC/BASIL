@@ -248,8 +248,11 @@ class TranslationValidator {
 
     def toAssume(
       proc: Procedure,
-      label: Option[String] = None
+      inPost: Boolean = false
     )(renameSrcSSA: (String, Expr) => Expr, renameTgtSSA: (String, Expr) => Expr) = i match {
+      // FIXME: this is a huge mess -- isPost; subtle as it can introduce soundness issues
+      // by generating the wrong constraint, good motivation to clean it up
+      // TODO: globalconstraint etc aren't used idk
       case Inv.GlobalConstraint(cutLabel, preds, c) => {
         val blockLabel =
           beforeRenamer.stripNamespace(
@@ -286,14 +289,14 @@ class TranslationValidator {
             _.toPred(x => (exprInSource(renameSrcSSA(blockLabel, x))), x => exprInTarget(renameTgtSSA(blockLabel, x)))
           )
         )
+
+        val rn =
+          if inPost then
+            renameSrcSSA("EXIT", (BinaryExpr(EQ, TransitionSystem.programCounterVar, PCMan.PCSym(cutLabel))))
+          else BinaryExpr(EQ, TransitionSystem.programCounterVar, PCMan.PCSym(cutLabel))
+
         val guarded =
-          BinaryExpr(
-            BoolIMPLIES,
-            exprInSource(
-              renameSrcSSA(blockLabel, (BinaryExpr(EQ, TransitionSystem.programCounterVar, PCMan.PCSym(cutLabel))))
-            ),
-            pred
-          )
+          BinaryExpr(BoolIMPLIES, exprInSource(rn), pred)
         Assume(guarded, c)
       }
       // case Global(pred, c) => {
@@ -558,17 +561,12 @@ class TranslationValidator {
     }
 
     def getParams(p: Procedure, frame: Frame) = {
-
-      val external = p.isExternal.contains(true) || (!(p.isExternal.contains(false)) || p.blocks.isEmpty)
-
       def paramTgt(v: Variable | Memory) = {
-        renaming(p.entryBlock.map(_.label))(v) match {
+        renaming(Some(p.entryBlock.map(_.label).getOrElse(p.name)))(v) match {
           case Some(n: (Variable | Memory)) => param(n)
           case _ => param(v)
         }
       }
-
-      // val frame = beforeFrame(p.name)
 
       val lhs: List[Variable | Memory] =
         p.formalOutParam.toList ++ frame.modifiedGlobalVars.toList ++ frame.modifiedMem.toList
@@ -584,8 +582,6 @@ class TranslationValidator {
     }
 
     val params = initProg.get.procedures.map(p => p.name -> getParams(p, afterFrame.getOrElse(p.name, Frame()))).toMap
-    val paramsBef =
-      initProgBefore.get.procedures.map(p => p.name -> getParams(p, afterFrame.getOrElse(p.name, Frame()))._1).toMap
 
     params
   }
@@ -616,20 +612,8 @@ class TranslationValidator {
   ) = {
     val p = afterProc
 
-    // val globalsSrc = globalsForTargetProc(p)(renamingTgtSrc(None))
     val globalsTgt = globalsForSourceProc(p)(renamingSrcTgt(None)).toList
     val globals = globalsTgt.collect { case (a, Some(b)) => CompatArg(toVariable(a), toVariable(b)) }.toList
-
-    val pcInv = CompatArg(TransitionSystem.programCounterVar, TransitionSystem.programCounterVar)
-    val traceInv = CompatArg(TransitionSystem.traceVar, TransitionSystem.traceVar)
-
-    /*
-    // TODO: Expclitly construct cutpoint for negated post condition invariant
-
-    val memoryInit = (srcReadMemory.keys.toSet ++ tgtReadMemory.keys).toList.map(k =>
-      Inv.CutPoint("ENTRY", List(CompatArg(srcLiveMemory(k), tgtLiveMemory(k))), Some(s"Memory$k"))
-    )
-     */
 
     def paramRepr(p: Variable | Memory): Variable = {
       SideEffectStatementOfStatement.param(p) match {
@@ -667,8 +651,8 @@ class TranslationValidator {
         .map(c => Inv.CutPoint(c, globals.toList))
         .toList
 
-    val source = afterCuts.find((k, v) => k.name == p.name).get._1
-    val target = beforeCuts.find((k, v) => k.name == p.name).get._1
+    val source = afterCuts.find((k, _) => k.name == p.name).get._1
+    val target = beforeCuts.find((k, _) => k.name == p.name).get._1
     val beforeCutsBls = beforeCuts(target).cutLabelBlockInProcedure.map { case (cl, b) =>
       cl -> b.label
     }
@@ -677,11 +661,6 @@ class TranslationValidator {
     }
 
     val cuts = (beforeCutsBls.keys ++ afterCutsBls.keys).toSet.toList
-
-    val alwaysInv = List(
-      CompatArg(TransitionSystem.programCounterVar, TransitionSystem.programCounterVar),
-      CompatArg(TransitionSystem.traceVar, TransitionSystem.traceVar)
-    )
 
     val invs = (cuts.map {
       case (label) => {
@@ -718,8 +697,8 @@ class TranslationValidator {
   ) = {
     val p = afterProc
 
-    val source = afterCuts.find((k, v) => k.name == p.name).get._1
-    val target = beforeCuts.find((k, v) => k.name == p.name).get._1
+    val source = afterCuts.find((k, _) => k.name == p.name).get._1
+    val target = beforeCuts.find((k, _) => k.name == p.name).get._1
 
     val beforeCutsBls = beforeCuts(target).cutLabelBlockInProcedure.map { case (cl, b) =>
       cl -> b.label
@@ -807,7 +786,6 @@ class TranslationValidator {
     combinedProc: Procedure,
     prover: SMTProver,
     invariant: Seq[Expr],
-    blockTraceVars: Map[String, Expr],
     renaming: TransformDataRelationFun = _ => e => Some(e),
     sourceEntry: String,
     targetEntry: String
@@ -878,7 +856,7 @@ class TranslationValidator {
 
     def getTrace(starting: String): Unit = {
 
-      var b = combinedProc.blocks.find(_.label == starting).get
+      val b = combinedProc.blocks.find(_.label == starting).get
 
       def isReached(l: Block) = {
         eval.evalExpr(SSADAG.blockDoneVar(l)) match {
@@ -890,8 +868,6 @@ class TranslationValidator {
       if (!isReached(b)) {
         return ()
       }
-
-      var indent = 0
 
       def pt(b: Block, indent: Int = 0): Unit = {
         if (isReached(b)) {
@@ -942,13 +918,13 @@ class TranslationValidator {
                 case Some(TrueLiteral) => s"($name matches)"
                 case Some(FalseLiteral) => s"($sv NOT MATCHING $tv : $s != $t)"
                 case None => s"($name $s != $t)"
+                case _ => ???
               }
             )
             .mkString(", ")
           a.comment = Some(pcomment + " " + compar)
           SkipChildren()
         }
-        case _ => SkipChildren()
       }
     }
 
@@ -983,11 +959,6 @@ class TranslationValidator {
 
     val source = afterProg.get.procedures.find(_.name == proc.name).get
     val target = beforeProg.get.procedures.find(_.name == proc.name).get
-
-    val srcEntry = source.entryBlock.get
-    val tgtEntry = target.entryBlock.get
-    val srcExit = source.returnBlock.get
-    val tgtExit = target.returnBlock.get
 
     TransitionSystem.totaliseAsserts(source, introducedAsserts)
     TransitionSystem.totaliseAsserts(target)
@@ -1058,15 +1029,7 @@ class TranslationValidator {
       CompatArg(TransitionSystem.traceVar, TransitionSystem.traceVar)
     )
 
-    val invEverywhere = cuts.toList.map(label =>
-      // FIXME: this is wrong; it is way too strong and is making vacuously unsat
-      Inv.SourceConditionalConstraint(
-        label,
-        BinaryExpr(NEQ, TransitionSystem.programCounterVar, PCMan.PCSym(PCMan.assumptionFailLabel)),
-        alwaysInv,
-        Some(s"GlobalConstraint$label")
-      )
-    )
+    val invEverywhere = cuts.toList.map(label => Inv.CutPoint(label, alwaysInv, Some(s"GlobalConstraint$label")))
 
     val factsInvariant = getFlowFactsInvariant(proc, liveVarsTarget, flowFacts(proc.name))
 
@@ -1076,19 +1039,19 @@ class TranslationValidator {
 
     val primedInv = invariant.map {
       case i: Inv.GlobalConstraint => {
-        i.toAssume(proc)(
+        i.toAssume(proc, true)(
           (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("EXIT").label, e),
           (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("EXIT").label, e)
         ).body
       }
       case i: Inv.SourceConditionalConstraint => {
-        i.toAssume(proc)(
+        i.toAssume(proc, true)(
           (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("EXIT").label, e),
           (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("EXIT").label, e)
         ).body
       }
       case i: Inv.CutPoint => {
-        i.toAssume(proc)(
+        i.toAssume(proc, true)(
           (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("EXIT").label, e),
           (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("EXIT").label, e)
         ).body
@@ -1102,15 +1065,13 @@ class TranslationValidator {
     SSADAG.passify(target)
     timer.checkPoint("passify")
 
-    val otargets = srcEntry.jump.asInstanceOf[GoTo].targets.toList
-
-    val splitName = "-" + proc.name // + "_split_" + splitNo
     // build smt query
     val b = translating.BasilIRToSMT2.SMTBuilder()
     val solver = config.verify.map(solver => util.SMT.SMTSolver(Some(1000), solver))
     val prover = solver.map(_.getProver(true))
 
     b.addCommand("set-logic", "QF_BV")
+    b.addCommand("set-option", ":produce-unsat-cores", "true")
 
     var count = 0
 
@@ -1172,7 +1133,7 @@ class TranslationValidator {
     val smtPath = config.outputPath.map(f => s"$f/${runNamePrefix}.smt2")
 
     smtPath.foreach(fname => {
-      val query = b.getCheckSat()
+      val query = b.getCheckSat() + "\n(get-unsat-core)"
       tvLogger.writeToFile(File(fname), query)
       tvLogger.info(s"Write query $fname")
       timer.checkPoint("write out " + fname)
@@ -1181,7 +1142,7 @@ class TranslationValidator {
     val verified = prover.map(prover => {
       val r = prover.checkSat()
       timer.checkPoint("checksat")
-      (prover, solver.get, r)
+      (prover, r)
     })
 
     if (config.debugDumpAlways) {
@@ -1193,30 +1154,17 @@ class TranslationValidator {
       })
     }
 
-    verified.foreach((prover, solver, res) => {
+    verified.foreach((prover, _) => {
       val res = prover.checkSat()
       res match {
         case SatResult.UNSAT => tvLogger.info("unsat")
         case SatResult.SAT(m) => {
           tvLogger.error(s"sat ${runNamePrefix} (verify failed)")
 
-          val traces = source.blocks
-            .flatMap(b =>
-              try {
-                val s = srcRenameSSA(afterRenamer.stripNamespace(b.label), TransitionSystem.traceVar)
-                val t = tgtRenameSSA(afterRenamer.stripNamespace(b.label), TransitionSystem.traceVar)
-                Seq(b.label -> BinaryExpr(EQ, s, t))
-              } catch {
-                case _ => Seq()
-              }
-            )
-            .toMap
-
           val g = processModel(
             newProg.mainProcedure,
             prover,
             primedInv.toList,
-            traces,
             invariantRenamingSrcTgt,
             source.entryBlock.get.label,
             target.entryBlock.get.label
@@ -1246,7 +1194,7 @@ class TranslationValidator {
       io.github.cvc5.Context.deletePointers()
     }
 
-    TVResult(runName, proc.name, verified.map(_._3), smtPath, timer.checkPoints().toMap)
+    TVResult(runName, proc.name, verified.map(_._2), smtPath, timer.checkPoints().toMap)
   }
 
   /**

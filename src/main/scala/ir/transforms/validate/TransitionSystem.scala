@@ -67,7 +67,6 @@ object TransitionSystem {
       cutPointRealBlockBegin = cutPointRealBlockBegin.updated("ENTRY", e)
     })
 
-    var returnEdgeCount = 0
     p.returnBlock.foreach(e => {
       e.jump match {
         case r: Return => {
@@ -97,7 +96,6 @@ object TransitionSystem {
     var loopCount = 0
 
     for (l <- loops.filter(l => p.blocks.contains(l.header))) {
-      var loopBECount = 0
       loopCount += 1
 
       val backedges = l.backEdges.toList.sortBy(e => s"${e.from.label}_${e.to.label}")
@@ -130,7 +128,6 @@ object TransitionSystem {
         .sortBy(_.label)
 
       for (c <- cuts) {
-        var incCount = 1
         joinCount = joinCount + 1
         val label = s"Join${joinCount}"
         cutPoints = cutPoints.updated(label, c)
@@ -147,7 +144,6 @@ object TransitionSystem {
       }
     }
 
-    var once = true
     for (s <- p) {
       s match {
         case u: Unreachable if u.parent != synthExit => {
@@ -226,6 +222,8 @@ object TransitionSystem {
         // successor is rest of block
 
         bl.statements.remove(stmt)
+        bl.statements.append(Assume(stmt.body))
+
         successor.statements.prepend(Assume(stmt.body, Some("assertpass")))
 
         val failureLabel =
