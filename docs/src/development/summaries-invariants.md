@@ -11,7 +11,7 @@ As such, predicates can be translated into boogie expressions.
 
 ## Predicate domains
 
-Predicate encoding domains (defined in [/src/main/scala/analysis/procedure_summaries/Predicate.scala](https://github.com/UQ-PAC/BASIL/blob/main/src/main/scala/analysis/procedure_summaries/Predicate.scala)) are abstract domains which can represent their results as predicates.
+Predicate encoding domains (defined in [src/main/scala/analysis/procedure_summaries/Predicate.scala](https://github.com/UQ-PAC/BASIL/blob/main/src/main/scala/analysis/procedure_summaries/Predicate.scala)) are abstract domains which can represent their results as predicates.
 ```scala
 trait PredicateEncodingDomain[L] extends AbstractDomain[L] {
   def toPred(x: L): Predicate
@@ -82,7 +82,7 @@ Indeed doing so encodes the requirements that the loop invariant is ensured on e
 
 ## Abstract interpretation for loop invariants
 
-- see [src/main/scala/analysis/InvariantGenerator.scala](https://github.com/UQ-PAC/BASIL/blob/main/src/main/scala/analysis/InvariantGenerator.scala)
+- see [src/main/scala/analysis/LoopInvariantGenerator.scala](https://github.com/UQ-PAC/BASIL/blob/main/src/main/scala/analysis/LoopInvariantGenerator.scala)
 
 Any predicate encoding domain  can be used to generate loop invariants.
 The result of an analysis on some procedure will be a mapping from blocks to lattice elements.
