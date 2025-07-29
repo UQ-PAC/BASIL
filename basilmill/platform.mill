@@ -1,0 +1,45 @@
+package build.basilmill
+
+import upickle.default.ReadWriter
+
+
+case class Platform(val arch: Platform.Arch, val os: Platform.Os) derives ReadWriter
+
+object Platform {
+  enum Arch(val mavenName: String, val gnuName: String) derives ReadWriter {
+    case X86_64 extends Arch("x64", "x86_64")
+    case Aarch64 extends Arch("arm64", "aarch64")
+  }
+
+  enum Os(val libExtension: String) derives ReadWriter {
+    case Linux extends Os("so")
+    case Mac extends Os("dylib")
+    case Windows extends Os("dll")
+
+    def coursierType = coursier.core.Type(libExtension)
+  }
+
+  export Arch.*
+  export Os.*
+
+  def detectArch() = System.getProperty("os.arch") match {
+    case "amd64" => Right(Arch.X86_64)
+    case "aarch64" => Right(Arch.Aarch64)
+    case x => Left("unknown arch: " + x)
+  }
+
+  def detectOs() = System.getProperty("os.name") match {
+    case "Linux" => Right(Os.Linux)
+    case m if m.startsWith("Mac OS") => Right(Os.Mac)
+    case w if w.startsWith("Windows") => Right(Os.Windows)
+    case x => Left("unknown os: " + x)
+  }
+
+  def detect() = for {
+    arch <- detectArch()
+    os <- detectOs()
+  } yield Platform(arch, os)
+
+  def detectExn() = detect().fold(x => throw Exception(x), identity)
+}
+

@@ -1,0 +1,78 @@
+package build.basilmill
+
+import mill._
+import api._
+import javalib._
+
+trait NativeDepsModule extends JavaModule {
+  /**
+   * This should be implemented by downstream modules.
+   *
+   * Given a platform, it should return a list of `(name, dep)`
+   * pairs. The downloaded dependency is renamed to `$name.$ext`
+   * where `$ext` is the platform-specific library extension.
+   */
+  def nativeMvnDeps(platform: Platform): Seq[(String, Dep)] = Seq()
+
+  def detectPlatform = Task.Input {
+    Platform.detect().fold(Task.fail, identity)
+  }
+
+  def nativeMvnDepsTask = Task {
+    nativeMvnDeps(detectPlatform())
+  }
+
+  def nativeLibraryPath = Task {
+    val plat = detectPlatform()
+    val resolver = millResolver()
+
+    // deduplicate only if name and dep are both identical
+    val (names, deps) = nativeMvnDeps(plat).toSet.unzip
+
+    // resolve individually to maintain order of deps for
+    // zipping after.
+    val libs = deps.map(dep =>
+      resolver.classpath(
+        Seq(dep),
+        artifactTypes = Some(Set(plat.os.coursierType))
+      ).head
+    )
+
+    (names zip libs).map((name, lib) => {
+      val newPath = Task.dest / s"$name.${plat.os.libExtension}"
+      println(s"copying to $newPath")
+      os.copy(lib.path, newPath)
+    })
+
+    Task.dest
+  }
+
+  def offlinePlatforms =
+    import Platform.*
+    Set(Platform(X86_64, Linux), Platform(Aarch64, Mac))
+
+  override def prepareOffline(all: mainargs.Flag) = Task.Command[Seq[PathRef]] {
+    val resolver = millResolver()
+
+    val deps = offlinePlatforms.flatMap(nativeMvnDeps).map(_._2)
+    val types = offlinePlatforms.map(_.os.coursierType).toSet
+
+    resolver.classpath(deps, artifactTypes = Some(types))
+      ++ super.prepareOffline(all)()
+  }
+
+  override def forkEnv = Task {
+    // bpaul: Windows for some reason wants the install path in PATH and ignores java.library.path,
+    // I cannot figure out why
+    val libPath = detectPlatform() match {
+      case Platform(_, Platform.Windows) => Some("PATH" -> (sys.env("PATH") + s";${nativeLibraryPath()}"))
+      case _ => None
+    }
+    super.forkEnv() ++ libPath
+  }
+
+  override def forkArgs = Task {
+    s"-Djava.library.path=${nativeLibraryPath()}" +: super.forkArgs()
+  }
+
+}
