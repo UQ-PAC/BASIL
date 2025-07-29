@@ -296,6 +296,8 @@ class SystemTestsGTIRB extends SystemTests {
 class SystemTestsGTIRBSimplifyTV extends SystemTests {
   // array theory solver seems to do bettwe with these difficult specs
   val simplify = SimplifyMode.ValidatedSimplify(Some(util.SMT.Solver.Z3), None)
+  private val timeout = 1200
+
   runTests(
     "correct",
     TestConfig(

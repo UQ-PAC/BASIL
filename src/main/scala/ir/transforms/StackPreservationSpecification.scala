@@ -106,8 +106,8 @@ def genStackAllocationSpec(p: Program) = {
       if (maxStack.value > 0) {
         // no integer overflow on allocation
         val requires1 = BinaryExpr(BVSGE, SP, BinaryExpr(BVSUB, SP, maxStack))
-        //val requires2 = BinaryExpr(BVSGT, BinaryExpr(BVSUB, SP, maxStack), BitVecLiteral(0, 64))
-        //val requires3 = BinaryExpr(BVSGE, SP, BitVecLiteral(0, 64))
+        // val requires2 = BinaryExpr(BVSGT, BinaryExpr(BVSUB, SP, maxStack), BitVecLiteral(0, 64))
+        // val requires3 = BinaryExpr(BVSGE, SP, BitVecLiteral(0, 64))
         proc.requiresExpr = requires1 :: proc.requiresExpr
       }
 

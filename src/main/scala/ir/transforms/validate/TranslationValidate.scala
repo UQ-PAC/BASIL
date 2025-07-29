@@ -144,7 +144,7 @@ class NamespaceState(val namespace: String) extends CILVisitor {
   }
 
   override def vexpr(e: Expr) = e match {
-    //case f @ FApplyExpr(n, p, r, _) =>
+    // case f @ FApplyExpr(n, p, r, _) =>
     //  ChangeDoChildrenPost(f.copy(name = namespace + "__" + f.name), x => x)
     case _ => DoChildren()
   }
@@ -1014,8 +1014,20 @@ class TranslationValidator {
     // val inputs = TransitionSystem.programCounterVar :: TransitionSystem.traceVar :: (globalsForProc(proc).toList)
     val frames = (afterFrame ++ beforeFrame)
 
-    val srcRenameSSA = SSADAG.transform(sourceParams, source, inputs(sourceParams(proc.name)), outputs(sourceParams(proc.name)), liveVarsSource)
-    val tgtRenameSSA = SSADAG.transform(targetParams, target, inputs(targetParams(proc.name)), outputs(targetParams(proc.name)), liveVarsTarget)
+    val srcRenameSSA = SSADAG.transform(
+      sourceParams,
+      source,
+      inputs(sourceParams(proc.name)),
+      outputs(sourceParams(proc.name)),
+      liveVarsSource
+    )
+    val tgtRenameSSA = SSADAG.transform(
+      targetParams,
+      target,
+      inputs(targetParams(proc.name)),
+      outputs(targetParams(proc.name)),
+      liveVarsTarget
+    )
     timer.checkPoint("SSA")
 
     val ackInv =
@@ -1140,7 +1152,18 @@ class TranslationValidator {
       prover.map(_.addConstraint(i))
       b.addAssert(i, Some(s"tgt$count"))
     }
-    val pinv = UnaryExpr(BoolNOT, AssocExpr(BoolAND, primedInv.toList))
+
+    val sourceAssumeFail =
+      BinaryExpr(
+        EQ,
+        srcRenameSSA(
+          afterCuts(source).cutLabelBlockInTr("EXIT").label.stripPrefix("source__"),
+          TransitionSystem.programCounterVar
+        ),
+        PCMan.PCSym(PCMan.assumptionFailLabel)
+      )
+
+    val pinv = UnaryExpr(BoolNOT, BinaryExpr(BoolOR, sourceAssumeFail, AssocExpr(BoolAND, primedInv.toList)))
     npe.statements.append(Assert(pinv, Some("InvPrimed")))
     b.addAssert(pinv, Some("InvPrimed"))
     timer.checkPoint("extract prog")

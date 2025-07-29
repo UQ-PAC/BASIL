@@ -10,11 +10,11 @@ import org.sosy_lab.java_smt.api.{
   BitvectorFormula,
   BooleanFormula,
   Evaluator,
+  Formula,
   FormulaManager,
-  ProverEnvironment,
-  SolverContext,
   FormulaType,
-  Formula
+  ProverEnvironment,
+  SolverContext
 }
 
 import scala.jdk.CollectionConverters.{SeqHasAsJava, SetHasAsJava}
@@ -285,15 +285,16 @@ class FormulaConverter(formulaManager: FormulaManager) {
 
   // Convert IR expressions
 
-  def convertExpr(e: Expr) : Formula = {
+  def convertExpr(e: Expr): Formula = {
     e.getType match {
       case BoolType => convertBoolExpr(e)
       case _: BitVecType => convertBVExpr(e)
-      case IntType => e match {
-        case IntLiteral(v) => 
-          bitvectorFormulaManager.makeBitvector(v.bitLength + 2, v.bigInteger)
-        case _ => throw Exception(s"integer formulas are not supported ${e.getType}: $e")
-      }
+      case IntType =>
+        e match {
+          case IntLiteral(v) =>
+            bitvectorFormulaManager.makeBitvector(v.bitLength + 2, v.bigInteger)
+          case _ => throw Exception(s"integer formulas are not supported ${e.getType}: $e")
+        }
       case _ => throw Exception(s"unsupported expr type ${e.getType}: $e")
     }
 
@@ -369,8 +370,8 @@ class FormulaConverter(formulaManager: FormulaManager) {
         }
       case v: Variable => convertBVVar(v.irType, v.name)
       case r: OldExpr => ???
-      case FApplyExpr(n, p, rt @ BitVecType(sz), _) => 
-        val t : FormulaType[BitvectorFormula] = FormulaType.getBitvectorTypeWithSize(sz)
+      case FApplyExpr(n, p, rt @ BitVecType(sz), _) =>
+        val t: FormulaType[BitvectorFormula] = FormulaType.getBitvectorTypeWithSize(sz)
         ufFormulaMAnager.declareAndCallUF(n, t, p.map(convertExpr).toList.asJava)
       case e => throw Exception(s"Non bitvector expression was attempted to be converted: $e")
     }
