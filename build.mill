@@ -26,7 +26,7 @@ import os.Path
 import contrib.scalapblib._
 import com.goyeau.mill.scalafix.ScalafixModule
 
-object `package` extends ScalaModule with BasilDocs with BasilVersion with ScalafixModule with Z3Module {
+object `package` extends ScalaModule with BasilDocs with BasilVersion with ScalafixModule {
   // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
   override def scalaVersion = "3.3.6"
@@ -68,6 +68,13 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
   override def moduleDir = BuildCtx.workspaceRoot / "src"
 
   override def sources = Task.Sources("main/scala")
+
+  override def forkArgs = Task {
+    super.forkArgs() ++ z3.forkArgs()
+  }
+  override def forkEnv = Task {
+    super.forkEnv() ++ z3.forkEnv()
+  }
 
   override def scalafixConfig = Task {
     Some(BuildCtx.workspaceRoot / ".scalafix.conf")
@@ -215,6 +222,8 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
       BuildCtx.workspaceRoot  / "docs"
     }
   }
+
+  object z3 extends Z3Module
 
   def ctagsConfig = Task.Source {
     BuildCtx.workspaceRoot / "basilmill" / "scala.ctags"
