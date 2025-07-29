@@ -149,5 +149,7 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
     Logger.info("[!] Translation validation passed")
   }
 
+  ir.transforms.genStackAllocationSpec(p)
+
   (config, nctx)
 }
