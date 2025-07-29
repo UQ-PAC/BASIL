@@ -26,14 +26,14 @@ import os.Path
 import contrib.scalapblib._
 import com.goyeau.mill.scalafix.ScalafixModule
 
-object `package` extends ScalaModule with BasilDocs with BasilVersion with ScalafixModule {
+object `package` extends ScalaModule with BasilDocs with BasilVersion with ScalafixModule with Z3Module {
   // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
   override def scalaVersion = "3.3.6"
 
   override def ammoniteVersion = "3.0.2"
 
-  override def moduleDeps = Seq(basilAntlr, basilProto, bnfc, z3)
+  override def moduleDeps = Seq(basilAntlr, basilProto, bnfc)
 
   override def scalacOptions: T[Seq[String]] = Seq("-deprecation", "-Wunused:imports", "-feature")
 
@@ -65,20 +65,9 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
 
   override def mainClass = Some("Main")
 
-  override def moduleDir = super.moduleDir / "src"
+  override def moduleDir = BuildCtx.workspaceRoot / "src"
 
   override def sources = Task.Sources("main/scala")
-
-  override def forkArgs = Task {
-    super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}")
-  }
-
-  // Windows for some reason wants the install path in PATH and ignores java.library.path, I cannot figure out why
-  override def forkEnv = Task {
-    if (System.getProperty("os.name").startsWith("Windows")) {
-      super.forkEnv() + ("PATH" -> (sys.env("PATH") + s";${z3.install()}"))
-    } else { super.forkEnv() }
-  }
 
   override def scalafixConfig = Task {
     Some(BuildCtx.workspaceRoot / ".scalafix.conf")
@@ -94,14 +83,12 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
 
     override def scalafixConfig = build.scalafixConfig
 
+    // inherit fork options with shared libraries from main package
     override def forkArgs = Task {
-      super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}")
+      super.forkArgs() ++ build.forkArgs()
     }
-
     override def forkEnv = Task {
-      if (System.getProperty("os.name").startsWith("Windows")) {
-        super.forkEnv() + ("PATH" -> (sys.env("PATH") + s";${z3.install()}"))
-      } else { super.forkEnv() }
+      super.forkEnv() ++ build.forkEnv()
     }
 
     override def testParallelism = false
@@ -228,8 +215,6 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
       BuildCtx.workspaceRoot  / "docs"
     }
   }
-
-  object z3 extends Z3Module
 
   def ctagsConfig = Task.Source {
     BuildCtx.workspaceRoot / "basilmill" / "scala.ctags"

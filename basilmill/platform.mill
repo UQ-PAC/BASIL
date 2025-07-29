@@ -1,14 +1,19 @@
 package build.basilmill
 
+import upickle.default.ReadWriter
+
 object Platform {
-  enum Arch {
-    case X86_64, Aarch64
+  enum Arch(val mavenName: String, val gnuName: String) derives ReadWriter {
+    case X86_64 extends Arch("x64", "x86_64")
+    case Aarch64 extends Arch("arm64", "aarch64")
   }
 
-  enum Os(val libExtension: String) {
+  enum Os(val libExtension: String) derives ReadWriter {
     case Linux extends Os("so")
     case Mac extends Os("dylib")
     case Windows extends Os("dll")
+
+    def coursierType = coursier.core.Type(libExtension)
   }
 
   export Arch.*
@@ -34,4 +39,4 @@ object Platform {
 
 }
 
-case class Platform(val arch: Platform.Arch, val os: Platform.Os)
+case class Platform(val arch: Platform.Arch, val os: Platform.Os) derives ReadWriter
