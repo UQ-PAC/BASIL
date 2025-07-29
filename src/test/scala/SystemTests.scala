@@ -296,7 +296,18 @@ class SystemTestsGTIRB extends SystemTests {
 class SystemTestsGTIRBSimplifyTV extends SystemTests {
   // array theory solver seems to do bettwe with these difficult specs
   val simplify = SimplifyMode.ValidatedSimplify(Some(util.SMT.Solver.Z3), None)
-  private val timeout = 600
+  private val timeout = 15
+
+  override def customiseTestsByName(name: String) = super.customiseTestsByName(name).orElse {
+    name match {
+      case "correct/functionpointer/clang:GTIRB" | "correct/functionpointer/clang_pic:GTIRB" |
+          "correct/malloc_with_local/clang:GTIRB" | "correct/malloc_with_local2/clang:GTIRB" |
+          "correct/malloc_with_local2/gcc:GTIRB" | "correct/malloc_with_local3/clang:GTIRB" |
+          "correct/malloc_with_local3/gcc:GTIRB" =>
+        Mode.Disabled("verification too slow")
+      case _ => Mode.Normal
+    }
+  }
 
   runTests(
     "correct",

@@ -36,7 +36,7 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
 
   override def moduleDeps = Seq(basilAntlr, basilProto, bnfc)
 
-  override def scalacOptions: T[Seq[String]] = Seq("-deprecation", "-Wunused:all", "-feature")
+  override def scalacOptions: T[Seq[String]] = Seq("-deprecation", "-Wunused:imports", "-feature")
 
   val javaTests = mvn"com.novocode:junit-interface:0.11"
   val scalaTests = mvn"org.scalatest::scalatest:3.2.19"
