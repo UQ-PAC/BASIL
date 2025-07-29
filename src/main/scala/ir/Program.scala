@@ -647,6 +647,8 @@ class Block private (
   }
 
   def replaceJump(j: Jump): Block = {
+    if (j eq jump)
+      return this
     if (j.hasParent) {
       val parent = j.parent
       j.deParent()

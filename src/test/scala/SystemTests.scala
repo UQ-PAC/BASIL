@@ -49,6 +49,18 @@ trait SystemTests extends AnyFunSuite, CaptureOutput, BASILTest, TestCustomisati
 
   override def customiseTestsByName(name: String): Mode = Mode.Normal
 
+  override def withFixture(test: NoArgTest) = {
+    import gtirb.GTIRBReadELF.RelfCompatibilityLevel.*
+
+    val checkRelf = test.name match {
+      // Throw by default for gtsrelf/oldrelf mismatches
+      case _ => Exception
+    }
+    gtirb.GTIRBReadELF.relfCompatibilityLevel.withValue(checkRelf) {
+      super.withFixture(test)
+    }
+  }
+
   def runTests(folder: String, conf: TestConfig): Unit = {
     val path = testPath + folder
     val programs = getSubdirectories(path)
@@ -273,7 +285,6 @@ class SystemTestsGTIRB extends SystemTests {
 
 @test_util.tags.StandardSystemTest
 class SystemTestsGTIRBOfflineLifter extends SystemTests {
-  override def testSuiteSuffix = ""
   runTests(
     "correct",
     TestConfig(
@@ -302,16 +313,17 @@ class SystemTestsGTIRBOfflineLifter extends SystemTests {
 @test_util.tags.Slow
 @test_util.tags.StandardSystemTest
 class ExtraSpecTests extends SystemTests {
+  override def testSuiteSuffix = ""
 
-  override def customiseTestsByName(name: String) = super.customiseTestsByName(name).orElse {
+  override def customiseTestsByName(name: String): Mode = super.customiseTestsByName(name).orElse {
     name match {
       case _ => Mode.Retry("timeout issues")
     }
   }
 
   // some of these tests have time out issues so they need more time, but some still time out even with this for unclear reasons
-  val timeout = 60
-  val boogieFlags = Seq("/proverOpt:O:smt.array.extensional=false")
+  private val timeout = 60
+  private val boogieFlags: Seq[String] = Seq("/proverOpt:O:smt.array.extensional=false")
   runTests(
     "extraspec_correct",
     TestConfig(

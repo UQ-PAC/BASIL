@@ -20,6 +20,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+      - run: sudo apt-get update
       - run: sudo apt-get -y install latexmk texlive-latex-recommended texlive-lang-japanese texlive-latex-extra texlive-extra-utils poppler-utils
       - run: |
           ./mill --no-server allDocs

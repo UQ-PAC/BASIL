@@ -6,9 +6,6 @@ import os.Path
 import scalalib._
 import scala.util.{Try}
 
-import $file.basilmill.util.DownloadModule
-
-
 trait mdbookBinary extends DownloadModule {
   def version = "0.4.51"
   def url = s"https://github.com/rust-lang/mdBook/releases/download/v${version}/mdbook-v${version}-${suffix}"
@@ -19,7 +16,7 @@ trait mdbookBinary extends DownloadModule {
   def osName = System.getProperty("os.name")
 
   def local = Task.Input {
-    Try(os.proc("mdbook", "--version").call())
+    Try(os.proc("mdbook", "--version").call(destroyOnExit = false))
       .map(Function.const("mdbook"))
       .toEither
       .left.map(_.toString)
