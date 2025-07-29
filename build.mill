@@ -65,19 +65,15 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
 
   override def mainClass = Some("Main")
 
-  override def moduleDir = super.moduleDir / "src"
+  override def moduleDir = BuildCtx.workspaceRoot / "src"
 
   override def sources = Task.Sources("main/scala")
 
   override def forkArgs = Task {
-    super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}")
+    super.forkArgs() ++ z3.forkArgs()
   }
-
-  // Windows for some reason wants the install path in PATH and ignores java.library.path, I cannot figure out why
   override def forkEnv = Task {
-    if (System.getProperty("os.name").startsWith("Windows")) {
-      super.forkEnv() + ("PATH" -> (sys.env("PATH") + s";${z3.install()}"))
-    } else { super.forkEnv() }
+    super.forkEnv() ++ z3.forkEnv()
   }
 
   override def scalafixConfig = Task {
@@ -94,14 +90,12 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
 
     override def scalafixConfig = build.scalafixConfig
 
+    // inherit fork options with shared libraries from main package
     override def forkArgs = Task {
-      super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}")
+      super.forkArgs() ++ build.forkArgs()
     }
-
     override def forkEnv = Task {
-      if (System.getProperty("os.name").startsWith("Windows")) {
-        super.forkEnv() + ("PATH" -> (sys.env("PATH") + s";${z3.install()}"))
-      } else { super.forkEnv() }
+      super.forkEnv() ++ build.forkEnv()
     }
 
     override def testParallelism = false
