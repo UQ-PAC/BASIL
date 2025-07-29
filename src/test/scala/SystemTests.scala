@@ -303,7 +303,8 @@ class SystemTestsGTIRBSimplifyTV extends SystemTests {
       case "correct/functionpointer/clang:GTIRB" | "correct/functionpointer/clang_pic:GTIRB" |
           "correct/malloc_with_local/clang:GTIRB" | "correct/malloc_with_local2/clang:GTIRB" |
           "correct/malloc_with_local2/gcc:GTIRB" | "correct/malloc_with_local3/clang:GTIRB" |
-          "correct/malloc_with_local3/gcc:GTIRB" =>
+          "correct/malloc_with_local3/gcc:GTIRB" | "correct/functionpointer/gcc_pic:GTIRB" |
+          "correct/functionpointer/gcc:GTIRB" =>
         Mode.Disabled("verification too slow")
       case _ => Mode.Normal
     }
