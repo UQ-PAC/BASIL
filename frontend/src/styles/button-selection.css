@@ -3,57 +3,8 @@
     flex-grow: 1;
 }
 
-.d2h-file-collapse {
-    display: none !important;
-}
-
-.d2h-file-name-wrapper {
-    display: none !important;
-}
-
-#diff { /* TODO: Move this into better named file at some point */
-    flex: 1;
-    max-width: 100%;
-    min-width: 0;
-    padding-right: 1rem;
-    box-sizing: border-box;
-}
-
-/*.d2h-code-line-ctn,*/
-/*.d2h-code-line-ctn * { !* TODO: What does the * mean and do Maybe just delete this *!*/
-/*    display: inline;*/
-/*    line-height: 1 !important;*/
-/*    margin: 0 !important;*/
-/*    padding: 0 !important;*/
-/*}*/
-
-.d2h-wrapper {
-    /*max-width: 100% !important;*/
-    /*overflow-x: visible;*/
-}
-
-.d2h-code-side-line,
-.d2h-code-line {
-    /*white-space: pre-wrap; !* Wrap long lines *!*/
-    /*word-break: break-word; !* Break inside long tokens *!*/
-}
-
-.d2h-file-header {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 0.5em 1em;
-}
-
-.custom-controls { /* TODO: This should also be moved to a different file */
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-}
-
  /*Context group*/
-.context-wrapper { /* TODO: Make this a custom button that looks a lit cleaner. Think of a nice approach */
+.context-wrapper {
     position: absolute;
     right: 1em;
     top: 50%;
@@ -139,7 +90,7 @@
 
 .procedure-dropdown:hover {
     border-color: #888;
-    background-color: #555;
+    background-color: #bfbfbf;
 }
 
 .procedure-dropdown option {
