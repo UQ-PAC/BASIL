@@ -955,7 +955,7 @@ class TranslationValidator {
     val runNamePrefix = runName + "-" + procTransformed.name
     val proc = procTransformed
 
-    val timer = PerformanceTimer(s"TV$runNamePrefix", LogLevel.DEBUG)
+    val timer = PerformanceTimer(s"TV$runNamePrefix", LogLevel.DEBUG, tvLogger)
 
     val source = afterProg.get.procedures.find(_.name == proc.name).get
     val target = beforeProg.get.procedures.find(_.name == proc.name).get
