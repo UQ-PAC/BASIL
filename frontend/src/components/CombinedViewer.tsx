@@ -207,6 +207,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({ selectedEpochName }) =>
                             <label htmlFor="combined-procedure-select">Select Procedure:</label> { /* Change this to match the last screen */ }
                             <select
                                 id="combined-procedure-select"
+                                className="procedure-dropdown"
                                 value={selectedProcedureFromDropdown || ''}
                                 onChange={(e) => setSelectedProcedureFromDropdown(e.target.value)}
                                 disabled={loading}

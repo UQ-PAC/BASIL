@@ -1,0 +1,42 @@
+
+.d2h-file-collapse {
+    display: none !important;
+}
+
+.d2h-file-name-wrapper {
+    display: none !important;
+}
+
+#diff {
+    flex: 1;
+    max-width: 100%;
+    min-width: 0;
+    padding-right: 1rem;
+    box-sizing: border-box;
+}
+
+/*.d2h-code-line-ctn,*/
+/*.d2h-code-line-ctn * { !* TODO: What does the * mean and do Maybe just delete this *!*/
+/*    display: inline;*/
+/*    line-height: 1 !important;*/
+/*    margin: 0 !important;*/
+/*    padding: 0 !important;*/
+/*}*/
+
+.d2h-wrapper {
+    /*max-width: 100% !important;*/
+    /*overflow-x: visible;*/
+}
+
+.d2h-code-side-line,
+.d2h-code-line {
+    /*white-space: pre-wrap; !* Wrap long lines *!*/
+    /*word-break: break-word; !* Break inside long tokens *!*/
+}
+
+.d2h-file-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0.5em 1em;
+}

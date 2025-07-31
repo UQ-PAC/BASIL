@@ -5,6 +5,7 @@ import * as Diff from 'diff';
 import Prism from 'prismjs';
 import 'prismjs/themes/prism.css';
 import '../styles/code-theme.css';
+import '../styles/diff-viewer.css';
 import '../lib/prism-ir';
 import '../styles/button-selection.css';
 import {ColorSchemeType} from "diff2html/lib/types";

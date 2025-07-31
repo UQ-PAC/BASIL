@@ -384,20 +384,23 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
                 {selectedEpochName && procedureNames.length > 0 && (
                     <>
                         <div className="flex-spacer"></div>
-                        <label className="procedure-select">Select Procedure: </label>
-                        <select
-                            id="procedure-select"
-                            value={selectedProcedureFromDropdown || ''}
-                            onChange={(e) => setSelectedProcedureFromDropdown(e.target.value)}
-                            disabled={loading}
-                        >
-                            {!selectedProcedureFromDropdown && <option value="">-- Choose a Procedure --</option>}
-                            {procedureNames.map((name) => (
-                                <option key={name} value={name}>
-                                    {name}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="procedure-select-wrapper">
+                            <label className="procedure-select">Select Procedure: </label>
+                            <select
+                                id="procedure-select"
+                                className="procedure-dropdown"
+                                value={selectedProcedureFromDropdown || ''}
+                                onChange={(e) => setSelectedProcedureFromDropdown(e.target.value)}
+                                disabled={loading}
+                            >
+                                {!selectedProcedureFromDropdown && <option value="">-- Choose a Procedure --</option>}
+                                {procedureNames.map((name) => (
+                                    <option key={name} value={name}>
+                                        {name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                         <div className="flex-spacer"></div> { /* TODO: Maybe add a bit more padding here? */ }
                     </>
                 )}
