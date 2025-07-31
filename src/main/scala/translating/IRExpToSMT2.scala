@@ -245,12 +245,15 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       exprs = exprs ++ List(list(sym("assert"), inner))
     }
 
-    def getCheckSat() = {
-      (exprsBefore.toVector ++ typedecls ++ decls ++ exprs ++ List(list(sym("check-sat"))))
+    def getCheckSat(getUnsatCore: Boolean = false) = {
+      val setUnsat =
+        if getUnsatCore then Seq(list(sym("set-option"), sym(":produce-unsat-cores"), sym("true"))) else Seq()
+      val getUnsat = if getUnsatCore then Seq(list(sym("get-unsat-core"))) else Seq()
+
+      ((exprsBefore ++ setUnsat).toVector ++ typedecls ++ decls ++ exprs ++ List(list(sym("check-sat"))) ++ getUnsat)
         .map(Sexp.print)
         .mkString("\n")
     }
-
   }
 
   /** Immediately invoke z3 and block until it returns a result.

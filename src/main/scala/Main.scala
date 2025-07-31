@@ -456,7 +456,7 @@ object Main {
     }
 
     val simplifyMode = (conf.simplify.value, conf.tvSimp.value) match {
-      case (_, true) => SimplifyMode.ValidatedSimplify(Some(util.SMT.Solver.Z3), Some("tvsmt"))
+      case (_, true) => SimplifyMode.ValidatedSimplify(None, Some("tvsmt"))
       case (true, _) => SimplifyMode.Simplify
       case _ => SimplifyMode.Disabled
     }

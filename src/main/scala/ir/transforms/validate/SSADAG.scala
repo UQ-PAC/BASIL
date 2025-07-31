@@ -74,7 +74,7 @@ object SSADAG {
   ): ((String, Expr) => Expr) = {
 
     var renameCount = 0
-    val stRename = mutable.Map[Block, mutable.Map[Variable, Variable]]()
+    val stRename = mutable.Map[Block, Map[Variable, Variable]]()
     val renameBefore = mutable.Map[Block, Map[Variable, Variable]]()
 
     def blockDone(b: Block) = blockDoneVar(b)
@@ -90,7 +90,7 @@ object SSADAG {
       }
 
     for (eb <- p.entryBlock) {
-      renameBefore(eb) = inputs.map(i => i -> freshName(i)).toMap
+      // renameBefore(eb) = inputs.map(i => i -> freshName(i)).toMap
     }
 
     class RenameRHS(rn: Variable => Option[Variable]) extends CILVisitor {
@@ -144,12 +144,10 @@ object SSADAG {
       var phis = Vector[Statement]()
 
       def live(v: Variable) =
-        v.name.startsWith("SYNTH") || v.name.startsWith("TRACE") || outputs.contains(v) || inputs.contains(
-          v
-        ) || liveVarsBefore.get(b.label).forall(_.contains(v))
+        v.name.startsWith("SYNTH") || v.name.startsWith("TRACE") || outputs.contains(v) || inputs.contains(v)
+          || liveVarsBefore.get(b.label).forall(_.contains(v))
 
-      var renaming = if (b.prevBlocks.nonEmpty) then {
-        var joinedRenames = Map[Variable, Variable]()
+      if (b.prevBlocks.nonEmpty) then {
         val defines: Iterable[(Block, Seq[(Variable, Variable)])] =
           b.prevBlocks.flatMap(b => stRename.get(b).map(renames => b -> renames.toSeq.filter((k, v) => live(k))))
         var varToRenamings: Map[Variable, Iterable[(Block, Variable, Variable)]] =
@@ -160,52 +158,64 @@ object SSADAG {
               }
             }
             .groupBy(_._2)
-        var inter: Set[Variable] = varToRenamings.collect {
-          case (v, defset) if defset.map(_._3).toSet.size > 1 => v
+        var inter: Set[Variable] = varToRenamings.collect { case (v, defset) =>
+          v
         }.toSet
-        var disjoint: Map[Variable, Variable] = varToRenamings.collect {
-          case (v, defset) if !inter.contains(v) => {
-            assert(defset.tail.forall(_._3 == defset.head._3))
-            (defset.head._2, defset.head._3)
+        // var disjoint: Map[Variable, Variable] = varToRenamings.collect {
+        //  case (v, defset) if !inter.contains(v) => {
+        //    assert(defset.tail.forall(_._3 == defset.head._3))
+        //    (defset.head._2, defset.head._3)
+        //  }
+        // }.toMap
+        var nrenaming = mutable.Map.from(Map[Variable, Variable]())
+        varToRenamings.foreach((v, defset) => {
+          val defsToJoin = b.prevBlocks.map(b => b -> stRename.get(b).flatMap(_.get(v)).getOrElse(v))
+          val inter = defsToJoin.map(_._2).toSet
+          if (inter.size == 1) {
+            nrenaming(v) = inter.head
+          } else {
+
+            val fresh = freshName(v)
+
+            val phicond = defsToJoin.map((b, nv) => {
+              BinaryExpr(BoolIMPLIES, blockDone(b), polyEqual(nv, fresh))
+            })
+
+            val phiscond = if (phicond.toList.length > 8) then {
+              phicond.map(b => Assume(b, Some("phi")))
+            } else Seq(Assume(boolAnd(phicond), Some("phim")))
+            // println(phicond)
+
+            phis = phis ++ phiscond
+
+            nrenaming(v) = fresh
           }
-        }.toMap
-        var nrenaming = mutable.Map.from(disjoint)
-        inter.foreach(v => {
-
-          val defsToJoin =
-            b.prevBlocks.filter(b => stRename.get(b).exists(_.contains(v)))
-
-          val fresh = freshName(v)
-
-          val oneOf = boolOr(defsToJoin.map(blockDone))
-          val phicond = defsToJoin.map(b => {
-            BinaryExpr(BoolIMPLIES, blockDone(b), polyEqual(stRename(b)(v), fresh))
-          })
-
-          val phiscond = if (phicond.toList.length > 8) then {
-            phicond.map(b => Assume(b))
-          } else Seq(Assume(boolAnd(phicond)))
-          phis = phis ++ phiscond
-
-          joinedRenames = joinedRenames + (v -> fresh)
         })
 
-        nrenaming ++= joinedRenames
-
-        stRename(b) = nrenaming
+        stRename(b) = nrenaming.toMap
         b.statements.prependAll(phis)
-        stRename(b)
       } else {
         val rn = mutable.Map.from(renameBefore.getOrElse(b, Map()))
+        stRename(b) = rn.toMap
         rn
-
       }
+
       if (!b.parent.entryBlock.contains(b)) {
-        renameBefore(b) = stRename.getOrElse(b, mutable.Map()).toMap
+        renameBefore(b) = stRename.getOrElse(b, Map())
       }
 
-      for (s <- b.statements.toList) {
+      val renaming = mutable.Map.from(renameBefore.getOrElse(b, Map()))
+
+      for (s <- b.statements.toList.filterNot(phis.contains)) {
         val c = renameRHS(renaming.get)(s) // also modifies in-place
+
+        // c match {
+
+        //  case a @ Assume(cond, _, _, _) if !phis.contains(a) =>
+        //    blockDoneCond = cond :: blockDoneCond
+        //  case _ => ()
+        // }
+
         c match {
           case a @ SideEffectStatement(s, n, lhs, rhs) => {
             val rn = lhs
@@ -233,7 +243,7 @@ object SSADAG {
       }
 
       renameRHS(renaming.get)(b.jump)
-      stRename(b) = renaming
+      stRename(b) = renaming.toMap
 
       val c =
         if (b.parent.entryBlock.contains(b) || b.label.endsWith("SYNTH_ENTRY")) then TrueLiteral

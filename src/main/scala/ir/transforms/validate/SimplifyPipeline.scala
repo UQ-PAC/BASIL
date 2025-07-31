@@ -122,6 +122,7 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
     case _ => TVJob(None, None)
   }
   transforms.applyRPO(p)
+  nop(config, p)
   val (res, nctx) = parameters(config, ctx)
   config = res
   config = assumePreservedParams(config, p)

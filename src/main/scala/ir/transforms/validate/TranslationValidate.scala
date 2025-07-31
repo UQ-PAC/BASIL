@@ -1177,6 +1177,10 @@ class TranslationValidator {
                 File(s"${path}/${runNamePrefix}-combined-${proc.name}.il"),
                 translating.PrettyPrinter.pp_prog(newProg)
               )
+              tvLogger.writeToFile(
+                File(s"${path}/${runNamePrefix}-${proc.name}.il"),
+                translating.PrettyPrinter.pp_proc(procTransformed)
+              )
             }
           })
         }
