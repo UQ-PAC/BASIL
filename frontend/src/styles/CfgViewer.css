@@ -12,7 +12,7 @@
 }
 
 .cfg-viewer-header {
-    text-align: center;
+    display: flex;
     border: 1px solid #000;
     background-color: #E0E0E0;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);

@@ -38,10 +38,6 @@
     width: 100%;
 }
 
-.flex-spacer {
-    flex-grow: 1;
-}
-
 .combined-content-area {
     display: flex;
     flex: 1;

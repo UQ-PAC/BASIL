@@ -1,4 +1,8 @@
 
+.flex-spacer {
+    flex-grow: 1;
+}
+
 .d2h-file-collapse {
     display: none !important;
 }
@@ -104,12 +108,7 @@
 
 /* Drop down group */
 .procedure-select-wrapper {
-    position: absolute;
-    right: 1em;
-    top: 50%;
-    transform: translateY(-50%);
     display: flex;
-    align-items: center;
     gap: 0.4em;
 }
 

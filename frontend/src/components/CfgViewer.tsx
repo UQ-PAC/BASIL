@@ -383,6 +383,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
             <div className="cfg-viewer-header">
                 {selectedEpochName && procedureNames.length > 0 && (
                     <>
+                        <div className="flex-spacer"></div>
                         <label className="procedure-select">Select Procedure: </label>
                         <select
                             id="procedure-select"
@@ -397,6 +398,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
                                 </option>
                             ))}
                         </select>
+                        <div className="flex-spacer"></div> { /* TODO: Maybe add a bit more padding here? */ }
                     </>
                 )}
                 {selectedEpochName && procedureNames.length === 0 && !loading && !error && (
