@@ -202,8 +202,12 @@ class CILVisitorImpl(val v: CILVisitor) {
         r match {
           case Nil => b.statements.remove(s)
           case n :: tl =>
-            b.statements.replace(s, n)
-            b.statements.insertAllAfter(Some(n), tl)
+            if (n ne s) {
+              b.statements.replace(s, n)
+              b.statements.insertAllAfter(Some(n), tl)
+            } else {
+              b.statements.insertAllAfter(Some(n), tl)
+            }
         }
       }
       b.replaceJump(visit_jump(b.jump))

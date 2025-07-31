@@ -1071,7 +1071,6 @@ class TranslationValidator {
     val prover = solver.map(_.getProver(true))
 
     b.addCommand("set-logic", "QF_BV")
-    b.addCommand("set-option", ":produce-unsat-cores", "true")
 
     var count = 0
 
@@ -1133,7 +1132,7 @@ class TranslationValidator {
     val smtPath = config.outputPath.map(f => s"$f/${runNamePrefix}.smt2")
 
     smtPath.foreach(fname => {
-      val query = b.getCheckSat() + "\n(get-unsat-core)"
+      val query = b.getCheckSat()
       tvLogger.writeToFile(File(fname), query)
       tvLogger.info(s"Write query $fname")
       timer.checkPoint("write out " + fname)

@@ -30,6 +30,7 @@ object SSADAG {
     override def vstmt(s: Statement) = s match {
       case l @ SideEffectStatement(s, n, lhs, rhs) => {
         // assume ackermann
+        // FIXME: should probably go in the ackermann pass?
         ChangeTo(List())
       }
       case SimulAssign(assignments, _) => {
@@ -137,11 +138,11 @@ object SSADAG {
       case s: Statement => visit_stmt(RenameLHS(substs.get), s)
     }
 
+    val phiLabel = "TVSSADAGPHI"
+
     while (worklist.nonEmpty) {
       val b = worklist.dequeue()
       var blockDoneCond = List[Expr](boolOr(b.prevBlocks.map(blockDone).toList))
-
-      var phis = Vector[Statement]()
 
       def live(v: Variable) =
         v.name.startsWith("SYNTH") || v.name.startsWith("TRACE") || outputs.contains(v) || inputs.contains(v)
@@ -161,12 +162,7 @@ object SSADAG {
         var inter: Set[Variable] = varToRenamings.collect { case (v, defset) =>
           v
         }.toSet
-        // var disjoint: Map[Variable, Variable] = varToRenamings.collect {
-        //  case (v, defset) if !inter.contains(v) => {
-        //    assert(defset.tail.forall(_._3 == defset.head._3))
-        //    (defset.head._2, defset.head._3)
-        //  }
-        // }.toMap
+
         var nrenaming = mutable.Map.from(Map[Variable, Variable]())
         varToRenamings.foreach((v, defset) => {
           val defsToJoin = b.prevBlocks.map(b => b -> stRename.get(b).flatMap(_.get(v)).getOrElse(v))
@@ -182,18 +178,16 @@ object SSADAG {
             })
 
             val phiscond = if (phicond.toList.length > 8) then {
-              phicond.map(b => Assume(b, Some("phi")))
-            } else Seq(Assume(boolAnd(phicond), Some("phim")))
-            // println(phicond)
+              phicond.map(b => Assume(b, None, Some(phiLabel)))
+            } else Seq(Assume(boolAnd(phicond), None, Some(phiLabel)))
 
-            phis = phis ++ phiscond
+            b.statements.prependAll(phiscond)
 
             nrenaming(v) = fresh
           }
         })
 
         stRename(b) = nrenaming.toMap
-        b.statements.prependAll(phis)
       } else {
         val rn = mutable.Map.from(renameBefore.getOrElse(b, Map()))
         stRename(b) = rn.toMap
@@ -206,18 +200,24 @@ object SSADAG {
 
       val renaming = mutable.Map.from(renameBefore.getOrElse(b, Map()))
 
-      for (s <- b.statements.toList.filterNot(phis.contains)) {
+      def isPhi(s: Statement) = s match {
+        case a: Assume if a.label.contains(phiLabel) => true
+        case _ => false
+      }
+
+      for (s <- b.statements.toList.filterNot(isPhi)) {
         val c = renameRHS(renaming.get)(s) // also modifies in-place
 
-        // c match {
-
-        //  case a @ Assume(cond, _, _, _) if !phis.contains(a) =>
-        //    blockDoneCond = cond :: blockDoneCond
-        //  case _ => ()
-        // }
+        c match {
+          case a @ Assume(cond, _, _, _) =>
+            blockDoneCond = cond :: blockDoneCond
+          case _ => ()
+        }
 
         c match {
           case a @ SideEffectStatement(s, n, lhs, rhs) => {
+            // note this matches some assume statements
+            // where checkSecurity = true
             val rn = lhs
               .map((formal, v) => {
                 val freshDef = freshName(v)
@@ -228,8 +228,7 @@ object SSADAG {
 
             renameLHS(rn, a)
           }
-          case a @ Assume(cond, _, _, _) if !phis.contains(a) =>
-            blockDoneCond = cond :: blockDoneCond
+          case a @ Assume(cond, _, _, _) =>
             b.statements.remove(a)
           case a: Assign => {
             a.assignees.foreach(v => {
