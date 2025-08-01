@@ -2,7 +2,8 @@ package ir.transforms.validate
 
 import analysis.ProcFrames.*
 import ir.*
-import util.Logger
+import util.functional.memoised
+import util.tvLogger
 
 import scala.collection.mutable
 
@@ -150,8 +151,8 @@ class SideEffectStatementOfStatement(callParams: Map[String, CallParamMapping]) 
 
       Some(SideEffectStatement(e, s"Call_${tgt.name}", lhsParams, rhsParams))
     case MemoryLoad(lhs, memory, addr, endian, size, _) =>
-      val args = List(param(memory), Field("addr") -> addr)
-      val rets = List(Field("out") -> lhs, param(memory))
+      val args = List(traceOut, Field("addr") -> addr)
+      val rets = List(Field("out") -> lhs, traceOut)
       Some(
         SideEffectStatement(
           e,
@@ -161,8 +162,8 @@ class SideEffectStatementOfStatement(callParams: Map[String, CallParamMapping]) 
         )
       )
     case MemoryStore(memory, addr, value, endian, size, _) =>
-      val args = List(traceOut, param(memory), Field("addr") -> addr)
-      val rets = List(traceOut, param(memory))
+      val args = List(traceOut, Field("addr") -> addr)
+      val rets = List(traceOut)
       Some(
         SideEffectStatement(
           e,
@@ -234,7 +235,7 @@ object Ackermann {
         renaming(None)(a) match {
           case Some(n: EffCallFormalParam) => n
           case Some(n) =>
-            Logger.warn(
+            tvLogger.warn(
               s"Transform description fun rewrite formal parameter $a to $n, which I can't fit back into the formal parameter type Variable | Memory | Field, ignoring"
             )
             a
@@ -291,7 +292,8 @@ object Ackermann {
     val seen = mutable.Set[CFGPosition]()
     var invariant = List[(Expr, String)]()
 
-    def succ(p: CFGPosition) =
+    def getSucc(p: CFGPosition) = {
+      // seen.add(p)
       var n = IntraProcIRCursor.succ(p)
       while (
         (n.size == 1) && (n.head match {
@@ -307,6 +309,9 @@ object Ackermann {
         case s => (None, s)
       }
       r
+    }
+
+    val (succ, succMemoStat) = memoised(getSucc)
 
     val q = mutable.Queue[((Option[SideEffectStatement], CFGPosition), (Option[SideEffectStatement], CFGPosition))]()
     val start = ((None, sourceEntry), (None, targetEntry))
@@ -347,9 +352,11 @@ object Ackermann {
       (srcCall, tgtCall) match {
         case (None, None) =>
           advanceBoth()
+        // case (None, Some(x)) if seen.contains(x) => advanceBoth()
+        // case (Some(x), None) if seen.contains(x) => advanceBoth()
         case (None, Some(_)) => advanceSrc()
         case (Some(_), None) => advanceTgt()
-        case (Some(src), Some(tgt)) => {
+        case (Some(src), Some(tgt)) /* if !(seen.contains(src) && seen.contains(tgt))  */ => {
           seen.add(src)
           seen.add(tgt)
 
@@ -359,13 +366,15 @@ object Ackermann {
               advanceBoth()
             }
             case Left(InstFailureReason.ParamMismatch(err)) =>
-              Logger.warn(s"Ackermannisation failure (side effect func params): $err; ${src} ${tgt}")
+              tvLogger.warn(s"Ackermannisation failure (side effect func params): $err; ${src} ${tgt}")
             case Left(_) => ()
           }
         }
         case _ => ()
       }
     }
+
+    tvLogger.debug(s"Ackermann hitrate : ${succMemoStat().hitRate} ${succMemoStat()}")
 
     invariant.toList
   }

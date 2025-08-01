@@ -74,6 +74,48 @@ type ProcID = String
 type TransformDataRelationFun = Option[BlockID] => (Variable | Memory) => Option[Expr]
 type TransformTargetTargetFlowFact = ProcID => Map[Variable, Expr]
 
+//def composeDR(a: TransformDataRelationFun, b: TransformDataRelationFun, aFF: TransformTargetTargetFlowFact, bFF: TransformTargetTargetFlowFact) = {
+//
+//  class subst(bl: Option[BlockID]) extends CILVisitor {
+//    def sub(v: Variable | Memory) = {
+//      b(bl)(v) match {
+//        case Some(e) => ChangeTo(e)
+//        case None => throw Exception("none")
+//      }
+//    }
+//
+//    override def vexpr(e: Expr) = e match {
+//      case v: Variable => sub(v)
+//      case v: Memory => sub(v)
+//      case _ => DoChildren()
+//    }
+//  }
+//
+//  val atx = aFF.map {
+//    case (proc, bs) => proc -> bs.map {
+//      case (v, e) => (a(None)(v), vexpr(subst(None)(e))) match
+//    }
+//  }
+//
+//  def toSource(bl: Option[BlockID])(e: Expr) = {
+//    try {
+//        Some(visit_expr(subst(bl), e))
+//      } catch {
+//        case x => None
+//      }
+//
+//  }
+//
+//
+//  def composed(bl : Option[BlockID])(v: Variable | Memory) = {
+//    a(bl)(v) match {
+//      case Some(e) =>       case None => None
+//    }
+//  }
+//
+//  composed
+//}
+
 enum FormalParam {
   case Global(v: Memory | GlobalVar)
   case FormalParam(n: String, t: IRType)
@@ -569,8 +611,9 @@ class TranslationValidator {
       }
 
       val lhs: List[Variable | Memory] =
-        p.formalOutParam.toList ++ frame.modifiedGlobalVars.toList ++ frame.modifiedMem.toList
-      val rhs: List[Variable | Memory] = p.formalInParam.toList ++ frame.readGlobalVars.toList ++ frame.readMem.toList
+        p.formalOutParam.toList ++ frame.modifiedGlobalVars.toList // ++ frame.modifiedMem.toList
+      val rhs: List[Variable | Memory] =
+        p.formalInParam.toList ++ frame.readGlobalVars.toList // ++ frame.readMem.toList
 
       val lhsSrc = lhs.map(param)
       val rhsSrc = rhs.map(param)
@@ -955,7 +998,7 @@ class TranslationValidator {
     val runNamePrefix = runName + "-" + procTransformed.name
     val proc = procTransformed
 
-    val timer = PerformanceTimer(s"TV$runNamePrefix", LogLevel.DEBUG, tvLogger)
+    val timer = PerformanceTimer(runNamePrefix, LogLevel.DEBUG, tvLogger)
 
     val source = afterProg.get.procedures.find(_.name == proc.name).get
     val target = beforeProg.get.procedures.find(_.name == proc.name).get
@@ -1035,7 +1078,28 @@ class TranslationValidator {
 
     val invariant = equalVarsInvariant ++ factsInvariant ++ invEverywhere
 
-    val preInv = invariant
+    // val preInv = invariant
+
+    val preInv = invariant.map {
+      case i: Inv.GlobalConstraint => {
+        i.toAssume(proc, true)(
+          (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("ENTRY").label, e),
+          (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("ENTRY").label, e)
+        ).body
+      }
+      case i: Inv.SourceConditionalConstraint => {
+        i.toAssume(proc, true)(
+          (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("ENTRY").label, e),
+          (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("ENTRY").label, e)
+        ).body
+      }
+      case i: Inv.CutPoint => {
+        i.toAssume(proc, true)(
+          (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("ENTRY").label, e),
+          (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("ENTRY").label, e)
+        ).body
+      }
+    }
 
     val primedInv = invariant.map {
       case i: Inv.GlobalConstraint => {
@@ -1080,7 +1144,7 @@ class TranslationValidator {
     count = 0
     for (i <- preInv) {
       count += 1
-      val e = i.toAssume(proc)(srcRenameSSA, tgtRenameSSA).body
+      val e = i
       try {
         val l = Some(s"inv$count")
         b.addAssert(e, l)
@@ -1146,10 +1210,8 @@ class TranslationValidator {
 
     if (config.debugDumpAlways) {
       config.outputPath.foreach(path => {
-        tvLogger.writeToFile(
-          File(s"${path}/${runNamePrefix}-combined-${proc.name}.il"),
-          translating.PrettyPrinter.pp_prog(newProg)
-        )
+        tvLogger.writeToFile(File(s"${path}/${runNamePrefix}-combined.il"), translating.PrettyPrinter.pp_prog(newProg))
+        tvLogger.writeToFile(File(s"${path}/${runNamePrefix}.il"), translating.PrettyPrinter.pp_proc(procTransformed))
       })
     }
 
@@ -1173,11 +1235,11 @@ class TranslationValidator {
             tvLogger.writeToFile(File(s"${path}/${runNamePrefix}-counterexample-combined-${proc.name}.dot"), g)
             if (!config.debugDumpAlways) {
               tvLogger.writeToFile(
-                File(s"${path}/${runNamePrefix}-combined-${proc.name}.il"),
+                File(s"${path}/${runNamePrefix}-combined.il"),
                 translating.PrettyPrinter.pp_prog(newProg)
               )
               tvLogger.writeToFile(
-                File(s"${path}/${runNamePrefix}-${proc.name}.il"),
+                File(s"${path}/${runNamePrefix}.il"),
                 translating.PrettyPrinter.pp_proc(procTransformed)
               )
             }

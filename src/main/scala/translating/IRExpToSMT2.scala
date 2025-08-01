@@ -47,7 +47,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
       case ZeroExtend(bits, arg) => vzeroextend(bits, vexpr(arg))
       case SignExtend(bits, arg) => vsignextend(bits, vexpr(arg))
       case BinaryExpr(op, arg, arg2) => vbinary_expr(op, vexpr(arg), vexpr(arg2))
-      case b @ AssocExpr(op, arg) => vexpr(b.toBinaryExpr)
+      case b @ AssocExpr(op, args) => vassoc_expr(op, args.map(vexpr))
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
       case v: Variable => vrvar(v)
       case f @ FApplyExpr(n, params, rt, _) => vfapply_expr(n, params.map(vexpr))
@@ -114,6 +114,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
 
 trait BasilIRExp[Repr[+_]] {
   def vexpr(e: Expr): Repr[Expr]
+  def vassoc_expr(o: BoolBinOp, es: List[Repr[Expr]]): Repr[Expr]
   def vextract(ed: Int, start: Int, a: Repr[Expr]): Repr[Expr]
   def vquantifier(q: QuantifierExpr): Repr[Expr]
   def vlambda(q: LambdaExpr): Repr[Expr]
@@ -121,7 +122,6 @@ trait BasilIRExp[Repr[+_]] {
   def vzeroextend(bits: Int, b: Repr[Expr]): Repr[Expr]
   def vsignextend(bits: Int, b: Repr[Expr]): Repr[Expr]
   def vbinary_expr(e: BinOp, l: Repr[Expr], r: Repr[Expr]): Repr[Expr]
-  def vbool_expr(e: BoolBinOp, l: List[Repr[Expr]]): Repr[Expr]
   def vunary_expr(e: UnOp, arg: Repr[Expr]): Repr[Expr]
   def vliteral(l: Literal): Repr[Literal] = {
     l match {
@@ -164,7 +164,7 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
         }
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
       case v: Variable => vrvar(v)
-      case b @ AssocExpr(op, args) => vbool_expr(op, args.map(vexpr))
+      case b @ AssocExpr(op, args) => vassoc_expr(op, args.map(vexpr))
       case r: SharedMemory => ???
       case r: StackMemory => ???
       case f @ FApplyExpr(n, params, rt, _) => vfapply_expr(n, params.map(vexpr))
@@ -332,7 +332,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     dumpTrace.add(e.toString + "(" + l + "," + r + ")")
     list(sym(opnameToFun(e)), l, r)
   }
-  override def vbool_expr(e: BoolBinOp, l: List[Sexp[Expr]]): Sexp[Expr] =
+  override def vassoc_expr(e: BoolBinOp, l: List[Sexp[Expr]]): Sexp[Expr] =
     dumpTrace.add(e.toString + "(" + l.mkString(",") + ")")
     Sexp.Slist(sym(opnameToFun(e)) :: l)
   override def vunary_expr(e: UnOp, arg: Sexp[Expr]): Sexp[Expr] = list(sym(unaryOpnameToFun(e)), arg)

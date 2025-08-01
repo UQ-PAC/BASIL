@@ -140,31 +140,34 @@ object SSADAG {
 
     val phiLabel = "TVSSADAGPHI"
 
+    var phis = 0
     while (worklist.nonEmpty) {
       val b = worklist.dequeue()
+
       var blockDoneCond = List[Expr](boolOr(b.prevBlocks.map(blockDone).toList))
 
-      def live(v: Variable) =
-        v.name.startsWith("SYNTH") || v.name.startsWith("TRACE") || outputs.contains(v) || inputs.contains(v)
-          || liveVarsBefore.get(b.label).forall(_.contains(v))
+      def live(v: Variable) = true
+      // liveVarsBefore.get(b.label).forall(_.contains(v))
+      // v.name.startsWith("SYNTH") || v.name.startsWith("TRACE") || outputs.contains(v) || inputs.contains(v)
 
       if (b.prevBlocks.nonEmpty) then {
-        val defines: Iterable[(Block, Seq[(Variable, Variable)])] =
-          b.prevBlocks.flatMap(b => stRename.get(b).map(renames => b -> renames.toSeq.filter((k, v) => live(k))))
-        var varToRenamings: Map[Variable, Iterable[(Block, Variable, Variable)]] =
-          defines
-            .flatMap { case (b, rns) =>
-              rns.map { case (v, rn) =>
-                (b, v, rn)
-              }
-            }
-            .groupBy(_._2)
-        var inter: Set[Variable] = varToRenamings.collect { case (v, defset) =>
-          v
-        }.toSet
+        // val defines: Iterable[(Block, Seq[(Variable, Variable)])] =
+        //  b.prevBlocks.flatMap(b => stRename.get(b).map(renames => b -> renames.toSeq.filter((k, v) => live(k))))
+        // var varToRenamings: Map[Variable, Iterable[(Block, Variable, Variable)]] =
+        //  defines
+        //    .flatMap { case (b, rns) =>
+        //      rns.map { case (v, rn) =>
+        //        (b, v, rn)
+        //      }
+        //    }
+        //    .groupBy(_._2)
+
+        val defines: Seq[Variable] =
+          (b.prevBlocks.toSeq.flatMap(b => stRename.get(b).toSeq.flatMap(_.map(_._1).filter(live)))).toSet.toSeq
 
         var nrenaming = mutable.Map.from(Map[Variable, Variable]())
-        varToRenamings.foreach((v, defset) => {
+
+        defines.foreach((v: Variable) => {
           val defsToJoin = b.prevBlocks.map(b => b -> stRename.get(b).flatMap(_.get(v)).getOrElse(v))
           val inter = defsToJoin.map(_._2).toSet
           if (inter.size == 1) {
@@ -173,14 +176,24 @@ object SSADAG {
 
             val fresh = freshName(v)
 
-            val phicond = defsToJoin.map((b, nv) => {
-              BinaryExpr(BoolIMPLIES, blockDone(b), polyEqual(nv, fresh))
-            })
+            val grouped = defsToJoin.groupBy(_._2).map {
+              case (ivar, blockset) => {
+                val blocks = blockset.map(_._1)
+                BinaryExpr(BoolIMPLIES, boolOr(blocks.map(blockDone)), polyEqual(ivar, fresh))
+              }
+            }
 
-            val phiscond = if (phicond.toList.length > 8) then {
+            val phicond = grouped.toList
+
+            // val phicond = defsToJoin.map((b, nv) => {
+            //  BinaryExpr(BoolIMPLIES, blockDone(b), polyEqual(nv, fresh))
+            // }).toList
+
+            val phiscond = if (phicond.length > 8) then {
               phicond.map(b => Assume(b, None, Some(phiLabel)))
             } else Seq(Assume(boolAnd(phicond), None, Some(phiLabel)))
 
+            phis += phicond.length
             b.statements.prependAll(phiscond)
 
             nrenaming(v) = fresh
@@ -254,6 +267,7 @@ object SSADAG {
       }
     }
 
+    // println("nphis: " + phis)
     val renameBeforeLabels = renameBefore.map((b, r) => b.label -> r)
 
     (b, c) => visit_expr(RenameRHS(renameBeforeLabels(b).get), c)

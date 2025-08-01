@@ -35,6 +35,28 @@ def dynamicSingleAssignment(config: TVJob, p: Program) = {
   validator.getValidationSMT(config, "DSA", sourceToTarget)
 }
 
+def dsaCopyPropCombined(config: TVJob, p: Program) = {
+
+  def dsa(p: Program) = transforms.OnePassDSA().applyTransform(p)
+  def copyprop(p: Program) =
+    p.procedures.foreach(ir.eval.AlgebraicSimplifications(_))
+    p.procedures.map(p => p.name -> transforms.OffsetProp.transform(p)).toMap
+
+  def transform(p: Program) = {
+    val dr = dsa(p)
+    val cp = copyprop(p)
+    (dr, cp)
+  }
+
+  def sourceToTarget(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
+    case l @ LocalVar(n, t, i) => Some(LocalVar(l.varName, t))
+    case g =>
+      Some(g)
+  }
+
+  val (validator, (dsaRes, copypropRes)) = validatorForTransform(transform)(p)
+}
+
 def copyProp(config: TVJob, p: Program) = {
   def transform(p: Program) = {
     p.procedures.foreach(ir.eval.AlgebraicSimplifications(_))
@@ -60,7 +82,7 @@ def parameters(config: TVJob, ctx: IRContext) = {
   def sourceToTarget(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
     case LocalVar(s"${i}_in", t, 0) => Some(GlobalVar(s"$i", t))
     case LocalVar(s"${i}_out", t, 0) => Some(GlobalVar(s"$i", t))
-    case LocalVar(n, t, 0) if (!n.startsWith("TRACE")) => Some(GlobalVar(n, t))
+    case LocalVar(n, t, 0) => Some(GlobalVar(n, t))
     case g => Some(g)
   }
 
