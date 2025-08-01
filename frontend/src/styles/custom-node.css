@@ -1,32 +1,10 @@
 /* src/styles/custom-node.css */
 
-/* --- CRITICAL FIX: Override React Flow's default wrapper styles for custom nodes --- */
 /* Preventing conflicting flex behaviours and allowing 'custom-flow-node' to dictate height and width. */
 /* Overriding from: @xyflow/react/dist/style.css. */
 .react-flow__node.react-flow__node-customNode {
     width: auto !important;
     height: auto !important;
-    /*display: block !important;*/
-    /*align-items: unset !important;*/
-    /*justify-content: unset !important;*/
-    /*flex-grow: unset !important;*/
-    /*flex-shrink: unset !important;*/
-    /* Remove any padding/border/shadow here, as it's handled by .custom-flow-node */
-    /*padding: 0 !important;*/
-    /*border: none !important;*/
-    /*box-shadow: none !important;*/
-    /*background-color: transparent !important;*/
-    /* Ensure no text styling here, as it's on .custom-node-header-text */
-    /*color: unset !important;*/
-    /*font-size: unset !important;*/
-    /*line-height: unset !important;*/
-    /*font-family: unset !important;*/
-    /*text-align: unset !important;*/
-    /*white-space: unset !important;*/
-    /*overflow: unset !important;*/
-    /*text-overflow: unset !important;*/
-    /*word-break: unset !important;*/
-    /*max-height: unset !important;*/
 }
 
 .custom-flow-node {
@@ -49,17 +27,4 @@
 .custom-node-header-text {
     flex-grow: 1;
     color: black;
-/*    flex-grow: 1; !* Allows this div to grow and take available space within the flex column *!*/
-/*    color: black;*/
-/*    font-size: 14px; !* Matches ELK estimation *!*/
-/*    line-height: 1.5; !* Matches ELK estimation *!*/
-/*    font-family: 'monospace'; !* Use monospace font for code *!*/
-/*    text-align: center; !* Centers the text within this div *!*/
-
-/*    !* Default (collapsed) state for text overflow *!*/
-/*    white-space: nowrap;*/
-/*    overflow: hidden;*/
-/*    text-overflow: ellipsis;*/
-/*    word-break: normal;*/
-/*    max-height: auto; !* No max-height in collapsed state, let it be defined by content *!*/
 }
