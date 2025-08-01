@@ -9,11 +9,11 @@ import {
 import type { Node, Edge } from '@xyflow/react';
 
 import '@xyflow/react/dist/style.css';
-import '../styles/CfgViewer.css';
+import '../styles/cfg-viewer.css';
 
 import { API_BASE_URL } from '../api';
 import { Graphviz } from "@hpcc-js/wasm-graphviz";
-import { getLayoutedElements } from '../utils/GraphLayout';
+import { getLayoutedElements } from '../utils/graphLayout.ts';
 
 import { type CustomNodeData } from './CustomNode';
 import GraphPanel from './GraphPanel';

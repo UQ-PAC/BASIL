@@ -5,11 +5,11 @@ import {
 } from '@xyflow/react';
 import { API_BASE_URL } from '../api';
 import { Graphviz } from "@hpcc-js/wasm-graphviz";
-import { getLayoutedElements } from '../utils/GraphLayout';
+import { getLayoutedElements } from '../utils/graphLayout.ts';
 import { type CustomNodeData } from './CustomNode';
 import GraphPanel from './GraphPanel';
 
-import '../styles/CombinedViewer.css'; // New CSS for this component TODO: I want this file to be changed dramatically <-
+import '../styles/combined-viewer.css'; // New CSS for this component TODO: I want this file to be changed dramatically <-
 import '../styles/button-selection.css' // TODO: Is this already imported through another file? - Why does it work without it?
 import { FIT_VIEW_OPTIONS, ZOOM_CONFIGS } from '../constants';
 

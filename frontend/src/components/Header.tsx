@@ -1,4 +1,4 @@
-import '../styles/Header.css';
+import '../styles/header.css';
 
 interface HeaderProps {
     setViewMode: (mode: 'IR' | 'CFG' | 'IR/CFG') => void;
