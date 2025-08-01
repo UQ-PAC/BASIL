@@ -76,6 +76,13 @@ def copyProp(config: TVJob, p: Program) = {
 }
 
 def parameters(config: TVJob, ctx: IRContext) = {
+
+  // val localInTarget = ctx.program.procedures.map {
+  //  case p => p.name -> freeVarsPos(p).collect {
+  //    case l: LocalVar
+  //  }.toSet
+  // }
+
   val (validator, res) =
     validatorForTransform(p => transforms.liftProcedureCallAbstraction(p, Some(ctx.specification)))(ctx.program)
 
@@ -140,11 +147,12 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   val p = ctx.program
   var config = mode match {
     case SimplifyMode.ValidatedSimplify(verifyMode, filePrefix) =>
-      TVJob(outputPath = filePrefix, verify = verifyMode)
+      TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = false)
     case _ => TVJob(None, None)
   }
   transforms.applyRPO(p)
-  nop(config, p)
+  // nop(config, p)
+  // Logger.writeToFile(File("beforeParams.il"), translating.PrettyPrinter.pp_prog(ctx.program))
   val (res, nctx) = parameters(config, ctx)
   config = res
   config = assumePreservedParams(config, p)

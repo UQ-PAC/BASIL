@@ -1144,6 +1144,8 @@ class TranslationValidator {
     count = 0
     for (i <- preInv) {
       count += 1
+      // should be no defines between entry and cut point ??
+      // val e = i.toAssume(proc)(srcRenameSSA, tgtRenameSSA).body
       val e = i
       try {
         val l = Some(s"inv$count")
@@ -1196,8 +1198,8 @@ class TranslationValidator {
     val smtPath = config.outputPath.map(f => s"$f/${runNamePrefix}.smt2")
 
     smtPath.foreach(fname => {
-      val query = b.getCheckSat()
-      tvLogger.writeToFile(File(fname), query)
+      // val query = b.getCheckSat()
+      b.writeCheckSatToFile(File(fname))
       tvLogger.info(s"Write query $fname")
       timer.checkPoint("write out " + fname)
     })

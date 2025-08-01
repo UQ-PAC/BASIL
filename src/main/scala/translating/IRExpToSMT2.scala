@@ -4,6 +4,8 @@ import ir.*
 import ir.cilvisitor.*
 import util.{OnCrash, RingTrace}
 
+import java.io.{BufferedWriter, File, FileWriter, Writer}
+
 trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
   // def vstmt(s: Statement) : Repr[Statement]
 
@@ -245,14 +247,33 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       exprs = exprs ++ List(list(sym("assert"), inner))
     }
 
+    def writeCheckSat(b: Writer, getUnsatCore: Boolean = false) = {
+      val query = getCheckSat(getUnsatCore)
+      for (q <- query) {
+        b.append(Sexp.print(q))
+        b.append("\n")
+      }
+    }
+
+    def writeCheckSatToFile(fname: File, getUnsatCore: Boolean = false) = {
+      val f = BufferedWriter(FileWriter(fname))
+      try {
+        writeCheckSat(f, getUnsatCore)
+      } finally {
+        if (f != null) {
+          f.close()
+        }
+      }
+    }
+
     def getCheckSat(getUnsatCore: Boolean = false) = {
       val setUnsat =
         if getUnsatCore then Seq(list(sym("set-option"), sym(":produce-unsat-cores"), sym("true"))) else Seq()
       val getUnsat = if getUnsatCore then Seq(list(sym("get-unsat-core"))) else Seq()
 
-      ((exprsBefore ++ setUnsat).toVector ++ typedecls ++ decls ++ exprs ++ List(list(sym("check-sat"))) ++ getUnsat)
-        .map(Sexp.print)
-        .mkString("\n")
+      setUnsat.iterator ++ exprsBefore.iterator ++ typedecls ++ decls ++ exprs ++ Seq(
+        list(sym("check-sat"))
+      ) ++ getUnsat
     }
   }
 
