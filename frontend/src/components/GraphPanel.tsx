@@ -3,17 +3,17 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
     ReactFlow,
     Controls,
-    Background,
     MiniMap,
     type NodeChange,
     type EdgeChange,
     type Node as ReactFlowNode,
     type ReactFlowInstance, useReactFlow,
 } from '@xyflow/react';
-import type { Node, Edge, FitViewOptions, BackgroundVariant } from '@xyflow/react';
+import type { Node, Edge, FitViewOptions } from '@xyflow/react';
 
 import CustomNode from './CustomNode';
 import { type CustomNodeData } from './CustomNode';
+import CustomBackground from './CustomBackground';
 
 interface GraphPanelProps {
     nodes: Node<CustomNodeData>[];
@@ -73,6 +73,7 @@ const GraphPanel: React.FC<GraphPanelProps> = ({
         <div key={`graph-panel-${graphRenderKey}`} className="graph-wrapper">
             <h3>{title}</h3>
             <div className="react-flow-instance">
+                {reactFlowInstanceReady && <CustomBackground />}
                 <ReactFlow
                     nodes={nodes}
                     edges={edges}
@@ -97,7 +98,6 @@ const GraphPanel: React.FC<GraphPanelProps> = ({
                             <Controls />
                         </>
                     )}
-                    <Background variant={"dots" as BackgroundVariant} gap={12} size={1} />
                 </ReactFlow>
             </div>
         </div>

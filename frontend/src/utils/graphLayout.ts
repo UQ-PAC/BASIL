@@ -43,7 +43,8 @@ export async function getLayoutedElements(dotString: string, prefix: string): Pr
                 continue;
             }
 
-            const fullLabelContent = match[3].replace(/\\"/g, '"').replace(/\\l/g, '\n').trim();
+            const originalLabelContent = match[3] || '';
+            const fullLabelContent = originalLabelContent.replace(/\\"/g, '"').replace(/\\l/g, '\n').trim();
             const attributes = match[4] || '';
             const shape = attributes.includes('shape="box"') ? 'box' : 'default';
 
