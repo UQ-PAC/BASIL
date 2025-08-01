@@ -40,3 +40,10 @@
     align-items: center;
     padding: 0.5em 1em;
 }
+
+.custom-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
