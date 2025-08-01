@@ -207,6 +207,8 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     debugAssert(newElem.unitary)
     onInsert(newElem)
     if (size > 0) {
+
+      // HERE
       insertAfter(lastElem.get, newElem)
     } else {
       firstElem = Some(newElem)
@@ -290,10 +292,10 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     */
   def insertAfter(intrusiveListElement: T, newElem: T): T = {
     debugAssert(size >= 1)
-    debugAssert(
-      containsRef(intrusiveListElement),
-      "element is not a member of this list, insertAfter could mangle start and end tracking"
-    )
+    // debugAssert(
+    //  containsRef(intrusiveListElement),
+    //  "element is not a member of this list, insertAfter could mangle start and end tracking"
+    // )
     debugAssert(newElem.unitary)
     numElems += 1
     if (intrusiveListElement == lastElem.get) {
@@ -479,9 +481,15 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
     first().insertBefore(elem)
   }
 
-  private[intrusive_list] final def getNext: T = next.get
+  private[intrusive_list] final def getNext: T =
+    val n = next.get
+    assert(n != this)
+    n
 
-  private[intrusive_list] final def getPrev: T = prev.get
+  private[intrusive_list] final def getPrev: T =
+    val p = prev.get
+    assert(p != this)
+    p
 
   private[intrusive_list] final def hasNext: Boolean = next.isDefined
   private[intrusive_list] final def hasPrev: Boolean = prev.isDefined

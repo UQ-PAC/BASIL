@@ -139,7 +139,9 @@ class IntraLiveVarsDomain extends PowerSetDomain[Variable] {
       case a: Assume => s ++ a.body.variables
       case a: Assert => s ++ a.body.variables
       case i: IndirectCall => s + i.target
-      case c: DirectCall => (s -- c.outParams.map(_._2)) ++ c.actualParams.flatMap(_._2.variables)
+      case c: DirectCall => {
+        s -- c.outParams.map(_._2) ++ c.actualParams.flatMap(_._2.variables)
+      }
       case g: GoTo => s
       case r: Return => s ++ r.outParams.flatMap(_._2.variables)
       case r: Unreachable => s
@@ -722,12 +724,7 @@ def simplifyCFG(p: Procedure) = {
   removeEmptyBlocks(p)
 }
 
-def copypropTransform(
-  p: Procedure,
-  procFrames: Map[Procedure, Set[Memory]],
-  funcEntries: Map[BigInt, Procedure],
-  constRead: (BigInt, Int) => Option[BitVecLiteral]
-) = {
+def copypropTransform(p: Procedure, procFrames: Map[Procedure, Set[Memory]]) = {
   val t = util.PerformanceTimer(s"simplify ${p.name} (${p.blocks.size} blocks)")
   // SimplifyLogger.info(s"${p.name} ExprComplexity ${ExprComplexity()(p)}")
   // val result = solver.solveProc(p, true).withDefaultValue(dom.bot)
@@ -1037,7 +1034,7 @@ def cleanupBlocks(p: Program) = {
   }
 }
 
-def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
+def doCopyPropTransform(p: Program) = {
 
   applyRPO(p)
 
@@ -1050,8 +1047,6 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
     }
 
   val procFrames = getProcFrame.solveInterproc(p)
-
-  val addrToProc = p.procedures.toSeq.flatMap(p => p.address.map(addr => addr -> p).toSeq).toMap
 
   def read(addr: BigInt, size: Int): Option[BitVecLiteral] = {
     val rodata = p.initialMemory.filter((_, s) => s.readOnly)
@@ -1080,7 +1075,7 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
         {
           SimplifyLogger
             .debug(s"CopyProp Transform ${p.name} (${p.blocks.size} blocks, expr complexity ${ExprComplexity()(p)})")
-          copypropTransform(p, procFrames, addrToProc, read)
+          copypropTransform(p, procFrames)
         }
     )
 
@@ -1108,9 +1103,9 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
 
 }
 
-def copyPropParamFixedPoint(p: Program, rela: Map[BigInt, BigInt]): Int = {
+def copyPropParamFixedPoint(p: Program): Int = {
   SimplifyLogger.info(s"Simplify:: Copyprop iteration 0")
-  doCopyPropTransform(p, rela)
+  doCopyPropTransform(p)
   var inlinedOutParams: Map[Procedure, Set[Variable]] = removeInvariantOutParameters(p)
   var changed = inlinedOutParams.nonEmpty
   var iterations = 1
@@ -1119,7 +1114,7 @@ def copyPropParamFixedPoint(p: Program, rela: Map[BigInt, BigInt]): Int = {
     changed = false
     SimplifyLogger.info(s"Simplify:: Copyprop iteration $iterations")
     transforms.removeTriviallyDeadBranches(p)
-    doCopyPropTransform(p, rela)
+    doCopyPropTransform(p)
     val extraInlined = removeInvariantOutParameters(p, inlinedOutParams)
     inlinedOutParams = extraInlined.foldLeft(inlinedOutParams)((acc, v) =>
       acc + (v._1 -> (acc.getOrElse(v._1, Set[Variable]()) ++ v._2))
@@ -1635,12 +1630,7 @@ object CopyProp {
     c.keys.filter(isMemVar).foreach(v => clobberFull(c, v))
   }
 
-  def DSACopyProp(
-    p: Procedure,
-    procFrames: Map[Procedure, Set[Memory]],
-    funcEntries: Map[BigInt, Procedure],
-    constRead: (BigInt, Int) => Option[BitVecLiteral]
-  ) = {
+  def DSACopyProp(p: Procedure, procFrames: Map[Procedure, Set[Memory]]) = {
     val updated = false
     val state = mutable.HashMap[Variable, PropState]()
     var poisoned = false // we have an indirect call
@@ -1724,27 +1714,6 @@ object CopyProp {
           // need a reaching-defs to get inout args (just assume register name matches?)
           // this reduce we have to clobber with the indirect call this round
           poisoned = true
-          val r = for {
-            (addr, deps) <- canPropTo(c, x.target)
-            addr <- addr match {
-              case b: BitVecLiteral => Some(b.value)
-              case _ => None
-            }
-            proc <- funcEntries.get(addr)
-          } yield (proc, deps)
-
-          r match {
-            case Some(target, deps) => {
-              SimplifyLogger.info("Resolved indirect call")
-            }
-            case None => {
-              for ((i, v) <- c) {
-                v.clobbered = true
-              }
-              poisoned = true
-            }
-          }
-
         }
         case _ => ()
       }

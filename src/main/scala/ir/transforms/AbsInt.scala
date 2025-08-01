@@ -305,7 +305,7 @@ class interprocSummaryFixpointSolver[SummaryAbsVal, LocalAbsVal, A <: AbstractDo
   */
 class BottomUpCallgraphWorklistSolver[L](transferProcedure: (Procedure => L, L, Procedure) => L, init: Procedure => L) {
 
-  def solve(p: Program) = {
+  def solve(p: Program): Map[Procedure, L] = {
     var old_summaries = Map[Procedure, L]()
     var summaries = Map[Procedure, L]()
 

@@ -271,7 +271,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
           trimEarly = main.isDefined,
           mainProcedureName = main.getOrElse("main")
         ),
-        simplify = true,
+        simplify = SimplifyMode.Simplify,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
@@ -285,7 +285,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
       BASILConfig(
         context = Some(context),
         loading = ILLoadingConfig(inputFile = "", relfFile = None),
-        simplify = true,
+        simplify = SimplifyMode.Simplify,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
