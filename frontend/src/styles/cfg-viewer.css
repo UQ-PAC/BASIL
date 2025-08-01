@@ -62,6 +62,7 @@
     flex-grow: 1;
     height: 100%;
     width: 100%;
+    position: relative;
 }
 
 .cfg-viewer-message,
