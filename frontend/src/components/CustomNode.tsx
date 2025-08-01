@@ -1,5 +1,5 @@
 // src/components/CustomNode.tsx
-import React, {memo, useEffect, useState, useRef} from 'react';
+import React, {memo, useEffect, useRef} from 'react';
 import { Handle, Position, useUpdateNodeInternals, type Node, type NodeProps } from '@xyflow/react';
 
 import '../styles/custom-node.css';
@@ -14,15 +14,16 @@ export interface CustomNodeData {
     fullContentWidth: number;
     fullContentHeight: number;
     nodeBorderColor?: string;
+    isExpanded: boolean;
     [key: string]: unknown; // Index signature to satisfy Record<string, unknown> constraint
 }
 
 type MyNodeType = Node<CustomNodeData>;
 
 const CustomNode: React.FC<NodeProps<MyNodeType>> = memo(({ id, data, selected }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
     const updateNodeInternals = useUpdateNodeInternals();
     const contentRef = useRef<HTMLDivElement>(null);
+    let isExpanded = data.isExpanded;
 
     useEffect(() => {
         updateNodeInternals(id);
@@ -46,10 +47,6 @@ const CustomNode: React.FC<NodeProps<MyNodeType>> = memo(({ id, data, selected }
         }
     }, [isExpanded, data.fullContent, data.header]);
 
-    const handleDoubleClick = () => {
-        setIsExpanded(prev => !prev);
-    };
-
     const currentWidth = isExpanded ? data.fullContentWidth : data.headerWidth;
     const currentHeight = isExpanded ? data.fullContentHeight : data.headerHeight;
 
@@ -68,9 +65,8 @@ const CustomNode: React.FC<NodeProps<MyNodeType>> = memo(({ id, data, selected }
         textAlign: isExpanded ? 'left' : 'center',
     };
 
-
     return (
-        <div className="custom-flow-node" style={nodeStyle} onDoubleClick={handleDoubleClick}>
+        <div className="custom-flow-node" style={nodeStyle}>
             <Handle type="target" position={Position.Top} />
             <div className="custom-node-header-text" ref={contentRef} style={textDivStyle} >
                 {data.header}

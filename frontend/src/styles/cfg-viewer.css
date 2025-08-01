@@ -84,3 +84,14 @@
     height: 1px;
     cursor: default !important;
 }
+
+.icon {
+    width: 24px;
+    height: 24px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .icon {
+        filter: invert(1);
+    }
+}

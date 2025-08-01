@@ -16,6 +16,61 @@ const elkLayoutOptions = {
     'org.eclipse.elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
 };
 
+export async function applyLayout(nodes: Node<CustomNodeData>[], edges: Edge[]): Promise<Node<CustomNodeData>[]> {
+    const elkNodes = nodes.map(node => {
+        const width = node.data.isExpanded ? node.data.fullContentWidth : node.data.headerWidth;
+        const height = node.data.isExpanded ? node.data.fullContentHeight : node.data.headerHeight;
+
+        return {
+            id: node.id,
+            width,
+            height,
+        };
+    });
+
+    const elkEdges = edges.map(edge => ({
+        id: edge.id,
+        sources: [edge.source],
+        targets: [edge.target],
+    }));
+
+    const elkGraph = {
+        id: 'root',
+        layoutOptions: elkLayoutOptions,
+        children: elkNodes,
+        edges: elkEdges,
+    };
+
+    try {
+        const layoutedGraph = await elk.layout(elkGraph);
+
+        if (!layoutedGraph.children) {
+            console.warn("ELK layout returned no children.");
+            return nodes;
+        }
+
+        const updatedNodes = nodes.map(node => {
+            const elkNode = layoutedGraph.children?.find(n => n.id === node.id);
+            if (elkNode) {
+                return {
+                    ...node,
+                    position: { x: elkNode.x || 0, y: elkNode.y || 0 },
+                    style: {
+                        width: elkNode.width,
+                        height: elkNode.height,
+                    },
+                };
+            }
+            return node;
+        });
+
+        return updatedNodes;
+    } catch (e) {
+        console.error("Failed to re-apply ELK layout:", e);
+        return nodes;
+    }
+}
+
 export async function getLayoutedElements(dotString: string, prefix: string): Promise<{ nodes: Node<CustomNodeData>[]; edges: Edge[] }> {
     console.log(`DEBUG: Input DOT String for ELK layout (prefix: ${prefix}):`, dotString);
 
@@ -142,6 +197,7 @@ export async function getLayoutedElements(dotString: string, prefix: string): Pr
                             headerHeight: originalNodeData.headerHeight,
                             fullContentWidth: originalNodeData.fullContentWidth,
                             fullContentHeight: originalNodeData.fullContentHeight,
+                            isExpanded: false,
                         },
                         style: { width: originalNodeData.headerWidth, height: originalNodeData.headerHeight },
                         type: 'customNode',
