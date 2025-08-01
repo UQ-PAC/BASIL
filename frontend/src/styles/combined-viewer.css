@@ -42,9 +42,6 @@
     display: flex;
     flex: 1;
     gap: 10px;
-    /*min-height: 0;*/
-    /*position: relative;*/
-    /*overflow: hidden;*/
     min-height: 0;
 }
 
@@ -55,7 +52,7 @@
     border: 1px solid #ddd;
     border-radius: 8px;
     overflow: hidden;
-    background-color: #282c34;
+    background-color: #ffffff; /* TODO: Make a light mode and dark mode Dark colour: #282c34 */
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     min-height: 0;
 }

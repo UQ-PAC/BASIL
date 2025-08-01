@@ -115,7 +115,7 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean])(
      */
     case GET -> Root / "cfg" / epochName / "before" =>
       ensureReady {
-        logger.info(s"Received GET /cfg/$epochName/before request.") *>
+        logger.info(s"Received GET /cfg/$epochName/before request.") *> // TODO: Can I merge this and the after one?
           epochStore.getEpoch(epochName)
             .flatMap {
               case Some(epoch) =>
