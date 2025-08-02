@@ -74,6 +74,8 @@ export async function applyLayout(nodes: Node<CustomNodeData>[], edges: Edge[]):
 export async function getLayoutedElements(dotString: string, prefix: string): Promise<{ nodes: Node<CustomNodeData>[]; edges: Edge[] }> {
     console.log(`DEBUG: Input DOT String for ELK layout (prefix: ${prefix}):`, dotString);
 
+    let cleanedDotString = dotString.replace(/graph\s*\[\];/g, '');
+
     const rawNodesMap = new Map<string, {
         id: string,
         fullLabelContent: string,
@@ -86,10 +88,13 @@ export async function getLayoutedElements(dotString: string, prefix: string): Pr
     }>();    const rawEdgesDataForELK: { id: string, source: string, target: string, label?: string }[] = [];
 
     try {
-        const nodeRegex = /(?:\"([^"]+)\"|(\w+))\s*\[label="((?:[^"\\]|\\.)*?)"(?:, ([^\]]*))?\]/g;
-        const nodeMatches = dotString.matchAll(nodeRegex);
+        const nodeDefinitionRegex = /(?:\"([^"]+)\"|(\w+))\s*\[((?:[^\]"]|\"(?:\\.|[^"\\])*\")*)\]/g;
+
+        const labelRegex = /label="((?:[^"\\]|\\.)*?)"/;
+        const shapeRegex = /shape="(\w+)"/;
         let uniqueNodeCount = 0;
 
+        const nodeMatches = cleanedDotString.matchAll(nodeDefinitionRegex);
         for (const match of nodeMatches) {
             const originalId = match[1] || match[2];
             const id = `${prefix}${originalId}`;
@@ -97,11 +102,13 @@ export async function getLayoutedElements(dotString: string, prefix: string): Pr
             if (rawNodesMap.has(id)) {
                 continue;
             }
-
-            const originalLabelContent = match[3] || '';
+            const attributesString = match[3] || '';
+            const labelMatch = attributesString.match(labelRegex);
+            const originalLabelContent = labelMatch ? labelMatch[1] : '';
             const fullLabelContent = originalLabelContent.replace(/\\"/g, '"').replace(/\\l/g, '\n').trim();
-            const attributes = match[4] || '';
-            const shape = attributes.includes('shape="box"') ? 'box' : 'default';
+
+            const shapeMatch = attributesString.match(shapeRegex);
+            const shape = shapeMatch ? shapeMatch[1] : 'default';
 
             const headerLine = fullLabelContent.split('\n')[0] || '';
 
@@ -121,6 +128,7 @@ export async function getLayoutedElements(dotString: string, prefix: string): Pr
             const fullContentWidth = Math.max(120, fullContentTextWidth + HORIZONTAL_PADDING_PX);
             const fullContentHeight = Math.max(40, (fullContentLines.length * ASSUMED_FONT_SIZE_PX * ASSUMED_LINE_HEIGHT_MULTIPLIER) + VERTICAL_PADDING_PX);
 
+            // console.log(`\nDEBUG: match: ${match}, \n\n attributesString: ${attributesString}, \n\nfullLabelContent: ${fullLabelContent}`)
             rawNodesMap.set(id, {
                 id,
                 fullLabelContent,

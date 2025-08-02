@@ -53,7 +53,7 @@ const CustomNode: React.FC<NodeProps<MyNodeType>> = memo(({ id, data, selected }
     const nodeStyle: React.CSSProperties = {
         width: currentWidth,
         height: currentHeight,
-        border: `2px solid ${data.nodeBorderColor || '#777'}`,
+        border: `3px solid ${data.nodeBorderColor || '#777'}`,
         backgroundColor: selected ? '#fbfbfb' : '#FFF',
         boxShadow: selected ? '0 0 0 3px rgba(0, 123, 255, 0.4)' : '0 2px 5px rgba(0,0,0,0.1)', // TODO: Maybe just use this as selected
         whiteSpace: isExpanded ? 'pre-wrap' : 'nowrap',
