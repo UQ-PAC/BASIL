@@ -3,6 +3,7 @@ import './App.css'
 import { DiffViewer } from './components/DiffViewer';
 import { Header } from './components/Header';
 import { Sidebar } from './components/SideBar';
+import { ResizableSidebar } from './components/ResizableSidebar';
 import CfgViewer from './components/CfgViewer';
 import CombinedViewer from './components/CombinedViewer';
 import { API_BASE_URL } from './api';
@@ -55,14 +56,16 @@ function App() {
         <div className="app-layout">
             <Header setViewMode={setViewMode} viewMode={viewMode} />
             <main className="main-layout">
-              <Sidebar
-                  epochNames={allEpochNames}
-                  selectedEpochName={selectedEpochName}
-                  onEpochSelect={handleEpochSelect}
-                  loading={loadingEpochs}
-                  error={epochError}
-              />
-              {viewMode === 'IR' ? ( // TODO: Change to enums and a switch
+                <ResizableSidebar>
+                    <Sidebar
+                      epochNames={allEpochNames}
+                      selectedEpochName={selectedEpochName}
+                      onEpochSelect={handleEpochSelect}
+                      loading={loadingEpochs}
+                      error={epochError}
+                    />
+                </ResizableSidebar>
+                {viewMode === 'IR' ? ( // TODO: Change to enums and a switch
                   <DiffViewer selectedEpochName={selectedEpochName} />
               ) : viewMode === 'CFG' ? (
                   <CfgViewer selectedEpochName={selectedEpochName} />

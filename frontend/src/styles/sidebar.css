@@ -1,7 +1,32 @@
+.resizable-sidebar-container {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    height: 100vh; /* TODO: Ensure that when there are so many options it is off the screen it still works */
+    flex-shrink: 0;
+}
+
+.resize-handle {
+    width: 8px;
+    background-color: transparent;
+    cursor: ew-resize;
+    position: absolute;
+    top: 0;
+    right: -4px;
+    height: 100%;
+    z-index: 10;
+    transition: background-color 0.2s ease;
+    border-radius: 999px;
+}
+
+.resize-handle:hover {
+    background-color: #ccc;
+}
+
 .sidebar {
-    width: 250px;
+    width: 100%;
+    height: 100%;
     background-color: #f0f0f0;
-    padding: 1rem;
     box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
@@ -32,6 +57,8 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem; /* Space between buttons */
+    padding-left: 10px;
+    padding-right: 10px;
 }
 
 .epoch-button {
@@ -43,9 +70,9 @@
     border-radius: 4px;
     font-size: 0.95rem;
     transition: background-color 0.2s ease, border-color 0.2s ease;
-    white-space: nowrap; /* Prevent text wrapping */
-    overflow: hidden;    /* Hide overflow text */
-    text-overflow: ellipsis; /* Show ellipsis for overflowed text */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .epoch-button:hover:not(:disabled) {

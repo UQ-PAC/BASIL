@@ -33,9 +33,8 @@
     display: none !important;
 }
 
-.d2h-code-line-ctn {
+.d2h-code-line {
     display: flex;
-    flex: 1;
     align-items: flex-start;
 }
 

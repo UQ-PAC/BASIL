@@ -26,7 +26,7 @@ interface IREpochData {
 }
 
 interface DiffViewerProps {
-    selectedEpochName: string | null; // Now received as a prop
+    selectedEpochName: string | null;
 }
 
 export function DiffViewer({ selectedEpochName }: DiffViewerProps) {

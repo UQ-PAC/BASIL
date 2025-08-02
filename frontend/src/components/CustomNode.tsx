@@ -55,7 +55,7 @@ const CustomNode: React.FC<NodeProps<MyNodeType>> = memo(({ id, data, selected }
         height: currentHeight,
         border: `3px solid ${data.nodeBorderColor || '#777'}`,
         backgroundColor: selected ? '#fbfbfb' : '#FFF',
-        boxShadow: selected ? '0 0 0 3px rgba(0, 123, 255, 0.4)' : '0 2px 5px rgba(0,0,0,0.1)', // TODO: Maybe just use this as selected
+        boxShadow: selected ? '0 0 0 3px rgba(0, 123, 255, 0.4)' : '0 2px 5px rgba(0,0,0,0.1)',
         whiteSpace: isExpanded ? 'pre-wrap' : 'nowrap',
         overflow: isExpanded ? 'auto' : 'hidden',
         textOverflow: isExpanded ? 'clip' : 'ellipsis',
