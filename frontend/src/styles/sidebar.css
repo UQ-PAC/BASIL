@@ -1,9 +1,37 @@
+
 .resizable-sidebar-container {
     position: sticky;
     top: 0;
     z-index: 10;
     height: 100vh; /* TODO: Ensure that when there are so many options it is off the screen it still works */
     flex-shrink: 0;
+}
+
+.collapse-button {
+    background: #9c9c9c;
+    border: none;
+    cursor: pointer;
+    width: 25px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 0;
+    right: -25px;
+    z-index: 100;
+    border-top-right-radius: 9999px;
+    border-bottom-right-radius: 9999px;
+    box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    padding: 0;
+    margin: 0;
+}
+
+.collapse-icon {
+    width: 14px;
+    height: 14px;
+    color: #ffffff; /* TODO: What does this change? It appears to be nothing... :( */
 }
 
 .resize-handle {

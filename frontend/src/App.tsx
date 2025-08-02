@@ -14,6 +14,7 @@ function App() {
     const [selectedEpochName, setSelectedEpochName] = useState<string | null>(null);
     const [loadingEpochs, setLoadingEpochs] = useState(true);
     const [epochError, setEpochError] = useState<string | null>(null);
+    const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
 
     useEffect(() => {
         const fetchEpochNames = async () => {
@@ -52,11 +53,18 @@ function App() {
         }
     }, [selectedEpochName]);
 
+    const toggleSidebar = () => {
+        setIsSidebarMinimized(!isSidebarMinimized);
+    };
+
     return (
         <div className="app-layout">
             <Header setViewMode={setViewMode} viewMode={viewMode} />
             <main className="main-layout">
-                <ResizableSidebar>
+                <ResizableSidebar
+                    isSidebarMinimised={isSidebarMinimized}
+                    toggleSidebar={toggleSidebar}
+                >
                     <Sidebar
                       epochNames={allEpochNames}
                       selectedEpochName={selectedEpochName}
