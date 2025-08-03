@@ -10,6 +10,7 @@ import type { Node, Edge } from '@xyflow/react';
 
 import '@xyflow/react/dist/style.css';
 import '../styles/cfg-viewer.css';
+import '../styles/graph.css';
 
 import { API_BASE_URL } from '../api';
 import { Graphviz } from "@hpcc-js/wasm-graphviz";
@@ -409,39 +410,52 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
                 )}
             </div>
             <div className="cfg-comparison-container">
-                {/* Render 'Before' Graph */}
-                {graphRenderKey > 0 && (
-                            <ReactFlowProvider>
-                                <GraphPanel
-                                    nodes={beforeNodes}
-                                    edges={beforeEdges}
-                                    onNodesChange={onBeforeNodesChange}
-                                    onEdgesChange={onBeforeEdgesChange}
-                                    title={`Before Transform: ${selectedProcedureFromDropdown}`}
-                                    fitViewOptions={FIT_VIEW_OPTIONS}
-                                    minZoom={ZOOM_CONFIGS.min}
-                                    maxZoom={ZOOM_CONFIGS.max}
-                                    graphRenderKey={graphRenderKey}
-                                />
-                            </ReactFlowProvider>
-                )}
-
-                {/* Render 'After' Graph */}
-                {graphRenderKey > 0 && (
-                            <ReactFlowProvider>
-                                <GraphPanel
-                                    nodes={afterNodes}
-                                    edges={afterEdges}
-                                    onNodesChange={onAfterNodesChange}
-                                    onEdgesChange={onAfterEdgesChange}
-                                    title={`After Transform: ${selectedProcedureFromDropdown}`}
-                                    fitViewOptions={FIT_VIEW_OPTIONS}
-                                    minZoom={ZOOM_CONFIGS.min}
-                                    maxZoom={ZOOM_CONFIGS.max}
-                                    graphRenderKey={graphRenderKey}
-                                />
-                            </ReactFlowProvider>
-                )}
+                <div className="cfg-panel">
+                    {beforeNodes.length > 0 || beforeEdges.length > 0 ? (
+                        <>
+                            {graphRenderKey > 0 && (
+                                        <ReactFlowProvider>
+                                            <GraphPanel
+                                                nodes={beforeNodes}
+                                                edges={beforeEdges}
+                                                onNodesChange={onBeforeNodesChange}
+                                                onEdgesChange={onBeforeEdgesChange}
+                                                title={`Before Transform: ${selectedProcedureFromDropdown}`}
+                                                fitViewOptions={FIT_VIEW_OPTIONS}
+                                                minZoom={ZOOM_CONFIGS.min}
+                                                maxZoom={ZOOM_CONFIGS.max}
+                                                graphRenderKey={graphRenderKey}
+                                            />
+                                        </ReactFlowProvider>
+                            )}
+                        </>
+                    ) : (
+                        <div className="cfg-panel-message">No CFG data available for the Before Nodes view.</div>
+                    )}
+                </div>
+                <div className="cfg-panel">
+                    {beforeNodes.length > 0 || beforeEdges.length > 0 ? (
+                        <>
+                            {graphRenderKey > 0 && (
+                                        <ReactFlowProvider>
+                                            <GraphPanel
+                                                nodes={afterNodes}
+                                                edges={afterEdges}
+                                                onNodesChange={onAfterNodesChange}
+                                                onEdgesChange={onAfterEdgesChange}
+                                                title={`After Transform: ${selectedProcedureFromDropdown}`}
+                                                fitViewOptions={FIT_VIEW_OPTIONS}
+                                                minZoom={ZOOM_CONFIGS.min}
+                                                maxZoom={ZOOM_CONFIGS.max}
+                                                graphRenderKey={graphRenderKey}
+                                            />
+                                        </ReactFlowProvider>
+                            )}
+                        </>
+                    ) : (
+                        <div className="cfg-panel-message">No CFG data available for the Before Nodes view.</div>
+                    )}
+                </div>
             </div>
         </div>
     );

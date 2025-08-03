@@ -9,8 +9,9 @@ import { getLayoutedElements } from '../utils/graphLayout.ts';
 import { type CustomNodeData } from './CustomNode';
 import GraphPanel from './GraphPanel';
 
-import '../styles/combined-viewer.css'; // New CSS for this component TODO: I want this file to be changed dramatically <-
-import '../styles/button-selection.css' // TODO: Is this already imported through another file? - Why does it work without it?
+import '../styles/combined-viewer.css';
+import '../styles/button-selection.css'
+import '../styles/graph.css'
 import { FIT_VIEW_OPTIONS, ZOOM_CONFIGS } from '../constants';
 
 declare const Prism: any;
