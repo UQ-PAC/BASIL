@@ -36,6 +36,7 @@ jobs:
 
       - name: Prepare diff for PR comment
         if: failure() && steps.diff.outcome == 'failure' && github.event_name == 'pull_request'
+        id: prepare
         run: |
           echo "mode=suggest" > "$GITHUB_OUTPUT"
 
