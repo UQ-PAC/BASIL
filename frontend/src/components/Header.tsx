@@ -1,5 +1,7 @@
 import '../styles/header.css';
 
+import SettingsIcon from '../assets/icon-settings.svg';
+
 interface HeaderProps {
     setViewMode: (mode: 'IR' | 'CFG' | 'IR/CFG') => void;
     viewMode: 'IR' | 'CFG' | 'IR/CFG';
@@ -48,8 +50,8 @@ export function Header({ setViewMode, viewMode }: HeaderProps) {
                 </div>
             </div>
 
-            <button className="settings-button" aria-label="Settings">  {/* TODO: Use an actual image... */}
-                ⚙️
+            <button className="settings-button" aria-label="Settings">
+                 <SettingsIcon className="settings-icon" />
             </button>
         </header>
     );

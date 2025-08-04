@@ -43,10 +43,22 @@
 .settings-button {
     background: none;
     border: none;
-    font-size: 1.5rem;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    fill: #6a737d;
 }
 
 .settings-button:hover {
-    color: #1976d2;
+    fill: #3d4c6a;
+}
+
+.settings-icon {
+    display: flex;
+    position: relative;
+    height: 40px;
+    width: 40px;
+    object-fit: contain;
+    pointer-events: none;
 }
