@@ -278,8 +278,7 @@ object Main {
     }
 
     Logger.setLevel(LogLevel.INFO, false)
-    if (conf.verbose.value) {
-      Logger.setLevel(LogLevel.DEBUG, true)
+    if (conf.verbose.value) { Logger.setLevel(LogLevel.DEBUG, true)
     }
     DebugDumpIRLogger.setLevel(LogLevel.OFF)
     AnalysisResultDotLogger.setLevel(LogLevel.OFF)
