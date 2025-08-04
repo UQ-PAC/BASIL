@@ -31,6 +31,7 @@
 # Devleopment Guidelines
 
 - [Testing](development/testing.md)
+  - [Integration (system) tests](development/integration-tests.md)
 - [Assertions](development/assertions.md)
 - [Scala](development/scala.md)
 
