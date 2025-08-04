@@ -194,15 +194,15 @@ case class SymbolTableInfo(
 
   def toAttrib = {
 
-    val goffs = Attrib.List(globalOffsets.toVector.map { case (l, r) =>
+    val goffs = Attrib.List(globalOffsets.toVector.sorted.map { case (l, r) =>
       Attrib.List(Vector(Attrib.Int(l), Attrib.Int(r)))
     })
 
     Attrib.Map(
       ListMap(
-        "externalFunctions" -> Attrib.List(externalFunctions.toVector.map(_.toAttrib)),
-        "globals" -> Attrib.List(globals.toVector.map(_.toAttrib)),
-        "funcEntries" -> Attrib.List(funcEntries.toVector.map(_.toAttrib)),
+        "externalFunctions" -> Attrib.List(externalFunctions.toVector.sorted.map(_.toAttrib)),
+        "globals" -> Attrib.List(globals.toVector.sorted.map(_.toAttrib)),
+        "funcEntries" -> Attrib.List(funcEntries.toVector.sorted.map(_.toAttrib)),
         "globalOffsets" -> goffs
       )
     )

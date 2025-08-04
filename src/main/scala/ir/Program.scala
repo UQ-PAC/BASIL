@@ -128,13 +128,14 @@ class Program(
 
     walk(mainProcedure)
 
-    var wl = procedures.toSet.diff(seen)
+    val wl = mutable.TreeSet.from(procedures)(Ordering.by(x => (x.procName, x.address)))
+    wl --= seen
 
     while (wl.nonEmpty) {
       // add the rest of the procedures
       val n = wl.find(p => p.incomingCalls().isEmpty).getOrElse(wl.head)
       walk(n)
-      wl = procedures.toSet.diff(seen)
+      wl --= seen
     }
 
     procedures.sortInPlaceBy(ordering)
