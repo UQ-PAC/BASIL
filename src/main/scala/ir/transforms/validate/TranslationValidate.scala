@@ -1009,52 +1009,6 @@ class TranslationValidator {
     TransitionSystem.removeUnreachableBlocks(source)
     TransitionSystem.removeUnreachableBlocks(target)
 
-    def inputs(c: CallParamMapping) = {
-      c.rhs.collect {
-        case (l, Some(r: Variable)) => r
-        case (l: (Variable | Memory), _) => SideEffectStatementOfStatement.param(l)._2
-        case _ => ???
-      }
-    }
-
-    def outputs(c: CallParamMapping) = {
-      c.lhs.collect {
-        case (l, Some(r: Variable)) => r
-        case (l: (Variable | Memory), _) => SideEffectStatementOfStatement.param(l)._2
-        case _ => ???
-      }
-    }
-
-    // val inputs = TransitionSystem.programCounterVar :: TransitionSystem.traceVar :: (globalsForProc(proc).toList)
-    val frames = (afterFrame ++ beforeFrame)
-
-    val srcRenameSSA = SSADAG.transform(
-      sourceParams,
-      source,
-      inputs(sourceParams(proc.name)),
-      outputs(sourceParams(proc.name)),
-      liveVarsSource
-    )
-    val tgtRenameSSA = SSADAG.transform(
-      targetParams,
-      target,
-      inputs(targetParams(proc.name)),
-      outputs(targetParams(proc.name)),
-      liveVarsTarget
-    )
-    timer.checkPoint("SSA")
-
-    val ackInv =
-      Ackermann.instantiateAxioms(
-        source.entryBlock.get,
-        target.entryBlock.get,
-        frames,
-        exprInSource,
-        exprInTarget,
-        invariantRenamingSrcTgt
-      )
-    timer.checkPoint("ackermann")
-
     val equalVarsInvariant = getEqualVarsInvariantRenaming(
       proc,
       invariantRenamingSrcTgt,
@@ -1077,6 +1031,67 @@ class TranslationValidator {
     val factsInvariant = getFlowFactsInvariant(proc, liveVarsTarget, flowFacts(proc.name))
 
     val invariant = equalVarsInvariant ++ factsInvariant ++ invEverywhere
+
+
+    def inputs(c: CallParamMapping) = {
+      c.rhs.collect {
+        case (l, Some(r: Variable)) => r
+        case (l: (Variable | Memory), _) => SideEffectStatementOfStatement.param(l)._2
+        case _ => ???
+      }
+    }
+
+    def outputs(isSource: Boolean)(c: CallParamMapping) = {
+      def fvInv = {
+        invariant.toSeq.flatMap {
+          case Inv.CutPoint(l, ca, _) => ca.flatMap {
+            case CompatArg(source, target) => if isSource then source.variables else target.variables
+            case TargetTerm(target) => if isSource then Seq() else target.variables
+          }
+            case Inv.GlobalConstraint(g, ca, _) => ca.flatMap {
+              case CompatArg(source, target) => if isSource then source.variables else target.variables
+              case TargetTerm(target) => if isSource then Seq() else target.variables
+          }
+        }
+      }
+
+      c.lhs.collect {
+        case (l, Some(r: Variable)) => r
+        case (l: (Variable | Memory), _) => SideEffectStatementOfStatement.param(l)._2
+        case _ => ???
+      }
+    }
+
+    // val inputs = TransitionSystem.programCounterVar :: TransitionSystem.traceVar :: (globalsForProc(proc).toList)
+    val frames = (afterFrame ++ beforeFrame)
+
+    val srcRenameSSA = SSADAG.transform(
+      sourceParams,
+      source,
+      inputs(sourceParams(proc.name)),
+      outputs(true)(sourceParams(proc.name)),
+      liveVarsSource
+    )
+    val tgtRenameSSA = SSADAG.transform(
+      targetParams,
+      target,
+      inputs(targetParams(proc.name)),
+      outputs(false)(targetParams(proc.name)),
+      liveVarsTarget
+    )
+    timer.checkPoint("SSA")
+
+    val ackInv =
+      Ackermann.instantiateAxioms(
+        source.entryBlock.get,
+        target.entryBlock.get,
+        frames,
+        exprInSource,
+        exprInTarget,
+        invariantRenamingSrcTgt
+      )
+    timer.checkPoint("ackermann")
+
 
     // val preInv = invariant
 
@@ -1198,7 +1213,6 @@ class TranslationValidator {
     val smtPath = config.outputPath.map(f => s"$f/${runNamePrefix}.smt2")
 
     smtPath.foreach(fname => {
-      // val query = b.getCheckSat()
       b.writeCheckSatToFile(File(fname))
       tvLogger.info(s"Write query $fname")
       timer.checkPoint("write out " + fname)

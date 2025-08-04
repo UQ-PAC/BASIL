@@ -146,9 +146,7 @@ object SSADAG {
 
       var blockDoneCond = List[Expr](boolOr(b.prevBlocks.map(blockDone).toList))
 
-      def live(v: Variable) = true
-      // liveVarsBefore.get(b.label).forall(_.contains(v))
-      // v.name.startsWith("SYNTH") || v.name.startsWith("TRACE") || outputs.contains(v) || inputs.contains(v)
+      def live(v: Variable) = liveVarsBefore.get(b.label).forall(_.contains(v)) ||  v.name.startsWith("SYNTH") || v.name.startsWith("TRACE") || outputs.contains(v) || inputs.contains(v)
 
       if (b.prevBlocks.nonEmpty) then {
         // val defines: Iterable[(Block, Seq[(Variable, Variable)])] =
@@ -267,7 +265,7 @@ object SSADAG {
       }
     }
 
-    // println("nphis: " + phis)
+    println("nphis: " + phis)
     val renameBeforeLabels = renameBefore.map((b, r) => b.label -> r)
 
     (b, c) => visit_expr(RenameRHS(renameBeforeLabels(b).get), c)

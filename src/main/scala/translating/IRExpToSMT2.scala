@@ -215,24 +215,24 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
 
   class SMTBuilder() {
     var before = true
-    var exprs = Vector[Sexp[Expr]]()
+    var exprs = Vector[() => Sexp[Expr]]()
     var exprsBefore = Vector[Sexp[Expr]]()
     var decls = Set[Sexp[Expr]]()
     var typedecls = Set[Sexp[Expr]]()
 
-    def addAssume(e: Expr) = {
-      before = false
-      val (t, d) = BasilIRToSMT2.extractDecls(e)
-      decls = decls ++ d
-      typedecls = typedecls ++ t
-      exprs = exprs ++ List(list(sym("assume"), BasilIRToSMT2.vexpr(e)))
-    }
+    //def addAssume(e: Expr) = {
+    //  before = false
+    //  val (t, d) = BasilIRToSMT2.extractDecls(e)
+    //  decls = decls ++ d
+    //  typedecls = typedecls ++ t
+    //  exprs = exprs ++ List(list(sym("assume"), BasilIRToSMT2.vexpr(e)))
+    //}
 
     def addCommand(rawSexp: String*) = {
       if (before) {
         exprsBefore = exprsBefore.appended(list(rawSexp.map(sym[Expr](_)): _*))
       } else {
-        exprs = exprs.appended(list(rawSexp.map(sym[Expr](_)): _*))
+        exprs = exprs.appended(() => list(rawSexp.map(sym[Expr](_)): _*))
       }
     }
 
@@ -241,10 +241,14 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       val (t, d) = BasilIRToSMT2.extractDecls(e)
       decls = decls ++ d
       typedecls = typedecls ++ t
-      val expr: Sexp[Expr] = BasilIRToSMT2.vexpr(e)
-      val inner: Sexp[Expr] = name.map(n => list(sym("!"), expr, sym(":named"), sym(n))).getOrElse(expr)
 
-      exprs = exprs ++ List(list(sym("assert"), inner))
+      def toExpr() = {
+        val expr: Sexp[Expr] = BasilIRToSMT2.vexpr(e)
+        val inner: Sexp[Expr] = name.map(n => list(sym("!"), expr, sym(":named"), sym(n))).getOrElse(expr)
+        list(sym("assert"), inner)
+      }
+
+      exprs = exprs ++ List(toExpr)
     }
 
     def writeCheckSat(b: Writer, getUnsatCore: Boolean = false) = {
@@ -271,7 +275,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
         if getUnsatCore then Seq(list(sym("set-option"), sym(":produce-unsat-cores"), sym("true"))) else Seq()
       val getUnsat = if getUnsatCore then Seq(list(sym("get-unsat-core"))) else Seq()
 
-      setUnsat.iterator ++ exprsBefore.iterator ++ typedecls ++ decls ++ exprs ++ Seq(
+      setUnsat.iterator ++ exprsBefore.iterator ++ typedecls ++ decls ++ exprs.view.map(_()) ++ Seq(
         list(sym("check-sat"))
       ) ++ getUnsat
     }

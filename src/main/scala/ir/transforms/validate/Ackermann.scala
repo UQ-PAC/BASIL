@@ -321,13 +321,20 @@ object Ackermann {
       q.enqueue(start)
     }
 
+    def flatMapSucc(s: CFGPosition) : Seq[SideEffectStatement] = {
+      succ(s).toSeq.flatMap {
+        case (None, r) => flatMapSucc(r)
+        case (Some(x), r) => Seq(x)
+      }
+    }
+
     while (q.nonEmpty) {
       val ((srcCall, srcPos), (tgtCall, tgtPos)) = q.dequeue
 
       def advanceBoth() = {
-        for (s <- succ(srcPos)) {
-          for (t <- succ(tgtPos)) {
-            q.enqueue((s, t))
+        for (s <- flatMapSucc(srcPos)) {
+          for (t <- flatMapSucc(tgtPos)) {
+            q.enqueue(((Some(s) , s), (Some(t), t)))
           }
         }
       }
