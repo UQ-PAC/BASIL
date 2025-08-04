@@ -32,23 +32,38 @@ jobs:
         id: diff
         run: git diff --exit-code --color
 
-      - uses: parkerbxyz/suggest-changes@v2
-        if: failure() && steps.diff.outcome == 'failure'
-        with:
-          comment: 'automated scalafmt changes'
+      - name: Prepare diff for PR comment
+        if: failure() && steps.diff.outcome == 'failure' && github.event_name == 'pull_request'
+        run: |
+          echo "mode=suggest" > "$GITHUB_OUTPUT"
 
-      # - if: failure()
-      #   id: patch
-      #   run: |
-      #     git config user.name 'github-actions[bot]'
-      #     git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-      #
-      #     git add -u && git commit -m "automated scalafmt"
-      #     git format-patch -U0 -1 HEAD --stdout > scalafmt.patch
-      #
-      #     cat <<EOF
-      #     echo '$(cat scalafmt.patch | sed "s/'/'\\\\''/g")' | git am -3
-      #     EOF
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          git add -u && git commit -m "automated scalafmt"
+          git format-patch -U0 -1 HEAD --stdout | sed "s/'/'\\\\''/g" > scalafmt.patch
+
+          cat <<EOF > /tmp/pr-message.txt
+          scalafmt changes needed. run this command to apply:
+          ```bash
+          echo '$(cat scalafmt.patch)' \
+            | git am -3
+          ```
+          EOF
+
+          git reset HEAD^
+
+      - uses: parkerbxyz/suggest-changes@v2
+        if: failure() && steps.prepare.outputs.mode == 'suggest'
+        with:
+          comment: 'scalafmt changes needed. apply via review suggestions.'
+
+      - uses: mshick/add-pr-comment@v2
+        if: failure() && steps.prepare.outputs.mode == 'suggest' # FIXME: 'comment'
+        with:
+          message-path: /tmp/pr-message.txt
+        permissions:
+          pull-requests: write
 
 
   Compile:
