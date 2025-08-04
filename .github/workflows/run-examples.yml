@@ -22,6 +22,8 @@ jobs:
 
   Scalafmt:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,8 +64,6 @@ jobs:
         if: failure() && steps.prepare.outputs.mode == 'suggest' # FIXME: 'comment'
         with:
           message-path: /tmp/pr-message.txt
-        permissions:
-          pull-requests: write
 
 
   Compile:
