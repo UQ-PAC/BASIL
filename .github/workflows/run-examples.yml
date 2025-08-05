@@ -63,11 +63,7 @@ jobs:
 
           <details>
 
-          <summary>
-
-          run this command to apply:
-
-          </summary>
+          <summary>run this command to apply:</summary>
 
           \`\`\`\`\`diff
           echo '$(cat scalafmt.patch)' \\
