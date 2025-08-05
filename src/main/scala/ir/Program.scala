@@ -436,6 +436,11 @@ class Procedure private (
     }
   }
 
+  def returnBlock_=(value: Option[Block]): Unit = value match {
+    case Some(newblock) => returnBlock = newblock
+    case None => _returnBlock = None
+  }
+
   def entryBlock: Option[Block] = _entryBlock
 
   def entryBlock_=(value: Block): Unit = {

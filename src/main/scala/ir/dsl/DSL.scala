@@ -373,8 +373,17 @@ case class EventuallyProcedure(
 
     def cont(prog: CachedLabelResolver) = {
       resolvers.foreach(_(prog, tempProc.name))
+
+      tempProc.returnBlock = tempProc.returnBlock.orElse {
+        val blocksWithReturn = tempProc.blocks.filter(b => b.statements.exists(_.isInstanceOf[Return])).toList
+        blocksWithReturn match {
+          case Seq(x) => Some(x)
+          case _ => None
+        }
+      }
+
       jumps.foreach((b, j) => b.replaceJump(j.resolve(prog, tempProc.name)))
-      tempBlocks.headOption.foreach(b => tempProc.entryBlock = b)
+      entry.foreach(b => tempProc.entryBlock = b)
     }
 
     (tempProc, cont)
