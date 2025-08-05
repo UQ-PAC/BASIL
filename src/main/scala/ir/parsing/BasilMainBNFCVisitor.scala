@@ -71,11 +71,11 @@ class BasilMainBNFCVisitor[A](var decls: Declarations)
 
     val progSpec = decls.progSpec
 
-    if (procs.isEmpty) {
+    lazy val defaultProc = procs.values.headOption.getOrElse {
       throw ParseException("module must contain at least one procedure", x)
     }
 
-    val mainProc = progSpec.mainProc.fold(procs.values.head)(procs(_))
+    val mainProc = progSpec.mainProc.fold(defaultProc)(procs(_))
     val otherProcs = procs.view.values.filter(_ ne mainProc)
 
     val initialMemory = progSpec.initialMemory.map(_.toMemorySection)
