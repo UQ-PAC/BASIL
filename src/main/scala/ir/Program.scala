@@ -70,15 +70,11 @@ class Program(
   val initialMemory: mutable.TreeMap[BigInt, MemorySection],
   val declarations: mutable.ArrayBuffer[Decl] = mutable.ArrayBuffer()
 ) extends Iterable[CFGPosition]
-    with DeepEquality {
+    with DeepEqualityByFields {
 
   val threads: ArrayBuffer[ProgramThread] = ArrayBuffer()
   val usedMemory: mutable.Map[BigInt, MemorySection] = mutable.TreeMap()
 
-  override def deepEquals(o: Object): Boolean = o match {
-    case p: Program => deepEqualsProg(p)
-    case _ => false
-  }
   private def deepEqualsProg(p: Program): Boolean = {
     def toMap(p: Program) = {
       p.procedures.view.map(p => p.name -> p).toMap
@@ -86,9 +82,14 @@ class Program(
     val t = toMap(this)
     val o = toMap(p)
     (mainProcedure.name == p.mainProcedure.name) && (t.keys == o.keys) && t.keys.forall { case k =>
-      t(k).deepEquals(o(k))
+      t(k).deepEqualsDbg(o(k))
     }
   }
+
+  override def deepEqualsConversion() =
+    Iterable(
+      "mainproc" -> Some(mainProcedure.name),
+    ) ++ convertToMap("procedures", procedures, _.name)
 
   def removeProcedure(i: Int): Unit = {
     val p = procedures(i)
