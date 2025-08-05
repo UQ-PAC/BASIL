@@ -1,7 +1,7 @@
 package analysis
 
 import ir.*
-import ir.transforms.{IntraproceduralWorklistSolver, NarrowingWorklistSolver, reversePostOrder}
+import ir.transforms.{reversePostOrder, worklistSolver}
 import util.functional.unionWith
 
 import collection.mutable
@@ -27,7 +27,7 @@ import collection.mutable
  */
 class SingleLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
   domain: A,
-  solver: IntraproceduralWorklistSolver[L, A],
+  solver: worklistSolver[L, A],
   backwards: Boolean
 ) {
   def generateInvariants(procedure: Procedure): Map[Block, Predicate] = {
@@ -56,7 +56,7 @@ class SingleLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
  */
 class ForwardLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
   domain: A,
-  solver: IntraproceduralWorklistSolver[L, A]
+  solver: worklistSolver[L, A]
 ) extends SingleLoopInvariantGenerator(domain, solver, false)
 
 /** Performs a single backwards analysis to generate loop invariants that hold at the start of a block. This will be
@@ -75,7 +75,7 @@ class ForwardLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
  */
 class BackwardLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
   domain: A,
-  solver: IntraproceduralWorklistSolver[L, A]
+  solver: worklistSolver[L, A]
 ) extends SingleLoopInvariantGenerator(domain, solver, true)
 
 /** Runs a collection of analyses to produce loop invariants, then inserts them into the IR.
@@ -89,7 +89,7 @@ class FullLoopInvariantGenerator(program: Program) {
 
     // Intervals give us constant bounds on variables, for example an iteration variable in a loop guard.
     val intervals = DoubleIntervalDomain(Some(procedure))
-    post += ForwardLoopInvariantGenerator(intervals, NarrowingWorklistSolver(intervals)).generateInvariants(procedure)
+    post += ForwardLoopInvariantGenerator(intervals, worklistSolver(intervals, true, true)).generateInvariants(procedure)
 
     // Gamma domains ensure that relations of the gammas of variables are maintained throughout loop iterations.
     // Currently broken! The gamma domains don't produce predicates correctly it seems

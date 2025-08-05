@@ -134,7 +134,7 @@ trait ProcedureSummaryGenerator[L, LocalDomain] extends ProcAbstractDomain[L] {
   * @param domain:
   *   The abstract domain implementing the analysis
   */
-trait IntraproceduralWorklistSolver[L, A <: AbstractDomain[L]](domain: A, widen: Boolean, narrow: Boolean) {
+class worklistSolver[L, A <: AbstractDomain[L]](domain: A, widen: Boolean = false, narrow: Boolean = false) {
 
   /** Perform the analysis on a procedure and return the resulting lattice values for each block.
     *
@@ -247,47 +247,6 @@ trait IntraproceduralWorklistSolver[L, A <: AbstractDomain[L]](domain: A, widen:
   }
 }
 
-/** Intraprocedural worklist solver.
-  *
-  * Traverses blocks in reverse-post-order so requires [[rpoOrder()]] to have been run on the procedure.
-  *
-  * @tparam L:
-  *   the lattice value type
-  * @tparam A:
-  *   The abstract domain defining the analysis using lattice value [[L]]
-  * @param domain:
-  *   The abstract domain implementing the analysis
-  */
-class worklistSolver[L, A <: AbstractDomain[L]](domain: A) extends IntraproceduralWorklistSolver(domain, false, false)
-
-/** Intraprocedural worklist solver that widens on loop heads.
-  *
-  * Traverses blocks in reverse-post-order so requires [[rpoOrder()]] to have been run on the procedure.
-  *
-  * @tparam L:
-  *   the lattice value type
-  * @tparam A:
-  *   The abstract domain defining the analysis using lattice value [[L]]
-  * @param domain:
-  *   The abstract domain implementing the analysis
-  */
-class WideningWorklistSolver[L, A <: AbstractDomain[L]](domain: A)
-    extends IntraproceduralWorklistSolver(domain, true, false)
-
-/** Intraprocedural worklist solver that widens and narrows on loop heads.
-  *
-  * Traverses blocks in reverse-post-order so requires [[rpoOrder()]] to have been run on the procedure.
-  *
-  * @tparam L:
-  *   the lattice value type
-  * @tparam A:
-  *   The abstract domain defining the analysis using lattice value [[L]]
-  * @param domain:
-  *   The abstract domain implementing the analysis
-  */
-class NarrowingWorklistSolver[L, A <: AbstractDomain[L]](domain: A)
-    extends IntraproceduralWorklistSolver(domain, true, true)
-
 /** Perform an interprocedural analysis by running an intraprocedural analysis on each procedure, computing a summary
   * based on the result, and computing the fixed point of summaries over the call graph.
   *
@@ -320,7 +279,7 @@ class interprocSummaryFixpointSolver[SummaryAbsVal, LocalAbsVal, A <: AbstractDo
     backwards: Boolean
   ): SummaryAbsVal = {
     val domain = DomainWithFunctionSummaries(localDomain, getSummary, sg.localTransferCall)
-    val solver = worklistSolver(domain)
+    val solver = worklistSolver(domain, false, false)
     val (beforeRes, afterRes) = solver.solveProc(b, backwards)
     sg.updateSummary(a, b, beforeRes, afterRes)
   }
