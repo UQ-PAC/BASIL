@@ -23,10 +23,6 @@ There is a necessary soundness condition so that the generated predicates are co
 - For backward analyses, we require that applying `toPred` then `wp` is stronger than applying the transfer function then `toPred`.
 Here `sp` refers to the strongest postcondition and `wp` refers to the weakest precondition (or perhaps wpIFRG).
 
-# Function summary generation
-
-TODO
-
 # Loop invariant generation
 
 In order for some procedures to verify it may be necessary for loop invariants to be annotated.
