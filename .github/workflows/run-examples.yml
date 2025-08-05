@@ -24,6 +24,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+
+    env:
+      footer: >-
+        last updated at ${{ github.event.pull_request.head.sha }}
+        ([logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})).
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,12 +39,19 @@ jobs:
         id: diff
         run: git diff --exit-code --color
 
+      - name: Prepare empty PR comment
+        if: success() && steps.diff.outcome == 'success' && github.event_name == 'pull_request'
+        run: |
+          cat <<EOF > /tmp/pr-message.txt
+          scalafmt check passed.
+
+          $footer
+          EOF
+
       - name: Prepare diff for PR comment
         if: failure() && steps.diff.outcome == 'failure' && github.event_name == 'pull_request'
         id: prepare
         run: |
-          echo "mode=suggest" > "$GITHUB_OUTPUT"
-
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
@@ -47,24 +59,32 @@ jobs:
           git format-patch -U1 -1 HEAD --stdout | sed "s/'/'\\\\''/g" > scalafmt.patch
 
           cat <<EOF > /tmp/pr-message.txt
-          scalafmt changes needed. run this command to apply:
-          \`\`\`bash
+          scalafmt changes needed.
+
+          <details>
+
+          <summary>
+
+          run this command to apply:
+
+          </summary>
+
+          \`\`\`\`\`diff
           echo '$(cat scalafmt.patch)' \\
-            | git am -3
-          \`\`\`
+          | git am -3
+          \`\`\`\`\`
+
+          </details>
+
+          $footer
           EOF
 
-          git reset HEAD^
-
-      - uses: parkerbxyz/suggest-changes@v2
-        if: failure() && steps.prepare.outputs.mode == 'suggest'
-        with:
-          comment: 'scalafmt changes needed. apply via review suggestions.'
-
       - uses: mshick/add-pr-comment@v2
-        if: failure() && steps.prepare.outputs.mode == 'suggest' # FIXME: 'comment'
+        if: always() && github.event_name == 'pull_request'
         with:
           message-path: /tmp/pr-message.txt
+          # avoid posting a comment if it succeeded the first time.
+          update-only: ${{ steps.diff.outcome == 'success' }}
 
 
   Compile:
