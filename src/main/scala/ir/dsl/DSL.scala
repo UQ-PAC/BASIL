@@ -322,7 +322,8 @@ case class EventuallyProcedure(
   returnBlockLabel: Option[String] = None,
   address: Option[BigInt] = None,
   requires: List[Expr] = List(),
-  ensures: List[Expr] = List()
+  ensures: List[Expr] = List(),
+  inferReturnBlock: Boolean = false,
 ) extends DeepEquality {
 
   def name = label + address.fold("")("_" + _)
@@ -337,7 +338,8 @@ case class EventuallyProcedure(
           `returnBlockLabel`,
           `address`,
           `requires`,
-          `ensures`
+          `ensures`,
+          _
         ) => {
       b.size == blocks.size && {
         b.zip(blocks).forall { case (l, r) =>
@@ -374,11 +376,13 @@ case class EventuallyProcedure(
     def cont(prog: CachedLabelResolver) = {
       resolvers.foreach(_(prog, tempProc.name))
 
-      tempProc.returnBlock = tempProc.returnBlock.orElse {
-        val blocksWithReturn = tempProc.blocks.filter(_.jump.isInstanceOf[Return]).toList
-        blocksWithReturn match {
-          case Seq(x) => Some(x)
-          case _ => None
+      if (inferReturnBlock) {
+        tempProc.returnBlock = tempProc.returnBlock.orElse {
+          val blocksWithReturn = tempProc.blocks.filter(_.jump.isInstanceOf[Return]).toList
+          blocksWithReturn match {
+            case Seq(x) => Some(x)
+            case _ => None
+          }
         }
       }
 
@@ -409,7 +413,7 @@ case class EventuallyProcedure(
 }
 
 def proc(label: String, blocks: EventuallyBlock*): EventuallyProcedure = {
-  EventuallyProcedure(label, SortedMap(), SortedMap(), blocks, blocks.headOption.map(_.label))
+  proc(label, Nil, Nil, blocks)
 }
 
 def proc(
@@ -418,7 +422,7 @@ def proc(
   out: Iterable[(String, IRType)],
   blocks: Iterable[EventuallyBlock]
 ): EventuallyProcedure = {
-  EventuallyProcedure(label, in.to(SortedMap), out.to(SortedMap), blocks.toSeq, blocks.headOption.map(_.label))
+  EventuallyProcedure(label, in.to(SortedMap), out.to(SortedMap), blocks.toSeq, blocks.headOption.map(_.label), inferReturnBlock = true)
 }
 
 def proc(
