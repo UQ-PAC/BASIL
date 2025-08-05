@@ -285,7 +285,9 @@ object Main {
     for (v <- conf.verboseLog) {
       Logger.findLoggerByName(v) match {
         case None =>
-          throw Exception(s"Unknown logger: '${v}': allowed are ${Logger.allLoggers.map(_.name).mkString(", ")}")
+          throw Exception(s"Unknown logger: '${v}': allowed are ${
+
+          Logger.allLoggers.map(_.name).mkString(", ")}")
         case Some(v) => v.setLevel(LogLevel.DEBUG, true)
       }
     }
