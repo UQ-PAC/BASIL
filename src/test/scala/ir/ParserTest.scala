@@ -1,13 +1,9 @@
 package ir
 
-import ir.*
-import ir.dsl.*
+import ir.parsing.ParseBasilIL
 import org.scalactic.*
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.{BASILTest, CaptureOutput}
-import translating.PrettyPrinter.*
-import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, LogLevel, Logger}
-import ir.parsing.ParseBasilIL
+import test_util.CaptureOutput
 
 import scala.collection.immutable.*
 
