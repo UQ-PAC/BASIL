@@ -28,11 +28,11 @@ jobs:
         with:
           path: out
           key: |
-            mill-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
           restore-keys: |
-            mill-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
-            mill-${{ runner.os }}-
-            mill-
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
+            build-${{ runner.os }}-
+            build-
 
       - run: './mill test.compile'
       - name: Check all test suites have at least one tag
@@ -54,11 +54,11 @@ jobs:
         with:
           path: out
           key: |
-            mill-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
           restore-keys: |
-            mill-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
-            mill-${{ runner.os }}-
-            mill-
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
+            build-${{ runner.os }}-
+            build-
 
       - run: ./mill fmt
 
@@ -86,11 +86,11 @@ jobs:
         with:
           path: out
           key: |
-            mill-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
           restore-keys: |
-            mill-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
-            mill-${{ runner.os }}-
-            mill-
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
+            build-${{ runner.os }}-
+            build-
 
       - name: Compile BASIL Mill
         run: ./mill compile
@@ -132,11 +132,11 @@ jobs:
         with:
           path: out
           key: |
-            mill-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
           restore-keys: |
-            mill-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
-            mill-${{ runner.os }}-
-            mill-
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
+            build-${{ runner.os }}-
+            build-
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -200,11 +200,11 @@ jobs:
         with:
           path: out
           key: |
-            mill-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
           restore-keys: |
-            mill-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
-            mill-${{ runner.os }}-
-            mill-
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
+            build-${{ runner.os }}-
+            build-
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -238,11 +238,11 @@ jobs:
         with:
           path: out
           key: |
-            mill-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
           restore-keys: |
-            mill-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
-            mill-${{ runner.os }}-
-            mill-
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
+            build-${{ runner.os }}-
+            build-
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -291,11 +291,11 @@ jobs:
         with:
           path: out
           key: |
-            mill-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
           restore-keys: |
-            mill-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
-            mill-${{ runner.os }}-
-            mill-
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
+            build-${{ runner.os }}-
+            build-
 
       - uses: actions/setup-dotnet@v4
         with:

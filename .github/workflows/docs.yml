@@ -31,11 +31,11 @@ jobs:
         with:
           path: out
           key: |
-            mill-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
           restore-keys: |
-            mill-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
-            mill-${{ runner.os }}-
-            mill-
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
+            build-${{ runner.os }}-
+            build-
 
       - run: sudo apt-get update
       - run: sudo apt-get -y install latexmk texlive-latex-recommended texlive-lang-japanese texlive-latex-extra texlive-extra-utils poppler-utils
