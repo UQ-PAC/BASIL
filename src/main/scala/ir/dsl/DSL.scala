@@ -375,7 +375,7 @@ case class EventuallyProcedure(
       resolvers.foreach(_(prog, tempProc.name))
 
       tempProc.returnBlock = tempProc.returnBlock.orElse {
-        val blocksWithReturn = tempProc.blocks.filter(b => b.statements.exists(_.isInstanceOf[Return])).toList
+        val blocksWithReturn = tempProc.blocks.filter(_.jump.isInstanceOf[Return]).toList
         blocksWithReturn match {
           case Seq(x) => Some(x)
           case _ => None

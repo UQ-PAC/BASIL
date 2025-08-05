@@ -339,11 +339,12 @@ class Procedure private (
     case _ => false
   }
   private def deepEqualsProc(p: Procedure) = {
-    name == p.name && (p.blocks.size == blocks.size) && returnBlock == p.returnBlock && {
+    name == p.name && (p.blocks.size == blocks.size) && {
       p.blocksBookended.zip(blocksBookended).forall { case ((l: Block), (r: Block)) =>
         l.deepEqualsDbg(r)
       }
     }
+    && (returnBlock corresponds p.returnBlock)(_ deepEqualsDbg _)
   }
 
   var blockCounter = 0
