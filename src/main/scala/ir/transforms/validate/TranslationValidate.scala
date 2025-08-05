@@ -71,7 +71,7 @@ type ProcID = String
  * FIXME: block ids are not required globally unique (althoguh they still are in practice I think),
  *  so this signature isn't precise enough to capture all possible transforms 
  */
-type TransformDataRelationFun = Option[BlockID] => (Variable | Memory) => Option[Expr]
+type TransformDataRelationFun = (ProcID, Option[BlockID]) => (Variable | Memory) => Seq[Expr]
 type TransformTargetTargetFlowFact = ProcID => Map[Variable, Expr]
 
 //def composeDR(a: TransformDataRelationFun, b: TransformDataRelationFun, aFF: TransformTargetTargetFlowFact, bFF: TransformTargetTargetFlowFact) = {
@@ -269,8 +269,10 @@ class TranslationValidator {
         case g: GoTo => s
         case r: Return => 
           val outFormal = frames(r.parent.parent.name).lhs.flatMap {
-            case (_, Some(r)) => Some(r)
-            case _ => None
+            //case (l: Variable, Some(r)) => Seq(l, r)
+            //case (l: Variable, None) => Seq(l)
+            case (_, Some(r)) => Seq(r)
+            case _ => Seq()
           }
           s ++ outFormal ++ r.outParams.flatMap(_._2.variables)
         case r: Unreachable => s
@@ -286,7 +288,15 @@ class TranslationValidator {
     transforms.reversePostOrder(p)
     val liveVarsDom = IntraLiveVarsDomainSideEffect(frames)
     val liveVarsSolver = transforms.worklistSolver(liveVarsDom)
-    liveVarsSolver.solveProc(p, backwards = true)
+    val params = frames(p.name).rhs.collect {
+      case (_, Some(l)) => l.variables
+      case (l: Variable, r) => Seq(l) ++ r.map(_.variables).toSeq.flatten
+    }.toSet.flatten
+
+    val (b, a) = liveVarsSolver.solveProc(p, backwards = true)
+    val extra = p.entryBlock.map(eb => eb -> (b.get(eb).toSet.flatten ++ params.toSet))
+    (b, a)
+    
   }
 
   // proc -> List (pred, comment)
@@ -445,12 +455,12 @@ class TranslationValidator {
 
   def globalsForSourceProc(
     p: Procedure
-  )(renaming: Variable | Memory => Option[Expr]): Iterable[(Expr, Option[Expr])] = {
+  )(renaming: Variable | Memory => Seq[Expr]): Iterable[(Expr, Option[Expr])] = {
     val globs = for {
       af <- afterFrame.get(p.name)
       globs: Seq[Variable | Memory] = (af.readGlobalVars ++ af.readMem ++ af.modifiedGlobalVars ++ af.modifiedMem).toSeq
       boop = globs
-        .flatMap(x => renaming(x).toSeq.map(t => x -> t))
+        .flatMap(x => renaming(x).map(t => x -> t))
         .map((t, s) => (t, Some(s)))
     } yield (boop)
     globs.getOrElse(Seq())
@@ -609,9 +619,13 @@ class TranslationValidator {
 
     def getParams(p: Procedure, frame: Frame) = {
       def paramTgt(v: Variable | Memory) = {
-        renaming(Some(p.entryBlock.map(_.label).getOrElse(p.name)))(v) match {
-          case Some(n: (Variable | Memory)) => param(n)
-          case _ => param(v)
+        renaming(p.name, Some(p.entryBlock.map(_.label).getOrElse(p.name)))(v).flatMap {
+          case (n: (Variable | Memory)) => Seq(param(n))
+          case _ => Seq()
+        }.toList match {
+          case h::Nil=> h
+          case h::tl => ???
+          case Nil => ???
         }
       }
 
@@ -652,7 +666,7 @@ class TranslationValidator {
   def getEqualVarsInvariantRenaming(
     // block label -> variable -> renamed variable
     afterProc: Procedure,
-    renamingSrcTgt: TransformDataRelationFun = _ => e => Some(e),
+    renamingSrcTgt: TransformDataRelationFun = (_, _) => e => Seq(e),
     liveVarsSourceBeforeBlock: Map[String, Set[Variable]],
     liveVarsTargetBeforeBlock: Map[String, Set[Variable]],
     srcParams: CallParamMapping,
@@ -660,7 +674,7 @@ class TranslationValidator {
   ) = {
     val p = afterProc
 
-    val globalsTgt = globalsForSourceProc(p)(renamingSrcTgt(None)).toList
+    val globalsTgt = globalsForSourceProc(p)(renamingSrcTgt(afterProc.name, None)).toList
     val globals = globalsTgt.collect { case (a, Some(b)) => CompatArg(toVariable(a), toVariable(b)) }.toList
 
     def paramRepr(p: Variable | Memory): Variable = {
@@ -716,11 +730,19 @@ class TranslationValidator {
         val srcCut = afterCutsBls(label)
 
         val srcLives = liveVarsSourceBeforeBlock.get(srcCut).toList.flatten
+
+        //println(label)
+        //println(srcLives)
+
         val tgtLives = liveVarsTargetBeforeBlock.get(tgtCut).toList.flatten
 
-        val invSrc = srcLives.map(s => s -> renamingSrcTgt(Some(srcCut))(s)).collect {
-          case (l, Some(r)) if r.variables.forall(tgtLives.contains) =>
-            CompatArg(toVariable(l), toVariable(r))
+
+        val invSrc = srcLives.map(s => s -> renamingSrcTgt(afterProc.name, Some(srcCut))(s)).flatMap {
+          case (l, r) => {
+            r.filter(_.variables.forall(tgtLives.contains)).map {
+              case e => CompatArg(toVariable(l), toVariable(e))
+            }
+          }
         }
         // val invTgt = tgtLives.collect {
         //  case t if renamingTgtSrc(Some(tgtCut))(t).isDefined =>
@@ -763,8 +785,8 @@ class TranslationValidator {
         val tgtLives = liveVarsTarget.get(tgtCut).toList.flatten
         val m = flowFactTgtTgt
           .collect {
-            case (v, e) if tgtLives.contains(v) =>
-              List(TargetTerm(BinaryExpr(EQ, v, e)), CompatArg(e, v))
+            case (v, e) if tgtLives.contains(v) && e.variables.forall(tgtLives.contains) =>
+              List(TargetTerm(BinaryExpr(EQ, v, e)))
           }
           .toList
           .flatten
@@ -836,7 +858,7 @@ class TranslationValidator {
     combinedProc: Procedure,
     prover: SMTProver,
     invariant: Seq[Expr],
-    renaming: TransformDataRelationFun = _ => e => Some(e),
+    renaming: TransformDataRelationFun = (_, _) => e => Seq(e),
     sourceEntry: String,
     targetEntry: String
   ) = {
@@ -946,11 +968,12 @@ class TranslationValidator {
     }
 
     class ComparVals extends CILVisitor {
-      override def vstmt(s: Statement) = s match {
+      override def vstmt(statement: Statement) = statement match {
         case a => {
           val vars = freeVarsPos(a).filter(v => v.name.startsWith("source__") || v.name.startsWith("target__"))
           val pcomment = a.comment.getOrElse("")
-          val blockLabel = Some(afterRenamer.stripNamespace(s.parent.label))
+          val proc = statement.parent.parent.name
+          val blockLabel = Some(afterRenamer.stripNamespace(statement.parent.label))
           val compar = vars
             .filter(_.name.startsWith("source__"))
             .map(b =>
@@ -958,12 +981,13 @@ class TranslationValidator {
               val (sv, tv) = b match {
                 case GlobalVar(v, ty) => {
                   val s = GlobalVar(name, ty)
-                  val t = (renaming(blockLabel)(s)).getOrElse(s)
+                  val t = (renaming(proc, blockLabel)(s)).headOption.getOrElse(s)
                   (exprInSource(s), exprInTarget(t))
                 }
                 case LocalVar(v, ty, i) => {
                   val s = LocalVar(name, ty)
-                  val t = renaming(blockLabel)(s).getOrElse(s)
+                  // FIXME: seq
+                  val t = renaming(proc, blockLabel)(s).headOption.getOrElse(s)
                   (exprInSource(s), exprInTarget(t))
                 }
               }
@@ -1172,7 +1196,6 @@ class TranslationValidator {
     count = 0
     for (i <- preInv) {
       count += 1
-      // should be no defines between entry and cut point ??
       // val e = i.toAssume(proc)(srcRenameSSA, tgtRenameSSA).body
       val e = i
       try {
@@ -1308,7 +1331,7 @@ class TranslationValidator {
   def getValidationSMT(
     config: TVJob,
     runName: String,
-    invariantRenamingSrcTgt: TransformDataRelationFun = _ => e => Some(e),
+    invariantRenamingSrcTgt: TransformDataRelationFun = (_, _) => e => Seq(e),
     flowFacts: TransformTargetTargetFlowFact = _ => Map(),
     introducedAsserts: Set[String] = Set()
   ): TVJob = {

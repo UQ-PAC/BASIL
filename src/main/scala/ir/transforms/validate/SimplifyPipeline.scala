@@ -26,10 +26,9 @@ def dynamicSingleAssignment(config: TVJob, p: Program) = {
   transforms.OnePassDSA().applyTransform(p)
   validator.setSourceProg(p)
 
-  def sourceToTarget(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
-    case l @ LocalVar(n, t, i) => Some(LocalVar(l.varName, t))
-    case g =>
-      Some(g)
+  def sourceToTarget(p: ProcID, b: Option[BlockID])(v: Variable | Memory) = v match {
+    case l @ LocalVar(n, t, i) => Seq(LocalVar(l.varName, t))
+    case g => Seq(g)
   }
 
   validator.getValidationSMT(config, "DSA", sourceToTarget)
@@ -68,8 +67,11 @@ def copyProp(config: TVJob, p: Program) = {
   def flowFacts(b: String): Map[Variable, Expr] = {
     results.getOrElse(b, Map())
   }
-  def renaming(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
-    case g => Some(g)
+  def renaming(proc: ProcID, b: Option[BlockID])(v: Variable | Memory) = v match {
+    case g => Seq(g) ++ (v match {
+      case v: Variable => results.get(proc).flatMap(_.get(v))
+      case _ => Seq()
+    })
   }
 
   validator.getValidationSMT(config, "CopyProp", renaming, flowFacts)
@@ -86,11 +88,11 @@ def parameters(config: TVJob, ctx: IRContext) = {
   val (validator, res) =
     validatorForTransform(p => transforms.liftProcedureCallAbstraction(p, Some(ctx.specification)))(ctx.program)
 
-  def sourceToTarget(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
-    case LocalVar(s"${i}_in", t, 0) => Some(GlobalVar(s"$i", t))
-    case LocalVar(s"${i}_out", t, 0) => Some(GlobalVar(s"$i", t))
-    case LocalVar(n, t, 0) => Some(GlobalVar(n, t))
-    case g => Some(g)
+  def sourceToTarget(p: ProcID, b: Option[String])(v: Variable | Memory): Seq[Expr] = v match {
+    case LocalVar(s"${i}_in", t, 0) => Seq(GlobalVar(s"$i", t))
+    case LocalVar(s"${i}_out", t, 0) => Seq(GlobalVar(s"$i", t))
+    case LocalVar(n, t, 0) => Seq(GlobalVar(n, t))
+    case g => Seq(g)
   }
 
   (validator.getValidationSMT(config, "Parameters", sourceToTarget), ctx.copy(specification = res.get))
@@ -132,7 +134,7 @@ def nop(config: TVJob, p: Program) = {
   val validator = TranslationValidator()
   validator.setTargetProg(p)
   validator.setSourceProg(p)
-  validator.getValidationSMT(config, "NOP", b => v => Some(v))
+  validator.getValidationSMT(config, "NOP", (p, b) => v => Seq(v))
 }
 
 def assumePreservedParams(config: TVJob, p: Program) = {
@@ -161,6 +163,7 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   transforms.applyRPO(p)
   config = dynamicSingleAssignment(config, p)
   transforms.applyRPO(p)
+  config = config.copy(verify = Some(util.SMT.Solver.Z3))
   config = copyProp(config, p)
   transforms.applyRPO(p)
   config = guardCleanup(config, p)

@@ -234,14 +234,15 @@ object Ackermann {
     def applyRename(a: EffCallFormalParam): EffCallFormalParam = a match {
       case a: Field => a
       case a: (Memory | Variable) =>
-        renaming(None)(a) match {
-          case Some(n: EffCallFormalParam) => n
-          case Some(n) =>
+        renaming(source.parent.parent.name, None)(a).toList match {
+          case (n: EffCallFormalParam)::Nil => n
+          case n::Nil =>
             tvLogger.warn(
               s"Transform description fun rewrite formal parameter $a to $n, which I can't fit back into the formal parameter type Variable | Memory | Field, ignoring"
             )
             a
-          case None => a
+          case Nil => a
+          case _ => ???
         }
     }
 
@@ -387,7 +388,7 @@ object Ackermann {
 
     tvLogger.debug(s"Ackermann inv count: ${invariant.size}")
     val invs = invariant.toSet
-    println(s"Ackermann inv dedup count: ${invs.size}")
+    tvLogger.debug(s"Ackermann inv dedup count: ${invs.size}")
 
     invs.toList
   }
