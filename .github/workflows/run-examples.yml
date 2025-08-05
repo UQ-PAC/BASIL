@@ -48,10 +48,10 @@ jobs:
 
           cat <<EOF > /tmp/pr-message.txt
           scalafmt changes needed. run this command to apply:
-          ```bash
+          \`\`\`bash
           echo '$(cat scalafmt.patch)' \
             | git am -3
-          ```
+          \`\`\`
           EOF
 
           git reset HEAD^
