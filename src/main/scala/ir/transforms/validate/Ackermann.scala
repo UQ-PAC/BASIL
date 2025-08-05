@@ -19,8 +19,10 @@ type EffCallFormalParam = Variable | Memory | Field
 *
 */
 case class CallParamMapping(
-  lhs: List[(EffCallFormalParam, Option[Variable])],
-  rhs: List[(EffCallFormalParam, Option[Expr])]
+  // Option[Variable] and Option[Expr] represent in and out parameters that are invariant for all calls, i.e.
+  // should be in terms of global variables
+  lhs: List[(EffCallFormalParam, Option[Variable])], // out params
+  rhs: List[(EffCallFormalParam, Option[Expr])] // in params
 )
 
 sealed trait InvTerm {
@@ -332,9 +334,9 @@ object Ackermann {
       val ((srcCall, srcPos), (tgtCall, tgtPos)) = q.dequeue
 
       def advanceBoth() = {
-        for (s <- flatMapSucc(srcPos)) {
-          for (t <- flatMapSucc(tgtPos)) {
-            q.enqueue(((Some(s) , s), (Some(t), t)))
+        for (s <- succ(srcPos)) {
+          for (t <- succ(tgtPos)) {
+            q.enqueue((s, t))
           }
         }
       }
@@ -383,6 +385,10 @@ object Ackermann {
 
     tvLogger.debug(s"Ackermann hitrate : ${succMemoStat().hitRate} ${succMemoStat()}")
 
-    invariant.toList
+    tvLogger.debug(s"Ackermann inv count: ${invariant.size}")
+    val invs = invariant.toSet
+    println(s"Ackermann inv dedup count: ${invs.size}")
+
+    invs.toList
   }
 }

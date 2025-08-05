@@ -267,7 +267,12 @@ class TranslationValidator {
           s -- c.outParams.map(_._2) ++ c.actualParams.flatMap(_._2.variables)
         }
         case g: GoTo => s
-        case r: Return => s ++ r.outParams.flatMap(_._2.variables)
+        case r: Return => 
+          val outFormal = frames(r.parent.parent.name).lhs.flatMap {
+            case (_, Some(r)) => Some(r)
+            case _ => None
+          }
+          s ++ outFormal ++ r.outParams.flatMap(_._2.variables)
         case r: Unreachable => s
         case n: NOP => s
       }
@@ -826,6 +831,8 @@ class TranslationValidator {
    * of what when wrong in the validation.
    */
   private def processModel(
+    source: Procedure,
+    target: Procedure,
     combinedProc: Procedure,
     prover: SMTProver,
     invariant: Seq[Expr],
@@ -846,13 +853,18 @@ class TranslationValidator {
       .flatten
       .toSet
 
+    val cutMap = afterCuts(source).cutLabelBlockInProcedure.map { case (cl, b) =>
+      PCMan.PCSym(cl) -> cl
+    }.toMap
+    tvLogger.info(s"Cut point labels: $cutMap")
+
     for (i <- invariant) {
       eval.evalExpr(i) match {
         case Some(FalseLiteral) =>
           tvLogger.error(s"Part of invariant failed: $i")
           i match {
-            case BinaryExpr(BoolIMPLIES, e, Conj(conjuncts)) => {
-              tvLogger.error(" Specifically:")
+            case BinaryExpr(BoolIMPLIES, BinaryExpr(EQ, pc, b: BitVecLiteral), Conj(conjuncts)) => {
+              tvLogger.error(s" Specifically: at cut point $b : ${cutMap.get(b)}")
               for (c <- conjuncts) {
                 eval.evalExpr(c) match {
                   case Some(FalseLiteral) => tvLogger.error(s"  $c is false")
@@ -1048,10 +1060,11 @@ class TranslationValidator {
             case CompatArg(source, target) => if isSource then source.variables else target.variables
             case TargetTerm(target) => if isSource then Seq() else target.variables
           }
-            case Inv.GlobalConstraint(g, ca, _) => ca.flatMap {
-              case CompatArg(source, target) => if isSource then source.variables else target.variables
-              case TargetTerm(target) => if isSource then Seq() else target.variables
-          }
+          case Inv.SourceConditionalConstraint(g, c, ca, _) => ??? 
+          case Inv.GlobalConstraint(g, ca, _) => ca.flatMap {
+            case CompatArg(source, target) => if isSource then source.variables else target.variables
+            case TargetTerm(target) => if isSource then Seq() else target.variables
+        }
         }
       }
 
@@ -1239,6 +1252,7 @@ class TranslationValidator {
           tvLogger.error(s"sat ${runNamePrefix} (verify failed)")
 
           val g = processModel(
+            source, target,
             newProg.mainProcedure,
             prover,
             primedInv.toList,

@@ -2,6 +2,7 @@ package ir.transforms.validate
 
 import ir.*
 import ir.transforms.Substitute
+import util.tvLogger
 
 import scala.collection.mutable
 
@@ -265,7 +266,7 @@ object SSADAG {
       }
     }
 
-    println("nphis: " + phis)
+    tvLogger.debug("Phi node count: " + phis)
     val renameBeforeLabels = renameBefore.map((b, r) => b.label -> r)
 
     (b, c) => visit_expr(RenameRHS(renameBeforeLabels(b).get), c)
