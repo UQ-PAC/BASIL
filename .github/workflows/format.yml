@@ -141,8 +141,10 @@ jobs:
         if: always()
         run: |
           set -x
-          echo Scalafmt check outcome:
-          ${{ steps.diff.outcome == 'success' }}
+          if ! ${{ inputs.autoformat }}; then
+            echo Scalafmt check outcome:
+            ${{ steps.diff.outcome == 'success' }}
+          fi
 
           echo Scalafmt comment/auto-apply outcome:
           ${{ steps.prepare.outcome == 'success' }}
