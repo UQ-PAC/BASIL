@@ -1,4 +1,4 @@
-//| mill-version: 1.0.1-jvm
+//| mill-version: 1.0.3-jvm
 //| mvnDeps:
 //| - org.antlr:antlr4:4.9.3
 //| - com.goyeau::mill-scalafix::0.6.0

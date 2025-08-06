@@ -32,6 +32,8 @@ args=(
   --insecure
   --no-progress
   --max-concurrency 16
+  --max-retries 10
+  --timeout 40
   "$@"
 )
 

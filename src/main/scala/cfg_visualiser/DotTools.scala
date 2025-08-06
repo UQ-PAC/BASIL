@@ -16,23 +16,23 @@ def escape(s: String) = {
   n
 }
 
-def wrap(_input: String, maxWidth: Integer = 100, slack: Integer = 20) = {
+def wrap(input: String, maxWidth: Integer = 100, slack: Integer = 20) = {
   val preferSplit = Set(')', '(', ',', ' ', ':')
 
-  def wr(acc: (Int, String, Boolean), c: Char) = {
+  def wr(acc: (Int, StringBuilder, Boolean), c: Char) = {
     val (l, str, first) = acc
     val nl = "\\l  "
     c match {
-      case '\n' => (0, str + "\\l", false)
+      case '\n' => (0, str ++= "\\l", false)
       case '\r' => (l, str, false)
       case ' ' if l == 0 => (0, str, first)
-      case chr if preferSplit.contains(chr) && (l >= (maxWidth - slack)) => (0, str + chr + nl, false)
-      case chr if l >= maxWidth => (0, str + chr + nl, false)
-      case chr => (l + 1, str + chr, false)
+      case chr if preferSplit.contains(chr) && (l >= (maxWidth - slack)) => (0, str += chr ++= nl, false)
+      case chr if l >= maxWidth => (0, str += chr ++= nl, false)
+      case chr => (l + 1, str += chr, false)
     }
   }
 
-  _input.foldLeft((0, "", true))(wr)._2
+  input.foldLeft((0, new StringBuilder(), true))(wr)._2.result
 }
 
 /** Super-class for elements of a Graphviz dot file.
