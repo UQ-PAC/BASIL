@@ -118,19 +118,18 @@ jobs:
 
           <summary>options to apply scalafmt changes:</summary>
 
-          - run this command:
-            `````diff
-            echo ' "$patch_escaped" '
-            | git am -3
-            `````
-          - trigger a workflow run on `$branch` with `autoformat=true`, either by [using the website](https://github.com/UQ-PAC/BASIL/actions/workflows/run-examples.yml) or by using the `gh` tool:
-            ```bash
-            gh workflow run run-examples.yml --field "autoformat=true" --ref ' "'$branch'" '
-            ```
-          - run the formatter locally:
-            ```bash
-            ./mill fmt
-            ```
+          run this command:
+          `````diff
+          echo ' "$patch_escaped" ' | git am -3
+          `````
+          trigger a workflow run on `' $branch '` with `autoformat=true`, either by [using the website](https://github.com/UQ-PAC/BASIL/actions/workflows/run-examples.yml) or by using the `gh` tool:
+          ```bash
+          gh workflow run run-examples.yml --field "autoformat=true" --ref ' "'$branch'" '
+          ```
+          run the formatter locally:
+          ```bash
+          ./mill fmt
+          ```
 
           </details>
           ' > /tmp/how-to-apply.txt
