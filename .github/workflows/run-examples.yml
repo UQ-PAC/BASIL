@@ -7,6 +7,11 @@ on:
     # running tests can be skipped for docs-only changes
     paths: ['src/**', 'basilmill/**', '**.mill', '.?mill*', '*.conf', '.github/workflows/run-examples.yml']
   workflow_dispatch:
+    inputs:
+      autoformat:
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   CheckTestTagging:
@@ -42,10 +47,13 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+      contents: write
 
     env:
+      branch: ${{ github.head_ref || github.ref_name }}
+      commit: ${{ github.event.pull_request.head.sha || github.sha }}
       footer: >-
-        last updated at ${{ github.event.pull_request.head.sha }}
+        last updated at ${{ github.event.pull_request.head.sha || github.sha }}
         ([logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})).
     steps:
       - name: Checkout
@@ -72,9 +80,10 @@ jobs:
       - name: Check source formatting and imports
         id: diff
         run: git diff --exit-code --color
+        continue-on-error: true
 
       - name: Prepare empty PR comment
-        if: success() && steps.diff.outcome == 'success' && github.event_name == 'pull_request'
+        if: always() && steps.diff.outcome == 'success'
         run: |
           cat <<EOF > /tmp/pr-message.txt
           scalafmt check passed.
@@ -83,31 +92,54 @@ jobs:
           EOF
 
       - name: Prepare diff for PR comment
-        if: failure() && steps.diff.outcome == 'failure' && github.event_name == 'pull_request'
+        if: always() && steps.diff.outcome == 'failure'
         id: prepare
+        env:
+          AUTOFORMAT: ${{ inputs.autoformat }}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
           git add -u && git commit -m "automated scalafmt"
-          git format-patch -U1 -1 HEAD --stdout | sed "s/'/'\\\\''/g" > scalafmt.patch
+          git format-patch -U1 -1 HEAD --stdout > scalafmt.patch
 
-          cat <<EOF > /tmp/pr-message.txt
-          scalafmt changes needed.
+          try_apply() {
+            git checkout ${{ github.head_ref }}
+            git am -3 scalafmt.patch
+            git push
+          }
 
-          <details>
+          if "$AUTOFORMAT"; then
 
-          <summary>run this command to apply:</summary>
+            if try_apply; then
+              ok=true
+              echo 'automated scalafmt applied successfully.' > /tmp/pr-message.txt
+            else
+              ok=false
+              echo 'automated scalafmt **failed**.' > /tmp/pr-message.txt
+            fi
 
-          \`\`\`\`\`diff
-          echo '$(cat scalafmt.patch)' \\
-          | git am -3
-          \`\`\`\`\`
+          else
+            ok=true
+            cat <<EOF > /tmp/pr-message.txt
+            scalafmt changes needed.
 
-          </details>
+            <details>
 
-          $footer
-          EOF
+            <summary>run this command to apply:</summary>
+
+            \`\`\`\`\`diff
+            echo '$(cat scalafmt.patch | sed "s/'/'\\\\''/g")' \\
+            | git am -3
+            \`\`\`\`\`
+
+            </details>
+            EOF
+          fi
+
+          printf '\n%s\n' "$footer" >> /tmp/pr-message.txt
+
+          "$ok"
 
       - uses: mshick/add-pr-comment@v2
         if: always() && github.event_name == 'pull_request'
@@ -115,6 +147,17 @@ jobs:
           message-path: /tmp/pr-message.txt
           # avoid posting a comment if it succeeded the first time.
           update-only: ${{ steps.diff.outcome == 'success' }}
+
+      - name: Report workflow status
+        if: always()
+        run: |
+          echo Scalafmt check outcome:
+          ${{ steps.diff.outcome == 'success' }}
+
+          echo Scalafmt comment/auto-apply outcome:
+          ${{ steps.prepare.outcome == 'success' }}
+
+
 
 
   Compile:
