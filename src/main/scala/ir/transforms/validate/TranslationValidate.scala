@@ -16,7 +16,34 @@ case class TVResult(
   verified: Option[SatResult],
   smtFile: Option[String],
   verifyTime: Map[String, Long]
-)
+) {
+  def toCSV = {
+    val veri = verified match {
+      case Some(SatResult.UNSAT) => "unsat"
+      case Some(s: SatResult.SAT) => "sat"
+      case Some(_) => "unknown"
+      case None => "disabled"
+    }
+    val times = verifyTime.toList
+      .sortBy(_._1)
+      .map { case (n, t) =>
+        t.toString
+      }
+      .mkString(",")
+
+    val timesHeader = verifyTime.toList
+      .sortBy(_._1)
+      .map { case (n, t) =>
+        n
+      }
+      .mkString(",")
+
+    val header = "pass,procedure,outcome," + timesHeader
+    val row = s"$runName,$proc,$veri,$times"
+
+    (header, row)
+  }
+}
 
 case class TVJob(
   outputPath: Option[String],
@@ -530,66 +557,6 @@ class TranslationValidator {
   }
 
   /**
-   *
-   * Match the actual signature of a call to the expected signature based on renaming, basically reorders the parameters
-   * so that [target] corresponds with [renamed(source)] so that congruence rule can be applied i.e. 
-   *
-   * target.actualparams.zip(source.actualparams).forall(equal) ==> f_t(target.actual) == f_s(source.actual)
-   *
-   * This is awful and convoluted and im tired
-   *
-   */
-  def matchTargetCallInSource(
-    expected: (CallParamMapping, CallParamMapping)
-  )(callLHS: List[(Variable | Memory, Variable)], callRHS: List[(Variable | Memory, Expr)]) = {
-
-    val (expSource, expTgt) = expected
-
-    val rhs = callRHS.map {
-      case (formal, actual) => {
-        val x = expSource.rhs.zip(expTgt.rhs)
-
-        x.collect {
-          case ((origS, mapS), (origT, mapT)) if origT == formal => ((origS, origT), actual)
-        }.toList match {
-          case h :: Nil => Seq(h)
-          case h :: tl => {
-            tvLogger.warn("multiple guys")
-            Seq(h)
-          }
-          case Nil => {
-            tvLogger.error("No matching Thingo found, ack gna fail")
-            None
-          }
-        }
-      }
-    }
-
-    val lhs = callLHS.map {
-      case (formal, actual) => {
-        val x = expSource.lhs.zip(expTgt.lhs)
-
-        x.collect {
-          case ((origS, mapS), (origT, mapT)) if origT == formal => (origS, actual)
-        }.toList match {
-          case h :: Nil => Seq(h)
-          case h :: tl => {
-            tvLogger.warn("multiple guys")
-            Seq(h)
-          }
-          case Nil => {
-            tvLogger.error("No matching Thingo found, ack gna fail")
-            None
-          }
-        }
-      }
-    }
-
-    (lhs, rhs)
-
-  }
-
-  /**
   * We re-infer the function signature of all target program procedures based on the transform
   * described by [[renaming]], and the [[Frame]] of the source. 
   *
@@ -790,14 +757,16 @@ class TranslationValidator {
         val tgtCut = beforeCutsBls(label)
         val tgtLives = liveVarsTarget.get(tgtCut).toSet.flatten
         val tgtDefines = definedVarsTarget(tgtCut)
-        println(label)
-        println(tgtDefines)
-        println(flowFactTgtTgt)
+        // println(label)
+        // println(tgtDefines)
+        // println(flowFactTgtTgt)
         val m = flowFactTgtTgt
           .collect {
-            case (v, e) if tgtLives.contains(v) && (e.variables).forall(tgtDefines.contains) /*&& e.variables.forall(tgtLives.contains) */ =>
+            case (v, e)
+                if tgtLives.contains(v) && (e.variables)
+                  .forall(tgtDefines.contains) /*&& e.variables.forall(tgtLives.contains) */ =>
               List(TargetTerm(BinaryExpr(EQ, v, e)))
-            //case (v, e) if tgtDefines.contains(v) && (e.variables).forall(tgtLives.contains) && e.variables.nonEmpty /*&& e.variables.forall(tgtLives.contains) */ =>
+            // case (v, e) if tgtDefines.contains(v) && (e.variables).forall(tgtLives.contains) && e.variables.nonEmpty /*&& e.variables.forall(tgtLives.contains) */ =>
             //  List(TargetTerm(BinaryExpr(EQ, v, e)))
             case (v, e) =>
               // println((e.variables + v).filterNot(vv => tgtLives.contains(vv) || tgtDefines.contains(vv)))
@@ -807,7 +776,7 @@ class TranslationValidator {
           .toList
           .flatten
         val i = Inv.CutPoint(label, m, Some(s"FLOWFACT at $label"))
-        println(i)
+        // println(i)
         i
       }
     }).toList
@@ -1132,6 +1101,8 @@ class TranslationValidator {
     val runNamePrefix = runName + "-" + procTransformed.name
     val proc = procTransformed
 
+    tvLogger.info("Generating TV for : " + runNamePrefix)
+
     val timer = PerformanceTimer(runNamePrefix, LogLevel.DEBUG, tvLogger)
 
     val source = afterProg.get.procedures.find(_.name == proc.name).get
@@ -1143,8 +1114,6 @@ class TranslationValidator {
     TransitionSystem.removeUnreachableBlocks(source)
     TransitionSystem.removeUnreachableBlocks(target)
 
-
-
     def inputs(c: CallParamMapping) = {
       c.rhs.collect {
         case (l, Some(r: Variable)) => r
@@ -1154,7 +1123,7 @@ class TranslationValidator {
     }
 
     def outputs(isSource: Boolean)(c: CallParamMapping) = {
-      //def fvInv = {
+      // def fvInv = {
       //  (equalVarsInvariant ++ invEverywhere).toSeq.flatMap {
       //    case Inv.CutPoint(l, ca, _) =>
       //      ca.flatMap {
@@ -1168,7 +1137,7 @@ class TranslationValidator {
       //        case TargetTerm(target) => if isSource then Seq() else target.variables
       //      }
       //  }
-      //}
+      // }
 
       c.lhs.collect {
         case (l, Some(r: Variable)) => r
@@ -1191,18 +1160,16 @@ class TranslationValidator {
       targetParams,
       target,
       inputs(targetParams(proc.name)),
-      outputs(false)(targetParams(proc.name)) ++ (flowFacts(proc.name).flatMap {
-        case (k, v) => Set(k) ++ v.variables
+      outputs(false)(targetParams(proc.name)) ++ (flowFacts(proc.name).flatMap { case (k, v) =>
+        Set(k) ++ v.variables
       }).toSet,
       liveVarsTarget
     )
     timer.checkPoint("SSA")
 
-
-    def targetDefined(block: BlockID) : Set[Variable] = {
+    def targetDefined(block: BlockID): Set[Variable] = {
       tgtSSADefs.get(block).map(_.keys).toSet.flatten ++ inputs(targetParams(proc.name))
     }
-
 
     val equalVarsInvariant = getEqualVarsInvariantRenaming(
       proc,

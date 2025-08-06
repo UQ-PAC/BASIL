@@ -3,6 +3,8 @@ import ir.*
 import util.SMT.SatResult
 import util.{IRContext, Logger, SimplifyMode}
 
+import java.io.File
+
 import cilvisitor.{visit_proc, visit_prog}
 
 /**
@@ -152,7 +154,7 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   val p = ctx.program
   var config = mode match {
     case SimplifyMode.ValidatedSimplify(verifyMode, filePrefix) =>
-      TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = true)
+      TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = false)
     case _ => TVJob(None, None)
   }
   transforms.applyRPO(p)
@@ -180,6 +182,11 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   } else if (config.verify.isDefined) {
     Logger.info("[!] Translation validation passed")
   }
+
+  config.outputPath.foreach(p => {
+    val csv = config.results.map(_.toCSV).mkString("\n")
+    Logger.writeToFile(File(p + "/stats.csv"), csv)
+  })
 
   ir.transforms.genStackAllocationSpec(p)
 
