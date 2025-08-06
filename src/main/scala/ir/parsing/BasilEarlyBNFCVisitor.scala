@@ -75,8 +75,7 @@ class BasilEarlyBNFCVisitor[A]()
           decls.merge(Declarations.empty.copy(procSpecs = Map(spec)))
 
         // declarations which do not contain expressions
-        case _: syntax.Decl_UnsharedMem | _: syntax.Decl_SharedMem | _: syntax.Decl_Var | _: syntax.Decl_ProgEmpty =>
-          decls
+        case _ => decls
       }
     )
 
