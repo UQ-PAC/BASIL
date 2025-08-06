@@ -124,27 +124,14 @@ trait BasilIRToScala {
     val params = if (x.formalInParam.isEmpty && x.formalOutParam.isEmpty) {
       List()
     } else {
-      List(
-        Twine("in = ", formalParamsToScala(x.formalInParam)),
-        Twine("out = ", formalParamsToScala(x.formalOutParam))
-      )
+      List(Twine("in = ", formalParamsToScala(x.formalInParam)), Twine("out = ", formalParamsToScala(x.formalOutParam)))
     }
 
     val returnBlock = List(Twine("returnBlockLabel = ", x.returnBlock.map(_.label).toScalaLines))
 
     Twine(
-      Twine.indentNested(
-        s"proc(${x.name.toScala}",
-        params ++ returnBlock,
-        ")",
-        headSep = true
-      ),
-      Twine.indentNested(
-        "(",
-        x.blocks.map(blockToScala).toList,
-        ")",
-        trySingleLine = false,
-      )
+      Twine.indentNested(s"proc(${x.name.toScala}", params ++ returnBlock, ")", headSep = true),
+      Twine.indentNested("(", x.blocks.map(blockToScala).toList, ")", trySingleLine = false)
     )
   }
 

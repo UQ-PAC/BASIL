@@ -174,10 +174,11 @@ object Twine {
 
   def shallowIsMultiline(tw: Twine) = tw match {
     case _: Lines | _: Indent => true
-    case Concat(parts) => parts.exists {
-      case _: Lines | _: Indent => true
-      case _ => false
-    }
+    case Concat(parts) =>
+      parts.exists {
+        case _: Lines | _: Indent => true
+        case _ => false
+      }
     case _: Str => false
   }
 
@@ -225,7 +226,7 @@ object Twine {
     tail: String,
     sep: String = ",",
     headSep: Boolean = false,
-    trySingleLine: Boolean = true,
+    trySingleLine: Boolean = true
   ): Twine = {
     val len = elems.iterator.length
 
