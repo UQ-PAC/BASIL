@@ -1258,7 +1258,7 @@ class TranslationValidator {
     timer.checkPoint("passify")
 
     // build smt query
-    val b = translating.BasilIRToSMT2.SMTBuilder()
+    var b = translating.BasilIRToSMT2.SMTBuilder()
     val solver = config.verify.map(solver => util.SMT.SMTSolver(Some(1000), solver))
     val prover = solver.map(_.getProver(true))
 
@@ -1266,8 +1266,10 @@ class TranslationValidator {
 
     var count = 0
 
-    val newProg = combineProcs(source, target)
-    val npe = newProg.mainProcedure.entryBlock.get
+    lazy val newProg = if (config.debugDumpAlways || config.verify.isDefined) {
+      Some(combineProcs(source, target))
+    } else None
+    lazy val npe = newProg.map(_.mainProcedure.entryBlock.get)
 
     count = 0
     for (i <- preInv) {
@@ -1278,7 +1280,7 @@ class TranslationValidator {
         val l = Some(s"inv$count")
         b.addAssert(e, l)
         prover.map(_.addConstraint(e))
-        npe.statements.append(Assert(e, l))
+        npe.map(_.statements.append(Assert(e, l)))
       } catch
         ex => {
           throw Exception(s"$ex Failed to gen smt for ?\n  $e :: \n $e")
@@ -1289,7 +1291,7 @@ class TranslationValidator {
     for ((ack, ackn) <- ackInv) {
       count += 1
       val l = Some(s"ackermann$ackn$count")
-      npe.statements.append(Assert(ack, l))
+      npe.map(_.statements.append(Assert(ack, l)))
       prover.map(_.addConstraint(ack))
       b.addAssert(ack, l)
     }
@@ -1317,7 +1319,7 @@ class TranslationValidator {
       )
 
     val pinv = UnaryExpr(BoolNOT, BinaryExpr(BoolOR, sourceAssumeFail, AssocExpr(BoolAND, primedInv.toList)))
-    npe.statements.append(Assert(pinv, Some("InvPrimed")))
+    npe.map(_.statements.append(Assert(pinv, Some("InvPrimed"))))
     b.addAssert(pinv, Some("InvPrimed"))
     timer.checkPoint("extract prog")
     prover.map(_.addConstraint(pinv))
@@ -1327,8 +1329,10 @@ class TranslationValidator {
     smtPath.foreach(fname => {
       b.writeCheckSatToFile(File(fname))
       tvLogger.info(s"Write query $fname")
-      timer.checkPoint("write out " + fname)
+      timer.checkPoint("writesmtfile")
     })
+
+    b = null
 
     val verified = prover.map(prover => {
       val r = prover.checkSat()
@@ -1338,7 +1342,7 @@ class TranslationValidator {
 
     if (config.debugDumpAlways) {
       config.outputPath.foreach(path => {
-        tvLogger.writeToFile(File(s"${path}/${runNamePrefix}-combined.il"), translating.PrettyPrinter.pp_prog(newProg))
+        newProg.foreach(newProg => tvLogger.writeToFile(File(s"${path}/${runNamePrefix}-combined.il"), translating.PrettyPrinter.pp_prog(newProg)))
         tvLogger.writeToFile(File(s"${path}/${runNamePrefix}.il"), translating.PrettyPrinter.pp_proc(procTransformed))
       })
     }
@@ -1353,7 +1357,7 @@ class TranslationValidator {
           val g = processModel(
             source,
             target,
-            newProg.mainProcedure,
+            newProg.get.mainProcedure,
             prover,
             primedInv.toList,
             invariantRenamingSrcTgt,
@@ -1366,7 +1370,7 @@ class TranslationValidator {
             if (!config.debugDumpAlways) {
               tvLogger.writeToFile(
                 File(s"${path}/${runNamePrefix}-combined.il"),
-                translating.PrettyPrinter.pp_prog(newProg)
+                translating.PrettyPrinter.pp_prog(newProg.get)
               )
               tvLogger.writeToFile(
                 File(s"${path}/${runNamePrefix}.il"),
@@ -1388,6 +1392,10 @@ class TranslationValidator {
     if (config.verify.contains(Solver.CVC5)) {
       io.github.cvc5.Context.deletePointers()
     }
+
+    // throw away transition system
+    source.clearBlocks()
+    target.clearBlocks()
 
     TVResult(runName, proc.name, verified.map(_._2), smtPath, timer.checkPoints().toMap)
   }
@@ -1425,15 +1433,17 @@ class TranslationValidator {
     val sourceParams = paramMapping.toSeq.map { case (pn, (source, target)) => (pn, source) }.toMap
     val targetParams = paramMapping.toSeq.map { case (pn, (source, target)) => (pn, target) }.toMap
 
-    val liveBefore = initProgBefore.get.procedures.map(p => p.name -> getLiveVars(p, targetParams)).toMap
-    val liveAfter = initProg.get.procedures.map(p => p.name -> getLiveVars(p, sourceParams)).toMap
 
-    val result = interesting.foldLeft(config)((accRes, proc) => {
-      val liveVarsTarget: Map[String, Set[Variable]] = liveBefore(proc.name)._1.map((k, v) => (k.label, v)).toMap
-      val liveVarsSource: Map[String, Set[Variable]] = liveAfter(proc.name)._1.map((k, v) => (k.label, v)).toMap
+    var result = config
+    interesting.foreach(proc => {
+
+      def livenessBlockLabelMap(r: (Map[Block, Set[Variable]], Map[Block, Set[Variable]])) = r._1.map((k, v) => (k.label, v)).toMap
+
+      val liveVarsTarget: Map[String, Set[Variable]] = initProgBefore.get.procedures.find(p => proc.name == p.name).map(getLiveVars(_, targetParams)).map(livenessBlockLabelMap).getOrElse(Map())
+      val liveVarsSource: Map[String, Set[Variable]] = initProg.get.procedures.find(p => proc.name == p.name).map(getLiveVars(_, sourceParams)).map(livenessBlockLabelMap).getOrElse(Map())
 
       val res = validateSMTSingleProc(
-        accRes,
+        result,
         runName,
         proc,
         invariantRenamingSrcTgt,
@@ -1445,7 +1455,7 @@ class TranslationValidator {
         liveVarsTarget
       )
 
-      accRes.copy(results = res :: accRes.results)
+      result = result.copy(results = res :: result.results)
     })
 
     result

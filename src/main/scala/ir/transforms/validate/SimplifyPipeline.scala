@@ -184,7 +184,13 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   }
 
   config.outputPath.foreach(p => {
-    val csv = config.results.map(_.toCSV).mkString("\n")
+    val csv = (config.results.map(_.toCSV).groupBy(_._1).toList match {
+      case (h, vs)::Nil => h :: vs.map(_._2)
+      case _ => {
+        Logger.error("Broken header structure for csv metrics file")
+        List()
+      }
+    }).mkString("\n")
     Logger.writeToFile(File(p + "/stats.csv"), csv)
   })
 

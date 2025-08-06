@@ -214,8 +214,23 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   def vintlit(b: BigInt): Sexp[IntLiteral] = ???
 
   class SMTBuilder() {
+
+    enum Cmd {
+      case AssertExp(e: Expr, n: Option[String])
+      case Raw(e: Sexp[Expr])
+
+      def toSexp = this match {
+        case Cmd.Raw(e) => e
+        case Cmd.AssertExp(e, name) => {
+          val expr: Sexp[Expr] = BasilIRToSMT2.vexpr(e)
+          val inner: Sexp[Expr] = name.map(n => list(sym("!"), expr, sym(":named"), sym(n))).getOrElse(expr)
+          list(sym("assert"), inner)
+        }
+      }
+    }
+
     var before = true
-    var exprs = Vector[() => Sexp[Expr]]()
+    var exprs = List[Cmd]()
     var exprsBefore = Vector[Sexp[Expr]]()
     var decls = Set[Sexp[Expr]]()
     var typedecls = Set[Sexp[Expr]]()
@@ -232,7 +247,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       if (before) {
         exprsBefore = exprsBefore.appended(list(rawSexp.map(sym[Expr](_)): _*))
       } else {
-        exprs = exprs.appended(() => list(rawSexp.map(sym[Expr](_)): _*))
+        exprs = Cmd.Raw(list(rawSexp.map(sym[Expr](_)): _*)) :: exprs
       }
     }
 
@@ -241,44 +256,51 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       val (t, d) = BasilIRToSMT2.extractDecls(e)
       decls = decls ++ d
       typedecls = typedecls ++ t
-
-      def toExpr() = {
-        val expr: Sexp[Expr] = BasilIRToSMT2.vexpr(e)
-        val inner: Sexp[Expr] = name.map(n => list(sym("!"), expr, sym(":named"), sym(n))).getOrElse(expr)
-        list(sym("assert"), inner)
-      }
-
-      exprs = exprs ++ List(toExpr)
+      exprs = Cmd.AssertExp(e, name) :: exprs
     }
 
     def writeCheckSat(b: Writer, getUnsatCore: Boolean = false) = {
-      val query = getCheckSat(getUnsatCore)
-      for (q <- query) {
-        b.append(Sexp.print(q))
+      val setUnsat = if getUnsatCore then Seq(list(sym("set-option"), sym(":produce-unsat-cores"), sym("true"))) else Seq()
+      val getUnsat = if getUnsatCore then Seq(list(sym("get-unsat-core"))) else Seq()
+
+      def psexp(p: Sexp[Expr]) = {
+        b.append(Sexp.print(p))
         b.append("\n")
       }
+
+      setUnsat.foreach(psexp)
+      exprsBefore.foreach(psexp)
+      typedecls.foreach(psexp)
+      decls.foreach(psexp)
+      exprs.foreach(e => psexp(e.toSexp))
+      psexp(list(sym("check-sat")))
+      getUnsat.foreach(psexp)
     }
 
-    def writeCheckSatToFile(fname: File, getUnsatCore: Boolean = false) = {
-      val f = BufferedWriter(FileWriter(fname))
+    def writeCheckSatToFile(fname: File, getUnsatCore: Boolean = false) : Unit = {
+      val fw = FileWriter(fname)
+      val f = BufferedWriter(fw)
       try {
         writeCheckSat(f, getUnsatCore)
       } finally {
         if (f != null) {
           f.close()
         }
+        if (fw != null) {
+          fw.close()
+        }
       }
     }
 
-    def getCheckSat(getUnsatCore: Boolean = false) = {
-      val setUnsat =
-        if getUnsatCore then Seq(list(sym("set-option"), sym(":produce-unsat-cores"), sym("true"))) else Seq()
-      val getUnsat = if getUnsatCore then Seq(list(sym("get-unsat-core"))) else Seq()
+    //def getCheckSat(getUnsatCore: Boolean = false) = {
+    //  val setUnsat =
+    //    if getUnsatCore then Seq(list(sym("set-option"), sym(":produce-unsat-cores"), sym("true"))) else Seq()
+    //  val getUnsat = if getUnsatCore then Seq(list(sym("get-unsat-core"))) else Seq()
 
-      setUnsat.iterator ++ exprsBefore.iterator ++ typedecls ++ decls ++ exprs.view.map(_()) ++ Seq(
-        list(sym("check-sat"))
-      ) ++ getUnsat
-    }
+    //  setUnsat.iterator ++ exprsBefore.iterator ++ typedecls ++ decls ++ exprs.view.map(_()) ++ Seq(
+    //    list(sym("check-sat"))
+    //  ) ++ getUnsat
+    //}
   }
 
   /** Immediately invoke z3 and block until it returns a result.

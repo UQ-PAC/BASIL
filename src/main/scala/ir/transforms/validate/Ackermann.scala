@@ -293,7 +293,7 @@ object Ackermann {
     paramMapping: TransformDataRelationFun
   ): List[(Expr, String)] = {
     val seen = mutable.Set[CFGPosition]()
-    var invariant = List[(Expr, String)]()
+    var invariant = Set[(Expr, String)]()
 
     def getSucc(p: CFGPosition) = {
       // seen.add(p)
@@ -331,8 +331,16 @@ object Ackermann {
       }
     }
 
-    while (q.nonEmpty) {
-      val ((srcCall, srcPos), (tgtCall, tgtPos)) = q.dequeue
+    val seenQ = mutable.Set[((Option[SideEffectStatement], CFGPosition), (Option[SideEffectStatement], CFGPosition))]()
+
+    while {
+      var c = q.dequeue
+      //while (seenQ.contains(c) && q.nonEmpty) {
+      //  c = q.dequeue
+      //}
+      //seenQ += c
+
+      val ((srcCall, srcPos), (tgtCall, tgtPos)) = c
 
       def advanceBoth() = {
         for (s <- succ(srcPos)) {
@@ -372,7 +380,7 @@ object Ackermann {
 
           instantiateAxiomInstance(paramMapping)(src, tgt) match {
             case Right(inv) => {
-              invariant = (inv.toPredicate(renameSourceExpr, renameTargetExpr), inv.name) :: invariant
+              invariant = invariant + ((inv.toPredicate(renameSourceExpr, renameTargetExpr)) -> inv.name)
               advanceBoth()
             }
             case Left(InstFailureReason.ParamMismatch(err)) =>
@@ -382,7 +390,8 @@ object Ackermann {
         }
         case _ => ()
       }
-    }
+      (q.nonEmpty) 
+    } do {}
 
     tvLogger.debug(s"Ackermann hitrate : ${succMemoStat().hitRate} ${succMemoStat()}")
 

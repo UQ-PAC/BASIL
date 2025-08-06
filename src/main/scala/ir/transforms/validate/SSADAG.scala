@@ -149,9 +149,10 @@ object SSADAG {
 
       val alwaysLive = (outputs ++ inputs).toSet
       def live(v: Variable) =
-        liveVarsBefore.get(b.label).forall(_.contains(v)) || v.name.startsWith("SYNTH") || v.name.startsWith(
-          "TRACE"
-        ) || alwaysLive.contains(v)
+        // FIXME: the alwaysLive set is hacky
+        // this is too caorse, reducing phi nodes probably neccessary for termination?
+        // There is probably something missing from the real liveness analysis
+        liveVarsBefore.get(b.label).forall(_.contains(v)) || v.name.startsWith("SYNTH") || v.name.startsWith( "TRACE") || alwaysLive.contains(v)
 
       if (b.prevBlocks.nonEmpty) then {
         // val defines: Iterable[(Block, Seq[(Variable, Variable)])] =
