@@ -109,29 +109,31 @@ jobs:
             git push
           }
 
-          cat <<EOF > /tmp/how-to-apply.txt
+          patch_escaped="'$(cat scalafmt.patch | sed "s/'/'\\\\''/g")'"
 
+          # XXX: i'm very sorry. what follows is a sequence of arguments to printf which get concatenated. each
+          # of these arguments is a multi-line single-quoted string or a variable.
+          printf '%s' '
           <details>
 
           <summary>options to apply scalafmt changes:</summary>
 
           - run this command:
-            \`\`\`\`\`diff
-            echo '$(cat scalafmt.patch | sed "s/'/'\\\\''/g")' \\
+            `````diff
+            echo ' "$patch_escaped" '
             | git am -3
-            \`\`\`\`\`
-          - trigger a workflow run on \`$branch\` with \`autoformat=true\`, either by [using the website](https://github.com/UQ-PAC/BASIL/actions/workflows/run-examples.yml) or by using the \`gh\` tool:
-            \`\`\`bash
-            gh workflow run run-examples.yml --field 'autoformat=true' --ref '$branch'
-            \`\`\`
+            `````
+          - trigger a workflow run on `$branch` with `autoformat=true`, either by [using the website](https://github.com/UQ-PAC/BASIL/actions/workflows/run-examples.yml) or by using the `gh` tool:
+            ```bash
+            gh workflow run run-examples.yml --field "autoformat=true" --ref ' "'$branch'" '
+            ```
           - run the formatter locally:
-            \`\`\`bash
+            ```bash
             ./mill fmt
-            \`\`\`
+            ```
 
           </details>
-
-          EOF
+          ' > /tmp/how-to-apply.txt
 
           if "$AUTOFORMAT"; then
 
@@ -140,20 +142,18 @@ jobs:
               echo 'automated scalafmt applied successfully.' > /tmp/pr-message.txt
             else
               ok=false
-              cat <<EOF > /tmp/pr-message.txt
-              automated scalafmt **failed**. please report this issue and try another method.
-
-              $(cat /tmp/how-to-apply.txt)
-              EOF
+              printf '%s\n' \
+                "automated scalafmt **failed**. please report this issue and try another method." \
+                '' \
+                "$(cat /tmp/how-to-apply.txt)" > /tmp/pr-message.txt
             fi
 
           else
             ok=true
-            cat <<EOF > /tmp/pr-message.txt
-            scalafmt changes needed.
-
-            $(cat /tmp/how-to-apply.txt)
-            EOF
+            printf '%s\n' \
+              "scalafmt changes needed." \
+              '' \
+              "$(cat /tmp/how-to-apply.txt)" > /tmp/pr-message.txt
           fi
 
           printf '\n%s\n' "$footer" >> /tmp/pr-message.txt
