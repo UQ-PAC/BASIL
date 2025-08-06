@@ -201,8 +201,8 @@ class InterpreterTests extends AnyFunSuite with CaptureOutput with BeforeAndAfte
       ),
       proc(
         "abs",
-        in = Seq("x" -> bv64),
-        out = Seq("abs_out" -> bv64),
+        Seq("x" -> bv64),
+        Seq("abs_out" -> bv64),
         If(x < 0.bv64) Then (ret("abs_out" -> (0.bv64 - x))) Else (ret("abs_out" -> x))
       )
     )
