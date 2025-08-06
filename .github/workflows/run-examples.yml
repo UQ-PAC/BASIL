@@ -37,7 +37,8 @@ jobs:
 
       - run: ./mill compile
       - run: ./mill test.compile
-      - run: ./mill fmt
+      # run to warm up cache for scalafmt
+      - run: './mill semanticDbData + test.semanticDbData + mill.scalalib.scalafmt.ScalafmtModule/scalafmtClasspath + test.fix'
 
   CheckTestTagging:
     runs-on: ubuntu-latest
