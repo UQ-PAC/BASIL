@@ -59,7 +59,9 @@ def dsaCopyPropCombined(config: TVJob, p: Program) = {
 def copyProp(config: TVJob, p: Program) = {
   def transform(p: Program) = {
     p.procedures.foreach(ir.eval.AlgebraicSimplifications(_))
-    p.procedures.map(p => p.name -> transforms.OffsetProp.transform(p)).toMap
+    val r = p.procedures.map(p => p.name -> transforms.OffsetProp.transform(p)).toMap
+    transforms.CleanupAssignments().transform(p)
+    r
   }
 
   val (validator, results) = validatorForTransform(transform)(p)
@@ -68,10 +70,11 @@ def copyProp(config: TVJob, p: Program) = {
     results.getOrElse(b, Map())
   }
   def renaming(proc: ProcID, b: Option[BlockID])(v: Variable | Memory) = v match {
-    case g => Seq(g) ++ (v match {
-      case v: Variable => results.get(proc).flatMap(_.get(v))
-      case _ => Seq()
-    })
+    case g =>
+      Seq(g) ++ (v match {
+        case v: Variable => results.get(proc).flatMap(_.get(v))
+        case _ => Seq()
+      })
   }
 
   validator.getValidationSMT(config, "CopyProp", renaming, flowFacts)
@@ -149,7 +152,7 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   val p = ctx.program
   var config = mode match {
     case SimplifyMode.ValidatedSimplify(verifyMode, filePrefix) =>
-      TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = false)
+      TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = true)
     case _ => TVJob(None, None)
   }
   transforms.applyRPO(p)
@@ -163,7 +166,7 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   transforms.applyRPO(p)
   config = dynamicSingleAssignment(config, p)
   transforms.applyRPO(p)
-  config = config.copy(verify = Some(util.SMT.Solver.Z3))
+  // config = config.copy(verify = Some(util.SMT.Solver.Z3))
   config = copyProp(config, p)
   transforms.applyRPO(p)
   config = guardCleanup(config, p)

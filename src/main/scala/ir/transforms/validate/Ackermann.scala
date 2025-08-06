@@ -235,8 +235,8 @@ object Ackermann {
       case a: Field => a
       case a: (Memory | Variable) =>
         renaming(source.parent.parent.name, None)(a).toList match {
-          case (n: EffCallFormalParam)::Nil => n
-          case n::Nil =>
+          case (n: EffCallFormalParam) :: Nil => n
+          case n :: Nil =>
             tvLogger.warn(
               s"Transform description fun rewrite formal parameter $a to $n, which I can't fit back into the formal parameter type Variable | Memory | Field, ignoring"
             )
@@ -324,7 +324,7 @@ object Ackermann {
       q.enqueue(start)
     }
 
-    def flatMapSucc(s: CFGPosition) : Seq[SideEffectStatement] = {
+    def flatMapSucc(s: CFGPosition): Seq[SideEffectStatement] = {
       succ(s).toSeq.flatMap {
         case (None, r) => flatMapSucc(r)
         case (Some(x), r) => Seq(x)

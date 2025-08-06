@@ -147,7 +147,10 @@ object SSADAG {
 
       var blockDoneCond = List[Expr](boolOr(b.prevBlocks.map(blockDone).toList))
 
-      def live(v: Variable) = liveVarsBefore.get(b.label).forall(_.contains(v)) ||  v.name.startsWith("SYNTH") || v.name.startsWith("TRACE") || outputs.contains(v) || inputs.contains(v)
+      def live(v: Variable) =
+        liveVarsBefore.get(b.label).forall(_.contains(v)) || v.name.startsWith("SYNTH") || v.name.startsWith(
+          "TRACE"
+        ) || outputs.contains(v) || inputs.contains(v)
 
       if (b.prevBlocks.nonEmpty) then {
         // val defines: Iterable[(Block, Seq[(Variable, Variable)])] =

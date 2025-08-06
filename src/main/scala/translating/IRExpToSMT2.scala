@@ -220,13 +220,13 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     var decls = Set[Sexp[Expr]]()
     var typedecls = Set[Sexp[Expr]]()
 
-    //def addAssume(e: Expr) = {
+    // def addAssume(e: Expr) = {
     //  before = false
     //  val (t, d) = BasilIRToSMT2.extractDecls(e)
     //  decls = decls ++ d
     //  typedecls = typedecls ++ t
     //  exprs = exprs ++ List(list(sym("assume"), BasilIRToSMT2.vexpr(e)))
-    //}
+    // }
 
     def addCommand(rawSexp: String*) = {
       if (before) {

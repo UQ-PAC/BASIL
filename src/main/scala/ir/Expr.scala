@@ -381,6 +381,7 @@ sealed trait Variable extends Expr {
 
 object Variable {
   implicit def ordering[V <: Variable]: Ordering[V] = Ordering.by(_.name)
+  implicit def catsOrdering[V <: Variable]: cats.kernel.Order[V] = cats.kernel.Order.by(_.name)
 }
 
 object Register {

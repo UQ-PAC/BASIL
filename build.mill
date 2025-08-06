@@ -51,8 +51,11 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
   val javaSmt = mvn"org.sosy-lab:java-smt:5.0.0"
   val javaSmtZ3 = mvn"org.sosy-lab:javasmt-solver-z3:4.14.0"
   val javaSmtCVC5 = mvn"org.sosy-lab:javasmt-solver-cvc5:1.2.1-g8594a8e4dc"
+  val cats_collections = mvn"org.typelevel::cats-collections-core:0.9.10"
+  val cats_core = mvn"org.typelevel::cats-core:2.13.0"
+  val cats_kernel = mvn"org.typelevel::cats-kernel:2.13.0"
 
-  override def mvnDeps = Seq(scalactic, sourceCode, mainArgs, upickle, aslpOffline, javaSmt, javaSmtZ3, javaSmtCVC5)
+  override def mvnDeps = Seq(scalactic, sourceCode, mainArgs, upickle, aslpOffline, javaSmt, javaSmtZ3, javaSmtCVC5, cats_kernel, cats_core, cats_collections)
 
   override def repositoriesTask = Task.Anon {
     super.repositoriesTask() :+ MavenRepository(

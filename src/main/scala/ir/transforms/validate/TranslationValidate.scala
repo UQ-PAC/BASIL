@@ -1,8 +1,10 @@
 package ir.transforms.validate
 
 import analysis.ProcFrames.*
+import cats.collections.DisjointSets
 import ir.*
 import ir.cilvisitor.*
+import translating.PrettyPrinter.*
 import util.SMT.*
 import util.{LogLevel, PerformanceTimer, tvLogger}
 
@@ -267,10 +269,10 @@ class TranslationValidator {
           s -- c.outParams.map(_._2) ++ c.actualParams.flatMap(_._2.variables)
         }
         case g: GoTo => s
-        case r: Return => 
+        case r: Return =>
           val outFormal = frames(r.parent.parent.name).lhs.flatMap {
-            //case (l: Variable, Some(r)) => Seq(l, r)
-            //case (l: Variable, None) => Seq(l)
+            // case (l: Variable, Some(r)) => Seq(l, r)
+            // case (l: Variable, None) => Seq(l)
             case (_, Some(r)) => Seq(r)
             case _ => Seq()
           }
@@ -288,15 +290,18 @@ class TranslationValidator {
     transforms.reversePostOrder(p)
     val liveVarsDom = IntraLiveVarsDomainSideEffect(frames)
     val liveVarsSolver = transforms.worklistSolver(liveVarsDom)
-    val params = frames(p.name).rhs.collect {
-      case (_, Some(l)) => l.variables
-      case (l: Variable, r) => Seq(l) ++ r.map(_.variables).toSeq.flatten
-    }.toSet.flatten
+    val params = frames(p.name).rhs
+      .collect {
+        case (_, Some(l)) => l.variables
+        case (l: Variable, r) => Seq(l) ++ r.map(_.variables).toSeq.flatten
+      }
+      .toSet
+      .flatten
 
     val (b, a) = liveVarsSolver.solveProc(p, backwards = true)
     val extra = p.entryBlock.map(eb => eb -> (b.get(eb).toSet.flatten ++ params.toSet))
     (b, a)
-    
+
   }
 
   // proc -> List (pred, comment)
@@ -453,9 +458,7 @@ class TranslationValidator {
     }
   }
 
-  def globalsForSourceProc(
-    p: Procedure
-  )(renaming: Variable | Memory => Seq[Expr]): Iterable[(Expr, Option[Expr])] = {
+  def globalsForSourceProc(p: Procedure)(renaming: Variable | Memory => Seq[Expr]): Iterable[(Expr, Option[Expr])] = {
     val globs = for {
       af <- afterFrame.get(p.name)
       globs: Seq[Variable | Memory] = (af.readGlobalVars ++ af.readMem ++ af.modifiedGlobalVars ++ af.modifiedMem).toSeq
@@ -623,8 +626,8 @@ class TranslationValidator {
           case (n: (Variable | Memory)) => Seq(param(n))
           case _ => Seq()
         }.toList match {
-          case h::Nil=> h
-          case h::tl => ???
+          case h :: Nil => h
+          case h :: tl => ???
           case Nil => ???
         }
       }
@@ -724,6 +727,7 @@ class TranslationValidator {
 
     val cuts = (beforeCutsBls.keys ++ afterCutsBls.keys).toSet.toList
 
+    // println(afterProc.name)
     val invs = (cuts.map {
       case (label) => {
         val tgtCut = beforeCutsBls(label)
@@ -731,16 +735,15 @@ class TranslationValidator {
 
         val srcLives = liveVarsSourceBeforeBlock.get(srcCut).toList.flatten
 
-        //println(label)
-        //println(srcLives)
+        // println(label + "  " + srcCut)
+        // println(srcLives)
 
         val tgtLives = liveVarsTargetBeforeBlock.get(tgtCut).toList.flatten
 
-
         val invSrc = srcLives.map(s => s -> renamingSrcTgt(afterProc.name, Some(srcCut))(s)).flatMap {
           case (l, r) => {
-            r.filter(_.variables.forall(tgtLives.contains)).map {
-              case e => CompatArg(toVariable(l), toVariable(e))
+            r.filter(_.variables.forall(tgtLives.contains)).map { case e =>
+              CompatArg(toVariable(l), toVariable(e))
             }
           }
         }
@@ -785,15 +788,21 @@ class TranslationValidator {
         val tgtLives = liveVarsTarget.get(tgtCut).toList.flatten
         val m = flowFactTgtTgt
           .collect {
-            case (v, e) if tgtLives.contains(v) && e.variables.forall(tgtLives.contains) =>
+            case (v, e) if tgtLives.contains(v) /*&& e.variables.forall(tgtLives.contains) */ =>
               List(TargetTerm(BinaryExpr(EQ, v, e)))
+            case (v, e) =>
+              // println(s"failed because liveness: ${v} ${e}")
+              List()
           }
           .toList
           .flatten
-        Inv.CutPoint(label, m, Some(s"FLOWFACT at $label"))
+        val i = Inv.CutPoint(label, m, Some(s"FLOWFACT at $label"))
+        // println(i)
+        i
       }
     }).toList
 
+    // println(invs)
     invs
   }
 
@@ -880,32 +889,86 @@ class TranslationValidator {
     }.toMap
     tvLogger.info(s"Cut point labels: $cutMap")
 
-    for (i <- invariant) {
-      eval.evalExpr(i) match {
-        case Some(FalseLiteral) =>
-          tvLogger.error(s"Part of invariant failed: $i")
-          i match {
-            case BinaryExpr(BoolIMPLIES, BinaryExpr(EQ, pc, b: BitVecLiteral), Conj(conjuncts)) => {
-              tvLogger.error(s" Specifically: at cut point $b : ${cutMap.get(b)}")
-              for (c <- conjuncts) {
-                eval.evalExpr(c) match {
-                  case Some(FalseLiteral) => tvLogger.error(s"  $c is false")
-                  case _ => ()
-                }
-              }
-            }
-            case _ => ()
-          }
-        case _ => ()
-      }
-    }
-
     case object Conj {
       def unapply(e: Expr): Option[List[Expr]] = e match {
         case BinaryExpr(BoolAND, a, b) => Some(List(a, b))
         case AssocExpr(BoolAND, a) => Some(a.toList)
         case n if n.getType == BoolType => Some(List(n))
         case _ => None
+      }
+    }
+
+    val toUnion = combinedProc.flatMap {
+      case Assume(Conj(conjuncts), _, _, _) =>
+        conjuncts.map(c => {
+          val v = c.variables
+          if (v.size > 1) then v else Seq()
+        })
+      case Assert(Conj(conjuncts), _, _) =>
+        conjuncts.map(c => {
+          val v = c.variables
+          if (v.size > 1) then v else Seq()
+        })
+      case _ => Seq()
+    }
+
+    val (variableDependencies, variableSets) = toUnion
+      .foldLeft(DisjointSets[Variable]())((ds, variables) =>
+        variables.toList match {
+          case h :: tl =>
+            tl.foldLeft(ds + h)((ds, v) => (ds + v).union(h, v)._1)
+          case _ => ds
+        }
+      )
+      .toSets
+
+    for (i <- invariant) {
+      eval.evalExpr(i) match {
+        case Some(FalseLiteral) =>
+          tvLogger.error(s"Part of invariant failed: $i")
+          i match {
+            case BinaryExpr(BoolIMPLIES, BinaryExpr(EQ, pc, b: BitVecLiteral), Conj(conjuncts)) => {
+
+              val ec = eval.evalExpr(exprInSource(TransitionSystem.programCounterVar)) match {
+                case Some(b: BitVecLiteral) => Some(b)
+                case _ => None
+              }
+
+              tvLogger.error(
+                s" Specifically: at cut point transition ${ec.flatMap(cutMap.get)} --> ${cutMap.get(b)} ($ec -> $b) "
+              )
+              val vars = (conjuncts)
+                .collect(c => {
+                  eval.evalExpr(c) match {
+                    case Some(FalseLiteral) => {
+                      tvLogger.error(s"  $c is false")
+                      c.variables
+                        .map(v =>
+                          variableDependencies.find(v)._2 match {
+                            case Some(v) => v
+                            case None => ???
+                          }
+                        )
+                        .toSet
+                    }
+                    case _ => Set()
+                  }
+                })
+                .toSet
+                .flatten
+
+              // val relatedVars : Set[Variable] = vars.map(variableSets.get(_).get.toScalaSet).toSet.flatten
+
+              // val relatedStmts = combinedProc.foreach {
+              //  case a @ Assume(Conj(b), _, _, _) => b.filter(b => b.variables.exists(relatedVars.contains)).foreach(e => println(translating.PrettyPrinter.pp_expr(e)))
+              //  case a @ Assume(b, _, _, _) if b.variables.exists(relatedVars.contains) => println(translating.PrettyPrinter.pp_stmt(a))
+              //  case _ => ()
+              // }
+
+            }
+            case _ => ()
+          }
+        case _ => ()
       }
     }
 
@@ -969,6 +1032,31 @@ class TranslationValidator {
 
     class ComparVals extends CILVisitor {
       override def vstmt(statement: Statement) = statement match {
+        case a @ Assert(BinaryExpr(BoolIMPLIES, Conj(prec), Conj(ante)), Some(com), _) if com.startsWith("ack") => {
+          // ackermann structure
+
+          val triggered = prec.map(eval.evalExpr).forall(_.contains(TrueLiteral))
+
+          val bad = prec
+            .flatMap(e => {
+              eval.evalExpr(e) match {
+                case Some(TrueLiteral) => Seq()
+                case _ => e.variables
+              }
+            })
+            .map(v => v -> eval.evalExpr(v))
+            .map(_.toString)
+
+          val precedent =
+            if (triggered) then "true"
+            else prec.map(p => pp_expr(p) + ":=" + eval.evalExpr(p).map(pp_expr)).mkString(" && ") + "\n"
+
+          val reason = precedent + " ==> " + ante
+            .map(p => "(" + pp_expr(p) + " is " + eval.evalExpr(p).map(pp_expr) + ")")
+            .mkString("\n&& ")
+          a.comment = Some(com + "\n  " + reason + "\n vars: " + bad)
+          SkipChildren()
+        }
         case a => {
           val vars = freeVarsPos(a).filter(v => v.name.startsWith("source__") || v.name.startsWith("target__"))
           val pcomment = a.comment.getOrElse("")
@@ -1068,7 +1156,6 @@ class TranslationValidator {
 
     val invariant = equalVarsInvariant ++ factsInvariant ++ invEverywhere
 
-
     def inputs(c: CallParamMapping) = {
       c.rhs.collect {
         case (l, Some(r: Variable)) => r
@@ -1080,15 +1167,17 @@ class TranslationValidator {
     def outputs(isSource: Boolean)(c: CallParamMapping) = {
       def fvInv = {
         invariant.toSeq.flatMap {
-          case Inv.CutPoint(l, ca, _) => ca.flatMap {
-            case CompatArg(source, target) => if isSource then source.variables else target.variables
-            case TargetTerm(target) => if isSource then Seq() else target.variables
-          }
-          case Inv.SourceConditionalConstraint(g, c, ca, _) => ??? 
-          case Inv.GlobalConstraint(g, ca, _) => ca.flatMap {
-            case CompatArg(source, target) => if isSource then source.variables else target.variables
-            case TargetTerm(target) => if isSource then Seq() else target.variables
-        }
+          case Inv.CutPoint(l, ca, _) =>
+            ca.flatMap {
+              case CompatArg(source, target) => if isSource then source.variables else target.variables
+              case TargetTerm(target) => if isSource then Seq() else target.variables
+            }
+          case Inv.SourceConditionalConstraint(g, c, ca, _) => ???
+          case Inv.GlobalConstraint(g, ca, _) =>
+            ca.flatMap {
+              case CompatArg(source, target) => if isSource then source.variables else target.variables
+              case TargetTerm(target) => if isSource then Seq() else target.variables
+            }
         }
       }
 
@@ -1128,7 +1217,6 @@ class TranslationValidator {
         invariantRenamingSrcTgt
       )
     timer.checkPoint("ackermann")
-
 
     // val preInv = invariant
 
@@ -1275,7 +1363,8 @@ class TranslationValidator {
           tvLogger.error(s"sat ${runNamePrefix} (verify failed)")
 
           val g = processModel(
-            source, target,
+            source,
+            target,
             newProg.mainProcedure,
             prover,
             primedInv.toList,
