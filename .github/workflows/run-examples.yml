@@ -7,6 +7,7 @@ on:
     # running tests can be skipped for docs-only changes
     paths: ['src/**', 'basilmill/**', '**.mill', '.?mill*', '*.conf', '.github/workflows/run-examples.yml']
   workflow_dispatch:
+
 jobs:
   CheckTestTagging:
     runs-on: ubuntu-latest
@@ -16,6 +17,23 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - uses: coursier/cache-action@v6
+        with:
+          extraMillFiles: '**/*.mill'
+          ignoreJob: true
+          ignoreMatrix: true
+
+      - uses: actions/cache@v4
+        with:
+          path: out
+          key: |
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
+          restore-keys: |
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
+            build-${{ runner.os }}-
+            build-
+
       - run: './mill test.compile'
       - name: Check all test suites have at least one tag
         run: .github/workflows/check-test-tagging.sh
@@ -32,6 +50,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - uses: coursier/cache-action@v6
+        with:
+          extraMillFiles: '**/*.mill'
+          ignoreJob: true
+          ignoreMatrix: true
+
+      - uses: actions/cache@v4
+        with:
+          path: out
+          key: |
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
+          restore-keys: |
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
+            build-${{ runner.os }}-
+            build-
 
       - run: ./mill fmt
 
@@ -94,6 +128,22 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - uses: coursier/cache-action@v6
+        with:
+          extraMillFiles: '**/*.mill'
+          ignoreJob: true
+          ignoreMatrix: true
+
+      - uses: actions/cache@v4
+        with:
+          path: out
+          key: |
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
+          restore-keys: |
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
+            build-${{ runner.os }}-
+            build-
+
       - name: Compile BASIL Mill
         run: ./mill compile && ./mill test.compile
 
@@ -123,6 +173,22 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - uses: coursier/cache-action@v6
+        with:
+          extraMillFiles: '**/*.mill'
+          ignoreJob: true
+          ignoreMatrix: true
+
+      - uses: actions/cache@v4
+        with:
+          path: out
+          key: |
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
+          restore-keys: |
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
+            build-${{ runner.os }}-
+            build-
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -176,6 +242,22 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - uses: coursier/cache-action@v6
+        with:
+          extraMillFiles: '**/*.mill'
+          ignoreJob: true
+          ignoreMatrix: true
+
+      - uses: actions/cache@v4
+        with:
+          path: out
+          key: |
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
+          restore-keys: |
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
+            build-${{ runner.os }}-
+            build-
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
@@ -197,6 +279,22 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - uses: coursier/cache-action@v6
+        with:
+          extraMillFiles: '**/*.mill'
+          ignoreJob: true
+          ignoreMatrix: true
+
+      - uses: actions/cache@v4
+        with:
+          path: out
+          key: |
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
+          restore-keys: |
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
+            build-${{ runner.os }}-
+            build-
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -234,6 +332,22 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - uses: coursier/cache-action@v6
+        with:
+          extraMillFiles: '**/*.mill'
+          ignoreJob: true
+          ignoreMatrix: true
+
+      - uses: actions/cache@v4
+        with:
+          path: out
+          key: |
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
+          restore-keys: |
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
+            build-${{ runner.os }}-
+            build-
 
       - uses: actions/setup-dotnet@v4
         with:
