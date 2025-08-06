@@ -73,7 +73,7 @@ object SSADAG {
     inputs: List[Variable],
     outputs: List[Variable],
     liveVarsBefore: Map[String, Set[Variable]]
-  ): ((String, Expr) => Expr) = {
+  ): (((String, Expr) => Expr), Map[BlockID, Map[Variable, Variable]]) = {
 
     var renameCount = 0
     val stRename = mutable.Map[Block, Map[Variable, Variable]]()
@@ -272,6 +272,6 @@ object SSADAG {
     tvLogger.debug("Phi node count: " + phis)
     val renameBeforeLabels = renameBefore.map((b, r) => b.label -> r)
 
-    (b, c) => visit_expr(RenameRHS(renameBeforeLabels(b).get), c)
+    ((b, c) => visit_expr(RenameRHS(renameBeforeLabels(b).get), c), renameBeforeLabels.toMap)
   }
 }

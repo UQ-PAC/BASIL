@@ -672,6 +672,7 @@ class TranslationValidator {
     renamingSrcTgt: TransformDataRelationFun = (_, _) => e => Seq(e),
     liveVarsSourceBeforeBlock: Map[String, Set[Variable]],
     liveVarsTargetBeforeBlock: Map[String, Set[Variable]],
+    targetDefined: BlockID => Set[Variable],
     srcParams: CallParamMapping,
     tgtParams: CallParamMapping
   ) = {
@@ -739,10 +740,11 @@ class TranslationValidator {
         // println(srcLives)
 
         val tgtLives = liveVarsTargetBeforeBlock.get(tgtCut).toList.flatten
+        val tgtDefines = targetDefined(tgtCut)
 
         val invSrc = srcLives.map(s => s -> renamingSrcTgt(afterProc.name, Some(srcCut))(s)).flatMap {
           case (l, r) => {
-            r.filter(_.variables.forall(tgtLives.contains)).map { case e =>
+            r.filter(_.variables.forall(v => tgtLives.contains(v) || tgtDefines.contains(v))).map { case e =>
               CompatArg(toVariable(l), toVariable(e))
             }
           }
@@ -766,6 +768,7 @@ class TranslationValidator {
     // block label -> variable -> renamed variable
     afterProc: Procedure,
     liveVarsTarget: Map[BlockID, Set[Variable]],
+    definedVarsTarget: BlockID => Set[Variable],
     flowFactTgtTgt: Map[Variable, Expr]
   ) = {
     val p = afterProc
@@ -785,19 +788,26 @@ class TranslationValidator {
     val invs = (cuts.map {
       case (label) => {
         val tgtCut = beforeCutsBls(label)
-        val tgtLives = liveVarsTarget.get(tgtCut).toList.flatten
+        val tgtLives = liveVarsTarget.get(tgtCut).toSet.flatten
+        val tgtDefines = definedVarsTarget(tgtCut)
+        println(label)
+        println(tgtDefines)
+        println(flowFactTgtTgt)
         val m = flowFactTgtTgt
           .collect {
-            case (v, e) if tgtLives.contains(v) /*&& e.variables.forall(tgtLives.contains) */ =>
+            case (v, e) if tgtLives.contains(v) && (e.variables).forall(tgtDefines.contains) /*&& e.variables.forall(tgtLives.contains) */ =>
               List(TargetTerm(BinaryExpr(EQ, v, e)))
+            //case (v, e) if tgtDefines.contains(v) && (e.variables).forall(tgtLives.contains) && e.variables.nonEmpty /*&& e.variables.forall(tgtLives.contains) */ =>
+            //  List(TargetTerm(BinaryExpr(EQ, v, e)))
             case (v, e) =>
+              // println((e.variables + v).filterNot(vv => tgtLives.contains(vv) || tgtDefines.contains(vv)))
               // println(s"failed because liveness: ${v} ${e}")
               List()
           }
           .toList
           .flatten
         val i = Inv.CutPoint(label, m, Some(s"FLOWFACT at $label"))
-        // println(i)
+        println(i)
         i
       }
     }).toList
@@ -1133,11 +1143,73 @@ class TranslationValidator {
     TransitionSystem.removeUnreachableBlocks(source)
     TransitionSystem.removeUnreachableBlocks(target)
 
+
+
+    def inputs(c: CallParamMapping) = {
+      c.rhs.collect {
+        case (l, Some(r: Variable)) => r
+        case (l: (Variable | Memory), _) => SideEffectStatementOfStatement.param(l)._2
+        case _ => ???
+      }
+    }
+
+    def outputs(isSource: Boolean)(c: CallParamMapping) = {
+      //def fvInv = {
+      //  (equalVarsInvariant ++ invEverywhere).toSeq.flatMap {
+      //    case Inv.CutPoint(l, ca, _) =>
+      //      ca.flatMap {
+      //        case CompatArg(source, target) => if isSource then source.variables else target.variables
+      //        case TargetTerm(target) => if isSource then Seq() else target.variables
+      //      }
+      //    case Inv.SourceConditionalConstraint(g, c, ca, _) => ???
+      //    case Inv.GlobalConstraint(g, ca, _) =>
+      //      ca.flatMap {
+      //        case CompatArg(source, target) => if isSource then source.variables else target.variables
+      //        case TargetTerm(target) => if isSource then Seq() else target.variables
+      //      }
+      //  }
+      //}
+
+      c.lhs.collect {
+        case (l, Some(r: Variable)) => r
+        case (l: (Variable | Memory), _) => SideEffectStatementOfStatement.param(l)._2
+        case _ => ???
+      }
+    }
+
+    // val inputs = TransitionSystem.programCounterVar :: TransitionSystem.traceVar :: (globalsForProc(proc).toList)
+    val frames = (afterFrame ++ beforeFrame)
+
+    val (srcRenameSSA, srcSSADefs) = SSADAG.transform(
+      sourceParams,
+      source,
+      inputs(sourceParams(proc.name)),
+      outputs(true)(sourceParams(proc.name)),
+      liveVarsSource
+    )
+    val (tgtRenameSSA, tgtSSADefs) = SSADAG.transform(
+      targetParams,
+      target,
+      inputs(targetParams(proc.name)),
+      outputs(false)(targetParams(proc.name)) ++ (flowFacts(proc.name).flatMap {
+        case (k, v) => Set(k) ++ v.variables
+      }).toSet,
+      liveVarsTarget
+    )
+    timer.checkPoint("SSA")
+
+
+    def targetDefined(block: BlockID) : Set[Variable] = {
+      tgtSSADefs.get(block).map(_.keys).toSet.flatten ++ inputs(targetParams(proc.name))
+    }
+
+
     val equalVarsInvariant = getEqualVarsInvariantRenaming(
       proc,
       invariantRenamingSrcTgt,
       liveVarsSource,
       liveVarsTarget,
+      targetDefined,
       sourceParams(proc.name),
       targetParams(proc.name)
     )
@@ -1152,60 +1224,9 @@ class TranslationValidator {
 
     val invEverywhere = cuts.toList.map(label => Inv.CutPoint(label, alwaysInv, Some(s"GlobalConstraint$label")))
 
-    val factsInvariant = getFlowFactsInvariant(proc, liveVarsTarget, flowFacts(proc.name))
+    val factsInvariant = getFlowFactsInvariant(proc, liveVarsTarget, targetDefined, flowFacts(proc.name))
 
     val invariant = equalVarsInvariant ++ factsInvariant ++ invEverywhere
-
-    def inputs(c: CallParamMapping) = {
-      c.rhs.collect {
-        case (l, Some(r: Variable)) => r
-        case (l: (Variable | Memory), _) => SideEffectStatementOfStatement.param(l)._2
-        case _ => ???
-      }
-    }
-
-    def outputs(isSource: Boolean)(c: CallParamMapping) = {
-      def fvInv = {
-        invariant.toSeq.flatMap {
-          case Inv.CutPoint(l, ca, _) =>
-            ca.flatMap {
-              case CompatArg(source, target) => if isSource then source.variables else target.variables
-              case TargetTerm(target) => if isSource then Seq() else target.variables
-            }
-          case Inv.SourceConditionalConstraint(g, c, ca, _) => ???
-          case Inv.GlobalConstraint(g, ca, _) =>
-            ca.flatMap {
-              case CompatArg(source, target) => if isSource then source.variables else target.variables
-              case TargetTerm(target) => if isSource then Seq() else target.variables
-            }
-        }
-      }
-
-      c.lhs.collect {
-        case (l, Some(r: Variable)) => r
-        case (l: (Variable | Memory), _) => SideEffectStatementOfStatement.param(l)._2
-        case _ => ???
-      }
-    }
-
-    // val inputs = TransitionSystem.programCounterVar :: TransitionSystem.traceVar :: (globalsForProc(proc).toList)
-    val frames = (afterFrame ++ beforeFrame)
-
-    val srcRenameSSA = SSADAG.transform(
-      sourceParams,
-      source,
-      inputs(sourceParams(proc.name)),
-      outputs(true)(sourceParams(proc.name)),
-      liveVarsSource
-    )
-    val tgtRenameSSA = SSADAG.transform(
-      targetParams,
-      target,
-      inputs(targetParams(proc.name)),
-      outputs(false)(targetParams(proc.name)),
-      liveVarsTarget
-    )
-    timer.checkPoint("SSA")
 
     val ackInv =
       Ackermann.instantiateAxioms(
