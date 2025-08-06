@@ -323,7 +323,6 @@ case class EventuallyProcedure(
   address: Option[BigInt] = None,
   requires: List[Expr] = List(),
   ensures: List[Expr] = List(),
-  inferReturnBlock: Boolean = false,
 ) extends DeepEquality {
 
   def name = label + address.fold("")("_" + _)
@@ -338,8 +337,7 @@ case class EventuallyProcedure(
           `returnBlockLabel`,
           `address`,
           `requires`,
-          `ensures`,
-          _
+          `ensures`
         ) => {
       b.size == blocks.size && {
         b.zip(blocks).forall { case (l, r) =>
@@ -375,17 +373,6 @@ case class EventuallyProcedure(
 
     def cont(prog: CachedLabelResolver) = {
       resolvers.foreach(_(prog, tempProc.name))
-
-      if (inferReturnBlock) {
-        tempProc.returnBlock = tempProc.returnBlock.orElse {
-          val blocksWithReturn = tempProc.blocks.filter(_.jump.isInstanceOf[Return]).toList
-          blocksWithReturn match {
-            case Seq(x) => Some(x)
-            case _ => None
-          }
-        }
-      }
-
       jumps.foreach((b, j) => b.replaceJump(j.resolve(prog, tempProc.name)))
       entry.foreach(b => tempProc.entryBlock = b)
     }
@@ -412,8 +399,19 @@ case class EventuallyProcedure(
   def cloneable = this.copy(blocks = blocks.map(_.cloneable))
 }
 
+def proc(
+  label: String,
+  in: Iterable[(String, IRType)],
+  out: Iterable[(String, IRType)],
+  blocks: Iterable[EventuallyBlock],
+  returnBlockLabel: Option[String]
+): EventuallyProcedure = {
+  EventuallyProcedure(label, in.to(SortedMap), out.to(SortedMap), blocks.toSeq, blocks.headOption.map(_.label), None)
+}
+
+
 def proc(label: String, blocks: EventuallyBlock*): EventuallyProcedure = {
-  proc(label, Nil, Nil, blocks)
+  proc(label, Nil, Nil, blocks, None)
 }
 
 def proc(
@@ -422,16 +420,24 @@ def proc(
   out: Iterable[(String, IRType)],
   blocks: Iterable[EventuallyBlock]
 ): EventuallyProcedure = {
-  EventuallyProcedure(label, in.to(SortedMap), out.to(SortedMap), blocks.toSeq, blocks.headOption.map(_.label), inferReturnBlock = true)
+
+  // val returnBlock = tempProc.returnBlock.orElse {
+  //   val blocksWithReturn = tempProc.blocks.filter(_.jump.isInstanceOf[Return]).toList
+  //   blocksWithReturn match {
+  //     case Seq(x) => Some(x)
+  //     case _ => None
+  //   }
+  // }
+  proc(label, in, out, blocks, None)
 }
 
 def proc(
   label: String,
-  in: Iterable[(String, IRType)],
-  out: Iterable[(String, IRType)],
+  in: Iterable[(String, IRType)] = Nil,
+  out: Iterable[(String, IRType)] = Nil,
   blocks: EventuallyBlock*
 ): EventuallyProcedure = {
-  proc(label, in, out, blocks.toSeq)
+  proc(label, in, out, blocks, None)
 }
 
 def mem: SharedMemory = SharedMemory("mem", 64, 8)
