@@ -63,10 +63,10 @@ prog(
     ),
     block("returnBlock", ret)
   ),
-  proc("callee1", returnBlockLabel = Some("returnBlock"))(
+  proc("callee1", returnBlockLabel = None)(
     block("returnBlock", ret)
   ),
-  proc("callee2", returnBlockLabel = Some("returnBlock"))(
+  proc("callee2", returnBlockLabel = None)(
     block("returnBlock", ret)
   ),
   proc("empty procedure", returnBlockLabel = None)()
@@ -91,11 +91,11 @@ prog(
     block("returnBlock", ret)
   )
 
-  def `procedure:callee1` = proc("callee1", returnBlockLabel = Some("returnBlock"))(
+  def `procedure:callee1` = proc("callee1", returnBlockLabel = None)(
     block("returnBlock", ret)
   )
 
-  def `procedure:callee2` = proc("callee2", returnBlockLabel = Some("returnBlock"))(
+  def `procedure:callee2` = proc("callee2", returnBlockLabel = None)(
     block("returnBlock", ret)
   )
 
@@ -162,7 +162,7 @@ prog(
 
     val expected = """
 {
-  def `procedure:main` = proc("main", returnBlockLabel = Some("entry"))(
+  def `procedure:main` = proc("main", returnBlockLabel = None)(
     block("entry", ret)
   )
 
@@ -247,7 +247,7 @@ prog(
       "R1_out" -> BitVecType(64),
       "R31_out" -> BitVecType(64)
     ),
-    returnBlockLabel = Some("get_two_1876_basil_return")
+    returnBlockLabel = None
   )(
     block("get_two_1876_basil_return",
       directCall(

@@ -419,16 +419,11 @@ class Procedure private (
     */
   def blocks: Iterator[Block] = _blocks.iterator
   def blocksBookended: Iterable[Block] =
-
-    extension (minuend: Iterator[Block])
-      def without(subtrahend: Option[Block]): Iterator[Block] =
-        minuend.filterNot(subtrahend.contains)
-
-    List(
-      entryBlock.iterator,
-      _blocks.iterator without entryBlock without returnBlock,
-      returnBlock.iterator without entryBlock
-    ).flatten
+    (entryBlock.iterator
+      ++ _blocks.iterator
+        .filterNot(entryBlock.contains)
+        .filterNot(returnBlock.contains)
+      ++ returnBlock.iterator).toSeq
 
   def addCaller(c: DirectCall): Unit = {
     _callers.add(c)

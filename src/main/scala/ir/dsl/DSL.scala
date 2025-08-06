@@ -423,10 +423,12 @@ def proc(
   returnBlockLabel: Option[String] | Unspecified.type = Unspecified
 )(blocks: EventuallyBlock*): EventuallyProcedure = {
 
+  val entryBlock = blocks.headOption
+
   lazy val inferredReturn = {
-    val blocksWithReturn = blocks.filter(_.j.isInstanceOf[EventuallyReturn]).toList
+    val blocksWithReturn = blocks.filter(_.j.isInstanceOf[EventuallyReturn]).toSeq
     blocksWithReturn match {
-      case Seq(b) => Some(b.label)
+      case Seq(b) if entryBlock.forall(_ ne b) => Some(b.label)
       case _ => None
     }
   }
@@ -436,14 +438,7 @@ def proc(
     case x: Option[String] => x
   }
 
-  EventuallyProcedure(
-    label,
-    in.to(SortedMap),
-    out.to(SortedMap),
-    blocks,
-    blocks.headOption.map(_.label),
-    _returnBlockLabel
-  )
+  EventuallyProcedure(label, in.to(SortedMap), out.to(SortedMap), blocks, entryBlock.map(_.label), _returnBlockLabel)
 }
 
 def proc(label: String, blocks: EventuallyBlock*): EventuallyProcedure = proc(label)(blocks: _*)
