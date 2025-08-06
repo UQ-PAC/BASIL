@@ -109,6 +109,30 @@ jobs:
             git push
           }
 
+          cat <<EOF > /tmp/how-to-apply.txt
+
+          <details>
+
+          <summary>options to apply scalafmt changes:</summary>
+
+          - run this command:
+            \`\`\`\`\`diff
+            echo '$(cat scalafmt.patch | sed "s/'/'\\\\''/g")' \\
+            | git am -3
+            \`\`\`\`\`
+          - trigger a workflow run on \`$branch\` with \`autoformat=true\`, either by [using the website](https://github.com/UQ-PAC/BASIL/actions/workflows/run-examples.yml) or by using the \`gh\` tool:
+            \`\`\`bash
+            gh workflow run run-examples.yml --field 'autoformat=true' --ref '$branch'
+            \`\`\`
+          - run the formatter locally:
+            \`\`\`bash
+            ./mill fmt
+            \`\`\`
+
+          </details>
+
+          EOF
+
           if "$AUTOFORMAT"; then
 
             if try_apply; then
@@ -116,7 +140,11 @@ jobs:
               echo 'automated scalafmt applied successfully.' > /tmp/pr-message.txt
             else
               ok=false
-              echo 'automated scalafmt **failed**.' > /tmp/pr-message.txt
+              cat <<EOF > /tmp/pr-message.txt
+              automated scalafmt **failed**. please report this issue and try another method.
+
+              $(cat /tmp/how-to-apply.txt)
+              EOF
             fi
 
           else
@@ -124,16 +152,7 @@ jobs:
             cat <<EOF > /tmp/pr-message.txt
             scalafmt changes needed.
 
-            <details>
-
-            <summary>run this command to apply:</summary>
-
-            \`\`\`\`\`diff
-            echo '$(cat scalafmt.patch | sed "s/'/'\\\\''/g")' \\
-            | git am -3
-            \`\`\`\`\`
-
-            </details>
+            $(cat /tmp/how-to-apply.txt)
             EOF
           fi
 
