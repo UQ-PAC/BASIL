@@ -322,7 +322,7 @@ case class EventuallyProcedure(
   returnBlockLabel: Option[String] = None,
   address: Option[BigInt] = None,
   requires: List[Expr] = List(),
-  ensures: List[Expr] = List(),
+  ensures: List[Expr] = List()
 ) extends DeepEquality {
 
   def name = label + address.fold("")("_" + _)
@@ -403,16 +403,25 @@ case class EventuallyProcedure(
   def cloneable = this.copy(blocks = blocks.map(_.cloneable))
 }
 
-
 case object Unspecified
 
+/**
+ * Main DSL entry point for constructing [[EventuallyProcedure]] values.
+ *
+ * Aside from `label`, all of the parameters are optional. By default,
+ * this function will attempt to infer the return block as the unique
+ * block containing a return statement. This can be disabled by giving
+ * an [[Option]] for `returnBlockLabel`.
+ *
+ * This is the only overload of [[proc]] which defines default parameter
+ * values. Other overloads have fewer parameter and defer to this function.
+ */
 def proc(
   label: String,
-  in: Iterable[(String, IRType)],
-  out: Iterable[(String, IRType)],
-  returnBlockLabel: Option[String] | Unspecified.type = Unspecified,
-  blocks: Iterable[EventuallyBlock]
-): EventuallyProcedure = {
+  in: Iterable[(String, IRType)] = Nil,
+  out: Iterable[(String, IRType)] = Nil,
+  returnBlockLabel: Option[String] | Unspecified.type = Unspecified
+)(blocks: EventuallyBlock*): EventuallyProcedure = {
 
   lazy val inferredReturn = {
     val blocksWithReturn = blocks.filter(_.j.isInstanceOf[EventuallyReturn]).toList
@@ -427,31 +436,24 @@ def proc(
     case x: Option[String] => x
   }
 
-  EventuallyProcedure(label, in.to(SortedMap), out.to(SortedMap), blocks.toSeq, blocks.headOption.map(_.label), _returnBlockLabel)
+  EventuallyProcedure(
+    label,
+    in.to(SortedMap),
+    out.to(SortedMap),
+    blocks,
+    blocks.headOption.map(_.label),
+    _returnBlockLabel
+  )
 }
 
-
-def proc(label: String, blocks: EventuallyBlock*): EventuallyProcedure = {
-  proc(label, Nil, Nil, Unspecified, blocks)
-}
+def proc(label: String, blocks: EventuallyBlock*): EventuallyProcedure = proc(label)(blocks: _*)
 
 def proc(
   label: String,
   in: Iterable[(String, IRType)],
   out: Iterable[(String, IRType)],
   blocks: Iterable[EventuallyBlock]
-): EventuallyProcedure = {
-  proc(label, in, out, Unspecified, blocks)
-}
-
-def proc(
-  label: String,
-  in: Iterable[(String, IRType)],
-  out: Iterable[(String, IRType)],
-  blocks: EventuallyBlock*
-): EventuallyProcedure = {
-  proc(label, in, out, Unspecified, blocks)
-}
+): EventuallyProcedure = proc(label, in, out)(blocks.toSeq: _*)
 
 def mem: SharedMemory = SharedMemory("mem", 64, 8)
 

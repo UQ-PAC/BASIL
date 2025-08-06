@@ -213,7 +213,7 @@ prog(
         "printf",
         Seq("R9_in" -> BitVecType(64), "R0_in" -> BitVecType(64)),
         Seq("R9_out" -> BitVecType(64), "R0_out" -> BitVecType(64))
-      )
+      )()
     )
 
     val expected = """
@@ -235,6 +235,8 @@ prog(
   }
 
   test("return params") {
+    import scala.language.implicitConversions
+
     val p = prog(
       proc(
         "proc",
@@ -250,7 +252,7 @@ prog(
           )
         )
       ),
-      proc("printf", Seq("in" -> BitVecType(64)), Seq("out" -> BitVecType(64)))
+      proc("printf", Seq("in" -> BitVecType(64)), Seq("out" -> BitVecType(64)))()
     )
 
     val expected = """
