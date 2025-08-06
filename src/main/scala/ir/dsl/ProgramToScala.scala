@@ -122,16 +122,29 @@ trait BasilIRToScala {
       x.iterator.map(extractParam).toSeq.toScalaLines
 
     val params = if (x.formalInParam.isEmpty && x.formalOutParam.isEmpty) {
-      LazyList.empty
+      List()
     } else {
-      LazyList(formalParamsToScala(x.formalInParam), formalParamsToScala(x.formalOutParam))
+      List(
+        Twine("in = ", formalParamsToScala(x.formalInParam)),
+        Twine("out = ", formalParamsToScala(x.formalOutParam))
+      )
     }
 
-    Twine.indentNested(
-      s"proc(${x.name.toScala}",
-      params #::: x.blocks.to(LazyList).map(blockToScala),
-      ")",
-      headSep = true
+    val returnBlock = List(Twine("returnBlockLabel = ", x.returnBlock.map(_.label).toScalaLines))
+
+    Twine(
+      Twine.indentNested(
+        s"proc(${x.name.toScala}",
+        params ++ returnBlock,
+        ")",
+        headSep = true
+      ),
+      Twine.indentNested(
+        "(",
+        x.blocks.map(blockToScala).toList,
+        ")",
+        trySingleLine = false,
+      )
     )
   }
 

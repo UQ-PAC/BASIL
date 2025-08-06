@@ -50,7 +50,7 @@ class ToScalaTest extends AnyFunSuite with CaptureOutput with TimeLimitedTests w
 
   val expected = """
 prog(
-  proc("main",
+  proc("main", returnBlockLabel = Some("returnBlock"))(
     block("first_call",
       LocalAssign(GlobalVar("R0", BitVecType(64)), BitVecLiteral(BigInt("1"), 64), None),
       LocalAssign(GlobalVar("R1", BitVecType(64)), BitVecLiteral(BigInt("1"), 64), None),
@@ -61,21 +61,15 @@ prog(
       directCall("callee2"),
       goto("returnBlock")
     ),
-    block("returnBlock",
-      ret
-    )
+    block("returnBlock", ret)
   ),
-  proc("callee1",
-    block("returnBlock",
-      ret
-    )
+  proc("callee1", returnBlockLabel = Some("returnBlock"))(
+    block("returnBlock", ret)
   ),
-  proc("callee2",
-    block("returnBlock",
-      ret
-    )
+  proc("callee2", returnBlockLabel = Some("returnBlock"))(
+    block("returnBlock", ret)
   ),
-  proc("empty procedure")
+  proc("empty procedure", returnBlockLabel = None)()
 )
   """
 
@@ -88,34 +82,28 @@ prog(
     goto("second_call")
   )
 
-  def `procedure:main` = proc("main",
+  def `procedure:main` = proc("main", returnBlockLabel = Some("returnBlock"))(
     `block:main.first_call`,
     block("second_call",
       directCall("callee2"),
       goto("returnBlock")
     ),
-    block("returnBlock",
-      ret
-    )
+    block("returnBlock", ret)
   )
 
-  def `procedure:callee1` = proc("callee1",
-    block("returnBlock",
-      ret
-    )
+  def `procedure:callee1` = proc("callee1", returnBlockLabel = Some("returnBlock"))(
+    block("returnBlock", ret)
   )
 
-  def `procedure:callee2` = proc("callee2",
-    block("returnBlock",
-      ret
-    )
+  def `procedure:callee2` = proc("callee2", returnBlockLabel = Some("returnBlock"))(
+    block("returnBlock", ret)
   )
 
   def program = prog(
     `procedure:main`,
     `procedure:callee1`,
     `procedure:callee2`,
-    proc("empty procedure")
+    proc("empty procedure", returnBlockLabel = None)()
   )
 
   program
@@ -159,9 +147,7 @@ prog(
 
     val expected = """
 {
-  def program = prog(
-    proc("main")
-  )
+  def program = prog(proc("main", returnBlockLabel = None)())
 
   program
 }
@@ -176,15 +162,11 @@ prog(
 
     val expected = """
 {
-  def `procedure:main` = proc("main",
-    block("entry",
-      ret
-    )
+  def `procedure:main` = proc("main", returnBlockLabel = Some("entry"))(
+    block("entry", ret)
   )
 
-  def program = prog(
-    `procedure:main`
-  )
+  def program = prog(`procedure:main`)
 
   program
 }
@@ -219,15 +201,16 @@ prog(
     val expected = """
 prog(
   proc("printf",
-    Seq(
+    in = Seq(
       "R0_in" -> BitVecType(64),
       "R9_in" -> BitVecType(64)
     ),
-    Seq(
+    out = Seq(
       "R0_out" -> BitVecType(64),
       "R9_out" -> BitVecType(64)
-    )
-  )
+    ),
+    returnBlockLabel = None
+  )()
 )
     """
 
@@ -258,21 +241,19 @@ prog(
     val expected = """
 prog(
   proc("proc",
-    Seq(),
-    Seq(
+    in = Seq(),
+    out = Seq(
       "R0_out" -> BitVecType(64),
       "R1_out" -> BitVecType(64),
       "R31_out" -> BitVecType(64)
     ),
+    returnBlockLabel = Some("get_two_1876_basil_return")
+  )(
     block("get_two_1876_basil_return",
       directCall(
-        Seq(
-          "out" -> GlobalVar("R0", BitVecType(64))
-        ),
+        Seq("out" -> GlobalVar("R0", BitVecType(64))),
         "printf",
-        Seq(
-          "in" -> LocalVar("R0", BitVecType(64), 0)
-        )
+        Seq("in" -> LocalVar("R0", BitVecType(64), 0))
       ),
       ret(
         "R0_out" -> LocalVar("R0", BitVecType(64), 0),
@@ -282,13 +263,10 @@ prog(
     )
   ),
   proc("printf",
-    Seq(
-      "in" -> BitVecType(64)
-    ),
-    Seq(
-      "out" -> BitVecType(64)
-    )
-  )
+    in = Seq("in" -> BitVecType(64)),
+    out = Seq("out" -> BitVecType(64)),
+    returnBlockLabel = None
+  )()
 )
     """
 
@@ -486,7 +464,7 @@ prog(
       region = None
     )
   ),
-  proc("knownBitsExample_4196164")
+  proc("knownBitsExample_4196164", returnBlockLabel = None)()
 )
 """
 
