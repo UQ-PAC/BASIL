@@ -40,7 +40,6 @@ trait NativeDepsModule extends JavaModule {
 
     (names zip libs).map((name, lib) => {
       val newPath = Task.dest / s"$name.${plat.os.libExtension}"
-      println(s"copying to $newPath")
       os.copy(lib.path, newPath)
     })
 
