@@ -476,22 +476,13 @@ class IRTest extends AnyFunSuite with CaptureOutput {
     )
     assertResult(Some("retblock"), "no infer because Some")(p.procedures.head.returnBlock.map(_.label))
 
-    p = prog(
-      proc("hi", returnBlockLabel = None)(
-        block("entry", goto("retblock")),
-        block("retblock", ret),
-      )
-    )
+    p = prog(proc("hi", returnBlockLabel = None)(block("entry", goto("retblock")), block("retblock", ret)))
     assertResult(None, "no infer because None")(p.procedures.head.returnBlock.map(_.label))
 
     assertThrows[Exception] {
       // throws because return block not found
-      p = prog(
-        proc("hi", returnBlockLabel = Some("DISAFJAD"))(
-          block("entry", goto("retblock")),
-          block("retblock", ret),
-        )
-      )
+      p =
+        prog(proc("hi", returnBlockLabel = Some("DISAFJAD"))(block("entry", goto("retblock")), block("retblock", ret)))
     }
   }
 
