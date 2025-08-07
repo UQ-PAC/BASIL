@@ -178,8 +178,7 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
    *         e.g. https://github.com/com-lihaoyi/mill/discussions/5360"
    */
   def fmt(ev: mill.api.Evaluator): Command[Unit] = Task.Command(exclusive = true) {
-    ev.execute(Seq(fix()))
-    ev.execute(Seq(test.fix()))
+    ev.execute(Seq(fix(), test.fix()))
     ev.execute(Seq(scalafmt.reformat()))
     ()
   }
