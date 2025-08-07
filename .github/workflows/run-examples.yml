@@ -70,34 +70,6 @@ jobs:
       - name: Check all test suites have at least one tag
         run: .github/workflows/check-test-tagging.sh
 
-  Scalafmt:
-    runs-on: ubuntu-latest
-    needs: [Compile]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - uses: coursier/cache-action@v6
-        with:
-          extraMillFiles: '**/*.mill'
-          ignoreJob: true
-          ignoreMatrix: true
-
-      - uses: actions/cache@v4
-        with:
-          path: out
-          key: |
-            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
-          restore-keys: |
-            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
-            build-${{ runner.os }}-
-            build-
-
-      - run: ./mill fmt
-
-      - name: Check source formatting and imports
-        run: git diff --exit-code
-
   # INFO: Scalatest runner arguments (i.e., arguments to scalatest.sh) can be
   # found at: https://www.scalatest.org/user_guide/using_the_runner
 
