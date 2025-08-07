@@ -1,3 +1,4 @@
+
 import {useEffect, useState, useCallback} from 'react'
 import './App.css'
 import { DiffViewer } from './components/DiffViewer';
@@ -6,6 +7,7 @@ import { Sidebar } from './components/SideBar';
 import { ResizableSidebar } from './components/ResizableSidebar';
 import CfgViewer from './components/CfgViewer';
 import CombinedViewer from './components/CombinedViewer';
+import SettingsModal from './components/SettingsModal'
 import { API_BASE_URL } from './api';
 
 function App() {
@@ -15,6 +17,10 @@ function App() {
     const [loadingEpochs, setLoadingEpochs] = useState(true);
     const [epochError, setEpochError] = useState<string | null>(null);
     const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+    const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(
+        (localStorage.getItem('theme') as 'light' | 'dark' | 'system') || 'system' // TODO: Save into a file instead
+    );
 
     useEffect(() => {
         const fetchEpochNames = async () => {
@@ -57,32 +63,55 @@ function App() {
         setIsSidebarMinimized(!isSidebarMinimized);
     };
 
+    const toggleSettings = () => {
+        setIsSettingsOpen(!isSettingsOpen);
+    };
+
+    useEffect(() => {
+        if (theme === 'system') {
+            document.documentElement.removeAttribute('data-theme');
+        } else {
+            document.documentElement.setAttribute('data-theme', theme);
+        }
+
+        localStorage.setItem('theme', theme);
+    }, [theme]);
+
     return (
-        <div className="app-layout">
-            <Header setViewMode={setViewMode} viewMode={viewMode} />
-            <main className="main-layout">
-                <ResizableSidebar
-                    isSidebarMinimised={isSidebarMinimized}
-                    toggleSidebar={toggleSidebar}
-                >
-                    <Sidebar
-                      epochNames={allEpochNames}
-                      selectedEpochName={selectedEpochName}
-                      onEpochSelect={handleEpochSelect}
-                      loading={loadingEpochs}
-                      error={epochError}
-                    />
-                </ResizableSidebar>
-                {viewMode === 'IR' ? ( // TODO: Change to enums and a switch
-                  <DiffViewer selectedEpochName={selectedEpochName} />
-              ) : viewMode === 'CFG' ? (
-                  <CfgViewer selectedEpochName={selectedEpochName} />
-              ) : ( // 'IR/CFG'
-                  <CombinedViewer
-                      selectedEpochName={selectedEpochName}
-                  />
-              )}
-            </main>
+        <div className="app-container">
+
+            <div className="app-layout">
+                <Header setViewMode={setViewMode} viewMode={viewMode} toggleSettings={toggleSettings} />
+                <main className="main-layout">
+                    <ResizableSidebar
+                        isSidebarMinimised={isSidebarMinimized}
+                        toggleSidebar={toggleSidebar}
+                    >
+                        <Sidebar
+                          epochNames={allEpochNames}
+                          selectedEpochName={selectedEpochName}
+                          onEpochSelect={handleEpochSelect}
+                          loading={loadingEpochs}
+                          error={epochError}
+                        />
+                    </ResizableSidebar>
+                    {viewMode === 'IR' ? ( // TODO: Change to enums and a switch
+                      <DiffViewer selectedEpochName={selectedEpochName} />
+                  ) : viewMode === 'CFG' ? (
+                      <CfgViewer selectedEpochName={selectedEpochName} />
+                  ) : ( // 'IR/CFG'
+                      <CombinedViewer
+                          selectedEpochName={selectedEpochName}
+                      />
+                  )}
+                </main>
+            </div>
+            <SettingsModal
+                isOpen={isSettingsOpen}
+                onClose={toggleSettings}
+                theme={theme}
+                setTheme={setTheme}
+            />
         </div>
     )
 }

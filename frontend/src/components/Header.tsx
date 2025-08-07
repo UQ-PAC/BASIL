@@ -5,9 +5,10 @@ import SettingsIcon from '../assets/icon-settings.svg';
 interface HeaderProps {
     setViewMode: (mode: 'IR' | 'CFG' | 'IR/CFG') => void;
     viewMode: 'IR' | 'CFG' | 'IR/CFG';
+    toggleSettings: () => void;
 }
 
-export function Header({ setViewMode, viewMode }: HeaderProps) {
+export function Header({ setViewMode, viewMode, toggleSettings }: HeaderProps) {
     return (
         <header className="app-header">
             <div className="header-information">
@@ -50,7 +51,7 @@ export function Header({ setViewMode, viewMode }: HeaderProps) {
                 </div>
             </div>
 
-            <button className="settings-button" aria-label="Settings">
+            <button className="settings-button" aria-label="Settings " onClick={toggleSettings}>
                  <SettingsIcon className="settings-icon" />
             </button>
         </header>

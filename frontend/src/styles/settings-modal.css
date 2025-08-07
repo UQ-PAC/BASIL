@@ -1,0 +1,60 @@
+/* settings-modal.css */
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    /*padding: 0.5em 1em;*/
+    padding-left: 10px;
+    border-bottom: 1px solid #ccc;
+    background-color: #f5f5f5;
+}
+
+.modal-title {
+    font-size: 1.25em;
+    font-weight: bold;
+    margin: 0;
+}
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(17, 24, 39, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    z-index: 50;
+}
+
+.modal-content {
+    background-color: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    padding: 10px;
+    width: 100%;
+    max-width: 28rem;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.selection-options {
+    padding: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .modal-content {
+        background-color: #1f2937; /* TODO: Check that this works */
+    }
+}
+
+.close-button {
+    background-color: transparent;
+    border: none;
+    font-size: 25px;
+    cursor: pointer;
+}
+
+.close-button:hover {
+    color: #777;
+}
