@@ -142,10 +142,7 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
     val irType = BitVecType(64)
 
     val program = prog(
-      proc(
-        "main",
-        Set(("R0", irType)),
-        Set(("R0", irType)),
+      proc("main", Set(("R0", irType)), Set(("R0", irType)))(
         block(
           "b",
           MemoryStore(mem, R31, R0, LittleEndian, 64, Some("01")),
@@ -178,10 +175,7 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
     val irType = BitVecType(64)
 
     val program = prog(
-      proc(
-        "main",
-        Set(("R0", irType), ("R1", irType)),
-        Set(("R1", irType)),
+      proc("main", Set(("R0", irType), ("R1", irType)), Set(("R1", irType)))(
         block("call", directCall(Set(("R0", R0)), "malloc", Set(("R0", R0))), goto("b")),
         block(
           "b",
@@ -193,9 +187,8 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
       proc(
         "malloc", // fake malloc
         Set(("R0", BitVecType(64))),
-        Set(("R0", BitVecType(64))),
-        block("malloc_b", m, ret(("R0", R0)))
-      )
+        Set(("R0", BitVecType(64)))
+      )(block("malloc_b", m, ret(("R0", R0))))
     )
 
     program.nameToProcedure("malloc").isExternal = Some(true)
@@ -265,10 +258,7 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
 
     // same as Multi Pointer but multiple pointers are split across procedures
     val program = prog(
-      proc(
-        "main",
-        Set(("R0", irType)),
-        Set(("R1", irType)),
+      proc("main", Set(("R0", irType)), Set(("R1", irType)))(
         block(
           "m",
           MemoryStore(mem, R0, xAddress, Endian.LittleEndian, 64, Some("00")),
@@ -298,10 +288,7 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
 
     // same as Multi Pointer but multiple pointers are split across procedures
     val program = prog(
-      proc(
-        "main",
-        Set(("R0", irType)),
-        Set(("R1", irType)),
+      proc("main", Set(("R0", irType)), Set(("R1", irType)))(
         block("a", directCall(Set(("R1", R0)), "callee", Set(("R0", R0))), goto("b")),
         block(
           "b",
@@ -310,10 +297,7 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
           ret(("R1", R0))
         )
       ),
-      proc(
-        "callee",
-        Set(("R0", irType)),
-        Set(("R1", irType)),
+      proc("callee", Set(("R0", irType)), Set(("R1", irType)))(
         block("c", MemoryLoad(R1, mem, R0, LittleEndian, 64, Some("01")), ret(("R1", R0)))
       )
     )
@@ -338,10 +322,7 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
 
     // same as Multi Pointer but multiple pointers are split across procedures
     val program = prog(
-      proc(
-        "main",
-        Set(("R0", irType)),
-        Set(),
+      proc("main", Set(("R0", irType)), Set())(
         block("a", directCall(Set(("R0", R0)), "malloc", Set(("R0", R0)), Some("heap1")), goto("b")),
         block(
           "b",
@@ -351,10 +332,7 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
         ),
         block("c", MemoryStore(mem, R0, xAddress, LittleEndian, 64, Some("02")), ret)
       ),
-      proc(
-        "malloc",
-        Set(("R0", BitVecType(64))),
-        Set(("R0", BitVecType(64))),
+      proc("malloc", Set(("R0", BitVecType(64))), Set(("R0", BitVecType(64))))(
         block("malloc_b", MemoryLoad(R0, mem, R0, LittleEndian, 64, None), ret(("R0", R0)))
       )
     )
@@ -381,19 +359,13 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
 
     // same as Multi Pointer but multiple pointers are split across procedures
     val program = prog(
-      proc(
-        "main",
-        Set(("R0", irType)),
-        Set(),
+      proc("main", Set(("R0", irType)), Set())(
         block("a", directCall(Set(("R0", R0)), "malloc", Set(("R0", R0)), Some("heap1")), goto("b", "c")),
         block("b", MemoryStore(mem, xAddress, R0, LittleEndian, 64, Some("01")), directCall("callee1"), goto("d")),
         block("c", MemoryStore(mem, xAddress, R0, LittleEndian, 64, Some("02")), directCall("callee2"), goto("d")),
         block("d", ret)
       ),
-      proc(
-        "malloc",
-        Set(("R0", BitVecType(64))),
-        Set(("R0", BitVecType(64))),
+      proc("malloc", Set(("R0", BitVecType(64))), Set(("R0", BitVecType(64))))(
         block("malloc_b", MemoryLoad(R0, mem, R0, LittleEndian, 64, None), ret(("R0", R0)))
       ),
       proc(

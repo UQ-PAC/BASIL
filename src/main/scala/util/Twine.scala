@@ -174,7 +174,12 @@ object Twine {
 
   def shallowIsMultiline(tw: Twine) = tw match {
     case _: Lines | _: Indent => true
-    case _ => false
+    case Concat(parts) =>
+      parts.exists {
+        case _: Lines | _: Indent => true
+        case _ => false
+      }
+    case _: Str => false
   }
 
   /**
@@ -210,18 +215,26 @@ object Twine {
   * ```
   * head tail
   * ```
+  *
+  * If `trySingleLine` is omitted or true, then single-item elements will attempt to
+  * be displayed in a single line. This is subject to the single-element being a
+  * non-multiline Twine.
   */
   def indentNested(
     head: String,
     elems: Iterable[Twine],
     tail: String,
     sep: String = ",",
-    headSep: Boolean = false
+    headSep: Boolean = false,
+    trySingleLine: Boolean = true
   ): Twine = {
     val len = elems.iterator.length
 
-    if (elems.isEmpty) {
+    if (len == 0) {
       Str(head + tail)
+    } else if (len == 1 && trySingleLine && !shallowIsMultiline(elems.head)) {
+      val gap = if headSep then Str(sep + " ") else empty
+      Twine(head, gap, elems.head, tail)
     } else {
       val first = if headSep then Str(head + sep) else Str(head)
       Lines(

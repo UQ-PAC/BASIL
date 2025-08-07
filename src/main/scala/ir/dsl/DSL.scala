@@ -352,8 +352,12 @@ case class EventuallyProcedure(
 
     val (tempBlocks, resolvers) = blocks.map(_.makeResolver).unzip
 
-    val entry = entryBlockLabel.flatMap(b => tempBlocks.find(_.label == b)).orElse(tempBlocks.headOption)
-    val returnBlock = returnBlockLabel.flatMap(b => tempBlocks.find(_.label == b))
+    def blockByName(label: String) = tempBlocks.find(_.label == label).getOrElse {
+      throw Exception(s"failed to find block with label '$label'")
+    }
+
+    val entry = entryBlockLabel.map(blockByName) orElse tempBlocks.headOption
+    val returnBlock = returnBlockLabel.map(blockByName)
 
     val tempProc: Procedure = Procedure(
       label,
@@ -374,7 +378,7 @@ case class EventuallyProcedure(
     def cont(prog: CachedLabelResolver) = {
       resolvers.foreach(_(prog, tempProc.name))
       jumps.foreach((b, j) => b.replaceJump(j.resolve(prog, tempProc.name)))
-      tempBlocks.headOption.foreach(b => tempProc.entryBlock = b)
+      entry.foreach(b => tempProc.entryBlock = b)
     }
 
     (tempProc, cont)
@@ -399,27 +403,52 @@ case class EventuallyProcedure(
   def cloneable = this.copy(blocks = blocks.map(_.cloneable))
 }
 
-def proc(label: String, blocks: EventuallyBlock*): EventuallyProcedure = {
-  EventuallyProcedure(label, SortedMap(), SortedMap(), blocks, blocks.headOption.map(_.label))
+case object Unspecified
+
+/**
+ * Main DSL entry point for constructing [[EventuallyProcedure]] values.
+ *
+ * Aside from `label`, all of the parameters are optional. By default,
+ * this function will attempt to infer the return block as the unique
+ * block containing a return statement. This can be disabled by giving
+ * an [[Option]] for `returnBlockLabel`.
+ *
+ * This is the only overload of [[proc]] which defines default parameter
+ * values. Other overloads have fewer parameter and defer to this function.
+ */
+def proc(
+  label: String,
+  in: Iterable[(String, IRType)] = Nil,
+  out: Iterable[(String, IRType)] = Nil,
+  returnBlockLabel: Option[String] | Unspecified.type = Unspecified
+)(blocks: EventuallyBlock*): EventuallyProcedure = {
+
+  val entryBlock = blocks.headOption
+
+  lazy val inferredReturn = {
+    val blocksWithReturn = blocks.filter(_.j.isInstanceOf[EventuallyReturn]).toSeq
+    blocksWithReturn match {
+      case Seq(b) if entryBlock.forall(_ ne b) => Some(b.label)
+      case _ => None
+    }
+  }
+
+  val _returnBlockLabel = returnBlockLabel match {
+    case Unspecified => inferredReturn
+    case x: Option[String] => x
+  }
+
+  EventuallyProcedure(label, in.to(SortedMap), out.to(SortedMap), blocks, entryBlock.map(_.label), _returnBlockLabel)
 }
+
+def proc(label: String, blocks: EventuallyBlock*): EventuallyProcedure = proc(label)(blocks: _*)
 
 def proc(
   label: String,
   in: Iterable[(String, IRType)],
   out: Iterable[(String, IRType)],
   blocks: Iterable[EventuallyBlock]
-): EventuallyProcedure = {
-  EventuallyProcedure(label, in.to(SortedMap), out.to(SortedMap), blocks.toSeq, blocks.headOption.map(_.label))
-}
-
-def proc(
-  label: String,
-  in: Iterable[(String, IRType)],
-  out: Iterable[(String, IRType)],
-  blocks: EventuallyBlock*
-): EventuallyProcedure = {
-  proc(label, in, out, blocks.toSeq)
-}
+): EventuallyProcedure = proc(label, in, out)(blocks.toSeq: _*)
 
 def mem: SharedMemory = SharedMemory("mem", 64, 8)
 

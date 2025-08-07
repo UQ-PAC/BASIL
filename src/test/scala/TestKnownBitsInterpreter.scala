@@ -29,7 +29,8 @@ class TestKnownBitsInterpreter
     proc(
       "knownBitsExample_4196164",
       Seq("R0_in" -> BitVecType(64), "R1_in" -> BitVecType(64)),
-      Seq("R0_out" -> BitVecType(64), "R2_out" -> BitVecType(64), "R3_out" -> BitVecType(64)),
+      Seq("R0_out" -> BitVecType(64), "R2_out" -> BitVecType(64), "R3_out" -> BitVecType(64))
+    )(
       block(
         "lknownBitsExample",
         LocalAssign(

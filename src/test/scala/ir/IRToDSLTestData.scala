@@ -42,6 +42,7 @@ object IRToDSLTestData {
         "R30_out" -> BitVecType(64),
         "R31_out" -> BitVecType(64)
       ),
+    )(
       block("lmain",
         LocalAssign(LocalVar("R0", BitVecType(64), 0), LocalVar("R0_in", BitVecType(64), 0), None),
         LocalAssign(LocalVar("R10", BitVecType(64), 0), LocalVar("R10_in", BitVecType(64), 0), None),
@@ -226,6 +227,7 @@ object IRToDSLTestData {
         "R1_out" -> BitVecType(64),
         "R31_out" -> BitVecType(64)
       ),
+    )(
       block("lget_two",
         LocalAssign(LocalVar("R0", BitVecType(64), 0), LocalVar("R0_in", BitVecType(64), 0), None),
         LocalAssign(LocalVar("R10", BitVecType(64), 0), LocalVar("R10_in", BitVecType(64), 0), None),
@@ -319,7 +321,7 @@ object IRToDSLTestData {
         "R8_out" -> BitVecType(64),
         "R9_out" -> BitVecType(64)
       )
-    )
+    )()
   ).cloneable
 
 }

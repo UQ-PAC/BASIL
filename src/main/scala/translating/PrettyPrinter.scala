@@ -409,8 +409,9 @@ class BasilIRPrettyPrinter(
 
     val addr = p.address.map(l => vaddress(l).toString).map(Sigil.BASIR.attrib + "address = " + _).toList
     val pname = Seq(s"${Sigil.BASIR.attrib}name = \"${p.procName}\"")
+    val retblock = p.returnBlock.map(b => s"${Sigil.BASIR.attrib}returnBlock = \"${b.label}\"")
 
-    val allattrs = pname ++ addr
+    val allattrs = pname ++ addr ++ retblock
 
     val attrs = if allattrs.isEmpty then "" else "  { " + allattrs.map("" + _).mkString("; ") + " }"
 
