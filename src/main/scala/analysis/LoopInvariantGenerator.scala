@@ -54,10 +54,8 @@ class SingleLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
  * @param solver
  *   : A type of worklist solver which may or may not support widening or narrowing
  */
-class ForwardLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
-  domain: A,
-  solver: worklistSolver[L, A]
-) extends SingleLoopInvariantGenerator(domain, solver, false)
+class ForwardLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](domain: A, solver: worklistSolver[L, A])
+    extends SingleLoopInvariantGenerator(domain, solver, false)
 
 /** Performs a single backwards analysis to generate loop invariants that hold at the start of a block. This will be
  *  encoded as an assertion at the start of a block. Invariants will only be generated on loop heads, and so loop head
@@ -73,10 +71,8 @@ class ForwardLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
  * @param solver
  *   : A type of worklist solver which may or may not support widening or narrowing
  */
-class BackwardLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](
-  domain: A,
-  solver: worklistSolver[L, A]
-) extends SingleLoopInvariantGenerator(domain, solver, true)
+class BackwardLoopInvariantGenerator[L, A <: PredicateEncodingDomain[L]](domain: A, solver: worklistSolver[L, A])
+    extends SingleLoopInvariantGenerator(domain, solver, true)
 
 /** Runs a collection of analyses to produce loop invariants, then inserts them into the IR.
  */
@@ -89,7 +85,9 @@ class FullLoopInvariantGenerator(program: Program) {
 
     // Intervals give us constant bounds on variables, for example an iteration variable in a loop guard.
     val intervals = DoubleIntervalDomain(Some(procedure))
-    post += ForwardLoopInvariantGenerator(intervals, worklistSolver(intervals, true, true)).generateInvariants(procedure)
+    post += ForwardLoopInvariantGenerator(intervals, worklistSolver(intervals, true, true)).generateInvariants(
+      procedure
+    )
 
     // Gamma domains ensure that relations of the gammas of variables are maintained throughout loop iterations.
     // Currently broken! The gamma domains don't produce predicates correctly it seems
