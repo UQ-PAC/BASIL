@@ -344,6 +344,8 @@ class Procedure private (
         l.deepEqualsDbg(r)
       }
     }
+    // `corresponds` tests whether its iterable arguments are equal, using the given predicate
+    // to compare elements pairwise.
     && (returnBlock corresponds p.returnBlock)(_ deepEqualsDbg _)
   }
 
