@@ -7,17 +7,6 @@
     box-sizing: border-box;
 }
 
-.d2h-wrapper {
-    /*max-width: 100% !important;*/
-    /*overflow-x: visible;*/
-}
-
-.d2h-code-side-line,
-.d2h-code-line {
-    /*white-space: pre-wrap; !* Wrap long lines *!*/
-    /*word-break: break-word; !* Break inside long tokens *!*/
-}
-
 .d2h-file-header {
     display: flex;
     justify-content: center;

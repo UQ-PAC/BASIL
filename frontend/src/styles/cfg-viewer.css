@@ -60,7 +60,7 @@
 
 .react-flow-instance {
     flex-grow: 1;
-    height: 100%;
+    height: 100vh; /* TODO: Fix up to make it dynamically size */
     width: 100%;
     position: relative;
 }

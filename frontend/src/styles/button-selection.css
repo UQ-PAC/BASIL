@@ -23,7 +23,6 @@
     display: flex;
     gap: 2px;
     align-items: flex-start;
-    border: 1px solid #ccc;
     border-radius: 4px;
     overflow: hidden;
 }
@@ -32,10 +31,10 @@
     padding: 2px 8px;
     font-size: 0.9em;
     line-height: 1.2;
-    cursor: pointer;
-    background-color: #f5f5f5;
-    color: #333;
-    border: none;
+    cursor: pointer; /* TODO: This isn't being set */
+    /*background-color: #f5f5f5;*/
+    /*color: #333;*/
+    /*border: none;*/
     transition: background-color 0.2s ease;
     position: relative;
 }
@@ -71,33 +70,21 @@
 
 .procedure-label {
     font-size: 0.9em;
-    color: #1a1a1a;
+    color: var(--text-color);
     white-space: nowrap;
 }
 
-/* Styles for dark mode */
-@media (prefers-color-scheme: dark) {
-    .procedure-label {
-        color: #e0e0e0; /* Light text for dark mode (e.g., a light grey) */
-    }
+.procedure-dropdown {
+    color: var(--text-color);
+    background-color: var(--background-color);
 }
-
-/*@media (prefers-color-scheme: dark) {*/
-/*    .procedure-select {*/
-/*        color: #e0e0e0; !* Light text for dark mode (e.g., a light grey) *!*/
-/*    }*/
-/*}*/
 
 .procedure-dropdown:hover {
     border-color: #888;
-    background-color: #bfbfbf;
+    background-color: var(--dropdown-background-color-hover);
 }
 
 .procedure-dropdown option {
     background-color: #999; /* Option background */
     color: #ddd; /* Option text color */
-}
-
-.procedure-dropdown option[value=""][disabled] {
-    color: #bbb; /* Lighter color for disabled placeholder option */
 }

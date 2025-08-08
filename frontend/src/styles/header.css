@@ -35,9 +35,6 @@
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    /*display: flex;*/
-    /*align-items: center;*/
-    /*flex-direction: column;*/
 }
 
 .settings-button {
@@ -47,11 +44,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    fill: #6a737d;
+    fill: var(--header-settings-icon-color);
 }
 
 .settings-button:hover {
-    fill: #3d4c6a;
+    fill: var(--header-settings-icon-color-hover);
 }
 
 .settings-icon {

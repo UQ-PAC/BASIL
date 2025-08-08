@@ -27,9 +27,10 @@ interface IREpochData {
 
 interface DiffViewerProps {
     selectedEpochName: string | null;
+    theme: string | null;
 }
 
-export function DiffViewer({ selectedEpochName }: DiffViewerProps) {
+export function DiffViewer({ selectedEpochName, theme }: DiffViewerProps) {
     const [irData, setIrData] = useState<IREpochData | null>(null);
     const [contextLines, setContextLines] = useState(5);
     const [outputFormat, setOutputFormat] = useState<'side-by-side' | 'line-by-line'>('side-by-side');
@@ -183,13 +184,20 @@ export function DiffViewer({ selectedEpochName }: DiffViewerProps) {
         );
         // console.log("Generated diffText:", diffText);
 
+        let diffColorScheme = ColorSchemeType.AUTO;
+        if (theme == 'dark') {
+            diffColorScheme = ColorSchemeType.DARK;
+        } if (theme == 'light') {
+            diffColorScheme = ColorSchemeType.LIGHT;
+        }
+
         diffContainer.innerHTML = '';
         const ui = new Diff2HtmlUI(diffContainer, diffText, {
             drawFileList: false,
             outputFormat,
             matching: 'lines',
             highlight: false,
-            colorScheme: ColorSchemeType.AUTO, // TODO: End result I want auto
+            colorScheme: diffColorScheme,
         });
 
         requestAnimationFrame(() => {
@@ -233,7 +241,7 @@ export function DiffViewer({ selectedEpochName }: DiffViewerProps) {
                 console.error("Error during diff rendering or highlighting:", error);
             }
         });
-    }, [irData, contextLines, outputFormat]);
+    }, [irData, contextLines, outputFormat, theme]);
 
     // --- Conditional rendering: these checks must come AFTER all hooks ---
     if (loading) {

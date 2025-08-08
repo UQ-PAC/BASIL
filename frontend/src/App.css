@@ -1,16 +1,88 @@
-#root {
-  /*max-width: 1280px;*/
-  /*margin: 0 auto;*/
-  /*padding: 2rem;*/
-  /*text-align: center;*/
+/* TODO: Move these to a different class */
+
+:root {
+    /* Main display */
+    --background-color: #ffffff;
+    --text-color: #1f2937;
+
+    /* Modal styles */
+    --modal-header-background-color: #f5f5f5;
+    --border-color: #ccc;
+}
+
+/* TODO: Maybe there is a cleaner way to do this later on */
+[data-theme='dark'] {
+    /* Main display */
+    --background-color: #1f2937;
+    --text-color: #f3f4f6;
+
+    /* Modal styles */
+    --modal-header-background-color: #313d53;
+    --border-color: #777;
+
+    /* Sidebar styles */
+    --sidebar-header-color: #f0f0f0;
+    --sidebar-background-color: #313d53;
+
+    /* Header styles */
+    --header-settings-icon-color: #919daa;
+    --header-settings-icon-color-hover: #b3bad5;
+
+    /* DropDown styles */
+    --dropdown-background-color-hover: #3c3c3c;
+}
+
+[data-theme='light'] {
+    /* Main display */
+    --background-color: #ffffff;
+    --text-color: #1f2937;
+
+    /* Modal styles */
+    --modal-header-background-color: #f5f5f5;
+    --border-color: #ccc;
+
+    /* Sidebar styles */
+    --sidebar-header-color: #333;
+    --sidebar-background-color: #f0f0f0;
+
+    /* Header styles */
+    --header-settings-icon-color: #6a737d;
+    --header-settings-icon-color-hover: #3d4c6a;
+
+    /* DropDown styles */
+    --dropdown-background-color-hover: #bfbfbf;
+}
+
+/* TODO: Check that this works */
+[data-theme='system'] {
+    @media (prefers-color-scheme: light) {
+        --background-color: #ffffff;
+        --text-color: #1f2937;
+
+        --modal-header-background-color: #f5f5f5;
+
+        --border-color: #ccc;
+    }
+}
+
+[data-theme='system'] {
+    @media (prefers-color-scheme: dark) {
+        /* Main display */
+        --background-color: #1f2937;
+        --text-color: #f3f4f6;
+
+        /* Modal styles */
+        --modal-header-background-color: #313d53;
+        --border-color: #000000;
+    }
 }
 
 .app-layout {
     display: flex;
     flex-direction: column;
-    /*width: 100vw;*/
     min-height: 100vh;
-    height: 100vh;
+    background-color: var(--background-color);
+    color: var(--text-color);
 }
 
 .main-layout {

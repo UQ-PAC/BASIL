@@ -96,7 +96,7 @@ function App() {
                         />
                     </ResizableSidebar>
                     {viewMode === 'IR' ? ( // TODO: Change to enums and a switch
-                      <DiffViewer selectedEpochName={selectedEpochName} />
+                      <DiffViewer selectedEpochName={selectedEpochName} theme={theme} />
                   ) : viewMode === 'CFG' ? (
                       <CfgViewer selectedEpochName={selectedEpochName} />
                   ) : ( // 'IR/CFG'
