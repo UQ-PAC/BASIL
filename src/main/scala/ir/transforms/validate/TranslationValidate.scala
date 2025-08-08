@@ -96,9 +96,6 @@ type ProcID = String
 
 /**
  * Describes the mapping from source variable to target expression at a given Block ID in the source program.
- *
- * FIXME: block ids are not required globally unique (althoguh they still are in practice I think),
- *  so this signature isn't precise enough to capture all possible transforms 
  */
 type TransformDataRelationFun = (ProcID, Option[BlockID]) => (Variable | Memory) => Seq[Expr]
 type TransformTargetTargetFlowFact = ProcID => Map[Variable, Expr]
@@ -301,14 +298,7 @@ class TranslationValidator {
             // case (l: Variable, Some(r)) => Seq(l, r)
             case (l: (Variable | Memory), r) => Seq(SideEffectStatementOfStatement.param(l)._2) ++ r
             case (_, r) => r.toSeq
-            case _ => Seq()
           }
-          // ++ frames(r.parent.parent.name).rhs.flatMap {
-          //  // case (l: Variable, Some(r)) => Seq(l, r)
-          //  case (l: (Variable | Memory), r) =>  Seq(SideEffectStatementOfStatement.param(l)._2) ++ r.toSeq.flatMap(_.variables)
-          //  case (_, r) => r.toSeq.flatMap(_.variables)
-          //  case _ => Seq()
-          // }
 
           (s -- r.outParams.map(_._1)) ++ outFormal ++ r.outParams.flatMap(_._2.variables) ++ Seq(
             TransitionSystem.traceVar,
@@ -389,11 +379,6 @@ class TranslationValidator {
           BinaryExpr(BoolIMPLIES, exprInSource(rn), pred)
         Assume(guarded, c)
       }
-      // case Global(pred, c) => {
-      //  val ssaRenamed = label.map(label => pred.map(renameSrcSSA(label, _), renameTgtSSA(label, _))).getOrElse(pred)
-      //  val pr = ssaRenamed.toPred(exprInSource, exprInTarget)
-      //  Assume(pr, c)
-      // }
     }
 
     def toAssert = i.toAssume match {
@@ -413,15 +398,6 @@ class TranslationValidator {
 
   def extractProg(proc: Procedure): Iterable[Expr] = {
     var assumes = List[Expr]()
-    //
-    // val begins = proc.entryBLock.get :: proc.blocks.toList.collect {
-    //  case p if p.prevBlocks.isEmpty => p
-    // }.filterNot(proc.entryBlock.contains)
-
-    // val seen = Set[Block]()
-    // for (begin <- begins) {
-
-    // }
 
     val begin = proc.entryBlock.get
     for (nb <- begin.forwardIteratorFrom) {
@@ -952,14 +928,6 @@ class TranslationValidator {
                 .toSet
                 .flatten
 
-              // val relatedVars : Set[Variable] = vars.map(variableSets.get(_).get.toScalaSet).toSet.flatten
-
-              // val relatedStmts = combinedProc.foreach {
-              //  case a @ Assume(Conj(b), _, _, _) => b.filter(b => b.variables.exists(relatedVars.contains)).foreach(e => println(translating.PrettyPrinter.pp_expr(e)))
-              //  case a @ Assume(b, _, _, _) if b.variables.exists(relatedVars.contains) => println(translating.PrettyPrinter.pp_stmt(a))
-              //  case _ => ()
-              // }
-
             }
             case _ => ()
           }
@@ -1131,61 +1099,15 @@ class TranslationValidator {
     TransitionSystem.removeUnreachableBlocks(source)
     TransitionSystem.removeUnreachableBlocks(target)
 
-    def inputs(c: CallParamMapping) = {
-      c.rhs.collect {
-        case (l, Some(r: Variable)) => r
-        case (l: (Variable | Memory), _) => SideEffectStatementOfStatement.param(l)._2
-        case _ => ???
-      }
-    }
-
-    def outputs(isSource: Boolean)(c: CallParamMapping) = {
-      // def fvInv = {
-      //  (equalVarsInvariant ++ invEverywhere).toSeq.flatMap {
-      //    case Inv.CutPoint(l, ca, _) =>
-      //      ca.flatMap {
-      //        case CompatArg(source, target) => if isSource then source.variables else target.variables
-      //        case TargetTerm(target) => if isSource then Seq() else target.variables
-      //      }
-      //    case Inv.SourceConditionalConstraint(g, c, ca, _) => ???
-      //    case Inv.GlobalConstraint(g, ca, _) =>
-      //      ca.flatMap {
-      //        case CompatArg(source, target) => if isSource then source.variables else target.variables
-      //        case TargetTerm(target) => if isSource then Seq() else target.variables
-      //      }
-      //  }
-      // }
-
-      c.lhs.collect {
-        case (l, Some(r: Variable)) => r
-        case (l: (Variable | Memory), _) => SideEffectStatementOfStatement.param(l)._2
-        case _ => ???
-      }
-    }
-
     // val inputs = TransitionSystem.programCounterVar :: TransitionSystem.traceVar :: (globalsForProc(proc).toList)
     val frames = (afterFrame ++ beforeFrame)
 
-    val (srcRenameSSA, srcSSADefs) = SSADAG.transform(
-      sourceParams,
-      source,
-      inputs(sourceParams(proc.name)),
-      outputs(true)(sourceParams(proc.name)),
-      liveVarsSource
-    )
-    val (tgtRenameSSA, tgtSSADefs) = SSADAG.transform(
-      targetParams,
-      target,
-      inputs(targetParams(proc.name)),
-      outputs(false)(targetParams(proc.name)) ++ (flowFacts(proc.name).flatMap { case (k, v) =>
-        Set(k) ++ v.variables
-      }).toSet,
-      liveVarsTarget
-    )
+    val (srcRenameSSA, srcSSADefs) = SSADAG.transform(sourceParams, source, liveVarsSource)
+    val (tgtRenameSSA, tgtSSADefs) = SSADAG.transform(targetParams, target, liveVarsTarget)
     timer.checkPoint("SSA")
 
     def targetDefined(block: BlockID): Set[Variable] = {
-      tgtSSADefs.get(block).map(_.keys).toSet.flatten ++ inputs(targetParams(proc.name))
+      tgtSSADefs.get(block).map(_.keys).toSet.flatten
     }
 
     val equalVarsInvariant = getEqualVarsInvariantRenaming(

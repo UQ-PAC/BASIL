@@ -15,16 +15,10 @@ object SSADAG {
   *
   * Returns the SSA renaming for each block entry in the CFA.
   */
-  def transform(
-    frames: Map[String, CallParamMapping],
-    p: Procedure,
-    inputs: List[Variable],
-    outputs: List[Variable],
-    liveVarsBefore: Map[String, Set[Variable]]
-  ) = {
+  def transform(frames: Map[String, CallParamMapping], p: Procedure, liveVarsBefore: Map[String, Set[Variable]]) = {
     convertToMonadicSideEffect(frames, p)
 
-    ssaTransform(p, inputs, outputs, liveVarsBefore)
+    ssaTransform(p, liveVarsBefore)
   }
 
   private class Passify extends CILVisitor {
@@ -70,8 +64,6 @@ object SSADAG {
   */
   def ssaTransform(
     p: Procedure,
-    inputs: List[Variable],
-    outputs: List[Variable],
     liveVarsBefore: Map[String, Set[Variable]]
   ): (((String, Expr) => Expr), Map[BlockID, Map[Variable, Variable]]) = {
 
@@ -90,10 +82,6 @@ object SSADAG {
         case l: LocalVar => l.copy(varName = l.name + "_AT" + renameCount, index = 0)
         case l: GlobalVar => l.copy(name = l.name + "_AT" + renameCount)
       }
-
-    for (eb <- p.entryBlock) {
-      // renameBefore(eb) = inputs.map(i => i -> freshName(i)).toMap
-    }
 
     class RenameRHS(rn: Variable => Option[Variable]) extends CILVisitor {
       override def vrvar(v: Variable) = ChangeTo(rn(v).getOrElse(v))
@@ -146,36 +134,13 @@ object SSADAG {
       val b = worklist.dequeue()
 
       var blockDoneCond = List[Expr](boolOr(b.prevBlocks.map(blockDone).toList))
-      // println("inputs not outputs : " + (inputs.toSet --outputs))
 
-      val alwaysLive = (outputs ++ inputs).toSet
       def live(v: Variable) =
-        // FIXME: the alwaysLive set is hacky
-        // this is too caorse, reducing phi nodes probably neccessary for termination?
-        // There is probably something missing from the real liveness analysis
-        // val d = alwaysLive -- liveVarsBefore.get(b.label).toSet.flatten
-        if (alwaysLive.contains(v) && !liveVarsBefore.get(b.label).forall(_.contains(v))) {
-          // println(s"Missed: $v (at ${b.label})")
-        }
         liveVarsBefore
           .get(b.label)
-          .forall(
-            _.contains(v)
-          ) // || v.name.startsWith("SYNTH") || v.name.startsWith( "TRACE") || alwaysLive.contains(v)
+          .forall(_.contains(v))
 
       if (b.prevBlocks.nonEmpty) then {
-        // val defines: Iterable[(Block, Seq[(Variable, Variable)])] =
-        //  b.prevBlocks.flatMap(b => stRename.get(b).map(renames => b -> renames.toSeq.filter((k, v) => live(k))))
-        // var varToRenamings: Map[Variable, Iterable[(Block, Variable, Variable)]] =
-        //  defines
-        //    .flatMap { case (b, rns) =>
-        //      rns.map { case (v, rn) =>
-        //        (b, v, rn)
-        //      }
-        //    }
-        //    .groupBy(_._2)
-
-        // println(s"Live at: ${b.label}: ${liveVarsBefore.get(b.label)}")
         val defines: Seq[Variable] =
           (b.prevBlocks.toSeq.flatMap(b => stRename.get(b).toSeq.flatMap(_.map(_._1).filter(live)))).toSet.toSeq
 
@@ -198,10 +163,6 @@ object SSADAG {
             }
 
             val phicond = grouped.toList
-
-            // val phicond = defsToJoin.map((b, nv) => {
-            //  BinaryExpr(BoolIMPLIES, blockDone(b), polyEqual(nv, fresh))
-            // }).toList
 
             val phiscond = if (phicond.length > 8) then {
               phicond.map(b => Assume(b, None, Some(phiLabel)))

@@ -319,11 +319,7 @@ object Ackermann {
 
     val q = mutable.Queue[((Option[SideEffectStatement], CFGPosition), (Option[SideEffectStatement], CFGPosition))]()
     val start = ((None, sourceEntry), (None, targetEntry))
-    if (true) {
-      // FIXME: -> [[instantiations.nonEmpty]] ; was previously conditional on there being any side-effects in the function, to fix a nontermination
-      // bug, unclear if this is neccessary
-      q.enqueue(start)
-    }
+    q.enqueue(start)
 
     def flatMapSucc(s: CFGPosition): Seq[SideEffectStatement] = {
       succ(s).toSeq.flatMap {
@@ -335,11 +331,12 @@ object Ackermann {
     val seenQ = mutable.Set[((Option[SideEffectStatement], CFGPosition), (Option[SideEffectStatement], CFGPosition))]()
 
     while {
+      // should probably fix the traversal order to avoid re-queuing but this works for now
       var c = q.dequeue
-      // while (seenQ.contains(c) && q.nonEmpty) {
-      //  c = q.dequeue
-      // }
-      // seenQ += c
+      while (seenQ.contains(c) && q.nonEmpty) {
+        c = q.dequeue
+      }
+      seenQ += c
 
       val ((srcCall, srcPos), (tgtCall, tgtPos)) = c
 

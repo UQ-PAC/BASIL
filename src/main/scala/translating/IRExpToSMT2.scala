@@ -2,7 +2,6 @@ package translating
 
 import ir.*
 import ir.cilvisitor.*
-import util.{OnCrash, RingTrace}
 
 import java.io.{BufferedWriter, File, FileWriter, Writer}
 
@@ -180,10 +179,23 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
 
 enum Sexp[+T] {
   case Symb(v: String)
-  case Slist(v: List[Sexp[T]])
+  case Slist(v: Iterable[Sexp[T]])
 }
 
 object Sexp {
+
+  def write[T](b: Writer, s: Sexp[T]): Unit = s match {
+    case Sexp.Symb(a) => b.append(a)
+    case Sexp.Slist(v) => {
+      b.append("(")
+      for (s <- v) {
+        write(b, s)
+        b.append(" ")
+      }
+      b.append(")")
+    }
+
+  }
 
   def print[T](s: Sexp[T]): String = s match {
     case Sexp.Symb(a) => a
@@ -192,12 +204,9 @@ object Sexp {
 }
 
 def sym[T](l: String): Sexp[T] = Sexp.Symb[T](l)
-def list[T](l: Sexp[T]*): Sexp[T] = Sexp.Slist(l.toList)
+def list[T](l: Sexp[T]*): Sexp[T] = Sexp.Slist(l)
 
-val dumpTrace = RingTrace[String](3, "BasilIRToSMT2")
 object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
-
-  OnCrash.register(dumpTrace)
 
   def vload(lhs: Sexp[Variable], mem: String, index: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryLoad] = ???
   def vstore(mem: Memory, index: Sexp[Expr], value: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryStore] = ???
@@ -265,7 +274,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       val getUnsat = if getUnsatCore then Seq(list(sym("get-unsat-core"))) else Seq()
 
       def psexp(p: Sexp[Expr]) = {
-        b.append(Sexp.print(p))
+        Sexp.write(b, p)
         b.append("\n")
       }
 
@@ -377,11 +386,9 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   override def vextract(ed: Int, start: Int, a: Sexp[Expr]): Sexp[Expr] =
     list(list(sym("_"), sym("extract"), int2smt(ed - 1), int2smt(start)), a)
   override def vbinary_expr(e: BinOp, l: Sexp[Expr], r: Sexp[Expr]): Sexp[Expr] = {
-    dumpTrace.add(e.toString + "(" + l + "," + r + ")")
     list(sym(opnameToFun(e)), l, r)
   }
   override def vassoc_expr(e: BoolBinOp, l: List[Sexp[Expr]]): Sexp[Expr] =
-    dumpTrace.add(e.toString + "(" + l.mkString(",") + ")")
     Sexp.Slist(sym(opnameToFun(e)) :: l)
   override def vunary_expr(e: UnOp, arg: Sexp[Expr]): Sexp[Expr] = list(sym(unaryOpnameToFun(e)), arg)
 
