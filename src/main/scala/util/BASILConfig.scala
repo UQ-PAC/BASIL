@@ -86,6 +86,7 @@ case class BASILConfig(
   tvSimp: Boolean = false,
   dsaConfig: Option[DSConfig] = None,
   summariseProcedures: Boolean = false,
+  generateLoopInvariants: Boolean = false,
   generateRelyGuarantees: Boolean = false,
   memoryTransform: Boolean = false,
   assertCalleeSaved: Boolean = false,

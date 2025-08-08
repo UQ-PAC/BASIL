@@ -195,11 +195,13 @@ object Main {
     threadSplit: Flag,
     @arg(name = "parameter-form", doc = "Lift registers to local variables passed by parameter")
     parameterForm: Flag,
-    @arg(
-      name = "summarise-procedures",
-      doc = "Generates summaries of procedures which are used in pre/post-conditions (requires --analyse flag)"
-    )
+    @arg(name = "summarise-procedures", doc = "Generates summaries of procedures which are used in pre/post-conditions")
     summariseProcedures: Flag,
+    @arg(
+      name = "generate-loop-invariants",
+      doc = "Generates loop invariants on loop headers (will not run with --no-irreducible-loops)"
+    )
+    generateLoopInvariants: Flag,
     @arg(
       name = "generate-rely-guarantees",
       doc = "Generates rely-guarantee conditions for each procedure that contains a return node."
@@ -478,6 +480,7 @@ object Main {
       simplify = simplifyMode,
       validateSimp = conf.validateSimplify.value,
       summariseProcedures = conf.summariseProcedures.value,
+      generateLoopInvariants = conf.generateLoopInvariants.value,
       generateRelyGuarantees = conf.generateRelyGuarantees.value,
       staticAnalysis = staticAnalysis,
       boogieTranslation = boogieGeneratorConfig,

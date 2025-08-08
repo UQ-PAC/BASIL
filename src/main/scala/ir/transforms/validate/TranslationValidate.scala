@@ -1339,8 +1339,8 @@ class TranslationValidator {
     val pinv = UnaryExpr(BoolNOT, BinaryExpr(BoolOR, sourceAssumeFail, AssocExpr(BoolAND, primedInv.toList)))
     npe.map(_.statements.append(Assert(pinv, Some("InvPrimed"))))
     b.addAssert(pinv, Some("InvPrimed"))
-    timer.checkPoint("extract prog")
     prover.map(_.addConstraint(pinv))
+    timer.checkPoint("extract prog")
 
     val smtPath = config.outputPath.map(f => s"$f/${runNamePrefix}.smt2")
 

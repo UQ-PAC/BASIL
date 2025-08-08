@@ -410,6 +410,10 @@ object IRTransform {
     modified
   }
 
+  def generateLoopInvariants(IRProgram: Program) = {
+    FullLoopInvariantGenerator(IRProgram).addInvariants()
+  }
+
   def generateRelyGuaranteeConditions(threads: List[Procedure]): Unit = {
     /* Todo: For the moment we are printing these to stdout, but in future we'd
     like to add them to the IR. */
@@ -433,6 +437,17 @@ object IRTransform {
 /** Methods relating to program static analysis.
   */
 object StaticAnalysis {
+
+  def reducibleLoops(IRProgram: Program) = {
+    StaticAnalysisLogger.debug("reducible loops")
+    val foundLoops = LoopDetector.identify_loops(IRProgram)
+    foundLoops.irreducibleLoops.foreach(l => StaticAnalysisLogger.debug(s"Irreducible loop found: ${l.name}"))
+
+    val newLoops = foundLoops.reducibleTransformIR().identifiedLoops
+    newLoops.foreach(l => StaticAnalysisLogger.debug(s"Loop found: ${l.name}"))
+
+    foundLoops.updateIrWithLoops()
+  }
 
   /** Run all static analysis passes on the provided IRProgram.
     */
@@ -471,16 +486,9 @@ object StaticAnalysis {
     StaticAnalysisLogger.debug("Subroutine Addresses:")
     StaticAnalysisLogger.debug(subroutines)
 
-    StaticAnalysisLogger.debug("reducible loops")
     // reducible loops
     if (config.irreducibleLoops) {
-      val foundLoops = LoopDetector.identify_loops(IRProgram)
-      foundLoops.irreducibleLoops.foreach(l => StaticAnalysisLogger.debug(s"Irreducible loop found: ${l.name}"))
-
-      val newLoops = foundLoops.reducibleTransformIR().identifiedLoops
-      newLoops.foreach(l => StaticAnalysisLogger.debug(s"Loop found: ${l.name}"))
-
-      foundLoops.updateIrWithLoops()
+      reducibleLoops(IRProgram)
 
       config.analysisDotPath.foreach { s =>
         AnalysisResultDotLogger.writeToFile(
@@ -1018,15 +1026,9 @@ object RunUtils {
     }
 
     if (conf.summariseProcedures) {
-      StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
-      IRTransform.generateProcedureSummaries(
-        ctx,
-        ctx.program,
-        q.loading.parameterForm || conf.simplify != SimplifyMode.Disabled
-      )
-    }
-
-    if (conf.summariseProcedures) {
+      if (!conf.staticAnalysis.exists(_.irreducibleLoops)) {
+        StaticAnalysis.reducibleLoops(ctx.program)
+      }
       StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
       IRTransform.generateProcedureSummaries(
         ctx,

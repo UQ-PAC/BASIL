@@ -123,7 +123,7 @@ trait ProcedureSummaryGenerator[L, LocalDomain] extends ProcAbstractDomain[L] {
   ): L
 }
 
-/** Intraprocedural worklist solver.
+/** A general worklist solver which optionally supports widening and narrowing on loop heads.
   *
   * Traverses blocks in reverse-post-order so requires [[rpoOrder()]] to have been run on the procedure.
   *
@@ -134,7 +134,7 @@ trait ProcedureSummaryGenerator[L, LocalDomain] extends ProcAbstractDomain[L] {
   * @param domain:
   *   The abstract domain implementing the analysis
   */
-class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
+class worklistSolver[L, A <: AbstractDomain[L]](domain: A, widen: Boolean = false, narrow: Boolean = false) {
 
   /** Perform the analysis on a procedure and return the resulting lattice values for each block.
     *
@@ -176,7 +176,10 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
         mutable.PriorityQueue[Block]()(Ordering.by(b => b.rpoOrder))
       }
     }
-    worklist.addAll(initial)
+    val initial2 = initial.iterator.to(List)
+    worklist.addAll(initial2)
+
+    var narrowing = false
 
     def successors(b: Block) = if backwards then b.prevBlocks else b.nextBlocks
     def predecessors(b: Block) = if backwards then b.nextBlocks else b.prevBlocks
@@ -199,11 +202,14 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
 
       val prev = savedAfter.get(b)
       val x = {
-        predecessors(b).toList.flatMap(b => savedAfter.get(b).toList) match {
+        val y = predecessors(b).toList.flatMap(b => savedAfter.get(b).toList) match {
           case Nil => domain.init(b)
           case h :: Nil => h
           case h :: tl => tl.foldLeft(h)((acc, nb) => domain.join(acc, nb, b))
         }
+        if narrowing && b.isLoopHeader() then domain.narrow(savedBefore.getOrElse(b, domain.bot), y)
+        else if widen && b.isLoopHeader() then domain.widen(savedBefore.getOrElse(b, domain.bot), y, b)
+        else y
       }
       savedBefore(b) = x
       val todo = List(b)
@@ -230,7 +236,13 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
         }
         worklist.addAll(successors(lastBlock))
       }
+
+      if (narrow && !narrowing && worklist.isEmpty) {
+        worklist.addAll(initial2)
+        narrowing = true
+      }
     }
+
     if backwards then (savedAfter.toMap, savedBefore.toMap) else (savedBefore.toMap, savedAfter.toMap)
   }
 }
@@ -267,7 +279,7 @@ class interprocSummaryFixpointSolver[SummaryAbsVal, LocalAbsVal, A <: AbstractDo
     backwards: Boolean
   ): SummaryAbsVal = {
     val domain = DomainWithFunctionSummaries(localDomain, getSummary, sg.localTransferCall)
-    val solver = worklistSolver(domain)
+    val solver = worklistSolver(domain, false, false)
     val (beforeRes, afterRes) = solver.solveProc(b, backwards)
     sg.updateSummary(a, b, beforeRes, afterRes)
   }
