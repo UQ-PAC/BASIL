@@ -260,7 +260,8 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     }
 
     def writeCheckSat(b: Writer, getUnsatCore: Boolean = false) = {
-      val setUnsat = if getUnsatCore then Seq(list(sym("set-option"), sym(":produce-unsat-cores"), sym("true"))) else Seq()
+      val setUnsat =
+        if getUnsatCore then Seq(list(sym("set-option"), sym(":produce-unsat-cores"), sym("true"))) else Seq()
       val getUnsat = if getUnsatCore then Seq(list(sym("get-unsat-core"))) else Seq()
 
       def psexp(p: Sexp[Expr]) = {
@@ -277,7 +278,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       getUnsat.foreach(psexp)
     }
 
-    def writeCheckSatToFile(fname: File, getUnsatCore: Boolean = false) : Unit = {
+    def writeCheckSatToFile(fname: File, getUnsatCore: Boolean = false): Unit = {
       val fw = FileWriter(fname)
       val f = BufferedWriter(fw)
       try {
@@ -292,7 +293,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       }
     }
 
-    //def getCheckSat(getUnsatCore: Boolean = false) = {
+    // def getCheckSat(getUnsatCore: Boolean = false) = {
     //  val setUnsat =
     //    if getUnsatCore then Seq(list(sym("set-option"), sym(":produce-unsat-cores"), sym("true"))) else Seq()
     //  val getUnsat = if getUnsatCore then Seq(list(sym("get-unsat-core"))) else Seq()
@@ -300,7 +301,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     //  setUnsat.iterator ++ exprsBefore.iterator ++ typedecls ++ decls ++ exprs.view.map(_()) ++ Seq(
     //    list(sym("check-sat"))
     //  ) ++ getUnsat
-    //}
+    // }
   }
 
   /** Immediately invoke z3 and block until it returns a result.

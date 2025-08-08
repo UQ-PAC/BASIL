@@ -293,17 +293,27 @@ class TranslationValidator {
         case a: Assert => s ++ a.body.variables
         case i: IndirectCall => s + i.target
         case c: DirectCall => {
-          s -- c.outParams.map(_._2) ++ c.actualParams.flatMap(_._2.variables)
+          ???
         }
         case g: GoTo => s
         case r: Return =>
           val outFormal = frames(r.parent.parent.name).lhs.flatMap {
             // case (l: Variable, Some(r)) => Seq(l, r)
-            // case (l: Variable, None) => Seq(l)
-            case (_, Some(r)) => Seq(r)
+            case (l: (Variable | Memory), r) => Seq(SideEffectStatementOfStatement.param(l)._2) ++ r
+            case (_, r) => r.toSeq
             case _ => Seq()
           }
-          s ++ outFormal ++ r.outParams.flatMap(_._2.variables)
+          // ++ frames(r.parent.parent.name).rhs.flatMap {
+          //  // case (l: Variable, Some(r)) => Seq(l, r)
+          //  case (l: (Variable | Memory), r) =>  Seq(SideEffectStatementOfStatement.param(l)._2) ++ r.toSeq.flatMap(_.variables)
+          //  case (_, r) => r.toSeq.flatMap(_.variables)
+          //  case _ => Seq()
+          // }
+
+          (s -- r.outParams.map(_._1)) ++ outFormal ++ r.outParams.flatMap(_._2.variables) ++ Seq(
+            TransitionSystem.traceVar,
+            TransitionSystem.programCounterVar
+          )
         case r: Unreachable => s
         case n: NOP => s
       }
@@ -317,16 +327,7 @@ class TranslationValidator {
     transforms.reversePostOrder(p)
     val liveVarsDom = IntraLiveVarsDomainSideEffect(frames)
     val liveVarsSolver = transforms.worklistSolver(liveVarsDom)
-    val params = frames(p.name).rhs
-      .collect {
-        case (_, Some(l)) => l.variables
-        case (l: Variable, r) => Seq(l) ++ r.map(_.variables).toSeq.flatten
-      }
-      .toSet
-      .flatten
-
     val (b, a) = liveVarsSolver.solveProc(p, backwards = true)
-    val extra = p.entryBlock.map(eb => eb -> (b.get(eb).toSet.flatten ++ params.toSet))
     (b, a)
 
   }
@@ -588,14 +589,20 @@ class TranslationValidator {
     }
 
     def getParams(p: Procedure, frame: Frame) = {
-      def paramTgt(v: Variable | Memory) = {
-        renaming(p.name, Some(p.entryBlock.map(_.label).getOrElse(p.name)))(v).flatMap {
+      def paramTgt(entry: Boolean)(v: Variable | Memory) = {
+        val bl = entry match {
+          case true => Some(p.entryBlock.map(_.label).getOrElse(p.name))
+          case false => Some(p.returnBlock.map(_.label).getOrElse(p.name))
+        }
+
+        renaming(p.name, bl)(v).flatMap {
           case (n: (Variable | Memory)) => Seq(param(n))
           case _ => Seq()
         }.toList match {
           case h :: Nil => h
-          case h :: tl => ???
-          case Nil => ???
+          case h :: tl => h
+          case Nil =>
+            throw Exception(s"Param corresponding to $v at $p.name $bl undefined")
         }
       }
 
@@ -607,8 +614,8 @@ class TranslationValidator {
       val lhsSrc = lhs.map(param)
       val rhsSrc = rhs.map(param)
 
-      val lhsTgt = lhs.map(paramTgt)
-      val rhsTgt = rhs.map(paramTgt)
+      val lhsTgt = lhs.map(paramTgt(false))
+      val rhsTgt = rhs.map(paramTgt(true))
 
       (CallParamMapping(lhsSrc, rhsSrc), CallParamMapping(lhsTgt, rhsTgt))
     }
@@ -637,6 +644,7 @@ class TranslationValidator {
     // block label -> variable -> renamed variable
     afterProc: Procedure,
     renamingSrcTgt: TransformDataRelationFun = (_, _) => e => Seq(e),
+    renamingTgtSrc: TransformDataRelationFun = (_, _) => e => Seq(e),
     liveVarsSourceBeforeBlock: Map[String, Set[Variable]],
     liveVarsTargetBeforeBlock: Map[String, Set[Variable]],
     targetDefined: BlockID => Set[Variable],
@@ -659,8 +667,6 @@ class TranslationValidator {
         Seq(CompatArg(srcActual, tgtActual))
       case ((srcFormal: (Variable | Memory), _), (tgtFormal: (Variable | Memory), _)) =>
         Seq(CompatArg(paramRepr(srcFormal), paramRepr(tgtFormal)))
-      // case ((srcFormal: (Variable | Memory), Some(srcActual)), (tgtFormal: (Variable | Memory), Some(tgtActual))) =>
-      //  Seq(CompatArg(paramRepr(srcFormal), paramRepr(tgtFormal)), CompatArg(srcActual, tgtActual))
       case _ => Seq()
     }
 
@@ -708,26 +714,33 @@ class TranslationValidator {
 
         val tgtLives = liveVarsTargetBeforeBlock.get(tgtCut).toList.flatten
         val tgtDefines = targetDefined(tgtCut)
+        // println(srcLives)
+        // println("RENAMED src" + srcLives.map(s => s -> renamingSrcTgt(afterProc.name, Some(srcCut))(s)))
 
         val invSrc = srcLives.map(s => s -> renamingSrcTgt(afterProc.name, Some(srcCut))(s)).flatMap {
           case (l, r) => {
-            r.filter(_.variables.forall(v => tgtLives.contains(v) || tgtDefines.contains(v))).map { case e =>
+            r.filter(_.variables.forall(v => tgtLives.contains(v))).map { case e =>
               CompatArg(toVariable(l), toVariable(e))
             }
           }
         }
-        // val invTgt = tgtLives.collect {
-        //  case t if renamingTgtSrc(Some(tgtCut))(t).isDefined =>
-        //    (renamingTgtSrc(Some(srcCut))(t).get, Some(t))
-        // }
+
+        val invTgt = tgtLives.map(s => s -> renamingTgtSrc(afterProc.name, Some(tgtCut))(s)).flatMap {
+          case (l, r) => {
+            r.filter(_.variables.forall(v => srcLives.contains(v))).map { case e =>
+              CompatArg(toVariable(e), toVariable(l))
+            }
+          }
+        }
 
         // TODO: intersect live in source and target for dead code.
 
-        Inv.CutPoint(label, invSrc, Some(s"INVARIANT at $label"))
+        Inv.CutPoint(label, invSrc ++ invTgt, Some(s"INVARIANT at $label"))
       }
     }).toList
 
     val inv = globalsInvEverywhere ++ invs ++ Seq(inparams) ++ Seq(outparams)
+    // println("INV: " + inv)
     inv
   }
 
@@ -763,11 +776,14 @@ class TranslationValidator {
         val m = flowFactTgtTgt
           .collect {
             case (v, e)
-                if tgtLives.contains(v) && (e.variables)
-                  .forall(tgtDefines.contains) /*&& e.variables.forall(tgtLives.contains) */ =>
+                if tgtLives.contains(v) && (e.variables).forall(e =>
+                  tgtDefines.contains(e) || tgtLives.contains(e)
+                ) /*&& e.variables.forall(tgtLives.contains) */ =>
               List(TargetTerm(BinaryExpr(EQ, v, e)))
-            // case (v, e) if tgtDefines.contains(v) && (e.variables).forall(tgtLives.contains) && e.variables.nonEmpty /*&& e.variables.forall(tgtLives.contains) */ =>
-            //  List(TargetTerm(BinaryExpr(EQ, v, e)))
+            case (v, e)
+                if tgtDefines.contains(v) && (e.variables)
+                  .forall(tgtLives.contains) && e.variables.nonEmpty /*&& e.variables.forall(tgtLives.contains) */ =>
+              List(TargetTerm(BinaryExpr(EQ, v, e)))
             case (v, e) =>
               // println((e.variables + v).filterNot(vv => tgtLives.contains(vv) || tgtDefines.contains(vv)))
               // println(s"failed because liveness: ${v} ${e}")
@@ -1091,6 +1107,7 @@ class TranslationValidator {
     runName: String,
     procTransformed: Procedure,
     invariantRenamingSrcTgt: TransformDataRelationFun,
+    invariantRenamingTgtSrc: TransformDataRelationFun,
     flowFacts: TransformTargetTargetFlowFact,
     introducedAsserts: Set[String],
     sourceParams: Map[BlockID, CallParamMapping],
@@ -1174,6 +1191,7 @@ class TranslationValidator {
     val equalVarsInvariant = getEqualVarsInvariantRenaming(
       proc,
       invariantRenamingSrcTgt,
+      invariantRenamingTgtSrc,
       liveVarsSource,
       liveVarsTarget,
       targetDefined,
@@ -1340,10 +1358,19 @@ class TranslationValidator {
       (prover, r)
     })
 
+    config.outputPath.foreach(path => {
+      tvLogger.writeToFile(File(s"${path}/${runNamePrefix}.il"), translating.PrettyPrinter.pp_proc(procTransformed))
+    })
+
     if (config.debugDumpAlways) {
       config.outputPath.foreach(path => {
-        newProg.foreach(newProg => tvLogger.writeToFile(File(s"${path}/${runNamePrefix}-combined.il"), translating.PrettyPrinter.pp_prog(newProg)))
-        tvLogger.writeToFile(File(s"${path}/${runNamePrefix}.il"), translating.PrettyPrinter.pp_proc(procTransformed))
+        newProg.foreach(newProg =>
+          tvLogger.writeToFile(
+            File(s"${path}/${runNamePrefix}-combined.il"),
+            translating.PrettyPrinter.pp_prog(newProg)
+          )
+        )
+        // tvLogger.writeToFile(File(s"${path}/${runNamePrefix}.il"), translating.PrettyPrinter.pp_proc(procTransformed))
       })
     }
 
@@ -1417,6 +1444,7 @@ class TranslationValidator {
     config: TVJob,
     runName: String,
     invariantRenamingSrcTgt: TransformDataRelationFun = (_, _) => e => Seq(e),
+    invariantRenamingTgtSrc: TransformDataRelationFun = (_, _) => _ => Seq(),
     flowFacts: TransformTargetTargetFlowFact = _ => Map(),
     introducedAsserts: Set[String] = Set()
   ): TVJob = {
@@ -1433,20 +1461,29 @@ class TranslationValidator {
     val sourceParams = paramMapping.toSeq.map { case (pn, (source, target)) => (pn, source) }.toMap
     val targetParams = paramMapping.toSeq.map { case (pn, (source, target)) => (pn, target) }.toMap
 
-
     var result = config
     interesting.foreach(proc => {
 
-      def livenessBlockLabelMap(r: (Map[Block, Set[Variable]], Map[Block, Set[Variable]])) = r._1.map((k, v) => (k.label, v)).toMap
+      def livenessBlockLabelMap(r: (Map[Block, Set[Variable]], Map[Block, Set[Variable]])) =
+        r._1.map((k, v) => (k.label, v)).toMap
 
-      val liveVarsTarget: Map[String, Set[Variable]] = initProgBefore.get.procedures.find(p => proc.name == p.name).map(getLiveVars(_, targetParams)).map(livenessBlockLabelMap).getOrElse(Map())
-      val liveVarsSource: Map[String, Set[Variable]] = initProg.get.procedures.find(p => proc.name == p.name).map(getLiveVars(_, sourceParams)).map(livenessBlockLabelMap).getOrElse(Map())
+      val liveVarsTarget: Map[String, Set[Variable]] = initProgBefore.get.procedures
+        .find(p => proc.name == p.name)
+        .map(getLiveVars(_, targetParams))
+        .map(livenessBlockLabelMap)
+        .getOrElse(Map())
+      val liveVarsSource: Map[String, Set[Variable]] = initProg.get.procedures
+        .find(p => proc.name == p.name)
+        .map(getLiveVars(_, sourceParams))
+        .map(livenessBlockLabelMap)
+        .getOrElse(Map())
 
       val res = validateSMTSingleProc(
         result,
         runName,
         proc,
         invariantRenamingSrcTgt,
+        invariantRenamingTgtSrc,
         flowFacts,
         introducedAsserts,
         sourceParams,

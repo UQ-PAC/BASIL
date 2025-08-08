@@ -1250,7 +1250,7 @@ object OffsetProp {
     def joinState(lhs: Variable, rhs: Expr) = {
       specJoinState(lhs, rhs) match {
         case Some((l, r)) => {
-          if (st.contains(l) && st(l) != r) {
+          if ((!st.contains(l)) || (st.contains(l) && st(l) != r)) {
             stSequenceNo += 1
           }
           st(l) = r
@@ -1335,7 +1335,7 @@ object OffsetProp {
 
     class SubstExprs(subst: Map[Variable, Expr]) extends CILVisitor {
       override def vexpr(e: Expr) = {
-        Substitute(subst.get)(e) match {
+        Substitute(subst.get, false)(e) match {
           case Some(n) => ChangeTo(n)
           case _ => SkipChildren()
         }

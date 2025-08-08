@@ -146,13 +146,22 @@ object SSADAG {
       val b = worklist.dequeue()
 
       var blockDoneCond = List[Expr](boolOr(b.prevBlocks.map(blockDone).toList))
+      // println("inputs not outputs : " + (inputs.toSet --outputs))
 
       val alwaysLive = (outputs ++ inputs).toSet
       def live(v: Variable) =
         // FIXME: the alwaysLive set is hacky
         // this is too caorse, reducing phi nodes probably neccessary for termination?
         // There is probably something missing from the real liveness analysis
-        liveVarsBefore.get(b.label).forall(_.contains(v)) || v.name.startsWith("SYNTH") || v.name.startsWith( "TRACE") || alwaysLive.contains(v)
+        // val d = alwaysLive -- liveVarsBefore.get(b.label).toSet.flatten
+        if (alwaysLive.contains(v) && !liveVarsBefore.get(b.label).forall(_.contains(v))) {
+          // println(s"Missed: $v (at ${b.label})")
+        }
+        liveVarsBefore
+          .get(b.label)
+          .forall(
+            _.contains(v)
+          ) // || v.name.startsWith("SYNTH") || v.name.startsWith( "TRACE") || alwaysLive.contains(v)
 
       if (b.prevBlocks.nonEmpty) then {
         // val defines: Iterable[(Block, Seq[(Variable, Variable)])] =
@@ -166,6 +175,7 @@ object SSADAG {
         //    }
         //    .groupBy(_._2)
 
+        // println(s"Live at: ${b.label}: ${liveVarsBefore.get(b.label)}")
         val defines: Seq[Variable] =
           (b.prevBlocks.toSeq.flatMap(b => stRename.get(b).toSeq.flatMap(_.map(_._1).filter(live)))).toSet.toSeq
 

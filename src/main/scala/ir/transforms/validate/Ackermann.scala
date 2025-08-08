@@ -236,6 +236,7 @@ object Ackermann {
       case a: (Memory | Variable) =>
         renaming(source.parent.parent.name, None)(a).toList match {
           case (n: EffCallFormalParam) :: Nil => n
+          case (n: EffCallFormalParam) :: tl => n
           case n :: Nil =>
             tvLogger.warn(
               s"Transform description fun rewrite formal parameter $a to $n, which I can't fit back into the formal parameter type Variable | Memory | Field, ignoring"
@@ -335,10 +336,10 @@ object Ackermann {
 
     while {
       var c = q.dequeue
-      //while (seenQ.contains(c) && q.nonEmpty) {
+      // while (seenQ.contains(c) && q.nonEmpty) {
       //  c = q.dequeue
-      //}
-      //seenQ += c
+      // }
+      // seenQ += c
 
       val ((srcCall, srcPos), (tgtCall, tgtPos)) = c
 
@@ -390,7 +391,7 @@ object Ackermann {
         }
         case _ => ()
       }
-      (q.nonEmpty) 
+      (q.nonEmpty)
     } do {}
 
     tvLogger.debug(s"Ackermann hitrate : ${succMemoStat().hitRate} ${succMemoStat()}")

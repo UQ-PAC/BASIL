@@ -71,32 +71,74 @@ def copyProp(config: TVJob, p: Program) = {
   def flowFacts(b: String): Map[Variable, Expr] = {
     results.getOrElse(b, Map())
   }
+
+  val revResults: Map[ProcID, Map[Variable, Set[Variable]]] = results.map { case (p, r) =>
+    val m: Map[Variable, Set[Variable]] = (r.toSeq
+      .collect { case (v1: Variable, v2: Variable) =>
+        v2 -> v1
+      }
+      .groupBy(_._1)
+      .map { case (k, v) =>
+        (k, v.map(_._2).toSet)
+      })
+    p -> m
+  }.toMap
+
+  def renamingTgt(proc: ProcID, b: Option[BlockID])(v: Variable | Memory) = v match {
+    case v: Variable => results.get(proc).flatMap(_.get(v)).toSeq
+  }
+
   def renaming(proc: ProcID, b: Option[BlockID])(v: Variable | Memory) = v match {
     case g =>
       Seq(g) ++ (v match {
-        case v: Variable => results.get(proc).flatMap(_.get(v))
+        case v: Variable =>
+          val rr = revResults.get(proc).toSeq.flatMap(_.get(v).toSeq.flatten)
+          results.get(proc).flatMap(_.get(v)) ++ rr
         case _ => Seq()
       })
   }
 
-  validator.getValidationSMT(config, "CopyProp", renaming, flowFacts)
+  validator.getValidationSMT(config, "CopyProp", renaming, renamingTgt)
 }
 
 def parameters(config: TVJob, ctx: IRContext) = {
 
-  // val localInTarget = ctx.program.procedures.map {
-  //  case p => p.name -> freeVarsPos(p).collect {
-  //    case l: LocalVar
-  //  }.toSet
-  // }
+  val localInTarget = ctx.program.procedures.view.map { case p =>
+    p.name -> (freeVarsPos(p).collect { case l: LocalVar =>
+      l
+    }.toSet)
+  }.toMap
 
   val (validator, res) =
     validatorForTransform(p => transforms.liftProcedureCallAbstraction(p, Some(ctx.specification)))(ctx.program)
 
+  val entryBlocks = ctx.program.procedures.collect {
+    case p if p.entryBlock.isDefined => p.name -> p.entryBlock.get.label
+  }.toMap
+
+  val returnBlocks = ctx.program.procedures.collect {
+    case p if p.returnBlock.isDefined => p.name -> p.returnBlock.get.label
+  }.toMap
+
   def sourceToTarget(p: ProcID, b: Option[String])(v: Variable | Memory): Seq[Expr] = v match {
-    case LocalVar(s"${i}_in", t, 0) => Seq(GlobalVar(s"$i", t))
-    case LocalVar(s"${i}_out", t, 0) => Seq(GlobalVar(s"$i", t))
-    case LocalVar(n, t, 0) => Seq(GlobalVar(n, t))
+    // in/out params only map to the registers at the procedure entry and exit
+    case LocalVar(s"${i}_in", t, 0) if b.forall(_.endsWith("ENTRY")) => Seq(GlobalVar(s"$i", t))
+    case LocalVar(s"${i}_out", t, 0) if b.forall(_.endsWith("EXIT")) => Seq(GlobalVar(s"$i", t))
+    case LocalVar(s"${i}_in", t, 0) if b.forall(b => entryBlocks.get(p).contains(b)) => Seq(GlobalVar(s"$i", t))
+    case LocalVar(s"${i}_out", t, 0) if b.forall(b => returnBlocks.get(p).contains(b)) => Seq(GlobalVar(s"$i", t))
+    case LocalVar(s"${i}_in", t, 0) if b.forall(_ == p) => Seq(GlobalVar(s"$i", t))
+    case LocalVar(s"${i}_out", t, 0) if b.forall(_ == p) => Seq(GlobalVar(s"$i", t))
+    case LocalVar(s"${i}_in", t, 0) =>
+      Seq()
+    case LocalVar(s"${i}_out", t, 0) =>
+      Seq()
+
+    case local @ LocalVar(n, t, 0) if localInTarget.get(p).exists(_.contains(local)) =>
+      // local variables
+      Seq(local)
+    case LocalVar(n, t, 0) =>
+      // the rest map to global variables with the same name
+      Seq(GlobalVar(n, t))
     case g => Seq(g)
   }
 
@@ -176,16 +218,16 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   val failed = config.results.filter(_.verified.exists(_.isInstanceOf[SatResult.SAT]))
 
   if (failed.nonEmpty) {
-    val fnames = failed.map(f => s"  ${f.runName}::${f.proc} ${f.smtFile}").mkString("\n")
+    val fnames = failed.map(f => s"  ${f.runName}::${f.proc} ${f.smtFile}").reverse.mkString("\n  ")
     // Logger.error(s"Failing cases: $fnames")
-    throw Exception(s"TranslationValidationFailed: $fnames")
+    throw Exception(s"TranslationValidationFailed:\n  $fnames")
   } else if (config.verify.isDefined) {
     Logger.info("[!] Translation validation passed")
   }
 
   config.outputPath.foreach(p => {
     val csv = (config.results.map(_.toCSV).groupBy(_._1).toList match {
-      case (h, vs)::Nil => h :: vs.map(_._2)
+      case (h, vs) :: Nil => h :: vs.map(_._2)
       case _ => {
         Logger.error("Broken header structure for csv metrics file")
         List()
