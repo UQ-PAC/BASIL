@@ -1,6 +1,5 @@
 package ir.transforms.validate
 import analysis.Loop
-import analysis.ProcFrames.*
 import ir.*
 import ir.dsl.IRToDSL
 
@@ -42,7 +41,7 @@ object TransitionSystem {
   val programCounterVar = GlobalVar("SYNTH_PC", BitVecType(64))
   val traceVar = GlobalVar("TRACE", traceType)
 
-  def procToTransition(p: Procedure, loops: List[Loop], frames: Map[Procedure, Frame], cutJoins: Boolean = false) = {
+  def procToTransition(p: Procedure, loops: List[Loop], cutJoins: Boolean = false) = {
 
     val pcVar = programCounterVar
 
@@ -163,10 +162,20 @@ object TransitionSystem {
 
   }
 
+  def toTransitionSystemInPlace(p: Procedure): CutPointMap = {
+    require(p.entryBlock.isDefined)
+
+    val loops = analysis.LoopDetector.identify_loops(p.entryBlock.get)
+    val floops = loops.identifiedLoops.toList.sortBy(_.header.label)
+    val cutPoints = procToTransition(p, floops)
+
+    cutPoints
+  }
+
   /**
   * Converts each procedure to a transition system
   */
-  def toTransitionSystem(iprogram: Program, frames: Map[Procedure, Frame]) = {
+  def toTransitionSystemClone(iprogram: Program) = {
 
     val program = IRToDSL.convertProgram(iprogram).resolve
 
@@ -175,7 +184,7 @@ object TransitionSystem {
 
     val cutPoints = program.procedures
       .map(p => {
-        p -> procToTransition(p, floops, frames)
+        p -> procToTransition(p, floops)
       })
       .toMap
 

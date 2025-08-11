@@ -1,6 +1,5 @@
 package ir.transforms.validate
 
-import analysis.ProcFrames.*
 import ir.*
 import util.functional.memoised
 import util.tvLogger
@@ -288,7 +287,6 @@ object Ackermann {
   def instantiateAxioms(
     sourceEntry: Block,
     targetEntry: Block,
-    frames: Map[String, Frame],
     renameSourceExpr: Expr => Expr,
     renameTargetExpr: Expr => Expr,
     paramMapping: TransformDataRelationFun

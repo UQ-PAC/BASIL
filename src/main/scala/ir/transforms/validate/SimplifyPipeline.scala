@@ -19,87 +19,89 @@ def simplifyCFG(p: Program) = {
 }
 
 def simplifyCFGValidated(config: TVJob, p: Program): TVJob = {
-  wrapShapePreservingTransformInValidation(config, simplifyCFG, "simplifyCFG")(p)
+  TranslationValidator.forTransform("simplifyCFG", simplifyCFG)(p, config)
 }
 
 def dynamicSingleAssignment(config: TVJob, p: Program) = {
-  val validator = TranslationValidator()
-  validator.setTargetProg(p)
-  transforms.OnePassDSA().applyTransform(p)
-  validator.setSourceProg(p)
 
-  def sourceToTarget(p: ProcID, b: Option[BlockID])(v: Variable | Memory) = v match {
-    case l @ LocalVar(n, t, i) => Seq(LocalVar(l.varName, t))
-    case g => Seq(g)
+  val invariant = (u: Unit) => {
+    def sourceToTarget(p: ProcID, b: Option[BlockID])(v: Variable | Memory) = v match {
+      case l @ LocalVar(n, t, i) => Seq(LocalVar(l.varName, t))
+      case g => Seq(g)
+    }
+    InvariantDescription(sourceToTarget)
   }
 
-  validator.getValidationSMT(config, "DSA", sourceToTarget)
+  TranslationValidator.forTransform("DSA", transforms.OnePassDSA().applyTransform, invariant)(p, config)
 }
 
-def dsaCopyPropCombined(config: TVJob, p: Program) = {
-
-  def dsa(p: Program) = transforms.OnePassDSA().applyTransform(p)
-  def copyprop(p: Program) =
-    p.procedures.foreach(ir.eval.AlgebraicSimplifications(_))
-    p.procedures.map(p => p.name -> transforms.OffsetProp.transform(p)).toMap
-
-  def transform(p: Program) = {
-    val dr = dsa(p)
-    val cp = copyprop(p)
-    (dr, cp)
-  }
-
-  def sourceToTarget(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
-    case l @ LocalVar(n, t, i) => Some(LocalVar(l.varName, t))
-    case g =>
-      Some(g)
-  }
-
-  val (validator, (dsaRes, copypropRes)) = validatorForTransform(transform)(p)
-}
+//def dsaCopyPropCombined(config: TVJob, p: Program) = {
+//
+//  def dsa(p: Program) = transforms.OnePassDSA().applyTransform(p)
+//  def copyprop(p: Program) =
+//    p.procedures.foreach(ir.eval.AlgebraicSimplifications(_))
+//    p.procedures.map(p => p.name -> transforms.OffsetProp.transform(p)).toMap
+//
+//  def transform(p: Program) = {
+//    val dr = dsa(p)
+//    val cp = copyprop(p)
+//    (dr, cp)
+//  }
+//
+//  def sourceToTarget(b: Option[String])(v: Variable | Memory): Option[Expr] = v match {
+//    case l @ LocalVar(n, t, i) => Some(LocalVar(l.varName, t))
+//    case g =>
+//      Some(g)
+//  }
+//
+//  val (validator, (dsaRes, copypropRes)) = TranslationValidator.forTransform("DSA", transform, _ => InvariantDescription())(p, config)
+//}
 
 def copyProp(config: TVJob, p: Program) = {
-  def transform(p: Program) = {
+
+  def transform(p: Program): Map[String, Map[Variable, Expr]] = {
     p.procedures.foreach(ir.eval.AlgebraicSimplifications(_))
     val r = p.procedures.map(p => p.name -> transforms.OffsetProp.transform(p)).toMap
     transforms.CleanupAssignments().transform(p)
     r
   }
 
-  val (validator, results) = validatorForTransform(transform)(p)
+  val invariant = (results: Map[String, Map[Variable, Expr]]) => {
+    def flowFacts(b: String): Map[Variable, Expr] = {
+      results.getOrElse(b, Map())
+    }
 
-  def flowFacts(b: String): Map[Variable, Expr] = {
-    results.getOrElse(b, Map())
+    val revResults: Map[ProcID, Map[Variable, Set[Variable]]] = results.map { case (p, r) =>
+      val m: Map[Variable, Set[Variable]] = (r.toSeq
+        .collect { case (v1: Variable, v2: Variable) =>
+          v2 -> v1
+        }
+        .groupBy(_._1)
+        .map { case (k, v) =>
+          (k, v.map(_._2).toSet)
+        })
+      p -> m
+    }.toMap
+
+    def renamingTgt(proc: ProcID, b: Option[BlockID])(v: Variable | Memory) = v match {
+      case v: Variable => results.get(proc).flatMap(_.get(v)).toSeq
+      case _ => Seq()
+    }
+
+    def renaming(proc: ProcID, b: Option[BlockID])(v: Variable | Memory) = v match {
+      case g =>
+        Seq(g) ++ (v match {
+          case v: Variable =>
+            val rr = revResults.get(proc).toSeq.flatMap(_.get(v).toSeq.flatten)
+            results.get(proc).flatMap(_.get(v)) ++ rr
+          case _ => Seq()
+        })
+    }
+
+    InvariantDescription(renaming, renamingTgt)
   }
 
-  val revResults: Map[ProcID, Map[Variable, Set[Variable]]] = results.map { case (p, r) =>
-    val m: Map[Variable, Set[Variable]] = (r.toSeq
-      .collect { case (v1: Variable, v2: Variable) =>
-        v2 -> v1
-      }
-      .groupBy(_._1)
-      .map { case (k, v) =>
-        (k, v.map(_._2).toSet)
-      })
-    p -> m
-  }.toMap
-
-  def renamingTgt(proc: ProcID, b: Option[BlockID])(v: Variable | Memory) = v match {
-    case v: Variable => results.get(proc).flatMap(_.get(v)).toSeq
-    case _ => Seq()
-  }
-
-  def renaming(proc: ProcID, b: Option[BlockID])(v: Variable | Memory) = v match {
-    case g =>
-      Seq(g) ++ (v match {
-        case v: Variable =>
-          val rr = revResults.get(proc).toSeq.flatMap(_.get(v).toSeq.flatten)
-          results.get(proc).flatMap(_.get(v)) ++ rr
-        case _ => Seq()
-      })
-  }
-
-  validator.getValidationSMT(config, "CopyProp", renaming, renamingTgt)
+  TranslationValidator.forTransform("CopyProp", transform, invariant)(p, config)
 }
 
 def parameters(config: TVJob, ctx: IRContext) = {
@@ -110,9 +112,6 @@ def parameters(config: TVJob, ctx: IRContext) = {
     }.toSet)
   }.toMap
 
-  val (validator, res) =
-    validatorForTransform(p => transforms.liftProcedureCallAbstraction(p, Some(ctx.specification)))(ctx.program)
-
   val entryBlocks = ctx.program.procedures.collect {
     case p if p.entryBlock.isDefined => p.name -> p.entryBlock.get.label
   }.toMap
@@ -121,29 +120,46 @@ def parameters(config: TVJob, ctx: IRContext) = {
     case p if p.returnBlock.isDefined => p.name -> p.returnBlock.get.label
   }.toMap
 
-  def sourceToTarget(p: ProcID, b: Option[String])(v: Variable | Memory): Seq[Expr] = v match {
-    // in/out params only map to the registers at the procedure entry and exit
-    case LocalVar(s"${i}_in", t, 0) if b.forall(_.endsWith("ENTRY")) => Seq(GlobalVar(s"$i", t))
-    case LocalVar(s"${i}_out", t, 0) if b.forall(_.endsWith("EXIT")) => Seq(GlobalVar(s"$i", t))
-    case LocalVar(s"${i}_in", t, 0) if b.forall(b => entryBlocks.get(p).contains(b)) => Seq(GlobalVar(s"$i", t))
-    case LocalVar(s"${i}_out", t, 0) if b.forall(b => returnBlocks.get(p).contains(b)) => Seq(GlobalVar(s"$i", t))
-    case LocalVar(s"${i}_in", t, 0) if b.forall(_ == p) => Seq(GlobalVar(s"$i", t))
-    case LocalVar(s"${i}_out", t, 0) if b.forall(_ == p) => Seq(GlobalVar(s"$i", t))
-    case LocalVar(s"${i}_in", t, 0) =>
-      Seq()
-    case LocalVar(s"${i}_out", t, 0) =>
-      Seq()
+  // val (validator, res) =
+  //  validatorForTransform(p => transforms.liftProcedureCallAbstraction(p, Some(ctx.specification)))(ctx.program)
 
-    case local @ LocalVar(n, t, 0) if localInTarget.get(p).exists(_.contains(local)) =>
-      // local variables
-      Seq(local)
-    case LocalVar(n, t, 0) =>
-      // the rest map to global variables with the same name
-      Seq(GlobalVar(n, t))
-    case g => Seq(g)
+  var res: Option[specification.Specification] = None
+
+  val invariant = (result: Option[specification.Specification]) => {
+    res = result
+
+    def sourceToTarget(p: ProcID, b: Option[String])(v: Variable | Memory): Seq[Expr] = v match {
+      // in/out params only map to the registers at the procedure entry and exit
+      case LocalVar(s"${i}_in", t, 0) if b.forall(_.endsWith("ENTRY")) => Seq(GlobalVar(s"$i", t))
+      case LocalVar(s"${i}_out", t, 0) if b.forall(_.endsWith("EXIT")) => Seq(GlobalVar(s"$i", t))
+      case LocalVar(s"${i}_in", t, 0) if b.forall(b => entryBlocks.get(p).contains(b)) => Seq(GlobalVar(s"$i", t))
+      case LocalVar(s"${i}_out", t, 0) if b.forall(b => returnBlocks.get(p).contains(b)) => Seq(GlobalVar(s"$i", t))
+      case LocalVar(s"${i}_in", t, 0) if b.forall(_ == p) => Seq(GlobalVar(s"$i", t))
+      case LocalVar(s"${i}_out", t, 0) if b.forall(_ == p) => Seq(GlobalVar(s"$i", t))
+      case LocalVar(s"${i}_in", t, 0) =>
+        Seq()
+      case LocalVar(s"${i}_out", t, 0) =>
+        Seq()
+
+      case local @ LocalVar(n, t, 0) if localInTarget.get(p).exists(_.contains(local)) =>
+        // local variables
+        Seq(local)
+      case LocalVar(n, t, 0) =>
+        // the rest map to global variables with the same name
+        Seq(GlobalVar(n, t))
+      case g => Seq(g)
+    }
+
+    InvariantDescription(sourceToTarget)
   }
 
-  (validator.getValidationSMT(config, "Parameters", sourceToTarget), ctx.copy(specification = res.get))
+  val vr = TranslationValidator.forTransform(
+    "Parameters",
+    p => transforms.liftProcedureCallAbstraction(p, Some(ctx.specification)),
+    invariant
+  )(ctx.program, config)
+
+  (vr, ctx.copy(specification = res.get))
 
 }
 
@@ -175,19 +191,22 @@ def guardCleanupTransforms(p: Program) = {
 }
 
 def guardCleanup(config: TVJob, p: Program) = {
-  wrapShapePreservingTransformInValidation(config, guardCleanupTransforms, "GuardCleanup")(p)
+  TranslationValidator.forTransform("GuardCleanup", guardCleanupTransforms)(p, config)
 }
 
 def nop(config: TVJob, p: Program) = {
-  val validator = TranslationValidator()
-  validator.setTargetProg(p)
-  validator.setSourceProg(p)
-  validator.getValidationSMT(config, "NOP", (p, b) => v => Seq(v))
+  TranslationValidator.forTransform("NOP", p => p)(p, config)
 }
 
 def assumePreservedParams(config: TVJob, p: Program) = {
-  val (validator, asserts) = validatorForTransform(transforms.CalleePreservedParam.transform)(p)
-  validator.getValidationSMT(config, "AssumeCallPreserved", introducedAsserts = asserts.toSet)
+  // val (validator, asserts) = validatorForTransform(transforms.CalleePreservedParam.transform)(p)
+  // validator.getValidationSMT(config, , introducedAsserts = asserts.toSet)
+  TranslationValidator.forTransform(
+    "AssumeCallPreserved",
+    transforms.CalleePreservedParam.transform,
+    asserts => InvariantDescription(introducedAsserts = asserts.toSet)
+  )(p, config)
+
 }
 
 def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, IRContext) = {

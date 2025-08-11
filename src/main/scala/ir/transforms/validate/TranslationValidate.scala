@@ -57,38 +57,12 @@ case class TVJob(
   }
 }
 
-/**
- *
- * Pure structure:
- *
- *  (Program, Program', invariants) -> proof
- *
- */
-
-/*
- * General considerations
- *
- *  - define at the Program level because cloning is implemented at that level
- *  - don't require reimplementation for interprocedural reasoning
- */
-
-/*
- * Passification of acyclic basil IR program (CFA)
- *
- * - ssa transform & passify
- */
-
-/*
- * Ackermann and monadic transform for basil ir program
- *
- * - fresh trace var
- * - gen axiom that links them
- *
- */
-
-/*
- * CFA conversion of basil ir programs
- */
+case class InvariantDescription(
+  renamingSrcTgt: TransformDataRelationFun = (_, _) => e => Seq(e),
+  renamingTgtSrc: TransformDataRelationFun = (_, _) => _ => Seq(),
+  flowFacts: TransformTargetTargetFlowFact = _ => Map(),
+  introducedAsserts: Set[String] = Set()
+)
 
 type CutLabel = String
 type BlockID = String
@@ -247,22 +221,41 @@ enum Inv {
 
 }
 
-class TranslationValidator {
+object TranslationValidator {
 
-  var initProgBefore: Option[Program] = None
-  var initProg: Option[Program] = None
+  case class ProcInfo(
+    name: String,
+    transition: Procedure,
+    liveVars: Map[BlockID, Set[Variable]],
+    cuts: CutPointMap,
+    callParams: CallParamMapping,
+    private val ssaRenamingFun: ((String, Expr) => Expr),
+    private val ssaDefines: Map[BlockID, Map[Variable, Variable]]
+  ) {
 
-  var beforeProg: Option[Program] = None
-  // var liveBefore = Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])]()
-  var beforeFrame = Map[String, Frame]()
-  // proc -> block -> absdom
 
-  var afterProg: Option[Program] = None
-  var liveAfter = Map[String, (Map[Block, Set[Variable]], Map[Block, Set[Variable]])]()
-  var afterFrame = Map[String, Frame]()
+    def defines(block: BlockID) : Set[Variable] = {
+      ssaDefines.get(block).map(_.keys).toSet.flatten
+    }
 
-  var beforeCuts: Map[Procedure, CutPointMap] = Map()
-  var afterCuts: Map[Procedure, CutPointMap] = Map()
+
+    lazy val cutBlockLabels = cuts.cutLabelBlockInProcedure.map { case (cl, b) =>
+      cl -> b.label
+    }
+
+    /**
+    * Apply the ssa renaming for a variable at a specific block identifier.
+    */
+    def renameSSA(block: BlockID, e: Expr): Expr = {
+      ssaRenamingFun(block, e)
+    }
+  }
+
+
+  case class InterproceduralInfo(program: Program, sourceFrames : Map[ProcID, Frame], targetFrames: Map[ProcID, Frame],
+    sourceParams: Map[ProcID, CallParamMapping], 
+    targetParams: Map[ProcID, CallParamMapping],
+    )
 
   class IntraLiveVarsDomainSideEffect(frames: Map[String, CallParamMapping])
       extends transforms.PowerSetDomain[Variable] {
@@ -381,28 +374,7 @@ class TranslationValidator {
     assumes.reverse
   }
 
-  def globalsForProc(p: Procedure): Iterable[Variable] = {
-    val globs = for {
-      bf <- beforeFrame.get(p.name)
-      af <- afterFrame.get(p.name)
-      globs = (bf.readGlobalVars ++ bf.readMem ++ bf.modifiedGlobalVars ++ bf.modifiedMem
-        ++ af.readGlobalVars ++ af.readMem ++ af.modifiedGlobalVars ++ af.modifiedMem)
-        .map(SideEffectStatementOfStatement.param)
-    } yield (globs.map(_._2))
-    globs.getOrElse(Seq())
-  }
 
-  def globalsForTargetProc(
-    p: Procedure
-  )(renaming: Variable | Memory => Option[Expr]): Iterable[(Expr, Option[Expr])] = {
-    val globs = for {
-      bf <- beforeFrame.get(p.name)
-      globs: Seq[Variable | Memory] = (bf.readGlobalVars ++ bf.readMem ++ bf.modifiedGlobalVars ++ bf.modifiedMem).toSeq
-      boop =
-        globs.flatMap(x => renaming(x).toSeq.map(t => x -> Some(t)))
-    } yield (boop)
-    globs.getOrElse(Seq())
-  }
 
   object toVariable {
     class SES extends CILVisitor {
@@ -425,9 +397,9 @@ class TranslationValidator {
     }
   }
 
-  def globalsForSourceProc(p: Procedure)(renaming: Variable | Memory => Seq[Expr]): Iterable[(Expr, Option[Expr])] = {
+  def globalsForSourceProc(i: InterproceduralInfo, p: ProcInfo)(renaming: Variable | Memory => Seq[Expr]): Iterable[(Expr, Option[Expr])] = {
     val globs = for {
-      af <- afterFrame.get(p.name)
+      af <- i.sourceFrames.get(p.name)
       globs: Seq[Variable | Memory] = (af.readGlobalVars ++ af.readMem ++ af.modifiedGlobalVars ++ af.modifiedMem).toSeq
       boop = globs
         .flatMap(x => renaming(x).map(t => x -> t))
@@ -519,7 +491,7 @@ class TranslationValidator {
   * pure function. Assuming we ensure invariants are not valid or false. 
   *
   */
-  def getFunctionSigsRenaming(renaming: TransformDataRelationFun): Map[String, (CallParamMapping, CallParamMapping)] = {
+  def getFunctionSigsRenaming(program: Program, afterFrame: Map[String, Frame], renaming: TransformDataRelationFun): Map[String, (CallParamMapping, CallParamMapping)] = {
 
     def param(v: Variable | Memory): (Variable | Memory, Option[Variable]) = v match {
       case g: GlobalVar => (g -> Some(g))
@@ -559,9 +531,7 @@ class TranslationValidator {
       (CallParamMapping(lhsSrc, rhsSrc), CallParamMapping(lhsTgt, rhsTgt))
     }
 
-    val params = initProg.get.procedures.map(p => p.name -> getParams(p, afterFrame.getOrElse(p.name, Frame()))).toMap
-
-    params
+    program.procedures.map(p => p.name -> getParams(p, afterFrame.getOrElse(p.name, Frame()))).toMap
   }
 
   /**
@@ -581,18 +551,16 @@ class TranslationValidator {
    */
   def getEqualVarsInvariantRenaming(
     // block label -> variable -> renamed variable
+    i: InterproceduralInfo,
     afterProc: Procedure,
+    sourceInfo: ProcInfo,
+    targetInfo: ProcInfo,
     renamingSrcTgt: TransformDataRelationFun = (_, _) => e => Seq(e),
-    renamingTgtSrc: TransformDataRelationFun = (_, _) => e => Seq(e),
-    liveVarsSourceBeforeBlock: Map[String, Set[Variable]],
-    liveVarsTargetBeforeBlock: Map[String, Set[Variable]],
-    targetDefined: BlockID => Set[Variable],
-    srcParams: CallParamMapping,
-    tgtParams: CallParamMapping
+    renamingTgtSrc: TransformDataRelationFun = (_, _) => e => Seq(e)
   ) = {
     val p = afterProc
 
-    val globalsTgt = globalsForSourceProc(p)(renamingSrcTgt(afterProc.name, None)).toList
+    val globalsTgt = globalsForSourceProc(i, sourceInfo)(renamingSrcTgt(sourceInfo.name, None)).toList
     val globals = globalsTgt.collect { case (a, Some(b)) => CompatArg(toVariable(a), toVariable(b)) }.toList
 
     def paramRepr(p: Variable | Memory): Variable = {
@@ -610,45 +578,31 @@ class TranslationValidator {
     }
 
     val inparams =
-      Inv.CutPoint("ENTRY", srcParams.rhs.toSeq.zip(tgtParams.rhs).flatMap(getVars))
+      Inv.CutPoint("ENTRY", sourceInfo.callParams.rhs.toSeq.zip(targetInfo.callParams.rhs).flatMap(getVars))
 
     val outparams =
-      Inv.CutPoint("RETURN", srcParams.lhs.toSeq.zip(tgtParams.lhs).flatMap(getVars))
+      Inv.CutPoint("RETURN", sourceInfo.callParams.lhs.toSeq.zip(targetInfo.callParams.lhs).flatMap(getVars))
 
     // skipping because should be live at entry and return resp.
     // val inparams = p.formalInParam.toList.map(p => CompatArg(p, p))
     // val outparams = p.formalOutParam.toList.map(p => CompatArg(p, p))
     // TODO: can probably just set at entry and let the liveness sort the rest out?
     val globalsInvEverywhere =
-      afterCuts
-        .find(_._1.name == p.name)
-        .get
-        ._2
-        .cutLabelBlockInProcedure
-        .keys
+      sourceInfo.cutBlockLabels.keys
         .map(c => Inv.CutPoint(c, globals.toList))
         .toList
 
-    val source = afterCuts.find((k, _) => k.name == p.name).get._1
-    val target = beforeCuts.find((k, _) => k.name == p.name).get._1
-    val beforeCutsBls = beforeCuts(target).cutLabelBlockInProcedure.map { case (cl, b) =>
-      cl -> b.label
-    }
-    val afterCutsBls = afterCuts(source).cutLabelBlockInProcedure.map { case (cl, b) =>
-      cl -> b.label
-    }
-
-    val cuts = (beforeCutsBls.keys ++ afterCutsBls.keys).toSet.toList
+    val cuts = (targetInfo.cutBlockLabels.keys ++ sourceInfo.cutBlockLabels.keys).toSet.toList
 
     val invs = (cuts.map {
       case (label) => {
-        val tgtCut = beforeCutsBls(label)
-        val srcCut = afterCutsBls(label)
+        val tgtCut = targetInfo.cutBlockLabels(label)
+        val srcCut = sourceInfo.cutBlockLabels(label)
 
-        val srcLives = liveVarsSourceBeforeBlock.get(srcCut).toList.flatten
+        val srcLives = sourceInfo.liveVars.get(srcCut).toList.flatten
+        val tgtLives = targetInfo.liveVars.get(tgtCut).toList.flatten
 
-        val tgtLives = liveVarsTargetBeforeBlock.get(tgtCut).toList.flatten
-        val tgtDefines = targetDefined(tgtCut)
+        val tgtDefines = targetInfo.defines(tgtCut)
 
         val invSrc = srcLives.map(s => s -> renamingSrcTgt(afterProc.name, Some(srcCut))(s)).flatMap {
           case (l, r) => {
@@ -677,29 +631,19 @@ class TranslationValidator {
   def getFlowFactsInvariant(
     // block label -> variable -> renamed variable
     afterProc: Procedure,
-    liveVarsTarget: Map[BlockID, Set[Variable]],
-    definedVarsTarget: BlockID => Set[Variable],
+    source: ProcInfo,
+    target: ProcInfo,
     flowFactTgtTgt: Map[Variable, Expr]
   ) = {
     val p = afterProc
 
-    val source = afterCuts.find((k, _) => k.name == p.name).get._1
-    val target = beforeCuts.find((k, _) => k.name == p.name).get._1
-
-    val beforeCutsBls = beforeCuts(target).cutLabelBlockInProcedure.map { case (cl, b) =>
-      cl -> b.label
-    }
-    val afterCutsBls = afterCuts(source).cutLabelBlockInProcedure.map { case (cl, b) =>
-      cl -> b.label
-    }
-
-    val cuts = (beforeCutsBls.keys ++ afterCutsBls.keys).toSet.toList
+    val cuts = (target.cutBlockLabels.keys ++ source.cutBlockLabels.keys).toSet.toList
 
     val invs = (cuts.map {
       case (label) => {
-        val tgtCut = beforeCutsBls(label)
-        val tgtLives = liveVarsTarget.get(tgtCut).toSet.flatten
-        val tgtDefines = definedVarsTarget(tgtCut)
+        val tgtCut = source.cutBlockLabels(label)
+        val tgtLives = target.liveVars.get(tgtCut).toSet.flatten
+        val tgtDefines = target.defines(tgtCut)
         val m = flowFactTgtTgt
           .collect {
             case (v, e)
@@ -724,15 +668,6 @@ class TranslationValidator {
     invs
   }
 
-  def setTargetProg(p: Program) = {
-    val f = inferProcFrames(p)
-    beforeFrame = f.map((k, v) => (k.name, v)).toMap
-    initProg = Some(p)
-    initProgBefore = Some(ir.dsl.IRToDSL.convertProgram(p).resolve)
-    val (prog, cuts) = TransitionSystem.toTransitionSystem(p, f)
-    beforeProg = Some(prog)
-    beforeCuts = cuts
-  }
 
   var paramCall = Map[Procedure, Map[Variable, Variable]]()
   var paramReturn = Map[Procedure, Map[Variable, Variable]]()
@@ -764,11 +699,11 @@ class TranslationValidator {
   }
 
   def setSourceProg(p: Program) = {
-    val f = inferProcFrames(p)
-    afterFrame = f.map((k, v) => (k.name, v)).toMap
-    val (prog, cuts) = TransitionSystem.toTransitionSystem(p, f)
-    afterProg = Some(prog)
-    afterCuts = cuts
+    // val f = inferProcFrames(p)
+    // afterFrame = f.map((k, v) => (k.name, v)).toMap
+    // val (prog, cuts) = TransitionSystem.toTransitionSystem(p, f)
+    // afterProg = Some(prog)
+    // afterCuts = cuts
   }
 
   def addAssumedAssertions(a: Iterable[Assert]) = {
@@ -780,8 +715,8 @@ class TranslationValidator {
    * of what when wrong in the validation.
    */
   private def processModel(
-    source: Procedure,
-    target: Procedure,
+    source: ProcInfo,
+    target: ProcInfo,
     combinedProc: Procedure,
     prover: SMTProver,
     invariant: Seq[Expr],
@@ -802,7 +737,7 @@ class TranslationValidator {
       .flatten
       .toSet
 
-    val cutMap = afterCuts(source).cutLabelBlockInProcedure.map { case (cl, b) =>
+    val cutMap = source.cuts.cutLabelBlockInProcedure.map { case (cl, b) =>
       PCMan.PCSym(cl) -> cl
     }.toMap
     tvLogger.info(s"Cut point labels: $cutMap")
@@ -1019,16 +954,12 @@ class TranslationValidator {
 
   private def validateSMTSingleProc(
     config: TVJob,
+    interproc: InterproceduralInfo,
     runName: String,
     procTransformed: Procedure,
-    invariantRenamingSrcTgt: TransformDataRelationFun,
-    invariantRenamingTgtSrc: TransformDataRelationFun,
-    flowFacts: TransformTargetTargetFlowFact,
-    introducedAsserts: Set[String],
-    sourceParams: Map[BlockID, CallParamMapping],
-    targetParams: Map[BlockID, CallParamMapping],
-    liveVarsSource: Map[BlockID, Set[Variable]],
-    liveVarsTarget: Map[BlockID, Set[Variable]]
+    invariant: InvariantDescription,
+    sourceInfo: ProcInfo,
+    targetInfo: ProcInfo
   ): TVResult = {
     val runNamePrefix = runName + "-" + procTransformed.name
     val proc = procTransformed
@@ -1037,39 +968,17 @@ class TranslationValidator {
 
     val timer = PerformanceTimer(runNamePrefix, LogLevel.DEBUG, tvLogger)
 
-    val source = afterProg.get.procedures.find(_.name == proc.name).get
-    val target = beforeProg.get.procedures.find(_.name == proc.name).get
+    val source = sourceInfo.transition // afterProg.get.procedures.find(_.name == proc.name).get
+    val target = targetInfo.transition // beforeProg.get.procedures.find(_.name == proc.name).get
 
-    TransitionSystem.totaliseAsserts(source, introducedAsserts)
-    TransitionSystem.totaliseAsserts(target)
-
-    TransitionSystem.removeUnreachableBlocks(source)
-    TransitionSystem.removeUnreachableBlocks(target)
-
-    // val inputs = TransitionSystem.programCounterVar :: TransitionSystem.traceVar :: (globalsForProc(proc).toList)
-    val frames = (afterFrame ++ beforeFrame)
-
-    val (srcRenameSSA, srcSSADefs) = SSADAG.transform(sourceParams, source, liveVarsSource)
-    val (tgtRenameSSA, tgtSSADefs) = SSADAG.transform(targetParams, target, liveVarsTarget)
     timer.checkPoint("SSA")
 
-    def targetDefined(block: BlockID): Set[Variable] = {
-      tgtSSADefs.get(block).map(_.keys).toSet.flatten
-    }
 
-    val equalVarsInvariant = getEqualVarsInvariantRenaming(
-      proc,
-      invariantRenamingSrcTgt,
-      invariantRenamingTgtSrc,
-      liveVarsSource,
-      liveVarsTarget,
-      targetDefined,
-      sourceParams(proc.name),
-      targetParams(proc.name)
-    )
+    val equalVarsInvariant =
+      getEqualVarsInvariantRenaming(interproc, proc, sourceInfo, targetInfo, invariant.renamingSrcTgt, invariant.renamingTgtSrc)
 
     val cuts =
-      beforeCuts(target).cutLabelBlockInProcedure.map(_._1) ++ afterCuts(source).cutLabelBlockInProcedure.map(_._1)
+      targetInfo.cuts.cutLabelBlockInProcedure.map(_._1) ++ sourceInfo.cuts.cutLabelBlockInProcedure.map(_._1)
 
     val alwaysInv = List(
       CompatArg(TransitionSystem.programCounterVar, TransitionSystem.programCounterVar),
@@ -1078,35 +987,34 @@ class TranslationValidator {
 
     val invEverywhere = cuts.toList.map(label => Inv.CutPoint(label, alwaysInv, Some(s"GlobalConstraint$label")))
 
-    val factsInvariant = getFlowFactsInvariant(proc, liveVarsTarget, targetDefined, flowFacts(proc.name))
+    val factsInvariant = getFlowFactsInvariant(proc, sourceInfo, targetInfo, invariant.flowFacts(proc.name))
 
-    val invariant = equalVarsInvariant ++ factsInvariant ++ invEverywhere
+    val concreteInvariant = equalVarsInvariant ++ factsInvariant ++ invEverywhere
 
     val ackInv =
       Ackermann.instantiateAxioms(
         source.entryBlock.get,
         target.entryBlock.get,
-        frames,
         exprInSource,
         exprInTarget,
-        invariantRenamingSrcTgt
+        invariant.renamingSrcTgt
       )
     timer.checkPoint("ackermann")
 
     // val preInv = invariant
 
-    val preInv = invariant.map(
+    val preInv = concreteInvariant.map(
       invToPredicateInState(
-        e => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("ENTRY").label, e),
-        e => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("ENTRY").label, e)
+        e => sourceInfo.renameSSA(sourceInfo.cuts.cutLabelBlockInTr("ENTRY").label, e),
+        e => targetInfo.renameSSA(targetInfo.cuts.cutLabelBlockInTr("ENTRY").label, e)
       )
     )
 
-    val primedInv = invariant
+    val primedInv = concreteInvariant
       .map(
         invToPredicateInState(
-          e => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("EXIT").label, e),
-          e => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("EXIT").label, e)
+          e => sourceInfo.renameSSA(sourceInfo.cuts.cutLabelBlockInTr("EXIT").label, e),
+          e => sourceInfo.renameSSA(targetInfo.cuts.cutLabelBlockInTr("EXIT").label, e)
         )
       )
       .map(_.body)
@@ -1173,8 +1081,8 @@ class TranslationValidator {
     val sourceAssumeFail =
       BinaryExpr(
         EQ,
-        srcRenameSSA(
-          afterCuts(source).cutLabelBlockInTr("EXIT").label.stripPrefix("source__"),
+        sourceInfo.renameSSA(
+          sourceInfo.cuts.cutLabelBlockInTr("EXIT").label.stripPrefix("source__"),
           TransitionSystem.programCounterVar
         ),
         PCMan.PCSym(PCMan.assumptionFailLabel)
@@ -1224,12 +1132,12 @@ class TranslationValidator {
           tvLogger.error(s"sat ${runNamePrefix} (verify failed)")
 
           val g = processModel(
-            source,
-            target,
+            sourceInfo,
+            targetInfo,
             newProg.get.mainProcedure,
             prover,
             primedInv.toList,
-            invariantRenamingSrcTgt,
+            invariant.renamingSrcTgt,
             source.entryBlock.get.label,
             target.entryBlock.get.label
           )
@@ -1272,7 +1180,7 @@ class TranslationValidator {
   /**
    * Generate an SMT query for the product program, 
    *
-   * @param invariantRenamingSrcTgt 
+   * @param invariant.renamingSrcTgt 
    *  function describing the transform as mapping from variable -> expression at a given block in the resulting program, 
    *  using a lambda Option[BlockId] => Variable | Memory => Option[Expr]
    *
@@ -1283,56 +1191,63 @@ class TranslationValidator {
    * Returns a map from proceudre -> smt query
    */
   def getValidationSMT(
+    program: Program,
     config: TVJob,
     runName: String,
-    invariantRenamingSrcTgt: TransformDataRelationFun = (_, _) => e => Seq(e),
-    invariantRenamingTgtSrc: TransformDataRelationFun = (_, _) => _ => Seq(),
-    flowFacts: TransformTargetTargetFlowFact = _ => Map(),
-    introducedAsserts: Set[String] = Set()
+    targetProgClone: Program,
+    sourceProgClone: Program,
+    invariant: InvariantDescription
   ): TVJob = {
 
-    val interesting = initProg.get.procedures
+    val framesTarget = inferProcFrames(targetProgClone).map((k, v) => (k.name, v)).toMap
+    val framesSource = inferProcFrames(sourceProgClone).map((k, v) => (k.name, v)).toMap
+
+    val interesting = program.procedures
       .filterNot(_.isExternal.contains(true))
       .filterNot(_.procName.startsWith("indirect_call_launchpad"))
-      .filter(n => beforeFrame.contains(n.name))
-      .filter(n => afterFrame.contains(n.name))
+      .filter(n => framesTarget.contains(n.name))
+      .filter(n => framesSource.contains(n.name))
 
     val paramMapping: Map[String, (CallParamMapping, CallParamMapping)] = getFunctionSigsRenaming(
-      invariantRenamingSrcTgt
+      program,
+      framesSource,
+      invariant.renamingSrcTgt,
     )
-    val sourceParams = paramMapping.toSeq.map { case (pn, (source, target)) => (pn, source) }.toMap
-    val targetParams = paramMapping.toSeq.map { case (pn, (source, target)) => (pn, target) }.toMap
+
+    val sourceParams: Map[String, CallParamMapping] = paramMapping.toSeq.map { case (pn, (source, target)) =>
+      (pn, source)
+    }.toMap
+    val targetParams: Map[String, CallParamMapping] = paramMapping.toSeq.map { case (pn, (source, target)) =>
+      (pn, target)
+    }.toMap
+
+    val interproc = InterproceduralInfo(program, framesSource, framesTarget, sourceParams, targetParams)
+
+
+    def procToTrInplace(p: Procedure, params: Map[String, CallParamMapping]) = {
+
+      val liveVars: Map[String, Set[Variable]] = getLiveVars(p, params)._1.map((k, v) => (k.label, v)).toMap
+
+      val cuts = TransitionSystem.toTransitionSystemInPlace(p)
+
+      TransitionSystem.totaliseAsserts(p, invariant.introducedAsserts)
+
+      TransitionSystem.removeUnreachableBlocks(p)
+
+      val (renameSSA, defines) = SSADAG.transform(params, p, liveVars)
+
+      ProcInfo(p.name, p, liveVars, cuts, params(p.name), renameSSA, defines)
+    }
 
     var result = config
     interesting.foreach(proc => {
+      val sourceProc = sourceProgClone.procedures.find(_.name == proc.name).get
+      val targetProc = targetProgClone.procedures.find(_.name == proc.name).get
 
-      def livenessBlockLabelMap(r: (Map[Block, Set[Variable]], Map[Block, Set[Variable]])) =
-        r._1.map((k, v) => (k.label, v)).toMap
+      val source = procToTrInplace(sourceProc, sourceParams)
+      val target = procToTrInplace(targetProc, targetParams)
 
-      val liveVarsTarget: Map[String, Set[Variable]] = initProgBefore.get.procedures
-        .find(p => proc.name == p.name)
-        .map(getLiveVars(_, targetParams))
-        .map(livenessBlockLabelMap)
-        .getOrElse(Map())
-      val liveVarsSource: Map[String, Set[Variable]] = initProg.get.procedures
-        .find(p => proc.name == p.name)
-        .map(getLiveVars(_, sourceParams))
-        .map(livenessBlockLabelMap)
-        .getOrElse(Map())
-
-      val res = validateSMTSingleProc(
-        result,
-        runName,
-        proc,
-        invariantRenamingSrcTgt,
-        invariantRenamingTgtSrc,
-        flowFacts,
-        introducedAsserts,
-        sourceParams,
-        targetParams,
-        liveVarsSource,
-        liveVarsTarget
-      )
+      val res = validateSMTSingleProc(result, interproc, runName, proc, invariant, source, target)
 
       result = result.copy(results = res :: result.results)
     })
@@ -1340,19 +1255,18 @@ class TranslationValidator {
     result
   }
 
-}
+  def forTransform[T](
+    transformName: String,
+    transform: Program => T,
+    invariant: T => InvariantDescription = (_: T) => InvariantDescription()
+  ): ((Program, TVJob) => TVJob) = { (p: Program, tvconf: TVJob) =>
+    {
+      val before = ir.dsl.IRToDSL.convertProgram(p).resolve
+      val r = transform(p)
+      val inv = invariant(r)
+      val after = ir.dsl.IRToDSL.convertProgram(p).resolve
+      getValidationSMT(p, tvconf, transformName, before, after, inv)
+    }
+  }
 
-def validatorForTransform[T](transform: Program => T)(p: Program): (TranslationValidator, T) = {
-  val v = TranslationValidator()
-  v.setTargetProg(p)
-  val r = transform(p)
-  v.setSourceProg(p)
-  (v, r)
-}
-
-def wrapShapePreservingTransformInValidation(tvJob: TVJob, transform: Program => Unit, name: String)(
-  p: Program
-): TVJob = {
-  val (validator, _) = validatorForTransform(transform)(p)
-  validator.getValidationSMT(tvJob, name)
 }
