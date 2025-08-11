@@ -130,7 +130,7 @@ jobs:
           "$ok"
 
       - uses: mshick/add-pr-comment@v2
-        if: always() && github.event_name == 'pull_request'
+        if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
         with:
           message-path: /tmp/pr-message.txt
           refresh-message-position: true
