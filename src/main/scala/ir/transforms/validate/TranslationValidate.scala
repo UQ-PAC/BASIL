@@ -244,12 +244,6 @@ enum Inv {
   case GlobalConstraint(cutPointPCGuard: String, pred: List[InvTerm], comment: Option[String] = None)
 
   /* a constraint conditional on a predicate in the source program */
-  case SourceConditionalConstraint(
-    cutPointPCGuard: String,
-    sourceCond: Expr,
-    pred: List[InvTerm],
-    comment: Option[String] = None
-  )
 
 }
 
@@ -322,67 +316,36 @@ class TranslationValidator {
 
   }
 
-  // proc -> List (pred, comment)
-
-  extension (i: Inv) {
-
-    def toAssume(
-      proc: Procedure,
-      inPost: Boolean = false
-    )(renameSrcSSA: (String, Expr) => Expr, renameTgtSSA: (String, Expr) => Expr) = i match {
+  /**
+   * Convert an invariant to a guarded invariant for a specific cut point as described by the invariant.
+   *
+   * renaming functions provide the expression rewriting for 
+   *  - the ssa index of varibales at exit block
+   *  - variable renaming for source/target program
+   *
+   */
+  def invToPredicateInState(renameSrcSSA: Expr => Expr, renameTgtSSA: Expr => Expr)(i: Inv) = {
+    i match {
       // FIXME: this is a huge mess -- isPost; subtle as it can introduce soundness issues
       // by generating the wrong constraint, good motivation to clean it up
       // TODO: globalconstraint etc aren't used idk
       case Inv.GlobalConstraint(cutLabel, preds, c) => {
-        val blockLabel =
-          beforeRenamer.stripNamespace(
-            (beforeCuts.find((p, _) => p.name == proc.name).get._2).cutLabelBlockInTr(cutLabel).label
-          )
         val pred = boolAnd(
-          preds.map(
-            _.toPred(x => (exprInSource(renameSrcSSA(blockLabel, x))), x => exprInTarget(renameTgtSSA(blockLabel, x)))
-          )
+          preds.map(_.toPred(x => (exprInSource(renameSrcSSA(x))), x => exprInTarget(renameTgtSSA(x))))
         )
         Assume(pred, c)
       }
-      case Inv.SourceConditionalConstraint(cutLabel, cond, preds, c) => {
-        val blockLabel =
-          beforeRenamer.stripNamespace(
-            (beforeCuts.find((p, _) => p.name == proc.name).get._2).cutLabelBlockInTr(cutLabel).label
-          )
-        val pred = boolAnd(
-          preds.map(
-            _.toPred(x => (exprInSource(renameSrcSSA(blockLabel, x))), x => exprInTarget(renameTgtSSA(blockLabel, x)))
-          )
-        )
-        val guarded =
-          BinaryExpr(BoolIMPLIES, exprInSource(renameSrcSSA(blockLabel, cond)), pred)
-        Assume(guarded, c)
-      }
       case Inv.CutPoint(cutLabel, preds, c) => {
-        val blockLabel =
-          beforeRenamer.stripNamespace(
-            (beforeCuts.find((p, _) => p.name == proc.name).get._2).cutLabelBlockInTr(cutLabel).label
-          )
         val pred = boolAnd(
-          preds.map(
-            _.toPred(x => (exprInSource(renameSrcSSA(blockLabel, x))), x => exprInTarget(renameTgtSSA(blockLabel, x)))
-          )
+          preds.map(_.toPred(x => (exprInSource(renameSrcSSA(x))), x => exprInTarget(renameTgtSSA(x))))
         )
 
-        val rn =
-          if inPost then
-            renameSrcSSA("EXIT", (BinaryExpr(EQ, TransitionSystem.programCounterVar, PCMan.PCSym(cutLabel))))
-          else BinaryExpr(EQ, TransitionSystem.programCounterVar, PCMan.PCSym(cutLabel))
+        val rn = renameSrcSSA((BinaryExpr(EQ, TransitionSystem.programCounterVar, PCMan.PCSym(cutLabel))))
 
         val guarded =
           BinaryExpr(BoolIMPLIES, exprInSource(rn), pred)
         Assume(guarded, c)
       }
-    }
-
-    def toAssert = i.toAssume match {
-      case Assume(b, c, _, _) => Assert(b, c)
     }
   }
 
@@ -677,7 +640,6 @@ class TranslationValidator {
 
     val cuts = (beforeCutsBls.keys ++ afterCutsBls.keys).toSet.toList
 
-    // println(afterProc.name)
     val invs = (cuts.map {
       case (label) => {
         val tgtCut = beforeCutsBls(label)
@@ -685,13 +647,8 @@ class TranslationValidator {
 
         val srcLives = liveVarsSourceBeforeBlock.get(srcCut).toList.flatten
 
-        // println(label + "  " + srcCut)
-        // println(srcLives)
-
         val tgtLives = liveVarsTargetBeforeBlock.get(tgtCut).toList.flatten
         val tgtDefines = targetDefined(tgtCut)
-        // println(srcLives)
-        // println("RENAMED src" + srcLives.map(s => s -> renamingSrcTgt(afterProc.name, Some(srcCut))(s)))
 
         val invSrc = srcLives.map(s => s -> renamingSrcTgt(afterProc.name, Some(srcCut))(s)).flatMap {
           case (l, r) => {
@@ -709,14 +666,11 @@ class TranslationValidator {
           }
         }
 
-        // TODO: intersect live in source and target for dead code.
-
         Inv.CutPoint(label, invSrc ++ invTgt, Some(s"INVARIANT at $label"))
       }
     }).toList
 
     val inv = globalsInvEverywhere ++ invs ++ Seq(inparams) ++ Seq(outparams)
-    // println("INV: " + inv)
     inv
   }
 
@@ -746,9 +700,6 @@ class TranslationValidator {
         val tgtCut = beforeCutsBls(label)
         val tgtLives = liveVarsTarget.get(tgtCut).toSet.flatten
         val tgtDefines = definedVarsTarget(tgtCut)
-        // println(label)
-        // println(tgtDefines)
-        // println(flowFactTgtTgt)
         val m = flowFactTgtTgt
           .collect {
             case (v, e)
@@ -761,19 +712,15 @@ class TranslationValidator {
                   .forall(tgtLives.contains) && e.variables.nonEmpty /*&& e.variables.forall(tgtLives.contains) */ =>
               List(TargetTerm(BinaryExpr(EQ, v, e)))
             case (v, e) =>
-              // println((e.variables + v).filterNot(vv => tgtLives.contains(vv) || tgtDefines.contains(vv)))
-              // println(s"failed because liveness: ${v} ${e}")
               List()
           }
           .toList
           .flatten
         val i = Inv.CutPoint(label, m, Some(s"FLOWFACT at $label"))
-        // println(i)
         i
       }
     }).toList
 
-    // println(invs)
     invs
   }
 
@@ -1148,47 +1095,21 @@ class TranslationValidator {
 
     // val preInv = invariant
 
-    val preInv = invariant.map {
-      case i: Inv.GlobalConstraint => {
-        i.toAssume(proc, true)(
-          (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("ENTRY").label, e),
-          (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("ENTRY").label, e)
-        ).body
-      }
-      case i: Inv.SourceConditionalConstraint => {
-        i.toAssume(proc, true)(
-          (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("ENTRY").label, e),
-          (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("ENTRY").label, e)
-        ).body
-      }
-      case i: Inv.CutPoint => {
-        i.toAssume(proc, true)(
-          (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("ENTRY").label, e),
-          (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("ENTRY").label, e)
-        ).body
-      }
-    }
+    val preInv = invariant.map(
+      invToPredicateInState(
+        e => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("ENTRY").label, e),
+        e => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("ENTRY").label, e)
+      )
+    )
 
-    val primedInv = invariant.map {
-      case i: Inv.GlobalConstraint => {
-        i.toAssume(proc, true)(
-          (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("EXIT").label, e),
-          (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("EXIT").label, e)
-        ).body
-      }
-      case i: Inv.SourceConditionalConstraint => {
-        i.toAssume(proc, true)(
-          (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("EXIT").label, e),
-          (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("EXIT").label, e)
-        ).body
-      }
-      case i: Inv.CutPoint => {
-        i.toAssume(proc, true)(
-          (l, e) => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("EXIT").label, e),
-          (l, e) => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("EXIT").label, e)
-        ).body
-      }
-    }
+    val primedInv = invariant
+      .map(
+        invToPredicateInState(
+          e => srcRenameSSA(afterCuts(source).cutLabelBlockInTr("EXIT").label, e),
+          e => tgtRenameSSA(beforeCuts(target).cutLabelBlockInTr("EXIT").label, e)
+        )
+      )
+      .map(_.body)
 
     visit_proc(afterRenamer, source)
     visit_proc(beforeRenamer, target)
@@ -1212,15 +1133,16 @@ class TranslationValidator {
     lazy val npe = newProg.map(_.mainProcedure.entryBlock.get)
 
     count = 0
-    for (i <- preInv) {
+    for (e <- preInv) {
       count += 1
-      // val e = i.toAssume(proc)(srcRenameSSA, tgtRenameSSA).body
-      val e = i
       try {
-        val l = Some(s"inv$count")
-        b.addAssert(e, l)
-        prover.map(_.addConstraint(e))
-        npe.map(_.statements.append(Assert(e, l)))
+        val l = e.comment match {
+          case None => Some(s"inv$count")
+          case Some(s) => Some(s"${s.replace(' ', '_')}_inv$count")
+        }
+        b.addAssert(e.body, l)
+        prover.map(_.addConstraint(e.body))
+        npe.map(_.statements.append(Assert(e.body, l)))
       } catch
         ex => {
           throw Exception(s"$ex Failed to gen smt for ?\n  $e :: \n $e")
@@ -1230,7 +1152,7 @@ class TranslationValidator {
     count = 0
     for ((ack, ackn) <- ackInv) {
       count += 1
-      val l = Some(s"ackermann$ackn$count")
+      val l = Some(s"ackermann$count$ackn")
       npe.map(_.statements.append(Assert(ack, l)))
       prover.map(_.addConstraint(ack))
       b.addAssert(ack, l)
@@ -1271,8 +1193,6 @@ class TranslationValidator {
       tvLogger.info(s"Write query $fname")
       timer.checkPoint("writesmtfile")
     })
-
-    b = null
 
     val verified = prover.map(prover => {
       val r = prover.checkSat()
