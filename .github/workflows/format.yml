@@ -73,9 +73,9 @@ jobs:
           git add -u && git commit -m "automated scalafmt"
           git format-patch -U1 -1 HEAD --stdout > scalafmt.patch
 
+          # this function will only be used from the `workflow_dispatch` action, which
+          # already uses the right branch - we don't need to worry about merge branches.
           try_apply() {
-            git checkout ${{ github.head_ref }}
-            git am -3 scalafmt.patch
             git push
           }
 
