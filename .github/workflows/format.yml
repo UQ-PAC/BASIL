@@ -133,6 +133,7 @@ jobs:
         if: always() && github.event_name == 'pull_request'
         with:
           message-path: /tmp/pr-message.txt
+          refresh-message-position: true
           # avoid posting a comment if it succeeded the first time.
           update-only: ${{ steps.diff.outcome == 'success' }}
 
@@ -141,13 +142,13 @@ jobs:
         run: |
           set -x
           if ! "$autoformat"; then
-            echo Scalafmt check outcome:
+            : Scalafmt check outcome:
             ${{ steps.diff.outcome != 'failed' }}
 
-            echo Scalafmt comment outcome:
+            : Scalafmt comment outcome:
             ${{ steps.prepare.outcome != 'failed' }}
           else
-            echo Scalafmt auto-format outcome:
+            : Scalafmt auto-format outcome:
             ${{ steps.prepare.outcome != 'failed' }}
           fi
 
