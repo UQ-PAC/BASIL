@@ -339,13 +339,10 @@ class Procedure private (
     case _ => false
   }
   private def deepEqualsProc(p: Procedure) = {
-    name == p.name && (p.blocks.size == blocks.size) && {
-      p.blocksBookended.zip(blocksBookended).forall { case ((l: Block), (r: Block)) =>
-        l.deepEqualsDbg(r)
-      }
-    }
     // `corresponds` tests whether its iterable arguments are equal, using the given predicate
     // to compare elements pairwise.
+    name == p.name
+    && (blocksBookended corresponds p.blocksBookended)(_ deepEqualsDbg _)
     && (returnBlock corresponds p.returnBlock)(_ deepEqualsDbg _)
   }
 
