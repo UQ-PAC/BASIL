@@ -339,11 +339,11 @@ class Procedure private (
     case _ => false
   }
   private def deepEqualsProc(p: Procedure) = {
-    name == p.name && (p.blocks.size == blocks.size) && {
-      p.blocksBookended.zip(blocksBookended).forall { case ((l: Block), (r: Block)) =>
-        l.deepEqualsDbg(r)
-      }
-    }
+    // `corresponds` tests whether its iterable arguments are equal, using the given predicate
+    // to compare elements pairwise.
+    name == p.name
+    && (blocksBookended corresponds p.blocksBookended)(_ deepEqualsDbg _)
+    && (returnBlock corresponds p.returnBlock)(_ deepEqualsDbg _)
   }
 
   var blockCounter = 0
@@ -418,7 +418,11 @@ class Procedure private (
     */
   def blocks: Iterator[Block] = _blocks.iterator
   def blocksBookended: Iterable[Block] =
-    entryBlock.toSeq ++ _blocks.filterNot(entryBlock.contains).filterNot(returnBlock.contains) ++ returnBlock.toSeq
+    (entryBlock.iterator
+      ++ _blocks.iterator
+        .filterNot(entryBlock.contains)
+        .filterNot(returnBlock.contains)
+      ++ returnBlock.iterator).toSeq
 
   def addCaller(c: DirectCall): Unit = {
     _callers.add(c)
@@ -434,6 +438,11 @@ class Procedure private (
     if (!returnBlock.contains(value)) {
       _returnBlock = Some(addBlock(value))
     }
+  }
+
+  def returnBlock_=(value: Option[Block]): Unit = value match {
+    case Some(newblock) => returnBlock = newblock
+    case None => _returnBlock = None
   }
 
   def entryBlock: Option[Block] = _entryBlock

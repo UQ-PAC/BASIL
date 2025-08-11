@@ -37,6 +37,7 @@ class BasilMainBNFCVisitor[A](var decls: Declarations)
     val attr = x.attribset_.accept(this, arg)
     val addr = attr.getInt("address")
     val rname = attr.getString("name").getOrElse(procName)
+    val retlabel = attr.getString("returnBlock")
 
     val formalIns = decls.formalIns(procName)
     val formalOuts = decls.formalOuts(procName)
@@ -52,7 +53,7 @@ class BasilMainBNFCVisitor[A](var decls: Declarations)
         out = formalOuts,
         blocks = blocks,
         entryBlockLabel = None,
-        returnBlockLabel = None,
+        returnBlockLabel = retlabel,
         address = addr,
         requires = procSpec.require,
         ensures = procSpec.ensure
