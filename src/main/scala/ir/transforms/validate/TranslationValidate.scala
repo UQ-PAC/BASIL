@@ -342,11 +342,8 @@ object TranslationValidator {
     }
   }
 
-  var asserts = Vector[Assert]()
-
   val beforeRenamer = NamespaceState("target")
   val afterRenamer = NamespaceState("source")
-
   def exprInSource(v: Expr) = visit_expr(afterRenamer, v)
   def exprInTarget(v: Expr) = visit_expr(beforeRenamer, v)
   def varInSource(v: Variable) = visit_rvar(afterRenamer, v)
@@ -641,7 +638,7 @@ object TranslationValidator {
 
     val invs = (cuts.map {
       case (label) => {
-        val tgtCut = source.cutBlockLabels(label)
+        val tgtCut = target.cutBlockLabels(label)
         val tgtLives = target.liveVars.get(tgtCut).toSet.flatten
         val tgtDefines = target.defines(tgtCut)
         val m = flowFactTgtTgt
@@ -668,47 +665,6 @@ object TranslationValidator {
     invs
   }
 
-
-  var paramCall = Map[Procedure, Map[Variable, Variable]]()
-  var paramReturn = Map[Procedure, Map[Variable, Variable]]()
-
-  /**
-   * For parameter analysis: describes an invariant across all call sites
-   * between source and target. 
-   *
-   * Assume call lvalues are invariant across all calls
-   *
-   * e.g.
-   *
-   * (%R0) := call proc (%R0, %R1)
-   * () := call proc()
-   *
-   * inParam
-   *  %R0 -> $R0, %R1 -> $R1
-   *
-   * outParam
-   *  %R0 -> $R0
-   *
-   */
-  def setParamMapping(
-    mapCall: Map[Procedure, Map[Variable, Variable]],
-    mapReturn: Map[Procedure, Map[Variable, Variable]]
-  ) = {
-    paramCall = mapCall
-    paramReturn = mapReturn
-  }
-
-  def setSourceProg(p: Program) = {
-    // val f = inferProcFrames(p)
-    // afterFrame = f.map((k, v) => (k.name, v)).toMap
-    // val (prog, cuts) = TransitionSystem.toTransitionSystem(p, f)
-    // afterProg = Some(prog)
-    // afterCuts = cuts
-  }
-
-  def addAssumedAssertions(a: Iterable[Assert]) = {
-    asserts = asserts ++ a
-  }
 
   /**
    * Dump some debug logs comparing source and target programs from the model retuned when [sat], to get an idea
@@ -971,8 +927,6 @@ object TranslationValidator {
     val source = sourceInfo.transition // afterProg.get.procedures.find(_.name == proc.name).get
     val target = targetInfo.transition // beforeProg.get.procedures.find(_.name == proc.name).get
 
-    timer.checkPoint("SSA")
-
 
     val equalVarsInvariant =
       getEqualVarsInvariantRenaming(interproc, proc, sourceInfo, targetInfo, invariant.renamingSrcTgt, invariant.renamingTgtSrc)
@@ -1048,7 +1002,7 @@ object TranslationValidator {
           case None => Some(s"inv$count")
           case Some(s) => Some(s"${s.replace(' ', '_')}_inv$count")
         }
-        b.addAssert(e.body, l)
+        b.addAssert(e.body, Some(s"inv$count"))
         prover.map(_.addConstraint(e.body))
         npe.map(_.statements.append(Assert(e.body, l)))
       } catch
@@ -1060,7 +1014,7 @@ object TranslationValidator {
     count = 0
     for ((ack, ackn) <- ackInv) {
       count += 1
-      val l = Some(s"ackermann$count$ackn")
+      val l = Some(s"ackermann$ackn$count")
       npe.map(_.statements.append(Assert(ack, l)))
       prover.map(_.addConstraint(ack))
       b.addAssert(ack, l)
@@ -1209,7 +1163,7 @@ object TranslationValidator {
       .filter(n => framesSource.contains(n.name))
 
     val paramMapping: Map[String, (CallParamMapping, CallParamMapping)] = getFunctionSigsRenaming(
-      program,
+      sourceProgClone,
       framesSource,
       invariant.renamingSrcTgt,
     )
@@ -1221,16 +1175,16 @@ object TranslationValidator {
       (pn, target)
     }.toMap
 
-    val interproc = InterproceduralInfo(program, framesSource, framesTarget, sourceParams, targetParams)
+    val interproc = InterproceduralInfo(sourceProgClone, framesSource, framesTarget, sourceParams, targetParams)
 
 
-    def procToTrInplace(p: Procedure, params: Map[String, CallParamMapping]) = {
+    def procToTrInplace(p: Procedure, params: Map[String, CallParamMapping], introducedAsserts: Set[String]) = {
 
       val liveVars: Map[String, Set[Variable]] = getLiveVars(p, params)._1.map((k, v) => (k.label, v)).toMap
 
       val cuts = TransitionSystem.toTransitionSystemInPlace(p)
 
-      TransitionSystem.totaliseAsserts(p, invariant.introducedAsserts)
+      TransitionSystem.totaliseAsserts(p, introducedAsserts)
 
       TransitionSystem.removeUnreachableBlocks(p)
 
@@ -1244,8 +1198,8 @@ object TranslationValidator {
       val sourceProc = sourceProgClone.procedures.find(_.name == proc.name).get
       val targetProc = targetProgClone.procedures.find(_.name == proc.name).get
 
-      val source = procToTrInplace(sourceProc, sourceParams)
-      val target = procToTrInplace(targetProc, targetParams)
+      val source = procToTrInplace(sourceProc, sourceParams, invariant.introducedAsserts)
+      val target = procToTrInplace(targetProc, targetParams, Set())
 
       val res = validateSMTSingleProc(result, interproc, runName, proc, invariant, source, target)
 
@@ -1262,6 +1216,13 @@ object TranslationValidator {
   ): ((Program, TVJob) => TVJob) = { (p: Program, tvconf: TVJob) =>
     {
       val before = ir.dsl.IRToDSL.convertProgram(p).resolve
+
+      val beforeprocs = before.nameToProcedure
+      for (p <- p.procedures) {
+        assert(p.blocks.map(_.label).corresponds(beforeprocs(p.procName).blocks.map(_.label).toList)(_.equals(_)))
+      }
+
+
       val r = transform(p)
       val inv = invariant(r)
       val after = ir.dsl.IRToDSL.convertProgram(p).resolve
