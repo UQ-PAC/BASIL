@@ -57,10 +57,7 @@ class SingleAssignmentTest extends AnyFunSuite with CaptureOutput {
     // val x = LocalVar("x0", BitVecType(32))
 
     val tightLoop = prog(
-      proc(
-        "errorFn_1848",
-        Seq("x" -> BitVecType(32)),
-        Seq(),
+      proc("errorFn_1848", Seq("x" -> BitVecType(32)), Seq())(
         block("errorFn_1848_entry", goto("loop")),
         block("loop", LocalAssign(x, BinaryExpr(BVADD, x, BitVecLiteral(1, 32))), goto("loop"))
       )

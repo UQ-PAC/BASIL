@@ -32,8 +32,9 @@ object IntervalDSATestData {
       proc(
         "main",
         Set(("R0", bv64), ("R1", bv64), ("R2", bv64)),
-        Set(),
+        Set()
         //          Set(("R0", bv64)),
+      )(
         block(
           "en",
           MemoryStore(mem, R1, BitVecLiteral(1, 32), LittleEndian, 32, Some("01")),
@@ -69,8 +70,9 @@ object IntervalDSATestData {
       proc(
         "main",
         Set(("R0", bv64)),
-        Set(),
+        Set()
         //          Set(("R0", bv64)),
+      )(
         block(
           "en",
           MemoryStore(mem, R0, BitVecLiteral(1, 32), LittleEndian, 32, Some("01")),
@@ -108,10 +110,7 @@ object IntervalDSATestData {
   def recursion: IRContext = {
     val program =
       prog(
-        proc(
-          "main",
-          Set(("R0", bv64)),
-          Set(("R0", bv64)),
+        proc("main", Set(("R0", bv64)), Set(("R0", bv64)))(
           block(
             "en",
             LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(1, 64)), Some("01")),
@@ -126,10 +125,7 @@ object IntervalDSATestData {
   def recursionWithIndirection: IRContext = {
     val program =
       prog(
-        proc(
-          "main",
-          Set(("R0", bv64)),
-          Set(("R0", bv64)),
+        proc("main", Set(("R0", bv64)), Set(("R0", bv64)))(
           block(
             "en",
             MemoryLoad(R1, mem, R0, LittleEndian, 64),
@@ -145,10 +141,7 @@ object IntervalDSATestData {
 
   def mutualRecursion: IRContext = {
     val program = prog(
-      proc(
-        "main",
-        Set(("R0", bv64)),
-        Set(("R0", bv64)),
+      proc("main", Set(("R0", bv64)), Set(("R0", bv64)))(
         block(
           "en",
           LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(1, 64)), Some("01")),
@@ -156,10 +149,7 @@ object IntervalDSATestData {
           ret(("R0", R0))
         )
       ),
-      proc(
-        "callee",
-        Set(("R0", bv64)),
-        Set(("R0", bv64)),
+      proc("callee", Set(("R0", bv64)), Set(("R0", bv64)))(
         block(
           "en",
           LocalAssign(R0, BinaryExpr(BVADD, R0, BitVecLiteral(1, 64)), Some("01")),
@@ -211,10 +201,7 @@ object IntervalDSATestData {
   def loopIndirection: IRContext = {
     val program =
       prog(
-        proc(
-          "main",
-          Set(("R0", bv64)),
-          Set(("R0", bv64)),
+        proc("main", Set(("R0", bv64)), Set(("R0", bv64)))(
           block(
             "en",
             MemoryLoad(R1, mem, R0, LittleEndian, 64, Some("00")),
@@ -473,10 +460,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val irType = BitVecType(64)
 
     val program = prog(
-      proc(
-        "main",
-        Set(("R0", irType)),
-        Set(("R0", irType), ("R1", irType)),
+      proc("main", Set(("R0", irType)), Set(("R0", irType), ("R1", irType)))(
         block(
           "en",
           LocalAssign(R1, R0, Some("01")),
@@ -484,10 +468,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
           ret(("R0", R0), ("R1", R1))
         )
       ),
-      proc(
-        "callee",
-        Set(("R0", irType), ("R1", irType), ("R2", irType)),
-        Set(("R0", irType), ("R1", irType)),
+      proc("callee", Set(("R0", irType), ("R1", irType), ("R2", irType)), Set(("R0", irType), ("R1", irType)))(
         block(
           "calleeEn",
           MemoryStore(mem, R0, xAddress, LittleEndian, 64, Some("02")),
@@ -536,7 +517,8 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
         proc(
           "main",
           Set(("R0", BitVecType(64))),
-          Set(("R0", BitVecType(64)), ("R1", BitVecType(64)), ("R2", BitVecType(64))),
+          Set(("R0", BitVecType(64)), ("R1", BitVecType(64)), ("R2", BitVecType(64)))
+        )(
           block("entry", mallocCall, goto("b1", "b2")),
           block(
             "b1",
@@ -557,18 +539,14 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
             ret(("R0", R0), ("R1", R0), ("R2", R0))
           )
         ),
-        proc(
-          "wmalloc",
-          Set(("R0", BitVecType(64))),
-          Set(("R0", BitVecType(64))),
+        proc("wmalloc", Set(("R0", BitVecType(64))), Set(("R0", BitVecType(64))))(
           block("en", mallocCall, ret(("R0", R0)))
         ),
         proc(
           "malloc", // fake malloc
           Set(("R0", BitVecType(64))),
-          Set(("R0", BitVecType(64))),
-          block("malloc_b", load, ret(("R0", R0)))
-        )
+          Set(("R0", BitVecType(64)))
+        )(block("malloc_b", load, ret(("R0", R0))))
       )
 
     val context = programToContext(program, Set.empty, Map.empty)
