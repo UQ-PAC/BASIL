@@ -968,7 +968,7 @@ object TranslationValidator {
       .map(
         invToPredicateInState(
           e => sourceInfo.renameSSA(sourceInfo.cuts.cutLabelBlockInTr("EXIT").label, e),
-          e => sourceInfo.renameSSA(targetInfo.cuts.cutLabelBlockInTr("EXIT").label, e)
+          e => targetInfo.renameSSA(targetInfo.cuts.cutLabelBlockInTr("EXIT").label, e)
         )
       )
       .map(_.body)
