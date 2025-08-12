@@ -30,6 +30,17 @@
 
     /* DropDown styles */
     --dropdown-background-color-hover: #3c3c3c;
+
+    /* CFG styles */
+    --cfg-header--background--color: #161B22;
+    --cfg-header-border-color: #444;
+    --cfg-header-text-color: #444;
+    --cfg-graph-border-color: #444;
+    --cfg-graph-background-color: #1e293b;
+    --cfg-graph-shadow-color: rgba(0, 0, 0, 0.3);
+    --cfg-graph-header-background: #313d53;
+    --cfg-graph-header-border: #444;
+    --cfg-graph-header-text: #f3f4f6;
 }
 
 [data-theme='light'] {
@@ -51,6 +62,17 @@
 
     /* DropDown styles */
     --dropdown-background-color-hover: #bfbfbf;
+
+    /* CFG styles */
+    --cfg-header--background--color: #E0E0E0;
+    --cfg-header-border-color: #000;
+    --cfg-header-text-color: #000;
+    --cfg-graph-border-color: #ddd;
+    --cfg-graph-background-color: #f9f9f9;
+    --cfg-graph-shadow-color: rgba(0, 0, 0, 0.1);
+    --cfg-graph-header-background: #e0e0e0;
+    --cfg-graph-header-border: #ccc;
+    --cfg-graph-header-text: #333;
 }
 
 /* TODO: Check that this works */

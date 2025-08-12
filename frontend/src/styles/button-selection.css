@@ -14,10 +14,6 @@
     gap: 0.4em;
 }
 
-.context-dropdown:hover {
-    border-color: #888;
-}
-
 /* Toggle group */
 .toggle-group {
     display: flex;
@@ -85,6 +81,15 @@
 }
 
 .procedure-dropdown option {
-    background-color: #999; /* Option background */
-    color: #ddd; /* Option text color */
+    background-color: #999;
+    color: #ddd;
 }
+
+
+.context-dropdown {
+    color: var(--text-color);
+    background-color: var(--background-color);}
+
+.context-dropdown:hover {
+    border-color: #888;
+    background-color: var(--dropdown-background-color-hover);}

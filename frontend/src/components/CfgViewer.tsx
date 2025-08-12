@@ -386,7 +386,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
                     <>
                         <div className="flex-spacer"></div>
                         <div className="procedure-select-wrapper">
-                            <label className="procedure-select">Select Procedure: </label>
+                            <label id="procedure-select">Select Procedure: </label>
                             <select
                                 id="procedure-select"
                                 className="procedure-dropdown"

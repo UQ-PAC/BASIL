@@ -51,20 +51,15 @@
     text-overflow: ellipsis;
 }
 
-.epoch-button:hover:not(:disabled) {
+.epoch-button:not(.selected):hover {
     background-color: #d0d0d0;
 }
 
 .epoch-button.selected {
-    background-color: #007bff; /* Primary color for selected button */
+    background-color: #007bff;
     color: white;
     border-color: #007bff;
     font-weight: bold;
-}
-
-.epoch-button:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
 }
 
 

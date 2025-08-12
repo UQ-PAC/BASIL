@@ -13,17 +13,11 @@
 
 .cfg-viewer-header {
     display: flex;
-    border: 1px solid #000;
-    background-color: #E0E0E0;
+    border: 1px solid var(--cfg-header-border-color);
+    background-color: var(--cfg-header--background--color);
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     flex-shrink: 0;
     border-radius: 8px;
-}
-
-.cfg-viewer-header h2 {
-    margin-top: 0;
-    color: #333;
-    font-size: 1.8em;
 }
 
 .cfg-comparison-container {
@@ -39,21 +33,21 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    border: 1px solid #ddd;
+    border: 1px solid var(--cfg-graph-border-color);
     border-radius: 8px;
     overflow: hidden;
-    background-color: #f9f9f9;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    background-color: var(--cfg-graph-background-color);
+    box-shadow: 0 4px 8px var(--cfg-graph-shadow-color);
     min-height: 0;
 }
 
 .graph-wrapper h3 {
     text-align: center;
     padding: 5px 0;
-    margin: 0; /* Remove default margin from h3 */
-    background-color: #e0e0e0;
-    border-bottom: 1px solid #ccc;
-    color: #333;
+    margin: 0;
+    background-color: var(--cfg-graph-header-background);
+    border-bottom: 1px solid var(--cfg-graph-header-border);
+    color: var(--cfg-graph-header-text);
     font-size: 1.2em;
     flex-shrink: 0; /* Prevent title from shrinking */
 }
