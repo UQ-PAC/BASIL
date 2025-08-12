@@ -971,8 +971,13 @@ object RunUtils {
     assert(ir.invariant.programDiamondForm(ctx.program))
     ir.eval.SimplifyValidation.validate = conf.validateSimp
 
-    for (p <- ctx.program.procedures) {
-      p.normaliseBlockNames()
+    conf.simplify match {
+      case SimplifyMode.Disabled => ()
+      case _ => {
+        for (p <- ctx.program.procedures) {
+          p.normaliseBlockNames()
+        }
+      }
     }
 
     conf.simplify match {
@@ -1026,15 +1031,21 @@ object RunUtils {
     }
 
     if (conf.summariseProcedures) {
-      if (!conf.staticAnalysis.exists(_.irreducibleLoops)) {
-        StaticAnalysis.reducibleLoops(ctx.program)
-      }
       StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
       IRTransform.generateProcedureSummaries(
         ctx,
         ctx.program,
         q.loading.parameterForm || conf.simplify != SimplifyMode.Disabled
       )
+    }
+
+    if (!conf.staticAnalysis.exists(!_.irreducibleLoops) && conf.generateLoopInvariants) {
+      if (!conf.staticAnalysis.exists(_.irreducibleLoops)) {
+        StaticAnalysis.reducibleLoops(ctx.program)
+      }
+
+      StaticAnalysisLogger.info("[!] Generating Loop Invariants")
+      IRTransform.generateLoopInvariants(ctx.program)
     }
 
     if (q.runInterpret) {
