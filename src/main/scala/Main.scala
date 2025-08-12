@@ -209,8 +209,8 @@ object Main {
     generateRelyGuarantees: Flag,
     @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (implies --parameter-form)")
     simplify: Flag,
-    @arg(name = "simplify-tv", doc = "Simplify with translation validation")
-    tvSimp: Flag,
+    @arg(name = "simplify-tv", doc = "Simplify pass with translation validation, takes smt file output directory")
+    tvSimp: Option[String],
     @arg(name = "simplify-tv-verify", doc = "Simplify with translation validation immediately call z3")
     tvSimpVerify: Flag,
     @arg(
@@ -457,10 +457,10 @@ object Main {
       util.assertion.disableAssertions = true
     }
 
-    val simplifyMode = (conf.simplify.value, conf.tvSimp.value, conf.tvSimpVerify.value) match {
-      case (_, _, true) => SimplifyMode.ValidatedSimplify(Some(util.SMT.Solver.Z3), Some("tvsmt"))
-      case (_, true, _) => SimplifyMode.ValidatedSimplify(None, Some("tvsmt"))
-      case (true, _, _) => SimplifyMode.Simplify
+    val simplifyMode = (conf.simplify.value, conf.tvSimp, conf.tvSimpVerify.value) match {
+      case (_, d, true) => SimplifyMode.ValidatedSimplify(Some(util.SMT.Solver.Z3), d)
+      case (_, Some(d), _) => SimplifyMode.ValidatedSimplify(None, Some(d))
+      case (true, None, _) => SimplifyMode.Simplify
       case _ => SimplifyMode.Disabled
     }
 
