@@ -197,15 +197,17 @@ object SSADAG {
         val c = renameRHS(renaming.get)(s) // also modifies in-place
 
         c match {
-          case a @ Assume(cond, _, _, _) =>
-            blockDoneCond = cond :: blockDoneCond
-          case _ => ()
-        }
-
-        c match {
           case a @ SideEffectStatement(s, n, lhs, rhs) => {
             // note this matches some assume statements
             // where checkSecurity = true
+
+            s match {
+              case a: Assume =>
+                renameRHS(renaming.get)(a)
+                blockDoneCond = (a.body) :: blockDoneCond
+              case _ => ()
+            }
+
             val rn = lhs
               .map((formal, v) => {
                 val freshDef = freshName(v)
@@ -217,6 +219,7 @@ object SSADAG {
             renameLHS(rn, a)
           }
           case a @ Assume(cond, _, _, _) =>
+            blockDoneCond = cond :: blockDoneCond
             b.statements.remove(a)
           case a: Assign => {
             a.assignees.foreach(v => {

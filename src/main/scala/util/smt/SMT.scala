@@ -175,7 +175,7 @@ class SMTProver(
     // To handle timeouts, we must create a thread that sends a shutdown request after an amount of milliseconds
     val thread = timeoutMillis.map(m => {
       new Thread(new Runnable() {
-        def run() = {
+        override def run() = {
           try {
             Thread.sleep(m)
             shutdownManager.requestShutdown("Timeout")

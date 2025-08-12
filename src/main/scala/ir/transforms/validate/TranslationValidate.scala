@@ -1093,7 +1093,7 @@ object TranslationValidator {
     })
 
     val verified = prover.map(prover => {
-      val r = prover.checkSat()
+      val r = prover.checkSat(Some(1000))
       timer.checkPoint("checksat")
       (prover, r)
     })
