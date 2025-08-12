@@ -10,6 +10,9 @@ import util.{LogLevel, PerformanceTimer, tvLogger}
 
 import java.io.File
 
+/**
+ * Result of a translation validation task for a single procedure and transform step.
+ */
 case class TVResult(
   runName: String,
   proc: String,
@@ -45,6 +48,9 @@ case class TVResult(
   }
 }
 
+/**
+ * Configuration and result list for a transltion validation task of a program (possibly including multiple separate passes).
+ */
 case class TVJob(
   outputPath: Option[String],
   verify: Option[util.SMT.Solver] = None,
@@ -57,22 +63,43 @@ case class TVJob(
   }
 }
 
+/**
+ * Describes the mapping from source variable to target expression at a given Block ID in the source program.
+ */
+type TransformDataRelationFun = (ProcID, Option[BlockID]) => (Variable | Memory) => Seq[Expr]
+type TransformTargetTargetFlowFact = ProcID => Map[Variable, Expr]
+
+/**
+ * Closures describing the reslationship between surce and target programs.
+ */
 case class InvariantDescription(
+  /** The way live variables at each cut in the source program relate to equivalent expressions or variables in the target.
+   *
+   * NOTE: !!! The first returned value of this is also used to map procedure call arguments in the source
+   * program to the equivalent arguments in the target program.
+   *  */
   renamingSrcTgt: TransformDataRelationFun = (_, _) => e => Seq(e),
+  /**
+   * Describes how live variables at a cut in the target program relate to equivalent variables in the source.
+   *
+   */
   renamingTgtSrc: TransformDataRelationFun = (_, _) => _ => Seq(),
+  /**
+   * Describes relations between variables within the target program
+   * (This is not tested and possibly generates non-useful invariants)
+   *
+   */
   flowFacts: TransformTargetTargetFlowFact = _ => Map(),
+  /**
+   * Set of values of [ir.Assert.label] for assertions introduced in this pass, whose should
+   * be ignored as far as translation validation is concerned.
+   */
   introducedAsserts: Set[String] = Set()
 )
 
 type CutLabel = String
 type BlockID = String
 type ProcID = String
-
-/**
- * Describes the mapping from source variable to target expression at a given Block ID in the source program.
- */
-type TransformDataRelationFun = (ProcID, Option[BlockID]) => (Variable | Memory) => Seq[Expr]
-type TransformTargetTargetFlowFact = ProcID => Map[Variable, Expr]
 
 //def composeDR(a: TransformDataRelationFun, b: TransformDataRelationFun, aFF: TransformTargetTargetFlowFact, bFF: TransformTargetTargetFlowFact) = {
 //
@@ -233,11 +260,9 @@ object TranslationValidator {
     private val ssaDefines: Map[BlockID, Map[Variable, Variable]]
   ) {
 
-
-    def defines(block: BlockID) : Set[Variable] = {
+    def defines(block: BlockID): Set[Variable] = {
       ssaDefines.get(block).map(_.keys).toSet.flatten
     }
-
 
     lazy val cutBlockLabels = cuts.cutLabelBlockInProcedure.map { case (cl, b) =>
       cl -> b.label
@@ -251,11 +276,13 @@ object TranslationValidator {
     }
   }
 
-
-  case class InterproceduralInfo(program: Program, sourceFrames : Map[ProcID, Frame], targetFrames: Map[ProcID, Frame],
-    sourceParams: Map[ProcID, CallParamMapping], 
-    targetParams: Map[ProcID, CallParamMapping],
-    )
+  case class InterproceduralInfo(
+    program: Program,
+    sourceFrames: Map[ProcID, Frame],
+    targetFrames: Map[ProcID, Frame],
+    sourceParams: Map[ProcID, CallParamMapping],
+    targetParams: Map[ProcID, CallParamMapping]
+  )
 
   class IntraLiveVarsDomainSideEffect(frames: Map[String, CallParamMapping])
       extends transforms.PowerSetDomain[Variable] {
@@ -371,8 +398,6 @@ object TranslationValidator {
     assumes.reverse
   }
 
-
-
   object toVariable {
     class SES extends CILVisitor {
       override def vrvar(v: Variable) = v match {
@@ -394,7 +419,9 @@ object TranslationValidator {
     }
   }
 
-  def globalsForSourceProc(i: InterproceduralInfo, p: ProcInfo)(renaming: Variable | Memory => Seq[Expr]): Iterable[(Expr, Option[Expr])] = {
+  def globalsForSourceProc(i: InterproceduralInfo, p: ProcInfo)(
+    renaming: Variable | Memory => Seq[Expr]
+  ): Iterable[(Expr, Option[Expr])] = {
     val globs = for {
       af <- i.sourceFrames.get(p.name)
       globs: Seq[Variable | Memory] = (af.readGlobalVars ++ af.readMem ++ af.modifiedGlobalVars ++ af.modifiedMem).toSeq
@@ -488,7 +515,11 @@ object TranslationValidator {
   * pure function. Assuming we ensure invariants are not valid or false. 
   *
   */
-  def getFunctionSigsRenaming(program: Program, afterFrame: Map[String, Frame], renaming: TransformDataRelationFun): Map[String, (CallParamMapping, CallParamMapping)] = {
+  def getFunctionSigsRenaming(
+    program: Program,
+    afterFrame: Map[String, Frame],
+    renaming: TransformDataRelationFun
+  ): Map[String, (CallParamMapping, CallParamMapping)] = {
 
     def param(v: Variable | Memory): (Variable | Memory, Option[Variable]) = v match {
       case g: GlobalVar => (g -> Some(g))
@@ -664,7 +695,6 @@ object TranslationValidator {
 
     invs
   }
-
 
   /**
    * Dump some debug logs comparing source and target programs from the model retuned when [sat], to get an idea
@@ -927,9 +957,15 @@ object TranslationValidator {
     val source = sourceInfo.transition // afterProg.get.procedures.find(_.name == proc.name).get
     val target = targetInfo.transition // beforeProg.get.procedures.find(_.name == proc.name).get
 
-
     val equalVarsInvariant =
-      getEqualVarsInvariantRenaming(interproc, proc, sourceInfo, targetInfo, invariant.renamingSrcTgt, invariant.renamingTgtSrc)
+      getEqualVarsInvariantRenaming(
+        interproc,
+        proc,
+        sourceInfo,
+        targetInfo,
+        invariant.renamingSrcTgt,
+        invariant.renamingTgtSrc
+      )
 
     val cuts =
       targetInfo.cuts.cutLabelBlockInProcedure.map(_._1) ++ sourceInfo.cuts.cutLabelBlockInProcedure.map(_._1)
@@ -1162,11 +1198,8 @@ object TranslationValidator {
       .filter(n => framesTarget.contains(n.name))
       .filter(n => framesSource.contains(n.name))
 
-    val paramMapping: Map[String, (CallParamMapping, CallParamMapping)] = getFunctionSigsRenaming(
-      sourceProgClone,
-      framesSource,
-      invariant.renamingSrcTgt,
-    )
+    val paramMapping: Map[String, (CallParamMapping, CallParamMapping)] =
+      getFunctionSigsRenaming(sourceProgClone, framesSource, invariant.renamingSrcTgt)
 
     val sourceParams: Map[String, CallParamMapping] = paramMapping.toSeq.map { case (pn, (source, target)) =>
       (pn, source)
@@ -1176,7 +1209,6 @@ object TranslationValidator {
     }.toMap
 
     val interproc = InterproceduralInfo(sourceProgClone, framesSource, framesTarget, sourceParams, targetParams)
-
 
     def procToTrInplace(p: Procedure, params: Map[String, CallParamMapping], introducedAsserts: Set[String]) = {
 
@@ -1221,7 +1253,6 @@ object TranslationValidator {
       for (p <- p.procedures) {
         assert(p.blocks.map(_.label).corresponds(beforeprocs(p.procName).blocks.map(_.label).toList)(_.equals(_)))
       }
-
 
       val r = transform(p)
       val inv = invariant(r)
