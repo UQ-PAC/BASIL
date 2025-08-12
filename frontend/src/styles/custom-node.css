@@ -9,6 +9,7 @@
 
 .custom-flow-node {
     padding: 10px 15px;
+    background-color: var(--cfg-node-background-color) !important;
     border-radius: 5px;
     font-family: 'Mono', monospace;
     font-size: 0.8em;
@@ -26,5 +27,17 @@
 
 .custom-node-header-text {
     flex-grow: 1;
-    color: black;
+    color: var(--cfg-node-text-color);
+}
+
+.react-flow__panel.react-flow__minimap {
+    background-color: var(--cfg-graph-background-color);
+}
+
+.react-flow__controls-button {
+    background-color: var(--cfg-node-background-color);
+}
+
+.react-flow__controls-button:hover {
+    background-color: var(--cfg-button-hover-color);
 }

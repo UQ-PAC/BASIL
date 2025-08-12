@@ -41,6 +41,9 @@
     --cfg-graph-header-background: #313d53;
     --cfg-graph-header-border: #444;
     --cfg-graph-header-text: #f3f4f6;
+    --cfg-node-background-color: #000;
+    --cfg-node-text-color: #FFF;
+    --cfg-button-hover-color: #333;
 }
 
 [data-theme='light'] {
@@ -73,6 +76,10 @@
     --cfg-graph-header-background: #e0e0e0;
     --cfg-graph-header-border: #ccc;
     --cfg-graph-header-text: #333;
+    --cfg-node-background-color: #FFF;
+    --cfg-node-text-color: #000;
+    --cfg-button-hover-color: #f0f0f0;
+
 }
 
 /* TODO: Check that this works */

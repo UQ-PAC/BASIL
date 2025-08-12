@@ -29,6 +29,15 @@
     min-height: 0;
 }
 
+.cfg-panel {
+    border-color: var(--cfg-graph-border-color) !important;
+    background-color: var(--cfg-graph-background-color) !important;
+}
+
+.cfg-panel-message {
+    color: var(--cfg-graph-header-text) !important;
+}
+
 .graph-wrapper {
     flex: 1;
     display: flex;
@@ -64,12 +73,12 @@
     text-align: center;
     padding: 20px;
     font-size: 1.1em;
-    color: #555;
+    color: var(--cfg-graph-header-text);
     margin-top: 50px;
 }
 
 .cfg-viewer-error {
-    color: #d9534f; /* Red for errors */
+    color: #d9534f;
     font-weight: bold;
 }
 
@@ -79,13 +88,7 @@
     cursor: default !important;
 }
 
-.icon {
+.icon { /* TODO: Convert to svg so that I can change the colour and add a bottom border */
     width: 24px;
     height: 24px;
-}
-
-@media (prefers-color-scheme: dark) {
-    .icon {
-        filter: invert(1);
-    }
 }
