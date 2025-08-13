@@ -40,34 +40,31 @@ interface DotGraphResponse {
 
 interface CfgViewerProps {
     selectedEpochName: string | null;
-    // selectedProcedureName: string | null;
+    selectedProcedureName: string | null;
+    setSelectedProcedureName: (name: string | null) => void;
+    procedureNames: string[];
+    loadingProcedures: boolean;
+    procedureError: string | null;
 }
 
-// TODO: Do something similar for other info as well
-const LOCAL_STORAGE_PROCEDURE_KEY = 'cfgViewerSelectedProcedure';
-
-const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
+const CfgViewer: React.FC<CfgViewerProps> = ({
+                                                 selectedEpochName,
+                                                 selectedProcedureName,
+                                                 setSelectedProcedureName,
+                                                 procedureNames,
+                                                 loadingProcedures,
+                                                 procedureError
+                                             }) => {
     const [beforeNodes, setBeforeNodes, onBeforeNodesChange] = useNodesState<Node<CustomNodeData>>([]);
     const [beforeEdges, setBeforeEdges, onBeforeEdgesChange] = useEdgesState<Edge>([]);
     const [afterNodes, setAfterNodes, onAfterNodesChange] = useNodesState<Node<CustomNodeData>>([]);
     const [afterEdges, setAfterEdges, onAfterEdgesChange] = useEdgesState<Edge>([]);
 
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [loadingGraphs, setLoadingGraphs] = useState(false);
+    const [graphError, setGraphError] = useState<string | null>(null);
     const [isGraphvizWasmReady, setIsGraphvizWasmReady] = useState(false);
 
     const [graphRenderKey, setGraphRenderKey] = useState(0);
-
-    const [procedureNames, setProcedureNames] = useState<string[]>([]);
-    const [selectedProcedureFromDropdown, setSelectedProcedureFromDropdown] = useState<string | null>(() => {
-        try {
-            const storedProcedure = localStorage.getItem(LOCAL_STORAGE_PROCEDURE_KEY);
-            return storedProcedure ? storedProcedure : null;
-        } catch (e) {
-            console.error("Failed to read from localStorage:", e);
-            return null;
-        }
-    });
 
     // --- Graphviz WASM Initialization ---
     useEffect(() => {
@@ -76,56 +73,9 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
             setIsGraphvizWasmReady(true);
         }).catch((err: any) => {
             console.error("Failed to initialize Graphviz WASM:", err);
-            setError((prev) => (prev ? prev + "\n" : "") + `Graphviz WASM failed to load: ${err.message}`);
+            setGraphError((prev) => (prev ? prev + "\n" : "") + `Graphviz WASM failed to load: ${err.message}`);
         });
     }, []);
-
-    useEffect(() => {
-        const fetchProcedureNames = async () => {
-            if (!selectedEpochName) {
-                setProcedureNames([]);
-                setSelectedProcedureFromDropdown(null);
-                return;
-            }
-
-            setLoading(true);
-            setError(null);
-            try {
-                const response = await fetch(`${API_BASE_URL}/procedures/${selectedEpochName}`);
-                if (!response.ok) {
-                    // TODO: Make the errors pop up alerts
-                    const errorMessage = `HTTP error! status: ${response.status} fetching procedures for ${selectedEpochName}`;
-                    console.error(errorMessage);
-                    setError(errorMessage);
-                    setProcedureNames([]);
-                    setSelectedProcedureFromDropdown(null);
-                    setLoading(false);
-                    return;                }
-                const names: string[] = await response.json();
-                setProcedureNames(names);
-
-                if (selectedProcedureFromDropdown === null || !names.includes(selectedProcedureFromDropdown)) {
-                    // Automatically select the first procedure if available
-                    if (names.length > 0) {
-                        console.log("The procedure names are: " + names.toString())
-                        setSelectedProcedureFromDropdown(names[0]);
-                    } else {
-                        setSelectedProcedureFromDropdown(null);
-                    }
-                } else {
-                    console.log("Retaining previously selected procedure: " + selectedProcedureFromDropdown);
-                }
-            } catch (e: any) {
-                console.error("Error fetching procedure names:", e);
-                setError(`Failed to load procedure names: ${e.message}`);
-                setProcedureNames([]);
-                setSelectedProcedureFromDropdown(null);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchProcedureNames().catch(error => console.error("Unhandled promise rejected from 'fetchProcedureNames: ", error));
-    }, [selectedEpochName]);
 
     const compareAndColorElements = useCallback((
         beforeGraphNodes: Node<CustomNodeData>[],
@@ -256,14 +206,14 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
 
     useEffect(() => {
         const fetchAndRenderCfgs = async () => {
-            if (!isGraphvizWasmReady || !selectedEpochName || !selectedProcedureFromDropdown) {
-                setError("Graphviz WebAssembly is still loading or failed to initialize.");
-                setLoading(false);
+            if (!isGraphvizWasmReady || !selectedEpochName || !selectedProcedureName) {
+                setGraphError("Graphviz WebAssembly is still loading or failed to initialize.");
+                setLoadingGraphs(false);
                 return;
             }
 
-            setLoading(true);
-            setError(null);
+            setLoadingGraphs(true);
+            setGraphError(null);
             setBeforeNodes([]);
             setBeforeEdges([]);
             setAfterNodes([]);
@@ -280,11 +230,11 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
                     }
                     const data: DotGraphResponse = await response.json(); // TODO: Save this so that I don't run this every time - calc time saved as well maybe? For Thesis
 
-                    if (!selectedProcedureFromDropdown) {
+                    if (!selectedProcedureName) {
                         return undefined;
                     }
 
-                    const lowerSelectedProcedure = selectedProcedureFromDropdown.toLowerCase();
+                    const lowerSelectedProcedure = selectedProcedureName.toLowerCase();
 
                     const matchingProcedureKey = Object.keys(data).find(key =>
                         key.toLowerCase().includes(lowerSelectedProcedure)
@@ -307,8 +257,8 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
                     processedBeforeEdges = edges;
                     console.log('Final Before Nodes Count:', nodes.length);
                 } else {
-                    console.warn(`No 'before' CFG data (DOT) for procedure '${selectedProcedureFromDropdown}' in epoch '${selectedEpochName}'.`);
-                    setError((prev) => (prev ? prev + "\n" : "") + `No 'before' CFG data for '${selectedProcedureFromDropdown}'.`);
+                    console.warn(`No 'before' CFG data (DOT) for procedure '${selectedProcedureName}' in epoch '${selectedEpochName}'.`);
+                    setGraphError((prev) => (prev ? prev + "\n" : "") + `No 'before' CFG data for '${selectedProcedureName}'.`);
                 }
 
                 if (afterDotString) {
@@ -317,8 +267,8 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
                     processedAfterEdges = edges;
                     console.log('Final After Nodes Count:', nodes.length);
                 } else {
-                    console.warn(`No 'after' CFG data (DOT) for procedure '${selectedProcedureFromDropdown}' in epoch '${selectedEpochName}'.`);
-                    setError((prev) => (prev ? prev + "\n" : "") + `No 'after' CFG data for '${selectedProcedureFromDropdown}'.`);
+                    console.warn(`No 'after' CFG data (DOT) for procedure '${selectedProcedureName}' in epoch '${selectedEpochName}'.`);
+                    setGraphError((prev) => (prev ? prev + "\n" : "") + `No 'after' CFG data for '${selectedProcedureName}'.`);
                 }
 
                 const {
@@ -339,39 +289,39 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
 
             } catch (e: any) {
                 console.error("Error fetching or processing CFG data:", e);
-                setError(`Failed to load or render CFG data: ${e.message}`);
+                setGraphError(`Failed to load or render CFG data: ${e.message}`);
             } finally {
-                setLoading(false);
+                setLoadingGraphs(false);
                 setGraphRenderKey(prev => prev + 1);
             }
         };
 
         if (isGraphvizWasmReady) {
             fetchAndRenderCfgs().catch(error => console.error("Unhandled promise rejected from 'fetchAndRenderCfgs: ", error));
-        } else if (!selectedEpochName || !selectedProcedureFromDropdown) {
+        } else if (!selectedEpochName || !selectedProcedureName) {
             setBeforeNodes([]);
             setBeforeEdges([]);
             setAfterNodes([]);
             setAfterEdges([]);
-            setLoading(false);
-            setError(null);
+            setLoadingGraphs(false);
+            setGraphError(null);
             setGraphRenderKey(prev => prev + 1);
         }
-    }, [selectedEpochName, selectedProcedureFromDropdown, isGraphvizWasmReady, compareAndColorElements]);
+    }, [selectedEpochName, selectedProcedureName, isGraphvizWasmReady, compareAndColorElements]);
 
-    if (loading) {
+    if (loadingProcedures || loadingGraphs) {
         return <div className="cfg-viewer-message">Loading CFG data...</div>;
     }
 
-    if (error) {
-        return <div className="cfg-viewer-error">Error: {error}</div>;
+    if (procedureError || graphError) {
+        return <div className="cfg-viewer-error">Error: {procedureError || graphError}</div>;
     }
 
-    const showInitialMessage = !selectedEpochName || !selectedProcedureFromDropdown;
+    const showInitialMessage = !selectedEpochName || !selectedProcedureName;
     if (showInitialMessage && procedureNames.length === 0) {
         return <div className="cfg-viewer-message">Please select an epoch from the sidebar to view CFGs.</div>;
     }
-    if (showInitialMessage && procedureNames.length > 0 && !selectedProcedureFromDropdown) {
+    if (showInitialMessage && procedureNames.length > 0 && !selectedProcedureName) {
         return <div className="cfg-viewer-message">Please select a procedure from the dropdown.</div>;
     }
 
@@ -390,11 +340,11 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
                             <select
                                 id="procedure-select"
                                 className="procedure-dropdown"
-                                value={selectedProcedureFromDropdown || ''}
-                                onChange={(e) => setSelectedProcedureFromDropdown(e.target.value)}
-                                disabled={loading}
+                                value={selectedProcedureName || ''}
+                                onChange={(e) => setSelectedProcedureName(e.target.value)}
+                                disabled={loadingGraphs}
                             >
-                                {!selectedProcedureFromDropdown && <option value="">-- Choose a Procedure --</option>}
+                                {!selectedProcedureName && <option value="">-- Choose a Procedure --</option>}
                                 {procedureNames.map((name) => (
                                     <option key={name} value={name}>
                                         {name}
@@ -405,7 +355,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
                         <div className="flex-spacer"></div> { /* TODO: Maybe add a bit more padding here? */ }
                     </>
                 )}
-                {selectedEpochName && procedureNames.length === 0 && !loading && !error && (
+                {selectedEpochName && procedureNames.length === 0 && !loadingGraphs && !graphError && (
                     <p className="no-procedures-message">No procedures found for epoch: {selectedEpochName}</p>
                 )}
             </div>
@@ -420,7 +370,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
                                                 edges={beforeEdges}
                                                 onNodesChange={onBeforeNodesChange}
                                                 onEdgesChange={onBeforeEdgesChange}
-                                                title={`Before Transform: ${selectedProcedureFromDropdown}`}
+                                                title={`Before Transform: ${selectedProcedureName}`}
                                                 fitViewOptions={FIT_VIEW_OPTIONS}
                                                 minZoom={ZOOM_CONFIGS.min}
                                                 maxZoom={ZOOM_CONFIGS.max}
@@ -443,7 +393,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({ selectedEpochName }) => {
                                                 edges={afterEdges}
                                                 onNodesChange={onAfterNodesChange}
                                                 onEdgesChange={onAfterEdgesChange}
-                                                title={`After Transform: ${selectedProcedureFromDropdown}`}
+                                                title={`After Transform: ${selectedProcedureName}`}
                                                 fitViewOptions={FIT_VIEW_OPTIONS}
                                                 minZoom={ZOOM_CONFIGS.min}
                                                 maxZoom={ZOOM_CONFIGS.max}

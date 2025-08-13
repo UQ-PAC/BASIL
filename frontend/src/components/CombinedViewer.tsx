@@ -24,15 +24,25 @@ interface DotGraphResponse {
 
 interface CombinedViewerProps {
     selectedEpochName: string | null;
+    selectedProcedureName: string | null;
+    setSelectedProcedureName: (name: string | null) => void;
+    procedureNames: string[];
+    loadingProcedures: boolean;
+    procedureError: string | null;
 }
 
 // TODO: Remove the dup
-const CombinedViewer: React.FC<CombinedViewerProps> = ({ selectedEpochName }) => {
-    const [procedureNames, setProcedureNames] = useState<string[]>([]);
-    const [selectedProcedureFromDropdown, setSelectedProcedureFromDropdown] = useState<string | null>(null);
+const CombinedViewer: React.FC<CombinedViewerProps> = ({
+                                                           selectedEpochName,
+                                                           selectedProcedureName,
+                                                           setSelectedProcedureName,
+                                                           procedureNames,
+                                                           loadingProcedures,
+                                                           procedureError
+                                                       }) => {
     const [irCode, setIrCode] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [loadingGraphs, setLoadingGraphs] = useState(false);
+    const [graphError, setGraphError] = useState<string | null>(null);
     const [isGraphvizWasmReady, setIsGraphvizWasmReady] = useState(false);
 
     // TODO: Do I need to State for storing both before and after graph data (after coloring)
@@ -82,7 +92,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({ selectedEpochName }) =>
             setIsGraphvizWasmReady(true);
         }).catch((err: any) => {
             console.error("Failed to initialize Graphviz WASM in CombinedViewer:", err);
-            setError((prev) => (prev ? prev + "\n" : "") + `Graphviz WASM failed to load: ${err.message}`);
+            setGraphError((prev) => (prev ? prev + "\n" : "") + `Graphviz WASM failed to load: ${err.message}`);
         });
     }, []);
 
@@ -109,47 +119,30 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({ selectedEpochName }) =>
     // TODO: This is also a lot of dup...
     useEffect(() => {
         const fetchAllData = async () => {
-            if (!selectedEpochName) {
-                setProcedureNames([]);
-                setSelectedProcedureFromDropdown(null);
+            if (!isGraphvizWasmReady || !selectedEpochName || !selectedProcedureName) {
+                setLoadingGraphs(false);
+                setGraphError(null);
                 setIrCode(null);
                 setBeforeNodes([]);
                 setBeforeEdges([]);
                 setAfterNodes([]);
                 setAfterEdges([]);
+                setGraphRenderKey(prev => prev + 1);
                 return;
             }
 
-            setLoading(true);
-            setError(null);
-            setIrCode(null); // TODO: Dupe
+            setLoadingGraphs(true);
+            setGraphError(null);
+            setIrCode(null);
             setBeforeNodes([]);
             setBeforeEdges([]);
             setAfterNodes([]);
             setAfterEdges([]);
 
             try {
-                const namesResponse = await fetch(`${API_BASE_URL}/procedures/${selectedEpochName}`);
-                if (!namesResponse.ok) {
-                    throw new Error(`HTTP error! status: ${namesResponse.status} fetching procedures for ${selectedEpochName}`);
-                }
-                const names: string[] = await namesResponse.json();
-                setProcedureNames(names);
-
-                let currentProcedure = selectedProcedureFromDropdown;
-                if (!currentProcedure || !names.includes(currentProcedure)) {
-                    currentProcedure = names.length > 0 ? names[0] : null;
-                    setSelectedProcedureFromDropdown(currentProcedure);
-                }
-
-                if (!currentProcedure) {
-                    setLoading(false);
-                    return;
-                }
-
-                const irResponse = await fetch(`${API_BASE_URL}/ir/${selectedEpochName}/${currentProcedure}/${displayCfgType}`);
+                const irResponse = await fetch(`${API_BASE_URL}/ir/${selectedEpochName}/${selectedProcedureName}/${displayCfgType}`);
                 if (!irResponse.ok) {
-                    throw new Error(`HTTP error! status: ${irResponse.status} fetching IR for ${currentProcedure} (${displayCfgType})`);
+                    throw new Error(`HTTP error! status: ${irResponse.status} fetching IR for ${selectedProcedureName} (${displayCfgType})`);
                 }
                 const code: string = await irResponse.text();
                 setIrCode(code);
@@ -161,7 +154,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({ selectedEpochName }) =>
                         return undefined;
                     }
                     const data: DotGraphResponse = await response.json();
-                    const lowerSelectedProcedure = currentProcedure!.toLowerCase();
+                    const lowerSelectedProcedure = selectedProcedureName!.toLowerCase();
                     const matchingProcedureKey = Object.keys(data).find(key =>
                         key.toLowerCase().includes(lowerSelectedProcedure)
                     );
@@ -176,7 +169,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({ selectedEpochName }) =>
                     setBeforeNodes(nodes);
                     setBeforeEdges(edges);
                 } else {
-                    console.warn(`No 'before' CFG data (DOT) for procedure '${currentProcedure}' in epoch '${selectedEpochName}'.`);
+                    console.warn(`No 'before' CFG data (DOT) for procedure '${selectedProcedureName}' in epoch '${selectedEpochName}'.`);
                 }
 
                 if (afterDotString) {
@@ -184,17 +177,15 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({ selectedEpochName }) =>
                     setAfterNodes(nodes);
                     setAfterEdges(edges);
                 } else {
-                    console.warn(`No 'after' CFG data (DOT) for procedure '${currentProcedure}' in epoch '${selectedEpochName}'.`);
+                    console.warn(`No 'after' CFG data (DOT) for procedure '${selectedProcedureName}' in epoch '${selectedEpochName}'.`);
                 }
 
             } catch (e: any) {
                 console.error("Error fetching data in CombinedViewer:", e);
-                setError(`Failed to load data: ${e.message}`);
+                setGraphError(`Failed to load data: ${e.message}`);
                 setIrCode(null);
-                setProcedureNames([]);
-                setSelectedProcedureFromDropdown(null);
             } finally {
-                setLoading(false);
+                setLoadingGraphs(false);
                 setGraphRenderKey(prev => prev + 1);
             }
         };
@@ -202,7 +193,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({ selectedEpochName }) =>
         if (isGraphvizWasmReady) {
             fetchAllData();
         }
-    }, [selectedEpochName, selectedProcedureFromDropdown, displayCfgType, isGraphvizWasmReady, setBeforeNodes, setBeforeEdges, setAfterNodes, setAfterEdges]); // Re-run when epoch or procedure changes or after/before
+    }, [selectedEpochName, selectedProcedureName, displayCfgType, isGraphvizWasmReady, setBeforeNodes, setBeforeEdges, setAfterNodes, setAfterEdges]);
 
 
     const currentCfgNodes = displayCfgType === 'before' ? beforeNodes : afterNodes;
@@ -210,21 +201,21 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({ selectedEpochName }) =>
     const currentOnNodesChange = displayCfgType === 'before' ? onBeforeNodesChange : onAfterNodesChange;
     const currentOnEdgesChange = displayCfgType === 'before' ? onBeforeEdgesChange : onAfterEdgesChange;
 
-    const currentCfgTitle = `${displayCfgType === 'before' ? 'Before' : 'After'} Transform: ${selectedProcedureFromDropdown || 'N/A'}`;
+    const currentCfgTitle = `${displayCfgType === 'before' ? 'Before' : 'After'} Transform: ${selectedProcedureName || 'N/A'}`;
 
-    if (loading) {
+    if (loadingProcedures || loadingGraphs) {
         return <div className="combined-viewer-message">Loading data...</div>;
     }
 
-    if (error) {
-        return <div className="combined-viewer-error">Error: {error}</div>;
+    if (procedureError || graphError) {
+        return <div className="combined-viewer-error">Error: {procedureError || graphError}</div>;
     }
 
-    const showInitialMessage = !selectedEpochName || !selectedProcedureFromDropdown;
+    const showInitialMessage = !selectedEpochName || !selectedProcedureName;
     if (showInitialMessage && procedureNames.length === 0) {
         return <div className="combined-viewer-message">Please select an epoch from the sidebar to view IR and CFG.</div>;
     }
-    if (showInitialMessage && procedureNames.length > 0 && !selectedProcedureFromDropdown) {
+    if (showInitialMessage && procedureNames.length > 0 && !selectedProcedureName) {
         return <div className="combined-viewer-message">Please select a procedure from the dropdown.</div>;
     }
 
@@ -239,11 +230,11 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({ selectedEpochName }) =>
                             <select
                                 id="combined-procedure-select"
                                 className="procedure-dropdown"
-                                value={selectedProcedureFromDropdown || ''}
-                                onChange={(e) => setSelectedProcedureFromDropdown(e.target.value)}
-                                disabled={loading}
+                                value={selectedProcedureName || ''}
+                                onChange={(e) => setSelectedProcedureName(e.target.value)} // TODO: I might need to make a handleProcSelect
+                                disabled={loadingProcedures || loadingGraphs}
                             >
-                                {!selectedProcedureFromDropdown && <option value="">-- Choose a Procedure --</option>}
+                                {!selectedProcedureName && <option value="">-- Choose a Procedure --</option>}
                                 {procedureNames.map((name) => (
                                     <option key={name} value={name}>
                                         {name}
@@ -256,7 +247,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({ selectedEpochName }) =>
                             <button
                                 className={`toggle-button ${displayCfgType === 'before' ? 'active' : ''}`}
                                 onClick={() => setDisplayCfgType('before')}
-                                disabled={loading}
+                                disabled={loadingProcedures || loadingGraphs}
                             >
                                 {displayCfgType === 'before' && <span className="tick">✓</span>}
                                 Show Before CFG
@@ -264,7 +255,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({ selectedEpochName }) =>
                             <button
                                 className={`toggle-button ${displayCfgType === 'after' ? 'active' : ''}`}
                                 onClick={() => setDisplayCfgType('after')}
-                                disabled={loading}
+                                disabled={loadingProcedures || loadingGraphs}
                             >
                                 {displayCfgType === 'after' && <span className="tick">✓</span>}
                                 Show After CFG
@@ -272,7 +263,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({ selectedEpochName }) =>
                         </div>
                     </div>
                 )}
-                {selectedEpochName && procedureNames.length === 0 && !loading && !error && (
+                {selectedEpochName && procedureNames.length === 0 && !loadingProcedures && !procedureError && (
                     <p className="no-procedures-message">No procedures found for epoch: {selectedEpochName}</p>
                 )}
             </div>

@@ -24,6 +24,9 @@
     /* Sidebar styles */
     --sidebar-header-color: #f0f0f0;
     --sidebar-background-color: #313d53;
+    --sidebar-epoch-button-background-color: #0d2e5c;
+    --sidebar-epoch-button-border-color: #010b23;
+    --sidebar-epoch-button-text-color: #fff;
 
     /* Header styles */
     --header-settings-icon-color: #919daa;
@@ -65,6 +68,9 @@
     /* Sidebar styles */
     --sidebar-header-color: #333;
     --sidebar-background-color: #f0f0f0;
+    --sidebar-epoch-button-background-color: #9bb8e1;
+    --sidebar-epoch-button-border-color: #ccc;
+    --sidebar-epoch-button-text-color: #000;
 
     /* Header styles */
     --header-settings-icon-color: #6a737d;
