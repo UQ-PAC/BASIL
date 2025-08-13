@@ -46,6 +46,36 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({ selectedEpochName }) =>
     const [graphRenderKey, setGraphRenderKey] = useState(0);
     const irCodeRef = useRef<HTMLDivElement>(null);
 
+    const [isSticky, setIsSticky] = useState(false);
+    const [panelTopOffset, setPanelTopOffset] = useState(0);
+    const graphWrapperRef = useRef<HTMLDivElement>(null);
+    const stickyTopOffset = 105; /* The distance the headers above it take up */
+
+    useEffect(() => {
+        const handleScroll = () => {
+            if (window.scrollY > panelTopOffset + stickyTopOffset) {
+                setIsSticky(true);
+            } else {
+                setIsSticky(false);
+            }
+        };
+
+        const setInitialTop = () => {
+            if (graphWrapperRef.current) {
+                setPanelTopOffset(graphWrapperRef.current.offsetTop);
+            }
+        };
+
+        const timeoutId = setTimeout(setInitialTop, 100);
+
+        window.addEventListener('scroll', handleScroll);
+
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            clearTimeout(timeoutId);
+        };
+    }, [panelTopOffset]);
+
     useEffect(() => { // TODO: Code dup here
         Graphviz.load().then(() => {
             console.log("Graphviz WASM initialized successfully in CombinedViewer.");
@@ -259,7 +289,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({ selectedEpochName }) =>
                         <div className="ir-code-message">No IR code available for this procedure.</div>
                     )}
                 </div>
-                <div className="cfg-panel">
+                <div className={`cfg-panel ${isSticky ? 'is-sticky-and-expanded' : ''}`}>
                     {/* Render only one GraphPanel */}
                     {currentCfgNodes.length > 0 || currentCfgEdges.length > 0 ? (
                         <ReactFlowProvider>
