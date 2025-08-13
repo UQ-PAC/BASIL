@@ -1,5 +1,6 @@
 package build.basilmill
 import mill._
+import mill.api.Task
 
 import os.Path
 import scala.util.control.Exception.{ignoring}
@@ -17,33 +18,12 @@ import scala.util.control.Exception.{ignoring}
 trait DownloadModule extends Module {
   def name: String
   def url: String
-  def local: Target[Either[String, String]]
+  def local: Task[Either[String, String]]
   def unzip: Option[Unzip] = None
 
   sealed trait Unzip
   case class TarGZ(extractedName: String) extends Unzip
   case class Zip(extractedName: String) extends Unzip
-
-
-  sealed trait OSName
-  case object Win extends OSName
-  case object Mac extends OSName
-  case object Linux extends OSName
-  case class UnknownOS(n: String) extends OSName
-
-  def hostOS : OSName = {
-    val osName = System.getProperty("os.name")
-    if (osName.contains("nux")) {
-      Linux
-    } else if (osName.contains("Mac")) {
-      Mac
-    } else if (osName.startsWith("Windows")) {
-      Win
-    } else {
-      UnknownOS(osName)
-    }
-  }
-
 
   def mode = "rwxr-xr-x"
 
@@ -55,7 +35,7 @@ trait DownloadModule extends Module {
       os.perms.set(p, mode)
     }
     unzip.map {
-      case TarGZ(extractedName) => 
+      case TarGZ(extractedName) =>
         os.call(Seq("tar", "-xzf", p.toString), cwd=dest)
         PathRef(dest / os.SubPath(extractedName)).path.toString
       case Zip(extractedName) =>
@@ -70,7 +50,7 @@ trait DownloadModule extends Module {
     local().getOrElse({
       remote(Task.dest)
     })
-    
+
   }
   // using path() as the originator (instead of pathref())
   // allows us to return values which are not absolute paths

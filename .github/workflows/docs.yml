@@ -20,6 +20,24 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+
+      - uses: coursier/cache-action@v6
+        with:
+          extraMillFiles: '**/*.mill'
+          ignoreJob: true
+          ignoreMatrix: true
+
+      - uses: actions/cache@v4
+        with:
+          path: out
+          key: |
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
+          restore-keys: |
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
+            build-${{ runner.os }}-
+            build-
+
+      - run: sudo apt-get update
       - run: sudo apt-get -y install latexmk texlive-latex-recommended texlive-lang-japanese texlive-latex-extra texlive-extra-utils poppler-utils
       - run: |
           ./mill --no-server allDocs

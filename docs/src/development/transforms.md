@@ -14,7 +14,6 @@ as constraint-based analyses.
     chapters (Distributive and later) are less relevant.
 - [Miné AbsInt tutorial](https://www-apr.lip6.fr/~mine/publi/article-mine-FTiPL17.pdf)
 - [Lecture series on AbsInt (Youtube)](https://www.youtube.com/watch?v=FTcIE7uzehE&list=PLtjm-n_Ts-J-6EU1WfVIWLhl1BUUR-Sqm&index=27)
-- [Scala tutorial for a toy language](https://continuation.passing.style/blog/writing-abstract-interpreter-in-scala.html)
 
 
 ## DSA Form
@@ -362,3 +361,10 @@ Within the provided Z3 Python script, the supported operator methods have been t
 
 ### Transfer Function ###
 The known bits analysis mainly focuses on simplifying local assignment commands or statements (`LocalAssign`), and handles `MemoryLoad` statements by defaulting to a fully unknown TNumValue. This can be seen within the `transfer(s: Map[Variable, TNum], b: Command): Map[Variable, TNum]` method that converts each `Command` expression into a TNum, maps the assigned variable to the resultant TNum, and returns the variable mapping of the current program state. To simplify the transfer method, the `evaluateExprToTNum(s: Map[Variable, TNum], expr: Expr): TNum` method has been implemented to allow for recursive evaluation of both nested and non-nested expressions that appear within `LocalAssign` statements.
+
+
+## Analysis framework design reference
+
+- [Scala tutorial for a toy language](https://web.archive.org/web/20250317112721/https://continuation.passing.style/blog/writing-abstract-interpreter-in-scala.html)
+  - This is substantially different to what we ended up implementing, but is a useful reference as related work
+

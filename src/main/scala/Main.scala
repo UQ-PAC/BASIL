@@ -1,5 +1,6 @@
 // package scala
 
+import gtirb.GTIRBReadELF
 import mainargs.{Flag, ParserForClass, arg, main}
 import util.boogie_interaction.BoogieResultKind
 import util.{
@@ -193,11 +194,13 @@ object Main {
     threadSplit: Flag,
     @arg(name = "parameter-form", doc = "Lift registers to local variables passed by parameter")
     parameterForm: Flag,
-    @arg(
-      name = "summarise-procedures",
-      doc = "Generates summaries of procedures which are used in pre/post-conditions (requires --analyse flag)"
-    )
+    @arg(name = "summarise-procedures", doc = "Generates summaries of procedures which are used in pre/post-conditions")
     summariseProcedures: Flag,
+    @arg(
+      name = "generate-loop-invariants",
+      doc = "Generates loop invariants on loop headers (will not run with --no-irreducible-loops)"
+    )
+    generateLoopInvariants: Flag,
     @arg(
       name = "generate-rely-guarantees",
       doc = "Generates rely-guarantee conditions for each procedure that contains a return node."
@@ -277,9 +280,7 @@ object Main {
     }
 
     Logger.setLevel(LogLevel.INFO, false)
-    if (conf.verbose.value) {
-      Logger.setLevel(LogLevel.DEBUG, true)
-    }
+    if (conf.verbose.value) { Logger.setLevel(LogLevel.DEBUG, true) }
     DebugDumpIRLogger.setLevel(LogLevel.OFF)
     AnalysisResultDotLogger.setLevel(LogLevel.OFF)
     for (v <- conf.verboseLog) {
@@ -399,12 +400,14 @@ object Main {
         val realRelfFile = loadingInputs.relfFile
 
         Logger.setLevel(LogLevel.DEBUG)
-        val (relf, gtirb) = (realRelfFile, gtirbRelfFile) match {
-          case (Some(relfFile), _) =>
-            val (a, b) = IRLoading.loadReadELFWithGTIRB(relfFile, loadingInputs)
-            (Some(a), b)
-          case (None, Some(_)) => (None, Some(IRLoading.loadGTIRBReadELF(loadingInputs)))
-          case _ => throw IllegalArgumentException("--dump-relf requires either --relf or a GTIRB input")
+        val (relf, gtirb) = GTIRBReadELF.withWarnings {
+          (realRelfFile, gtirbRelfFile) match {
+            case (Some(relfFile), _) =>
+              val (a, b) = IRLoading.loadReadELFWithGTIRB(relfFile, loadingInputs)
+              (Some(a), b)
+            case (None, Some(_)) => (None, Some(IRLoading.loadGTIRBReadELF(loadingInputs)))
+            case _ => throw IllegalArgumentException("--dump-relf requires either --relf or a GTIRB input")
+          }
         }
 
         // skip writing files if the given path is an empty string. this checks compatibility and exits.
@@ -463,6 +466,7 @@ object Main {
       simplify = conf.simplify.value,
       validateSimp = conf.validateSimplify.value,
       summariseProcedures = conf.summariseProcedures.value,
+      generateLoopInvariants = conf.generateLoopInvariants.value,
       generateRelyGuarantees = conf.generateRelyGuarantees.value,
       staticAnalysis = staticAnalysis,
       boogieTranslation = boogieGeneratorConfig,
@@ -474,7 +478,9 @@ object Main {
 
     Logger.info(programNameVersionHeader)
 
-    val result = RunUtils.run(q)
+    val result = GTIRBReadELF.withWarnings {
+      RunUtils.run(q)
+    }
     if (conf.verify.value) {
       assert(result.boogie.nonEmpty)
       var failed = false

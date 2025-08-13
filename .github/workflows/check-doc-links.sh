@@ -9,13 +9,22 @@ if ! [[ -d "$dir" ]]; then
   exit 2
 fi
 
+commit="${GITHUB_SHA:-$(git rev-parse HEAD)}"
+
+if ! [[ -n "$commit" ]]; then
+  echo "unable to detect git commit" >&2
+  exit 3
+fi
+
 # last two --remap arguments will append index.html onto URLs with no extension (and allowing for # fragments)
 # NOTE: this relies on --remap only actioning the /first/ matching regex
 args=(
   "$dir"
   --fallback-extensions html,htm
   --root-dir "$dir"
-  --remap "https://uq-pac.github.io/BASIL file://$dir/BASIL"
+  --remap "https://uq-pac\.github\.io/BASIL file://$dir/BASIL"
+  --remap "https://github\.com/UQ-PAC/BASIL/blob/main https://github.com/UQ-PAC/BASIL/blob/$commit"
+  --remap "https://github\.com/UQ-PAC/BASIL/tree/main https://github.com/UQ-PAC/BASIL/tree/$commit"
   --remap '(\.[a-z]+(#.*)?)$ $1'
   --remap '^file:///.* $0/index.html'
   --exclude '/scala-lang\.org/api/'
@@ -23,6 +32,8 @@ args=(
   --insecure
   --no-progress
   --max-concurrency 16
+  --max-retries 10
+  --timeout 120
   "$@"
 )
 

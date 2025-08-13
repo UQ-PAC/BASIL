@@ -337,6 +337,8 @@ trait MapDomain[D, L] extends AbstractDomain[LatticeMap[D, L]] {
 
   def widenTerm(a: L, b: L, pos: Block): L = joinTerm(a, b, pos)
 
+  def narrowTerm(a: L, b: L): L = a
+
   def botTerm: L
   def topTerm: L
 
@@ -360,6 +362,25 @@ trait MapDomain[D, L] extends AbstractDomain[LatticeMap[D, L]] {
         topMap(widenMaps(m1, m2, topTerm, botTerm).filter(_._2 != topTerm).toMap)
       case (TopMap(m1), TopMap(m2)) =>
         topMap(widenMaps(m1, m2, topTerm, topTerm).filter(_._2 != topTerm).toMap)
+    }
+
+  override def narrow(a: LatticeMap[D, L], b: LatticeMap[D, L]): LatticeMap[D, L] =
+    def narrowMaps(m1: Map[D, L], m2: Map[D, L], d1: L, d2: L) =
+      (m1.keys ++ m2.keys).map(x => (x -> narrowTerm(m1.getOrElse(x, d1), m2.getOrElse(x, d2))))
+
+    (a, b) match {
+      case (Bottom(), b) => b
+      case (a, Bottom()) => a
+      case (Top(), _) => Top()
+      case (_, Top()) => Top()
+      case (BottomMap(m1), BottomMap(m2)) =>
+        bottomMap(narrowMaps(m1, m2, botTerm, botTerm).filter(_._2 != botTerm).toMap)
+      case (BottomMap(m1), TopMap(m2)) =>
+        topMap(narrowMaps(m1, m2, botTerm, topTerm).filter(_._2 != topTerm).toMap)
+      case (TopMap(m1), BottomMap(m2)) =>
+        topMap(narrowMaps(m1, m2, topTerm, botTerm).filter(_._2 != topTerm).toMap)
+      case (TopMap(m1), TopMap(m2)) =>
+        topMap(narrowMaps(m1, m2, topTerm, topTerm).filter(_._2 != topTerm).toMap)
     }
 
   def bot: LatticeMap[D, L] = Bottom()

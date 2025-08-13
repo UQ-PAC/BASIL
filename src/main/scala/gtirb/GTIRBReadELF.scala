@@ -8,6 +8,7 @@ import translating.{ELFBind, ELFNDX, ELFSymType, ELFSymbol, ELFVis, ReadELFData}
 import util.Logger
 
 import java.io.ByteArrayInputStream
+import scala.util.DynamicVariable
 import scala.util.chaining.scalaUtilChainingOps
 
 /**
@@ -140,6 +141,9 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
       .sortBy(x => x.num)
   }
 
+  /**
+   * Returns relocations as a tuple of relocation offsets and external functions.
+   */
   def getRelocations(): (Map[BigInt, BigInt], Set[ExternalFunction]) = {
     def getSectionBytes(sectionName: String) =
       gtirb.sectionsByName(sectionName).byteIntervals.head.contents
@@ -159,13 +163,13 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
   def getGlobals(): Set[SpecGlobal] =
     gtirb.symbolEntriesByUuid.view.flatMap {
-      case (symid, (size, "OBJECT", "GLOBAL", "DEFAULT", idx)) =>
+      case (symid, (size, "OBJECT", "GLOBAL" | "LOCAL", "DEFAULT", idx)) =>
 
-        val referentid = symid.getReferentUuid.get
-        val referent: Option[gtirb.BlockData] = referentid.getOption
-        referent match {
-          case Some(blk) =>
-            Some(SpecGlobal(symid.get.name, (size * 8).toInt, None, blk.address))
+        // val addr = symid.getReferentUuid.map(_.get.address)
+        val addr = symid.getReferentAddress
+        addr match {
+          case Some(addr) =>
+            Some(SpecGlobal(symid.get.name, (size * 8).toInt, None, addr))
 
           // if the referent is not a real block, then this is a
           // forwarding target symbol. discard, because we generate
@@ -196,7 +200,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     }.toSet
 
   def getMainAddress(mainProcedureName: String): BigInt =
-    gtirb.symbolsByName(mainProcedureName).getReferentUuid.get.get.address
+    gtirb.symbolsByName(mainProcedureName).getReferentAddress.get
 
   def getReadELFData(mainProcedureName: String): ReadELFData = {
 
@@ -213,6 +217,33 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
 
 object GTIRBReadELF {
 
+  enum RelfCompatibilityLevel { outer =>
+    case Silent, Warning, Exception
+
+    /** Returns true iff the current [[RelfCompatibilityLevel]] is equal to or
+     *  stricter than the given [[RelfCompatibilityLevel]].
+     */
+    def isAtLeast(baseline: RelfCompatibilityLevel) =
+      this.ordinal - baseline.ordinal >= 0
+
+    def isAtLeastWarning() = this.isAtLeast(RelfCompatibilityLevel.Warning)
+    def isAtLeastException() = this.isAtLeast(RelfCompatibilityLevel.Exception)
+  }
+
+  /**
+   * This affects the behaviour of [[checkReadELFCompatibility]] when finding
+   * mismatched [[translating.ReadELFData]]. The default is [[RelfCompatibilityLevel.Exception]],
+   * but this is overridden by the main entry point of the Basil tool and certain test cases.
+   */
+  final val relfCompatibilityLevel = DynamicVariable(RelfCompatibilityLevel.Exception)
+  // TODO: collect into centralised flag system
+
+  /** Sets [[relfCompatibilityLevel]] to warning within the given block. */
+  def withWarnings[T](f: => T) = relfCompatibilityLevel.withValue(RelfCompatibilityLevel.Warning)(f)
+
+  /** Sets [[relfCompatibilityLevel]] to silent within the given block. */
+  def withSilent[T](f: => T) = relfCompatibilityLevel.withValue(RelfCompatibilityLevel.Silent)(f)
+
   private val atSuffix = """@[A-Za-z_\d.]+$""".r
 
   /**
@@ -227,28 +258,43 @@ object GTIRBReadELF {
     val exts = relf.externalFunctions.map(x => x.copy(name = atSuffix.replaceFirstIn(x.name, "")))
     val syms = relf.symbolTable.flatMap {
       case ELFSymbol(_, 0, 0, ELFSymType.FILE, ELFBind.LOCAL, ELFVis.DEFAULT, ELFNDX.ABS, "crtstuff.c") => None
-      case sym if sym.etype != ELFSymType.SECTION && sym.num != -1 && !sym.name.startsWith("$") =>
-        Some(sym.copy(name = atSuffix.replaceFirstIn(sym.name, "")))
-      case _ => None
+      case ELFSymbol(_, 0, 0, ELFSymType.SECTION, ELFBind.LOCAL, ELFVis.DEFAULT, ELFNDX.Section(_), ".comment") => None
+      case sym if sym.name.startsWith("$") => None
+
+      case sym => Some(sym.copy(name = atSuffix.replaceFirstIn(sym.name, "")))
     }
     val globs = relf.globalVariables.map { x =>
       x.copy(name = atSuffix.replaceFirstIn(x.name, ""))
     }
 
-    relf.copy(externalFunctions = exts, symbolTable = syms, globalVariables = globs)
+    // oldrelf will generate both SpecGlobal and ExternalFunction entries for external global variables
+    // (e.g., errno, optind). subtract these from the ExternalFunctions, as the SpecGlobal entry
+    // is more correct and contains strictly more information.
+    val externalGlobalVariables = globs.view.map { glo => ExternalFunction(glo.name, glo.address) }
+
+    relf.copy(externalFunctions = exts -- externalGlobalVariables, symbolTable = syms, globalVariables = globs)
   }
 
   /**
    * Determines whether the current ReadELFData is compatible with
    * a given reference ReadELFData. That is, whether the two ELF datas are
-   * equivalent when normalised ([[normalisedRelf]]).
+   * equivalent when normalised with [[normaliseRelf]]. If mismatching, prints
+   * warning-level messages to the log and exhorts the user to report the issue.
+   * This may throw, depending on the value of [[relfCompatibilityLevel]].
    */
   def checkReadELFCompatibility(gtirbRelf: ReadELFData, referenceRelf: ReadELFData): Boolean = {
     var ok = true
 
+    val level = relfCompatibilityLevel.value
+
     inline def check(b: Boolean, s: String) = {
       if (!b) {
-        Logger.warn("PLEASE REPORT THIS ISSUE! include the gts and relf files. gtirb relf discrepancy, " + s)
+        val exhortation = if (level.isAtLeastWarning()) {
+          "PLEASE REPORT THIS ISSUE (https://github.com/UQ-PAC/BASIL/issues/509)! include the gts and relf files.\n"
+        } else {
+          "(suppressed) "
+        }
+        Logger.warn(exhortation + "gtirb relf discrepancy, " + s)
         ok = false
       }
     }
@@ -259,8 +305,32 @@ object GTIRBReadELF {
     inline def checkEq(x: Any, y: Any, s: String) =
       check(x == y, s"$s: gtirb: $x, readelf: $y}")
 
-    val g = normaliseRelf(gtirbRelf)
-    val o = normaliseRelf(referenceRelf)
+    var g = normaliseRelf(gtirbRelf)
+    var o = normaliseRelf(referenceRelf)
+
+    // XXX: account for gtsrelf moving the bss_start symbols to .bss in certain binaries on certain compilers.
+    {
+      val gs = g.symbolTable.toSet
+      val os = o.symbolTable.toSet
+      val bss = g.symbolTable.collectFirst {
+        case ELFSymbol(_, addr, 0, ELFSymType.SECTION, ELFBind.LOCAL, ELFVis.DEFAULT, ELFNDX.Section(_), ".bss") => addr
+      }
+      val bssNames = Seq("__bss_start", "__bss_start__")
+      val bssGtirb = (gs -- os).filter(bssNames contains _.name)
+
+      bss match {
+        // if the gtsrelf incorrectly has bss_start pointing to .bss, rewrites the oldrelf to have the same,
+        // effectively ignoring this mismatch
+        case Some(bss) if bssGtirb.nonEmpty && bssGtirb.forall(_.value == bss) =>
+          o = o.copy(symbolTable = o.symbolTable.map {
+            case sym if bssNames contains sym.name => sym.copy(value = bss)
+            case x => x
+          })
+          Logger.warn("ignoring bss_start quirk in gtsrelf data")
+        case _ => ()
+      }
+    }
+
     checkEq(g.mainAddress, o.mainAddress, "main address differs")
     checkSet(g.functionEntries, o.functionEntries, "function entries differ")
     checkSet(g.relocationOffsets.toSet, o.relocationOffsets.toSet, "relocations differ")
@@ -268,7 +338,10 @@ object GTIRBReadELF {
     checkSet(g.externalFunctions, o.externalFunctions, "external functions differ")
     checkSet(g.symbolTable.toSet, o.symbolTable.toSet, "symbol tables differ")
 
-    Logger.debug("gtirb relf and readelf relf compatible: " + ok)
+    Logger.debug("gtirb relf and readelf relf compatibility result: " + ok)
+    if (level.isAtLeastException()) {
+      assert(ok, "gtirb/relf incompatibility")
+    }
     ok
   }
 

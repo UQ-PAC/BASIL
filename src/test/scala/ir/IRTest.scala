@@ -328,16 +328,10 @@ class IRTest extends AnyFunSuite with CaptureOutput {
   test("dsl params") {
 
     val p = prog(
-      proc(
-        "p1",
-        Seq(("R0_in" -> BitVecType(64))),
-        Seq(("R0_out", BitVecType(64))),
+      proc("p1", Seq(("R0_in" -> BitVecType(64))), Seq(("R0_out", BitVecType(64))))(
         block("b1", ret("R0_out" -> LocalVar("R0_in", BitVecType(64))))
       ),
-      proc(
-        "main",
-        Seq(),
-        Seq(("R0_out") -> BitVecType(64)),
+      proc("main", Seq(), Seq(("R0_out") -> BitVecType(64)))(
         block("l_main", indirectCall(R1), goto("returntarget")),
         block(
           "block2",
@@ -382,7 +376,8 @@ class IRTest extends AnyFunSuite with CaptureOutput {
       proc(
         "knownBitsExample_4196164",
         Seq("R0_in" -> BitVecType(64), "R1_in" -> BitVecType(64)),
-        Seq("R0_out" -> BitVecType(64), "R2_out" -> BitVecType(64), "R3_out" -> BitVecType(64)),
+        Seq("R0_out" -> BitVecType(64), "R2_out" -> BitVecType(64), "R3_out" -> BitVecType(64))
+      )(
         block(
           "lknownBitsExample",
           LocalAssign(
@@ -460,6 +455,35 @@ class IRTest extends AnyFunSuite with CaptureOutput {
     assert(v.locals.map(_.name) == Set("x", "y"))
     assert(v.globals == Set())
 
+  }
+
+  test("dsl return block inference") {
+    var p = prog(proc("hi")(block("entry", goto("retblock")), block("retblock", ret)))
+    assertResult(Some("retblock"), "normal infer case")(p.procedures.head.returnBlock.map(_.label))
+
+    p = prog(proc("hi")(block("entry", goto("retblock")), block("retblock", ret), block("retblock2", ret)))
+    assertResult(None, "should fail because multiple returns")(p.procedures.head.returnBlock.map(_.label))
+
+    p = prog(proc("hi")(block("entry", goto("entry"))))
+    assertResult(None, "should fail because no returns")(p.procedures.head.returnBlock.map(_.label))
+
+    p = prog(
+      proc("hi", returnBlockLabel = Some("retblock"))(
+        block("entry", goto("retblock")),
+        block("retblock", ret),
+        block("retblock2", ret)
+      )
+    )
+    assertResult(Some("retblock"), "no infer because Some")(p.procedures.head.returnBlock.map(_.label))
+
+    p = prog(proc("hi", returnBlockLabel = None)(block("entry", goto("retblock")), block("retblock", ret)))
+    assertResult(None, "no infer because None")(p.procedures.head.returnBlock.map(_.label))
+
+    assertThrows[Exception] {
+      // throws because return block not found
+      p =
+        prog(proc("hi", returnBlockLabel = Some("DISAFJAD"))(block("entry", goto("retblock")), block("retblock", ret)))
+    }
   }
 
 }

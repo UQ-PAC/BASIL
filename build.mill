@@ -1,27 +1,32 @@
+//| mill-version: 1.0.3-jvm
+//| mvnDeps:
+//| - org.antlr:antlr4:4.9.3
+//| - com.goyeau::mill-scalafix::0.6.0
+//| - com.lihaoyi::mill-contrib-buildinfo:$MILL_VERSION
+//| - com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION
+
 package build
-import $packages._
 
 import mill._
 import scalalib._
+import mill.api.BuildCtx
 import coursier.core.Authentication
 import coursier.maven.MavenRepository
 
-import $file.basilmill.mdbook.mdbookBinary
-import $file.basilmill.bnfc.BNFCJFlexModule
-import $file.basilmill.antlr.AntlrModule
-import $file.basilmill.basildocs.BasilDocs
-import $file.basilmill.basilversion.BasilVersion
-import $file.basilmill.profile.ProfileModule
-import $file.basilmill.z3.Z3Module
+import basilmill.mdbookBinary
+import basilmill.BNFCJFlexModule
+import basilmill.AntlrModule
+import basilmill.BasilDocs
+import basilmill.BasilVersion
+import basilmill.ProfileModule
+import basilmill.Z3Module
 
 import os.Path
 
-import $ivy.`com.goyeau::mill-scalafix::0.4.2`
-import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
 import contrib.scalapblib._
 import com.goyeau.mill.scalafix.ScalafixModule
 
-object `package` extends RootModule with ScalaModule with BasilDocs with BasilVersion with ScalafixModule {
+object `package` extends ScalaModule with BasilDocs with BasilVersion with ScalafixModule {
   // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
   override def scalaVersion = "3.3.6"
@@ -32,30 +37,29 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
 
   override def scalacOptions: T[Seq[String]] = Seq("-deprecation", "-Wunused:imports", "-feature")
 
-  val javaTests = ivy"com.novocode:junit-interface:0.11"
-  val scalaTests = ivy"org.scalatest::scalatest:3.2.19"
-  val scalaCheck = ivy"org.scalatestplus::scalacheck-1-18:3.2.19.0"
-  val scalactic = ivy"org.scalactic::scalactic:3.2.19"
-  val antlrRuntime = ivy"org.antlr:antlr4-runtime:4.9"
-  val sourceCode = ivy"com.lihaoyi::sourcecode:0.4.2"
-  val mainArgs = ivy"com.lihaoyi::mainargs:0.7.6"
-  val scalapb = ivy"com.thesamet.scalapb::scalapb-runtime:0.11.15"
-  val upickle = ivy"com.lihaoyi::upickle:4.2.1"
-  val aslpOffline = ivy"io.github.uq-pac::lifter:0.1.0"
-  val javaSmt = ivy"org.sosy-lab:java-smt:5.0.0"
-  val javaSmtZ3 = ivy"org.sosy-lab:javasmt-solver-z3:4.14.0"
-  val catsEffect = ivy"org.typelevel::cats-effect:3.5.4"
+  val javaTests = mvn"com.novocode:junit-interface:0.11"
+  val scalaTests = mvn"org.scalatest::scalatest:3.2.19"
+  val scalaCheck = mvn"org.scalatestplus::scalacheck-1-18:3.2.19.0"
+  val scalactic = mvn"org.scalactic::scalactic:3.2.19"
+  val antlrRuntime = mvn"org.antlr:antlr4-runtime:4.9"
+  val sourceCode = mvn"com.lihaoyi::sourcecode:0.4.2"
+  val mainArgs = mvn"com.lihaoyi::mainargs:0.7.6"
+  val scalapb = mvn"com.thesamet.scalapb::scalapb-runtime:0.11.15"
+  val upickle = mvn"com.lihaoyi::upickle:4.2.1"
+  val aslpOffline = mvn"io.github.uq-pac::lifter:0.1.0"
+  val javaSmt = mvn"org.sosy-lab:java-smt:5.0.0"
+  val javaSmtZ3 = mvn"org.sosy-lab:javasmt-solver-z3:4.14.0"
+  val catsEffect = mvn"org.typelevel::cats-effect:3.5.4"
   val http4sVersion = "1.0.0-M40"
-  val http4Dsl = ivy"org.http4s::http4s-dsl::$http4sVersion"
-  val http4Circe = ivy"org.http4s::http4s-circe::$http4sVersion"
-  val circleGeneric = ivy"io.circe::circe-generic:0.14.6"
-  val slf4j = ivy"org.slf4j:slf4j-simple:2.0.12"
-  val scalaXml = ivy"org.scala-lang.modules::scala-xml:2.1.0"
-  val emberServer = ivy"org.http4s::http4s-ember-server::$http4sVersion"
-  val log4cats = ivy"org.typelevel::log4cats-slf4j:2.6.0"
+  val http4Dsl = mvn"org.http4s::http4s-dsl::$http4sVersion"
+  val http4Circe = mvn"org.http4s::http4s-circe::$http4sVersion"
+  val circleGeneric = mvn"io.circe::circe-generic:0.14.6"
+  val slf4j = mvn"org.slf4j:slf4j-simple:2.0.12"
+  val scalaXml = mvn"org.scala-lang.modules::scala-xml:2.1.0"
+  val emberServer = mvn"org.http4s::http4s-ember-server::$http4sVersion"
+  val log4cats = mvn"org.typelevel::log4cats-slf4j:2.6.0"
 
-  override def ivyDeps = Agg(
-    scalactic, sourceCode, mainArgs, upickle, aslpOffline, javaSmt, javaSmtZ3, catsEffect, http4Dsl,
+  override def mvnDeps = Seq(scalactic, sourceCode, mainArgs, upickle, aslpOffline, javaSmt, javaSmtZ3, catsEffect, http4Dsl,
     http4Circe, circleGeneric, slf4j, scalaXml, emberServer, log4cats)
 
   override def repositoriesTask = Task.Anon {
@@ -71,57 +75,42 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
 
   override def mainClass = Some("Main")
 
-  override def millSourcePath = super.millSourcePath / "src"
+  override def moduleDir = BuildCtx.workspaceRoot / "src"
 
   override def sources = Task.Sources("main/scala")
 
   override def forkArgs = Task {
-    super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}")
+    super.forkArgs() ++ z3.forkArgs()
   }
-
-  // Windows for some reason wants the install path in PATH and ignores java.library.path, I cannot figure out why
   override def forkEnv = Task {
-    if (System.getProperty("os.name").startsWith("Windows")) {
-      super.forkEnv() + ("PATH" -> (sys.env("PATH") + s";${z3.install()}"))
-    } else { super.forkEnv() }
+    super.forkEnv() ++ z3.forkEnv()
   }
 
   override def scalafixConfig = Task {
-    Some(Task.workspace / ".scalafix.conf")
+    Some(BuildCtx.workspaceRoot / ".scalafix.conf")
   }
 
   object test extends ScalaTests with TestModule.ScalaTest with ScalafixModule {
 
     override def ammoniteVersion = build.ammoniteVersion
-    override def ivyDeps = Agg(scalaTests, scalaCheck, javaTests)
+    override def mvnDeps = Seq(scalaTests, scalaCheck, javaTests)
 
     def basilTestDir = build.moduleDir / "test"
     override def sources = Task.Sources(basilTestDir / "scala")
 
     override def scalafixConfig = build.scalafixConfig
 
+    // inherit fork options with shared libraries from main package
     override def forkArgs = Task {
-      super.forkArgs() :+ (s"-Djava.library.path=${z3.install()}")
+      super.forkArgs() ++ build.forkArgs()
     }
-
     override def forkEnv = Task {
-      if (System.getProperty("os.name").startsWith("Windows")) {
-        super.forkEnv() + ("PATH" -> (sys.env("PATH") + s";${z3.install()}"))
-      } else { super.forkEnv() }
+      super.forkEnv() ++ build.forkEnv()
     }
 
-    // note: toBoolean accepts precisely "true" or "false"
-    def basilTestParallel = Task.Input {
-      Task.env.get("BASIL_TEST_PARALLEL").fold(false)(_.toBoolean)
-    }
-
+    override def testParallelism = false
     override def testForkGrouping = Task {
-      val numGroups = 13
-      if (basilTestParallel()) {
-        discoveredTestClasses().zipWithIndex.groupMap(x => x._2 % numGroups)(_._1).values.toSeq
-      } else {
-        Seq(discoveredTestClasses())
-      }
+      Seq(discoveredTestClasses())
     }
   }
 
@@ -198,16 +187,14 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
    *         but a command taking Evaluator could do that
    *         e.g. https://github.com/com-lihaoyi/mill/discussions/5360"
    */
-  def fmt(ev: mill.eval.Evaluator): Command[Unit] = Task.Command(exclusive = true) {
-    mill.main.RunScript.evaluateNamed(ev, Agg(fix()))
-    mill.main.RunScript.evaluateNamed(ev, Agg(test.fix()))
-    mill.main.RunScript.evaluateNamed(ev, Agg(scalafmt.reformat()))
+  def fmt(ev: mill.api.Evaluator): Command[Unit] = Task.Command(exclusive = true) {
+    ev.execute(Seq(fix(), test.fix()))
+    ev.execute(Seq(scalafmt.reformat()))
     ()
   }
 
-
   object basilAntlr extends AntlrModule {
-    override def ivyDeps = Agg(build.antlrRuntime)
+    override def mvnDeps = Seq(build.antlrRuntime)
     override def antlrPackage = Some("Parsers")
     override def antlrGenerateVisitor = true
     override def antlrGrammarSources = Task.Sources(build.moduleDir / "main/antlr4")
@@ -217,7 +204,7 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     override def scalaPBVersion = "0.11.15"
 
     override def scalaVersion = build.scalaVersion
-    override def ivyDeps = Agg(build.scalapb)
+    override def mvnDeps = Seq(build.scalapb)
 
     override def scalaPBSources = Task.Sources(build.moduleDir / "main/protobuf")
 
@@ -234,21 +221,21 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
       super.javadocOptions() ++ Seq(
         "-linkoffline",
         s"$baseUrl/api/java-cup",
-        cup.docJar().path / ".." / "javadoc"
+        cup.javadocGenerated().path
       ).map(_.toString)
     }
   }
 
   object mdbook extends mdbookBinary {
     override def mdbookSources = Task.Source {
-      Task.workspace  / "docs"
+      BuildCtx.workspaceRoot  / "docs"
     }
   }
 
   object z3 extends Z3Module
 
   def ctagsConfig = Task.Source {
-    Task.workspace / "basilmill" / "scala.ctags"
+    BuildCtx.workspaceRoot / "basilmill" / "scala.ctags"
   }
 
   /**
@@ -259,15 +246,15 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
     val src = Task.traverse(Seq(this, test) ++ moduleDeps)(_.allSources)().flatten
     val srcArgs = src.map(_.path).filter(os.exists(_)).map(_.toString)
 
-    val newFile = Task.workspace / "tags.new"
-    val tagsFile = Task.workspace / "tags"
+    val newFile = BuildCtx.workspaceRoot / "tags.new"
+    val tagsFile = BuildCtx.workspaceRoot / "tags"
 
     val args = Seq(
       "ctags", "--tag-relative=no", "-R", "-f", newFile.toString,
       "--options=" + ctagsConfig().path,
       "--languages=scala,java", "--fields=+zK")
 
-    os.call(args ++ srcArgs, cwd = Task.workspace)
+    os.call(args ++ srcArgs, cwd = BuildCtx.workspaceRoot)
     os.move(newFile, tagsFile, replaceExisting = true, atomicMove = true)
   }
 
@@ -278,7 +265,7 @@ object `package` extends RootModule with ScalaModule with BasilDocs with BasilVe
   def runProfile(profileDest: String, args: String*) = Task.Command {
     println(s"Profiling: you may want to set\n  sudo sysctl kernel.perf_event_paranoid=1\n  sudo sysctl kernel.kptr_restrict=0\n")
     val prof = asyncProf.path()
-    os.call(("java", s"-agentpath:${prof}=start,event=cpu,file=${profileDest}",  "-jar", assembly().path.toString, args), stdout = os.Inherit, cwd = Task.workspace)
+    os.call(("java", s"-agentpath:${prof}=start,event=cpu,file=${profileDest}",  "-jar", assembly().path.toString, args), stdout = os.Inherit, cwd = BuildCtx.workspaceRoot)
   }
 
 }
