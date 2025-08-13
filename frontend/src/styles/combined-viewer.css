@@ -12,8 +12,8 @@
 
 .combined-viewer-header {
     text-align: justify;
-    background-color: #f0f0f0;
-    border: 1px solid #000;
+    background-color: var(--combined--header-background-color);
+    border: 1px solid var(--combined-border-background-color);
     box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* TODO: Do I want this? */
     flex-shrink: 0;
     border-radius: 8px;
@@ -49,10 +49,10 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    border: 1px solid #ddd;
+    border: 1px solid var(--combined-ir-code-panel-border-color);
     border-radius: 8px;
     overflow: hidden;
-    background-color: #ffffff; /* TODO: Make a light mode and dark mode Dark colour: #282c34 */
+    background-color: var(--combined-ir-code-panel-background-color);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     min-height: 0;
 }

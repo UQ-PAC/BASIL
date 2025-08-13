@@ -204,8 +204,8 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({ selectedEpochName }) =>
                 {selectedEpochName && procedureNames.length > 0 && (
                     <div className="header-controls">
                         <div className="flex-spacer"></div>
-                        <div className="procedure-select">
-                            <label htmlFor="combined-procedure-select">Select Procedure:</label> { /* Change this to match the last screen */ }
+                        <div className="procedure-select-wrapper">
+                            <label id="procedure-select">Select Procedure: </label>
                             <select
                                 id="combined-procedure-select"
                                 className="procedure-dropdown"

@@ -11,6 +11,7 @@
 }
 
 /* TODO: Maybe there is a cleaner way to do this later on */
+/* TODO: System isn't working? */
 [data-theme='dark'] {
     /* Main display */
     --background-color: #1f2937;
@@ -32,7 +33,7 @@
     --dropdown-background-color-hover: #3c3c3c;
 
     /* CFG styles */
-    --cfg-header--background--color: #161B22;
+    --cfg-header-background--color: #161B22;
     --cfg-header-border-color: #444;
     --cfg-header-text-color: #444;
     --cfg-graph-border-color: #444;
@@ -44,6 +45,12 @@
     --cfg-node-background-color: #000;
     --cfg-node-text-color: #FFF;
     --cfg-button-hover-color: #333;
+
+    /* Combined Viewer */
+    --combined--header-background-color: #161B22;
+    --combined-border-background-color: #444;
+    --combined-ir-code-panel-background-color: #000;
+    --combined-ir-code-panel-border-color: #555;
 }
 
 [data-theme='light'] {
@@ -67,7 +74,7 @@
     --dropdown-background-color-hover: #bfbfbf;
 
     /* CFG styles */
-    --cfg-header--background--color: #E0E0E0;
+    --cfg-header-background--color: #E0E0E0;
     --cfg-header-border-color: #000;
     --cfg-header-text-color: #000;
     --cfg-graph-border-color: #ddd;
@@ -80,17 +87,54 @@
     --cfg-node-text-color: #000;
     --cfg-button-hover-color: #f0f0f0;
 
+    /* Combined Viewer */
+    --combined--header-background-color: #E0E0E0;
+    --combined-border-background-color: #000;
+    --combined-ir-code-panel-background-color: #FFF;
+    --combined-ir-code-panel-border-color: #DDD;
 }
 
 /* TODO: Check that this works */
 [data-theme='system'] {
     @media (prefers-color-scheme: light) {
+        /* Main display */
         --background-color: #ffffff;
         --text-color: #1f2937;
 
+        /* Modal styles */
         --modal-header-background-color: #f5f5f5;
-
         --border-color: #ccc;
+
+        /* Sidebar styles */
+        --sidebar-header-color: #333;
+        --sidebar-background-color: #f0f0f0;
+
+        /* Header styles */
+        --header-settings-icon-color: #6a737d;
+        --header-settings-icon-color-hover: #3d4c6a;
+
+        /* DropDown styles */
+        --dropdown-background-color-hover: #bfbfbf;
+
+        /* CFG styles */
+        --cfg-header-background--color: #E0E0E0;
+        --cfg-header-border-color: #000;
+        --cfg-header-text-color: #000;
+        --cfg-graph-border-color: #ddd;
+        --cfg-graph-background-color: #f9f9f9;
+        --cfg-graph-shadow-color: rgba(0, 0, 0, 0.1);
+        --cfg-graph-header-background: #e0e0e0;
+        --cfg-graph-header-border: #ccc;
+        --cfg-graph-header-text: #333;
+        --cfg-node-background-color: #FFF;
+        --cfg-node-text-color: #000;
+        --cfg-button-hover-color: #f0f0f0;
+
+        /* Combined Viewer */
+        --combined--header-background-color: #E0E0E0;
+        --combined-border-background-color: #000;
+        --combined-ir-code-panel-background-color: #FFF;
+        --combined-ir-code-panel-border-color: #DDD;
     }
 }
 
@@ -102,7 +146,38 @@
 
         /* Modal styles */
         --modal-header-background-color: #313d53;
-        --border-color: #000000;
+        --border-color: #777;
+
+        /* Sidebar styles */
+        --sidebar-header-color: #f0f0f0;
+        --sidebar-background-color: #313d53;
+
+        /* Header styles */
+        --header-settings-icon-color: #919daa;
+        --header-settings-icon-color-hover: #b3bad5;
+
+        /* DropDown styles */
+        --dropdown-background-color-hover: #3c3c3c;
+
+        /* CFG styles */
+        --cfg-header-background--color: #161B22;
+        --cfg-header-border-color: #444;
+        --cfg-header-text-color: #444;
+        --cfg-graph-border-color: #444;
+        --cfg-graph-background-color: #1e293b;
+        --cfg-graph-shadow-color: rgba(0, 0, 0, 0.3);
+        --cfg-graph-header-background: #313d53;
+        --cfg-graph-header-border: #444;
+        --cfg-graph-header-text: #f3f4f6;
+        --cfg-node-background-color: #000;
+        --cfg-node-text-color: #FFF;
+        --cfg-button-hover-color: #333;
+
+        /* Combined Viewer */
+        --combined--header-background-color: #161B22;
+        --combined-border-background-color: #444;
+        --combined-ir-code-panel-background-color: #000;
+        --combined-ir-code-panel-border-color: #555;
     }
 }
 

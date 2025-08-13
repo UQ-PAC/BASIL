@@ -14,7 +14,7 @@
 .cfg-viewer-header {
     display: flex;
     border: 1px solid var(--cfg-header-border-color);
-    background-color: var(--cfg-header--background--color);
+    background-color: var(--cfg-header-background--color);
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     flex-shrink: 0;
     border-radius: 8px;
